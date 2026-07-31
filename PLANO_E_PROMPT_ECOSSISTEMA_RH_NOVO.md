@@ -12,14 +12,14 @@ A referência funcional inclui a família TOTVS RH (Folha/eSocial, Ponto Eletrô
 
 ### 2.1 Módulos ativos/mapeados no legado
 
-| Domínio | Módulos encontrados |
-|---|---|
-| Base organizacional | empresas, cadastros, colaboradores CLT, estagiários, PJ, perfis, parâmetros, feriados e CCT |
-| DP e folha | rubricas, lançamentos, folha, fechamento de competência, pagamentos avulsos, 13º, férias, atestados/afastamentos, empréstimos, rescisão, provisões, contas a pagar e contábil |
-| Jornada | ponto, banco de horas e ponto digital |
-| Gestão de pessoas | admissão/onboarding, documentos, advertências, desempenho/PDI, treinamentos, trilhas, tarefas, projetos, aniversariantes e manuais |
-| Comunicação | mural/avisos, comunicação, solicitações, e-mails, WhatsApp e notificações |
-| Inteligência e operação | painel, relatórios, IA, histórico/atividade, backup, manutenção, integrações e migração |
+| Domínio                 | Módulos encontrados                                                                                                                                                           |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Base organizacional     | empresas, cadastros, colaboradores CLT, estagiários, PJ, perfis, parâmetros, feriados e CCT                                                                                   |
+| DP e folha              | rubricas, lançamentos, folha, fechamento de competência, pagamentos avulsos, 13º, férias, atestados/afastamentos, empréstimos, rescisão, provisões, contas a pagar e contábil |
+| Jornada                 | ponto, banco de horas e ponto digital                                                                                                                                         |
+| Gestão de pessoas       | admissão/onboarding, documentos, advertências, desempenho/PDI, treinamentos, trilhas, tarefas, projetos, aniversariantes e manuais                                            |
+| Comunicação             | mural/avisos, comunicação, solicitações, e-mails, WhatsApp e notificações                                                                                                     |
+| Inteligência e operação | painel, relatórios, IA, histórico/atividade, backup, manutenção, integrações e migração                                                                                       |
 
 ### 2.2 Requisitos novos já registrados, separados do legado
 
@@ -70,19 +70,19 @@ docs/
 
 ## 5. Ordem de desenvolvimento e portões de aprovação
 
-| Etapa | Entrega | Dependências | Só avança quando |
-|---|---|---|---|
-| 0. Fundação | monorepo, CI, ambientes, PostgreSQL, migrations, observabilidade, design system, autenticação/MFA, RBAC/ABAC, auditoria, gestão de documentos, LGPD e backup | decisões de papéis, empresas e DPO | testes de segurança, restore, auditoria e matriz de acessos aprovados |
-| 1. Core organizacional | empresa/unidade/departamento/cargo, pessoas, vínculos CLT/estágio/PJ, colaboradores, perfis e dados cadastrais | etapa 0 | CRUD, segregação por empresa e escopo, auditoria e homologação RH aprovados |
-| 2. Documentos e admissão | cofre documental, documentos admissionais, coleta segura, onboarding e aprovações | etapas 0–1 | upload/quarentena, acesso por escopo, retenção e fluxo admissional aprovados |
-| 3. Jornada e ponto | escalas, feriados, importação TXT em staging, marcação imutável, ajustes, espelho, banco de horas e fechamento | etapas 0–1 e layout do relógio | arquivo homologado reimporta sem duplicar; cálculos conciliados; RBAC e auditoria aprovados |
-| 4. Folha e DP operacional | rubricas, parâmetros versionados, lançamentos, férias, 13º, afastamentos, empréstimos, rescisão, provisões e fechamento | etapas 1 e 3; regras legais aprovadas | testes de cálculo, competência travada, dupla conferência e relatórios aprovados |
-| 5. Pagamentos e integrações financeiras | relatórios de pagamento, aprovações, PJ/avulsos, CNAB/contábil conforme fornecedor | etapa 4 | reconciliação, segregação de funções, exportação auditada e homologação financeira |
-| 6. Treinamentos e compliance | catálogo, trilhas, obrigatoriedade, certificação, alertas e relatórios de conformidade | etapas 0–2 | atribuição automática, visão do gestor limitada e evidência de conclusão validada |
-| 7. ATS/Recrutamento | vagas, candidatos, e-mail de recrutamento, currículos, pipeline, entrevistas e devolutivas | etapas 0 e 2 | retenção, acesso restrito, anexos seguros e trilha de comunicação aprovados |
-| 8. Analytics executivo | métricas com dicionário, qualidade do dado, filtros, agregação e limiar de anonimato | módulos fonte homologados | fórmulas aprovadas, sem vazamento de dados e exportação controlada |
-| 9. Clima e engajamento | campanhas anônimas, respostas separadas, agregação, planos de ação | etapas 0, 1 e 8 | nenhum vínculo resposta-pessoa; limiar de anonimato e DPO aprovados |
-| 10. Ecossistema e automação | portal do colaborador/gestor, comunicação, solicitações, integrações externas e IA com governança | core estabilizado | cada integração possui contrato, consentimento/base legal quando aplicável, monitoramento e plano de falha |
+| Etapa                                   | Entrega                                                                                                                                                      | Dependências                          | Só avança quando                                                                                           |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| 0. Fundação                             | monorepo, CI, ambientes, PostgreSQL, migrations, observabilidade, design system, autenticação/MFA, RBAC/ABAC, auditoria, gestão de documentos, LGPD e backup | decisões de papéis, empresas e DPO    | testes de segurança, restore, auditoria e matriz de acessos aprovados                                      |
+| 1. Core organizacional                  | empresa/unidade/departamento/cargo, pessoas, vínculos CLT/estágio/PJ, colaboradores, perfis e dados cadastrais                                               | etapa 0                               | CRUD, segregação por empresa e escopo, auditoria e homologação RH aprovados                                |
+| 2. Documentos e admissão                | cofre documental, documentos admissionais, coleta segura, onboarding e aprovações                                                                            | etapas 0–1                            | upload/quarentena, acesso por escopo, retenção e fluxo admissional aprovados                               |
+| 3. Jornada e ponto                      | escalas, feriados, importação TXT em staging, marcação imutável, ajustes, espelho, banco de horas e fechamento                                               | etapas 0–1 e layout do relógio        | arquivo homologado reimporta sem duplicar; cálculos conciliados; RBAC e auditoria aprovados                |
+| 4. Folha e DP operacional               | rubricas, parâmetros versionados, lançamentos, férias, 13º, afastamentos, empréstimos, rescisão, provisões e fechamento                                      | etapas 1 e 3; regras legais aprovadas | testes de cálculo, competência travada, dupla conferência e relatórios aprovados                           |
+| 5. Pagamentos e integrações financeiras | relatórios de pagamento, aprovações, PJ/avulsos, CNAB/contábil conforme fornecedor                                                                           | etapa 4                               | reconciliação, segregação de funções, exportação auditada e homologação financeira                         |
+| 6. Treinamentos e compliance            | catálogo, trilhas, obrigatoriedade, certificação, alertas e relatórios de conformidade                                                                       | etapas 0–2                            | atribuição automática, visão do gestor limitada e evidência de conclusão validada                          |
+| 7. ATS/Recrutamento                     | vagas, candidatos, e-mail de recrutamento, currículos, pipeline, entrevistas e devolutivas                                                                   | etapas 0 e 2                          | retenção, acesso restrito, anexos seguros e trilha de comunicação aprovados                                |
+| 8. Analytics executivo                  | métricas com dicionário, qualidade do dado, filtros, agregação e limiar de anonimato                                                                         | módulos fonte homologados             | fórmulas aprovadas, sem vazamento de dados e exportação controlada                                         |
+| 9. Clima e engajamento                  | campanhas anônimas, respostas separadas, agregação, planos de ação                                                                                           | etapas 0, 1 e 8                       | nenhum vínculo resposta-pessoa; limiar de anonimato e DPO aprovados                                        |
+| 10. Ecossistema e automação             | portal do colaborador/gestor, comunicação, solicitações, integrações externas e IA com governança                                                            | core estabilizado                     | cada integração possui contrato, consentimento/base legal quando aplicável, monitoramento e plano de falha |
 
 ## 6. Rito obrigatório para cada módulo
 
@@ -123,4 +123,3 @@ docs/
 ## 9. Primeira execução recomendada
 
 Iniciar somente a etapa 0, nesta ordem: criar repositório novo e privado; registrar o documento de visão e decisões pendentes; criar monorepo TypeScript; configurar PostgreSQL local/homologação, migrations, CI e scan de segredos; implementar identidade, MFA, autorização, auditoria e gestão segura de documentos; criar matriz de dados, retenção e ROPA inicial; validar backup/restauração. Só então iniciar o cadastro organizacional e de colaboradores.
-

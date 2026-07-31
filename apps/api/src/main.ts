@@ -1,13 +1,13 @@
-import 'reflect-metadata';
-import { NestFactory } from '@nestjs/core';
-import { VersioningType } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { Logger } from 'nestjs-pino';
-import helmet from 'helmet';
-import { AppModule } from './app.module';
-import { AllExceptionsFilter } from './common/filters/http-exception.filter';
-import { requestIdMiddleware } from './common/request-id';
-import { setupOpenApi } from './openapi/openapi';
+import "reflect-metadata";
+import { NestFactory } from "@nestjs/core";
+import { VersioningType } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { Logger } from "nestjs-pino";
+import helmet from "helmet";
+import { AppModule } from "./app.module";
+import { AllExceptionsFilter } from "./common/filters/http-exception.filter";
+import { requestIdMiddleware } from "./common/request-id";
+import { setupOpenApi } from "./openapi/openapi";
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
@@ -20,11 +20,11 @@ async function bootstrap(): Promise<void> {
   app.useLogger(app.get(Logger));
   app.use(helmet());
   app.useGlobalFilters(new AllExceptionsFilter());
-  app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
+  app.enableVersioning({ type: VersioningType.URI, defaultVersion: "1" });
 
   const configService = app.get(ConfigService);
-  const port = configService.get<number>('PORT', 3000);
-  const version = configService.get<string>('APP_VERSION', '0.0.0');
+  const port = configService.get<number>("PORT", 3000);
+  const version = configService.get<string>("APP_VERSION", "0.0.0");
 
   setupOpenApi(app, version);
 
@@ -33,6 +33,6 @@ async function bootstrap(): Promise<void> {
 
 bootstrap().catch((error) => {
   // eslint-disable-next-line no-console
-  console.error('Falha ao iniciar a aplicação', error);
+  console.error("Falha ao iniciar a aplicação", error);
   process.exit(1);
 });

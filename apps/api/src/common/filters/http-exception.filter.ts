@@ -5,8 +5,8 @@ import {
   HttpException,
   HttpStatus,
   Logger,
-} from '@nestjs/common';
-import { Request, Response } from 'express';
+} from "@nestjs/common";
+import { Request, Response } from "express";
 
 interface ErrorBody {
   status_code: number;
@@ -15,21 +15,23 @@ interface ErrorBody {
   timestamp: string;
 }
 
-const DEFAULT_CLIENT_MESSAGE = 'Não foi possível processar a requisição.';
-const DEFAULT_SERVER_MESSAGE = 'Erro interno inesperado. Contate o suporte informando o request_id.';
+const DEFAULT_CLIENT_MESSAGE = "Não foi possível processar a requisição.";
+const DEFAULT_SERVER_MESSAGE =
+  "Erro interno inesperado. Contate o suporte informando o request_id.";
 
 // Mensagens públicas fixas por status HTTP. Nunca derivadas da mensagem da
 // exceção — evita vazar SQL, caminho interno, stack trace ou entrada do
 // usuário refletida na resposta.
 const PUBLIC_MESSAGES: Partial<Record<number, string>> = {
-  [HttpStatus.BAD_REQUEST]: 'Requisição inválida.',
-  [HttpStatus.UNAUTHORIZED]: 'Não autorizado.',
-  [HttpStatus.FORBIDDEN]: 'Acesso negado.',
-  [HttpStatus.NOT_FOUND]: 'Recurso não encontrado.',
-  [HttpStatus.METHOD_NOT_ALLOWED]: 'Método não permitido.',
-  [HttpStatus.CONFLICT]: 'Conflito ao processar a requisição.',
-  [HttpStatus.UNPROCESSABLE_ENTITY]: 'Dados inválidos.',
-  [HttpStatus.TOO_MANY_REQUESTS]: 'Muitas requisições. Tente novamente mais tarde.',
+  [HttpStatus.BAD_REQUEST]: "Requisição inválida.",
+  [HttpStatus.UNAUTHORIZED]: "Não autorizado.",
+  [HttpStatus.FORBIDDEN]: "Acesso negado.",
+  [HttpStatus.NOT_FOUND]: "Recurso não encontrado.",
+  [HttpStatus.METHOD_NOT_ALLOWED]: "Método não permitido.",
+  [HttpStatus.CONFLICT]: "Conflito ao processar a requisição.",
+  [HttpStatus.UNPROCESSABLE_ENTITY]: "Dados inválidos.",
+  [HttpStatus.TOO_MANY_REQUESTS]:
+    "Muitas requisições. Tente novamente mais tarde.",
 };
 
 @Catch()
@@ -40,7 +42,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
-    const requestId = request.requestId ?? 'unknown';
+    const requestId = request.requestId ?? "unknown";
 
     const isHttpException = exception instanceof HttpException;
     const statusCode = isHttpException
@@ -51,10 +53,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
     if (!isHttpException || statusCode >= HttpStatus.INTERNAL_SERVER_ERROR) {
       this.logger.error({
-        msg: 'Erro não tratado na requisição',
+        msg: "Erro não tratado na requisição",
         requestId,
         statusCode,
-        errorName: exception instanceof Error ? exception.name : 'UnknownError',
+        errorName: exception instanceof Error ? exception.name : "UnknownError",
       });
     }
 

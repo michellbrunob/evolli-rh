@@ -1,31 +1,31 @@
-import { Module } from '@nestjs/common';
-import { LoggerModule as PinoLoggerModule } from 'nestjs-pino';
-import { Request } from 'express';
-import { IncomingMessage, ServerResponse } from 'node:http';
+import { Module } from "@nestjs/common";
+import { LoggerModule as PinoLoggerModule } from "nestjs-pino";
+import { Request } from "express";
+import { IncomingMessage, ServerResponse } from "node:http";
 
 const REDACT_PATHS = [
-  'req.headers.authorization',
-  'req.headers.cookie',
+  "req.headers.authorization",
+  "req.headers.cookie",
   'req.headers["x-api-key"]',
-  'req.body',
-  'req.query',
-  'req.params',
+  "req.body",
+  "req.query",
+  "req.params",
   'res.headers["set-cookie"]',
-  '*.password',
-  '*.senha',
-  '*.token',
-  '*.cpf',
-  '*.salario',
+  "*.password",
+  "*.senha",
+  "*.token",
+  "*.cpf",
+  "*.salario",
 ];
 
 @Module({
   imports: [
     PinoLoggerModule.forRoot({
       pinoHttp: {
-        level: process.env.LOG_LEVEL ?? 'info',
+        level: process.env.LOG_LEVEL ?? "info",
         redact: {
           paths: REDACT_PATHS,
-          censor: '[REDACTED]',
+          censor: "[REDACTED]",
         },
         genReqId: (req: IncomingMessage) => (req as Request).requestId,
         customProps: (req: IncomingMessage) => ({

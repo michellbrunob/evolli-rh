@@ -14,4 +14,3 @@
 - Auditoria para acessos, exportações, alterações sensíveis, aprovações e integrações.
 - Segredos exclusivamente por variáveis de ambiente/cofre; nunca versionados.
 - Dados e documentos sensíveis não entram em logs, testes, repositório ou URLs públicas.
-

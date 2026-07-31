@@ -1,9 +1,9 @@
 module.exports = {
-  rootDir: 'src',
-  testEnvironment: 'node',
-  testRegex: '.spec.ts$',
+  rootDir: "src",
+  testEnvironment: "node",
+  testRegex: ".spec.ts$",
   transform: {
-    '^.+\\.(t|j)s$': 'ts-jest',
+    "^.+\\.(t|j)s$": "ts-jest",
   },
-  collectCoverageFrom: ['**/*.(t|j)s'],
+  collectCoverageFrom: ["**/*.(t|j)s"],
 };

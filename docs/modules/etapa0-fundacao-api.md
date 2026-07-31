@@ -39,9 +39,9 @@ Nenhum modelo de domínio. `prisma/schema.prisma` define apenas `datasource`.
 
 ## APIs
 
-| Método | Rota | Descrição | Autenticação |
-|---|---|---|---|
-| GET | `/v1/health` | status, versão, timestamp UTC | pública |
+| Método | Rota         | Descrição                     | Autenticação |
+| ------ | ------------ | ----------------------------- | ------------ |
+| GET    | `/v1/health` | status, versão, timestamp UTC | pública      |
 
 ## Estratégia de teste
 
