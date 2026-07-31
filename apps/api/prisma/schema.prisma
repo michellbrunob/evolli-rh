@@ -1,0 +1,11 @@
+// Schema inicial da fundação. Nenhum modelo de domínio (RH, colaborador, etc.)
+// é definido nesta fatia — apenas a conexão com PostgreSQL é validada.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}

@@ -1,8 +1,10 @@
 # Dependencies and builds
 node_modules/
 dist/
+build/
 coverage/
 .turbo/
+*.log
 
 # Environment and secrets
 .env
@@ -25,4 +27,3 @@ tmp/
 Thumbs.db
 .idea/
 .vscode/
-

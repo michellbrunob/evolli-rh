@@ -19,4 +19,3 @@ Claude deve atuar em tarefas fechadas, sempre em uma branch própria e sem alter
 ## Entrega
 
 Informar arquivos alterados, migrations, testes executados, evidências de segurança/LGPD, riscos e decisões pendentes.
-
