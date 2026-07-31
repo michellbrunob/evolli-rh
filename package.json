@@ -4,6 +4,9 @@
   "private": true,
   "description": "Ecossistema corporativo de RH e Departamento Pessoal.",
   "packageManager": "pnpm@10.0.0",
+  "engines": {
+    "node": ">=22 <23"
+  },
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev --parallel",
@@ -19,4 +22,3 @@
     "typescript": "^5.7.0"
   }
 }
-
