@@ -2,6 +2,7 @@ import { INestApplication, VersioningType } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
+import { requestIdMiddleware } from '../src/common/request-id';
 
 describe('GET /v1/health (e2e)', () => {
   let app: INestApplication;
@@ -12,6 +13,7 @@ describe('GET /v1/health (e2e)', () => {
     }).compile();
 
     app = moduleRef.createNestApplication();
+    app.use(requestIdMiddleware);
     app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
     await app.init();
   });

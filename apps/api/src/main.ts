@@ -6,10 +6,16 @@ import { Logger } from 'nestjs-pino';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
+import { requestIdMiddleware } from './common/request-id';
 import { setupOpenApi } from './openapi/openapi';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
+
+  // Precisa ser o primeiro middleware: define req.requestId antes do
+  // middleware de log do pino-http e de qualquer outro handler, garantindo
+  // uma única fonte para o request_id (header, log e corpo de erro).
+  app.use(requestIdMiddleware);
 
   app.useLogger(app.get(Logger));
   app.use(helmet());
