@@ -9,6 +9,7 @@ describe("validateEnv", () => {
     expect(result.NODE_ENV).toBe("development");
     expect(result.PORT).toBe(3000);
     expect(result.APP_VERSION).toBe("0.0.0");
+    expect(result.DB_READY_TIMEOUT_MS).toBe(2000);
   });
 
   it("rejeita configuração sem DATABASE_URL", () => {

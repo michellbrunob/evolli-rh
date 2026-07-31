@@ -10,6 +10,10 @@ const envSchema = z.object({
   LOG_LEVEL: z
     .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
     .default("info"),
+  // Timeout do SELECT 1 de prontidão em GET /v1/health/ready. Não é a
+  // MIGRATE_DATABASE_URL (essa é lida só pelo Prisma CLI a partir do .env,
+  // nunca pela aplicação em runtime — por isso não entra neste schema).
+  DB_READY_TIMEOUT_MS: z.coerce.number().int().positive().default(2000),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;

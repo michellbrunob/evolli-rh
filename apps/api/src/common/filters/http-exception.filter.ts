@@ -32,6 +32,7 @@ const PUBLIC_MESSAGES: Partial<Record<number, string>> = {
   [HttpStatus.UNPROCESSABLE_ENTITY]: "Dados inválidos.",
   [HttpStatus.TOO_MANY_REQUESTS]:
     "Muitas requisições. Tente novamente mais tarde.",
+  [HttpStatus.SERVICE_UNAVAILABLE]: "Serviço temporariamente indisponível.",
 };
 
 @Catch()
