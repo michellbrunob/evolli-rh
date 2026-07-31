@@ -1,0 +1,22 @@
+{
+  "name": "evolli-rh",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Ecossistema corporativo de RH e Departamento Pessoal.",
+  "packageManager": "pnpm@10.0.0",
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev --parallel",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "prettier": "^3.5.0",
+    "turbo": "^2.4.0",
+    "typescript": "^5.7.0"
+  }
+}
+

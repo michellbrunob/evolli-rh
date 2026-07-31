@@ -1,0 +1,28 @@
+# Dependencies and builds
+node_modules/
+dist/
+coverage/
+.turbo/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Local data and uploads
+storage/
+uploads/
+tmp/
+*.sqlite
+*.sqlite-*
+
+# Editors and operating systems
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
