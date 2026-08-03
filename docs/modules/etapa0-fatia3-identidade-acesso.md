@@ -1,17 +1,20 @@
 # Etapa 0 — Fatia 3: Identidade, sessões seguras e autorização
 
-Status: **especificação para revisão — não implementada**
+Status: **especificação aprovada — decisões fechadas, implementação ainda não iniciada**
 
 Depende de: [Fatia 1 — fundação da API](etapa0-fundacao-api.md),
 [Fatia 2 — PostgreSQL/migrations](etapa0-fatia2-postgres-migrations.md),
 [ADR 0001](../adr/0001-fundacao-api.md), [ADR 0002](../adr/0002-papeis-postgres-e-migrations.md).
+
+Decisão arquitetural registrada em
+[docs/adr/0003-identidade-sessao-e-autorizacao.md](../adr/0003-identidade-sessao-e-autorizacao.md).
 
 ## 1. Objetivo e escopo
 
 ### Objetivo
 
 Dar à `apps/api` identidade real: autenticação de usuário, sessão segura em
-cookie, MFA para perfis privilegiados e autorização RBAC/ABAC por
+cookie, MFA obrigatório para todo usuário e autorização RBAC/ABAC por
 empresa/unidade/equipe/recurso/ação/classificação do dado, com negação por
 padrão — sem ainda expor nenhum dado ou processo de RH/DP.
 
@@ -21,8 +24,14 @@ padrão — sem ainda expor nenhum dado ou processo de RH/DP.
   de "colaborador" (que só existe a partir da Etapa 1 — core organizacional).
   Nesta fatia, o usuário de acesso é uma entidade própria e mínima (e-mail,
   hash de senha, papel, empresa/unidade/equipe de escopo), sem dado de RH.
-- Login por e-mail/senha, política de senha, fluxo de recuperação de acesso.
-- MFA (TOTP) obrigatório para perfis privilegiados.
+- Login por e-mail/senha (autenticação própria — decisão fechada, ver ADR
+  0003), política de senha, fluxo de recuperação de acesso. Camada de
+  autenticação desenhada por interface, para permitir OIDC/SSO no futuro
+  sem reescrever sessão nem autorização (ver §4, §11) — nenhum IdP externo
+  é integrado nesta fatia.
+- MFA (TOTP) **obrigatório para todo usuário ativo desde o primeiro acesso**
+  — não só perfis privilegiados (decisão fechada). WebAuthn/passkeys fica
+  como evolução futura, fora de escopo desta fatia.
 - Sessão de servidor com cookie `httpOnly`/`Secure`/`SameSite`, expiração,
   renovação (rotação de sessão), logout e revogação (individual e em massa).
 - Proteção CSRF para toda rota que muda estado.
@@ -42,8 +51,10 @@ padrão — sem ainda expor nenhum dado ou processo de RH/DP.
   deve capturar (§10). Login/logout podem gerar log estruturado técnico
   (já existente via `nestjs-pino`), mas trilha de auditoria formal (WORM,
   consulta, retenção) é fatia própria.
-- SSO/login social, provedor de identidade externo (Keycloak, Auth0, Azure
-  AD) — avaliado como decisão pendente (§11), não decidido nesta fatia.
+- Integração real com SSO/IdP externo (Keycloak, Auth0, Azure AD/Entra ID) —
+  decisão fechada: **não** integrar nesta fatia (ADR 0003). A camada de
+  autenticação só é desenhada para não exigir reescrever sessão/autorização
+  quando isso for decidido no futuro.
 - Cadastro de empresas/unidades/equipes em si (isso é Etapa 1 — core
   organizacional); esta fatia assume que esses identificadores existem como
   referência mínima (IDs) para escopo de permissão, sem CRUD próprio.
@@ -71,8 +82,10 @@ etc.) é tratado nesta fatia — a entidade "usuário de acesso" é técnica.
 
 - Minimização: só e-mail, hash, papel/escopo e metadado técnico de sessão —
   nenhum campo de RH.
-- Senha nunca armazenada em claro (hash com `argon2id`, ver §4); segredo MFA
-  armazenado cifrado em repouso (chave de aplicação, fora do banco).
+- Senha nunca armazenada em claro (hash com `argon2id`, parâmetros mínimos
+  fechados no §4); segredo MFA cifrado em repouso com **AES-256-GCM**, chave
+  de cifragem fora do banco, com rotação de chave documentada — decisão
+  fechada (ADR 0003). Segredo MFA nunca aparece em log, em nenhuma hipótese.
 - Nenhum dado sensível (senha, hash, segredo MFA, token de sessão) em log —
   reaproveita o padrão já existente de `redact` do `nestjs-pino` (ADR 0001),
   estendido para os novos campos (§6).
@@ -91,18 +104,24 @@ Atores (conforme `PLANO_E_PROMPT_ECOSSISTEMA_RH_NOVO.md`, §7):
 **administrador técnico, RH, DP, gestor, financeiro, colaborador, auditor,
 DPO**.
 
-### Classificação de privilégio (para exigência de MFA, §4)
+### MFA e classificação de privilégio
 
-| Papel                 | Privilegiado? (MFA obrigatório)                                                                                                         | Justificativa                                         |
-| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| Administrador técnico | Sim                                                                                                                                     | Acesso irrestrito a configuração/infra da aplicação   |
-| RH                    | Sim                                                                                                                                     | Acesso amplo a dado de colaborador em etapas futuras  |
-| DP                    | Sim                                                                                                                                     | Acesso a dado de folha/DP em etapas futuras           |
-| Financeiro            | Sim                                                                                                                                     | Acesso a dado de pagamento em etapas futuras          |
-| Auditor               | Sim                                                                                                                                     | Acesso de leitura ampla a trilha de auditoria e dados |
-| DPO                   | Sim                                                                                                                                     | Acesso a dado pessoal para fins de compliance         |
-| Gestor                | Não nesta fatia — **recomendado** obrigatório a partir do momento em que acessar dado de subordinado (Etapa 1+); decisão pendente (§11) |
-| Colaborador           | Não — acesso restrito ao próprio dado (autoatendimento, etapas futuras)                                                                 |
+**Decisão fechada:** MFA é obrigatório para **todo** usuário ativo desde o
+primeiro acesso, sem exceção por papel (ver §4) — não é mais um recorte por
+"perfil privilegiado". A classificação de privilégio abaixo continua
+relevante para **escopo de gestão de conta** e **acesso à trilha de
+acesso/log** (§3, matriz de permissões), não mais para exigência de MFA.
+
+| Papel                 | Justificativa do nível de privilégio                     |
+| --------------------- | -------------------------------------------------------- |
+| Administrador técnico | Acesso irrestrito a configuração/infra da aplicação      |
+| RH                    | Acesso amplo a dado de colaborador em etapas futuras     |
+| DP                    | Acesso a dado de folha/DP em etapas futuras              |
+| Financeiro            | Acesso a dado de pagamento em etapas futuras             |
+| Auditor               | Acesso de leitura ampla a trilha de auditoria e dados    |
+| DPO                   | Acesso a dado pessoal para fins de compliance            |
+| Gestor                | Acesso a dado de subordinado a partir da Etapa 1+        |
+| Colaborador           | Acesso restrito ao próprio dado (autoatendimento futuro) |
 
 ### Matriz inicial de permissões (por recurso desta fatia)
 
@@ -134,15 +153,18 @@ Regras adicionais de negação por padrão:
 
 - Login por e-mail + senha. Endpoint dedicado (contrato em §8), rate limited
   (ver §6).
-- **Hash de senha:** `argon2id` (parâmetros conforme recomendação OWASP
-  vigente — memória/iterações definidas na implementação, não fixadas nesta
-  spec para não engessar ajuste por hardware do ambiente real).
-- **Política de senha:** mínimo 12 caracteres, sem máximo artificial baixo
-  (permitir passphrase), sem exigência de composição arbitrária (letra
-  maiúscula+símbolo etc. — prática hoje desencorajada pelo NIST 800-63B em
-  favor de comprimento e checagem contra lista de senhas vazadas/comuns).
-  Checagem contra lista de senhas comuns/vazadas (ex.: dataset local, sem
-  chamar serviço externo com a senha em claro).
+- **Hash de senha (decisão fechada):** `argon2id`, parâmetros mínimos —
+  memória **19 MiB**, **2** iterações, paralelismo **1**. Recalibração desses
+  parâmetros só é permitida documentada por ambiente (ex.: hardware de
+  produção com mais capacidade), nunca reduzida abaixo do mínimo fixado
+  aqui.
+- **Política de senha (decisão fechada):** mínimo **15 caracteres**, máximo
+  suportado de pelo menos **64**, Unicode e espaço permitidos (favorece
+  passphrase), **sem** exigência de composição arbitrária (maiúscula/
+  símbolo etc. — desencorajado pelo NIST 800-63B em favor de comprimento) e
+  **sem** expiração periódica forçada. Checagem obrigatória contra lista de
+  senhas comuns/vazadas (ex.: dataset local, nunca enviando a senha em claro
+  a serviço externo).
 - **Recuperação de acesso:** fluxo de "esqueci minha senha" por link de uso
   único, expiração curta (ex.: 15–30 min, valor final na implementação),
   token opaco de alta entropia (não JWT previsível), invalidado após uso ou
@@ -154,11 +176,17 @@ Regras adicionais de negação por padrão:
 
 ### MFA
 
-- TOTP (RFC 6238), compatível com apps padrão (Google Authenticator, Authy
-  etc.) — sem dependência de SMS (custo, spoofing de SIM, não é prática
-  recomendada para o perfil de risco deste produto).
-- Obrigatório no primeiro login para papéis privilegiados (§3); bloqueia uso
-  do sistema até configurar.
+- **Decisão fechada:** TOTP (RFC 6238) implementado nesta fatia, compatível
+  com apps padrão (Google Authenticator, Authy etc.) — sem dependência de
+  SMS (custo, spoofing de SIM, não recomendado para o perfil de risco deste
+  produto). WebAuthn/passkeys registrado como evolução futura (ADR 0003),
+  não implementado agora.
+- **Obrigatório para todo usuário ativo desde o primeiro acesso** (decisão
+  fechada — substitui o recorte por "perfil privilegiado" da versão anterior
+  desta spec) — login não concede sessão completa sem MFA configurado e
+  verificado.
+- Segredo TOTP armazenado cifrado com **AES-256-GCM**, chave fora do banco,
+  rotação de chave documentada, nunca logado (§2, §7).
 - Códigos de recuperação (backup codes) de uso único, gerados na ativação,
   armazenados com hash (não em claro).
 - Reset de MFA de um usuário só por Admin técnico (ou RH/DP dentro do próprio
@@ -172,32 +200,40 @@ Regras adicionais de negação por padrão:
   para resposta a incidente (revogar sessão comprometida imediatamente).
 - Cookie: `httpOnly`, `Secure` (HTTPS obrigatório fora de local), `SameSite=Lax`
   como padrão (ou `Strict` para rotas mais sensíveis, a avaliar na
-  implementação), assinado/opaco (identificador de sessão, não dado
-  decodificável no cliente).
-- **Armazenamento da sessão:** proposta principal — tabela no PostgreSQL
-  (schema `app`, mesmo isolamento de privilégio da ADR 0002), por já ser a
-  peça de infraestrutura existente e evitar introduzir Redis antes do
-  necessário. Redis (já cogitado em `docs/ARCHITECTURE.md` para filas) é
-  alternativa se o volume de sessão/latência justificar — registrado como
-  decisão pendente com proposta de ADR (§11).
+  implementação).
+- **Token de sessão (decisão fechada):** o cookie recebe um **token opaco
+  aleatório de alta entropia**, gerado no servidor. O banco armazena
+  **somente `token_hash`** (hash do token, único) — o token bruto nunca é
+  persistido em nenhuma tabela. O `id` interno da sessão (chave primária,
+  usado só para referência/join interno) **não é aceito como credencial**
+  em nenhuma rota — só o token do cookie, validado contra `token_hash`,
+  autentica uma sessão (ver §7).
+- **Armazenamento da sessão (decisão fechada):** PostgreSQL nesta fatia
+  (schema `app`, mesmo isolamento de privilégio da ADR 0002). Redis só entra
+  em evolução futura, condicionada a métrica real de escala/latência (ver
+  ADR 0003 para os critérios de gatilho dessa migração) — não é decisão
+  desta fatia.
 - **Expiração:** tempo de vida absoluto (ex.: 8–12h, valor final na
   implementação) + tempo de vida por inatividade (ex.: 30 min), o que
   ocorrer primeiro.
-- **Renovação:** rotação do identificador de sessão em elevação de
-  privilégio (ex.: após completar MFA) e periodicamente durante uso ativo —
-  mitiga fixação de sessão (§6).
+- **Rotação (decisão fechada):** o token de sessão é rotacionado (novo token
+  emitido, token anterior invalidado) após login e após conclusão do MFA —
+  nenhum token emitido antes da autenticação completa continua válido depois
+  dela. Mitiga fixação de sessão (§6).
 - **Logout:** invalida a sessão no servidor (não só remove cookie no
   cliente).
-- **Revogação:** usuário pode listar e encerrar as próprias sessões ativas;
-  Admin técnico (ou RH/DP no próprio escopo) pode revogar sessão de terceiro
-  (ex.: desligamento, incidente) — gera evento de auditoria (§10).
+- **Revogação (obrigatória, decisão fechada):** usuário lista e encerra as
+  próprias sessões ativas; Admin técnico (ou RH/DP no próprio escopo) revoga
+  sessão de terceiro (ex.: desligamento, incidente). Revogação é sempre
+  possível e imediata (marca a sessão inválida no servidor) — gera evento de
+  auditoria (§10).
 
 ### CSRF
 
-- Toda rota que muda estado (não-GET) exige token CSRF (padrão
-  synchronizer-token ou double-submit cookie — decisão de implementação) além
-  do cookie de sessão. `SameSite=Lax/Strict` no cookie de sessão como camada
-  adicional, não substituta.
+- **Decisão fechada:** padrão **synchronizer token**, vinculado à sessão do
+  usuário e validado no servidor, exigido em toda rota que altera estado
+  (não-GET), além do cookie de sessão. `SameSite=Lax/Strict` no cookie é
+  **defesa adicional, não substituta** do token synchronizer.
 
 ## 5. Modelo RBAC/ABAC
 
@@ -256,7 +292,8 @@ app.access_mfa_recovery_code
   created_at          timestamptz NOT NULL DEFAULT now()
 
 app.access_session
-  id                  uuid PK               -- valor opaco no cookie
+  id                  uuid PK               -- identificador interno; NUNCA aceito como credencial
+  token_hash          text UNIQUE NOT NULL  -- hash do token opaco enviado no cookie; token bruto nunca é persistido
   user_id             uuid FK -> access_user
   created_at          timestamptz NOT NULL DEFAULT now()
   last_seen_at        timestamptz NOT NULL DEFAULT now()
@@ -284,14 +321,20 @@ app.access_login_attempt          -- suporte a rate limiting/lockout (§6)
 
 Notas para a implementação futura:
 
-- `company_id`/`unit_id`/`team_id` referenciam entidades que só passam a
-  existir de fato na Etapa 1 (core organizacional) — nesta fatia ficam como
-  `uuid` de referência simples (sem FK enforced ainda, ou com tabela
-  placeholder mínima, decisão de implementação).
+- **Decisão fechada:** `access_user` permanece desacoplado de "colaborador".
+  `company_id`/`unit_id`/`team_id` são referências técnicas (`uuid`), **sem
+  FK enforced**, até a Etapa 1 (core organizacional) criar essas entidades de
+  fato. O vínculo `access_user` ↔ `colaborador` é adicionado por migration
+  futura própria, revisada quando a Etapa 1 chegar — não antecipado aqui.
 - Toda tabela fica no schema `app`, criada só por `evolli_migrator`,
   consumida em runtime só por `evolli_app` (DML), conforme ADR 0002.
-- Nenhum campo de senha/segredo em texto claro; `password_hash` e
-  `code_hash`/`token_hash` sempre hash, `mfa_secret_encrypted` sempre cifrado.
+- Nenhum campo de senha/segredo em texto claro; `password_hash`,
+  `code_hash` e `token_hash` (de `access_session` e
+  `access_password_reset_token`) sempre hash — o token/segredo bruto nunca é
+  persistido. `mfa_secret_encrypted` sempre cifrado com AES-256-GCM, chave
+  fora do banco (decisão fechada, §4, ADR 0003).
+- `access_session.id` (chave interna) nunca é aceito como credencial em
+  nenhuma rota — só `token_hash` (derivado do token do cookie) autentica.
 
 ## 8. Contratos de API necessários (futuro — não implementados nesta fatia)
 
@@ -373,48 +416,60 @@ reset/CSRF ou código de recuperação — só metadado da ação.
 
 ### Riscos
 
-- Sem "colaborador" ainda existir (Etapa 1), a entidade de acesso desta
-  fatia é técnica/mínima — precisa de cuidado para não duplicar cadastro
-  quando a Etapa 1 chegar (decisão pendente 3 abaixo).
-- MFA obrigatório para papéis privilegiados pode gerar atrito operacional no
-  piloto se não houver processo de suporte para reset — mitigado pelo evento
-  de auditoria e fluxo de reset restrito (§4).
-- Sessão em Postgres (proposta principal) adiciona carga de leitura por
-  requisição autenticada; se o volume não comportar, migração para Redis é
-  mudança de infraestrutura, não só de código — melhor decidir antes da
-  implementação (§11, decisão 1).
+- MFA obrigatório para todo usuário desde o primeiro acesso pode gerar
+  atrito operacional no piloto se não houver processo de suporte para reset
+  — mitigado pelo evento de auditoria e fluxo de reset restrito (§4).
+- Sessão em Postgres adiciona carga de leitura por requisição autenticada;
+  os critérios objetivos de quando migrar para Redis estão na ADR 0003 —
+  sem métrica real de escala/latência que os dispare, a fatia não migra.
 - Envio real de e-mail (recuperação de senha) depende de provedor ainda não
   escolhido — sem isso, o fluxo de recuperação não é utilizável em produção
   (mitigação: pode ficar restrito a reset manual por Admin técnico até o
   provedor ser decidido).
+- Desenhar a autenticação por interface (para permitir OIDC/SSO futuro sem
+  reescrever sessão/autorização) adiciona uma camada de abstração desde já —
+  risco de over-engineering se essa evolução nunca ocorrer; mitigado por
+  manter a interface mínima (só o necessário para trocar o provedor de
+  verificação de credencial, não um framework de plugins genérico).
 
-### Decisões pendentes (aguardando aprovação)
+### Decisões fechadas nesta validação (ver ADR 0003 para contexto completo)
 
-1. **Armazenamento de sessão:** Postgres (schema `app`) vs. Redis. Proposta
-   desta spec: Postgres, por reaproveitar infraestrutura já existente
-   (Fatia 2) e não introduzir nova dependência antes do necessário. Se
-   aprovado Redis, é decisão arquitetural significativa — **proposta de ADR**
-   (ver abaixo) cobrindo os dois casos.
-2. **Provedor de identidade:** construir autenticação própria (proposta desta
-   spec, alinhada ao princípio de dependência mínima já seguido nas ADRs
-   0001/0002) vs. adotar IdP externo (Keycloak, Auth0, Azure AD/Entra ID).
-   Se optar por IdP externo, é mudança arquitetural significativa —
-   **proposta de ADR** obrigatória antes de implementar.
-3. **Relação entre "usuário de acesso" (esta fatia) e "colaborador" (Etapa
-   1):** um único cadastro desde já (antecipando parte da Etapa 1) vs. dois
-   cadastros hoje com vínculo futuro. Proposta desta spec: dois cadastros
-   (mais simples de isolar, sem acoplar a Etapa 1 antes da hora), com
-   vínculo (`collaborator_id` nullable) adicionado quando a Etapa 1 chegar.
-4. **Provedor de envio de e-mail transacional** (recuperação de senha,
+1. **Sessão:** PostgreSQL nesta fatia. Redis só em evolução futura,
+   condicionada a métrica de escala/latência (critérios na ADR 0003).
+2. **Autenticação:** própria, por e-mail/senha, nesta fatia — desenhada por
+   interface para permitir OIDC/SSO futuro sem reescrever sessão/autorização.
+   Nenhum IdP externo integrado agora.
+3. **MFA:** obrigatório para todo usuário ativo desde o primeiro acesso.
+   TOTP implementado nesta fatia; WebAuthn/passkeys é evolução futura.
+4. **Senha:** mínimo 15 caracteres, máximo ≥ 64, Unicode/espaço permitidos,
+   sem composição arbitrária, sem expiração periódica, bloqueio de senha
+   comum/vazada. Argon2id com mínimo 19 MiB / 2 iterações / paralelismo 1,
+   só recalibrável de forma documentada por ambiente.
+5. **Sessão segura:** cookie com token opaco de alta entropia; banco guarda
+   só `token_hash`; `id` interno da sessão nunca é credencial; rotação
+   após login/MFA; revogação sempre disponível.
+6. **CSRF:** synchronizer token vinculado à sessão, validado no servidor,
+   em toda operação que muda estado; `SameSite` é defesa adicional.
+7. **Segredo MFA:** cifrado com AES-256-GCM, chave fora do banco, rotação de
+   chave documentada, nunca em log.
+8. **Escopo organizacional:** `access_user` desacoplado de colaborador até a
+   Etapa 1; `company_id`/`unit_id`/`team_id` sem FK enforced até lá; vínculo
+   com colaborador entra por migration futura revisada.
+
+### Decisões ainda pendentes (aguardando aprovação)
+
+1. **Provedor de envio de e-mail transacional** (recuperação de senha,
    notificação de segurança) — não decidido, fora de escopo de código desta
-   fatia.
-5. **Se `gestor` deve ter MFA obrigatório desde já** ou só a partir do
-   momento em que passa a acessar dado de subordinado (Etapa 1+) — proposta
-   desta spec: não obrigatório ainda (§3), a confirmar.
-6. **Parâmetros exatos** de política de senha (comprimento mínimo final),
-   expiração de sessão (absoluta/inatividade), janela de rate limiting e
-   limiar de bloqueio de conta — valores de referência dados em §4/§6,
-   finalizados na implementação com aprovação de segurança.
+   fatia. Até ser decidido, recuperação de senha pode ficar restrita a reset
+   manual por Admin técnico.
+2. **Parâmetros finos ainda não fixados:** expiração de sessão (absoluta e
+   por inatividade), janela de rate limiting e limiar exato de bloqueio de
+   conta por força bruta — valores de referência em §4/§6, a fechar na
+   implementação com aprovação de segurança (senha e Argon2id já têm
+   parâmetro mínimo fixado na decisão 4 acima, não são mais pendência).
+3. **Prazo/gatilho de avaliação de WebAuthn/passkeys** como complemento ou
+   substituto do TOTP — não decidido, registrado como evolução futura
+   (ADR 0003).
 
 ### Dependências de DPO/jurídico
 
@@ -460,16 +515,5 @@ apps/api/src/app.module.ts                           # registro dos novos módul
 apps/api/.env.example                                # novas variáveis (ex.: chave de cifra MFA, parâmetros de sessão)
 apps/api/test/auth.e2e-spec.ts                       # e2e de autenticação/sessão/MFA
 apps/api/test/authorization.e2e-spec.ts              # e2e de RBAC/ABAC e cenários de ataque
-docs/adr/0003-...                                    # ADR(s) das decisões pendentes 1 e/ou 2, se aprovadas
 docs/modules/etapa0-fatia3-identidade-acesso.md      # este documento, atualizado para "implementado"
 ```
-
-## Proposta de ADR (não criada nesta tarefa)
-
-Se as decisões pendentes 1 e/ou 2 (§11) forem fechadas, propõe-se registrar:
-
-**ADR 0003 — Identidade e sessão: armazenamento de sessão e estratégia de
-autenticação**, cobrindo: (a) Postgres vs. Redis para sessão de servidor,
-com critério de quando migrar; (b) autenticação própria vs. IdP externo, com
-alternativas descartadas e consequências. Depende da aprovação das decisões
-1 e 2 para ser escrita com decisão final, não como opções.
