@@ -45,6 +45,21 @@ cp apps/api/.env.example apps/api/.env
 Preencha `DATABASE_URL` com uma instância PostgreSQL local. Nenhum valor do
 `.env.example` é segredo real.
 
+### Isolamento de credenciais: API vs. migration (P1 de segurança)
+
+A API inicia **exclusivamente** com `DATABASE_URL` (usuário `evolli_app`, só
+DML). `MIGRATE_DATABASE_URL` (usuário `evolli_migrator`, DDL) **nunca** entra
+em `apps/api/.env`, na imagem/container da API, nem em qualquer variável do
+processo que sobe a API — se isso acontecer, o bootstrap falha de propósito
+(`env.validation.ts`), sem revelar a URL/credencial no erro.
+
+`MIGRATE_DATABASE_URL` só existe no processo isolado de migration: localmente,
+em `apps/api/.env.migrate` (copiado de `.env.migrate.example`, gitignored); em
+CI/CD, como variável injetada pelo pipeline/operador só no job de migration.
+Os scripts `pnpm --filter @evolli/api db:migrate:dev/deploy` carregam esse
+arquivo só para o subprocesso do Prisma CLI (`node --env-file-if-exists`) —
+ver `infra/postgres/README.md`.
+
 ## Rodar a API localmente
 
 ```bash

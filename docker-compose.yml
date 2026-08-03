@@ -1,0 +1,29 @@
+# PostgreSQL de desenvolvimento local — Etapa 0, Fatia 2.
+#
+# Uso: cp .env.example .env, ajustar valores, depois `docker compose up -d`.
+# Nenhuma credencial real fica neste arquivo; tudo vem de .env (ignorado pelo
+# git). A porta é publicada só em 127.0.0.1 — nunca acessível fora da máquina
+# local. Ver infra/postgres/README.md para criar os papéis evolli_migrator e
+# evolli_app depois que o container estiver de pé.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?defina POSTGRES_DB em .env}
+      POSTGRES_USER: ${POSTGRES_USER:?defina POSTGRES_USER em .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD em .env}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - evolli_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+volumes:
+  evolli_postgres_data:

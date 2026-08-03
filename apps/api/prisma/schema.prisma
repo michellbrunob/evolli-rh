@@ -1,11 +1,18 @@
-// Schema inicial da fundação. Nenhum modelo de domínio (RH, colaborador, etc.)
-// é definido nesta fatia — apenas a conexão com PostgreSQL é validada.
+// Etapa 0 — Fatia 2: schema técnico. Nenhum modelo de domínio (RH,
+// colaborador, etc.) é definido nesta fatia.
+//
+// `url` é a conexão de runtime da aplicação (usuário evolli_app, só DML).
+// `directUrl` é usada exclusivamente pelo Prisma CLI para comandos de
+// migration (usuário evolli_migrator, DDL) — nunca pela aplicação em
+// runtime. Ver ADR 0002 (docs/adr/0002-papeis-postgres-e-migrations.md) e
+// https://www.prisma.io/docs/postgres/database/connecting-to-your-database.
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("MIGRATE_DATABASE_URL")
 }
