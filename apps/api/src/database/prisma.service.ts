@@ -1,10 +1,6 @@
-import {
-  Injectable,
-  Logger,
-  OnModuleDestroy,
-  OnModuleInit,
-} from "@nestjs/common";
+import { Injectable, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { PrismaClient } from "@prisma/client";
+import { PinoLogger } from "nestjs-pino";
 
 /**
  * Conectado ao ciclo de vida do Nest (OnModuleInit/OnModuleDestroy), mas a
@@ -19,7 +15,10 @@ export class PrismaService
   extends PrismaClient
   implements OnModuleInit, OnModuleDestroy
 {
-  private readonly logger = new Logger(PrismaService.name);
+  constructor(private readonly logger: PinoLogger) {
+    super();
+    this.logger.setContext(PrismaService.name);
+  }
 
   async onModuleInit(): Promise<void> {
     try {

@@ -1,10 +1,6 @@
-import {
-  Controller,
-  Get,
-  Logger,
-  ServiceUnavailableException,
-} from "@nestjs/common";
+import { Controller, Get, ServiceUnavailableException } from "@nestjs/common";
 import { ApiOkResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
+import { PinoLogger } from "nestjs-pino";
 import { HealthService } from "./health.service";
 import { HealthResponseDto } from "./dto/health-response.dto";
 import { HealthReadyResponseDto } from "./dto/health-ready-response.dto";
@@ -12,9 +8,15 @@ import { HealthReadyResponseDto } from "./dto/health-ready-response.dto";
 @ApiTags("health")
 @Controller("health")
 export class HealthController {
-  private readonly logger = new Logger(HealthController.name);
+  private readonly logger: PinoLogger;
 
-  constructor(private readonly healthService: HealthService) {}
+  constructor(
+    private readonly healthService: HealthService,
+    logger: PinoLogger,
+  ) {
+    logger.setContext(HealthController.name);
+    this.logger = logger;
+  }
 
   @Get()
   @ApiOperation({

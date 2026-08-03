@@ -36,6 +36,28 @@ um health check de banco seguro — sem introduzir nenhum modelo de domínio de 
   executado de ponta a ponta contra o `docker-compose.yml` local (evidência na
   descrição do PR).
 
+### Correção de segurança P1 (pós-implementação inicial)
+
+Revisão de segurança apontou que `MIGRATE_DATABASE_URL` (credencial DDL do
+`evolli_migrator`) estava presente em `apps/api/.env.example`, junto com
+`DATABASE_URL` — ou seja, podia acabar no mesmo arquivo/processo que sobe a
+API, quebrando a segregação de privilégio da ADR 0002 se uma exploração da API
+conseguisse ler variáveis de ambiente do processo. Corrigido:
+
+- `apps/api/.env.example` não tem mais `MIGRATE_DATABASE_URL`.
+- Novo `apps/api/.env.migrate.example` (e `.env.migrate` local, gitignored) —
+  arquivo separado, lido só pelos scripts de migration, nunca pela API.
+- `db:migrate:dev`/`db:migrate:deploy` carregam esse arquivo só para o
+  subprocesso do Prisma CLI (`node --env-file-if-exists=.env.migrate`),
+  compatível com CI/CD injetando a variável diretamente (sem arquivo).
+- `env.validation.ts`: se `MIGRATE_DATABASE_URL` existir no processo da API, o
+  bootstrap falha imediatamente, com mensagem fixa que nunca inclui a URL/
+  credencial (testado em `env.validation.spec.ts`).
+- `PrismaService` e `HealthController` (rota `ready`) trocaram `Logger` padrão
+  do Nest pelo logger estruturado já configurado (`PinoLogger`/
+  `InjectPinoLogger` do `nestjs-pino`), mantendo as mesmas mensagens fixas
+  (sem detalhe de conexão).
+
 ### Escopo — não entra (mantido)
 
 - Qualquer tabela/model de domínio (colaborador, empresa, cargo, folha, ponto etc.).
@@ -214,6 +236,9 @@ escopo de código).
       testados e com evidência anexada ao PR de implementação.
 - [x] Nenhum segredo real em `.env.example`, código, teste, log ou
       `infra/postgres/`.
+- [x] `MIGRATE_DATABASE_URL` nunca presente no processo/ambiente da API — se
+      estiver, bootstrap falha de propósito, sem revelar a URL/credencial
+      (validado por teste automatizado).
 - [ ] Nenhuma migration destrutiva mesclada sem `rollback.sql`/runbook
       associado — critério permanente para futuras migrations, não aplicável
       ainda (única migration desta fatia é não destrutiva).
@@ -231,22 +256,28 @@ infra/postgres/01_create_roles.sql             # novo
 infra/postgres/02_schema_and_grants.sql        # novo
 infra/postgres/README.md                       # novo
 infra/postgres/runbook-backup-restore.md       # novo
-apps/api/.env.example                          # + MIGRATE_DATABASE_URL, DB_READY_TIMEOUT_MS
+apps/api/.env.example                          # DB_READY_TIMEOUT_MS; SEM MIGRATE_DATABASE_URL (P1)
+apps/api/.env.migrate.example                  # novo (P1) — só MIGRATE_DATABASE_URL, isolado da API
 apps/api/package.json                          # + postinstall (prisma generate --allow-no-models),
-                                                #   scripts db:migrate:dev/deploy, dep testcontainers
+                                                #   scripts db:migrate:dev/deploy (P1: node
+                                                #   --env-file-if-exists=.env.migrate), dep testcontainers
 apps/api/prisma/schema.prisma                  # + directUrl
 apps/api/prisma/migrations/migration_lock.toml # novo
 apps/api/prisma/migrations/20260731150000_init_technical_baseline/migration.sql  # novo
-apps/api/src/config/env.validation.ts          # + DB_READY_TIMEOUT_MS
-apps/api/src/config/env.validation.spec.ts     # + assert do novo default
+apps/api/src/config/env.validation.ts          # + DB_READY_TIMEOUT_MS; (P1) falha se
+                                                #   MIGRATE_DATABASE_URL presente, sem revelar valor
+apps/api/src/config/env.validation.spec.ts     # + assert do novo default; (P1) teste da falha segura
 apps/api/src/database/prisma.module.ts         # novo
-apps/api/src/database/prisma.service.ts        # novo
+apps/api/src/database/prisma.service.ts        # novo; (P1) logger trocado para PinoLogger
 apps/api/src/app.module.ts                     # + PrismaModule
 apps/api/src/health/health.service.ts          # + checkReadiness()
 apps/api/src/health/health.service.spec.ts     # + testes de readiness
-apps/api/src/health/health.controller.ts       # + GET /ready
+apps/api/src/health/health.controller.ts       # + GET /ready; (P1) logger trocado para PinoLogger
 apps/api/src/health/dto/health-ready-response.dto.ts  # novo
 apps/api/src/common/filters/http-exception.filter.ts  # + mensagem pública para 503
 apps/api/test/database.e2e-spec.ts             # novo — Testcontainers
+.gitignore                                     # (P1) exceção para .env.migrate.example
+README.md                                      # (P1) seção de isolamento de credenciais
+infra/postgres/README.md                       # (P1) fluxo com .env/.env.migrate separados
 docs/modules/etapa0-fatia2-postgres-migrations.md  # este documento
 ```

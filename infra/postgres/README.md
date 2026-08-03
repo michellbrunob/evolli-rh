@@ -41,13 +41,32 @@ psql "$PGADMIN_URL" \
 psql "$PGADMIN_URL" -f infra/postgres/02_schema_and_grants.sql
 ```
 
-Depois disso, preencha `apps/api/.env` (a partir de `apps/api/.env.example`)
-com:
+Depois disso, preencha **dois arquivos separados** — nunca a mesma credencial
+nos dois, e `MIGRATE_DATABASE_URL` nunca no arquivo da API:
+
+`apps/api/.env` (a partir de `apps/api/.env.example`) — **usado pela API**:
 
 ```
 DATABASE_URL=postgresql://evolli_app:<EVOLLI_APP_PASSWORD>@127.0.0.1:5432/evolli_rh_dev?schema=app
+```
+
+`apps/api/.env.migrate` (a partir de `apps/api/.env.migrate.example`) —
+**usado só pelos scripts de migration**, nunca pela API:
+
+```
 MIGRATE_DATABASE_URL=postgresql://evolli_migrator:<EVOLLI_MIGRATOR_PASSWORD>@127.0.0.1:5432/evolli_rh_dev?schema=app
 ```
+
+Rodar a migration:
+
+```bash
+pnpm --filter @evolli/api db:migrate:deploy
+```
+
+Esse script carrega `apps/api/.env.migrate` só para o subprocesso do Prisma
+CLI (`node --env-file-if-exists=.env.migrate`) — a variável nunca fica
+presente no processo que sobe a API (`pnpm --filter @evolli/api dev`/`start`),
+mesmo que os dois comandos sejam executados na mesma máquina.
 
 ## Reexecução
 
@@ -65,3 +84,10 @@ Mesmos scripts, apontando `PGADMIN_URL` para o admin do provedor gerenciado
 (decisão de infraestrutura ainda pendente — ver
 `docs/modules/etapa0-fatia2-postgres-migrations.md`). Senhas via cofre de
 segredos da plataforma, nunca em texto puro em terminal compartilhado/CI log.
+
+A mesma segregação vale em CI/CD: `MIGRATE_DATABASE_URL` é injetada só no
+job/step que roda `db:migrate:deploy` (ex.: secret de pipeline escopado a esse
+step), nunca nas variáveis de ambiente do container/processo que sobe a API.
+Se, por engano de configuração, `MIGRATE_DATABASE_URL` chegar ao processo da
+API, o bootstrap falha imediatamente (`env.validation.ts`), sem revelar a URL
+ou a credencial no log/erro.

@@ -10,6 +10,7 @@ coverage/
 .env
 .env.*
 !.env.example
+!.env.migrate.example
 *.pem
 *.key
 *.p12
