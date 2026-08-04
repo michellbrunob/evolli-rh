@@ -8,7 +8,6 @@ import {
 import { Test, TestingModule } from "@nestjs/testing";
 import { PrismaClient } from "@prisma/client";
 import cookieParser from "cookie-parser";
-import { authenticator } from "otplib";
 import request from "supertest";
 import { GenericContainer, StartedTestContainer, Wait } from "testcontainers";
 import { AppModule } from "../src/app.module";
@@ -19,6 +18,10 @@ import { requestIdMiddleware } from "../src/common/request-id";
  * Etapa 0 — Fatia 3: identidade, sessão e autorização. Integração real com
  * PostgreSQL efêmero (Testcontainers) — mesmo padrão de `database.e2e-spec.ts`
  * (Fatia 2). Requer Docker disponível.
+ *
+ * MFA (TOTP) foi adiado para a próxima fatia de segurança (ADR 0003) — este
+ * arquivo cobre apenas o escopo da entrega executiva: login direto por
+ * e-mail/senha, sessão, CSRF, RBAC/ABAC, rate limiting e enumeração.
  */
 
 jest.setTimeout(300_000);
@@ -40,7 +43,6 @@ const ADMIN_PASSWORD = "admin_test_pw";
 const ADMIN_DB = "evolli_test";
 const MIGRATOR_PASSWORD = "migrator_test_pw";
 const APP_PASSWORD = "app_test_pw";
-const MFA_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString("base64");
 
 async function runInfraScript(
   container: StartedTestContainer,
@@ -106,19 +108,6 @@ function runBootstrap(env: Record<string, string>): {
       output: `${execError.stdout ?? ""}${execError.stderr ?? ""}`,
     };
   }
-}
-
-// Compartilhado entre describes: guarda o segredo TOTP de cada e-mail já
-// enrolado neste arquivo, para permitir login subsequente (mfa/verify) sem
-// precisar reenrolar.
-const totpSecretByEmail = new Map<string, string>();
-
-function extractTotpSecret(otpauthUri: string): string {
-  const match = /[?&]secret=([^&]+)/.exec(otpauthUri);
-  if (!match?.[1]) {
-    throw new Error("otpauthUri sem secret");
-  }
-  return match[1];
 }
 
 async function buildApp(): Promise<INestApplication> {
@@ -190,7 +179,6 @@ describe("Identidade, sessão e autorização (e2e)", () => {
     );
 
     process.env.DATABASE_URL = appUrl;
-    process.env.MFA_ENCRYPTION_KEY = MFA_ENCRYPTION_KEY;
   });
 
   afterAll(async () => {
@@ -201,7 +189,6 @@ describe("Identidade, sessão e autorização (e2e)", () => {
     it("cria o admin_tecnico quando as variáveis estão no processo e nenhum admin existe", () => {
       const result = runBootstrap({
         DATABASE_URL: appUrl,
-        MFA_ENCRYPTION_KEY,
         ADMIN_BOOTSTRAP_EMAIL: "admin@evolli.test",
         ADMIN_BOOTSTRAP_PASSWORD: "uma-passphrase-de-bootstrap-bem-longa",
       });
@@ -215,7 +202,6 @@ describe("Identidade, sessão e autorização (e2e)", () => {
     it("falha (sem revelar segredo) se já existir admin_tecnico", () => {
       const result = runBootstrap({
         DATABASE_URL: appUrl,
-        MFA_ENCRYPTION_KEY,
         ADMIN_BOOTSTRAP_EMAIL: "admin2@evolli.test",
         ADMIN_BOOTSTRAP_PASSWORD: "outra-passphrase-de-bootstrap-longa",
       });
@@ -228,13 +214,13 @@ describe("Identidade, sessão e autorização (e2e)", () => {
     });
 
     it("falha sem revelar nada se as variáveis não estiverem no ambiente do processo", () => {
-      const result = runBootstrap({ DATABASE_URL: appUrl, MFA_ENCRYPTION_KEY });
+      const result = runBootstrap({ DATABASE_URL: appUrl });
       expect(result.status).not.toBe(0);
       expect(result.output).toMatch(/ADMIN_BOOTSTRAP_EMAIL/);
     });
   });
 
-  describe("fluxo completo: login, MFA obrigatório, sessão, CSRF", () => {
+  describe("fluxo completo: login, sessão, CSRF", () => {
     let app: INestApplication;
     const agent = () => request(app.getHttpServer());
     const adminEmail = "admin@evolli.test";
@@ -268,43 +254,16 @@ describe("Identidade, sessão e autorização (e2e)", () => {
       });
     });
 
-    it("login do admin recém-criado exige enrollment de MFA (primeiro acesso)", async () => {
+    it("login com credenciais válidas emite sessão + csrfToken diretamente", async () => {
       const response = await agent()
         .post("/v1/auth/login")
         .send({ email: adminEmail, password: adminPassword })
         .expect(200);
 
-      expect(response.body).toEqual({
-        status: "mfa_enrollment_required",
-        challengeToken: expect.any(String),
-      });
-    });
+      expect(response.body.csrfToken).toEqual(expect.any(String));
+      expect(response.headers["set-cookie"]).toBeDefined();
 
-    it("completa enroll + confirm de MFA e recebe sessão + csrfToken + recovery codes", async () => {
-      const loginResponse = await agent()
-        .post("/v1/auth/login")
-        .send({ email: adminEmail, password: adminPassword })
-        .expect(200);
-
-      const enrollResponse = await agent()
-        .post("/v1/auth/mfa/enroll")
-        .send({ challengeToken: loginResponse.body.challengeToken })
-        .expect(200);
-
-      const secret = extractTotpSecret(enrollResponse.body.otpauthUri);
-      totpSecretByEmail.set(adminEmail, secret);
-      const code = authenticator.generate(secret);
-
-      const confirmResponse = await agent()
-        .post("/v1/auth/mfa/confirm")
-        .send({ challengeToken: enrollResponse.body.challengeToken, code })
-        .expect(200);
-
-      expect(confirmResponse.body.csrfToken).toEqual(expect.any(String));
-      expect(confirmResponse.body.recoveryCodes).toHaveLength(10);
-      expect(confirmResponse.headers["set-cookie"]).toBeDefined();
-
-      const setCookieHeader = confirmResponse.headers["set-cookie"];
+      const setCookieHeader = response.headers["set-cookie"];
       const cookies = Array.isArray(setCookieHeader)
         ? setCookieHeader
         : [setCookieHeader as unknown as string];
@@ -319,7 +278,7 @@ describe("Identidade, sessão e autorização (e2e)", () => {
       expect(sessionCookie).toContain("SameSite=Lax");
 
       adminCookie = sessionCookie!.split(";")[0]!;
-      adminCsrfToken = confirmResponse.body.csrfToken;
+      adminCsrfToken = response.body.csrfToken;
     });
 
     it("sessão dá acesso a GET /v1/users/me sem dado sensível", async () => {
@@ -331,10 +290,8 @@ describe("Identidade, sessão e autorização (e2e)", () => {
       expect(response.body).toMatchObject({
         email: adminEmail,
         role: "admin_tecnico",
-        mfaEnabled: true,
       });
       expect(response.body).not.toHaveProperty("passwordHash");
-      expect(response.body).not.toHaveProperty("mfaSecretEncrypted");
 
       const sessions = await agent()
         .get("/v1/auth/sessions")
@@ -380,23 +337,15 @@ describe("Identidade, sessão e autorização (e2e)", () => {
     });
 
     it("nenhuma resposta de erro deste fluxo contém segredo/detalhe interno", async () => {
-      const responses = await Promise.all([
-        agent()
-          .post("/v1/auth/login")
-          .send({ email: "nao-existe@evolli.test", password: "qualquer" }),
-        agent()
-          .post("/v1/auth/mfa/verify")
-          .send({ challengeToken: "invalido", code: "000000" }),
-      ]);
+      const response = await agent()
+        .post("/v1/auth/login")
+        .send({ email: "nao-existe@evolli.test", password: "qualquer" });
 
-      for (const response of responses) {
-        const text = JSON.stringify(response.body);
-        expect(text).not.toMatch(/argon2/i);
-        expect(text).not.toContain(adminPassword);
-        expect(text).not.toContain(MFA_ENCRYPTION_KEY);
-        expect(text).not.toMatch(/at .*\.ts:\d+/);
-        expect(response.body).not.toHaveProperty("stack");
-      }
+      const text = JSON.stringify(response.body);
+      expect(text).not.toMatch(/argon2/i);
+      expect(text).not.toContain(adminPassword);
+      expect(text).not.toMatch(/at .*\.ts:\d+/);
+      expect(response.body).not.toHaveProperty("stack");
     });
   });
 
@@ -410,69 +359,20 @@ describe("Identidade, sessão e autorização (e2e)", () => {
     let rhUserId: string;
     let colaboradorCompanyBId: string;
 
-    async function loginAndCompleteMfa(
+    async function login(
       email: string,
       password: string,
     ): Promise<{ cookie: string; csrfToken: string }> {
-      const loginResponse = await agent()
+      const response = await agent()
         .post("/v1/auth/login")
         .send({ email, password })
         .expect(200);
 
-      let challengeToken = loginResponse.body.challengeToken as string;
-      let code: string;
-
-      if (loginResponse.body.status === "mfa_enrollment_required") {
-        const enrollResponse = await agent()
-          .post("/v1/auth/mfa/enroll")
-          .send({ challengeToken })
-          .expect(200);
-        const secret = extractTotpSecret(enrollResponse.body.otpauthUri);
-        totpSecretByEmail.set(email, secret);
-        challengeToken = enrollResponse.body.challengeToken;
-        code = authenticator.generate(secret);
-
-        const confirmResponse = await agent()
-          .post("/v1/auth/mfa/confirm")
-          .send({ challengeToken, code })
-          .expect(200);
-        const cookies = confirmResponse.headers[
-          "set-cookie"
-        ] as unknown as string[];
-        const sessionCookie = cookies
-          .find((c) => c.startsWith("evolli_session="))!
-          .split(";")[0]!;
-        return {
-          cookie: sessionCookie,
-          csrfToken: confirmResponse.body.csrfToken,
-        };
-      }
-
-      // mfa_verification_required — usuário já tinha MFA configurado (ex.:
-      // reautenticando o admin do describe anterior). Usa o segredo TOTP
-      // capturado quando o enroll aconteceu.
-      const secret = totpSecretByEmail.get(email);
-      if (!secret) {
-        throw new Error(
-          `Teste mal configurado: nenhum segredo TOTP conhecido para ${email}`,
-        );
-      }
-      code = authenticator.generate(secret);
-
-      const verifyResponse = await agent()
-        .post("/v1/auth/mfa/verify")
-        .send({ challengeToken, code })
-        .expect(200);
-      const cookies = verifyResponse.headers[
-        "set-cookie"
-      ] as unknown as string[];
+      const cookies = response.headers["set-cookie"] as unknown as string[];
       const sessionCookie = cookies
         .find((c) => c.startsWith("evolli_session="))!
         .split(";")[0]!;
-      return {
-        cookie: sessionCookie,
-        csrfToken: verifyResponse.body.csrfToken,
-      };
+      return { cookie: sessionCookie, csrfToken: response.body.csrfToken };
     }
 
     beforeAll(async () => {
@@ -481,7 +381,7 @@ describe("Identidade, sessão e autorização (e2e)", () => {
 
       // Reautentica como admin (sessão anterior foi revogada no describe
       // anterior) só para provisionar os usuários de teste via API real.
-      const admin = await loginAndCompleteMfa(
+      const admin = await login(
         "admin@evolli.test",
         "uma-passphrase-de-bootstrap-bem-longa",
       );
@@ -512,10 +412,7 @@ describe("Identidade, sessão e autorização (e2e)", () => {
         .expect(201);
       colaboradorCompanyBId = colaboradorB.body.id;
 
-      const rh = await loginAndCompleteMfa(
-        rhEmail,
-        "senha-do-rh-empresa-a-bem-longa",
-      );
+      const rh = await login(rhEmail, "senha-do-rh-empresa-a-bem-longa");
       rhCookie = rh.cookie;
       rhCsrfToken = rh.csrfToken;
 
@@ -596,16 +493,6 @@ describe("Identidade, sessão e autorização (e2e)", () => {
       app = await buildApp();
       prisma = new PrismaClient({ datasources: { db: { url: appUrl } } });
 
-      const admin = await request(app.getHttpServer())
-        .post("/v1/auth/login")
-        .send({
-          email: "admin@evolli.test",
-          password: "uma-passphrase-de-bootstrap-bem-longa",
-        });
-      // Login não emite sessão sem MFA — aqui só criamos o usuário-alvo
-      // diretamente via Prisma para isolar este describe do fluxo de MFA.
-      void admin;
-
       const { PasswordHashService } =
         await import("../src/auth/password/password-hash.service");
       const passwordHash = await new PasswordHashService().hash(
@@ -616,7 +503,6 @@ describe("Identidade, sessão e autorização (e2e)", () => {
           email: targetEmail,
           passwordHash,
           role: "colaborador",
-          mfaEnabled: false,
         },
       });
     });
@@ -697,7 +583,7 @@ describe("Identidade, sessão e autorização (e2e)", () => {
           password: "senha-da-vitima-bem-longa-123456",
         })
         .expect(200);
-      expect(afterWindow.body.status).toBe("mfa_enrollment_required");
+      expect(afterWindow.body.csrfToken).toEqual(expect.any(String));
     });
   });
 });

@@ -1,33 +1,34 @@
 # Etapa 0 — Fatia 3: Identidade, sessões seguras e autorização
 
-Status: **implementada** (branch `feature/etapa0-identidade-acesso`)
+Status: **implementada — entrega executiva, MFA adiado** (branch
+`feature/etapa0-identidade-acesso`)
 
 ### Resumo do que foi implementado
 
 Autenticação e-mail/senha (interface `CredentialVerifier`, hoje só
 `LocalCredentialVerifier`), Argon2id (piso 19 MiB/2/1), política de senha
-(15–256 chars, Unicode/espaço, lista local de comuns/vazadas), MFA TOTP
-obrigatório desde o primeiro acesso (enroll/confirm/verify/reset, códigos de
-recuperação com hash, segredo cifrado AES-256-GCM), sessão em PostgreSQL
-(token opaco no cookie, só `token_hash` no banco, `id` interno nunca aceito
-como credencial, rotação pós-login/MFA via emissão nova + revogação da
-anterior quando aplicável, expiração 8h/30min), CSRF synchronizer token,
-RBAC/ABAC reutilizável (`evaluatePermission` + `AuthorizationGuard` +
-`@RequirePermission`), rate limit 5/15min (login e MFA), bootstrap exclusivo
-do admin técnico (`pnpm --filter @evolli/api bootstrap:admin`), redact de log
-estendido. Migration real aplicada e testada (Testcontainers + banco local).
-Recuperação de senha por e-mail **não envia e-mail real** — `EmailNotifier`
-com implementação `Noop`, pendência de provedor mantida (§11).
+(15–256 chars, Unicode/espaço, lista local de comuns/vazadas), sessão em
+PostgreSQL (token opaco no cookie, só `token_hash` no banco, `id` interno
+nunca aceito como credencial, rotação pós-login via emissão nova + revogação
+da anterior, expiração 8h/30min), CSRF synchronizer token, RBAC/ABAC
+reutilizável (`evaluatePermission` + `AuthorizationGuard` +
+`@RequirePermission`), rate limit 5/15min (login e recuperação de senha),
+bootstrap exclusivo do admin técnico (`pnpm --filter @evolli/api
+bootstrap:admin`), redact de log estendido. Migration real aplicada e
+testada (Testcontainers + banco local). Recuperação de senha por e-mail
+**não envia e-mail real** — `EmailNotifier` com implementação `Noop`,
+pendência de provedor mantida (§11).
 
-Duas adaptações de implementação, sem mudar a decisão arquitetural:
+**MFA (TOTP) foi adiado** para a próxima fatia de segurança — decisão
+posterior aprovada, registrada como risco aceito com controles
+compensatórios (§11, ADR 0003). Nenhuma estrutura de MFA (endpoint, serviço,
+tabela, coluna, dependência, variável de ambiente) existe nesta entrega.
+
+Uma adaptação de implementação, sem mudar a decisão arquitetural:
 
 - `AccessSession` ganhou a coluna `csrf_token_hash` (não estava no rascunho
   conceitual do §7) — necessária para o synchronizer token ficar vinculado à
   sessão (ADR 0003 §6); mesmo padrão de "só hash, nunca o valor bruto".
-- `POST /v1/auth/mfa/reset` virou `POST /v1/auth/mfa/reset/:id` — o `:id` do
-  usuário-alvo é exigido pelo `AuthorizationGuard` reutilizável (mesmo padrão
-  de `/v1/users/:id/role` e `/v1/users/:id/disable`); o contrato original no
-  §8 era só ilustrativo ("rota proposta").
 
 Depende de: [Fatia 1 — fundação da API](etapa0-fundacao-api.md),
 [Fatia 2 — PostgreSQL/migrations](etapa0-fatia2-postgres-migrations.md),
@@ -41,9 +42,10 @@ Decisão arquitetural registrada em
 ### Objetivo
 
 Dar à `apps/api` identidade real: autenticação de usuário, sessão segura em
-cookie, MFA obrigatório para todo usuário e autorização RBAC/ABAC por
-empresa/unidade/equipe/recurso/ação/classificação do dado, com negação por
-padrão — sem ainda expor nenhum dado ou processo de RH/DP.
+cookie e autorização RBAC/ABAC por empresa/unidade/equipe/recurso/ação/
+classificação do dado, com negação por padrão — sem ainda expor nenhum dado
+ou processo de RH/DP. MFA (TOTP) fica para a próxima fatia de segurança
+(risco aceito e controles compensatórios registrados no §11).
 
 ### Escopo — entra
 
@@ -56,9 +58,6 @@ padrão — sem ainda expor nenhum dado ou processo de RH/DP.
   autenticação desenhada por interface, para permitir OIDC/SSO no futuro
   sem reescrever sessão nem autorização (ver §4, §11) — nenhum IdP externo
   é integrado nesta fatia.
-- MFA (TOTP) **obrigatório para todo usuário ativo desde o primeiro acesso**
-  — não só perfis privilegiados (decisão fechada). WebAuthn/passkeys fica
-  como evolução futura, fora de escopo desta fatia.
 - Sessão de servidor com cookie `httpOnly`/`Secure`/`SameSite`, expiração,
   renovação (rotação de sessão), logout e revogação (individual e em massa).
 - Proteção CSRF para toda rota que muda estado.
@@ -71,6 +70,10 @@ padrão — sem ainda expor nenhum dado ou processo de RH/DP.
 
 ### Escopo — não entra
 
+- **MFA (TOTP)** — decisão posterior aprovada: adiado para a próxima fatia
+  de segurança, obrigatório antes de qualquer piloto com dados reais de RH
+  ou produção (§11, ADR 0003). Risco aceito nesta entrega, com controles
+  compensatórios registrados no §11.
 - Qualquer tabela/tela/processo de RH/DP (colaborador, cargo, folha, ponto
   etc.) — a entidade "usuário de acesso" desta fatia **não é** "colaborador".
 - Auditoria imutável completa (armazenamento, consulta, retenção) — esta
@@ -98,7 +101,6 @@ padrão — sem ainda expor nenhum dado ou processo de RH/DP.
 | -------------------------------------------------------------- | ------------------------------------------------------ | ---------------------------------------- | ------------------------------------------------------------------------------- |
 | E-mail de login                                                | Pessoal                                                | Identificação/autenticação               | Execução de contrato de trabalho/prestação de serviço (uso interno corporativo) |
 | Hash de senha (nunca a senha em claro)                         | Pessoal sensível operacional (segredo de autenticação) | Autenticação                             | Idem                                                                            |
-| Segredo MFA (TOTP secret)                                      | Pessoal sensível operacional                           | Segundo fator de autenticação            | Idem                                                                            |
 | Metadado de sessão (IP, user-agent, timestamp de login/logout) | Pessoal                                                | Segurança, detecção de anomalia, suporte | Legítimo interesse de segurança da informação                                   |
 | Papel/escopo de acesso (empresa/unidade/equipe/perfil)         | Pessoal (associado ao usuário)                         | Autorização                              | Execução de contrato                                                            |
 
@@ -110,10 +112,8 @@ etc.) é tratado nesta fatia — a entidade "usuário de acesso" é técnica.
 - Minimização: só e-mail, hash, papel/escopo e metadado técnico de sessão —
   nenhum campo de RH.
 - Senha nunca armazenada em claro (hash com `argon2id`, parâmetros mínimos
-  fechados no §4); segredo MFA cifrado em repouso com **AES-256-GCM**, chave
-  de cifragem fora do banco, com rotação de chave documentada — decisão
-  fechada (ADR 0003). Segredo MFA nunca aparece em log, em nenhuma hipótese.
-- Nenhum dado sensível (senha, hash, segredo MFA, token de sessão) em log —
+  fechados no §4).
+- Nenhum dado sensível (senha, hash, token de sessão/CSRF) em log —
   reaproveita o padrão já existente de `redact` do `nestjs-pino` (ADR 0001),
   estendido para os novos campos (§6).
 - Direito do titular: usuário pode encerrar as próprias sessões (logout/
@@ -131,13 +131,12 @@ Atores (conforme `PLANO_E_PROMPT_ECOSSISTEMA_RH_NOVO.md`, §7):
 **administrador técnico, RH, DP, gestor, financeiro, colaborador, auditor,
 DPO**.
 
-### MFA e classificação de privilégio
+### Classificação de privilégio
 
-**Decisão fechada:** MFA é obrigatório para **todo** usuário ativo desde o
-primeiro acesso, sem exceção por papel (ver §4) — não é mais um recorte por
-"perfil privilegiado". A classificação de privilégio abaixo continua
-relevante para **escopo de gestão de conta** e **acesso à trilha de
-acesso/log** (§3, matriz de permissões), não mais para exigência de MFA.
+A classificação abaixo é usada para **escopo de gestão de conta** e **acesso
+à trilha de acesso/log** (§3, matriz de permissões). MFA (TOTP) fica adiado
+para a próxima fatia de segurança (§11) — quando implementado, será
+obrigatório para todo usuário ativo, sem exceção por papel.
 
 | Papel                 | Justificativa do nível de privilégio                     |
 | --------------------- | -------------------------------------------------------- |
@@ -157,12 +156,12 @@ sessão. A matriz abaixo é a base do modelo — será estendida por recurso a
 cada fatia futura (colaborador, documento, ponto, folha etc.), nunca
 reduzida.
 
-| Recurso                                                | Ação          | Admin técnico                 | RH                                                                        | DP                           | Gestor | Financeiro | Colaborador | Auditor                      | DPO                                   |
-| ------------------------------------------------------ | ------------- | ----------------------------- | ------------------------------------------------------------------------- | ---------------------------- | ------ | ---------- | ----------- | ---------------------------- | ------------------------------------- |
-| Própria conta (perfil, senha, MFA, sessões)            | ler/gerenciar | ✅                            | ✅                                                                        | ✅                           | ✅     | ✅         | ✅          | ✅                           | ✅                                    |
-| Conta de outro usuário (criar, desativar, resetar MFA) | gerenciar     | ✅ (escopo: toda a instância) | ✅ (escopo: própria empresa)                                              | ✅ (escopo: própria empresa) | ❌     | ❌         | ❌          | ❌ (só leitura, ver abaixo)  | ❌                                    |
-| Log/trilha de acesso (login, sessão)                   | ler           | ✅                            | ❌                                                                        | ❌                           | ❌     | ❌         | ❌          | ✅ (leitura, todas empresas) | ✅ (leitura, para fins de compliance) |
-| Papel/escopo de outro usuário                          | alterar       | ✅                            | ✅ (dentro da própria empresa, não pode se auto-promover a admin técnico) | ❌                           | ❌     | ❌         | ❌          | ❌                           | ❌                                    |
+| Recurso                                   | Ação          | Admin técnico                 | RH                                                                        | DP                           | Gestor | Financeiro | Colaborador | Auditor                      | DPO                                   |
+| ----------------------------------------- | ------------- | ----------------------------- | ------------------------------------------------------------------------- | ---------------------------- | ------ | ---------- | ----------- | ---------------------------- | ------------------------------------- |
+| Própria conta (perfil, senha, sessões)    | ler/gerenciar | ✅                            | ✅                                                                        | ✅                           | ✅     | ✅         | ✅          | ✅                           | ✅                                    |
+| Conta de outro usuário (criar, desativar) | gerenciar     | ✅ (escopo: toda a instância) | ✅ (escopo: própria empresa)                                              | ✅ (escopo: própria empresa) | ❌     | ❌         | ❌          | ❌ (só leitura, ver abaixo)  | ❌                                    |
+| Log/trilha de acesso (login, sessão)      | ler           | ✅                            | ❌                                                                        | ❌                           | ❌     | ❌         | ❌          | ✅ (leitura, todas empresas) | ✅ (leitura, para fins de compliance) |
+| Papel/escopo de outro usuário             | alterar       | ✅                            | ✅ (dentro da própria empresa, não pode se auto-promover a admin técnico) | ❌                           | ❌     | ❌         | ❌          | ❌                           | ❌                                    |
 
 Regras adicionais de negação por padrão:
 
@@ -201,24 +200,13 @@ Regras adicionais de negação por padrão:
 - Nenhuma mensagem de erro do fluxo de login/recuperação revela se o e-mail
   existe ou não (§6 — enumeração).
 
-### MFA
+### MFA (adiado — próxima fatia de segurança)
 
-- **Decisão fechada:** TOTP (RFC 6238) implementado nesta fatia, compatível
-  com apps padrão (Google Authenticator, Authy etc.) — sem dependência de
-  SMS (custo, spoofing de SIM, não recomendado para o perfil de risco deste
-  produto). WebAuthn/passkeys registrado como evolução futura (ADR 0003),
-  não implementado agora.
-- **Obrigatório para todo usuário ativo desde o primeiro acesso** (decisão
-  fechada — substitui o recorte por "perfil privilegiado" da versão anterior
-  desta spec) — login não concede sessão completa sem MFA configurado e
-  verificado.
-- Segredo TOTP armazenado cifrado com **AES-256-GCM**, chave fora do banco,
-  rotação de chave documentada, nunca logado (§2, §7).
-- Códigos de recuperação (backup codes) de uso único, gerados na ativação,
-  armazenados com hash (não em claro).
-- Reset de MFA de um usuário só por Admin técnico (ou RH/DP dentro do próprio
-  escopo), sempre gerando evento de auditoria (§10) — nunca autoatendimento
-  sem verificação adicional, para não virar vetor de bypass.
+MFA (TOTP, RFC 6238) **não é implementado nesta entrega** — decisão posterior
+aprovada, registrada como risco aceito com controles compensatórios (§11,
+ADR 0003). Login concede sessão completa só com e-mail/senha válidos. A
+implementação de MFA fica obrigatória, como próxima fatia de segurança,
+antes de qualquer piloto com dados reais de RH ou produção.
 
 ### Sessão
 
@@ -244,9 +232,10 @@ Regras adicionais de negação por padrão:
   implementação) + tempo de vida por inatividade (ex.: 30 min), o que
   ocorrer primeiro.
 - **Rotação (decisão fechada):** o token de sessão é rotacionado (novo token
-  emitido, token anterior invalidado) após login e após conclusão do MFA —
-  nenhum token emitido antes da autenticação completa continua válido depois
-  dela. Mitiga fixação de sessão (§6).
+  emitido, token anterior invalidado) após autenticação completa — nenhum
+  token emitido antes do login continua válido depois dele. Mecanismo
+  reutilizável para qualquer elevação de credencial futura (ex.: MFA, quando
+  implementado). Mitiga fixação de sessão (§6).
 - **Logout:** invalida a sessão no servidor (não só remove cookie no
   cliente).
 - **Revogação (obrigatória, decisão fechada):** usuário lista e encerra as
@@ -287,10 +276,10 @@ técnico`, `rh`, `dp`, `gestor`, `financeiro`, `colaborador`, `auditor`,
 | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | IDOR/BOLA              | Todo endpoint que recebe identificador de recurso (`:id`) valida, no servidor, que o recurso pertence ao escopo (empresa/unidade/equipe) do usuário autenticado — nunca confia em ID vindo do cliente sem checagem de posse/escopo. Testado explicitamente (§9). |
 | Elevação de privilégio | Ninguém altera o próprio papel/escopo (§3); alteração de papel de terceiro é auditada; guard de autorização roda no servidor, nunca decisão só no cliente.                                                                                                       |
-| Fixação de sessão      | Identificador de sessão rotacionado após autenticação completa (login + MFA quando aplicável); nenhum identificador de sessão é aceito se criado antes do login.                                                                                                 |
-| Força bruta            | Rate limiting por IP e por conta nas rotas de login/recuperação/MFA; backoff progressivo; bloqueio temporário de conta após N tentativas malsucedidas, com mensagem genérica.                                                                                    |
+| Fixação de sessão      | Identificador de sessão rotacionado após autenticação completa (login); nenhum identificador de sessão é aceito se criado antes do login.                                                                                                                        |
+| Força bruta            | Rate limiting por IP e por conta nas rotas de login/recuperação de senha; bloqueio temporário (429 genérico) após N tentativas malsucedidas em janela de 15min, sem bloqueio permanente.                                                                         |
 | Enumeração de usuário  | Resposta idêntica (tempo e conteúdo) para "e-mail não existe" e "senha errada"; fluxo de recuperação de senha nunca confirma existência do e-mail.                                                                                                               |
-| Vazamento em erro/log  | Reaproveita `AllExceptionsFilter` (ADR 0001): mensagem pública fixa por status HTTP, nunca stack trace/SQL/detalhe interno. `redact` do `nestjs-pino` estendido para nunca logar senha, hash, segredo MFA, token de sessão/CSRF, código de recuperação.          |
+| Vazamento em erro/log  | Reaproveita `AllExceptionsFilter` (ADR 0001): mensagem pública fixa por status HTTP, nunca stack trace/SQL/detalhe interno. `redact` do `nestjs-pino` estendido para nunca logar senha, hash, token de sessão/CSRF.                                              |
 
 ## 7. Modelo de dados necessário (futuro — sem migration nesta fatia)
 
@@ -305,18 +294,9 @@ app.access_user
   company_id          uuid NULL               -- NULL só para admin_tecnico (escopo instância)
   unit_id             uuid NULL
   team_id             uuid NULL
-  mfa_enabled         boolean NOT NULL DEFAULT false
-  mfa_secret_encrypted bytea NULL
   status              text NOT NULL           -- enum: active | disabled | locked
   created_at          timestamptz NOT NULL DEFAULT now()
   updated_at          timestamptz NOT NULL DEFAULT now()
-
-app.access_mfa_recovery_code
-  id                  uuid PK
-  user_id             uuid FK -> access_user
-  code_hash           text NOT NULL
-  used_at             timestamptz NULL
-  created_at          timestamptz NOT NULL DEFAULT now()
 
 app.access_session
   id                  uuid PK               -- identificador interno; NUNCA aceito como credencial
@@ -355,11 +335,9 @@ Notas para a implementação futura:
   futura própria, revisada quando a Etapa 1 chegar — não antecipado aqui.
 - Toda tabela fica no schema `app`, criada só por `evolli_migrator`,
   consumida em runtime só por `evolli_app` (DML), conforme ADR 0002.
-- Nenhum campo de senha/segredo em texto claro; `password_hash`,
-  `code_hash` e `token_hash` (de `access_session` e
-  `access_password_reset_token`) sempre hash — o token/segredo bruto nunca é
-  persistido. `mfa_secret_encrypted` sempre cifrado com AES-256-GCM, chave
-  fora do banco (decisão fechada, §4, ADR 0003).
+- Nenhum campo de senha/segredo em texto claro; `password_hash` e
+  `token_hash` (de `access_session` e `access_password_reset_token`) sempre
+  hash — o token/segredo bruto nunca é persistido.
 - `access_session.id` (chave interna) nunca é aceito como credencial em
   nenhuma rota — só `token_hash` (derivado do token do cookie) autentica.
 
@@ -367,16 +345,12 @@ Notas para a implementação futura:
 
 | Método | Rota (proposta, sob `/v1`) | Descrição                                                 | Rate limit |
 | ------ | -------------------------- | --------------------------------------------------------- | ---------- |
-| POST   | `/v1/auth/login`           | E-mail + senha → sessão (ou desafio MFA)                  | Sim        |
-| POST   | `/v1/auth/mfa/verify`      | Completa login com código TOTP                            | Sim        |
+| POST   | `/v1/auth/login`           | E-mail + senha → sessão diretamente                       | Sim        |
 | POST   | `/v1/auth/logout`          | Encerra a sessão atual                                    | —          |
 | GET    | `/v1/auth/sessions`        | Lista sessões ativas do usuário autenticado               | —          |
 | DELETE | `/v1/auth/sessions/:id`    | Revoga uma sessão própria (ou de terceiro, se autorizado) | —          |
 | POST   | `/v1/auth/password/forgot` | Inicia recuperação de senha (resposta genérica sempre)    | Sim        |
 | POST   | `/v1/auth/password/reset`  | Conclui troca de senha via token                          | Sim        |
-| POST   | `/v1/auth/mfa/enroll`      | Inicia configuração de MFA (gera QR/segredo)              | Sim        |
-| POST   | `/v1/auth/mfa/confirm`     | Confirma ativação de MFA com primeiro código válido       | Sim        |
-| POST   | `/v1/auth/mfa/reset`       | Admin técnico/RH/DP reseta MFA de terceiro (auditado)     | Sim        |
 | GET    | `/v1/users/me`             | Perfil do usuário autenticado (sem dado de RH)            | —          |
 | POST   | `/v1/users`                | Cria conta de acesso de terceiro (escopo conforme §3)     | Sim        |
 | PATCH  | `/v1/users/:id/role`       | Altera papel/escopo de terceiro (nunca o próprio)         | Sim        |
@@ -389,14 +363,13 @@ seguindo o padrão do `AllExceptionsFilter`) ficam para a implementação.
 
 ## 9. Estratégia de testes
 
-- **Unitários:** hashing/verificação de senha, geração/validação de TOTP,
-  política de senha, geração/validação de token opaco (reset), lógica pura
-  do avaliador RBAC/ABAC (papel + escopo + recurso + ação + classificação →
+- **Unitários:** hashing/verificação de senha, política de senha,
+  geração/validação de token opaco (sessão/reset), lógica pura do avaliador
+  RBAC/ABAC (papel + escopo + recurso + ação + classificação →
   permitir/negar), isolados de banco/HTTP.
 - **Integração (Testcontainers, seguindo padrão da Fatia 2):** login com
-  banco real, criação/expiração/revogação de sessão persistida, fluxo
-  completo de MFA (enroll → confirm → login exige código), reset de senha
-  fim a fim.
+  banco real, criação/expiração/revogação de sessão persistida, reset de
+  senha fim a fim.
 - **Autorização (por recurso/ação):** para cada entrada da matriz (§3), teste
   automatizado positivo (permite quando deveria) e negativo (nega quando não
   deveria) — inclusive escopo cruzado (usuário da empresa A não acessa/gerencia
@@ -415,8 +388,8 @@ seguindo o padrão do `AllExceptionsFilter`) ficam para a implementação.
   - CSRF: requisição de mudança de estado sem token CSRF válido é rejeitada
     mesmo com cookie de sessão válido.
   - Vazamento em erro: nenhuma resposta de erro do módulo de auth contém
-    stack trace, SQL, hash, segredo MFA ou token — mesmo padrão de teste já
-    usado em `http-exception.filter.spec.ts` (ADR 0001), estendido aos novos
+    stack trace, SQL, hash ou token — mesmo padrão de teste já usado em
+    `http-exception.filter.spec.ts` (ADR 0001), estendido aos novos
     endpoints.
 
 ## 10. Eventos mínimos para auditoria (próxima fatia)
@@ -426,26 +399,52 @@ fatia precisa gerar, no mínimo, estes eventos (quem, quando, de onde, ação,
 resultado) para consumo futuro:
 
 - Login bem-sucedido / login malsucedido (com motivo genérico: credencial
-  inválida, MFA inválido, conta bloqueada).
+  inválida, conta bloqueada).
 - Logout.
 - Criação de conta de acesso de terceiro.
 - Alteração de papel/escopo de terceiro (valor anterior → novo, quem alterou).
 - Desativação/reativação de conta.
-- Ativação, reset ou desativação de MFA (próprio ou de terceiro).
 - Início e conclusão de fluxo de recuperação de senha (sem o token em si).
 - Revogação de sessão (própria ou de terceiro), com motivo.
 - Bloqueio de conta por força bruta.
 
-Nenhum desses eventos registra senha, hash, segredo MFA, token de sessão/
-reset/CSRF ou código de recuperação — só metadado da ação.
+Quando MFA for implementado (próxima fatia de segurança), ativação/reset/
+desativação de MFA (próprio ou de terceiro) entra nesta lista.
+
+Nenhum desses eventos registra senha, hash ou token de sessão/reset/CSRF —
+só metadado da ação.
 
 ## 11. Riscos, decisões pendentes e critérios de aceite
 
-### Riscos
+### Risco aceito: ausência de MFA nesta entrega
 
-- MFA obrigatório para todo usuário desde o primeiro acesso pode gerar
-  atrito operacional no piloto se não houver processo de suporte para reset
-  — mitigado pelo evento de auditoria e fluxo de reset restrito (§4).
+**Decisão posterior aprovada:** MFA (TOTP) foi adiado para a próxima fatia de
+segurança e **não está implementado** nesta entrega. Isso é um risco aceito
+conscientemente, não um esquecimento — registrado aqui e na ADR 0003.
+
+- **Risco:** uma conta comprometida por vazamento/reuso de senha (fora do
+  controle desta aplicação) concede sessão completa sem segundo fator.
+- **Controles compensatórios desta entrega** (mitigam, não eliminam o risco):
+  - Hash de senha Argon2id (piso 19 MiB/2/1, §4) — resistente a força bruta
+    offline mesmo em caso de vazamento do banco.
+  - Política de senha forte (mínimo 15 caracteres, checagem contra lista de
+    senhas comuns/vazadas, §4).
+  - Sessão opaca em cookie `HttpOnly`/`Secure`/`SameSite=Lax`, só `token_hash`
+    persistido, `id` interno nunca aceito como credencial (§4).
+  - CSRF synchronizer token em toda rota que muda estado (§4).
+  - Logout e revogação de sessão (própria e por admin/RH/DP no escopo) sempre
+    disponíveis e imediatos (§4).
+  - Rate limiting de 5 tentativas/15min por e-mail+IP nas rotas de
+    autenticação, sem bloqueio permanente (§6).
+  - RBAC/ABAC com negação por padrão, escopado por empresa/unidade/equipe
+    (§3, §5).
+  - Proteção contra enumeração de usuário e IDOR/BOLA (§6).
+- **Condição de saída do risco:** MFA (TOTP) implementado e **obrigatório
+  antes de qualquer piloto com dados reais de RH ou produção** — não é
+  aceitável rodar piloto com dado real ou produção sem MFA ativo.
+
+### Outros riscos
+
 - Sessão em Postgres adiciona carga de leitura por requisição autenticada;
   os critérios objetivos de quando migrar para Redis estão na ADR 0003 —
   sem métrica real de escala/latência que os dispare, a fatia não migra.
@@ -466,8 +465,11 @@ reset/CSRF ou código de recuperação — só metadado da ação.
 2. **Autenticação:** própria, por e-mail/senha, nesta fatia — desenhada por
    interface para permitir OIDC/SSO futuro sem reescrever sessão/autorização.
    Nenhum IdP externo integrado agora.
-3. **MFA:** obrigatório para todo usuário ativo desde o primeiro acesso.
-   TOTP implementado nesta fatia; WebAuthn/passkeys é evolução futura.
+3. **MFA:** adiado para a próxima fatia de segurança (decisão posterior
+   aprovada) — risco aceito com controles compensatórios (ver acima).
+   Obrigatório antes de qualquer piloto com dados reais de RH ou produção.
+   TOTP continua sendo a tecnologia decidida; WebAuthn/passkeys é evolução
+   futura além disso.
 4. **Senha:** mínimo 15 caracteres, máximo ≥ 64, Unicode/espaço permitidos,
    sem composição arbitrária, sem expiração periódica, bloqueio de senha
    comum/vazada. Argon2id com mínimo 19 MiB / 2 iterações / paralelismo 1,
@@ -485,16 +487,19 @@ reset/CSRF ou código de recuperação — só metadado da ação.
 
 ### Decisões ainda pendentes (aguardando aprovação)
 
+1. **Implementação de MFA (TOTP)** — próxima fatia de segurança, obrigatória
+   antes de qualquer piloto com dados reais de RH ou produção (risco aceito
+   documentado acima, ADR 0003).
 1. **Provedor de envio de e-mail transacional** (recuperação de senha,
    notificação de segurança) — não decidido, fora de escopo de código desta
    fatia. Até ser decidido, recuperação de senha pode ficar restrita a reset
    manual por Admin técnico.
-2. **Parâmetros finos ainda não fixados:** expiração de sessão (absoluta e
+1. **Parâmetros finos ainda não fixados:** expiração de sessão (absoluta e
    por inatividade), janela de rate limiting e limiar exato de bloqueio de
    conta por força bruta — valores de referência em §4/§6, a fechar na
    implementação com aprovação de segurança (senha e Argon2id já têm
    parâmetro mínimo fixado na decisão 4 acima, não são mais pendência).
-3. **Prazo/gatilho de avaliação de WebAuthn/passkeys** como complemento ou
+1. **Prazo/gatilho de avaliação de WebAuthn/passkeys** como complemento ou
    substituto do TOTP — não decidido, registrado como evolução futura
    (ADR 0003).
 
@@ -510,14 +515,14 @@ reset/CSRF ou código de recuperação — só metadado da ação.
 
 ### Critérios de aceite
 
-- [x] Nenhuma senha, hash, segredo MFA, token de sessão/reset/CSRF ou código
-      de recuperação aparece em log, erro HTTP ou resposta de API — validado
-      por teste automatizado e por smoke test manual contra Postgres real.
+- [x] Nenhuma senha, hash ou token de sessão/reset/CSRF aparece em log, erro
+      HTTP ou resposta de API — validado por teste automatizado e por smoke
+      test manual contra Postgres real.
 - [x] Todo endpoint autenticado exige sessão válida; toda ação exige
       permissão explícita da matriz RBAC/ABAC — nada permitido por omissão.
-- [x] MFA obrigatório e verificado antes de conceder sessão completa para
-      **todo** usuário (não só papel privilegiado — decisão fechada, ver
-      resumo no topo do documento).
+- [x] MFA formalmente adiado para a próxima fatia de segurança, com risco
+      aceito e controles compensatórios documentados (§11) — não é critério
+      de aceite desta entrega (decisão posterior aprovada).
 - [x] Todos os cenários de ataque do §9 cobertos por teste automatizado e
       verdes (IDOR/BOLA, autoelevação, fixação de sessão por construção,
       força bruta, enumeração, CSRF, vazamento em erro/log).
@@ -540,7 +545,6 @@ apps/api/src/auth/                                              # módulo comple
 apps/api/src/auth/auth.controller.ts                            # endpoints §8
 apps/api/src/auth/auth.service.ts                               # orquestra login/mfa/reset
 apps/api/src/auth/password/                                     # argon2id, política, lista de comuns
-apps/api/src/auth/mfa/                                          # TOTP, cifra AES-256-GCM, recovery codes, challenge
 apps/api/src/auth/session/                                      # sessão, guard, cookie
 apps/api/src/auth/csrf/                                         # synchronizer token guard
 apps/api/src/auth/rate-limit/                                   # 5 tentativas/15min
@@ -553,9 +557,9 @@ apps/api/src/bootstrap/bootstrap-admin.ts                       # comando exclus
 apps/api/src/common/logger/logger.module.ts                     # redact estendido
 apps/api/src/app.module.ts                                      # registra AuthModule/UsersModule
 apps/api/src/main.ts                                             # cookie-parser, ValidationPipe global
-apps/api/src/config/env.validation.ts                            # MFA_ENCRYPTION_KEY obrigatória
-apps/api/.env.example                                             # MFA_ENCRYPTION_KEY
-apps/api/package.json                                             # argon2, otplib, cookie-parser, class-validator/transformer; bootstrap:admin
+apps/api/src/config/env.validation.ts                            # validação de env (sem MFA nesta fatia)
+apps/api/.env.example
+apps/api/package.json                                             # argon2, cookie-parser, class-validator/transformer; bootstrap:admin
 package.json                                                      # pnpm.onlyBuiltDependencies (argon2 nativo)
 apps/api/test/identity.e2e-spec.ts                                # integração + e2e completos (Testcontainers)
 docs/modules/etapa0-fatia3-identidade-acesso.md                   # este documento

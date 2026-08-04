@@ -18,8 +18,6 @@ import { Request, Response } from "express";
 import { ApiTags } from "@nestjs/swagger";
 import { AuthService } from "./auth.service";
 import { LoginDto } from "./dto/login.dto";
-import { MfaVerifyDto } from "./dto/mfa-verify.dto";
-import { MfaEnrollConfirmDto } from "./dto/mfa-enroll-confirm.dto";
 import { PasswordForgotDto } from "./dto/password-forgot.dto";
 import { PasswordResetDto } from "./dto/password-reset.dto";
 import { SessionGuard } from "./session/session.guard";
@@ -32,8 +30,6 @@ import {
 import { extractRequestMetadata } from "./request-metadata.util";
 import { SessionService } from "./session/session.service";
 import { evaluatePermission } from "./authorization/rbac.evaluator";
-import { RequirePermission } from "./authorization/require-permission.decorator";
-import { AuthorizationGuard } from "./authorization/authorization.guard";
 import { AccessSession, AccessUser } from "@prisma/client";
 
 @ApiTags("auth")
@@ -47,52 +43,19 @@ export class AuthController {
 
   @Post("login")
   @HttpCode(HttpStatus.OK)
-  async login(@Body() dto: LoginDto, @Req() req: Request) {
-    const { ip } = extractRequestMetadata(req);
-    return this.authService.login(dto.email, dto.password, ip);
-  }
-
-  @Post("mfa/enroll")
-  @HttpCode(HttpStatus.OK)
-  async enrollMfa(@Body() body: { challengeToken: string }) {
-    return this.authService.startMfaEnrollment(body.challengeToken);
-  }
-
-  @Post("mfa/confirm")
-  @HttpCode(HttpStatus.OK)
-  async confirmMfa(
-    @Body() dto: MfaEnrollConfirmDto,
+  async login(
+    @Body() dto: LoginDto,
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
     const metadata = extractRequestMetadata(req);
-    const result = await this.authService.confirmMfaEnrollment(
-      dto.challengeToken,
-      dto.code,
+    const issued = await this.authService.login(
+      dto.email,
+      dto.password,
       metadata,
     );
-    setSessionCookie(res, result.issuedSession.token, this.configService);
-    return {
-      csrfToken: result.issuedSession.csrfToken,
-      recoveryCodes: result.recoveryCodes,
-    };
-  }
-
-  @Post("mfa/verify")
-  @HttpCode(HttpStatus.OK)
-  async verifyMfa(
-    @Body() dto: MfaVerifyDto,
-    @Req() req: Request,
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    const metadata = extractRequestMetadata(req);
-    const result = await this.authService.verifyMfa(
-      dto.challengeToken,
-      dto.code,
-      metadata,
-    );
-    setSessionCookie(res, result.issuedSession.token, this.configService);
-    return { csrfToken: result.issuedSession.csrfToken };
+    setSessionCookie(res, issued.token, this.configService);
+    return { csrfToken: issued.csrfToken };
   }
 
   @Post("logout")
@@ -173,13 +136,5 @@ export class AuthController {
   ): Promise<void> {
     const { ip } = extractRequestMetadata(req);
     await this.authService.resetPassword(dto.token, dto.newPassword, ip);
-  }
-
-  @Post("mfa/reset/:id")
-  @HttpCode(HttpStatus.NO_CONTENT)
-  @UseGuards(SessionGuard, CsrfGuard, AuthorizationGuard)
-  @RequirePermission("other_account", "manage")
-  async resetMfa(@Param("id") targetUserId: string): Promise<void> {
-    await this.authService.resetMfaForUser(targetUserId);
   }
 }

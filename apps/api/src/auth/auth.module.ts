@@ -3,10 +3,6 @@ import { AuthController } from "./auth.controller";
 import { AuthService } from "./auth.service";
 import { PasswordHashService } from "./password/password-hash.service";
 import { PasswordPolicyService } from "./password/password-policy.service";
-import { TotpService } from "./mfa/totp.service";
-import { MfaSecretCipherService } from "./mfa/mfa-secret-cipher.service";
-import { RecoveryCodeService } from "./mfa/recovery-code.service";
-import { MfaChallengeService } from "./mfa/mfa-challenge.service";
 import { SessionService } from "./session/session.service";
 import { SessionGuard } from "./session/session.guard";
 import { CsrfGuard } from "./csrf/csrf.guard";
@@ -23,10 +19,6 @@ import { NoopEmailNotifier } from "./email/noop-email-notifier.service";
     AuthService,
     PasswordHashService,
     PasswordPolicyService,
-    TotpService,
-    MfaSecretCipherService,
-    RecoveryCodeService,
-    MfaChallengeService,
     SessionService,
     SessionGuard,
     CsrfGuard,

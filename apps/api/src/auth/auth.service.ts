@@ -5,17 +5,9 @@ import {
   UnauthorizedException,
   UnprocessableEntityException,
 } from "@nestjs/common";
-import { AccessUser } from "@prisma/client";
 import { PrismaService } from "../database/prisma.service";
 import { PasswordHashService } from "./password/password-hash.service";
 import { PasswordPolicyService } from "./password/password-policy.service";
-import { TotpService } from "./mfa/totp.service";
-import { MfaSecretCipherService } from "./mfa/mfa-secret-cipher.service";
-import { RecoveryCodeService } from "./mfa/recovery-code.service";
-import {
-  MfaChallengePayload,
-  MfaChallengeService,
-} from "./mfa/mfa-challenge.service";
 import {
   IssuedSession,
   SessionRequestMetadata,
@@ -38,15 +30,6 @@ import { normalizeEmail } from "./normalize-email.util";
 
 const PASSWORD_RESET_TOKEN_TTL_MS = 20 * 60 * 1000; // 20 min (janela §4: 15–30 min)
 
-export type LoginOutcome =
-  | { status: "mfa_enrollment_required"; challengeToken: string }
-  | { status: "mfa_verification_required"; challengeToken: string };
-
-export interface MfaCompletionResult {
-  issuedSession: IssuedSession;
-  recoveryCodes?: string[];
-}
-
 @Injectable()
 export class AuthService {
   constructor(
@@ -54,10 +37,6 @@ export class AuthService {
     @Inject(CREDENTIAL_VERIFIER)
     private readonly credentialVerifier: CredentialVerifier,
     private readonly rateLimitService: RateLimitService,
-    private readonly mfaChallengeService: MfaChallengeService,
-    private readonly totpService: TotpService,
-    private readonly mfaSecretCipher: MfaSecretCipherService,
-    private readonly recoveryCodeService: RecoveryCodeService,
     private readonly sessionService: SessionService,
     private readonly passwordHashService: PasswordHashService,
     private readonly passwordPolicyService: PasswordPolicyService,
@@ -67,14 +46,14 @@ export class AuthService {
   async login(
     email: string,
     password: string,
-    ip: string | null,
-  ): Promise<LoginOutcome> {
-    await this.rateLimitService.assertLoginNotRateLimited(email, ip);
+    metadata: SessionRequestMetadata,
+  ): Promise<IssuedSession> {
+    await this.rateLimitService.assertNotRateLimited(email, metadata.ip);
 
     const result = await this.credentialVerifier.verify(email, password);
-    await this.rateLimitService.recordLoginAttempt(
+    await this.rateLimitService.recordAttempt(
       email,
-      ip,
+      metadata.ip,
       result.outcome === "valid",
     );
 
@@ -84,149 +63,12 @@ export class AuthService {
       throw new UnauthorizedException();
     }
 
-    const user = result.user;
-    if (!user.mfaEnabled) {
-      return {
-        status: "mfa_enrollment_required",
-        challengeToken: this.mfaChallengeService.issue(user.id, "mfa_enroll"),
-      };
-    }
-
-    return {
-      status: "mfa_verification_required",
-      challengeToken: this.mfaChallengeService.issue(user.id, "mfa_verify"),
-    };
-  }
-
-  async startMfaEnrollment(
-    challengeToken: string,
-  ): Promise<{ otpauthUri: string; challengeToken: string }> {
-    const payload = this.requireChallenge(challengeToken, "mfa_enroll");
-    const user = await this.requireUserById(payload.sub);
-
-    const secret = this.totpService.generateSecret();
-    const encrypted = this.mfaSecretCipher.encrypt(secret);
-
-    await this.prisma.accessUser.update({
-      where: { id: user.id },
-      data: { mfaSecretEncrypted: encrypted },
-    });
-
-    return {
-      otpauthUri: this.totpService.buildOtpAuthUri(user.email, secret),
-      challengeToken: this.mfaChallengeService.issue(user.id, "mfa_enroll"),
-    };
-  }
-
-  async confirmMfaEnrollment(
-    challengeToken: string,
-    code: string,
-    metadata: SessionRequestMetadata,
-  ): Promise<MfaCompletionResult> {
-    const payload = this.requireChallenge(challengeToken, "mfa_enroll");
-    const user = await this.requireUserById(payload.sub);
-
-    await this.rateLimitService.assertMfaNotRateLimited(
-      user.email,
-      metadata.ip,
-    );
-
-    if (!user.mfaSecretEncrypted) {
-      throw new UnauthorizedException();
-    }
-
-    const secret = this.mfaSecretCipher.decrypt(user.mfaSecretEncrypted);
-    const valid = this.totpService.verify(code, secret);
-    await this.rateLimitService.recordMfaAttempt(
-      user.email,
-      metadata.ip,
-      valid,
-    );
-
-    if (!valid) {
-      throw new UnauthorizedException();
-    }
-
-    const recoveryCodes = this.recoveryCodeService.generateCodes();
-    // Hash (Argon2id, assíncrono) precisa terminar ANTES de montar as
-    // chamadas do $transaction — passar uma Promise já resolvida (await
-    // solto) para $transaction executaria fora da transação.
-    const recoveryCodeHashes = await Promise.all(
-      recoveryCodes.map((code) => this.recoveryCodeService.hashCode(code)),
-    );
-
-    await this.prisma.$transaction([
-      this.prisma.accessUser.update({
-        where: { id: user.id },
-        data: { mfaEnabled: true },
-      }),
-      ...recoveryCodeHashes.map((codeHash) =>
-        this.prisma.accessMfaRecoveryCode.create({
-          data: { userId: user.id, codeHash },
-        }),
-      ),
-    ]);
-
-    const issuedSession = await this.sessionService.issue(user.id, metadata);
-    return { issuedSession, recoveryCodes };
-  }
-
-  async verifyMfa(
-    challengeToken: string,
-    code: string,
-    metadata: SessionRequestMetadata,
-  ): Promise<MfaCompletionResult> {
-    const payload = this.requireChallenge(challengeToken, "mfa_verify");
-    const user = await this.requireUserById(payload.sub);
-
-    await this.rateLimitService.assertMfaNotRateLimited(
-      user.email,
-      metadata.ip,
-    );
-
-    if (!user.mfaSecretEncrypted) {
-      throw new UnauthorizedException();
-    }
-
-    const secret = this.mfaSecretCipher.decrypt(user.mfaSecretEncrypted);
-    const valid = this.totpService.verify(code, secret);
-    await this.rateLimitService.recordMfaAttempt(
-      user.email,
-      metadata.ip,
-      valid,
-    );
-
-    if (!valid) {
-      throw new UnauthorizedException();
-    }
-
-    const issuedSession = await this.sessionService.issue(user.id, metadata);
-    return { issuedSession };
-  }
-
-  /** Reset de MFA de terceiro — sempre reautentica do zero no próximo login. */
-  async resetMfaForUser(targetUserId: string): Promise<void> {
-    await this.prisma.$transaction([
-      this.prisma.accessUser.update({
-        where: { id: targetUserId },
-        data: { mfaEnabled: false, mfaSecretEncrypted: null },
-      }),
-      this.prisma.accessMfaRecoveryCode.deleteMany({
-        where: { userId: targetUserId },
-      }),
-    ]);
-    await this.sessionService.revokeAllForUser(
-      targetUserId,
-      "mfa_reset_by_admin",
-    );
+    return this.sessionService.issue(result.user.id, metadata);
   }
 
   async requestPasswordReset(email: string, ip: string | null): Promise<void> {
     const normalized = normalizeEmail(email);
-    await this.rateLimitService.assertLoginNotRateLimited(
-      `reset:${normalized}`,
-      ip,
-    );
+    await this.rateLimitService.assertNotRateLimited(`reset:${normalized}`, ip);
 
     const user = await this.prisma.accessUser.findUnique({
       where: { email: normalized },
@@ -247,11 +89,7 @@ export class AuthService {
     // Sempre grava tentativa "bem-sucedida" (não é rate limit de força
     // bruta de senha, é limite de disparo do fluxo) e sempre retorna igual,
     // exista ou não o e-mail — evita enumeração (spec §6).
-    await this.rateLimitService.recordLoginAttempt(
-      `reset:${normalized}`,
-      ip,
-      true,
-    );
+    await this.rateLimitService.recordAttempt(`reset:${normalized}`, ip, true);
   }
 
   async resetPassword(
@@ -259,13 +97,13 @@ export class AuthService {
     newPassword: string,
     ip: string | null,
   ): Promise<void> {
-    await this.rateLimitService.assertLoginNotRateLimited(
+    await this.rateLimitService.assertNotRateLimited(
       `pwreset-attempt:${ip ?? "unknown"}`,
       ip,
     );
 
     if (!this.passwordPolicyService.isValid(newPassword)) {
-      await this.rateLimitService.recordLoginAttempt(
+      await this.rateLimitService.recordAttempt(
         `pwreset-attempt:${ip ?? "unknown"}`,
         ip,
         false,
@@ -279,7 +117,7 @@ export class AuthService {
     });
 
     if (!resetToken) {
-      await this.rateLimitService.recordLoginAttempt(
+      await this.rateLimitService.recordAttempt(
         `pwreset-attempt:${ip ?? "unknown"}`,
         ip,
         false,
@@ -287,7 +125,7 @@ export class AuthService {
       throw new BadRequestException();
     }
 
-    await this.rateLimitService.recordLoginAttempt(
+    await this.rateLimitService.recordAttempt(
       `pwreset-attempt:${ip ?? "unknown"}`,
       ip,
       true,
@@ -310,26 +148,5 @@ export class AuthService {
       resetToken.userId,
       "password_reset",
     );
-  }
-
-  private requireChallenge(
-    token: string,
-    purpose: "mfa_enroll" | "mfa_verify",
-  ): MfaChallengePayload {
-    const payload = this.mfaChallengeService.verify(token, purpose);
-    if (!payload) {
-      throw new UnauthorizedException();
-    }
-    return payload;
-  }
-
-  private async requireUserById(userId: string): Promise<AccessUser> {
-    const user = await this.prisma.accessUser.findUnique({
-      where: { id: userId },
-    });
-    if (!user || user.status !== "active") {
-      throw new UnauthorizedException();
-    }
-    return user;
   }
 }

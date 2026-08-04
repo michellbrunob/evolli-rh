@@ -2,6 +2,10 @@
 // (colaborador, folha, ponto, documento) é definido aqui — só identidade
 // técnica de acesso (Fatia 3, ADR 0003).
 //
+// MFA (TOTP) foi adiado para a próxima fatia de segurança (decisão
+// posterior aprovada) — nenhuma estrutura de MFA entra neste schema. Ver
+// docs/modules/etapa0-fatia3-identidade-acesso.md e ADR 0003.
+//
 // `url` é a conexão de runtime da aplicação (usuário evolli_app, só DML).
 // `directUrl` é usada exclusivamente pelo Prisma CLI para comandos de
 // migration (usuário evolli_migrator, DDL) — nunca pela aplicação em
@@ -49,35 +53,16 @@ model AccessUser {
   unitId    String? @map("unit_id")
   teamId    String? @map("team_id")
 
-  mfaEnabled Boolean @default(false) @map("mfa_enabled")
-  // AES-256-GCM: iv(12) || authTag(16) || ciphertext, chave fora do banco
-  // (MFA_ENCRYPTION_KEY) — ver ADR 0003 §7.
-  mfaSecretEncrypted Bytes? @map("mfa_secret_encrypted")
-
   status AccessUserStatus @default(active)
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   sessions            AccessSession[]
-  recoveryCodes       AccessMfaRecoveryCode[]
   passwordResetTokens AccessPasswordResetToken[]
 
   @@index([companyId])
   @@map("access_user")
-}
-
-model AccessMfaRecoveryCode {
-  id        String    @id @default(uuid())
-  userId    String    @map("user_id")
-  codeHash  String    @map("code_hash")
-  usedAt    DateTime? @map("used_at")
-  createdAt DateTime  @default(now()) @map("created_at")
-
-  user AccessUser @relation(fields: [userId], references: [id])
-
-  @@index([userId])
-  @@map("access_mfa_recovery_code")
 }
 
 // Sessão de servidor. `id` é só referência interna, NUNCA aceito como
@@ -121,9 +106,7 @@ model AccessPasswordResetToken {
   @@map("access_password_reset_token")
 }
 
-// Suporte a rate limiting/lockout (§6). Reaproveitada também para tentativas
-// de verificação de MFA, prefixando `emailAttempted` com "mfa:" — evita
-// nova tabela para uma janela de contagem com a mesma forma.
+// Suporte a rate limiting/lockout (§6).
 model AccessLoginAttempt {
   id             String   @id @default(uuid())
   emailAttempted String   @map("email_attempted")

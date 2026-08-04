@@ -9,11 +9,9 @@ export const ARGON2ID_TIME_COST = 2;
 export const ARGON2ID_PARALLELISM = 1;
 
 /**
- * Hash/verificação de senha e de código de recuperação MFA — ambos são
- * segredos de baixa entropia escolhidos/gerados para serem memorizáveis ou
- * anotados por humano, por isso usam Argon2id (lento, resistente a força
- * bruta offline), diferente do token opaco de sessão (ver
- * crypto/opaque-token.util.ts).
+ * Hash/verificação de senha — segredo de baixa entropia escolhido por
+ * humano, por isso usa Argon2id (lento, resistente a força bruta offline),
+ * diferente do token opaco de sessão (ver crypto/opaque-token.util.ts).
  */
 @Injectable()
 export class PasswordHashService {

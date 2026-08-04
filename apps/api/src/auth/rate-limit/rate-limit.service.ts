@@ -8,57 +8,15 @@ import { normalizeEmail } from "../normalize-email.util";
 export const RATE_LIMIT_MAX_ATTEMPTS = 5;
 export const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 
-const MFA_ATTEMPT_PREFIX = "mfa:";
-
 @Injectable()
 export class RateLimitService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async assertLoginNotRateLimited(
-    email: string,
-    ip: string | null,
-  ): Promise<void> {
-    await this.assertNotRateLimited(normalizeEmail(email), ip);
-  }
-
-  async assertMfaNotRateLimited(
-    userEmail: string,
-    ip: string | null,
-  ): Promise<void> {
-    await this.assertNotRateLimited(
-      `${MFA_ATTEMPT_PREFIX}${normalizeEmail(userEmail)}`,
-      ip,
-    );
-  }
-
-  async recordLoginAttempt(
-    email: string,
-    ip: string | null,
-    succeeded: boolean,
-  ): Promise<void> {
-    await this.recordAttempt(normalizeEmail(email), ip, succeeded);
-  }
-
-  async recordMfaAttempt(
-    userEmail: string,
-    ip: string | null,
-    succeeded: boolean,
-  ): Promise<void> {
-    await this.recordAttempt(
-      `${MFA_ATTEMPT_PREFIX}${normalizeEmail(userEmail)}`,
-      ip,
-      succeeded,
-    );
-  }
-
-  private async assertNotRateLimited(
-    key: string,
-    ip: string | null,
-  ): Promise<void> {
+  async assertNotRateLimited(key: string, ip: string | null): Promise<void> {
     const since = new Date(Date.now() - RATE_LIMIT_WINDOW_MS);
     const failedCount = await this.prisma.accessLoginAttempt.count({
       where: {
-        emailAttempted: key,
+        emailAttempted: normalizeEmail(key),
         ip: ip ?? null,
         succeeded: false,
         createdAt: { gte: since },
@@ -75,14 +33,14 @@ export class RateLimitService {
     }
   }
 
-  private async recordAttempt(
+  async recordAttempt(
     key: string,
     ip: string | null,
     succeeded: boolean,
   ): Promise<void> {
     await this.prisma.accessLoginAttempt.create({
       data: {
-        emailAttempted: key,
+        emailAttempted: normalizeEmail(key),
         ip: ip ?? null,
         succeeded,
       },

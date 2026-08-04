@@ -57,15 +57,28 @@ exigência de desenhar por interface onde a troca futura for previsível.
   fatia. Se essa integração vier a ser aprovada no futuro, é decisão
   arquitetural nova, com ADR própria.
 
-### 3. MFA obrigatório para todo usuário desde o primeiro acesso; TOTP nesta fatia
+### 3. MFA adiado para a próxima fatia de segurança (decisão posterior aprovada)
 
-- MFA (TOTP, RFC 6238) obrigatório para **todo** usuário ativo, sem exceção
-  por papel, desde o primeiro login — substitui qualquer proposta anterior
-  de restringir a "perfis privilegiados".
-- WebAuthn/passkeys registrado como evolução futura (mais resistente a
-  phishing que TOTP), não implementado nesta fatia — TOTP cobre o requisito
-  de segundo fator sem exigir suporte a hardware/plataforma específico dos
-  usuários no piloto.
+- **Decisão original desta ADR** (2026-08-03) fechava MFA (TOTP, RFC 6238)
+  como obrigatório para todo usuário ativo desde o primeiro login, já
+  implementado nesta fatia.
+- **Decisão revisada (posterior à aprovação original):** MFA é **adiado**
+  para a próxima fatia de segurança. Esta PR/fatia entrega login e sessão
+  só com e-mail/senha — nenhuma estrutura de MFA (endpoint, serviço, tabela,
+  coluna, dependência, variável de ambiente) é incluída.
+- Isso é tratado como **risco aceito conscientemente**, não como
+  enfraquecimento silencioso da decisão original: TOTP continua sendo a
+  tecnologia decidida para quando MFA for implementado; WebAuthn/passkeys
+  seguem como evolução futura além disso.
+- **Controles compensatórios** desta entrega (mitigam, não substituem MFA):
+  Argon2id (decisão 4), política de senha forte (decisão 4), sessão opaca em
+  cookie `HttpOnly`/`Secure`/`SameSite` com só `token_hash` persistido
+  (decisão 5), CSRF synchronizer token (decisão 6), logout/revogação de
+  sessão sempre disponíveis, rate limiting de tentativas de login, RBAC/ABAC
+  com negação por padrão, e proteção contra enumeração de usuário/IDOR/BOLA.
+- **Condição de saída do risco aceito:** MFA implementado e **obrigatório
+  antes de qualquer piloto com dados reais de RH ou produção** — não é
+  aceitável operar piloto com dado real ou produção sem MFA ativo.
 
 ### 4. Parâmetros mínimos de senha e hashing
 
@@ -90,8 +103,9 @@ exigência de desenhar por interface onde a troca futura for previsível.
   referência/join) **não é aceito como credencial** em nenhuma rota — a
   única forma de autenticar uma sessão é apresentar o token do cookie, que o
   servidor rehash e compara contra `token_hash`.
-- Rotação de token obrigatória após login e após conclusão de MFA; revogação
-  (própria ou de terceiro autorizado) sempre disponível e imediata.
+- Rotação de token obrigatória após login (e, futuramente, após conclusão de
+  MFA quando implementado); revogação (própria ou de terceiro autorizado)
+  sempre disponível e imediata.
 
 ### 6. CSRF: synchronizer token
 
@@ -100,16 +114,19 @@ exigência de desenhar por interface onde a troca futura for previsível.
 - `SameSite` do cookie de sessão é camada adicional de defesa em
   profundidade — não substitui o token synchronizer.
 
-### 7. Segredo de MFA cifrado com AES-256-GCM, chave fora do banco
+### 7. Segredo de MFA cifrado com AES-256-GCM, chave fora do banco (aplica-se quando MFA for implementado)
 
-- O segredo TOTP de cada usuário é cifrado em repouso com AES-256-GCM antes
-  de gravar no banco.
-- A chave de cifragem vive fora do banco de dados (variável de
+- Decisão preservada para quando MFA for implementado (decisão 3, adiada):
+  o segredo TOTP de cada usuário será cifrado em repouso com AES-256-GCM
+  antes de gravar no banco.
+- A chave de cifragem viverá fora do banco de dados (variável de
   ambiente/cofre de segredos da plataforma, mesmo padrão de segredo já
   estabelecido nas ADRs 0001/0002 — nunca versionada).
-- Rotação de chave é procedimento documentado (não implementada
-  automaticamente nesta fatia); o segredo MFA nunca aparece em log, erro ou
-  resposta de API, em nenhuma hipótese.
+- Rotação de chave será procedimento documentado (não automática); o
+  segredo MFA nunca deverá aparecer em log, erro ou resposta de API, em
+  nenhuma hipótese.
+- Nesta fatia, nenhuma dessas estruturas existe no código/schema — a decisão
+  fica registrada como especificação para a implementação futura de MFA.
 
 ### 8. `access_user` desacoplado de colaborador
 
@@ -126,17 +143,17 @@ exigência de desenhar por interface onde a troca futura for previsível.
 
 ## Alternativas descartadas
 
-| Alternativa                                                   | Por que foi descartada                                                                                                                                                                                           |
-| ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Redis para sessão desde o início                              | Introduz dependência de infraestrutura nova sem métrica real que justifique — Postgres já é infraestrutura existente (Fatia 2) e suficiente para o volume esperado do piloto. Descartado por dependência mínima. |
-| JWT stateless para sessão                                     | Impede revogação real (exigida no enunciado): um JWT válido não pode ser invalidado antes de expirar sem uma lista de revogação, que reintroduz o mesmo problema que sessão de servidor já resolve. Descartado.  |
-| IdP externo (Keycloak/Auth0/Azure AD) já nesta fatia          | Mudança arquitetural significativa, custo operacional e de integração desproporcional para a Etapa 0; adiado até haver necessidade real (múltiplos sistemas, exigência corporativa de SSO). Descartado por ora.  |
-| MFA só para perfis privilegiados                              | Contradiz a decisão de negação por padrão e o perfil de risco de um sistema de RH/DP — qualquer conta comprometida sem MFA já é uma porta de entrada. Descartado em favor de MFA universal.                      |
-| WebAuthn/passkeys nesta fatia                                 | Maior complexidade de implementação e de suporte a dispositivo/navegador do usuário no piloto; TOTP atende o requisito de segundo fator com menor atrito. Adiado como evolução.                                  |
-| Guardar o token de sessão em claro no banco (não só o hash)   | Um vazamento do banco (backup, dump, acesso indevido) exporia sessões ativas diretamente, sem precisar do cookie do cliente. Descartado — só `token_hash` é armazenado.                                          |
-| Usar o `id` interno da sessão como credencial                 | Um identificador interno sequencial/previsível (ou mesmo UUID exposto via log/URL) vira vetor de sequestro de sessão se aceito como credencial. Descartado — só o token do cookie autentica.                     |
-| CSRF só por `SameSite`, sem token synchronizer                | `SameSite` sozinho não cobre todos os vetores (navegadores antigos, subdomínios, certas configurações de proxy) — prática recomendada é usar as duas camadas. Descartado usar só uma.                            |
-| Antecipar o vínculo `access_user` ↔ `colaborador` nesta fatia | Acoplaria esta fatia à Etapa 1 antes dela ser especificada/homologada, e obrigaria migration especulativa. Descartado — vínculo fica para quando a Etapa 1 for implementada e revisada.                          |
+| Alternativa                                                   | Por que foi descartada                                                                                                                                                                                                       |
+| ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Redis para sessão desde o início                              | Introduz dependência de infraestrutura nova sem métrica real que justifique — Postgres já é infraestrutura existente (Fatia 2) e suficiente para o volume esperado do piloto. Descartado por dependência mínima.             |
+| JWT stateless para sessão                                     | Impede revogação real (exigida no enunciado): um JWT válido não pode ser invalidado antes de expirar sem uma lista de revogação, que reintroduz o mesmo problema que sessão de servidor já resolve. Descartado.              |
+| IdP externo (Keycloak/Auth0/Azure AD) já nesta fatia          | Mudança arquitetural significativa, custo operacional e de integração desproporcional para a Etapa 0; adiado até haver necessidade real (múltiplos sistemas, exigência corporativa de SSO). Descartado por ora.              |
+| MFA só para perfis privilegiados                              | Contradiz a decisão de negação por padrão e o perfil de risco de um sistema de RH/DP — qualquer conta comprometida sem MFA já é uma porta de entrada. Descartado em favor de MFA universal (quando implementado, decisão 3). |
+| WebAuthn/passkeys nesta fatia                                 | Maior complexidade de implementação e de suporte a dispositivo/navegador do usuário no piloto; TOTP atende o requisito de segundo fator com menor atrito. Adiado como evolução.                                              |
+| Guardar o token de sessão em claro no banco (não só o hash)   | Um vazamento do banco (backup, dump, acesso indevido) exporia sessões ativas diretamente, sem precisar do cookie do cliente. Descartado — só `token_hash` é armazenado.                                                      |
+| Usar o `id` interno da sessão como credencial                 | Um identificador interno sequencial/previsível (ou mesmo UUID exposto via log/URL) vira vetor de sequestro de sessão se aceito como credencial. Descartado — só o token do cookie autentica.                                 |
+| CSRF só por `SameSite`, sem token synchronizer                | `SameSite` sozinho não cobre todos os vetores (navegadores antigos, subdomínios, certas configurações de proxy) — prática recomendada é usar as duas camadas. Descartado usar só uma.                                        |
+| Antecipar o vínculo `access_user` ↔ `colaborador` nesta fatia | Acoplaria esta fatia à Etapa 1 antes dela ser especificada/homologada, e obrigaria migration especulativa. Descartado — vínculo fica para quando a Etapa 1 for implementada e revisada.                                      |
 
 ## Consequências
 
@@ -146,9 +163,14 @@ exigência de desenhar por interface onde a troca futura for previsível.
 - A interface de autenticação (decisão 2) adiciona uma camada de abstração
   desde já, mesmo sem OIDC/SSO implementado — trade-off aceito para evitar
   reescrever sessão/autorização se essa evolução for aprovada depois.
-- MFA universal (decisão 3) aumenta o atrito de onboarding de todo usuário,
-  não só de perfis privilegiados — exige processo de suporte a reset desde o
-  primeiro piloto (evento de auditoria já especificado na Fatia 3).
+- MFA adiado (decisão 3) significa que esta fatia opera com risco aceito —
+  conta comprometida por senha vazada/reutilizada não tem segundo fator até
+  a próxima fatia de segurança implementar MFA, o que é obrigatório antes de
+  qualquer piloto com dado real de RH ou produção (controles compensatórios
+  documentados na decisão 3 e na Fatia 3 §11). Quando implementado, MFA
+  universal aumentará o atrito de onboarding de todo usuário, exigindo
+  processo de suporte a reset (evento de auditoria já especificado na
+  Fatia 3).
 - Parâmetros de Argon2id (decisão 4) custam CPU por login — piso definido
   conscientemente para resistência a ataque de força bruta offline; ambientes
   com mais capacidade podem aumentar (nunca reduzir), com registro
@@ -160,8 +182,9 @@ exigência de desenhar por interface onde a troca futura for previsível.
   de mutação no frontend (Etapa futura) carregue e envie o token — acoplamento
   a ser considerado no contrato de API (Fatia 3, §8).
 - Rotação de chave de cifragem do segredo MFA (decisão 7) é procedimento
-  manual documentado nesta fatia — não há automação de rotação ainda; isso é
-  risco operacional aceito conscientemente, a revisar se o produto crescer.
+  manual a documentar quando MFA for implementado — não há automação de
+  rotação prevista; será risco operacional aceito conscientemente, a revisar
+  se o produto crescer.
 - `access_user` desacoplado de colaborador (decisão 8) significa que, até a
   Etapa 1, um usuário de acesso pode existir sem nenhum colaborador
   correspondente (ex.: conta de admin técnico) — isso é esperado, não um bug.
@@ -172,35 +195,41 @@ exigência de desenhar por interface onde a troca futura for previsível.
   suportar OIDC/SSO sem refatoração relevante quando chegar a hora — mitigado
   mantendo a interface deliberadamente pequena (só verificação de credencial
   - identidade resultante), revisada antes de qualquer integração futura.
-- MFA universal sem fluxo de suporte maduro pode travar usuário legítimo fora
-  do sistema — mitigado por reset restrito a Admin técnico/RH/DP com
-  auditoria (Fatia 3, §4, §10).
+- MFA adiado é o risco aceito principal desta fatia — ver decisão 3 e Fatia 3
+  §11 para controles compensatórios e condição de saída. Quando MFA for
+  implementado, MFA universal sem fluxo de suporte maduro pode travar
+  usuário legítimo fora do sistema — mitigação prevista: reset restrito a
+  Admin técnico/RH/DP com auditoria (Fatia 3, §4, §10).
 - Critérios de migração a Redis (decisão 1) dependem de instrumentação de
   métrica real em produção que ainda não existe (observabilidade é fatia
   futura) — até lá, a decisão de migrar fica sem dado objetivo para embasar,
   o que é aceito como estado inicial esperado.
-- Rotação manual da chave de cifragem do segredo MFA (decisão 7) depende de
-  disciplina operacional — sem automação, o risco é a rotação nunca
-  acontecer na prática; mitigação fica registrada como item de revisão
-  periódica de segurança, fora do escopo de código desta fatia.
+- Rotação manual da chave de cifragem do segredo MFA (decisão 7, aplicável
+  quando MFA for implementado) dependerá de disciplina operacional — sem
+  automação, o risco é a rotação nunca acontecer na prática; mitigação fica
+  registrada como item de revisão periódica de segurança.
 
 ## Responsabilidades
 
 - **Time de desenvolvimento (código):** implementar a interface de
   autenticação de forma realmente substituível (decisão 2); garantir que
   `token_hash` seja o único dado de sessão persistido e que o `id` interno
-  nunca sirva de credencial (decisão 5); implementar MFA universal com fluxo
-  de reset auditado (decisão 3); nunca reduzir os parâmetros mínimos de
+  nunca sirva de credencial (decisão 5); implementar MFA (decisão 3) na
+  próxima fatia de segurança, com fluxo de reset auditado, antes de qualquer
+  piloto com dado real ou produção; nunca reduzir os parâmetros mínimos de
   senha/Argon2id (decisão 4) sem registro documentado.
-- **TI/Segurança:** definir e revisar o procedimento de rotação da chave de
-  cifragem do segredo MFA (decisão 7); acompanhar a métrica de latência/
-  contenção de sessão que dispararia a decisão 1 assim que observabilidade
-  existir.
+- **TI/Segurança:** priorizar e acompanhar a implementação de MFA (decisão 3) como próxima fatia de segurança; definir e revisar o procedimento de
+  rotação da chave de cifragem do segredo MFA (decisão 7) quando MFA for
+  implementado; acompanhar a métrica de latência/contenção de sessão que
+  dispararia a decisão 1 assim que observabilidade existir.
 - **DPO/jurídico:** validar finalidade, base legal e retenção dos dados de
-  identidade/sessão tratados (ver Fatia 3, §2), antes de produção.
+  identidade/sessão tratados (ver Fatia 3, §2), antes de produção; confirmar
+  que o risco aceito de MFA adiado (decisão 3) é compatível com qualquer
+  piloto com dado real antes de ele ocorrer.
 - **Revisor de PR:** bloquear merge que grave token de sessão em claro, use
   `id` interno como credencial, reduza parâmetro mínimo de senha/Argon2id
-  sem documentação, ou logue segredo MFA/senha/token em qualquer forma.
+  sem documentação, logue segredo MFA/senha/token em qualquer forma, ou
+  autorize piloto com dado real de RH/produção sem MFA implementado.
 
 ## Critérios para futura migração a Redis/IdP externo
 
@@ -215,6 +244,10 @@ exigência de desenhar por interface onde a troca futura for previsível.
 
 ## Limitações
 
+- Esta ADR **não implementa MFA nesta fatia** (decisão 3, adiada) — o
+  código/schema desta entrega não contém nenhuma estrutura de MFA. A
+  implementação fica para a próxima fatia de segurança, obrigatória antes de
+  qualquer piloto com dado real de RH ou produção.
 - Esta ADR não define parâmetros finos ainda pendentes (expiração exata de
   sessão, janela de rate limiting, limiar de bloqueio por força bruta) — ver
   Fatia 3, §11, decisões ainda pendentes.

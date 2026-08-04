@@ -87,8 +87,8 @@ async function main(): Promise<void> {
 
     // eslint-disable-next-line no-console
     console.log(
-      "Administrador técnico criado. MFA (TOTP) é obrigatório e será " +
-        "exigido no primeiro login.",
+      "Administrador técnico criado. MFA (TOTP) fica para a próxima fatia " +
+        "de segurança — não é exigido nesta entrega (ADR 0003).",
     );
   } finally {
     await appContext.close();

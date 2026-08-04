@@ -101,7 +101,11 @@ export class SessionService {
     return { session: touched, user };
   }
 
-  /** Rotação pós-login/MFA (ADR 0003 §5): emite sessão nova, revoga a velha. */
+  /**
+   * Rotação de sessão (ADR 0003 §5): emite sessão nova, revoga a velha.
+   * Reutilizável para qualquer elevação de credencial futura (ex.: quando
+   * MFA — adiado para a próxima fatia de segurança — for implementado).
+   */
   async rotate(
     previousSessionId: string,
     userId: string,

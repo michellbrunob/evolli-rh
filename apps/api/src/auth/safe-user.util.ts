@@ -1,6 +1,6 @@
 import { AccessUser } from "@prisma/client";
 
-/** Projeção segura de AccessUser — nunca inclui passwordHash/mfaSecretEncrypted. */
+/** Projeção segura de AccessUser — nunca inclui passwordHash. */
 export interface SafeAccessUser {
   id: string;
   email: string;
@@ -8,7 +8,6 @@ export interface SafeAccessUser {
   companyId: string | null;
   unitId: string | null;
   teamId: string | null;
-  mfaEnabled: boolean;
   status: string;
   createdAt: Date;
 }
@@ -21,7 +20,6 @@ export function toSafeUser(user: AccessUser): SafeAccessUser {
     companyId: user.companyId,
     unitId: user.unitId,
     teamId: user.teamId,
-    mfaEnabled: user.mfaEnabled,
     status: user.status,
     createdAt: user.createdAt,
   };

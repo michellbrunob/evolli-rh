@@ -13,24 +13,11 @@ CREATE TABLE "access_user" (
     "company_id" TEXT,
     "unit_id" TEXT,
     "team_id" TEXT,
-    "mfa_enabled" BOOLEAN NOT NULL DEFAULT false,
-    "mfa_secret_encrypted" BYTEA,
     "status" "AccessUserStatus" NOT NULL DEFAULT 'active',
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "access_user_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "access_mfa_recovery_code" (
-    "id" TEXT NOT NULL,
-    "user_id" TEXT NOT NULL,
-    "code_hash" TEXT NOT NULL,
-    "used_at" TIMESTAMP(3),
-    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "access_mfa_recovery_code_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -80,9 +67,6 @@ CREATE UNIQUE INDEX "access_user_email_key" ON "access_user"("email");
 CREATE INDEX "access_user_company_id_idx" ON "access_user"("company_id");
 
 -- CreateIndex
-CREATE INDEX "access_mfa_recovery_code_user_id_idx" ON "access_mfa_recovery_code"("user_id");
-
--- CreateIndex
 CREATE UNIQUE INDEX "access_session_token_hash_key" ON "access_session"("token_hash");
 
 -- CreateIndex
@@ -93,9 +77,6 @@ CREATE INDEX "access_password_reset_token_user_id_idx" ON "access_password_reset
 
 -- CreateIndex
 CREATE INDEX "access_login_attempt_email_attempted_created_at_idx" ON "access_login_attempt"("email_attempted", "created_at");
-
--- AddForeignKey
-ALTER TABLE "access_mfa_recovery_code" ADD CONSTRAINT "access_mfa_recovery_code_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "access_user"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "access_session" ADD CONSTRAINT "access_session_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "access_user"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
