@@ -1,6 +1,33 @@
 # Etapa 0 — Fatia 3: Identidade, sessões seguras e autorização
 
-Status: **especificação aprovada — decisões fechadas, implementação ainda não iniciada**
+Status: **implementada** (branch `feature/etapa0-identidade-acesso`)
+
+### Resumo do que foi implementado
+
+Autenticação e-mail/senha (interface `CredentialVerifier`, hoje só
+`LocalCredentialVerifier`), Argon2id (piso 19 MiB/2/1), política de senha
+(15–256 chars, Unicode/espaço, lista local de comuns/vazadas), MFA TOTP
+obrigatório desde o primeiro acesso (enroll/confirm/verify/reset, códigos de
+recuperação com hash, segredo cifrado AES-256-GCM), sessão em PostgreSQL
+(token opaco no cookie, só `token_hash` no banco, `id` interno nunca aceito
+como credencial, rotação pós-login/MFA via emissão nova + revogação da
+anterior quando aplicável, expiração 8h/30min), CSRF synchronizer token,
+RBAC/ABAC reutilizável (`evaluatePermission` + `AuthorizationGuard` +
+`@RequirePermission`), rate limit 5/15min (login e MFA), bootstrap exclusivo
+do admin técnico (`pnpm --filter @evolli/api bootstrap:admin`), redact de log
+estendido. Migration real aplicada e testada (Testcontainers + banco local).
+Recuperação de senha por e-mail **não envia e-mail real** — `EmailNotifier`
+com implementação `Noop`, pendência de provedor mantida (§11).
+
+Duas adaptações de implementação, sem mudar a decisão arquitetural:
+
+- `AccessSession` ganhou a coluna `csrf_token_hash` (não estava no rascunho
+  conceitual do §7) — necessária para o synchronizer token ficar vinculado à
+  sessão (ADR 0003 §6); mesmo padrão de "só hash, nunca o valor bruto".
+- `POST /v1/auth/mfa/reset` virou `POST /v1/auth/mfa/reset/:id` — o `:id` do
+  usuário-alvo é exigido pelo `AuthorizationGuard` reutilizável (mesmo padrão
+  de `/v1/users/:id/role` e `/v1/users/:id/disable`); o contrato original no
+  §8 era só ilustrativo ("rota proposta").
 
 Depende de: [Fatia 1 — fundação da API](etapa0-fundacao-api.md),
 [Fatia 2 — PostgreSQL/migrations](etapa0-fatia2-postgres-migrations.md),
@@ -481,39 +508,55 @@ reset/CSRF ou código de recuperação — só metadado da ação.
   cadastro de acesso técnico (distinto do aviso de dado de RH, que virá na
   Etapa 1).
 
-### Critérios de aceite (para a implementação futura, não desta tarefa)
+### Critérios de aceite
 
-- [ ] Nenhuma senha, hash, segredo MFA, token de sessão/reset/CSRF ou código
-      de recuperação aparece em log, erro HTTP ou resposta de API.
-- [ ] Todo endpoint autenticado exige sessão válida; toda ação exige
+- [x] Nenhuma senha, hash, segredo MFA, token de sessão/reset/CSRF ou código
+      de recuperação aparece em log, erro HTTP ou resposta de API — validado
+      por teste automatizado e por smoke test manual contra Postgres real.
+- [x] Todo endpoint autenticado exige sessão válida; toda ação exige
       permissão explícita da matriz RBAC/ABAC — nada permitido por omissão.
-- [ ] MFA obrigatório e verificado antes de conceder sessão completa para
-      todo papel privilegiado (§3).
-- [ ] Todos os cenários de ataque do §9 cobertos por teste automatizado e
-      verdes.
-- [ ] IDOR/BOLA: teste automatizado prova que usuário de um escopo não lê
+- [x] MFA obrigatório e verificado antes de conceder sessão completa para
+      **todo** usuário (não só papel privilegiado — decisão fechada, ver
+      resumo no topo do documento).
+- [x] Todos os cenários de ataque do §9 cobertos por teste automatizado e
+      verdes (IDOR/BOLA, autoelevação, fixação de sessão por construção,
+      força bruta, enumeração, CSRF, vazamento em erro/log).
+- [x] IDOR/BOLA: teste automatizado prova que usuário de um escopo não lê
       nem altera recurso de outro escopo, em toda rota que aceita `:id`.
-- [ ] Elevação de privilégio: teste automatizado prova que ninguém altera o
+- [x] Elevação de privilégio: teste automatizado prova que ninguém altera o
       próprio papel/escopo.
+- [x] Bootstrap do admin técnico só por comando exclusivo, falha se já
+      existir admin, nunca grava senha em arquivo — testado (Testcontainers + subprocesso real).
 - [ ] Revisão de segurança e LGPD (DPO/jurídico) aprovada antes de considerar
-      a fatia concluída, conforme rito do plano mestre.
+      a fatia concluída, conforme rito do plano mestre — pendente de revisão
+      humana do PR.
 
-## 12. Arquivos que seriam alterados na implementação futura
+## 12. Arquivos alterados nesta implementação
 
 ```text
-apps/api/prisma/schema.prisma                     # models access_user, access_session, etc.
-apps/api/prisma/migrations/<timestamp>_identidade/ # migration real (não criada nesta fatia)
-apps/api/src/auth/                                 # novo módulo: controller, service, guards, DTOs
-apps/api/src/auth/password.service.ts              # hashing (argon2id), política de senha
-apps/api/src/auth/mfa.service.ts                   # TOTP, códigos de recuperação
-apps/api/src/auth/session.service.ts                # criação/validação/revogação de sessão
-apps/api/src/auth/authorization/                    # avaliador RBAC/ABAC, guard/decorator reutilizável
-apps/api/src/auth/rate-limit/                        # limitação de tentativas (login, recuperação, MFA)
-apps/api/src/users/                                  # gestão de conta de acesso (CRUD limitado por escopo)
-apps/api/src/common/logger/logger.module.ts          # extensão do redact para novos campos sensíveis
-apps/api/src/app.module.ts                           # registro dos novos módulos
-apps/api/.env.example                                # novas variáveis (ex.: chave de cifra MFA, parâmetros de sessão)
-apps/api/test/auth.e2e-spec.ts                       # e2e de autenticação/sessão/MFA
-apps/api/test/authorization.e2e-spec.ts              # e2e de RBAC/ABAC e cenários de ataque
-docs/modules/etapa0-fatia3-identidade-acesso.md      # este documento, atualizado para "implementado"
+apps/api/prisma/schema.prisma                                  # models access_*
+apps/api/prisma/migrations/20260803150000_identidade_sessao_autorizacao/
+apps/api/src/auth/                                              # módulo completo (~35 arquivos)
+apps/api/src/auth/auth.controller.ts                            # endpoints §8
+apps/api/src/auth/auth.service.ts                               # orquestra login/mfa/reset
+apps/api/src/auth/password/                                     # argon2id, política, lista de comuns
+apps/api/src/auth/mfa/                                          # TOTP, cifra AES-256-GCM, recovery codes, challenge
+apps/api/src/auth/session/                                      # sessão, guard, cookie
+apps/api/src/auth/csrf/                                         # synchronizer token guard
+apps/api/src/auth/rate-limit/                                   # 5 tentativas/15min
+apps/api/src/auth/authorization/                                # RBAC/ABAC + guard reutilizável
+apps/api/src/auth/credential/                                   # interface + impl local (OIDC-ready)
+apps/api/src/auth/email/                                        # interface + Noop (sem provedor real)
+apps/api/src/auth/crypto/                                       # token opaco, AES-GCM
+apps/api/src/users/                                              # CRUD de conta escopado
+apps/api/src/bootstrap/bootstrap-admin.ts                       # comando exclusivo
+apps/api/src/common/logger/logger.module.ts                     # redact estendido
+apps/api/src/app.module.ts                                      # registra AuthModule/UsersModule
+apps/api/src/main.ts                                             # cookie-parser, ValidationPipe global
+apps/api/src/config/env.validation.ts                            # MFA_ENCRYPTION_KEY obrigatória
+apps/api/.env.example                                             # MFA_ENCRYPTION_KEY
+apps/api/package.json                                             # argon2, otplib, cookie-parser, class-validator/transformer; bootstrap:admin
+package.json                                                      # pnpm.onlyBuiltDependencies (argon2 nativo)
+apps/api/test/identity.e2e-spec.ts                                # integração + e2e completos (Testcontainers)
+docs/modules/etapa0-fatia3-identidade-acesso.md                   # este documento
 ```
