@@ -32,6 +32,7 @@ import { SessionService } from "./session/session.service";
 import { evaluatePermission } from "./authorization/rbac.evaluator";
 import { AccessSession, AccessUser } from "@prisma/client";
 import { AuditService } from "../audit/audit.service";
+import { PrismaService } from "../database/prisma.service";
 
 @ApiTags("auth")
 @Controller("auth")
@@ -41,6 +42,7 @@ export class AuthController {
     private readonly sessionService: SessionService,
     private readonly configService: ConfigService,
     private readonly auditService: AuditService,
+    private readonly prisma: PrismaService,
   ) {}
 
   @Post("login")
@@ -69,23 +71,32 @@ export class AuthController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ): Promise<void> {
-    await this.sessionService.revokeById(session.id, "logout");
-    clearSessionCookie(res, this.configService);
-
     const metadata = extractRequestMetadata(req);
-    await this.auditService.record({
-      actorType: "user",
-      actorUserId: user.id,
-      actorRole: user.role,
-      companyId: user.companyId,
-      action: "logout",
-      resource: "access_session",
-      resourceId: session.id,
-      ip: metadata.ip,
-      userAgent: metadata.userAgent,
-      result: "success",
-      requestId: metadata.requestId,
+
+    // Revogação e evento de auditoria na mesma transação (ADR 0004 §2) —
+    // ou os dois persistem, ou nenhum. O cookie só é limpo depois do
+    // commit, nunca antes.
+    await this.prisma.$transaction(async (tx) => {
+      await this.sessionService.revokeById(session.id, "logout", tx);
+      await this.auditService.record(
+        {
+          actorType: "user",
+          actorUserId: user.id,
+          actorRole: user.role,
+          companyId: user.companyId,
+          action: "logout",
+          resource: "access_session",
+          resourceId: session.id,
+          ip: metadata.ip,
+          userAgent: metadata.userAgent,
+          result: "success",
+          requestId: metadata.requestId,
+        },
+        tx,
+      );
     });
+
+    clearSessionCookie(res, this.configService);
   }
 
   @Get("sessions")
@@ -133,24 +144,31 @@ export class AuthController {
       throw new ForbiddenException();
     }
 
-    await this.sessionService.revokeById(
-      sessionId,
-      isOwnSession ? "revoked_by_self" : "revoked_by_admin",
-    );
-
     const metadata = extractRequestMetadata(req);
-    await this.auditService.record({
-      actorType: "user",
-      actorUserId: actor.id,
-      actorRole: actor.role,
-      companyId: actor.companyId,
-      action: "session_revoked",
-      resource: "access_session",
-      resourceId: sessionId,
-      ip: metadata.ip,
-      userAgent: metadata.userAgent,
-      result: "success",
-      requestId: metadata.requestId,
+
+    // Revogação e evento de auditoria na mesma transação (ADR 0004 §2).
+    await this.prisma.$transaction(async (tx) => {
+      await this.sessionService.revokeById(
+        sessionId,
+        isOwnSession ? "revoked_by_self" : "revoked_by_admin",
+        tx,
+      );
+      await this.auditService.record(
+        {
+          actorType: "user",
+          actorUserId: actor.id,
+          actorRole: actor.role,
+          companyId: actor.companyId,
+          action: "session_revoked",
+          resource: "access_session",
+          resourceId: sessionId,
+          ip: metadata.ip,
+          userAgent: metadata.userAgent,
+          result: "success",
+          requestId: metadata.requestId,
+        },
+        tx,
+      );
     });
   }
 

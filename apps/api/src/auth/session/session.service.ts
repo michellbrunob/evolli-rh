@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { AccessSession, AccessUser } from "@prisma/client";
+import { AccessSession, AccessUser, Prisma } from "@prisma/client";
 import { PrismaService } from "../../database/prisma.service";
 import {
   generateOpaqueToken,
@@ -34,6 +34,15 @@ export interface SessionRequestMetadata {
  * token opaco do cookie, rehashado e comparado contra `token_hash`
  * (ADR 0003 §5). Todo método aqui recebe/retorna o token bruto só na
  * emissão; nunca o persiste.
+ *
+ * Métodos que mutam estado (`issue`, `revokeById`, `revokeAllForUser`)
+ * aceitam um `Prisma.TransactionClient` opcional (`tx`) — quando fornecido,
+ * a operação participa da transação do chamador em vez de abrir a sua
+ * própria (ADR 0004 §2): usado por fluxos onde sessão e evento de
+ * auditoria correspondente precisam persistir atomicamente (login,
+ * logout, revogação explícita, redefinição de senha, desativação de
+ * conta). Sem `tx`, o comportamento é idêntico ao anterior — cada chamada
+ * usa sua própria conexão via `this.prisma`.
  */
 @Injectable()
 export class SessionService {
@@ -45,12 +54,14 @@ export class SessionService {
   async issue(
     userId: string,
     metadata: SessionRequestMetadata,
+    tx?: Prisma.TransactionClient,
   ): Promise<IssuedSession> {
+    const client = tx ?? this.prisma;
     const token = generateOpaqueToken();
     const csrfToken = generateOpaqueToken();
     const now = Date.now();
 
-    const session = await this.prisma.accessSession.create({
+    const session = await client.accessSession.create({
       data: {
         userId,
         tokenHash: hashOpaqueToken(token),
@@ -64,12 +75,6 @@ export class SessionService {
     return { session, token, csrfToken };
   }
 
-  /**
-   * Valida o token do cookie e "toca" a sessão (atualiza last_seen_at) se
-   * ainda estiver dentro da janela de inatividade. Sessão expirada por
-   * inatividade ou por TTL absoluto é tratada como inválida (e marcada
-   * revogada, para auditoria).
-   */
   async validateAndTouch(
     token: string,
     requestId: string,
@@ -121,9 +126,10 @@ export class SessionService {
     previousSessionId: string,
     userId: string,
     metadata: SessionRequestMetadata,
+    tx?: Prisma.TransactionClient,
   ): Promise<IssuedSession> {
-    const issued = await this.issue(userId, metadata);
-    await this.revokeById(previousSessionId, "rotated");
+    const issued = await this.issue(userId, metadata, tx);
+    await this.revokeById(previousSessionId, "rotated", tx);
     return issued;
   }
 
@@ -140,13 +146,6 @@ export class SessionService {
     return this.prisma.accessSession.findMany({
       where: { userId, revokedAt: null, expiresAt: { gt: new Date() } },
       orderBy: { createdAt: "desc" },
-    });
-  }
-
-  async revokeById(sessionId: string, reason: string): Promise<void> {
-    await this.prisma.accessSession.updateMany({
-      where: { id: sessionId, revokedAt: null },
-      data: { revokedAt: new Date(), revokedReason: reason },
     });
   }
 
@@ -170,12 +169,26 @@ export class SessionService {
     });
   }
 
+  async revokeById(
+    sessionId: string,
+    reason: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<void> {
+    const client = tx ?? this.prisma;
+    await client.accessSession.updateMany({
+      where: { id: sessionId, revokedAt: null },
+      data: { revokedAt: new Date(), revokedReason: reason },
+    });
+  }
+
   async revokeAllForUser(
     userId: string,
     reason: string,
     exceptSessionId?: string,
+    tx?: Prisma.TransactionClient,
   ): Promise<void> {
-    await this.prisma.accessSession.updateMany({
+    const client = tx ?? this.prisma;
+    await client.accessSession.updateMany({
       where: {
         userId,
         revokedAt: null,

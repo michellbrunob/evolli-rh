@@ -174,10 +174,11 @@ describe("Auditoria formal e rastreabilidade (e2e)", () => {
       },
     );
 
-    // Só depois da migration — a tabela audit_event precisa existir
-    // (ADR 0004 §1).
-    await runInfraScript(container, "03_audit_grants.sql", []);
-
+    // Nenhum script manual adicional — o REVOKE UPDATE/DELETE de evolli_app
+    // em audit_event é parte da própria migration (ADR 0004 §1). Este
+    // banco só passou por 01/02 (papéis/schema) e o `migrate deploy` acima;
+    // `03_audit_grants.sql` (runbook auxiliar) nunca roda neste teste — os
+    // testes de privilégio abaixo provam a garantia real, não a do script.
     process.env.DATABASE_URL = appUrl;
   });
 
@@ -525,6 +526,110 @@ describe("Auditoria formal e rastreabilidade (e2e)", () => {
       const bodyAsText = JSON.stringify(response.body);
       expect(bodyAsText).not.toMatch(/at .*\.ts:\d+/);
       expect(response.body).not.toHaveProperty("stack");
+    });
+
+    describe("atomicidade: rollback real quando o evento não pode ser persistido (ADR 0004 §2)", () => {
+      async function withAuditInsertBlocked<T>(
+        fn: () => Promise<T>,
+      ): Promise<T> {
+        const migratorClient = new PrismaClient({
+          datasources: { db: { url: migratorUrl } },
+        });
+        try {
+          await migratorClient.$executeRawUnsafe(
+            "REVOKE INSERT ON TABLE app.audit_event FROM evolli_app",
+          );
+          return await fn();
+        } finally {
+          await migratorClient.$executeRawUnsafe(
+            "GRANT INSERT ON TABLE app.audit_event TO evolli_app",
+          );
+          await migratorClient.$disconnect();
+        }
+      }
+
+      it("login: se login_succeeded não puder ser gravado, nenhuma sessão é criada e nenhum cookie é emitido", async () => {
+        const email = "rollback-login@empresa-auditoria.test";
+        const password = "senha-bem-longa-para-rollback-login";
+        await createUserWithRole("colaborador", email, password);
+
+        const prisma = new PrismaClient({
+          datasources: { db: { url: appUrl } },
+        });
+        try {
+          const before = await prisma.accessSession.count({
+            where: { user: { email } },
+          });
+
+          const response = await withAuditInsertBlocked(() =>
+            agent().post("/v1/auth/login").send({ email, password }),
+          );
+
+          expect(response.status).toBe(500);
+          expect(response.headers["set-cookie"]).toBeUndefined();
+
+          const after = await prisma.accessSession.count({
+            where: { user: { email } },
+          });
+          expect(after).toBe(before);
+        } finally {
+          await prisma.$disconnect();
+        }
+      });
+
+      it("desativação de usuário: se os eventos não puderem ser gravados, o usuário permanece ativo e as sessões não são revogadas", async () => {
+        const email = "rollback-disable@empresa-auditoria.test";
+        const password = "senha-bem-longa-para-rollback-disable";
+        await createUserWithRole("colaborador", email, password);
+
+        const prisma = new PrismaClient({
+          datasources: { db: { url: appUrl } },
+        });
+        try {
+          const target = await prisma.accessUser.findUniqueOrThrow({
+            where: { email },
+          });
+          const targetSession = await login(email, password);
+
+          const response = await withAuditInsertBlocked(() =>
+            agent()
+              .post(`/v1/users/${target.id}/disable`)
+              .set("Cookie", adminCookie)
+              .set("x-csrf-token", adminCsrfToken),
+          );
+
+          expect(response.status).toBe(500);
+
+          const stillActive = await prisma.accessUser.findUniqueOrThrow({
+            where: { id: target.id },
+          });
+          expect(stillActive.status).toBe("active");
+
+          // A própria sessão do usuário-alvo, criada acima, precisa
+          // continuar válida — a revogação em massa não pode ter ocorrido.
+          await agent()
+            .get("/v1/users/me")
+            .set("Cookie", targetSession.cookie)
+            .expect(200);
+        } finally {
+          await prisma.$disconnect();
+        }
+      });
+
+      it("consulta à trilha: se audit_log_read não puder ser gravado, a consulta não retorna 200", async () => {
+        const response = await withAuditInsertBlocked(() =>
+          agent().get("/v1/audit/events").set("Cookie", adminCookie),
+        );
+
+        expect(response.status).toBe(500);
+        expect(response.body).toEqual({
+          status_code: 500,
+          message: expect.any(String),
+          request_id: expect.any(String),
+          timestamp: expect.any(String),
+        });
+        expect(JSON.stringify(response.body)).not.toMatch(/at .*\.ts:\d+/);
+      });
     });
   });
 });

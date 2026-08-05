@@ -48,3 +48,11 @@ CREATE INDEX "audit_event_company_id_idx" ON "audit_event"("company_id");
 
 -- AddForeignKey
 ALTER TABLE "audit_event" ADD CONSTRAINT "audit_event_actor_user_id_fkey" FOREIGN KEY ("actor_user_id") REFERENCES "access_user"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- RevokePrivileges (ADR 0004 §1): append-only garantido pela própria migration,
+-- não por etapa manual separada — evolli_app (ALTER DEFAULT PRIVILEGES,
+-- 02_schema_and_grants.sql) herdaria UPDATE/DELETE como qualquer tabela nova;
+-- revogado aqui, no mesmo `prisma migrate deploy` que cria a tabela, para que
+-- um banco provisionado do zero já nasça sem esse privilégio, sem depender de
+-- rodar infra/postgres/03_audit_grants.sql manualmente depois.
+REVOKE UPDATE, DELETE ON TABLE "audit_event" FROM evolli_app;

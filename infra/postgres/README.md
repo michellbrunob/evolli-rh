@@ -7,8 +7,12 @@ Scripts idempotentes que criam os dois papéis de banco definidos na
 - `evolli_app` — só DML (`SELECT`, `INSERT`, `UPDATE`, `DELETE`) no schema `app`,
   usado pela API em runtime. Nunca tem privilégio de DDL. Exceção: na tabela
   `audit_event` (Etapa 0 — Fatia 4, ADR 0004), `evolli_app` só tem `SELECT`/
-  `INSERT` — `UPDATE`/`DELETE` são revogados por `03_audit_grants.sql`
-  (append-only, mesmo em caso de exploit na API).
+  `INSERT` — `UPDATE`/`DELETE` são revogados **pela própria migration**
+  (`20260805120000_auditoria_formal/migration.sql`, mesmo `prisma migrate
+deploy` que cria a tabela — nenhuma etapa manual separada é necessária).
+  `03_audit_grants.sql` existe só como runbook idempotente auxiliar, para
+  reaplicar o privilégio manualmente se algo o restaurar por engano — nunca
+  é a única garantia.
 
 Nenhum script aqui contém senha, URL real ou qualquer segredo. Toda credencial
 entra via variável de ambiente/parâmetro `-v` do `psql`, no momento da execução.
@@ -71,10 +75,11 @@ CLI (`node --env-file-if-exists=.env.migrate`) — a variável nunca fica
 presente no processo que sobe a API (`pnpm --filter @evolli/api dev`/`start`),
 mesmo que os dois comandos sejam executados na mesma máquina.
 
-Depois da migration (a partir da Etapa 0 — Fatia 4, quando a tabela
-`audit_event` existir), restrinja o privilégio de `evolli_app` nessa tabela
-— **precisa rodar depois** de `db:migrate:deploy`, pois a tabela só existe
-após a migration:
+A partir da Etapa 0 — Fatia 4, esse `db:migrate:deploy` já revoga
+`UPDATE`/`DELETE` de `evolli_app` em `audit_event` como parte da própria
+migration — nenhum passo manual adicional é necessário. `03_audit_grants.sql`
+só precisa ser rodado à parte se, por algum motivo excepcional, esse
+privilégio precisar ser reaplicado depois (ex.: reconcessão manual acidental):
 
 ```bash
 psql "$PGADMIN_URL" -f infra/postgres/03_audit_grants.sql

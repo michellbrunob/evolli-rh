@@ -165,6 +165,56 @@ describe("SessionService", () => {
     );
   });
 
+  it("issue() com tx: usa o client da transação, não o padrão (ADR 0004 §2)", async () => {
+    const prisma = createPrismaMock();
+    const txAccessSession = {
+      create: jest
+        .fn()
+        .mockImplementation(({ data }) =>
+          Promise.resolve({ id: "session-tx", ...data }),
+        ),
+    };
+    const tx = { accessSession: txAccessSession } as never;
+    const service = new SessionService(prisma, createAuditServiceMock());
+
+    await service.issue(
+      "user-1",
+      { ip: null, userAgent: null, requestId: "req-1" },
+      tx,
+    );
+
+    expect(txAccessSession.create).toHaveBeenCalledTimes(1);
+    expect(prisma.accessSession.create).not.toHaveBeenCalled();
+  });
+
+  it("revokeById() com tx: usa o client da transação, não o padrão", async () => {
+    const prisma = createPrismaMock();
+    const txAccessSession = {
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+    };
+    const tx = { accessSession: txAccessSession } as never;
+    const service = new SessionService(prisma, createAuditServiceMock());
+
+    await service.revokeById("session-1", "logout", tx);
+
+    expect(txAccessSession.updateMany).toHaveBeenCalledTimes(1);
+    expect(prisma.accessSession.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("revokeAllForUser() com tx: usa o client da transação, não o padrão", async () => {
+    const prisma = createPrismaMock();
+    const txAccessSession = {
+      updateMany: jest.fn().mockResolvedValue({ count: 2 }),
+    };
+    const tx = { accessSession: txAccessSession } as never;
+    const service = new SessionService(prisma, createAuditServiceMock());
+
+    await service.revokeAllForUser("user-1", "account_disabled", undefined, tx);
+
+    expect(txAccessSession.updateMany).toHaveBeenCalledTimes(1);
+    expect(prisma.accessSession.updateMany).not.toHaveBeenCalled();
+  });
+
   it("validateAndTouch() rejeita se o usuário não estiver ativo", async () => {
     const prisma = createPrismaMock();
     prisma.accessSession.findUnique.mockResolvedValue({

@@ -133,6 +133,9 @@ export class UsersService {
     targetUserId: string,
     auditCtx: AuditActorContext,
   ): Promise<void> {
+    // Mudança de status, revogação de TODAS as sessões ativas e os dois
+    // eventos correspondentes (user_disabled, session_revoked) na mesma
+    // transação (ADR 0004 §2) — ou tudo persiste, ou nada.
     await this.prisma.$transaction(async (tx) => {
       await tx.accessUser.update({
         where: { id: targetUserId },
@@ -155,27 +158,29 @@ export class UsersService {
         },
         tx,
       );
-    });
 
-    await this.sessionService.revokeAllForUser(
-      targetUserId,
-      "account_disabled",
-    );
-
-    // Best-effort (ADR 0004 §2) — consequência já garantida atomicamente
-    // acima; a revogação de sessão em si é best-effort.
-    await this.auditService.record({
-      actorType: "user",
-      actorUserId: auditCtx.actor.id,
-      actorRole: auditCtx.actor.role,
-      companyId: auditCtx.actor.companyId,
-      action: "session_revoked",
-      resource: "access_session",
-      resourceId: targetUserId,
-      ip: auditCtx.metadata.ip,
-      userAgent: auditCtx.metadata.userAgent,
-      result: "success",
-      requestId: auditCtx.metadata.requestId,
+      await this.sessionService.revokeAllForUser(
+        targetUserId,
+        "account_disabled",
+        undefined,
+        tx,
+      );
+      await this.auditService.record(
+        {
+          actorType: "user",
+          actorUserId: auditCtx.actor.id,
+          actorRole: auditCtx.actor.role,
+          companyId: auditCtx.actor.companyId,
+          action: "session_revoked",
+          resource: "access_session",
+          resourceId: targetUserId,
+          ip: auditCtx.metadata.ip,
+          userAgent: auditCtx.metadata.userAgent,
+          result: "success",
+          requestId: auditCtx.metadata.requestId,
+        },
+        tx,
+      );
     });
   }
 }

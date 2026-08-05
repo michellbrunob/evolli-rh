@@ -80,6 +80,15 @@ export class AuditController {
     return event;
   }
 
+  /**
+   * Não usa o modo best-effort padrão de `AuditService.record()` — se o
+   * evento `audit_log_read` não puder ser persistido, este método propaga
+   * o erro (via `recordOrThrow`) e o controller nunca chega a retornar os
+   * dados consultados (spec §7: toda consulta bem-sucedida gera um novo
+   * evento; sem o evento, a consulta não é reportada como bem-sucedida).
+   * O erro propagado cai no `AllExceptionsFilter` (ADR 0001), que responde
+   * 500 genérico sem vazar detalhe interno.
+   */
   private async recordAccess(
     user: AccessUser,
     req: Request,
@@ -87,7 +96,7 @@ export class AuditController {
     result: "success" | "failure",
   ): Promise<void> {
     const metadata = extractRequestMetadata(req);
-    await this.auditService.record({
+    await this.auditService.recordOrThrow({
       actorType: "user",
       actorUserId: user.id,
       actorRole: user.role,

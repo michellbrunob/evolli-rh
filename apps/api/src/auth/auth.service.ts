@@ -99,20 +99,34 @@ export class AuthService {
     }
 
     const user = result.user;
-    const issued = await this.sessionService.issue(user.id, metadata);
 
-    await this.auditService.record({
-      actorType: "user",
-      actorUserId: user.id,
-      actorRole: user.role,
-      companyId: user.companyId,
-      action: "login_succeeded",
-      resource: "access_session",
-      resourceId: issued.session.id,
-      ip: metadata.ip,
-      userAgent: metadata.userAgent,
-      result: "success",
-      requestId: metadata.requestId,
+    // Ação sensível bem-sucedida: emissão da sessão e evento de auditoria
+    // na mesma transação (ADR 0004 §2) — ou os dois persistem, ou nenhum.
+    // O cookie só é emitido pelo controller depois que este método retorna,
+    // ou seja, só depois do commit — nunca antes.
+    const issued = await this.prisma.$transaction(async (tx) => {
+      const issuedSession = await this.sessionService.issue(
+        user.id,
+        metadata,
+        tx,
+      );
+      await this.auditService.record(
+        {
+          actorType: "user",
+          actorUserId: user.id,
+          actorRole: user.role,
+          companyId: user.companyId,
+          action: "login_succeeded",
+          resource: "access_session",
+          resourceId: issuedSession.session.id,
+          ip: metadata.ip,
+          userAgent: metadata.userAgent,
+          result: "success",
+          requestId: metadata.requestId,
+        },
+        tx,
+      );
+      return issuedSession;
     });
 
     return issued;
@@ -231,8 +245,10 @@ export class AuthService {
 
     const passwordHash = await this.passwordHashService.hash(newPassword);
 
-    // Ação sensível bem-sucedida: alteração e evento de auditoria na mesma
-    // transação (ADR 0004 §2) — ou os dois persistem, ou nenhum.
+    // Ação sensível bem-sucedida: senha, consumo do token, revogação de
+    // TODAS as sessões ativas e os dois eventos correspondentes
+    // (password_reset_completed, session_revoked) na mesma transação
+    // (ADR 0004 §2) — ou tudo persiste, ou nada.
     await this.prisma.$transaction(async (tx) => {
       await tx.accessUser.update({
         where: { id: resetToken.userId },
@@ -258,27 +274,29 @@ export class AuthService {
         },
         tx,
       );
-    });
 
-    await this.sessionService.revokeAllForUser(
-      resetToken.userId,
-      "password_reset",
-    );
-
-    // Best-effort (ADR 0004 §2) — consequência da conclusão acima, já
-    // garantida atomicamente; a revogação de sessão em si é best-effort.
-    await this.auditService.record({
-      actorType: "user",
-      actorUserId: resetToken.user.id,
-      actorRole: resetToken.user.role,
-      companyId: resetToken.user.companyId,
-      action: "session_revoked",
-      resource: "access_session",
-      resourceId: resetToken.userId,
-      ip: metadata.ip,
-      userAgent: metadata.userAgent,
-      result: "success",
-      requestId: metadata.requestId,
+      await this.sessionService.revokeAllForUser(
+        resetToken.userId,
+        "password_reset",
+        undefined,
+        tx,
+      );
+      await this.auditService.record(
+        {
+          actorType: "user",
+          actorUserId: resetToken.user.id,
+          actorRole: resetToken.user.role,
+          companyId: resetToken.user.companyId,
+          action: "session_revoked",
+          resource: "access_session",
+          resourceId: resetToken.userId,
+          ip: metadata.ip,
+          userAgent: metadata.userAgent,
+          result: "success",
+          requestId: metadata.requestId,
+        },
+        tx,
+      );
     });
   }
 

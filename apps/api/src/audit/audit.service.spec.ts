@@ -148,6 +148,30 @@ describe("AuditService", () => {
     );
   });
 
+  it("recordOrThrow() propaga falha de persistência (nunca resolve silenciosamente)", async () => {
+    const prisma = createPrismaMock();
+    prisma.auditEvent.create.mockRejectedValue(new Error("db down"));
+    (prisma as unknown as { $transaction: jest.Mock }).$transaction = jest
+      .fn()
+      .mockImplementation((cb) => cb(prisma));
+    const service = new AuditService(prisma, createLoggerMock());
+
+    await expect(service.recordOrThrow(baseUserEvent)).rejects.toThrow(
+      "db down",
+    );
+  });
+
+  it("recordOrThrow() resolve normalmente quando a persistência funciona", async () => {
+    const prisma = createPrismaMock();
+    prisma.auditEvent.create.mockResolvedValue({});
+    (prisma as unknown as { $transaction: jest.Mock }).$transaction = jest
+      .fn()
+      .mockImplementation((cb) => cb(prisma));
+    const service = new AuditService(prisma, createLoggerMock());
+
+    await expect(service.recordOrThrow(baseUserEvent)).resolves.toBeUndefined();
+  });
+
   it("findMany() aplica paginação e filtros sem incluir chaves vazias", async () => {
     const prisma = createPrismaMock();
     prisma.auditEvent.findMany.mockResolvedValue([]);

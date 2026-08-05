@@ -83,6 +83,22 @@ export class AuditService {
     }
   }
 
+  /**
+   * Variante de `record()` que **não** captura falha de persistência —
+   * propaga o erro para o chamador. Usada onde a ação de negócio em si é a
+   * consulta à trilha (`GET /v1/audit/events*`): "toda consulta bem-
+   * sucedida gera um novo evento" (spec §7) significa que, se o evento não
+   * puder ser gravado, a consulta não pode ser reportada como bem-
+   * sucedida — o chamador deixa o erro propagar para o
+   * `AllExceptionsFilter` (ADR 0001), que responde com erro genérico sem
+   * detalhe interno. Abre sua própria transação de uma escrita só, só para
+   * garantir que a falha realmente propague (`record()` sem `tx` sempre
+   * resolve, mesmo em erro).
+   */
+  async recordOrThrow(input: RecordAuditEventInput): Promise<void> {
+    await this.prisma.$transaction((tx) => this.record(input, tx));
+  }
+
   async findMany(
     filter: ListAuditEventsFilter,
     pagination: ListAuditEventsPagination,

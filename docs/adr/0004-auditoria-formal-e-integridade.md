@@ -25,9 +25,15 @@ que fica deliberadamente fora.
 - `evolli_app` (papel de runtime da API) recebe **apenas `INSERT` e
   `SELECT`** em `audit_event` — nunca `UPDATE` nem `DELETE`. Isso é reforço
   além do privilégio padrão já concedido a outras tabelas (`SELECT`,
-  `INSERT`, `UPDATE`, `DELETE` via `ALTER DEFAULT PRIVILEGES`, ADR 0002): a
-  tabela de auditoria tem grant explícito e restrito, revogando `UPDATE`/
-  `DELETE` especificamente, comprovado por teste real (não só documentado).
+  `INSERT`, `UPDATE`, `DELETE` via `ALTER DEFAULT PRIVILEGES`, ADR 0002): o
+  `REVOKE UPDATE, DELETE` é parte da **própria migration**
+  (`20260805120000_auditoria_formal/migration.sql`), no mesmo `prisma
+migrate deploy` que cria a tabela — um banco provisionado do zero já
+  nasce append-only, sem depender de rodar um script manual separado depois.
+  `infra/postgres/03_audit_grants.sql` existe só como runbook idempotente
+  auxiliar para reaplicar o privilégio manualmente em caso excepcional
+  (nunca a única garantia). Comprovado por teste real (não só documentado),
+  contra um banco criado exclusivamente por `prisma migrate deploy`.
 - Nenhum papel de runtime tem privilégio de alterar ou apagar um evento já
   gravado — a única forma de "corrigir" um evento é gravar um novo evento
   complementar (ver decisão 3).
