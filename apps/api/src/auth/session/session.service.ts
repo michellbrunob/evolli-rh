@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { AccessSession, AccessUser } from "@prisma/client";
+import { AccessSession, AccessUser, Prisma } from "@prisma/client";
 import { PrismaService } from "../../database/prisma.service";
 import {
   generateOpaqueToken,
@@ -9,6 +9,7 @@ import {
   SESSION_ABSOLUTE_TTL_MS,
   SESSION_INACTIVITY_TTL_MS,
 } from "./session.constants";
+import { AuditService } from "../../audit/audit.service";
 
 export interface IssuedSession {
   session: AccessSession;
@@ -24,6 +25,8 @@ export interface ValidatedSession {
 export interface SessionRequestMetadata {
   ip: string | null;
   userAgent: string | null;
+  /** Correlação com o log técnico e a trilha de auditoria (ADR 0001/0004). */
+  requestId: string;
 }
 
 /**
@@ -31,20 +34,34 @@ export interface SessionRequestMetadata {
  * token opaco do cookie, rehashado e comparado contra `token_hash`
  * (ADR 0003 §5). Todo método aqui recebe/retorna o token bruto só na
  * emissão; nunca o persiste.
+ *
+ * Métodos que mutam estado (`issue`, `revokeById`, `revokeAllForUser`)
+ * aceitam um `Prisma.TransactionClient` opcional (`tx`) — quando fornecido,
+ * a operação participa da transação do chamador em vez de abrir a sua
+ * própria (ADR 0004 §2): usado por fluxos onde sessão e evento de
+ * auditoria correspondente precisam persistir atomicamente (login,
+ * logout, revogação explícita, redefinição de senha, desativação de
+ * conta). Sem `tx`, o comportamento é idêntico ao anterior — cada chamada
+ * usa sua própria conexão via `this.prisma`.
  */
 @Injectable()
 export class SessionService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditService: AuditService,
+  ) {}
 
   async issue(
     userId: string,
     metadata: SessionRequestMetadata,
+    tx?: Prisma.TransactionClient,
   ): Promise<IssuedSession> {
+    const client = tx ?? this.prisma;
     const token = generateOpaqueToken();
     const csrfToken = generateOpaqueToken();
     const now = Date.now();
 
-    const session = await this.prisma.accessSession.create({
+    const session = await client.accessSession.create({
       data: {
         userId,
         tokenHash: hashOpaqueToken(token),
@@ -58,13 +75,10 @@ export class SessionService {
     return { session, token, csrfToken };
   }
 
-  /**
-   * Valida o token do cookie e "toca" a sessão (atualiza last_seen_at) se
-   * ainda estiver dentro da janela de inatividade. Sessão expirada por
-   * inatividade ou por TTL absoluto é tratada como inválida (e marcada
-   * revogada, para auditoria).
-   */
-  async validateAndTouch(token: string): Promise<ValidatedSession | null> {
+  async validateAndTouch(
+    token: string,
+    requestId: string,
+  ): Promise<ValidatedSession | null> {
     const tokenHash = hashOpaqueToken(token);
     const session = await this.prisma.accessSession.findUnique({
       where: { tokenHash },
@@ -79,12 +93,14 @@ export class SessionService {
 
     if (session.expiresAt <= now) {
       await this.revokeById(session.id, "expired_absolute");
+      await this.auditExpiry(session, requestId);
       return null;
     }
 
     const inactiveSince = now.getTime() - session.lastSeenAt.getTime();
     if (inactiveSince > SESSION_INACTIVITY_TTL_MS) {
       await this.revokeById(session.id, "expired_inactivity");
+      await this.auditExpiry(session, requestId);
       return null;
     }
 
@@ -110,9 +126,10 @@ export class SessionService {
     previousSessionId: string,
     userId: string,
     metadata: SessionRequestMetadata,
+    tx?: Prisma.TransactionClient,
   ): Promise<IssuedSession> {
-    const issued = await this.issue(userId, metadata);
-    await this.revokeById(previousSessionId, "rotated");
+    const issued = await this.issue(userId, metadata, tx);
+    await this.revokeById(previousSessionId, "rotated", tx);
     return issued;
   }
 
@@ -132,8 +149,33 @@ export class SessionService {
     });
   }
 
-  async revokeById(sessionId: string, reason: string): Promise<void> {
-    await this.prisma.accessSession.updateMany({
+  /** Best-effort (ADR 0004 §2) — falha ao auditar não afeta a expiração já aplicada. */
+  private async auditExpiry(
+    session: AccessSession & { user: AccessUser },
+    requestId: string,
+  ): Promise<void> {
+    await this.auditService.record({
+      actorType: "user",
+      actorUserId: session.user.id,
+      actorRole: session.user.role,
+      companyId: session.user.companyId,
+      action: "session_expired",
+      resource: "access_session",
+      resourceId: session.id,
+      ip: session.ip,
+      userAgent: session.userAgent,
+      result: "success",
+      requestId,
+    });
+  }
+
+  async revokeById(
+    sessionId: string,
+    reason: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<void> {
+    const client = tx ?? this.prisma;
+    await client.accessSession.updateMany({
       where: { id: sessionId, revokedAt: null },
       data: { revokedAt: new Date(), revokedReason: reason },
     });
@@ -143,8 +185,10 @@ export class SessionService {
     userId: string,
     reason: string,
     exceptSessionId?: string,
+    tx?: Prisma.TransactionClient,
   ): Promise<void> {
-    await this.prisma.accessSession.updateMany({
+    const client = tx ?? this.prisma;
+    await client.accessSession.updateMany({
       where: {
         userId,
         revokedAt: null,

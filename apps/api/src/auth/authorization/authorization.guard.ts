@@ -16,6 +16,8 @@ import {
   PERMISSION_METADATA_KEY,
   RequiredPermission,
 } from "./require-permission.decorator";
+import { AuditService } from "../../audit/audit.service";
+import { extractRequestMetadata } from "../request-metadata.util";
 
 declare module "express" {
   interface Request {
@@ -34,6 +36,7 @@ export class AuthorizationGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     private readonly prisma: PrismaService,
+    private readonly auditService: AuditService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -92,6 +95,23 @@ export class AuthorizationGuard implements CanActivate {
     );
 
     if (!allowed) {
+      // Best-effort (ADR 0004 §2): falha ao gravar o evento nunca reverte
+      // ou atrasa a negação já decidida.
+      const metadata = extractRequestMetadata(request);
+      await this.auditService.record({
+        actorType: "user",
+        actorUserId: subjectUser.id,
+        actorRole: subjectUser.role,
+        companyId: subjectUser.companyId,
+        action: "authorization_denied",
+        resource:
+          required.resource === "access_log" ? "audit_event" : "access_user",
+        resourceId: target.targetUserId ?? null,
+        ip: metadata.ip,
+        userAgent: metadata.userAgent,
+        result: "denied",
+        requestId: metadata.requestId,
+      });
       throw new ForbiddenException();
     }
 

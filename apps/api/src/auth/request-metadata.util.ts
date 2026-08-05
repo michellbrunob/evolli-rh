@@ -5,5 +5,6 @@ export function extractRequestMetadata(req: Request): SessionRequestMetadata {
   return {
     ip: req.ip ?? null,
     userAgent: req.get("user-agent") ?? null,
+    requestId: req.requestId,
   };
 }

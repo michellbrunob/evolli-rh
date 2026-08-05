@@ -60,6 +60,7 @@ model AccessUser {
 
   sessions            AccessSession[]
   passwordResetTokens AccessPasswordResetToken[]
+  auditEvents         AuditEvent[]
 
   @@index([companyId])
   @@map("access_user")
@@ -116,4 +117,87 @@ model AccessLoginAttempt {
 
   @@index([emailAttempted, createdAt])
   @@map("access_login_attempt")
+}
+
+// Etapa 0 — Fatia 4: trilha de auditoria formal (ADR 0004). Distinta do log
+// técnico de observabilidade (nestjs-pino, ADR 0001) — retenção, propósito e
+// garantia de imutabilidade diferentes. Append-only: evolli_app tem só
+// INSERT/SELECT nesta tabela (ver infra/postgres), nunca UPDATE/DELETE.
+// Nenhum campo de conteúdo antes/depois (ADR 0004 §5) — só metadado seguro.
+enum AuditActorType {
+  user
+  system
+}
+
+// Lista fechada de ações auditáveis desta fatia (ADR 0004 §5, spec §4).
+// Estender exige migration — nunca aceitar ação como texto livre.
+enum AuditAction {
+  login_succeeded
+  login_failed
+  logout
+  session_revoked
+  session_expired
+  password_reset_requested
+  password_reset_completed
+  user_created
+  user_role_changed
+  user_disabled
+  authorization_denied
+  rate_limit_blocked
+  audit_log_read
+}
+
+enum AuditResult {
+  success
+  failure
+  denied
+}
+
+model AuditEvent {
+  id String @id @default(uuid())
+
+  occurredAt DateTime @map("occurred_at")
+
+  // Ator: "user" referencia AccessUser (actorUserId); "system" identifica a
+  // origem técnica (actorSystemId, ex. "auth-service:login") quando não há
+  // usuário autenticado resolvido — nunca um ator nulo sem identificação.
+  actorType     AuditActorType @map("actor_type")
+  actorUserId   String?        @map("actor_user_id")
+  actorSystemId String?        @map("actor_system_id")
+  // Snapshot do papel do ator no momento da ação — papel pode mudar depois;
+  // o evento preserva o papel vigente na hora (null quando actorType=system).
+  actorRole AccessRole? @map("actor_role")
+
+  companyId String? @map("company_id")
+  unitId    String? @map("unit_id")
+  teamId    String? @map("team_id")
+
+  action AuditAction
+
+  // Tipo do recurso é validado por união de tipos no código (extensível por
+  // módulo futuro sem migration) — não é enum de banco, ao contrário de
+  // `action`/`result`, que são fechados por design (ADR 0004 §5).
+  resource   String
+  resourceId String? @map("resource_id")
+
+  // Minimizados (ADR 0004 §5) — mesmo par já usado em SessionRequestMetadata
+  // (Fatia 3), sem cabeçalho ou fingerprint adicional.
+  ip        String? @db.Inet
+  userAgent String? @map("user_agent")
+
+  result AuditResult
+
+  requestId     String  @map("request_id")
+  correlationId String? @map("correlation_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  actorUser AccessUser? @relation(fields: [actorUserId], references: [id])
+
+  @@index([occurredAt])
+  @@index([actorUserId])
+  @@index([action])
+  @@index([resource, resourceId])
+  @@index([companyId])
+  @@map("audit_event")
 }

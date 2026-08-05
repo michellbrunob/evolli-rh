@@ -5,7 +5,14 @@ Scripts idempotentes que criam os dois papéis de banco definidos na
 
 - `evolli_migrator` — DDL/migrations (`CREATE`, `ALTER`, `DROP` no schema `app`).
 - `evolli_app` — só DML (`SELECT`, `INSERT`, `UPDATE`, `DELETE`) no schema `app`,
-  usado pela API em runtime. Nunca tem privilégio de DDL.
+  usado pela API em runtime. Nunca tem privilégio de DDL. Exceção: na tabela
+  `audit_event` (Etapa 0 — Fatia 4, ADR 0004), `evolli_app` só tem `SELECT`/
+  `INSERT` — `UPDATE`/`DELETE` são revogados **pela própria migration**
+  (`20260805120000_auditoria_formal/migration.sql`, mesmo `prisma migrate
+deploy` que cria a tabela — nenhuma etapa manual separada é necessária).
+  `03_audit_grants.sql` existe só como runbook idempotente auxiliar, para
+  reaplicar o privilégio manualmente se algo o restaurar por engano — nunca
+  é a única garantia.
 
 Nenhum script aqui contém senha, URL real ou qualquer segredo. Toda credencial
 entra via variável de ambiente/parâmetro `-v` do `psql`, no momento da execução.
@@ -68,6 +75,16 @@ CLI (`node --env-file-if-exists=.env.migrate`) — a variável nunca fica
 presente no processo que sobe a API (`pnpm --filter @evolli/api dev`/`start`),
 mesmo que os dois comandos sejam executados na mesma máquina.
 
+A partir da Etapa 0 — Fatia 4, esse `db:migrate:deploy` já revoga
+`UPDATE`/`DELETE` de `evolli_app` em `audit_event` como parte da própria
+migration — nenhum passo manual adicional é necessário. `03_audit_grants.sql`
+só precisa ser rodado à parte se, por algum motivo excepcional, esse
+privilégio precisar ser reaplicado depois (ex.: reconcessão manual acidental):
+
+```bash
+psql "$PGADMIN_URL" -f infra/postgres/03_audit_grants.sql
+```
+
 ## Reexecução
 
 Ambos os scripts são seguros de rodar de novo:
@@ -77,6 +94,9 @@ Ambos os scripts são seguros de rodar de novo:
   fora deste script — evita sobrescrever segredo de produção por acidente).
 - `02_schema_and_grants.sql`: `CREATE SCHEMA IF NOT EXISTS` + `GRANT`/
   `ALTER DEFAULT PRIVILEGES` são idempotentes por natureza.
+- `03_audit_grants.sql`: `REVOKE` de privilégio já ausente não falha —
+  idempotente. Precisa da tabela `audit_event` já criada (rodar depois da
+  migration da Fatia 4).
 
 ## Homologação/produção
 

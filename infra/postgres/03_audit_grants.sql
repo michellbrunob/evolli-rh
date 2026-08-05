@@ -1,0 +1,23 @@
+-- Etapa 0 — Fatia 4: privilégio restrito para audit_event (ADR 0004 §1).
+--
+-- GARANTIA REAL: a migration `20260805120000_auditoria_formal` já inclui
+-- este mesmo REVOKE, executado no mesmo `prisma migrate deploy` que cria a
+-- tabela — um banco provisionado do zero já nasce append-only, sem depender
+-- de rodar este script manualmente depois. Este arquivo é só um **runbook
+-- idempotente auxiliar**, para o caso raro de o privilégio precisar ser
+-- reaplicado manualmente (ex.: alguém concedeu `UPDATE`/`DELETE` de volta
+-- por engano, ou uma migration futura reintroduziu o privilégio padrão sem
+-- repetir o REVOKE) — nunca a única garantia de append-only.
+--
+-- ALTER DEFAULT PRIVILEGES (02_schema_and_grants.sql) concede
+-- SELECT/INSERT/UPDATE/DELETE a evolli_app em toda tabela nova criada por
+-- evolli_migrator — igual a qualquer outra tabela do schema "app". Para
+-- audit_event isso é privilégio demais: a trilha de auditoria é append-only
+-- por design (ADR 0004 §1) — evolli_app só pode gravar e consultar evento,
+-- nunca alterar ou apagar um já gravado, nem mesmo em caso de exploit na
+-- API (RCE, injeção).
+--
+-- Seguro de reexecutar a qualquer momento: revogar privilégio já ausente
+-- não falha.
+
+REVOKE UPDATE, DELETE ON TABLE app.audit_event FROM evolli_app;

@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { forwardRef, Module } from "@nestjs/common";
 import { AuthController } from "./auth.controller";
 import { AuthService } from "./auth.service";
 import { PasswordHashService } from "./password/password-hash.service";
@@ -12,8 +12,10 @@ import { CREDENTIAL_VERIFIER } from "./credential/credential-verifier.interface"
 import { LocalCredentialVerifier } from "./credential/local-credential-verifier.service";
 import { EMAIL_NOTIFIER } from "./email/email-notifier.interface";
 import { NoopEmailNotifier } from "./email/noop-email-notifier.service";
+import { AuditModule } from "../audit/audit.module";
 
 @Module({
+  imports: [forwardRef(() => AuditModule)],
   controllers: [AuthController],
   providers: [
     AuthService,
