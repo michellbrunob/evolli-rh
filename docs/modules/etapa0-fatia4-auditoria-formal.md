@@ -74,12 +74,20 @@ diferentes).
 
 ## 2. Relação com o PRD, LGPD, ADRs anteriores e a camada de Identidade e Acesso
 
-- **PRD "Sistema RH - Reserva Fiscal"**: complementar ao roadmap comercial do
-  Evolli RH, não normativo para esta fatia técnica — nenhuma regra de negócio
-  deste documento foi inferida do PRD; ele é citado aqui apenas para registrar
-  que os dois documentos coexistem sem conflito de escopo (o PRD trata do
-  produto comercial da Reserva Fiscal; esta fatia trata da fundação técnica
-  do Evolli RH).
+- **PRD "Sistema RH - Reserva Fiscal"**: fonte **complementar e obrigatória**
+  de requisitos funcionais, segurança, LGPD e critérios de aceite do Evolli
+  RH — não é um documento à parte, dispensável ou de prioridade menor que o
+  roadmap técnico. O roadmap comercial do Evolli RH define a **sequência de
+  implementação** por dependência técnica (por isso auditoria formal vem
+  antes de ponto por TXT, §0), mas não sobrepõe nem rebaixa requisito já
+  registrado no PRD. Caso um requisito, prioridade ou item de escopo desta
+  especificação pareça conflitar com o PRD, esse conflito deve ser
+  **registrado como decisão explícita** (quem decidiu, por quê, o que foi
+  priorizado e o que ficou para depois) — nunca ignorado ou rebaixado
+  silenciosamente. Nenhum conflito foi identificado entre este documento e o
+  PRD até o momento; nenhuma regra de negócio deste documento foi inferida
+  diretamente do PRD, apenas do plano mestre técnico (§3 abaixo) e dos ADRs
+  já aceitos.
 - **`PLANO_E_PROMPT_ECOSSISTEMA_RH_NOVO.md`** (§3, princípios inegociáveis):
   já registra "auditoria imutável" como princípio de fundação, exigindo
   registrar quem/quando/de onde/qual ação, especialmente consulta/download/
@@ -375,10 +383,22 @@ implementação, quando aprovada.
 - Depende da Fatia 3 (identidade/sessão/autorização) estar **mergeada e
   homologada** antes de iniciar implementação — não há ator estável para
   registrar sem isso.
-- Depende de decisão de retenção/descarte por classe de evento (DPO/
-  jurídico) antes de fechar o mecanismo de expurgo (§5).
-- Depende de decisão de DPO sobre mascaramento de CPF/campos sensíveis em
-  `dado_anterior`/`dado_novo` (§3, §6) antes de implementar esses campos.
+- **Não depende** de aprovação prévia de DPO/jurídico para iniciar a
+  implementação técnica inicial — minimização de dado e proibição de dado
+  sensível em claro (§6) são regras de engenharia já fechadas nesta
+  especificação, aplicáveis desde o primeiro commit de código, com dado
+  sintético (nunca dado real de RH) e sem popular `dado_anterior`/
+  `dado_novo` com valor sensível algum (§3, §6).
+- **Depende** de decisão de DPO/jurídico, especificamente, antes de:
+  - usar a trilha de auditoria com **dado real** de RH ou em **produção**;
+  - fechar o **prazo jurídico exato** de retenção por classe de evento (§5);
+  - executar **descarte definitivo** de qualquer evento (o mecanismo técnico
+    de expurgo pode existir e ser testado com dado sintético antes disso,
+    mas não deve ser acionado contra dado real sem essa aprovação);
+  - fechar a **política fina de mascaramento** de CPF/campos sensíveis
+    quando referenciados por identificador em `dado_anterior`/`dado_novo`
+    (§3, §6) — até essa aprovação, esses dois campos permanecem _não
+    implementados_ (não "implementados com valor sensível temporário").
 
 ### Riscos
 
@@ -417,11 +437,20 @@ implementação, quando aprovada.
 
 - [ ] Aprovação humana explícita do modelo conceitual (§3) antes de qualquer
       migration ser criada.
-- [ ] Aprovação de DPO/jurídico sobre retenção/descarte (§5) e mascaramento
-      (§6) antes de implementação.
 - [ ] Revisão de segurança confirma que nenhum campo do modelo conceitual, se
-      implementado literalmente, vazaria dado sensível em claro.
+      implementado literalmente, vazaria dado sensível em claro — minimização
+      e proibição de dado sensível em claro (§6) são obrigatórias **já na
+      implementação inicial**, não uma condição futura.
 - [ ] PR #11 (Fatia 3) mergeada antes do início da implementação desta fatia.
+- [ ] Implementação técnica inicial pode prosseguir **sem** aprovação prévia
+      de DPO/jurídico, desde que: use somente dado sintético (nunca dado real
+      de RH); trate a retenção como parâmetro configurável, sem prazo fixo
+      no código; e não popule `dado_anterior`/`dado_novo` com nenhum valor
+      sensível (§3, §6).
+- [ ] Aprovação de DPO/jurídico sobre prazo de retenção, descarte definitivo
+      e política fina de mascaramento (§5, §6) é obrigatória antes de: usar
+      a trilha com dado real de RH; operar em produção; ou executar qualquer
+      descarte definitivo de evento.
 
 ## 12. Arquivos futuros previstos para implementação (não criados nesta fatia)
 
