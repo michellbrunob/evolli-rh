@@ -6,7 +6,7 @@ dependência ou endpoint implementado nesta fatia)
 ## 0. Contexto e ordem no roadmap
 
 Esta é a fatia que sucede a Etapa 0 — Fatia 3 (identidade, sessão e
-autorização, PR #11, **ainda não mergeada**). A prioridade de implementação
+autorização, PR #11, **mergeada em `main`**). A prioridade de implementação
 após a Fatia 3 é a **auditoria formal**, não a importação de ponto por TXT —
 auditoria é pré-requisito transversal para todo pilar seguinte (Núcleo
 Organizacional, Colaboradores, Documentos e workflows), pois cada um desses
@@ -117,21 +117,22 @@ diferentes).
   a migration real desta fatia (quando aprovada e implementada) segue o
   mesmo padrão de `prisma migrate diff --from-empty` já usado na Fatia 3
   (schema sem shadow DB disponível).
-- **ADR 0003** (identidade, sessão e autorização — Fatia 3, PR #11 ainda não
-  mergeada): é a primeira e única fonte de eventos que esta fatia audita
-  hoje — login, logout, sessão, CSRF, RBAC/ABAC, rate limit, recuperação de
-  senha (§4). Auditoria formal depende do `AccessUser`/`AccessSession`/
-  `evaluatePermission` já especificados ali para saber "quem" e "com qual
-  papel/escopo" agiu. Esta fatia **não** duplica nem substitui os eventos
-  técnicos já logados via `nestjs-pino` (ADR 0001) — cria uma trilha formal
-  paralela, com garantias diferentes (§5, §8).
-- **Camada de Identidade e Acesso (futura, pós-merge da PR #11)**: quando
+- **ADR 0003** (identidade, sessão e autorização — Fatia 3, PR #11 **já
+  mergeada em `main`**): é a primeira e única fonte de eventos que esta
+  fatia audita hoje — login, logout, sessão, CSRF, RBAC/ABAC, rate limit,
+  recuperação de senha (§4). Auditoria formal depende do `AccessUser`/
+  `AccessSession`/`evaluatePermission` já especificados ali para saber
+  "quem" e "com qual papel/escopo" agiu. Esta fatia **não** duplica nem
+  substitui os eventos técnicos já logados via `nestjs-pino` (ADR 0001) —
+  cria uma trilha formal paralela, com garantias diferentes (§5, §8).
+- **Camada de Identidade e Acesso (já integrada em `main`)**: com a Fatia 3
   mergeada, o serviço de auditoria passa a ser o consumidor natural dos
   eventos de autenticação/autorização já emitidos pelo `AuthService`/
-  `AuthorizationGuard`. Esta especificação assume essa integração como
-  pré-condição de implementação (§11) — auditoria formal não deveria ser
-  implementada antes da Fatia 3 estar mergeada e homologada, pois não há
-  ainda identidade de ator estável para registrar.
+  `AuthorizationGuard`. Essa integração deixa de ser uma dependência futura
+  e passa a ser uma **pré-condição já satisfeita** — a implementação desta
+  fatia pode começar assim que a especificação for aprovada, sem precisar
+  aguardar merge ou homologação adicional de identidade, pois já existe
+  identidade de ator estável para registrar.
 
 ## 3. Modelo conceitual de evento de auditoria (sem migration)
 
@@ -380,9 +381,10 @@ implementação, quando aprovada.
 
 ### Dependências
 
-- Depende da Fatia 3 (identidade/sessão/autorização) estar **mergeada e
-  homologada** antes de iniciar implementação — não há ator estável para
-  registrar sem isso.
+- Dependia da Fatia 3 (identidade/sessão/autorização) estar **mergeada**
+  antes de iniciar implementação — **satisfeita**: PR #11 já está integrada
+  em `main`. Homologação/verificação contínua da Fatia 3 segue seu próprio
+  rito, mas não bloqueia mais o início desta fatia.
 - **Não depende** de aprovação prévia de DPO/jurídico para iniciar a
   implementação técnica inicial — minimização de dado e proibição de dado
   sensível em claro (§6) são regras de engenharia já fechadas nesta
@@ -441,7 +443,7 @@ implementação, quando aprovada.
       implementado literalmente, vazaria dado sensível em claro — minimização
       e proibição de dado sensível em claro (§6) são obrigatórias **já na
       implementação inicial**, não uma condição futura.
-- [ ] PR #11 (Fatia 3) mergeada antes do início da implementação desta fatia.
+- [x] PR #11 (Fatia 3) mergeada antes do início da implementação desta fatia.
 - [ ] Implementação técnica inicial pode prosseguir **sem** aprovação prévia
       de DPO/jurídico, desde que: use somente dado sintético (nunca dado real
       de RH); trate a retenção como parâmetro configurável, sem prazo fixo
