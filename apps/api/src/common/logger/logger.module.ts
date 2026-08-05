@@ -12,8 +12,12 @@ const REDACT_PATHS = [
   "req.params",
   'res.headers["set-cookie"]',
   "*.password",
+  "*.newPassword",
   "*.senha",
   "*.token",
+  "*.tokenHash",
+  "*.csrfToken",
+  "*.csrfTokenHash",
   "*.cpf",
   "*.salario",
 ];

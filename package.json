@@ -20,5 +20,10 @@
     "prettier": "^3.5.0",
     "turbo": "^2.4.0",
     "typescript": "^5.7.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "argon2"
+    ]
   }
 }

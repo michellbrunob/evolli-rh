@@ -15,7 +15,8 @@
     "test": "jest --config jest.config.js",
     "test:e2e": "jest --config test/jest-e2e.config.js",
     "db:migrate:dev": "node --env-file-if-exists=.env.migrate node_modules/prisma/build/index.js migrate dev --schema=prisma/schema.prisma",
-    "db:migrate:deploy": "node --env-file-if-exists=.env.migrate node_modules/prisma/build/index.js migrate deploy --schema=prisma/schema.prisma"
+    "db:migrate:deploy": "node --env-file-if-exists=.env.migrate node_modules/prisma/build/index.js migrate deploy --schema=prisma/schema.prisma",
+    "bootstrap:admin": "node dist/bootstrap/bootstrap-admin.js"
   },
   "dependencies": {
     "@nestjs/common": "^10.4.15",
@@ -24,6 +25,10 @@
     "@nestjs/platform-express": "^10.4.15",
     "@nestjs/swagger": "^8.1.0",
     "@prisma/client": "^5.22.0",
+    "argon2": "^0.41.1",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.1",
+    "cookie-parser": "^1.4.7",
     "helmet": "^8.0.0",
     "nestjs-pino": "^4.1.0",
     "pino-http": "^10.3.0",
@@ -35,6 +40,7 @@
     "@nestjs/cli": "^10.4.9",
     "@nestjs/schematics": "^10.2.3",
     "@nestjs/testing": "^10.4.15",
+    "@types/cookie-parser": "^1.4.8",
     "@types/express": "^5.0.0",
     "@types/jest": "^29.5.14",
     "@types/node": "^22.10.2",
