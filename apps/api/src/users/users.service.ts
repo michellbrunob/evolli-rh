@@ -1,11 +1,15 @@
 import { Injectable, UnprocessableEntityException } from "@nestjs/common";
-import { AccessRole } from "@prisma/client";
+import { AccessRole, AccessUser } from "@prisma/client";
 import { PrismaService } from "../database/prisma.service";
 import { PasswordHashService } from "../auth/password/password-hash.service";
 import { PasswordPolicyService } from "../auth/password/password-policy.service";
-import { SessionService } from "../auth/session/session.service";
+import {
+  SessionRequestMetadata,
+  SessionService,
+} from "../auth/session/session.service";
 import { normalizeEmail } from "../auth/normalize-email.util";
 import { toSafeUser, SafeAccessUser } from "../auth/safe-user.util";
+import { AuditService } from "../audit/audit.service";
 
 export interface CreateUserInput {
   email: string;
@@ -16,6 +20,12 @@ export interface CreateUserInput {
   teamId?: string;
 }
 
+/** Ator + contexto de requisição para a trilha de auditoria (ADR 0004). */
+export interface AuditActorContext {
+  actor: AccessUser;
+  metadata: SessionRequestMetadata;
+}
+
 @Injectable()
 export class UsersService {
   constructor(
@@ -23,9 +33,13 @@ export class UsersService {
     private readonly passwordHashService: PasswordHashService,
     private readonly passwordPolicyService: PasswordPolicyService,
     private readonly sessionService: SessionService,
+    private readonly auditService: AuditService,
   ) {}
 
-  async createUser(input: CreateUserInput): Promise<SafeAccessUser> {
+  async createUser(
+    input: CreateUserInput,
+    auditCtx: AuditActorContext,
+  ): Promise<SafeAccessUser> {
     // Autorização já aplicada pelo AuthorizationGuard (RequirePermission
     // "user_role"/"create") antes deste método rodar.
     if (!this.passwordPolicyService.isValid(input.password)) {
@@ -34,15 +48,38 @@ export class UsersService {
 
     const passwordHash = await this.passwordHashService.hash(input.password);
 
-    const user = await this.prisma.accessUser.create({
-      data: {
-        email: normalizeEmail(input.email),
-        passwordHash,
-        role: input.role,
-        companyId: input.companyId ?? null,
-        unitId: input.unitId ?? null,
-        teamId: input.teamId ?? null,
-      },
+    const user = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.accessUser.create({
+        data: {
+          email: normalizeEmail(input.email),
+          passwordHash,
+          role: input.role,
+          companyId: input.companyId ?? null,
+          unitId: input.unitId ?? null,
+          teamId: input.teamId ?? null,
+        },
+      });
+
+      // Ação sensível bem-sucedida: alteração e evento de auditoria na
+      // mesma transação (ADR 0004 §2).
+      await this.auditService.record(
+        {
+          actorType: "user",
+          actorUserId: auditCtx.actor.id,
+          actorRole: auditCtx.actor.role,
+          companyId: auditCtx.actor.companyId,
+          action: "user_created",
+          resource: "access_user",
+          resourceId: created.id,
+          ip: auditCtx.metadata.ip,
+          userAgent: auditCtx.metadata.userAgent,
+          result: "success",
+          requestId: auditCtx.metadata.requestId,
+        },
+        tx,
+      );
+
+      return created;
     });
 
     return toSafeUser(user);
@@ -51,32 +88,94 @@ export class UsersService {
   async updateRole(
     targetUserId: string,
     role: AccessRole,
+    auditCtx: AuditActorContext,
     companyId?: string,
     unitId?: string,
     teamId?: string,
   ): Promise<SafeAccessUser> {
     // Autorização já aplicada pelo AuthorizationGuard (RequirePermission
     // "user_role"/"alter") antes deste método rodar.
-    const user = await this.prisma.accessUser.update({
-      where: { id: targetUserId },
-      data: {
-        role,
-        companyId: companyId ?? null,
-        unitId: unitId ?? null,
-        teamId: teamId ?? null,
-      },
+    const user = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.accessUser.update({
+        where: { id: targetUserId },
+        data: {
+          role,
+          companyId: companyId ?? null,
+          unitId: unitId ?? null,
+          teamId: teamId ?? null,
+        },
+      });
+
+      await this.auditService.record(
+        {
+          actorType: "user",
+          actorUserId: auditCtx.actor.id,
+          actorRole: auditCtx.actor.role,
+          companyId: auditCtx.actor.companyId,
+          action: "user_role_changed",
+          resource: "access_user",
+          resourceId: targetUserId,
+          ip: auditCtx.metadata.ip,
+          userAgent: auditCtx.metadata.userAgent,
+          result: "success",
+          requestId: auditCtx.metadata.requestId,
+        },
+        tx,
+      );
+
+      return updated;
     });
+
     return toSafeUser(user);
   }
 
-  async disable(targetUserId: string): Promise<void> {
-    await this.prisma.accessUser.update({
-      where: { id: targetUserId },
-      data: { status: "disabled" },
+  async disable(
+    targetUserId: string,
+    auditCtx: AuditActorContext,
+  ): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      await tx.accessUser.update({
+        where: { id: targetUserId },
+        data: { status: "disabled" },
+      });
+
+      await this.auditService.record(
+        {
+          actorType: "user",
+          actorUserId: auditCtx.actor.id,
+          actorRole: auditCtx.actor.role,
+          companyId: auditCtx.actor.companyId,
+          action: "user_disabled",
+          resource: "access_user",
+          resourceId: targetUserId,
+          ip: auditCtx.metadata.ip,
+          userAgent: auditCtx.metadata.userAgent,
+          result: "success",
+          requestId: auditCtx.metadata.requestId,
+        },
+        tx,
+      );
     });
+
     await this.sessionService.revokeAllForUser(
       targetUserId,
       "account_disabled",
     );
+
+    // Best-effort (ADR 0004 §2) — consequência já garantida atomicamente
+    // acima; a revogação de sessão em si é best-effort.
+    await this.auditService.record({
+      actorType: "user",
+      actorUserId: auditCtx.actor.id,
+      actorRole: auditCtx.actor.role,
+      companyId: auditCtx.actor.companyId,
+      action: "session_revoked",
+      resource: "access_session",
+      resourceId: targetUserId,
+      ip: auditCtx.metadata.ip,
+      userAgent: auditCtx.metadata.userAgent,
+      result: "success",
+      requestId: auditCtx.metadata.requestId,
+    });
   }
 }

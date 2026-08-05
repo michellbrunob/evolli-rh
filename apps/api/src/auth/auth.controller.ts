@@ -31,6 +31,7 @@ import { extractRequestMetadata } from "./request-metadata.util";
 import { SessionService } from "./session/session.service";
 import { evaluatePermission } from "./authorization/rbac.evaluator";
 import { AccessSession, AccessUser } from "@prisma/client";
+import { AuditService } from "../audit/audit.service";
 
 @ApiTags("auth")
 @Controller("auth")
@@ -39,6 +40,7 @@ export class AuthController {
     private readonly authService: AuthService,
     private readonly sessionService: SessionService,
     private readonly configService: ConfigService,
+    private readonly auditService: AuditService,
   ) {}
 
   @Post("login")
@@ -63,10 +65,27 @@ export class AuthController {
   @UseGuards(SessionGuard, CsrfGuard)
   async logout(
     @CurrentSession() session: AccessSession,
+    @CurrentUser() user: AccessUser,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ): Promise<void> {
     await this.sessionService.revokeById(session.id, "logout");
     clearSessionCookie(res, this.configService);
+
+    const metadata = extractRequestMetadata(req);
+    await this.auditService.record({
+      actorType: "user",
+      actorUserId: user.id,
+      actorRole: user.role,
+      companyId: user.companyId,
+      action: "logout",
+      resource: "access_session",
+      resourceId: session.id,
+      ip: metadata.ip,
+      userAgent: metadata.userAgent,
+      result: "success",
+      requestId: metadata.requestId,
+    });
   }
 
   @Get("sessions")
@@ -89,6 +108,7 @@ export class AuthController {
   async revokeSession(
     @Param("id") sessionId: string,
     @CurrentUser() actor: AccessUser,
+    @Req() req: Request,
   ): Promise<void> {
     const target = await this.sessionService.findByIdWithUser(sessionId);
 
@@ -117,13 +137,28 @@ export class AuthController {
       sessionId,
       isOwnSession ? "revoked_by_self" : "revoked_by_admin",
     );
+
+    const metadata = extractRequestMetadata(req);
+    await this.auditService.record({
+      actorType: "user",
+      actorUserId: actor.id,
+      actorRole: actor.role,
+      companyId: actor.companyId,
+      action: "session_revoked",
+      resource: "access_session",
+      resourceId: sessionId,
+      ip: metadata.ip,
+      userAgent: metadata.userAgent,
+      result: "success",
+      requestId: metadata.requestId,
+    });
   }
 
   @Post("password/forgot")
   @HttpCode(HttpStatus.ACCEPTED)
   async forgotPassword(@Body() dto: PasswordForgotDto, @Req() req: Request) {
-    const { ip } = extractRequestMetadata(req);
-    await this.authService.requestPasswordReset(dto.email, ip);
+    const metadata = extractRequestMetadata(req);
+    await this.authService.requestPasswordReset(dto.email, metadata);
     // Resposta genérica sempre — nunca revela se o e-mail existe (spec §6).
     return { status: "ok" };
   }
@@ -134,7 +169,7 @@ export class AuthController {
     @Body() dto: PasswordResetDto,
     @Req() req: Request,
   ): Promise<void> {
-    const { ip } = extractRequestMetadata(req);
-    await this.authService.resetPassword(dto.token, dto.newPassword, ip);
+    const metadata = extractRequestMetadata(req);
+    await this.authService.resetPassword(dto.token, dto.newPassword, metadata);
   }
 }

@@ -1,6 +1,7 @@
 import { HttpException, HttpStatus, Injectable } from "@nestjs/common";
 import { PrismaService } from "../../database/prisma.service";
 import { normalizeEmail } from "../normalize-email.util";
+import { AuditService } from "../../audit/audit.service";
 
 // Parâmetro inicial fechado (spec): no máximo 5 tentativas inválidas por
 // combinação de e-mail normalizado + IP em 15 minutos. Sem bloqueio
@@ -10,9 +11,16 @@ export const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 
 @Injectable()
 export class RateLimitService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditService: AuditService,
+  ) {}
 
-  async assertNotRateLimited(key: string, ip: string | null): Promise<void> {
+  async assertNotRateLimited(
+    key: string,
+    ip: string | null,
+    requestId: string,
+  ): Promise<void> {
     const since = new Date(Date.now() - RATE_LIMIT_WINDOW_MS);
     const failedCount = await this.prisma.accessLoginAttempt.count({
       where: {
@@ -24,6 +32,20 @@ export class RateLimitService {
     });
 
     if (failedCount >= RATE_LIMIT_MAX_ATTEMPTS) {
+      // Best-effort — falha ao gravar o evento nunca reverte o bloqueio já
+      // decidido (ADR 0004 §2).
+      await this.auditService.record({
+        actorType: "system",
+        actorSystemId: "rate-limit-service",
+        action: "rate_limit_blocked",
+        resource: "access_login_attempt",
+        resourceId: null,
+        ip,
+        userAgent: null,
+        result: "denied",
+        requestId,
+      });
+
       // Mensagem pública fixa via AllExceptionsFilter — nunca revela
       // contagem/janela restante.
       throw new HttpException(

@@ -9,6 +9,7 @@ import {
   SESSION_ABSOLUTE_TTL_MS,
   SESSION_INACTIVITY_TTL_MS,
 } from "./session.constants";
+import { AuditService } from "../../audit/audit.service";
 
 export interface IssuedSession {
   session: AccessSession;
@@ -24,6 +25,8 @@ export interface ValidatedSession {
 export interface SessionRequestMetadata {
   ip: string | null;
   userAgent: string | null;
+  /** Correlação com o log técnico e a trilha de auditoria (ADR 0001/0004). */
+  requestId: string;
 }
 
 /**
@@ -34,7 +37,10 @@ export interface SessionRequestMetadata {
  */
 @Injectable()
 export class SessionService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditService: AuditService,
+  ) {}
 
   async issue(
     userId: string,
@@ -64,7 +70,10 @@ export class SessionService {
    * inatividade ou por TTL absoluto é tratada como inválida (e marcada
    * revogada, para auditoria).
    */
-  async validateAndTouch(token: string): Promise<ValidatedSession | null> {
+  async validateAndTouch(
+    token: string,
+    requestId: string,
+  ): Promise<ValidatedSession | null> {
     const tokenHash = hashOpaqueToken(token);
     const session = await this.prisma.accessSession.findUnique({
       where: { tokenHash },
@@ -79,12 +88,14 @@ export class SessionService {
 
     if (session.expiresAt <= now) {
       await this.revokeById(session.id, "expired_absolute");
+      await this.auditExpiry(session, requestId);
       return null;
     }
 
     const inactiveSince = now.getTime() - session.lastSeenAt.getTime();
     if (inactiveSince > SESSION_INACTIVITY_TTL_MS) {
       await this.revokeById(session.id, "expired_inactivity");
+      await this.auditExpiry(session, requestId);
       return null;
     }
 
@@ -136,6 +147,26 @@ export class SessionService {
     await this.prisma.accessSession.updateMany({
       where: { id: sessionId, revokedAt: null },
       data: { revokedAt: new Date(), revokedReason: reason },
+    });
+  }
+
+  /** Best-effort (ADR 0004 §2) — falha ao auditar não afeta a expiração já aplicada. */
+  private async auditExpiry(
+    session: AccessSession & { user: AccessUser },
+    requestId: string,
+  ): Promise<void> {
+    await this.auditService.record({
+      actorType: "user",
+      actorUserId: session.user.id,
+      actorRole: session.user.role,
+      companyId: session.user.companyId,
+      action: "session_expired",
+      resource: "access_session",
+      resourceId: session.id,
+      ip: session.ip,
+      userAgent: session.userAgent,
+      result: "success",
+      requestId,
     });
   }
 

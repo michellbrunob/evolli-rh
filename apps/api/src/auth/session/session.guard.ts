@@ -27,7 +27,10 @@ export class SessionGuard implements CanActivate {
       throw new UnauthorizedException();
     }
 
-    const validated = await this.sessionService.validateAndTouch(token);
+    const validated = await this.sessionService.validateAndTouch(
+      token,
+      request.requestId,
+    );
     if (!validated) {
       throw new UnauthorizedException();
     }

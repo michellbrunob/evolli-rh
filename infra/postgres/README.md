@@ -5,7 +5,10 @@ Scripts idempotentes que criam os dois papéis de banco definidos na
 
 - `evolli_migrator` — DDL/migrations (`CREATE`, `ALTER`, `DROP` no schema `app`).
 - `evolli_app` — só DML (`SELECT`, `INSERT`, `UPDATE`, `DELETE`) no schema `app`,
-  usado pela API em runtime. Nunca tem privilégio de DDL.
+  usado pela API em runtime. Nunca tem privilégio de DDL. Exceção: na tabela
+  `audit_event` (Etapa 0 — Fatia 4, ADR 0004), `evolli_app` só tem `SELECT`/
+  `INSERT` — `UPDATE`/`DELETE` são revogados por `03_audit_grants.sql`
+  (append-only, mesmo em caso de exploit na API).
 
 Nenhum script aqui contém senha, URL real ou qualquer segredo. Toda credencial
 entra via variável de ambiente/parâmetro `-v` do `psql`, no momento da execução.
@@ -68,6 +71,15 @@ CLI (`node --env-file-if-exists=.env.migrate`) — a variável nunca fica
 presente no processo que sobe a API (`pnpm --filter @evolli/api dev`/`start`),
 mesmo que os dois comandos sejam executados na mesma máquina.
 
+Depois da migration (a partir da Etapa 0 — Fatia 4, quando a tabela
+`audit_event` existir), restrinja o privilégio de `evolli_app` nessa tabela
+— **precisa rodar depois** de `db:migrate:deploy`, pois a tabela só existe
+após a migration:
+
+```bash
+psql "$PGADMIN_URL" -f infra/postgres/03_audit_grants.sql
+```
+
 ## Reexecução
 
 Ambos os scripts são seguros de rodar de novo:
@@ -77,6 +89,9 @@ Ambos os scripts são seguros de rodar de novo:
   fora deste script — evita sobrescrever segredo de produção por acidente).
 - `02_schema_and_grants.sql`: `CREATE SCHEMA IF NOT EXISTS` + `GRANT`/
   `ALTER DEFAULT PRIVILEGES` são idempotentes por natureza.
+- `03_audit_grants.sql`: `REVOKE` de privilégio já ausente não falha —
+  idempotente. Precisa da tabela `audit_event` já criada (rodar depois da
+  migration da Fatia 4).
 
 ## Homologação/produção
 

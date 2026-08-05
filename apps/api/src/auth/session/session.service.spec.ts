@@ -5,6 +5,7 @@ import {
   SESSION_ABSOLUTE_TTL_MS,
   SESSION_INACTIVITY_TTL_MS,
 } from "./session.constants";
+import { AuditService } from "../../audit/audit.service";
 
 function createPrismaMock() {
   return {
@@ -26,17 +27,24 @@ function createPrismaMock() {
   };
 }
 
+function createAuditServiceMock() {
+  return { record: jest.fn() } as unknown as AuditService & {
+    record: jest.Mock;
+  };
+}
+
 describe("SessionService", () => {
   it("issue() gera token opaco e persiste só o hash", async () => {
     const prisma = createPrismaMock();
     prisma.accessSession.create.mockImplementation(({ data }) =>
       Promise.resolve({ id: "session-1", ...data }),
     );
-    const service = new SessionService(prisma);
+    const service = new SessionService(prisma, createAuditServiceMock());
 
     const issued = await service.issue("user-1", {
       ip: "1.2.3.4",
       userAgent: "jest",
+      requestId: "req-1",
     });
 
     expect(issued.token).toBeDefined();
@@ -67,8 +75,8 @@ describe("SessionService", () => {
       Promise.resolve({ ...session, ...data }),
     );
 
-    const service = new SessionService(prisma);
-    const result = await service.validateAndTouch(token);
+    const service = new SessionService(prisma, createAuditServiceMock());
+    const result = await service.validateAndTouch(token, "req-1");
 
     expect(result).not.toBeNull();
     expect(result?.user.id).toBe("user-1");
@@ -78,9 +86,11 @@ describe("SessionService", () => {
   it("validateAndTouch() rejeita token inexistente", async () => {
     const prisma = createPrismaMock();
     prisma.accessSession.findUnique.mockResolvedValue(null);
-    const service = new SessionService(prisma);
+    const service = new SessionService(prisma, createAuditServiceMock());
 
-    expect(await service.validateAndTouch("token-qualquer")).toBeNull();
+    expect(
+      await service.validateAndTouch("token-qualquer", "req-1"),
+    ).toBeNull();
   });
 
   it("validateAndTouch() rejeita sessão revogada", async () => {
@@ -92,9 +102,9 @@ describe("SessionService", () => {
       lastSeenAt: new Date(),
       user: { id: "u1", status: "active" },
     });
-    const service = new SessionService(prisma);
+    const service = new SessionService(prisma, createAuditServiceMock());
 
-    expect(await service.validateAndTouch("token")).toBeNull();
+    expect(await service.validateAndTouch("token", "req-1")).toBeNull();
   });
 
   it("validateAndTouch() rejeita e revoga sessão expirada (TTL absoluto)", async () => {
@@ -104,16 +114,27 @@ describe("SessionService", () => {
       revokedAt: null,
       expiresAt: new Date(Date.now() - 1000),
       lastSeenAt: new Date(),
-      user: { id: "u1", status: "active" },
+      ip: null,
+      userAgent: null,
+      user: {
+        id: "u1",
+        status: "active",
+        role: "colaborador",
+        companyId: null,
+      },
     });
     prisma.accessSession.updateMany.mockResolvedValue({ count: 1 });
-    const service = new SessionService(prisma);
+    const auditService = createAuditServiceMock();
+    const service = new SessionService(prisma, auditService);
 
-    expect(await service.validateAndTouch("token")).toBeNull();
+    expect(await service.validateAndTouch("token", "req-1")).toBeNull();
     expect(prisma.accessSession.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ revokedReason: "expired_absolute" }),
       }),
+    );
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "session_expired" }),
     );
   });
 
@@ -124,12 +145,19 @@ describe("SessionService", () => {
       revokedAt: null,
       expiresAt: new Date(Date.now() + SESSION_ABSOLUTE_TTL_MS),
       lastSeenAt: new Date(Date.now() - SESSION_INACTIVITY_TTL_MS - 1000),
-      user: { id: "u1", status: "active" },
+      ip: null,
+      userAgent: null,
+      user: {
+        id: "u1",
+        status: "active",
+        role: "colaborador",
+        companyId: null,
+      },
     });
     prisma.accessSession.updateMany.mockResolvedValue({ count: 1 });
-    const service = new SessionService(prisma);
+    const service = new SessionService(prisma, createAuditServiceMock());
 
-    expect(await service.validateAndTouch("token")).toBeNull();
+    expect(await service.validateAndTouch("token", "req-1")).toBeNull();
     expect(prisma.accessSession.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ revokedReason: "expired_inactivity" }),
@@ -146,8 +174,8 @@ describe("SessionService", () => {
       lastSeenAt: new Date(),
       user: { id: "u1", status: "disabled" },
     });
-    const service = new SessionService(prisma);
+    const service = new SessionService(prisma, createAuditServiceMock());
 
-    expect(await service.validateAndTouch("token")).toBeNull();
+    expect(await service.validateAndTouch("token", "req-1")).toBeNull();
   });
 });

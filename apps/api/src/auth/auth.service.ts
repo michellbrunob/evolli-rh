@@ -27,6 +27,7 @@ import {
   hashOpaqueToken,
 } from "./crypto/opaque-token.util";
 import { normalizeEmail } from "./normalize-email.util";
+import { AuditService } from "../audit/audit.service";
 
 const PASSWORD_RESET_TOKEN_TTL_MS = 20 * 60 * 1000; // 20 min (janela §4: 15–30 min)
 
@@ -41,6 +42,7 @@ export class AuthService {
     private readonly passwordHashService: PasswordHashService,
     private readonly passwordPolicyService: PasswordPolicyService,
     @Inject(EMAIL_NOTIFIER) private readonly emailNotifier: EmailNotifier,
+    private readonly auditService: AuditService,
   ) {}
 
   async login(
@@ -48,7 +50,11 @@ export class AuthService {
     password: string,
     metadata: SessionRequestMetadata,
   ): Promise<IssuedSession> {
-    await this.rateLimitService.assertNotRateLimited(email, metadata.ip);
+    await this.rateLimitService.assertNotRateLimited(
+      email,
+      metadata.ip,
+      metadata.requestId,
+    );
 
     const result = await this.credentialVerifier.verify(email, password);
     await this.rateLimitService.recordAttempt(
@@ -58,17 +64,70 @@ export class AuthService {
     );
 
     if (result.outcome !== "valid" || !result.user) {
+      // Best-effort (ADR 0004 §2) — falha ao auditar nunca muda a negação.
+      await this.auditService.record(
+        result.user
+          ? {
+              actorType: "user",
+              actorUserId: result.user.id,
+              actorRole: result.user.role,
+              companyId: result.user.companyId,
+              action: "login_failed",
+              resource: "access_user",
+              resourceId: result.user.id,
+              ip: metadata.ip,
+              userAgent: metadata.userAgent,
+              result: "failure",
+              requestId: metadata.requestId,
+            }
+          : {
+              actorType: "system",
+              actorSystemId: "auth-service:login",
+              action: "login_failed",
+              resource: "access_user",
+              resourceId: null,
+              ip: metadata.ip,
+              userAgent: metadata.userAgent,
+              result: "failure",
+              requestId: metadata.requestId,
+            },
+      );
+
       // Mesma resposta para credencial errada, conta inexistente,
       // desativada ou bloqueada — evita enumeração (spec §6).
       throw new UnauthorizedException();
     }
 
-    return this.sessionService.issue(result.user.id, metadata);
+    const user = result.user;
+    const issued = await this.sessionService.issue(user.id, metadata);
+
+    await this.auditService.record({
+      actorType: "user",
+      actorUserId: user.id,
+      actorRole: user.role,
+      companyId: user.companyId,
+      action: "login_succeeded",
+      resource: "access_session",
+      resourceId: issued.session.id,
+      ip: metadata.ip,
+      userAgent: metadata.userAgent,
+      result: "success",
+      requestId: metadata.requestId,
+    });
+
+    return issued;
   }
 
-  async requestPasswordReset(email: string, ip: string | null): Promise<void> {
+  async requestPasswordReset(
+    email: string,
+    metadata: SessionRequestMetadata,
+  ): Promise<void> {
     const normalized = normalizeEmail(email);
-    await this.rateLimitService.assertNotRateLimited(`reset:${normalized}`, ip);
+    await this.rateLimitService.assertNotRateLimited(
+      `reset:${normalized}`,
+      metadata.ip,
+      metadata.requestId,
+    );
 
     const user = await this.prisma.accessUser.findUnique({
       where: { email: normalized },
@@ -89,64 +148,153 @@ export class AuthService {
     // Sempre grava tentativa "bem-sucedida" (não é rate limit de força
     // bruta de senha, é limite de disparo do fluxo) e sempre retorna igual,
     // exista ou não o e-mail — evita enumeração (spec §6).
-    await this.rateLimitService.recordAttempt(`reset:${normalized}`, ip, true);
+    await this.rateLimitService.recordAttempt(
+      `reset:${normalized}`,
+      metadata.ip,
+      true,
+    );
+
+    // Resultado sempre "success" na auditoria também — o próprio ato de
+    // solicitar (não a existência do e-mail) é o que se audita, mesma
+    // proteção anti-enumeração da resposta HTTP (spec §6).
+    await this.auditService.record(
+      user
+        ? {
+            actorType: "user",
+            actorUserId: user.id,
+            actorRole: user.role,
+            companyId: user.companyId,
+            action: "password_reset_requested",
+            resource: "access_user",
+            resourceId: user.id,
+            ip: metadata.ip,
+            userAgent: metadata.userAgent,
+            result: "success",
+            requestId: metadata.requestId,
+          }
+        : {
+            actorType: "system",
+            actorSystemId: "auth-service:password-reset",
+            action: "password_reset_requested",
+            resource: "access_user",
+            resourceId: null,
+            ip: metadata.ip,
+            userAgent: metadata.userAgent,
+            result: "success",
+            requestId: metadata.requestId,
+          },
+    );
   }
 
   async resetPassword(
     token: string,
     newPassword: string,
-    ip: string | null,
+    metadata: SessionRequestMetadata,
   ): Promise<void> {
     await this.rateLimitService.assertNotRateLimited(
-      `pwreset-attempt:${ip ?? "unknown"}`,
-      ip,
+      `pwreset-attempt:${metadata.ip ?? "unknown"}`,
+      metadata.ip,
+      metadata.requestId,
     );
 
     if (!this.passwordPolicyService.isValid(newPassword)) {
       await this.rateLimitService.recordAttempt(
-        `pwreset-attempt:${ip ?? "unknown"}`,
-        ip,
+        `pwreset-attempt:${metadata.ip ?? "unknown"}`,
+        metadata.ip,
         false,
       );
+      await this.auditFailedResetCompletion(metadata);
       throw new UnprocessableEntityException();
     }
 
     const tokenHash = hashOpaqueToken(token);
     const resetToken = await this.prisma.accessPasswordResetToken.findFirst({
       where: { tokenHash, usedAt: null, expiresAt: { gt: new Date() } },
+      include: { user: true },
     });
 
     if (!resetToken) {
       await this.rateLimitService.recordAttempt(
-        `pwreset-attempt:${ip ?? "unknown"}`,
-        ip,
+        `pwreset-attempt:${metadata.ip ?? "unknown"}`,
+        metadata.ip,
         false,
       );
+      await this.auditFailedResetCompletion(metadata);
       throw new BadRequestException();
     }
 
     await this.rateLimitService.recordAttempt(
-      `pwreset-attempt:${ip ?? "unknown"}`,
-      ip,
+      `pwreset-attempt:${metadata.ip ?? "unknown"}`,
+      metadata.ip,
       true,
     );
 
     const passwordHash = await this.passwordHashService.hash(newPassword);
 
-    await this.prisma.$transaction([
-      this.prisma.accessUser.update({
+    // Ação sensível bem-sucedida: alteração e evento de auditoria na mesma
+    // transação (ADR 0004 §2) — ou os dois persistem, ou nenhum.
+    await this.prisma.$transaction(async (tx) => {
+      await tx.accessUser.update({
         where: { id: resetToken.userId },
         data: { passwordHash },
-      }),
-      this.prisma.accessPasswordResetToken.update({
+      });
+      await tx.accessPasswordResetToken.update({
         where: { id: resetToken.id },
         data: { usedAt: new Date() },
-      }),
-    ]);
+      });
+      await this.auditService.record(
+        {
+          actorType: "user",
+          actorUserId: resetToken.user.id,
+          actorRole: resetToken.user.role,
+          companyId: resetToken.user.companyId,
+          action: "password_reset_completed",
+          resource: "access_user",
+          resourceId: resetToken.userId,
+          ip: metadata.ip,
+          userAgent: metadata.userAgent,
+          result: "success",
+          requestId: metadata.requestId,
+        },
+        tx,
+      );
+    });
 
     await this.sessionService.revokeAllForUser(
       resetToken.userId,
       "password_reset",
     );
+
+    // Best-effort (ADR 0004 §2) — consequência da conclusão acima, já
+    // garantida atomicamente; a revogação de sessão em si é best-effort.
+    await this.auditService.record({
+      actorType: "user",
+      actorUserId: resetToken.user.id,
+      actorRole: resetToken.user.role,
+      companyId: resetToken.user.companyId,
+      action: "session_revoked",
+      resource: "access_session",
+      resourceId: resetToken.userId,
+      ip: metadata.ip,
+      userAgent: metadata.userAgent,
+      result: "success",
+      requestId: metadata.requestId,
+    });
+  }
+
+  private async auditFailedResetCompletion(
+    metadata: SessionRequestMetadata,
+  ): Promise<void> {
+    await this.auditService.record({
+      actorType: "system",
+      actorSystemId: "auth-service:password-reset",
+      action: "password_reset_completed",
+      resource: "access_password_reset_token",
+      resourceId: null,
+      ip: metadata.ip,
+      userAgent: metadata.userAgent,
+      result: "failure",
+      requestId: metadata.requestId,
+    });
   }
 }

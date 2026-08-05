@@ -1,7 +1,12 @@
 # Etapa 0 — Fatia 4: Auditoria formal e rastreabilidade
 
-Status: **especificação — aguardando aprovação** (nenhum código, migration,
-dependência ou endpoint implementado nesta fatia)
+Status: **implementação iniciada** (branch `feature/etapa0-auditoria-formal`)
+— especificação aprovada (PR #12, mergeada), decisões de retenção,
+integridade e acesso desta primeira versão fechadas em
+[ADR 0004](../adr/0004-auditoria-formal-e-integridade.md). As seções abaixo
+permanecem como registro da especificação original aprovada — não foram
+apagadas; onde a implementação real divergiu ou fechou uma opção em aberto,
+isso está registrado na ADR 0004, não editado retroativamente aqui.
 
 ## 0. Contexto e ordem no roadmap
 
@@ -454,7 +459,11 @@ implementação, quando aprovada.
       a trilha com dado real de RH; operar em produção; ou executar qualquer
       descarte definitivo de evento.
 
-## 12. Arquivos futuros previstos para implementação (não criados nesta fatia)
+## 12. Arquivos (lista original prevista — ver ADR 0004 e branch `feature/etapa0-auditoria-formal` para a lista real implementada)
+
+Lista original prevista nesta especificação, mantida como registro — a lista
+real de arquivos alterados na implementação está no changelog da PR de
+implementação, não editada retroativamente aqui:
 
 ```text
 apps/api/prisma/schema.prisma                       # novo model de evento de auditoria
@@ -468,13 +477,26 @@ apps/api/test/audit.e2e-spec.ts
 docs/adr/0004-auditoria-formal-e-integridade.md        # ADR formal, só após aprovação (§13)
 ```
 
-## 13. Proposta de ADR 0004 (não criada — depende de aprovação)
+Divergência já conhecida entre esta lista original e a implementação real:
+esta primeira versão **não implementa** `POST /v1/audit/exports` (decisão 4
+da ADR 0004) — só os dois endpoints de consulta (`GET /v1/audit/events`,
+`GET /v1/audit/events/:id`).
 
-O texto abaixo é a **proposta** de conteúdo para `docs/adr/0004-auditoria-
-formal-e-integridade.md`, mantida dentro deste documento porque a ADR formal
-só deve ser criada como arquivo próprio depois que as decisões de retenção
-(§5), integridade (§8) e acesso (§7) estiverem aprovadas — criar a ADR antes
-disso registraria uma decisão que ainda não foi tomada.
+## 13. Proposta de ADR 0004 (histórico — ADR real criada em `docs/adr/0004-auditoria-formal-e-integridade.md`)
+
+**Atualização:** as decisões de retenção (§5), integridade (§8) e acesso
+(§7) foram fechadas para esta primeira versão implementada — a ADR 0004 foi
+criada como arquivo próprio, com status **aceito**:
+[docs/adr/0004-auditoria-formal-e-integridade.md](../adr/0004-auditoria-formal-e-integridade.md).
+O texto abaixo é mantido como **registro histórico** da proposta original
+que motivou essas decisões — a ADR 0004 real é a fonte de verdade atual, não
+este bloco.
+
+O texto abaixo é a **proposta original** de conteúdo para `docs/adr/0004-
+auditoria-formal-e-integridade.md`, mantida dentro deste documento porque,
+no momento em que foi escrita, a ADR formal ainda não podia ser criada como
+arquivo próprio — as decisões de retenção (§5), integridade (§8) e acesso
+(§7) ainda dependiam de aprovação.
 
 > ### ADR 0004 — Auditoria formal e integridade (proposta)
 >
