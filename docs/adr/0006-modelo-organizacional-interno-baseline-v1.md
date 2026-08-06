@@ -1,6 +1,6 @@
 # ADR 0006 — Modelo organizacional interno, Baseline V1
 
-- Status: aceito
+- Status: aceito (com Emenda 1, 2026-08-06 — ver seção "Emenda 1" ao final)
 - Data: 2026-08-06
 - Relacionado: [docs/modules/etapa1-nucleo-organizacional.md](../modules/etapa1-nucleo-organizacional.md), [docs/decisions/etapa1-modelagem-organizacional-pendente.md](../decisions/etapa1-modelagem-organizacional-pendente.md), [ADR 0002](0002-papeis-postgres-e-migrations.md), [ADR 0003](0003-identidade-sessao-e-autorizacao.md), [ADR 0004](0004-auditoria-formal-e-integridade.md), [ADR 0005](0005-escopo-interno-e-evolucao-multitenant.md)
 
@@ -140,9 +140,9 @@ Resumo das alternativas descartadas mais relevantes:
   mais bloqueia a fase Implementar quanto à modelagem.
 - A fase Implementar pode iniciar sem decisão de modelagem pendente para
   departamento, área, equipe, cargo, centro de custo, inativação ou
-  hierarquia. As pendências residuais são: DP-4 (CNPJ, decisão de
-  produto/DPO à parte) e DP-9 (nomenclatura final de tabelas/colunas,
-  decisão de implementação).
+  hierarquia. A pendência residual é DP-4 (CNPJ, decisão de produto/DPO
+  à parte). DP-9 (nomenclatura) foi resolvida em 2026-08-06 — ver
+  "Emenda 1" ao final desta ADR.
 - `area` é uma entidade nova, não prevista na primeira versão do
   levantamento — sua introdução não altera nenhuma tabela já mergeada.
 - Nenhuma tabela já mergeada (`access_user`, `audit_event`) é alterada por
@@ -192,8 +192,6 @@ Resumo das alternativas descartadas mais relevantes:
   endereçada pela Baseline V1.
 - **Escopo de acesso de `auditor`/`dpo`** — decisão pendente separada
   (DP-7), tratada pela Emenda 1 da ADR 0005, não endereçada aqui.
-- **Nomenclatura final de tabelas/colunas** (pt-BR vs. inglês) — decisão
-  de implementação (DP-9), não endereçada aqui.
 - **Escopo do papel `gestor`** — princípio de não antecipação está
   resolvido (decisão 8); a pergunta "o escopo tende a ser por equipe?"
   permanece genuinamente futura, dependente da entidade colaborador.
@@ -227,9 +225,10 @@ Esta decisão deve ser reaberta — com ADR nova ou emenda formal — quando
   9 decisões desta ADR, sem introduzir campo, entidade ou regra além do
   que está aqui descrito; manter a extensão de `AuditAction` sempre
   aditiva.
-- **Produto:** resolver DP-4 (CNPJ) e DP-9 (nomenclatura) antes ou
-  durante a implementação, conforme a necessidade surgir; não é
-  bloqueante para o início da fase Implementar quanto à modelagem em si.
+- **Produto:** resolver DP-4 (CNPJ) antes ou durante a implementação,
+  conforme a necessidade surgir; não é bloqueante para o início da fase
+  Implementar quanto à modelagem em si. DP-9 (nomenclatura) já resolvida
+  — ver Emenda 1.
 - **TI/Segurança:** revisar, antes do merge da implementação, que
   nenhuma checagem de autorização passou a depender de
   `department_id`/`area_id` (decisão 2).
@@ -239,3 +238,83 @@ Esta decisão deve ser reaberta — com ADR nova ou emenda formal — quando
 - **Revisor de PR:** bloquear merge que introduza `department_id` em
   `access_user`/`audit_event`, que implemente inativação em cascata, ou
   que antecipe estruturalmente relação de gestor/colaborador.
+
+---
+
+## Emenda 1 (2026-08-06)
+
+**Esta seção é um aditivo — não reescreve nem apaga a decisão original
+acima.** As 9 decisões de modelagem permanecem tal como aceitas. Esta
+emenda formaliza uma decisão complementar, tomada na mesma data: a
+**nomenclatura** do Núcleo Organizacional, resolvendo **DP-9**.
+
+### Contexto da emenda
+
+A decisão original (§"Itens fora de escopo") deixou a nomenclatura final
+de tabelas e colunas como decisão de implementação, não endereçada. O
+produto avaliou e aprovou, em ciclo próprio, a nomenclatura de negócio,
+código, banco, APIs, eventos e documentação técnica do Núcleo
+Organizacional.
+
+### Decisão da emenda
+
+1. **Nomenclatura em português** para tudo que o Núcleo Organizacional
+   ainda vai criar: negócio, código, banco, APIs, eventos e documentação
+   técnica. Identificadores técnicos **não usam** acento, espaço, hífen
+   interno nem caractere especial.
+2. **Nomes de entidade aprovados:**
+
+   | Conceito        | Tipo/model (PascalCase) | Tabela futura (snake_case) |
+   | --------------- | ----------------------- | -------------------------- |
+   | Empresa         | `Empresa`               | `empresa`                  |
+   | Unidade         | `UnidadeOrganizacional` | `unidade_organizacional`   |
+   | Departamento    | `Departamento`          | `departamento`             |
+   | Área            | `Area`                  | `area`                     |
+   | Equipe          | `Equipe`                | `equipe`                   |
+   | Cargo           | `Cargo`                 | `cargo`                    |
+   | Centro de custo | `CentroCusto`           | `centro_custo`             |
+
+3. **Convenções de forma aprovadas:**
+   - Tipos/classes/models: PascalCase em português (ex.:
+     `UnidadeOrganizacional`).
+   - Campos e variáveis: camelCase em português (ex.: `empresaId`,
+     `centroCustoId`).
+   - Tabelas e colunas físicas futuras: snake_case em português (ex.:
+     `unidade_organizacional`, `empresa_id`).
+   - Rotas futuras: português, minúsculas, plurais (ex.: `/v1/empresas`,
+     `/v1/unidades-organizacionais`, `/v1/centros-de-custo`).
+   - Eventos de auditoria futuros: português, minúsculas, separados por
+     ponto (ex.: `organizacao.empresa.criada`).
+   - **`Cargo`, nunca `Role`** — o domínio de autorização já usa "papel"
+     (`AuthorizationSubject.role`) para outro conceito; usar "Role" para
+     cargo colidiria com esse vocabulário já implementado.
+4. **Nada já implementado é renomeado.** `access_user`, `audit_event`,
+   `company_id`/`unit_id`/`team_id`, `AuthorizationSubject`,
+   `rbac.evaluator.ts`, `AuditAction`/`AuditResource` — tudo já mergeado
+   nas Fatias 3 e 4 permanece em inglês, exatamente como está.
+5. **Convivência de dois padrões de evento é aceita conscientemente:**
+   os verbos de auditoria já implementados (Fatias 3/4) seguem
+   snake_case em inglês (ex.: `login_succeeded`); os novos, do Núcleo
+   Organizacional, seguem português separado por ponto (ex.:
+   `organizacao.empresa.criada`). Não é inconsistência não percebida —
+   é decisão explícita desta emenda, registrada para que revisões
+   futuras não a tratem como erro.
+
+### O que esta emenda não faz
+
+- Não cria tabela, migration, endpoint, model Prisma ou qualquer artefato
+  real — as tabelas/colunas do item 2 são convenção para a fase
+  Implementar, não schema fechado.
+- Não altera nenhuma das 9 decisões de modelagem da ADR original.
+- Não renomeia código, teste, schema, migration, endpoint, dependência ou
+  infraestrutura já existente.
+- Não resolve DP-4 (CNPJ) nem DP-7 (escopo `auditor`/`dpo`) — seguem
+  pendentes, sem relação com esta emenda.
+
+### Diferenciação explícita
+
+| Tema                                           | Status após esta emenda                               |
+| ---------------------------------------------- | ----------------------------------------------------- |
+| Nomenclatura do Núcleo Organizacional (futuro) | Aprovada em português (itens 1–3 acima)               |
+| Nomenclatura já implementada (Fatias 3/4)      | **Inalterada**, permanece em inglês                   |
+| Nomenclatura de evento (auditoria)             | Dois padrões coexistem por decisão explícita (item 5) |

@@ -3,12 +3,15 @@
 > ## STATUS: DECISÃO APROVADA — Baseline V1
 >
 > As nove decisões descritas na seção "Baseline V1" abaixo foram aprovadas pelo produto em
-> 2026-08-06. Este documento preserva **integralmente** o levantamento de
-> fatos, as alternativas avaliadas, as tabelas de impacto e as
-> recomendações técnicas originais como **histórico** — nada foi apagado
-> ou reescrito. Cada seção D1–D8/QT-1 recebeu uma anotação de resolução
-> logo após o título, indicando o que foi decidido e remetendo à Baseline
-> V1. A formalização arquitetural está em
+> 2026-08-06. Em seguida, na mesma data, o produto também aprovou a
+> **nomenclatura em português** do Núcleo Organizacional, resolvendo
+> **DP-9** — ver a seção "Nomenclatura aprovada" dentro de D7 (§8). Este
+> documento preserva **integralmente** o levantamento de fatos, as
+> alternativas avaliadas, as tabelas de impacto e as recomendações
+> técnicas originais como **histórico** — nada foi apagado ou reescrito.
+> Cada seção D1–D8/QT-1 recebeu uma anotação de resolução logo após o
+> título, indicando o que foi decidido e remetendo à Baseline V1. A
+> formalização arquitetural está em
 > [ADR 0006 — Modelo organizacional interno, Baseline V1](../adr/0006-modelo-organizacional-interno-baseline-v1.md).
 
 - Fase do rito SDD: **Especificar / Decidir → Registrar**
@@ -68,9 +71,10 @@ está registrada dentro de cada seção.
 ### O que permanece pendente após esta decisão
 
 Ver síntese atualizada em §11 e tabela de perguntas em §12. Em resumo:
-`DP-4` (CNPJ, LGPD), `DP-9` parcial (algumas nomenclaturas técnicas finais)
-e as perguntas genuinamente futuras da fatia de colaboradores (escopo do
-gestor por equipe, "unidade é sempre local físico").
+`DP-4` (CNPJ, LGPD) e as perguntas genuinamente futuras da fatia de
+colaboradores (escopo do gestor por equipe, "unidade é sempre local
+físico"). `DP-9` (nomenclatura) foi **integralmente resolvida** em
+2026-08-06 — ver "Nomenclatura aprovada" em D7 (§8).
 
 ## 0. Escopo e limites deste documento
 
@@ -529,10 +533,51 @@ isso permanece decisão da fase Implementar.
 > função explicitamente adiada para a vida funcional futura (item 4,
 > resolve P7.2 — mesma resposta de D3). **P7.3 ("unidade é sempre local
 > físico?") permanece em aberto** — não foi endereçada pela Baseline V1;
-> ver §12. Nomes técnicos definitivos de tabela/coluna continuam decisão
-> da fase Implementar. Vocabulário e tabela abaixo preservados como
-> histórico, com a coluna "Ambiguidade a resolver" ainda válida para
-> "unidade".
+> ver §12. Vocabulário e tabela abaixo preservados como histórico, com a
+> coluna "Ambiguidade a resolver" ainda válida para "unidade". **Os nomes
+> técnicos definitivos foram decididos separadamente — ver "Nomenclatura
+> aprovada" logo abaixo.**
+
+> **✅ NOMENCLATURA APROVADA — 2026-08-06 (resolve DP-9 integralmente).**
+> O produto decidiu, em ciclo próprio, que a nomenclatura de negócio,
+> código, banco, APIs, eventos e documentação técnica do Núcleo
+> Organizacional é **em português**. Identificadores técnicos não usam
+> acento, espaço, hífen interno nem caractere especial. Isso substitui a
+> coluna "Termo técnico sugerido (en)" da tabela de vocabulário abaixo —
+> preservada como histórico do raciocínio original, não como nome final.
+>
+> Nomes aprovados (tipo/model em PascalCase):
+>
+> | Conceito        | Tipo/model              | Tabela futura            |
+> | --------------- | ----------------------- | ------------------------ |
+> | Empresa         | `Empresa`               | `empresa`                |
+> | Unidade         | `UnidadeOrganizacional` | `unidade_organizacional` |
+> | Departamento    | `Departamento`          | `departamento`           |
+> | Área            | `Area`                  | `area`                   |
+> | Equipe          | `Equipe`                | `equipe`                 |
+> | Cargo           | `Cargo`                 | `cargo`                  |
+> | Centro de custo | `CentroCusto`           | `centro_custo`           |
+>
+> Convenções de forma: tipos/classes em PascalCase português; campos e
+> variáveis em camelCase português (ex.: `empresaId`, `centroCustoId`);
+> tabelas/colunas físicas futuras em snake_case português (ex.:
+> `unidade_organizacional`, `empresa_id`); rotas futuras em português,
+> minúsculas, plurais (ex.: `/v1/empresas`,
+> `/v1/unidades-organizacionais`, `/v1/centros-de-custo`); eventos de
+> auditoria futuros em português, minúsculas, separados por ponto (ex.:
+> `organizacao.empresa.criada`). **"Cargo", nunca "Role"** — o domínio de
+> autorização já usa "papel" (`AuthorizationSubject.role`) para outro
+> conceito; usar "Role" para cargo colidiria.
+>
+> **Não renomeia nada já implementado.** `access_user`, `audit_event`,
+> `company_id`/`unit_id`/`team_id`, `AuthorizationSubject`,
+> `rbac.evaluator.ts`, `AuditAction`/`AuditResource` — tudo já mergeado
+> nas Fatias 3 e 4 permanece em inglês, exatamente como está. A decisão
+> vale só para o que o Núcleo Organizacional ainda vai criar.
+>
+> Formalização completa em
+> [ADR 0006](../adr/0006-modelo-organizacional-interno-baseline-v1.md) e
+> na spec, [docs/modules/etapa1-nucleo-organizacional.md §3](../modules/etapa1-nucleo-organizacional.md).
 
 ### Vocabulário de negócio proposto (a validar)
 
@@ -706,14 +751,18 @@ apenas para as alocações de pessoas (fatia futura)?
 
 ### Decisões que bloqueavam a implementação da Fatia 1 — todas resolvidas
 
-| Decisão                                                          | Por que bloqueava                                                                                        | Resolução (Baseline V1)                                                          |
-| ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| **D1** — Departamento por empresa / unidade / híbrido            | Define a chave estrangeira e a regra de unicidade de `department`; errar exige migração destrutiva (B→A) | Departamento por empresa; área = subdivisão opcional do departamento (itens 1–2) |
-| **D2** — Equipe vinculada a quê                                  | Define as FKs de `team` e a regra de unicidade                                                           | Equipe → departamento obrigatório, unidade opcional (item 3)                     |
-| **D3** — Catálogo de cargos por empresa ou compartilhado         | Define se `job_role` tem `company_id`; a opção B conflita com a ADR 0005                                 | Catálogo por empresa; só cargo, sem função nesta fatia (itens 4–5)               |
-| **D7 (parcial)** — Significado de "área" e de "cargo vs. função" | São questões de **conceito**, não de nome: definem se existem 5, 6 ou 7 entidades                        | Área e cargo/função definidos pelos itens 1 e 4; nomenclatura fina em DP-9       |
+| Decisão                                                                    | Por que bloqueava                                                                                        | Resolução (Baseline V1)                                                                                              |
+| -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| **D1** — Departamento por empresa / unidade / híbrido                      | Define a chave estrangeira e a regra de unicidade de `department`; errar exige migração destrutiva (B→A) | Departamento por empresa; área = subdivisão opcional do departamento (itens 1–2)                                     |
+| **D2** — Equipe vinculada a quê                                            | Define as FKs de `team` e a regra de unicidade                                                           | Equipe → departamento obrigatório, unidade opcional (item 3)                                                         |
+| **D3** — Catálogo de cargos por empresa ou compartilhado                   | Define se `job_role` tem `company_id`; a opção B conflita com a ADR 0005                                 | Catálogo por empresa; só cargo, sem função nesta fatia (itens 4–5)                                                   |
+| **D7** — Significado de "área" e de "cargo vs. função"; nomenclatura final | São questões de **conceito** (existem 5, 6 ou 7 entidades?) e de **nome** (DP-9)                         | Conceitos definidos pelos itens 1 e 4; nomenclatura em português aprovada em 2026-08-06 (resolve DP-9 integralmente) |
 
-Nenhuma decisão bloqueante permanece pendente.
+Nenhuma decisão bloqueante permanece pendente. `DP-9` (nomenclatura), que
+constava como parcialmente resolvida na primeira aprovação, foi
+**integralmente resolvida** em 2026-08-06 — ver "Nomenclatura aprovada"
+em D7 (§8). P7.3 ("unidade é sempre local físico?") continua em aberto,
+como questão de conceito genuinamente futura, não de nome.
 
 ### Decisões que podiam ser postergadas — status após a Baseline V1
 
@@ -830,6 +879,8 @@ endereçou e que continuam genuinamente em aberto:
 | P7.3 | "Unidade" é sempre local físico?           | Não coberta pela Baseline V1; permanece futura (ver D7 §8)                        |
 | P8.2 | O escopo do gestor tende a ser por equipe? | Depende da entidade colaborador, ainda não modelada; permanece futura (ver D8 §9) |
 
-Pendências não modeladas por perguntas P-numeradas, mas que também
-seguem em aberto (ver Baseline V1 — "O que permanece pendente"): DP-4
-(CNPJ da empresa) e DP-9 (nomenclatura final de tabelas/colunas).
+Pendência não modelada por pergunta P-numerada, mas que também segue em
+aberto (ver Baseline V1 — "O que permanece pendente"): DP-4 (CNPJ da
+empresa). `DP-9` (nomenclatura) foi **integralmente resolvida** em
+2026-08-06 — ver "Nomenclatura aprovada" em D7 (§8) — e não é mais
+pergunta pendente.
