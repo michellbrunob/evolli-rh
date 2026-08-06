@@ -16,6 +16,8 @@ import { podeAcessar } from "../autorizacao.util";
 import { traduzirErroPrisma } from "../prisma-erro.util";
 import {
   assertAindaAtivo,
+  assertAindaInativo,
+  assertPaisAtivosParaReativar,
   deslocamento,
   resolverDepartamentoPai,
   resolverUnidadePai,
@@ -234,6 +236,57 @@ export class EquipeService {
       );
 
       return inativada;
+    });
+  }
+
+  /**
+   * R-INA-5: reativação explícita e auditada. Equipe é o único nó com dois
+   * pais, então **ambos** precisam estar ativos — o departamento sempre, e a
+   * unidade só quando houver vínculo. A reativação não reclassifica: nenhum
+   * `departamentoId`/`unidadeOrganizacionalId` é tocado.
+   */
+  async reativar(
+    equipeId: string,
+    ctx: OrganizacaoAuditContext,
+  ): Promise<Equipe> {
+    const escopo = resolverEscopo(ctx.actor);
+    const equipe = await this.carregarNoEscopo(equipeId, ctx, escopo, "manage");
+    assertAindaInativo(equipe.status);
+
+    const [departamento, unidade] = await Promise.all([
+      this.prisma.departamento.findUniqueOrThrow({
+        where: { id: equipe.departamentoId },
+        select: { status: true },
+      }),
+      equipe.unidadeOrganizacionalId
+        ? this.prisma.unidadeOrganizacional.findUniqueOrThrow({
+            where: { id: equipe.unidadeOrganizacionalId },
+            select: { status: true },
+          })
+        : Promise.resolve(null),
+    ]);
+
+    assertPaisAtivosParaReativar([
+      departamento.status,
+      ...(unidade ? [unidade.status] : []),
+    ]);
+
+    return this.prisma.$transaction(async (tx) => {
+      const reativada = await tx.equipe.update({
+        where: { id: equipe.id },
+        data: { status: StatusOrganizacional.ativo },
+      });
+
+      await this.auditoria.registrarMutacao(
+        tx,
+        ctx,
+        "organizacao_equipe_reativada",
+        "equipe",
+        reativada.id,
+        reativada.empresaId,
+      );
+
+      return reativada;
     });
   }
 

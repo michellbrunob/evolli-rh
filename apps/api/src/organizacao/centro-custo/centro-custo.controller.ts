@@ -110,4 +110,19 @@ export class CentroCustoController {
       metadata: extractRequestMetadata(req),
     });
   }
+
+  @Post(":centroCustoId/reativar")
+  @UseGuards(CsrfGuard, AuthorizationGuard)
+  @RequirePermission("centro_custo", "manage")
+  @ApiOperation({ summary: "Reativa o centro de custo; exige empresa ativa" })
+  async reativar(
+    @Param("centroCustoId", ParseUUIDPipe) centroCustoId: string,
+    @CurrentUser() actor: AccessUser,
+    @Req() req: Request,
+  ) {
+    return this.service.reativar(centroCustoId, {
+      actor,
+      metadata: extractRequestMetadata(req),
+    });
+  }
 }

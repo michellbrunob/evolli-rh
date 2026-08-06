@@ -16,6 +16,8 @@ import { podeAcessar } from "../autorizacao.util";
 import { traduzirErroPrisma } from "../prisma-erro.util";
 import {
   assertAindaAtivo,
+  assertAindaInativo,
+  assertPaisAtivosParaReativar,
   deslocamento,
   resolverEmpresaPai,
 } from "../validacao.util";
@@ -202,6 +204,43 @@ export class CargoService {
       );
 
       return inativado;
+    });
+  }
+
+  /**
+   * R-INA-5: reativação explícita e auditada, condicionada a a empresa pai
+   * estar ativa (ver `assertPaisAtivosParaReativar`).
+   */
+  async reativar(
+    cargoId: string,
+    ctx: OrganizacaoAuditContext,
+  ): Promise<Cargo> {
+    const escopo = resolverEscopo(ctx.actor);
+    const cargo = await this.carregarNoEscopo(cargoId, ctx, escopo, "manage");
+    assertAindaInativo(cargo.status);
+
+    const empresa = await this.prisma.empresa.findUniqueOrThrow({
+      where: { id: cargo.empresaId },
+      select: { status: true },
+    });
+    assertPaisAtivosParaReativar([empresa.status]);
+
+    return this.prisma.$transaction(async (tx) => {
+      const reativado = await tx.cargo.update({
+        where: { id: cargo.id },
+        data: { status: StatusOrganizacional.ativo },
+      });
+
+      await this.auditoria.registrarMutacao(
+        tx,
+        ctx,
+        "organizacao_cargo_reativado",
+        "cargo",
+        reativado.id,
+        reativado.empresaId,
+      );
+
+      return reativado;
     });
   }
 

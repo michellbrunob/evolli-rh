@@ -36,8 +36,8 @@ const contexto = (actor: AccessUser = ator()) => ({
 });
 
 interface PrismaDuble {
-  departamento: { findFirst: jest.Mock };
-  unidadeOrganizacional: { findFirst: jest.Mock };
+  departamento: { findFirst: jest.Mock; findUniqueOrThrow: jest.Mock };
+  unidadeOrganizacional: { findFirst: jest.Mock; findUniqueOrThrow: jest.Mock };
   equipe: {
     findFirst: jest.Mock;
     create: jest.Mock;
@@ -50,8 +50,14 @@ interface PrismaDuble {
 
 function criarPrisma(): PrismaDuble {
   const duble: PrismaDuble = {
-    departamento: { findFirst: jest.fn() },
-    unidadeOrganizacional: { findFirst: jest.fn() },
+    departamento: {
+      findFirst: jest.fn(),
+      findUniqueOrThrow: jest.fn().mockResolvedValue({ status: "ativo" }),
+    },
+    unidadeOrganizacional: {
+      findFirst: jest.fn(),
+      findUniqueOrThrow: jest.fn().mockResolvedValue({ status: "ativo" }),
+    },
     equipe: {
       findFirst: jest.fn(),
       create: jest.fn(),
@@ -196,6 +202,81 @@ describe("EquipeService", () => {
         contexto(),
       ),
     ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  describe("reativar (R-INA-5) — único nó com dois pais", () => {
+    const EQUIPE_INATIVA = { ...EQUIPE_CRIADA, status: "inativo" as const };
+    const EQUIPE_INATIVA_COM_UNIDADE = {
+      ...EQUIPE_INATIVA,
+      unidadeOrganizacionalId: "uni-1",
+    };
+
+    it("reativa quando o departamento está ativo e não há unidade", async () => {
+      const prisma = criarPrisma();
+      prisma.equipe.findFirst.mockResolvedValue(EQUIPE_INATIVA);
+      prisma.equipe.update.mockResolvedValue(EQUIPE_CRIADA);
+      const { service, auditoria } = montar(prisma);
+
+      await service.reativar("eq-1", contexto());
+
+      expect(prisma.equipe.update).toHaveBeenCalledWith({
+        where: { id: "eq-1" },
+        data: { status: "ativo" },
+      });
+      // Sem unidade vinculada, a unidade não é consultada.
+      expect(
+        prisma.unidadeOrganizacional.findUniqueOrThrow,
+      ).not.toHaveBeenCalled();
+      expect(auditoria.registrarMutacao.mock.calls[0]?.[2]).toBe(
+        "organizacao_equipe_reativada",
+      );
+    });
+
+    it("exige que a unidade também esteja ativa quando houver vínculo", async () => {
+      const prisma = criarPrisma();
+      prisma.equipe.findFirst.mockResolvedValue(EQUIPE_INATIVA_COM_UNIDADE);
+      prisma.departamento.findUniqueOrThrow.mockResolvedValue({
+        status: "ativo",
+      });
+      prisma.unidadeOrganizacional.findUniqueOrThrow.mockResolvedValue({
+        status: "inativo",
+      });
+      const { service } = montar(prisma);
+
+      await expect(service.reativar("eq-1", contexto())).rejects.toBeInstanceOf(
+        UnprocessableEntityException,
+      );
+      expect(prisma.equipe.update).not.toHaveBeenCalled();
+    });
+
+    it("recusa quando o departamento está inativo", async () => {
+      const prisma = criarPrisma();
+      prisma.equipe.findFirst.mockResolvedValue(EQUIPE_INATIVA);
+      prisma.departamento.findUniqueOrThrow.mockResolvedValue({
+        status: "inativo",
+      });
+      const { service } = montar(prisma);
+
+      await expect(service.reativar("eq-1", contexto())).rejects.toBeInstanceOf(
+        UnprocessableEntityException,
+      );
+      expect(prisma.equipe.update).not.toHaveBeenCalled();
+    });
+
+    it("não reclassifica: departamento e unidade não são tocados", async () => {
+      const prisma = criarPrisma();
+      prisma.equipe.findFirst.mockResolvedValue(EQUIPE_INATIVA_COM_UNIDADE);
+      prisma.equipe.update.mockResolvedValue(EQUIPE_CRIADA);
+      const { service } = montar(prisma);
+
+      await service.reativar("eq-1", contexto());
+
+      const dados = prisma.equipe.update.mock.calls[0]?.[0]?.data as Record<
+        string,
+        unknown
+      >;
+      expect(Object.keys(dados)).toEqual(["status"]);
+    });
   });
 
   it("atualização não move a equipe de departamento nem de unidade", async () => {

@@ -128,6 +128,36 @@ export function assertAindaAtivo(status: StatusOrganizacional): void {
   }
 }
 
+/**
+ * R-INA-5: reativar o que já está ativo é conflito, pela mesma razão — evita
+ * evento de auditoria sem transição de status correspondente.
+ */
+export function assertAindaInativo(status: StatusOrganizacional): void {
+  if (status !== StatusOrganizacional.inativo) {
+    throw new ConflictException();
+  }
+}
+
+/**
+ * R-INA-5 + R-INA-3: reativar um nó exige que seus pais estejam **ativos**.
+ *
+ * Sem isso, a reativação criaria exatamente o estado que R-INA-3 proíbe na
+ * criação — filho ativo pendurado em pai inativo —, entrando pela porta dos
+ * fundos. Recusa com **422**: é dado inválido para a operação, não negação de
+ * acesso, e por isso não vira evento `denied`.
+ *
+ * Basta checar o **pai direto**: para um pai estar ativo, o avô já precisou
+ * estar (a inativação é bloqueada enquanto houver filho ativo), então a
+ * cadeia inteira é garantida por invariante, sem consulta recursiva.
+ */
+export function assertPaisAtivosParaReativar(
+  statusDosPais: readonly StatusOrganizacional[],
+): void {
+  if (statusDosPais.some((status) => status !== StatusOrganizacional.ativo)) {
+    throw new UnprocessableEntityException();
+  }
+}
+
 /** Deslocamento de paginação, com página 1-indexada. */
 export function deslocamento(pagina: number, tamanhoPagina: number): number {
   return (pagina - 1) * tamanhoPagina;

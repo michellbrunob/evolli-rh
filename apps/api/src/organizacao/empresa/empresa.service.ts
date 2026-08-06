@@ -13,6 +13,7 @@ import {
 import { EscopoOrganizacional, resolverEscopo } from "../escopo.util";
 import { podeAcessar } from "../autorizacao.util";
 import { traduzirErroPrisma } from "../prisma-erro.util";
+import { assertAindaInativo } from "../validacao.util";
 import {
   AtualizarNoOrganizacionalDto,
   CriarEmpresaDto,
@@ -187,6 +188,44 @@ export class EmpresaService {
       );
 
       return inativada;
+    });
+  }
+
+  /**
+   * R-INA-5: reativação é operação explícita e auditada.
+   *
+   * `Empresa` é a raiz — não tem pai a validar. Não reclassifica, não altera
+   * `codigo`, empresa ou qualquer relação: só a transição de status.
+   */
+  async reativar(
+    empresaId: string,
+    ctx: OrganizacaoAuditContext,
+  ): Promise<Empresa> {
+    const escopo = resolverEscopo(ctx.actor);
+    const empresa = await this.carregarNoEscopo(
+      empresaId,
+      ctx,
+      escopo,
+      "manage",
+    );
+    assertAindaInativo(empresa.status);
+
+    return this.prisma.$transaction(async (tx) => {
+      const reativada = await tx.empresa.update({
+        where: { id: empresa.id },
+        data: { status: StatusOrganizacional.ativo },
+      });
+
+      await this.auditoria.registrarMutacao(
+        tx,
+        ctx,
+        "organizacao_empresa_reativada",
+        "empresa",
+        reativada.id,
+        reativada.id,
+      );
+
+      return reativada;
     });
   }
 

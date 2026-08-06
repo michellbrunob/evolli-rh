@@ -110,4 +110,19 @@ export class UnidadeOrganizacionalController {
       metadata: extractRequestMetadata(req),
     });
   }
+
+  @Post(":unidadeId/reativar")
+  @UseGuards(CsrfGuard, AuthorizationGuard)
+  @RequirePermission("unidade_organizacional", "manage")
+  @ApiOperation({ summary: "Reativa a unidade; exige empresa ativa" })
+  async reativar(
+    @Param("unidadeId", ParseUUIDPipe) unidadeId: string,
+    @CurrentUser() actor: AccessUser,
+    @Req() req: Request,
+  ) {
+    return this.service.reativar(unidadeId, {
+      actor,
+      metadata: extractRequestMetadata(req),
+    });
+  }
 }

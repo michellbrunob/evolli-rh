@@ -108,4 +108,19 @@ export class AreaController {
       metadata: extractRequestMetadata(req),
     });
   }
+
+  @Post(":areaId/reativar")
+  @UseGuards(CsrfGuard, AuthorizationGuard)
+  @RequirePermission("area", "manage")
+  @ApiOperation({ summary: "Reativa a area; exige departamento ativo" })
+  async reativar(
+    @Param("areaId", ParseUUIDPipe) areaId: string,
+    @CurrentUser() actor: AccessUser,
+    @Req() req: Request,
+  ) {
+    return this.service.reativar(areaId, {
+      actor,
+      metadata: extractRequestMetadata(req),
+    });
+  }
 }

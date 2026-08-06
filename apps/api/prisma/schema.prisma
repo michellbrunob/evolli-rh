@@ -157,30 +157,37 @@ enum AuditAction {
   organizacao_empresa_criada    @map("organizacao.empresa.criada")
   organizacao_empresa_atualizada @map("organizacao.empresa.atualizada")
   organizacao_empresa_inativada @map("organizacao.empresa.inativada")
+  organizacao_empresa_reativada @map("organizacao.empresa.reativada")
 
   organizacao_unidade_organizacional_criada    @map("organizacao.unidade_organizacional.criada")
   organizacao_unidade_organizacional_atualizada @map("organizacao.unidade_organizacional.atualizada")
   organizacao_unidade_organizacional_inativada @map("organizacao.unidade_organizacional.inativada")
+  organizacao_unidade_organizacional_reativada @map("organizacao.unidade_organizacional.reativada")
 
   organizacao_departamento_criado    @map("organizacao.departamento.criado")
   organizacao_departamento_atualizado @map("organizacao.departamento.atualizado")
   organizacao_departamento_inativado @map("organizacao.departamento.inativado")
+  organizacao_departamento_reativado @map("organizacao.departamento.reativado")
 
   organizacao_area_criada    @map("organizacao.area.criada")
   organizacao_area_atualizada @map("organizacao.area.atualizada")
   organizacao_area_inativada @map("organizacao.area.inativada")
+  organizacao_area_reativada @map("organizacao.area.reativada")
 
   organizacao_equipe_criada    @map("organizacao.equipe.criada")
   organizacao_equipe_atualizada @map("organizacao.equipe.atualizada")
   organizacao_equipe_inativada @map("organizacao.equipe.inativada")
+  organizacao_equipe_reativada @map("organizacao.equipe.reativada")
 
   organizacao_cargo_criado    @map("organizacao.cargo.criado")
   organizacao_cargo_atualizado @map("organizacao.cargo.atualizado")
   organizacao_cargo_inativado @map("organizacao.cargo.inativado")
+  organizacao_cargo_reativado @map("organizacao.cargo.reativado")
 
   organizacao_centro_custo_criado    @map("organizacao.centro_custo.criado")
   organizacao_centro_custo_atualizado @map("organizacao.centro_custo.atualizado")
   organizacao_centro_custo_inativado @map("organizacao.centro_custo.inativado")
+  organizacao_centro_custo_reativado @map("organizacao.centro_custo.reativado")
 
   organizacao_estrutura_consultada @map("organizacao.estrutura.consultada")
 }

@@ -108,4 +108,19 @@ export class CargoController {
       metadata: extractRequestMetadata(req),
     });
   }
+
+  @Post(":cargoId/reativar")
+  @UseGuards(CsrfGuard, AuthorizationGuard)
+  @RequirePermission("cargo", "manage")
+  @ApiOperation({ summary: "Reativa o cargo; exige empresa ativa" })
+  async reativar(
+    @Param("cargoId", ParseUUIDPipe) cargoId: string,
+    @CurrentUser() actor: AccessUser,
+    @Req() req: Request,
+  ) {
+    return this.service.reativar(cargoId, {
+      actor,
+      metadata: extractRequestMetadata(req),
+    });
+  }
 }

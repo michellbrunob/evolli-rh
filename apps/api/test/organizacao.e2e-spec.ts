@@ -595,6 +595,300 @@ describe("Núcleo Organizacional Interno (e2e)", () => {
     });
   });
 
+  describe("reativação auditada (R-INA-5)", () => {
+    let empresaD: string;
+    let departamentoD: string;
+    let areaD: string;
+
+    beforeAll(async () => {
+      const empresa = await post("/v1/empresas", admin)
+        .send({ codigo: "EMPD", nome: "Empresa D" })
+        .expect(201);
+      empresaD = empresa.body.id;
+
+      const departamento = await post("/v1/departamentos", admin)
+        .send({ empresaId: empresaD, codigo: "LOG", nome: "Logistica" })
+        .expect(201);
+      departamentoD = departamento.body.id;
+
+      const area = await post("/v1/areas", admin)
+        .send({
+          departamentoId: departamentoD,
+          codigo: "EXPED",
+          nome: "Expedicao",
+        })
+        .expect(201);
+      areaD = area.body.id;
+    });
+
+    it("reativa um nó inativo e volta o status para ativo", async () => {
+      await post(`/v1/areas/${areaD}/inativar`, admin).send().expect(201);
+      const inativa = await get(`/v1/areas/${areaD}`, admin).expect(200);
+      expect(inativa.body.status).toBe("inativo");
+
+      const reativada = await post(`/v1/areas/${areaD}/reativar`, admin)
+        .send()
+        .expect(201);
+      expect(reativada.body.status).toBe("ativo");
+      // Não reclassifica: continua no mesmo departamento, com o mesmo código.
+      expect(reativada.body.departamentoId).toBe(departamentoD);
+      expect(reativada.body.codigo).toBe("EXPED");
+    });
+
+    it("gera o evento organizacao.area.reativada com o escopo correto", async () => {
+      const prisma = new PrismaClient({ datasources: { db: { url: appUrl } } });
+      try {
+        const eventos = await prisma.auditEvent.findMany({
+          where: { action: "organizacao_area_reativada", resourceId: areaD },
+        });
+        expect(eventos.length).toBeGreaterThanOrEqual(1);
+        expect(eventos[0]?.resource).toBe("area");
+        expect(eventos[0]?.result).toBe("success");
+        // Escopo do evento é a empresa da entidade afetada.
+        expect(eventos[0]?.companyId).toBe(empresaD);
+
+        // O valor persistido segue a convenção aprovada em português.
+        const [linha] = await prisma.$queryRawUnsafe<Array<{ action: string }>>(
+          `SELECT action::text AS action FROM app.audit_event WHERE id = '${eventos[0]!.id}'`,
+        );
+        expect(linha?.action).toBe("organizacao.area.reativada");
+      } finally {
+        await prisma.$disconnect();
+      }
+    });
+
+    it("recusa reativar o que já está ativo (409)", async () => {
+      await post(`/v1/areas/${areaD}/reativar`, admin).send().expect(409);
+    });
+
+    it("recusa reativar sob pai inativo (422) e não altera o filho", async () => {
+      await post(`/v1/areas/${areaD}/inativar`, admin).send().expect(201);
+      await post(`/v1/departamentos/${departamentoD}/inativar`, admin)
+        .send()
+        .expect(201);
+
+      await post(`/v1/areas/${areaD}/reativar`, admin).send().expect(422);
+
+      const conferencia = await get(`/v1/areas/${areaD}`, admin).expect(200);
+      expect(conferencia.body.status).toBe("inativo");
+    });
+
+    it("reativado o pai, o filho volta a poder ser reativado", async () => {
+      await post(`/v1/departamentos/${departamentoD}/reativar`, admin)
+        .send()
+        .expect(201);
+      await post(`/v1/areas/${areaD}/reativar`, admin).send().expect(201);
+    });
+
+    it("reativar entidade de outra empresa responde 404", async () => {
+      const departamentoB = await post("/v1/departamentos", rhB)
+        .send({ empresaId: empresaB, codigo: "TMP", nome: "Temporario" })
+        .expect(201);
+      await post(`/v1/departamentos/${departamentoB.body.id}/inativar`, rhB)
+        .send()
+        .expect(201);
+
+      // rhA não alcança entidade da empresa B — nem para reativar.
+      await post(`/v1/departamentos/${departamentoB.body.id}/reativar`, rhA)
+        .send()
+        .expect(404);
+
+      // E o objeto continua inativo: nada foi alterado pela tentativa.
+      const conferencia = await get(
+        `/v1/departamentos/${departamentoB.body.id}`,
+        rhB,
+      ).expect(200);
+      expect(conferencia.body.status).toBe("inativo");
+    });
+
+    it("papel sem manage não reativa", async () => {
+      // Cargo é folha: inativar não esbarra em R-INA-2, o que mantém este
+      // teste focado só na autorização.
+      const cargo = await post("/v1/cargos", admin)
+        .send({ empresaId: empresaD, codigo: "SEMMANAGE", nome: "Sem Manage" })
+        .expect(201);
+      await post(`/v1/cargos/${cargo.body.id}/inativar`, admin)
+        .send()
+        .expect(201);
+
+      await post(`/v1/cargos/${cargo.body.id}/reativar`, dpA)
+        .send()
+        .expect(403);
+      await post(`/v1/cargos/${cargo.body.id}/reativar`, colaboradorA)
+        .send()
+        .expect(403);
+
+      await post(`/v1/cargos/${cargo.body.id}/reativar`, admin)
+        .send()
+        .expect(201);
+    });
+
+    it("reativação exige CSRF", async () => {
+      const cargo = await post("/v1/cargos", admin)
+        .send({ empresaId: empresaD, codigo: "SEMCSRF2", nome: "Sem CSRF" })
+        .expect(201);
+      await post(`/v1/cargos/${cargo.body.id}/inativar`, admin)
+        .send()
+        .expect(201);
+
+      await agent()
+        .post(`/v1/cargos/${cargo.body.id}/reativar`)
+        .set("Cookie", admin.cookie)
+        .send()
+        .expect(403);
+
+      await post(`/v1/cargos/${cargo.body.id}/reativar`, admin)
+        .send()
+        .expect(201);
+    });
+
+    it("reativação em cada uma das sete entidades", async () => {
+      const unidade = await post("/v1/unidades-organizacionais", admin)
+        .send({ empresaId: empresaD, codigo: "FILIAL", nome: "Filial" })
+        .expect(201);
+      const equipe = await post("/v1/equipes", admin)
+        .send({
+          departamentoId: departamentoD,
+          unidadeOrganizacionalId: unidade.body.id,
+          codigo: "TIME1",
+          nome: "Time 1",
+        })
+        .expect(201);
+      const cargo = await post("/v1/cargos", admin)
+        .send({ empresaId: empresaD, codigo: "AUX", nome: "Auxiliar" })
+        .expect(201);
+      const centroCusto = await post("/v1/centros-de-custo", admin)
+        .send({ empresaId: empresaD, codigo: "CC900", nome: "Centro 900" })
+        .expect(201);
+
+      // A ordem importa e é ela mesma uma prova de R-INA-2: inativa-se de
+      // baixo para cima (equipe antes da unidade que ela referencia) e
+      // reativa-se de cima para baixo (unidade antes da equipe). Fazer o
+      // contrário é recusado pelo próprio serviço.
+      const inativarNaOrdem: Array<[string, string]> = [
+        ["equipes", equipe.body.id],
+        ["unidades-organizacionais", unidade.body.id],
+        ["areas", areaD],
+        ["cargos", cargo.body.id],
+        ["centros-de-custo", centroCusto.body.id],
+      ];
+      for (const [recurso, id] of inativarNaOrdem) {
+        await post(`/v1/${recurso}/${id}/inativar`, admin).send().expect(201);
+      }
+
+      const reativarNaOrdem = [...inativarNaOrdem].reverse();
+      for (const [recurso, id] of reativarNaOrdem) {
+        const reativado = await post(`/v1/${recurso}/${id}/reativar`, admin)
+          .send()
+          .expect(201);
+        expect(reativado.body.status).toBe("ativo");
+      }
+
+      // Empresa fecha a lista das sete: sem pai a validar.
+      const empresaE = await post("/v1/empresas", admin)
+        .send({ codigo: "EMPE", nome: "Empresa E" })
+        .expect(201);
+      await post(`/v1/empresas/${empresaE.body.id}/inativar`, admin)
+        .send()
+        .expect(201);
+      const empresaReativada = await post(
+        `/v1/empresas/${empresaE.body.id}/reativar`,
+        admin,
+      )
+        .send()
+        .expect(201);
+      expect(empresaReativada.body.status).toBe("ativo");
+    });
+
+    it("equipe só reativa se departamento E unidade estiverem ativos", async () => {
+      const unidade = await post("/v1/unidades-organizacionais", admin)
+        .send({ empresaId: empresaD, codigo: "FILIAL2", nome: "Filial 2" })
+        .expect(201);
+      const equipe = await post("/v1/equipes", admin)
+        .send({
+          departamentoId: departamentoD,
+          unidadeOrganizacionalId: unidade.body.id,
+          codigo: "TIME2",
+          nome: "Time 2",
+        })
+        .expect(201);
+
+      await post(`/v1/equipes/${equipe.body.id}/inativar`, admin)
+        .send()
+        .expect(201);
+      await post(
+        `/v1/unidades-organizacionais/${unidade.body.id}/inativar`,
+        admin,
+      )
+        .send()
+        .expect(201);
+
+      // Departamento ativo, unidade inativa: recusado.
+      await post(`/v1/equipes/${equipe.body.id}/reativar`, admin)
+        .send()
+        .expect(422);
+
+      await post(
+        `/v1/unidades-organizacionais/${unidade.body.id}/reativar`,
+        admin,
+      )
+        .send()
+        .expect(201);
+      await post(`/v1/equipes/${equipe.body.id}/reativar`, admin)
+        .send()
+        .expect(201);
+    });
+
+    it("INSERT revogado em audit_event impede a reativação (atomicidade)", async () => {
+      const cargo = await post("/v1/cargos", admin)
+        .send({ empresaId: empresaD, codigo: "ROLLBK2", nome: "Rollback 2" })
+        .expect(201);
+      await post(`/v1/cargos/${cargo.body.id}/inativar`, admin)
+        .send()
+        .expect(201);
+
+      const migrator = new PrismaClient({
+        datasources: { db: { url: migratorUrl } },
+      });
+      try {
+        await migrator.$executeRawUnsafe(
+          "REVOKE INSERT ON TABLE app.audit_event FROM evolli_app",
+        );
+        await post(`/v1/cargos/${cargo.body.id}/reativar`, admin)
+          .send()
+          .expect(500);
+      } finally {
+        await migrator.$executeRawUnsafe(
+          "GRANT INSERT ON TABLE app.audit_event TO evolli_app",
+        );
+        await migrator.$disconnect();
+      }
+
+      // A reativação não persistiu: o cargo continua inativo.
+      const conferencia = await get(
+        `/v1/cargos/${cargo.body.id}`,
+        admin,
+      ).expect(200);
+      expect(conferencia.body.status).toBe("inativo");
+    });
+
+    it("reativação não é exclusão física disfarçada: nenhuma linha some", async () => {
+      const prisma = new PrismaClient({ datasources: { db: { url: appUrl } } });
+      try {
+        const area = await prisma.area.findUnique({ where: { id: areaD } });
+        expect(area).not.toBeNull();
+      } finally {
+        await prisma.$disconnect();
+      }
+
+      await agent()
+        .delete(`/v1/areas/${areaD}/reativar`)
+        .set("Cookie", admin.cookie)
+        .set("x-csrf-token", admin.csrfToken)
+        .expect(404);
+    });
+  });
+
   describe("ausência de exclusão física (spec R6)", () => {
     it("nenhuma rota DELETE existe em entidade organizacional", async () => {
       for (const rota of [

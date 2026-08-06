@@ -43,7 +43,7 @@ function contexto(actor: AccessUser = ator()) {
 }
 
 interface PrismaDuble {
-  empresa: { findFirst: jest.Mock };
+  empresa: { findFirst: jest.Mock; findUniqueOrThrow: jest.Mock };
   departamento: {
     findFirst: jest.Mock;
     create: jest.Mock;
@@ -58,7 +58,10 @@ interface PrismaDuble {
 
 function criarPrisma(): PrismaDuble {
   const duble: PrismaDuble = {
-    empresa: { findFirst: jest.fn() },
+    empresa: {
+      findFirst: jest.fn(),
+      findUniqueOrThrow: jest.fn().mockResolvedValue({ status: "ativo" }),
+    },
     departamento: {
       findFirst: jest.fn(),
       create: jest.fn(),
@@ -254,6 +257,111 @@ describe("DepartamentoService", () => {
       // Nenhum update em área ou equipe existe sequer como capacidade aqui.
       expect(Object.keys(prisma.area)).toEqual(["count"]);
       expect(Object.keys(prisma.equipe)).toEqual(["count"]);
+    });
+  });
+
+  describe("reativar (R-INA-5)", () => {
+    const DEPARTAMENTO_INATIVO = {
+      ...DEPARTAMENTO_ATIVO,
+      status: "inativo" as const,
+    };
+
+    it("reativa quando a empresa pai está ativa, com evento atômico", async () => {
+      const prisma = criarPrisma();
+      prisma.departamento.findFirst.mockResolvedValue(DEPARTAMENTO_INATIVO);
+      prisma.empresa.findUniqueOrThrow.mockResolvedValue({ status: "ativo" });
+      prisma.departamento.update.mockResolvedValue(DEPARTAMENTO_ATIVO);
+      const { service, auditoria } = montar(prisma);
+
+      const resultado = await service.reativar("dep-1", contexto());
+
+      expect(resultado.status).toBe("ativo");
+      expect(prisma.departamento.update).toHaveBeenCalledWith({
+        where: { id: "dep-1" },
+        data: { status: "ativo" },
+      });
+      // Alteração e evento na mesma transação.
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(auditoria.registrarMutacao.mock.calls[0]?.[0]).toBe(prisma);
+      expect(auditoria.registrarMutacao.mock.calls[0]?.[2]).toBe(
+        "organizacao_departamento_reativado",
+      );
+      expect(auditoria.registrarMutacao.mock.calls[0]?.[5]).toBe("empresa-a");
+    });
+
+    it("recusa reativar o que já está ativo", async () => {
+      const prisma = criarPrisma();
+      prisma.departamento.findFirst.mockResolvedValue(DEPARTAMENTO_ATIVO);
+      const { service } = montar(prisma);
+
+      await expect(
+        service.reativar("dep-1", contexto()),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(prisma.departamento.update).not.toHaveBeenCalled();
+    });
+
+    it("recusa reativar sob empresa inativa (não recria estado proibido por R-INA-3)", async () => {
+      const prisma = criarPrisma();
+      prisma.departamento.findFirst.mockResolvedValue(DEPARTAMENTO_INATIVO);
+      prisma.empresa.findUniqueOrThrow.mockResolvedValue({ status: "inativo" });
+      const { service } = montar(prisma);
+
+      await expect(
+        service.reativar("dep-1", contexto()),
+      ).rejects.toBeInstanceOf(UnprocessableEntityException);
+      expect(prisma.departamento.update).not.toHaveBeenCalled();
+    });
+
+    it("responde 404 e audita denied quando fora do escopo", async () => {
+      const prisma = criarPrisma();
+      prisma.departamento.findFirst.mockResolvedValue(null);
+      const { service, auditoria } = montar(prisma);
+
+      await expect(
+        service.reativar("dep-de-outra-empresa", contexto()),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(auditoria.negarAcesso).toHaveBeenCalled();
+      expect(prisma.departamento.update).not.toHaveBeenCalled();
+    });
+
+    it("papel sem manage não reativa", async () => {
+      const prisma = criarPrisma();
+      prisma.departamento.findFirst.mockResolvedValue(DEPARTAMENTO_INATIVO);
+      const { service } = montar(prisma);
+
+      await expect(
+        service.reativar("dep-1", contexto(ator({ role: "dp" as AccessRole }))),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.departamento.update).not.toHaveBeenCalled();
+    });
+
+    it("não persiste quando o evento de auditoria falha (rollback)", async () => {
+      const prisma = criarPrisma();
+      prisma.departamento.findFirst.mockResolvedValue(DEPARTAMENTO_INATIVO);
+      prisma.departamento.update.mockResolvedValue(DEPARTAMENTO_ATIVO);
+      const auditoria = criarAuditoria();
+      // Evento transacional falha: a transação inteira deve propagar o erro.
+      (auditoria.registrarMutacao as jest.Mock).mockRejectedValue(
+        new Error("audit indisponivel"),
+      );
+      const { service } = montar(prisma, auditoria);
+
+      await expect(service.reativar("dep-1", contexto())).rejects.toThrow(
+        "audit indisponivel",
+      );
+    });
+
+    it("não reclassifica: só o status é tocado", async () => {
+      const prisma = criarPrisma();
+      prisma.departamento.findFirst.mockResolvedValue(DEPARTAMENTO_INATIVO);
+      prisma.departamento.update.mockResolvedValue(DEPARTAMENTO_ATIVO);
+      const { service } = montar(prisma);
+
+      await service.reativar("dep-1", contexto());
+
+      const dadosAtualizados = prisma.departamento.update.mock.calls[0]?.[0]
+        ?.data as Record<string, unknown>;
+      expect(Object.keys(dadosAtualizados)).toEqual(["status"]);
     });
   });
 

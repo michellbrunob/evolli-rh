@@ -111,4 +111,22 @@ export class EquipeController {
       metadata: extractRequestMetadata(req),
     });
   }
+
+  @Post(":equipeId/reativar")
+  @UseGuards(CsrfGuard, AuthorizationGuard)
+  @RequirePermission("equipe", "manage")
+  @ApiOperation({
+    summary:
+      "Reativa a equipe; exige departamento e, se houver, unidade ativos",
+  })
+  async reativar(
+    @Param("equipeId", ParseUUIDPipe) equipeId: string,
+    @CurrentUser() actor: AccessUser,
+    @Req() req: Request,
+  ) {
+    return this.service.reativar(equipeId, {
+      actor,
+      metadata: extractRequestMetadata(req),
+    });
+  }
 }

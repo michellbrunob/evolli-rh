@@ -379,10 +379,38 @@ aplicada **negação por padrão**, sem decidir a pendência por conta própria:
 Ampliar qualquer um desses exige decisão de produto/segurança registrada —
 não é ajuste de implementação.
 
+### Correção posterior: R-INA-5 (reativação)
+
+A primeira versão desta emenda registrava a reativação como "não
+implementada", tratando-a como limitação de escopo. **Isso estava errado:**
+R-INA-5 ("reativação é operação explícita e auditada") é requisito da spec
+aprovada, e a estratégia de testes cobre R-INA-1 a R-INA-5. Uma seção de
+evidência de implementação não pode rebaixar requisito aprovado — só o
+produto pode, por decisão registrada.
+
+A reativação foi implementada para as sete entidades, com:
+
+- rota `POST /v1/<recurso>/:<recurso>Id/reativar`, exigindo sessão, CSRF e
+  autorização `manage` — mesma matriz da inativação;
+- **validação de pais ativos**, para que a reativação não recrie pela porta
+  dos fundos o estado que R-INA-3 proíbe na criação (filho ativo sob pai
+  inativo). Basta o pai direto: a cadeia acima já é garantida por
+  invariante, porque a inativação é bloqueada enquanto houver filho ativo;
+- **404** para alvo fora do escopo (com evento `denied`) e **409** para
+  entidade já ativa;
+- **nenhuma reclassificação**: só `status` é tocado — código, empresa e
+  relações permanecem imutáveis;
+- **atomicidade** com a auditoria, comprovada por rollback real.
+
+Sete verbos novos no enum fechado — `organizacao.<entidade>.reativada` —,
+seguindo o mesmo padrão da Emenda 1: valor persistido em português separado
+por ponto, identificador Prisma com `_`. A migration organizacional foi
+**ajustada e regenerada** (não duplicada), por ainda não estar mergeada.
+
 ### O que esta emenda não faz
 
-- Não implementa reativação (R-INA-5), árvore organizacional, transferência
-  ou reclassificação — todos permanecem futuros.
+- Não implementa árvore organizacional, transferência ou reclassificação —
+  todos permanecem futuros.
 - Não introduz CNPJ (DP-4), colaborador, gestor, função, vigência ou
   multitenancy.
 - Não altera o comportamento de autorização já mergeado da Etapa 0: os

@@ -20,6 +20,8 @@ import { podeAcessar } from "../autorizacao.util";
 import { traduzirErroPrisma } from "../prisma-erro.util";
 import {
   assertAindaAtivo,
+  assertAindaInativo,
+  assertPaisAtivosParaReativar,
   assertSemFilhosAtivos,
   deslocamento,
   resolverEmpresaPai,
@@ -226,6 +228,49 @@ export class UnidadeOrganizacionalService {
       );
 
       return inativada;
+    });
+  }
+
+  /**
+   * R-INA-5: reativação explícita e auditada, condicionada a a empresa pai
+   * estar ativa — reativar sob pai inativo recriaria pela porta dos fundos o
+   * estado que R-INA-3 proíbe na criação.
+   */
+  async reativar(
+    unidadeId: string,
+    ctx: OrganizacaoAuditContext,
+  ): Promise<UnidadeOrganizacional> {
+    const escopo = resolverEscopo(ctx.actor);
+    const unidade = await this.carregarNoEscopo(
+      unidadeId,
+      ctx,
+      escopo,
+      "manage",
+    );
+    assertAindaInativo(unidade.status);
+
+    const empresa = await this.prisma.empresa.findUniqueOrThrow({
+      where: { id: unidade.empresaId },
+      select: { status: true },
+    });
+    assertPaisAtivosParaReativar([empresa.status]);
+
+    return this.prisma.$transaction(async (tx) => {
+      const reativada = await tx.unidadeOrganizacional.update({
+        where: { id: unidade.id },
+        data: { status: StatusOrganizacional.ativo },
+      });
+
+      await this.auditoria.registrarMutacao(
+        tx,
+        ctx,
+        "organizacao_unidade_organizacional_reativada",
+        "unidade_organizacional",
+        reativada.id,
+        reativada.empresaId,
+      );
+
+      return reativada;
     });
   }
 

@@ -16,6 +16,8 @@ import { podeAcessar } from "../autorizacao.util";
 import { traduzirErroPrisma } from "../prisma-erro.util";
 import {
   assertAindaAtivo,
+  assertAindaInativo,
+  assertPaisAtivosParaReativar,
   assertSemFilhosAtivos,
   deslocamento,
   resolverEmpresaPai,
@@ -228,6 +230,48 @@ export class DepartamentoService {
       );
 
       return inativado;
+    });
+  }
+
+  /**
+   * R-INA-5: reativação explícita e auditada, condicionada a a empresa pai
+   * estar ativa (ver `assertPaisAtivosParaReativar`).
+   */
+  async reativar(
+    departamentoId: string,
+    ctx: OrganizacaoAuditContext,
+  ): Promise<Departamento> {
+    const escopo = resolverEscopo(ctx.actor);
+    const departamento = await this.carregarNoEscopo(
+      departamentoId,
+      ctx,
+      escopo,
+      "manage",
+    );
+    assertAindaInativo(departamento.status);
+
+    const empresa = await this.prisma.empresa.findUniqueOrThrow({
+      where: { id: departamento.empresaId },
+      select: { status: true },
+    });
+    assertPaisAtivosParaReativar([empresa.status]);
+
+    return this.prisma.$transaction(async (tx) => {
+      const reativado = await tx.departamento.update({
+        where: { id: departamento.id },
+        data: { status: StatusOrganizacional.ativo },
+      });
+
+      await this.auditoria.registrarMutacao(
+        tx,
+        ctx,
+        "organizacao_departamento_reativado",
+        "departamento",
+        reativado.id,
+        reativado.empresaId,
+      );
+
+      return reativado;
     });
   }
 

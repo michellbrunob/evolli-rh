@@ -120,4 +120,19 @@ export class EmpresaController {
       metadata: extractRequestMetadata(req),
     });
   }
+
+  @Post(":empresaId/reativar")
+  @UseGuards(CsrfGuard, AuthorizationGuard)
+  @RequirePermission("empresa", "manage")
+  @ApiOperation({ summary: "Reativa a empresa; recusa se ja estiver ativa" })
+  async reativar(
+    @Param("empresaId", ParseUUIDPipe) empresaId: string,
+    @CurrentUser() actor: AccessUser,
+    @Req() req: Request,
+  ) {
+    return this.empresaService.reativar(empresaId, {
+      actor,
+      metadata: extractRequestMetadata(req),
+    });
+  }
 }

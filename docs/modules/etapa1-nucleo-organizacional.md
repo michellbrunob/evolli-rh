@@ -976,16 +976,18 @@ peso — o que **não** foi. Nada aqui amplia o escopo aprovado.
 Rotas em português, plurais, minúsculas, sob `/v1`, documentadas no OpenAPI
 (tag `organizacao`). Para cada uma das sete entidades:
 
-| Método | Rota                                  | Ação              |
-| ------ | ------------------------------------- | ----------------- |
-| GET    | `/v1/<plural>`                        | listar (paginado) |
-| GET    | `/v1/<plural>/:<entidade>Id`          | detalhar          |
-| POST   | `/v1/<plural>`                        | criar             |
-| PATCH  | `/v1/<plural>/:<entidade>Id`          | atualizar nome    |
-| POST   | `/v1/<plural>/:<entidade>Id/inativar` | inativar          |
+| Método | Rota                                  | Ação               |
+| ------ | ------------------------------------- | ------------------ |
+| GET    | `/v1/<plural>`                        | listar (paginado)  |
+| GET    | `/v1/<plural>/:<entidade>Id`          | detalhar           |
+| POST   | `/v1/<plural>`                        | criar              |
+| PATCH  | `/v1/<plural>/:<entidade>Id`          | atualizar nome     |
+| POST   | `/v1/<plural>/:<entidade>Id/inativar` | inativar           |
+| POST   | `/v1/<plural>/:<entidade>Id/reativar` | reativar (R-INA-5) |
 
 Plurais: `empresas`, `unidades-organizacionais`, `departamentos`, `areas`,
-`equipes`, `cargos`, `centros-de-custo`. **Nenhuma rota `DELETE`** existe.
+`equipes`, `cargos`, `centros-de-custo`. **Nenhuma rota `DELETE`** existe —
+"remover" é sempre transição de `status`, nos dois sentidos.
 
 Parâmetros de rota nunca se chamam `id` — o `AuthorizationGuard` resolve
 `request.params.id` como `AccessUser` alvo, e reaproveitar esse nome
@@ -1021,7 +1023,9 @@ acoplaria a rota organizacional àquele comportamento.
 
 - Escrita exclusivamente via `AuditService` (ADR 0004 §2) — nenhum
   `prisma.auditEvent.create()` direto.
-- **22 verbos novos** no enum fechado `AuditAction`, por migration aditiva.
+- **29 verbos novos** no enum fechado `AuditAction`, por migration aditiva —
+  criação, alteração, **inativação e reativação** de cada entidade, mais a
+  consulta de escopo amplo.
   O valor **persistido** segue a convenção aprovada em português separada
   por ponto (`organizacao.empresa.criada`), aplicada via `@map`; o
   identificador Prisma usa `_` por restrição da linguagem. Os verbos da
@@ -1048,16 +1052,24 @@ acoplaria a rota organizacional àquele comportamento.
 
 ### 14.5 Verificação executada
 
-- **Unitários — 108/108** (15 suites), incluindo
+- **Unitários — 114/114** (13 suites), incluindo
   `rbac.evaluator.organizacao.spec.ts` (matriz §8 célula a célula, nas duas
   fases), `departamento.service.spec.ts` e `equipe.service.spec.ts`
-  (integridade, inativação, escopo, atomicidade, negação auditada). O teste
-  de sincronia `AUDIT_ACTIONS` × enum de banco foi tornado **estrutural**:
-  compara com o enum gerado pelo Prisma em vez de um número fixo, então
-  continua detectando drift em fatias futuras.
-- **E2E — 36/36** (`test/organizacao.e2e-spec.ts`), contra PostgreSQL real
+  (integridade, inativação, **reativação**, escopo, atomicidade, negação
+  auditada). O teste de sincronia `AUDIT_ACTIONS` × enum de banco foi
+  tornado **estrutural**: compara com o enum gerado pelo Prisma em vez de um
+  número fixo, então continua detectando drift em fatias futuras — foi ele
+  que absorveu os sete verbos de reativação sem edição manual.
+- **E2E — 48/48** (`test/organizacao.e2e-spec.ts`), contra PostgreSQL real
   via Testcontainers, com a migration aplicada do zero:
   - CRUD completo permitido;
+  - **reativação (R-INA-5)** nas sete entidades: volta a `ativo`, gera
+    `organizacao.<entidade>.reativada` com o escopo da entidade afetada e
+    valor persistido em português conferido direto no banco; recusa sob pai
+    inativo (**422**, e o filho permanece inativo); recusa entidade já ativa
+    (**409**); alvo de outra empresa responde **404** sem alterar nada;
+    exige `manage` e CSRF; equipe só reativa com departamento **e** unidade
+    ativos; `INSERT` revogado em `audit_event` impede a reativação;
   - bootstrap administrativo continua funcionando (RI-2) e cada uso de
     escopo amplo gera evento com o escopo **da entidade afetada**;
   - IDOR/BOLA em detalhe, atualização e inativação → **404**, nunca 403 nem
@@ -1078,9 +1090,6 @@ acoplaria a rota organizacional àquele comportamento.
 Entregue **menos** do que a spec descreve em alguns pontos, por decisão de
 escopo. Registrado para não ser confundido com esquecimento:
 
-- **Sem reativação.** Esta fatia expõe criar, listar, detalhar, atualizar e
-  inativar. **R-INA-5 (reativação auditada) não foi implementada**, e por
-  isso não existe verbo `*.reativada` no enum.
 - **Sem árvore organizacional.** `GET /v1/organizacao/arvore` (§10) e o
   recurso `estrutura_organizacional` como alvo de autorização não entraram;
   `estrutura_organizacional` existe apenas como etiqueta de auditoria da

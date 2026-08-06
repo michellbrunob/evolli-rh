@@ -112,4 +112,19 @@ export class DepartamentoController {
       metadata: extractRequestMetadata(req),
     });
   }
+
+  @Post(":departamentoId/reativar")
+  @UseGuards(CsrfGuard, AuthorizationGuard)
+  @RequirePermission("departamento", "manage")
+  @ApiOperation({ summary: "Reativa o departamento; exige empresa ativa" })
+  async reativar(
+    @Param("departamentoId", ParseUUIDPipe) departamentoId: string,
+    @CurrentUser() actor: AccessUser,
+    @Req() req: Request,
+  ) {
+    return this.service.reativar(departamentoId, {
+      actor,
+      metadata: extractRequestMetadata(req),
+    });
+  }
 }
