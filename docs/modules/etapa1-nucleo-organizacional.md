@@ -1,10 +1,13 @@
-# Etapa 1 — Núcleo Organizacional Multitenant
+# Etapa 1 — Fatia 1: Núcleo Organizacional Interno
 
 Status: **especificação — aguardando aprovação** (nenhum código, migration,
 schema, endpoint, dependência ou infraestrutura criado nesta fase)
 
 Fase do rito SDD: **Especificar**. Este documento cobre apenas o primeiro
 passo de Especificar → Aprovar → Implementar → Verificar → Registrar.
+
+Decisão arquitetural desta fatia registrada em
+[ADR 0005 — Escopo interno e evolução multitenant](../adr/0005-escopo-interno-e-evolucao-multitenant.md).
 
 Depende de: [Etapa 0 — Fatia 3 (identidade, sessão e autorização)](etapa0-fatia3-identidade-acesso.md),
 [Etapa 0 — Fatia 4 (auditoria formal)](etapa0-fatia4-auditoria-formal.md),
@@ -13,220 +16,182 @@ Depende de: [Etapa 0 — Fatia 3 (identidade, sessão e autorização)](etapa0-f
 [ADR 0004](../adr/0004-auditoria-formal-e-integridade.md) — todas já
 integradas em `main`.
 
-## 0. Divergências e bloqueios identificados antes de especificar
+## 0. Contexto decisório e observações registradas
 
-Estas divergências foram **encontradas, não resolvidas**. Nenhuma foi
-decidida por suposição — cada uma exige decisão explícita antes da fase
-Implementar (ver §12, decisões pendentes).
+O Evolli RH será utilizado **inicialmente apenas pelo escritório**. A
+comercialização para múltiplas empresas clientes é evolução futura, não
+requisito de implementação agora (ADR 0005). Esta especificação foi
+ajustada a esse contexto: entrega a estrutura organizacional interna, sem
+introduzir multitenancy técnica.
 
-### D1 — PRD "Sistema RH - Reserva Fiscal" não está no repositório
+As observações abaixo foram **registradas, não resolvidas por suposição**.
 
-O PRD foi declarado fonte **complementar e obrigatória** de requisitos
-(§2). Uma busca no repositório não encontrou nenhum arquivo de PRD:
+### O1 — PRD do Notion é fonte complementar obrigatória, não versionada
 
-```text
-$ find . -iname "*PRD*" -o -iname "*Reserva*Fiscal*"   # (excluindo node_modules)
-(nenhum resultado)
-```
+O PRD "Sistema RH - Reserva Fiscal" vive no Notion e **não está versionado
+no repositório** — uma busca no checkout não encontra nenhum arquivo
+correspondente. Isso é uma característica conhecida do fluxo de trabalho,
+**não um bloqueio de aceite desta fatia**.
 
-**Consequência:** esta especificação foi escrita a partir das fontes
-técnicas disponíveis (`PLANO_E_PROMPT_ECOSSISTEMA_RH_NOVO.md`, ROADMAP,
-ADRs 0001–0004, specs das Fatias 3 e 4). Nenhum requisito foi inferido,
-inventado ou atribuído ao PRD. Onde o PRD normalmente decidiria uma
-questão de modelagem (cardinalidade, catálogo por empresa vs. por tenant,
-identificadores fiscais), a questão está registrada como **decisão
-pendente**, com alternativas objetivas — nunca preenchida por suposição.
+Consequências práticas, aplicadas neste documento:
 
-**Bloqueio de aceite:** esta especificação não pode ser considerada
-completa até que o PRD seja disponibilizado no repositório e confrontado
-com as decisões pendentes do §12.
+- Nenhum requisito foi inferido, inventado ou atribuído ao PRD. Tudo aqui
+  vem do contexto decisório aprovado (acima) e das fontes técnicas
+  versionadas (`PLANO_E_PROMPT_ECOSSISTEMA_RH_NOVO.md`, ROADMAP,
+  ADRs 0001–0004, specs das Fatias 3 e 4).
+- Onde o PRD normalmente decidiria uma questão de modelagem
+  (cardinalidade, catálogo de cargos, identificadores fiscais), a questão
+  está em **decisões pendentes** (§12), com alternativas objetivas.
+- **Dependência de rastreabilidade registrada:** a próxima fatia funcional
+  (colaboradores e vínculos) precisa de rastreabilidade explícita entre os
+  requisitos do PRD e a especificação — seja versionando um extrato do PRD
+  no repositório, seja mantendo uma matriz de rastreabilidade
+  requisito ↔ spec ↔ teste. Pendência da próxima fatia, não desta.
 
-### D2 — Escopo da Etapa 1 diverge do roadmap vigente
+### O2 — Interpretação de "Fatia 1" perante o roadmap
 
-O roadmap oficial define a Etapa 1 de forma mais ampla do que o escopo
-solicitado para esta especificação:
+O roadmap vigente descreve a Etapa 1 de forma mais ampla — "Core
+organizacional: empresas, unidades, cargos, vínculos e colaboradores"
+(`docs/ROADMAP.md`); o plano mestre §5 acrescenta "pessoas, vínculos
+CLT/estágio/PJ, colaboradores, perfis e dados cadastrais".
 
-| Fonte                                      | Escopo declarado da Etapa 1                                                                                          |
-| ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
-| `docs/ROADMAP.md` (linha 10)               | "Core organizacional: empresas, unidades, cargos, vínculos **e colaboradores**"                                      |
-| `PLANO_E_PROMPT_ECOSSISTEMA_RH_NOVO.md` §5 | "empresa/unidade/departamento/cargo, **pessoas, vínculos CLT/estágio/PJ, colaboradores, perfis e dados cadastrais**" |
-| Escopo desta especificação                 | Só estrutura organizacional — **sem** colaborador, pessoa, vínculo ou dado cadastral pessoal                         |
+**Interpretação registrada (decisão aprovada 6):** esta especificação é a
+**Fatia 1 — Núcleo Organizacional Interno** da Etapa 1. Colaboradores e
+seus vínculos permanecem no escopo da Etapa 1 do roadmap, porém em
+**fatia posterior**.
 
-**Registro da divergência:** o escopo desta especificação é
-deliberadamente **menor** que o da Etapa 1 do roadmap. Colaboradores,
-pessoas e vínculos permanecem previstos, mas fora desta especificação.
+`docs/ROADMAP.md` **não é alterado** por esta tarefa — o fatiamento interno
+da etapa é detalhamento de execução, não renumeração do roadmap.
 
-**Alternativas objetivas** (a decidir, §12):
+### O3 — Impacto da decisão 4 sobre autorização já implementada
 
-- **(a)** Tratar esta spec como "Etapa 1 — Fatia 1 (estrutura
-  organizacional)", com colaboradores/vínculos em uma Fatia 2 própria da
-  mesma etapa. Mantém o roadmap intacto; só detalha o fatiamento interno.
-- **(b)** Atualizar `docs/ROADMAP.md` para refletir o novo recorte,
-  movendo colaboradores/vínculos para uma etapa própria.
+A decisão aprovada 4 — "`admin_tecnico`, `auditor` e `dpo` só podem
+acessar empresas para as quais tenham escopo autorizado" — **diverge do
+comportamento hoje implementado e mergeado** em `rbac.evaluator.ts`:
 
-Nenhuma das duas foi aplicada aqui — alterar `docs/ROADMAP.md` está fora
-do escopo desta entrega (restrição: nenhum arquivo além deste markdown).
-A recomendação técnica é **(a)**, por não exigir renumeração do roadmap.
+| Regra atual (em `main`) | Comportamento hoje                                                                | Decisão 4 exige                                                                               |
+| ----------------------- | --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `evaluateAccessLog`     | `admin_tecnico`, `auditor`, `dpo` → permitido **sem nenhuma checagem de empresa** | Restringir ao escopo de empresa autorizado                                                    |
+| `evaluateOtherAccount`  | `admin_tecnico` → permitido, comentado como "escopo: instância inteira"           | Acesso amplo deixa de ser implícito; quando existir, precisa ser explícito, mínimo e auditado |
 
-### D3 — "Multiempresa" (fontes vigentes) vs. "multitenant" (escopo pedido)
+**Nada disso foi alterado nesta tarefa** — ela é exclusivamente
+documental. O ajuste do avaliador RBAC/ABAC é trabalho da fase
+**Implementar** desta fatia, e está registrado como:
 
-Toda a fundação já entregue trata isolamento como **multiempresa**
-(`company_id`), não multitenant:
+- item obrigatório dos critérios de aceite da implementação (§12);
+- decisão pendente quanto à **forma** do acesso amplo interno (§12, DP-7);
+- risco de regressão de autorização a ser coberto por teste (§11, RI-2).
 
-- `PLANO_E_PROMPT_ECOSSISTEMA_RH_NOVO.md` §1: "multiempresa e modular".
-- ADR 0003 §8: `company_id`/`unit_id`/`team_id` em `access_user`, sem
-  camada acima de empresa.
-- `rbac.evaluator.ts`: `isSameCompany(subject, target)` — a maior
-  granularidade de escopo hoje é a empresa; `admin_tecnico` tem escopo
-  "instância inteira".
-- `audit_event`: `company_id`/`unit_id`/`team_id`, sem `tenant_id`.
-
-Introduzir um **tenant acima de empresa** (cliente comercial que agrupa
-várias empresas) é uma **mudança arquitetural nova**, não uma
-continuação. Ela é o objeto central da proposta de ADR 0005 (§13) e tem
-impacto retroativo em duas tabelas já mergeadas (`access_user`,
-`audit_event`) e no avaliador RBAC/ABAC — ver §5 e §12.
-
-### D4 — Escopo cross-tenant de `admin_tecnico`, `auditor` e `dpo`
-
-Consequência direta de D3, com impacto de segurança:
-
-| Papel           | Escopo hoje (Fatias 3/4, em produção)        | Pergunta aberta em multitenant                                        |
-| --------------- | -------------------------------------------- | --------------------------------------------------------------------- |
-| `admin_tecnico` | Instância inteira                            | Operador da plataforma (vê todos os tenants) ou escopado a um tenant? |
-| `auditor`       | Trilha de auditoria de **todas as empresas** | Todos os tenants, ou só o próprio tenant?                             |
-| `dpo`           | Trilha de auditoria de **todas as empresas** | Todos os tenants, ou só o próprio tenant?                             |
-
-Se `auditor`/`dpo` permanecerem com o escopo literal de hoje ("todas as
-empresas"), em multitenant isso passa a significar **leitura cross-tenant
-da trilha de auditoria** — provavelmente indesejado, e uma regressão de
-isolamento introduzida sem decisão explícita. Registrado como decisão
-pendente prioritária (§12, DP-1). Esta especificação **não** altera a
-matriz das Fatias 3/4 por conta própria.
+Registrar essa divergência aqui é o que permite que ela seja tratada
+deliberadamente, em vez de descoberta durante a implementação.
 
 ## 1. Objetivo, escopo e fora de escopo
 
 ### Objetivo
 
-Especificar o núcleo organizacional multitenant do Evolli RH: as
-entidades de estrutura (tenant, empresa, unidade, departamento, equipe,
-cargo, centro de custo), suas regras de integridade, o modelo de
-isolamento entre tenants e a matriz de autorização correspondente — de
-forma que Colaboradores, Portal do Gestor, Documentos, Ponto, Dashboard e
-demais módulos futuros tenham um esqueleto organizacional estável para
-referenciar, com isolamento e auditoria garantidos desde o primeiro CRUD.
+Especificar o núcleo organizacional **interno** do Evolli RH — empresa,
+unidade, área/departamento, equipe, cargo/função e centro de custo
+opcional — com regras de integridade, limites de autorização por empresa e
+auditoria desde o primeiro CRUD, de forma que Colaboradores, Portal do
+Gestor, Documentos, Ponto, Dashboard e demais módulos futuros tenham um
+esqueleto organizacional estável para referenciar.
+
+A preparação conceitual para a evolução comercial é preservada (§13), mas
+**nenhuma multitenancy técnica é introduzida nesta fatia**.
 
 ### Escopo — entra (nesta especificação)
 
-- Modelo conceitual das entidades organizacionais, sem migration (§3).
+- Modelo conceitual das entidades organizacionais internas, sem migration (§3).
 - Definições, cardinalidades e regras de inativação (§4).
-- Estratégia de isolamento multitenant, com alternativas e trade-offs (§5).
+- Escopo organizacional e limites de autorização, tendo `company_id` como
+  maior limite atual (§5).
 - Regras de integridade: código, nome, unicidade, status, referências,
   proibição de exclusão física (§6).
 - Classificação de dados e confirmação LGPD (§7).
-- Matriz de acesso por papel, escopo e ação, compatível com o RBAC/ABAC
-  já implementado (§8).
+- Matriz de acesso por papel, escopo e ação, compatível com o RBAC/ABAC já
+  implementado (§8).
 - Eventos obrigatórios de auditoria (§9).
 - Contratos de API futuros, sem criar endpoint (§10).
 - Estratégia de testes (§11).
-- Critérios de aceite, riscos, dependências, decisões pendentes e
-  arquivos previstos (§12).
-- Proposta de ADR 0005, descrita dentro deste documento, **sem criar o
-  arquivo da ADR** (§13).
+- Critérios de aceite, riscos, dependências, decisões pendentes e arquivos
+  previstos (§12).
+- Gates da evolução comercial futura, sem desenho de implementação (§13).
 
 ### Escopo — não entra
 
 - **Nenhum artefato de implementação**: código, migration, `schema.prisma`,
   endpoint, DTO, guard, dependência, infraestrutura, interface, PR ou
   merge. Esta fase é só documento.
+- **Nenhuma multitenancy técnica** (decisão aprovada 2): sem entidade
+  `tenant`, sem coluna `tenant_id`, sem Row-Level Security multitenant,
+  sem backfill e sem migration retroativa nesta fatia.
 - **Nenhuma entidade de colaborador, pessoa ou vínculo** (CLT, estágio,
-  PJ) — a relação gestor/subordinado é apenas _prevista_ (§3.8), sem
-  entidade que a materialize nesta etapa.
+  PJ) — a relação gestor/subordinado é apenas _prevista_ (§3.6), sem
+  entidade que a materialize nesta fatia (decisão aprovada 6).
 - **Nenhum dado trabalhista, legal, fiscal, financeiro ou de benefício** —
   centro de custo entra como rótulo organizacional, explicitamente **sem**
-  integração financeira, contábil ou orçamentária (§3.7).
-- **Nenhum requisito ausente das fontes disponíveis** — ver D1.
-- **Nenhuma alteração da matriz de acesso das Fatias 3/4** — só extensão
-  para os recursos novos (§8); mudanças no escopo de papéis existentes
-  ficam como decisão pendente (D4/DP-1).
-- **MFA TOTP** — decisão vigente inalterada: adiado da demonstração, mas
-  **obrigatório antes de qualquer piloto com dados reais ou produção**
-  (ADR 0003 decisão 3). Esta etapa não implementa nem altera isso; herda
-  a obrigação como pré-condição de piloto.
-- Hierarquia organizacional recursiva de profundidade arbitrária (ex.:
-  departamento dentro de departamento, N níveis) — ver DP-4.
+  integração financeira, contábil ou orçamentária (§3.5).
+- **Nenhum requisito ausente das fontes disponíveis** (O1).
+- **MFA TOTP** — decisão vigente inalterada (decisão aprovada 8): adiado
+  apenas da demonstração inicial, **obrigatório antes de piloto com dados
+  reais ou produção** (ADR 0003, decisão 3). Esta fatia não implementa nem
+  altera isso; herda a obrigação como pré-condição de piloto.
+- Hierarquia organizacional recursiva de profundidade arbitrária (DP-10).
 
 ## 2. Relação com o PRD e com o roadmap
 
-- **PRD "Sistema RH - Reserva Fiscal"**: fonte **complementar e
+- **PRD "Sistema RH - Reserva Fiscal" (Notion)**: fonte **complementar e
   obrigatória** de requisitos funcionais, de segurança, de LGPD e de
   critérios de aceite. Não é documento acessório nem de prioridade menor
-  que o roadmap técnico.
-- **Roadmap do Evolli RH** (`docs/ROADMAP.md`, plano mestre §5): define a
-  **ordem técnica de implementação** por dependência — não sobrepõe nem
-  rebaixa requisito registrado no PRD.
+  que o roadmap técnico. Não estar versionado no repositório não reduz sua
+  autoridade — só impede a confrontação automática no checkout (O1).
+- **Roadmap do Evolli RH**: define a **ordem técnica de implementação** por
+  dependência. Não sobrepõe nem rebaixa requisito registrado no PRD.
 - **Conflitos são registrados como decisão explícita**, nunca resolvidos
   por suposição nem rebaixados silenciosamente: quem decidiu, por quê, o
-  que foi priorizado e o que ficou para depois. As divergências já
-  encontradas estão em §0 (D1–D4) e §12.
-- **Estado atual desta relação:** o PRD não está disponível no
-  repositório (D1). Portanto **nenhum requisito desta especificação foi
-  derivado do PRD** — todos vêm das fontes técnicas versionadas. A
-  confrontação spec × PRD é um item de aceite pendente (§12), não uma
-  etapa já cumprida.
+  que foi priorizado e o que ficou para depois. As observações desta fatia
+  estão em §0.
+- **Rastreabilidade PRD ↔ spec ↔ teste** é pendência da **próxima fatia
+  funcional** (colaboradores/vínculos), quando requisitos de negócio
+  passarem a ser derivados diretamente do PRD (O1).
 
 ## 3. Modelo conceitual (sem migration)
 
 Rascunho conceitual, para revisão — **nenhuma migration, nenhum model
 Prisma criado nesta fase**. Nomes de entidade e de campo são propostas de
-trabalho, não contrato fechado (ver DP-8).
+trabalho, não contrato fechado (DP-9).
 
-Convenção: `[PK]` chave; `[FK]` referência; `[U]` participa de restrição
-de unicidade (§6); `?` opcional.
+Convenção: `[PK]` chave; `[FK]` referência; `[U]` participa de restrição de
+unicidade (§6); `?` opcional.
 
-### 3.1 `tenant` — cliente comercial
+**`company` é a raiz do escopo organizacional** — não existe entidade
+acima dela nesta fatia (decisão aprovada 3).
 
-```text
-tenant
-  id            [PK]  identificador não sequencial previsível (mesmo padrão
-                      de UUID já usado desde a Fatia 3)
-  code          [U]   código curto, estável, imutável após criação
-  name                razão social/nome comercial do cliente
-  status              enum fechado: active | suspended | inactive
-  created_at / updated_at
-```
-
-Raiz do isolamento. **Todo** dado organizacional (e, em etapas futuras,
-todo dado de RH) pertence a exatamente um tenant, direta ou
-transitivamente (§5).
-
-### 3.2 `company` — empresa
+### 3.1 `company` — empresa
 
 ```text
 company
-  id            [PK]
-  tenant_id     [FK] -> tenant
-  code          [U] (único dentro do tenant)
-  name
+  id            [PK]  identificador não sequencial previsível (mesmo padrão
+                      de UUID já usado desde a Fatia 3)
+  code          [U]   código curto, estável, imutável após criação
+  name                razão social/nome
   status              enum fechado: active | inactive
   created_at / updated_at
 ```
 
-Pessoa jurídica do cliente. Um tenant pode ter várias empresas (grupo
-econômico); uma empresa pertence a exatamente um tenant e **nunca** é
-movida entre tenants (§6, R7).
+Maior limite organizacional e de autorização atual. No deployment interno,
+representa a(s) empresa(s) do próprio escritório.
 
-**Identificador fiscal (CNPJ) não está incluído** — decisão pendente
-DP-6, por dois motivos: (a) não há requisito de PRD que o exija (D1);
-(b) CNPJ de MEI/empresário individual pode ser associável a pessoa
-física, o que muda a classificação LGPD desta etapa (§7).
+**Identificador fiscal (CNPJ) não está incluído** — decisão pendente DP-4:
+(a) não há requisito versionado que o exija (O1); (b) CNPJ de
+MEI/empresário individual pode ser associável a pessoa física, o que
+mudaria a classificação LGPD desta fatia (§7).
 
-### 3.3 `unit` — unidade
+### 3.2 `unit` — unidade
 
 ```text
 unit
   id            [PK]
-  tenant_id     [FK] -> tenant        (desnormalizado, ver §5)
   company_id    [FK] -> company
   code          [U] (único dentro da empresa)
   name
@@ -236,80 +201,64 @@ unit
 
 Estabelecimento/filial/local de uma empresa.
 
-### 3.4 `department` — departamento ou área
+### 3.3 `department` — área ou departamento
 
 ```text
 department
   id            [PK]
-  tenant_id     [FK] -> tenant        (desnormalizado, ver §5)
   company_id    [FK] -> company
-  unit_id       [FK] -> unit  ?       (ver DP-2)
+  unit_id       [FK] -> unit  ?      (ver DP-1)
+  code          [U] (escopo de unicidade depende de DP-1)
+  name
+  status              enum fechado: active | inactive
+  created_at / updated_at
+```
+
+**DP-1 (decisão pendente):** departamento pertence à **empresa**
+(atravessando unidades) ou à **unidade**? As duas modelagens são comuns e
+não equivalentes:
+
+- **(a) Por empresa** (`unit_id` ausente): "Financeiro" é um só, presente
+  em várias unidades. Unicidade de `code` por empresa.
+- **(b) Por unidade** (`unit_id` obrigatório): cada unidade tem seu próprio
+  "Financeiro". Unicidade de `code` por unidade.
+- **(c) Híbrido** (`unit_id` opcional, como no rascunho): corporativo
+  quando nulo, local quando preenchido. Mais flexível, mas torna a regra
+  de unicidade e a de escopo de acesso mais complexas.
+
+Não decidido aqui. O rascunho registra (c) apenas para tornar a
+ambiguidade visível, **não** como escolha.
+
+### 3.4 `team` — equipe
+
+```text
+team
+  id            [PK]
+  company_id    [FK] -> company
+  department_id [FK] -> department ? (ver DP-2)
+  unit_id       [FK] -> unit ?       (ver DP-2)
   code          [U] (escopo de unicidade depende de DP-2)
   name
   status              enum fechado: active | inactive
   created_at / updated_at
 ```
 
-**DP-2 (decisão pendente):** departamento pertence à **empresa**
-(atravessando unidades) ou à **unidade**? As duas modelagens são comuns e
-não equivalentes:
+**DP-2 (decisão pendente):** equipe pertence a departamento, a unidade ou a
+ambos? Mesma natureza de ambiguidade da DP-1, não decidida aqui.
 
-- **(a) Departamento por empresa** (`unit_id` ausente): "Financeiro" é um
-  só, presente em várias unidades. Unicidade de `code` por empresa.
-- **(b) Departamento por unidade** (`unit_id` obrigatório): cada unidade
-  tem seu próprio "Financeiro". Unicidade de `code` por unidade.
-- **(c) Híbrido** (`unit_id` opcional, como acima): departamento
-  corporativo quando nulo, local quando preenchido. Mais flexível, mas
-  torna a regra de unicidade e a de escopo de acesso mais complexas.
-
-Não decidido aqui — depende do PRD/RH. O rascunho acima registra a opção
-(c) apenas para tornar a ambiguidade visível, **não** como escolha.
-
-### 3.5 `team` — equipe
-
-```text
-team
-  id            [PK]
-  tenant_id     [FK] -> tenant        (desnormalizado, ver §5)
-  company_id    [FK] -> company
-  department_id [FK] -> department ?  (ver DP-3)
-  unit_id       [FK] -> unit ?        (ver DP-3)
-  code          [U] (escopo de unicidade depende de DP-3)
-  name
-  status              enum fechado: active | inactive
-  created_at / updated_at
-```
-
-**DP-3 (decisão pendente):** equipe pertence a departamento, a unidade,
-ou a ambos? Mesma natureza de ambiguidade da DP-2, não decidida aqui.
-
-### 3.6 `job_role` — cargo/função
+### 3.5 `job_role` — cargo/função e `cost_center` — centro de custo
 
 ```text
 job_role
   id            [PK]
-  tenant_id     [FK] -> tenant
-  company_id    [FK] -> company ?     (ver DP-5)
-  code          [U] (escopo de unicidade depende de DP-5)
+  company_id    [FK] -> company ?    (ver DP-3)
+  code          [U] (escopo de unicidade depende de DP-3)
   name
   status              enum fechado: active | inactive
   created_at / updated_at
-```
 
-Catálogo de cargos/funções. **Sem** faixa salarial, CBO, jornada,
-requisito legal ou qualquer atributo trabalhista/fiscal — todos fora de
-escopo (§1).
-
-**DP-5 (decisão pendente):** o catálogo de cargos é **por tenant**
-(compartilhado entre as empresas do grupo) ou **por empresa**? Impacta
-unicidade e reuso.
-
-### 3.7 `cost_center` — centro de custo (opcional)
-
-```text
-cost_center
+cost_center                          -- opcional
   id            [PK]
-  tenant_id     [FK] -> tenant
   company_id    [FK] -> company
   code          [U] (único dentro da empresa)
   name
@@ -317,29 +266,37 @@ cost_center
   created_at / updated_at
 ```
 
-Rótulo organizacional **opcional**, sem integração financeira, contábil
-ou orçamentária nesta etapa (restrição explícita §1). Nenhum valor
-monetário, rateio, plano de contas ou vínculo com sistema financeiro
+`job_role` é catálogo de cargos/funções. **Sem** faixa salarial, CBO,
+jornada, requisito legal ou qualquer atributo trabalhista/fiscal — todos
+fora de escopo (§1).
+
+**DP-3 (decisão pendente):** o catálogo de cargos é **por empresa** ou
+**compartilhado** entre as empresas do escritório? Impacta unicidade e
+reuso.
+
+`cost_center` é rótulo organizacional **opcional**, sem integração
+financeira, contábil ou orçamentária nesta fatia (restrição §1). Nenhum
+valor monetário, rateio, plano de contas ou vínculo com sistema financeiro
 externo entra aqui. A associação entre centro de custo e as demais
-entidades organizacionais é decisão pendente (DP-7).
+entidades é decisão pendente (DP-5).
 
-### 3.8 Relação gestor ↔ subordinado (prevista, não materializada)
+### 3.6 Relação gestor ↔ subordinado (prevista, não materializada)
 
-**Nenhuma entidade de colaborador é criada nesta etapa** (restrição §1).
-A relação gestor/subordinado é apenas _antecipada no desenho_, para que a
-estrutura organizacional não precise ser redesenhada quando
-Colaboradores existir:
+**Nenhuma entidade de colaborador é criada nesta fatia** (restrição §1,
+decisão aprovada 6). A relação gestor/subordinado é apenas _antecipada no
+desenho_, para que a estrutura organizacional não precise ser redesenhada
+quando Colaboradores existir:
 
 - Cada nó organizacional (`unit`, `department`, `team`) é o **ponto de
   ancoragem previsto** para uma futura referência de responsável/gestor.
-- Essa referência **não existe como campo nesta etapa** — seria uma FK
-  para uma entidade (colaborador/pessoa) que ainda não foi especificada,
-  e criá-la agora seria especular sobre a modelagem da etapa seguinte
-  (mesmo princípio que a ADR 0003 §8 já aplicou ao manter
-  `access_user` desacoplado de colaborador).
+- Essa referência **não existe como campo nesta fatia** — seria uma FK para
+  uma entidade (colaborador/pessoa) ainda não especificada, e criá-la agora
+  seria especular sobre a modelagem da fatia seguinte (mesmo princípio que
+  a ADR 0003 §8 já aplicou ao manter `access_user` desacoplado de
+  colaborador).
 - Quando Colaboradores for especificado, a ligação entra por migration
   aditiva própria, revisada naquele momento.
-- Consequência aceita: **nesta etapa não é possível responder "quem é o
+- Consequência aceita: **nesta fatia não é possível responder "quem é o
   gestor desta equipe"** — a estrutura existe, o responsável não. Isso é
   esperado, não uma lacuna.
 
@@ -347,185 +304,149 @@ Colaboradores existir:
 
 ### Cardinalidades propostas
 
-| Relação                   | Cardinalidade | Observação                                             |
-| ------------------------- | ------------- | ------------------------------------------------------ |
-| tenant → company          | 1:N           | Empresa pertence a exatamente um tenant, imutável (R7) |
-| company → unit            | 1:N           | Unidade pertence a exatamente uma empresa              |
-| company → department      | 1:N           | Sujeito a DP-2                                         |
-| unit → department         | 1:N ou N/A    | Depende de DP-2                                        |
-| department → team         | 1:N ou N/A    | Depende de DP-3                                        |
-| company/tenant → job_role | 1:N           | Depende de DP-5                                        |
-| company → cost_center     | 1:N           | Associação a outras entidades: DP-7                    |
+| Relação               | Cardinalidade | Observação                                |
+| --------------------- | ------------- | ----------------------------------------- |
+| company → unit        | 1:N           | Unidade pertence a exatamente uma empresa |
+| company → department  | 1:N           | Sujeito a DP-1                            |
+| unit → department     | 1:N ou N/A    | Depende de DP-1                           |
+| department → team     | 1:N ou N/A    | Depende de DP-2                           |
+| company → job_role    | 1:N ou N/A    | Depende de DP-3                           |
+| company → cost_center | 1:N           | Associação a outras entidades: DP-5       |
 
-Nenhuma relação N:N é proposta nesta etapa. Uma entidade organizacional
+Nenhuma relação N:N é proposta nesta fatia. Uma entidade organizacional
 **nunca** pertence a dois pais do mesmo tipo.
 
 ### Regras de inativação
 
-- **R-INA-1 — Inativação, nunca exclusão física.** Toda entidade
-  organizacional tem `status` (`active` | `inactive`; `tenant` também
-  admite `suspended`). "Remover" é sempre transição para `inactive`
-  (§6, R6).
-- **R-INA-2 — Inativação em cascata é explícita, nunca implícita.**
-  Inativar uma empresa **não** inativa silenciosamente suas unidades. A
-  operação deve ou (a) recusar enquanto houver filhos ativos, ou (b)
-  exigir confirmação explícita de cascata que gera evento de auditoria
-  **por entidade afetada** (§9). A escolha entre (a) e (b) é DP-9.
+- **R-INA-1 — Inativação, nunca exclusão física.** Toda entidade tem
+  `status` (`active` | `inactive`). "Remover" é sempre transição para
+  `inactive` (§6, R6).
+- **R-INA-2 — Inativação em cascata é explícita, nunca implícita.** Inativar
+  uma empresa **não** inativa silenciosamente suas unidades. A operação deve
+  ou (a) recusar enquanto houver filhos ativos, ou (b) exigir confirmação
+  explícita de cascata que gera evento de auditoria **por entidade
+  afetada** (§9). A escolha entre (a) e (b) é DP-6.
 - **R-INA-3 — Entidade inativa não aceita novos vínculos.** Criar uma
   unidade sob empresa inativa, ou vincular algo a um nó inativo, é
   rejeitado.
-- **R-INA-4 — Vínculos preexistentes sobrevivem à inativação.**
-  Inativar não quebra referências já criadas — o histórico continua
-  legível e auditável.
+- **R-INA-4 — Vínculos preexistentes sobrevivem à inativação.** Inativar não
+  quebra referências já criadas — o histórico continua legível e auditável.
 - **R-INA-5 — Reativação é operação explícita e auditada**, sujeita às
-  mesmas regras de integridade da criação (ex.: unicidade de código
-  ainda válida no escopo).
-- **R-INA-6 — Tenant suspenso bloqueia escrita, preserva leitura.**
-  `suspended` (suspensão comercial) impede operações de escrita no
-  tenant, sem apagar nem ocultar dado — distinto de `inactive`.
-  Semântica exata e efeitos sobre sessões ativas: DP-10.
+  mesmas regras de integridade da criação (ex.: unicidade de código ainda
+  válida no escopo).
 
-## 5. Estratégia de isolamento multitenant
+## 5. Escopo organizacional e limites de autorização
 
 ### Princípio
 
-**Todo dado organizacional pertence a um tenant. Acesso entre tenants é
-negado por padrão** — extensão direta do princípio de negação por padrão
-já vigente desde a ADR 0002 (menor privilégio no banco) e a ADR 0003
-(RBAC/ABAC deny-by-default).
+**`company_id` é o maior limite organizacional e de autorização atual**
+(decisão aprovada 3). Abaixo dele existem unidade, área/departamento,
+equipe, cargo/função e centro de custo opcional. Não existe camada acima
+da empresa nesta fatia.
 
-O isolamento é avaliado **antes** de qualquer regra de papel: um ator do
-tenant A nunca alcança dado do tenant B, **independentemente do papel**
-— inclusive papéis hoje descritos como "todas as empresas" (D4/DP-1).
+O escopo é avaliado com **negação por padrão**, extensão direta do que já
+vigora desde a ADR 0002 (menor privilégio no banco) e a ADR 0003
+(RBAC/ABAC deny-by-default). Reaproveita o mecanismo já implementado
+(`isSameCompany` em `rbac.evaluator.ts`), sem introduzir um segundo modelo
+de escopo paralelo.
 
-### `tenant_id` desnormalizado em toda entidade
+### Acesso amplo interno: explícito, mínimo e auditado
 
-Toda entidade organizacional carrega `tenant_id` diretamente, mesmo
-quando ele seria derivável por join (`unit → company → tenant`). Motivos:
+Decisão aprovada 4: `admin_tecnico`, `auditor` e `dpo` **só acessam
+empresas para as quais tenham escopo autorizado**. Quando um acesso amplo
+interno for realmente necessário, ele deve ser:
 
-- Permite filtro de isolamento **na própria consulta**, sem depender de
-  join correto em cada query nova — reduz a chance de um `WHERE`
-  esquecido virar vazamento cross-tenant.
-- É pré-requisito de qualquer política de Row-Level Security (opção B
-  abaixo), que precisa do discriminador na própria linha.
-- Custo: `tenant_id` precisa ser mantido consistente com o pai — exige
-  restrição de integridade que o impeça de divergir (ver R8, §6).
+- **explícito** — concedido deliberadamente, nunca herdado por ser "o papel
+  técnico" ou implícito no código;
+- **mínimo** — restrito ao conjunto de empresas efetivamente necessário;
+- **auditado** — cada uso gera evento de auditoria (§9).
 
-### Alternativas de enforcement (a decidir — ADR 0005)
+Isso **muda comportamento hoje implementado** (O3): `evaluateAccessLog`
+concede leitura da trilha a `admin_tecnico`/`auditor`/`dpo` sem checar
+empresa, e `evaluateOtherAccount` trata `admin_tecnico` como "instância
+inteira". O ajuste é trabalho da fase Implementar desta fatia (§12), não
+desta tarefa documental. A **forma** exata de representar o escopo
+autorizado desses papéis é DP-7.
 
-| Opção                                       | Como funciona                                                                                     | A favor                                                                          | Contra                                                                                                                                        |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| **A — Filtro na aplicação**                 | Toda query inclui `tenant_id` do ator; repositório/serviço central garante                        | Simples; sem infraestrutura nova; direto no Prisma                               | Garantia só no código — uma query nova sem filtro vaza; contradiz o precedente da ADR 0004 (append-only garantido no banco, não só no código) |
-| **B — PostgreSQL Row-Level Security (RLS)** | Política `USING (tenant_id = current_setting('app.tenant_id'))`; sessão de banco carrega o tenant | Garantia **no banco**: uma query esquecida não vaza; mesma filosofia da ADR 0004 | Exige `SET LOCAL` por transação; interação não trivial com pooling do Prisma; custo operacional e de teste real                               |
-| **C — Schema por tenant**                   | Um schema PostgreSQL por cliente                                                                  | Isolamento forte                                                                 | Migrations multiplicadas por tenant; operacionalmente pesado; conflita com "dependência mínima"                                               |
-| **D — Banco por tenant**                    | Uma instância/base por cliente                                                                    | Isolamento máximo                                                                | Custo e complexidade desproporcionais para a escala atual                                                                                     |
+### Sem multitenancy técnica
 
-**Recomendação técnica desta especificação: A + B combinados** — filtro na
-aplicação como caminho normal, RLS como rede de segurança que torna o
-vazamento impossível mesmo com erro de código. É a opção mais coerente
-com o precedente já aceito na ADR 0004 §1 (o `REVOKE UPDATE/DELETE` de
-`audit_event` foi colocado na própria migration justamente para que a
-garantia não dependesse de disciplina de código nem de etapa manual).
-
-**Não decidido aqui.** C e D ficam descartados por desproporção, mas a
-escolha entre A isolado e A+B é objeto da ADR 0005 (§13) — depende de
-validação de custo operacional com TI e de prova de compatibilidade com o
-pooling do Prisma.
-
-### Impacto retroativo em tabelas já mergeadas
-
-Consequência de D3, a tratar na fase Implementar:
-
-| Tabela                 | Situação hoje                                                                              | Impacto                                                                                           |
-| ---------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
-| `access_user`          | `company_id`/`unit_id`/`team_id` como texto, **sem FK** (ADR 0003 §8), **sem `tenant_id`** | Precisa de `tenant_id`; o escopo do ator passa a ser resolvido contra entidades reais             |
-| `audit_event`          | `company_id`/`unit_id`/`team_id`, **sem `tenant_id`**                                      | Precisa de `tenant_id` para que a trilha seja consultável e isolada por tenant                    |
-| `AuthorizationSubject` | `{ userId, role, companyId }`                                                              | Precisa de `tenantId` (e provavelmente `unitId`/`departmentId`/`teamId`) para ABAC organizacional |
-| `rbac.evaluator.ts`    | `isSameCompany()` é a maior granularidade                                                  | Precisa de checagem de tenant **antes** da de empresa                                             |
-
-Migrations sobre `access_user`/`audit_event` são **aditivas**; nenhuma
-coluna existente é removida ou renomeada. Estratégia de preenchimento do
-`tenant_id` para linhas preexistentes (backfill) é DP-11.
+Não há `tenant`, `tenant_id`, Row-Level Security multitenant, backfill nem
+migration retroativa nesta fatia (decisão aprovada 2, ADR 0005). Nenhuma
+tabela já mergeada (`access_user`, `audit_event`) é alterada para
+acomodar multitenancy. A evolução comercial futura tem gates próprios
+(§13).
 
 ## 6. Regras de integridade
 
-- **R1 — Código obrigatório, estável e imutável.** Toda entidade tem
-  `code` curto, obrigatório, imutável após a criação. Renomear é operação
-  de `name`, nunca de `code` — código é o identificador estável para
+- **R1 — Código obrigatório, estável e imutável.** Toda entidade tem `code`
+  curto, obrigatório, imutável após a criação. Renomear é operação de
+  `name`, nunca de `code` — código é o identificador estável para
   integrações e referências futuras.
-- **R2 — Unicidade sempre no escopo correto, nunca global.**
-  `tenant.code` é único globalmente; `company.code` é único **dentro do
-  tenant**; `unit.code` dentro da empresa; demais escopos dependem de
-  DP-2/DP-3/DP-5. Unicidade global de código de empresa seria vazamento
-  de informação entre tenants (permitiria inferir a existência de um
-  cliente por colisão de código).
-- **R3 — Nome obrigatório, não único.** Dois departamentos podem se
-  chamar "Financeiro" em unidades diferentes; a distinção é por `code` e
-  escopo.
+- **R2 — Unicidade sempre no escopo correto.** `company.code` é único no
+  deployment; `unit.code` é único **dentro da empresa**; demais escopos
+  dependem de DP-1/DP-2/DP-3.
+- **R3 — Nome obrigatório, não único.** Dois departamentos podem se chamar
+  "Financeiro" em unidades diferentes; a distinção é por `code` e escopo.
 - **R4 — Status por enum fechado**, nunca texto livre — mesmo padrão de
   `AccessUserStatus` (Fatia 3) e `AuditAction`/`AuditResult` (Fatia 4).
-- **R5 — Toda referência aponta para entidade do mesmo tenant.** Uma
-  unidade nunca referencia empresa de outro tenant. Deve ser garantido
-  por restrição de banco, não só por validação de aplicação (ver R8).
+- **R5 — Toda referência aponta para entidade da mesma empresa.** Uma equipe
+  nunca referencia departamento de outra empresa. Garantido por restrição
+  de banco, não só por validação de aplicação.
 - **R6 — Proibição de exclusão física quando houver vínculo.** Nenhum
   `DELETE` é exposto por API. Mesmo sem vínculos atuais, entidades
   organizacionais são referenciadas por eventos de auditoria já gravados
   (append-only, ADR 0004) — apagar a entidade tornaria a trilha
-  ininterpretável. A operação de "remoção" é sempre inativação (§4).
-- **R7 — Tenant de uma entidade é imutável.** Uma empresa nunca migra de
-  tenant. Movimentação entre clientes comerciais, se um dia necessária, é
-  processo próprio com ADR e trilha dedicada — não um `UPDATE`.
-- **R8 — Consistência do `tenant_id` desnormalizado.** O `tenant_id` de
-  uma entidade filha deve ser sempre igual ao do pai. Precisa ser
-  garantido estruturalmente (ex.: FK composta `(id, tenant_id)` no pai e
-  `(company_id, tenant_id)` na filha), não por validação de aplicação —
-  caso contrário o campo que existe para prevenir vazamento vira ele
-  mesmo uma fonte de inconsistência. Técnica exata: DP-12.
-- **R9 — Hierarquia acíclica e de profundidade fixa.** Nenhuma entidade
-  é ancestral de si mesma. Profundidade recursiva arbitrária está fora de
-  escopo (DP-4).
+  ininterpretável. "Remoção" é sempre inativação (§4).
+- **R7 — Empresa de uma entidade é imutável.** Uma unidade nunca migra de
+  empresa. Movimentação entre empresas, se um dia necessária, é processo
+  próprio com trilha dedicada — não um `UPDATE`.
+- **R8 — Hierarquia acíclica e de profundidade fixa.** Nenhuma entidade é
+  ancestral de si mesma. Profundidade recursiva arbitrária está fora de
+  escopo (DP-10).
 
 ## 7. Classificação de dados e LGPD
 
 ### Confirmação
 
-**Esta etapa não introduz dado pessoal de colaborador.** Todas as
-entidades especificadas (§3) são estrutura organizacional: identificadores
-técnicos, códigos, nomes de unidade/departamento/equipe/cargo e status.
+**Esta fatia não introduz dado pessoal de colaborador.** Todas as entidades
+especificadas (§3) são estrutura organizacional: identificadores técnicos,
+códigos, nomes de empresa/unidade/departamento/equipe/cargo e status.
 Nenhum CPF, nome de pessoa física, endereço, contato pessoal, dado de
 saúde, salário, documento ou dado de dependente entra aqui.
 
-| Dado                                            | Classificação                    | Observação                                                                 |
-| ----------------------------------------------- | -------------------------------- | -------------------------------------------------------------------------- |
-| `tenant.name` (razão social do cliente)         | Dado de pessoa jurídica          | Não é dado pessoal, salvo o caso de MEI/empresário individual (ver bordas) |
-| `company.name`, `unit.name`                     | Pessoa jurídica / organizacional | —                                                                          |
-| `department.name`, `team.name`, `job_role.name` | Organizacional                   | —                                                                          |
-| `cost_center.name`/`code`                       | Organizacional                   | Sem valor monetário (§3.7)                                                 |
-| `status`, `code`, timestamps                    | Técnico                          | —                                                                          |
+| Dado                                            | Classificação   | Observação                                             |
+| ----------------------------------------------- | --------------- | ------------------------------------------------------ |
+| `company.name`                                  | Pessoa jurídica | Salvo o caso de MEI/empresário individual (ver bordas) |
+| `unit.name`                                     | Organizacional  | —                                                      |
+| `department.name`, `team.name`, `job_role.name` | Organizacional  | —                                                      |
+| `cost_center.name`/`code`                       | Organizacional  | Sem valor monetário (§3.5)                             |
+| `status`, `code`, timestamps                    | Técnico         | —                                                      |
 
 ### Bordas registradas (não resolvidas)
 
-- **CNPJ (DP-6):** não incluído nesta especificação. Se vier a ser
-  incluído, o caso de MEI/empresário individual torna o identificador
-  potencialmente associável a pessoa física — o que mudaria a afirmação
-  acima e exigiria revisão de DPO. Por isso a inclusão é decisão
-  pendente, não omissão.
+- **CNPJ (DP-4):** não incluído. Se vier a ser incluído, o caso de
+  MEI/empresário individual torna o identificador potencialmente associável
+  a pessoa física — o que mudaria a afirmação acima e exigiria revisão de
+  DPO. Por isso a inclusão é decisão pendente, não omissão.
 - **Nome de entidade contendo nome de pessoa:** nada impede
-  operacionalmente que um cliente nomeie uma equipe como "Equipe do
-  João". Isso não é um campo de dado pessoal por desenho, e a
-  especificação não prevê validação de conteúdo — registrado como risco
-  residual (§12, RI-5), não como controle.
+  operacionalmente que alguém nomeie uma equipe como "Equipe do João". Não é
+  campo de dado pessoal por desenho, e não há validação de conteúdo
+  prevista — registrado como risco residual (RI-4), não como controle.
 - **Auditoria organizacional (§9)** registra ator (`access_user`) e IP —
-  dado pessoal já tratado e classificado na Fatia 3 §2 e na ADR 0004;
-  esta etapa não amplia esse tratamento, só gera mais eventos do mesmo
-  tipo já aprovado.
+  dado pessoal já tratado e classificado na Fatia 3 §2 e na ADR 0004. Esta
+  fatia não amplia esse tratamento, só gera mais eventos do mesmo tipo já
+  aprovado.
+- **Evolução comercial futura** exigirá revisão de LGPD específica (§13,
+  ADR 0005) — dado de cliente terceiro tem base legal e finalidade
+  distintas de dado interno do escritório. Nada disso é declarado
+  concluído aqui.
 
 ### Herança de controles
 
 Continuam valendo, sem alteração: minimização; proibição de senha, hash,
-token, cookie, CSRF, CPF completo, salário e conteúdo de documento em
-claro em qualquer log ou evento (ADR 0004 §5/§6); `AllExceptionsFilter`
-sem vazamento de detalhe interno (ADR 0001).
+token, cookie, CSRF, CPF completo, salário e conteúdo de documento em claro
+em qualquer log ou evento (ADR 0004 §5/§6); `AllExceptionsFilter` sem
+vazamento de detalhe interno (ADR 0001).
 
 ## 8. Matriz inicial de acesso
 
@@ -537,205 +458,205 @@ existe. As ações reaproveitam o vocabulário atual (`read`, `manage`,
 
 ### Recursos propostos
 
-`organization_structure` (leitura da árvore organizacional),
-`company`, `unit`, `department`, `team`, `job_role`, `cost_center`.
+`organization_structure` (leitura da árvore organizacional), `company`,
+`unit`, `department`, `team`, `job_role`, `cost_center`.
 
 ### Matriz
 
 | Papel           | Ler estrutura | Criar/alterar/inativar | Escopo                                      |
 | --------------- | ------------- | ---------------------- | ------------------------------------------- |
-| `admin_tecnico` | ✅            | ✅                     | Ver DP-1 (plataforma vs. tenant)            |
-| `rh`            | ✅            | ✅                     | Própria empresa, dentro do próprio tenant   |
+| `admin_tecnico` | ✅            | ✅                     | Empresas autorizadas (decisão 4; DP-7)      |
+| `rh`            | ✅            | ✅                     | Própria empresa                             |
 | `dp`            | ✅            | ❌                     | Leitura na própria empresa                  |
-| `gestor`        | ✅ (restrita) | ❌                     | Só os nós do próprio escopo — ver DP-13     |
+| `gestor`        | ✅ (restrita) | ❌                     | Só os nós do próprio escopo — DP-8          |
 | `financeiro`    | ✅ (restrita) | ❌                     | Leitura de `cost_center` e estrutura mínima |
-| `colaborador`   | ❌            | ❌                     | Sem acesso à estrutura nesta etapa          |
-| `auditor`       | ✅ (leitura)  | ❌                     | Ver DP-1                                    |
-| `dpo`           | ✅ (leitura)  | ❌                     | Ver DP-1                                    |
+| `colaborador`   | ❌            | ❌                     | Sem acesso à estrutura nesta fatia          |
+| `auditor`       | ✅ (leitura)  | ❌                     | Empresas autorizadas (decisão 4; DP-7)      |
+| `dpo`           | ✅ (leitura)  | ❌                     | Empresas autorizadas (decisão 4; DP-7)      |
 
 ### Regras invioláveis
 
-- **A1 — Isolamento antes de papel.** A checagem de tenant precede
-  qualquer regra de papel. Nenhum papel, incluindo os de leitura ampla,
-  atravessa tenant sem decisão explícita (D4/DP-1).
+- **A1 — Escopo de empresa antes de papel.** A checagem de escopo precede
+  qualquer regra de papel. Nenhum papel atravessa empresa sem autorização
+  explícita (decisão 4).
 - **A2 — Negação por padrão.** Ação não listada é negada. Recurso novo
   criado por módulo futuro nasce negado até ser adicionado à matriz.
-- **A3 — Nenhuma escrita direta na trilha de auditoria** por nenhum
-  papel — mantém a ADR 0004 §2 (escrita só via `AuditService`).
-- **A4 — Ninguém amplia o próprio escopo organizacional.** Mesma
-  proteção contra autoelevação já implementada na Fatia 3 para papel:
-  um ator não move a si mesmo para um escopo mais amplo.
+- **A3 — Nenhuma escrita direta na trilha de auditoria** por nenhum papel —
+  mantém a ADR 0004 §2 (escrita só via `AuditService`).
+- **A4 — Ninguém amplia o próprio escopo organizacional.** Mesma proteção
+  contra autoelevação já implementada na Fatia 3 para papel: um ator não
+  move a si mesmo para um escopo mais amplo.
 
 ## 9. Eventos obrigatórios de auditoria
 
-Toda ação sensível desta etapa é auditada via `AuditService.record()` —
+Toda ação sensível desta fatia é auditada via `AuditService.record()` —
 **ponto único de escrita** (ADR 0004 §2), nunca `prisma.auditEvent.create()`
 direto.
 
-| Evento                             | Quando                                                                                              | `result`  |
-| ---------------------------------- | --------------------------------------------------------------------------------------------------- | --------- |
-| Criação de entidade organizacional | Tenant, empresa, unidade, departamento, equipe, cargo, centro de custo criados                      | `success` |
-| Alteração de entidade              | Mudança de `name` ou de referência estrutural                                                       | `success` |
-| Inativação / reativação            | Transição de `status`, **um evento por entidade afetada** em caso de cascata (R-INA-2)              | `success` |
-| Tentativa negada                   | 403 do `AuthorizationGuard` sobre recurso organizacional, incluindo **toda** tentativa cross-tenant | `denied`  |
-| Consulta relevante                 | Leitura da estrutura completa de um tenant/empresa e qualquer consulta de escopo amplo              | `success` |
+| Evento                             | Quando                                                                                                  | `result`  |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------- | --------- |
+| Criação de entidade organizacional | Empresa, unidade, departamento, equipe, cargo, centro de custo criados                                  | `success` |
+| Alteração de entidade              | Mudança de `name` ou de referência estrutural                                                           | `success` |
+| Inativação / reativação            | Transição de `status`, **um evento por entidade afetada** em caso de cascata (R-INA-2)                  | `success` |
+| Tentativa negada                   | 403 do `AuthorizationGuard` sobre recurso organizacional, incluindo tentativa fora do escopo de empresa | `denied`  |
+| Consulta relevante                 | Leitura da estrutura completa de uma empresa e qualquer consulta de escopo amplo (§5)                   | `success` |
 
 ### Garantias herdadas da Fatia 4 (aplicam-se sem exceção)
 
-- **Atomicidade:** criação, alteração e inativação persistem a mudança e
-  o evento **na mesma transação** — ou os dois, ou nenhum (ADR 0004 §2).
-- **Best-effort na negação:** uma tentativa negada continua negada mesmo
-  se o evento não puder ser gravado; só o log técnico registra a falha,
-  sem segredo.
+- **Atomicidade:** criação, alteração e inativação persistem a mudança e o
+  evento **na mesma transação** — ou os dois, ou nenhum (ADR 0004 §2).
+- **Best-effort na negação:** uma tentativa negada continua negada mesmo se
+  o evento não puder ser gravado; só o log técnico registra a falha, sem
+  segredo.
 - **Sem valores antes/depois:** o evento registra `action` +
   `resource`/`resource_id`, nunca o valor de campo alterado (ADR 0004 §5,
-  decisão inalterada). "O que mudou" é expresso pelo verbo da ação.
+  decisão inalterada).
 - **Append-only:** garantido por privilégio de banco na própria migration
   (ADR 0004 §1) — vale automaticamente para os eventos novos.
 
 ### Impacto técnico a considerar na implementação
 
-- `AuditAction` é **enum de banco fechado** (ADR 0004 §5): cada verbo
-  novo (ex.: `company_created`) exige **migration** para estender o enum,
-  e atualização do array runtime `AUDIT_ACTIONS`. Existe teste de
-  sincronia entre os dois — a divergência falha o build, por desenho.
+- `AuditAction` é **enum de banco fechado** (ADR 0004 §5): cada verbo novo
+  (ex.: `company_created`) exige **migration aditiva** para estender o enum
+  e atualização do array runtime `AUDIT_ACTIONS`. Existe teste de sincronia
+  entre os dois — a divergência falha o build, por desenho.
 - `AuditResource` é **união de tipos no código**: os recursos
   organizacionais entram **sem migration**.
-- `audit_event` precisa de `tenant_id` para que a trilha seja isolável
-  por tenant (§5) — hoje só tem `company_id`/`unit_id`/`team_id`.
+- `audit_event` já possui `company_id`/`unit_id`/`team_id` — suficiente
+  para o escopo desta fatia, **sem alteração retroativa**.
 
 ## 10. Contratos de API futuros (sem criar endpoint)
 
 Propostos, **não implementados**. Nenhum endpoint, DTO ou controller é
 criado nesta fase.
 
-| Método         | Rota (proposta, sob `/v1`)                                               | Descrição                                    | Autorização                           |
-| -------------- | ------------------------------------------------------------------------ | -------------------------------------------- | ------------------------------------- |
-| GET            | `/v1/org/companies`                                                      | Lista empresas do tenant do ator, paginado   | `read` sobre `company`                |
-| GET            | `/v1/org/companies/:companyId`                                           | Detalhe                                      | Idem                                  |
-| POST           | `/v1/org/companies`                                                      | Cria empresa                                 | `create`                              |
-| PATCH          | `/v1/org/companies/:companyId`                                           | Altera `name` (nunca `code`, nunca `tenant`) | `alter`                               |
-| POST           | `/v1/org/companies/:companyId/deactivate`                                | Inativa (nunca exclui)                       | `manage`                              |
-| GET/POST/PATCH | `/v1/org/units`, `/departments`, `/teams`, `/job-roles`, `/cost-centers` | Mesmo padrão                                 | Conforme §8                           |
-| GET            | `/v1/org/tree`                                                           | Árvore organizacional do escopo do ator      | `read` sobre `organization_structure` |
+| Método         | Rota (proposta, sob `/v1`)                                               | Descrição                                  | Autorização                           |
+| -------------- | ------------------------------------------------------------------------ | ------------------------------------------ | ------------------------------------- |
+| GET            | `/v1/org/companies`                                                      | Lista empresas do escopo do ator, paginado | `read` sobre `company`                |
+| GET            | `/v1/org/companies/:companyId`                                           | Detalhe                                    | Idem                                  |
+| POST           | `/v1/org/companies`                                                      | Cria empresa                               | `create`                              |
+| PATCH          | `/v1/org/companies/:companyId`                                           | Altera `name` (nunca `code`)               | `alter`                               |
+| POST           | `/v1/org/companies/:companyId/deactivate`                                | Inativa (nunca exclui)                     | `manage`                              |
+| GET/POST/PATCH | `/v1/org/units`, `/departments`, `/teams`, `/job-roles`, `/cost-centers` | Mesmo padrão                               | Conforme §8                           |
+| GET            | `/v1/org/tree`                                                           | Árvore organizacional do escopo do ator    | `read` sobre `organization_structure` |
 
 ### Regras de contrato
 
 - **Nenhuma rota `DELETE`** em entidade organizacional (R6).
-- **`tenant_id` nunca vem do cliente** — é sempre derivado da sessão
-  autenticada. Aceitá-lo do corpo/query seria vetor direto de acesso
-  cross-tenant.
+- **Escopo nunca vem do cliente** — a empresa acessível é sempre derivada
+  da sessão autenticada e do escopo autorizado do ator. Aceitá-la do
+  corpo/query seria vetor direto de acesso fora de escopo.
 - Toda rota de mutação exige CSRF (padrão da Fatia 3) e gera evento de
   auditoria atômico (§9).
-- Recurso de outro tenant responde **404 genérico**, nunca 403 — 403
-  confirmaria a existência do recurso e permitiria enumeração
-  cross-tenant. Mesmo princípio anti-enumeração da Fatia 3 §6.
-  (O evento de auditoria interno registra `denied`; a resposta pública é
-  404.)
+- Recurso fora do escopo do ator responde **404 genérico**, nunca 403 — 403
+  confirmaria a existência do recurso e permitiria enumeração. Mesmo
+  princípio anti-enumeração da Fatia 3 §6. O evento de auditoria interno
+  registra `denied`; a resposta pública é 404.
 - Parâmetro de rota **não** nomeado `id` quando o alvo não for um
   `AccessUser` — o `AuthorizationGuard` resolve `request.params.id` como
-  usuário-alvo; usar `:companyId`/`:unitId` evita esse acoplamento
-  (lição já registrada na implementação da Fatia 4).
+  usuário-alvo; usar `:companyId`/`:unitId` evita esse acoplamento (lição
+  já registrada na implementação da Fatia 4).
 
 ## 11. Estratégia de testes
 
 - **Unidade:** avaliador RBAC/ABAC estendido (cada célula da matriz §8,
   positiva e negativa); regras de unicidade por escopo; regras de
-  inativação (R-INA-1..6); imutabilidade de `code` e de `tenant`.
-- **Integração (Testcontainers, padrão das Fatias 2–4):** CRUD real
-  contra PostgreSQL efêmero; unicidade no escopo correto; recusa de
-  referência cruzando tenant (R5/R8); ausência de rota de exclusão.
-- **Autorização:** para cada papel fora da matriz, prova de 403 —
-  inclusive `colaborador` (sem acesso) e `dp`/`gestor`/`financeiro` (sem
-  escrita).
-- **Isolamento entre tenants (obrigatório, prova negativa real):**
-  - Ator do tenant A não lê, não altera e não inativa entidade do tenant
-    B — em **toda** rota que aceita identificador.
-  - Resposta é **404**, nunca 403 nem 200 (anti-enumeração, §10).
-  - Se RLS for adotado (§5, opção B): prova a **nível de banco** de que
-    uma query sem filtro de tenant não retorna linha de outro tenant —
-    mesmo padrão de "prova negativa no banco" já usado na Fatia 2
-    (`evolli_app` sem DDL) e na Fatia 4 (append-only).
-  - Tentativa cross-tenant gera evento `denied` na trilha.
-- **Auditoria:** cada evento do §9 é gerado com ator, escopo e
-  `request_id` corretos; atomicidade comprovada por **rollback real**
-  (criação/alteração/inativação revertem por completo quando a
-  persistência do evento falha) — mesmo padrão já implementado na
-  Fatia 4.
-- **Vazamento:** nenhuma resposta de erro do módulo contém stack trace,
-  SQL, nome de tabela ou detalhe interno.
-- **Dados:** exclusivamente técnicos/sintéticos. Nenhum dado real de
-  cliente ou de RH em teste, em nenhuma hipótese.
+  inativação (R-INA-1..5); imutabilidade de `code` e de `company`.
+- **Integração (Testcontainers, padrão das Fatias 2–4):** CRUD real contra
+  PostgreSQL efêmero; unicidade no escopo correto; recusa de referência
+  cruzando empresa (R5); ausência de rota de exclusão.
+- **Autorização (prova negativa real):**
+  - Para cada papel fora da matriz, prova de 403 — inclusive `colaborador`
+    (sem acesso) e `dp`/`gestor`/`financeiro` (sem escrita).
+  - Ator de uma empresa não lê, não altera e não inativa entidade de outra
+    empresa, em **toda** rota que aceita identificador; resposta **404**,
+    nunca 403 nem 200.
+  - **Regressão da decisão 4 (obrigatória):** `admin_tecnico`, `auditor` e
+    `dpo` **não** acessam empresa fora do escopo autorizado — teste que
+    falharia hoje contra o comportamento atual (O3), por desenho.
+  - Tentativa fora de escopo gera evento `denied` na trilha.
+- **Auditoria:** cada evento do §9 é gerado com ator, escopo e `request_id`
+  corretos; atomicidade comprovada por **rollback real** (criação/alteração/
+  inativação revertem por completo quando a persistência do evento falha) —
+  mesmo padrão já implementado na Fatia 4.
+- **Vazamento:** nenhuma resposta de erro do módulo contém stack trace, SQL,
+  nome de tabela ou detalhe interno.
+- **Dados:** exclusivamente técnicos/sintéticos. Nenhum dado real de RH em
+  teste, em nenhuma hipótese.
 
 ## 12. Aceite, riscos, dependências, decisões pendentes e arquivos previstos
 
 ### Critérios objetivos de aceite (desta especificação)
 
-- [ ] PRD disponibilizado no repositório e confrontado com esta spec (D1).
-- [ ] Divergência de escopo da Etapa 1 decidida — alternativa (a) ou (b) do D2.
-- [ ] Introdução da camada `tenant` aprovada como decisão arquitetural (D3), com ADR 0005 criada.
-- [ ] Escopo cross-tenant de `admin_tecnico`/`auditor`/`dpo` decidido (D4/DP-1) **antes** de qualquer implementação.
-- [ ] Estratégia de enforcement de isolamento escolhida (§5: A ou A+B), com custo operacional validado por TI.
-- [ ] Decisões pendentes de modelagem (DP-2, DP-3, DP-5, DP-6, DP-7) resolvidas com RH/DPO — nunca por suposição.
-- [ ] Revisão de segurança confirma que nenhum campo do modelo (§3), se implementado literalmente, permite acesso cross-tenant ou introduz dado pessoal não declarado.
-- [ ] Confirmação de DPO de que esta etapa não introduz dado pessoal de colaborador (§7), incluindo a borda de CNPJ (DP-6).
+- [ ] Decisões pendentes de modelagem (DP-1, DP-2, DP-3, DP-4, DP-5)
+      resolvidas com o produto/DPO — nunca por suposição.
+- [ ] Forma do escopo autorizado de `admin_tecnico`/`auditor`/`dpo`
+      decidida (DP-7) **antes** de iniciar a implementação, por ser mudança
+      de autorização já mergeada (O3).
+- [ ] Revisão de segurança confirma que nenhum campo do modelo (§3), se
+      implementado literalmente, permite acesso fora do escopo de empresa
+      ou introduz dado pessoal não declarado.
+- [ ] Confirmação de DPO de que esta fatia não introduz dado pessoal de
+      colaborador (§7), incluindo a borda de CNPJ (DP-4).
 
 ### Critérios de aceite (da futura implementação, para registro)
 
 - [ ] Nenhuma rota `DELETE` em entidade organizacional.
-- [ ] Teste automatizado prova isolamento cross-tenant em toda rota com identificador, com resposta 404.
-- [ ] Toda mutação organizacional é atômica com seu evento de auditoria, com rollback comprovado.
-- [ ] MFA implementado antes de qualquer piloto com dados reais ou produção (ADR 0003, inalterado).
+- [ ] Teste automatizado prova que `admin_tecnico`, `auditor` e `dpo` não
+      acessam empresa fora do escopo autorizado (decisão 4 / O3).
+- [ ] Teste automatizado prova negação fora de escopo em toda rota com
+      identificador, com resposta 404.
+- [ ] Toda mutação organizacional é atômica com seu evento de auditoria,
+      com rollback comprovado.
+- [ ] Nenhuma coluna `tenant_id`, política de RLS multitenant ou migration
+      retroativa foi introduzida (decisão aprovada 2).
+- [ ] MFA implementado antes de qualquer piloto com dados reais ou produção
+      (ADR 0003, inalterado).
 
 ### Riscos
 
-- **RI-1 — Vazamento cross-tenant é a falha mais grave possível deste
-  módulo.** Um `WHERE` esquecido expõe dado de um cliente a outro.
-  Mitigação proposta: `tenant_id` desnormalizado + enforcement no banco
-  (§5, opção B) + prova negativa automatizada (§11).
-- **RI-2 — Escopo cross-tenant herdado de `auditor`/`dpo`** (D4) pode
-  virar regressão silenciosa de isolamento se a matriz das Fatias 3/4 for
-  aplicada literalmente em multitenant. Mitigação: decisão explícita
-  antes de implementar (DP-1).
-- **RI-3 — Modelagem decidida por suposição** (DP-2/DP-3/DP-5) seria cara
-  de reverter depois que houver dado real e módulos dependentes.
-  Mitigação: bloquear implementação até decisão do PRD/RH.
-- **RI-4 — Migration retroativa em `access_user`/`audit_event`** toca
-  tabelas já em uso. Mitigação: migrations aditivas, backfill explícito
-  (DP-11), nenhuma coluna removida ou renomeada.
-- **RI-5 — Nome de entidade contendo dado pessoal** por decisão
-  operacional do cliente (§7). Risco residual aceito; não há validação de
-  conteúdo prevista.
-- **RI-6 — MFA continua adiado.** Risco aceito já registrado (ADR 0003);
-  esta etapa não o altera nem o agrava, mas a chegada de estrutura
-  multitenant aumenta o impacto potencial de uma conta comprometida —
-  reforça a obrigatoriedade de MFA antes de piloto com dado real.
+- **RI-1 — Modelagem decidida por suposição** (DP-1/DP-2/DP-3) seria cara de
+  reverter depois que houver dado real e módulos dependentes. Mitigação:
+  bloquear implementação até decisão do produto/RH.
+- **RI-2 — Regressão de autorização ao aplicar a decisão 4.** Restringir
+  `admin_tecnico`/`auditor`/`dpo` altera comportamento já mergeado e
+  testado (O3); feito sem cuidado, pode quebrar o bootstrap administrativo
+  ou a leitura da trilha de auditoria da Fatia 4. Mitigação: teste de
+  regressão explícito (§11) e decisão prévia de DP-7.
+- **RI-3 — Retrabalho na evolução comercial.** Não introduzir multitenancy
+  agora significa que a comercialização futura exigirá migration aditiva e
+  backfill. Risco **aceito conscientemente** (ADR 0005): antecipar
+  multitenancy custaria complexidade permanente para um requisito que ainda
+  não existe. Gates registrados em §13.
+- **RI-4 — Nome de entidade contendo dado pessoal** por decisão operacional
+  (§7). Risco residual aceito; não há validação de conteúdo prevista.
+- **RI-5 — MFA continua adiado.** Risco aceito já registrado (ADR 0003);
+  esta fatia não o altera nem o agrava. Obrigatório antes de piloto com
+  dados reais ou produção.
 
 ### Dependências
 
 - Fatias 3 e 4 mergeadas em `main` — **satisfeita**.
-- PRD disponível — **não satisfeita** (D1), bloqueia o aceite.
-- Decisões DP-1 a DP-13 — bloqueiam a fase Implementar, não a Especificar.
-- Extensão do enum `AuditAction` por migration (§9) — dependência técnica
-  da implementação.
+- Decisões DP-1 a DP-10 — bloqueiam a fase Implementar, não a Especificar.
+- Extensão do enum `AuditAction` por migration aditiva (§9) — dependência
+  técnica da implementação.
+- Rastreabilidade com o PRD do Notion — pendência da **próxima fatia
+  funcional** (O1), não desta.
 
 ### Decisões pendentes
 
-| ID    | Decisão                                                                         | Responsável             |
-| ----- | ------------------------------------------------------------------------------- | ----------------------- |
-| DP-1  | Escopo de `admin_tecnico`/`auditor`/`dpo` em multitenant (D4) — **prioritária** | Produto + Segurança     |
-| DP-2  | Departamento pertence a empresa, unidade ou híbrido (§3.4)                      | PRD/RH                  |
-| DP-3  | Equipe pertence a departamento, unidade ou ambos (§3.5)                         | PRD/RH                  |
-| DP-4  | Hierarquia recursiva de profundidade arbitrária: necessária?                    | PRD/RH                  |
-| DP-5  | Catálogo de cargos por tenant ou por empresa (§3.6)                             | PRD/RH                  |
-| DP-6  | Incluir CNPJ em `company`/`tenant` — e impacto LGPD (MEI)                       | DPO + jurídico          |
-| DP-7  | A que entidades o centro de custo se associa (§3.7)                             | PRD/RH                  |
-| DP-8  | Nomenclatura final de entidades e campos (pt-BR vs. en)                         | Time de desenvolvimento |
-| DP-9  | Inativação com filhos ativos: recusar ou cascata confirmada (R-INA-2)           | Produto                 |
-| DP-10 | Semântica de `tenant.suspended` e efeito sobre sessões ativas (R-INA-6)         | Produto + Segurança     |
-| DP-11 | Backfill de `tenant_id` em `access_user`/`audit_event` (§5)                     | Time de desenvolvimento |
-| DP-12 | Técnica de garantia de consistência do `tenant_id` (R8)                         | Time de desenvolvimento |
-| DP-13 | Escopo exato de leitura do `gestor` sem entidade de colaborador (§8)            | Produto                 |
+| ID    | Decisão                                                                                                           | Responsável             |
+| ----- | ----------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| DP-1  | Departamento pertence a empresa, unidade ou híbrido (§3.3)                                                        | Produto/RH              |
+| DP-2  | Equipe pertence a departamento, unidade ou ambos (§3.4)                                                           | Produto/RH              |
+| DP-3  | Catálogo de cargos por empresa ou compartilhado (§3.5)                                                            | Produto/RH              |
+| DP-4  | Incluir CNPJ em `company` — e impacto LGPD (MEI) (§7)                                                             | DPO + jurídico          |
+| DP-5  | A que entidades o centro de custo se associa (§3.5)                                                               | Produto/RH              |
+| DP-6  | Inativação com filhos ativos: recusar ou cascata confirmada (R-INA-2)                                             | Produto                 |
+| DP-7  | Forma do escopo autorizado de `admin_tecnico`/`auditor`/`dpo` — **prioritária**, altera autorização mergeada (O3) | Produto + Segurança     |
+| DP-8  | Escopo exato de leitura do `gestor` sem entidade de colaborador (§8)                                              | Produto                 |
+| DP-9  | Nomenclatura final de entidades e campos (pt-BR vs. en)                                                           | Time de desenvolvimento |
+| DP-10 | Hierarquia recursiva de profundidade arbitrária: necessária?                                                      | Produto/RH              |
 
 ### Arquivos previstos para a fase Implementar (não criados agora)
 
@@ -749,52 +670,35 @@ apps/api/src/organization/department/
 apps/api/src/organization/team/
 apps/api/src/organization/job-role/
 apps/api/src/organization/cost-center/
-apps/api/src/organization/tenant-scope/                # resolução e enforcement do tenant do ator
 apps/api/src/auth/authorization/permission.types.ts    # (alteração) novos recursos
-apps/api/src/auth/authorization/rbac.evaluator.ts      # (alteração) checagem de tenant antes de papel
+apps/api/src/auth/authorization/rbac.evaluator.ts      # (alteração) escopo de empresa p/ admin_tecnico/auditor/dpo (decisão 4)
 apps/api/src/audit/audit.types.ts                      # (alteração) novos AuditResource/AUDIT_ACTIONS
 apps/api/test/organization.e2e-spec.ts
-apps/api/test/tenant-isolation.e2e-spec.ts             # prova negativa cross-tenant
-docs/adr/0005-nucleo-organizacional-multitenant.md     # só após aprovação (§13)
+apps/api/test/organization-scope.e2e-spec.ts           # prova negativa de escopo de empresa
 ```
 
-## 13. Proposta de ADR 0005 (descrita — arquivo não criado)
+## 13. Evolução comercial futura
 
-Conteúdo proposto para `docs/adr/0005-nucleo-organizacional-multitenant.md`.
-**A ADR não é criada nesta fase**: as decisões abaixo ainda não foram
-tomadas, e registrar uma ADR de decisão não tomada seria falsear o
-histórico arquitetural. O mesmo procedimento foi adotado na Fatia 4, onde
-a proposta ficou dentro da spec até a aprovação.
+A comercialização para múltiplas empresas clientes **não é requisito de
+implementação agora** (ADR 0005). O desenho desta fatia preserva a
+possibilidade — `company` já é a raiz do escopo, e a estrutura abaixo dela
+não pressupõe deployment de cliente único — mas **nenhuma implementação é
+antecipada**.
 
-> ### ADR 0005 — Núcleo organizacional multitenant (proposta)
->
-> - Status: **proposto, não aceito**
-> - Relacionado: este documento, ADR 0002, ADR 0003, ADR 0004
->
-> **Contexto (proposto):** a Etapa 1 introduz a estrutura organizacional
-> que todos os módulos seguintes referenciam. A fundação atual é
-> multiempresa (`company_id`), não multitenant — introduzir um cliente
-> comercial acima de empresa é mudança arquitetural com impacto
-> retroativo em identidade e auditoria (D3).
->
-> **Decisões a fechar quando aprovada:**
->
-> 1. Adoção da camada `tenant` como raiz de isolamento, acima de empresa.
-> 2. `tenant_id` desnormalizado em toda entidade organizacional, com
->    consistência garantida estruturalmente (R8/DP-12).
-> 3. Estratégia de enforcement do isolamento: filtro na aplicação isolado
->    ou combinado com RLS no banco (§5) — recomendação: combinado, pelo
->    precedente da ADR 0004 §1.
-> 4. Escopo de `admin_tecnico`, `auditor` e `dpo` em multitenant (DP-1),
->    incluindo se a leitura ampla da trilha de auditoria passa a ser
->    limitada ao tenant.
-> 5. Proibição de exclusão física e de troca de tenant (R6/R7).
-> 6. Extensão — nunca redução — da união `AuthorizationResource` e do
->    enum `AuditAction`, mantendo negação por padrão.
-> 7. Resposta 404 (não 403) para recurso de outro tenant, como controle
->    anti-enumeração cross-tenant.
->
-> **Esta ADR não é aceita até que:** o PRD esteja disponível e
-> confrontado (D1); as decisões pendentes DP-1 a DP-13 estejam
-> resolvidas; e esta especificação esteja aprovada no rito
-> Especificar → Aprovar.
+Quando a comercialização for aprovada, ela exige **etapa própria**, com
+estes gates (sem desenho detalhado aqui):
+
+1. **ADR específica** de multitenancy, com alternativas de isolamento e
+   trade-offs avaliados.
+2. **Modelagem de tenant** e definição do discriminador de isolamento.
+3. **Migration aditiva**, nunca destrutiva, sobre as tabelas existentes.
+4. **Plano de backfill** para dados já existentes.
+5. **Testes de isolamento** entre tenants, com prova negativa real.
+6. **Revisão de segurança e LGPD específica** — dado de cliente terceiro
+   tem base legal, finalidade e retenção distintas de dado interno; nada
+   dessa análise está concluído nesta fatia.
+7. **Reavaliação do escopo dos papéis** `admin_tecnico`/`auditor`/`dpo`
+   diante da fronteira de tenant.
+
+Nenhum desses itens é iniciado nesta fatia. Antecipá-los introduziria
+complexidade permanente por um requisito que ainda não existe.
