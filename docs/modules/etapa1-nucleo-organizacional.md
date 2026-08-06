@@ -1,15 +1,14 @@
 # Etapa 1 — Fatia 1: Núcleo Organizacional Interno
 
-Status: **modelagem organizacional aprovada (Baseline V1, 2026-08-06);
-nomenclatura aprovada (2026-08-06)** — nenhum código, migration, schema,
-endpoint, dependência ou infraestrutura criado nesta fase; a fase
-Implementar ainda não foi iniciada.
+Status: **implementada e verificada (V1, 2026-08-06)** — modelagem
+(Baseline V1) e nomenclatura aprovadas, schema/migration, módulo NestJS,
+endpoints, autorização, auditoria e testes entregues. Evidências objetivas
+em §14.
 
-Fase do rito SDD: **Especificar** (com decisões de modelagem e de
-nomenclatura já **Aprovadas**). Este documento cobre o passo Especificar
-de Especificar → Aprovar → Implementar → Verificar → Registrar; a
-modelagem organizacional e a nomenclatura já percorreram Aprovar
-(Baseline V1) e aguardam o início de Implementar.
+Fase do rito SDD: **Implementar → Verificar**. Especificar e Aprovar
+concluídos (Baseline V1 + nomenclatura, ambos 2026-08-06); esta versão
+entrega a implementação correspondente, com as limitações declaradas em
+§14. Registrar acontece no merge da PR.
 
 Decisão arquitetural desta fatia registrada em
 [ADR 0005 — Escopo interno e evolução multitenant](../adr/0005-escopo-interno-e-evolucao-multitenant.md)
@@ -933,3 +932,171 @@ estes gates (sem desenho detalhado aqui):
 
 Nenhum desses itens é iniciado nesta fatia. Antecipá-los introduziria
 complexidade permanente por um requisito que ainda não existe.
+
+## 14. Evidências de implementação (V1, 2026-08-06)
+
+Esta seção registra **o que foi entregue e verificado**, e — com o mesmo
+peso — o que **não** foi. Nada aqui amplia o escopo aprovado.
+
+### 14.1 Schema e migration
+
+- `apps/api/prisma/schema.prisma`: enum `StatusOrganizacional`
+  (`ativo`/`inativo`) e sete models — `Empresa`, `UnidadeOrganizacional`,
+  `Departamento`, `Area`, `Equipe`, `Cargo`, `CentroCusto`. Nomenclatura em
+  português, tabelas/colunas `snake_case`, sem acento (ADR 0006, Emenda 1).
+- `apps/api/prisma/migrations/20260806120000_nucleo_organizacional/` —
+  migration **aditiva**, gerada por `prisma migrate diff` (sem shadow DB,
+  mesmo padrão das Fatias 3/4) e validada com `prisma migrate deploy`
+  contra PostgreSQL real (Testcontainers), a partir de banco vazio.
+- Nenhuma tabela já mergeada foi alterada. **Nenhum** `tenant_id`, política
+  de RLS multitenant, backfill ou `department_id` em
+  `access_user`/`audit_event` (Baseline V1, item 2).
+- **Integridade no banco, não só na aplicação (R5):** `equipe` referencia
+  departamento e unidade por **FK composta** incluindo `empresa_id`
+  (`equipe_departamento_id_empresa_id_fkey`,
+  `equipe_unidade_organizacional_id_empresa_id_fkey`). O banco recusa
+  equipe cujo pai seja de outra empresa mesmo que a validação de aplicação
+  falhe. `area` não tem `empresa_id` de propósito: herda a do departamento,
+  o que torna divergência impossível por construção.
+- Unicidade por escopo: `empresa.codigo` global; `unidade_organizacional` e
+  `departamento` por empresa; `area` e `equipe` por departamento; `cargo` e
+  `centro_custo` por empresa.
+- Privilégios: as tabelas nascem com DML para `evolli_app` via
+  `ALTER DEFAULT PRIVILEGES` — nenhum `GRANT` explícito foi necessário.
+  Diferente de `audit_event`, os nós organizacionais **são** mutáveis; a
+  proibição de exclusão física (R6) vem da ausência de rota `DELETE`, não
+  de privilégio, porque inativar exige `UPDATE`.
+
+### 14.2 Módulo e endpoints
+
+`apps/api/src/organizacao/` — um controller e um service por entidade, mais
+`organizacao-auditoria.service.ts`, `escopo.util.ts`, `autorizacao.util.ts`,
+`validacao.util.ts`, `prisma-erro.util.ts` e `dto/organizacao.dto.ts`.
+
+Rotas em português, plurais, minúsculas, sob `/v1`, documentadas no OpenAPI
+(tag `organizacao`). Para cada uma das sete entidades:
+
+| Método | Rota                                  | Ação              |
+| ------ | ------------------------------------- | ----------------- |
+| GET    | `/v1/<plural>`                        | listar (paginado) |
+| GET    | `/v1/<plural>/:<entidade>Id`          | detalhar          |
+| POST   | `/v1/<plural>`                        | criar             |
+| PATCH  | `/v1/<plural>/:<entidade>Id`          | atualizar nome    |
+| POST   | `/v1/<plural>/:<entidade>Id/inativar` | inativar          |
+
+Plurais: `empresas`, `unidades-organizacionais`, `departamentos`, `areas`,
+`equipes`, `cargos`, `centros-de-custo`. **Nenhuma rota `DELETE`** existe.
+
+Parâmetros de rota nunca se chamam `id` — o `AuthorizationGuard` resolve
+`request.params.id` como `AccessUser` alvo, e reaproveitar esse nome
+acoplaria a rota organizacional àquele comportamento.
+
+### 14.3 Autorização
+
+- O avaliador RBAC/ABAC foi **estendido, nunca alterado**: os quatro
+  recursos da Etapa 0 mantêm as regras originais, e os organizacionais
+  entram por um ramo novo (`evaluateOrganizacao`). O teste da Fatia 3
+  continua verde sem edição.
+- Avaliação em duas fases, porque o alvo organizacional não é um
+  `AccessUser` e o guard não o carrega: **capacidade** no guard (o papel
+  pode, em princípio?) e **escopo** no service, com a empresa resolvida. O
+  isolamento não depende de o service lembrar de checar — toda consulta já
+  é construída com o filtro de empresa derivado da sessão.
+- Escopo **nunca** vem do cliente. `empresaId` em query é filtro, não
+  concessão: um ator escopado que peça outra empresa recebe página vazia,
+  não erro (erro confirmaria a existência).
+- `admin_tecnico` mantém acesso global, como exceção temporária aprovada
+  (Emenda 1 da ADR 0005) — e todo uso de escopo amplo gera evento (§14.4).
+
+**Papéis negados por decisão explícita, não por omissão:**
+
+| Papel                | Decisão aplicada                                                                                                                                                                                    |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `gestor`             | **Negado.** A matriz marca leitura "restrita", mas o escopo exato é pendência declarada (DP-8) e depende de colaborador. Conceder exigiria escolher a fronteira por conta própria.                  |
+| `auditor`, `dpo`     | **Negado** na estrutura organizacional (DP-7; o critério de aceite de §12 exige que não sejam provisionáveis nesta fatia). A leitura da trilha (`access_log`) que já possuíam permanece inalterada. |
+| `financeiro`         | Só `read` em `centro_custo`. "Estrutura mínima" não define quais nós nem em que profundidade — a parte ambígua ficou negada.                                                                        |
+| `rh` (criar empresa) | **Negado.** Criar empresa nova está fora de "própria empresa": a empresa criada, por definição, não é a do ator.                                                                                    |
+
+### 14.4 Auditoria
+
+- Escrita exclusivamente via `AuditService` (ADR 0004 §2) — nenhum
+  `prisma.auditEvent.create()` direto.
+- **22 verbos novos** no enum fechado `AuditAction`, por migration aditiva.
+  O valor **persistido** segue a convenção aprovada em português separada
+  por ponto (`organizacao.empresa.criada`), aplicada via `@map`; o
+  identificador Prisma usa `_` por restrição da linguagem. Os verbos da
+  Etapa 0 não foram renomeados — os dois padrões convivem por decisão
+  explícita (ADR 0006, Emenda 1, item 5).
+- Recursos organizacionais entraram em `AuditResource` **sem migration**
+  (união no código), como previsto.
+- **Mutação e evento na mesma transação** — ou os dois persistem, ou
+  nenhum. Comprovado por rollback real (§14.5).
+- **Consulta de escopo amplo é auditada de forma fail-safe**
+  (`recordOrThrow`): se o evento não puder ser gravado, a consulta não é
+  respondida. É a auditoria que torna o acesso amplo aceitável (Emenda 1 da
+  ADR 0005), então ela não pode ser best-effort aqui. Leitura dentro da
+  própria empresa é rotina e **não** gera evento, sob pena de a trilha virar
+  log de tráfego e perder significado.
+- **Tentativa fora do escopo gera `denied`** mesmo respondendo 404 (§9/§10).
+  Isso foi um **gap encontrado pelos próprios testes** durante a
+  implementação: a versão inicial respondia 404 silenciosamente, o que
+  tornaria uma varredura entre empresas invisível na trilha. Corrigido.
+- O `AuthorizationGuard` passou a etiquetar o recurso organizacional no
+  evento `authorization_denied`, em vez de registrar tudo como
+  `access_user` — trilha enganosa não é trilha.
+- Nenhum valor antes/depois, nenhum segredo (ADR 0004 §5, inalterado).
+
+### 14.5 Verificação executada
+
+- **Unitários — 108/108** (15 suites), incluindo
+  `rbac.evaluator.organizacao.spec.ts` (matriz §8 célula a célula, nas duas
+  fases), `departamento.service.spec.ts` e `equipe.service.spec.ts`
+  (integridade, inativação, escopo, atomicidade, negação auditada). O teste
+  de sincronia `AUDIT_ACTIONS` × enum de banco foi tornado **estrutural**:
+  compara com o enum gerado pelo Prisma em vez de um número fixo, então
+  continua detectando drift em fatias futuras.
+- **E2E — 36/36** (`test/organizacao.e2e-spec.ts`), contra PostgreSQL real
+  via Testcontainers, com a migration aplicada do zero:
+  - CRUD completo permitido;
+  - bootstrap administrativo continua funcionando (RI-2) e cada uso de
+    escopo amplo gera evento com o escopo **da entidade afetada**;
+  - IDOR/BOLA em detalhe, atualização e inativação → **404**, nunca 403 nem
+    200; listagem não vaza; filtro por outra empresa devolve página vazia;
+  - criação sob pai inativo → 422; inativação com filho ativo → 409, e o
+    filho **permanece ativo** (prova de ausência de cascata);
+  - nenhuma rota `DELETE` responde;
+  - **FK composta provada no banco**: `INSERT` cru de equipe com
+    departamento de outra empresa é recusado pelo PostgreSQL;
+  - **atomicidade real**: com `INSERT` revogado em `audit_event`, criação e
+    inativação revertem por completo e a consulta ampla não retorna 200;
+  - `evolli_app` sem DDL, sem `UPDATE`/`DELETE` em `audit_event`, com DML
+    normal nas tabelas organizacionais;
+  - nenhum segredo em evento ou resposta; erro sem detalhe interno.
+
+### 14.6 Limitações declaradas desta V1
+
+Entregue **menos** do que a spec descreve em alguns pontos, por decisão de
+escopo. Registrado para não ser confundido com esquecimento:
+
+- **Sem reativação.** Esta fatia expõe criar, listar, detalhar, atualizar e
+  inativar. **R-INA-5 (reativação auditada) não foi implementada**, e por
+  isso não existe verbo `*.reativada` no enum.
+- **Sem árvore organizacional.** `GET /v1/organizacao/arvore` (§10) e o
+  recurso `estrutura_organizacional` como alvo de autorização não entraram;
+  `estrutura_organizacional` existe apenas como etiqueta de auditoria da
+  consulta ampla.
+- **Atualização só de `nome`.** Trocar o departamento ou a unidade de uma
+  equipe é reclassificação — fluxo declarado futuro (Baseline V1, item 7).
+- **`codigo` restrito a `[A-Z0-9_]{2,32}`**, sem hífen interno, seguindo a
+  regra de identificadores técnicos da decisão de nomenclatura. Se o
+  negócio precisar de hífen em código, é decisão de produto a registrar.
+- **Sem CNPJ** (DP-4 pendente), sem colaborador, gestor, função, vínculo,
+  salário, folha, ponto, documento, benefício ou qualquer dado pessoal.
+- **Sem vigência** nos nós organizacionais (Baseline V1, item 9).
+- **Sem hierarquia recursiva** e sem qualquer antecipação da relação de
+  gestor, nem estrutural (item 8).
+- **Multitenancy permanece fora de escopo** (ADR 0005, decisão 5).
+- **MFA continua obrigatório antes de piloto com dados reais ou produção**
+  (ADR 0003, decisão 3) — esta fatia não altera nem satisfaz essa condição.
+- **Nada de LGPD é declarado concluído.** A confirmação de DPO (§12)
+  continua pendente, incluindo a borda de CNPJ.

@@ -1,6 +1,6 @@
 # ADR 0006 — Modelo organizacional interno, Baseline V1
 
-- Status: aceito (com Emenda 1, 2026-08-06 — ver seção "Emenda 1" ao final)
+- Status: aceito (com Emenda 1 — nomenclatura — e Emenda 2 — implementação V1, ambas 2026-08-06; ver seções ao final)
 - Data: 2026-08-06
 - Relacionado: [docs/modules/etapa1-nucleo-organizacional.md](../modules/etapa1-nucleo-organizacional.md), [docs/decisions/etapa1-modelagem-organizacional-pendente.md](../decisions/etapa1-modelagem-organizacional-pendente.md), [ADR 0002](0002-papeis-postgres-e-migrations.md), [ADR 0003](0003-identidade-sessao-e-autorizacao.md), [ADR 0004](0004-auditoria-formal-e-integridade.md), [ADR 0005](0005-escopo-interno-e-evolucao-multitenant.md)
 
@@ -318,3 +318,77 @@ Organizacional.
 | Nomenclatura do Núcleo Organizacional (futuro) | Aprovada em português (itens 1–3 acima)               |
 | Nomenclatura já implementada (Fatias 3/4)      | **Inalterada**, permanece em inglês                   |
 | Nomenclatura de evento (auditoria)             | Dois padrões coexistem por decisão explícita (item 5) |
+
+---
+
+## Emenda 2 (2026-08-06) — registro da implementação V1
+
+**Aditivo.** Nenhuma das 9 decisões de modelagem nem a Emenda 1
+(nomenclatura) é alterada, reinterpretada ou revogada. Esta seção registra
+**como** a decisão foi implementada e, com o mesmo peso, **o que ficou de
+fora**.
+
+Evidência detalhada (arquivos, endpoints, contagem de testes) em
+[docs/modules/etapa1-nucleo-organizacional.md §14](../modules/etapa1-nucleo-organizacional.md).
+
+### O que a implementação confirma
+
+- As 7 entidades existem com a nomenclatura aprovada e as cardinalidades da
+  Baseline V1. Migration **aditiva**: nenhuma tabela já mergeada foi
+  alterada.
+- **Decisão 2 sustentada no código, não só no texto:** não existe
+  `department_id`/`area_id` em `access_user`, em `audit_event` nem no
+  sujeito de autorização. `empresa_id` continua a única fronteira, e há
+  teste que falha se isso mudar.
+- **Decisão 7 sustentada:** inativação bloqueia com filho ativo, e o filho
+  permanece ativo — não há caminho de código que inative em cascata.
+- **Decisões 4, 8 e 9 sustentadas por ausência:** nenhuma entidade,
+  campo ou rota de função, gestor, subordinado, organograma ou vigência foi
+  criada.
+
+### Decisões de implementação tomadas dentro do que já estava aprovado
+
+Registradas por serem escolhas visíveis, ainda que não ampliem escopo:
+
+1. **Autorização organizacional avaliada em duas fases** — capacidade do
+   papel no `AuthorizationGuard`, escopo de empresa no service, com a
+   entidade carregada. Consequência de o guard resolver apenas `AccessUser`
+   como alvo. O isolamento é estrutural: toda consulta carrega o filtro de
+   empresa derivado da sessão.
+2. **`equipe` usa FK composta com `empresa_id`** para que o **banco** —
+   não só a aplicação — recuse referência cruzando empresas (spec R5).
+3. **Consulta de escopo amplo é auditada de forma fail-safe**; leitura
+   dentro da própria empresa não gera evento. Auditar tudo transformaria a
+   trilha em log de tráfego; não auditar o acesso amplo removeria
+   exatamente o controle que torna a exceção do `admin_tecnico` aceitável.
+4. **Tentativa fora de escopo responde 404 e registra `denied`.** As duas
+   coisas ao mesmo tempo: a resposta não confirma existência, a trilha
+   permite detectar varredura depois.
+
+### Restrições aplicadas onde a matriz era ambígua
+
+A matriz da spec §8 não era inequívoca em três pontos. Em todos, foi
+aplicada **negação por padrão**, sem decidir a pendência por conta própria:
+
+| Papel            | Ambiguidade                                | O que foi feito                                                         |
+| ---------------- | ------------------------------------------ | ----------------------------------------------------------------------- |
+| `gestor`         | "leitura restrita", escopo pendente (DP-8) | Negado na estrutura organizacional até DP-8 ser decidida                |
+| `auditor`, `dpo` | "leitura", escopo pendente (DP-7)          | Negados na estrutura; leitura da trilha (`access_log`) **inalterada**   |
+| `financeiro`     | "`centro_custo` e estrutura mínima"        | Concedido só `centro_custo`; "estrutura mínima" indefinida ficou negada |
+
+Ampliar qualquer um desses exige decisão de produto/segurança registrada —
+não é ajuste de implementação.
+
+### O que esta emenda não faz
+
+- Não implementa reativação (R-INA-5), árvore organizacional, transferência
+  ou reclassificação — todos permanecem futuros.
+- Não introduz CNPJ (DP-4), colaborador, gestor, função, vigência ou
+  multitenancy.
+- Não altera o comportamento de autorização já mergeado da Etapa 0: os
+  quatro recursos originais mantêm as regras, e o avaliador foi estendido
+  por ramo novo.
+- **Não declara conformidade LGPD concluída.** A confirmação de DPO segue
+  pendente, com as bordas conhecidas em aberto.
+- Não altera os gatilhos de reavaliação da ADR original nem os da Emenda 1
+  da ADR 0005 (prazo de 90 dias do `admin_tecnico` continua correndo).
