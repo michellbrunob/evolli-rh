@@ -1,13 +1,21 @@
 # Etapa 1 — Fatia 1: Núcleo Organizacional Interno
 
-Status: **especificação — aguardando aprovação** (nenhum código, migration,
-schema, endpoint, dependência ou infraestrutura criado nesta fase)
+Status: **modelagem organizacional aprovada (Baseline V1, 2026-08-06)** —
+nenhum código, migration, schema, endpoint, dependência ou infraestrutura
+criado nesta fase; a fase Implementar ainda não foi iniciada.
 
-Fase do rito SDD: **Especificar**. Este documento cobre apenas o primeiro
-passo de Especificar → Aprovar → Implementar → Verificar → Registrar.
+Fase do rito SDD: **Especificar** (com decisões de modelagem já
+**Aprovadas**). Este documento cobre o passo Especificar de
+Especificar → Aprovar → Implementar → Verificar → Registrar; a modelagem
+organizacional já percorreu Aprovar (Baseline V1) e aguarda o início de
+Implementar.
 
 Decisão arquitetural desta fatia registrada em
-[ADR 0005 — Escopo interno e evolução multitenant](../adr/0005-escopo-interno-e-evolucao-multitenant.md).
+[ADR 0005 — Escopo interno e evolução multitenant](../adr/0005-escopo-interno-e-evolucao-multitenant.md)
+e em
+[ADR 0006 — Modelo organizacional interno, Baseline V1](../adr/0006-modelo-organizacional-interno-baseline-v1.md).
+Histórico completo de alternativas e a decisão aprovada em
+[docs/decisions/etapa1-modelagem-organizacional-pendente.md](../decisions/etapa1-modelagem-organizacional-pendente.md).
 
 Depende de: [Etapa 0 — Fatia 3 (identidade, sessão e autorização)](etapa0-fatia3-identidade-acesso.md),
 [Etapa 0 — Fatia 4 (auditoria formal)](etapa0-fatia4-auditoria-formal.md),
@@ -102,11 +110,12 @@ auditoria com o escopo efetivo utilizado (ver RI-2, §12, atualizado).
 ### Objetivo
 
 Especificar o núcleo organizacional **interno** do Evolli RH — empresa,
-unidade, área/departamento, equipe, cargo/função e centro de custo
-opcional — com regras de integridade, limites de autorização por empresa e
-auditoria desde o primeiro CRUD, de forma que Colaboradores, Portal do
-Gestor, Documentos, Ponto, Dashboard e demais módulos futuros tenham um
-esqueleto organizacional estável para referenciar.
+unidade, departamento, área (subdivisão opcional do departamento), equipe,
+cargo e centro de custo opcional — com regras de integridade, limites de
+autorização por empresa e auditoria desde o primeiro CRUD, de forma que
+Colaboradores, Portal do Gestor, Documentos, Ponto, Dashboard e demais
+módulos futuros tenham um esqueleto organizacional estável para
+referenciar.
 
 A preparação conceitual para a evolução comercial é preservada (§13), mas
 **nenhuma multitenancy técnica é introduzida nesta fatia**.
@@ -138,17 +147,32 @@ A preparação conceitual para a evolução comercial é preservada (§13), mas
   `tenant`, sem coluna `tenant_id`, sem Row-Level Security multitenant,
   sem backfill e sem migration retroativa nesta fatia.
 - **Nenhuma entidade de colaborador, pessoa ou vínculo** (CLT, estágio,
-  PJ) — a relação gestor/subordinado é apenas _prevista_ (§3.6), sem
-  entidade que a materialize nesta fatia (decisão aprovada 6).
+  PJ) — a relação gestor/subordinado **não é antecipada de nenhuma
+  forma** (§3.6, Baseline V1 item 8), sem entidade que a materialize
+  nesta fatia (decisão aprovada 6).
+- **Nenhuma entidade, campo ou regra de "função"** distinta de cargo
+  (Baseline V1, item 4) — fica para a futura vida funcional do
+  colaborador.
+- **Nenhum campo de vigência** nos nós organizacionais (Baseline V1, item 9) — vigência será tratada futuramente nas associações do colaborador
+  (cargo, equipe, gestor, centro de custo).
+- **Nenhuma inativação em cascata**, em nenhuma hipótese (Baseline V1,
+  item 7) — inativação bloqueia quando há elementos ativos vinculados;
+  transferência/reclassificação é fluxo futuro.
 - **Nenhum dado trabalhista, legal, fiscal, financeiro ou de benefício** —
   centro de custo entra como rótulo organizacional, explicitamente **sem**
-  integração financeira, contábil ou orçamentária (§3.5).
+  integração financeira, contábil ou orçamentária, e sem associação a
+  unidade, departamento, área ou equipe (§3.5, Baseline V1 item 6).
 - **Nenhum requisito ausente das fontes disponíveis** (O1).
 - **MFA TOTP** — decisão vigente inalterada (decisão aprovada 8): adiado
   apenas da demonstração inicial, **obrigatório antes de piloto com dados
   reais ou produção** (ADR 0003, decisão 3). Esta fatia não implementa nem
   altera isso; herda a obrigação como pré-condição de piloto.
-- Hierarquia organizacional recursiva de profundidade arbitrária (DP-10).
+- Hierarquia organizacional recursiva de profundidade arbitrária —
+  hierarquia é fixa nesta versão, sem árvore recursiva (Baseline V1,
+  item 8).
+- **Colaborador, gestor, função, salário, vínculo, folha, ponto,
+  documentos, benefícios e dados pessoais** — nenhum destes entra nesta
+  fatia, em nenhuma forma, nem estrutural.
 
 ## 2. Relação com o PRD e com o roadmap
 
@@ -213,33 +237,46 @@ unit
 
 Estabelecimento/filial/local de uma empresa.
 
-### 3.3 `department` — área ou departamento
+### 3.3 `department` — departamento e `area` — subdivisão opcional
+
+Departamento e área são entidades **distintas** (Baseline V1, item 1):
+departamento é o nível organizacional principal; área é uma subdivisão
+**opcional** do departamento — nunca da unidade, nunca da empresa
+diretamente.
 
 ```text
 department
   id            [PK]
   company_id    [FK] -> company
-  unit_id       [FK] -> unit  ?      (ver DP-1)
-  code          [U] (escopo de unicidade depende de DP-1)
+  code          [U] (único dentro da empresa)
+  name
+  status              enum fechado: active | inactive
+  created_at / updated_at
+
+area                                 -- opcional, subdivisão de department
+  id            [PK]
+  department_id [FK] -> department
+  code          [U] (único dentro do departamento)
   name
   status              enum fechado: active | inactive
   created_at / updated_at
 ```
 
-**DP-1 (decisão pendente):** departamento pertence à **empresa**
-(atravessando unidades) ou à **unidade**? As duas modelagens são comuns e
-não equivalentes:
+**Resolvido (Baseline V1, itens 1 e 2):**
 
-- **(a) Por empresa** (`unit_id` ausente): "Financeiro" é um só, presente
-  em várias unidades. Unicidade de `code` por empresa.
-- **(b) Por unidade** (`unit_id` obrigatório): cada unidade tem seu próprio
-  "Financeiro". Unicidade de `code` por unidade.
-- **(c) Híbrido** (`unit_id` opcional, como no rascunho): corporativo
-  quando nulo, local quando preenchido. Mais flexível, mas torna a regra
-  de unicidade e a de escopo de acesso mais complexas.
+- Departamento pertence **à empresa**, atravessando unidades — não à
+  unidade, não em modelagem híbrida. Unicidade de `code` por empresa.
+- Área é subdivisão opcional do departamento, com `code` único dentro do
+  departamento a que pertence.
+- **Departamento e área não são fronteira de autorização.** `company_id`
+  continua o maior limite de autorização (§5); nenhuma checagem de escopo
+  usa `department_id`/`area_id`.
+- **`department_id` não é introduzido em `access_user` nem em
+  `audit_event`** (Baseline V1, item 2) — sem alteração retroativa das
+  tabelas já mergeadas.
 
-Não decidido aqui. O rascunho registra (c) apenas para tornar a
-ambiguidade visível, **não** como escolha.
+Histórico completo de alternativas em
+[docs/decisions/etapa1-modelagem-organizacional-pendente.md — D1](../decisions/etapa1-modelagem-organizacional-pendente.md).
 
 ### 3.4 `team` — equipe
 
@@ -247,24 +284,28 @@ ambiguidade visível, **não** como escolha.
 team
   id            [PK]
   company_id    [FK] -> company
-  department_id [FK] -> department ? (ver DP-2)
-  unit_id       [FK] -> unit ?       (ver DP-2)
-  code          [U] (escopo de unicidade depende de DP-2)
+  department_id [FK] -> department       (obrigatório)
+  unit_id       [FK] -> unit ?           (opcional)
+  code          [U] (único dentro do departamento)
   name
   status              enum fechado: active | inactive
   created_at / updated_at
 ```
 
-**DP-2 (decisão pendente):** equipe pertence a departamento, a unidade ou a
-ambos? Mesma natureza de ambiguidade da DP-1, não decidida aqui.
+**Resolvido (Baseline V1, item 3):** equipe pertence **obrigatoriamente**
+a um departamento e pode, **opcionalmente**, ser vinculada a uma unidade.
+Unicidade de `code` no escopo do departamento.
 
-### 3.5 `job_role` — cargo/função e `cost_center` — centro de custo
+Histórico completo de alternativas em
+[docs/decisions/etapa1-modelagem-organizacional-pendente.md — D2](../decisions/etapa1-modelagem-organizacional-pendente.md).
+
+### 3.5 `job_role` — cargo e `cost_center` — centro de custo
 
 ```text
 job_role
   id            [PK]
-  company_id    [FK] -> company ?    (ver DP-3)
-  code          [U] (escopo de unicidade depende de DP-3)
+  company_id    [FK] -> company          (obrigatório)
+  code          [U] (único dentro da empresa)
   name
   status              enum fechado: active | inactive
   created_at / updated_at
@@ -278,52 +319,71 @@ cost_center                          -- opcional
   created_at / updated_at
 ```
 
-`job_role` é catálogo de cargos/funções. **Sem** faixa salarial, CBO,
-jornada, requisito legal ou qualquer atributo trabalhista/fiscal — todos
-fora de escopo (§1).
+`job_role` é catálogo de **cargo**. **Sem** faixa salarial, CBO, jornada,
+requisito legal ou qualquer atributo trabalhista/fiscal — todos fora de
+escopo (§1).
 
-**DP-3 (decisão pendente):** o catálogo de cargos é **por empresa** ou
-**compartilhado** entre as empresas do escritório? Impacta unicidade e
-reuso.
+**Resolvido (Baseline V1, itens 4 e 5):**
+
+- Nesta fatia existe apenas **cargo**. **Função** fica para a futura vida
+  funcional do colaborador — nenhuma entidade, campo ou regra de função é
+  criada agora.
+- O catálogo de cargos é **por empresa**, com código padronizável para
+  futura consolidação (ex.: mesmo `code` em catálogos de empresas
+  diferentes, sem que isso implique compartilhamento de linha).
 
 `cost_center` é rótulo organizacional **opcional**, sem integração
 financeira, contábil ou orçamentária nesta fatia (restrição §1). Nenhum
 valor monetário, rateio, plano de contas ou vínculo com sistema financeiro
-externo entra aqui. A associação entre centro de custo e as demais
-entidades é decisão pendente (DP-5).
+externo entra aqui.
 
-### 3.6 Relação gestor ↔ subordinado (prevista, não materializada)
+**Resolvido (Baseline V1, item 6):** centro de custo é cadastrado **por
+empresa**, **sem associação** a unidade, departamento, área ou equipe
+nesta fatia.
+
+Histórico completo de alternativas em
+[docs/decisions/etapa1-modelagem-organizacional-pendente.md — D3 e D4](../decisions/etapa1-modelagem-organizacional-pendente.md).
+
+### 3.6 Relação gestor ↔ subordinado — não antecipada
 
 **Nenhuma entidade de colaborador é criada nesta fatia** (restrição §1,
-decisão aprovada 6). A relação gestor/subordinado é apenas _antecipada no
-desenho_, para que a estrutura organizacional não precise ser redesenhada
-quando Colaboradores existir:
+decisão aprovada 6). **Resolvido (Baseline V1, item 8):** a relação
+gestor/subordinado **não é antecipada de nenhuma forma nesta fatia**, nem
+mesmo estruturalmente:
 
-- Cada nó organizacional (`unit`, `department`, `team`) é o **ponto de
-  ancoragem previsto** para uma futura referência de responsável/gestor.
-- Essa referência **não existe como campo nesta fatia** — seria uma FK para
-  uma entidade (colaborador/pessoa) ainda não especificada, e criá-la agora
-  seria especular sobre a modelagem da fatia seguinte (mesmo princípio que
-  a ADR 0003 §8 já aplicou ao manter `access_user` desacoplado de
-  colaborador).
-- Quando Colaboradores for especificado, a ligação entra por migration
-  aditiva própria, revisada naquele momento.
+- Nenhum nó organizacional (`unit`, `department`, `area`, `team`) é
+  tratado como ponto de ancoragem previsto para uma futura referência de
+  responsável/gestor. Não há propriedade, comentário de schema ou
+  convenção de nomenclatura reservada para esse fim.
+- Quando Colaboradores for especificado, a relação de gestor — e o
+  julgamento de como ela se ancora na estrutura organizacional — é
+  decisão **daquela fatia**, tomada com o contexto completo da entidade
+  colaborador em mãos.
 - Consequência aceita: **nesta fatia não é possível responder "quem é o
-  gestor desta equipe"** — a estrutura existe, o responsável não. Isso é
-  esperado, não uma lacuna.
+  gestor desta equipe"**, e o desenho atual **não pressupõe sequer que a
+  resposta virá por uma FK direta em `team`**. Isso é esperado, não uma
+  lacuna.
+- O escopo de leitura do papel `gestor` na matriz de acesso (§8) segue
+  como pendência genuinamente futura (DP-8, restrita à pergunta "o
+  escopo do gestor tende a ser por equipe?"), pois depende da entidade
+  colaborador.
+
+Histórico completo em
+[docs/decisions/etapa1-modelagem-organizacional-pendente.md — D8](../decisions/etapa1-modelagem-organizacional-pendente.md).
 
 ## 4. Definições, cardinalidades e regras de inativação
 
-### Cardinalidades propostas
+### Cardinalidades (Baseline V1)
 
-| Relação               | Cardinalidade | Observação                                |
-| --------------------- | ------------- | ----------------------------------------- |
-| company → unit        | 1:N           | Unidade pertence a exatamente uma empresa |
-| company → department  | 1:N           | Sujeito a DP-1                            |
-| unit → department     | 1:N ou N/A    | Depende de DP-1                           |
-| department → team     | 1:N ou N/A    | Depende de DP-2                           |
-| company → job_role    | 1:N ou N/A    | Depende de DP-3                           |
-| company → cost_center | 1:N           | Associação a outras entidades: DP-5       |
+| Relação               | Cardinalidade  | Observação                                                       |
+| --------------------- | -------------- | ---------------------------------------------------------------- |
+| company → unit        | 1:N            | Unidade pertence a exatamente uma empresa                        |
+| company → department  | 1:N            | Departamento pertence à empresa (item 1)                         |
+| department → area     | 1:N (opcional) | Área é subdivisão opcional do departamento (item 1)              |
+| department → team     | 1:N            | Equipe pertence obrigatoriamente a um departamento (item 3)      |
+| unit → team           | 1:N (opcional) | Equipe pode, opcionalmente, vincular-se a uma unidade (item 3)   |
+| company → job_role    | 1:N            | Catálogo por empresa (item 5)                                    |
+| company → cost_center | 1:N            | Cadastro por empresa, sem associação a outras entidades (item 6) |
 
 Nenhuma relação N:N é proposta nesta fatia. Uma entidade organizacional
 **nunca** pertence a dois pais do mesmo tipo.
@@ -333,11 +393,12 @@ Nenhuma relação N:N é proposta nesta fatia. Uma entidade organizacional
 - **R-INA-1 — Inativação, nunca exclusão física.** Toda entidade tem
   `status` (`active` | `inactive`). "Remover" é sempre transição para
   `inactive` (§6, R6).
-- **R-INA-2 — Inativação em cascata é explícita, nunca implícita.** Inativar
-  uma empresa **não** inativa silenciosamente suas unidades. A operação deve
-  ou (a) recusar enquanto houver filhos ativos, ou (b) exigir confirmação
-  explícita de cascata que gera evento de auditoria **por entidade
-  afetada** (§9). A escolha entre (a) e (b) é DP-6.
+- **R-INA-2 — Inativação bloqueia quando há elementos ativos vinculados;
+  nenhuma cascata.** (Resolvido, Baseline V1 item 7.) Inativar uma
+  empresa/departamento/área/unidade/equipe com filhos ativos é **sempre
+  recusado** — não há inativação em cascata, em nenhuma hipótese.
+  Transferência ou reclassificação de um elemento para outro pai, como
+  alternativa à recusa, é fluxo **futuro**, fora desta fatia.
 - **R-INA-3 — Entidade inativa não aceita novos vínculos.** Criar uma
   unidade sob empresa inativa, ou vincular algo a um nó inativo, é
   rejeitado.
@@ -352,9 +413,19 @@ Nenhuma relação N:N é proposta nesta fatia. Uma entidade organizacional
 ### Princípio
 
 **`company_id` é o maior limite organizacional e de autorização atual**
-(decisão aprovada 3). Abaixo dele existem unidade, área/departamento,
-equipe, cargo/função e centro de custo opcional. Não existe camada acima
-da empresa nesta fatia.
+(decisão aprovada 3, reafirmada pela Baseline V1 item 2). Abaixo dele
+existem unidade, departamento, área, equipe, cargo e centro de custo
+opcional. Não existe camada acima da empresa nesta fatia.
+
+**Resolvido (Baseline V1, item 2): departamento e área não são novas
+fronteiras de autorização nesta fatia.** `unidade` e `equipe` mantêm os
+escopos organizacionais já previstos (informativos, não filtros de
+acesso); `department_id`/`area_id` **não são introduzidos** em
+`AuthorizationSubject`, no avaliador RBAC/ABAC, nem em `access_user` ou
+`audit_event` — nenhuma checagem de escopo, nenhum filtro de consulta e
+nenhum campo de evento de auditoria usa departamento ou área. Se um dia
+essa fronteira for necessária, é decisão explícita de uma fatia futura,
+com sua própria migration.
 
 O escopo é avaliado com **negação por padrão**, extensão direta do que já
 vigora desde a ADR 0002 (menor privilégio no banco) e a ADR 0003
@@ -400,8 +471,10 @@ acomodar multitenancy. A evolução comercial futura tem gates próprios
   `name`, nunca de `code` — código é o identificador estável para
   integrações e referências futuras.
 - **R2 — Unicidade sempre no escopo correto.** `company.code` é único no
-  deployment; `unit.code` é único **dentro da empresa**; demais escopos
-  dependem de DP-1/DP-2/DP-3.
+  deployment; `unit.code` e `department.code` são únicos **dentro da
+  empresa**; `area.code` é único **dentro do departamento**; `team.code`
+  é único **dentro do departamento**; `job_role.code` é único **dentro da
+  empresa** (Baseline V1).
 - **R3 — Nome obrigatório, não único.** Dois departamentos podem se chamar
   "Financeiro" em unidades diferentes; a distinção é por `code` e escopo.
 - **R4 — Status por enum fechado**, nunca texto livre — mesmo padrão de
@@ -431,13 +504,13 @@ códigos, nomes de empresa/unidade/departamento/equipe/cargo e status.
 Nenhum CPF, nome de pessoa física, endereço, contato pessoal, dado de
 saúde, salário, documento ou dado de dependente entra aqui.
 
-| Dado                                            | Classificação   | Observação                                             |
-| ----------------------------------------------- | --------------- | ------------------------------------------------------ |
-| `company.name`                                  | Pessoa jurídica | Salvo o caso de MEI/empresário individual (ver bordas) |
-| `unit.name`                                     | Organizacional  | —                                                      |
-| `department.name`, `team.name`, `job_role.name` | Organizacional  | —                                                      |
-| `cost_center.name`/`code`                       | Organizacional  | Sem valor monetário (§3.5)                             |
-| `status`, `code`, timestamps                    | Técnico         | —                                                      |
+| Dado                                                         | Classificação   | Observação                                             |
+| ------------------------------------------------------------ | --------------- | ------------------------------------------------------ |
+| `company.name`                                               | Pessoa jurídica | Salvo o caso de MEI/empresário individual (ver bordas) |
+| `unit.name`                                                  | Organizacional  | —                                                      |
+| `department.name`, `area.name`, `team.name`, `job_role.name` | Organizacional  | —                                                      |
+| `cost_center.name`/`code`                                    | Organizacional  | Sem valor monetário (§3.5)                             |
+| `status`, `code`, timestamps                                 | Técnico         | —                                                      |
 
 ### Bordas registradas (não resolvidas)
 
@@ -476,20 +549,20 @@ existe. As ações reaproveitam o vocabulário atual (`read`, `manage`,
 ### Recursos propostos
 
 `organization_structure` (leitura da árvore organizacional), `company`,
-`unit`, `department`, `team`, `job_role`, `cost_center`.
+`unit`, `department`, `area`, `team`, `job_role`, `cost_center`.
 
 ### Matriz
 
-| Papel           | Ler estrutura | Criar/alterar/inativar | Escopo                                                                              |
-| --------------- | ------------- | ---------------------- | ----------------------------------------------------------------------------------- |
-| `admin_tecnico` | ✅            | ✅                     | Instância inteira — exceção temporária aprovada (Emenda 1, ADR 0005, prazo 90 dias) |
-| `rh`            | ✅            | ✅                     | Própria empresa                                                                     |
-| `dp`            | ✅            | ❌                     | Leitura na própria empresa                                                          |
-| `gestor`        | ✅ (restrita) | ❌                     | Só os nós do próprio escopo — DP-8                                                  |
-| `financeiro`    | ✅ (restrita) | ❌                     | Leitura de `cost_center` e estrutura mínima                                         |
-| `colaborador`   | ❌            | ❌                     | Sem acesso à estrutura nesta fatia                                                  |
-| `auditor`       | ✅ (leitura)  | ❌                     | **Não provisionado atualmente** — escopo pendente de deliberação futura (DP-7)      |
-| `dpo`           | ✅ (leitura)  | ❌                     | **Não provisionado atualmente** — escopo pendente de deliberação futura (DP-7)      |
+| Papel           | Ler estrutura | Criar/alterar/inativar | Escopo                                                                                                                      |
+| --------------- | ------------- | ---------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `admin_tecnico` | ✅            | ✅                     | Instância inteira — exceção temporária aprovada (Emenda 1, ADR 0005, prazo 90 dias)                                         |
+| `rh`            | ✅            | ✅                     | Própria empresa                                                                                                             |
+| `dp`            | ✅            | ❌                     | Leitura na própria empresa                                                                                                  |
+| `gestor`        | ✅ (restrita) | ❌                     | Escopo exato ainda pendente (DP-8) — depende de colaborador; nenhuma preparação estrutural antecipada (Baseline V1, item 8) |
+| `financeiro`    | ✅ (restrita) | ❌                     | Leitura de `cost_center` e estrutura mínima                                                                                 |
+| `colaborador`   | ❌            | ❌                     | Sem acesso à estrutura nesta fatia                                                                                          |
+| `auditor`       | ✅ (leitura)  | ❌                     | **Não provisionado atualmente** — escopo pendente de deliberação futura (DP-7)                                              |
+| `dpo`           | ✅ (leitura)  | ❌                     | **Não provisionado atualmente** — escopo pendente de deliberação futura (DP-7)                                              |
 
 ### Regras invioláveis
 
@@ -512,7 +585,7 @@ direto.
 
 | Evento                             | Quando                                                                                                  | `result`  |
 | ---------------------------------- | ------------------------------------------------------------------------------------------------------- | --------- |
-| Criação de entidade organizacional | Empresa, unidade, departamento, equipe, cargo, centro de custo criados                                  | `success` |
+| Criação de entidade organizacional | Empresa, unidade, departamento, área, equipe, cargo, centro de custo criados                            | `success` |
 | Alteração de entidade              | Mudança de `name` ou de referência estrutural                                                           | `success` |
 | Inativação / reativação            | Transição de `status`, **um evento por entidade afetada** em caso de cascata (R-INA-2)                  | `success` |
 | Tentativa negada                   | 403 do `AuthorizationGuard` sobre recurso organizacional, incluindo tentativa fora do escopo de empresa | `denied`  |
@@ -541,21 +614,26 @@ direto.
   organizacionais entram **sem migration**.
 - `audit_event` já possui `company_id`/`unit_id`/`team_id` — suficiente
   para o escopo desta fatia, **sem alteração retroativa**.
+- **Resolvido (Baseline V1, item 2): `department_id`/`area_id` não são
+  adicionados a `audit_event`.** Eventos sobre departamento/área usam
+  `resource`/`resource_id` (já suportados por `AuditResource`, sem
+  migration) e o escopo de empresa/unidade/equipe já existente — nunca um
+  novo campo de escopo por departamento ou área.
 
 ## 10. Contratos de API futuros (sem criar endpoint)
 
 Propostos, **não implementados**. Nenhum endpoint, DTO ou controller é
 criado nesta fase.
 
-| Método         | Rota (proposta, sob `/v1`)                                               | Descrição                                  | Autorização                           |
-| -------------- | ------------------------------------------------------------------------ | ------------------------------------------ | ------------------------------------- |
-| GET            | `/v1/org/companies`                                                      | Lista empresas do escopo do ator, paginado | `read` sobre `company`                |
-| GET            | `/v1/org/companies/:companyId`                                           | Detalhe                                    | Idem                                  |
-| POST           | `/v1/org/companies`                                                      | Cria empresa                               | `create`                              |
-| PATCH          | `/v1/org/companies/:companyId`                                           | Altera `name` (nunca `code`)               | `alter`                               |
-| POST           | `/v1/org/companies/:companyId/deactivate`                                | Inativa (nunca exclui)                     | `manage`                              |
-| GET/POST/PATCH | `/v1/org/units`, `/departments`, `/teams`, `/job-roles`, `/cost-centers` | Mesmo padrão                               | Conforme §8                           |
-| GET            | `/v1/org/tree`                                                           | Árvore organizacional do escopo do ator    | `read` sobre `organization_structure` |
+| Método         | Rota (proposta, sob `/v1`)                                                         | Descrição                                  | Autorização                           |
+| -------------- | ---------------------------------------------------------------------------------- | ------------------------------------------ | ------------------------------------- |
+| GET            | `/v1/org/companies`                                                                | Lista empresas do escopo do ator, paginado | `read` sobre `company`                |
+| GET            | `/v1/org/companies/:companyId`                                                     | Detalhe                                    | Idem                                  |
+| POST           | `/v1/org/companies`                                                                | Cria empresa                               | `create`                              |
+| PATCH          | `/v1/org/companies/:companyId`                                                     | Altera `name` (nunca `code`)               | `alter`                               |
+| POST           | `/v1/org/companies/:companyId/deactivate`                                          | Inativa (nunca exclui)                     | `manage`                              |
+| GET/POST/PATCH | `/v1/org/units`, `/departments`, `/areas`, `/teams`, `/job-roles`, `/cost-centers` | Mesmo padrão                               | Conforme §8                           |
+| GET            | `/v1/org/tree`                                                                     | Árvore organizacional do escopo do ator    | `read` sobre `organization_structure` |
 
 ### Regras de contrato
 
@@ -610,8 +688,11 @@ criado nesta fase.
 
 ### Critérios objetivos de aceite (desta especificação)
 
-- [ ] Decisões pendentes de modelagem (DP-1, DP-2, DP-3, DP-4, DP-5)
-      resolvidas com o produto/DPO — nunca por suposição.
+- [x] Decisões de modelagem (D1-D8/QT-1, antigas DP-1, DP-2, DP-3, DP-5,
+      DP-6, DP-10) resolvidas com o produto — **Baseline V1, aprovada em
+      2026-08-06**. Registro completo em
+      [docs/decisions/etapa1-modelagem-organizacional-pendente.md](../decisions/etapa1-modelagem-organizacional-pendente.md)
+      e em [ADR 0006](../adr/0006-modelo-organizacional-interno-baseline-v1.md).
 - [x] Escopo de `admin_tecnico` decidido (O3) — exceção temporária
       aprovada em 2026-08-06 (Emenda 1, ADR 0005). O escopo de `auditor` e
       `dpo` **permanece pendente** (DP-7, restrita a esses dois papéis) e
@@ -621,7 +702,8 @@ criado nesta fase.
       implementado literalmente, permite acesso fora do escopo de empresa
       ou introduz dado pessoal não declarado.
 - [ ] Confirmação de DPO de que esta fatia não introduz dado pessoal de
-      colaborador (§7), incluindo a borda de CNPJ (DP-4).
+      colaborador (§7), incluindo a borda de CNPJ (DP-4, ainda pendente —
+      fora da Baseline V1).
 
 ### Critérios de aceite (da futura implementação, para registro)
 
@@ -635,6 +717,10 @@ criado nesta fase.
       empresa (`rh`, `dp`, `gestor`, `financeiro`).
 - [ ] `auditor` e `dpo` não são provisionáveis por nenhum fluxo desta fatia
       até que DP-7 seja resolvida.
+- [ ] Teste automatizado prova que inativação com filhos ativos é sempre
+      recusada, nunca em cascata (Baseline V1, item 7).
+- [ ] Teste automatizado prova ausência de `department_id`/`area_id` em
+      `AuthorizationSubject` e em `audit_event` (Baseline V1, item 2).
 - [ ] Toda mutação organizacional é atômica com seu evento de auditoria,
       com rollback comprovado.
 - [ ] Nenhuma coluna `tenant_id`, política de RLS multitenant ou migration
@@ -644,9 +730,14 @@ criado nesta fase.
 
 ### Riscos
 
-- **RI-1 — Modelagem decidida por suposição** (DP-1/DP-2/DP-3) seria cara de
-  reverter depois que houver dado real e módulos dependentes. Mitigação:
-  bloquear implementação até decisão do produto/RH.
+- **RI-1 — Retrabalho por modelagem decidida por suposição.** (Resolvido)
+  A modelagem (departamento, área, equipe, cargo, centro de custo,
+  hierarquia) foi aprovada como Baseline V1 (2026-08-06), antes de
+  qualquer commit de schema — o risco de reverter migração cara depois de
+  dado real não se materializa mais para essas decisões. Risco
+  remanescente, menor: nomenclatura final de tabelas/colunas (DP-9) ainda
+  não fechada, mas não é destrutiva de reverter (renomear coluna é
+  migration simples, não redesenho de relação).
 - **RI-2 — Implementação futura precisa preservar o bootstrap
   administrativo e auditar todo acesso amplo.** A exceção temporária de
   `admin_tecnico` (O3, Emenda 1 da ADR 0005) elimina o risco de regressão
@@ -680,10 +771,13 @@ criado nesta fase.
 - Fatias 3 e 4 mergeadas em `main` — **satisfeita**.
 - Decisão de escopo de `admin_tecnico` (O3) — **satisfeita** em 2026-08-06
   (Emenda 1, ADR 0005).
-- Decisões DP-1 a DP-6 e DP-8 a DP-10 — bloqueiam a fase Implementar, não a
-  Especificar. DP-7 (escopo de `auditor`/`dpo`) bloqueia só o primeiro
-  provisionamento desses dois papéis, não a implementação da estrutura
-  organizacional.
+- Decisões de modelagem (D1-D8/QT-1) — **satisfeitas** em 2026-08-06
+  (Baseline V1). Não bloqueiam mais a fase Implementar.
+- DP-4 (CNPJ) e DP-9 (nomenclatura final) — pendências residuais, não
+  bloqueantes da estrutura em si; DP-4 bloqueia especificamente a inclusão
+  de identificador fiscal em `company`.
+- DP-7 (escopo de `auditor`/`dpo`) bloqueia só o primeiro provisionamento
+  desses dois papéis, não a implementação da estrutura organizacional.
 - Extensão do enum `AuditAction` por migration aditiva (§9) — dependência
   técnica da implementação.
 - Rastreabilidade com o PRD do Notion — pendência da **próxima fatia
@@ -691,18 +785,18 @@ criado nesta fase.
 
 ### Decisões pendentes
 
-| ID    | Decisão                                                                                                                                                                                                                                              | Responsável             |
-| ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
-| DP-1  | Departamento pertence a empresa, unidade ou híbrido (§3.3)                                                                                                                                                                                           | Produto/RH              |
-| DP-2  | Equipe pertence a departamento, unidade ou ambos (§3.4)                                                                                                                                                                                              | Produto/RH              |
-| DP-3  | Catálogo de cargos por empresa ou compartilhado (§3.5)                                                                                                                                                                                               | Produto/RH              |
-| DP-4  | Incluir CNPJ em `company` — e impacto LGPD (MEI) (§7)                                                                                                                                                                                                | DPO + jurídico          |
-| DP-5  | A que entidades o centro de custo se associa (§3.5)                                                                                                                                                                                                  | Produto/RH              |
-| DP-6  | Inativação com filhos ativos: recusar ou cascata confirmada (R-INA-2)                                                                                                                                                                                | Produto                 |
-| DP-7  | Escopo de acesso de `auditor`/`dpo` quando forem provisionados (O3) — `admin_tecnico` resolvido em 2026-08-06, ver Emenda 1 da ADR 0005; bloqueia o **primeiro provisionamento** desses dois papéis, não a implementação da estrutura organizacional | Produto + Segurança     |
-| DP-8  | Escopo exato de leitura do `gestor` sem entidade de colaborador (§8)                                                                                                                                                                                 | Produto                 |
-| DP-9  | Nomenclatura final de entidades e campos (pt-BR vs. en)                                                                                                                                                                                              | Time de desenvolvimento |
-| DP-10 | Hierarquia recursiva de profundidade arbitrária: necessária?                                                                                                                                                                                         | Produto/RH              |
+Decisões de modelagem D1-D8/QT-1 (antigas DP-1, DP-2, DP-3, DP-5, DP-6,
+DP-10) foram **resolvidas pela Baseline V1** (2026-08-06) e removidas
+desta tabela como bloqueio — ver
+[docs/decisions/etapa1-modelagem-organizacional-pendente.md](../decisions/etapa1-modelagem-organizacional-pendente.md)
+para o registro completo. Restam:
+
+| ID   | Decisão                                                                                                                                                                                                                                              | Responsável             |
+| ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| DP-4 | Incluir CNPJ em `company` — e impacto LGPD (MEI) (§7)                                                                                                                                                                                                | DPO + jurídico          |
+| DP-7 | Escopo de acesso de `auditor`/`dpo` quando forem provisionados (O3) — `admin_tecnico` resolvido em 2026-08-06, ver Emenda 1 da ADR 0005; bloqueia o **primeiro provisionamento** desses dois papéis, não a implementação da estrutura organizacional | Produto + Segurança     |
+| DP-8 | Escopo exato de leitura do `gestor` sem entidade de colaborador (§8) — princípio de não antecipação já resolvido (Baseline V1, item 8); resta só a pergunta "escopo por equipe?"                                                                     | Produto (fatia futura)  |
+| DP-9 | Nomenclatura final de entidades e campos (pt-BR vs. en); conceitos já resolvidos (Baseline V1)                                                                                                                                                       | Time de desenvolvimento |
 
 ### Arquivos previstos para a fase Implementar (não criados agora)
 
@@ -713,6 +807,7 @@ apps/api/src/organization/organization.module.ts
 apps/api/src/organization/company/                     # service, controller, dto
 apps/api/src/organization/unit/
 apps/api/src/organization/department/
+apps/api/src/organization/area/
 apps/api/src/organization/team/
 apps/api/src/organization/job-role/
 apps/api/src/organization/cost-center/

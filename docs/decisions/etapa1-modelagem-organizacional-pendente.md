@@ -1,22 +1,76 @@
-# Modelagem organizacional interna — proposta de decisão
+# Modelagem organizacional interna — decisão aprovada (Baseline V1)
 
-> ## PENDENTE DE APROVAÇÃO DO PRODUTO — NÃO IMPLEMENTAR
+> ## STATUS: DECISÃO APROVADA — Baseline V1
 >
-> Este documento **não decide nada**. Apresenta fatos verificados,
-> alternativas, impactos e recomendações técnicas para que o responsável
-> pelo produto decida. Nenhuma recomendação aqui pode ser implementada
-> antes de aprovação explícita e registrada.
+> As nove decisões descritas na seção "Baseline V1" abaixo foram aprovadas pelo produto em
+> 2026-08-06. Este documento preserva **integralmente** o levantamento de
+> fatos, as alternativas avaliadas, as tabelas de impacto e as
+> recomendações técnicas originais como **histórico** — nada foi apagado
+> ou reescrito. Cada seção D1–D8/QT-1 recebeu uma anotação de resolução
+> logo após o título, indicando o que foi decidido e remetendo à Baseline
+> V1. A formalização arquitetural está em
+> [ADR 0006 — Modelo organizacional interno, Baseline V1](../adr/0006-modelo-organizacional-interno-baseline-v1.md).
 
-- Fase do rito SDD: **Especificar / Decidir**
+- Fase do rito SDD: **Especificar / Decidir → Registrar**
 - Data do levantamento: 2026-08-06
+- **Data da aprovação: 2026-08-06**
 - Origem: decisões pendentes **DP-1, DP-2, DP-3, DP-5, DP-6, DP-8, DP-9 e
   DP-10** de
   [docs/modules/etapa1-nucleo-organizacional.md](../modules/etapa1-nucleo-organizacional.md)
+  (todas resolvidas ou reclassificadas por esta decisão — ver §0-A)
 - Relacionado:
-  [ADR 0005](../adr/0005-escopo-interno-e-evolucao-multitenant.md),
+  [ADR 0005](../adr/0005-escopo-interno-e-evolucao-multitenant.md) (e sua
+  Emenda 1),
+  [ADR 0006](../adr/0006-modelo-organizacional-interno-baseline-v1.md),
   [decisão de escopo de autorização interna](etapa1-escopo-autorizacao-interna-pendente.md),
   [ADR 0003](../adr/0003-identidade-sessao-e-autorizacao.md),
   [ADR 0004](../adr/0004-auditoria-formal-e-integridade.md)
+
+## Baseline V1 — registro formal da decisão aprovada
+
+**Status:** DECISÃO APROVADA
+**Data:** 2026-08-06
+**Aprovada por:** responsável pelo produto (conforme instrução de
+execução desta tarefa)
+
+As nove decisões abaixo foram aprovadas e são a fonte de verdade desta
+Baseline V1. Cada uma resolve ou reclassifica uma ou mais das perguntas
+levantadas nas seções D1–D8/QT-1 (§2–§10) — a referência cruzada exata
+está registrada dentro de cada seção.
+
+1. **Departamento e área são entidades distintas.** Departamento é o
+   nível organizacional principal; área é uma subdivisão **opcional** do
+   departamento — não um sinônimo, não um agrupamento acima dele.
+2. **Departamento e área não são novas fronteiras de autorização nesta
+   fatia.** `company_id` permanece o maior limite de autorização; unidade
+   e equipe mantêm os escopos organizacionais já previstos;
+   **`department_id` não é introduzido** em identidade, sessão ou
+   auditoria nesta fase.
+3. **Equipe pertence obrigatoriamente a um departamento** e pode ser
+   vinculada **opcionalmente** a uma unidade.
+4. **Nesta fatia existe apenas cargo.** Função fica para a futura vida
+   funcional do colaborador — nenhuma entidade, campo ou regra para
+   função é criada agora.
+5. **O catálogo de cargos é por empresa**, com código padronizável para
+   futura consolidação entre empresas.
+6. **Centro de custo é cadastrado por empresa**, sem associação a
+   unidade, departamento, área ou equipe nesta fatia.
+7. **Inativação:** bloquear quando houver elementos ativos vinculados;
+   **nunca** cascata; transferência/reclassificação é fluxo futuro, não
+   desta fatia.
+8. **Hierarquia organizacional é fixa nesta versão.** Sem árvore
+   recursiva; **nenhuma** relação de gestor, subordinados ou organograma
+   de colaboradores é antecipada — nem estruturalmente.
+9. **Vigência não se aplica aos nós organizacionais agora.** Vigência
+   será tratada futuramente nas associações do colaborador (cargo,
+   equipe, gestor, centro de custo), não nos nós desta fatia.
+
+### O que permanece pendente após esta decisão
+
+Ver síntese atualizada em §11 e tabela de perguntas em §12. Em resumo:
+`DP-4` (CNPJ, LGPD), `DP-9` parcial (algumas nomenclaturas técnicas finais)
+e as perguntas genuinamente futuras da fatia de colaboradores (escopo do
+gestor por equipe, "unidade é sempre local físico").
 
 ## 0. Escopo e limites deste documento
 
@@ -119,6 +173,19 @@ foram resolvidas por suposição.
 
 **Pendência de origem:** DP-1.
 
+> **✅ RESOLVIDO — Baseline V1 (2026-08-06), itens 1 e 2.** Departamento e
+> área são entidades distintas: departamento é o nível organizacional
+> principal (**Alternativa A abaixo — por empresa —, a recomendada**);
+> área é uma subdivisão **opcional do departamento**, não modelada nas
+> alternativas A/B/C originais (que tratavam só do vínculo do
+> departamento, não da existência de área como entidade própria). Resolve
+> também P1.1, P1.2, P1.3 e a parte de F6 relativa a "área". Departamento
+> e área **não** se tornam fronteira de autorização — `company_id`
+> permanece o maior limite, e `department_id` **não** é introduzido em
+> `access_user`/`audit_event` (resolve F1 definitivamente: **não**).
+> Alternativas, tabela de impacto e recomendação abaixo preservadas como
+> histórico da análise que fundamentou a escolha.
+
 ### Alternativas
 
 | #   | Alternativa                                           | Descrição                                                                                              |
@@ -170,6 +237,12 @@ relatórios?
 
 **Pendência de origem:** DP-2.
 
+> **✅ RESOLVIDO — Baseline V1 (2026-08-06), item 3.** Equipe pertence
+> **obrigatoriamente** a um departamento e pode ser vinculada
+> **opcionalmente** a uma unidade — coincide com a **Alternativa C**
+> abaixo (departamento obrigatório, unidade opcional), a recomendada.
+> Resolve P2.1. Alternativas e avaliação preservadas como histórico.
+
 ### Alternativas
 
 | #   | Alternativa                         | Descrição                                                               |
@@ -215,6 +288,15 @@ sim, a unidade precisa ser opcional.
 ## 4. D3 — Cargo/função
 
 **Pendência de origem:** DP-3.
+
+> **✅ RESOLVIDO — Baseline V1 (2026-08-06), itens 4 e 5.** Nesta fatia
+> existe **apenas cargo** — função fica para a futura vida funcional do
+> colaborador, sem entidade, campo ou regra criada agora (resolve P3.3: a
+> resposta é "por ora, um conceito só — cargo"). O catálogo de cargos é
+> **por empresa** (**Alternativa A abaixo**, a recomendada), com código
+> padronizável para consolidação futura entre empresas (resolve P3.1;
+> P3.2 fica sem objeto, já que B não foi adotada). Alternativas e
+> avaliação preservadas como histórico.
 
 ### Alternativas
 
@@ -272,6 +354,16 @@ distintos — cargo como posição formal e função como atribuição exercida?
 
 **Pendência de origem:** DP-5.
 
+> **✅ RESOLVIDO — Baseline V1 (2026-08-06), item 6.** Centro de custo é
+> cadastrado por empresa, **sem associação** a unidade, departamento,
+> área ou equipe nesta fatia — **Alternativa A abaixo**, a recomendada.
+> Resolve P4.1 (basta o cadastro). P4.2 fica sem objeto para esta fatia:
+> a resposta da Baseline V1 é "nenhuma associação estrutural agora",
+> independentemente de o centro de custo ser, no uso real, atributo do
+> setor ou da pessoa — essa distinção só importará quando a associação
+> for revisitada (não nesta fatia). Alternativas e avaliação preservadas
+> como histórico.
+
 ### Alternativas
 
 | #   | Alternativa                                                        | Descrição                                                          |
@@ -318,6 +410,15 @@ estrutural chega a ser necessária.)
 
 **Pendência de origem:** DP-6 (e R-INA-2 da spec).
 
+> **✅ RESOLVIDO — Baseline V1 (2026-08-06), item 7.** Bloquear
+> inativação quando houver elementos ativos vinculados (**Alternativa A
+> abaixo**); **cascata (Alternativa C) não é adotada, em nenhuma
+> hipótese**; transferência/reclassificação (Alternativa B) fica como
+> **fluxo futuro**, fora desta fatia — mais conservador que a
+> recomendação original (que sugeria B já nesta fatia como fluxo
+> operacional). Resolve P5.1 e P5.2. Alternativas e avaliação preservadas
+> como histórico.
+
 ### Alternativas
 
 | #   | Alternativa                                                   | Descrição                                                               |
@@ -362,6 +463,16 @@ deve existir já nesta fatia, ou pode vir com a fatia de colaboradores?
 ## 7. D6 — Hierarquia
 
 **Pendência de origem:** DP-10.
+
+> **✅ RESOLVIDO — Baseline V1 (2026-08-06), item 8.** Hierarquia
+> organizacional é **fixa** nesta versão — **Alternativa A abaixo**, sem
+> árvore recursiva (B). A Baseline V1 é mais estrita que a recomendação
+> original (que sugeria C — fixa com evolução planejada): aqui **nenhuma**
+> relação de gestor, subordinados ou organograma de colaboradores é
+> antecipada, nem estruturalmente. Resolve P6.1/P6.2 (ficam sem objeto —
+> não há decisão sobre subdepartamento a fazer, pois recursão não é
+> adotada) e reforça a decisão de D8 (§9) de não antecipar nada da relação
+> de gestão. Alternativas e avaliação preservadas como histórico.
 
 ### Alternativas
 
@@ -409,6 +520,19 @@ além de empresa > unidade > departamento > equipe)?
 
 **Pendência de origem:** DP-9. **Não define nomes definitivos de tabela** —
 isso permanece decisão da fase Implementar.
+
+> **🟡 PARCIALMENTE RESOLVIDO — Baseline V1 (2026-08-06).** As duas
+> ambiguidades de **conceito** (não de nome de coluna) estão fechadas:
+> "área" é subdivisão opcional de departamento, não sinônimo nem
+> agrupamento acima (item 1, resolve P7.1 — mesma resposta de D1);
+> "cargo" e "função" são, por ora, **um conceito só** — cargo — com
+> função explicitamente adiada para a vida funcional futura (item 4,
+> resolve P7.2 — mesma resposta de D3). **P7.3 ("unidade é sempre local
+> físico?") permanece em aberto** — não foi endereçada pela Baseline V1;
+> ver §12. Nomes técnicos definitivos de tabela/coluna continuam decisão
+> da fase Implementar. Vocabulário e tabela abaixo preservados como
+> histórico, com a coluna "Ambiguidade a resolver" ainda válida para
+> "unidade".
 
 ### Vocabulário de negócio proposto (a validar)
 
@@ -458,6 +582,22 @@ negócio sem endereço?
 **Pendência de origem:** DP-8. **Nada de relação de gestor é implementado
 ou modelado nesta fatia** — a entidade colaborador não existe.
 
+> **✅ RESOLVIDO (quanto ao princípio) — Baseline V1 (2026-08-06), item 8.**
+> Confirmado: **nenhuma** relação de gestor, subordinados ou organograma
+> de colaboradores é antecipada nesta fatia — **nem estruturalmente**.
+> Resolve P8.1 (confirmado: sim, nenhuma relação de gestão nesta fatia).
+> Isso é mais estrito que a recomendação original, que sugeria preparar
+> certas propriedades (id imutável, hierarquia navegável, equipe
+> granular) especificamente em função do gestor futuro. Essas
+> propriedades **continuam existindo** no modelo — mas como consequência
+> de outras decisões já tomadas por outros motivos (R1, D2, D6), nunca
+> como preparação deliberada para gestão. A tabela abaixo é preservada
+> como **registro histórico do raciocínio**, não como lista de itens
+> "a construir para o gestor". **P8.2 (o escopo do gestor tende a ser por
+> equipe?) permanece genuinamente futura** — não foi respondida pela
+> Baseline V1 e só poderá ser respondida quando a entidade colaborador
+> existir; ver §12.
+
 ### O que permanece explicitamente futuro
 
 - Se o gestor enxerga **apenas subordinados diretos** ou também
@@ -499,9 +639,21 @@ não por departamento ou unidade)? A resposta orienta D2 e o gap de
 
 ## 10. QT-1 — Questão transversal: vigência temporal
 
-**Não consta das oito decisões solicitadas, mas é requisito declarado do
-contexto de produto** ("alterações organizacionais devem ser auditáveis,
-ter vigência quando aplicável e não apagar histórico") — F5.
+**Não constava das oito decisões originalmente solicitadas, mas é
+requisito declarado do contexto de produto** ("alterações organizacionais
+devem ser auditáveis, ter vigência quando aplicável e não apagar
+histórico") — F5.
+
+> **✅ RESOLVIDO — Baseline V1 (2026-08-06), item 9.** Vigência **não** se
+> aplica aos nós organizacionais desta fatia — coincide com a
+> **Alternativa A abaixo** para o cadastro em si. A Baseline V1 confirma
+> explicitamente que vigência será tratada **futuramente nas associações
+> do colaborador** (cargo, equipe, gestor, centro de custo) — o mesmo
+> raciocínio da recomendação original (Alternativa C: vigência importa
+> nas associações que mudam no tempo, não no cadastro estrutural).
+> Resolve QT-1.1 e QT-1.2 — a decisão fica registrada, evitando o risco
+> apontado de introdução tardia impedir reconstrução de histórico.
+> Alternativas preservadas como histórico.
 
 ### O problema
 
@@ -550,60 +702,73 @@ auditoria das mudanças?
 **QT-1.2:** Se for necessário, isso vale para o cadastro dos nós, ou
 apenas para as alocações de pessoas (fatia futura)?
 
-## 11. Síntese
+## 11. Síntese (atualizada pós-aprovação da Baseline V1)
 
-### Decisões que bloqueiam a implementação da Fatia 1
+### Decisões que bloqueavam a implementação da Fatia 1 — todas resolvidas
 
-Sem elas, não é possível escrever o schema sem decidir por suposição:
+| Decisão                                                          | Por que bloqueava                                                                                        | Resolução (Baseline V1)                                                          |
+| ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| **D1** — Departamento por empresa / unidade / híbrido            | Define a chave estrangeira e a regra de unicidade de `department`; errar exige migração destrutiva (B→A) | Departamento por empresa; área = subdivisão opcional do departamento (itens 1–2) |
+| **D2** — Equipe vinculada a quê                                  | Define as FKs de `team` e a regra de unicidade                                                           | Equipe → departamento obrigatório, unidade opcional (item 3)                     |
+| **D3** — Catálogo de cargos por empresa ou compartilhado         | Define se `job_role` tem `company_id`; a opção B conflita com a ADR 0005                                 | Catálogo por empresa; só cargo, sem função nesta fatia (itens 4–5)               |
+| **D7 (parcial)** — Significado de "área" e de "cargo vs. função" | São questões de **conceito**, não de nome: definem se existem 5, 6 ou 7 entidades                        | Área e cargo/função definidos pelos itens 1 e 4; nomenclatura fina em DP-9       |
 
-| Decisão                                                          | Por que bloqueia                                                                                         |
-| ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| **D1** — Departamento por empresa / unidade / híbrido            | Define a chave estrangeira e a regra de unicidade de `department`; errar exige migração destrutiva (B→A) |
-| **D2** — Equipe vinculada a quê                                  | Define as FKs de `team` e a regra de unicidade                                                           |
-| **D3** — Catálogo de cargos por empresa ou compartilhado         | Define se `job_role` tem `company_id`; a opção B conflita com a ADR 0005 e precisa de decisão consciente |
-| **D7 (parcial)** — Significado de "área" e de "cargo vs. função" | São questões de **conceito**, não de nome: definem se existem 5, 6 ou 7 entidades                        |
+Nenhuma decisão bloqueante permanece pendente.
 
-### Decisões que podem ser postergadas sem bloquear a Fatia 1
+### Decisões que podiam ser postergadas — status após a Baseline V1
 
-| Decisão                                                 | Por que pode esperar                                                                             |
-| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| **D4** — Associação estrutural do centro de custo       | A recomendação (só cadastro) é aditiva; associar depois não quebra nada                          |
-| **D5** — Fluxo de transferência/reclassificação         | A regra de bloqueio (A) é implementável já; o fluxo de transferência é operação própria, adiável |
-| **D6** — Hierarquia recursiva                           | A evolução A→B é aditiva se planejada                                                            |
-| **D8** — Escopo do gestor                               | Depende da entidade colaborador, que não existe                                                  |
-| **QT-1** — Vigência                                     | Recomendação é não introduzir agora, **mas a decisão deve ser registrada**, não esquecida        |
-| **F1** — `department_id` em `access_user`/`audit_event` | Só necessário se departamento virar fronteira de autorização (P1.3)                              |
+| Decisão                                                 | Status                                                                                                                                                                     |
+| ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **D4** — Associação estrutural do centro de custo       | **Resolvida** (item 6): sem associação nesta fatia                                                                                                                         |
+| **D5** — Fluxo de transferência/reclassificação         | **Resolvida** (item 7): bloquear inativação com vínculo ativo; **sem cascata em nenhuma hipótese**; transferência fica para fluxo futuro                                   |
+| **D6** — Hierarquia recursiva                           | **Resolvida** (item 8): fixa nesta versão, sem recursão, sem preparação estrutural para gestor                                                                             |
+| **D8** — Escopo do gestor                               | Princípio resolvido (item 8: nenhuma antecipação, nem estrutural); a pergunta de fundo (escopo por equipe?) segue **genuinamente futura**, depende da entidade colaborador |
+| **QT-1** — Vigência                                     | **Resolvida** (item 9): não se aplica aos nós agora; entra nas futuras associações do colaborador                                                                          |
+| **F1** — `department_id` em `access_user`/`audit_event` | **Resolvida** (item 2): não introduzido nesta fase — departamento/área não são fronteira de autorização nem entram no evento de auditoria                                  |
 
-### Sequência recomendada após a aprovação
+### Sequência executada (histórico — substitui a sequência originalmente recomendada)
 
-1. Responder **P7.1/P7.2** (conceitos de área e cargo/função) — definem
-   quantas entidades existem, e tudo depende disso.
-2. Responder **P1.1/P1.3** (departamento: dono e se é fronteira de
-   autorização) — define o schema de `department` e o gap F1.
-3. Responder **P2.1/P2.2** (equipe) — depende de D1.
-4. Responder **P3.1/P3.2** (cargos) — independente das anteriores, pode
-   correr em paralelo.
-5. Registrar **QT-1** (vigência) como decisão explícita, mesmo que seja
-   "não agora".
-6. Atualizar a spec da Fatia 1 com as decisões aprovadas e **encerrar as
-   pendências DP correspondentes**.
-7. Só então iniciar a fase Implementar (schema → migration → serviços →
-   endpoints → testes).
+A sequência original sugeria responder as perguntas em passos distintos
+(P7.1/P7.2 → P1.1/P1.3 → P2.1/P2.2 → P3.1/P3.2). O produto aprovou a
+Baseline V1 como pacote único em 2026-08-06, respondendo todas de uma vez.
+Passos concluídos neste ciclo de registro:
+
+1. Baseline V1 aprovada pelo produto.
+2. Este documento atualizado: status, alternativas preservadas como
+   histórico, anotações de resolução em cada seção D1–D8/QT-1.
+3. Spec da Fatia 1
+   ([docs/modules/etapa1-nucleo-organizacional.md](../modules/etapa1-nucleo-organizacional.md))
+   atualizada para refletir a Baseline V1.
+4. ADR 0006 criada
+   ([docs/adr/0006-modelo-organizacional-interno-baseline-v1.md](../adr/0006-modelo-organizacional-interno-baseline-v1.md)).
+5. Próximo passo, fora do escopo deste registro: iniciar a fase
+   Implementar (schema → migration → serviços → endpoints → testes),
+   sujeita aos critérios de aceite abaixo.
 
 ### Critérios de aceite para a futura implementação
 
-- [ ] Toda decisão desta lista aprovada e registrada antes do primeiro
-      commit de schema; nenhuma resolvida por suposição durante a
-      implementação.
-- [ ] Spec da Fatia 1 atualizada, com as pendências DP encerradas
+- [x] Toda decisão bloqueante aprovada e registrada antes do primeiro
+      commit de schema (Baseline V1, 2026-08-06).
+- [x] Spec da Fatia 1 atualizada, com as pendências DP encerradas
       referenciando a decisão que as resolveu.
 - [ ] Nenhuma entidade de colaborador, vínculo, admissão, salário, folha,
       ponto, documento, benefício ou dado pessoal criada.
-- [ ] Nenhum CNPJ introduzido sem finalidade e validação específica.
-- [ ] `company_id` permanece a fronteira de autorização; nenhuma entidade
-      escapa a ela sem decisão explícita (relevante para D3-B).
+- [ ] Nenhum CNPJ introduzido sem finalidade e validação específica
+      (DP-4, ainda pendente — fora da Baseline V1).
+- [ ] `company_id` permanece a única fronteira de autorização; nenhuma
+      entidade organizacional, incluindo `department`/`area`, introduz
+      escopo próprio de acesso; `department_id` não é introduzido em
+      `access_user` nem `audit_event` (item 2).
 - [ ] Exclusão física ausente: nenhuma rota `DELETE` em entidade
       organizacional.
+- [ ] Inativação bloqueia quando há elementos ativos vinculados; nenhuma
+      cascata é implementada em nenhuma hipótese (item 7).
+- [ ] Nenhuma entidade, campo ou regra de "função" distinta de cargo é
+      criada nesta fatia (item 4).
+- [ ] Nenhum campo de vigência é introduzido nos nós organizacionais
+      (item 9).
+- [ ] Nenhuma relação de gestor, subordinado ou organograma de
+      colaboradores é criada, nem estruturalmente (item 8).
 - [ ] Toda mutação organizacional é atômica com seu evento de auditoria
       (ADR 0004) e o enum `AuditAction` é estendido por migration aditiva.
 - [ ] Revisão de segurança antes do merge; nenhuma alteração no
@@ -615,12 +780,14 @@ Sem elas, não é possível escrever o schema sem decidir por suposição:
 
 **Integridade estrutural**
 
-- Unicidade de `code` no escopo correto (por empresa, por unidade — conforme
-  D1/D2), com prova de que a duplicata é rejeitada.
+- Unicidade de `code` no escopo correto (departamento por empresa, equipe
+  por departamento, cargo por empresa — conforme Baseline V1), com prova
+  de que a duplicata é rejeitada.
 - Imutabilidade de `code` e da empresa de uma entidade (spec R1/R7).
 - Recusa de referência cruzando empresas (spec R5): equipe não referencia
   departamento de outra empresa.
-- Ausência de ciclo na hierarquia (spec R8).
+- Hierarquia fixa nesta versão (item 8): sem árvore recursiva, logo sem
+  risco de ciclo por construção — não requer teste de ciclo nesta fatia.
 
 **Autorização por `company_id`**
 
@@ -630,11 +797,14 @@ Sem elas, não é possível escrever o schema sem decidir por suposição:
   403 nem 200 (anti-enumeração, spec §10).
 - Bootstrap administrativo continua funcionando com a exceção temporária
   aprovada (decisão de escopo de autorização interna).
+- Departamento e área não aparecem no sujeito de autorização nem
+  restringem consulta (item 2) — teste negativo confirmando ausência de
+  filtro por `department_id`.
 
 **Auditoria**
 
 - Cada evento de §9 da spec é gerado com ator, escopo e `request_id`
-  corretos.
+  corretos, sem `department_id`/`area_id` no evento (item 2).
 - Atomicidade comprovada por **rollback real**: criação/alteração/
   inativação revertem por completo quando a persistência do evento falha
   (padrão já implementado na Fatia 4).
@@ -642,37 +812,24 @@ Sem elas, não é possível escrever o schema sem decidir por suposição:
 
 **Inativação**
 
-- Inativar nó com filhos ativos se comporta conforme D5 aprovada
-  (recusa ou cascata), com evento por entidade afetada em caso de cascata.
+- Inativar nó com filhos ativos é sempre recusado (item 7) — nenhum teste
+  de cascata, pois cascata não é implementada em nenhuma hipótese.
 - Entidade inativa não aceita novos vínculos (spec R-INA-3).
 - Vínculos preexistentes sobrevivem à inativação (spec R-INA-4).
 - Reativação é auditada e revalida a unicidade no escopo (spec R-INA-5).
 
-**Dados de teste:** exclusivamente técnicos/sintéticos. Nenhum dado real
-de RH, nenhum dado pessoal, nenhum usuário real.
+## 12. Perguntas consolidadas — apenas as genuinamente futuras
 
-## 12. Perguntas consolidadas para validação do produto
+Todas as demais perguntas originalmente listadas (P1.1–P6.2, P7.1, P7.2,
+P8.1, QT-1.1, QT-1.2) foram respondidas pela Baseline V1 e estão
+registradas na seção 11. Restam apenas as perguntas que a Baseline V1 não
+endereçou e que continuam genuinamente em aberto:
 
-| #      | Pergunta                                                                   | Bloqueia implementação?                             |
-| ------ | -------------------------------------------------------------------------- | --------------------------------------------------- |
-| P1.1   | Departamento é um só na empresa, ou um por unidade?                        | **Sim**                                             |
-| P1.2   | "Área" é sinônimo de departamento, agrupamento acima ou subdivisão abaixo? | **Sim**                                             |
-| P1.3   | Departamento limita **acesso**, ou é só informação estrutural?             | **Sim** (define o gap F1)                           |
-| P2.1   | Equipe pertence a departamento, unidade ou ambos?                          | **Sim**                                             |
-| P2.2   | Existem equipes corporativas sem local físico?                             | **Sim** (define opcionalidade)                      |
-| P3.1   | Catálogo de cargos por empresa ou compartilhado?                           | **Sim**                                             |
-| P3.2   | Se compartilhado: aceita-se cargo fora da fronteira de `company_id`?       | **Sim**                                             |
-| P3.3   | "Cargo" e "função" são um conceito ou dois?                                | **Sim**                                             |
-| P4.1   | Basta cadastrar centros de custo, ou já associá-los à estrutura?           | Não                                                 |
-| P4.2   | Centro de custo é atributo do setor ou da pessoa/vínculo?                  | Não                                                 |
-| P5.1   | Inativar nó com filhos ativos: recusar ou cascata confirmada?              | Não (recomendação A é implementável)                |
-| P5.2   | Fluxo de transferência entra nesta fatia?                                  | Não                                                 |
-| P6.1   | O organograma real tem subdepartamentos?                                   | Não                                                 |
-| P6.2   | Se tiver, é necessário na Fatia 1?                                         | Não                                                 |
-| P7.1   | "Área" é conceito distinto de departamento?                                | **Sim** (mesma questão de P1.2)                     |
-| P7.2   | "Cargo" e "função" distinguem posição formal de atribuição?                | **Sim** (mesma questão de P3.3)                     |
-| P7.3   | "Unidade" é sempre local físico?                                           | Não                                                 |
-| P8.1   | Confirma-se nenhuma relação de gestão nesta fatia?                         | Não                                                 |
-| P8.2   | O escopo do gestor tende a ser por equipe?                                 | Não (orienta D2)                                    |
-| QT-1.1 | É preciso responder "como era a estrutura em data passada"?                | Não, **mas decidir agora evita perda irreversível** |
-| QT-1.2 | Vigência vale para os nós ou só para alocações futuras?                    | Não                                                 |
+| #    | Pergunta                                   | Situação                                                                          |
+| ---- | ------------------------------------------ | --------------------------------------------------------------------------------- |
+| P7.3 | "Unidade" é sempre local físico?           | Não coberta pela Baseline V1; permanece futura (ver D7 §8)                        |
+| P8.2 | O escopo do gestor tende a ser por equipe? | Depende da entidade colaborador, ainda não modelada; permanece futura (ver D8 §9) |
+
+Pendências não modeladas por perguntas P-numeradas, mas que também
+seguem em aberto (ver Baseline V1 — "O que permanece pendente"): DP-4
+(CNPJ da empresa) e DP-9 (nomenclatura final de tabelas/colunas).

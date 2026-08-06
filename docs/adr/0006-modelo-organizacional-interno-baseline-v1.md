@@ -1,0 +1,241 @@
+# ADR 0006 — Modelo organizacional interno, Baseline V1
+
+- Status: aceito
+- Data: 2026-08-06
+- Relacionado: [docs/modules/etapa1-nucleo-organizacional.md](../modules/etapa1-nucleo-organizacional.md), [docs/decisions/etapa1-modelagem-organizacional-pendente.md](../decisions/etapa1-modelagem-organizacional-pendente.md), [ADR 0002](0002-papeis-postgres-e-migrations.md), [ADR 0003](0003-identidade-sessao-e-autorizacao.md), [ADR 0004](0004-auditoria-formal-e-integridade.md), [ADR 0005](0005-escopo-interno-e-evolucao-multitenant.md)
+
+## Contexto
+
+A [ADR 0005](0005-escopo-interno-e-evolucao-multitenant.md) fixou o
+cenário de implantação (single-tenant, uso interno do escritório) e o
+maior limite de autorização (`company_id`). Ela deliberadamente **não**
+fechou a modelagem fina da estrutura organizacional abaixo da empresa —
+departamento, área, equipe, cargo e centro de custo — deixando-a como
+decisões pendentes da spec da Fatia 1
+([docs/modules/etapa1-nucleo-organizacional.md](../modules/etapa1-nucleo-organizacional.md)).
+
+Essas decisões foram levantadas, com alternativas objetivas e avaliação
+de impacto, em
+[docs/decisions/etapa1-modelagem-organizacional-pendente.md](../decisions/etapa1-modelagem-organizacional-pendente.md)
+(8 decisões de modelagem D1–D8, mais uma questão transversal QT-1 sobre
+vigência). Nenhuma escolha foi feita nesse levantamento — ele apresentou
+alternativas e recomendações técnicas, sem decidir por suposição.
+
+O produto avaliou o levantamento e aprovou, em 2026-08-06, um conjunto
+único de 9 decisões — **Baseline V1** — que resolve D1–D8 e QT-1. Esta
+ADR formaliza essa decisão arquitetural. Ela é **complementar** à
+ADR 0005: onde a 0005 trata da fronteira de autorização e do cenário de
+implantação, esta trata da forma da estrutura organizacional abaixo
+dessa fronteira — as duas questões são relacionadas, mas distintas (ver
+"Estrutura organizacional vs. escopo de autorização", abaixo).
+
+## Decisão
+
+A Baseline V1 é aceita como modelo organizacional desta fatia, com as
+9 decisões a seguir.
+
+### 1. Departamento e área são entidades distintas
+
+Departamento é o nível organizacional principal, pertencente à empresa
+(`company_id`), atravessando unidades. Área é uma subdivisão **opcional**
+do departamento — nunca da unidade, nunca da empresa diretamente.
+
+### 2. Departamento e área não são novas fronteiras de autorização nesta fatia
+
+`company_id` permanece como maior limite de autorização (ADR 0005,
+decisão 3, inalterada). Unidade e equipe mantêm os escopos organizacionais
+já previstos, sem alteração. **`department_id` não é introduzido** em
+`AuthorizationSubject`, no avaliador RBAC/ABAC, em `access_user` ou em
+`audit_event`, nesta fase.
+
+### 3. Equipe pertence obrigatoriamente a um departamento
+
+Vínculo a uma unidade é opcional. Uma equipe nunca existe sem
+departamento; pode, ou não, estar associada a uma unidade específica.
+
+### 4. Nesta fatia existe apenas cargo
+
+Função — entendida como atribuição distinta de posição formal — fica
+para a futura vida funcional do colaborador. Nenhuma entidade, campo ou
+regra de função é criada agora.
+
+### 5. O catálogo de cargos é por empresa
+
+Cada empresa tem seu próprio catálogo de `job_role`, com código
+padronizável (mesmo `code` reutilizável entre catálogos de empresas
+diferentes) para viabilizar consolidação futura, sem que isso implique
+compartilhamento de linha entre empresas.
+
+### 6. Centro de custo é cadastrado por empresa, sem associação estrutural
+
+`cost_center` nesta fatia é só cadastro — sem associação a unidade,
+departamento, área ou equipe. Continua sem integração financeira,
+contábil ou orçamentária (herdado da especificação original).
+
+### 7. Inativação bloqueia; nunca cascata
+
+Inativar um nó organizacional com elementos ativos vinculados é **sempre
+recusado**. Não há inativação em cascata, em nenhuma hipótese. Transferir
+ou reclassificar um elemento para outro pai, como alternativa à recusa,
+é fluxo **futuro**, fora desta fatia.
+
+### 8. Hierarquia organizacional fixa nesta versão
+
+Nenhuma árvore recursiva de profundidade arbitrária é criada. Nenhuma
+relação de gestor, subordinado ou organograma de colaboradores é
+antecipada — nem estruturalmente. Nenhum nó organizacional é tratado como
+ponto de ancoragem previsto para uma futura FK de responsável/gestor; essa
+decisão é inteiramente da fatia futura de Colaboradores, com o contexto
+completo daquela entidade em mãos.
+
+### 9. Vigência não se aplica aos nós organizacionais agora
+
+Nenhum campo de vigência (`vigente_de`/`vigente_ate` ou equivalente) é
+introduzido em `department`, `area`, `team`, `job_role` ou `cost_center`
+nesta fatia. Vigência será tratada futuramente nas associações do
+colaborador (cargo, equipe, gestor, centro de custo), quando essa
+entidade existir.
+
+## Estrutura organizacional vs. escopo de autorização
+
+Esta ADR resolve **o que existe e como se relaciona** (estrutura). A
+ADR 0005 resolve **quem pode acessar o quê** (autorização). As duas não
+são a mesma pergunta:
+
+- Um departamento e uma área existem como dados estruturais, navegáveis
+  e consultáveis, mas **não filtram nem restringem acesso** — o filtro de
+  acesso continua sendo `company_id`, ponto (decisão 2 acima, reafirmando
+  ADR 0005 decisão 3).
+- Se, no futuro, departamento ou área precisarem virar fronteira de
+  autorização (por exemplo, um `gestor` restrito a ver só o próprio
+  departamento), essa é uma decisão de autorização nova, com sua própria
+  migration e sua própria ADR ou emenda — não uma consequência automática
+  de departamento existir como estrutura.
+
+## Alternativas consideradas
+
+O levantamento completo de alternativas, com tabelas de impacto e
+recomendação técnica por decisão, está preservado como histórico em
+[docs/decisions/etapa1-modelagem-organizacional-pendente.md](../decisions/etapa1-modelagem-organizacional-pendente.md).
+Resumo das alternativas descartadas mais relevantes:
+
+| Alternativa descartada                                                      | Por que foi descartada                                                                                                                                                                                     |
+| --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Departamento por unidade, ou híbrido (unidade opcional)                     | Complica unicidade e escopo de acesso sem benefício claro no cenário single-tenant interno atual; departamento por empresa é mais simples e suficiente                                                     |
+| Equipe com departamento **opcional** (só unidade)                           | Deixaria equipes "órfãs" de departamento, dificultando relatórios e futura associação de cargo/centro de custo por linha organizacional                                                                    |
+| Catálogo de cargos compartilhado entre empresas                             | Conflita com `company_id` como fronteira central (ADR 0005) e exigiria regra de exceção só para `job_role`                                                                                                 |
+| Centro de custo associado à estrutura já nesta fatia                        | Associação é aditiva depois; antecipá-la sem caso de uso real seria modelagem especulativa                                                                                                                 |
+| Inativação com cascata confirmada (opção B do levantamento original)        | Cascata em estrutura organizacional é operação de alto risco (efeito difícil de prever/reverter); bloquear e exigir fluxo de transferência futuro é mais seguro                                            |
+| Hierarquia recursiva com evolução planejada (preparar campos para o futuro) | Preparar campo especulativo para uma entidade (gestor) que ainda não existe é mesmo padrão já rejeitado na Fatia 3 (`access_user` desacoplado de colaborador); a fatia futura decide com contexto completo |
+| Vigência aplicada aos nós organizacionais desde já                          | Sem colaborador, não há caso de uso real para vigência de nó; adicionar o campo agora seria especulação sobre a modelagem da fatia seguinte                                                                |
+
+## Consequências
+
+- A spec da Fatia 1
+  ([docs/modules/etapa1-nucleo-organizacional.md](../modules/etapa1-nucleo-organizacional.md))
+  é atualizada para refletir esta Baseline V1: modelo conceitual (§3),
+  cardinalidades e inativação (§4), princípio de autorização (§5),
+  unicidade (§6), classificação LGPD (§7), matriz de acesso (§8), eventos
+  de auditoria (§9) e a lista de decisões pendentes (§12) — nenhuma delas
+  mais bloqueia a fase Implementar quanto à modelagem.
+- A fase Implementar pode iniciar sem decisão de modelagem pendente para
+  departamento, área, equipe, cargo, centro de custo, inativação ou
+  hierarquia. As pendências residuais são: DP-4 (CNPJ, decisão de
+  produto/DPO à parte) e DP-9 (nomenclatura final de tabelas/colunas,
+  decisão de implementação).
+- `area` é uma entidade nova, não prevista na primeira versão do
+  levantamento — sua introdução não altera nenhuma tabela já mergeada.
+- Nenhuma tabela já mergeada (`access_user`, `audit_event`) é alterada por
+  esta decisão — `department_id`/`area_id` explicitamente não entram
+  nelas (decisão 2).
+- A hierarquia fixa (decisão 8) é **mais conservadora** que a recomendação
+  técnica original do levantamento (que sugeria preparar certas
+  propriedades para uso futuro de gestor); o produto optou por não
+  antecipar nada, nem estruturalmente.
+
+## Controles de segurança
+
+- **Menor privilégio inalterado:** nenhuma decisão desta ADR concede
+  novo acesso amplo; `company_id` continua a única fronteira de
+  autorização (ADR 0002, ADR 0003, ADR 0005).
+- **Negação por padrão:** departamento e área, por não serem fronteira de
+  autorização, não introduzem novo caminho de checagem — logo não há novo
+  ponto de decisão de acesso a testar além do que já existe para
+  `company_id`.
+- **Sem exclusão física:** inativação (decisão 7) segue o mesmo padrão já
+  estabelecido para as demais entidades organizacionais (R-INA-1, spec
+  §4) — nenhuma rota `DELETE`.
+- **Auditoria:** toda criação, alteração e inativação de `department`,
+  `area`, `team`, `job_role` e `cost_center` gera evento via
+  `AuditService.record()` (ADR 0004 §2), atômico com a mutação. Nenhum
+  evento carrega valor antes/depois (ADR 0004 §5, inalterado).
+
+## Impacto em auditoria
+
+- `AuditResource` (união de tipos no código) recebe os novos recursos
+  organizacionais **sem migration** (ADR 0004 §5).
+- `AuditAction` (enum de banco fechado) recebe os novos verbos por
+  **migration aditiva**, com o teste de sincronia entre enum de banco e
+  array runtime já em vigor desde a Fatia 4.
+- `audit_event` **não** recebe `department_id`/`area_id` (decisão 2) —
+  eventos sobre departamento/área usam `resource`/`resource_id` e o
+  escopo de empresa/unidade/equipe já existente.
+
+## Itens fora de escopo desta ADR
+
+- **Colaborador, gestor, função, salário, vínculo, folha, ponto,
+  documentos, benefícios e dados pessoais** — nenhum entra nesta fatia,
+  em nenhuma forma, nem estrutural.
+- **Multitenancy comercial** — inteiramente fora de escopo, tratada pela
+  ADR 0005, decisão 5 e "Gatilho de reavaliação", inalterada por esta ADR.
+- **CNPJ em `company`** — decisão pendente separada (DP-4), não
+  endereçada pela Baseline V1.
+- **Escopo de acesso de `auditor`/`dpo`** — decisão pendente separada
+  (DP-7), tratada pela Emenda 1 da ADR 0005, não endereçada aqui.
+- **Nomenclatura final de tabelas/colunas** (pt-BR vs. inglês) — decisão
+  de implementação (DP-9), não endereçada aqui.
+- **Escopo do papel `gestor`** — princípio de não antecipação está
+  resolvido (decisão 8); a pergunta "o escopo tende a ser por equipe?"
+  permanece genuinamente futura, dependente da entidade colaborador.
+
+**Esta ADR não declara conformidade LGPD concluída.** Ela trata
+exclusivamente de estrutura organizacional; a classificação de dados e as
+bordas em aberto (CNPJ de MEI, nome de entidade contendo nome de pessoa)
+continuam registradas na spec (§7) e nos limites da ADR 0005, inalteradas.
+
+## Gatilhos de reavaliação
+
+Esta decisão deve ser reaberta — com ADR nova ou emenda formal — quando
+**qualquer** um destes ocorrer:
+
+1. A entidade Colaborador for especificada e exigir decidir, com contexto
+   completo, como a relação de gestor se ancora na estrutura
+   organizacional (decisão 8 revisitada).
+2. Departamento ou área precisarem virar fronteira de autorização (por
+   exemplo, escopo de `gestor` por departamento) — decisão de autorização
+   nova, não consequência automática desta ADR.
+3. O bloqueio de inativação (decisão 7) se mostrar operacionalmente
+   inviável em uso real, exigindo desenhar o fluxo de
+   transferência/reclassificação hoje deferido.
+4. A comercialização multitenant for aprovada (gatilho já registrado na
+   ADR 0005) — a modelagem aqui descrita precisará ser revisada quanto a
+   isolamento entre clientes.
+
+## Responsabilidades
+
+- **Time de desenvolvimento (código):** implementar o schema conforme as
+  9 decisões desta ADR, sem introduzir campo, entidade ou regra além do
+  que está aqui descrito; manter a extensão de `AuditAction` sempre
+  aditiva.
+- **Produto:** resolver DP-4 (CNPJ) e DP-9 (nomenclatura) antes ou
+  durante a implementação, conforme a necessidade surgir; não é
+  bloqueante para o início da fase Implementar quanto à modelagem em si.
+- **TI/Segurança:** revisar, antes do merge da implementação, que
+  nenhuma checagem de autorização passou a depender de
+  `department_id`/`area_id` (decisão 2).
+- **DPO/jurídico:** seguem as mesmas responsabilidades já registradas na
+  ADR 0005 quanto à confirmação de ausência de dado pessoal de
+  colaborador nesta fatia.
+- **Revisor de PR:** bloquear merge que introduza `department_id` em
+  `access_user`/`audit_event`, que implemente inativação em cascata, ou
+  que antecipe estruturalmente relação de gestor/colaborador.
