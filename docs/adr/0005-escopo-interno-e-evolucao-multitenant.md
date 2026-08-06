@@ -1,8 +1,8 @@
 # ADR 0005 — Escopo interno e evolução multitenant
 
-- Status: aceito
+- Status: aceito (com Emenda 1, 2026-08-06 — ver seção "Emenda 1" ao final)
 - Data: 2026-08-06
-- Relacionado: [docs/modules/etapa1-nucleo-organizacional.md](../modules/etapa1-nucleo-organizacional.md), [ADR 0002](0002-papeis-postgres-e-migrations.md), [ADR 0003](0003-identidade-sessao-e-autorizacao.md), [ADR 0004](0004-auditoria-formal-e-integridade.md)
+- Relacionado: [docs/modules/etapa1-nucleo-organizacional.md](../modules/etapa1-nucleo-organizacional.md), [ADR 0002](0002-papeis-postgres-e-migrations.md), [ADR 0003](0003-identidade-sessao-e-autorizacao.md), [ADR 0004](0004-auditoria-formal-e-integridade.md), [decisão aprovada — escopo de autorização interna](../decisions/etapa1-escopo-autorizacao-interna-pendente.md)
 
 ## Contexto
 
@@ -202,3 +202,88 @@ deliberada, e não por omissão.
   multitenant ou backfill nesta fatia; que conceda acesso amplo implícito a
   papel técnico; ou que declare conformidade LGPD para uso comercial sem a
   revisão específica.
+
+---
+
+## Emenda 1 (2026-08-06)
+
+**Esta seção é um aditivo — não reescreve nem apaga a decisão original
+acima.** A decisão 4 original ("Acesso amplo interno é explícito, mínimo e
+auditado", incluindo a afirmação de que `admin_tecnico`, `auditor` e `dpo`
+"só podem acessar empresas para as quais tenham escopo autorizado")
+permanece registrada tal como foi aceita. Esta emenda concede uma
+**exceção temporária, explícita e com prazo**, para o `admin_tecnico`, no
+contexto de uso exclusivamente interno.
+
+### Contexto da emenda
+
+O levantamento de fatos em
+[docs/decisions/etapa1-escopo-autorizacao-interna-pendente.md](../decisions/etapa1-escopo-autorizacao-interna-pendente.md)
+mostrou que a decisão 4 original, aplicada literalmente, contradiz o
+comportamento hoje implementado e necessário para o próprio bootstrap do
+sistema: o primeiro `admin_tecnico` é criado sem empresa atribuída
+(`companyId: null`) e, sem escopo global, não conseguiria criar a primeira
+empresa nem atribuir escopo a ninguém. O produto e a segurança avaliaram
+três alternativas (A, B e C, detalhadas no documento de decisão) e
+aprovaram a Alternativa A para o momento atual, com condições.
+
+### Decisão da emenda
+
+1. **`admin_tecnico` mantém acesso global ao ambiente interno**, como
+   exceção temporária à decisão 4 original, enquanto o uso for
+   exclusivamente interno ao escritório.
+2. **Condições obrigatórias desta exceção** (detalhadas no documento de
+   decisão, seção "Decisão aprovada"):
+   - ao menos duas contas administrativas nominativas;
+   - contas `admin_tecnico` separadas de contas de uso rotineiro, usadas
+     só para administração excepcional;
+   - toda ação relevante continua auditada (ADR 0004, inalterado);
+   - reavaliação obrigatória em até 90 dias, ou antes da comercialização
+     para terceiros — o que ocorrer primeiro (ver "Gatilho de
+     reavaliação", atualizado abaixo).
+3. **`auditor` e `dpo` não são cobertos por esta exceção.** Seu
+   comportamento de leitura ampla da trilha de auditoria, hoje presente no
+   código (`evaluateAccessLog`), permanece como **capacidade técnica não
+   validada por uso real** — não há usuário interno com esses papéis, e
+   nenhuma decisão foi tomada sobre seu escopo. Antes do primeiro
+   provisionamento de `auditor` ou `dpo`, o escopo de acesso deles precisa
+   ser deliberado explicitamente, em ciclo de decisão próprio.
+4. **A evolução comercial multitenant continua inteiramente fora de
+   escopo** desta emenda e da ADR original — nenhuma das decisões 1, 2, 5
+   e 6 da seção "Decisão" acima é alterada.
+
+### Diferenciação explícita (para não confundir os três temas)
+
+| Tema                                                | Status após esta emenda                                                               |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Acesso global interno temporário de `admin_tecnico` | Aprovado, com condições e prazo (itens 1–2 acima)                                     |
+| Acesso futuro de `auditor` e `dpo`                  | **Não aprovado, não decidido** — pendente de deliberação futura antes do primeiro uso |
+| Evolução comercial multitenant                      | **Fora de escopo**, inalterada — decisão 5 da ADR original permanece integral         |
+
+### Gatilho de reavaliação (específico desta emenda)
+
+Esta exceção deve ser reavaliada — obrigatoriamente, não só "quando
+conveniente" — no que ocorrer primeiro:
+
+1. **90 dias corridos** a partir de 2026-08-06 (ou seja, até
+   2026-11-04); ou
+2. **Início de qualquer processo de comercialização para terceiros**,
+   mesmo que preliminar.
+
+O gatilho de reavaliação geral da ADR original (seção "Gatilho de
+reavaliação" acima) continua valendo, sem alteração, para a decisão de
+multitenancy como um todo.
+
+### O que esta emenda não faz
+
+- Não declara MFA implementado — continua adiado só da demonstração
+  inicial e obrigatório antes de piloto com dados reais ou produção
+  (ADR 0003, decisão 3, inalterada).
+- Não decide o escopo de `auditor`/`dpo`.
+- Não introduz `tenant_id`, RLS multitenant, backfill ou qualquer
+  artefato de multitenancy técnica.
+- Não altera código, testes, schema, migration, endpoint, dependência ou
+  infraestrutura — é registro de decisão; a implementação correspondente é
+  trabalho posterior, com critério de aceite próprio.
+- Não torna a exceção permanente por omissão — o prazo do item anterior é
+  vinculante.

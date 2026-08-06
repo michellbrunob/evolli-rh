@@ -1,19 +1,28 @@
-# Escopo de autorização interna — proposta de decisão
+# Escopo de autorização interna — decisão aprovada
 
-> ## STATUS: PENDENTE DE APROVAÇÃO DO PRODUTO — NÃO IMPLEMENTAR
+> ## STATUS: DECISÃO APROVADA
 >
-> Este documento **não decide nada**. Ele levanta fatos verificados no
-> código atual, mede impactos e apresenta alternativas para que o
-> responsável pelo produto decida. Nenhuma das alternativas abaixo pode
-> ser implementada antes de aprovação explícita e registrada.
+> A Alternativa A (acesso global interno de `admin_tecnico`, sempre
+> auditado) foi aprovada para o contexto interno atual, com condições
+> explícitas (§9). Este documento registra a decisão e preserva as
+> alternativas B e C como histórico de opções avaliadas e descartadas
+> **por ora** — não como opções eliminadas em definitivo.
+>
+> A decisão está formalizada como emenda à
+> [ADR 0005](../adr/0005-escopo-interno-e-evolucao-multitenant.md#emenda-1-2026-08-06).
+> A implementação segue liberada para a Etapa 1 — Fatia 1, sujeita ao
+> critério de aceite atualizado (§10).
 
-- Fase do rito SDD: **Especificar / Decidir**
+- Fase do rito SDD: **Especificar / Decidir → Registrar**
 - Data do levantamento: 2026-08-06
+- **Data da aprovação: 2026-08-06**
 - Origem: decisão pendente **DP-7** de
   [docs/modules/etapa1-nucleo-organizacional.md](../modules/etapa1-nucleo-organizacional.md)
+  (agora resolvida — ver §9)
 - Relacionado: [ADR 0003](../adr/0003-identidade-sessao-e-autorizacao.md),
   [ADR 0004](../adr/0004-auditoria-formal-e-integridade.md),
   [ADR 0005](../adr/0005-escopo-interno-e-evolucao-multitenant.md)
+  (emenda 1, 2026-08-06)
 
 ## 1. Por que este documento existe
 
@@ -26,17 +35,22 @@ deve ser explícito, mínimo e auditado. Mas o princípio não determina, por
 si só, a forma técnica. Implementar sem essa definição significaria decidir
 por omissão uma regra de segurança em produção.
 
-### Tensão que o produto precisa resolver conscientemente
+### Tensão identificada e resolvida por decisão explícita
 
-A ADR 0005, decisão 4, afirma que `admin_tecnico`, `auditor` e `dpo`
+A ADR 0005, decisão 4, afirmava que `admin_tecnico`, `auditor` e `dpo`
 "só podem acessar empresas para as quais tenham escopo autorizado".
 
-**A Alternativa A deste documento contradiz essa formulação.** Se o produto
-escolher A, a ADR 0005 precisará de emenda ou de ADR sucessora — não basta
-implementar A e deixar a ADR dizendo o contrário. Isso está explicitado
-aqui porque a contradição deve ser resolvida por decisão, não silenciada.
+**A Alternativa A contradizia essa formulação.** Por isso, a aprovação da
+Alternativa A (§9) foi condicionada explicitamente a uma emenda da
+ADR 0005 — não bastaria implementar A e deixar a ADR dizendo o contrário.
+Essa emenda foi registrada no mesmo ciclo desta decisão (ADR 0005, seção
+"Emenda 1"). A contradição foi resolvida por decisão registrada, não
+silenciada.
 
-Este documento **não altera** a ADR 0005 nem a spec da Etapa 1.
+Este documento, ao ser aprovado, passou a refletir uma decisão já tomada —
+não altera retroativamente a ADR 0005 nem a spec da Etapa 1 além do que
+está registrado nos três documentos deste ciclo (este arquivo, a emenda da
+ADR 0005 e a atualização da spec).
 
 ## 2. Fatos confirmados no código atual
 
@@ -180,12 +194,16 @@ provisionamento dos testes e2e** de identidade e auditoria, que dependem
 de um admin sem empresa criando usuários em empresas diferentes. Não é uma
 mudança localizada.
 
-## 3. Alternativas para validação humana
+## 3. Alternativas avaliadas (histórico)
 
-Nenhuma foi escolhida. As três estão descritas com o mesmo nível de
-detalhe, deliberadamente.
+As três alternativas abaixo foram avaliadas com o mesmo nível de detalhe,
+deliberadamente, antes da decisão. **A Alternativa A foi aprovada para o
+contexto interno atual (§9).** B e C são preservadas como histórico de
+opções avaliadas e descartadas por ora — não eliminadas em definitivo;
+permanecem candidatas naturais quando o gatilho de reavaliação (§9, item 4)
+for acionado.
 
-### Alternativa A — Admin técnico com acesso global interno, sempre auditado
+### Alternativa A — Admin técnico com acesso global interno, sempre auditado ✅ ACEITA (2026-08-06, condicionada — ver §9)
 
 O `admin_tecnico` mantém escopo de instância no ambiente interno. Todo uso
 continua registrado na trilha de auditoria.
@@ -200,7 +218,7 @@ continua registrado na trilha de auditoria.
 | **Dados/decisões adicionais necessários**         | Quantas pessoas terão a conta `admin_tecnico`? Haverá uso rotineiro ou só operação excepcional? DPO aceita acesso amplo permanente quando houver dado pessoal? MFA será antecipado para essa conta?                                                                                                            |
 | **Avaliação técnica (recomendação, não decisão)** | Adequada **enquanto o uso for estritamente interno e o número de administradores for muito pequeno**. O risco cresce com: (1) chegada de dado pessoal real, (2) aumento de administradores, (3) qualquer usuário externo. Se escolhida, recomenda-se prazo de revisão explícito, não indefinido.               |
 
-### Alternativa B — Admin técnico limitado às empresas explicitamente atribuídas
+### Alternativa B — Admin técnico limitado às empresas explicitamente atribuídas (não adotada agora — item 6, §9)
 
 O `admin_tecnico` só acessa empresas às quais tenha sido explicitamente
 associado.
@@ -215,7 +233,7 @@ associado.
 | **Dados/decisões adicionais necessários**         | Como o primeiro admin recebe escopo, já que ninguém altera o próprio? Quem atribui escopo a um admin — outro admin? Qual o procedimento de recuperação de lockout? Um admin sem escopo pode criar a primeira empresa?                                                                                                                                                                                                                            |
 | **Avaliação técnica (recomendação, não decisão)** | Tecnicamente a mais sólida a longo prazo e a mais alinhada às ADRs. Porém, hoje, **resolve um risco que ainda não existe** (não há múltiplas empresas nem clientes externos) ao custo de complexidade imediata e de um risco novo e concreto (lockout). Recomenda-se **não implementá-la agora isoladamente**, e sim quando houver mais de uma empresa real ou perspectiva concreta de comercialização.                                          |
 
-### Alternativa C — Bootstrap global temporário, com perda de acesso amplo depois
+### Alternativa C — Bootstrap global temporário, com perda de acesso amplo depois (não adotada agora — item 6, §9)
 
 O `admin_tecnico` nasce com acesso global para criar a estrutura
 organizacional inicial e, cumprido um gatilho, passa a operar com escopo
@@ -244,10 +262,15 @@ administrador, nenhuma empresa cadastrada, sem `auditor`/`dpo` ativos):
 3. **C**, apenas se A e B forem rejeitadas, e nunca sem o gatilho de
    transição fechado previamente.
 
-Isto é uma **leitura técnica de trade-offs**, não uma decisão. A escolha é
-do responsável pelo produto, e qualquer uma das três é implementável.
+Esta síntese foi a **leitura técnica de trade-offs** que embasou a decisão
+do produto (§9) — a recomendação (opção 1, Alternativa A com prazo de
+revisão explícito) coincide com a alternativa aprovada.
 
 ## 4. `auditor` e `dpo`: capacidade existente, necessidade não aprovada
+
+**Confirmado na decisão aprovada (§9, item 5): `auditor` e `dpo` não devem
+ser provisionados no cenário interno atual.** Esta seção permanece com o
+mesmo raciocínio que embasou essa condição.
 
 **Fato:** não há, neste momento, usuários internos com os papéis `auditor`
 ou `dpo` (contexto validado pelo produto). O comportamento desses papéis
@@ -275,20 +298,33 @@ provisionado, ele receberá leitura da trilha inteira automaticamente, sem
 nova decisão. Convém que a resposta à pergunta Q5 (§5) preceda esse
 provimento.
 
-## 5. Perguntas objetivas para o responsável pelo produto
+## 5. Perguntas objetivas — respondidas pela decisão e pendentes remanescentes
 
-| #   | Pergunta                                                                                          | Por que importa                                                                |
-| --- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| Q1  | Qual alternativa — A, B ou C — deve ser adotada para o `admin_tecnico`?                           | É a decisão que destrava a implementação da Etapa 1 (DP-7)                     |
-| Q2  | Quantas pessoas terão conta `admin_tecnico` no uso interno?                                       | Uma pessoa e cinco pessoas mudam materialmente o risco da alternativa A        |
-| Q3  | O `admin_tecnico` será usado rotineiramente ou só em operação excepcional?                        | Uso rotineiro com acesso global aumenta a exposição e enfraquece a trilha      |
-| Q4  | Se A for escolhida: qual o prazo ou gatilho de revisão dessa decisão?                             | Evita que "temporário" vire permanente por omissão                             |
-| Q5  | `auditor` e `dpo`, quando existirem, devem ler a trilha inteira ou só a das empresas atribuídas?  | Precisa ser respondida **antes** do primeiro provimento desses papéis (§4)     |
-| Q6  | Se B ou C: qual o procedimento de recuperação caso ninguém tenha escopo administrativo (lockout)? | Sem isso, existe risco real de ficar sem caminho de recuperação pela aplicação |
-| Q7  | Se B ou C: quem atribui escopo a um `admin_tecnico`, dado que ninguém altera o próprio escopo?    | Lacuna estrutural do modelo atual (§2.3c)                                      |
-| Q8  | Se C: qual exatamente o gatilho de saída do modo bootstrap, e ele é reversível?                   | Gatilho ambíguo é o principal risco da alternativa C                           |
-| Q9  | Se A for escolhida: aprova-se emendar a ADR 0005 (decisão 4), que hoje diz o contrário?           | A contradição precisa ser resolvida por decisão registrada, não silenciada     |
-| Q10 | MFA deve ser antecipado para contas `admin_tecnico`, antes do piloto?                             | Acesso amplo sem segundo fator é o cenário de maior impacto de comprometimento |
+### Respondidas pela decisão aprovada (§9)
+
+| #   | Pergunta                                                                                | Resposta registrada                                                                        |
+| --- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Q1  | Qual alternativa — A, B ou C — deve ser adotada para o `admin_tecnico`?                 | **A**, aprovada (§9, item 1)                                                               |
+| Q2  | Quantas pessoas terão conta `admin_tecnico` no uso interno?                             | **Ao menos duas**, nominativas (§9, item 2)                                                |
+| Q3  | O `admin_tecnico` será usado rotineiramente ou só em operação excepcional?              | **Só administração excepcional** — separada de conta de uso rotineiro (§9, item 3)         |
+| Q4  | Se A for escolhida: qual o prazo ou gatilho de revisão dessa decisão?                   | **90 dias, ou antes da comercialização a terceiros — o que ocorrer primeiro** (§9, item 4) |
+| Q9  | Se A for escolhida: aprova-se emendar a ADR 0005 (decisão 4), que hoje diz o contrário? | **Sim** — emenda registrada na ADR 0005 (§9, item 8)                                       |
+
+### Ainda em aberto (permanecem como pendência futura)
+
+| #   | Pergunta                                                                                         | Por que ainda importa                                                                                                                                   |
+| --- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Q5  | `auditor` e `dpo`, quando existirem, devem ler a trilha inteira ou só a das empresas atribuídas? | Confirmado que não serão provisionados agora (§9, item 5), mas a resposta técnica continua pendente e precisa vir **antes** do primeiro provimento (§4) |
+| Q10 | MFA deve ser antecipado para contas `admin_tecnico` especificamente, antes do piloto geral?      | A decisão (§9, item 7) reafirma a política geral de MFA (ADR 0003) sem decidir antecipação específica para contas administrativas — permanece em aberto |
+
+### Não se aplicam mais no ciclo atual
+
+Q6 (procedimento de recuperação de lockout), Q7 (quem atribui escopo a um
+admin) e Q8 (gatilho de saída do modo bootstrap) eram específicas das
+Alternativas B e C, não adotadas agora (§9, item 6). Permanecem
+registradas em §3, como parte da avaliação preservada, e voltam a ser
+relevantes se o gatilho de reavaliação (§9, item 4) levar à adoção de B ou
+C no futuro.
 
 ## 6. Critério de aceite para a futura implementação (após a decisão)
 
@@ -343,16 +379,67 @@ Independente da alternativa escolhida:
 - **Dados:** exclusivamente técnicos/sintéticos. Nenhum usuário, dado de RH
   ou dado real criado para teste.
 
-## 8. O que este documento não faz
+## 8. Limites — o que esta decisão não faz
 
-Registro explícito dos limites, para evitar leitura equivocada:
+Registro explícito, para evitar leitura equivocada, mesmo após a
+aprovação (§9):
 
-- **Não decide** o escopo do `admin_tecnico`, de `auditor` ou de `dpo`.
-- **Não altera** código, testes, schema, migration, endpoint, dependência,
-  infraestrutura, ADR existente ou spec existente.
+- **Não decide** o escopo definitivo de `auditor` ou `dpo` — continua
+  pendente, a resolver antes do primeiro provimento desses papéis (§4, Q5).
+- Esta decisão, por si só, **não altera** código, testes, schema,
+  migration, endpoint, dependência ou infraestrutura — a implementação
+  correspondente é trabalho posterior, sujeito ao critério de aceite (§6).
 - **Não remove** nem propõe remover os papéis `auditor` e `dpo`.
-- **Não declara** decisão arquitetural concluída — a ADR correspondente só
-  existirá depois da aprovação.
+- **Não é definitiva** — é explicitamente temporária, com prazo/gatilho de
+  reavaliação (§9, item 4).
 - **Não declara** conformidade LGPD concluída: a adequação do acesso amplo
-  a dado pessoal exige análise do DPO, que não foi feita.
-- **Não cria** usuários, dados de RH ou dados reais.
+  a dado pessoal futuro continua exigindo análise do DPO, não feita aqui.
+- **Não cria** usuários, dados de RH, dados reais ou qualquer segredo.
+
+## 9. Decisão aprovada — registro formal
+
+**Status:** DECISÃO APROVADA
+**Data:** 2026-08-06
+**Aprovada por:** responsável pelo produto e segurança (conforme instrução
+de execução desta tarefa)
+
+As oito decisões abaixo foram aprovadas e são registradas aqui como fonte
+de verdade desta decisão. A formalização arquitetural correspondente está
+na [ADR 0005, seção "Emenda 1"](../adr/0005-escopo-interno-e-evolucao-multitenant.md#emenda-1-2026-08-06).
+
+1. **Alternativa A adotada** para o uso interno atual: `admin_tecnico`
+   possui acesso global ao ambiente interno, com toda ação relevante
+   auditada.
+2. **Ao menos duas contas administrativas nominativas** devem existir —
+   nunca uma única conta de administrador.
+3. **Contas `admin_tecnico` são separadas de contas de uso rotineiro** —
+   usadas apenas para administração excepcional, não para operação do
+   dia a dia.
+4. **Reavaliação obrigatória em até 90 dias, ou antes da comercialização
+   para terceiros — o que ocorrer primeiro.** Este é o gatilho formal de
+   revisão referenciado em todo este documento.
+5. **`auditor` e `dpo` não devem ser provisionados** no cenário interno
+   atual. Antes do primeiro provisionamento, o escopo de acesso desses
+   papéis deve ser deliberado explicitamente (§4, Q5 continua em aberto).
+6. **As Alternativas B e C não são adotadas neste momento** — preservadas
+   como histórico em §3, candidatas naturais na próxima reavaliação.
+7. **MFA continua adiado apenas para a demonstração inicial**, sendo
+   obrigatório antes de qualquer piloto com dados reais ou produção (ADR
+   0003, decisão 3 — inalterada). Esta decisão **não declara MFA
+   implementado** e não substitui essa obrigação.
+8. **A ADR 0005 recebe emenda explícita**, pois sua decisão 4 original
+   conflitava com o acesso global interno ora aprovado para
+   `admin_tecnico`. A emenda preserva a decisão 4 original como histórico
+   e não a apaga nem reescreve (ver ADR 0005, "Emenda 1").
+
+### O que permanece pendente após esta decisão
+
+- Escopo técnico de `auditor`/`dpo` quando forem provisionados (Q5).
+- Antecipação ou não de MFA especificamente para contas `admin_tecnico`
+  (Q10).
+- Implementação da Etapa 1 — Fatia 1 em si (código, migration, endpoint),
+  sujeita ao critério de aceite atualizado (§6, incluindo o item de RI-2
+  atualizado na spec — ver
+  [docs/modules/etapa1-nucleo-organizacional.md](../modules/etapa1-nucleo-organizacional.md)).
+- Todas as decisões pendentes de modelagem organizacional (DP-1 a DP-6,
+  DP-8 a DP-10 da spec), não tocadas por esta decisão.

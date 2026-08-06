@@ -63,27 +63,39 @@ seus vínculos permanecem no escopo da Etapa 1 do roadmap, porém em
 `docs/ROADMAP.md` **não é alterado** por esta tarefa — o fatiamento interno
 da etapa é detalhamento de execução, não renumeração do roadmap.
 
-### O3 — Impacto da decisão 4 sobre autorização já implementada
+### O3 — Divergência resolvida: `admin_tecnico` mantém acesso global (exceção temporária aprovada)
 
-A decisão aprovada 4 — "`admin_tecnico`, `auditor` e `dpo` só podem
-acessar empresas para as quais tenham escopo autorizado" — **diverge do
-comportamento hoje implementado e mergeado** em `rbac.evaluator.ts`:
+A decisão aprovada 4 da ADR 0005 ("`admin_tecnico`, `auditor` e `dpo` só
+podem acessar empresas para as quais tenham escopo autorizado") divergia
+do comportamento então implementado e mergeado em `rbac.evaluator.ts`
+(`evaluateAccessLog`, `evaluateOtherAccount`) — ambos concedem acesso
+global sem checagem de empresa para esses papéis.
 
-| Regra atual (em `main`) | Comportamento hoje                                                                | Decisão 4 exige                                                                               |
-| ----------------------- | --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| `evaluateAccessLog`     | `admin_tecnico`, `auditor`, `dpo` → permitido **sem nenhuma checagem de empresa** | Restringir ao escopo de empresa autorizado                                                    |
-| `evaluateOtherAccount`  | `admin_tecnico` → permitido, comentado como "escopo: instância inteira"           | Acesso amplo deixa de ser implícito; quando existir, precisa ser explícito, mínimo e auditado |
+**Esta divergência foi levantada, decidida e registrada** em
+[docs/decisions/etapa1-escopo-autorizacao-interna-pendente.md](../decisions/etapa1-escopo-autorizacao-interna-pendente.md)
+e formalizada como **Emenda 1** da
+[ADR 0005](../adr/0005-escopo-interno-e-evolucao-multitenant.md#emenda-1-2026-08-06)
+(2026-08-06):
 
-**Nada disso foi alterado nesta tarefa** — ela é exclusivamente
-documental. O ajuste do avaliador RBAC/ABAC é trabalho da fase
-**Implementar** desta fatia, e está registrado como:
+- **`admin_tecnico`** mantém acesso global ao ambiente interno como
+  **exceção temporária e condicionada** (ao menos duas contas nominativas;
+  uso só para administração excepcional, separado de conta de uso
+  rotineiro; toda ação auditada; reavaliação obrigatória em até 90 dias ou
+  antes da comercialização a terceiros). O comportamento hoje implementado
+  em `rbac.evaluator.ts` **já está alinhado** a esta decisão — nenhuma
+  mudança de autorização é exigida para `admin_tecnico` na implementação
+  desta fatia.
+- **`auditor` e `dpo` continuam fora dessa exceção.** Eles não são
+  provisionados no cenário interno atual, e o comportamento hoje presente
+  no código (leitura ampla, sem checagem de empresa) permanece **capacidade
+  técnica não validada por uso real** — não uma decisão aprovada. O escopo
+  deles precisa ser deliberado explicitamente antes do primeiro
+  provisionamento (ver §5, matriz).
 
-- item obrigatório dos critérios de aceite da implementação (§12);
-- decisão pendente quanto à **forma** do acesso amplo interno (§12, DP-7);
-- risco de regressão de autorização a ser coberto por teste (§11, RI-2).
-
-Registrar essa divergência aqui é o que permite que ela seja tratada
-deliberadamente, em vez de descoberta durante a implementação.
+**O que ainda é trabalho da fase Implementar:** garantir, na implementação
+do Núcleo Organizacional, que o bootstrap administrativo continue
+funcionando e que todo acesso administrativo amplo gere evento de
+auditoria com o escopo efetivo utilizado (ver RI-2, §12, atualizado).
 
 ## 1. Objetivo, escopo e fora de escopo
 
@@ -350,23 +362,28 @@ vigora desde a ADR 0002 (menor privilégio no banco) e a ADR 0003
 (`isSameCompany` em `rbac.evaluator.ts`), sem introduzir um segundo modelo
 de escopo paralelo.
 
-### Acesso amplo interno: explícito, mínimo e auditado
+### Acesso amplo interno: explícito, mínimo e auditado — com exceção temporária para `admin_tecnico`
 
-Decisão aprovada 4: `admin_tecnico`, `auditor` e `dpo` **só acessam
-empresas para as quais tenham escopo autorizado**. Quando um acesso amplo
-interno for realmente necessário, ele deve ser:
+Princípio geral (ADR 0005, decisão 4): acesso amplo interno deve ser
+**explícito** (concedido deliberadamente, nunca herdado por ser "o papel
+técnico"), **mínimo** e **auditado** (cada uso gera evento, §9).
 
-- **explícito** — concedido deliberadamente, nunca herdado por ser "o papel
-  técnico" ou implícito no código;
-- **mínimo** — restrito ao conjunto de empresas efetivamente necessário;
-- **auditado** — cada uso gera evento de auditoria (§9).
+**Decisão resolvida (O3, Emenda 1 da ADR 0005, 2026-08-06):**
+`admin_tecnico` mantém acesso global ao ambiente interno como **exceção
+temporária e condicionada** a esse princípio — não uma violação dele, mas
+uma exceção aprovada explicitamente, com prazo. Condições: ao menos duas
+contas administrativas nominativas; uso restrito a administração
+excepcional, separado de conta de uso rotineiro; toda ação auditada;
+reavaliação obrigatória em até 90 dias ou antes da comercialização a
+terceiros, o que ocorrer primeiro. Detalhe completo em
+[docs/decisions/etapa1-escopo-autorizacao-interna-pendente.md](../decisions/etapa1-escopo-autorizacao-interna-pendente.md).
 
-Isso **muda comportamento hoje implementado** (O3): `evaluateAccessLog`
-concede leitura da trilha a `admin_tecnico`/`auditor`/`dpo` sem checar
-empresa, e `evaluateOtherAccount` trata `admin_tecnico` como "instância
-inteira". O ajuste é trabalho da fase Implementar desta fatia (§12), não
-desta tarefa documental. A **forma** exata de representar o escopo
-autorizado desses papéis é DP-7.
+**`auditor` e `dpo` não são cobertos por essa exceção.** Eles não são
+provisionados no cenário interno atual (contexto validado pelo produto), e
+seu escopo de acesso — hoje idêntico ao do `admin_tecnico` no código —
+**não foi aprovado nem decidido**. Continua como decisão pendente, a
+resolver antes do primeiro provimento desses papéis (DP-7, restrita a esse
+escopo).
 
 ### Sem multitenancy técnica
 
@@ -463,16 +480,16 @@ existe. As ações reaproveitam o vocabulário atual (`read`, `manage`,
 
 ### Matriz
 
-| Papel           | Ler estrutura | Criar/alterar/inativar | Escopo                                      |
-| --------------- | ------------- | ---------------------- | ------------------------------------------- |
-| `admin_tecnico` | ✅            | ✅                     | Empresas autorizadas (decisão 4; DP-7)      |
-| `rh`            | ✅            | ✅                     | Própria empresa                             |
-| `dp`            | ✅            | ❌                     | Leitura na própria empresa                  |
-| `gestor`        | ✅ (restrita) | ❌                     | Só os nós do próprio escopo — DP-8          |
-| `financeiro`    | ✅ (restrita) | ❌                     | Leitura de `cost_center` e estrutura mínima |
-| `colaborador`   | ❌            | ❌                     | Sem acesso à estrutura nesta fatia          |
-| `auditor`       | ✅ (leitura)  | ❌                     | Empresas autorizadas (decisão 4; DP-7)      |
-| `dpo`           | ✅ (leitura)  | ❌                     | Empresas autorizadas (decisão 4; DP-7)      |
+| Papel           | Ler estrutura | Criar/alterar/inativar | Escopo                                                                              |
+| --------------- | ------------- | ---------------------- | ----------------------------------------------------------------------------------- |
+| `admin_tecnico` | ✅            | ✅                     | Instância inteira — exceção temporária aprovada (Emenda 1, ADR 0005, prazo 90 dias) |
+| `rh`            | ✅            | ✅                     | Própria empresa                                                                     |
+| `dp`            | ✅            | ❌                     | Leitura na própria empresa                                                          |
+| `gestor`        | ✅ (restrita) | ❌                     | Só os nós do próprio escopo — DP-8                                                  |
+| `financeiro`    | ✅ (restrita) | ❌                     | Leitura de `cost_center` e estrutura mínima                                         |
+| `colaborador`   | ❌            | ❌                     | Sem acesso à estrutura nesta fatia                                                  |
+| `auditor`       | ✅ (leitura)  | ❌                     | **Não provisionado atualmente** — escopo pendente de deliberação futura (DP-7)      |
+| `dpo`           | ✅ (leitura)  | ❌                     | **Não provisionado atualmente** — escopo pendente de deliberação futura (DP-7)      |
 
 ### Regras invioláveis
 
@@ -571,9 +588,14 @@ criado nesta fase.
   - Ator de uma empresa não lê, não altera e não inativa entidade de outra
     empresa, em **toda** rota que aceita identificador; resposta **404**,
     nunca 403 nem 200.
-  - **Regressão da decisão 4 (obrigatória):** `admin_tecnico`, `auditor` e
-    `dpo` **não** acessam empresa fora do escopo autorizado — teste que
-    falharia hoje contra o comportamento atual (O3), por desenho.
+  - **Bootstrap administrativo (obrigatória):** prova de que o
+    `admin_tecnico` de bootstrap (sem empresa atribuída) continua
+    conseguindo criar a primeira empresa e atribuir o primeiro escopo,
+    exercendo a exceção temporária aprovada (O3, Emenda 1 da ADR 0005) —
+    e que cada uso desse acesso amplo gera evento de auditoria com escopo
+    efetivo.
+  - `auditor` e `dpo` **não** são provisionados nesta fatia (O3, §5) — sem
+    teste de escopo para esses papéis até que DP-7 seja resolvida.
   - Tentativa fora de escopo gera evento `denied` na trilha.
 - **Auditoria:** cada evento do §9 é gerado com ator, escopo e `request_id`
   corretos; atomicidade comprovada por **rollback real** (criação/alteração/
@@ -590,9 +612,11 @@ criado nesta fase.
 
 - [ ] Decisões pendentes de modelagem (DP-1, DP-2, DP-3, DP-4, DP-5)
       resolvidas com o produto/DPO — nunca por suposição.
-- [ ] Forma do escopo autorizado de `admin_tecnico`/`auditor`/`dpo`
-      decidida (DP-7) **antes** de iniciar a implementação, por ser mudança
-      de autorização já mergeada (O3).
+- [x] Escopo de `admin_tecnico` decidido (O3) — exceção temporária
+      aprovada em 2026-08-06 (Emenda 1, ADR 0005). O escopo de `auditor` e
+      `dpo` **permanece pendente** (DP-7, restrita a esses dois papéis) e
+      bloqueia o primeiro provisionamento deles, não a implementação da
+      estrutura organizacional em si.
 - [ ] Revisão de segurança confirma que nenhum campo do modelo (§3), se
       implementado literalmente, permite acesso fora do escopo de empresa
       ou introduz dado pessoal não declarado.
@@ -602,10 +626,15 @@ criado nesta fase.
 ### Critérios de aceite (da futura implementação, para registro)
 
 - [ ] Nenhuma rota `DELETE` em entidade organizacional.
-- [ ] Teste automatizado prova que `admin_tecnico`, `auditor` e `dpo` não
-      acessam empresa fora do escopo autorizado (decisão 4 / O3).
+- [ ] Teste automatizado prova que o bootstrap administrativo continua
+      funcionando com a exceção temporária de `admin_tecnico` (O3, Emenda 1
+      da ADR 0005), e que cada uso do acesso amplo gera evento de auditoria
+      com escopo efetivo.
 - [ ] Teste automatizado prova negação fora de escopo em toda rota com
-      identificador, com resposta 404.
+      identificador, com resposta 404 — para os papéis sujeitos a escopo de
+      empresa (`rh`, `dp`, `gestor`, `financeiro`).
+- [ ] `auditor` e `dpo` não são provisionáveis por nenhum fluxo desta fatia
+      até que DP-7 seja resolvida.
 - [ ] Toda mutação organizacional é atômica com seu evento de auditoria,
       com rollback comprovado.
 - [ ] Nenhuma coluna `tenant_id`, política de RLS multitenant ou migration
@@ -618,11 +647,23 @@ criado nesta fase.
 - **RI-1 — Modelagem decidida por suposição** (DP-1/DP-2/DP-3) seria cara de
   reverter depois que houver dado real e módulos dependentes. Mitigação:
   bloquear implementação até decisão do produto/RH.
-- **RI-2 — Regressão de autorização ao aplicar a decisão 4.** Restringir
-  `admin_tecnico`/`auditor`/`dpo` altera comportamento já mergeado e
-  testado (O3); feito sem cuidado, pode quebrar o bootstrap administrativo
-  ou a leitura da trilha de auditoria da Fatia 4. Mitigação: teste de
-  regressão explícito (§11) e decisão prévia de DP-7.
+- **RI-2 — Implementação futura precisa preservar o bootstrap
+  administrativo e auditar todo acesso amplo.** A exceção temporária de
+  `admin_tecnico` (O3, Emenda 1 da ADR 0005) elimina o risco de regressão
+  de autorização sobre esse papel — o comportamento hoje mergeado já está
+  alinhado à decisão aprovada, nenhuma mudança é exigida nele. O risco
+  remanescente é de **implementação**, não de autorização já decidida: a
+  Etapa 1 precisa (a) preservar o funcionamento do bootstrap administrativo
+  tal como existe hoje (`admin_tecnico` sem empresa atribuída, capaz de
+  criar a primeira empresa e atribuir o primeiro escopo) e (b) garantir que
+  todo uso do acesso administrativo amplo — inclusive sobre as novas
+  entidades organizacionais — gere evento de auditoria com o escopo efetivo
+  utilizado (§9). Mitigação: teste de regressão que prove que o bootstrap
+  continua funcionando após a implementação (§11), e que cada ação de
+  `admin_tecnico` sobre estrutura organizacional é auditada. O escopo de
+  `auditor`/`dpo` permanece risco separado, coberto pela pendência DP-7,
+  restrita a esses dois papéis — não bloqueia a implementação da estrutura
+  organizacional em si, mas bloqueia o primeiro provisionamento deles.
 - **RI-3 — Retrabalho na evolução comercial.** Não introduzir multitenancy
   agora significa que a comercialização futura exigirá migration aditiva e
   backfill. Risco **aceito conscientemente** (ADR 0005): antecipar
@@ -637,7 +678,12 @@ criado nesta fase.
 ### Dependências
 
 - Fatias 3 e 4 mergeadas em `main` — **satisfeita**.
-- Decisões DP-1 a DP-10 — bloqueiam a fase Implementar, não a Especificar.
+- Decisão de escopo de `admin_tecnico` (O3) — **satisfeita** em 2026-08-06
+  (Emenda 1, ADR 0005).
+- Decisões DP-1 a DP-6 e DP-8 a DP-10 — bloqueiam a fase Implementar, não a
+  Especificar. DP-7 (escopo de `auditor`/`dpo`) bloqueia só o primeiro
+  provisionamento desses dois papéis, não a implementação da estrutura
+  organizacional.
 - Extensão do enum `AuditAction` por migration aditiva (§9) — dependência
   técnica da implementação.
 - Rastreabilidade com o PRD do Notion — pendência da **próxima fatia
@@ -645,18 +691,18 @@ criado nesta fase.
 
 ### Decisões pendentes
 
-| ID    | Decisão                                                                                                           | Responsável             |
-| ----- | ----------------------------------------------------------------------------------------------------------------- | ----------------------- |
-| DP-1  | Departamento pertence a empresa, unidade ou híbrido (§3.3)                                                        | Produto/RH              |
-| DP-2  | Equipe pertence a departamento, unidade ou ambos (§3.4)                                                           | Produto/RH              |
-| DP-3  | Catálogo de cargos por empresa ou compartilhado (§3.5)                                                            | Produto/RH              |
-| DP-4  | Incluir CNPJ em `company` — e impacto LGPD (MEI) (§7)                                                             | DPO + jurídico          |
-| DP-5  | A que entidades o centro de custo se associa (§3.5)                                                               | Produto/RH              |
-| DP-6  | Inativação com filhos ativos: recusar ou cascata confirmada (R-INA-2)                                             | Produto                 |
-| DP-7  | Forma do escopo autorizado de `admin_tecnico`/`auditor`/`dpo` — **prioritária**, altera autorização mergeada (O3) | Produto + Segurança     |
-| DP-8  | Escopo exato de leitura do `gestor` sem entidade de colaborador (§8)                                              | Produto                 |
-| DP-9  | Nomenclatura final de entidades e campos (pt-BR vs. en)                                                           | Time de desenvolvimento |
-| DP-10 | Hierarquia recursiva de profundidade arbitrária: necessária?                                                      | Produto/RH              |
+| ID    | Decisão                                                                                                                                                                                                                                              | Responsável             |
+| ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| DP-1  | Departamento pertence a empresa, unidade ou híbrido (§3.3)                                                                                                                                                                                           | Produto/RH              |
+| DP-2  | Equipe pertence a departamento, unidade ou ambos (§3.4)                                                                                                                                                                                              | Produto/RH              |
+| DP-3  | Catálogo de cargos por empresa ou compartilhado (§3.5)                                                                                                                                                                                               | Produto/RH              |
+| DP-4  | Incluir CNPJ em `company` — e impacto LGPD (MEI) (§7)                                                                                                                                                                                                | DPO + jurídico          |
+| DP-5  | A que entidades o centro de custo se associa (§3.5)                                                                                                                                                                                                  | Produto/RH              |
+| DP-6  | Inativação com filhos ativos: recusar ou cascata confirmada (R-INA-2)                                                                                                                                                                                | Produto                 |
+| DP-7  | Escopo de acesso de `auditor`/`dpo` quando forem provisionados (O3) — `admin_tecnico` resolvido em 2026-08-06, ver Emenda 1 da ADR 0005; bloqueia o **primeiro provisionamento** desses dois papéis, não a implementação da estrutura organizacional | Produto + Segurança     |
+| DP-8  | Escopo exato de leitura do `gestor` sem entidade de colaborador (§8)                                                                                                                                                                                 | Produto                 |
+| DP-9  | Nomenclatura final de entidades e campos (pt-BR vs. en)                                                                                                                                                                                              | Time de desenvolvimento |
+| DP-10 | Hierarquia recursiva de profundidade arbitrária: necessária?                                                                                                                                                                                         | Produto/RH              |
 
 ### Arquivos previstos para a fase Implementar (não criados agora)
 
