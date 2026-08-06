@@ -5,10 +5,14 @@ export function setupOpenApi(app: INestApplication, version: string): void {
   const config = new DocumentBuilder()
     .setTitle("Evolli RH API")
     .setDescription(
-      "API corporativa do ecossistema Evolli RH — fundação, sem módulos de domínio.",
+      "API corporativa do ecossistema Evolli RH — fundação e núcleo organizacional interno.",
     )
     .setVersion(version)
     .addTag("health", "Verificação de disponibilidade da API")
+    .addTag(
+      "organizacao",
+      "Núcleo organizacional interno: empresa, unidade organizacional, departamento, área, equipe, cargo e centro de custo",
+    )
     .build();
 
   const document = SwaggerModule.createDocument(app, config);

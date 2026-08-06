@@ -15,6 +15,34 @@ export const AUDIT_ACTIONS = [
   "authorization_denied",
   "rate_limit_blocked",
   "audit_log_read",
+
+  // Etapa 1 — Fatia 1: Núcleo Organizacional. O valor **persistido** segue a
+  // convenção aprovada em português separada por ponto
+  // (`organizacao.empresa.criada`); o identificador abaixo é o nome Prisma do
+  // mesmo valor, com `_` porque a linguagem não aceita `.` em identificador
+  // (ver `@map` no enum `AuditAction` em schema.prisma, ADR 0006 Emenda 1).
+  "organizacao_empresa_criada",
+  "organizacao_empresa_atualizada",
+  "organizacao_empresa_inativada",
+  "organizacao_unidade_organizacional_criada",
+  "organizacao_unidade_organizacional_atualizada",
+  "organizacao_unidade_organizacional_inativada",
+  "organizacao_departamento_criado",
+  "organizacao_departamento_atualizado",
+  "organizacao_departamento_inativado",
+  "organizacao_area_criada",
+  "organizacao_area_atualizada",
+  "organizacao_area_inativada",
+  "organizacao_equipe_criada",
+  "organizacao_equipe_atualizada",
+  "organizacao_equipe_inativada",
+  "organizacao_cargo_criado",
+  "organizacao_cargo_atualizado",
+  "organizacao_cargo_inativado",
+  "organizacao_centro_custo_criado",
+  "organizacao_centro_custo_atualizado",
+  "organizacao_centro_custo_inativado",
+  "organizacao_estrutura_consultada",
 ] as const satisfies readonly AuditAction[];
 
 /**
@@ -30,7 +58,18 @@ export type AuditResource =
   | "access_session"
   | "access_password_reset_token"
   | "access_login_attempt"
-  | "audit_event";
+  | "audit_event"
+  // Etapa 1 — Fatia 1: entram sem migration, exatamente por `resource` ser
+  // união no código. `estrutura_organizacional` identifica a leitura de
+  // escopo amplo (spec §9, RI-2), não uma tabela.
+  | "empresa"
+  | "unidade_organizacional"
+  | "departamento"
+  | "area"
+  | "equipe"
+  | "cargo"
+  | "centro_custo"
+  | "estrutura_organizacional";
 
 export type RecordAuditEventInput =
   | {
