@@ -1,4 +1,5 @@
 import { PinoLogger } from "nestjs-pino";
+import { AuditAction } from "@prisma/client";
 import { PrismaService } from "../database/prisma.service";
 import { AuditService } from "./audit.service";
 import { AUDIT_ACTIONS } from "./audit.types";
@@ -190,6 +191,17 @@ describe("AuditService", () => {
     // Regressão: se o enum `AuditAction` do schema.prisma mudar sem
     // atualizar a lista runtime usada pela validação de DTO (@IsIn), este
     // teste falha — evita ação "fechada" na prática só de um lado.
+    //
+    // A comparação é feita contra o enum **gerado pelo Prisma a partir do
+    // schema**, não contra uma lista fixa reescrita à mão: assim o teste
+    // continua detectando drift quando uma fatia futura estender o enum,
+    // em vez de só exigir que alguém atualize um número aqui.
+    const doBanco = Object.values(AuditAction).sort();
+    const doRuntime = [...AUDIT_ACTIONS].sort();
+    expect(doRuntime).toEqual(doBanco);
+
+    // Verbos da Etapa 0 (Fatias 3/4) continuam presentes — nenhuma extensão
+    // posterior pode removê-los silenciosamente.
     expect(AUDIT_ACTIONS).toEqual(
       expect.arrayContaining([
         "login_succeeded",
@@ -207,6 +219,5 @@ describe("AuditService", () => {
         "audit_log_read",
       ]),
     );
-    expect(AUDIT_ACTIONS.length).toBe(13);
   });
 });

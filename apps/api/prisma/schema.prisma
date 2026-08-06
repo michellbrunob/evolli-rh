@@ -129,8 +129,16 @@ enum AuditActorType {
   system
 }
 
-// Lista fechada de ações auditáveis desta fatia (ADR 0004 §5, spec §4).
-// Estender exige migration — nunca aceitar ação como texto livre.
+// Lista fechada de ações auditáveis (ADR 0004 §5, spec §4). Estender exige
+// migration — nunca aceitar ação como texto livre.
+//
+// Os verbos da Etapa 0 (Fatias 3/4) permanecem em snake_case inglês, tal como
+// mergeados — nada é renomeado (ADR 0006, Emenda 1, item 4). Os verbos do
+// Núcleo Organizacional seguem a convenção aprovada em português separada por
+// ponto (`organizacao.empresa.criada`), aplicada ao valor persistido via
+// `@map`; o identificador Prisma usa `_` por ser restrição da linguagem, não
+// escolha de nomenclatura. Convivência dos dois padrões é decisão explícita
+// (ADR 0006, Emenda 1, item 5).
 enum AuditAction {
   login_succeeded
   login_failed
@@ -145,6 +153,43 @@ enum AuditAction {
   authorization_denied
   rate_limit_blocked
   audit_log_read
+
+  organizacao_empresa_criada    @map("organizacao.empresa.criada")
+  organizacao_empresa_atualizada @map("organizacao.empresa.atualizada")
+  organizacao_empresa_inativada @map("organizacao.empresa.inativada")
+  organizacao_empresa_reativada @map("organizacao.empresa.reativada")
+
+  organizacao_unidade_organizacional_criada    @map("organizacao.unidade_organizacional.criada")
+  organizacao_unidade_organizacional_atualizada @map("organizacao.unidade_organizacional.atualizada")
+  organizacao_unidade_organizacional_inativada @map("organizacao.unidade_organizacional.inativada")
+  organizacao_unidade_organizacional_reativada @map("organizacao.unidade_organizacional.reativada")
+
+  organizacao_departamento_criado    @map("organizacao.departamento.criado")
+  organizacao_departamento_atualizado @map("organizacao.departamento.atualizado")
+  organizacao_departamento_inativado @map("organizacao.departamento.inativado")
+  organizacao_departamento_reativado @map("organizacao.departamento.reativado")
+
+  organizacao_area_criada    @map("organizacao.area.criada")
+  organizacao_area_atualizada @map("organizacao.area.atualizada")
+  organizacao_area_inativada @map("organizacao.area.inativada")
+  organizacao_area_reativada @map("organizacao.area.reativada")
+
+  organizacao_equipe_criada    @map("organizacao.equipe.criada")
+  organizacao_equipe_atualizada @map("organizacao.equipe.atualizada")
+  organizacao_equipe_inativada @map("organizacao.equipe.inativada")
+  organizacao_equipe_reativada @map("organizacao.equipe.reativada")
+
+  organizacao_cargo_criado    @map("organizacao.cargo.criado")
+  organizacao_cargo_atualizado @map("organizacao.cargo.atualizado")
+  organizacao_cargo_inativado @map("organizacao.cargo.inativado")
+  organizacao_cargo_reativado @map("organizacao.cargo.reativado")
+
+  organizacao_centro_custo_criado    @map("organizacao.centro_custo.criado")
+  organizacao_centro_custo_atualizado @map("organizacao.centro_custo.atualizado")
+  organizacao_centro_custo_inativado @map("organizacao.centro_custo.inativado")
+  organizacao_centro_custo_reativado @map("organizacao.centro_custo.reativado")
+
+  organizacao_estrutura_consultada @map("organizacao.estrutura.consultada")
 }
 
 enum AuditResult {
@@ -200,4 +245,181 @@ model AuditEvent {
   @@index([resource, resourceId])
   @@index([companyId])
   @@map("audit_event")
+}
+
+// ---------------------------------------------------------------------------
+// Etapa 1 — Fatia 1: Núcleo Organizacional Interno
+// ---------------------------------------------------------------------------
+// Modelo aprovado na Baseline V1 (ADR 0006) e especificado em
+// docs/modules/etapa1-nucleo-organizacional.md §3. Nomenclatura em português
+// (ADR 0006, Emenda 1): tipos PascalCase, campos camelCase, tabelas e colunas
+// snake_case — todos sem acento.
+//
+// Limites estruturais desta fatia, por decisão explícita:
+//   - Departamento e Area são estrutura, NÃO fronteira de autorização
+//     (Baseline V1 item 2): nenhum `departamento_id`/`area_id` é adicionado a
+//     `access_user` nem a `audit_event`; `empresa_id` continua o maior limite.
+//   - Sem hierarquia recursiva e sem relação de gestor/subordinado, nem
+//     estruturalmente (item 8).
+//   - Sem campo de vigência nos nós organizacionais (item 9).
+//   - Sem CNPJ (DP-4, pendente), sem colaborador, vínculo, função, salário,
+//     folha, ponto, documento, benefício ou qualquer dado pessoal.
+//   - Sem exclusão física: "remover" é sempre transição de `status` (R6).
+
+enum StatusOrganizacional {
+  ativo
+  inativo
+}
+
+model Empresa {
+  id     String               @id @default(uuid())
+  codigo String               @unique
+  nome   String
+  status StatusOrganizacional @default(ativo)
+
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  unidades      UnidadeOrganizacional[]
+  departamentos Departamento[]
+  equipes       Equipe[]
+  cargos        Cargo[]
+  centrosCusto  CentroCusto[]
+
+  @@index([status])
+  @@map("empresa")
+}
+
+model UnidadeOrganizacional {
+  id        String               @id @default(uuid())
+  empresaId String               @map("empresa_id")
+  codigo    String
+  nome      String
+  status    StatusOrganizacional @default(ativo)
+
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  empresa Empresa  @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  equipes Equipe[]
+
+  @@unique([empresaId, codigo])
+  // Alvo da FK composta vinda de Equipe: o banco passa a garantir que a
+  // unidade referenciada pertence à mesma empresa da equipe (spec R5), sem
+  // depender de validação de aplicação.
+  @@unique([id, empresaId])
+  @@index([empresaId, status])
+  @@map("unidade_organizacional")
+}
+
+model Departamento {
+  id        String               @id @default(uuid())
+  empresaId String               @map("empresa_id")
+  codigo    String
+  nome      String
+  status    StatusOrganizacional @default(ativo)
+
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  empresa Empresa  @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  areas   Area[]
+  equipes Equipe[]
+
+  @@unique([empresaId, codigo])
+  // Mesmo propósito do par em UnidadeOrganizacional: alvo da FK composta de
+  // Equipe, garantindo mesma empresa no nível do banco (spec R5).
+  @@unique([id, empresaId])
+  @@index([empresaId, status])
+  @@map("departamento")
+}
+
+// Subdivisão OPCIONAL de Departamento (Baseline V1 item 1). Não tem
+// `empresa_id` próprio de propósito: a empresa é sempre a do departamento
+// pai, o que torna divergência de empresa impossível por construção — não há
+// o que validar nem o que denormalizar.
+model Area {
+  id             String               @id @default(uuid())
+  departamentoId String               @map("departamento_id")
+  codigo         String
+  nome           String
+  status         StatusOrganizacional @default(ativo)
+
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  departamento Departamento @relation(fields: [departamentoId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([departamentoId, codigo])
+  @@index([departamentoId, status])
+  @@map("area")
+}
+
+// Pertence obrigatoriamente a um Departamento e, opcionalmente, a uma
+// UnidadeOrganizacional (Baseline V1 item 3). As duas referências são FKs
+// COMPOSTAS incluindo `empresa_id`, de modo que o banco recusa equipe cujo
+// departamento ou unidade sejam de outra empresa (spec R5).
+model Equipe {
+  id                      String               @id @default(uuid())
+  empresaId               String               @map("empresa_id")
+  departamentoId          String               @map("departamento_id")
+  unidadeOrganizacionalId String?              @map("unidade_organizacional_id")
+  codigo                  String
+  nome                    String
+  status                  StatusOrganizacional @default(ativo)
+
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  empresa      Empresa      @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  departamento Departamento @relation(fields: [departamentoId, empresaId], references: [id, empresaId], onDelete: Restrict, onUpdate: Cascade)
+  unidadeOrganizacional UnidadeOrganizacional? @relation(fields: [unidadeOrganizacionalId, empresaId], references: [id, empresaId], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([departamentoId, codigo])
+  @@index([empresaId, status])
+  @@index([departamentoId])
+  @@index([unidadeOrganizacionalId])
+  @@map("equipe")
+}
+
+// Catálogo de cargos POR EMPRESA (Baseline V1 item 5). "Cargo", nunca "Role":
+// o domínio de autorização já usa papel (`AccessRole`) para outro conceito
+// (ADR 0006, Emenda 1, item 3). Sem faixa salarial, CBO, jornada ou qualquer
+// atributo trabalhista/fiscal — e sem "função", que fica para a vida
+// funcional futura do colaborador (item 4).
+model Cargo {
+  id        String               @id @default(uuid())
+  empresaId String               @map("empresa_id")
+  codigo    String
+  nome      String
+  status    StatusOrganizacional @default(ativo)
+
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  empresa Empresa @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([empresaId, codigo])
+  @@index([empresaId, status])
+  @@map("cargo")
+}
+
+// Cadastro por empresa, SEM associação a unidade, departamento, área ou
+// equipe nesta fatia (Baseline V1 item 6). Rótulo organizacional apenas: sem
+// valor monetário, rateio, plano de contas ou integração financeira.
+model CentroCusto {
+  id        String               @id @default(uuid())
+  empresaId String               @map("empresa_id")
+  codigo    String
+  nome      String
+  status    StatusOrganizacional @default(ativo)
+
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  empresa Empresa @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([empresaId, codigo])
+  @@index([empresaId, status])
+  @@map("centro_custo")
 }

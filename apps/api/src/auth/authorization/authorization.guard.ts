@@ -11,7 +11,12 @@ import { AccessRole } from "@prisma/client";
 import "../session/session-request.types";
 import { PrismaService } from "../../database/prisma.service";
 import { evaluatePermission } from "./rbac.evaluator";
-import { AuthorizationTarget } from "./permission.types";
+import {
+  AuthorizationResource,
+  AuthorizationTarget,
+  isOrganizationalResource,
+} from "./permission.types";
+import { AuditResource } from "../../audit/audit.types";
 import {
   PERMISSION_METADATA_KEY,
   RequiredPermission,
@@ -24,6 +29,22 @@ declare module "express" {
     /** Populado pelo guard quando a permissão exige alvo (`:id` de rota). */
     authorizationTargetUser?: import("@prisma/client").AccessUser;
   }
+}
+
+/**
+ * Etiqueta do recurso no evento `authorization_denied`. Os dois casos da
+ * Etapa 0 permanecem exatamente como estavam; recursos organizacionais
+ * (Etapa 1) passam a se auto-identificar, em vez de serem registrados como
+ * `access_user` — o que produziria trilha enganosa.
+ */
+function toAuditResource(resource: AuthorizationResource): AuditResource {
+  if (resource === "access_log") {
+    return "audit_event";
+  }
+  if (isOrganizationalResource(resource)) {
+    return resource;
+  }
+  return "access_user";
 }
 
 /**
@@ -104,8 +125,7 @@ export class AuthorizationGuard implements CanActivate {
         actorRole: subjectUser.role,
         companyId: subjectUser.companyId,
         action: "authorization_denied",
-        resource:
-          required.resource === "access_log" ? "audit_event" : "access_user",
+        resource: toAuditResource(required.resource),
         resourceId: target.targetUserId ?? null,
         ip: metadata.ip,
         userAgent: metadata.userAgent,
