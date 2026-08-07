@@ -1,16 +1,23 @@
 # Etapa 1 — Fatia 2: Colaboradores e vida funcional
 
-Status: **especificação em revisão (2026-08-07)** — nenhuma implementação
-existe. Este documento é **somente especificação**: não cria código,
-`schema.prisma`, migration, endpoint, DTO, teste, dependência,
-infraestrutura, interface, PR ou merge.
+Status: **Baseline V1 aprovada (2026-08-07)** — decisão de produto
+registrada em
+[docs/decisions/etapa1-fatia2-colaboradores-baseline-v1.md](../decisions/etapa1-fatia2-colaboradores-baseline-v1.md)
+e formalizada em
+[ADR 0007](../adr/0007-colaboradores-e-vida-funcional-baseline-v1.md)
+(status: aceito). Nenhuma implementação existe. Este documento continua
+**somente especificação**: não cria código, `schema.prisma`, migration,
+endpoint, DTO, teste, dependência, infraestrutura, interface, PR ou merge.
 
-Fase do rito SDD: **Especificar**. Aprovar, Implementar, Verificar e
-Registrar são fases posteriores, cada uma com seu próprio ciclo. Esta
-fatia **não pode entrar em Implementar** enquanto as decisões pendentes
-bloqueantes de §12 não forem resolvidas por quem tem competência para
-decidi-las — em especial as de dado pessoal, que dependem de DPO e
-jurídico, não de arquitetura.
+Fase do rito SDD: **Especificar → Aprovar concluído (Baseline V1) →
+Registrar** (este documento). **Implementar** é a próxima fase possível
+para o escopo reduzido da Baseline V1, com dados exclusivamente
+sintéticos — ver §12 para a lista fechada do que ainda bloqueia mesmo
+nesse escopo, e para os **gates que continuam valendo antes de qualquer
+piloto com dado real ou produção** (retenção/descarte, MFA, confirmação
+formal de DPO). Extensões além da Baseline V1 (dado restrito, gestor,
+aprovação formal, novo papel) permanecem em **Especificar**, cada uma
+dependente de decisão própria.
 
 Depende de (tudo já integrado em `main`, commit
 `45ce79bfac9d86f100e0958447c83547350748cd`):
@@ -24,8 +31,8 @@ Depende de (tudo já integrado em `main`, commit
   [ADR 0005](../adr/0005-escopo-interno-e-evolucao-multitenant.md),
   [ADR 0006](../adr/0006-modelo-organizacional-interno-baseline-v1.md)
 
-Decisão arquitetural correspondente: **proposta de ADR 0007**, descrita em
-§13. O arquivo da ADR **não é criado** por esta tarefa.
+Decisão arquitetural correspondente: **ADR 0007** (aceita), formalizando a
+Baseline V1 do produto. Ver §13 para o resumo e o link para o arquivo.
 
 ## 0. Contexto decisório e observações registradas
 
@@ -154,6 +161,78 @@ elemento já implementado. `access_user`, `audit_event`,
 organizacionais e seus 29 verbos de auditoria permanecem exatamente como
 estão.
 
+### O6 — Baseline V1: decisão de produto aprovada, este documento atualizado para refleti-la
+
+Em 2026-08-07 o produto aprovou 13 decisões fechando o escopo mínimo desta
+fatia — registradas em
+[docs/decisions/etapa1-fatia2-colaboradores-baseline-v1.md](../decisions/etapa1-fatia2-colaboradores-baseline-v1.md)
+e formalizadas na [ADR 0007](../adr/0007-colaboradores-e-vida-funcional-baseline-v1.md)
+(aceita). Esta seção resume o que mudou; cada seção afetada (§3, §4, §5,
+§6, §7, §8, §9, §12) foi atualizada para refletir a decisão, preservando
+como histórico as alternativas e riscos que motivaram o desenho original.
+
+Resumo objetivo do que a Baseline V1 resolve — detalhe completo no
+documento de decisão:
+
+1. **Dados aprovados para V1:** matrícula, nome completo, situação,
+   vínculo funcional. Nenhum outro campo de dado pessoal entra nesta
+   fatia (resolve DP-11 para o escopo V1).
+2. **Matrícula** passa a ser identificador do **vínculo**, não do
+   colaborador — único **por Empresa**, nunca CPF como chave (resolve
+   DP-22).
+3. **Histórico de múltiplos vínculos é permitido; no máximo um vínculo
+   ativo por Colaborador e Empresa** nesta V1 (resolve DP-12, adiciona
+   RI-V6).
+4. **Tipos de vínculo fechados:** `clt`, `estagio`, `pj`, `temporario`,
+   `outro_controlado` — sem automação de regra trabalhista (resolve
+   DP-13).
+5. **Dado restrito (salário, família, saúde, benefícios, documentos)
+   fica inteiramente fora desta fatia** — não é modelado, não é
+   implementado (confirma a exclusão já proposta em §4.7/§5.3; a
+   segregação por recurso próprio permanece desenho válido para quando
+   esse dado for aprovado, em fatia futura).
+6. **Retenção/anonimização/descarte continuam pendentes (DP-15)** —
+   **não bloqueiam** a implementação desta V1 com dados sintéticos, mas
+   **continuam gate obrigatório antes de qualquer piloto com dado real ou
+   produção**. Nenhuma aprovação jurídica/LGPD é declarada concluída.
+7. **Sem workflow de aprovação nesta V1** — RH e DP autorizados registram
+   alterações dentro do escopo aprovado, diretamente, sempre auditadas.
+   `AprovacaoMovimentacao` (§4.5) e os estados `aprovada`/`rejeitada`
+   (§8) ficam **fora de uso nesta V1** (resolve DP-17).
+8. **`admin_tecnico` não acessa dado pessoal de Colaborador** — nem
+   cadastro básico, nem qualquer campo. A exceção temporária de acesso
+   global (Emenda 1 da ADR 0005) permanece limitada à estrutura
+   organizacional da Fatia 1 e **não é ampliada por herança** para este
+   domínio (resolve DP-21, de forma definitiva, não apenas para a V1).
+9. **Nome social e identidade de gênero não entram nesta V1** — exigem
+   requisito formal de RH e avaliação de privacidade própria (resolve
+   DP-25 para o escopo V1).
+10. **Alocação organizacional é obrigatória antes de efetivar vínculo
+    como `ativo`**; um vínculo em rascunho (`previsto`) pode existir sem
+    alocação (resolve DP-28 no nível de existência do registro; a
+    obrigatoriedade fina de cada campo dentro da alocação permanece
+    detalhe de implementação, não bloqueante).
+11. **Motivo usa catálogo controlado; texto livre não é aceito nesta V1**
+    (resolve DP-29 quanto ao mecanismo; o conteúdo do catálogo é detalhe
+    de implementação a validar com RH, não bloqueante).
+12. **Papel `dp` atua só na própria Empresa**, com acesso a cadastro
+    básico e vínculo funcional — leitura **e** registro de alteração
+    dentro do escopo aprovado (item 7), sempre auditado; sem acesso a
+    campo restrito, que permanece fora da fatia (resolve DP-30).
+13. **Papel `diretoria` não é criado agora** — confirma O3: o papel
+    continua inexistente no enum, fora do escopo desta V1 (reafirma
+    DP-20, sem alteração).
+
+**O que a Baseline V1 explicitamente não resolve** — permanece pendente,
+sem alteração de status: DP-4 (CNPJ), DP-7 (escopo `auditor`/`dpo`), DP-8
+(escopo `gestor`), DP-14 (categorias de dado restrito, fora de escopo
+nesta fatia mas sem decisão de base legal para o dia em que forem
+introduzidas), DP-16 (gestor/subordinado), DP-18 (folha/ponto), DP-19
+(reautenticação), DP-20 (papel `diretoria`), DP-23 (vínculo `AccessUser`
+↔ Colaborador), DP-24 (anexos), DP-26 (prefixo `pessoas`), DP-27
+(matriz de rastreabilidade PRD). MFA continua obrigatório antes de piloto
+com dado real ou produção (ADR 0003, decisão 3, inalterada).
+
 ## 1. Objetivo, valor de negócio, escopo e fora de escopo
 
 ### Contexto funcional recebido
@@ -244,11 +323,14 @@ silenciosamente o registro que valia naquela data.**
 - **Nenhum artefato de implementação.** Código, `schema.prisma`,
   migration, endpoint, DTO, guard, teste, dependência, infraestrutura,
   interface, PR ou merge. Esta fase é só documento.
-- **Nenhum campo de dado pessoal dado como decidido.** Documento fiscal
-  (CPF), documento de identidade (RG), endereço, telefone, dado bancário,
-  salário, dado médico, dado familiar/dependente e benefício **não são
-  criados nesta spec como campo**, nem "conceitualmente obrigatórios" —
-  todos aparecem só como decisão pendente (§5, §12).
+- **Nenhum campo de dado pessoal além do aprovado na Baseline V1.** A
+  Baseline V1 (O6, §12) aprovou exatamente quatro dados: matrícula, nome
+  completo, situação e vínculo funcional. Documento fiscal (CPF),
+  documento de identidade (RG), endereço, telefone, dado bancário,
+  salário, dado médico, dado familiar/dependente, benefício, nome social e
+  identidade de gênero **não são criados nesta spec como campo**, nem
+  "conceitualmente obrigatórios" — todos ficam **fora desta fatia**, por
+  decisão explícita (§5, §12), não por pendência de arquitetura.
 - **Nenhuma relação gestor ↔ subordinado.** Nem entidade, nem campo, nem
   convenção de nomenclatura reservada, nem "ponto de ancoragem previsto".
   A ADR 0006 decisão 8 proibiu antecipação estrutural na Fatia 1; esta
@@ -420,10 +502,20 @@ com uma empresa**. Separá-los é o que permite, se aprovado, que a mesma
 pessoa tenha mais de um vínculo — e o que garante que o desligamento
 encerre a relação sem apagar a pessoa.
 
-**Não decidido nesta spec:** se um colaborador pode ter mais de um vínculo
-(simultâneo ou sequencial), quais tipos de vínculo existem (CLT, estágio,
-PJ, aprendiz, temporário, aposentado, outros) e que regras trabalhistas
-cada tipo carrega. **DP-12** e **DP-13**.
+**Resolvido pela Baseline V1 (O6, item 3):** histórico de múltiplos
+vínculos é permitido — um colaborador pode ter vários vínculos ao longo
+do tempo, inclusive com empresas diferentes. **No máximo um vínculo em
+situação `ativo` ou `suspenso` por par (Colaborador, Empresa)** nesta V1
+(RI-V6, §7). Não há limite ao número de vínculos **históricos**
+(`encerrado`) nem à quantidade de empresas distintas com que um
+colaborador pode ter se relacionado ao longo do tempo — o limite é
+estritamente "um vínculo em curso por empresa".
+
+**Resolvido pela Baseline V1 (O6, item 4):** catálogo fechado de tipos de
+vínculo — `clt`, `estagio`, `pj`, `temporario`, `outro_controlado` (§4.2).
+Nenhum tipo carrega regra trabalhista automatizada (§8) — o sistema
+registra o tipo declarado por RH/DP, não deriva nem valida enquadramento
+legal.
 
 ### 3.3 Movimentação funcional
 
@@ -499,39 +591,40 @@ camelCase, tabelas/colunas futuras snake_case sem acento.
 
 ### 4.1 `Colaborador`
 
+**Campos aprovados pela Baseline V1 (O6, item 1):** este é o conjunto
+fechado desta fatia — nenhum outro campo entra sem nova decisão de
+produto/DPO/RH.
+
 ```text
 colaborador
   id                [PK]  identificador interno, não sequencial previsível
                           (UUID, mesmo padrão desde a Fatia 3)
-  matricula         [U]   identificador funcional — escopo de unicidade a
-                          decidir [DP-22]
   nome                    nome civil completo — DADO PESSOAL (§5)
-  nome_social       ?     [DP-25]
   situacao                enum fechado: ver §8
   criado_em / atualizado_em
 
-  -- NENHUM outro campo de dado pessoal é proposto aqui.
-  -- Documento fiscal, documento de identidade, data de nascimento,
-  -- endereço, telefone, e-mail pessoal, dado bancário, estado civil,
-  -- nacionalidade, escolaridade e afins: [DP-11], não decididos.
-  -- Dado familiar, médico, salarial e de benefício: [DP-14], não
-  -- decididos, e provavelmente não pertencem a esta entidade (§4.7).
+  -- Matrícula NÃO é campo do colaborador nesta V1 — é campo do vínculo
+  -- (§4.2), porque sua unicidade é "por Empresa" (Baseline V1, item 2),
+  -- e o colaborador em si não é escopado a uma empresa.
+  --
+  -- NENHUM outro campo de dado pessoal entra nesta fatia (Baseline V1,
+  -- item 1). Documento fiscal, documento de identidade, data de
+  -- nascimento, endereço, telefone, e-mail pessoal, dado bancário, estado
+  -- civil, nacionalidade, escolaridade, nome social e identidade de
+  -- gênero: fora de escopo desta V1 (§5, §12) — exigem decisão de
+  -- produto/DPO/RH própria caso venham a ser propostos numa fatia futura.
+  -- Dado familiar, médico, salarial e de benefício: fora desta fatia,
+  -- Baseline V1 item 5 (§4.7).
 ```
 
-**Sobre `id` e `matricula` — são coisas diferentes, de propósito:**
+**Sobre `id` — é técnico**: opaco, gerado pelo servidor, usado em rota, FK
+e auditoria. Nunca carrega significado de negócio. O identificador
+funcional (`matricula`) vive no vínculo (§4.2), não aqui.
 
-- `id` é **técnico**: opaco, gerado pelo servidor, usado em rota, FK e
-  auditoria. Nunca carrega significado de negócio.
-- `matricula` é **funcional**: o identificador que RH/DP e a pessoa
-  reconhecem, usado em documento e conferência.
-
-Separá-los evita o antipadrão de usar identificador de negócio como chave
-técnica — que trava correção de erro de cadastro e vaza informação em URL.
-
-**`matricula` é o identificador funcional. Documento pessoal (CPF ou
-qualquer outro) NUNCA é chave**, nem primária, nem natural, nem de
-unicidade, nem componente de URL — ver RI-C1 (§7). Isso vale mesmo que
-DP-11 venha a aprovar a coleta de CPF.
+**Documento pessoal (CPF ou qualquer outro) NUNCA é chave**, nem
+primária, nem natural, nem de unicidade, nem componente de URL — ver
+RI-C1 (§7). Vale mesmo que uma fatia futura venha a aprovar a coleta de
+CPF.
 
 **Situação do colaborador vs. situação do vínculo.** São distintas: a
 pessoa pode não ter nenhum vínculo ativo e continuar existindo (histórico,
@@ -546,18 +639,26 @@ vinculo_funcional
   id                    [PK]
   colaborador_id        [FK] -> colaborador
   empresa_id            [FK] -> empresa      (obrigatório, imutável)
-  tipo                        [DP-13] — catálogo de tipos não decidido
-  matricula_vinculo     ?     [DP-22] — se a matrícula é do colaborador
-                                        ou do vínculo depende do escopo
+  matricula              [U]  identificador funcional — único DENTRO DA
+                               EMPRESA (Baseline V1, item 2); nunca CPF
+  tipo                        enum fechado — ver catálogo abaixo
   data_admissao               data de início do vínculo
   data_desligamento     ?     preenchida só quando o desligamento efetiva
   situacao                    enum fechado: ver §8
   criado_em / atualizado_em
 
-  -- Sem salário, sem jornada contratual, sem cláusula, sem rubrica:
-  -- [DP-14] e [DP-18]. Jornada/escala é movimentação (§4.4), e seu
-  -- catálogo depende do módulo de Ponto (Etapa 3).
+  -- Sem salário, sem jornada contratual, sem cláusula, sem rubrica —
+  -- fora desta fatia (Baseline V1, item 5; §4.7) e [DP-18]. Jornada/
+  -- escala é movimentação (§4.4), e seu catálogo depende do módulo de
+  -- Ponto (Etapa 3).
 ```
+
+**Catálogo fechado de `tipo`** (Baseline V1, item 4): `clt`, `estagio`,
+`pj`, `temporario`, `outro_controlado`. `outro_controlado` é o único
+valor de escape — não é texto livre; é uma opção fechada do próprio enum,
+para os casos que RH precise registrar sem caber nos quatro tipos
+nomeados. Nenhum tipo altera comportamento do sistema (sem cálculo, sem
+regra trabalhista automatizada) — a distinção é só de registro (§8).
 
 `empresa_id` aqui **é a fronteira de autorização** de tudo que pende deste
 vínculo. É imutável pelo mesmo motivo de R7 da Fatia 1: mover uma pessoa
@@ -565,9 +666,16 @@ entre empresas não é `UPDATE`, é processo próprio com trilha dedicada
 (e, provavelmente, desligamento + nova admissão — decisão de RH, não de
 arquitetura).
 
-**Cardinalidade colaborador → vínculo não é decidida** (DP-12). O modelo
-acima **suporta** 1:N sem se comprometer com ele; se o produto decidir
-vínculo único, isso vira restrição de unicidade adicional, aditiva.
+**`matricula` fica no vínculo, não no colaborador** (Baseline V1, item 2,
+resolve DP-22): a unicidade exigida é "por Empresa", e `empresa_id` é
+propriedade do vínculo — o colaborador em si não é escopado a uma
+empresa. Consequência: o mesmo colaborador, com vínculos históricos em
+empresas diferentes, pode ter matrículas diferentes em cada uma — o que é
+esperado, não inconsistência.
+
+**Cardinalidade colaborador → vínculo, resolvida pela Baseline V1 (item 3,
+§3.2):** histórico de múltiplos vínculos permitido; **no máximo um em
+`ativo` ou `suspenso` por par (colaborador, empresa)** — RI-V6, §7.
 
 ### 4.3 `AlocacaoOrganizacional`
 
@@ -626,11 +734,11 @@ movimentacao_funcional
   vinculo_id            [FK] -> vinculo_funcional
   empresa_id            [FK] -> empresa      (fronteira de autorização)
   tipo                        enum fechado — ver catálogo abaixo
-  status                      enum fechado — ver §8
-  solicitada_em               quando foi solicitada (timestamp)
-  solicitante_user_id   [FK] -> access_user   quem solicitou
-  motivo                ?     texto controlado — ver aviso abaixo
-  motivo_codigo         ?     [DP-29] catálogo de motivos não decidido
+  status                      enum fechado — ver §8 (nesta V1, sem etapa
+                              de aprovação separada — Baseline V1, item 7)
+  solicitada_em               quando foi registrada (timestamp)
+  solicitante_user_id   [FK] -> access_user   RH ou DP que registrou
+  motivo_codigo         ?     catálogo controlado — ver aviso abaixo
   vigencia_inicio             data em que passa (ou passou) a valer
   vigencia_fim          ?     só para movimentação de duração definida
                               (ex.: férias, afastamento com retorno previsto)
@@ -638,6 +746,8 @@ movimentacao_funcional
   executor_user_id      [FK] ? quem efetivou
   retifica_id           [FK] ? -> movimentacao_funcional (§4.10)
   criado_em / atualizado_em
+
+  -- Sem campo de texto livre para motivo — Baseline V1, item 11.
 ```
 
 **Catálogo de tipos** — derivado do contexto funcional recebido (§1):
@@ -651,43 +761,54 @@ calcula direito, saldo, período aquisitivo ou concessivo (§8). O mesmo
 vale para `afastamento` (sem classificação de motivo legal) e
 `desligamento` (sem cálculo de rescisão ou aviso).
 
-**Aviso sobre `motivo` em texto livre.** Motivo de afastamento e de
-desligamento é exatamente onde dado sensível vaza para campo não
-classificado (diagnóstico médico digitado num campo de observação). Duas
-salvaguardas propostas:
+**Resolvido pela Baseline V1 (item 11):** motivo usa **catálogo
+controlado** (`motivo_codigo`); **texto livre não é aceito nesta V1**.
+Isso resolve o mecanismo — remove o risco descrito na spec original de
+dado sensível (ex.: diagnóstico médico) vazar para um campo de observação
+não classificado. O **conteúdo** do catálogo (quais códigos existem por
+tipo de movimentação) permanece detalhe de implementação a validar com
+RH — não bloqueante, e extensível de forma aditiva, mesmo padrão já usado
+em `AuditAction` (DP-29, quanto ao mecanismo, resolvido; quanto ao
+conteúdo do catálogo, aberto e não bloqueante).
 
-- **Preferir `motivo_codigo`** (catálogo fechado) sobre texto livre
-  (DP-29).
-- Se texto livre for aprovado, ele é **dado restrito** por classificação
-  (§5.3), com o mesmo controle de acesso e auditoria de leitura dos demais
-  restritos — nunca campo aberto no cadastro básico.
+### 4.5 `AprovacaoMovimentacao` — NÃO IMPLEMENTADA NESTA V1
 
-### 4.5 `AprovacaoMovimentacao`
+**Resolvido pela Baseline V1 (item 7):** esta fatia **não implementa
+workflow de aprovação**. RH e DP autorizados registram alterações
+diretamente, dentro do escopo aprovado (própria empresa, cadastro básico
+e vínculo funcional — §6), sempre auditadas (§9). Não há aprovador
+distinto do solicitante nesta V1: quem registra a movimentação é quem a
+torna válida, sob sua própria responsabilidade auditada.
 
-O contexto funcional exige registrar **aprovadores** (plural). Uma coluna
-`aprovador_id` não expressa isso.
+O rascunho conceitual abaixo é preservado como **desenho para fatia
+futura**, quando um workflow de aprovação formal for aprovado — não é
+criado, nem parcialmente, nesta V1:
 
 ```text
+-- NÃO IMPLEMENTADA NESTA V1 (Baseline V1, item 7) — preservado como
+-- desenho de referência para quando o workflow de aprovação for
+-- aprovado em fatia própria.
 aprovacao_movimentacao
   id                [PK]
   movimentacao_id   [FK] -> movimentacao_funcional
   aprovador_user_id [FK] -> access_user
-  ordem             ?     posição na cadeia, se houver cadeia [DP-17]
+  ordem             ?     posição na cadeia, se houver cadeia
   decisao                 enum fechado: pendente | aprovada | rejeitada
   decidida_em       ?
   justificativa     ?     dado restrito se contiver motivo pessoal
   criado_em
 ```
 
-**A matriz de aprovação não é decidida aqui** (DP-17): quem aprova o quê,
-se há cadeia ou aprovação única, se o aprovador pode ser o próprio
-solicitante, se aprovação é obrigatória por tipo de movimentação. São
-regras de governança de RH.
+A matriz de aprovação (quem aprova o quê, cadeia ou aprovação única,
+obrigatoriedade por tipo de movimentação) permanece **decisão pendente e
+não bloqueante** para uma fatia futura, caso o produto decida introduzir
+workflow formal.
 
-Uma restrição de segurança **é** proposta desde já, por não depender
-daquela decisão: **RI-M5 — solicitante e aprovador não podem ser o mesmo
-`AccessUser`** na mesma movimentação (segregação de funções). Se o produto
-quiser exceção, é decisão explícita.
+**RI-M5 — solicitante e aprovador não podem ser o mesmo `AccessUser`** na
+mesma movimentação (segregação de funções) permanece **registrada, mas
+inaplicável nesta V1** por não existir aprovador distinto — a regra é
+preservada para reaproveitamento automático no dia em que o workflow for
+implementado, sem precisar ser redesenhada.
 
 ### 4.6 `AnexoMovimentacao` — slot previsto, não implementado
 
@@ -711,15 +832,26 @@ nesta fatia significaria construir um subsistema de documentos por
 atalho, sem os controles que a Etapa 2 vai definir — o caminho mais curto
 para vazamento. **DP-24.**
 
-### 4.7 Dado restrito — segregado por desenho
+### 4.7 Dado restrito — fora desta fatia (Baseline V1)
 
 O contexto funcional é explícito: dados salariais, familiares, médicos,
 documentos pessoais e benefícios **são restritos e não podem ser expostos
 a gestores por padrão**.
 
-**Decisão de desenho proposta:** dado restrito **não mora no cadastro
-básico do colaborador**. Ele é segregado em estrutura própria, com
-autorização própria e auditoria de leitura própria (§9).
+**Resolvido pela Baseline V1 (item 5):** dado restrito **fica inteiramente
+fora desta fatia** — nenhuma categoria abaixo é modelada, nenhum recurso
+`dado_restrito_colaborador` é implementado, nenhuma rota segregada existe
+nesta V1 (§6, §10 atualizados). Isso não é a mesma coisa que "decidir que
+esses dados nunca existirão" — é decidir que **esta fatia não os
+introduz**, deixando a introdução (com base legal, finalidade e
+segregação técnica) para fatia futura, com decisão própria de DPO/RH.
+
+O desenho de segregação abaixo é preservado como **referência para essa
+fatia futura**, não como algo implementado agora: se e quando dado
+restrito for aprovado, ele **não mora no cadastro básico do
+colaborador** — é segregado em estrutura própria, com autorização própria
+e auditoria de leitura própria (§9), pelo mesmo raciocínio original desta
+spec.
 
 Motivo: se o dado restrito estivesse na mesma entidade do cadastro básico,
 toda leitura do cadastro precisaria de projeção condicional por papel —
@@ -728,20 +860,24 @@ padrão de leitura **não tem** como retornar o dado restrito; expô-lo exige
 rota, permissão e evento de auditoria distintos.
 
 ```text
--- Forma da segregação a definir na implementação (§13). NENHUMA das
--- categorias abaixo é criada nesta spec — todas dependem de [DP-14].
+-- NÃO IMPLEMENTADA NESTA V1 (Baseline V1, item 5). Forma de segregação
+-- preservada como referência para fatia futura — nenhuma categoria
+-- abaixo é criada por esta spec, e nenhuma entra sem decisão própria de
+-- DPO/RH (DP-14) naquela fatia.
 --
 -- Categorias identificadas no contexto funcional:
 --   * remuneratória      (salário, faixa, reajuste)
 --   * familiar           (dependentes, estado civil, filiação)
 --   * saúde              (atestado, restrição, acomodação)  -> SENSÍVEL
---   * documental pessoal (documento fiscal, identidade)     -> [DP-11]
+--   * documental pessoal (documento fiscal, identidade)     -> DP-11 (V2)
 --   * benefícios         (adesão, plano)                    -> módulo próprio
 ```
 
-Nenhuma dessas estruturas é especificada em detalhe aqui: sem DP-11 e
-DP-14 resolvidas, especificá-las seria decidir por suposição qual dado
-pessoal o sistema coleta — precisamente o que este documento não faz.
+Nenhuma dessas estruturas é especificada em detalhe aqui: a Baseline V1
+decidiu **não introduzir** essas categorias nesta fatia (item 5) — não
+apenas "ainda não decidiu". Especificá-las em detalhe seria antecipar,
+por conta própria, qual dado pessoal uma fatia futura vai coletar —
+precisamente o que este documento não faz.
 
 ### 4.8 Linha do tempo e consulta por data de referência
 
@@ -807,32 +943,37 @@ deveria ser. Efeito em folha/ponto é decisão de outro módulo (DP-18).
 delimita — e transfere explicitamente para DPO e jurídico o que só eles
 podem decidir.
 
-### 5.1 Dados mínimos indispensáveis (propostos)
+### 5.1 Dados mínimos indispensáveis — APROVADOS (Baseline V1)
 
-O conjunto mínimo abaixo é o que torna o domínio **funcionalmente
-possível**. Qualquer conjunto menor não permite identificar de quem é a
-vida funcional registrada.
+**Resolvido pela Baseline V1 (item 1):** este é o conjunto **aprovado**
+para implementação com dados sintéticos — não mais proposta. Nenhum outro
+campo de dado pessoal entra sem nova decisão de produto/DPO/RH.
 
-| Dado                                       | Classificação                     | Finalidade                              | Minimização aplicada                                       |
-| ------------------------------------------ | --------------------------------- | --------------------------------------- | ---------------------------------------------------------- |
-| `colaborador.id`                           | Técnico                           | Chave interna, FK, auditoria            | Opaco; não deriva de dado pessoal                          |
-| `colaborador.matricula`                    | Pessoal (identificador funcional) | Identificação funcional interna         | Gerado/atribuído pela organização; não é documento oficial |
-| `colaborador.nome`                         | **Pessoal**                       | Identificar o titular da vida funcional | Nome apenas; sem filiação, sem documento                   |
-| `vinculo.empresa_id`                       | Organizacional                    | Fronteira de autorização                | Já existente (Fatia 1)                                     |
-| `vinculo.data_admissao`                    | Pessoal (funcional)               | Marco inicial do histórico              | Data apenas                                                |
-| `vinculo.data_desligamento`                | Pessoal (funcional)               | Marco final do histórico                | Data apenas; **sem motivo** neste campo                    |
-| Alocação (nós + vigência)                  | Pessoal (funcional)               | Situação organizacional por data        | Referências a nós já existentes; sem dado pessoal novo     |
-| Movimentação (tipo, datas, status, atores) | Pessoal (funcional)               | Rastro do ato funcional                 | Atores são `AccessUser` (dado já tratado na Fatia 3)       |
+| Dado                                                        | Classificação                     | Finalidade                                | Minimização aplicada                                                                                      |
+| ----------------------------------------------------------- | --------------------------------- | ----------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `colaborador.id`                                            | Técnico                           | Chave interna, FK, auditoria              | Opaco; não deriva de dado pessoal                                                                         |
+| `colaborador.nome`                                          | **Pessoal**                       | Identificar o titular da vida funcional   | Nome apenas; sem filiação, sem documento                                                                  |
+| `colaborador.situacao`                                      | Funcional (derivado)              | Refletir se há vínculo em curso           | Não é dado pessoal em si; deriva do vínculo (§4.1)                                                        |
+| `vinculo.matricula`                                         | Pessoal (identificador funcional) | Identificação funcional dentro da empresa | Gerado/atribuído pela organização; único por empresa (§4.2); não é documento oficial                      |
+| `vinculo.empresa_id`                                        | Organizacional                    | Fronteira de autorização                  | Já existente (Fatia 1)                                                                                    |
+| `vinculo.data_admissao`                                     | Pessoal (funcional)               | Marco inicial do histórico                | Data apenas                                                                                               |
+| `vinculo.data_desligamento`                                 | Pessoal (funcional)               | Marco final do histórico                  | Data apenas; **sem motivo** neste campo                                                                   |
+| `vinculo.tipo`                                              | Funcional                         | Registrar a natureza do vínculo           | Catálogo fechado (§4.2), sem regra trabalhista associada                                                  |
+| Alocação (nós + vigência)                                   | Pessoal (funcional)               | Situação organizacional por data          | Referências a nós já existentes; sem dado pessoal novo                                                    |
+| Movimentação (tipo, datas, status, atores, `motivo_codigo`) | Pessoal (funcional)               | Rastro do ato funcional                   | Atores são `AccessUser` (dado já tratado na Fatia 3); motivo é catálogo fechado, nunca texto livre (§4.4) |
 
-Mesmo esta lista mínima é **proposta**, não aprovada — DP-11 cobre o
-conjunto exato, incluindo a pergunta de se `nome` civil basta ou se
-`nome_social` é obrigatório (DP-25).
+**Nome social e identidade de gênero não entram nesta V1** (Baseline V1,
+item 9, resolve DP-25 para o escopo desta fatia) — exigem requisito
+formal de RH e avaliação de privacidade específica antes de proposta
+futura.
 
-### 5.2 Dados pessoais comuns — todos pendentes
+### 5.2 Dados pessoais comuns — fora desta fatia, por decisão
 
-Nenhum dos itens abaixo é criado como campo por esta spec. Todos dependem
-de **DP-11**, com finalidade declarada item a item antes de qualquer
-coleta:
+Nenhum dos itens abaixo é criado como campo por esta spec. A Baseline V1
+(item 1) **decidiu não incluí-los** nesta fatia — não é ausência de
+decisão, é decisão de excluí-los agora. Uma fatia futura que queira
+introduzir qualquer um precisa de decisão própria, com finalidade
+declarada item a item (referência mantida como **DP-11 (V2)**):
 
 documento fiscal (CPF), documento de identidade (RG e equivalentes),
 data de nascimento, naturalidade/nacionalidade, endereço residencial,
@@ -854,17 +995,23 @@ Independentemente de DP-11: **CPF nunca é chave** (RI-C1) e **nunca
 aparece em log, URL, mensagem de erro ou evento de auditoria** — o que já
 é vedação vigente (ADR 0004 §5, §6), não novidade desta spec.
 
-### 5.3 Categorias sensíveis e restritas — todas pendentes
+### 5.3 Categorias sensíveis e restritas — fora desta fatia (Baseline V1)
 
-| Categoria                                         | Natureza                                | Pendência              |
-| ------------------------------------------------- | --------------------------------------- | ---------------------- |
-| Dado de saúde                                     | **Sensível** (regime jurídico próprio)  | DP-14                  |
-| Dado familiar/dependente                          | Pessoal de **terceiro** não colaborador | DP-14                  |
-| Dado remuneratório                                | Restrito (alto impacto se vazado)       | DP-14                  |
-| Benefícios                                        | Restrito; pode revelar dado de saúde    | DP-14 + módulo próprio |
-| Documento pessoal                                 | Restrito                                | DP-11 + DP-24          |
-| Identidade de gênero                              | **Sensível**                            | DP-25                  |
-| Motivo de afastamento/desligamento em texto livre | Pode conter dado de saúde               | DP-29                  |
+**Resolvido pela Baseline V1 (itens 5 e 9):** todas as categorias abaixo
+ficam **fora desta fatia**, por decisão — não por pendência de
+arquitetura. A pendência de cada uma diz respeito a **quando** e **como**
+uma fatia futura poderá introduzi-las, não a se elas existem hoje (não
+existem).
+
+| Categoria                                         | Natureza                                | Status nesta V1                                           | Pendência p/ fatia futura                                            |
+| ------------------------------------------------- | --------------------------------------- | --------------------------------------------------------- | -------------------------------------------------------------------- |
+| Dado de saúde                                     | **Sensível** (regime jurídico próprio)  | Fora desta fatia (Baseline V1, item 5)                    | DP-14                                                                |
+| Dado familiar/dependente                          | Pessoal de **terceiro** não colaborador | Fora desta fatia (Baseline V1, item 5)                    | DP-14                                                                |
+| Dado remuneratório                                | Restrito (alto impacto se vazado)       | Fora desta fatia (Baseline V1, item 5)                    | DP-14                                                                |
+| Benefícios                                        | Restrito; pode revelar dado de saúde    | Fora desta fatia (Baseline V1, item 5)                    | DP-14 + módulo próprio                                               |
+| Documento pessoal                                 | Restrito                                | Fora desta fatia (Baseline V1, item 1)                    | DP-11 (V2) + DP-24                                                   |
+| Identidade de gênero                              | **Sensível**                            | Fora desta fatia (Baseline V1, item 9)                    | DP-25 (V2)                                                           |
+| Motivo de afastamento/desligamento em texto livre | Pode conter dado de saúde               | **Resolvido: não existe nesta V1** (Baseline V1, item 11) | — (mecanismo fechado; conteúdo do catálogo é detalhe não bloqueante) |
 
 Três alertas objetivos, registrados para não se perderem:
 
@@ -938,7 +1085,20 @@ Herda integralmente, sem alteração, e estende:
 
 ### 5.7 Retenção
 
-**Não decidida. DP-15.**
+**Não decidida. DP-15.** A Baseline V1 (item 6) confirma explicitamente
+que **não resolve** esta pendência — apenas separa dois momentos, para
+que a ausência de decisão jurídica não trave a implementação do que já
+está aprovado:
+
+- **Implementação com dados sintéticos (esta V1):** **não bloqueada** por
+  DP-15. Nenhum dado real existe para reter ou descartar; a ausência de
+  política não impede escrever e testar o código.
+- **Piloto com dado real ou produção:** **continua bloqueado** até DP-15
+  ser resolvida — junto de MFA (ADR 0003) e confirmação formal de DPO
+  (§12), é um dos gates que **não** se movem por esta decisão de produto.
+
+**Esta decisão não declara aprovação jurídica ou LGPD concluída**, em
+nenhum grau — nem para dado sintético, nem para dado real.
 
 Registrado, sem que esta spec resolva:
 
@@ -959,84 +1119,108 @@ Registrado, sem que esta spec resolva:
   seletiva preservando a estrutura do histórico — **decisão de DPO com
   arquitetura, não de arquitetura sozinha**. Registrado como **RI-F2-3**.
 
-### 5.8 Dependência de RH, jurídico e DPO
+### 5.8 Dependência de RH, jurídico e DPO — atualizada pós-Baseline V1
 
-| Quem          | O que precisa decidir antes da fase Implementar                                                                                                                  |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **RH**        | Conjunto de dados do lançamento (DP-11); tipos de vínculo (DP-13); obrigatoriedade da alocação (DP-28); catálogo de motivos (DP-29); matriz de aprovação (DP-17) |
-| **Jurídico**  | Tipos de vínculo e implicações trabalhistas (DP-13); prazos de retenção (DP-15)                                                                                  |
-| **DPO**       | Base legal e finalidade por categoria (DP-11, DP-14); dado de dependente; retenção e descarte (DP-15); acesso do `admin_tecnico` a dado restrito (DP-21)         |
-| **Produto**   | Cardinalidade de vínculos (DP-12); gestor/subordinado (DP-16); papel `diretoria` (DP-20); Portal e vínculo de acesso (DP-23)                                     |
-| **Segurança** | Reautenticação para ação de alto impacto (DP-19); DP-21 em conjunto com DPO                                                                                      |
+A Baseline V1 resolveu DP-11 (conjunto de dados), DP-12 (cardinalidade),
+DP-13 (tipos de vínculo), DP-17 (sem workflow), DP-21 (`admin_tecnico`
+negado), DP-22 (escopo da matrícula), DP-25 (nome social fora de V1),
+DP-28 (alocação obrigatória antes de ativar), DP-29 (mecanismo de
+motivo), DP-30 (escopo de `dp`) — para o escopo desta V1. O que resta:
 
-**Nenhum item desta tabela pode ser decidido por implementação.** Se a
-fase Implementar começar com qualquer um em aberto, a resposta correta é
-implementar a parte não afetada e deixar a afetada de fora — nunca
-escolher a opção "que parece razoável".
+| Quem          | O que ainda precisa decidir — não bloqueia esta V1, mas bloqueia extensão futura ou piloto real                                                                                                                       |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **RH**        | Conteúdo do catálogo de motivos (DP-29, detalhe não bloqueante); matriz de aprovação formal, se vier a existir (DP-17, futura)                                                                                        |
+| **Jurídico**  | Prazos de retenção (DP-15) — **gate antes de piloto real/produção**, não bloqueia implementação sintética                                                                                                             |
+| **DPO**       | Base legal e finalidade de qualquer categoria de dado restrito, caso proposta em fatia futura (DP-14); retenção e descarte (DP-15, gate de piloto real); confirmação formal de que esta V1 não introduz dado sensível |
+| **Produto**   | Gestor/subordinado (DP-16); papel `diretoria` (DP-20); Portal e vínculo de acesso `AccessUser` ↔ Colaborador (DP-23); prefixo de módulo `pessoas` (DP-26)                                                             |
+| **Segurança** | Reautenticação para ação de alto impacto (DP-19)                                                                                                                                                                      |
+
+**Nenhum item desta tabela pode ser decidido por implementação.** Onde a
+Baseline V1 já decidiu, a implementação segue a decisão registrada; onde
+não decidiu, a resposta correta é implementar a parte não afetada e
+deixar a afetada de fora — nunca escolher a opção "que parece razoável".
 
 ## 6. Matriz de acesso inicial
 
 Compatível com o RBAC/ABAC já implementado. Os recursos desta fatia
 **estendem** `AuthorizationResource` por ramo novo, sem reduzir nem
-alterar nada existente (§2.2, acréscimos 3 e 4).
+alterar nada existente (§2.2, acréscimos 3 e 4). **Atualizada pela
+Baseline V1** (O6, itens 7, 8 e 12) — ver justificativas abaixo.
 
 ### Recursos propostos
 
 `colaborador`, `vinculo_funcional`, `movimentacao_funcional`,
-`alocacao_organizacional`, `dado_restrito_colaborador`.
+`alocacao_organizacional`.
 
 Ações reaproveitam o vocabulário atual: `read`, `create`, `alter`,
 `manage`.
 
-**`dado_restrito_colaborador` é recurso separado de propósito** — é o que
-torna possível conceder leitura do cadastro básico sem conceder leitura de
-dado restrito, e auditar as duas de formas diferentes (§9).
+**`dado_restrito_colaborador` não é criado nesta V1.** A Baseline V1
+(item 5) decidiu que dado restrito fica inteiramente fora desta fatia —
+o recurso separado é preservado como desenho para quando dado restrito
+for aprovado (§4.7, §9), mas **não existe** para efeito de autorização
+nesta entrega.
 
 ### Matriz
 
-Legenda: ✅ concedido · ❌ negado · **⛔ negado por pendência** (não é
-recusa definitiva; é ausência de decisão que autorize conceder).
+Legenda: ✅ concedido · ❌ negado (decisão definitiva ou ausência de
+requisito) · **⛔ negado por pendência** (ausência de decisão que
+autorize conceder, aplicável a extensão futura, não a esta V1).
 
-| Papel           | Ler cadastro básico      | Ler dado restrito                   | Criar/alterar colaborador e vínculo | Movimentações | Escopo                                                    |
-| --------------- | ------------------------ | ----------------------------------- | ----------------------------------- | ------------- | --------------------------------------------------------- |
-| `admin_tecnico` | ✅                       | **⛔ DP-21**                        | ✅                                  | ✅            | Instância — exceção temporária, prazo até 2026-11-04 (O4) |
-| `rh`            | ✅                       | **⛔ DP-14**                        | ✅                                  | ✅            | Própria empresa                                           |
-| `dp`            | ✅                       | **⛔ DP-14**                        | **⛔ DP-30**                        | **⛔ DP-30**  | Própria empresa (leitura)                                 |
-| `gestor`        | **⛔ DP-8/DP-16**        | ❌ (contexto funcional é explícito) | ❌                                  | ❌            | Nenhum nesta fatia                                        |
-| `financeiro`    | ❌                       | ❌                                  | ❌                                  | ❌            | Nenhum — mantém só `centro_custo` da Fatia 1              |
-| `colaborador`   | ❌                       | ❌                                  | ❌                                  | ❌            | Nenhum — depende do Portal (§3.5)                         |
-| `auditor`       | **⛔ DP-7**              | **⛔ DP-7**                         | ❌                                  | ❌            | Nenhum — leitura da trilha (`access_log`) **inalterada**  |
-| `dpo`           | **⛔ DP-7**              | **⛔ DP-7**                         | ❌                                  | ❌            | Nenhum — leitura da trilha (`access_log`) **inalterada**  |
-| `diretoria`     | ❌ **papel inexistente** | ❌                                  | ❌                                  | ❌            | **O papel não existe no sistema** (O3) — criação é DP-20  |
+| Papel           | Ler cadastro básico        | Criar/alterar colaborador e vínculo | Registrar movimentação     | Escopo                                                                                                                                                                   |
+| --------------- | -------------------------- | ----------------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `admin_tecnico` | **❌ Baseline V1, item 8** | **❌ Baseline V1, item 8**          | **❌ Baseline V1, item 8** | Nenhum — a exceção temporária de acesso global (O4) permanece limitada à estrutura organizacional da Fatia 1, **não ampliada por herança** a dado pessoal de Colaborador |
+| `rh`            | ✅                         | ✅                                  | ✅                         | Própria empresa                                                                                                                                                          |
+| `dp`            | ✅ (Baseline V1, item 12)  | ✅ (Baseline V1, itens 7 e 12)      | ✅ (Baseline V1, item 7)   | Própria empresa — registra diretamente, dentro do escopo aprovado, sempre auditado                                                                                       |
+| `gestor`        | **⛔ DP-8/DP-16**          | ❌                                  | ❌                         | Nenhum nesta fatia                                                                                                                                                       |
+| `financeiro`    | ❌                         | ❌                                  | ❌                         | Nenhum — mantém só `centro_custo` da Fatia 1                                                                                                                             |
+| `colaborador`   | ❌                         | ❌                                  | ❌                         | Nenhum — depende do Portal (§3.5)                                                                                                                                        |
+| `auditor`       | **⛔ DP-7**                | ❌                                  | ❌                         | Nenhum — leitura da trilha (`access_log`) **inalterada**                                                                                                                 |
+| `dpo`           | **⛔ DP-7**                | ❌                                  | ❌                         | Nenhum — leitura da trilha (`access_log`) **inalterada**                                                                                                                 |
+| `diretoria`     | ❌ **papel inexistente**   | ❌                                  | ❌                         | **O papel não existe no sistema** (O3) — criação é DP-20, reafirmada pela Baseline V1 item 13                                                                            |
 
-### Justificativa de cada negação — nenhuma é omissão
+**Ler dado restrito não é uma coluna desta matriz** — o recurso não
+existe nesta V1 (acima). Quando dado restrito for aprovado em fatia
+futura, a matriz para ele é redesenhada naquele momento, com a mesma
+disciplina de negação por padrão.
 
+### Justificativa de cada célula — nenhuma é omissão
+
+- **`admin_tecnico`.** Resolvido pela Baseline V1 (item 8), de forma
+  **definitiva**, não apenas para esta V1: o papel **não acessa dado
+  pessoal de Colaborador**, nem cadastro básico. A exceção temporária de
+  acesso global (Emenda 1 da ADR 0005) foi concedida sobre estrutura
+  organizacional sem dado pessoal (O4) — estendê-la a este domínio por
+  inércia de implementação ampliaria materialmente uma exceção aprovada
+  em outro contexto. A Baseline V1 fecha essa questão negando
+  explicitamente, em vez de deixá-la como pendência (⛔): não é "ainda não
+  decidido", é "decidido que não".
+- **`dp`.** Resolvido pela Baseline V1 (itens 7 e 12): `dp` passa a poder
+  **ler e registrar** alterações de cadastro básico e vínculo funcional,
+  restrito à própria empresa, sempre auditado — não porque ganhou um
+  fluxo de aprovação (que não existe nesta V1), mas porque a Baseline V1
+  tratou RH e DP como igualmente autorizados a registrar diretamente
+  dentro do escopo aprovado. Diferente da Fatia 1, onde `dp` tinha só
+  leitura — aqui a decisão de produto foi explícita em sentido contrário,
+  e está registrada, não presumida por simetria.
 - **`gestor`.** O contexto funcional diz literalmente que "gestor
   futuramente verá apenas equipe autorizada; essa regra ainda não está
-  decidida e não pode ser inventada". Conceder qualquer leitura exigiria
-  escolher a fronteira (equipe? departamento? direto ou indireto?) por
-  conta própria. **Negado integralmente**, mesmo no cadastro básico.
+  decidida e não pode ser inventada". A Baseline V1 não trata desse
+  ponto — continua **negado integralmente**, mesmo no cadastro básico.
   Mesma postura já aplicada na Fatia 1 (ADR 0006, Emenda 2).
 - **`auditor` e `dpo`.** DP-7 continua pendente desde a Fatia 1 e bloqueia
   o **primeiro provisionamento** desses papéis. Negá-los aqui é coerência,
   não regressão: a leitura da trilha de auditoria que eles já têm
   (`access_log`) permanece **exatamente como está**.
 - **`financeiro`.** Na Fatia 1, "estrutura mínima" era ambíguo e ficou
-  negado; só `centro_custo` foi concedido. Nada no contexto funcional
-  desta fatia indica que financeiro deva ler pessoas. Negado.
+  negado; só `centro_custo` foi concedido. Nada na Baseline V1 concede
+  acesso de financeiro a pessoas. Negado.
 - **`colaborador`.** O que ele acessaria é o Portal do Colaborador, que
   não existe (§3.5). Conceder acesso ao domínio sem o Portal seria expor
   dados de terceiros ao titular.
-- **`dp`.** Aqui há **ambiguidade real**: DP é a área que
-  operacionalmente executa admissão, movimentação e desligamento — mas na
-  Fatia 1 `dp` ficou com **leitura apenas**. Estender `dp` para escrita
-  no domínio de pessoas é decisão de governança, não de simetria.
-  **Negado até decisão** — **DP-30**.
-- **`admin_tecnico` e dado restrito.** Ver O4. A exceção temporária foi
-  concedida sobre estrutura organizacional sem dado pessoal. **Negado até
-  DP-21.**
-- **`diretoria`.** Não existe (O3). Não é possível conceder acesso a um
-  papel inexistente, e criá-lo é DP-20.
+- **`diretoria`.** Não existe (O3). A Baseline V1 (item 13) confirma
+  explicitamente que o papel não é criado agora — não é possível conceder
+  acesso a um papel inexistente.
 
 ### Regras invioláveis
 
@@ -1051,27 +1235,38 @@ recusa definitiva; é ausência de decisão que autorize conceder).
 - **A4 — Nenhuma escrita direta na trilha de auditoria**, por nenhum papel
   (ADR 0004 §2).
 - **A5 — Ninguém amplia o próprio escopo.** Herdada da Fatia 3.
-- **A6 — Ler cadastro básico nunca implica ler dado restrito.** São
-  recursos distintos, permissões distintas, eventos de auditoria
-  distintos. Não há herança entre eles, em nenhuma direção.
+- **A6 — Ler cadastro básico nunca implicará ler dado restrito, quando
+  esse recurso existir.** Não implementado nesta V1 (dado restrito está
+  fora de escopo, §4.7), mas o princípio fica registrado para a fatia que
+  o introduzir: recursos distintos, permissões distintas, eventos de
+  auditoria distintos, sem herança entre eles em nenhuma direção.
 - **A7 — Nenhum papel recebe acesso por interpretação de ambiguidade.**
   Onde a matriz é ambígua, aplica-se negação — nunca a leitura "mais
-  provável". Ampliar exige decisão registrada de produto/segurança.
+  provável". Ampliar exige decisão registrada de produto/segurança. A
+  Baseline V1 resolveu explicitamente as ambiguidades de `dp` e
+  `admin_tecnico` que existiam na versão anterior desta spec — o que
+  permanece ambíguo (`gestor`, `auditor`, `dpo`) continua negado.
+- **A8 — `admin_tecnico` não recebe dado pessoal de Colaborador por
+  herança.** Regra nova desta Baseline V1 (item 8): a exceção temporária
+  de acesso global concedida pela Emenda 1 da ADR 0005 é interpretada
+  **restritivamente** — vale só para o que já a motivou (estrutura
+  organizacional), nunca se estende automaticamente a um domínio novo só
+  porque o papel tem acesso amplo em outro.
 
 ## 7. Regras de integridade
 
 ### Identidade e cadastro
 
-- **RI-C1 — Matrícula é o identificador funcional; documento pessoal nunca
-  é chave.** CPF (ou qualquer documento pessoal) não é chave primária, não
-  é chave natural, não participa de restrição de unicidade, não entra em
-  URL e não identifica recurso em rota. Vale mesmo se DP-11 aprovar a
-  coleta.
-- **RI-C2 — Unicidade de matrícula no escopo correto.** O escopo é
-  **DP-22**: por empresa (permite a mesma matrícula em empresas
-  diferentes) ou global no deployment. Enquanto não decidido, a
-  implementação **não pode** escolher — é restrição de banco, cara de
-  reverter depois de haver dado.
+- **RI-C1 — Matrícula (do vínculo) é o identificador funcional; documento
+  pessoal nunca é chave.** CPF (ou qualquer documento pessoal) não é chave
+  primária, não é chave natural, não participa de restrição de unicidade,
+  não entra em URL e não identifica recurso em rota. Vale mesmo se uma
+  fatia futura aprovar a coleta de CPF (DP-11 V2).
+- **RI-C2 — Unicidade de matrícula por Empresa.** Resolvido pela Baseline
+  V1 (item 2, DP-22): `matricula` vive em `VinculoFuncional` (§4.2) e é
+  única **dentro da empresa** — restrição de banco em
+  `(empresa_id, matricula)`. A mesma matrícula pode existir em empresas
+  diferentes sem conflito.
 - **RI-C3 — Colaborador não é criado por extensão de `AccessUser`**, nem
   por inferência de igualdade de campo (RS-1, RS-2, RS-3).
 - **RI-C4 — Colaborador nunca é excluído fisicamente.** Nem no
@@ -1084,12 +1279,20 @@ recusa definitiva; é ausência de decisão que autorize conceder).
   imutável.** Mesmo princípio de R7 da Fatia 1.
 - **RI-V2 — Vínculo só é criado sob `Empresa` ativa.** Análogo direto de
   R-INA-3 da Fatia 1.
-- **RI-V3 — Cardinalidade colaborador → vínculo conforme DP-12.** Até a
-  decisão, a implementação **não impõe** unicidade nem a **relaxa**
-  deliberadamente: o item fica de fora do escopo implementado.
+- **RI-V3 — Histórico de vínculos ilimitado.** Resolvido pela Baseline V1
+  (item 3, DP-12): um colaborador pode ter qualquer número de vínculos
+  `encerrado` ao longo do tempo, inclusive com empresas diferentes. Não há
+  restrição de banco que limite esse total.
 - **RI-V4 — `data_desligamento` nunca é anterior a `data_admissao`.**
 - **RI-V5 — Desligamento encerra o vínculo, nunca apaga o colaborador nem
   seu histórico.**
+- **RI-V6 — No máximo um vínculo em `ativo` ou `suspenso` por par
+  (colaborador, empresa).** Resolvido pela Baseline V1 (item 3). Garantido
+  **por restrição de banco** (índice único parcial sobre
+  `(colaborador_id, empresa_id)` filtrado por situação em `ativo`/
+  `suspenso`, ou equivalente), não só por validação de aplicação — mesmo
+  padrão de RI-A1/RI-A2. Tentar efetivar uma segunda admissão para o
+  mesmo par enquanto a primeira segue em curso é recusado (`409`).
 
 ### Alocação
 
@@ -1109,6 +1312,14 @@ recusa definitiva; é ausência de decisão que autorize conceder).
   alteração de estado sem ato registrado que a justifique.
 - **RI-A5 — Alocação encerrada é imutável.** Fechar `vigente_ate` é a
   única alteração admitida numa alocação; depois disso, nada nela muda.
+- **RI-A6 — Alocação é obrigatória antes de o vínculo tornar-se `ativo`.**
+  Resolvido pela Baseline V1 (item 10, DP-28 no nível de existência do
+  registro): um vínculo em `previsto` (rascunho) pode existir sem
+  alocação; a transição para `ativo` (§8) exige que exista ao menos um
+  registro de alocação vigente. A obrigatoriedade fina de cada campo
+  dentro da alocação (se `departamento_id` ou `cargo_id` são
+  individualmente obrigatórios) permanece detalhe de implementação a
+  validar com RH — não bloqueante.
 
 ### Movimentação
 
@@ -1124,10 +1335,15 @@ recusa definitiva; é ausência de decisão que autorize conceder).
 - **RI-M4 — `vigencia_inicio` não pode ser anterior a `data_admissao`** do
   vínculo, nem posterior a `data_desligamento` quando este já existir.
 - **RI-M5 — Solicitante e aprovador não podem ser o mesmo `AccessUser`**
-  na mesma movimentação (segregação de funções, §4.5).
+  na mesma movimentação (segregação de funções). **Inaplicável nesta V1**
+  — não há aprovador distinto do solicitante (Baseline V1, item 7, §4.5).
+  Regra preservada para quando o workflow de aprovação for implementado.
 - **RI-M6 — Movimentação nunca é excluída fisicamente**, em nenhum status
-  — inclusive `rejeitada` e `cancelada`. A tentativa recusada faz parte do
-  histórico.
+  — inclusive `cancelada`. A tentativa recusada faz parte do histórico.
+- **RI-M7 — Motivo é sempre catálogo controlado, nunca texto livre.**
+  Resolvido pela Baseline V1 (item 11, DP-29 quanto ao mecanismo):
+  `motivo_codigo` é o único campo de motivo em `MovimentacaoFuncional`
+  (§4.4); não existe campo de texto livre para motivo nesta V1.
 
 ### Histórico e integração organizacional
 
@@ -1182,59 +1398,69 @@ derivada é decisão de implementação (§13).
 | `suspenso`  | Afastamento efetivado, com retorno esperado         |
 | `encerrado` | Desligamento efetivado                              |
 
-| De         | Para        | Disparada por                    |
-| ---------- | ----------- | -------------------------------- |
-| —          | `previsto`  | `admissao` programada            |
-| `previsto` | `ativo`     | efetivação de `admissao`         |
-| `previsto` | —           | cancelamento (vínculo não nasce) |
-| `ativo`    | `suspenso`  | efetivação de `afastamento`      |
-| `suspenso` | `ativo`     | efetivação de `retorno`          |
-| `ativo`    | `encerrado` | efetivação de `desligamento`     |
-| `suspenso` | `encerrado` | efetivação de `desligamento`     |
+| De         | Para        | Disparada por                                                                                |
+| ---------- | ----------- | -------------------------------------------------------------------------------------------- |
+| —          | `previsto`  | `admissao` programada                                                                        |
+| `previsto` | `ativo`     | efetivação de `admissao` — exige alocação vigente já registrada (RI-A6, Baseline V1 item 10) |
+| `previsto` | —           | cancelamento (vínculo não nasce)                                                             |
+| `ativo`    | `suspenso`  | efetivação de `afastamento`                                                                  |
+| `suspenso` | `ativo`     | efetivação de `retorno`                                                                      |
+| `ativo`    | `encerrado` | efetivação de `desligamento`                                                                 |
+| `suspenso` | `encerrado` | efetivação de `desligamento`                                                                 |
 
 **`encerrado` é terminal.** Readmissão é **vínculo novo**, nunca
 reativação do anterior — reativar apagaria a fronteira entre dois
 períodos distintos de relação, que é justamente o que o histórico precisa
 distinguir. (Contraste deliberado com R-INA-5 da Fatia 1, onde reativar um
 nó organizacional faz sentido porque o nó não tem período de relação.)
+Uma admissão que criaria vínculo `ativo` para um par (colaborador,
+empresa) que já tenha vínculo `ativo`/`suspenso` é recusada por RI-V6.
 
 **Férias não muda o estado do vínculo.** É movimentação com vigência
-delimitada, não suspensão. Se isso está correto para o negócio é
-confirmação de RH — registrado em **DP-13**.
+delimitada, não suspensão — confirmado pela Baseline V1 (item 4, tipos de
+vínculo sem automação trabalhista).
 
 ### Movimentação funcional
 
-| Estado       | Significado                                                     |
-| ------------ | --------------------------------------------------------------- |
-| `solicitada` | Registrada, aguardando decisão                                  |
-| `aprovada`   | Decidida favoravelmente; vigência é hoje ou passada             |
-| `programada` | Aprovada com vigência futura (§4.9)                             |
-| `rejeitada`  | Decidida desfavoravelmente — **terminal**                       |
-| `cancelada`  | Desistência antes da efetivação — **terminal**                  |
-| `efetivada`  | Aplicada: alocação/vínculo alterados — **imutável** (RI-M1)     |
-| `retificada` | Foi efetivada e depois corrigida por outra movimentação (§4.10) |
+**Sem workflow de aprovação nesta V1** (Baseline V1, item 7, §4.5): RH/DP
+registram e — quando a vigência já chegou — efetivam diretamente, sob sua
+própria responsabilidade auditada. Os estados `aprovada`/`rejeitada` não
+são usados nesta V1; permanecem na tabela abaixo só como referência para
+a fatia futura que implementar o workflow formal.
 
-| De           | Para         | Observação                                           |
-| ------------ | ------------ | ---------------------------------------------------- |
-| —            | `solicitada` | Criação                                              |
-| `solicitada` | `aprovada`   | Conforme matriz de aprovação (DP-17)                 |
-| `solicitada` | `programada` | Aprovada com vigência futura                         |
-| `solicitada` | `rejeitada`  | Terminal                                             |
-| `solicitada` | `cancelada`  | Terminal                                             |
-| `programada` | `cancelada`  | Antes da vigência; libera conflito de RI-M3          |
-| `programada` | `efetivada`  | Ato explícito e auditado na data de vigência (§4.9)  |
-| `aprovada`   | `efetivada`  | Ato explícito e auditado                             |
-| `aprovada`   | `cancelada`  | Antes da efetivação                                  |
-| `efetivada`  | `retificada` | **Única transição admitida** a partir de `efetivada` |
+| Estado       | Significado                                                      | Uso nesta V1                       |
+| ------------ | ---------------------------------------------------------------- | ---------------------------------- |
+| `solicitada` | Registrada por RH/DP; vigência é hoje ou passada                 | ✅ Usado                           |
+| `aprovada`   | Decidida favoravelmente por aprovador distinto do solicitante    | ⛔ Não usado (Baseline V1, item 7) |
+| `programada` | Registrada por RH/DP com vigência futura (§4.9)                  | ✅ Usado                           |
+| `rejeitada`  | Decidida desfavoravelmente por aprovador distinto — **terminal** | ⛔ Não usado (Baseline V1, item 7) |
+| `cancelada`  | Desistência antes da efetivação — **terminal**                   | ✅ Usado                           |
+| `efetivada`  | Aplicada: alocação/vínculo alterados — **imutável** (RI-M1)      | ✅ Usado                           |
+| `retificada` | Foi efetivada e depois corrigida por outra movimentação (§4.10)  | ✅ Usado                           |
+
+| De           | Para         | Observação                                                     | Uso nesta V1 |
+| ------------ | ------------ | -------------------------------------------------------------- | ------------ |
+| —            | `solicitada` | Criação por RH/DP, vigência hoje/passada                       | ✅           |
+| —            | `programada` | Criação por RH/DP, vigência futura                             | ✅           |
+| `solicitada` | `aprovada`   | Fora de uso — reservado a workflow futuro                      | ⛔           |
+| `solicitada` | `rejeitada`  | Fora de uso — reservado a workflow futuro                      | ⛔           |
+| `solicitada` | `cancelada`  | Terminal                                                       | ✅           |
+| `solicitada` | `efetivada`  | Ato explícito e auditado, direto (sem aprovação intermediária) | ✅           |
+| `programada` | `cancelada`  | Antes da vigência; libera conflito de RI-M3                    | ✅           |
+| `programada` | `efetivada`  | Ato explícito e auditado na data de vigência (§4.9)            | ✅           |
+| `efetivada`  | `retificada` | **Única transição admitida** a partir de `efetivada`           | ✅           |
 
 **Ausências deliberadas:**
 
-- Não há transição de `rejeitada` ou `cancelada` de volta para
-  `solicitada`. Nova tentativa é movimentação nova — a recusa anterior
-  permanece no histórico (RI-M6).
+- Não há transição de `cancelada` de volta para `solicitada`. Nova
+  tentativa é movimentação nova — a recusa anterior permanece no
+  histórico (RI-M6).
 - Não há transição que saia de `efetivada` para qualquer estado que não
   seja `retificada`.
 - Não há exclusão em nenhum estado.
+- `aprovada`/`rejeitada` não têm transição de entrada nem de saída
+  **ativa** nesta V1 — preservadas na tabela só para não obrigar redesenho
+  quando o workflow de aprovação for aprovado em fatia futura.
 
 ## 9. Eventos obrigatórios de auditoria
 
@@ -1244,23 +1470,23 @@ escrita** (ADR 0004 §2), nunca `prisma.auditEvent.create()` direto.
 Nomenclatura conforme convenção aprovada (O5, DP-26): português,
 minúsculas, separadas por ponto, prefixo `pessoas`.
 
-| Evento                                         | Quando                                                      | `result`  | Atomicidade      |
-| ---------------------------------------------- | ----------------------------------------------------------- | --------- | ---------------- |
-| `pessoas.colaborador.criado`                   | Cadastro criado                                             | `success` | **Transacional** |
-| `pessoas.colaborador.atualizado`               | Retificação de dado cadastral                               | `success` | **Transacional** |
-| `pessoas.vinculo.criado`                       | Vínculo criado (admissão programada ou efetivada)           | `success` | **Transacional** |
-| `pessoas.vinculo.encerrado`                    | Desligamento efetivado                                      | `success` | **Transacional** |
-| `pessoas.vinculo.suspenso` / `.retomado`       | Afastamento / retorno efetivados                            | `success` | **Transacional** |
-| `pessoas.movimentacao.solicitada`              | Movimentação registrada                                     | `success` | **Transacional** |
-| `pessoas.movimentacao.aprovada` / `.rejeitada` | Decisão de aprovador                                        | `success` | **Transacional** |
-| `pessoas.movimentacao.programada`              | Aprovada com vigência futura                                | `success` | **Transacional** |
-| `pessoas.movimentacao.efetivada`               | Aplicada ao vínculo/alocação                                | `success` | **Transacional** |
-| `pessoas.movimentacao.cancelada`               | Cancelada antes de efetivar                                 | `success` | **Transacional** |
-| `pessoas.movimentacao.retificada`              | Efetivada e depois corrigida                                | `success` | **Transacional** |
-| `pessoas.alocacao.criada` / `.encerrada`       | Sucessão de alocação                                        | `success` | **Transacional** |
-| `pessoas.dado_restrito.consultado`             | **Leitura** de qualquer dado restrito (§4.7)                | `success` | **Fail-safe**    |
-| `pessoas.colaborador.consultado`               | Leitura de cadastro **fora do escopo próprio** do ator      | `success` | **Fail-safe**    |
-| `authorization_denied`                         | Negação sobre recurso desta fatia, incluindo fora de escopo | `denied`  | Best-effort      |
+| Evento                                         | Quando                                                                             | `result`  | Atomicidade      | Uso nesta V1 |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------- | --------- | ---------------- | ------------ |
+| `pessoas.colaborador.criado`                   | Cadastro criado                                                                    | `success` | **Transacional** | ✅           |
+| `pessoas.colaborador.atualizado`               | Retificação de dado cadastral                                                      | `success` | **Transacional** | ✅           |
+| `pessoas.vinculo.criado`                       | Vínculo criado (admissão programada ou efetivada)                                  | `success` | **Transacional** | ✅           |
+| `pessoas.vinculo.encerrado`                    | Desligamento efetivado                                                             | `success` | **Transacional** | ✅           |
+| `pessoas.vinculo.suspenso` / `.retomado`       | Afastamento / retorno efetivados                                                   | `success` | **Transacional** | ✅           |
+| `pessoas.movimentacao.solicitada`              | Movimentação registrada por RH/DP                                                  | `success` | **Transacional** | ✅           |
+| `pessoas.movimentacao.aprovada` / `.rejeitada` | Decisão de aprovador — **não emitido nesta V1** (sem workflow, Baseline V1 item 7) | `success` | **Transacional** | ⛔           |
+| `pessoas.movimentacao.programada`              | Registrada por RH/DP com vigência futura                                           | `success` | **Transacional** | ✅           |
+| `pessoas.movimentacao.efetivada`               | Aplicada ao vínculo/alocação                                                       | `success` | **Transacional** | ✅           |
+| `pessoas.movimentacao.cancelada`               | Cancelada antes de efetivar                                                        | `success` | **Transacional** | ✅           |
+| `pessoas.movimentacao.retificada`              | Efetivada e depois corrigida                                                       | `success` | **Transacional** | ✅           |
+| `pessoas.alocacao.criada` / `.encerrada`       | Sucessão de alocação                                                               | `success` | **Transacional** | ✅           |
+| `pessoas.dado_restrito.consultado`             | **Não emitido nesta V1** — recurso não implementado (§4.7, Baseline V1 item 5)     | `success` | **Fail-safe**    | ⛔           |
+| `pessoas.colaborador.consultado`               | Leitura de cadastro **fora do escopo próprio** do ator                             | `success` | **Fail-safe**    | ✅           |
+| `authorization_denied`                         | Negação sobre recurso desta fatia, incluindo fora de escopo                        | `denied`  | Best-effort      | ✅           |
 
 ### Regras de atomicidade
 
@@ -1284,12 +1510,12 @@ Na Fatia 1, leitura dentro da própria empresa **deliberadamente não
 gerava evento**, para a trilha não virar log de tráfego. **Aqui isso muda
 parcialmente**, e a distinção é intencional:
 
-| Leitura                                        | Gera evento? | Por quê                                                       |
-| ---------------------------------------------- | ------------ | ------------------------------------------------------------- |
-| Cadastro básico, dentro do escopo do ator      | **Não**      | Rotina de RH; auditar tudo destruiria o sinal da trilha       |
-| **Qualquer** dado restrito                     | **Sim**      | Dado sensível/restrito: quem viu e quando é a questão central |
-| Cadastro fora do escopo próprio (acesso amplo) | **Sim**      | Mesmo princípio da consulta ampla da Fatia 1                  |
-| Tentativa negada                               | **Sim**      | `denied`, mesmo respondendo 404                               |
+| Leitura                                        | Gera evento? | Por quê                                                                 |
+| ---------------------------------------------- | ------------ | ----------------------------------------------------------------------- |
+| Cadastro básico, dentro do escopo do ator      | **Não**      | Rotina de RH/DP; auditar tudo destruiria o sinal da trilha              |
+| Dado restrito                                  | N/A          | Recurso não existe nesta V1 (§4.7, Baseline V1 item 5) — nada a auditar |
+| Cadastro fora do escopo próprio (acesso amplo) | **Sim**      | Mesmo princípio da consulta ampla da Fatia 1                            |
+| Tentativa negada                               | **Sim**      | `denied`, mesmo respondendo 404                                         |
 
 ### Impacto técnico a considerar na implementação
 
@@ -1317,33 +1543,35 @@ Propostos, **não implementados**. Nenhum endpoint, DTO ou controller é
 criado nesta fase. Rotas em português, plurais, minúsculas, sob `/v1`,
 conforme convenção aprovada.
 
-| Método | Rota (proposta)                                               | Descrição                                   | Autorização                          |
-| ------ | ------------------------------------------------------------- | ------------------------------------------- | ------------------------------------ |
-| GET    | `/v1/colaboradores`                                           | Lista paginada do escopo do ator            | `read` · `colaborador`               |
-| GET    | `/v1/colaboradores/:colaboradorId`                            | Cadastro básico                             | `read` · `colaborador`               |
-| POST   | `/v1/colaboradores`                                           | Cria cadastro (não cria conta de acesso)    | `create` · `colaborador`             |
-| PATCH  | `/v1/colaboradores/:colaboradorId`                            | Retifica dado cadastral                     | `alter` · `colaborador`              |
-| GET    | `/v1/colaboradores/:colaboradorId/vinculos`                   | Vínculos do colaborador                     | `read` · `vinculo_funcional`         |
-| POST   | `/v1/vinculos`                                                | Cria vínculo (via movimentação de admissão) | `create` · `vinculo_funcional`       |
-| GET    | `/v1/vinculos/:vinculoId/alocacoes`                           | Histórico completo de alocações             | `read` · `alocacao_organizacional`   |
-| GET    | `/v1/vinculos/:vinculoId/situacao?dataReferencia=YYYY-MM-DD`  | **Situação em uma data** (§1)               | `read` · `alocacao_organizacional`   |
-| GET    | `/v1/vinculos/:vinculoId/linha-do-tempo`                      | Movimentações ordenadas (§4.8)              | `read` · `movimentacao_funcional`    |
-| GET    | `/v1/movimentacoes`                                           | Lista paginada, filtrável por tipo/status   | `read` · `movimentacao_funcional`    |
-| POST   | `/v1/movimentacoes`                                           | Solicita movimentação                       | `create` · `movimentacao_funcional`  |
-| POST   | `/v1/movimentacoes/:movimentacaoId/aprovar`                   | Registra aprovação                          | `manage` · `movimentacao_funcional`  |
-| POST   | `/v1/movimentacoes/:movimentacaoId/rejeitar`                  | Registra rejeição                           | `manage` · `movimentacao_funcional`  |
-| POST   | `/v1/movimentacoes/:movimentacaoId/cancelar`                  | Cancela antes de efetivar                   | `manage` · `movimentacao_funcional`  |
-| POST   | `/v1/movimentacoes/:movimentacaoId/efetivar`                  | Efetiva; altera vínculo/alocação            | `manage` · `movimentacao_funcional`  |
-| POST   | `/v1/movimentacoes/:movimentacaoId/retificar`                 | Cria retificação (§4.10)                    | `manage` · `movimentacao_funcional`  |
-| GET    | `/v1/colaboradores/:colaboradorId/dados-restritos/:categoria` | **Rota segregada** (§4.7)                   | `read` · `dado_restrito_colaborador` |
+| Método | Rota (proposta)                                               | Descrição                                   | Autorização                          | Uso nesta V1                                                       |
+| ------ | ------------------------------------------------------------- | ------------------------------------------- | ------------------------------------ | ------------------------------------------------------------------ |
+| GET    | `/v1/colaboradores`                                           | Lista paginada do escopo do ator            | `read` · `colaborador`               | ✅                                                                 |
+| GET    | `/v1/colaboradores/:colaboradorId`                            | Cadastro básico                             | `read` · `colaborador`               | ✅                                                                 |
+| POST   | `/v1/colaboradores`                                           | Cria cadastro (não cria conta de acesso)    | `create` · `colaborador`             | ✅                                                                 |
+| PATCH  | `/v1/colaboradores/:colaboradorId`                            | Retifica dado cadastral                     | `alter` · `colaborador`              | ✅                                                                 |
+| GET    | `/v1/colaboradores/:colaboradorId/vinculos`                   | Vínculos do colaborador                     | `read` · `vinculo_funcional`         | ✅                                                                 |
+| POST   | `/v1/vinculos`                                                | Cria vínculo (via movimentação de admissão) | `create` · `vinculo_funcional`       | ✅                                                                 |
+| GET    | `/v1/vinculos/:vinculoId/alocacoes`                           | Histórico completo de alocações             | `read` · `alocacao_organizacional`   | ✅                                                                 |
+| GET    | `/v1/vinculos/:vinculoId/situacao?dataReferencia=YYYY-MM-DD`  | **Situação em uma data** (§1)               | `read` · `alocacao_organizacional`   | ✅                                                                 |
+| GET    | `/v1/vinculos/:vinculoId/linha-do-tempo`                      | Movimentações ordenadas (§4.8)              | `read` · `movimentacao_funcional`    | ✅                                                                 |
+| GET    | `/v1/movimentacoes`                                           | Lista paginada, filtrável por tipo/status   | `read` · `movimentacao_funcional`    | ✅                                                                 |
+| POST   | `/v1/movimentacoes`                                           | Registra movimentação (RH/DP, direto)       | `create` · `movimentacao_funcional`  | ✅                                                                 |
+| POST   | `/v1/movimentacoes/:movimentacaoId/aprovar`                   | Registra aprovação                          | `manage` · `movimentacao_funcional`  | ⛔ Não implementada (Baseline V1, item 7)                          |
+| POST   | `/v1/movimentacoes/:movimentacaoId/rejeitar`                  | Registra rejeição                           | `manage` · `movimentacao_funcional`  | ⛔ Não implementada (Baseline V1, item 7)                          |
+| POST   | `/v1/movimentacoes/:movimentacaoId/cancelar`                  | Cancela antes de efetivar                   | `manage` · `movimentacao_funcional`  | ✅                                                                 |
+| POST   | `/v1/movimentacoes/:movimentacaoId/efetivar`                  | Efetiva; altera vínculo/alocação            | `manage` · `movimentacao_funcional`  | ✅                                                                 |
+| POST   | `/v1/movimentacoes/:movimentacaoId/retificar`                 | Cria retificação (§4.10)                    | `manage` · `movimentacao_funcional`  | ✅                                                                 |
+| GET    | `/v1/colaboradores/:colaboradorId/dados-restritos/:categoria` | **Rota segregada** (§4.7)                   | `read` · `dado_restrito_colaborador` | ⛔ Não implementada — recurso fora de escopo (Baseline V1, item 5) |
 
 ### Regras de contrato
 
 - **Nenhuma rota `DELETE`**, para nenhum recurso desta fatia (RI-H1).
-- **Nenhum dado restrito em resposta de rota de cadastro básico**, em
-  nenhuma circunstância — nem sob projeção condicional, nem "quando o
-  papel permite". Dado restrito só sai pela rota segregada, com permissão
-  própria e evento de auditoria próprio (§9, A6).
+- **Dado restrito não existe nesta V1** (Baseline V1, item 5) — logo
+  nenhuma rota de cadastro básico pode retorná-lo, por não haver campo
+  correspondente no modelo (§4.1, §4.2). Quando dado restrito for
+  aprovado em fatia futura, vale a mesma regra já registrada em A6/A8:
+  nunca por projeção condicional na rota de cadastro básico, só por rota
+  segregada, com permissão e auditoria próprias.
 - **Escopo nunca vem do cliente** — a empresa acessível é sempre derivada
   da sessão e do escopo autorizado. `empresaId` em query é filtro, não
   concessão (A3).
@@ -1382,7 +1610,8 @@ gerados como valores inválidos por construção.
   célula**: cada transição válida permitida, cada transição inválida
   recusada — incluindo toda tentativa de sair de `efetivada` para algo que
   não seja `retificada`.
-- Regras de integridade RI-C1..RI-M6, positivas e negativas.
+- Regras de integridade RI-C1..RI-C4, RI-V1..RI-V6, RI-A1..RI-A6,
+  RI-M1..RI-M7, RI-H1..RI-O2 (§7), positivas e negativas.
 - Cálculo de sucessão de alocação: fechar a vigente e abrir a nova, sem
   sobreposição e sem lacuna.
 - Consulta por data de referência: borda inicial, borda final, data
@@ -1404,6 +1633,11 @@ gerados como valores inválidos por construção.
   aplicação.
 - **RI-A2 provada no banco:** `INSERT` cru de alocação sobreposta é
   recusado pelo PostgreSQL.
+- **RI-V6 provada no banco:** `INSERT` cru de um segundo vínculo
+  `ativo`/`suspenso` para o mesmo par (colaborador, empresa) é recusado
+  pelo PostgreSQL.
+- **RI-A6:** tentativa de efetivar admissão (transição `previsto` →
+  `ativo`) sem alocação registrada é recusada.
 - **RI-O1:** inativar nó organizacional com alocação vigente é recusado
   (409), e a alocação **permanece vigente** — prova de ausência de
   cascata.
@@ -1421,10 +1655,16 @@ gerados como valores inválidos por construção.
   da empresa B, em **toda** rota que aceita identificador. Resposta
   **404**, nunca 403 nem 200.
 - Listagem não vaza: filtro por outra empresa devolve **página vazia**.
-- **Teste específico de vazamento por dado restrito:** ator autorizado a
-  ler cadastro básico e **não** autorizado a dado restrito recebe resposta
-  que **não contém nenhum campo restrito** — verificado por asserção sobre
-  o corpo inteiro, não por campo esperado.
+- **`admin_tecnico` não acessa nenhum recurso desta fatia** (Baseline V1,
+  item 8) — prova explícita de negação em toda rota de leitura e
+  mutação, não apenas presunção de que a exceção de acesso amplo não se
+  aplicaria.
+- **Teste de resposta não contém campo além do modelo aprovado:**
+  verificação de que a resposta de cadastro básico contém exatamente os
+  campos aprovados pela Baseline V1 (§5.1) — por asserção sobre o corpo
+  inteiro, não por campo esperado. Serve como salvaguarda de regressão
+  caso um campo de dado restrito seja adicionado no futuro sem passar
+  pela rota segregada correspondente.
 - **Teste de canal lateral em RI-O1:** ator autorizado a inativar
   estrutura e **não** autorizado a ler pessoas recebe 409 que **não
   revela** a existência ou identidade do colaborador alocado.
@@ -1479,147 +1719,191 @@ Categoria própria porque é onde o histórico silenciosamente corrompe:
 
 ### Critérios de aceite desta especificação
 
-- [ ] Produto e RH aprovam o conjunto de dados do lançamento (**DP-11**),
-      com finalidade declarada campo a campo.
-- [ ] DPO e jurídico aprovam a classificação, a base legal por categoria e
-      o tratamento de dado sensível e de dado de terceiro (**DP-14**).
-- [ ] DPO e jurídico definem retenção e descarte por categoria, incluindo
-      a tensão com a imutabilidade do histórico (**DP-15**, RI-F2-3).
-- [ ] Produto decide a cardinalidade de vínculos (**DP-12**) e os tipos de
-      vínculo com jurídico (**DP-13**).
-- [ ] Produto e segurança decidem **DP-21** (acesso do `admin_tecnico` a
-      dado restrito) — **bloqueante**, por ampliar exceção aprovada em
-      outro contexto.
-- [ ] Produto decide a matriz de aprovação (**DP-17**) e o escopo de `dp`
-      (**DP-30**).
+- [x] Produto aprova o conjunto de dados do lançamento — matrícula, nome,
+      situação, vínculo funcional (**DP-11, resolvida para V1** pela
+      Baseline V1, item 1). Nenhum outro campo entra sem nova decisão.
+- [x] Produto decide a cardinalidade de vínculos (**DP-12, resolvida**) e
+      o catálogo de tipos de vínculo (**DP-13, resolvida**), item 4.
+- [x] Produto e segurança decidem **DP-21** (acesso do `admin_tecnico`) —
+      **resolvida de forma definitiva**: negado, não apenas para esta V1.
+- [x] Produto decide ausência de workflow de aprovação nesta V1
+      (**DP-17, resolvida**) e o escopo de `dp` (**DP-30, resolvida**).
+- [x] Produto decide obrigatoriedade de alocação antes de vínculo ativo
+      (**DP-28, resolvida no nível de registro**) e mecanismo de motivo
+      (**DP-29, resolvida quanto ao mecanismo**).
+- [x] Produto decide que nome social/identidade de gênero ficam fora
+      desta V1 (**DP-25, resolvida para V1**).
+- [ ] DPO e jurídico aprovam base legal e finalidade dos quatro dados
+      aprovados (§5.1) — confirmação formal ainda pendente, não bloqueia
+      implementação sintética, mas é pré-condição de piloto real (§12,
+      gates).
+- [ ] DPO e jurídico definem retenção e descarte (**DP-15**) — **gate
+      antes de piloto real/produção**, não bloqueia implementação com
+      dados sintéticos (Baseline V1, item 6).
 - [ ] Revisão de segurança confirma que nenhum campo do modelo (§4), se
       implementado literalmente, permite acesso fora do escopo de empresa
-      nem expõe dado restrito por caminho padrão.
-- [ ] ADR 0007 (§13) redigida, revisada e aceita **antes** do início da
-      fase Implementar.
+      ou introduz dado pessoal além do aprovado.
+- [x] ADR 0007 redigida e aceita — ver
+      [docs/adr/0007-colaboradores-e-vida-funcional-baseline-v1.md](../adr/0007-colaboradores-e-vida-funcional-baseline-v1.md).
 
 ### Critérios de aceite da futura implementação (para registro)
 
 - [ ] Nenhuma rota `DELETE` em nenhum recurso desta fatia.
-- [ ] `matricula` é o identificador funcional; nenhum documento pessoal é
-      chave, aparece em URL, log ou evento.
+- [ ] `matricula` (do vínculo) é o identificador funcional, único por
+      empresa; nenhum documento pessoal é chave, aparece em URL, log ou
+      evento.
 - [ ] Alocações sobrepostas são impossíveis **por restrição de banco**,
       provado por `INSERT` cru recusado.
 - [ ] Alocação cruzando empresa é impossível **por restrição de banco**,
       provado por `INSERT` cru recusado.
+- [ ] Um segundo vínculo `ativo`/`suspenso` para o mesmo par
+      (colaborador, empresa) é impossível **por restrição de banco**
+      (RI-V6), provado por `INSERT` cru recusado.
+- [ ] Efetivar admissão sem alocação registrada é recusado (RI-A6).
 - [ ] Inativar nó organizacional com alocação vigente é recusado (409),
       sem cascata e sem revelar o dependente.
 - [ ] Suites `organizacao.e2e-spec.ts`, `rbac.evaluator.spec.ts` e
       `rbac.evaluator.organizacao.spec.ts` passam **sem edição**.
+- [ ] `admin_tecnico` não obtém acesso a nenhum recurso desta fatia;
+      provado teste a teste.
 - [ ] Nenhum papel marcado ⛔/❌ na matriz §6 obtém acesso; provado teste a
       teste.
-- [ ] Resposta de cadastro básico não contém nenhum campo restrito,
-      provado por asserção sobre o corpo inteiro.
-- [ ] Toda mutação é atômica com seu evento; leitura de dado restrito é
-      fail-safe. Ambos provados por rollback real.
+- [ ] Resposta de cadastro básico contém exatamente os campos aprovados
+      (§5.1), provado por asserção sobre o corpo inteiro.
+- [ ] Toda mutação é atômica com seu evento, provado por rollback real.
 - [ ] Nenhum evento de auditoria contém valor de campo pessoal.
 - [ ] Nenhuma coluna `tenant_id`, RLS multitenant ou migration retroativa.
 - [ ] Nenhuma relação gestor/subordinado criada, nem estruturalmente.
 - [ ] Nenhuma conta de acesso criada automaticamente por admissão.
+- [ ] Nenhuma tabela/rota/campo de `AprovacaoMovimentacao` ou dado
+      restrito criada nesta V1 (Baseline V1, itens 5 e 7).
 - [ ] **MFA implementado antes de qualquer piloto com dados reais ou
       produção** (ADR 0003, decisão 3) — condição vinculante, agravada por
-      esta ser a primeira fatia com dado pessoal de titular.
+      esta ser a primeira fatia com dado pessoal de titular. **Não
+      alterada pela Baseline V1.**
 
 ### Riscos
 
-- **RI-F2-1 — Decidir dado pessoal por conveniência de implementação.** O
-  risco mais provável desta fatia: a implementação "precisa" de CPF para
-  testar algo e o campo entra sem passar por DPO. Mitigação: DP-11 é
-  bloqueante e o critério de aceite exige finalidade declarada campo a
-  campo; revisor de PR bloqueia campo de dado pessoal sem decisão
-  registrada.
+Preservados como histórico da spec original — a coluna "Situação
+pós-Baseline V1" indica o que mudou.
+
+- **RI-F2-1 — Decidir dado pessoal por conveniência de implementação.**
+  Risco original: a implementação "precisa" de CPF para testar algo e o
+  campo entra sem passar por DPO. **Situação pós-Baseline V1: mitigado.**
+  O conjunto de dados está fechado (§5.1) — qualquer campo além dele é
+  desvio de escopo aprovado, não zona cinzenta de "talvez seja
+  necessário".
 - **RI-F2-2 — Vazamento de dado restrito por projeção esquecida.**
-  Mitigação estrutural: segregação (§4.7) faz o caminho padrão **não ter**
-  o dado; e teste que assere sobre o corpo inteiro da resposta, não sobre
-  campos esperados.
+  **Situação pós-Baseline V1: eliminado nesta V1.** Dado restrito não é
+  modelado (§4.7) — não há campo para vazar. O risco **reaparece** quando
+  uma fatia futura introduzir dado restrito; a mitigação original
+  (segregação estrutural) permanece o desenho de referência para aquele
+  momento.
 - **RI-F2-3 — Tensão entre imutabilidade do histórico e dever de
-  eliminação.** RI-H1/RI-H2 exigem não apagar; a LGPD pode exigir
-  eliminação. Não resolvida aqui. Provável caminho: anonimização seletiva
-  preservando a estrutura do histórico — **decisão de DPO com
-  arquitetura**, registrada em DP-15. Risco **aberto**, não mitigado.
+  eliminação.** **Situação pós-Baseline V1: não resolvido, mas
+  reclassificado como gate de piloto real, não bloqueio de implementação
+  sintética** (item 6). RI-H1/RI-H2 exigem não apagar; a LGPD pode exigir
+  eliminação. Provável caminho: anonimização seletiva preservando a
+  estrutura do histórico — decisão de DPO com arquitetura, registrada em
+  DP-15. Risco **aberto**, não mitigado — só adiado para antes do dado
+  real, não para depois dele.
 - **RI-F2-4 — Três padrões de nomenclatura de evento convivendo.**
-  `snake_case` inglês (Etapa 0), `organizacao.*` (Fatia 1), `pessoas.*`
-  (esta). Decisão explícita herdada da ADR 0006 Emenda 1 item 5 —
-  registrada para que revisões futuras não tratem como erro.
+  **Situação pós-Baseline V1: inalterado**, natureza do risco confirmada
+  como decisão explícita, não erro. `snake_case` inglês (Etapa 0),
+  `organizacao.*` (Fatia 1), `pessoas.*` (esta) — herdado da ADR 0006
+  Emenda 1 item 5.
 - **RI-F2-5 — MFA continua adiado, agora com dado pessoal de titular em
-  jogo.** O risco aceito da ADR 0003 **não muda de status**, mas muda de
-  peso: até aqui, uma conta comprometida expunha estrutura organizacional;
-  a partir desta fatia, exporia vida funcional de pessoas. Não é
-  autorização para relaxar nada — é reforço da condição de saída já
-  vinculante.
+  jogo.** **Situação pós-Baseline V1: inalterado e reforçado.** O risco
+  aceito da ADR 0003 não muda de status; a Baseline V1 não o toca.
 - **RI-F2-6 — Prazo da exceção do `admin_tecnico` corre durante esta
-  fatia.** Vence em 2026-11-04 (O4). A reavaliação obrigatória pode cair
-  no meio da implementação, alterando a matriz §6. Mitigação: DP-21 é
-  bloqueante e força a discussão antes, não depois.
+  fatia.** **Situação pós-Baseline V1: parcialmente mitigado.** Vence em
+  2026-11-04 (O4) — mas como `admin_tecnico` agora **não acessa** dado
+  pessoal de Colaborador em nenhuma hipótese (item 8), a reavaliação da
+  exceção (que trata só de estrutura organizacional) não afeta mais este
+  domínio.
 - **RI-F2-7 — Alteração em código já mergeado do Núcleo Organizacional**
-  (§2.2, acréscimo 5). Risco de regressão sobre comportamento testado.
-  Mitigação: teste de regressão explícito e exigência de que a suite
-  existente passe sem edição.
-- **RI-F2-8 — Modelo de vigência mal implementado degrada silenciosamente.**
-  Sobreposição ou lacuna de alocação não gera erro visível: gera resposta
-  errada numa consulta por data, meses depois. Mitigação: garantia **no
-  banco** (RI-A2), não em aplicação, e testes de concorrência dedicados
-  (§11).
-- **RI-F2-9 — Anexos sem módulo de Documentos.** Pressão operacional para
-  "só guardar o PDF" antes da Etapa 2 é previsível. Mitigação: DP-24
-  explícito e ausência total de storage nesta fatia.
+  (§2.2, acréscimo 5). **Situação pós-Baseline V1: inalterado.** Risco de
+  regressão sobre comportamento testado; mitigação continua sendo teste
+  de regressão explícito.
+- **RI-F2-8 — Modelo de vigência mal implementado degrada
+  silenciosamente.** **Situação pós-Baseline V1: inalterado.** Mitigação
+  continua sendo garantia no banco (RI-A2) e testes de concorrência
+  dedicados (§11).
+- **RI-F2-9 — Anexos sem módulo de Documentos.** **Situação pós-Baseline
+  V1: inalterado.** DP-24 explícito; ausência total de storage nesta
+  fatia.
+- **RI-F2-10 — Ausência de workflow de aprovação vira ponto único de
+  falha humana.** **Risco novo, introduzido pela Baseline V1 (item 7).**
+  Sem segregação entre quem solicita e quem aprova, um erro de RH/DP se
+  torna efetivo sem segunda revisão. Mitigação: toda ação é auditada
+  (§9) com o `AccessUser` que a registrou, tornando o erro rastreável
+  mesmo sem tê-lo impedido; retificação (§4.10) permite correção sem
+  apagar o registro incorreto. Se o volume de correções se mostrar alto
+  em uso real, é sinal objetivo para acionar o workflow de aprovação
+  (DP-17) numa fatia futura.
 
 ### Dependências
 
-| Dependência                                                       | Status                                                  |
-| ----------------------------------------------------------------- | ------------------------------------------------------- |
-| Fatias 3 e 4 (identidade, autorização, auditoria) em `main`       | **Satisfeita**                                          |
-| Núcleo Organizacional V1 em `main`                                | **Satisfeita** (commit `45ce79b`)                       |
-| Vigência endereçada a esta fatia (ADR 0006 d. 9)                  | **Satisfeita** — é o mandato desta spec (§2.3)          |
-| DP-4 (CNPJ em `Empresa`)                                          | Pendente — não bloqueia esta fatia                      |
-| DP-7 (escopo de `auditor`/`dpo`)                                  | Pendente — mantém os dois negados aqui                  |
-| DP-8 (escopo do `gestor`)                                         | Pendente — mantém `gestor` negado aqui                  |
-| DP-11, DP-14, DP-15, DP-21 (dado pessoal, retenção, acesso amplo) | **Pendentes e bloqueantes** da fase Implementar         |
-| Módulo de Documentos (Etapa 2)                                    | **Não existe** — bloqueia anexos (DP-24)                |
-| Módulos de Folha (Etapa 4) e Ponto (Etapa 3)                      | **Não existem** — bloqueiam integração (DP-18)          |
-| Portal do Colaborador (Etapa 10)                                  | **Não existe** — bloqueia DP-23                         |
-| Extensão aditiva de `AuditAction` por migration                   | Dependência técnica da implementação                    |
-| MFA (ADR 0003, decisão 3)                                         | Pendente — **vinculante antes de piloto com dado real** |
-| Matriz de rastreabilidade PRD ↔ spec ↔ teste                      | **Pendente e devida nesta fatia** (O1, DP-27)           |
+| Dependência                                                 | Status                                                                                                  |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Fatias 3 e 4 (identidade, autorização, auditoria) em `main` | **Satisfeita**                                                                                          |
+| Núcleo Organizacional V1 em `main`                          | **Satisfeita** (commit `45ce79b`)                                                                       |
+| Vigência endereçada a esta fatia (ADR 0006 d. 9)            | **Satisfeita** — é o mandato desta spec (§2.3)                                                          |
+| Baseline V1 de Colaboradores aprovada                       | **Satisfeita** (2026-08-06/07) — ver decisão e ADR 0007                                                 |
+| DP-4 (CNPJ em `Empresa`)                                    | Pendente — não bloqueia esta fatia                                                                      |
+| DP-7 (escopo de `auditor`/`dpo`)                            | Pendente — mantém os dois negados aqui                                                                  |
+| DP-8 (escopo do `gestor`)                                   | Pendente — mantém `gestor` negado aqui                                                                  |
+| DP-14 (categorias de dado restrito)                         | Pendente — **fora de escopo nesta V1**, não bloqueante; decisão própria quando proposta em fatia futura |
+| DP-15 (retenção/descarte)                                   | Pendente — **gate antes de piloto real/produção**, não bloqueia implementação sintética                 |
+| Módulo de Documentos (Etapa 2)                              | **Não existe** — bloqueia anexos (DP-24)                                                                |
+| Módulos de Folha (Etapa 4) e Ponto (Etapa 3)                | **Não existem** — bloqueiam integração (DP-18)                                                          |
+| Portal do Colaborador (Etapa 10)                            | **Não existe** — bloqueia DP-23                                                                         |
+| Extensão aditiva de `AuditAction` por migration             | Dependência técnica da implementação                                                                    |
+| MFA (ADR 0003, decisão 3)                                   | Pendente — **vinculante antes de piloto com dado real**, inalterado pela Baseline V1                    |
+| Matriz de rastreabilidade PRD ↔ spec ↔ teste                | **Pendente e devida nesta fatia** (O1, DP-27) — não bloqueia esta V1                                    |
 
 ### Decisões pendentes
 
 Numeração continua a sequência global. DP-1, DP-2, DP-3, DP-5, DP-6,
-DP-9 e DP-10 foram resolvidas na Fatia 1 (Baseline V1 e Emenda 1 da
-ADR 0006). DP-4, DP-7 e DP-8 seguem pendentes e são referenciadas, não
-renumeradas.
+DP-9 e DP-10 foram resolvidas na Fatia 1 (Baseline V1 do Núcleo
+Organizacional e Emenda 1 da ADR 0006). DP-11, DP-12, DP-13, DP-17,
+DP-21, DP-22, DP-25, DP-28, DP-29 e DP-30 foram **resolvidas por esta
+Baseline V1** (O6) — mantidas na tabela abaixo, marcadas como resolvidas,
+para preservar a numeração e o histórico de por que existiam. DP-4, DP-7
+e DP-8 seguem pendentes desde a Fatia 1, sem alteração.
 
-| ID    | Decisão                                                                                                                          | Responsável               | Bloqueia Implementar? |
-| ----- | -------------------------------------------------------------------------------------------------------------------------------- | ------------------------- | --------------------- |
-| DP-11 | Conjunto exato de dados pessoais do lançamento, com finalidade declarada campo a campo (§5.1, §5.2)                              | RH + DPO + Produto        | **Sim**               |
-| DP-12 | Vínculo único ou múltiplos vínculos por colaborador — simultâneos e/ou sequenciais (§3.2, RI-V3)                                 | Produto + RH              | **Sim**               |
-| DP-13 | Catálogo de tipos de vínculo (CLT, estágio, PJ, aprendiz, temporário…) e regras trabalhistas associadas (§4.2, §8)               | RH + Jurídico             | **Sim**               |
-| DP-14 | Dados familiares, médicos, salariais e de benefício: se entram, quais, base legal por categoria e regime de dado sensível (§5.3) | DPO + Jurídico + RH       | **Sim**               |
-| DP-15 | Retenção e descarte por categoria, incluindo a tensão com imutabilidade do histórico (§5.7, RI-F2-3)                             | DPO + Jurídico            | **Sim**               |
-| DP-16 | Entidade e semântica da relação gestor ↔ subordinado (direto/indireto) — não antecipada aqui (§1, §3)                            | Produto                   | Não (mantém negado)   |
-| DP-17 | Matriz de aprovação por tipo de movimentação: quem aprova, cadeia ou única, obrigatoriedade (§4.5)                               | Produto + RH              | **Sim**               |
-| DP-18 | Integração com folha e ponto: contrato, direção, efeito de retificação (§4.10, §5.4)                                             | Produto + RH              | Não (fora de escopo)  |
-| DP-19 | Reautenticação para ações de alto impacto — quais ações, qual mecanismo (§10)                                                    | Segurança + Produto       | Não (aditivo)         |
-| DP-20 | Criar o papel `diretoria` — enum de banco, avaliador, escopo e matriz (O3, §6)                                                   | Produto + Segurança       | Não (mantém negado)   |
-| DP-21 | Acesso do `admin_tecnico` a **dado restrito** de colaborador — ampliação da exceção da Emenda 1 da ADR 0005 (O4, §6)             | Produto + Segurança + DPO | **Sim**               |
-| DP-22 | Escopo de unicidade de `matricula`: por empresa ou global; e se é do colaborador ou do vínculo (§4.1, RI-C2)                     | RH + Produto              | **Sim**               |
-| DP-23 | Vínculo técnico `AccessUser` ↔ colaborador: se, quando e como (coluna aditiva × tabela de associação com vigência) (§3.1, RS-4)  | Produto + Segurança       | Não (deferido)        |
-| DP-24 | Anexos de movimentação — depende do módulo de Documentos (Etapa 2) (§4.6)                                                        | Produto                   | Não (slot vazio)      |
-| DP-25 | Nome social e identidade de gênero: coleta, uso e classificação (dado sensível) (§4.1, §5.3)                                     | DPO + RH                  | **Sim**               |
-| DP-26 | Confirmação do prefixo de módulo `pessoas` para diretório, recursos e eventos (O5, §9)                                           | Produto                   | Não (cosmético)       |
-| DP-27 | Matriz de rastreabilidade PRD ↔ spec ↔ teste — pendência herdada da Fatia 1, devida aqui (O1)                                    | Produto + Arquitetura     | Não (processual)      |
-| DP-28 | Obrigatoriedade de cada dimensão da alocação: unidade, departamento, equipe, cargo (§4.3)                                        | RH + Produto              | **Sim**               |
-| DP-29 | Catálogo fechado de motivos × texto livre para afastamento e desligamento (§4.4)                                                 | RH + DPO                  | **Sim**               |
-| DP-30 | Escopo do papel `dp` neste domínio: leitura apenas (como na Fatia 1) ou escrita operacional (§6)                                 | Produto + RH              | **Sim**               |
+| ID    | Decisão                                                                                                  | Responsável               | Status                                                                                                                                                |
+| ----- | -------------------------------------------------------------------------------------------------------- | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| DP-11 | Conjunto exato de dados pessoais do lançamento (§5.1, §5.2)                                              | RH + DPO + Produto        | **Resolvida (Baseline V1, item 1)** — matrícula, nome, situação, vínculo; extensão futura é DP-11 (V2)                                                |
+| DP-12 | Cardinalidade de vínculos por colaborador (§3.2, RI-V3/RI-V6)                                            | Produto + RH              | **Resolvida (Baseline V1, item 3)** — histórico ilimitado; máx. 1 ativo por (colaborador, empresa)                                                    |
+| DP-13 | Catálogo de tipos de vínculo e regras trabalhistas associadas (§4.2, §8)                                 | RH + Jurídico             | **Resolvida (Baseline V1, item 4)** — `clt`, `estagio`, `pj`, `temporario`, `outro_controlado`, sem automação                                         |
+| DP-14 | Dados familiares, médicos, salariais e de benefício: se, quando e como entrarão numa fatia futura (§5.3) | DPO + Jurídico + RH       | **Pendente — fora de escopo nesta V1** (Baseline V1, item 5), não bloqueante                                                                          |
+| DP-15 | Retenção e descarte por categoria, incluindo a tensão com imutabilidade do histórico (§5.7, RI-F2-3)     | DPO + Jurídico            | **Pendente — gate de piloto real/produção** (Baseline V1, item 6), não bloqueia implementação sintética                                               |
+| DP-16 | Entidade e semântica da relação gestor ↔ subordinado — não antecipada aqui (§1, §3)                      | Produto                   | Pendente (mantém negado)                                                                                                                              |
+| DP-17 | Workflow de aprovação de movimentação — se e quando existirá (§4.5)                                      | Produto + RH              | **Resolvida (Baseline V1, item 7)** — não implementado nesta V1; RH/DP registram diretamente                                                          |
+| DP-18 | Integração com folha e ponto: contrato, direção, efeito de retificação (§4.10, §5.4)                     | Produto + RH              | Pendente (fora de escopo)                                                                                                                             |
+| DP-19 | Reautenticação para ações de alto impacto — quais ações, qual mecanismo (§10)                            | Segurança + Produto       | Pendente (aditivo)                                                                                                                                    |
+| DP-20 | Criar o papel `diretoria` — enum de banco, avaliador, escopo e matriz (O3, §6)                           | Produto + Segurança       | Pendente — **reafirmada como não criada** (Baseline V1, item 13)                                                                                      |
+| DP-21 | Acesso do `admin_tecnico` a dado pessoal de Colaborador (O4, §6)                                         | Produto + Segurança + DPO | **Resolvida, de forma definitiva (Baseline V1, item 8)** — negado; exceção da ADR 0005 não se estende a este domínio                                  |
+| DP-22 | Escopo de unicidade de `matricula` e a qual entidade pertence (§4.2, RI-C2)                              | RH + Produto              | **Resolvida (Baseline V1, item 2)** — pertence ao vínculo, única por empresa                                                                          |
+| DP-23 | Vínculo técnico `AccessUser` ↔ colaborador: se, quando e como (§3.1, RS-4)                               | Produto + Segurança       | Pendente (deferido)                                                                                                                                   |
+| DP-24 | Anexos de movimentação — depende do módulo de Documentos (Etapa 2) (§4.6)                                | Produto                   | Pendente (slot vazio)                                                                                                                                 |
+| DP-25 | Nome social e identidade de gênero (§4.1, §5.3)                                                          | DPO + RH                  | **Resolvida para V1 (Baseline V1, item 9)** — fora de escopo; extensão futura é DP-25 (V2)                                                            |
+| DP-26 | Confirmação do prefixo de módulo `pessoas` para diretório, recursos e eventos (O5, §9)                   | Produto                   | Pendente (cosmético)                                                                                                                                  |
+| DP-27 | Matriz de rastreabilidade PRD ↔ spec ↔ teste — pendência herdada da Fatia 1, devida aqui (O1)            | Produto + Arquitetura     | Pendente (processual)                                                                                                                                 |
+| DP-28 | Obrigatoriedade de alocação antes de vínculo ativo, e de cada campo dentro dela (§4.3)                   | RH + Produto              | **Resolvida no nível de registro (Baseline V1, item 10)** — alocação obrigatória antes de `ativo`; obrigatoriedade por campo é detalhe não bloqueante |
+| DP-29 | Mecanismo de motivo (catálogo × texto livre) e conteúdo do catálogo (§4.4)                               | RH + DPO                  | **Resolvida quanto ao mecanismo (Baseline V1, item 11)** — catálogo controlado, sem texto livre; conteúdo do catálogo é detalhe não bloqueante        |
+| DP-30 | Escopo do papel `dp` neste domínio (§6)                                                                  | Produto + RH              | **Resolvida (Baseline V1, item 12)** — leitura e registro de alteração, própria empresa, auditado                                                     |
 
-**Onze decisões bloqueiam a fase Implementar.** Isso não é sinal de spec
-incompleta: é o resultado esperado de especificar o primeiro domínio com
-dado pessoal sem inventar as respostas que pertencem a RH, jurídico e DPO.
+**Após a Baseline V1, nenhuma decisão bloqueia a implementação desta
+fatia com dados sintéticos.** As pendências remanescentes (DP-4, DP-7,
+DP-8, DP-14, DP-16, DP-18, DP-19, DP-20, DP-23, DP-24, DP-26, DP-27)
+bloqueiam apenas **extensões futuras** desta fatia — gestor/subordinado,
+dado restrito, workflow de aprovação formal, novo papel, Portal do
+Colaborador, integrações. DP-15, MFA (ADR 0003) e a confirmação formal de
+DPO sobre os quatro dados aprovados continuam **gates obrigatórios antes
+de qualquer piloto com dado real ou produção** — não movidos por esta
+decisão de produto.
 
 ### Arquivos previstos para a fase Implementar (não criados agora)
 
@@ -1643,149 +1927,44 @@ apps/api/src/audit/audit.types.ts                        # (alteração) AuditRe
 apps/api/src/organizacao/validacao.util.ts               # (alteração) RI-O1: alocação vigente como filho ativo
 apps/api/test/pessoas.e2e-spec.ts
 apps/api/test/pessoas-historico.e2e-spec.ts              # consulta por data de referência
-apps/api/test/pessoas-concorrencia.e2e-spec.ts           # RI-A2, RI-M3 sob corrida
-docs/adr/0007-<slug>.md                                  # ADR proposta em §13
+apps/api/test/pessoas-concorrencia.e2e-spec.ts           # RI-A2, RI-V6, RI-M3 sob corrida
+
+# NAO previstos nesta V1 (fora de escopo, Baseline V1):
+#   apps/api/src/pessoas/aprovacao/                       # workflow de aprovacao (DP-17)
+#   apps/api/src/pessoas/dado-restrito/                   # dado restrito (DP-14)
 ```
 
-## 13. Proposta de ADR 0007 (descrita, não criada)
+## 13. ADR 0007 — formalizada
 
-**O arquivo `docs/adr/0007-*.md` NÃO é criado por esta tarefa.** Esta
-seção descreve o conteúdo proposto, para que a ADR possa ser redigida,
-revisada e aceita como ato próprio — antes do início da fase Implementar.
+**A ADR 0007 foi redigida, revisada e aceita** em
+[docs/adr/0007-colaboradores-e-vida-funcional-baseline-v1.md](../adr/0007-colaboradores-e-vida-funcional-baseline-v1.md),
+como ato próprio, a partir da Baseline V1 aprovada pelo produto (O6, §12) e
+registrada em
+[docs/decisions/etapa1-fatia2-colaboradores-baseline-v1.md](../decisions/etapa1-fatia2-colaboradores-baseline-v1.md).
 
-### Título proposto
+Resumo — detalhe completo no arquivo da ADR:
 
-**ADR 0007 — Vida funcional: histórico imutável, alocação vigente e
-separação entre colaborador e conta de acesso**
+- **Título:** Colaboradores e vida funcional — Baseline V1: histórico
+  imutável, alocação vigente e separação entre colaborador e conta de
+  acesso.
+- **Status:** aceito.
+- Registra as onze decisões estruturais que sustentam o modelo desta spec
+  (separação colaborador/`AccessUser`, matrícula como identificador
+  funcional nunca-chave, evento×estado, histórico por sucessão de
+  vigência, imutabilidade com retificação, proibição de exclusão física,
+  segregação de dado restrito — mesmo não implementado nesta V1 —,
+  `empresa_id` como única fronteira, extensão da regra de inativação da
+  Fatia 1, ausência de automação trabalhista, nomenclatura) e as treze
+  decisões de produto da Baseline V1 (§0, O6).
+- Registra, com o mesmo peso, o que **não** decide: dado restrito (DP-14),
+  retenção (DP-15), gestor/subordinado (DP-16), matriz de aprovação
+  formal (DP-17 — resolvida quanto a **não existir nesta V1**, não quanto
+  a como seria se existisse), papel `diretoria` (DP-20), Portal do
+  Colaborador (DP-23), CNPJ, multitenancy e MFA — todas inalteradas.
+- Registra alternativas descartadas e gatilhos de reavaliação, incluindo
+  o prazo de 2026-11-04 da exceção do `admin_tecnico` (ADR 0005, Emenda 1)
+  e a introdução futura de dado restrito ou de workflow de aprovação.
 
-### Status proposto
-
-`proposta` — a ser promovida a `aceito` somente após as decisões
-bloqueantes de §12 serem resolvidas por seus responsáveis.
-
-### Contexto que a ADR deve registrar
-
-A ADR 0005 fixou o cenário single-tenant e `company_id` como maior limite
-de autorização. A ADR 0006 fixou a estrutura organizacional (Baseline V1)
-e **endereçou explicitamente a esta fatia** o tratamento de vigência nas
-associações do colaborador (decisão 9). A ADR 0003, decisão 8, deixou o
-vínculo `access_user` ↔ colaborador para "migration futura própria,
-revisada no momento em que a Etapa 1 for implementada".
-
-Esta é a primeira fatia com dado pessoal de titular (O2) e a primeira em
-que o sistema precisa responder "qual era a situação em uma data".
-
-### Decisões propostas
-
-1. **Colaborador é entidade própria, nunca extensão de `AccessUser`.**
-   Nenhuma criação automática em qualquer direção; nenhuma correspondência
-   inferida por igualdade de campo. O vínculo técnico entre os dois **não
-   é materializado nesta fatia** (RS-1..RS-4, DP-23).
-2. **Matrícula é o identificador funcional; documento pessoal nunca é
-   chave.** Nem primária, nem natural, nem de unicidade, nem em URL —
-   independentemente do que DP-11 aprovar (RI-C1).
-3. **Separação evento × estado.** Movimentação é o ato imutável; alocação
-   é o estado vigente num intervalo. Toda alocação tem movimentação de
-   origem; nenhuma alocação nasce sem ato registrado (§3.4, RI-A4).
-4. **Histórico por sucessão de vigência, nunca por sobrescrita.** A
-   situação em qualquer data de referência é leitura direta de linhas que
-   nunca foram alteradas nem apagadas. Não sobreposição e não cruzamento
-   de empresa são garantidos **por restrição de banco**, não por
-   aplicação (RI-A1, RI-A2).
-5. **Movimentação efetivada é imutável; correção é retificação.** Evento
-   novo referenciando o original, que permanece visível. Aplicação ao
-   domínio funcional do mesmo princípio já aceito para a trilha de
-   auditoria (ADR 0004, decisão 3).
-6. **Proibição total de exclusão física** em todas as entidades desta
-   fatia, em todos os estados — inclusive `rejeitada` e `cancelada`.
-   Nenhuma rota `DELETE` (RI-H1, RI-M6).
-7. **Dado restrito é segregado do cadastro básico**, com recurso de
-   autorização próprio (`dado_restrito_colaborador`), rota própria e
-   **auditoria de leitura fail-safe**. Ler cadastro básico nunca implica
-   ler dado restrito (§4.7, A6).
-8. **`empresa_id` continua a única fronteira de autorização.** Alocar
-   alguém num departamento ou equipe **não** cria fronteira de autorização
-   por departamento ou equipe. ADR 0006 decisão 2 permanece intacta
-   (RI-O2).
-9. **Inativação de nó organizacional passa a considerar alocação vigente
-   como elemento ativo vinculado.** Extensão aditiva de ADR 0006 decisão 7
-   a uma nova classe de dependente — bloqueia, nunca cascateia, e a recusa
-   não revela o dependente (RI-O1, §2.2).
-10. **Nenhuma decisão trabalhista é automatizada.** O sistema registra
-    quem decidiu, quando e com qual efeito; não calcula direito, saldo,
-    período, rescisão ou enquadramento legal (§8).
-11. **Nomenclatura:** convenção da ADR 0006 Emenda 1 estendida, com
-    prefixo de módulo `pessoas` (a confirmar, DP-26). Nada já implementado
-    é renomeado. Três famílias de nomenclatura de evento convivem por
-    decisão explícita (RI-F2-4).
-
-### O que a ADR 0007 explicitamente NÃO decide
-
-Deve registrar, com o mesmo peso das decisões, que **não** resolve:
-
-- Nenhum campo de dado pessoal (DP-11), nenhuma categoria sensível ou
-  restrita (DP-14), nenhuma base legal, nenhum prazo de retenção (DP-15).
-- Cardinalidade de vínculos (DP-12) nem tipos de vínculo (DP-13).
-- Relação gestor ↔ subordinado (DP-16) — a não antecipação da ADR 0006
-  decisão 8 permanece integral.
-- Matriz de aprovação (DP-17), escopo de `dp` (DP-30), criação do papel
-  `diretoria` (DP-20).
-- Acesso do `admin_tecnico` a dado restrito (DP-21) — **a exceção da
-  Emenda 1 da ADR 0005 não é ampliada por esta ADR**.
-- Escopo de `auditor`/`dpo` (DP-7) nem do `gestor` (DP-8) — pendências da
-  Fatia 1, inalteradas.
-- CNPJ (DP-4), multitenancy (ADR 0005 decisões 2 e 5), MFA (ADR 0003
-  decisão 3) — todas inalteradas.
-- Integração com folha e ponto (DP-18), anexos (DP-24), Portal do
-  Colaborador e vínculo de acesso (DP-23).
-
-### Alternativas que a ADR deve registrar como descartadas
-
-| Alternativa                                                           | Por que descartar                                                                                                                                     |
-| --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Colaborador como extensão/subtipo de `AccessUser`                     | Acopla identidade técnica a pessoa funcional; a maioria dos colaboradores nunca terá login, e contas técnicas não têm pessoa. Contraria ADR 0003 d. 8 |
-| Estado atual mutável (`UPDATE` na lotação), com log separado          | Perde a garantia central: histórico vira reconstrução de log, sujeita a lacuna. Consulta por data deixa de ser leitura e vira reprocessamento         |
-| Alocação futura criada já na programação                              | Introduz linhas "vigentes no futuro" que contaminam consulta por data e cálculo de sobreposição. Efetivação vira ato explícito e auditado (§4.9)      |
-| Dado restrito no cadastro básico, com projeção condicional por papel  | Uma consulta esquecida vira vazamento. Segregar faz o caminho padrão **não conseguir** retornar o dado                                                |
-| Não sobreposição garantida só na aplicação                            | Sempre há janela de corrida entre verificar e inserir; o histórico corrompe silenciosamente e só aparece meses depois numa consulta por data          |
-| CPF como chave natural ou identificador de rota                       | Trava correção de erro de cadastro, vaza dado pessoal em URL/log, e cria dependência de dado cuja coleta sequer está aprovada (DP-11)                 |
-| Reativar vínculo encerrado em vez de criar vínculo novo na readmissão | Apaga a fronteira entre dois períodos distintos de relação — exatamente o que o histórico precisa distinguir                                          |
-| Estender a exceção do `admin_tecnico` a dado restrito por inércia     | Ampliaria materialmente exceção aprovada em contexto sem dado pessoal, sem decisão registrada (O4). Fica pendente (DP-21)                             |
-| Criar o papel `diretoria` para atender a matriz pedida                | Papel não existe no enum; criá-lo é mudança de autorização em produção, não ajuste de documento (O3, DP-20)                                           |
-
-### Gatilhos de reavaliação que a ADR deve registrar
-
-1. Resolução de DP-11 ou DP-14 que introduza categoria de dado não
-   prevista na segregação proposta (decisão 7).
-2. Decisão sobre gestor ↔ subordinado (DP-16) que exija departamento,
-   área ou equipe como fronteira de autorização — revisita a decisão 8 e a
-   ADR 0006 decisão 2.
-3. Reavaliação obrigatória da exceção do `admin_tecnico` (até 2026-11-04,
-   Emenda 1 da ADR 0005).
-4. Aprovação do Portal do Colaborador, que torna DP-23 bloqueante.
-5. Especificação de folha ou ponto (DP-18), que pode exigir efeito
-   retroativo de retificação hoje deliberadamente não modelado (§4.10).
-6. Aprovação da comercialização multitenant (gatilho já registrado na
-   ADR 0005), que exige revisar isolamento de dado pessoal entre clientes.
-
-### Responsabilidades que a ADR deve atribuir
-
-- **Desenvolvimento:** não introduzir campo de dado pessoal sem decisão
-  registrada; garantir não sobreposição e não cruzamento de empresa **no
-  banco**; manter extensões de `AuditAction`/`AuthorizationResource`
-  sempre aditivas; não alterar ramos existentes do avaliador RBAC/ABAC.
-- **Produto:** resolver as onze pendências bloqueantes antes do início da
-  fase Implementar; não pedir concessão de acesso por interpretação de
-  ambiguidade.
-- **RH e jurídico:** definir dados do lançamento, tipos de vínculo, matriz
-  de aprovação e prazos de retenção.
-- **DPO:** aprovar classificação, base legal por categoria, tratamento de
-  dado sensível e de dado de terceiro, e a estratégia de descarte diante
-  da imutabilidade do histórico.
-- **TI/Segurança:** revisar DP-19 e DP-21; confirmar que nenhuma checagem
-  de autorização passou a depender de departamento, área ou equipe.
-- **Revisor de PR:** bloquear merge que crie campo de dado pessoal sem
-  decisão registrada; que exponha dado restrito em rota de cadastro
-  básico; que crie conta de acesso automaticamente; que introduza relação
-  gestor/subordinado; que permita exclusão física; ou que garanta não
-  sobreposição apenas em aplicação.
+Esta seção permanece como índice de navegação — o conteúdo normativo vive
+no arquivo da ADR, não duplicado aqui, para que futuras alterações da ADR
+não exijam sincronizar duas cópias do mesmo texto.
