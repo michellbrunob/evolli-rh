@@ -1,6 +1,6 @@
 # ADR 0007 — Colaboradores e vida funcional: Baseline V1
 
-- Status: **aceito** (com Emenda 1 — implementacao V1 — e Emenda 2 — integridade temporal no banco e admissao atomica —, ambas 2026-08-07)
+- Status: **aceito** (com Emendas 1, 2 e 3 — implementacao V1, integridade temporal no banco e admissao atomica, e correcao P1 de cobertura das invariantes —, todas 2026-08-07)
 - Data: 2026-08-07
 - Relacionado: [docs/modules/etapa1-fatia2-colaboradores-vida-funcional.md](../modules/etapa1-fatia2-colaboradores-vida-funcional.md),
   [docs/decisions/etapa1-fatia2-colaboradores-baseline-v1.md](../decisions/etapa1-fatia2-colaboradores-baseline-v1.md)
@@ -524,12 +524,18 @@ colaborador e vínculo juntos. Esse desvio é agora **contrato oficial**:
    `Colaborador` não tem `empresa_id` (decisão 2 da Baseline V1: a empresa é
    propriedade do vínculo), então um cadastro sem vínculo ficaria fora de todo
    escopo de autorização — invisível até para quem o criou.
-3. **A invariante deixa de depender do service.** Duas `CONSTRAINT TRIGGER`
-   `DEFERRABLE INITIALLY DEFERRED` garantem no COMMIT que (a) todo colaborador
-   tem ao menos um vínculo e (b) todo vínculo `ativo` tem alocação vigente. A
-   verificação diferida é o que permite que a ordem interna da transação
-   continue livre — fechar a alocação vigente antes de abrir a sucessora, por
-   exemplo — sem recusar estados intermediários legítimos.
+3. **A invariante deixa de depender do service.** São **duas invariantes**,
+   cobertas por **quatro** `CONSTRAINT TRIGGER` `DEFERRABLE INITIALLY
+DEFERRED`, que garantem no COMMIT que (a) todo colaborador tem ao menos um
+   vínculo e (b) todo vínculo `ativo` tem alocação vigente. A verificação
+   diferida é o que permite que a ordem interna da transação continue livre —
+   fechar a alocação vigente antes de abrir a sucessora, por exemplo — sem
+   recusar estados intermediários legítimos.
+
+   **A contagem difere de propósito** (ver Emenda 3): uma invariante que
+   atravessa tabelas só fica garantida se **toda porta** capaz de quebrá-la
+   disparar a verificação. Cada trigger é uma porta, não uma regra.
+
 4. **Vínculos posteriores seguem o fluxo próprio** (`POST /v1/vinculos`), sem
    alteração.
 5. **Auditoria atômica preservada:** se a gravação em `audit_event` falhar,
@@ -549,3 +555,89 @@ colaborador e vínculo juntos. Esse desvio é agora **contrato oficial**:
   confirmação formal de DPO sobre os quatro dados e o MFA (ADR 0003) continuam
   **gates obrigatórios antes de qualquer piloto com dado real ou produção**. A
   implementação segue homologada **só para dados sintéticos**.
+
+---
+
+## Emenda 3 (2026-08-07) — correção P1: cobertura completa das invariantes
+
+**Aditivo e corretivo.** Nenhuma decisão é revogada. Esta emenda registra uma
+**lacuna confirmada** nas triggers introduzidas pela Emenda 2 e a correção
+aplicada. A redação da Emenda 2 permanece legível — inclusive a contagem "duas
+triggers" que esta emenda revisa.
+
+### A lacuna encontrada
+
+As invariantes da Emenda 2 estavam **corretas na intenção e incompletas na
+cobertura**. Três buracos, todos exploráveis por escrita direta no banco:
+
+1. **`colaborador_exige_vinculo` disparava só em `INSERT` de `colaborador`.**
+   Remover o último vínculo (ou reapontá-lo para outro colaborador) deixava o
+   colaborador anterior órfão, sem empresa e sem escopo de autorização — sem
+   que nada recusasse.
+
+2. **Nenhuma trigger cobria `DELETE`** de vínculo ou de alocação. Apagar a
+   alocação vigente de um vínculo ativo passava.
+
+3. **`COALESCE(NEW.vinculo_id, OLD.vinculo_id)` nunca avaliava `OLD`.** Como a
+   coluna é `NOT NULL`, `NEW.vinculo_id` jamais é nulo: num `UPDATE` que
+   reaponta a alocação do vínculo A para o B, **só o B era verificado**, e o A
+   ficava ativo sem alocação vigente.
+
+O item 3 foi **reproduzido empiricamente** antes da correção: reinstalando a
+função antiga e movendo a alocação de um vínculo `ativo` para um `previsto`
+(que não colide com a `EXCLUSION CONSTRAINT` nem viola a invariante 2 no
+destino), a transação **commitava** e o vínculo de origem terminava `ativo`
+com **zero** alocações abertas.
+
+Isso contradizia o contrato da Emenda 2: as invariantes de admissão atômica
+devem valer **contra escrita direta**, não só contra o caminho da API.
+
+### A correção
+
+**Duas invariantes, quatro triggers.** A contagem difere de propósito: uma
+invariante que atravessa tabelas só fica garantida se **toda porta** capaz de
+quebrá-la disparar a verificação. Cada trigger é uma porta, não uma regra.
+
+| Invariante                                         | Portas cobertas                                                                                   |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| **1.** Colaborador sempre tem ao menos um vínculo  | `INSERT` de `colaborador`; `UPDATE`/`DELETE` de `vinculo_funcional`                               |
+| **2.** Vínculo `ativo` sempre tem alocação vigente | `INSERT`/`UPDATE` de `vinculo_funcional`; `INSERT`/`UPDATE`/`DELETE` de `alocacao_organizacional` |
+
+Triggers resultantes, todas `DEFERRABLE INITIALLY DEFERRED`:
+
+- `colaborador_exige_vinculo`
+- `vinculo_removido_exige_colaborador_com_vinculo` _(nova)_
+- `vinculo_ativo_exige_alocacao`
+- `alocacao_alterada_exige_vinculo_com_alocacao` _(substitui
+  `alocacao_encerrada_exige_sucessora`, agora cobrindo `INSERT`/`UPDATE`/`DELETE`)_
+
+**As funções passaram a verificar todos os registros afetados**, montando um
+array de alvos a partir de `OLD` **e** `NEW` conforme `TG_OP`:
+
+- em `DELETE`, só `OLD` existe;
+- em `UPDATE` que reaponta a FK, **origem e destino** entram no array;
+- em `INSERT`, só `NEW`.
+
+A verificação da invariante 1 ignora colaborador que deixou de existir — a
+regra é "colaborador sem vínculo", não "colaborador não pode sumir".
+
+### O que continua valendo, sem alteração
+
+`btree_gist` como pré-condição gerenciada, a `EXCLUSION CONSTRAINT` de
+não-sobreposição, a separação de privilégios da ADR 0002 (nenhum privilégio
+novo a `evolli_migrator` ou `evolli_app`), FKs compostas por empresa, CHECKs,
+índices únicos e `SELECT ... FOR UPDATE` na efetivação.
+
+Como a migration **ainda não estava publicada em `main`**, foi alterada no
+lugar — sem migration corretiva.
+
+### O que esta emenda não faz
+
+- **Não introduz `DELETE` na API.** Nenhuma rota nova; as FKs seguem
+  `ON DELETE RESTRICT`. A cobertura de `DELETE` é defesa em profundidade
+  contra SQL direto, manutenção manual e módulo futuro (RI-H1 inalterada).
+- Não altera dado, autorização, escopo, privilégio ou qualquer decisão de
+  produto.
+- **Não declara conformidade LGPD concluída** — retenção/descarte (DP-15),
+  confirmação de DPO e MFA continuam gates obrigatórios antes de piloto com
+  dado real ou produção.

@@ -461,7 +461,9 @@ como divergência tolerada entre spec e código.
   existe — nem passa a existir — endpoint de cadastro de colaborador sem
   vínculo.
 - A invariante deixa de depender do service e passa a ser **estrutural**: duas
-  `CONSTRAINT TRIGGER` _deferidas_ garantem, no COMMIT, que (a) todo
+  `CONSTRAINT TRIGGER` _deferidas_ — quatro delas, para duas invariantes,
+  porque cada trigger cobre uma **porta** distinta (`INSERT`, `UPDATE`,
+  `DELETE`) capaz de quebrá-las — garantem, no COMMIT, que (a) todo
   colaborador tem ao menos um vínculo e (b) todo vínculo `ativo` tem alocação
   vigente. Verificação no commit, e não a cada comando, é o que permite que a
   ordem interna da transação continue livre — fechar a alocação vigente antes
