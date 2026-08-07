@@ -1176,6 +1176,304 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
       }
     });
 
+    // ---------------------------------------------------------------------
+    // Cobertura de DELETE e de reaponte de FK.
+    //
+    // A API nao expoe DELETE em nenhum recurso desta fatia (RI-H1) e nao passa
+    // a expor. Estes casos sao defesa em profundidade contra SQL direto,
+    // manutencao manual e modulo futuro — o unico caminho por onde a
+    // invariante poderia ser quebrada hoje.
+    //
+    // Todos usam SQL cru pelo papel de migration e sao avaliados no COMMIT:
+    // as triggers sao DEFERRABLE INITIALLY DEFERRED, entao a recusa so
+    // aparece ao fechar a transacao, nunca no comando isolado.
+    // ---------------------------------------------------------------------
+
+    it("DELETE da unica alocacao vigente de vinculo ATIVO e recusado no COMMIT", async () => {
+      const migrator = new PrismaClient({
+        datasources: { db: { url: migratorUrl } },
+      });
+      try {
+        const aberta = await migrator.alocacaoOrganizacional.findFirst({
+          where: { vigenteAte: null, vinculo: { situacao: "ativo" } },
+        });
+        expect(aberta).not.toBeNull();
+
+        await expect(
+          migrator.$transaction([
+            migrator.$executeRawUnsafe(
+              `DELETE FROM app.alocacao_organizacional WHERE id = $1`,
+              aberta!.id,
+            ),
+          ]),
+        ).rejects.toThrow(/sem alocacao organizacional vigente/i);
+
+        // Nada foi removido.
+        const conferencia = await migrator.alocacaoOrganizacional.count({
+          where: { id: aberta!.id },
+        });
+        expect(conferencia).toBe(1);
+      } finally {
+        await migrator.$disconnect();
+      }
+    });
+
+    it("DELETE do ultimo vinculo de um colaborador e recusado no COMMIT", async () => {
+      const migrator = new PrismaClient({
+        datasources: { db: { url: migratorUrl } },
+      });
+      try {
+        // Colaborador com exatamente um vinculo, ja encerrado — o unico caso
+        // em que as FKs permitiriam chegar ate o DELETE do vinculo.
+        const { vinculoId, colaboradorId } = await admitirEEfetivar(rhA, {
+          nome: "Pessoa Sintetica Delete Vinculo",
+          empresaId: empresaA,
+          matricula: "MAT-DELV",
+          departamentoId: departamentoA,
+        });
+
+        const desligamento = await post("/v1/movimentacoes", rhA)
+          .send({
+            vinculoId,
+            tipo: "desligamento",
+            motivoCodigo: "encerramento_de_vinculo",
+            vigenciaInicio: DESLIGAMENTO,
+          })
+          .expect(201);
+        await post(`/v1/movimentacoes/${desligamento.body.id}/efetivar`, rhA)
+          .send()
+          .expect(201);
+
+        // Ordem que satisfaz as FKs: alocacoes -> movimentacoes -> vinculo.
+        await expect(
+          migrator.$transaction([
+            migrator.$executeRawUnsafe(
+              `DELETE FROM app.alocacao_organizacional WHERE vinculo_id = $1`,
+              vinculoId,
+            ),
+            migrator.$executeRawUnsafe(
+              `DELETE FROM app.movimentacao_funcional WHERE vinculo_id = $1`,
+              vinculoId,
+            ),
+            migrator.$executeRawUnsafe(
+              `DELETE FROM app.vinculo_funcional WHERE id = $1`,
+              vinculoId,
+            ),
+          ]),
+        ).rejects.toThrow(/colaborador sem vinculo funcional/i);
+
+        // O vinculo e o colaborador continuam la.
+        expect(
+          await migrator.vinculoFuncional.count({ where: { id: vinculoId } }),
+        ).toBe(1);
+        expect(
+          await migrator.colaborador.count({ where: { id: colaboradorId } }),
+        ).toBe(1);
+      } finally {
+        await migrator.$disconnect();
+      }
+    });
+
+    it("MOVER alocacao para outro vinculo, deixando o original ATIVO sem alocacao, e recusado", async () => {
+      // Esta e a lacuna que um COALESCE(NEW.vinculo_id, OLD.vinculo_id)
+      // esconderia: como a coluna e NOT NULL, NEW nunca seria nulo e so o
+      // DESTINO seria verificado — a ORIGEM ficaria ativa sem alocacao.
+      const migrator = new PrismaClient({
+        datasources: { db: { url: migratorUrl } },
+      });
+      try {
+        // Origem: vinculo ATIVO, com alocacao vigente.
+        const origem = await admitirEEfetivar(rhA, {
+          nome: "Pessoa Sintetica Origem",
+          empresaId: empresaA,
+          matricula: "MAT-ORIG",
+          departamentoId: departamentoA,
+        });
+
+        // Destino: vinculo PREVISTO, sem alocacao. Escolhido de proposito —
+        // a invariante 2 nao se aplica a ele e nao ha alocacao com que
+        // colidir, entao nem a EXCLUSION CONSTRAINT nem a checagem do destino
+        // recusariam. Se o teste passar, foi a checagem da ORIGEM que agiu.
+        const destinoColaborador = await post("/v1/colaboradores", rhA)
+          .send({
+            nome: "Pessoa Sintetica Destino",
+            empresaId: empresaA,
+            matricula: "MAT-DEST",
+            tipo: "clt",
+            dataAdmissao: ADMISSAO,
+            motivoCodigo: "admissao_inicial",
+            departamentoId: departamentoA,
+          })
+          .expect(201);
+        const destinoVinculos = await get(
+          `/v1/colaboradores/${destinoColaborador.body.id}/vinculos`,
+          rhA,
+        ).expect(200);
+        const destinoId: string = destinoVinculos.body[0].id;
+        expect(destinoVinculos.body[0].situacao).toBe("previsto");
+
+        const aberta = await migrator.alocacaoOrganizacional.findFirstOrThrow({
+          where: { vinculoId: origem.vinculoId, vigenteAte: null },
+        });
+
+        await expect(
+          migrator.$transaction([
+            migrator.$executeRawUnsafe(
+              `UPDATE app.alocacao_organizacional SET vinculo_id = $1 WHERE id = $2`,
+              destinoId,
+              aberta.id,
+            ),
+          ]),
+        ).rejects.toThrow(/sem alocacao organizacional vigente/i);
+
+        // A origem continua intacta: alocacao no lugar, vinculo ativo.
+        const conferencia =
+          await migrator.alocacaoOrganizacional.findUniqueOrThrow({
+            where: { id: aberta.id },
+          });
+        expect(conferencia.vinculoId).toBe(origem.vinculoId);
+        expect(
+          await migrator.alocacaoOrganizacional.count({
+            where: { vinculoId: origem.vinculoId, vigenteAte: null },
+          }),
+        ).toBe(1);
+      } finally {
+        await migrator.$disconnect();
+      }
+    });
+
+    it("REAPONTAR vinculo para outro colaborador, deixando o original sem vinculo, e recusado", async () => {
+      const migrator = new PrismaClient({
+        datasources: { db: { url: migratorUrl } },
+      });
+      try {
+        const origem = await admitirEEfetivar(rhA, {
+          nome: "Pessoa Sintetica Reaponte Origem",
+          empresaId: empresaA,
+          matricula: "MAT-REAP1",
+          departamentoId: departamentoA,
+        });
+        // Destino NAO efetivado de proposito: seu vinculo fica `previsto`,
+        // entao mover um vinculo ATIVO para ele nao esbarra em RI-V6 (no
+        // maximo um ativo por colaborador+empresa). Se o teste passar, foi a
+        // checagem da ORIGEM que agiu, nao a unicidade.
+        const destinoColaborador = await post("/v1/colaboradores", rhA)
+          .send({
+            nome: "Pessoa Sintetica Reaponte Destino",
+            empresaId: empresaA,
+            matricula: "MAT-REAP2",
+            tipo: "clt",
+            dataAdmissao: ADMISSAO,
+            motivoCodigo: "admissao_inicial",
+            departamentoId: departamentoA,
+          })
+          .expect(201);
+        const destino = { colaboradorId: destinoColaborador.body.id };
+
+        // Mover o unico vinculo da origem para o colaborador destino deixaria
+        // a origem sem nenhum vinculo — e sem escopo de autorizacao.
+        await expect(
+          migrator.$transaction([
+            migrator.$executeRawUnsafe(
+              `UPDATE app.vinculo_funcional SET colaborador_id = $1 WHERE id = $2`,
+              destino.colaboradorId,
+              origem.vinculoId,
+            ),
+          ]),
+        ).rejects.toThrow(/colaborador sem vinculo funcional/i);
+
+        const conferencia = await migrator.vinculoFuncional.findUniqueOrThrow({
+          where: { id: origem.vinculoId },
+        });
+        expect(conferencia.colaboradorId).toBe(origem.colaboradorId);
+      } finally {
+        await migrator.$disconnect();
+      }
+    });
+
+    it("LEGITIMO: encerrar vinculo e fechar alocacao na MESMA transacao e aceito", async () => {
+      // O vinculo deixa de estar ativo, entao a invariante 2 nao se aplica
+      // mais a ele — e a verificacao diferida no COMMIT e justamente o que
+      // permite que a ordem interna da transacao seja livre.
+      const migrator = new PrismaClient({
+        datasources: { db: { url: migratorUrl } },
+      });
+      try {
+        const { vinculoId } = await admitirEEfetivar(rhA, {
+          nome: "Pessoa Sintetica Encerra Junto",
+          empresaId: empresaA,
+          matricula: "MAT-ENCJ",
+          departamentoId: departamentoA,
+        });
+
+        await migrator.$transaction([
+          migrator.$executeRawUnsafe(
+            `UPDATE app.alocacao_organizacional
+                SET vigente_ate = DATE '2026-09-01'
+              WHERE vinculo_id = $1 AND vigente_ate IS NULL`,
+            vinculoId,
+          ),
+          migrator.$executeRawUnsafe(
+            `UPDATE app.vinculo_funcional
+                SET situacao = 'encerrado', data_desligamento = DATE '2026-09-01'
+              WHERE id = $1`,
+            vinculoId,
+          ),
+        ]);
+
+        const vinculo = await migrator.vinculoFuncional.findUniqueOrThrow({
+          where: { id: vinculoId },
+        });
+        expect(vinculo.situacao).toBe("encerrado");
+        expect(
+          await migrator.alocacaoOrganizacional.count({
+            where: { vinculoId, vigenteAte: null },
+          }),
+        ).toBe(0);
+      } finally {
+        await migrator.$disconnect();
+      }
+    });
+
+    it("as duas invariantes sao cobertas por QUATRO triggers, todas deferidas", async () => {
+      const migrator = new PrismaClient({
+        datasources: { db: { url: migratorUrl } },
+      });
+      try {
+        const triggers = await migrator.$queryRawUnsafe<
+          {
+            tgname: string;
+            deferravel: boolean;
+            inicialmente_deferida: boolean;
+          }[]
+        >(
+          `SELECT t.tgname,
+                  t.tgdeferrable  AS deferravel,
+                  t.tginitdeferred AS inicialmente_deferida
+             FROM pg_trigger t
+             JOIN pg_class c ON c.oid = t.tgrelid
+             JOIN pg_namespace n ON n.oid = c.relnamespace
+            WHERE n.nspname = 'app' AND NOT t.tgisinternal
+            ORDER BY t.tgname`,
+        );
+
+        expect(triggers.map((t) => t.tgname)).toEqual([
+          "alocacao_alterada_exige_vinculo_com_alocacao",
+          "colaborador_exige_vinculo",
+          "vinculo_ativo_exige_alocacao",
+          "vinculo_removido_exige_colaborador_com_vinculo",
+        ]);
+        // Sem DEFERRABLE INITIALLY DEFERRED, estados intermediarios legitimos
+        // (fechar a vigente antes de abrir a sucessora) seriam recusados.
+        for (const t of triggers) {
+          expect(t.deferravel).toBe(true);
+          expect(t.inicialmente_deferida).toBe(true);
+        }
+      } finally {
+        await migrator.$disconnect();
+      }
+    });
+
     it("admissao cria colaborador, vinculo e movimentacao na MESMA transacao", async () => {
       const resposta = await post("/v1/colaboradores", rhA)
         .send({
