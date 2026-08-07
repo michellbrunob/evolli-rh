@@ -97,6 +97,11 @@ describe("PostgreSQL — papéis, migrations e readiness (e2e)", () => {
       `app_password=${APP_PASSWORD}`,
     ]);
     await runInfraScript(container, "02_schema_and_grants.sql", []);
+    // Pre-condicao de infraestrutura da Fatia 2: a migration exige
+    // btree_gist. Provisionada aqui pelo papel ADMINISTRADOR do container
+    // efemero — nunca por evolli_migrator, que por desenho da ADR 0002 nao
+    // tem CREATE na base. Ver infra/postgres/README.md.
+    await runInfraScript(container, "04_extensions.sql", []);
 
     migratorUrl = `postgresql://evolli_migrator:${MIGRATOR_PASSWORD}@${host}:${port}/${ADMIN_DB}?schema=app`;
     appUrl = `postgresql://evolli_app:${APP_PASSWORD}@${host}:${port}/${ADMIN_DB}?schema=app`;

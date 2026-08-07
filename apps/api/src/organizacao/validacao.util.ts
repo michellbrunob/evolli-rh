@@ -2,7 +2,7 @@ import {
   ConflictException,
   UnprocessableEntityException,
 } from "@nestjs/common";
-import { StatusOrganizacional } from "@prisma/client";
+import { Prisma, StatusOrganizacional } from "@prisma/client";
 import { PrismaService } from "../database/prisma.service";
 import { EscopoOrganizacional, filtroEmpresa } from "./escopo.util";
 
@@ -156,6 +156,48 @@ export function assertPaisAtivosParaReativar(
   if (statusDosPais.some((status) => status !== StatusOrganizacional.ativo)) {
     throw new UnprocessableEntityException();
   }
+}
+
+/**
+ * RI-O1 (Etapa 1 — Fatia 2): conta os **dependentes funcionais ativos** de um
+ * nó organizacional — vínculos ativos alocados nele, no momento.
+ *
+ * Isto **não altera** a decisão 7 da ADR 0006 ("inativação bloqueia com
+ * elemento ativo vinculado, nunca cascata"): aplica a mesma regra a uma classe
+ * nova de dependente. Sem isto, a lotação vigente de uma pessoa poderia
+ * apontar para um nó inativo — exatamente o estado que R-INA-3 proíbe na
+ * criação e que a reativação já valida.
+ *
+ * **A recusa nunca revela quem é o dependente.** `assertSemFilhosAtivos` lança
+ * `ConflictException` sem detalhe, e é de propósito: quem pode inativar
+ * estrutura não necessariamente pode ler pessoas (matriz da Fatia 2), então
+ * uma mensagem do tipo "existe colaborador alocado aqui" seria vazamento por
+ * canal lateral.
+ *
+ * Só conta alocação **vigente** (`vigenteAte: null`) de vínculo **ativo**:
+ * histórico encerrado não bloqueia nada — é justamente o que precisa
+ * sobreviver à inativação (R-INA-4).
+ */
+export async function contarDependentesFuncionaisAtivos(
+  prisma: PrismaService,
+  filtro: Prisma.AlocacaoOrganizacionalWhereInput,
+): Promise<number> {
+  return prisma.alocacaoOrganizacional.count({
+    where: { ...filtro, vigenteAte: null, vinculo: { situacao: "ativo" } },
+  });
+}
+
+/**
+ * RI-O1 para `Empresa`: a raiz não é referenciada por alocação como as demais,
+ * então o dependente é o próprio vínculo ativo.
+ */
+export async function contarVinculosAtivosNaEmpresa(
+  prisma: PrismaService,
+  empresaId: string,
+): Promise<number> {
+  return prisma.vinculoFuncional.count({
+    where: { empresaId, situacao: "ativo" },
+  });
 }
 
 /** Deslocamento de paginação, com página 1-indexada. */

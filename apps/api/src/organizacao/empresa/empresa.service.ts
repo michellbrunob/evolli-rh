@@ -13,7 +13,11 @@ import {
 import { EscopoOrganizacional, resolverEscopo } from "../escopo.util";
 import { podeAcessar } from "../autorizacao.util";
 import { traduzirErroPrisma } from "../prisma-erro.util";
-import { assertAindaInativo } from "../validacao.util";
+import {
+  assertAindaInativo,
+  assertSemFilhosAtivos,
+  contarVinculosAtivosNaEmpresa,
+} from "../validacao.util";
 import {
   AtualizarNoOrganizacionalDto,
   CriarEmpresaDto,
@@ -171,6 +175,12 @@ export class EmpresaService {
     }
 
     await this.assertSemFilhosAtivos(empresaId);
+    // RI-O1 (Fatia 2): alocacao vigente de vinculo ativo tambem bloqueia.
+    // Mesma regra da ADR 0006 d.7 aplicada a uma classe nova de dependente
+    // — bloqueia, nunca cascateia. A recusa nao revela o dependente.
+    assertSemFilhosAtivos(
+      await contarVinculosAtivosNaEmpresa(this.prisma, empresa.id),
+    );
 
     return this.prisma.$transaction(async (tx) => {
       const inativada = await tx.empresa.update({

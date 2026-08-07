@@ -2,6 +2,7 @@ import {
   AuthorizationSubject,
   AuthorizationTarget,
   isOrganizationalResource,
+  isPessoasResource,
 } from "./permission.types";
 
 /**
@@ -24,11 +25,16 @@ export function evaluatePermission(
     case "user_role":
       return evaluateUserRole(subject, target);
     default:
-      // Recursos organizacionais (Etapa 1, Fatia 1). Mantém a negação por
-      // padrão: qualquer recurso não reconhecido continua bloqueado.
-      return isOrganizationalResource(target.resource)
-        ? evaluateOrganizacao(subject, target)
-        : false;
+      // Recursos organizacionais (Etapa 1, Fatia 1) e de pessoas (Fatia 2),
+      // cada um em seu próprio ramo. Mantém a negação por padrão: qualquer
+      // recurso não reconhecido continua bloqueado.
+      if (isOrganizationalResource(target.resource)) {
+        return evaluateOrganizacao(subject, target);
+      }
+      if (isPessoasResource(target.resource)) {
+        return evaluatePessoas(subject, target);
+      }
+      return false;
   }
 }
 
@@ -190,6 +196,59 @@ function evaluateOrganizacao(
     // (`access_log`) que eles já possuem permanece inalterada.
     //
     // `colaborador`: sem acesso à estrutura nesta fatia (matriz §8).
+    default:
+      return false;
+  }
+}
+
+/**
+ * Colaboradores e vida funcional (Etapa 1 — Fatia 2, ADR 0007; spec §6).
+ *
+ * Mesma avaliação em **duas fases** do ramo organizacional — capacidade no
+ * guard (`targetCompanyId === undefined`), escopo no service, com a empresa do
+ * **vínculo** já resolvida. A fronteira é `empresa_id` do vínculo, nunca do
+ * colaborador: a pessoa pode ter vínculos históricos em empresas distintas
+ * (Baseline V1, item 2).
+ *
+ * **`admin_tecnico` é NEGADO aqui — e isso é deliberado, não omissão.**
+ *
+ * A exceção temporária de acesso global (Emenda 1 da ADR 0005) foi concedida
+ * sobre a estrutura organizacional da Fatia 1, que declaradamente não continha
+ * dado pessoal. Estendê-la a este domínio por herança ampliaria materialmente
+ * uma exceção aprovada em outro contexto — exatamente o que a Baseline V1
+ * (item 8) fechou ao negar o papel neste módulo, de forma **definitiva**, não
+ * apenas para esta V1. Note a assimetria com `evaluateOrganizacao`, onde
+ * `admin_tecnico` retorna `true`: as duas coisas convivem por decisão
+ * registrada, não por inconsistência.
+ */
+function evaluatePessoas(
+  subject: AuthorizationSubject,
+  target: AuthorizationTarget,
+): boolean {
+  const escopoResolvido = target.targetCompanyId !== undefined;
+
+  switch (subject.role) {
+    // Baseline V1, itens 7 e 12: RH e DP registram e efetivam diretamente,
+    // restritos à própria empresa, sempre auditados. Não há aprovador distinto
+    // do solicitante nesta V1 — quem registra responde pelo registro.
+    case "rh":
+    case "dp":
+      return escopoResolvido
+        ? isSameCompany(subject, target)
+        : subject.companyId !== null;
+
+    // Negados por decisão explícita, cada um por um motivo distinto:
+    //
+    // `admin_tecnico` — Baseline V1, item 8 (ver bloco acima).
+    // `gestor`        — escopo pendente (DP-8/DP-16); conceder exigiria
+    //                   escolher a fronteira (equipe? departamento? direto ou
+    //                   indireto?) por conta própria.
+    // `auditor`/`dpo` — não provisionados; escopo pendente (DP-7). A leitura
+    //                   da trilha (`access_log`) que já possuem fica intacta.
+    // `financeiro`    — nada na Baseline concede acesso a pessoas; mantém só
+    //                   `centro_custo` da Fatia 1.
+    // `colaborador`   — o que ele acessaria é o Portal do Colaborador, que não
+    //                   existe (DP-23); conceder aqui exporia dado de terceiro.
     default:
       return false;
   }

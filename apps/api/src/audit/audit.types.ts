@@ -50,6 +50,28 @@ export const AUDIT_ACTIONS = [
   "organizacao_centro_custo_inativado",
   "organizacao_centro_custo_reativado",
   "organizacao_estrutura_consultada",
+
+  // Etapa 1 — Fatia 2: Colaboradores e vida funcional (ADR 0007). Mesma
+  // convenção da Fatia 1: valor persistido em português separado por ponto
+  // (`pessoas.colaborador.criado`), identificador Prisma com `_`.
+  //
+  // Verbos deliberadamente ausentes, por a capacidade não existir nesta V1:
+  // `aprovada`/`rejeitada` (sem workflow, Baseline V1 item 7),
+  // `dado_restrito.*` (fora da fatia, item 5) e `colaborador.consultado`
+  // (nenhum papel tem escopo amplo neste domínio, então leitura fora do
+  // escopo próprio é sempre 404 — nunca leitura a auditar).
+  "pessoas_colaborador_criado",
+  "pessoas_colaborador_atualizado",
+  "pessoas_vinculo_criado",
+  "pessoas_vinculo_ativado",
+  "pessoas_vinculo_encerrado",
+  "pessoas_movimentacao_registrada",
+  "pessoas_movimentacao_programada",
+  "pessoas_movimentacao_efetivada",
+  "pessoas_movimentacao_cancelada",
+  "pessoas_movimentacao_retificada",
+  "pessoas_alocacao_criada",
+  "pessoas_alocacao_encerrada",
 ] as const satisfies readonly AuditAction[];
 
 /**
@@ -76,7 +98,15 @@ export type AuditResource =
   | "equipe"
   | "cargo"
   | "centro_custo"
-  | "estrutura_organizacional";
+  | "estrutura_organizacional"
+  // Etapa 1 — Fatia 2: entram sem migration, pelo mesmo motivo. Não há
+  // `dado_restrito_colaborador`: essa categoria ficou fora da fatia
+  // (Baseline V1, item 5), e etiquetar um recurso inexistente na trilha
+  // sugeriria uma capacidade que o sistema não tem.
+  | "colaborador"
+  | "vinculo_funcional"
+  | "movimentacao_funcional"
+  | "alocacao_organizacional";
 
 export type RecordAuditEventInput =
   | {

@@ -53,6 +53,13 @@ interface PrismaDuble {
   };
   area: { count: jest.Mock };
   equipe: { count: jest.Mock };
+  /**
+   * RI-O1 (Etapa 1 — Fatia 2): a inativação passou a consultar também as
+   * alocações vigentes de vínculo ativo. O dublê ganha o colaborador novo; o
+   * comportamento verificado pelos casos existentes não muda — por padrão
+   * devolve 0, que é "nenhum dependente funcional".
+   */
+  alocacaoOrganizacional: { count: jest.Mock };
   $transaction: jest.Mock;
 }
 
@@ -71,6 +78,7 @@ function criarPrisma(): PrismaDuble {
     },
     area: { count: jest.fn().mockResolvedValue(0) },
     equipe: { count: jest.fn().mockResolvedValue(0) },
+    alocacaoOrganizacional: { count: jest.fn().mockResolvedValue(0) },
     // Executa o callback com o próprio dublê, imitando o client de transação.
     $transaction: jest.fn(async (cb: (tx: unknown) => Promise<unknown>) =>
       cb(duble),

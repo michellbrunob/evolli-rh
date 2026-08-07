@@ -62,6 +62,14 @@ model AccessUser {
   passwordResetTokens AccessPasswordResetToken[]
   auditEvents         AuditEvent[]
 
+  // Etapa 1 — Fatia 2: quem registrou e quem efetivou uma movimentacao
+  // funcional. Relacao de leitura apenas no schema Prisma — nenhuma coluna
+  // nova entra em `access_user`; as FKs ficam em `movimentacao_funcional`.
+  // NAO e o vinculo AccessUser <-> Colaborador (DP-23, deliberadamente nao
+  // materializado): identifica o ATOR da operacao, nunca a pessoa registrada.
+  movimentacoesSolicitadas MovimentacaoFuncional[] @relation("MovimentacaoSolicitante")
+  movimentacoesExecutadas  MovimentacaoFuncional[] @relation("MovimentacaoExecutor")
+
   @@index([companyId])
   @@map("access_user")
 }
@@ -72,10 +80,10 @@ model AccessUser {
 // (ADR 0003 §6) — extensão técnica desta implementação, não altera o
 // desenho aprovado.
 model AccessSession {
-  id            String    @id @default(uuid())
-  tokenHash     String    @unique @map("token_hash")
-  csrfTokenHash String    @map("csrf_token_hash")
-  userId        String    @map("user_id")
+  id            String @id @default(uuid())
+  tokenHash     String @unique @map("token_hash")
+  csrfTokenHash String @map("csrf_token_hash")
+  userId        String @map("user_id")
 
   createdAt  DateTime @default(now()) @map("created_at")
   lastSeenAt DateTime @default(now()) @map("last_seen_at")
@@ -154,42 +162,70 @@ enum AuditAction {
   rate_limit_blocked
   audit_log_read
 
-  organizacao_empresa_criada    @map("organizacao.empresa.criada")
+  organizacao_empresa_criada     @map("organizacao.empresa.criada")
   organizacao_empresa_atualizada @map("organizacao.empresa.atualizada")
-  organizacao_empresa_inativada @map("organizacao.empresa.inativada")
-  organizacao_empresa_reativada @map("organizacao.empresa.reativada")
+  organizacao_empresa_inativada  @map("organizacao.empresa.inativada")
+  organizacao_empresa_reativada  @map("organizacao.empresa.reativada")
 
-  organizacao_unidade_organizacional_criada    @map("organizacao.unidade_organizacional.criada")
+  organizacao_unidade_organizacional_criada     @map("organizacao.unidade_organizacional.criada")
   organizacao_unidade_organizacional_atualizada @map("organizacao.unidade_organizacional.atualizada")
-  organizacao_unidade_organizacional_inativada @map("organizacao.unidade_organizacional.inativada")
-  organizacao_unidade_organizacional_reativada @map("organizacao.unidade_organizacional.reativada")
+  organizacao_unidade_organizacional_inativada  @map("organizacao.unidade_organizacional.inativada")
+  organizacao_unidade_organizacional_reativada  @map("organizacao.unidade_organizacional.reativada")
 
-  organizacao_departamento_criado    @map("organizacao.departamento.criado")
+  organizacao_departamento_criado     @map("organizacao.departamento.criado")
   organizacao_departamento_atualizado @map("organizacao.departamento.atualizado")
-  organizacao_departamento_inativado @map("organizacao.departamento.inativado")
-  organizacao_departamento_reativado @map("organizacao.departamento.reativado")
+  organizacao_departamento_inativado  @map("organizacao.departamento.inativado")
+  organizacao_departamento_reativado  @map("organizacao.departamento.reativado")
 
-  organizacao_area_criada    @map("organizacao.area.criada")
+  organizacao_area_criada     @map("organizacao.area.criada")
   organizacao_area_atualizada @map("organizacao.area.atualizada")
-  organizacao_area_inativada @map("organizacao.area.inativada")
-  organizacao_area_reativada @map("organizacao.area.reativada")
+  organizacao_area_inativada  @map("organizacao.area.inativada")
+  organizacao_area_reativada  @map("organizacao.area.reativada")
 
-  organizacao_equipe_criada    @map("organizacao.equipe.criada")
+  organizacao_equipe_criada     @map("organizacao.equipe.criada")
   organizacao_equipe_atualizada @map("organizacao.equipe.atualizada")
-  organizacao_equipe_inativada @map("organizacao.equipe.inativada")
-  organizacao_equipe_reativada @map("organizacao.equipe.reativada")
+  organizacao_equipe_inativada  @map("organizacao.equipe.inativada")
+  organizacao_equipe_reativada  @map("organizacao.equipe.reativada")
 
-  organizacao_cargo_criado    @map("organizacao.cargo.criado")
+  organizacao_cargo_criado     @map("organizacao.cargo.criado")
   organizacao_cargo_atualizado @map("organizacao.cargo.atualizado")
-  organizacao_cargo_inativado @map("organizacao.cargo.inativado")
-  organizacao_cargo_reativado @map("organizacao.cargo.reativado")
+  organizacao_cargo_inativado  @map("organizacao.cargo.inativado")
+  organizacao_cargo_reativado  @map("organizacao.cargo.reativado")
 
-  organizacao_centro_custo_criado    @map("organizacao.centro_custo.criado")
+  organizacao_centro_custo_criado     @map("organizacao.centro_custo.criado")
   organizacao_centro_custo_atualizado @map("organizacao.centro_custo.atualizado")
-  organizacao_centro_custo_inativado @map("organizacao.centro_custo.inativado")
-  organizacao_centro_custo_reativado @map("organizacao.centro_custo.reativado")
+  organizacao_centro_custo_inativado  @map("organizacao.centro_custo.inativado")
+  organizacao_centro_custo_reativado  @map("organizacao.centro_custo.reativado")
 
   organizacao_estrutura_consultada @map("organizacao.estrutura.consultada")
+
+  // Etapa 1 — Fatia 2: Colaboradores e vida funcional (ADR 0007, Baseline V1).
+  // Mesma convencao da Fatia 1 — valor persistido em portugues separado por
+  // ponto, identificador Prisma com `_`. Terceira familia de nomenclatura de
+  // evento convivendo por decisao explicita (ADR 0006 Emenda 1 item 5,
+  // reafirmada pela ADR 0007).
+  //
+  // Verbos deliberadamente AUSENTES, por a capacidade correspondente nao
+  // existir nesta V1 (nao ha o que auditar):
+  //   - aprovada/rejeitada  -> sem workflow de aprovacao (Baseline V1, item 7)
+  //   - dado_restrito.*     -> dado restrito fora da fatia (item 5)
+  //   - colaborador.consultado -> nenhum papel tem escopo amplo neste dominio,
+  //     entao "leitura fora do escopo proprio" e sempre 404, nunca leitura
+  pessoas_colaborador_criado     @map("pessoas.colaborador.criado")
+  pessoas_colaborador_atualizado @map("pessoas.colaborador.atualizado")
+
+  pessoas_vinculo_criado    @map("pessoas.vinculo.criado")
+  pessoas_vinculo_ativado   @map("pessoas.vinculo.ativado")
+  pessoas_vinculo_encerrado @map("pessoas.vinculo.encerrado")
+
+  pessoas_movimentacao_registrada @map("pessoas.movimentacao.registrada")
+  pessoas_movimentacao_programada @map("pessoas.movimentacao.programada")
+  pessoas_movimentacao_efetivada  @map("pessoas.movimentacao.efetivada")
+  pessoas_movimentacao_cancelada  @map("pessoas.movimentacao.cancelada")
+  pessoas_movimentacao_retificada @map("pessoas.movimentacao.retificada")
+
+  pessoas_alocacao_criada    @map("pessoas.alocacao.criada")
+  pessoas_alocacao_encerrada @map("pessoas.alocacao.encerrada")
 }
 
 enum AuditResult {
@@ -211,7 +247,7 @@ model AuditEvent {
   actorSystemId String?        @map("actor_system_id")
   // Snapshot do papel do ator no momento da ação — papel pode mudar depois;
   // o evento preserva o papel vigente na hora (null quando actorType=system).
-  actorRole AccessRole? @map("actor_role")
+  actorRole     AccessRole?    @map("actor_role")
 
   companyId String? @map("company_id")
   unitId    String? @map("unit_id")
@@ -286,6 +322,11 @@ model Empresa {
   cargos        Cargo[]
   centrosCusto  CentroCusto[]
 
+  // Etapa 1 — Fatia 2
+  vinculos      VinculoFuncional[]
+  alocacoes     AlocacaoOrganizacional[]
+  movimentacoes MovimentacaoFuncional[]
+
   @@index([status])
   @@map("empresa")
 }
@@ -303,10 +344,15 @@ model UnidadeOrganizacional {
   empresa Empresa  @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   equipes Equipe[]
 
+  // Etapa 1 — Fatia 2
+  alocacoes         AlocacaoOrganizacional[]
+  movimentacoesAlvo MovimentacaoFuncional[]
+
   @@unique([empresaId, codigo])
   // Alvo da FK composta vinda de Equipe: o banco passa a garantir que a
   // unidade referenciada pertence à mesma empresa da equipe (spec R5), sem
-  // depender de validação de aplicação.
+  // depender de validação de aplicação. A Fatia 2 reaproveita o mesmo alvo
+  // para alocacao_organizacional e movimentacao_funcional.
   @@unique([id, empresaId])
   @@index([empresaId, status])
   @@map("unidade_organizacional")
@@ -326,9 +372,14 @@ model Departamento {
   areas   Area[]
   equipes Equipe[]
 
+  // Etapa 1 — Fatia 2
+  alocacoes         AlocacaoOrganizacional[]
+  movimentacoesAlvo MovimentacaoFuncional[]
+
   @@unique([empresaId, codigo])
   // Mesmo propósito do par em UnidadeOrganizacional: alvo da FK composta de
-  // Equipe, garantindo mesma empresa no nível do banco (spec R5).
+  // Equipe, garantindo mesma empresa no nível do banco (spec R5). A Fatia 2
+  // reaproveita o mesmo alvo para alocacao e movimentacao.
   @@unique([id, empresaId])
   @@index([empresaId, status])
   @@map("departamento")
@@ -350,7 +401,16 @@ model Area {
 
   departamento Departamento @relation(fields: [departamentoId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
+  // Etapa 1 — Fatia 2
+  alocacoes         AlocacaoOrganizacional[]
+  movimentacoesAlvo MovimentacaoFuncional[]
+
   @@unique([departamentoId, codigo])
+  // Alvo da FK composta (area_id, departamento_id) vinda da Fatia 2. Como
+  // `departamento` ja carrega FK composta com `empresa_id`, a cadeia
+  // area -> departamento -> empresa fica garantida pelo banco, mesmo sem
+  // `empresa_id` proprio nesta tabela.
+  @@unique([id, departamentoId])
   @@index([departamentoId, status])
   @@map("area")
 }
@@ -371,11 +431,17 @@ model Equipe {
   criadoEm     DateTime @default(now()) @map("criado_em")
   atualizadoEm DateTime @updatedAt @map("atualizado_em")
 
-  empresa      Empresa      @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  departamento Departamento @relation(fields: [departamentoId, empresaId], references: [id, empresaId], onDelete: Restrict, onUpdate: Cascade)
+  empresa               Empresa                @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  departamento          Departamento           @relation(fields: [departamentoId, empresaId], references: [id, empresaId], onDelete: Restrict, onUpdate: Cascade)
   unidadeOrganizacional UnidadeOrganizacional? @relation(fields: [unidadeOrganizacionalId, empresaId], references: [id, empresaId], onDelete: Restrict, onUpdate: Cascade)
 
+  // Etapa 1 — Fatia 2
+  alocacoes         AlocacaoOrganizacional[]
+  movimentacoesAlvo MovimentacaoFuncional[]
+
   @@unique([departamentoId, codigo])
+  /// Alvo da FK composta da Fatia 2 (equipe_id, empresa_id).
+  @@unique([id, empresaId])
   @@index([empresaId, status])
   @@index([departamentoId])
   @@index([unidadeOrganizacionalId])
@@ -399,7 +465,13 @@ model Cargo {
 
   empresa Empresa @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
+  // Etapa 1 — Fatia 2
+  alocacoes         AlocacaoOrganizacional[]
+  movimentacoesAlvo MovimentacaoFuncional[]
+
   @@unique([empresaId, codigo])
+  /// Alvo da FK composta da Fatia 2 (cargo_id, empresa_id).
+  @@unique([id, empresaId])
   @@index([empresaId, status])
   @@map("cargo")
 }
@@ -419,7 +491,315 @@ model CentroCusto {
 
   empresa Empresa @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
+  // Etapa 1 — Fatia 2
+  alocacoes         AlocacaoOrganizacional[]
+  movimentacoesAlvo MovimentacaoFuncional[]
+
   @@unique([empresaId, codigo])
+  /// Alvo da FK composta da Fatia 2 (centro_custo_id, empresa_id).
+  @@unique([id, empresaId])
   @@index([empresaId, status])
   @@map("centro_custo")
+}
+
+// ---------------------------------------------------------------------------
+// Etapa 1 — Fatia 2: Colaboradores e Vida Funcional
+// ---------------------------------------------------------------------------
+// Modelo aprovado na Baseline V1 (ADR 0007) e especificado em
+// docs/modules/etapa1-fatia2-colaboradores-vida-funcional.md.
+//
+// DADOS APROVADOS, lista fechada (Baseline V1, item 1): nome completo,
+// matricula (no vinculo), situacao, tipo/situacao do vinculo, referencias
+// organizacionais aprovadas e datas funcionais. NENHUM outro dado pessoal.
+//
+// AUSENCIAS DELIBERADAS — cada uma por decisao registrada, nao por esquecimento:
+//   - CPF, RG, endereco, telefone, e-mail, data de nascimento, nome social,
+//     identidade de genero: fora desta fatia (Baseline V1, itens 1 e 9).
+//   - salario, remuneracao, beneficio, dado familiar, medico ou sensivel:
+//     fora desta fatia (item 5).
+//   - documento, anexo, imagem ou arquivo: dependem do modulo de Documentos,
+//     Etapa 2 (DP-24).
+//   - ferias, afastamento, retorno e jornada: dependem de Ponto (Etapa 3) e de
+//     regra trabalhista nao decidida — ausentes dos enums de tipo/situacao.
+//   - gestor/subordinado: nao antecipado, nem estruturalmente (ADR 0006, d. 8).
+//   - vinculo AccessUser <-> Colaborador: nao materializado (DP-23). Os campos
+//     solicitante_user_id/executor_user_id identificam o ATOR da operacao,
+//     nunca a pessoa registrada.
+//   - workflow de aprovacao: sem tabela, sem estado aprovada/rejeitada (item 7).
+//   - tenant_id, RLS multitenant: fora de escopo (ADR 0005, d. 2).
+//   - exclusao fisica: nenhuma rota DELETE; onDelete Restrict em toda FK.
+
+enum SituacaoColaborador {
+  ativo
+  inativo
+}
+
+/// Catalogo FECHADO (Baseline V1, item 4). `outro_controlado` e valor de
+/// escape do proprio enum — nunca texto livre. Nenhum tipo altera
+/// comportamento do sistema: sem calculo, sem enquadramento legal, sem
+/// automacao trabalhista.
+enum TipoVinculo {
+  clt
+  estagio
+  pj
+  temporario
+  outro_controlado
+}
+
+/// Sem `suspenso`: afastamento esta fora desta fatia. Reintroduzir e migration
+/// aditiva quando a capacidade for aprovada — valor de enum morto seria mais
+/// caro de remover depois do que de acrescentar na hora certa.
+enum SituacaoVinculo {
+  previsto
+  ativo
+  encerrado
+}
+
+/// Sem `ferias`, `afastamento`, `retorno` e `alteracao_jornada`: dependem de
+/// regra trabalhista e do modulo de Ponto, ambos fora desta fatia.
+enum TipoMovimentacao {
+  admissao
+  transferencia_organizacional
+  mudanca_cargo
+  desligamento
+}
+
+/// Sem `aprovada`/`rejeitada`: nao ha workflow de aprovacao nesta V1
+/// (Baseline V1, item 7). RH/DP registram e efetivam diretamente, sob
+/// responsabilidade auditada.
+enum StatusMovimentacao {
+  solicitada
+  programada
+  efetivada
+  cancelada
+  retificada
+}
+
+/// Catalogo controlado de motivos (Baseline V1, item 11) — substitui texto
+/// livre justamente para que dado sensivel (ex.: diagnostico medico) nao possa
+/// ser digitado num campo de observacao nao classificado.
+///
+/// Rotulos deliberadamente ORGANIZACIONAIS, nunca classificacao juridica: nao
+/// ha "justa causa", "pedido de demissao" ou equivalente, porque isso seria
+/// enquadramento trabalhista, que esta fatia nao decide nem registra. O
+/// conteudo definitivo por tipo de movimentacao segue pendente de validacao
+/// com RH — extensivel de forma aditiva, sem bloquear esta entrega.
+enum MotivoMovimentacao {
+  admissao_inicial
+  reestruturacao_organizacional
+  realocacao_interna
+  promocao
+  correcao_cadastral
+  encerramento_de_vinculo
+  outro_controlado
+}
+
+/// A pessoa. NAO tem `empresa_id`: a empresa e propriedade do VINCULO, nunca
+/// do colaborador (Baseline V1, item 2) — a mesma pessoa pode ter vinculos
+/// historicos em empresas diferentes.
+///
+/// Consequencia de autorizacao: o escopo de leitura de um colaborador e
+/// derivado dos seus vinculos, nunca de um campo proprio. Por isso todo
+/// colaborador nasce junto do seu primeiro vinculo — um cadastro sem vinculo
+/// ficaria fora de qualquer escopo e invisivel a todos.
+model Colaborador {
+  id   String @id @default(uuid())
+  nome String
+
+  /// Derivada dos vinculos e materializada na mesma transacao que os altera —
+  /// nunca alterada por comando direto (spec §8).
+  situacao SituacaoColaborador @default(inativo)
+
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  vinculos VinculoFuncional[]
+
+  @@index([situacao])
+  @@map("colaborador")
+}
+
+/// A relacao formal entre um Colaborador e uma Empresa. E ele — nao o
+/// colaborador — que carrega `empresa_id`, e portanto a fronteira de
+/// autorizacao (ADR 0005, d. 3; ADR 0007, d. 11).
+///
+/// Garantias de banco desta tabela:
+///   - matricula unica DENTRO da empresa (Baseline V1, item 2);
+///   - no maximo UM vinculo `ativo` por (colaborador, empresa) — indice unico
+///     PARCIAL criado na migration, ja que Prisma nao expressa WHERE em indice
+///     (RI-V6, Baseline V1 item 3);
+///   - data_desligamento >= data_admissao (CHECK na migration, RI-V4).
+model VinculoFuncional {
+  id            String          @id @default(uuid())
+  colaboradorId String          @map("colaborador_id")
+  empresaId     String          @map("empresa_id")
+  matricula     String
+  tipo          TipoVinculo
+  situacao      SituacaoVinculo @default(previsto)
+
+  dataAdmissao     DateTime  @map("data_admissao") @db.Date
+  dataDesligamento DateTime? @map("data_desligamento") @db.Date
+
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  colaborador Colaborador @relation(fields: [colaboradorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  empresa     Empresa     @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  alocacoes     AlocacaoOrganizacional[]
+  movimentacoes MovimentacaoFuncional[]
+
+  @@unique([empresaId, matricula])
+  /// Alvo das FKs compostas de alocacao e movimentacao: o banco garante que
+  /// filho e vinculo pertencem a mesma empresa, sem depender da aplicacao.
+  @@unique([id, empresaId])
+  @@index([colaboradorId])
+  @@index([empresaId, situacao])
+  @@map("vinculo_funcional")
+}
+
+/// O ESTADO: onde o vinculo esta posicionado na estrutura organizacional, e
+/// durante qual periodo. Sucessao, nunca sobrescrita (ADR 0007, d. 6).
+///
+/// TODA referencia organizacional e FK COMPOSTA com empresa_id (ou, no caso de
+/// `area`, com departamento_id, que por sua vez e composto com empresa): o
+/// PostgreSQL recusa alocacao apontando para no de outra empresa mesmo que a
+/// validacao de aplicacao falhe (RI-A1).
+///
+/// Garantias adicionais criadas na migration (Prisma nao as expressa):
+///   - NAO SOBREPOSICAO de periodos do mesmo vinculo, por EXCLUSION CONSTRAINT
+///     GiST sobre daterange(vigente_de, vigente_ate, '[)') — inicio inclusivo,
+///     fim exclusivo, e `vigente_ate` nulo como limite INFINITO. Exige a
+///     extensao btree_gist, provisionada pelo admin/owner via
+///     infra/postgres/04_extensions.sql (pre-condicao verificada pela propria
+///     migration, que aborta se faltar). Prisma nao tem sintaxe para EXCLUDE:
+///     a constraint vive em SQL explicito na migration, e este comentario e a
+///     documentacao dela — nenhuma estrutura Prisma falsa e declarada;
+///   - no maximo UMA alocacao aberta (vigente_ate IS NULL) por vinculo
+///     (complemento com erro de unicidade estavel, nao substituto do EXCLUDE);
+///   - vigente_ate > vigente_de;
+///   - area_id so com departamento_id preenchido (senao a FK composta nao
+///     seria verificada, por MATCH SIMPLE);
+///   - ao menos uma referencia organizacional preenchida.
+model AlocacaoOrganizacional {
+  id        String @id @default(uuid())
+  vinculoId String @map("vinculo_id")
+
+  /// Redundante por desenho, exatamente como em `equipe`: e o que viabiliza as
+  /// FKs compostas abaixo.
+  empresaId String @map("empresa_id")
+
+  unidadeOrganizacionalId String? @map("unidade_organizacional_id")
+  departamentoId          String? @map("departamento_id")
+  areaId                  String? @map("area_id")
+  equipeId                String? @map("equipe_id")
+  cargoId                 String? @map("cargo_id")
+  centroCustoId           String? @map("centro_custo_id")
+
+  vigenteDe DateTime @map("vigente_de") @db.Date
+
+  /// `null` = alocacao vigente. Fechar este campo e a UNICA alteracao admitida
+  /// numa alocacao (RI-A5).
+  vigenteAte DateTime? @map("vigente_ate") @db.Date
+
+  /// Todo estado tem o ato que o produziu (RI-A4). Nao existe alocacao sem
+  /// movimentacao de origem.
+  movimentacaoOrigemId String @map("movimentacao_origem_id")
+
+  criadoEm DateTime @default(now()) @map("criado_em")
+
+  vinculo               VinculoFuncional       @relation(fields: [vinculoId, empresaId], references: [id, empresaId], onDelete: Restrict, onUpdate: Cascade)
+  empresa               Empresa                @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  unidadeOrganizacional UnidadeOrganizacional? @relation(fields: [unidadeOrganizacionalId, empresaId], references: [id, empresaId], onDelete: Restrict, onUpdate: Cascade)
+  departamento          Departamento?          @relation(fields: [departamentoId, empresaId], references: [id, empresaId], onDelete: Restrict, onUpdate: Cascade)
+  area                  Area?                  @relation(fields: [areaId, departamentoId], references: [id, departamentoId], onDelete: Restrict, onUpdate: Cascade)
+  equipe                Equipe?                @relation(fields: [equipeId, empresaId], references: [id, empresaId], onDelete: Restrict, onUpdate: Cascade)
+  cargo                 Cargo?                 @relation(fields: [cargoId, empresaId], references: [id, empresaId], onDelete: Restrict, onUpdate: Cascade)
+  centroCusto           CentroCusto?           @relation(fields: [centroCustoId, empresaId], references: [id, empresaId], onDelete: Restrict, onUpdate: Cascade)
+  movimentacaoOrigem    MovimentacaoFuncional  @relation(fields: [movimentacaoOrigemId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  /// Duas alocacoes do mesmo vinculo nunca comecam na mesma data.
+  @@unique([vinculoId, vigenteDe])
+  @@index([vinculoId, vigenteDe])
+  @@index([empresaId])
+  @@index([unidadeOrganizacionalId])
+  @@index([departamentoId])
+  @@index([areaId])
+  @@index([equipeId])
+  @@index([cargoId])
+  @@index([centroCustoId])
+  @@index([movimentacaoOrigemId])
+  @@map("alocacao_organizacional")
+}
+
+/// O ATO: o evento que altera a vida funcional. Imutavel depois de efetivada;
+/// correcao e retificacao — movimentacao nova que referencia a original, que
+/// permanece visivel (ADR 0007, d. 7).
+///
+/// Os campos destino_* sao a instrucao ("mover para o departamento X, cargo Y,
+/// a partir de D"); a efetivacao os materializa em alocacao_organizacional.
+/// Guardar o destino no ato — e nao so na alocacao — e o que da sentido a uma
+/// movimentacao `programada`, que ainda nao produziu estado nenhum.
+///
+/// SEM campo de motivo em texto livre (Baseline V1, item 11) e SEM tabela de
+/// aprovacao (item 7).
+model MovimentacaoFuncional {
+  id        String             @id @default(uuid())
+  vinculoId String             @map("vinculo_id")
+  empresaId String             @map("empresa_id")
+  tipo      TipoMovimentacao
+  status    StatusMovimentacao @default(solicitada)
+
+  motivoCodigo MotivoMovimentacao @map("motivo_codigo")
+
+  registradaEm DateTime @default(now()) @map("registrada_em")
+
+  /// Ator que registrou — `AccessUser`, nunca o colaborador registrado.
+  solicitanteUserId String @map("solicitante_user_id")
+
+  vigenciaInicio DateTime @map("vigencia_inicio") @db.Date
+
+  efetivadaEm    DateTime? @map("efetivada_em")
+  executorUserId String?   @map("executor_user_id")
+
+  /// Aponta para a movimentacao que esta corrigindo (spec §4.10). A original
+  /// transita para `retificada` e permanece na linha do tempo.
+  retificaId String? @map("retifica_id")
+
+  destinoUnidadeOrganizacionalId String? @map("destino_unidade_organizacional_id")
+  destinoDepartamentoId          String? @map("destino_departamento_id")
+  destinoAreaId                  String? @map("destino_area_id")
+  destinoEquipeId                String? @map("destino_equipe_id")
+  destinoCargoId                 String? @map("destino_cargo_id")
+  destinoCentroCustoId           String? @map("destino_centro_custo_id")
+
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  vinculo     VinculoFuncional @relation(fields: [vinculoId, empresaId], references: [id, empresaId], onDelete: Restrict, onUpdate: Cascade)
+  empresa     Empresa          @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  solicitante AccessUser       @relation("MovimentacaoSolicitante", fields: [solicitanteUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  executor    AccessUser?      @relation("MovimentacaoExecutor", fields: [executorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  retifica      MovimentacaoFuncional?  @relation("Retificacao", fields: [retificaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  retificadaPor MovimentacaoFuncional[] @relation("Retificacao")
+
+  destinoUnidadeOrganizacional UnidadeOrganizacional? @relation(fields: [destinoUnidadeOrganizacionalId, empresaId], references: [id, empresaId], onDelete: Restrict, onUpdate: Cascade)
+  destinoDepartamento          Departamento?          @relation(fields: [destinoDepartamentoId, empresaId], references: [id, empresaId], onDelete: Restrict, onUpdate: Cascade)
+  destinoArea                  Area?                  @relation(fields: [destinoAreaId, destinoDepartamentoId], references: [id, departamentoId], onDelete: Restrict, onUpdate: Cascade)
+  destinoEquipe                Equipe?                @relation(fields: [destinoEquipeId, empresaId], references: [id, empresaId], onDelete: Restrict, onUpdate: Cascade)
+  destinoCargo                 Cargo?                 @relation(fields: [destinoCargoId, empresaId], references: [id, empresaId], onDelete: Restrict, onUpdate: Cascade)
+  destinoCentroCusto           CentroCusto?           @relation(fields: [destinoCentroCustoId, empresaId], references: [id, empresaId], onDelete: Restrict, onUpdate: Cascade)
+
+  alocacoesOrigem AlocacaoOrganizacional[]
+
+  /// Uma movimentacao efetivada so pode ser retificada UMA vez — a correcao da
+  /// correcao e uma nova retificacao encadeada, nunca duas concorrentes sobre
+  /// o mesmo original.
+  @@unique([retificaId])
+  @@index([vinculoId, vigenciaInicio])
+  @@index([empresaId, status])
+  @@index([solicitanteUserId])
+  @@index([executorUserId])
+  @@map("movimentacao_funcional")
 }
