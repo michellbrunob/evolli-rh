@@ -18,6 +18,8 @@ import {
   assertAindaAtivo,
   assertAindaInativo,
   assertPaisAtivosParaReativar,
+  assertSemFilhosAtivos,
+  contarDependentesFuncionaisAtivos,
   deslocamento,
   resolverEmpresaPai,
 } from "../validacao.util";
@@ -187,6 +189,15 @@ export class CargoService {
     const escopo = resolverEscopo(ctx.actor);
     const cargo = await this.carregarNoEscopo(cargoId, ctx, escopo, "manage");
     assertAindaAtivo(cargo.status);
+
+    // RI-O1 (Fatia 2): alocacao vigente de vinculo ativo tambem bloqueia.
+    // Mesma regra da ADR 0006 d.7 aplicada a uma classe nova de dependente
+    // — bloqueia, nunca cascateia. A recusa nao revela o dependente.
+    assertSemFilhosAtivos(
+      await contarDependentesFuncionaisAtivos(this.prisma, {
+        cargoId: cargo.id,
+      }),
+    );
 
     return this.prisma.$transaction(async (tx) => {
       const inativado = await tx.cargo.update({
