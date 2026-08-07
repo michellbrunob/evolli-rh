@@ -450,12 +450,37 @@ ALTER TABLE "movimentacao_funcional"
 -- nasce ativo, a AlocacaoOrganizacional, tudo na mesma transacao. Nao pode
 -- existir colaborador orfao, sem empresa, vinculo ou escopo de autorizacao.
 --
--- As duas invariantes abaixo atravessam tabelas, entao nenhuma CHECK ou UNIQUE
--- as expressa. Sao CONSTRAINT TRIGGERS DEFERRABLE INITIALLY DEFERRED: a
--- verificacao acontece no COMMIT, nao a cada comando. Isso e o que permite que
--- a ordem interna da transacao seja livre — ativar o vinculo antes de inserir
--- a alocacao, ou fechar a alocacao vigente antes de abrir a sucessora — sem
--- que um estado intermediario legitimo seja recusado.
+-- SAO DUAS INVARIANTES, cobertas por QUATRO triggers. A contagem difere de
+-- proposito: uma invariante que atravessa tabelas so fica garantida se TODA
+-- porta capaz de quebra-la disparar a verificacao. Cada trigger e uma porta,
+-- nao uma regra.
+--
+--   Invariante 1 — colaborador SEMPRE tem ao menos um vinculo funcional
+--     portas: INSERT de colaborador; UPDATE/DELETE de vinculo_funcional
+--             (mudar `colaborador_id` ou remover o ultimo vinculo).
+--
+--   Invariante 2 — vinculo ATIVO sempre tem alocacao vigente
+--     portas: INSERT/UPDATE de vinculo_funcional (passar a ativo);
+--             INSERT/UPDATE/DELETE de alocacao_organizacional (fechar, mover
+--             para outro vinculo, ou remover a alocacao vigente).
+--
+-- Todas sao CONSTRAINT TRIGGERS DEFERRABLE INITIALLY DEFERRED: a verificacao
+-- acontece no COMMIT, nao a cada comando. Isso e o que permite que a ordem
+-- interna da transacao seja livre — ativar o vinculo antes de inserir a
+-- alocacao, ou fechar a alocacao vigente antes de abrir a sucessora — sem que
+-- um estado intermediario legitimo seja recusado.
+--
+-- AS FUNCOES VERIFICAM TODOS OS REGISTROS AFETADOS, usando OLD e NEW conforme
+-- a operacao. Isso e essencial em UPDATE que reaponta a linha: mover uma
+-- alocacao do vinculo A para o vinculo B precisa checar A **e** B — checar so
+-- o novo deixaria A ativo sem alocacao vigente. Como `vinculo_id` e
+-- `colaborador_id` sao NOT NULL, um `COALESCE(NEW, OLD)` nunca chegaria a
+-- avaliar OLD, e a lacuna passaria despercebida.
+--
+-- COBERTURA DE DELETE e defesa em profundidade contra SQL direto, manutencao
+-- manual e modulo futuro. A API NAO expoe DELETE em nenhum recurso desta fatia
+-- (RI-H1), e esta migration nao introduz nenhum — as FKs seguem ON DELETE
+-- RESTRICT.
 --
 -- Por que no banco, e nao so no service: um service pode ser contornado por
 -- script, correcao manual ou modulo futuro. A garantia estrutural vale para
@@ -469,14 +494,39 @@ CREATE OR REPLACE FUNCTION "app"."assert_colaborador_com_vinculo"()
 RETURNS trigger
 LANGUAGE plpgsql
 AS $$
+DECLARE
+  alvos text[] := '{}';
+  alvo  text;
 BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM "app"."vinculo_funcional" v WHERE v."colaborador_id" = NEW."id"
-  ) THEN
-    RAISE EXCEPTION
-      'colaborador sem vinculo funcional: admissao deve criar colaborador e vinculo na mesma transacao'
-      USING ERRCODE = 'integrity_constraint_violation';
+  IF TG_TABLE_NAME = 'colaborador' THEN
+    alvos := ARRAY[NEW."id"];
+  ELSE
+    -- vinculo_funcional: em DELETE so existe OLD; em UPDATE o `colaborador_id`
+    -- pode ter sido reapontado, entao os dois lados sao verificados.
+    IF TG_OP = 'DELETE' THEN
+      alvos := ARRAY[OLD."colaborador_id"];
+    ELSE
+      alvos := ARRAY[OLD."colaborador_id"];
+      IF NEW."colaborador_id" IS DISTINCT FROM OLD."colaborador_id" THEN
+        alvos := alvos || NEW."colaborador_id";
+      END IF;
+    END IF;
   END IF;
+
+  FOREACH alvo IN ARRAY alvos LOOP
+    -- Se o proprio colaborador deixou de existir, nao ha invariante a violar:
+    -- a regra e "colaborador sem vinculo", nao "colaborador nao pode sumir".
+    IF EXISTS (
+      SELECT 1 FROM "app"."colaborador" c WHERE c."id" = alvo
+    ) AND NOT EXISTS (
+      SELECT 1 FROM "app"."vinculo_funcional" v WHERE v."colaborador_id" = alvo
+    ) THEN
+      RAISE EXCEPTION
+        'colaborador sem vinculo funcional: admissao deve criar colaborador e vinculo na mesma transacao'
+        USING ERRCODE = 'integrity_constraint_violation';
+    END IF;
+  END LOOP;
+
   RETURN NULL;
 END;
 $$;
@@ -487,36 +537,57 @@ CREATE CONSTRAINT TRIGGER "colaborador_exige_vinculo"
   FOR EACH ROW
   EXECUTE FUNCTION "app"."assert_colaborador_com_vinculo"();
 
+-- Fecha a porta oposta: remover o ultimo vinculo (ou reaponta-lo para outro
+-- colaborador) deixaria o colaborador anterior orfao.
+CREATE CONSTRAINT TRIGGER "vinculo_removido_exige_colaborador_com_vinculo"
+  AFTER UPDATE OR DELETE ON "vinculo_funcional"
+  DEFERRABLE INITIALLY DEFERRED
+  FOR EACH ROW
+  EXECUTE FUNCTION "app"."assert_colaborador_com_vinculo"();
+
 -- Invariante 2: vinculo ATIVO sempre tem alocacao organizacional vigente.
 -- Baseline V1, item 10: alocacao e obrigatoria antes de efetivar vinculo ativo.
--- A funcao recebe o id do vinculo por argumento porque e disparada de duas
--- tabelas: de `vinculo_funcional` (quando o vinculo passa a ativo) e de
--- `alocacao_organizacional` (quando a alocacao vigente e fechada) — as duas
--- portas pelas quais a invariante poderia ser quebrada.
 CREATE OR REPLACE FUNCTION "app"."assert_vinculo_ativo_com_alocacao"()
 RETURNS trigger
 LANGUAGE plpgsql
 AS $$
 DECLARE
-  alvo text;
+  alvos text[] := '{}';
+  alvo  text;
 BEGIN
   IF TG_TABLE_NAME = 'vinculo_funcional' THEN
-    alvo := NEW."id";
+    alvos := ARRAY[NEW."id"];
   ELSE
-    alvo := COALESCE(NEW."vinculo_id", OLD."vinculo_id");
+    -- alocacao_organizacional. Em UPDATE, `vinculo_id` pode ter sido
+    -- reapontado: verificar so o destino deixaria a ORIGEM ativa sem alocacao
+    -- vigente — exatamente a lacuna que um COALESCE(NEW, OLD) esconderia,
+    -- ja que a coluna e NOT NULL e NEW nunca seria nulo.
+    IF TG_OP = 'INSERT' THEN
+      alvos := ARRAY[NEW."vinculo_id"];
+    ELSIF TG_OP = 'DELETE' THEN
+      alvos := ARRAY[OLD."vinculo_id"];
+    ELSE
+      alvos := ARRAY[OLD."vinculo_id"];
+      IF NEW."vinculo_id" IS DISTINCT FROM OLD."vinculo_id" THEN
+        alvos := alvos || NEW."vinculo_id";
+      END IF;
+    END IF;
   END IF;
 
-  IF EXISTS (
-    SELECT 1 FROM "app"."vinculo_funcional" v
-     WHERE v."id" = alvo AND v."situacao" = 'ativo'
-  ) AND NOT EXISTS (
-    SELECT 1 FROM "app"."alocacao_organizacional" a
-     WHERE a."vinculo_id" = alvo AND a."vigente_ate" IS NULL
-  ) THEN
-    RAISE EXCEPTION
-      'vinculo ativo sem alocacao organizacional vigente'
-      USING ERRCODE = 'integrity_constraint_violation';
-  END IF;
+  FOREACH alvo IN ARRAY alvos LOOP
+    IF EXISTS (
+      SELECT 1 FROM "app"."vinculo_funcional" v
+       WHERE v."id" = alvo AND v."situacao" = 'ativo'
+    ) AND NOT EXISTS (
+      SELECT 1 FROM "app"."alocacao_organizacional" a
+       WHERE a."vinculo_id" = alvo AND a."vigente_ate" IS NULL
+    ) THEN
+      RAISE EXCEPTION
+        'vinculo ativo sem alocacao organizacional vigente'
+        USING ERRCODE = 'integrity_constraint_violation';
+    END IF;
+  END LOOP;
+
   RETURN NULL;
 END;
 $$;
@@ -528,8 +599,11 @@ CREATE CONSTRAINT TRIGGER "vinculo_ativo_exige_alocacao"
   WHEN (NEW."situacao" = 'ativo')
   EXECUTE FUNCTION "app"."assert_vinculo_ativo_com_alocacao"();
 
-CREATE CONSTRAINT TRIGGER "alocacao_encerrada_exige_sucessora"
-  AFTER UPDATE ON "alocacao_organizacional"
+-- Cobre as tres portas do lado da alocacao: fechar a vigente (UPDATE de
+-- vigente_ate), mover para outro vinculo (UPDATE de vinculo_id) e remover a
+-- vigente (DELETE). INSERT entra por simetria e custo desprezivel.
+CREATE CONSTRAINT TRIGGER "alocacao_alterada_exige_vinculo_com_alocacao"
+  AFTER INSERT OR UPDATE OR DELETE ON "alocacao_organizacional"
   DEFERRABLE INITIALLY DEFERRED
   FOR EACH ROW
   EXECUTE FUNCTION "app"."assert_vinculo_ativo_com_alocacao"();
