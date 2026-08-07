@@ -29,37 +29,59 @@
 --         area -> departamento -> empresa fecha porque `departamento` ja tem
 --         FK composta com empresa_id.
 --
---   4. no maximo UMA alocacao aberta por vinculo  [RI-A2, parcial]
---      -> alocacao_organizacional_vigente_unica (indice unico PARCIAL)
+--   4. periodos de alocacao do mesmo vinculo NUNCA se sobrepoem  [RI-A2]
+--      -> alocacao_organizacional_sem_sobreposicao (EXCLUSION CONSTRAINT
+--         GiST sobre daterange, abaixo), com alocacao aberta tratada como
+--         intervalo infinito. Complementada pelo indice unico PARCIAL
+--         alocacao_organizacional_vigente_unica, que mantem o caso mais comum
+--         (duas alocacoes ABERTAS) com erro de unicidade estavel.
 --
 --   5. intervalos coerentes e referencias minimas
 --      -> CHECKs abaixo.
 --
--- LIMITACAO DECLARADA (RI-A2 parcial): a nao-sobreposicao COMPLETA de
--- intervalos exigiria uma EXCLUSION CONSTRAINT com daterange + btree_gist. A
--- extensao btree_gist NAO pode ser criada por `evolli_migrator`, que por
--- desenho (ADR 0002, menor privilegio) nao tem CREATE na base de dados —
--- verificado: "permission denied to create extension btree_gist". Instalar a
--- extensao e decisao de INFRAESTRUTURA (exige superusuario/owner da base) e
--- nao foi tomada por conta propria nesta entrega.
--- Controles compensatorios efetivamente aplicados:
---   (a) no maximo uma alocacao ABERTA por vinculo, garantido por indice unico
---       parcial — e a abertura que a concorrencia ameaca;
---   (b) duas alocacoes do mesmo vinculo nunca comecam na mesma data
---       (alocacao_organizacional_vinculo_id_vigente_de_key);
---   (c) vigente_ate > vigente_de por CHECK;
---   (d) sucessao serializada por lock de linha do vinculo dentro da transacao
---       (SELECT ... FOR UPDATE no service), com teste de concorrencia real.
+-- PRE-CONDICAO DE INFRAESTRUTURA (btree_gist):
 --
--- PRIVILEGIOS: nenhum GRANT explicito e necessario. As tabelas nascem com
--- SELECT/INSERT/UPDATE/DELETE para evolli_app via ALTER DEFAULT PRIVILEGES
--- (infra/postgres/02_schema_and_grants.sql). A proibicao de exclusao fisica
--- (RI-H1) vem da ausencia de rota DELETE e do ON DELETE RESTRICT em toda FK,
--- nao de privilegio — inativar/encerrar exige UPDATE.
+-- A EXCLUSION CONSTRAINT do item 4 exige a extensao `btree_gist`, que fornece
+-- as classes de operador para combinar igualdade sobre `vinculo_id` (text) com
+-- sobreposicao de `daterange` num mesmo indice GiST.
+--
+-- `CREATE EXTENSION` exige privilegio CREATE na BASE, e `evolli_migrator`
+-- deliberadamente nao o tem (ADR 0002, menor privilegio): ele e dono do schema
+-- `app` e nada alem disso. Cria-la aqui exigiria ampliar permanentemente o
+-- privilegio do papel de migration — o que enfraqueceria a separacao de papeis
+-- da ADR 0002 e NAO e feito.
+--
+-- A extensao e, portanto, PRE-CONDICAO GERENCIADA: provisionada uma vez pelo
+-- administrador/owner via infra/postgres/04_extensions.sql, e apenas
+-- VERIFICADA aqui. Se faltar, esta migration ABORTA com mensagem explicita —
+-- nunca cria a tabela sem a restricao, nunca degrada em silencio para uma
+-- garantia mais fraca.
+--
+-- PRIVILEGIOS: nenhum GRANT explicito e necessario, e NENHUM privilegio novo e
+-- concedido a evolli_migrator ou evolli_app por esta migration. As tabelas
+-- nascem com SELECT/INSERT/UPDATE/DELETE para evolli_app via ALTER DEFAULT
+-- PRIVILEGES (infra/postgres/02_schema_and_grants.sql). A proibicao de exclusao
+-- fisica (RI-H1) vem da ausencia de rota DELETE e do ON DELETE RESTRICT em toda
+-- FK, nao de privilegio — inativar/encerrar exige UPDATE.
 --
 -- ALTER TYPE ... ADD VALUE roda dentro da transacao da migration (suportado
 -- desde o PostgreSQL 12) e nenhum dos valores novos e usado nesta mesma
 -- migration.
+
+-- ---------------------------------------------------------------------------
+-- Guarda de pre-condicao: falha explicita, nunca fallback silencioso.
+-- ---------------------------------------------------------------------------
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'btree_gist') THEN
+    RAISE EXCEPTION
+      'pre-condicao de infraestrutura ausente: extensao "btree_gist" nao instalada.'
+      USING HINT =
+        'Rode infra/postgres/04_extensions.sql como administrador/owner da base '
+        'ANTES de prisma migrate deploy. Ver infra/postgres/README.md.';
+  END IF;
+END
+$$;
 
 -- CreateEnum
 CREATE TYPE "SituacaoColaborador" AS ENUM ('ativo', 'inativo');
@@ -328,10 +350,38 @@ ALTER TABLE "vinculo_funcional"
     ADD CONSTRAINT "vinculo_funcional_datas_coerentes"
     CHECK ("data_desligamento" IS NULL OR "data_desligamento" >= "data_admissao");
 
--- [RI-A2, parcial] No maximo UMA alocacao aberta (vigente) por vinculo. E a
--- invariante que a concorrencia realmente ameaca: duas efetivacoes simultaneas
--- deixariam duas alocacoes abertas e a consulta por data passaria a ter duas
--- respostas. Ver LIMITACAO DECLARADA no cabecalho.
+-- [RI-A2] NAO SOBREPOSICAO DE PERIODOS, garantida pelo banco.
+--
+-- `daterange(vigente_de, vigente_ate, '[)')` modela o intervalo exatamente com
+-- a semantica que a aplicacao usa: inicio INCLUSIVO, fim EXCLUSIVO. Duas
+-- consequencias diretas, e as duas sao desejadas:
+--
+--   * periodos ADJACENTES nao conflitam — [01-01, 03-01) e [03-01, 05-01) sao
+--     aceitos, que e exatamente o que a sucessao de alocacoes produz ao fechar
+--     a anterior onde a nova comeca;
+--   * `vigente_ate IS NULL` vira limite superior INFINITO — [05-01, ) —, entao
+--     uma alocacao aberta conflita com qualquer periodo posterior, fechado ou
+--     aberto. E isto que impede que um lancamento retroativo ou concorrente
+--     atravesse a alocacao vigente.
+--
+-- Exige `btree_gist` (ver guarda de pre-condicao no cabecalho): GiST sozinho
+-- indexa `daterange`, mas nao `text` — sem a extensao, restringir POR VINCULO
+-- seria inexprimivel.
+--
+-- Prisma nao tem sintaxe nativa para EXCLUSION CONSTRAINT. Ela e criada aqui
+-- em SQL explicito, e o schema Prisma a documenta em comentario, sem declarar
+-- estrutura falsa que o `migrate diff` tentaria reconciliar.
+ALTER TABLE "alocacao_organizacional"
+    ADD CONSTRAINT "alocacao_organizacional_sem_sobreposicao"
+    EXCLUDE USING gist (
+        "vinculo_id" WITH =,
+        daterange("vigente_de", "vigente_ate", '[)') WITH &&
+    );
+
+-- Complemento, nao substituto: o caso mais comum (duas alocacoes ABERTAS para
+-- o mesmo vinculo) tambem viola a EXCLUSION acima, mas este indice o rejeita
+-- com erro de UNICIDADE, que a aplicacao ja traduz para 409 de forma estavel.
+-- Mantido por ser a colisao que a concorrencia real produz.
 CREATE UNIQUE INDEX "alocacao_organizacional_vigente_unica"
     ON "alocacao_organizacional" ("vinculo_id")
     WHERE "vigente_ate" IS NULL;
@@ -391,3 +441,95 @@ ALTER TABLE "movimentacao_funcional"
             AND "executor_user_id" IS NULL
         )
     );
+
+-- ---------------------------------------------------------------------------
+-- Admissao atomica: invariantes estruturais entre tabelas.
+-- ---------------------------------------------------------------------------
+-- Decisao aprovada (2026-08-07): POST /v1/colaboradores e uma ADMISSAO
+-- ATOMICA — cria Colaborador, primeiro VinculoFuncional e, quando o vinculo ja
+-- nasce ativo, a AlocacaoOrganizacional, tudo na mesma transacao. Nao pode
+-- existir colaborador orfao, sem empresa, vinculo ou escopo de autorizacao.
+--
+-- As duas invariantes abaixo atravessam tabelas, entao nenhuma CHECK ou UNIQUE
+-- as expressa. Sao CONSTRAINT TRIGGERS DEFERRABLE INITIALLY DEFERRED: a
+-- verificacao acontece no COMMIT, nao a cada comando. Isso e o que permite que
+-- a ordem interna da transacao seja livre — ativar o vinculo antes de inserir
+-- a alocacao, ou fechar a alocacao vigente antes de abrir a sucessora — sem
+-- que um estado intermediario legitimo seja recusado.
+--
+-- Por que no banco, e nao so no service: um service pode ser contornado por
+-- script, correcao manual ou modulo futuro. A garantia estrutural vale para
+-- qualquer caminho de escrita, inclusive os que ainda nao existem.
+
+-- Invariante 1: colaborador SEMPRE tem ao menos um vinculo funcional.
+-- Sem isso, o colaborador nao teria empresa — e, como o escopo de autorizacao
+-- e derivado do vinculo, ficaria fora de todo escopo: invisivel inclusive para
+-- quem o criou, e impossivel de auditar por empresa.
+CREATE OR REPLACE FUNCTION "app"."assert_colaborador_com_vinculo"()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM "app"."vinculo_funcional" v WHERE v."colaborador_id" = NEW."id"
+  ) THEN
+    RAISE EXCEPTION
+      'colaborador sem vinculo funcional: admissao deve criar colaborador e vinculo na mesma transacao'
+      USING ERRCODE = 'integrity_constraint_violation';
+  END IF;
+  RETURN NULL;
+END;
+$$;
+
+CREATE CONSTRAINT TRIGGER "colaborador_exige_vinculo"
+  AFTER INSERT ON "colaborador"
+  DEFERRABLE INITIALLY DEFERRED
+  FOR EACH ROW
+  EXECUTE FUNCTION "app"."assert_colaborador_com_vinculo"();
+
+-- Invariante 2: vinculo ATIVO sempre tem alocacao organizacional vigente.
+-- Baseline V1, item 10: alocacao e obrigatoria antes de efetivar vinculo ativo.
+-- A funcao recebe o id do vinculo por argumento porque e disparada de duas
+-- tabelas: de `vinculo_funcional` (quando o vinculo passa a ativo) e de
+-- `alocacao_organizacional` (quando a alocacao vigente e fechada) — as duas
+-- portas pelas quais a invariante poderia ser quebrada.
+CREATE OR REPLACE FUNCTION "app"."assert_vinculo_ativo_com_alocacao"()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  alvo text;
+BEGIN
+  IF TG_TABLE_NAME = 'vinculo_funcional' THEN
+    alvo := NEW."id";
+  ELSE
+    alvo := COALESCE(NEW."vinculo_id", OLD."vinculo_id");
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM "app"."vinculo_funcional" v
+     WHERE v."id" = alvo AND v."situacao" = 'ativo'
+  ) AND NOT EXISTS (
+    SELECT 1 FROM "app"."alocacao_organizacional" a
+     WHERE a."vinculo_id" = alvo AND a."vigente_ate" IS NULL
+  ) THEN
+    RAISE EXCEPTION
+      'vinculo ativo sem alocacao organizacional vigente'
+      USING ERRCODE = 'integrity_constraint_violation';
+  END IF;
+  RETURN NULL;
+END;
+$$;
+
+CREATE CONSTRAINT TRIGGER "vinculo_ativo_exige_alocacao"
+  AFTER INSERT OR UPDATE ON "vinculo_funcional"
+  DEFERRABLE INITIALLY DEFERRED
+  FOR EACH ROW
+  WHEN (NEW."situacao" = 'ativo')
+  EXECUTE FUNCTION "app"."assert_vinculo_ativo_com_alocacao"();
+
+CREATE CONSTRAINT TRIGGER "alocacao_encerrada_exige_sucessora"
+  AFTER UPDATE ON "alocacao_organizacional"
+  DEFERRABLE INITIALLY DEFERRED
+  FOR EACH ROW
+  EXECUTE FUNCTION "app"."assert_vinculo_ativo_com_alocacao"();

@@ -667,7 +667,16 @@ model VinculoFuncional {
 /// validacao de aplicacao falhe (RI-A1).
 ///
 /// Garantias adicionais criadas na migration (Prisma nao as expressa):
-///   - no maximo UMA alocacao aberta (vigente_ate IS NULL) por vinculo;
+///   - NAO SOBREPOSICAO de periodos do mesmo vinculo, por EXCLUSION CONSTRAINT
+///     GiST sobre daterange(vigente_de, vigente_ate, '[)') — inicio inclusivo,
+///     fim exclusivo, e `vigente_ate` nulo como limite INFINITO. Exige a
+///     extensao btree_gist, provisionada pelo admin/owner via
+///     infra/postgres/04_extensions.sql (pre-condicao verificada pela propria
+///     migration, que aborta se faltar). Prisma nao tem sintaxe para EXCLUDE:
+///     a constraint vive em SQL explicito na migration, e este comentario e a
+///     documentacao dela — nenhuma estrutura Prisma falsa e declarada;
+///   - no maximo UMA alocacao aberta (vigente_ate IS NULL) por vinculo
+///     (complemento com erro de unicidade estavel, nao substituto do EXCLUDE);
 ///   - vigente_ate > vigente_de;
 ///   - area_id so com departamento_id preenchido (senao a FK composta nao
 ///     seria verificada, por MATCH SIMPLE);
