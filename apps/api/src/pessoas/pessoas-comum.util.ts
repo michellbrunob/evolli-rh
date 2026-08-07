@@ -46,13 +46,28 @@ export function traduzirErroPessoas(error: unknown): never {
       throw new UnprocessableEntityException();
     }
   }
-  // P0001/23514 (CHECK) chegam como erro não tipado do Prisma; mapear para 422
-  // mantém a resposta estável sem revelar qual restrição falhou.
-  if (
-    error instanceof Prisma.PrismaClientUnknownRequestError &&
-    /violates check constraint/i.test(error.message)
-  ) {
-    throw new UnprocessableEntityException();
+  // Restrições que o Prisma não tipifica chegam como erro "unknown", com o
+  // SQLSTATE só no texto. Mapear aqui mantém a resposta estável e impede que
+  // detalhe interno (nome de constraint, intervalo em conflito) vaze pelo
+  // `AllExceptionsFilter` como erro 500 não tratado.
+  if (error instanceof Prisma.PrismaClientUnknownRequestError) {
+    // 23P01 — EXCLUSION CONSTRAINT: períodos de alocação do mesmo vínculo se
+    // sobrepõem (RI-A2). É conflito de estado, não dado inválido: 409, mesma
+    // classe do índice único parcial que cobre o caso de duas abertas.
+    if (
+      /23P01/.test(error.message) ||
+      /violates exclusion constraint/i.test(error.message)
+    ) {
+      throw new ConflictException();
+    }
+    // 23514 — CHECK: intervalo incoerente, referência mínima ausente, área sem
+    // departamento, status × efetivação inconsistente.
+    if (
+      /23514/.test(error.message) ||
+      /violates check constraint/i.test(error.message)
+    ) {
+      throw new UnprocessableEntityException();
+    }
   }
   throw error;
 }
