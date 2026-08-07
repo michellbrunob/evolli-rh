@@ -1,0 +1,41 @@
+-- Etapa 1 — Fatia 2: extensões obrigatórias do banco.
+--
+-- Executar como **administrador/proprietário da base**, ANTES de
+-- `prisma migrate deploy` da migration 20260807120000_colaboradores_vida_funcional.
+--
+-- POR QUE ESTE SCRIPT EXISTE, EM VEZ DE UM `CREATE EXTENSION` NA MIGRATION:
+--
+-- `CREATE EXTENSION` exige privilégio `CREATE` **na base de dados**, e
+-- `evolli_migrator` deliberadamente não o tem — ele é dono do schema `app` e
+-- nada além disso (ADR 0002, menor privilégio). Colocar a criação da extensão
+-- dentro da migration exigiria conceder `CREATE` na base ao papel de
+-- migration, ampliando permanentemente o privilégio dele para resolver um
+-- problema pontual de provisionamento. Isso enfraqueceria a separação de
+-- papéis que a ADR 0002 estabelece, então **não é feito**.
+--
+-- A extensão é, portanto, uma **pré-condição gerenciada de infraestrutura**:
+-- provisionada uma vez por quem já tem o privilégio (admin/owner), e depois
+-- apenas *verificada* pela migration, que falha de forma explícita se ela não
+-- estiver presente — nunca com fallback silencioso.
+--
+-- O QUE A EXTENSÃO HABILITA:
+--
+-- `btree_gist` fornece as classes de operador que permitem combinar, num mesmo
+-- índice GiST, igualdade sobre um tipo escalar (`vinculo_id`) com sobreposição
+-- de intervalo (`daterange`). É isso que viabiliza a EXCLUSION CONSTRAINT
+-- `alocacao_organizacional_sem_sobreposicao`, que garante **no banco** que dois
+-- períodos de alocação do mesmo vínculo nunca se sobrepõem — inclusive quando
+-- um deles está aberto (`vigente_ate IS NULL`, tratado como limite infinito).
+--
+-- Sem `btree_gist`, GiST sozinho indexa `daterange`, mas não `text` — e a
+-- restrição por vínculo seria impossível de expressar.
+--
+-- IDEMPOTENTE: `IF NOT EXISTS` torna a reexecução segura. A extensão é
+-- instalada no schema padrão (`public`); a constraint é criada no schema `app`
+-- e resolve as classes de operador normalmente, sem qualificação — verificado
+-- em PostgreSQL 16.
+--
+-- ESCOPO: nenhum privilégio é concedido a `evolli_migrator` ou `evolli_app`
+-- por este script. Ele cria a extensão e nada mais.
+
+CREATE EXTENSION IF NOT EXISTS btree_gist;
