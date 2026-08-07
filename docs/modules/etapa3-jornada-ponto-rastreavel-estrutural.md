@@ -1,10 +1,16 @@
 # Etapa 3 — Jornada e Ponto Rastreável V1 Estrutural
 
-- Status: especificação em elaboração — fase **Especificar** apenas.
-- Fase do SDD: Especificar. Nenhuma implementação, schema, migration,
-  endpoint, dependência ou integração externa criada nesta fase.
+- Status: **Baseline V1 aprovada** (2026-08-07) para o núcleo conceitual
+  descrito neste documento — fase **Registrar decisão aprovada**. Nenhuma
+  fase Implementar foi aberta ou autorizada por esta atualização.
+- Fase do SDD: Registrar decisão aprovada. Nenhuma implementação, schema,
+  migration, endpoint, dependência ou integração externa criada nesta
+  fase.
 - Depende de: [Etapa 1 — Fatia 2: Colaboradores e vida funcional](etapa1-fatia2-colaboradores-vida-funcional.md),
   [ADR 0007](../adr/0007-colaboradores-e-vida-funcional-baseline-v1.md).
+- Decisão de produto: [Baseline V1 de Jornada e Ponto Rastreável](../decisions/etapa3-jornada-ponto-baseline-v1.md)
+  (8 decisões aprovadas, 2026-08-07) e [ADR 0008](../adr/0008-jornada-ponto-rastreavel-baseline-v1.md)
+  (formalização arquitetural correspondente).
 - Relacionado: [ADR 0003](../adr/0003-identidade-sessao-e-autorizacao.md),
   [ADR 0004](../adr/0004-auditoria-formal-e-integridade.md),
   [ADR 0006](../adr/0006-modelo-organizacional-interno-baseline-v1.md),
@@ -100,6 +106,34 @@ eventos de auditoria futuros em português separados por ponto. Nenhum
 nome de tabela, coluna ou rota é comprometido nesta fase — os nomes
 usados neste documento (`EventoPonto`, `AjustePonto` etc.) são
 conceituais, sujeitos a revisão na fase de modelagem real.
+
+### O8 — Baseline V1 aprovada: o que muda, o que não muda
+
+**Aditivo — não reescreve O1 a O7.** Em 2026-08-07, o produto avaliou o
+levantamento de decisões pendentes (§9, versão original) e aprovou 8
+decisões, registradas em
+[docs/decisions/etapa3-jornada-ponto-baseline-v1.md](../decisions/etapa3-jornada-ponto-baseline-v1.md)
+e formalizadas em
+[ADR 0008](../adr/0008-jornada-ponto-rastreavel-baseline-v1.md). As
+seções seguintes deste documento foram atualizadas para refletir essa
+Baseline — cada atualização está marcada com "(Baseline V1, Decisão N)".
+
+**O que a Baseline resolve:** catálogo fechado de evento (§3.3), origem
+única de registro (§4), mecanismo de correção sem texto livre (§3.4),
+matriz mínima de acesso para RH e DP (§7), granularidade de competência
+(§3.5) e confirmação de que escala complexa, aprovação e fechamento legal
+não entram nesta V1 (§3.2, §3.6).
+
+**O que a Baseline não resolve — permanece pendente, sem inferência:**
+validade legal (DP-3J-09), retenção/descarte/acesso do titular
+(DP-3J-11), tratamento de biometria/geolocalização/dispositivo
+(DP-3J-10), importação TXT (DP-3J-07), integração com folha (DP-3J-08) e
+escopo do papel `gestor` (DP-3J-12, bloqueada por DP-8 da ADR 0006). Ver
+§9 para o estado atualizado de cada decisão pendente.
+
+**O que a Baseline não autoriza:** nenhum código, schema, migration,
+endpoint, dependência ou infraestrutura. A Baseline resolve decisões de
+produto que uma futura fase Implementar exigiria — não abre essa fase.
 
 ## 1. Objetivo, valor de negócio e escopo
 
@@ -204,45 +238,55 @@ distribuição concreta dessa carga no calendário.
 A distribuição concreta da jornada no tempo — em quais dias, em quais
 horários, um vínculo é esperado a trabalhar. Pode variar por período,
 por padrão (fixo, turno, revezamento) — a variedade de modelos de escala
-é, ela mesma, decisão pendente (§9, DP-3J-01), não assumida aqui.
+continua indefinida (§9, DP-3J-01). **(Baseline V1, Decisão 1)**: esta V1
+**não implementa escala complexa** — nenhum motor de turno, revezamento
+ou múltiplos padrões simultâneos é aprovado. A separação conceitual entre
+jornada e escala permanece como referência, não como compromisso de
+modelagem.
 
 ### 3.3 Evento de ponto
 
-O registro atômico de uma ocorrência — tipicamente entrada, saída, início
-ou fim de intervalo, mas o conjunto fechado de tipos é decisão pendente
-(§9, DP-3J-02). Um evento de ponto, uma vez registrado, é **imutável**:
-não é editado, não é apagado. Qualquer erro é corrigido por um evento
-complementar (ajuste, 3.4), nunca por alteração do evento original — o
-mesmo princípio já aprovado para auditoria (ADR 0004) e para movimentação
-funcional (Fatia 2), aplicado aqui ao dado mais granular do domínio.
+O registro atômico de uma ocorrência. **(Baseline V1, Decisão 2)**:
+catálogo fechado de quatro tipos aprovado para esta V1: `entrada`,
+`saida`, `inicio_pausa`, `fim_pausa`. Nenhum outro tipo entra nesta V1;
+extensão do catálogo é decisão própria futura (DP-3J-02, V2). Um evento
+de ponto, uma vez registrado, é **imutável**: não é editado, não é
+apagado. Qualquer erro é corrigido por um evento complementar (ajuste,
+3.4), nunca por alteração do evento original — o mesmo princípio já
+aprovado para auditoria (ADR 0004) e para movimentação funcional
+(Fatia 2), aplicado aqui ao dado mais granular do domínio.
 
 ### 3.4 Ajuste (retificação de ponto)
 
 Um registro posterior que corrige, complementa ou contesta um evento de
-ponto existente — nunca sobrescreve o original. Quem pode propor um
-ajuste, quem pode aprová-lo, e se aprovação é sequer necessária nesta
-fatia, são decisões pendentes (§9, DP-3J-04, DP-3J-05). O que já está
-decidido, por herança de princípio (não por escolha nova desta fatia): o
-evento original permanece legível, e a trilha entre evento e ajuste é
-rastreável.
+ponto existente — nunca sobrescreve o original. **(Baseline V1, Decisão 4)**: o ajuste **não aceita campo de texto livre** — mesmo princípio já
+usado para `motivo_codigo` em Movimentação Funcional (Fatia 2). O
+conteúdo exato do que um ajuste registra (motivo codificado, referência
+ao evento original) é detalhe de modelagem, não resolvido aqui. **(Baseline
+V1, Decisão 5)**: quem pode propor um ajuste é RH ou DP, dentro da
+própria empresa (§7) — a mesma matriz mínima aprovada para registrar
+evento. Aprovação de ajuste não existe nesta V1 (Decisão 7, §3.6) — não
+há papel que aprove, porque não há fluxo de aprovação. O evento original
+permanece legível, e a trilha entre evento e ajuste é rastreável.
 
 ### 3.5 Apuração (período de competência)
 
-O processo, ainda conceitual, de consolidar eventos de ponto (e seus
-ajustes) num período de competência (ex.: mês) para gerar um resultado
-verificável. Esta especificação **não define** o que a apuração calcula
-— nenhuma regra de hora extra, banco de horas, adicional noturno ou DSR é
-assumida (essas são explicitamente fora de escopo, §4). "Apuração" aqui é
-só o conceito de "existe um período fechável", não o motor de cálculo.
+O processo de consolidar eventos de ponto (e seus ajustes) num período de
+competência. **(Baseline V1, Decisão 6)**: competência é **mensal**,
+apenas como organização do histórico — esta especificação **não define**
+nenhum motor de cálculo. Nenhuma regra de hora extra, banco de horas,
+adicional noturno, DSR ou jornada legal é assumida (essas são
+explicitamente fora de escopo, §4). "Apuração" aqui é só o conceito de
+"existe um agrupamento mensal de eventos", não um motor de cálculo.
 
 ### 3.6 Fechamento
 
-O estado final de um período de apuração, quando ele deixa de aceitar
-novos eventos/ajustes referentes àquele período (ou passa a exigir um
-fluxo de reabertura explícito — não definido aqui). Fechamento **não**
-implica em cálculo de folha nem em qualquer integração externa — é,
-nesta fatia, um conceito de controle de estado, não um processo de
-liquidação financeira.
+O estado final de um período de apuração. **(Baseline V1, Decisão 7)**:
+aprovação e fechamento ficam **fora desta V1** — nenhum workflow de
+aprovação, aprovação por gestor ou fechamento com efeito legal é
+implementado. O conceito permanece registrado (controle de estado, sem
+implicar cálculo de folha ou integração externa) como referência para uma
+fatia futura que decidir implementá-lo.
 
 ### 3.7 Quadro-resumo
 
@@ -259,6 +303,11 @@ liquidação financeira.
 
 Cada item abaixo é fora de escopo **desta fatia especificamente** — não é
 julgamento sobre se algum dia existirá, e cada um tem razão registrada.
+**(Baseline V1, Decisão 3)** confirma, como decisão de produto, que
+importação TXT, integração externa, biometria, foto, geolocalização, IP
+e dispositivo não entram nesta V1 — a única origem aprovada é registro
+manual interno por RH/DP (§7). **(Baseline V1, Decisão 7)** confirma
+aprovação por gestor e fechamento legal como fora desta V1.
 
 | Fora de escopo                                                                                                          | Por que fica de fora agora                                                                                                                                                                 |
 | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -301,18 +350,31 @@ matriz explícita seja aprovada (§7). Isso vale inclusive para leitura —
 
 Mesma restrição já aplicada em Pessoas (Fatia 2, Baseline V1 item 8):
 `admin_tecnico` não recebe acesso amplo a dado de Jornada e Ponto por ser
-administrador técnico. Se algum acesso técnico limitado (ex.: suporte a
-incidente) vier a ser necessário, é decisão de produto/segurança
-separada, registrada explicitamente — nunca herdada por omissão do papel
-técnico já existir.
+administrador técnico. **(Baseline V1, Decisão 5)** reafirma essa negação
+como decisão de produto explícita, sem exceção — pela mesma lógica já
+aplicada em Pessoas: a exceção de acesso amplo do `admin_tecnico` foi
+concedida sobre estrutura organizacional (Emenda 1, ADR 0005), não sobre
+dado pessoal, e não se estende por herança a este domínio. Se algum
+acesso técnico limitado (ex.: suporte a incidente) vier a ser necessário,
+é decisão de produto/segurança separada, registrada explicitamente —
+nunca herdada por omissão do papel técnico já existir.
 
-### 5.4 Nenhum acesso a gestor, RH, DP, financeiro, auditor, DPO ou colaborador sem matriz aprovada
+### 5.4 Acesso V1 restrito a RH e DP; demais papéis seguem sem matriz aprovada
 
-Nenhum desses papéis recebe acesso a Jornada e Ponto por analogia com o
-que já têm em Pessoas ou Organização. Cada célula da matriz futura precisa
-de decisão própria (§7) — inclusive papéis com acesso amplo em outros
-domínios (ex.: `auditor`/`dpo` já leem `access_log`) não herdam acesso
-automático a este novo domínio.
+**(Baseline V1, Decisão 5)**: RH e DP, limitados à própria empresa,
+recebem acesso para **registrar** (evento e ajuste) e **consultar** —
+única exceção à negação por padrão desta fatia, e limitada exatamente ao
+que está descrito em §7. Isso não cria acesso global, cross-company, nem
+a dado/documento fora deste módulo — RH e DP de uma empresa continuam sem
+acesso ao que pertence a outra empresa, e a concessão não se estende, por
+analogia, a nenhum outro domínio.
+
+Gestor, financeiro, auditor, DPO e colaborador **não** recebem acesso a
+Jornada e Ponto por analogia com o que já têm em Pessoas, Organização ou
+na trilha de auditoria. Cada célula pendente da matriz (§7) segue exigindo
+decisão própria — inclusive papéis com acesso amplo em outros domínios
+(ex.: `auditor`/`dpo` já leem `access_log`) não herdam acesso automático a
+este novo domínio.
 
 ### 5.5 Auditoria sem conteúdo pessoal desnecessário
 
@@ -427,28 +489,33 @@ resolvida primeiro (O5).
 
 ## 7. Matriz preliminar de acesso
 
-Segue o mesmo padrão já usado na especificação estrutural da Etapa 2
-(Documentos): a matriz é **deliberadamente quase vazia**. Nenhuma célula
-é preenchida por analogia com o que o papel já tem em outro domínio.
+**(Baseline V1, Decisão 5, 2026-08-07)**: duas células passam a ✅
+aprovado — RH e DP, para registrar e consultar, sempre restritos à
+própria empresa. Todas as demais permanecem ❌ negado ou ⛔ pendente,
+seguindo o mesmo padrão já usado na especificação estrutural da Etapa 2
+(Documentos): nenhuma célula é preenchida por analogia com o que o papel
+já tem em outro domínio.
 
-| Papel           | Evento de ponto                                                                                                                           | Ajuste      | Apuração    | Fechamento  |
-| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ----------- | ----------- | ----------- |
-| `admin_tecnico` | ❌ negado (consequência do princípio, §5.3, não decisão nova)                                                                             | ❌ negado   | ❌ negado   | ❌ negado   |
-| `rh`            | ⛔ pendente                                                                                                                               | ⛔ pendente | ⛔ pendente | ⛔ pendente |
-| `dp`            | ⛔ pendente                                                                                                                               | ⛔ pendente | ⛔ pendente | ⛔ pendente |
-| `gestor`        | ⛔ pendente (bloqueado por DP-8 antes de qualquer coisa, O5)                                                                              | ⛔ pendente | ⛔ pendente | ⛔ pendente |
-| `financeiro`    | ⛔ pendente                                                                                                                               | ⛔ pendente | ⛔ pendente | ⛔ pendente |
-| `auditor`       | ⛔ pendente (leitura da trilha de auditoria, não do dado, já é escopo de `access_log`; leitura do dado de ponto em si é pendente própria) | —           | —           | —           |
-| `dpo`           | ⛔ pendente (mesma observação de `auditor`)                                                                                               | —           | —           | —           |
-| `colaborador`   | ⛔ pendente (portal do colaborador é explicitamente fora de escopo, §4)                                                                   | ⛔ pendente | —           | —           |
+| Papel           | Evento de ponto                                                                                                                           | Ajuste                               | Apuração                                                       | Fechamento                                   |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ | -------------------------------------------------------------- | -------------------------------------------- |
+| `admin_tecnico` | ❌ negado (Baseline V1, Decisão 5 — mesmo princípio de §5.3, não decisão nova)                                                            | ❌ negado                            | ❌ negado                                                      | ❌ negado                                    |
+| `rh`            | ✅ registrar e consultar, só própria empresa (Baseline V1, Decisão 5)                                                                     | ✅ registrar e consultar (Decisão 4) | ⛔ pendente (agrupamento, DP-3J-06 quanto ao motor de cálculo) | ❌ negado (fechamento fora da V1, Decisão 7) |
+| `dp`            | ✅ registrar e consultar, só própria empresa (Baseline V1, Decisão 5)                                                                     | ✅ registrar e consultar (Decisão 4) | ⛔ pendente (idem `rh`)                                        | ❌ negado (idem `rh`)                        |
+| `gestor`        | ⛔ pendente (bloqueado por DP-8 antes de qualquer coisa, O5; Baseline V1 não resolve)                                                     | ⛔ pendente                          | ⛔ pendente                                                    | ⛔ pendente                                  |
+| `financeiro`    | ⛔ pendente                                                                                                                               | ⛔ pendente                          | ⛔ pendente                                                    | ⛔ pendente                                  |
+| `auditor`       | ⛔ pendente (leitura da trilha de auditoria, não do dado, já é escopo de `access_log`; leitura do dado de ponto em si é pendente própria) | —                                    | —                                                              | —                                            |
+| `dpo`           | ⛔ pendente (mesma observação de `auditor`)                                                                                               | —                                    | —                                                              | —                                            |
+| `colaborador`   | ⛔ pendente (portal do colaborador é explicitamente fora de escopo, §4)                                                                   | ⛔ pendente                          | —                                                              | —                                            |
 
-**Legenda**: ❌ negado por consequência de princípio já aprovado (não é
-decisão nova desta fatia). ⛔ pendente de decisão de produto — nenhum
-acesso deve ser assumido, inferido ou implementado enquanto a célula
-estiver neste estado. Células "—" indicam que o conceito de linha não se
-aplica claramente ao papel sem decisão prévia (ex.: `auditor` aprovando
-ajuste não faz sentido de negócio óbvio, mas não é descartado
-formalmente — só não tem célula a preencher agora).
+**Legenda**: ✅ aprovado nesta V1, com o escopo exato descrito na célula
+(Baseline V1, Decisão 5) — nunca mais amplo que o texto registrado. ❌
+negado por consequência de princípio já aprovado (não é decisão nova
+desta fatia). ⛔ pendente de decisão de produto — nenhum acesso deve ser
+assumido, inferido ou implementado enquanto a célula estiver neste
+estado. Células "—" indicam que o conceito de linha não se aplica
+claramente ao papel sem decisão prévia. Nenhuma célula ✅ desta matriz
+autoriza código — a matriz descreve o que uma futura fase Implementar
+poderia construir, não o que já existe.
 
 ## 8. Estratégia futura de testes
 
@@ -486,23 +553,28 @@ seja inventada sob pressão de prazo depois.
 
 ## 9. Decisões pendentes
 
-Nenhuma destas é resolvida por esta especificação. Aprovação requer
-produto/RH, e — onde marcado — jurídico/DPO.
+**(Baseline V1, 2026-08-07)**: das 12 decisões abaixo, 6 foram
+integralmente ou parcialmente resolvidas para o escopo desta V1 — cada
+uma marcada com o efeito exato da Baseline. As demais permanecem
+pendentes, sem resolução por inferência. Nenhuma resolução aqui equivale
+a autorizar código — ver [Baseline V1](../decisions/etapa3-jornada-ponto-baseline-v1.md)
+e [ADR 0008](../adr/0008-jornada-ponto-rastreavel-baseline-v1.md) para o
+texto completo de cada decisão.
 
-| ID       | Decisão pendente                                                                                                                            | Quem decide            |
-| -------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
-| DP-3J-01 | Modelo de jornada e escala: quantos padrões, como se relacionam, se `Jornada` e `EscalaJornada` são entidades separadas ou uma só           | Produto, RH            |
-| DP-3J-02 | Tipos de evento de ponto (catálogo fechado): quais existem, e se o catálogo é fixo ou versionável                                           | Produto, RH            |
-| DP-3J-03 | Origem permitida do registro de evento (ex.: manual pelo próprio, manual por RH, importação futura) — nenhuma origem é assumida nesta fatia | Produto, RH            |
-| DP-3J-04 | Política de ajuste/retificação: quem pode propor, se exige aprovação, prazo para contestar                                                  | Produto, RH, jurídico  |
-| DP-3J-05 | Quem consulta, ajusta, aprova e fecha — a matriz completa de §7, incluindo se `gestor` participa (depende de DP-8, ADR 0006)                | Produto, RH            |
-| DP-3J-06 | Conceito de competência/período de apuração (mensal? outro?) e regra de transição de estado                                                 | Produto, RH, jurídico  |
-| DP-3J-07 | Importação TXT futura: formato, layout, proveniência (qual REP), tratamento de erro/divergência                                             | Produto, TI            |
-| DP-3J-08 | Integração com folha: quando, como, quais dados atravessam a fronteira                                                                      | Produto, Etapa 4       |
-| DP-3J-09 | Validade legal e requisitos regulatórios aplicáveis ao controle de jornada implementado                                                     | Jurídico               |
-| DP-3J-10 | Tratamento de biometria, geolocalização e dispositivo: se serão implementados, sob qual base legal, com qual controle técnico               | Produto, jurídico, DPO |
-| DP-3J-11 | Retenção, descarte e acesso do titular ao próprio histórico de ponto                                                                        | Jurídico, DPO          |
-| DP-3J-12 | Vínculo futuro com gestor/equipe (aprovação, visibilidade) — bloqueado por DP-8 (ADR 0006) antes de qualquer avanço aqui                    | Produto                |
+| ID       | Decisão pendente                                                                                                                            | Quem decide            | Status após Baseline V1                                                                                                                         |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| DP-3J-01 | Modelo de jornada e escala: quantos padrões, como se relacionam, se `Jornada` e `EscalaJornada` são entidades separadas ou uma só           | Produto, RH            | Pendente quanto ao modelo final; **esclarecido** que a V1 não depende de resolvê-lo (Decisão 1: sem escala complexa)                            |
+| DP-3J-02 | Tipos de evento de ponto (catálogo fechado): quais existem, e se o catálogo é fixo ou versionável                                           | Produto, RH            | **Resolvida para V1** (Decisão 2): `entrada`, `saida`, `inicio_pausa`, `fim_pausa`. Extensão futura = DP-3J-02 (V2)                             |
+| DP-3J-03 | Origem permitida do registro de evento (ex.: manual pelo próprio, manual por RH, importação futura) — nenhuma origem é assumida nesta fatia | Produto, RH            | **Resolvida para V1** (Decisão 3): só registro manual interno, por RH/DP                                                                        |
+| DP-3J-04 | Política de ajuste/retificação: quem pode propor, se exige aprovação, prazo para contestar                                                  | Produto, RH, jurídico  | **Mecanismo resolvido** (Decisão 4: ajuste rastreável, sem texto livre); prazo para contestar segue pendente                                    |
+| DP-3J-05 | Quem consulta, ajusta, aprova e fecha — a matriz completa de §7, incluindo se `gestor` participa (depende de DP-8, ADR 0006)                | Produto, RH            | **Consultar/ajustar resolvido para V1** (Decisão 5: RH e DP); aprovar/fechar sem objeto nesta V1 (Decisão 7); `gestor` segue bloqueado por DP-8 |
+| DP-3J-06 | Conceito de competência/período de apuração (mensal? outro?) e regra de transição de estado                                                 | Produto, RH, jurídico  | **Granularidade resolvida** (Decisão 6: mensal); nenhuma regra de cálculo aprovada                                                              |
+| DP-3J-07 | Importação TXT futura: formato, layout, proveniência (qual REP), tratamento de erro/divergência                                             | Produto, TI            | Pendente — confirmado fora da V1 (Decisão 3), sem resolução do formato futuro                                                                   |
+| DP-3J-08 | Integração com folha: quando, como, quais dados atravessam a fronteira                                                                      | Produto, Etapa 4       | Pendente — não endereçada pela Baseline V1                                                                                                      |
+| DP-3J-09 | Validade legal e requisitos regulatórios aplicáveis ao controle de jornada implementado                                                     | Jurídico               | Pendente — reafirmada como gate de dado real (Decisão 8)                                                                                        |
+| DP-3J-10 | Tratamento de biometria, geolocalização e dispositivo: se serão implementados, sob qual base legal, com qual controle técnico               | Produto, jurídico, DPO | Pendente — confirmado fora da V1 (Decisão 3), tratamento futuro não resolvido                                                                   |
+| DP-3J-11 | Retenção, descarte e acesso do titular ao próprio histórico de ponto                                                                        | Jurídico, DPO          | Pendente — reafirmada como gate de dado real (Decisão 8)                                                                                        |
+| DP-3J-12 | Vínculo futuro com gestor/equipe (aprovação, visibilidade) — bloqueado por DP-8 (ADR 0006) antes de qualquer avanço aqui                    | Produto                | Pendente — inalterada; `gestor` confirmado negado nesta V1 (Decisão 5)                                                                          |
 
 ## 10. Riscos
 
@@ -537,9 +609,12 @@ Nenhum destes é opcional. Implementação real (mesmo com dado sintético)
 só deve começar depois de:
 
 1. **Decisões de produto/RH** resolvidas o suficiente para fechar ao
-   menos o núcleo mínimo (DP-3J-01, DP-3J-02, DP-3J-03, DP-3J-05) — não é
-   necessário resolver todas as 12 decisões pendentes de uma vez, mas o
-   núcleo conceitual (jornada/escala/evento) precisa de base decidida.
+   menos o núcleo mínimo. **(Baseline V1, 2026-08-07)** este critério está
+   **parcialmente satisfeito**: DP-3J-02, DP-3J-03 e DP-3J-06 resolvidas
+   para V1; DP-3J-04 e DP-3J-05 resolvidas quanto ao mecanismo/registro;
+   DP-3J-01 esclarecida (não bloqueia por não haver escala complexa). Isso
+   resolve o critério 1 — **não** os critérios 2 a 6 abaixo, nenhum dos
+   quais é satisfeito pela Baseline V1.
 2. **Validação jurídico/DPO** confirmando validade legal e requisitos
    regulatórios aplicáveis (DP-3J-09) antes de qualquer controle de
    jornada ser tratado como funcional além de estrutura interna de teste.
@@ -558,11 +633,13 @@ só deve começar depois de:
    real entrar em ambiente não isolado — mesmo padrão de todas as fatias
    anteriores desta trilha.
 
-Nenhum destes critérios é satisfeito por este documento. Este documento
-**não declara** aderência legal, conclusão de LGPD, nem validade
-trabalhista de nenhum controle de jornada — apenas organiza o que
-precisa ser decidido antes de qualquer um desses critérios poder ser
-avaliado.
+Com a Baseline V1, o critério 1 está parcialmente satisfeito (ver acima);
+**os critérios 2 a 6 continuam integralmente não satisfeitos**. Este
+documento **não declara** aderência legal, conclusão de LGPD, nem
+validade trabalhista de nenhum controle de jornada — apenas organiza o
+que precisa ser decidido antes de qualquer um desses critérios poder ser
+avaliado, e nenhuma decisão registrada até aqui autoriza início de
+código.
 
 ## 12. Arquivos previstos para a fase Implementar (não criados agora)
 
@@ -572,8 +649,11 @@ avaliado.
 
 apps/api/src/jornada-ponto/                    # módulo futuro, NAO criado
 apps/api/prisma/migrations/<data>_jornada_ponto_estrutural/  # NAO criado
-docs/decisions/etapa3-jornada-ponto-baseline-v1.md            # NAO criado
-docs/adr/0008-jornada-ponto-baseline-v1.md                    # NAO criado
+
+# Ja criados na fase "Registrar decisao aprovada" (2026-08-07) — documentais,
+# sem nenhum artefato de codigo/schema/infraestrutura:
+docs/decisions/etapa3-jornada-ponto-baseline-v1.md            # CRIADO
+docs/adr/0008-jornada-ponto-rastreavel-baseline-v1.md         # CRIADO
 
 # Explicitamente NAO previstos nesta V1 Estrutural (bloqueados por
 # decisão pendente, ver §9 e §4):
@@ -586,6 +666,11 @@ docs/adr/0008-jornada-ponto-baseline-v1.md                    # NAO criado
 
 ## 13. Referências
 
+- [Baseline V1 de Jornada e Ponto Rastreável](../decisions/etapa3-jornada-ponto-baseline-v1.md) —
+  as 8 decisões de produto aprovadas (2026-08-07) que esta especificação
+  reflete.
+- [ADR 0008](../adr/0008-jornada-ponto-rastreavel-baseline-v1.md) —
+  formalização arquitetural da Baseline V1.
 - [docs/ROADMAP.md](../ROADMAP.md) — Etapa 3 no roadmap geral.
 - [docs/ARCHITECTURE.md](../ARCHITECTURE.md) — regras de segurança
   transversais (menor privilégio, negação por padrão, auditoria).
