@@ -7,6 +7,7 @@ import { AuthModule } from "./auth/auth.module";
 import { UsersModule } from "./users/users.module";
 import { AuditModule } from "./audit/audit.module";
 import { OrganizacaoModule } from "./organizacao/organizacao.module";
+import { PessoasModule } from "./pessoas/pessoas.module";
 import { validateEnv } from "./config/env.validation";
 
 @Module({
@@ -22,6 +23,7 @@ import { validateEnv } from "./config/env.validation";
     UsersModule,
     AuditModule,
     OrganizacaoModule,
+    PessoasModule,
   ],
 })
 export class AppModule {}
