@@ -262,6 +262,11 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
       `app_password=${APP_PASSWORD}`,
     ]);
     await runInfraScript(container, "02_schema_and_grants.sql", []);
+    // Pre-condicao de infraestrutura da Fatia 2: a migration exige
+    // btree_gist. Provisionada aqui pelo papel ADMINISTRADOR do container
+    // efemero — nunca por evolli_migrator, que por desenho da ADR 0002 nao
+    // tem CREATE na base. Ver infra/postgres/README.md.
+    await runInfraScript(container, "04_extensions.sql", []);
 
     migratorUrl = `postgresql://evolli_migrator:${MIGRATOR_PASSWORD}@${host}:${port}/${ADMIN_DB}?schema=app`;
     appUrl = `postgresql://evolli_app:${APP_PASSWORD}@${host}:${port}/${ADMIN_DB}?schema=app`;
@@ -861,6 +866,421 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
     });
   });
 
+  // -------------------------------------------------------------------------
+
+  describe("RI-A2: nao sobreposicao de periodos, garantida pelo banco", () => {
+    // Todos os INSERTs abaixo sao CRUS, pelo papel de migration: contornam
+    // service, DTO, lock de aplicacao e qualquer validacao de codigo. Se
+    // passassem, a garantia nao estaria no banco.
+    let migrator: PrismaClient;
+    let vinculoId: string;
+    let empresaId: string;
+    let departamentoId: string;
+    let movimentacaoId: string;
+
+    /** INSERT cru de alocacao; `ate` nulo = alocacao aberta. */
+    async function inserirAlocacao(
+      de: string,
+      ate: string | null,
+    ): Promise<void> {
+      await migrator.$executeRawUnsafe(
+        `INSERT INTO app.alocacao_organizacional
+           (id, vinculo_id, empresa_id, departamento_id, vigente_de,
+            vigente_ate, movimentacao_origem_id, criado_em)
+         VALUES (gen_random_uuid()::text, $1, $2, $3, $4::date, $5::date, $6, now())`,
+        vinculoId,
+        empresaId,
+        departamentoId,
+        de,
+        ate,
+        movimentacaoId,
+      );
+    }
+
+    beforeAll(async () => {
+      migrator = new PrismaClient({
+        datasources: { db: { url: migratorUrl } },
+      });
+
+      // Vinculo dedicado, em `previsto`, para nao colidir com o historico dos
+      // outros casos nem com a invariante "vinculo ativo exige alocacao".
+      const colaborador = await post("/v1/colaboradores", rhA)
+        .send({
+          nome: "Pessoa Sintetica Intervalo",
+          empresaId: empresaA,
+          matricula: "MAT-INTV",
+          tipo: "clt",
+          dataAdmissao: ADMISSAO,
+          motivoCodigo: "admissao_inicial",
+          departamentoId: departamentoA,
+        })
+        .expect(201);
+
+      const vinculos = await get(
+        `/v1/colaboradores/${colaborador.body.id}/vinculos`,
+        rhA,
+      ).expect(200);
+      vinculoId = vinculos.body[0].id;
+      empresaId = empresaA;
+      departamentoId = departamentoA;
+
+      const linha = await get(
+        `/v1/vinculos/${vinculoId}/linha-do-tempo`,
+        rhA,
+      ).expect(200);
+      movimentacaoId = linha.body[0].id;
+    });
+
+    afterAll(async () => {
+      await migrator?.$disconnect();
+    });
+
+    it("a EXCLUSION CONSTRAINT existe, com daterange [) sobre o vinculo", async () => {
+      const linhas = await migrator.$queryRawUnsafe<
+        { conname: string; definicao: string }[]
+      >(
+        `SELECT conname, pg_get_constraintdef(oid) AS definicao
+           FROM pg_constraint
+          WHERE conname = 'alocacao_organizacional_sem_sobreposicao'`,
+      );
+      expect(linhas).toHaveLength(1);
+      expect(linhas[0]!.definicao).toContain("EXCLUDE USING gist");
+      expect(linhas[0]!.definicao).toContain("vinculo_id WITH =");
+      expect(linhas[0]!.definicao).toContain("'[)'");
+    });
+
+    it("aceita o primeiro periodo fechado", async () => {
+      // Se lancar, o teste falha — nao ha assercao a fazer alem de "passou".
+      await inserirAlocacao("2026-01-01", "2026-03-01");
+    });
+
+    it("aceita periodo ADJACENTE, sem intersecao", async () => {
+      // [01-01, 03-01) e [03-01, 05-01) encostam mas nao se sobrepoem — e
+      // exatamente o que a sucessao de alocacoes produz.
+      await inserirAlocacao("2026-03-01", "2026-05-01");
+    });
+
+    it("RECUSA periodo sobreposto", async () => {
+      await expect(inserirAlocacao("2026-02-01", "2026-04-01")).rejects.toThrow(
+        /exclusion constraint|23P01/i,
+      );
+    });
+
+    it("RECUSA periodo contido em outro", async () => {
+      await expect(inserirAlocacao("2026-01-10", "2026-02-10")).rejects.toThrow(
+        /exclusion constraint|23P01/i,
+      );
+    });
+
+    it("RECUSA periodo que contem outro", async () => {
+      await expect(inserirAlocacao("2025-12-01", "2026-06-01")).rejects.toThrow(
+        /exclusion constraint|23P01/i,
+      );
+    });
+
+    it("aceita alocacao ABERTA apos o ultimo periodo fechado", async () => {
+      await inserirAlocacao("2026-05-01", null);
+    });
+
+    it("alocacao ABERTA bloqueia periodo FECHADO posterior (limite infinito)", async () => {
+      // Prova que `vigente_ate IS NULL` e tratado como infinito: um periodo
+      // inteiramente no futuro ainda conflita com a alocacao aberta.
+      await expect(inserirAlocacao("2027-07-01", "2027-08-01")).rejects.toThrow(
+        /exclusion constraint|23P01/i,
+      );
+    });
+
+    it("alocacao ABERTA bloqueia outra alocacao ABERTA", async () => {
+      await expect(inserirAlocacao("2028-01-01", null)).rejects.toThrow(
+        // Duas abertas violam a EXCLUSION e tambem o indice unico parcial;
+        // qualquer uma das duas recusas serve — nenhuma passa.
+        /exclusion constraint|23P01|unique constraint|vigente_unica/i,
+      );
+    });
+
+    it("o historico final tem exatamente os periodos aceitos, sem sobreposicao", async () => {
+      const alocacoes = await migrator.alocacaoOrganizacional.findMany({
+        where: { vinculoId },
+        orderBy: { vigenteDe: "asc" },
+      });
+      expect(alocacoes).toHaveLength(3);
+      expect(alocacoes[2]!.vigenteAte).toBeNull();
+    });
+  });
+
+  describe("privilegio do papel de migration nao foi ampliado", () => {
+    it("evolli_migrator nao e superuser nem tem CREATEDB/CREATEROLE", async () => {
+      const migrator = new PrismaClient({
+        datasources: { db: { url: migratorUrl } },
+      });
+      try {
+        const papeis = await migrator.$queryRawUnsafe<
+          {
+            rolsuper: boolean;
+            rolcreatedb: boolean;
+            rolcreaterole: boolean;
+            rolbypassrls: boolean;
+          }[]
+        >(
+          `SELECT rolsuper, rolcreatedb, rolcreaterole, rolbypassrls
+             FROM pg_roles WHERE rolname = 'evolli_migrator'`,
+        );
+        expect(papeis[0]).toEqual({
+          rolsuper: false,
+          rolcreatedb: false,
+          rolcreaterole: false,
+          rolbypassrls: false,
+        });
+      } finally {
+        await migrator.$disconnect();
+      }
+    });
+
+    it("nem evolli_migrator nem evolli_app tem CREATE na base", async () => {
+      const migrator = new PrismaClient({
+        datasources: { db: { url: migratorUrl } },
+      });
+      try {
+        const privilegios = await migrator.$queryRawUnsafe<
+          { migrator: boolean; app: boolean }[]
+        >(
+          `SELECT has_database_privilege('evolli_migrator', current_database(), 'CREATE') AS migrator,
+                  has_database_privilege('evolli_app', current_database(), 'CREATE') AS app`,
+        );
+        expect(privilegios[0]).toEqual({ migrator: false, app: false });
+      } finally {
+        await migrator.$disconnect();
+      }
+    });
+
+    it("evolli_migrator NAO consegue instalar a extensao — ela e pre-condicao do admin", async () => {
+      const migrator = new PrismaClient({
+        datasources: { db: { url: migratorUrl } },
+      });
+      try {
+        await expect(
+          migrator.$executeRawUnsafe("CREATE EXTENSION IF NOT EXISTS pg_trgm"),
+        ).rejects.toThrow(/permission denied/i);
+      } finally {
+        await migrator.$disconnect();
+      }
+    });
+
+    it("btree_gist esta instalada — provisionada pelo papel administrativo", async () => {
+      const prisma = new PrismaClient({ datasources: { db: { url: appUrl } } });
+      try {
+        const extensoes = await prisma.$queryRawUnsafe<{ extname: string }[]>(
+          `SELECT extname FROM pg_extension WHERE extname = 'btree_gist'`,
+        );
+        expect(extensoes).toHaveLength(1);
+      } finally {
+        await prisma.$disconnect();
+      }
+    });
+  });
+
+  describe("admissao atomica: invariantes estruturais", () => {
+    it("colaborador orfao e impossivel pelo BANCO, mesmo por INSERT cru", async () => {
+      const migrator = new PrismaClient({
+        datasources: { db: { url: migratorUrl } },
+      });
+      try {
+        // A trigger e DEFERRABLE INITIALLY DEFERRED: a recusa acontece no
+        // COMMIT, nao no INSERT — por isso o teste precisa da transacao
+        // inteira, e nao so do comando.
+        await expect(
+          migrator.$transaction([
+            migrator.$executeRawUnsafe(
+              `INSERT INTO app.colaborador (id, nome, situacao, criado_em, atualizado_em)
+               VALUES (gen_random_uuid()::text, 'Orfao Sintetico', 'inativo', now(), now())`,
+            ),
+          ]),
+        ).rejects.toThrow(/sem vinculo funcional/i);
+
+        const restou = await migrator.colaborador.count({
+          where: { nome: "Orfao Sintetico" },
+        });
+        expect(restou).toBe(0);
+      } finally {
+        await migrator.$disconnect();
+      }
+    });
+
+    it("colaborador orfao e impossivel pela API — nao ha rota de cadastro sem vinculo", async () => {
+      // A unica rota de criacao e a admissao, e ela exige empresa, matricula,
+      // tipo, data e destino organizacional.
+      await post("/v1/colaboradores", rhA)
+        .send({ nome: "So Nome" })
+        .expect(400);
+
+      const prisma = new PrismaClient({ datasources: { db: { url: appUrl } } });
+      try {
+        const semVinculo = await prisma.colaborador.count({
+          where: { vinculos: { none: {} } },
+        });
+        expect(semVinculo).toBe(0);
+      } finally {
+        await prisma.$disconnect();
+      }
+    });
+
+    it("vinculo ATIVO sem alocacao vigente e impossivel pelo BANCO", async () => {
+      const migrator = new PrismaClient({
+        datasources: { db: { url: migratorUrl } },
+      });
+      try {
+        const previsto = await migrator.vinculoFuncional.findFirst({
+          where: { situacao: "previsto" },
+        });
+        expect(previsto).not.toBeNull();
+
+        // Ativar sem criar alocacao viola a invariante no COMMIT.
+        await expect(
+          migrator.$transaction([
+            migrator.$executeRawUnsafe(
+              `UPDATE app.vinculo_funcional SET situacao = 'ativo' WHERE id = $1`,
+              previsto!.id,
+            ),
+          ]),
+        ).rejects.toThrow(/sem alocacao organizacional vigente/i);
+
+        const conferencia = await migrator.vinculoFuncional.findUniqueOrThrow({
+          where: { id: previsto!.id },
+        });
+        expect(conferencia.situacao).toBe("previsto");
+      } finally {
+        await migrator.$disconnect();
+      }
+    });
+
+    it("fechar a alocacao vigente de um vinculo ATIVO sem sucessora e impossivel", async () => {
+      const migrator = new PrismaClient({
+        datasources: { db: { url: migratorUrl } },
+      });
+      try {
+        const aberta = await migrator.alocacaoOrganizacional.findFirst({
+          where: { vigenteAte: null, vinculo: { situacao: "ativo" } },
+        });
+        expect(aberta).not.toBeNull();
+
+        await expect(
+          migrator.$transaction([
+            migrator.$executeRawUnsafe(
+              `UPDATE app.alocacao_organizacional SET vigente_ate = DATE '2027-12-31' WHERE id = $1`,
+              aberta!.id,
+            ),
+          ]),
+        ).rejects.toThrow(/sem alocacao organizacional vigente/i);
+      } finally {
+        await migrator.$disconnect();
+      }
+    });
+
+    it("admissao cria colaborador, vinculo e movimentacao na MESMA transacao", async () => {
+      const resposta = await post("/v1/colaboradores", rhA)
+        .send({
+          nome: "Pessoa Sintetica Atomica",
+          empresaId: empresaA,
+          matricula: "MAT-ATOM",
+          tipo: "clt",
+          dataAdmissao: ADMISSAO,
+          motivoCodigo: "admissao_inicial",
+          departamentoId: departamentoA,
+          cargoId: cargoA,
+        })
+        .expect(201);
+
+      const prisma = new PrismaClient({ datasources: { db: { url: appUrl } } });
+      try {
+        const colaborador = await prisma.colaborador.findUniqueOrThrow({
+          where: { id: resposta.body.id },
+          include: { vinculos: { include: { movimentacoes: true } } },
+        });
+        expect(colaborador.vinculos).toHaveLength(1);
+        expect(colaborador.vinculos[0]!.empresaId).toBe(empresaA);
+        expect(colaborador.vinculos[0]!.movimentacoes).toHaveLength(1);
+        expect(colaborador.vinculos[0]!.movimentacoes[0]!.tipo).toBe(
+          "admissao",
+        );
+      } finally {
+        await prisma.$disconnect();
+      }
+    });
+
+    it("efetivar a admissao cria a alocacao na MESMA transacao da ativacao", async () => {
+      const { vinculoId } = await admitirEEfetivar(rhA, {
+        nome: "Pessoa Sintetica Atomica Dois",
+        empresaId: empresaA,
+        matricula: "MAT-ATOM2",
+        departamentoId: departamentoA,
+      });
+
+      const prisma = new PrismaClient({ datasources: { db: { url: appUrl } } });
+      try {
+        const vinculo = await prisma.vinculoFuncional.findUniqueOrThrow({
+          where: { id: vinculoId },
+          include: { alocacoes: true },
+        });
+        expect(vinculo.situacao).toBe("ativo");
+        expect(vinculo.alocacoes).toHaveLength(1);
+        expect(vinculo.alocacoes[0]!.vigenteAte).toBeNull();
+      } finally {
+        await prisma.$disconnect();
+      }
+    });
+
+    it("falha da auditoria reverte a admissao INTEIRA, sem deixar orfao", async () => {
+      const migrator = new PrismaClient({
+        datasources: { db: { url: migratorUrl } },
+      });
+      try {
+        await migrator.$executeRawUnsafe(
+          "REVOKE INSERT ON TABLE app.audit_event FROM evolli_app",
+        );
+        await post("/v1/colaboradores", rhA)
+          .send({
+            nome: "Pessoa Sintetica Atomica Falha",
+            empresaId: empresaA,
+            matricula: "MAT-ATOMF",
+            tipo: "clt",
+            dataAdmissao: ADMISSAO,
+            motivoCodigo: "admissao_inicial",
+            departamentoId: departamentoA,
+          })
+          .expect(500);
+      } finally {
+        await migrator.$executeRawUnsafe(
+          "GRANT INSERT ON TABLE app.audit_event TO evolli_app",
+        );
+        await migrator.$disconnect();
+      }
+
+      const prisma = new PrismaClient({ datasources: { db: { url: appUrl } } });
+      try {
+        expect(
+          await prisma.colaborador.count({
+            where: { nome: "Pessoa Sintetica Atomica Falha" },
+          }),
+        ).toBe(0);
+        expect(
+          await prisma.vinculoFuncional.count({
+            where: { matricula: "MAT-ATOMF" },
+          }),
+        ).toBe(0);
+        expect(
+          await prisma.movimentacaoFuncional.count({
+            where: { vinculo: { matricula: "MAT-ATOMF" } },
+          }),
+        ).toBe(0);
+        // E, sobretudo: nenhum colaborador ficou sem vinculo.
+        expect(
+          await prisma.colaborador.count({ where: { vinculos: { none: {} } } }),
+        ).toBe(0);
+      } finally {
+        await prisma.$disconnect();
+      }
+    });
+  });
   // -------------------------------------------------------------------------
 
   describe("retificação: corrige o registro sem apagar o histórico", () => {
