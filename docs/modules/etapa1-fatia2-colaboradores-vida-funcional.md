@@ -1546,25 +1546,25 @@ Propostos, **não implementados**. Nenhum endpoint, DTO ou controller é
 criado nesta fase. Rotas em português, plurais, minúsculas, sob `/v1`,
 conforme convenção aprovada.
 
-| Método | Rota (proposta)                                               | Descrição                                   | Autorização                          | Uso nesta V1                                                       |
-| ------ | ------------------------------------------------------------- | ------------------------------------------- | ------------------------------------ | ------------------------------------------------------------------ |
-| GET    | `/v1/colaboradores`                                           | Lista paginada do escopo do ator            | `read` · `colaborador`               | ✅                                                                 |
-| GET    | `/v1/colaboradores/:colaboradorId`                            | Cadastro básico                             | `read` · `colaborador`               | ✅                                                                 |
-| POST   | `/v1/colaboradores`                                           | Cria cadastro (não cria conta de acesso)    | `create` · `colaborador`             | ✅                                                                 |
-| PATCH  | `/v1/colaboradores/:colaboradorId`                            | Retifica dado cadastral                     | `alter` · `colaborador`              | ✅                                                                 |
-| GET    | `/v1/colaboradores/:colaboradorId/vinculos`                   | Vínculos do colaborador                     | `read` · `vinculo_funcional`         | ✅                                                                 |
-| POST   | `/v1/vinculos`                                                | Cria vínculo (via movimentação de admissão) | `create` · `vinculo_funcional`       | ✅                                                                 |
-| GET    | `/v1/vinculos/:vinculoId/alocacoes`                           | Histórico completo de alocações             | `read` · `alocacao_organizacional`   | ✅                                                                 |
-| GET    | `/v1/vinculos/:vinculoId/situacao?dataReferencia=YYYY-MM-DD`  | **Situação em uma data** (§1)               | `read` · `alocacao_organizacional`   | ✅                                                                 |
-| GET    | `/v1/vinculos/:vinculoId/linha-do-tempo`                      | Movimentações ordenadas (§4.8)              | `read` · `movimentacao_funcional`    | ✅                                                                 |
-| GET    | `/v1/movimentacoes`                                           | Lista paginada, filtrável por tipo/status   | `read` · `movimentacao_funcional`    | ✅                                                                 |
-| POST   | `/v1/movimentacoes`                                           | Registra movimentação (RH/DP, direto)       | `create` · `movimentacao_funcional`  | ✅                                                                 |
-| POST   | `/v1/movimentacoes/:movimentacaoId/aprovar`                   | Registra aprovação                          | `manage` · `movimentacao_funcional`  | ⛔ Não implementada (Baseline V1, item 7)                          |
-| POST   | `/v1/movimentacoes/:movimentacaoId/rejeitar`                  | Registra rejeição                           | `manage` · `movimentacao_funcional`  | ⛔ Não implementada (Baseline V1, item 7)                          |
-| POST   | `/v1/movimentacoes/:movimentacaoId/cancelar`                  | Cancela antes de efetivar                   | `manage` · `movimentacao_funcional`  | ✅                                                                 |
-| POST   | `/v1/movimentacoes/:movimentacaoId/efetivar`                  | Efetiva; altera vínculo/alocação            | `manage` · `movimentacao_funcional`  | ✅                                                                 |
-| POST   | `/v1/movimentacoes/:movimentacaoId/retificar`                 | Cria retificação (§4.10)                    | `manage` · `movimentacao_funcional`  | ✅                                                                 |
-| GET    | `/v1/colaboradores/:colaboradorId/dados-restritos/:categoria` | **Rota segregada** (§4.7)                   | `read` · `dado_restrito_colaborador` | ⛔ Não implementada — recurso fora de escopo (Baseline V1, item 5) |
+| Método | Rota (proposta)                                               | Descrição                                                                                                                                                 | Autorização                          | Uso nesta V1                                                       |
+| ------ | ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ | ------------------------------------------------------------------ |
+| GET    | `/v1/colaboradores`                                           | Lista paginada do escopo do ator                                                                                                                          | `read` · `colaborador`               | ✅                                                                 |
+| GET    | `/v1/colaboradores/:colaboradorId`                            | Cadastro básico                                                                                                                                           | `read` · `colaborador`               | ✅                                                                 |
+| POST   | `/v1/colaboradores`                                           | **Admissão atômica**: cria colaborador, primeiro vínculo e — quando o vínculo já nasce ativo — a alocação, na mesma transação. Nunca cria conta de acesso | `create` · `colaborador`             | ✅                                                                 |
+| PATCH  | `/v1/colaboradores/:colaboradorId`                            | Retifica dado cadastral                                                                                                                                   | `alter` · `colaborador`              | ✅                                                                 |
+| GET    | `/v1/colaboradores/:colaboradorId/vinculos`                   | Vínculos do colaborador                                                                                                                                   | `read` · `vinculo_funcional`         | ✅                                                                 |
+| POST   | `/v1/vinculos`                                                | Cria vínculo (via movimentação de admissão)                                                                                                               | `create` · `vinculo_funcional`       | ✅                                                                 |
+| GET    | `/v1/vinculos/:vinculoId/alocacoes`                           | Histórico completo de alocações                                                                                                                           | `read` · `alocacao_organizacional`   | ✅                                                                 |
+| GET    | `/v1/vinculos/:vinculoId/situacao?dataReferencia=YYYY-MM-DD`  | **Situação em uma data** (§1)                                                                                                                             | `read` · `alocacao_organizacional`   | ✅                                                                 |
+| GET    | `/v1/vinculos/:vinculoId/linha-do-tempo`                      | Movimentações ordenadas (§4.8)                                                                                                                            | `read` · `movimentacao_funcional`    | ✅                                                                 |
+| GET    | `/v1/movimentacoes`                                           | Lista paginada, filtrável por tipo/status                                                                                                                 | `read` · `movimentacao_funcional`    | ✅                                                                 |
+| POST   | `/v1/movimentacoes`                                           | Registra movimentação (RH/DP, direto)                                                                                                                     | `create` · `movimentacao_funcional`  | ✅                                                                 |
+| POST   | `/v1/movimentacoes/:movimentacaoId/aprovar`                   | Registra aprovação                                                                                                                                        | `manage` · `movimentacao_funcional`  | ⛔ Não implementada (Baseline V1, item 7)                          |
+| POST   | `/v1/movimentacoes/:movimentacaoId/rejeitar`                  | Registra rejeição                                                                                                                                         | `manage` · `movimentacao_funcional`  | ⛔ Não implementada (Baseline V1, item 7)                          |
+| POST   | `/v1/movimentacoes/:movimentacaoId/cancelar`                  | Cancela antes de efetivar                                                                                                                                 | `manage` · `movimentacao_funcional`  | ✅                                                                 |
+| POST   | `/v1/movimentacoes/:movimentacaoId/efetivar`                  | Efetiva; altera vínculo/alocação                                                                                                                          | `manage` · `movimentacao_funcional`  | ✅                                                                 |
+| POST   | `/v1/movimentacoes/:movimentacaoId/retificar`                 | Cria retificação (§4.10)                                                                                                                                  | `manage` · `movimentacao_funcional`  | ✅                                                                 |
+| GET    | `/v1/colaboradores/:colaboradorId/dados-restritos/:categoria` | **Rota segregada** (§4.7)                                                                                                                                 | `read` · `dado_restrito_colaborador` | ⛔ Não implementada — recurso fora de escopo (Baseline V1, item 5) |
 
 ### Regras de contrato
 
@@ -1999,20 +1999,22 @@ peso — **o que não foi**. Nada aqui amplia o escopo aprovado na Baseline V1.
 
 **Integridade garantida pelo banco, não apenas pela aplicação:**
 
-| Regra                                                       | Garantia física                                                                                                                                        |
-| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Matrícula única na empresa (item 2)                         | `vinculo_funcional_empresa_id_matricula_key`                                                                                                           |
-| Máx. 1 vínculo `ativo` por (colaborador, empresa) — RI-V6   | Índice único **parcial** `vinculo_funcional_ativo_unico ... WHERE situacao = 'ativo'`                                                                  |
-| Alocação e movimentação na mesma empresa do vínculo — RI-A1 | FKs **compostas** com `empresa_id` em todas as referências; para `area`, `(area_id, departamento_id)`, fechando a cadeia area → departamento → empresa |
-| Máx. 1 alocação **aberta** por vínculo — RI-A2 (parcial)    | Índice único parcial `alocacao_organizacional_vigente_unica ... WHERE vigente_ate IS NULL`                                                             |
-| Intervalo coerente                                          | CHECK `vigente_ate > vigente_de`                                                                                                                       |
-| `area_id` exige `departamento_id`                           | CHECK — sem ele, a FK composta não seria verificada (MATCH SIMPLE ignora tupla com NULL)                                                               |
-| Alocação com ao menos uma referência (item 10)              | CHECK `referencia_minima`                                                                                                                              |
-| Desligamento ≥ admissão — RI-V4                             | CHECK `vinculo_funcional_datas_coerentes`                                                                                                              |
-| Movimentação não retifica a si mesma                        | CHECK `movimentacao_funcional_retifica_outra`                                                                                                          |
-| Coerência status × efetivação — RI-M1                       | CHECK `movimentacao_funcional_efetivacao_coerente`                                                                                                     |
-| Uma retificação por movimentação                            | `movimentacao_funcional_retifica_id_key`                                                                                                               |
-| Sem exclusão física — RI-H1                                 | `ON DELETE RESTRICT` em toda FK + ausência de rota `DELETE`                                                                                            |
+| Regra                                                                 | Garantia física                                                                                                                                                                                                               |
+| --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Matrícula única na empresa (item 2)                                   | `vinculo_funcional_empresa_id_matricula_key`                                                                                                                                                                                  |
+| Máx. 1 vínculo `ativo` por (colaborador, empresa) — RI-V6             | Índice único **parcial** `vinculo_funcional_ativo_unico ... WHERE situacao = 'ativo'`                                                                                                                                         |
+| Alocação e movimentação na mesma empresa do vínculo — RI-A1           | FKs **compostas** com `empresa_id` em todas as referências; para `area`, `(area_id, departamento_id)`, fechando a cadeia area → departamento → empresa                                                                        |
+| **Períodos do mesmo vínculo nunca se sobrepõem — RI-A2**              | **`EXCLUSION CONSTRAINT` GiST `alocacao_organizacional_sem_sobreposicao`** sobre `daterange(vigente_de, vigente_ate, '[)')`, com `vigente_ate` nulo como limite infinito. Exige `btree_gist` (pré-condição de infraestrutura) |
+| Máx. 1 alocação **aberta** por vínculo (caminho rápido)               | Índice único parcial `alocacao_organizacional_vigente_unica ... WHERE vigente_ate IS NULL` — complemento, não substituto do EXCLUDE                                                                                           |
+| **Colaborador sempre tem vínculo; vínculo ativo sempre tem alocação** | **`CONSTRAINT TRIGGER` deferidas**, verificadas no COMMIT: `colaborador_exige_vinculo`, `vinculo_ativo_exige_alocacao`, `alocacao_encerrada_exige_sucessora`                                                                  |
+| Intervalo coerente                                                    | CHECK `vigente_ate > vigente_de`                                                                                                                                                                                              |
+| `area_id` exige `departamento_id`                                     | CHECK — sem ele, a FK composta não seria verificada (MATCH SIMPLE ignora tupla com NULL)                                                                                                                                      |
+| Alocação com ao menos uma referência (item 10)                        | CHECK `referencia_minima`                                                                                                                                                                                                     |
+| Desligamento ≥ admissão — RI-V4                                       | CHECK `vinculo_funcional_datas_coerentes`                                                                                                                                                                                     |
+| Movimentação não retifica a si mesma                                  | CHECK `movimentacao_funcional_retifica_outra`                                                                                                                                                                                 |
+| Coerência status × efetivação — RI-M1                                 | CHECK `movimentacao_funcional_efetivacao_coerente`                                                                                                                                                                            |
+| Uma retificação por movimentação                                      | `movimentacao_funcional_retifica_id_key`                                                                                                                                                                                      |
+| Sem exclusão física — RI-H1                                           | `ON DELETE RESTRICT` em toda FK + ausência de rota `DELETE`                                                                                                                                                                   |
 
 Privilégios: nenhum `GRANT` explícito foi necessário — as tabelas nascem
 com DML para `evolli_app` via `ALTER DEFAULT PRIVILEGES`. `audit_event`
@@ -2028,22 +2030,22 @@ continua append-only, verificado por teste.
 Rotas em português, plurais, sob `/v1`, documentadas no OpenAPI (tag
 `pessoas`):
 
-| Método | Rota                                               | Ação                                           |
-| ------ | -------------------------------------------------- | ---------------------------------------------- |
-| GET    | `/v1/colaboradores`                                | listar (paginado)                              |
-| GET    | `/v1/colaboradores/:colaboradorId`                 | detalhar cadastro básico                       |
-| POST   | `/v1/colaboradores`                                | admitir (colaborador + vínculo + movimentação) |
-| PATCH  | `/v1/colaboradores/:colaboradorId`                 | retificar nome                                 |
-| GET    | `/v1/colaboradores/:colaboradorId/vinculos`        | vínculos na empresa                            |
-| POST   | `/v1/vinculos`                                     | novo vínculo (readmissão)                      |
-| GET    | `/v1/vinculos/:vinculoId/alocacoes`                | histórico completo                             |
-| GET    | `/v1/vinculos/:vinculoId/situacao?dataReferencia=` | **situação em uma data**                       |
-| GET    | `/v1/vinculos/:vinculoId/linha-do-tempo`           | movimentações ordenadas                        |
-| GET    | `/v1/movimentacoes`                                | listar (paginado)                              |
-| POST   | `/v1/movimentacoes`                                | registrar                                      |
-| POST   | `/v1/movimentacoes/:movimentacaoId/cancelar`       | cancelar                                       |
-| POST   | `/v1/movimentacoes/:movimentacaoId/efetivar`       | efetivar                                       |
-| POST   | `/v1/movimentacoes/:movimentacaoId/retificar`      | retificar                                      |
+| Método | Rota                                               | Ação                                                        |
+| ------ | -------------------------------------------------- | ----------------------------------------------------------- |
+| GET    | `/v1/colaboradores`                                | listar (paginado)                                           |
+| GET    | `/v1/colaboradores/:colaboradorId`                 | detalhar cadastro básico                                    |
+| POST   | `/v1/colaboradores`                                | **admissão atômica** (colaborador + vínculo + movimentação) |
+| PATCH  | `/v1/colaboradores/:colaboradorId`                 | retificar nome                                              |
+| GET    | `/v1/colaboradores/:colaboradorId/vinculos`        | vínculos na empresa                                         |
+| POST   | `/v1/vinculos`                                     | novo vínculo (readmissão)                                   |
+| GET    | `/v1/vinculos/:vinculoId/alocacoes`                | histórico completo                                          |
+| GET    | `/v1/vinculos/:vinculoId/situacao?dataReferencia=` | **situação em uma data**                                    |
+| GET    | `/v1/vinculos/:vinculoId/linha-do-tempo`           | movimentações ordenadas                                     |
+| GET    | `/v1/movimentacoes`                                | listar (paginado)                                           |
+| POST   | `/v1/movimentacoes`                                | registrar                                                   |
+| POST   | `/v1/movimentacoes/:movimentacaoId/cancelar`       | cancelar                                                    |
+| POST   | `/v1/movimentacoes/:movimentacaoId/efetivar`       | efetivar                                                    |
+| POST   | `/v1/movimentacoes/:movimentacaoId/retificar`      | retificar                                                   |
 
 **Nenhuma rota `DELETE`.** Nenhuma rota `/aprovar` ou `/rejeitar` (sem
 workflow, item 7). Nenhuma rota de dado restrito (item 5). Parâmetros de
@@ -2153,20 +2155,32 @@ Entregue **menos** do que a spec descreve em alguns pontos, por decisão de
 escopo ou por restrição objetiva. Registrado para não ser confundido com
 esquecimento:
 
-1. **RI-A2 é garantida no banco apenas parcialmente.** A não-sobreposição
-   completa de intervalos exigiria `EXCLUSION CONSTRAINT` com `daterange`
-   - `btree_gist`. A extensão **não pode ser criada por
-     `evolli_migrator`**, que por desenho (ADR 0002, menor privilégio) não
-     tem `CREATE` na base — verificado: `permission denied to create
-extension "btree_gist"`. Instalar a extensão é decisão de
-     **infraestrutura** (exige superusuário/owner da base) e **não foi
-     tomada por conta própria**. Controles compensatórios efetivamente
-     aplicados: no máximo uma alocação **aberta** por vínculo (índice único
-     parcial — é a abertura que a concorrência ameaça); unicidade de
-     `(vinculo_id, vigente_de)`; CHECK de intervalo; sucessão serializada
-     por `SELECT ... FOR UPDATE` na linha do vínculo; e teste de
-     concorrência real. **Pendência de infraestrutura registrada**, não
-     resolvida.
+1. **RI-A2 é garantida plenamente pelo banco — limitação RESOLVIDA em
+   2026-08-07.** A primeira versão desta entrega registrou aqui uma limitação
+   honesta: a não-sobreposição completa de intervalos exigiria
+   `EXCLUSION CONSTRAINT` com `daterange` + `btree_gist`, e a extensão **não
+   pode ser criada por `evolli_migrator`** — verificado: `permission denied to
+create extension "btree_gist"`. A implementação **não** contornou a
+   restrição nem ampliou privilégio: escalou como pendência de infraestrutura.
+
+   A pendência foi decidida (decisão 14): a extensão é agora **pré-condição
+   gerenciada**, provisionada pelo administrador/owner via
+   `infra/postgres/04_extensions.sql`, e a constraint existe:
+
+   ```sql
+   EXCLUDE USING gist (
+       "vinculo_id" WITH =,
+       daterange("vigente_de", "vigente_ate", '[)') WITH &&
+   )
+   ```
+
+   **A ADR 0002 permanece integral:** nenhum privilégio novo foi concedido a
+   `evolli_migrator` ou `evolli_app` — há teste que falha se isso mudar. A
+   migration **verifica** a pré-condição e **aborta com mensagem explícita** se
+   a extensão faltar, sem fallback silencioso. Os controles anteriores (índice
+   único parcial, unicidade de `(vinculo_id, vigente_de)`, CHECK de intervalo,
+   `SELECT ... FOR UPDATE`) foram **preservados**, agora como caminho rápido e
+   não como garantia principal.
 
 2. **`ferias`, `afastamento`, `retorno` e `alteracao_jornada` não
    existem** — nem como valor de enum. Férias e afastamento estão na lista
@@ -2180,12 +2194,19 @@ extension "btree_gist"`. Instalar a extensão é decisão de
    motivo (sem workflow, item 7). A spec §8 os preserva como referência
    textual para a fatia futura; o banco não os materializa.
 
-4. **`POST /v1/colaboradores` cria colaborador _e_ primeiro vínculo**, não
-   só o cadastro. Refinamento de implementação sobre o contrato da spec
-   §10, por necessidade de autorização: `Colaborador` não tem
-   `empresa_id` (item 2), então um cadastro sem vínculo ficaria fora de
-   todo escopo — invisível inclusive para quem o criou. Registrado como
-   desvio consciente do contrato descrito, não como ampliação de escopo.
+4. **`POST /v1/colaboradores` é admissão atômica — contrato OFICIAL desde
+   2026-08-07.** A primeira versão registrou isto como _desvio consciente_ do
+   contrato da spec §10, que descrevia "cria cadastro". A decisão 15 promoveu
+   o desvio a contrato: a rota cria, na mesma transação, `Colaborador`, o
+   primeiro `VinculoFuncional` e — quando o vínculo já nasce ativo — a
+   primeira `AlocacaoOrganizacional`. `Colaborador` não tem `empresa_id`,
+   então um cadastro sem vínculo ficaria fora de todo escopo de autorização,
+   invisível até para quem o criou.
+
+   A invariante deixou de depender do service: duas `CONSTRAINT TRIGGER`
+   **deferidas** garantem no COMMIT que todo colaborador tem ao menos um
+   vínculo e que todo vínculo `ativo` tem alocação vigente. Não existe — nem
+   passa a existir — endpoint de cadastro sem vínculo.
 
 5. **Reaproveitar colaborador entre empresas é impossível.** Sem
    identificador pessoal (item 1), o sistema não tem como reconhecer que

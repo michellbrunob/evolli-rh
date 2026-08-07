@@ -1,6 +1,6 @@
 # ADR 0007 — Colaboradores e vida funcional: Baseline V1
 
-- Status: **aceito** (com Emenda 1 — registro da implementacao V1, 2026-08-07)
+- Status: **aceito** (com Emenda 1 — implementacao V1 — e Emenda 2 — integridade temporal no banco e admissao atomica —, ambas 2026-08-07)
 - Data: 2026-08-07
 - Relacionado: [docs/modules/etapa1-fatia2-colaboradores-vida-funcional.md](../modules/etapa1-fatia2-colaboradores-vida-funcional.md),
   [docs/decisions/etapa1-fatia2-colaboradores-baseline-v1.md](../decisions/etapa1-fatia2-colaboradores-baseline-v1.md)
@@ -444,3 +444,108 @@ tipo de movimentação (seria inventar regra de RH).
   — a implementação é homologada **só para dados sintéticos**.
 - Não altera os gatilhos de reavaliação registrados acima, nem o prazo de
   2026-11-04 da Emenda 1 da ADR 0005.
+
+---
+
+## Emenda 2 (2026-08-07) — integridade temporal no banco e admissão atômica
+
+**Aditivo.** Nenhuma das onze decisões estruturais, nenhuma das treze decisões
+de produto da Baseline V1 e nada registrado na Emenda 1 é alterado ou
+revogado. Esta emenda formaliza **duas decisões aprovadas depois** da
+implementação inicial, em resposta a achados concretos registrados na
+Emenda 1 — e a redação anterior permanece legível, inclusive as limitações que
+estas decisões resolvem.
+
+Registro completo em
+[docs/decisions/etapa1-fatia2-colaboradores-baseline-v1.md §4](../decisions/etapa1-fatia2-colaboradores-baseline-v1.md).
+
+### Decisão 12 — `btree_gist` é pré-condição gerenciada; RI-A2 passa a ser garantia plena do banco
+
+A Emenda 1 registrou que a não-sobreposição **completa** de intervalos não era
+garantida pelo banco, porque `evolli_migrator` não pode criar `btree_gist` —
+e que instalar a extensão era decisão de infraestrutura, **não tomada por
+conta própria**. Essa decisão foi tomada agora, e a consequência é:
+
+1. **A extensão é pré-condição gerenciada de infraestrutura**, provisionada
+   pelo administrador/proprietário da base via
+   `infra/postgres/04_extensions.sql` (idempotente), na mesma etapa em que
+   `01_create_roles.sql` e `02_schema_and_grants.sql` são aplicados.
+2. **A ADR 0002 permanece integral.** Nenhum privilégio novo é concedido a
+   `evolli_migrator` ou `evolli_app` — nem `CREATE` na base, nem `SUPERUSER`,
+   `CREATEDB`, `CREATEROLE` ou `BYPASSRLS`. Resolver o provisionamento
+   ampliando o papel de migration teria enfraquecido permanentemente a
+   separação de papéis para atender uma necessidade pontual; foi
+   deliberadamente rejeitado. Há teste que falha se isso mudar.
+3. **A migration verifica e falha de modo explícito.** Ela começa consultando
+   `pg_extension` e aborta com mensagem apontando o script e o README se a
+   extensão faltar — sem fallback silencioso, sem criar a tabela com garantia
+   mais fraca.
+4. **RI-A2 passa a ser garantida plenamente pelo banco**, por
+   `EXCLUSION CONSTRAINT` GiST:
+
+   ```sql
+   ALTER TABLE "alocacao_organizacional"
+       ADD CONSTRAINT "alocacao_organizacional_sem_sobreposicao"
+       EXCLUDE USING gist (
+           "vinculo_id" WITH =,
+           daterange("vigente_de", "vigente_ate", '[)') WITH &&
+       );
+   ```
+
+   O `daterange` com limite `'[)'` reproduz exatamente a semântica que a
+   aplicação já usava (início inclusivo, fim exclusivo). Duas consequências,
+   ambas desejadas: períodos **adjacentes** não conflitam — que é o que a
+   sucessão de alocações produz —, e `vigente_ate IS NULL` vira limite
+   **infinito**, de modo que uma alocação aberta bloqueia qualquer período
+   posterior, fechado ou aberto.
+
+5. **Os controles anteriores são preservados, não substituídos:** FKs
+   compostas por empresa, CHECKs, unicidade de `(vinculo_id, vigente_de)`,
+   índice único parcial de alocação aberta e `SELECT ... FOR UPDATE` na
+   efetivação continuam. O índice parcial deixa de ser a garantia principal e
+   passa a ser o caminho rápido do caso mais comum, com erro de unicidade
+   estável que a aplicação já traduz para 409.
+6. **Prisma não expressa `EXCLUDE`.** A constraint vive em SQL explícito na
+   migration, documentada em comentário no `schema.prisma` — **nenhuma
+   estrutura Prisma falsa é declarada** para simulá-la, e `migrate diff`
+   continua reportando drift zero.
+7. Como a migration **ainda não estava publicada em `main`**, foi alterada no
+   lugar, sem migration corretiva.
+
+### Decisão 13 — `POST /v1/colaboradores` é admissão atômica, com invariante estrutural
+
+A Emenda 1 registrou como **desvio consciente** o fato de a rota criar
+colaborador e vínculo juntos. Esse desvio é agora **contrato oficial**:
+
+1. `POST /v1/colaboradores` cria, na mesma transação, `Colaborador`, o
+   primeiro `VinculoFuncional` e — quando o vínculo já nasce ativo — a
+   primeira `AlocacaoOrganizacional`.
+2. **Não existe, e não passa a existir, endpoint de cadastro sem vínculo.**
+   `Colaborador` não tem `empresa_id` (decisão 2 da Baseline V1: a empresa é
+   propriedade do vínculo), então um cadastro sem vínculo ficaria fora de todo
+   escopo de autorização — invisível até para quem o criou.
+3. **A invariante deixa de depender do service.** Duas `CONSTRAINT TRIGGER`
+   `DEFERRABLE INITIALLY DEFERRED` garantem no COMMIT que (a) todo colaborador
+   tem ao menos um vínculo e (b) todo vínculo `ativo` tem alocação vigente. A
+   verificação diferida é o que permite que a ordem interna da transação
+   continue livre — fechar a alocação vigente antes de abrir a sucessora, por
+   exemplo — sem recusar estados intermediários legítimos.
+4. **Vínculos posteriores seguem o fluxo próprio** (`POST /v1/vinculos`), sem
+   alteração.
+5. **Auditoria atômica preservada:** se a gravação em `audit_event` falhar,
+   nenhum dos três registros persiste — provado por teste que também verifica
+   que nenhum colaborador ficou sem vínculo.
+
+### O que esta emenda não faz
+
+- Não introduz nenhum dado além dos quatro aprovados na Baseline V1 (item 1).
+- Não altera a matriz de acesso: `admin_tecnico` continua **negado em todo o
+  domínio** (item 8); RH e DP continuam restritos à própria empresa (item 12);
+  ambiguidades continuam negadas por padrão.
+- Não amplia privilégio de nenhum papel de banco.
+- Não instala a extensão em ambiente externo, homologação ou produção — isso é
+  ato de operação, no deploy.
+- **Não declara conformidade LGPD concluída.** Retenção/descarte (DP-15), a
+  confirmação formal de DPO sobre os quatro dados e o MFA (ADR 0003) continuam
+  **gates obrigatórios antes de qualquer piloto com dado real ou produção**. A
+  implementação segue homologada **só para dados sintéticos**.

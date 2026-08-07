@@ -1,6 +1,6 @@
 # Baseline V1 de Colaboradores e Vida Funcional — decisão aprovada
 
-Status: **DECISÃO APROVADA** (2026-08-07)
+Status: **DECISÃO APROVADA** (2026-08-07; complementada pelas decisões 14 e 15 na mesma data — ver §4)
 
 Relacionado:
 [docs/modules/etapa1-fatia2-colaboradores-vida-funcional.md](../modules/etapa1-fatia2-colaboradores-vida-funcional.md)
@@ -389,3 +389,97 @@ além disso.
 | 11. Motivos                           | Decisão 11             | §4.4, §7 (RI-M7)         |
 | 12. Papel DP                          | Decisão 12             | §6                       |
 | 13. Diretoria                         | Decisão 13             | §0 (O3), §6              |
+
+## 4. Complemento aprovado (2026-08-07) — decisões 14 e 15
+
+**Aditivo.** Nenhuma das treze decisões acima é alterada, reinterpretada ou
+revogada. Esta seção registra duas decisões tomadas **depois** da Baseline V1,
+em resposta a achados concretos da fase Implementar, e mantém o histórico
+anterior legível — inclusive as limitações que estas decisões resolvem.
+
+### Decisão 14 — `btree_gist` é pré-condição gerenciada de infraestrutura
+
+**Aprovado:** a extensão `btree_gist` passa a ser pré-condição de
+infraestrutura da base, provisionada pelo administrador/proprietário antes de
+aplicar a migration da Fatia 2, para que o PostgreSQL garanta que períodos de
+alocação organizacional de um mesmo vínculo não se sobreponham.
+
+**Contexto (o que motivou).** A primeira entrega da implementação registrou uma
+limitação honesta: a não-sobreposição **completa** de intervalos exigiria uma
+`EXCLUSION CONSTRAINT` com `daterange` + `btree_gist`, e a extensão **não pode
+ser criada por `evolli_migrator`** — verificado objetivamente:
+`permission denied to create extension "btree_gist"`. O papel de migration não
+tem `CREATE` na base **por desenho** (ADR 0002, menor privilégio): é dono do
+schema `app` e nada além disso.
+
+Na ocasião, a implementação **não** contornou a restrição: não ampliou o
+privilégio do papel, não instalou a extensão por conta própria, e entregou
+controles compensatórios (uma alocação aberta por vínculo, unicidade de
+`(vinculo_id, vigente_de)`, CHECK de intervalo, lock de linha). A decisão foi
+escalada como pendência de infraestrutura — que é o que esta decisão resolve.
+
+**Consequência.**
+
+- Novo script `infra/postgres/04_extensions.sql`, idempotente, executado pelo
+  **admin/owner** — nunca por `evolli_migrator` ou `evolli_app`. Segue a
+  convenção numérica já existente em `infra/postgres/`.
+- **Nenhum privilégio é concedido a `evolli_migrator` ou `evolli_app`.** A
+  ADR 0002 permanece integralmente válida: a separação de papéis não foi
+  enfraquecida para acomodar a extensão. Há teste que falha se o papel de
+  migration ganhar `SUPERUSER`, `CREATEDB`, `CREATEROLE`, `BYPASSRLS` ou
+  `CREATE` na base.
+- A migration **verifica** a pré-condição e **aborta com mensagem explícita**
+  se a extensão faltar — nunca cria a tabela sem a restrição, nunca degrada
+  em silêncio para uma garantia mais fraca.
+- Como a migration ainda **não estava publicada em `main`**, ela foi alterada
+  no lugar, sem migration corretiva — o histórico de `main` permanece limpo.
+
+**O que esta decisão não faz:** não autoriza instalar a extensão em ambiente
+externo, homologação ou produção como parte desta entrega. Provisionar essas
+bases é ato de operação, no momento do deploy, por quem tem o privilégio.
+
+### Decisão 15 — `POST /v1/colaboradores` é oficialmente admissão atômica
+
+**Aprovado:** `POST /v1/colaboradores` é uma **admissão atômica**, que cria, na
+mesma transação, `Colaborador`, o primeiro `VinculoFuncional` e — quando o
+vínculo já nasce ativo — a primeira `AlocacaoOrganizacional`. **Não pode
+existir colaborador órfão**, sem empresa, vínculo ou escopo de autorização.
+
+**Contexto (o que motivou).** A spec §10 descrevia `POST /v1/colaboradores`
+como "cria cadastro". A implementação precisou criar cadastro **e** vínculo
+juntos, e registrou isso como **desvio consciente** — porque `Colaborador` não
+tem `empresa_id` (decisão 2: a empresa é propriedade do vínculo), então um
+cadastro sem vínculo ficaria fora de todo escopo de autorização: invisível
+inclusive para quem o criou, e impossível de auditar por empresa.
+
+Esta decisão **promove aquele desvio a contrato oficial**, em vez de mantê-lo
+como divergência tolerada entre spec e código.
+
+**Consequência.**
+
+- O contrato da spec passa a descrever a operação como admissão atômica. Não
+  existe — nem passa a existir — endpoint de cadastro de colaborador sem
+  vínculo.
+- A invariante deixa de depender do service e passa a ser **estrutural**: duas
+  `CONSTRAINT TRIGGER` _deferidas_ garantem, no COMMIT, que (a) todo
+  colaborador tem ao menos um vínculo e (b) todo vínculo `ativo` tem alocação
+  vigente. Verificação no commit, e não a cada comando, é o que permite que a
+  ordem interna da transação continue livre — fechar a alocação vigente antes
+  de abrir a sucessora, por exemplo.
+- Vínculos posteriores continuam pelo fluxo próprio já existente
+  (`POST /v1/vinculos`), sem alteração.
+- **Auditoria atômica preservada e reforçada por teste:** se a gravação em
+  `audit_event` falhar, nenhum dos registros persiste — e nenhum colaborador
+  fica sem vínculo.
+
+**O que esta decisão não faz:** não introduz nenhum dado além dos quatro
+aprovados na decisão 1, não altera a matriz de acesso (decisões 8 e 12 —
+`admin_tecnico` segue negado em todo o domínio; RH e DP seguem limitados à
+própria empresa), e não move nenhum dos gates da §2.
+
+### Atualização da rastreabilidade
+
+| Item                                          | Decisão    | Seção da spec    |
+| --------------------------------------------- | ---------- | ---------------- |
+| 14. `btree_gist` como pré-condição gerenciada | Decisão 14 | §14.1, §14.7     |
+| 15. Admissão atômica                          | Decisão 15 | §4.1, §10, §14.2 |
