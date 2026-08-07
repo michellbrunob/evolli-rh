@@ -5,19 +5,22 @@ registrada em
 [docs/decisions/etapa1-fatia2-colaboradores-baseline-v1.md](../decisions/etapa1-fatia2-colaboradores-baseline-v1.md)
 e formalizada em
 [ADR 0007](../adr/0007-colaboradores-e-vida-funcional-baseline-v1.md)
-(status: aceito). Nenhuma implementação existe. Este documento continua
-**somente especificação**: não cria código, `schema.prisma`, migration,
-endpoint, DTO, teste, dependência, infraestrutura, interface, PR ou merge.
+(status: aceito). **Implementada e verificada (V1, 2026-08-07)** — schema,
+migration, módulo NestJS, endpoints, autorização, auditoria e testes
+entregues, com dados exclusivamente sintéticos. Evidências objetivas e
+limitações declaradas em **§14**.
 
-Fase do rito SDD: **Especificar → Aprovar concluído (Baseline V1) →
-Registrar** (este documento). **Implementar** é a próxima fase possível
-para o escopo reduzido da Baseline V1, com dados exclusivamente
-sintéticos — ver §12 para a lista fechada do que ainda bloqueia mesmo
-nesse escopo, e para os **gates que continuam valendo antes de qualquer
-piloto com dado real ou produção** (retenção/descarte, MFA, confirmação
-formal de DPO). Extensões além da Baseline V1 (dado restrito, gestor,
-aprovação formal, novo papel) permanecem em **Especificar**, cada uma
-dependente de decisão própria.
+Fase do rito SDD: **Implementar → Verificar**. Especificar, Aprovar
+(Baseline V1) e Registrar concluídos. Registrar a implementação acontece
+no merge da PR.
+
+**Os gates para dado real continuam valendo, sem exceção** —
+retenção/descarte (DP-15), confirmação formal de DPO sobre os quatro
+dados aprovados, e MFA (ADR 0003, decisão 3). Nenhum foi satisfeito por
+esta entrega, e nada aqui os enfraquece: a implementação é homologada
+**só para dados sintéticos**. Extensões além da Baseline V1 (dado
+restrito, gestor, aprovação formal, novo papel) permanecem em
+**Especificar**, cada uma dependente de decisão própria.
 
 Depende de (tudo já integrado em `main`, commit
 `45ce79bfac9d86f100e0958447c83547350748cd`):
@@ -1968,3 +1971,258 @@ Resumo — detalhe completo no arquivo da ADR:
 Esta seção permanece como índice de navegação — o conteúdo normativo vive
 no arquivo da ADR, não duplicado aqui, para que futuras alterações da ADR
 não exijam sincronizar duas cópias do mesmo texto.
+
+## 14. Evidências de implementação (V1, 2026-08-07)
+
+Esta seção registra **o que foi entregue e verificado** e — com o mesmo
+peso — **o que não foi**. Nada aqui amplia o escopo aprovado na Baseline V1.
+
+### 14.1 Schema e migration
+
+- `apps/api/prisma/schema.prisma`: seis enums novos
+  (`SituacaoColaborador`, `TipoVinculo`, `SituacaoVinculo`,
+  `TipoMovimentacao`, `StatusMovimentacao`, `MotivoMovimentacao`) e quatro
+  models — `Colaborador`, `VinculoFuncional`, `AlocacaoOrganizacional`,
+  `MovimentacaoFuncional`.
+- `apps/api/prisma/migrations/20260807120000_colaboradores_vida_funcional/`
+  — migration **aditiva**, gerada por `prisma migrate diff` (nunca
+  `migrate dev`, conforme processo do repositório) e validada com
+  `prisma migrate deploy` contra PostgreSQL real **a partir de banco
+  vazio**. `prisma migrate diff` do banco contra o schema devolve vazio
+  (drift zero).
+- Nenhuma coluna de tabela já mergeada foi alterada ou removida. As únicas
+  mudanças sobre tabelas existentes são **índices únicos novos** em
+  `area(id, departamento_id)`, `cargo(id, empresa_id)`,
+  `centro_custo(id, empresa_id)` e `equipe(id, empresa_id)`, criados
+  exclusivamente para servir de alvo às FKs compostas desta fatia.
+- Nenhum `tenant_id`, RLS multitenant, backfill ou migration retroativa.
+
+**Integridade garantida pelo banco, não apenas pela aplicação:**
+
+| Regra                                                       | Garantia física                                                                                                                                        |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Matrícula única na empresa (item 2)                         | `vinculo_funcional_empresa_id_matricula_key`                                                                                                           |
+| Máx. 1 vínculo `ativo` por (colaborador, empresa) — RI-V6   | Índice único **parcial** `vinculo_funcional_ativo_unico ... WHERE situacao = 'ativo'`                                                                  |
+| Alocação e movimentação na mesma empresa do vínculo — RI-A1 | FKs **compostas** com `empresa_id` em todas as referências; para `area`, `(area_id, departamento_id)`, fechando a cadeia area → departamento → empresa |
+| Máx. 1 alocação **aberta** por vínculo — RI-A2 (parcial)    | Índice único parcial `alocacao_organizacional_vigente_unica ... WHERE vigente_ate IS NULL`                                                             |
+| Intervalo coerente                                          | CHECK `vigente_ate > vigente_de`                                                                                                                       |
+| `area_id` exige `departamento_id`                           | CHECK — sem ele, a FK composta não seria verificada (MATCH SIMPLE ignora tupla com NULL)                                                               |
+| Alocação com ao menos uma referência (item 10)              | CHECK `referencia_minima`                                                                                                                              |
+| Desligamento ≥ admissão — RI-V4                             | CHECK `vinculo_funcional_datas_coerentes`                                                                                                              |
+| Movimentação não retifica a si mesma                        | CHECK `movimentacao_funcional_retifica_outra`                                                                                                          |
+| Coerência status × efetivação — RI-M1                       | CHECK `movimentacao_funcional_efetivacao_coerente`                                                                                                     |
+| Uma retificação por movimentação                            | `movimentacao_funcional_retifica_id_key`                                                                                                               |
+| Sem exclusão física — RI-H1                                 | `ON DELETE RESTRICT` em toda FK + ausência de rota `DELETE`                                                                                            |
+
+Privilégios: nenhum `GRANT` explícito foi necessário — as tabelas nascem
+com DML para `evolli_app` via `ALTER DEFAULT PRIVILEGES`. `audit_event`
+continua append-only, verificado por teste.
+
+### 14.2 Módulo e endpoints
+
+`apps/api/src/pessoas/` — três controllers e três services, mais
+`pessoas-auditoria.service.ts`, `escopo-pessoas.util.ts`,
+`validacao-pessoas.util.ts`, `pessoas-comum.util.ts` e
+`dto/pessoas.dto.ts`.
+
+Rotas em português, plurais, sob `/v1`, documentadas no OpenAPI (tag
+`pessoas`):
+
+| Método | Rota                                               | Ação                                           |
+| ------ | -------------------------------------------------- | ---------------------------------------------- |
+| GET    | `/v1/colaboradores`                                | listar (paginado)                              |
+| GET    | `/v1/colaboradores/:colaboradorId`                 | detalhar cadastro básico                       |
+| POST   | `/v1/colaboradores`                                | admitir (colaborador + vínculo + movimentação) |
+| PATCH  | `/v1/colaboradores/:colaboradorId`                 | retificar nome                                 |
+| GET    | `/v1/colaboradores/:colaboradorId/vinculos`        | vínculos na empresa                            |
+| POST   | `/v1/vinculos`                                     | novo vínculo (readmissão)                      |
+| GET    | `/v1/vinculos/:vinculoId/alocacoes`                | histórico completo                             |
+| GET    | `/v1/vinculos/:vinculoId/situacao?dataReferencia=` | **situação em uma data**                       |
+| GET    | `/v1/vinculos/:vinculoId/linha-do-tempo`           | movimentações ordenadas                        |
+| GET    | `/v1/movimentacoes`                                | listar (paginado)                              |
+| POST   | `/v1/movimentacoes`                                | registrar                                      |
+| POST   | `/v1/movimentacoes/:movimentacaoId/cancelar`       | cancelar                                       |
+| POST   | `/v1/movimentacoes/:movimentacaoId/efetivar`       | efetivar                                       |
+| POST   | `/v1/movimentacoes/:movimentacaoId/retificar`      | retificar                                      |
+
+**Nenhuma rota `DELETE`.** Nenhuma rota `/aprovar` ou `/rejeitar` (sem
+workflow, item 7). Nenhuma rota de dado restrito (item 5). Parâmetros de
+rota nunca se chamam `id`, e o identificador é sempre o `id` **técnico** —
+nunca matrícula (RI-C1).
+
+**Semântica de vigência:** `vigente_ate` é **exclusivo** — o intervalo
+válido é `[vigente_de, vigente_ate)`. A sucessão fecha a alocação anterior
+exatamente onde a nova começa: sem lacuna, sem sobreposição, e a consulta
+por data vira comparação simples em vez de reconstrução de log.
+
+### 14.3 Autorização
+
+- Avaliador RBAC/ABAC **estendido, nunca alterado**: os recursos
+  anteriores mantêm as regras e os de pessoas entram por ramo novo
+  (`evaluatePessoas`). `rbac.evaluator.spec.ts` e
+  `rbac.evaluator.organizacao.spec.ts` passam **sem edição**.
+- **`admin_tecnico` é negado em todo o domínio** (Baseline V1, item 8),
+  em toda ação e nas duas fases — provado teste a teste. A assimetria com
+  o ramo organizacional (onde ele retorna `true`) é deliberada e
+  comentada no código, para que nenhuma revisão futura a "corrija".
+- `escopo-pessoas.util.ts` **não tem variante global**: o tipo
+  `EscopoPessoas` é `{ empresaId: string }`, e não uma união com
+  `{ global: true }`. "Esqueci de tratar o caso global" é impossível
+  porque o caso não existe no domínio de tipos.
+- Escopo **nunca** vem do cliente: `empresaId` em query é filtro, e ator
+  que peça outra empresa recebe **página vazia**, não erro.
+- Fora do escopo responde **404**, nunca 403 — aqui mais crítico que na
+  Fatia 1, porque 403 confirmaria a existência de uma _pessoa_.
+
+### 14.4 Auditoria
+
+- Escrita exclusivamente via `AuditService` (ADR 0004 §2).
+- **12 verbos novos** no enum fechado, por migration aditiva, com valor
+  persistido em português separado por ponto (`pessoas.colaborador.criado`)
+  via `@map`. Terceira família de nomenclatura convivendo, por decisão
+  explícita (RI-F2-4).
+- **Mutação e evento na mesma transação**, sem exceção — comprovado por
+  rollback real: com `INSERT` revogado em `audit_event`, a admissão
+  inteira reverte (nem colaborador, nem vínculo, nem movimentação
+  persistem).
+- **Nenhum dado pessoal na trilha**: verificado por asserção sobre os
+  eventos lidos direto do banco — nenhum contém nome, matrícula ou valor
+  de campo. `resource_id` é sempre UUID técnico (ou `null`, em negação sem
+  alvo resolvido).
+- Tentativa fora de escopo gera `denied` mesmo respondendo 404.
+- `audit_event` **não recebeu campo novo**: sem `colaborador_id`,
+  `vinculo_id`, `departamento_id` ou `area_id`.
+
+### 14.5 Integração com o Núcleo Organizacional (RI-O1)
+
+`inativar` dos **sete** nós passou a recusar quando há dependente
+funcional ativo — alocação vigente de vínculo ativo (ou, para `Empresa`,
+vínculo ativo). Bloqueia, **nunca cascateia**.
+
+- Mesmo `409` já usado, **sem revelar o dependente**: teste assere que o
+  corpo da recusa não contém nome, matrícula nem as palavras
+  "colaborador"/"vinculo"/"alocacao", e que as chaves da resposta são
+  exatamente as do erro público padrão. Quem inativa estrutura não
+  necessariamente pode ler pessoas.
+- Histórico encerrado **não** bloqueia (R-INA-4), provado por teste.
+- Regressão: bloqueio por filho organizacional ativo continua idêntico;
+  `organizacao.e2e-spec.ts` passa **sem edição**.
+
+### 14.6 Verificação executada
+
+| Comando                                                    | Resultado                   |
+| ---------------------------------------------------------- | --------------------------- |
+| `pnpm install --frozen-lockfile`                           | ✓ sem alteração de lockfile |
+| `pnpm typecheck`                                           | ✓                           |
+| `pnpm build`                                               | ✓                           |
+| `pnpm lint`                                                | ✓                           |
+| `pnpm test`                                                | ✓ **156/156** (15 suites)   |
+| `pnpm --filter @evolli/api test:e2e`                       | ✓ **164/164** (7 suites)    |
+| `prisma migrate deploy` em PostgreSQL real, de banco vazio | ✓                           |
+| `prisma migrate diff` (drift)                              | ✓ vazio                     |
+| `git diff --check`                                         | ✓                           |
+| Varredura de segredos e de campo proibido                  | ✓                           |
+
+Cobertura e2e desta fatia (`test/pessoas.e2e-spec.ts`): ciclo completo
+admissão → transferência → desligamento → readmissão; consulta por data de
+referência nas bordas (antes da admissão, na virada, depois do
+desligamento); matrícula duplicada (409) e a mesma matrícula aceita em
+outra empresa; **RI-V6 provada com `INSERT` cru recusado pelo banco**;
+**RI-A1 e RI-A2 provadas com `INSERT` cru recusado**; alocação em nó de
+outra empresa e em nó inativo (422); cargo de outra empresa recusado mesmo
+com departamento correto; motivo fora do catálogo e tipo de vínculo
+inválido (400); retificação preservando a original; recusa de dupla
+retificação, dupla efetivação e efetivação antecipada de programada;
+cancelamento permanecendo no histórico; **`admin_tecnico` negado em toda
+rota**; gestor/financeiro/colaborador/auditor negados; `dp` operando na
+própria empresa; CSRF e sessão exigidos; IDOR/BOLA em detalhe, listagem,
+retificação, movimentação, efetivação, cancelamento e retificação → 404;
+RI-O1 sem vazamento; atomicidade real; ausência de rota `DELETE`;
+**ausência comprovada de coluna proibida no schema e de campo extra na
+resposta**; concorrência (duas efetivações e duas transferências
+simultâneas nunca deixam duas alocações abertas); privilégios de banco
+íntegros.
+
+**Dados exclusivamente sintéticos**, sem exceção: nomes fictícios,
+domínio reservado `example.test` para conta técnica, matrículas
+arbitrárias. Nenhum dado real de pessoa em nenhum ponto.
+
+### 14.7 Limitações declaradas desta V1
+
+Entregue **menos** do que a spec descreve em alguns pontos, por decisão de
+escopo ou por restrição objetiva. Registrado para não ser confundido com
+esquecimento:
+
+1. **RI-A2 é garantida no banco apenas parcialmente.** A não-sobreposição
+   completa de intervalos exigiria `EXCLUSION CONSTRAINT` com `daterange`
+   - `btree_gist`. A extensão **não pode ser criada por
+     `evolli_migrator`**, que por desenho (ADR 0002, menor privilégio) não
+     tem `CREATE` na base — verificado: `permission denied to create
+extension "btree_gist"`. Instalar a extensão é decisão de
+     **infraestrutura** (exige superusuário/owner da base) e **não foi
+     tomada por conta própria**. Controles compensatórios efetivamente
+     aplicados: no máximo uma alocação **aberta** por vínculo (índice único
+     parcial — é a abertura que a concorrência ameaça); unicidade de
+     `(vinculo_id, vigente_de)`; CHECK de intervalo; sucessão serializada
+     por `SELECT ... FOR UPDATE` na linha do vínculo; e teste de
+     concorrência real. **Pendência de infraestrutura registrada**, não
+     resolvida.
+
+2. **`ferias`, `afastamento`, `retorno` e `alteracao_jornada` não
+   existem** — nem como valor de enum. Férias e afastamento estão na lista
+   de dados proibidos desta entrega, e jornada depende do módulo de Ponto
+   (Etapa 3). Consequência: `SituacaoVinculo` não tem `suspenso`.
+   Reintroduzir é migration aditiva quando a capacidade for aprovada —
+   valor de enum morto seria mais caro de remover depois do que de
+   acrescentar na hora certa.
+
+3. **`aprovada`/`rejeitada` não existem no enum de status**, pelo mesmo
+   motivo (sem workflow, item 7). A spec §8 os preserva como referência
+   textual para a fatia futura; o banco não os materializa.
+
+4. **`POST /v1/colaboradores` cria colaborador _e_ primeiro vínculo**, não
+   só o cadastro. Refinamento de implementação sobre o contrato da spec
+   §10, por necessidade de autorização: `Colaborador` não tem
+   `empresa_id` (item 2), então um cadastro sem vínculo ficaria fora de
+   todo escopo — invisível inclusive para quem o criou. Registrado como
+   desvio consciente do contrato descrito, não como ampliação de escopo.
+
+5. **Reaproveitar colaborador entre empresas é impossível.** Sem
+   identificador pessoal (item 1), o sistema não tem como reconhecer que
+   duas pessoas são a mesma. `POST /v1/vinculos` exige colaborador já
+   visível no escopo do ator (readmissão na mesma empresa). Consequência
+   direta e aceita do conjunto de dados aprovado.
+
+6. **Sem `GET /v1/movimentacoes/:id`** — a spec §10 não o previa, e não
+   foi acrescentado para não criar rota fora dos contratos aprovados. A
+   movimentação individual é lida pela linha do tempo do vínculo.
+
+7. **Catálogo de motivos com rótulos organizacionais neutros**
+   (`admissao_inicial`, `reestruturacao_organizacional`,
+   `realocacao_interna`, `promocao`, `correcao_cadastral`,
+   `encerramento_de_vinculo`, `outro_controlado`). **Deliberadamente sem
+   classificação jurídica** — não há "justa causa", "pedido de demissão"
+   ou equivalente, porque isso seria enquadramento trabalhista, que esta
+   fatia não decide nem registra. A validação de **quais** motivos valem
+   para **qual** tipo de movimentação **não** foi implementada: seria
+   inventar regra de RH. Pendência não bloqueante.
+
+8. **Obrigatoriedade fina por campo da alocação não foi decidida.** Exige-
+   se ao menos uma referência organizacional (CHECK); se `departamento` ou
+   `cargo` são individualmente obrigatórios continua pendente de RH
+   (DP-28, resolvido apenas no nível "a alocação precisa existir").
+
+9. **Efetivação é sempre ato explícito.** Não há job que efetive
+   movimentação programada ao chegar a data — a spec §4.9 previa a
+   automação como decisão de implementação a registrar, e ela **não foi
+   implementada**. Movimentação programada aguarda `POST /efetivar`.
+
+10. **Nada de LGPD é declarado concluído.** Retenção/descarte (DP-15) e a
+    confirmação formal de DPO sobre os quatro dados aprovados continuam
+    **pendentes** e seguem sendo **gate obrigatório antes de qualquer
+    piloto com dado real ou produção**.
+
+11. **MFA continua obrigatório antes de piloto com dados reais ou
+    produção** (ADR 0003, decisão 3) — esta fatia não altera nem satisfaz
+    essa condição, e a agrava por ser a primeira com dado pessoal de
+    titular modelado.

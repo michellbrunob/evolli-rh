@@ -1,6 +1,6 @@
 # ADR 0007 — Colaboradores e vida funcional: Baseline V1
 
-- Status: **aceito**
+- Status: **aceito** (com Emenda 1 — registro da implementacao V1, 2026-08-07)
 - Data: 2026-08-07
 - Relacionado: [docs/modules/etapa1-fatia2-colaboradores-vida-funcional.md](../modules/etapa1-fatia2-colaboradores-vida-funcional.md),
   [docs/decisions/etapa1-fatia2-colaboradores-baseline-v1.md](../decisions/etapa1-fatia2-colaboradores-baseline-v1.md)
@@ -329,3 +329,118 @@ Esta decisão deve ser reaberta — com ADR nova ou emenda formal — quando
   partir de um colaborador; que introduza relação gestor/subordinado; que
   permita exclusão física; que declare conformidade LGPD ou retenção
   resolvida sem confirmação de DPO/jurídico.
+
+---
+
+## Emenda 1 (2026-08-07) — registro da implementação V1
+
+**Aditivo.** Nenhuma das onze decisões estruturais acima, nem qualquer das
+treze decisões de produto da Baseline V1, é alterada, reinterpretada ou
+revogada. Esta seção registra **como** a decisão foi implementada e, com o
+mesmo peso, **o que ficou de fora**.
+
+Evidência detalhada (arquivos, constraints, endpoints, contagem de testes)
+em
+[docs/modules/etapa1-fatia2-colaboradores-vida-funcional.md §14](../modules/etapa1-fatia2-colaboradores-vida-funcional.md).
+
+### O que a implementação confirma
+
+- As quatro entidades existem com a nomenclatura aprovada. Migration
+  **aditiva**: nenhuma coluna de tabela já mergeada foi alterada; as únicas
+  mudanças sobre tabelas existentes são índices únicos novos, criados para
+  servir de alvo às FKs compostas.
+- **Decisão 2 sustentada no código:** `matricula` vive em
+  `vinculo_funcional`, única por empresa. Nenhum documento pessoal existe
+  no schema — há teste que falha se qualquer coluna proibida aparecer.
+- **Decisão 5 sustentada por ausência:** nenhuma tabela, coluna ou rota de
+  dado restrito foi criada; teste verifica que `aprovacao_movimentacao`,
+  `anexo_movimentacao` e `dado_restrito_colaborador` não existem.
+- **Decisão 6 sustentada:** histórico por sucessão, com `vigente_ate`
+  exclusivo; a consulta por data de referência é leitura direta, provada
+  nas bordas (antes da admissão, na virada entre alocações, depois do
+  desligamento).
+- **Decisão 9 sustentada:** nenhuma rota `DELETE` responde, e toda FK usa
+  `ON DELETE RESTRICT`.
+- **Decisão 10 sustentada, e é a mais visível no código:**
+  `admin_tecnico` é negado em todo o domínio, em toda ação e nas duas
+  fases da avaliação — provado teste a teste, incluindo a prova de que seu
+  acesso à estrutura organizacional da Fatia 1 **não** regrediu.
+- **Decisão 11 sustentada:** nenhuma checagem de autorização passou a
+  depender de departamento, área ou equipe.
+
+### Decisões de implementação tomadas dentro do que já estava aprovado
+
+Registradas por serem escolhas visíveis, ainda que não ampliem escopo:
+
+1. **`vigente_ate` é exclusivo** — intervalo `[vigente_de, vigente_ate)`.
+   Fecha a alocação anterior exatamente onde a nova começa: sem lacuna,
+   sem sobreposição, e a consulta por data vira comparação simples.
+2. **Toda referência organizacional usa FK composta com `empresa_id`**
+   (e, para `area`, com `departamento_id`), de modo que o **banco** —
+   não só a aplicação — recuse referência cruzando empresa.
+3. **`EscopoPessoas` não tem variante global.** O tipo é
+   `{ empresaId: string }`, não uma união com `{ global: true }`: o caso
+   "escopo global" não existe no domínio de tipos, então não há como
+   esquecer de tratá-lo.
+4. **Efetivação serializada por `SELECT ... FOR UPDATE`** na linha do
+   vínculo, para que a recusa de efetivação concorrente seja conflito
+   previsível, não corrida.
+5. **Catálogo de motivos com rótulos organizacionais neutros**, sem
+   nenhuma classificação jurídica — coerente com a decisão 10 da ADR
+   (nenhuma decisão trabalhista automatizada).
+
+### Restrição de infraestrutura encontrada, não contornada
+
+**A não-sobreposição completa de intervalos de alocação não é garantida
+pelo banco.** Exigiria `EXCLUSION CONSTRAINT` com `daterange` +
+`btree_gist`, e a extensão **não pode ser criada por `evolli_migrator`**,
+que por desenho da ADR 0002 (menor privilégio) não tem `CREATE` na base —
+verificado objetivamente: `permission denied to create extension
+"btree_gist"`.
+
+Instalar a extensão exige superusuário/owner da base e é **decisão de
+infraestrutura**. Ela **não foi tomada por conta própria**, e o modelo de
+privilégios da ADR 0002 **não foi enfraquecido** para acomodá-la.
+
+Controles compensatórios efetivamente aplicados, e provados por teste: no
+máximo uma alocação **aberta** por vínculo (índice único parcial — é a
+abertura que a concorrência ameaça); unicidade de
+`(vinculo_id, vigente_de)`; CHECK de intervalo coerente; serialização por
+lock de linha; e teste de concorrência real com efetivações simultâneas.
+
+**Pendência de infraestrutura registrada**, a decidir por TI/Segurança:
+autorizar (ou não) a instalação de `btree_gist` por operador com
+privilégio adequado, como pré-condição de fortalecer RI-A2.
+
+### Escopo reduzido dentro da Baseline V1
+
+Três capacidades descritas na spec **não** foram implementadas, por
+dependerem de decisão que a Baseline V1 não tomou:
+
+| Ausente                                                 | Motivo                                                                                                                                                              |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ferias`, `afastamento`, `retorno`, `alteracao_jornada` | Férias e afastamento estão na lista de dados proibidos da entrega; jornada depende do módulo de Ponto (Etapa 3). Consequência: `SituacaoVinculo` não tem `suspenso` |
+| `aprovada`/`rejeitada` como estado real                 | Sem workflow de aprovação (Baseline V1, item 7) — os valores não entram no enum de banco                                                                            |
+| Efetivação automática de movimentação programada        | A spec §4.9 previa a automação como decisão de implementação a registrar; não foi implementada. Efetivar é sempre ato explícito, com executor identificado          |
+
+Também não implementados, por não constarem dos contratos aprovados:
+`GET /v1/movimentacoes/:id` e a validação de quais motivos valem para qual
+tipo de movimentação (seria inventar regra de RH).
+
+### O que esta emenda não faz
+
+- Não altera nenhuma das onze decisões estruturais nem as treze decisões
+  de produto.
+- Não introduz dado pessoal além dos quatro aprovados, dado restrito,
+  gestor/subordinado, CNPJ, folha, ponto, documentos, benefícios,
+  multitenancy ou `tenant_id`.
+- Não cria o papel `diretoria`.
+- Não materializa o vínculo `AccessUser` ↔ `Colaborador` (DP-23).
+- **Não declara conformidade LGPD concluída.** Retenção/descarte (DP-15) e
+  a confirmação formal de DPO sobre os quatro dados aprovados continuam
+  pendentes e seguem sendo **gate obrigatório antes de qualquer piloto com
+  dado real ou produção**.
+- **Não satisfaz nem enfraquece a exigência de MFA** (ADR 0003, decisão 3)
+  — a implementação é homologada **só para dados sintéticos**.
+- Não altera os gatilhos de reavaliação registrados acima, nem o prazo de
+  2026-11-04 da Emenda 1 da ADR 0005.
