@@ -107,16 +107,39 @@ jobs:
             -p 5432:5432 \
             postgres:16-alpine >/dev/null
 
-          for _ in $(seq 1 60); do
-            if docker exec -e PGPASSWORD="${PG_ADMIN_PW}" evolli-ci-pg \
-                 pg_isready -U evolli_ci_admin -d evolli_ci >/dev/null 2>&1; then
-              echo "PostgreSQL pronto."
-              exit 0
+          # O entrypoint da imagem `postgres` sobe um servidor TEMPORARIO,
+          # ouvindo SO no socket Unix, para executar a inicializacao
+          # (createuser/createdb) — e depois o DERRUBA antes de subir o
+          # definitivo. Esperar apenas por `pg_isready` no socket aceita esse
+          # servidor transitorio, e o passo seguinte esbarra em
+          # "FATAL: the database system is shutting down".
+          #
+          # A espera correta combina duas condicoes:
+          #   (a) a mensagem de "ready" aparecer DUAS vezes no log — servidor
+          #       de inicializacao e servidor definitivo. Mesma convencao que
+          #       as suites e2e ja usam com Testcontainers;
+          #   (b) uma query real responder sobre TCP, que o servidor de
+          #       inicializacao deliberadamente nao expoe.
+          pronto=0
+          for _ in $(seq 1 90); do
+            vezes="$(docker logs evolli-ci-pg 2>&1 \
+              | grep -c 'database system is ready to accept connections' || true)"
+            if [ "${vezes}" -ge 2 ] \
+              && docker exec -e PGPASSWORD="${PG_ADMIN_PW}" evolli-ci-pg \
+                   psql -h 127.0.0.1 -U evolli_ci_admin -d evolli_ci \
+                     -tAc 'SELECT 1' >/dev/null 2>&1; then
+              pronto=1
+              break
             fi
             sleep 2
           done
-          echo "PostgreSQL nao ficou pronto dentro do limite." >&2
-          exit 1
+
+          if [ "${pronto}" -ne 1 ]; then
+            echo "PostgreSQL nao ficou pronto dentro do limite." >&2
+            docker logs evolli-ci-pg 2>&1 | tail -20 >&2
+            exit 1
+          fi
+          echo "PostgreSQL pronto."
 
       # Os três scripts rodam com a conta ADMINISTRATIVA do container, que é a
       # única com privilégio para criar papel e extensão — exatamente a
@@ -131,17 +154,17 @@ jobs:
           done
 
           docker exec -e PGPASSWORD="${PG_ADMIN_PW}" evolli-ci-pg \
-            psql -U evolli_ci_admin -d evolli_ci -q -v ON_ERROR_STOP=1 \
+            psql -h 127.0.0.1 -U evolli_ci_admin -d evolli_ci -q -v ON_ERROR_STOP=1 \
               -v migrator_password="${PG_MIGRATOR_PW}" \
               -v app_password="${PG_APP_PW}" \
               -f /tmp/01_create_roles.sql
 
           docker exec -e PGPASSWORD="${PG_ADMIN_PW}" evolli-ci-pg \
-            psql -U evolli_ci_admin -d evolli_ci -q -v ON_ERROR_STOP=1 \
+            psql -h 127.0.0.1 -U evolli_ci_admin -d evolli_ci -q -v ON_ERROR_STOP=1 \
               -f /tmp/02_schema_and_grants.sql
 
           docker exec -e PGPASSWORD="${PG_ADMIN_PW}" evolli-ci-pg \
-            psql -U evolli_ci_admin -d evolli_ci -q -v ON_ERROR_STOP=1 \
+            psql -h 127.0.0.1 -U evolli_ci_admin -d evolli_ci -q -v ON_ERROR_STOP=1 \
               -f /tmp/04_extensions.sql
 
       # DATABASE_URL aponta para um destino INALCANCAVEL e SEM credencial.
@@ -191,11 +214,11 @@ jobs:
           set -euo pipefail
 
           docker exec -e PGPASSWORD="${PG_ADMIN_PW}" evolli-ci-pg \
-            createdb -U evolli_ci_admin evolli_ci_sem_ext
+            createdb -h 127.0.0.1 -U evolli_ci_admin evolli_ci_sem_ext
           docker cp infra/postgres/02_schema_and_grants.sql \
             evolli-ci-pg:/tmp/02_sem_ext.sql
           docker exec -e PGPASSWORD="${PG_ADMIN_PW}" evolli-ci-pg \
-            psql -U evolli_ci_admin -d evolli_ci_sem_ext -q -v ON_ERROR_STOP=1 \
+            psql -h 127.0.0.1 -U evolli_ci_admin -d evolli_ci_sem_ext -q -v ON_ERROR_STOP=1 \
               -f /tmp/02_sem_ext.sql
 
           set +e
