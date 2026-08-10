@@ -36,6 +36,18 @@ export const PESSOAS_RESOURCES = [
 export type PessoasResource = (typeof PESSOAS_RESOURCES)[number];
 
 /**
+ * Recursos de Jornada e Ponto (Etapa 3, ADR 0008, Baseline Jornada V1).
+ *
+ * Só dois. Não existe `periodo_apuracao` nem `fechamento_ponto`: competência é
+ * um campo do evento, não uma entidade (decisão 6), e fechamento está fora
+ * desta V1 (decisão 7) — criar o recurso de autorização sem a capacidade
+ * correspondente sugeriria uma superfície que o sistema não tem.
+ */
+export const PONTO_RESOURCES = ["evento_ponto", "ajuste_ponto"] as const;
+
+export type PontoResource = (typeof PONTO_RESOURCES)[number];
+
+/**
  * Recursos/ações desta fatia (matriz §3 da spec). Módulos futuros (Etapa 1+)
  * estendem este union — nunca reduzem o que já está aqui.
  */
@@ -45,7 +57,8 @@ export type AuthorizationResource =
   | "access_log"
   | "user_role"
   | OrganizationalResource
-  | PessoasResource;
+  | PessoasResource
+  | PontoResource;
 
 export type AuthorizationAction = "read" | "manage" | "alter" | "create";
 
@@ -80,4 +93,10 @@ export function isPessoasResource(
   resource: AuthorizationResource,
 ): resource is PessoasResource {
   return (PESSOAS_RESOURCES as readonly string[]).includes(resource);
+}
+
+export function isPontoResource(
+  resource: AuthorizationResource,
+): resource is PontoResource {
+  return (PONTO_RESOURCES as readonly string[]).includes(resource);
 }

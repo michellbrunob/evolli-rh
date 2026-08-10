@@ -72,6 +72,20 @@ export const AUDIT_ACTIONS = [
   "pessoas_movimentacao_retificada",
   "pessoas_alocacao_criada",
   "pessoas_alocacao_encerrada",
+
+  // Etapa 3 — Jornada e Ponto Rastreável (ADR 0008). Mesma convenção.
+  //
+  // Verbos deliberadamente ausentes: `ponto.evento.alterado`/`.excluido` (o
+  // evento é imutável — não há caminho de alteração a auditar) e
+  // `ponto.periodo.fechado`/`.aprovado` (fechamento e aprovação estão fora
+  // desta V1).
+  //
+  // `ponto_consultado` existe aqui, ao contrário de `pessoas.*`: ver dado de
+  // jornada/presença é ação sensível por si (spec Etapa 3 §5.5), mesmo
+  // critério de `audit_log_read` (ADR 0004, decisão 6).
+  "ponto_evento_registrado",
+  "ponto_ajuste_registrado",
+  "ponto_consultado",
 ] as const satisfies readonly AuditAction[];
 
 /**
@@ -106,7 +120,11 @@ export type AuditResource =
   | "colaborador"
   | "vinculo_funcional"
   | "movimentacao_funcional"
-  | "alocacao_organizacional";
+  | "alocacao_organizacional"
+  // Etapa 3 — Jornada e Ponto. Não há `periodo_apuracao`: competência é campo
+  // do evento, não entidade (Baseline Jornada V1, decisão 6).
+  | "evento_ponto"
+  | "ajuste_ponto";
 
 export type RecordAuditEventInput =
   | {

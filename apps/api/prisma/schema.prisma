@@ -70,6 +70,12 @@ model AccessUser {
   movimentacoesSolicitadas MovimentacaoFuncional[] @relation("MovimentacaoSolicitante")
   movimentacoesExecutadas  MovimentacaoFuncional[] @relation("MovimentacaoExecutor")
 
+  // Etapa 3 — quem registrou a marcacao/ajuste de ponto. Mesma natureza das
+  // relacoes acima: identifica o ATOR da operacao, nunca a pessoa cujo ponto
+  // foi registrado (essa e alcancada so via VinculoFuncional).
+  pontosRegistrados       EventoPonto[] @relation("PontoRegistradoPor")
+  ajustesPontoRegistrados AjustePonto[] @relation("AjustePontoRegistradoPor")
+
   @@index([companyId])
   @@map("access_user")
 }
@@ -226,6 +232,26 @@ enum AuditAction {
 
   pessoas_alocacao_criada    @map("pessoas.alocacao.criada")
   pessoas_alocacao_encerrada @map("pessoas.alocacao.encerrada")
+
+  // Etapa 3 — Jornada e Ponto Rastreavel (ADR 0008, Baseline Jornada V1).
+  // Mesma convencao: valor persistido em portugues separado por ponto,
+  // identificador Prisma com `_`.
+  //
+  // Verbos deliberadamente AUSENTES, por a capacidade nao existir nesta V1:
+  //   - ponto.evento.alterado / .excluido -> o evento e IMUTAVEL; nao ha
+  //     caminho de alteracao a auditar (Baseline Jornada V1, decisao 4). A
+  //     correcao aparece como `ponto.ajuste.registrado`, nunca como alteracao.
+  //   - ponto.periodo.fechado / .aprovado -> fechamento e aprovacao estao fora
+  //     desta V1 (decisao 7).
+  //
+  // `ponto.consultado` EXISTE aqui, diferente de `pessoas.*` (onde leitura no
+  // proprio escopo nao gera evento): a spec da Etapa 3, §5.5, argumenta que
+  // ver dado de jornada/presenca de terceiro e, em si, acao sensivel — mesmo
+  // criterio que ja faz `audit_log_read` auditar toda leitura da trilha
+  // (ADR 0004, decisao 6). Consequencia de volume registrada na spec.
+  ponto_evento_registrado @map("ponto.evento.registrado")
+  ponto_ajuste_registrado @map("ponto.ajuste.registrado")
+  ponto_consultado        @map("ponto.consultado")
 }
 
 enum AuditResult {
@@ -326,6 +352,12 @@ model Empresa {
   vinculos      VinculoFuncional[]
   alocacoes     AlocacaoOrganizacional[]
   movimentacoes MovimentacaoFuncional[]
+
+  // Etapa 3 — Jornada e Ponto. `empresa_id` redundante com o do vinculo por
+  // desenho: e o que permite a FK COMPOSTA garantir, no banco, que evento e
+  // ajuste nunca cruzam empresa (mesmo padrao de alocacao/movimentacao).
+  eventosPonto EventoPonto[]
+  ajustesPonto AjustePonto[]
 
   @@index([status])
   @@map("empresa")
@@ -648,6 +680,7 @@ model VinculoFuncional {
 
   alocacoes     AlocacaoOrganizacional[]
   movimentacoes MovimentacaoFuncional[]
+  eventosPonto  EventoPonto[]
 
   @@unique([empresaId, matricula])
   /// Alvo das FKs compostas de alocacao e movimentacao: o banco garante que
@@ -802,4 +835,139 @@ model MovimentacaoFuncional {
   @@index([solicitanteUserId])
   @@index([executorUserId])
   @@map("movimentacao_funcional")
+}
+
+// ---------------------------------------------------------------------------
+// Etapa 3 — Jornada e Ponto Rastreavel V1 (ADR 0008, Baseline Jornada V1).
+// ---------------------------------------------------------------------------
+// ESCOPO FECHADO. O que NAO existe aqui, por decisao registrada, e tao
+// importante quanto o que existe:
+//
+//   - sem escala/jornada complexa (decisao 1) — nenhuma tabela de turno,
+//     revezamento ou padrao de horario esperado;
+//   - sem origem automatizada (decisao 3) — nenhuma coluna de dispositivo,
+//     IP, foto, biometria, geolocalizacao ou proveniencia de arquivo. O unico
+//     registro possivel e manual, feito por RH/DP dentro do sistema;
+//   - sem periodo_apuracao / fechamento (decisoes 6 e 7) — competencia e um
+//     campo do proprio evento, nao uma entidade com estado. Nao ha nada que
+//     "feche";
+//   - sem workflow de aprovacao (decisao 7) — nenhum campo de aprovador,
+//     nenhum status pendente/aprovado;
+//   - sem calculo (decisao 6) — nenhuma coluna de saldo, horas, extra ou
+//     adicional. O modulo registra ocorrencias; nao as interpreta.
+//
+// DADO PESSOAL: o par (vinculo, momento) ja e dado pessoal de comportamento e
+// presenca. Nenhum nome, matricula ou identificador de pessoa e duplicado
+// aqui — o alcance ate a pessoa e sempre via VinculoFuncional.
+
+/// Catalogo FECHADO de tipos de evento (Baseline Jornada V1, decisao 2).
+/// Exatamente quatro; qualquer tipo adicional exige decisao de produto propria.
+enum TipoEventoPonto {
+  entrada
+  saida
+  inicio_pausa
+  fim_pausa
+}
+
+/// Motivo CODIFICADO do ajuste — nunca texto livre (decisao 4). Mesmo
+/// mecanismo de `MotivoMovimentacao` (Fatia 2) e pela mesma razao: um campo de
+/// observacao sem classificacao e por onde dado sensivel entra sem controle.
+///
+/// O CONTEUDO deste catalogo e detalhe de implementacao, extensivel de forma
+/// aditiva e a validar com RH — o que a Baseline fecha e o mecanismo (codigo
+/// fechado), nao a lista.
+enum MotivoAjustePonto {
+  erro_de_digitacao
+  registro_duplicado
+  registro_indevido
+  outro_controlado
+}
+
+/// A OCORRENCIA: registro atomico de uma marcacao de ponto.
+///
+/// IMUTAVEL — e isso e garantido pelo BANCO, nao pela disciplina do service:
+/// a migration REVOGA `UPDATE` e `DELETE` de `evolli_app` nesta tabela, mesmo
+/// tratamento que `audit_event` recebe desde a ADR 0004. Um exploit na API nao
+/// consegue reescrever nem apagar historico de presenca.
+///
+/// Por isso NAO existe `atualizado_em` aqui: a ausencia da coluna e
+/// intencional e sinaliza que a linha nunca muda. Correcao vive em
+/// `ajuste_ponto`, apontando para este registro, que permanece legivel.
+model EventoPonto {
+  id        String          @id @default(uuid())
+  vinculoId String          @map("vinculo_id")
+  empresaId String          @map("empresa_id")
+  tipo      TipoEventoPonto
+
+  /// Instante da marcacao, informado por quem registra (nao e o horario do
+  /// servidor: o registro e manual e frequentemente retroativo).
+  momento DateTime @db.Timestamptz(3)
+
+  /// Competencia mensal 'YYYY-MM' (decisao 6), calculada NO INSERT a partir de
+  /// `momento` sob um unico fuso declarado em codigo, e nunca recalculada.
+  ///
+  /// Gravar — em vez de derivar na consulta — e deliberado: num modulo cuja
+  /// razao de ser e rastreabilidade, o mes a que o registro pertence precisa
+  /// ser parte do registro imutavel. Se fosse derivada, mudar o fuso da
+  /// aplicacao re-classificaria historico ja gravado, sem nenhuma escrita e
+  /// sem deixar rastro.
+  competencia String @db.Char(7)
+
+  /// Ator que registrou — `AccessUser`, nunca o colaborador registrado.
+  registradoPorUserId String   @map("registrado_por_user_id")
+  registradoEm        DateTime @default(now()) @map("registrado_em")
+
+  vinculo       VinculoFuncional @relation(fields: [vinculoId, empresaId], references: [id, empresaId], onDelete: Restrict, onUpdate: Cascade)
+  empresa       Empresa          @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  registradoPor AccessUser       @relation("PontoRegistradoPor", fields: [registradoPorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  ajustes AjustePonto[]
+
+  /// Alvo da FK composta de `ajuste_ponto`: o banco garante que ajuste e
+  /// evento pertencem a MESMA empresa, sem depender da aplicacao.
+  @@unique([id, empresaId])
+  @@index([vinculoId, momento])
+  @@index([empresaId, competencia])
+  @@index([registradoPorUserId])
+  @@map("evento_ponto")
+}
+
+/// A CORRECAO: registro posterior que corrige ou anula um `EventoPonto`.
+///
+/// Nunca sobrescreve o original (decisao 4). Tambem e append-only no banco —
+/// corrigir um ajuste errado e registrar OUTRO ajuste, encadeado. O valor
+/// efetivo de um evento e o do ajuste mais recente; sem ajuste, e o original.
+///
+/// Cadeia permitida de proposito: um ajuste tambem pode estar errado, e a
+/// alternativa (permitir editar o ajuste) reintroduziria exatamente a
+/// sobrescrita que a decisao 4 proibe.
+model AjustePonto {
+  id            String @id @default(uuid())
+  eventoPontoId String @map("evento_ponto_id")
+  empresaId     String @map("empresa_id")
+
+  motivoCodigo MotivoAjustePonto @map("motivo_codigo")
+
+  /// `true` = o evento nao deveria existir (duplicado, indevido). Nesse caso
+  /// nenhum valor corrigido acompanha — anular e corrigir sao efeitos
+  /// mutuamente exclusivos, garantido por CHECK na migration.
+  anula Boolean @default(false)
+
+  /// Valores corrigidos. `NULL` = este campo nao muda. Um ajuste que nao anula
+  /// precisa corrigir ao menos um dos dois (CHECK) — um ajuste sem efeito
+  /// nenhum seria ruido na trilha.
+  momentoCorrigido DateTime?        @map("momento_corrigido") @db.Timestamptz(3)
+  tipoCorrigido    TipoEventoPonto? @map("tipo_corrigido")
+
+  registradoPorUserId String   @map("registrado_por_user_id")
+  registradoEm        DateTime @default(now()) @map("registrado_em")
+
+  evento        EventoPonto @relation(fields: [eventoPontoId, empresaId], references: [id, empresaId], onDelete: Restrict, onUpdate: Cascade)
+  empresa       Empresa     @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  registradoPor AccessUser  @relation("AjustePontoRegistradoPor", fields: [registradoPorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([eventoPontoId, registradoEm])
+  @@index([empresaId])
+  @@index([registradoPorUserId])
+  @@map("ajuste_ponto")
 }
