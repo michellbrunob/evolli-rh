@@ -44,7 +44,7 @@ inclusive a implementação do endpoint, é ato separado.
 ## Decisão
 
 A Baseline V1 é aceita como arquitetura do Painel Administrativo Web desta
-fatia, com as três decisões a seguir.
+fatia, com as quatro decisões a seguir.
 
 ### 1. Framework: React + Vite + TypeScript
 
@@ -95,44 +95,89 @@ sessão corrente sem exigir novo login e sem usar `localStorage` ou
 | Superfície exposta        | Nenhuma credencial, dado pessoal ou informação de autorização além do próprio token CSRF                                |
 | Autoridade de autorização | A API permanece única fonte de verdade — este endpoint não introduz mecanismo paralelo de decisão de acesso             |
 
-**Detalhe de implementação explicitamente não fechado por esta ADR:** o
-banco guarda hoje só `csrf_token_hash` (mesmo padrão hash-only de
-`token_hash` da sessão, ADR 0003 decisão 5) — nunca o valor bruto do
-token. Um endpoint que "recupera" o token CSRF, portanto, não pode ler um
-valor já persistido; a implementação real precisará decidir entre emitir
-um **novo** token a cada chamada (rotacionando o hash armazenado) ou outra
-estratégia compatível com o padrão hash-only. Essa escolha é **decisão de
-implementação**, revisada quando o endpoint for efetivamente codificado —
-não decidida por esta ADR nem pela Baseline que ela formaliza.
+**Estratégia interna de emissão, na ocasião não fechada:** o banco guarda
+hoje só `csrf_token_hash` (mesmo padrão hash-only de `token_hash` da
+sessão, ADR 0003 decisão 5) — nunca o valor bruto do token. Um endpoint
+que "recupera" o token CSRF, portanto, não pode ler um valor já
+persistido. A decisão 4, abaixo, fecha esse ponto.
 
 **Esta ADR não cria o endpoint.** Nenhuma rota, controller, service,
 migration ou dependência é adicionada aqui.
 
+### 4. Estratégia de emissão: rotação, hash-only, invalidação do token anterior
+
+A cada chamada autenticada a `GET /v1/auth/csrf`, a API **gera um novo
+token CSRF aleatório**, persiste **somente seu hash** na sessão
+(substituindo o hash anterior) e **invalida o token CSRF anterior** dessa
+sessão. É rotação, não leitura — resolve o impasse da decisão 3 sem exigir
+guardar ou recuperar o valor bruto do token, preservando integralmente o
+padrão hash-only já aprovado para toda credencial de sessão (ADR 0003,
+decisão 5).
+
+**Garantias fixadas por esta decisão, sem exceção:**
+
+| Propriedade                 | Requisito                                                                                                                                                                           |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Persistência do token bruto | **Nunca** — nem banco, nem cookie, nem log, nem evento de auditoria, nem `localStorage`, nem `sessionStorage`. Só o hash existe no servidor; o valor bruto só em memória no cliente |
+| Autenticação                | Exige sessão válida — mesmo `SessionGuard` de toda rota autenticada                                                                                                                 |
+| Corpo da resposta           | Somente o token CSRF, com `Cache-Control: no-store`                                                                                                                                 |
+| Token anterior da sessão    | Invalidado imediatamente após a rotação — uma mutação que ainda carregue o token antigo é recusada pelo `CsrfGuard` com 403, mesmo com sessão válida                                |
+| Sessão ausente/expirada     | 401 genérico, sem detalhe interno                                                                                                                                                   |
+| Escopo de domínio           | O endpoint **não concede autorização nem altera domínio de RH** — é puramente técnico, sobre o mecanismo de CSRF da própria sessão                                                  |
+| Armazenamento no cliente    | O frontend guarda o token só em memória — nunca em armazenamento persistente do navegador                                                                                           |
+| Mecanismo CSRF              | Segue sem cookie double-submit — o synchronizer token da ADR 0003 (decisão 6) permanece o mecanismo; a rotação afeta só o hash já guardado na sessão existente                      |
+
+**Impacto conhecido, registrado e não contornado — concorrência entre
+abas.** Como o token anterior é invalidado a cada rotação, duas abas
+autenticadas na mesma sessão competem pelo mesmo token CSRF: se a aba A
+chama o endpoint e obtém um token novo, o token que a aba B tinha em
+memória passa a ser inválido, e a próxima mutação da aba B falha com 403.
+A aplicação deve buscar um token novo antes da próxima mutação nesse
+cenário, **mas nunca deve reenviar automaticamente uma mutação que já foi
+despachada** — reenvio automático arrisca duplicar uma operação (ex.:
+registrar um evento de ponto duas vezes), o que é pior do que pedir nova
+tentativa ao usuário. Este comportamento é consequência aceita do desenho
+(nunca guardar o token em claro em lugar nenhum), não defeito a esconder.
+
+**Esta decisão não cria o endpoint, não implementa a rotação em código, e
+não declara o endpoint implementado.** Não altera a decisão 2 (mesma
+origem/proxy reverso), SSO futuro (fora de escopo desta ADR, ver "Itens
+fora de escopo") nem MFA obrigatório antes de dado real (ADR 0003, decisão
+3, inalterada).
+
 ## Alternativas descartadas
 
-| Alternativa                                                             | Por que foi descartada                                                                                                                                                                                                                                                                                                                                                         |
-| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Framework diferente de React (Vue, Svelte, Angular)                     | `apps/web/README.md` já registrava React/TSX como intenção desde a fundação do monorepo; trocar exigiria justificativa nova sem ganho identificado. Descartado por falta de motivo para desviar da intenção já registrada.                                                                                                                                                     |
-| CRA (Create React App) ou outro bundler no lugar de Vite                | Vite é a ferramenta de build mais adotada atualmente para React+TypeScript, com tempo de inicialização e HMR superiores às alternativas legadas. Descartado em favor da opção mais madura hoje.                                                                                                                                                                                |
-| CORS com lista de origens confiáveis, já nesta V1                       | Exigiria alterar `main.ts`, reavaliar `sameSite` do cookie de sessão e ampliar a superfície de CSRF administrada — mudança de backend com impacto de segurança, desproporcional para viabilizar uma topologia (origens distintas) sem necessidade comprovada ainda. Descartado; mesma origem resolve o V1 sem tocar em código já auditado.                                     |
-| Cookie de CSRF do tipo double-submit, substituindo o synchronizer atual | Mudaria o desenho de CSRF já aprovado e testado pela ADR 0003 (decisão 6) só para resolver um problema de UX de reload — trocaria um mecanismo funcionando por outro, sem necessidade que justifique o risco de regressão. Descartado em favor de manter o synchronizer e resolver o reload com um endpoint de leitura.                                                        |
-| Aceitar que todo _reload_ exija novo login (opção "c" da spec original) | Resolveria a lacuna O4 sem tocar em backend, mas é degradação de usabilidade que o produto não considerou aceitável para um painel administrativo de uso diário. Descartado em favor do endpoint dedicado.                                                                                                                                                                     |
-| Guardar o token CSRF em `localStorage`/`sessionStorage`                 | Contraria diretamente a exigência de não persistir credencial em armazenamento acessível a script, reintroduzindo exatamente o vetor que o cookie `HttpOnly` da sessão foi desenhado para eliminar. Descartado sem ressalva — nunca foi opção real, mas precisa constar como descartada explicitamente porque é a "solução óbvia" que alguém sem o contexto completo tentaria. |
-| Definir agora o provedor/ferramenta de proxy reverso                    | Provisionamento de infraestrutura é decisão operacional, não arquitetural de produto — antecipá-la sem que a fase Implementar do painel exista ainda seria decidir sem informação (requisitos de deploy, ambiente-alvo) que só aparece mais perto da execução. Descartado; fica como responsabilidade futura registrada.                                                       |
+| Alternativa                                                                                    | Por que foi descartada                                                                                                                                                                                                                                                                                                                                                         |
+| ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Framework diferente de React (Vue, Svelte, Angular)                                            | `apps/web/README.md` já registrava React/TSX como intenção desde a fundação do monorepo; trocar exigiria justificativa nova sem ganho identificado. Descartado por falta de motivo para desviar da intenção já registrada.                                                                                                                                                     |
+| CRA (Create React App) ou outro bundler no lugar de Vite                                       | Vite é a ferramenta de build mais adotada atualmente para React+TypeScript, com tempo de inicialização e HMR superiores às alternativas legadas. Descartado em favor da opção mais madura hoje.                                                                                                                                                                                |
+| CORS com lista de origens confiáveis, já nesta V1                                              | Exigiria alterar `main.ts`, reavaliar `sameSite` do cookie de sessão e ampliar a superfície de CSRF administrada — mudança de backend com impacto de segurança, desproporcional para viabilizar uma topologia (origens distintas) sem necessidade comprovada ainda. Descartado; mesma origem resolve o V1 sem tocar em código já auditado.                                     |
+| Cookie de CSRF do tipo double-submit, substituindo o synchronizer atual                        | Mudaria o desenho de CSRF já aprovado e testado pela ADR 0003 (decisão 6) só para resolver um problema de UX de reload — trocaria um mecanismo funcionando por outro, sem necessidade que justifique o risco de regressão. Descartado em favor de manter o synchronizer e resolver o reload com um endpoint de leitura.                                                        |
+| Aceitar que todo _reload_ exija novo login (opção "c" da spec original)                        | Resolveria a lacuna O4 sem tocar em backend, mas é degradação de usabilidade que o produto não considerou aceitável para um painel administrativo de uso diário. Descartado em favor do endpoint dedicado.                                                                                                                                                                     |
+| Guardar o token CSRF em `localStorage`/`sessionStorage`                                        | Contraria diretamente a exigência de não persistir credencial em armazenamento acessível a script, reintroduzindo exatamente o vetor que o cookie `HttpOnly` da sessão foi desenhado para eliminar. Descartado sem ressalva — nunca foi opção real, mas precisa constar como descartada explicitamente porque é a "solução óbvia" que alguém sem o contexto completo tentaria. |
+| Definir agora o provedor/ferramenta de proxy reverso                                           | Provisionamento de infraestrutura é decisão operacional, não arquitetural de produto — antecipá-la sem que a fase Implementar do painel exista ainda seria decidir sem informação (requisitos de deploy, ambiente-alvo) que só aparece mais perto da execução. Descartado; fica como responsabilidade futura registrada.                                                       |
+| Guardar o token CSRF bruto (não só o hash) para permitir leitura direta em `GET /v1/auth/csrf` | Quebraria o padrão hash-only já aprovado para toda credencial de sessão (ADR 0003, decisão 5) — um vazamento do banco exporia diretamente tokens CSRF válidos, sem precisar do cookie do cliente. Descartado; rotação resolve o mesmo problema sem esse risco.                                                                                                                 |
+| Manter o token CSRF válido indefinidamente após emitir um novo, para não invalidar outras abas | Elimina o problema de concorrência entre abas, mas mantém tokens antigos válidos por tempo indeterminado, ampliando a janela de uso de um token potencialmente exposto. Descartado; o impacto de multi-aba é aceito como consequência conhecida, não contornado enfraquecendo a rotação.                                                                                       |
 
 ## Consequências
 
 - A especificação
   ([docs/modules/painel-administrativo-web-v1.md](../modules/painel-administrativo-web-v1.md))
   é atualizada para refletir esta Baseline V1: O1 (framework), O2 (mesma
-  origem, sem CORS) e O4 (contrato do endpoint futuro) passam de
-  observação/lacuna para decisão registrada, sem que nenhuma delas passe a
-  autorizar código, endpoint ou infraestrutura.
+  origem, sem CORS) e O4 (contrato do endpoint futuro **e** estratégia de
+  emissão) passam de observação/lacuna para decisão registrada, sem que
+  nenhuma delas passe a autorizar código, endpoint ou infraestrutura.
 - Uma futura fase Implementar do painel, se e quando autorizada
   separadamente, terá resolvido: qual framework usar, qual topologia de
-  origem assumir, e que o mecanismo de recuperação de CSRF será um
-  endpoint dedicado com contrato já fechado — sem precisar decidir
-  nenhum desses três pontos durante a implementação.
+  origem assumir, que o mecanismo de recuperação de CSRF será um endpoint
+  dedicado com contrato já fechado, e que a estratégia interna de emissão
+  será rotação com invalidação do token anterior — sem precisar decidir
+  nenhum desses quatro pontos durante a implementação.
+- **A implementação futura precisará tratar a concorrência entre abas**
+  descrita na decisão 4: rotação invalida o token de qualquer outra aba da
+  mesma sessão que ainda não o buscou de novo. Isso é consequência aceita
+  do desenho, registrada aqui para que a fase Implementar não a trate como
+  bug a corrigir silenciosamente contornando a invalidação.
 - **`main.ts` continua sem CORS até nova ADR.** Qualquer necessidade
   futura de servir o painel de origem distinta da API exige reabrir esta
   decisão, não apenas configurar infraestrutura.
@@ -152,12 +197,18 @@ migration ou dependência é adicionada aqui.
   acesso de painel a papel que hoje não tem acesso ao domínio
   correspondente na API. A matriz de autorização de Organização, Pessoas e
   Ponto permanece exatamente como está.
+- **Sem token bruto persistido em lugar nenhum:** decisão 4 fixa que nem o
+  banco, nem cookie, nem log, nem auditoria guardam o valor bruto do token
+  — só o hash, do lado do servidor, e só memória, do lado do cliente.
 - **Sem token em armazenamento persistente do navegador:** reafirmado como
   requisito do contrato do `GET /v1/auth/csrf` (decisão 3) e da spec
   original (§3) — nenhuma decisão desta ADR relaxa essa exigência.
 - **CSRF preservado, não substituído:** o synchronizer token da ADR 0003
   (decisão 6) continua sendo o mecanismo; o endpoint futuro só resolve
   _como recuperar_ o token existente, não _como validá-lo_.
+- **Token anterior sempre invalidado na rotação:** nenhuma janela em que
+  dois tokens CSRF válidos coexistem para a mesma sessão — reduz o tempo
+  de vida útil de um token potencialmente exposto.
 - **Sem ampliação de superfície de CORS:** manter CORS desligado nesta V1
   é, em si, um controle — reduz a superfície que precisaria ser validada
   contra origem cruzada.
@@ -181,9 +232,9 @@ migration ou dependência é adicionada aqui.
 
 **Esta ADR não declara CORS seguro, hospedagem existente, conformidade
 LGPD ou qualquer endpoint desta fatia como já implementado.** Ela trata
-exclusivamente de três decisões de arquitetura e contrato para o núcleo do
-painel administrativo; validade legal, retenção e MFA seguem regidos pelas
-ADRs já aceitas, sem alteração.
+exclusivamente de quatro decisões de arquitetura e contrato para o núcleo
+do painel administrativo; validade legal, retenção e MFA seguem regidos
+pelas ADRs já aceitas, sem alteração.
 
 ## Gatilhos de reavaliação
 
@@ -194,9 +245,9 @@ Esta decisão deve ser reaberta — com ADR nova ou emenda formal — quando
    reabrir a decisão 2, com desenho explícito de CORS e reavaliação de
    `sameSite`.
 2. O endpoint `GET /v1/auth/csrf` for efetivamente implementado — a
-   estratégia interna de emissão (rotação de token vs. alternativa) deve
-   ser documentada como evidência de implementação, no mesmo padrão já
-   usado nas Emendas das ADRs 0006 a 0008.
+   implementação da rotação (decisão 4) deve ser documentada como
+   evidência de implementação, no mesmo padrão já usado nas Emendas das
+   ADRs 0006 a 0008.
 3. SSO for avaliado como necessidade real — decisão de autenticação nova,
    não consequência automática desta ADR.
 4. Qualquer decisão pendente (DP-W-03 a DP-W-11) for resolvida pelo
@@ -206,10 +257,11 @@ Esta decisão deve ser reaberta — com ADR nova ou emenda formal — quando
 ## Responsabilidades
 
 - **Time de desenvolvimento (código):** ao iniciar, se e quando
-  autorizada, a fase Implementar do painel, respeitar as três decisões
+  autorizada, a fase Implementar do painel, respeitar as quatro decisões
   desta Baseline sem ampliar escopo por conveniência — em particular, não
-  introduzir CORS, não usar cookie double-submit, e não gravar token CSRF
-  em armazenamento persistente do navegador.
+  introduzir CORS, não usar cookie double-submit, não gravar token CSRF em
+  armazenamento persistente do navegador, e implementar a rotação (decisão 4) exatamente como especificada, sem reintroduzir reenvio automático de
+  mutação já despachada.
 - **Produto:** resolver DP-W-03 a DP-W-07, DP-W-09, DP-W-10 e DP-W-11
   conforme a necessidade surgir; nenhuma delas é bloqueante para o núcleo
   já aprovado desta Baseline.
@@ -237,9 +289,13 @@ Esta decisão deve ser reaberta — com ADR nova ou emenda formal — quando
   (acessibilidade e navegadores-alvo), DP-W-09 (telemetria), DP-W-10
   (testes visuais/e2e) nem DP-W-11 (OpenAPI/cliente tipado) — todas seguem
   pendentes.
-- Não define a estratégia interna de emissão do token no futuro
-  `GET /v1/auth/csrf` (rotação vs. alternativa) — decisão de implementação
-  deliberadamente deixada para quando o endpoint for codificado.
+- A estratégia interna de emissão do token no futuro `GET /v1/auth/csrf`
+  está definida (decisão 4: rotação, hash-only, invalidação do anterior) —
+  o que falta é só a implementação em código, não a decisão.
+- Não resolve como a implementação futura tratará, na prática de UX, a
+  concorrência entre abas descrita na decisão 4 — o comportamento correto
+  ("buscar novo token, nunca reenviar mutação já despachada") está
+  definido; o desenho de interface para comunicar isso ao usuário não.
 - Não estende nem relaxa MFA (ADR 0003) ou o modelo de auditoria
   (ADR 0004) — ambos permanecem integralmente aplicáveis.
 - Não introduz nenhuma tabela, campo pessoal, enum de banco, rota real ou

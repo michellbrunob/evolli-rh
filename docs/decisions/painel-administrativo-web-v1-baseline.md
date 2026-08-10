@@ -13,11 +13,12 @@ como precedente de formato para este tipo de registro.
 ## 0. Escopo e limites deste documento
 
 Este documento registra **o que o produto decidiu** em 2026-08-10 para o
-Painel Administrativo Web V1: três decisões que resolvem parte do que a
+Painel Administrativo Web V1: quatro decisões que resolvem parte do que a
 especificação estrutural (2026-08-10) deixava pendente — framework do
-frontend, topologia de origem entre painel e API, e o mecanismo futuro de
+frontend, topologia de origem entre painel e API, o mecanismo futuro de
 recuperação do token CSRF após recarregar a página (a lacuna bloqueante
-identificada na spec original, O4).
+identificada na spec original, O4), e a estratégia interna de emissão
+desse token (rotação, hash-only).
 
 **O que este documento não faz:**
 
@@ -41,7 +42,7 @@ identificada na spec original, O4).
   domínio correspondente na API — a autorização visual continua sendo
   reflexo do que o backend já decide, nunca uma concessão nova.
 
-## 1. As 3 decisões aprovadas
+## 1. As 4 decisões aprovadas
 
 Cada decisão preserva, como histórico, o que a especificação estrutural
 original (2026-08-10) deixava como pendência — referenciado abaixo, não
@@ -138,17 +139,12 @@ detalhamento completo na [ADR 0009](../adr/0009-painel-administrativo-web-v1.md)
 - a API continua sendo a **única fonte de verdade** de autorização — este
   endpoint não introduz nenhum mecanismo paralelo de decisão de acesso.
 
-**Detalhe técnico que a implementação futura precisará resolver, não
-decidido aqui:** o banco guarda hoje só o **hash** do token CSRF
-(`csrf_token_hash`, mesmo padrão de `token_hash` da sessão — ADR 0003,
-decisão 5), nunca o valor bruto. Isso significa que "recuperar o token
-CSRF associado à sessão" não pode ser uma leitura simples de um valor já
-persistido — a implementação real precisará decidir entre (i) emitir um
-**novo** token CSRF a cada chamada a este endpoint, substituindo o hash
-armazenado (rotação), ou (ii) alguma outra estratégia compatível com o
-padrão hash-only. Esta decisão **aprova a existência e o contrato externo
-do endpoint**, não a estratégia interna de emissão — que é decisão de
-implementação, revisada quando o endpoint for codificado.
+**Estratégia interna de emissão, na ocasião, não decidida:** o banco guarda
+só o **hash** do token CSRF (`csrf_token_hash`, mesmo padrão de
+`token_hash` da sessão — ADR 0003, decisão 5), nunca o valor bruto. Isso
+significa que "recuperar o token CSRF associado à sessão" não pode ser uma
+leitura simples de um valor já persistido. Esta decisão registrou o
+impasse sem resolvê-lo — a Decisão 4, abaixo, fecha esse ponto.
 
 **O que esta decisão não faz:** não cria o endpoint, não altera
 `schema.prisma`, `session.service.ts`, `csrf.guard.ts` ou qualquer rota já
@@ -156,8 +152,75 @@ mergeada. Nenhuma migration, dependência ou linha de código é adicionada
 por esta decisão.
 
 **Efeito na especificação:** resolve **DP-W-08** quanto ao mecanismo
-escolhido (endpoint dedicado); a estratégia interna de emissão do token
-permanece detalhe de implementação, não bloqueante para esta decisão.
+escolhido (endpoint dedicado); a estratégia interna de emissão é resolvida
+pela Decisão 4.
+
+### Decisão 4 — Estratégia de emissão do token: rotação, hash-only, invalidação do anterior
+
+**Aprovado:** a cada chamada autenticada a `GET /v1/auth/csrf`, a API
+**gerará um novo token CSRF aleatório**, persistirá **somente seu hash** na
+sessão (substituindo o hash anterior) e **invalidará o token CSRF
+anterior** daquela sessão.
+
+**Contexto preservado (Decisão 3, acima):** a Decisão 3 aprovou a
+existência e o contrato externo do endpoint, mas deixou em aberto a
+estratégia interna de emissão, justamente porque o banco nunca guarda o
+token em claro. Esta decisão fecha esse ponto, escolhendo **rotação** em
+vez de qualquer alternativa que exigisse guardar ou recuperar o valor
+bruto do token — o que teria exigido alterar o padrão hash-only já
+aprovado na ADR 0003 (decisão 5) para toda credencial de sessão.
+
+**Garantias que esta decisão fixa, sem exceção:**
+
+- o **token bruto nunca é persistido** — nem no banco, nem em cookie, nem
+  em log, nem em evento de auditoria, nem em `localStorage`, nem em
+  `sessionStorage`. Só o hash existe do lado do servidor, e só em memória
+  do lado do cliente (spec original, §3; Decisão 3, acima);
+- o endpoint **exige sessão válida** — mesmo `SessionGuard` já usado em
+  toda rota autenticada;
+- a resposta contém **somente o token CSRF**, com header
+  `Cache-Control: no-store`;
+- o **token anterior da sessão fica inválido** imediatamente após a
+  rotação — uma requisição de mutação que ainda carregue o token antigo
+  passa a ser recusada pelo `CsrfGuard` com **403**, mesmo que a sessão
+  continue válida;
+- resposta **401 genérica** para sessão ausente ou expirada, sem detalhe
+  interno — mesmo padrão de erro já usado em toda a API;
+- o endpoint **não concede autorização nem altera domínio de RH** — é
+  puramente técnico, sobre o mecanismo de CSRF da própria sessão, sem
+  tocar em nenhuma entidade de Organização, Pessoas ou Ponto;
+- o **frontend guarda o token só em memória** — nunca em armazenamento
+  persistente do navegador (reafirma Decisão 3 e spec original, §3).
+
+**Impacto conhecido, registrado e não contornado:** como o token anterior
+é invalidado a cada rotação, **duas abas autenticadas na mesma sessão
+competem pelo mesmo token CSRF**. Se a aba A chama o endpoint e obtém um
+token novo, o token que a aba B tinha em memória passa a ser inválido — a
+próxima mutação da aba B falha com 403. A aplicação **deve buscar um token
+novo antes da próxima mutação** quando isso acontecer, mas **nunca deve
+reenviar automaticamente uma mutação que já foi despachada** ao servidor:
+um reenvio automático correndo o risco de duplicar uma operação (ex.:
+registrar um evento de ponto duas vezes) é pior do que pedir que o usuário
+tente de novo. Este comportamento é **aceito como consequência do
+desenho**, não como defeito a esconder — é o preço de nunca guardar o
+token em claro em lugar nenhum.
+
+**Não usa cookie de CSRF do tipo double-submit** — reafirma a Decisão 3: o
+synchronizer token da ADR 0003 (decisão 6) continua sendo o mecanismo; a
+rotação acontece só no valor guardado como hash na sessão existente, não
+introduz um segundo canal de validação.
+
+**O que esta decisão não faz:** não cria o endpoint, não implementa a
+rotação em código, não altera `schema.prisma`, `session.service.ts` ou
+`csrf.guard.ts`. **Não declara o endpoint implementado** — ele continua
+não existindo até que a fase Implementar seja autorizada separadamente.
+Não altera a decisão de mesma origem/proxy reverso (Decisão 2), SSO futuro
+ou MFA obrigatório antes de dado real (ADR 0003, decisão 3) — nenhum dos
+três é tocado por esta decisão.
+
+**Efeito na especificação:** fecha o detalhe de implementação que a
+Decisão 3 havia deixado aberto, sem alterar o contrato externo já
+aprovado.
 
 ## 2. O que permanece pendente, sem resolução por inferência
 
@@ -202,8 +265,9 @@ de autorização própria, separada deste documento.
 
 ## 3. Rastreabilidade
 
-| Item da tarefa (enunciado original)      | Decisão nesta Baseline | Seção da spec atualizada |
-| ---------------------------------------- | ---------------------- | ------------------------ |
-| 1. Framework (React + Vite + TypeScript) | Decisão 1              | O1, §4 (DP-W-01)         |
-| 2. Mesma origem, com proxy reverso       | Decisão 2              | O2, §4 (DP-W-02)         |
-| 3. Endpoint futuro `GET /v1/auth/csrf`   | Decisão 3              | O4, §4 (DP-W-08), §5     |
+| Item da tarefa (enunciado original)                       | Decisão nesta Baseline | Seção da spec atualizada |
+| --------------------------------------------------------- | ---------------------- | ------------------------ |
+| 1. Framework (React + Vite + TypeScript)                  | Decisão 1              | O1, §4 (DP-W-01)         |
+| 2. Mesma origem, com proxy reverso                        | Decisão 2              | O2, §4 (DP-W-02)         |
+| 3. Endpoint futuro `GET /v1/auth/csrf`                    | Decisão 3              | O4, §4 (DP-W-08), §5     |
+| 4. Estratégia de emissão: rotação, hash-only, invalidação | Decisão 4              | O4, §4 (DP-W-08)         |
