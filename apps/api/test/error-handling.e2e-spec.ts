@@ -5,6 +5,19 @@ import { AppModule } from "../src/app.module";
 import { AllExceptionsFilter } from "../src/common/filters/http-exception.filter";
 import { requestIdMiddleware } from "../src/common/request-id";
 
+/**
+ * Esta suíte não sobe banco: ela exercita só o filtro de exceção e o
+ * `request-id`. Ainda assim, `AppModule` instancia o `PrismaService`, cujo
+ * `onModuleInit` tenta conectar (e engole a falha por desenho, ADR 0002).
+ *
+ * O timeout explícito cobre essa tentativa: rodando em paralelo com as suítes
+ * que sobem PostgreSQL via Testcontainers, o `beforeAll` pode ultrapassar os
+ * 5 s padrão do Jest — e falhar por contenção de recurso, não por defeito.
+ * Todas as demais suítes e2e já definem o seu; esta passa a seguir a mesma
+ * convenção. Um travamento real continua sendo reprovado.
+ */
+jest.setTimeout(120_000);
+
 describe("Tratamento centralizado de erros (e2e)", () => {
   let app: INestApplication;
 

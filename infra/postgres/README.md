@@ -156,3 +156,40 @@ step), nunca nas variáveis de ambiente do container/processo que sobe a API.
 Se, por engano de configuração, `MIGRATE_DATABASE_URL` chegar ao processo da
 API, o bootstrap falha imediatamente (`env.validation.ts`), sem revelar a URL
 ou a credencial no log/erro.
+
+## Migration na CI oficial (`.github/workflows/ci.yml`)
+
+O job **`migration-smoke`** aplica estes mesmos scripts a cada execução, num
+PostgreSQL 16 efêmero criado e destruído dentro do próprio job, com senhas
+aleatórias geradas na hora e mascaradas no log. Nenhum segredo do repositório,
+ambiente externo ou banco persistente é usado.
+
+A sequência é a mesma documentada acima — `01`, `02` e `04` pela conta
+administrativa, depois `db:migrate:deploy` pelo `evolli_migrator` —, e o job
+ainda verifica que não há drift e que a migration **aborta** numa base sem
+`btree_gist` (isto é, que a pré-condição é real, e não uma verificação que
+degradou em silêncio).
+
+### `DATABASE_URL` no passo de migration: por que ela existe e por que é inválida
+
+O Prisma 5.x valida o schema **inteiro** antes de migrar e aborta com `P1012`
+se `env("DATABASE_URL")` não resolver — mesmo que `migrate deploy` use
+`directUrl`. Rodar a migration "somente com `MIGRATE_DATABASE_URL`", ao pé da
+letra, não é possível nessa versão.
+
+Por isso a CI define `DATABASE_URL` com um destino **deliberadamente
+inalcançável e sem credencial**:
+
+```
+DATABASE_URL=postgresql://unused:unused@127.0.0.1:1/unused
+```
+
+Isso converte a limitação em garantia: se `migrate deploy` tentasse usar essa
+URL, falharia na conexão. O sucesso do passo é, portanto, evidência de que a
+única conexão aberta foi a de `MIGRATE_DATABASE_URL` — e a credencial de
+runtime (`evolli_app`) nem chega a existir naquele passo.
+
+**Ao reproduzir isso em outro pipeline, nunca preencha `DATABASE_URL` com a
+credencial real da aplicação** só para "satisfazer o Prisma": isso colocaria a
+credencial de runtime no mesmo processo que executa DDL, que é exatamente o que
+a ADR 0002 separa.

@@ -9,10 +9,15 @@ on:
 permissions:
   contents: read
 
+# Nenhum job usa segredo do repositório, ambiente externo, banco persistente
+# ou variável de produção. Todo banco é efêmero, criado e destruído dentro do
+# próprio job, com credenciais sintéticas geradas na hora.
+
 jobs:
   quality:
     name: Quality gates
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -20,9 +25,240 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-      # O lockfile será incorporado na primeira inicialização local da etapa 0.
-      - run: pnpm install --no-frozen-lockfile
+      # `--frozen-lockfile`: a instalação falha se `pnpm-lock.yaml` divergir do
+      # `package.json`, em vez de resolver silenciosamente uma árvore de
+      # dependências diferente da validada localmente.
+      - run: pnpm install --frozen-lockfile
       - run: pnpm format:check
       - run: pnpm lint
       - run: pnpm typecheck
+      - run: pnpm build
       - run: pnpm test
+
+  e2e:
+    name: E2E (PostgreSQL real via Testcontainers)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # Testcontainers sobe um PostgreSQL efêmero por suíte, aplica as
+      # migrations do zero e destrói tudo ao final. O runner hospedado do
+      # GitHub já traz Docker e o usuário do job no grupo `docker`, então
+      # nenhuma dependência extra é instalada aqui.
+      #
+      # Nenhum teste é pulado, marcado como opcional ou tolerado a falhar:
+      # `test:e2e` roda a suíte inteira e o job falha se qualquer caso falhar.
+      - name: Testes end-to-end
+        run: pnpm --filter @evolli/api test:e2e
+
+  migration-smoke:
+    name: Migration smoke (banco vazio, papéis segregados)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # Senhas aleatórias por execução, mascaradas no log antes de existirem em
+      # qualquer outro lugar. `add-mask` faz o GitHub redigir o valor caso ele
+      # apareça em qualquer saída — inclusive dentro de uma URL de conexão que
+      # alguma ferramenta resolva imprimir.
+      #
+      # Saída de `openssl rand -hex` é [0-9a-f]: sem caractere que exija
+      # escaping em shell, psql ou URL.
+      - name: Gerar credenciais sintéticas efêmeras
+        run: |
+          set -euo pipefail
+          ADMIN_PW="$(openssl rand -hex 24)"
+          MIGRATOR_PW="$(openssl rand -hex 24)"
+          APP_PW="$(openssl rand -hex 24)"
+          echo "::add-mask::${ADMIN_PW}"
+          echo "::add-mask::${MIGRATOR_PW}"
+          echo "::add-mask::${APP_PW}"
+          {
+            echo "PG_ADMIN_PW=${ADMIN_PW}"
+            echo "PG_MIGRATOR_PW=${MIGRATOR_PW}"
+            echo "PG_APP_PW=${APP_PW}"
+          } >> "$GITHUB_ENV"
+
+      # `docker run` + `docker exec` em vez de `services:` deliberadamente: o
+      # `psql` usado é o da própria imagem `postgres:16-alpine`, então o job não
+      # depende de o runner ter cliente PostgreSQL instalado nem da versão que
+      # ele traria. Mesma imagem usada localmente e pelos Testcontainers.
+      - name: Subir PostgreSQL 16 efêmero, exclusivo deste job
+        run: |
+          set -euo pipefail
+          docker run -d --name evolli-ci-pg \
+            -e POSTGRES_USER=evolli_ci_admin \
+            -e POSTGRES_PASSWORD="${PG_ADMIN_PW}" \
+            -e POSTGRES_DB=evolli_ci \
+            -p 5432:5432 \
+            postgres:16-alpine >/dev/null
+
+          # O entrypoint da imagem `postgres` sobe um servidor TEMPORARIO,
+          # ouvindo SO no socket Unix, para executar a inicializacao
+          # (createuser/createdb) — e depois o DERRUBA antes de subir o
+          # definitivo. Esperar apenas por `pg_isready` no socket aceita esse
+          # servidor transitorio, e o passo seguinte esbarra em
+          # "FATAL: the database system is shutting down".
+          #
+          # A espera correta combina duas condicoes:
+          #   (a) a mensagem de "ready" aparecer DUAS vezes no log — servidor
+          #       de inicializacao e servidor definitivo. Mesma convencao que
+          #       as suites e2e ja usam com Testcontainers;
+          #   (b) uma query real responder sobre TCP, que o servidor de
+          #       inicializacao deliberadamente nao expoe.
+          pronto=0
+          for _ in $(seq 1 90); do
+            vezes="$(docker logs evolli-ci-pg 2>&1 \
+              | grep -c 'database system is ready to accept connections' || true)"
+            if [ "${vezes}" -ge 2 ] \
+              && docker exec -e PGPASSWORD="${PG_ADMIN_PW}" evolli-ci-pg \
+                   psql -h 127.0.0.1 -U evolli_ci_admin -d evolli_ci \
+                     -tAc 'SELECT 1' >/dev/null 2>&1; then
+              pronto=1
+              break
+            fi
+            sleep 2
+          done
+
+          if [ "${pronto}" -ne 1 ]; then
+            echo "PostgreSQL nao ficou pronto dentro do limite." >&2
+            docker logs evolli-ci-pg 2>&1 | tail -20 >&2
+            exit 1
+          fi
+          echo "PostgreSQL pronto."
+
+      # Os três scripts rodam com a conta ADMINISTRATIVA do container, que é a
+      # única com privilégio para criar papel e extensão — exatamente a
+      # separação da ADR 0002. Os scripts são usados como estão no repositório:
+      # nenhum é simplificado, e nenhum privilégio extra é concedido a
+      # `evolli_migrator` ou `evolli_app`.
+      - name: Provisionar papéis, schema e extensões (conta administrativa)
+        run: |
+          set -euo pipefail
+          for f in 01_create_roles.sql 02_schema_and_grants.sql 04_extensions.sql; do
+            docker cp "infra/postgres/${f}" "evolli-ci-pg:/tmp/${f}"
+          done
+
+          docker exec -e PGPASSWORD="${PG_ADMIN_PW}" evolli-ci-pg \
+            psql -h 127.0.0.1 -U evolli_ci_admin -d evolli_ci -q -v ON_ERROR_STOP=1 \
+              -v migrator_password="${PG_MIGRATOR_PW}" \
+              -v app_password="${PG_APP_PW}" \
+              -f /tmp/01_create_roles.sql
+
+          docker exec -e PGPASSWORD="${PG_ADMIN_PW}" evolli-ci-pg \
+            psql -h 127.0.0.1 -U evolli_ci_admin -d evolli_ci -q -v ON_ERROR_STOP=1 \
+              -f /tmp/02_schema_and_grants.sql
+
+          docker exec -e PGPASSWORD="${PG_ADMIN_PW}" evolli-ci-pg \
+            psql -h 127.0.0.1 -U evolli_ci_admin -d evolli_ci -q -v ON_ERROR_STOP=1 \
+              -f /tmp/04_extensions.sql
+
+      # DATABASE_URL aponta para um destino INALCANCAVEL e SEM credencial.
+      #
+      # Ela não é opcional: o Prisma 5.x valida o schema inteiro antes de
+      # migrar e aborta com P1012 se `env("DATABASE_URL")` não resolver, mesmo
+      # que `migrate deploy` use `directUrl`. Rodar "somente com
+      # MIGRATE_DATABASE_URL", ao pé da letra, é impossível com esta versão.
+      #
+      # O placeholder transforma essa limitação em PROVA: se `migrate deploy`
+      # tentasse usar DATABASE_URL, falharia na conexão. O sucesso desta etapa
+      # é, portanto, evidência de que a única conexão aberta foi a de
+      # MIGRATE_DATABASE_URL — e a credencial de runtime (`evolli_app`) sequer
+      # existe neste passo.
+      - name: Aplicar migrations em banco vazio (só a credencial de migration)
+        env:
+          DATABASE_URL: postgresql://unused:unused@127.0.0.1:1/unused
+          MIGRATE_DATABASE_URL: postgresql://evolli_migrator:${{ env.PG_MIGRATOR_PW }}@127.0.0.1:5432/evolli_ci?schema=app
+        run: pnpm --filter @evolli/api db:migrate:deploy
+
+      # A saída de `migrate status` não é ecoada: ela nomeia host, porta e base.
+      # Só o veredito é impresso.
+      - name: Confirmar migrations aplicadas e ausência de drift
+        env:
+          DATABASE_URL: postgresql://unused:unused@127.0.0.1:1/unused
+          MIGRATE_DATABASE_URL: postgresql://evolli_migrator:${{ env.PG_MIGRATOR_PW }}@127.0.0.1:5432/evolli_ci?schema=app
+        run: |
+          set -euo pipefail
+          STATUS="$(pnpm --filter @evolli/api exec prisma migrate status \
+            --schema=prisma/schema.prisma 2>&1)" || true
+
+          if ! printf '%s' "${STATUS}" | grep -q "Database schema is up to date!"; then
+            echo "Migrations pendentes ou drift entre schema e migrations." >&2
+            exit 1
+          fi
+          echo "Todas as migrations aplicadas; schema sem drift."
+
+      # A migration declara `btree_gist` como pré-condição e aborta se faltar
+      # (ADR 0002: `evolli_migrator` não tem CREATE na base, então não pode
+      # instalá-la). Esta etapa prova que a verificação é real — sem ela, a
+      # migration poderia estar degradando em silêncio para uma garantia mais
+      # fraca e ninguém notaria.
+      #
+      # Base NOVA, com papéis e schema, mas SEM 04_extensions.sql.
+      - name: Provar que btree_gist é pré-requisito real da migration
+        run: |
+          set -euo pipefail
+
+          docker exec -e PGPASSWORD="${PG_ADMIN_PW}" evolli-ci-pg \
+            createdb -h 127.0.0.1 -U evolli_ci_admin evolli_ci_sem_ext
+          docker cp infra/postgres/02_schema_and_grants.sql \
+            evolli-ci-pg:/tmp/02_sem_ext.sql
+          docker exec -e PGPASSWORD="${PG_ADMIN_PW}" evolli-ci-pg \
+            psql -h 127.0.0.1 -U evolli_ci_admin -d evolli_ci_sem_ext -q -v ON_ERROR_STOP=1 \
+              -f /tmp/02_sem_ext.sql
+
+          set +e
+          SAIDA="$(
+            DATABASE_URL='postgresql://unused:unused@127.0.0.1:1/unused' \
+            MIGRATE_DATABASE_URL="postgresql://evolli_migrator:${PG_MIGRATOR_PW}@127.0.0.1:5432/evolli_ci_sem_ext?schema=app" \
+            pnpm --filter @evolli/api db:migrate:deploy 2>&1
+          )"
+          CODIGO=$?
+          set -e
+
+          if [ "${CODIGO}" -eq 0 ]; then
+            echo "FALHA: a migration foi aplicada SEM btree_gist — a pré-condição não está sendo verificada." >&2
+            exit 1
+          fi
+
+          # Falhar não basta: precisa falhar pelo motivo certo. Sem esta
+          # checagem, um erro de conexão passaria por "pré-condição funcionando".
+          if ! printf '%s' "${SAIDA}" | grep -q 'pre-condicao de infraestrutura ausente'; then
+            echo "FALHA: a migration abortou, mas não pela pré-condição de btree_gist." >&2
+            exit 1
+          fi
+
+          echo "Confirmado: sem btree_gist a migration aborta com mensagem explícita."
+
+      # MIGRATE_DATABASE_URL é declarada por PASSO, nunca no ambiente do job.
+      # Esta etapa transforma isso em asserção verificável: se alguém a
+      # promover para `env:` de job no futuro, o gate quebra.
+      - name: Confirmar que MIGRATE_DATABASE_URL não é ambiente do job
+        run: |
+          set -euo pipefail
+          if [ -n "${MIGRATE_DATABASE_URL:-}" ]; then
+            echo "FALHA: MIGRATE_DATABASE_URL vazou para o ambiente do job." >&2
+            exit 1
+          fi
+          echo "Confirmado: MIGRATE_DATABASE_URL existe apenas nos passos de migration."
+
+      # Limpeza de recurso do runner. Não mascara falha: `if: always()` só
+      # garante que o container seja removido mesmo quando um passo anterior
+      # falhou — o resultado do job continua sendo o do passo que falhou.
+      - name: Remover PostgreSQL efêmero
+        if: always()
+        run: docker rm -f evolli-ci-pg >/dev/null 2>&1 || true

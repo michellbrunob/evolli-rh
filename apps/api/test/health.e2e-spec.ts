@@ -4,6 +4,16 @@ import request from "supertest";
 import { AppModule } from "../src/app.module";
 import { requestIdMiddleware } from "../src/common/request-id";
 
+/**
+ * Liveness não depende de banco (ADR 0002) — mas `AppModule` instancia o
+ * `PrismaService`, cujo `onModuleInit` tenta conectar e engole a falha por
+ * desenho. O timeout explícito cobre essa tentativa: em paralelo com as suítes
+ * que sobem PostgreSQL via Testcontainers, o `beforeAll` pode ultrapassar os
+ * 5 s padrão do Jest e falhar por contenção, não por defeito. Todas as demais
+ * suítes e2e já definem o seu. Um travamento real continua sendo reprovado.
+ */
+jest.setTimeout(120_000);
+
 describe("GET /v1/health (e2e)", () => {
   let app: INestApplication;
 

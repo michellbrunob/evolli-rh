@@ -3,6 +3,7 @@ import {
   AuthorizationTarget,
   isOrganizationalResource,
   isPessoasResource,
+  isPontoResource,
 } from "./permission.types";
 
 /**
@@ -25,14 +26,17 @@ export function evaluatePermission(
     case "user_role":
       return evaluateUserRole(subject, target);
     default:
-      // Recursos organizacionais (Etapa 1, Fatia 1) e de pessoas (Fatia 2),
-      // cada um em seu próprio ramo. Mantém a negação por padrão: qualquer
-      // recurso não reconhecido continua bloqueado.
+      // Recursos organizacionais (Etapa 1, Fatia 1), de pessoas (Fatia 2) e de
+      // jornada/ponto (Etapa 3), cada um em seu próprio ramo. Mantém a negação
+      // por padrão: qualquer recurso não reconhecido continua bloqueado.
       if (isOrganizationalResource(target.resource)) {
         return evaluateOrganizacao(subject, target);
       }
       if (isPessoasResource(target.resource)) {
         return evaluatePessoas(subject, target);
+      }
+      if (isPontoResource(target.resource)) {
+        return evaluatePonto(subject, target);
       }
       return false;
   }
@@ -249,6 +253,66 @@ function evaluatePessoas(
     //                   `centro_custo` da Fatia 1.
     // `colaborador`   — o que ele acessaria é o Portal do Colaborador, que não
     //                   existe (DP-23); conceder aqui exporia dado de terceiro.
+    default:
+      return false;
+  }
+}
+
+/**
+ * Jornada e Ponto (Etapa 3, ADR 0008; Baseline Jornada V1, decisão 5).
+ *
+ * Mesma avaliação em **duas fases** dos ramos anteriores — capacidade no guard
+ * (`targetCompanyId === undefined`), escopo no service, com a empresa do
+ * **vínculo** já resolvida. A fronteira continua sendo `empresa_id`; esta
+ * fatia não introduz nenhuma nova.
+ *
+ * **A lista de quem pode é exatamente `rh` e `dp`, e nada mais.** A Baseline
+ * (decisão 5) preencheu duas células de uma matriz que estava inteiramente
+ * vazia; toda célula não preenchida continua negada — não "aberta a
+ * interpretação".
+ *
+ * **`admin_tecnico` é NEGADO — deliberado, não omissão.** Pelo mesmo raciocínio
+ * já aplicado em `evaluatePessoas`: a exceção de acesso global (Emenda 1 da
+ * ADR 0005) foi concedida sobre estrutura organizacional sem dado pessoal, e
+ * dado de comportamento/presença está na mesma categoria de sensibilidade que
+ * motivou a negação em Pessoas. Note de novo a assimetria com
+ * `evaluateOrganizacao`, onde o papel retorna `true`: as duas coisas convivem
+ * por decisão registrada.
+ *
+ * Não há ação `manage` nem `alter` neste domínio — o evento é imutável
+ * (decisão 4) e não existe aprovação nem fechamento (decisão 7). Só `create` e
+ * `read` são reconhecidos; qualquer outra ação cai na negação por padrão,
+ * mesmo vinda de `rh`/`dp`.
+ */
+function evaluatePonto(
+  subject: AuthorizationSubject,
+  target: AuthorizationTarget,
+): boolean {
+  if (target.action !== "create" && target.action !== "read") {
+    return false;
+  }
+
+  const escopoResolvido = target.targetCompanyId !== undefined;
+
+  switch (subject.role) {
+    case "rh":
+    case "dp":
+      return escopoResolvido
+        ? isSameCompany(subject, target)
+        : subject.companyId !== null;
+
+    // Negados, cada um por um motivo próprio já registrado:
+    //
+    // `admin_tecnico` — Baseline Jornada V1, decisão 5 (ver bloco acima).
+    // `gestor`        — escopo pendente (DP-8/DP-3J-12). "Gestor aprova o
+    //                   ponto da equipe" é o fluxo natural do domínio, e é
+    //                   exatamente por isso que conceder aqui sem a decisão
+    //                   seria escolher a fronteira por conta própria.
+    // `colaborador`   — o que ele acessaria é o Portal do Colaborador, fora de
+    //                   escopo (spec §4); conceder exporia dado de terceiro.
+    // `auditor`/`dpo` — leem a trilha (`access_log`), que é outro escopo; o
+    //                   dado de ponto em si é pendência própria (DP-3J-05).
+    // `financeiro`    — nada na Baseline concede acesso a ponto.
     default:
       return false;
   }
