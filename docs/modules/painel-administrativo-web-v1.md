@@ -1,11 +1,17 @@
 # Painel Administrativo Web V1 — especificação
 
-- Status: especificação em elaboração — fase **Especificar** apenas.
-- Fase do SDD: Especificar. Nenhuma aplicação, componente, dependência,
-  endpoint, migration ou integração criada nesta fase.
+- Status: **Baseline V1 aprovada** (2026-08-10) para framework, topologia de
+  origem e contrato do endpoint futuro de CSRF — fase **Registrar decisão
+  aprovada**. Nenhuma fase Implementar foi aberta ou autorizada por esta
+  atualização.
+- Fase do SDD: Registrar decisão aprovada. Nenhuma aplicação, componente,
+  dependência, endpoint, migration ou integração criada nesta fase.
 - Escopo: primeira interface administrativa visual do Evolli RH, consumindo
   **exclusivamente** APIs já implementadas e **exclusivamente** dados
   sintéticos.
+- Decisão de produto: [Baseline V1 do Painel Administrativo Web](../decisions/painel-administrativo-web-v1-baseline.md)
+  (3 decisões aprovadas, 2026-08-10) e [ADR 0009](../adr/0009-painel-administrativo-web-v1.md)
+  (formalização arquitetural correspondente).
 - Relacionado: [README.md](../../README.md), [docs/ARCHITECTURE.md](../ARCHITECTURE.md),
   [docs/ROADMAP.md](../ROADMAP.md), [ADR 0003](../adr/0003-identidade-sessao-e-autorizacao.md),
   [ADR 0004](../adr/0004-auditoria-formal-e-integridade.md),
@@ -35,6 +41,12 @@ após a definição do design system e do contrato de autenticação". O contrat
 autenticação **já existe** (ADR 0003, implementado); o design system **não**
 (§4, DP-W-03).
 
+**(Baseline V1, Decisão 1, 2026-08-10)**: o framework está aprovado — **React
+
+- Vite + TypeScript**. Isso resolve **DP-W-01**. Nenhum projeto é inicializado
+  por essa decisão; `apps/web/` continua contendo só `README.md` até a fase
+  Implementar ser autorizada.
+
 ### O2 — A API não tem CORS configurado. Isto é a restrição estrutural mais importante desta fatia
 
 Verificado em `apps/api/src/main.ts`: o bootstrap aplica `helmet`,
@@ -59,6 +71,15 @@ que esta spec resolva:
 **Recomendação técnica:** opção 1. Ela mantém o desenho atual intacto, evita
 ampliar a superfície de CSRF e é a única que não exige tocar em código já
 mergeado e auditado. Registrada como recomendação — a decisão é do produto/TI.
+
+**(Baseline V1, Decisão 2, 2026-08-10)**: a recomendação foi adotada — **mesma
+origem, com proxy reverso**, sem CORS nesta V1. Isso resolve a parte de
+topologia de **DP-W-02**. Provedor, domínio e ferramenta de proxy **não** são
+decididos por essa decisão — permanecem responsabilidade futura de
+infraestrutura (**DP-W-02, infraestrutura**), não bloqueante para a fase
+Implementar do painel. Enquanto CORS não for configurado, nenhuma topologia
+de origens distintas funciona no navegador — não é detalhe de configuração a
+ajustar depois, é consequência direta desta decisão de arquitetura.
 
 ### O3 — Contrato de sessão e CSRF, como implementado
 
@@ -116,6 +137,24 @@ Esta spec **não escolhe** entre (a), (b) e (c) — e explicitamente **não
 inventa** o endpoint de (a). Registrar a lacuna é o entregável; resolvê-la é
 decisão que antecede a fase Implementar do painel.
 
+**(Baseline V1, Decisão 3, 2026-08-10)**: o caminho **(a)** foi escolhido —
+será criado, em fase própria futura, o endpoint autenticado `GET
+/v1/auth/csrf`, com contrato fechado: exige sessão válida; devolve **somente**
+o token CSRF da sessão; não é mutação de domínio; resposta com `Cache-Control:
+no-store`; **não** usa cookie double-submit (o synchronizer token da ADR 0003
+permanece o mecanismo); o token nunca é gravado em armazenamento persistente
+do navegador; responde **401** sem detalhe interno para sessão ausente/
+expirada; não expõe credencial, dado pessoal ou informação de autorização.
+Isso resolve **DP-W-08** quanto ao mecanismo. **Esta decisão não cria o
+endpoint** — nenhuma rota, controller ou linha de código existe ainda. Detalhe
+técnico não resolvido pela decisão: como o banco guarda só o hash do token
+CSRF (nunca o valor bruto — ADR 0003, decisão 5), a implementação futura
+precisará decidir entre rotacionar o token a cada chamada ou outra estratégia
+compatível — decisão de implementação, não desta Baseline. Ver
+[Baseline V1](../decisions/painel-administrativo-web-v1-baseline.md) e
+[ADR 0009](../adr/0009-painel-administrativo-web-v1.md) para o contrato
+completo.
+
 ### O5 — `admin_tecnico` enxerga muito pouco do painel, e isso é intencional
 
 Verificado em `rbac.evaluator.ts`: `admin_tecnico` tem acesso amplo à
@@ -159,6 +198,34 @@ Consequência: um cliente tipado gerado hoje a partir desse documento
 descreveria caminhos e formatos, mas **não** o esquema de autenticação. Isso é
 observação factual — completar o documento é alteração de backend, fora desta
 fase (§4, DP-W-11).
+
+### O8 — Baseline V1 aprovada: o que muda, o que não muda
+
+**Aditivo — não reescreve O1 a O7.** Em 2026-08-10, o produto avaliou três
+das lacunas registradas acima e aprovou 3 decisões, registradas em
+[docs/decisions/painel-administrativo-web-v1-baseline.md](../decisions/painel-administrativo-web-v1-baseline.md)
+e formalizadas em
+[ADR 0009](../adr/0009-painel-administrativo-web-v1.md). As observações O1,
+O2 e O4 foram atualizadas para refletir essa Baseline — cada atualização está
+marcada com "(Baseline V1, Decisão N)".
+
+**O que a Baseline resolve:** framework (React + Vite + TypeScript, O1);
+topologia de origem (mesma origem com proxy reverso, sem CORS nesta V1, O2);
+contrato do futuro `GET /v1/auth/csrf` para recuperar o token CSRF após
+_reload_ (O4).
+
+**O que a Baseline não resolve — permanece pendente, sem inferência:** design
+system (DP-W-03), identidade visual (DP-W-04), layout e navegação (DP-W-05),
+métricas (DP-W-06), acessibilidade e navegadores-alvo (DP-W-07), provedor/
+domínio/ferramenta de proxy reverso (DP-W-02, infraestrutura), telemetria
+(DP-W-09), testes visuais/e2e (DP-W-10), exposição de OpenAPI/cliente tipado
+(DP-W-11), e todas as lacunas de API do §5.2 exceto o CSRF. **Nenhum papel
+ganha acesso novo** por esta Baseline — a autorização visual continua sendo
+reflexo do que a API já decide.
+
+**O que a Baseline não autoriza:** nenhum código React, endpoint, proxy,
+CORS, migration, dependência ou infraestrutura. Ela resolve decisões de
+arquitetura que uma futura fase Implementar exigiria — não abre essa fase.
 
 ## 1. Escopo visual V1
 
@@ -368,21 +435,26 @@ servidor — nunca como conteúdo a interpretar ou desdobrar.
 
 ## 4. Decisões pendentes
 
-Nenhuma é resolvida por esta especificação.
+**(Baseline V1, 2026-08-10)**: das 11 decisões abaixo, 3 foram resolvidas
+para o escopo desta V1 — cada uma marcada com o efeito exato da Baseline. As
+demais permanecem pendentes, sem resolução por inferência. Nenhuma resolução
+aqui equivale a autorizar código — ver
+[Baseline V1](../decisions/painel-administrativo-web-v1-baseline.md) e
+[ADR 0009](../adr/0009-painel-administrativo-web-v1.md).
 
-| ID      | Decisão pendente                                                                                                                  | Quem decide                     |
-| ------- | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
-| DP-W-01 | Framework concreto do frontend (o `README.md` cita React/TSX como intenção; nada foi inicializado — O1)                           | Produto, Arquitetura            |
-| DP-W-02 | Hospedagem e topologia de origem: mesma origem/proxy **ou** habilitar CORS na API (esta segunda **exige alterar o backend** — O2) | Arquitetura, TI                 |
-| DP-W-03 | Design system: adotar existente ou construir `packages/ui` (hoje só `README.md`)                                                  | Produto, Design                 |
-| DP-W-04 | Identidade visual (marca, cor, tipografia, tom)                                                                                   | Produto, Design                 |
-| DP-W-05 | Layout, navegação e quais módulos entram no V1 visual (inclui recuperação de senha e trilha de auditoria)                         | Produto, Design                 |
-| DP-W-06 | Se a visão inicial terá números e, em caso positivo, de onde vêm — não há endpoint de agregação                                   | Produto                         |
-| DP-W-07 | Acessibilidade (nível-alvo) e navegadores suportados                                                                              | Produto, Design                 |
-| DP-W-08 | Tratamento de sessão expirada **e** recuperação do token CSRF após _reload_ — ver O4, que é bloqueante                            | Produto, Segurança, Arquitetura |
-| DP-W-09 | Política de logs e telemetria do cliente, com regra de redação                                                                    | Produto, DPO, Segurança         |
-| DP-W-10 | Estratégia de testes visuais e e2e do painel (ferramenta, profundidade, execução em CI)                                           | Arquitetura, QA                 |
-| DP-W-11 | Como expor OpenAPI e gerar cliente tipado; inclui completar o documento com o esquema de autenticação (O7)                        | Arquitetura                     |
+| ID      | Decisão pendente                                                                                                                  | Quem decide                     | Status após Baseline V1                                                                                                                                                                                       |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| DP-W-01 | Framework concreto do frontend (o `README.md` cita React/TSX como intenção; nada foi inicializado — O1)                           | Produto, Arquitetura            | **Resolvida** (Decisão 1: React + Vite + TypeScript)                                                                                                                                                          |
+| DP-W-02 | Hospedagem e topologia de origem: mesma origem/proxy **ou** habilitar CORS na API (esta segunda **exige alterar o backend** — O2) | Arquitetura, TI                 | **Topologia resolvida** (Decisão 2: mesma origem, sem CORS); provedor/domínio/ferramenta de proxy seguem pendentes como DP-W-02 (infraestrutura)                                                              |
+| DP-W-03 | Design system: adotar existente ou construir `packages/ui` (hoje só `README.md`)                                                  | Produto, Design                 | Pendente                                                                                                                                                                                                      |
+| DP-W-04 | Identidade visual (marca, cor, tipografia, tom)                                                                                   | Produto, Design                 | Pendente                                                                                                                                                                                                      |
+| DP-W-05 | Layout, navegação e quais módulos entram no V1 visual (inclui recuperação de senha e trilha de auditoria)                         | Produto, Design                 | Pendente                                                                                                                                                                                                      |
+| DP-W-06 | Se a visão inicial terá números e, em caso positivo, de onde vêm — não há endpoint de agregação                                   | Produto                         | Pendente                                                                                                                                                                                                      |
+| DP-W-07 | Acessibilidade (nível-alvo) e navegadores suportados                                                                              | Produto, Design                 | Pendente                                                                                                                                                                                                      |
+| DP-W-08 | Tratamento de sessão expirada **e** recuperação do token CSRF após _reload_ — ver O4, que era bloqueante                          | Produto, Segurança, Arquitetura | **Mecanismo resolvido** (Decisão 3: endpoint `GET /v1/auth/csrf` dedicado, contrato fechado); endpoint ainda não implementado, e a estratégia interna de emissão do token segue como detalhe de implementação |
+| DP-W-09 | Política de logs e telemetria do cliente, com regra de redação                                                                    | Produto, DPO, Segurança         | Pendente                                                                                                                                                                                                      |
+| DP-W-10 | Estratégia de testes visuais e e2e do painel (ferramenta, profundidade, execução em CI)                                           | Arquitetura, QA                 | Pendente                                                                                                                                                                                                      |
+| DP-W-11 | Como expor OpenAPI e gerar cliente tipado; inclui completar o documento com o esquema de autenticação (O7)                        | Arquitetura                     | Pendente                                                                                                                                                                                                      |
 
 ## 5. Matriz de telas
 
@@ -423,16 +495,22 @@ prefixadas por `/v1`.
 
 ### 5.2 Lacunas de API — não podem ser resolvidas inventando endpoint
 
-| Lacuna                                                                       | Efeito na interface                                                                                | Encaminhamento                                                                                     |
-| ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| **Sem rota para obter o token CSRF de uma sessão já autenticada** (O4)       | Após _reload_, o usuário segue autenticado mas **não consegue mutar nada**. Bloqueia o V1 como SPA | DP-W-08. Exige decisão de produto/segurança e, em duas das três alternativas, alteração de backend |
-| **Sem CORS** (O2)                                                            | Frontend em origem distinta não funciona                                                           | DP-W-02. Ou mesma origem, ou alterar a API                                                         |
-| **Sem rota de listagem de usuários**                                         | Não há tela de gestão de acessos com listagem; só criação e ações sobre um id já conhecido         | Endpoint novo seria alteração de backend — fora desta fase                                         |
-| **Sem `GET /movimentacoes/:id`**                                             | Detalhe de movimentação só via listagem filtrada ou linha do tempo do vínculo                      | Contornável hoje; endpoint novo exigiria decisão                                                   |
-| **Sem `GET /vinculos/:id`**                                                  | Não há detalhe direto do vínculo; só sub-recursos e a lista dentro do colaborador                  | Contornável hoje                                                                                   |
-| **Sem endpoint de agregação/métrica**                                        | Visão inicial não pode exibir indicador sem inventar API                                           | DP-W-06                                                                                            |
-| **OpenAPI sem esquema de autenticação e sem tags de `pessoas`/`ponto`** (O7) | Cliente tipado gerado hoje não descreve autenticação                                               | DP-W-11                                                                                            |
-| **Ponto não devolve nome/matrícula** (decisão de minimização)                | Telas de ponto identificam por `vinculoId`                                                         | **Não é lacuna a corrigir na interface.** Correlacionar exige decisão de produto (§3.3)            |
+**(Baseline V1, 2026-08-10)**: as duas primeiras linhas desta tabela foram
+resolvidas por decisão de produto — ver
+[Baseline V1](../decisions/painel-administrativo-web-v1-baseline.md). Nenhuma
+das duas já está implementada; a resolução é de arquitetura/contrato, não de
+código.
+
+| Lacuna                                                                       | Efeito na interface                                                                                 | Encaminhamento                                                                                                                                                                                               |
+| ---------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Sem rota para obter o token CSRF de uma sessão já autenticada** (O4)       | Após _reload_, o usuário segue autenticado mas **não consegue mutar nada**. Bloqueava o V1 como SPA | **(Baseline V1, Decisão 3)** resolvida por decisão: será criado `GET /v1/auth/csrf`, contrato fechado. **Endpoint ainda não existe** — continua bloqueante até ser implementado                              |
+| **Sem CORS** (O2)                                                            | Frontend em origem distinta não funciona                                                            | **(Baseline V1, Decisão 2)** resolvida por decisão: mesma origem, sem CORS nesta V1. CORS continua **não configurado** — topologia de origens distintas seguirá não funcionando, por decisão, não por lacuna |
+| **Sem rota de listagem de usuários**                                         | Não há tela de gestão de acessos com listagem; só criação e ações sobre um id já conhecido          | Endpoint novo seria alteração de backend — fora desta fase                                                                                                                                                   |
+| **Sem `GET /movimentacoes/:id`**                                             | Detalhe de movimentação só via listagem filtrada ou linha do tempo do vínculo                       | Contornável hoje; endpoint novo exigiria decisão                                                                                                                                                             |
+| **Sem `GET /vinculos/:id`**                                                  | Não há detalhe direto do vínculo; só sub-recursos e a lista dentro do colaborador                   | Contornável hoje                                                                                                                                                                                             |
+| **Sem endpoint de agregação/métrica**                                        | Visão inicial não pode exibir indicador sem inventar API                                            | DP-W-06                                                                                                                                                                                                      |
+| **OpenAPI sem esquema de autenticação e sem tags de `pessoas`/`ponto`** (O7) | Cliente tipado gerado hoje não descreve autenticação                                                | DP-W-11                                                                                                                                                                                                      |
+| **Ponto não devolve nome/matrícula** (decisão de minimização)                | Telas de ponto identificam por `vinculoId`                                                          | **Não é lacuna a corrigir na interface.** Correlacionar exige decisão de produto (§3.3)                                                                                                                      |
 
 ## 6. Critérios de aceite futuros
 
