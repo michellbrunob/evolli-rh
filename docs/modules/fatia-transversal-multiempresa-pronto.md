@@ -1,11 +1,14 @@
 # Fatia transversal — evolução multiempresa preparada
 
-- Status: especificação em elaboração — fase **Especificar** apenas.
-- Fase do SDD: Especificar. Nenhum código, schema, migration, endpoint,
-  dependência, infraestrutura, banco, bucket ou serviço externo é criado,
-  alterado ou autorizado por este documento.
+- Status: **decisão aprovada** (2026-08-11) para a interpretação do gatilho
+  e as restrições que a acompanham — fase **Registrar decisão aprovada**.
+  Nenhuma fase Implementar foi aberta por esta atualização.
+- Fase do SDD: Registrar decisão aprovada. Nenhum código, schema,
+  migration, endpoint, dependência, infraestrutura, banco, bucket ou
+  serviço externo é criado, alterado ou autorizado por este documento.
 - Decisão correspondente: [rebaseline-multiempresa-pronto-pendente.md](../decisions/rebaseline-multiempresa-pronto-pendente.md)
-  — **pendente de aprovação do produto**. Nenhuma ADR é criada nesta fase.
+  — **DECISÃO APROVADA**, formalizada na
+  [ADR 0010 — Preparação Multiempresa Interna](../adr/0010-preparacao-multiempresa-interna.md).
 - Relacionado: [README.md](../../README.md), [docs/ARCHITECTURE.md](../ARCHITECTURE.md),
   [docs/ROADMAP.md](../ROADMAP.md),
   [ADR 0003](../adr/0003-identidade-sessao-e-autorizacao.md),
@@ -74,13 +77,20 @@ formalmente a operação para terceiros é, plausivelmente, um "processo de
 comercialização preliminar"** — o que faria o item 2 disparar agora, antes
 do prazo de 2026-11-04.
 
-Esta especificação **não decide** se o gatilho disparou. Interpretar o
+Esta especificação **não decidiu** se o gatilho disparou. Interpretar o
 alcance da própria exceção é decisão de produto e segurança, não de
-arquitetura. O que este documento faz é **registrar a questão em vez de
-deixá-la passar em silêncio** — porque o efeito prático é concreto: se o
-gatilho disparou, a reavaliação do acesso global do `admin_tecnico` deixa de
-ter prazo até novembro e passa a ser devida agora. Ver documento de decisão,
-**DP-M-01**.
+arquitetura. O que este documento fez foi **registrar a questão em vez de
+deixá-la passar em silêncio**.
+
+**Resolvido em 2026-08-11 (DP-M-01).** O produto decidiu: **preparação
+arquitetural interna não caracteriza início de comercialização** — o
+gatilho (2) **não está acionado**. A reavaliação é antecipada apenas
+diante de cinco fatos verificáveis (proposta comercial ativa, contrato com
+cliente externo, piloto com terceiro, provisionamento de cliente externo,
+acesso de terceiro ao ecossistema). **Sem eles, o prazo de 04/11/2026
+continua valendo, sem extensão.** Ver
+[documento de decisão §1.1](../decisions/rebaseline-multiempresa-pronto-pendente.md)
+e [ADR 0010, decisão 2](../adr/0010-preparacao-multiempresa-interna.md).
 
 ### O4 — A ADR 0005 exige ADR nova, não emenda, quando a multitenancy for acionada
 
@@ -90,11 +100,17 @@ incluindo decisão comercial de vender para cliente externo e "necessidade de
 operar, no mesmo deployment, dados de organizações com fronteira de
 confiança distinta".
 
-Por isso, e por instrução do próprio enunciado, **nenhuma ADR é criada nesta
-fase**. Esta especificação é trabalho **preparatório**: ela desenha
-alternativas e fixa disciplina de código, mas **não aciona o gatilho, não
-substitui a ADR futura e não decide a multitenancy**. Quando o produto
-aprovar o rebaseline, a ADR correspondente é etapa própria.
+Esta especificação é trabalho **preparatório**: ela desenha alternativas e
+fixa disciplina de código, mas **não aciona o gatilho, não substitui a ADR
+futura de multitenancy e não decide a multitenancy**.
+
+**Atualização (2026-08-11).** A [ADR 0010](../adr/0010-preparacao-multiempresa-interna.md)
+foi aceita e formaliza a interpretação operacional do gatilho da Emenda 1
+(O3). Ela **não é** a ADR de multitenancy exigida pela decisão 5 da
+ADR 0005 — essa continua futura, condicionada ao gatilho comercial, e é a
+que trará modelagem de cliente, migration aditiva, plano de backfill,
+testes de isolamento com prova negativa e revisão específica de LGPD.
+A ADR 0010 **não altera** a ADR 0005 nem sua Emenda 1.
 
 ### O5 — Pendências herdadas que esta direção torna mais relevantes
 
@@ -134,7 +150,7 @@ decisão**, e nada nesta seção autoriza implementação.
 - **Banco atual: um PostgreSQL**, com separação de papéis `evolli_migrator`
   (DDL) e `evolli_app` (DML) — ADR 0002.
 
-### 1.2 Decisão vigente (não alterada por este documento)
+### 1.2 Decisão vigente
 
 - Não criar agora: multitenancy técnica, `tenant_id`, RLS, base central,
   banco adicional, troca dinâmica de conexão, novo papel, CNPJ, migration
@@ -142,11 +158,17 @@ decisão**, e nada nesta seção autoriza implementação.
 - `company_id` permanece a fronteira organizacional e de autorização.
 - MFA continua obrigatório antes de dado real. SSO segue evolução futura; a
   V1 mantém login por e-mail e senha.
+- **(Aprovado em 2026-08-11, ADR 0010)** Preparação arquitetural interna
+  **não** caracteriza início de comercialização; a reavaliação da exceção
+  do `admin_tecnico` é antecipada apenas pelos fatos G1–G5, e o prazo de
+  **04/11/2026** segue valendo sem extensão. Nenhum cliente externo é
+  criado ou atendido; nenhum `auditor` ou `dpo` é provisionado.
 
-### 1.3 Propostas — sujeitas à aprovação do produto
+### 1.3 Propostas — ainda sujeitas à aprovação do produto
 
-Nenhuma destas está aprovada. Cada uma vira decisão apenas se o produto a
-registrar formalmente.
+**Nenhuma destas foi aprovada.** A decisão de 2026-08-11 aprovou a
+_preparação_ e a interpretação do gatilho (§1.2), **não** as propostas
+abaixo — que seguem dependendo do gatilho comercial e de ADR própria.
 
 1. **Criar futuramente um contexto comercial de _Cliente contratante_**,
    acima das empresas/CNPJs que ele administra — uma camada nova, não uma
@@ -158,11 +180,17 @@ registrar formalmente.
 
 ### 1.4 Pendências
 
-Consolidadas no documento de decisão. As mais estruturais: definição oficial
-de "Cliente contratante", cardinalidade cliente ↔ CNPJ, gatilho objetivo
-para sair do banco único interno, escolha do modelo de isolamento, contas
-Master nominativas, escopo do prestador de serviço, e todos os gates de
-documentos/LGPD.
+Consolidadas no documento de decisão, e agora **classificadas pelo que cada
+uma bloqueia** — comercialização, dados reais/documentos, ou nada do Painel
+Web interno (ver
+[documento de decisão §2](../decisions/rebaseline-multiempresa-pronto-pendente.md)).
+
+As mais estruturais: definição oficial de "Cliente contratante",
+cardinalidade cliente ↔ CNPJ, gatilho objetivo para sair do banco único
+interno, escolha do modelo de isolamento, contas Master nominativas, escopo
+do prestador de serviço, e todos os gates de documentos/LGPD.
+
+**Nenhuma delas bloqueia o Painel Administrativo Web V1 interno.**
 
 ## 2. Arquitetura-alvo, sem implementação
 
@@ -354,6 +382,12 @@ O produto exato da Cloudflare e sua avaliação de segurança são pendência
 correspondente **não está em `main`** (O1) — quando for integrada, é ela que
 detalha os controles, não este documento.
 
+**A decisão de 2026-08-11 confirmou isto sem alteração:** Cloudflare R2
+segue **apenas como direção futura**, condicionada aos gates de segurança,
+LGPD, DPO, classificação, retenção, descarte, auditoria e
+quarentena/antimalware. **Não é integração existente.** Nenhum bucket,
+credencial, endpoint ou SDK foi criado.
+
 ## 6. Impacto nos módulos existentes e sequência recomendada
 
 ### 6.1 Organização, Pessoas e Ponto **não** devem ser reescritos agora
@@ -371,20 +405,30 @@ Demonstração, não afirmação:
 Conclusão: **o custo de preparar é disciplina (§4), não refatoração.** O que
 custaria caro é violar R1–R7 e descobrir depois.
 
-### 6.2 Sequência recomendada
+### 6.2 Sequência de execução
 
-1. **Aprovar esta decisão transversal** (ou rejeitá-la, ou emendá-la) —
-   documento de decisão, hoje pendente.
-2. **Atualizar roadmap e ADR somente após aprovação.** Enquanto não houver
-   aprovação, `docs/ROADMAP.md` e as ADRs seguem inalterados.
-3. **Implementar o endpoint CSRF aprovado e o Painel Administrativo Web V1**
-   — lembrando que essas decisões estão em branch **não integrada** (O1), e
-   que o merge delas é pré-requisito de qualquer implementação.
-4. **Somente no gatilho comercial aprovado**, implementar a camada de
-   cliente e o modelo de isolamento escolhido — com ADR nova, conforme a
-   ADR 0005 exige (O4).
-5. **Tratar documentos e integrações de ponto real em fatias próprias**,
-   cada uma com seus gates.
+Atualizada após a aprovação de 2026-08-11
+([decisão](../decisions/rebaseline-multiempresa-pronto-pendente.md),
+[ADR 0010](../adr/0010-preparacao-multiempresa-interna.md)):
+
+1. **Integrar esta decisão documental** — a decisão está aprovada e a
+   ADR 0010 formalizada; falta o merge desta branch em `main`.
+2. **Integrar as decisões documentais do Painel Administrativo Web** —
+   ADR 0009, spec e baseline, hoje em branch **não integrada** (O1). O
+   merge é pré-requisito dos passos 3 e 4: implementar contra decisão não
+   integrada seria construir sobre base que ainda pode mudar.
+3. **Implementar o endpoint CSRF aprovado** (`GET /v1/auth/csrf`, com
+   rotação e invalidação do token anterior), conforme o contrato registrado
+   naqueles documentos.
+4. **Implementar o Painel Administrativo Web V1 interno.** Nenhuma
+   pendência desta fatia transversal o bloqueia — ver a classificação das
+   pendências no documento de decisão (§2).
+5. **Somente diante do gatilho comercial** (fatos G1–G5 da ADR 0010),
+   abrir **ADR nova** e implementar a camada de cliente e o modelo de
+   isolamento escolhido — conforme a ADR 0005 exige (O4).
+
+**Documentos e integrações de ponto real são fatias próprias**, cada uma
+com seus gates, fora desta sequência.
 
 ## 7. Riscos registrados
 
