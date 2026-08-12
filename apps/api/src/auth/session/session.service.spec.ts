@@ -215,6 +215,82 @@ describe("SessionService", () => {
     expect(prisma.accessSession.updateMany).not.toHaveBeenCalled();
   });
 
+  it("rotateCsrfToken() persiste só o hash do token novo, nunca o valor bruto", async () => {
+    const prisma = createPrismaMock();
+    prisma.accessSession.updateMany.mockResolvedValue({ count: 1 });
+    const service = new SessionService(prisma, createAuditServiceMock());
+
+    const csrfToken = await service.rotateCsrfToken("session-1");
+
+    expect(csrfToken).toEqual(expect.any(String));
+    const call = prisma.accessSession.updateMany.mock.calls[0][0];
+    expect(call.data.csrfTokenHash).toBe(hashOpaqueToken(csrfToken as string));
+    // só a sessão não revogada e ainda não expirada é rotacionada, e o
+    // token bruto nunca vai ao banco
+    expect(call.where.id).toBe("session-1");
+    expect(call.where.revokedAt).toBeNull();
+    expect(call.where.expiresAt.gt).toBeInstanceOf(Date);
+    expect(JSON.stringify(call)).not.toContain(csrfToken);
+  });
+
+  it("rotateCsrfToken() condiciona o UPDATE a revokedAt nulo E expiresAt no futuro", async () => {
+    const prisma = createPrismaMock();
+    prisma.accessSession.updateMany.mockResolvedValue({ count: 1 });
+    const service = new SessionService(prisma, createAuditServiceMock());
+
+    const before = Date.now();
+    await service.rotateCsrfToken("session-1");
+    const after = Date.now();
+
+    const call = prisma.accessSession.updateMany.mock.calls[0][0];
+    // condição atômica no próprio UPDATE, não checagem separada antes dele
+    expect(call.where).toMatchObject({
+      id: "session-1",
+      revokedAt: null,
+    });
+    const gt = call.where.expiresAt.gt as Date;
+    expect(gt.getTime()).toBeGreaterThanOrEqual(before);
+    expect(gt.getTime()).toBeLessThanOrEqual(after);
+  });
+
+  it("rotateCsrfToken() devolve null para sessão não revogada porém expirada (nenhuma linha afetada)", async () => {
+    const prisma = createPrismaMock();
+    // o UPDATE não afeta nenhuma linha porque expiresAt <= now, mesmo com
+    // revokedAt ainda nulo — simula a janela de corrida entre a validação
+    // do SessionGuard e este UPDATE
+    prisma.accessSession.updateMany.mockResolvedValue({ count: 0 });
+    const service = new SessionService(prisma, createAuditServiceMock());
+
+    expect(await service.rotateCsrfToken("session-expirada")).toBeNull();
+    expect(prisma.accessSession.updateMany).toHaveBeenCalledTimes(1);
+  });
+
+  it("rotateCsrfToken() emite token diferente a cada chamada (invalida o anterior)", async () => {
+    const prisma = createPrismaMock();
+    prisma.accessSession.updateMany.mockResolvedValue({ count: 1 });
+    const service = new SessionService(prisma, createAuditServiceMock());
+
+    const first = await service.rotateCsrfToken("session-1");
+    const second = await service.rotateCsrfToken("session-1");
+
+    expect(first).not.toBe(second);
+    // o hash gravado na segunda chamada substitui o da primeira
+    const firstHash =
+      prisma.accessSession.updateMany.mock.calls[0][0].data.csrfTokenHash;
+    const secondHash =
+      prisma.accessSession.updateMany.mock.calls[1][0].data.csrfTokenHash;
+    expect(secondHash).not.toBe(firstHash);
+    expect(secondHash).toBe(hashOpaqueToken(second as string));
+  });
+
+  it("rotateCsrfToken() devolve null se a sessão já não estiver ativa", async () => {
+    const prisma = createPrismaMock();
+    prisma.accessSession.updateMany.mockResolvedValue({ count: 0 });
+    const service = new SessionService(prisma, createAuditServiceMock());
+
+    expect(await service.rotateCsrfToken("session-revogada")).toBeNull();
+  });
+
   it("validateAndTouch() rejeita se o usuário não estiver ativo", async () => {
     const prisma = createPrismaMock();
     prisma.accessSession.findUnique.mockResolvedValue({

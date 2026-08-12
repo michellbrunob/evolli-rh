@@ -4,6 +4,7 @@ import {
   Delete,
   ForbiddenException,
   Get,
+  Header,
   HttpCode,
   HttpStatus,
   NotFoundException,
@@ -11,11 +12,17 @@ import {
   Post,
   Req,
   Res,
+  UnauthorizedException,
   UseGuards,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Request, Response } from "express";
-import { ApiTags } from "@nestjs/swagger";
+import {
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+  ApiUnauthorizedResponse,
+} from "@nestjs/swagger";
 import { AuthService } from "./auth.service";
 import { LoginDto } from "./dto/login.dto";
 import { PasswordForgotDto } from "./dto/password-forgot.dto";
@@ -97,6 +104,49 @@ export class AuthController {
     });
 
     clearSessionCookie(res, this.configService);
+  }
+
+  // Rotação, não leitura (ADR 0009 §4): o banco guarda só o hash do token
+  // CSRF, então recuperá-lo após um reload é impossível por desenho. Cada
+  // chamada emite um token novo e invalida o anterior desta sessão — uma
+  // mutação que ainda carregue o token antigo passa a ser recusada com 403
+  // pelo CsrfGuard. Sendo GET, não exige token CSRF para ser chamado.
+  @Get("csrf")
+  @UseGuards(SessionGuard)
+  @Header("Cache-Control", "no-store")
+  @ApiOperation({
+    summary: "Emite um token CSRF novo para a sessão autenticada",
+    description:
+      "Exige sessão válida (cookie de sessão HttpOnly). Gera um token CSRF novo, " +
+      "persiste somente seu hash e invalida o token anterior da mesma sessão. " +
+      "Não altera nenhum dado de RH e não concede autorização.",
+  })
+  @ApiOkResponse({
+    description: "Token CSRF novo, válido para a sessão corrente.",
+    schema: {
+      type: "object",
+      required: ["csrfToken"],
+      properties: {
+        csrfToken: {
+          type: "string",
+          description:
+            "Enviar no header x-csrf-token das requisições de mudança de estado. " +
+            "Manter apenas em memória — nunca em localStorage ou sessionStorage.",
+        },
+      },
+    },
+  })
+  @ApiUnauthorizedResponse({
+    description: "Sessão ausente, expirada ou revogada.",
+  })
+  async issueCsrfToken(@CurrentSession() session: AccessSession) {
+    const csrfToken = await this.sessionService.rotateCsrfToken(session.id);
+
+    if (!csrfToken) {
+      throw new UnauthorizedException();
+    }
+
+    return { csrfToken };
   }
 
   @Get("sessions")
