@@ -13,6 +13,8 @@ import { GenericContainer, StartedTestContainer, Wait } from "testcontainers";
 import { AppModule } from "../src/app.module";
 import { AllExceptionsFilter } from "../src/common/filters/http-exception.filter";
 import { requestIdMiddleware } from "../src/common/request-id";
+import { setupOpenApi } from "../src/openapi/openapi";
+import { hashOpaqueToken } from "../src/auth/crypto/opaque-token.util";
 
 /**
  * Etapa 0 — Fatia 3: identidade, sessão e autorização. Integração real com
@@ -351,6 +353,250 @@ describe("Identidade, sessão e autorização (e2e)", () => {
       expect(text).not.toContain(adminPassword);
       expect(text).not.toMatch(/at .*\.ts:\d+/);
       expect(response.body).not.toHaveProperty("stack");
+    });
+  });
+
+  describe("GET /v1/auth/csrf: emissão por rotação (ADR 0009 §4)", () => {
+    let app: INestApplication;
+    let prisma: PrismaClient;
+    const agent = () => request(app.getHttpServer());
+    const adminEmail = "admin@evolli.test";
+    const adminPassword = "uma-passphrase-de-bootstrap-bem-longa";
+
+    let cookie: string;
+    let loginCsrfToken: string;
+    let firstToken: string;
+    let secondToken: string;
+
+    beforeAll(async () => {
+      app = await buildApp();
+      prisma = new PrismaClient({ datasources: { db: { url: appUrl } } });
+
+      const response = await agent()
+        .post("/v1/auth/login")
+        .send({ email: adminEmail, password: adminPassword })
+        .expect(200);
+
+      const cookies = response.headers["set-cookie"] as unknown as string[];
+      cookie = cookies
+        .find((c) => c.startsWith("evolli_session="))!
+        .split(";")[0]!;
+      loginCsrfToken = response.body.csrfToken;
+    });
+
+    afterAll(async () => {
+      await prisma.$disconnect();
+      await app.close();
+    });
+
+    it("sessão válida recebe token novo, só o token no corpo, com Cache-Control: no-store", async () => {
+      const response = await agent()
+        .get("/v1/auth/csrf")
+        .set("Cookie", cookie)
+        .expect(200);
+
+      expect(response.headers["cache-control"]).toBe("no-store");
+      // corpo contém exclusivamente o token (ADR 0009 §3)
+      expect(Object.keys(response.body)).toEqual(["csrfToken"]);
+      expect(response.body.csrfToken).toEqual(expect.any(String));
+      // é rotação, não leitura: o token do login já não é o token corrente
+      expect(response.body.csrfToken).not.toBe(loginCsrfToken);
+
+      firstToken = response.body.csrfToken;
+    });
+
+    it("GET não exige token CSRF e duas chamadas sequenciais devolvem tokens diferentes", async () => {
+      // nenhum header x-csrf-token é enviado aqui — GET não é mutação
+      const response = await agent()
+        .get("/v1/auth/csrf")
+        .set("Cookie", cookie)
+        .expect(200);
+
+      expect(response.body.csrfToken).not.toBe(firstToken);
+      expect(response.body.csrfToken).not.toBe(loginCsrfToken);
+
+      secondToken = response.body.csrfToken;
+    });
+
+    it("token anterior à rotação é recusado com 403 em mutação protegida", async () => {
+      const response = await agent()
+        .post("/v1/users")
+        .set("Cookie", cookie)
+        .set("x-csrf-token", firstToken)
+        .send({
+          email: "nao-deve-ser-criado@evolli.test",
+          password: "senha-que-nunca-sera-usada-bem-longa",
+          role: "colaborador",
+          companyId: "empresa-a",
+        })
+        .expect(403);
+
+      expect(response.body.message).toBe("Acesso negado.");
+      // a mutação foi bloqueada antes de qualquer efeito
+      expect(
+        await prisma.accessUser.findUnique({
+          where: { email: "nao-deve-ser-criado@evolli.test" },
+        }),
+      ).toBeNull();
+
+      // o token emitido no login também caducou nas rotações anteriores
+      await agent()
+        .post("/v1/users")
+        .set("Cookie", cookie)
+        .set("x-csrf-token", loginCsrfToken)
+        .send({
+          email: "tambem-nao-criado@evolli.test",
+          password: "senha-que-nunca-sera-usada-bem-longa",
+          role: "colaborador",
+          companyId: "empresa-a",
+        })
+        .expect(403);
+    });
+
+    it("token corrente autoriza mutação protegida", async () => {
+      await agent()
+        .post("/v1/users")
+        .set("Cookie", cookie)
+        .set("x-csrf-token", secondToken)
+        .send({
+          email: "criado-com-token-rotacionado@evolli.test",
+          password: "senha-do-usuario-de-teste-bem-longa",
+          role: "colaborador",
+          companyId: "empresa-a",
+        })
+        .expect(201);
+    });
+
+    it("sem cookie de sessão, responde 401 genérico sem detalhe interno", async () => {
+      const response = await agent().get("/v1/auth/csrf").expect(401);
+
+      expect(response.body).toEqual({
+        status_code: 401,
+        message: "Não autorizado.",
+        request_id: expect.any(String),
+        timestamp: expect.any(String),
+      });
+    });
+
+    it("cookie de sessão inválido também responde 401 genérico", async () => {
+      const response = await agent()
+        .get("/v1/auth/csrf")
+        .set("Cookie", "evolli_session=sessao-que-nao-existe")
+        .expect(401);
+
+      expect(response.body.message).toBe("Não autorizado.");
+      expect(response.body).not.toHaveProperty("csrfToken");
+      expect(response.body).not.toHaveProperty("stack");
+    });
+
+    it("sessão revogada não emite token novo (401), e a rotação não a ressuscita", async () => {
+      const login = await agent()
+        .post("/v1/auth/login")
+        .send({ email: adminEmail, password: adminPassword })
+        .expect(200);
+
+      const descartavelCookie = (
+        login.headers["set-cookie"] as unknown as string[]
+      )
+        .find((c) => c.startsWith("evolli_session="))!
+        .split(";")[0]!;
+
+      // logout revoga exatamente esta sessão, sem tocar na sessão principal
+      await agent()
+        .post("/v1/auth/logout")
+        .set("Cookie", descartavelCookie)
+        .set("x-csrf-token", login.body.csrfToken)
+        .expect(204);
+
+      await agent()
+        .get("/v1/auth/csrf")
+        .set("Cookie", descartavelCookie)
+        .expect(401);
+
+      // a sessão principal continua íntegra e ainda rotaciona
+      await agent().get("/v1/auth/csrf").set("Cookie", cookie).expect(200);
+    });
+
+    it("token bruto não aparece no banco, na auditoria nem em log capturado", async () => {
+      const written: string[] = [];
+      const originalWrite = process.stdout.write.bind(process.stdout);
+      jest
+        .spyOn(process.stdout, "write")
+        .mockImplementation((chunk: unknown, ...rest: unknown[]) => {
+          written.push(String(chunk));
+          return (originalWrite as unknown as (...args: unknown[]) => boolean)(
+            chunk,
+            ...rest,
+          );
+        });
+
+      let emitido: string;
+      try {
+        const response = await agent()
+          .get("/v1/auth/csrf")
+          .set("Cookie", cookie)
+          .expect(200);
+        emitido = response.body.csrfToken;
+      } finally {
+        jest.restoreAllMocks();
+      }
+
+      // nenhuma linha de log carrega o token bruto
+      expect(written.join("")).not.toContain(emitido);
+
+      // o banco guarda só o hash — nunca o valor bruto, em nenhuma coluna
+      const sessoes = await prisma.accessSession.findMany();
+      expect(JSON.stringify(sessoes)).not.toContain(emitido);
+      const corrente = sessoes.find(
+        (s) => s.csrfTokenHash === hashOpaqueToken(emitido),
+      );
+      expect(corrente).toBeDefined();
+
+      // a trilha de auditoria não registra o token nem o seu hash
+      const eventos = await prisma.auditEvent.findMany();
+      const trilha = JSON.stringify(eventos);
+      expect(trilha).not.toContain(emitido);
+      expect(trilha).not.toContain(corrente!.csrfTokenHash);
+    });
+
+    it("OpenAPI declara o endpoint sem token de exemplo e sem esquema de autenticação enganoso", async () => {
+      const documentApp = await buildApp();
+      try {
+        const document = setupOpenApi(documentApp, "0.0.0-test");
+        const operation = document.paths["/v1/auth/csrf"]?.get;
+
+        expect(operation).toBeDefined();
+        const serializado = JSON.stringify(operation);
+        const resposta = JSON.parse(serializado) as {
+          responses: Record<
+            string,
+            {
+              content?: Record<string, { schema?: Record<string, unknown> }>;
+            }
+          >;
+          security?: unknown;
+        };
+
+        expect(
+          resposta.responses["200"]?.content?.["application/json"]?.schema,
+        ).toMatchObject({
+          type: "object",
+          properties: { csrfToken: { type: "string" } },
+        });
+        expect(resposta.responses["401"]).toBeDefined();
+
+        // nenhum exemplo de token — nem real, nem plausível
+        expect(serializado).not.toMatch(/"example"/);
+        expect(serializado).not.toContain(secondToken);
+
+        // o documento não declara esquema de autenticação nenhum; declarar um
+        // que não corresponda ao cookie de sessão seria enganoso (DP-W-11
+        // segue pendente, ADR 0009).
+        expect(document.components?.securitySchemes).toBeUndefined();
+        expect(resposta.security).toBeUndefined();
+      } finally {
+        await documentApp.close();
+      }
     });
   });
 
