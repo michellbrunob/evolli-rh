@@ -140,11 +140,22 @@ export class SessionService {
    * persiste o valor bruto, que só existe em memória e na resposta.
    * Devolve `null` se a sessão já não estiver ativa, para o chamador
    * responder 401 genérico em vez de emitir um token órfão.
+   *
+   * `SessionGuard` já validou a sessão antes do controller chegar aqui, mas
+   * existe uma janela entre essa validação e este `UPDATE` em que a sessão
+   * pode expirar (TTL absoluto). O filtro repete `revokedAt: null` e soma
+   * `expiresAt` no próprio `UPDATE` — condição atômica, não uma checagem
+   * separada — para que a rotação nunca sobreviva a uma sessão expirada
+   * nessa janela.
    */
   async rotateCsrfToken(sessionId: string): Promise<string | null> {
     const csrfToken = generateOpaqueToken();
     const { count } = await this.prisma.accessSession.updateMany({
-      where: { id: sessionId, revokedAt: null },
+      where: {
+        id: sessionId,
+        revokedAt: null,
+        expiresAt: { gt: new Date() },
+      },
       data: { csrfTokenHash: hashOpaqueToken(csrfToken) },
     });
 

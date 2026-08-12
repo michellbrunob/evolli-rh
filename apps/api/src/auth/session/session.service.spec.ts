@@ -225,9 +225,44 @@ describe("SessionService", () => {
     expect(csrfToken).toEqual(expect.any(String));
     const call = prisma.accessSession.updateMany.mock.calls[0][0];
     expect(call.data.csrfTokenHash).toBe(hashOpaqueToken(csrfToken as string));
-    // só a sessão ativa é rotacionada, e o token bruto nunca vai ao banco
-    expect(call.where).toEqual({ id: "session-1", revokedAt: null });
+    // só a sessão não revogada e ainda não expirada é rotacionada, e o
+    // token bruto nunca vai ao banco
+    expect(call.where.id).toBe("session-1");
+    expect(call.where.revokedAt).toBeNull();
+    expect(call.where.expiresAt.gt).toBeInstanceOf(Date);
     expect(JSON.stringify(call)).not.toContain(csrfToken);
+  });
+
+  it("rotateCsrfToken() condiciona o UPDATE a revokedAt nulo E expiresAt no futuro", async () => {
+    const prisma = createPrismaMock();
+    prisma.accessSession.updateMany.mockResolvedValue({ count: 1 });
+    const service = new SessionService(prisma, createAuditServiceMock());
+
+    const before = Date.now();
+    await service.rotateCsrfToken("session-1");
+    const after = Date.now();
+
+    const call = prisma.accessSession.updateMany.mock.calls[0][0];
+    // condição atômica no próprio UPDATE, não checagem separada antes dele
+    expect(call.where).toMatchObject({
+      id: "session-1",
+      revokedAt: null,
+    });
+    const gt = call.where.expiresAt.gt as Date;
+    expect(gt.getTime()).toBeGreaterThanOrEqual(before);
+    expect(gt.getTime()).toBeLessThanOrEqual(after);
+  });
+
+  it("rotateCsrfToken() devolve null para sessão não revogada porém expirada (nenhuma linha afetada)", async () => {
+    const prisma = createPrismaMock();
+    // o UPDATE não afeta nenhuma linha porque expiresAt <= now, mesmo com
+    // revokedAt ainda nulo — simula a janela de corrida entre a validação
+    // do SessionGuard e este UPDATE
+    prisma.accessSession.updateMany.mockResolvedValue({ count: 0 });
+    const service = new SessionService(prisma, createAuditServiceMock());
+
+    expect(await service.rotateCsrfToken("session-expirada")).toBeNull();
+    expect(prisma.accessSession.updateMany).toHaveBeenCalledTimes(1);
   });
 
   it("rotateCsrfToken() emite token diferente a cada chamada (invalida o anterior)", async () => {
