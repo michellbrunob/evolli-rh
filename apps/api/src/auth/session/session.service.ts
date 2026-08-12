@@ -133,6 +133,24 @@ export class SessionService {
     return issued;
   }
 
+  /**
+   * Rotação do token CSRF da sessão (ADR 0009 §4): gera um token novo,
+   * persiste só o hash — substituindo o anterior — e com isso invalida
+   * imediatamente o token CSRF anterior daquela sessão. Nunca lê nem
+   * persiste o valor bruto, que só existe em memória e na resposta.
+   * Devolve `null` se a sessão já não estiver ativa, para o chamador
+   * responder 401 genérico em vez de emitir um token órfão.
+   */
+  async rotateCsrfToken(sessionId: string): Promise<string | null> {
+    const csrfToken = generateOpaqueToken();
+    const { count } = await this.prisma.accessSession.updateMany({
+      where: { id: sessionId, revokedAt: null },
+      data: { csrfTokenHash: hashOpaqueToken(csrfToken) },
+    });
+
+    return count === 1 ? csrfToken : null;
+  }
+
   async findByIdWithUser(
     sessionId: string,
   ): Promise<(AccessSession & { user: AccessUser }) | null> {

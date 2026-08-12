@@ -1,7 +1,10 @@
 import { INestApplication } from "@nestjs/common";
-import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
+import { DocumentBuilder, OpenAPIObject, SwaggerModule } from "@nestjs/swagger";
 
-export function setupOpenApi(app: INestApplication, version: string): void {
+export function setupOpenApi(
+  app: INestApplication,
+  version: string,
+): OpenAPIObject {
   const config = new DocumentBuilder()
     .setTitle("Evolli RH API")
     .setDescription(
@@ -17,4 +20,5 @@ export function setupOpenApi(app: INestApplication, version: string): void {
 
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup("docs", app, document);
+  return document;
 }
