@@ -8,6 +8,15 @@ externa, upload, segredo, teste, PR ou merge.
 Fase do rito SDD: **Especificar**. Aprovar, Implementar, Verificar e
 Registrar são fases posteriores, cada uma com ciclo próprio.
 
+> **Atualização (2026-08-14, T007):** a ADR prevista no §15 foi redigida como
+> [ADR 0011 — Documentos privados e admissão digital](../adr/0011-documentos-privados-e-admissao-digital.md),
+> em status **Proposta** (promovida a `aceito` apenas quando os portões de
+> Nível 1 do §13.1 forem satisfeitos). As aprovações pendentes deste módulo
+> estão consolidadas, por responsável e nível de bloqueio, em
+> [docs/decisions/etapa2-documentos-admissao-aprovacoes-pendentes.md](../decisions/etapa2-documentos-admissao-aprovacoes-pendentes.md).
+> Esta atualização **não** altera o conteúdo desta especificação, não a
+> aprova e não habilita upload.
+
 **Esta fatia não habilita upload de documento real, e nada nela deve ser
 lido como se habilitasse.** O objetivo é decidir a arquitetura de
 segurança, o modelo conceitual e as fronteiras **antes** de existir
@@ -1017,7 +1026,10 @@ infraestrutura é previsto — nem como placeholder.**
 
 ## 15. Proposta de ADR futura (descrita, não criada)
 
-**Nenhum arquivo de ADR é criado por esta tarefa.**
+**Nenhum arquivo de ADR é criado por esta tarefa.** (Redigida posteriormente
+em T007 — ver a nota de atualização no topo deste documento e a
+[ADR 0011](../adr/0011-documentos-privados-e-admissao-digital.md), status
+Proposta.)
 
 ### Título proposto
 
