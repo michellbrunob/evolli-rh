@@ -1,0 +1,26 @@
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  font-family: system-ui, sans-serif;
+}
+
+.app-shell__header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid #d0d0d0;
+}
+
+.app-shell__brand {
+  font-weight: 700;
+}
+
+.app-shell__subtitle {
+  color: #555555;
+}
+
+.app-shell__main {
+  padding: 1.5rem;
+}
