@@ -768,6 +768,47 @@ describe("Documentos — metadados V1 (e2e)", () => {
         ]),
       ).rejects.toThrow(/orfanaria|sustenta/i);
     });
+
+    it("SUBSTITUIR o vínculo sustentador por outro do MESMO par, numa unica transacao, CONCLUI", async () => {
+      // Caso legítimo (positivo): trocar um vínculo por outro do mesmo par
+      // (colaborador, empresa) enquanto existe documento. Os triggers são
+      // DEFERRABLE INITIALLY DEFERRED: a verificação ocorre no COMMIT, quando o
+      // par já tem o vínculo substituto — a transação conclui com sucesso.
+      const { colaborador, vinculoB } =
+        await prepararColaboradorComDocumentoEmB("SWAP");
+
+      await expect(
+        migrator.$transaction([
+          migrator.$executeRawUnsafe(
+            "DELETE FROM app.vinculo_funcional WHERE id = $1",
+            vinculoB,
+          ),
+          migrator.$executeRawUnsafe(
+            `INSERT INTO app.vinculo_funcional
+               (id, colaborador_id, empresa_id, matricula, tipo, situacao, data_admissao, criado_em, atualizado_em)
+             VALUES (gen_random_uuid()::text, $1, $2, 'SWAP-INTEG-B2', 'clt', 'previsto', DATE '2026-01-05', now(), now())`,
+            colaborador,
+            empresaB,
+          ),
+        ]),
+      ).resolves.toBeDefined();
+
+      // O par (colaborador, empresa B) continua com exatamente um vínculo, e o
+      // documento em B permanece íntegro.
+      const vinculos = await migrator.$queryRawUnsafe<{ n: bigint }[]>(
+        "SELECT count(*)::bigint AS n FROM app.vinculo_funcional WHERE colaborador_id = $1 AND empresa_id = $2",
+        colaborador,
+        empresaB,
+      );
+      expect(Number(vinculos[0]!.n)).toBe(1);
+
+      const docs = await migrator.$queryRawUnsafe<{ n: bigint }[]>(
+        "SELECT count(*)::bigint AS n FROM app.documento_metadado WHERE colaborador_id = $1 AND empresa_id = $2",
+        colaborador,
+        empresaB,
+      );
+      expect(Number(docs[0]!.n)).toBe(1);
+    });
   });
 
   // -------------------------------------------------------------------------
