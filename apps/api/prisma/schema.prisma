@@ -76,6 +76,11 @@ model AccessUser {
   pontosRegistrados       EventoPonto[] @relation("PontoRegistradoPor")
   ajustesPontoRegistrados AjustePonto[] @relation("AjustePontoRegistradoPor")
 
+  // Etapa 2 — Documentos: quem solicitou um documento. Relacao de leitura
+  // apenas — nenhuma coluna nova entra em `access_user`; a FK vive em
+  // `solicitacao_documento`. Identifica o ATOR, nunca o sujeito do documento.
+  solicitacoesDocumento SolicitacaoDocumento[] @relation("SolicitacaoDocumentoSolicitante")
+
   @@index([companyId])
   @@map("access_user")
 }
@@ -252,6 +257,21 @@ enum AuditAction {
   ponto_evento_registrado @map("ponto.evento.registrado")
   ponto_ajuste_registrado @map("ponto.ajuste.registrado")
   ponto_consultado        @map("ponto.consultado")
+
+  // Etapa 2 — Documentos (metadados, sem conteudo; ADR 0011, T008). Mesma
+  // convencao: valor persistido em portugues separado por ponto, identificador
+  // Prisma com `_`. A trilha registra a ACAO e o identificador tecnico do
+  // recurso — NUNCA o rotulo/tipo documental (ADR 0011, decisao 10; DP-2E-12),
+  // que revelaria categoria sensivel por inferencia.
+  //
+  // Verbos deliberadamente AUSENTES por a capacidade nao existir nesta V1 (sem
+  // conteudo): versao_recebida/aprovada/reprovada, conteudo_baixado, expirado.
+  documentos_tipo_documento_criado          @map("documentos.tipo_documento.criado")
+  documentos_tipo_documento_atualizado      @map("documentos.tipo_documento.atualizado")
+  documentos_documento_metadado_criado      @map("documentos.documento_metadado.criado")
+  documentos_documento_metadado_consultado  @map("documentos.documento_metadado.consultado")
+  documentos_documento_metadado_substituido @map("documentos.documento_metadado.substituido")
+  documentos_solicitacao_documento_criada   @map("documentos.solicitacao_documento.criada")
 }
 
 enum AuditResult {
@@ -358,6 +378,12 @@ model Empresa {
   // ajuste nunca cruzam empresa (mesmo padrao de alocacao/movimentacao).
   eventosPonto EventoPonto[]
   ajustesPonto AjustePonto[]
+
+  // Etapa 2 — Documentos (metadados, sem conteudo). `empresa_id` continua a
+  // unica fronteira de autorizacao (ADR 0011, decisao 5).
+  tiposDocumento        TipoDocumento[]
+  documentosMetadado    DocumentoMetadado[]
+  solicitacoesDocumento SolicitacaoDocumento[]
 
   @@index([status])
   @@map("empresa")
@@ -646,6 +672,13 @@ model Colaborador {
   atualizadoEm DateTime @updatedAt @map("atualizado_em")
 
   vinculos VinculoFuncional[]
+
+  // Etapa 2 — Documentos: o colaborador e o SUJEITO do documento (ADR 0011,
+  // DP-2E-07). Relacao de leitura apenas; a coerencia empresa<->colaborador e
+  // validada na aplicacao (o colaborador precisa ter vinculo na empresa do
+  // documento), ja que o colaborador nao carrega `empresa_id` proprio.
+  documentosMetadado    DocumentoMetadado[]
+  solicitacoesDocumento SolicitacaoDocumento[]
 
   @@index([situacao])
   @@map("colaborador")
@@ -970,4 +1003,141 @@ model AjustePonto {
   @@index([empresaId])
   @@index([registradoPorUserId])
   @@map("ajuste_ponto")
+}
+
+// ===========================================================================
+// Etapa 2 — Documentos e Admissao Digital: V1 de METADADOS (ADR 0011, T008).
+//
+// NADA nestas entidades armazena, referencia ou aponta para CONTEUDO de
+// arquivo. Nao existe — em nenhuma delas — coluna de bytes, base64, stream,
+// caminho, URL, bucket, chave, hash de conteudo, tamanho, MIME ou nome de
+// arquivo original. Upload permanece desabilitado por construcao: nao ha
+// entidade de versao de conteudo nem transicao de estado que leve a conteudo
+// (ADR 0011, decisoes 1 e 2). Habilitar upload e trabalho de Nivel 2, exige
+// nova migration/codigo/ADR — nao ha feature flag.
+// ===========================================================================
+
+/// Classificacao de sensibilidade do tipo documental (ADR 0011, decisao 10).
+/// Comeca com o UNICO valor aprovado: `restrito`. Todo tipo nasce restrito
+/// (Emenda 1 da ADR 0011). Ampliar o esquema de classificacao e DP-2E-02
+/// (produto + DPO), por migration aditiva — enum de valor morto seria mais
+/// caro remover depois do que acrescentar na hora certa.
+enum ClassificacaoDocumento {
+  restrito
+}
+
+/// Estado de ciclo de vida do metadado. `upload_desabilitado` e o unico estado
+/// "ativo" alcancavel e NAO tem transicao de saida para conteudo (ADR 0011,
+/// decisao 2) — nao existe estado `disponivel`/`em_processamento` porque nao
+/// existe conteudo. `substituido` marca o metadado corrigido por outro mais
+/// novo (substituicao preserva historico; nunca exclusao fisica).
+enum EstadoDocumento {
+  upload_desabilitado
+  substituido
+}
+
+/// Estado da solicitacao. Nesta V1 so `pendente` e alcancavel: `atendida`
+/// exigiria conteudo (Nivel 2) e por isso NAO existe aqui — um valor de enum
+/// que nunca poderia ser atingido seria estrutura especulativa.
+enum EstadoSolicitacao {
+  pendente
+}
+
+/// Catalogo de tipos documentais, POR EMPRESA (a fronteira e sempre
+/// `empresa_id`; ADR 0011, decisao 5 — sem catalogo global). Apenas RH cria ou
+/// altera, com aprovacao de DPO registrada (Emenda 1 da ADR 0011). NAO nomeia
+/// nenhum tipo real: as linhas sao dados operacionais criados em runtime, nunca
+/// seed — nomear tipos e decisao de produto+DPO (DP-2E-02), nao de schema.
+model TipoDocumento {
+  id            String                 @id @default(uuid())
+  empresaId     String                 @map("empresa_id")
+  codigo        String
+  nome          String
+  classificacao ClassificacaoDocumento @default(restrito)
+
+  /// Evidencia da aprovacao de DPO exigida para operar o catalogo (Emenda 1).
+  /// Referencia tecnica registrada no fluxo; a verificacao de que o DPO de fato
+  /// a emitiu depende do provisionamento do papel `dpo` (DP-7), pendente — a V1
+  /// exige a PRESENCA da referencia e a registra, nao a valida criptograficamente.
+  dpoAprovacaoReferencia String   @map("dpo_aprovacao_referencia")
+  dpoAprovadoEm          DateTime @map("dpo_aprovado_em")
+
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  empresa Empresa @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  documentosMetadado DocumentoMetadado[]
+  solicitacoes       SolicitacaoDocumento[]
+
+  @@unique([empresaId, codigo])
+  /// Alvo das FKs compostas de documento_metadado e solicitacao_documento: o
+  /// banco garante que o tipo referenciado pertence a mesma empresa (ADR 0011,
+  /// decisao 5), sem depender de validacao de aplicacao.
+  @@unique([id, empresaId])
+  @@index([empresaId])
+  @@map("tipo_documento")
+}
+
+/// Metadado do documento — o documento como CONCEITO. Sem conteudo (ver bloco
+/// acima). O sujeito e o `Colaborador` (DP-2E-07); `empresa_id` e proprio e
+/// explicito (nao derivado do colaborador, que nao o tem). Substituicao cria um
+/// registro NOVO apontando para o anterior via `substitui_documento_id`; o
+/// anterior transita para `substituido` e permanece (sem exclusao fisica).
+model DocumentoMetadado {
+  id                   String          @id @default(uuid())
+  empresaId            String          @map("empresa_id")
+  colaboradorId        String          @map("colaborador_id")
+  tipoDocumentoId      String          @map("tipo_documento_id")
+  estado               EstadoDocumento @default(upload_desabilitado)
+  substituiDocumentoId String?         @map("substitui_documento_id")
+
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  empresa     Empresa       @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  colaborador Colaborador   @relation(fields: [colaboradorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  tipo        TipoDocumento @relation(fields: [tipoDocumentoId, empresaId], references: [id, empresaId], onDelete: Restrict, onUpdate: Cascade)
+
+  /// Auto-relacao COMPOSTA com `empresa_id`: uma substituicao so pode apontar
+  /// para metadado da MESMA empresa (garantido pelo banco).
+  substitui      DocumentoMetadado?  @relation("SubstituicaoDocumento", fields: [substituiDocumentoId, empresaId], references: [id, empresaId], onDelete: Restrict, onUpdate: Cascade)
+  substituidoPor DocumentoMetadado[] @relation("SubstituicaoDocumento")
+
+  /// Alvo da auto-FK composta de substituicao.
+  @@unique([id, empresaId])
+  @@index([empresaId, colaboradorId])
+  @@index([empresaId, estado])
+  @@index([tipoDocumentoId, empresaId])
+  @@map("documento_metadado")
+}
+
+/// Solicitacao (pedido) de um documento. Existe ANTES de qualquer documento e
+/// pode nunca ser atendida (atender exige conteudo, Nivel 2). Sem `prazo`
+/// (DP-2E-06, Nivel 2), sem canal de notificacao, sem `documento_id` (o vinculo
+/// so faz sentido quando `atendida` for alcancavel — adiciona-lo agora seria
+/// coluna especulativa).
+model SolicitacaoDocumento {
+  id              String            @id @default(uuid())
+  empresaId       String            @map("empresa_id")
+  colaboradorId   String            @map("colaborador_id")
+  tipoDocumentoId String            @map("tipo_documento_id")
+  estado          EstadoSolicitacao @default(pendente)
+
+  /// Ator que solicitou — `AccessUser`, nunca o colaborador (sujeito).
+  solicitanteUserId String   @map("solicitante_user_id")
+  solicitadaEm      DateTime @default(now()) @map("solicitada_em")
+
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  empresa     Empresa       @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  colaborador Colaborador   @relation(fields: [colaboradorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  tipo        TipoDocumento @relation(fields: [tipoDocumentoId, empresaId], references: [id, empresaId], onDelete: Restrict, onUpdate: Cascade)
+  solicitante AccessUser    @relation("SolicitacaoDocumentoSolicitante", fields: [solicitanteUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([empresaId, colaboradorId])
+  @@index([tipoDocumentoId, empresaId])
+  @@index([solicitanteUserId])
+  @@map("solicitacao_documento")
 }

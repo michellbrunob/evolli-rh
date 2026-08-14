@@ -16,6 +16,10 @@ export function setupOpenApi(
       "organizacao",
       "Núcleo organizacional interno: empresa, unidade organizacional, departamento, área, equipe, cargo e centro de custo",
     )
+    .addTag(
+      "documentos",
+      "Documentos e admissão digital — V1 de metadados (sem conteúdo): tipo documental, metadado e solicitação",
+    )
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
