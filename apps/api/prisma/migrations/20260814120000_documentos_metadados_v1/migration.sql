@@ -142,3 +142,130 @@ ALTER TABLE "solicitacao_documento" ADD CONSTRAINT "solicitacao_documento_solici
 -- nao podem ganhar por esta migration, qualquer coluna de conteudo. A ausencia
 -- e o controle — nao ha o que armazenar nem por onde. A prova automatizada
 -- (E2E) le information_schema.columns e falha se surgir coluna de conteudo.
+
+-- ---------------------------------------------------------------------------
+-- INTEGRIDADE empresa <-> colaborador (P1): documento/solicitacao so pode
+-- referenciar colaborador COM VINCULO NA MESMA EMPRESA.
+-- ---------------------------------------------------------------------------
+--
+-- As FKs desta migration ja garantem, isoladamente, que `empresa_id` aponta
+-- para uma empresa e `colaborador_id` para um colaborador; e a FK composta
+-- (tipo_documento_id, empresa_id) garante que o TIPO e da mesma empresa. O que
+-- FK nenhuma expressa e a coerencia entre o COLABORADOR e a EMPRESA do
+-- documento: o colaborador nao carrega `empresa_id` (ADR 0007) — a empresa e
+-- propriedade do VINCULO — e o par (colaborador_id, empresa_id) nao e unico em
+-- `vinculo_funcional` (uma pessoa pode ter historico de vinculos na mesma
+-- empresa), entao ele nao pode ser alvo de FK composta.
+--
+-- A regra e, portanto, um invariante ENTRE TABELAS, garantido por CONSTRAINT
+-- TRIGGERS DEFERRABLE INITIALLY DEFERRED — mesmo mecanismo ja usado na Fatia 2
+-- para "colaborador sempre tem vinculo" e "vinculo ativo tem alocacao". Vale
+-- para QUALQUER caminho de escrita, inclusive SQL direto, correcao manual e
+-- modulo futuro — nunca so pela aplicacao (o service valida antes e responde
+-- 404 anti-enumeracao; o banco e a rede de seguranca que nao pode ser
+-- contornada).
+--
+-- SAO DUAS PORTAS, cobertas por triggers em ambos os lados. Diferir a
+-- verificacao para o COMMIT e o que permite reapontar/substituir dentro de uma
+-- transacao (trocar um vinculo por outro no mesmo par) sem recusar um estado
+-- intermediario legitimo:
+--
+--   Porta A — o documento/solicitacao referencia o par (colaborador, empresa)
+--     lado: INSERT de documento_metadado/solicitacao_documento; UPDATE que
+--           reaponte colaborador_id ou empresa_id.
+--
+--   Porta B — o vinculo que SUSTENTA o par e removido ou reapontado
+--     lado: UPDATE/DELETE de vinculo_funcional que mude/retire o ultimo
+--           vinculo do par (colaborador, empresa) ainda referenciado por algum
+--           documento/solicitacao.
+
+-- Porta A. Uma unica funcao serve as duas tabelas: ambas tem `colaborador_id` e
+-- `empresa_id`. Em UPDATE cujo par nao mudou (ex.: mudanca de estado na
+-- substituicao), nada a reverificar — o vinculo que ja o sustentava continua.
+CREATE OR REPLACE FUNCTION "app"."assert_documento_com_vinculo_na_empresa"()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF TG_OP = 'UPDATE'
+     AND NEW."colaborador_id" IS NOT DISTINCT FROM OLD."colaborador_id"
+     AND NEW."empresa_id" IS NOT DISTINCT FROM OLD."empresa_id" THEN
+    RETURN NULL;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM "app"."vinculo_funcional" v
+     WHERE v."colaborador_id" = NEW."colaborador_id"
+       AND v."empresa_id" = NEW."empresa_id"
+  ) THEN
+    RAISE EXCEPTION
+      'documento referencia colaborador sem vinculo na mesma empresa'
+      USING ERRCODE = 'integrity_constraint_violation';
+  END IF;
+
+  RETURN NULL;
+END;
+$$;
+
+CREATE CONSTRAINT TRIGGER "documento_metadado_exige_vinculo_na_empresa"
+  AFTER INSERT OR UPDATE ON "documento_metadado"
+  DEFERRABLE INITIALLY DEFERRED
+  FOR EACH ROW
+  EXECUTE FUNCTION "app"."assert_documento_com_vinculo_na_empresa"();
+
+CREATE CONSTRAINT TRIGGER "solicitacao_documento_exige_vinculo_na_empresa"
+  AFTER INSERT OR UPDATE ON "solicitacao_documento"
+  DEFERRABLE INITIALLY DEFERRED
+  FOR EACH ROW
+  EXECUTE FUNCTION "app"."assert_documento_com_vinculo_na_empresa"();
+
+-- Porta B. Ao remover ou reapontar um vinculo, verifica o par ANTIGO
+-- (OLD.colaborador_id, OLD.empresa_id): se nenhum vinculo restou para ele e
+-- ainda existe documento/solicitacao apontando para esse par, a operacao
+-- orfanaria o metadado — recusada. Diferida: trocar um vinculo por outro no
+-- mesmo par dentro de uma transacao permanece valido no COMMIT.
+--
+-- Verifica-se o par OLD porque e o que o documento referencia. Em UPDATE cujo
+-- par nao mudou (ex.: efetivar/encerrar altera situacao/datas, nao o par), nao
+-- ha o que orfanar — retorna cedo, sem custo para o fluxo de Pessoas.
+CREATE OR REPLACE FUNCTION "app"."assert_vinculo_nao_orfana_documentos"()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF TG_OP = 'UPDATE'
+     AND NEW."colaborador_id" IS NOT DISTINCT FROM OLD."colaborador_id"
+     AND NEW."empresa_id" IS NOT DISTINCT FROM OLD."empresa_id" THEN
+    RETURN NULL;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM "app"."vinculo_funcional" v
+     WHERE v."colaborador_id" = OLD."colaborador_id"
+       AND v."empresa_id" = OLD."empresa_id"
+  ) AND (
+    EXISTS (
+      SELECT 1 FROM "app"."documento_metadado" d
+       WHERE d."colaborador_id" = OLD."colaborador_id"
+         AND d."empresa_id" = OLD."empresa_id"
+    )
+    OR EXISTS (
+      SELECT 1 FROM "app"."solicitacao_documento" s
+       WHERE s."colaborador_id" = OLD."colaborador_id"
+         AND s."empresa_id" = OLD."empresa_id"
+    )
+  ) THEN
+    RAISE EXCEPTION
+      'vinculo sustenta documento/solicitacao: remover ou reapontar orfanaria metadado sem vinculo na empresa'
+      USING ERRCODE = 'integrity_constraint_violation';
+  END IF;
+
+  RETURN NULL;
+END;
+$$;
+
+CREATE CONSTRAINT TRIGGER "vinculo_sustenta_documentos_da_empresa"
+  AFTER UPDATE OR DELETE ON "vinculo_funcional"
+  DEFERRABLE INITIALLY DEFERRED
+  FOR EACH ROW
+  EXECUTE FUNCTION "app"."assert_vinculo_nao_orfana_documentos"();

@@ -1084,6 +1084,14 @@ model TipoDocumento {
 /// explicito (nao derivado do colaborador, que nao o tem). Substituicao cria um
 /// registro NOVO apontando para o anterior via `substitui_documento_id`; o
 /// anterior transita para `substituido` e permanece (sem exclusao fisica).
+///
+/// INTEGRIDADE empresa<->colaborador (garantida pelo banco, nao so pela
+/// aplicacao): o colaborador referenciado PRECISA ter vinculo na mesma empresa
+/// do documento. Como o par (colaborador_id, empresa_id) nao e unico em
+/// vinculo_funcional, isso nao e FK composta — e um CONSTRAINT TRIGGER diferido
+/// criado na migration (`assert_documento_com_vinculo_na_empresa` e
+/// `assert_vinculo_nao_orfana_documentos`), no mesmo padrao das invariantes da
+/// Fatia 2. Prisma nao expressa triggers; este comentario e a documentacao.
 model DocumentoMetadado {
   id                   String          @id @default(uuid())
   empresaId            String          @map("empresa_id")
@@ -1117,6 +1125,10 @@ model DocumentoMetadado {
 /// (DP-2E-06, Nivel 2), sem canal de notificacao, sem `documento_id` (o vinculo
 /// so faz sentido quando `atendida` for alcancavel — adiciona-lo agora seria
 /// coluna especulativa).
+///
+/// Mesma INTEGRIDADE empresa<->colaborador do `DocumentoMetadado`, garantida
+/// pelos mesmos CONSTRAINT TRIGGERS diferidos da migration: o colaborador
+/// referenciado precisa ter vinculo na mesma empresa da solicitacao.
 model SolicitacaoDocumento {
   id              String            @id @default(uuid())
   empresaId       String            @map("empresa_id")

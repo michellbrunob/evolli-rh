@@ -629,6 +629,148 @@ describe("Documentos — metadados V1 (e2e)", () => {
   });
 
   // -------------------------------------------------------------------------
+  // Integridade empresa <-> colaborador, garantida pelo BANCO (P1)
+  //
+  // Prova que a coerência não depende só da aplicação: SQL direto (conta
+  // migrator, contornando os services) tentando cruzar documento/solicitação
+  // da empresa A com colaborador sem vínculo em A falha no banco; e remover ou
+  // reapontar o vínculo que sustenta um metadado/solicitação existente também
+  // falha. Constraint triggers diferidos: verificação no COMMIT.
+  // -------------------------------------------------------------------------
+
+  describe("integridade empresa <-> colaborador (garantia no banco)", () => {
+    let migrator: PrismaClient;
+    let tipoIntegA: string;
+    let userId: string;
+
+    beforeAll(async () => {
+      migrator = new PrismaClient({
+        datasources: { db: { url: migratorUrl } },
+      });
+      tipoIntegA = await criarTipo(
+        rhA,
+        empresaA,
+        "TIPO-INTEG-A",
+        "Tipo Integ A",
+      );
+      const users = await migrator.$queryRawUnsafe<{ id: string }[]>(
+        "SELECT id FROM app.access_user LIMIT 1",
+      );
+      userId = users[0]!.id;
+    });
+
+    afterAll(async () => {
+      await migrator.$disconnect();
+    });
+
+    /**
+     * Cria um colaborador com vínculo em A (via admissão) e um SEGUNDO vínculo
+     * em B inserido cru — SEM movimentação/alocação, para que remover/reapontar
+     * o vínculo B esbarre no trigger de integridade, não no FK de movimentação
+     * (que tem ON UPDATE CASCADE). O documento é criado em B, sustentado pelo
+     * vínculo B. Como o colaborador mantém o vínculo em A, a invariante de
+     * Pessoas ("colaborador sempre tem vínculo") não é a que dispara — isola o
+     * trigger DESTE módulo.
+     */
+    async function prepararColaboradorComDocumentoEmB(sufixo: string): Promise<{
+      colaborador: string;
+      vinculoB: string;
+    }> {
+      const colaborador = await admitir(
+        rhA,
+        empresaA,
+        departamentoA,
+        `DOC-${sufixo}-A`,
+      );
+      await migrator.$executeRawUnsafe(
+        `INSERT INTO app.vinculo_funcional
+           (id, colaborador_id, empresa_id, matricula, tipo, situacao, data_admissao, criado_em, atualizado_em)
+         VALUES (gen_random_uuid()::text, $1, $2, $3, 'clt', 'previsto', DATE '2026-01-05', now(), now())`,
+        colaborador,
+        empresaB,
+        `INTEG-${sufixo}-B`,
+      );
+      const tipoB = await criarTipo(
+        rhB,
+        empresaB,
+        `TIPO-${sufixo}-B`,
+        `Tipo ${sufixo} B`,
+      );
+      await post("/v1/documentos", rhB)
+        .send({
+          empresaId: empresaB,
+          colaboradorId: colaborador,
+          tipoDocumentoId: tipoB,
+        })
+        .expect(201);
+      const linhas = await migrator.$queryRawUnsafe<{ id: string }[]>(
+        "SELECT id FROM app.vinculo_funcional WHERE colaborador_id = $1 AND empresa_id = $2",
+        colaborador,
+        empresaB,
+      );
+      return { colaborador, vinculoB: linhas[0]!.id };
+    }
+
+    it("INSERT direto de documento_metadado (empresa A × colaborador sem vínculo em A) falha", async () => {
+      await expect(
+        migrator.$transaction([
+          migrator.$executeRawUnsafe(
+            `INSERT INTO app.documento_metadado
+               (id, empresa_id, colaborador_id, tipo_documento_id, estado, criado_em, atualizado_em)
+             VALUES (gen_random_uuid()::text, $1, $2, $3, 'upload_desabilitado', now(), now())`,
+            empresaA,
+            colaboradorB1, // vínculo de colaboradorB1 é em B, não em A
+            tipoIntegA,
+          ),
+        ]),
+      ).rejects.toThrow(/sem vinculo na mesma empresa/i);
+    });
+
+    it("INSERT direto de solicitacao_documento (empresa A × colaborador sem vínculo em A) falha", async () => {
+      await expect(
+        migrator.$transaction([
+          migrator.$executeRawUnsafe(
+            `INSERT INTO app.solicitacao_documento
+               (id, empresa_id, colaborador_id, tipo_documento_id, estado, solicitante_user_id, solicitada_em, criado_em, atualizado_em)
+             VALUES (gen_random_uuid()::text, $1, $2, $3, 'pendente', $4, now(), now(), now())`,
+            empresaA,
+            colaboradorB1,
+            tipoIntegA,
+            userId,
+          ),
+        ]),
+      ).rejects.toThrow(/sem vinculo na mesma empresa/i);
+    });
+
+    it("REAPONTAR a empresa do vínculo que sustenta um documento falha (orfanaria o metadado)", async () => {
+      const { vinculoB } = await prepararColaboradorComDocumentoEmB("REAP");
+      // Reaponta o vínculo B para A: o par (colaborador, B) perde o vínculo e o
+      // documento em B fica órfão.
+      await expect(
+        migrator.$transaction([
+          migrator.$executeRawUnsafe(
+            "UPDATE app.vinculo_funcional SET empresa_id = $1 WHERE id = $2",
+            empresaA,
+            vinculoB,
+          ),
+        ]),
+      ).rejects.toThrow(/orfanaria|sustenta/i);
+    });
+
+    it("REMOVER o vínculo que sustenta um documento falha, mesmo havendo outro vínculo em outra empresa", async () => {
+      const { vinculoB } = await prepararColaboradorComDocumentoEmB("DEL");
+      await expect(
+        migrator.$transaction([
+          migrator.$executeRawUnsafe(
+            "DELETE FROM app.vinculo_funcional WHERE id = $1",
+            vinculoB,
+          ),
+        ]),
+      ).rejects.toThrow(/orfanaria|sustenta/i);
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // Sessão, CSRF e garantias estruturais no banco
   // -------------------------------------------------------------------------
 
