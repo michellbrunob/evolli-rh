@@ -48,6 +48,22 @@ export const PONTO_RESOURCES = ["evento_ponto", "ajuste_ponto"] as const;
 export type PontoResource = (typeof PONTO_RESOURCES)[number];
 
 /**
+ * Recursos de Documentos — V1 de METADADOS (Etapa 2, ADR 0011, T008).
+ *
+ * `versao_documento`/`conteudo_documento` **não** aparecem aqui: conteúdo é
+ * Nível 2, não existe, e criar o recurso sem a capacidade seria conceder
+ * superfície de autorização a algo inexistente (mesmo critério de
+ * `dado_restrito_colaborador` na Fatia 2).
+ */
+export const DOCUMENTOS_RESOURCES = [
+  "tipo_documento",
+  "documento_metadado",
+  "solicitacao_documento",
+] as const;
+
+export type DocumentosResource = (typeof DOCUMENTOS_RESOURCES)[number];
+
+/**
  * Recursos/ações desta fatia (matriz §3 da spec). Módulos futuros (Etapa 1+)
  * estendem este union — nunca reduzem o que já está aqui.
  */
@@ -58,7 +74,8 @@ export type AuthorizationResource =
   | "user_role"
   | OrganizationalResource
   | PessoasResource
-  | PontoResource;
+  | PontoResource
+  | DocumentosResource;
 
 export type AuthorizationAction = "read" | "manage" | "alter" | "create";
 
@@ -99,4 +116,10 @@ export function isPontoResource(
   resource: AuthorizationResource,
 ): resource is PontoResource {
   return (PONTO_RESOURCES as readonly string[]).includes(resource);
+}
+
+export function isDocumentosResource(
+  resource: AuthorizationResource,
+): resource is DocumentosResource {
+  return (DOCUMENTOS_RESOURCES as readonly string[]).includes(resource);
 }

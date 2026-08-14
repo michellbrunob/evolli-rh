@@ -1,6 +1,9 @@
 import {
+  AuthorizationAction,
+  AuthorizationResource,
   AuthorizationSubject,
   AuthorizationTarget,
+  isDocumentosResource,
   isOrganizationalResource,
   isPessoasResource,
   isPontoResource,
@@ -37,6 +40,9 @@ export function evaluatePermission(
       }
       if (isPontoResource(target.resource)) {
         return evaluatePonto(subject, target);
+      }
+      if (isDocumentosResource(target.resource)) {
+        return evaluateDocumentos(subject, target);
       }
       return false;
   }
@@ -313,6 +319,80 @@ function evaluatePonto(
     // `auditor`/`dpo` — leem a trilha (`access_log`), que é outro escopo; o
     //                   dado de ponto em si é pendência própria (DP-3J-05).
     // `financeiro`    — nada na Baseline concede acesso a ponto.
+    default:
+      return false;
+  }
+}
+
+/**
+ * Documentos — V1 de METADADOS (Etapa 2, ADR 0011, T008).
+ *
+ * Mesma avaliação em **duas fases** dos ramos organizacional e de pessoas —
+ * capacidade no guard (`targetCompanyId === undefined`), escopo no service, com
+ * a empresa do documento já resolvida. A fronteira é `empresa_id`, sem variante
+ * global (ADR 0011, decisão 5).
+ *
+ * **`admin_tecnico` é NEGADO aqui — deliberado, não omissão.** Documento sobre
+ * colaborador é dado pessoal desse colaborador; a Baseline V1 item 8 (ADR 0007)
+ * e a decisão 6 da ADR 0011 negam o papel neste domínio. A exceção de acesso
+ * global da Emenda 1 da ADR 0005 (estrutura sem dado pessoal) não se estende
+ * por herança — mesma assimetria já registrada em `evaluatePessoas`.
+ *
+ * Distribuição de capacidade (ADR 0011, decisões aprovadas de Nível 1):
+ * - `rh`: catálogo (criar/alterar/ler), metadado (criar/alterar/ler) e
+ *   solicitação (criar/ler);
+ * - `dp`: **lê** o catálogo (para referenciá-lo), mas **não** o cria nem altera
+ *   ("apenas RH" — Emenda 1); metadado (criar/alterar/ler) e solicitação
+ *   (criar/ler);
+ * - demais papéis: negados.
+ */
+function evaluateDocumentos(
+  subject: AuthorizationSubject,
+  target: AuthorizationTarget,
+): boolean {
+  if (subject.role !== "rh" && subject.role !== "dp") {
+    // Inclui admin_tecnico, gestor, colaborador, financeiro, auditor, dpo.
+    return false;
+  }
+
+  if (!podeAcaoDocumentos(subject.role, target.resource, target.action)) {
+    return false;
+  }
+
+  const escopoResolvido = target.targetCompanyId !== undefined;
+  return escopoResolvido
+    ? isSameCompany(subject, target)
+    : subject.companyId !== null;
+}
+
+/**
+ * Matriz recurso × ação por papel, independente de escopo. Só `rh` e `dp`
+ * chegam aqui. A única diferença entre eles é o catálogo: criar/alterar tipo é
+ * exclusivo de `rh`.
+ */
+function podeAcaoDocumentos(
+  role: "rh" | "dp",
+  resource: AuthorizationResource,
+  action: AuthorizationAction,
+): boolean {
+  switch (resource) {
+    case "tipo_documento":
+      if (action === "read") {
+        return true; // rh e dp leem o catálogo
+      }
+      // Criar/alterar catálogo: apenas RH, e com aprovação de DPO registrada
+      // (validada no service). `alter`/`create` de dp caem aqui como negados.
+      return role === "rh" && (action === "create" || action === "alter");
+
+    case "documento_metadado":
+      // Consultar, criar e substituir (substituir usa `alter`).
+      return action === "read" || action === "create" || action === "alter";
+
+    case "solicitacao_documento":
+      // Solicitar (`create`) e consultar (`read`). Não há alteração de
+      // solicitação nesta V1.
+      return action === "read" || action === "create";
+
     default:
       return false;
   }

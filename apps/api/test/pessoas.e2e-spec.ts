@@ -1435,11 +1435,20 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
       }
     });
 
-    it("as duas invariantes sao cobertas por QUATRO triggers, todas deferidas", async () => {
+    it("as duas invariantes de Pessoas sao cobertas por QUATRO triggers nas tabelas do modulo, todas deferidas", async () => {
       const migrator = new PrismaClient({
         datasources: { db: { url: migratorUrl } },
       });
       try {
+        // Escopado as tabelas do modulo Pessoas (colaborador, vinculo_funcional,
+        // alocacao_organizacional) E as FUNCOES proprias das duas invariantes
+        // desta fatia (assert_colaborador_com_vinculo,
+        // assert_vinculo_ativo_com_alocacao). So a tabela nao bastaria: outros
+        // modulos podem ter trigger propria sobre `vinculo_funcional` (ex.:
+        // Documentos, T008, cuja invariante empresa<->colaborador tambem dispara
+        // em UPDATE/DELETE de vinculo_funcional) — o filtro por funcao garante
+        // que so as invariantes de Pessoas entram nesta verificacao, mesmo que
+        // uma tabela seja compartilhada entre modulos.
         const triggers = await migrator.$queryRawUnsafe<
           {
             tgname: string;
@@ -1453,7 +1462,10 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
              FROM pg_trigger t
              JOIN pg_class c ON c.oid = t.tgrelid
              JOIN pg_namespace n ON n.oid = c.relnamespace
+             JOIN pg_proc p ON p.oid = t.tgfoid
             WHERE n.nspname = 'app' AND NOT t.tgisinternal
+              AND c.relname IN ('colaborador', 'vinculo_funcional', 'alocacao_organizacional')
+              AND p.proname IN ('assert_colaborador_com_vinculo', 'assert_vinculo_ativo_com_alocacao')
             ORDER BY t.tgname`,
         );
 

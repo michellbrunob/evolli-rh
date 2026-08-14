@@ -14,6 +14,7 @@ import { evaluatePermission } from "./rbac.evaluator";
 import {
   AuthorizationResource,
   AuthorizationTarget,
+  isDocumentosResource,
   isOrganizationalResource,
 } from "./permission.types";
 import { AuditResource } from "../../audit/audit.types";
@@ -42,6 +43,13 @@ function toAuditResource(resource: AuthorizationResource): AuditResource {
     return "audit_event";
   }
   if (isOrganizationalResource(resource)) {
+    return resource;
+  }
+  // Recursos de documentos se auto-identificam na trilha pelo rótulo TÉCNICO do
+  // tipo de recurso (`documento_metadado` etc.) — nunca o rótulo/tipo
+  // documental (ADR 0011, decisão 10; DP-2E-12). Sem isso, uma negação de
+  // capacidade seria registrada como `access_user`, produzindo trilha enganosa.
+  if (isDocumentosResource(resource)) {
     return resource;
   }
   return "access_user";

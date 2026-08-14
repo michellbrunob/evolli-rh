@@ -86,6 +86,17 @@ export const AUDIT_ACTIONS = [
   "ponto_evento_registrado",
   "ponto_ajuste_registrado",
   "ponto_consultado",
+
+  // Etapa 2 — Documentos (metadados, sem conteúdo; ADR 0011, T008). Valor
+  // persistido em português por ponto (`documentos.documento_metadado.criado`),
+  // identificador Prisma com `_`. A trilha registra a ação e o id técnico do
+  // recurso — nunca o rótulo/tipo documental (ADR 0011, decisão 10; DP-2E-12).
+  "documentos_tipo_documento_criado",
+  "documentos_tipo_documento_atualizado",
+  "documentos_documento_metadado_criado",
+  "documentos_documento_metadado_consultado",
+  "documentos_documento_metadado_substituido",
+  "documentos_solicitacao_documento_criada",
 ] as const satisfies readonly AuditAction[];
 
 /**
@@ -124,7 +135,12 @@ export type AuditResource =
   // Etapa 3 — Jornada e Ponto. Não há `periodo_apuracao`: competência é campo
   // do evento, não entidade (Baseline Jornada V1, decisão 6).
   | "evento_ponto"
-  | "ajuste_ponto";
+  | "ajuste_ponto"
+  // Etapa 2 — Documentos: rótulos TÉCNICOS do tipo de recurso, nunca o
+  // tipo/rótulo documental (ADR 0011, decisão 10; DP-2E-12).
+  | "tipo_documento"
+  | "documento_metadado"
+  | "solicitacao_documento";
 
 export type RecordAuditEventInput =
   | {
