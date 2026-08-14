@@ -8,14 +8,13 @@ externa, upload, segredo, teste, PR ou merge.
 Fase do rito SDD: **Especificar**. Aprovar, Implementar, Verificar e
 Registrar são fases posteriores, cada uma com ciclo próprio.
 
-> **Atualização (2026-08-14, T007):** a ADR prevista no §15 foi redigida como
+> **Atualização (2026-08-14, decisão de Nível 1):** a ADR prevista no §15 foi redigida como
 > [ADR 0011 — Documentos privados e admissão digital](../adr/0011-documentos-privados-e-admissao-digital.md),
-> em status **Proposta** (promovida a `aceito` apenas quando os portões de
-> Nível 1 do §13.1 forem satisfeitos). As aprovações pendentes deste módulo
-> estão consolidadas, por responsável e nível de bloqueio, em
+> em status **Aceito**. Os portões de Nível 1 autorizam somente a T008 para
+> metadados, sem conteúdo, upload ou storage. Os bloqueios remanescentes de
+> Nível 2 estão consolidados, por responsável e nível de bloqueio, em
 > [docs/decisions/etapa2-documentos-admissao-aprovacoes-pendentes.md](../decisions/etapa2-documentos-admissao-aprovacoes-pendentes.md).
-> Esta atualização **não** altera o conteúdo desta especificação, não a
-> aprova e não habilita upload.
+> Esta atualização não habilita upload nem documento real.
 
 **Esta fatia não habilita upload de documento real, e nada nela deve ser
 lido como se habilitasse.** O objetivo é decidir a arquitetura de

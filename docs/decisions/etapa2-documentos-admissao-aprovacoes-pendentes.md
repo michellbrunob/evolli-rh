@@ -1,11 +1,11 @@
 # Etapa 2 — Documentos e Admissão Digital: aprovações pendentes
 
-- Status: **pendente** — nenhuma das decisões abaixo foi resolvida. Este
-  documento **registra** o que precisa ser aprovado, por quem, e o que cada
-  pendência bloqueia. Não decide, não infere e não declara conformidade.
+- Status: **Nível 1 resolvido em 2026-08-14; Nível 2 pendente.** Este
+  documento registra aprovações e bloqueios remanescentes; não declara
+  conformidade LGPD nem habilita upload.
 - Data: 2026-08-14
 - Relacionado:
-  [ADR 0011 (Proposta)](../adr/0011-documentos-privados-e-admissao-digital.md),
+  [ADR 0011 (Aceito)](../adr/0011-documentos-privados-e-admissao-digital.md),
   [especificação estrutural Etapa 2](../modules/etapa2-documentos-admissao-digital-estrutural.md)
   (esquema `DP-2E-nn` em seu §14.1),
   [ADR 0003](../adr/0003-identidade-sessao-e-autorizacao.md),
@@ -21,13 +21,15 @@
 ## Propósito
 
 A [ADR 0011](../adr/0011-documentos-privados-e-admissao-digital.md) fixou a
-arquitetura de segurança do módulo de documentos, mas permanece em status
-**Proposta**. A promoção da ADR e o início da tarefa **T008** (implementar
-publicação e acesso a documentos) dependem de decisões que **não são de
-arquitetura** — são de produto, RH, DPO/Jurídico, Segurança e TI. Este
-documento consolida essas decisões em um único lugar, com responsável e
-impacto de bloqueio, para que a obtenção das aprovações seja um processo
-verificável e não uma decisão difusa.
+arquitetura de segurança do módulo de documentos. Os itens de **Nível 1**
+foram resolvidos em 2026-08-14 (ver "Registro de resolução de Nível 1"
+abaixo) e a ADR foi promovida a **Aceito**, autorizando a tarefa **T008**
+apenas para **metadados**, sem conteúdo. Os itens de **Nível 2** — que
+dependem de decisões de produto, RH, DPO/Jurídico, Segurança e TI —
+permanecem pendentes e seguem bloqueando upload e conteúdo real. Este
+documento consolida ambos em um único lugar, com responsável e impacto de
+bloqueio, para que a obtenção das aprovações seja um processo verificável e
+não uma decisão difusa.
 
 A numeração `DP-2E-nn` é a da especificação estrutural (§14.1); é
 **reutilizada, não renumerada**, para preservar rastreabilidade. Nenhuma
@@ -46,6 +48,32 @@ confundi-los faria parecer que implementar metadado já autoriza upload:
 
 **Upload permanece desabilitado enquanto qualquer item de Nível 2 estiver
 aberto** — e por construção, não por configuração (ADR 0011, decisão 2).
+
+## Registro de resolução de Nível 1 - 2026-08-14
+
+As linhas Nível 1 abaixo são histórico do gate. Foram resolvidas pela
+autoridade de Produto, RH, DPO/Jurídico, Segurança e Arquitetura confirmada
+na decisão do projeto e registradas na ADR 0011, agora **Aceito**.
+
+| ID                  | Resultado aprovado                                                                                        |
+| ------------------- | --------------------------------------------------------------------------------------------------------- |
+| DP-2E-01            | `DocumentoMetadado`, `SolicitacaoDocumento` e `TipoDocumento`, sem conteúdo/versão/upload/storage.        |
+| DP-2E-02            | Tipos iniciam restritos; catálogo por RH autorizado com aprovação do DPO.                                 |
+| DP-2E-07            | Sujeito `Colaborador` com `empresa_id` próprio.                                                           |
+| DP-2E-08            | Upload desabilitado é estado sem saída.                                                                   |
+| DP-2E-12            | Sem rótulo do tipo na auditoria.                                                                          |
+| DP-2E-13 (metadado) | RH/DP autorizado no escopo consulta, solicita e substitui; gestor, colaborador e `admin_tecnico` negados. |
+| DPO/Jurídico        | Finalidade administrativa e obrigações aplicáveis; metadado tratado como dado pessoal por inferência.     |
+| Segurança           | C1-C7 e C15-C18, e decisões 1-10 da ADR 0011, aprovados.                                                  |
+
+**Efeito:** T008 fica autorizada somente para metadados. O Nível 2 e MFA
+continuam bloqueando conteúdo e upload real.
+
+### Emenda 1 - catálogo materializado (2026-08-14)
+
+`TipoDocumento` foi aprovado como terceira entidade da V1 de metadados para
+permitir catálogo executável e auditável. Toda entrada inicia restrita e só RH
+autorizado, com aprovação do DPO, pode criar ou alterar o catálogo.
 
 ## Decisões pendentes por nível e responsável
 

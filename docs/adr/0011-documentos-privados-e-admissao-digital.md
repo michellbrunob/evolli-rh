@@ -1,6 +1,6 @@
 # ADR 0011 — Documentos privados e admissão digital: segregação metadado/conteúdo, quarentena obrigatória e upload desabilitado por construção
 
-- Status: **Proposta**
+- Status: **Aceito**
 - Data: 2026-08-14
 - Relacionado:
   [docs/modules/etapa2-documentos-admissao-digital-estrutural.md](../modules/etapa2-documentos-admissao-digital-estrutural.md)
@@ -77,6 +77,36 @@ condiciona explicitamente a promoção desta ADR a `aceito` à satisfação dos
 **portões de Nível 1** (§13.1 da spec). Enquanto esses portões estiverem
 abertos, esta ADR permanece **Proposta**: ela registra a arquitetura para
 revisão, sem declará-la aprovada e sem declarar conformidade LGPD.
+
+### Promoção para Aceito - evidência de aprovação de Nível 1
+
+Em **2026-08-14**, o responsável do projeto confirmou possuir autoridade de
+Produto, RH, DPO/Jurídico, Segurança e Arquitetura e aprovou as deliberações
+abaixo. Esta promoção autoriza exclusivamente a T008 de **metadados**, sem
+conteúdo, upload, armazenamento real ou declaração de conformidade LGPD.
+
+| Item         | Deliberação aprovada                                                                                                                                                   |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| DP-2E-01     | Materializar `DocumentoMetadado`, `SolicitacaoDocumento` e `TipoDocumento`; sem conteúdo, versão de arquivo, upload ou storage.                                        |
+| DP-2E-02     | Todo tipo documental inicia como **restrito**; catálogo e alterações exigem RH autorizado e aprovação do DPO.                                                          |
+| DP-2E-07     | O sujeito do documento é `Colaborador`, com `empresa_id` próprio no metadado.                                                                                          |
+| DP-2E-08     | `upload_desabilitado` é estado sem transição de saída, nunca feature flag.                                                                                             |
+| DP-2E-12     | O rótulo do tipo documental não entra na auditoria; registrar somente ação e identificador técnico.                                                                    |
+| DP-2E-13     | RH/DP autorizado no escopo da empresa pode consultar, solicitar e substituir metadados; gestor, colaborador e `admin_tecnico` são negados nesta V1.                    |
+| DPO/Jurídico | Finalidade: gestão administrativa da relação de trabalho e cumprimento de obrigações legais/regulatórias aplicáveis; metadado é dado pessoal pelo risco de inferência. |
+| Segurança    | Controles C1-C7 e C15-C18 da especificação, e decisões 1-10 desta ADR, aprovados.                                                                                      |
+
+### Emenda 1 - catálogo materializado (2026-08-14)
+
+Após a promoção, a autoridade aprovadora confirmou que o catálogo precisa ser
+executável e auditável. Portanto, `TipoDocumento` passa a integrar a V1 de
+metadados. A entidade começa sempre como **restrita**; somente RH autorizado,
+com aprovação do DPO, pode criar ou alterar uma entrada. Esta emenda não
+introduz conteúdo, upload, storage, download de conteúdo ou acesso do
+colaborador/gestor/admin técnico.
+
+Todos os itens de Nível 2 permanecem pendentes e continuam bloqueando upload,
+conteúdo, download de conteúdo e processamento de documentos reais.
 
 ## Decisão
 
@@ -347,12 +377,11 @@ Esta ADR deve ser reaberta — com emenda ou promoção formal — quando
 
 ## Limitações
 
-- Esta ADR **não autoriza início de código, endpoint, tabela, migration,
-  bucket, credencial, dependência ou infraestrutura** — nenhuma fase
-  Implementar é aberta por este documento.
-- Permanece **Proposta** até os portões de Nível 1 serem satisfeitos; não
-  declara conformidade LGPD nem prontidão para dado real.
-- Não resolve nenhuma decisão `DP-2E-nn`; apenas fixa a arquitetura que as
-  emoldura.
+- Esta ADR autoriza somente a T008 de metadados aprovada; não autoriza
+  conteúdo, upload, download de conteúdo, bucket, credencial, infraestrutura
+  ou processamento de documentos reais.
+- Não declara conformidade LGPD nem prontidão para dado real.
+- Os itens de Nível 2 permanecem pendentes; novo tipo documental ou alteração
+  de acesso exige registro e aprovação conforme esta ADR.
 - Não estende nem relaxa MFA (ADR 0003) ou o modelo de auditoria (ADR 0004) —
   ambos permanecem integralmente aplicáveis e, no caso do MFA, agravados.
