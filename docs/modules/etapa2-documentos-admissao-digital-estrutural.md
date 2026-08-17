@@ -16,6 +16,17 @@ Registrar são fases posteriores, cada uma com ciclo próprio.
 > [docs/decisions/etapa2-documentos-admissao-aprovacoes-pendentes.md](../decisions/etapa2-documentos-admissao-aprovacoes-pendentes.md).
 > Esta atualização não habilita upload nem documento real.
 
+> **Convergência (T027, 2026-08-14).** A **T008 de metadados foi implementada e
+> integrada em `main`** pelo [PR #20](https://github.com/michellbrunob/evolli-rh/pull/20)
+> (squash `cdf4a71`): `TipoDocumento`, `DocumentoMetadado` e
+> `SolicitacaoDocumento`, **sem conteúdo**. Logo, o **Status** no topo
+> ("especificação em revisão — nenhuma implementação existe") e a **§15**
+> ("Proposta de ADR futura") são **históricos da fase Especificar**: a ADR
+> existe ([ADR 0011](../adr/0011-documentos-privados-e-admissao-digital.md),
+> **Aceito**) e o metadado está implementado. **Nível 2 e MFA seguem
+> bloqueando** upload/download/conteúdo. Convergência completa em
+> [docs/decisions/etapa2-documentos-convergencia.md](../decisions/etapa2-documentos-convergencia.md).
+
 **Esta fatia não habilita upload de documento real, e nada nela deve ser
 lido como se habilitasse.** O objetivo é decidir a arquitetura de
 segurança, o modelo conceitual e as fronteiras **antes** de existir
@@ -1023,12 +1034,16 @@ apps/api/prisma/migrations/<timestamp>_.../ # SOMENTE apos DP-2E-01
 **Nenhum caminho de armazenamento, bucket, credencial ou artefato de
 infraestrutura é previsto — nem como placeholder.**
 
-## 15. Proposta de ADR futura (descrita, não criada)
+## 15. Proposta de ADR futura (descrita, não criada) — histórico
+
+_Histórico da fase Especificar. A ADR foi redigida (T007), promovida a
+**Aceito** (Nível 1) e a T008 de metadados foi integrada em `main` (PR #20,
+`cdf4a71`). Ver a Nota de convergência no topo._
 
 **Nenhum arquivo de ADR é criado por esta tarefa.** (Redigida posteriormente
 em T007 — ver a nota de atualização no topo deste documento e a
 [ADR 0011](../adr/0011-documentos-privados-e-admissao-digital.md), status
-Proposta.)
+**Aceito**.)
 
 ### Título proposto
 
