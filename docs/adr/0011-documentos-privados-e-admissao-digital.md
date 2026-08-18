@@ -16,6 +16,19 @@
 - Constituição: v1.3.0, Princípios I, II, III e V; "Mandatory Architecture and Data Constraints".
 - PRD: `Sistema RH - Reserva Fiscal - PRD` (Notion `dceacf66-ba47-834d-b3fc-014cc2835594`), módulo de documentos e admissão digital.
 
+> **Nota de convergência (T027, 2026-08-14).** Os portões de **Nível 1** foram
+> satisfeitos e esta ADR está **Aceito**; a **T008 (metadados, sem conteúdo)**
+> foi implementada e **integrada em `main`** pelo [PR #20](https://github.com/michellbrunob/evolli-rh/pull/20)
+> (squash `cdf4a71`), com Quality Gates, E2E PostgreSQL e Migration Smoke
+> verdes. Em consequência, os trechos **redigidos antes da promoção** —
+> a seção "Por que Proposta e não Aceito" e o parágrafo "Esta ADR não
+> autoriza... início de código" logo abaixo — são **históricos**: descrevem
+> o estado anterior à aprovação de Nível 1, não o estado atual. **Nível 2 e
+> MFA permanecem bloqueando** upload, download e conteúdo real (ver §"Gatilhos
+> de reavaliação" e a [decisão de aprovações pendentes](../decisions/etapa2-documentos-admissao-aprovacoes-pendentes.md)).
+> A convergência completa está em
+> [docs/decisions/etapa2-documentos-convergencia.md](../decisions/etapa2-documentos-convergencia.md).
+
 ## Nota de topologia de branch (rastreabilidade, não decisão)
 
 Esta ADR foi redigida sobre a branch da especificação estrutural
@@ -65,7 +78,11 @@ que depende de decisão de produto, RH, DPO/Jurídico, Segurança ou TI
 (ver "O que esta ADR mantém explicitamente NÃO decidido" e a
 [decisão de aprovações pendentes](../decisions/etapa2-documentos-admissao-aprovacoes-pendentes.md)).
 
-## Por que Proposta e não Aceito
+_(Histórico — pré-promoção. Ver a Nota de convergência no topo: os portões de
+Nível 1 foram satisfeitos e a T008 de metadados foi implementada e integrada.
+O que continua bloqueado é o **Nível 2** — upload, download e conteúdo real.)_
+
+## Por que Proposta e não Aceito (histórico, pré-promoção)
 
 As ADRs de baseline anteriores (0006–0009) foram aceitas porque
 formalizavam decisões de produto **já aprovadas**. Aqui não há aprovação
@@ -284,6 +301,13 @@ Coerente com o §15 da especificação e com a Constituição:
 | Materializar já a tabela de metadado ("V1 estrutural" mínima)                      | Tabela que ninguém pode usar é o "campo especulativo" rejeitado nas ADRs 0003, 0006. Descartado; DP-2E-01 é decisão de produto ainda não tomada.                                                                                                                                                                                                              |
 
 ## Consequências
+
+_(Histórico — pré-promoção; ver a Nota de convergência no topo. Os itens
+abaixo descrevem as consequências projetadas quando a ADR ainda era Proposta.
+Hoje: ADR **Aceito**, **T008 de metadados integrada** em `main` (PR #20,
+`cdf4a71`) — as tabelas de metadado e o código do módulo existem. **Upload,
+download e conteúdo (Nível 2) seguem bloqueados**, e a linha sobre MFA abaixo
+permanece integralmente vigente.)_
 
 - A especificação estrutural
   ([docs/modules/etapa2-documentos-admissao-digital-estrutural.md](../modules/etapa2-documentos-admissao-digital-estrutural.md))
