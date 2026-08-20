@@ -287,3 +287,26 @@ multitenancy como um todo.
   trabalho posterior, com critério de aceite próprio.
 - Não torna a exceção permanente por omissão — o prazo do item anterior é
   vinculante.
+
+---
+
+## Nota de convergência (ADR 0012, 2026-08-20)
+
+**Esta nota não altera nem apaga o texto acima; adiciona uma camada de
+convergência.** A [ADR 0012](0012-convergencia-governanca-privacidade-e-perfis-globais.md)
+formaliza o desfecho aprovado da exceção temporária desta Emenda 1:
+
+- O acesso global **standing** migra do `admin_tecnico` para o
+  **`master_tecnico`** — o único perfil global permanente, conforme a
+  Constituição v1.3.0 ("the sole permitted exception"). O `admin_tecnico`
+  converge para **bootstrap/histórico** e não permanece como perfil global
+  operacional contínuo; deverá, em tarefa futura, perder a capacidade de criar
+  ou promover `admin_tecnico`.
+- O **prazo de 2026-11-04** desta Emenda 1 **permanece vinculante** como gate de
+  decisão para formalizar essa restrição de RBAC — não é estendido nem
+  enfraquecido.
+- `auditor` e `dpo` seguem **não provisionados**; o papel `dpo` fica
+  **formalmente depreciado** (ADR 0012), mantido no enum/histórico e removível
+  só por expand/contract.
+- A governança de privacidade/LGPD é de **RH + Jurídico** (ADR 0012); onde este
+  documento diz "DPO/jurídico", leia-se "RH + Jurídico".
