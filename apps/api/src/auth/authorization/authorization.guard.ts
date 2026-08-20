@@ -56,6 +56,28 @@ function toAuditResource(resource: AuthorizationResource): AuditResource {
 }
 
 /**
+ * Anti-enumeração (Constituição, Princípio II): um usuário-alvo de OUTRA
+ * empresa não pode ser distinguível de um inexistente. Verdadeiro quando o
+ * ator não alcança a empresa do alvo — nesse caso a negação responde 404
+ * (idêntico a "não existe"), nunca 403, que confirmaria a existência do alvo,
+ * sua empresa ou seu papel. `admin_tecnico` tem alcance de instância inteira
+ * (Emenda 1 da ADR 0005) e por isso nunca cai neste caso. Sem alvo carregado
+ * (ex.: criação, cujo escopo vem do corpo) também não é caso de enumeração.
+ */
+function targetUserForaDoEscopo(
+  subject: { role: AccessRole; companyId: string | null },
+  targetUser: { companyId: string | null } | undefined,
+): boolean {
+  if (!targetUser) {
+    return false;
+  }
+  if (subject.role === "admin_tecnico") {
+    return false;
+  }
+  return targetUser.companyId !== subject.companyId;
+}
+
+/**
  * Resolve o alvo (usuário referenciado por `:id`, quando existir) e chama o
  * avaliador RBAC/ABAC (spec §5). Sempre nega por padrão — sem metadata de
  * permissão declarada, a rota é bloqueada, não liberada.
@@ -140,6 +162,14 @@ export class AuthorizationGuard implements CanActivate {
         result: "denied",
         requestId: metadata.requestId,
       });
+      // Recurso de outra empresa → 404 anti-enumeração (indistinguível de
+      // inexistente); demais negações (ex.: autoelevação na própria empresa,
+      // falta de capacidade dentro do escopo) permanecem 403.
+      if (
+        targetUserForaDoEscopo(subjectUser, request.authorizationTargetUser)
+      ) {
+        throw new NotFoundException();
+      }
       throw new ForbiddenException();
     }
 

@@ -89,20 +89,21 @@ export class UsersService {
     targetUserId: string,
     role: AccessRole,
     auditCtx: AuditActorContext,
-    companyId?: string,
-    unitId?: string,
-    teamId?: string,
   ): Promise<SafeAccessUser> {
     // Autorização já aplicada pelo AuthorizationGuard (RequirePermission
     // "user_role"/"alter") antes deste método rodar.
+    //
+    // Escopo IMUTÁVEL (T029): a atualização toca apenas `role`. `companyId`,
+    // `unitId` e `teamId` nunca são escritos aqui — o usuário permanece na
+    // empresa em que foi criado. Isso impede que um RH/DP transfira, remova ou
+    // reatribua o escopo de outra empresa a partir desta rota, mesmo que algo
+    // escapasse da validação de entrada (defesa em profundidade). Transferência
+    // entre empresas não existe na V1.
     const user = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.accessUser.update({
         where: { id: targetUserId },
         data: {
           role,
-          companyId: companyId ?? null,
-          unitId: unitId ?? null,
-          teamId: teamId ?? null,
         },
       });
 

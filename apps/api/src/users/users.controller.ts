@@ -58,14 +58,10 @@ export class UsersController {
     @CurrentUser() actor: AccessUser,
     @Req() req: Request,
   ) {
-    return this.usersService.updateRole(
-      targetUserId,
-      dto.role,
-      { actor, metadata: extractRequestMetadata(req) },
-      dto.companyId,
-      dto.unitId,
-      dto.teamId,
-    );
+    return this.usersService.updateRole(targetUserId, dto.role, {
+      actor,
+      metadata: extractRequestMetadata(req),
+    });
   }
 
   @Post(":id/disable")
