@@ -409,3 +409,25 @@ Esta ADR deve ser reaberta — com emenda ou promoção formal — quando
   de acesso exige registro e aprovação conforme esta ADR.
 - Não estende nem relaxa MFA (ADR 0003) ou o modelo de auditoria (ADR 0004) —
   ambos permanecem integralmente aplicáveis e, no caso do MFA, agravados.
+
+---
+
+## Nota de convergência (ADR 0012, 2026-08-20)
+
+**Esta nota não altera nem apaga o texto acima; adiciona uma camada de
+convergência.** A [ADR 0012](0012-convergencia-governanca-privacidade-e-perfis-globais.md)
+formaliza:
+
+- A **"aprovação do DPO"** exigida para criar/alterar o catálogo de tipos
+  documentais é a aprovação da **função responsável: RH + Jurídico** — não de um
+  usuário com papel `dpo` provisionado (que não existe; DP-7 pendente). O
+  mecanismo atual (registrar a **referência de aprovação** + data como
+  pré-condição) permanece válido; muda apenas o **responsável nomeado**.
+- Os campos hoje rotulados como aprovação de DPO
+  (`dpo_aprovacao_referencia`/`dpo_aprovado_em`) serão renomeados para
+  **nomenclatura neutra** por **migração expand/contract futura**, com
+  preservação integral do histórico — **não agora** (ADR 0012 decisão 5). O
+  código/schema de Documentos permanece **congelado** até então.
+- As confirmações de finalidade, base legal, RIPD/DPIA e retenção continuam
+  **pendentes** e são responsabilidade de **RH + Jurídico** — esta nota não
+  declara conformidade.

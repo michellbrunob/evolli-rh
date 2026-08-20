@@ -272,3 +272,22 @@ Esta decisão deve ser reaberta — com ADR nova ou emenda formal — quando
   ADR 0005.
 - Não altera nenhuma ADR anterior — apenas referencia e interpreta um
   critério da ADR 0005, sem reescrever sua história.
+
+---
+
+## Nota de convergência (ADR 0012, 2026-08-20)
+
+**Esta nota não altera nem apaga o texto acima; adiciona uma camada de
+convergência.** A [ADR 0012](0012-convergencia-governanca-privacidade-e-perfis-globais.md)
+formaliza:
+
+- O `admin_tecnico` **deixa de ser** perfil de acesso global operacional
+  contínuo e converge para **bootstrap/histórico**; o único acesso global
+  **standing** passa a ser o **`master_tecnico`** (Constituição v1.3.0). A
+  decisão 4 desta ADR ("nenhum cliente externo, nenhum `auditor`, nenhum `dpo`
+  agora") é **reforçada**, e o `dpo` fica **formalmente depreciado** — mantido no
+  enum/histórico, removível só por expand/contract.
+- As responsabilidades de privacidade/LGPD atribuídas a "DPO/jurídico" passam a
+  ser de **RH + Jurídico**; a designação formal de encarregado é decisão futura
+  do Jurídico.
+- As regras R1–R7 e os gates de MFA/T004 permanecem **inalterados**.
