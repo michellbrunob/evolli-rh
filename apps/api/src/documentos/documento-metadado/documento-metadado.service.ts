@@ -4,11 +4,14 @@ import { PrismaService } from "../../database/prisma.service";
 import { DocumentosAuditoriaService } from "../documentos-auditoria.service";
 import { DocumentosAuditContext, ResultadoPaginado } from "../documentos.types";
 import {
-  EscopoDocumentos,
+  EscopoLeituraDocumentos,
   deslocamento,
-  intersectarEmpresaSolicitada,
+  filtroEmpresaLeituraDocumentos,
+  intersectarLeituraDocumentos,
   podeAcessarDocumentos,
+  podeConsultarDocumentos,
   resolverEscopoDocumentos,
+  resolverEscopoLeituraDocumentos,
 } from "../escopo-documentos.util";
 import {
   buscarTipoNaEmpresa,
@@ -107,8 +110,8 @@ export class DocumentoMetadadoService {
     query: ListarDocumentosMetadadoQueryDto,
     ctx: DocumentosAuditContext,
   ): Promise<ResultadoPaginado<DocumentoMetadado>> {
-    const escopo = resolverEscopoDocumentos(ctx.actor);
-    const filtro = intersectarEmpresaSolicitada(escopo, query.empresaId);
+    const escopo = resolverEscopoLeituraDocumentos(ctx.actor);
+    const filtro = intersectarLeituraDocumentos(escopo, query.empresaId);
 
     if (filtro === null) {
       // Pedido de outra empresa devolve página vazia, nunca erro — e não gera
@@ -122,7 +125,10 @@ export class DocumentoMetadadoService {
     }
 
     const where: Prisma.DocumentoMetadadoWhereInput = {
-      empresaId: filtro.empresaId,
+      // Escopado: empresa do ator. Global (Master): sem filtro de empresa.
+      ...(filtro.empresaId !== undefined
+        ? { empresaId: filtro.empresaId }
+        : {}),
       ...(query.colaboradorId ? { colaboradorId: query.colaboradorId } : {}),
       ...(query.tipoDocumentoId
         ? { tipoDocumentoId: query.tipoDocumentoId }
@@ -141,13 +147,14 @@ export class DocumentoMetadadoService {
     ]);
 
     // Fail-safe: se o evento de leitura não puder ser gravado, a consulta não é
-    // reportada como bem-sucedida (ADR 0011, decisão 7).
+    // reportada como bem-sucedida (ADR 0011, decisão 7). Empresa `null` na
+    // leitura global do Master (T030).
     await this.auditoria.registrarLeitura(
       ctx,
       "documentos_documento_metadado_consultado",
       "documento_metadado",
       null,
-      filtro.empresaId,
+      filtro.empresaId ?? null,
     );
 
     return {
@@ -162,7 +169,7 @@ export class DocumentoMetadadoService {
     documentoId: string,
     ctx: DocumentosAuditContext,
   ): Promise<DocumentoMetadado> {
-    const escopo = resolverEscopoDocumentos(ctx.actor);
+    const escopo = resolverEscopoLeituraDocumentos(ctx.actor);
     const metadado = await this.carregarNoEscopo(
       documentoId,
       ctx,
@@ -175,7 +182,7 @@ export class DocumentoMetadadoService {
       "documentos_documento_metadado_consultado",
       "documento_metadado",
       metadado.id,
-      escopo.empresaId,
+      escopo.global ? null : escopo.empresaId,
     );
 
     return metadado;
@@ -197,7 +204,8 @@ export class DocumentoMetadadoService {
     const atual = await this.carregarNoEscopo(
       documentoId,
       ctx,
-      escopo,
+      // Mutação é sempre escopada (master_tecnico nunca chega aqui).
+      { global: false, empresaId: escopo.empresaId },
       "alter",
     );
 
@@ -288,11 +296,11 @@ export class DocumentoMetadadoService {
   private async carregarNoEscopo(
     documentoId: string,
     ctx: DocumentosAuditContext,
-    escopo: EscopoDocumentos,
+    escopo: EscopoLeituraDocumentos,
     action: "read" | "alter",
   ): Promise<DocumentoMetadado> {
     const metadado = await this.prisma.documentoMetadado.findFirst({
-      where: { id: documentoId, empresaId: escopo.empresaId },
+      where: { id: documentoId, ...filtroEmpresaLeituraDocumentos(escopo) },
     });
 
     if (!metadado) {
@@ -305,18 +313,13 @@ export class DocumentoMetadadoService {
     }
 
     if (
-      !podeAcessarDocumentos(
-        ctx.actor,
-        "documento_metadado",
-        action,
-        escopo.empresaId,
-      )
+      !podeConsultarDocumentos(ctx.actor, "documento_metadado", action, escopo)
     ) {
       return this.auditoria.negarAcesso(
         ctx,
         "documento_metadado",
         metadado.id,
-        escopo.empresaId,
+        escopo.global ? null : escopo.empresaId,
       );
     }
 

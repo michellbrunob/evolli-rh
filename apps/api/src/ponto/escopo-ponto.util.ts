@@ -29,9 +29,9 @@ export interface EscopoPonto {
  */
 export function resolverEscopoPonto(actor: AccessUser): EscopoPonto {
   if (actor.role !== "rh" && actor.role !== "dp") {
-    // Inclui `admin_tecnico`, `gestor` e `colaborador`: negados neste domínio
-    // por decisão explícita, cada um por um motivo próprio (ver
-    // `evaluatePonto` em rbac.evaluator.ts).
+    // Inclui `admin_tecnico`, `gestor`, `colaborador` e `master_tecnico`:
+    // nenhum registra ponto (mutação). `master_tecnico` só LÊ — ver o resolver
+    // de leitura abaixo.
     throw new ForbiddenException();
   }
 
@@ -40,6 +40,56 @@ export function resolverEscopoPonto(actor: AccessUser): EscopoPonto {
   }
 
   return { empresaId: actor.companyId };
+}
+
+/**
+ * Escopo de **LEITURA** de ponto (T030). Variante global exclusiva do
+ * `master_tecnico` (perfil global controlado; Constituição, Princípio II);
+ * rh/dp continuam presos à própria empresa. A leitura de ponto é auditada por
+ * si (`ponto.consultado`), inclusive a global do Master.
+ */
+export type EscopoLeituraPonto =
+  { global: true } | { global: false; empresaId: string };
+
+export function resolverEscopoLeituraPonto(
+  actor: AccessUser,
+): EscopoLeituraPonto {
+  if (actor.role === "master_tecnico") {
+    return { global: true };
+  }
+  if (actor.role !== "rh" && actor.role !== "dp") {
+    throw new ForbiddenException();
+  }
+  if (actor.companyId === null) {
+    throw new ForbiddenException();
+  }
+  return { global: false, empresaId: actor.companyId };
+}
+
+/** Filtro por `empresa_id` para leitura. Global (Master): sem filtro. */
+export function filtroEmpresaLeituraPonto(escopo: EscopoLeituraPonto): {
+  empresaId?: string;
+} {
+  return escopo.global ? {} : { empresaId: escopo.empresaId };
+}
+
+/**
+ * Reavaliação de LEITURA global-aware (fase 2). Escopado: empresa como
+ * fronteira. Global (Master): capacidade sem empresa-alvo — leitura concedida,
+ * mutação negada.
+ */
+export function podeConsultarPonto(
+  actor: AccessUser,
+  resource: AuthorizationResource,
+  action: AuthorizationAction,
+  escopo: EscopoLeituraPonto,
+): boolean {
+  return evaluatePermission(
+    { userId: actor.id, role: actor.role, companyId: actor.companyId },
+    escopo.global
+      ? { resource, action }
+      : { resource, action, targetCompanyId: escopo.empresaId },
+  );
 }
 
 /**

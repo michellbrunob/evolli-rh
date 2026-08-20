@@ -64,7 +64,8 @@ export class DocumentosAuditoriaService {
     action: AuditAction,
     resource: AuditResource,
     resourceId: string | null,
-    empresaId: string,
+    // `null` na leitura GLOBAL do Master (T030): a consulta atravessa empresas.
+    empresaId: string | null,
   ): Promise<void> {
     await this.auditService.recordOrThrow({
       actorType: "user",
@@ -72,6 +73,33 @@ export class DocumentosAuditoriaService {
       actorRole: ctx.actor.role,
       companyId: empresaId,
       action,
+      resource,
+      resourceId,
+      ip: ctx.metadata.ip,
+      userAgent: ctx.metadata.userAgent,
+      result: "success",
+      requestId: ctx.metadata.requestId,
+    });
+  }
+
+  /**
+   * Consulta em escopo **GLOBAL** do `master_tecnico` (T030), para os recursos
+   * cuja leitura escopada de rh/dp não gera evento (catálogo e solicitação). É
+   * a leitura ampla — a exceção — que se audita, fail-safe (`recordOrThrow`),
+   * com ação, tipo de recurso e id técnico; nunca rótulo documental ou dado
+   * pessoal.
+   */
+  async registrarConsultaGlobal(
+    ctx: DocumentosAuditContext,
+    resource: AuditResource,
+    resourceId: string | null,
+  ): Promise<void> {
+    await this.auditService.recordOrThrow({
+      actorType: "user",
+      actorUserId: ctx.actor.id,
+      actorRole: ctx.actor.role,
+      companyId: null,
+      action: "master_consulta_global",
       resource,
       resourceId,
       ip: ctx.metadata.ip,

@@ -10,8 +10,9 @@ import { PessoasAuditContext, ResultadoPaginado } from "../pessoas.types";
 import {
   EscopoPessoas,
   deslocamento,
-  intersectarEmpresaSolicitada,
+  intersectarLeitura,
   podeAcessarPessoas,
+  resolverEscopoLeituraPessoas,
   resolverEscopoPessoas,
 } from "../escopo-pessoas.util";
 import {
@@ -130,8 +131,8 @@ export class MovimentacaoService {
     query: ListarMovimentacoesQueryDto,
     ctx: PessoasAuditContext,
   ): Promise<ResultadoPaginado<MovimentacaoFuncional>> {
-    const escopo = resolverEscopoPessoas(ctx.actor);
-    const filtro = intersectarEmpresaSolicitada(escopo, query.empresaId);
+    const escopo = resolverEscopoLeituraPessoas(ctx.actor);
+    const filtro = intersectarLeitura(escopo, query.empresaId);
 
     if (filtro === null) {
       return {
@@ -143,7 +144,10 @@ export class MovimentacaoService {
     }
 
     const where: Prisma.MovimentacaoFuncionalWhereInput = {
-      empresaId: filtro.empresaId,
+      // Escopado: empresa do ator. Global (Master): sem filtro de empresa.
+      ...(filtro.empresaId !== undefined
+        ? { empresaId: filtro.empresaId }
+        : {}),
       ...(query.vinculoId ? { vinculoId: query.vinculoId } : {}),
       ...(query.tipo ? { tipo: query.tipo } : {}),
       ...(query.status ? { status: query.status } : {}),
@@ -158,6 +162,14 @@ export class MovimentacaoService {
       }),
       this.prisma.movimentacaoFuncional.count({ where }),
     ]);
+
+    if (escopo.global) {
+      await this.auditoria.registrarConsultaGlobal(
+        ctx,
+        "movimentacao_funcional",
+        null,
+      );
+    }
 
     return {
       itens,

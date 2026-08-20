@@ -4,11 +4,14 @@ import { PrismaService } from "../../database/prisma.service";
 import { DocumentosAuditoriaService } from "../documentos-auditoria.service";
 import { DocumentosAuditContext, ResultadoPaginado } from "../documentos.types";
 import {
-  EscopoDocumentos,
+  EscopoLeituraDocumentos,
   deslocamento,
-  intersectarEmpresaSolicitada,
+  filtroEmpresaLeituraDocumentos,
+  intersectarLeituraDocumentos,
   podeAcessarDocumentos,
+  podeConsultarDocumentos,
   resolverEscopoDocumentos,
+  resolverEscopoLeituraDocumentos,
 } from "../escopo-documentos.util";
 import { traduzirErroDocumentos } from "../validacao-documentos.util";
 import {
@@ -97,7 +100,13 @@ export class TipoDocumentoService {
     ctx: DocumentosAuditContext,
   ): Promise<TipoDocumento> {
     const escopo = resolverEscopoDocumentos(ctx.actor);
-    await this.carregarNoEscopo(tipoDocumentoId, ctx, escopo, "alter");
+    await this.carregarNoEscopo(
+      tipoDocumentoId,
+      ctx,
+      // Mutação é sempre escopada (master_tecnico nunca chega aqui).
+      { global: false, empresaId: escopo.empresaId },
+      "alter",
+    );
 
     try {
       return await this.prisma.$transaction(async (tx) => {
@@ -131,8 +140,8 @@ export class TipoDocumentoService {
     query: ListarTiposDocumentoQueryDto,
     ctx: DocumentosAuditContext,
   ): Promise<ResultadoPaginado<TipoDocumento>> {
-    const escopo = resolverEscopoDocumentos(ctx.actor);
-    const filtro = intersectarEmpresaSolicitada(escopo, query.empresaId);
+    const escopo = resolverEscopoLeituraDocumentos(ctx.actor);
+    const filtro = intersectarLeituraDocumentos(escopo, query.empresaId);
 
     if (filtro === null) {
       return {
@@ -144,7 +153,10 @@ export class TipoDocumentoService {
     }
 
     const where: Prisma.TipoDocumentoWhereInput = {
-      empresaId: filtro.empresaId,
+      // Escopado: empresa do ator. Global (Master): sem filtro de empresa.
+      ...(filtro.empresaId !== undefined
+        ? { empresaId: filtro.empresaId }
+        : {}),
     };
 
     const [itens, total] = await Promise.all([
@@ -156,6 +168,10 @@ export class TipoDocumentoService {
       }),
       this.prisma.tipoDocumento.count({ where }),
     ]);
+
+    if (escopo.global) {
+      await this.auditoria.registrarConsultaGlobal(ctx, "tipo_documento", null);
+    }
 
     return {
       itens,
@@ -169,18 +185,33 @@ export class TipoDocumentoService {
     tipoDocumentoId: string,
     ctx: DocumentosAuditContext,
   ): Promise<TipoDocumento> {
-    const escopo = resolverEscopoDocumentos(ctx.actor);
-    return this.carregarNoEscopo(tipoDocumentoId, ctx, escopo, "read");
+    const escopo = resolverEscopoLeituraDocumentos(ctx.actor);
+    const tipo = await this.carregarNoEscopo(
+      tipoDocumentoId,
+      ctx,
+      escopo,
+      "read",
+    );
+
+    if (escopo.global) {
+      await this.auditoria.registrarConsultaGlobal(
+        ctx,
+        "tipo_documento",
+        tipo.id,
+      );
+    }
+
+    return tipo;
   }
 
   private async carregarNoEscopo(
     tipoDocumentoId: string,
     ctx: DocumentosAuditContext,
-    escopo: EscopoDocumentos,
+    escopo: EscopoLeituraDocumentos,
     action: "read" | "alter",
   ): Promise<TipoDocumento> {
     const tipo = await this.prisma.tipoDocumento.findFirst({
-      where: { id: tipoDocumentoId, empresaId: escopo.empresaId },
+      where: { id: tipoDocumentoId, ...filtroEmpresaLeituraDocumentos(escopo) },
     });
 
     if (!tipo) {
@@ -193,19 +224,12 @@ export class TipoDocumentoService {
       );
     }
 
-    if (
-      !podeAcessarDocumentos(
-        ctx.actor,
-        "tipo_documento",
-        action,
-        escopo.empresaId,
-      )
-    ) {
+    if (!podeConsultarDocumentos(ctx.actor, "tipo_documento", action, escopo)) {
       return this.auditoria.negarAcesso(
         ctx,
         "tipo_documento",
         tipo.id,
-        escopo.empresaId,
+        escopo.global ? null : escopo.empresaId,
       );
     }
 

@@ -35,7 +35,7 @@ export interface EscopoDocumentos {
  */
 export function resolverEscopoDocumentos(actor: AccessUser): EscopoDocumentos {
   if (actor.role !== "rh" && actor.role !== "dp") {
-    // Inclui `admin_tecnico`: negado neste domínio por decisão explícita.
+    // Inclui `admin_tecnico` e `master_tecnico`: nenhum MUTA documentos.
     throw new ForbiddenException();
   }
 
@@ -44,6 +44,55 @@ export function resolverEscopoDocumentos(actor: AccessUser): EscopoDocumentos {
   }
 
   return { empresaId: actor.companyId };
+}
+
+/**
+ * Escopo de **LEITURA** de documentos (T030). Variante global exclusiva do
+ * `master_tecnico` (perfil global controlado; Constituição, Princípio II);
+ * rh/dp seguem presos à própria empresa. Leitura global auditada (fail-safe).
+ */
+export type EscopoLeituraDocumentos =
+  { global: true } | { global: false; empresaId: string };
+
+export function resolverEscopoLeituraDocumentos(
+  actor: AccessUser,
+): EscopoLeituraDocumentos {
+  if (actor.role === "master_tecnico") {
+    return { global: true };
+  }
+  if (actor.role !== "rh" && actor.role !== "dp") {
+    throw new ForbiddenException();
+  }
+  if (actor.companyId === null) {
+    throw new ForbiddenException();
+  }
+  return { global: false, empresaId: actor.companyId };
+}
+
+/** Filtro por `empresa_id` para leitura. Global (Master): sem filtro. */
+export function filtroEmpresaLeituraDocumentos(
+  escopo: EscopoLeituraDocumentos,
+): { empresaId?: string } {
+  return escopo.global ? {} : { empresaId: escopo.empresaId };
+}
+
+/**
+ * Reavaliação de LEITURA global-aware (fase 2). Escopado: empresa como
+ * fronteira. Global (Master): capacidade sem empresa-alvo — leitura concedida,
+ * mutação (criar/substituir/alterar) negada.
+ */
+export function podeConsultarDocumentos(
+  actor: AccessUser,
+  resource: AuthorizationResource,
+  action: AuthorizationAction,
+  escopo: EscopoLeituraDocumentos,
+): boolean {
+  return evaluatePermission(
+    { userId: actor.id, role: actor.role, companyId: actor.companyId },
+    escopo.global
+      ? { resource, action }
+      : { resource, action, targetCompanyId: escopo.empresaId },
+  );
 }
 
 /**
@@ -68,12 +117,15 @@ export function podeAcessarDocumentos(
  * que peça outra empresa recebe **página vazia**, nunca erro — erro confirmaria
  * a existência da empresa (anti-enumeração).
  */
-export function intersectarEmpresaSolicitada(
-  escopo: EscopoDocumentos,
+export function intersectarLeituraDocumentos(
+  escopo: EscopoLeituraDocumentos,
   empresaIdSolicitada: string | undefined,
-): { empresaId: string } | null {
+): { empresaId?: string } | null {
   if (empresaIdSolicitada === undefined) {
-    return { empresaId: escopo.empresaId };
+    return filtroEmpresaLeituraDocumentos(escopo);
+  }
+  if (escopo.global) {
+    return { empresaId: empresaIdSolicitada };
   }
   return escopo.empresaId === empresaIdSolicitada
     ? { empresaId: escopo.empresaId }
