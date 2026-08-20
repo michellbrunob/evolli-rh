@@ -160,7 +160,11 @@ describe("Documentos — metadados V1 (e2e)", () => {
   let migratorUrl: string;
   let app: INestApplication;
 
-  let admin: Credencial; // admin_tecnico
+  // `admin` = admin_tecnico do bootstrap, mantido só para PROVAR negação
+  // (CG-RBAC-01). `master` = master_tecnico semeado (único acesso global
+  // standing, ADR 0012) — faz setup e operações organizacionais.
+  let admin: Credencial;
+  let master: Credencial;
   let rhA: Credencial;
   let rhB: Credencial;
   let dpA: Credencial;
@@ -189,6 +193,21 @@ describe("Documentos — metadados V1 (e2e)", () => {
     return { cookie, csrfToken: response.body.csrfToken };
   }
 
+  async function seedMaster(email: string): Promise<Credencial> {
+    const { PasswordHashService } =
+      await import("../src/auth/password/password-hash.service");
+    const prisma = new PrismaClient({ datasources: { db: { url: appUrl } } });
+    try {
+      const passwordHash = await new PasswordHashService().hash(SENHA_PADRAO);
+      await prisma.accessUser.create({
+        data: { email, passwordHash, role: "master_tecnico", status: "active" },
+      });
+    } finally {
+      await prisma.$disconnect();
+    }
+    return login(email, SENHA_PADRAO);
+  }
+
   async function criarUsuario(
     email: string,
     role: string,
@@ -196,8 +215,8 @@ describe("Documentos — metadados V1 (e2e)", () => {
   ): Promise<Credencial> {
     await agent()
       .post("/v1/users")
-      .set("Cookie", admin.cookie)
-      .set("x-csrf-token", admin.csrfToken)
+      .set("Cookie", master.cookie)
+      .set("x-csrf-token", master.csrfToken)
       .send({
         email,
         password: SENHA_PADRAO,
@@ -315,25 +334,27 @@ describe("Documentos — metadados V1 (e2e)", () => {
       }).status,
     ).toBe(0);
     admin = await login(adminEmail, SENHA_PADRAO);
+    // Operador global (setup + estrutura) — admin_tecnico não opera mais por rota.
+    master = await seedMaster("master.docs@example.test");
 
     empresaA = (
-      await post("/v1/empresas", admin)
+      await post("/v1/empresas", master)
         .send({ codigo: "DOCA", nome: "Empresa Docs A" })
         .expect(201)
     ).body.id;
     empresaB = (
-      await post("/v1/empresas", admin)
+      await post("/v1/empresas", master)
         .send({ codigo: "DOCB", nome: "Empresa Docs B" })
         .expect(201)
     ).body.id;
 
     departamentoA = (
-      await post("/v1/departamentos", admin)
+      await post("/v1/departamentos", master)
         .send({ empresaId: empresaA, codigo: "DDEPA", nome: "Dep Docs A" })
         .expect(201)
     ).body.id;
     departamentoB = (
-      await post("/v1/departamentos", admin)
+      await post("/v1/departamentos", master)
         .send({ empresaId: empresaB, codigo: "DDEPB", nome: "Dep Docs B" })
         .expect(201)
     ).body.id;
@@ -914,36 +935,12 @@ describe("Documentos — metadados V1 (e2e)", () => {
   });
 
   describe("master_tecnico (T030) — perfil global controlado", () => {
-    let master: Credencial;
+    // Reusa o `master` do setup (spec-level): mesmo perfil global standing.
     let tipoMasterA: string;
     let tipoMasterB: string;
     let metadadoB: string;
 
-    async function seedMaster(email: string): Promise<Credencial> {
-      const { PasswordHashService } =
-        await import("../src/auth/password/password-hash.service");
-      const prisma = new PrismaClient({ datasources: { db: { url: appUrl } } });
-      try {
-        const passwordHash = await new PasswordHashService().hash(SENHA_PADRAO);
-        // O Master não pode ser criado por rota comum (T030). É provisionado
-        // diretamente — o análogo de teste do runbook futuro (sujeito a MFA).
-        await prisma.accessUser.create({
-          data: {
-            email,
-            passwordHash,
-            role: "master_tecnico",
-            status: "active",
-          },
-        });
-      } finally {
-        await prisma.$disconnect();
-      }
-      return login(email, SENHA_PADRAO);
-    }
-
     beforeAll(async () => {
-      master = await seedMaster("master@ecossistema.test");
-
       tipoMasterA = await criarTipo(
         rhA,
         empresaA,
@@ -1032,7 +1029,7 @@ describe("Documentos — metadados V1 (e2e)", () => {
     });
 
     it("gerencia conta comum em qualquer empresa (desativa usuário da empresa B)", async () => {
-      const alvo = await post("/v1/users", admin)
+      const alvo = await post("/v1/users", master)
         .send({
           email: "descartavel.b@example.test",
           password: SENHA_PADRAO,

@@ -55,7 +55,8 @@ describe("evaluatePermission (RBAC/ABAC)", () => {
   });
 
   describe("other_account (gerenciar conta de terceiro)", () => {
-    it("admin_tecnico gerencia qualquer empresa (escopo instância)", () => {
+    it("admin_tecnico NÃO gerencia conta de terceiro (CG-RBAC-01, ADR 0012)", () => {
+      // Convergido para bootstrap/histórico: sem gestão global de contas.
       expect(
         evaluatePermission(subject({ role: "admin_tecnico" }), {
           resource: "other_account",
@@ -63,7 +64,7 @@ describe("evaluatePermission (RBAC/ABAC)", () => {
           targetUserId: "user-2",
           targetCompanyId: "outra-empresa",
         }),
-      ).toBe(true);
+      ).toBe(false);
     });
 
     it("rh gerencia só dentro da própria empresa", () => {
@@ -120,8 +121,9 @@ describe("evaluatePermission (RBAC/ABAC)", () => {
   });
 
   describe("access_log", () => {
-    it("permite leitura só para admin_tecnico, auditor e dpo", () => {
-      for (const role of ["admin_tecnico", "auditor", "dpo"] as const) {
+    it("permite leitura só para master_tecnico, auditor e dpo", () => {
+      // `admin_tecnico` deixou de ler a trilha (CG-RBAC-01, ADR 0012).
+      for (const role of ["master_tecnico", "auditor", "dpo"] as const) {
         expect(
           evaluatePermission(subject({ role }), {
             resource: "access_log",
@@ -131,8 +133,9 @@ describe("evaluatePermission (RBAC/ABAC)", () => {
       }
     });
 
-    it("nega leitura para os demais papéis", () => {
+    it("nega leitura para os demais papéis (inclui admin_tecnico)", () => {
       for (const role of [
+        "admin_tecnico",
         "rh",
         "dp",
         "gestor",
@@ -162,7 +165,8 @@ describe("evaluatePermission (RBAC/ABAC)", () => {
       ).toBe(false);
     });
 
-    it("admin_tecnico altera papel de terceiro em qualquer empresa", () => {
+    it("admin_tecnico NÃO atribui papel a terceiro (CG-RBAC-01, ADR 0012)", () => {
+      // Convergido para bootstrap/histórico: sem atribuição de papéis por rota.
       expect(
         evaluatePermission(subject({ role: "admin_tecnico" }), {
           resource: "user_role",
@@ -171,7 +175,20 @@ describe("evaluatePermission (RBAC/ABAC)", () => {
           targetCompanyId: "outra-empresa",
           targetNewRole: "rh",
         }),
-      ).toBe(true);
+      ).toBe(false);
+    });
+
+    it("ninguém cria/promove a admin_tecnico por rota — nem master, nem rh (CG-RBAC-01)", () => {
+      for (const role of ["master_tecnico", "rh"] as const) {
+        expect(
+          evaluatePermission(subject({ role, companyId: "empresa-a" }), {
+            resource: "user_role",
+            action: "create",
+            targetCompanyId: "empresa-a",
+            targetNewRole: "admin_tecnico",
+          }),
+        ).toBe(false);
+      }
     });
 
     it("rh não pode promover terceiro a admin_tecnico", () => {

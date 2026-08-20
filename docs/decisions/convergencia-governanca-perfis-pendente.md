@@ -25,17 +25,26 @@ em produção exige ADR/critério próprio antes da implementação.
 
 ## 1. Mudanças de RBAC para restringir `admin_tecnico`
 
-- **CG-RBAC-01** — Remover a auto-cunhagem: `admin_tecnico` deixa de poder
-  **criar/promover** `admin_tecnico` (`evaluateUserRole`). Responsável:
-  Segurança + Desenvolvimento. **Altera autorização** → exige ADR/aceite próprio.
-- **CG-RBAC-02** — Restringir o uso standing de `admin_tecnico` à operação de
-  **bootstrap**; migrar a operação técnica global contínua (contas, estrutura,
-  trilha) para `master_tecnico`. Avaliar se `admin_tecnico` deve perder o acesso
-  global em `evaluateOrganizacao`/`other_account`/`access_log` após o primeiro
-  `master_tecnico` existir. Responsável: Segurança + Produto.
-- **CG-RBAC-03** — **Não remover** `admin_tecnico` do enum: permanece por
-  bootstrap e por integridade do histórico de auditoria (`actor_role`).
-- **Gate de decisão:** **2026-11-04** (prazo da Emenda 1 da ADR 0005).
+- **CG-RBAC-01 — IMPLEMENTADA** (restrição de `admin_tecnico`). O
+  `admin_tecnico` deixou de ter acesso operacional global: negado em
+  `evaluateOrganizacao` (estrutura), `evaluateOtherAccount` (contas),
+  `evaluateUserRole` (atribuição de papéis) e `evaluateAccessLog` (trilha); a
+  auto-cunhagem foi removida — nenhuma rota comum cria/atribui/promove
+  `admin_tecnico` (bloqueio universal, ao lado de `master_tecnico`). O escopo
+  global de organização foi retirado do `resolverEscopo` (só `master_tecnico`).
+  A negação a alvo de outra empresa passa a ser 404 anti-enumeração também para
+  o `admin_tecnico`, agora não-global. Testes unitários e E2E atualizados
+  (setup e operações globais migrados para `master_tecnico` semeado; provas de
+  negação do `admin_tecnico`). **Não** alterou schema/migration; `admin_tecnico`
+  permanece no enum e no histórico.
+- **CG-RBAC-02 — coberta pela CG-RBAC-01**: o uso standing global do
+  `admin_tecnico` (contas, estrutura, trilha) foi migrado para `master_tecnico`.
+  Resta apenas confirmar o mecanismo de bootstrap definitivo (ver CG-PROV).
+- **CG-RBAC-03 — respeitada**: `admin_tecnico` **não** foi removido do enum;
+  permanece por bootstrap e por integridade do histórico de auditoria
+  (`actor_role`). Nenhuma remoção destrutiva.
+- **Gate de decisão:** **2026-11-04** (prazo da Emenda 1 da ADR 0005) — mantido
+  para a formalização e para o provisionamento do primeiro Master.
 
 ## 2. Provisionamento controlado do primeiro `master_tecnico`
 

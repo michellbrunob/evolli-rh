@@ -60,11 +60,12 @@ function toAuditResource(resource: AuthorizationResource): AuditResource {
  * empresa não pode ser distinguível de um inexistente. Verdadeiro quando o
  * ator não alcança a empresa do alvo — nesse caso a negação responde 404
  * (idêntico a "não existe"), nunca 403, que confirmaria a existência do alvo,
- * sua empresa ou seu papel. `admin_tecnico` (Emenda 1 da ADR 0005) e
- * `master_tecnico` (T030) têm alcance de instância inteira — enxergam qualquer
- * empresa — e por isso nunca caem neste caso: para eles não há existência a
- * esconder. Sem alvo carregado (ex.: criação, cujo escopo vem do corpo) também
- * não é caso de enumeração.
+ * sua empresa ou seu papel. `master_tecnico` (T030) tem alcance de instância
+ * inteira — enxerga qualquer empresa — e por isso nunca cai neste caso: para
+ * ele não há existência a esconder. `admin_tecnico` deixou de ser global
+ * (CG-RBAC-01, ADR 0012): uma negação sua sobre alvo de outra empresa vira 404
+ * anti-enumeração, como para qualquer papel não-global. Sem alvo carregado
+ * (ex.: criação, cujo escopo vem do corpo) também não é caso de enumeração.
  */
 function targetUserForaDoEscopo(
   subject: { role: AccessRole; companyId: string | null },
@@ -73,7 +74,7 @@ function targetUserForaDoEscopo(
   if (!targetUser) {
     return false;
   }
-  if (subject.role === "admin_tecnico" || subject.role === "master_tecnico") {
+  if (subject.role === "master_tecnico") {
     return false;
   }
   return targetUser.companyId !== subject.companyId;

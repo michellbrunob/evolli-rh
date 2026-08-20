@@ -130,7 +130,12 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
   let migratorUrl: string;
   let app: INestApplication;
 
+  // `admin` = admin_tecnico do bootstrap, mantido apenas para PROVAR negação
+  // (CG-RBAC-01: convergido para bootstrap/histórico, sem acesso operacional).
+  // `master` = master_tecnico semeado, único acesso global standing, faz todo o
+  // setup e as operações organizacionais (ADR 0012).
   let admin: Credencial;
+  let master: Credencial;
   let rhA: Credencial;
   let rhB: Credencial;
   let dpA: Credencial;
@@ -162,6 +167,21 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
     return { cookie, csrfToken: response.body.csrfToken };
   }
 
+  async function seedMaster(email: string): Promise<Credencial> {
+    const { PasswordHashService } =
+      await import("../src/auth/password/password-hash.service");
+    const prisma = new PrismaClient({ datasources: { db: { url: appUrl } } });
+    try {
+      const passwordHash = await new PasswordHashService().hash(SENHA_PADRAO);
+      await prisma.accessUser.create({
+        data: { email, passwordHash, role: "master_tecnico", status: "active" },
+      });
+    } finally {
+      await prisma.$disconnect();
+    }
+    return login(email, SENHA_PADRAO);
+  }
+
   async function criarUsuario(
     email: string,
     role: string,
@@ -169,8 +189,8 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
   ): Promise<Credencial> {
     await agent()
       .post("/v1/users")
-      .set("Cookie", admin.cookie)
-      .set("x-csrf-token", admin.csrfToken)
+      .set("Cookie", master.cookie)
+      .set("x-csrf-token", master.csrfToken)
       .send({
         email,
         password: SENHA_PADRAO,
@@ -297,35 +317,37 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
       }).status,
     ).toBe(0);
     admin = await login(adminEmail, SENHA_PADRAO);
+    // Operador global (setup + estrutura) — admin_tecnico não opera mais por rota.
+    master = await seedMaster("master.pessoas@example.test");
 
     empresaA = (
-      await post("/v1/empresas", admin)
+      await post("/v1/empresas", master)
         .send({ codigo: "PESSOAA", nome: "Empresa A" })
         .expect(201)
     ).body.id;
     empresaB = (
-      await post("/v1/empresas", admin)
+      await post("/v1/empresas", master)
         .send({ codigo: "PESSOAB", nome: "Empresa B" })
         .expect(201)
     ).body.id;
 
     departamentoA = (
-      await post("/v1/departamentos", admin)
+      await post("/v1/departamentos", master)
         .send({ empresaId: empresaA, codigo: "DEPA1", nome: "Departamento A1" })
         .expect(201)
     ).body.id;
     departamentoA2 = (
-      await post("/v1/departamentos", admin)
+      await post("/v1/departamentos", master)
         .send({ empresaId: empresaA, codigo: "DEPA2", nome: "Departamento A2" })
         .expect(201)
     ).body.id;
     cargoA = (
-      await post("/v1/cargos", admin)
+      await post("/v1/cargos", master)
         .send({ empresaId: empresaA, codigo: "CARGOA1", nome: "Cargo A1" })
         .expect(201)
     ).body.id;
     equipeA = (
-      await post("/v1/equipes", admin)
+      await post("/v1/equipes", master)
         .send({
           departamentoId: departamentoA,
           codigo: "EQPA1",
@@ -335,12 +357,12 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
     ).body.id;
 
     departamentoB = (
-      await post("/v1/departamentos", admin)
+      await post("/v1/departamentos", master)
         .send({ empresaId: empresaB, codigo: "DEPB1", nome: "Departamento B1" })
         .expect(201)
     ).body.id;
     cargoB = (
-      await post("/v1/cargos", admin)
+      await post("/v1/cargos", master)
         .send({ empresaId: empresaB, codigo: "CARGOB1", nome: "Cargo B1" })
         .expect(201)
     ).body.id;
@@ -803,11 +825,11 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
 
     it("recusa alocação em nó organizacional INATIVO (RI-A3)", async () => {
       const departamentoInativo = (
-        await post("/v1/departamentos", admin)
+        await post("/v1/departamentos", master)
           .send({ empresaId: empresaA, codigo: "DEPINA", nome: "Dep Inativo" })
           .expect(201)
       ).body.id;
-      await post(`/v1/departamentos/${departamentoInativo}/inativar`, admin)
+      await post(`/v1/departamentos/${departamentoInativo}/inativar`, master)
         .send()
         .expect(201);
 
@@ -1810,9 +1832,14 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
       );
     });
 
-    it("admin_tecnico mantém acesso à estrutura organizacional (sem regressão)", async () => {
-      await get("/v1/empresas", admin).expect(200);
-      await get("/v1/departamentos", admin).expect(200);
+    it("admin_tecnico TAMBÉM é negado na estrutura organizacional (CG-RBAC-01)", async () => {
+      // A antiga assimetria acabou: admin_tecnico converge para
+      // bootstrap/histórico e é negado também em Organização. O acesso global à
+      // estrutura passou ao master_tecnico.
+      await get("/v1/empresas", admin).expect(403);
+      await get("/v1/departamentos", admin).expect(403);
+      // O master (global) continua lendo a estrutura.
+      await get("/v1/empresas", master).expect(200);
     });
   });
 
@@ -2018,12 +2045,12 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
 
     beforeAll(async () => {
       departamentoOcupado = (
-        await post("/v1/departamentos", admin)
+        await post("/v1/departamentos", master)
           .send({ empresaId: empresaA, codigo: "DEPOCU", nome: "Dep Ocupado" })
           .expect(201)
       ).body.id;
       cargoOcupado = (
-        await post("/v1/cargos", admin)
+        await post("/v1/cargos", master)
           .send({
             empresaId: empresaA,
             codigo: "CARGOCU",
@@ -2032,7 +2059,7 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
           .expect(201)
       ).body.id;
       equipeOcupada = (
-        await post("/v1/equipes", admin)
+        await post("/v1/equipes", master)
           .send({
             departamentoId: departamentoOcupado,
             codigo: "EQPOCU",
@@ -2069,28 +2096,30 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
     });
 
     it("recusa inativar departamento com alocação vigente (409)", async () => {
-      await post(`/v1/departamentos/${departamentoOcupado}/inativar`, admin)
+      await post(`/v1/departamentos/${departamentoOcupado}/inativar`, master)
         .send()
         .expect(409);
     });
 
     it("recusa inativar cargo e equipe com alocação vigente", async () => {
-      await post(`/v1/cargos/${cargoOcupado}/inativar`, admin)
+      await post(`/v1/cargos/${cargoOcupado}/inativar`, master)
         .send()
         .expect(409);
-      await post(`/v1/equipes/${equipeOcupada}/inativar`, admin)
+      await post(`/v1/equipes/${equipeOcupada}/inativar`, master)
         .send()
         .expect(409);
     });
 
     it("recusa inativar a empresa com vínculo ativo", async () => {
-      await post(`/v1/empresas/${empresaA}/inativar`, admin).send().expect(409);
+      await post(`/v1/empresas/${empresaA}/inativar`, master)
+        .send()
+        .expect(409);
     });
 
     it("a recusa NÃO revela nome, matrícula ou identidade do dependente", async () => {
       const resposta = await post(
         `/v1/departamentos/${departamentoOcupado}/inativar`,
-        admin,
+        master,
       )
         .send()
         .expect(409);
@@ -2119,14 +2148,14 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
     it("o nó organizacional permanece ATIVO — não houve cascata", async () => {
       const departamento = await get(
         `/v1/departamentos/${departamentoOcupado}`,
-        admin,
+        master,
       ).expect(200);
       expect(departamento.body.status).toBe("ativo");
     });
 
     it("histórico encerrado NÃO bloqueia inativação (R-INA-4)", async () => {
       const departamentoLivre = (
-        await post("/v1/departamentos", admin)
+        await post("/v1/departamentos", master)
           .send({ empresaId: empresaA, codigo: "DEPLIV", nome: "Dep Livre" })
           .expect(201)
       ).body.id;
@@ -2151,18 +2180,18 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
         .expect(201);
 
       // Alocação encerrada e vínculo encerrado: nada bloqueia mais.
-      await post(`/v1/departamentos/${departamentoLivre}/inativar`, admin)
+      await post(`/v1/departamentos/${departamentoLivre}/inativar`, master)
         .send()
         .expect(201);
     });
 
     it("bloqueio por filho ORGANIZACIONAL ativo continua idêntico (regressão)", async () => {
       const departamentoPai = (
-        await post("/v1/departamentos", admin)
+        await post("/v1/departamentos", master)
           .send({ empresaId: empresaA, codigo: "DEPPAI", nome: "Dep Pai" })
           .expect(201)
       ).body.id;
-      await post("/v1/areas", admin)
+      await post("/v1/areas", master)
         .send({
           departamentoId: departamentoPai,
           codigo: "AREAF",
@@ -2170,7 +2199,7 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
         })
         .expect(201);
 
-      await post(`/v1/departamentos/${departamentoPai}/inativar`, admin)
+      await post(`/v1/departamentos/${departamentoPai}/inativar`, master)
         .send()
         .expect(409);
     });

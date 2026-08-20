@@ -74,10 +74,12 @@ function evaluateOtherAccount(
     // autoatendimento passa por "own_account".
     return false;
   }
-  if (subject.role === "admin_tecnico" || subject.role === "master_tecnico") {
+  if (subject.role === "master_tecnico") {
     // Escopo: instância inteira. `master_tecnico` administra contas de acesso em
     // qualquer empresa (T030); a atribuição de PAPÉIS é regida por
     // `evaluateUserRole`, que impede promover alguém a `master_tecnico`.
+    // `admin_tecnico` NÃO gerencia contas (CG-RBAC-01, ADR 0012): converge para
+    // bootstrap/histórico e cai na negação por padrão abaixo.
     return true;
   }
   if (subject.role === "rh" || subject.role === "dp") {
@@ -97,11 +99,11 @@ function evaluateAccessLog(
   // as duas empresas, sem depender de filtro do cliente (o serviço de auditoria
   // não confina a consulta por empresa; para um papel global isso é o desejado).
   // A própria leitura gera evento `audit_log_read` (fail-closed, sem recursão).
-  // Nenhum outro papel comum ganha acesso: rh/dp/gestor/financeiro/colaborador
-  // permanecem negados (deny-by-default), e `auditor`/`dpo` seguem não
-  // provisionados (ADR 0010, decisão 4) — esta mudança não os habilita.
+  // `admin_tecnico` deixa de ler a trilha (CG-RBAC-01, ADR 0012): converge para
+  // bootstrap/histórico e não opera a auditoria. `auditor`/`dpo` seguem não
+  // provisionados (ADR 0010, decisão 4); `dpo` está formalmente depreciado
+  // (ADR 0012) — nenhum papel comum ganha acesso (deny-by-default).
   return (
-    subject.role === "admin_tecnico" ||
     subject.role === "master_tecnico" ||
     subject.role === "auditor" ||
     subject.role === "dpo"
@@ -121,36 +123,29 @@ function evaluateUserRole(
     return false;
   }
 
-  // Nenhuma rota comum cria, atribui, remove ou promove alguém a
-  // `master_tecnico` (T030; Constituição, Princípio II). O provisionamento do
-  // Master exige runbook próprio, sujeito a MFA, fora de qualquer endpoint
-  // ordinário — então o bloqueio vale para TODOS os atores, inclusive
-  // `admin_tecnico` e o próprio `master_tecnico` (nenhum se autoperpetua por
-  // aqui).
-  if (target.targetNewRole === "master_tecnico") {
+  // Nenhuma rota comum cria, atribui, remove ou promove alguém a um papel
+  // PRIVILEGIADO — nem `master_tecnico` (T030; Constituição, Princípio II) nem
+  // `admin_tecnico` (CG-RBAC-01, ADR 0012). O provisionamento do Master exige
+  // runbook próprio, sujeito a MFA; o `admin_tecnico` converge para
+  // bootstrap/histórico e deixa de ser atribuível por rota. O bloqueio vale
+  // para TODOS os atores — ninguém se autoperpetua nem cunha o outro por aqui.
+  if (
+    target.targetNewRole === "master_tecnico" ||
+    target.targetNewRole === "admin_tecnico"
+  ) {
     return false;
   }
 
-  if (subject.role === "admin_tecnico") {
-    return true;
-  }
   if (subject.role === "master_tecnico") {
-    // Administra papéis COMUNS em qualquer empresa (escopo global, T030). Não
-    // cria outro papel privilegiado: `admin_tecnico` fica de fora por
-    // deny-by-default; `master_tecnico` já foi bloqueado acima.
-    if (target.targetNewRole === "admin_tecnico") {
-      return false;
-    }
+    // Administra papéis COMUNS em qualquer empresa (escopo global, T030). Os
+    // papéis privilegiados já foram bloqueados acima.
     return true;
   }
   if (subject.role === "rh") {
-    if (target.targetNewRole === "admin_tecnico") {
-      // RH não pode se auto-promover nem criar/promover terceiro a admin
-      // técnico.
-      return false;
-    }
+    // RH atribui papéis comuns na própria empresa (privilegiados já bloqueados).
     return isSameCompany(subject, target);
   }
+  // `admin_tecnico` deixa de atribuir papéis (CG-RBAC-01): cai aqui, negado.
   return false;
 }
 
@@ -184,16 +179,15 @@ function evaluateOrganizacao(
   const escopoResolvido = target.targetCompanyId !== undefined;
 
   switch (subject.role) {
-    // Exceção temporária e condicionada aprovada na Emenda 1 da ADR 0005:
-    // acesso global ao ambiente interno, sempre auditado. Toda leitura de
-    // escopo amplo gera evento (spec §9).
-    case "admin_tecnico":
-      return true;
+    // `admin_tecnico` NÃO tem mais visão nem gestão global da estrutura
+    // organizacional (CG-RBAC-01, ADR 0012): a exceção temporária da Emenda 1
+    // da ADR 0005 converge para `master_tecnico`. `admin_tecnico` cai na
+    // negação por padrão (default) abaixo — reservado a bootstrap/histórico.
 
     // Perfil global controlado (T030; Constituição, Princípio II): lê e
     // administra a estrutura organizacional de qualquer empresa. Toda consulta
-    // em escopo global é auditada (registrarConsultaAmpla, fail-safe). Convive
-    // com `admin_tecnico` sem alterá-lo.
+    // em escopo global é auditada (registrarConsultaAmpla, fail-safe). É o
+    // ÚNICO acesso global standing (ADR 0012).
     case "master_tecnico":
       return true;
 

@@ -372,9 +372,25 @@ describe("Identidade, sessão e autorização (e2e)", () => {
       app = await buildApp();
       prisma = new PrismaClient({ datasources: { db: { url: appUrl } } });
 
+      // A mutação protegida deste bloco (criar usuário) exige um operador com
+      // capacidade — o master_tecnico (CG-RBAC-01: admin_tecnico não cria mais
+      // usuário por rota). Semeado direto (análogo de teste do runbook).
+      const masterEmail = "master.csrf@evolli.test";
+      const masterPassword = "uma-passphrase-de-master-csrf-bem-longa";
+      const { PasswordHashService } =
+        await import("../src/auth/password/password-hash.service");
+      await prisma.accessUser.create({
+        data: {
+          email: masterEmail,
+          passwordHash: await new PasswordHashService().hash(masterPassword),
+          role: "master_tecnico",
+          status: "active",
+        },
+      });
+
       const response = await agent()
         .post("/v1/auth/login")
-        .send({ email: adminEmail, password: adminPassword })
+        .send({ email: masterEmail, password: masterPassword })
         .expect(200);
 
       const cookies = response.headers["set-cookie"] as unknown as string[];
@@ -631,18 +647,29 @@ describe("Identidade, sessão e autorização (e2e)", () => {
       app = await buildApp();
       prisma = new PrismaClient({ datasources: { db: { url: appUrl } } });
 
-      // Reautentica como admin (sessão anterior foi revogada no describe
-      // anterior) só para provisionar os usuários de teste via API real.
-      const admin = await login(
-        "admin@evolli.test",
-        "uma-passphrase-de-bootstrap-bem-longa",
-      );
+      // Provisiona os usuários de teste via API real. O admin_tecnico do
+      // bootstrap não cria usuário por rota (CG-RBAC-01, ADR 0012): o operador
+      // global é um master_tecnico, semeado direto no banco (análogo de teste do
+      // runbook futuro, sujeito a MFA).
+      const masterEmail = "master.identity@evolli.test";
+      const masterSenha = "uma-passphrase-de-master-bem-longa";
+      const { PasswordHashService } =
+        await import("../src/auth/password/password-hash.service");
+      await prisma.accessUser.create({
+        data: {
+          email: masterEmail,
+          passwordHash: await new PasswordHashService().hash(masterSenha),
+          role: "master_tecnico",
+          status: "active",
+        },
+      });
+      const master = await login(masterEmail, masterSenha);
 
       const rhEmail = "rh@empresa-a.test";
       await agent()
         .post("/v1/users")
-        .set("Cookie", admin.cookie)
-        .set("x-csrf-token", admin.csrfToken)
+        .set("Cookie", master.cookie)
+        .set("x-csrf-token", master.csrfToken)
         .send({
           email: rhEmail,
           password: "senha-do-rh-empresa-a-bem-longa",
@@ -653,8 +680,8 @@ describe("Identidade, sessão e autorização (e2e)", () => {
 
       const colaboradorB = await agent()
         .post("/v1/users")
-        .set("Cookie", admin.cookie)
-        .set("x-csrf-token", admin.csrfToken)
+        .set("Cookie", master.cookie)
+        .set("x-csrf-token", master.csrfToken)
         .send({
           email: "colaborador@empresa-b.test",
           password: "senha-do-colaborador-b-bem-longa",
@@ -669,8 +696,8 @@ describe("Identidade, sessão e autorização (e2e)", () => {
       // válida sobre o alvo, o escopo permanece imutável (T029).
       const colaboradorA = await agent()
         .post("/v1/users")
-        .set("Cookie", admin.cookie)
-        .set("x-csrf-token", admin.csrfToken)
+        .set("Cookie", master.cookie)
+        .set("x-csrf-token", master.csrfToken)
         .send({
           email: "colaborador@empresa-a.test",
           password: "senha-do-colaborador-a-bem-longa",
