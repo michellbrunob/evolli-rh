@@ -16,11 +16,13 @@ export type EscopoOrganizacional =
  * requisição (spec §10, "escopo nunca vem do cliente").
  */
 export function resolverEscopo(actor: AccessUser): EscopoOrganizacional {
-  if (actor.role === "admin_tecnico" || actor.role === "master_tecnico") {
-    // `admin_tecnico`: exceção temporária e condicionada (Emenda 1 da ADR 0005).
+  if (actor.role === "master_tecnico") {
     // `master_tecnico`: perfil global controlado (T030; Constituição, Princípio
-    // II). Ambos operam a estrutura em escopo global — e toda consulta ampla
-    // gera evento (spec §9, RI-2; registrarConsultaAmpla, fail-safe).
+    // II) — o ÚNICO acesso global standing (ADR 0012). Opera a estrutura em
+    // escopo global; toda consulta ampla gera evento (spec §9, RI-2;
+    // registrarConsultaAmpla, fail-safe). `admin_tecnico` NÃO é mais global
+    // (CG-RBAC-01): é negado no guard (evaluateOrganizacao) antes de chegar
+    // aqui; se chegasse, cai no ForbiddenException abaixo (companyId nulo).
     return { global: true };
   }
 

@@ -125,7 +125,12 @@ describe("Núcleo Organizacional Interno (e2e)", () => {
   let migratorUrl: string;
   let app: INestApplication;
 
+  // `admin` = admin_tecnico do bootstrap, mantido só para PROVAR negação
+  // (CG-RBAC-01: convergido para bootstrap/histórico). `master` = master_tecnico
+  // semeado (único acesso global standing, ADR 0012) — faz todo o setup e as
+  // operações organizacionais.
   let admin: Credencial;
+  let master: Credencial;
   let rhA: Credencial;
   let rhB: Credencial;
   let dpA: Credencial;
@@ -150,6 +155,21 @@ describe("Núcleo Organizacional Interno (e2e)", () => {
     return { cookie, csrfToken: response.body.csrfToken };
   }
 
+  async function seedMaster(email: string): Promise<Credencial> {
+    const { PasswordHashService } =
+      await import("../src/auth/password/password-hash.service");
+    const prisma = new PrismaClient({ datasources: { db: { url: appUrl } } });
+    try {
+      const passwordHash = await new PasswordHashService().hash(SENHA_PADRAO);
+      await prisma.accessUser.create({
+        data: { email, passwordHash, role: "master_tecnico", status: "active" },
+      });
+    } finally {
+      await prisma.$disconnect();
+    }
+    return login(email, SENHA_PADRAO);
+  }
+
   async function criarUsuario(
     email: string,
     role: string,
@@ -157,8 +177,8 @@ describe("Núcleo Organizacional Interno (e2e)", () => {
   ): Promise<Credencial> {
     await agent()
       .post("/v1/users")
-      .set("Cookie", admin.cookie)
-      .set("x-csrf-token", admin.csrfToken)
+      .set("Cookie", master.cookie)
+      .set("x-csrf-token", master.csrfToken)
       .send({
         email,
         password: SENHA_PADRAO,
@@ -249,15 +269,17 @@ describe("Núcleo Organizacional Interno (e2e)", () => {
     ).toBe(0);
 
     admin = await login(adminEmail, SENHA_PADRAO);
+    // Operador global (setup + estrutura) — admin_tecnico não opera mais por rota.
+    master = await seedMaster("master.org@example.test");
 
     // Bootstrap administrativo: o admin sem empresa atribuída cria a
     // primeira empresa (RI-2 / Emenda 1 da ADR 0005).
-    const respostaA = await post("/v1/empresas", admin)
+    const respostaA = await post("/v1/empresas", master)
       .send({ codigo: "EMPA", nome: "Empresa A" })
       .expect(201);
     empresaA = respostaA.body.id;
 
-    const respostaB = await post("/v1/empresas", admin)
+    const respostaB = await post("/v1/empresas", master)
       .send({ codigo: "EMPB", nome: "Empresa B" })
       .expect(201);
     empresaB = respostaB.body.id;
@@ -282,10 +304,20 @@ describe("Núcleo Organizacional Interno (e2e)", () => {
     await container?.stop();
   });
 
-  describe("bootstrap administrativo continua funcionando (RI-2)", () => {
-    it("admin sem empresa atribuída criou a primeira empresa", () => {
+  describe("setup por master_tecnico e negação do admin_tecnico (CG-RBAC-01)", () => {
+    it("o master_tecnico (não o admin_tecnico) criou a primeira empresa", () => {
       expect(empresaA).toEqual(expect.any(String));
       expect(empresaB).toEqual(expect.any(String));
+    });
+
+    it("admin_tecnico é NEGADO na estrutura organizacional; o master a opera", async () => {
+      // Convergência: o admin_tecnico do bootstrap deixou de criar/ler empresa
+      // por rota (403); o único acesso global standing é o master_tecnico.
+      await post("/v1/empresas", admin)
+        .send({ codigo: "ADMNEG", nome: "Nao Deve Criar" })
+        .expect(403);
+      await get("/v1/empresas", admin).expect(403);
+      await get("/v1/empresas", master).expect(200);
     });
 
     it("cada uso de escopo amplo gera evento de auditoria com o escopo efetivo", async () => {
@@ -299,7 +331,8 @@ describe("Núcleo Organizacional Interno (e2e)", () => {
         expect(eventos.map((e) => e.companyId)).toEqual(
           expect.arrayContaining([empresaA, empresaB]),
         );
-        expect(eventos.every((e) => e.actorRole === "admin_tecnico")).toBe(
+        // As empresas foram criadas pelo master_tecnico (setup).
+        expect(eventos.every((e) => e.actorRole === "master_tecnico")).toBe(
           true,
         );
       } finally {
@@ -531,43 +564,43 @@ describe("Núcleo Organizacional Interno (e2e)", () => {
     let departamentoC: string;
 
     beforeAll(async () => {
-      const empresa = await post("/v1/empresas", admin)
+      const empresa = await post("/v1/empresas", master)
         .send({ codigo: "EMPC", nome: "Empresa C" })
         .expect(201);
       empresaC = empresa.body.id;
 
-      const departamento = await post("/v1/departamentos", admin)
+      const departamento = await post("/v1/departamentos", master)
         .send({ empresaId: empresaC, codigo: "OPS", nome: "Operacoes" })
         .expect(201);
       departamentoC = departamento.body.id;
     });
 
     it("bloqueia inativação de departamento com área ativa — sem cascata", async () => {
-      const area = await post("/v1/areas", admin)
+      const area = await post("/v1/areas", master)
         .send({ departamentoId: departamentoC, codigo: "SUB", nome: "Sub" })
         .expect(201);
 
-      await post(`/v1/departamentos/${departamentoC}/inativar`, admin)
+      await post(`/v1/departamentos/${departamentoC}/inativar`, master)
         .send()
         .expect(409);
 
       // A área continua ativa: nada foi inativado em cascata.
-      const conferencia = await get(`/v1/areas/${area.body.id}`, admin).expect(
+      const conferencia = await get(`/v1/areas/${area.body.id}`, master).expect(
         200,
       );
       expect(conferencia.body.status).toBe("ativo");
 
       // Inativando a área primeiro, o departamento passa a poder ser inativado.
-      await post(`/v1/areas/${area.body.id}/inativar`, admin)
+      await post(`/v1/areas/${area.body.id}/inativar`, master)
         .send()
         .expect(201);
-      await post(`/v1/departamentos/${departamentoC}/inativar`, admin)
+      await post(`/v1/departamentos/${departamentoC}/inativar`, master)
         .send()
         .expect(201);
     });
 
     it("bloqueia criação de filho sob pai inativo (R-INA-3)", async () => {
-      await post("/v1/areas", admin)
+      await post("/v1/areas", master)
         .send({
           departamentoId: departamentoC,
           codigo: "TARDIA",
@@ -577,24 +610,26 @@ describe("Núcleo Organizacional Interno (e2e)", () => {
     });
 
     it("bloqueia inativação de empresa com filho ativo", async () => {
-      await post("/v1/cargos", admin)
+      await post("/v1/cargos", master)
         .send({ empresaId: empresaC, codigo: "OPER", nome: "Operador" })
         .expect(201);
 
-      await post(`/v1/empresas/${empresaC}/inativar`, admin).send().expect(409);
+      await post(`/v1/empresas/${empresaC}/inativar`, master)
+        .send()
+        .expect(409);
     });
 
     it("recusa inativar duas vezes", async () => {
-      await post(`/v1/departamentos/${departamentoC}/inativar`, admin)
+      await post(`/v1/departamentos/${departamentoC}/inativar`, master)
         .send()
         .expect(409);
     });
 
     it("não permite alterar codigo nem empresa via PATCH", async () => {
-      await patch(`/v1/departamentos/${departamentoC}`, admin)
+      await patch(`/v1/departamentos/${departamentoC}`, master)
         .send({ nome: "Novo", codigo: "OUTRO" })
         .expect(400);
-      await patch(`/v1/departamentos/${departamentoC}`, admin)
+      await patch(`/v1/departamentos/${departamentoC}`, master)
         .send({ nome: "Novo", empresaId: empresaA })
         .expect(400);
     });
@@ -606,17 +641,17 @@ describe("Núcleo Organizacional Interno (e2e)", () => {
     let areaD: string;
 
     beforeAll(async () => {
-      const empresa = await post("/v1/empresas", admin)
+      const empresa = await post("/v1/empresas", master)
         .send({ codigo: "EMPD", nome: "Empresa D" })
         .expect(201);
       empresaD = empresa.body.id;
 
-      const departamento = await post("/v1/departamentos", admin)
+      const departamento = await post("/v1/departamentos", master)
         .send({ empresaId: empresaD, codigo: "LOG", nome: "Logistica" })
         .expect(201);
       departamentoD = departamento.body.id;
 
-      const area = await post("/v1/areas", admin)
+      const area = await post("/v1/areas", master)
         .send({
           departamentoId: departamentoD,
           codigo: "EXPED",
@@ -627,11 +662,11 @@ describe("Núcleo Organizacional Interno (e2e)", () => {
     });
 
     it("reativa um nó inativo e volta o status para ativo", async () => {
-      await post(`/v1/areas/${areaD}/inativar`, admin).send().expect(201);
-      const inativa = await get(`/v1/areas/${areaD}`, admin).expect(200);
+      await post(`/v1/areas/${areaD}/inativar`, master).send().expect(201);
+      const inativa = await get(`/v1/areas/${areaD}`, master).expect(200);
       expect(inativa.body.status).toBe("inativo");
 
-      const reativada = await post(`/v1/areas/${areaD}/reativar`, admin)
+      const reativada = await post(`/v1/areas/${areaD}/reativar`, master)
         .send()
         .expect(201);
       expect(reativada.body.status).toBe("ativo");
@@ -663,26 +698,26 @@ describe("Núcleo Organizacional Interno (e2e)", () => {
     });
 
     it("recusa reativar o que já está ativo (409)", async () => {
-      await post(`/v1/areas/${areaD}/reativar`, admin).send().expect(409);
+      await post(`/v1/areas/${areaD}/reativar`, master).send().expect(409);
     });
 
     it("recusa reativar sob pai inativo (422) e não altera o filho", async () => {
-      await post(`/v1/areas/${areaD}/inativar`, admin).send().expect(201);
-      await post(`/v1/departamentos/${departamentoD}/inativar`, admin)
+      await post(`/v1/areas/${areaD}/inativar`, master).send().expect(201);
+      await post(`/v1/departamentos/${departamentoD}/inativar`, master)
         .send()
         .expect(201);
 
-      await post(`/v1/areas/${areaD}/reativar`, admin).send().expect(422);
+      await post(`/v1/areas/${areaD}/reativar`, master).send().expect(422);
 
-      const conferencia = await get(`/v1/areas/${areaD}`, admin).expect(200);
+      const conferencia = await get(`/v1/areas/${areaD}`, master).expect(200);
       expect(conferencia.body.status).toBe("inativo");
     });
 
     it("reativado o pai, o filho volta a poder ser reativado", async () => {
-      await post(`/v1/departamentos/${departamentoD}/reativar`, admin)
+      await post(`/v1/departamentos/${departamentoD}/reativar`, master)
         .send()
         .expect(201);
-      await post(`/v1/areas/${areaD}/reativar`, admin).send().expect(201);
+      await post(`/v1/areas/${areaD}/reativar`, master).send().expect(201);
     });
 
     it("reativar entidade de outra empresa responde 404", async () => {
@@ -709,10 +744,10 @@ describe("Núcleo Organizacional Interno (e2e)", () => {
     it("papel sem manage não reativa", async () => {
       // Cargo é folha: inativar não esbarra em R-INA-2, o que mantém este
       // teste focado só na autorização.
-      const cargo = await post("/v1/cargos", admin)
+      const cargo = await post("/v1/cargos", master)
         .send({ empresaId: empresaD, codigo: "SEMMANAGE", nome: "Sem Manage" })
         .expect(201);
-      await post(`/v1/cargos/${cargo.body.id}/inativar`, admin)
+      await post(`/v1/cargos/${cargo.body.id}/inativar`, master)
         .send()
         .expect(201);
 
@@ -723,35 +758,35 @@ describe("Núcleo Organizacional Interno (e2e)", () => {
         .send()
         .expect(403);
 
-      await post(`/v1/cargos/${cargo.body.id}/reativar`, admin)
+      await post(`/v1/cargos/${cargo.body.id}/reativar`, master)
         .send()
         .expect(201);
     });
 
     it("reativação exige CSRF", async () => {
-      const cargo = await post("/v1/cargos", admin)
+      const cargo = await post("/v1/cargos", master)
         .send({ empresaId: empresaD, codigo: "SEMCSRF2", nome: "Sem CSRF" })
         .expect(201);
-      await post(`/v1/cargos/${cargo.body.id}/inativar`, admin)
+      await post(`/v1/cargos/${cargo.body.id}/inativar`, master)
         .send()
         .expect(201);
 
       await agent()
         .post(`/v1/cargos/${cargo.body.id}/reativar`)
-        .set("Cookie", admin.cookie)
+        .set("Cookie", master.cookie)
         .send()
         .expect(403);
 
-      await post(`/v1/cargos/${cargo.body.id}/reativar`, admin)
+      await post(`/v1/cargos/${cargo.body.id}/reativar`, master)
         .send()
         .expect(201);
     });
 
     it("reativação em cada uma das sete entidades", async () => {
-      const unidade = await post("/v1/unidades-organizacionais", admin)
+      const unidade = await post("/v1/unidades-organizacionais", master)
         .send({ empresaId: empresaD, codigo: "FILIAL", nome: "Filial" })
         .expect(201);
-      const equipe = await post("/v1/equipes", admin)
+      const equipe = await post("/v1/equipes", master)
         .send({
           departamentoId: departamentoD,
           unidadeOrganizacionalId: unidade.body.id,
@@ -759,10 +794,10 @@ describe("Núcleo Organizacional Interno (e2e)", () => {
           nome: "Time 1",
         })
         .expect(201);
-      const cargo = await post("/v1/cargos", admin)
+      const cargo = await post("/v1/cargos", master)
         .send({ empresaId: empresaD, codigo: "AUX", nome: "Auxiliar" })
         .expect(201);
-      const centroCusto = await post("/v1/centros-de-custo", admin)
+      const centroCusto = await post("/v1/centros-de-custo", master)
         .send({ empresaId: empresaD, codigo: "CC900", nome: "Centro 900" })
         .expect(201);
 
@@ -778,27 +813,27 @@ describe("Núcleo Organizacional Interno (e2e)", () => {
         ["centros-de-custo", centroCusto.body.id],
       ];
       for (const [recurso, id] of inativarNaOrdem) {
-        await post(`/v1/${recurso}/${id}/inativar`, admin).send().expect(201);
+        await post(`/v1/${recurso}/${id}/inativar`, master).send().expect(201);
       }
 
       const reativarNaOrdem = [...inativarNaOrdem].reverse();
       for (const [recurso, id] of reativarNaOrdem) {
-        const reativado = await post(`/v1/${recurso}/${id}/reativar`, admin)
+        const reativado = await post(`/v1/${recurso}/${id}/reativar`, master)
           .send()
           .expect(201);
         expect(reativado.body.status).toBe("ativo");
       }
 
       // Empresa fecha a lista das sete: sem pai a validar.
-      const empresaE = await post("/v1/empresas", admin)
+      const empresaE = await post("/v1/empresas", master)
         .send({ codigo: "EMPE", nome: "Empresa E" })
         .expect(201);
-      await post(`/v1/empresas/${empresaE.body.id}/inativar`, admin)
+      await post(`/v1/empresas/${empresaE.body.id}/inativar`, master)
         .send()
         .expect(201);
       const empresaReativada = await post(
         `/v1/empresas/${empresaE.body.id}/reativar`,
-        admin,
+        master,
       )
         .send()
         .expect(201);
@@ -806,10 +841,10 @@ describe("Núcleo Organizacional Interno (e2e)", () => {
     });
 
     it("equipe só reativa se departamento E unidade estiverem ativos", async () => {
-      const unidade = await post("/v1/unidades-organizacionais", admin)
+      const unidade = await post("/v1/unidades-organizacionais", master)
         .send({ empresaId: empresaD, codigo: "FILIAL2", nome: "Filial 2" })
         .expect(201);
-      const equipe = await post("/v1/equipes", admin)
+      const equipe = await post("/v1/equipes", master)
         .send({
           departamentoId: departamentoD,
           unidadeOrganizacionalId: unidade.body.id,
@@ -818,37 +853,37 @@ describe("Núcleo Organizacional Interno (e2e)", () => {
         })
         .expect(201);
 
-      await post(`/v1/equipes/${equipe.body.id}/inativar`, admin)
+      await post(`/v1/equipes/${equipe.body.id}/inativar`, master)
         .send()
         .expect(201);
       await post(
         `/v1/unidades-organizacionais/${unidade.body.id}/inativar`,
-        admin,
+        master,
       )
         .send()
         .expect(201);
 
       // Departamento ativo, unidade inativa: recusado.
-      await post(`/v1/equipes/${equipe.body.id}/reativar`, admin)
+      await post(`/v1/equipes/${equipe.body.id}/reativar`, master)
         .send()
         .expect(422);
 
       await post(
         `/v1/unidades-organizacionais/${unidade.body.id}/reativar`,
-        admin,
+        master,
       )
         .send()
         .expect(201);
-      await post(`/v1/equipes/${equipe.body.id}/reativar`, admin)
+      await post(`/v1/equipes/${equipe.body.id}/reativar`, master)
         .send()
         .expect(201);
     });
 
     it("INSERT revogado em audit_event impede a reativação (atomicidade)", async () => {
-      const cargo = await post("/v1/cargos", admin)
+      const cargo = await post("/v1/cargos", master)
         .send({ empresaId: empresaD, codigo: "ROLLBK2", nome: "Rollback 2" })
         .expect(201);
-      await post(`/v1/cargos/${cargo.body.id}/inativar`, admin)
+      await post(`/v1/cargos/${cargo.body.id}/inativar`, master)
         .send()
         .expect(201);
 
@@ -859,7 +894,7 @@ describe("Núcleo Organizacional Interno (e2e)", () => {
         await migrator.$executeRawUnsafe(
           "REVOKE INSERT ON TABLE app.audit_event FROM evolli_app",
         );
-        await post(`/v1/cargos/${cargo.body.id}/reativar`, admin)
+        await post(`/v1/cargos/${cargo.body.id}/reativar`, master)
           .send()
           .expect(500);
       } finally {
@@ -872,7 +907,7 @@ describe("Núcleo Organizacional Interno (e2e)", () => {
       // A reativação não persistiu: o cargo continua inativo.
       const conferencia = await get(
         `/v1/cargos/${cargo.body.id}`,
-        admin,
+        master,
       ).expect(200);
       expect(conferencia.body.status).toBe("inativo");
     });
@@ -888,8 +923,8 @@ describe("Núcleo Organizacional Interno (e2e)", () => {
 
       await agent()
         .delete(`/v1/areas/${areaD}/reativar`)
-        .set("Cookie", admin.cookie)
-        .set("x-csrf-token", admin.csrfToken)
+        .set("Cookie", master.cookie)
+        .set("x-csrf-token", master.csrfToken)
         .expect(404);
     });
   });
@@ -907,8 +942,8 @@ describe("Núcleo Organizacional Interno (e2e)", () => {
       ]) {
         await agent()
           .delete(rota)
-          .set("Cookie", admin.cookie)
-          .set("x-csrf-token", admin.csrfToken)
+          .set("Cookie", master.cookie)
+          .set("x-csrf-token", master.csrfToken)
           .expect(404);
       }
     });
@@ -992,7 +1027,7 @@ describe("Núcleo Organizacional Interno (e2e)", () => {
     it("consulta de escopo amplo não retorna 200 sem o evento correspondente", async () => {
       await comAuditoriaBloqueada(async () => {
         // Ator de escopo global: a consulta é auditada de forma fail-safe.
-        await get("/v1/departamentos", admin).expect(500);
+        await get("/v1/departamentos", master).expect(500);
         // Ator escopado não gera evento de consulta e segue respondendo.
         await get("/v1/departamentos", rhA).expect(200);
       });

@@ -169,12 +169,19 @@ describe("evaluatePonto — matriz da Baseline Jornada V1", () => {
       }
     });
 
-    it("continua com acesso amplo a ESTRUTURA organizacional — a assimetria e a decisao", () => {
-      // Prova que a negação acima é específica deste domínio, e não uma
-      // regressão que quebrou o papel em todo lugar (Emenda 1 da ADR 0005
-      // segue valendo onde foi concedida).
+    it("também NÃO acessa a ESTRUTURA organizacional (CG-RBAC-01, ADR 0012)", () => {
+      // A antiga assimetria acabou: `admin_tecnico` converge para
+      // bootstrap/histórico e é negado de forma uniforme. O único acesso global
+      // standing (inclusive à estrutura) passou a ser do `master_tecnico`.
       expect(
         evaluatePermission(sujeito("admin_tecnico", null), {
+          resource: "empresa",
+          action: "read",
+          targetCompanyId: EMPRESA_B,
+        }),
+      ).toBe(false);
+      expect(
+        evaluatePermission(sujeito("master_tecnico", null), {
           resource: "empresa",
           action: "read",
           targetCompanyId: EMPRESA_B,

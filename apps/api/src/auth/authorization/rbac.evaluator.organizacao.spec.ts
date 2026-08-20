@@ -28,28 +28,45 @@ const RECURSOS = ORGANIZATIONAL_RESOURCES;
 const ACOES = ["read", "create", "alter", "manage"] as const;
 
 describe("evaluatePermission — estrutura organizacional", () => {
-  describe("admin_tecnico (exceção temporária aprovada, Emenda 1 da ADR 0005)", () => {
-    it("administra qualquer recurso organizacional, em qualquer empresa", () => {
+  describe("admin_tecnico (convergido para bootstrap/histórico — CG-RBAC-01, ADR 0012)", () => {
+    it("NÃO administra nem lê a estrutura organizacional, em nenhuma empresa", () => {
       for (const resource of RECURSOS) {
         for (const action of ACOES) {
+          // Fase 2 (escopo) e fase 1 (capacidade), ambas negadas.
           expect(
             evaluatePermission(
               subject({ role: "admin_tecnico", companyId: null }),
               { resource, action, targetCompanyId: "empresa-b" },
             ),
-          ).toBe(true);
+          ).toBe(false);
+          expect(
+            evaluatePermission(
+              subject({ role: "admin_tecnico", companyId: null }),
+              { resource, action },
+            ),
+          ).toBe(false);
         }
       }
     });
+  });
 
-    it("passa a fase de capacidade mesmo sem empresa atribuída (bootstrap)", () => {
+  describe("master_tecnico (único acesso global standing — T030/ADR 0012)", () => {
+    it("administra qualquer recurso organizacional, em qualquer empresa", () => {
       for (const resource of RECURSOS) {
-        expect(
-          evaluatePermission(
-            subject({ role: "admin_tecnico", companyId: null }),
-            { resource, action: "create" },
-          ),
-        ).toBe(true);
+        for (const action of ACOES) {
+          expect(
+            evaluatePermission(
+              subject({ role: "master_tecnico", companyId: null }),
+              { resource, action, targetCompanyId: "empresa-b" },
+            ),
+          ).toBe(true);
+          expect(
+            evaluatePermission(
+              subject({ role: "master_tecnico", companyId: null }),
+              { resource, action },
+            ),
+          ).toBe(true);
+        }
       }
     });
   });
@@ -257,9 +274,9 @@ describe("evaluatePermission — estrutura organizacional", () => {
     });
   });
 
-  describe("regressão: leitura da trilha de auditoria segue inalterada", () => {
-    it("auditor e dpo continuam lendo access_log, como na Fatia 4", () => {
-      for (const role of ["auditor", "dpo", "admin_tecnico"] as const) {
+  describe("leitura da trilha de auditoria", () => {
+    it("auditor, dpo e master_tecnico leem access_log; admin_tecnico não (CG-RBAC-01)", () => {
+      for (const role of ["auditor", "dpo", "master_tecnico"] as const) {
         expect(
           evaluatePermission(subject({ role, companyId: "empresa-a" }), {
             resource: "access_log",
@@ -267,6 +284,12 @@ describe("evaluatePermission — estrutura organizacional", () => {
           }),
         ).toBe(true);
       }
+      expect(
+        evaluatePermission(
+          subject({ role: "admin_tecnico", companyId: null }),
+          { resource: "access_log", action: "read" },
+        ),
+      ).toBe(false);
     });
   });
 

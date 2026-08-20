@@ -88,11 +88,19 @@ describe("RBAC/ABAC — Colaboradores e vida funcional (Fatia 2)", () => {
       },
     );
 
-    it("continua com acesso à estrutura organizacional (Fatia 1 inalterada)", () => {
-      // Prova de que a negação acima é *deste domínio*, não uma regressão de
-      // autorização sobre o que já estava mergeado.
+    it("também NÃO acessa a estrutura organizacional (CG-RBAC-01, ADR 0012)", () => {
+      // A antiga assimetria (negado em Pessoas, global em Organização) foi
+      // removida: `admin_tecnico` converge para bootstrap/histórico e é negado
+      // de forma uniforme. O acesso global standing agora é só do
+      // `master_tecnico`.
       expect(
         evaluatePermission(sujeito("admin_tecnico", null), {
+          resource: "empresa",
+          action: "create",
+        }),
+      ).toBe(false);
+      expect(
+        evaluatePermission(sujeito("master_tecnico", null), {
           resource: "empresa",
           action: "create",
         }),

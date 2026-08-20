@@ -84,13 +84,15 @@ describe("RBAC/ABAC — Documentos (Etapa 2, metadados)", () => {
       },
     );
 
-    it("continua com acesso à estrutura organizacional (Fatia 1 inalterada)", () => {
+    it("também NÃO acessa a estrutura organizacional (CG-RBAC-01, ADR 0012)", () => {
+      // Assimetria removida: `admin_tecnico` é negado de forma uniforme e
+      // converge para bootstrap/histórico; o global standing é do `master_tecnico`.
       expect(
         evaluatePermission(sujeito("admin_tecnico", null), {
           resource: "empresa",
           action: "create",
         }),
-      ).toBe(true);
+      ).toBe(false);
     });
   });
 

@@ -136,7 +136,11 @@ describe("Jornada e Ponto Rastreavel (e2e)", () => {
   let migratorUrl: string;
   let app: INestApplication;
 
+  // `admin` = admin_tecnico do bootstrap, mantido só para PROVAR negação
+  // (CG-RBAC-01). `master` = master_tecnico semeado (único acesso global
+  // standing, ADR 0012) — faz setup e operações organizacionais.
   let admin: Credencial;
+  let master: Credencial;
   let rhA: Credencial;
   let dpA: Credencial;
   let rhB: Credencial;
@@ -170,6 +174,21 @@ describe("Jornada e Ponto Rastreavel (e2e)", () => {
     return { cookie, csrfToken: response.body.csrfToken };
   }
 
+  async function seedMaster(email: string): Promise<Credencial> {
+    const { PasswordHashService } =
+      await import("../src/auth/password/password-hash.service");
+    const prisma = new PrismaClient({ datasources: { db: { url: appUrl } } });
+    try {
+      const passwordHash = await new PasswordHashService().hash(SENHA_PADRAO);
+      await prisma.accessUser.create({
+        data: { email, passwordHash, role: "master_tecnico", status: "active" },
+      });
+    } finally {
+      await prisma.$disconnect();
+    }
+    return login(email, SENHA_PADRAO);
+  }
+
   async function criarUsuario(
     email: string,
     role: string,
@@ -177,8 +196,8 @@ describe("Jornada e Ponto Rastreavel (e2e)", () => {
   ): Promise<Credencial> {
     await agent()
       .post("/v1/users")
-      .set("Cookie", admin.cookie)
-      .set("x-csrf-token", admin.csrfToken)
+      .set("Cookie", master.cookie)
+      .set("x-csrf-token", master.csrfToken)
       .send({
         email,
         password: SENHA_PADRAO,
@@ -308,18 +327,20 @@ describe("Jornada e Ponto Rastreavel (e2e)", () => {
       }).status,
     ).toBe(0);
     admin = await login(adminEmail, SENHA_PADRAO);
+    // Operador global (setup + estrutura) — admin_tecnico não opera mais por rota.
+    master = await seedMaster("master.ponto@example.test");
 
-    const empA = await post("/v1/empresas", admin)
+    const empA = await post("/v1/empresas", master)
       .send({ codigo: "EMP_PONTO_A", nome: "Empresa Sintetica Ponto A" })
       .expect(201);
     empresaA = empA.body.id;
 
-    const empB = await post("/v1/empresas", admin)
+    const empB = await post("/v1/empresas", master)
       .send({ codigo: "EMP_PONTO_B", nome: "Empresa Sintetica Ponto B" })
       .expect(201);
     empresaB = empB.body.id;
 
-    const depA = await post("/v1/departamentos", admin)
+    const depA = await post("/v1/departamentos", master)
       .send({
         codigo: "DEP_PONTO_A",
         nome: "Departamento Sintetico A",
@@ -328,7 +349,7 @@ describe("Jornada e Ponto Rastreavel (e2e)", () => {
       .expect(201);
     departamentoA = depA.body.id;
 
-    const depB = await post("/v1/departamentos", admin)
+    const depB = await post("/v1/departamentos", master)
       .send({
         codigo: "DEP_PONTO_B",
         nome: "Departamento Sintetico B",
@@ -958,12 +979,15 @@ describe("Jornada e Ponto Rastreavel (e2e)", () => {
       }
     });
 
-    it("admin_tecnico e negado mesmo tendo acesso amplo a estrutura organizacional", async () => {
-      // Prova a assimetria deliberada: o mesmo ator que le a estrutura de
-      // qualquer empresa nao le ponto de nenhuma.
-      await get(`/v1/empresas/${empresaA}`, admin).expect(200);
+    it("admin_tecnico e negado em ponto E na estrutura organizacional (CG-RBAC-01)", async () => {
+      // A antiga assimetria acabou: admin_tecnico converge para
+      // bootstrap/histórico e é negado de forma uniforme. Quem lê a estrutura de
+      // qualquer empresa agora é o master_tecnico.
+      await get(`/v1/empresas/${empresaA}`, admin).expect(403);
       const ponto = await get(`/v1/pontos`, admin);
       expect([403, 404]).toContain(ponto.status);
+      // O master (global) lê a estrutura.
+      await get(`/v1/empresas/${empresaA}`, master).expect(200);
     });
 
     it("exige sessao valida", async () => {
@@ -1255,9 +1279,10 @@ describe("Jornada e Ponto Rastreavel (e2e)", () => {
   // -------------------------------------------------------------------------
 
   describe("regressao: fatias anteriores intactas", () => {
-    it("organizacao continua respondendo, inclusive para admin_tecnico", async () => {
-      await get(`/v1/empresas/${empresaA}`, admin).expect(200);
-      await get(`/v1/departamentos/${departamentoA}`, admin).expect(200);
+    it("organizacao continua respondendo para o master_tecnico; admin_tecnico é negado", async () => {
+      await get(`/v1/empresas/${empresaA}`, master).expect(200);
+      await get(`/v1/departamentos/${departamentoA}`, master).expect(200);
+      await get(`/v1/empresas/${empresaA}`, admin).expect(403);
     });
 
     it("pessoas continua respondendo para RH da propria empresa", async () => {
@@ -1318,31 +1343,10 @@ describe("Jornada e Ponto Rastreavel (e2e)", () => {
   });
 
   describe("master_tecnico (T030) — leitura global de ponto, sem mutação", () => {
-    let master: Credencial;
+    // Reusa o `master` do setup (spec-level): mesmo perfil global standing.
     let eventoB: string;
 
-    async function seedMaster(email: string): Promise<Credencial> {
-      const { PasswordHashService } =
-        await import("../src/auth/password/password-hash.service");
-      const prisma = new PrismaClient({ datasources: { db: { url: appUrl } } });
-      try {
-        const passwordHash = await new PasswordHashService().hash(SENHA_PADRAO);
-        await prisma.accessUser.create({
-          data: {
-            email,
-            passwordHash,
-            role: "master_tecnico",
-            status: "active",
-          },
-        });
-      } finally {
-        await prisma.$disconnect();
-      }
-      return login(email, SENHA_PADRAO);
-    }
-
     beforeAll(async () => {
-      master = await seedMaster("master.ponto@ecossistema.test");
       // Garante ao menos um evento na empresa B para a leitura global provar
       // que atravessa empresas.
       const ev = await registrarPonto(rhB, vinculoB, "entrada", ENTRADA);

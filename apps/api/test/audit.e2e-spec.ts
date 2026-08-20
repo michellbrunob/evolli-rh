@@ -240,9 +240,14 @@ describe("Auditoria formal e rastreabilidade (e2e)", () => {
     const agent = () => request(app.getHttpServer());
     const adminEmail = "admin@evolli.test";
     const adminPassword = "uma-passphrase-de-bootstrap-bem-longa-audit";
+    // `adminCookie` = admin_tecnico do bootstrap, mantido só para PROVAR que
+    // NÃO lê mais a trilha (CG-RBAC-01). `masterCookie` = master_tecnico
+    // semeado, que agora lê a trilha e provisiona os usuários de teste.
     let adminCookie: string;
     let adminCsrfToken: string;
     let adminUserId: string;
+    let masterCookie: string;
+    let masterCsrfToken: string;
 
     async function login(
       email: string,
@@ -273,8 +278,8 @@ describe("Auditoria formal e rastreabilidade (e2e)", () => {
     ): Promise<void> {
       await agent()
         .post("/v1/users")
-        .set("Cookie", adminCookie)
-        .set("x-csrf-token", adminCsrfToken)
+        .set("Cookie", masterCookie)
+        .set("x-csrf-token", masterCsrfToken)
         .send({ email, password, role, companyId: "empresa-auditoria" })
         .expect(201);
     }
@@ -293,15 +298,34 @@ describe("Auditoria formal e rastreabilidade (e2e)", () => {
       adminCookie = admin.cookie;
       adminCsrfToken = admin.csrfToken;
 
+      // Master semeado: único acesso global standing (ADR 0012). Lê a trilha e
+      // provisiona os usuários de teste — o admin_tecnico não faz mais isso.
+      const masterEmail = "master.audit@evolli.test";
+      const masterPassword = "uma-passphrase-de-master-audit-bem-longa";
       const prisma = new PrismaClient({ datasources: { db: { url: appUrl } } });
       try {
         const adminUser = await prisma.accessUser.findUniqueOrThrow({
           where: { email: adminEmail },
         });
         adminUserId = adminUser.id;
+
+        const { PasswordHashService } =
+          await import("../src/auth/password/password-hash.service");
+        await prisma.accessUser.create({
+          data: {
+            email: masterEmail,
+            passwordHash: await new PasswordHashService().hash(masterPassword),
+            role: "master_tecnico",
+            status: "active",
+          },
+        });
       } finally {
         await prisma.$disconnect();
       }
+
+      const masterCred = await login(masterEmail, masterPassword);
+      masterCookie = masterCred.cookie;
+      masterCsrfToken = masterCred.csrfToken;
     });
 
     afterAll(async () => {
@@ -312,7 +336,7 @@ describe("Auditoria formal e rastreabilidade (e2e)", () => {
       const response = await agent()
         .get("/v1/audit/events")
         .query({ action: "login_succeeded", actorUserId: adminUserId })
-        .set("Cookie", adminCookie)
+        .set("Cookie", masterCookie)
         .expect(200);
 
       expect(response.body.total).toBeGreaterThanOrEqual(1);
@@ -331,14 +355,14 @@ describe("Auditoria formal e rastreabilidade (e2e)", () => {
       const list = await agent()
         .get("/v1/audit/events")
         .query({ action: "login_succeeded", actorUserId: adminUserId })
-        .set("Cookie", adminCookie)
+        .set("Cookie", masterCookie)
         .expect(200);
 
       const eventId = list.body.items[0].id;
 
       const detail = await agent()
         .get(`/v1/audit/events/${eventId}`)
-        .set("Cookie", adminCookie)
+        .set("Cookie", masterCookie)
         .expect(200);
 
       expect(detail.body.id).toBe(eventId);
@@ -347,7 +371,7 @@ describe("Auditoria formal e rastreabilidade (e2e)", () => {
     it("GET /v1/audit/events/:id com id inexistente retorna 404 genérico", async () => {
       const response = await agent()
         .get("/v1/audit/events/00000000-0000-0000-0000-000000000000")
-        .set("Cookie", adminCookie)
+        .set("Cookie", masterCookie)
         .expect(404);
 
       expect(response.body).toEqual({
@@ -361,13 +385,13 @@ describe("Auditoria formal e rastreabilidade (e2e)", () => {
     it("toda consulta bem-sucedida à trilha gera, ela mesma, um novo evento (audit_log_read)", async () => {
       await agent()
         .get("/v1/audit/events")
-        .set("Cookie", adminCookie)
+        .set("Cookie", masterCookie)
         .expect(200);
 
       const response = await agent()
         .get("/v1/audit/events")
         .query({ action: "audit_log_read", actorUserId: adminUserId })
-        .set("Cookie", adminCookie)
+        .set("Cookie", masterCookie)
         .expect(200);
 
       expect(response.body.total).toBeGreaterThanOrEqual(1);
@@ -463,6 +487,19 @@ describe("Auditoria formal e rastreabilidade (e2e)", () => {
         .expect(200);
     });
 
+    it("RBAC positivo: master_tecnico lê a trilha; admin_tecnico NÃO (CG-RBAC-01)", async () => {
+      // master_tecnico é o único acesso global standing e lê a trilha (T030);
+      // admin_tecnico convergiu para bootstrap/histórico e deixou de lê-la.
+      await agent()
+        .get("/v1/audit/events")
+        .set("Cookie", masterCookie)
+        .expect(200);
+      await agent()
+        .get("/v1/audit/events")
+        .set("Cookie", adminCookie)
+        .expect(403);
+    });
+
     it("sem sessão, GET /v1/audit/events retorna 401 genérico", async () => {
       await agent().get("/v1/audit/events").expect(401);
     });
@@ -470,27 +507,27 @@ describe("Auditoria formal e rastreabilidade (e2e)", () => {
     it("nenhuma rota de alteração/exclusão de evento existe (PATCH/PUT/DELETE → 404)", async () => {
       const list = await agent()
         .get("/v1/audit/events")
-        .set("Cookie", adminCookie)
+        .set("Cookie", masterCookie)
         .expect(200);
       const anyEventId = list.body.items[0].id;
 
       await agent()
         .patch(`/v1/audit/events/${anyEventId}`)
-        .set("Cookie", adminCookie)
-        .set("x-csrf-token", adminCsrfToken)
+        .set("Cookie", masterCookie)
+        .set("x-csrf-token", masterCsrfToken)
         .send({ result: "failure" })
         .expect(404);
 
       await agent()
         .delete(`/v1/audit/events/${anyEventId}`)
-        .set("Cookie", adminCookie)
-        .set("x-csrf-token", adminCsrfToken)
+        .set("Cookie", masterCookie)
+        .set("x-csrf-token", masterCsrfToken)
         .expect(404);
 
       await agent()
         .put("/v1/audit/events")
-        .set("Cookie", adminCookie)
-        .set("x-csrf-token", adminCsrfToken)
+        .set("Cookie", masterCookie)
+        .set("x-csrf-token", masterCsrfToken)
         .send({})
         .expect(404);
     });
@@ -499,7 +536,7 @@ describe("Auditoria formal e rastreabilidade (e2e)", () => {
       const response = await agent()
         .get("/v1/audit/events")
         .query({ pageSize: 100 })
-        .set("Cookie", adminCookie)
+        .set("Cookie", masterCookie)
         .expect(200);
 
       const bodyAsText = JSON.stringify(response.body);
@@ -526,7 +563,7 @@ describe("Auditoria formal e rastreabilidade (e2e)", () => {
     it("nenhuma resposta de erro deste módulo contém stack trace ou detalhe interno", async () => {
       const response = await agent()
         .get("/v1/audit/events/id-invalido-nao-uuid")
-        .set("Cookie", adminCookie);
+        .set("Cookie", masterCookie);
 
       const bodyAsText = JSON.stringify(response.body);
       expect(bodyAsText).not.toMatch(/at .*\.ts:\d+/);
@@ -599,8 +636,8 @@ describe("Auditoria formal e rastreabilidade (e2e)", () => {
           const response = await withAuditInsertBlocked(() =>
             agent()
               .post(`/v1/users/${target.id}/disable`)
-              .set("Cookie", adminCookie)
-              .set("x-csrf-token", adminCsrfToken),
+              .set("Cookie", masterCookie)
+              .set("x-csrf-token", masterCsrfToken),
           );
 
           expect(response.status).toBe(500);
@@ -623,7 +660,7 @@ describe("Auditoria formal e rastreabilidade (e2e)", () => {
 
       it("consulta à trilha: se audit_log_read não puder ser gravado, a consulta não retorna 200", async () => {
         const response = await withAuditInsertBlocked(() =>
-          agent().get("/v1/audit/events").set("Cookie", adminCookie),
+          agent().get("/v1/audit/events").set("Cookie", masterCookie),
         );
 
         expect(response.status).toBe(500);

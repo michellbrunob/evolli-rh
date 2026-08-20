@@ -458,10 +458,12 @@ describe("DepartamentoService", () => {
         auditoria.registrarConsultaAmpla.mock.calls[0]?.[0];
       expect(escopoEscopado).toEqual({ global: false, empresaId: "empresa-a" });
 
+      // Escopo global é do `master_tecnico` (único acesso global standing —
+      // CG-RBAC-01, ADR 0012); `admin_tecnico` não é mais global.
       await service.listar(
         { pagina: 1, tamanhoPagina: 20 },
         contexto(
-          ator({ role: "admin_tecnico" as AccessRole, companyId: null }),
+          ator({ role: "master_tecnico" as AccessRole, companyId: null }),
         ),
       );
       const escopoGlobal = auditoria.registrarConsultaAmpla.mock.calls[1]?.[0];
