@@ -9,10 +9,13 @@ import { PrismaService } from "../../database/prisma.service";
 import { PessoasAuditoriaService } from "../pessoas-auditoria.service";
 import { PessoasAuditContext, ResultadoPaginado } from "../pessoas.types";
 import {
-  EscopoPessoas,
+  EscopoLeituraPessoas,
   deslocamento,
-  intersectarEmpresaSolicitada,
+  filtroVinculoEmpresa,
+  intersectarLeitura,
   podeAcessarPessoas,
+  podeConsultarPessoas,
+  resolverEscopoLeituraPessoas,
   resolverEscopoPessoas,
 } from "../escopo-pessoas.util";
 import {
@@ -163,8 +166,8 @@ export class ColaboradorService {
     query: ListarColaboradoresQueryDto,
     ctx: PessoasAuditContext,
   ): Promise<ResultadoPaginado<Colaborador>> {
-    const escopo = resolverEscopoPessoas(ctx.actor);
-    const filtro = intersectarEmpresaSolicitada(escopo, query.empresaId);
+    const escopo = resolverEscopoLeituraPessoas(ctx.actor);
+    const filtro = intersectarLeitura(escopo, query.empresaId);
 
     if (filtro === null) {
       // Pedido de outra empresa devolve página vazia, nunca erro.
@@ -176,16 +179,25 @@ export class ColaboradorService {
       };
     }
 
-    // O escopo é estrutural: a consulta só encontra colaborador que tenha
-    // vínculo na empresa do ator. Não depende de o service lembrar de filtrar
-    // depois.
+    // O escopo é estrutural: para rh/dp a consulta só encontra colaborador com
+    // vínculo na empresa do ator. Para o `master_tecnico` (global), sem filtro
+    // de empresa (`filtro.empresaId` indefinido) — toda a base, auditada.
+    const filtroVinculo =
+      filtro.empresaId !== undefined
+        ? {
+            some: {
+              empresaId: filtro.empresaId,
+              ...(query.situacaoVinculo
+                ? { situacao: query.situacaoVinculo }
+                : {}),
+            },
+          }
+        : query.situacaoVinculo
+          ? { some: { situacao: query.situacaoVinculo } }
+          : undefined;
+
     const where: Prisma.ColaboradorWhereInput = {
-      vinculos: {
-        some: {
-          empresaId: filtro.empresaId,
-          ...(query.situacaoVinculo ? { situacao: query.situacaoVinculo } : {}),
-        },
-      },
+      ...(filtroVinculo ? { vinculos: filtroVinculo } : {}),
       ...(query.situacao ? { situacao: query.situacao } : {}),
     };
 
@@ -200,6 +212,11 @@ export class ColaboradorService {
       this.prisma.colaborador.count({ where }),
     ]);
 
+    if (escopo.global) {
+      // Consulta ampla do Master: auditada (fail-safe), sem dado pessoal.
+      await this.auditoria.registrarConsultaGlobal(ctx, "colaborador", null);
+    }
+
     return {
       itens,
       pagina: query.pagina,
@@ -212,7 +229,7 @@ export class ColaboradorService {
     colaboradorId: string,
     ctx: PessoasAuditContext,
   ): Promise<Colaborador> {
-    const escopo = resolverEscopoPessoas(ctx.actor);
+    const escopo = resolverEscopoLeituraPessoas(ctx.actor);
     return this.carregarNoEscopo(colaboradorId, ctx, escopo, "read");
   }
 
@@ -232,7 +249,9 @@ export class ColaboradorService {
     const colaborador = await this.carregarNoEscopo(
       colaboradorId,
       ctx,
-      escopo,
+      // Mutação é sempre escopada (master_tecnico nunca chega aqui): reusa o
+      // carregador de leitura na forma escopada.
+      { global: false, empresaId: escopo.empresaId },
       "alter",
     );
 
@@ -258,13 +277,15 @@ export class ColaboradorService {
   private async carregarNoEscopo(
     colaboradorId: string,
     ctx: PessoasAuditContext,
-    escopo: EscopoPessoas,
+    escopo: EscopoLeituraPessoas,
     action: "read" | "alter" | "manage",
   ): Promise<Colaborador> {
     const colaborador = await this.prisma.colaborador.findFirst({
       where: {
         id: colaboradorId,
-        vinculos: { some: { empresaId: escopo.empresaId } },
+        // Escopado: só se tiver vínculo na empresa do ator. Global (Master):
+        // sem filtro de empresa.
+        ...filtroVinculoEmpresa(escopo),
       },
     });
 
@@ -279,14 +300,21 @@ export class ColaboradorService {
       );
     }
 
-    if (
-      !podeAcessarPessoas(ctx.actor, "colaborador", action, escopo.empresaId)
-    ) {
+    if (!podeConsultarPessoas(ctx.actor, "colaborador", action, escopo)) {
       return this.auditoria.negarAcesso(
         ctx,
         "colaborador",
         colaborador.id,
-        escopo.empresaId,
+        escopo.global ? null : escopo.empresaId,
+      );
+    }
+
+    if (escopo.global && action === "read") {
+      // Leitura global do Master: auditada (fail-safe), só id técnico.
+      await this.auditoria.registrarConsultaGlobal(
+        ctx,
+        "colaborador",
+        colaborador.id,
       );
     }
 

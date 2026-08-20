@@ -97,6 +97,11 @@ export const AUDIT_ACTIONS = [
   "documentos_documento_metadado_consultado",
   "documentos_documento_metadado_substituido",
   "documentos_solicitacao_documento_criada",
+
+  // T030 — Perfil global `master_tecnico`. Registra toda consulta em escopo
+  // GLOBAL do Master (fail-safe, como `organizacao_estrutura_consultada`), com
+  // ação + tipo de recurso + id técnico — nunca dado pessoal.
+  "master_consulta_global",
 ] as const satisfies readonly AuditAction[];
 
 /**

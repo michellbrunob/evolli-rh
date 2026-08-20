@@ -75,7 +75,9 @@ export class PontoAuditoriaService {
     ctx: PontoAuditContext,
     resource: AuditResource,
     resourceId: string | null,
-    empresaId: string,
+    // `null` na leitura GLOBAL do Master (T030): a consulta atravessa empresas,
+    // então o evento não fixa uma. Para rh/dp é sempre a empresa do escopo.
+    empresaId: string | null,
   ): Promise<void> {
     await this.auditService.record({
       actorType: "user",

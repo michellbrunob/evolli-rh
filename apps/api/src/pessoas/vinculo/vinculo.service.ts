@@ -9,8 +9,12 @@ import { PrismaService } from "../../database/prisma.service";
 import { PessoasAuditoriaService } from "../pessoas-auditoria.service";
 import { PessoasAuditContext } from "../pessoas.types";
 import {
-  EscopoPessoas,
+  EscopoLeituraPessoas,
+  filtroEmpresaLeitura,
+  filtroVinculoEmpresa,
   podeAcessarPessoas,
+  podeConsultarPessoas,
+  resolverEscopoLeituraPessoas,
   resolverEscopoPessoas,
 } from "../escopo-pessoas.util";
 import {
@@ -162,12 +166,12 @@ export class VinculoService {
     colaboradorId: string,
     ctx: PessoasAuditContext,
   ): Promise<VinculoFuncional[]> {
-    const escopo = resolverEscopoPessoas(ctx.actor);
+    const escopo = resolverEscopoLeituraPessoas(ctx.actor);
 
     const colaborador = await this.prisma.colaborador.findFirst({
       where: {
         id: colaboradorId,
-        vinculos: { some: { empresaId: escopo.empresaId } },
+        ...filtroVinculoEmpresa(escopo),
       },
       select: { id: true },
     });
@@ -179,28 +183,32 @@ export class VinculoService {
         null,
       );
     }
-    if (
-      !podeAcessarPessoas(
-        ctx.actor,
-        "vinculo_funcional",
-        "read",
-        escopo.empresaId,
-      )
-    ) {
+    if (!podeConsultarPessoas(ctx.actor, "vinculo_funcional", "read", escopo)) {
       return this.auditoria.negarAcesso(
         ctx,
         "vinculo_funcional",
         colaboradorId,
-        escopo.empresaId,
+        escopo.global ? null : escopo.empresaId,
       );
     }
 
-    // Só os vínculos da empresa do ator: um colaborador com vínculo em duas
-    // empresas não expõe uma para quem só tem escopo na outra.
-    return this.prisma.vinculoFuncional.findMany({
-      where: { colaboradorId: colaborador.id, empresaId: escopo.empresaId },
+    // Escopado: só os vínculos da empresa do ator — um colaborador com vínculo
+    // em duas empresas não expõe uma para quem só tem escopo na outra. Global
+    // (Master): todos os vínculos do colaborador, auditado.
+    const vinculos = await this.prisma.vinculoFuncional.findMany({
+      where: { colaboradorId: colaborador.id, ...filtroEmpresaLeitura(escopo) },
       orderBy: [{ dataAdmissao: "desc" }, { id: "asc" }],
     });
+
+    if (escopo.global) {
+      await this.auditoria.registrarConsultaGlobal(
+        ctx,
+        "vinculo_funcional",
+        colaboradorId,
+      );
+    }
+
+    return vinculos;
   }
 
   /** Histórico completo de alocações — nenhuma linha é omitida ou reescrita. */
@@ -208,7 +216,7 @@ export class VinculoService {
     vinculoId: string,
     ctx: PessoasAuditContext,
   ): Promise<AlocacaoOrganizacional[]> {
-    const escopo = resolverEscopoPessoas(ctx.actor);
+    const escopo = resolverEscopoLeituraPessoas(ctx.actor);
     const vinculo = await this.carregarVinculoNoEscopo(
       vinculoId,
       ctx,
@@ -243,7 +251,7 @@ export class VinculoService {
     dataReferencia: string;
     alocacao: AlocacaoOrganizacional | null;
   }> {
-    const escopo = resolverEscopoPessoas(ctx.actor);
+    const escopo = resolverEscopoLeituraPessoas(ctx.actor);
     const vinculo = await this.carregarVinculoNoEscopo(
       vinculoId,
       ctx,
@@ -270,7 +278,7 @@ export class VinculoService {
     vinculoId: string,
     ctx: PessoasAuditContext,
   ): Promise<MovimentacaoFuncional[]> {
-    const escopo = resolverEscopoPessoas(ctx.actor);
+    const escopo = resolverEscopoLeituraPessoas(ctx.actor);
     const vinculo = await this.carregarVinculoNoEscopo(
       vinculoId,
       ctx,
@@ -290,7 +298,7 @@ export class VinculoService {
   private async carregarVinculoNoEscopo(
     vinculoId: string,
     ctx: PessoasAuditContext,
-    escopo: EscopoPessoas,
+    escopo: EscopoLeituraPessoas,
     action: "read" | "alter" | "manage",
     resource:
       | "vinculo_funcional"
@@ -298,19 +306,23 @@ export class VinculoService {
       | "movimentacao_funcional",
   ): Promise<VinculoFuncional> {
     const vinculo = await this.prisma.vinculoFuncional.findFirst({
-      where: { id: vinculoId, empresaId: escopo.empresaId },
+      where: { id: vinculoId, ...filtroEmpresaLeitura(escopo) },
     });
 
     if (!vinculo) {
       return this.auditoria.negarAcesso(ctx, resource, vinculoId, null);
     }
-    if (!podeAcessarPessoas(ctx.actor, resource, action, vinculo.empresaId)) {
+    if (!podeConsultarPessoas(ctx.actor, resource, action, escopo)) {
       return this.auditoria.negarAcesso(
         ctx,
         resource,
         vinculo.id,
         vinculo.empresaId,
       );
+    }
+
+    if (escopo.global && action === "read") {
+      await this.auditoria.registrarConsultaGlobal(ctx, resource, vinculo.id);
     }
 
     return vinculo;

@@ -74,8 +74,11 @@ function evaluateOtherAccount(
     // autoatendimento passa por "own_account".
     return false;
   }
-  if (subject.role === "admin_tecnico") {
-    return true; // escopo: instância inteira
+  if (subject.role === "admin_tecnico" || subject.role === "master_tecnico") {
+    // Escopo: instância inteira. `master_tecnico` administra contas de acesso em
+    // qualquer empresa (T030); a atribuição de PAPÉIS é regida por
+    // `evaluateUserRole`, que impede promover alguém a `master_tecnico`.
+    return true;
   }
   if (subject.role === "rh" || subject.role === "dp") {
     return isSameCompany(subject, target);
@@ -90,8 +93,16 @@ function evaluateAccessLog(
   if (target.action !== "read") {
     return false;
   }
+  // `master_tecnico` (T030) lê a trilha em escopo global — a consulta abrange
+  // as duas empresas, sem depender de filtro do cliente (o serviço de auditoria
+  // não confina a consulta por empresa; para um papel global isso é o desejado).
+  // A própria leitura gera evento `audit_log_read` (fail-closed, sem recursão).
+  // Nenhum outro papel comum ganha acesso: rh/dp/gestor/financeiro/colaborador
+  // permanecem negados (deny-by-default), e `auditor`/`dpo` seguem não
+  // provisionados (ADR 0010, decisão 4) — esta mudança não os habilita.
   return (
     subject.role === "admin_tecnico" ||
+    subject.role === "master_tecnico" ||
     subject.role === "auditor" ||
     subject.role === "dpo"
   );
@@ -110,7 +121,26 @@ function evaluateUserRole(
     return false;
   }
 
+  // Nenhuma rota comum cria, atribui, remove ou promove alguém a
+  // `master_tecnico` (T030; Constituição, Princípio II). O provisionamento do
+  // Master exige runbook próprio, sujeito a MFA, fora de qualquer endpoint
+  // ordinário — então o bloqueio vale para TODOS os atores, inclusive
+  // `admin_tecnico` e o próprio `master_tecnico` (nenhum se autoperpetua por
+  // aqui).
+  if (target.targetNewRole === "master_tecnico") {
+    return false;
+  }
+
   if (subject.role === "admin_tecnico") {
+    return true;
+  }
+  if (subject.role === "master_tecnico") {
+    // Administra papéis COMUNS em qualquer empresa (escopo global, T030). Não
+    // cria outro papel privilegiado: `admin_tecnico` fica de fora por
+    // deny-by-default; `master_tecnico` já foi bloqueado acima.
+    if (target.targetNewRole === "admin_tecnico") {
+      return false;
+    }
     return true;
   }
   if (subject.role === "rh") {
@@ -158,6 +188,13 @@ function evaluateOrganizacao(
     // acesso global ao ambiente interno, sempre auditado. Toda leitura de
     // escopo amplo gera evento (spec §9).
     case "admin_tecnico":
+      return true;
+
+    // Perfil global controlado (T030; Constituição, Princípio II): lê e
+    // administra a estrutura organizacional de qualquer empresa. Toda consulta
+    // em escopo global é auditada (registrarConsultaAmpla, fail-safe). Convive
+    // com `admin_tecnico` sem alterá-lo.
+    case "master_tecnico":
       return true;
 
     // Matriz §8: lê e administra a estrutura da própria empresa.
@@ -238,6 +275,15 @@ function evaluatePessoas(
   const escopoResolvido = target.targetCompanyId !== undefined;
 
   switch (subject.role) {
+    // Perfil global controlado (T030): LÊ dado de pessoas/vida funcional em
+    // qualquer empresa; NÃO executa nenhuma mutação (admissão, efetivação,
+    // retificação, movimentação) — estas seguem exclusivas de rh/dp, com
+    // alçada. Leitura global auditada (registrarConsultaGlobal, fail-safe). A
+    // negação de mutação é reforçada em duas camadas: aqui (só `read`) e no
+    // resolver de escopo de mutação, que recusa o papel.
+    case "master_tecnico":
+      return target.action === "read";
+
     // Baseline V1, itens 7 e 12: RH e DP registram e efetivam diretamente,
     // restritos à própria empresa, sempre auditados. Não há aprovador distinto
     // do solicitante nesta V1 — quem registra responde pelo registro.
@@ -301,6 +347,13 @@ function evaluatePonto(
   const escopoResolvido = target.targetCompanyId !== undefined;
 
   switch (subject.role) {
+    // Perfil global controlado (T030): LÊ dado de jornada/ponto de qualquer
+    // empresa; NUNCA registra evento nem ajuste (`create` é negado) — o registro
+    // de ponto segue exclusivo de rh/dp. Leitura de ponto já é auditada por si
+    // (`ponto_consultado`), inclusive a do Master.
+    case "master_tecnico":
+      return target.action === "read";
+
     case "rh":
     case "dp":
       return escopoResolvido
@@ -350,6 +403,13 @@ function evaluateDocumentos(
   subject: AuthorizationSubject,
   target: AuthorizationTarget,
 ): boolean {
+  if (subject.role === "master_tecnico") {
+    // Perfil global controlado (T030): LÊ metadados, solicitações e catálogo de
+    // qualquer empresa; NÃO cria, substitui nem altera nada (metadado, catálogo
+    // e conteúdo de Nível 2 seguem com rh/dp e alçada de RH/DPO). Leitura global
+    // auditada (registrarConsultaGlobal, fail-safe).
+    return target.action === "read";
+  }
   if (subject.role !== "rh" && subject.role !== "dp") {
     // Inclui admin_tecnico, gestor, colaborador, financeiro, auditor, dpo.
     return false;

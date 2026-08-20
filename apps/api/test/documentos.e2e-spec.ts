@@ -912,4 +912,260 @@ describe("Documentos — metadados V1 (e2e)", () => {
       }
     });
   });
+
+  describe("master_tecnico (T030) — perfil global controlado", () => {
+    let master: Credencial;
+    let tipoMasterA: string;
+    let tipoMasterB: string;
+    let metadadoB: string;
+
+    async function seedMaster(email: string): Promise<Credencial> {
+      const { PasswordHashService } =
+        await import("../src/auth/password/password-hash.service");
+      const prisma = new PrismaClient({ datasources: { db: { url: appUrl } } });
+      try {
+        const passwordHash = await new PasswordHashService().hash(SENHA_PADRAO);
+        // O Master não pode ser criado por rota comum (T030). É provisionado
+        // diretamente — o análogo de teste do runbook futuro (sujeito a MFA).
+        await prisma.accessUser.create({
+          data: {
+            email,
+            passwordHash,
+            role: "master_tecnico",
+            status: "active",
+          },
+        });
+      } finally {
+        await prisma.$disconnect();
+      }
+      return login(email, SENHA_PADRAO);
+    }
+
+    beforeAll(async () => {
+      master = await seedMaster("master@ecossistema.test");
+
+      tipoMasterA = await criarTipo(
+        rhA,
+        empresaA,
+        "TIPO-MST-A",
+        "Tipo Master A",
+      );
+      tipoMasterB = await criarTipo(
+        rhB,
+        empresaB,
+        "TIPO-MST-B",
+        "Tipo Master B",
+      );
+
+      const meta = await post("/v1/documentos", rhB)
+        .send({
+          empresaId: empresaB,
+          colaboradorId: colaboradorB1,
+          tipoDocumentoId: tipoMasterB,
+        })
+        .expect(201);
+      metadadoB = meta.body.id as string;
+    });
+
+    it("lê colaboradores das DUAS empresas numa única listagem global", async () => {
+      const resp = await get("/v1/colaboradores", master).expect(200);
+      const ids = (resp.body.itens as { id: string }[]).map((c) => c.id);
+      expect(ids).toEqual(
+        expect.arrayContaining([colaboradorA1, colaboradorB1]),
+      );
+    });
+
+    it("lê o detalhe de um colaborador de outra empresa (leitura global)", async () => {
+      await get(`/v1/colaboradores/${colaboradorB1}`, master).expect(200);
+    });
+
+    it("lê a estrutura organizacional das duas empresas", async () => {
+      const resp = await get("/v1/departamentos", master).expect(200);
+      const ids = (resp.body.itens as { id: string }[]).map((d) => d.id);
+      expect(ids).toEqual(
+        expect.arrayContaining([departamentoA, departamentoB]),
+      );
+    });
+
+    it("lê o catálogo de documentos das duas empresas", async () => {
+      const resp = await get("/v1/tipos-documento", master).expect(200);
+      const ids = (resp.body.itens as { id: string }[]).map((t) => t.id);
+      expect(ids).toEqual(expect.arrayContaining([tipoMasterA, tipoMasterB]));
+    });
+
+    it("lê metadado de qualquer empresa, ainda sem conteúdo algum", async () => {
+      const resp = await get(`/v1/documentos/${metadadoB}`, master).expect(200);
+      assertSemConteudo(resp.body);
+    });
+
+    it("NÃO admite colaborador (mutação sensível negada)", async () => {
+      await post("/v1/colaboradores", master)
+        .send({
+          nome: "Nao Deve Ser Criado",
+          empresaId: empresaA,
+          matricula: "MST-X-0001",
+          tipo: "clt",
+          dataAdmissao: ADMISSAO,
+          motivoCodigo: "admissao_inicial",
+          departamentoId: departamentoA,
+        })
+        .expect(403);
+    });
+
+    it("NÃO cria tipo de documento nem metadado (mutação negada)", async () => {
+      await post("/v1/tipos-documento", master)
+        .send({
+          empresaId: empresaA,
+          codigo: "TIPO-MST-NEG",
+          nome: "Nao",
+          aprovacaoDpoReferencia: "DPO-REF-SINT-0002",
+        })
+        .expect(403);
+
+      await post("/v1/documentos", master)
+        .send({
+          empresaId: empresaB,
+          colaboradorId: colaboradorB1,
+          tipoDocumentoId: tipoMasterB,
+        })
+        .expect(403);
+    });
+
+    it("gerencia conta comum em qualquer empresa (desativa usuário da empresa B)", async () => {
+      const alvo = await post("/v1/users", admin)
+        .send({
+          email: "descartavel.b@example.test",
+          password: SENHA_PADRAO,
+          role: "colaborador",
+          companyId: empresaB,
+        })
+        .expect(201);
+
+      await post(`/v1/users/${alvo.body.id}/disable`, master).expect(204);
+    });
+
+    it("NÃO promove ninguém a master_tecnico — nem o próprio Master, nem RH", async () => {
+      await post("/v1/users", master)
+        .send({
+          email: "outro.master@example.test",
+          password: SENHA_PADRAO,
+          role: "master_tecnico",
+          companyId: empresaA,
+        })
+        .expect(403);
+
+      await post("/v1/users", rhA)
+        .send({
+          email: "master.por.rh@example.test",
+          password: SENHA_PADRAO,
+          role: "master_tecnico",
+          companyId: empresaA,
+        })
+        .expect(403);
+    });
+
+    it("registra as consultas globais na trilha, sem dado pessoal", async () => {
+      const prisma = new PrismaClient({ datasources: { db: { url: appUrl } } });
+      try {
+        const eventos = await prisma.auditEvent.findMany({
+          where: { action: "master_consulta_global" },
+        });
+        // As leituras globais acima geraram eventos.
+        expect(eventos.length).toBeGreaterThan(0);
+        // Ator é o Master; empresa nula (consulta atravessa empresas); só id
+        // técnico como recurso — nunca nome ou matrícula.
+        expect(eventos.every((e) => e.actorRole === "master_tecnico")).toBe(
+          true,
+        );
+        expect(eventos.every((e) => e.companyId === null)).toBe(true);
+        expect(
+          eventos.every(
+            (e) =>
+              e.resourceId === null ||
+              /^[0-9a-fA-F-]{36}$/.test(e.resourceId ?? ""),
+          ),
+        ).toBe(true);
+      } finally {
+        await prisma.$disconnect();
+      }
+    });
+
+    it("lê a trilha de auditoria das DUAS empresas, sem depender de filtro", async () => {
+      // Sem filtro do cliente: a consulta abrange as duas empresas.
+      const geral = await get("/v1/audit/events?pageSize=100", master).expect(
+        200,
+      );
+      const empresas = new Set(
+        (geral.body.items as { companyId: string | null }[])
+          .map((e) => e.companyId)
+          .filter((c): c is string => c !== null),
+      );
+      expect(empresas.has(empresaA)).toBe(true);
+      expect(empresas.has(empresaB)).toBe(true);
+    });
+
+    it("filtro por empresa apenas restringe — cada empresa retorna só a sua", async () => {
+      const soA = await get(
+        `/v1/audit/events?companyId=${empresaA}&pageSize=100`,
+        master,
+      ).expect(200);
+      expect(soA.body.items.length).toBeGreaterThan(0);
+      expect(
+        (soA.body.items as { companyId: string | null }[]).every(
+          (e) => e.companyId === empresaA,
+        ),
+      ).toBe(true);
+
+      const soB = await get(
+        `/v1/audit/events?companyId=${empresaB}&pageSize=100`,
+        master,
+      ).expect(200);
+      expect(soB.body.items.length).toBeGreaterThan(0);
+      expect(
+        (soB.body.items as { companyId: string | null }[]).every(
+          (e) => e.companyId === empresaB,
+        ),
+      ).toBe(true);
+    });
+
+    it("a resposta da trilha não expõe dado pessoal nem segredo", async () => {
+      const resp = await get("/v1/audit/events?pageSize=100", master).expect(
+        200,
+      );
+      const serial = JSON.stringify(resp.body);
+      // Sem credencial, token, hash, conteúdo, CPF, e-mail ou nome em claro.
+      expect(serial).not.toMatch(/passwordhash|password|senha|token|argon2/i);
+      expect(serial).not.toMatch(/cpf|\b\d{11}\b/i);
+      expect(serial).not.toMatch(/@[a-z0-9.-]+\.[a-z]{2,}/i); // e-mail
+      for (const evento of resp.body.items as Record<string, unknown>[]) {
+        const chaves = Object.keys(evento).map((k) => k.toLowerCase());
+        for (const proibida of ["email", "nome", "name", "cpf", "senha"]) {
+          expect(chaves).not.toContain(proibida);
+        }
+      }
+    });
+
+    it("RH não consulta a trilha (403), nem global nem por empresa", async () => {
+      await get("/v1/audit/events", rhA).expect(403);
+      await get(`/v1/audit/events?companyId=${empresaB}`, rhA).expect(403);
+      await get(`/v1/audit/events?companyId=${empresaA}`, dpA).expect(403);
+    });
+
+    it("a consulta da trilha pelo Master é auditada (audit_log_read), sem recursão infinita", async () => {
+      await get("/v1/audit/events?pageSize=5", master).expect(200);
+
+      const prisma = new PrismaClient({ datasources: { db: { url: appUrl } } });
+      try {
+        const lidos = await prisma.auditEvent.findMany({
+          where: { action: "audit_log_read", actorRole: "master_tecnico" },
+        });
+        expect(lidos.length).toBeGreaterThan(0);
+        // Uma leitura gera UM evento (não recursão): o evento de leitura tem
+        // recurso técnico e nenhum dado pessoal.
+        expect(lidos.every((e) => e.resource === "audit_event")).toBe(true);
+      } finally {
+        await prisma.$disconnect();
+      }
+    });
+  });
 });

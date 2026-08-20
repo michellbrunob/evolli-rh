@@ -32,6 +32,17 @@ enum AccessRole {
   colaborador
   auditor
   dpo
+  // Perfil global controlado (T030; Constituição, Princípio II: "the sole
+  // permitted exception"). Atribuível SOMENTE a conta nominativa formalmente
+  // autorizada para desenvolvimento/suporte do ecossistema. Escopo global de
+  // leitura e de configuração (contas, papéis comuns, estrutura organizacional);
+  // NÃO executa mutações sensíveis de negócio (admissão/efetivação/retificação
+  // de vínculo, ponto, documentos) nem substitui alçada de RH/Jurídico. Nenhuma
+  // rota comum pode atribuí-lo; provisionamento real depende de MFA e runbook
+  // futuro. Distinto de `admin_tecnico`, que permanece inalterado. Acrescentado
+  // ao fim do enum para casar com a migration (Prisma acrescenta valores novos
+  // ao fim).
+  master_tecnico
 }
 
 enum AccessUserStatus {
@@ -272,6 +283,13 @@ enum AuditAction {
   documentos_documento_metadado_consultado  @map("documentos.documento_metadado.consultado")
   documentos_documento_metadado_substituido @map("documentos.documento_metadado.substituido")
   documentos_solicitacao_documento_criada   @map("documentos.solicitacao_documento.criada")
+
+  // T030 — Perfil global `master_tecnico`. Toda consulta em escopo GLOBAL feita
+  // pelo Master é registrada com esta ação (mesmo critério fail-safe de
+  // `organizacao.estrutura.consultada`): a auditoria é o controle que torna o
+  // acesso amplo aceitável. Registra ação + tipo de recurso + id técnico —
+  // nunca nome, matrícula, rótulo documental ou qualquer dado pessoal.
+  master_consulta_global @map("master.consulta.global")
 }
 
 enum AuditResult {

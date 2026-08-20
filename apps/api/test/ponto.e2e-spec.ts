@@ -1316,4 +1316,98 @@ describe("Jornada e Ponto Rastreavel (e2e)", () => {
       }
     });
   });
+
+  describe("master_tecnico (T030) — leitura global de ponto, sem mutação", () => {
+    let master: Credencial;
+    let eventoB: string;
+
+    async function seedMaster(email: string): Promise<Credencial> {
+      const { PasswordHashService } =
+        await import("../src/auth/password/password-hash.service");
+      const prisma = new PrismaClient({ datasources: { db: { url: appUrl } } });
+      try {
+        const passwordHash = await new PasswordHashService().hash(SENHA_PADRAO);
+        await prisma.accessUser.create({
+          data: {
+            email,
+            passwordHash,
+            role: "master_tecnico",
+            status: "active",
+          },
+        });
+      } finally {
+        await prisma.$disconnect();
+      }
+      return login(email, SENHA_PADRAO);
+    }
+
+    beforeAll(async () => {
+      master = await seedMaster("master.ponto@ecossistema.test");
+      // Garante ao menos um evento na empresa B para a leitura global provar
+      // que atravessa empresas.
+      const ev = await registrarPonto(rhB, vinculoB, "entrada", ENTRADA);
+      eventoB = ev.id as string;
+    });
+
+    it("lê marcações de vínculo de qualquer empresa (A e B)", async () => {
+      const respB = await get(
+        `/v1/pontos?vinculoId=${vinculoB}&tamanhoPagina=50`,
+        master,
+      ).expect(200);
+      expect(respB.body.itens.length).toBeGreaterThan(0);
+      expect(
+        (respB.body.itens as { empresaId: string }[]).every(
+          (e) => e.empresaId === empresaB,
+        ),
+      ).toBe(true);
+
+      const respA = await get(
+        `/v1/pontos?vinculoId=${vinculoA}&tamanhoPagina=50`,
+        master,
+      ).expect(200);
+      expect(respA.body.itens.length).toBeGreaterThan(0);
+      expect(
+        (respA.body.itens as { empresaId: string }[]).every(
+          (e) => e.empresaId === empresaA,
+        ),
+      ).toBe(true);
+    });
+
+    it("lê o detalhe de uma marcação de outra empresa", async () => {
+      const resp = await get(`/v1/pontos/${eventoB}`, master).expect(200);
+      expect(resp.body.empresaId).toBe(empresaB);
+    });
+
+    it("NÃO registra marcação (create negado)", async () => {
+      await post("/v1/pontos", master)
+        .send({ vinculoId: vinculoB, tipo: "saida", momento: SAIDA })
+        .expect(403);
+    });
+
+    it("NÃO registra ajuste (create negado)", async () => {
+      await post(`/v1/pontos/${eventoB}/ajustes`, master)
+        .send({ motivoCodigo: "correcao_manual", anula: true })
+        .expect(403);
+    });
+
+    it("a leitura global do Master é auditada (ponto.consultado)", async () => {
+      const prisma = new PrismaClient({ datasources: { db: { url: appUrl } } });
+      try {
+        const eventos = await prisma.auditEvent.findMany({
+          where: { action: "ponto_consultado", actorRole: "master_tecnico" },
+        });
+        expect(eventos.length).toBeGreaterThan(0);
+        // Sem dado pessoal: resourceId é id técnico ou nulo.
+        expect(
+          eventos.every(
+            (e) =>
+              e.resourceId === null ||
+              /^[0-9a-fA-F-]{36}$/.test(e.resourceId ?? ""),
+          ),
+        ).toBe(true);
+      } finally {
+        await prisma.$disconnect();
+      }
+    });
+  });
 });

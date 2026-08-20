@@ -52,6 +52,36 @@ export class PessoasAuditoriaService {
   }
 
   /**
+   * Consulta em escopo **GLOBAL** feita pelo `master_tecnico` (T030). A leitura
+   * da própria empresa por rh/dp NÃO gera evento (seria log de tráfego); só a
+   * leitura ampla, que é a exceção controlada, é registrada.
+   *
+   * **Fail-safe** (`recordOrThrow`, como `organizacao_estrutura_consultada`): a
+   * auditoria é o controle que torna o acesso global aceitável — se o evento não
+   * puder ser gravado, a consulta não é respondida. Registra ação, tipo de
+   * recurso e id técnico; **nunca** nome, matrícula ou qualquer dado pessoal.
+   */
+  async registrarConsultaGlobal(
+    ctx: PessoasAuditContext,
+    resource: AuditResource,
+    resourceId: string | null,
+  ): Promise<void> {
+    await this.auditService.recordOrThrow({
+      actorType: "user",
+      actorUserId: ctx.actor.id,
+      actorRole: ctx.actor.role,
+      companyId: null,
+      action: "master_consulta_global",
+      resource,
+      resourceId,
+      ip: ctx.metadata.ip,
+      userAgent: ctx.metadata.userAgent,
+      result: "success",
+      requestId: ctx.metadata.requestId,
+    });
+  }
+
+  /**
    * Tentativa negada sobre recurso de pessoas, **incluindo tentativa fora do
    * escopo de empresa**.
    *

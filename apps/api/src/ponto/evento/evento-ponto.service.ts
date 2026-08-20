@@ -9,8 +9,12 @@ import {
   ValorEfetivoPonto,
 } from "../ponto.types";
 import {
+  EscopoLeituraPonto,
   deslocamento,
+  filtroEmpresaLeituraPonto,
   podeAcessarPonto,
+  podeConsultarPonto,
+  resolverEscopoLeituraPonto,
   resolverEscopoPonto,
 } from "../escopo-ponto.util";
 import { competenciaDe } from "../competencia.util";
@@ -169,10 +173,11 @@ export class EventoPontoService {
     query: ListarPontosQueryDto,
     ctx: PontoAuditContext,
   ): Promise<ResultadoPaginado<EventoProjetado>> {
-    const escopo = resolverEscopoPonto(ctx.actor);
+    const escopo = resolverEscopoLeituraPonto(ctx.actor);
 
     const where: Prisma.EventoPontoWhereInput = {
-      empresaId: escopo.empresaId,
+      // Escopado: empresa do ator. Global (Master): sem filtro de empresa.
+      ...filtroEmpresaLeituraPonto(escopo),
       ...(query.vinculoId !== undefined && { vinculoId: query.vinculoId }),
       ...(query.competencia !== undefined && {
         competencia: query.competencia,
@@ -188,10 +193,10 @@ export class EventoPontoService {
     query: ListarPontosDoVinculoQueryDto,
     ctx: PontoAuditContext,
   ): Promise<ResultadoPaginado<EventoProjetado>> {
-    const escopo = resolverEscopoPonto(ctx.actor);
+    const escopo = resolverEscopoLeituraPonto(ctx.actor);
 
     const vinculo = await this.prisma.vinculoFuncional.findFirst({
-      where: { id: vinculoId, empresaId: escopo.empresaId },
+      where: { id: vinculoId, ...filtroEmpresaLeituraPonto(escopo) },
       select: { id: true, empresaId: true },
     });
 
@@ -200,13 +205,11 @@ export class EventoPontoService {
         ctx,
         "evento_ponto",
         vinculoId,
-        escopo.empresaId,
+        escopo.global ? null : escopo.empresaId,
       );
     }
 
-    if (
-      !podeAcessarPonto(ctx.actor, "evento_ponto", "read", vinculo.empresaId)
-    ) {
+    if (!podeConsultarPonto(ctx.actor, "evento_ponto", "read", escopo)) {
       return this.auditoria.negarAcesso(
         ctx,
         "evento_ponto",
@@ -216,7 +219,8 @@ export class EventoPontoService {
     }
 
     const where: Prisma.EventoPontoWhereInput = {
-      empresaId: escopo.empresaId,
+      // Escopado: empresa do ator. Global (Master): sem filtro de empresa.
+      ...filtroEmpresaLeituraPonto(escopo),
       vinculoId,
       ...(query.competencia !== undefined && {
         competencia: query.competencia,
@@ -242,7 +246,7 @@ export class EventoPontoService {
       ctx,
       "evento_ponto",
       evento.id,
-      escopo.empresaId,
+      escopo.global ? null : escopo.empresaId,
     );
 
     return {
@@ -264,7 +268,7 @@ export class EventoPontoService {
       ctx,
       "ajuste_ponto",
       evento.id,
-      escopo.empresaId,
+      escopo.global ? null : escopo.empresaId,
     );
 
     return ajustes.map((ajuste) => this.projetarAjuste(ajuste));
@@ -349,12 +353,16 @@ export class EventoPontoService {
   ): Promise<{
     evento: EventoPonto;
     ajustes: AjustePonto[];
-    escopo: { empresaId: string };
+    escopo: EscopoLeituraPonto;
   }> {
-    const escopo = resolverEscopoPonto(ctx.actor);
+    // Leitura pode ser global (Master). O registro de ajuste (`create`) chega
+    // aqui só por rh/dp — o guard nega o Master antes; se chegasse, o resolver
+    // devolveria global e `podeConsultarPonto(create)` negaria (defesa em
+    // profundidade).
+    const escopo = resolverEscopoLeituraPonto(ctx.actor);
 
     const evento = await this.prisma.eventoPonto.findFirst({
-      where: { id: pontoId, empresaId: escopo.empresaId },
+      where: { id: pontoId, ...filtroEmpresaLeituraPonto(escopo) },
     });
 
     if (evento === null) {
@@ -362,12 +370,12 @@ export class EventoPontoService {
         ctx,
         "evento_ponto",
         pontoId,
-        escopo.empresaId,
+        escopo.global ? null : escopo.empresaId,
       );
     }
 
     const recurso = acao === "create" ? "ajuste_ponto" : "evento_ponto";
-    if (!podeAcessarPonto(ctx.actor, recurso, acao, evento.empresaId)) {
+    if (!podeConsultarPonto(ctx.actor, recurso, acao, escopo)) {
       return this.auditoria.negarAcesso(
         ctx,
         recurso,
@@ -377,7 +385,7 @@ export class EventoPontoService {
     }
 
     const ajustes = await this.prisma.ajustePonto.findMany({
-      where: { eventoPontoId: evento.id, empresaId: escopo.empresaId },
+      where: { eventoPontoId: evento.id, ...filtroEmpresaLeituraPonto(escopo) },
       orderBy: ORDEM_AJUSTES,
     });
 
@@ -396,7 +404,7 @@ export class EventoPontoService {
     paginaSolicitada: number | undefined,
     tamanhoSolicitado: number | undefined,
     ctx: PontoAuditContext,
-    escopo: { empresaId: string },
+    escopo: EscopoLeituraPonto,
     extra?: { resourceId: string },
   ): Promise<ResultadoPaginado<EventoProjetado>> {
     const pagina = paginaSolicitada ?? 1;
@@ -414,14 +422,14 @@ export class EventoPontoService {
 
     const ajustesPorEvento = await this.agruparAjustes(
       eventos.map((evento) => evento.id),
-      escopo.empresaId,
+      escopo,
     );
 
     await this.auditoria.registrarConsulta(
       ctx,
       "evento_ponto",
       extra?.resourceId ?? null,
-      escopo.empresaId,
+      escopo.global ? null : escopo.empresaId,
     );
 
     return {
@@ -436,7 +444,7 @@ export class EventoPontoService {
 
   private async agruparAjustes(
     eventoIds: string[],
-    empresaId: string,
+    escopo: EscopoLeituraPonto,
   ): Promise<Map<string, AjustePonto[]>> {
     const agrupado = new Map<string, AjustePonto[]>();
     if (eventoIds.length === 0) {
@@ -444,7 +452,12 @@ export class EventoPontoService {
     }
 
     const ajustes = await this.prisma.ajustePonto.findMany({
-      where: { eventoPontoId: { in: eventoIds }, empresaId },
+      // Eventos já vieram escopados; o filtro de empresa é defesa adicional
+      // (omitido no escopo global do Master).
+      where: {
+        eventoPontoId: { in: eventoIds },
+        ...filtroEmpresaLeituraPonto(escopo),
+      },
       orderBy: ORDEM_AJUSTES,
     });
 
