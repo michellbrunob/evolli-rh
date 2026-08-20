@@ -695,21 +695,51 @@ describe("Identidade, sessão e autorização (e2e)", () => {
       await app.close();
     });
 
-    it("IDOR/BOLA: RH não gerencia conta de outra empresa (403, nunca 200)", async () => {
-      await agent()
+    it("IDOR/BOLA: RH não gerencia conta de outra empresa (404 anti-enumeração, nunca 200 nem 403)", async () => {
+      const response = await agent()
         .post(`/v1/users/${colaboradorCompanyBId}/disable`)
         .set("Cookie", rhCookie)
         .set("x-csrf-token", rhCsrfToken)
-        .expect(403);
+        .expect(404);
+
+      // Indistinguível de "não existe": nenhuma existência, empresa, e-mail
+      // ou papel do alvo é revelado (Constituição, Princípio II).
+      expect(response.body).toEqual({
+        status_code: 404,
+        message: "Recurso não encontrado.",
+        request_id: expect.any(String),
+        timestamp: expect.any(String),
+      });
+
+      // A conta de B permanece intacta.
+      const alvoB = await prisma.accessUser.findUniqueOrThrow({
+        where: { id: colaboradorCompanyBId },
+      });
+      expect(alvoB.status).toBe("active");
     });
 
-    it("IDOR/BOLA: RH não altera papel de usuário de outra empresa (403)", async () => {
-      await agent()
+    it("IDOR/BOLA: RH não altera papel de usuário de outra empresa (404 anti-enumeração, nunca 403)", async () => {
+      // Mesmo enviando escopo no corpo, o 404 do guard precede a validação —
+      // não se revela sequer que o campo seria rejeitado.
+      const response = await agent()
         .patch(`/v1/users/${colaboradorCompanyBId}/role`)
         .set("Cookie", rhCookie)
         .set("x-csrf-token", rhCsrfToken)
         .send({ role: "gestor", companyId: "empresa-b" })
-        .expect(403);
+        .expect(404);
+
+      expect(response.body).toEqual({
+        status_code: 404,
+        message: "Recurso não encontrado.",
+        request_id: expect.any(String),
+        timestamp: expect.any(String),
+      });
+
+      const alvoB = await prisma.accessUser.findUniqueOrThrow({
+        where: { id: colaboradorCompanyBId },
+      });
+      expect(alvoB.role).toBe("colaborador");
+      expect(alvoB.companyId).toBe("empresa-b");
     });
 
     it("autoelevação: RH não altera o próprio papel (403)", async () => {
@@ -789,13 +819,21 @@ describe("Identidade, sessão e autorização (e2e)", () => {
         expect(await escopoDoAlvoA()).toEqual(antes);
       });
 
-      it("RH da empresa A não altera papel de usuário da empresa B, mesmo sem enviar escopo (403)", async () => {
-        await agent()
+      it("RH da empresa A não altera usuário da empresa B: 404 anti-enumeração, escopo original permanece", async () => {
+        const response = await agent()
           .patch(`/v1/users/${colaboradorCompanyBId}/role`)
           .set("Cookie", rhCookie)
           .set("x-csrf-token", rhCsrfToken)
           .send({ role: "dp" })
-          .expect(403);
+          .expect(404);
+
+        // Nenhum metadado do alvo de outra empresa é revelado.
+        expect(response.body).toEqual({
+          status_code: 404,
+          message: "Recurso não encontrado.",
+          request_id: expect.any(String),
+          timestamp: expect.any(String),
+        });
 
         const alvoB = await prisma.accessUser.findUniqueOrThrow({
           where: { id: colaboradorCompanyBId },
