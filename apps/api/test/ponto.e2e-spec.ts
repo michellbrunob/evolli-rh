@@ -189,6 +189,28 @@ describe("Jornada e Ponto Rastreavel (e2e)", () => {
     return login(email, SENHA_PADRAO);
   }
 
+  // Semeia um usuário de papel NÃO provisionável por rota (ex.: `dpo`,
+  // depreciado — CG-DPO-01) direto no banco, só para exercitar a negação por
+  // domínio; a rota comum recusa esse papel.
+  async function seedUsuarioComPapel(
+    email: string,
+    role: "dpo" | "auditor",
+    companyId: string,
+  ): Promise<Credencial> {
+    const { PasswordHashService } =
+      await import("../src/auth/password/password-hash.service");
+    const prisma = new PrismaClient({ datasources: { db: { url: appUrl } } });
+    try {
+      const passwordHash = await new PasswordHashService().hash(SENHA_PADRAO);
+      await prisma.accessUser.create({
+        data: { email, passwordHash, role, companyId, status: "active" },
+      });
+    } finally {
+      await prisma.$disconnect();
+    }
+    return login(email, SENHA_PADRAO);
+  }
+
   async function criarUsuario(
     email: string,
     role: string,
@@ -381,7 +403,13 @@ describe("Jornada e Ponto Rastreavel (e2e)", () => {
       "auditor",
       empresaA,
     );
-    dpoA = await criarUsuario("dpo.a.ponto@example.test", "dpo", empresaA);
+    // `dpo` não é provisionável por rota (CG-DPO-01) — semeado direto só para
+    // exercitar a negação de leitura de ponto (capacidade do domínio inalterada).
+    dpoA = await seedUsuarioComPapel(
+      "dpo.a.ponto@example.test",
+      "dpo",
+      empresaA,
+    );
 
     vinculoA = await admitirEEfetivar(rhA, {
       nome: "Pessoa Sintetica Ponto A",

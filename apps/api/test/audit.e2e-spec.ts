@@ -284,6 +284,32 @@ describe("Auditoria formal e rastreabilidade (e2e)", () => {
         .expect(201);
     }
 
+    // Semeadura direta de um papel NÃO provisionável por rota (ex.: `dpo`,
+    // depreciado — CG-DPO-01). Insere no banco para exercitar a capacidade
+    // latente (leitura da trilha, inalterada) sem passar pela rota, que recusa.
+    async function seedUserWithRole(
+      role: AccessRole,
+      email: string,
+      password: string,
+    ): Promise<void> {
+      const { PasswordHashService } =
+        await import("../src/auth/password/password-hash.service");
+      const prisma = new PrismaClient({ datasources: { db: { url: appUrl } } });
+      try {
+        await prisma.accessUser.create({
+          data: {
+            email,
+            passwordHash: await new PasswordHashService().hash(password),
+            role,
+            companyId: "empresa-auditoria",
+            status: "active",
+          },
+        });
+      } finally {
+        await prisma.$disconnect();
+      }
+    }
+
     beforeAll(async () => {
       app = await buildApp();
 
@@ -477,16 +503,66 @@ describe("Auditoria formal e rastreabilidade (e2e)", () => {
       }
     });
 
-    it("RBAC positivo: auditor e dpo leem a trilha (200)", async () => {
+    it("RBAC positivo: auditor e dpo leem a trilha (200) — capacidade inalterada", async () => {
+      // `auditor` ainda é provisionável por rota (não faz parte desta task);
+      // `dpo` é semeado direto, pois seu provisionamento por rota foi bloqueado
+      // (CG-DPO-01). A capacidade de leitura da trilha (evaluateAccessLog)
+      // permanece a mesma para ambos.
+      const auditorEmail = "auditor-auditoria@empresa-auditoria.test";
+      const auditorPassword = "senha-bem-longa-para-auditor-auditoria";
+      await createUserWithRole("auditor", auditorEmail, auditorPassword);
+      const auditorSession = await login(auditorEmail, auditorPassword);
+      await agent()
+        .get("/v1/audit/events")
+        .set("Cookie", auditorSession.cookie)
+        .expect(200);
+
       const dpoEmail = "dpo-auditoria@empresa-auditoria.test";
       const dpoPassword = "senha-bem-longa-para-dpo-auditoria";
-      await createUserWithRole("dpo", dpoEmail, dpoPassword);
+      await seedUserWithRole("dpo", dpoEmail, dpoPassword);
       const dpoSession = await login(dpoEmail, dpoPassword);
-
       await agent()
         .get("/v1/audit/events")
         .set("Cookie", dpoSession.cookie)
         .expect(200);
+    });
+
+    it("dpo NÃO pode ser provisionado por rota — criação e alteração recusadas (CG-DPO-01)", async () => {
+      // Criação com papel dpo: negada com erro seguro genérico, sem vazamento.
+      const criacao = await agent()
+        .post("/v1/users")
+        .set("Cookie", masterCookie)
+        .set("x-csrf-token", masterCsrfToken)
+        .send({
+          email: "tentativa-dpo@empresa-auditoria.test",
+          password: "senha-bem-longa-que-nunca-sera-usada",
+          role: "dpo",
+          companyId: "empresa-auditoria",
+        })
+        .expect(403);
+      expect(criacao.body.message).toBe("Acesso negado.");
+      expect(JSON.stringify(criacao.body)).not.toMatch(
+        /passwordhash|senha|token/i,
+      );
+
+      // Alteração de um usuário existente para dpo: também recusada.
+      const alvo = await agent()
+        .post("/v1/users")
+        .set("Cookie", masterCookie)
+        .set("x-csrf-token", masterCsrfToken)
+        .send({
+          email: "alvo-alteracao-dpo@empresa-auditoria.test",
+          password: "senha-bem-longa-do-alvo-de-teste",
+          role: "colaborador",
+          companyId: "empresa-auditoria",
+        })
+        .expect(201);
+      await agent()
+        .patch(`/v1/users/${alvo.body.id}/role`)
+        .set("Cookie", masterCookie)
+        .set("x-csrf-token", masterCsrfToken)
+        .send({ role: "dpo" })
+        .expect(403);
     });
 
     it("RBAC positivo: master_tecnico lê a trilha; admin_tecnico NÃO (CG-RBAC-01)", async () => {

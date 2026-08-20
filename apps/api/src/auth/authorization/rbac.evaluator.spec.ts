@@ -203,6 +203,29 @@ describe("evaluatePermission (RBAC/ABAC)", () => {
       ).toBe(false);
     });
 
+    it("ninguém atribui dpo por rota — papel legado depreciado (CG-DPO-01)", () => {
+      // `dpo` permanece no enum/histórico, mas é proibido de provisionamento.
+      for (const role of ["master_tecnico", "rh"] as const) {
+        expect(
+          evaluatePermission(subject({ role, companyId: "empresa-a" }), {
+            resource: "user_role",
+            action: "create",
+            targetCompanyId: "empresa-a",
+            targetNewRole: "dpo",
+          }),
+        ).toBe(false);
+        expect(
+          evaluatePermission(subject({ role, companyId: "empresa-a" }), {
+            resource: "user_role",
+            action: "alter",
+            targetUserId: "u2",
+            targetCompanyId: "empresa-a",
+            targetNewRole: "dpo",
+          }),
+        ).toBe(false);
+      }
+    });
+
     it("rh só altera papel dentro da própria empresa", () => {
       const rh = subject({ role: "rh", companyId: "empresa-a" });
 

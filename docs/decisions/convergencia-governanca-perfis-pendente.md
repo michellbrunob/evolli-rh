@@ -59,15 +59,25 @@ em produção exige ADR/critério próprio antes da implementação.
 
 ## 3. Papel `dpo` (e `auditor`): depreciação e remoção só por expand/contract
 
-- **CG-DPO-01** — Marcar `dpo` como **depreciado** na documentação e nos
-  comentários de código (sem remover do enum). Proibição de provisionamento já
-  vigente (ADR 0010 decisão 4; ADR 0012 decisão 2).
+- **CG-DPO-01 — IMPLEMENTADA** (proibição de provisionamento do `dpo`). O
+  avaliador (`evaluateUserRole`) recusa qualquer criação/alteração de usuário
+  cujo papel-alvo seja `dpo`, por **qualquer ator e qualquer rota** — ao lado
+  do bloqueio já existente de `admin_tecnico`/`master_tecnico`. A recusa é um
+  erro seguro genérico (403, "Acesso negado."), sem vazamento. O valor
+  permanece **no enum, no schema, nas migrations e no histórico** — nada
+  removido/renomeado (fora de escopo). `dpo` continua marcado como depreciado
+  em comentários de código. Testes unitários e E2E provam o bloqueio; a
+  capacidade latente de leitura da trilha (`evaluateAccessLog`) permanece
+  inalterada (exercitada em teste por semeadura direta, não por rota).
+  `auditor` **não** foi habilitado por esta mudança (ver CG-DPO-03).
 - **CG-DPO-02** — **Remoção futura** do valor de enum `dpo` **somente por
   expand/contract**, após verificar que **nenhum** `audit_event.actor_role`
   referencia `dpo` (hoje não há — nunca provisionado). Nunca destrutivo.
   Responsável: Desenvolvimento + Segurança.
-- **CG-DPO-03** — `auditor`: escopo segue **pendente (DP-7)**; não provisionar;
-  mesmo tratamento não destrutivo se um dia for retirado.
+- **CG-DPO-03** — `auditor`: escopo segue **pendente (DP-7)**; hoje ainda é
+  provisionável por rota (não faz parte da CG-DPO-01) — bloqueá-lo por rota,
+  com o mesmo mecanismo, é tarefa própria; não provisionar; mesmo tratamento
+  não destrutivo se um dia for retirado.
 
 ## 4. Renomeação futura dos campos de aprovação documental
 
