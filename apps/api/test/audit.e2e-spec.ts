@@ -388,9 +388,11 @@ describe("Auditoria formal e rastreabilidade (e2e)", () => {
         .set("Cookie", masterCookie)
         .expect(200);
 
+      // O leitor da trilha agora é o master_tecnico (CG-RBAC-01): filtra-se pela
+      // ação, não pelo ator antigo (admin_tecnico deixou de ler a trilha).
       const response = await agent()
         .get("/v1/audit/events")
-        .query({ action: "audit_log_read", actorUserId: adminUserId })
+        .query({ action: "audit_log_read" })
         .set("Cookie", masterCookie)
         .expect(200);
 

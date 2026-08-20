@@ -372,9 +372,25 @@ describe("Identidade, sessão e autorização (e2e)", () => {
       app = await buildApp();
       prisma = new PrismaClient({ datasources: { db: { url: appUrl } } });
 
+      // A mutação protegida deste bloco (criar usuário) exige um operador com
+      // capacidade — o master_tecnico (CG-RBAC-01: admin_tecnico não cria mais
+      // usuário por rota). Semeado direto (análogo de teste do runbook).
+      const masterEmail = "master.csrf@evolli.test";
+      const masterPassword = "uma-passphrase-de-master-csrf-bem-longa";
+      const { PasswordHashService } =
+        await import("../src/auth/password/password-hash.service");
+      await prisma.accessUser.create({
+        data: {
+          email: masterEmail,
+          passwordHash: await new PasswordHashService().hash(masterPassword),
+          role: "master_tecnico",
+          status: "active",
+        },
+      });
+
       const response = await agent()
         .post("/v1/auth/login")
-        .send({ email: adminEmail, password: adminPassword })
+        .send({ email: masterEmail, password: masterPassword })
         .expect(200);
 
       const cookies = response.headers["set-cookie"] as unknown as string[];
