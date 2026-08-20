@@ -93,8 +93,16 @@ function evaluateAccessLog(
   if (target.action !== "read") {
     return false;
   }
+  // `master_tecnico` (T030) lê a trilha em escopo global — a consulta abrange
+  // as duas empresas, sem depender de filtro do cliente (o serviço de auditoria
+  // não confina a consulta por empresa; para um papel global isso é o desejado).
+  // A própria leitura gera evento `audit_log_read` (fail-closed, sem recursão).
+  // Nenhum outro papel comum ganha acesso: rh/dp/gestor/financeiro/colaborador
+  // permanecem negados (deny-by-default), e `auditor`/`dpo` seguem não
+  // provisionados (ADR 0010, decisão 4) — esta mudança não os habilita.
   return (
     subject.role === "admin_tecnico" ||
+    subject.role === "master_tecnico" ||
     subject.role === "auditor" ||
     subject.role === "dpo"
   );

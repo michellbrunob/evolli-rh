@@ -1089,5 +1089,83 @@ describe("Documentos — metadados V1 (e2e)", () => {
         await prisma.$disconnect();
       }
     });
+
+    it("lê a trilha de auditoria das DUAS empresas, sem depender de filtro", async () => {
+      // Sem filtro do cliente: a consulta abrange as duas empresas.
+      const geral = await get("/v1/audit/events?pageSize=100", master).expect(
+        200,
+      );
+      const empresas = new Set(
+        (geral.body.items as { companyId: string | null }[])
+          .map((e) => e.companyId)
+          .filter((c): c is string => c !== null),
+      );
+      expect(empresas.has(empresaA)).toBe(true);
+      expect(empresas.has(empresaB)).toBe(true);
+    });
+
+    it("filtro por empresa apenas restringe — cada empresa retorna só a sua", async () => {
+      const soA = await get(
+        `/v1/audit/events?companyId=${empresaA}&pageSize=100`,
+        master,
+      ).expect(200);
+      expect(soA.body.items.length).toBeGreaterThan(0);
+      expect(
+        (soA.body.items as { companyId: string | null }[]).every(
+          (e) => e.companyId === empresaA,
+        ),
+      ).toBe(true);
+
+      const soB = await get(
+        `/v1/audit/events?companyId=${empresaB}&pageSize=100`,
+        master,
+      ).expect(200);
+      expect(soB.body.items.length).toBeGreaterThan(0);
+      expect(
+        (soB.body.items as { companyId: string | null }[]).every(
+          (e) => e.companyId === empresaB,
+        ),
+      ).toBe(true);
+    });
+
+    it("a resposta da trilha não expõe dado pessoal nem segredo", async () => {
+      const resp = await get("/v1/audit/events?pageSize=100", master).expect(
+        200,
+      );
+      const serial = JSON.stringify(resp.body);
+      // Sem credencial, token, hash, conteúdo, CPF, e-mail ou nome em claro.
+      expect(serial).not.toMatch(/passwordhash|password|senha|token|argon2/i);
+      expect(serial).not.toMatch(/cpf|\b\d{11}\b/i);
+      expect(serial).not.toMatch(/@[a-z0-9.-]+\.[a-z]{2,}/i); // e-mail
+      for (const evento of resp.body.items as Record<string, unknown>[]) {
+        const chaves = Object.keys(evento).map((k) => k.toLowerCase());
+        for (const proibida of ["email", "nome", "name", "cpf", "senha"]) {
+          expect(chaves).not.toContain(proibida);
+        }
+      }
+    });
+
+    it("RH não consulta a trilha (403), nem global nem por empresa", async () => {
+      await get("/v1/audit/events", rhA).expect(403);
+      await get(`/v1/audit/events?companyId=${empresaB}`, rhA).expect(403);
+      await get(`/v1/audit/events?companyId=${empresaA}`, dpA).expect(403);
+    });
+
+    it("a consulta da trilha pelo Master é auditada (audit_log_read), sem recursão infinita", async () => {
+      await get("/v1/audit/events?pageSize=5", master).expect(200);
+
+      const prisma = new PrismaClient({ datasources: { db: { url: appUrl } } });
+      try {
+        const lidos = await prisma.auditEvent.findMany({
+          where: { action: "audit_log_read", actorRole: "master_tecnico" },
+        });
+        expect(lidos.length).toBeGreaterThan(0);
+        // Uma leitura gera UM evento (não recursão): o evento de leitura tem
+        // recurso técnico e nenhum dado pessoal.
+        expect(lidos.every((e) => e.resource === "audit_event")).toBe(true);
+      } finally {
+        await prisma.$disconnect();
+      }
+    });
   });
 });

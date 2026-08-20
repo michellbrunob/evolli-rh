@@ -6,8 +6,9 @@ import { AuthorizationAction, AuthorizationSubject } from "./permission.types";
  * T030 — Perfil global controlado `master_tecnico`. Matriz efetiva, célula a
  * célula, nas duas fases (capacidade sem `targetCompanyId`; escopo com a
  * empresa resolvida). Cobre o que o perfil PODE (leitura global + administração
- * de contas/papéis comuns + estrutura organizacional) e o que ele NÃO PODE
- * (mutação sensível de negócio, promoção a `master_tecnico`, acesso à trilha).
+ * de contas/papéis comuns + estrutura organizacional + leitura da trilha) e o
+ * que ele NÃO PODE (mutação sensível de negócio, promoção a `master_tecnico`,
+ * escrita na trilha).
  */
 
 const EMPRESA_A = "11111111-1111-4111-8111-111111111111";
@@ -196,11 +197,41 @@ describe("RBAC/ABAC — master_tecnico (T030, perfil global controlado)", () => 
     });
   });
 
-  describe("Limites do perfil", () => {
-    it("NÃO lê a trilha de auditoria (access_log) — fora do escopo desta tarefa", () => {
-      expect(pode(master(), "access_log", "read")).toBe(false);
+  describe("Trilha de auditoria (access_log)", () => {
+    it("LÊ a trilha em escopo global (as duas empresas)", () => {
+      expect(pode(master(), "access_log", "read")).toBe(true);
+      // Independe de empresa-alvo: papel global, consulta ampla.
+      expect(pode(master(), "access_log", "read", EMPRESA_A)).toBe(true);
+      expect(pode(master(), "access_log", "read", EMPRESA_B)).toBe(true);
     });
 
+    it("não escreve na trilha — só leitura", () => {
+      for (const acao of ["create", "alter", "manage"] as const) {
+        expect(pode(master(), "access_log", acao)).toBe(false);
+      }
+    });
+
+    it("nenhum papel comum ganha acesso à trilha (deny-by-default preservado)", () => {
+      for (const papel of [
+        "rh",
+        "dp",
+        "gestor",
+        "financeiro",
+        "colaborador",
+      ] as AccessRole[]) {
+        expect(
+          pode(
+            { userId: "x", role: papel, companyId: EMPRESA_A },
+            "access_log",
+            "read",
+            EMPRESA_A,
+          ),
+        ).toBe(false);
+      }
+    });
+  });
+
+  describe("Limites do perfil", () => {
     it("lê e gerencia apenas a PRÓPRIA conta (own_account)", () => {
       expect(
         evaluatePermission(master(), {
