@@ -609,6 +609,7 @@ describe("Identidade, sessão e autorização (e2e)", () => {
     let rhCsrfToken: string;
     let rhUserId: string;
     let colaboradorCompanyBId: string;
+    let colaboradorCompanyAId: string;
 
     async function login(
       email: string,
@@ -663,6 +664,22 @@ describe("Identidade, sessão e autorização (e2e)", () => {
         .expect(201);
       colaboradorCompanyBId = colaboradorB.body.id;
 
+      // Alvo legítimo na MESMA empresa do RH (empresa-a): o RH pode alterar o
+      // papel deste usuário. Usado para provar que, mesmo com autorização
+      // válida sobre o alvo, o escopo permanece imutável (T029).
+      const colaboradorA = await agent()
+        .post("/v1/users")
+        .set("Cookie", admin.cookie)
+        .set("x-csrf-token", admin.csrfToken)
+        .send({
+          email: "colaborador@empresa-a.test",
+          password: "senha-do-colaborador-a-bem-longa",
+          role: "colaborador",
+          companyId: "empresa-a",
+        })
+        .expect(201);
+      colaboradorCompanyAId = colaboradorA.body.id;
+
       const rh = await login(rhEmail, "senha-do-rh-empresa-a-bem-longa");
       rhCookie = rh.cookie;
       rhCsrfToken = rh.csrfToken;
@@ -702,6 +719,148 @@ describe("Identidade, sessão e autorização (e2e)", () => {
         .set("x-csrf-token", rhCsrfToken)
         .send({ role: "admin_tecnico", companyId: "empresa-a" })
         .expect(403);
+    });
+
+    describe("T029 — escopo de empresa é imutável em PATCH /:id/role", () => {
+      async function escopoDoAlvoA() {
+        const alvo = await prisma.accessUser.findUniqueOrThrow({
+          where: { id: colaboradorCompanyAId },
+        });
+        return {
+          role: alvo.role,
+          companyId: alvo.companyId,
+          unitId: alvo.unitId,
+          teamId: alvo.teamId,
+        };
+      }
+
+      it("recusa transferir usuário da própria empresa para outra empresa; empresa original permanece", async () => {
+        const antes = await escopoDoAlvoA();
+        expect(antes.companyId).toBe("empresa-a");
+
+        // Autorização sobre o alvo é válida (mesma empresa do RH); a recusa vem
+        // da validação de entrada, não do guard — 400, nunca aceitar.
+        await agent()
+          .patch(`/v1/users/${colaboradorCompanyAId}/role`)
+          .set("Cookie", rhCookie)
+          .set("x-csrf-token", rhCsrfToken)
+          .send({ role: "dp", companyId: "empresa-b" })
+          .expect(400);
+
+        expect(await escopoDoAlvoA()).toEqual(antes);
+      });
+
+      it("recusa remover o companyId (companyId nulo no corpo); empresa original permanece", async () => {
+        const antes = await escopoDoAlvoA();
+
+        await agent()
+          .patch(`/v1/users/${colaboradorCompanyAId}/role`)
+          .set("Cookie", rhCookie)
+          .set("x-csrf-token", rhCsrfToken)
+          .send({ role: "dp", companyId: null })
+          .expect(400);
+
+        expect(await escopoDoAlvoA()).toEqual(antes);
+      });
+
+      it("recusa alterar unitId; escopo original permanece", async () => {
+        const antes = await escopoDoAlvoA();
+
+        await agent()
+          .patch(`/v1/users/${colaboradorCompanyAId}/role`)
+          .set("Cookie", rhCookie)
+          .set("x-csrf-token", rhCsrfToken)
+          .send({ role: "dp", unitId: "unidade-x" })
+          .expect(400);
+
+        expect(await escopoDoAlvoA()).toEqual(antes);
+      });
+
+      it("recusa alterar teamId; escopo original permanece", async () => {
+        const antes = await escopoDoAlvoA();
+
+        await agent()
+          .patch(`/v1/users/${colaboradorCompanyAId}/role`)
+          .set("Cookie", rhCookie)
+          .set("x-csrf-token", rhCsrfToken)
+          .send({ role: "dp", teamId: "equipe-x" })
+          .expect(400);
+
+        expect(await escopoDoAlvoA()).toEqual(antes);
+      });
+
+      it("RH da empresa A não altera papel de usuário da empresa B, mesmo sem enviar escopo (403)", async () => {
+        await agent()
+          .patch(`/v1/users/${colaboradorCompanyBId}/role`)
+          .set("Cookie", rhCookie)
+          .set("x-csrf-token", rhCsrfToken)
+          .send({ role: "dp" })
+          .expect(403);
+
+        const alvoB = await prisma.accessUser.findUniqueOrThrow({
+          where: { id: colaboradorCompanyBId },
+        });
+        expect(alvoB.role).toBe("colaborador");
+        expect(alvoB.companyId).toBe("empresa-b");
+      });
+
+      it("altera apenas o papel (sem campos de escopo) e preserva a empresa original", async () => {
+        const response = await agent()
+          .patch(`/v1/users/${colaboradorCompanyAId}/role`)
+          .set("Cookie", rhCookie)
+          .set("x-csrf-token", rhCsrfToken)
+          .send({ role: "dp" })
+          .expect(200);
+
+        // Papel mudou; escopo intacto.
+        expect(response.body.role).toBe("dp");
+        expect(response.body.companyId).toBe("empresa-a");
+        expect(response.body.unitId).toBeNull();
+        expect(response.body.teamId).toBeNull();
+
+        const depois = await escopoDoAlvoA();
+        expect(depois).toEqual({
+          role: "dp",
+          companyId: "empresa-a",
+          unitId: null,
+          teamId: null,
+        });
+      });
+
+      it("nenhuma resposta expõe dado sensível além do necessário", async () => {
+        // Resposta de sucesso: projeção segura, sem segredo de credencial.
+        const ok = await agent()
+          .patch(`/v1/users/${colaboradorCompanyAId}/role`)
+          .set("Cookie", rhCookie)
+          .set("x-csrf-token", rhCsrfToken)
+          .send({ role: "gestor" })
+          .expect(200);
+        expect(Object.keys(ok.body).sort()).toEqual([
+          "companyId",
+          "createdAt",
+          "email",
+          "id",
+          "role",
+          "status",
+          "teamId",
+          "unitId",
+        ]);
+        expect(ok.body).not.toHaveProperty("passwordHash");
+        expect(JSON.stringify(ok.body)).not.toMatch(/senha|password|hash/i);
+
+        // Resposta de erro de validação: envelope genérico, sem vazar
+        // credencial, stack, SQL nem nome de tabela.
+        const erro = await agent()
+          .patch(`/v1/users/${colaboradorCompanyAId}/role`)
+          .set("Cookie", rhCookie)
+          .set("x-csrf-token", rhCsrfToken)
+          .send({ role: "dp", companyId: "empresa-b" })
+          .expect(400);
+        const serializado = JSON.stringify(erro.body);
+        expect(serializado).not.toMatch(/passwordHash|senha|argon2/i);
+        expect(serializado).not.toMatch(/select |from |where |prisma/i);
+        expect(serializado).not.toMatch(/\bat .+\.ts:\d+/);
+      });
     });
 
     it("RH não pode criar usuário admin_tecnico", async () => {
