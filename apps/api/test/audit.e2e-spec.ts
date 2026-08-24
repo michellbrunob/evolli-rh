@@ -431,7 +431,10 @@ describe("Auditoria formal e rastreabilidade (e2e)", () => {
         email: "correlacao@empresa-auditoria.test",
         password: "senha-de-correlacao-bem-longa",
       };
-      await createUserWithRole(
+      // `auditor` não é provisionável por rota (CG-DPO-03) — semeado direto; o
+      // teste só precisa de um login válido para checar a correlação de
+      // request_id.
+      await seedUserWithRole(
         "auditor",
         auditorCredentials.email,
         auditorCredentials.password,
