@@ -1,0 +1,31 @@
+/**
+ * FormActions (UI-F03) — só tokens; sem sombra, sem gradiente.
+ */
+
+.evolli-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  align-items: center;
+}
+
+.evolli-form-actions--end {
+  justify-content: flex-end;
+}
+
+.evolli-form-actions--start {
+  justify-content: flex-start;
+}
+
+/* No mobile: empilha em largura total; a ação primária (último filho) fica no
+   topo via column-reverse. Os botões mantêm o alvo de 44px do próprio Button. */
+@media (max-width: 640px) {
+  .evolli-form-actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .evolli-form-actions .evolli-button {
+    width: 100%;
+  }
+}
