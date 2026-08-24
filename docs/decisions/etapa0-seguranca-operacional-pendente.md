@@ -6,6 +6,12 @@
   e o que cada pendência bloqueia. Não decide, não infere, não escolhe
   fornecedor e não declara conformidade.
 - Data: 2026-08-18
+- **Formulário de aprovação (T033):** as pendências deste registro
+  (identificadores `DS-…`) foram convertidas em um **pacote de decisão** objetivo
+  para Produto/TI, RH e Jurídico —
+  [pacote de decisão de segurança operacional](pacote-decisao-seguranca-operacional.md).
+  Os identificadores são **reusados**; aprovar um item lá é aprovar a pendência
+  de mesmo ID aqui. Nenhuma decisão foi tomada por essa conversão.
 - Fase/tarefa: Fase 0 — Fundação e gates transversais; **T004** (`.specify/tasks.md`).
 - Relacionado:
   [ADR 0002](../adr/0002-papeis-postgres-e-migrations.md) (papéis de banco,
