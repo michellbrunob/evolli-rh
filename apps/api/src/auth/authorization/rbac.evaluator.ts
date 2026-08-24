@@ -124,14 +124,22 @@ function evaluateUserRole(
   }
 
   // Nenhuma rota comum cria, atribui, remove ou promove alguém a um papel
-  // PRIVILEGIADO — nem `master_tecnico` (T030; Constituição, Princípio II) nem
-  // `admin_tecnico` (CG-RBAC-01, ADR 0012). O provisionamento do Master exige
-  // runbook próprio, sujeito a MFA; o `admin_tecnico` converge para
-  // bootstrap/histórico e deixa de ser atribuível por rota. O bloqueio vale
-  // para TODOS os atores — ninguém se autoperpetua nem cunha o outro por aqui.
+  // NÃO PROVISIONÁVEL:
+  // - `master_tecnico` (T030; Constituição, Princípio II) e `admin_tecnico`
+  //   (CG-RBAC-01, ADR 0012): perfis privilegiados; o Master exige runbook
+  //   próprio (MFA) e o admin converge para bootstrap/histórico.
+  // - `dpo` (CG-DPO-01, ADR 0012): papel legado formalmente DEPRECIADO e
+  //   proibido de provisionamento — RH+Jurídico são a governança de
+  //   privacidade e não há DPO provisionado. O valor permanece no enum, no
+  //   schema e no histórico (não é removido); só a atribuição por rota é
+  //   recusada. `auditor` segue pendente (DP-7) e não é habilitado por esta
+  //   mudança.
+  // O bloqueio vale para TODOS os atores — ninguém se autoperpetua nem cunha
+  // um papel não provisionável por aqui.
   if (
     target.targetNewRole === "master_tecnico" ||
-    target.targetNewRole === "admin_tecnico"
+    target.targetNewRole === "admin_tecnico" ||
+    target.targetNewRole === "dpo"
   ) {
     return false;
   }
