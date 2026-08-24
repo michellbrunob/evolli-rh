@@ -398,13 +398,14 @@ describe("Jornada e Ponto Rastreavel (e2e)", () => {
       "colaborador",
       empresaA,
     );
-    auditorA = await criarUsuario(
+    // `auditor` (CG-DPO-03) e `dpo` (CG-DPO-01) não são provisionáveis por rota
+    // — semeados direto só para exercitar a negação de leitura de ponto
+    // (capacidade do domínio inalterada).
+    auditorA = await seedUsuarioComPapel(
       "auditor.a.ponto@example.test",
       "auditor",
       empresaA,
     );
-    // `dpo` não é provisionável por rota (CG-DPO-01) — semeado direto só para
-    // exercitar a negação de leitura de ponto (capacidade do domínio inalterada).
     dpoA = await seedUsuarioComPapel(
       "dpo.a.ponto@example.test",
       "dpo",

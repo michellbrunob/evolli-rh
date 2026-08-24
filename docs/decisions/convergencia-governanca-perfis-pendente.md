@@ -74,10 +74,17 @@ em produção exige ADR/critério próprio antes da implementação.
   expand/contract**, após verificar que **nenhum** `audit_event.actor_role`
   referencia `dpo` (hoje não há — nunca provisionado). Nunca destrutivo.
   Responsável: Desenvolvimento + Segurança.
-- **CG-DPO-03** — `auditor`: escopo segue **pendente (DP-7)**; hoje ainda é
-  provisionável por rota (não faz parte da CG-DPO-01) — bloqueá-lo por rota,
-  com o mesmo mecanismo, é tarefa própria; não provisionar; mesmo tratamento
-  não destrutivo se um dia for retirado.
+- **CG-DPO-03 — IMPLEMENTADA** (proibição de provisionamento do `auditor`). O
+  avaliador (`evaluateUserRole`) recusa qualquer criação/alteração de usuário
+  cujo papel-alvo seja `auditor`, por **qualquer ator e qualquer rota** — ao
+  lado de `dpo`/`admin_tecnico`/`master_tecnico`. A recusa é um erro seguro
+  genérico (403, "Acesso negado."), sem vazamento. O valor `auditor` permanece
+  **no enum, no schema, nas migrations e no histórico** — nada
+  removido/renomeado. O **escopo** técnico de `auditor` continua **pendente
+  (DP-7)**: esta task só fecha o provisionamento por rota, não decide seu
+  escopo. A capacidade latente de leitura da trilha (`evaluateAccessLog`)
+  permanece inalterada para registros históricos. Testes unitários e E2E provam
+  o bloqueio; nenhum usuário real é criado.
 
 ## 4. Renomeação futura dos campos de aprovação documental
 

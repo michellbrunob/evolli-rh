@@ -203,26 +203,29 @@ describe("evaluatePermission (RBAC/ABAC)", () => {
       ).toBe(false);
     });
 
-    it("ninguém atribui dpo por rota — papel legado depreciado (CG-DPO-01)", () => {
-      // `dpo` permanece no enum/histórico, mas é proibido de provisionamento.
-      for (const role of ["master_tecnico", "rh"] as const) {
-        expect(
-          evaluatePermission(subject({ role, companyId: "empresa-a" }), {
-            resource: "user_role",
-            action: "create",
-            targetCompanyId: "empresa-a",
-            targetNewRole: "dpo",
-          }),
-        ).toBe(false);
-        expect(
-          evaluatePermission(subject({ role, companyId: "empresa-a" }), {
-            resource: "user_role",
-            action: "alter",
-            targetUserId: "u2",
-            targetCompanyId: "empresa-a",
-            targetNewRole: "dpo",
-          }),
-        ).toBe(false);
+    it("ninguém atribui dpo nem auditor por rota — papéis legados não provisionáveis (CG-DPO-01/03)", () => {
+      // `dpo` (depreciado) e `auditor` (pendente DP-7) permanecem no
+      // enum/histórico, mas são proibidos de provisionamento por rota.
+      for (const alvo of ["dpo", "auditor"] as const) {
+        for (const role of ["master_tecnico", "rh"] as const) {
+          expect(
+            evaluatePermission(subject({ role, companyId: "empresa-a" }), {
+              resource: "user_role",
+              action: "create",
+              targetCompanyId: "empresa-a",
+              targetNewRole: alvo,
+            }),
+          ).toBe(false);
+          expect(
+            evaluatePermission(subject({ role, companyId: "empresa-a" }), {
+              resource: "user_role",
+              action: "alter",
+              targetUserId: "u2",
+              targetCompanyId: "empresa-a",
+              targetNewRole: alvo,
+            }),
+          ).toBe(false);
+        }
       }
     });
 

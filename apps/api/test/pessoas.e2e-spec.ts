@@ -182,6 +182,28 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
     return login(email, SENHA_PADRAO);
   }
 
+  // Semeia um usuário de papel NÃO provisionável por rota (`auditor` — CG-DPO-03;
+  // `dpo` — CG-DPO-01) direto no banco, só para exercitar a negação de acesso
+  // ao domínio; a rota comum recusa esses papéis.
+  async function seedUsuarioComPapel(
+    email: string,
+    role: "auditor" | "dpo",
+    companyId: string,
+  ): Promise<Credencial> {
+    const { PasswordHashService } =
+      await import("../src/auth/password/password-hash.service");
+    const prisma = new PrismaClient({ datasources: { db: { url: appUrl } } });
+    try {
+      const passwordHash = await new PasswordHashService().hash(SENHA_PADRAO);
+      await prisma.accessUser.create({
+        data: { email, passwordHash, role, companyId, status: "active" },
+      });
+    } finally {
+      await prisma.$disconnect();
+    }
+    return login(email, SENHA_PADRAO);
+  }
+
   async function criarUsuario(
     email: string,
     role: string,
@@ -381,7 +403,9 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
       "colaborador",
       empresaA,
     );
-    auditorA = await criarUsuario(
+    // `auditor` não é provisionável por rota (CG-DPO-03) — semeado direto só
+    // para exercitar a negação de acesso a Pessoas.
+    auditorA = await seedUsuarioComPapel(
       "auditor.pa@example.test",
       "auditor",
       empresaA,

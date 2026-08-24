@@ -431,7 +431,10 @@ describe("Auditoria formal e rastreabilidade (e2e)", () => {
         email: "correlacao@empresa-auditoria.test",
         password: "senha-de-correlacao-bem-longa",
       };
-      await createUserWithRole(
+      // `auditor` não é provisionável por rota (CG-DPO-03) — semeado direto; o
+      // teste só precisa de um login válido para checar a correlação de
+      // request_id.
+      await seedUserWithRole(
         "auditor",
         auditorCredentials.email,
         auditorCredentials.password,
@@ -505,12 +508,12 @@ describe("Auditoria formal e rastreabilidade (e2e)", () => {
 
     it("RBAC positivo: auditor e dpo leem a trilha (200) — capacidade inalterada", async () => {
       // `auditor` ainda é provisionável por rota (não faz parte desta task);
-      // `dpo` é semeado direto, pois seu provisionamento por rota foi bloqueado
-      // (CG-DPO-01). A capacidade de leitura da trilha (evaluateAccessLog)
-      // permanece a mesma para ambos.
+      // `auditor` (CG-DPO-03) e `dpo` (CG-DPO-01) são semeados direto, pois seu
+      // provisionamento por rota foi bloqueado. A capacidade de leitura da
+      // trilha (evaluateAccessLog) permanece a mesma para ambos.
       const auditorEmail = "auditor-auditoria@empresa-auditoria.test";
       const auditorPassword = "senha-bem-longa-para-auditor-auditoria";
-      await createUserWithRole("auditor", auditorEmail, auditorPassword);
+      await seedUserWithRole("auditor", auditorEmail, auditorPassword);
       const auditorSession = await login(auditorEmail, auditorPassword);
       await agent()
         .get("/v1/audit/events")
@@ -527,43 +530,47 @@ describe("Auditoria formal e rastreabilidade (e2e)", () => {
         .expect(200);
     });
 
-    it("dpo NÃO pode ser provisionado por rota — criação e alteração recusadas (CG-DPO-01)", async () => {
-      // Criação com papel dpo: negada com erro seguro genérico, sem vazamento.
-      const criacao = await agent()
-        .post("/v1/users")
-        .set("Cookie", masterCookie)
-        .set("x-csrf-token", masterCsrfToken)
-        .send({
-          email: "tentativa-dpo@empresa-auditoria.test",
-          password: "senha-bem-longa-que-nunca-sera-usada",
-          role: "dpo",
-          companyId: "empresa-auditoria",
-        })
-        .expect(403);
-      expect(criacao.body.message).toBe("Acesso negado.");
-      expect(JSON.stringify(criacao.body)).not.toMatch(
-        /passwordhash|senha|token/i,
-      );
+    it.each(["dpo", "auditor"] as const)(
+      "%s NÃO pode ser provisionado por rota — criação e alteração recusadas (CG-DPO-01/03)",
+      async (papelBloqueado) => {
+        // Criação com papel bloqueado: negada com erro seguro genérico, sem
+        // vazamento de senha/token/hash.
+        const criacao = await agent()
+          .post("/v1/users")
+          .set("Cookie", masterCookie)
+          .set("x-csrf-token", masterCsrfToken)
+          .send({
+            email: `tentativa-${papelBloqueado}@empresa-auditoria.test`,
+            password: "senha-bem-longa-que-nunca-sera-usada",
+            role: papelBloqueado,
+            companyId: "empresa-auditoria",
+          })
+          .expect(403);
+        expect(criacao.body.message).toBe("Acesso negado.");
+        expect(JSON.stringify(criacao.body)).not.toMatch(
+          /passwordhash|senha|token|argon2/i,
+        );
 
-      // Alteração de um usuário existente para dpo: também recusada.
-      const alvo = await agent()
-        .post("/v1/users")
-        .set("Cookie", masterCookie)
-        .set("x-csrf-token", masterCsrfToken)
-        .send({
-          email: "alvo-alteracao-dpo@empresa-auditoria.test",
-          password: "senha-bem-longa-do-alvo-de-teste",
-          role: "colaborador",
-          companyId: "empresa-auditoria",
-        })
-        .expect(201);
-      await agent()
-        .patch(`/v1/users/${alvo.body.id}/role`)
-        .set("Cookie", masterCookie)
-        .set("x-csrf-token", masterCsrfToken)
-        .send({ role: "dpo" })
-        .expect(403);
-    });
+        // Alteração de um usuário existente para o papel bloqueado: recusada.
+        const alvo = await agent()
+          .post("/v1/users")
+          .set("Cookie", masterCookie)
+          .set("x-csrf-token", masterCsrfToken)
+          .send({
+            email: `alvo-alteracao-${papelBloqueado}@empresa-auditoria.test`,
+            password: "senha-bem-longa-do-alvo-de-teste",
+            role: "colaborador",
+            companyId: "empresa-auditoria",
+          })
+          .expect(201);
+        await agent()
+          .patch(`/v1/users/${alvo.body.id}/role`)
+          .set("Cookie", masterCookie)
+          .set("x-csrf-token", masterCsrfToken)
+          .send({ role: papelBloqueado })
+          .expect(403);
+      },
+    );
 
     it("RBAC positivo: master_tecnico lê a trilha; admin_tecnico NÃO (CG-RBAC-01)", async () => {
       // master_tecnico é o único acesso global standing e lê a trilha (T030);

@@ -128,18 +128,20 @@ function evaluateUserRole(
   // - `master_tecnico` (T030; Constituição, Princípio II) e `admin_tecnico`
   //   (CG-RBAC-01, ADR 0012): perfis privilegiados; o Master exige runbook
   //   próprio (MFA) e o admin converge para bootstrap/histórico.
-  // - `dpo` (CG-DPO-01, ADR 0012): papel legado formalmente DEPRECIADO e
-  //   proibido de provisionamento — RH+Jurídico são a governança de
-  //   privacidade e não há DPO provisionado. O valor permanece no enum, no
-  //   schema e no histórico (não é removido); só a atribuição por rota é
-  //   recusada. `auditor` segue pendente (DP-7) e não é habilitado por esta
-  //   mudança.
+  // - `dpo` (CG-DPO-01, ADR 0012) e `auditor` (CG-DPO-03): papéis legados NÃO
+  //   provisionados nesta fase. `dpo` está formalmente depreciado; `auditor`
+  //   tem escopo pendente (DP-7, ADR 0005 Emenda 1 item 3; ADR 0010 decisão 4)
+  //   e não deve ser provisionado. Ambos os valores permanecem no enum, no
+  //   schema, nas migrations e no histórico (não são removidos); só a
+  //   atribuição por rota é recusada. A capacidade latente de leitura da trilha
+  //   (`evaluateAccessLog`) permanece inalterada para registros históricos.
   // O bloqueio vale para TODOS os atores — ninguém se autoperpetua nem cunha
   // um papel não provisionável por aqui.
   if (
     target.targetNewRole === "master_tecnico" ||
     target.targetNewRole === "admin_tecnico" ||
-    target.targetNewRole === "dpo"
+    target.targetNewRole === "dpo" ||
+    target.targetNewRole === "auditor"
   ) {
     return false;
   }
