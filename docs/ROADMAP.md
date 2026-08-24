@@ -17,3 +17,21 @@ Cada etapa exige especificação aprovada, testes automatizados, revisão de seg
 | 8     | People Analytics executivo                                                                                   |
 | 9     | Clima anônimo e planos de ação                                                                               |
 | 10    | Portal, integrações e IA governada                                                                           |
+
+> **Nota de convergência (T032).** A Etapa 0 lista a Fundação de forma
+> agregada, mas nem tudo que ela cita está **entregue** — parte são **gates
+> pendentes**, que bloqueiam qualquer uso com dado real:
+>
+> - **Entregue e integrado:** monorepo, CI, PostgreSQL/Prisma, identidade e
+>   sessão, RBAC/ABAC, auditoria formal append-only, documentos V1 de metadados
+>   (sem conteúdo).
+> - **Pendente (bloqueia dado real):** **MFA**; decisões operacionais da
+>   **T004** (cofre de segredos, **backup/restauração testada**); **runbook de
+>   provisionamento do primeiro `master_tecnico`**; definições de **retenção,
+>   base legal e RIPD/DPIA** por módulo (RH + Jurídico). Ver
+>   [decisões de segurança operacional (T004)](decisions/etapa0-seguranca-operacional-pendente.md)
+>   e [convergência de governança e perfis](decisions/convergencia-governanca-perfis-pendente.md).
+>
+> As etapas 4–10 estão **planejadas**, sem especificação aprovada; o conteúdo de
+> cada uma é decisão de Produto/RH. "Reserva Fiscal" é o **nome da empresa**, não
+> uma etapa/módulo (ver [glossário](decisions/glossario-reserva-fiscal.md)).

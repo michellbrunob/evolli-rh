@@ -1,5 +1,13 @@
 # Etapa 1 — Fatia 2: Colaboradores e vida funcional
 
+> **Nota de convergência (T032; [ADR 0012](../adr/0012-convergencia-governanca-privacidade-e-perfis-globais.md), CG-RBAC-01).**
+> Onde este documento descreve o `admin_tecnico` com **acesso global** ao
+> ambiente interno (exceção da Emenda 1 da ADR 0005), leia-se como registro
+> **histórico**: o `admin_tecnico` **convergiu para bootstrap/histórico** e não é
+> mais perfil global operacional. O **único** acesso global permanente é o
+> **`master_tecnico`** (ADR 0012, T030). Os textos abaixo são preservados como
+> história — não reescritos.
+
 Status: **Baseline V1 aprovada (2026-08-07)** — decisão de produto
 registrada em
 [docs/decisions/etapa1-fatia2-colaboradores-baseline-v1.md](../decisions/etapa1-fatia2-colaboradores-baseline-v1.md)

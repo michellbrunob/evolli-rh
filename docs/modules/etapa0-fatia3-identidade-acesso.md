@@ -1,5 +1,14 @@
 # Etapa 0 — Fatia 3: Identidade, sessões seguras e autorização
 
+> **Nota de convergência (T032; [ADR 0012](../adr/0012-convergencia-governanca-privacidade-e-perfis-globais.md), CG-RBAC-01).**
+> Onde este documento associa `company_id` nulo ao `admin_tecnico` como **escopo
+> de instância inteira** (acesso global), leia-se como registro **histórico**: o
+> `admin_tecnico` **convergiu para bootstrap/histórico** e não é mais perfil
+> global operacional. O `company_id` nulo permanece no modelo (bootstrap e
+> histórico de auditoria), mas o **único** acesso global permanente é o
+> **`master_tecnico`** (ADR 0012, T030). Os textos abaixo são preservados como
+> história — não reescritos.
+
 Status: **implementada — entrega executiva, MFA adiado** (branch
 `feature/etapa0-identidade-acesso`)
 

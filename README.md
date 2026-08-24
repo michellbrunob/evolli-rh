@@ -5,24 +5,56 @@ Ecossistema corporativo de RH e Departamento Pessoal, modular e multiempresa.
 ## Princípios
 
 - Segurança, privacidade e auditoria desde o desenho.
-- LGPD por padrão, com validação formal do DPO/jurídico onde aplicável.
+- LGPD por padrão. A governança de privacidade (base legal, retenção, RIPD) é de
+  **RH + Jurídico** (ADR 0012); não há papel DPO provisionado.
 - Evolução por módulos: nenhum módulo avança sem testes, revisão de segurança e homologação.
-- Código TypeScript, APIs documentadas, PostgreSQL e integrações auditáveis.
+- Código TypeScript estrito, APIs documentadas, PostgreSQL e integrações auditáveis.
+
+## Stack
+
+- **Monorepo:** pnpm 10 + Turborepo (`apps/*`, `packages/*`).
+- **API:** NestJS 10 sobre o adaptador Express (`@nestjs/platform-express`), REST
+  versionada em `/v1`, contratos OpenAPI; PostgreSQL 16 via Prisma 5.
+- **Web:** React 18 + Vite 5 + TypeScript estrito.
+- **Segurança:** Argon2id, sessão opaca em PostgreSQL, CSRF synchronizer, Helmet.
+- **CI:** Quality Gates, E2E (PostgreSQL real via Testcontainers) e Migration Smoke
+  (banco vazio, papéis segregados, verificação de drift).
 
 ## Estrutura
 
-- `apps/web`: portal administrativo e, futuramente, autoatendimento.
-- `apps/api`: API corporativa e módulos de domínio. Etapa 0, fatia 1 (fundação)
-  implementada — ver [docs/modules/etapa0-fundacao-api.md](docs/modules/etapa0-fundacao-api.md).
-- `packages/domain`: regras de negócio puras e testes de cálculo.
-- `packages/database`: schema, migrations e acesso ao PostgreSQL.
-- `packages/contracts`: contratos, DTOs e especificação OpenAPI.
-- `packages/ui`: design system acessível.
-- `docs`: decisões, requisitos, compliance e especificações de módulos.
+- `apps/web`: portal administrativo e, futuramente, autoatendimento (shell V1 integrado).
+- `apps/api`: API corporativa e módulos de domínio integrados (ver "Estado atual").
+  O **schema Prisma e as migrations vivem em `apps/api/prisma/`** — é a
+  localização atual do banco.
+- `packages/*` (`domain`, `database`, `contracts`, `ui`): **stubs** reservados
+  para extração futura; **não** contêm hoje o schema, as migrations nem regras de
+  negócio — estes vivem em `apps/api`.
+- `docs`: ADRs, decisões, requisitos, compliance e especificações de módulos.
 
-## Próxima etapa
+## Estado atual
 
-Seguir a fundação: PostgreSQL, autenticação, autorização, auditoria e CI completo.
+**Integrados** (em `main`, com testes e CI verdes):
+
+- Fundação: monorepo, CI, PostgreSQL/Prisma, identidade e sessão, RBAC/ABAC,
+  auditoria formal append-only.
+- Core organizacional (empresas, unidades, departamentos, áreas, equipes, cargos,
+  centros de custo).
+- Pessoas e vida funcional (colaboradores, vínculos, movimentações, alocações).
+- Jornada e Ponto — V1 estrutural (registro manual rastreável; sem importação TXT
+  nem fechamento).
+- Documentos — V1 de metadados (sem conteúdo/upload; upload desabilitado por
+  construção).
+- Governança de perfis: `master_tecnico` como único acesso global permanente;
+  `admin_tecnico` convergido para bootstrap/histórico; `dpo`/`auditor` legados
+  preservados no enum, porém **não provisionáveis** (ADR 0012; CG-RBAC-01/CG-DPO).
+
+**Bloqueado até decisão/entrega** (nenhum dado real antes disso):
+
+- **MFA**, **cofre de segredos**, **backup/restauração testada**, decisões
+  operacionais da **T004** e o **runbook de provisionamento do primeiro
+  `master_tecnico`**.
+- Retenção, base legal e RIPD/DPIA por módulo (RH + Jurídico).
+
 Consulte [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Pré-requisitos

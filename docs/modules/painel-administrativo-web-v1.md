@@ -19,6 +19,29 @@
   [ADR 0007](../adr/0007-colaboradores-e-vida-funcional-baseline-v1.md),
   [ADR 0008](../adr/0008-jornada-ponto-rastreavel-baseline-v1.md).
 
+## Referência visual (T032)
+
+O arquivo raiz [`DESIGN-apple.md`](../../DESIGN-apple.md) é a **fonte oficial de
+tokens e princípios visuais** do painel — a referência de design para as
+próximas interfaces do Evolli RH.
+
+**Adotar** dele: o **azul de ação `#0066cc`**, superfícies claras/neutras,
+tipografia **system/SF Pro com fallback seguro** (`system-ui, -apple-system,
+sans-serif`), **espaçamento generoso**, **botões pill**, **bordas sutis** e
+**responsividade**.
+
+**Adaptar** para um sistema **interno de RH**: dados, tabelas, formulários,
+alertas, **estados de erro** e **acessibilidade** prevalecem sobre estética de
+marketing. A referência orienta o vocabulário visual, não o layout de um site de
+produto.
+
+**Não copiar** marcas, imagens, textos ou componentes proprietários da Apple —
+`DESIGN-apple.md` é uma extração de tokens/princípios, não um kit de ativos.
+
+**Obrigatórios (não negociáveis):** **contraste** adequado, **foco visível**,
+**navegação por teclado**, compatibilidade com **leitores de tela** e **alvos de
+toque mínimos**. Acessibilidade tem precedência sobre qualquer escolha estética.
+
 ## 0. Estado verificado e observações registradas
 
 Esta seção separa **o que foi verificado no repositório** do que é
@@ -191,6 +214,14 @@ permanece pendente para a fase Implementar do painel — o comportamento correto
 apenas em decisão, sem interface que o comunique.
 
 ### O5 — `admin_tecnico` enxerga muito pouco do painel, e isso é intencional
+
+> **Nota de convergência (T032; ADR 0012, CG-RBAC-01).** O parágrafo abaixo
+> descreve o estado **anterior** à convergência de perfis. Hoje, em
+> `rbac.evaluator.ts`, o **`master_tecnico` é o único perfil de acesso global**
+> permanente; o `admin_tecnico` **convergiu para bootstrap/histórico** e passou a
+> ser **negado também na estrutura organizacional** (não só em Pessoas e Ponto).
+> A afirmação "acesso amplo à estrutura organizacional" abaixo **não vale mais**
+> para `admin_tecnico` — o texto é preservado como registro histórico.
 
 Verificado em `rbac.evaluator.ts`: `admin_tecnico` tem acesso amplo à
 **estrutura organizacional** (exceção da Emenda 1 da ADR 0005), mas é
