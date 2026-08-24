@@ -77,30 +77,34 @@
   outline: none; /* alvo do skip-link; foco não desenha contorno na região */
 }
 
-/* Estado vazio claro — sem citar módulos/áreas ainda não liberados. */
-.app-shell__empty {
-  max-width: 44rem;
-  margin: 0 auto;
-  padding: clamp(var(--space-xl), 6vw, var(--space-3xl)) var(--space-lg);
-  text-align: center;
-  background: var(--surface-canvas);
-  border: 1px solid var(--divider-soft);
-  border-radius: var(--radius-lg);
+/* Pilha vertical de seções da área principal. */
+.app-shell__stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xl);
 }
 
-.app-shell__empty-title {
-  margin: 0 0 var(--space-sm);
-  font-size: var(--text-display);
+/* Agrupamento neutro de demonstração (rótulo + amostras). */
+.demo-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.demo-group__title {
+  margin: 0;
+  font-size: var(--text-lead);
   line-height: var(--leading-tight);
   letter-spacing: var(--tracking-tight);
   font-weight: var(--weight-strong);
   color: var(--color-ink);
 }
 
-.app-shell__empty-text {
-  margin: 0 auto;
-  max-width: 34rem;
-  color: var(--color-ink-muted);
+.demo-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  align-items: center;
 }
 
 /* Rodapé técnico discreto — sem dado real, empresa, usuário ou métrica. */
@@ -126,66 +130,13 @@
   color: var(--color-ink-muted);
 }
 
-/* -------------------------------------------------------------------------
- * Componentes reutilizáveis da fundação (para telas futuras)
- * ------------------------------------------------------------------------- */
-
-/* Botão pill — cor de ação única; SEM sombra. */
-.ui-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: var(--touch-target);
-  padding: 0 var(--space-lg);
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-pill);
-  background: var(--surface-canvas);
-  color: var(--color-action);
-  font: inherit;
-  font-weight: var(--weight-strong);
-  letter-spacing: 0;
-  cursor: pointer;
-}
-
-.ui-button--primary {
-  background: var(--color-action);
-  color: var(--color-on-action);
-  border-color: transparent;
-}
-
-.ui-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* Cartão/superfície reutilizável — borda sutil, sem sombra. */
-.ui-surface {
-  background: var(--surface-canvas);
-  border: 1px solid var(--divider-soft);
-  border-radius: var(--radius-lg);
-  padding: var(--space-lg);
-}
-
-/* Micro-interação (scale no press) SÓ quando o usuário não pediu menos
-   movimento. Transições idem. */
+/* Transição do skip-link SÓ quando o usuário não pediu menos movimento.
+   Os componentes reutilizáveis (Button, Surface, EmptyState, StatusBadge,
+   PageHeader) vivem agora em `src/components/` (UI-F02), cada um com seu CSS. */
 @media (prefers-reduced-motion: no-preference) {
   .app-shell__skip-link {
     transition: transform 120ms ease;
   }
-
-  .ui-button {
-    transition:
-      background-color 120ms ease,
-      transform 80ms ease;
-  }
-
-  .ui-button:not(:disabled):active {
-    transform: scale(0.97);
-  }
-}
-
-.ui-button--primary:not(:disabled):hover {
-  background: var(--color-action-hover);
 }
 
 /* Ajustes por breakpoint (referência: 834px / 640px). */
@@ -196,10 +147,6 @@
 }
 
 @media (max-width: 640px) {
-  .app-shell__empty {
-    text-align: left;
-  }
-
   .app-shell__footer-inner {
     flex-direction: column;
   }

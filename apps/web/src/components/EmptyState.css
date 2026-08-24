@@ -1,0 +1,54 @@
+/**
+ * EmptyState (UI-F02) — só tokens; borda sutil, sem sombra, sem gradiente.
+ */
+
+.evolli-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+  text-align: center;
+  padding: var(--space-2xl) var(--space-lg);
+  background: var(--surface-canvas);
+  border: 1px solid var(--divider-soft);
+  border-radius: var(--radius-lg);
+}
+
+.evolli-empty-state__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--touch-target);
+  height: var(--touch-target);
+  border-radius: var(--radius-pill);
+  background: var(--surface-neutral);
+  color: var(--color-ink-subtle);
+  font-size: var(--text-lead);
+  line-height: 1;
+}
+
+.evolli-empty-state__title {
+  margin: 0;
+  font-size: var(--text-lead);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  font-weight: var(--weight-strong);
+  color: var(--color-ink);
+}
+
+.evolli-empty-state__text {
+  margin: 0;
+  max-width: 46ch;
+  color: var(--color-ink-muted);
+}
+
+.evolli-empty-state__action {
+  margin-top: var(--space-sm);
+}
+
+@media (max-width: 640px) {
+  .evolli-empty-state {
+    align-items: flex-start;
+    text-align: left;
+  }
+}

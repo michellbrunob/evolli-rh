@@ -57,11 +57,41 @@ domínio, autenticação ou dados:
   vazio claro (sem citar áreas ainda não liberadas), rodapé técnico discreto
   (sem dado real, empresa, usuário ou métrica), link "pular para o conteúdo" e
   respeito a `prefers-reduced-motion`.
-- **Componentes reutilizáveis** de estilo (`.ui-button` pill, `.ui-surface`)
-  para telas futuras — sem render funcional nesta fase.
+- **Componentes reutilizáveis** de apresentação, entregues na UI-F02 (ver
+  subseção abaixo). Os placeholders de estilo `.ui-button`/`.ui-surface` da
+  UI-F01 foram substituídos por componentes React tipados.
 
 O cliente CSRF (`apps/web/src/api/csrfClient.ts`) permanece **isolado** e não é
 importado pelo shell: não há login nem sessão nesta fundação.
+
+### Biblioteca de componentes (UI-F02)
+
+Biblioteca mínima de componentes de apresentação em `apps/web/src/components/`,
+tipados e acessíveis, **sem** dado de domínio, ligação com API ou regra de
+negócio — a base para as futuras telas administrativas. Cada componente consome
+apenas os tokens de `tokens.css` (nenhum hexadecimal avulso fora dele) e não usa
+sombra nem gradiente decorativo.
+
+- **`Button`** — variantes `primary`/`secondary`/`subtle`, estados
+  `disabled`/foco visível, alvo de toque mínimo de 44px; encaminha os atributos
+  nativos de `<button>` e usa `type="button"` por padrão.
+- **`PageHeader`** — título (nível de cabeçalho configurável), descrição
+  opcional e área de ações. É um `<div>` (não um `<header>`): como pode ser
+  colocado dentro de `<main>`, evitar o landmark `banner` garante um único
+  banner por página (a barra do shell).
+- **`Surface`** — superfície/cartão neutro com borda sutil, elemento
+  (`div`/`section`/`article`) e espaçamento configuráveis; sem sombra.
+- **`EmptyState`** — título, descrição e ação opcionais, com ícone puramente
+  decorativo (`aria-hidden`).
+- **`StatusBadge`** — variante neutra + semânticas (sucesso, atenção, erro,
+  informação). A **cor nunca é o único sinal**: cada estado combina rótulo
+  textual visível, glifo de forma distinta (decorativo, `aria-hidden`) e cor,
+  com tinta escura sobre superfície clara em contraste AA.
+
+Acessibilidade verificada em navegador real: um único landmark `banner`, um
+único `h1`, contrastes AA (badges 5.37–11.6:1; botões 5.11–5.57:1), alvos de
+44px, ausência de sombra em botões/superfícies/badges e sem rolagem horizontal
+no mobile. O cliente CSRF continua isolado e não importado.
 
 ## 0. Estado verificado e observações registradas
 

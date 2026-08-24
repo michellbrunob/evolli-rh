@@ -2,11 +2,15 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { App } from "./App";
 
-describe("App — fundação visual do shell (UI-F01)", () => {
-  it("usa marcos semânticos (banner, main, contentinfo)", () => {
+describe("App — shell + vitrine de componentes (UI-F01/UI-F02)", () => {
+  it("usa marcos semânticos e um único banner (a barra do shell)", () => {
     render(<App />);
 
-    expect(screen.getByRole("banner")).toBeInTheDocument();
+    // Exatamente um banner: a barra superior do shell. O PageHeader é um <div>
+    // (não landmark), então não há segundo banner competindo na página.
+    const banner = screen.getByRole("banner");
+    expect(banner).toHaveClass("app-shell__topbar");
+
     expect(screen.getByRole("main")).toBeInTheDocument();
     expect(screen.getByRole("contentinfo")).toBeInTheDocument();
   });
@@ -28,8 +32,7 @@ describe("App — fundação visual do shell (UI-F01)", () => {
     render(<App />);
 
     const skip = screen.getByRole("link", { name: /pular para o conteúdo/i });
-    const href = skip.getAttribute("href");
-    expect(href).toBe("#conteudo-principal");
+    expect(skip.getAttribute("href")).toBe("#conteudo-principal");
 
     const alvo = document.getElementById("conteudo-principal");
     expect(alvo).not.toBeNull();
@@ -45,13 +48,23 @@ describe("App — fundação visual do shell (UI-F01)", () => {
     expect(document.getElementById(rotuloId!)?.tagName).toBe("H1");
   });
 
-  it("mostra um estado vazio claro, sem citar módulos/áreas", () => {
+  it("demonstra os componentes com rótulos neutros", () => {
     render(<App />);
 
-    expect(screen.getByText("Fundação visual pronta")).toBeInTheDocument();
     expect(
-      screen.getByText(/base visual reutilizável do painel administrativo/i),
+      screen.getByRole("heading", {
+        level: 1,
+        name: /biblioteca de componentes/i,
+      }),
     ).toBeInTheDocument();
+    // Uma amostra de cada componente-chave da vitrine.
+    expect(
+      screen.getByRole("button", { name: "Primária" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Indisponível" })).toBeDisabled();
+    expect(screen.getByText("Cartão neutro")).toBeInTheDocument();
+    expect(screen.getByText("Concluído")).toBeInTheDocument();
+    expect(screen.getByText("Nada para exibir ainda")).toBeInTheDocument();
   });
 
   it("não referencia domínio, dados reais, login ou sessão no shell", () => {

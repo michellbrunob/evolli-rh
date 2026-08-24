@@ -40,6 +40,25 @@
   --hairline: #d2d2d7;
   --divider-soft: #e8e8ed;
 
+  /* Estados semânticos (badges/alertas): tinta ESCURA sobre superfície clara,
+     todas com contraste AA. A cor nunca é o único sinal — o componente
+     acrescenta um glifo/rótulo textual distinto por estado. */
+  --status-neutral-ink: #333333;
+  --status-neutral-surface: #f5f5f7;
+  --status-neutral-border: #d2d2d7;
+  --status-success-ink: #1f6b3b;
+  --status-success-surface: #eaf6ee;
+  --status-success-border: #b7dfc5;
+  --status-warning-ink: #8a5a00;
+  --status-warning-surface: #fbf3e2;
+  --status-warning-border: #ecd6a8;
+  --status-danger-ink: #a1272f;
+  --status-danger-surface: #fbebec;
+  --status-danger-border: #edc4c7;
+  --status-info-ink: #0b5aa8;
+  --status-info-surface: #e9f2fb;
+  --status-info-border: #bcd8f2;
+
   /* Raios (grade fechada: sm / md / lg / pill). */
   --radius-sm: 8px;
   --radius-md: 11px;

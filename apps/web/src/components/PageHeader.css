@@ -1,0 +1,46 @@
+/**
+ * PageHeader (UI-F02) — só tokens; sem sombra e sem gradiente. Divisor por
+ * borda sutil (hairline), coerente com a referência.
+ */
+
+.evolli-page-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-md) var(--space-lg);
+  padding-bottom: var(--space-lg);
+  border-bottom: 1px solid var(--divider-soft);
+}
+
+.evolli-page-header__text {
+  min-width: 0;
+}
+
+.evolli-page-header__title {
+  margin: 0;
+  font-size: var(--text-title);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  font-weight: var(--weight-strong);
+  color: var(--color-ink);
+}
+
+.evolli-page-header__description {
+  margin: var(--space-xs) 0 0;
+  max-width: 60ch;
+  color: var(--color-ink-muted);
+}
+
+.evolli-page-header__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  align-items: center;
+}
+
+@media (max-width: 640px) {
+  .evolli-page-header {
+    align-items: flex-start;
+  }
+}
