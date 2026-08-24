@@ -107,6 +107,14 @@
   align-items: center;
 }
 
+/* Formulário de demonstração: pilha de campos com largura contida. */
+.demo-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  max-width: 32rem;
+}
+
 /* Rodapé técnico discreto — sem dado real, empresa, usuário ou métrica. */
 .app-shell__footer {
   border-top: 1px solid var(--hairline);

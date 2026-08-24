@@ -16,11 +16,48 @@ import "./tokens.css";
 import "./app-shell.css";
 import {
   Button,
+  DataTable,
   EmptyState,
+  FormActions,
+  FormField,
   PageHeader,
   StatusBadge,
   Surface,
 } from "../components";
+import type { DataTableColumn, StatusVariant } from "../components";
+
+// Dados deliberadamente genéricos e não identificáveis — apenas para
+// demonstrar os componentes. Nada de empresa, pessoa, documento ou métrica.
+interface DemoItem {
+  id: string;
+  rotulo: string;
+  estado: { variant: StatusVariant; texto: string };
+}
+
+const DEMO_ROWS: DemoItem[] = [
+  {
+    id: "Item A",
+    rotulo: "Primeiro item",
+    estado: { variant: "success", texto: "Ativo" },
+  },
+  {
+    id: "Item B",
+    rotulo: "Segundo item",
+    estado: { variant: "neutral", texto: "Em espera" },
+  },
+];
+
+const DEMO_COLUMNS: DataTableColumn<DemoItem>[] = [
+  { key: "id", header: "Identificador", cell: (row) => row.id },
+  { key: "rotulo", header: "Rótulo", cell: (row) => row.rotulo },
+  {
+    key: "estado",
+    header: "Estado",
+    cell: (row) => (
+      <StatusBadge variant={row.estado.variant}>{row.estado.texto}</StatusBadge>
+    ),
+  },
+];
 
 export function App() {
   return (
@@ -96,6 +133,97 @@ export function App() {
               <StatusBadge variant="danger">Falha</StatusBadge>
               <StatusBadge variant="info">Informação</StatusBadge>
             </div>
+          </section>
+
+          <section className="demo-group" aria-labelledby="grupo-tabela">
+            <h2 id="grupo-tabela" className="demo-group__title">
+              Tabela de dados
+            </h2>
+            <DataTable
+              caption="Itens de demonstração"
+              columns={DEMO_COLUMNS}
+              rows={DEMO_ROWS}
+              rowKey={(row) => row.id}
+            />
+          </section>
+
+          <section className="demo-group" aria-labelledby="grupo-formulario">
+            <h2 id="grupo-formulario" className="demo-group__title">
+              Formulário
+            </h2>
+            <form
+              className="demo-form"
+              aria-labelledby="grupo-formulario"
+              // Demonstração visual: sem submit, sem persistência, sem rede.
+              // Os botões são type="button" (padrão do Button), então não há
+              // envio implícito.
+            >
+              <FormField
+                id="campo-rotulo"
+                label="Rótulo do item"
+                help="Texto de ajuda opcional para orientar o preenchimento."
+              >
+                {(control) => (
+                  <input type="text" placeholder="Ex.: Item A" {...control} />
+                )}
+              </FormField>
+
+              <FormField id="campo-categoria" label="Categoria" required>
+                {(control) => (
+                  <select defaultValue="" {...control}>
+                    <option value="" disabled>
+                      Selecione…
+                    </option>
+                    <option value="1">Opção 1</option>
+                    <option value="2">Opção 2</option>
+                    <option value="3">Opção 3</option>
+                  </select>
+                )}
+              </FormField>
+
+              <FormField
+                id="campo-observacoes"
+                label="Observações"
+                help="Campo de texto livre, sem validação nesta fase."
+              >
+                {(control) => (
+                  <textarea rows={3} placeholder="Texto livre…" {...control} />
+                )}
+              </FormField>
+
+              <FormField
+                id="campo-com-erro"
+                label="Campo com erro"
+                error="Informe um valor válido."
+              >
+                {(control) => (
+                  <input
+                    type="text"
+                    defaultValue="valor inválido"
+                    {...control}
+                  />
+                )}
+              </FormField>
+
+              <FormField
+                id="campo-desabilitado"
+                label="Campo desabilitado"
+                disabled
+              >
+                {(control) => (
+                  <input
+                    type="text"
+                    defaultValue="Somente leitura"
+                    {...control}
+                  />
+                )}
+              </FormField>
+
+              <FormActions>
+                <Button variant="secondary">Cancelar</Button>
+                <Button variant="primary">Confirmar</Button>
+              </FormActions>
+            </form>
           </section>
 
           <section className="demo-group" aria-labelledby="grupo-vazio">

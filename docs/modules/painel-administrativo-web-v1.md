@@ -93,6 +93,34 @@ Acessibilidade verificada em navegador real: um único landmark `banner`, um
 44px, ausência de sombra em botões/superfícies/badges e sem rolagem horizontal
 no mobile. O cliente CSRF continua isolado e não importado.
 
+### Tabela e formulário (UI-F03)
+
+Componentes de apresentação para as futuras telas de dados, sem qualquer módulo
+funcional ou conexão com API. Consomem apenas tokens existentes (nenhum novo
+token foi necessário) e não usam sombra nem gradiente.
+
+- **`DataTable`** — tabela genérica e tipada (colunas/linhas por props). Renderiza
+  `<table>` semântica com `<caption>` acessível (visível ou só para leitor de
+  tela), cabeçalhos `<th scope="col">` e estado vazio explícito. O contêiner rola
+  horizontalmente por conta própria em telas estreitas — **a rolagem fica contida
+  na tabela, sem gerar rolagem horizontal da página** — e é uma região focável por
+  teclado. **Sem** ordenação, filtro, paginação, seleção, exportação ou navegação.
+- **`FormField`** — campo acessível reutilizável: rótulo associado por `htmlFor`,
+  texto de ajuda, marca de obrigatório (visual + `aria-required` + texto para
+  leitor de tela), estado desabilitado e erro. O **erro é comunicado por texto +
+  ícone + semântica** (`aria-invalid`, `role="alert"`, `aria-describedby`), nunca
+  só por cor. Serve a `input`, `select` e `textarea` por composição (render-prop
+  que entrega as props de acessibilidade a espalhar no controle).
+- **`FormActions`** — agrupamento responsivo das ações (à direita no amplo,
+  empilhado em largura total no mobile). **Reutiliza o `Button`** — não cria
+  gramática visual nova.
+
+Acessibilidade verificada em navegador real: `<table>` com caption como nome
+acessível e `th scope="col"`; rótulo↔controle associados; erro com
+`aria-invalid`/`role="alert"`/borda de estado; contrastes AA (cabeçalho 15.46:1,
+célula 12.63:1, ajuda 7.99:1, erro 6.78:1); alvos de 44px em campos e botões; no
+mobile a página não rola na horizontal e a rolagem fica contida na tabela.
+
 ## 0. Estado verificado e observações registradas
 
 Esta seção separa **o que foi verificado no repositório** do que é

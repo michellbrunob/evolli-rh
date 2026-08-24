@@ -67,6 +67,29 @@ describe("App — shell + vitrine de componentes (UI-F01/UI-F02)", () => {
     expect(screen.getByText("Nada para exibir ainda")).toBeInTheDocument();
   });
 
+  it("demonstra a tabela e o formulário com dados genéricos", () => {
+    render(<App />);
+
+    // Tabela de dados genéricos (Item A / Item B).
+    expect(
+      screen.getByRole("table", { name: "Itens de demonstração" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("cell", { name: "Item A" })).toBeInTheDocument();
+
+    // Formulário: rótulos associados aos controles.
+    expect(screen.getByLabelText("Rótulo do item")).toBeInTheDocument();
+    // O rótulo acessível inclui "(obrigatório)", por isso o matcher parcial.
+    expect(screen.getByLabelText(/categoria/i)).toHaveAttribute(
+      "aria-required",
+      "true",
+    );
+    expect(screen.getByLabelText("Campo desabilitado")).toBeDisabled();
+    // Estado de erro comunicado por role=alert (semântica, não só cor).
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Informe um valor válido.",
+    );
+  });
+
   it("não referencia domínio, dados reais, login ou sessão no shell", () => {
     render(<App />);
 

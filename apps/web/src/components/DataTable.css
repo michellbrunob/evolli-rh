@@ -1,0 +1,72 @@
+/**
+ * DataTable (UI-F03) — só tokens; borda sutil, sem sombra, sem gradiente.
+ * A rolagem horizontal fica contida no próprio contêiner.
+ */
+
+.evolli-datatable {
+  width: 100%;
+  overflow-x: auto; /* rolagem horizontal SÓ aqui — nunca na página */
+  background: var(--surface-canvas);
+  border: 1px solid var(--divider-soft);
+  border-radius: var(--radius-lg);
+}
+
+.evolli-datatable__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-body);
+}
+
+.evolli-datatable__caption {
+  padding: var(--space-md) var(--space-lg);
+  text-align: left;
+  font-size: var(--text-caption);
+  color: var(--color-ink-muted);
+}
+
+/* Legenda apenas para leitores de tela (visualmente oculta, sem sumir do
+   acessível). */
+.evolli-datatable__caption--sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.evolli-datatable__th,
+.evolli-datatable__td {
+  padding: var(--space-sm) var(--space-lg);
+  text-align: left;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--divider-soft);
+}
+
+.evolli-datatable__th {
+  font-weight: var(--weight-strong);
+  color: var(--color-ink);
+  background: var(--surface-neutral);
+  border-bottom-color: var(--hairline);
+}
+
+.evolli-datatable__td {
+  color: var(--color-ink-muted);
+}
+
+.evolli-datatable__cell--end {
+  text-align: right;
+}
+
+.evolli-datatable__table tbody tr:last-child .evolli-datatable__td {
+  border-bottom: none;
+}
+
+.evolli-datatable__empty {
+  padding: var(--space-xl) var(--space-lg);
+  text-align: center;
+  color: var(--color-ink-subtle);
+}
