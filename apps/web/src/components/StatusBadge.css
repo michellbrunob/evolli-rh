@@ -1,0 +1,54 @@
+/**
+ * StatusBadge (UI-F02) — só tokens; tinta escura sobre superfície clara (AA),
+ * borda sutil, sem sombra, sem gradiente. O glifo dá forma distinta ao estado.
+ */
+
+.evolli-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+  min-height: 24px;
+  padding: 2px var(--space-sm);
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-strong);
+  line-height: 1.3;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+.evolli-badge__glyph {
+  font-weight: var(--weight-bold);
+  line-height: 1;
+}
+
+.evolli-badge--neutral {
+  background: var(--status-neutral-surface);
+  color: var(--status-neutral-ink);
+  border-color: var(--status-neutral-border);
+}
+
+.evolli-badge--success {
+  background: var(--status-success-surface);
+  color: var(--status-success-ink);
+  border-color: var(--status-success-border);
+}
+
+.evolli-badge--warning {
+  background: var(--status-warning-surface);
+  color: var(--status-warning-ink);
+  border-color: var(--status-warning-border);
+}
+
+.evolli-badge--danger {
+  background: var(--status-danger-surface);
+  color: var(--status-danger-ink);
+  border-color: var(--status-danger-border);
+}
+
+.evolli-badge--info {
+  background: var(--status-info-surface);
+  color: var(--status-info-ink);
+  border-color: var(--status-info-border);
+}

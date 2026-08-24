@@ -1,0 +1,69 @@
+/**
+ * Button (UI-F02) — consome apenas tokens; sem hex avulso, sem sombra, sem
+ * gradiente. Foco visível vem de `:focus-visible` global (tokens.css).
+ */
+
+.evolli-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  min-height: var(--touch-target);
+  min-width: var(--touch-target);
+  padding: 0 var(--space-lg);
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  font: inherit;
+  font-weight: var(--weight-strong);
+  line-height: 1;
+  letter-spacing: 0;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.evolli-button--primary {
+  background: var(--color-action);
+  color: var(--color-on-action);
+  border-color: transparent;
+}
+
+.evolli-button--secondary {
+  background: var(--surface-canvas);
+  color: var(--color-action);
+  border-color: var(--color-action);
+}
+
+.evolli-button--subtle {
+  background: transparent;
+  color: var(--color-action);
+  border-color: transparent;
+}
+
+.evolli-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Estados de repouso/pressão (hover não é sinal essencial; apenas reforço). */
+.evolli-button--primary:not(:disabled):hover {
+  background: var(--color-action-hover);
+}
+
+.evolli-button--secondary:not(:disabled):hover,
+.evolli-button--subtle:not(:disabled):hover {
+  background: var(--surface-neutral);
+}
+
+/* Micro-interação de pressão só quando o usuário não pediu menos movimento. */
+@media (prefers-reduced-motion: no-preference) {
+  .evolli-button {
+    transition:
+      background-color 120ms ease,
+      transform 80ms ease;
+  }
+
+  .evolli-button:not(:disabled):active {
+    transform: scale(0.97);
+  }
+}

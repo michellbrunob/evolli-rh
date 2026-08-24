@@ -1,0 +1,25 @@
+/**
+ * Surface / Card (UI-F02) — só tokens; borda sutil, sem sombra, sem gradiente.
+ */
+
+.evolli-surface {
+  background: var(--surface-canvas);
+  border: 1px solid var(--divider-soft);
+  border-radius: var(--radius-lg);
+}
+
+.evolli-surface--pad-none {
+  padding: 0;
+}
+
+.evolli-surface--pad-sm {
+  padding: var(--space-md);
+}
+
+.evolli-surface--pad-md {
+  padding: var(--space-lg);
+}
+
+.evolli-surface--pad-lg {
+  padding: var(--space-xl);
+}
