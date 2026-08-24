@@ -42,6 +42,27 @@ produto.
 **navegação por teclado**, compatibilidade com **leitores de tela** e **alvos de
 toque mínimos**. Acessibilidade tem precedência sobre qualquer escolha estética.
 
+### Fundação implementada (UI-F01)
+
+A fundação visual está implementada em `apps/web`, **sem** funcionalidade de
+domínio, autenticação ou dados:
+
+- **Tokens reutilizáveis** em `apps/web/src/app/tokens.css` (`:root`): cor de
+  ação `#0066cc`, superfícies claras/neutras + superfície escura pontual,
+  tipografia só do sistema (`system-ui` + fallback), escala de espaçamento,
+  raios (sm/md/lg/pill), foco visível por `:focus-visible` e alvo mínimo de
+  toque (44px). Sem sombras (cards/botões/texto) e sem gradientes decorativos.
+- **Shell neutro** em `apps/web/src/app/App.tsx` + `app-shell.css`: barra
+  superior discreta (marca textual "Evolli RH"), `main` responsivo com estado
+  vazio claro (sem citar áreas ainda não liberadas), rodapé técnico discreto
+  (sem dado real, empresa, usuário ou métrica), link "pular para o conteúdo" e
+  respeito a `prefers-reduced-motion`.
+- **Componentes reutilizáveis** de estilo (`.ui-button` pill, `.ui-surface`)
+  para telas futuras — sem render funcional nesta fase.
+
+O cliente CSRF (`apps/web/src/api/csrfClient.ts`) permanece **isolado** e não é
+importado pelo shell: não há login nem sessão nesta fundação.
+
 ## 0. Estado verificado e observações registradas
 
 Esta seção separa **o que foi verificado no repositório** do que é
