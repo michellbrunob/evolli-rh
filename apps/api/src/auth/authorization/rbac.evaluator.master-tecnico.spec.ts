@@ -174,24 +174,26 @@ describe("RBAC/ABAC — master_tecnico (T030, perfil global controlado)", () => 
       ).toBe(false);
     });
 
-    it("NÃO atribui dpo — papel legado depreciado, não provisionável (CG-DPO-01)", () => {
-      expect(
-        evaluatePermission(master(), {
-          resource: "user_role",
-          action: "create",
-          targetNewRole: "dpo",
-          targetCompanyId: EMPRESA_A,
-        }),
-      ).toBe(false);
-      expect(
-        evaluatePermission(master(), {
-          resource: "user_role",
-          action: "alter",
-          targetUserId: "outro",
-          targetNewRole: "dpo",
-          targetCompanyId: EMPRESA_A,
-        }),
-      ).toBe(false);
+    it("NÃO atribui dpo nem auditor — papéis legados não provisionáveis (CG-DPO-01/03)", () => {
+      for (const alvo of ["dpo", "auditor"] as const) {
+        expect(
+          evaluatePermission(master(), {
+            resource: "user_role",
+            action: "create",
+            targetNewRole: alvo,
+            targetCompanyId: EMPRESA_A,
+          }),
+        ).toBe(false);
+        expect(
+          evaluatePermission(master(), {
+            resource: "user_role",
+            action: "alter",
+            targetUserId: "outro",
+            targetNewRole: alvo,
+            targetCompanyId: EMPRESA_A,
+          }),
+        ).toBe(false);
+      }
     });
 
     it("NÃO cria admin_tecnico (papel privilegiado, fora dos comuns)", () => {
