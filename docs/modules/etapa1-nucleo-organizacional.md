@@ -1,5 +1,13 @@
 # Etapa 1 — Fatia 1: Núcleo Organizacional Interno
 
+> **Nota de convergência (T032; [ADR 0012](../adr/0012-convergencia-governanca-privacidade-e-perfis-globais.md), CG-RBAC-01).**
+> Onde este documento descreve o `admin_tecnico` com **acesso global/amplo/de
+> instância** ao ambiente interno (exceção da Emenda 1 da ADR 0005), leia-se como
+> registro **histórico**: o `admin_tecnico` **convergiu para bootstrap/histórico**
+> e não é mais perfil global operacional. O **único** acesso global permanente é
+> o **`master_tecnico`** (ADR 0012, T030). Os textos abaixo são preservados como
+> história da decisão que valeu até então — não reescritos.
+
 Status: **implementada e verificada (V1, 2026-08-06)** — modelagem
 (Baseline V1) e nomenclatura aprovadas, schema/migration, módulo NestJS,
 endpoints, autorização, auditoria e testes entregues. Evidências objetivas

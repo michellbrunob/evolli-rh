@@ -1,5 +1,13 @@
 # Etapa 2 — Documentos privados, V1 de metadados: convergência (T027)
 
+> **Nota de convergência (T032; [glossário Reserva Fiscal](glossario-reserva-fiscal.md)).**
+> As linhas abaixo que listam **"Reserva Fiscal" como módulo/fatia (T020+)** são
+> um **equívoco** já cancelado: **"Reserva Fiscal" é o nome da empresa/projeto**,
+> **não** um módulo, produto, serviço ou escopo fiscal. Não existe módulo
+> fiscal/reserva no repositório, e as tarefas T020–T023 (antiga "fatia fiscal")
+> estão **canceladas**. O texto abaixo é preservado como história — não
+> reescrito.
+
 - Status: **Convergida e integrada** (2026-08-14). Fatia 2 (Documentos, V1 de
   metadados) fechada; upload/conteúdo permanecem bloqueados (Nível 2).
 - Data: 2026-08-14

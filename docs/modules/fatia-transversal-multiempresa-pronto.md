@@ -1,5 +1,13 @@
 # Fatia transversal — evolução multiempresa preparada
 
+> **Nota de convergência (T032; [ADR 0012](../adr/0012-convergencia-governanca-privacidade-e-perfis-globais.md), CG-RBAC-01).**
+> Onde este documento descreve o `admin_tecnico` com **acesso global** ao
+> ambiente interno (exceção da Emenda 1 da ADR 0005), leia-se como registro
+> **histórico**: o `admin_tecnico` **convergiu para bootstrap/histórico** e não é
+> mais perfil global operacional. O **único** acesso global permanente é o
+> **`master_tecnico`** (ADR 0012, T030). Os textos abaixo são preservados como
+> história — não reescritos.
+
 - Status: **decisão aprovada** (2026-08-11) para a interpretação do gatilho
   e as restrições que a acompanham — fase **Registrar decisão aprovada**.
   Nenhuma fase Implementar foi aberta por esta atualização.

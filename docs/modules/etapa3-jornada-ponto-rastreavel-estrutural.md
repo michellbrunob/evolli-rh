@@ -1,5 +1,14 @@
 # Etapa 3 — Jornada e Ponto Rastreável V1 Estrutural
 
+> **Nota de convergência (T032; [ADR 0012](../adr/0012-convergencia-governanca-privacidade-e-perfis-globais.md), CG-RBAC-01).**
+> Onde este documento descreve a assimetria em que o `admin_tecnico` é negado em
+> Ponto mas mantém **acesso amplo à estrutura organizacional**, leia-se a segunda
+> parte como registro **histórico**: o `admin_tecnico` **convergiu para
+> bootstrap/histórico** e passou a ser **negado também na estrutura
+> organizacional**. O **único** acesso global permanente é o **`master_tecnico`**
+> (ADR 0012, T030). A negação do `admin_tecnico` em Ponto permanece válida; os
+> textos abaixo são preservados como história — não reescritos.
+
 - Status: **Baseline V1 aprovada** (2026-08-07) para o núcleo conceitual
   descrito neste documento — fase **Registrar decisão aprovada**. Nenhuma
   fase Implementar foi aberta ou autorizada por esta atualização.
