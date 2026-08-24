@@ -78,20 +78,28 @@ Baseline V1.
 
 ### 1.3 Atores
 
-| Ator                                          | Papel nesta V1 (a formalizar)                                                                                |
-| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| **RH**                                        | **Único** perfil que importa batidas, ajusta, aprova e fecha o ponto, **restrito à própria empresa**.        |
-| Colaborador                                   | **Sem acesso** nesta V1 (Portal do Colaborador fora de escopo — Baseline V1).                                |
-| `gestor`                                      | **Negado** (escopo indefinido, DP-8/ADR 0006).                                                               |
-| `master_tecnico`                              | **Negado** para mutação de negócio de ponto (ADR 0012 dec. 3); leitura global existe, mas não opera o ponto. |
-| `admin_tecnico`                               | **Negado**, sem exceção (ADR 0008 dec. 6; ADR 0012).                                                         |
-| `colaborador`, `financeiro`, `auditor`, `dpo` | **Negados** — nenhum recebe acesso por analogia.                                                             |
+Matriz **operacional decidida** para o V1 (não é pendência). "Operar o ponto" =
+importar batidas, visualizar a fila "Verificar folhas", registrar ajuste,
+aprovar e fechar.
 
-> **Reconciliação pendente (DP-3J-23).** A Baseline V1 (Decisão 5) concedia
-> **registrar/consultar a RH e DP**. A entrada de produto da T034 diz **"RH é o
-> único perfil"** para importar/ajustar/aprovar/fechar. A matriz final — se DP
-> mantém consulta, e se "aprovar/fechar" (que a Baseline V1 não tinha) passa a
-> existir — é **decisão de produto a formalizar**, não resolvida aqui.
+| Ator                           | Operar o ponto no V1                                                                                                                                     |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **RH**                         | **Único perfil autorizado**: importa batidas, visualiza a fila "Verificar folhas", registra ajuste, aprova e fecha — **restrito à própria empresa**.     |
+| **DP**                         | **Negado** para todas essas operações no V1 (a concessão de registrar/consultar da Baseline V1 **não** se estende a operar o ponto aqui).                |
+| `gestor`                       | **Negado** (escopo indefinido, DP-8/ADR 0006).                                                                                                           |
+| Colaborador                    | **Negado / sem acesso** (Portal do Colaborador fora de escopo — Baseline V1).                                                                            |
+| `master_tecnico`               | **Sem mutação trabalhista**: mantém **apenas** os limites técnicos de leitura já aprovados (ADR 0012 dec. 3); **não** importa, ajusta, aprova nem fecha. |
+| `admin_tecnico`                | **Negado**, sem exceção (ADR 0008 dec. 6; ADR 0012).                                                                                                     |
+| `financeiro`, `auditor`, `dpo` | **Negados** — nenhum recebe acesso por analogia.                                                                                                         |
+
+> **Alçada operacional definida (não é pendência do V1).** O requisito aprovado
+> pelo RH é inequívoco: **RH é o único perfil** que importa, visualiza a fila
+> "Verificar folhas", registra ajuste, aprova e fecha o ponto no V1. **DP,
+> `gestor` e colaborador são negados** para essas operações no V1; o
+> `master_tecnico` mantém **apenas** os limites técnicos de leitura já aprovados,
+> **sem** mutação trabalhista. Qualquer alteração futura de alçada (por exemplo,
+> conceder consulta a DP) **exige decisão de produto nova** — **não** é pendência
+> em aberto desta V1 e **não** abre a possibilidade de DP operar o ponto no V1.
 
 ### 1.4 Isolamento entre empresas
 
@@ -155,9 +163,10 @@ nunca em `AccessUser` (ADR 0008 dec. 1).
   atraso/saída antecipada, com extra, situação registrada, etc.). É a base do
   espelho (§3) e da fila (§5).
 - **Nenhum número trabalhista é fixado aqui.** A tolerância de **15 minutos**
-  (atraso, saída antecipada e almoço) é **entrada do RH com semântica pendente**
-  (aplicada por batida? por dia? por período? — DP-3J-13). O **período exato de
-  apuração/fechamento** é pendência (DP-3J-14).
+  (atraso, saída antecipada e almoço) é **valor aprovado pelo RH**; apenas sua
+  **semântica** — se aplicada por batida, por dia ou por período — **permanece
+  pendente** (DP-3J-13). O **período exato de apuração/fechamento** é pendência
+  (DP-3J-14).
 
 ### 2.6 Apontamento (situação do dia)
 
@@ -380,7 +389,14 @@ resolvida por este documento.**
 | DP-3J-20 | **Tipo de REP e leiaute oficial (AFD/AEJ)** do BLUE BIOPROX-C, sob Portaria 671, com CPF — confirmação.       | Fornecedor + Jurídico + TI |
 | DP-3J-21 | **Desconto de DSR** nas faltas em banco — suspenso **até autorização dos diretores**.                         | Diretoria + RH             |
 | DP-3J-22 | **Marcos das jornadas 1 (Horario Reserva Fiscal), 2 (HORARIO LIBERTY) e 19 (ESTAGIARIO)** — não recebidos.    | RH                         |
-| DP-3J-23 | **Matriz de acesso final**: RH único operador (importar/ajustar/aprovar/fechar) × RH+DP da Baseline V1.       | Produto + RH               |
+
+> **DP-3J-23 — reclassificada (resolvida para o V1; não bloqueante).** A alçada
+> operacional do V1 está **decidida**: **RH é o único perfil** que opera o ponto
+> (§1.3). **DP, `gestor` e colaborador ficam negados** para essas operações no
+> V1. Portanto DP-3J-23 **deixa de ser pendência bloqueante** — não há matriz "em
+> aberto" e **não** existe possibilidade de DP operar o ponto no V1. Qualquer
+> **expansão futura** de alçada além do RH é **decisão de produto nova**, tratada
+> quando/se surgir — **fora do escopo do V1**, não uma pendência dele.
 
 Herdadas e ainda bloqueantes de **dado real** (spec estrutural §9): **DP-3J-09**
 (validade legal), **DP-3J-11** (retenção/descarte/acesso do titular), **MFA**
@@ -426,22 +442,22 @@ colaborador/equipe são pendência** (DP-3J-19).
 
 ## 10. Regras recebidas do RH — classificação
 
-| Regra                                                               | Classificação                              |
-| ------------------------------------------------------------------- | ------------------------------------------ |
-| Sem trabalho inicial em sábados/domingos/feriados/turnos            | **Recebida**                               |
-| Situações: atestado, folga, férias, compensação, almoço livre       | **Recebida** (catálogo)                    |
-| Horas extras entram no banco                                        | **Recebida** (cálculo pendente)            |
-| Atrasos não compensados entram no banco                             | **Recebida** (cálculo pendente)            |
-| Faltas em banco só com saldo positivo; senão, relatório no dia 28   | **Recebida** (semântica pendente)          |
-| Saldo positivo permanece; negativo avaliado mensalmente             | **Recebida**                               |
-| Fechamento e prazo de ajustes: dia 28                               | **Recebida** (janela — DP-3J-14)           |
-| Feriados nacionais iniciais; municipais/pontes/exceções caso a caso | **Recebida**                               |
-| CPF ausente/inválido/sem colaborador gera erro apontado             | **Recebida** (parcial×total — DP-3J-17)    |
-| Tolerância de 15 min (atraso, saída antecipada, almoço)             | **Hipótese/semântica pendente** (DP-3J-13) |
-| Almoço livre garante ≥ 1h; regra automática exata                   | **Hipótese/homologar** (DP-3J-16)          |
-| Limites +38h / −24h                                                 | **Recebida** (ação — DP-3J-15)             |
-| DSR não descontado até autorização dos diretores                    | **Hipótese/aguarda diretoria** (DP-3J-21)  |
-| BLUE BIOPROX-C; Portaria 671; CPF como identificador                | **Hipótese** (leiaute — DP-3J-20)          |
+| Regra                                                               | Classificação                                              |
+| ------------------------------------------------------------------- | ---------------------------------------------------------- |
+| Sem trabalho inicial em sábados/domingos/feriados/turnos            | **Recebida**                                               |
+| Situações: atestado, folga, férias, compensação, almoço livre       | **Recebida** (catálogo)                                    |
+| Horas extras entram no banco                                        | **Recebida** (cálculo pendente)                            |
+| Atrasos não compensados entram no banco                             | **Recebida** (cálculo pendente)                            |
+| Faltas em banco só com saldo positivo; senão, relatório no dia 28   | **Recebida** (semântica pendente)                          |
+| Saldo positivo permanece; negativo avaliado mensalmente             | **Recebida**                                               |
+| Fechamento e prazo de ajustes: dia 28                               | **Recebida** (janela — DP-3J-14)                           |
+| Feriados nacionais iniciais; municipais/pontes/exceções caso a caso | **Recebida**                                               |
+| CPF ausente/inválido/sem colaborador gera erro apontado             | **Recebida** (parcial×total — DP-3J-17)                    |
+| Tolerância de 15 min (atraso, saída antecipada, almoço)             | **Valor aprovado (15 min); semântica pendente** (DP-3J-13) |
+| Almoço livre garante ≥ 1h; regra automática exata                   | **Hipótese/homologar** (DP-3J-16)                          |
+| Limites +38h / −24h                                                 | **Recebida** (ação — DP-3J-15)                             |
+| DSR não descontado até autorização dos diretores                    | **Hipótese/aguarda diretoria** (DP-3J-21)                  |
+| BLUE BIOPROX-C; Portaria 671; CPF como identificador                | **Hipótese** (leiaute — DP-3J-20)                          |
 
 ## 11. Declaração
 

@@ -17,8 +17,10 @@
   "Verificar folhas") está em
   [Jornada e Ponto V1 detalhada](etapa3-jornada-ponto-v1-detalhada.md). Ela
   **estende** este núcleo com entradas de RH cujas semânticas seguem pendentes
-  (novas pendências `DP-3J-13..23`); **nada** é decidido ou implementado por
-  ela, e o núcleo mínimo desta Baseline permanece inalterado.
+  (novas pendências `DP-3J-13..22`; a alçada operacional do V1 é **RH como único
+  operador**, e a antiga DP-3J-23 foi reclassificada como não bloqueante);
+  **nada** é decidido ou implementado por ela, e o núcleo mínimo desta Baseline
+  permanece inalterado.
 - Fase do SDD: Registrar decisão aprovada. Nenhuma implementação, schema,
   migration, endpoint, dependência ou integração externa criada nesta
   fase.
