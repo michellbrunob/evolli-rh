@@ -1,0 +1,115 @@
+/**
+ * Fundação de tokens visuais (UI-F01) — inspirada em DESIGN-apple.md.
+ *
+ * Princípios adotados (adaptados para um sistema INTERNO de RH, onde dados,
+ * tabelas, formulários, erros e acessibilidade prevalecem sobre estética de
+ * marketing):
+ *  - Cor de ação ÚNICA: Action Blue #0066cc.
+ *  - Superfícies claras/neutras; superfície escura usada de forma pontual.
+ *  - Tipografia SÓ do sistema (system-ui + fallback seguro) — nenhuma fonte
+ *    proprietária é baixada ou embutida.
+ *  - Espaçamento por escala, bordas sutis (hairline), botões pill.
+ *  - SEM gradientes decorativos; SEM sombras em cards, botões ou texto.
+ *
+ * Estes tokens são a base reutilizável para futuras telas; não contêm dado de
+ * domínio, marca proprietária, imagem nem ativo de terceiros.
+ */
+
+:root {
+  color-scheme: light;
+
+  /* Cor de ação — única, para todo elemento interativo (links, CTAs, foco). */
+  --color-action: #0066cc;
+  --color-action-hover: #0071e3;
+
+  /* Tinta e texto (contraste AA sobre superfícies claras). */
+  --color-ink: #1d1d1f; /* texto principal (~16:1 no branco) */
+  --color-ink-muted: #333333; /* texto secundário (~12:1) */
+  --color-ink-subtle: #4b4b4d; /* legendas/rodapé (~8:1, passa AA) */
+  --color-on-action: #ffffff; /* texto sobre a cor de ação */
+  --color-on-dark: #ffffff; /* texto sobre a superfície escura */
+  --color-on-dark-muted: #d2d2d7; /* texto secundário sobre escuro (~11:1) */
+
+  /* Superfícies claras/neutras + uso PONTUAL de superfície escura. */
+  --surface-canvas: #ffffff;
+  --surface-neutral: #f5f5f7;
+  --surface-pearl: #fafafc;
+  --surface-dark: #1d1d1f;
+
+  /* Bordas sutis. */
+  --hairline: #d2d2d7;
+  --divider-soft: #e8e8ed;
+
+  /* Raios (grade fechada: sm / md / lg / pill). */
+  --radius-sm: 8px;
+  --radius-md: 11px;
+  --radius-lg: 18px;
+  --radius-pill: 9999px;
+
+  /* Espaçamento (escala). */
+  --space-xxs: 4px;
+  --space-xs: 8px;
+  --space-sm: 12px;
+  --space-md: 17px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-2xl: 48px;
+  --space-3xl: 80px;
+
+  /* Tipografia — apenas fontes do sistema, com fallback seguro. */
+  --font-sans:
+    system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --text-caption: 0.875rem; /* 14px */
+  --text-body: 1.0625rem; /* 17px — o "passo de leitura" da referência */
+  --text-lead: 1.3125rem; /* 21px */
+  --text-title: 1.75rem; /* 28px */
+  --text-display: clamp(1.75rem, 1.2rem + 2.2vw, 2.5rem); /* 28→40px */
+  --leading-body: 1.47;
+  --leading-tight: 1.1;
+  --tracking-body: -0.011em;
+  --tracking-tight: -0.02em;
+  --weight-regular: 400;
+  --weight-strong: 600;
+  --weight-bold: 700;
+
+  /* Foco visível por teclado (cor de ação). */
+  --focus-width: 2px;
+  --focus-offset: 2px;
+
+  /* Alvo mínimo de interação. */
+  --touch-target: 44px;
+
+  /* Largura máxima de conteúdo (trava responsiva). */
+  --content-max: 1120px;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--text-body);
+  line-height: var(--leading-body);
+  letter-spacing: var(--tracking-body);
+  color: var(--color-ink);
+  background: var(--surface-neutral);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Foco visível consistente para TODO elemento interativo. Nunca removido sem
+   substituto (acessibilidade obrigatória). */
+:focus-visible {
+  outline: var(--focus-width) solid var(--color-action);
+  outline-offset: var(--focus-offset);
+  border-radius: var(--radius-sm);
+}

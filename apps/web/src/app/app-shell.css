@@ -1,26 +1,206 @@
+/**
+ * Shell administrativo (UI-F01) — estrutura visual neutra e reutilizável.
+ *
+ * Sem dado de domínio, sem tela de módulo, sem fluxo de negócio. Consome apenas
+ * os tokens de `tokens.css`. Sem sombras (cards/botões/texto) e sem gradientes
+ * decorativos, conforme a referência.
+ */
+
 .app-shell {
   min-height: 100vh;
+  min-height: 100svh;
   display: flex;
   flex-direction: column;
-  font-family: system-ui, sans-serif;
+  background: var(--surface-neutral);
 }
 
-.app-shell__header {
+/* Link "pular para o conteúdo" — visível só quando recebe foco por teclado. */
+.app-shell__skip-link {
+  position: absolute;
+  top: var(--space-sm);
+  left: var(--space-sm);
+  z-index: 20;
+  transform: translateY(calc(-100% - var(--space-lg)));
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-target);
+  padding: 0 var(--space-lg);
+  border-radius: var(--radius-pill);
+  background: var(--color-action);
+  color: var(--color-on-action);
+  font-weight: var(--weight-strong);
+  text-decoration: none;
+}
+
+.app-shell__skip-link:focus {
+  transform: translateY(0);
+}
+
+/* Barra superior discreta — uso PONTUAL de superfície escura. */
+.app-shell__topbar {
+  background: var(--surface-dark);
+  color: var(--color-on-dark);
+  border-bottom: 1px solid #000000;
+}
+
+.app-shell__topbar-inner {
+  max-width: var(--content-max);
+  margin: 0 auto;
+  min-height: 56px;
   display: flex;
   align-items: baseline;
-  gap: 0.5rem;
-  padding: 1rem 1.5rem;
-  border-bottom: 1px solid #d0d0d0;
+  gap: var(--space-sm);
+  padding: var(--space-sm) clamp(var(--space-md), 4vw, var(--space-xl));
 }
 
 .app-shell__brand {
-  font-weight: 700;
+  font-size: var(--text-lead);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-tight);
+  color: var(--color-on-dark);
 }
 
-.app-shell__subtitle {
-  color: #555555;
+.app-shell__brand-tag {
+  font-size: var(--text-caption);
+  font-weight: var(--weight-regular);
+  color: var(--color-on-dark-muted);
 }
 
+/* Área principal responsiva. */
 .app-shell__main {
-  padding: 1.5rem;
+  flex: 1 1 auto;
+  width: 100%;
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: clamp(var(--space-lg), 5vw, var(--space-3xl))
+    clamp(var(--space-md), 4vw, var(--space-xl));
+  outline: none; /* alvo do skip-link; foco não desenha contorno na região */
+}
+
+/* Estado vazio claro — sem citar módulos/áreas ainda não liberados. */
+.app-shell__empty {
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: clamp(var(--space-xl), 6vw, var(--space-3xl)) var(--space-lg);
+  text-align: center;
+  background: var(--surface-canvas);
+  border: 1px solid var(--divider-soft);
+  border-radius: var(--radius-lg);
+}
+
+.app-shell__empty-title {
+  margin: 0 0 var(--space-sm);
+  font-size: var(--text-display);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  font-weight: var(--weight-strong);
+  color: var(--color-ink);
+}
+
+.app-shell__empty-text {
+  margin: 0 auto;
+  max-width: 34rem;
+  color: var(--color-ink-muted);
+}
+
+/* Rodapé técnico discreto — sem dado real, empresa, usuário ou métrica. */
+.app-shell__footer {
+  border-top: 1px solid var(--hairline);
+  background: var(--surface-canvas);
+}
+
+.app-shell__footer-inner {
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: var(--space-md) clamp(var(--space-md), 4vw, var(--space-xl));
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs) var(--space-md);
+  align-items: baseline;
+  font-size: var(--text-caption);
+  color: var(--color-ink-subtle);
+}
+
+.app-shell__footer-brand {
+  font-weight: var(--weight-strong);
+  color: var(--color-ink-muted);
+}
+
+/* -------------------------------------------------------------------------
+ * Componentes reutilizáveis da fundação (para telas futuras)
+ * ------------------------------------------------------------------------- */
+
+/* Botão pill — cor de ação única; SEM sombra. */
+.ui-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--touch-target);
+  padding: 0 var(--space-lg);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-pill);
+  background: var(--surface-canvas);
+  color: var(--color-action);
+  font: inherit;
+  font-weight: var(--weight-strong);
+  letter-spacing: 0;
+  cursor: pointer;
+}
+
+.ui-button--primary {
+  background: var(--color-action);
+  color: var(--color-on-action);
+  border-color: transparent;
+}
+
+.ui-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Cartão/superfície reutilizável — borda sutil, sem sombra. */
+.ui-surface {
+  background: var(--surface-canvas);
+  border: 1px solid var(--divider-soft);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+}
+
+/* Micro-interação (scale no press) SÓ quando o usuário não pediu menos
+   movimento. Transições idem. */
+@media (prefers-reduced-motion: no-preference) {
+  .app-shell__skip-link {
+    transition: transform 120ms ease;
+  }
+
+  .ui-button {
+    transition:
+      background-color 120ms ease,
+      transform 80ms ease;
+  }
+
+  .ui-button:not(:disabled):active {
+    transform: scale(0.97);
+  }
+}
+
+.ui-button--primary:not(:disabled):hover {
+  background: var(--color-action-hover);
+}
+
+/* Ajustes por breakpoint (referência: 834px / 640px). */
+@media (max-width: 834px) {
+  .app-shell__topbar-inner {
+    min-height: 52px;
+  }
+}
+
+@media (max-width: 640px) {
+  .app-shell__empty {
+    text-align: left;
+  }
+
+  .app-shell__footer-inner {
+    flex-direction: column;
+  }
 }
