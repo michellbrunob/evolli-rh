@@ -1,14 +1,16 @@
 # Etapa 3 — Jornada e Ponto V1 (detalhada) e a fila "Verificar folhas"
 
 - Status: **Especificação — fase Registrar decisão** (T034, consolidada pela
-  T035). **Nenhuma fase Implementar é aberta ou autorizada por este documento.**
-  Não há código, banco, API, UI funcional, importação ou cálculo aqui — apenas
-  especificação.
+  T035 e corrigida pela T036). **Nenhuma fase Implementar é aberta ou
+  autorizada por este documento.** Não há código, banco, API, UI funcional,
+  importação ou cálculo aqui — apenas especificação.
 - Data: 2026-08-24 (T034); consolidação de novas decisões do RH em 2026-08-25
-  (T035).
+  (T035); correção do período de apuração em 2026-08-25 (T036).
 - Fase/tarefa: Fase 3 — Jornada e Ponto; **T034** (detalhamento da V1 e da nova
   função "Verificar folhas"); **T035** (consolidação de decisões do RH que
-  resolvem parte das pendências abertas pela T034).
+  resolvem parte das pendências abertas pela T034); **T036** (correção do
+  período de apuração para dia 26 a dia 25 do mês seguinte, resolvendo
+  `DP-3J-14`).
 - Base conceitual (não reaberta): [ADR 0008](../adr/0008-jornada-ponto-rastreavel-baseline-v1.md)
   e [Baseline V1 de Jornada e Ponto](../decisions/etapa3-jornada-ponto-baseline-v1.md)
   (8 decisões, 2026-08-07), detalhadas na
@@ -84,10 +86,10 @@ Baseline V1.
 - **Não calcula**: nenhum resultado numérico de horas, banco, extra, falta ou
   DSR é produzido aqui; os exemplos são **estruturas a homologar** (§8, DP-3J-18).
 - **Consolida** decisões operacionais já recebidas do RH (tolerância, ação de
-  limite, almoço mínimo, rejeição parcial, atribuição de horário — §2, §8.2),
-  mas **não implementa** nenhuma delas. **Não decide** o tratamento dos dias
-  29–31, leiaute técnico de arquivo, tipo de REP, base legal ou retenção —
-  seguem em §8.
+  limite, almoço mínimo, rejeição parcial, atribuição de horário, período de
+  apuração — §2, §8.2), mas **não implementa** nenhuma delas. **Não decide**
+  leiaute técnico de arquivo, tipo de REP, base legal ou retenção — seguem em
+  §8.
 - **Não declara conformidade** legal, trabalhista ou LGPD.
 - **Não integra** com folha (Etapa 4), nem trata biometria/geolocalização.
 
@@ -197,12 +199,10 @@ nunca em `AccessUser` (ADR 0008 dec. 1).
   (atraso, saída antecipada e almoço) é **valor aprovado pelo RH**, com
   **semântica decidida (T035 — resolve DP-3J-13): aplicada por dia** — não por
   batida individual nem por período/competência.
-- **Período de apuração/fechamento (RH, T035 — resolve parte de DP-3J-14):**
-  informado como **dia 1 ao dia 28**. Fica como a **única pendência bloqueante
-  remanescente** deste conjunto de decisões (DP-3J-14, escopo reduzido): **o
-  tratamento dos dias 29, 30 e 31** — se pertencem ao período seguinte, ficam
-  fora da apuração, ou seguem outra regra — **não foi informado e não é
-  inferido aqui**.
+- **Período de apuração (RH, T036 — resolve DP-3J-14):** o período de apuração
+  **começa no dia 26 de um mês e termina no dia 25 do mês seguinte**. Todos os
+  dias do mês (inclusive 29, 30 e 31, quando existirem) pertencem a algum
+  período de apuração por essa regra de intervalo — não há dia órfão.
 
 ### 2.6 Apontamento (situação do dia)
 
@@ -247,14 +247,10 @@ Regras recebidas do RH, **a homologar** (semântica e cálculo pendentes):
 
 ### 2.9 Fechamento mensal
 
-- **Fechamento e prazo de ajustes: dia 28.** O **período informado pelo RH é
-  dia 1 ao dia 28** (T035, §2.5) — **decidido** para esse intervalo. O
-  tratamento dos **dias 29, 30 e 31** é a **única pendência bloqueante**
-  remanescente deste conjunto de decisões (DP-3J-14, §8); não presumir que
-  esses dias entram no período corrente, no próximo, ou seguem regra própria.
-  Após o fechamento de uma competência, o RH **não** deveria alterar marcações
-  daquele período por ajuste comum; qualquer exceção é decisão de produto a
-  definir.
+- **Fechamento e prazo de ajustes: dia 28.** O **período de apuração é
+  decidido (T036, §2.5, DP-3J-14): de dia 26 a dia 25 do mês seguinte.** Após o
+  fechamento de uma competência, o RH **não** deveria alterar marcações daquele
+  período por ajuste comum; qualquer exceção é decisão de produto a definir.
 - O fechamento é **ação manual do RH** e **auditada**. **Efeito legal** do
   fechamento depende de DP-3J-09 (validade legal) — **não declarado** aqui. Esta
   capacidade **estende** a Baseline V1 (que não tinha fechamento) e exige
@@ -444,11 +440,11 @@ documento:**
 
 ### 7.4 Gates (não relaxados)
 
-- **RH:** definir o **tratamento dos dias 29–31** (§8.1, DP-3J-14) e homologar
-  os **três exemplos completos** com entrada e resultado (§8.3, DP-3J-18) —
-  tolerância, almoço livre, ação de limite e rejeição parcial já foram
-  **decididos** (§8.2), mas seguem sujeitos aos mesmos gates de dado real
-  abaixo antes de qualquer implementação com dado sintético virar dado real.
+- **RH:** homologar os **três exemplos completos** com entrada e resultado
+  (§8.2, DP-3J-18) — tolerância, almoço livre, ação de limite, rejeição
+  parcial e período de apuração já foram **decididos** (§8.1), mas seguem
+  sujeitos aos mesmos gates de dado real abaixo antes de qualquer
+  implementação com dado sintético virar dado real.
 - **Jurídico:** validade legal do controle de jornada e do fechamento
   (DP-3J-09); leiaute AFD/AEJ oficial e enquadramento (DP-3J-20, com fornecedor);
   retenção/descarte e acesso do titular (DP-3J-11) — **RH + Jurídico** como
@@ -460,28 +456,24 @@ documento:**
 ## 8. Pendências bloqueantes
 
 Continuam a família `DP-3J-*` da spec estrutural (que vai até DP-3J-12). A T035
-(RH) **resolveu** DP-3J-13, DP-3J-15, DP-3J-16, DP-3J-17 e DP-3J-19 (§8.2).
-**DP-3J-14** foi **reduzida** à única pergunta ainda sem resposta deste
-conjunto: o tratamento dos dias 29–31 (§8.1). As demais (DP-3J-18, 20, 21, 22 e
-as herdadas de dado real) **não** são resolvidas por este documento.
+(RH) **resolveu** DP-3J-13, DP-3J-15, DP-3J-16, DP-3J-17 e DP-3J-19; a T036
+(RH) **resolveu DP-3J-14** (período de apuração) — ver §8.1. **Nenhuma
+pendência bloqueante deste conjunto permanece em aberto.** As demais
+(DP-3J-18, 20, 21, 22 e as herdadas de dado real) **não** são resolvidas por
+este documento — ver §8.2.
 
-### 8.1 Pendência bloqueante remanescente (não inferida)
+### 8.1 Decisões que resolvem pendências anteriores (T035/T036)
 
-| ID       | Pendência bloqueante                                                                                                                                                                                                                         | Responsável  |
-| -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ |
-| DP-3J-14 | **Tratamento dos dias 29, 30 e 31.** O RH informou o período como "dia 1 ao dia 28" (§2.5, §2.9). Falta definir: esses dias pertencem ao **período seguinte**, ficam **fora da apuração**, ou seguem **outra regra**? **Não inferido aqui.** | RH + Produto |
+| ID       | Estava pendente como                                                                 | Resolução (RH)                                                                                                                        |
+| -------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| DP-3J-13 | Semântica da tolerância de 15 min: por batida, por dia ou por período.               | **Resolvida (T035):** aplicada **por dia** (§2.5).                                                                                    |
+| DP-3J-14 | Período exato de apuração/fechamento; tratamento dos dias 29, 30 e 31.               | **Resolvida (T036):** período de apuração de **dia 26 a dia 25 do mês seguinte** — todo dia do mês cai em algum período (§2.5, §2.9). |
+| DP-3J-15 | Ação ao atingir +38h / −24h.                                                         | **Resolvida (T035):** o sistema **apenas alerta** — não bloqueia, compensa, desconta ou fecha automaticamente (§2.8).                 |
+| DP-3J-16 | Efeito de intervalo de almoço menor que uma hora.                                    | **Resolvida (T035):** a apuração **considera automaticamente uma hora mínima** de intervalo (§2.6).                                   |
+| DP-3J-17 | Rejeição parcial × total do lote quando um CPF é inválido/ausente/sem colaborador.   | **Resolvida (T035):** rejeição **só da marcação afetada**; cria pendência para o colaborador; **resto do lote segue** (§2.3).         |
+| DP-3J-19 | Vínculo horário → colaborador/equipe (qual horário se aplica a quem) — não recebido. | **Resolvida (T035) quanto ao ponto de atribuição:** o horário é **atribuído no cadastro do colaborador** (§2.4).                      |
 
-### 8.2 Decisões da T035 que resolvem pendências anteriores
-
-| ID       | Estava pendente como                                                                 | Resolução (RH, T035)                                                                                                   |
-| -------- | ------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
-| DP-3J-13 | Semântica da tolerância de 15 min: por batida, por dia ou por período.               | **Resolvida:** aplicada **por dia** (§2.5).                                                                            |
-| DP-3J-15 | Ação ao atingir +38h / −24h.                                                         | **Resolvida:** o sistema **apenas alerta** — não bloqueia, compensa, desconta ou fecha automaticamente (§2.8).         |
-| DP-3J-16 | Efeito de intervalo de almoço menor que uma hora.                                    | **Resolvida:** a apuração **considera automaticamente uma hora mínima** de intervalo (§2.6).                           |
-| DP-3J-17 | Rejeição parcial × total do lote quando um CPF é inválido/ausente/sem colaborador.   | **Resolvida:** rejeição **só da marcação afetada**; cria pendência para o colaborador; **resto do lote segue** (§2.3). |
-| DP-3J-19 | Vínculo horário → colaborador/equipe (qual horário se aplica a quem) — não recebido. | **Resolvida quanto ao ponto de atribuição:** o horário é **atribuído no cadastro do colaborador** (§2.4).              |
-
-### 8.3 Pendências não afetadas por este documento
+### 8.2 Pendências não afetadas por este documento
 
 | ID       | Pendência bloqueante                                                                                                                                                                      | Responsável                |
 | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- |
@@ -545,41 +537,41 @@ ativos permanecem para a fase de modelagem futura.
 
 ## 10. Regras recebidas do RH — classificação
 
-| Regra                                                               | Classificação                                                               |
-| ------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| Sem trabalho inicial em sábados/domingos/feriados/turnos            | **Recebida**                                                                |
-| Situações: atestado, folga, férias, compensação, almoço livre       | **Recebida** (catálogo)                                                     |
-| Horas extras entram no banco                                        | **Recebida** (cálculo pendente)                                             |
-| Atrasos não compensados entram no banco                             | **Recebida** (cálculo pendente)                                             |
-| Faltas em banco só com saldo positivo; senão, relatório no dia 28   | **Recebida** (semântica pendente)                                           |
-| Saldo positivo permanece; negativo avaliado mensalmente             | **Recebida**                                                                |
-| Fechamento e prazo de ajustes: dia 28                               | **Decidida** — período dia 1–28 (T035); **dias 29–31 pendentes** (DP-3J-14) |
-| Feriados nacionais iniciais; municipais/pontes/exceções caso a caso | **Recebida**                                                                |
-| CPF ausente/inválido/sem colaborador gera erro apontado             | **Decidida (T035):** rejeição só da marcação; resto do lote segue           |
-| Tolerância de 15 min (atraso, saída antecipada, almoço)             | **Decidida (T035):** valor 15 min, aplicada **por dia**                     |
-| Almoço livre garante ≥ 1h; regra automática exata                   | **Decidida (T035):** intervalo &lt;1h considera automaticamente 1h mínima   |
-| Limites +38h / −24h                                                 | **Decidida (T035):** ao atingir, **apenas alerta** — sem ação automática    |
-| DSR não descontado até autorização dos diretores                    | **Hipótese/aguarda diretoria** (DP-3J-21)                                   |
-| BLUE BIOPROX-C; Portaria 671; CPF como identificador                | **Hipótese** (leiaute técnico — DP-3J-20)                                   |
-| Entrada do Ponto V1 é arquivo TXT                                   | **Decidida (T035):** formato de transporte; leiaute técnico segue pendente  |
-| Tabela de horários atribuída no cadastro do colaborador             | **Decidida (T035):** ponto de atribuição (DP-3J-19)                         |
-| Cada empresa só administra as próprias tabelas de horários          | **Decidida (T035)**                                                         |
-| Jornadas planejadas de 9h confirmadas pelo RH como previstas        | **Requisito operacional recebido (T035)** — sem declarar conformidade legal |
-| Exemplos visuais (dia normal, hora extra/banco, folga)              | **Recebida como referência de apresentação** — não substitui DP-3J-18       |
-| Sistema externo observado é só referência funcional/visual          | **Recebida (T035)** — sem integração técnica, API, sincronização ou cópia   |
+| Regra                                                               | Classificação                                                                                        |
+| ------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Sem trabalho inicial em sábados/domingos/feriados/turnos            | **Recebida**                                                                                         |
+| Situações: atestado, folga, férias, compensação, almoço livre       | **Recebida** (catálogo)                                                                              |
+| Horas extras entram no banco                                        | **Recebida** (cálculo pendente)                                                                      |
+| Atrasos não compensados entram no banco                             | **Recebida** (cálculo pendente)                                                                      |
+| Faltas em banco só com saldo positivo; senão, relatório no dia 28   | **Recebida** (semântica pendente)                                                                    |
+| Saldo positivo permanece; negativo avaliado mensalmente             | **Recebida**                                                                                         |
+| Fechamento e prazo de ajustes: dia 28                               | **Recebida** (prazo de ajustes); **período de apuração decidido (T036): dia 26 a dia 25** (DP-3J-14) |
+| Feriados nacionais iniciais; municipais/pontes/exceções caso a caso | **Recebida**                                                                                         |
+| CPF ausente/inválido/sem colaborador gera erro apontado             | **Decidida (T035):** rejeição só da marcação; resto do lote segue                                    |
+| Tolerância de 15 min (atraso, saída antecipada, almoço)             | **Decidida (T035):** valor 15 min, aplicada **por dia**                                              |
+| Almoço livre garante ≥ 1h; regra automática exata                   | **Decidida (T035):** intervalo &lt;1h considera automaticamente 1h mínima                            |
+| Limites +38h / −24h                                                 | **Decidida (T035):** ao atingir, **apenas alerta** — sem ação automática                             |
+| DSR não descontado até autorização dos diretores                    | **Hipótese/aguarda diretoria** (DP-3J-21)                                                            |
+| BLUE BIOPROX-C; Portaria 671; CPF como identificador                | **Hipótese** (leiaute técnico — DP-3J-20)                                                            |
+| Entrada do Ponto V1 é arquivo TXT                                   | **Decidida (T035):** formato de transporte; leiaute técnico segue pendente                           |
+| Tabela de horários atribuída no cadastro do colaborador             | **Decidida (T035):** ponto de atribuição (DP-3J-19)                                                  |
+| Cada empresa só administra as próprias tabelas de horários          | **Decidida (T035)**                                                                                  |
+| Jornadas planejadas de 9h confirmadas pelo RH como previstas        | **Requisito operacional recebido (T035)** — sem declarar conformidade legal                          |
+| Exemplos visuais (dia normal, hora extra/banco, folga)              | **Recebida como referência de apresentação** — não substitui DP-3J-18                                |
+| Sistema externo observado é só referência funcional/visual          | **Recebida (T035)** — sem integração técnica, API, sincronização ou cópia                            |
 
 ## 11. Declaração
 
-Este documento **especifica**, não implementa. A T035 **consolida** decisões
-operacionais recebidas do RH (tolerância por dia, alerta em vez de ação
-automática nos limites de banco, almoço mínimo automático, rejeição só da
+Este documento **especifica**, não implementa. A T035 e a T036 **consolidam**
+decisões operacionais recebidas do RH (tolerância por dia, alerta em vez de
+ação automática nos limites de banco, almoço mínimo automático, rejeição só da
 marcação afetada, horário atribuído no cadastro, isolamento de horários por
 empresa, jornadas de 9h como requisito operacional, entrada TXT, exemplos
 visuais como referência de apresentação, ausência de integração com sistema
-externo) — mas **nenhuma linha de código, schema, migration, API, UI, parser,
-teste ou dado real** é criada por este documento. A **única pendência
-bloqueante remanescente** deste conjunto é o **tratamento dos dias 29, 30 e 31**
-(§8.1, DP-3J-14) — **não inferido**. As demais pendências não tratadas por esta
+externo, e o **período de apuração de dia 26 a dia 25 do mês seguinte**) — mas
+**nenhuma linha de código, schema, migration, API, UI, parser, teste ou dado
+real** é criada por este documento. **Nenhuma pendência bloqueante deste
+conjunto permanece em aberto** (§8.1). As pendências não tratadas por esta
 consolidação (DP-3J-18, 20, 21, 22) permanecem exatamente como estavam.
 **Não declara** conformidade legal, trabalhista ou LGPD; **não habilita** dado
 real, importação, cálculo, fechamento com efeito legal, produção ou exposição
