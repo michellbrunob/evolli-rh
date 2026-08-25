@@ -12,15 +12,18 @@
 - Status: **Baseline V1 aprovada** (2026-08-07) para o núcleo conceitual
   descrito neste documento — fase **Registrar decisão aprovada**. Nenhuma
   fase Implementar foi aberta ou autorizada por esta atualização.
-- **Detalhamento (T034):** a especificação detalhada da V1 operável (importação
-  do relógio, tolerância, situações, banco de horas, fechamento e a fila
-  "Verificar folhas") está em
-  [Jornada e Ponto V1 detalhada](etapa3-jornada-ponto-v1-detalhada.md). Ela
-  **estende** este núcleo com entradas de RH cujas semânticas seguem pendentes
-  (novas pendências `DP-3J-13..22`; a alçada operacional do V1 é **RH como único
-  operador**, e a antiga DP-3J-23 foi reclassificada como não bloqueante);
-  **nada** é decidido ou implementado por ela, e o núcleo mínimo desta Baseline
-  permanece inalterado.
+- **Detalhamento (T034) e consolidação (T035):** a especificação detalhada da
+  V1 operável (importação do relógio, tolerância, situações, banco de horas,
+  fechamento e a fila "Verificar folhas") está em
+  [Jornada e Ponto V1 detalhada](etapa3-jornada-ponto-v1-detalhada.md). A T035
+  **consolidou** novas decisões do RH que resolvem a maior parte das
+  pendências abertas pela T034 (tolerância por dia, alerta nos limites de
+  banco, almoço mínimo automático, rejeição só da marcação, horário atribuído
+  no cadastro, entrada TXT); a alçada operacional do V1 continua **RH como
+  único operador**. A **única pendência bloqueante remanescente** desse
+  conjunto é o **tratamento dos dias 29–31** (`DP-3J-14`); as demais pendências
+  não tratadas (`DP-3J-18`, `20`, `21`, `22`) seguem inalteradas. **Nada** é
+  implementado; o núcleo mínimo desta Baseline permanece inalterado.
 - Fase do SDD: Registrar decisão aprovada. Nenhuma implementação, schema,
   migration, endpoint, dependência ou integração externa criada nesta
   fase.
