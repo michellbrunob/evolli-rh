@@ -102,6 +102,20 @@ export const AUDIT_ACTIONS = [
   // GLOBAL do Master (fail-safe, como `organizacao_estrutura_consultada`), com
   // ação + tipo de recurso + id técnico — nunca dado pessoal.
   "master_consulta_global",
+
+  // T038 — Cadastros: Horarios. Mesma convenção. A trilha registra ação + tipo
+  // de recurso + id técnico — nunca o nome/descrição da tabela, o dia/hora
+  // configurados, nem qualquer dado pessoal do colaborador vinculado.
+  //
+  // `horarios_consultado` existe (como `ponto_consultado`) porque saber qual
+  // horário um colaborador cumpre é dado sensível de presença/jornada — leitura
+  // auditada em regime fail-safe.
+  "horarios_tabela_criada",
+  "horarios_tabela_desativada",
+  "horarios_tabela_reativada",
+  "horarios_vinculo_criado",
+  "horarios_vinculo_encerrado",
+  "horarios_consultado",
 ] as const satisfies readonly AuditAction[];
 
 /**
@@ -145,7 +159,11 @@ export type AuditResource =
   // tipo/rótulo documental (ADR 0011, decisão 10; DP-2E-12).
   | "tipo_documento"
   | "documento_metadado"
-  | "solicitacao_documento";
+  | "solicitacao_documento"
+  // T038 — Cadastros: Horarios. Rótulos técnicos; nunca o nome/descrição da
+  // tabela nem o dia/hora configurados.
+  | "tabela_horario"
+  | "vinculo_horario";
 
 export type RecordAuditEventInput =
   | {

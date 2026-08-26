@@ -4,6 +4,7 @@ import {
   AuthorizationSubject,
   AuthorizationTarget,
   isDocumentosResource,
+  isHorariosResource,
   isOrganizationalResource,
   isPessoasResource,
   isPontoResource,
@@ -43,6 +44,9 @@ export function evaluatePermission(
       }
       if (isDocumentosResource(target.resource)) {
         return evaluateDocumentos(subject, target);
+      }
+      if (isHorariosResource(target.resource)) {
+        return evaluateHorarios(subject, target);
       }
       return false;
   }
@@ -457,6 +461,65 @@ function podeAcaoDocumentos(
       // solicitação nesta V1.
       return action === "read" || action === "create";
 
+    default:
+      return false;
+  }
+}
+
+/**
+ * Cadastros — Horarios (T038). Tabelas de horario por empresa e vínculo
+ * histórico ao colaborador.
+ *
+ * Mesma avaliação em **duas fases** dos ramos anteriores — capacidade no guard
+ * (`targetCompanyId === undefined`), escopo no service, com a empresa da tabela
+ * ou do colaborador já resolvida. A fronteira é `empresa_id`.
+ *
+ * **RH é o ÚNICO perfil operacional** (T037): cria tabela, altera estado
+ * (desativar/reativar), vincula e encerra vínculo — sempre na própria empresa.
+ * `master_tecnico` (T030) **só lê**, em escopo global; nunca cria, altera,
+ * desativa nem vincula. **DP, `gestor`, `colaborador`, `financeiro`,
+ * `admin_tecnico`, `auditor` e `dpo` são NEGADOS** — diferentemente de ponto
+ * (que era RH+DP), aqui a alçada operacional é exclusiva de RH (T037), e a
+ * matriz não deixa nenhuma célula "aberta a interpretação".
+ *
+ * Ações reconhecidas: `create` (tabela/vínculo), `read` (consulta) e `alter`
+ * (mudança de estado da tabela e encerramento de vínculo). Não há `manage`.
+ */
+function evaluateHorarios(
+  subject: AuthorizationSubject,
+  target: AuthorizationTarget,
+): boolean {
+  if (
+    target.action !== "create" &&
+    target.action !== "read" &&
+    target.action !== "alter"
+  ) {
+    return false;
+  }
+
+  const escopoResolvido = target.targetCompanyId !== undefined;
+
+  switch (subject.role) {
+    // Perfil global controlado (T030): LÊ tabelas e vínculos de qualquer
+    // empresa; NUNCA cria, altera, desativa nem vincula (`create`/`alter`
+    // negados). A leitura global é auditada por si (`horarios.consultado`).
+    case "master_tecnico":
+      return target.action === "read";
+
+    // Único operador do domínio (T037), restrito à própria empresa.
+    case "rh":
+      return escopoResolvido
+        ? isSameCompany(subject, target)
+        : subject.companyId !== null;
+
+    // Negados, cada um por decisão registrada:
+    //
+    // `dp`            — a alçada de ponto/horário no V1 é exclusiva de RH
+    //                   (T037). DP não opera horários, ao contrário de ponto.
+    // `admin_tecnico` — mesmo raciocínio de pessoas/ponto: sem exceção global.
+    // `gestor`        — escopo pendente (DP-8).
+    // `colaborador`   — Portal do Colaborador fora de escopo.
+    // `financeiro`/`auditor`/`dpo` — nada concede acesso a horários.
     default:
       return false;
   }
