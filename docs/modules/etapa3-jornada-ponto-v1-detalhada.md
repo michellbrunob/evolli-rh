@@ -215,6 +215,23 @@ nunca em `AccessUser` (ADR 0008 dec. 1).
   legal ou trabalhista (inclusive quanto à Portaria 671, §6); a validade da
   carga horária permanece sujeita a DP-3J-09 (validade legal, jurídico).
 
+> **Fundação implementada (T038).** A **base de cadastro** dos horários acima já
+> está implementada no backend (`apps/api`, módulo `horarios`), estritamente
+> como fundação: **tabela de horário por empresa** (grade semanal de períodos
+> por dia, definição imutável — "alterar" é criar uma **revisão**; desativação
+> **lógica**, sem exclusão física) e **vínculo histórico ao colaborador com
+> vigência** (início e fim opcional). As garantias de integridade estão **no
+> banco, não só no serviço**: sem sobreposição de períodos no mesmo dia
+> (EXCLUSION `int4range`), sem duas tabelas vigentes para o mesmo colaborador na
+> mesma empresa (EXCLUSION `daterange` + índice parcial), vínculo sempre da
+> mesma empresa (FK composta + trigger de integridade colaborador↔empresa).
+> **RH é o único operador** (T037); `master_tecnico` só lê; DP/gestor/colaborador
+> negados. Tudo auditado sem dado pessoal na trilha. **Fora desta fundação e
+> inalterado:** cálculo de jornada/tolerância/banco/DSR, importação
+> TXT/REP/AFD, fechamento, espelho, assinatura e UI (§6, §8) — nenhum deles é
+> tocado pela T038, que **não** implementa apuração nem habilita dado real
+> (MFA, `DS-OPS-01`, DP-3J-09/11 seguem gates).
+
 ### 2.5 Apuração diária
 
 - Para um vínculo e um dia, a apuração **compara** as marcações do dia com o

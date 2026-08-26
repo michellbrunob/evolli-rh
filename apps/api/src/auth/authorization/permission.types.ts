@@ -64,6 +64,21 @@ export const DOCUMENTOS_RESOURCES = [
 export type DocumentosResource = (typeof DOCUMENTOS_RESOURCES)[number];
 
 /**
+ * Recursos de Cadastros — Horarios (T038).
+ *
+ * `tabela_horario` é a grade semanal reutilizável por empresa; `vinculo_horario`
+ * é a atribuição histórica (com vigência) de uma tabela a um colaborador. Não
+ * há recurso de "periodo": período é parte da definição imutável da tabela,
+ * criado junto dela — não uma superfície de autorização própria.
+ */
+export const HORARIOS_RESOURCES = [
+  "tabela_horario",
+  "vinculo_horario",
+] as const;
+
+export type HorariosResource = (typeof HORARIOS_RESOURCES)[number];
+
+/**
  * Recursos/ações desta fatia (matriz §3 da spec). Módulos futuros (Etapa 1+)
  * estendem este union — nunca reduzem o que já está aqui.
  */
@@ -75,7 +90,8 @@ export type AuthorizationResource =
   | OrganizationalResource
   | PessoasResource
   | PontoResource
-  | DocumentosResource;
+  | DocumentosResource
+  | HorariosResource;
 
 export type AuthorizationAction = "read" | "manage" | "alter" | "create";
 
@@ -122,4 +138,10 @@ export function isDocumentosResource(
   resource: AuthorizationResource,
 ): resource is DocumentosResource {
   return (DOCUMENTOS_RESOURCES as readonly string[]).includes(resource);
+}
+
+export function isHorariosResource(
+  resource: AuthorizationResource,
+): resource is HorariosResource {
+  return (HORARIOS_RESOURCES as readonly string[]).includes(resource);
 }

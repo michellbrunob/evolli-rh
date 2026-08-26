@@ -10,6 +10,7 @@ import { OrganizacaoModule } from "./organizacao/organizacao.module";
 import { PessoasModule } from "./pessoas/pessoas.module";
 import { PontoModule } from "./ponto/ponto.module";
 import { DocumentosModule } from "./documentos/documentos.module";
+import { HorariosModule } from "./horarios/horarios.module";
 import { validateEnv } from "./config/env.validation";
 
 @Module({
@@ -28,6 +29,7 @@ import { validateEnv } from "./config/env.validation";
     PessoasModule,
     PontoModule,
     DocumentosModule,
+    HorariosModule,
   ],
 })
 export class AppModule {}

@@ -92,6 +92,12 @@ model AccessUser {
   // `solicitacao_documento`. Identifica o ATOR, nunca o sujeito do documento.
   solicitacoesDocumento SolicitacaoDocumento[] @relation("SolicitacaoDocumentoSolicitante")
 
+  // T038 — Cadastros: Horarios. Quem cadastrou uma tabela de horario e quem
+  // criou um vinculo horario<->colaborador. Mesma natureza das relacoes acima:
+  // identifica o ATOR da operacao, nunca a pessoa cujo horario foi vinculado.
+  tabelasHorarioCriadas  TabelaHorario[]  @relation("HorarioTabelaCriadaPor")
+  vinculosHorarioCriados VinculoHorario[] @relation("HorarioVinculoCriadoPor")
+
   @@index([companyId])
   @@map("access_user")
 }
@@ -290,6 +296,19 @@ enum AuditAction {
   // acesso amplo aceitável. Registra ação + tipo de recurso + id técnico —
   // nunca nome, matrícula, rótulo documental ou qualquer dado pessoal.
   master_consulta_global @map("master.consulta.global")
+
+  // T038 — Cadastros: Horarios e vinculo historico ao colaborador. Mesma
+  // convencao: valor persistido em portugues por ponto
+  // (`horarios.tabela.criada`), identificador Prisma com `_`. A trilha registra
+  // acao + tipo de recurso + id tecnico — NUNCA nome, descricao do horario,
+  // dia/hora configurados ou qualquer dado pessoal (ADR 0004 §5). Acrescentados
+  // ao fim do enum para casar com a migration.
+  horarios_tabela_criada     @map("horarios.tabela.criada")
+  horarios_tabela_desativada @map("horarios.tabela.desativada")
+  horarios_tabela_reativada  @map("horarios.tabela.reativada")
+  horarios_vinculo_criado    @map("horarios.vinculo.criado")
+  horarios_vinculo_encerrado @map("horarios.vinculo.encerrado")
+  horarios_consultado        @map("horarios.consultado")
 }
 
 enum AuditResult {
@@ -402,6 +421,13 @@ model Empresa {
   tiposDocumento        TipoDocumento[]
   documentosMetadado    DocumentoMetadado[]
   solicitacoesDocumento SolicitacaoDocumento[]
+
+  // T038 — Cadastros: Horarios. Cada tabela de horario pertence a UMA empresa
+  // (fronteira `empresa_id`); o vinculo horario<->colaborador carrega
+  // `empresa_id` redundante por desenho, para que a FK COMPOSTA garanta, no
+  // banco, que o vinculo nunca aponte para tabela de outra empresa.
+  tabelasHorario  TabelaHorario[]
+  vinculosHorario VinculoHorario[]
 
   @@index([status])
   @@map("empresa")
@@ -697,6 +723,13 @@ model Colaborador {
   // documento), ja que o colaborador nao carrega `empresa_id` proprio.
   documentosMetadado    DocumentoMetadado[]
   solicitacoesDocumento SolicitacaoDocumento[]
+
+  // T038 — Cadastros: Horarios. Vinculo historico de uma tabela de horario a
+  // este colaborador, com vigencia. Como o colaborador nao carrega
+  // `empresa_id` proprio, a coerencia empresa<->colaborador (o colaborador
+  // precisa ter vinculo funcional na empresa do horario) e garantida por
+  // CONSTRAINT TRIGGER na migration, alem da checagem na aplicacao.
+  vinculosHorario VinculoHorario[]
 
   @@index([situacao])
   @@map("colaborador")
@@ -1170,4 +1203,127 @@ model SolicitacaoDocumento {
   @@index([tipoDocumentoId, empresaId])
   @@index([solicitanteUserId])
   @@map("solicitacao_documento")
+}
+
+// ---------------------------------------------------------------------------
+// T038 — Cadastros: Horarios e vinculo historico ao colaborador.
+//
+// Escopo desta fatia (fundacao): cadastrar TABELAS DE HORARIO por empresa e
+// VINCULAR uma tabela a um colaborador com vigencia historica. NAO ha calculo
+// de jornada, tolerancia, banco de horas, DSR, fechamento, espelho, importacao
+// TXT/REP/AFD nem interface web — todos fora de escopo (T034/T037).
+//
+// Perfil: RH e o UNICO perfil operacional (cria, altera estado, vincula,
+// encerra), restrito a propria empresa (T037). `master_tecnico` so LE (global).
+// DP, gestor e colaborador sao negados.
+// ---------------------------------------------------------------------------
+
+/// Tabela (grade) semanal de horario, reutilizavel dentro de UMA empresa.
+///
+/// A DEFINICAO (os periodos por dia da semana) e IMUTAVEL apos a criacao: nao
+/// existe rota que edite periodos de uma tabela ja criada. "Alterar" o horario
+/// de um colaborador e criar uma NOVA tabela (revisao) e um novo vinculo para
+/// vigencia futura — assim o historico do periodo ja apurado nunca muda por
+/// edicao posterior (T037; requisito de preservacao historica). A tabela pode
+/// ser DESATIVADA logicamente (`ativo=false`): nao pode mais ser vinculada, mas
+/// os vinculos historicos que a usaram permanecem. Nao ha exclusao fisica (a
+/// migration REVOGA DELETE de `evolli_app`).
+model TabelaHorario {
+  id              String  @id @default(uuid())
+  empresaId       String  @map("empresa_id")
+  nome            String
+  ativo           Boolean @default(true)
+  criadoPorUserId String  @map("criado_por_user_id")
+
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  empresa   Empresa          @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  criadoPor AccessUser       @relation("HorarioTabelaCriadaPor", fields: [criadoPorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  periodos  PeriodoHorario[]
+  vinculos  VinculoHorario[]
+
+  /// Alvo da FK COMPOSTA de `vinculo_horario` — garante, no banco, que um
+  /// vinculo so referencie tabela da MESMA empresa.
+  @@unique([id, empresaId])
+  @@index([empresaId, ativo])
+  @@map("tabela_horario")
+}
+
+/// Um periodo de trabalho de um dia da semana de uma tabela (ex.: 08:00–12:00).
+///
+/// `diaSemana` e INTEIRO 1..7 (1=segunda ... 7=domingo), nao enum de banco, de
+/// proposito: a EXCLUSION CONSTRAINT que impede sobreposicao de periodos do
+/// mesmo dia combina, num indice GiST, igualdade em `dia_semana` (via
+/// btree_gist) com sobreposicao de `int4range(inicio_minuto, fim_minuto)` — e
+/// os tipos inteiros nativos do btree_gist sao a base segura para isso. As
+/// horas sao guardadas como MINUTOS desde a meia-noite (0..1440), o que torna o
+/// range e o CHECK (`fim_minuto > inicio_minuto`) diretos. Um dia SEM periodo
+/// (sabado/domingo, ou folga) simplesmente nao tem linha aqui.
+///
+/// Sobreposicao entre periodos do mesmo dia e coerencia inicio<fim sao
+/// garantidas por EXCLUSION CONSTRAINT e CHECK na migration (Prisma nao os
+/// expressa) — este comentario e a documentacao deles. `periodo_horario` e
+/// imutavel: a migration REVOGA UPDATE e DELETE de `evolli_app`.
+model PeriodoHorario {
+  id              String @id @default(uuid())
+  tabelaHorarioId String @map("tabela_horario_id")
+
+  /// 1=segunda ... 7=domingo (CHECK `dia_semana BETWEEN 1 AND 7` na migration).
+  diaSemana Int @map("dia_semana")
+
+  /// Minutos desde a meia-noite, 0..1440 (CHECK na migration).
+  inicioMinuto Int @map("inicio_minuto")
+  fimMinuto    Int @map("fim_minuto")
+
+  criadoEm DateTime @default(now()) @map("criado_em")
+
+  tabela TabelaHorario @relation(fields: [tabelaHorarioId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([tabelaHorarioId, diaSemana])
+  @@map("periodo_horario")
+}
+
+/// Vinculo HISTORICO de uma tabela de horario a um colaborador, com vigencia.
+///
+/// Garantias de banco desta tabela:
+///   - vigencia coerente: `vigencia_fim IS NULL OR vigencia_fim > vigencia_inicio` (CHECK);
+///   - um colaborador NUNCA tem duas tabelas vigentes para o mesmo dia na mesma
+///     empresa: EXCLUSION CONSTRAINT sobre `(colaborador_id, empresa_id,
+///     daterange(vigencia_inicio, vigencia_fim, '[)'))` — periodos adjacentes
+///     nao conflitam (fechar onde o proximo comeca), aberto (`fim` NULL) vira
+///     infinito e conflita com qualquer posterior. Complementada por indice
+///     unico PARCIAL para o caso comum (dois vinculos ABERTOS);
+///   - a tabela vinculada e da MESMA empresa: FK COMPOSTA
+///     `(tabela_horario_id, empresa_id) -> tabela_horario(id, empresa_id)`;
+///   - o colaborador tem vinculo funcional na empresa (nao ha vinculo cruzado
+///     entre empresas): CONSTRAINT TRIGGER, alem da checagem na aplicacao.
+///
+/// Historico preservado: a "troca" de horario fecha o vinculo aberto
+/// (`vigencia_fim`) e cria o proximo — a definicao aplicada a um periodo ja
+/// decorrido nunca e alterada. Sem exclusao fisica (DELETE revogado de
+/// `evolli_app`).
+model VinculoHorario {
+  id              String @id @default(uuid())
+  colaboradorId   String @map("colaborador_id")
+  empresaId       String @map("empresa_id")
+  tabelaHorarioId String @map("tabela_horario_id")
+
+  vigenciaInicio DateTime  @map("vigencia_inicio") @db.Date
+  vigenciaFim    DateTime? @map("vigencia_fim") @db.Date
+
+  criadoPorUserId String @map("criado_por_user_id")
+
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  colaborador Colaborador   @relation(fields: [colaboradorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  empresa     Empresa       @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  tabela      TabelaHorario @relation(fields: [tabelaHorarioId, empresaId], references: [id, empresaId], onDelete: Restrict, onUpdate: Cascade)
+  criadoPor   AccessUser    @relation("HorarioVinculoCriadoPor", fields: [criadoPorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([colaboradorId, empresaId, vigenciaInicio])
+  @@index([empresaId])
+  @@index([tabelaHorarioId, empresaId])
+  @@map("vinculo_horario")
 }

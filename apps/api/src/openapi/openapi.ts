@@ -20,6 +20,10 @@ export function setupOpenApi(
       "documentos",
       "Documentos e admissão digital — V1 de metadados (sem conteúdo): tipo documental, metadado e solicitação",
     )
+    .addTag(
+      "horarios",
+      "Cadastros — Tabelas de horário por empresa e vínculo histórico ao colaborador (sem cálculo de jornada)",
+    )
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
