@@ -12,15 +12,29 @@
 - Status: **Baseline V1 aprovada** (2026-08-07) para o núcleo conceitual
   descrito neste documento — fase **Registrar decisão aprovada**. Nenhuma
   fase Implementar foi aberta ou autorizada por esta atualização.
-- **Detalhamento (T034):** a especificação detalhada da V1 operável (importação
-  do relógio, tolerância, situações, banco de horas, fechamento e a fila
-  "Verificar folhas") está em
-  [Jornada e Ponto V1 detalhada](etapa3-jornada-ponto-v1-detalhada.md). Ela
-  **estende** este núcleo com entradas de RH cujas semânticas seguem pendentes
-  (novas pendências `DP-3J-13..22`; a alçada operacional do V1 é **RH como único
-  operador**, e a antiga DP-3J-23 foi reclassificada como não bloqueante);
-  **nada** é decidido ou implementado por ela, e o núcleo mínimo desta Baseline
-  permanece inalterado.
+- **Detalhamento (T034), consolidação (T035), correção de período (T036) e
+  decisões adicionais (T037):** a especificação detalhada da V1 operável
+  (importação do relógio, tolerância, situações, banco de horas, fechamento e
+  a fila "Verificar folhas") está em
+  [Jornada e Ponto V1 detalhada](etapa3-jornada-ponto-v1-detalhada.md). A T035
+  **consolidou** novas decisões do RH que resolvem a maior parte das
+  pendências abertas pela T034 (tolerância por dia, alerta nos limites de
+  banco, almoço mínimo automático, rejeição só da marcação, horário atribuído
+  no cadastro, entrada TXT); a T036 **resolveu `DP-3J-14`**: o período de
+  apuração é de **dia 26 a dia 25 do mês seguinte**. A T037 **acrescentou**:
+  fechamento no **dia 25**; Espelho de Ponto emitido para **conferência e
+  assinatura manual** do colaborador (ciência/assinatura eletrônica
+  **bloqueada** como evolução futura); **apontamento** — sem cálculo
+  financeiro — de desconto de DSR em falta não justificada (`DP-3J-21`
+  resolvida quanto ao apontamento; cálculo financeiro segue pendente); RH
+  cadastrando tabelas de horários por empresa; vigência do vínculo
+  horário↔colaborador; e a **política de apuração única**, que impede mudança
+  de horário de alterar período já apurado. A alçada operacional do V1
+  continua **RH como único operador**. **Nenhuma pendência bloqueante deste
+  conjunto permanece em aberto**; as demais pendências não tratadas
+  (`DP-3J-18`, `20`, `22`, e o cálculo financeiro de `DP-3J-21`) seguem
+  inalteradas. **Nada** é implementado; o
+  núcleo mínimo desta Baseline permanece inalterado.
 - Fase do SDD: Registrar decisão aprovada. Nenhuma implementação, schema,
   migration, endpoint, dependência ou integração externa criada nesta
   fase.
