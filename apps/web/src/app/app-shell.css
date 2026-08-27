@@ -1,9 +1,11 @@
 /**
  * Shell administrativo (UI-F01) — estrutura visual neutra e reutilizável.
  *
- * Sem dado de domínio, sem tela de módulo, sem fluxo de negócio. Consome apenas
- * os tokens de `tokens.css`. Sem sombras (cards/botões/texto) e sem gradientes
- * decorativos, conforme a referência.
+ * Apenas o envoltório (banner, skip-link, área principal, rodapé); a tela de
+ * domínio renderizada dentro de `.app-shell__main` define seu próprio layout
+ * interno (ver `src/screens/`). Consome apenas os tokens de `tokens.css`. Sem
+ * sombras (cards/botões/texto) e sem gradientes decorativos, conforme a
+ * referência.
  */
 
 .app-shell {
@@ -66,53 +68,20 @@
   color: var(--color-on-dark-muted);
 }
 
-/* Área principal responsiva. */
+/* Área principal responsiva. `min-width: 0` é necessário porque `.app-shell`
+   é um flex container em coluna: sem isso, um item flex (esta área) recusa
+   encolher abaixo do min-content de seus descendentes (ex.: uma tabela larga
+   com rolagem própria), o que vazaria a rolagem horizontal para a página
+   inteira em vez de ficar contida no componente que já a trata. */
 .app-shell__main {
   flex: 1 1 auto;
+  min-width: 0;
   width: 100%;
   max-width: var(--content-max);
   margin: 0 auto;
   padding: clamp(var(--space-lg), 5vw, var(--space-3xl))
     clamp(var(--space-md), 4vw, var(--space-xl));
   outline: none; /* alvo do skip-link; foco não desenha contorno na região */
-}
-
-/* Pilha vertical de seções da área principal. */
-.app-shell__stack {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2xl);
-}
-
-/* Agrupamento neutro de demonstração (rótulo + amostras). */
-.demo-group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-md);
-}
-
-.demo-group__title {
-  margin: 0;
-  font-size: var(--text-lead);
-  line-height: var(--leading-tight);
-  letter-spacing: var(--tracking-tight);
-  font-weight: var(--weight-strong);
-  color: var(--color-ink);
-}
-
-.demo-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-md);
-  align-items: center;
-}
-
-/* Formulário de demonstração: pilha de campos com largura contida. */
-.demo-form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-lg);
-  max-width: 32rem;
 }
 
 /* Rodapé técnico discreto — sem dado real, empresa, usuário ou métrica. */
@@ -140,7 +109,9 @@
 
 /* Transição do skip-link SÓ quando o usuário não pediu menos movimento.
    Os componentes reutilizáveis (Button, Surface, EmptyState, StatusBadge,
-   PageHeader) vivem agora em `src/components/` (UI-F02), cada um com seu CSS. */
+   PageHeader, DataTable, FormField, FormActions) vivem em `src/components/`
+   (UI-F02/UI-F03), cada um com seu CSS; as telas de domínio vivem em
+   `src/screens/`, cada uma com o seu. */
 @media (prefers-reduced-motion: no-preference) {
   .app-shell__skip-link {
     transition: transform 120ms ease;

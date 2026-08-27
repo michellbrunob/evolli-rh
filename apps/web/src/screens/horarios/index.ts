@@ -1,0 +1,1 @@
+export { CadastroHorariosScreen } from "./CadastroHorariosScreen";
