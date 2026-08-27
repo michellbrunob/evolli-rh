@@ -2,12 +2,12 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { App } from "./App";
 
-describe("App — shell + vitrine de componentes (UI-F01/UI-F02)", () => {
+describe("App — shell administrativo + tela Cadastros > Horários (T043)", () => {
   it("usa marcos semânticos e um único banner (a barra do shell)", () => {
     render(<App />);
 
-    // Exatamente um banner: a barra superior do shell. O PageHeader é um <div>
-    // (não landmark), então não há segundo banner competindo na página.
+    // Exatamente um banner: a barra superior do shell. A tela de domínio não
+    // introduz landmark próprio, então não há segundo banner competindo.
     const banner = screen.getByRole("banner");
     expect(banner).toHaveClass("app-shell__topbar");
 
@@ -22,10 +22,12 @@ describe("App — shell + vitrine de componentes (UI-F01/UI-F02)", () => {
     expect(screen.getByText("Painel Administrativo")).toBeInTheDocument();
   });
 
-  it("tem exatamente um título de nível 1", () => {
+  it("tem exatamente um título de nível 1: o da tela Horários", () => {
     render(<App />);
 
-    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    const titulos = screen.getAllByRole("heading", { level: 1 });
+    expect(titulos).toHaveLength(1);
+    expect(titulos[0]).toHaveTextContent("Horários");
   });
 
   it("oferece um link 'pular para o conteúdo' que aponta para o <main>", () => {
@@ -39,68 +41,38 @@ describe("App — shell + vitrine de componentes (UI-F01/UI-F02)", () => {
     expect(alvo).toBe(screen.getByRole("main"));
   });
 
-  it("o <main> é rotulado pelo título da página (aria-labelledby)", () => {
+  it("o <main> é rotulado pelo título da tela (aria-labelledby)", () => {
     render(<App />);
 
     const main = screen.getByRole("main");
     const rotuloId = main.getAttribute("aria-labelledby");
     expect(rotuloId).toBeTruthy();
-    expect(document.getElementById(rotuloId!)?.tagName).toBe("H1");
+    const rotulo = document.getElementById(rotuloId!);
+    expect(rotulo?.tagName).toBe("H1");
+    expect(rotulo).toHaveTextContent("Horários");
   });
 
-  it("demonstra os componentes com rótulos neutros", () => {
+  it("renderiza a tela Cadastros > Horários dentro do <main>", () => {
     render(<App />);
 
+    const main = screen.getByRole("main");
     expect(
-      screen.getByRole("heading", {
-        level: 1,
-        name: /biblioteca de componentes/i,
-      }),
+      screen.getByRole("table", { name: "Tabelas de horário cadastradas" }),
     ).toBeInTheDocument();
-    // Uma amostra de cada componente-chave da vitrine.
-    expect(
-      screen.getByRole("button", { name: "Primária" }),
-    ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Indisponível" })).toBeDisabled();
-    expect(screen.getByText("Cartão neutro")).toBeInTheDocument();
-    expect(screen.getByText("Concluído")).toBeInTheDocument();
-    expect(screen.getByText("Nada para exibir ainda")).toBeInTheDocument();
+    expect(screen.getByText("Somente RH")).toBeInTheDocument();
+    expect(main).toContainElement(screen.getByText("Somente RH"));
   });
 
-  it("demonstra a tabela e o formulário com dados genéricos", () => {
-    render(<App />);
-
-    // Tabela de dados genéricos (Item A / Item B).
-    expect(
-      screen.getByRole("table", { name: "Itens de demonstração" }),
-    ).toBeInTheDocument();
-    expect(screen.getByRole("cell", { name: "Item A" })).toBeInTheDocument();
-
-    // Formulário: rótulos associados aos controles.
-    expect(screen.getByLabelText("Rótulo do item")).toBeInTheDocument();
-    // O rótulo acessível inclui "(obrigatório)", por isso o matcher parcial.
-    expect(screen.getByLabelText(/categoria/i)).toHaveAttribute(
-      "aria-required",
-      "true",
-    );
-    expect(screen.getByLabelText("Campo desabilitado")).toBeDisabled();
-    // Estado de erro comunicado por role=alert (semântica, não só cor).
-    expect(screen.getByRole("alert")).toHaveTextContent(
-      "Informe um valor válido.",
-    );
-  });
-
-  it("não referencia domínio, dados reais, login ou sessão no shell", () => {
+  it("não referencia autenticação, sessão real ou dado sensível no shell", () => {
     render(<App />);
 
     const texto = document.body.innerHTML.toLowerCase();
     for (const termoProibido of [
-      "colaborador",
-      "ponto",
-      "folha",
+      "cpf",
       "reserva fiscal",
-      "documento",
-      "relatório",
+      "secullum",
+      "rwtech",
+      "bioprox",
       "login",
       "senha",
       "sessão",

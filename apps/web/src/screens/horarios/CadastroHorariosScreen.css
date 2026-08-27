@@ -9,6 +9,16 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-lg);
+  min-width: 0;
+}
+
+/* Cada seção é um item flex (coluna): sem `min-width: 0` ela recusaria
+   encolher abaixo do min-content de seus descendentes — em particular a
+   tabela de horários, que é mais larga que o viewport em telas estreitas e já
+   trata a própria rolagem horizontal (`DataTable`/`.evolli-datatable`). Sem
+   isso aqui, essa rolagem vazaria para a página inteira. */
+.horarios-screen > * {
+  min-width: 0;
 }
 
 .horarios-screen__section-title {
