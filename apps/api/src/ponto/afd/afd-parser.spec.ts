@@ -156,6 +156,15 @@ describe("parseAfdSintetico — erros estruturais fatais (fail-closed)", () => {
     esperarRejeicao(arquivo, "AFD_TIPO_REGISTRO_DESCONHECIDO");
   });
 
+  it("NSR de registro de dados não numérico", () => {
+    const arquivo = montarArquivo([
+      montarCabecalho(),
+      `NSRINVALI4000000000000000`, // NSR "NSRINVALI" não numérico; tipo "4" reconhecido
+      montarTrailer({}),
+    ]);
+    esperarRejeicao(arquivo, "AFD_NSR_INVALIDO");
+  });
+
   it("linha curta demais para ler o tipo (truncada além do reconhecível)", () => {
     const arquivo = montarArquivo([
       montarCabecalho(),
