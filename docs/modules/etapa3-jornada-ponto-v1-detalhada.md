@@ -12,7 +12,8 @@
   (T037); evidência técnica da entrada AFD (fabricante, modelo, extração
   manual via Secullum, estrutura observada) em 2026-08-27 (T039); contrato
   técnico do parser AFD a partir da fonte oficial do MTE (leiaute AFD versão
-  "004", Portaria MTP 671/2021) em 2026-08-27 (T040).
+  "004", Portaria MTP 671/2021) em 2026-08-27 (T040); contrato do lote de
+  importação AFD e rastreabilidade em 2026-08-27 (T042).
 - Fase/tarefa: Fase 3 — Jornada e Ponto; **T034** (detalhamento da V1 e da nova
   função "Verificar folhas"); **T035** (consolidação de decisões do RH que
   resolvem parte das pendências abertas pela T034); **T036** (correção do
@@ -28,7 +29,11 @@
   validação estrutural, fail-closed, erro por linha sem expor CPF, auditoria e
   fixtures sintéticos; `DP-3J-20` avança parcialmente — leiaute oficial "004"
   identificado —, preservando homologação do fornecedor e validação jurídica;
-  ver [contrato técnico do parser AFD](etapa3-parser-afd-contrato-tecnico-v1.md)).
+  ver [contrato técnico do parser AFD](etapa3-parser-afd-contrato-tecnico-v1.md));
+  **T042** (contrato do lote de importação AFD e rastreabilidade — máquina de
+  estados, fail-closed × rejeição parcial, cinco camadas separadas, dados
+  mínimos/proibições, autorização e gates; ver
+  [contrato do lote de importação AFD](etapa3-lote-importacao-afd-contrato-v1.md)).
 - Base conceitual (não reaberta): [ADR 0008](../adr/0008-jornada-ponto-rastreavel-baseline-v1.md)
   e [Baseline V1 de Jornada e Ponto](../decisions/etapa3-jornada-ponto-baseline-v1.md)
   (8 decisões, 2026-08-07), detalhadas na
@@ -503,6 +508,16 @@ a ação são **humanas (RH)** e passam pelos fluxos próprios, auditados.
 - **Fonte de dado (reforço, §0):** o arquivo TXT fornece **somente marcações
   brutas**. Empresa, colaborador e horário permanecem **cadastrados no
   Evolli** — a importação nunca cria ou altera esses cadastros.
+- **Contrato do lote de importação (T042):** o **envelope de proveniência e
+  estado** que ligará o parser puro (T041) à futura gravação de marcações está
+  especificado em
+  [Contrato do lote de importação AFD](etapa3-lote-importacao-afd-contrato-v1.md)
+  — máquina de estados do lote, fail-closed × rejeição parcial, cinco camadas
+  separadas (integridade do arquivo → resultados do parser → associação por CPF
+  → marcações persistidas → apuração), dados mínimos/proibições, autorização
+  (RH único operador por empresa; 404 anti-enumeração), idempotência como
+  pendência e gates preservados. **Não** implementa lote, endpoint, upload,
+  banco, associação ou cálculo.
 
 ### 6.1 Referências futuras (não autorizadas para implementação agora)
 
