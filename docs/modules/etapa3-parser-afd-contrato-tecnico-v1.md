@@ -1,13 +1,16 @@
 # Etapa 3 — Contrato técnico do parser AFD (Ponto V1)
 
-- Status: **Especificação técnica — fase Registrar decisão** (T040). **Nenhuma
-  fase Implementar é aberta ou autorizada por este documento.** Não há código,
-  parser, upload, endpoint, banco, migration, UI, cálculo, integração ou dado
-  real aqui — apenas o **contrato técnico** que uma futura implementação (com
-  **AFD sintético**) deverá respeitar.
-- Data: 2026-08-27 (T040).
+- Status: **Contrato técnico (T040) + fundação do núcleo implementada (T041).**
+  O documento em si **não** implementa nada; a **fundação do parser** (núcleo
+  TypeScript puro de interpretação/validação estrutural com AFD **sintético**)
+  foi implementada na T041 (ver "Fundação implementada" abaixo). Permanecem
+  **fora** e como gates: upload, endpoint, banco, migration, UI, cálculo,
+  integração e dado real.
+- Data: 2026-08-27 (T040 — contrato; T041 — fundação do núcleo).
 - Fase/tarefa: Fase 3 — Jornada e Ponto; **T040** (especificação técnica oficial
-  do parser AFD, para uso futuro com dados sintéticos).
+  do parser AFD, para uso futuro com dados sintéticos); **T041** (núcleo do
+  parser AFD sintético — interpretação e validação estrutural do perfil REP-C,
+  sem endpoint/upload/banco/regra trabalhista).
 - Base factual (não reaberta): [Jornada e Ponto V1 detalhada](etapa3-jornada-ponto-v1-detalhada.md)
   (§6, formato TXT/AFD e evidência técnica T039), [ADR 0008](../adr/0008-jornada-ponto-rastreavel-baseline-v1.md)
   (Baseline V1), [spec estrutural da Etapa 3](etapa3-jornada-ponto-rastreavel-estrutural.md).
@@ -51,6 +54,27 @@ formato de arquivo **TXT/AFD** — ver [detalhada §6](etapa3-jornada-ponto-v1-d
 - **Não declara conformidade** legal, trabalhista ou LGPD — inclusive quanto à
   **Portaria MTP 671** (§10). Citar o leiaute oficial **não** adéqua o Evolli à
   Portaria.
+
+> **Fundação implementada (T041).** O **núcleo do parser** deste contrato está
+> implementado no backend como **módulo TypeScript puro e isolado**, em
+> `apps/api/src/ponto/afd/` (`afd-layout.ts`, `afd-parser.types.ts`,
+> `afd-parser.ts`), com fixtures **exclusivamente sintéticas**
+> (`afd-fixtures.ts`) e testes unitários completos (`afd-parser.spec.ts`). A
+> função `parseAfdSintetico(conteudo: Buffer)` interpreta e valida
+> estruturalmente o AFD de **REP-C** (cabeçalho tipo `1`, marcação tipo `3`,
+> trailer tipo `9`), aplicando **fail-closed** para erro estrutural (§5) e
+> **rejeição por marcação** (§7) para linha de tipo `3` inválida, e devolve
+> **em memória** apenas os dados mínimos das marcações aceitas e as pendências
+> técnicas — **sem** log, persistência, upload, endpoint, banco, Prisma,
+> NestJS, associação CPF↔colaborador ou qualquer regra trabalhista. Os erros
+> expõem **apenas** código seguro + `posicaoLinha`/`nsr` técnico, **nunca** CPF,
+> nome, conteúdo da linha, data/hora bruta ou hash (§8). **Permanecem
+> deliberadamente não implementados** (condicionados/pendentes, sem inventar
+> regra): **CRC-16** (§4.7), **validação de assinatura** (§4.8), **normalização
+> do CPF de 12 posições** (§2.2), **política definitiva de lacuna de NSR**
+> (§4.4) e **chave de idempotência** (§4.9). **Nada** de dado real, MFA,
+> `DS-OPS-01` ou conformidade com a Portaria 671 é habilitado pela T041 — todos
+> os gates de §10 seguem intactos.
 
 ## 1. Fonte oficial, versão e escopo aplicável
 
