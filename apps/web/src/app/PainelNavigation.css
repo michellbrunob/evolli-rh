@@ -1,0 +1,108 @@
+/**
+ * PainelNavigation (T044) — só tokens já existentes (tokens.css); sem hex
+ * novo, sem sombra, sem gradiente. Uma única lista de botões: em telas largas
+ * vira uma coluna lateral; em telas estreitas vira uma faixa horizontal com
+ * rolagem própria e contida (mesma técnica já usada pelo `DataTable`).
+ */
+
+.painel-nav {
+  flex: 0 0 auto;
+  width: 220px;
+}
+
+.painel-nav__lista {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.painel-nav__item {
+  margin: 0;
+}
+
+.painel-nav__link {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  min-height: var(--touch-target);
+  padding: var(--space-sm) var(--space-md);
+  border: none;
+  border-left: 3px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-ink-muted);
+  font: inherit;
+  font-weight: var(--weight-regular);
+  text-align: left;
+  cursor: pointer;
+}
+
+.painel-nav__link:hover {
+  background: var(--surface-canvas);
+}
+
+/* Item ativo: nunca só cor — soma peso de fonte, fundo e uma barra lateral
+   sólida (forma), além do sinal semântico `aria-current="page"`. */
+.painel-nav__link--ativo {
+  border-left-color: var(--color-action);
+  background: var(--surface-canvas);
+  color: var(--color-ink);
+  font-weight: var(--weight-strong);
+}
+
+.painel-nav__link-grupo {
+  font-size: var(--text-caption);
+}
+
+.painel-nav__link-sub {
+  font-size: var(--text-caption);
+  color: var(--color-ink-subtle);
+}
+
+.painel-nav__link--ativo .painel-nav__link-sub {
+  color: var(--color-ink-muted);
+}
+
+/* A partir daqui a navegação vira uma faixa horizontal com rolagem própria
+   (nunca a rolagem da página inteira — mesmo princípio do `DataTable`). */
+@media (max-width: 834px) {
+  .painel-nav {
+    width: 100%;
+    overflow-x: auto;
+    border-bottom: 1px solid var(--hairline);
+    background: var(--surface-canvas);
+  }
+
+  .painel-nav__lista {
+    flex-direction: row;
+    gap: var(--space-xs);
+    padding: var(--space-xs) clamp(var(--space-md), 4vw, var(--space-xl));
+  }
+
+  .painel-nav__item {
+    flex: 0 0 auto;
+  }
+
+  .painel-nav__link {
+    flex-direction: row;
+    align-items: center;
+    width: auto;
+    white-space: nowrap;
+    border-left: none;
+    border-bottom: 3px solid transparent;
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  }
+
+  .painel-nav__link--ativo {
+    border-left-color: transparent;
+    border-bottom-color: var(--color-action);
+  }
+
+  .painel-nav__link-grupo::after {
+    content: " ";
+  }
+}

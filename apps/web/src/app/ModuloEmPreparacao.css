@@ -1,0 +1,10 @@
+/**
+ * ModuloEmPreparacao (T044) — só tokens já existentes; sem sombra/gradiente.
+ */
+
+.modulo-em-preparo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  min-width: 0;
+}
