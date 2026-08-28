@@ -344,6 +344,14 @@ Regras recebidas do RH, **a homologar** (semântica e cálculo pendentes):
 > sintético, sem dinheiro/persistência/Folha) foi implementado na T050 — ver
 > [motor de apuração puro V1](etapa3-motor-apuracao-puro-v1.md).
 
+> **Ponteiro (T051).** O **ciclo de vida** do Banco de Horas (extrato, saldo
+> derivado dos eventos, movimentos, invariante de histórico imutável, estados
+> conceituais da **quitação futura** pela Folha — sempre rastreável, nunca
+> apagando movimentos — e as pendências para RH/Jurídico/Folha) está
+> especificado, **somente como documentação**, no
+> [contrato do ciclo de vida do Banco de Horas V1](etapa3-banco-horas-ciclo-vida-contrato-v1.md).
+> Ele **não** implementa nem calcula dinheiro/Folha, e **não** relaxa gates.
+
 ### 2.9 Fechamento mensal
 
 - **Decidido (RH, T037):** o **fechamento do ponto ocorre no dia 25 de cada

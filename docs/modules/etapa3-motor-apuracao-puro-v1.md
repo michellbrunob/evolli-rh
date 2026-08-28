@@ -140,6 +140,14 @@ testável**, isolado.
 > Folha + Jurídico. D1 **não** resolve `DP-3J-22` (marcos dos horários), que
 > segue com o RH.
 
+> **Ponteiro (T051).** O **ciclo de vida** do Banco de Horas (extrato, saldo
+> derivado, movimentos, invariantes e os estados conceituais da **quitação
+> futura** que materializa D3 — evento rastreável que zera o saldo sem apagar
+> movimentos) está especificado, **somente como documentação**, no
+> [contrato do ciclo de vida do Banco de Horas V1](etapa3-banco-horas-ciclo-vida-contrato-v1.md).
+> Este motor continua produzindo apenas o **impacto do dia**; saldo, quitação e
+> pagamento seguem **fora** dele.
+
 ## 3. Contrato do motor puro — entrada
 
 O motor recebe, **por dia e por vínculo** (o chamador já resolveu empresa,
