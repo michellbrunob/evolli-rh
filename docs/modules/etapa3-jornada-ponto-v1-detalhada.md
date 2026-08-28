@@ -234,6 +234,14 @@ nunca em `AccessUser` (ADR 0008 dec. 1).
   legal ou trabalhista (inclusive quanto à Portaria 671, §6); a validade da
   carga horária permanece sujeita a DP-3J-09 (validade legal, jurídico).
 
+> **Decisão registrada (T050 — D1).** O horário **2 (HORARIO LIBERTY)**, cujos
+> marcos não foram recebidos (DP-3J-22, §9), **permanece cadastrado, porém
+> inicialmente inativo/não atribuível** no V1; **RH pode habilitar/desabilitar
+> tabelas por empresa** (desativação lógica), e essa mudança **não reabre
+> períodos já apurados** (reforça a imutabilidade acima). Ver
+> [motor de apuração puro V1 §2](etapa3-motor-apuracao-puro-v1.md). Os marcos
+> dos horários 1/2/19 seguem pendentes (DP-3J-22).
+
 > **Fundação implementada (T038).** A **base de cadastro** dos horários acima já
 > está implementada no backend (`apps/api`, módulo `horarios`), estritamente
 > como fundação: **tabela de horário por empresa** (grade semanal de períodos
@@ -312,6 +320,16 @@ Regras recebidas do RH, **a homologar** (semântica e cálculo pendentes):
 > O motor de cálculo do banco **não é implementado nem especificado
 > numericamente** aqui — permanece dependente de decisão de produto e do gate de
 > validade legal (DP-3J-09), coerente com a Baseline V1 (Decisão 6).
+
+> **Decisões registradas (T050 — D2/D3).** **D2:** a **hora extra positiva entra
+> exclusivamente no banco de horas** — não vira pagamento nem valor monetário
+> nesta fatia — e **não compensa nem apaga** débito de atraso/saída antecipada
+> (crédito e débito são componentes separados). **D3:** um **pagamento futuro**
+> de saldo positivo **zera o saldo corrente preservando o histórico auditável**,
+> **sem** calcular valor monetário nem integrar Folha (o valor segue em
+> DP-3J-21, cálculo financeiro). Um **motor puro de apuração diária** (só dado
+> sintético, sem dinheiro/persistência/Folha) foi implementado na T050 — ver
+> [motor de apuração puro V1](etapa3-motor-apuracao-puro-v1.md).
 
 ### 2.9 Fechamento mensal
 
