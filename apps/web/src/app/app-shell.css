@@ -68,19 +68,32 @@
   color: var(--color-on-dark-muted);
 }
 
-/* Área principal responsiva. `min-width: 0` é necessário porque `.app-shell`
-   é um flex container em coluna: sem isso, um item flex (esta área) recusa
-   encolher abaixo do min-content de seus descendentes (ex.: uma tabela larga
-   com rolagem própria), o que vazaria a rolagem horizontal para a página
-   inteira em vez de ficar contida no componente que já a trata. */
-.app-shell__main {
+/* Corpo do painel: navegação (`PainelNavigation`) + área principal, lado a
+   lado em telas largas. `min-width: 0` por ser flex container dentro de
+   `.app-shell` (também flex em coluna) — mesmo motivo do item abaixo. */
+.app-shell__body {
   flex: 1 1 auto;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
   min-width: 0;
   width: 100%;
   max-width: var(--content-max);
   margin: 0 auto;
-  padding: clamp(var(--space-lg), 5vw, var(--space-3xl))
-    clamp(var(--space-md), 4vw, var(--space-xl));
+  gap: clamp(var(--space-md), 3vw, var(--space-xl));
+  padding: 0 clamp(var(--space-md), 4vw, var(--space-xl));
+}
+
+/* Área principal responsiva. `min-width: 0` é necessário porque o item flex
+   (esta área) recusaria, por padrão, encolher abaixo do min-content de seus
+   descendentes (ex.: uma tabela larga com rolagem própria), o que vazaria a
+   rolagem horizontal para a página inteira em vez de ficar contida no
+   componente que já a trata. */
+.app-shell__main {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+  padding: clamp(var(--space-lg), 5vw, var(--space-3xl)) 0;
   outline: none; /* alvo do skip-link; foco não desenha contorno na região */
 }
 
@@ -118,10 +131,23 @@
   }
 }
 
-/* Ajustes por breakpoint (referência: 834px / 640px). */
+/* Ajustes por breakpoint (referência: 834px / 640px). Abaixo de 834px a
+   navegação vira faixa horizontal (`PainelNavigation.css`) acima do
+   conteúdo — o corpo empilha em coluna. */
 @media (max-width: 834px) {
   .app-shell__topbar-inner {
     min-height: 52px;
+  }
+
+  .app-shell__body {
+    flex-direction: column;
+    gap: 0;
+    padding: 0;
+  }
+
+  .app-shell__main {
+    padding: clamp(var(--space-lg), 5vw, var(--space-3xl))
+      clamp(var(--space-md), 4vw, var(--space-xl));
   }
 }
 

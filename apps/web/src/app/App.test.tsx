@@ -1,8 +1,8 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { App } from "./App";
 
-describe("App — shell administrativo + tela Cadastros > Horários (T043)", () => {
+describe("App — shell administrativo + navegação visual (T044)", () => {
   it("usa marcos semânticos e um único banner (a barra do shell)", () => {
     render(<App />);
 
@@ -79,6 +79,77 @@ describe("App — shell administrativo + tela Cadastros > Horários (T043)", () 
       "mfa",
     ]) {
       expect(texto).not.toContain(termoProibido);
+    }
+  });
+
+  it("apresenta a navegação com os cinco destinos, Cadastros ativo por padrão", () => {
+    render(<App />);
+
+    const nav = screen.getByRole("navigation", {
+      name: "Navegação do painel",
+    });
+    expect(nav).toBeInTheDocument();
+
+    for (const rotulo of ["Início", "Pessoas", "Ponto", "Documentos"]) {
+      expect(screen.getByRole("button", { name: rotulo })).toBeInTheDocument();
+    }
+
+    const cadastros = screen.getByRole("button", { name: /Cadastros/ });
+    expect(cadastros).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("button", { name: "Início" })).not.toHaveAttribute(
+      "aria-current",
+    );
+  });
+
+  it("troca o conteúdo do <main> ao selecionar outro destino, com h1 único", () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Pessoas" }));
+
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Pessoas" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Módulo em preparação")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("table", { name: "Tabelas de horário cadastradas" }),
+    ).not.toBeInTheDocument();
+
+    const pessoasBtn = screen.getByRole("button", { name: "Pessoas" });
+    expect(pessoasBtn).toHaveAttribute("aria-current", "page");
+    expect(
+      screen.getByRole("button", { name: /Cadastros/ }),
+    ).not.toHaveAttribute("aria-current");
+  });
+
+  it("os quatro destinos em preparação mostram título próprio e nenhum dado real", () => {
+    render(<App />);
+
+    for (const [rotulo, tituloEsperado] of [
+      ["Início", "Início"],
+      ["Pessoas", "Pessoas"],
+      ["Ponto", "Ponto"],
+      ["Documentos", "Documentos"],
+    ] as const) {
+      fireEvent.click(screen.getByRole("button", { name: rotulo }));
+      expect(
+        screen.getByRole("heading", { level: 1, name: tituloEsperado }),
+      ).toBeInTheDocument();
+      expect(screen.getByText("Módulo em preparação")).toBeInTheDocument();
+    }
+  });
+
+  it("cada botão de navegação é um <button> nativo, operável por teclado", () => {
+    render(<App />);
+
+    const nav = screen.getByRole("navigation", {
+      name: "Navegação do painel",
+    });
+    const botoes = Array.from(nav.querySelectorAll("button"));
+    expect(botoes).toHaveLength(5);
+    for (const botao of botoes) {
+      expect(botao.tagName).toBe("BUTTON");
+      expect(botao).toHaveAttribute("type", "button");
     }
   });
 });
