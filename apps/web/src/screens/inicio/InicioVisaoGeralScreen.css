@@ -1,0 +1,105 @@
+/**
+ * Início > Visão geral (T048) — só tokens já existentes (tokens.css); sem
+ * hexadecimal novo, sem sombra, sem gradiente. Layout responsivo: pilha
+ * vertical de seções, com a grade de cards colapsando para uma coluna em
+ * telas estreitas (via `auto-fit`, sem breakpoint manual).
+ */
+
+.inicio-visao-geral-screen {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.inicio-visao-geral-screen__section-title {
+  margin: 0 0 var(--space-sm);
+  font-size: var(--text-lead);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  font-weight: var(--weight-strong);
+  color: var(--color-ink);
+}
+
+/* Aviso — reaproveita os tokens semânticos de "info". */
+.inicio-visao-geral-screen__aviso {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+  background: var(--status-info-surface);
+  border-color: var(--status-info-border);
+}
+
+.inicio-visao-geral-screen__aviso-texto {
+  margin: 0;
+  color: var(--color-ink);
+  flex: 1 1 16rem;
+}
+
+/* Destaque de pendências de ponto — tokens semânticos de "warning". */
+.inicio-visao-geral-screen__destaque {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  background: var(--status-warning-surface);
+  border-color: var(--status-warning-border);
+}
+
+.inicio-visao-geral-screen__destaque-titulo {
+  margin: 0;
+  font-size: var(--text-lead);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  font-weight: var(--weight-strong);
+  color: var(--color-ink);
+}
+
+.inicio-visao-geral-screen__destaque-metrica {
+  margin: 0;
+  font-size: var(--text-display);
+  font-weight: var(--weight-bold);
+  color: var(--color-ink);
+}
+
+.inicio-visao-geral-screen__destaque-texto {
+  margin: 0;
+  color: var(--color-ink-subtle);
+}
+
+/* Grade de cards de módulo — colapsa para uma coluna quando não há espaço
+   para pelo menos 220px por card, sem precisar de um breakpoint manual. */
+.inicio-visao-geral-screen__grade {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-md);
+}
+
+.inicio-visao-geral-screen__card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-sm);
+}
+
+.inicio-visao-geral-screen__card-titulo {
+  margin: 0;
+  font-size: var(--text-body);
+  font-weight: var(--weight-strong);
+  color: var(--color-ink);
+}
+
+.inicio-visao-geral-screen__card-metrica {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+  color: var(--color-ink);
+}
+
+.inicio-visao-geral-screen__card-descricao {
+  margin: 0;
+  color: var(--color-ink-subtle);
+  font-size: var(--text-caption);
+}

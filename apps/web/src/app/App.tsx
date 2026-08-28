@@ -4,14 +4,19 @@
  *
  * Envoltório visual neutro (banner, skip-link, navegação, main, rodapé). A
  * navegação (`PainelNavigation`) troca apenas um estado local de "destino
- * selecionado" — sem React Router, sem rota real, sem API/fetch. "Cadastros"
+ * selecionado" — sem React Router, sem rota real, sem API/fetch. Os cinco
+ * destinos já têm tela própria: "Início" (Visão geral, T048), "Cadastros"
  * (Horários, T043), "Pessoas" (Horário de trabalho, T046), "Ponto"
- * (Verificar folhas, T045) e "Documentos" (Metadados, T047) têm tela
- * própria; o destino "Início" mostra um estado vazio claro de módulo em
- * preparação (`ModuloEmPreparacao`). Sem autenticação, sessão ou dado real.
- * A presença deste shell não concede nem implica autorização: a tela
- * renderizada continua dependendo da decisão do servidor por papel, escopo
- * e objeto (docs/modules/painel-administrativo-web-v1.md, §3.6).
+ * (Verificar folhas, T045) e "Documentos" (Metadados, T047). Os atalhos da
+ * Visão geral também trocam apenas esse mesmo estado local (`onNavegar` =
+ * `setDestinoAtivoId`). Sem autenticação, sessão ou dado real. A presença
+ * deste shell não concede nem implica autorização: a tela renderizada
+ * continua dependendo da decisão do servidor por papel, escopo e objeto
+ * (docs/modules/painel-administrativo-web-v1.md, §3.6).
+ *
+ * `ModuloEmPreparacao` permanece importado como retorno defensivo de
+ * `conteudoDoDestino` para qualquer destino fora da lista conhecida — hoje
+ * inalcançável, já que todos os itens de `DESTINOS_PAINEL` têm tela própria.
  *
  * O cliente CSRF (`../api/csrfClient`) permanece isolado e NÃO é importado
  * aqui: não há login nem sessão nesta fundação.
@@ -21,26 +26,28 @@ import "./tokens.css";
 import "./app-shell.css";
 import { DocumentosMetadadosScreen } from "../screens/documentos";
 import { CadastroHorariosScreen } from "../screens/horarios";
+import { InicioVisaoGeralScreen } from "../screens/inicio";
 import { PessoasHorarioScreen } from "../screens/pessoas";
 import { VerificarFolhasScreen } from "../screens/ponto";
 import { ModuloEmPreparacao } from "./ModuloEmPreparacao";
 import { DESTINOS_PAINEL, PainelNavigation } from "./PainelNavigation";
 
-/** Descrição neutra por destino ainda sem tela própria. */
-const DESCRICAO_EM_PREPARO: Record<string, string> = {
-  inicio:
-    "A tela inicial do painel ainda está em preparação. Quando estiver disponível, ela reunirá os atalhos autorizados ao seu papel.",
-};
-
 /** `titleId` do `h1` de cada destino, para `aria-labelledby` do `<main>`. */
 const TITULO_ID_POR_DESTINO: Record<string, string> = {
+  inicio: "inicio-visao-geral-titulo",
   cadastros: "horarios-titulo",
   pessoas: "pessoas-horario-titulo",
   ponto: "verificar-folhas-titulo",
   documentos: "documentos-metadados-titulo",
 };
 
-function conteudoDoDestino(destinoId: string) {
+function conteudoDoDestino(
+  destinoId: string,
+  onNavegar: (destinoId: string) => void,
+) {
+  if (destinoId === "inicio") {
+    return <InicioVisaoGeralScreen onNavegar={onNavegar} />;
+  }
   if (destinoId === "cadastros") {
     return <CadastroHorariosScreen />;
   }
@@ -57,10 +64,7 @@ function conteudoDoDestino(destinoId: string) {
   return (
     <ModuloEmPreparacao
       titulo={destino?.label ?? "Módulo"}
-      descricao={
-        DESCRICAO_EM_PREPARO[destinoId] ??
-        "Este módulo ainda está em preparação."
-      }
+      descricao="Este módulo ainda está em preparação."
     />
   );
 }
@@ -95,7 +99,7 @@ export function App() {
             TITULO_ID_POR_DESTINO[destinoAtivoId] ?? "modulo-titulo"
           }
         >
-          {conteudoDoDestino(destinoAtivoId)}
+          {conteudoDoDestino(destinoAtivoId, setDestinoAtivoId)}
         </main>
       </div>
 
