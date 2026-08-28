@@ -42,12 +42,17 @@ describe("apurarDiaSintetico — cenários homologados (sintéticos)", () => {
   it("(b) atraso + hora extra: crédito e débito separados, sem compensação", () => {
     const r = apurado(apurarDiaSintetico(CENARIO_ATRASO_MAIS_EXTRA));
 
-    // 30 min de atraso no 1º bloco; 60 min além no 2º bloco.
-    expect(r.debitoAtrasoSaidaAntecipadaMinutos).toBe(30);
-    expect(r.creditoHoraExtraMinutos).toBe(60);
-    // Componentes permanecem separados — nada de líquido de 30.
-    expect(r.impactoBanco).toEqual({ creditoMinutos: 60, debitoMinutos: 30 });
-    expect(r.diferencaNegativaBrutaMinutos).toBe(30);
+    // Homologado (caderno §4.1): previsto 08:00–12:00 / 13:00–17:00; marcações
+    // 08:25 / 12:00 / 13:00 / 18:30. 25 min de atraso no 1º bloco; 90 min além
+    // no 2º bloco. Tempo efetivo 545 min (9h05).
+    expect(r.jornadaPrevistaMinutos).toBe(480);
+    expect(r.tempoEfetivoTrabalhadoMinutos).toBe(545);
+    expect(r.jornadaComputadaMinutos).toBe(545);
+    expect(r.debitoAtrasoSaidaAntecipadaMinutos).toBe(25);
+    expect(r.creditoHoraExtraMinutos).toBe(90);
+    // Componentes permanecem separados — o crédito de 90 não abate o débito de 25.
+    expect(r.impactoBanco).toEqual({ creditoMinutos: 90, debitoMinutos: 25 });
+    expect(r.diferencaNegativaBrutaMinutos).toBe(25);
     expect(r.toleranciaAplicada).toBe(false);
   });
 

@@ -50,13 +50,19 @@ export const CENARIO_DIA_NORMAL: ApuracaoDiariaEntrada = montarDia({
 });
 
 /**
- * Cenário homologado (b) — **atraso + hora extra**: entra 30 min atrasado no
- * 1º bloco e sai 60 min além no 2º bloco. Débito (30) e crédito (60) devem
- * permanecer **separados** (hora extra não compensa atraso).
+ * Cenário homologado (b) — **atraso + hora extra** (valores homologados pelo RH,
+ * caderno §4.1). Previsto 08:00–12:00 / 13:00–17:00; marcações sintéticas
+ * 08:25 / 12:00 / 13:00 / 18:30. Entra 25 min atrasado no 1º bloco e sai 90 min
+ * além no 2º bloco: tempo efetivo 545 min (9h05), **débito 25**, **crédito 90**,
+ * componentes **separados** (hora extra não compensa atraso).
  */
 export const CENARIO_ATRASO_MAIS_EXTRA: ApuracaoDiariaEntrada = montarDia({
   classificacao: "regular",
-  marcacoes: ["08:30", "12:00", "14:00", "19:00"],
+  faixasPrevistas: [
+    { inicio: "08:00", fim: "12:00" },
+    { inicio: "13:00", fim: "17:00" },
+  ],
+  marcacoes: ["08:25", "12:00", "13:00", "18:30"],
 });
 
 /**
