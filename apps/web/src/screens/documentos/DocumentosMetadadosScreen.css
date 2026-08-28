@@ -1,0 +1,92 @@
+/**
+ * Documentos > Metadados (T047) — só tokens já existentes (tokens.css);
+ * sem hexadecimal novo, sem sombra, sem gradiente. Layout responsivo: pilha
+ * vertical de seções.
+ */
+
+.documentos-metadados-screen {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  min-width: 0;
+}
+
+/* Cada seção é um item flex (coluna): sem `min-width: 0` ela recusaria
+   encolher abaixo do min-content de seus descendentes — em particular as
+   tabelas, que podem ser mais largas que o viewport em telas estreitas e já
+   tratam a própria rolagem horizontal (`DataTable`/`.evolli-datatable`). Sem
+   isso aqui, essa rolagem vazaria para a página inteira (mesmo princípio já
+   aplicado nas telas anteriores: T043, T045, T046). */
+.documentos-metadados-screen > * {
+  min-width: 0;
+}
+
+.documentos-metadados-screen__section-title {
+  margin: 0 0 var(--space-sm);
+  font-size: var(--text-lead);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  font-weight: var(--weight-strong);
+  color: var(--color-ink);
+}
+
+/* Avisos — reaproveitam os tokens semânticos de "info". */
+.documentos-metadados-screen__aviso {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+  background: var(--status-info-surface);
+  border-color: var(--status-info-border);
+}
+
+.documentos-metadados-screen__aviso-texto {
+  margin: 0;
+  color: var(--color-ink);
+  flex: 1 1 16rem;
+}
+
+/* Alternador do estado de demonstração (dados / vazio / erro). */
+.documentos-metadados-screen__demo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.documentos-metadados-screen__demo-texto {
+  margin: 0;
+  color: var(--color-ink-subtle);
+  font-size: var(--text-caption);
+}
+
+.documentos-metadados-screen__demo-botoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+/* Bloco de erro — tokens semânticos de "danger". */
+.documentos-metadados-screen__erro {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  background: var(--status-danger-surface);
+  border-color: var(--status-danger-border);
+}
+
+.documentos-metadados-screen__erro-referencia {
+  margin: 0;
+  font-size: var(--text-caption);
+  color: var(--color-ink-subtle);
+}
+
+.documentos-metadados-screen__erro-referencia code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.documentos-metadados-screen__validade-nota {
+  margin: var(--space-sm) 0 0;
+  font-size: var(--text-caption);
+  color: var(--color-ink-subtle);
+}

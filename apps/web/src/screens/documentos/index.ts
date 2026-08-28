@@ -1,0 +1,1 @@
+export { DocumentosMetadadosScreen } from "./DocumentosMetadadosScreen";
