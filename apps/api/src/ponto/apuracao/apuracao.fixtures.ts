@@ -34,6 +34,9 @@ export function montarDia(
     ...(parcial.almocoLivre !== undefined
       ? { almocoLivre: parcial.almocoLivre }
       : {}),
+    ...(parcial.limiteJornadaDiariaMinutos !== undefined
+      ? { limiteJornadaDiariaMinutos: parcial.limiteJornadaDiariaMinutos }
+      : {}),
   };
 }
 

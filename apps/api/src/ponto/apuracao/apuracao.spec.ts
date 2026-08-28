@@ -320,6 +320,120 @@ describe("apurarDiaSintetico — entrada inválida (falha segura)", () => {
   }
 });
 
+describe("apurarDiaSintetico — alerta não financeiro de limite diário (CCT)", () => {
+  // Faixa única de 10h (08:00–18:00): jornada computada = 600 min, on-time.
+  const diaLongo = {
+    classificacao: "regular" as const,
+    faixasPrevistas: [{ inicio: "08:00", fim: "18:00" }],
+    marcacoes: ["08:00", "18:00"],
+  };
+
+  it("sinaliza (sem bloquear/pagar) quando a jornada computada excede o limite", () => {
+    const r = apurado(
+      apurarDiaSintetico(
+        montarDia({ ...diaLongo, limiteJornadaDiariaMinutos: 480 }),
+      ),
+    );
+    // Continua apurado (não bloqueia) e não altera crédito/débito.
+    expect(r.jornadaComputadaMinutos).toBe(600);
+    expect(r.creditoHoraExtraMinutos).toBe(0);
+    expect(r.debitoAtrasoSaidaAntecipadaMinutos).toBe(0);
+    expect(r.apontamentos).toEqual([
+      { codigo: "alerta_jornada_diaria_excedida", financeiro: false },
+    ]);
+    // O alerta é NÃO financeiro.
+    for (const apontamento of r.apontamentos) {
+      expect(apontamento.financeiro).toBe(false);
+    }
+  });
+
+  it("não sinaliza quando a jornada computada é igual ou inferior ao limite", () => {
+    const igual = apurado(
+      apurarDiaSintetico(
+        montarDia({ ...diaLongo, limiteJornadaDiariaMinutos: 600 }),
+      ),
+    );
+    expect(igual.apontamentos).toEqual([]);
+
+    const acima = apurado(
+      apurarDiaSintetico(
+        montarDia({ ...diaLongo, limiteJornadaDiariaMinutos: 601 }),
+      ),
+    );
+    expect(acima.apontamentos).toEqual([]);
+  });
+
+  it("não sinaliza quando nenhum limite é configurado", () => {
+    const r = apurado(apurarDiaSintetico(montarDia(diaLongo)));
+    expect(r.apontamentos).toEqual([]);
+  });
+});
+
+describe("apurarDiaSintetico — feriado trabalhado (sinalizado, não regular)", () => {
+  it("feriado com marcações: sinaliza sem calcular crédito/débito", () => {
+    const r = apurado(
+      apurarDiaSintetico(
+        montarDia({
+          classificacao: "feriado",
+          marcacoes: ["08:00", "12:00", "14:00", "18:00"],
+        }),
+      ),
+    );
+    // Não é tratado como dia regular: nada é apurado a partir das marcações.
+    expect(r.tempoEfetivoTrabalhadoMinutos).toBe(0);
+    expect(r.jornadaComputadaMinutos).toBe(0);
+    expect(r.impactoBanco).toEqual({ creditoMinutos: 0, debitoMinutos: 0 });
+    expect(r.apontamentos).toEqual([
+      { codigo: "feriado_trabalhado_sinalizado", financeiro: false },
+    ]);
+  });
+
+  it("feriado sem marcações: nenhum apontamento", () => {
+    const r = apurado(
+      apurarDiaSintetico(montarDia({ classificacao: "feriado" })),
+    );
+    expect(r.apontamentos).toEqual([]);
+  });
+});
+
+describe("apuração — sem efeito financeiro na saída", () => {
+  it("nenhum resultado expõe valor/percentual/pagamento/salário/Folha", () => {
+    const resultados = [
+      apurarDiaSintetico(CENARIO_ATRASO_MAIS_EXTRA),
+      apurarDiaSintetico(
+        montarDia({
+          classificacao: "regular",
+          faixasPrevistas: [{ inicio: "08:00", fim: "18:00" }],
+          marcacoes: ["08:00", "18:00"],
+          limiteJornadaDiariaMinutos: 480,
+        }),
+      ),
+      apurarDiaSintetico(
+        montarDia({
+          classificacao: "feriado",
+          marcacoes: ["08:00", "12:00"],
+        }),
+      ),
+    ];
+    for (const resultado of resultados) {
+      const texto = JSON.stringify(resultado).toLowerCase();
+      for (const termoProibido of [
+        "valor",
+        "percentual",
+        "pagamento",
+        "salario",
+        "salário",
+        "reais",
+        "dinheiro",
+        "folha",
+        "monet",
+      ]) {
+        expect(texto).not.toContain(termoProibido);
+      }
+    }
+  });
+});
+
 describe("apuração — pureza (sem framework nem dado real)", () => {
   function importsDoArquivo(nomeArquivo: string): string[] {
     const fonte = readFileSync(join(__dirname, nomeArquivo), "utf8");

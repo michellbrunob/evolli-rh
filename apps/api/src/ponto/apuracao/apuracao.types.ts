@@ -51,10 +51,26 @@ export interface ApuracaoDiariaEntrada {
   readonly classificacao: ClassificacaoDia;
   /** Quando verdadeiro, aplica o intervalo mínimo de 1h (almoço livre). */
   readonly almocoLivre?: boolean;
+  /**
+   * Limite diário de jornada (min) **configurado pelo chamador** — nunca um
+   * valor legal fixado no código. Quando informado, a jornada computada acima
+   * dele gera um **alerta não financeiro** (`alerta_jornada_diaria_excedida`),
+   * sem bloquear nem calcular pagamento. Ver nota de convergência com a CCT.
+   */
+  readonly limiteJornadaDiariaMinutos?: number;
 }
 
-/** Código de apontamento — catálogo fechado, sem texto livre. */
-export type ApontamentoCodigo = "dsr_desconto_sinalizado";
+/**
+ * Código de apontamento — catálogo fechado, sem texto livre. Todos os
+ * apontamentos são **não financeiros** (ver `Apontamento`).
+ */
+export type ApontamentoCodigo =
+  /** Falta injustificada: sinalizador de desconto de DSR (não financeiro, R8). */
+  | "dsr_desconto_sinalizado"
+  /** Jornada computada acima do limite diário configurado (alerta, §4.5). */
+  | "alerta_jornada_diaria_excedida"
+  /** Feriado com marcações: trabalho em feriado a tratar manualmente pelo RH. */
+  | "feriado_trabalhado_sinalizado";
 
 /**
  * Apontamento **não financeiro** — um sinalizador codificado. O campo

@@ -201,6 +201,19 @@ function apurarRegular(
   const debito = dentroDaTolerancia ? 0 : totalDeficit;
   const credito = totalExtra;
 
+  // Alerta NÃO financeiro quando a jornada computada ultrapassa um limite
+  // diário fornecido pelo chamador (nunca um valor legal fixado no código). O
+  // alerta apenas sinaliza — não bloqueia, não calcula pagamento e não altera
+  // crédito/débito (contrato §4.5; nota de convergência com a CCT, C4/C6).
+  const apontamentos: Apontamento[] = [];
+  const limite = entrada.limiteJornadaDiariaMinutos;
+  if (typeof limite === "number" && jornadaComputada > limite) {
+    apontamentos.push({
+      codigo: "alerta_jornada_diaria_excedida",
+      financeiro: false,
+    });
+  }
+
   return {
     status: "apurado",
     classificacao: entrada.classificacao,
@@ -212,7 +225,7 @@ function apurarRegular(
     diferencaNegativaBrutaMinutos: totalDeficit,
     toleranciaAplicada: totalDeficit > 0 && dentroDaTolerancia,
     impactoBanco: { creditoMinutos: credito, debitoMinutos: debito },
-    apontamentos: [],
+    apontamentos,
   };
 }
 
@@ -248,11 +261,24 @@ export function apurarDiaSintetico(
       ]);
 
     case "compensacao":
-      // Débito proposto da jornada prevista, sem validar saldo (contrato §5).
+      // Débito proposto da jornada prevista, sem validar saldo nem acordo
+      // (contrato §5; nota de convergência com a CCT, C3).
       return apuradoSimples(entrada, jornadaPrevista, jornadaPrevista, []);
 
-    case "falta_justificada":
     case "feriado":
+      // Feriado NÃO é apurado como operação regular automática. Se houver
+      // marcações (trabalho em feriado), apenas SINALIZA — sem cálculo, crédito
+      // ou débito (contrato §5; CCT C4). Tratamento é manual do RH.
+      return apuradoSimples(
+        entrada,
+        jornadaPrevista,
+        0,
+        marcacoes.length > 0
+          ? [{ codigo: "feriado_trabalhado_sinalizado", financeiro: false }]
+          : [],
+      );
+
+    case "falta_justificada":
     case "folga":
     case "ferias":
       // Sem débito de banco, sem crédito, sem apontamento.
