@@ -1,13 +1,14 @@
 # Etapa 3 — Caderno de homologação da apuração de jornada e banco de horas (Ponto V1)
 
-- Status: **Especificação — fase Registrar decisão** (T049). **Nenhuma fase
-  Implementar é aberta ou autorizada por este documento.** Não há código,
-  teste, schema, migration, endpoint, API, UI, parser, importação, associação
-  por CPF, persistência, cálculo, banco de horas, DSR, fechamento, espelho ou
-  assinatura aqui — apenas um **caderno de homologação** que transforma os
-  requisitos já recebidos do RH em **casos de decisão/teste** para uma futura
-  apuração.
-- Data: 2026-08-28 (T049).
+- Status: **Especificação — fase Registrar decisão** (T049), **atualizado pela
+  T050** para registrar os **três exemplos de teste homologados** para o motor
+  sintético (§4.1) e reclassificar `DP-3J-18` como resolvida **somente quanto aos
+  exemplos de teste**. O caderno em si continua **sem** código, schema,
+  migration, endpoint, API, UI, parser, importação, associação por CPF,
+  persistência, cálculo com dado real, fechamento, espelho, assinatura ou dado
+  real — apenas **casos de decisão/teste**. O motor sintético em si vive em
+  `apps/api/src/ponto/apuracao/` (T050), fora deste documento.
+- Data: 2026-08-28 (T049; atualização T050 na mesma data).
 - Fase/tarefa: Fase 3 — Jornada e Ponto; **T049** (caderno de homologação da
   apuração de jornada e banco de horas V1).
 - Base factual (não reaberta — este caderno **consolida**, não decide):
@@ -148,15 +149,15 @@ recalibrada aqui.
 Transcritas da [detalhada §8.2](etapa3-jornada-ponto-v1-detalhada.md); este
 caderno **não** as resolve — apenas as **organiza** para homologação (§5).
 
-| ID                    | Pendência                                                                                                            | Responsável                       |
-| --------------------- | -------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
-| DP-3J-18              | **Três exemplos completos** homologados (entrada **e** resultado), não só referência visual.                         | RH                                |
-| DP-3J-20              | Homologação do fornecedor (RWTech) do BLUE BIOPROX-C campo a campo e enquadramento jurídico do leiaute AFD.          | Fornecedor + Jurídico + TI        |
-| DP-3J-21 (financeiro) | **Valor/desconto financeiro** de DSR em faltas no banco — suspenso até autorização dos diretores + Folha + Jurídico. | Diretoria + RH + Jurídico + Folha |
-| DP-3J-22              | **Marcos das jornadas 1 (Horario Reserva Fiscal), 2 (HORARIO LIBERTY) e 19 (ESTAGIARIO)** — não recebidos.           | RH                                |
-| DP-3J-09              | **Validade/enquadramento legal** do controle de jornada e do fechamento.                                             | Jurídico                          |
-| DP-3J-11              | **Retenção, descarte e acesso do titular** do arquivo e das marcações.                                               | RH + Jurídico                     |
-| MFA / `DS-OPS-01`     | Gates de dado real: MFA obrigatório (ADR 0003) e gate-mestre de segurança operacional.                               | TI/Segurança + conjunta           |
+| ID                    | Pendência                                                                                                                                                                                                                          | Responsável                           |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| DP-3J-18              | **Parcialmente resolvida (T050):** os **três exemplos de teste** foram homologados para o **motor sintético** (§4.1). Permanece pendente somente quanto à **validade legal** dos resultados para dado real (liga-se a `DP-3J-09`). | RH (exemplos ✓) / Jurídico (validade) |
+| DP-3J-20              | Homologação do fornecedor (RWTech) do BLUE BIOPROX-C campo a campo e enquadramento jurídico do leiaute AFD.                                                                                                                        | Fornecedor + Jurídico + TI            |
+| DP-3J-21 (financeiro) | **Valor/desconto financeiro** de DSR em faltas no banco — suspenso até autorização dos diretores + Folha + Jurídico.                                                                                                               | Diretoria + RH + Jurídico + Folha     |
+| DP-3J-22              | **Marcos das jornadas 1 (Horario Reserva Fiscal), 2 (HORARIO LIBERTY) e 19 (ESTAGIARIO)** — não recebidos.                                                                                                                         | RH                                    |
+| DP-3J-09              | **Validade/enquadramento legal** do controle de jornada e do fechamento.                                                                                                                                                           | Jurídico                              |
+| DP-3J-11              | **Retenção, descarte e acesso do titular** do arquivo e das marcações.                                                                                                                                                             | RH + Jurídico                         |
+| MFA / `DS-OPS-01`     | Gates de dado real: MFA obrigatório (ADR 0003) e gate-mestre de segurança operacional.                                                                                                                                             | TI/Segurança + conjunta               |
 
 ## 3. Insumos de apuração já fixados (referência rápida)
 
@@ -220,6 +221,32 @@ de resultado) para o RH homologar. Para cada um declaramos:
 > [parser §7](etapa3-parser-afd-contrato-tecnico-v1.md)). Um caso não vira o
 > outro (fronteira rígida, [lote §4.3](etapa3-lote-importacao-afd-contrato-v1.md)).
 
+### 4.1 Exemplos homologados para o motor sintético (atualização T050)
+
+> **Atualização (T050).** O RH forneceu os **três exemplos completos** (entrada
+> **e** resultado) que a T049 havia deixado como pendência de homologação
+> (`DP-3J-18`). Eles ficam registrados abaixo **como exemplos de teste
+> homologados para o motor sintético** ([motor de apuração puro V1](etapa3-motor-apuracao-puro-v1.md)),
+> com valores **inteiramente sintéticos** (horários fictícios, sem nome, CPF,
+> empresa real ou dado real). Isto **resolve `DP-3J-18` somente quanto aos
+> exemplos de teste** (§2.3, §5.2); **não** declara validade legal, **não**
+> interpreta norma e **não** habilita dado real — a validade/enquadramento segue
+> em `DP-3J-09` e os gates de dado real permanecem (§5.5).
+
+| Exemplo            | Entrada sintética                                                                | Resultado homologado (motor sintético)                                                                                                                                                                                           |
+| ------------------ | -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| (a) Dia normal     | Previsto 08:00–12:00 / 14:00–18:00; marcações 08:00 / 12:00 / 14:00 / 18:00.     | Tempo efetivo **480 min**; jornada computada **480**; crédito **0**; débito **0**.                                                                                                                                               |
+| (b) Atraso + extra | Previsto 08:00–12:00 / 13:00–17:00; marcações **08:25 / 12:00 / 13:00 / 18:30**. | Tempo efetivo **545 min (9h05)**; **débito 25 min**; **crédito de hora extra 90 min**; crédito e débito **separados** (extra **não** compensa o atraso).                                                                         |
+| (c) Classificações | Mesma jornada prevista padrão, por classificação do dia (§5 do motor).           | Falta injustificada → débito da jornada prevista + **apontamento não financeiro** de DSR; feriado/folga/férias/falta justificada → **sem débito**; compensação → **débito proposto** da jornada prevista, **sem validar saldo**. |
+
+No exemplo (b), a tolerância de 15 min/dia **não** absorve o atraso porque a
+diferença negativa (25 min) **excede** 15 — o débito é sobre **toda** a diferença
+negativa (25), coerente com R3; o crédito de hora extra (90) permanece
+**componente separado** (D2 do motor). Estes três exemplos são os **casos de
+teste** do motor sintético; as demais linhas de §4 (CEN-\*) seguem como
+preparação de homologação, e a validade legal dos resultados continua em
+`DP-3J-09`.
+
 ## 5. Decisões ainda necessárias antes de implementar o motor
 
 Organizadas como **questões de homologação (QH-\*)** ligadas às pendências de
@@ -240,13 +267,16 @@ semântica de aplicação**, por exemplo (perguntas, não respostas):
 Sem essa homologação (parte de `DP-3J-18`), CEN-02, CEN-03 e CEN-04 **não têm
 resultado numérico** — só classificação estrutural.
 
-### 5.2 Tratamento aprovado das três amostras completas — DP-3J-18
+### 5.2 Tratamento das três amostras completas — DP-3J-18 (resolvida quanto aos exemplos de teste)
 
-O RH deve fornecer **entrada e resultado completos** de três exemplos (dia
-normal; atraso + hora extra; falta/feriado/folga/compensação) — **não** apenas
-a referência visual já recebida (T035, decisão 10). Só então os cenários de §4
-viram **casos de teste com resultado esperado**. Enquanto abertos, o motor
-(T050) **não** pode ter oráculo de resultado.
+**Resolvida (T050) somente quanto aos exemplos de teste.** O RH forneceu
+**entrada e resultado completos** dos três exemplos (dia normal; atraso + hora
+extra; falta/feriado/folga/compensação), registrados em **§4.1** como
+homologados para o **motor sintético** — o motor passa a ter **oráculo de
+resultado** para esses casos de teste (com dado sintético). **Permanece
+pendente** apenas a **validade legal** desses resultados para uso com **dado
+real**, que segue com o Jurídico em `DP-3J-09` (e os demais gates de dado real,
+§5.5). Esta resolução **não** declara conformidade nem habilita dado real.
 
 ### 5.3 Marcos completos das jornadas 1, 2 e 19 — DP-3J-22
 
@@ -390,7 +420,11 @@ fechamento, espelho, assinatura ou dado real** é criada por este documento. Ele
 **não decide regra trabalhista nova**, **não altera** nenhuma decisão existente,
 **não calcula nem infere** resultado não aprovado, **não declara** conformidade
 com a **Portaria MTP 671** e **não faz** interpretação jurídica/trabalhista.
-As pendências `DP-3J-09`, `DP-3J-11`, `DP-3J-18`, `DP-3J-20`, `DP-3J-22`, o
-**cálculo financeiro** de `DP-3J-21`, além de **MFA** e `DS-OPS-01`, permanecem
-**exatamente como estavam**. Enquanto esses gates estiverem abertos, **nenhum
+A pendência `DP-3J-18` é **atualizada (T050)**: resolvida **somente quanto aos
+exemplos de teste** homologados para o motor sintético (§4.1), permanecendo
+pendente apenas quanto à **validade legal** dos resultados para dado real
+(`DP-3J-09`). As demais — `DP-3J-09`, `DP-3J-11`, `DP-3J-20`, `DP-3J-22`, o
+**cálculo financeiro** de `DP-3J-21`, além de **MFA** e `DS-OPS-01` — permanecem
+**exatamente como estavam**. Esta atualização **não** declara conformidade legal
+nem faz interpretação jurídica; enquanto esses gates estiverem abertos, **nenhum
 dado real** entra em nenhum ambiente.
