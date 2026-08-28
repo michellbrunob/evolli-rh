@@ -38,6 +38,7 @@ const SUB_ROTULO: Record<string, string> = {
   cadastros: "Horários",
   pessoas: "Horário de trabalho",
   ponto: "Verificar folhas",
+  documentos: "Metadados",
 };
 
 export interface PainelNavigationProps {

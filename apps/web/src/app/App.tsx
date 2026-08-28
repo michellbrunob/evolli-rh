@@ -5,13 +5,13 @@
  * Envoltório visual neutro (banner, skip-link, navegação, main, rodapé). A
  * navegação (`PainelNavigation`) troca apenas um estado local de "destino
  * selecionado" — sem React Router, sem rota real, sem API/fetch. "Cadastros"
- * (Horários, T043), "Pessoas" (Horário de trabalho, T046) e "Ponto"
- * (Verificar folhas, T045) têm tela própria; os demais dois destinos mostram
- * um estado vazio claro de módulo em preparação (`ModuloEmPreparacao`). Sem
- * autenticação, sessão ou dado real. A presença deste shell não concede nem
- * implica autorização: a tela renderizada continua dependendo da decisão do
- * servidor por papel, escopo e objeto
- * (docs/modules/painel-administrativo-web-v1.md, §3.6).
+ * (Horários, T043), "Pessoas" (Horário de trabalho, T046), "Ponto"
+ * (Verificar folhas, T045) e "Documentos" (Metadados, T047) têm tela
+ * própria; o destino "Início" mostra um estado vazio claro de módulo em
+ * preparação (`ModuloEmPreparacao`). Sem autenticação, sessão ou dado real.
+ * A presença deste shell não concede nem implica autorização: a tela
+ * renderizada continua dependendo da decisão do servidor por papel, escopo
+ * e objeto (docs/modules/painel-administrativo-web-v1.md, §3.6).
  *
  * O cliente CSRF (`../api/csrfClient`) permanece isolado e NÃO é importado
  * aqui: não há login nem sessão nesta fundação.
@@ -19,6 +19,7 @@
 import { useState } from "react";
 import "./tokens.css";
 import "./app-shell.css";
+import { DocumentosMetadadosScreen } from "../screens/documentos";
 import { CadastroHorariosScreen } from "../screens/horarios";
 import { PessoasHorarioScreen } from "../screens/pessoas";
 import { VerificarFolhasScreen } from "../screens/ponto";
@@ -29,8 +30,6 @@ import { DESTINOS_PAINEL, PainelNavigation } from "./PainelNavigation";
 const DESCRICAO_EM_PREPARO: Record<string, string> = {
   inicio:
     "A tela inicial do painel ainda está em preparação. Quando estiver disponível, ela reunirá os atalhos autorizados ao seu papel.",
-  documentos:
-    "O módulo de Documentos ainda está em preparação. Quando estiver disponível, reunirá publicação e consulta de documentos autorizados.",
 };
 
 /** `titleId` do `h1` de cada destino, para `aria-labelledby` do `<main>`. */
@@ -38,6 +37,7 @@ const TITULO_ID_POR_DESTINO: Record<string, string> = {
   cadastros: "horarios-titulo",
   pessoas: "pessoas-horario-titulo",
   ponto: "verificar-folhas-titulo",
+  documentos: "documentos-metadados-titulo",
 };
 
 function conteudoDoDestino(destinoId: string) {
@@ -49,6 +49,9 @@ function conteudoDoDestino(destinoId: string) {
   }
   if (destinoId === "ponto") {
     return <VerificarFolhasScreen />;
+  }
+  if (destinoId === "documentos") {
+    return <DocumentosMetadadosScreen />;
   }
   const destino = DESTINOS_PAINEL.find((item) => item.id === destinoId);
   return (

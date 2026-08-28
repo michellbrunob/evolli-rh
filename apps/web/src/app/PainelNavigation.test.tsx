@@ -73,4 +73,16 @@ describe("PainelNavigation (T044)", () => {
     expect(botao).toBeInTheDocument();
     expect(botao).toHaveAttribute("aria-current", "page");
   });
+
+  it("apresenta 'Documentos' com o sub-rótulo 'Metadados'", () => {
+    render(
+      <PainelNavigation destinoAtivoId="documentos" onSelecionar={() => {}} />,
+    );
+
+    const botao = screen.getByRole("button", {
+      name: /Documentos.*Metadados/,
+    });
+    expect(botao).toBeInTheDocument();
+    expect(botao).toHaveAttribute("aria-current", "page");
+  });
 });

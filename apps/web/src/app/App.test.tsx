@@ -90,14 +90,15 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     });
     expect(nav).toBeInTheDocument();
 
-    for (const rotulo of ["Início", "Documentos"]) {
-      expect(screen.getByRole("button", { name: rotulo })).toBeInTheDocument();
-    }
+    expect(screen.getByRole("button", { name: "Início" })).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /Pessoas.*Horário de trabalho/ }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /Ponto.*Verificar folhas/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Documentos.*Metadados/ }),
     ).toBeInTheDocument();
 
     const cadastros = screen.getByRole("button", { name: /Cadastros/ });
@@ -128,19 +129,14 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     ).not.toHaveAttribute("aria-current");
   });
 
-  it("os dois destinos em preparação mostram título próprio e nenhum dado real", () => {
+  it("o único destino em preparação (Início) mostra título próprio e nenhum dado real", () => {
     render(<App />);
 
-    for (const [rotulo, tituloEsperado] of [
-      ["Início", "Início"],
-      ["Documentos", "Documentos"],
-    ] as const) {
-      fireEvent.click(screen.getByRole("button", { name: rotulo }));
-      expect(
-        screen.getByRole("heading", { level: 1, name: tituloEsperado }),
-      ).toBeInTheDocument();
-      expect(screen.getByText("Módulo em preparação")).toBeInTheDocument();
-    }
+    fireEvent.click(screen.getByRole("button", { name: "Início" }));
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Início" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Módulo em preparação")).toBeInTheDocument();
   });
 
   it("renderiza a tela Ponto > Verificar folhas com h1 único", () => {
@@ -190,6 +186,32 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     const rotuloId = main.getAttribute("aria-labelledby");
     expect(document.getElementById(rotuloId!)).toHaveTextContent(
       "Horário de trabalho",
+    );
+  });
+
+  it("renderiza a tela Documentos > Metadados com h1 único", () => {
+    render(<App />);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Documentos.*Metadados/ }),
+    );
+
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(
+      screen.getByRole("heading", {
+        level: 1,
+        name: "Metadados de documentos",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("table", { name: "Catálogo de tipos documentais" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Módulo em preparação")).not.toBeInTheDocument();
+
+    const main = screen.getByRole("main");
+    const rotuloId = main.getAttribute("aria-labelledby");
+    expect(document.getElementById(rotuloId!)).toHaveTextContent(
+      "Metadados de documentos",
     );
   });
 
