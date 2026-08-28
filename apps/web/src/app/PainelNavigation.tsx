@@ -33,6 +33,12 @@ export const DESTINOS_PAINEL: readonly DestinoPainel[] = [
   { id: "documentos", label: "Documentos" },
 ];
 
+/** Sub-rótulo exibido junto ao destino quando ele já tem tela própria. */
+const SUB_ROTULO: Record<string, string> = {
+  cadastros: "Horários",
+  ponto: "Verificar folhas",
+};
+
 export interface PainelNavigationProps {
   destinoAtivoId: string;
   onSelecionar: (id: string) => void;
@@ -59,10 +65,15 @@ export function PainelNavigation({
                 aria-current={ativo ? "page" : undefined}
                 onClick={() => onSelecionar(destino.id)}
               >
-                {destino.id === "cadastros" ? (
+                {SUB_ROTULO[destino.id] ? (
                   <>
-                    <span className="painel-nav__link-grupo">Cadastros</span>
-                    <span className="painel-nav__link-sub"> › Horários</span>
+                    <span className="painel-nav__link-grupo">
+                      {destino.label}
+                    </span>
+                    <span className="painel-nav__link-sub">
+                      {" "}
+                      › {SUB_ROTULO[destino.id]}
+                    </span>
                   </>
                 ) : (
                   destino.label
