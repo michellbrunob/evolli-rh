@@ -242,6 +242,19 @@ nunca em `AccessUser` (ADR 0008 dec. 1).
 > [motor de apuração puro V1 §2](etapa3-motor-apuracao-puro-v1.md). Os marcos
 > dos horários 1/2/19 seguem pendentes (DP-3J-22).
 
+> **Convergência com a CCT 2026/2027 (T050 — complemento).** Impactos
+> operacionais registrados **sem** declarar conformidade jurídica e **sem**
+> copiar dado pessoal/assinatura/identificação do PDF: 44h de seg a sex;
+> **horário com sábado pode permanecer cadastrado, porém inativo/não atribuível
+> no V1**; compensação de sábado depende de acordo aplicável e **o sistema não
+> valida acordo** (apenas apura a tabela vigente); horas extras/DSR/feriado têm
+> efeitos financeiros próprios, mas **cálculo monetário e Folha seguem fora do
+> Ponto**; atestados com prazo da CCT seguem em **validação manual do RH**
+> enquanto não houver conteúdo documental autorizado; e a CCT **não substitui**
+> os gates de RH/Jurídico, MFA, retenção/base legal ou a decisão sobre dado
+> real. Ver
+> [nota de convergência com a CCT](../decisions/etapa3-cct-2026-2027-convergencia-jornada-ponto.md).
+
 > **Fundação implementada (T038).** A **base de cadastro** dos horários acima já
 > está implementada no backend (`apps/api`, módulo `horarios`), estritamente
 > como fundação: **tabela de horário por empresa** (grade semanal de períodos

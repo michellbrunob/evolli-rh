@@ -19,7 +19,9 @@
   (T040/T041 — padrão de núcleo puro),
   [Contrato do lote de importação AFD](etapa3-lote-importacao-afd-contrato-v1.md)
   (T042), [ADR 0008](../adr/0008-jornada-ponto-rastreavel-baseline-v1.md)
-  (Baseline V1). Fundação de horários: `apps/api/src/horarios/` (T038).
+  (Baseline V1),
+  [Nota de convergência com a CCT 2026/2027](../decisions/etapa3-cct-2026-2027-convergencia-jornada-ponto.md)
+  (T050 — complemento). Fundação de horários: `apps/api/src/horarios/` (T038).
 - Relacionado: [ADR 0003](../adr/0003-identidade-sessao-e-autorizacao.md) (MFA
   antes de dado real), [ADR 0004](../adr/0004-auditoria-formal-e-integridade.md)
   (auditoria append-only — não tocada por um núcleo puro),
@@ -212,20 +214,31 @@ o almoço curto **sai** da jornada computada e reaparece, pela conta de desvios
 inventada. (Para dias de faixa única não há intervalo entre faixas; a regra não
 tem efeito.)
 
+### 4.5 Alerta não financeiro de jornada acima do limite diário configurado
+
+Quando o chamador fornece `limiteJornadaDiariaMinutos`, o motor **sinaliza** —
+com o apontamento não financeiro `alerta_jornada_diaria_excedida` — os dias
+`regular` cuja **jornada computada** ultrapassa esse limite. O limite é
+**configuração do chamador**, **nunca** um valor legal fixado no código
+(coerente com a [nota de convergência com a CCT](../decisions/etapa3-cct-2026-2027-convergencia-jornada-ponto.md),
+C4/C6): o motor **não interpreta** a CCT nem declara limite legal. O alerta
+**não bloqueia**, **não calcula pagamento** e **não** altera crédito/débito —
+apenas acrescenta um sinalizador para tratamento humano.
+
 ## 5. Classificações sintéticas do dia
 
 Catálogo **fechado** (sem texto livre; alinhado a R12 do caderno e à ADR 0008
 dec. 5). A classificação é **entrada** do motor:
 
-| Classificação         | Débito de banco                                             | Crédito | Apontamento                           |
-| --------------------- | ----------------------------------------------------------- | ------- | ------------------------------------- |
-| `regular`             | Conforme §4.3 (tolerância; toda a diferença > 15)           | §4.2    | —                                     |
-| `falta_justificada`   | **Sem débito**                                              | —       | —                                     |
-| `falta_injustificada` | **Débito da jornada prevista**                              | —       | **Sinalizador não financeiro de DSR** |
-| `feriado`             | **Sem débito**                                              | —       | —                                     |
-| `folga`               | **Sem débito**                                              | —       | —                                     |
-| `ferias`              | **Sem débito**                                              | —       | —                                     |
-| `compensacao`         | **Débito proposto da jornada prevista** (sem validar saldo) | —       | —                                     |
+| Classificação         | Débito de banco                                             | Crédito | Apontamento                                                                |
+| --------------------- | ----------------------------------------------------------- | ------- | -------------------------------------------------------------------------- |
+| `regular`             | Conforme §4.3 (tolerância; toda a diferença > 15)           | §4.2    | —                                                                          |
+| `falta_justificada`   | **Sem débito**                                              | —       | —                                                                          |
+| `falta_injustificada` | **Débito da jornada prevista**                              | —       | **Sinalizador não financeiro de DSR**                                      |
+| `feriado`             | **Sem débito**                                              | —       | **Sinalizador não financeiro de feriado trabalhado** (se houver marcações) |
+| `folga`               | **Sem débito**                                              | —       | —                                                                          |
+| `ferias`              | **Sem débito**                                              | —       | —                                                                          |
+| `compensacao`         | **Débito proposto da jornada prevista** (sem validar saldo) | —       | —                                                                          |
 
 - **`falta_injustificada`:** débito igual à **jornada prevista** total do dia +
   um **apontamento não financeiro** de desconto de DSR (sinalizador, coerente
@@ -234,9 +247,12 @@ dec. 5). A classificação é **entrada** do motor:
   **sem validar saldo disponível** nesta tarefa (a validação de saldo e a
   semântica de compensação seguem para modelagem futura — [caderno §4, CEN-13](etapa3-caderno-homologacao-apuracao-jornada-banco-horas-v1.md)).
 - **`feriado`/`folga`/`ferias`/`falta_justificada`:** **sem débito de banco**;
-  o motor não credita nem debita (trabalho em feriado, se houver, é pendente —
-  [caderno §4, CEN-12](etapa3-caderno-homologacao-apuracao-jornada-banco-horas-v1.md)
-  — e não é inferido aqui).
+  o motor não credita nem debita. Em **feriado**, o motor **não** trata o dia
+  como operação regular automática (trabalho em feriado é pendente —
+  [caderno §4, CEN-12](etapa3-caderno-homologacao-apuracao-jornada-banco-horas-v1.md)):
+  se houver marcações, emite o apontamento não financeiro
+  `feriado_trabalhado_sinalizado` para tratamento manual do RH, **sem** calcular
+  crédito, débito ou qualquer valor (nota de convergência com a CCT, C4).
 
 ## 6. Saída, falha segura e o que permanece fora
 
