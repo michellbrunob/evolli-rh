@@ -352,6 +352,14 @@ Regras recebidas do RH, **a homologar** (semântica e cálculo pendentes):
 > [contrato do ciclo de vida do Banco de Horas V1](etapa3-banco-horas-ciclo-vida-contrato-v1.md).
 > Ele **não** implementa nem calcula dinheiro/Folha, e **não** relaxa gates.
 
+> **Fundação implementada (T052).** A camada de **extrato/saldo** desse contrato
+> tem um **núcleo TypeScript puro** em `apps/api/src/ponto/banco-horas/` (só dado
+> sintético): gera o extrato imutável, o **saldo derivado** e os totais
+> separados de crédito e débito, com adaptador puro do resultado do motor
+> (T050) e validação fail-closed — **sem** compensação/quitação/pagamento/Folha,
+> **sem** persistência e **sem** dado real. Ver
+> [contrato do ciclo de vida do Banco de Horas V1](etapa3-banco-horas-ciclo-vida-contrato-v1.md).
+
 ### 2.9 Fechamento mensal
 
 - **Decidido (RH, T037):** o **fechamento do ponto ocorre no dia 25 de cada
