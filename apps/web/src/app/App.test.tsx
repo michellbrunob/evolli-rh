@@ -90,9 +90,12 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     });
     expect(nav).toBeInTheDocument();
 
-    for (const rotulo of ["Início", "Pessoas", "Ponto", "Documentos"]) {
+    for (const rotulo of ["Início", "Pessoas", "Documentos"]) {
       expect(screen.getByRole("button", { name: rotulo })).toBeInTheDocument();
     }
+    expect(
+      screen.getByRole("button", { name: /Ponto.*Verificar folhas/ }),
+    ).toBeInTheDocument();
 
     const cadastros = screen.getByRole("button", { name: /Cadastros/ });
     expect(cadastros).toHaveAttribute("aria-current", "page");
@@ -122,13 +125,12 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     ).not.toHaveAttribute("aria-current");
   });
 
-  it("os quatro destinos em preparação mostram título próprio e nenhum dado real", () => {
+  it("os três destinos em preparação mostram título próprio e nenhum dado real", () => {
     render(<App />);
 
     for (const [rotulo, tituloEsperado] of [
       ["Início", "Início"],
       ["Pessoas", "Pessoas"],
-      ["Ponto", "Ponto"],
       ["Documentos", "Documentos"],
     ] as const) {
       fireEvent.click(screen.getByRole("button", { name: rotulo }));
@@ -137,6 +139,31 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
       ).toBeInTheDocument();
       expect(screen.getByText("Módulo em preparação")).toBeInTheDocument();
     }
+  });
+
+  it("renderiza a tela Ponto > Verificar folhas com h1 único", () => {
+    render(<App />);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Ponto.*Verificar folhas/ }),
+    );
+
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Verificar folhas" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("table", {
+        name: "Pendências da fila de verificação",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Módulo em preparação")).not.toBeInTheDocument();
+
+    const main = screen.getByRole("main");
+    const rotuloId = main.getAttribute("aria-labelledby");
+    expect(document.getElementById(rotuloId!)).toHaveTextContent(
+      "Verificar folhas",
+    );
   });
 
   it("cada botão de navegação é um <button> nativo, operável por teclado", () => {

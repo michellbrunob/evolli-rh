@@ -39,7 +39,7 @@ describe("PainelNavigation (T044)", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Ponto" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Ponto/ }));
     expect(onSelecionar).toHaveBeenCalledWith("ponto");
   });
 
@@ -50,5 +50,15 @@ describe("PainelNavigation (T044)", () => {
 
     const botao = screen.getByRole("button", { name: /Cadastros.*Horários/ });
     expect(botao).toBeInTheDocument();
+  });
+
+  it("apresenta 'Ponto' com o sub-rótulo 'Verificar folhas'", () => {
+    render(<PainelNavigation destinoAtivoId="ponto" onSelecionar={() => {}} />);
+
+    const botao = screen.getByRole("button", {
+      name: /Ponto.*Verificar folhas/,
+    });
+    expect(botao).toBeInTheDocument();
+    expect(botao).toHaveAttribute("aria-current", "page");
   });
 });
