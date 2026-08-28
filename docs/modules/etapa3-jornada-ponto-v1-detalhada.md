@@ -234,6 +234,27 @@ nunca em `AccessUser` (ADR 0008 dec. 1).
   legal ou trabalhista (inclusive quanto à Portaria 671, §6); a validade da
   carga horária permanece sujeita a DP-3J-09 (validade legal, jurídico).
 
+> **Decisão registrada (T050 — D1).** O horário **2 (HORARIO LIBERTY)**, cujos
+> marcos não foram recebidos (DP-3J-22, §9), **permanece cadastrado, porém
+> inicialmente inativo/não atribuível** no V1; **RH pode habilitar/desabilitar
+> tabelas por empresa** (desativação lógica), e essa mudança **não reabre
+> períodos já apurados** (reforça a imutabilidade acima). Ver
+> [motor de apuração puro V1 §2](etapa3-motor-apuracao-puro-v1.md). Os marcos
+> dos horários 1/2/19 seguem pendentes (DP-3J-22).
+
+> **Convergência com a CCT 2026/2027 (T050 — complemento).** Impactos
+> operacionais registrados **sem** declarar conformidade jurídica e **sem**
+> copiar dado pessoal/assinatura/identificação do PDF: 44h de seg a sex;
+> **horário com sábado pode permanecer cadastrado, porém inativo/não atribuível
+> no V1**; compensação de sábado depende de acordo aplicável e **o sistema não
+> valida acordo** (apenas apura a tabela vigente); horas extras/DSR/feriado têm
+> efeitos financeiros próprios, mas **cálculo monetário e Folha seguem fora do
+> Ponto**; atestados com prazo da CCT seguem em **validação manual do RH**
+> enquanto não houver conteúdo documental autorizado; e a CCT **não substitui**
+> os gates de RH/Jurídico, MFA, retenção/base legal ou a decisão sobre dado
+> real. Ver
+> [nota de convergência com a CCT](../decisions/etapa3-cct-2026-2027-convergencia-jornada-ponto.md).
+
 > **Fundação implementada (T038).** A **base de cadastro** dos horários acima já
 > está implementada no backend (`apps/api`, módulo `horarios`), estritamente
 > como fundação: **tabela de horário por empresa** (grade semanal de períodos
@@ -312,6 +333,16 @@ Regras recebidas do RH, **a homologar** (semântica e cálculo pendentes):
 > O motor de cálculo do banco **não é implementado nem especificado
 > numericamente** aqui — permanece dependente de decisão de produto e do gate de
 > validade legal (DP-3J-09), coerente com a Baseline V1 (Decisão 6).
+
+> **Decisões registradas (T050 — D2/D3).** **D2:** a **hora extra positiva entra
+> exclusivamente no banco de horas** — não vira pagamento nem valor monetário
+> nesta fatia — e **não compensa nem apaga** débito de atraso/saída antecipada
+> (crédito e débito são componentes separados). **D3:** um **pagamento futuro**
+> de saldo positivo **zera o saldo corrente preservando o histórico auditável**,
+> **sem** calcular valor monetário nem integrar Folha (o valor segue em
+> DP-3J-21, cálculo financeiro). Um **motor puro de apuração diária** (só dado
+> sintético, sem dinheiro/persistência/Folha) foi implementado na T050 — ver
+> [motor de apuração puro V1](etapa3-motor-apuracao-puro-v1.md).
 
 ### 2.9 Fechamento mensal
 
