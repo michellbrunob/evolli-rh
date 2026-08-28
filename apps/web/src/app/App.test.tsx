@@ -90,9 +90,12 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     });
     expect(nav).toBeInTheDocument();
 
-    for (const rotulo of ["Início", "Pessoas", "Documentos"]) {
+    for (const rotulo of ["Início", "Documentos"]) {
       expect(screen.getByRole("button", { name: rotulo })).toBeInTheDocument();
     }
+    expect(
+      screen.getByRole("button", { name: /Pessoas.*Horário de trabalho/ }),
+    ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /Ponto.*Verificar folhas/ }),
     ).toBeInTheDocument();
@@ -107,30 +110,29 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
   it("troca o conteúdo do <main> ao selecionar outro destino, com h1 único", () => {
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Pessoas" }));
+    fireEvent.click(screen.getByRole("button", { name: "Início" }));
 
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     expect(
-      screen.getByRole("heading", { level: 1, name: "Pessoas" }),
+      screen.getByRole("heading", { level: 1, name: "Início" }),
     ).toBeInTheDocument();
     expect(screen.getByText("Módulo em preparação")).toBeInTheDocument();
     expect(
       screen.queryByRole("table", { name: "Tabelas de horário cadastradas" }),
     ).not.toBeInTheDocument();
 
-    const pessoasBtn = screen.getByRole("button", { name: "Pessoas" });
-    expect(pessoasBtn).toHaveAttribute("aria-current", "page");
+    const inicioBtn = screen.getByRole("button", { name: "Início" });
+    expect(inicioBtn).toHaveAttribute("aria-current", "page");
     expect(
       screen.getByRole("button", { name: /Cadastros/ }),
     ).not.toHaveAttribute("aria-current");
   });
 
-  it("os três destinos em preparação mostram título próprio e nenhum dado real", () => {
+  it("os dois destinos em preparação mostram título próprio e nenhum dado real", () => {
     render(<App />);
 
     for (const [rotulo, tituloEsperado] of [
       ["Início", "Início"],
-      ["Pessoas", "Pessoas"],
       ["Documentos", "Documentos"],
     ] as const) {
       fireEvent.click(screen.getByRole("button", { name: rotulo }));
@@ -163,6 +165,31 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     const rotuloId = main.getAttribute("aria-labelledby");
     expect(document.getElementById(rotuloId!)).toHaveTextContent(
       "Verificar folhas",
+    );
+  });
+
+  it("renderiza a tela Pessoas > Horário de trabalho com h1 único", () => {
+    render(<App />);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Pessoas.*Horário de trabalho/ }),
+    );
+
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Horário de trabalho" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("table", {
+        name: "Colaboradores com tabela de horário atribuída",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Módulo em preparação")).not.toBeInTheDocument();
+
+    const main = screen.getByRole("main");
+    const rotuloId = main.getAttribute("aria-labelledby");
+    expect(document.getElementById(rotuloId!)).toHaveTextContent(
+      "Horário de trabalho",
     );
   });
 

@@ -21,7 +21,7 @@ describe("PainelNavigation (T044)", () => {
       <PainelNavigation destinoAtivoId="pessoas" onSelecionar={() => {}} />,
     );
 
-    expect(screen.getByRole("button", { name: "Pessoas" })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: /^Pessoas/ })).toHaveAttribute(
       "aria-current",
       "page",
     );
@@ -57,6 +57,18 @@ describe("PainelNavigation (T044)", () => {
 
     const botao = screen.getByRole("button", {
       name: /Ponto.*Verificar folhas/,
+    });
+    expect(botao).toBeInTheDocument();
+    expect(botao).toHaveAttribute("aria-current", "page");
+  });
+
+  it("apresenta 'Pessoas' com o sub-rótulo 'Horário de trabalho'", () => {
+    render(
+      <PainelNavigation destinoAtivoId="pessoas" onSelecionar={() => {}} />,
+    );
+
+    const botao = screen.getByRole("button", {
+      name: /Pessoas.*Horário de trabalho/,
     });
     expect(botao).toBeInTheDocument();
     expect(botao).toHaveAttribute("aria-current", "page");

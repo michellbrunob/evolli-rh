@@ -1,0 +1,124 @@
+/**
+ * Pessoas > Horário de trabalho (T046) — só tokens já existentes
+ * (tokens.css); sem hexadecimal novo, sem sombra, sem gradiente. Layout
+ * responsivo: pilha vertical de seções.
+ */
+
+.pessoas-horario-screen {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  min-width: 0;
+}
+
+/* Cada seção é um item flex (coluna): sem `min-width: 0` ela recusaria
+   encolher abaixo do min-content de seus descendentes — em particular a
+   tabela de atribuições, que pode ser mais larga que o viewport em telas
+   estreitas e já trata a própria rolagem horizontal
+   (`DataTable`/`.evolli-datatable`). Sem isso aqui, essa rolagem vazaria
+   para a página inteira (mesmo princípio já aplicado em
+   `CadastroHorariosScreen.css` e `VerificarFolhasScreen.css`). */
+.pessoas-horario-screen > * {
+  min-width: 0;
+}
+
+.pessoas-horario-screen__section-title {
+  margin: 0 0 var(--space-sm);
+  font-size: var(--text-lead);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  font-weight: var(--weight-strong);
+  color: var(--color-ink);
+}
+
+/* Aviso "Somente RH" — reaproveita os tokens semânticos de "info". */
+.pessoas-horario-screen__aviso {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+  background: var(--status-info-surface);
+  border-color: var(--status-info-border);
+}
+
+.pessoas-horario-screen__aviso-texto {
+  margin: 0;
+  color: var(--color-ink);
+  flex: 1 1 16rem;
+}
+
+/* Alternador do estado de demonstração (dados / vazio / erro). */
+.pessoas-horario-screen__demo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.pessoas-horario-screen__demo-texto {
+  margin: 0;
+  color: var(--color-ink-subtle);
+  font-size: var(--text-caption);
+}
+
+.pessoas-horario-screen__demo-botoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+/* Bloco de erro — tokens semânticos de "danger". */
+.pessoas-horario-screen__erro {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  background: var(--status-danger-surface);
+  border-color: var(--status-danger-border);
+}
+
+.pessoas-horario-screen__erro-referencia {
+  margin: 0;
+  font-size: var(--text-caption);
+  color: var(--color-ink-subtle);
+}
+
+.pessoas-horario-screen__erro-referencia code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* Painel do formulário de atribuição/alteração. */
+.pessoas-horario-screen__formulario {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.pessoas-horario-screen__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  max-width: 32rem;
+}
+
+/* Confirmação demonstrativa — tokens semânticos de "success" (ação
+   concluída na demonstração, mesmo sem efeito real). */
+.pessoas-horario-screen__confirmacao {
+  margin: 0;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-sm);
+  background: var(--status-success-surface);
+  color: var(--status-success-ink);
+}
+
+/* Texto só para leitores de tela (mesma técnica de `.evolli-field__sr`). */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
