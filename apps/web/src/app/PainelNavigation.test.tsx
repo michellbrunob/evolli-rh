@@ -25,7 +25,7 @@ describe("PainelNavigation (T044)", () => {
       "aria-current",
       "page",
     );
-    expect(screen.getByRole("button", { name: "Início" })).not.toHaveAttribute(
+    expect(screen.getByRole("button", { name: /^Início/ })).not.toHaveAttribute(
       "aria-current",
     );
   });
@@ -81,6 +81,18 @@ describe("PainelNavigation (T044)", () => {
 
     const botao = screen.getByRole("button", {
       name: /Documentos.*Metadados/,
+    });
+    expect(botao).toBeInTheDocument();
+    expect(botao).toHaveAttribute("aria-current", "page");
+  });
+
+  it("apresenta 'Início' com o sub-rótulo 'Visão geral'", () => {
+    render(
+      <PainelNavigation destinoAtivoId="inicio" onSelecionar={() => {}} />,
+    );
+
+    const botao = screen.getByRole("button", {
+      name: /Início.*Visão geral/,
     });
     expect(botao).toBeInTheDocument();
     expect(botao).toHaveAttribute("aria-current", "page");

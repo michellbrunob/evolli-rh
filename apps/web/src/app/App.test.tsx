@@ -90,7 +90,9 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     });
     expect(nav).toBeInTheDocument();
 
-    expect(screen.getByRole("button", { name: "Início" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Início.*Visão geral/ }),
+    ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /Pessoas.*Horário de trabalho/ }),
     ).toBeInTheDocument();
@@ -103,40 +105,80 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
 
     const cadastros = screen.getByRole("button", { name: /Cadastros/ });
     expect(cadastros).toHaveAttribute("aria-current", "page");
-    expect(screen.getByRole("button", { name: "Início" })).not.toHaveAttribute(
-      "aria-current",
-    );
+    expect(
+      screen.getByRole("button", { name: /Início.*Visão geral/ }),
+    ).not.toHaveAttribute("aria-current");
   });
 
   it("troca o conteúdo do <main> ao selecionar outro destino, com h1 único", () => {
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Início" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /Início.*Visão geral/ }),
+    );
 
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     expect(
-      screen.getByRole("heading", { level: 1, name: "Início" }),
+      screen.getByRole("heading", { level: 1, name: "Visão geral" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("Módulo em preparação")).toBeInTheDocument();
+    expect(screen.queryByText("Módulo em preparação")).not.toBeInTheDocument();
     expect(
       screen.queryByRole("table", { name: "Tabelas de horário cadastradas" }),
     ).not.toBeInTheDocument();
 
-    const inicioBtn = screen.getByRole("button", { name: "Início" });
+    const inicioBtn = screen.getByRole("button", {
+      name: /Início.*Visão geral/,
+    });
     expect(inicioBtn).toHaveAttribute("aria-current", "page");
     expect(
-      screen.getByRole("button", { name: /Cadastros/ }),
+      screen.getByRole("button", { name: /^Cadastros/ }),
     ).not.toHaveAttribute("aria-current");
   });
 
-  it("o único destino em preparação (Início) mostra título próprio e nenhum dado real", () => {
+  it("nenhum destino mostra mais 'Módulo em preparação' — todos têm tela própria (T048)", () => {
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Início" }));
+    for (const rotulo of [
+      /^Início.*Visão geral/,
+      /^Cadastros/,
+      /^Pessoas.*Horário de trabalho/,
+      /^Ponto.*Verificar folhas/,
+      /^Documentos.*Metadados/,
+    ]) {
+      fireEvent.click(screen.getByRole("button", { name: rotulo }));
+      expect(
+        screen.queryByText("Módulo em preparação"),
+      ).not.toBeInTheDocument();
+    }
+  });
+
+  it("renderiza a tela Início > Visão geral com h1 único e atalhos que trocam o destino local", () => {
+    render(<App />);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Início.*Visão geral/ }),
+    );
+
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     expect(
-      screen.getByRole("heading", { level: 1, name: "Início" }),
+      screen.getByRole("heading", { level: 1, name: "Visão geral" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("Módulo em preparação")).toBeInTheDocument();
+
+    const main = screen.getByRole("main");
+    const rotuloId = main.getAttribute("aria-labelledby");
+    expect(document.getElementById(rotuloId!)).toHaveTextContent("Visão geral");
+
+    // O atalho do card "Documentos" troca o destino local — sem rota real.
+    fireEvent.click(screen.getByRole("button", { name: "Ir para Documentos" }));
+    expect(
+      screen.getByRole("heading", {
+        level: 1,
+        name: "Metadados de documentos",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Documentos.*Metadados/ }),
+    ).toHaveAttribute("aria-current", "page");
   });
 
   it("renderiza a tela Ponto > Verificar folhas com h1 único", () => {

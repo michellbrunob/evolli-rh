@@ -35,6 +35,7 @@ export const DESTINOS_PAINEL: readonly DestinoPainel[] = [
 
 /** Sub-rótulo exibido junto ao destino quando ele já tem tela própria. */
 const SUB_ROTULO: Record<string, string> = {
+  inicio: "Visão geral",
   cadastros: "Horários",
   pessoas: "Horário de trabalho",
   ponto: "Verificar folhas",
