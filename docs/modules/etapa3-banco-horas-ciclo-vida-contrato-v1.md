@@ -96,6 +96,24 @@ apuração diária; cada fronteira é um **handoff explícito**, nunca um atalho
 - **Nenhuma camada calcula dinheiro.** O saldo e os movimentos são **minutos**;
   a conversão em valor é **Folha**, fora daqui (B7).
 
+> **Fundação implementada (T052).** A **camada 2** (extrato/saldo) tem um
+> **núcleo TypeScript puro e isolado** em `apps/api/src/ponto/banco-horas/`
+> (`banco-horas.ts`, `banco-horas.types.ts`), com fixtures **exclusivamente
+> sintéticas** e testes unitários. `gerarExtratoSintetico(movimentos)` recebe
+> movimentos **já normalizados e sintéticos** (crédito/débito em minutos, id
+> técnico, data de referência, origem técnica) e devolve, **em memória**, o
+> extrato na ordem de entrada (nunca reordenada), o **saldo derivado** e os
+> **totais separados** de crédito e débito — honrando as invariantes §4 (nunca
+> compensar, apagar, reordenar ou fundir movimentos; saldo derivado dos
+> eventos). Um adaptador puro (`movimentosDeApuracaoDiaria`) converte o
+> resultado diário do motor (T050) em movimentos de crédito e débito separados,
+> **sem** reimplementar a apuração. **Fail-closed** para entrada inválida (id
+> vazio/duplicado, data inválida, minutos não positivos, natureza/origem
+> desconhecidas). **Permanecem fora** (não implementados): compensação
+> automática, ordem de consumo, validade de crédito, bloqueio de saldo negativo,
+> ajuste humano, aprovação, **`debito_quitacao`** (BH-04/05/06), pagamento,
+> Folha, valor monetário e dado real — **sem** NestJS/Prisma/I/O/rede/banco.
+
 ## 3. Modelo conceitual de movimentos
 
 Nomes **conceituais** (sujeitos à modelagem real; **não** são schema/enum de
