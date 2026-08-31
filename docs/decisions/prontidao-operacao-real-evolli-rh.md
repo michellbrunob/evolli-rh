@@ -158,8 +158,8 @@ Este documento **não decide** nenhum item abaixo; apenas os registra.
   e homologação do fornecedor.
 - **`DP-3J-21` financeiro** — valor/desconto financeiro de DSR (aguarda
   diretoria + Folha + Jurídico).
-- **`DP-3J-22`** — marcos das jornadas 1 (Reserva Fiscal), 2 (Liberty) e 19
-  (Estagiário) não recebidos.
+- **`DP-3J-22`** — marcos e regras das jornadas pendentes de homologação,
+  conforme documentação de Jornada/Ponto.
 - **`BH-01`..`BH-08`** — validade/expiração de créditos, ordem de consumo, saldo
   negativo, alçada de aprovação, documento/evidência, integração com a Folha,
   retenção/descarte e semântica do ajuste humano.
