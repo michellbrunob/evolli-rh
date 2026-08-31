@@ -135,6 +135,22 @@ conferencia_manual_pendente  ──▶ conferencia_manual_registrada
   definida aqui: permanece **pendente** de decisão RH/Jurídico (§5, §8).
 - **Toda transição é auditável** (§6), sem dado pessoal em claro.
 
+> **Fundação implementada (T057).** A **máquina de estados** desta seção tem um
+> **núcleo TypeScript puro e isolado** em `apps/api/src/ponto/fechamento/`
+> (`fechamento.ts`, `fechamento.types.ts`), com fixtures **exclusivamente
+> sintéticas** e testes unitários. `transicionarPeriodo(periodo, acao, papel,
+refAuditoriaNova)` aplica apenas as transições lineares do §3.1 (sempre por
+> ação humana sintética do RH), retornando a cada passo uma **nova versão** do
+> período + um **evento técnico de auditoria** (imutável — não muta a entrada;
+> `aplicarSequenciaPeriodo` acumula o histórico). O núcleo é **neutro de
+> autorização** (permite só `rh`; nega `master_tecnico`/`dp`/`gestor`/
+> `colaborador`) e **fail-closed** (campos vazios, data inválida, intervalo
+> invertido, estado/ação desconhecidos, papel negado, transição fora de ordem,
+> tentativa após terminal). **Permanece fora** (não implementado): reabertura/
+> recusa/correção/retrocesso, emissão de PDF/Espelho real/assinatura, movimento
+> de Banco de Horas, chamada a T050/T052/T054, saldo, pagamento/Folha — **sem**
+> NestJS/Prisma/I/O/rede/banco/dado real.
+
 ## 4. Pré-condições conceituais para o fechamento
 
 Para o período ir a `fechado_operacionalmente` (conceitualmente):
