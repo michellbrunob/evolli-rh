@@ -114,6 +114,15 @@ apuração diária; cada fronteira é um **handoff explícito**, nunca um atalho
 > ajuste humano, aprovação, **`debito_quitacao`** (BH-04/05/06), pagamento,
 > Folha, valor monetário e dado real — **sem** NestJS/Prisma/I/O/rede/banco.
 
+> **Ponteiro (T053).** A **compensação proposta** (workflow do RH: `rascunho` →
+> `submetida_para_revisao` → `aprovada_para_registro`/`recusada`/`cancelada`) e
+> a fronteira entre **proposta** (não altera saldo nem extrato) e **débito de
+> compensação efetivado** (só por registro futuro autorizado, via núcleo T052)
+> estão especificadas, **somente como documentação**, no
+> [contrato da compensação de Banco de Horas V1](etapa3-banco-horas-compensacao-contrato-v1.md).
+> Ele **não** implementa, **não** cria movimento e **não** relaxa gates
+> (BH-04/05/06 seguem pendentes).
+
 ## 3. Modelo conceitual de movimentos
 
 Nomes **conceituais** (sujeitos à modelagem real; **não** são schema/enum de
