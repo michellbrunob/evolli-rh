@@ -444,6 +444,17 @@ consulta; as ações ficam nos fluxos próprios do RH, sempre manuais e auditada
 > [contrato do fechamento e do Espelho de Ponto V1](etapa3-fechamento-espelho-contrato-v1.md).
 > Sem cálculo de dinheiro/Folha, sem assinatura eletrônica e sem relaxar gates.
 
+> **Fundação implementada (T057).** A **máquina de estados** do período (dos
+> estados acima) tem um **núcleo TypeScript puro** em
+> `apps/api/src/ponto/fechamento/` (só dado sintético): transições lineares por
+> ação humana do `rh`, imutabilidade (nova versão + evento de auditoria a cada
+> passo), permissão exclusiva `rh` e validação fail-closed;
+> `conferencia_manual_registrada` é terminal; sem reabertura/recusa/correção. O
+> núcleo **não** cria movimento de Banco de Horas, **não** chama T050/T052/T054,
+> **não** altera saldo, **não** emite PDF/assinatura e **não** calcula dinheiro/
+> Folha. Ver
+> [contrato do fechamento e do Espelho de Ponto V1](etapa3-fechamento-espelho-contrato-v1.md).
+
 ## 4. Requisitos visuais para telas futuras (UI-F01/F02/F03)
 
 Requisitos **visuais/estruturais**, não implementação. As telas futuras devem
