@@ -514,6 +514,16 @@ A fila **não** ajusta batida, **não** desconta, **não** compensa e **não** f
 período — **em nenhuma hipótese automaticamente**. Ela **sinaliza**; a decisão e
 a ação são **humanas (RH)** e passam pelos fluxos próprios, auditados.
 
+> **Ponteiro (T058).** O **contrato conceitual** desta fila — tipos de pendência,
+> estrutura mínima (só referências técnicas), estados conceituais
+> (`aberta` → `em_revisao_rh`/`aguardando_informacao` →
+> `resolvida_sem_alteracao_automatica`/`descartada_por_erro_tecnico`),
+> severidade como priorização (sem cálculo/efeito, sem bloquear o fechamento) e a
+> fila como **revisão anterior ao fechamento** (T057) — está especificado,
+> **somente como documentação**, no
+> [contrato da fila "Verificar folhas" V1](etapa3-fila-verificar-folhas-contrato-v1.md).
+> A fila continua **não** corrigindo/aprovando/calculando/fechando nada.
+
 ## 6. Importação segura e idempotente via arquivo TXT (leiaute técnico condicionado)
 
 - **Decidido (RH, T035 — resolve parte de DP-3J-20):** a **entrada do Ponto V1

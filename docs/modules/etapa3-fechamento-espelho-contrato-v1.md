@@ -102,6 +102,13 @@ Cada fronteira é um **handoff explícito**, nunca um atalho.
 - **Alertas +38h/−24h** (T051 B3) são **sinal não financeiro**; **não** são
   cálculo nem bloqueiam o fechamento por si.
 
+> **Ponteiro (T058).** A camada 4 (**Verificar folhas**) — fila de **revisão
+> humana** anterior ao fechamento, com tipos de pendência, estados conceituais e
+> severidade só como priorização (sem cálculo, sem bloquear automaticamente o
+> fechamento) — está especificada no
+> [contrato da fila "Verificar folhas" V1](etapa3-fila-verificar-folhas-contrato-v1.md).
+> A fila **sinaliza**; a decisão de fechar (T057) é humana e não automática.
+
 ## 3. Estados conceituais do período e transições
 
 Estados **conceituais** (nomes conceituais, **não** schema/enum de banco, **não**
