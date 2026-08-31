@@ -100,6 +100,11 @@ débito de compensação no Banco de Horas. Ela é **estritamente separada** do
 - Este contrato cobre a **proposta** e sua fronteira; o **registro** do débito
   usa o núcleo T052 por um adaptador futuro (§6) — **não** implementado aqui.
 
+> **Ponteiro (T056).** No **fechamento operacional** do período, **compensações
+> ainda propostas não se tornam débito automaticamente** — fechar o período
+> **não** registra `debito_compensacao`. Ver
+> [contrato do fechamento e do Espelho de Ponto V1](etapa3-fechamento-espelho-contrato-v1.md).
+
 ## 3. Estados conceituais e transições
 
 Estados **conceituais** mínimos da compensação proposta (nomes conceituais,

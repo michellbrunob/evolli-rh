@@ -96,6 +96,13 @@ apuração diária; cada fronteira é um **handoff explícito**, nunca um atalho
 - **Nenhuma camada calcula dinheiro.** O saldo e os movimentos são **minutos**;
   a conversão em valor é **Folha**, fora daqui (B7).
 
+> **Ponteiro (T056).** O **fechamento operacional** do período e a emissão do
+> **Espelho de Ponto V1** — que apenas **lê** crédito/débito separados e o saldo
+> **derivado** deste extrato, **sem** criar movimento nem calcular valor — estão
+> especificados no
+> [contrato do fechamento e do Espelho de Ponto V1](etapa3-fechamento-espelho-contrato-v1.md).
+> Fechar/emitir **não** altera o extrato nem apaga histórico.
+
 > **Fundação implementada (T052).** A **camada 2** (extrato/saldo) tem um
 > **núcleo TypeScript puro e isolado** em `apps/api/src/ponto/banco-horas/`
 > (`banco-horas.ts`, `banco-horas.types.ts`), com fixtures **exclusivamente
