@@ -136,6 +136,22 @@ cancelada                ──▶ (nenhuma)   terminal
 - **Toda transição é auditável** (§5): ator, empresa, proposta, estado de/para,
   resultado — sem dado pessoal.
 
+> **Fundação implementada (T054).** A **máquina de estados** desta seção tem um
+> **núcleo TypeScript puro e isolado** em `apps/api/src/ponto/compensacao/`
+> (`compensacao.ts`, `compensacao.types.ts`), com fixtures **exclusivamente
+> sintéticas** e testes unitários. `transicionar(proposta, acao, papel,
+refAuditoriaNova)` aplica apenas as transições explícitas do §3, retornando a
+> cada passo uma **nova versão** da proposta + um **evento técnico de auditoria**
+> (imutável — não muta a entrada, `aplicarSequencia` acumula o histórico). O
+> núcleo é **neutro de autorização** (recebe um papel técnico sintético e permite
+> só `rh`; nega `master_tecnico`/`dp`/`gestor`/`colaborador`) e é **fail-closed**
+> (campos vazios, período/minutos/justificativa inválidos, estado/ação
+> desconhecidos, papel sem permissão, transição a partir de terminal).
+> **Permanece fora** (não implementado): `debito_compensacao`, integração ao
+> extrato (T052), registro efetivo, decisão de saldo/ordem/validade/saldo
+> negativo, alçada definitiva, pagamento/Folha/dinheiro — **sem**
+> NestJS/Prisma/I/O/rede/banco/dado real.
+
 ## 4. Informações conceituais da proposta
 
 Campos **conceituais** (sujeitos à modelagem; **não** schema). Só endereçamento

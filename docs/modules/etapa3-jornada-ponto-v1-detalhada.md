@@ -368,6 +368,15 @@ Regras recebidas do RH, **a homologar** (semântica e cálculo pendentes):
 > [contrato da compensação de Banco de Horas V1](etapa3-banco-horas-compensacao-contrato-v1.md).
 > Sem compensação automática, sem pagamento/Folha e sem relaxar gates.
 
+> **Fundação implementada (T054).** A **máquina de estados** da proposta de
+> compensação tem um **núcleo TypeScript puro** em
+> `apps/api/src/ponto/compensacao/` (só dado sintético): transições explícitas
+> (`rascunho`→`submetida`→`aprovada`/`recusada`/`cancelada`), imutabilidade
+> (nova versão + evento de auditoria a cada passo), permissão exclusiva para
+> `rh` e validação fail-closed. **Não** cria `debito_compensacao`, **não** toca
+> o extrato (T052) e **não** decide saldo/pagamento/Folha. Ver
+> [contrato da compensação de Banco de Horas V1](etapa3-banco-horas-compensacao-contrato-v1.md).
+
 ### 2.9 Fechamento mensal
 
 - **Decidido (RH, T037):** o **fechamento do ponto ocorre no dia 25 de cada
