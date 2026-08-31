@@ -360,6 +360,14 @@ Regras recebidas do RH, **a homologar** (semântica e cálculo pendentes):
 > **sem** persistência e **sem** dado real. Ver
 > [contrato do ciclo de vida do Banco de Horas V1](etapa3-banco-horas-ciclo-vida-contrato-v1.md).
 
+> **Ponteiro (T053).** A **compensação proposta** do Banco de Horas — workflow
+> do RH (`rascunho`/`submetida_para_revisao`/`aprovada_para_registro`/`recusada`/
+> `cancelada`) e a fronteira entre **proposta** (não altera saldo/extrato) e
+> **débito efetivado** (só por registro futuro autorizado) — está especificada,
+> **somente como documentação**, no
+> [contrato da compensação de Banco de Horas V1](etapa3-banco-horas-compensacao-contrato-v1.md).
+> Sem compensação automática, sem pagamento/Folha e sem relaxar gates.
+
 ### 2.9 Fechamento mensal
 
 - **Decidido (RH, T037):** o **fechamento do ponto ocorre no dia 25 de cada
