@@ -91,6 +91,16 @@ V-001`, `Empresa A`/`Empresa B`).
   poderia fornecer **marcações brutas** (batidas) — nunca empresa, colaborador,
   horário, cargo ou estrutura, que continuam sendo dado de origem do Evolli.
 
+> **Ponteiro (T061).** Um **panorama executivo e técnico de prontidão** para
+> operação real do Ecossistema Evolli RH (com foco em Ponto V1) — matriz de
+> prontidão por frente, separação entre o que está pronto só com sintéticos, o
+> documentado-não-implementado, o bloqueado por gate e o futuro, o registro dos
+> bloqueadores (MFA, `DS-OPS-01`, `DP-3J-09/11/20/21/22`, `BH-01`..`BH-08`,
+> `BH-REG`, `BH-QUIT`) e uma sequência de ativação segura conceitual — está em
+> [prontidão para operação real do Evolli RH](../decisions/prontidao-operacao-real-evolli-rh.md).
+> Esse documento **não decide** pendências, **não** libera dado real e **não**
+> declara conformidade com CCT/Portaria 671.
+
 ## 1. Objetivo, limites, atores e isolamento
 
 ### 1.1 Objetivo
