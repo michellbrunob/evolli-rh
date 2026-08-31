@@ -252,6 +252,13 @@ Herdados e ainda bloqueantes de **dado real**: **MFA** (ADR 0003), `DS-OPS-01`
 (gate-mestre), `DP-3J-09` (validade legal), `DP-3J-11` (retenção). Enquanto
 abertos, **nenhum dado real** entra em nenhum ambiente.
 
+> **Ponteiro (T055).** As pendências BH-01..08 e as decisões de **registro
+> efetivo** (proposta aprovada → `debito_compensacao`) e de **quitação futura
+> para a Folha** (evento rastreável, sem apagar histórico) são consolidadas para
+> aprovação por RH/Jurídico/Folha, como formulário de decisão, no
+> [pacote de decisão de compensação/quitação de Banco de Horas](../decisions/pacote-decisao-compensacao-quitacao-banco-horas.md).
+> Todas seguem **Pendentes**; o pacote **não** implementa nem decide.
+
 ## 8. Relação com a CCT (apenas referência)
 
 A [nota de convergência com a CCT 2026/2027](../decisions/etapa3-cct-2026-2027-convergencia-jornada-ponto.md)

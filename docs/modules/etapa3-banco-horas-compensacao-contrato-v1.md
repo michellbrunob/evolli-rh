@@ -234,6 +234,13 @@ Herdados e ainda bloqueantes de **dado real**: **MFA** (ADR 0003), `DS-OPS-01`,
 `DP-3J-09` (validade legal), `DP-3J-11` (retenção). Enquanto abertos, **nenhum
 dado real** entra em nenhum ambiente.
 
+> **Ponteiro (T055).** Estas pendências (BH-01..08) e as decisões de **quando
+> uma proposta aprovada vira `debito_compensacao`** (registro efetivo) e **como
+> a quitação futura para Folha vira evento rastreável** são consolidadas para
+> aprovação, como formulário de decisão (RH/Jurídico/Folha), no
+> [pacote de decisão de compensação/quitação de Banco de Horas](../decisions/pacote-decisao-compensacao-quitacao-banco-horas.md).
+> Todas seguem **Pendentes**; o pacote **não** implementa nem decide.
+
 ## 9. Autorização e auditoria
 
 - **RH da própria empresa** cria, revisa, aprova, recusa ou cancela a proposta,
