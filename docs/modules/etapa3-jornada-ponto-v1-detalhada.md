@@ -534,6 +534,25 @@ a ação são **humanas (RH)** e passam pelos fluxos próprios, auditados.
 > T050/T052/T054/T057, **não** altera saldo e **não** corrige marcação. Ver
 > [contrato da fila "Verificar folhas" V1](etapa3-fila-verificar-folhas-contrato-v1.md).
 
+> **Fundação implementada (T060).** Os **handoffs** deste fluxo têm um
+> **orquestrador TypeScript puro** em `apps/api/src/ponto/orquestracao/`
+> (`orquestracao.ts`, `orquestracao.types.ts`), com fixtures **exclusivamente
+> sintéticas** e testes de ponta a ponta. `simularFluxoPonto(entrada)` **compõe**
+> os núcleos já integrados — apuração diária (T050) → movimentos **separados** de
+> crédito/débito pelo adaptador de T052 → extrato/saldo derivado (T052);
+> pendências da fila (T059), propostas de compensação (T054) e fechamento do
+> período (T057) seguem **cada um em sua própria máquina de estados**. O
+> orquestrador **valida os handoffs** — não cria regra trabalhista nova nem
+> substitui os núcleos: o crédito nunca compensa o débito automaticamente, a
+> proposta aprovada permanece **sem movimento**, a pendência resolvida/descartada
+> **não altera saldo**, o fechamento só percorre estados por **ação humana de
+> RH** fornecida (nunca por saldo/severidade/alerta/ausência de pendência) e é
+> **fail-closed** (núcleo inválido, referência inconsistente, ação fora de ordem
+> recusam a simulação inteira, sem resultado parcial). **Permanece fora** (não
+> implementado): compensação efetiva/`debito_compensacao`, quitação, reabertura,
+> correção, PDF/assinatura, dinheiro/Folha/pagamento — **sem**
+> NestJS/Prisma/I/O/rede/banco/dado real.
+
 ## 6. Importação segura e idempotente via arquivo TXT (leiaute técnico condicionado)
 
 - **Decidido (RH, T035 — resolve parte de DP-3J-20):** a **entrada do Ponto V1

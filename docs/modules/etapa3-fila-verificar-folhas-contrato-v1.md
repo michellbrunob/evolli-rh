@@ -187,6 +187,17 @@ descartada_por_erro_tecnico        ──▶ (nenhuma)   terminal
 >   T050/T052/T054/T057, movimento/saldo de Banco de Horas, fechamento, Espelho,
 >   assinatura, Folha, pagamento — **sem** NestJS/Prisma/I/O/rede/banco/dado real.
 
+> **Fundação implementada (T060).** Esta fila é exercida, **dentro do fluxo
+> completo**, por um **orquestrador TypeScript puro** em
+> `apps/api/src/ponto/orquestracao/` (só dado sintético). Em
+> `simularFluxoPonto(entrada)`, as pendências da fila seguem **independentes do
+> saldo**: o percurso de revisão do `rh` (T059) roda em paralelo aos demais
+> núcleos e uma pendência resolvida/descartada **não altera** o extrato nem o
+> saldo derivado do Banco de Horas; a **severidade** continua só como priorização
+> recebida (não fecha período, não bloqueia). Um percurso de pendência inválido
+> recusa a simulação inteira (fail-closed). Ver
+> [Jornada e Ponto V1 (detalhada)](etapa3-jornada-ponto-v1-detalhada.md).
+
 ## 6. Severidade e "pronto para fechamento"
 
 ### 6.1 Severidade
