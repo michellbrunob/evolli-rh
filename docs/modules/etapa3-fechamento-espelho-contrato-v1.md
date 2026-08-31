@@ -158,6 +158,16 @@ refAuditoriaNova)` aplica apenas as transições lineares do §3.1 (sempre por
 > de Banco de Horas, chamada a T050/T052/T054, saldo, pagamento/Folha — **sem**
 > NestJS/Prisma/I/O/rede/banco/dado real.
 
+> **Fundação implementada (T060).** Este ciclo de fechamento é exercido, **dentro
+> do fluxo completo**, por um **orquestrador TypeScript puro** em
+> `apps/api/src/ponto/orquestracao/` (só dado sintético). Em
+> `simularFluxoPonto(entrada)`, o fechamento só percorre estados quando o
+> chamador fornece as **ações humanas de RH** — o orquestrador **nunca** fecha
+> automaticamente por saldo, severidade, alerta ou ausência de pendência, **não**
+> cria movimento, **não** altera o saldo derivado e **não** captura assinatura;
+> uma ação fora de ordem recusa a simulação inteira (fail-closed). Ver
+> [Jornada e Ponto V1 (detalhada)](etapa3-jornada-ponto-v1-detalhada.md).
+
 ## 4. Pré-condições conceituais para o fechamento
 
 Para o período ir a `fechado_operacionalmente` (conceitualmente):
