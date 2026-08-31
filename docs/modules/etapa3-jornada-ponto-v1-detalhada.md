@@ -435,6 +435,15 @@ consulta; as ações ficam nos fluxos próprios do RH, sempre manuais e auditada
   documento; nenhuma captura de ciência/assinatura eletrônica é especificada
   em detalhe ou implementada aqui.
 
+> **Ponteiro (T056).** O **fechamento operacional** do período (dia 25) e a
+> **emissão do Espelho de Ponto V1** — estados conceituais do período
+> (`em_apuracao` … `conferencia_manual_registrada`), pré-condições do
+> fechamento, conteúdo mínimo do Espelho (só referências técnicas, sem valor),
+> imutabilidade, autorização e a **assinatura manual externa** (sem captura/
+> PDF/imagem) — estão especificados, **somente como documentação**, no
+> [contrato do fechamento e do Espelho de Ponto V1](etapa3-fechamento-espelho-contrato-v1.md).
+> Sem cálculo de dinheiro/Folha, sem assinatura eletrônica e sem relaxar gates.
+
 ## 4. Requisitos visuais para telas futuras (UI-F01/F02/F03)
 
 Requisitos **visuais/estruturais**, não implementação. As telas futuras devem
