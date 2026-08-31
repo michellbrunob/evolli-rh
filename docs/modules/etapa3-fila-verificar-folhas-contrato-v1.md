@@ -168,6 +168,25 @@ descartada_por_erro_tecnico        ──▶ (nenhuma)   terminal
   **pendente** (§8).
 - **Toda transição é auditável** (§7), sem dado pessoal em claro.
 
+> **Fundação implementada (T059).** A **máquina de estados** desta pendência tem
+> um **núcleo TypeScript puro e isolado** em `apps/api/src/ponto/verificar-folhas/`
+> (`verificar-folhas.ts`, `verificar-folhas.types.ts`), com fixtures
+> **exclusivamente sintéticas** e testes unitários.
+> `transicionarPendencia(pendencia, acao, papel, refAuditoriaNova)` aplica apenas
+> as transições do §5.1, retornando a cada passo uma **nova versão** da pendência
+>
+> - um **evento técnico de auditoria** (imutável — não muta a entrada;
+>   `aplicarSequenciaPendencia` acumula o histórico). A **severidade** é apenas
+>   priorização **recebida** (o núcleo não calcula/reclassifica nem a usa para
+>   bloquear/resolver/descartar/fechar). O núcleo é **neutro de autorização**
+>   (permite só `rh`; nega `master_tecnico`/`dp`/`gestor`/`colaborador`) e
+>   **fail-closed** (campos vazios, data inválida, tipo/estado/ação/severidade/
+>   origem/motivo desconhecidos, papel negado, transição fora de ordem, terminal).
+>   **Permanece fora** (não implementado): criação real de pendência, parser/
+>   importação, associação por CPF, ajuste de marcação, cálculo, chamada a
+>   T050/T052/T054/T057, movimento/saldo de Banco de Horas, fechamento, Espelho,
+>   assinatura, Folha, pagamento — **sem** NestJS/Prisma/I/O/rede/banco/dado real.
+
 ## 6. Severidade e "pronto para fechamento"
 
 ### 6.1 Severidade

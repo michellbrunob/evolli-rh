@@ -524,6 +524,16 @@ a ação são **humanas (RH)** e passam pelos fluxos próprios, auditados.
 > [contrato da fila "Verificar folhas" V1](etapa3-fila-verificar-folhas-contrato-v1.md).
 > A fila continua **não** corrigindo/aprovando/calculando/fechando nada.
 
+> **Fundação implementada (T059).** A **máquina de estados** de uma pendência da
+> fila tem um **núcleo TypeScript puro** em `apps/api/src/ponto/verificar-folhas/`
+> (só dado sintético): transições explícitas por ação humana do `rh`,
+> imutabilidade (nova versão + evento de auditoria), severidade só como
+> priorização recebida, permissão exclusiva `rh` e validação fail-closed; os
+> estados `resolvida_sem_alteracao_automatica`/`descartada_por_erro_tecnico` são
+> terminais. O núcleo **não** cria movimento de Banco de Horas, **não** chama
+> T050/T052/T054/T057, **não** altera saldo e **não** corrige marcação. Ver
+> [contrato da fila "Verificar folhas" V1](etapa3-fila-verificar-folhas-contrato-v1.md).
+
 ## 6. Importação segura e idempotente via arquivo TXT (leiaute técnico condicionado)
 
 - **Decidido (RH, T035 — resolve parte de DP-3J-20):** a **entrada do Ponto V1
