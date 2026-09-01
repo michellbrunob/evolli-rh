@@ -206,6 +206,18 @@ começa quando a anterior estiver satisfeita.
 > Esse contrato **não** cria schema/migration/DDL/API, **não** decide pendências
 > e **não** declara conformidade.
 
+> **Ponteiro (T065).** A frente de **autosserviço do colaborador** tem um
+> **contrato conceitual da futura Central de Solicitações do Colaborador** —
+> catálogo inicial (contestação de ponto, ausência, férias, atualização
+> cadastral, documento), estados/transições em que o encaminhamento **não**
+> executa mutação, permissões (colaborador só o próprio; RH da própria empresa;
+> `master_tecnico` sem mutação; 404 anti-enumeração) e bloqueio de
+> anexos/evidências — em
+> [contrato da Central de Solicitações do Colaborador](../modules/etapa3-central-solicitacoes-colaborador-contrato-v1.md).
+> Segue **bloqueado para dado real** (MFA, `DS-OPS-01`, base legal/retenção,
+> validação RH + Jurídico); esse contrato **não** cria portal/código/UI/
+> persistência e **não** declara conformidade.
+
 ## 6. Declaração
 
 Este é um **panorama de prontidão**, não uma decisão nem uma autorização. Não foi
