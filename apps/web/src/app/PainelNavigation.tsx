@@ -1,9 +1,9 @@
 /**
  * PainelNavigation (T044) — navegação visual do painel administrativo.
  *
- * Lista os seis destinos previstos para o painel (Início, Cadastros,
- * Pessoas, Ponto, Documentos, Portal do Colaborador), sem rota real: a
- * navegação troca apenas o
+ * Lista os sete destinos previstos para o painel (Início, Cadastros,
+ * Pessoas, Ponto, Documentos, Portal do Colaborador, Solicitações), sem rota
+ * real: a navegação troca apenas o
  * estado local de "destino selecionado" — não há React Router, `history`,
  * `<a href>` real, API nem fetch. É coerente com
  * `docs/modules/painel-administrativo-web-v1.md` (§3.6): a ocultação/seleção
@@ -33,6 +33,7 @@ export const DESTINOS_PAINEL: readonly DestinoPainel[] = [
   { id: "ponto", label: "Ponto" },
   { id: "documentos", label: "Documentos" },
   { id: "portal-colaborador", label: "Portal do Colaborador" },
+  { id: "solicitacoes-rh", label: "Solicitações" },
 ];
 
 /** Sub-rótulo exibido junto ao destino quando ele já tem tela própria. Para
@@ -47,6 +48,7 @@ const SUB_ROTULO: Record<string, string> = {
   ponto: "Visão do período",
   documentos: "Metadados",
   "portal-colaborador": "Visão geral — demonstração",
+  "solicitacoes-rh": "Central do RH",
 };
 
 export interface PainelNavigationProps {

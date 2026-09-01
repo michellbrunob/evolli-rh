@@ -4,13 +4,14 @@
  *
  * Envoltório visual neutro (banner, skip-link, navegação, main, rodapé). A
  * navegação (`PainelNavigation`) troca apenas um estado local de "destino
- * selecionado" — sem React Router, sem rota real, sem API/fetch. Os seis
+ * selecionado" — sem React Router, sem rota real, sem API/fetch. Os sete
  * destinos já têm tela própria: "Início" (Visão geral, T048), "Cadastros"
  * (Horários, T043), "Pessoas" (Horário de trabalho, T046), "Ponto" (Visão do
  * período por padrão + Verificar folhas por aba local, T045/T063),
- * "Documentos" (Metadados, T047) e "Portal do Colaborador" (Visão geral por
- * padrão + demais abas locais, T067 — prévia de interface, sem login real).
- * Os atalhos da Visão geral também trocam apenas esse mesmo estado local
+ * "Documentos" (Metadados, T047), "Portal do Colaborador" (Visão geral por
+ * padrão + demais abas locais, T067 — prévia de interface, sem login real) e
+ * "Solicitações" (Central do RH, T068 — fila de revisão demonstrativa). Os
+ * atalhos da Visão geral também trocam apenas esse mesmo estado local
  * (`onNavegar` = `setDestinoAtivoId`). Sem autenticação, sessão ou dado real.
  * A presença deste shell não concede nem implica autorização: a tela
  * renderizada continua dependendo da decisão do servidor por papel, escopo e
@@ -40,17 +41,20 @@ import { PontoScreen } from "../screens/ponto/PontoScreen";
 import { VISAO_PERIODO_TITULO_ID } from "../screens/ponto/VisaoPeriodoScreen";
 import { PortalColaboradorScreen } from "../screens/portal-colaborador/PortalColaboradorScreen";
 import { VISAO_GERAL_PORTAL_TITULO_ID } from "../screens/portal-colaborador/VisaoGeralPortalScreen";
+import { CentralSolicitacoesRHScreen } from "../screens/solicitacoes-rh/CentralSolicitacoesRHScreen";
 import { ModuloEmPreparacao } from "./ModuloEmPreparacao";
 import { DESTINOS_PAINEL, PainelNavigation } from "./PainelNavigation";
 
 /** `titleId` do `h1` de cada destino, para `aria-labelledby` do `<main>`.
  * "ponto" e "portal-colaborador" não aparecem aqui: seus `titleId` são
- * dinâmicos (ver `pontoTituloId`/`portalTituloId`). */
+ * dinâmicos (ver `pontoTituloId`/`portalTituloId`). "solicitacoes-rh" tem
+ * tela única, sem aba local, então usa o mapa estático normalmente. */
 const TITULO_ID_POR_DESTINO: Record<string, string> = {
   inicio: "inicio-visao-geral-titulo",
   cadastros: "horarios-titulo",
   pessoas: "pessoas-horario-titulo",
   documentos: "documentos-metadados-titulo",
+  "solicitacoes-rh": "central-solicitacoes-rh-titulo",
 };
 
 function conteudoDoDestino(
@@ -78,6 +82,9 @@ function conteudoDoDestino(
     return (
       <PortalColaboradorScreen onTituloIdChange={onPortalTituloIdChange} />
     );
+  }
+  if (destinoId === "solicitacoes-rh") {
+    return <CentralSolicitacoesRHScreen />;
   }
   const destino = DESTINOS_PAINEL.find((item) => item.id === destinoId);
   return (
