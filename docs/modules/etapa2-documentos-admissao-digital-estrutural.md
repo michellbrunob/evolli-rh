@@ -166,6 +166,15 @@ detalha — nunca os relaxa.
 > Esse contrato **não** relaxa nenhuma restrição herdada aqui e **não** declara
 > conformidade.
 
+> **Fundação implementada (T066).** A máquina de estados dessa Central tem um
+> **núcleo TypeScript puro** em `apps/api/src/solicitacoes/` (só dado sintético).
+> Uma solicitação do tipo `documento` anda pelos estados **só por referência
+> técnica e motivo codificado** — o núcleo **não** trata anexo, upload, download,
+> arquivo, imagem, PDF, atestado ou documento pessoal, e **não** armazena nada
+> (as restrições herdadas desta spec seguem intactas). A emissão real (se
+> houver) continua no fluxo próprio de Documentos/RH. Ver
+> [contrato da Central de Solicitações do Colaborador](etapa3-central-solicitacoes-colaborador-contrato-v1.md).
+
 ## 1. Objetivo, valor, escopo e fora de escopo
 
 ### Objetivo

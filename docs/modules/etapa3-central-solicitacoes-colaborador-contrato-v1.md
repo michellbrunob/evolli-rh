@@ -142,6 +142,27 @@ cancelada                    ──▶ (nenhuma)   terminal
   **pendente** (§8).
 - **Toda transição é auditável** (§5), sem dado pessoal em claro.
 
+> **Fundação implementada (T066).** A **máquina de estados** desta solicitação
+> tem um **núcleo TypeScript puro e isolado** em `apps/api/src/solicitacoes/`
+> (`solicitacoes.ts`, `solicitacoes.types.ts`), com fixtures **exclusivamente
+> sintéticas** e testes unitários.
+> `transicionarSolicitacao(solicitacao, acao, ator, refAuditoriaNova)` aplica
+> apenas as transições do §4.1, retornando a cada passo uma **nova versão** da
+> solicitação + um **evento técnico de auditoria** (imutável — não muta a
+> entrada; `aplicarSequenciaSolicitacao` acumula o histórico). O ator é só
+> **papel + referências técnicas**: `colaborador` só na própria solicitação
+> (`vinculoRef`/`empresaRef` compatíveis), `rh` só na própria empresa
+> (`empresaRef`); `master_tecnico`/`dp`/`gestor` são **negados**; escopo
+> incompatível falha de forma segura. É **fail-closed** (campos vazios, período
+> inválido, tipo/motivo/estado/ação/papel desconhecidos, papel não autorizado,
+> ator fora do escopo, transição fora de ordem, terminal). O
+> `encaminhar_para_operacao` é **só mudança de estado** — **nenhuma** marcação,
+> saldo, cadastro, documento, fechamento ou Folha é tocado. **Permanece fora**
+> (não implementado): portal/login/MFA/sessão/API/endpoint/persistência, anexo/
+> upload/arquivo/PDF/assinatura/notificação, correção de ponto, débito de Banco
+> de Horas, chamada a Ponto/Folha/Documentos/eSocial — **sem**
+> NestJS/Prisma/I/O/rede/banco/dado real.
+
 ## 5. Permissões conceituais
 
 - **Colaborador (futuro) só acessa as próprias solicitações:** consulta e envia

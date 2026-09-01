@@ -122,6 +122,17 @@ V-001`, `Empresa A`/`Empresa B`).
 > ajuste rastreável do RH, §2.7); esse contrato **não** cria código/UI/persistência,
 > **não** decide pendências e **não** declara conformidade.
 
+> **Fundação implementada (T066).** A máquina de estados dessa Central tem um
+> **núcleo TypeScript puro** em `apps/api/src/solicitacoes/` (só dado sintético):
+> `transicionarSolicitacao` aplica as transições do contrato T065, sendo que uma
+> `contestacao_ajuste_ponto` encaminhada ao RH (`encaminhada_para_operacao_rh`)
+> é **só mudança de estado** — **não** corrige marcação nem altera saldo/Banco
+> de Horas; a correção real segue o ajuste rastreável do RH (§2.7). O núcleo é
+> imutável, fail-closed e neutro de autorização (colaborador só o próprio; RH da
+> própria empresa; demais negados); **não** chama Ponto/Banco de Horas/Folha nem
+> persiste. Ver
+> [contrato da Central de Solicitações do Colaborador](etapa3-central-solicitacoes-colaborador-contrato-v1.md).
+
 ## 1. Objetivo, limites, atores e isolamento
 
 ### 1.1 Objetivo
