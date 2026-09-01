@@ -33,12 +33,15 @@ export const DESTINOS_PAINEL: readonly DestinoPainel[] = [
   { id: "documentos", label: "Documentos" },
 ];
 
-/** Sub-rótulo exibido junto ao destino quando ele já tem tela própria. */
+/** Sub-rótulo exibido junto ao destino quando ele já tem tela própria. Para
+ * "ponto", reflete a aba padrão mostrada ao selecionar o destino (T063) —
+ * não a aba interna eventualmente ativa: a navegação aqui é só a de destino
+ * principal, sem conhecer o estado local de abas de cada tela. */
 const SUB_ROTULO: Record<string, string> = {
   inicio: "Visão geral",
   cadastros: "Horários",
   pessoas: "Horário de trabalho",
-  ponto: "Verificar folhas",
+  ponto: "Visão do período",
   documentos: "Metadados",
 };
 

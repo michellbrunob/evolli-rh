@@ -52,11 +52,11 @@ describe("PainelNavigation (T044)", () => {
     expect(botao).toBeInTheDocument();
   });
 
-  it("apresenta 'Ponto' com o sub-rótulo 'Verificar folhas'", () => {
+  it("apresenta 'Ponto' com o sub-rótulo 'Visão do período' (T063)", () => {
     render(<PainelNavigation destinoAtivoId="ponto" onSelecionar={() => {}} />);
 
     const botao = screen.getByRole("button", {
-      name: /Ponto.*Verificar folhas/,
+      name: /Ponto.*Visão do período/,
     });
     expect(botao).toBeInTheDocument();
     expect(botao).toHaveAttribute("aria-current", "page");
