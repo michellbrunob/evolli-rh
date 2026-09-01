@@ -82,7 +82,7 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     }
   });
 
-  it("apresenta a navegação com os cinco destinos, Cadastros ativo por padrão", () => {
+  it("apresenta a navegação com os seis destinos, Cadastros ativo por padrão", () => {
     render(<App />);
 
     const nav = screen.getByRole("navigation", {
@@ -101,6 +101,11 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /Documentos.*Metadados/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", {
+        name: /Portal do Colaborador.*Visão geral — demonstração/,
+      }),
     ).toBeInTheDocument();
 
     const cadastros = screen.getByRole("button", { name: /Cadastros/ });
@@ -144,6 +149,7 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
       /^Pessoas.*Horário de trabalho/,
       /^Ponto.*Visão do período/,
       /^Documentos.*Metadados/,
+      /^Portal do Colaborador.*Visão geral — demonstração/,
     ]) {
       fireEvent.click(screen.getByRole("button", { name: rotulo }));
       expect(
@@ -298,6 +304,54 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     );
   });
 
+  it("renderiza o Portal do Colaborador > Visão geral por padrão, com h1 único (T067)", () => {
+    render(<App />);
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /Portal do Colaborador.*Visão geral — demonstração/,
+      }),
+    );
+
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Visão geral" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Portal do Colaborador — demonstração"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Módulo em preparação")).not.toBeInTheDocument();
+
+    const main = screen.getByRole("main");
+    const rotuloId = main.getAttribute("aria-labelledby");
+    expect(document.getElementById(rotuloId!)).toHaveTextContent("Visão geral");
+  });
+
+  it("Portal do Colaborador > troca de aba local não é regressão e reseta ao sair/voltar (T067)", () => {
+    render(<App />);
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /Portal do Colaborador.*Visão geral — demonstração/,
+      }),
+    );
+    fireEvent.click(screen.getByRole("tab", { name: "Meus documentos" }));
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Meus documentos" }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /^Cadastros/ }));
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /Portal do Colaborador.*Visão geral — demonstração/,
+      }),
+    );
+
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Visão geral" }),
+    ).toBeInTheDocument();
+  });
+
   it("cada botão de navegação é um <button> nativo, operável por teclado", () => {
     render(<App />);
 
@@ -305,7 +359,7 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
       name: "Navegação do painel",
     });
     const botoes = Array.from(nav.querySelectorAll("button"));
-    expect(botoes).toHaveLength(5);
+    expect(botoes).toHaveLength(6);
     for (const botao of botoes) {
       expect(botao.tagName).toBe("BUTTON");
       expect(botao).toHaveAttribute("type", "button");
