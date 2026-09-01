@@ -196,6 +196,16 @@ começa quando a anterior estiver satisfeita.
    RH + Jurídico + Segurança levantando `DS-OPS-01`, condição necessária para
    qualquer dado real.
 
+> **Ponteiro (T062).** O passo 2 (**desenho de persistência e auditoria**) tem um
+> **contrato arquitetural conceitual** — fronteiras entre os núcleos, princípios
+> obrigatórios (segregação por empresa, referências técnicas/minimização,
+> histórico append-only, saldo derivado, sem exclusão física, correção aditiva,
+> 404 anti-enumeração, RBAC neutro), agregados conceituais futuros e uma sequência
+> de implementação — em
+> [contrato de persistência e auditoria do Ponto](contrato-persistencia-auditoria-ponto-v1.md).
+> Esse contrato **não** cria schema/migration/DDL/API, **não** decide pendências
+> e **não** declara conformidade.
+
 ## 6. Declaração
 
 Este é um **panorama de prontidão**, não uma decisão nem uma autorização. Não foi
