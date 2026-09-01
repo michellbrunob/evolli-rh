@@ -1,13 +1,13 @@
 /**
- * Ponto (T063) — wrapper de navegação local entre "Visão do período" (padrão)
- * e "Verificar folhas" (T045).
+ * Ponto (T063) — wrapper de navegação local entre "Visão do período" (padrão),
+ * "Verificar folhas" (T045) e "Banco de Horas" (T069).
  *
  * A troca de aba é feita só por estado React local (`useState`) — sem React
  * Router, sem rota real, sem API/fetch. A cada vez que o destino "Ponto" é
  * selecionado no shell, este componente remonta e volta ao padrão "Visão do
  * período" (T063 requisito 1). Como só a aba ativa é renderizada por vez,
  * existe sempre exatamente um `h1` na página — cada tela (`VisaoPeriodoScreen`,
- * `VerificarFolhasScreen`) já traz o seu próprio.
+ * `VerificarFolhasScreen`, `BancoHorasScreen`) já traz o seu próprio.
  *
  * As abas usam o padrão ARIA de abas (`role="tablist"`/`role="tab"` +
  * `aria-selected`), distinto do `aria-current` do `PainelNavigation` (que
@@ -21,11 +21,12 @@ import {
   VisaoPeriodoScreen,
 } from "./VisaoPeriodoScreen";
 import { VerificarFolhasScreen } from "./VerificarFolhasScreen";
+import { BANCO_HORAS_TITULO_ID, BancoHorasScreen } from "./BancoHorasScreen";
 import "./PontoScreen.css";
 
 export const VERIFICAR_FOLHAS_TITULO_ID = "verificar-folhas-titulo";
 
-type AbaPonto = "periodo" | "verificar_folhas";
+type AbaPonto = "periodo" | "verificar_folhas" | "banco_horas";
 
 interface AbaDefinicao {
   readonly id: AbaPonto;
@@ -43,6 +44,11 @@ const ABAS: readonly AbaDefinicao[] = [
     id: "verificar_folhas",
     rotulo: "Verificar folhas",
     tituloId: VERIFICAR_FOLHAS_TITULO_ID,
+  },
+  {
+    id: "banco_horas",
+    rotulo: "Banco de Horas",
+    tituloId: BANCO_HORAS_TITULO_ID,
   },
 ];
 
@@ -102,8 +108,10 @@ export function PontoScreen({ onTituloIdChange }: PontoScreenProps) {
           <VisaoPeriodoScreen
             onAbrirVerificarFolhas={() => setAbaAtiva("verificar_folhas")}
           />
-        ) : (
+        ) : abaAtiva === "verificar_folhas" ? (
           <VerificarFolhasScreen />
+        ) : (
+          <BancoHorasScreen />
         )}
       </div>
     </div>
