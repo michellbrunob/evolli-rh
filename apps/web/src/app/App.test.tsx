@@ -82,7 +82,7 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     }
   });
 
-  it("apresenta a navegação com os seis destinos, Cadastros ativo por padrão", () => {
+  it("apresenta a navegação com os sete destinos, Cadastros ativo por padrão", () => {
     render(<App />);
 
     const nav = screen.getByRole("navigation", {
@@ -105,6 +105,11 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     expect(
       screen.getByRole("button", {
         name: /Portal do Colaborador.*Visão geral — demonstração/,
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", {
+        name: /Solicitações.*Central do RH/,
       }),
     ).toBeInTheDocument();
 
@@ -150,6 +155,7 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
       /^Ponto.*Visão do período/,
       /^Documentos.*Metadados/,
       /^Portal do Colaborador.*Visão geral — demonstração/,
+      /^Solicitações.*Central do RH/,
     ]) {
       fireEvent.click(screen.getByRole("button", { name: rotulo }));
       expect(
@@ -352,6 +358,29 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     ).toBeInTheDocument();
   });
 
+  it("renderiza Solicitações > Central do RH com h1 único (T068)", () => {
+    render(<App />);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Solicitações.*Central do RH/ }),
+    );
+
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Central do RH" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("table", { name: "Solicitações para revisão do RH" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Módulo em preparação")).not.toBeInTheDocument();
+
+    const main = screen.getByRole("main");
+    const rotuloId = main.getAttribute("aria-labelledby");
+    expect(document.getElementById(rotuloId!)).toHaveTextContent(
+      "Central do RH",
+    );
+  });
+
   it("cada botão de navegação é um <button> nativo, operável por teclado", () => {
     render(<App />);
 
@@ -359,7 +388,7 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
       name: "Navegação do painel",
     });
     const botoes = Array.from(nav.querySelectorAll("button"));
-    expect(botoes).toHaveLength(6);
+    expect(botoes).toHaveLength(7);
     for (const botao of botoes) {
       expect(botao.tagName).toBe("BUTTON");
       expect(botao).toHaveAttribute("type", "button");
