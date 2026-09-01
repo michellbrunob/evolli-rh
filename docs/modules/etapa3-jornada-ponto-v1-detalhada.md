@@ -101,6 +101,16 @@ V-001`, `Empresa A`/`Empresa B`).
 > Esse documento **não decide** pendências, **não** libera dado real e **não**
 > declara conformidade com CCT/Portaria 671.
 
+> **Ponteiro (T062).** Um **contrato arquitetural conceitual de persistência e
+> auditoria futura** do Ponto V1 — fronteiras entre os núcleos, princípios
+> obrigatórios (segregação por empresa, minimização, histórico append-only, saldo
+> derivado, sem exclusão física, correção aditiva, 404 anti-enumeração, RBAC
+> neutro), agregados conceituais e uma sequência de implementação — está em
+> [contrato de persistência e auditoria do Ponto](../decisions/contrato-persistencia-auditoria-ponto-v1.md).
+> Esse contrato **não** cria schema/migration/DDL/API/banco, **não** decide
+> pendências (`BH-*`, `DP-3J-*`, MFA, `DS-OPS-01`) e **não** declara conformidade
+> com CCT/Portaria 671.
+
 ## 1. Objetivo, limites, atores e isolamento
 
 ### 1.1 Objetivo
