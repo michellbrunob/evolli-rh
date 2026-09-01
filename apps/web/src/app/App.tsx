@@ -6,12 +6,13 @@
  * navegação (`PainelNavigation`) troca apenas um estado local de "destino
  * selecionado" — sem React Router, sem rota real, sem API/fetch. Os cinco
  * destinos já têm tela própria: "Início" (Visão geral, T048), "Cadastros"
- * (Horários, T043), "Pessoas" (Horário de trabalho, T046), "Ponto"
- * (Verificar folhas, T045) e "Documentos" (Metadados, T047). Os atalhos da
- * Visão geral também trocam apenas esse mesmo estado local (`onNavegar` =
- * `setDestinoAtivoId`). Sem autenticação, sessão ou dado real. A presença
- * deste shell não concede nem implica autorização: a tela renderizada
- * continua dependendo da decisão do servidor por papel, escopo e objeto
+ * (Horários, T043), "Pessoas" (Horário de trabalho, T046), "Ponto" (Visão do
+ * período por padrão + Verificar folhas por aba local, T045/T063) e
+ * "Documentos" (Metadados, T047). Os atalhos da Visão geral também trocam
+ * apenas esse mesmo estado local (`onNavegar` = `setDestinoAtivoId`). Sem
+ * autenticação, sessão ou dado real. A presença deste shell não concede nem
+ * implica autorização: a tela renderizada continua dependendo da decisão do
+ * servidor por papel, escopo e objeto
  * (docs/modules/painel-administrativo-web-v1.md, §3.6).
  *
  * `ModuloEmPreparacao` permanece importado como retorno defensivo de
@@ -20,6 +21,12 @@
  *
  * O cliente CSRF (`../api/csrfClient`) permanece isolado e NÃO é importado
  * aqui: não há login nem sessão nesta fundação.
+ *
+ * "Ponto" é o único destino cujo `h1` pode mudar sem trocar de destino (a
+ * aba local troca entre "Visão do período" e "Verificar folhas", cada uma com
+ * seu próprio `h1`). `PontoScreen` reporta o `titleId` do `h1` visível via
+ * `onTituloIdChange`, guardado em `pontoTituloId` — os demais destinos
+ * continuam usando o mapa estático `TITULO_ID_POR_DESTINO`.
  */
 import { useState } from "react";
 import "./tokens.css";
@@ -28,22 +35,24 @@ import { DocumentosMetadadosScreen } from "../screens/documentos";
 import { CadastroHorariosScreen } from "../screens/horarios";
 import { InicioVisaoGeralScreen } from "../screens/inicio";
 import { PessoasHorarioScreen } from "../screens/pessoas";
-import { VerificarFolhasScreen } from "../screens/ponto";
+import { PontoScreen } from "../screens/ponto/PontoScreen";
+import { VISAO_PERIODO_TITULO_ID } from "../screens/ponto/VisaoPeriodoScreen";
 import { ModuloEmPreparacao } from "./ModuloEmPreparacao";
 import { DESTINOS_PAINEL, PainelNavigation } from "./PainelNavigation";
 
-/** `titleId` do `h1` de cada destino, para `aria-labelledby` do `<main>`. */
+/** `titleId` do `h1` de cada destino, para `aria-labelledby` do `<main>`.
+ * "ponto" não aparece aqui: seu `titleId` é dinâmico (ver `pontoTituloId`). */
 const TITULO_ID_POR_DESTINO: Record<string, string> = {
   inicio: "inicio-visao-geral-titulo",
   cadastros: "horarios-titulo",
   pessoas: "pessoas-horario-titulo",
-  ponto: "verificar-folhas-titulo",
   documentos: "documentos-metadados-titulo",
 };
 
 function conteudoDoDestino(
   destinoId: string,
   onNavegar: (destinoId: string) => void,
+  onPontoTituloIdChange: (tituloId: string) => void,
 ) {
   if (destinoId === "inicio") {
     return <InicioVisaoGeralScreen onNavegar={onNavegar} />;
@@ -55,7 +64,7 @@ function conteudoDoDestino(
     return <PessoasHorarioScreen />;
   }
   if (destinoId === "ponto") {
-    return <VerificarFolhasScreen />;
+    return <PontoScreen onTituloIdChange={onPontoTituloIdChange} />;
   }
   if (destinoId === "documentos") {
     return <DocumentosMetadadosScreen />;
@@ -71,6 +80,10 @@ function conteudoDoDestino(
 
 export function App() {
   const [destinoAtivoId, setDestinoAtivoId] = useState("cadastros");
+  // "Ponto" sempre volta para "Visão do período" ao ser selecionado
+  // (`PontoScreen` remonta e reseta sua aba interna) — por isso o valor
+  // inicial já é o `titleId` dessa aba padrão.
+  const [pontoTituloId, setPontoTituloId] = useState(VISAO_PERIODO_TITULO_ID);
 
   return (
     <div className="app-shell">
@@ -96,10 +109,16 @@ export function App() {
           className="app-shell__main"
           tabIndex={-1}
           aria-labelledby={
-            TITULO_ID_POR_DESTINO[destinoAtivoId] ?? "modulo-titulo"
+            destinoAtivoId === "ponto"
+              ? pontoTituloId
+              : (TITULO_ID_POR_DESTINO[destinoAtivoId] ?? "modulo-titulo")
           }
         >
-          {conteudoDoDestino(destinoAtivoId, setDestinoAtivoId)}
+          {conteudoDoDestino(
+            destinoAtivoId,
+            setDestinoAtivoId,
+            setPontoTituloId,
+          )}
         </main>
       </div>
 

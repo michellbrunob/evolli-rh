@@ -1,0 +1,51 @@
+/**
+ * Ponto — wrapper de abas locais (T063). Só tokens já existentes
+ * (tokens.css); sem hexadecimal novo, sem sombra, sem gradiente.
+ */
+
+.ponto-screen {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  min-width: 0;
+}
+
+/* Barra de abas com rolagem própria e contida em telas estreitas — nunca
+   rolagem da página inteira (mesma técnica de `DataTable`/`PainelNavigation`). */
+.ponto-screen__tabs {
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  gap: var(--space-xs);
+  border-bottom: 1px solid var(--hairline);
+}
+
+.ponto-screen__tab {
+  flex: 0 0 auto;
+  min-height: var(--touch-target);
+  padding: var(--space-sm) var(--space-md);
+  border: none;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  color: var(--color-ink-muted);
+  font: inherit;
+  font-weight: var(--weight-regular);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.ponto-screen__tab:hover {
+  color: var(--color-ink);
+}
+
+/* Aba ativa: nunca só cor — soma `aria-selected` (semântica), peso de fonte e
+   uma barra inferior sólida (forma), mesmo princípio do `PainelNavigation`. */
+.ponto-screen__tab--ativa {
+  border-bottom-color: var(--color-action);
+  color: var(--color-ink);
+  font-weight: var(--weight-strong);
+}
+
+.ponto-screen__panel {
+  min-width: 0;
+}

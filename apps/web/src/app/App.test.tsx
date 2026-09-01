@@ -97,7 +97,7 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
       screen.getByRole("button", { name: /Pessoas.*Horário de trabalho/ }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: /Ponto.*Verificar folhas/ }),
+      screen.getByRole("button", { name: /Ponto.*Visão do período/ }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /Documentos.*Metadados/ }),
@@ -142,7 +142,7 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
       /^Início.*Visão geral/,
       /^Cadastros/,
       /^Pessoas.*Horário de trabalho/,
-      /^Ponto.*Verificar folhas/,
+      /^Ponto.*Visão do período/,
       /^Documentos.*Metadados/,
     ]) {
       fireEvent.click(screen.getByRole("button", { name: rotulo }));
@@ -181,12 +181,33 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     ).toHaveAttribute("aria-current", "page");
   });
 
-  it("renderiza a tela Ponto > Verificar folhas com h1 único", () => {
+  it("renderiza a tela Ponto > Visão do período por padrão, com h1 único (T063)", () => {
     render(<App />);
 
     fireEvent.click(
-      screen.getByRole("button", { name: /Ponto.*Verificar folhas/ }),
+      screen.getByRole("button", { name: /Ponto.*Visão do período/ }),
     );
+
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Visão do período" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Módulo em preparação")).not.toBeInTheDocument();
+
+    const main = screen.getByRole("main");
+    const rotuloId = main.getAttribute("aria-labelledby");
+    expect(document.getElementById(rotuloId!)).toHaveTextContent(
+      "Visão do período",
+    );
+  });
+
+  it("Ponto > aba local 'Verificar folhas' continua acessível, sem regressão (T063)", () => {
+    render(<App />);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Ponto.*Visão do período/ }),
+    );
+    fireEvent.click(screen.getByRole("tab", { name: "Verificar folhas" }));
 
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     expect(
@@ -197,13 +218,33 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
         name: "Pendências da fila de verificação",
       }),
     ).toBeInTheDocument();
-    expect(screen.queryByText("Módulo em preparação")).not.toBeInTheDocument();
 
     const main = screen.getByRole("main");
     const rotuloId = main.getAttribute("aria-labelledby");
     expect(document.getElementById(rotuloId!)).toHaveTextContent(
       "Verificar folhas",
     );
+  });
+
+  it("Ponto volta para 'Visão do período' ao sair e voltar ao destino (T063)", () => {
+    render(<App />);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Ponto.*Visão do período/ }),
+    );
+    fireEvent.click(screen.getByRole("tab", { name: "Verificar folhas" }));
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Verificar folhas" }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /^Cadastros/ }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /Ponto.*Visão do período/ }),
+    );
+
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Visão do período" }),
+    ).toBeInTheDocument();
   });
 
   it("renderiza a tela Pessoas > Horário de trabalho com h1 único", () => {
