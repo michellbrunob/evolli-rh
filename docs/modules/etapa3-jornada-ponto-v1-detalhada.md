@@ -111,6 +111,17 @@ V-001`, `Empresa A`/`Empresa B`).
 > pendências (`BH-*`, `DP-3J-*`, MFA, `DS-OPS-01`) e **não** declara conformidade
 > com CCT/Portaria 671.
 
+> **Ponteiro (T065).** Um **contrato conceitual da futura Central de Solicitações
+> do Colaborador** — em que o colaborador poderá consultar/enviar solicitações
+> próprias (ex.: contestação de ponto), sempre **sem** alterar marcação, saldo,
+> cadastro, documento, fechamento ou Folha: a Central só **registra e encaminha**
+> ao fluxo próprio e autorizado do RH, e o encaminhamento **não** executa mutação
+> automática — está em
+> [contrato da Central de Solicitações do Colaborador](etapa3-central-solicitacoes-colaborador-contrato-v1.md).
+> Uma `contestacao_ajuste_ponto` **não** corrige marcação (a correção segue o
+> ajuste rastreável do RH, §2.7); esse contrato **não** cria código/UI/persistência,
+> **não** decide pendências e **não** declara conformidade.
+
 ## 1. Objetivo, limites, atores e isolamento
 
 ### 1.1 Objetivo

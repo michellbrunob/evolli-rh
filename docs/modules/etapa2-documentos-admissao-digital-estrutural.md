@@ -156,6 +156,16 @@ Não são propostas desta spec; são compromissos já versionados
 Esta spec os trata como **restrições herdadas, não negociáveis** (§8), e os
 detalha — nunca os relaxa.
 
+> **Ponteiro (T065).** Um **contrato conceitual da futura Central de Solicitações
+> do Colaborador** prevê o tipo `documento` (solicitação de documento pelo
+> colaborador) — mas mantém **anexos, arquivos, imagens e documentos pessoais
+> bloqueados** nesta fase: a solicitação anda **só por referência técnica e
+> motivo codificado**, sem upload nem armazenamento, e a emissão real (se houver)
+> segue o fluxo próprio de Documentos/RH desta spec. Ver
+> [contrato da Central de Solicitações do Colaborador](etapa3-central-solicitacoes-colaborador-contrato-v1.md).
+> Esse contrato **não** relaxa nenhuma restrição herdada aqui e **não** declara
+> conformidade.
+
 ## 1. Objetivo, valor, escopo e fora de escopo
 
 ### Objetivo
