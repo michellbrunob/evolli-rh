@@ -18,7 +18,6 @@ export type NaturezaMovimentoExemplo = "credito" | "debito";
 export type OrigemMovimentoExemplo =
   | "apuracao_credito_extra"
   | "apuracao_debito_atraso_saida"
-  | "apuracao_debito_compensacao"
   | "apuracao_debito_falta"
   | "movimento_sintetico";
 
@@ -33,7 +32,6 @@ export interface MovimentoBancoHorasExemplo {
 export const ROTULO_ORIGEM_MOVIMENTO: Record<OrigemMovimentoExemplo, string> = {
   apuracao_credito_extra: "Crédito de hora extra (apuração)",
   apuracao_debito_atraso_saida: "Débito de atraso/saída antecipada (apuração)",
-  apuracao_debito_compensacao: "Débito de compensação (apuração)",
   apuracao_debito_falta: "Débito de falta (apuração)",
   movimento_sintetico: "Movimento sintético (exemplo avulso)",
 };
