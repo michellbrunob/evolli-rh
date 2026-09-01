@@ -1,0 +1,133 @@
+/**
+ * Ponto > Banco de Horas (T069) — só tokens já existentes (tokens.css); sem
+ * hexadecimal novo, sem sombra, sem gradiente. Layout responsivo: pilha
+ * vertical de seções.
+ */
+
+.banco-horas-screen {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  min-width: 0;
+}
+
+/* Sem `min-width: 0` aqui, a tabela (mais larga que o viewport em telas
+   estreitas) vazaria rolagem horizontal para a página inteira — mesma técnica
+   já usada em `VerificarFolhasScreen`/`CentralSolicitacoesRHScreen`. */
+.banco-horas-screen > * {
+  min-width: 0;
+}
+
+.banco-horas-screen__section-title {
+  margin: 0 0 var(--space-sm);
+  font-size: var(--text-lead);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  font-weight: var(--weight-strong);
+  color: var(--color-ink);
+}
+
+.banco-horas-screen__aviso {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+  background: var(--status-info-surface);
+  border-color: var(--status-info-border);
+}
+
+.banco-horas-screen__aviso-texto {
+  margin: 0;
+  color: var(--color-ink);
+  flex: 1 1 16rem;
+}
+
+.banco-horas-screen__demo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.banco-horas-screen__demo-texto {
+  margin: 0;
+  color: var(--color-ink-subtle);
+  font-size: var(--text-caption);
+}
+
+.banco-horas-screen__demo-botoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.banco-horas-screen__erro {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  background: var(--status-danger-surface);
+  border-color: var(--status-danger-border);
+}
+
+.banco-horas-screen__erro-referencia {
+  margin: 0;
+  font-size: var(--text-caption);
+  color: var(--color-ink-subtle);
+}
+
+.banco-horas-screen__erro-referencia code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.banco-horas-screen__bloco {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.banco-horas-screen__resumo-lista {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: var(--space-sm) var(--space-lg);
+  margin: 0;
+}
+
+.banco-horas-screen__resumo-lista dt {
+  font-size: var(--text-caption);
+  font-weight: var(--weight-strong);
+  color: var(--color-ink-subtle);
+}
+
+.banco-horas-screen__resumo-lista dd {
+  margin: 0;
+  font-size: var(--text-lead);
+  color: var(--color-ink);
+}
+
+.banco-horas-screen__nota {
+  margin: var(--space-sm) 0 0;
+  font-size: var(--text-caption);
+  color: var(--color-ink-subtle);
+}
+
+.banco-horas-screen__alertas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.banco-horas-screen__alerta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-xs);
+  flex: 1 1 16rem;
+}
+
+.banco-horas-screen__alerta p {
+  margin: 0;
+  color: var(--color-ink);
+}

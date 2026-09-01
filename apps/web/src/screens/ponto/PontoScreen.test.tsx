@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { PontoScreen } from "./PontoScreen";
 
-describe("PontoScreen — abas locais 'Visão do período' / 'Verificar folhas' (T063)", () => {
+describe("PontoScreen — abas locais 'Visão do período' / 'Verificar folhas' / 'Banco de Horas' (T063/T069)", () => {
   it("mostra 'Visão do período' por padrão, com h1 único", () => {
     render(<PontoScreen />);
 
@@ -12,7 +12,7 @@ describe("PontoScreen — abas locais 'Visão do período' / 'Verificar folhas' 
     ).toBeInTheDocument();
   });
 
-  it("expõe as duas abas com role='tab' e aria-selected correto por padrão", () => {
+  it("expõe as três abas com role='tab' e aria-selected correto por padrão", () => {
     render(<PontoScreen />);
 
     const tablist = screen.getByRole("tablist", { name: "Seções de Ponto" });
@@ -20,10 +20,40 @@ describe("PontoScreen — abas locais 'Visão do período' / 'Verificar folhas' 
 
     const abaPeriodo = screen.getByRole("tab", { name: "Visão do período" });
     const abaVerificar = screen.getByRole("tab", { name: "Verificar folhas" });
+    const abaBancoHoras = screen.getByRole("tab", { name: "Banco de Horas" });
     expect(abaPeriodo).toHaveAttribute("aria-selected", "true");
     expect(abaVerificar).toHaveAttribute("aria-selected", "false");
+    expect(abaBancoHoras).toHaveAttribute("aria-selected", "false");
     expect(abaPeriodo.tagName).toBe("BUTTON");
     expect(abaVerificar.tagName).toBe("BUTTON");
+    expect(abaBancoHoras.tagName).toBe("BUTTON");
+  });
+
+  it("troca para 'Banco de Horas' ao clicar na aba, com h1 único e informa o titleId", () => {
+    const onTituloIdChange = vi.fn();
+    render(<PontoScreen onTituloIdChange={onTituloIdChange} />);
+
+    fireEvent.click(screen.getByRole("tab", { name: "Banco de Horas" }));
+
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Banco de Horas" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("table", { name: "Extrato do Banco de Horas" }),
+    ).toBeInTheDocument();
+
+    expect(screen.getByRole("tab", { name: "Banco de Horas" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(
+      screen.getByRole("tab", { name: "Visão do período" }),
+    ).toHaveAttribute("aria-selected", "false");
+    expect(
+      screen.getByRole("tab", { name: "Verificar folhas" }),
+    ).toHaveAttribute("aria-selected", "false");
+    expect(onTituloIdChange).toHaveBeenCalledWith("banco-horas-titulo");
   });
 
   it("troca para 'Verificar folhas' ao clicar na aba, só por estado local (sem regressão)", () => {
