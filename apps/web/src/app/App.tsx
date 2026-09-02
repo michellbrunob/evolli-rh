@@ -8,14 +8,15 @@
  * destinos já têm tela própria: "Início" (Visão geral, T048), "Cadastros"
  * (Horários, T043), "Pessoas" (Horário de trabalho, T046), "Ponto" (Visão do
  * período por padrão + Verificar folhas por aba local, T045/T063),
- * "Documentos" (Metadados, T047), "Portal do Colaborador" (Visão geral por
- * padrão + demais abas locais, T067 — prévia de interface, sem login real) e
- * "Solicitações" (Central do RH, T068 — fila de revisão demonstrativa). Os
- * atalhos da Visão geral também trocam apenas esse mesmo estado local
- * (`onNavegar` = `setDestinoAtivoId`). Sem autenticação, sessão ou dado real.
- * A presença deste shell não concede nem implica autorização: a tela
- * renderizada continua dependendo da decisão do servidor por papel, escopo e
- * objeto (docs/modules/painel-administrativo-web-v1.md, §3.6).
+ * "Documentos" (Metadados por padrão + "Repositório documental" por aba
+ * local, T047/T070), "Portal do Colaborador" (Visão geral por padrão + demais
+ * abas locais, T067 — prévia de interface, sem login real) e "Solicitações"
+ * (Central do RH, T068 — fila de revisão demonstrativa). Os atalhos da Visão
+ * geral também trocam apenas esse mesmo estado local (`onNavegar` =
+ * `setDestinoAtivoId`). Sem autenticação, sessão ou dado real. A presença
+ * deste shell não concede nem implica autorização: a tela renderizada
+ * continua dependendo da decisão do servidor por papel, escopo e objeto
+ * (docs/modules/painel-administrativo-web-v1.md, §3.6).
  *
  * `ModuloEmPreparacao` permanece importado como retorno defensivo de
  * `conteudoDoDestino` para qualquer destino fora da lista conhecida — hoje
@@ -24,16 +25,20 @@
  * O cliente CSRF (`../api/csrfClient`) permanece isolado e NÃO é importado
  * aqui: não há login nem sessão nesta fundação.
  *
- * "Ponto" e "Portal do Colaborador" são os destinos cujo `h1` pode mudar sem
- * trocar de destino (cada um troca de aba local entre telas com `h1` próprio).
- * `PontoScreen`/`PortalColaboradorScreen` reportam o `titleId` do `h1` visível
- * via `onTituloIdChange`, guardado em `pontoTituloId`/`portalTituloId` — os
- * demais destinos continuam usando o mapa estático `TITULO_ID_POR_DESTINO`.
+ * "Ponto", "Documentos" e "Portal do Colaborador" são os destinos cujo `h1`
+ * pode mudar sem trocar de destino (cada um troca de aba local entre telas
+ * com `h1` próprio). `PontoScreen`/`DocumentosScreen`/`PortalColaboradorScreen`
+ * reportam o `titleId` do `h1` visível via `onTituloIdChange`, guardado em
+ * `pontoTituloId`/`documentosTituloId`/`portalTituloId` — os demais destinos
+ * continuam usando o mapa estático `TITULO_ID_POR_DESTINO`.
  */
 import { useState } from "react";
 import "./tokens.css";
 import "./app-shell.css";
-import { DocumentosMetadadosScreen } from "../screens/documentos";
+import {
+  DOCUMENTOS_METADADOS_TITULO_ID,
+  DocumentosScreen,
+} from "../screens/documentos";
 import { CadastroHorariosScreen } from "../screens/horarios";
 import { InicioVisaoGeralScreen } from "../screens/inicio";
 import { PessoasHorarioScreen } from "../screens/pessoas";
@@ -46,14 +51,14 @@ import { ModuloEmPreparacao } from "./ModuloEmPreparacao";
 import { DESTINOS_PAINEL, PainelNavigation } from "./PainelNavigation";
 
 /** `titleId` do `h1` de cada destino, para `aria-labelledby` do `<main>`.
- * "ponto" e "portal-colaborador" não aparecem aqui: seus `titleId` são
- * dinâmicos (ver `pontoTituloId`/`portalTituloId`). "solicitacoes-rh" tem
- * tela única, sem aba local, então usa o mapa estático normalmente. */
+ * "ponto", "documentos" e "portal-colaborador" não aparecem aqui: seus
+ * `titleId` são dinâmicos (ver
+ * `pontoTituloId`/`documentosTituloId`/`portalTituloId`). "solicitacoes-rh"
+ * tem tela única, sem aba local, então usa o mapa estático normalmente. */
 const TITULO_ID_POR_DESTINO: Record<string, string> = {
   inicio: "inicio-visao-geral-titulo",
   cadastros: "horarios-titulo",
   pessoas: "pessoas-horario-titulo",
-  documentos: "documentos-metadados-titulo",
   "solicitacoes-rh": "central-solicitacoes-rh-titulo",
 };
 
@@ -61,6 +66,7 @@ function conteudoDoDestino(
   destinoId: string,
   onNavegar: (destinoId: string) => void,
   onPontoTituloIdChange: (tituloId: string) => void,
+  onDocumentosTituloIdChange: (tituloId: string) => void,
   onPortalTituloIdChange: (tituloId: string) => void,
 ) {
   if (destinoId === "inicio") {
@@ -76,7 +82,7 @@ function conteudoDoDestino(
     return <PontoScreen onTituloIdChange={onPontoTituloIdChange} />;
   }
   if (destinoId === "documentos") {
-    return <DocumentosMetadadosScreen />;
+    return <DocumentosScreen onTituloIdChange={onDocumentosTituloIdChange} />;
   }
   if (destinoId === "portal-colaborador") {
     return (
@@ -97,10 +103,14 @@ function conteudoDoDestino(
 
 export function App() {
   const [destinoAtivoId, setDestinoAtivoId] = useState("cadastros");
-  // "Ponto" e "Portal do Colaborador" sempre voltam à aba padrão ao serem
-  // selecionados (o wrapper de cada um remonta e reseta sua aba interna) —
-  // por isso o valor inicial já é o `titleId` dessa aba padrão.
+  // "Ponto", "Documentos" e "Portal do Colaborador" sempre voltam à aba
+  // padrão ao serem selecionados (o wrapper de cada um remonta e reseta sua
+  // aba interna) — por isso o valor inicial já é o `titleId` dessa aba
+  // padrão.
   const [pontoTituloId, setPontoTituloId] = useState(VISAO_PERIODO_TITULO_ID);
+  const [documentosTituloId, setDocumentosTituloId] = useState(
+    DOCUMENTOS_METADADOS_TITULO_ID,
+  );
   const [portalTituloId, setPortalTituloId] = useState(
     VISAO_GERAL_PORTAL_TITULO_ID,
   );
@@ -131,15 +141,18 @@ export function App() {
           aria-labelledby={
             destinoAtivoId === "ponto"
               ? pontoTituloId
-              : destinoAtivoId === "portal-colaborador"
-                ? portalTituloId
-                : (TITULO_ID_POR_DESTINO[destinoAtivoId] ?? "modulo-titulo")
+              : destinoAtivoId === "documentos"
+                ? documentosTituloId
+                : destinoAtivoId === "portal-colaborador"
+                  ? portalTituloId
+                  : (TITULO_ID_POR_DESTINO[destinoAtivoId] ?? "modulo-titulo")
           }
         >
           {conteudoDoDestino(
             destinoAtivoId,
             setDestinoAtivoId,
             setPontoTituloId,
+            setDocumentosTituloId,
             setPortalTituloId,
           )}
         </main>
