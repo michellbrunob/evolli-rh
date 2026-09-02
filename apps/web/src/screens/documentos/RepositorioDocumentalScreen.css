@@ -1,0 +1,130 @@
+/**
+ * Documentos > Repositório documental (T070) — só tokens já existentes
+ * (tokens.css); sem hexadecimal novo, sem sombra, sem gradiente. Layout
+ * responsivo: pilha vertical de seções.
+ */
+
+.repositorio-documental-screen {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  min-width: 0;
+}
+
+/* Sem `min-width: 0` aqui, a tabela (mais larga que o viewport em telas
+   estreitas) vazaria rolagem horizontal para a página inteira — mesma técnica
+   já usada em `VerificarFolhasScreen`/`DocumentosMetadadosScreen`. */
+.repositorio-documental-screen > * {
+  min-width: 0;
+}
+
+.repositorio-documental-screen__section-title {
+  margin: 0 0 var(--space-sm);
+  font-size: var(--text-lead);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  font-weight: var(--weight-strong);
+  color: var(--color-ink);
+}
+
+.repositorio-documental-screen__aviso {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+  background: var(--status-info-surface);
+  border-color: var(--status-info-border);
+}
+
+.repositorio-documental-screen__aviso-texto {
+  margin: 0;
+  color: var(--color-ink);
+  flex: 1 1 16rem;
+}
+
+.repositorio-documental-screen__aviso-texto code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.repositorio-documental-screen__resumo-lista {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin: 0 0 var(--space-sm);
+  padding: 0;
+  list-style: none;
+}
+
+.repositorio-documental-screen__resumo-item {
+  flex: 0 0 auto;
+}
+
+.repositorio-documental-screen__resumo-nota {
+  margin: 0;
+  font-size: var(--text-caption);
+  color: var(--color-ink-subtle);
+}
+
+.repositorio-documental-screen__demo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.repositorio-documental-screen__demo-texto {
+  margin: 0;
+  color: var(--color-ink-subtle);
+  font-size: var(--text-caption);
+}
+
+.repositorio-documental-screen__demo-botoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.repositorio-documental-screen__erro {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  background: var(--status-danger-surface);
+  border-color: var(--status-danger-border);
+}
+
+.repositorio-documental-screen__erro-referencia {
+  margin: 0;
+  font-size: var(--text-caption);
+  color: var(--color-ink-subtle);
+}
+
+.repositorio-documental-screen__erro-referencia code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* Filtros — só locais, recalculam a lista em memória. */
+.repositorio-documental-screen__filtros {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-md);
+  margin-bottom: var(--space-sm);
+}
+
+.repositorio-documental-screen__filtros > .evolli-field {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.repositorio-documental-screen__filtros-nota {
+  margin: 0 0 var(--space-md);
+  font-size: var(--text-caption);
+  color: var(--color-ink-subtle);
+}
+
+@media (max-width: 640px) {
+  .repositorio-documental-screen__filtros {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
