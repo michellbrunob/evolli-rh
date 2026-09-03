@@ -94,7 +94,7 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
       screen.getByRole("button", { name: /Início.*Visão geral/ }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: /Pessoas.*Horário de trabalho/ }),
+      screen.getByRole("button", { name: /Pessoas.*Colaboradores/ }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /Ponto.*Visão do período/ }),
@@ -151,7 +151,7 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     for (const rotulo of [
       /^Início.*Visão geral/,
       /^Cadastros/,
-      /^Pessoas.*Horário de trabalho/,
+      /^Pessoas.*Colaboradores/,
       /^Ponto.*Visão do período/,
       /^Documentos.*Metadados/,
       /^Portal do Colaborador.*Visão geral — demonstração/,
@@ -259,12 +259,36 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     ).toBeInTheDocument();
   });
 
-  it("renderiza a tela Pessoas > Horário de trabalho com h1 único", () => {
+  it("renderiza a tela Pessoas > Colaboradores por padrão, com h1 único (T072)", () => {
     render(<App />);
 
     fireEvent.click(
-      screen.getByRole("button", { name: /Pessoas.*Horário de trabalho/ }),
+      screen.getByRole("button", { name: /Pessoas.*Colaboradores/ }),
     );
+
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Colaboradores" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("table", { name: "Colaboradores desta empresa" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Módulo em preparação")).not.toBeInTheDocument();
+
+    const main = screen.getByRole("main");
+    const rotuloId = main.getAttribute("aria-labelledby");
+    expect(document.getElementById(rotuloId!)).toHaveTextContent(
+      "Colaboradores",
+    );
+  });
+
+  it("Pessoas > aba local 'Horário de trabalho' continua acessível, sem regressão (T046/T072)", () => {
+    render(<App />);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Pessoas.*Colaboradores/ }),
+    );
+    fireEvent.click(screen.getByRole("tab", { name: "Horário de trabalho" }));
 
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     expect(
@@ -275,13 +299,33 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
         name: "Colaboradores com tabela de horário atribuída",
       }),
     ).toBeInTheDocument();
-    expect(screen.queryByText("Módulo em preparação")).not.toBeInTheDocument();
 
     const main = screen.getByRole("main");
     const rotuloId = main.getAttribute("aria-labelledby");
     expect(document.getElementById(rotuloId!)).toHaveTextContent(
       "Horário de trabalho",
     );
+  });
+
+  it("Pessoas volta para 'Colaboradores' ao sair e voltar ao destino (T072)", () => {
+    render(<App />);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Pessoas.*Colaboradores/ }),
+    );
+    fireEvent.click(screen.getByRole("tab", { name: "Horário de trabalho" }));
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Horário de trabalho" }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /^Cadastros/ }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /Pessoas.*Colaboradores/ }),
+    );
+
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Colaboradores" }),
+    ).toBeInTheDocument();
   });
 
   it("renderiza a tela Documentos > Metadados com h1 único", () => {

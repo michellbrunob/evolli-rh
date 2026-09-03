@@ -1,0 +1,131 @@
+/**
+ * Pessoas > Colaboradores (T072) — só tokens já existentes (tokens.css);
+ * sem hexadecimal novo, sem sombra, sem gradiente. Layout responsivo: pilha
+ * vertical de seções.
+ */
+
+.colaboradores-screen {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  min-width: 0;
+}
+
+/* Sem `min-width: 0` aqui, a tabela (mais larga que o viewport em telas
+   estreitas) vazaria rolagem horizontal para a página inteira — mesma técnica
+   já usada em `PessoasHorarioScreen`/`VerificarFolhasScreen`. */
+.colaboradores-screen > * {
+  min-width: 0;
+}
+
+.colaboradores-screen__section-title {
+  margin: 0 0 var(--space-sm);
+  font-size: var(--text-lead);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  font-weight: var(--weight-strong);
+  color: var(--color-ink);
+}
+
+.colaboradores-screen__aviso {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+  background: var(--status-info-surface);
+  border-color: var(--status-info-border);
+}
+
+.colaboradores-screen__aviso-texto {
+  margin: 0;
+  color: var(--color-ink);
+  flex: 1 1 16rem;
+}
+
+.colaboradores-screen__demo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.colaboradores-screen__demo-texto {
+  margin: 0;
+  color: var(--color-ink-subtle);
+  font-size: var(--text-caption);
+}
+
+.colaboradores-screen__demo-botoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.colaboradores-screen__erro {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  background: var(--status-danger-surface);
+  border-color: var(--status-danger-border);
+}
+
+.colaboradores-screen__erro-referencia {
+  margin: 0;
+  font-size: var(--text-caption);
+  color: var(--color-ink-subtle);
+}
+
+.colaboradores-screen__erro-referencia code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* Filtros — só locais, recalculam a lista em memória. */
+.colaboradores-screen__filtros {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-md);
+  margin-bottom: var(--space-sm);
+}
+
+.colaboradores-screen__filtros > .evolli-field {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.colaboradores-screen__filtros-nota {
+  margin: 0 0 var(--space-md);
+  font-size: var(--text-caption);
+  color: var(--color-ink-subtle);
+}
+
+/* Painel do formulário "Novo colaborador". */
+.colaboradores-screen__formulario {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.colaboradores-screen__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  max-width: 32rem;
+}
+
+/* Confirmação demonstrativa — tokens semânticos de "success" (ação
+   concluída na demonstração, mesmo sem efeito real). */
+.colaboradores-screen__confirmacao {
+  margin: 0;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-sm);
+  background: var(--status-success-surface);
+  color: var(--status-success-ink);
+}
+
+@media (max-width: 640px) {
+  .colaboradores-screen__filtros {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
