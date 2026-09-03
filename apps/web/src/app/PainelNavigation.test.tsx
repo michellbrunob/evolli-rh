@@ -62,13 +62,13 @@ describe("PainelNavigation (T044)", () => {
     expect(botao).toHaveAttribute("aria-current", "page");
   });
 
-  it("apresenta 'Pessoas' com o sub-rótulo 'Horário de trabalho'", () => {
+  it("apresenta 'Pessoas' com o sub-rótulo 'Colaboradores' (T072)", () => {
     render(
       <PainelNavigation destinoAtivoId="pessoas" onSelecionar={() => {}} />,
     );
 
     const botao = screen.getByRole("button", {
-      name: /Pessoas.*Horário de trabalho/,
+      name: /Pessoas.*Colaboradores/,
     });
     expect(botao).toBeInTheDocument();
     expect(botao).toHaveAttribute("aria-current", "page");
