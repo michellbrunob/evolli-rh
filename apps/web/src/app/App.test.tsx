@@ -63,6 +63,54 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     expect(main).toContainElement(screen.getByText("Somente RH"));
   });
 
+  it("Cadastros > aba local 'Estrutura organizacional' continua acessível, sem regressão em Horários (T043/T073)", () => {
+    render(<App />);
+
+    fireEvent.click(
+      screen.getByRole("tab", { name: "Estrutura organizacional" }),
+    );
+
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(
+      screen.getByRole("heading", {
+        level: 1,
+        name: "Estrutura organizacional",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("table", {
+        name: "Itens da estrutura organizacional",
+      }),
+    ).toBeInTheDocument();
+
+    const main = screen.getByRole("main");
+    const rotuloId = main.getAttribute("aria-labelledby");
+    expect(document.getElementById(rotuloId!)).toHaveTextContent(
+      "Estrutura organizacional",
+    );
+  });
+
+  it("Cadastros volta para 'Horários' ao sair e voltar ao destino (T073)", () => {
+    render(<App />);
+
+    fireEvent.click(
+      screen.getByRole("tab", { name: "Estrutura organizacional" }),
+    );
+    expect(
+      screen.getByRole("heading", {
+        level: 1,
+        name: "Estrutura organizacional",
+      }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /^Pessoas/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^Cadastros/ }));
+
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Horários" }),
+    ).toBeInTheDocument();
+  });
+
   it("não referencia autenticação, sessão real ou dado sensível no shell", () => {
     render(<App />);
 
