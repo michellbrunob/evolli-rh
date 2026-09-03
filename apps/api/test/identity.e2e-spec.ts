@@ -1061,4 +1061,134 @@ describe("Identidade, sessão e autorização (e2e)", () => {
       expect(afterWindow.body.csrfToken).toEqual(expect.any(String));
     });
   });
+
+  describe("T071 — recuperação de senha: limite específico e anti-enumeração", () => {
+    let app: INestApplication;
+    const agent = () => request(app.getHttpServer());
+    let prisma: PrismaClient;
+    const existingEmail = "recuperar-existente@empresa-a.test";
+
+    beforeAll(async () => {
+      app = await buildApp();
+      prisma = new PrismaClient({ datasources: { db: { url: appUrl } } });
+
+      const { PasswordHashService } =
+        await import("../src/auth/password/password-hash.service");
+      const passwordHash = await new PasswordHashService().hash(
+        "senha-existente-bem-longa-123456",
+      );
+      await prisma.accessUser.create({
+        data: {
+          email: existingEmail,
+          passwordHash,
+          role: "colaborador",
+        },
+      });
+    });
+
+    afterAll(async () => {
+      await prisma.accessLoginAttempt.deleteMany({});
+      await prisma.$disconnect();
+      await app.close();
+    });
+
+    beforeEach(async () => {
+      // Isola a janela de cada teste — o limite é por e-mail+IP na janela.
+      await prisma.accessLoginAttempt.deleteMany({});
+    });
+
+    it("e-mail existente e inexistente respondem igual (202 { status: 'ok' }) — sem enumeração", async () => {
+      const existe = await agent()
+        .post("/v1/auth/password/forgot")
+        .send({ email: existingEmail })
+        .expect(202);
+
+      const naoExiste = await agent()
+        .post("/v1/auth/password/forgot")
+        .send({ email: "nunca-existiu-reset@empresa-a.test" })
+        .expect(202);
+
+      expect(existe.body).toEqual({ status: "ok" });
+      expect(naoExiste.body).toEqual(existe.body);
+    });
+
+    it("bloqueia após 5 solicitações por e-mail+IP — contando TODA solicitação, mesmo sem conta existente", async () => {
+      const email = "conta-inexistente-reset@empresa-a.test";
+
+      // As 5 primeiras passam e são tratadas como bem-sucedidas (202) — antes
+      // da correção P2, nenhuma delas contava e o limite nunca disparava.
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        await agent()
+          .post("/v1/auth/password/forgot")
+          .send({ email })
+          .expect(202);
+      }
+
+      const blocked = await agent()
+        .post("/v1/auth/password/forgot")
+        .send({ email })
+        .expect(429);
+      expect(blocked.body.message).toMatch(/Muitas requisições/);
+    });
+
+    it("bloqueia após 5 solicitações também para e-mail existente, com a mesma resposta pública", async () => {
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        await agent()
+          .post("/v1/auth/password/forgot")
+          .send({ email: existingEmail })
+          .expect(202);
+      }
+
+      await agent()
+        .post("/v1/auth/password/forgot")
+        .send({ email: existingEmail })
+        .expect(429);
+    });
+
+    it("normaliza o e-mail: variações de caixa contam para o mesmo limite", async () => {
+      const variacoes = [
+        "Reset.Caixa@Empresa-A.test",
+        "reset.caixa@empresa-a.test",
+        "RESET.CAIXA@empresa-a.test",
+        "Reset.Caixa@empresa-a.TEST",
+        "rEsEt.cAiXa@EMPRESA-a.test",
+      ];
+
+      for (const email of variacoes) {
+        await agent()
+          .post("/v1/auth/password/forgot")
+          .send({ email })
+          .expect(202);
+      }
+
+      // 6ª — qualquer caixa normaliza para a mesma chave, então é barrada.
+      await agent()
+        .post("/v1/auth/password/forgot")
+        .send({ email: "reset.caixa@empresa-a.test" })
+        .expect(429);
+    });
+
+    it("não há regressão no limite de login: falha de login e recuperação usam chaves distintas", async () => {
+      // 5 solicitações de recuperação para um e-mail esgotam a janela DELE...
+      const email = "isolamento-reset@empresa-a.test";
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        await agent()
+          .post("/v1/auth/password/forgot")
+          .send({ email })
+          .expect(202);
+      }
+      await agent()
+        .post("/v1/auth/password/forgot")
+        .send({ email })
+        .expect(429);
+
+      // ...mas NÃO afetam o limite de login do mesmo e-mail: o login usa a
+      // chave sem o prefixo `reset:` e conta só falhas. A 1ª tentativa de
+      // login ainda responde 401 (credencial), nunca 429.
+      await agent()
+        .post("/v1/auth/login")
+        .send({ email, password: "qualquer-senha-123456789" })
+        .expect(401);
+    });
+  });
 });
