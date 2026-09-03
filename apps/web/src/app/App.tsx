@@ -6,8 +6,9 @@
  * navegação (`PainelNavigation`) troca apenas um estado local de "destino
  * selecionado" — sem React Router, sem rota real, sem API/fetch. Os sete
  * destinos já têm tela própria: "Início" (Visão geral, T048), "Cadastros"
- * (Horários, T043), "Pessoas" (Colaboradores por padrão + "Horário de
- * trabalho" por aba local, T046/T072), "Ponto" (Visão do período por padrão +
+ * (Horários por padrão + "Estrutura organizacional" por aba local,
+ * T043/T073), "Pessoas" (Colaboradores por padrão + "Horário de trabalho"
+ * por aba local, T046/T072), "Ponto" (Visão do período por padrão +
  * Verificar folhas por aba local, T045/T063), "Documentos" (Metadados por
  * padrão + "Repositório documental" por aba local, T047/T070), "Portal do
  * Colaborador" (Visão geral por padrão + demais abas locais, T067 — prévia de
@@ -26,13 +27,13 @@
  * O cliente CSRF (`../api/csrfClient`) permanece isolado e NÃO é importado
  * aqui: não há login nem sessão nesta fundação.
  *
- * "Pessoas", "Ponto", "Documentos" e "Portal do Colaborador" são os destinos
- * cujo `h1` pode mudar sem trocar de destino (cada um troca de aba local
- * entre telas com `h1` próprio).
- * `PessoasScreen`/`PontoScreen`/`DocumentosScreen`/`PortalColaboradorScreen`
+ * "Cadastros", "Pessoas", "Ponto", "Documentos" e "Portal do Colaborador" são
+ * os destinos cujo `h1` pode mudar sem trocar de destino (cada um troca de
+ * aba local entre telas com `h1` próprio).
+ * `CadastrosScreen`/`PessoasScreen`/`PontoScreen`/`DocumentosScreen`/`PortalColaboradorScreen`
  * reportam o `titleId` do `h1` visível via `onTituloIdChange`, guardado em
- * `pessoasTituloId`/`pontoTituloId`/`documentosTituloId`/`portalTituloId` —
- * os demais destinos continuam usando o mapa estático `TITULO_ID_POR_DESTINO`.
+ * `cadastrosTituloId`/`pessoasTituloId`/`pontoTituloId`/`documentosTituloId`/`portalTituloId`
+ * — os demais destinos continuam usando o mapa estático `TITULO_ID_POR_DESTINO`.
  */
 import { useState } from "react";
 import "./tokens.css";
@@ -41,7 +42,7 @@ import {
   DOCUMENTOS_METADADOS_TITULO_ID,
   DocumentosScreen,
 } from "../screens/documentos";
-import { CadastroHorariosScreen } from "../screens/horarios";
+import { CadastrosScreen, HORARIOS_TITULO_ID } from "../screens/horarios";
 import { InicioVisaoGeralScreen } from "../screens/inicio";
 import { COLABORADORES_TITULO_ID, PessoasScreen } from "../screens/pessoas";
 import { PontoScreen } from "../screens/ponto/PontoScreen";
@@ -53,20 +54,20 @@ import { ModuloEmPreparacao } from "./ModuloEmPreparacao";
 import { DESTINOS_PAINEL, PainelNavigation } from "./PainelNavigation";
 
 /** `titleId` do `h1` de cada destino, para `aria-labelledby` do `<main>`.
- * "pessoas", "ponto", "documentos" e "portal-colaborador" não aparecem aqui:
- * seus `titleId` são dinâmicos (ver
- * `pessoasTituloId`/`pontoTituloId`/`documentosTituloId`/`portalTituloId`).
+ * "cadastros", "pessoas", "ponto", "documentos" e "portal-colaborador" não
+ * aparecem aqui: seus `titleId` são dinâmicos (ver
+ * `cadastrosTituloId`/`pessoasTituloId`/`pontoTituloId`/`documentosTituloId`/`portalTituloId`).
  * "solicitacoes-rh" tem tela única, sem aba local, então usa o mapa estático
  * normalmente. */
 const TITULO_ID_POR_DESTINO: Record<string, string> = {
   inicio: "inicio-visao-geral-titulo",
-  cadastros: "horarios-titulo",
   "solicitacoes-rh": "central-solicitacoes-rh-titulo",
 };
 
 function conteudoDoDestino(
   destinoId: string,
   onNavegar: (destinoId: string) => void,
+  onCadastrosTituloIdChange: (tituloId: string) => void,
   onPessoasTituloIdChange: (tituloId: string) => void,
   onPontoTituloIdChange: (tituloId: string) => void,
   onDocumentosTituloIdChange: (tituloId: string) => void,
@@ -76,7 +77,7 @@ function conteudoDoDestino(
     return <InicioVisaoGeralScreen onNavegar={onNavegar} />;
   }
   if (destinoId === "cadastros") {
-    return <CadastroHorariosScreen />;
+    return <CadastrosScreen onTituloIdChange={onCadastrosTituloIdChange} />;
   }
   if (destinoId === "pessoas") {
     return <PessoasScreen onTituloIdChange={onPessoasTituloIdChange} />;
@@ -106,10 +107,12 @@ function conteudoDoDestino(
 
 export function App() {
   const [destinoAtivoId, setDestinoAtivoId] = useState("cadastros");
-  // "Pessoas", "Ponto", "Documentos" e "Portal do Colaborador" sempre voltam
-  // à aba padrão ao serem selecionados (o wrapper de cada um remonta e
-  // reseta sua aba interna) — por isso o valor inicial já é o `titleId`
-  // dessa aba padrão.
+  // "Cadastros", "Pessoas", "Ponto", "Documentos" e "Portal do Colaborador"
+  // sempre voltam à aba padrão ao serem selecionados (o wrapper de cada um
+  // remonta e reseta sua aba interna) — por isso o valor inicial já é o
+  // `titleId` dessa aba padrão.
+  const [cadastrosTituloId, setCadastrosTituloId] =
+    useState(HORARIOS_TITULO_ID);
   const [pessoasTituloId, setPessoasTituloId] = useState(
     COLABORADORES_TITULO_ID,
   );
@@ -145,20 +148,24 @@ export function App() {
           className="app-shell__main"
           tabIndex={-1}
           aria-labelledby={
-            destinoAtivoId === "pessoas"
-              ? pessoasTituloId
-              : destinoAtivoId === "ponto"
-                ? pontoTituloId
-                : destinoAtivoId === "documentos"
-                  ? documentosTituloId
-                  : destinoAtivoId === "portal-colaborador"
-                    ? portalTituloId
-                    : (TITULO_ID_POR_DESTINO[destinoAtivoId] ?? "modulo-titulo")
+            destinoAtivoId === "cadastros"
+              ? cadastrosTituloId
+              : destinoAtivoId === "pessoas"
+                ? pessoasTituloId
+                : destinoAtivoId === "ponto"
+                  ? pontoTituloId
+                  : destinoAtivoId === "documentos"
+                    ? documentosTituloId
+                    : destinoAtivoId === "portal-colaborador"
+                      ? portalTituloId
+                      : (TITULO_ID_POR_DESTINO[destinoAtivoId] ??
+                        "modulo-titulo")
           }
         >
           {conteudoDoDestino(
             destinoAtivoId,
             setDestinoAtivoId,
+            setCadastrosTituloId,
             setPessoasTituloId,
             setPontoTituloId,
             setDocumentosTituloId,

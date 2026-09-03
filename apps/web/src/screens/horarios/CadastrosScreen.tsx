@@ -1,0 +1,110 @@
+/**
+ * Cadastros (T073) — wrapper de navegação local entre "Horários" (padrão,
+ * T043) e "Estrutura organizacional" (T073).
+ *
+ * A troca de aba é feita só por estado React local (`useState`) — sem React
+ * Router, sem rota real, sem API/fetch. A cada vez que o destino "Cadastros"
+ * é selecionado no shell, este componente remonta e volta ao padrão
+ * "Horários" (mesmo princípio do "Ponto" — T063 — do "Documentos" — T070 —
+ * e do "Pessoas" — T072). Como só a aba ativa é renderizada por vez, existe
+ * sempre exatamente um `h1` na página — cada tela (`CadastroHorariosScreen`,
+ * `EstruturaOrganizacionalScreen`) já traz o seu próprio.
+ *
+ * As abas usam o padrão ARIA de abas (`role="tablist"`/`role="tab"` +
+ * `aria-selected`), distinto do `aria-current` do `PainelNavigation` (que
+ * marca um destino de navegação, não uma aba de conteúdo). O item ativo nunca
+ * depende só de cor: soma `aria-selected`, peso de fonte e uma barra inferior
+ * sólida (mesmo princípio do `PainelNavigation`/`StatusBadge`).
+ */
+import { useEffect, useState } from "react";
+import { CadastroHorariosScreen } from "./CadastroHorariosScreen";
+import {
+  ESTRUTURA_ORGANIZACIONAL_TITULO_ID,
+  EstruturaOrganizacionalScreen,
+} from "./EstruturaOrganizacionalScreen";
+import "./CadastrosScreen.css";
+
+export const HORARIOS_TITULO_ID = "horarios-titulo";
+
+type AbaCadastros = "horarios" | "estrutura";
+
+interface AbaDefinicao {
+  readonly id: AbaCadastros;
+  readonly rotulo: string;
+  readonly tituloId: string;
+}
+
+const ABAS: readonly AbaDefinicao[] = [
+  {
+    id: "horarios",
+    rotulo: "Horários",
+    tituloId: HORARIOS_TITULO_ID,
+  },
+  {
+    id: "estrutura",
+    rotulo: "Estrutura organizacional",
+    tituloId: ESTRUTURA_ORGANIZACIONAL_TITULO_ID,
+  },
+];
+
+export interface CadastrosScreenProps {
+  /** Informa o `id` do `h1` atualmente visível, para o shell rotular o
+   * `<main>` (`aria-labelledby`) mesmo quando a aba muda sem trocar de
+   * destino. Não é navegação real — só sincroniza o rótulo de acessibilidade. */
+  onTituloIdChange?: (tituloId: string) => void;
+}
+
+export function CadastrosScreen({ onTituloIdChange }: CadastrosScreenProps) {
+  const [abaAtiva, setAbaAtiva] = useState<AbaCadastros>("horarios");
+
+  const definicaoAtiva = ABAS.find((aba) => aba.id === abaAtiva) ?? ABAS[0]!;
+
+  useEffect(() => {
+    onTituloIdChange?.(definicaoAtiva.tituloId);
+  }, [definicaoAtiva.tituloId, onTituloIdChange]);
+
+  return (
+    <div className="cadastros-screen">
+      <div
+        role="tablist"
+        aria-label="Seções de Cadastros"
+        className="cadastros-screen__tabs"
+      >
+        {ABAS.map((aba) => {
+          const selecionada = aba.id === abaAtiva;
+          return (
+            <button
+              key={aba.id}
+              type="button"
+              role="tab"
+              id={`cadastros-tab-${aba.id}`}
+              aria-selected={selecionada}
+              aria-controls={`cadastros-panel-${aba.id}`}
+              className={
+                selecionada
+                  ? "cadastros-screen__tab cadastros-screen__tab--ativa"
+                  : "cadastros-screen__tab"
+              }
+              onClick={() => setAbaAtiva(aba.id)}
+            >
+              {aba.rotulo}
+            </button>
+          );
+        })}
+      </div>
+
+      <div
+        role="tabpanel"
+        id={`cadastros-panel-${definicaoAtiva.id}`}
+        aria-labelledby={`cadastros-tab-${definicaoAtiva.id}`}
+        className="cadastros-screen__panel"
+      >
+        {abaAtiva === "horarios" ? (
+          <CadastroHorariosScreen />
+        ) : (
+          <EstruturaOrganizacionalScreen />
+        )}
+      </div>
+    </div>
+  );
+}
