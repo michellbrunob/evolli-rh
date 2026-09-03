@@ -137,7 +137,12 @@ export class AuthService {
     metadata: SessionRequestMetadata,
   ): Promise<void> {
     const normalized = normalizeEmail(email);
-    await this.rateLimitService.assertNotRateLimited(
+    // Limite ESPECÍFICO de recuperação de senha: conta toda solicitação da
+    // janela (e-mail normalizado + IP), não só as "falhadas". Se reutilizasse
+    // `assertNotRateLimited` (regra de falha de login), o disparo do fluxo —
+    // que sempre grava tentativa "bem-sucedida" — nunca contaria, deixando o
+    // endpoint público sem limite efetivo.
+    await this.rateLimitService.assertRequestRateNotExceeded(
       `reset:${normalized}`,
       metadata.ip,
       metadata.requestId,
@@ -159,9 +164,12 @@ export class AuthService {
       await this.emailNotifier.notifyPasswordResetRequested(user.email, token);
     }
 
-    // Sempre grava tentativa "bem-sucedida" (não é rate limit de força
-    // bruta de senha, é limite de disparo do fluxo) e sempre retorna igual,
-    // exista ou não o e-mail — evita enumeração (spec §6).
+    // Sempre grava a tentativa (uma por solicitação) — o limite de disparo do
+    // fluxo (`assertRequestRateNotExceeded`) conta TODAS as solicitações da
+    // janela, não só falhas, então cada requisição conta independentemente de
+    // existir conta, enviar e-mail ou o fluxo ser tratado como bem-sucedido. A
+    // resposta pública segue uniforme, exista ou não o e-mail — evita
+    // enumeração (spec §6).
     await this.rateLimitService.recordAttempt(
       `reset:${normalized}`,
       metadata.ip,
