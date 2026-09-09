@@ -369,6 +369,31 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     );
   });
 
+  it("Ponto > aba local 'Fechamento e Espelho' continua acessível, sem regressão em Visão do período/Verificar folhas/Banco de Horas/Ajustes manuais (T079)", () => {
+    render(<App />);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Ponto.*Visão do período/ }),
+    );
+    fireEvent.click(screen.getByRole("tab", { name: "Fechamento e Espelho" }));
+
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Fechamento e Espelho" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("table", {
+        name: "Fechamento e Espelho — períodos (exemplo)",
+      }),
+    ).toBeInTheDocument();
+
+    const main = screen.getByRole("main");
+    const rotuloId = main.getAttribute("aria-labelledby");
+    expect(document.getElementById(rotuloId!)).toHaveTextContent(
+      "Fechamento e Espelho",
+    );
+  });
+
   it("Ponto volta para 'Visão do período' ao sair e voltar ao destino (T063)", () => {
     render(<App />);
 

@@ -1,15 +1,15 @@
 /**
  * Ponto (T063) — wrapper de navegação local entre "Visão do período" (padrão),
- * "Verificar folhas" (T045), "Banco de Horas" (T069) e "Ajustes manuais"
- * (T077).
+ * "Verificar folhas" (T045), "Banco de Horas" (T069), "Ajustes manuais"
+ * (T077) e "Fechamento e Espelho" (T079).
  *
  * A troca de aba é feita só por estado React local (`useState`) — sem React
  * Router, sem rota real, sem API/fetch. A cada vez que o destino "Ponto" é
  * selecionado no shell, este componente remonta e volta ao padrão "Visão do
  * período" (T063 requisito 1). Como só a aba ativa é renderizada por vez,
  * existe sempre exatamente um `h1` na página — cada tela (`VisaoPeriodoScreen`,
- * `VerificarFolhasScreen`, `BancoHorasScreen`, `AjustesManuaisScreen`) já traz
- * o seu próprio.
+ * `VerificarFolhasScreen`, `BancoHorasScreen`, `AjustesManuaisScreen`,
+ * `FechamentoEspelhoScreen`) já traz o seu próprio.
  *
  * As abas usam o padrão ARIA de abas (`role="tablist"`/`role="tab"` +
  * `aria-selected`), distinto do `aria-current` do `PainelNavigation` (que
@@ -28,12 +28,20 @@ import {
   AJUSTES_MANUAIS_TITULO_ID,
   AjustesManuaisScreen,
 } from "./AjustesManuaisScreen";
+import {
+  FECHAMENTO_ESPELHO_TITULO_ID,
+  FechamentoEspelhoScreen,
+} from "./FechamentoEspelhoScreen";
 import "./PontoScreen.css";
 
 export const VERIFICAR_FOLHAS_TITULO_ID = "verificar-folhas-titulo";
 
 type AbaPonto =
-  "periodo" | "verificar_folhas" | "banco_horas" | "ajustes_manuais";
+  | "periodo"
+  | "verificar_folhas"
+  | "banco_horas"
+  | "ajustes_manuais"
+  | "fechamento_espelho";
 
 interface AbaDefinicao {
   readonly id: AbaPonto;
@@ -61,6 +69,11 @@ const ABAS: readonly AbaDefinicao[] = [
     id: "ajustes_manuais",
     rotulo: "Ajustes manuais",
     tituloId: AJUSTES_MANUAIS_TITULO_ID,
+  },
+  {
+    id: "fechamento_espelho",
+    rotulo: "Fechamento e Espelho",
+    tituloId: FECHAMENTO_ESPELHO_TITULO_ID,
   },
 ];
 
@@ -124,8 +137,10 @@ export function PontoScreen({ onTituloIdChange }: PontoScreenProps) {
           <VerificarFolhasScreen />
         ) : abaAtiva === "banco_horas" ? (
           <BancoHorasScreen />
-        ) : (
+        ) : abaAtiva === "ajustes_manuais" ? (
           <AjustesManuaisScreen />
+        ) : (
+          <FechamentoEspelhoScreen />
         )}
       </div>
     </div>
