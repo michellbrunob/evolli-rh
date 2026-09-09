@@ -1,7 +1,7 @@
 /**
  * Cadastros (T073) — wrapper de navegação local entre "Horários" (padrão,
- * T043), "Estrutura organizacional" (T073), "Calendário de feriados" (T076)
- * e "Políticas de Banco de Horas" (T078).
+ * T043), "Estrutura organizacional" (T073), "Calendário de feriados" (T076),
+ * "Políticas de Banco de Horas" (T078) e "Funções e cargos" (T080).
  *
  * A troca de aba é feita só por estado React local (`useState`) — sem React
  * Router, sem rota real, sem API/fetch. A cada vez que o destino "Cadastros"
@@ -10,7 +10,7 @@
  * e do "Pessoas" — T072). Como só a aba ativa é renderizada por vez, existe
  * sempre exatamente um `h1` na página — cada tela (`CadastroHorariosScreen`,
  * `EstruturaOrganizacionalScreen`, `CalendarioFeriadosScreen`,
- * `PoliticasBancoHorasScreen`) já traz o seu próprio.
+ * `PoliticasBancoHorasScreen`, `FuncoesCargosScreen`) já traz o seu próprio.
  *
  * As abas usam o padrão ARIA de abas (`role="tablist"`/`role="tab"` +
  * `aria-selected`), distinto do `aria-current` do `PainelNavigation` (que
@@ -29,6 +29,10 @@ import {
   EstruturaOrganizacionalScreen,
 } from "./EstruturaOrganizacionalScreen";
 import {
+  FUNCOES_CARGOS_TITULO_ID,
+  FuncoesCargosScreen,
+} from "./FuncoesCargosScreen";
+import {
   POLITICAS_BANCO_HORAS_TITULO_ID,
   PoliticasBancoHorasScreen,
 } from "./PoliticasBancoHorasScreen";
@@ -36,7 +40,8 @@ import "./CadastrosScreen.css";
 
 export const HORARIOS_TITULO_ID = "horarios-titulo";
 
-type AbaCadastros = "horarios" | "estrutura" | "feriados" | "politicas_bh";
+type AbaCadastros =
+  "horarios" | "estrutura" | "feriados" | "politicas_bh" | "funcoes_cargos";
 
 interface AbaDefinicao {
   readonly id: AbaCadastros;
@@ -64,6 +69,11 @@ const ABAS: readonly AbaDefinicao[] = [
     id: "politicas_bh",
     rotulo: "Políticas de Banco de Horas",
     tituloId: POLITICAS_BANCO_HORAS_TITULO_ID,
+  },
+  {
+    id: "funcoes_cargos",
+    rotulo: "Funções e cargos",
+    tituloId: FUNCOES_CARGOS_TITULO_ID,
   },
 ];
 
@@ -125,8 +135,10 @@ export function CadastrosScreen({ onTituloIdChange }: CadastrosScreenProps) {
           <EstruturaOrganizacionalScreen />
         ) : abaAtiva === "feriados" ? (
           <CalendarioFeriadosScreen />
-        ) : (
+        ) : abaAtiva === "politicas_bh" ? (
           <PoliticasBancoHorasScreen />
+        ) : (
+          <FuncoesCargosScreen />
         )}
       </div>
     </div>
