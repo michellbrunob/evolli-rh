@@ -317,6 +317,31 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     );
   });
 
+  it("Ponto > aba local 'Ajustes manuais' continua acessível, sem regressão em Visão do período/Verificar folhas/Banco de Horas (T077)", () => {
+    render(<App />);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Ponto.*Visão do período/ }),
+    );
+    fireEvent.click(screen.getByRole("tab", { name: "Ajustes manuais" }));
+
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Ajustes manuais" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("table", {
+        name: "Ajustes manuais de marcação (exemplo)",
+      }),
+    ).toBeInTheDocument();
+
+    const main = screen.getByRole("main");
+    const rotuloId = main.getAttribute("aria-labelledby");
+    expect(document.getElementById(rotuloId!)).toHaveTextContent(
+      "Ajustes manuais",
+    );
+  });
+
   it("Ponto volta para 'Visão do período' ao sair e voltar ao destino (T063)", () => {
     render(<App />);
 

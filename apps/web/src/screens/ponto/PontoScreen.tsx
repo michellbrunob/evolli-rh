@@ -1,13 +1,15 @@
 /**
  * Ponto (T063) — wrapper de navegação local entre "Visão do período" (padrão),
- * "Verificar folhas" (T045) e "Banco de Horas" (T069).
+ * "Verificar folhas" (T045), "Banco de Horas" (T069) e "Ajustes manuais"
+ * (T077).
  *
  * A troca de aba é feita só por estado React local (`useState`) — sem React
  * Router, sem rota real, sem API/fetch. A cada vez que o destino "Ponto" é
  * selecionado no shell, este componente remonta e volta ao padrão "Visão do
  * período" (T063 requisito 1). Como só a aba ativa é renderizada por vez,
  * existe sempre exatamente um `h1` na página — cada tela (`VisaoPeriodoScreen`,
- * `VerificarFolhasScreen`, `BancoHorasScreen`) já traz o seu próprio.
+ * `VerificarFolhasScreen`, `BancoHorasScreen`, `AjustesManuaisScreen`) já traz
+ * o seu próprio.
  *
  * As abas usam o padrão ARIA de abas (`role="tablist"`/`role="tab"` +
  * `aria-selected`), distinto do `aria-current` do `PainelNavigation` (que
@@ -22,11 +24,16 @@ import {
 } from "./VisaoPeriodoScreen";
 import { VerificarFolhasScreen } from "./VerificarFolhasScreen";
 import { BANCO_HORAS_TITULO_ID, BancoHorasScreen } from "./BancoHorasScreen";
+import {
+  AJUSTES_MANUAIS_TITULO_ID,
+  AjustesManuaisScreen,
+} from "./AjustesManuaisScreen";
 import "./PontoScreen.css";
 
 export const VERIFICAR_FOLHAS_TITULO_ID = "verificar-folhas-titulo";
 
-type AbaPonto = "periodo" | "verificar_folhas" | "banco_horas";
+type AbaPonto =
+  "periodo" | "verificar_folhas" | "banco_horas" | "ajustes_manuais";
 
 interface AbaDefinicao {
   readonly id: AbaPonto;
@@ -49,6 +56,11 @@ const ABAS: readonly AbaDefinicao[] = [
     id: "banco_horas",
     rotulo: "Banco de Horas",
     tituloId: BANCO_HORAS_TITULO_ID,
+  },
+  {
+    id: "ajustes_manuais",
+    rotulo: "Ajustes manuais",
+    tituloId: AJUSTES_MANUAIS_TITULO_ID,
   },
 ];
 
@@ -110,8 +122,10 @@ export function PontoScreen({ onTituloIdChange }: PontoScreenProps) {
           />
         ) : abaAtiva === "verificar_folhas" ? (
           <VerificarFolhasScreen />
-        ) : (
+        ) : abaAtiva === "banco_horas" ? (
           <BancoHorasScreen />
+        ) : (
+          <AjustesManuaisScreen />
         )}
       </div>
     </div>
