@@ -1,9 +1,9 @@
 /**
  * PainelNavigation (T044) — navegação visual do painel administrativo.
  *
- * Lista os sete destinos previstos para o painel (Início, Cadastros,
- * Pessoas, Ponto, Documentos, Portal do Colaborador, Solicitações), sem rota
- * real: a navegação troca apenas o
+ * Lista os oito destinos previstos para o painel (Início, Cadastros,
+ * Pessoas, Ponto, Documentos, Portal do Colaborador, Solicitações,
+ * Relatórios), sem rota real: a navegação troca apenas o
  * estado local de "destino selecionado" — não há React Router, `history`,
  * `<a href>` real, API nem fetch. É coerente com
  * `docs/modules/painel-administrativo-web-v1.md` (§3.6): a ocultação/seleção
@@ -34,13 +34,14 @@ export const DESTINOS_PAINEL: readonly DestinoPainel[] = [
   { id: "documentos", label: "Documentos" },
   { id: "portal-colaborador", label: "Portal do Colaborador" },
   { id: "solicitacoes-rh", label: "Solicitações" },
+  { id: "relatorios", label: "Relatórios" },
 ];
 
 /** Sub-rótulo exibido junto ao destino quando ele já tem tela própria. Para
- * "cadastros", "pessoas", "ponto" e "portal-colaborador", reflete a aba
- * padrão mostrada ao selecionar o destino (T073/T072/T063/T067) — não a aba
- * interna eventualmente ativa: a navegação aqui é só a de destino principal,
- * sem conhecer o estado local de abas de cada tela. */
+ * "cadastros", "pessoas", "ponto", "portal-colaborador" e "relatorios",
+ * reflete a aba padrão mostrada ao selecionar o destino (T075/T073/T072/
+ * T063/T067) — não a aba interna eventualmente ativa: a navegação aqui é só
+ * a de destino principal, sem conhecer o estado local de abas de cada tela. */
 const SUB_ROTULO: Record<string, string> = {
   inicio: "Visão geral",
   cadastros: "Horários",
@@ -49,6 +50,7 @@ const SUB_ROTULO: Record<string, string> = {
   documentos: "Metadados",
   "portal-colaborador": "Visão geral — demonstração",
   "solicitacoes-rh": "Central do RH",
+  relatorios: "Exceções de Ponto",
 };
 
 export interface PainelNavigationProps {

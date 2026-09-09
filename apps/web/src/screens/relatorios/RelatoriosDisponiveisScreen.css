@@ -1,0 +1,42 @@
+/**
+ * Relatórios > Relatórios disponíveis (T075) — só tokens já existentes
+ * (tokens.css); sem hexadecimal novo, sem sombra, sem gradiente.
+ */
+
+.relatorios-disponiveis-screen {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  min-width: 0;
+}
+
+/* Sem `min-width: 0` aqui, a tabela (mais larga que o viewport em telas
+   estreitas) vazaria rolagem horizontal para a página inteira — mesma técnica
+   já usada em `ExcecoesPontoScreen`/`CentralSolicitacoesRHScreen`. */
+.relatorios-disponiveis-screen > * {
+  min-width: 0;
+}
+
+.relatorios-disponiveis-screen__section-title {
+  margin: 0 0 var(--space-sm);
+  font-size: var(--text-lead);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  font-weight: var(--weight-strong);
+  color: var(--color-ink);
+}
+
+.relatorios-disponiveis-screen__aviso {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+  background: var(--status-warning-surface);
+  border-color: var(--status-warning-border);
+}
+
+.relatorios-disponiveis-screen__aviso-texto {
+  margin: 0;
+  color: var(--color-ink);
+  flex: 1 1 16rem;
+}

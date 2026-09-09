@@ -130,7 +130,7 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     }
   });
 
-  it("apresenta a navegação com os sete destinos, Cadastros ativo por padrão", () => {
+  it("apresenta a navegação com os oito destinos, Cadastros ativo por padrão", () => {
     render(<App />);
 
     const nav = screen.getByRole("navigation", {
@@ -158,6 +158,11 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     expect(
       screen.getByRole("button", {
         name: /Solicitações.*Central do RH/,
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", {
+        name: /Relatórios.*Exceções de Ponto/,
       }),
     ).toBeInTheDocument();
 
@@ -204,6 +209,7 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
       /^Documentos.*Metadados/,
       /^Portal do Colaborador.*Visão geral — demonstração/,
       /^Solicitações.*Central do RH/,
+      /^Relatórios.*Exceções de Ponto/,
     ]) {
       fireEvent.click(screen.getByRole("button", { name: rotulo }));
       expect(
@@ -473,6 +479,87 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     );
   });
 
+  it("renderiza Relatórios > Exceções de Ponto por padrão, com h1 único (T075)", () => {
+    render(<App />);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Relatórios.*Exceções de Ponto/ }),
+    );
+
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Exceções de Ponto" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("table", {
+        name: "Exceções de Ponto para priorização e revisão do RH",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Módulo em preparação")).not.toBeInTheDocument();
+
+    const main = screen.getByRole("main");
+    const rotuloId = main.getAttribute("aria-labelledby");
+    expect(document.getElementById(rotuloId!)).toHaveTextContent(
+      "Exceções de Ponto",
+    );
+  });
+
+  it("Relatórios > aba local 'Relatórios disponíveis' continua acessível, sem regressão em Exceções de Ponto (T075)", () => {
+    render(<App />);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Relatórios.*Exceções de Ponto/ }),
+    );
+    fireEvent.click(
+      screen.getByRole("tab", { name: "Relatórios disponíveis" }),
+    );
+
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(
+      screen.getByRole("heading", {
+        level: 1,
+        name: "Relatórios disponíveis",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("table", {
+        name: "Relatórios futuros do módulo de Ponto",
+      }),
+    ).toBeInTheDocument();
+
+    const main = screen.getByRole("main");
+    const rotuloId = main.getAttribute("aria-labelledby");
+    expect(document.getElementById(rotuloId!)).toHaveTextContent(
+      "Relatórios disponíveis",
+    );
+  });
+
+  it("Relatórios volta para 'Exceções de Ponto' ao sair e voltar ao destino (T075)", () => {
+    render(<App />);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Relatórios.*Exceções de Ponto/ }),
+    );
+    fireEvent.click(
+      screen.getByRole("tab", { name: "Relatórios disponíveis" }),
+    );
+    expect(
+      screen.getByRole("heading", {
+        level: 1,
+        name: "Relatórios disponíveis",
+      }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /^Cadastros/ }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /Relatórios.*Exceções de Ponto/ }),
+    );
+
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Exceções de Ponto" }),
+    ).toBeInTheDocument();
+  });
+
   it("cada botão de navegação é um <button> nativo, operável por teclado", () => {
     render(<App />);
 
@@ -480,7 +567,7 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
       name: "Navegação do painel",
     });
     const botoes = Array.from(nav.querySelectorAll("button"));
-    expect(botoes).toHaveLength(7);
+    expect(botoes).toHaveLength(8);
     for (const botao of botoes) {
       expect(botao.tagName).toBe("BUTTON");
       expect(botao).toHaveAttribute("type", "button");
