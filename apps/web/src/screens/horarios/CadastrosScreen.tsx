@@ -1,6 +1,7 @@
 /**
  * Cadastros (T073) — wrapper de navegação local entre "Horários" (padrão,
- * T043) e "Estrutura organizacional" (T073).
+ * T043), "Estrutura organizacional" (T073) e "Calendário de feriados"
+ * (T076).
  *
  * A troca de aba é feita só por estado React local (`useState`) — sem React
  * Router, sem rota real, sem API/fetch. A cada vez que o destino "Cadastros"
@@ -8,7 +9,8 @@
  * "Horários" (mesmo princípio do "Ponto" — T063 — do "Documentos" — T070 —
  * e do "Pessoas" — T072). Como só a aba ativa é renderizada por vez, existe
  * sempre exatamente um `h1` na página — cada tela (`CadastroHorariosScreen`,
- * `EstruturaOrganizacionalScreen`) já traz o seu próprio.
+ * `EstruturaOrganizacionalScreen`, `CalendarioFeriadosScreen`) já traz o seu
+ * próprio.
  *
  * As abas usam o padrão ARIA de abas (`role="tablist"`/`role="tab"` +
  * `aria-selected`), distinto do `aria-current` do `PainelNavigation` (que
@@ -19,6 +21,10 @@
 import { useEffect, useState } from "react";
 import { CadastroHorariosScreen } from "./CadastroHorariosScreen";
 import {
+  CALENDARIO_FERIADOS_TITULO_ID,
+  CalendarioFeriadosScreen,
+} from "./CalendarioFeriadosScreen";
+import {
   ESTRUTURA_ORGANIZACIONAL_TITULO_ID,
   EstruturaOrganizacionalScreen,
 } from "./EstruturaOrganizacionalScreen";
@@ -26,7 +32,7 @@ import "./CadastrosScreen.css";
 
 export const HORARIOS_TITULO_ID = "horarios-titulo";
 
-type AbaCadastros = "horarios" | "estrutura";
+type AbaCadastros = "horarios" | "estrutura" | "feriados";
 
 interface AbaDefinicao {
   readonly id: AbaCadastros;
@@ -44,6 +50,11 @@ const ABAS: readonly AbaDefinicao[] = [
     id: "estrutura",
     rotulo: "Estrutura organizacional",
     tituloId: ESTRUTURA_ORGANIZACIONAL_TITULO_ID,
+  },
+  {
+    id: "feriados",
+    rotulo: "Calendário de feriados",
+    tituloId: CALENDARIO_FERIADOS_TITULO_ID,
   },
 ];
 
@@ -101,8 +112,10 @@ export function CadastrosScreen({ onTituloIdChange }: CadastrosScreenProps) {
       >
         {abaAtiva === "horarios" ? (
           <CadastroHorariosScreen />
-        ) : (
+        ) : abaAtiva === "estrutura" ? (
           <EstruturaOrganizacionalScreen />
+        ) : (
+          <CalendarioFeriadosScreen />
         )}
       </div>
     </div>
