@@ -9,6 +9,10 @@ export {
   EstruturaOrganizacionalScreen,
 } from "./EstruturaOrganizacionalScreen";
 export {
+  FUNCOES_CARGOS_TITULO_ID,
+  FuncoesCargosScreen,
+} from "./FuncoesCargosScreen";
+export {
   POLITICAS_BANCO_HORAS_TITULO_ID,
   PoliticasBancoHorasScreen,
 } from "./PoliticasBancoHorasScreen";

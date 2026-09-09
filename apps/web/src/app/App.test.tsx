@@ -142,6 +142,31 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     );
   });
 
+  it("Cadastros > aba local 'Funções e cargos' continua acessível, sem regressão em Horários/Estrutura organizacional/Calendário de feriados/Políticas de Banco de Horas (T080)", () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("tab", { name: "Funções e cargos" }));
+
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(
+      screen.getByRole("heading", {
+        level: 1,
+        name: "Funções e cargos",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("table", {
+        name: "Funções e cargos (exemplo)",
+      }),
+    ).toBeInTheDocument();
+
+    const main = screen.getByRole("main");
+    const rotuloId = main.getAttribute("aria-labelledby");
+    expect(document.getElementById(rotuloId!)).toHaveTextContent(
+      "Funções e cargos",
+    );
+  });
+
   it("Cadastros volta para 'Horários' ao sair e voltar ao destino (T073)", () => {
     render(<App />);
 
