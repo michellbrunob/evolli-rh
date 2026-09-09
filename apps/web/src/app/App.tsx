@@ -4,7 +4,7 @@
  *
  * Envoltório visual neutro (banner, skip-link, navegação, main, rodapé). A
  * navegação (`PainelNavigation`) troca apenas um estado local de "destino
- * selecionado" — sem React Router, sem rota real, sem API/fetch. Os sete
+ * selecionado" — sem React Router, sem rota real, sem API/fetch. Os oito
  * destinos já têm tela própria: "Início" (Visão geral, T048), "Cadastros"
  * (Horários por padrão + "Estrutura organizacional" por aba local,
  * T043/T073), "Pessoas" (Colaboradores por padrão + "Horário de trabalho"
@@ -12,13 +12,14 @@
  * Verificar folhas por aba local, T045/T063), "Documentos" (Metadados por
  * padrão + "Repositório documental" por aba local, T047/T070), "Portal do
  * Colaborador" (Visão geral por padrão + demais abas locais, T067 — prévia de
- * interface, sem login real) e "Solicitações" (Central do RH, T068 — fila de
- * revisão demonstrativa). Os atalhos da Visão geral também trocam apenas esse
- * mesmo estado local (`onNavegar` = `setDestinoAtivoId`). Sem autenticação,
- * sessão ou dado real. A presença deste shell não concede nem implica
- * autorização: a tela renderizada continua dependendo da decisão do servidor
- * por papel, escopo e objeto (docs/modules/painel-administrativo-web-v1.md,
- * §3.6).
+ * interface, sem login real), "Solicitações" (Central do RH, T068 — fila de
+ * revisão demonstrativa) e "Relatórios" (Exceções de Ponto por padrão +
+ * "Relatórios disponíveis" por aba local, T075). Os atalhos da Visão geral
+ * também trocam apenas esse mesmo estado local (`onNavegar` =
+ * `setDestinoAtivoId`). Sem autenticação, sessão ou dado real. A presença
+ * deste shell não concede nem implica autorização: a tela renderizada
+ * continua dependendo da decisão do servidor por papel, escopo e objeto
+ * (docs/modules/painel-administrativo-web-v1.md, §3.6).
  *
  * `ModuloEmPreparacao` permanece importado como retorno defensivo de
  * `conteudoDoDestino` para qualquer destino fora da lista conhecida — hoje
@@ -27,12 +28,12 @@
  * O cliente CSRF (`../api/csrfClient`) permanece isolado e NÃO é importado
  * aqui: não há login nem sessão nesta fundação.
  *
- * "Cadastros", "Pessoas", "Ponto", "Documentos" e "Portal do Colaborador" são
- * os destinos cujo `h1` pode mudar sem trocar de destino (cada um troca de
- * aba local entre telas com `h1` próprio).
- * `CadastrosScreen`/`PessoasScreen`/`PontoScreen`/`DocumentosScreen`/`PortalColaboradorScreen`
+ * "Cadastros", "Pessoas", "Ponto", "Documentos", "Portal do Colaborador" e
+ * "Relatórios" são os destinos cujo `h1` pode mudar sem trocar de destino
+ * (cada um troca de aba local entre telas com `h1` próprio).
+ * `CadastrosScreen`/`PessoasScreen`/`PontoScreen`/`DocumentosScreen`/`PortalColaboradorScreen`/`RelatoriosScreen`
  * reportam o `titleId` do `h1` visível via `onTituloIdChange`, guardado em
- * `cadastrosTituloId`/`pessoasTituloId`/`pontoTituloId`/`documentosTituloId`/`portalTituloId`
+ * `cadastrosTituloId`/`pessoasTituloId`/`pontoTituloId`/`documentosTituloId`/`portalTituloId`/`relatoriosTituloId`
  * — os demais destinos continuam usando o mapa estático `TITULO_ID_POR_DESTINO`.
  */
 import { useState } from "react";
@@ -49,14 +50,18 @@ import { PontoScreen } from "../screens/ponto/PontoScreen";
 import { VISAO_PERIODO_TITULO_ID } from "../screens/ponto/VisaoPeriodoScreen";
 import { PortalColaboradorScreen } from "../screens/portal-colaborador/PortalColaboradorScreen";
 import { VISAO_GERAL_PORTAL_TITULO_ID } from "../screens/portal-colaborador/VisaoGeralPortalScreen";
+import {
+  EXCECOES_PONTO_TITULO_ID,
+  RelatoriosScreen,
+} from "../screens/relatorios";
 import { CentralSolicitacoesRHScreen } from "../screens/solicitacoes-rh/CentralSolicitacoesRHScreen";
 import { ModuloEmPreparacao } from "./ModuloEmPreparacao";
 import { DESTINOS_PAINEL, PainelNavigation } from "./PainelNavigation";
 
 /** `titleId` do `h1` de cada destino, para `aria-labelledby` do `<main>`.
- * "cadastros", "pessoas", "ponto", "documentos" e "portal-colaborador" não
- * aparecem aqui: seus `titleId` são dinâmicos (ver
- * `cadastrosTituloId`/`pessoasTituloId`/`pontoTituloId`/`documentosTituloId`/`portalTituloId`).
+ * "cadastros", "pessoas", "ponto", "documentos", "portal-colaborador" e
+ * "relatorios" não aparecem aqui: seus `titleId` são dinâmicos (ver
+ * `cadastrosTituloId`/`pessoasTituloId`/`pontoTituloId`/`documentosTituloId`/`portalTituloId`/`relatoriosTituloId`).
  * "solicitacoes-rh" tem tela única, sem aba local, então usa o mapa estático
  * normalmente. */
 const TITULO_ID_POR_DESTINO: Record<string, string> = {
@@ -72,6 +77,7 @@ function conteudoDoDestino(
   onPontoTituloIdChange: (tituloId: string) => void,
   onDocumentosTituloIdChange: (tituloId: string) => void,
   onPortalTituloIdChange: (tituloId: string) => void,
+  onRelatoriosTituloIdChange: (tituloId: string) => void,
 ) {
   if (destinoId === "inicio") {
     return <InicioVisaoGeralScreen onNavegar={onNavegar} />;
@@ -96,6 +102,9 @@ function conteudoDoDestino(
   if (destinoId === "solicitacoes-rh") {
     return <CentralSolicitacoesRHScreen />;
   }
+  if (destinoId === "relatorios") {
+    return <RelatoriosScreen onTituloIdChange={onRelatoriosTituloIdChange} />;
+  }
   const destino = DESTINOS_PAINEL.find((item) => item.id === destinoId);
   return (
     <ModuloEmPreparacao
@@ -107,10 +116,10 @@ function conteudoDoDestino(
 
 export function App() {
   const [destinoAtivoId, setDestinoAtivoId] = useState("cadastros");
-  // "Cadastros", "Pessoas", "Ponto", "Documentos" e "Portal do Colaborador"
-  // sempre voltam à aba padrão ao serem selecionados (o wrapper de cada um
-  // remonta e reseta sua aba interna) — por isso o valor inicial já é o
-  // `titleId` dessa aba padrão.
+  // "Cadastros", "Pessoas", "Ponto", "Documentos", "Portal do Colaborador" e
+  // "Relatórios" sempre voltam à aba padrão ao serem selecionados (o wrapper
+  // de cada um remonta e reseta sua aba interna) — por isso o valor inicial
+  // já é o `titleId` dessa aba padrão.
   const [cadastrosTituloId, setCadastrosTituloId] =
     useState(HORARIOS_TITULO_ID);
   const [pessoasTituloId, setPessoasTituloId] = useState(
@@ -122,6 +131,9 @@ export function App() {
   );
   const [portalTituloId, setPortalTituloId] = useState(
     VISAO_GERAL_PORTAL_TITULO_ID,
+  );
+  const [relatoriosTituloId, setRelatoriosTituloId] = useState(
+    EXCECOES_PONTO_TITULO_ID,
   );
 
   return (
@@ -158,8 +170,10 @@ export function App() {
                     ? documentosTituloId
                     : destinoAtivoId === "portal-colaborador"
                       ? portalTituloId
-                      : (TITULO_ID_POR_DESTINO[destinoAtivoId] ??
-                        "modulo-titulo")
+                      : destinoAtivoId === "relatorios"
+                        ? relatoriosTituloId
+                        : (TITULO_ID_POR_DESTINO[destinoAtivoId] ??
+                          "modulo-titulo")
           }
         >
           {conteudoDoDestino(
@@ -170,6 +184,7 @@ export function App() {
             setPontoTituloId,
             setDocumentosTituloId,
             setPortalTituloId,
+            setRelatoriosTituloId,
           )}
         </main>
       </div>
