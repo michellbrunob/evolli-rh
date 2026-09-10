@@ -24,3 +24,7 @@ export {
   POLITICAS_BANCO_HORAS_TITULO_ID,
   PoliticasBancoHorasScreen,
 } from "./PoliticasBancoHorasScreen";
+export {
+  TIPOS_DOCUMENTO_TITULO_ID,
+  TiposDocumentoScreen,
+} from "./TiposDocumentoScreen";
