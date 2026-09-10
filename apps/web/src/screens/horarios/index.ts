@@ -13,6 +13,10 @@ export {
   FuncoesCargosScreen,
 } from "./FuncoesCargosScreen";
 export {
+  MOTIVOS_AUSENCIA_JUSTIFICATIVAS_TITULO_ID,
+  MotivosAusenciaJustificativasScreen,
+} from "./MotivosAusenciaJustificativasScreen";
+export {
   POLITICAS_BANCO_HORAS_TITULO_ID,
   PoliticasBancoHorasScreen,
 } from "./PoliticasBancoHorasScreen";

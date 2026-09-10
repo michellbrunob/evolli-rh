@@ -1,7 +1,8 @@
 /**
  * Cadastros (T073) — wrapper de navegação local entre "Horários" (padrão,
  * T043), "Estrutura organizacional" (T073), "Calendário de feriados" (T076),
- * "Políticas de Banco de Horas" (T078) e "Funções e cargos" (T080).
+ * "Políticas de Banco de Horas" (T078), "Funções e cargos" (T080) e
+ * "Motivos de ausência e justificativas" (T081).
  *
  * A troca de aba é feita só por estado React local (`useState`) — sem React
  * Router, sem rota real, sem API/fetch. A cada vez que o destino "Cadastros"
@@ -10,7 +11,8 @@
  * e do "Pessoas" — T072). Como só a aba ativa é renderizada por vez, existe
  * sempre exatamente um `h1` na página — cada tela (`CadastroHorariosScreen`,
  * `EstruturaOrganizacionalScreen`, `CalendarioFeriadosScreen`,
- * `PoliticasBancoHorasScreen`, `FuncoesCargosScreen`) já traz o seu próprio.
+ * `PoliticasBancoHorasScreen`, `FuncoesCargosScreen`,
+ * `MotivosAusenciaJustificativasScreen`) já traz o seu próprio.
  *
  * As abas usam o padrão ARIA de abas (`role="tablist"`/`role="tab"` +
  * `aria-selected`), distinto do `aria-current` do `PainelNavigation` (que
@@ -33,6 +35,10 @@ import {
   FuncoesCargosScreen,
 } from "./FuncoesCargosScreen";
 import {
+  MOTIVOS_AUSENCIA_JUSTIFICATIVAS_TITULO_ID,
+  MotivosAusenciaJustificativasScreen,
+} from "./MotivosAusenciaJustificativasScreen";
+import {
   POLITICAS_BANCO_HORAS_TITULO_ID,
   PoliticasBancoHorasScreen,
 } from "./PoliticasBancoHorasScreen";
@@ -41,7 +47,12 @@ import "./CadastrosScreen.css";
 export const HORARIOS_TITULO_ID = "horarios-titulo";
 
 type AbaCadastros =
-  "horarios" | "estrutura" | "feriados" | "politicas_bh" | "funcoes_cargos";
+  | "horarios"
+  | "estrutura"
+  | "feriados"
+  | "politicas_bh"
+  | "funcoes_cargos"
+  | "motivos_ausencia_justificativas";
 
 interface AbaDefinicao {
   readonly id: AbaCadastros;
@@ -74,6 +85,11 @@ const ABAS: readonly AbaDefinicao[] = [
     id: "funcoes_cargos",
     rotulo: "Funções e cargos",
     tituloId: FUNCOES_CARGOS_TITULO_ID,
+  },
+  {
+    id: "motivos_ausencia_justificativas",
+    rotulo: "Motivos de ausência e justificativas",
+    tituloId: MOTIVOS_AUSENCIA_JUSTIFICATIVAS_TITULO_ID,
   },
 ];
 
@@ -137,8 +153,10 @@ export function CadastrosScreen({ onTituloIdChange }: CadastrosScreenProps) {
           <CalendarioFeriadosScreen />
         ) : abaAtiva === "politicas_bh" ? (
           <PoliticasBancoHorasScreen />
-        ) : (
+        ) : abaAtiva === "funcoes_cargos" ? (
           <FuncoesCargosScreen />
+        ) : (
+          <MotivosAusenciaJustificativasScreen />
         )}
       </div>
     </div>
