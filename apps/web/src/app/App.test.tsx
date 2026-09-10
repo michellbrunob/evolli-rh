@@ -167,6 +167,35 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     );
   });
 
+  it("Cadastros > aba local 'Motivos de ausência e justificativas' continua acessível, sem regressão em Horários/Estrutura organizacional/Calendário de feriados/Políticas de Banco de Horas/Funções e cargos (T081)", () => {
+    render(<App />);
+
+    fireEvent.click(
+      screen.getByRole("tab", {
+        name: "Motivos de ausência e justificativas",
+      }),
+    );
+
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(
+      screen.getByRole("heading", {
+        level: 1,
+        name: "Motivos de ausência e justificativas",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("table", {
+        name: "Motivos de ausência e justificativas (exemplo)",
+      }),
+    ).toBeInTheDocument();
+
+    const main = screen.getByRole("main");
+    const rotuloId = main.getAttribute("aria-labelledby");
+    expect(document.getElementById(rotuloId!)).toHaveTextContent(
+      "Motivos de ausência e justificativas",
+    );
+  });
+
   it("Cadastros volta para 'Horários' ao sair e voltar ao destino (T073)", () => {
     render(<App />);
 
