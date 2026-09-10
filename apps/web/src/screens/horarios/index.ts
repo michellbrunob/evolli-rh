@@ -5,6 +5,10 @@ export {
 } from "./CalendarioFeriadosScreen";
 export { HORARIOS_TITULO_ID, CadastrosScreen } from "./CadastrosScreen";
 export {
+  CENTROS_CUSTO_TITULO_ID,
+  CentrosCustoScreen,
+} from "./CentrosCustoScreen";
+export {
   ESTRUTURA_ORGANIZACIONAL_TITULO_ID,
   EstruturaOrganizacionalScreen,
 } from "./EstruturaOrganizacionalScreen";
