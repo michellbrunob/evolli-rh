@@ -2,8 +2,8 @@
  * Cadastros (T073) — wrapper de navegação local entre "Horários" (padrão,
  * T043), "Estrutura organizacional" (T073), "Calendário de feriados" (T076),
  * "Políticas de Banco de Horas" (T078), "Funções e cargos" (T080),
- * "Motivos de ausência e justificativas" (T081), "Centros de custo" (T083) e
- * "Tipos de documento" (T084).
+ * "Motivos de ausência e justificativas" (T081), "Centros de custo" (T083),
+ * "Tipos de documento" (T084) e "Motivos de desligamento" (T085).
  *
  * A troca de aba é feita só por estado React local (`useState`) — sem React
  * Router, sem rota real, sem API/fetch. A cada vez que o destino "Cadastros"
@@ -14,7 +14,7 @@
  * `EstruturaOrganizacionalScreen`, `CalendarioFeriadosScreen`,
  * `PoliticasBancoHorasScreen`, `FuncoesCargosScreen`,
  * `MotivosAusenciaJustificativasScreen`, `CentrosCustoScreen`,
- * `TiposDocumentoScreen`) já traz o seu próprio.
+ * `TiposDocumentoScreen`, `MotivosDesligamentoScreen`) já traz o seu próprio.
  *
  * As abas usam o padrão ARIA de abas (`role="tablist"`/`role="tab"` +
  * `aria-selected`), distinto do `aria-current` do `PainelNavigation` (que
@@ -45,6 +45,10 @@ import {
   MotivosAusenciaJustificativasScreen,
 } from "./MotivosAusenciaJustificativasScreen";
 import {
+  MOTIVOS_DESLIGAMENTO_TITULO_ID,
+  MotivosDesligamentoScreen,
+} from "./MotivosDesligamentoScreen";
+import {
   POLITICAS_BANCO_HORAS_TITULO_ID,
   PoliticasBancoHorasScreen,
 } from "./PoliticasBancoHorasScreen";
@@ -64,7 +68,8 @@ type AbaCadastros =
   | "funcoes_cargos"
   | "motivos_ausencia_justificativas"
   | "centros_custo"
-  | "tipos_documento";
+  | "tipos_documento"
+  | "motivos_desligamento";
 
 interface AbaDefinicao {
   readonly id: AbaCadastros;
@@ -112,6 +117,11 @@ const ABAS: readonly AbaDefinicao[] = [
     id: "tipos_documento",
     rotulo: "Tipos de documento",
     tituloId: TIPOS_DOCUMENTO_TITULO_ID,
+  },
+  {
+    id: "motivos_desligamento",
+    rotulo: "Motivos de desligamento",
+    tituloId: MOTIVOS_DESLIGAMENTO_TITULO_ID,
   },
 ];
 
@@ -181,8 +191,10 @@ export function CadastrosScreen({ onTituloIdChange }: CadastrosScreenProps) {
           <MotivosAusenciaJustificativasScreen />
         ) : abaAtiva === "centros_custo" ? (
           <CentrosCustoScreen />
-        ) : (
+        ) : abaAtiva === "tipos_documento" ? (
           <TiposDocumentoScreen />
+        ) : (
+          <MotivosDesligamentoScreen />
         )}
       </div>
     </div>
