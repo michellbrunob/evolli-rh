@@ -3,7 +3,8 @@
  * T043), "Estrutura organizacional" (T073), "Calendário de feriados" (T076),
  * "Políticas de Banco de Horas" (T078), "Funções e cargos" (T080),
  * "Motivos de ausência e justificativas" (T081), "Centros de custo" (T083),
- * "Tipos de documento" (T084) e "Motivos de desligamento" (T085).
+ * "Tipos de documento" (T084), "Motivos de desligamento" (T085) e
+ * "Escolaridade" (T086).
  *
  * A troca de aba é feita só por estado React local (`useState`) — sem React
  * Router, sem rota real, sem API/fetch. A cada vez que o destino "Cadastros"
@@ -14,7 +15,8 @@
  * `EstruturaOrganizacionalScreen`, `CalendarioFeriadosScreen`,
  * `PoliticasBancoHorasScreen`, `FuncoesCargosScreen`,
  * `MotivosAusenciaJustificativasScreen`, `CentrosCustoScreen`,
- * `TiposDocumentoScreen`, `MotivosDesligamentoScreen`) já traz o seu próprio.
+ * `TiposDocumentoScreen`, `MotivosDesligamentoScreen`, `EscolaridadeScreen`)
+ * já traz o seu próprio.
  *
  * As abas usam o padrão ARIA de abas (`role="tablist"`/`role="tab"` +
  * `aria-selected`), distinto do `aria-current` do `PainelNavigation` (que
@@ -32,6 +34,10 @@ import {
   CENTROS_CUSTO_TITULO_ID,
   CentrosCustoScreen,
 } from "./CentrosCustoScreen";
+import {
+  ESCOLARIDADE_TITULO_ID,
+  EscolaridadeScreen,
+} from "./EscolaridadeScreen";
 import {
   ESTRUTURA_ORGANIZACIONAL_TITULO_ID,
   EstruturaOrganizacionalScreen,
@@ -69,7 +75,8 @@ type AbaCadastros =
   | "motivos_ausencia_justificativas"
   | "centros_custo"
   | "tipos_documento"
-  | "motivos_desligamento";
+  | "motivos_desligamento"
+  | "escolaridade";
 
 interface AbaDefinicao {
   readonly id: AbaCadastros;
@@ -122,6 +129,11 @@ const ABAS: readonly AbaDefinicao[] = [
     id: "motivos_desligamento",
     rotulo: "Motivos de desligamento",
     tituloId: MOTIVOS_DESLIGAMENTO_TITULO_ID,
+  },
+  {
+    id: "escolaridade",
+    rotulo: "Escolaridade",
+    tituloId: ESCOLARIDADE_TITULO_ID,
   },
 ];
 
@@ -193,8 +205,10 @@ export function CadastrosScreen({ onTituloIdChange }: CadastrosScreenProps) {
           <CentrosCustoScreen />
         ) : abaAtiva === "tipos_documento" ? (
           <TiposDocumentoScreen />
-        ) : (
+        ) : abaAtiva === "motivos_desligamento" ? (
           <MotivosDesligamentoScreen />
+        ) : (
+          <EscolaridadeScreen />
         )}
       </div>
     </div>
