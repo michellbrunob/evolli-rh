@@ -1,6 +1,6 @@
 /**
  * Pessoas (T072) — wrapper de navegação local entre "Colaboradores" (padrão,
- * T072) e "Horário de trabalho" (T046).
+ * T072), "Horário de trabalho" (T046) e "Histórico funcional" (T088).
  *
  * A troca de aba é feita só por estado React local (`useState`) — sem React
  * Router, sem rota real, sem API/fetch. A cada vez que o destino "Pessoas"
@@ -8,7 +8,8 @@
  * "Colaboradores" (mesmo princípio do "Ponto" — T063 — do "Documentos" —
  * T070 — e do "Portal do Colaborador" — T067). Como só a aba ativa é
  * renderizada por vez, existe sempre exatamente um `h1` na página — cada
- * tela (`ColaboradoresScreen`, `PessoasHorarioScreen`) já traz o seu próprio.
+ * tela (`ColaboradoresScreen`, `PessoasHorarioScreen`,
+ * `HistoricoFuncionalScreen`) já traz o seu próprio.
  *
  * As abas usam o padrão ARIA de abas (`role="tablist"`/`role="tab"` +
  * `aria-selected`), distinto do `aria-current` do `PainelNavigation` (que
@@ -21,12 +22,16 @@ import {
   COLABORADORES_TITULO_ID,
   ColaboradoresScreen,
 } from "./ColaboradoresScreen";
+import {
+  HISTORICO_FUNCIONAL_TITULO_ID,
+  HistoricoFuncionalScreen,
+} from "./HistoricoFuncionalScreen";
 import { PessoasHorarioScreen } from "./PessoasHorarioScreen";
 import "./PessoasScreen.css";
 
 export const PESSOAS_HORARIO_TITULO_ID = "pessoas-horario-titulo";
 
-type AbaPessoas = "colaboradores" | "horario";
+type AbaPessoas = "colaboradores" | "horario" | "historico_funcional";
 
 interface AbaDefinicao {
   readonly id: AbaPessoas;
@@ -44,6 +49,11 @@ const ABAS: readonly AbaDefinicao[] = [
     id: "horario",
     rotulo: "Horário de trabalho",
     tituloId: PESSOAS_HORARIO_TITULO_ID,
+  },
+  {
+    id: "historico_funcional",
+    rotulo: "Histórico funcional",
+    tituloId: HISTORICO_FUNCIONAL_TITULO_ID,
   },
 ];
 
@@ -101,8 +111,10 @@ export function PessoasScreen({ onTituloIdChange }: PessoasScreenProps) {
       >
         {abaAtiva === "colaboradores" ? (
           <ColaboradoresScreen />
-        ) : (
+        ) : abaAtiva === "horario" ? (
           <PessoasHorarioScreen />
+        ) : (
+          <HistoricoFuncionalScreen />
         )}
       </div>
     </div>
