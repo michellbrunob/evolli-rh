@@ -9,6 +9,10 @@ export {
   CentrosCustoScreen,
 } from "./CentrosCustoScreen";
 export {
+  ESCOLARIDADE_TITULO_ID,
+  EscolaridadeScreen,
+} from "./EscolaridadeScreen";
+export {
   ESTRUTURA_ORGANIZACIONAL_TITULO_ID,
   EstruturaOrganizacionalScreen,
 } from "./EstruturaOrganizacionalScreen";
