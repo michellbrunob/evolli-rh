@@ -21,6 +21,10 @@ export {
   MotivosAusenciaJustificativasScreen,
 } from "./MotivosAusenciaJustificativasScreen";
 export {
+  MOTIVOS_DESLIGAMENTO_TITULO_ID,
+  MotivosDesligamentoScreen,
+} from "./MotivosDesligamentoScreen";
+export {
   POLITICAS_BANCO_HORAS_TITULO_ID,
   PoliticasBancoHorasScreen,
 } from "./PoliticasBancoHorasScreen";
