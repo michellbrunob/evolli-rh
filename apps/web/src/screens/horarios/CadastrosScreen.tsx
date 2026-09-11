@@ -3,8 +3,8 @@
  * T043), "Estrutura organizacional" (T073), "Calendário de feriados" (T076),
  * "Políticas de Banco de Horas" (T078), "Funções e cargos" (T080),
  * "Motivos de ausência e justificativas" (T081), "Centros de custo" (T083),
- * "Tipos de documento" (T084), "Motivos de desligamento" (T085) e
- * "Escolaridade" (T086).
+ * "Tipos de documento" (T084), "Motivos de desligamento" (T085),
+ * "Escolaridade" (T086) e "Cidades e localidades" (T087).
  *
  * A troca de aba é feita só por estado React local (`useState`) — sem React
  * Router, sem rota real, sem API/fetch. A cada vez que o destino "Cadastros"
@@ -15,8 +15,8 @@
  * `EstruturaOrganizacionalScreen`, `CalendarioFeriadosScreen`,
  * `PoliticasBancoHorasScreen`, `FuncoesCargosScreen`,
  * `MotivosAusenciaJustificativasScreen`, `CentrosCustoScreen`,
- * `TiposDocumentoScreen`, `MotivosDesligamentoScreen`, `EscolaridadeScreen`)
- * já traz o seu próprio.
+ * `TiposDocumentoScreen`, `MotivosDesligamentoScreen`, `EscolaridadeScreen`,
+ * `CidadesLocalidadesScreen`) já traz o seu próprio.
  *
  * As abas usam o padrão ARIA de abas (`role="tablist"`/`role="tab"` +
  * `aria-selected`), distinto do `aria-current` do `PainelNavigation` (que
@@ -34,6 +34,10 @@ import {
   CENTROS_CUSTO_TITULO_ID,
   CentrosCustoScreen,
 } from "./CentrosCustoScreen";
+import {
+  CIDADES_LOCALIDADES_TITULO_ID,
+  CidadesLocalidadesScreen,
+} from "./CidadesLocalidadesScreen";
 import {
   ESCOLARIDADE_TITULO_ID,
   EscolaridadeScreen,
@@ -76,7 +80,8 @@ type AbaCadastros =
   | "centros_custo"
   | "tipos_documento"
   | "motivos_desligamento"
-  | "escolaridade";
+  | "escolaridade"
+  | "cidades_localidades";
 
 interface AbaDefinicao {
   readonly id: AbaCadastros;
@@ -134,6 +139,11 @@ const ABAS: readonly AbaDefinicao[] = [
     id: "escolaridade",
     rotulo: "Escolaridade",
     tituloId: ESCOLARIDADE_TITULO_ID,
+  },
+  {
+    id: "cidades_localidades",
+    rotulo: "Cidades e localidades",
+    tituloId: CIDADES_LOCALIDADES_TITULO_ID,
   },
 ];
 
@@ -207,8 +217,10 @@ export function CadastrosScreen({ onTituloIdChange }: CadastrosScreenProps) {
           <TiposDocumentoScreen />
         ) : abaAtiva === "motivos_desligamento" ? (
           <MotivosDesligamentoScreen />
-        ) : (
+        ) : abaAtiva === "escolaridade" ? (
           <EscolaridadeScreen />
+        ) : (
+          <CidadesLocalidadesScreen />
         )}
       </div>
     </div>
