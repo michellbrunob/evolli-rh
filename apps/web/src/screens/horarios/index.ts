@@ -9,6 +9,10 @@ export {
   CentrosCustoScreen,
 } from "./CentrosCustoScreen";
 export {
+  CIDADES_LOCALIDADES_TITULO_ID,
+  CidadesLocalidadesScreen,
+} from "./CidadesLocalidadesScreen";
+export {
   ESCOLARIDADE_TITULO_ID,
   EscolaridadeScreen,
 } from "./EscolaridadeScreen";
