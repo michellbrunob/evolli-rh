@@ -3,6 +3,10 @@ export {
   ExcecoesPontoScreen,
 } from "./ExcecoesPontoScreen";
 export {
+  ESPELHO_PONTO_TITULO_ID,
+  EspelhoPontoScreen,
+} from "./EspelhoPontoScreen";
+export {
   EXTRATO_BANCO_HORAS_TITULO_ID,
   ExtratoBancoHorasScreen,
 } from "./ExtratoBancoHorasScreen";
