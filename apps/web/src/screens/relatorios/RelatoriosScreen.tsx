@@ -1,7 +1,7 @@
 /**
  * Relatórios (T075) — wrapper de navegação local entre "Exceções de Ponto"
- * (padrão), "Relatórios disponíveis", "Extrato de Banco de Horas" (T098) e
- * "Espelho de Ponto" (T099).
+ * (padrão), "Relatórios disponíveis", "Extrato de Banco de Horas" (T098),
+ * "Espelho de Ponto" (T099) e "Justificativas" (T100).
  *
  * A troca de aba é feita só por estado React local (`useState`) — sem React
  * Router, sem rota real, sem API/fetch. A cada vez que o destino
@@ -11,7 +11,8 @@
  * Como só a aba ativa é renderizada por vez, existe sempre exatamente um
  * `h1` na página — cada tela (`ExcecoesPontoScreen`,
  * `RelatoriosDisponiveisScreen`, `ExtratoBancoHorasScreen`,
- * `EspelhoPontoScreen`) já traz o seu próprio.
+ * `EspelhoPontoScreen`, `RelatorioJustificativasScreen`) já traz o seu
+ * próprio.
  *
  * As abas usam o padrão ARIA de abas (`role="tablist"`/`role="tab"` +
  * `aria-selected`), distinto do `aria-current` do `PainelNavigation` (que
@@ -33,13 +34,21 @@ import {
   ExtratoBancoHorasScreen,
 } from "./ExtratoBancoHorasScreen";
 import {
+  RELATORIO_JUSTIFICATIVAS_TITULO_ID,
+  RelatorioJustificativasScreen,
+} from "./RelatorioJustificativasScreen";
+import {
   RELATORIOS_DISPONIVEIS_TITULO_ID,
   RelatoriosDisponiveisScreen,
 } from "./RelatoriosDisponiveisScreen";
 import "./RelatoriosScreen.css";
 
 type AbaRelatorios =
-  "excecoes" | "disponiveis" | "extrato_banco_horas" | "espelho_ponto";
+  | "excecoes"
+  | "disponiveis"
+  | "extrato_banco_horas"
+  | "espelho_ponto"
+  | "justificativas";
 
 interface AbaDefinicao {
   readonly id: AbaRelatorios;
@@ -67,6 +76,11 @@ const ABAS: readonly AbaDefinicao[] = [
     id: "espelho_ponto",
     rotulo: "Espelho de Ponto",
     tituloId: ESPELHO_PONTO_TITULO_ID,
+  },
+  {
+    id: "justificativas",
+    rotulo: "Justificativas",
+    tituloId: RELATORIO_JUSTIFICATIVAS_TITULO_ID,
   },
 ];
 
@@ -128,8 +142,10 @@ export function RelatoriosScreen({ onTituloIdChange }: RelatoriosScreenProps) {
           <RelatoriosDisponiveisScreen />
         ) : abaAtiva === "extrato_banco_horas" ? (
           <ExtratoBancoHorasScreen />
-        ) : (
+        ) : abaAtiva === "espelho_ponto" ? (
           <EspelhoPontoScreen />
+        ) : (
+          <RelatorioJustificativasScreen />
         )}
       </div>
     </div>
