@@ -7,6 +7,7 @@ export {
   DADOS_CONTRATUAIS_TITULO_ID,
   DadosContratuaisScreen,
 } from "./DadosContratuaisScreen";
+export { DEPENDENTES_TITULO_ID, DependentesScreen } from "./DependentesScreen";
 export {
   HISTORICO_FUNCIONAL_TITULO_ID,
   HistoricoFuncionalScreen,
