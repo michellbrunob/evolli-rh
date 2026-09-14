@@ -1,6 +1,7 @@
 /**
  * Pessoas (T072) — wrapper de navegação local entre "Colaboradores" (padrão,
- * T072), "Horário de trabalho" (T046) e "Histórico funcional" (T088).
+ * T072), "Horário de trabalho" (T046), "Histórico funcional" (T088) e
+ * "Dados contratuais" (T089).
  *
  * A troca de aba é feita só por estado React local (`useState`) — sem React
  * Router, sem rota real, sem API/fetch. A cada vez que o destino "Pessoas"
@@ -9,7 +10,8 @@
  * T070 — e do "Portal do Colaborador" — T067). Como só a aba ativa é
  * renderizada por vez, existe sempre exatamente um `h1` na página — cada
  * tela (`ColaboradoresScreen`, `PessoasHorarioScreen`,
- * `HistoricoFuncionalScreen`) já traz o seu próprio.
+ * `HistoricoFuncionalScreen`, `DadosContratuaisScreen`) já traz o seu
+ * próprio.
  *
  * As abas usam o padrão ARIA de abas (`role="tablist"`/`role="tab"` +
  * `aria-selected`), distinto do `aria-current` do `PainelNavigation` (que
@@ -23,6 +25,10 @@ import {
   ColaboradoresScreen,
 } from "./ColaboradoresScreen";
 import {
+  DADOS_CONTRATUAIS_TITULO_ID,
+  DadosContratuaisScreen,
+} from "./DadosContratuaisScreen";
+import {
   HISTORICO_FUNCIONAL_TITULO_ID,
   HistoricoFuncionalScreen,
 } from "./HistoricoFuncionalScreen";
@@ -31,7 +37,8 @@ import "./PessoasScreen.css";
 
 export const PESSOAS_HORARIO_TITULO_ID = "pessoas-horario-titulo";
 
-type AbaPessoas = "colaboradores" | "horario" | "historico_funcional";
+type AbaPessoas =
+  "colaboradores" | "horario" | "historico_funcional" | "dados_contratuais";
 
 interface AbaDefinicao {
   readonly id: AbaPessoas;
@@ -54,6 +61,11 @@ const ABAS: readonly AbaDefinicao[] = [
     id: "historico_funcional",
     rotulo: "Histórico funcional",
     tituloId: HISTORICO_FUNCIONAL_TITULO_ID,
+  },
+  {
+    id: "dados_contratuais",
+    rotulo: "Dados contratuais",
+    tituloId: DADOS_CONTRATUAIS_TITULO_ID,
   },
 ];
 
@@ -113,8 +125,10 @@ export function PessoasScreen({ onTituloIdChange }: PessoasScreenProps) {
           <ColaboradoresScreen />
         ) : abaAtiva === "horario" ? (
           <PessoasHorarioScreen />
-        ) : (
+        ) : abaAtiva === "historico_funcional" ? (
           <HistoricoFuncionalScreen />
+        ) : (
+          <DadosContratuaisScreen />
         )}
       </div>
     </div>

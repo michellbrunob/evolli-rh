@@ -3,6 +3,10 @@ export {
   ColaboradoresScreen,
 } from "./ColaboradoresScreen";
 export {
+  DADOS_CONTRATUAIS_TITULO_ID,
+  DadosContratuaisScreen,
+} from "./DadosContratuaisScreen";
+export {
   HISTORICO_FUNCIONAL_TITULO_ID,
   HistoricoFuncionalScreen,
 } from "./HistoricoFuncionalScreen";
