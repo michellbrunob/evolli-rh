@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { PontoScreen } from "./PontoScreen";
 
-describe("PontoScreen — abas locais 'Visão do período' / 'Verificar folhas' / 'Banco de Horas' / 'Ajustes manuais' / 'Fechamento e Espelho' / 'Escalas e jornadas' / 'Inconsistências' (T063/T069/T077/T079/T095/T096)", () => {
+describe("PontoScreen — abas locais 'Visão do período' / 'Verificar folhas' / 'Banco de Horas' / 'Ajustes manuais' / 'Fechamento e Espelho' / 'Escalas e jornadas' / 'Inconsistências' / 'Justificativas' (T063/T069/T077/T079/T095/T096/T097)", () => {
   it("mostra 'Visão do período' por padrão, com h1 único", () => {
     render(<PontoScreen />);
 
@@ -12,7 +12,7 @@ describe("PontoScreen — abas locais 'Visão do período' / 'Verificar folhas' 
     ).toBeInTheDocument();
   });
 
-  it("expõe as sete abas com role='tab' e aria-selected correto por padrão", () => {
+  it("expõe as oito abas com role='tab' e aria-selected correto por padrão", () => {
     render(<PontoScreen />);
 
     const tablist = screen.getByRole("tablist", { name: "Seções de Ponto" });
@@ -31,6 +31,9 @@ describe("PontoScreen — abas locais 'Visão do período' / 'Verificar folhas' 
     const abaInconsistencias = screen.getByRole("tab", {
       name: "Inconsistências",
     });
+    const abaJustificativas = screen.getByRole("tab", {
+      name: "Justificativas",
+    });
     expect(abaPeriodo).toHaveAttribute("aria-selected", "true");
     expect(abaVerificar).toHaveAttribute("aria-selected", "false");
     expect(abaBancoHoras).toHaveAttribute("aria-selected", "false");
@@ -38,6 +41,7 @@ describe("PontoScreen — abas locais 'Visão do período' / 'Verificar folhas' 
     expect(abaFechamento).toHaveAttribute("aria-selected", "false");
     expect(abaEscalas).toHaveAttribute("aria-selected", "false");
     expect(abaInconsistencias).toHaveAttribute("aria-selected", "false");
+    expect(abaJustificativas).toHaveAttribute("aria-selected", "false");
     expect(abaPeriodo.tagName).toBe("BUTTON");
     expect(abaVerificar.tagName).toBe("BUTTON");
     expect(abaBancoHoras.tagName).toBe("BUTTON");
@@ -45,6 +49,7 @@ describe("PontoScreen — abas locais 'Visão do período' / 'Verificar folhas' 
     expect(abaFechamento.tagName).toBe("BUTTON");
     expect(abaEscalas.tagName).toBe("BUTTON");
     expect(abaInconsistencias.tagName).toBe("BUTTON");
+    expect(abaJustificativas.tagName).toBe("BUTTON");
   });
 
   it("troca para 'Banco de Horas' ao clicar na aba, com h1 único e informa o titleId", () => {
@@ -280,6 +285,59 @@ describe("PontoScreen — abas locais 'Visão do período' / 'Verificar folhas' 
     expect(onTituloIdChange).toHaveBeenCalledWith("inconsistencias-titulo");
   });
 
+  it("troca para 'Justificativas' ao clicar na aba, com h1 único e informa o titleId", () => {
+    const onTituloIdChange = vi.fn();
+    render(<PontoScreen onTituloIdChange={onTituloIdChange} />);
+
+    fireEvent.click(screen.getByRole("tab", { name: "Justificativas" }));
+
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Justificativas" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("table", { name: "Justificativas (exemplo)" }),
+    ).toBeInTheDocument();
+
+    expect(screen.getByRole("tab", { name: "Justificativas" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(
+      screen.getByRole("tab", { name: "Visão do período" }),
+    ).toHaveAttribute("aria-selected", "false");
+    expect(onTituloIdChange).toHaveBeenCalledWith("justificativas-titulo");
+  });
+
+  it("passa por 'Justificativas' e volta para 'Visão do período', preservando 'Inconsistências'/'Escalas e jornadas' sem regressão", () => {
+    render(<PontoScreen />);
+
+    fireEvent.click(screen.getByRole("tab", { name: "Justificativas" }));
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Justificativas" }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Inconsistências" }));
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Inconsistências" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("table", {
+        name: "Inconsistências de ponto (exemplo)",
+      }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Escalas e jornadas" }));
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Escalas e jornadas" }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Visão do período" }));
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Visão do período" }),
+    ).toBeInTheDocument();
+  });
+
   it("passa por 'Inconsistências' e volta para 'Visão do período', preservando 'Escalas e jornadas'/'Fechamento e Espelho' sem regressão", () => {
     render(<PontoScreen />);
 
@@ -346,6 +404,7 @@ describe("PontoScreen — abas locais 'Visão do período' / 'Verificar folhas' 
     fireEvent.click(screen.getByRole("tab", { name: "Fechamento e Espelho" }));
     fireEvent.click(screen.getByRole("tab", { name: "Escalas e jornadas" }));
     fireEvent.click(screen.getByRole("tab", { name: "Inconsistências" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Justificativas" }));
     fireEvent.click(screen.getByRole("tab", { name: "Visão do período" }));
 
     const texto = document.body.innerHTML.toLowerCase();
