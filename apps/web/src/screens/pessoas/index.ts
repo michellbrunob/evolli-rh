@@ -1,3 +1,7 @@
+export {
+  AFASTAMENTOS_TITULO_ID,
+  AfastamentosScreen,
+} from "./AfastamentosScreen";
 export { BENEFICIOS_TITULO_ID, BeneficiosScreen } from "./BeneficiosScreen";
 export {
   COLABORADORES_TITULO_ID,
