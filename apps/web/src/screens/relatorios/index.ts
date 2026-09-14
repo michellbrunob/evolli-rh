@@ -11,6 +11,10 @@ export {
   ExtratoBancoHorasScreen,
 } from "./ExtratoBancoHorasScreen";
 export {
+  RELATORIO_JUSTIFICATIVAS_TITULO_ID,
+  RelatorioJustificativasScreen,
+} from "./RelatorioJustificativasScreen";
+export {
   RELATORIOS_DISPONIVEIS_TITULO_ID,
   RelatoriosDisponiveisScreen,
 } from "./RelatoriosDisponiveisScreen";
