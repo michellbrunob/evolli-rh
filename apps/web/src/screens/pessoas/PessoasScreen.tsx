@@ -1,7 +1,7 @@
 /**
  * Pessoas (T072) — wrapper de navegação local entre "Colaboradores" (padrão,
  * T072), "Horário de trabalho" (T046), "Histórico funcional" (T088),
- * "Dados contratuais" (T089) e "Documentos" (T090).
+ * "Dados contratuais" (T089), "Documentos" (T090) e "Solicitações" (T091).
  *
  * A troca de aba é feita só por estado React local (`useState`) — sem React
  * Router, sem rota real, sem API/fetch. A cada vez que o destino "Pessoas"
@@ -11,7 +11,7 @@
  * renderizada por vez, existe sempre exatamente um `h1` na página — cada
  * tela (`ColaboradoresScreen`, `PessoasHorarioScreen`,
  * `HistoricoFuncionalScreen`, `DadosContratuaisScreen`,
- * `PessoasDocumentosScreen`) já traz o seu próprio.
+ * `PessoasDocumentosScreen`, `SolicitacoesScreen`) já traz o seu próprio.
  *
  * As abas usam o padrão ARIA de abas (`role="tablist"`/`role="tab"` +
  * `aria-selected`), distinto do `aria-current` do `PainelNavigation` (que
@@ -38,6 +38,10 @@ import {
 } from "./PessoasDocumentosScreen";
 import { PessoasHorarioScreen } from "./PessoasHorarioScreen";
 import "./PessoasScreen.css";
+import {
+  SOLICITACOES_TITULO_ID,
+  SolicitacoesScreen,
+} from "./SolicitacoesScreen";
 
 export const PESSOAS_HORARIO_TITULO_ID = "pessoas-horario-titulo";
 
@@ -46,7 +50,8 @@ type AbaPessoas =
   | "horario"
   | "historico_funcional"
   | "dados_contratuais"
-  | "documentos";
+  | "documentos"
+  | "solicitacoes";
 
 interface AbaDefinicao {
   readonly id: AbaPessoas;
@@ -79,6 +84,11 @@ const ABAS: readonly AbaDefinicao[] = [
     id: "documentos",
     rotulo: "Documentos",
     tituloId: PESSOAS_DOCUMENTOS_TITULO_ID,
+  },
+  {
+    id: "solicitacoes",
+    rotulo: "Solicitações",
+    tituloId: SOLICITACOES_TITULO_ID,
   },
 ];
 
@@ -142,8 +152,10 @@ export function PessoasScreen({ onTituloIdChange }: PessoasScreenProps) {
           <HistoricoFuncionalScreen />
         ) : abaAtiva === "dados_contratuais" ? (
           <DadosContratuaisScreen />
-        ) : (
+        ) : abaAtiva === "documentos" ? (
           <PessoasDocumentosScreen />
+        ) : (
+          <SolicitacoesScreen />
         )}
       </div>
     </div>
