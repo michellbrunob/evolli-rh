@@ -1,6 +1,6 @@
 /**
  * Relatórios (T075) — wrapper de navegação local entre "Exceções de Ponto"
- * (padrão) e "Relatórios disponíveis".
+ * (padrão), "Relatórios disponíveis" e "Extrato de Banco de Horas" (T098).
  *
  * A troca de aba é feita só por estado React local (`useState`) — sem React
  * Router, sem rota real, sem API/fetch. A cada vez que o destino
@@ -9,7 +9,8 @@
  * "Documentos" — T070 — do "Pessoas" — T072 — e do "Cadastros" — T073).
  * Como só a aba ativa é renderizada por vez, existe sempre exatamente um
  * `h1` na página — cada tela (`ExcecoesPontoScreen`,
- * `RelatoriosDisponiveisScreen`) já traz o seu próprio.
+ * `RelatoriosDisponiveisScreen`, `ExtratoBancoHorasScreen`) já traz o seu
+ * próprio.
  *
  * As abas usam o padrão ARIA de abas (`role="tablist"`/`role="tab"` +
  * `aria-selected`), distinto do `aria-current` do `PainelNavigation` (que
@@ -23,12 +24,16 @@ import {
   ExcecoesPontoScreen,
 } from "./ExcecoesPontoScreen";
 import {
+  EXTRATO_BANCO_HORAS_TITULO_ID,
+  ExtratoBancoHorasScreen,
+} from "./ExtratoBancoHorasScreen";
+import {
   RELATORIOS_DISPONIVEIS_TITULO_ID,
   RelatoriosDisponiveisScreen,
 } from "./RelatoriosDisponiveisScreen";
 import "./RelatoriosScreen.css";
 
-type AbaRelatorios = "excecoes" | "disponiveis";
+type AbaRelatorios = "excecoes" | "disponiveis" | "extrato_banco_horas";
 
 interface AbaDefinicao {
   readonly id: AbaRelatorios;
@@ -46,6 +51,11 @@ const ABAS: readonly AbaDefinicao[] = [
     id: "disponiveis",
     rotulo: "Relatórios disponíveis",
     tituloId: RELATORIOS_DISPONIVEIS_TITULO_ID,
+  },
+  {
+    id: "extrato_banco_horas",
+    rotulo: "Extrato de Banco de Horas",
+    tituloId: EXTRATO_BANCO_HORAS_TITULO_ID,
   },
 ];
 
@@ -103,8 +113,10 @@ export function RelatoriosScreen({ onTituloIdChange }: RelatoriosScreenProps) {
       >
         {abaAtiva === "excecoes" ? (
           <ExcecoesPontoScreen />
-        ) : (
+        ) : abaAtiva === "disponiveis" ? (
           <RelatoriosDisponiveisScreen />
+        ) : (
+          <ExtratoBancoHorasScreen />
         )}
       </div>
     </div>
