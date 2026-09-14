@@ -2,7 +2,7 @@
  * Pessoas (T072) — wrapper de navegação local entre "Colaboradores" (padrão,
  * T072), "Horário de trabalho" (T046), "Histórico funcional" (T088),
  * "Dados contratuais" (T089), "Documentos" (T090), "Solicitações" (T091),
- * "Benefícios" (T092) e "Dependentes" (T093).
+ * "Benefícios" (T092), "Dependentes" (T093) e "Afastamentos" (T094).
  *
  * A troca de aba é feita só por estado React local (`useState`) — sem React
  * Router, sem rota real, sem API/fetch. A cada vez que o destino "Pessoas"
@@ -13,7 +13,7 @@
  * tela (`ColaboradoresScreen`, `PessoasHorarioScreen`,
  * `HistoricoFuncionalScreen`, `DadosContratuaisScreen`,
  * `PessoasDocumentosScreen`, `SolicitacoesScreen`, `BeneficiosScreen`,
- * `DependentesScreen`) já traz o seu próprio.
+ * `DependentesScreen`, `AfastamentosScreen`) já traz o seu próprio.
  *
  * As abas usam o padrão ARIA de abas (`role="tablist"`/`role="tab"` +
  * `aria-selected`), distinto do `aria-current` do `PainelNavigation` (que
@@ -22,6 +22,10 @@
  * sólida (mesmo princípio do `PainelNavigation`/`StatusBadge`).
  */
 import { useEffect, useState } from "react";
+import {
+  AFASTAMENTOS_TITULO_ID,
+  AfastamentosScreen,
+} from "./AfastamentosScreen";
 import { BeneficiosScreen, BENEFICIOS_TITULO_ID } from "./BeneficiosScreen";
 import {
   COLABORADORES_TITULO_ID,
@@ -57,7 +61,8 @@ type AbaPessoas =
   | "documentos"
   | "solicitacoes"
   | "beneficios"
-  | "dependentes";
+  | "dependentes"
+  | "afastamentos";
 
 interface AbaDefinicao {
   readonly id: AbaPessoas;
@@ -105,6 +110,11 @@ const ABAS: readonly AbaDefinicao[] = [
     id: "dependentes",
     rotulo: "Dependentes",
     tituloId: DEPENDENTES_TITULO_ID,
+  },
+  {
+    id: "afastamentos",
+    rotulo: "Afastamentos",
+    tituloId: AFASTAMENTOS_TITULO_ID,
   },
 ];
 
@@ -174,8 +184,10 @@ export function PessoasScreen({ onTituloIdChange }: PessoasScreenProps) {
           <SolicitacoesScreen />
         ) : abaAtiva === "beneficios" ? (
           <BeneficiosScreen />
-        ) : (
+        ) : abaAtiva === "dependentes" ? (
           <DependentesScreen />
+        ) : (
+          <AfastamentosScreen />
         )}
       </div>
     </div>
