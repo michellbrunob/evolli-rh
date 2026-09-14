@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { PontoScreen } from "./PontoScreen";
 
-describe("PontoScreen — abas locais 'Visão do período' / 'Verificar folhas' / 'Banco de Horas' / 'Ajustes manuais' / 'Fechamento e Espelho' / 'Escalas e jornadas' (T063/T069/T077/T079/T095)", () => {
+describe("PontoScreen — abas locais 'Visão do período' / 'Verificar folhas' / 'Banco de Horas' / 'Ajustes manuais' / 'Fechamento e Espelho' / 'Escalas e jornadas' / 'Inconsistências' (T063/T069/T077/T079/T095/T096)", () => {
   it("mostra 'Visão do período' por padrão, com h1 único", () => {
     render(<PontoScreen />);
 
@@ -12,7 +12,7 @@ describe("PontoScreen — abas locais 'Visão do período' / 'Verificar folhas' 
     ).toBeInTheDocument();
   });
 
-  it("expõe as seis abas com role='tab' e aria-selected correto por padrão", () => {
+  it("expõe as sete abas com role='tab' e aria-selected correto por padrão", () => {
     render(<PontoScreen />);
 
     const tablist = screen.getByRole("tablist", { name: "Seções de Ponto" });
@@ -28,18 +28,23 @@ describe("PontoScreen — abas locais 'Visão do período' / 'Verificar folhas' 
     const abaEscalas = screen.getByRole("tab", {
       name: "Escalas e jornadas",
     });
+    const abaInconsistencias = screen.getByRole("tab", {
+      name: "Inconsistências",
+    });
     expect(abaPeriodo).toHaveAttribute("aria-selected", "true");
     expect(abaVerificar).toHaveAttribute("aria-selected", "false");
     expect(abaBancoHoras).toHaveAttribute("aria-selected", "false");
     expect(abaAjustes).toHaveAttribute("aria-selected", "false");
     expect(abaFechamento).toHaveAttribute("aria-selected", "false");
     expect(abaEscalas).toHaveAttribute("aria-selected", "false");
+    expect(abaInconsistencias).toHaveAttribute("aria-selected", "false");
     expect(abaPeriodo.tagName).toBe("BUTTON");
     expect(abaVerificar.tagName).toBe("BUTTON");
     expect(abaBancoHoras.tagName).toBe("BUTTON");
     expect(abaAjustes.tagName).toBe("BUTTON");
     expect(abaFechamento.tagName).toBe("BUTTON");
     expect(abaEscalas.tagName).toBe("BUTTON");
+    expect(abaInconsistencias.tagName).toBe("BUTTON");
   });
 
   it("troca para 'Banco de Horas' ao clicar na aba, com h1 único e informa o titleId", () => {
@@ -250,6 +255,63 @@ describe("PontoScreen — abas locais 'Visão do período' / 'Verificar folhas' 
     expect(onTituloIdChange).toHaveBeenCalledWith("escalas-jornadas-titulo");
   });
 
+  it("troca para 'Inconsistências' ao clicar na aba, com h1 único e informa o titleId", () => {
+    const onTituloIdChange = vi.fn();
+    render(<PontoScreen onTituloIdChange={onTituloIdChange} />);
+
+    fireEvent.click(screen.getByRole("tab", { name: "Inconsistências" }));
+
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Inconsistências" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("table", {
+        name: "Inconsistências de ponto (exemplo)",
+      }),
+    ).toBeInTheDocument();
+
+    expect(
+      screen.getByRole("tab", { name: "Inconsistências" }),
+    ).toHaveAttribute("aria-selected", "true");
+    expect(
+      screen.getByRole("tab", { name: "Visão do período" }),
+    ).toHaveAttribute("aria-selected", "false");
+    expect(onTituloIdChange).toHaveBeenCalledWith("inconsistencias-titulo");
+  });
+
+  it("passa por 'Inconsistências' e volta para 'Visão do período', preservando 'Escalas e jornadas'/'Fechamento e Espelho' sem regressão", () => {
+    render(<PontoScreen />);
+
+    fireEvent.click(screen.getByRole("tab", { name: "Inconsistências" }));
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Inconsistências" }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Escalas e jornadas" }));
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Escalas e jornadas" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("table", { name: "Escalas e jornadas (exemplo)" }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Fechamento e Espelho" }));
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Fechamento e Espelho" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("table", {
+        name: "Fechamento e Espelho — períodos (exemplo)",
+      }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Visão do período" }));
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Visão do período" }),
+    ).toBeInTheDocument();
+  });
+
   it("o botão 'Ver fila completa' da Visão do período troca para a aba Verificar folhas", () => {
     render(<PontoScreen />);
 
@@ -283,6 +345,7 @@ describe("PontoScreen — abas locais 'Visão do período' / 'Verificar folhas' 
     fireEvent.click(screen.getByRole("tab", { name: "Ajustes manuais" }));
     fireEvent.click(screen.getByRole("tab", { name: "Fechamento e Espelho" }));
     fireEvent.click(screen.getByRole("tab", { name: "Escalas e jornadas" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Inconsistências" }));
     fireEvent.click(screen.getByRole("tab", { name: "Visão do período" }));
 
     const texto = document.body.innerHTML.toLowerCase();
