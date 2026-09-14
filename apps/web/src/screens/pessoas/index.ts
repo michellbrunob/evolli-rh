@@ -1,3 +1,4 @@
+export { BENEFICIOS_TITULO_ID, BeneficiosScreen } from "./BeneficiosScreen";
 export {
   COLABORADORES_TITULO_ID,
   ColaboradoresScreen,

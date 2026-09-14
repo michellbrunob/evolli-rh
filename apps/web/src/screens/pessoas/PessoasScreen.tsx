@@ -1,7 +1,8 @@
 /**
  * Pessoas (T072) — wrapper de navegação local entre "Colaboradores" (padrão,
  * T072), "Horário de trabalho" (T046), "Histórico funcional" (T088),
- * "Dados contratuais" (T089), "Documentos" (T090) e "Solicitações" (T091).
+ * "Dados contratuais" (T089), "Documentos" (T090), "Solicitações" (T091) e
+ * "Benefícios" (T092).
  *
  * A troca de aba é feita só por estado React local (`useState`) — sem React
  * Router, sem rota real, sem API/fetch. A cada vez que o destino "Pessoas"
@@ -11,7 +12,8 @@
  * renderizada por vez, existe sempre exatamente um `h1` na página — cada
  * tela (`ColaboradoresScreen`, `PessoasHorarioScreen`,
  * `HistoricoFuncionalScreen`, `DadosContratuaisScreen`,
- * `PessoasDocumentosScreen`, `SolicitacoesScreen`) já traz o seu próprio.
+ * `PessoasDocumentosScreen`, `SolicitacoesScreen`, `BeneficiosScreen`) já
+ * traz o seu próprio.
  *
  * As abas usam o padrão ARIA de abas (`role="tablist"`/`role="tab"` +
  * `aria-selected`), distinto do `aria-current` do `PainelNavigation` (que
@@ -20,6 +22,7 @@
  * sólida (mesmo princípio do `PainelNavigation`/`StatusBadge`).
  */
 import { useEffect, useState } from "react";
+import { BeneficiosScreen, BENEFICIOS_TITULO_ID } from "./BeneficiosScreen";
 import {
   COLABORADORES_TITULO_ID,
   ColaboradoresScreen,
@@ -51,7 +54,8 @@ type AbaPessoas =
   | "historico_funcional"
   | "dados_contratuais"
   | "documentos"
-  | "solicitacoes";
+  | "solicitacoes"
+  | "beneficios";
 
 interface AbaDefinicao {
   readonly id: AbaPessoas;
@@ -89,6 +93,11 @@ const ABAS: readonly AbaDefinicao[] = [
     id: "solicitacoes",
     rotulo: "Solicitações",
     tituloId: SOLICITACOES_TITULO_ID,
+  },
+  {
+    id: "beneficios",
+    rotulo: "Benefícios",
+    tituloId: BENEFICIOS_TITULO_ID,
   },
 ];
 
@@ -154,8 +163,10 @@ export function PessoasScreen({ onTituloIdChange }: PessoasScreenProps) {
           <DadosContratuaisScreen />
         ) : abaAtiva === "documentos" ? (
           <PessoasDocumentosScreen />
-        ) : (
+        ) : abaAtiva === "solicitacoes" ? (
           <SolicitacoesScreen />
+        ) : (
+          <BeneficiosScreen />
         )}
       </div>
     </div>
