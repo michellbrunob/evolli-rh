@@ -1,7 +1,7 @@
 /**
  * Ponto (T063) — wrapper de navegação local entre "Visão do período" (padrão),
  * "Verificar folhas" (T045), "Banco de Horas" (T069), "Ajustes manuais"
- * (T077) e "Fechamento e Espelho" (T079).
+ * (T077), "Fechamento e Espelho" (T079) e "Escalas e jornadas" (T095).
  *
  * A troca de aba é feita só por estado React local (`useState`) — sem React
  * Router, sem rota real, sem API/fetch. A cada vez que o destino "Ponto" é
@@ -9,7 +9,7 @@
  * período" (T063 requisito 1). Como só a aba ativa é renderizada por vez,
  * existe sempre exatamente um `h1` na página — cada tela (`VisaoPeriodoScreen`,
  * `VerificarFolhasScreen`, `BancoHorasScreen`, `AjustesManuaisScreen`,
- * `FechamentoEspelhoScreen`) já traz o seu próprio.
+ * `FechamentoEspelhoScreen`, `EscalasJornadasScreen`) já traz o seu próprio.
  *
  * As abas usam o padrão ARIA de abas (`role="tablist"`/`role="tab"` +
  * `aria-selected`), distinto do `aria-current` do `PainelNavigation` (que
@@ -32,6 +32,10 @@ import {
   FECHAMENTO_ESPELHO_TITULO_ID,
   FechamentoEspelhoScreen,
 } from "./FechamentoEspelhoScreen";
+import {
+  ESCALAS_JORNADAS_TITULO_ID,
+  EscalasJornadasScreen,
+} from "./EscalasJornadasScreen";
 import "./PontoScreen.css";
 
 export const VERIFICAR_FOLHAS_TITULO_ID = "verificar-folhas-titulo";
@@ -41,7 +45,8 @@ type AbaPonto =
   | "verificar_folhas"
   | "banco_horas"
   | "ajustes_manuais"
-  | "fechamento_espelho";
+  | "fechamento_espelho"
+  | "escalas_jornadas";
 
 interface AbaDefinicao {
   readonly id: AbaPonto;
@@ -74,6 +79,11 @@ const ABAS: readonly AbaDefinicao[] = [
     id: "fechamento_espelho",
     rotulo: "Fechamento e Espelho",
     tituloId: FECHAMENTO_ESPELHO_TITULO_ID,
+  },
+  {
+    id: "escalas_jornadas",
+    rotulo: "Escalas e jornadas",
+    tituloId: ESCALAS_JORNADAS_TITULO_ID,
   },
 ];
 
@@ -139,8 +149,10 @@ export function PontoScreen({ onTituloIdChange }: PontoScreenProps) {
           <BancoHorasScreen />
         ) : abaAtiva === "ajustes_manuais" ? (
           <AjustesManuaisScreen />
-        ) : (
+        ) : abaAtiva === "fechamento_espelho" ? (
           <FechamentoEspelhoScreen />
+        ) : (
+          <EscalasJornadasScreen />
         )}
       </div>
     </div>
