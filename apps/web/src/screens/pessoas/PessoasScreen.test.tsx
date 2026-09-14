@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { PessoasScreen } from "./PessoasScreen";
 
-describe("PessoasScreen — abas locais 'Colaboradores' / 'Horário de trabalho' / 'Histórico funcional' / 'Dados contratuais' (T072/T088/T089)", () => {
+describe("PessoasScreen — abas locais 'Colaboradores' / 'Horário de trabalho' / 'Histórico funcional' / 'Dados contratuais' / 'Documentos' (T072/T088/T089/T090)", () => {
   it("mostra 'Colaboradores' por padrão, com h1 único", () => {
     render(<PessoasScreen />);
 
@@ -12,7 +12,7 @@ describe("PessoasScreen — abas locais 'Colaboradores' / 'Horário de trabalho'
     ).toBeInTheDocument();
   });
 
-  it("expõe as quatro abas com role='tab' e aria-selected correto por padrão", () => {
+  it("expõe as cinco abas com role='tab' e aria-selected correto por padrão", () => {
     render(<PessoasScreen />);
 
     const tablist = screen.getByRole("tablist", { name: "Seções de Pessoas" });
@@ -30,14 +30,19 @@ describe("PessoasScreen — abas locais 'Colaboradores' / 'Horário de trabalho'
     const abaDadosContratuais = screen.getByRole("tab", {
       name: "Dados contratuais",
     });
+    const abaDocumentos = screen.getByRole("tab", {
+      name: "Documentos",
+    });
     expect(abaColaboradores).toHaveAttribute("aria-selected", "true");
     expect(abaHorario).toHaveAttribute("aria-selected", "false");
     expect(abaHistoricoFuncional).toHaveAttribute("aria-selected", "false");
     expect(abaDadosContratuais).toHaveAttribute("aria-selected", "false");
+    expect(abaDocumentos).toHaveAttribute("aria-selected", "false");
     expect(abaColaboradores.tagName).toBe("BUTTON");
     expect(abaHorario.tagName).toBe("BUTTON");
     expect(abaHistoricoFuncional.tagName).toBe("BUTTON");
     expect(abaDadosContratuais.tagName).toBe("BUTTON");
+    expect(abaDocumentos.tagName).toBe("BUTTON");
   });
 
   it("troca para 'Horário de trabalho' ao clicar na aba — preservado sem regressão (T046)", () => {
@@ -114,6 +119,31 @@ describe("PessoasScreen — abas locais 'Colaboradores' / 'Horário de trabalho'
     expect(onTituloIdChange).toHaveBeenCalledWith("dados-contratuais-titulo");
   });
 
+  it("troca para 'Documentos' ao clicar na aba, com h1 único e informa o titleId", () => {
+    const onTituloIdChange = vi.fn();
+    render(<PessoasScreen onTituloIdChange={onTituloIdChange} />);
+
+    fireEvent.click(screen.getByRole("tab", { name: "Documentos" }));
+
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Documentos" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("table", { name: "Documentos (exemplo)" }),
+    ).toBeInTheDocument();
+
+    expect(screen.getByRole("tab", { name: "Documentos" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.getByRole("tab", { name: "Colaboradores" })).toHaveAttribute(
+      "aria-selected",
+      "false",
+    );
+    expect(onTituloIdChange).toHaveBeenCalledWith("pessoas-documentos-titulo");
+  });
+
   it("volta para 'Colaboradores' ao clicar de novo na aba", () => {
     render(<PessoasScreen />);
 
@@ -167,6 +197,7 @@ describe("PessoasScreen — abas locais 'Colaboradores' / 'Horário de trabalho'
     fireEvent.click(screen.getByRole("tab", { name: "Horário de trabalho" }));
     fireEvent.click(screen.getByRole("tab", { name: "Histórico funcional" }));
     fireEvent.click(screen.getByRole("tab", { name: "Dados contratuais" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Documentos" }));
     fireEvent.click(screen.getByRole("tab", { name: "Colaboradores" }));
 
     const texto = document.body.innerHTML.toLowerCase();

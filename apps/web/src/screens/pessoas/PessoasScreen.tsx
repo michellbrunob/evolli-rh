@@ -1,7 +1,7 @@
 /**
  * Pessoas (T072) — wrapper de navegação local entre "Colaboradores" (padrão,
- * T072), "Horário de trabalho" (T046), "Histórico funcional" (T088) e
- * "Dados contratuais" (T089).
+ * T072), "Horário de trabalho" (T046), "Histórico funcional" (T088),
+ * "Dados contratuais" (T089) e "Documentos" (T090).
  *
  * A troca de aba é feita só por estado React local (`useState`) — sem React
  * Router, sem rota real, sem API/fetch. A cada vez que o destino "Pessoas"
@@ -10,8 +10,8 @@
  * T070 — e do "Portal do Colaborador" — T067). Como só a aba ativa é
  * renderizada por vez, existe sempre exatamente um `h1` na página — cada
  * tela (`ColaboradoresScreen`, `PessoasHorarioScreen`,
- * `HistoricoFuncionalScreen`, `DadosContratuaisScreen`) já traz o seu
- * próprio.
+ * `HistoricoFuncionalScreen`, `DadosContratuaisScreen`,
+ * `PessoasDocumentosScreen`) já traz o seu próprio.
  *
  * As abas usam o padrão ARIA de abas (`role="tablist"`/`role="tab"` +
  * `aria-selected`), distinto do `aria-current` do `PainelNavigation` (que
@@ -32,13 +32,21 @@ import {
   HISTORICO_FUNCIONAL_TITULO_ID,
   HistoricoFuncionalScreen,
 } from "./HistoricoFuncionalScreen";
+import {
+  PESSOAS_DOCUMENTOS_TITULO_ID,
+  PessoasDocumentosScreen,
+} from "./PessoasDocumentosScreen";
 import { PessoasHorarioScreen } from "./PessoasHorarioScreen";
 import "./PessoasScreen.css";
 
 export const PESSOAS_HORARIO_TITULO_ID = "pessoas-horario-titulo";
 
 type AbaPessoas =
-  "colaboradores" | "horario" | "historico_funcional" | "dados_contratuais";
+  | "colaboradores"
+  | "horario"
+  | "historico_funcional"
+  | "dados_contratuais"
+  | "documentos";
 
 interface AbaDefinicao {
   readonly id: AbaPessoas;
@@ -66,6 +74,11 @@ const ABAS: readonly AbaDefinicao[] = [
     id: "dados_contratuais",
     rotulo: "Dados contratuais",
     tituloId: DADOS_CONTRATUAIS_TITULO_ID,
+  },
+  {
+    id: "documentos",
+    rotulo: "Documentos",
+    tituloId: PESSOAS_DOCUMENTOS_TITULO_ID,
   },
 ];
 
@@ -127,8 +140,10 @@ export function PessoasScreen({ onTituloIdChange }: PessoasScreenProps) {
           <PessoasHorarioScreen />
         ) : abaAtiva === "historico_funcional" ? (
           <HistoricoFuncionalScreen />
-        ) : (
+        ) : abaAtiva === "dados_contratuais" ? (
           <DadosContratuaisScreen />
+        ) : (
+          <PessoasDocumentosScreen />
         )}
       </div>
     </div>
