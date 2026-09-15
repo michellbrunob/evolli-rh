@@ -912,6 +912,53 @@ describe("Cadastros: Horarios e vinculo ao colaborador (e2e)", () => {
   });
 
   // -------------------------------------------------------------------------
+  describe("T110 — fundação web: tabelas de horário", () => {
+    it("cria tabela e confirma nome e períodos por GET individual", async () => {
+      const { id, body } = await criarTabela(rhA, "T110 Comercial (teste)");
+      expect(body.nome).toBe("T110 Comercial (teste)");
+      expect(body.ativo).toBe(true);
+
+      const detalhe = await get(`/v1/horarios/${id}`, rhA).expect(200);
+      expect(detalhe.body.nome).toBe("T110 Comercial (teste)");
+      const periodos = detalhe.body.periodos as {
+        dia: string;
+        inicio: string;
+        fim: string;
+      }[];
+      expect(periodos).toContainEqual({
+        dia: "segunda",
+        inicio: "08:00",
+        fim: "12:00",
+      });
+    });
+
+    it("ciclo desativar → reativar preserva nome e periodos", async () => {
+      const { id } = await criarTabela(rhA, "T110 Ciclo Ativo (teste)");
+
+      const desativada = await post(`/v1/horarios/${id}/desativar`, rhA)
+        .send()
+        .expect(201);
+      expect(desativada.body.ativo).toBe(false);
+
+      const reativada = await post(`/v1/horarios/${id}/reativar`, rhA)
+        .send()
+        .expect(201);
+      expect(reativada.body.ativo).toBe(true);
+
+      const detalhe = await get(`/v1/horarios/${id}`, rhA).expect(200);
+      expect(detalhe.body.ativo).toBe(true);
+      expect(detalhe.body.nome).toBe("T110 Ciclo Ativo (teste)");
+    });
+
+    it("IDOR: rhB não consegue desativar tabela de rhA (404 anti-enumeração)", async () => {
+      const { id } = await criarTabela(rhA, "T110 Alvo IDOR (teste)");
+      await post(`/v1/horarios/${id}/desativar`, rhB).send().expect(404);
+      // rhA ainda vê e opera normalmente.
+      await get(`/v1/horarios/${id}`, rhA).expect(200);
+    });
+  });
+
+  // -------------------------------------------------------------------------
   describe("regressao: fatias anteriores intactas", () => {
     it("master ainda le estrutura organizacional; admin_tecnico segue negado", async () => {
       await get("/v1/empresas", master).expect(200);

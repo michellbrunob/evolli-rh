@@ -1,8 +1,8 @@
 /**
- * Cadastros > Horários (T043) — só tokens já existentes (tokens.css); sem
+ * Cadastros > Horários (T110) — só tokens já existentes (tokens.css); sem
  * novo hexadecimal, sem sombra, sem gradiente. Layout responsivo: pilha
- * vertical de seções, com o formulário se ajustando a duas colunas só a
- * partir de telas largas.
+ * vertical de seções, com o formulário e os períodos se ajustando a partir
+ * de telas largas.
  */
 
 .horarios-screen {
@@ -30,8 +30,7 @@
   color: var(--color-ink);
 }
 
-/* Aviso "Somente RH" — reaproveita os tokens semânticos de "info", já usados
-   pelo StatusBadge, num bloco de texto maior. */
+/* Aviso "Somente RH" — reaproveita os tokens semânticos de "info". */
 .horarios-screen__aviso {
   display: flex;
   flex-wrap: wrap;
@@ -47,26 +46,7 @@
   flex: 1 1 16rem;
 }
 
-/* Alternador do estado de demonstração (dados / vazio / erro). */
-.horarios-screen__demo {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xs);
-}
-
-.horarios-screen__demo-texto {
-  margin: 0;
-  color: var(--color-ink-subtle);
-  font-size: var(--text-caption);
-}
-
-.horarios-screen__demo-botoes {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-sm);
-}
-
-/* Bloco de erro — tokens semânticos de "danger", mesma gramática do badge. */
+/* Bloco de erro — tokens semânticos de "danger". */
 .horarios-screen__erro {
   display: flex;
   flex-direction: column;
@@ -76,17 +56,21 @@
   border-color: var(--status-danger-border);
 }
 
-.horarios-screen__erro-referencia {
+/* Filtros de listagem. */
+.horarios-screen__filtros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+/* Indicador de carregamento. */
+.horarios-screen__carregando {
   margin: 0;
-  font-size: var(--text-caption);
   color: var(--color-ink-subtle);
 }
 
-.horarios-screen__erro-referencia code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-}
-
-/* Painel do formulário de cadastro/edição. */
+/* Painel do formulário de cadastro e do painel de detalhe. */
 .horarios-screen__formulario {
   display: flex;
   flex-direction: column;
@@ -100,10 +84,31 @@
   max-width: 40rem;
 }
 
-.horarios-screen__form-linha {
+/* Erro inline no formulário (validação ou retorno da API). */
+.horarios-screen__form-erro {
+  margin: 0;
+  color: var(--status-danger-ink);
+}
+
+/* Área do editor de períodos. */
+.horarios-screen__periodos {
   display: flex;
   flex-direction: column;
-  gap: var(--space-lg);
+  gap: var(--space-sm);
+}
+
+/* Uma linha de período (dia + entrada + saída + remover). */
+.horarios-screen__periodo-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  align-items: flex-end;
+  padding-bottom: var(--space-sm);
+  border-bottom: 1px solid var(--hairline);
+}
+
+.horarios-screen__periodo-row > * {
+  flex: 1 1 8rem;
 }
 
 /* Texto só para leitores de tela (mesma técnica de `.evolli-field__sr`). */
@@ -117,15 +122,4 @@
   clip: rect(0 0 0 0);
   white-space: nowrap;
   border: 0;
-}
-
-/* A partir de tablet paisagem, as duas datas de vigência dividem a linha. */
-@media (min-width: 640px) {
-  .horarios-screen__form-linha {
-    flex-direction: row;
-  }
-
-  .horarios-screen__form-linha > * {
-    flex: 1 1 0;
-  }
 }

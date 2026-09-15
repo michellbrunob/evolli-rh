@@ -25,7 +25,10 @@
  * sólida (mesmo princípio do `PainelNavigation`/`StatusBadge`).
  */
 import { useEffect, useState } from "react";
-import { CadastroHorariosScreen } from "./CadastroHorariosScreen";
+import {
+  CadastroHorariosScreen,
+  HORARIOS_TITULO_ID,
+} from "./CadastroHorariosScreen";
 import {
   CALENDARIO_FERIADOS_TITULO_ID,
   CalendarioFeriadosScreen,
@@ -68,7 +71,7 @@ import {
 } from "./TiposDocumentoScreen";
 import "./CadastrosScreen.css";
 
-export const HORARIOS_TITULO_ID = "horarios-titulo";
+export { HORARIOS_TITULO_ID };
 
 type AbaCadastros =
   | "horarios"

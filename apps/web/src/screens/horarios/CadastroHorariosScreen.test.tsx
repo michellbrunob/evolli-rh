@@ -1,106 +1,153 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { Mock } from "vitest";
 import { CadastroHorariosScreen } from "./CadastroHorariosScreen";
+import {
+  criarTabelaHorario,
+  desativarTabelaHorario,
+  listarTabelasHorario,
+  reativarTabelaHorario,
+} from "../../api/horariosClient";
+import type {
+  ResultadoPaginado,
+  TabelaHorarioApi,
+} from "../../api/horariosClient";
 
-describe("CadastroHorariosScreen (T043 — tela visual estática)", () => {
-  it("tem um único título de nível 1 e a listagem por padrão", () => {
+vi.mock("../../api/horariosClient");
+
+const mockListarTabelasHorario = listarTabelasHorario as Mock;
+const mockCriarTabelaHorario = criarTabelaHorario as Mock;
+const mockDesativarTabelaHorario = desativarTabelaHorario as Mock;
+const mockReativarTabelaHorario = reativarTabelaHorario as Mock;
+
+const tabela1: TabelaHorarioApi = {
+  id: "11111111-1111-1111-1111-111111111111",
+  empresaId: "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
+  nome: "Comercial 44h (teste)",
+  ativo: true,
+  criadoPorUserId: "uuuuuuuu-uuuu-uuuu-uuuu-uuuuuuuuuuuu",
+  criadoEm: "2026-01-01T00:00:00.000Z",
+  atualizadoEm: "2026-01-01T00:00:00.000Z",
+  periodos: [
+    { dia: "segunda", inicio: "08:00", fim: "12:00" },
+    { dia: "segunda", inicio: "13:00", fim: "18:00" },
+  ],
+};
+
+const tabela2: TabelaHorarioApi = {
+  id: "22222222-2222-2222-2222-222222222222",
+  empresaId: "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
+  nome: "Meio Período (teste)",
+  ativo: false,
+  criadoPorUserId: "uuuuuuuu-uuuu-uuuu-uuuu-uuuuuuuuuuuu",
+  criadoEm: "2026-02-01T00:00:00.000Z",
+  atualizadoEm: "2026-02-01T00:00:00.000Z",
+  periodos: [{ dia: "segunda", inicio: "09:00", fim: "13:00" }],
+};
+
+function paginado<T>(itens: T[]): ResultadoPaginado<T> {
+  return { itens, pagina: 1, tamanhoPagina: 50, total: itens.length };
+}
+
+describe("CadastroHorariosScreen (T110 — funcional)", () => {
+  beforeEach(() => {
+    mockListarTabelasHorario.mockResolvedValue(paginado([tabela1, tabela2]));
+    mockCriarTabelaHorario.mockResolvedValue({
+      ...tabela1,
+      id: "33333333-3333-3333-3333-333333333333",
+    });
+    mockDesativarTabelaHorario.mockResolvedValue({ ...tabela1, ativo: false });
+    mockReativarTabelaHorario.mockResolvedValue({ ...tabela2, ativo: true });
+  });
+
+  it("tem um único h1 com texto 'Horários' e exibe o aviso Somente RH", () => {
     render(<CadastroHorariosScreen />);
 
     expect(
       screen.getAllByRole("heading", { level: 1, name: "Horários" }),
     ).toHaveLength(1);
-    expect(
-      screen.getByRole("table", { name: "Tabelas de horário cadastradas" }),
-    ).toBeInTheDocument();
-  });
-
-  it("exibe o aviso de que somente RH opera o cadastro", () => {
-    render(<CadastroHorariosScreen />);
-
     expect(screen.getByText("Somente RH")).toBeInTheDocument();
+  });
+
+  it("exibe a listagem após carregar com sucesso", async () => {
+    render(<CadastroHorariosScreen />);
+
+    await screen.findByRole("table", { name: "Tabelas de horário" });
     expect(
-      screen.getByText(/operado exclusivamente pelo RH da própria empresa/i),
+      screen.getByRole("cell", { name: "Comercial 44h (teste)" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("cell", { name: "Meio Período (teste)" }),
     ).toBeInTheDocument();
   });
 
-  it("lista as tabelas sintéticas com nome, situação, dias, faixas e vigência", () => {
+  it("exibe estado de erro com retry quando a API falha", async () => {
+    mockListarTabelasHorario.mockRejectedValue(new Error("Falha de rede"));
+
     render(<CadastroHorariosScreen />);
 
-    const tabela = screen.getByRole("table", {
-      name: "Tabelas de horário cadastradas",
+    await screen.findByRole("heading", {
+      name: "Não foi possível carregar as tabelas de horário",
     });
-    const linha = within(tabela)
-      .getByRole("cell", {
-        name: "Tabela Administrativo (exemplo)",
-      })
-      .closest("tr")!;
-    const dentroDaLinha = within(linha);
-
-    expect(dentroDaLinha.getByText("Ativa")).toBeInTheDocument();
     expect(
-      dentroDaLinha.getByText(/Seg, Ter, Qua, Qui, Sex/),
-    ).toBeInTheDocument();
-    expect(
-      dentroDaLinha.getByText(/09:00–12:00 \/ 13:00–18:00/),
-    ).toBeInTheDocument();
-    expect(
-      dentroDaLinha.getByText(/01\/01\/2026 – vigente/),
+      screen.getByRole("button", { name: "Tentar novamente" }),
     ).toBeInTheDocument();
   });
 
-  it("alterna para o estado vazio e mostra o EmptyState com ação", () => {
+  it("retry recarrega as tabelas com sucesso", async () => {
+    mockListarTabelasHorario
+      .mockRejectedValueOnce(new Error("Falha"))
+      .mockResolvedValue(paginado([tabela1]));
+
     render(<CadastroHorariosScreen />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Vazio" }));
-
-    expect(
-      screen.queryByRole("table", { name: "Tabelas de horário cadastradas" }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", {
-        level: 3,
-        name: "Nenhuma tabela de horário cadastrada",
-      }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Cadastrar tabela de horário" }),
-    ).toBeInTheDocument();
-  });
-
-  it("alterna para o estado de erro com referência ilustrativa e ação de retorno", () => {
-    render(<CadastroHorariosScreen />);
-
-    fireEvent.click(screen.getByRole("button", { name: "Erro" }));
-
-    expect(
-      screen.getByRole("heading", {
-        name: "Não foi possível carregar as tabelas de horário",
-      }),
-    ).toBeInTheDocument();
-    expect(screen.getByText(/REQ-DEMO-000123/)).toBeInTheDocument();
-    expect(screen.getByText(/ilustrativa/)).toBeInTheDocument();
-
+    await screen.findByRole("heading", {
+      name: "Não foi possível carregar as tabelas de horário",
+    });
     fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
-    expect(
-      screen.getByRole("table", { name: "Tabelas de horário cadastradas" }),
-    ).toBeInTheDocument();
+    await screen.findByRole("table", { name: "Tabelas de horário" });
   });
 
-  it("marca o botão do estado ativo com aria-pressed", () => {
+  it("exibe EmptyState quando não há tabelas cadastradas", async () => {
+    mockListarTabelasHorario.mockResolvedValue(paginado([]));
+
     render(<CadastroHorariosScreen />);
 
-    expect(screen.getByRole("button", { name: "Com dados" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-    expect(screen.getByRole("button", { name: "Vazio" })).toHaveAttribute(
-      "aria-pressed",
-      "false",
-    );
+    await screen.findByRole("heading", {
+      level: 3,
+      name: "Nenhuma tabela de horário cadastrada",
+    });
   });
 
-  it("abre o formulário em branco ao clicar em 'Nova tabela de horário'", () => {
+  it("filtra por 'Ativa' e passa ativo=true para a API", async () => {
     render(<CadastroHorariosScreen />);
+    await screen.findByRole("table", { name: "Tabelas de horário" });
+
+    mockListarTabelasHorario.mockResolvedValue(paginado([tabela1]));
+    fireEvent.change(screen.getByLabelText("Situação"), {
+      target: { value: "ativo" },
+    });
+
+    await screen.findByRole("table", { name: "Tabelas de horário" });
+    expect(mockListarTabelasHorario).toHaveBeenCalledWith({ ativo: true });
+  });
+
+  it("filtra por 'Inativa' e passa ativo=false para a API", async () => {
+    render(<CadastroHorariosScreen />);
+    await screen.findByRole("table", { name: "Tabelas de horário" });
+
+    mockListarTabelasHorario.mockResolvedValue(paginado([tabela2]));
+    fireEvent.change(screen.getByLabelText("Situação"), {
+      target: { value: "inativo" },
+    });
+
+    await screen.findByRole("table", { name: "Tabelas de horário" });
+    expect(mockListarTabelasHorario).toHaveBeenCalledWith({ ativo: false });
+  });
+
+  it("abre formulário vazio ao clicar em 'Nova tabela de horário'", async () => {
+    render(<CadastroHorariosScreen />);
+    await screen.findByRole("table", { name: "Tabelas de horário" });
 
     fireEvent.click(
       screen.getByRole("button", { name: "Nova tabela de horário" }),
@@ -112,89 +159,245 @@ describe("CadastroHorariosScreen (T043 — tela visual estática)", () => {
     expect(screen.getByLabelText(/nome da tabela/i)).toHaveValue("");
   });
 
-  it("abre o formulário pré-preenchido ao editar uma linha existente", () => {
+  it("fecha formulário ao cancelar", async () => {
     render(<CadastroHorariosScreen />);
-
-    const linhasEditar = screen.getAllByRole("button", { name: /^Editar/ });
-    fireEvent.click(linhasEditar[0]!);
-
-    expect(
-      screen.getByRole("heading", {
-        name: /Editar tabela — Tabela Administrativo \(exemplo\)/,
-      }),
-    ).toBeInTheDocument();
-    expect(screen.getByLabelText(/nome da tabela/i)).toHaveValue(
-      "Tabela Administrativo (exemplo)",
-    );
-  });
-
-  it("não vaza o valor de uma edição anterior ao abrir 'Nova tabela de horário' em seguida", () => {
-    render(<CadastroHorariosScreen />);
-
-    // Edita uma linha existente (formulário fica preenchido)...
-    fireEvent.click(screen.getAllByRole("button", { name: /^Editar/ })[0]!);
-    expect(screen.getByLabelText(/nome da tabela/i)).toHaveValue(
-      "Tabela Administrativo (exemplo)",
-    );
-    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
-
-    // ...e abre "Nova tabela de horário": o campo deve nascer vazio, nunca
-    // reaproveitar o valor do formulário de edição anterior.
-    fireEvent.click(
-      screen.getByRole("button", { name: "Nova tabela de horário" }),
-    );
-    expect(
-      screen.getByRole("heading", { name: "Nova tabela de horário" }),
-    ).toBeInTheDocument();
-    expect(screen.getByLabelText(/nome da tabela/i)).toHaveValue("");
-  });
-
-  it("fecha o formulário sem alterar a listagem ao cancelar", () => {
-    render(<CadastroHorariosScreen />);
+    await screen.findByRole("table", { name: "Tabelas de horário" });
 
     fireEvent.click(
       screen.getByRole("button", { name: "Nova tabela de horário" }),
     );
-    expect(
-      screen.getByRole("heading", { name: "Nova tabela de horário" }),
-    ).toBeInTheDocument();
-
     fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+
     expect(
       screen.queryByRole("heading", { name: "Nova tabela de horário" }),
     ).not.toBeInTheDocument();
   });
 
-  it("demonstra um campo com erro de validação por texto + semântica", () => {
+  it("valida nome obrigatório ao tentar salvar", async () => {
     render(<CadastroHorariosScreen />);
+    await screen.findByRole("table", { name: "Tabelas de horário" });
 
     fireEvent.click(
       screen.getByRole("button", { name: "Nova tabela de horário" }),
     );
+    fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
 
-    const alerta = screen.getByRole("alert");
-    expect(alerta).toHaveTextContent(
-      "Informe um horário válido no formato HH:MM.",
-    );
-    expect(
-      screen.getByLabelText(/faixa de horário \(exemplo/i),
-    ).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByText("Nome é obrigatório.")).toBeInTheDocument();
+    expect(mockCriarTabelaHorario).not.toHaveBeenCalled();
   });
 
-  it("não faz chamada de rede, não usa fetch e não referencia dado real", () => {
+  it("valida períodos incompletos (dia preenchido sem entrada/saída)", async () => {
     render(<CadastroHorariosScreen />);
+    await screen.findByRole("table", { name: "Tabelas de horário" });
 
-    const texto = document.body.innerHTML.toLowerCase();
-    for (const termoProibido of [
-      "cpf",
-      "secullum",
-      "bioprox",
-      "rwtech",
-      "senha",
-      "sessão",
-      "mfa",
-    ]) {
-      expect(texto).not.toContain(termoProibido);
-    }
+    fireEvent.click(
+      screen.getByRole("button", { name: "Nova tabela de horário" }),
+    );
+    fireEvent.change(screen.getByLabelText(/nome da tabela/i), {
+      target: { value: "Tabela Teste" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Adicionar período" }));
+    fireEvent.change(screen.getByLabelText("Dia"), {
+      target: { value: "segunda" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
+
+    expect(screen.getByText(/Preencha todos os campos/)).toBeInTheDocument();
+    expect(mockCriarTabelaHorario).not.toHaveBeenCalled();
+  });
+
+  it("cria tabela com sucesso, fecha formulário e recarrega lista", async () => {
+    const novaTabela: TabelaHorarioApi = {
+      ...tabela1,
+      id: "33333333-3333-3333-3333-333333333333",
+      nome: "Nova 44h (teste)",
+    };
+    mockCriarTabelaHorario.mockResolvedValue(novaTabela);
+    mockListarTabelasHorario
+      .mockResolvedValueOnce(paginado([tabela1, tabela2]))
+      .mockResolvedValue(paginado([tabela1, tabela2, novaTabela]));
+
+    render(<CadastroHorariosScreen />);
+    await screen.findByRole("table", { name: "Tabelas de horário" });
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Nova tabela de horário" }),
+    );
+    fireEvent.change(screen.getByLabelText(/nome da tabela/i), {
+      target: { value: "Nova 44h (teste)" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
+
+    await waitFor(() => {
+      expect(mockCriarTabelaHorario).toHaveBeenCalledWith({
+        nome: "Nova 44h (teste)",
+        periodos: [],
+      });
+    });
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("heading", { name: "Nova tabela de horário" }),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  it("exibe erro geral da API ao falhar a criação", async () => {
+    mockCriarTabelaHorario.mockRejectedValue(
+      new Error("Período sobreposto no mesmo dia."),
+    );
+
+    render(<CadastroHorariosScreen />);
+    await screen.findByRole("table", { name: "Tabelas de horário" });
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Nova tabela de horário" }),
+    );
+    fireEvent.change(screen.getByLabelText(/nome da tabela/i), {
+      target: { value: "Tabela Teste" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
+
+    const alerta = await screen.findByRole("alert");
+    expect(alerta).toHaveTextContent("Período sobreposto no mesmo dia.");
+  });
+
+  it("permite adicionar e remover linhas de período no formulário", async () => {
+    render(<CadastroHorariosScreen />);
+    await screen.findByRole("table", { name: "Tabelas de horário" });
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Nova tabela de horário" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Adicionar período" }));
+
+    expect(screen.getByLabelText("Dia")).toBeInTheDocument();
+
+    const btnRemover = screen.getByRole("button", { name: /Remover/ });
+    fireEvent.click(btnRemover);
+
+    expect(screen.queryByLabelText("Dia")).not.toBeInTheDocument();
+  });
+
+  it("abre o detalhe ao clicar em 'Ver detalhes' e exibe a tabela de períodos", async () => {
+    render(<CadastroHorariosScreen />);
+    const botoes = await screen.findAllByRole("button", {
+      name: /Ver detalhes/,
+    });
+    fireEvent.click(botoes[0]!);
+
+    expect(
+      screen.getByRole("heading", { name: "Comercial 44h (teste)" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("table", { name: /Períodos — Comercial 44h/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("fecha o detalhe ao clicar em 'Fechar'", async () => {
+    render(<CadastroHorariosScreen />);
+    const botoes = await screen.findAllByRole("button", {
+      name: /Ver detalhes/,
+    });
+    fireEvent.click(botoes[0]!);
+
+    fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
+
+    expect(
+      screen.queryByRole("heading", { name: "Comercial 44h (teste)" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("desativa uma tabela ativa no painel de detalhe", async () => {
+    const desativada: TabelaHorarioApi = { ...tabela1, ativo: false };
+    mockDesativarTabelaHorario.mockResolvedValue(desativada);
+
+    render(<CadastroHorariosScreen />);
+    const botoes = await screen.findAllByRole("button", {
+      name: /Ver detalhes/,
+    });
+    fireEvent.click(botoes[0]!);
+
+    fireEvent.click(screen.getByRole("button", { name: "Desativar" }));
+
+    await waitFor(() => {
+      expect(mockDesativarTabelaHorario).toHaveBeenCalledWith(tabela1.id);
+    });
+    expect(
+      screen.getByRole("button", { name: "Reativar" }),
+    ).toBeInTheDocument();
+  });
+
+  it("reativa uma tabela inativa no painel de detalhe", async () => {
+    const reativada: TabelaHorarioApi = { ...tabela2, ativo: true };
+    mockReativarTabelaHorario.mockResolvedValue(reativada);
+
+    render(<CadastroHorariosScreen />);
+    const botoes = await screen.findAllByRole("button", {
+      name: /Ver detalhes/,
+    });
+    fireEvent.click(botoes[1]!);
+
+    fireEvent.click(screen.getByRole("button", { name: "Reativar" }));
+
+    await waitFor(() => {
+      expect(mockReativarTabelaHorario).toHaveBeenCalledWith(tabela2.id);
+    });
+    expect(
+      screen.getByRole("button", { name: "Desativar" }),
+    ).toBeInTheDocument();
+  });
+
+  it("exibe erro no painel de detalhe quando a desativação falha", async () => {
+    mockDesativarTabelaHorario.mockRejectedValue(
+      new Error("Não foi possível desativar."),
+    );
+
+    render(<CadastroHorariosScreen />);
+    const botoes = await screen.findAllByRole("button", {
+      name: /Ver detalhes/,
+    });
+    fireEvent.click(botoes[0]!);
+
+    fireEvent.click(screen.getByRole("button", { name: "Desativar" }));
+
+    const alerta = await screen.findByRole("alert");
+    expect(alerta).toHaveTextContent("Não foi possível desativar.");
+  });
+
+  it("abrir formulário fecha o detalhe aberto e vice-versa", async () => {
+    render(<CadastroHorariosScreen />);
+    const botoes = await screen.findAllByRole("button", {
+      name: /Ver detalhes/,
+    });
+    fireEvent.click(botoes[0]!);
+    expect(
+      screen.getByRole("heading", { name: "Comercial 44h (teste)" }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Nova tabela de horário" }),
+    );
+    expect(
+      screen.queryByRole("heading", { name: "Comercial 44h (teste)" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Nova tabela de horário" }),
+    ).toBeInTheDocument();
+  });
+
+  it("detalhe de tabela sem períodos exibe mensagem e não renderiza tabela de períodos", async () => {
+    const semPeriodos: TabelaHorarioApi = { ...tabela1, periodos: [] };
+    mockListarTabelasHorario.mockResolvedValue(paginado([semPeriodos]));
+
+    render(<CadastroHorariosScreen />);
+    const botoes = await screen.findAllByRole("button", {
+      name: /Ver detalhes/,
+    });
+    fireEvent.click(botoes[0]!);
+
+    expect(screen.getByText("Nenhum período definido.")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("table", { name: /Períodos/ }),
+    ).not.toBeInTheDocument();
   });
 });

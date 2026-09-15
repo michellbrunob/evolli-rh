@@ -56,9 +56,6 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     render(<App />);
 
     const main = screen.getByRole("main");
-    expect(
-      screen.getByRole("table", { name: "Tabelas de horário cadastradas" }),
-    ).toBeInTheDocument();
     expect(screen.getByText("Somente RH")).toBeInTheDocument();
     expect(main).toContainElement(screen.getByText("Somente RH"));
   });
@@ -283,9 +280,6 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
       screen.getByRole("heading", { level: 1, name: "Visão geral" }),
     ).toBeInTheDocument();
     expect(screen.queryByText("Módulo em preparação")).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("table", { name: "Tabelas de horário cadastradas" }),
-    ).not.toBeInTheDocument();
 
     const inicioBtn = screen.getByRole("button", {
       name: /Início.*Visão geral/,

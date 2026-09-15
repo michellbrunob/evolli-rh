@@ -369,7 +369,7 @@ describe("CadastrosScreen — abas locais 'Horários' / 'Estrutura organizaciona
     expect(onTituloIdChange).toHaveBeenCalledWith("cidades-localidades-titulo");
   });
 
-  it("volta para 'Horários' ao clicar de novo na aba, preservando a tela T043 sem regressão", () => {
+  it("volta para 'Horários' ao clicar de novo na aba, preservando a tela T110 sem regressão", () => {
     render(<CadastrosScreen />);
 
     fireEvent.click(
@@ -380,9 +380,7 @@ describe("CadastrosScreen — abas locais 'Horários' / 'Estrutura organizaciona
     expect(
       screen.getByRole("heading", { level: 1, name: "Horários" }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", { name: "Tabelas de horário cadastradas" }),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Somente RH")).toBeInTheDocument();
   });
 
   it("passa por 'Calendário de feriados' e volta para 'Horários', preservando 'Estrutura organizacional' sem regressão", () => {
@@ -413,9 +411,7 @@ describe("CadastrosScreen — abas locais 'Horários' / 'Estrutura organizaciona
     expect(
       screen.getByRole("heading", { level: 1, name: "Horários" }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", { name: "Tabelas de horário cadastradas" }),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Somente RH")).toBeInTheDocument();
   });
 
   it("passa por 'Políticas de Banco de Horas' e volta para 'Horários', preservando 'Estrutura organizacional' e 'Calendário de feriados' sem regressão", () => {
@@ -459,9 +455,7 @@ describe("CadastrosScreen — abas locais 'Horários' / 'Estrutura organizaciona
     expect(
       screen.getByRole("heading", { level: 1, name: "Horários" }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", { name: "Tabelas de horário cadastradas" }),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Somente RH")).toBeInTheDocument();
   });
 
   it("passa por 'Funções e cargos' e volta para 'Horários', preservando 'Estrutura organizacional'/'Calendário de feriados'/'Políticas de Banco de Horas' sem regressão", () => {
@@ -515,9 +509,7 @@ describe("CadastrosScreen — abas locais 'Horários' / 'Estrutura organizaciona
     expect(
       screen.getByRole("heading", { level: 1, name: "Horários" }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", { name: "Tabelas de horário cadastradas" }),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Somente RH")).toBeInTheDocument();
   });
 
   it("passa por 'Motivos de ausência e justificativas' e volta para 'Horários', preservando 'Funções e cargos'/'Políticas de Banco de Horas'/'Calendário de feriados'/'Estrutura organizacional' sem regressão", () => {
@@ -584,9 +576,7 @@ describe("CadastrosScreen — abas locais 'Horários' / 'Estrutura organizaciona
     expect(
       screen.getByRole("heading", { level: 1, name: "Horários" }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", { name: "Tabelas de horário cadastradas" }),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Somente RH")).toBeInTheDocument();
   });
 
   it("passa por 'Centros de custo' e volta para 'Horários', preservando 'Motivos de ausência e justificativas'/'Funções e cargos'/'Políticas de Banco de Horas'/'Calendário de feriados'/'Estrutura organizacional' sem regressão", () => {
@@ -663,9 +653,7 @@ describe("CadastrosScreen — abas locais 'Horários' / 'Estrutura organizaciona
     expect(
       screen.getByRole("heading", { level: 1, name: "Horários" }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", { name: "Tabelas de horário cadastradas" }),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Somente RH")).toBeInTheDocument();
   });
 
   it("passa por 'Tipos de documento' e volta para 'Horários', preservando 'Centros de custo'/'Motivos de ausência e justificativas'/'Funções e cargos'/'Políticas de Banco de Horas'/'Calendário de feriados'/'Estrutura organizacional' sem regressão", () => {
@@ -747,9 +735,7 @@ describe("CadastrosScreen — abas locais 'Horários' / 'Estrutura organizaciona
     expect(
       screen.getByRole("heading", { level: 1, name: "Horários" }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", { name: "Tabelas de horário cadastradas" }),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Somente RH")).toBeInTheDocument();
   });
 
   it("passa por 'Motivos de desligamento' e volta para 'Horários', preservando 'Tipos de documento'/'Centros de custo'/'Motivos de ausência e justificativas'/'Funções e cargos'/'Políticas de Banco de Horas'/'Calendário de feriados'/'Estrutura organizacional' sem regressão", () => {
@@ -844,9 +830,7 @@ describe("CadastrosScreen — abas locais 'Horários' / 'Estrutura organizaciona
     expect(
       screen.getByRole("heading", { level: 1, name: "Horários" }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", { name: "Tabelas de horário cadastradas" }),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Somente RH")).toBeInTheDocument();
   });
 
   it("passa por 'Escolaridade' e volta para 'Horários', preservando 'Motivos de desligamento'/'Tipos de documento'/'Centros de custo'/'Motivos de ausência e justificativas'/'Funções e cargos'/'Políticas de Banco de Horas'/'Calendário de feriados'/'Estrutura organizacional' sem regressão", () => {
@@ -949,9 +933,7 @@ describe("CadastrosScreen — abas locais 'Horários' / 'Estrutura organizaciona
     expect(
       screen.getByRole("heading", { level: 1, name: "Horários" }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", { name: "Tabelas de horário cadastradas" }),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Somente RH")).toBeInTheDocument();
   });
 
   it("passa por 'Cidades e localidades' e volta para 'Horários', preservando 'Escolaridade'/'Motivos de desligamento'/'Tipos de documento'/'Centros de custo'/'Motivos de ausência e justificativas'/'Funções e cargos'/'Políticas de Banco de Horas'/'Calendário de feriados'/'Estrutura organizacional' sem regressão", () => {
@@ -1065,9 +1047,7 @@ describe("CadastrosScreen — abas locais 'Horários' / 'Estrutura organizaciona
     expect(
       screen.getByRole("heading", { level: 1, name: "Horários" }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", { name: "Tabelas de horário cadastradas" }),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Somente RH")).toBeInTheDocument();
   });
 
   it("informa o titleId do h1 visível via onTituloIdChange, inclusive ao trocar de aba", () => {
