@@ -1,5 +1,5 @@
 /**
- * Cadastros > Estrutura organizacional (T073) — só tokens já existentes
+ * Cadastros > Estrutura organizacional (T104) — só tokens já existentes
  * (tokens.css); sem hexadecimal novo, sem sombra, sem gradiente. Layout
  * responsivo: pilha vertical de seções.
  */
@@ -36,57 +36,15 @@
   border-color: var(--status-info-border);
 }
 
+.estrutura-organizacional-screen__aviso--auditado {
+  background: var(--status-warning-surface);
+  border-color: var(--status-warning-border);
+}
+
 .estrutura-organizacional-screen__aviso-texto {
   margin: 0;
   color: var(--color-ink);
   flex: 1 1 16rem;
-}
-
-/* Hierarquia ilustrativa (Empresa → Unidade → Departamento → Centro de custo). */
-.estrutura-organizacional-screen__hierarquia-lista {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-xs);
-  margin: 0 0 var(--space-sm);
-  padding: 0;
-  list-style: none;
-}
-
-.estrutura-organizacional-screen__hierarquia-lista li {
-  display: flex;
-  align-items: center;
-  gap: var(--space-xs);
-  padding: var(--space-xs) var(--space-sm);
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-sm);
-  color: var(--color-ink);
-  font-weight: var(--weight-strong);
-}
-
-.estrutura-organizacional-screen__hierarquia-lista li:not(:last-child)::after {
-  content: "→";
-  margin-left: var(--space-xs);
-  color: var(--color-ink-subtle);
-  font-weight: var(--weight-regular);
-}
-
-.estrutura-organizacional-screen__demo {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xs);
-}
-
-.estrutura-organizacional-screen__demo-texto {
-  margin: 0;
-  color: var(--color-ink-subtle);
-  font-size: var(--text-caption);
-}
-
-.estrutura-organizacional-screen__demo-botoes {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-sm);
 }
 
 .estrutura-organizacional-screen__erro {
@@ -98,17 +56,7 @@
   border-color: var(--status-danger-border);
 }
 
-.estrutura-organizacional-screen__erro-referencia {
-  margin: 0;
-  font-size: var(--text-caption);
-  color: var(--color-ink-subtle);
-}
-
-.estrutura-organizacional-screen__erro-referencia code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-}
-
-/* Filtros — só locais, recalculam a lista em memória. */
+/* Filtros — enviados à API como query param `status`. */
 .estrutura-organizacional-screen__filtros {
   display: flex;
   flex-wrap: wrap;
@@ -122,13 +70,13 @@
   min-width: 0;
 }
 
-.estrutura-organizacional-screen__filtros-nota {
-  margin: 0 0 var(--space-md);
-  font-size: var(--text-caption);
+.estrutura-organizacional-screen__carregando {
+  margin: 0;
   color: var(--color-ink-subtle);
+  font-size: var(--text-caption);
 }
 
-/* Painel do formulário "Novo item de estrutura". */
+/* Painel do formulário de criação/edição de unidade. */
 .estrutura-organizacional-screen__formulario {
   display: flex;
   flex-direction: column;
@@ -142,14 +90,12 @@
   max-width: 32rem;
 }
 
-/* Confirmação demonstrativa — tokens semânticos de "success" (ação
-   concluída na demonstração, mesmo sem efeito real). */
-.estrutura-organizacional-screen__confirmacao {
+.estrutura-organizacional-screen__form-erro {
   margin: 0;
   padding: var(--space-sm) var(--space-md);
   border-radius: var(--radius-sm);
-  background: var(--status-success-surface);
-  color: var(--status-success-ink);
+  background: var(--status-danger-surface);
+  color: var(--status-danger-ink);
 }
 
 @media (max-width: 640px) {
