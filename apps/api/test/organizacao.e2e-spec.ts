@@ -453,6 +453,48 @@ describe("Núcleo Organizacional Interno (e2e)", () => {
         .send({ nome: "Sequestrado" })
         .expect(404);
     });
+
+    it("departamento: listar → criar → editar → reler (fluxo CRUD autocontido)", async () => {
+      const novo = await post("/v1/departamentos", rhA)
+        .send({ empresaId: empresaA, codigo: "MKTG", nome: "Marketing" })
+        .expect(201);
+      const novoId = novo.body.id as string;
+      expect(novo.body.codigo).toBe("MKTG");
+      expect(novo.body.nome).toBe("Marketing");
+      expect(novo.body.empresaId).toBe(empresaA);
+
+      const lista = await get("/v1/departamentos", rhA).expect(200);
+      const ids = (lista.body.itens as Array<{ id: string }>).map((d) => d.id);
+      expect(ids).toContain(novoId);
+
+      const editado = await patch(`/v1/departamentos/${novoId}`, rhA)
+        .send({ nome: "Marketing e Comunicação" })
+        .expect(200);
+      expect(editado.body.nome).toBe("Marketing e Comunicação");
+      expect(editado.body.codigo).toBe("MKTG");
+
+      const releitura = await get(`/v1/departamentos/${novoId}`, rhA).expect(
+        200,
+      );
+      expect(releitura.body.nome).toBe("Marketing e Comunicação");
+      expect(releitura.body.codigo).toBe("MKTG");
+      expect(releitura.body.empresaId).toBe(empresaA);
+    });
+
+    it("IDOR: PATCH de departamento de outra empresa responde 404", async () => {
+      const criado = await post("/v1/departamentos", rhA)
+        .send({
+          empresaId: empresaA,
+          codigo: "IDOR_DEP",
+          nome: "Alvo IDOR Dep",
+        })
+        .expect(201);
+      const depId = criado.body.id as string;
+
+      await patch(`/v1/departamentos/${depId}`, rhB)
+        .send({ nome: "Sequestrado" })
+        .expect(404);
+    });
   });
 
   describe("isolamento entre empresas (IDOR/BOLA)", () => {
