@@ -29,16 +29,16 @@ export const ESTRUTURA_ORGANIZACIONAL_TITULO_ID =
 const CODIGO_PATTERN = /^[A-Z0-9_]{2,32}$/;
 
 const VARIANTE_STATUS: Record<string, StatusVariant> = {
-  ativa: "success",
-  inativa: "neutral",
+  ativo: "success",
+  inativo: "neutral",
 };
 
 const ROTULO_STATUS: Record<string, string> = {
-  ativa: "Ativa",
-  inativa: "Inativa",
+  ativo: "Ativa",
+  inativo: "Inativa",
 };
 
-type StatusFiltro = "todos" | "ativa" | "inativa";
+type StatusFiltro = "todos" | "ativo" | "inativo";
 
 interface FormularioErros {
   codigo?: string;
@@ -303,8 +303,8 @@ export function EstruturaOrganizacionalScreen() {
                   {...control}
                 >
                   <option value="todos">Todas as situações</option>
-                  <option value="ativa">Ativa</option>
-                  <option value="inativa">Inativa</option>
+                  <option value="ativo">Ativa</option>
+                  <option value="inativo">Inativa</option>
                 </select>
               )}
             </FormField>

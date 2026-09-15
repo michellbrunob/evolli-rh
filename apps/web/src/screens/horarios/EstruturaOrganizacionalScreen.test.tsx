@@ -31,7 +31,7 @@ const empresaFixture: EmpresaApi = {
   id: "00000000-0000-0000-0000-000000000001",
   codigo: "EMP-01",
   nome: "Empresa Exemplo (teste)",
-  status: "ativa",
+  status: "ativo",
 };
 
 const unidade1: UnidadeOrganizacionalApi = {
@@ -39,7 +39,7 @@ const unidade1: UnidadeOrganizacionalApi = {
   codigo: "UNID_SP",
   nome: "Unidade São Paulo (teste)",
   empresaId: empresaFixture.id,
-  status: "ativa",
+  status: "ativo",
   criadoEm: "2026-01-01T00:00:00.000Z",
   atualizadoEm: "2026-01-01T00:00:00.000Z",
 };
@@ -49,7 +49,7 @@ const unidade2: UnidadeOrganizacionalApi = {
   codigo: "UNID_RJ",
   nome: "Unidade Rio de Janeiro (teste)",
   empresaId: empresaFixture.id,
-  status: "inativa",
+  status: "inativo",
   criadoEm: "2026-01-01T00:00:00.000Z",
   atualizadoEm: "2026-01-01T00:00:00.000Z",
 };
@@ -177,12 +177,12 @@ describe("EstruturaOrganizacionalScreen (T104 — funcional)", () => {
     } satisfies ResultadoPaginado<UnidadeOrganizacionalApi>);
 
     fireEvent.change(screen.getByLabelText("Situação"), {
-      target: { value: "ativa" },
+      target: { value: "ativo" },
     });
 
     await waitFor(() =>
       expect(mockListarUnidades).toHaveBeenCalledWith(
-        expect.objectContaining({ status: "ativa" }),
+        expect.objectContaining({ status: "ativo" }),
       ),
     );
   });
