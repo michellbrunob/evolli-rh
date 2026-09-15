@@ -1,336 +1,522 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type {
+  CentroCustoApi,
+  EmpresaApi,
+  ResultadoPaginado,
+} from "../../api/organizacaoClient";
 import { CentrosCustoScreen } from "./CentrosCustoScreen";
 
-describe("CentrosCustoScreen (T083 — tela visual estática)", () => {
-  it("tem um único h1", () => {
-    render(<CentrosCustoScreen />);
+vi.mock("../../api/organizacaoClient");
 
-    expect(
-      screen.getAllByRole("heading", {
-        level: 1,
-        name: "Centros de custo",
-      }),
-    ).toHaveLength(1);
+import {
+  atualizarCentroCusto,
+  criarCentroCusto,
+  listarCentrosCusto,
+  listarEmpresasParaCentroCusto,
+} from "../../api/organizacaoClient";
+
+const mockListarEmpresas = vi.mocked(listarEmpresasParaCentroCusto);
+const mockListarCentrosCusto = vi.mocked(listarCentrosCusto);
+const mockCriarCentroCusto = vi.mocked(criarCentroCusto);
+const mockAtualizarCentroCusto = vi.mocked(atualizarCentroCusto);
+
+const empresaFixture: EmpresaApi = {
+  id: "00000000-0000-0000-0000-000000000001",
+  codigo: "EMP-01",
+  nome: "Empresa Exemplo (teste)",
+  status: "ativo",
+};
+
+const empresaB: EmpresaApi = {
+  id: "00000000-0000-0000-0000-000000000002",
+  codigo: "EMP-02",
+  nome: "Empresa B (teste)",
+  status: "ativo",
+};
+
+const cc1: CentroCustoApi = {
+  id: "00000000-0000-0000-0000-000000000011",
+  empresaId: empresaFixture.id,
+  codigo: "CC_ADM",
+  nome: "Centro Administrativo (teste)",
+  status: "ativo",
+  criadoEm: "2026-01-01T00:00:00.000Z",
+  atualizadoEm: "2026-01-01T00:00:00.000Z",
+};
+
+const cc2: CentroCustoApi = {
+  id: "00000000-0000-0000-0000-000000000012",
+  empresaId: empresaFixture.id,
+  codigo: "CC_OPS",
+  nome: "Centro Operacional (teste)",
+  status: "inativo",
+  criadoEm: "2026-01-01T00:00:00.000Z",
+  atualizadoEm: "2026-01-01T00:00:00.000Z",
+};
+
+function mockSucesso(lista: CentroCustoApi[] = [cc1, cc2]) {
+  mockListarEmpresas.mockResolvedValue({
+    itens: [empresaFixture],
+    pagina: 1,
+    tamanhoPagina: 100,
+    total: 1,
+  } satisfies ResultadoPaginado<EmpresaApi>);
+  mockListarCentrosCusto.mockResolvedValue({
+    itens: lista,
+    pagina: 1,
+    tamanhoPagina: 50,
+    total: lista.length,
+  } satisfies ResultadoPaginado<CentroCustoApi>);
+}
+
+function mockMultiEmpresa() {
+  mockListarEmpresas.mockResolvedValue({
+    itens: [empresaFixture, empresaB],
+    pagina: 1,
+    tamanhoPagina: 100,
+    total: 2,
+  } satisfies ResultadoPaginado<EmpresaApi>);
+  mockListarCentrosCusto.mockResolvedValue({
+    itens: [cc1],
+    pagina: 1,
+    tamanhoPagina: 50,
+    total: 1,
+  } satisfies ResultadoPaginado<CentroCustoApi>);
+}
+
+describe("CentrosCustoScreen (T109 — funcional)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
   });
 
-  it("exibe o aviso de que o RH consulta somente referências da própria empresa e unidades autorizadas", () => {
+  it("tem um único h1", async () => {
+    mockSucesso();
     render(<CentrosCustoScreen />);
 
-    expect(screen.getByText("Somente RH")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        screen.getByRole("heading", { level: 1, name: "Centros de custo" }),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+  });
+
+  it("exibe os avisos de escopo, auditoria e referências organizacionais", async () => {
+    mockSucesso();
+    render(<CentrosCustoScreen />);
+
+    await waitFor(() =>
+      expect(screen.getByText("Somente RH")).toBeInTheDocument(),
+    );
+    expect(
+      screen.getByText(/Somente o RH da própria empresa administra centros/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Auditado")).toBeInTheDocument();
+    expect(
+      screen.getByText(/geram trilha de auditoria automática/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Referências organizacionais")).toBeInTheDocument();
     expect(
       screen.getByText(
-        /o rh consulta somente referências de centro de custo da própria empresa e das unidades autorizadas/i,
+        /cargo, função, departamento, centro de custo e estrutura são referências distintas/i,
       ),
     ).toBeInTheDocument();
   });
 
-  it("exibe o aviso de que é só demonstração, sem login, API, persistência, importação, exportação, cálculo, integração, lançamento ou alteração cadastral", () => {
+  it("lista centros de custo com código, nome, situação e botão Editar", async () => {
+    mockSucesso();
     render(<CentrosCustoScreen />);
 
-    expect(screen.getByText("Somente demonstração")).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        /não há login, api, persistência, importação, exportação, cálculo, integração, lançamento ou alteração cadastral real/i,
-      ),
-    ).toBeInTheDocument();
-  });
-
-  it("exibe o aviso de que centro de custo é referência organizacional e não cria rateio, orçamento, pagamento, desconto, lançamento contábil, regra de Folha ou permissão", () => {
-    render(<CentrosCustoScreen />);
-
-    expect(
-      screen.getByText("Referência não é regra financeira"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        /centro de custo é referência organizacional e não cria rateio, orçamento, pagamento, desconto, lançamento contábil, regra de folha ou permissão de acesso/i,
-      ),
-    ).toBeInTheDocument();
-  });
-
-  it("exibe o aviso de dados reais bloqueados: MFA, DS-OPS-01, auditoria, retenção/base legal e validações de RH/Jurídico/Folha-DP/Contabilidade/TI", () => {
-    render(<CentrosCustoScreen />);
-
-    expect(screen.getByText("Dados reais bloqueados")).toBeInTheDocument();
-    expect(screen.getByText(/MFA/)).toBeInTheDocument();
-    expect(screen.getByText("DS-OPS-01")).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        /validações aplicáveis de rh, jurídico\/privacidade, folha\/dp, contabilidade e ti/i,
-      ),
-    ).toBeInTheDocument();
-  });
-
-  it("mostra o resumo com os cinco indicadores (rótulo curto + contagem) e a nota de que não calculam valores/orçamento/rateio/etc.", () => {
-    render(<CentrosCustoScreen />);
-
-    const resumo = screen.getByText("Resumo (exemplo)").closest("section")!;
-    const dentroDoResumo = within(resumo);
-
-    expect(dentroDoResumo.getByText("Centros de custo")).toBeInTheDocument();
-    expect(
-      dentroDoResumo.getByText("7 centro(s) de custo de referência (exemplo)"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDoResumo.getByText("Unidades relacionadas"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDoResumo.getByText(
-        "3 unidade(s) técnica(s) relacionada(s) (exemplo)",
-      ),
-    ).toBeInTheDocument();
-    expect(dentroDoResumo.getByText("Em revisão")).toBeInTheDocument();
-    expect(
-      dentroDoResumo.getByText(
-        "3 referência(s) organizacional(is) em revisão (exemplo)",
-      ),
-    ).toBeInTheDocument();
-    expect(
-      dentroDoResumo.getByText("Exigem decisão formal"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDoResumo.getByText(
-        "2 item(ns) aguardando decisão formal (exemplo)",
-      ),
-    ).toBeInTheDocument();
-    expect(dentroDoResumo.getByText("Itens históricos")).toBeInTheDocument();
-    expect(
-      dentroDoResumo.getByText(
-        "2 item(ns) histórico(s) ilustrativo(s) (exemplo)",
-      ),
-    ).toBeInTheDocument();
-    expect(
-      dentroDoResumo.getByText(
-        /não calculam valores, orçamento, rateio, pagamento, desconto, jornada, banco de horas, folha, contabilidade, permissões ou acesso/i,
-      ),
-    ).toBeInTheDocument();
-  });
-
-  it("lista as referências com referência técnica, código técnico, centro de custo, unidade, estrutura, situação, responsável e trilha", () => {
-    render(<CentrosCustoScreen />);
-
-    const tabela = screen.getByRole("table", {
-      name: "Centros de custo (exemplo)",
+    const tabela = await screen.findByRole("table", {
+      name: "Centros de custo",
     });
-    const dentro = within(tabela);
-
-    const linha = dentro.getByText("CC-2026-0004").closest("tr")!;
-    const dentroDaLinha = within(linha);
-    expect(dentroDaLinha.getByText("CTEC-004 (exemplo)")).toBeInTheDocument();
+    expect(within(tabela).getByText("CC_ADM")).toBeInTheDocument();
     expect(
-      dentroDaLinha.getByText("Centro de custo de referência D (exemplo)"),
+      within(tabela).getByText("Centro Administrativo (teste)"),
     ).toBeInTheDocument();
+    expect(within(tabela).getByText("Ativo")).toBeInTheDocument();
+    expect(within(tabela).getByText("CC_OPS")).toBeInTheDocument();
     expect(
-      dentroDaLinha.getByText("Unidade U-03 (exemplo)"),
+      within(tabela).getByText("Centro Operacional (teste)"),
     ).toBeInTheDocument();
+    expect(within(tabela).getByText("Inativo")).toBeInTheDocument();
     expect(
-      dentroDaLinha.getByText("Departamento técnico D-01 (exemplo)"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDaLinha.getByText("Aguardando decisão (exemplo)"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDaLinha.getByText("RT-CentroCusto-03 (exemplo)"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDaLinha.getByText("2 eventos registrados (exemplo)"),
-    ).toBeInTheDocument();
+      within(tabela).getAllByRole("button", { name: "Editar" }),
+    ).toHaveLength(2);
   });
 
-  it("filtra localmente por situação, empresa/unidade técnica e estrutura/departamento técnico", () => {
+  it("status 'ativo' exibe rótulo 'Ativo' e 'inativo' exibe 'Inativo'", async () => {
+    mockSucesso([cc1, cc2]);
     render(<CentrosCustoScreen />);
 
-    fireEvent.change(screen.getByLabelText("Situação"), {
-      target: { value: "historico_ilustrativo" },
+    const tabela = await screen.findByRole("table", {
+      name: "Centros de custo",
     });
-
-    const tabela = screen.getByRole("table", {
-      name: "Centros de custo (exemplo)",
-    });
-    expect(within(tabela).getByText("CC-2025-0001")).toBeInTheDocument();
-    expect(within(tabela).getByText("CC-2025-0002")).toBeInTheDocument();
-    expect(within(tabela).queryByText("CC-2026-0001")).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Limpar filtros" }));
-    expect(screen.getByText("CC-2026-0001")).toBeInTheDocument();
-
-    fireEvent.change(screen.getByLabelText("Empresa/unidade técnica"), {
-      target: { value: "Unidade U-01 (exemplo)" },
-    });
-    expect(screen.getByText("CC-2026-0001")).toBeInTheDocument();
-    expect(screen.getByText("CC-2026-0003")).toBeInTheDocument();
-    expect(screen.getByText("CC-2025-0002")).toBeInTheDocument();
-    expect(screen.queryByText("CC-2026-0002")).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Limpar filtros" }));
-    fireEvent.change(screen.getByLabelText("Estrutura/departamento técnico"), {
-      target: { value: "Departamento técnico D-01 (exemplo)" },
-    });
-    expect(screen.getByText("CC-2026-0001")).toBeInTheDocument();
-    expect(screen.getByText("CC-2026-0004")).toBeInTheDocument();
-    expect(screen.queryByText("CC-2026-0002")).not.toBeInTheDocument();
+    const linhaAtivo = within(tabela).getByText("CC_ADM").closest("tr")!;
+    expect(within(linhaAtivo).getByText("Ativo")).toBeInTheDocument();
+    const linhaInativo = within(tabela).getByText("CC_OPS").closest("tr")!;
+    expect(within(linhaInativo).getByText("Inativo")).toBeInTheDocument();
   });
 
-  it("mostra EmptyState quando o filtro não corresponde a nenhuma referência", () => {
+  it("mostra EmptyState quando não há centros de custo", async () => {
+    mockSucesso([]);
     render(<CentrosCustoScreen />);
 
-    fireEvent.change(screen.getByLabelText("Situação"), {
-      target: { value: "historico_ilustrativo" },
-    });
-    fireEvent.change(screen.getByLabelText("Empresa/unidade técnica"), {
-      target: { value: "Unidade U-02 (exemplo)" },
-    });
-
+    await waitFor(() =>
+      expect(
+        screen.getByRole("heading", {
+          name: "Nenhum centro de custo cadastrado",
+        }),
+      ).toBeInTheDocument(),
+    );
     expect(
-      screen.getByRole("heading", {
-        name: "Nenhuma referência corresponde aos filtros",
-      }),
-    ).toBeInTheDocument();
-  });
-
-  it("abre o painel de detalhe ao clicar em 'Ver detalhe', somente leitura, com campos pendentes e único controle 'Fechar'", () => {
-    render(<CentrosCustoScreen />);
-
-    const linha = screen.getByText("CC-2026-0001").closest("tr")!;
-    fireEvent.click(within(linha).getByRole("button", { name: /Ver detalhe/ }));
-
-    expect(screen.getByText("Detalhe demonstrativo")).toBeInTheDocument();
-    const tituloDetalhe = screen.getByRole("heading", {
-      name: "Detalhe da referência — CC-2026-0001",
-    });
-    expect(tituloDetalhe).toBeInTheDocument();
-    const painel = tituloDetalhe.closest("section")!;
-    const dentroDoPainel = within(painel);
-
-    expect(
-      dentroDoPainel.getByText("Centro de custo de referência A (exemplo)"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDoPainel.getByText("Matriz de acesso (exemplo)"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDoPainel.getByText("Validação RH (exemplo)"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDoPainel.getByText(
-        /registro de referência técnica para centro de custo \(exemplo ilustrativo, sem rateio ou orçamento real\)/i,
-      ),
-    ).toBeInTheDocument();
-    expect(
-      dentroDoPainel.getByText(
-        /este painel não cria, edita, vincula, ativa, aprova, salva, importa, exporta, integra, calcula valor, gera rateio nem altera qualquer registro real/i,
-      ),
-    ).toBeInTheDocument();
-
-    expect(
-      dentroDoPainel.getAllByRole("button").map((b) => b.textContent),
-    ).toEqual(["Fechar"]);
-
-    fireEvent.click(dentroDoPainel.getByRole("button", { name: "Fechar" }));
-    expect(screen.queryByText("Detalhe demonstrativo")).not.toBeInTheDocument();
-  });
-
-  it("mostra 'nenhum campo pendente' quando o item de exemplo não tem pendências", () => {
-    render(<CentrosCustoScreen />);
-
-    const linha = screen.getByText("CC-2026-0005").closest("tr")!;
-    fireEvent.click(within(linha).getByRole("button", { name: /Ver detalhe/ }));
-
-    expect(
-      screen.getByText("Nenhum campo pendente (exemplo)."),
-    ).toBeInTheDocument();
-  });
-
-  it("alterna para o estado vazio e mostra o EmptyState", () => {
-    render(<CentrosCustoScreen />);
-
-    fireEvent.click(screen.getByRole("button", { name: "Vazio" }));
-
-    expect(
-      screen.queryByRole("table", {
-        name: "Centros de custo (exemplo)",
-      }),
+      screen.queryByRole("table", { name: "Centros de custo" }),
     ).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", {
-        level: 3,
-        name: "Nenhuma referência de centro de custo cadastrada",
-      }),
-    ).toBeInTheDocument();
   });
 
-  it("alterna para o estado de erro com referência ilustrativa e ação de retorno", () => {
+  it("mostra erro e permite tentar novamente", async () => {
+    mockListarEmpresas.mockRejectedValue(new Error("falha de rede"));
+    mockListarCentrosCusto.mockRejectedValue(new Error("falha de rede"));
     render(<CentrosCustoScreen />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Erro" }));
+    await waitFor(() =>
+      expect(
+        screen.getByRole("heading", {
+          name: "Não foi possível carregar os centros de custo",
+        }),
+      ).toBeInTheDocument(),
+    );
 
-    expect(
-      screen.getByRole("heading", {
-        name: "Não foi possível carregar as referências de centro de custo",
-      }),
-    ).toBeInTheDocument();
-    expect(screen.getByText(/REQ-DEMO-003014/)).toBeInTheDocument();
-
+    mockSucesso();
     fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
+
+    await screen.findByRole("table", { name: "Centros de custo" });
+  });
+
+  it("filtra por situação chamando a API com o parâmetro status correto", async () => {
+    mockSucesso();
+    render(<CentrosCustoScreen />);
+    await screen.findByRole("table", { name: "Centros de custo" });
+
+    mockListarCentrosCusto.mockResolvedValue({
+      itens: [cc1],
+      pagina: 1,
+      tamanhoPagina: 50,
+      total: 1,
+    } satisfies ResultadoPaginado<CentroCustoApi>);
+
+    fireEvent.change(screen.getByLabelText("Situação"), {
+      target: { value: "ativo" },
+    });
+
+    await waitFor(() =>
+      expect(mockListarCentrosCusto).toHaveBeenCalledWith(
+        expect.objectContaining({ status: "ativo" }),
+      ),
+    );
+  });
+
+  it("o filtro envia 'inativo' (não 'inativa') para a API", async () => {
+    mockSucesso();
+    render(<CentrosCustoScreen />);
+    await screen.findByRole("table", { name: "Centros de custo" });
+
+    mockListarCentrosCusto.mockResolvedValue({
+      itens: [cc2],
+      pagina: 1,
+      tamanhoPagina: 50,
+      total: 1,
+    } satisfies ResultadoPaginado<CentroCustoApi>);
+
+    fireEvent.change(screen.getByLabelText("Situação"), {
+      target: { value: "inativo" },
+    });
+
+    await waitFor(() =>
+      expect(mockListarCentrosCusto).toHaveBeenCalledWith(
+        expect.objectContaining({ status: "inativo" }),
+      ),
+    );
+  });
+
+  it("abre formulário de criação, valida campos e salva via API (empresa única auto-determinada)", async () => {
+    mockSucesso();
+    mockCriarCentroCusto.mockResolvedValue({
+      ...cc1,
+      id: "00000000-0000-0000-0000-000000000099",
+      codigo: "CC_FIN",
+      nome: "Centro Financeiro (teste)",
+    });
+    render(<CentrosCustoScreen />);
+    await screen.findByRole("table", { name: "Centros de custo" });
+
+    fireEvent.click(
+      screen.getAllByRole("button", { name: "Novo centro de custo" })[0]!,
+    );
+
+    const form = screen.getByRole("form", {
+      name: "Formulário de novo centro de custo",
+    });
+
+    // Sem empresa selector (única empresa no escopo)
     expect(
-      screen.getByRole("table", {
-        name: "Centros de custo (exemplo)",
+      within(form).queryByLabelText("Empresa", { exact: false }),
+    ).not.toBeInTheDocument();
+
+    // Submeter sem preencher → erros de validação
+    fireEvent.click(within(form).getByRole("button", { name: "Salvar" }));
+    expect(
+      await screen.findByText("Código é obrigatório."),
+    ).toBeInTheDocument();
+
+    fireEvent.change(within(form).getByLabelText("Código", { exact: false }), {
+      target: { value: "CC_FIN" },
+    });
+    fireEvent.change(within(form).getByLabelText("Nome", { exact: false }), {
+      target: { value: "Centro Financeiro (teste)" },
+    });
+    fireEvent.click(within(form).getByRole("button", { name: "Salvar" }));
+
+    await waitFor(() =>
+      expect(screen.queryByRole("form")).not.toBeInTheDocument(),
+    );
+    expect(mockCriarCentroCusto).toHaveBeenCalledWith({
+      codigo: "CC_FIN",
+      nome: "Centro Financeiro (teste)",
+      empresaId: empresaFixture.id,
+    });
+  });
+
+  it("código inválido exibe mensagem de erro", async () => {
+    mockSucesso();
+    render(<CentrosCustoScreen />);
+    await screen.findByRole("table", { name: "Centros de custo" });
+
+    fireEvent.click(
+      screen.getAllByRole("button", { name: "Novo centro de custo" })[0]!,
+    );
+    const form = screen.getByRole("form", {
+      name: "Formulário de novo centro de custo",
+    });
+
+    fireEvent.change(within(form).getByLabelText("Código", { exact: false }), {
+      target: { value: "invalido com espaco" },
+    });
+    fireEvent.click(within(form).getByRole("button", { name: "Salvar" }));
+
+    expect(
+      await screen.findByText(
+        /Código deve conter apenas letras maiúsculas, dígitos e _/,
+      ),
+    ).toBeInTheDocument();
+    expect(mockCriarCentroCusto).not.toHaveBeenCalled();
+  });
+
+  it("exige seleção explícita de empresa quando há mais de uma no escopo", async () => {
+    mockMultiEmpresa();
+    render(<CentrosCustoScreen />);
+    await screen.findByRole("table", { name: "Centros de custo" });
+
+    fireEvent.click(
+      screen.getAllByRole("button", { name: "Novo centro de custo" })[0]!,
+    );
+    const form = screen.getByRole("form", {
+      name: "Formulário de novo centro de custo",
+    });
+
+    // Seletor de empresa deve estar visível
+    expect(
+      within(form).getByLabelText("Empresa", { exact: false }),
+    ).toBeInTheDocument();
+
+    // Submeter sem selecionar empresa → erro
+    fireEvent.change(within(form).getByLabelText("Código", { exact: false }), {
+      target: { value: "CC_FIN" },
+    });
+    fireEvent.change(within(form).getByLabelText("Nome", { exact: false }), {
+      target: { value: "Centro Financeiro (teste)" },
+    });
+    fireEvent.click(within(form).getByRole("button", { name: "Salvar" }));
+
+    expect(await screen.findByText("Selecione a empresa.")).toBeInTheDocument();
+    expect(mockCriarCentroCusto).not.toHaveBeenCalled();
+  });
+
+  it("permite criar com seleção explícita de empresa em escopo multi-empresa", async () => {
+    mockMultiEmpresa();
+    mockCriarCentroCusto.mockResolvedValue({
+      ...cc1,
+      empresaId: empresaB.id,
+      codigo: "CC_FIN",
+      nome: "Centro Financeiro (teste)",
+    });
+    render(<CentrosCustoScreen />);
+    await screen.findByRole("table", { name: "Centros de custo" });
+
+    fireEvent.click(
+      screen.getAllByRole("button", { name: "Novo centro de custo" })[0]!,
+    );
+    const form = screen.getByRole("form", {
+      name: "Formulário de novo centro de custo",
+    });
+
+    fireEvent.change(within(form).getByLabelText("Empresa", { exact: false }), {
+      target: { value: empresaB.id },
+    });
+    fireEvent.change(within(form).getByLabelText("Código", { exact: false }), {
+      target: { value: "CC_FIN" },
+    });
+    fireEvent.change(within(form).getByLabelText("Nome", { exact: false }), {
+      target: { value: "Centro Financeiro (teste)" },
+    });
+    fireEvent.click(within(form).getByRole("button", { name: "Salvar" }));
+
+    await waitFor(() =>
+      expect(screen.queryByRole("form")).not.toBeInTheDocument(),
+    );
+    expect(mockCriarCentroCusto).toHaveBeenCalledWith({
+      codigo: "CC_FIN",
+      nome: "Centro Financeiro (teste)",
+      empresaId: empresaB.id,
+    });
+  });
+
+  it("abre formulário de edição com código somente leitura e salva nome via API", async () => {
+    mockSucesso();
+    mockAtualizarCentroCusto.mockResolvedValue({
+      ...cc1,
+      nome: "Centro Administrativo Pleno (teste)",
+    });
+    mockListarCentrosCusto.mockResolvedValue({
+      itens: [{ ...cc1, nome: "Centro Administrativo Pleno (teste)" }, cc2],
+      pagina: 1,
+      tamanhoPagina: 50,
+      total: 2,
+    } satisfies ResultadoPaginado<CentroCustoApi>);
+
+    render(<CentrosCustoScreen />);
+    const tabela = await screen.findByRole("table", {
+      name: "Centros de custo",
+    });
+
+    const linhaAdm = within(tabela).getByText("CC_ADM").closest("tr")!;
+    fireEvent.click(within(linhaAdm).getByRole("button", { name: "Editar" }));
+
+    const form = screen.getByRole("form", {
+      name: "Formulário de edição de centro de custo",
+    });
+    const campoCodigo = within(form).getByLabelText("Código", { exact: false });
+    expect(campoCodigo).toHaveAttribute("readonly");
+    expect(campoCodigo).toHaveValue("CC_ADM");
+
+    const campoNome = within(form).getByLabelText("Nome", { exact: false });
+    fireEvent.change(campoNome, {
+      target: { value: "Centro Administrativo Pleno (teste)" },
+    });
+    fireEvent.click(within(form).getByRole("button", { name: "Salvar" }));
+
+    await waitFor(() =>
+      expect(screen.queryByRole("form")).not.toBeInTheDocument(),
+    );
+    expect(mockAtualizarCentroCusto).toHaveBeenCalledWith(cc1.id, {
+      nome: "Centro Administrativo Pleno (teste)",
+    });
+  });
+
+  it("cancelar fecha o formulário sem chamar a API", async () => {
+    mockSucesso();
+    render(<CentrosCustoScreen />);
+    await screen.findByRole("table", { name: "Centros de custo" });
+
+    fireEvent.click(
+      screen.getAllByRole("button", { name: "Novo centro de custo" })[0]!,
+    );
+    expect(
+      screen.getByRole("form", {
+        name: "Formulário de novo centro de custo",
       }),
     ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    expect(screen.queryByRole("form")).not.toBeInTheDocument();
+    expect(mockCriarCentroCusto).not.toHaveBeenCalled();
   });
 
-  it("nenhum botão executa ação mutante, financeira ou de integração (criar, vincular, ativar, aprovar, salvar, importar, exportar, integrar, calcular ou ratear)", () => {
+  it("a lista é atualizada após criar um centro de custo", async () => {
+    mockSucesso([cc1]);
+    mockCriarCentroCusto.mockResolvedValue({
+      ...cc2,
+      id: "00000000-0000-0000-0000-000000000099",
+    });
+    mockListarCentrosCusto
+      .mockResolvedValueOnce({
+        itens: [cc1],
+        pagina: 1,
+        tamanhoPagina: 50,
+        total: 1,
+      } satisfies ResultadoPaginado<CentroCustoApi>)
+      .mockResolvedValue({
+        itens: [cc1, cc2],
+        pagina: 1,
+        tamanhoPagina: 50,
+        total: 2,
+      } satisfies ResultadoPaginado<CentroCustoApi>);
+
     render(<CentrosCustoScreen />);
+    await screen.findByRole("table", { name: "Centros de custo" });
 
-    const linha = screen.getByText("CC-2026-0001").closest("tr")!;
-    fireEvent.click(within(linha).getByRole("button", { name: /Ver detalhe/ }));
+    fireEvent.click(
+      screen.getAllByRole("button", { name: "Novo centro de custo" })[0]!,
+    );
+    const form = screen.getByRole("form", {
+      name: "Formulário de novo centro de custo",
+    });
+    fireEvent.change(within(form).getByLabelText("Código", { exact: false }), {
+      target: { value: "CC_OPS" },
+    });
+    fireEvent.change(within(form).getByLabelText("Nome", { exact: false }), {
+      target: { value: "Centro Operacional (teste)" },
+    });
+    fireEvent.click(within(form).getByRole("button", { name: "Salvar" }));
 
-    const rotulos = screen
-      .getAllByRole("button")
-      .map((botao) => botao.textContent?.toLowerCase() ?? "");
-
-    for (const rotulo of rotulos) {
-      expect(rotulo).not.toMatch(
-        /criar|vincular|ativar|aprovar|salvar|importar|exportar|integrar|calcular|ratear|excluir|editar/,
-      );
-    }
+    await waitFor(() => {
+      const tabela = screen.getByRole("table", { name: "Centros de custo" });
+      expect(within(tabela).getByText("CC_OPS")).toBeInTheDocument();
+    });
   });
 
-  it("não contém CPF, e-mail, IP, conta bancária, valor, orçamento ou dado pessoal real", () => {
+  it("não contém dados sensíveis, marca de terceiro ou valor financeiro", async () => {
+    mockSucesso();
     render(<CentrosCustoScreen />);
-
-    expect(document.querySelectorAll('input[type="file"]')).toHaveLength(0);
-    expect(document.querySelectorAll("a")).toHaveLength(0);
-    expect(document.querySelectorAll("img")).toHaveLength(0);
-    expect(document.querySelectorAll("iframe")).toHaveLength(0);
-    expect(document.querySelectorAll("form")).toHaveLength(0);
+    await screen.findByRole("table", { name: "Centros de custo" });
 
     const texto = document.body.innerHTML.toLowerCase();
     for (const termoProibido of [
-      "cpf",
-      "cnpj",
       "secullum",
       "rwtech",
       "bioprox",
       "reserva fiscal",
       "senha",
-      "sessão",
-      "telefone",
-      "conta bancária",
-      "orçamento real",
       "r$",
+      ".pdf",
       "localstorage",
-      "@",
-      "http://",
-      "https://",
+      "logradouro",
     ]) {
       expect(texto).not.toContain(termoProibido);
     }
   });
 
-  it("não declara conformidade com CLT, CCT, Portaria 671, LGPD ou eSocial", () => {
+  it("não declara conformidade com CLT, CCT/ACT, Portaria 671, LGPD ou eSocial", async () => {
+    mockSucesso();
     render(<CentrosCustoScreen />);
+    await screen.findByRole("table", { name: "Centros de custo" });
 
     const texto = document.body.innerHTML.toLowerCase();
     for (const termoProibido of [

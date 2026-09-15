@@ -314,6 +314,77 @@ export async function atualizarEquipe(
   return jsonOrThrow(res);
 }
 
+export interface CentroCustoApi {
+  id: string;
+  empresaId: string;
+  codigo: string;
+  nome: string;
+  status: string;
+  criadoEm: string;
+  atualizadoEm: string;
+}
+
+export interface ListarCentrosCustoQuery {
+  pagina?: number;
+  tamanhoPagina?: number;
+  status?: string;
+}
+
+export interface CriarCentroCustoDto {
+  codigo: string;
+  nome: string;
+  empresaId: string;
+}
+
+export interface AtualizarCentroCustoDto {
+  nome: string;
+}
+
+export async function listarEmpresasParaCentroCusto(): Promise<
+  ResultadoPaginado<EmpresaApi>
+> {
+  const res = await apiFetch("/empresas?tamanhoPagina=100");
+  return jsonOrThrow(res);
+}
+
+export async function listarCentrosCusto(
+  query: ListarCentrosCustoQuery = {},
+): Promise<ResultadoPaginado<CentroCustoApi>> {
+  const params = new URLSearchParams();
+  if (query.pagina !== undefined) params.set("pagina", String(query.pagina));
+  if (query.tamanhoPagina !== undefined)
+    params.set("tamanhoPagina", String(query.tamanhoPagina));
+  if (query.status) params.set("status", query.status);
+  const qs = params.toString();
+  const res = await apiFetch(`/centros-de-custo${qs ? `?${qs}` : ""}`);
+  return jsonOrThrow(res);
+}
+
+export async function criarCentroCusto(
+  dto: CriarCentroCustoDto,
+): Promise<CentroCustoApi> {
+  const token = await getCsrf();
+  const res = await apiFetch("/centros-de-custo", {
+    method: "POST",
+    headers: { "x-csrf-token": token },
+    body: JSON.stringify(dto),
+  });
+  return jsonOrThrow(res);
+}
+
+export async function atualizarCentroCusto(
+  id: string,
+  dto: AtualizarCentroCustoDto,
+): Promise<CentroCustoApi> {
+  const token = await getCsrf();
+  const res = await apiFetch(`/centros-de-custo/${id}`, {
+    method: "PATCH",
+    headers: { "x-csrf-token": token },
+    body: JSON.stringify(dto),
+  });
+  return jsonOrThrow(res);
+}
+
 export async function listarUnidades(
   query: ListarUnidadesQuery = {},
 ): Promise<ResultadoPaginado<UnidadeOrganizacionalApi>> {
