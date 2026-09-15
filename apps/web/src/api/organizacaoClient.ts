@@ -159,6 +159,77 @@ export async function atualizarDepartamento(
   return jsonOrThrow(res);
 }
 
+export interface AreaApi {
+  id: string;
+  departamentoId: string;
+  codigo: string;
+  nome: string;
+  status: string;
+  criadoEm: string;
+  atualizadoEm: string;
+}
+
+export interface ListarAreasQuery {
+  pagina?: number;
+  tamanhoPagina?: number;
+  status?: string;
+  departamentoId?: string;
+}
+
+export interface CriarAreaDto {
+  codigo: string;
+  nome: string;
+  departamentoId: string;
+}
+
+export interface AtualizarAreaDto {
+  nome: string;
+}
+
+export async function listarDepartamentosParaArea(): Promise<
+  ResultadoPaginado<DepartamentoApi>
+> {
+  const res = await apiFetch("/departamentos?tamanhoPagina=100");
+  return jsonOrThrow(res);
+}
+
+export async function listarAreas(
+  query: ListarAreasQuery = {},
+): Promise<ResultadoPaginado<AreaApi>> {
+  const params = new URLSearchParams();
+  if (query.pagina !== undefined) params.set("pagina", String(query.pagina));
+  if (query.tamanhoPagina !== undefined)
+    params.set("tamanhoPagina", String(query.tamanhoPagina));
+  if (query.status) params.set("status", query.status);
+  if (query.departamentoId) params.set("departamentoId", query.departamentoId);
+  const qs = params.toString();
+  const res = await apiFetch(`/areas${qs ? `?${qs}` : ""}`);
+  return jsonOrThrow(res);
+}
+
+export async function criarArea(dto: CriarAreaDto): Promise<AreaApi> {
+  const token = await getCsrf();
+  const res = await apiFetch("/areas", {
+    method: "POST",
+    headers: { "x-csrf-token": token },
+    body: JSON.stringify(dto),
+  });
+  return jsonOrThrow(res);
+}
+
+export async function atualizarArea(
+  id: string,
+  dto: AtualizarAreaDto,
+): Promise<AreaApi> {
+  const token = await getCsrf();
+  const res = await apiFetch(`/areas/${id}`, {
+    method: "PATCH",
+    headers: { "x-csrf-token": token },
+    body: JSON.stringify(dto),
+  });
+  return jsonOrThrow(res);
+}
+
 export async function listarUnidades(
   query: ListarUnidadesQuery = {},
 ): Promise<ResultadoPaginado<UnidadeOrganizacionalApi>> {
