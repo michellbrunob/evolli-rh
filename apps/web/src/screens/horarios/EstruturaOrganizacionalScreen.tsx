@@ -14,28 +14,37 @@ import {
   type AreaApi,
   type AtualizarAreaDto,
   type AtualizarDepartamentoDto,
+  type AtualizarEquipeDto,
   type AtualizarUnidadeDto,
   type CriarAreaDto,
   type CriarDepartamentoDto,
+  type CriarEquipeDto,
   type CriarUnidadeDto,
   type DepartamentoApi,
+  type EquipeApi,
   type EmpresaApi,
   type ListarAreasQuery,
   type ListarDepartamentosQuery,
+  type ListarEquipesQuery,
   type ListarUnidadesQuery,
   type UnidadeOrganizacionalApi,
   atualizarArea,
   atualizarDepartamento,
+  atualizarEquipe,
   atualizarUnidade,
   criarArea,
   criarDepartamento,
+  criarEquipe,
   criarUnidade,
   listarAreas,
   listarDepartamentos,
   listarDepartamentosParaArea,
+  listarDepartamentosParaEquipe,
   listarEmpresas,
   listarEmpresasMulti,
+  listarEquipes,
   listarUnidades,
+  listarUnidadesParaEquipe,
 } from "../../api/organizacaoClient";
 import "./EstruturaOrganizacionalScreen.css";
 
@@ -55,7 +64,7 @@ const ROTULO_STATUS: Record<string, string> = {
 };
 
 type StatusFiltro = "todos" | "ativo" | "inativo";
-type AbaAtiva = "unidades" | "departamentos" | "areas";
+type AbaAtiva = "unidades" | "departamentos" | "areas" | "equipes";
 
 interface FormularioErros {
   codigo?: string;
@@ -109,6 +118,25 @@ interface FormularioAreaState {
   salvando: boolean;
 }
 
+interface FormularioEquipeErros {
+  departamentoId?: string;
+  codigo?: string;
+  nome?: string;
+  geral?: string;
+}
+
+interface FormularioEquipeState {
+  modo: "criar" | "editar";
+  equipeId?: string;
+  codigoAtual?: string;
+  codigo: string;
+  nome: string;
+  departamentoId: string;
+  unidadeOrganizacionalId: string;
+  erros: FormularioEquipeErros;
+  salvando: boolean;
+}
+
 export function EstruturaOrganizacionalScreen() {
   const [statusCarregamento, setStatusCarregamento] = useState<
     "carregando" | "erro" | "dados"
@@ -144,6 +172,22 @@ export function EstruturaOrganizacionalScreen() {
   const [formularioArea, setFormularioArea] =
     useState<FormularioAreaState | null>(null);
   const formAreaTituloId = useId();
+
+  const [statusEquipeCarregamento, setStatusEquipeCarregamento] = useState<
+    "carregando" | "erro" | "dados"
+  >("carregando");
+  const [equipes, setEquipes] = useState<EquipeApi[]>([]);
+  const [departamentosEquipe, setDepartamentosEquipe] = useState<
+    DepartamentoApi[]
+  >([]);
+  const [unidadesEquipe, setUnidadesEquipe] = useState<
+    UnidadeOrganizacionalApi[]
+  >([]);
+  const [filtroEquipeStatus, setFiltroEquipeStatus] =
+    useState<StatusFiltro>("todos");
+  const [formularioEquipe, setFormularioEquipe] =
+    useState<FormularioEquipeState | null>(null);
+  const formEquipeTituloId = useId();
 
   const carregarDados = useCallback(async (status: StatusFiltro) => {
     setStatusCarregamento("carregando");
@@ -211,6 +255,31 @@ export function EstruturaOrganizacionalScreen() {
       void carregarAreas(filtroAreaStatus);
     }
   }, [abaAtiva, filtroAreaStatus, carregarAreas]);
+
+  const carregarEquipes = useCallback(async (status: StatusFiltro) => {
+    setStatusEquipeCarregamento("carregando");
+    try {
+      const query: ListarEquipesQuery = {};
+      if (status !== "todos") query.status = status;
+      const [depsResp, unidsResp, equipesResp] = await Promise.all([
+        listarDepartamentosParaEquipe(),
+        listarUnidadesParaEquipe(),
+        listarEquipes(query),
+      ]);
+      setDepartamentosEquipe(depsResp.itens);
+      setUnidadesEquipe(unidsResp.itens);
+      setEquipes(equipesResp.itens);
+      setStatusEquipeCarregamento("dados");
+    } catch {
+      setStatusEquipeCarregamento("erro");
+    }
+  }, []);
+
+  useEffect(() => {
+    if (abaAtiva === "equipes") {
+      void carregarEquipes(filtroEquipeStatus);
+    }
+  }, [abaAtiva, filtroEquipeStatus, carregarEquipes]);
 
   function abrirCriar() {
     setFormulario({
@@ -429,6 +498,113 @@ export function EstruturaOrganizacionalScreen() {
     setFormularioArea(null);
   }
 
+  const departamentosAtivosEquipe = departamentosEquipe.filter(
+    (d) => d.status === "ativo",
+  );
+  const unidadesAtivasEquipe = unidadesEquipe.filter(
+    (u) => u.status === "ativo",
+  );
+  const podeCriarEquipe =
+    statusEquipeCarregamento === "dados" &&
+    departamentosAtivosEquipe.length > 0;
+
+  function abrirCriarEquipe() {
+    setFormularioEquipe({
+      modo: "criar",
+      codigo: "",
+      nome: "",
+      departamentoId:
+        departamentosAtivosEquipe.length === 1
+          ? (departamentosAtivosEquipe[0]?.id ?? "")
+          : "",
+      unidadeOrganizacionalId: "",
+      erros: {},
+      salvando: false,
+    });
+  }
+
+  function abrirEditarEquipe(equipe: EquipeApi) {
+    setFormularioEquipe({
+      modo: "editar",
+      equipeId: equipe.id,
+      codigoAtual: equipe.codigo,
+      codigo: "",
+      nome: equipe.nome,
+      departamentoId: equipe.departamentoId,
+      unidadeOrganizacionalId: equipe.unidadeOrganizacionalId ?? "",
+      erros: {},
+      salvando: false,
+    });
+  }
+
+  function fecharFormularioEquipe() {
+    setFormularioEquipe(null);
+  }
+
+  async function handleSubmitEquipe(evento: React.FormEvent) {
+    evento.preventDefault();
+    if (!formularioEquipe) return;
+
+    const erros: FormularioEquipeErros = {};
+    if (formularioEquipe.modo === "criar") {
+      if (
+        departamentosAtivosEquipe.length > 1 &&
+        !formularioEquipe.departamentoId
+      ) {
+        erros.departamentoId = "Selecione o departamento.";
+      }
+      const erroCodigo = validarCodigo(formularioEquipe.codigo);
+      if (erroCodigo) erros.codigo = erroCodigo;
+    }
+    const erroNome = validarNome(formularioEquipe.nome);
+    if (erroNome) erros.nome = erroNome;
+
+    if (erros.departamentoId ?? erros.codigo ?? erros.nome) {
+      setFormularioEquipe((prev) => (prev ? { ...prev, erros } : prev));
+      return;
+    }
+
+    setFormularioEquipe((prev) =>
+      prev ? { ...prev, salvando: true, erros: {} } : prev,
+    );
+
+    try {
+      if (formularioEquipe.modo === "criar") {
+        const dto: CriarEquipeDto = {
+          codigo: formularioEquipe.codigo.trim(),
+          nome: formularioEquipe.nome.trim(),
+          departamentoId: formularioEquipe.departamentoId,
+          ...(formularioEquipe.unidadeOrganizacionalId
+            ? {
+                unidadeOrganizacionalId:
+                  formularioEquipe.unidadeOrganizacionalId,
+              }
+            : {}),
+        };
+        await criarEquipe(dto);
+      } else {
+        const dto: AtualizarEquipeDto = { nome: formularioEquipe.nome.trim() };
+        await atualizarEquipe(formularioEquipe.equipeId!, dto);
+      }
+      setFormularioEquipe(null);
+      await carregarEquipes(filtroEquipeStatus);
+    } catch (err: unknown) {
+      const mensagem =
+        err instanceof Error
+          ? err.message
+          : "Não foi possível salvar. Tente novamente.";
+      setFormularioEquipe((prev) =>
+        prev
+          ? {
+              ...prev,
+              salvando: false,
+              erros: { ...prev.erros, geral: mensagem },
+            }
+          : prev,
+      );
+    }
+  }
+
   async function handleSubmitArea(evento: React.FormEvent) {
     evento.preventDefault();
     if (!formularioArea) return;
@@ -578,13 +754,61 @@ export function EstruturaOrganizacionalScreen() {
     },
   ];
 
+  const colunasEquipe: DataTableColumn<EquipeApi>[] = [
+    {
+      key: "codigo",
+      header: "Código",
+      cell: (linha) => <code>{linha.codigo}</code>,
+    },
+    { key: "nome", header: "Nome", cell: (linha) => linha.nome },
+    {
+      key: "departamento",
+      header: "Departamento",
+      cell: (linha) => {
+        const dep = departamentosEquipe.find(
+          (d) => d.id === linha.departamentoId,
+        );
+        return dep ? <code>{dep.codigo}</code> : "—";
+      },
+    },
+    {
+      key: "unidade",
+      header: "Unidade",
+      cell: (linha) => {
+        if (!linha.unidadeOrganizacionalId) return "—";
+        const unid = unidadesEquipe.find(
+          (u) => u.id === linha.unidadeOrganizacionalId,
+        );
+        return unid ? <code>{unid.codigo}</code> : "—";
+      },
+    },
+    {
+      key: "situacao",
+      header: "Situação",
+      cell: (linha) => (
+        <StatusBadge variant={VARIANTE_STATUS[linha.status] ?? "neutral"}>
+          {ROTULO_STATUS[linha.status] ?? linha.status}
+        </StatusBadge>
+      ),
+    },
+    {
+      key: "acoes",
+      header: "Ações",
+      cell: (linha) => (
+        <Button variant="secondary" onClick={() => abrirEditarEquipe(linha)}>
+          Editar
+        </Button>
+      ),
+    },
+  ];
+
   return (
     <div className="estrutura-organizacional-screen">
       <PageHeader
         headingLevel={1}
         titleId={ESTRUTURA_ORGANIZACIONAL_TITULO_ID}
         title="Estrutura organizacional"
-        description="Gerencie as unidades, departamentos e áreas organizacionais da sua empresa: cadastre, consulte e edite as referências de estrutura dentro do seu escopo."
+        description="Gerencie as unidades, departamentos, áreas e equipes organizacionais da sua empresa: cadastre, consulte e edite as referências de estrutura dentro do seu escopo."
         actions={
           abaAtiva === "unidades" ? (
             <Button
@@ -597,9 +821,13 @@ export function EstruturaOrganizacionalScreen() {
             <Button onClick={abrirCriarDep} disabled={!podeCriarDep}>
               Novo departamento
             </Button>
-          ) : (
+          ) : abaAtiva === "areas" ? (
             <Button onClick={abrirCriarArea} disabled={!podeCriarArea}>
               Nova área
+            </Button>
+          ) : (
+            <Button onClick={abrirCriarEquipe} disabled={!podeCriarEquipe}>
+              Nova equipe
             </Button>
           )
         }
@@ -633,9 +861,9 @@ export function EstruturaOrganizacionalScreen() {
           id="estrutura-organizacional-aviso-auditado-titulo"
           className="estrutura-organizacional-screen__aviso-texto"
         >
-          Cadastros e edições de unidades, departamentos e áreas organizacionais
-          geram trilha de auditoria automática. Não é possível excluir — apenas
-          inativar.
+          Cadastros e edições de unidades, departamentos, áreas e equipes
+          organizacionais geram trilha de auditoria automática. Não é possível
+          excluir — apenas inativar.
         </p>
       </Surface>
 
@@ -670,6 +898,15 @@ export function EstruturaOrganizacionalScreen() {
           onClick={() => setAbaAtiva("areas")}
         >
           Áreas
+        </button>
+        <button
+          role="tab"
+          type="button"
+          className={`estrutura-organizacional-screen__aba${abaAtiva === "equipes" ? " estrutura-organizacional-screen__aba--ativa" : ""}`}
+          aria-selected={abaAtiva === "equipes"}
+          onClick={() => setAbaAtiva("equipes")}
+        >
+          Equipes
         </button>
       </div>
 
@@ -839,19 +1076,102 @@ export function EstruturaOrganizacionalScreen() {
             )}
           </section>
         )
-      ) : statusAreaCarregamento === "erro" ? (
+      ) : abaAtiva === "areas" ? (
+        statusAreaCarregamento === "erro" ? (
+          <Surface
+            as="section"
+            padding="lg"
+            className="estrutura-organizacional-screen__erro"
+            aria-labelledby="estrutura-area-erro-titulo"
+          >
+            <StatusBadge variant="danger">Erro</StatusBadge>
+            <h2
+              id="estrutura-area-erro-titulo"
+              className="estrutura-organizacional-screen__section-title"
+            >
+              Não foi possível carregar as áreas
+            </h2>
+            <p>
+              Verifique sua conexão e tente novamente. Se o problema persistir,
+              contate o suporte.
+            </p>
+            <Button
+              variant="secondary"
+              onClick={() => void carregarAreas(filtroAreaStatus)}
+            >
+              Tentar novamente
+            </Button>
+          </Surface>
+        ) : (
+          <section aria-labelledby="estrutura-area-lista-titulo">
+            <h2
+              id="estrutura-area-lista-titulo"
+              className="estrutura-organizacional-screen__section-title"
+            >
+              Áreas
+            </h2>
+
+            <div className="estrutura-organizacional-screen__filtros">
+              <FormField id="estrutura-area-filtro-status" label="Situação">
+                {(control) => (
+                  <select
+                    value={filtroAreaStatus}
+                    onChange={(evento) =>
+                      setFiltroAreaStatus(evento.target.value as StatusFiltro)
+                    }
+                    disabled={statusAreaCarregamento === "carregando"}
+                    {...control}
+                  >
+                    <option value="todos">Todas as situações</option>
+                    <option value="ativo">Ativa</option>
+                    <option value="inativo">Inativa</option>
+                  </select>
+                )}
+              </FormField>
+            </div>
+
+            {statusAreaCarregamento === "carregando" ? (
+              <p
+                className="estrutura-organizacional-screen__carregando"
+                role="status"
+              >
+                Carregando áreas…
+              </p>
+            ) : areas.length === 0 ? (
+              <EmptyState
+                headingLevel={3}
+                icon="—"
+                title="Nenhuma área cadastrada"
+                description="Cadastre a primeira área para um departamento desta empresa."
+                action={
+                  podeCriarArea ? (
+                    <Button onClick={abrirCriarArea}>Nova área</Button>
+                  ) : undefined
+                }
+              />
+            ) : (
+              <DataTable
+                caption="Áreas"
+                columns={colunasArea}
+                rows={areas}
+                rowKey={(linha) => linha.id}
+              />
+            )}
+          </section>
+        )
+      ) : statusEquipeCarregamento === "erro" ? (
         <Surface
           as="section"
           padding="lg"
           className="estrutura-organizacional-screen__erro"
-          aria-labelledby="estrutura-area-erro-titulo"
+          aria-labelledby="estrutura-equipe-erro-titulo"
         >
           <StatusBadge variant="danger">Erro</StatusBadge>
           <h2
-            id="estrutura-area-erro-titulo"
+            id="estrutura-equipe-erro-titulo"
             className="estrutura-organizacional-screen__section-title"
           >
-            Não foi possível carregar as áreas
+            Não foi possível carregar as equipes
           </h2>
           <p>
             Verifique sua conexão e tente novamente. Se o problema persistir,
@@ -859,29 +1179,29 @@ export function EstruturaOrganizacionalScreen() {
           </p>
           <Button
             variant="secondary"
-            onClick={() => void carregarAreas(filtroAreaStatus)}
+            onClick={() => void carregarEquipes(filtroEquipeStatus)}
           >
             Tentar novamente
           </Button>
         </Surface>
       ) : (
-        <section aria-labelledby="estrutura-area-lista-titulo">
+        <section aria-labelledby="estrutura-equipe-lista-titulo">
           <h2
-            id="estrutura-area-lista-titulo"
+            id="estrutura-equipe-lista-titulo"
             className="estrutura-organizacional-screen__section-title"
           >
-            Áreas
+            Equipes
           </h2>
 
           <div className="estrutura-organizacional-screen__filtros">
-            <FormField id="estrutura-area-filtro-status" label="Situação">
+            <FormField id="estrutura-equipe-filtro-status" label="Situação">
               {(control) => (
                 <select
-                  value={filtroAreaStatus}
+                  value={filtroEquipeStatus}
                   onChange={(evento) =>
-                    setFiltroAreaStatus(evento.target.value as StatusFiltro)
+                    setFiltroEquipeStatus(evento.target.value as StatusFiltro)
                   }
-                  disabled={statusAreaCarregamento === "carregando"}
+                  disabled={statusEquipeCarregamento === "carregando"}
                   {...control}
                 >
                   <option value="todos">Todas as situações</option>
@@ -892,30 +1212,30 @@ export function EstruturaOrganizacionalScreen() {
             </FormField>
           </div>
 
-          {statusAreaCarregamento === "carregando" ? (
+          {statusEquipeCarregamento === "carregando" ? (
             <p
               className="estrutura-organizacional-screen__carregando"
               role="status"
             >
-              Carregando áreas…
+              Carregando equipes…
             </p>
-          ) : areas.length === 0 ? (
+          ) : equipes.length === 0 ? (
             <EmptyState
               headingLevel={3}
               icon="—"
-              title="Nenhuma área cadastrada"
-              description="Cadastre a primeira área para um departamento desta empresa."
+              title="Nenhuma equipe cadastrada"
+              description="Cadastre a primeira equipe para um departamento desta empresa."
               action={
-                podeCriarArea ? (
-                  <Button onClick={abrirCriarArea}>Nova área</Button>
+                podeCriarEquipe ? (
+                  <Button onClick={abrirCriarEquipe}>Nova equipe</Button>
                 ) : undefined
               }
             />
           ) : (
             <DataTable
-              caption="Áreas"
-              columns={colunasArea}
-              rows={areas}
+              caption="Equipes"
+              columns={colunasEquipe}
+              rows={equipes}
               rowKey={(linha) => linha.id}
             />
           )}
@@ -1200,6 +1520,202 @@ export function EstruturaOrganizacionalScreen() {
                 disabled={formularioDep.salvando}
               >
                 {formularioDep.salvando ? "Salvando…" : "Salvar"}
+              </Button>
+            </FormActions>
+          </form>
+        </Surface>
+      ) : null}
+
+      {formularioEquipe ? (
+        <Surface
+          as="section"
+          padding="lg"
+          className="estrutura-organizacional-screen__formulario"
+          aria-labelledby={formEquipeTituloId}
+        >
+          <h2
+            id={formEquipeTituloId}
+            className="estrutura-organizacional-screen__section-title"
+          >
+            {formularioEquipe.modo === "criar"
+              ? "Nova equipe"
+              : "Editar equipe"}
+          </h2>
+
+          <form
+            className="estrutura-organizacional-screen__form"
+            aria-label={
+              formularioEquipe.modo === "criar"
+                ? "Formulário de nova equipe"
+                : "Formulário de edição de equipe"
+            }
+            onSubmit={(e) => void handleSubmitEquipe(e)}
+          >
+            {formularioEquipe.modo === "criar" &&
+            departamentosAtivosEquipe.length > 1 ? (
+              <FormField
+                id="estrutura-equipe-departamento"
+                label="Departamento"
+                required
+                {...(formularioEquipe.erros.departamentoId
+                  ? { error: formularioEquipe.erros.departamentoId }
+                  : {})}
+              >
+                {(control) => (
+                  <select
+                    value={formularioEquipe.departamentoId}
+                    onChange={(e) =>
+                      setFormularioEquipe((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              departamentoId: e.target.value,
+                              erros: {},
+                            }
+                          : prev,
+                      )
+                    }
+                    {...control}
+                  >
+                    <option value="">Selecione o departamento</option>
+                    {departamentosAtivosEquipe.map((dep) => (
+                      <option key={dep.id} value={dep.id}>
+                        {dep.codigo} — {dep.nome}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </FormField>
+            ) : null}
+
+            {formularioEquipe.modo === "criar" ? (
+              <FormField
+                id="estrutura-equipe-codigo"
+                label="Código"
+                required
+                help="Letras maiúsculas, dígitos e _ (2 a 32 caracteres). Imutável após o cadastro."
+                {...(formularioEquipe.erros.codigo
+                  ? { error: formularioEquipe.erros.codigo }
+                  : {})}
+              >
+                {(control) => (
+                  <input
+                    type="text"
+                    maxLength={32}
+                    placeholder="Ex.: EQUIPE_TI"
+                    value={formularioEquipe.codigo}
+                    onChange={(e) =>
+                      setFormularioEquipe((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              codigo: e.target.value.toUpperCase(),
+                              erros: {},
+                            }
+                          : prev,
+                      )
+                    }
+                    {...control}
+                  />
+                )}
+              </FormField>
+            ) : (
+              <FormField id="estrutura-equipe-codigo-fixo" label="Código">
+                {(control) => (
+                  <input
+                    type="text"
+                    readOnly
+                    value={formularioEquipe.codigoAtual ?? ""}
+                    aria-readonly="true"
+                    {...control}
+                  />
+                )}
+              </FormField>
+            )}
+
+            <FormField
+              id="estrutura-equipe-nome"
+              label="Nome"
+              required
+              help="Identificador da equipe. Máximo 160 caracteres."
+              {...(formularioEquipe.erros.nome
+                ? { error: formularioEquipe.erros.nome }
+                : {})}
+            >
+              {(control) => (
+                <input
+                  type="text"
+                  maxLength={160}
+                  value={formularioEquipe.nome}
+                  onChange={(e) =>
+                    setFormularioEquipe((prev) =>
+                      prev
+                        ? { ...prev, nome: e.target.value, erros: {} }
+                        : prev,
+                    )
+                  }
+                  {...control}
+                />
+              )}
+            </FormField>
+
+            {formularioEquipe.modo === "criar" ? (
+              <FormField
+                id="estrutura-equipe-unidade"
+                label="Unidade (opcional)"
+                help="Vincule a equipe a uma unidade organizacional, se aplicável."
+              >
+                {(control) => (
+                  <select
+                    value={formularioEquipe.unidadeOrganizacionalId}
+                    onChange={(e) =>
+                      setFormularioEquipe((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              unidadeOrganizacionalId: e.target.value,
+                              erros: {},
+                            }
+                          : prev,
+                      )
+                    }
+                    {...control}
+                  >
+                    <option value="">Sem unidade</option>
+                    {unidadesAtivasEquipe.map((unid) => (
+                      <option key={unid.id} value={unid.id}>
+                        {unid.codigo} — {unid.nome}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </FormField>
+            ) : null}
+
+            {formularioEquipe.erros.geral ? (
+              <p
+                className="estrutura-organizacional-screen__form-erro"
+                role="alert"
+              >
+                {formularioEquipe.erros.geral}
+              </p>
+            ) : null}
+
+            <FormActions>
+              <Button
+                variant="secondary"
+                type="button"
+                onClick={fecharFormularioEquipe}
+                disabled={formularioEquipe.salvando}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                disabled={formularioEquipe.salvando}
+              >
+                {formularioEquipe.salvando ? "Salvando…" : "Salvar"}
               </Button>
             </FormActions>
           </form>

@@ -230,6 +230,90 @@ export async function atualizarArea(
   return jsonOrThrow(res);
 }
 
+export interface EquipeApi {
+  id: string;
+  empresaId: string;
+  departamentoId: string;
+  unidadeOrganizacionalId: string | null;
+  codigo: string;
+  nome: string;
+  status: string;
+  criadoEm: string;
+  atualizadoEm: string;
+}
+
+export interface ListarEquipesQuery {
+  pagina?: number;
+  tamanhoPagina?: number;
+  status?: string;
+  departamentoId?: string;
+  unidadeOrganizacionalId?: string;
+}
+
+export interface CriarEquipeDto {
+  codigo: string;
+  nome: string;
+  departamentoId: string;
+  unidadeOrganizacionalId?: string;
+}
+
+export interface AtualizarEquipeDto {
+  nome: string;
+}
+
+export async function listarDepartamentosParaEquipe(): Promise<
+  ResultadoPaginado<DepartamentoApi>
+> {
+  const res = await apiFetch("/departamentos?tamanhoPagina=100");
+  return jsonOrThrow(res);
+}
+
+export async function listarUnidadesParaEquipe(): Promise<
+  ResultadoPaginado<UnidadeOrganizacionalApi>
+> {
+  const res = await apiFetch("/unidades-organizacionais?tamanhoPagina=100");
+  return jsonOrThrow(res);
+}
+
+export async function listarEquipes(
+  query: ListarEquipesQuery = {},
+): Promise<ResultadoPaginado<EquipeApi>> {
+  const params = new URLSearchParams();
+  if (query.pagina !== undefined) params.set("pagina", String(query.pagina));
+  if (query.tamanhoPagina !== undefined)
+    params.set("tamanhoPagina", String(query.tamanhoPagina));
+  if (query.status) params.set("status", query.status);
+  if (query.departamentoId) params.set("departamentoId", query.departamentoId);
+  if (query.unidadeOrganizacionalId)
+    params.set("unidadeOrganizacionalId", query.unidadeOrganizacionalId);
+  const qs = params.toString();
+  const res = await apiFetch(`/equipes${qs ? `?${qs}` : ""}`);
+  return jsonOrThrow(res);
+}
+
+export async function criarEquipe(dto: CriarEquipeDto): Promise<EquipeApi> {
+  const token = await getCsrf();
+  const res = await apiFetch("/equipes", {
+    method: "POST",
+    headers: { "x-csrf-token": token },
+    body: JSON.stringify(dto),
+  });
+  return jsonOrThrow(res);
+}
+
+export async function atualizarEquipe(
+  id: string,
+  dto: AtualizarEquipeDto,
+): Promise<EquipeApi> {
+  const token = await getCsrf();
+  const res = await apiFetch(`/equipes/${id}`, {
+    method: "PATCH",
+    headers: { "x-csrf-token": token },
+    body: JSON.stringify(dto),
+  });
+  return jsonOrThrow(res);
+}
+
 export async function listarUnidades(
   query: ListarUnidadesQuery = {},
 ): Promise<ResultadoPaginado<UnidadeOrganizacionalApi>> {
