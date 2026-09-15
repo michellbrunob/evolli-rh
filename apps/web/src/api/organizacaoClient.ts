@@ -83,8 +83,79 @@ async function jsonOrThrow<T>(res: Response): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+export interface DepartamentoApi {
+  id: string;
+  codigo: string;
+  nome: string;
+  empresaId: string;
+  status: string;
+  criadoEm: string;
+  atualizadoEm: string;
+}
+
+export interface ListarDepartamentosQuery {
+  pagina?: number;
+  tamanhoPagina?: number;
+  status?: string;
+}
+
+export interface CriarDepartamentoDto {
+  codigo: string;
+  nome: string;
+  empresaId: string;
+}
+
+export interface AtualizarDepartamentoDto {
+  nome: string;
+}
+
 export async function listarEmpresas(): Promise<ResultadoPaginado<EmpresaApi>> {
   const res = await apiFetch("/empresas?tamanhoPagina=1");
+  return jsonOrThrow(res);
+}
+
+export async function listarEmpresasMulti(): Promise<
+  ResultadoPaginado<EmpresaApi>
+> {
+  const res = await apiFetch("/empresas?tamanhoPagina=100");
+  return jsonOrThrow(res);
+}
+
+export async function listarDepartamentos(
+  query: ListarDepartamentosQuery = {},
+): Promise<ResultadoPaginado<DepartamentoApi>> {
+  const params = new URLSearchParams();
+  if (query.pagina !== undefined) params.set("pagina", String(query.pagina));
+  if (query.tamanhoPagina !== undefined)
+    params.set("tamanhoPagina", String(query.tamanhoPagina));
+  if (query.status) params.set("status", query.status);
+  const qs = params.toString();
+  const res = await apiFetch(`/departamentos${qs ? `?${qs}` : ""}`);
+  return jsonOrThrow(res);
+}
+
+export async function criarDepartamento(
+  dto: CriarDepartamentoDto,
+): Promise<DepartamentoApi> {
+  const token = await getCsrf();
+  const res = await apiFetch("/departamentos", {
+    method: "POST",
+    headers: { "x-csrf-token": token },
+    body: JSON.stringify(dto),
+  });
+  return jsonOrThrow(res);
+}
+
+export async function atualizarDepartamento(
+  id: string,
+  dto: AtualizarDepartamentoDto,
+): Promise<DepartamentoApi> {
+  const token = await getCsrf();
+  const res = await apiFetch(`/departamentos/${id}`, {
+    method: "PATCH",
+    headers: { "x-csrf-token": token },
+    body: JSON.stringify(dto),
+  });
   return jsonOrThrow(res);
 }
 

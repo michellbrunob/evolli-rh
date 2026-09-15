@@ -7,6 +7,7 @@ import {
 } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
+  DepartamentoApi,
   EmpresaApi,
   ResultadoPaginado,
   UnidadeOrganizacionalApi,
@@ -16,9 +17,13 @@ import { EstruturaOrganizacionalScreen } from "./EstruturaOrganizacionalScreen";
 vi.mock("../../api/organizacaoClient");
 
 import {
+  atualizarDepartamento,
   atualizarUnidade,
+  criarDepartamento,
   criarUnidade,
+  listarDepartamentos,
   listarEmpresas,
+  listarEmpresasMulti,
   listarUnidades,
 } from "../../api/organizacaoClient";
 
@@ -26,12 +31,43 @@ const mockListarEmpresas = vi.mocked(listarEmpresas);
 const mockListarUnidades = vi.mocked(listarUnidades);
 const mockCriarUnidade = vi.mocked(criarUnidade);
 const mockAtualizarUnidade = vi.mocked(atualizarUnidade);
+const mockListarEmpresasMulti = vi.mocked(listarEmpresasMulti);
+const mockListarDepartamentos = vi.mocked(listarDepartamentos);
+const mockCriarDepartamento = vi.mocked(criarDepartamento);
+const mockAtualizarDepartamento = vi.mocked(atualizarDepartamento);
 
 const empresaFixture: EmpresaApi = {
   id: "00000000-0000-0000-0000-000000000001",
   codigo: "EMP-01",
   nome: "Empresa Exemplo (teste)",
   status: "ativo",
+};
+
+const empresa2Fixture: EmpresaApi = {
+  id: "00000000-0000-0000-0000-000000000002",
+  codigo: "EMP-02",
+  nome: "Empresa Dois (teste)",
+  status: "ativo",
+};
+
+const dep1: DepartamentoApi = {
+  id: "00000000-0000-0000-0000-000000000021",
+  codigo: "FIN",
+  nome: "Financeiro (teste)",
+  empresaId: empresaFixture.id,
+  status: "ativo",
+  criadoEm: "2026-01-01T00:00:00.000Z",
+  atualizadoEm: "2026-01-01T00:00:00.000Z",
+};
+
+const dep2: DepartamentoApi = {
+  id: "00000000-0000-0000-0000-000000000022",
+  codigo: "RH",
+  nome: "Recursos Humanos (teste)",
+  empresaId: empresaFixture.id,
+  status: "inativo",
+  criadoEm: "2026-01-01T00:00:00.000Z",
+  atualizadoEm: "2026-01-01T00:00:00.000Z",
 };
 
 const unidade1: UnidadeOrganizacionalApi = {
@@ -69,6 +105,28 @@ function mockSucesso(
     tamanhoPagina: 50,
     total: unidades.length,
   } satisfies ResultadoPaginado<UnidadeOrganizacionalApi>);
+}
+
+function mockSucessoDep(
+  deps: DepartamentoApi[] = [dep1, dep2],
+  empresas: EmpresaApi[] = [empresaFixture],
+) {
+  mockListarEmpresasMulti.mockResolvedValue({
+    itens: empresas,
+    pagina: 1,
+    tamanhoPagina: 100,
+    total: empresas.length,
+  } satisfies ResultadoPaginado<EmpresaApi>);
+  mockListarDepartamentos.mockResolvedValue({
+    itens: deps,
+    pagina: 1,
+    tamanhoPagina: 50,
+    total: deps.length,
+  } satisfies ResultadoPaginado<DepartamentoApi>);
+}
+
+async function ativarAbaDepartamentos() {
+  fireEvent.click(screen.getByRole("tab", { name: "Departamentos" }));
 }
 
 describe("EstruturaOrganizacionalScreen (T104 — funcional)", () => {
@@ -343,6 +401,371 @@ describe("EstruturaOrganizacionalScreen (T104 — funcional)", () => {
       "portaria 671",
       "lgpd",
       "esocial",
+    ]) {
+      expect(texto).not.toContain(termoProibido);
+    }
+  });
+
+  it("estrutura de abas é acessível: tablist com dois tabs, aba ativa marcada", async () => {
+    mockSucesso();
+    render(<EstruturaOrganizacionalScreen />);
+    await screen.findByRole("table", { name: "Unidades organizacionais" });
+
+    const tablist = screen.getByRole("tablist");
+    expect(tablist).toBeInTheDocument();
+
+    const tabs = within(tablist).getAllByRole("tab");
+    expect(tabs).toHaveLength(2);
+
+    const abaUnidades = within(tablist).getByRole("tab", { name: "Unidades" });
+    expect(abaUnidades).toHaveAttribute("aria-selected", "true");
+
+    const abaDeps = within(tablist).getByRole("tab", { name: "Departamentos" });
+    expect(abaDeps).toHaveAttribute("aria-selected", "false");
+  });
+});
+
+describe("EstruturaOrganizacionalScreen — Departamentos (T106)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("seleciona a aba Departamentos e exibe a lista", async () => {
+    mockSucesso();
+    mockSucessoDep();
+    render(<EstruturaOrganizacionalScreen />);
+    await screen.findByRole("table", { name: "Unidades organizacionais" });
+
+    await ativarAbaDepartamentos();
+
+    const tabela = await screen.findByRole("table", { name: "Departamentos" });
+    expect(within(tabela).getByText("FIN")).toBeInTheDocument();
+    expect(within(tabela).getByText("Financeiro (teste)")).toBeInTheDocument();
+    expect(within(tabela).getByText("RH")).toBeInTheDocument();
+    expect(
+      within(tabela).getByText("Recursos Humanos (teste)"),
+    ).toBeInTheDocument();
+    expect(
+      within(tabela).getAllByRole("button", { name: "Editar" }),
+    ).toHaveLength(2);
+  });
+
+  it("aba Departamentos marcada como ativa após seleção", async () => {
+    mockSucesso();
+    mockSucessoDep();
+    render(<EstruturaOrganizacionalScreen />);
+    await screen.findByRole("table", { name: "Unidades organizacionais" });
+
+    await ativarAbaDepartamentos();
+    await screen.findByRole("table", { name: "Departamentos" });
+
+    const tablist = screen.getByRole("tablist");
+    expect(
+      within(tablist).getByRole("tab", { name: "Departamentos" }),
+    ).toHaveAttribute("aria-selected", "true");
+    expect(
+      within(tablist).getByRole("tab", { name: "Unidades" }),
+    ).toHaveAttribute("aria-selected", "false");
+  });
+
+  it("exibe EmptyState quando não há departamentos cadastrados", async () => {
+    mockSucesso();
+    mockSucessoDep([]);
+    render(<EstruturaOrganizacionalScreen />);
+    await screen.findByRole("table", { name: "Unidades organizacionais" });
+
+    await ativarAbaDepartamentos();
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole("heading", {
+          name: "Nenhum departamento cadastrado",
+        }),
+      ).toBeInTheDocument(),
+    );
+    expect(
+      screen.queryByRole("table", { name: "Departamentos" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("exibe erro ao carregar departamentos e permite tentar novamente", async () => {
+    mockSucesso();
+    mockListarEmpresasMulti.mockRejectedValue(new Error("falha"));
+    mockListarDepartamentos.mockRejectedValue(new Error("falha"));
+    render(<EstruturaOrganizacionalScreen />);
+    await screen.findByRole("table", { name: "Unidades organizacionais" });
+
+    await ativarAbaDepartamentos();
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole("heading", {
+          name: "Não foi possível carregar os departamentos",
+        }),
+      ).toBeInTheDocument(),
+    );
+
+    mockSucessoDep();
+    fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
+
+    await screen.findByRole("table", { name: "Departamentos" });
+  });
+
+  it("abre formulário de criação, valida campos obrigatórios e salva via API", async () => {
+    mockSucesso();
+    mockSucessoDep([dep1]);
+    mockCriarDepartamento.mockResolvedValue({
+      ...dep1,
+      id: "00000000-0000-0000-0000-000000000099",
+      codigo: "MKT",
+      nome: "Marketing",
+    });
+    render(<EstruturaOrganizacionalScreen />);
+    await screen.findByRole("table", { name: "Unidades organizacionais" });
+
+    await ativarAbaDepartamentos();
+    await screen.findByRole("table", { name: "Departamentos" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Novo departamento" }));
+
+    const form = screen.getByRole("form", {
+      name: "Formulário de novo departamento",
+    });
+
+    fireEvent.click(within(form).getByRole("button", { name: "Salvar" }));
+    expect(
+      await screen.findByText("Código é obrigatório."),
+    ).toBeInTheDocument();
+
+    fireEvent.change(within(form).getByLabelText("Código", { exact: false }), {
+      target: { value: "MKT" },
+    });
+    fireEvent.change(within(form).getByLabelText("Nome", { exact: false }), {
+      target: { value: "Marketing" },
+    });
+    fireEvent.click(within(form).getByRole("button", { name: "Salvar" }));
+
+    await waitFor(() =>
+      expect(screen.queryByRole("form")).not.toBeInTheDocument(),
+    );
+    expect(mockCriarDepartamento).toHaveBeenCalledWith({
+      codigo: "MKT",
+      nome: "Marketing",
+      empresaId: empresaFixture.id,
+    });
+  });
+
+  it("código inválido no formulário de departamento exibe mensagem de erro", async () => {
+    mockSucesso();
+    mockSucessoDep([dep1]);
+    render(<EstruturaOrganizacionalScreen />);
+    await screen.findByRole("table", { name: "Unidades organizacionais" });
+
+    await ativarAbaDepartamentos();
+    await screen.findByRole("table", { name: "Departamentos" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Novo departamento" }));
+    const form = screen.getByRole("form", {
+      name: "Formulário de novo departamento",
+    });
+    fireEvent.change(within(form).getByLabelText("Código", { exact: false }), {
+      target: { value: "invalido com espaco" },
+    });
+    fireEvent.click(within(form).getByRole("button", { name: "Salvar" }));
+
+    expect(
+      await screen.findByText(
+        /Código deve conter apenas letras maiúsculas, dígitos e _/,
+      ),
+    ).toBeInTheDocument();
+    expect(mockCriarDepartamento).not.toHaveBeenCalled();
+  });
+
+  it("sem empresa selector quando há empresa única no criar", async () => {
+    mockSucesso();
+    mockSucessoDep([dep1], [empresaFixture]);
+    render(<EstruturaOrganizacionalScreen />);
+    await screen.findByRole("table", { name: "Unidades organizacionais" });
+
+    await ativarAbaDepartamentos();
+    await screen.findByRole("table", { name: "Departamentos" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Novo departamento" }));
+    const form = screen.getByRole("form", {
+      name: "Formulário de novo departamento",
+    });
+
+    expect(
+      within(form).queryByLabelText("Empresa", { exact: false }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("mostra selector de empresa quando há múltiplas empresas no criar", async () => {
+    mockSucesso();
+    mockSucessoDep([dep1], [empresaFixture, empresa2Fixture]);
+    render(<EstruturaOrganizacionalScreen />);
+    await screen.findByRole("table", { name: "Unidades organizacionais" });
+
+    await ativarAbaDepartamentos();
+    await screen.findByRole("table", { name: "Departamentos" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Novo departamento" }));
+    const form = screen.getByRole("form", {
+      name: "Formulário de novo departamento",
+    });
+
+    expect(
+      within(form).getByLabelText("Empresa", { exact: false }),
+    ).toBeInTheDocument();
+  });
+
+  it("abre formulário de edição com código somente leitura e empresa imutável", async () => {
+    mockSucesso();
+    mockSucessoDep();
+    mockAtualizarDepartamento.mockResolvedValue({
+      ...dep1,
+      nome: "Financeiro Atualizado",
+    });
+    mockListarDepartamentos.mockResolvedValue({
+      itens: [{ ...dep1, nome: "Financeiro Atualizado" }, dep2],
+      pagina: 1,
+      tamanhoPagina: 50,
+      total: 2,
+    } satisfies ResultadoPaginado<DepartamentoApi>);
+
+    render(<EstruturaOrganizacionalScreen />);
+    await screen.findByRole("table", { name: "Unidades organizacionais" });
+
+    await ativarAbaDepartamentos();
+    const tabela = await screen.findByRole("table", { name: "Departamentos" });
+
+    const linhaFin = within(tabela).getByText("FIN").closest("tr")!;
+    fireEvent.click(within(linhaFin).getByRole("button", { name: "Editar" }));
+
+    const form = screen.getByRole("form", {
+      name: "Formulário de edição de departamento",
+    });
+
+    const campoCodigo = within(form).getByLabelText("Código", { exact: false });
+    expect(campoCodigo).toHaveAttribute("readonly");
+    expect(campoCodigo).toHaveValue("FIN");
+
+    expect(
+      within(form).queryByLabelText("Empresa", { exact: false }),
+    ).not.toBeInTheDocument();
+
+    const campoNome = within(form).getByLabelText("Nome", { exact: false });
+    fireEvent.change(campoNome, { target: { value: "Financeiro Atualizado" } });
+    fireEvent.click(within(form).getByRole("button", { name: "Salvar" }));
+
+    await waitFor(() =>
+      expect(screen.queryByRole("form")).not.toBeInTheDocument(),
+    );
+    expect(mockAtualizarDepartamento).toHaveBeenCalledWith(dep1.id, {
+      nome: "Financeiro Atualizado",
+    });
+  });
+
+  it("a lista é atualizada após criar um departamento", async () => {
+    mockSucesso();
+    mockSucessoDep([dep1]);
+    const novoDep: DepartamentoApi = {
+      id: "00000000-0000-0000-0000-000000000099",
+      codigo: "GESTOR",
+      nome: "Gestores (teste)",
+      empresaId: empresaFixture.id,
+      status: "ativo",
+      criadoEm: "2026-01-01T00:00:00.000Z",
+      atualizadoEm: "2026-01-01T00:00:00.000Z",
+    };
+    mockCriarDepartamento.mockResolvedValue(novoDep);
+    render(<EstruturaOrganizacionalScreen />);
+    await screen.findByRole("table", { name: "Unidades organizacionais" });
+
+    await ativarAbaDepartamentos();
+    await screen.findByRole("table", { name: "Departamentos" });
+
+    mockListarDepartamentos.mockResolvedValue({
+      itens: [dep1, novoDep],
+      pagina: 1,
+      tamanhoPagina: 50,
+      total: 2,
+    } satisfies ResultadoPaginado<DepartamentoApi>);
+
+    fireEvent.click(screen.getByRole("button", { name: "Novo departamento" }));
+    const form = screen.getByRole("form", {
+      name: "Formulário de novo departamento",
+    });
+    fireEvent.change(within(form).getByLabelText("Código", { exact: false }), {
+      target: { value: "GESTOR" },
+    });
+    fireEvent.change(within(form).getByLabelText("Nome", { exact: false }), {
+      target: { value: "Gestores (teste)" },
+    });
+    fireEvent.click(within(form).getByRole("button", { name: "Salvar" }));
+
+    await waitFor(() => {
+      const tabela = screen.getByRole("table", { name: "Departamentos" });
+      expect(within(tabela).getByText("GESTOR")).toBeInTheDocument();
+    });
+  });
+
+  it("cancelar formulário de departamento fecha sem chamar a API", async () => {
+    mockSucesso();
+    mockSucessoDep([dep1]);
+    render(<EstruturaOrganizacionalScreen />);
+    await screen.findByRole("table", { name: "Unidades organizacionais" });
+
+    await ativarAbaDepartamentos();
+    await screen.findByRole("table", { name: "Departamentos" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Novo departamento" }));
+    expect(
+      screen.getByRole("form", { name: "Formulário de novo departamento" }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    expect(screen.queryByRole("form")).not.toBeInTheDocument();
+    expect(mockCriarDepartamento).not.toHaveBeenCalled();
+  });
+
+  it("não regressão — aba Unidades funciona após ativar e retornar da aba Departamentos", async () => {
+    mockSucesso();
+    mockSucessoDep();
+    render(<EstruturaOrganizacionalScreen />);
+    await screen.findByRole("table", { name: "Unidades organizacionais" });
+
+    await ativarAbaDepartamentos();
+    await screen.findByRole("table", { name: "Departamentos" });
+
+    fireEvent.click(screen.getByRole("tab", { name: "Unidades" }));
+
+    await screen.findByRole("table", { name: "Unidades organizacionais" });
+    expect(
+      screen.queryByRole("table", { name: "Departamentos" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("não contém razão social, CNPJ, nome de pessoa, endereço ou valor financeiro (departamentos)", async () => {
+    mockSucesso();
+    mockSucessoDep();
+    render(<EstruturaOrganizacionalScreen />);
+    await screen.findByRole("table", { name: "Unidades organizacionais" });
+
+    await ativarAbaDepartamentos();
+    await screen.findByRole("table", { name: "Departamentos" });
+
+    const texto = document.body.innerHTML.toLowerCase();
+    for (const termoProibido of [
+      "secullum",
+      "rwtech",
+      "bioprox",
+      "reserva fiscal",
+      "senha",
+      "r$",
+      ".pdf",
+      "localstorage",
+      "logradouro",
     ]) {
       expect(texto).not.toContain(termoProibido);
     }

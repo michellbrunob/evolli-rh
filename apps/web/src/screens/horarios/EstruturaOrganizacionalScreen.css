@@ -98,6 +98,35 @@
   color: var(--status-danger-ink);
 }
 
+/* Navegação por abas — Unidades / Departamentos */
+.estrutura-organizacional-screen__abas {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.estrutura-organizacional-screen__aba {
+  padding: var(--space-xs) var(--space-md);
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  background: none;
+  cursor: pointer;
+  color: var(--color-ink-subtle);
+  font-size: var(--text-body);
+  line-height: var(--leading-normal);
+}
+
+.estrutura-organizacional-screen__aba:hover {
+  color: var(--color-ink);
+}
+
+.estrutura-organizacional-screen__aba--ativa {
+  color: var(--color-action);
+  border-bottom-color: var(--color-action);
+  font-weight: var(--weight-strong);
+}
+
 @media (max-width: 640px) {
   .estrutura-organizacional-screen__filtros {
     flex-direction: column;
