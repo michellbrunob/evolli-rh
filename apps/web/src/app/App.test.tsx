@@ -77,11 +77,7 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
         name: "Estrutura organizacional",
       }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", {
-        name: "Itens da estrutura organizacional",
-      }),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Somente RH")).toBeInTheDocument();
 
     const main = screen.getByRole("main");
     const rotuloId = main.getAttribute("aria-labelledby");

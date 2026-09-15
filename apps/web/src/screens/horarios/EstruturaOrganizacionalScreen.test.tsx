@@ -1,244 +1,319 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type {
+  EmpresaApi,
+  ResultadoPaginado,
+  UnidadeOrganizacionalApi,
+} from "../../api/organizacaoClient";
 import { EstruturaOrganizacionalScreen } from "./EstruturaOrganizacionalScreen";
 
-describe("EstruturaOrganizacionalScreen (T073 — tela visual estática)", () => {
-  it("tem um único h1", () => {
-    render(<EstruturaOrganizacionalScreen />);
+vi.mock("../../api/organizacaoClient");
 
-    expect(
-      screen.getAllByRole("heading", {
-        level: 1,
-        name: "Estrutura organizacional",
-      }),
-    ).toHaveLength(1);
+import {
+  atualizarUnidade,
+  criarUnidade,
+  listarEmpresas,
+  listarUnidades,
+} from "../../api/organizacaoClient";
+
+const mockListarEmpresas = vi.mocked(listarEmpresas);
+const mockListarUnidades = vi.mocked(listarUnidades);
+const mockCriarUnidade = vi.mocked(criarUnidade);
+const mockAtualizarUnidade = vi.mocked(atualizarUnidade);
+
+const empresaFixture: EmpresaApi = {
+  id: "00000000-0000-0000-0000-000000000001",
+  codigo: "EMP-01",
+  nome: "Empresa Exemplo (teste)",
+  status: "ativa",
+};
+
+const unidade1: UnidadeOrganizacionalApi = {
+  id: "00000000-0000-0000-0000-000000000011",
+  codigo: "UNID_SP",
+  nome: "Unidade São Paulo (teste)",
+  empresaId: empresaFixture.id,
+  status: "ativa",
+  criadoEm: "2026-01-01T00:00:00.000Z",
+  atualizadoEm: "2026-01-01T00:00:00.000Z",
+};
+
+const unidade2: UnidadeOrganizacionalApi = {
+  id: "00000000-0000-0000-0000-000000000012",
+  codigo: "UNID_RJ",
+  nome: "Unidade Rio de Janeiro (teste)",
+  empresaId: empresaFixture.id,
+  status: "inativa",
+  criadoEm: "2026-01-01T00:00:00.000Z",
+  atualizadoEm: "2026-01-01T00:00:00.000Z",
+};
+
+function mockSucesso(
+  unidades: UnidadeOrganizacionalApi[] = [unidade1, unidade2],
+) {
+  mockListarEmpresas.mockResolvedValue({
+    itens: [empresaFixture],
+    pagina: 1,
+    tamanhoPagina: 1,
+    total: 1,
+  } satisfies ResultadoPaginado<EmpresaApi>);
+  mockListarUnidades.mockResolvedValue({
+    itens: unidades,
+    pagina: 1,
+    tamanhoPagina: 50,
+    total: unidades.length,
+  } satisfies ResultadoPaginado<UnidadeOrganizacionalApi>);
+}
+
+describe("EstruturaOrganizacionalScreen (T104 — funcional)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
   });
 
-  it("exibe o aviso de que somente RH administra e nenhuma alteração é persistida", () => {
+  it("tem um único h1", async () => {
+    mockSucesso();
     render(<EstruturaOrganizacionalScreen />);
 
-    expect(screen.getByText("Somente RH")).toBeInTheDocument();
-    expect(
-      screen.getByText(/Nenhuma alteração feita aqui é persistida/i),
-    ).toBeInTheDocument();
-  });
-
-  it("exibe o aviso de que empresa real, CNPJ, cadastro fiscal, colaboradores, Folha, eSocial, API e importação ainda não estão disponíveis", () => {
-    render(<EstruturaOrganizacionalScreen />);
-
-    expect(screen.getByText("Ainda indisponível")).toBeInTheDocument();
-    const aviso = document.getElementById(
-      "estrutura-organizacional-aviso-indisponivel-titulo",
-    )!;
-    expect(aviso).toHaveTextContent(
-      "Empresa real, CNPJ, cadastro fiscal, colaboradores, Folha, eSocial, API e importação ainda não estão disponíveis nesta demonstração.",
+    await waitFor(() =>
+      expect(
+        screen.getByRole("heading", {
+          level: 1,
+          name: "Estrutura organizacional",
+        }),
+      ).toBeInTheDocument(),
     );
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
   });
 
-  it("mostra a hierarquia ilustrativa Empresa → Unidade → Departamento → Centro de custo", () => {
+  it("exibe o aviso 'Somente RH' com texto de escopo e o aviso 'Auditado' com trilha de auditoria", async () => {
+    mockSucesso();
     render(<EstruturaOrganizacionalScreen />);
 
-    const lista = screen
-      .getByText("Hierarquia (exemplo)")
-      .closest("section")!
-      .querySelector("ol")!;
-    const itens = within(lista).getAllByRole("listitem");
-
-    expect(itens.map((item) => item.textContent)).toEqual([
-      "Empresa",
-      "Unidade",
-      "Departamento",
-      "Centro de custo",
-    ]);
-  });
-
-  // As referências técnicas reaparecem como "vínculo superior" de outras
-  // linhas (ex.: EST-2026-0001 é referência da 1ª linha e vínculo superior
-  // da 2ª) — por isso a linha é localizada pela primeira célula (referência
-  // técnica própria), nunca por `getByText`, que seria ambíguo.
-  function localizarLinhaPorReferencia(
-    tabela: HTMLElement,
-    referenciaTecnica: string,
-  ): HTMLElement {
-    const linha = Array.from(tabela.querySelectorAll("tbody tr")).find(
-      (tr) =>
-        tr.querySelector("td:first-child")?.textContent === referenciaTecnica,
+    await waitFor(() =>
+      expect(screen.getByText("Somente RH")).toBeInTheDocument(),
     );
-    if (!linha) {
-      throw new Error(
-        `Linha com referência ${referenciaTecnica} não encontrada`,
-      );
-    }
-    return linha as HTMLElement;
-  }
-
-  it("lista itens com referência técnica, tipo, vínculo superior, situação e responsável técnico", () => {
-    render(<EstruturaOrganizacionalScreen />);
-
-    const tabela = screen.getByRole("table", {
-      name: "Itens da estrutura organizacional",
-    });
-    const linha = localizarLinhaPorReferencia(tabela, "EST-2026-0003");
-    const dentroDaLinha = within(linha);
-    expect(dentroDaLinha.getByText("Departamento")).toBeInTheDocument();
-    expect(dentroDaLinha.getByText("Operações (exemplo)")).toBeInTheDocument();
-    expect(dentroDaLinha.getByText("EST-2026-0002")).toBeInTheDocument();
-    expect(dentroDaLinha.getByText("Ativa")).toBeInTheDocument();
     expect(
-      dentroDaLinha.getByText("RT-Estrutura-02 (exemplo)"),
+      screen.getByText(/Somente o RH da própria empresa administra/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Auditado")).toBeInTheDocument();
+    expect(
+      screen.getByText(/geram trilha de auditoria automática/i),
     ).toBeInTheDocument();
   });
 
-  it("mostra travessão para o item de topo, sem vínculo superior", () => {
+  it("lista unidades com código, nome, situação e botão Editar", async () => {
+    mockSucesso();
     render(<EstruturaOrganizacionalScreen />);
 
-    const tabela = screen.getByRole("table", {
-      name: "Itens da estrutura organizacional",
+    const tabela = await screen.findByRole("table", {
+      name: "Unidades organizacionais",
     });
-    const linha = localizarLinhaPorReferencia(tabela, "EST-2026-0001");
-    expect(within(linha).getByText("—")).toBeInTheDocument();
-  });
-
-  it("filtra localmente por tipo e por situação", () => {
-    render(<EstruturaOrganizacionalScreen />);
-
-    fireEvent.change(screen.getByLabelText("Situação"), {
-      target: { value: "inativa" },
-    });
-
-    const tabela = screen.getByRole("table", {
-      name: "Itens da estrutura organizacional",
-    });
+    expect(within(tabela).getByText("UNID_SP")).toBeInTheDocument();
     expect(
-      Array.from(tabela.querySelectorAll("tbody tr")).map(
-        (tr) => tr.querySelector("td:first-child")?.textContent,
-      ),
-    ).toEqual(["EST-2026-0005"]);
-
-    fireEvent.click(screen.getByRole("button", { name: "Limpar filtros" }));
-    expect(Array.from(tabela.querySelectorAll("tbody tr"))).toHaveLength(5);
-  });
-
-  it("mostra EmptyState quando o filtro não corresponde a nenhum item", () => {
-    render(<EstruturaOrganizacionalScreen />);
-
-    fireEvent.change(screen.getByLabelText("Tipo de estrutura"), {
-      target: { value: "empresa" },
-    });
-    fireEvent.change(screen.getByLabelText("Situação"), {
-      target: { value: "inativa" },
-    });
-
-    expect(
-      screen.getByRole("heading", {
-        name: "Nenhum item corresponde aos filtros",
-      }),
+      within(tabela).getByText("Unidade São Paulo (teste)"),
     ).toBeInTheDocument();
+    expect(within(tabela).getByText("Ativa")).toBeInTheDocument();
+    expect(within(tabela).getByText("UNID_RJ")).toBeInTheDocument();
+    expect(
+      within(tabela).getByText("Unidade Rio de Janeiro (teste)"),
+    ).toBeInTheDocument();
+    expect(within(tabela).getByText("Inativa")).toBeInTheDocument();
+    expect(
+      within(tabela).getAllByRole("button", { name: "Editar" }),
+    ).toHaveLength(2);
   });
 
-  it("alterna para o estado vazio e mostra o EmptyState", () => {
+  it("mostra EmptyState quando não há unidades cadastradas", async () => {
+    mockSucesso([]);
     render(<EstruturaOrganizacionalScreen />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Vazio" }));
-
+    await waitFor(() =>
+      expect(
+        screen.getByRole("heading", {
+          name: "Nenhuma unidade organizacional cadastrada",
+        }),
+      ).toBeInTheDocument(),
+    );
     expect(
-      screen.queryByRole("table", {
-        name: "Itens da estrutura organizacional",
-      }),
+      screen.queryByRole("table", { name: "Unidades organizacionais" }),
     ).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", {
-        level: 3,
-        name: "Nenhum item de estrutura cadastrado",
-      }),
-    ).toBeInTheDocument();
   });
 
-  it("alterna para o estado de erro com referência ilustrativa e ação de retorno", () => {
+  it("mostra erro e permite tentar novamente", async () => {
+    mockListarEmpresas.mockRejectedValue(new Error("falha de rede"));
+    mockListarUnidades.mockRejectedValue(new Error("falha de rede"));
     render(<EstruturaOrganizacionalScreen />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Erro" }));
+    await waitFor(() =>
+      expect(
+        screen.getByRole("heading", {
+          name: "Não foi possível carregar a estrutura organizacional",
+        }),
+      ).toBeInTheDocument(),
+    );
 
-    expect(
-      screen.getByRole("heading", {
-        name: "Não foi possível carregar a estrutura organizacional",
-      }),
-    ).toBeInTheDocument();
-    expect(screen.getByText(/REQ-DEMO-001034/)).toBeInTheDocument();
-
+    mockSucesso();
     fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
-    expect(
-      screen.getByRole("table", {
-        name: "Itens da estrutura organizacional",
-      }),
-    ).toBeInTheDocument();
+
+    await screen.findByRole("table", { name: "Unidades organizacionais" });
   });
 
-  it("abre o formulário 'Novo item de estrutura' e confirmar não cria, salva, altera nem persiste nada", () => {
+  it("filtra por situação chamando a API com o parâmetro status", async () => {
+    mockSucesso();
     render(<EstruturaOrganizacionalScreen />);
+    await screen.findByRole("table", { name: "Unidades organizacionais" });
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "Novo item de estrutura" }),
-    );
+    mockListarUnidades.mockResolvedValue({
+      itens: [unidade1],
+      pagina: 1,
+      tamanhoPagina: 50,
+      total: 1,
+    } satisfies ResultadoPaginado<UnidadeOrganizacionalApi>);
 
-    const formulario = screen.getByRole("form", {
-      name: "Formulário de novo item de estrutura",
+    fireEvent.change(screen.getByLabelText("Situação"), {
+      target: { value: "ativa" },
     });
-    expect(formulario).toBeInTheDocument();
+
+    await waitFor(() =>
+      expect(mockListarUnidades).toHaveBeenCalledWith(
+        expect.objectContaining({ status: "ativa" }),
+      ),
+    );
+  });
+
+  it("abre formulário de criação, valida campos e salva via API", async () => {
+    mockSucesso();
+    mockCriarUnidade.mockResolvedValue({
+      ...unidade1,
+      id: "00000000-0000-0000-0000-000000000099",
+      codigo: "UNID_TESTE",
+      nome: "Unidade Teste",
+    });
+    render(<EstruturaOrganizacionalScreen />);
+    await screen.findByRole("table", { name: "Unidades organizacionais" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Nova unidade" }));
+
+    const form = screen.getByRole("form", {
+      name: "Formulário de nova unidade organizacional",
+    });
+
+    // Submeter sem preencher → erros de validação
+    fireEvent.click(within(form).getByRole("button", { name: "Salvar" }));
     expect(
-      screen.getByText(/nada é criado, salvo, alterado ou persistido/i),
+      await screen.findByText("Código é obrigatório."),
     ).toBeInTheDocument();
 
-    fireEvent.click(
-      within(formulario).getByRole("button", {
-        name: "Confirmar (demonstração)",
-      }),
+    fireEvent.change(within(form).getByLabelText("Código", { exact: false }), {
+      target: { value: "UNID_TESTE" },
+    });
+    fireEvent.change(within(form).getByLabelText("Nome", { exact: false }), {
+      target: { value: "Unidade Teste" },
+    });
+    fireEvent.click(within(form).getByRole("button", { name: "Salvar" }));
+
+    await waitFor(() =>
+      expect(screen.queryByRole("form")).not.toBeInTheDocument(),
     );
+    expect(mockCriarUnidade).toHaveBeenCalledWith({
+      codigo: "UNID_TESTE",
+      nome: "Unidade Teste",
+      empresaId: empresaFixture.id,
+    });
+  });
+
+  it("código inválido no formulário de criação exibe mensagem de erro", async () => {
+    mockSucesso();
+    render(<EstruturaOrganizacionalScreen />);
+    await screen.findByRole("table", { name: "Unidades organizacionais" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Nova unidade" }));
+
+    const form = screen.getByRole("form", {
+      name: "Formulário de nova unidade organizacional",
+    });
+    fireEvent.change(within(form).getByLabelText("Código", { exact: false }), {
+      target: { value: "invalido com espaço" },
+    });
+    fireEvent.click(within(form).getByRole("button", { name: "Salvar" }));
 
     expect(
-      screen.getByText(
-        "Ação apenas demonstrativa: nenhum item de estrutura foi realmente criado, salvo, alterado ou persistido.",
+      await screen.findByText(
+        /Código deve conter apenas letras maiúsculas, dígitos e _/,
       ),
     ).toBeInTheDocument();
+    expect(mockCriarUnidade).not.toHaveBeenCalled();
+  });
 
-    // A listagem não é alterada pela submissão do formulário demonstrativo.
+  it("abre formulário de edição com código somente leitura e salva nome via API", async () => {
+    mockSucesso();
+    mockAtualizarUnidade.mockResolvedValue({
+      ...unidade1,
+      nome: "Unidade SP Atualizada",
+    });
+    mockListarUnidades.mockResolvedValue({
+      itens: [{ ...unidade1, nome: "Unidade SP Atualizada" }, unidade2],
+      pagina: 1,
+      tamanhoPagina: 50,
+      total: 2,
+    } satisfies ResultadoPaginado<UnidadeOrganizacionalApi>);
+
+    render(<EstruturaOrganizacionalScreen />);
+    const tabela = await screen.findByRole("table", {
+      name: "Unidades organizacionais",
+    });
+
+    const linhaUnidade1 = within(tabela).getByText("UNID_SP").closest("tr")!;
+    fireEvent.click(
+      within(linhaUnidade1).getByRole("button", { name: "Editar" }),
+    );
+
+    const form = screen.getByRole("form", {
+      name: "Formulário de edição de unidade organizacional",
+    });
+    const campoCodigo = within(form).getByLabelText("Código", { exact: false });
+    expect(campoCodigo).toHaveAttribute("readonly");
+    expect(campoCodigo).toHaveValue("UNID_SP");
+
+    const campoNome = within(form).getByLabelText("Nome", { exact: false });
+    fireEvent.change(campoNome, { target: { value: "Unidade SP Atualizada" } });
+    fireEvent.click(within(form).getByRole("button", { name: "Salvar" }));
+
+    await waitFor(() =>
+      expect(screen.queryByRole("form")).not.toBeInTheDocument(),
+    );
+    expect(mockAtualizarUnidade).toHaveBeenCalledWith(unidade1.id, {
+      nome: "Unidade SP Atualizada",
+    });
+  });
+
+  it("cancelar fecha o formulário sem chamar a API", async () => {
+    mockSucesso();
+    render(<EstruturaOrganizacionalScreen />);
+    await screen.findByRole("table", { name: "Unidades organizacionais" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Nova unidade" }));
     expect(
-      screen.getByRole("table", {
-        name: "Itens da estrutura organizacional",
+      screen.getByRole("form", {
+        name: "Formulário de nova unidade organizacional",
       }),
     ).toBeInTheDocument();
 
-    fireEvent.click(
-      within(formulario).getByRole("button", { name: "Cancelar" }),
-    );
-    expect(
-      screen.queryByRole("form", {
-        name: "Formulário de novo item de estrutura",
-      }),
-    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    expect(screen.queryByRole("form")).not.toBeInTheDocument();
+    expect(mockCriarUnidade).not.toHaveBeenCalled();
   });
 
-  it("o formulário demonstra um campo com erro de validação, comunicado por texto e semântica", () => {
+  it("não contém razão social, CNPJ, nome de pessoa, endereço, documento ou valor financeiro", async () => {
+    mockSucesso();
     render(<EstruturaOrganizacionalScreen />);
-
-    fireEvent.click(
-      screen.getByRole("button", { name: "Novo item de estrutura" }),
-    );
-
-    const erro = screen.getByText(
-      "Referência técnica não encontrada nesta demonstração.",
-    );
-    expect(erro.closest('[role="alert"]')).toBeInTheDocument();
-
-    const campoInvalido = screen.getByDisplayValue("EST-9999-9999");
-    expect(campoInvalido).toHaveAttribute("aria-invalid", "true");
-  });
-
-  it("não contém razão social, CNPJ, nome de pessoa, endereço, documento ou valor financeiro", () => {
-    render(<EstruturaOrganizacionalScreen />);
-    fireEvent.click(
-      screen.getByRole("button", { name: "Novo item de estrutura" }),
-    );
+    await screen.findByRole("table", { name: "Unidades organizacionais" });
 
     const texto = document.body.innerHTML.toLowerCase();
     for (const termoProibido of [
@@ -247,11 +322,27 @@ describe("EstruturaOrganizacionalScreen (T073 — tela visual estática)", () =>
       "bioprox",
       "reserva fiscal",
       "senha",
-      "sessão",
       "r$",
       ".pdf",
       "localstorage",
       "logradouro",
+    ]) {
+      expect(texto).not.toContain(termoProibido);
+    }
+  });
+
+  it("não declara conformidade com CLT, CCT/ACT, Portaria 671, LGPD ou eSocial", async () => {
+    mockSucesso();
+    render(<EstruturaOrganizacionalScreen />);
+    await screen.findByRole("table", { name: "Unidades organizacionais" });
+
+    const texto = document.body.innerHTML.toLowerCase();
+    for (const termoProibido of [
+      "clt",
+      "cct",
+      "portaria 671",
+      "lgpd",
+      "esocial",
     ]) {
       expect(texto).not.toContain(termoProibido);
     }

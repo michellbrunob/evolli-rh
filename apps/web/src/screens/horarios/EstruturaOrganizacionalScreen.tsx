@@ -1,21 +1,4 @@
-/**
- * Cadastros > Estrutura organizacional (T073) — tela visual estática.
- *
- * Visão administrativa demonstrativa que organiza o ecossistema para as
- * futuras relações entre empresas, unidades, departamentos e centros de
- * custo — apenas referências técnicas, tipo, vínculo superior, situação e
- * responsável técnico de exemplo. Não ativa nenhuma operação real de
- * cadastro.
- *
- * Escopo: PURAMENTE visual. Sem `fetch`, sem autenticação/sessão/CSRF/MFA,
- * sem rota real, sem persistência, sem backend, schema ou dependência nova.
- * Todo dado é sintético (`estruturaOrganizacional.fixtures.ts`),
- * independente do catálogo de "Horários" (T043). O formulário "Novo item de
- * estrutura" é inteiramente demonstrativo: confirmar não cria, salva, altera
- * nem persiste nenhum item de verdade, e a listagem nunca é modificada por
- * ele.
- */
-import { useId, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
 import {
   Button,
   DataTable,
@@ -28,107 +11,198 @@ import {
 } from "../../components";
 import type { DataTableColumn, StatusVariant } from "../../components";
 import {
-  HIERARQUIA_TIPOS,
-  type ItemEstruturaExemplo,
-  ITENS_ESTRUTURA_EXEMPLO,
-  ROTULO_SITUACAO_ESTRUTURA,
-  ROTULO_TIPO_ESTRUTURA,
-  type SituacaoEstrutura,
-  type TipoEstrutura,
-} from "./estruturaOrganizacional.fixtures";
+  type AtualizarUnidadeDto,
+  type CriarUnidadeDto,
+  type EmpresaApi,
+  type ListarUnidadesQuery,
+  type UnidadeOrganizacionalApi,
+  atualizarUnidade,
+  criarUnidade,
+  listarEmpresas,
+  listarUnidades,
+} from "../../api/organizacaoClient";
 import "./EstruturaOrganizacionalScreen.css";
 
 export const ESTRUTURA_ORGANIZACIONAL_TITULO_ID =
   "estrutura-organizacional-titulo";
 
-type EstadoDemonstracao = "dados" | "vazio" | "erro";
+const CODIGO_PATTERN = /^[A-Z0-9_]{2,32}$/;
 
-const ROTULO_ESTADO_DEMO: Record<EstadoDemonstracao, string> = {
-  dados: "Com dados",
-  vazio: "Vazio",
-  erro: "Erro",
-};
-
-const VARIANTE_SITUACAO: Record<SituacaoEstrutura, StatusVariant> = {
+const VARIANTE_STATUS: Record<string, StatusVariant> = {
   ativa: "success",
   inativa: "neutral",
 };
 
-const OPCAO_TODOS = "todos";
+const ROTULO_STATUS: Record<string, string> = {
+  ativa: "Ativa",
+  inativa: "Inativa",
+};
+
+type StatusFiltro = "todos" | "ativa" | "inativa";
+
+interface FormularioErros {
+  codigo?: string;
+  nome?: string;
+  geral?: string;
+}
+
+interface FormularioState {
+  modo: "criar" | "editar";
+  unidadeId?: string;
+  codigoAtual?: string;
+  codigo: string;
+  nome: string;
+  erros: FormularioErros;
+  salvando: boolean;
+}
 
 export function EstruturaOrganizacionalScreen() {
-  const [estadoDemo, setEstadoDemo] = useState<EstadoDemonstracao>("dados");
-  const [filtroTipo, setFiltroTipo] = useState<string>(OPCAO_TODOS);
-  const [filtroSituacao, setFiltroSituacao] = useState<string>(OPCAO_TODOS);
-  const [formularioAberto, setFormularioAberto] = useState(false);
-  const [confirmacaoVisivel, setConfirmacaoVisivel] = useState(false);
+  const [statusCarregamento, setStatusCarregamento] = useState<
+    "carregando" | "erro" | "dados"
+  >("carregando");
+  const [unidades, setUnidades] = useState<UnidadeOrganizacionalApi[]>([]);
+  const [empresa, setEmpresa] = useState<EmpresaApi | null>(null);
+  const [filtroStatus, setFiltroStatus] = useState<StatusFiltro>("todos");
+  const [formulario, setFormulario] = useState<FormularioState | null>(null);
   const formTituloId = useId();
 
-  const itensBase = useMemo(
-    () => (estadoDemo === "vazio" ? [] : ITENS_ESTRUTURA_EXEMPLO),
-    [estadoDemo],
-  );
+  const carregarDados = useCallback(async (status: StatusFiltro) => {
+    setStatusCarregamento("carregando");
+    try {
+      const query: ListarUnidadesQuery = {};
+      if (status !== "todos") query.status = status;
+      const [empresaResp, unidadesResp] = await Promise.all([
+        listarEmpresas(),
+        listarUnidades(query),
+      ]);
+      setEmpresa(empresaResp.itens[0] ?? null);
+      setUnidades(unidadesResp.itens);
+      setStatusCarregamento("dados");
+    } catch {
+      setStatusCarregamento("erro");
+    }
+  }, []);
 
-  const itensFiltrados = useMemo(() => {
-    return itensBase.filter((item) => {
-      if (filtroTipo !== OPCAO_TODOS && item.tipo !== filtroTipo) {
-        return false;
-      }
-      if (filtroSituacao !== OPCAO_TODOS && item.situacao !== filtroSituacao) {
-        return false;
-      }
-      return true;
+  useEffect(() => {
+    void carregarDados(filtroStatus);
+  }, [filtroStatus, carregarDados]);
+
+  function abrirCriar() {
+    setFormulario({
+      modo: "criar",
+      codigo: "",
+      nome: "",
+      erros: {},
+      salvando: false,
     });
-  }, [itensBase, filtroTipo, filtroSituacao]);
-
-  const filtrosAtivos =
-    filtroTipo !== OPCAO_TODOS || filtroSituacao !== OPCAO_TODOS;
-
-  function limparFiltros() {
-    setFiltroTipo(OPCAO_TODOS);
-    setFiltroSituacao(OPCAO_TODOS);
   }
 
-  function abrirNovo() {
-    setConfirmacaoVisivel(false);
-    setFormularioAberto(true);
+  function abrirEditar(unidade: UnidadeOrganizacionalApi) {
+    setFormulario({
+      modo: "editar",
+      unidadeId: unidade.id,
+      codigoAtual: unidade.codigo,
+      codigo: "",
+      nome: unidade.nome,
+      erros: {},
+      salvando: false,
+    });
   }
 
   function fecharFormulario() {
-    setFormularioAberto(false);
+    setFormulario(null);
   }
 
-  const colunas: DataTableColumn<ItemEstruturaExemplo>[] = [
+  function validarCodigo(codigo: string): string | undefined {
+    if (!codigo.trim()) return "Código é obrigatório.";
+    if (!CODIGO_PATTERN.test(codigo))
+      return "Código deve conter apenas letras maiúsculas, dígitos e _ (2 a 32 caracteres).";
+    return undefined;
+  }
+
+  function validarNome(nome: string): string | undefined {
+    if (!nome.trim()) return "Nome é obrigatório.";
+    if (nome.trim().length > 160)
+      return "Nome deve ter no máximo 160 caracteres.";
+    return undefined;
+  }
+
+  async function handleSubmit(evento: React.FormEvent) {
+    evento.preventDefault();
+    if (!formulario) return;
+
+    const erros: FormularioErros = {};
+    if (formulario.modo === "criar") {
+      const erroCodigo = validarCodigo(formulario.codigo);
+      if (erroCodigo) erros.codigo = erroCodigo;
+    }
+    const erroNome = validarNome(formulario.nome);
+    if (erroNome) erros.nome = erroNome;
+
+    if (erros.codigo || erros.nome) {
+      setFormulario((prev) => (prev ? { ...prev, erros } : prev));
+      return;
+    }
+
+    setFormulario((prev) =>
+      prev ? { ...prev, salvando: true, erros: {} } : prev,
+    );
+
+    try {
+      if (formulario.modo === "criar") {
+        const dto: CriarUnidadeDto = {
+          codigo: formulario.codigo.trim(),
+          nome: formulario.nome.trim(),
+          empresaId: empresa!.id,
+        };
+        await criarUnidade(dto);
+      } else {
+        const dto: AtualizarUnidadeDto = { nome: formulario.nome.trim() };
+        await atualizarUnidade(formulario.unidadeId!, dto);
+      }
+      setFormulario(null);
+      await carregarDados(filtroStatus);
+    } catch (err: unknown) {
+      const mensagem =
+        err instanceof Error
+          ? err.message
+          : "Não foi possível salvar. Tente novamente.";
+      setFormulario((prev) =>
+        prev
+          ? {
+              ...prev,
+              salvando: false,
+              erros: { ...prev.erros, geral: mensagem },
+            }
+          : prev,
+      );
+    }
+  }
+
+  const colunas: DataTableColumn<UnidadeOrganizacionalApi>[] = [
     {
-      key: "referencia",
-      header: "Referência técnica",
-      cell: (linha) => <code>{linha.referenciaTecnica}</code>,
-    },
-    {
-      key: "tipo",
-      header: "Tipo de estrutura",
-      cell: (linha) => ROTULO_TIPO_ESTRUTURA[linha.tipo],
+      key: "codigo",
+      header: "Código",
+      cell: (linha) => <code>{linha.codigo}</code>,
     },
     { key: "nome", header: "Nome", cell: (linha) => linha.nome },
-    {
-      key: "vinculoSuperior",
-      header: "Vínculo superior",
-      cell: (linha) =>
-        linha.vinculoSuperior ? <code>{linha.vinculoSuperior}</code> : "—",
-    },
     {
       key: "situacao",
       header: "Situação",
       cell: (linha) => (
-        <StatusBadge variant={VARIANTE_SITUACAO[linha.situacao]}>
-          {ROTULO_SITUACAO_ESTRUTURA[linha.situacao]}
+        <StatusBadge variant={VARIANTE_STATUS[linha.status] ?? "neutral"}>
+          {ROTULO_STATUS[linha.status] ?? linha.status}
         </StatusBadge>
       ),
     },
     {
-      key: "responsavel",
-      header: "Responsável técnico",
-      cell: (linha) => linha.responsavelTecnico,
+      key: "acoes",
+      header: "Ações",
+      cell: (linha) => (
+        <Button variant="secondary" onClick={() => abrirEditar(linha)}>
+          Editar
+        </Button>
+      ),
     },
   ];
 
@@ -138,8 +212,15 @@ export function EstruturaOrganizacionalScreen() {
         headingLevel={1}
         titleId={ESTRUTURA_ORGANIZACIONAL_TITULO_ID}
         title="Estrutura organizacional"
-        description="Demonstração visual da futura hierarquia entre empresas, unidades, departamentos e centros de custo — apenas referências técnicas e situação de cada item, nunca dado real."
-        actions={<Button onClick={abrirNovo}>Novo item de estrutura</Button>}
+        description="Gerencie as unidades organizacionais da sua empresa: cadastre, consulte e edite as referências de estrutura dentro do seu escopo."
+        actions={
+          <Button
+            onClick={abrirCriar}
+            disabled={statusCarregamento !== "dados" || !empresa}
+          >
+            Nova unidade
+          </Button>
+        }
       />
 
       <Surface
@@ -153,85 +234,30 @@ export function EstruturaOrganizacionalScreen() {
           id="estrutura-organizacional-aviso-rh-titulo"
           className="estrutura-organizacional-screen__aviso-texto"
         >
-          Somente o RH da própria empresa administra a estrutura organizacional
-          nesta demonstração. Nenhuma alteração feita aqui é persistida — é uma
-          amostra visual, sempre restrita à sua empresa.
+          Somente o RH da própria empresa administra a estrutura organizacional.
+          Todas as operações são restritas ao escopo da sua empresa e unidades
+          autorizadas.
         </p>
       </Surface>
 
       <Surface
         as="section"
         padding="md"
-        className="estrutura-organizacional-screen__aviso"
-        aria-labelledby="estrutura-organizacional-aviso-indisponivel-titulo"
+        className="estrutura-organizacional-screen__aviso estrutura-organizacional-screen__aviso--auditado"
+        aria-labelledby="estrutura-organizacional-aviso-auditado-titulo"
       >
-        <StatusBadge variant="warning">Ainda indisponível</StatusBadge>
+        <StatusBadge variant="warning">Auditado</StatusBadge>
         <p
-          id="estrutura-organizacional-aviso-indisponivel-titulo"
+          id="estrutura-organizacional-aviso-auditado-titulo"
           className="estrutura-organizacional-screen__aviso-texto"
         >
-          Empresa real, CNPJ, cadastro fiscal, colaboradores, Folha, eSocial,
-          API e importação ainda não estão disponíveis nesta demonstração.
+          Cadastros e edições de unidades organizacionais geram trilha de
+          auditoria automática. Não é possível excluir uma unidade — apenas
+          inativar.
         </p>
       </Surface>
 
-      <section
-        aria-labelledby="estrutura-organizacional-hierarquia-titulo"
-        className="estrutura-organizacional-screen__hierarquia"
-      >
-        <h2
-          id="estrutura-organizacional-hierarquia-titulo"
-          className="estrutura-organizacional-screen__section-title"
-        >
-          Hierarquia (exemplo)
-        </h2>
-        <ol className="estrutura-organizacional-screen__hierarquia-lista">
-          {HIERARQUIA_TIPOS.map((tipo) => (
-            <li key={tipo}>{ROTULO_TIPO_ESTRUTURA[tipo]}</li>
-          ))}
-        </ol>
-        <p className="estrutura-organizacional-screen__demo-texto">
-          Cada nível se vincula ao nível imediatamente superior — a ilustração
-          acima é só uma amostra da relação, não a estrutura real desta empresa.
-        </p>
-      </section>
-
-      <section
-        aria-labelledby="estrutura-organizacional-demo-titulo"
-        className="estrutura-organizacional-screen__demo"
-      >
-        <h2
-          id="estrutura-organizacional-demo-titulo"
-          className="estrutura-organizacional-screen__section-title"
-        >
-          Estado de demonstração
-        </h2>
-        <p className="estrutura-organizacional-screen__demo-texto">
-          Alterna a amostra visual exibida abaixo — não representa uma chamada
-          real à API.
-        </p>
-        <div
-          role="group"
-          aria-label="Selecionar estado de demonstração da listagem"
-          className="estrutura-organizacional-screen__demo-botoes"
-        >
-          {(Object.keys(ROTULO_ESTADO_DEMO) as EstadoDemonstracao[]).map(
-            (chave) => (
-              <Button
-                key={chave}
-                type="button"
-                variant={estadoDemo === chave ? "primary" : "secondary"}
-                aria-pressed={estadoDemo === chave}
-                onClick={() => setEstadoDemo(chave)}
-              >
-                {ROTULO_ESTADO_DEMO[chave]}
-              </Button>
-            ),
-          )}
-        </div>
-      </section>
-
-      {estadoDemo === "erro" ? (
+      {statusCarregamento === "erro" ? (
         <Surface
           as="section"
           padding="lg"
@@ -246,13 +272,13 @@ export function EstruturaOrganizacionalScreen() {
             Não foi possível carregar a estrutura organizacional
           </h2>
           <p>
-            Tente novamente em instantes. Se o problema persistir, contate o
-            suporte informando a referência abaixo.
+            Verifique sua conexão e tente novamente. Se o problema persistir,
+            contate o suporte.
           </p>
-          <p className="estrutura-organizacional-screen__erro-referencia">
-            Referência: <code>REQ-DEMO-001034</code> (ilustrativa)
-          </p>
-          <Button variant="secondary" onClick={() => setEstadoDemo("dados")}>
+          <Button
+            variant="secondary"
+            onClick={() => void carregarDados(filtroStatus)}
+          >
             Tentar novamente
           </Button>
         </Surface>
@@ -262,97 +288,59 @@ export function EstruturaOrganizacionalScreen() {
             id="estrutura-organizacional-lista-titulo"
             className="estrutura-organizacional-screen__section-title"
           >
-            Itens de estrutura
+            Unidades organizacionais
           </h2>
 
           <div className="estrutura-organizacional-screen__filtros">
-            <FormField id="estrutura-filtro-tipo" label="Tipo de estrutura">
+            <FormField id="estrutura-filtro-status" label="Situação">
               {(control) => (
                 <select
-                  value={filtroTipo}
-                  onChange={(evento) => setFiltroTipo(evento.target.value)}
+                  value={filtroStatus}
+                  onChange={(evento) =>
+                    setFiltroStatus(evento.target.value as StatusFiltro)
+                  }
+                  disabled={statusCarregamento === "carregando"}
                   {...control}
                 >
-                  <option value={OPCAO_TODOS}>Todos os tipos</option>
-                  {(Object.keys(ROTULO_TIPO_ESTRUTURA) as TipoEstrutura[]).map(
-                    (tipo) => (
-                      <option key={tipo} value={tipo}>
-                        {ROTULO_TIPO_ESTRUTURA[tipo]}
-                      </option>
-                    ),
-                  )}
+                  <option value="todos">Todas as situações</option>
+                  <option value="ativa">Ativa</option>
+                  <option value="inativa">Inativa</option>
                 </select>
               )}
             </FormField>
-
-            <FormField id="estrutura-filtro-situacao" label="Situação">
-              {(control) => (
-                <select
-                  value={filtroSituacao}
-                  onChange={(evento) => setFiltroSituacao(evento.target.value)}
-                  {...control}
-                >
-                  <option value={OPCAO_TODOS}>Todas as situações</option>
-                  {(
-                    Object.keys(
-                      ROTULO_SITUACAO_ESTRUTURA,
-                    ) as SituacaoEstrutura[]
-                  ).map((situacao) => (
-                    <option key={situacao} value={situacao}>
-                      {ROTULO_SITUACAO_ESTRUTURA[situacao]}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </FormField>
-
-            <Button
-              variant="subtle"
-              onClick={limparFiltros}
-              disabled={!filtrosAtivos}
-            >
-              Limpar filtros
-            </Button>
           </div>
-          <p className="estrutura-organizacional-screen__filtros-nota">
-            Filtro só local, apenas para esta demonstração — não é enviado a
-            nenhum servidor nem fica salvo ao recarregar a página.
-          </p>
 
-          {itensBase.length === 0 ? (
+          {statusCarregamento === "carregando" ? (
+            <p
+              className="estrutura-organizacional-screen__carregando"
+              role="status"
+            >
+              Carregando unidades…
+            </p>
+          ) : unidades.length === 0 ? (
             <EmptyState
               headingLevel={3}
               icon="—"
-              title="Nenhum item de estrutura cadastrado"
-              description="Quando houver um item de estrutura organizacional para esta empresa, ele aparece aqui (exemplo)."
+              title="Nenhuma unidade organizacional cadastrada"
+              description="Cadastre a primeira unidade organizacional para esta empresa."
               action={
-                <Button onClick={abrirNovo}>Novo item de estrutura</Button>
-              }
-            />
-          ) : itensFiltrados.length === 0 ? (
-            <EmptyState
-              headingLevel={3}
-              icon="—"
-              title="Nenhum item corresponde aos filtros"
-              description="Ajuste ou limpe os filtros para ver os demais itens desta demonstração."
-              action={
-                <Button variant="primary" onClick={limparFiltros}>
-                  Limpar filtros
-                </Button>
+                empresa ? (
+                  <Button onClick={abrirCriar}>Nova unidade</Button>
+                ) : undefined
               }
             />
           ) : (
             <DataTable
-              caption="Itens da estrutura organizacional"
+              caption="Unidades organizacionais"
               columns={colunas}
-              rows={itensFiltrados}
+              rows={unidades}
               rowKey={(linha) => linha.id}
             />
           )}
         </section>
       )}
 
-      {formularioAberto ? (
+      {formulario ? (
         <Surface
           as="section"
           padding="lg"
@@ -363,96 +351,115 @@ export function EstruturaOrganizacionalScreen() {
             id={formTituloId}
             className="estrutura-organizacional-screen__section-title"
           >
-            Novo item de estrutura
+            {formulario.modo === "criar"
+              ? "Nova unidade organizacional"
+              : "Editar unidade organizacional"}
           </h2>
-          <p className="estrutura-organizacional-screen__demo-texto">
-            Demonstração visual: nada é criado, salvo, alterado ou persistido ao
-            confirmar. Empresa real, CNPJ, cadastro fiscal, colaboradores,
-            Folha, eSocial, API e importação ainda não estão disponíveis.
-          </p>
 
           <form
             className="estrutura-organizacional-screen__form"
-            aria-label="Formulário de novo item de estrutura"
-            onSubmit={(evento) => {
-              evento.preventDefault();
-              setConfirmacaoVisivel(true);
-            }}
+            aria-label={
+              formulario.modo === "criar"
+                ? "Formulário de nova unidade organizacional"
+                : "Formulário de edição de unidade organizacional"
+            }
+            onSubmit={(e) => void handleSubmit(e)}
           >
-            <FormField id="estrutura-tipo" label="Tipo de estrutura" required>
-              {(control) => (
-                <select defaultValue="" {...control}>
-                  <option value="" disabled>
-                    Selecione…
-                  </option>
-                  {(Object.keys(ROTULO_TIPO_ESTRUTURA) as TipoEstrutura[]).map(
-                    (tipo) => (
-                      <option key={tipo} value={tipo}>
-                        {ROTULO_TIPO_ESTRUTURA[tipo]}
-                      </option>
-                    ),
-                  )}
-                </select>
-              )}
-            </FormField>
+            {formulario.modo === "criar" ? (
+              <FormField
+                id="estrutura-codigo"
+                label="Código"
+                required
+                help="Letras maiúsculas, dígitos e _ (2 a 32 caracteres). Imutável após o cadastro."
+                {...(formulario.erros.codigo
+                  ? { error: formulario.erros.codigo }
+                  : {})}
+              >
+                {(control) => (
+                  <input
+                    type="text"
+                    maxLength={32}
+                    placeholder="Ex.: UNID_SP"
+                    value={formulario.codigo}
+                    onChange={(e) =>
+                      setFormulario((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              codigo: e.target.value.toUpperCase(),
+                              erros: {},
+                            }
+                          : prev,
+                      )
+                    }
+                    {...control}
+                  />
+                )}
+              </FormField>
+            ) : (
+              <FormField id="estrutura-codigo-fixo" label="Código">
+                {(control) => (
+                  <input
+                    type="text"
+                    readOnly
+                    value={formulario.codigoAtual ?? ""}
+                    aria-readonly="true"
+                    {...control}
+                  />
+                )}
+              </FormField>
+            )}
 
             <FormField
               id="estrutura-nome"
               label="Nome"
               required
-              help="Identificador de exemplo — nunca razão social ou nome real."
+              help="Identificador da unidade. Máximo 160 caracteres."
+              {...(formulario.erros.nome
+                ? { error: formulario.erros.nome }
+                : {})}
             >
               {(control) => (
                 <input
                   type="text"
-                  maxLength={120}
-                  placeholder="Ex.: Departamento Operações (exemplo)"
+                  maxLength={160}
+                  value={formulario.nome}
+                  onChange={(e) =>
+                    setFormulario((prev) =>
+                      prev
+                        ? { ...prev, nome: e.target.value, erros: {} }
+                        : prev,
+                    )
+                  }
                   {...control}
                 />
               )}
             </FormField>
 
-            <FormField
-              id="estrutura-vinculo-superior"
-              label="Vínculo superior"
-              help="Referência técnica ilustrativa do item hierarquicamente acima — deixe em branco para o nível mais alto (Empresa)."
-            >
-              {(control) => (
-                <input
-                  type="text"
-                  maxLength={40}
-                  placeholder="Ex.: EST-2026-0001"
-                  {...control}
-                />
-              )}
-            </FormField>
-
-            <FormField
-              id="estrutura-vinculo-exemplo-erro"
-              label="Vínculo superior (exemplo de validação)"
-              error="Referência técnica não encontrada nesta demonstração."
-            >
-              {(control) => (
-                <input type="text" defaultValue="EST-9999-9999" {...control} />
-              )}
-            </FormField>
-
-            {confirmacaoVisivel ? (
+            {formulario.erros.geral ? (
               <p
-                className="estrutura-organizacional-screen__confirmacao"
-                role="status"
+                className="estrutura-organizacional-screen__form-erro"
+                role="alert"
               >
-                Ação apenas demonstrativa: nenhum item de estrutura foi
-                realmente criado, salvo, alterado ou persistido.
+                {formulario.erros.geral}
               </p>
             ) : null}
 
             <FormActions>
-              <Button variant="secondary" onClick={fecharFormulario}>
+              <Button
+                variant="secondary"
+                type="button"
+                onClick={fecharFormulario}
+                disabled={formulario.salvando}
+              >
                 Cancelar
               </Button>
-              <Button type="submit" variant="primary">
-                Confirmar (demonstração)
+              <Button
+                type="submit"
+                variant="primary"
+                disabled={formulario.salvando}
+              >
+                {formulario.salvando ? "Salvando…" : "Salvar"}
               </Button>
             </FormActions>
           </form>

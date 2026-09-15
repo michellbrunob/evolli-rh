@@ -219,11 +219,7 @@ describe("CadastrosScreen — abas locais 'Horários' / 'Estrutura organizaciona
         name: "Estrutura organizacional",
       }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", {
-        name: "Itens da estrutura organizacional",
-      }),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Somente RH")).toBeInTheDocument();
 
     expect(
       screen.getByRole("tab", { name: "Estrutura organizacional" }),
@@ -415,11 +411,7 @@ describe("CadastrosScreen — abas locais 'Horários' / 'Estrutura organizaciona
         name: "Estrutura organizacional",
       }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", {
-        name: "Itens da estrutura organizacional",
-      }),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Somente RH")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("tab", { name: "Horários" }));
     expect(
@@ -465,11 +457,7 @@ describe("CadastrosScreen — abas locais 'Horários' / 'Estrutura organizaciona
         name: "Estrutura organizacional",
       }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", {
-        name: "Itens da estrutura organizacional",
-      }),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Somente RH")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("tab", { name: "Horários" }));
     expect(
@@ -525,11 +513,7 @@ describe("CadastrosScreen — abas locais 'Horários' / 'Estrutura organizaciona
         name: "Estrutura organizacional",
       }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", {
-        name: "Itens da estrutura organizacional",
-      }),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Somente RH")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("tab", { name: "Horários" }));
     expect(
@@ -600,11 +584,7 @@ describe("CadastrosScreen — abas locais 'Horários' / 'Estrutura organizaciona
         name: "Estrutura organizacional",
       }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", {
-        name: "Itens da estrutura organizacional",
-      }),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Somente RH")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("tab", { name: "Horários" }));
     expect(
@@ -685,11 +665,7 @@ describe("CadastrosScreen — abas locais 'Horários' / 'Estrutura organizaciona
         name: "Estrutura organizacional",
       }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", {
-        name: "Itens da estrutura organizacional",
-      }),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Somente RH")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("tab", { name: "Horários" }));
     expect(
@@ -778,11 +754,7 @@ describe("CadastrosScreen — abas locais 'Horários' / 'Estrutura organizaciona
         name: "Estrutura organizacional",
       }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", {
-        name: "Itens da estrutura organizacional",
-      }),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Somente RH")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("tab", { name: "Horários" }));
     expect(
@@ -884,11 +856,7 @@ describe("CadastrosScreen — abas locais 'Horários' / 'Estrutura organizaciona
         name: "Estrutura organizacional",
       }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", {
-        name: "Itens da estrutura organizacional",
-      }),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Somente RH")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("tab", { name: "Horários" }));
     expect(
@@ -998,11 +966,7 @@ describe("CadastrosScreen — abas locais 'Horários' / 'Estrutura organizaciona
         name: "Estrutura organizacional",
       }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", {
-        name: "Itens da estrutura organizacional",
-      }),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Somente RH")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("tab", { name: "Horários" }));
     expect(
@@ -1123,11 +1087,7 @@ describe("CadastrosScreen — abas locais 'Horários' / 'Estrutura organizaciona
         name: "Estrutura organizacional",
       }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", {
-        name: "Itens da estrutura organizacional",
-      }),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Somente RH")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("tab", { name: "Horários" }));
     expect(
