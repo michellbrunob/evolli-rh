@@ -498,12 +498,20 @@ describe("Núcleo Organizacional Interno (e2e)", () => {
 
     it("area: listar → criar → editar → reler (fluxo CRUD autocontido)", async () => {
       const depResp = await post("/v1/departamentos", rhA)
-        .send({ empresaId: empresaA, codigo: "AREA_T107", nome: "Dep para Area T107" })
+        .send({
+          empresaId: empresaA,
+          codigo: "AREA_T107",
+          nome: "Dep para Area T107",
+        })
         .expect(201);
       const depIdArea = depResp.body.id as string;
 
       const nova = await post("/v1/areas", rhA)
-        .send({ departamentoId: depIdArea, codigo: "CTRL", nome: "Controladoria" })
+        .send({
+          departamentoId: depIdArea,
+          codigo: "CTRL",
+          nome: "Controladoria",
+        })
         .expect(201);
       const areaId = nova.body.id as string;
       expect(nova.body.codigo).toBe("CTRL");
@@ -530,10 +538,18 @@ describe("Núcleo Organizacional Interno (e2e)", () => {
 
     it("IDOR: PATCH de área de outra empresa responde 404", async () => {
       const depResp = await post("/v1/departamentos", rhA)
-        .send({ empresaId: empresaA, codigo: "IDOR_AREA_D", nome: "Dep IDOR Area" })
+        .send({
+          empresaId: empresaA,
+          codigo: "IDOR_AREA_D",
+          nome: "Dep IDOR Area",
+        })
         .expect(201);
       const criada = await post("/v1/areas", rhA)
-        .send({ departamentoId: depResp.body.id as string, codigo: "IDOR_AREA", nome: "Alvo IDOR Area" })
+        .send({
+          departamentoId: depResp.body.id as string,
+          codigo: "IDOR_AREA",
+          nome: "Alvo IDOR Area",
+        })
         .expect(201);
 
       await patch(`/v1/areas/${criada.body.id as string}`, rhB)
