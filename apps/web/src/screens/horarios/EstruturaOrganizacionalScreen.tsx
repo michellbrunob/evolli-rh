@@ -11,20 +11,28 @@ import {
 } from "../../components";
 import type { DataTableColumn, StatusVariant } from "../../components";
 import {
+  type AreaApi,
+  type AtualizarAreaDto,
   type AtualizarDepartamentoDto,
   type AtualizarUnidadeDto,
+  type CriarAreaDto,
   type CriarDepartamentoDto,
   type CriarUnidadeDto,
   type DepartamentoApi,
   type EmpresaApi,
+  type ListarAreasQuery,
   type ListarDepartamentosQuery,
   type ListarUnidadesQuery,
   type UnidadeOrganizacionalApi,
+  atualizarArea,
   atualizarDepartamento,
   atualizarUnidade,
+  criarArea,
   criarDepartamento,
   criarUnidade,
+  listarAreas,
   listarDepartamentos,
+  listarDepartamentosParaArea,
   listarEmpresas,
   listarEmpresasMulti,
   listarUnidades,
@@ -47,7 +55,7 @@ const ROTULO_STATUS: Record<string, string> = {
 };
 
 type StatusFiltro = "todos" | "ativo" | "inativo";
-type AbaAtiva = "unidades" | "departamentos";
+type AbaAtiva = "unidades" | "departamentos" | "areas";
 
 interface FormularioErros {
   codigo?: string;
@@ -83,6 +91,24 @@ interface FormularioDepState {
   salvando: boolean;
 }
 
+interface FormularioAreaErros {
+  departamentoId?: string;
+  codigo?: string;
+  nome?: string;
+  geral?: string;
+}
+
+interface FormularioAreaState {
+  modo: "criar" | "editar";
+  areaId?: string;
+  codigoAtual?: string;
+  codigo: string;
+  nome: string;
+  departamentoId: string;
+  erros: FormularioAreaErros;
+  salvando: boolean;
+}
+
 export function EstruturaOrganizacionalScreen() {
   const [statusCarregamento, setStatusCarregamento] = useState<
     "carregando" | "erro" | "dados"
@@ -105,6 +131,19 @@ export function EstruturaOrganizacionalScreen() {
     null,
   );
   const formDepTituloId = useId();
+
+  const [statusAreaCarregamento, setStatusAreaCarregamento] = useState<
+    "carregando" | "erro" | "dados"
+  >("carregando");
+  const [areas, setAreas] = useState<AreaApi[]>([]);
+  const [departamentosArea, setDepartamentosArea] = useState<DepartamentoApi[]>(
+    [],
+  );
+  const [filtroAreaStatus, setFiltroAreaStatus] =
+    useState<StatusFiltro>("todos");
+  const [formularioArea, setFormularioArea] =
+    useState<FormularioAreaState | null>(null);
+  const formAreaTituloId = useId();
 
   const carregarDados = useCallback(async (status: StatusFiltro) => {
     setStatusCarregamento("carregando");
@@ -149,6 +188,29 @@ export function EstruturaOrganizacionalScreen() {
       void carregarDepartamentos(filtroDepStatus);
     }
   }, [abaAtiva, filtroDepStatus, carregarDepartamentos]);
+
+  const carregarAreas = useCallback(async (status: StatusFiltro) => {
+    setStatusAreaCarregamento("carregando");
+    try {
+      const query: ListarAreasQuery = {};
+      if (status !== "todos") query.status = status;
+      const [depsResp, areasResp] = await Promise.all([
+        listarDepartamentosParaArea(),
+        listarAreas(query),
+      ]);
+      setDepartamentosArea(depsResp.itens);
+      setAreas(areasResp.itens);
+      setStatusAreaCarregamento("dados");
+    } catch {
+      setStatusAreaCarregamento("erro");
+    }
+  }, []);
+
+  useEffect(() => {
+    if (abaAtiva === "areas") {
+      void carregarAreas(filtroAreaStatus);
+    }
+  }, [abaAtiva, filtroAreaStatus, carregarAreas]);
 
   function abrirCriar() {
     setFormulario({
@@ -330,6 +392,101 @@ export function EstruturaOrganizacionalScreen() {
     }
   }
 
+  const departamentosAtivosArea = departamentosArea.filter(
+    (d) => d.status === "ativo",
+  );
+  const podeCriarArea =
+    statusAreaCarregamento === "dados" && departamentosAtivosArea.length > 0;
+
+  function abrirCriarArea() {
+    setFormularioArea({
+      modo: "criar",
+      codigo: "",
+      nome: "",
+      departamentoId:
+        departamentosAtivosArea.length === 1
+          ? (departamentosAtivosArea[0]?.id ?? "")
+          : "",
+      erros: {},
+      salvando: false,
+    });
+  }
+
+  function abrirEditarArea(area: AreaApi) {
+    setFormularioArea({
+      modo: "editar",
+      areaId: area.id,
+      codigoAtual: area.codigo,
+      codigo: "",
+      nome: area.nome,
+      departamentoId: area.departamentoId,
+      erros: {},
+      salvando: false,
+    });
+  }
+
+  function fecharFormularioArea() {
+    setFormularioArea(null);
+  }
+
+  async function handleSubmitArea(evento: React.FormEvent) {
+    evento.preventDefault();
+    if (!formularioArea) return;
+
+    const erros: FormularioAreaErros = {};
+    if (formularioArea.modo === "criar") {
+      if (
+        departamentosAtivosArea.length > 1 &&
+        !formularioArea.departamentoId
+      ) {
+        erros.departamentoId = "Selecione o departamento.";
+      }
+      const erroCodigo = validarCodigo(formularioArea.codigo);
+      if (erroCodigo) erros.codigo = erroCodigo;
+    }
+    const erroNome = validarNome(formularioArea.nome);
+    if (erroNome) erros.nome = erroNome;
+
+    if (erros.departamentoId ?? erros.codigo ?? erros.nome) {
+      setFormularioArea((prev) => (prev ? { ...prev, erros } : prev));
+      return;
+    }
+
+    setFormularioArea((prev) =>
+      prev ? { ...prev, salvando: true, erros: {} } : prev,
+    );
+
+    try {
+      if (formularioArea.modo === "criar") {
+        const dto: CriarAreaDto = {
+          codigo: formularioArea.codigo.trim(),
+          nome: formularioArea.nome.trim(),
+          departamentoId: formularioArea.departamentoId,
+        };
+        await criarArea(dto);
+      } else {
+        const dto: AtualizarAreaDto = { nome: formularioArea.nome.trim() };
+        await atualizarArea(formularioArea.areaId!, dto);
+      }
+      setFormularioArea(null);
+      await carregarAreas(filtroAreaStatus);
+    } catch (err: unknown) {
+      const mensagem =
+        err instanceof Error
+          ? err.message
+          : "Não foi possível salvar. Tente novamente.";
+      setFormularioArea((prev) =>
+        prev
+          ? {
+              ...prev,
+              salvando: false,
+              erros: { ...prev.erros, geral: mensagem },
+            }
+          : prev,
+      );
+    }
+  }
+
   const colunas: DataTableColumn<UnidadeOrganizacionalApi>[] = [
     {
       key: "codigo",
@@ -384,13 +541,50 @@ export function EstruturaOrganizacionalScreen() {
     },
   ];
 
+  const colunasArea: DataTableColumn<AreaApi>[] = [
+    {
+      key: "codigo",
+      header: "Código",
+      cell: (linha) => <code>{linha.codigo}</code>,
+    },
+    { key: "nome", header: "Nome", cell: (linha) => linha.nome },
+    {
+      key: "departamento",
+      header: "Departamento",
+      cell: (linha) => {
+        const dep = departamentosArea.find(
+          (d) => d.id === linha.departamentoId,
+        );
+        return dep ? <code>{dep.codigo}</code> : "—";
+      },
+    },
+    {
+      key: "situacao",
+      header: "Situação",
+      cell: (linha) => (
+        <StatusBadge variant={VARIANTE_STATUS[linha.status] ?? "neutral"}>
+          {ROTULO_STATUS[linha.status] ?? linha.status}
+        </StatusBadge>
+      ),
+    },
+    {
+      key: "acoes",
+      header: "Ações",
+      cell: (linha) => (
+        <Button variant="secondary" onClick={() => abrirEditarArea(linha)}>
+          Editar
+        </Button>
+      ),
+    },
+  ];
+
   return (
     <div className="estrutura-organizacional-screen">
       <PageHeader
         headingLevel={1}
         titleId={ESTRUTURA_ORGANIZACIONAL_TITULO_ID}
         title="Estrutura organizacional"
-        description="Gerencie as unidades e departamentos organizacionais da sua empresa: cadastre, consulte e edite as referências de estrutura dentro do seu escopo."
+        description="Gerencie as unidades, departamentos e áreas organizacionais da sua empresa: cadastre, consulte e edite as referências de estrutura dentro do seu escopo."
         actions={
           abaAtiva === "unidades" ? (
             <Button
@@ -399,9 +593,13 @@ export function EstruturaOrganizacionalScreen() {
             >
               Nova unidade
             </Button>
-          ) : (
+          ) : abaAtiva === "departamentos" ? (
             <Button onClick={abrirCriarDep} disabled={!podeCriarDep}>
               Novo departamento
+            </Button>
+          ) : (
+            <Button onClick={abrirCriarArea} disabled={!podeCriarArea}>
+              Nova área
             </Button>
           )
         }
@@ -435,8 +633,8 @@ export function EstruturaOrganizacionalScreen() {
           id="estrutura-organizacional-aviso-auditado-titulo"
           className="estrutura-organizacional-screen__aviso-texto"
         >
-          Cadastros e edições de unidades e departamentos organizacionais geram
-          trilha de auditoria automática. Não é possível excluir — apenas
+          Cadastros e edições de unidades, departamentos e áreas organizacionais
+          geram trilha de auditoria automática. Não é possível excluir — apenas
           inativar.
         </p>
       </Surface>
@@ -463,6 +661,15 @@ export function EstruturaOrganizacionalScreen() {
           onClick={() => setAbaAtiva("departamentos")}
         >
           Departamentos
+        </button>
+        <button
+          role="tab"
+          type="button"
+          className={`estrutura-organizacional-screen__aba${abaAtiva === "areas" ? " estrutura-organizacional-screen__aba--ativa" : ""}`}
+          aria-selected={abaAtiva === "areas"}
+          onClick={() => setAbaAtiva("areas")}
+        >
+          Áreas
         </button>
       </div>
 
@@ -549,19 +756,102 @@ export function EstruturaOrganizacionalScreen() {
             )}
           </section>
         )
-      ) : statusDepCarregamento === "erro" ? (
+      ) : abaAtiva === "departamentos" ? (
+        statusDepCarregamento === "erro" ? (
+          <Surface
+            as="section"
+            padding="lg"
+            className="estrutura-organizacional-screen__erro"
+            aria-labelledby="estrutura-dep-erro-titulo"
+          >
+            <StatusBadge variant="danger">Erro</StatusBadge>
+            <h2
+              id="estrutura-dep-erro-titulo"
+              className="estrutura-organizacional-screen__section-title"
+            >
+              Não foi possível carregar os departamentos
+            </h2>
+            <p>
+              Verifique sua conexão e tente novamente. Se o problema persistir,
+              contate o suporte.
+            </p>
+            <Button
+              variant="secondary"
+              onClick={() => void carregarDepartamentos(filtroDepStatus)}
+            >
+              Tentar novamente
+            </Button>
+          </Surface>
+        ) : (
+          <section aria-labelledby="estrutura-dep-lista-titulo">
+            <h2
+              id="estrutura-dep-lista-titulo"
+              className="estrutura-organizacional-screen__section-title"
+            >
+              Departamentos
+            </h2>
+
+            <div className="estrutura-organizacional-screen__filtros">
+              <FormField id="estrutura-dep-filtro-status" label="Situação">
+                {(control) => (
+                  <select
+                    value={filtroDepStatus}
+                    onChange={(evento) =>
+                      setFiltroDepStatus(evento.target.value as StatusFiltro)
+                    }
+                    disabled={statusDepCarregamento === "carregando"}
+                    {...control}
+                  >
+                    <option value="todos">Todas as situações</option>
+                    <option value="ativo">Ativa</option>
+                    <option value="inativo">Inativa</option>
+                  </select>
+                )}
+              </FormField>
+            </div>
+
+            {statusDepCarregamento === "carregando" ? (
+              <p
+                className="estrutura-organizacional-screen__carregando"
+                role="status"
+              >
+                Carregando departamentos…
+              </p>
+            ) : departamentos.length === 0 ? (
+              <EmptyState
+                headingLevel={3}
+                icon="—"
+                title="Nenhum departamento cadastrado"
+                description="Cadastre o primeiro departamento para esta empresa."
+                action={
+                  podeCriarDep ? (
+                    <Button onClick={abrirCriarDep}>Novo departamento</Button>
+                  ) : undefined
+                }
+              />
+            ) : (
+              <DataTable
+                caption="Departamentos"
+                columns={colunasDep}
+                rows={departamentos}
+                rowKey={(linha) => linha.id}
+              />
+            )}
+          </section>
+        )
+      ) : statusAreaCarregamento === "erro" ? (
         <Surface
           as="section"
           padding="lg"
           className="estrutura-organizacional-screen__erro"
-          aria-labelledby="estrutura-dep-erro-titulo"
+          aria-labelledby="estrutura-area-erro-titulo"
         >
           <StatusBadge variant="danger">Erro</StatusBadge>
           <h2
-            id="estrutura-dep-erro-titulo"
+            id="estrutura-area-erro-titulo"
             className="estrutura-organizacional-screen__section-title"
           >
-            Não foi possível carregar os departamentos
+            Não foi possível carregar as áreas
           </h2>
           <p>
             Verifique sua conexão e tente novamente. Se o problema persistir,
@@ -569,29 +859,29 @@ export function EstruturaOrganizacionalScreen() {
           </p>
           <Button
             variant="secondary"
-            onClick={() => void carregarDepartamentos(filtroDepStatus)}
+            onClick={() => void carregarAreas(filtroAreaStatus)}
           >
             Tentar novamente
           </Button>
         </Surface>
       ) : (
-        <section aria-labelledby="estrutura-dep-lista-titulo">
+        <section aria-labelledby="estrutura-area-lista-titulo">
           <h2
-            id="estrutura-dep-lista-titulo"
+            id="estrutura-area-lista-titulo"
             className="estrutura-organizacional-screen__section-title"
           >
-            Departamentos
+            Áreas
           </h2>
 
           <div className="estrutura-organizacional-screen__filtros">
-            <FormField id="estrutura-dep-filtro-status" label="Situação">
+            <FormField id="estrutura-area-filtro-status" label="Situação">
               {(control) => (
                 <select
-                  value={filtroDepStatus}
+                  value={filtroAreaStatus}
                   onChange={(evento) =>
-                    setFiltroDepStatus(evento.target.value as StatusFiltro)
+                    setFiltroAreaStatus(evento.target.value as StatusFiltro)
                   }
-                  disabled={statusDepCarregamento === "carregando"}
+                  disabled={statusAreaCarregamento === "carregando"}
                   {...control}
                 >
                   <option value="todos">Todas as situações</option>
@@ -602,30 +892,30 @@ export function EstruturaOrganizacionalScreen() {
             </FormField>
           </div>
 
-          {statusDepCarregamento === "carregando" ? (
+          {statusAreaCarregamento === "carregando" ? (
             <p
               className="estrutura-organizacional-screen__carregando"
               role="status"
             >
-              Carregando departamentos…
+              Carregando áreas…
             </p>
-          ) : departamentos.length === 0 ? (
+          ) : areas.length === 0 ? (
             <EmptyState
               headingLevel={3}
               icon="—"
-              title="Nenhum departamento cadastrado"
-              description="Cadastre o primeiro departamento para esta empresa."
+              title="Nenhuma área cadastrada"
+              description="Cadastre a primeira área para um departamento desta empresa."
               action={
-                podeCriarDep ? (
-                  <Button onClick={abrirCriarDep}>Novo departamento</Button>
+                podeCriarArea ? (
+                  <Button onClick={abrirCriarArea}>Nova área</Button>
                 ) : undefined
               }
             />
           ) : (
             <DataTable
-              caption="Departamentos"
-              columns={colunasDep}
-              rows={departamentos}
+              caption="Áreas"
+              columns={colunasArea}
+              rows={areas}
               rowKey={(linha) => linha.id}
             />
           )}
@@ -910,6 +1200,167 @@ export function EstruturaOrganizacionalScreen() {
                 disabled={formularioDep.salvando}
               >
                 {formularioDep.salvando ? "Salvando…" : "Salvar"}
+              </Button>
+            </FormActions>
+          </form>
+        </Surface>
+      ) : null}
+
+      {formularioArea ? (
+        <Surface
+          as="section"
+          padding="lg"
+          className="estrutura-organizacional-screen__formulario"
+          aria-labelledby={formAreaTituloId}
+        >
+          <h2
+            id={formAreaTituloId}
+            className="estrutura-organizacional-screen__section-title"
+          >
+            {formularioArea.modo === "criar" ? "Nova área" : "Editar área"}
+          </h2>
+
+          <form
+            className="estrutura-organizacional-screen__form"
+            aria-label={
+              formularioArea.modo === "criar"
+                ? "Formulário de nova área"
+                : "Formulário de edição de área"
+            }
+            onSubmit={(e) => void handleSubmitArea(e)}
+          >
+            {formularioArea.modo === "criar" &&
+            departamentosAtivosArea.length > 1 ? (
+              <FormField
+                id="estrutura-area-departamento"
+                label="Departamento"
+                required
+                {...(formularioArea.erros.departamentoId
+                  ? { error: formularioArea.erros.departamentoId }
+                  : {})}
+              >
+                {(control) => (
+                  <select
+                    value={formularioArea.departamentoId}
+                    onChange={(e) =>
+                      setFormularioArea((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              departamentoId: e.target.value,
+                              erros: {},
+                            }
+                          : prev,
+                      )
+                    }
+                    {...control}
+                  >
+                    <option value="">Selecione o departamento</option>
+                    {departamentosAtivosArea.map((dep) => (
+                      <option key={dep.id} value={dep.id}>
+                        {dep.codigo} — {dep.nome}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </FormField>
+            ) : null}
+
+            {formularioArea.modo === "criar" ? (
+              <FormField
+                id="estrutura-area-codigo"
+                label="Código"
+                required
+                help="Letras maiúsculas, dígitos e _ (2 a 32 caracteres). Imutável após o cadastro."
+                {...(formularioArea.erros.codigo
+                  ? { error: formularioArea.erros.codigo }
+                  : {})}
+              >
+                {(control) => (
+                  <input
+                    type="text"
+                    maxLength={32}
+                    placeholder="Ex.: CONTAS"
+                    value={formularioArea.codigo}
+                    onChange={(e) =>
+                      setFormularioArea((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              codigo: e.target.value.toUpperCase(),
+                              erros: {},
+                            }
+                          : prev,
+                      )
+                    }
+                    {...control}
+                  />
+                )}
+              </FormField>
+            ) : (
+              <FormField id="estrutura-area-codigo-fixo" label="Código">
+                {(control) => (
+                  <input
+                    type="text"
+                    readOnly
+                    value={formularioArea.codigoAtual ?? ""}
+                    aria-readonly="true"
+                    {...control}
+                  />
+                )}
+              </FormField>
+            )}
+
+            <FormField
+              id="estrutura-area-nome"
+              label="Nome"
+              required
+              help="Identificador da área. Máximo 160 caracteres."
+              {...(formularioArea.erros.nome
+                ? { error: formularioArea.erros.nome }
+                : {})}
+            >
+              {(control) => (
+                <input
+                  type="text"
+                  maxLength={160}
+                  value={formularioArea.nome}
+                  onChange={(e) =>
+                    setFormularioArea((prev) =>
+                      prev
+                        ? { ...prev, nome: e.target.value, erros: {} }
+                        : prev,
+                    )
+                  }
+                  {...control}
+                />
+              )}
+            </FormField>
+
+            {formularioArea.erros.geral ? (
+              <p
+                className="estrutura-organizacional-screen__form-erro"
+                role="alert"
+              >
+                {formularioArea.erros.geral}
+              </p>
+            ) : null}
+
+            <FormActions>
+              <Button
+                variant="secondary"
+                type="button"
+                onClick={fecharFormularioArea}
+                disabled={formularioArea.salvando}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                disabled={formularioArea.salvando}
+              >
+                {formularioArea.salvando ? "Salvando…" : "Salvar"}
               </Button>
             </FormActions>
           </form>
