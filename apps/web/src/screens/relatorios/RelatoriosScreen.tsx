@@ -1,8 +1,8 @@
 /**
  * Relatórios (T075) — wrapper de navegação local entre "Exceções de Ponto"
  * (padrão), "Relatórios disponíveis", "Extrato de Banco de Horas" (T098),
- * "Espelho de Ponto" (T099), "Justificativas" (T100) e "Quadro de Horários"
- * (T101).
+ * "Espelho de Ponto" (T099), "Justificativas" (T100), "Quadro de Horários"
+ * (T101) e "Calendário de Feriados" (T102).
  *
  * A troca de aba é feita só por estado React local (`useState`) — sem React
  * Router, sem rota real, sem API/fetch. A cada vez que o destino
@@ -13,7 +13,8 @@
  * `h1` na página — cada tela (`ExcecoesPontoScreen`,
  * `RelatoriosDisponiveisScreen`, `ExtratoBancoHorasScreen`,
  * `EspelhoPontoScreen`, `RelatorioJustificativasScreen`,
- * `QuadroHorariosScreen`) já traz o seu próprio.
+ * `QuadroHorariosScreen`, `RelatorioCalendarioFeriadosScreen`) já traz o seu
+ * próprio.
  *
  * As abas usam o padrão ARIA de abas (`role="tablist"`/`role="tab"` +
  * `aria-selected`), distinto do `aria-current` do `PainelNavigation` (que
@@ -39,6 +40,10 @@ import {
   QuadroHorariosScreen,
 } from "./QuadroHorariosScreen";
 import {
+  RELATORIO_CALENDARIO_FERIADOS_TITULO_ID,
+  RelatorioCalendarioFeriadosScreen,
+} from "./RelatorioCalendarioFeriadosScreen";
+import {
   RELATORIO_JUSTIFICATIVAS_TITULO_ID,
   RelatorioJustificativasScreen,
 } from "./RelatorioJustificativasScreen";
@@ -54,7 +59,8 @@ type AbaRelatorios =
   | "extrato_banco_horas"
   | "espelho_ponto"
   | "justificativas"
-  | "quadro_horarios";
+  | "quadro_horarios"
+  | "calendario_feriados";
 
 interface AbaDefinicao {
   readonly id: AbaRelatorios;
@@ -92,6 +98,11 @@ const ABAS: readonly AbaDefinicao[] = [
     id: "quadro_horarios",
     rotulo: "Quadro de Horários",
     tituloId: QUADRO_HORARIOS_TITULO_ID,
+  },
+  {
+    id: "calendario_feriados",
+    rotulo: "Calendário de Feriados",
+    tituloId: RELATORIO_CALENDARIO_FERIADOS_TITULO_ID,
   },
 ];
 
@@ -157,8 +168,10 @@ export function RelatoriosScreen({ onTituloIdChange }: RelatoriosScreenProps) {
           <EspelhoPontoScreen />
         ) : abaAtiva === "justificativas" ? (
           <RelatorioJustificativasScreen />
-        ) : (
+        ) : abaAtiva === "quadro_horarios" ? (
           <QuadroHorariosScreen />
+        ) : (
+          <RelatorioCalendarioFeriadosScreen />
         )}
       </div>
     </div>

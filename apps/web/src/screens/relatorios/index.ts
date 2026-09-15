@@ -15,6 +15,10 @@ export {
   QuadroHorariosScreen,
 } from "./QuadroHorariosScreen";
 export {
+  RELATORIO_CALENDARIO_FERIADOS_TITULO_ID,
+  RelatorioCalendarioFeriadosScreen,
+} from "./RelatorioCalendarioFeriadosScreen";
+export {
   RELATORIO_JUSTIFICATIVAS_TITULO_ID,
   RelatorioJustificativasScreen,
 } from "./RelatorioJustificativasScreen";
