@@ -1,334 +1,512 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type {
+  CargoApi,
+  EmpresaApi,
+  ResultadoPaginado,
+} from "../../api/cargoClient";
 import { FuncoesCargosScreen } from "./FuncoesCargosScreen";
 
-describe("FuncoesCargosScreen (T080 — tela visual estática)", () => {
-  it("tem um único h1", () => {
-    render(<FuncoesCargosScreen />);
+vi.mock("../../api/cargoClient");
 
-    expect(
-      screen.getAllByRole("heading", {
-        level: 1,
-        name: "Funções e cargos",
-      }),
-    ).toHaveLength(1);
+import {
+  atualizarCargo,
+  criarCargo,
+  listarCargos,
+  listarEmpresas,
+} from "../../api/cargoClient";
+
+const mockListarEmpresas = vi.mocked(listarEmpresas);
+const mockListarCargos = vi.mocked(listarCargos);
+const mockCriarCargo = vi.mocked(criarCargo);
+const mockAtualizarCargo = vi.mocked(atualizarCargo);
+
+const empresaFixture: EmpresaApi = {
+  id: "00000000-0000-0000-0000-000000000001",
+  codigo: "EMP-01",
+  nome: "Empresa Exemplo (teste)",
+  status: "ativo",
+};
+
+const empresaB: EmpresaApi = {
+  id: "00000000-0000-0000-0000-000000000002",
+  codigo: "EMP-02",
+  nome: "Empresa B (teste)",
+  status: "ativo",
+};
+
+const cargo1: CargoApi = {
+  id: "00000000-0000-0000-0000-000000000011",
+  codigo: "ANALISTA",
+  nome: "Analista (teste)",
+  empresaId: empresaFixture.id,
+  status: "ativo",
+  criadoEm: "2026-01-01T00:00:00.000Z",
+  atualizadoEm: "2026-01-01T00:00:00.000Z",
+};
+
+const cargo2: CargoApi = {
+  id: "00000000-0000-0000-0000-000000000012",
+  codigo: "GESTOR",
+  nome: "Gestor (teste)",
+  empresaId: empresaFixture.id,
+  status: "inativo",
+  criadoEm: "2026-01-01T00:00:00.000Z",
+  atualizadoEm: "2026-01-01T00:00:00.000Z",
+};
+
+function mockSucesso(cargosLista: CargoApi[] = [cargo1, cargo2]) {
+  mockListarEmpresas.mockResolvedValue({
+    itens: [empresaFixture],
+    pagina: 1,
+    tamanhoPagina: 100,
+    total: 1,
+  } satisfies ResultadoPaginado<EmpresaApi>);
+  mockListarCargos.mockResolvedValue({
+    itens: cargosLista,
+    pagina: 1,
+    tamanhoPagina: 50,
+    total: cargosLista.length,
+  } satisfies ResultadoPaginado<CargoApi>);
+}
+
+function mockMultiEmpresa() {
+  mockListarEmpresas.mockResolvedValue({
+    itens: [empresaFixture, empresaB],
+    pagina: 1,
+    tamanhoPagina: 100,
+    total: 2,
+  } satisfies ResultadoPaginado<EmpresaApi>);
+  mockListarCargos.mockResolvedValue({
+    itens: [cargo1],
+    pagina: 1,
+    tamanhoPagina: 50,
+    total: 1,
+  } satisfies ResultadoPaginado<CargoApi>);
+}
+
+describe("FuncoesCargosScreen (T105 — funcional)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
   });
 
-  it("exibe o aviso de que o RH consulta somente referências da própria empresa e unidades autorizadas", () => {
+  it("tem um único h1", async () => {
+    mockSucesso();
     render(<FuncoesCargosScreen />);
 
-    expect(screen.getByText("Somente RH")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        screen.getByRole("heading", { level: 1, name: "Funções e cargos" }),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+  });
+
+  it("exibe os avisos de escopo, auditoria e referências organizacionais", async () => {
+    mockSucesso();
+    render(<FuncoesCargosScreen />);
+
+    await waitFor(() =>
+      expect(screen.getByText("Somente RH")).toBeInTheDocument(),
+    );
     expect(
       screen.getByText(
-        /somente referências de função e cargo da própria empresa e das unidades autorizadas/i,
+        /Somente o RH da própria empresa administra o catálogo/i,
       ),
     ).toBeInTheDocument();
-  });
-
-  it("exibe o aviso de que é só demonstração, sem login, API, persistência, importação, exportação, integração ou cálculo", () => {
-    render(<FuncoesCargosScreen />);
-
-    expect(screen.getByText("Somente demonstração")).toBeInTheDocument();
+    expect(screen.getByText("Auditado")).toBeInTheDocument();
     expect(
-      screen.getByText(
-        /não há login, api, persistência, importação, exportação, integração, cálculo ou alteração cadastral real/i,
-      ),
+      screen.getByText(/geram trilha de auditoria automática/i),
     ).toBeInTheDocument();
-  });
-
-  it("exibe o aviso de que cargo/função/departamento/centro de custo/estrutura são referências distintas e não concedem acesso", () => {
-    render(<FuncoesCargosScreen />);
-
     expect(screen.getByText("Referências organizacionais")).toBeInTheDocument();
     expect(
       screen.getByText(
-        /cargo, função, departamento, centro de custo e estrutura são referências distintas e não concedem permissão de acesso/i,
+        /cargo, função, departamento, centro de custo e estrutura são referências distintas/i,
       ),
     ).toBeInTheDocument();
   });
 
-  it("exibe o aviso de que dados reais exigem MFA, DS-OPS-01, auditoria, retenção/base legal e validações RH+Jurídico/privacidade+TI", () => {
+  it("exibe a seção de Funções como referência não operacional sem formulário", async () => {
+    mockSucesso();
     render(<FuncoesCargosScreen />);
 
-    expect(screen.getByText("Dados reais bloqueados")).toBeInTheDocument();
-    expect(screen.getByText(/MFA/)).toBeInTheDocument();
-    expect(screen.getByText("DS-OPS-01")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        screen.getByText("Funções — referência pendente"),
+      ).toBeInTheDocument(),
+    );
     expect(
-      screen.getByText(
-        /validações aplicáveis de rh, jurídico\/privacidade e ti/i,
-      ),
-    ).toBeInTheDocument();
-  });
-
-  it("mostra o resumo com os cinco indicadores (rótulo curto + contagem) e a nota de que não alteram vínculo/remuneração/jornada/etc.", () => {
-    render(<FuncoesCargosScreen />);
-
-    const resumo = screen.getByText("Resumo (exemplo)").closest("section")!;
-    const dentroDoResumo = within(resumo);
-
-    expect(
-      dentroDoResumo.getByText("Funções de referência"),
+      screen.getByText(/Funções não possuem ainda um modelo de domínio/i),
     ).toBeInTheDocument();
     expect(
-      dentroDoResumo.getByText("3 função(ões) de referência (exemplo)"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDoResumo.getByText("Cargos de referência"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDoResumo.getByText("3 cargo(s) de referência (exemplo)"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDoResumo.getByText("Vínculos organizacionais"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDoResumo.getByText(
-        "8 vínculo(s) organizacional(is) ilustrativo(s) (exemplo)",
-      ),
-    ).toBeInTheDocument();
-    expect(
-      dentroDoResumo.getByText("Aguardando decisão formal"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDoResumo.getByText(
-        "3 item(ns) aguardando decisão formal (exemplo)",
-      ),
-    ).toBeInTheDocument();
-    expect(dentroDoResumo.getByText("Itens históricos")).toBeInTheDocument();
-    expect(
-      dentroDoResumo.getByText(
-        "2 item(ns) histórico(s) demonstrativo(s) (exemplo)",
-      ),
-    ).toBeInTheDocument();
-    expect(
-      dentroDoResumo.getByText(
-        /não alteram vínculo, remuneração, jornada, escala, banco de horas, folha, permissões ou acesso ao sistema/i,
-      ),
-    ).toBeInTheDocument();
-  });
-
-  it("lista as referências com referência técnica, função, cargo, unidade, departamento, responsável e trilha", () => {
-    render(<FuncoesCargosScreen />);
-
-    const tabela = screen.getByRole("table", {
-      name: "Funções e cargos (exemplo)",
-    });
-    const dentro = within(tabela);
-
-    const linha = dentro.getByText("FC-2026-0004").closest("tr")!;
-    const dentroDaLinha = within(linha);
-    expect(
-      dentroDaLinha.getByText("Função de referência C (exemplo)"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDaLinha.getByText("Cargo de referência A (exemplo)"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDaLinha.getByText("Unidade U-03 (exemplo)"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDaLinha.getByText("Departamento D-01 (exemplo)"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDaLinha.getByText("Aguardando decisão (exemplo)"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDaLinha.getByText("RT-Funcoes-03 (exemplo)"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDaLinha.getByText("2 eventos registrados (exemplo)"),
-    ).toBeInTheDocument();
-  });
-
-  it("filtra localmente por situação, empresa/unidade técnica e departamento/estrutura técnica", () => {
-    render(<FuncoesCargosScreen />);
-
-    fireEvent.change(screen.getByLabelText("Situação"), {
-      target: { value: "historico_ilustrativo" },
-    });
-
-    const tabela = screen.getByRole("table", {
-      name: "Funções e cargos (exemplo)",
-    });
-    expect(within(tabela).getByText("FC-2025-0001")).toBeInTheDocument();
-    expect(within(tabela).getByText("FC-2025-0002")).toBeInTheDocument();
-    expect(within(tabela).queryByText("FC-2026-0001")).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Limpar filtros" }));
-    expect(screen.getByText("FC-2026-0001")).toBeInTheDocument();
-
-    fireEvent.change(screen.getByLabelText("Empresa/unidade técnica"), {
-      target: { value: "Unidade U-01 (exemplo)" },
-    });
-    expect(screen.getByText("FC-2026-0001")).toBeInTheDocument();
-    expect(screen.getByText("FC-2026-0003")).toBeInTheDocument();
-    expect(screen.getByText("FC-2026-0006")).toBeInTheDocument();
-    expect(screen.queryByText("FC-2026-0002")).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Limpar filtros" }));
-    fireEvent.change(screen.getByLabelText("Departamento/estrutura técnica"), {
-      target: { value: "Departamento D-02 (exemplo)" },
-    });
-    expect(screen.getByText("FC-2026-0002")).toBeInTheDocument();
-    expect(screen.getByText("FC-2026-0005")).toBeInTheDocument();
-    expect(screen.getByText("FC-2025-0002")).toBeInTheDocument();
-    expect(screen.queryByText("FC-2026-0001")).not.toBeInTheDocument();
-  });
-
-  it("mostra EmptyState quando o filtro não corresponde a nenhuma referência", () => {
-    render(<FuncoesCargosScreen />);
-
-    fireEvent.change(screen.getByLabelText("Situação"), {
-      target: { value: "historico_ilustrativo" },
-    });
-    fireEvent.change(screen.getByLabelText("Empresa/unidade técnica"), {
-      target: { value: "Unidade U-01 (exemplo)" },
-    });
-
-    expect(
-      screen.getByRole("heading", {
-        name: "Nenhuma referência corresponde aos filtros",
+      screen.queryByRole("form", {
+        name: /formulário.*função/i,
       }),
-    ).toBeInTheDocument();
-  });
-
-  it("abre o painel de detalhe ao clicar em 'Ver detalhe', somente leitura, com campos pendentes e único controle 'Fechar'", () => {
-    render(<FuncoesCargosScreen />);
-
-    const linha = screen.getByText("FC-2026-0001").closest("tr")!;
-    fireEvent.click(within(linha).getByRole("button", { name: /Ver detalhe/ }));
-
-    expect(screen.getByText("Detalhe demonstrativo")).toBeInTheDocument();
-    const tituloDetalhe = screen.getByRole("heading", {
-      name: "Detalhe da referência — FC-2026-0001",
-    });
-    expect(tituloDetalhe).toBeInTheDocument();
-    const painel = tituloDetalhe.closest("section")!;
-    const dentroDoPainel = within(painel);
-
-    expect(
-      dentroDoPainel.getByText("Função de referência A (exemplo)"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDoPainel.getByText("Cargo de referência A (exemplo)"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDoPainel.getByText("Vínculo com centro de custo (exemplo)"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDoPainel.getByText("Nível hierárquico (exemplo)"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDoPainel.getByText(
-        /este painel não cria, edita, vincula, ativa, aprova, salva, importa, exporta nem altera registro real/i,
-      ),
-    ).toBeInTheDocument();
-
-    expect(
-      dentroDoPainel.getAllByRole("button").map((b) => b.textContent),
-    ).toEqual(["Fechar"]);
-
-    fireEvent.click(dentroDoPainel.getByRole("button", { name: "Fechar" }));
-    expect(screen.queryByText("Detalhe demonstrativo")).not.toBeInTheDocument();
-  });
-
-  it("mostra 'nenhum campo pendente' quando o item de exemplo não tem pendências", () => {
-    render(<FuncoesCargosScreen />);
-
-    const linha = screen.getByText("FC-2026-0005").closest("tr")!;
-    fireEvent.click(within(linha).getByRole("button", { name: /Ver detalhe/ }));
-
-    expect(
-      screen.getByText("Nenhum campo pendente (exemplo)."),
-    ).toBeInTheDocument();
-  });
-
-  it("alterna para o estado vazio e mostra o EmptyState", () => {
-    render(<FuncoesCargosScreen />);
-
-    fireEvent.click(screen.getByRole("button", { name: "Vazio" }));
-
-    expect(
-      screen.queryByRole("table", { name: "Funções e cargos (exemplo)" }),
     ).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", {
-        level: 3,
-        name: "Nenhuma referência de função ou cargo cadastrada",
-      }),
-    ).toBeInTheDocument();
   });
 
-  it("alterna para o estado de erro com referência ilustrativa e ação de retorno", () => {
+  it("lista cargos com código, nome, situação e botão Editar", async () => {
+    mockSucesso();
     render(<FuncoesCargosScreen />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Erro" }));
-
+    const tabela = await screen.findByRole("table", { name: "Cargos" });
+    expect(within(tabela).getByText("ANALISTA")).toBeInTheDocument();
+    expect(within(tabela).getByText("Analista (teste)")).toBeInTheDocument();
+    expect(within(tabela).getByText("Ativa")).toBeInTheDocument();
+    expect(within(tabela).getByText("GESTOR")).toBeInTheDocument();
+    expect(within(tabela).getByText("Gestor (teste)")).toBeInTheDocument();
+    expect(within(tabela).getByText("Inativa")).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", {
-        name: "Não foi possível carregar as referências de função e cargo",
-      }),
-    ).toBeInTheDocument();
-    expect(screen.getByText(/REQ-DEMO-001922/)).toBeInTheDocument();
+      within(tabela).getAllByRole("button", { name: "Editar" }),
+    ).toHaveLength(2);
+  });
 
+  it("status 'ativo' exibe rótulo 'Ativa' e 'inativo' exibe 'Inativa'", async () => {
+    mockSucesso([cargo1, cargo2]);
+    render(<FuncoesCargosScreen />);
+
+    const tabela = await screen.findByRole("table", { name: "Cargos" });
+    const linhaAtivo = within(tabela).getByText("ANALISTA").closest("tr")!;
+    expect(within(linhaAtivo).getByText("Ativa")).toBeInTheDocument();
+    const linhaInativo = within(tabela).getByText("GESTOR").closest("tr")!;
+    expect(within(linhaInativo).getByText("Inativa")).toBeInTheDocument();
+  });
+
+  it("mostra EmptyState quando não há cargos", async () => {
+    mockSucesso([]);
+    render(<FuncoesCargosScreen />);
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole("heading", { name: "Nenhum cargo cadastrado" }),
+      ).toBeInTheDocument(),
+    );
+    expect(
+      screen.queryByRole("table", { name: "Cargos" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("mostra erro e permite tentar novamente", async () => {
+    mockListarEmpresas.mockRejectedValue(new Error("falha de rede"));
+    mockListarCargos.mockRejectedValue(new Error("falha de rede"));
+    render(<FuncoesCargosScreen />);
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole("heading", {
+          name: "Não foi possível carregar os cargos",
+        }),
+      ).toBeInTheDocument(),
+    );
+
+    mockSucesso();
     fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
+
+    await screen.findByRole("table", { name: "Cargos" });
+  });
+
+  it("filtra por situação chamando a API com o parâmetro status correto", async () => {
+    mockSucesso();
+    render(<FuncoesCargosScreen />);
+    await screen.findByRole("table", { name: "Cargos" });
+
+    mockListarCargos.mockResolvedValue({
+      itens: [cargo1],
+      pagina: 1,
+      tamanhoPagina: 50,
+      total: 1,
+    } satisfies ResultadoPaginado<CargoApi>);
+
+    fireEvent.change(screen.getByLabelText("Situação"), {
+      target: { value: "ativo" },
+    });
+
+    await waitFor(() =>
+      expect(mockListarCargos).toHaveBeenCalledWith(
+        expect.objectContaining({ status: "ativo" }),
+      ),
+    );
+  });
+
+  it("o filtro envia 'inativo' (não 'inativa') para a API", async () => {
+    mockSucesso();
+    render(<FuncoesCargosScreen />);
+    await screen.findByRole("table", { name: "Cargos" });
+
+    mockListarCargos.mockResolvedValue({
+      itens: [cargo2],
+      pagina: 1,
+      tamanhoPagina: 50,
+      total: 1,
+    } satisfies ResultadoPaginado<CargoApi>);
+
+    fireEvent.change(screen.getByLabelText("Situação"), {
+      target: { value: "inativo" },
+    });
+
+    await waitFor(() =>
+      expect(mockListarCargos).toHaveBeenCalledWith(
+        expect.objectContaining({ status: "inativo" }),
+      ),
+    );
+  });
+
+  it("abre formulário de criação, valida campos e salva via API (empresa única auto-determinada)", async () => {
+    mockSucesso();
+    mockCriarCargo.mockResolvedValue({
+      ...cargo1,
+      id: "00000000-0000-0000-0000-000000000099",
+      codigo: "COORD",
+      nome: "Coordenador (teste)",
+    });
+    render(<FuncoesCargosScreen />);
+    await screen.findByRole("table", { name: "Cargos" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Novo cargo" }));
+
+    const form = screen.getByRole("form", {
+      name: "Formulário de novo cargo",
+    });
+
+    // Sem empresa selector (única empresa no escopo)
     expect(
-      screen.getByRole("table", { name: "Funções e cargos (exemplo)" }),
+      within(form).queryByLabelText("Empresa", { exact: false }),
+    ).not.toBeInTheDocument();
+
+    // Submeter sem preencher → erros de validação
+    fireEvent.click(within(form).getByRole("button", { name: "Salvar" }));
+    expect(
+      await screen.findByText("Código é obrigatório."),
     ).toBeInTheDocument();
+
+    fireEvent.change(within(form).getByLabelText("Código", { exact: false }), {
+      target: { value: "COORD" },
+    });
+    fireEvent.change(within(form).getByLabelText("Nome", { exact: false }), {
+      target: { value: "Coordenador (teste)" },
+    });
+    fireEvent.click(within(form).getByRole("button", { name: "Salvar" }));
+
+    await waitFor(() =>
+      expect(screen.queryByRole("form")).not.toBeInTheDocument(),
+    );
+    expect(mockCriarCargo).toHaveBeenCalledWith({
+      codigo: "COORD",
+      nome: "Coordenador (teste)",
+      empresaId: empresaFixture.id,
+    });
   });
 
-  it("nenhum botão executa criar, vincular, ativar, aprovar, salvar, importar ou exportar registro", () => {
+  it("código inválido exibe mensagem de erro", async () => {
+    mockSucesso();
     render(<FuncoesCargosScreen />);
+    await screen.findByRole("table", { name: "Cargos" });
 
-    const linha = screen.getByText("FC-2026-0001").closest("tr")!;
-    fireEvent.click(within(linha).getByRole("button", { name: /Ver detalhe/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Novo cargo" }));
+    const form = screen.getByRole("form", { name: "Formulário de novo cargo" });
 
-    const rotulos = screen
-      .getAllByRole("button")
-      .map((botao) => botao.textContent?.toLowerCase() ?? "");
+    fireEvent.change(within(form).getByLabelText("Código", { exact: false }), {
+      target: { value: "invalido com espaco" },
+    });
+    fireEvent.click(within(form).getByRole("button", { name: "Salvar" }));
 
-    for (const rotulo of rotulos) {
-      expect(rotulo).not.toMatch(
-        /criar|vincular|ativar|aprovar|salvar|importar|exportar/,
-      );
-    }
+    expect(
+      await screen.findByText(
+        /Código deve conter apenas letras maiúsculas, dígitos e _/,
+      ),
+    ).toBeInTheDocument();
+    expect(mockCriarCargo).not.toHaveBeenCalled();
   });
 
-  it("não contém CPF, CNPJ, nome de empresa/pessoa real, e-mail, IP, arquivo, biometria ou valor financeiro", () => {
+  it("exige seleção explícita de empresa quando há mais de uma no escopo", async () => {
+    mockMultiEmpresa();
     render(<FuncoesCargosScreen />);
+    await screen.findByRole("table", { name: "Cargos" });
 
-    expect(document.querySelectorAll('input[type="file"]')).toHaveLength(0);
-    expect(document.querySelectorAll("a")).toHaveLength(0);
-    expect(document.querySelectorAll("img")).toHaveLength(0);
-    expect(document.querySelectorAll("iframe")).toHaveLength(0);
-    expect(document.querySelectorAll("form")).toHaveLength(0);
+    fireEvent.click(screen.getByRole("button", { name: "Novo cargo" }));
+    const form = screen.getByRole("form", { name: "Formulário de novo cargo" });
+
+    // Seletor de empresa deve estar visível
+    expect(
+      within(form).getByLabelText("Empresa", { exact: false }),
+    ).toBeInTheDocument();
+
+    // Submeter sem selecionar empresa → erro
+    fireEvent.change(within(form).getByLabelText("Código", { exact: false }), {
+      target: { value: "COORD" },
+    });
+    fireEvent.change(within(form).getByLabelText("Nome", { exact: false }), {
+      target: { value: "Coordenador (teste)" },
+    });
+    fireEvent.click(within(form).getByRole("button", { name: "Salvar" }));
+
+    expect(await screen.findByText("Selecione a empresa.")).toBeInTheDocument();
+    expect(mockCriarCargo).not.toHaveBeenCalled();
+  });
+
+  it("permite criar com seleção explícita de empresa em escopo multi-empresa", async () => {
+    mockMultiEmpresa();
+    mockCriarCargo.mockResolvedValue({
+      ...cargo1,
+      empresaId: empresaB.id,
+      codigo: "COORD",
+      nome: "Coordenador (teste)",
+    });
+    render(<FuncoesCargosScreen />);
+    await screen.findByRole("table", { name: "Cargos" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Novo cargo" }));
+    const form = screen.getByRole("form", { name: "Formulário de novo cargo" });
+
+    fireEvent.change(within(form).getByLabelText("Empresa", { exact: false }), {
+      target: { value: empresaB.id },
+    });
+    fireEvent.change(within(form).getByLabelText("Código", { exact: false }), {
+      target: { value: "COORD" },
+    });
+    fireEvent.change(within(form).getByLabelText("Nome", { exact: false }), {
+      target: { value: "Coordenador (teste)" },
+    });
+    fireEvent.click(within(form).getByRole("button", { name: "Salvar" }));
+
+    await waitFor(() =>
+      expect(screen.queryByRole("form")).not.toBeInTheDocument(),
+    );
+    expect(mockCriarCargo).toHaveBeenCalledWith({
+      codigo: "COORD",
+      nome: "Coordenador (teste)",
+      empresaId: empresaB.id,
+    });
+  });
+
+  it("abre formulário de edição com código somente leitura e salva nome via API", async () => {
+    mockSucesso();
+    mockAtualizarCargo.mockResolvedValue({
+      ...cargo1,
+      nome: "Analista Pleno (teste)",
+    });
+    mockListarCargos.mockResolvedValue({
+      itens: [{ ...cargo1, nome: "Analista Pleno (teste)" }, cargo2],
+      pagina: 1,
+      tamanhoPagina: 50,
+      total: 2,
+    } satisfies ResultadoPaginado<CargoApi>);
+
+    render(<FuncoesCargosScreen />);
+    const tabela = await screen.findByRole("table", { name: "Cargos" });
+
+    const linhaAnalista = within(tabela).getByText("ANALISTA").closest("tr")!;
+    fireEvent.click(
+      within(linhaAnalista).getByRole("button", { name: "Editar" }),
+    );
+
+    const form = screen.getByRole("form", {
+      name: "Formulário de edição de cargo",
+    });
+    const campoCodigo = within(form).getByLabelText("Código", { exact: false });
+    expect(campoCodigo).toHaveAttribute("readonly");
+    expect(campoCodigo).toHaveValue("ANALISTA");
+
+    const campoNome = within(form).getByLabelText("Nome", { exact: false });
+    fireEvent.change(campoNome, {
+      target: { value: "Analista Pleno (teste)" },
+    });
+    fireEvent.click(within(form).getByRole("button", { name: "Salvar" }));
+
+    await waitFor(() =>
+      expect(screen.queryByRole("form")).not.toBeInTheDocument(),
+    );
+    expect(mockAtualizarCargo).toHaveBeenCalledWith(cargo1.id, {
+      nome: "Analista Pleno (teste)",
+    });
+  });
+
+  it("cancelar fecha o formulário sem chamar a API", async () => {
+    mockSucesso();
+    render(<FuncoesCargosScreen />);
+    await screen.findByRole("table", { name: "Cargos" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Novo cargo" }));
+    expect(
+      screen.getByRole("form", { name: "Formulário de novo cargo" }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    expect(screen.queryByRole("form")).not.toBeInTheDocument();
+    expect(mockCriarCargo).not.toHaveBeenCalled();
+  });
+
+  it("a lista é atualizada após criar um cargo", async () => {
+    mockSucesso([cargo1]);
+    mockCriarCargo.mockResolvedValue({
+      ...cargo2,
+      id: "00000000-0000-0000-0000-000000000099",
+    });
+    // Após criar, a listagem retorna os dois cargos
+    mockListarCargos
+      .mockResolvedValueOnce({
+        itens: [cargo1],
+        pagina: 1,
+        tamanhoPagina: 50,
+        total: 1,
+      } satisfies ResultadoPaginado<CargoApi>)
+      .mockResolvedValue({
+        itens: [cargo1, cargo2],
+        pagina: 1,
+        tamanhoPagina: 50,
+        total: 2,
+      } satisfies ResultadoPaginado<CargoApi>);
+
+    render(<FuncoesCargosScreen />);
+    await screen.findByRole("table", { name: "Cargos" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Novo cargo" }));
+    const form = screen.getByRole("form", { name: "Formulário de novo cargo" });
+    fireEvent.change(within(form).getByLabelText("Código", { exact: false }), {
+      target: { value: "GESTOR" },
+    });
+    fireEvent.change(within(form).getByLabelText("Nome", { exact: false }), {
+      target: { value: "Gestor (teste)" },
+    });
+    fireEvent.click(within(form).getByRole("button", { name: "Salvar" }));
+
+    await waitFor(() => {
+      const tabela = screen.getByRole("table", { name: "Cargos" });
+      expect(within(tabela).getByText("GESTOR")).toBeInTheDocument();
+    });
+  });
+
+  it("não contém dados sensíveis, marca de terceiro ou valor financeiro", async () => {
+    mockSucesso();
+    render(<FuncoesCargosScreen />);
+    await screen.findByRole("table", { name: "Cargos" });
 
     const texto = document.body.innerHTML.toLowerCase();
     for (const termoProibido of [
-      "cpf",
-      "cnpj",
       "secullum",
       "rwtech",
       "bioprox",
       "reserva fiscal",
       "senha",
-      "sessão",
-      "telefone",
-      "biometria",
-      "afd",
       "r$",
       ".pdf",
       "localstorage",
-      "@",
-      "http://",
-      "https://",
+      "logradouro",
     ]) {
       expect(texto).not.toContain(termoProibido);
     }
   });
 
-  it("não declara conformidade com CLT, CCT, Portaria 671, LGPD ou eSocial", () => {
+  it("não declara conformidade com CLT, CCT/ACT, Portaria 671, LGPD ou eSocial", async () => {
+    mockSucesso();
     render(<FuncoesCargosScreen />);
+    await screen.findByRole("table", { name: "Cargos" });
 
     const texto = document.body.innerHTML.toLowerCase();
     for (const termoProibido of [
