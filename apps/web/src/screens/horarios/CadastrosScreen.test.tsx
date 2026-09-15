@@ -244,9 +244,7 @@ describe("CadastrosScreen — abas locais 'Horários' / 'Estrutura organizaciona
         name: "Centros de custo",
       }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", { name: "Centros de custo (exemplo)" }),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Somente RH")).toBeInTheDocument();
 
     expect(
       screen.getByRole("tab", { name: "Centros de custo" }),
@@ -682,9 +680,6 @@ describe("CadastrosScreen — abas locais 'Horários' / 'Estrutura organizaciona
     expect(
       screen.getByRole("heading", { level: 1, name: "Centros de custo" }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", { name: "Centros de custo (exemplo)" }),
-    ).toBeInTheDocument();
 
     fireEvent.click(
       screen.getByRole("tab", {
@@ -781,9 +776,6 @@ describe("CadastrosScreen — abas locais 'Horários' / 'Estrutura organizaciona
     fireEvent.click(screen.getByRole("tab", { name: "Centros de custo" }));
     expect(
       screen.getByRole("heading", { level: 1, name: "Centros de custo" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", { name: "Centros de custo (exemplo)" }),
     ).toBeInTheDocument();
 
     fireEvent.click(
@@ -889,9 +881,6 @@ describe("CadastrosScreen — abas locais 'Horários' / 'Estrutura organizaciona
     fireEvent.click(screen.getByRole("tab", { name: "Centros de custo" }));
     expect(
       screen.getByRole("heading", { level: 1, name: "Centros de custo" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", { name: "Centros de custo (exemplo)" }),
     ).toBeInTheDocument();
 
     fireEvent.click(
@@ -1008,9 +997,6 @@ describe("CadastrosScreen — abas locais 'Horários' / 'Estrutura organizaciona
     fireEvent.click(screen.getByRole("tab", { name: "Centros de custo" }));
     expect(
       screen.getByRole("heading", { level: 1, name: "Centros de custo" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", { name: "Centros de custo (exemplo)" }),
     ).toBeInTheDocument();
 
     fireEvent.click(

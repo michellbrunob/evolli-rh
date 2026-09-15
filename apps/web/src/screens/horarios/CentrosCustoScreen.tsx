@@ -1,23 +1,9 @@
-/**
- * Cadastros > Centros de custo (T083) — tela visual estática.
- *
- * Demonstra como o RH poderá consultar referências organizacionais de centro
- * de custo por empresa/unidade e estrutura técnica — sem criar rateio,
- * orçamento, pagamento, desconto, lançamento contábil, regra de Folha ou
- * permissão de acesso real. Tudo aqui é amostra sintética própria, em
- * memória.
- *
- * Escopo: PURAMENTE visual. Sem `fetch`, sem autenticação/sessão/CSRF/MFA,
- * sem rota real, sem persistência, sem backend, schema ou dependência nova.
- * O painel de detalhe é só leitura: nenhuma ação cria, edita, vincula, ativa,
- * aprova, salva, importa, exporta, integra, calcula valor, gera rateio nem
- * altera registro real.
- */
-import { useId, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
 import {
   Button,
   DataTable,
   EmptyState,
+  FormActions,
   FormField,
   PageHeader,
   StatusBadge,
@@ -25,177 +11,209 @@ import {
 } from "../../components";
 import type { DataTableColumn, StatusVariant } from "../../components";
 import {
-  CENTROS_CUSTO_EXEMPLO,
-  type CentroCustoExemplo,
-  ROTULO_SITUACAO_CENTRO_CUSTO,
-  type SituacaoCentroCusto,
-} from "./centrosCusto.fixtures";
+  type AtualizarCentroCustoDto,
+  type CentroCustoApi,
+  type CriarCentroCustoDto,
+  type EmpresaApi,
+  type ListarCentrosCustoQuery,
+  atualizarCentroCusto,
+  criarCentroCusto,
+  listarCentrosCusto,
+  listarEmpresasParaCentroCusto,
+} from "../../api/organizacaoClient";
 import "./CentrosCustoScreen.css";
 
 export const CENTROS_CUSTO_TITULO_ID = "centros-custo-titulo";
 
-type EstadoDemonstracao = "dados" | "vazio" | "erro";
+const CODIGO_PATTERN = /^[A-Z0-9_]{2,32}$/;
 
-const ROTULO_ESTADO_DEMO: Record<EstadoDemonstracao, string> = {
-  dados: "Com dados",
-  vazio: "Vazio",
-  erro: "Erro",
+const VARIANTE_STATUS: Record<string, StatusVariant> = {
+  ativo: "success",
+  inativo: "neutral",
 };
 
-const VARIANTE_SITUACAO: Record<SituacaoCentroCusto, StatusVariant> = {
-  referencia_em_revisao_exemplo: "info",
-  aguardando_decisao_exemplo: "warning",
-  historico_ilustrativo: "neutral",
+const ROTULO_STATUS: Record<string, string> = {
+  ativo: "Ativo",
+  inativo: "Inativo",
 };
 
-const OPCAO_TODOS = "todos";
+type StatusFiltro = "todos" | "ativo" | "inativo";
+
+interface FormularioErros {
+  empresaId?: string;
+  codigo?: string;
+  nome?: string;
+  geral?: string;
+}
+
+interface FormularioState {
+  modo: "criar" | "editar";
+  centroCustoId?: string;
+  codigoAtual?: string;
+  codigo: string;
+  nome: string;
+  empresaId: string;
+  erros: FormularioErros;
+  salvando: boolean;
+}
 
 export function CentrosCustoScreen() {
-  const [estadoDemo, setEstadoDemo] = useState<EstadoDemonstracao>("dados");
-  const [filtroSituacao, setFiltroSituacao] = useState<string>(OPCAO_TODOS);
-  const [filtroUnidade, setFiltroUnidade] = useState<string>(OPCAO_TODOS);
-  const [filtroEstrutura, setFiltroEstrutura] = useState<string>(OPCAO_TODOS);
-  const [detalheAbertoId, setDetalheAbertoId] = useState<string | null>(null);
-  const detalheTituloId = useId();
+  const [statusCarregamento, setStatusCarregamento] = useState<
+    "carregando" | "erro" | "dados"
+  >("carregando");
+  const [centrosCusto, setCentrosCusto] = useState<CentroCustoApi[]>([]);
+  const [empresas, setEmpresas] = useState<EmpresaApi[]>([]);
+  const [filtroStatus, setFiltroStatus] = useState<StatusFiltro>("todos");
+  const [formulario, setFormulario] = useState<FormularioState | null>(null);
+  const formTituloId = useId();
 
-  const linhasBase = useMemo(
-    () => (estadoDemo === "vazio" ? [] : CENTROS_CUSTO_EXEMPLO),
-    [estadoDemo],
-  );
-
-  const unidadesDisponiveis = useMemo(() => {
-    const unicos = new Set(
-      CENTROS_CUSTO_EXEMPLO.map((linha) => linha.empresaUnidadeTecnica),
-    );
-    return Array.from(unicos);
+  const carregarDados = useCallback(async (status: StatusFiltro) => {
+    setStatusCarregamento("carregando");
+    try {
+      const query: ListarCentrosCustoQuery = {};
+      if (status !== "todos") query.status = status;
+      const [empresaResp, centrosResp] = await Promise.all([
+        listarEmpresasParaCentroCusto(),
+        listarCentrosCusto(query),
+      ]);
+      setEmpresas(empresaResp.itens);
+      setCentrosCusto(centrosResp.itens);
+      setStatusCarregamento("dados");
+    } catch {
+      setStatusCarregamento("erro");
+    }
   }, []);
 
-  const estruturasDisponiveis = useMemo(() => {
-    const unicos = new Set(
-      CENTROS_CUSTO_EXEMPLO.map((linha) => linha.estruturaDepartamentoTecnico),
-    );
-    return Array.from(unicos);
-  }, []);
+  useEffect(() => {
+    void carregarDados(filtroStatus);
+  }, [filtroStatus, carregarDados]);
 
-  const linhasFiltradas = useMemo(() => {
-    return linhasBase.filter((linha) => {
-      if (filtroSituacao !== OPCAO_TODOS && linha.situacao !== filtroSituacao) {
-        return false;
-      }
-      if (
-        filtroUnidade !== OPCAO_TODOS &&
-        linha.empresaUnidadeTecnica !== filtroUnidade
-      ) {
-        return false;
-      }
-      if (
-        filtroEstrutura !== OPCAO_TODOS &&
-        linha.estruturaDepartamentoTecnico !== filtroEstrutura
-      ) {
-        return false;
-      }
-      return true;
+  function abrirCriar() {
+    setFormulario({
+      modo: "criar",
+      codigo: "",
+      nome: "",
+      empresaId: empresas.length === 1 ? (empresas[0]?.id ?? "") : "",
+      erros: {},
+      salvando: false,
     });
-  }, [linhasBase, filtroSituacao, filtroUnidade, filtroEstrutura]);
-
-  const filtrosAtivos =
-    filtroSituacao !== OPCAO_TODOS ||
-    filtroUnidade !== OPCAO_TODOS ||
-    filtroEstrutura !== OPCAO_TODOS;
-
-  function limparFiltros() {
-    setFiltroSituacao(OPCAO_TODOS);
-    setFiltroUnidade(OPCAO_TODOS);
-    setFiltroEstrutura(OPCAO_TODOS);
   }
 
-  const resumo = useMemo(() => {
-    const unidadesRelacionadas = new Set<string>();
-    let totalEmRevisao = 0;
-    let totalAguardandoDecisao = 0;
-    let totalHistorico = 0;
-    for (const linha of linhasBase) {
-      unidadesRelacionadas.add(linha.empresaUnidadeTecnica);
-      if (linha.situacao === "referencia_em_revisao_exemplo") {
-        totalEmRevisao += 1;
+  function abrirEditar(cc: CentroCustoApi) {
+    setFormulario({
+      modo: "editar",
+      centroCustoId: cc.id,
+      codigoAtual: cc.codigo,
+      codigo: "",
+      nome: cc.nome,
+      empresaId: cc.empresaId,
+      erros: {},
+      salvando: false,
+    });
+  }
+
+  function fecharFormulario() {
+    setFormulario(null);
+  }
+
+  function validarCodigo(codigo: string): string | undefined {
+    if (!codigo.trim()) return "Código é obrigatório.";
+    if (!CODIGO_PATTERN.test(codigo))
+      return "Código deve conter apenas letras maiúsculas, dígitos e _ (2 a 32 caracteres).";
+    return undefined;
+  }
+
+  function validarNome(nome: string): string | undefined {
+    if (!nome.trim()) return "Nome é obrigatório.";
+    if (nome.trim().length > 160)
+      return "Nome deve ter no máximo 160 caracteres.";
+    return undefined;
+  }
+
+  async function handleSubmit(evento: React.FormEvent) {
+    evento.preventDefault();
+    if (!formulario) return;
+
+    const erros: FormularioErros = {};
+
+    if (formulario.modo === "criar") {
+      if (empresas.length > 1 && !formulario.empresaId) {
+        erros.empresaId = "Selecione a empresa.";
       }
-      if (linha.situacao === "aguardando_decisao_exemplo") {
-        totalAguardandoDecisao += 1;
-      }
-      if (linha.situacao === "historico_ilustrativo") {
-        totalHistorico += 1;
-      }
+      const erroCodigo = validarCodigo(formulario.codigo);
+      if (erroCodigo) erros.codigo = erroCodigo;
     }
-    return {
-      totalCentrosCusto: linhasBase.length,
-      totalUnidadesRelacionadas: unidadesRelacionadas.size,
-      totalEmRevisao,
-      totalAguardandoDecisao,
-      totalHistorico,
-    };
-  }, [linhasBase]);
+    const erroNome = validarNome(formulario.nome);
+    if (erroNome) erros.nome = erroNome;
 
-  const detalheAberto =
-    detalheAbertoId != null
-      ? linhasBase.find((linha) => linha.id === detalheAbertoId)
-      : undefined;
+    if (erros.empresaId ?? erros.codigo ?? erros.nome) {
+      setFormulario((prev) => (prev ? { ...prev, erros } : prev));
+      return;
+    }
 
-  const colunas: DataTableColumn<CentroCustoExemplo>[] = [
+    setFormulario((prev) =>
+      prev ? { ...prev, salvando: true, erros: {} } : prev,
+    );
+
+    try {
+      if (formulario.modo === "criar") {
+        const dto: CriarCentroCustoDto = {
+          codigo: formulario.codigo.trim(),
+          nome: formulario.nome.trim(),
+          empresaId: formulario.empresaId,
+        };
+        await criarCentroCusto(dto);
+      } else {
+        const dto: AtualizarCentroCustoDto = { nome: formulario.nome.trim() };
+        await atualizarCentroCusto(formulario.centroCustoId!, dto);
+      }
+      setFormulario(null);
+      await carregarDados(filtroStatus);
+    } catch (err: unknown) {
+      const mensagem =
+        err instanceof Error
+          ? err.message
+          : "Não foi possível salvar. Tente novamente.";
+      setFormulario((prev) =>
+        prev
+          ? {
+              ...prev,
+              salvando: false,
+              erros: { ...prev.erros, geral: mensagem },
+            }
+          : prev,
+      );
+    }
+  }
+
+  const colunas: DataTableColumn<CentroCustoApi>[] = [
     {
-      key: "referencia",
-      header: "Referência técnica",
-      cell: (linha) => <code>{linha.id}</code>,
+      key: "codigo",
+      header: "Código",
+      cell: (linha) => <code>{linha.codigo}</code>,
     },
-    {
-      key: "codigoTecnico",
-      header: "Código técnico ilustrativo",
-      cell: (linha) => linha.codigoTecnico,
-    },
-    {
-      key: "centroCusto",
-      header: "Centro de custo",
-      cell: (linha) => linha.centroCusto,
-    },
-    {
-      key: "unidade",
-      header: "Empresa/unidade técnica",
-      cell: (linha) => linha.empresaUnidadeTecnica,
-    },
-    {
-      key: "estrutura",
-      header: "Estrutura/departamento técnico",
-      cell: (linha) => linha.estruturaDepartamentoTecnico,
-    },
+    { key: "nome", header: "Nome", cell: (linha) => linha.nome },
     {
       key: "situacao",
       header: "Situação",
       cell: (linha) => (
-        <StatusBadge variant={VARIANTE_SITUACAO[linha.situacao]}>
-          {ROTULO_SITUACAO_CENTRO_CUSTO[linha.situacao]}
+        <StatusBadge variant={VARIANTE_STATUS[linha.status] ?? "neutral"}>
+          {ROTULO_STATUS[linha.status] ?? linha.status}
         </StatusBadge>
       ),
-    },
-    {
-      key: "responsavel",
-      header: "Responsável técnico",
-      cell: (linha) => linha.responsavelTecnico,
-    },
-    {
-      key: "trilha",
-      header: "Trilha de auditoria",
-      cell: (linha) => linha.trilhaAuditoria,
     },
     {
       key: "acoes",
       header: "Ações",
       cell: (linha) => (
-        <Button variant="subtle" onClick={() => setDetalheAbertoId(linha.id)}>
-          Ver detalhe
-          <span className="sr-only"> — {linha.id}</span>
+        <Button variant="secondary" onClick={() => abrirEditar(linha)}>
+          Editar
         </Button>
       ),
     },
   ];
+
+  const podeCriar = statusCarregamento === "dados" && empresas.length > 0;
 
   return (
     <div className="centros-custo-screen">
@@ -203,7 +221,12 @@ export function CentrosCustoScreen() {
         headingLevel={1}
         titleId={CENTROS_CUSTO_TITULO_ID}
         title="Centros de custo"
-        description="Demonstração visual de como o RH poderá consultar referências organizacionais de centro de custo por empresa/unidade e estrutura técnica."
+        description="Gerencie os centros de custo da sua empresa: cadastre, consulte e edite dentro do seu escopo autorizado. Centro de custo é referência organizacional e não cria rateio, orçamento ou lançamento contábil."
+        actions={
+          <Button onClick={abrirCriar} disabled={!podeCriar}>
+            Novo centro de custo
+          </Button>
+        }
       />
 
       <Surface
@@ -217,43 +240,27 @@ export function CentrosCustoScreen() {
           id="centros-custo-aviso-rh-titulo"
           className="centros-custo-screen__aviso-texto"
         >
-          O RH consulta somente referências de centro de custo da própria
-          empresa e das unidades autorizadas.
+          Somente o RH da própria empresa administra centros de custo. Todas as
+          operações são restritas ao escopo autorizado e não concedem permissão
+          de acesso, alteram vínculo, remuneração, jornada, escala ou Banco de
+          Horas.
         </p>
       </Surface>
 
       <Surface
         as="section"
         padding="md"
-        className="centros-custo-screen__aviso"
-        aria-labelledby="centros-custo-aviso-demo-titulo"
+        className="centros-custo-screen__aviso centros-custo-screen__aviso--auditado"
+        aria-labelledby="centros-custo-aviso-auditado-titulo"
       >
-        <StatusBadge variant="info">Somente demonstração</StatusBadge>
+        <StatusBadge variant="warning">Auditado</StatusBadge>
         <p
-          id="centros-custo-aviso-demo-titulo"
+          id="centros-custo-aviso-auditado-titulo"
           className="centros-custo-screen__aviso-texto"
         >
-          Não há login, API, persistência, importação, exportação, cálculo,
-          integração, lançamento ou alteração cadastral real nesta tela.
-        </p>
-      </Surface>
-
-      <Surface
-        as="section"
-        padding="md"
-        className="centros-custo-screen__aviso centros-custo-screen__aviso--indisponivel"
-        aria-labelledby="centros-custo-aviso-financeiro-titulo"
-      >
-        <StatusBadge variant="warning">
-          Referência não é regra financeira
-        </StatusBadge>
-        <p
-          id="centros-custo-aviso-financeiro-titulo"
-          className="centros-custo-screen__aviso-texto"
-        >
-          Centro de custo é referência organizacional e não cria rateio,
-          orçamento, pagamento, desconto, lançamento contábil, regra de Folha ou
-          permissão de acesso.
+          Cadastros e edições de centros de custo geram trilha de auditoria
+          automática. Não é possível excluir um centro de custo — apenas
+          inativar.
         </p>
       </Surface>
 
@@ -261,140 +268,19 @@ export function CentrosCustoScreen() {
         as="section"
         padding="md"
         className="centros-custo-screen__aviso centros-custo-screen__aviso--indisponivel"
-        aria-labelledby="centros-custo-aviso-dados-titulo"
+        aria-labelledby="centros-custo-aviso-referencias-titulo"
       >
-        <StatusBadge variant="warning">Dados reais bloqueados</StatusBadge>
+        <StatusBadge variant="warning">Referências organizacionais</StatusBadge>
         <p
-          id="centros-custo-aviso-dados-titulo"
+          id="centros-custo-aviso-referencias-titulo"
           className="centros-custo-screen__aviso-texto"
         >
-          Qualquer operação real depende de MFA, do gate-mestre de segurança
-          operacional (<code>DS-OPS-01</code>), auditoria, retenção/base legal e
-          validações aplicáveis de RH, Jurídico/privacidade, Folha/DP,
-          Contabilidade e TI.
+          Cargo, função, departamento, centro de custo e estrutura são
+          referências distintas e não concedem permissão de acesso.
         </p>
       </Surface>
 
-      <section
-        aria-labelledby="centros-custo-resumo-titulo"
-        className="centros-custo-screen__resumo"
-      >
-        <h2
-          id="centros-custo-resumo-titulo"
-          className="centros-custo-screen__section-title"
-        >
-          Resumo (exemplo)
-        </h2>
-        <ul className="centros-custo-screen__resumo-lista">
-          <li className="centros-custo-screen__resumo-item">
-            <Surface
-              as="div"
-              padding="md"
-              className="centros-custo-screen__resumo-item-conteudo"
-            >
-              <StatusBadge variant="info">Centros de custo</StatusBadge>
-              <p className="centros-custo-screen__resumo-item-texto">
-                {resumo.totalCentrosCusto} centro(s) de custo de referência
-                (exemplo)
-              </p>
-            </Surface>
-          </li>
-          <li className="centros-custo-screen__resumo-item">
-            <Surface
-              as="div"
-              padding="md"
-              className="centros-custo-screen__resumo-item-conteudo"
-            >
-              <StatusBadge variant="info">Unidades relacionadas</StatusBadge>
-              <p className="centros-custo-screen__resumo-item-texto">
-                {resumo.totalUnidadesRelacionadas} unidade(s) técnica(s)
-                relacionada(s) (exemplo)
-              </p>
-            </Surface>
-          </li>
-          <li className="centros-custo-screen__resumo-item">
-            <Surface
-              as="div"
-              padding="md"
-              className="centros-custo-screen__resumo-item-conteudo"
-            >
-              <StatusBadge variant="info">Em revisão</StatusBadge>
-              <p className="centros-custo-screen__resumo-item-texto">
-                {resumo.totalEmRevisao} referência(s) organizacional(is) em
-                revisão (exemplo)
-              </p>
-            </Surface>
-          </li>
-          <li className="centros-custo-screen__resumo-item">
-            <Surface
-              as="div"
-              padding="md"
-              className="centros-custo-screen__resumo-item-conteudo"
-            >
-              <StatusBadge variant="warning">Exigem decisão formal</StatusBadge>
-              <p className="centros-custo-screen__resumo-item-texto">
-                {resumo.totalAguardandoDecisao} item(ns) aguardando decisão
-                formal (exemplo)
-              </p>
-            </Surface>
-          </li>
-          <li className="centros-custo-screen__resumo-item">
-            <Surface
-              as="div"
-              padding="md"
-              className="centros-custo-screen__resumo-item-conteudo"
-            >
-              <StatusBadge variant="neutral">Itens históricos</StatusBadge>
-              <p className="centros-custo-screen__resumo-item-texto">
-                {resumo.totalHistorico} item(ns) histórico(s) ilustrativo(s)
-                (exemplo)
-              </p>
-            </Surface>
-          </li>
-        </ul>
-        <p className="centros-custo-screen__nota">
-          Estes indicadores não calculam valores, orçamento, rateio, pagamento,
-          desconto, jornada, Banco de Horas, Folha, contabilidade, permissões ou
-          acesso.
-        </p>
-      </section>
-
-      <section
-        aria-labelledby="centros-custo-demo-titulo"
-        className="centros-custo-screen__demo"
-      >
-        <h2
-          id="centros-custo-demo-titulo"
-          className="centros-custo-screen__section-title"
-        >
-          Estado de demonstração
-        </h2>
-        <p className="centros-custo-screen__demo-texto">
-          Alterna a amostra visual exibida abaixo — não representa uma chamada
-          real à API.
-        </p>
-        <div
-          role="group"
-          aria-label="Selecionar estado de demonstração dos centros de custo"
-          className="centros-custo-screen__demo-botoes"
-        >
-          {(Object.keys(ROTULO_ESTADO_DEMO) as EstadoDemonstracao[]).map(
-            (chave) => (
-              <Button
-                key={chave}
-                type="button"
-                variant={estadoDemo === chave ? "primary" : "secondary"}
-                aria-pressed={estadoDemo === chave}
-                onClick={() => setEstadoDemo(chave)}
-              >
-                {ROTULO_ESTADO_DEMO[chave]}
-              </Button>
-            ),
-          )}
-        </div>
-      </section>
-
-      {estadoDemo === "erro" ? (
+      {statusCarregamento === "erro" ? (
         <Surface
           as="section"
           padding="lg"
@@ -406,16 +292,16 @@ export function CentrosCustoScreen() {
             id="centros-custo-erro-titulo"
             className="centros-custo-screen__section-title"
           >
-            Não foi possível carregar as referências de centro de custo
+            Não foi possível carregar os centros de custo
           </h2>
           <p>
-            Tente novamente em instantes. Se o problema persistir, contate o
-            suporte informando a referência abaixo.
+            Verifique sua conexão e tente novamente. Se o problema persistir,
+            contate o suporte.
           </p>
-          <p className="centros-custo-screen__erro-referencia">
-            Referência: <code>REQ-DEMO-003014</code> (ilustrativa)
-          </p>
-          <Button variant="secondary" onClick={() => setEstadoDemo("dados")}>
+          <Button
+            variant="secondary"
+            onClick={() => void carregarDados(filtroStatus)}
+          >
             Tentar novamente
           </Button>
         </Surface>
@@ -425,191 +311,204 @@ export function CentrosCustoScreen() {
             id="centros-custo-lista-titulo"
             className="centros-custo-screen__section-title"
           >
-            Referências de centro de custo
+            Centros de custo
           </h2>
 
           <div className="centros-custo-screen__filtros">
-            <FormField id="centros-custo-filtro-situacao" label="Situação">
+            <FormField id="centros-custo-filtro-status" label="Situação">
               {(control) => (
                 <select
-                  value={filtroSituacao}
-                  onChange={(evento) => setFiltroSituacao(evento.target.value)}
+                  value={filtroStatus}
+                  onChange={(evento) =>
+                    setFiltroStatus(evento.target.value as StatusFiltro)
+                  }
+                  disabled={statusCarregamento === "carregando"}
                   {...control}
                 >
-                  <option value={OPCAO_TODOS}>Todas as situações</option>
-                  {(
-                    Object.keys(
-                      ROTULO_SITUACAO_CENTRO_CUSTO,
-                    ) as SituacaoCentroCusto[]
-                  ).map((situacao) => (
-                    <option key={situacao} value={situacao}>
-                      {ROTULO_SITUACAO_CENTRO_CUSTO[situacao]}
-                    </option>
-                  ))}
+                  <option value="todos">Todas as situações</option>
+                  <option value="ativo">Ativo</option>
+                  <option value="inativo">Inativo</option>
                 </select>
               )}
             </FormField>
-
-            <FormField
-              id="centros-custo-filtro-unidade"
-              label="Empresa/unidade técnica"
-            >
-              {(control) => (
-                <select
-                  value={filtroUnidade}
-                  onChange={(evento) => setFiltroUnidade(evento.target.value)}
-                  {...control}
-                >
-                  <option value={OPCAO_TODOS}>Todas as unidades</option>
-                  {unidadesDisponiveis.map((unidade) => (
-                    <option key={unidade} value={unidade}>
-                      {unidade}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </FormField>
-
-            <FormField
-              id="centros-custo-filtro-estrutura"
-              label="Estrutura/departamento técnico"
-            >
-              {(control) => (
-                <select
-                  value={filtroEstrutura}
-                  onChange={(evento) => setFiltroEstrutura(evento.target.value)}
-                  {...control}
-                >
-                  <option value={OPCAO_TODOS}>Todas as estruturas</option>
-                  {estruturasDisponiveis.map((estrutura) => (
-                    <option key={estrutura} value={estrutura}>
-                      {estrutura}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </FormField>
-
-            <Button
-              variant="subtle"
-              onClick={limparFiltros}
-              disabled={!filtrosAtivos}
-            >
-              Limpar filtros
-            </Button>
           </div>
-          <p className="centros-custo-screen__filtros-nota">
-            Filtro só local, apenas para esta demonstração — não é enviado a
-            nenhum servidor nem fica salvo ao recarregar a página.
-          </p>
 
-          {linhasBase.length === 0 ? (
+          {statusCarregamento === "carregando" ? (
+            <p className="centros-custo-screen__carregando" role="status">
+              Carregando centros de custo…
+            </p>
+          ) : centrosCusto.length === 0 ? (
             <EmptyState
               headingLevel={3}
               icon="—"
-              title="Nenhuma referência de centro de custo cadastrada"
-              description="Quando houver uma referência desta empresa, ela aparece aqui (exemplo)."
-            />
-          ) : linhasFiltradas.length === 0 ? (
-            <EmptyState
-              headingLevel={3}
-              icon="—"
-              title="Nenhuma referência corresponde aos filtros"
-              description="Ajuste ou limpe os filtros para ver as demais referências desta demonstração."
+              title="Nenhum centro de custo cadastrado"
+              description="Cadastre o primeiro centro de custo para esta empresa."
               action={
-                <Button variant="primary" onClick={limparFiltros}>
-                  Limpar filtros
-                </Button>
+                podeCriar ? (
+                  <Button onClick={abrirCriar}>Novo centro de custo</Button>
+                ) : undefined
               }
             />
           ) : (
             <DataTable
-              caption="Centros de custo (exemplo)"
+              caption="Centros de custo"
               columns={colunas}
-              rows={linhasFiltradas}
+              rows={centrosCusto}
               rowKey={(linha) => linha.id}
             />
           )}
         </section>
       )}
 
-      {detalheAberto ? (
+      {formulario ? (
         <Surface
           as="section"
           padding="lg"
-          className="centros-custo-screen__detalhe"
-          aria-labelledby={detalheTituloId}
+          className="centros-custo-screen__formulario"
+          aria-labelledby={formTituloId}
         >
-          <StatusBadge variant="info">Detalhe demonstrativo</StatusBadge>
-          <h2
-            id={detalheTituloId}
-            className="centros-custo-screen__section-title"
-          >
-            Detalhe da referência — {detalheAberto.id}
+          <h2 id={formTituloId} className="centros-custo-screen__section-title">
+            {formulario.modo === "criar"
+              ? "Novo centro de custo"
+              : "Editar centro de custo"}
           </h2>
-          <dl className="centros-custo-screen__detalhe-lista">
-            <div>
-              <dt>Referência técnica</dt>
-              <dd>
-                <code>{detalheAberto.id}</code>
-              </dd>
-            </div>
-            <div>
-              <dt>Código técnico ilustrativo</dt>
-              <dd>{detalheAberto.codigoTecnico}</dd>
-            </div>
-            <div>
-              <dt>Centro de custo</dt>
-              <dd>{detalheAberto.centroCusto}</dd>
-            </div>
-            <div>
-              <dt>Empresa/unidade técnica</dt>
-              <dd>{detalheAberto.empresaUnidadeTecnica}</dd>
-            </div>
-            <div>
-              <dt>Estrutura/departamento técnico</dt>
-              <dd>{detalheAberto.estruturaDepartamentoTecnico}</dd>
-            </div>
-            <div>
-              <dt>Situação</dt>
-              <dd>{ROTULO_SITUACAO_CENTRO_CUSTO[detalheAberto.situacao]}</dd>
-            </div>
-            <div>
-              <dt>Responsável técnico</dt>
-              <dd>{detalheAberto.responsavelTecnico}</dd>
-            </div>
-            <div>
-              <dt>Trilha de auditoria</dt>
-              <dd>{detalheAberto.trilhaAuditoria}</dd>
-            </div>
-          </dl>
 
-          <h3 className="centros-custo-screen__detalhe-subtitulo">
-            Descrição de referência (exemplo)
-          </h3>
-          <p>{detalheAberto.descricaoReferencia}</p>
+          <form
+            className="centros-custo-screen__form"
+            aria-label={
+              formulario.modo === "criar"
+                ? "Formulário de novo centro de custo"
+                : "Formulário de edição de centro de custo"
+            }
+            onSubmit={(e) => void handleSubmit(e)}
+          >
+            {formulario.modo === "criar" && empresas.length > 1 ? (
+              <FormField
+                id="centros-custo-empresa"
+                label="Empresa"
+                required
+                {...(formulario.erros.empresaId
+                  ? { error: formulario.erros.empresaId }
+                  : {})}
+              >
+                {(control) => (
+                  <select
+                    value={formulario.empresaId}
+                    onChange={(e) =>
+                      setFormulario((prev) =>
+                        prev
+                          ? { ...prev, empresaId: e.target.value, erros: {} }
+                          : prev,
+                      )
+                    }
+                    {...control}
+                  >
+                    <option value="">Selecione a empresa</option>
+                    {empresas.map((emp) => (
+                      <option key={emp.id} value={emp.id}>
+                        {emp.nome}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </FormField>
+            ) : null}
 
-          <h3 className="centros-custo-screen__detalhe-subtitulo">
-            Campos que dependem de decisão formal (exemplo)
-          </h3>
-          {detalheAberto.camposPendentes.length === 0 ? (
-            <p>Nenhum campo pendente (exemplo).</p>
-          ) : (
-            <ul className="centros-custo-screen__detalhe-lista-simples">
-              {detalheAberto.camposPendentes.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-          )}
+            {formulario.modo === "criar" ? (
+              <FormField
+                id="centros-custo-codigo"
+                label="Código"
+                required
+                help="Letras maiúsculas, dígitos e _ (2 a 32 caracteres). Imutável após o cadastro."
+                {...(formulario.erros.codigo
+                  ? { error: formulario.erros.codigo }
+                  : {})}
+              >
+                {(control) => (
+                  <input
+                    type="text"
+                    maxLength={32}
+                    placeholder="Ex.: CC_ADM"
+                    value={formulario.codigo}
+                    onChange={(e) =>
+                      setFormulario((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              codigo: e.target.value.toUpperCase(),
+                              erros: {},
+                            }
+                          : prev,
+                      )
+                    }
+                    {...control}
+                  />
+                )}
+              </FormField>
+            ) : (
+              <FormField id="centros-custo-codigo-fixo" label="Código">
+                {(control) => (
+                  <input
+                    type="text"
+                    readOnly
+                    value={formulario.codigoAtual ?? ""}
+                    aria-readonly="true"
+                    {...control}
+                  />
+                )}
+              </FormField>
+            )}
 
-          <p className="centros-custo-screen__detalhe-aviso">
-            <strong>Ação apenas demonstrativa:</strong> este painel não cria,
-            edita, vincula, ativa, aprova, salva, importa, exporta, integra,
-            calcula valor, gera rateio nem altera qualquer registro real.
-          </p>
-          <Button variant="secondary" onClick={() => setDetalheAbertoId(null)}>
-            Fechar
-          </Button>
+            <FormField
+              id="centros-custo-nome"
+              label="Nome"
+              required
+              help="Identificador do centro de custo. Máximo 160 caracteres."
+              {...(formulario.erros.nome
+                ? { error: formulario.erros.nome }
+                : {})}
+            >
+              {(control) => (
+                <input
+                  type="text"
+                  maxLength={160}
+                  value={formulario.nome}
+                  onChange={(e) =>
+                    setFormulario((prev) =>
+                      prev
+                        ? { ...prev, nome: e.target.value, erros: {} }
+                        : prev,
+                    )
+                  }
+                  {...control}
+                />
+              )}
+            </FormField>
+
+            {formulario.erros.geral ? (
+              <p className="centros-custo-screen__form-erro" role="alert">
+                {formulario.erros.geral}
+              </p>
+            ) : null}
+
+            <FormActions>
+              <Button
+                variant="secondary"
+                type="button"
+                onClick={fecharFormulario}
+                disabled={formulario.salvando}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                disabled={formulario.salvando}
+              >
+                {formulario.salvando ? "Salvando…" : "Salvar"}
+              </Button>
+            </FormActions>
+          </form>
         </Surface>
       ) : null}
     </div>

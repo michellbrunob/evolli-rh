@@ -633,6 +633,48 @@ describe("Núcleo Organizacional Interno (e2e)", () => {
         .send({ nome: "Sequestrado" })
         .expect(404);
     });
+
+    it("centro de custo: CRUD completo com imutabilidade de código e empresaId (T109)", async () => {
+      const criado = await post("/v1/centros-de-custo", rhA)
+        .send({ empresaId: empresaA, codigo: "CC_T109", nome: "Centro T109" })
+        .expect(201);
+      const ccId = criado.body.id as string;
+      expect(criado.body.codigo).toBe("CC_T109");
+      expect(criado.body.nome).toBe("Centro T109");
+      expect(criado.body.empresaId).toBe(empresaA);
+
+      const lista = await get("/v1/centros-de-custo", rhA).expect(200);
+      const ids = (lista.body.itens as Array<{ id: string }>).map((c) => c.id);
+      expect(ids).toContain(ccId);
+
+      const editado = await patch(`/v1/centros-de-custo/${ccId}`, rhA)
+        .send({ nome: "Centro T109 Editado" })
+        .expect(200);
+      expect(editado.body.nome).toBe("Centro T109 Editado");
+      expect(editado.body.codigo).toBe("CC_T109");
+      expect(editado.body.empresaId).toBe(empresaA);
+
+      const releitura = await get(`/v1/centros-de-custo/${ccId}`, rhA).expect(
+        200,
+      );
+      expect(releitura.body.nome).toBe("Centro T109 Editado");
+      expect(releitura.body.codigo).toBe("CC_T109");
+      expect(releitura.body.empresaId).toBe(empresaA);
+    });
+
+    it("IDOR: PATCH de centro de custo de outra empresa responde 404 (T109)", async () => {
+      const criado = await post("/v1/centros-de-custo", rhA)
+        .send({
+          empresaId: empresaA,
+          codigo: "IDOR_CC",
+          nome: "Alvo IDOR CC",
+        })
+        .expect(201);
+
+      await patch(`/v1/centros-de-custo/${criado.body.id as string}`, rhB)
+        .send({ nome: "Sequestrado" })
+        .expect(404);
+    });
   });
 
   describe("isolamento entre empresas (IDOR/BOLA)", () => {
