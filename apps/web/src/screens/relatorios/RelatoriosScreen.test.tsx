@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { RelatoriosScreen } from "./RelatoriosScreen";
 
-describe("RelatoriosScreen — abas locais 'Exceções de Ponto' / 'Relatórios disponíveis' / 'Extrato de Banco de Horas' / 'Espelho de Ponto' / 'Justificativas' (T075/T098/T099/T100)", () => {
+describe("RelatoriosScreen — abas locais 'Exceções de Ponto' / 'Relatórios disponíveis' / 'Extrato de Banco de Horas' / 'Espelho de Ponto' / 'Justificativas' / 'Quadro de Horários' (T075/T098/T099/T100/T101)", () => {
   it("mostra 'Exceções de Ponto' por padrão, com h1 único", () => {
     render(<RelatoriosScreen />);
 
@@ -12,7 +12,7 @@ describe("RelatoriosScreen — abas locais 'Exceções de Ponto' / 'Relatórios 
     ).toBeInTheDocument();
   });
 
-  it("expõe as cinco abas com role='tab' e aria-selected correto por padrão", () => {
+  it("expõe as seis abas com role='tab' e aria-selected correto por padrão", () => {
     render(<RelatoriosScreen />);
 
     const tablist = screen.getByRole("tablist", {
@@ -33,16 +33,21 @@ describe("RelatoriosScreen — abas locais 'Exceções de Ponto' / 'Relatórios 
     const abaJustificativas = screen.getByRole("tab", {
       name: "Justificativas",
     });
+    const abaQuadroHorarios = screen.getByRole("tab", {
+      name: "Quadro de Horários",
+    });
     expect(abaExcecoes).toHaveAttribute("aria-selected", "true");
     expect(abaDisponiveis).toHaveAttribute("aria-selected", "false");
     expect(abaExtrato).toHaveAttribute("aria-selected", "false");
     expect(abaEspelho).toHaveAttribute("aria-selected", "false");
     expect(abaJustificativas).toHaveAttribute("aria-selected", "false");
+    expect(abaQuadroHorarios).toHaveAttribute("aria-selected", "false");
     expect(abaExcecoes.tagName).toBe("BUTTON");
     expect(abaDisponiveis.tagName).toBe("BUTTON");
     expect(abaExtrato.tagName).toBe("BUTTON");
     expect(abaEspelho.tagName).toBe("BUTTON");
     expect(abaJustificativas.tagName).toBe("BUTTON");
+    expect(abaQuadroHorarios.tagName).toBe("BUTTON");
   });
 
   it("troca para 'Relatórios disponíveis' ao clicar na aba, com h1 único e informa o titleId", () => {
@@ -278,6 +283,58 @@ describe("RelatoriosScreen — abas locais 'Exceções de Ponto' / 'Relatórios 
     ).toBeInTheDocument();
   });
 
+  it("troca para 'Quadro de Horários' ao clicar na aba, com h1 único e informa o titleId", () => {
+    const onTituloIdChange = vi.fn();
+    render(<RelatoriosScreen onTituloIdChange={onTituloIdChange} />);
+
+    fireEvent.click(screen.getByRole("tab", { name: "Quadro de Horários" }));
+
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Quadro de Horários" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("table", { name: "Quadro de Horários (exemplo)" }),
+    ).toBeInTheDocument();
+
+    expect(
+      screen.getByRole("tab", { name: "Quadro de Horários" }),
+    ).toHaveAttribute("aria-selected", "true");
+    expect(
+      screen.getByRole("tab", { name: "Exceções de Ponto" }),
+    ).toHaveAttribute("aria-selected", "false");
+    expect(onTituloIdChange).toHaveBeenCalledWith("quadro-horarios-titulo");
+  });
+
+  it("passa por 'Quadro de Horários' e volta para 'Exceções de Ponto', preservando 'Justificativas'/'Espelho de Ponto' sem regressão", () => {
+    render(<RelatoriosScreen />);
+
+    fireEvent.click(screen.getByRole("tab", { name: "Quadro de Horários" }));
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Quadro de Horários" }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Justificativas" }));
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Justificativas" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("table", {
+        name: "Relatório de justificativas (exemplo)",
+      }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Espelho de Ponto" }));
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Espelho de Ponto" }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Exceções de Ponto" }));
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Exceções de Ponto" }),
+    ).toBeInTheDocument();
+  });
+
   it("informa o titleId do h1 visível via onTituloIdChange, inclusive ao trocar de aba", () => {
     const onTituloIdChange = vi.fn();
     render(<RelatoriosScreen onTituloIdChange={onTituloIdChange} />);
@@ -305,6 +362,7 @@ describe("RelatoriosScreen — abas locais 'Exceções de Ponto' / 'Relatórios 
     );
     fireEvent.click(screen.getByRole("tab", { name: "Espelho de Ponto" }));
     fireEvent.click(screen.getByRole("tab", { name: "Justificativas" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Quadro de Horários" }));
     fireEvent.click(screen.getByRole("tab", { name: "Exceções de Ponto" }));
 
     const texto = document.body.innerHTML.toLowerCase();
