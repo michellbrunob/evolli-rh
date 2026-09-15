@@ -246,6 +246,28 @@ describe("CentrosCustoScreen (T109 — funcional)", () => {
     );
   });
 
+  it("desabilita o botão de criação quando não há empresas no escopo", async () => {
+    mockListarEmpresas.mockResolvedValue({
+      itens: [],
+      pagina: 1,
+      tamanhoPagina: 100,
+      total: 0,
+    } satisfies ResultadoPaginado<EmpresaApi>);
+    mockListarCentrosCusto.mockResolvedValue({
+      itens: [cc1],
+      pagina: 1,
+      tamanhoPagina: 50,
+      total: 1,
+    } satisfies ResultadoPaginado<CentroCustoApi>);
+
+    render(<CentrosCustoScreen />);
+    await screen.findByRole("table", { name: "Centros de custo" });
+
+    expect(
+      screen.getByRole("button", { name: "Novo centro de custo" }),
+    ).toBeDisabled();
+  });
+
   it("abre formulário de criação, valida campos e salva via API (empresa única auto-determinada)", async () => {
     mockSucesso();
     mockCriarCentroCusto.mockResolvedValue({
