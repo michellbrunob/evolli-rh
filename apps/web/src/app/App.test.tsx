@@ -150,11 +150,7 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
         name: "Funções e cargos",
       }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", {
-        name: "Funções e cargos (exemplo)",
-      }),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Somente RH")).toBeInTheDocument();
 
     const main = screen.getByRole("main");
     const rotuloId = main.getAttribute("aria-labelledby");

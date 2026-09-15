@@ -153,9 +153,7 @@ describe("CadastrosScreen — abas locais 'Horários' / 'Estrutura organizaciona
         name: "Funções e cargos",
       }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", { name: "Funções e cargos (exemplo)" }),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Somente RH")).toBeInTheDocument();
 
     expect(
       screen.getByRole("tab", { name: "Funções e cargos" }),
@@ -543,9 +541,7 @@ describe("CadastrosScreen — abas locais 'Horários' / 'Estrutura organizaciona
     expect(
       screen.getByRole("heading", { level: 1, name: "Funções e cargos" }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", { name: "Funções e cargos (exemplo)" }),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Somente RH")).toBeInTheDocument();
 
     fireEvent.click(
       screen.getByRole("tab", { name: "Políticas de Banco de Horas" }),
@@ -624,9 +620,7 @@ describe("CadastrosScreen — abas locais 'Horários' / 'Estrutura organizaciona
     expect(
       screen.getByRole("heading", { level: 1, name: "Funções e cargos" }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", { name: "Funções e cargos (exemplo)" }),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Somente RH")).toBeInTheDocument();
 
     fireEvent.click(
       screen.getByRole("tab", { name: "Políticas de Banco de Horas" }),
@@ -713,9 +707,7 @@ describe("CadastrosScreen — abas locais 'Horários' / 'Estrutura organizaciona
     expect(
       screen.getByRole("heading", { level: 1, name: "Funções e cargos" }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", { name: "Funções e cargos (exemplo)" }),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Somente RH")).toBeInTheDocument();
 
     fireEvent.click(
       screen.getByRole("tab", { name: "Políticas de Banco de Horas" }),
@@ -815,9 +807,7 @@ describe("CadastrosScreen — abas locais 'Horários' / 'Estrutura organizaciona
     expect(
       screen.getByRole("heading", { level: 1, name: "Funções e cargos" }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", { name: "Funções e cargos (exemplo)" }),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Somente RH")).toBeInTheDocument();
 
     fireEvent.click(
       screen.getByRole("tab", { name: "Políticas de Banco de Horas" }),
@@ -925,9 +915,7 @@ describe("CadastrosScreen — abas locais 'Horários' / 'Estrutura organizaciona
     expect(
       screen.getByRole("heading", { level: 1, name: "Funções e cargos" }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", { name: "Funções e cargos (exemplo)" }),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Somente RH")).toBeInTheDocument();
 
     fireEvent.click(
       screen.getByRole("tab", { name: "Políticas de Banco de Horas" }),
@@ -1046,9 +1034,7 @@ describe("CadastrosScreen — abas locais 'Horários' / 'Estrutura organizaciona
     expect(
       screen.getByRole("heading", { level: 1, name: "Funções e cargos" }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", { name: "Funções e cargos (exemplo)" }),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Somente RH")).toBeInTheDocument();
 
     fireEvent.click(
       screen.getByRole("tab", { name: "Políticas de Banco de Horas" }),

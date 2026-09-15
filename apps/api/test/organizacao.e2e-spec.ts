@@ -420,6 +420,39 @@ describe("Núcleo Organizacional Interno (e2e)", () => {
           .expect(400);
       }
     });
+
+    it("atualiza o nome do cargo e confirma código imutável (listar → criar → editar → reler)", async () => {
+      const criado = await post("/v1/cargos", rhA)
+        .send({ empresaId: empresaA, codigo: "COORD", nome: "Coordenador" })
+        .expect(201);
+      const cargoId = criado.body.id as string;
+      expect(criado.body.codigo).toBe("COORD");
+
+      const atualizado = await patch(`/v1/cargos/${cargoId}`, rhA)
+        .send({ nome: "Coordenador Pleno" })
+        .expect(200);
+      expect(atualizado.body.nome).toBe("Coordenador Pleno");
+      expect(atualizado.body.codigo).toBe("COORD");
+
+      const releitura = await get(`/v1/cargos/${cargoId}`, rhA).expect(200);
+      expect(releitura.body.nome).toBe("Coordenador Pleno");
+      expect(releitura.body.codigo).toBe("COORD");
+
+      const lista = await get("/v1/cargos", rhA).expect(200);
+      const ids = (lista.body.itens as Array<{ id: string }>).map((c) => c.id);
+      expect(ids).toContain(cargoId);
+    });
+
+    it("PATCH de cargo de outra empresa responde 404 (isolamento IDOR)", async () => {
+      const criado = await post("/v1/cargos", rhA)
+        .send({ empresaId: empresaA, codigo: "IDOR_CARGO", nome: "Alvo IDOR" })
+        .expect(201);
+      const cargoId = criado.body.id as string;
+
+      await patch(`/v1/cargos/${cargoId}`, rhB)
+        .send({ nome: "Sequestrado" })
+        .expect(404);
+    });
   });
 
   describe("isolamento entre empresas (IDOR/BOLA)", () => {

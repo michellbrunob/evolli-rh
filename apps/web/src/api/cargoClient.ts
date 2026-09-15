@@ -1,0 +1,130 @@
+import { clearCsrfToken, getCsrfToken, refreshCsrfToken } from "./csrfClient";
+
+const BASE = "/v1";
+
+export interface EmpresaApi {
+  id: string;
+  codigo: string;
+  nome: string;
+  status: string;
+}
+
+export interface CargoApi {
+  id: string;
+  codigo: string;
+  nome: string;
+  empresaId: string;
+  status: string;
+  criadoEm: string;
+  atualizadoEm: string;
+}
+
+export interface ResultadoPaginado<T> {
+  itens: T[];
+  pagina: number;
+  tamanhoPagina: number;
+  total: number;
+}
+
+export interface ListarCargosQuery {
+  pagina?: number;
+  tamanhoPagina?: number;
+  status?: string;
+}
+
+export interface CriarCargoDto {
+  codigo: string;
+  nome: string;
+  empresaId: string;
+}
+
+export interface AtualizarCargoDto {
+  nome: string;
+}
+
+export class ApiError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
+async function getCsrf(): Promise<string> {
+  return getCsrfToken() ?? refreshCsrfToken();
+}
+
+async function apiFetch(
+  path: string,
+  init: RequestInit = {},
+): Promise<Response> {
+  const res = await fetch(`${BASE}${path}`, {
+    credentials: "same-origin",
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      ...(init.headers as Record<string, string>),
+    },
+  });
+  if (res.status === 401) {
+    clearCsrfToken();
+  }
+  return res;
+}
+
+async function jsonOrThrow<T>(res: Response): Promise<T> {
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { message?: string };
+    throw new ApiError(res.status, body.message ?? "Erro na requisição.");
+  }
+  return res.json() as Promise<T>;
+}
+
+/**
+ * Lista empresas no escopo do ator com tamanhoPagina=100 para suportar atores
+ * com múltiplas empresas autorizadas. Não usa tamanhoPagina=1 para evitar
+ * associação silenciosa de criação à primeira empresa retornada.
+ */
+export async function listarEmpresas(): Promise<ResultadoPaginado<EmpresaApi>> {
+  const res = await apiFetch("/empresas?tamanhoPagina=100");
+  return jsonOrThrow(res);
+}
+
+export async function listarCargos(
+  query: ListarCargosQuery = {},
+): Promise<ResultadoPaginado<CargoApi>> {
+  const params = new URLSearchParams();
+  if (query.pagina !== undefined) params.set("pagina", String(query.pagina));
+  if (query.tamanhoPagina !== undefined)
+    params.set("tamanhoPagina", String(query.tamanhoPagina));
+  if (query.status) params.set("status", query.status);
+  const qs = params.toString();
+  const res = await apiFetch(`/cargos${qs ? `?${qs}` : ""}`);
+  return jsonOrThrow(res);
+}
+
+export async function criarCargo(dto: CriarCargoDto): Promise<CargoApi> {
+  const token = await getCsrf();
+  const res = await apiFetch("/cargos", {
+    method: "POST",
+    headers: { "x-csrf-token": token },
+    body: JSON.stringify(dto),
+  });
+  return jsonOrThrow(res);
+}
+
+export async function atualizarCargo(
+  id: string,
+  dto: AtualizarCargoDto,
+): Promise<CargoApi> {
+  const token = await getCsrf();
+  const res = await apiFetch(`/cargos/${id}`, {
+    method: "PATCH",
+    headers: { "x-csrf-token": token },
+    body: JSON.stringify(dto),
+  });
+  return jsonOrThrow(res);
+}
