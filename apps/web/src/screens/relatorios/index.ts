@@ -23,6 +23,10 @@ export {
   RelatorioJustificativasScreen,
 } from "./RelatorioJustificativasScreen";
 export {
+  RELATORIO_LISTAGEM_COLABORADORES_TITULO_ID,
+  RelatorioListagemColaboradoresScreen,
+} from "./RelatorioListagemColaboradoresScreen";
+export {
   RELATORIOS_DISPONIVEIS_TITULO_ID,
   RelatoriosDisponiveisScreen,
 } from "./RelatoriosDisponiveisScreen";

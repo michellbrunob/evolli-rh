@@ -2,7 +2,8 @@
  * Relatórios (T075) — wrapper de navegação local entre "Exceções de Ponto"
  * (padrão), "Relatórios disponíveis", "Extrato de Banco de Horas" (T098),
  * "Espelho de Ponto" (T099), "Justificativas" (T100), "Quadro de Horários"
- * (T101) e "Calendário de Feriados" (T102).
+ * (T101), "Calendário de Feriados" (T102) e "Listagem de Colaboradores"
+ * (T103).
  *
  * A troca de aba é feita só por estado React local (`useState`) — sem React
  * Router, sem rota real, sem API/fetch. A cada vez que o destino
@@ -13,8 +14,8 @@
  * `h1` na página — cada tela (`ExcecoesPontoScreen`,
  * `RelatoriosDisponiveisScreen`, `ExtratoBancoHorasScreen`,
  * `EspelhoPontoScreen`, `RelatorioJustificativasScreen`,
- * `QuadroHorariosScreen`, `RelatorioCalendarioFeriadosScreen`) já traz o seu
- * próprio.
+ * `QuadroHorariosScreen`, `RelatorioCalendarioFeriadosScreen`,
+ * `RelatorioListagemColaboradoresScreen`) já traz o seu próprio.
  *
  * As abas usam o padrão ARIA de abas (`role="tablist"`/`role="tab"` +
  * `aria-selected`), distinto do `aria-current` do `PainelNavigation` (que
@@ -48,6 +49,10 @@ import {
   RelatorioJustificativasScreen,
 } from "./RelatorioJustificativasScreen";
 import {
+  RELATORIO_LISTAGEM_COLABORADORES_TITULO_ID,
+  RelatorioListagemColaboradoresScreen,
+} from "./RelatorioListagemColaboradoresScreen";
+import {
   RELATORIOS_DISPONIVEIS_TITULO_ID,
   RelatoriosDisponiveisScreen,
 } from "./RelatoriosDisponiveisScreen";
@@ -60,7 +65,8 @@ type AbaRelatorios =
   | "espelho_ponto"
   | "justificativas"
   | "quadro_horarios"
-  | "calendario_feriados";
+  | "calendario_feriados"
+  | "listagem_colaboradores";
 
 interface AbaDefinicao {
   readonly id: AbaRelatorios;
@@ -103,6 +109,11 @@ const ABAS: readonly AbaDefinicao[] = [
     id: "calendario_feriados",
     rotulo: "Calendário de Feriados",
     tituloId: RELATORIO_CALENDARIO_FERIADOS_TITULO_ID,
+  },
+  {
+    id: "listagem_colaboradores",
+    rotulo: "Listagem de Colaboradores",
+    tituloId: RELATORIO_LISTAGEM_COLABORADORES_TITULO_ID,
   },
 ];
 
@@ -170,8 +181,10 @@ export function RelatoriosScreen({ onTituloIdChange }: RelatoriosScreenProps) {
           <RelatorioJustificativasScreen />
         ) : abaAtiva === "quadro_horarios" ? (
           <QuadroHorariosScreen />
-        ) : (
+        ) : abaAtiva === "calendario_feriados" ? (
           <RelatorioCalendarioFeriadosScreen />
+        ) : (
+          <RelatorioListagemColaboradoresScreen />
         )}
       </div>
     </div>
