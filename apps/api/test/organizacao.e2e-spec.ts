@@ -556,6 +556,83 @@ describe("Núcleo Organizacional Interno (e2e)", () => {
         .send({ nome: "Sequestrado" })
         .expect(404);
     });
+
+    it("equipe: CRUD completo com imutabilidade de código, departamentoId e unidadeOrganizacionalId (T108)", async () => {
+      const depResp = await post("/v1/departamentos", rhA)
+        .send({
+          empresaId: empresaA,
+          codigo: "T108_DEP",
+          nome: "Dep T108",
+        })
+        .expect(201);
+      const depId = depResp.body.id as string;
+
+      const unidResp = await post("/v1/unidades-organizacionais", rhA)
+        .send({ empresaId: empresaA, codigo: "T108_UNID", nome: "Unid T108" })
+        .expect(201);
+      const unidId = unidResp.body.id as string;
+
+      // Criar sem unidade
+      const semUnidade = await post("/v1/equipes", rhA)
+        .send({
+          departamentoId: depId,
+          codigo: "T108_EQ1",
+          nome: "Equipe Sem Unidade",
+        })
+        .expect(201);
+      expect(semUnidade.body.codigo).toBe("T108_EQ1");
+      expect(semUnidade.body.departamentoId).toBe(depId);
+      expect(semUnidade.body.unidadeOrganizacionalId).toBeNull();
+      expect(semUnidade.body.empresaId).toBe(empresaA);
+
+      // Criar com unidade
+      const comUnidade = await post("/v1/equipes", rhA)
+        .send({
+          departamentoId: depId,
+          unidadeOrganizacionalId: unidId,
+          codigo: "T108_EQ2",
+          nome: "Equipe Com Unidade",
+        })
+        .expect(201);
+      expect(comUnidade.body.unidadeOrganizacionalId).toBe(unidId);
+
+      // Editar somente o nome
+      const equipeId = semUnidade.body.id as string;
+      const editada = await patch(`/v1/equipes/${equipeId}`, rhA)
+        .send({ nome: "Equipe Sem Unidade Editada" })
+        .expect(200);
+      expect(editada.body.nome).toBe("Equipe Sem Unidade Editada");
+      expect(editada.body.codigo).toBe("T108_EQ1");
+      expect(editada.body.departamentoId).toBe(depId);
+      expect(editada.body.unidadeOrganizacionalId).toBeNull();
+
+      // Reler confirma imutabilidade
+      const releitura = await get(`/v1/equipes/${equipeId}`, rhA).expect(200);
+      expect(releitura.body.codigo).toBe("T108_EQ1");
+      expect(releitura.body.departamentoId).toBe(depId);
+      expect(releitura.body.unidadeOrganizacionalId).toBeNull();
+    });
+
+    it("IDOR: PATCH de equipe de outra empresa responde 404 (T108)", async () => {
+      const depResp = await post("/v1/departamentos", rhA)
+        .send({
+          empresaId: empresaA,
+          codigo: "IDOR_EQ_D",
+          nome: "Dep IDOR Equipe",
+        })
+        .expect(201);
+      const criada = await post("/v1/equipes", rhA)
+        .send({
+          departamentoId: depResp.body.id as string,
+          codigo: "IDOR_EQ",
+          nome: "Alvo IDOR Equipe",
+        })
+        .expect(201);
+
+      await patch(`/v1/equipes/${criada.body.id as string}`, rhB)
+        .send({ nome: "Sequestrado" })
+        .expect(404);
+    });
   });
 
   describe("isolamento entre empresas (IDOR/BOLA)", () => {

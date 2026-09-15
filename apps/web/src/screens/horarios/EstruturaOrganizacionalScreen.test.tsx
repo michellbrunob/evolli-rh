@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   AreaApi,
   DepartamentoApi,
+  EquipeApi,
   EmpresaApi,
   ResultadoPaginado,
   UnidadeOrganizacionalApi,
@@ -20,16 +21,21 @@ vi.mock("../../api/organizacaoClient");
 import {
   atualizarArea,
   atualizarDepartamento,
+  atualizarEquipe,
   atualizarUnidade,
   criarArea,
   criarDepartamento,
+  criarEquipe,
   criarUnidade,
   listarAreas,
   listarDepartamentos,
   listarDepartamentosParaArea,
+  listarDepartamentosParaEquipe,
   listarEmpresas,
   listarEmpresasMulti,
+  listarEquipes,
   listarUnidades,
+  listarUnidadesParaEquipe,
 } from "../../api/organizacaoClient";
 
 const mockListarEmpresas = vi.mocked(listarEmpresas);
@@ -44,6 +50,13 @@ const mockListarDepartamentosParaArea = vi.mocked(listarDepartamentosParaArea);
 const mockListarAreas = vi.mocked(listarAreas);
 const mockCriarArea = vi.mocked(criarArea);
 const mockAtualizarArea = vi.mocked(atualizarArea);
+const mockListarDepartamentosParaEquipe = vi.mocked(
+  listarDepartamentosParaEquipe,
+);
+const mockListarUnidadesParaEquipe = vi.mocked(listarUnidadesParaEquipe);
+const mockListarEquipes = vi.mocked(listarEquipes);
+const mockCriarEquipe = vi.mocked(criarEquipe);
+const mockAtualizarEquipe = vi.mocked(atualizarEquipe);
 
 const empresaFixture: EmpresaApi = {
   id: "00000000-0000-0000-0000-000000000001",
@@ -129,6 +142,30 @@ const unidade2: UnidadeOrganizacionalApi = {
   atualizadoEm: "2026-01-01T00:00:00.000Z",
 };
 
+const equipe1: EquipeApi = {
+  id: "00000000-0000-0000-0000-000000000041",
+  empresaId: empresaFixture.id,
+  departamentoId: dep1.id,
+  unidadeOrganizacionalId: unidade1.id,
+  codigo: "EQUIPE_FIN",
+  nome: "Equipe Financeira (teste)",
+  status: "ativo",
+  criadoEm: "2026-01-01T00:00:00.000Z",
+  atualizadoEm: "2026-01-01T00:00:00.000Z",
+};
+
+const equipe2: EquipeApi = {
+  id: "00000000-0000-0000-0000-000000000042",
+  empresaId: empresaFixture.id,
+  departamentoId: dep1.id,
+  unidadeOrganizacionalId: null,
+  codigo: "EQUIPE_RH",
+  nome: "Equipe RH (teste)",
+  status: "inativo",
+  criadoEm: "2026-01-01T00:00:00.000Z",
+  atualizadoEm: "2026-01-01T00:00:00.000Z",
+};
+
 function mockSucesso(
   unidades: UnidadeOrganizacionalApi[] = [unidade1, unidade2],
 ) {
@@ -188,6 +225,35 @@ async function ativarAbaDepartamentos() {
 
 async function ativarAbaAreas() {
   fireEvent.click(screen.getByRole("tab", { name: "Áreas" }));
+}
+
+function mockSucessoEquipe(
+  equipes: EquipeApi[] = [equipe1, equipe2],
+  deps: DepartamentoApi[] = [dep1],
+  unids: UnidadeOrganizacionalApi[] = [unidade1],
+) {
+  mockListarDepartamentosParaEquipe.mockResolvedValue({
+    itens: deps,
+    pagina: 1,
+    tamanhoPagina: 100,
+    total: deps.length,
+  } satisfies ResultadoPaginado<DepartamentoApi>);
+  mockListarUnidadesParaEquipe.mockResolvedValue({
+    itens: unids,
+    pagina: 1,
+    tamanhoPagina: 100,
+    total: unids.length,
+  } satisfies ResultadoPaginado<UnidadeOrganizacionalApi>);
+  mockListarEquipes.mockResolvedValue({
+    itens: equipes,
+    pagina: 1,
+    tamanhoPagina: 50,
+    total: equipes.length,
+  } satisfies ResultadoPaginado<EquipeApi>);
+}
+
+async function ativarAbaEquipes() {
+  fireEvent.click(screen.getByRole("tab", { name: "Equipes" }));
 }
 
 describe("EstruturaOrganizacionalScreen (T104 — funcional)", () => {
@@ -467,7 +533,7 @@ describe("EstruturaOrganizacionalScreen (T104 — funcional)", () => {
     }
   });
 
-  it("estrutura de abas é acessível: tablist com três tabs, aba ativa marcada", async () => {
+  it("estrutura de abas é acessível: tablist com quatro tabs, aba ativa marcada", async () => {
     mockSucesso();
     render(<EstruturaOrganizacionalScreen />);
     await screen.findByRole("table", { name: "Unidades organizacionais" });
@@ -476,7 +542,7 @@ describe("EstruturaOrganizacionalScreen (T104 — funcional)", () => {
     expect(tablist).toBeInTheDocument();
 
     const tabs = within(tablist).getAllByRole("tab");
-    expect(tabs).toHaveLength(3);
+    expect(tabs).toHaveLength(4);
 
     const abaUnidades = within(tablist).getByRole("tab", { name: "Unidades" });
     expect(abaUnidades).toHaveAttribute("aria-selected", "true");
@@ -486,6 +552,9 @@ describe("EstruturaOrganizacionalScreen (T104 — funcional)", () => {
 
     const abaAreas = within(tablist).getByRole("tab", { name: "Áreas" });
     expect(abaAreas).toHaveAttribute("aria-selected", "false");
+
+    const abaEquipes = within(tablist).getByRole("tab", { name: "Equipes" });
+    expect(abaEquipes).toHaveAttribute("aria-selected", "false");
   });
 });
 
@@ -1206,6 +1275,434 @@ describe("EstruturaOrganizacionalScreen — Áreas (T107)", () => {
 
     await ativarAbaAreas();
     await screen.findByRole("table", { name: "Áreas" });
+
+    const texto = document.body.innerHTML.toLowerCase();
+    for (const termoProibido of [
+      "secullum",
+      "rwtech",
+      "bioprox",
+      "reserva fiscal",
+      "senha",
+      "r$",
+      ".pdf",
+      "localstorage",
+      "logradouro",
+    ]) {
+      expect(texto).not.toContain(termoProibido);
+    }
+  });
+});
+
+describe("EstruturaOrganizacionalScreen — Equipes (T108)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("ativa aba Equipes e exibe lista com colunas Departamento e Unidade", async () => {
+    mockSucesso();
+    mockSucessoEquipe();
+    render(<EstruturaOrganizacionalScreen />);
+    await screen.findByRole("table", { name: "Unidades organizacionais" });
+
+    await ativarAbaEquipes();
+
+    const tabela = await screen.findByRole("table", { name: "Equipes" });
+    expect(within(tabela).getByText("EQUIPE_FIN")).toBeInTheDocument();
+    expect(
+      within(tabela).getByText("Equipe Financeira (teste)"),
+    ).toBeInTheDocument();
+    expect(within(tabela).getByText("EQUIPE_RH")).toBeInTheDocument();
+    expect(within(tabela).getByText("Equipe RH (teste)")).toBeInTheDocument();
+    expect(within(tabela).getAllByText("FIN").length).toBeGreaterThanOrEqual(1);
+    expect(within(tabela).getByText("UNID_SP")).toBeInTheDocument();
+  });
+
+  it("equipes não são carregadas enquanto a aba estiver inativa", async () => {
+    mockSucesso();
+    render(<EstruturaOrganizacionalScreen />);
+    await screen.findByRole("table", { name: "Unidades organizacionais" });
+
+    expect(mockListarDepartamentosParaEquipe).not.toHaveBeenCalled();
+    expect(mockListarUnidadesParaEquipe).not.toHaveBeenCalled();
+    expect(mockListarEquipes).not.toHaveBeenCalled();
+  });
+
+  it("exibe EmptyState quando não há equipes cadastradas", async () => {
+    mockSucesso();
+    mockSucessoEquipe([]);
+    render(<EstruturaOrganizacionalScreen />);
+    await screen.findByRole("table", { name: "Unidades organizacionais" });
+
+    await ativarAbaEquipes();
+    await waitFor(() =>
+      expect(
+        screen.getByRole("heading", { name: "Nenhuma equipe cadastrada" }),
+      ).toBeInTheDocument(),
+    );
+    expect(
+      screen.queryByRole("table", { name: "Equipes" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getAllByRole("button", { name: "Nova equipe" }).length,
+    ).toBeGreaterThanOrEqual(1);
+  });
+
+  it("exibe erro e botão Tentar novamente quando o carregamento falha", async () => {
+    mockSucesso();
+    mockListarDepartamentosParaEquipe.mockRejectedValue(new Error("falha"));
+    mockListarUnidadesParaEquipe.mockRejectedValue(new Error("falha"));
+    mockListarEquipes.mockRejectedValue(new Error("falha"));
+    render(<EstruturaOrganizacionalScreen />);
+    await screen.findByRole("table", { name: "Unidades organizacionais" });
+
+    await ativarAbaEquipes();
+    await waitFor(() =>
+      expect(
+        screen.getByText("Não foi possível carregar as equipes"),
+      ).toBeInTheDocument(),
+    );
+    const btnRetry = screen.getByRole("button", { name: "Tentar novamente" });
+    expect(btnRetry).toBeInTheDocument();
+
+    mockSucessoEquipe();
+    fireEvent.click(btnRetry);
+    await screen.findByRole("table", { name: "Equipes" });
+  });
+
+  it("botão Nova equipe desabilitado quando não há departamentos ativos", async () => {
+    mockSucesso();
+    mockSucessoEquipe([], [dep2], []);
+    render(<EstruturaOrganizacionalScreen />);
+    await screen.findByRole("table", { name: "Unidades organizacionais" });
+
+    await ativarAbaEquipes();
+    await waitFor(() =>
+      expect(screen.getByText("Nenhuma equipe cadastrada")).toBeInTheDocument(),
+    );
+
+    const botao = screen.getByRole("button", { name: "Nova equipe" });
+    expect(botao).toBeDisabled();
+  });
+
+  it("com único departamento ativo: abre formulário sem seletor de departamento", async () => {
+    mockSucesso();
+    mockSucessoEquipe([], [dep1]);
+    render(<EstruturaOrganizacionalScreen />);
+    await screen.findByRole("table", { name: "Unidades organizacionais" });
+
+    await ativarAbaEquipes();
+    await waitFor(() =>
+      expect(screen.getByText("Nenhuma equipe cadastrada")).toBeInTheDocument(),
+    );
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Nova equipe" })[0]!);
+    const form = screen.getByRole("form", {
+      name: "Formulário de nova equipe",
+    });
+    expect(form).toBeInTheDocument();
+    expect(
+      within(form).queryByLabelText(/departamento/i, { exact: false }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("com múltiplos departamentos ativos: seletor obrigatório sem seleção silenciosa", async () => {
+    mockSucesso();
+    mockSucessoEquipe([], [dep1, dep3]);
+    render(<EstruturaOrganizacionalScreen />);
+    await screen.findByRole("table", { name: "Unidades organizacionais" });
+
+    await ativarAbaEquipes();
+    await waitFor(() =>
+      expect(screen.getByText("Nenhuma equipe cadastrada")).toBeInTheDocument(),
+    );
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Nova equipe" })[0]!);
+    const form = screen.getByRole("form", {
+      name: "Formulário de nova equipe",
+    });
+    const selectDep = within(form).getByLabelText(/departamento/i, {
+      exact: false,
+    });
+    expect(selectDep).toHaveValue("");
+
+    const inputCodigo = within(form).getByLabelText(/código/i, {
+      exact: false,
+    });
+    const inputNome = within(form).getByLabelText(/nome/i, { exact: false });
+    fireEvent.change(inputCodigo, { target: { value: "EQ_TESTE" } });
+    fireEvent.change(inputNome, { target: { value: "Equipe Teste (teste)" } });
+    fireEvent.click(within(form).getByRole("button", { name: "Salvar" }));
+
+    await waitFor(() =>
+      expect(screen.getByText("Selecione o departamento.")).toBeInTheDocument(),
+    );
+    expect(mockCriarEquipe).not.toHaveBeenCalled();
+  });
+
+  it("cria equipe com único departamento e sem unidade", async () => {
+    mockSucesso();
+    mockSucessoEquipe([], [dep1], []);
+    mockCriarEquipe.mockResolvedValue({
+      ...equipe2,
+      id: "00000000-0000-0000-0000-000000000099",
+    });
+    render(<EstruturaOrganizacionalScreen />);
+    await screen.findByRole("table", { name: "Unidades organizacionais" });
+
+    await ativarAbaEquipes();
+    await waitFor(() =>
+      expect(
+        screen.getByRole("heading", { name: "Nenhuma equipe cadastrada" }),
+      ).toBeInTheDocument(),
+    );
+
+    mockSucessoEquipe([equipe2], [dep1], []);
+    fireEvent.click(screen.getAllByRole("button", { name: "Nova equipe" })[0]!);
+    const form = screen.getByRole("form", {
+      name: "Formulário de nova equipe",
+    });
+
+    fireEvent.change(within(form).getByLabelText(/código/i, { exact: false }), {
+      target: { value: "EQ_TEST" },
+    });
+    fireEvent.change(within(form).getByLabelText(/nome/i, { exact: false }), {
+      target: { value: "Nova Equipe (teste)" },
+    });
+    fireEvent.click(within(form).getByRole("button", { name: "Salvar" }));
+
+    await waitFor(() =>
+      expect(mockCriarEquipe).toHaveBeenCalledWith({
+        codigo: "EQ_TEST",
+        nome: "Nova Equipe (teste)",
+        departamentoId: dep1.id,
+      }),
+    );
+    await screen.findByRole("table", { name: "Equipes" });
+  });
+
+  it("cria equipe com unidade selecionada", async () => {
+    mockSucesso();
+    mockSucessoEquipe([], [dep1], [unidade1]);
+    mockCriarEquipe.mockResolvedValue(equipe1);
+    render(<EstruturaOrganizacionalScreen />);
+    await screen.findByRole("table", { name: "Unidades organizacionais" });
+
+    await ativarAbaEquipes();
+    await waitFor(() =>
+      expect(
+        screen.getByRole("heading", { name: "Nenhuma equipe cadastrada" }),
+      ).toBeInTheDocument(),
+    );
+
+    mockSucessoEquipe([equipe1], [dep1], [unidade1]);
+    fireEvent.click(screen.getAllByRole("button", { name: "Nova equipe" })[0]!);
+    const form = screen.getByRole("form", {
+      name: "Formulário de nova equipe",
+    });
+
+    fireEvent.change(within(form).getByLabelText(/código/i, { exact: false }), {
+      target: { value: "EQUIPE_FIN" },
+    });
+    fireEvent.change(within(form).getByLabelText(/nome/i, { exact: false }), {
+      target: { value: "Equipe Financeira (teste)" },
+    });
+    const selectUnidade = within(form).getByLabelText(/unidade/i, {
+      exact: false,
+    });
+    fireEvent.change(selectUnidade, { target: { value: unidade1.id } });
+    fireEvent.click(within(form).getByRole("button", { name: "Salvar" }));
+
+    await waitFor(() =>
+      expect(mockCriarEquipe).toHaveBeenCalledWith({
+        codigo: "EQUIPE_FIN",
+        nome: "Equipe Financeira (teste)",
+        departamentoId: dep1.id,
+        unidadeOrganizacionalId: unidade1.id,
+      }),
+    );
+    await screen.findByRole("table", { name: "Equipes" });
+  });
+
+  it("valida código vazio na criação", async () => {
+    mockSucesso();
+    mockSucessoEquipe([], [dep1]);
+    render(<EstruturaOrganizacionalScreen />);
+    await screen.findByRole("table", { name: "Unidades organizacionais" });
+
+    await ativarAbaEquipes();
+    await waitFor(() =>
+      expect(
+        screen.getByRole("heading", { name: "Nenhuma equipe cadastrada" }),
+      ).toBeInTheDocument(),
+    );
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Nova equipe" })[0]!);
+    const form = screen.getByRole("form", {
+      name: "Formulário de nova equipe",
+    });
+    fireEvent.change(within(form).getByLabelText(/nome/i, { exact: false }), {
+      target: { value: "Equipe Válida (teste)" },
+    });
+    fireEvent.click(within(form).getByRole("button", { name: "Salvar" }));
+
+    await waitFor(() =>
+      expect(screen.getByText("Código é obrigatório.")).toBeInTheDocument(),
+    );
+    expect(mockCriarEquipe).not.toHaveBeenCalled();
+  });
+
+  it("valida nome vazio na criação", async () => {
+    mockSucesso();
+    mockSucessoEquipe([], [dep1]);
+    render(<EstruturaOrganizacionalScreen />);
+    await screen.findByRole("table", { name: "Unidades organizacionais" });
+
+    await ativarAbaEquipes();
+    await waitFor(() =>
+      expect(
+        screen.getByRole("heading", { name: "Nenhuma equipe cadastrada" }),
+      ).toBeInTheDocument(),
+    );
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Nova equipe" })[0]!);
+    const form = screen.getByRole("form", {
+      name: "Formulário de nova equipe",
+    });
+    fireEvent.change(within(form).getByLabelText(/código/i, { exact: false }), {
+      target: { value: "EQ_OK" },
+    });
+    fireEvent.click(within(form).getByRole("button", { name: "Salvar" }));
+
+    await waitFor(() =>
+      expect(screen.getByText("Nome é obrigatório.")).toBeInTheDocument(),
+    );
+    expect(mockCriarEquipe).not.toHaveBeenCalled();
+  });
+
+  it("abre formulário de edição com código somente leitura e departamento/unidade imutáveis", async () => {
+    mockSucesso();
+    mockSucessoEquipe([equipe1], [dep1], [unidade1]);
+    render(<EstruturaOrganizacionalScreen />);
+    await screen.findByRole("table", { name: "Unidades organizacionais" });
+
+    await ativarAbaEquipes();
+    await screen.findByRole("table", { name: "Equipes" });
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Editar" })[0]!);
+    const form = screen.getByRole("form", {
+      name: "Formulário de edição de equipe",
+    });
+    expect(form).toBeInTheDocument();
+
+    const inputCodigo = within(form).getByDisplayValue("EQUIPE_FIN");
+    expect(inputCodigo).toHaveAttribute("readonly");
+
+    expect(
+      within(form).getByDisplayValue("Equipe Financeira (teste)"),
+    ).toBeInTheDocument();
+
+    expect(
+      within(form).queryByLabelText(/departamento/i, { exact: false }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(form).queryByLabelText(/unidade/i, { exact: false }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("edita apenas o nome da equipe", async () => {
+    mockSucesso();
+    mockSucessoEquipe([equipe1], [dep1], [unidade1]);
+    mockAtualizarEquipe.mockResolvedValue({
+      ...equipe1,
+      nome: "Equipe Financeira Editada (teste)",
+    });
+    render(<EstruturaOrganizacionalScreen />);
+    await screen.findByRole("table", { name: "Unidades organizacionais" });
+
+    await ativarAbaEquipes();
+    await screen.findByRole("table", { name: "Equipes" });
+
+    mockSucessoEquipe(
+      [{ ...equipe1, nome: "Equipe Financeira Editada (teste)" }],
+      [dep1],
+      [unidade1],
+    );
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Editar" })[0]!);
+    const form = screen.getByRole("form", {
+      name: "Formulário de edição de equipe",
+    });
+
+    const inputNome = within(form).getByDisplayValue(
+      "Equipe Financeira (teste)",
+    );
+    fireEvent.change(inputNome, {
+      target: { value: "Equipe Financeira Editada (teste)" },
+    });
+    fireEvent.click(within(form).getByRole("button", { name: "Salvar" }));
+
+    await waitFor(() =>
+      expect(mockAtualizarEquipe).toHaveBeenCalledWith(equipe1.id, {
+        nome: "Equipe Financeira Editada (teste)",
+      }),
+    );
+    await screen.findByText("Equipe Financeira Editada (teste)");
+  });
+
+  it("cancelar formulário de equipe fecha sem chamar a API", async () => {
+    mockSucesso();
+    mockSucessoEquipe([equipe1]);
+    render(<EstruturaOrganizacionalScreen />);
+    await screen.findByRole("table", { name: "Unidades organizacionais" });
+
+    await ativarAbaEquipes();
+    await screen.findByRole("table", { name: "Equipes" });
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Editar" })[0]!);
+    expect(
+      screen.getByRole("form", { name: "Formulário de edição de equipe" }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    expect(screen.queryByRole("form")).not.toBeInTheDocument();
+    expect(mockAtualizarEquipe).not.toHaveBeenCalled();
+  });
+
+  it("não regressão — Unidades, Departamentos e Áreas funcionam após navegar pela aba Equipes", async () => {
+    mockSucesso();
+    mockSucessoDep();
+    mockSucessoArea();
+    mockSucessoEquipe();
+    render(<EstruturaOrganizacionalScreen />);
+    await screen.findByRole("table", { name: "Unidades organizacionais" });
+
+    await ativarAbaEquipes();
+    await screen.findByRole("table", { name: "Equipes" });
+
+    fireEvent.click(screen.getByRole("tab", { name: "Unidades" }));
+    await screen.findByRole("table", { name: "Unidades organizacionais" });
+    expect(
+      screen.queryByRole("table", { name: "Equipes" }),
+    ).not.toBeInTheDocument();
+
+    await ativarAbaDepartamentos();
+    await screen.findByRole("table", { name: "Departamentos" });
+
+    await ativarAbaAreas();
+    await screen.findByRole("table", { name: "Áreas" });
+    expect(
+      screen.queryByRole("table", { name: "Equipes" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("não contém razão social, CNPJ, nome de pessoa, endereço ou valor financeiro (equipes)", async () => {
+    mockSucesso();
+    mockSucessoEquipe();
+    render(<EstruturaOrganizacionalScreen />);
+    await screen.findByRole("table", { name: "Unidades organizacionais" });
+
+    await ativarAbaEquipes();
+    await screen.findByRole("table", { name: "Equipes" });
 
     const texto = document.body.innerHTML.toLowerCase();
     for (const termoProibido of [
