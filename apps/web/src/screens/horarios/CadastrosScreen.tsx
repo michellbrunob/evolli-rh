@@ -29,7 +29,6 @@ import {
   CadastroHorariosScreen,
   HORARIOS_TITULO_ID,
 } from "./CadastroHorariosScreen";
-export { HORARIOS_TITULO_ID };
 import {
   CALENDARIO_FERIADOS_TITULO_ID,
   CalendarioFeriadosScreen,
@@ -71,6 +70,8 @@ import {
   TiposDocumentoScreen,
 } from "./TiposDocumentoScreen";
 import "./CadastrosScreen.css";
+
+export { HORARIOS_TITULO_ID };
 
 type AbaCadastros =
   | "horarios"
