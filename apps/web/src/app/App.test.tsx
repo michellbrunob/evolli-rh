@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 
 describe("App — shell administrativo + navegação visual (T044)", () => {
@@ -694,6 +694,25 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     expect(
       screen.getByRole("heading", { level: 1, name: "Exceções de Ponto" }),
     ).toBeInTheDocument();
+  });
+
+  it("sem onLogout (uso direto, como em todo teste acima): não mostra nenhum botão 'Sair' (T116)", () => {
+    render(<App />);
+
+    expect(
+      screen.queryByRole("button", { name: "Sair" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("com onLogout informado, mostra o botão 'Sair' na barra superior e o aciona ao clicar (T116)", () => {
+    const onLogout = vi.fn();
+    render(<App onLogout={onLogout} />);
+
+    const botaoSair = screen.getByRole("button", { name: "Sair" });
+    expect(botaoSair).toBeInTheDocument();
+
+    fireEvent.click(botaoSair);
+    expect(onLogout).toHaveBeenCalledTimes(1);
   });
 
   it("cada botão de navegação é um <button> nativo, operável por teclado", () => {

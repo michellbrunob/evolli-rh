@@ -68,6 +68,23 @@
   color: var(--color-on-dark-muted);
 }
 
+/* Botão "Sair" (T116) — só aparece quando `App` recebe `onLogout`. Empurrado
+   para a extremidade oposta da marca via `margin-left: auto` no container
+   flex (`app-shell__topbar-inner`). */
+.app-shell__logout {
+  margin-left: auto;
+  min-height: var(--touch-target);
+  padding: 0 var(--space-md);
+  border: 1px solid var(--color-on-dark-muted);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-on-dark);
+  font-family: inherit;
+  font-size: var(--text-caption);
+  font-weight: var(--weight-strong);
+  cursor: pointer;
+}
+
 /* Corpo do painel: navegação (`PainelNavigation`) + área principal, lado a
    lado em telas largas. `min-width: 0` por ser flex container dentro de
    `.app-shell` (também flex em coluna) — mesmo motivo do item abaixo. */

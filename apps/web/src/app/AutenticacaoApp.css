@@ -1,0 +1,16 @@
+/**
+ * Portão de sessão (T116) — só tokens já existentes (tokens.css); sem
+ * hexadecimal novo, sem sombra, sem gradiente.
+ */
+
+.autenticacao-app__verificando {
+  min-height: 100vh;
+  min-height: 100svh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-lg);
+  color: var(--color-ink-subtle);
+  background: var(--surface-neutral);
+  text-align: center;
+}
