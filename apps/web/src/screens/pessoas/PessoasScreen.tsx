@@ -44,14 +44,17 @@ import {
   PESSOAS_DOCUMENTOS_TITULO_ID,
   PessoasDocumentosScreen,
 } from "./PessoasDocumentosScreen";
-import { PessoasHorarioScreen } from "./PessoasHorarioScreen";
+import {
+  PESSOAS_HORARIO_TITULO_ID,
+  PessoasHorarioScreen,
+} from "./PessoasHorarioScreen";
 import "./PessoasScreen.css";
 import {
   SOLICITACOES_TITULO_ID,
   SolicitacoesScreen,
 } from "./SolicitacoesScreen";
 
-export const PESSOAS_HORARIO_TITULO_ID = "pessoas-horario-titulo";
+export { PESSOAS_HORARIO_TITULO_ID };
 
 type AbaPessoas =
   | "colaboradores"

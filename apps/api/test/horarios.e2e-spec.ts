@@ -613,6 +613,87 @@ describe("Cadastros: Horarios e vinculo ao colaborador (e2e)", () => {
   });
 
   // -------------------------------------------------------------------------
+
+  describe("T112 — fundação web: Pessoas > Horário de trabalho", () => {
+    it("lista → cria vínculo → relê por listagem e por detalhe → encerra vigência", async () => {
+      const { id: tabelaId } = await criarTabela(rhA, "T112 Vinculavel");
+      // Colaborador dedicado (não o `colaboradorAId` compartilhado com o
+      // bloco "RH vincula tabela..." acima) — evita 409 por já existir um
+      // vínculo de horário aberto naquele colaborador de outro teste.
+      const colaboradorId = await admitir(rhA, {
+        nome: "Pessoa T112 Ciclo",
+        empresaId: empresaA,
+        matricula: "MAT-T112-1",
+        departamentoId: departamentoA,
+      });
+
+      const antes = await get(
+        `/v1/horarios/vinculos?colaboradorId=${colaboradorId}`,
+        rhA,
+      ).expect(200);
+      expect(antes.body.total).toBe(0);
+
+      const criado = await post("/v1/horarios/vinculos", rhA)
+        .send({
+          colaboradorId,
+          tabelaHorarioId: tabelaId,
+          vigenciaInicio: "2026-08-01",
+        })
+        .expect(201);
+      expect(criado.body.vigenciaFim).toBeNull();
+
+      const lista = await get(
+        `/v1/horarios/vinculos?colaboradorId=${colaboradorId}`,
+        rhA,
+      ).expect(200);
+      expect(lista.body.total).toBe(1);
+
+      const detalhe = await get(
+        `/v1/horarios/vinculos/${criado.body.id}`,
+        rhA,
+      ).expect(200);
+      expect(detalhe.body.tabelaHorarioId).toBe(tabelaId);
+      expect(detalhe.body.vigenciaInicio).toBe("2026-08-01");
+
+      const encerrado = await post(
+        `/v1/horarios/vinculos/${criado.body.id}/encerrar`,
+        rhA,
+      )
+        .send({ vigenciaFim: "2026-09-01" })
+        .expect(201);
+      expect(encerrado.body.vigenciaFim).toBe("2026-09-01");
+
+      const detalheEncerrado = await get(
+        `/v1/horarios/vinculos/${criado.body.id}`,
+        rhA,
+      ).expect(200);
+      expect(detalheEncerrado.body.vigenciaFim).toBe("2026-09-01");
+    });
+
+    it("IDOR: rhB não acessa nem encerra vínculo de horário de rhA (404 anti-enumeração)", async () => {
+      const { id: tabelaId } = await criarTabela(rhA, "T112 IDOR");
+      const colaboradorId = await admitir(rhA, {
+        nome: "Pessoa T112 IDOR",
+        empresaId: empresaA,
+        matricula: "MAT-T112-2",
+        departamentoId: departamentoA,
+      });
+      const vinculo = await post("/v1/horarios/vinculos", rhA)
+        .send({
+          colaboradorId,
+          tabelaHorarioId: tabelaId,
+          vigenciaInicio: "2026-08-01",
+        })
+        .expect(201);
+
+      await get(`/v1/horarios/vinculos/${vinculo.body.id}`, rhB).expect(404);
+      await post(`/v1/horarios/vinculos/${vinculo.body.id}/encerrar`, rhB)
+        .send({ vigenciaFim: "2026-09-01" })
+        .expect(404);
+    });
+  });
+
+  // -------------------------------------------------------------------------
   describe("isolamento por empresa (IDOR/BOLA)", () => {
     it("rhA nao ve nem opera tabela da empresa B (404)", async () => {
       const { id: tabelaB } = await criarTabela(rhB, "So da B");

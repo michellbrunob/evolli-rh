@@ -476,7 +476,7 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     );
   });
 
-  it("Pessoas > aba local 'Horário de trabalho' continua acessível, sem regressão (T046/T072)", () => {
+  it("Pessoas > aba local 'Horário de trabalho' continua acessível, sem regressão (T112)", () => {
     render(<App />);
 
     fireEvent.click(
@@ -488,11 +488,7 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     expect(
       screen.getByRole("heading", { level: 1, name: "Horário de trabalho" }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", {
-        name: "Colaboradores com tabela de horário atribuída",
-      }),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Somente RH")).toBeInTheDocument();
 
     const main = screen.getByRole("main");
     const rotuloId = main.getAttribute("aria-labelledby");

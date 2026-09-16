@@ -1,188 +1,574 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PessoasHorarioScreen } from "./PessoasHorarioScreen";
+import {
+  type ColaboradorApi,
+  listarColaboradores,
+} from "../../api/colaboradoresClient";
+import {
+  type TabelaHorarioApi,
+  listarTabelasHorario,
+} from "../../api/horariosClient";
+import {
+  type VinculoHorarioApi,
+  criarVinculoHorario,
+  encerrarVinculoHorario,
+  listarVinculosHorario,
+} from "../../api/vinculoHorarioClient";
 
-describe("PessoasHorarioScreen (T046 — tela visual estática)", () => {
-  it("tem um único h1 e explica que o RH atribui a tabela de horário", () => {
+vi.mock("../../api/colaboradoresClient");
+vi.mock("../../api/horariosClient");
+vi.mock("../../api/vinculoHorarioClient");
+
+interface ResultadoPaginadoTeste<T> {
+  itens: T[];
+  pagina: number;
+  tamanhoPagina: number;
+  total: number;
+}
+
+function paginado<T>(itens: T[]): ResultadoPaginadoTeste<T> {
+  return { itens, pagina: 1, tamanhoPagina: 100, total: itens.length };
+}
+
+const colaborador1: ColaboradorApi = {
+  id: "11111111-1111-1111-1111-111111111111",
+  nome: "Ana Colaboradora (teste)",
+  situacao: "ativo",
+  criadoEm: "2025-01-01T12:00:00.000Z",
+  atualizadoEm: "2025-01-01T12:00:00.000Z",
+};
+
+const colaborador2: ColaboradorApi = {
+  id: "22222222-2222-2222-2222-222222222222",
+  nome: "Bruno Colaborador (teste)",
+  situacao: "ativo",
+  criadoEm: "2025-01-01T12:00:00.000Z",
+  atualizadoEm: "2025-01-01T12:00:00.000Z",
+};
+
+const colaboradorInativo: ColaboradorApi = {
+  id: "33333333-3333-3333-3333-333333333333",
+  nome: "Carla Inativa (teste)",
+  situacao: "inativo",
+  criadoEm: "2025-01-01T12:00:00.000Z",
+  atualizadoEm: "2025-01-01T12:00:00.000Z",
+};
+
+const tabelaAtiva: TabelaHorarioApi = {
+  id: "44444444-4444-4444-4444-444444444444",
+  empresaId: "77777777-7777-7777-7777-777777777777",
+  nome: "Tabela Comercial (teste)",
+  ativo: true,
+  criadoPorUserId: "88888888-8888-8888-8888-888888888888",
+  criadoEm: "2025-01-01T12:00:00.000Z",
+  atualizadoEm: "2025-01-01T12:00:00.000Z",
+  periodos: [],
+};
+
+const tabelaInativa: TabelaHorarioApi = {
+  id: "55555555-5555-5555-5555-555555555555",
+  empresaId: "77777777-7777-7777-7777-777777777777",
+  nome: "Tabela Descontinuada (teste)",
+  ativo: false,
+  criadoPorUserId: "88888888-8888-8888-8888-888888888888",
+  criadoEm: "2025-01-01T12:00:00.000Z",
+  atualizadoEm: "2025-01-01T12:00:00.000Z",
+  periodos: [],
+};
+
+const vinculoVigente: VinculoHorarioApi = {
+  id: "66666666-6666-6666-6666-666666666666",
+  colaboradorId: colaborador1.id,
+  empresaId: tabelaAtiva.empresaId,
+  tabelaHorarioId: tabelaAtiva.id,
+  vigenciaInicio: "2025-01-10",
+  vigenciaFim: null,
+  criadoPorUserId: "88888888-8888-8888-8888-888888888888",
+  criadoEm: "2025-01-10T12:00:00.000Z",
+  atualizadoEm: "2025-01-10T12:00:00.000Z",
+};
+
+const vinculoEncerrado: VinculoHorarioApi = {
+  id: "99999999-9999-9999-9999-999999999999",
+  colaboradorId: colaboradorInativo.id,
+  empresaId: tabelaAtiva.empresaId,
+  tabelaHorarioId: tabelaAtiva.id,
+  vigenciaInicio: "2024-01-01",
+  vigenciaFim: "2024-12-31",
+  criadoPorUserId: "88888888-8888-8888-8888-888888888888",
+  criadoEm: "2024-01-01T12:00:00.000Z",
+  atualizadoEm: "2024-12-31T12:00:00.000Z",
+};
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  vi.mocked(listarVinculosHorario).mockResolvedValue(
+    paginado([vinculoVigente, vinculoEncerrado]),
+  );
+  vi.mocked(listarColaboradores).mockResolvedValue(
+    paginado([colaborador1, colaborador2, colaboradorInativo]),
+  );
+  vi.mocked(listarTabelasHorario).mockResolvedValue(
+    paginado([tabelaAtiva, tabelaInativa]),
+  );
+  vi.mocked(criarVinculoHorario).mockResolvedValue(vinculoVigente);
+  vi.mocked(encerrarVinculoHorario).mockResolvedValue(vinculoVigente);
+});
+
+describe("PessoasHorarioScreen (T112 — funcional)", () => {
+  it("tem um único h1 e exibe o aviso Somente RH", async () => {
     render(<PessoasHorarioScreen />);
 
     expect(
-      screen.getAllByRole("heading", {
-        level: 1,
-        name: "Horário de trabalho",
-      }),
+      screen.getAllByRole("heading", { level: 1, name: "Horário de trabalho" }),
     ).toHaveLength(1);
-    expect(
-      screen.getByText(/O RH atribui uma tabela de horário ao colaborador/i),
-    ).toBeInTheDocument();
-  });
-
-  it("exibe o aviso de que somente RH atua e que vigência futura não altera apuração passada", () => {
-    render(<PessoasHorarioScreen />);
-
     expect(screen.getByText("Somente RH")).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        /nunca altera a apuração de dias já calculados com a versão de horário anterior/i,
-      ),
-    ).toBeInTheDocument();
+
+    await waitFor(() => expect(listarVinculosHorario).toHaveBeenCalled());
   });
 
-  it("lista colaborador, tabela de horário, vigência e situação", () => {
+  it("lista vínculos reais com nome do colaborador, tabela, vigência e situação", async () => {
     render(<PessoasHorarioScreen />);
 
-    const tabela = screen.getByRole("table", {
-      name: "Colaboradores com tabela de horário atribuída",
+    const tabela = await screen.findByRole("table", {
+      name: "Colaboradores com tabela de horário vinculada",
     });
-    const dentroDaTabela = within(tabela);
-
-    expect(dentroDaTabela.getByText("Vínculo V-001")).toBeInTheDocument();
-    expect(
-      dentroDaTabela.getAllByText("Tabela Administrativo (exemplo)").length,
-    ).toBeGreaterThan(0);
-    expect(
-      dentroDaTabela.getByText(/01\/01\/2026 – vigente/),
-    ).toBeInTheDocument();
-    expect(dentroDaTabela.getAllByText("Vigente").length).toBeGreaterThan(0);
-    expect(dentroDaTabela.getByText("Encerrada")).toBeInTheDocument();
+    const dentro = within(tabela);
+    expect(dentro.getByText("Ana Colaboradora (teste)")).toBeInTheDocument();
+    expect(dentro.getByText("Carla Inativa (teste)")).toBeInTheDocument();
+    expect(dentro.getAllByText("Tabela Comercial (teste)").length).toBe(2);
+    expect(dentro.getByText("2025-01-10 – vigente")).toBeInTheDocument();
+    expect(dentro.getByText("2024-01-01 – 2024-12-31")).toBeInTheDocument();
+    expect(dentro.getByText("Vigente")).toBeInTheDocument();
+    expect(dentro.getByText("Encerrada")).toBeInTheDocument();
   });
 
-  it("abre o formulário em branco ao clicar em 'Nova atribuição'", () => {
-    render(<PessoasHorarioScreen />);
+  it("mostra o estado de carregamento antes dos dados chegarem", async () => {
+    let resolver: (v: ResultadoPaginadoTeste<VinculoHorarioApi>) => void;
+    vi.mocked(listarVinculosHorario).mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolver = resolve;
+      }) as ReturnType<typeof listarVinculosHorario>,
+    );
 
-    fireEvent.click(screen.getByRole("button", { name: "Nova atribuição" }));
+    render(<PessoasHorarioScreen />);
 
     expect(
-      screen.getByRole("heading", { name: "Nova atribuição de horário" }),
+      screen.getByText("Carregando vínculos de horário…"),
     ).toBeInTheDocument();
-    expect(screen.getByLabelText(/colaborador \(vínculo\)/i)).toHaveValue("");
-  });
 
-  it("abre o formulário pré-preenchido ao 'Atribuir/alterar' uma linha existente", () => {
-    render(<PessoasHorarioScreen />);
-
-    const botoes = screen.getAllByRole("button", {
-      name: /^Atribuir\/alterar/,
+    resolver!(paginado([vinculoVigente]));
+    await screen.findByRole("table", {
+      name: "Colaboradores com tabela de horário vinculada",
     });
-    fireEvent.click(botoes[0]!);
-
-    expect(
-      screen.getByRole("heading", {
-        name: "Alterar atribuição — Vínculo V-001",
-      }),
-    ).toBeInTheDocument();
-    expect(screen.getByLabelText(/colaborador \(vínculo\)/i)).toHaveValue(
-      "Vínculo V-001",
-    );
   });
 
-  it("não vaza o valor de uma edição anterior ao abrir 'Nova atribuição' em seguida", () => {
+  it("mostra erro de carregamento e permite tentar novamente", async () => {
+    vi.mocked(listarVinculosHorario).mockRejectedValueOnce(new Error("falha"));
+
     render(<PessoasHorarioScreen />);
 
-    fireEvent.click(
-      screen.getAllByRole("button", { name: /^Atribuir\/alterar/ })[0]!,
-    );
-    expect(screen.getByLabelText(/colaborador \(vínculo\)/i)).toHaveValue(
-      "Vínculo V-001",
-    );
-    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
-
-    fireEvent.click(screen.getByRole("button", { name: "Nova atribuição" }));
-    expect(
-      screen.getByRole("heading", { name: "Nova atribuição de horário" }),
-    ).toBeInTheDocument();
-    expect(screen.getByLabelText(/colaborador \(vínculo\)/i)).toHaveValue("");
-  });
-
-  it("confirmar o formulário mostra aviso demonstrativo e não altera a listagem", () => {
-    render(<PessoasHorarioScreen />);
-
-    fireEvent.click(screen.getByRole("button", { name: "Nova atribuição" }));
-    fireEvent.click(
-      screen.getByRole("button", { name: "Confirmar (demonstração)" }),
-    );
-
-    expect(
-      screen.getByText(
-        /Ação apenas demonstrativa: nenhuma tabela de horário foi realmente atribuída/,
-      ),
-    ).toBeInTheDocument();
-
-    // A listagem original permanece intacta (mesmas quatro linhas de sempre).
-    const tabela = screen.getByRole("table", {
-      name: "Colaboradores com tabela de horário atribuída",
+    await screen.findByRole("heading", {
+      name: "Não foi possível carregar os vínculos de horário",
     });
-    expect(within(tabela).getAllByRole("row")).toHaveLength(5); // cabeçalho + 4
-  });
-
-  it("demonstra um campo com erro de validação por texto + semântica", () => {
-    render(<PessoasHorarioScreen />);
-
-    fireEvent.click(screen.getByRole("button", { name: "Nova atribuição" }));
-
-    const alerta = screen.getByRole("alert");
-    expect(alerta).toHaveTextContent("Informe uma data no formato AAAA-MM-DD.");
-    expect(
-      screen.getByLabelText(/vigência — início \(exemplo de validação\)/i),
-    ).toHaveAttribute("aria-invalid", "true");
-  });
-
-  it("alterna para o estado vazio e mostra o EmptyState com ação", () => {
-    render(<PessoasHorarioScreen />);
-
-    fireEvent.click(screen.getByRole("button", { name: "Vazio" }));
-
-    expect(
-      screen.queryByRole("table", {
-        name: "Colaboradores com tabela de horário atribuída",
-      }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", {
-        level: 3,
-        name: "Nenhuma atribuição de horário cadastrada",
-      }),
-    ).toBeInTheDocument();
-  });
-
-  it("alterna para o estado de erro com referência ilustrativa e ação de retorno", () => {
-    render(<PessoasHorarioScreen />);
-
-    fireEvent.click(screen.getByRole("button", { name: "Erro" }));
-
-    expect(
-      screen.getByRole("heading", {
-        name: "Não foi possível carregar as atribuições de horário",
-      }),
-    ).toBeInTheDocument();
-    expect(screen.getByText(/REQ-DEMO-000789/)).toBeInTheDocument();
-    expect(screen.getByText(/ilustrativa/)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
+
+    await screen.findByRole("table", {
+      name: "Colaboradores com tabela de horário vinculada",
+    });
+  });
+
+  it("mostra EmptyState quando não há vínculos", async () => {
+    vi.mocked(listarVinculosHorario).mockResolvedValue(paginado([]));
+
+    render(<PessoasHorarioScreen />);
+
     expect(
-      screen.getByRole("table", {
-        name: "Colaboradores com tabela de horário atribuída",
+      await screen.findByRole("heading", {
+        name: "Nenhum vínculo de horário cadastrado",
       }),
     ).toBeInTheDocument();
   });
 
-  it("não referencia CPF, nome real, cálculo, banco de horas, AFD ou dado real", () => {
+  it("abre o formulário: múltiplos colaboradores ativos exigem seleção explícita; tabela única fica oculta/resolvida", async () => {
     render(<PessoasHorarioScreen />);
+    await screen.findByRole("table", {
+      name: "Colaboradores com tabela de horário vinculada",
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Novo vínculo" }));
+
+    expect(
+      screen.getByRole("form", {
+        name: "Formulário de novo vínculo de horário",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Colaborador\b/i)).toBeInTheDocument();
+    expect(
+      screen.queryByLabelText(/^Tabela de horário/i),
+    ).not.toBeInTheDocument();
+  });
+
+  it("valida vigência de início obrigatória", async () => {
+    render(<PessoasHorarioScreen />);
+    await screen.findByRole("table", {
+      name: "Colaboradores com tabela de horário vinculada",
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Novo vínculo" }));
+
+    fireEvent.change(screen.getByLabelText(/^Colaborador\b/i), {
+      target: { value: colaborador1.id },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Criar vínculo" }));
+
+    expect(
+      await screen.findByText("Informe o início da vigência."),
+    ).toBeInTheDocument();
+    expect(criarVinculoHorario).not.toHaveBeenCalled();
+  });
+
+  it("valida que o fim da vigência deve ser posterior ao início", async () => {
+    render(<PessoasHorarioScreen />);
+    await screen.findByRole("table", {
+      name: "Colaboradores com tabela de horário vinculada",
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Novo vínculo" }));
+
+    fireEvent.change(screen.getByLabelText(/^Colaborador\b/i), {
+      target: { value: colaborador1.id },
+    });
+    fireEvent.change(screen.getByLabelText(/Vigência — início/i), {
+      target: { value: "2026-05-01" },
+    });
+    fireEvent.change(screen.getByLabelText(/Vigência — fim/i), {
+      target: { value: "2026-01-01" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Criar vínculo" }));
+
+    expect(
+      await screen.findByText(
+        "O fim da vigência deve ser posterior ao início.",
+      ),
+    ).toBeInTheDocument();
+    expect(criarVinculoHorario).not.toHaveBeenCalled();
+  });
+
+  it("cria vínculo com sucesso (tabela única resolvida automaticamente) e recarrega a lista", async () => {
+    render(<PessoasHorarioScreen />);
+    await screen.findByRole("table", {
+      name: "Colaboradores com tabela de horário vinculada",
+    });
+    const chamadasAntes = vi.mocked(listarVinculosHorario).mock.calls.length;
+
+    fireEvent.click(screen.getByRole("button", { name: "Novo vínculo" }));
+    fireEvent.change(screen.getByLabelText(/^Colaborador\b/i), {
+      target: { value: colaborador2.id },
+    });
+    fireEvent.change(screen.getByLabelText(/Vigência — início/i), {
+      target: { value: "2026-01-05" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Criar vínculo" }));
+
+    await waitFor(() =>
+      expect(criarVinculoHorario).toHaveBeenCalledWith({
+        colaboradorId: colaborador2.id,
+        tabelaHorarioId: tabelaAtiva.id,
+        vigenciaInicio: "2026-01-05",
+      }),
+    );
+
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("form", {
+          name: "Formulário de novo vínculo de horário",
+        }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(vi.mocked(listarVinculosHorario).mock.calls.length).toBe(
+      chamadasAntes + 1,
+    );
+  });
+
+  it("mostra mensagem amigável de sobreposição em erro 409", async () => {
+    vi.mocked(criarVinculoHorario).mockRejectedValueOnce(
+      Object.assign(new Error("Conflict"), { status: 409 }),
+    );
+
+    render(<PessoasHorarioScreen />);
+    await screen.findByRole("table", {
+      name: "Colaboradores com tabela de horário vinculada",
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Novo vínculo" }));
+    fireEvent.change(screen.getByLabelText(/^Colaborador\b/i), {
+      target: { value: colaborador1.id },
+    });
+    fireEvent.change(screen.getByLabelText(/Vigência — início/i), {
+      target: { value: "2026-01-05" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Criar vínculo" }));
+
+    expect(
+      await screen.findByText(/já possui uma tabela de horário vigente/i),
+    ).toBeInTheDocument();
+  });
+
+  it("bloqueia a criação quando não há colaborador ativo disponível", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue(
+      paginado([colaboradorInativo]),
+    );
+
+    render(<PessoasHorarioScreen />);
+    await screen.findByRole("table", {
+      name: "Colaboradores com tabela de horário vinculada",
+    });
+
+    expect(
+      screen.getByText(/Nenhum colaborador ativo disponível para vincular/i),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Novo vínculo" })).toBeDisabled();
+  });
+
+  it("bloqueia a criação quando não há tabela de horário ativa disponível", async () => {
+    vi.mocked(listarTabelasHorario).mockResolvedValue(
+      paginado([tabelaInativa]),
+    );
+
+    render(<PessoasHorarioScreen />);
+    await screen.findByRole("table", {
+      name: "Colaboradores com tabela de horário vinculada",
+    });
+
+    expect(
+      screen.getByText(
+        /Nenhuma tabela de horário ativa disponível para vincular/i,
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Novo vínculo" })).toBeDisabled();
+  });
+
+  it("exige seleção explícita quando há múltiplas tabelas de horário ativas", async () => {
+    const tabelaAtiva2: TabelaHorarioApi = {
+      ...tabelaAtiva,
+      id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      nome: "Tabela Administrativo (teste)",
+    };
+    vi.mocked(listarTabelasHorario).mockResolvedValue(
+      paginado([tabelaAtiva, tabelaAtiva2]),
+    );
+
+    render(<PessoasHorarioScreen />);
+    await screen.findByRole("table", {
+      name: "Colaboradores com tabela de horário vinculada",
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Novo vínculo" }));
+
+    expect(screen.getByLabelText(/^Tabela de horário/i)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/^Colaborador\b/i), {
+      target: { value: colaborador1.id },
+    });
+    fireEvent.change(screen.getByLabelText(/Vigência — início/i), {
+      target: { value: "2026-01-05" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Criar vínculo" }));
+
+    expect(
+      await screen.findByText("Selecione a tabela de horário."),
+    ).toBeInTheDocument();
+    expect(criarVinculoHorario).not.toHaveBeenCalled();
+  });
+
+  it("resolve automaticamente o colaborador quando há só um ativo", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue(paginado([colaborador1]));
+
+    render(<PessoasHorarioScreen />);
+    await screen.findByRole("table", {
+      name: "Colaboradores com tabela de horário vinculada",
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Novo vínculo" }));
+
+    expect(screen.queryByLabelText(/^Colaborador\b/i)).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/Vigência — início/i), {
+      target: { value: "2026-01-05" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Criar vínculo" }));
+
+    await waitFor(() =>
+      expect(criarVinculoHorario).toHaveBeenCalledWith(
+        expect.objectContaining({ colaboradorId: colaborador1.id }),
+      ),
+    );
+  });
+
+  it("abre o detalhe e mostra colaborador, tabela e vigência, sem campos editáveis além do encerramento", async () => {
+    render(<PessoasHorarioScreen />);
+    await screen.findByRole("table", {
+      name: "Colaboradores com tabela de horário vinculada",
+    });
+
+    const linha = screen.getByText("Ana Colaboradora (teste)").closest("tr")!;
+    fireEvent.click(
+      within(linha).getByRole("button", { name: /Ver detalhes/ }),
+    );
+
+    expect(
+      screen.getByRole("heading", { name: "Ana Colaboradora (teste)" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Tabela de horário:/)).toHaveTextContent(
+      "Tabela Comercial (teste)",
+    );
+    expect(screen.queryByLabelText(/^Colaborador\b/i)).not.toBeInTheDocument();
+    expect(
+      screen.queryByLabelText(/^Tabela de horário/i),
+    ).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Encerrar vigência em")).toBeInTheDocument();
+  });
+
+  it("encerra a vigência com sucesso e atualiza lista e detalhe", async () => {
+    const encerrado: VinculoHorarioApi = {
+      ...vinculoVigente,
+      vigenciaFim: "2026-02-01",
+    };
+    vi.mocked(encerrarVinculoHorario).mockResolvedValueOnce(encerrado);
+
+    render(<PessoasHorarioScreen />);
+    await screen.findByRole("table", {
+      name: "Colaboradores com tabela de horário vinculada",
+    });
+
+    const linha = screen.getByText("Ana Colaboradora (teste)").closest("tr")!;
+    fireEvent.click(
+      within(linha).getByRole("button", { name: /Ver detalhes/ }),
+    );
+
+    fireEvent.change(screen.getByLabelText("Encerrar vigência em"), {
+      target: { value: "2026-02-01" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Encerrar vigência" }));
+
+    await waitFor(() =>
+      expect(encerrarVinculoHorario).toHaveBeenCalledWith(vinculoVigente.id, {
+        vigenciaFim: "2026-02-01",
+      }),
+    );
+    const painelDetalhe = screen
+      .getByRole("heading", { name: "Ana Colaboradora (teste)" })
+      .closest("section")!;
+    expect(
+      await within(painelDetalhe).findByText("Encerrada"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByLabelText("Encerrar vigência em"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("valida a data de encerramento obrigatória e posterior ao início", async () => {
+    render(<PessoasHorarioScreen />);
+    await screen.findByRole("table", {
+      name: "Colaboradores com tabela de horário vinculada",
+    });
+    const linha = screen.getByText("Ana Colaboradora (teste)").closest("tr")!;
+    fireEvent.click(
+      within(linha).getByRole("button", { name: /Ver detalhes/ }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Encerrar vigência" }));
+    expect(
+      await screen.findByText("Informe a data de encerramento."),
+    ).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Encerrar vigência em"), {
+      target: { value: "2025-01-01" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Encerrar vigência" }));
+    expect(
+      await screen.findByText(
+        "A data de encerramento deve ser posterior ao início da vigência.",
+      ),
+    ).toBeInTheDocument();
+    expect(encerrarVinculoHorario).not.toHaveBeenCalled();
+  });
+
+  it("não mostra formulário de encerramento para vínculo já encerrado", async () => {
+    render(<PessoasHorarioScreen />);
+    await screen.findByRole("table", {
+      name: "Colaboradores com tabela de horário vinculada",
+    });
+
+    const linha = screen.getByText("Carla Inativa (teste)").closest("tr")!;
+    fireEvent.click(
+      within(linha).getByRole("button", { name: /Ver detalhes/ }),
+    );
+
+    expect(
+      screen.queryByLabelText("Encerrar vigência em"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("fecha o painel de detalhe", async () => {
+    render(<PessoasHorarioScreen />);
+    await screen.findByRole("table", {
+      name: "Colaboradores com tabela de horário vinculada",
+    });
+    const linha = screen.getByText("Ana Colaboradora (teste)").closest("tr")!;
+    fireEvent.click(
+      within(linha).getByRole("button", { name: /Ver detalhes/ }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
+
+    expect(
+      screen.queryByRole("heading", { name: "Ana Colaboradora (teste)" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("abrir o formulário fecha um detalhe que estava aberto", async () => {
+    render(<PessoasHorarioScreen />);
+    await screen.findByRole("table", {
+      name: "Colaboradores com tabela de horário vinculada",
+    });
+    const linha = screen.getByText("Ana Colaboradora (teste)").closest("tr")!;
+    fireEvent.click(
+      within(linha).getByRole("button", { name: /Ver detalhes/ }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Novo vínculo" }));
+
+    expect(
+      screen.queryByRole("heading", { name: "Ana Colaboradora (teste)" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("não referencia cálculo de jornada, Banco de Horas, DSR, AFD, Folha, CPF, senha ou sessão", async () => {
+    render(<PessoasHorarioScreen />);
+    await screen.findByRole("table", {
+      name: "Colaboradores com tabela de horário vinculada",
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Novo vínculo" }));
 
     const texto = document.body.innerHTML.toLowerCase();
     for (const termoProibido of [
       "cpf",
-      "secullum",
-      "rwtech",
-      "bioprox",
+      "senha",
+      "sessão",
       "banco de horas",
+      "dsr",
       "afd",
       "fechamento",
       "espelho",
-      "assinatura",
-      "senha",
-      "sessão",
-      "mfa",
+      "folha",
+      "tolerância",
+      "hora extra",
+      "localstorage",
     ]) {
       expect(texto).not.toContain(termoProibido);
     }
