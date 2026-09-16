@@ -370,19 +370,6 @@ describe("PontoScreen — abas locais 'Visão do período' / 'Verificar folhas' 
     ).toBeInTheDocument();
   });
 
-  it("o botão 'Ver fila completa' da Visão do período troca para a aba Verificar folhas", () => {
-    render(<PontoScreen />);
-
-    fireEvent.click(screen.getByRole("button", { name: "Ver fila completa" }));
-
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Verificar folhas" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("tab", { name: "Verificar folhas" }),
-    ).toHaveAttribute("aria-selected", "true");
-  });
-
   it("informa o titleId do h1 visível via onTituloIdChange, inclusive ao trocar de aba", () => {
     const onTituloIdChange = vi.fn();
     render(<PontoScreen onTituloIdChange={onTituloIdChange} />);

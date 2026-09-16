@@ -162,9 +162,7 @@ export function PontoScreen({ onTituloIdChange }: PontoScreenProps) {
         className="ponto-screen__panel"
       >
         {abaAtiva === "periodo" ? (
-          <VisaoPeriodoScreen
-            onAbrirVerificarFolhas={() => setAbaAtiva("verificar_folhas")}
-          />
+          <VisaoPeriodoScreen />
         ) : abaAtiva === "verificar_folhas" ? (
           <VerificarFolhasScreen />
         ) : abaAtiva === "banco_horas" ? (
