@@ -968,6 +968,117 @@ describe("Jornada e Ponto Rastreavel (e2e)", () => {
   });
 
   // -------------------------------------------------------------------------
+  // T113 — fundação web: Ponto > Visão do período
+  // -------------------------------------------------------------------------
+
+  describe("T113 — fundação web: Ponto > Visão do período", () => {
+    it("lista → registra → relê → ajusta → relê, preservando o registro original", async () => {
+      const vinculo = await admitirEEfetivar(rhA, {
+        nome: "Pessoa T113 Ciclo",
+        empresaId: empresaA,
+        matricula: "MAT-T113-1",
+        departamentoId: departamentoA,
+      });
+
+      const antes = await get(`/v1/pontos?vinculoId=${vinculo}`, rhA).expect(
+        200,
+      );
+      expect(antes.body.total).toBe(0);
+
+      const criado = await registrarPonto(
+        rhA,
+        vinculo,
+        "entrada",
+        "2026-03-12T08:00:00-03:00",
+      );
+      expect(criado.efetivo.totalAjustes).toBe(0);
+      expect(criado.efetivo.anulado).toBe(false);
+
+      const relista = await get(`/v1/pontos?vinculoId=${vinculo}`, rhA).expect(
+        200,
+      );
+      expect(relista.body.total).toBe(1);
+
+      // Ajuste aditivo de correção de horário.
+      await post(`/v1/pontos/${criado.id}/ajustes`, rhA)
+        .send({
+          motivoCodigo: "erro_de_digitacao",
+          momentoCorrigido: "2026-03-12T08:05:00-03:00",
+        })
+        .expect(201);
+
+      const detalhe = await get(`/v1/pontos/${criado.id}`, rhA).expect(200);
+      // Original preservado byte a byte.
+      expect(detalhe.body.momento).toBe(criado.momento);
+      // Valor efetivo reflete a correção.
+      expect(detalhe.body.efetivo.totalAjustes).toBe(1);
+      expect(detalhe.body.ajustes).toHaveLength(1);
+      expect(detalhe.body.ajustes[0].motivoCodigo).toBe("erro_de_digitacao");
+    });
+
+    it("anula é terminal: após anular, o original permanece e novo ajuste é recusado (409)", async () => {
+      const vinculo = await admitirEEfetivar(rhA, {
+        nome: "Pessoa T113 Anula",
+        empresaId: empresaA,
+        matricula: "MAT-T113-2",
+        departamentoId: departamentoA,
+      });
+      const criado = await registrarPonto(
+        rhA,
+        vinculo,
+        "entrada",
+        "2026-03-13T08:00:00-03:00",
+      );
+
+      await post(`/v1/pontos/${criado.id}/ajustes`, rhA)
+        .send({ motivoCodigo: "registro_indevido", anula: true })
+        .expect(201);
+
+      const detalhe = await get(`/v1/pontos/${criado.id}`, rhA).expect(200);
+      expect(detalhe.body.momento).toBe(criado.momento);
+      expect(detalhe.body.efetivo.anulado).toBe(true);
+
+      // Anulação é terminal — novo ajuste recusado.
+      await post(`/v1/pontos/${criado.id}/ajustes`, rhA)
+        .send({ motivoCodigo: "outro_controlado", anula: true })
+        .expect(409);
+    });
+
+    it("IDOR: rhB não lê, ajusta nem registra na marcação de rhA (404 anti-enumeração)", async () => {
+      const vinculo = await admitirEEfetivar(rhA, {
+        nome: "Pessoa T113 IDOR",
+        empresaId: empresaA,
+        matricula: "MAT-T113-3",
+        departamentoId: departamentoA,
+      });
+      const criado = await registrarPonto(
+        rhA,
+        vinculo,
+        "entrada",
+        "2026-03-14T08:00:00-03:00",
+      );
+
+      await get(`/v1/pontos/${criado.id}`, rhB).expect(404);
+      await post(`/v1/pontos/${criado.id}/ajustes`, rhB)
+        .send({ motivoCodigo: "erro_de_digitacao", anula: true })
+        .expect(404);
+      // rhB também não registra marcação para o vínculo de rhA.
+      await post("/v1/pontos", rhB)
+        .send({
+          vinculoId: vinculo,
+          tipo: "saida",
+          momento: "2026-03-14T17:00:00-03:00",
+        })
+        .expect(404);
+
+      // Do lado de rhA, nada mudou: a marcação segue original.
+      const detalhe = await get(`/v1/pontos/${criado.id}`, rhA).expect(200);
+      expect(detalhe.body.efetivo.totalAjustes).toBe(0);
+      expect(detalhe.body.efetivo.anulado).toBe(false);
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // Autorizacao (decisao 5)
   // -------------------------------------------------------------------------
 

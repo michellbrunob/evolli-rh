@@ -1,5 +1,5 @@
 /**
- * Ponto > Visão do período (T063) — só tokens já existentes (tokens.css);
+ * Ponto > Visão do período (T113) — só tokens já existentes (tokens.css);
  * sem hexadecimal novo, sem sombra, sem gradiente. Layout responsivo: pilha
  * vertical de seções.
  */
@@ -11,9 +11,10 @@
   min-width: 0;
 }
 
-/* Mesmo princípio de `.verificar-folhas-screen > *`: evita que um descendente
-   mais largo que o viewport (ex.: a lista de etapas em telas estreitas) vaze
-   rolagem horizontal para a página inteira. */
+/* Cada seção é um item flex (coluna): sem `min-width: 0` a tabela de
+   marcações (mais larga que o viewport em telas estreitas, com rolagem
+   própria via `DataTable`/`.evolli-datatable`) vazaria rolagem horizontal
+   para a página inteira. */
 .visao-periodo-screen > * {
   min-width: 0;
 }
@@ -27,6 +28,7 @@
   color: var(--color-ink);
 }
 
+/* Aviso "Somente RH e DP" — reaproveita os tokens semânticos de "info". */
 .visao-periodo-screen__aviso {
   display: flex;
   flex-wrap: wrap;
@@ -42,24 +44,7 @@
   flex: 1 1 16rem;
 }
 
-.visao-periodo-screen__demo {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xs);
-}
-
-.visao-periodo-screen__demo-texto {
-  margin: 0;
-  color: var(--color-ink-subtle);
-  font-size: var(--text-caption);
-}
-
-.visao-periodo-screen__demo-botoes {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-sm);
-}
-
+/* Bloco de erro — tokens semânticos de "danger". */
 .visao-periodo-screen__erro {
   display: flex;
   flex-direction: column;
@@ -69,68 +54,46 @@
   border-color: var(--status-danger-border);
 }
 
-.visao-periodo-screen__erro-referencia {
+/* Filtros de listagem. */
+.visao-periodo-screen__filtros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.visao-periodo-screen__filtros > .evolli-field {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+/* Indicador de carregamento. */
+.visao-periodo-screen__carregando {
   margin: 0;
-  font-size: var(--text-caption);
   color: var(--color-ink-subtle);
 }
 
-.visao-periodo-screen__erro-referencia code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-}
-
-.visao-periodo-screen__cabecalho-card {
+/* Painel do formulário de registro e do painel de detalhe. */
+.visao-periodo-screen__formulario {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  flex-direction: column;
   gap: var(--space-sm);
 }
 
-.visao-periodo-screen__periodo {
-  margin: 0;
-  font-size: var(--text-lead);
-  font-weight: var(--weight-strong);
-  color: var(--color-ink);
-}
-
-/* Linha do tempo: lista ordenada horizontal, com rolagem própria e contida em
-   telas estreitas (mesma técnica já usada por `DataTable`/`PainelNavigation`
-   para nunca vazar rolagem horizontal para a página). */
-.visao-periodo-screen__etapas {
+.visao-periodo-screen__form {
   display: flex;
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  gap: var(--space-md);
+  flex-direction: column;
+  gap: var(--space-lg);
+  max-width: 40rem;
+}
+
+/* Erro inline no formulário (validação ou retorno da API). */
+.visao-periodo-screen__form-erro {
   margin: 0;
-  padding: var(--space-xs) 0;
-  list-style: none;
+  color: var(--status-danger-ink);
 }
 
-.visao-periodo-screen__etapa {
-  display: flex;
-  align-items: center;
-  gap: var(--space-xxs);
-  flex: 0 0 auto;
-  color: var(--color-ink-subtle);
-  white-space: nowrap;
-}
-
-.visao-periodo-screen__etapa-marcador {
-  font-size: var(--text-lead);
-  line-height: 1;
-}
-
-/* O passo atual nunca depende só de cor: soma peso de fonte + o glifo "●"
-   (já distinto de "✓" concluído e "○" futuro). */
-.visao-periodo-screen__etapa--atual {
-  color: var(--color-ink);
-  font-weight: var(--weight-strong);
-}
-
-.visao-periodo-screen__etapa--concluida {
-  color: var(--status-success-ink);
-}
-
+/* Lista de descrição para o par original / efetivo no detalhe. */
 .visao-periodo-screen__resumo-lista {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
@@ -150,17 +113,17 @@
   color: var(--color-ink);
 }
 
-.visao-periodo-screen__nota {
-  margin: var(--space-sm) 0 0;
-  font-size: var(--text-caption);
-  color: var(--color-ink-subtle);
+/* Subseções do detalhe (histórico de ajustes, formulário de ajuste). */
+.visao-periodo-screen__bloco {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
 }
 
-.visao-periodo-screen__pendencias-card {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-sm);
+.visao-periodo-screen__nota {
+  margin: 0;
+  font-size: var(--text-caption);
+  color: var(--color-ink-subtle);
 }
 
 /* Texto só para leitores de tela (mesma técnica de `.evolli-field__sr`). */

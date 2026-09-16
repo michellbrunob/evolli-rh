@@ -1,68 +1,456 @@
-/**
- * Ponto > Visão do período (T063) — tela visual estática.
- *
- * Torna visível, apenas para demonstração, o fluxo já documentado e validado
- * nos núcleos puros de Ponto V1 (apuração → extrato/saldo de Banco de Horas →
- * fila "Verificar folhas" → fechamento → Espelho — T050 a T060,
- * `docs/modules/etapa3-jornada-ponto-v1-detalhada.md`,
- * `docs/decisions/prontidao-operacao-real-evolli-rh.md`). Não é uma integração
- * com esses núcleos: todo valor, estado e status aqui é um EXEMPLO fixo.
- *
- * Escopo: PURAMENTE visual. Sem `fetch`, sem autenticação/sessão/CSRF, sem
- * rota real, sem persistência, sem associação por identificador, sem cálculo
- * de jornada/tolerância/banco de horas/DSR/fechamento/espelho/assinatura. Todo
- * dado é sintético (`visaoPeriodo.fixtures.ts`). O alternador de "estado de
- * demonstração" só recalcula o que é exibido em memória — nada é salvo,
- * enviado ou persistido.
- */
-import { useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Button,
+  DataTable,
   EmptyState,
+  FormActions,
+  FormField,
   PageHeader,
   StatusBadge,
   Surface,
 } from "../../components";
-import type { StatusVariant } from "../../components";
+import type { DataTableColumn, StatusVariant } from "../../components";
 import {
-  contarPendenciasARevisar,
-  ESTADO_PERIODO_EXEMPLO,
-  ETAPA_ATUAL_INDICE_EXEMPLO,
-  ETAPAS_FLUXO_EXEMPLO,
-  formatarDataBr,
-  PERIODO_EXEMPLO,
-  RESUMO_BANCO_HORAS_EXEMPLO,
-  RESUMO_JORNADA_EXEMPLO,
-  ROTULO_ESTADO_PERIODO,
-  STATUS_ESPELHO_EXEMPLO,
-  STATUS_FECHAMENTO_EXEMPLO,
-} from "./visaoPeriodo.fixtures";
+  type VinculoApi,
+  listarColaboradores,
+  listarVinculosDoColaborador,
+} from "../../api/colaboradoresClient";
+import {
+  type AjustePontoApi,
+  type EventoPontoApi,
+  type EventoPontoDetalhadoApi,
+  type MotivoAjustePonto,
+  type RegistrarAjustePontoDto,
+  type RegistrarEventoPontoDto,
+  type TipoEventoPonto,
+  buscarPonto,
+  listarPontos,
+  registrarAjustePonto,
+  registrarPonto,
+} from "../../api/pontoClient";
 import "./VisaoPeriodoScreen.css";
 
 export const VISAO_PERIODO_TITULO_ID = "visao-periodo-titulo";
 
-type EstadoDemonstracao = "dados" | "vazio" | "erro";
+const TIPOS_EVENTO: { valor: TipoEventoPonto; rotulo: string }[] = [
+  { valor: "entrada", rotulo: "Entrada" },
+  { valor: "saida", rotulo: "Saída" },
+  { valor: "inicio_pausa", rotulo: "Início de pausa" },
+  { valor: "fim_pausa", rotulo: "Fim de pausa" },
+];
 
-const ROTULO_ESTADO_DEMO: Record<EstadoDemonstracao, string> = {
-  dados: "Com dados",
-  vazio: "Vazio",
-  erro: "Erro",
-};
+const ROTULO_TIPO: Record<string, string> = Object.fromEntries(
+  TIPOS_EVENTO.map(({ valor, rotulo }) => [valor, rotulo]),
+);
 
-const VARIANTE_ESTADO_PERIODO: StatusVariant = "info";
+const MOTIVOS_AJUSTE: { valor: MotivoAjustePonto; rotulo: string }[] = [
+  { valor: "erro_de_digitacao", rotulo: "Erro de digitação" },
+  { valor: "registro_duplicado", rotulo: "Registro duplicado" },
+  { valor: "registro_indevido", rotulo: "Registro indevido" },
+  { valor: "outro_controlado", rotulo: "Outro (controlado)" },
+];
 
-export interface VisaoPeriodoScreenProps {
-  /** Chamado quando o exemplo convida a abrir a fila de revisão — troca só a
-   * aba local de "Ponto"; nunca navega de verdade nem chama API. */
-  onAbrirVerificarFolhas?: () => void;
+const ROTULO_MOTIVO: Record<string, string> = Object.fromEntries(
+  MOTIVOS_AJUSTE.map(({ valor, rotulo }) => [valor, rotulo]),
+);
+
+type FiltroTipo = "todos" | TipoEventoPonto;
+
+interface VinculoComColaborador extends VinculoApi {
+  nomeColaborador: string;
 }
 
-export function VisaoPeriodoScreen({
-  onAbrirVerificarFolhas,
-}: VisaoPeriodoScreenProps) {
-  const [estadoDemo, setEstadoDemo] = useState<EstadoDemonstracao>("dados");
+/** ISO → "AAAA-MM-DD HH:MM" (fatiado em UTC, estável e sem dependência de locale). */
+function formatarMomento(iso: string): string {
+  if (iso.length < 16) return iso;
+  return `${iso.slice(0, 10)} ${iso.slice(11, 16)}`;
+}
 
-  const quantidadePendencias = useMemo(() => contarPendenciasARevisar(), []);
+/** "AAAA-MM-DDTHH:MM" (datetime-local) → ISO completo com fuso. */
+function paraIso(local: string): string {
+  return new Date(local).toISOString();
+}
+
+interface FormularioErros {
+  vinculoId?: string;
+  tipo?: string;
+  momento?: string;
+  geral?: string;
+}
+
+interface FormularioState {
+  vinculoId: string;
+  tipo: TipoEventoPonto | "";
+  momento: string;
+  erros: FormularioErros;
+  salvando: boolean;
+}
+
+interface AjusteErros {
+  motivoCodigo?: string;
+  correcao?: string;
+  geral?: string;
+}
+
+type ModoAjuste = "corrigir" | "anular";
+
+interface DetalheState {
+  pontoId: string;
+  status: "carregando" | "erro" | "dados";
+  evento: EventoPontoDetalhadoApi | null;
+  modoAjuste: ModoAjuste;
+  ajusteMotivo: MotivoAjustePonto | "";
+  ajusteMomento: string;
+  ajusteTipo: TipoEventoPonto | "";
+  ajusteErros: AjusteErros;
+  salvandoAjuste: boolean;
+}
+
+export function VisaoPeriodoScreen() {
+  const [statusCarregamento, setStatusCarregamento] = useState<
+    "carregando" | "erro" | "dados"
+  >("carregando");
+  const [eventos, setEventos] = useState<EventoPontoApi[]>([]);
+  const [vinculos, setVinculos] = useState<VinculoComColaborador[]>([]);
+  const [filtroVinculo, setFiltroVinculo] = useState<string>("todos");
+  const [filtroCompetencia, setFiltroCompetencia] = useState<string>("");
+  const [filtroTipo, setFiltroTipo] = useState<FiltroTipo>("todos");
+  const [formulario, setFormulario] = useState<FormularioState | null>(null);
+  const [detalhe, setDetalhe] = useState<DetalheState | null>(null);
+  const formTituloId = useId();
+  const detalheTituloId = useId();
+  const referenciasCarregadas = useRef(false);
+
+  const carregarReferencias = useCallback(async () => {
+    const colaboradoresResp = await listarColaboradores({ tamanhoPagina: 100 });
+    const ativos = colaboradoresResp.itens.filter(
+      (c) => c.situacao === "ativo",
+    );
+    const listas = await Promise.all(
+      ativos.map(async (c) => {
+        const vs = await listarVinculosDoColaborador(c.id);
+        return vs.map((v): VinculoComColaborador => ({
+          ...v,
+          nomeColaborador: c.nome,
+        }));
+      }),
+    );
+    return listas.flat();
+  }, []);
+
+  const carregarDados = useCallback(
+    async (vinculoId: string, competencia: string, tipo: FiltroTipo) => {
+      setStatusCarregamento("carregando");
+      try {
+        const query: {
+          vinculoId?: string;
+          competencia?: string;
+          tipo?: TipoEventoPonto;
+        } = {};
+        if (vinculoId !== "todos") query.vinculoId = vinculoId;
+        if (competencia) query.competencia = competencia;
+        if (tipo !== "todos") query.tipo = tipo;
+
+        // Referências (colaboradores/vínculos) só na primeira carga; depois
+        // os filtros só refazem a listagem de marcações.
+        const precisaRefs = !referenciasCarregadas.current;
+        const [eventosResp, refs] = await Promise.all([
+          listarPontos({ ...query, tamanhoPagina: 100 }),
+          precisaRefs ? carregarReferencias() : Promise.resolve(null),
+        ]);
+        setEventos(eventosResp.itens);
+        if (refs) {
+          setVinculos(refs);
+          referenciasCarregadas.current = true;
+        }
+        setStatusCarregamento("dados");
+      } catch {
+        setStatusCarregamento("erro");
+      }
+    },
+    [carregarReferencias],
+  );
+
+  useEffect(() => {
+    void carregarDados(filtroVinculo, filtroCompetencia, filtroTipo);
+  }, [filtroVinculo, filtroCompetencia, filtroTipo, carregarDados]);
+
+  const vinculosPorId = useMemo(
+    () => new Map(vinculos.map((v) => [v.id, v])),
+    [vinculos],
+  );
+  const vinculosAtivos = useMemo(
+    () => vinculos.filter((v) => v.situacao === "ativo"),
+    [vinculos],
+  );
+
+  function rotuloVinculo(v: VinculoComColaborador): string {
+    return `${v.nomeColaborador} — ${v.matricula}`;
+  }
+  function nomePorVinculoId(id: string): string {
+    const v = vinculosPorId.get(id);
+    return v ? rotuloVinculo(v) : `Vínculo ${id.slice(0, 8)}`;
+  }
+
+  function situacaoEvento(e: EventoPontoApi): {
+    rotulo: string;
+    variante: StatusVariant;
+  } {
+    if (e.efetivo.anulado) return { rotulo: "Anulada", variante: "neutral" };
+    if (e.efetivo.totalAjustes > 0)
+      return { rotulo: "Ajustada", variante: "warning" };
+    return { rotulo: "Original", variante: "success" };
+  }
+
+  function abrirFormulario() {
+    setDetalhe(null);
+    setFormulario({
+      vinculoId: vinculosAtivos.length === 1 ? vinculosAtivos[0]!.id : "",
+      tipo: "",
+      momento: "",
+      erros: {},
+      salvando: false,
+    });
+  }
+
+  function fecharFormulario() {
+    setFormulario(null);
+  }
+
+  async function abrirDetalhe(pontoId: string) {
+    setFormulario(null);
+    setDetalhe({
+      pontoId,
+      status: "carregando",
+      evento: null,
+      modoAjuste: "corrigir",
+      ajusteMotivo: "",
+      ajusteMomento: "",
+      ajusteTipo: "",
+      ajusteErros: {},
+      salvandoAjuste: false,
+    });
+    await recarregarDetalhe(pontoId);
+  }
+
+  async function recarregarDetalhe(pontoId: string) {
+    setDetalhe((prev) =>
+      prev && prev.pontoId === pontoId
+        ? { ...prev, status: "carregando" }
+        : prev,
+    );
+    try {
+      const evento = await buscarPonto(pontoId);
+      setDetalhe((prev) =>
+        prev && prev.pontoId === pontoId
+          ? { ...prev, evento, status: "dados" }
+          : prev,
+      );
+    } catch {
+      setDetalhe((prev) =>
+        prev && prev.pontoId === pontoId ? { ...prev, status: "erro" } : prev,
+      );
+    }
+  }
+
+  function fecharDetalhe() {
+    setDetalhe(null);
+  }
+
+  async function handleSubmit(evento: React.FormEvent) {
+    evento.preventDefault();
+    if (!formulario) return;
+
+    const erros: FormularioErros = {};
+    if (vinculosAtivos.length > 1 && !formulario.vinculoId) {
+      erros.vinculoId = "Selecione o vínculo.";
+    }
+    if (!formulario.tipo) {
+      erros.tipo = "Selecione o tipo de marcação.";
+    }
+    if (!formulario.momento) {
+      erros.momento = "Informe a data e hora da marcação.";
+    }
+    if (erros.vinculoId ?? erros.tipo ?? erros.momento) {
+      setFormulario((prev) => (prev ? { ...prev, erros } : prev));
+      return;
+    }
+
+    setFormulario((prev) =>
+      prev ? { ...prev, salvando: true, erros: {} } : prev,
+    );
+    try {
+      const dto: RegistrarEventoPontoDto = {
+        vinculoId: formulario.vinculoId,
+        tipo: formulario.tipo as TipoEventoPonto,
+        momento: paraIso(formulario.momento),
+      };
+      await registrarPonto(dto);
+      setFormulario(null);
+      await carregarDados(filtroVinculo, filtroCompetencia, filtroTipo);
+    } catch (err: unknown) {
+      const mensagem =
+        err instanceof Error
+          ? err.message
+          : "Não foi possível registrar a marcação. Tente novamente.";
+      setFormulario((prev) =>
+        prev
+          ? {
+              ...prev,
+              salvando: false,
+              erros: { ...prev.erros, geral: mensagem },
+            }
+          : prev,
+      );
+    }
+  }
+
+  async function handleSubmitAjuste(evento: React.FormEvent) {
+    evento.preventDefault();
+    if (!detalhe || !detalhe.evento) return;
+
+    const erros: AjusteErros = {};
+    if (!detalhe.ajusteMotivo) {
+      erros.motivoCodigo = "Selecione o motivo do ajuste.";
+    }
+    if (
+      detalhe.modoAjuste === "corrigir" &&
+      !detalhe.ajusteMomento &&
+      !detalhe.ajusteTipo
+    ) {
+      erros.correcao =
+        "Informe ao menos um novo valor (data/hora ou tipo) para corrigir.";
+    }
+    if (erros.motivoCodigo ?? erros.correcao) {
+      setDetalhe((prev) => (prev ? { ...prev, ajusteErros: erros } : prev));
+      return;
+    }
+
+    setDetalhe((prev) =>
+      prev ? { ...prev, salvandoAjuste: true, ajusteErros: {} } : prev,
+    );
+    try {
+      const dto: RegistrarAjustePontoDto =
+        detalhe.modoAjuste === "anular"
+          ? {
+              motivoCodigo: detalhe.ajusteMotivo as MotivoAjustePonto,
+              anula: true,
+            }
+          : {
+              motivoCodigo: detalhe.ajusteMotivo as MotivoAjustePonto,
+              ...(detalhe.ajusteMomento
+                ? { momentoCorrigido: paraIso(detalhe.ajusteMomento) }
+                : {}),
+              ...(detalhe.ajusteTipo
+                ? { tipoCorrigido: detalhe.ajusteTipo as TipoEventoPonto }
+                : {}),
+            };
+      await registrarAjustePonto(detalhe.pontoId, dto);
+      setDetalhe((prev) =>
+        prev
+          ? {
+              ...prev,
+              salvandoAjuste: false,
+              ajusteMotivo: "",
+              ajusteMomento: "",
+              ajusteTipo: "",
+              modoAjuste: "corrigir",
+            }
+          : prev,
+      );
+      await recarregarDetalhe(detalhe.pontoId);
+      await carregarDados(filtroVinculo, filtroCompetencia, filtroTipo);
+    } catch (err: unknown) {
+      const mensagem =
+        err instanceof Error
+          ? err.message
+          : "Não foi possível registrar o ajuste. Tente novamente.";
+      setDetalhe((prev) =>
+        prev
+          ? {
+              ...prev,
+              salvandoAjuste: false,
+              ajusteErros: { ...prev.ajusteErros, geral: mensagem },
+            }
+          : prev,
+      );
+    }
+  }
+
+  const colunas: DataTableColumn<EventoPontoApi>[] = [
+    {
+      key: "colaborador",
+      header: "Colaborador",
+      cell: (e) => nomePorVinculoId(e.vinculoId),
+    },
+    { key: "tipo", header: "Tipo", cell: (e) => ROTULO_TIPO[e.tipo] ?? e.tipo },
+    {
+      key: "momento",
+      header: "Momento",
+      cell: (e) => formatarMomento(e.momento),
+    },
+    { key: "competencia", header: "Competência", cell: (e) => e.competencia },
+    {
+      key: "situacao",
+      header: "Situação",
+      cell: (e) => {
+        const s = situacaoEvento(e);
+        return <StatusBadge variant={s.variante}>{s.rotulo}</StatusBadge>;
+      },
+    },
+    {
+      key: "acoes",
+      header: "Ações",
+      cell: (e) => (
+        <Button variant="secondary" onClick={() => void abrirDetalhe(e.id)}>
+          Ver detalhes
+          <span className="sr-only"> — {formatarMomento(e.momento)}</span>
+        </Button>
+      ),
+    },
+  ];
+
+  const colunasAjustes: DataTableColumn<AjustePontoApi>[] = [
+    {
+      key: "efeito",
+      header: "Efeito",
+      cell: (a) => (a.anula ? "Anulação" : "Correção"),
+    },
+    {
+      key: "motivo",
+      header: "Motivo",
+      cell: (a) => ROTULO_MOTIVO[a.motivoCodigo] ?? a.motivoCodigo,
+    },
+    {
+      key: "novoMomento",
+      header: "Novo momento",
+      cell: (a) =>
+        a.momentoCorrigido ? formatarMomento(a.momentoCorrigido) : "—",
+    },
+    {
+      key: "novoTipo",
+      header: "Novo tipo",
+      cell: (a) =>
+        a.tipoCorrigido
+          ? (ROTULO_TIPO[a.tipoCorrigido] ?? a.tipoCorrigido)
+          : "—",
+    },
+    {
+      key: "registradoEm",
+      header: "Registrado em",
+      cell: (a) => formatarMomento(a.registradoEm),
+    },
+  ];
+
+  const semVinculosAtivos =
+    statusCarregamento === "dados" && vinculosAtivos.length === 0;
 
   return (
     <div className="visao-periodo-screen">
@@ -70,7 +458,15 @@ export function VisaoPeriodoScreen({
         headingLevel={1}
         titleId={VISAO_PERIODO_TITULO_ID}
         title="Visão do período"
-        description="Panorama demonstrativo do fluxo de Ponto — apuração, extrato de Banco de Horas, fila de revisão e fechamento/Espelho — com dados de exemplo, sem cálculo, correção, aprovação ou persistência real."
+        description="Marcações de ponto por vínculo e competência. Cada marcação é imutável — correções são sempre ajustes aditivos que preservam o registro original. Esta tela apenas registra e corrige marcações; não faz nenhum cálculo nem apuração."
+        actions={
+          <Button
+            onClick={abrirFormulario}
+            disabled={statusCarregamento !== "dados" || semVinculosAtivos}
+          >
+            Registrar marcação
+          </Button>
+        }
       />
 
       <Surface
@@ -79,53 +475,18 @@ export function VisaoPeriodoScreen({
         className="visao-periodo-screen__aviso"
         aria-labelledby="visao-periodo-aviso-titulo"
       >
-        <StatusBadge variant="info">Somente RH</StatusBadge>
+        <StatusBadge variant="info">RH e DP</StatusBadge>
         <p
           id="visao-periodo-aviso-titulo"
           className="visao-periodo-screen__aviso-texto"
         >
-          Somente o RH da própria empresa opera o Ponto. Todos os dados, status
-          e valores abaixo são exemplos ilustrativos — esta tela não calcula,
-          corrige, aprova, fecha, assina, paga ou persiste nada.
+          Somente o RH e o DP da própria empresa registram e corrigem marcações.
+          A marcação original nunca é editada nem excluída: toda correção é um
+          ajuste aditivo rastreável, e cada ação gera trilha de auditoria.
         </p>
       </Surface>
 
-      <section
-        aria-labelledby="visao-periodo-demo-titulo"
-        className="visao-periodo-screen__demo"
-      >
-        <h2
-          id="visao-periodo-demo-titulo"
-          className="visao-periodo-screen__section-title"
-        >
-          Estado de demonstração
-        </h2>
-        <p className="visao-periodo-screen__demo-texto">
-          Alterna a amostra visual exibida abaixo — não representa uma chamada
-          real à API.
-        </p>
-        <div
-          role="group"
-          aria-label="Selecionar estado de demonstração da visão do período"
-          className="visao-periodo-screen__demo-botoes"
-        >
-          {(Object.keys(ROTULO_ESTADO_DEMO) as EstadoDemonstracao[]).map(
-            (chave) => (
-              <Button
-                key={chave}
-                type="button"
-                variant={estadoDemo === chave ? "primary" : "secondary"}
-                aria-pressed={estadoDemo === chave}
-                onClick={() => setEstadoDemo(chave)}
-              >
-                {ROTULO_ESTADO_DEMO[chave]}
-              </Button>
-            ),
-          )}
-        </div>
-      </section>
-
-      {estadoDemo === "erro" ? (
+      {statusCarregamento === "erro" ? (
         <Surface
           as="section"
           padding="lg"
@@ -137,213 +498,515 @@ export function VisaoPeriodoScreen({
             id="visao-periodo-erro-titulo"
             className="visao-periodo-screen__section-title"
           >
-            Não foi possível carregar a visão do período
+            Não foi possível carregar as marcações
           </h2>
           <p>
-            Tente novamente em instantes. Se o problema persistir, contate o
-            suporte informando a referência abaixo.
+            Verifique sua conexão e tente novamente. Se o problema persistir,
+            contate o suporte.
           </p>
-          <p className="visao-periodo-screen__erro-referencia">
-            Referência: <code>REQ-DEMO-000789</code> (ilustrativa)
-          </p>
-          <Button variant="secondary" onClick={() => setEstadoDemo("dados")}>
+          <Button
+            variant="secondary"
+            onClick={() =>
+              void carregarDados(filtroVinculo, filtroCompetencia, filtroTipo)
+            }
+          >
             Tentar novamente
           </Button>
         </Surface>
-      ) : estadoDemo === "vazio" ? (
-        <EmptyState
-          headingLevel={2}
-          icon="—"
-          title="Nenhum dado disponível para este período"
-          description="Quando a apuração deste período estiver disponível, o panorama aparece aqui (exemplo)."
-        />
       ) : (
-        <>
-          <section
-            aria-labelledby="visao-periodo-cabecalho-titulo"
-            className="visao-periodo-screen__cabecalho"
+        <section aria-labelledby="visao-periodo-lista-titulo">
+          <h2
+            id="visao-periodo-lista-titulo"
+            className="visao-periodo-screen__section-title"
           >
-            <h2
-              id="visao-periodo-cabecalho-titulo"
-              className="visao-periodo-screen__section-title"
-            >
-              Período de referência (exemplo)
-            </h2>
-            <Surface
-              as="div"
-              padding="md"
-              className="visao-periodo-screen__cabecalho-card"
-            >
-              <p className="visao-periodo-screen__periodo">
-                {formatarDataBr(PERIODO_EXEMPLO.inicio)} –{" "}
-                {formatarDataBr(PERIODO_EXEMPLO.fim)}
-              </p>
-              <StatusBadge variant={VARIANTE_ESTADO_PERIODO}>
-                {ROTULO_ESTADO_PERIODO[ESTADO_PERIODO_EXEMPLO]}
-              </StatusBadge>
-            </Surface>
-          </section>
+            Marcações
+          </h2>
 
-          <section
-            aria-labelledby="visao-periodo-linha-tempo-titulo"
-            className="visao-periodo-screen__linha-tempo"
-          >
-            <h2
-              id="visao-periodo-linha-tempo-titulo"
-              className="visao-periodo-screen__section-title"
-            >
-              Linha do tempo do fluxo (exemplo)
-            </h2>
-            <ol className="visao-periodo-screen__etapas">
-              {ETAPAS_FLUXO_EXEMPLO.map((etapa, indice) => {
-                const concluida = indice < ETAPA_ATUAL_INDICE_EXEMPLO;
-                const atual = indice === ETAPA_ATUAL_INDICE_EXEMPLO;
-                const estadoEtapa = concluida
-                  ? "concluida"
-                  : atual
-                    ? "atual"
-                    : "futura";
-                const estadoEtapaRotulo = concluida
-                  ? "concluída"
-                  : atual
-                    ? "atual"
-                    : "futura";
-                return (
-                  <li
-                    key={etapa.id}
-                    className={`visao-periodo-screen__etapa visao-periodo-screen__etapa--${estadoEtapa}`}
-                  >
-                    <span
-                      className="visao-periodo-screen__etapa-marcador"
-                      aria-hidden="true"
-                    >
-                      {concluida ? "✓" : atual ? "●" : "○"}
-                    </span>
-                    <span className="visao-periodo-screen__etapa-rotulo">
-                      {etapa.rotulo}
-                      <span className="sr-only">
-                        {" "}
-                        ({estadoEtapaRotulo}, exemplo)
-                      </span>
-                    </span>
-                  </li>
-                );
-              })}
-            </ol>
-          </section>
+          <div className="visao-periodo-screen__filtros">
+            <FormField id="visao-periodo-filtro-vinculo" label="Vínculo">
+              {(control) => (
+                <select
+                  value={filtroVinculo}
+                  onChange={(e) => setFiltroVinculo(e.target.value)}
+                  disabled={statusCarregamento === "carregando"}
+                  {...control}
+                >
+                  <option value="todos">Todos os vínculos</option>
+                  {vinculos.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {rotuloVinculo(v)}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </FormField>
 
-          <section
-            aria-labelledby="visao-periodo-jornada-titulo"
-            className="visao-periodo-screen__jornada"
-          >
-            <h2
-              id="visao-periodo-jornada-titulo"
-              className="visao-periodo-screen__section-title"
+            <FormField
+              id="visao-periodo-filtro-competencia"
+              label="Competência"
             >
-              Resumo de jornada (exemplo)
-            </h2>
-            <dl className="visao-periodo-screen__resumo-lista">
-              <div>
-                <dt>Jornada prevista</dt>
-                <dd>{RESUMO_JORNADA_EXEMPLO.jornadaPrevistaMinutos} min</dd>
-              </div>
-              <div>
-                <dt>Jornada computada</dt>
-                <dd>{RESUMO_JORNADA_EXEMPLO.jornadaComputadaMinutos} min</dd>
-              </div>
-              <div>
-                <dt>Apontamentos não financeiros</dt>
-                <dd>{RESUMO_JORNADA_EXEMPLO.apontamentosNaoFinanceiros}</dd>
-              </div>
-            </dl>
-          </section>
+              {(control) => (
+                <input
+                  type="month"
+                  value={filtroCompetencia}
+                  onChange={(e) => setFiltroCompetencia(e.target.value)}
+                  disabled={statusCarregamento === "carregando"}
+                  {...control}
+                />
+              )}
+            </FormField>
 
-          <section
-            aria-labelledby="visao-periodo-banco-horas-titulo"
-            className="visao-periodo-screen__banco-horas"
-          >
-            <h2
-              id="visao-periodo-banco-horas-titulo"
-              className="visao-periodo-screen__section-title"
-            >
-              Banco de Horas (exemplo)
-            </h2>
-            <dl className="visao-periodo-screen__resumo-lista">
-              <div>
-                <dt>Crédito</dt>
-                <dd>{RESUMO_BANCO_HORAS_EXEMPLO.creditoMinutos} min</dd>
-              </div>
-              <div>
-                <dt>Débito</dt>
-                <dd>{RESUMO_BANCO_HORAS_EXEMPLO.debitoMinutos} min</dd>
-              </div>
-              <div>
-                <dt>Saldo derivado</dt>
-                <dd>{RESUMO_BANCO_HORAS_EXEMPLO.saldoDerivadoMinutos} min</dd>
-              </div>
-            </dl>
-            <p className="visao-periodo-screen__nota">
-              Crédito e débito são sempre separados — o crédito nunca compensa o
-              débito automaticamente; o saldo é apenas derivado da soma dos dois
-              (exemplo).
+            <FormField id="visao-periodo-filtro-tipo" label="Tipo">
+              {(control) => (
+                <select
+                  value={filtroTipo}
+                  onChange={(e) => setFiltroTipo(e.target.value as FiltroTipo)}
+                  disabled={statusCarregamento === "carregando"}
+                  {...control}
+                >
+                  <option value="todos">Todos os tipos</option>
+                  {TIPOS_EVENTO.map((t) => (
+                    <option key={t.valor} value={t.valor}>
+                      {t.rotulo}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </FormField>
+          </div>
+
+          {statusCarregamento === "carregando" ? (
+            <p className="visao-periodo-screen__carregando" role="status">
+              Carregando marcações…
             </p>
-          </section>
+          ) : eventos.length === 0 ? (
+            <EmptyState
+              headingLevel={3}
+              icon="—"
+              title="Nenhuma marcação encontrada"
+              description="Ajuste os filtros ou registre uma marcação para esta empresa."
+            />
+          ) : (
+            <DataTable
+              caption="Marcações de ponto"
+              columns={colunas}
+              rows={eventos}
+              rowKey={(e) => e.id}
+            />
+          )}
 
-          <section
-            aria-labelledby="visao-periodo-pendencias-titulo"
-            className="visao-periodo-screen__pendencias"
-          >
-            <h2
-              id="visao-periodo-pendencias-titulo"
-              className="visao-periodo-screen__section-title"
-            >
-              Fila "Verificar folhas" (exemplo)
-            </h2>
-            <Surface
-              as="div"
-              padding="md"
-              className="visao-periodo-screen__pendencias-card"
-            >
-              <StatusBadge
-                variant={quantidadePendencias > 0 ? "warning" : "success"}
-              >
-                {quantidadePendencias} pendência(s) a revisar
-              </StatusBadge>
-              {onAbrirVerificarFolhas ? (
-                <Button variant="subtle" onClick={onAbrirVerificarFolhas}>
-                  Ver fila completa
-                </Button>
-              ) : null}
-            </Surface>
-          </section>
-
-          <section
-            aria-labelledby="visao-periodo-fechamento-titulo"
-            className="visao-periodo-screen__fechamento"
-          >
-            <h2
-              id="visao-periodo-fechamento-titulo"
-              className="visao-periodo-screen__section-title"
-            >
-              Fechamento e Espelho (exemplo)
-            </h2>
-            <dl className="visao-periodo-screen__resumo-lista">
-              <div>
-                <dt>Fechamento</dt>
-                <dd>{STATUS_FECHAMENTO_EXEMPLO}</dd>
-              </div>
-              <div>
-                <dt>Espelho</dt>
-                <dd>{STATUS_ESPELHO_EXEMPLO}</dd>
-              </div>
-            </dl>
-            <p className="visao-periodo-screen__nota">
-              Nenhum documento, PDF ou assinatura real é gerado nesta
-              demonstração.
+          {semVinculosAtivos ? (
+            <p className="visao-periodo-screen__nota" role="status">
+              Nenhum vínculo ativo disponível para registrar marcação.
             </p>
-          </section>
-        </>
+          ) : null}
+        </section>
       )}
+
+      {detalhe ? (
+        <Surface
+          as="section"
+          padding="lg"
+          className="visao-periodo-screen__formulario"
+          aria-labelledby={detalheTituloId}
+        >
+          <h2
+            id={detalheTituloId}
+            className="visao-periodo-screen__section-title"
+          >
+            Detalhe da marcação
+          </h2>
+
+          {detalhe.status === "carregando" ? (
+            <p className="visao-periodo-screen__carregando" role="status">
+              Carregando detalhe…
+            </p>
+          ) : detalhe.status === "erro" || !detalhe.evento ? (
+            <>
+              <p className="visao-periodo-screen__form-erro" role="alert">
+                Não foi possível carregar o detalhe desta marcação.
+              </p>
+              <FormActions>
+                <Button
+                  variant="secondary"
+                  onClick={() => void recarregarDetalhe(detalhe.pontoId)}
+                >
+                  Tentar novamente
+                </Button>
+                <Button variant="secondary" onClick={fecharDetalhe}>
+                  Fechar
+                </Button>
+              </FormActions>
+            </>
+          ) : (
+            <>
+              <dl className="visao-periodo-screen__resumo-lista">
+                <div>
+                  <dt>Colaborador</dt>
+                  <dd>{nomePorVinculoId(detalhe.evento.vinculoId)}</dd>
+                </div>
+                <div>
+                  <dt>Competência</dt>
+                  <dd>{detalhe.evento.competencia}</dd>
+                </div>
+                <div>
+                  <dt>Registro original</dt>
+                  <dd>
+                    {ROTULO_TIPO[detalhe.evento.tipo] ?? detalhe.evento.tipo} ·{" "}
+                    {formatarMomento(detalhe.evento.momento)}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Valor efetivo</dt>
+                  <dd>
+                    {detalhe.evento.efetivo.anulado
+                      ? "Anulada"
+                      : `${ROTULO_TIPO[detalhe.evento.efetivo.tipo] ?? detalhe.evento.efetivo.tipo} · ${formatarMomento(detalhe.evento.efetivo.momento)}`}
+                  </dd>
+                </div>
+              </dl>
+
+              <p className="visao-periodo-screen__nota">
+                O registro original é imutável e permanece preservado, qualquer
+                que seja o histórico de ajustes abaixo.
+              </p>
+
+              <div className="visao-periodo-screen__bloco">
+                <h3 className="visao-periodo-screen__section-title">
+                  Histórico de ajustes
+                </h3>
+                {detalhe.evento.ajustes.length === 0 ? (
+                  <p>Nenhum ajuste — vale o registro original.</p>
+                ) : (
+                  <DataTable
+                    caption={`Histórico de ajustes — ${formatarMomento(detalhe.evento.momento)}`}
+                    columns={colunasAjustes}
+                    rows={detalhe.evento.ajustes}
+                    rowKey={(a) => a.id}
+                  />
+                )}
+              </div>
+
+              {detalhe.evento.efetivo.anulado ? (
+                <p className="visao-periodo-screen__nota">
+                  Esta marcação foi anulada — a anulação é terminal e não aceita
+                  novos ajustes.
+                </p>
+              ) : (
+                <form
+                  className="visao-periodo-screen__form"
+                  aria-label="Formulário de ajuste de marcação"
+                  onSubmit={(e) => void handleSubmitAjuste(e)}
+                >
+                  <h3 className="visao-periodo-screen__section-title">
+                    Registrar ajuste
+                  </h3>
+                  <p className="visao-periodo-screen__nota">
+                    O ajuste é aditivo: corrige o valor efetivo ou anula a
+                    marcação, sem nunca apagar o registro original.
+                  </p>
+
+                  <FormField
+                    id="visao-periodo-ajuste-modo"
+                    label="Tipo de ajuste"
+                    required
+                  >
+                    {(control) => (
+                      <select
+                        value={detalhe.modoAjuste}
+                        onChange={(e) =>
+                          setDetalhe((prev) =>
+                            prev
+                              ? {
+                                  ...prev,
+                                  modoAjuste: e.target.value as ModoAjuste,
+                                  ajusteErros: {},
+                                }
+                              : prev,
+                          )
+                        }
+                        {...control}
+                      >
+                        <option value="corrigir">Corrigir</option>
+                        <option value="anular">Anular</option>
+                      </select>
+                    )}
+                  </FormField>
+
+                  <FormField
+                    id="visao-periodo-ajuste-motivo"
+                    label="Motivo"
+                    required
+                    {...(detalhe.ajusteErros.motivoCodigo
+                      ? { error: detalhe.ajusteErros.motivoCodigo }
+                      : {})}
+                  >
+                    {(control) => (
+                      <select
+                        value={detalhe.ajusteMotivo}
+                        onChange={(e) =>
+                          setDetalhe((prev) =>
+                            prev
+                              ? {
+                                  ...prev,
+                                  ajusteMotivo: e.target
+                                    .value as MotivoAjustePonto,
+                                  ajusteErros: {},
+                                }
+                              : prev,
+                          )
+                        }
+                        {...control}
+                      >
+                        <option value="">Selecione…</option>
+                        {MOTIVOS_AJUSTE.map((m) => (
+                          <option key={m.valor} value={m.valor}>
+                            {m.rotulo}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </FormField>
+
+                  {detalhe.modoAjuste === "corrigir" ? (
+                    <>
+                      <FormField
+                        id="visao-periodo-ajuste-momento"
+                        label="Novo momento (opcional)"
+                        help="Deve permanecer na mesma competência da marcação original."
+                        {...(detalhe.ajusteErros.correcao
+                          ? { error: detalhe.ajusteErros.correcao }
+                          : {})}
+                      >
+                        {(control) => (
+                          <input
+                            type="datetime-local"
+                            value={detalhe.ajusteMomento}
+                            onChange={(e) =>
+                              setDetalhe((prev) =>
+                                prev
+                                  ? {
+                                      ...prev,
+                                      ajusteMomento: e.target.value,
+                                      ajusteErros: {},
+                                    }
+                                  : prev,
+                              )
+                            }
+                            {...control}
+                          />
+                        )}
+                      </FormField>
+
+                      <FormField
+                        id="visao-periodo-ajuste-tipo"
+                        label="Novo tipo (opcional)"
+                      >
+                        {(control) => (
+                          <select
+                            value={detalhe.ajusteTipo}
+                            onChange={(e) =>
+                              setDetalhe((prev) =>
+                                prev
+                                  ? {
+                                      ...prev,
+                                      ajusteTipo: e.target
+                                        .value as TipoEventoPonto,
+                                      ajusteErros: {},
+                                    }
+                                  : prev,
+                              )
+                            }
+                            {...control}
+                          >
+                            <option value="">Manter</option>
+                            {TIPOS_EVENTO.map((t) => (
+                              <option key={t.valor} value={t.valor}>
+                                {t.rotulo}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </FormField>
+                    </>
+                  ) : null}
+
+                  {detalhe.ajusteErros.geral ? (
+                    <p className="visao-periodo-screen__form-erro" role="alert">
+                      {detalhe.ajusteErros.geral}
+                    </p>
+                  ) : null}
+
+                  <FormActions>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={fecharDetalhe}
+                      disabled={detalhe.salvandoAjuste}
+                    >
+                      Fechar
+                    </Button>
+                    <Button
+                      type="submit"
+                      variant="primary"
+                      disabled={detalhe.salvandoAjuste}
+                    >
+                      {detalhe.salvandoAjuste
+                        ? "Registrando…"
+                        : "Registrar ajuste"}
+                    </Button>
+                  </FormActions>
+                </form>
+              )}
+
+              {detalhe.evento.efetivo.anulado ? (
+                <FormActions>
+                  <Button variant="secondary" onClick={fecharDetalhe}>
+                    Fechar
+                  </Button>
+                </FormActions>
+              ) : null}
+            </>
+          )}
+        </Surface>
+      ) : null}
+
+      {formulario ? (
+        <Surface
+          as="section"
+          padding="lg"
+          className="visao-periodo-screen__formulario"
+          aria-labelledby={formTituloId}
+        >
+          <h2 id={formTituloId} className="visao-periodo-screen__section-title">
+            Registrar marcação
+          </h2>
+          <p className="visao-periodo-screen__aviso-texto">
+            A marcação é registrada como veio e passa a ser imutável. Correções
+            posteriores são sempre ajustes aditivos.
+          </p>
+
+          <form
+            className="visao-periodo-screen__form"
+            aria-label="Formulário de nova marcação"
+            onSubmit={(e) => void handleSubmit(e)}
+          >
+            {vinculosAtivos.length > 1 ? (
+              <FormField
+                id="visao-periodo-vinculo"
+                label="Vínculo"
+                required
+                {...(formulario.erros.vinculoId
+                  ? { error: formulario.erros.vinculoId }
+                  : {})}
+              >
+                {(control) => (
+                  <select
+                    value={formulario.vinculoId}
+                    onChange={(e) =>
+                      setFormulario((prev) =>
+                        prev
+                          ? { ...prev, vinculoId: e.target.value, erros: {} }
+                          : prev,
+                      )
+                    }
+                    {...control}
+                  >
+                    <option value="">Selecione…</option>
+                    {vinculosAtivos.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {rotuloVinculo(v)}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </FormField>
+            ) : null}
+
+            <FormField
+              id="visao-periodo-tipo"
+              label="Tipo de marcação"
+              required
+              {...(formulario.erros.tipo
+                ? { error: formulario.erros.tipo }
+                : {})}
+            >
+              {(control) => (
+                <select
+                  value={formulario.tipo}
+                  onChange={(e) =>
+                    setFormulario((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            tipo: e.target.value as TipoEventoPonto,
+                            erros: {},
+                          }
+                        : prev,
+                    )
+                  }
+                  {...control}
+                >
+                  <option value="">Selecione…</option>
+                  {TIPOS_EVENTO.map((t) => (
+                    <option key={t.valor} value={t.valor}>
+                      {t.rotulo}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </FormField>
+
+            <FormField
+              id="visao-periodo-momento"
+              label="Data e hora"
+              required
+              {...(formulario.erros.momento
+                ? { error: formulario.erros.momento }
+                : {})}
+            >
+              {(control) => (
+                <input
+                  type="datetime-local"
+                  value={formulario.momento}
+                  onChange={(e) =>
+                    setFormulario((prev) =>
+                      prev
+                        ? { ...prev, momento: e.target.value, erros: {} }
+                        : prev,
+                    )
+                  }
+                  {...control}
+                />
+              )}
+            </FormField>
+
+            {formulario.erros.geral ? (
+              <p className="visao-periodo-screen__form-erro" role="alert">
+                {formulario.erros.geral}
+              </p>
+            ) : null}
+
+            <FormActions>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={fecharFormulario}
+                disabled={formulario.salvando}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                disabled={formulario.salvando}
+              >
+                {formulario.salvando ? "Registrando…" : "Registrar marcação"}
+              </Button>
+            </FormActions>
+          </form>
+        </Surface>
+      ) : null}
     </div>
   );
 }
