@@ -455,7 +455,7 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     ).toBeInTheDocument();
   });
 
-  it("renderiza a tela Pessoas > Colaboradores por padrão, com h1 único (T072)", () => {
+  it("renderiza a tela Pessoas > Colaboradores por padrão, com h1 único (T111)", () => {
     render(<App />);
 
     fireEvent.click(
@@ -466,9 +466,7 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     expect(
       screen.getByRole("heading", { level: 1, name: "Colaboradores" }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", { name: "Colaboradores desta empresa" }),
-    ).toBeInTheDocument();
+    expect(screen.getByText("RH e DP")).toBeInTheDocument();
     expect(screen.queryByText("Módulo em preparação")).not.toBeInTheDocument();
 
     const main = screen.getByRole("main");

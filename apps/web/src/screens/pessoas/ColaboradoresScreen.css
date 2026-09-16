@@ -1,6 +1,6 @@
 /**
- * Pessoas > Colaboradores (T072) — só tokens já existentes (tokens.css);
- * sem hexadecimal novo, sem sombra, sem gradiente. Layout responsivo: pilha
+ * Pessoas > Colaboradores (T111) — só tokens já existentes (tokens.css); sem
+ * novo hexadecimal, sem sombra, sem gradiente. Layout responsivo: pilha
  * vertical de seções.
  */
 
@@ -13,7 +13,7 @@
 
 /* Sem `min-width: 0` aqui, a tabela (mais larga que o viewport em telas
    estreitas) vazaria rolagem horizontal para a página inteira — mesma técnica
-   já usada em `PessoasHorarioScreen`/`VerificarFolhasScreen`. */
+   já usada em `CadastroHorariosScreen`/`PessoasHorarioScreen`. */
 .colaboradores-screen > * {
   min-width: 0;
 }
@@ -27,6 +27,7 @@
   color: var(--color-ink);
 }
 
+/* Aviso "RH e DP" — reaproveita os tokens semânticos de "info". */
 .colaboradores-screen__aviso {
   display: flex;
   flex-wrap: wrap;
@@ -42,24 +43,7 @@
   flex: 1 1 16rem;
 }
 
-.colaboradores-screen__demo {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xs);
-}
-
-.colaboradores-screen__demo-texto {
-  margin: 0;
-  color: var(--color-ink-subtle);
-  font-size: var(--text-caption);
-}
-
-.colaboradores-screen__demo-botoes {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-sm);
-}
-
+/* Bloco de erro — tokens semânticos de "danger". */
 .colaboradores-screen__erro {
   display: flex;
   flex-direction: column;
@@ -69,37 +53,21 @@
   border-color: var(--status-danger-border);
 }
 
-.colaboradores-screen__erro-referencia {
-  margin: 0;
-  font-size: var(--text-caption);
-  color: var(--color-ink-subtle);
-}
-
-.colaboradores-screen__erro-referencia code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-}
-
-/* Filtros — só locais, recalculam a lista em memória. */
+/* Filtros de listagem. */
 .colaboradores-screen__filtros {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
   gap: var(--space-md);
-  margin-bottom: var(--space-sm);
+  margin-bottom: var(--space-md);
 }
 
-.colaboradores-screen__filtros > .evolli-field {
-  flex: 1 1 12rem;
-  min-width: 0;
-}
-
-.colaboradores-screen__filtros-nota {
-  margin: 0 0 var(--space-md);
-  font-size: var(--text-caption);
+/* Indicador de carregamento. */
+.colaboradores-screen__carregando {
+  margin: 0;
   color: var(--color-ink-subtle);
 }
 
-/* Painel do formulário "Novo colaborador". */
+/* Painel do formulário de admissão e do painel de detalhe. */
 .colaboradores-screen__formulario {
   display: flex;
   flex-direction: column;
@@ -110,22 +78,43 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-lg);
-  max-width: 32rem;
+  max-width: 40rem;
 }
 
-/* Confirmação demonstrativa — tokens semânticos de "success" (ação
-   concluída na demonstração, mesmo sem efeito real). */
-.colaboradores-screen__confirmacao {
+/* Erro inline no formulário (validação ou retorno da API). */
+.colaboradores-screen__form-erro {
   margin: 0;
-  padding: var(--space-sm) var(--space-md);
-  border-radius: var(--radius-sm);
-  background: var(--status-success-surface);
-  color: var(--status-success-ink);
+  color: var(--status-danger-ink);
 }
 
-@media (max-width: 640px) {
-  .colaboradores-screen__filtros {
-    flex-direction: column;
-    align-items: stretch;
-  }
+/* Subseção "Vínculos" dentro do painel de detalhe. */
+.colaboradores-screen__vinculos {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+/* Bloco de edição de nome dentro do painel de detalhe. */
+.colaboradores-screen__edicao-nome {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-md);
+}
+
+.colaboradores-screen__edicao-nome > .evolli-field {
+  flex: 1 1 16rem;
+}
+
+/* Texto só para leitores de tela (mesma técnica de `.evolli-field__sr`). */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }

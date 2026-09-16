@@ -1,188 +1,666 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ColaboradoresScreen } from "./ColaboradoresScreen";
+import {
+  type ColaboradorApi,
+  type VinculoApi,
+  admitirColaborador,
+  buscarColaborador,
+  listarColaboradores,
+  listarVinculosDoColaborador,
+  retificarColaborador,
+} from "../../api/colaboradoresClient";
+import {
+  type AreaApi,
+  type CentroCustoApi,
+  type DepartamentoApi,
+  type EmpresaApi,
+  type EquipeApi,
+  type UnidadeOrganizacionalApi,
+  listarAreas,
+  listarCentrosCusto,
+  listarDepartamentos,
+  listarEmpresasMulti,
+  listarEquipes,
+  listarUnidades,
+} from "../../api/organizacaoClient";
+import { type CargoApi, listarCargos } from "../../api/cargoClient";
 
-describe("ColaboradoresScreen (T072 — tela visual estática)", () => {
-  it("tem um único h1", () => {
+vi.mock("../../api/colaboradoresClient");
+vi.mock("../../api/organizacaoClient");
+vi.mock("../../api/cargoClient");
+
+interface ResultadoPaginadoTeste<T> {
+  itens: T[];
+  pagina: number;
+  tamanhoPagina: number;
+  total: number;
+}
+
+function paginado<T>(itens: T[]): ResultadoPaginadoTeste<T> {
+  return { itens, pagina: 1, tamanhoPagina: 100, total: itens.length };
+}
+
+const colaborador1: ColaboradorApi = {
+  id: "11111111-1111-1111-1111-111111111111",
+  nome: "Ana Colaboradora (teste)",
+  situacao: "ativo",
+  criadoEm: "2025-01-10T12:00:00.000Z",
+  atualizadoEm: "2025-01-10T12:00:00.000Z",
+};
+
+const colaborador2: ColaboradorApi = {
+  id: "22222222-2222-2222-2222-222222222222",
+  nome: "Bruno Colaborador (teste)",
+  situacao: "inativo",
+  criadoEm: "2025-02-05T12:00:00.000Z",
+  atualizadoEm: "2025-02-05T12:00:00.000Z",
+};
+
+const vinculo1: VinculoApi = {
+  id: "33333333-3333-3333-3333-333333333333",
+  colaboradorId: colaborador1.id,
+  empresaId: "44444444-4444-4444-4444-444444444444",
+  matricula: "MAT-0001",
+  tipo: "clt",
+  situacao: "ativo",
+  dataAdmissao: "2025-01-10",
+  dataDesligamento: null,
+  criadoEm: "2025-01-10T12:00:00.000Z",
+  atualizadoEm: "2025-01-10T12:00:00.000Z",
+};
+
+const empresa1: EmpresaApi = {
+  id: "44444444-4444-4444-4444-444444444444",
+  codigo: "EMP1",
+  nome: "Empresa Um (teste)",
+  status: "ativo",
+};
+
+const departamento1: DepartamentoApi = {
+  id: "55555555-5555-5555-5555-555555555555",
+  codigo: "DEP1",
+  nome: "Departamento Um (teste)",
+  empresaId: empresa1.id,
+  status: "ativo",
+  criadoEm: "2025-01-01T12:00:00.000Z",
+  atualizadoEm: "2025-01-01T12:00:00.000Z",
+};
+
+const area1: AreaApi = {
+  id: "66666666-6666-6666-6666-666666666666",
+  departamentoId: departamento1.id,
+  codigo: "ARE1",
+  nome: "Área Um (teste)",
+  status: "ativo",
+  criadoEm: "2025-01-01T12:00:00.000Z",
+  atualizadoEm: "2025-01-01T12:00:00.000Z",
+};
+
+const unidade1: UnidadeOrganizacionalApi = {
+  id: "77777777-7777-7777-7777-777777777777",
+  codigo: "UNI1",
+  nome: "Unidade Um (teste)",
+  empresaId: empresa1.id,
+  status: "ativo",
+  criadoEm: "2025-01-01T12:00:00.000Z",
+  atualizadoEm: "2025-01-01T12:00:00.000Z",
+};
+
+const equipe1: EquipeApi = {
+  id: "88888888-8888-8888-8888-888888888888",
+  empresaId: empresa1.id,
+  departamentoId: departamento1.id,
+  unidadeOrganizacionalId: null,
+  codigo: "EQU1",
+  nome: "Equipe Um (teste)",
+  status: "ativo",
+  criadoEm: "2025-01-01T12:00:00.000Z",
+  atualizadoEm: "2025-01-01T12:00:00.000Z",
+};
+
+const cargo1: CargoApi = {
+  id: "99999999-9999-9999-9999-999999999999",
+  codigo: "CAR1",
+  nome: "Cargo Um (teste)",
+  empresaId: empresa1.id,
+  status: "ativo",
+  criadoEm: "2025-01-01T12:00:00.000Z",
+  atualizadoEm: "2025-01-01T12:00:00.000Z",
+};
+
+const centroCusto1: CentroCustoApi = {
+  id: "10101010-1010-1010-1010-101010101010",
+  codigo: "CC1",
+  nome: "Centro de Custo Um (teste)",
+  empresaId: empresa1.id,
+  status: "ativo",
+  criadoEm: "2025-01-01T12:00:00.000Z",
+  atualizadoEm: "2025-01-01T12:00:00.000Z",
+};
+
+beforeEach(() => {
+  vi.mocked(listarColaboradores).mockResolvedValue(
+    paginado([colaborador1, colaborador2]),
+  );
+  vi.mocked(buscarColaborador).mockResolvedValue(colaborador1);
+  vi.mocked(listarVinculosDoColaborador).mockResolvedValue([vinculo1]);
+  vi.mocked(admitirColaborador).mockResolvedValue(colaborador1);
+  vi.mocked(retificarColaborador).mockResolvedValue(colaborador1);
+
+  vi.mocked(listarEmpresasMulti).mockResolvedValue(paginado([empresa1]));
+  vi.mocked(listarDepartamentos).mockResolvedValue(paginado([departamento1]));
+  vi.mocked(listarUnidades).mockResolvedValue(paginado([unidade1]));
+  vi.mocked(listarEquipes).mockResolvedValue(paginado([equipe1]));
+  vi.mocked(listarCentrosCusto).mockResolvedValue(paginado([centroCusto1]));
+  vi.mocked(listarAreas).mockResolvedValue(paginado([area1]));
+  vi.mocked(listarCargos).mockResolvedValue(paginado([cargo1]));
+});
+
+async function abrirFormularioEAguardarOpcoes() {
+  fireEvent.click(screen.getByRole("button", { name: "Novo colaborador" }));
+  await waitFor(() => expect(listarEmpresasMulti).toHaveBeenCalled());
+  await waitFor(() =>
+    expect(screen.getByLabelText(/Tipo de vínculo/i)).not.toBeDisabled(),
+  );
+}
+
+describe("ColaboradoresScreen (T111 — funcional)", () => {
+  it("tem um único h1 e exibe o aviso RH e DP", async () => {
     render(<ColaboradoresScreen />);
 
     expect(
       screen.getAllByRole("heading", { level: 1, name: "Colaboradores" }),
     ).toHaveLength(1);
+    expect(screen.getByText("RH e DP")).toBeInTheDocument();
+
+    await waitFor(() => expect(listarColaboradores).toHaveBeenCalled());
   });
 
-  it("exibe o aviso de que somente RH administra e nenhuma alteração é persistida", () => {
+  it("lista colaboradores reais retornados pela API", async () => {
     render(<ColaboradoresScreen />);
 
-    expect(screen.getByText("Somente RH")).toBeInTheDocument();
-    expect(
-      screen.getByText(/Nenhuma alteração feita aqui é persistida/i),
-    ).toBeInTheDocument();
-  });
-
-  it("exibe o aviso de que CPF, documentos, admissão real, Folha, eSocial e upload ainda não estão disponíveis", () => {
-    render(<ColaboradoresScreen />);
-
-    expect(screen.getByText("Ainda indisponível")).toBeInTheDocument();
-    expect(screen.getByText(/CPF/)).toBeInTheDocument();
-    expect(screen.getByText(/documentos/)).toBeInTheDocument();
-    expect(screen.getByText(/admissão real/)).toBeInTheDocument();
-    expect(screen.getByText(/Folha/)).toBeInTheDocument();
-    expect(screen.getByText(/eSocial/)).toBeInTheDocument();
-    expect(screen.getByText(/upload de arquivos/)).toBeInTheDocument();
-  });
-
-  it("lista colaboradores com referência técnica, situação, tipo de vínculo, unidade e vigência", () => {
-    render(<ColaboradoresScreen />);
-
-    const tabela = screen.getByRole("table", {
+    const tabela = await screen.findByRole("table", {
       name: "Colaboradores desta empresa",
     });
     const dentro = within(tabela);
-
-    const linha = dentro.getByText("COL-2026-0001").closest("tr")!;
-    const dentroDaLinha = within(linha);
-    expect(dentroDaLinha.getByText("Ativo")).toBeInTheDocument();
-    expect(dentroDaLinha.getByText("CLT")).toBeInTheDocument();
-    expect(dentroDaLinha.getByText("Operações (exemplo)")).toBeInTheDocument();
-    expect(
-      dentroDaLinha.getByText(/10\/03\/2025.*vigente/),
-    ).toBeInTheDocument();
+    expect(dentro.getByText("Ana Colaboradora (teste)")).toBeInTheDocument();
+    expect(dentro.getByText("Bruno Colaborador (teste)")).toBeInTheDocument();
+    expect(dentro.getByText("Ativo")).toBeInTheDocument();
+    expect(dentro.getByText("Inativo")).toBeInTheDocument();
   });
 
-  it("filtra localmente por situação e por tipo de vínculo", () => {
+  it("mostra o estado de carregamento antes dos dados chegarem", async () => {
+    let resolver: (v: ResultadoPaginadoTeste<ColaboradorApi>) => void;
+    vi.mocked(listarColaboradores).mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolver = resolve;
+      }) as ReturnType<typeof listarColaboradores>,
+    );
+
     render(<ColaboradoresScreen />);
 
-    fireEvent.change(screen.getByLabelText("Situação"), {
-      target: { value: "desligado" },
-    });
+    expect(screen.getByText("Carregando colaboradores…")).toBeInTheDocument();
 
-    const tabela = screen.getByRole("table", {
-      name: "Colaboradores desta empresa",
-    });
-    expect(within(tabela).getByText("COL-2026-0004")).toBeInTheDocument();
-    expect(within(tabela).queryByText("COL-2026-0001")).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Limpar filtros" }));
-    expect(screen.getByText("COL-2026-0001")).toBeInTheDocument();
+    resolver!(paginado([colaborador1]));
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
   });
 
-  it("mostra EmptyState quando o filtro não corresponde a nenhum colaborador", () => {
+  it("mostra erro de carregamento e permite tentar novamente", async () => {
+    vi.mocked(listarColaboradores).mockRejectedValueOnce(new Error("falha"));
+
     render(<ColaboradoresScreen />);
 
-    fireEvent.change(screen.getByLabelText("Situação"), {
-      target: { value: "desligado" },
-    });
-    fireEvent.change(screen.getByLabelText("Tipo de vínculo"), {
-      target: { value: "clt" },
+    await screen.findByRole("heading", {
+      name: "Não foi possível carregar os colaboradores",
     });
 
-    expect(
-      screen.getByRole("heading", {
-        name: "Nenhum colaborador corresponde aos filtros",
-      }),
-    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
+
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
   });
 
-  it("alterna para o estado vazio e mostra o EmptyState", () => {
+  it("mostra EmptyState quando não há colaboradores", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue(paginado([]));
+
     render(<ColaboradoresScreen />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Vazio" }));
-
     expect(
-      screen.queryByRole("table", { name: "Colaboradores desta empresa" }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", {
-        level: 3,
+      await screen.findByRole("heading", {
         name: "Nenhum colaborador cadastrado",
       }),
     ).toBeInTheDocument();
   });
 
-  it("alterna para o estado de erro com referência ilustrativa e ação de retorno", () => {
+  it("filtra por situação, enviando o parâmetro correto à API", async () => {
     render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
 
-    fireEvent.click(screen.getByRole("button", { name: "Erro" }));
+    fireEvent.change(screen.getByLabelText("Situação"), {
+      target: { value: "ativo" },
+    });
 
-    expect(
-      screen.getByRole("heading", {
-        name: "Não foi possível carregar os colaboradores",
+    await waitFor(() =>
+      expect(listarColaboradores).toHaveBeenLastCalledWith({
+        situacao: "ativo",
       }),
-    ).toBeInTheDocument();
-    expect(screen.getByText(/REQ-DEMO-000912/)).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
-    expect(
-      screen.getByRole("table", { name: "Colaboradores desta empresa" }),
-    ).toBeInTheDocument();
+    );
   });
 
-  it("abre o formulário 'Novo colaborador' e confirmar não cria, salva nem altera nada", () => {
+  it("filtra por situação do vínculo, enviando o parâmetro correto à API", async () => {
     render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
 
-    fireEvent.click(screen.getByRole("button", { name: "Novo colaborador" }));
-
-    const formulario = screen.getByRole("form", {
-      name: "Formulário de novo colaborador",
+    fireEvent.change(screen.getByLabelText("Situação do vínculo"), {
+      target: { value: "previsto" },
     });
-    expect(formulario).toBeInTheDocument();
-    expect(
-      screen.getByText(/nada é criado, salvo ou realmente alterado/i),
-    ).toBeInTheDocument();
 
-    fireEvent.click(
-      within(formulario).getByRole("button", {
-        name: "Confirmar (demonstração)",
+    await waitFor(() =>
+      expect(listarColaboradores).toHaveBeenLastCalledWith({
+        situacaoVinculo: "previsto",
       }),
     );
+  });
+
+  it("abre e fecha o formulário de novo colaborador", async () => {
+    render(<ColaboradoresScreen />);
+    await abrirFormularioEAguardarOpcoes();
 
     expect(
-      screen.getByText(
-        "Ação apenas demonstrativa: nenhum colaborador foi realmente criado, salvo ou alterado.",
-      ),
+      screen.getByRole("form", { name: "Formulário de novo colaborador" }),
     ).toBeInTheDocument();
 
-    // A listagem não é alterada pela submissão do formulário demonstrativo.
-    expect(
-      screen.getByRole("table", { name: "Colaboradores desta empresa" }),
-    ).toBeInTheDocument();
-
-    fireEvent.click(
-      within(formulario).getByRole("button", { name: "Cancelar" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
     expect(
       screen.queryByRole("form", { name: "Formulário de novo colaborador" }),
     ).not.toBeInTheDocument();
   });
 
-  it("o formulário demonstra um campo com erro de validação, comunicado por texto e semântica", () => {
+  it("valida nome obrigatório", async () => {
     render(<ColaboradoresScreen />);
+    await abrirFormularioEAguardarOpcoes();
 
-    fireEvent.click(screen.getByRole("button", { name: "Novo colaborador" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Admitir colaborador" }),
+    );
 
-    const erro = screen.getByText("Informe uma data no formato AAAA-MM-DD.");
-    expect(erro.closest('[role="alert"]')).toBeInTheDocument();
-
-    const campoInvalido = screen.getByDisplayValue("31/02/2026");
-    expect(campoInvalido).toHaveAttribute("aria-invalid", "true");
+    expect(await screen.findByText("Nome é obrigatório.")).toBeInTheDocument();
+    expect(admitirColaborador).not.toHaveBeenCalled();
   });
 
-  it("não contém CPF, nome real, empresa real, documento, valor financeiro ou dado sensível", () => {
+  it("valida o padrão da matrícula", async () => {
     render(<ColaboradoresScreen />);
-    fireEvent.click(screen.getByRole("button", { name: "Novo colaborador" }));
+    await abrirFormularioEAguardarOpcoes();
+
+    fireEvent.change(screen.getByLabelText(/Nome completo/i), {
+      target: { value: "Colaborador Teste" },
+    });
+    fireEvent.change(screen.getByLabelText(/Matrícula/i), {
+      target: { value: "!!" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Admitir colaborador" }),
+    );
+
+    expect(
+      await screen.findByText(
+        "Use apenas letras maiúsculas, números, - e _ (2 a 32 caracteres).",
+      ),
+    ).toBeInTheDocument();
+    expect(admitirColaborador).not.toHaveBeenCalled();
+  });
+
+  it("exige tipo de vínculo, data de admissão e lotação inicial", async () => {
+    render(<ColaboradoresScreen />);
+    await abrirFormularioEAguardarOpcoes();
+
+    fireEvent.change(screen.getByLabelText(/Nome completo/i), {
+      target: { value: "Colaborador Teste" },
+    });
+    fireEvent.change(screen.getByLabelText(/Matrícula/i), {
+      target: { value: "MAT-0099" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Admitir colaborador" }),
+    );
+
+    expect(
+      await screen.findByText("Selecione o tipo de vínculo."),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Informe a data de admissão.")).toBeInTheDocument();
+    expect(
+      screen.getByText("Selecione a lotação inicial do colaborador."),
+    ).toBeInTheDocument();
+    expect(admitirColaborador).not.toHaveBeenCalled();
+  });
+
+  it("admite um colaborador com sucesso (lotação por departamento) e recarrega a lista", async () => {
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+    const chamadasAntes = vi.mocked(listarColaboradores).mock.calls.length;
+    await abrirFormularioEAguardarOpcoes();
+
+    fireEvent.change(screen.getByLabelText(/Nome completo/i), {
+      target: { value: "Colaborador Novo" },
+    });
+    fireEvent.change(screen.getByLabelText(/Matrícula/i), {
+      target: { value: "mat-0099" },
+    });
+    fireEvent.change(screen.getByLabelText(/Tipo de vínculo/i), {
+      target: { value: "clt" },
+    });
+    fireEvent.change(screen.getByLabelText(/Data de admissão/i), {
+      target: { value: "2026-01-05" },
+    });
+    fireEvent.change(screen.getByLabelText(/Tipo de lotação inicial/i), {
+      target: { value: "departamento" },
+    });
+    fireEvent.change(screen.getByLabelText(/Departamento/i), {
+      target: { value: departamento1.id },
+    });
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Admitir colaborador" }),
+    );
+
+    await waitFor(() =>
+      expect(admitirColaborador).toHaveBeenCalledWith({
+        nome: "Colaborador Novo",
+        empresaId: empresa1.id,
+        matricula: "MAT-0099",
+        tipo: "clt",
+        dataAdmissao: "2026-01-05",
+        motivoCodigo: "admissao_inicial",
+        departamentoId: departamento1.id,
+      }),
+    );
+
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("form", { name: "Formulário de novo colaborador" }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(vi.mocked(listarColaboradores).mock.calls.length).toBe(
+      chamadasAntes + 1,
+    );
+    expect(listarColaboradores).toHaveBeenLastCalledWith({});
+  });
+
+  it("exige departamento antes de liberar a seleção de área, e envia ambos ao admitir", async () => {
+    render(<ColaboradoresScreen />);
+    await abrirFormularioEAguardarOpcoes();
+
+    fireEvent.change(screen.getByLabelText(/Nome completo/i), {
+      target: { value: "Colaborador Área" },
+    });
+    fireEvent.change(screen.getByLabelText(/Matrícula/i), {
+      target: { value: "MAT-0100" },
+    });
+    fireEvent.change(screen.getByLabelText(/Tipo de vínculo/i), {
+      target: { value: "clt" },
+    });
+    fireEvent.change(screen.getByLabelText(/Data de admissão/i), {
+      target: { value: "2026-01-05" },
+    });
+    fireEvent.change(screen.getByLabelText(/Tipo de lotação inicial/i), {
+      target: { value: "area" },
+    });
+
+    const selectArea = screen.getByLabelText(/^Área/i);
+    expect(selectArea).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText(/Departamento/i), {
+      target: { value: departamento1.id },
+    });
+
+    await waitFor(() =>
+      expect(listarAreas).toHaveBeenCalledWith({
+        departamentoId: departamento1.id,
+        status: "ativo",
+        tamanhoPagina: 100,
+      }),
+    );
+    await waitFor(() =>
+      expect(screen.getByLabelText(/^Área/i)).not.toBeDisabled(),
+    );
+
+    fireEvent.change(screen.getByLabelText(/^Área/i), {
+      target: { value: area1.id },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Admitir colaborador" }),
+    );
+
+    await waitFor(() =>
+      expect(admitirColaborador).toHaveBeenCalledWith(
+        expect.objectContaining({
+          areaId: area1.id,
+          departamentoId: departamento1.id,
+        }),
+      ),
+    );
+  });
+
+  it("mostra o erro retornado pela API ao admitir", async () => {
+    vi.mocked(admitirColaborador).mockRejectedValueOnce(
+      new Error("Matrícula já utilizada nesta empresa."),
+    );
+
+    render(<ColaboradoresScreen />);
+    await abrirFormularioEAguardarOpcoes();
+
+    fireEvent.change(screen.getByLabelText(/Nome completo/i), {
+      target: { value: "Colaborador Novo" },
+    });
+    fireEvent.change(screen.getByLabelText(/Matrícula/i), {
+      target: { value: "MAT-0099" },
+    });
+    fireEvent.change(screen.getByLabelText(/Tipo de vínculo/i), {
+      target: { value: "clt" },
+    });
+    fireEvent.change(screen.getByLabelText(/Data de admissão/i), {
+      target: { value: "2026-01-05" },
+    });
+    fireEvent.change(screen.getByLabelText(/Tipo de lotação inicial/i), {
+      target: { value: "departamento" },
+    });
+    fireEvent.change(screen.getByLabelText(/Departamento/i), {
+      target: { value: departamento1.id },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Admitir colaborador" }),
+    );
+
+    expect(
+      await screen.findByText("Matrícula já utilizada nesta empresa."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("form", { name: "Formulário de novo colaborador" }),
+    ).toBeInTheDocument();
+  });
+
+  it("abre o detalhe de um colaborador e carrega seus vínculos", async () => {
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+
+    const linha = screen.getByText("Ana Colaboradora (teste)").closest("tr")!;
+    fireEvent.click(
+      within(linha).getByRole("button", { name: /Ver detalhes/ }),
+    );
+
+    expect(listarVinculosDoColaborador).toHaveBeenCalledWith(colaborador1.id);
+
+    const tabelaVinculos = await screen.findByRole("table", {
+      name: `Vínculos — ${colaborador1.nome}`,
+    });
+    const dentro = within(tabelaVinculos);
+    expect(dentro.getByText("MAT-0001")).toBeInTheDocument();
+    expect(dentro.getByText("CLT")).toBeInTheDocument();
+  });
+
+  it("não expõe campos para alterar matrícula, tipo ou data de admissão no detalhe", async () => {
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+
+    const linha = screen.getByText("Ana Colaboradora (teste)").closest("tr")!;
+    fireEvent.click(
+      within(linha).getByRole("button", { name: /Ver detalhes/ }),
+    );
+
+    await screen.findByRole("table", {
+      name: `Vínculos — ${colaborador1.nome}`,
+    });
+
+    expect(screen.queryByLabelText("Matrícula")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Tipo de vínculo")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Data de admissão")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Nome")).toBeInTheDocument();
+  });
+
+  it("mostra erro ao carregar vínculos, com opção de tentar novamente", async () => {
+    vi.mocked(listarVinculosDoColaborador).mockRejectedValueOnce(
+      new Error("falha"),
+    );
+
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+
+    const linha = screen.getByText("Ana Colaboradora (teste)").closest("tr")!;
+    fireEvent.click(
+      within(linha).getByRole("button", { name: /Ver detalhes/ }),
+    );
+
+    expect(
+      await screen.findByText(
+        "Não foi possível carregar os vínculos deste colaborador.",
+      ),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
+
+    await screen.findByRole("table", {
+      name: `Vínculos — ${colaborador1.nome}`,
+    });
+  });
+
+  it("edita o nome do colaborador com sucesso e atualiza a listagem", async () => {
+    const atualizado: ColaboradorApi = {
+      ...colaborador1,
+      nome: "Ana Renomeada (teste)",
+    };
+    vi.mocked(retificarColaborador).mockResolvedValueOnce(atualizado);
+
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+
+    const linha = screen.getByText("Ana Colaboradora (teste)").closest("tr")!;
+    fireEvent.click(
+      within(linha).getByRole("button", { name: /Ver detalhes/ }),
+    );
+    await screen.findByRole("table", {
+      name: `Vínculos — ${colaborador1.nome}`,
+    });
+
+    fireEvent.change(screen.getByLabelText("Nome"), {
+      target: { value: "Ana Renomeada (teste)" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar nome" }));
+
+    await waitFor(() =>
+      expect(retificarColaborador).toHaveBeenCalledWith(colaborador1.id, {
+        nome: "Ana Renomeada (teste)",
+      }),
+    );
+    expect(
+      await screen.findByRole("heading", { name: "Ana Renomeada (teste)" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("table", { name: "Colaboradores desta empresa" }),
+    ).toHaveTextContent("Ana Renomeada (teste)");
+  });
+
+  it("mostra erro ao falhar a alteração de nome", async () => {
+    vi.mocked(retificarColaborador).mockRejectedValueOnce(
+      new Error("Não foi possível salvar."),
+    );
+
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+
+    const linha = screen.getByText("Ana Colaboradora (teste)").closest("tr")!;
+    fireEvent.click(
+      within(linha).getByRole("button", { name: /Ver detalhes/ }),
+    );
+    await screen.findByRole("table", {
+      name: `Vínculos — ${colaborador1.nome}`,
+    });
+
+    fireEvent.change(screen.getByLabelText("Nome"), {
+      target: { value: "Outro Nome (teste)" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar nome" }));
+
+    expect(
+      await screen.findByText("Não foi possível salvar."),
+    ).toBeInTheDocument();
+  });
+
+  it("fecha o painel de detalhe", async () => {
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+
+    const linha = screen.getByText("Ana Colaboradora (teste)").closest("tr")!;
+    fireEvent.click(
+      within(linha).getByRole("button", { name: /Ver detalhes/ }),
+    );
+    await screen.findByRole("table", {
+      name: `Vínculos — ${colaborador1.nome}`,
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
+
+    expect(
+      screen.queryByRole("table", { name: `Vínculos — ${colaborador1.nome}` }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("abrir o formulário fecha um detalhe que estava aberto", async () => {
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+
+    const linha = screen.getByText("Ana Colaboradora (teste)").closest("tr")!;
+    fireEvent.click(
+      within(linha).getByRole("button", { name: /Ver detalhes/ }),
+    );
+    await screen.findByRole("table", {
+      name: `Vínculos — ${colaborador1.nome}`,
+    });
+
+    await abrirFormularioEAguardarOpcoes();
+
+    expect(
+      screen.queryByRole("table", { name: `Vínculos — ${colaborador1.nome}` }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("não contém CPF, senha, sessão ou outro dado sensível na tela", async () => {
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+    await abrirFormularioEAguardarOpcoes();
 
     const texto = document.body.innerHTML.toLowerCase();
     for (const termoProibido of [
-      "secullum",
-      "rwtech",
-      "bioprox",
-      "reserva fiscal",
+      "cpf",
       "senha",
       "sessão",
-      "r$",
-      ".pdf",
       "localstorage",
+      "r$",
     ]) {
       expect(texto).not.toContain(termoProibido);
     }

@@ -1,19 +1,4 @@
-/**
- * Pessoas > Colaboradores (T072) — tela visual estática.
- *
- * Visão administrativa demonstrativa que organiza o ecossistema para o
- * futuro cadastro/vínculo de pessoas — apenas referências técnicas,
- * situação, tipo de vínculo, unidade/departamento de exemplo e vigência.
- * Não ativa nenhuma operação real de cadastro.
- *
- * Escopo: PURAMENTE visual. Sem `fetch`, sem autenticação/sessão/CSRF/MFA,
- * sem rota real, sem persistência, sem backend, schema ou dependência nova.
- * Todo dado é sintético (`colaboradores.fixtures.ts`), independente do
- * catálogo de "Horário de trabalho" (T046). O formulário "Novo colaborador"
- * é inteiramente demonstrativo: confirmar não cria, salva nem altera nenhum
- * colaborador de verdade, e a listagem nunca é modificada por ele.
- */
-import { useId, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
 import {
   Button,
   DataTable,
@@ -26,113 +11,554 @@ import {
 } from "../../components";
 import type { DataTableColumn, StatusVariant } from "../../components";
 import {
-  COLABORADORES_EXEMPLO,
-  type ColaboradorExemplo,
-  formatarVigenciaColaborador,
-  ROTULO_SITUACAO_COLABORADOR,
-  ROTULO_TIPO_VINCULO,
-  type SituacaoColaborador,
-  type TipoVinculoColaborador,
-  UNIDADES_EXEMPLO,
-} from "./colaboradores.fixtures";
+  type AdmitirColaboradorDto,
+  type ColaboradorApi,
+  type RetificarColaboradorDto,
+  type TipoVinculo,
+  type VinculoApi,
+  admitirColaborador,
+  listarColaboradores,
+  listarVinculosDoColaborador,
+  retificarColaborador,
+} from "../../api/colaboradoresClient";
+import {
+  type AreaApi,
+  type CentroCustoApi,
+  type DepartamentoApi,
+  type EmpresaApi,
+  type EquipeApi,
+  type UnidadeOrganizacionalApi,
+  listarAreas,
+  listarCentrosCusto,
+  listarDepartamentos,
+  listarEmpresasMulti,
+  listarEquipes,
+  listarUnidades,
+} from "../../api/organizacaoClient";
+import { type CargoApi, listarCargos } from "../../api/cargoClient";
 import "./ColaboradoresScreen.css";
 
 export const COLABORADORES_TITULO_ID = "colaboradores-titulo";
 
-type EstadoDemonstracao = "dados" | "vazio" | "erro";
+const MATRICULA_PATTERN = /^[A-Z0-9_-]{2,32}$/;
 
-const ROTULO_ESTADO_DEMO: Record<EstadoDemonstracao, string> = {
-  dados: "Com dados",
-  vazio: "Vazio",
-  erro: "Erro",
+type FiltroSituacao = "todos" | "ativo" | "inativo";
+type FiltroSituacaoVinculo = "todos" | "previsto" | "ativo" | "encerrado";
+
+const ROTULO_TIPO_VINCULO: Record<TipoVinculo, string> = {
+  clt: "CLT",
+  estagio: "Estágio",
+  pj: "PJ",
+  temporario: "Temporário",
+  outro_controlado: "Outro controlado",
 };
 
-const VARIANTE_SITUACAO: Record<SituacaoColaborador, StatusVariant> = {
+const VARIANTE_SITUACAO_COLABORADOR: Record<string, StatusVariant> = {
   ativo: "success",
-  afastado: "warning",
-  desligado: "neutral",
+  inativo: "neutral",
 };
 
-const OPCAO_TODOS = "todos";
+const VARIANTE_SITUACAO_VINCULO: Record<string, StatusVariant> = {
+  previsto: "info",
+  ativo: "success",
+  encerrado: "neutral",
+};
+
+const ROTULO_SITUACAO_VINCULO: Record<string, string> = {
+  previsto: "Previsto",
+  ativo: "Ativo",
+  encerrado: "Encerrado",
+};
+
+type TipoDestino =
+  "" | "unidade" | "departamento" | "area" | "equipe" | "cargo" | "centroCusto";
+
+const OPCOES_TIPO_DESTINO: { valor: TipoDestino; rotulo: string }[] = [
+  { valor: "unidade", rotulo: "Unidade organizacional" },
+  { valor: "departamento", rotulo: "Departamento" },
+  { valor: "area", rotulo: "Área" },
+  { valor: "equipe", rotulo: "Equipe" },
+  { valor: "cargo", rotulo: "Cargo" },
+  { valor: "centroCusto", rotulo: "Centro de custo" },
+];
+
+interface FormularioErros {
+  nome?: string;
+  empresaId?: string;
+  matricula?: string;
+  tipo?: string;
+  dataAdmissao?: string;
+  destino?: string;
+  geral?: string;
+}
+
+interface FormularioState {
+  nome: string;
+  empresas: EmpresaApi[];
+  empresaId: string;
+  matricula: string;
+  tipo: TipoVinculo | "";
+  dataAdmissao: string;
+  tipoDestino: TipoDestino;
+  destinoId: string;
+  departamentoIdArea: string;
+  departamentos: DepartamentoApi[];
+  unidades: UnidadeOrganizacionalApi[];
+  equipes: EquipeApi[];
+  cargos: CargoApi[];
+  centrosCusto: CentroCustoApi[];
+  areasDoDepartamento: AreaApi[];
+  carregandoAreas: boolean;
+  carregandoOpcoes: boolean;
+  erros: FormularioErros;
+  salvando: boolean;
+}
+
+interface DetalheState {
+  colaborador: ColaboradorApi;
+  statusVinculos: "carregando" | "erro" | "dados";
+  vinculos: VinculoApi[];
+  nomeEdicao: string;
+  salvandoNome: boolean;
+  erroNome: string | null;
+}
 
 export function ColaboradoresScreen() {
-  const [estadoDemo, setEstadoDemo] = useState<EstadoDemonstracao>("dados");
-  const [filtroSituacao, setFiltroSituacao] = useState<string>(OPCAO_TODOS);
-  const [filtroTipoVinculo, setFiltroTipoVinculo] =
-    useState<string>(OPCAO_TODOS);
-  const [formularioAberto, setFormularioAberto] = useState(false);
-  const [confirmacaoVisivel, setConfirmacaoVisivel] = useState(false);
+  const [statusCarregamento, setStatusCarregamento] = useState<
+    "carregando" | "erro" | "dados"
+  >("carregando");
+  const [colaboradores, setColaboradores] = useState<ColaboradorApi[]>([]);
+  const [filtroSituacao, setFiltroSituacao] = useState<FiltroSituacao>("todos");
+  const [filtroSituacaoVinculo, setFiltroSituacaoVinculo] =
+    useState<FiltroSituacaoVinculo>("todos");
+  const [formulario, setFormulario] = useState<FormularioState | null>(null);
+  const [detalhe, setDetalhe] = useState<DetalheState | null>(null);
   const formTituloId = useId();
+  const detalheTituloId = useId();
 
-  const colaboradoresBase = useMemo(
-    () => (estadoDemo === "vazio" ? [] : COLABORADORES_EXEMPLO),
-    [estadoDemo],
+  const carregarDados = useCallback(
+    async (
+      situacao: FiltroSituacao,
+      situacaoVinculo: FiltroSituacaoVinculo,
+    ) => {
+      setStatusCarregamento("carregando");
+      try {
+        const query: {
+          situacao?: "ativo" | "inativo";
+          situacaoVinculo?: "previsto" | "ativo" | "encerrado";
+        } = {};
+        if (situacao !== "todos") query.situacao = situacao;
+        if (situacaoVinculo !== "todos")
+          query.situacaoVinculo = situacaoVinculo;
+        const resp = await listarColaboradores(query);
+        setColaboradores(resp.itens);
+        setStatusCarregamento("dados");
+      } catch {
+        setStatusCarregamento("erro");
+      }
+    },
+    [],
   );
 
-  const colaboradoresFiltrados = useMemo(() => {
-    return colaboradoresBase.filter((colaborador) => {
-      if (
-        filtroSituacao !== OPCAO_TODOS &&
-        colaborador.situacao !== filtroSituacao
-      ) {
-        return false;
-      }
-      if (
-        filtroTipoVinculo !== OPCAO_TODOS &&
-        colaborador.tipoVinculo !== filtroTipoVinculo
-      ) {
-        return false;
-      }
-      return true;
+  useEffect(() => {
+    void carregarDados(filtroSituacao, filtroSituacaoVinculo);
+  }, [filtroSituacao, filtroSituacaoVinculo, carregarDados]);
+
+  async function abrirFormulario() {
+    setDetalhe(null);
+    setFormulario({
+      nome: "",
+      empresas: [],
+      empresaId: "",
+      matricula: "",
+      tipo: "",
+      dataAdmissao: "",
+      tipoDestino: "",
+      destinoId: "",
+      departamentoIdArea: "",
+      departamentos: [],
+      unidades: [],
+      equipes: [],
+      cargos: [],
+      centrosCusto: [],
+      areasDoDepartamento: [],
+      carregandoAreas: false,
+      carregandoOpcoes: true,
+      erros: {},
+      salvando: false,
     });
-  }, [colaboradoresBase, filtroSituacao, filtroTipoVinculo]);
 
-  const filtrosAtivos =
-    filtroSituacao !== OPCAO_TODOS || filtroTipoVinculo !== OPCAO_TODOS;
-
-  function limparFiltros() {
-    setFiltroSituacao(OPCAO_TODOS);
-    setFiltroTipoVinculo(OPCAO_TODOS);
-  }
-
-  function abrirNovo() {
-    setConfirmacaoVisivel(false);
-    setFormularioAberto(true);
+    try {
+      const [
+        empresasResp,
+        departamentosResp,
+        unidadesResp,
+        equipesResp,
+        cargosResp,
+        centrosResp,
+      ] = await Promise.all([
+        listarEmpresasMulti(),
+        listarDepartamentos({ status: "ativo", tamanhoPagina: 100 }),
+        listarUnidades({ status: "ativo", tamanhoPagina: 100 }),
+        listarEquipes({ status: "ativo", tamanhoPagina: 100 }),
+        listarCargos({ status: "ativo", tamanhoPagina: 100 }),
+        listarCentrosCusto({ status: "ativo", tamanhoPagina: 100 }),
+      ]);
+      setFormulario((prev) =>
+        prev
+          ? {
+              ...prev,
+              empresas: empresasResp.itens,
+              empresaId:
+                empresasResp.itens.length === 1
+                  ? (empresasResp.itens[0]?.id ?? "")
+                  : "",
+              departamentos: departamentosResp.itens,
+              unidades: unidadesResp.itens,
+              equipes: equipesResp.itens,
+              cargos: cargosResp.itens,
+              centrosCusto: centrosResp.itens,
+              carregandoOpcoes: false,
+            }
+          : prev,
+      );
+    } catch {
+      setFormulario((prev) =>
+        prev
+          ? {
+              ...prev,
+              carregandoOpcoes: false,
+              erros: {
+                geral:
+                  "Não foi possível carregar as opções de lotação. Feche e tente novamente.",
+              },
+            }
+          : prev,
+      );
+    }
   }
 
   function fecharFormulario() {
-    setFormularioAberto(false);
+    setFormulario(null);
   }
 
-  const colunas: DataTableColumn<ColaboradorExemplo>[] = [
-    {
-      key: "referencia",
-      header: "Referência técnica",
-      cell: (linha) => <code>{linha.referenciaTecnica}</code>,
-    },
+  async function selecionarDepartamentoArea(departamentoId: string) {
+    setFormulario((prev) =>
+      prev
+        ? {
+            ...prev,
+            departamentoIdArea: departamentoId,
+            destinoId: "",
+            areasDoDepartamento: [],
+            carregandoAreas: departamentoId !== "",
+            erros: {},
+          }
+        : prev,
+    );
+    if (!departamentoId) return;
+    try {
+      const resp = await listarAreas({
+        departamentoId,
+        status: "ativo",
+        tamanhoPagina: 100,
+      });
+      setFormulario((prev) =>
+        prev
+          ? { ...prev, areasDoDepartamento: resp.itens, carregandoAreas: false }
+          : prev,
+      );
+    } catch {
+      setFormulario((prev) =>
+        prev ? { ...prev, carregandoAreas: false } : prev,
+      );
+    }
+  }
+
+  function selecionarTipoDestino(tipoDestino: TipoDestino) {
+    setFormulario((prev) =>
+      prev
+        ? {
+            ...prev,
+            tipoDestino,
+            destinoId: "",
+            departamentoIdArea: "",
+            areasDoDepartamento: [],
+            erros: {},
+          }
+        : prev,
+    );
+  }
+
+  function abrirDetalhe(colaborador: ColaboradorApi) {
+    setFormulario(null);
+    setDetalhe({
+      colaborador,
+      statusVinculos: "carregando",
+      vinculos: [],
+      nomeEdicao: colaborador.nome,
+      salvandoNome: false,
+      erroNome: null,
+    });
+    void carregarVinculos(colaborador.id);
+  }
+
+  async function carregarVinculos(colaboradorId: string) {
+    setDetalhe((prev) =>
+      prev ? { ...prev, statusVinculos: "carregando" } : prev,
+    );
+    try {
+      const vinculos = await listarVinculosDoColaborador(colaboradorId);
+      setDetalhe((prev) =>
+        prev ? { ...prev, vinculos, statusVinculos: "dados" } : prev,
+      );
+    } catch {
+      setDetalhe((prev) => (prev ? { ...prev, statusVinculos: "erro" } : prev));
+    }
+  }
+
+  function fecharDetalhe() {
+    setDetalhe(null);
+  }
+
+  async function handleSalvarNome() {
+    if (!detalhe) return;
+    const nome = detalhe.nomeEdicao.trim();
+    if (!nome) {
+      setDetalhe((prev) =>
+        prev ? { ...prev, erroNome: "Nome é obrigatório." } : prev,
+      );
+      return;
+    }
+    if (nome.length > 160) {
+      setDetalhe((prev) =>
+        prev
+          ? { ...prev, erroNome: "Nome deve ter no máximo 160 caracteres." }
+          : prev,
+      );
+      return;
+    }
+
+    setDetalhe((prev) =>
+      prev ? { ...prev, salvandoNome: true, erroNome: null } : prev,
+    );
+    try {
+      const dto: RetificarColaboradorDto = { nome };
+      const atualizado = await retificarColaborador(
+        detalhe.colaborador.id,
+        dto,
+      );
+      setDetalhe((prev) =>
+        prev
+          ? {
+              ...prev,
+              colaborador: atualizado,
+              nomeEdicao: atualizado.nome,
+              salvandoNome: false,
+            }
+          : prev,
+      );
+      setColaboradores((prev) =>
+        prev.map((c) => (c.id === atualizado.id ? atualizado : c)),
+      );
+    } catch (err: unknown) {
+      const mensagem =
+        err instanceof Error
+          ? err.message
+          : "Não foi possível salvar o nome. Tente novamente.";
+      setDetalhe((prev) =>
+        prev ? { ...prev, salvandoNome: false, erroNome: mensagem } : prev,
+      );
+    }
+  }
+
+  async function handleSubmit(evento: React.FormEvent) {
+    evento.preventDefault();
+    if (!formulario) return;
+
+    const erros: FormularioErros = {};
+    const nome = formulario.nome.trim();
+    if (!nome) {
+      erros.nome = "Nome é obrigatório.";
+    } else if (nome.length < 2 || nome.length > 160) {
+      erros.nome = "Nome deve ter entre 2 e 160 caracteres.";
+    }
+    if (formulario.empresas.length > 1 && !formulario.empresaId) {
+      erros.empresaId = "Selecione a empresa.";
+    }
+    const matricula = formulario.matricula.trim().toUpperCase();
+    if (!MATRICULA_PATTERN.test(matricula)) {
+      erros.matricula =
+        "Use apenas letras maiúsculas, números, - e _ (2 a 32 caracteres).";
+    }
+    if (!formulario.tipo) {
+      erros.tipo = "Selecione o tipo de vínculo.";
+    }
+    if (!formulario.dataAdmissao) {
+      erros.dataAdmissao = "Informe a data de admissão.";
+    }
+    if (!formulario.tipoDestino || !formulario.destinoId) {
+      erros.destino = "Selecione a lotação inicial do colaborador.";
+    } else if (
+      formulario.tipoDestino === "area" &&
+      !formulario.departamentoIdArea
+    ) {
+      erros.destino = "Selecione o departamento da área.";
+    }
+
+    if (
+      erros.nome ??
+      erros.empresaId ??
+      erros.matricula ??
+      erros.tipo ??
+      erros.dataAdmissao ??
+      erros.destino
+    ) {
+      setFormulario((prev) => (prev ? { ...prev, erros } : prev));
+      return;
+    }
+
+    setFormulario((prev) =>
+      prev ? { ...prev, salvando: true, erros: {} } : prev,
+    );
+
+    try {
+      const empresaId =
+        formulario.empresaId || (formulario.empresas[0]?.id ?? "");
+
+      const dto: AdmitirColaboradorDto = {
+        nome,
+        empresaId,
+        matricula,
+        tipo: formulario.tipo as TipoVinculo,
+        dataAdmissao: formulario.dataAdmissao,
+        motivoCodigo: "admissao_inicial",
+        ...(formulario.tipoDestino === "unidade"
+          ? { unidadeOrganizacionalId: formulario.destinoId }
+          : {}),
+        ...(formulario.tipoDestino === "departamento"
+          ? { departamentoId: formulario.destinoId }
+          : {}),
+        ...(formulario.tipoDestino === "area"
+          ? {
+              areaId: formulario.destinoId,
+              departamentoId: formulario.departamentoIdArea,
+            }
+          : {}),
+        ...(formulario.tipoDestino === "equipe"
+          ? { equipeId: formulario.destinoId }
+          : {}),
+        ...(formulario.tipoDestino === "cargo"
+          ? { cargoId: formulario.destinoId }
+          : {}),
+        ...(formulario.tipoDestino === "centroCusto"
+          ? { centroCustoId: formulario.destinoId }
+          : {}),
+      };
+      await admitirColaborador(dto);
+      setFormulario(null);
+      await carregarDados(filtroSituacao, filtroSituacaoVinculo);
+    } catch (err: unknown) {
+      const mensagem =
+        err instanceof Error
+          ? err.message
+          : "Não foi possível admitir o colaborador. Tente novamente.";
+      setFormulario((prev) =>
+        prev
+          ? {
+              ...prev,
+              salvando: false,
+              erros: { ...prev.erros, geral: mensagem },
+            }
+          : prev,
+      );
+    }
+  }
+
+  const opcoesDestinoAtuais: { id: string; rotulo: string }[] =
+    formulario?.tipoDestino === "unidade"
+      ? (formulario.unidades.map((u) => ({
+          id: u.id,
+          rotulo: `${u.codigo} — ${u.nome}`,
+        })) ?? [])
+      : formulario?.tipoDestino === "departamento"
+        ? formulario.departamentos.map((d) => ({
+            id: d.id,
+            rotulo: `${d.codigo} — ${d.nome}`,
+          }))
+        : formulario?.tipoDestino === "area"
+          ? formulario.areasDoDepartamento.map((a) => ({
+              id: a.id,
+              rotulo: `${a.codigo} — ${a.nome}`,
+            }))
+          : formulario?.tipoDestino === "equipe"
+            ? (formulario.equipes.map((e) => ({
+                id: e.id,
+                rotulo: `${e.codigo} — ${e.nome}`,
+              })) ?? [])
+            : formulario?.tipoDestino === "cargo"
+              ? (formulario.cargos.map((c) => ({
+                  id: c.id,
+                  rotulo: `${c.codigo} — ${c.nome}`,
+                })) ?? [])
+              : formulario?.tipoDestino === "centroCusto"
+                ? (formulario.centrosCusto.map((c) => ({
+                    id: c.id,
+                    rotulo: `${c.codigo} — ${c.nome}`,
+                  })) ?? [])
+                : [];
+
+  const rotuloDestinoAtual =
+    OPCOES_TIPO_DESTINO.find((o) => o.valor === formulario?.tipoDestino)
+      ?.rotulo ?? "Registro";
+
+  const colunasColaboradores: DataTableColumn<ColaboradorApi>[] = [
+    { key: "nome", header: "Nome", cell: (c) => c.nome },
     {
       key: "situacao",
       header: "Situação",
-      cell: (linha) => (
-        <StatusBadge variant={VARIANTE_SITUACAO[linha.situacao]}>
-          {ROTULO_SITUACAO_COLABORADOR[linha.situacao]}
+      cell: (c) => (
+        <StatusBadge
+          variant={VARIANTE_SITUACAO_COLABORADOR[c.situacao] ?? "neutral"}
+        >
+          {c.situacao === "ativo" ? "Ativo" : "Inativo"}
         </StatusBadge>
       ),
     },
     {
-      key: "tipoVinculo",
-      header: "Tipo de vínculo",
-      cell: (linha) => ROTULO_TIPO_VINCULO[linha.tipoVinculo],
+      key: "acoes",
+      header: "Ações",
+      cell: (c) => (
+        <Button variant="secondary" onClick={() => abrirDetalhe(c)}>
+          Ver detalhes
+          <span className="sr-only"> — {c.nome}</span>
+        </Button>
+      ),
+    },
+  ];
+
+  const colunasVinculos: DataTableColumn<VinculoApi>[] = [
+    { key: "matricula", header: "Matrícula", cell: (v) => v.matricula },
+    {
+      key: "tipo",
+      header: "Tipo",
+      cell: (v) => ROTULO_TIPO_VINCULO[v.tipo] ?? v.tipo,
     },
     {
-      key: "unidade",
-      header: "Unidade/departamento",
-      cell: (linha) => linha.unidade,
+      key: "situacao",
+      header: "Situação",
+      cell: (v) => (
+        <StatusBadge
+          variant={VARIANTE_SITUACAO_VINCULO[v.situacao] ?? "neutral"}
+        >
+          {ROTULO_SITUACAO_VINCULO[v.situacao] ?? v.situacao}
+        </StatusBadge>
+      ),
     },
+    { key: "admissao", header: "Admissão", cell: (v) => v.dataAdmissao },
     {
-      key: "vigencia",
-      header: "Vigência",
-      cell: (linha) => formatarVigenciaColaborador(linha),
+      key: "desligamento",
+      header: "Desligamento",
+      cell: (v) => v.dataDesligamento ?? "—",
     },
   ];
 
@@ -142,8 +568,12 @@ export function ColaboradoresScreen() {
         headingLevel={1}
         titleId={COLABORADORES_TITULO_ID}
         title="Colaboradores"
-        description="Visão administrativa demonstrativa que organiza o ecossistema para o futuro cadastro e vínculo de pessoas — apenas referências técnicas e situação de cada registro, nunca dado pessoal real."
-        actions={<Button onClick={abrirNovo}>Novo colaborador</Button>}
+        description="Administre a admissão e o cadastro de colaboradores da sua empresa. Situação, vínculo e lotação seguem sempre a fonte de verdade do backend."
+        actions={
+          <Button onClick={() => void abrirFormulario()}>
+            Novo colaborador
+          </Button>
+        }
       />
 
       <Surface
@@ -152,14 +582,14 @@ export function ColaboradoresScreen() {
         className="colaboradores-screen__aviso"
         aria-labelledby="colaboradores-aviso-rh-titulo"
       >
-        <StatusBadge variant="info">Somente RH</StatusBadge>
+        <StatusBadge variant="info">RH e DP</StatusBadge>
         <p
           id="colaboradores-aviso-rh-titulo"
           className="colaboradores-screen__aviso-texto"
         >
-          Somente o RH da própria empresa administra colaboradores nesta
-          demonstração. Nenhuma alteração feita aqui é persistida — é uma
-          amostra visual, sempre restrita à sua empresa.
+          Este cadastro é operado exclusivamente pelo RH e DP da própria
+          empresa. Admissão, consulta e alteração de nome aqui geram trilha de
+          auditoria automática.
         </p>
       </Surface>
 
@@ -174,47 +604,13 @@ export function ColaboradoresScreen() {
           id="colaboradores-aviso-indisponivel-titulo"
           className="colaboradores-screen__aviso-texto"
         >
-          CPF, documentos, admissão real, Folha, eSocial e upload de arquivos
-          ainda não estão disponíveis nesta demonstração.
+          Transferência, mudança de cargo, desligamento, reclassificação de
+          vínculo, Folha, documentos, benefícios, dependentes, afastamentos e
+          Banco de Horas ainda não têm operação nesta tela.
         </p>
       </Surface>
 
-      <section
-        aria-labelledby="colaboradores-demo-titulo"
-        className="colaboradores-screen__demo"
-      >
-        <h2
-          id="colaboradores-demo-titulo"
-          className="colaboradores-screen__section-title"
-        >
-          Estado de demonstração
-        </h2>
-        <p className="colaboradores-screen__demo-texto">
-          Alterna a amostra visual exibida abaixo — não representa uma chamada
-          real à API.
-        </p>
-        <div
-          role="group"
-          aria-label="Selecionar estado de demonstração da listagem"
-          className="colaboradores-screen__demo-botoes"
-        >
-          {(Object.keys(ROTULO_ESTADO_DEMO) as EstadoDemonstracao[]).map(
-            (chave) => (
-              <Button
-                key={chave}
-                type="button"
-                variant={estadoDemo === chave ? "primary" : "secondary"}
-                aria-pressed={estadoDemo === chave}
-                onClick={() => setEstadoDemo(chave)}
-              >
-                {ROTULO_ESTADO_DEMO[chave]}
-              </Button>
-            ),
-          )}
-        </div>
-      </section>
-
-      {estadoDemo === "erro" ? (
+      {statusCarregamento === "erro" ? (
         <Surface
           as="section"
           padding="lg"
@@ -229,13 +625,15 @@ export function ColaboradoresScreen() {
             Não foi possível carregar os colaboradores
           </h2>
           <p>
-            Tente novamente em instantes. Se o problema persistir, contate o
-            suporte informando a referência abaixo.
+            Verifique sua conexão e tente novamente. Se o problema persistir,
+            contate o suporte.
           </p>
-          <p className="colaboradores-screen__erro-referencia">
-            Referência: <code>REQ-DEMO-000912</code> (ilustrativa)
-          </p>
-          <Button variant="secondary" onClick={() => setEstadoDemo("dados")}>
+          <Button
+            variant="secondary"
+            onClick={() =>
+              void carregarDados(filtroSituacao, filtroSituacaoVinculo)
+            }
+          >
             Tentar novamente
           </Button>
         </Surface>
@@ -253,92 +651,174 @@ export function ColaboradoresScreen() {
               {(control) => (
                 <select
                   value={filtroSituacao}
-                  onChange={(evento) => setFiltroSituacao(evento.target.value)}
+                  onChange={(e) =>
+                    setFiltroSituacao(e.target.value as FiltroSituacao)
+                  }
+                  disabled={statusCarregamento === "carregando"}
                   {...control}
                 >
-                  <option value={OPCAO_TODOS}>Todas as situações</option>
-                  {(
-                    Object.keys(
-                      ROTULO_SITUACAO_COLABORADOR,
-                    ) as SituacaoColaborador[]
-                  ).map((situacao) => (
-                    <option key={situacao} value={situacao}>
-                      {ROTULO_SITUACAO_COLABORADOR[situacao]}
-                    </option>
-                  ))}
+                  <option value="todos">Todas as situações</option>
+                  <option value="ativo">Ativo</option>
+                  <option value="inativo">Inativo</option>
                 </select>
               )}
             </FormField>
 
             <FormField
-              id="colaboradores-filtro-tipo-vinculo"
-              label="Tipo de vínculo"
+              id="colaboradores-filtro-situacao-vinculo"
+              label="Situação do vínculo"
             >
               {(control) => (
                 <select
-                  value={filtroTipoVinculo}
-                  onChange={(evento) =>
-                    setFiltroTipoVinculo(evento.target.value)
+                  value={filtroSituacaoVinculo}
+                  onChange={(e) =>
+                    setFiltroSituacaoVinculo(
+                      e.target.value as FiltroSituacaoVinculo,
+                    )
                   }
+                  disabled={statusCarregamento === "carregando"}
                   {...control}
                 >
-                  <option value={OPCAO_TODOS}>Todos os tipos</option>
-                  {(
-                    Object.keys(ROTULO_TIPO_VINCULO) as TipoVinculoColaborador[]
-                  ).map((tipo) => (
-                    <option key={tipo} value={tipo}>
-                      {ROTULO_TIPO_VINCULO[tipo]}
-                    </option>
-                  ))}
+                  <option value="todos">Todas</option>
+                  <option value="previsto">Previsto</option>
+                  <option value="ativo">Ativo</option>
+                  <option value="encerrado">Encerrado</option>
                 </select>
               )}
             </FormField>
-
-            <Button
-              variant="subtle"
-              onClick={limparFiltros}
-              disabled={!filtrosAtivos}
-            >
-              Limpar filtros
-            </Button>
           </div>
-          <p className="colaboradores-screen__filtros-nota">
-            Filtro só local, apenas para esta demonstração — não é enviado a
-            nenhum servidor nem fica salvo ao recarregar a página.
-          </p>
 
-          {colaboradoresBase.length === 0 ? (
+          {statusCarregamento === "carregando" ? (
+            <p className="colaboradores-screen__carregando" role="status">
+              Carregando colaboradores…
+            </p>
+          ) : colaboradores.length === 0 ? (
             <EmptyState
               headingLevel={3}
               icon="—"
               title="Nenhum colaborador cadastrado"
-              description="Quando houver um colaborador registrado para esta empresa, ele aparece aqui (exemplo)."
-              action={<Button onClick={abrirNovo}>Novo colaborador</Button>}
-            />
-          ) : colaboradoresFiltrados.length === 0 ? (
-            <EmptyState
-              headingLevel={3}
-              icon="—"
-              title="Nenhum colaborador corresponde aos filtros"
-              description="Ajuste ou limpe os filtros para ver os demais colaboradores desta demonstração."
+              description="Registre a admissão do primeiro colaborador desta empresa."
               action={
-                <Button variant="primary" onClick={limparFiltros}>
-                  Limpar filtros
+                <Button onClick={() => void abrirFormulario()}>
+                  Novo colaborador
                 </Button>
               }
             />
           ) : (
             <DataTable
               caption="Colaboradores desta empresa"
-              columns={colunas}
-              rows={colaboradoresFiltrados}
-              rowKey={(linha) => linha.id}
+              columns={colunasColaboradores}
+              rows={colaboradores}
+              rowKey={(c) => c.id}
             />
           )}
         </section>
       )}
 
-      {formularioAberto ? (
+      {detalhe ? (
+        <Surface
+          as="section"
+          padding="lg"
+          className="colaboradores-screen__formulario"
+          aria-labelledby={detalheTituloId}
+        >
+          <h2
+            id={detalheTituloId}
+            className="colaboradores-screen__section-title"
+          >
+            {detalhe.colaborador.nome}
+          </h2>
+          <p>
+            <StatusBadge
+              variant={
+                VARIANTE_SITUACAO_COLABORADOR[detalhe.colaborador.situacao] ??
+                "neutral"
+              }
+            >
+              {detalhe.colaborador.situacao === "ativo" ? "Ativo" : "Inativo"}
+            </StatusBadge>
+          </p>
+          <p className="colaboradores-screen__aviso-texto">
+            Matrícula, tipo de vínculo e data de admissão são imutáveis nesta
+            tela. Apenas o nome pode ser corrigido abaixo.
+          </p>
+
+          <div className="colaboradores-screen__edicao-nome">
+            <FormField
+              id="colaboradores-detalhe-nome"
+              label="Nome"
+              {...(detalhe.erroNome ? { error: detalhe.erroNome } : {})}
+            >
+              {(control) => (
+                <input
+                  type="text"
+                  maxLength={160}
+                  value={detalhe.nomeEdicao}
+                  onChange={(e) =>
+                    setDetalhe((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            nomeEdicao: e.target.value,
+                            erroNome: null,
+                          }
+                        : prev,
+                    )
+                  }
+                  {...control}
+                />
+              )}
+            </FormField>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => void handleSalvarNome()}
+              disabled={
+                detalhe.salvandoNome ||
+                detalhe.nomeEdicao.trim() === detalhe.colaborador.nome
+              }
+            >
+              {detalhe.salvandoNome ? "Salvando…" : "Salvar nome"}
+            </Button>
+          </div>
+
+          <div className="colaboradores-screen__vinculos">
+            <h3 className="colaboradores-screen__section-title">Vínculos</h3>
+            {detalhe.statusVinculos === "carregando" ? (
+              <p className="colaboradores-screen__carregando" role="status">
+                Carregando vínculos…
+              </p>
+            ) : detalhe.statusVinculos === "erro" ? (
+              <p className="colaboradores-screen__form-erro" role="alert">
+                Não foi possível carregar os vínculos deste colaborador.{" "}
+                <Button
+                  variant="secondary"
+                  onClick={() => void carregarVinculos(detalhe.colaborador.id)}
+                >
+                  Tentar novamente
+                </Button>
+              </p>
+            ) : detalhe.vinculos.length === 0 ? (
+              <p>Nenhum vínculo encontrado.</p>
+            ) : (
+              <DataTable
+                caption={`Vínculos — ${detalhe.colaborador.nome}`}
+                columns={colunasVinculos}
+                rows={detalhe.vinculos}
+                rowKey={(v) => v.id}
+              />
+            )}
+          </div>
+
+          <FormActions>
+            <Button variant="secondary" type="button" onClick={fecharDetalhe}>
+              Fechar
+            </Button>
+          </FormActions>
+        </Surface>
+      ) : null}
+
+      {formulario ? (
         <Surface
           as="section"
           padding="lg"
@@ -348,93 +828,277 @@ export function ColaboradoresScreen() {
           <h2 id={formTituloId} className="colaboradores-screen__section-title">
             Novo colaborador
           </h2>
-          <p className="colaboradores-screen__demo-texto">
-            Demonstração visual: nada é criado, salvo ou realmente alterado ao
-            confirmar. CPF, documentos, admissão real, Folha, eSocial e upload
-            ainda não estão disponíveis.
+          <p className="colaboradores-screen__aviso-texto">
+            A admissão cria o colaborador e o primeiro vínculo em conjunto.
+            Matrícula, tipo de vínculo, data de admissão e lotação inicial são
+            imutáveis nesta tela — corrija apenas o nome depois, se necessário.
           </p>
 
           <form
             className="colaboradores-screen__form"
             aria-label="Formulário de novo colaborador"
-            onSubmit={(evento) => {
-              evento.preventDefault();
-              setConfirmacaoVisivel(true);
-            }}
+            onSubmit={(e) => void handleSubmit(e)}
           >
             <FormField
-              id="colaborador-tipo-vinculo"
+              id="colaboradores-nome"
+              label="Nome completo"
+              required
+              help="2 a 160 caracteres."
+              {...(formulario.erros.nome
+                ? { error: formulario.erros.nome }
+                : {})}
+            >
+              {(control) => (
+                <input
+                  type="text"
+                  maxLength={160}
+                  value={formulario.nome}
+                  onChange={(e) =>
+                    setFormulario((prev) =>
+                      prev
+                        ? { ...prev, nome: e.target.value, erros: {} }
+                        : prev,
+                    )
+                  }
+                  {...control}
+                />
+              )}
+            </FormField>
+
+            {formulario.empresas.length > 1 ? (
+              <FormField
+                id="colaboradores-empresa"
+                label="Empresa"
+                required
+                {...(formulario.erros.empresaId
+                  ? { error: formulario.erros.empresaId }
+                  : {})}
+              >
+                {(control) => (
+                  <select
+                    value={formulario.empresaId}
+                    onChange={(e) =>
+                      setFormulario((prev) =>
+                        prev
+                          ? { ...prev, empresaId: e.target.value, erros: {} }
+                          : prev,
+                      )
+                    }
+                    {...control}
+                  >
+                    <option value="">Selecione…</option>
+                    {formulario.empresas.map((empresa) => (
+                      <option key={empresa.id} value={empresa.id}>
+                        {empresa.nome}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </FormField>
+            ) : null}
+
+            <FormField
+              id="colaboradores-matricula"
+              label="Matrícula"
+              required
+              help="Letras maiúsculas, números, - e _ (2 a 32 caracteres)."
+              {...(formulario.erros.matricula
+                ? { error: formulario.erros.matricula }
+                : {})}
+            >
+              {(control) => (
+                <input
+                  type="text"
+                  maxLength={32}
+                  value={formulario.matricula}
+                  onChange={(e) =>
+                    setFormulario((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            matricula: e.target.value.toUpperCase(),
+                            erros: {},
+                          }
+                        : prev,
+                    )
+                  }
+                  {...control}
+                />
+              )}
+            </FormField>
+
+            <FormField
+              id="colaboradores-tipo-vinculo"
               label="Tipo de vínculo"
               required
+              {...(formulario.erros.tipo
+                ? { error: formulario.erros.tipo }
+                : {})}
             >
               {(control) => (
-                <select defaultValue="" {...control}>
-                  <option value="" disabled>
-                    Selecione…
-                  </option>
-                  {(
-                    Object.keys(ROTULO_TIPO_VINCULO) as TipoVinculoColaborador[]
-                  ).map((tipo) => (
-                    <option key={tipo} value={tipo}>
-                      {ROTULO_TIPO_VINCULO[tipo]}
+                <select
+                  value={formulario.tipo}
+                  onChange={(e) =>
+                    setFormulario((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            tipo: e.target.value as TipoVinculo,
+                            erros: {},
+                          }
+                        : prev,
+                    )
+                  }
+                  {...control}
+                >
+                  <option value="">Selecione…</option>
+                  {(Object.keys(ROTULO_TIPO_VINCULO) as TipoVinculo[]).map(
+                    (tipo) => (
+                      <option key={tipo} value={tipo}>
+                        {ROTULO_TIPO_VINCULO[tipo]}
+                      </option>
+                    ),
+                  )}
+                </select>
+              )}
+            </FormField>
+
+            <FormField
+              id="colaboradores-data-admissao"
+              label="Data de admissão"
+              required
+              {...(formulario.erros.dataAdmissao
+                ? { error: formulario.erros.dataAdmissao }
+                : {})}
+            >
+              {(control) => (
+                <input
+                  type="date"
+                  value={formulario.dataAdmissao}
+                  onChange={(e) =>
+                    setFormulario((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            dataAdmissao: e.target.value,
+                            erros: {},
+                          }
+                        : prev,
+                    )
+                  }
+                  {...control}
+                />
+              )}
+            </FormField>
+
+            <FormField
+              id="colaboradores-tipo-destino"
+              label="Tipo de lotação inicial"
+              required
+              help="Ao menos uma referência organizacional é exigida para efetivar a admissão."
+              {...(formulario.erros.destino
+                ? { error: formulario.erros.destino }
+                : {})}
+            >
+              {(control) => (
+                <select
+                  value={formulario.tipoDestino}
+                  onChange={(e) =>
+                    selecionarTipoDestino(e.target.value as TipoDestino)
+                  }
+                  disabled={formulario.carregandoOpcoes}
+                  {...control}
+                >
+                  <option value="">Selecione…</option>
+                  {OPCOES_TIPO_DESTINO.map((opcao) => (
+                    <option key={opcao.valor} value={opcao.valor}>
+                      {opcao.rotulo}
                     </option>
                   ))}
                 </select>
               )}
             </FormField>
 
-            <FormField
-              id="colaborador-unidade"
-              label="Unidade/departamento"
-              required
-              help="Rótulo de exemplo — a estrutura organizacional real ainda não está disponível nesta demonstração."
-            >
-              {(control) => (
-                <select defaultValue="" {...control}>
-                  <option value="" disabled>
-                    Selecione…
-                  </option>
-                  {UNIDADES_EXEMPLO.map((unidade) => (
-                    <option key={unidade} value={unidade}>
-                      {unidade}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </FormField>
+            {formulario.tipoDestino === "area" ? (
+              <FormField
+                id="colaboradores-departamento-area"
+                label="Departamento"
+                required
+              >
+                {(control) => (
+                  <select
+                    value={formulario.departamentoIdArea}
+                    onChange={(e) =>
+                      void selecionarDepartamentoArea(e.target.value)
+                    }
+                    {...control}
+                  >
+                    <option value="">Selecione…</option>
+                    {formulario.departamentos.map((dep) => (
+                      <option key={dep.id} value={dep.id}>
+                        {dep.codigo} — {dep.nome}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </FormField>
+            ) : null}
 
-            <FormField
-              id="colaborador-vigencia-inicio"
-              label="Vigência — início"
-              required
-              help="Data ilustrativa de início do vínculo nesta demonstração."
-            >
-              {(control) => <input type="date" {...control} />}
-            </FormField>
+            {formulario.tipoDestino ? (
+              <FormField
+                id="colaboradores-destino"
+                label={rotuloDestinoAtual}
+                required
+              >
+                {(control) => (
+                  <select
+                    value={formulario.destinoId}
+                    onChange={(e) =>
+                      setFormulario((prev) =>
+                        prev
+                          ? { ...prev, destinoId: e.target.value, erros: {} }
+                          : prev,
+                      )
+                    }
+                    disabled={
+                      formulario.tipoDestino === "area" &&
+                      (!formulario.departamentoIdArea ||
+                        formulario.carregandoAreas)
+                    }
+                    {...control}
+                  >
+                    <option value="">Selecione…</option>
+                    {opcoesDestinoAtuais.map((opcao) => (
+                      <option key={opcao.id} value={opcao.id}>
+                        {opcao.rotulo}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </FormField>
+            ) : null}
 
-            <FormField
-              id="colaborador-vigencia-exemplo-erro"
-              label="Vigência — início (exemplo de validação)"
-              error="Informe uma data no formato AAAA-MM-DD."
-            >
-              {(control) => (
-                <input type="text" defaultValue="31/02/2026" {...control} />
-              )}
-            </FormField>
-
-            {confirmacaoVisivel ? (
-              <p className="colaboradores-screen__confirmacao" role="status">
-                Ação apenas demonstrativa: nenhum colaborador foi realmente
-                criado, salvo ou alterado.
+            {formulario.erros.geral ? (
+              <p className="colaboradores-screen__form-erro" role="alert">
+                {formulario.erros.geral}
               </p>
             ) : null}
 
             <FormActions>
-              <Button variant="secondary" onClick={fecharFormulario}>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={fecharFormulario}
+                disabled={formulario.salvando}
+              >
                 Cancelar
               </Button>
-              <Button type="submit" variant="primary">
-                Confirmar (demonstração)
+              <Button
+                type="submit"
+                variant="primary"
+                disabled={formulario.salvando || formulario.carregandoOpcoes}
+              >
+                {formulario.salvando ? "Admitindo…" : "Admitir colaborador"}
               </Button>
             </FormActions>
           </form>
