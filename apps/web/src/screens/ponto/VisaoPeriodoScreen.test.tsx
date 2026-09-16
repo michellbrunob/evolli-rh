@@ -21,9 +21,19 @@ import {
   registrarAjustePonto,
   registrarPonto,
 } from "../../api/pontoClient";
+import {
+  type TabelaHorarioApi,
+  buscarTabelaHorario,
+} from "../../api/horariosClient";
+import {
+  type VinculoHorarioApi,
+  listarVinculosHorario,
+} from "../../api/vinculoHorarioClient";
 
 vi.mock("../../api/colaboradoresClient");
 vi.mock("../../api/pontoClient");
+vi.mock("../../api/horariosClient");
+vi.mock("../../api/vinculoHorarioClient");
 
 interface Paginado<T> {
   itens: T[];
@@ -132,6 +142,66 @@ const detalheAjustado: EventoPontoDetalhadoApi = {
   ],
 };
 
+const tabelaComercial: TabelaHorarioApi = {
+  id: "th111111-1111-1111-1111-111111111111",
+  empresaId: vinculo1.empresaId,
+  nome: "Tabela Comercial (teste)",
+  ativo: true,
+  criadoPorUserId: "u0000000-0000-0000-0000-000000000000",
+  criadoEm: "2025-01-01T12:00:00.000Z",
+  atualizadoEm: "2025-01-01T12:00:00.000Z",
+  periodos: [{ dia: "segunda", inicio: "08:00", fim: "17:00" }],
+};
+
+const tabelaMeioPeriodo: TabelaHorarioApi = {
+  id: "th222222-2222-2222-2222-222222222222",
+  empresaId: vinculo1.empresaId,
+  nome: "Tabela Meio Período (teste)",
+  ativo: true,
+  criadoPorUserId: "u0000000-0000-0000-0000-000000000000",
+  criadoEm: "2025-01-01T12:00:00.000Z",
+  atualizadoEm: "2025-01-01T12:00:00.000Z",
+  periodos: [{ dia: "segunda", inicio: "08:00", fim: "12:00" }],
+};
+
+/** Vigência aberta, cobre qualquer competência a partir de 2026-01. */
+const vinculoHorarioAberto: VinculoHorarioApi = {
+  id: "vh111111-1111-1111-1111-111111111111",
+  colaboradorId: colaborador1.id,
+  empresaId: vinculo1.empresaId,
+  tabelaHorarioId: tabelaComercial.id,
+  vigenciaInicio: "2026-01-01",
+  vigenciaFim: null,
+  criadoPorUserId: "u0000000-0000-0000-0000-000000000000",
+  criadoEm: "2026-01-01T12:00:00.000Z",
+  atualizadoEm: "2026-01-01T12:00:00.000Z",
+};
+
+/** Duas vigências que se sobrepõem à competência 2026-03 (troca no meio do mês). */
+const vinculoHorarioAntesDaTroca: VinculoHorarioApi = {
+  id: "vh222222-2222-2222-2222-222222222222",
+  colaboradorId: colaborador1.id,
+  empresaId: vinculo1.empresaId,
+  tabelaHorarioId: tabelaComercial.id,
+  vigenciaInicio: "2025-06-01",
+  vigenciaFim: "2026-03-15",
+  criadoPorUserId: "u0000000-0000-0000-0000-000000000000",
+  criadoEm: "2025-06-01T12:00:00.000Z",
+  atualizadoEm: "2026-03-15T12:00:00.000Z",
+};
+
+const vinculoHorarioDepoisDaTroca: VinculoHorarioApi = {
+  id: "vh333333-3333-3333-3333-333333333333",
+  colaboradorId: colaborador1.id,
+  empresaId: vinculo1.empresaId,
+  tabelaHorarioId: tabelaMeioPeriodo.id,
+  vigenciaInicio: "2026-03-15",
+  vigenciaFim: null,
+  criadoPorUserId: "u0000000-0000-0000-0000-000000000000",
+  criadoEm: "2026-03-15T12:00:00.000Z",
+  atualizadoEm: "2026-03-15T12:00:00.000Z",
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(listarColaboradores).mockResolvedValue(
@@ -148,6 +218,14 @@ beforeEach(() => {
   vi.mocked(registrarAjustePonto).mockResolvedValue(
     detalheAjustado.ajustes[0]!,
   );
+  vi.mocked(listarVinculosHorario).mockResolvedValue(
+    paginado([vinculoHorarioAberto]),
+  );
+  vi.mocked(buscarTabelaHorario).mockImplementation(async (id) => {
+    if (id === tabelaComercial.id) return tabelaComercial;
+    if (id === tabelaMeioPeriodo.id) return tabelaMeioPeriodo;
+    throw new Error("tabela não encontrada (teste)");
+  });
 });
 
 async function aguardarLista() {
@@ -592,5 +670,303 @@ describe("VisaoPeriodoScreen (T113 — funcional)", () => {
     ]) {
       expect(texto).not.toContain(termoProibido);
     }
+  });
+
+  describe("Ver horários de referência (T114 — somente leitura)", () => {
+    async function selecionarVinculoECompetencia(
+      vinculoId: string,
+      competencia: string,
+    ) {
+      fireEvent.change(screen.getByLabelText("Vínculo"), {
+        target: { value: vinculoId },
+      });
+      fireEvent.change(screen.getByLabelText("Competência"), {
+        target: { value: competencia },
+      });
+      // Trocar os filtros recarrega a listagem de marcações (passa por
+      // "carregando"), o que desabilita o botão momentaneamente — espera
+      // assentar antes de agir sobre ele.
+      await waitFor(() =>
+        expect(
+          screen.getByRole("button", { name: "Ver horários de referência" }),
+        ).not.toBeDisabled(),
+      );
+    }
+
+    it("o botão fica desabilitado sem vínculo específico e competência selecionados", async () => {
+      render(<VisaoPeriodoScreen />);
+      await aguardarLista();
+
+      expect(
+        screen.getByRole("button", { name: "Ver horários de referência" }),
+      ).toBeDisabled();
+      expect(
+        screen.getByText(/Selecione um vínculo específico e uma competência/i),
+      ).toBeInTheDocument();
+
+      // Só vínculo, sem competência: continua desabilitado (sem seleção
+      // silenciosa de "hoje" nem de "o mais recente").
+      fireEvent.change(screen.getByLabelText("Vínculo"), {
+        target: { value: vinculo1.id },
+      });
+      await waitFor(() => expect(listarPontos).toHaveBeenCalledTimes(2));
+      expect(
+        screen.getByRole("button", { name: "Ver horários de referência" }),
+      ).toBeDisabled();
+
+      // Vínculo + competência: habilita.
+      fireEvent.change(screen.getByLabelText("Competência"), {
+        target: { value: "2026-03" },
+      });
+      await waitFor(() =>
+        expect(
+          screen.getByRole("button", { name: "Ver horários de referência" }),
+        ).not.toBeDisabled(),
+      );
+    });
+
+    it("relaciona o vínculo selecionado ao colaborador autorizado ao consultar", async () => {
+      render(<VisaoPeriodoScreen />);
+      await aguardarLista();
+      await selecionarVinculoECompetencia(vinculo1.id, "2026-03");
+
+      fireEvent.click(
+        screen.getByRole("button", { name: "Ver horários de referência" }),
+      );
+
+      await waitFor(() =>
+        expect(listarVinculosHorario).toHaveBeenCalledWith({
+          colaboradorId: colaborador1.id,
+          tamanhoPagina: 100,
+        }),
+      );
+    });
+
+    it("abre o painel e mostra a tabela de horário, vigência e períodos projetados", async () => {
+      render(<VisaoPeriodoScreen />);
+      await aguardarLista();
+      await selecionarVinculoECompetencia(vinculo1.id, "2026-03");
+      fireEvent.click(
+        screen.getByRole("button", { name: "Ver horários de referência" }),
+      );
+
+      await screen.findByRole("heading", {
+        name: /Horários de referência/,
+      });
+      expect(screen.getByText("Tabela Comercial (teste)")).toBeInTheDocument();
+      expect(
+        screen.getByText(/Vigência: 2026-01-01 – vigente/),
+      ).toBeInTheDocument();
+
+      const tabelaPeriodos = screen.getByRole("table", {
+        name: "Períodos — Tabela Comercial (teste)",
+      });
+      expect(
+        within(tabelaPeriodos).getByText("Segunda-feira"),
+      ).toBeInTheDocument();
+      expect(within(tabelaPeriodos).getByText("08:00")).toBeInTheDocument();
+      expect(within(tabelaPeriodos).getByText("17:00")).toBeInTheDocument();
+
+      // Referência única: sem nota de múltiplas vigências.
+      expect(
+        screen.queryByText(/Mais de uma tabela de horário vigorou/),
+      ).not.toBeInTheDocument();
+    });
+
+    it("mostra o estado de carregamento do painel antes dos dados chegarem", async () => {
+      let resolver: (v: Paginado<VinculoHorarioApi>) => void;
+      vi.mocked(listarVinculosHorario).mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolver = resolve;
+        }) as ReturnType<typeof listarVinculosHorario>,
+      );
+
+      render(<VisaoPeriodoScreen />);
+      await aguardarLista();
+      await selecionarVinculoECompetencia(vinculo1.id, "2026-03");
+      fireEvent.click(
+        screen.getByRole("button", { name: "Ver horários de referência" }),
+      );
+
+      expect(
+        screen.getByText("Carregando horários de referência…"),
+      ).toBeInTheDocument();
+
+      resolver!(paginado([vinculoHorarioAberto]));
+      await screen.findByText("Tabela Comercial (teste)");
+    });
+
+    it("mostra erro no painel e permite tentar novamente", async () => {
+      vi.mocked(listarVinculosHorario).mockRejectedValueOnce(
+        new Error("falha"),
+      );
+
+      render(<VisaoPeriodoScreen />);
+      await aguardarLista();
+      await selecionarVinculoECompetencia(vinculo1.id, "2026-03");
+      fireEvent.click(
+        screen.getByRole("button", { name: "Ver horários de referência" }),
+      );
+
+      expect(
+        await screen.findByText(
+          "Não foi possível carregar os horários de referência.",
+        ),
+      ).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
+      await screen.findByText("Tabela Comercial (teste)");
+    });
+
+    it("indica claramente quando não há horário de referência aplicável à competência", async () => {
+      // Vigência encerrada bem antes de março — não sobrepõe a competência.
+      vi.mocked(listarVinculosHorario).mockResolvedValue(
+        paginado([
+          {
+            ...vinculoHorarioAberto,
+            vigenciaInicio: "2024-01-01",
+            vigenciaFim: "2024-06-01",
+          },
+        ]),
+      );
+
+      render(<VisaoPeriodoScreen />);
+      await aguardarLista();
+      await selecionarVinculoECompetencia(vinculo1.id, "2026-03");
+      fireEvent.click(
+        screen.getByRole("button", { name: "Ver horários de referência" }),
+      );
+
+      expect(
+        await screen.findByText(
+          "Nenhum horário de referência aplicável a esta competência.",
+        ),
+      ).toBeInTheDocument();
+    });
+
+    it("mostra múltiplas vigências em ordem cronológica quando há troca dentro da competência", async () => {
+      vi.mocked(listarVinculosHorario).mockResolvedValue(
+        paginado([vinculoHorarioDepoisDaTroca, vinculoHorarioAntesDaTroca]),
+      );
+
+      render(<VisaoPeriodoScreen />);
+      await aguardarLista();
+      await selecionarVinculoECompetencia(vinculo1.id, "2026-03");
+      fireEvent.click(
+        screen.getByRole("button", { name: "Ver horários de referência" }),
+      );
+
+      await screen.findByText(/Mais de uma tabela de horário vigorou/);
+
+      const titulos = screen
+        .getAllByRole("heading", { level: 3 })
+        .map((h) => h.textContent);
+      const posicaoComercial = titulos.findIndex((t) =>
+        t?.includes("Tabela Comercial (teste)"),
+      );
+      const posicaoMeioPeriodo = titulos.findIndex((t) =>
+        t?.includes("Tabela Meio Período (teste)"),
+      );
+      expect(posicaoComercial).toBeGreaterThanOrEqual(0);
+      expect(posicaoMeioPeriodo).toBeGreaterThan(posicaoComercial);
+
+      expect(
+        screen.getByText(/Vigência: 2025-06-01 – 2026-03-15/),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/Vigência: 2026-03-15 – vigente/),
+      ).toBeInTheDocument();
+    });
+
+    it("declara explicitamente que é referência de consulta, sem mutação", async () => {
+      render(<VisaoPeriodoScreen />);
+      await aguardarLista();
+      await selecionarVinculoECompetencia(vinculo1.id, "2026-03");
+      fireEvent.click(
+        screen.getByRole("button", { name: "Ver horários de referência" }),
+      );
+
+      const aviso = await screen.findByText(
+        /não corrige marcação, não calcula jornada, tolerância, horas extras, faltas ou DSR, não gera ajuste, não fecha período e não altera saldo, Banco de Horas ou Folha/,
+      );
+      expect(aviso).toBeInTheDocument();
+    });
+
+    it("painel é somente leitura: sem campos de entrada, só Fechar", async () => {
+      render(<VisaoPeriodoScreen />);
+      await aguardarLista();
+      await selecionarVinculoECompetencia(vinculo1.id, "2026-03");
+      fireEvent.click(
+        screen.getByRole("button", { name: "Ver horários de referência" }),
+      );
+
+      const painel = (
+        await screen.findByRole("heading", { name: /Horários de referência/ })
+      ).closest("section")!;
+      expect(within(painel).queryAllByRole("textbox")).toHaveLength(0);
+      expect(within(painel).queryAllByRole("combobox")).toHaveLength(0);
+      expect(within(painel).getAllByRole("button")).toHaveLength(1);
+      expect(
+        within(painel).getByRole("button", { name: "Fechar" }),
+      ).toBeInTheDocument();
+      expect(
+        within(painel).queryByRole("button", { name: "Registrar marcação" }),
+      ).not.toBeInTheDocument();
+      expect(
+        within(painel).queryByRole("button", { name: "Registrar ajuste" }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("fecha o painel de referência", async () => {
+      render(<VisaoPeriodoScreen />);
+      await aguardarLista();
+      await selecionarVinculoECompetencia(vinculo1.id, "2026-03");
+      fireEvent.click(
+        screen.getByRole("button", { name: "Ver horários de referência" }),
+      );
+      await screen.findByRole("heading", { name: /Horários de referência/ });
+
+      fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
+      expect(
+        screen.queryByRole("heading", { name: /Horários de referência/ }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("abrir o formulário de registro fecha o painel de referência aberto", async () => {
+      render(<VisaoPeriodoScreen />);
+      await aguardarLista();
+      await selecionarVinculoECompetencia(vinculo1.id, "2026-03");
+      fireEvent.click(
+        screen.getByRole("button", { name: "Ver horários de referência" }),
+      );
+      await screen.findByRole("heading", { name: /Horários de referência/ });
+
+      fireEvent.click(
+        screen.getByRole("button", { name: "Registrar marcação" }),
+      );
+      expect(
+        screen.queryByRole("heading", { name: /Horários de referência/ }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("abrir o painel de referência fecha um detalhe de marcação aberto", async () => {
+      render(<VisaoPeriodoScreen />);
+      await aguardarLista();
+      const linha = screen.getByText("Original").closest("tr")!;
+      fireEvent.click(
+        within(linha).getByRole("button", { name: /Ver detalhes/ }),
+      );
+      await screen.findByRole("heading", { name: "Detalhe da marcação" });
+      await screen.findByText("Registro original");
+
+      await selecionarVinculoECompetencia(vinculo1.id, "2026-03");
+      fireEvent.click(
+        screen.getByRole("button", { name: "Ver horários de referência" }),
+      );
+
+      expect(
+        screen.queryByRole("heading", { name: "Detalhe da marcação" }),
+      ).not.toBeInTheDocument();
+    });
   });
 });

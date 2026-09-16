@@ -23,6 +23,11 @@ import {
   listarVinculosDoColaborador,
 } from "../../api/colaboradoresClient";
 import {
+  type PeriodoApi,
+  type TabelaHorarioApi,
+  buscarTabelaHorario,
+} from "../../api/horariosClient";
+import {
   type AjustePontoApi,
   type EventoPontoApi,
   type EventoPontoDetalhadoApi,
@@ -35,6 +40,10 @@ import {
   registrarAjustePonto,
   registrarPonto,
 } from "../../api/pontoClient";
+import {
+  type VinculoHorarioApi,
+  listarVinculosHorario,
+} from "../../api/vinculoHorarioClient";
 import "./VisaoPeriodoScreen.css";
 
 export const VISAO_PERIODO_TITULO_ID = "visao-periodo-titulo";
@@ -61,10 +70,60 @@ const ROTULO_MOTIVO: Record<string, string> = Object.fromEntries(
   MOTIVOS_AJUSTE.map(({ valor, rotulo }) => [valor, rotulo]),
 );
 
+const ROTULO_DIA: Record<string, string> = {
+  segunda: "Segunda-feira",
+  terca: "Terça-feira",
+  quarta: "Quarta-feira",
+  quinta: "Quinta-feira",
+  sexta: "Sexta-feira",
+  sabado: "Sábado",
+  domingo: "Domingo",
+};
+
 type FiltroTipo = "todos" | TipoEventoPonto;
 
 interface VinculoComColaborador extends VinculoApi {
   nomeColaborador: string;
+}
+
+interface VinculoHorarioComTabela extends VinculoHorarioApi {
+  tabela: TabelaHorarioApi | null;
+}
+
+interface ReferenciaHorarioState {
+  vinculoId: string;
+  competencia: string;
+  status: "carregando" | "erro" | "dados";
+  itens: VinculoHorarioComTabela[];
+}
+
+/**
+ * Limites `[inicio, fim)` (ISO `AAAA-MM-DD`) da competência `AAAA-MM` — mesma
+ * semântica de intervalo semiaberto usada pelo backend para vigência.
+ */
+function limitesCompetencia(competencia: string): {
+  inicio: string;
+  fim: string;
+} {
+  const [anoStr, mesStr] = competencia.split("-");
+  const ano = Number(anoStr);
+  const mes = Number(mesStr);
+  const inicio = `${anoStr}-${mesStr}-01`;
+  const fim = new Date(Date.UTC(ano, mes, 1)).toISOString().slice(0, 10);
+  return { inicio, fim };
+}
+
+/** Um vínculo de horário se sobrepõe à competência se seu intervalo de
+ * vigência `[vigenciaInicio, vigenciaFim)` intersecta `[inicio, fim)`. */
+function vigenciaSeSobrepoe(
+  v: VinculoHorarioApi,
+  inicio: string,
+  fim: string,
+): boolean {
+  const comecaAntesDoFim = v.vigenciaInicio < fim;
+  const terminaDepoisDoInicio =
+    v.vigenciaFim === null || v.vigenciaFim > inicio;
+  return comecaAntesDoFim && terminaDepoisDoInicio;
 }
 
 /** ISO → "AAAA-MM-DD HH:MM" (fatiado em UTC, estável e sem dependência de locale). */
@@ -124,8 +183,11 @@ export function VisaoPeriodoScreen() {
   const [filtroTipo, setFiltroTipo] = useState<FiltroTipo>("todos");
   const [formulario, setFormulario] = useState<FormularioState | null>(null);
   const [detalhe, setDetalhe] = useState<DetalheState | null>(null);
+  const [referenciaHorario, setReferenciaHorario] =
+    useState<ReferenciaHorarioState | null>(null);
   const formTituloId = useId();
   const detalheTituloId = useId();
+  const referenciaHorarioTituloId = useId();
   const referenciasCarregadas = useRef(false);
 
   const carregarReferencias = useCallback(async () => {
@@ -211,6 +273,7 @@ export function VisaoPeriodoScreen() {
 
   function abrirFormulario() {
     setDetalhe(null);
+    setReferenciaHorario(null);
     setFormulario({
       vinculoId: vinculosAtivos.length === 1 ? vinculosAtivos[0]!.id : "",
       tipo: "",
@@ -226,6 +289,7 @@ export function VisaoPeriodoScreen() {
 
   async function abrirDetalhe(pontoId: string) {
     setFormulario(null);
+    setReferenciaHorario(null);
     setDetalhe({
       pontoId,
       status: "carregando",
@@ -262,6 +326,77 @@ export function VisaoPeriodoScreen() {
 
   function fecharDetalhe() {
     setDetalhe(null);
+  }
+
+  /**
+   * Referência de horário: consulta somente leitura, nunca resolvida
+   * silenciosamente. Só habilita quando o vínculo (colaborador autorizado,
+   * já resolvido em `vinculosPorId`) e a competência foram explicitamente
+   * escolhidos nos filtros acima — nunca assume "hoje" nem "o mais recente".
+   */
+  async function carregarReferenciaHorario(
+    colaboradorId: string,
+    competencia: string,
+  ) {
+    setReferenciaHorario((prev) =>
+      prev ? { ...prev, status: "carregando" } : prev,
+    );
+    try {
+      const { inicio, fim } = limitesCompetencia(competencia);
+      const resp = await listarVinculosHorario({
+        colaboradorId,
+        tamanhoPagina: 100,
+      });
+      const sobrepostos = resp.itens
+        .filter((v) => vigenciaSeSobrepoe(v, inicio, fim))
+        .sort((a, b) => a.vigenciaInicio.localeCompare(b.vigenciaInicio));
+      const comTabela = await Promise.all(
+        sobrepostos.map(async (v): Promise<VinculoHorarioComTabela> => {
+          try {
+            const tabela = await buscarTabelaHorario(v.tabelaHorarioId);
+            return { ...v, tabela };
+          } catch {
+            return { ...v, tabela: null };
+          }
+        }),
+      );
+      setReferenciaHorario((prev) =>
+        prev ? { ...prev, status: "dados", itens: comTabela } : prev,
+      );
+    } catch {
+      setReferenciaHorario((prev) =>
+        prev ? { ...prev, status: "erro" } : prev,
+      );
+    }
+  }
+
+  async function abrirReferenciaHorario() {
+    if (filtroVinculo === "todos" || !filtroCompetencia) return;
+    const vinculo = vinculosPorId.get(filtroVinculo);
+    if (!vinculo) return;
+    setFormulario(null);
+    setDetalhe(null);
+    setReferenciaHorario({
+      vinculoId: filtroVinculo,
+      competencia: filtroCompetencia,
+      status: "carregando",
+      itens: [],
+    });
+    await carregarReferenciaHorario(vinculo.colaboradorId, filtroCompetencia);
+  }
+
+  function tentarNovamenteReferenciaHorario() {
+    if (!referenciaHorario) return;
+    const vinculo = vinculosPorId.get(referenciaHorario.vinculoId);
+    if (!vinculo) return;
+    void carregarReferenciaHorario(
+      vinculo.colaboradorId,
+      referenciaHorario.competencia,
+    );
+  }
+
+  function fecharReferenciaHorario() {
+    setReferenciaHorario(null);
   }
 
   async function handleSubmit(evento: React.FormEvent) {
@@ -449,8 +584,16 @@ export function VisaoPeriodoScreen() {
     },
   ];
 
+  const colunasPeriodos: DataTableColumn<PeriodoApi>[] = [
+    { key: "dia", header: "Dia", cell: (p) => ROTULO_DIA[p.dia] ?? p.dia },
+    { key: "inicio", header: "Entrada", cell: (p) => p.inicio },
+    { key: "fim", header: "Saída", cell: (p) => p.fim },
+  ];
+
   const semVinculosAtivos =
     statusCarregamento === "dados" && vinculosAtivos.length === 0;
+  const referenciaHorarioDesabilitada =
+    filtroVinculo === "todos" || !filtroCompetencia;
 
   return (
     <div className="visao-periodo-screen">
@@ -573,6 +716,25 @@ export function VisaoPeriodoScreen() {
                 </select>
               )}
             </FormField>
+          </div>
+
+          <div className="visao-periodo-screen__referencia-acao">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => void abrirReferenciaHorario()}
+              disabled={
+                statusCarregamento !== "dados" || referenciaHorarioDesabilitada
+              }
+            >
+              Ver horários de referência
+            </Button>
+            {referenciaHorarioDesabilitada ? (
+              <p className="visao-periodo-screen__nota">
+                Selecione um vínculo específico e uma competência acima para ver
+                os horários de referência.
+              </p>
+            ) : null}
           </div>
 
           {statusCarregamento === "carregando" ? (
@@ -1005,6 +1167,88 @@ export function VisaoPeriodoScreen() {
               </Button>
             </FormActions>
           </form>
+        </Surface>
+      ) : null}
+
+      {referenciaHorario ? (
+        <Surface
+          as="section"
+          padding="lg"
+          className="visao-periodo-screen__formulario"
+          aria-labelledby={referenciaHorarioTituloId}
+        >
+          <h2
+            id={referenciaHorarioTituloId}
+            className="visao-periodo-screen__section-title"
+          >
+            Horários de referência —{" "}
+            {nomePorVinculoId(referenciaHorario.vinculoId)} ·{" "}
+            {referenciaHorario.competencia}
+          </h2>
+          <p className="visao-periodo-screen__nota">
+            Consulta somente leitura: não corrige marcação, não calcula jornada,
+            tolerância, horas extras, faltas ou DSR, não gera ajuste, não fecha
+            período e não altera saldo, Banco de Horas ou Folha.
+          </p>
+
+          {referenciaHorario.status === "carregando" ? (
+            <p className="visao-periodo-screen__carregando" role="status">
+              Carregando horários de referência…
+            </p>
+          ) : referenciaHorario.status === "erro" ? (
+            <>
+              <p className="visao-periodo-screen__form-erro" role="alert">
+                Não foi possível carregar os horários de referência.
+              </p>
+              <Button
+                variant="secondary"
+                onClick={tentarNovamenteReferenciaHorario}
+              >
+                Tentar novamente
+              </Button>
+            </>
+          ) : referenciaHorario.itens.length === 0 ? (
+            <p>Nenhum horário de referência aplicável a esta competência.</p>
+          ) : (
+            <div className="visao-periodo-screen__bloco">
+              {referenciaHorario.itens.length > 1 ? (
+                <p className="visao-periodo-screen__nota" role="status">
+                  Mais de uma tabela de horário vigorou nesta competência —
+                  nenhuma delas vale sozinha para o mês inteiro. Exibidas em
+                  ordem cronológica.
+                </p>
+              ) : null}
+              {referenciaHorario.itens.map((item) => (
+                <div key={item.id} className="visao-periodo-screen__bloco">
+                  <h3 className="visao-periodo-screen__section-title">
+                    {item.tabela
+                      ? item.tabela.nome
+                      : `Tabela ${item.tabelaHorarioId.slice(0, 8)}`}
+                  </h3>
+                  <p className="visao-periodo-screen__nota">
+                    Vigência: {item.vigenciaInicio} –{" "}
+                    {item.vigenciaFim ?? "vigente"}
+                  </p>
+                  {!item.tabela || item.tabela.periodos.length === 0 ? (
+                    <p>Nenhum período cadastrado nesta tabela.</p>
+                  ) : (
+                    <DataTable
+                      caption={`Períodos — ${item.tabela.nome}`}
+                      columns={colunasPeriodos}
+                      rows={item.tabela.periodos}
+                      rowKey={(p, i) => `${item.id}-${p.dia}-${i}`}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          <FormActions>
+            <Button variant="secondary" onClick={fecharReferenciaHorario}>
+              Fechar
+            </Button>
+          </FormActions>
         </Surface>
       ) : null}
     </div>

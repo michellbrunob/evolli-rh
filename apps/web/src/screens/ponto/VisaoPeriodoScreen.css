@@ -67,6 +67,15 @@
   min-width: 0;
 }
 
+/* Ação "Ver horários de referência" — botão + nota de habilitação. */
+.visao-periodo-screen__referencia-acao {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+}
+
 /* Indicador de carregamento. */
 .visao-periodo-screen__carregando {
   margin: 0;
