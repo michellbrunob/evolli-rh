@@ -1,5 +1,5 @@
 /**
- * Pessoas > Horário de trabalho (T046) — só tokens já existentes
+ * Pessoas > Horário de trabalho (T112) — só tokens já existentes
  * (tokens.css); sem hexadecimal novo, sem sombra, sem gradiente. Layout
  * responsivo: pilha vertical de seções.
  */
@@ -13,11 +13,10 @@
 
 /* Cada seção é um item flex (coluna): sem `min-width: 0` ela recusaria
    encolher abaixo do min-content de seus descendentes — em particular a
-   tabela de atribuições, que pode ser mais larga que o viewport em telas
+   tabela de vínculos, que pode ser mais larga que o viewport em telas
    estreitas e já trata a própria rolagem horizontal
    (`DataTable`/`.evolli-datatable`). Sem isso aqui, essa rolagem vazaria
-   para a página inteira (mesmo princípio já aplicado em
-   `CadastroHorariosScreen.css` e `VerificarFolhasScreen.css`). */
+   para a página inteira (mesmo princípio de `CadastroHorariosScreen.css`). */
 .pessoas-horario-screen > * {
   min-width: 0;
 }
@@ -47,25 +46,6 @@
   flex: 1 1 16rem;
 }
 
-/* Alternador do estado de demonstração (dados / vazio / erro). */
-.pessoas-horario-screen__demo {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xs);
-}
-
-.pessoas-horario-screen__demo-texto {
-  margin: 0;
-  color: var(--color-ink-subtle);
-  font-size: var(--text-caption);
-}
-
-.pessoas-horario-screen__demo-botoes {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-sm);
-}
-
 /* Bloco de erro — tokens semânticos de "danger". */
 .pessoas-horario-screen__erro {
   display: flex;
@@ -76,17 +56,13 @@
   border-color: var(--status-danger-border);
 }
 
-.pessoas-horario-screen__erro-referencia {
+/* Indicador de carregamento. */
+.pessoas-horario-screen__carregando {
   margin: 0;
-  font-size: var(--text-caption);
   color: var(--color-ink-subtle);
 }
 
-.pessoas-horario-screen__erro-referencia code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-}
-
-/* Painel do formulário de atribuição/alteração. */
+/* Painel do formulário de novo vínculo e do painel de detalhe. */
 .pessoas-horario-screen__formulario {
   display: flex;
   flex-direction: column;
@@ -100,14 +76,22 @@
   max-width: 32rem;
 }
 
-/* Confirmação demonstrativa — tokens semânticos de "success" (ação
-   concluída na demonstração, mesmo sem efeito real). */
-.pessoas-horario-screen__confirmacao {
+/* Erro inline no formulário (validação ou retorno da API). */
+.pessoas-horario-screen__form-erro {
   margin: 0;
-  padding: var(--space-sm) var(--space-md);
-  border-radius: var(--radius-sm);
-  background: var(--status-success-surface);
-  color: var(--status-success-ink);
+  color: var(--status-danger-ink);
+}
+
+/* Bloco de encerramento dentro do painel de detalhe. */
+.pessoas-horario-screen__encerrar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-md);
+}
+
+.pessoas-horario-screen__encerrar > .evolli-field {
+  flex: 1 1 12rem;
 }
 
 /* Texto só para leitores de tela (mesma técnica de `.evolli-field__sr`). */

@@ -65,7 +65,7 @@ describe("PessoasScreen — abas locais 'Colaboradores' / 'Horário de trabalho'
     expect(abaAfastamentos.tagName).toBe("BUTTON");
   });
 
-  it("troca para 'Horário de trabalho' ao clicar na aba — preservado sem regressão (T046)", () => {
+  it("troca para 'Horário de trabalho' ao clicar na aba — preservado sem regressão (T112)", () => {
     const onTituloIdChange = vi.fn();
     render(<PessoasScreen onTituloIdChange={onTituloIdChange} />);
 
@@ -75,11 +75,7 @@ describe("PessoasScreen — abas locais 'Colaboradores' / 'Horário de trabalho'
     expect(
       screen.getByRole("heading", { level: 1, name: "Horário de trabalho" }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", {
-        name: "Colaboradores com tabela de horário atribuída",
-      }),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Somente RH")).toBeInTheDocument();
 
     expect(
       screen.getByRole("tab", { name: "Horário de trabalho" }),
@@ -287,11 +283,7 @@ describe("PessoasScreen — abas locais 'Colaboradores' / 'Horário de trabalho'
     expect(
       screen.getByRole("heading", { level: 1, name: "Horário de trabalho" }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", {
-        name: "Colaboradores com tabela de horário atribuída",
-      }),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Somente RH")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("tab", { name: "Colaboradores" }));
     expect(
