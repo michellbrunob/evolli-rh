@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AutenticacaoApp } from "./AutenticacaoApp";
 import { login, logout } from "../api/authClient";
 import { refreshCsrfToken } from "../api/csrfClient";
+import { ApiError, listarSessoesAtivas } from "../api/sessoesClient";
 
 vi.mock("../api/authClient", async () => {
   const actual =
@@ -24,6 +25,16 @@ vi.mock("../api/csrfClient", async () => {
   return {
     ...actual,
     refreshCsrfToken: vi.fn(),
+  };
+});
+
+vi.mock("../api/sessoesClient", async () => {
+  const actual = await vi.importActual<typeof import("../api/sessoesClient")>(
+    "../api/sessoesClient",
+  );
+  return {
+    ...actual,
+    listarSessoesAtivas: vi.fn(),
   };
 });
 
@@ -166,5 +177,36 @@ describe("AutenticacaoApp (T116) — portão de sessão", () => {
     await waitFor(() => expect(logout).toHaveBeenCalled());
 
     expect(localStorageSpy).not.toHaveBeenCalled();
+  });
+
+  it("T117: 'Sessões ativas' descobrindo que a própria sessão não é mais válida (401) volta ao login, como o logout", async () => {
+    vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token-restaurado");
+    vi.mocked(listarSessoesAtivas).mockRejectedValueOnce(
+      new ApiError(401, "Não autorizado."),
+    );
+
+    render(<AutenticacaoApp />);
+    await screen.findByRole("navigation", { name: "Navegação do painel" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Sessões ativas" }));
+    await screen.findByRole("heading", { name: "Sessões ativas" });
+
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "Entrar" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("navigation", { name: "Navegação do painel" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("T117: botão 'Sessões ativas' só existe depois de autenticado — nunca durante verificação ou login", async () => {
+    vi.mocked(refreshCsrfToken).mockRejectedValueOnce(new Error("401"));
+
+    render(<AutenticacaoApp />);
+    await screen.findByRole("heading", { level: 1, name: "Entrar" });
+
+    expect(
+      screen.queryByRole("button", { name: "Sessões ativas" }),
+    ).not.toBeInTheDocument();
   });
 });

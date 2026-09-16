@@ -715,6 +715,40 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     expect(onLogout).toHaveBeenCalledTimes(1);
   });
 
+  it("sem onLogout: não mostra o botão 'Sessões ativas' nem o painel (T117)", () => {
+    render(<App />);
+
+    expect(
+      screen.queryByRole("button", { name: "Sessões ativas" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Sessões ativas" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("com onLogout informado, mostra e abre o painel 'Sessões ativas' ao clicar, e fecha ao clicar em Fechar (T117)", () => {
+    render(<App onLogout={vi.fn()} />);
+
+    const botaoAbrir = screen.getByRole("button", { name: "Sessões ativas" });
+    expect(botaoAbrir).toHaveAttribute("aria-expanded", "false");
+    expect(
+      screen.queryByRole("heading", { name: "Sessões ativas" }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(botaoAbrir);
+
+    expect(botaoAbrir).toHaveAttribute("aria-expanded", "true");
+    expect(
+      screen.getByRole("heading", { name: "Sessões ativas" }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
+
+    expect(
+      screen.queryByRole("heading", { name: "Sessões ativas" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("cada botão de navegação é um <button> nativo, operável por teclado", () => {
     render(<App />);
 
