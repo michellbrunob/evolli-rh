@@ -747,6 +747,27 @@ describe("Cadastros: Horarios e vinculo ao colaborador (e2e)", () => {
     });
 
     it("IDOR: filtrar a listagem por colaborador de outra empresa nunca vaza dados — página vazia, nunca 403", async () => {
+      // O vínculo de horário existe de fato na empresa B — a página vazia
+      // para rhA precisa vir do escopo por empresa, não da ausência de dado.
+      const { id: tabelaB } = await criarTabela(rhB, "T114 IDOR Tabela B");
+      const vinculoHorarioB = await post("/v1/horarios/vinculos", rhB)
+        .send({
+          colaboradorId: colaboradorBId,
+          tabelaHorarioId: tabelaB,
+          vigenciaInicio: "2026-01-01",
+        })
+        .expect(201);
+
+      // rhB enxerga o próprio vínculo normalmente.
+      const listaDeB = await get(
+        `/v1/horarios/vinculos?colaboradorId=${colaboradorBId}`,
+        rhB,
+      ).expect(200);
+      expect(listaDeB.body.total).toBe(1);
+      expect(listaDeB.body.itens[0].id).toBe(vinculoHorarioB.body.id);
+
+      // rhA, filtrando pelo mesmo colaboradorId de outra empresa, recebe
+      // página vazia — nunca 403, nunca o dado de fato de B.
       const semVinculo = await get(
         `/v1/horarios/vinculos?colaboradorId=${colaboradorBId}`,
         rhA,

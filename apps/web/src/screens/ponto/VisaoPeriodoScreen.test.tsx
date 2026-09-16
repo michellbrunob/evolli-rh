@@ -796,6 +796,63 @@ describe("VisaoPeriodoScreen (T113 — funcional)", () => {
       await screen.findByText("Tabela Comercial (teste)");
     });
 
+    it("resposta atrasada de uma consulta anterior não sobrescreve o painel de outro vínculo/competência já aberto", async () => {
+      let resolverA: (v: Paginado<VinculoHorarioApi>) => void;
+      let resolverB: (v: Paginado<VinculoHorarioApi>) => void;
+      vi.mocked(listarVinculosHorario)
+        .mockReturnValueOnce(
+          new Promise((resolve) => {
+            resolverA = resolve;
+          }) as ReturnType<typeof listarVinculosHorario>,
+        )
+        .mockReturnValueOnce(
+          new Promise((resolve) => {
+            resolverB = resolve;
+          }) as ReturnType<typeof listarVinculosHorario>,
+        );
+
+      render(<VisaoPeriodoScreen />);
+      await aguardarLista();
+
+      // Abre a referência do vínculo A (colaborador1) / 2026-03 — fica pendente.
+      await selecionarVinculoECompetencia(vinculo1.id, "2026-03");
+      fireEvent.click(
+        screen.getByRole("button", { name: "Ver horários de referência" }),
+      );
+      await screen.findByRole("heading", {
+        name: /Ana Colaboradora \(teste\)/,
+      });
+
+      // Troca para o vínculo B (colaborador2) / 2026-05 e reabre — segunda
+      // consulta também fica pendente, sem que a primeira tenha respondido.
+      await selecionarVinculoECompetencia(vinculo2.id, "2026-05");
+      fireEvent.click(
+        screen.getByRole("button", { name: "Ver horários de referência" }),
+      );
+      await screen.findByRole("heading", {
+        name: /Bruno Colaborador \(teste\)/,
+      });
+
+      // A resposta atrasada de A chega DEPOIS de o painel já mostrar B — não
+      // pode preencher o painel de B com os dados de A.
+      resolverA!(paginado([vinculoHorarioAberto]));
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(
+        screen.getByRole("heading", { name: /Bruno Colaborador \(teste\)/ }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText("Carregando horários de referência…"),
+      ).toBeInTheDocument();
+
+      // A resposta de B, quando chega, é exibida normalmente.
+      resolverB!(paginado([vinculoHorarioAberto]));
+      await screen.findByText("Tabela Comercial (teste)");
+      expect(
+        screen.getByRole("heading", { name: /Bruno Colaborador \(teste\)/ }),
+      ).toBeInTheDocument();
+    });
+
     it("mostra erro no painel e permite tentar novamente", async () => {
       vi.mocked(listarVinculosHorario).mockRejectedValueOnce(
         new Error("falha"),

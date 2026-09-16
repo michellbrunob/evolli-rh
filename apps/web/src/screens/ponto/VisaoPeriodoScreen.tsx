@@ -334,12 +334,27 @@ export function VisaoPeriodoScreen() {
    * já resolvido em `vinculosPorId`) e a competência foram explicitamente
    * escolhidos nos filtros acima — nunca assume "hoje" nem "o mais recente".
    */
+  /**
+   * `vinculoId`/`competencia` são os mesmos parâmetros já gravados em
+   * `referenciaHorario` no momento da chamada — servem só para confirmar,
+   * a cada `setReferenciaHorario`, que a resposta (sucesso ou erro) ainda
+   * corresponde ao painel aberto. Sem essa checagem, uma resposta atrasada
+   * de uma consulta anterior (outro vínculo/competência, já fechada ou
+   * substituída) poderia preencher o painel errado — mesmo padrão já usado
+   * em `recarregarDetalhe`.
+   */
   async function carregarReferenciaHorario(
-    colaboradorId: string,
+    vinculoId: string,
     competencia: string,
+    colaboradorId: string,
   ) {
+    const aindaCorresponde = (prev: ReferenciaHorarioState | null) =>
+      prev !== null &&
+      prev.vinculoId === vinculoId &&
+      prev.competencia === competencia;
+
     setReferenciaHorario((prev) =>
-      prev ? { ...prev, status: "carregando" } : prev,
+      aindaCorresponde(prev) ? { ...prev!, status: "carregando" } : prev,
     );
     try {
       const { inicio, fim } = limitesCompetencia(competencia);
@@ -361,11 +376,13 @@ export function VisaoPeriodoScreen() {
         }),
       );
       setReferenciaHorario((prev) =>
-        prev ? { ...prev, status: "dados", itens: comTabela } : prev,
+        aindaCorresponde(prev)
+          ? { ...prev!, status: "dados", itens: comTabela }
+          : prev,
       );
     } catch {
       setReferenciaHorario((prev) =>
-        prev ? { ...prev, status: "erro" } : prev,
+        aindaCorresponde(prev) ? { ...prev!, status: "erro" } : prev,
       );
     }
   }
@@ -374,15 +391,21 @@ export function VisaoPeriodoScreen() {
     if (filtroVinculo === "todos" || !filtroCompetencia) return;
     const vinculo = vinculosPorId.get(filtroVinculo);
     if (!vinculo) return;
+    const vinculoId = filtroVinculo;
+    const competencia = filtroCompetencia;
     setFormulario(null);
     setDetalhe(null);
     setReferenciaHorario({
-      vinculoId: filtroVinculo,
-      competencia: filtroCompetencia,
+      vinculoId,
+      competencia,
       status: "carregando",
       itens: [],
     });
-    await carregarReferenciaHorario(vinculo.colaboradorId, filtroCompetencia);
+    await carregarReferenciaHorario(
+      vinculoId,
+      competencia,
+      vinculo.colaboradorId,
+    );
   }
 
   function tentarNovamenteReferenciaHorario() {
@@ -390,8 +413,9 @@ export function VisaoPeriodoScreen() {
     const vinculo = vinculosPorId.get(referenciaHorario.vinculoId);
     if (!vinculo) return;
     void carregarReferenciaHorario(
-      vinculo.colaboradorId,
+      referenciaHorario.vinculoId,
       referenciaHorario.competencia,
+      vinculo.colaboradorId,
     );
   }
 
