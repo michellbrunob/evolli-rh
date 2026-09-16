@@ -16,17 +16,23 @@
  * revisão demonstrativa) e "Relatórios" (Exceções de Ponto por padrão +
  * "Relatórios disponíveis" por aba local, T075). Os atalhos da Visão geral
  * também trocam apenas esse mesmo estado local (`onNavegar` =
- * `setDestinoAtivoId`). Sem autenticação, sessão ou dado real. A presença
- * deste shell não concede nem implica autorização: a tela renderizada
- * continua dependendo da decisão do servidor por papel, escopo e objeto
+ * `setDestinoAtivoId`). Sem dado real. A presença deste shell não concede
+ * nem implica autorização: a tela renderizada continua dependendo da
+ * decisão do servidor por papel, escopo e objeto
  * (docs/modules/painel-administrativo-web-v1.md, §3.6).
  *
  * `ModuloEmPreparacao` permanece importado como retorno defensivo de
  * `conteudoDoDestino` para qualquer destino fora da lista conhecida — hoje
  * inalcançável, já que todos os itens de `DESTINOS_PAINEL` têm tela própria.
  *
- * O cliente CSRF (`../api/csrfClient`) permanece isolado e NÃO é importado
- * aqui: não há login nem sessão nesta fundação.
+ * Este componente continua sem saber nada de sessão, login ou CSRF — só
+ * recebe, opcionalmente, `onLogout` (T116): quando presente, mostra um botão
+ * "Sair" na barra superior; quando ausente (como em todo teste deste
+ * arquivo, que renderiza `<App />` sem props), o botão simplesmente não
+ * aparece — o shell renderizado é idêntico ao de antes do T116. Quem decide
+ * SE este shell deve ou não ser renderizado — a sessão está confirmada ou
+ * não — é o `AutenticacaoApp` (`./AutenticacaoApp.tsx`), que envolve este
+ * componente e nunca o contrário.
  *
  * "Cadastros", "Pessoas", "Ponto", "Documentos", "Portal do Colaborador" e
  * "Relatórios" são os destinos cujo `h1` pode mudar sem trocar de destino
@@ -114,7 +120,14 @@ function conteudoDoDestino(
   );
 }
 
-export function App() {
+export interface AppProps {
+  /** Presente só quando há sessão autenticada (ver `AutenticacaoApp`). Sem
+   * ele, nenhum botão "Sair" aparece — comportamento idêntico ao de antes
+   * do T116. */
+  onLogout?: () => void;
+}
+
+export function App({ onLogout }: AppProps = {}) {
   const [destinoAtivoId, setDestinoAtivoId] = useState("cadastros");
   // "Cadastros", "Pessoas", "Ponto", "Documentos", "Portal do Colaborador" e
   // "Relatórios" sempre voltam à aba padrão ao serem selecionados (o wrapper
@@ -146,6 +159,15 @@ export function App() {
         <div className="app-shell__topbar-inner">
           <span className="app-shell__brand">Evolli RH</span>
           <span className="app-shell__brand-tag">Painel Administrativo</span>
+          {onLogout ? (
+            <button
+              type="button"
+              className="app-shell__logout"
+              onClick={onLogout}
+            >
+              Sair
+            </button>
+          ) : null}
         </div>
       </header>
 

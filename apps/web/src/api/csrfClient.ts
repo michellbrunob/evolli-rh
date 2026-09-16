@@ -40,6 +40,18 @@ export function clearCsrfToken(): void {
 }
 
 /**
+ * Guarda em memória um token CSRF já obtido por outra chamada — usado após
+ * login bem-sucedido, cuja própria resposta de `POST /v1/auth/login` já traz
+ * o token da sessão nova. Evita um round-trip extra a `GET /v1/auth/csrf`,
+ * que rotacionaria (e invalidaria) esse token à toa. Mesma garantia das
+ * demais funções deste módulo: nunca grava em localStorage, sessionStorage
+ * ou qualquer armazenamento do navegador.
+ */
+export function setCsrfToken(token: string): void {
+  csrfTokenInMemory = token;
+}
+
+/**
  * Busca um token CSRF novo para a sessão corrente e o guarda em memória.
  * Nunca grava em localStorage/sessionStorage/cookie; a resposta é lida sem
  * permitir cache do navegador (`cache: "no-store"`), reforçando o

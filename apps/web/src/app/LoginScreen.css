@@ -1,0 +1,67 @@
+/**
+ * Login web (T116) — só tokens já existentes (tokens.css); sem hexadecimal
+ * novo, sem sombra, sem gradiente. Cartão centralizado, responsivo desde
+ * 375px.
+ */
+
+.login-screen {
+  min-height: 100vh;
+  min-height: 100svh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-lg);
+  background: var(--surface-neutral);
+}
+
+.login-screen__card {
+  width: 100%;
+  max-width: 26rem;
+  padding: var(--space-xl);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+  background: var(--surface-canvas);
+}
+
+.login-screen__title {
+  margin: 0 0 var(--space-xs);
+  font-size: var(--text-title);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  font-weight: var(--weight-bold);
+  color: var(--color-ink);
+}
+
+.login-screen__subtitle {
+  margin: 0 0 var(--space-lg);
+  color: var(--color-ink-subtle);
+}
+
+.login-screen__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.login-screen__form > .evolli-button {
+  align-self: flex-start;
+}
+
+.login-screen__erro {
+  margin: 0;
+  color: var(--status-danger-ink);
+}
+
+@media (max-width: 480px) {
+  .login-screen {
+    padding: var(--space-md);
+  }
+
+  .login-screen__card {
+    padding: var(--space-lg);
+  }
+
+  .login-screen__form > .evolli-button {
+    align-self: stretch;
+  }
+}

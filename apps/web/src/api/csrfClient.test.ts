@@ -5,6 +5,7 @@ import {
   clearCsrfToken,
   getCsrfToken,
   refreshCsrfToken,
+  setCsrfToken,
 } from "./csrfClient";
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -102,5 +103,23 @@ describe("csrfClient", () => {
     clearCsrfToken();
 
     expect(getCsrfToken()).toBeNull();
+  });
+
+  it("setCsrfToken guarda em memória o token já trazido por outra resposta (ex.: login), sem round-trip a /auth/csrf", () => {
+    const localStorageSpy = vi.spyOn(Storage.prototype, "setItem");
+
+    setCsrfToken("token-do-login");
+
+    expect(getCsrfToken()).toBe("token-do-login");
+    expect(localStorageSpy).not.toHaveBeenCalled();
+  });
+
+  it("setCsrfToken substitui um token anterior em memória", () => {
+    setCsrfToken("token-antigo");
+    expect(getCsrfToken()).toBe("token-antigo");
+
+    setCsrfToken("token-novo");
+
+    expect(getCsrfToken()).toBe("token-novo");
   });
 });
