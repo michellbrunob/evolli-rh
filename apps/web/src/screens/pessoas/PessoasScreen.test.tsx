@@ -87,7 +87,7 @@ describe("PessoasScreen — abas locais 'Colaboradores' / 'Horário de trabalho'
     expect(onTituloIdChange).toHaveBeenCalledWith("pessoas-horario-titulo");
   });
 
-  it("troca para 'Histórico funcional' ao clicar na aba, com h1 único e informa o titleId", () => {
+  it("troca para 'Histórico funcional' ao clicar na aba — preservado sem regressão (T115)", () => {
     const onTituloIdChange = vi.fn();
     render(<PessoasScreen onTituloIdChange={onTituloIdChange} />);
 
@@ -97,9 +97,7 @@ describe("PessoasScreen — abas locais 'Colaboradores' / 'Horário de trabalho'
     expect(
       screen.getByRole("heading", { level: 1, name: "Histórico funcional" }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", { name: "Histórico funcional (exemplo)" }),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Somente RH e DP")).toBeInTheDocument();
 
     expect(
       screen.getByRole("tab", { name: "Histórico funcional" }),

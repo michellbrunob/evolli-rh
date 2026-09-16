@@ -1,23 +1,29 @@
 /**
- * Pessoas > Histórico funcional (T088) — tela visual estática.
+ * Pessoas > Histórico funcional (T115) — leitura e operação real de
+ * movimentação funcional sobre o contrato já existente do backend.
  *
- * Demonstra como o RH poderá consultar referências de vínculo e
- * movimentação funcional por referência organizacional — sem criar, alterar,
- * reconhecer, aprovar ou encerrar vínculo, cargo, função, salário, jornada,
- * ponto, documentos, Banco de Horas, Folha, permissão ou acesso. Tudo aqui é
- * amostra sintética própria, em memória.
+ * Reaproveita exclusivamente endpoints já existentes:
+ * `GET/POST /v1/movimentacoes`, `POST /v1/movimentacoes/:id/{efetivar,
+ * cancelar,retificar}`, `GET /v1/vinculos/:id/linha-do-tempo`,
+ * `GET /v1/colaboradores`, `GET /v1/colaboradores/:id/vinculos` e as
+ * listagens organizacionais (departamentos, unidades, áreas, equipes,
+ * cargos, centros de custo). Nenhum endpoint, migration, schema ou
+ * dependência novo.
  *
- * Escopo: PURAMENTE visual. Sem `fetch`, sem autenticação/sessão/CSRF/MFA,
- * sem rota real, sem persistência, sem backend, schema ou dependência nova.
- * O painel de detalhe é só leitura: nenhuma ação cria, edita, admite,
- * transfere, promove, altera salário, altera jornada, desliga, bloqueia
- * acesso, salva, importa, exporta, aprova ou integra dados reais.
+ * Fora de escopo, por decisão do próprio backend (Baseline V1, itens 7 e 11):
+ * não há aprovação/rejeição, e o motivo é sempre um código controlado, nunca
+ * texto livre. Esta tela também não cria admissão (ela nasce junto do
+ * vínculo, em "Colaboradores" — T111) nem toca acesso, remuneração, salário,
+ * cálculo, Folha, documentos, benefícios, dependentes, afastamentos, jornada
+ * ou Banco de Horas. Retificação sempre cria um registro novo e preserva o
+ * original na linha do tempo — nada é apagado, editado ou ocultado.
  */
-import { useId, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import {
   Button,
   DataTable,
   EmptyState,
+  FormActions,
   FormField,
   PageHeader,
   StatusBadge,
@@ -25,180 +31,868 @@ import {
 } from "../../components";
 import type { DataTableColumn, StatusVariant } from "../../components";
 import {
-  HISTORICO_FUNCIONAL_EXEMPLO,
-  type HistoricoFuncionalExemplo,
-  ROTULO_SITUACAO_HISTORICO_FUNCIONAL,
-  type SituacaoHistoricoFuncional,
-} from "./historicoFuncional.fixtures";
+  type ColaboradorApi,
+  type TipoVinculo,
+  type VinculoApi,
+  listarColaboradores,
+  listarVinculosDoColaborador,
+} from "../../api/colaboradoresClient";
+import {
+  type AreaApi,
+  type CentroCustoApi,
+  type DepartamentoApi,
+  type EquipeApi,
+  type UnidadeOrganizacionalApi,
+  listarAreas,
+  listarCentrosCusto,
+  listarDepartamentos,
+  listarEquipes,
+  listarUnidades,
+} from "../../api/organizacaoClient";
+import { type CargoApi, listarCargos } from "../../api/cargoClient";
+import {
+  type DestinoOrganizacionalDto,
+  type ListarMovimentacoesQuery,
+  type MotivoMovimentacao,
+  type MovimentacaoApi,
+  type RegistrarMovimentacaoDto,
+  type RetificarMovimentacaoDto,
+  type StatusMovimentacao,
+  type TipoMovimentacao,
+  type TipoMovimentacaoRegistravel,
+  buscarLinhaDoTempo,
+  cancelarMovimentacao,
+  efetivarMovimentacao,
+  listarMovimentacoes,
+  registrarMovimentacao,
+  retificarMovimentacao,
+} from "../../api/movimentacaoClient";
 import "./HistoricoFuncionalScreen.css";
 
 export const HISTORICO_FUNCIONAL_TITULO_ID = "historico-funcional-titulo";
 
-type EstadoDemonstracao = "dados" | "vazio" | "erro";
+type TipoDestino =
+  "" | "unidade" | "departamento" | "area" | "equipe" | "cargo" | "centroCusto";
 
-const ROTULO_ESTADO_DEMO: Record<EstadoDemonstracao, string> = {
-  dados: "Com dados",
-  vazio: "Vazio",
-  erro: "Erro",
+const OPCOES_TIPO_DESTINO: { valor: TipoDestino; rotulo: string }[] = [
+  { valor: "unidade", rotulo: "Unidade organizacional" },
+  { valor: "departamento", rotulo: "Departamento" },
+  { valor: "area", rotulo: "Área" },
+  { valor: "equipe", rotulo: "Equipe" },
+  { valor: "cargo", rotulo: "Cargo" },
+  { valor: "centroCusto", rotulo: "Centro de custo" },
+];
+
+const TIPOS_REGISTRAVEIS: readonly TipoMovimentacaoRegistravel[] = [
+  "transferencia_organizacional",
+  "mudanca_cargo",
+  "desligamento",
+];
+
+const ROTULO_TIPO_MOVIMENTACAO: Record<TipoMovimentacao, string> = {
+  admissao: "Admissão",
+  transferencia_organizacional: "Transferência organizacional",
+  mudanca_cargo: "Mudança de cargo",
+  desligamento: "Desligamento",
 };
 
-const VARIANTE_SITUACAO: Record<SituacaoHistoricoFuncional, StatusVariant> = {
-  referencia_em_revisao_exemplo: "info",
-  aguardando_decisao_exemplo: "warning",
-  historico_ilustrativo: "neutral",
+const ROTULO_STATUS_MOVIMENTACAO: Record<StatusMovimentacao, string> = {
+  solicitada: "Solicitada",
+  programada: "Programada",
+  efetivada: "Efetivada",
+  cancelada: "Cancelada",
+  retificada: "Retificada",
 };
 
-const OPCAO_TODOS = "todos";
+const VARIANTE_STATUS_MOVIMENTACAO: Record<StatusMovimentacao, StatusVariant> =
+  {
+    solicitada: "info",
+    programada: "info",
+    efetivada: "success",
+    cancelada: "neutral",
+    retificada: "neutral",
+  };
+
+const ROTULO_MOTIVO: Record<MotivoMovimentacao, string> = {
+  admissao_inicial: "Admissão inicial",
+  reestruturacao_organizacional: "Reestruturação organizacional",
+  realocacao_interna: "Realocação interna",
+  promocao: "Promoção",
+  correcao_cadastral: "Correção cadastral",
+  encerramento_de_vinculo: "Encerramento de vínculo",
+  outro_controlado: "Outro (controlado)",
+};
+
+const MOTIVOS: readonly MotivoMovimentacao[] = Object.keys(
+  ROTULO_MOTIVO,
+) as MotivoMovimentacao[];
+
+const ROTULO_TIPO_VINCULO: Record<TipoVinculo, string> = {
+  clt: "CLT",
+  estagio: "Estágio",
+  pj: "PJ",
+  temporario: "Temporário",
+  outro_controlado: "Outro controlado",
+};
+
+interface RegistroErros {
+  tipo?: string;
+  motivoCodigo?: string;
+  vigenciaInicio?: string;
+  destino?: string;
+  geral?: string;
+}
+
+interface FormularioRegistroState {
+  vinculoId: string;
+  tipo: TipoMovimentacaoRegistravel | "";
+  motivoCodigo: MotivoMovimentacao | "";
+  vigenciaInicio: string;
+  tipoDestino: TipoDestino;
+  destinoId: string;
+  departamentoIdArea: string;
+  erros: RegistroErros;
+  salvando: boolean;
+}
+
+interface RetificarErros {
+  motivoCodigo?: string;
+  vigenciaInicio?: string;
+  destino?: string;
+  geral?: string;
+}
+
+interface RetificarFormState {
+  movimentacaoId: string;
+  tipoOriginal: TipoMovimentacao;
+  motivoCodigo: MotivoMovimentacao | "";
+  vigenciaInicio: string;
+  tipoDestino: TipoDestino;
+  destinoId: string;
+  departamentoIdArea: string;
+  erros: RetificarErros;
+  salvando: boolean;
+}
+
+interface LinhaDoTempoState {
+  vinculoId: string;
+  vinculoLabel: string;
+  status: "carregando" | "erro" | "dados";
+  itens: MovimentacaoApi[];
+  acaoEmAndamentoId: string | null;
+  erroAcao: string | null;
+  retificar: RetificarFormState | null;
+}
+
+/** Ao menos uma referência exigida — exceto `desligamento`, que não aceita nenhuma (espelha `assertDestinoCoerente`). */
+function validarDestino(
+  tipo: string,
+  tipoDestino: TipoDestino,
+  destinoId: string,
+  departamentoIdArea: string,
+): string | undefined {
+  if (tipo === "desligamento") return undefined;
+  if (!tipoDestino || !destinoId) {
+    return "Selecione o destino organizacional.";
+  }
+  if (tipoDestino === "area" && !departamentoIdArea) {
+    return "Selecione o departamento da área.";
+  }
+  return undefined;
+}
+
+function montarDestinoDto(
+  tipoDestino: TipoDestino,
+  destinoId: string,
+  departamentoIdArea: string,
+): DestinoOrganizacionalDto {
+  switch (tipoDestino) {
+    case "unidade":
+      return { unidadeOrganizacionalId: destinoId };
+    case "departamento":
+      return { departamentoId: destinoId };
+    case "area":
+      return { areaId: destinoId, departamentoId: departamentoIdArea };
+    case "equipe":
+      return { equipeId: destinoId };
+    case "cargo":
+      return { cargoId: destinoId };
+    case "centroCusto":
+      return { centroCustoId: destinoId };
+    default:
+      return {};
+  }
+}
+
+function formatarDataHora(iso: string): string {
+  return iso.replace("T", " ").slice(0, 16);
+}
 
 export function HistoricoFuncionalScreen() {
-  const [estadoDemo, setEstadoDemo] = useState<EstadoDemonstracao>("dados");
-  const [filtroTipoEvento, setFiltroTipoEvento] = useState<string>(OPCAO_TODOS);
-  const [filtroSituacao, setFiltroSituacao] = useState<string>(OPCAO_TODOS);
-  const [filtroOrganizacional, setFiltroOrganizacional] =
-    useState<string>(OPCAO_TODOS);
-  const [detalheAbertoId, setDetalheAbertoId] = useState<string | null>(null);
-  const detalheTituloId = useId();
-
-  const linhasBase = useMemo(
-    () => (estadoDemo === "vazio" ? [] : HISTORICO_FUNCIONAL_EXEMPLO),
-    [estadoDemo],
+  const [statusCarregamento, setStatusCarregamento] = useState<
+    "carregando" | "erro" | "dados"
+  >("carregando");
+  const [colaboradores, setColaboradores] = useState<ColaboradorApi[]>([]);
+  const [departamentosLista, setDepartamentosLista] = useState<
+    DepartamentoApi[]
+  >([]);
+  const [unidadesLista, setUnidadesLista] = useState<
+    UnidadeOrganizacionalApi[]
+  >([]);
+  const [areasLista, setAreasLista] = useState<AreaApi[]>([]);
+  const [equipesLista, setEquipesLista] = useState<EquipeApi[]>([]);
+  const [cargosLista, setCargosLista] = useState<CargoApi[]>([]);
+  const [centrosCustoLista, setCentrosCustoLista] = useState<CentroCustoApi[]>(
+    [],
   );
 
-  const tiposEventoDisponiveis = useMemo(() => {
-    const unicos = new Set(
-      HISTORICO_FUNCIONAL_EXEMPLO.map((linha) => linha.tipoEventoIlustrativo),
-    );
-    return Array.from(unicos);
+  const [filtroColaboradorId, setFiltroColaboradorId] = useState("todos");
+  const [vinculosDoColaborador, setVinculosDoColaborador] = useState<
+    VinculoApi[]
+  >([]);
+  const [statusVinculos, setStatusVinculos] = useState<
+    "ocioso" | "carregando" | "erro" | "dados"
+  >("ocioso");
+  const [filtroVinculoId, setFiltroVinculoId] = useState("");
+  const [filtroTipo, setFiltroTipo] = useState("todos");
+  const [filtroStatus, setFiltroStatus] = useState("todos");
+
+  const [statusListagem, setStatusListagem] = useState<
+    "carregando" | "erro" | "dados"
+  >("carregando");
+  const [movimentacoes, setMovimentacoes] = useState<MovimentacaoApi[]>([]);
+
+  const [formulario, setFormulario] = useState<FormularioRegistroState | null>(
+    null,
+  );
+  const [linhaDoTempo, setLinhaDoTempo] = useState<LinhaDoTempoState | null>(
+    null,
+  );
+
+  const formTituloId = useId();
+  const linhaTituloId = useId();
+
+  const carregarBase = useCallback(async () => {
+    setStatusCarregamento("carregando");
+    try {
+      const [colabResp, deps, unis, areas, equipes, cargos, centros] =
+        await Promise.all([
+          listarColaboradores({ tamanhoPagina: 100 }),
+          listarDepartamentos({ tamanhoPagina: 100 }),
+          listarUnidades({ tamanhoPagina: 100 }),
+          listarAreas({ tamanhoPagina: 100 }),
+          listarEquipes({ tamanhoPagina: 100 }),
+          listarCargos({ tamanhoPagina: 100 }),
+          listarCentrosCusto({ tamanhoPagina: 100 }),
+        ]);
+      setColaboradores(colabResp.itens);
+      setDepartamentosLista(deps.itens);
+      setUnidadesLista(unis.itens);
+      setAreasLista(areas.itens);
+      setEquipesLista(equipes.itens);
+      setCargosLista(cargos.itens);
+      setCentrosCustoLista(centros.itens);
+      setStatusCarregamento("dados");
+    } catch {
+      setStatusCarregamento("erro");
+    }
   }, []);
 
-  const referenciasOrganizacionaisDisponiveis = useMemo(() => {
-    const unicos = new Set(
-      HISTORICO_FUNCIONAL_EXEMPLO.map(
-        (linha) => linha.referenciaOrganizacional,
-      ),
-    );
-    return Array.from(unicos);
-  }, []);
+  useEffect(() => {
+    void carregarBase();
+  }, [carregarBase]);
 
-  const linhasFiltradas = useMemo(() => {
-    return linhasBase.filter((linha) => {
-      if (
-        filtroTipoEvento !== OPCAO_TODOS &&
-        linha.tipoEventoIlustrativo !== filtroTipoEvento
-      ) {
-        return false;
-      }
-      if (filtroSituacao !== OPCAO_TODOS && linha.situacao !== filtroSituacao) {
-        return false;
-      }
-      if (
-        filtroOrganizacional !== OPCAO_TODOS &&
-        linha.referenciaOrganizacional !== filtroOrganizacional
-      ) {
-        return false;
-      }
-      return true;
-    });
-  }, [linhasBase, filtroTipoEvento, filtroSituacao, filtroOrganizacional]);
+  const carregarListagem = useCallback(async () => {
+    setStatusListagem("carregando");
+    try {
+      const query: ListarMovimentacoesQuery = { tamanhoPagina: 100 };
+      if (filtroVinculoId) query.vinculoId = filtroVinculoId;
+      if (filtroTipo !== "todos") query.tipo = filtroTipo as TipoMovimentacao;
+      if (filtroStatus !== "todos")
+        query.status = filtroStatus as StatusMovimentacao;
+      const resp = await listarMovimentacoes(query);
+      setMovimentacoes(resp.itens);
+      setStatusListagem("dados");
+    } catch {
+      setStatusListagem("erro");
+    }
+  }, [filtroVinculoId, filtroTipo, filtroStatus]);
 
-  const filtrosAtivos =
-    filtroTipoEvento !== OPCAO_TODOS ||
-    filtroSituacao !== OPCAO_TODOS ||
-    filtroOrganizacional !== OPCAO_TODOS;
+  useEffect(() => {
+    void carregarListagem();
+  }, [carregarListagem]);
 
-  function limparFiltros() {
-    setFiltroTipoEvento(OPCAO_TODOS);
-    setFiltroSituacao(OPCAO_TODOS);
-    setFiltroOrganizacional(OPCAO_TODOS);
+  const colaboradoresPorId = useMemo(
+    () => new Map(colaboradores.map((c) => [c.id, c])),
+    [colaboradores],
+  );
+
+  async function selecionarColaborador(colaboradorId: string) {
+    setFiltroColaboradorId(colaboradorId);
+    setFormulario(null);
+    setFiltroVinculoId("");
+    setVinculosDoColaborador([]);
+    if (!colaboradorId || colaboradorId === "todos") {
+      setStatusVinculos("ocioso");
+      return;
+    }
+    setStatusVinculos("carregando");
+    try {
+      const vinculos = await listarVinculosDoColaborador(colaboradorId);
+      setVinculosDoColaborador(vinculos);
+      setStatusVinculos("dados");
+      if (vinculos.length === 1) {
+        setFiltroVinculoId(vinculos[0]!.id);
+      }
+    } catch {
+      setStatusVinculos("erro");
+    }
   }
 
-  const resumo = useMemo(() => {
-    const vinculosReferencia = new Set<string>();
-    let totalEmRevisao = 0;
-    let totalAguardandoDecisao = 0;
-    let totalHistorico = 0;
-    for (const linha of linhasBase) {
-      vinculosReferencia.add(linha.vinculoTecnico);
-      if (linha.situacao === "referencia_em_revisao_exemplo") {
-        totalEmRevisao += 1;
-      }
-      if (linha.situacao === "aguardando_decisao_exemplo") {
-        totalAguardandoDecisao += 1;
-      }
-      if (linha.situacao === "historico_ilustrativo") {
-        totalHistorico += 1;
+  function selecionarVinculo(vinculoId: string) {
+    setFiltroVinculoId(vinculoId);
+    setFormulario(null);
+  }
+
+  function resolverVinculo(vinculoId: string): string {
+    const vinculo = vinculosDoColaborador.find((v) => v.id === vinculoId);
+    if (!vinculo) return `Vínculo ${vinculoId.slice(0, 8)}`;
+    const colaborador = colaboradoresPorId.get(vinculo.colaboradorId);
+    const nomeColaborador =
+      colaborador?.nome ?? `Colaborador ${vinculo.colaboradorId.slice(0, 8)}`;
+    return `${vinculo.matricula} (${ROTULO_TIPO_VINCULO[vinculo.tipo]}) — ${nomeColaborador}`;
+  }
+
+  function resolverDestino(m: MovimentacaoApi): string {
+    const candidatos: [
+      string | null,
+      string,
+      { id: string; codigo: string; nome: string }[],
+    ][] = [
+      [m.destinoUnidadeOrganizacionalId, "Unidade", unidadesLista],
+      [m.destinoDepartamentoId, "Departamento", departamentosLista],
+      [m.destinoAreaId, "Área", areasLista],
+      [m.destinoEquipeId, "Equipe", equipesLista],
+      [m.destinoCargoId, "Cargo", cargosLista],
+      [m.destinoCentroCustoId, "Centro de custo", centrosCustoLista],
+    ];
+    for (const [id, rotulo, lista] of candidatos) {
+      if (id) {
+        const item = lista.find((x) => x.id === id);
+        return item
+          ? `${rotulo}: ${item.codigo} — ${item.nome}`
+          : `${rotulo} ${id.slice(0, 8)}`;
       }
     }
-    return {
-      totalVinculos: vinculosReferencia.size,
-      totalMovimentos: linhasBase.length,
-      totalEmRevisao,
-      totalAguardandoDecisao,
-      totalHistorico,
-    };
-  }, [linhasBase]);
+    return "—";
+  }
 
-  const detalheAberto =
-    detalheAbertoId != null
-      ? linhasBase.find((linha) => linha.id === detalheAbertoId)
-      : undefined;
+  function opcoesDestinoAtuais(
+    tipoDestino: TipoDestino,
+    departamentoIdArea: string,
+  ): { id: string; rotulo: string }[] {
+    switch (tipoDestino) {
+      case "unidade":
+        return unidadesLista
+          .filter((u) => u.status === "ativo")
+          .map((u) => ({ id: u.id, rotulo: `${u.codigo} — ${u.nome}` }));
+      case "departamento":
+        return departamentosLista
+          .filter((d) => d.status === "ativo")
+          .map((d) => ({ id: d.id, rotulo: `${d.codigo} — ${d.nome}` }));
+      case "area":
+        return areasLista
+          .filter(
+            (a) =>
+              a.status === "ativo" && a.departamentoId === departamentoIdArea,
+          )
+          .map((a) => ({ id: a.id, rotulo: `${a.codigo} — ${a.nome}` }));
+      case "equipe":
+        return equipesLista
+          .filter((e) => e.status === "ativo")
+          .map((e) => ({ id: e.id, rotulo: `${e.codigo} — ${e.nome}` }));
+      case "cargo":
+        return cargosLista
+          .filter((c) => c.status === "ativo")
+          .map((c) => ({ id: c.id, rotulo: `${c.codigo} — ${c.nome}` }));
+      case "centroCusto":
+        return centrosCustoLista
+          .filter((c) => c.status === "ativo")
+          .map((c) => ({ id: c.id, rotulo: `${c.codigo} — ${c.nome}` }));
+      default:
+        return [];
+    }
+  }
 
-  const colunas: DataTableColumn<HistoricoFuncionalExemplo>[] = [
-    {
-      key: "referencia",
-      header: "Referência técnica",
-      cell: (linha) => <code>{linha.id}</code>,
-    },
+  const departamentosAtivos = useMemo(
+    () => departamentosLista.filter((d) => d.status === "ativo"),
+    [departamentosLista],
+  );
+
+  function abrirFormulario() {
+    if (!filtroVinculoId) return;
+    setLinhaDoTempo(null);
+    setFormulario({
+      vinculoId: filtroVinculoId,
+      tipo: "",
+      motivoCodigo: "",
+      vigenciaInicio: "",
+      tipoDestino: "",
+      destinoId: "",
+      departamentoIdArea: "",
+      erros: {},
+      salvando: false,
+    });
+  }
+
+  function fecharFormulario() {
+    setFormulario(null);
+  }
+
+  async function handleSubmitRegistro(evento: React.FormEvent) {
+    evento.preventDefault();
+    if (!formulario) return;
+
+    const erros: RegistroErros = {};
+    if (!formulario.tipo) erros.tipo = "Selecione o tipo de movimentação.";
+    if (!formulario.motivoCodigo) erros.motivoCodigo = "Selecione o motivo.";
+    if (!formulario.vigenciaInicio)
+      erros.vigenciaInicio = "Informe o início da vigência.";
+    const erroDestino = validarDestino(
+      formulario.tipo,
+      formulario.tipoDestino,
+      formulario.destinoId,
+      formulario.departamentoIdArea,
+    );
+    if (erroDestino) erros.destino = erroDestino;
+
+    if (
+      erros.tipo ??
+      erros.motivoCodigo ??
+      erros.vigenciaInicio ??
+      erros.destino
+    ) {
+      setFormulario((prev) => (prev ? { ...prev, erros } : prev));
+      return;
+    }
+
+    setFormulario((prev) =>
+      prev ? { ...prev, salvando: true, erros: {} } : prev,
+    );
+    try {
+      const dto: RegistrarMovimentacaoDto = {
+        vinculoId: formulario.vinculoId,
+        tipo: formulario.tipo as TipoMovimentacaoRegistravel,
+        motivoCodigo: formulario.motivoCodigo as MotivoMovimentacao,
+        vigenciaInicio: formulario.vigenciaInicio,
+        ...(formulario.tipo !== "desligamento"
+          ? montarDestinoDto(
+              formulario.tipoDestino,
+              formulario.destinoId,
+              formulario.departamentoIdArea,
+            )
+          : {}),
+      };
+      await registrarMovimentacao(dto);
+      setFormulario(null);
+      await carregarListagem();
+    } catch (err: unknown) {
+      const mensagem =
+        err instanceof Error
+          ? err.message
+          : "Não foi possível registrar a movimentação. Tente novamente.";
+      setFormulario((prev) =>
+        prev
+          ? {
+              ...prev,
+              salvando: false,
+              erros: { ...prev.erros, geral: mensagem },
+            }
+          : prev,
+      );
+    }
+  }
+
+  async function carregarLinhaDoTempo(vinculoId: string) {
+    setLinhaDoTempo((prev) =>
+      prev && prev.vinculoId === vinculoId
+        ? { ...prev, status: "carregando" }
+        : prev,
+    );
+    try {
+      const itens = await buscarLinhaDoTempo(vinculoId);
+      setLinhaDoTempo((prev) =>
+        prev && prev.vinculoId === vinculoId
+          ? { ...prev, itens, status: "dados" }
+          : prev,
+      );
+    } catch {
+      setLinhaDoTempo((prev) =>
+        prev && prev.vinculoId === vinculoId
+          ? { ...prev, status: "erro" }
+          : prev,
+      );
+    }
+  }
+
+  /** Atualiza a linha do tempo sem piscar para "carregando" — usado após ações. */
+  async function atualizarLinhaDoTempoSilenciosa(vinculoId: string) {
+    try {
+      const itens = await buscarLinhaDoTempo(vinculoId);
+      setLinhaDoTempo((prev) =>
+        prev && prev.vinculoId === vinculoId
+          ? { ...prev, itens, status: "dados" }
+          : prev,
+      );
+    } catch {
+      // Mantém os itens já exibidos; a falha de atualização silenciosa não
+      // interrompe o fluxo — o botão "Tentar novamente" cobre o caso.
+    }
+  }
+
+  async function abrirLinhaDoTempo(vinculoId: string, vinculoLabel: string) {
+    setFormulario(null);
+    setLinhaDoTempo({
+      vinculoId,
+      vinculoLabel,
+      status: "carregando",
+      itens: [],
+      acaoEmAndamentoId: null,
+      erroAcao: null,
+      retificar: null,
+    });
+    await carregarLinhaDoTempo(vinculoId);
+  }
+
+  function fecharLinhaDoTempo() {
+    setLinhaDoTempo(null);
+  }
+
+  async function handleEfetivar(movimentacaoId: string) {
+    if (!linhaDoTempo) return;
+    const vinculoId = linhaDoTempo.vinculoId;
+    setLinhaDoTempo((prev) =>
+      prev && prev.vinculoId === vinculoId
+        ? { ...prev, acaoEmAndamentoId: movimentacaoId, erroAcao: null }
+        : prev,
+    );
+    try {
+      await efetivarMovimentacao(movimentacaoId);
+      await atualizarLinhaDoTempoSilenciosa(vinculoId);
+      await carregarListagem();
+      setLinhaDoTempo((prev) =>
+        prev && prev.vinculoId === vinculoId
+          ? { ...prev, acaoEmAndamentoId: null }
+          : prev,
+      );
+    } catch (err: unknown) {
+      const mensagem =
+        err instanceof Error
+          ? err.message
+          : "Não foi possível efetivar a movimentação. Tente novamente.";
+      setLinhaDoTempo((prev) =>
+        prev && prev.vinculoId === vinculoId
+          ? { ...prev, acaoEmAndamentoId: null, erroAcao: mensagem }
+          : prev,
+      );
+    }
+  }
+
+  async function handleCancelar(movimentacaoId: string) {
+    if (!linhaDoTempo) return;
+    const vinculoId = linhaDoTempo.vinculoId;
+    setLinhaDoTempo((prev) =>
+      prev && prev.vinculoId === vinculoId
+        ? { ...prev, acaoEmAndamentoId: movimentacaoId, erroAcao: null }
+        : prev,
+    );
+    try {
+      await cancelarMovimentacao(movimentacaoId);
+      await atualizarLinhaDoTempoSilenciosa(vinculoId);
+      await carregarListagem();
+      setLinhaDoTempo((prev) =>
+        prev && prev.vinculoId === vinculoId
+          ? { ...prev, acaoEmAndamentoId: null }
+          : prev,
+      );
+    } catch (err: unknown) {
+      const mensagem =
+        err instanceof Error
+          ? err.message
+          : "Não foi possível cancelar a movimentação. Tente novamente.";
+      setLinhaDoTempo((prev) =>
+        prev && prev.vinculoId === vinculoId
+          ? { ...prev, acaoEmAndamentoId: null, erroAcao: mensagem }
+          : prev,
+      );
+    }
+  }
+
+  function abrirRetificar(m: MovimentacaoApi) {
+    setLinhaDoTempo((prev) =>
+      prev
+        ? {
+            ...prev,
+            erroAcao: null,
+            retificar: {
+              movimentacaoId: m.id,
+              tipoOriginal: m.tipo,
+              motivoCodigo: "",
+              vigenciaInicio: "",
+              tipoDestino: "",
+              destinoId: "",
+              departamentoIdArea: "",
+              erros: {},
+              salvando: false,
+            },
+          }
+        : prev,
+    );
+  }
+
+  function fecharRetificar() {
+    setLinhaDoTempo((prev) => (prev ? { ...prev, retificar: null } : prev));
+  }
+
+  async function handleSubmitRetificar(evento: React.FormEvent) {
+    evento.preventDefault();
+    if (!linhaDoTempo?.retificar) return;
+    const r = linhaDoTempo.retificar;
+
+    const erros: RetificarErros = {};
+    if (!r.motivoCodigo) erros.motivoCodigo = "Selecione o motivo.";
+    if (!r.vigenciaInicio)
+      erros.vigenciaInicio = "Informe o início da vigência.";
+    const erroDestino = validarDestino(
+      r.tipoOriginal,
+      r.tipoDestino,
+      r.destinoId,
+      r.departamentoIdArea,
+    );
+    if (erroDestino) erros.destino = erroDestino;
+
+    if (erros.motivoCodigo ?? erros.vigenciaInicio ?? erros.destino) {
+      setLinhaDoTempo((prev) =>
+        prev && prev.retificar
+          ? { ...prev, retificar: { ...prev.retificar, erros } }
+          : prev,
+      );
+      return;
+    }
+
+    const vinculoId = linhaDoTempo.vinculoId;
+    setLinhaDoTempo((prev) =>
+      prev && prev.retificar
+        ? {
+            ...prev,
+            retificar: { ...prev.retificar, salvando: true, erros: {} },
+          }
+        : prev,
+    );
+    try {
+      const dto: RetificarMovimentacaoDto = {
+        motivoCodigo: r.motivoCodigo as MotivoMovimentacao,
+        vigenciaInicio: r.vigenciaInicio,
+        ...(r.tipoOriginal !== "desligamento"
+          ? montarDestinoDto(r.tipoDestino, r.destinoId, r.departamentoIdArea)
+          : {}),
+      };
+      await retificarMovimentacao(r.movimentacaoId, dto);
+      setLinhaDoTempo((prev) =>
+        prev && prev.vinculoId === vinculoId
+          ? { ...prev, retificar: null }
+          : prev,
+      );
+      await atualizarLinhaDoTempoSilenciosa(vinculoId);
+      await carregarListagem();
+    } catch (err: unknown) {
+      const mensagem =
+        err instanceof Error
+          ? err.message
+          : "Não foi possível retificar a movimentação. Tente novamente.";
+      setLinhaDoTempo((prev) =>
+        prev && prev.retificar
+          ? {
+              ...prev,
+              retificar: {
+                ...prev.retificar,
+                salvando: false,
+                erros: { ...prev.retificar.erros, geral: mensagem },
+              },
+            }
+          : prev,
+      );
+    }
+  }
+
+  function renderAcoesLinhaDoTempo(m: MovimentacaoApi) {
+    if (!linhaDoTempo) return null;
+    const algumaAcaoEmAndamento = linhaDoTempo.acaoEmAndamentoId !== null;
+    const estaEmAndamento = linhaDoTempo.acaoEmAndamentoId === m.id;
+
+    if (m.status === "solicitada" || m.status === "programada") {
+      return (
+        <div className="historico-funcional-screen__acoes-linha">
+          <Button
+            variant="secondary"
+            onClick={() => void handleEfetivar(m.id)}
+            disabled={algumaAcaoEmAndamento}
+          >
+            {estaEmAndamento ? "Efetivando…" : "Efetivar"}
+          </Button>
+          <Button
+            variant="subtle"
+            onClick={() => void handleCancelar(m.id)}
+            disabled={algumaAcaoEmAndamento}
+          >
+            {estaEmAndamento ? "Cancelando…" : "Cancelar"}
+          </Button>
+        </div>
+      );
+    }
+    if (m.status === "efetivada") {
+      return (
+        <Button
+          variant="secondary"
+          onClick={() => abrirRetificar(m)}
+          disabled={linhaDoTempo.retificar !== null || algumaAcaoEmAndamento}
+        >
+          Retificar
+        </Button>
+      );
+    }
+    return <span className="historico-funcional-screen__nota">—</span>;
+  }
+
+  function renderRetificacaoInfo(m: MovimentacaoApi): string {
+    if (m.status === "retificada") {
+      const correcao = linhaDoTempo?.itens.find((x) => x.retificaId === m.id);
+      return correcao
+        ? `Corrigida — nova vigência ${correcao.vigenciaInicio}`
+        : "Corrigida";
+    }
+    if (m.retificaId) return "É a correção de outra movimentação";
+    return "—";
+  }
+
+  const colunasMovimentacoes: DataTableColumn<MovimentacaoApi>[] = [
     {
       key: "vinculo",
-      header: "Vínculo técnico",
-      cell: (linha) => linha.vinculoTecnico,
+      header: "Vínculo",
+      cell: (m) => resolverVinculo(m.vinculoId),
     },
     {
-      key: "tipoEvento",
-      header: "Tipo de evento ilustrativo",
-      cell: (linha) => linha.tipoEventoIlustrativo,
+      key: "tipo",
+      header: "Tipo",
+      cell: (m) => ROTULO_TIPO_MOVIMENTACAO[m.tipo],
     },
     {
-      key: "referenciaOrganizacional",
-      header: "Referência organizacional",
-      cell: (linha) => linha.referenciaOrganizacional,
-    },
-    {
-      key: "periodo",
-      header: "Período ilustrativo",
-      cell: (linha) => linha.periodoIlustrativo,
-    },
-    {
-      key: "situacao",
-      header: "Situação",
-      cell: (linha) => (
-        <StatusBadge variant={VARIANTE_SITUACAO[linha.situacao]}>
-          {ROTULO_SITUACAO_HISTORICO_FUNCIONAL[linha.situacao]}
+      key: "status",
+      header: "Status",
+      cell: (m) => (
+        <StatusBadge variant={VARIANTE_STATUS_MOVIMENTACAO[m.status]}>
+          {ROTULO_STATUS_MOVIMENTACAO[m.status]}
         </StatusBadge>
       ),
     },
     {
-      key: "responsavel",
-      header: "Responsável técnico",
-      cell: (linha) => linha.responsavelTecnico,
+      key: "motivo",
+      header: "Motivo",
+      cell: (m) => ROTULO_MOTIVO[m.motivoCodigo],
     },
     {
-      key: "trilha",
-      header: "Trilha de auditoria",
-      cell: (linha) => linha.trilhaAuditoria,
+      key: "vigencia",
+      header: "Vigência início",
+      cell: (m) => m.vigenciaInicio,
+    },
+    {
+      key: "registrada",
+      header: "Registrada em",
+      cell: (m) => formatarDataHora(m.registradaEm),
+    },
+    {
+      key: "efetivada",
+      header: "Efetivada em",
+      cell: (m) => (m.efetivadaEm ? formatarDataHora(m.efetivadaEm) : "—"),
     },
     {
       key: "acoes",
       header: "Ações",
-      cell: (linha) => (
-        <Button variant="subtle" onClick={() => setDetalheAbertoId(linha.id)}>
-          Ver detalhe
-          <span className="sr-only"> — {linha.id}</span>
+      cell: (m) => (
+        <Button
+          variant="subtle"
+          onClick={() =>
+            void abrirLinhaDoTempo(m.vinculoId, resolverVinculo(m.vinculoId))
+          }
+        >
+          Ver linha do tempo
+          <span className="sr-only"> — {resolverVinculo(m.vinculoId)}</span>
         </Button>
       ),
     },
   ];
+
+  const colunasLinhaDoTempo: DataTableColumn<MovimentacaoApi>[] = [
+    {
+      key: "tipo",
+      header: "Tipo",
+      cell: (m) => ROTULO_TIPO_MOVIMENTACAO[m.tipo],
+    },
+    {
+      key: "status",
+      header: "Status",
+      cell: (m) => (
+        <StatusBadge variant={VARIANTE_STATUS_MOVIMENTACAO[m.status]}>
+          {ROTULO_STATUS_MOVIMENTACAO[m.status]}
+        </StatusBadge>
+      ),
+    },
+    {
+      key: "motivo",
+      header: "Motivo",
+      cell: (m) => ROTULO_MOTIVO[m.motivoCodigo],
+    },
+    { key: "destino", header: "Destino", cell: (m) => resolverDestino(m) },
+    {
+      key: "vigencia",
+      header: "Vigência início",
+      cell: (m) => m.vigenciaInicio,
+    },
+    {
+      key: "registrada",
+      header: "Registrada em",
+      cell: (m) => formatarDataHora(m.registradaEm),
+    },
+    {
+      key: "efetivada",
+      header: "Efetivada em",
+      cell: (m) => (m.efetivadaEm ? formatarDataHora(m.efetivadaEm) : "—"),
+    },
+    {
+      key: "retificacao",
+      header: "Retificação",
+      cell: (m) => renderRetificacaoInfo(m),
+    },
+    { key: "acoes", header: "Ações", cell: (m) => renderAcoesLinhaDoTempo(m) },
+  ];
+
+  const opcoesDestinoRegistro = formulario
+    ? opcoesDestinoAtuais(formulario.tipoDestino, formulario.departamentoIdArea)
+    : [];
+  const rotuloDestinoRegistro =
+    OPCOES_TIPO_DESTINO.find((o) => o.valor === formulario?.tipoDestino)
+      ?.rotulo ?? "Destino organizacional";
+
+  const opcoesDestinoRetificar = linhaDoTempo?.retificar
+    ? opcoesDestinoAtuais(
+        linhaDoTempo.retificar.tipoDestino,
+        linhaDoTempo.retificar.departamentoIdArea,
+      )
+    : [];
+  const rotuloDestinoRetificar =
+    OPCOES_TIPO_DESTINO.find(
+      (o) => o.valor === linhaDoTempo?.retificar?.tipoDestino,
+    )?.rotulo ?? "Destino organizacional";
 
   return (
     <div className="historico-funcional-screen">
@@ -206,7 +900,7 @@ export function HistoricoFuncionalScreen() {
         headingLevel={1}
         titleId={HISTORICO_FUNCIONAL_TITULO_ID}
         title="Histórico funcional"
-        description="Demonstração visual de como o RH poderá consultar referências de vínculo e movimentação funcional por referência organizacional."
+        description="Registre, efetive, cancele e retifique movimentações funcionais de um vínculo — transferência, mudança de cargo e desligamento — e consulte a linha do tempo completa de cada vínculo."
       />
 
       <Surface
@@ -215,28 +909,14 @@ export function HistoricoFuncionalScreen() {
         className="historico-funcional-screen__aviso"
         aria-labelledby="historico-funcional-aviso-rh-titulo"
       >
-        <StatusBadge variant="info">Somente RH</StatusBadge>
+        <StatusBadge variant="info">Somente RH e DP</StatusBadge>
         <p
           id="historico-funcional-aviso-rh-titulo"
           className="historico-funcional-screen__aviso-texto"
         >
-          A consulta é limitada à própria empresa e às unidades autorizadas.
-        </p>
-      </Surface>
-
-      <Surface
-        as="section"
-        padding="md"
-        className="historico-funcional-screen__aviso"
-        aria-labelledby="historico-funcional-aviso-demo-titulo"
-      >
-        <StatusBadge variant="info">Somente demonstração</StatusBadge>
-        <p
-          id="historico-funcional-aviso-demo-titulo"
-          className="historico-funcional-screen__aviso-texto"
-        >
-          Não há login, API, persistência, alteração cadastral, admissão,
-          transferência, promoção, desligamento ou integração real nesta tela.
+          Esta tela é operada exclusivamente pelo RH e DP da própria empresa.
+          Master técnico apenas consulta, em qualquer empresa. Toda ação gera
+          trilha de auditoria automática.
         </p>
       </Surface>
 
@@ -244,378 +924,797 @@ export function HistoricoFuncionalScreen() {
         as="section"
         padding="md"
         className="historico-funcional-screen__aviso historico-funcional-screen__aviso--indisponivel"
-        aria-labelledby="historico-funcional-aviso-historico-titulo"
+        aria-labelledby="historico-funcional-aviso-indisponivel-titulo"
       >
-        <StatusBadge variant="warning">Histórico não é alteração</StatusBadge>
+        <StatusBadge variant="warning">Fora de escopo</StatusBadge>
         <p
-          id="historico-funcional-aviso-historico-titulo"
+          id="historico-funcional-aviso-indisponivel-titulo"
           className="historico-funcional-screen__aviso-texto"
         >
-          Referências de vínculo e movimentação não alteram colaborador, cargo,
-          função, salário, jornada, ponto, documentos, Banco de Horas, Folha,
-          permissão ou acesso.
+          Não há aprovação/rejeição — RH/DP registram e efetivam diretamente,
+          sob responsabilidade auditada. Esta tela não cria admissão (ela nasce
+          junto do vínculo, em "Colaboradores"), nem calcula ou altera acesso,
+          remuneração, salário, cálculo, Folha, documentos, benefícios,
+          dependentes, afastamentos, jornada ou Banco de Horas. Retificar sempre
+          cria um registro novo e preserva o original na linha do tempo — nada é
+          apagado, editado ou ocultado.
         </p>
       </Surface>
 
-      <Surface
-        as="section"
-        padding="md"
-        className="historico-funcional-screen__aviso historico-funcional-screen__aviso--indisponivel"
-        aria-labelledby="historico-funcional-aviso-dados-titulo"
-      >
-        <StatusBadge variant="warning">Dados reais bloqueados</StatusBadge>
-        <p
-          id="historico-funcional-aviso-dados-titulo"
-          className="historico-funcional-screen__aviso-texto"
-        >
-          Qualquer operação real exige MFA, o gate-mestre de segurança
-          operacional (<code>DS-OPS-01</code>), auditoria, retenção/base legal e
-          validações aplicáveis de RH, Jurídico/privacidade, Folha/DP e TI.
-        </p>
-      </Surface>
-
-      <section
-        aria-labelledby="historico-funcional-resumo-titulo"
-        className="historico-funcional-screen__resumo"
-      >
-        <h2
-          id="historico-funcional-resumo-titulo"
-          className="historico-funcional-screen__section-title"
-        >
-          Resumo (exemplo)
-        </h2>
-        <ul className="historico-funcional-screen__resumo-lista">
-          <li className="historico-funcional-screen__resumo-item">
-            <Surface
-              as="div"
-              padding="md"
-              className="historico-funcional-screen__resumo-item-conteudo"
-            >
-              <StatusBadge variant="info">Vínculos de referência</StatusBadge>
-              <p className="historico-funcional-screen__resumo-item-texto">
-                {resumo.totalVinculos} vínculo(s) de referência (exemplo)
-              </p>
-            </Surface>
-          </li>
-          <li className="historico-funcional-screen__resumo-item">
-            <Surface
-              as="div"
-              padding="md"
-              className="historico-funcional-screen__resumo-item-conteudo"
-            >
-              <StatusBadge variant="info">Movimentos ilustrativos</StatusBadge>
-              <p className="historico-funcional-screen__resumo-item-texto">
-                {resumo.totalMovimentos} movimento(s) funcional(is)
-                ilustrativo(s) (exemplo)
-              </p>
-            </Surface>
-          </li>
-          <li className="historico-funcional-screen__resumo-item">
-            <Surface
-              as="div"
-              padding="md"
-              className="historico-funcional-screen__resumo-item-conteudo"
-            >
-              <StatusBadge variant="info">Em revisão</StatusBadge>
-              <p className="historico-funcional-screen__resumo-item-texto">
-                {resumo.totalEmRevisao} item(ns) em revisão (exemplo)
-              </p>
-            </Surface>
-          </li>
-          <li className="historico-funcional-screen__resumo-item">
-            <Surface
-              as="div"
-              padding="md"
-              className="historico-funcional-screen__resumo-item-conteudo"
-            >
-              <StatusBadge variant="warning">Pendentes de decisão</StatusBadge>
-              <p className="historico-funcional-screen__resumo-item-texto">
-                {resumo.totalAguardandoDecisao} item(ns) pendente(s) de decisão
-                (exemplo)
-              </p>
-            </Surface>
-          </li>
-          <li className="historico-funcional-screen__resumo-item">
-            <Surface
-              as="div"
-              padding="md"
-              className="historico-funcional-screen__resumo-item-conteudo"
-            >
-              <StatusBadge variant="neutral">Itens históricos</StatusBadge>
-              <p className="historico-funcional-screen__resumo-item-texto">
-                {resumo.totalHistorico} item(ns) histórico(s) (exemplo)
-              </p>
-            </Surface>
-          </li>
-        </ul>
-        <p className="historico-funcional-screen__nota">
-          Os indicadores não criam, alteram, reconhecem, aprovam ou encerram
-          vínculo; não calculam remuneração, pagamento, desconto, jornada, Banco
-          de Horas, Folha ou integração.
-        </p>
-      </section>
-
-      <section
-        aria-labelledby="historico-funcional-demo-titulo"
-        className="historico-funcional-screen__demo"
-      >
-        <h2
-          id="historico-funcional-demo-titulo"
-          className="historico-funcional-screen__section-title"
-        >
-          Estado de demonstração
-        </h2>
-        <p className="historico-funcional-screen__demo-texto">
-          Alterna a amostra visual exibida abaixo — não representa uma chamada
-          real à API.
-        </p>
-        <div
-          role="group"
-          aria-label="Selecionar estado de demonstração do histórico funcional"
-          className="historico-funcional-screen__demo-botoes"
-        >
-          {(Object.keys(ROTULO_ESTADO_DEMO) as EstadoDemonstracao[]).map(
-            (chave) => (
-              <Button
-                key={chave}
-                type="button"
-                variant={estadoDemo === chave ? "primary" : "secondary"}
-                aria-pressed={estadoDemo === chave}
-                onClick={() => setEstadoDemo(chave)}
-              >
-                {ROTULO_ESTADO_DEMO[chave]}
-              </Button>
-            ),
-          )}
-        </div>
-      </section>
-
-      {estadoDemo === "erro" ? (
+      {statusCarregamento === "erro" ? (
         <Surface
           as="section"
           padding="lg"
           className="historico-funcional-screen__erro"
-          aria-labelledby="historico-funcional-erro-titulo"
+          aria-labelledby="historico-funcional-erro-base-titulo"
         >
           <StatusBadge variant="danger">Erro</StatusBadge>
           <h2
-            id="historico-funcional-erro-titulo"
+            id="historico-funcional-erro-base-titulo"
             className="historico-funcional-screen__section-title"
           >
-            Não foi possível carregar as referências de histórico funcional
+            Não foi possível carregar os dados desta tela
           </h2>
           <p>
-            Tente novamente em instantes. Se o problema persistir, contate o
-            suporte informando a referência abaixo.
+            Verifique sua conexão e tente novamente. Se o problema persistir,
+            contate o suporte.
           </p>
-          <p className="historico-funcional-screen__erro-referencia">
-            Referência: <code>REQ-DEMO-008014</code> (ilustrativa)
-          </p>
-          <Button variant="secondary" onClick={() => setEstadoDemo("dados")}>
+          <Button variant="secondary" onClick={() => void carregarBase()}>
             Tentar novamente
           </Button>
         </Surface>
+      ) : statusCarregamento === "carregando" ? (
+        <p className="historico-funcional-screen__carregando" role="status">
+          Carregando colaboradores…
+        </p>
+      ) : colaboradores.length === 0 ? (
+        <EmptyState
+          headingLevel={2}
+          icon="—"
+          title="Nenhum colaborador cadastrado"
+          description="Cadastre um colaborador na aba Colaboradores para começar a registrar movimentações."
+        />
       ) : (
-        <section aria-labelledby="historico-funcional-lista-titulo">
-          <h2
-            id="historico-funcional-lista-titulo"
-            className="historico-funcional-screen__section-title"
-          >
-            Referências de histórico funcional
-          </h2>
-
-          <div className="historico-funcional-screen__filtros">
-            <FormField
-              id="historico-funcional-filtro-tipo-evento"
-              label="Tipo de evento"
+        <>
+          <section aria-labelledby="historico-funcional-filtros-titulo">
+            <h2
+              id="historico-funcional-filtros-titulo"
+              className="historico-funcional-screen__section-title"
             >
-              {(control) => (
-                <select
-                  value={filtroTipoEvento}
-                  onChange={(evento) =>
-                    setFiltroTipoEvento(evento.target.value)
-                  }
-                  {...control}
-                >
-                  <option value={OPCAO_TODOS}>Todos os tipos</option>
-                  {tiposEventoDisponiveis.map((tipo) => (
-                    <option key={tipo} value={tipo}>
-                      {tipo}
+              Filtros
+            </h2>
+            <div className="historico-funcional-screen__filtros">
+              <FormField
+                id="historico-funcional-filtro-colaborador"
+                label="Colaborador"
+              >
+                {(control) => (
+                  <select
+                    value={filtroColaboradorId}
+                    onChange={(e) => void selecionarColaborador(e.target.value)}
+                    {...control}
+                  >
+                    <option value="todos">Todos os colaboradores</option>
+                    {colaboradores.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.nome}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </FormField>
+
+              <FormField
+                id="historico-funcional-filtro-vinculo"
+                label="Vínculo"
+              >
+                {(control) => (
+                  <select
+                    value={filtroVinculoId}
+                    onChange={(e) => selecionarVinculo(e.target.value)}
+                    disabled={
+                      filtroColaboradorId === "todos" ||
+                      statusVinculos !== "dados"
+                    }
+                    {...control}
+                  >
+                    <option value="">
+                      {filtroColaboradorId === "todos"
+                        ? "Selecione um colaborador primeiro"
+                        : "Selecione…"}
                     </option>
-                  ))}
-                </select>
-              )}
-            </FormField>
+                    {vinculosDoColaborador.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.matricula} — {ROTULO_TIPO_VINCULO[v.tipo]}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </FormField>
 
-            <FormField
-              id="historico-funcional-filtro-situacao"
-              label="Situação"
+              <FormField id="historico-funcional-filtro-tipo" label="Tipo">
+                {(control) => (
+                  <select
+                    value={filtroTipo}
+                    onChange={(e) => setFiltroTipo(e.target.value)}
+                    {...control}
+                  >
+                    <option value="todos">Todos os tipos</option>
+                    {(
+                      Object.keys(
+                        ROTULO_TIPO_MOVIMENTACAO,
+                      ) as TipoMovimentacao[]
+                    ).map((tipo) => (
+                      <option key={tipo} value={tipo}>
+                        {ROTULO_TIPO_MOVIMENTACAO[tipo]}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </FormField>
+
+              <FormField id="historico-funcional-filtro-status" label="Status">
+                {(control) => (
+                  <select
+                    value={filtroStatus}
+                    onChange={(e) => setFiltroStatus(e.target.value)}
+                    {...control}
+                  >
+                    <option value="todos">Todos os status</option>
+                    {(
+                      Object.keys(
+                        ROTULO_STATUS_MOVIMENTACAO,
+                      ) as StatusMovimentacao[]
+                    ).map((status) => (
+                      <option key={status} value={status}>
+                        {ROTULO_STATUS_MOVIMENTACAO[status]}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </FormField>
+
+              <Button onClick={abrirFormulario} disabled={!filtroVinculoId}>
+                Registrar movimentação
+              </Button>
+            </div>
+            {statusVinculos === "erro" ? (
+              <p className="historico-funcional-screen__form-erro" role="alert">
+                Não foi possível carregar os vínculos deste colaborador.
+              </p>
+            ) : null}
+            {statusVinculos === "dados" &&
+            vinculosDoColaborador.length === 0 ? (
+              <p className="historico-funcional-screen__nota">
+                Este colaborador não tem nenhum vínculo.
+              </p>
+            ) : null}
+            {!filtroVinculoId ? (
+              <p className="historico-funcional-screen__nota">
+                Selecione um colaborador e um vínculo específico para registrar
+                uma nova movimentação — a escolha nunca é automática quando há
+                mais de uma opção.
+              </p>
+            ) : null}
+          </section>
+
+          <section aria-labelledby="historico-funcional-lista-titulo">
+            <h2
+              id="historico-funcional-lista-titulo"
+              className="historico-funcional-screen__section-title"
             >
-              {(control) => (
-                <select
-                  value={filtroSituacao}
-                  onChange={(evento) => setFiltroSituacao(evento.target.value)}
-                  {...control}
+              Movimentações
+            </h2>
+
+            {statusListagem === "erro" ? (
+              <Surface
+                as="div"
+                padding="lg"
+                className="historico-funcional-screen__erro"
+              >
+                <StatusBadge variant="danger">Erro</StatusBadge>
+                <p>Não foi possível carregar as movimentações.</p>
+                <Button
+                  variant="secondary"
+                  onClick={() => void carregarListagem()}
                 >
-                  <option value={OPCAO_TODOS}>Todas as situações</option>
-                  {(
-                    Object.keys(
-                      ROTULO_SITUACAO_HISTORICO_FUNCIONAL,
-                    ) as SituacaoHistoricoFuncional[]
-                  ).map((situacao) => (
-                    <option key={situacao} value={situacao}>
-                      {ROTULO_SITUACAO_HISTORICO_FUNCIONAL[situacao]}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </FormField>
-
-            <FormField
-              id="historico-funcional-filtro-organizacional"
-              label="Referência organizacional"
-            >
-              {(control) => (
-                <select
-                  value={filtroOrganizacional}
-                  onChange={(evento) =>
-                    setFiltroOrganizacional(evento.target.value)
-                  }
-                  {...control}
-                >
-                  <option value={OPCAO_TODOS}>Todas as referências</option>
-                  {referenciasOrganizacionaisDisponiveis.map((referencia) => (
-                    <option key={referencia} value={referencia}>
-                      {referencia}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </FormField>
-
-            <Button
-              variant="subtle"
-              onClick={limparFiltros}
-              disabled={!filtrosAtivos}
-            >
-              Limpar filtros
-            </Button>
-          </div>
-          <p className="historico-funcional-screen__filtros-nota">
-            Filtro só local, apenas para esta demonstração — não é enviado a
-            nenhum servidor nem fica salvo ao recarregar a página.
-          </p>
-
-          {linhasBase.length === 0 ? (
-            <EmptyState
-              headingLevel={3}
-              icon="—"
-              title="Nenhuma referência de histórico funcional cadastrada"
-              description="Quando houver uma referência desta empresa, ela aparece aqui (exemplo)."
-            />
-          ) : linhasFiltradas.length === 0 ? (
-            <EmptyState
-              headingLevel={3}
-              icon="—"
-              title="Nenhuma referência corresponde aos filtros"
-              description="Ajuste ou limpe os filtros para ver as demais referências desta demonstração."
-              action={
-                <Button variant="primary" onClick={limparFiltros}>
-                  Limpar filtros
+                  Tentar novamente
                 </Button>
-              }
-            />
-          ) : (
-            <DataTable
-              caption="Histórico funcional (exemplo)"
-              columns={colunas}
-              rows={linhasFiltradas}
-              rowKey={(linha) => linha.id}
-            />
-          )}
-        </section>
+              </Surface>
+            ) : statusListagem === "carregando" ? (
+              <p
+                className="historico-funcional-screen__carregando"
+                role="status"
+              >
+                Carregando movimentações…
+              </p>
+            ) : movimentacoes.length === 0 ? (
+              <EmptyState
+                headingLevel={3}
+                icon="—"
+                title="Nenhuma movimentação encontrada"
+                description="Ajuste os filtros ou registre uma nova movimentação para um vínculo selecionado."
+              />
+            ) : (
+              <DataTable
+                caption="Movimentações funcionais"
+                columns={colunasMovimentacoes}
+                rows={movimentacoes}
+                rowKey={(m) => m.id}
+              />
+            )}
+          </section>
+        </>
       )}
 
-      {detalheAberto ? (
+      {formulario ? (
         <Surface
           as="section"
           padding="lg"
-          className="historico-funcional-screen__detalhe"
-          aria-labelledby={detalheTituloId}
+          className="historico-funcional-screen__formulario"
+          aria-labelledby={formTituloId}
         >
-          <StatusBadge variant="info">Detalhe demonstrativo</StatusBadge>
           <h2
-            id={detalheTituloId}
+            id={formTituloId}
             className="historico-funcional-screen__section-title"
           >
-            Detalhe da referência — {detalheAberto.id}
+            Registrar movimentação — {resolverVinculo(formulario.vinculoId)}
           </h2>
-          <dl className="historico-funcional-screen__detalhe-lista">
-            <div>
-              <dt>Referência técnica</dt>
-              <dd>
-                <code>{detalheAberto.id}</code>
-              </dd>
-            </div>
-            <div>
-              <dt>Vínculo técnico</dt>
-              <dd>{detalheAberto.vinculoTecnico}</dd>
-            </div>
-            <div>
-              <dt>Tipo de evento ilustrativo</dt>
-              <dd>{detalheAberto.tipoEventoIlustrativo}</dd>
-            </div>
-            <div>
-              <dt>Referência organizacional</dt>
-              <dd>{detalheAberto.referenciaOrganizacional}</dd>
-            </div>
-            <div>
-              <dt>Período ilustrativo</dt>
-              <dd>{detalheAberto.periodoIlustrativo}</dd>
-            </div>
-            <div>
-              <dt>Situação</dt>
-              <dd>
-                {ROTULO_SITUACAO_HISTORICO_FUNCIONAL[detalheAberto.situacao]}
-              </dd>
-            </div>
-            <div>
-              <dt>Responsável técnico</dt>
-              <dd>{detalheAberto.responsavelTecnico}</dd>
-            </div>
-            <div>
-              <dt>Trilha de auditoria</dt>
-              <dd>{detalheAberto.trilhaAuditoria}</dd>
-            </div>
-          </dl>
+          <p className="historico-funcional-screen__aviso-texto">
+            A movimentação só produz efeito quando efetivada — o registro
+            sozinho não altera cargo, departamento, jornada, salário ou qualquer
+            cálculo.
+          </p>
 
-          <h3 className="historico-funcional-screen__detalhe-subtitulo">
-            Descrição de referência (exemplo)
-          </h3>
-          <p>{detalheAberto.descricaoReferencia}</p>
+          <form
+            className="historico-funcional-screen__form"
+            aria-label="Formulário de registro de movimentação"
+            onSubmit={(e) => void handleSubmitRegistro(e)}
+          >
+            <FormField
+              id="historico-funcional-registrar-tipo"
+              label="Tipo de movimentação"
+              required
+              {...(formulario.erros.tipo
+                ? { error: formulario.erros.tipo }
+                : {})}
+            >
+              {(control) => (
+                <select
+                  value={formulario.tipo}
+                  onChange={(e) =>
+                    setFormulario((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            tipo: e.target.value as TipoMovimentacaoRegistravel,
+                            tipoDestino: "",
+                            destinoId: "",
+                            departamentoIdArea: "",
+                            erros: {},
+                          }
+                        : prev,
+                    )
+                  }
+                  {...control}
+                >
+                  <option value="">Selecione…</option>
+                  {TIPOS_REGISTRAVEIS.map((tipo) => (
+                    <option key={tipo} value={tipo}>
+                      {ROTULO_TIPO_MOVIMENTACAO[tipo]}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </FormField>
 
-          <h3 className="historico-funcional-screen__detalhe-subtitulo">
-            Campos que dependem de decisão formal (exemplo)
-          </h3>
-          {detalheAberto.camposPendentes.length === 0 ? (
-            <p>Nenhum campo pendente (exemplo).</p>
+            <FormField
+              id="historico-funcional-registrar-motivo"
+              label="Motivo"
+              required
+              {...(formulario.erros.motivoCodigo
+                ? { error: formulario.erros.motivoCodigo }
+                : {})}
+            >
+              {(control) => (
+                <select
+                  value={formulario.motivoCodigo}
+                  onChange={(e) =>
+                    setFormulario((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            motivoCodigo: e.target.value as MotivoMovimentacao,
+                            erros: {},
+                          }
+                        : prev,
+                    )
+                  }
+                  {...control}
+                >
+                  <option value="">Selecione…</option>
+                  {MOTIVOS.map((motivo) => (
+                    <option key={motivo} value={motivo}>
+                      {ROTULO_MOTIVO[motivo]}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </FormField>
+
+            <FormField
+              id="historico-funcional-registrar-vigencia"
+              label="Vigência — início"
+              required
+              {...(formulario.erros.vigenciaInicio
+                ? { error: formulario.erros.vigenciaInicio }
+                : {})}
+            >
+              {(control) => (
+                <input
+                  type="date"
+                  value={formulario.vigenciaInicio}
+                  onChange={(e) =>
+                    setFormulario((prev) =>
+                      prev
+                        ? { ...prev, vigenciaInicio: e.target.value, erros: {} }
+                        : prev,
+                    )
+                  }
+                  {...control}
+                />
+              )}
+            </FormField>
+
+            {formulario.tipo && formulario.tipo !== "desligamento" ? (
+              <>
+                <FormField
+                  id="historico-funcional-registrar-tipo-destino"
+                  label="Tipo de destino organizacional"
+                  required
+                  {...(formulario.erros.destino
+                    ? { error: formulario.erros.destino }
+                    : {})}
+                >
+                  {(control) => (
+                    <select
+                      value={formulario.tipoDestino}
+                      onChange={(e) =>
+                        setFormulario((prev) =>
+                          prev
+                            ? {
+                                ...prev,
+                                tipoDestino: e.target.value as TipoDestino,
+                                destinoId: "",
+                                departamentoIdArea: "",
+                                erros: {},
+                              }
+                            : prev,
+                        )
+                      }
+                      {...control}
+                    >
+                      <option value="">Selecione…</option>
+                      {OPCOES_TIPO_DESTINO.map((o) => (
+                        <option key={o.valor} value={o.valor}>
+                          {o.rotulo}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </FormField>
+
+                {formulario.tipoDestino === "area" ? (
+                  <FormField
+                    id="historico-funcional-registrar-departamento-area"
+                    label="Departamento"
+                    required
+                  >
+                    {(control) => (
+                      <select
+                        value={formulario.departamentoIdArea}
+                        onChange={(e) =>
+                          setFormulario((prev) =>
+                            prev
+                              ? {
+                                  ...prev,
+                                  departamentoIdArea: e.target.value,
+                                  destinoId: "",
+                                  erros: {},
+                                }
+                              : prev,
+                          )
+                        }
+                        {...control}
+                      >
+                        <option value="">Selecione…</option>
+                        {departamentosAtivos.map((d) => (
+                          <option key={d.id} value={d.id}>
+                            {d.codigo} — {d.nome}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </FormField>
+                ) : null}
+
+                {formulario.tipoDestino ? (
+                  <FormField
+                    id="historico-funcional-registrar-destino"
+                    label={rotuloDestinoRegistro}
+                    required
+                  >
+                    {(control) => (
+                      <select
+                        value={formulario.destinoId}
+                        onChange={(e) =>
+                          setFormulario((prev) =>
+                            prev
+                              ? {
+                                  ...prev,
+                                  destinoId: e.target.value,
+                                  erros: {},
+                                }
+                              : prev,
+                          )
+                        }
+                        disabled={
+                          formulario.tipoDestino === "area" &&
+                          !formulario.departamentoIdArea
+                        }
+                        {...control}
+                      >
+                        <option value="">Selecione…</option>
+                        {opcoesDestinoRegistro.map((o) => (
+                          <option key={o.id} value={o.id}>
+                            {o.rotulo}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </FormField>
+                ) : null}
+              </>
+            ) : null}
+
+            {formulario.erros.geral ? (
+              <p className="historico-funcional-screen__form-erro" role="alert">
+                {formulario.erros.geral}
+              </p>
+            ) : null}
+
+            <FormActions>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={fecharFormulario}
+                disabled={formulario.salvando}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                disabled={formulario.salvando}
+              >
+                {formulario.salvando ? "Registrando…" : "Confirmar registro"}
+              </Button>
+            </FormActions>
+          </form>
+        </Surface>
+      ) : null}
+
+      {linhaDoTempo ? (
+        <Surface
+          as="section"
+          padding="lg"
+          className="historico-funcional-screen__linha-do-tempo"
+          aria-labelledby={linhaTituloId}
+        >
+          <h2
+            id={linhaTituloId}
+            className="historico-funcional-screen__section-title"
+          >
+            Linha do tempo — {linhaDoTempo.vinculoLabel}
+          </h2>
+          <p className="historico-funcional-screen__aviso-texto">
+            Inclui movimentações canceladas e retificadas — nada é omitido do
+            histórico. Uma movimentação retificada permanece aqui, com a
+            correção listada logo abaixo dela.
+          </p>
+
+          {linhaDoTempo.erroAcao ? (
+            <p className="historico-funcional-screen__form-erro" role="alert">
+              {linhaDoTempo.erroAcao}
+            </p>
+          ) : null}
+
+          {linhaDoTempo.status === "erro" ? (
+            <Surface
+              as="div"
+              padding="lg"
+              className="historico-funcional-screen__erro"
+            >
+              <StatusBadge variant="danger">Erro</StatusBadge>
+              <p>Não foi possível carregar a linha do tempo deste vínculo.</p>
+              <Button
+                variant="secondary"
+                onClick={() =>
+                  void carregarLinhaDoTempo(linhaDoTempo.vinculoId)
+                }
+              >
+                Tentar novamente
+              </Button>
+            </Surface>
+          ) : linhaDoTempo.status === "carregando" ? (
+            <p className="historico-funcional-screen__carregando" role="status">
+              Carregando linha do tempo…
+            </p>
+          ) : linhaDoTempo.itens.length === 0 ? (
+            <EmptyState
+              headingLevel={3}
+              icon="—"
+              title="Nenhuma movimentação neste vínculo"
+              description="Ainda não há movimentação registrada para este vínculo."
+            />
           ) : (
-            <ul className="historico-funcional-screen__detalhe-lista-simples">
-              {detalheAberto.camposPendentes.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
+            <DataTable
+              caption={`Linha do tempo — ${linhaDoTempo.vinculoLabel}`}
+              columns={colunasLinhaDoTempo}
+              rows={linhaDoTempo.itens}
+              rowKey={(m) => m.id}
+            />
           )}
 
-          <p className="historico-funcional-screen__detalhe-aviso">
-            <strong>Ação apenas demonstrativa:</strong> este painel não cria,
-            edita, admite, transfere, promove, altera salário, altera jornada,
-            desliga, bloqueia acesso, salva, importa, exporta, aprova nem
-            integra dados reais.
-          </p>
-          <Button variant="secondary" onClick={() => setDetalheAbertoId(null)}>
-            Fechar
-          </Button>
+          {linhaDoTempo.retificar ? (
+            <Surface
+              as="div"
+              padding="md"
+              className="historico-funcional-screen__retificar"
+            >
+              <h3 className="historico-funcional-screen__section-title">
+                Retificar movimentação
+              </h3>
+              <p className="historico-funcional-screen__aviso-texto">
+                Cria uma movimentação nova, corrigida — a original permanece na
+                linha do tempo, marcada como retificada.
+              </p>
+              <form
+                className="historico-funcional-screen__form"
+                aria-label="Formulário de retificação de movimentação"
+                onSubmit={(e) => void handleSubmitRetificar(e)}
+              >
+                <FormField
+                  id="historico-funcional-retificar-motivo"
+                  label="Motivo"
+                  required
+                  {...(linhaDoTempo.retificar.erros.motivoCodigo
+                    ? { error: linhaDoTempo.retificar.erros.motivoCodigo }
+                    : {})}
+                >
+                  {(control) => (
+                    <select
+                      value={linhaDoTempo.retificar!.motivoCodigo}
+                      onChange={(e) =>
+                        setLinhaDoTempo((prev) =>
+                          prev && prev.retificar
+                            ? {
+                                ...prev,
+                                retificar: {
+                                  ...prev.retificar,
+                                  motivoCodigo: e.target
+                                    .value as MotivoMovimentacao,
+                                  erros: {},
+                                },
+                              }
+                            : prev,
+                        )
+                      }
+                      {...control}
+                    >
+                      <option value="">Selecione…</option>
+                      {MOTIVOS.map((motivo) => (
+                        <option key={motivo} value={motivo}>
+                          {ROTULO_MOTIVO[motivo]}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </FormField>
+
+                <FormField
+                  id="historico-funcional-retificar-vigencia"
+                  label="Vigência — início"
+                  required
+                  {...(linhaDoTempo.retificar.erros.vigenciaInicio
+                    ? { error: linhaDoTempo.retificar.erros.vigenciaInicio }
+                    : {})}
+                >
+                  {(control) => (
+                    <input
+                      type="date"
+                      value={linhaDoTempo.retificar!.vigenciaInicio}
+                      onChange={(e) =>
+                        setLinhaDoTempo((prev) =>
+                          prev && prev.retificar
+                            ? {
+                                ...prev,
+                                retificar: {
+                                  ...prev.retificar,
+                                  vigenciaInicio: e.target.value,
+                                  erros: {},
+                                },
+                              }
+                            : prev,
+                        )
+                      }
+                      {...control}
+                    />
+                  )}
+                </FormField>
+
+                {linhaDoTempo.retificar.tipoOriginal !== "desligamento" ? (
+                  <>
+                    <FormField
+                      id="historico-funcional-retificar-tipo-destino"
+                      label="Tipo de destino organizacional"
+                      required
+                      {...(linhaDoTempo.retificar.erros.destino
+                        ? { error: linhaDoTempo.retificar.erros.destino }
+                        : {})}
+                    >
+                      {(control) => (
+                        <select
+                          value={linhaDoTempo.retificar!.tipoDestino}
+                          onChange={(e) =>
+                            setLinhaDoTempo((prev) =>
+                              prev && prev.retificar
+                                ? {
+                                    ...prev,
+                                    retificar: {
+                                      ...prev.retificar,
+                                      tipoDestino: e.target
+                                        .value as TipoDestino,
+                                      destinoId: "",
+                                      departamentoIdArea: "",
+                                      erros: {},
+                                    },
+                                  }
+                                : prev,
+                            )
+                          }
+                          {...control}
+                        >
+                          <option value="">Selecione…</option>
+                          {OPCOES_TIPO_DESTINO.map((o) => (
+                            <option key={o.valor} value={o.valor}>
+                              {o.rotulo}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </FormField>
+
+                    {linhaDoTempo.retificar.tipoDestino === "area" ? (
+                      <FormField
+                        id="historico-funcional-retificar-departamento-area"
+                        label="Departamento"
+                        required
+                      >
+                        {(control) => (
+                          <select
+                            value={linhaDoTempo.retificar!.departamentoIdArea}
+                            onChange={(e) =>
+                              setLinhaDoTempo((prev) =>
+                                prev && prev.retificar
+                                  ? {
+                                      ...prev,
+                                      retificar: {
+                                        ...prev.retificar,
+                                        departamentoIdArea: e.target.value,
+                                        destinoId: "",
+                                        erros: {},
+                                      },
+                                    }
+                                  : prev,
+                              )
+                            }
+                            {...control}
+                          >
+                            <option value="">Selecione…</option>
+                            {departamentosAtivos.map((d) => (
+                              <option key={d.id} value={d.id}>
+                                {d.codigo} — {d.nome}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </FormField>
+                    ) : null}
+
+                    {linhaDoTempo.retificar.tipoDestino ? (
+                      <FormField
+                        id="historico-funcional-retificar-destino"
+                        label={rotuloDestinoRetificar}
+                        required
+                      >
+                        {(control) => (
+                          <select
+                            value={linhaDoTempo.retificar!.destinoId}
+                            onChange={(e) =>
+                              setLinhaDoTempo((prev) =>
+                                prev && prev.retificar
+                                  ? {
+                                      ...prev,
+                                      retificar: {
+                                        ...prev.retificar,
+                                        destinoId: e.target.value,
+                                        erros: {},
+                                      },
+                                    }
+                                  : prev,
+                              )
+                            }
+                            disabled={
+                              linhaDoTempo.retificar!.tipoDestino === "area" &&
+                              !linhaDoTempo.retificar!.departamentoIdArea
+                            }
+                            {...control}
+                          >
+                            <option value="">Selecione…</option>
+                            {opcoesDestinoRetificar.map((o) => (
+                              <option key={o.id} value={o.id}>
+                                {o.rotulo}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </FormField>
+                    ) : null}
+                  </>
+                ) : null}
+
+                {linhaDoTempo.retificar.erros.geral ? (
+                  <p
+                    className="historico-funcional-screen__form-erro"
+                    role="alert"
+                  >
+                    {linhaDoTempo.retificar.erros.geral}
+                  </p>
+                ) : null}
+
+                <FormActions>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={fecharRetificar}
+                    disabled={linhaDoTempo.retificar.salvando}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    disabled={linhaDoTempo.retificar.salvando}
+                  >
+                    {linhaDoTempo.retificar.salvando
+                      ? "Retificando…"
+                      : "Confirmar retificação"}
+                  </Button>
+                </FormActions>
+              </form>
+            </Surface>
+          ) : null}
+
+          <FormActions>
+            <Button
+              variant="secondary"
+              type="button"
+              onClick={fecharLinhaDoTempo}
+            >
+              Fechar
+            </Button>
+          </FormActions>
         </Surface>
       ) : null}
     </div>

@@ -1,338 +1,871 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { HistoricoFuncionalScreen } from "./HistoricoFuncionalScreen";
+import {
+  type ColaboradorApi,
+  type VinculoApi,
+  listarColaboradores,
+  listarVinculosDoColaborador,
+} from "../../api/colaboradoresClient";
+import {
+  type AreaApi,
+  type CentroCustoApi,
+  type DepartamentoApi,
+  type EquipeApi,
+  type UnidadeOrganizacionalApi,
+  listarAreas,
+  listarCentrosCusto,
+  listarDepartamentos,
+  listarEquipes,
+  listarUnidades,
+} from "../../api/organizacaoClient";
+import { type CargoApi, listarCargos } from "../../api/cargoClient";
+import {
+  type MovimentacaoApi,
+  buscarLinhaDoTempo,
+  cancelarMovimentacao,
+  efetivarMovimentacao,
+  listarMovimentacoes,
+  registrarMovimentacao,
+  retificarMovimentacao,
+} from "../../api/movimentacaoClient";
 
-describe("HistoricoFuncionalScreen (T088 — tela visual estática)", () => {
-  it("tem um único h1", () => {
+vi.mock("../../api/colaboradoresClient");
+vi.mock("../../api/organizacaoClient");
+vi.mock("../../api/cargoClient");
+vi.mock("../../api/movimentacaoClient");
+
+interface ResultadoPaginadoTeste<T> {
+  itens: T[];
+  pagina: number;
+  tamanhoPagina: number;
+  total: number;
+}
+
+function paginado<T>(itens: T[]): ResultadoPaginadoTeste<T> {
+  return { itens, pagina: 1, tamanhoPagina: 100, total: itens.length };
+}
+
+const EMPRESA_ID = "99999999-9999-9999-9999-999999999999";
+
+const colaborador1: ColaboradorApi = {
+  id: "11111111-1111-1111-1111-111111111111",
+  nome: "Ana Colaboradora (teste)",
+  situacao: "ativo",
+  criadoEm: "2025-01-01T12:00:00.000Z",
+  atualizadoEm: "2025-01-01T12:00:00.000Z",
+};
+
+const colaborador2: ColaboradorApi = {
+  id: "22222222-2222-2222-2222-222222222222",
+  nome: "Bruno Colaborador (teste)",
+  situacao: "ativo",
+  criadoEm: "2025-01-01T12:00:00.000Z",
+  atualizadoEm: "2025-01-01T12:00:00.000Z",
+};
+
+const vinculo1: VinculoApi = {
+  id: "10101010-1010-1010-1010-101010101010",
+  colaboradorId: colaborador1.id,
+  empresaId: EMPRESA_ID,
+  matricula: "MAT-001",
+  tipo: "clt",
+  situacao: "ativo",
+  dataAdmissao: "2025-01-05",
+  dataDesligamento: null,
+  criadoEm: "2025-01-05T12:00:00.000Z",
+  atualizadoEm: "2025-01-05T12:00:00.000Z",
+};
+
+const vinculo2a: VinculoApi = {
+  id: "20202020-2020-2020-2020-202020202020",
+  colaboradorId: colaborador2.id,
+  empresaId: EMPRESA_ID,
+  matricula: "MAT-002A",
+  tipo: "clt",
+  situacao: "ativo",
+  dataAdmissao: "2024-01-05",
+  dataDesligamento: null,
+  criadoEm: "2024-01-05T12:00:00.000Z",
+  atualizadoEm: "2024-01-05T12:00:00.000Z",
+};
+
+const vinculo2b: VinculoApi = {
+  id: "21212121-2121-2121-2121-212121212121",
+  colaboradorId: colaborador2.id,
+  empresaId: EMPRESA_ID,
+  matricula: "MAT-002B",
+  tipo: "pj",
+  situacao: "previsto",
+  dataAdmissao: "2026-06-01",
+  dataDesligamento: null,
+  criadoEm: "2026-05-01T12:00:00.000Z",
+  atualizadoEm: "2026-05-01T12:00:00.000Z",
+};
+
+const departamento1: DepartamentoApi = {
+  id: "30303030-3030-3030-3030-303030303030",
+  codigo: "DEP1",
+  nome: "Departamento Um (teste)",
+  empresaId: EMPRESA_ID,
+  status: "ativo",
+  criadoEm: "2025-01-01T12:00:00.000Z",
+  atualizadoEm: "2025-01-01T12:00:00.000Z",
+};
+
+const unidade1: UnidadeOrganizacionalApi = {
+  id: "31313131-3131-3131-3131-313131313131",
+  codigo: "UNI1",
+  nome: "Unidade Um (teste)",
+  empresaId: EMPRESA_ID,
+  status: "ativo",
+  criadoEm: "2025-01-01T12:00:00.000Z",
+  atualizadoEm: "2025-01-01T12:00:00.000Z",
+};
+
+const area1: AreaApi = {
+  id: "32323232-3232-3232-3232-323232323232",
+  departamentoId: departamento1.id,
+  codigo: "ARE1",
+  nome: "Área Um (teste)",
+  status: "ativo",
+  criadoEm: "2025-01-01T12:00:00.000Z",
+  atualizadoEm: "2025-01-01T12:00:00.000Z",
+};
+
+const equipe1: EquipeApi = {
+  id: "33333333-3333-3333-3333-333333333333",
+  empresaId: EMPRESA_ID,
+  departamentoId: departamento1.id,
+  unidadeOrganizacionalId: null,
+  codigo: "EQP1",
+  nome: "Equipe Um (teste)",
+  status: "ativo",
+  criadoEm: "2025-01-01T12:00:00.000Z",
+  atualizadoEm: "2025-01-01T12:00:00.000Z",
+};
+
+const cargo1: CargoApi = {
+  id: "34343434-3434-3434-3434-343434343434",
+  codigo: "CAR1",
+  nome: "Cargo Um (teste)",
+  empresaId: EMPRESA_ID,
+  status: "ativo",
+  criadoEm: "2025-01-01T12:00:00.000Z",
+  atualizadoEm: "2025-01-01T12:00:00.000Z",
+};
+
+const centroCusto1: CentroCustoApi = {
+  id: "35353535-3535-3535-3535-353535353535",
+  empresaId: EMPRESA_ID,
+  codigo: "CC1",
+  nome: "Centro de Custo Um (teste)",
+  status: "ativo",
+  criadoEm: "2025-01-01T12:00:00.000Z",
+  atualizadoEm: "2025-01-01T12:00:00.000Z",
+};
+
+const movSolicitada: MovimentacaoApi = {
+  id: "40404040-4040-4040-4040-404040404040",
+  vinculoId: vinculo1.id,
+  empresaId: EMPRESA_ID,
+  tipo: "transferencia_organizacional",
+  status: "solicitada",
+  motivoCodigo: "realocacao_interna",
+  registradaEm: "2026-01-05T10:00:00.000Z",
+  solicitanteUserId: "user-1",
+  vigenciaInicio: "2026-01-10",
+  efetivadaEm: null,
+  executorUserId: null,
+  retificaId: null,
+  destinoUnidadeOrganizacionalId: null,
+  destinoDepartamentoId: departamento1.id,
+  destinoAreaId: null,
+  destinoEquipeId: null,
+  destinoCargoId: null,
+  destinoCentroCustoId: null,
+  criadoEm: "2026-01-05T10:00:00.000Z",
+  atualizadoEm: "2026-01-05T10:00:00.000Z",
+};
+
+const movAdmissaoEfetivada: MovimentacaoApi = {
+  ...movSolicitada,
+  id: "41414141-4141-4141-4141-414141414141",
+  tipo: "admissao",
+  status: "efetivada",
+  motivoCodigo: "admissao_inicial",
+  registradaEm: "2025-01-05T09:00:00.000Z",
+  vigenciaInicio: "2025-01-05",
+  efetivadaEm: "2025-01-05T09:05:00.000Z",
+  executorUserId: "user-1",
+  destinoDepartamentoId: null,
+};
+
+const movCancelada: MovimentacaoApi = {
+  ...movSolicitada,
+  id: "42424242-4242-4242-4242-424242424242",
+  vinculoId: vinculo2a.id,
+  tipo: "mudanca_cargo",
+  status: "cancelada",
+  motivoCodigo: "promocao",
+  registradaEm: "2026-01-02T08:00:00.000Z",
+  vigenciaInicio: "2026-01-15",
+  destinoDepartamentoId: null,
+  destinoCargoId: cargo1.id,
+};
+
+const movEfetivada: MovimentacaoApi = {
+  ...movSolicitada,
+  id: "43434343-4343-4343-4343-434343434343",
+  status: "efetivada",
+  vigenciaInicio: "2026-01-01",
+  efetivadaEm: "2026-01-01T09:00:00.000Z",
+  executorUserId: "user-1",
+};
+
+const movCorrecao: MovimentacaoApi = {
+  ...movSolicitada,
+  id: "44444444-4444-4444-4444-444444444444",
+  status: "solicitada",
+  motivoCodigo: "correcao_cadastral",
+  vigenciaInicio: "2026-01-20",
+  retificaId: movEfetivada.id,
+};
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  vi.mocked(listarColaboradores).mockResolvedValue(
+    paginado([colaborador1, colaborador2]),
+  );
+  vi.mocked(listarDepartamentos).mockResolvedValue(paginado([departamento1]));
+  vi.mocked(listarUnidades).mockResolvedValue(paginado([unidade1]));
+  vi.mocked(listarAreas).mockResolvedValue(paginado([area1]));
+  vi.mocked(listarEquipes).mockResolvedValue(paginado([equipe1]));
+  vi.mocked(listarCargos).mockResolvedValue(paginado([cargo1]));
+  vi.mocked(listarCentrosCusto).mockResolvedValue(paginado([centroCusto1]));
+
+  vi.mocked(listarVinculosDoColaborador).mockImplementation(async (id) => {
+    if (id === colaborador1.id) return [vinculo1];
+    if (id === colaborador2.id) return [vinculo2a, vinculo2b];
+    return [];
+  });
+
+  vi.mocked(listarMovimentacoes).mockResolvedValue(
+    paginado([movSolicitada, movAdmissaoEfetivada, movCancelada]),
+  );
+  vi.mocked(buscarLinhaDoTempo).mockResolvedValue([
+    movAdmissaoEfetivada,
+    movSolicitada,
+  ]);
+  vi.mocked(registrarMovimentacao).mockResolvedValue(movSolicitada);
+  vi.mocked(efetivarMovimentacao).mockResolvedValue({
+    ...movSolicitada,
+    status: "efetivada",
+  });
+  vi.mocked(cancelarMovimentacao).mockResolvedValue({
+    ...movSolicitada,
+    status: "cancelada",
+  });
+  vi.mocked(retificarMovimentacao).mockResolvedValue(movCorrecao);
+});
+
+async function selecionarColaborador(colaboradorId: string) {
+  fireEvent.change(screen.getByLabelText(/^Colaborador\b/i), {
+    target: { value: colaboradorId },
+  });
+  await waitFor(() => expect(listarVinculosDoColaborador).toHaveBeenCalled());
+}
+
+describe("HistoricoFuncionalScreen (T115 — funcional)", () => {
+  it("tem um único h1 e exibe o aviso Somente RH e DP", async () => {
     render(<HistoricoFuncionalScreen />);
 
     expect(
-      screen.getAllByRole("heading", {
-        level: 1,
-        name: "Histórico funcional",
-      }),
+      screen.getAllByRole("heading", { level: 1, name: "Histórico funcional" }),
     ).toHaveLength(1);
+    expect(screen.getByText("Somente RH e DP")).toBeInTheDocument();
+
+    await waitFor(() => expect(listarMovimentacoes).toHaveBeenCalled());
   });
 
-  it("exibe o aviso de que a consulta é limitada à própria empresa e unidades autorizadas", () => {
+  it("lista movimentações reais com tipo, status, motivo e vigência", async () => {
     render(<HistoricoFuncionalScreen />);
 
-    expect(screen.getByText("Somente RH")).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        /a consulta é limitada à própria empresa e às unidades autorizadas/i,
-      ),
-    ).toBeInTheDocument();
-  });
-
-  it("exibe o aviso de que é só demonstração, sem login, API, persistência, alteração cadastral, admissão, transferência, promoção, desligamento ou integração real", () => {
-    render(<HistoricoFuncionalScreen />);
-
-    expect(screen.getByText("Somente demonstração")).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        /não há login, api, persistência, alteração cadastral, admissão, transferência, promoção, desligamento ou integração real/i,
-      ),
-    ).toBeInTheDocument();
-  });
-
-  it("exibe o aviso de que histórico não é alteração e não altera colaborador, cargo, função, salário, jornada, ponto, documentos, Banco de Horas, Folha, permissão ou acesso", () => {
-    render(<HistoricoFuncionalScreen />);
-
-    expect(screen.getByText("Histórico não é alteração")).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        /referências de vínculo e movimentação não alteram colaborador, cargo, função, salário, jornada, ponto, documentos, banco de horas, folha, permissão ou acesso/i,
-      ),
-    ).toBeInTheDocument();
-  });
-
-  it("exibe o aviso de dados reais bloqueados: MFA, DS-OPS-01, auditoria, retenção/base legal e validações de RH/Jurídico/Folha-DP/TI", () => {
-    render(<HistoricoFuncionalScreen />);
-
-    expect(screen.getByText("Dados reais bloqueados")).toBeInTheDocument();
-    expect(screen.getByText(/MFA/)).toBeInTheDocument();
-    expect(screen.getByText("DS-OPS-01")).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        /validações aplicáveis de rh, jurídico\/privacidade, folha\/dp e ti/i,
-      ),
-    ).toBeInTheDocument();
-  });
-
-  it("mostra o resumo com os cinco indicadores (rótulo curto + contagem) e a nota de que não criam/alteram/reconhecem vínculo/etc.", () => {
-    render(<HistoricoFuncionalScreen />);
-
-    const resumo = screen.getByText("Resumo (exemplo)").closest("section")!;
-    const dentroDoResumo = within(resumo);
-
-    expect(
-      dentroDoResumo.getByText("Vínculos de referência"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDoResumo.getByText("4 vínculo(s) de referência (exemplo)"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDoResumo.getByText("Movimentos ilustrativos"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDoResumo.getByText(
-        "7 movimento(s) funcional(is) ilustrativo(s) (exemplo)",
-      ),
-    ).toBeInTheDocument();
-    expect(dentroDoResumo.getByText("Em revisão")).toBeInTheDocument();
-    expect(
-      dentroDoResumo.getByText("3 item(ns) em revisão (exemplo)"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDoResumo.getByText("Pendentes de decisão"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDoResumo.getByText("2 item(ns) pendente(s) de decisão (exemplo)"),
-    ).toBeInTheDocument();
-    expect(dentroDoResumo.getByText("Itens históricos")).toBeInTheDocument();
-    expect(
-      dentroDoResumo.getByText("2 item(ns) histórico(s) (exemplo)"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDoResumo.getByText(
-        /não criam, alteram, reconhecem, aprovam ou encerram vínculo; não calculam remuneração, pagamento, desconto, jornada, banco de horas, folha ou integração/i,
-      ),
-    ).toBeInTheDocument();
-  });
-
-  it("lista as referências com referência técnica, vínculo, tipo de evento, referência organizacional, período, situação, responsável e trilha", () => {
-    render(<HistoricoFuncionalScreen />);
-
-    const tabela = screen.getByRole("table", {
-      name: "Histórico funcional (exemplo)",
+    const tabela = await screen.findByRole("table", {
+      name: "Movimentações funcionais",
     });
     const dentro = within(tabela);
-
-    const linha = dentro.getByText("HF-2026-0004").closest("tr")!;
-    const dentroDaLinha = within(linha);
     expect(
-      dentroDaLinha.getByText("Vínculo V-03 (exemplo)"),
+      dentro.getByText("Transferência organizacional"),
     ).toBeInTheDocument();
-    expect(
-      dentroDaLinha.getByText("Afastamento ilustrativo (exemplo)"),
-    ).toBeInTheDocument();
-    expect(dentroDaLinha.getByText("Org O-03 (exemplo)")).toBeInTheDocument();
-    expect(
-      dentroDaLinha.getByText("Período P-04 (exemplo)"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDaLinha.getByText("Aguardando decisão (exemplo)"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDaLinha.getByText("RT-Historico-03 (exemplo)"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDaLinha.getByText("2 eventos registrados (exemplo)"),
-    ).toBeInTheDocument();
+    expect(dentro.getByText("Admissão")).toBeInTheDocument();
+    expect(dentro.getByText("Solicitada")).toBeInTheDocument();
+    expect(dentro.getByText("Efetivada")).toBeInTheDocument();
+    expect(dentro.getByText("Cancelada")).toBeInTheDocument();
+    expect(dentro.getByText("Realocação interna")).toBeInTheDocument();
+    expect(dentro.getByText("2026-01-10")).toBeInTheDocument();
   });
 
-  it("filtra localmente por tipo de evento, situação e referência organizacional", () => {
+  it("mostra o estado de carregamento antes das movimentações chegarem", async () => {
+    let resolver: (v: ResultadoPaginadoTeste<MovimentacaoApi>) => void;
+    vi.mocked(listarMovimentacoes).mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolver = resolve;
+      }) as ReturnType<typeof listarMovimentacoes>,
+    );
+
     render(<HistoricoFuncionalScreen />);
-
-    fireEvent.change(screen.getByLabelText("Tipo de evento"), {
-      target: { value: "Admissão ilustrativa (exemplo)" },
-    });
-
-    const tabela = screen.getByRole("table", {
-      name: "Histórico funcional (exemplo)",
-    });
-    expect(within(tabela).getByText("HF-2026-0001")).toBeInTheDocument();
-    expect(within(tabela).getByText("HF-2025-0001")).toBeInTheDocument();
-    expect(within(tabela).queryByText("HF-2026-0002")).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Limpar filtros" }));
-    expect(screen.getByText("HF-2026-0002")).toBeInTheDocument();
-
-    fireEvent.change(screen.getByLabelText("Situação"), {
-      target: { value: "historico_ilustrativo" },
-    });
-    expect(screen.getByText("HF-2025-0001")).toBeInTheDocument();
-    expect(screen.getByText("HF-2025-0002")).toBeInTheDocument();
-    expect(screen.queryByText("HF-2026-0001")).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Limpar filtros" }));
-    fireEvent.change(screen.getByLabelText("Referência organizacional"), {
-      target: { value: "Org O-01 (exemplo)" },
-    });
-    expect(screen.getByText("HF-2026-0001")).toBeInTheDocument();
-    expect(screen.getByText("HF-2026-0003")).toBeInTheDocument();
-    expect(screen.getByText("HF-2025-0002")).toBeInTheDocument();
-    expect(screen.queryByText("HF-2026-0002")).not.toBeInTheDocument();
-  });
-
-  it("mostra EmptyState quando o filtro não corresponde a nenhuma referência", () => {
-    render(<HistoricoFuncionalScreen />);
-
-    fireEvent.change(screen.getByLabelText("Situação"), {
-      target: { value: "historico_ilustrativo" },
-    });
-    fireEvent.change(screen.getByLabelText("Referência organizacional"), {
-      target: { value: "Org O-02 (exemplo)" },
-    });
 
     expect(
-      screen.getByRole("heading", {
-        name: "Nenhuma referência corresponde aos filtros",
+      await screen.findByText("Carregando movimentações…"),
+    ).toBeInTheDocument();
+
+    resolver!(paginado([movSolicitada]));
+    await screen.findByRole("table", { name: "Movimentações funcionais" });
+  });
+
+  it("mostra erro de carregamento da listagem e permite tentar novamente", async () => {
+    vi.mocked(listarMovimentacoes).mockRejectedValueOnce(new Error("falha"));
+
+    render(<HistoricoFuncionalScreen />);
+
+    await screen.findByText("Não foi possível carregar as movimentações.");
+    fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
+
+    await screen.findByRole("table", { name: "Movimentações funcionais" });
+  });
+
+  it("mostra EmptyState quando não há movimentações", async () => {
+    vi.mocked(listarMovimentacoes).mockResolvedValue(paginado([]));
+
+    render(<HistoricoFuncionalScreen />);
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "Nenhuma movimentação encontrada",
       }),
     ).toBeInTheDocument();
   });
 
-  it("abre o painel de detalhe ao clicar em 'Ver detalhe', somente leitura, com campos pendentes e único controle 'Fechar'", () => {
+  it("mostra erro base e permite tentar novamente quando falha ao carregar dados de referência", async () => {
+    vi.mocked(listarColaboradores).mockRejectedValueOnce(new Error("falha"));
+
     render(<HistoricoFuncionalScreen />);
 
-    const linha = screen.getByText("HF-2026-0001").closest("tr")!;
-    fireEvent.click(within(linha).getByRole("button", { name: /Ver detalhe/ }));
-
-    expect(screen.getByText("Detalhe demonstrativo")).toBeInTheDocument();
-    const tituloDetalhe = screen.getByRole("heading", {
-      name: "Detalhe da referência — HF-2026-0001",
+    await screen.findByRole("heading", {
+      name: "Não foi possível carregar os dados desta tela",
     });
-    expect(tituloDetalhe).toBeInTheDocument();
-    const painel = tituloDetalhe.closest("section")!;
-    const dentroDoPainel = within(painel);
+    fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
 
-    expect(
-      dentroDoPainel.getByText("Vínculo V-01 (exemplo)"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDoPainel.getByText("Admissão ilustrativa (exemplo)"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDoPainel.getByText("Validação RH (exemplo)"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDoPainel.getByText(
-        /registro de referência técnica de vínculo e movimentação funcional \(exemplo ilustrativo, sem alteração real de cargo, salário ou vínculo\)/i,
-      ),
-    ).toBeInTheDocument();
-    expect(
-      dentroDoPainel.getByText(
-        /este painel não cria, edita, admite, transfere, promove, altera salário, altera jornada, desliga, bloqueia acesso, salva, importa, exporta, aprova nem integra dados reais/i,
-      ),
-    ).toBeInTheDocument();
-
-    expect(
-      dentroDoPainel.getAllByRole("button").map((b) => b.textContent),
-    ).toEqual(["Fechar"]);
-
-    fireEvent.click(dentroDoPainel.getByRole("button", { name: "Fechar" }));
-    expect(screen.queryByText("Detalhe demonstrativo")).not.toBeInTheDocument();
+    expect(await screen.findByLabelText(/^Colaborador\b/i)).toBeInTheDocument();
   });
 
-  it("mostra 'nenhum campo pendente' quando o item de exemplo não tem pendências", () => {
+  it("seleciona colaborador com um único vínculo: resolve automaticamente e habilita registrar", async () => {
     render(<HistoricoFuncionalScreen />);
+    await screen.findByRole("table", { name: "Movimentações funcionais" });
 
-    const linha = screen.getByText("HF-2026-0002").closest("tr")!;
-    fireEvent.click(within(linha).getByRole("button", { name: /Ver detalhe/ }));
+    await selecionarColaborador(colaborador1.id);
+
+    await waitFor(() =>
+      expect(screen.getByLabelText(/^Vínculo\b/i)).toHaveValue(vinculo1.id),
+    );
+    expect(
+      screen.getByRole("button", { name: "Registrar movimentação" }),
+    ).not.toBeDisabled();
+  });
+
+  it("seleciona colaborador com múltiplos vínculos: exige seleção explícita, sem escolha silenciosa", async () => {
+    render(<HistoricoFuncionalScreen />);
+    await screen.findByRole("table", { name: "Movimentações funcionais" });
+
+    await selecionarColaborador(colaborador2.id);
+
+    expect(screen.getByLabelText(/^Vínculo\b/i)).toHaveValue("");
+    expect(
+      screen.getByRole("button", { name: "Registrar movimentação" }),
+    ).toBeDisabled();
+  });
+
+  it("colaborador sem nenhum vínculo bloqueia o registro e avisa", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue(
+      paginado([
+        colaborador1,
+        colaborador2,
+        {
+          ...colaborador1,
+          id: "55555555-5555-5555-5555-555555555555",
+          nome: "Carla Sem Vínculo (teste)",
+        },
+      ]),
+    );
+
+    render(<HistoricoFuncionalScreen />);
+    await screen.findByRole("table", { name: "Movimentações funcionais" });
+
+    await selecionarColaborador("55555555-5555-5555-5555-555555555555");
 
     expect(
-      screen.getByText("Nenhum campo pendente (exemplo)."),
+      screen.getByText("Este colaborador não tem nenhum vínculo."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Registrar movimentação" }),
+    ).toBeDisabled();
+  });
+
+  it("mostra erro ao carregar vínculos do colaborador", async () => {
+    vi.mocked(listarVinculosDoColaborador).mockRejectedValueOnce(
+      new Error("falha"),
+    );
+
+    render(<HistoricoFuncionalScreen />);
+    await screen.findByRole("table", { name: "Movimentações funcionais" });
+
+    await selecionarColaborador(colaborador1.id);
+
+    expect(
+      await screen.findByText(
+        "Não foi possível carregar os vínculos deste colaborador.",
+      ),
     ).toBeInTheDocument();
   });
 
-  it("alterna para o estado vazio e mostra o EmptyState", () => {
+  it("filtra a listagem por tipo e por status", async () => {
     render(<HistoricoFuncionalScreen />);
+    await screen.findByRole("table", { name: "Movimentações funcionais" });
 
-    fireEvent.click(screen.getByRole("button", { name: "Vazio" }));
+    fireEvent.change(screen.getByLabelText(/^Tipo\b/i), {
+      target: { value: "desligamento" },
+    });
+    await waitFor(() =>
+      expect(listarMovimentacoes).toHaveBeenLastCalledWith(
+        expect.objectContaining({ tipo: "desligamento" }),
+      ),
+    );
+
+    fireEvent.change(screen.getByLabelText(/^Status\b/i), {
+      target: { value: "efetivada" },
+    });
+    await waitFor(() =>
+      expect(listarMovimentacoes).toHaveBeenLastCalledWith(
+        expect.objectContaining({ tipo: "desligamento", status: "efetivada" }),
+      ),
+    );
+  });
+
+  it("abre o formulário de registro e valida campos obrigatórios", async () => {
+    render(<HistoricoFuncionalScreen />);
+    await screen.findByRole("table", { name: "Movimentações funcionais" });
+    await selecionarColaborador(colaborador1.id);
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Registrar movimentação" }),
+      ).not.toBeDisabled(),
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Registrar movimentação" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar registro" }));
 
     expect(
-      screen.queryByRole("table", {
-        name: "Histórico funcional (exemplo)",
+      await screen.findByText("Selecione o tipo de movimentação."),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Selecione o motivo.")).toBeInTheDocument();
+    expect(
+      screen.getByText("Informe o início da vigência."),
+    ).toBeInTheDocument();
+    expect(registrarMovimentacao).not.toHaveBeenCalled();
+  });
+
+  it("registra transferência com destino departamento e recarrega a listagem", async () => {
+    render(<HistoricoFuncionalScreen />);
+    await screen.findByRole("table", { name: "Movimentações funcionais" });
+    await selecionarColaborador(colaborador1.id);
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Registrar movimentação" }),
+      ).not.toBeDisabled(),
+    );
+    const chamadasAntes = vi.mocked(listarMovimentacoes).mock.calls.length;
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Registrar movimentação" }),
+    );
+    fireEvent.change(screen.getByLabelText(/^Tipo de movimentação/i), {
+      target: { value: "transferencia_organizacional" },
+    });
+    fireEvent.change(screen.getByLabelText(/^Motivo\b/i), {
+      target: { value: "realocacao_interna" },
+    });
+    fireEvent.change(screen.getByLabelText(/Vigência — início/i), {
+      target: { value: "2026-02-01" },
+    });
+    fireEvent.change(screen.getByLabelText(/Tipo de destino organizacional/i), {
+      target: { value: "departamento" },
+    });
+    fireEvent.change(screen.getByLabelText(/^Departamento\b/i), {
+      target: { value: departamento1.id },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar registro" }));
+
+    await waitFor(() =>
+      expect(registrarMovimentacao).toHaveBeenCalledWith({
+        vinculoId: vinculo1.id,
+        tipo: "transferencia_organizacional",
+        motivoCodigo: "realocacao_interna",
+        vigenciaInicio: "2026-02-01",
+        departamentoId: departamento1.id,
       }),
+    );
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("form", {
+          name: "Formulário de registro de movimentação",
+        }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(vi.mocked(listarMovimentacoes).mock.calls.length).toBeGreaterThan(
+      chamadasAntes,
+    );
+  });
+
+  it("desligamento não exibe nem exige destino organizacional", async () => {
+    render(<HistoricoFuncionalScreen />);
+    await screen.findByRole("table", { name: "Movimentações funcionais" });
+    await selecionarColaborador(colaborador1.id);
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Registrar movimentação" }),
+      ).not.toBeDisabled(),
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Registrar movimentação" }),
+    );
+    fireEvent.change(screen.getByLabelText(/^Tipo de movimentação/i), {
+      target: { value: "desligamento" },
+    });
+
+    expect(
+      screen.queryByLabelText(/Tipo de destino organizacional/i),
+    ).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/^Motivo\b/i), {
+      target: { value: "encerramento_de_vinculo" },
+    });
+    fireEvent.change(screen.getByLabelText(/Vigência — início/i), {
+      target: { value: "2026-03-01" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar registro" }));
+
+    await waitFor(() =>
+      expect(registrarMovimentacao).toHaveBeenCalledWith({
+        vinculoId: vinculo1.id,
+        tipo: "desligamento",
+        motivoCodigo: "encerramento_de_vinculo",
+        vigenciaInicio: "2026-03-01",
+      }),
+    );
+  });
+
+  it("mostra mensagem de erro amigável quando registrar falha", async () => {
+    vi.mocked(registrarMovimentacao).mockRejectedValueOnce(
+      new Error("Vínculo fora de escopo."),
+    );
+
+    render(<HistoricoFuncionalScreen />);
+    await screen.findByRole("table", { name: "Movimentações funcionais" });
+    await selecionarColaborador(colaborador1.id);
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Registrar movimentação" }),
+      ).not.toBeDisabled(),
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Registrar movimentação" }),
+    );
+    fireEvent.change(screen.getByLabelText(/^Tipo de movimentação/i), {
+      target: { value: "desligamento" },
+    });
+    fireEvent.change(screen.getByLabelText(/^Motivo\b/i), {
+      target: { value: "encerramento_de_vinculo" },
+    });
+    fireEvent.change(screen.getByLabelText(/Vigência — início/i), {
+      target: { value: "2026-03-01" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar registro" }));
+
+    expect(
+      await screen.findByText("Vínculo fora de escopo."),
+    ).toBeInTheDocument();
+  });
+
+  it("abre a linha do tempo de um vínculo e mostra o histórico completo, inclusive canceladas", async () => {
+    vi.mocked(buscarLinhaDoTempo).mockResolvedValueOnce([
+      movAdmissaoEfetivada,
+      movSolicitada,
+    ]);
+
+    render(<HistoricoFuncionalScreen />);
+    const tabela = await screen.findByRole("table", {
+      name: "Movimentações funcionais",
+    });
+    const linha = within(tabela).getByText("Admissão").closest("tr")!;
+    fireEvent.click(
+      within(linha).getByRole("button", { name: /Ver linha do tempo/ }),
+    );
+
+    await waitFor(() =>
+      expect(buscarLinhaDoTempo).toHaveBeenCalledWith(vinculo1.id),
+    );
+    expect(
+      await screen.findByRole("heading", { name: /Linha do tempo/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("efetiva uma movimentação solicitada, atualiza a linha do tempo e a listagem", async () => {
+    vi.mocked(buscarLinhaDoTempo).mockResolvedValue([movSolicitada]);
+
+    render(<HistoricoFuncionalScreen />);
+    const tabela = await screen.findByRole("table", {
+      name: "Movimentações funcionais",
+    });
+    const linha = within(tabela)
+      .getByText("Transferência organizacional")
+      .closest("tr")!;
+    fireEvent.click(
+      within(linha).getByRole("button", { name: /Ver linha do tempo/ }),
+    );
+    await screen.findByRole("heading", { name: /Linha do tempo/ });
+
+    fireEvent.click(screen.getByRole("button", { name: "Efetivar" }));
+
+    await waitFor(() =>
+      expect(efetivarMovimentacao).toHaveBeenCalledWith(movSolicitada.id),
+    );
+    await waitFor(() => expect(buscarLinhaDoTempo).toHaveBeenCalledTimes(2));
+  });
+
+  it("cancela uma movimentação solicitada", async () => {
+    vi.mocked(buscarLinhaDoTempo).mockResolvedValue([movSolicitada]);
+
+    render(<HistoricoFuncionalScreen />);
+    const tabela = await screen.findByRole("table", {
+      name: "Movimentações funcionais",
+    });
+    const linha = within(tabela)
+      .getByText("Transferência organizacional")
+      .closest("tr")!;
+    fireEvent.click(
+      within(linha).getByRole("button", { name: /Ver linha do tempo/ }),
+    );
+    await screen.findByRole("heading", { name: /Linha do tempo/ });
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+
+    await waitFor(() =>
+      expect(cancelarMovimentacao).toHaveBeenCalledWith(movSolicitada.id),
+    );
+  });
+
+  it("mostra erro inline quando a ação de efetivar falha, sem derrubar o painel", async () => {
+    vi.mocked(buscarLinhaDoTempo).mockResolvedValue([movSolicitada]);
+    vi.mocked(efetivarMovimentacao).mockRejectedValueOnce(
+      new Error("Vigência ainda não alcançada."),
+    );
+
+    render(<HistoricoFuncionalScreen />);
+    const tabela = await screen.findByRole("table", {
+      name: "Movimentações funcionais",
+    });
+    const linha = within(tabela)
+      .getByText("Transferência organizacional")
+      .closest("tr")!;
+    fireEvent.click(
+      within(linha).getByRole("button", { name: /Ver linha do tempo/ }),
+    );
+    await screen.findByRole("heading", { name: /Linha do tempo/ });
+
+    fireEvent.click(screen.getByRole("button", { name: "Efetivar" }));
+
+    expect(
+      await screen.findByText("Vigência ainda não alcançada."),
+    ).toBeInTheDocument();
+  });
+
+  it("retifica uma movimentação efetivada: cria a correção e preserva a original na linha do tempo", async () => {
+    vi.mocked(buscarLinhaDoTempo)
+      .mockResolvedValueOnce([movEfetivada])
+      .mockResolvedValueOnce([
+        { ...movEfetivada, status: "retificada" },
+        movCorrecao,
+      ]);
+
+    render(<HistoricoFuncionalScreen />);
+    const tabela = await screen.findByRole("table", {
+      name: "Movimentações funcionais",
+    });
+    const linha = within(tabela)
+      .getByText("Transferência organizacional")
+      .closest("tr")!;
+    fireEvent.click(
+      within(linha).getByRole("button", { name: /Ver linha do tempo/ }),
+    );
+    await screen.findByRole("heading", { name: /Linha do tempo/ });
+
+    fireEvent.click(screen.getByRole("button", { name: "Retificar" }));
+    fireEvent.change(screen.getByLabelText(/^Motivo\b/i), {
+      target: { value: "correcao_cadastral" },
+    });
+    fireEvent.change(screen.getByLabelText(/Vigência — início/i), {
+      target: { value: "2026-01-20" },
+    });
+    fireEvent.change(screen.getByLabelText(/Tipo de destino organizacional/i), {
+      target: { value: "departamento" },
+    });
+    fireEvent.change(screen.getByLabelText(/^Departamento\b/i), {
+      target: { value: departamento1.id },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Confirmar retificação" }),
+    );
+
+    await waitFor(() =>
+      expect(retificarMovimentacao).toHaveBeenCalledWith(movEfetivada.id, {
+        motivoCodigo: "correcao_cadastral",
+        vigenciaInicio: "2026-01-20",
+        departamentoId: departamento1.id,
+      }),
+    );
+
+    const painel = (
+      await screen.findByRole("heading", { name: /Linha do tempo/ })
+    ).closest("section")!;
+    await waitFor(() =>
+      expect(within(painel).getByText("Retificada")).toBeInTheDocument(),
+    );
+    expect(within(painel).getAllByText("Solicitada").length).toBeGreaterThan(0);
+    expect(
+      within(painel).getByText(/Corrigida — nova vigência 2026-01-20/),
+    ).toBeInTheDocument();
+    expect(
+      within(painel).getByText("É a correção de outra movimentação"),
+    ).toBeInTheDocument();
+  });
+
+  it("movimentação cancelada ou retificada não exibe ações — são terminais", async () => {
+    vi.mocked(buscarLinhaDoTempo).mockResolvedValue([
+      movCancelada,
+      { ...movEfetivada, status: "retificada" },
+    ]);
+
+    render(<HistoricoFuncionalScreen />);
+    const tabela = await screen.findByRole("table", {
+      name: "Movimentações funcionais",
+    });
+    const linha = within(tabela).getByText("Cancelada").closest("tr")!;
+    fireEvent.click(
+      within(linha).getByRole("button", { name: /Ver linha do tempo/ }),
+    );
+    const painel = (
+      await screen.findByRole("heading", { name: /Linha do tempo/ })
+    ).closest("section")!;
+
+    expect(
+      within(painel).queryByRole("button", { name: "Efetivar" }),
     ).not.toBeInTheDocument();
     expect(
-      screen.getByRole("heading", {
-        level: 3,
-        name: "Nenhuma referência de histórico funcional cadastrada",
-      }),
-    ).toBeInTheDocument();
-  });
-
-  it("alterna para o estado de erro com referência ilustrativa e ação de retorno", () => {
-    render(<HistoricoFuncionalScreen />);
-
-    fireEvent.click(screen.getByRole("button", { name: "Erro" }));
-
+      within(painel).queryByRole("button", { name: "Cancelar" }),
+    ).not.toBeInTheDocument();
     expect(
-      screen.getByRole("heading", {
-        name: "Não foi possível carregar as referências de histórico funcional",
-      }),
-    ).toBeInTheDocument();
-    expect(screen.getByText(/REQ-DEMO-008014/)).toBeInTheDocument();
+      within(painel).queryByRole("button", { name: "Retificar" }),
+    ).not.toBeInTheDocument();
+  });
 
-    fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
+  it("fecha a linha do tempo e o registro fecha uma linha do tempo aberta", async () => {
+    vi.mocked(buscarLinhaDoTempo).mockResolvedValue([movSolicitada]);
+
+    render(<HistoricoFuncionalScreen />);
+    const tabela = await screen.findByRole("table", {
+      name: "Movimentações funcionais",
+    });
+    const linha = within(tabela)
+      .getByText("Transferência organizacional")
+      .closest("tr")!;
+    fireEvent.click(
+      within(linha).getByRole("button", { name: /Ver linha do tempo/ }),
+    );
+    await screen.findByRole("heading", { name: /Linha do tempo/ });
+
+    fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
     expect(
-      screen.getByRole("table", {
-        name: "Histórico funcional (exemplo)",
-      }),
-    ).toBeInTheDocument();
+      screen.queryByRole("heading", { name: /Linha do tempo/ }),
+    ).not.toBeInTheDocument();
+
+    await selecionarColaborador(colaborador1.id);
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Registrar movimentação" }),
+      ).not.toBeDisabled(),
+    );
+    fireEvent.click(
+      within(tabela).getAllByRole("button", { name: /Ver linha do tempo/ })[0]!,
+    );
+    await screen.findByRole("heading", { name: /Linha do tempo/ });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Registrar movimentação" }),
+    );
+    expect(
+      screen.queryByRole("heading", { name: /Linha do tempo/ }),
+    ).not.toBeInTheDocument();
   });
 
-  it("nenhum botão executa admissão, transferência, promoção, desligamento ou ação mutante/financeira (criar, admitir, transferir, promover, desligar, salvar, importar, exportar, aprovar)", () => {
+  it("não tem botão de aprovar/rejeitar, nem referencia cálculo de jornada, Banco de Horas, Folha, CPF, senha ou sessão", async () => {
+    vi.mocked(buscarLinhaDoTempo).mockResolvedValue([
+      movSolicitada,
+      movEfetivada,
+    ]);
+
     render(<HistoricoFuncionalScreen />);
+    const tabela = await screen.findByRole("table", {
+      name: "Movimentações funcionais",
+    });
+    await selecionarColaborador(colaborador1.id);
+    fireEvent.click(
+      within(tabela).getAllByRole("button", { name: /Ver linha do tempo/ })[0]!,
+    );
+    await screen.findByRole("heading", { name: /Linha do tempo/ });
 
-    const linha = screen.getByText("HF-2026-0001").closest("tr")!;
-    fireEvent.click(within(linha).getByRole("button", { name: /Ver detalhe/ }));
+    // Não há workflow de aprovação nesta V1 (Baseline V1, item 7): o
+    // disclaimer da tela explica essa ausência em prosa (por isso as
+    // palavras "aprovação"/"rejeição" aparecem no texto), mas nenhum
+    // CONTROLE de aprovar/rejeitar existe de fato.
+    expect(
+      screen.queryByRole("button", { name: /Aprovar/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Rejeitar/ }),
+    ).not.toBeInTheDocument();
 
-    const rotulos = screen
-      .getAllByRole("button")
-      .map((botao) => botao.textContent?.toLowerCase() ?? "");
-
-    for (const rotulo of rotulos) {
-      expect(rotulo).not.toMatch(
-        /criar|admitir|transferir|promover|desligar|salvar|importar|exportar|aprovar|excluir|editar/,
-      );
-    }
-  });
-
-  it("não contém nomes, empresa real, CPF, e-mail, telefone, IP, matrícula, salário, valor ou dado pessoal real", () => {
-    render(<HistoricoFuncionalScreen />);
-
-    expect(document.querySelectorAll('input[type="file"]')).toHaveLength(0);
-    expect(document.querySelectorAll("a")).toHaveLength(0);
-    expect(document.querySelectorAll("img")).toHaveLength(0);
-    expect(document.querySelectorAll("iframe")).toHaveLength(0);
-    expect(document.querySelectorAll("form")).toHaveLength(0);
-
+    // "Banco de Horas", "Folha", "benefícios", "dependentes" e "afastamentos"
+    // aparecem no próprio disclaimer da tela, EXPLICANDO que ela não os toca
+    // — a ausência é declarada em prosa, e é isso que os testes acima e o
+    // teste de botões (Aprovar/Rejeitar) verificam de fato.
     const texto = document.body.innerHTML.toLowerCase();
     for (const termoProibido of [
       "cpf",
-      "cnpj",
-      "secullum",
-      "rwtech",
-      "bioprox",
-      "reserva fiscal",
       "senha",
       "sessão",
-      "telefone",
-      "matrícula",
-      "matricula",
-      "r$",
+      "tolerância",
+      "hora extra",
       "localstorage",
-      "@",
-      "http://",
-      "https://",
-    ]) {
-      expect(texto).not.toContain(termoProibido);
-    }
-  });
-
-  it("não declara conformidade com CLT, CCT, Portaria 671, LGPD ou eSocial", () => {
-    render(<HistoricoFuncionalScreen />);
-
-    const texto = document.body.innerHTML.toLowerCase();
-    for (const termoProibido of [
-      "clt",
-      "cct",
-      "portaria 671",
-      "lgpd",
-      "esocial",
     ]) {
       expect(texto).not.toContain(termoProibido);
     }
