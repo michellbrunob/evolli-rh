@@ -723,6 +723,183 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
 
   // -------------------------------------------------------------------------
 
+  describe("T115 — fundação web: Pessoas > Histórico funcional", () => {
+    let vinculoId: string;
+    let movimentacaoEfetivadaId: string;
+
+    it("registra movimentação via web, relê pela listagem (vinculoId) e pela linha do tempo, com status calculado pelo servidor", async () => {
+      const admitido = await admitirEEfetivar(rhA, {
+        nome: "Pessoa Sintetica T115",
+        empresaId: empresaA,
+        matricula: "MAT-T115",
+        departamentoId: departamentoA,
+      });
+      vinculoId = admitido.vinculoId;
+
+      const registrada = await post("/v1/movimentacoes", rhA)
+        .send({
+          vinculoId,
+          tipo: "transferencia_organizacional",
+          motivoCodigo: "realocacao_interna",
+          vigenciaInicio: TRANSFERENCIA,
+          departamentoId: departamentoA2,
+        })
+        .expect(201);
+      movimentacaoEfetivadaId = registrada.body.id;
+      // Vigência já passada: o servidor calcula `solicitada`, nunca o cliente.
+      expect(registrada.body.status).toBe("solicitada");
+
+      const lista = await get(
+        `/v1/movimentacoes?vinculoId=${vinculoId}`,
+        rhA,
+      ).expect(200);
+      expect(lista.body.total).toBe(2); // admissão (efetivada) + esta
+      expect(
+        lista.body.itens.some(
+          (m: { id: string }) => m.id === movimentacaoEfetivadaId,
+        ),
+      ).toBe(true);
+
+      const linha = await get(
+        `/v1/vinculos/${vinculoId}/linha-do-tempo`,
+        rhA,
+      ).expect(200);
+      expect(linha.body).toHaveLength(2);
+      expect(
+        linha.body.find((m: { id: string }) => m.id === movimentacaoEfetivadaId)
+          .status,
+      ).toBe("solicitada");
+    });
+
+    it("efetiva a movimentação registrada: alocação sucede, sem projetar nada antes disso", async () => {
+      const efetivada = await post(
+        `/v1/movimentacoes/${movimentacaoEfetivadaId}/efetivar`,
+        rhA,
+      )
+        .send()
+        .expect(201);
+      expect(efetivada.body.status).toBe("efetivada");
+
+      const situacao = await get(
+        `/v1/vinculos/${vinculoId}/situacao?dataReferencia=${TRANSFERENCIA}`,
+        rhA,
+      ).expect(200);
+      expect(situacao.body.alocacao.departamentoId).toBe(departamentoA2);
+    });
+
+    it("cancela uma movimentação antes de efetivar — permanece no histórico, nunca desaparece", async () => {
+      const registrada = await post("/v1/movimentacoes", rhA)
+        .send({
+          vinculoId,
+          tipo: "mudanca_cargo",
+          motivoCodigo: "promocao",
+          vigenciaInicio: DESLIGAMENTO,
+          departamentoId: departamentoA2,
+          cargoId: cargoA,
+        })
+        .expect(201);
+
+      const cancelada = await post(
+        `/v1/movimentacoes/${registrada.body.id}/cancelar`,
+        rhA,
+      )
+        .send()
+        .expect(201);
+      expect(cancelada.body.status).toBe("cancelada");
+
+      const linha = await get(
+        `/v1/vinculos/${vinculoId}/linha-do-tempo`,
+        rhA,
+      ).expect(200);
+      const naLinha = linha.body.find(
+        (m: { id: string }) => m.id === registrada.body.id,
+      );
+      expect(naLinha).toBeDefined();
+      expect(naLinha.status).toBe("cancelada");
+    });
+
+    it("retifica a movimentação efetivada: original vira retificada, a correção nasce nova, nada é apagado", async () => {
+      const correcao = await post(
+        `/v1/movimentacoes/${movimentacaoEfetivadaId}/retificar`,
+        rhA,
+      )
+        .send({
+          motivoCodigo: "correcao_cadastral",
+          vigenciaInicio: "2026-05-20",
+          departamentoId: departamentoA,
+        })
+        .expect(201);
+      expect(correcao.body.retificaId).toBe(movimentacaoEfetivadaId);
+      expect(correcao.body.status).toBe("solicitada");
+
+      const linha = await get(
+        `/v1/vinculos/${vinculoId}/linha-do-tempo`,
+        rhA,
+      ).expect(200);
+      const original = linha.body.find(
+        (m: { id: string }) => m.id === movimentacaoEfetivadaId,
+      );
+      // A original permanece na linha do tempo, só o status muda.
+      expect(original).toBeDefined();
+      expect(original.status).toBe("retificada");
+      expect(
+        linha.body.some((m: { id: string }) => m.id === correcao.body.id),
+      ).toBe(true);
+    });
+
+    it("IDOR: rhA não lê nem opera movimentação ou linha do tempo de vínculo de outra empresa — listagem filtrada nunca vaza", async () => {
+      const { vinculoId: vinculoDeB } = await admitirEEfetivar(rhB, {
+        nome: "Pessoa Sintetica T115 IDOR",
+        empresaId: empresaB,
+        matricula: "MAT-T115-IDOR",
+        departamentoId: departamentoB,
+      });
+      const movimentacaoDeB = await post("/v1/movimentacoes", rhB)
+        .send({
+          vinculoId: vinculoDeB,
+          tipo: "mudanca_cargo",
+          motivoCodigo: "promocao",
+          vigenciaInicio: TRANSFERENCIA,
+          departamentoId: departamentoB,
+          cargoId: cargoB,
+        })
+        .expect(201);
+
+      // rhB enxerga o próprio vínculo e movimentação normalmente.
+      const linhaDeB = await get(
+        `/v1/vinculos/${vinculoDeB}/linha-do-tempo`,
+        rhB,
+      ).expect(200);
+      expect(linhaDeB.body.length).toBeGreaterThan(0);
+
+      // rhA, mesma empresa nunca: 404 em toda rota por-recurso — nunca 403.
+      await get(`/v1/vinculos/${vinculoDeB}/linha-do-tempo`, rhA).expect(404);
+      await post(`/v1/movimentacoes/${movimentacaoDeB.body.id}/efetivar`, rhA)
+        .send()
+        .expect(404);
+      await post(`/v1/movimentacoes/${movimentacaoDeB.body.id}/cancelar`, rhA)
+        .send()
+        .expect(404);
+      await post(`/v1/movimentacoes/${movimentacaoDeB.body.id}/retificar`, rhA)
+        .send({
+          motivoCodigo: "correcao_cadastral",
+          vigenciaInicio: "2026-05-01",
+        })
+        .expect(404);
+
+      // A listagem filtrada por vinculoId de outra empresa nunca vaza dado —
+      // página vazia, porque o escopo é por empresa, não ausência de dado.
+      const semAcesso = await get(
+        `/v1/movimentacoes?vinculoId=${vinculoDeB}`,
+        rhA,
+      ).expect(200);
+      expect(semAcesso.body.total).toBe(0);
+      expect(semAcesso.body.itens).toEqual([]);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+
   describe("garantias de integridade no banco", () => {
     it("recusa matrícula duplicada dentro da empresa", async () => {
       await post("/v1/colaboradores", rhA)

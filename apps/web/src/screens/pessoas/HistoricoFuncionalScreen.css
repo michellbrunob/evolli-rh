@@ -1,5 +1,5 @@
 /**
- * Pessoas > Histórico funcional (T088) — só tokens já existentes
+ * Pessoas > Histórico funcional (T115) — só tokens já existentes
  * (tokens.css); sem hexadecimal novo, sem sombra, sem gradiente. Layout
  * responsivo: pilha vertical de seções.
  */
@@ -12,11 +12,9 @@
 }
 
 /* Sem `min-width: 0` aqui, a tabela (mais larga que o viewport em telas
-   estreitas) vazaria rolagem horizontal para a página inteira — mesma técnica
-   já usada em `FuncoesCargosScreen`/`FechamentoEspelhoScreen`/
-   `MotivosAusenciaJustificativasScreen`/`CentrosCustoScreen`/
-   `TiposDocumentoScreen`/`MotivosDesligamentoScreen`/`EscolaridadeScreen`/
-   `CidadesLocalidadesScreen`. */
+   estreitas) vazaria rolagem horizontal para a página inteira — mesma
+   técnica já usada em `PessoasHorarioScreen`/`ColaboradoresScreen`/
+   `VisaoPeriodoScreen`. */
 .historico-funcional-screen > * {
   min-width: 0;
 }
@@ -30,6 +28,7 @@
   color: var(--color-ink);
 }
 
+/* Avisos — reaproveitam os tokens semânticos de "info"/"warning". */
 .historico-funcional-screen__aviso {
   display: flex;
   flex-wrap: wrap;
@@ -50,72 +49,7 @@
   flex: 1 1 16rem;
 }
 
-.historico-funcional-screen__aviso-texto code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-}
-
-.historico-funcional-screen__resumo {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xs);
-}
-
-.historico-funcional-screen__resumo-lista {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-sm);
-  margin: 0 0 var(--space-sm);
-  padding: 0;
-  list-style: none;
-}
-
-/* Item flexível (nunca `flex: 0 0 auto`): precisa poder encolher para não
-   vazar rolagem horizontal quando o texto do indicador é longo — mesma
-   correção validada em `FechamentoEspelhoScreen` (T079). */
-.historico-funcional-screen__resumo-item {
-  flex: 1 1 16rem;
-  min-width: 0;
-}
-
-.historico-funcional-screen__resumo-item-conteudo {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-sm);
-  min-width: 0;
-}
-
-.historico-funcional-screen__resumo-item-texto {
-  margin: 0;
-  color: var(--color-ink);
-  flex: 1 1 10rem;
-  min-width: 0;
-}
-
-.historico-funcional-screen__nota {
-  margin: 0;
-  font-size: var(--text-caption);
-  color: var(--color-ink-subtle);
-}
-
-.historico-funcional-screen__demo {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xs);
-}
-
-.historico-funcional-screen__demo-texto {
-  margin: 0;
-  color: var(--color-ink-subtle);
-  font-size: var(--text-caption);
-}
-
-.historico-funcional-screen__demo-botoes {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-sm);
-}
-
+/* Bloco de erro — tokens semânticos de "danger". */
 .historico-funcional-screen__erro {
   display: flex;
   flex-direction: column;
@@ -125,16 +59,25 @@
   border-color: var(--status-danger-border);
 }
 
-.historico-funcional-screen__erro-referencia {
+/* Indicador de carregamento. */
+.historico-funcional-screen__carregando {
+  margin: 0;
+  color: var(--color-ink-subtle);
+}
+
+.historico-funcional-screen__nota {
   margin: 0;
   font-size: var(--text-caption);
   color: var(--color-ink-subtle);
 }
 
-.historico-funcional-screen__erro-referencia code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+/* Erro inline no formulário (validação ou retorno da API). */
+.historico-funcional-screen__form-erro {
+  margin: 0;
+  color: var(--status-danger-ink);
 }
 
+/* Filtros de listagem. */
 .historico-funcional-screen__filtros {
   display: flex;
   flex-wrap: wrap;
@@ -148,55 +91,33 @@
   min-width: 0;
 }
 
-.historico-funcional-screen__filtros-nota {
-  margin: 0 0 var(--space-md);
-  font-size: var(--text-caption);
-  color: var(--color-ink-subtle);
-}
-
-.historico-funcional-screen__detalhe {
+/* Painel do formulário de registro/retificação e da linha do tempo. */
+.historico-funcional-screen__formulario,
+.historico-funcional-screen__linha-do-tempo {
   display: flex;
   flex-direction: column;
-  gap: var(--space-md);
+  gap: var(--space-sm);
 }
 
-.historico-funcional-screen__detalhe-lista {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
-  gap: var(--space-sm) var(--space-lg);
-  margin: 0;
+.historico-funcional-screen__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  max-width: 36rem;
 }
 
-.historico-funcional-screen__detalhe-lista dt {
-  font-size: var(--text-caption);
-  font-weight: var(--weight-strong);
-  color: var(--color-ink-subtle);
+/* Sub-painel de retificação, dentro da linha do tempo. */
+.historico-funcional-screen__retificar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
 }
 
-.historico-funcional-screen__detalhe-lista dd {
-  margin: 0;
-  color: var(--color-ink);
-}
-
-.historico-funcional-screen__detalhe-subtitulo {
-  margin: 0;
-  font-size: var(--text-body);
-  font-weight: var(--weight-strong);
-  color: var(--color-ink);
-}
-
-.historico-funcional-screen__detalhe-lista-simples {
-  margin: 0;
-  padding-left: var(--space-lg);
-  color: var(--color-ink);
-}
-
-.historico-funcional-screen__detalhe-aviso {
-  margin: 0;
-  padding: var(--space-sm) var(--space-md);
-  border-radius: var(--radius-sm);
-  background: var(--status-warning-surface);
-  color: var(--status-warning-ink);
+/* Botões de efetivar/cancelar lado a lado, na mesma célula da tabela. */
+.historico-funcional-screen__acoes-linha {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
 }
 
 /* Texto só para leitores de tela (mesma técnica de `.evolli-field__sr`). */
@@ -214,6 +135,11 @@
 
 @media (max-width: 640px) {
   .historico-funcional-screen__filtros {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .historico-funcional-screen__acoes-linha {
     flex-direction: column;
     align-items: stretch;
   }
