@@ -34,6 +34,15 @@
  * não — é o `AutenticacaoApp` (`./AutenticacaoApp.tsx`), que envolve este
  * componente e nunca o contrário.
  *
+ * T117 soma, pelo mesmo gate de `onLogout`, o botão "Sessões ativas" e o
+ * painel `SessoesAtivasPanel` (Minha conta > Sessões ativas). O painel só
+ * lista/revoga sessões da própria conta (`GET/DELETE /v1/auth/sessions*`,
+ * já existentes) — nunca administra outra pessoa, papel, e-mail ou senha.
+ * `onSessaoAtualEncerrada` é chamado quando o próprio painel descobre (por
+ * uma releitura que responde 401, nunca por adivinhação) que a sessão desta
+ * aba deixou de ser válida; o `AutenticacaoApp` reage limpando o estado em
+ * memória e voltando ao login — mesmo caminho do logout explícito.
+ *
  * "Cadastros", "Pessoas", "Ponto", "Documentos", "Portal do Colaborador" e
  * "Relatórios" são os destinos cujo `h1` pode mudar sem trocar de destino
  * (cada um troca de aba local entre telas com `h1` próprio).
@@ -45,6 +54,7 @@
 import { useState } from "react";
 import "./tokens.css";
 import "./app-shell.css";
+import { SessoesAtivasPanel } from "./SessoesAtivasPanel";
 import {
   DOCUMENTOS_METADADOS_TITULO_ID,
   DocumentosScreen,
@@ -125,10 +135,16 @@ export interface AppProps {
    * ele, nenhum botão "Sair" aparece — comportamento idêntico ao de antes
    * do T116. */
   onLogout?: () => void;
+  /** T117: chamado quando `SessoesAtivasPanel` descobre que a sessão desta
+   * aba deixou de ser válida (foi a sessão revogada, ou já havia expirado).
+   * Sem `onLogout`, o botão "Sessões ativas" também não aparece, então esta
+   * prop nunca é exercida — mesmo gate das duas capacidades. */
+  onSessaoAtualEncerrada?: () => void;
 }
 
-export function App({ onLogout }: AppProps = {}) {
+export function App({ onLogout, onSessaoAtualEncerrada }: AppProps = {}) {
   const [destinoAtivoId, setDestinoAtivoId] = useState("cadastros");
+  const [sessoesAtivasAberto, setSessoesAtivasAberto] = useState(false);
   // "Cadastros", "Pessoas", "Ponto", "Documentos", "Portal do Colaborador" e
   // "Relatórios" sempre voltam à aba padrão ao serem selecionados (o wrapper
   // de cada um remonta e reseta sua aba interna) — por isso o valor inicial
@@ -162,6 +178,16 @@ export function App({ onLogout }: AppProps = {}) {
           {onLogout ? (
             <button
               type="button"
+              className="app-shell__sessoes-ativas"
+              aria-expanded={sessoesAtivasAberto}
+              onClick={() => setSessoesAtivasAberto((aberto) => !aberto)}
+            >
+              Sessões ativas
+            </button>
+          ) : null}
+          {onLogout ? (
+            <button
+              type="button"
               className="app-shell__logout"
               onClick={onLogout}
             >
@@ -170,6 +196,16 @@ export function App({ onLogout }: AppProps = {}) {
           ) : null}
         </div>
       </header>
+
+      {onLogout && sessoesAtivasAberto ? (
+        <div className="app-shell__sessoes-ativas-wrapper">
+          <SessoesAtivasPanel
+            aberto={sessoesAtivasAberto}
+            onFechar={() => setSessoesAtivasAberto(false)}
+            onSessaoAtualEncerrada={() => onSessaoAtualEncerrada?.()}
+          />
+        </div>
+      ) : null}
 
       <div className="app-shell__body">
         <PainelNavigation

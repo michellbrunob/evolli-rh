@@ -49,6 +49,19 @@ export function AutenticacaoApp() {
     };
   }, []);
 
+  /**
+   * Limpa só o estado em memória e volta ao login — nunca toca em
+   * storage. Usado tanto pelo logout explícito (depois de tentar avisar o
+   * servidor) quanto por `SessoesAtivasPanel` (T117), quando ele descobre —
+   * por uma releitura que responde 401, nunca por adivinhação — que a
+   * sessão desta aba já não é válida (foi a sessão revogada em "Sessões
+   * ativas", ou expirou por outro motivo).
+   */
+  function encerrarSessaoLocalmente() {
+    clearCsrfToken();
+    setEstado("login");
+  }
+
   async function handleLogout() {
     try {
       await logout();
@@ -57,8 +70,7 @@ export function AutenticacaoApp() {
       // sessão já expirada), a aba não pode ficar presa numa tela que
       // parece autenticada — segue para o login de qualquer forma.
     } finally {
-      clearCsrfToken();
-      setEstado("login");
+      encerrarSessaoLocalmente();
     }
   }
 
@@ -74,5 +86,10 @@ export function AutenticacaoApp() {
     return <LoginScreen onLoginSuccess={() => setEstado("autenticado")} />;
   }
 
-  return <App onLogout={() => void handleLogout()} />;
+  return (
+    <App
+      onLogout={() => void handleLogout()}
+      onSessaoAtualEncerrada={encerrarSessaoLocalmente}
+    />
+  );
 }

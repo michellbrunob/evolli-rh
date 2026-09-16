@@ -68,11 +68,13 @@
   color: var(--color-on-dark-muted);
 }
 
-/* Botão "Sair" (T116) — só aparece quando `App` recebe `onLogout`. Empurrado
-   para a extremidade oposta da marca via `margin-left: auto` no container
-   flex (`app-shell__topbar-inner`). */
+/* Botão "Sessões ativas" (T117) e botão "Sair" (T116) — só aparecem quando
+   `App` recebe `onLogout`. O primeiro dos dois (`app-shell__sessoes-ativas`)
+   é empurrado para a extremidade oposta da marca via `margin-left: auto` no
+   container flex (`app-shell__topbar-inner`); o `gap` do próprio container
+   cuida do espaçamento entre os dois botões. */
+.app-shell__sessoes-ativas,
 .app-shell__logout {
-  margin-left: auto;
   min-height: var(--touch-target);
   padding: 0 var(--space-md);
   border: 1px solid var(--color-on-dark-muted);
@@ -83,6 +85,20 @@
   font-size: var(--text-caption);
   font-weight: var(--weight-strong);
   cursor: pointer;
+}
+
+.app-shell__sessoes-ativas {
+  margin-left: auto;
+}
+
+/* Container do painel "Sessões ativas" — mesma trava de largura e mesmo
+   padding lateral de `app-shell__topbar-inner`/`app-shell__body`, para que o
+   painel se alinhe com o resto do shell em qualquer largura. */
+.app-shell__sessoes-ativas-wrapper {
+  max-width: var(--content-max);
+  margin: 0 auto;
+  width: 100%;
+  padding: var(--space-md) clamp(var(--space-md), 4vw, var(--space-xl)) 0;
 }
 
 /* Corpo do painel: navegação (`PainelNavigation`) + área principal, lado a

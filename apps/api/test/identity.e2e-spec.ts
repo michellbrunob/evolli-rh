@@ -1191,4 +1191,179 @@ describe("Identidade, sessão e autorização (e2e)", () => {
         .expect(401);
     });
   });
+
+  describe("T117 — fundação web: Minha conta > Sessões ativas", () => {
+    let app: INestApplication;
+    const agent = () => request(app.getHttpServer());
+    let prisma: PrismaClient;
+
+    let cookieA: string;
+    let csrfTokenA: string;
+    let cookieB: string;
+    let csrfTokenB: string;
+    let sessionIdB: string;
+
+    async function login(
+      email: string,
+      password: string,
+    ): Promise<{ cookie: string; csrfToken: string }> {
+      const response = await agent()
+        .post("/v1/auth/login")
+        .send({ email, password })
+        .expect(200);
+
+      const cookies = response.headers["set-cookie"] as unknown as string[];
+      const sessionCookie = cookies
+        .find((c) => c.startsWith("evolli_session="))!
+        .split(";")[0]!;
+      return { cookie: sessionCookie, csrfToken: response.body.csrfToken };
+    }
+
+    beforeAll(async () => {
+      app = await buildApp();
+      prisma = new PrismaClient({ datasources: { db: { url: appUrl } } });
+
+      const masterEmail = "master.t117@evolli.test";
+      const masterSenha = "uma-passphrase-de-master-t117-bem-longa";
+      const { PasswordHashService } =
+        await import("../src/auth/password/password-hash.service");
+      await prisma.accessUser.create({
+        data: {
+          email: masterEmail,
+          passwordHash: await new PasswordHashService().hash(masterSenha),
+          role: "master_tecnico",
+          status: "active",
+        },
+      });
+      const master = await login(masterEmail, masterSenha);
+
+      // Dois colaboradores comuns — nenhum dos dois tem qualquer alçada sobre
+      // conta alheia (evaluateOtherAccount nega por padrão para este papel).
+      const emailA = "colaborador.a@t117.test";
+      const senhaA = "senha-do-colaborador-a-t117-bem-longa";
+      await agent()
+        .post("/v1/users")
+        .set("Cookie", master.cookie)
+        .set("x-csrf-token", master.csrfToken)
+        .send({
+          email: emailA,
+          password: senhaA,
+          role: "colaborador",
+          companyId: "empresa-t117",
+        })
+        .expect(201);
+
+      const emailB = "colaborador.b@t117.test";
+      const senhaB = "senha-do-colaborador-b-t117-bem-longa";
+      await agent()
+        .post("/v1/users")
+        .set("Cookie", master.cookie)
+        .set("x-csrf-token", master.csrfToken)
+        .send({
+          email: emailB,
+          password: senhaB,
+          role: "colaborador",
+          companyId: "empresa-t117",
+        })
+        .expect(201);
+
+      const a = await login(emailA, senhaA);
+      cookieA = a.cookie;
+      csrfTokenA = a.csrfToken;
+
+      const b = await login(emailB, senhaB);
+      cookieB = b.cookie;
+      csrfTokenB = b.csrfToken;
+
+      const sessionsB = await agent()
+        .get("/v1/auth/sessions")
+        .set("Cookie", cookieB)
+        .expect(200);
+      sessionIdB = sessionsB.body[0].id;
+    });
+
+    afterAll(async () => {
+      await prisma.$disconnect();
+      await app.close();
+    });
+
+    it("lista só as sessões da própria conta, com campos seguros (sem token/hash/cookie)", async () => {
+      const resposta = await agent()
+        .get("/v1/auth/sessions")
+        .set("Cookie", cookieA)
+        .expect(200);
+
+      expect(resposta.body).toHaveLength(1);
+      const sessao = resposta.body[0];
+      expect(sessao).toMatchObject({
+        id: expect.any(String),
+        createdAt: expect.any(String),
+        lastSeenAt: expect.any(String),
+        expiresAt: expect.any(String),
+      });
+      expect(sessao).not.toHaveProperty("tokenHash");
+      expect(sessao).not.toHaveProperty("csrfTokenHash");
+      expect(sessao).not.toHaveProperty("token");
+      expect(sessao).not.toHaveProperty("csrfToken");
+      // Nunca vaza dado de OUTRO usuário na própria listagem.
+      expect(sessao.id).not.toBe(sessionIdB);
+    });
+
+    // Roda ANTES do teste que revoga a própria sessão de A: precisa da
+    // sessão de A ainda viva para tentar (sem sucesso) revogar a de B.
+    it("colaborador não revoga sessão de outro usuário (403 — segue o contrato existente, nunca deixa a sessão alheia vulnerável)", async () => {
+      // Um colaborador comum nunca tem a capacidade `other_account`/`manage`
+      // (evaluateOtherAccount nega por padrão para este papel — diferente de
+      // rh/dp/master_tecnico, que a têm para administrar conta de terceiro
+      // dentro do próprio escopo). Este é o contrato JÁ existente do
+      // backend, que esta tela nunca exercita: a UI de Sessões ativas só
+      // opera com id vindo da própria listagem, nunca com id digitado ou de
+      // outra conta.
+      await agent()
+        .delete(`/v1/auth/sessions/${sessionIdB}`)
+        .set("Cookie", cookieA)
+        .set("x-csrf-token", csrfTokenA)
+        .expect(403);
+
+      // A sessão de B, mesmo alvo da tentativa, continua íntegra.
+      await agent().get("/v1/users/me").set("Cookie", cookieB).expect(200);
+    });
+
+    it("revogar um id inexistente responde 404, sem detalhe interno", async () => {
+      await agent()
+        .delete("/v1/auth/sessions/00000000-0000-0000-0000-000000000000")
+        .set("Cookie", cookieB)
+        .set("x-csrf-token", csrfTokenB)
+        .expect(404);
+
+      // A sessão de B usada para a tentativa continua íntegra.
+      await agent().get("/v1/users/me").set("Cookie", cookieB).expect(200);
+    });
+
+    it("revoga a própria sessão (CSRF obrigatório) e perde acesso imediatamente", async () => {
+      const sessionsAntes = await agent()
+        .get("/v1/auth/sessions")
+        .set("Cookie", cookieA)
+        .expect(200);
+      const sessionIdA: string = sessionsAntes.body[0].id;
+
+      // Sem CSRF: recusado, sessão continua válida.
+      await agent()
+        .delete(`/v1/auth/sessions/${sessionIdA}`)
+        .set("Cookie", cookieA)
+        .expect(403);
+      await agent().get("/v1/users/me").set("Cookie", cookieA).expect(200);
+
+      // Com CSRF: revoga de fato.
+      await agent()
+        .delete(`/v1/auth/sessions/${sessionIdA}`)
+        .set("Cookie", cookieA)
+        .set("x-csrf-token", csrfTokenA)
+        .expect(204);
+
+      // A mesma sessão não dá mais acesso a nada — nem a listar sessões.
+      await agent().get("/v1/users/me").set("Cookie", cookieA).expect(401);
+      await agent().get("/v1/auth/sessions").set("Cookie", cookieA).expect(401);
+    });
+  });
 });
