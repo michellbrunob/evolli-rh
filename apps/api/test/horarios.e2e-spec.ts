@@ -694,6 +694,90 @@ describe("Cadastros: Horarios e vinculo ao colaborador (e2e)", () => {
   });
 
   // -------------------------------------------------------------------------
+
+  describe("T114 — leitura de referência de horário (somente leitura)", () => {
+    it("lista, por colaboradorId, todos os vínculos de horário que se sobrepõem a uma troca no meio do mês", async () => {
+      const colaboradorId = await admitir(rhA, {
+        nome: "Pessoa T114 Referencia",
+        empresaId: empresaA,
+        matricula: "MAT-T114-1",
+        departamentoId: departamentoA,
+      });
+      const { id: tabelaAntiga } = await criarTabela(rhA, "T114 Antiga");
+      const { id: tabelaNova } = await criarTabela(rhA, "T114 Nova");
+
+      const vinculoAntigo = await post("/v1/horarios/vinculos", rhA)
+        .send({
+          colaboradorId,
+          tabelaHorarioId: tabelaAntiga,
+          vigenciaInicio: "2025-06-01",
+        })
+        .expect(201);
+      await post(`/v1/horarios/vinculos/${vinculoAntigo.body.id}/encerrar`, rhA)
+        .send({ vigenciaFim: "2026-03-15" })
+        .expect(201);
+      await post("/v1/horarios/vinculos", rhA)
+        .send({
+          colaboradorId,
+          tabelaHorarioId: tabelaNova,
+          vigenciaInicio: "2026-03-15",
+        })
+        .expect(201);
+
+      // A tela busca todos os vínculos do colaborador e filtra no cliente os
+      // que se sobrepõem à competência escolhida (aqui, 2026-03).
+      const lista = await get(
+        `/v1/horarios/vinculos?colaboradorId=${colaboradorId}`,
+        rhA,
+      ).expect(200);
+      expect(lista.body.total).toBe(2);
+      const tabelasRetornadas = lista.body.itens.map(
+        (v: { tabelaHorarioId: string }) => v.tabelaHorarioId,
+      );
+      expect(tabelasRetornadas).toEqual(
+        expect.arrayContaining([tabelaAntiga, tabelaNova]),
+      );
+
+      // A tabela de cada vínculo carrega períodos projetados normalmente.
+      const detalheTabelaNova = await get(
+        `/v1/horarios/${tabelaNova}`,
+        rhA,
+      ).expect(200);
+      expect(Array.isArray(detalheTabelaNova.body.periodos)).toBe(true);
+    });
+
+    it("IDOR: filtrar a listagem por colaborador de outra empresa nunca vaza dados — página vazia, nunca 403", async () => {
+      // O vínculo de horário existe de fato na empresa B — a página vazia
+      // para rhA precisa vir do escopo por empresa, não da ausência de dado.
+      const { id: tabelaB } = await criarTabela(rhB, "T114 IDOR Tabela B");
+      const vinculoHorarioB = await post("/v1/horarios/vinculos", rhB)
+        .send({
+          colaboradorId: colaboradorBId,
+          tabelaHorarioId: tabelaB,
+          vigenciaInicio: "2026-01-01",
+        })
+        .expect(201);
+
+      // rhB enxerga o próprio vínculo normalmente.
+      const listaDeB = await get(
+        `/v1/horarios/vinculos?colaboradorId=${colaboradorBId}`,
+        rhB,
+      ).expect(200);
+      expect(listaDeB.body.total).toBe(1);
+      expect(listaDeB.body.itens[0].id).toBe(vinculoHorarioB.body.id);
+
+      // rhA, filtrando pelo mesmo colaboradorId de outra empresa, recebe
+      // página vazia — nunca 403, nunca o dado de fato de B.
+      const semVinculo = await get(
+        `/v1/horarios/vinculos?colaboradorId=${colaboradorBId}`,
+        rhA,
+      ).expect(200);
+      expect(semVinculo.body.total).toBe(0);
+      expect(semVinculo.body.itens).toEqual([]);
+    });
+  });
+
+  // -------------------------------------------------------------------------
   describe("isolamento por empresa (IDOR/BOLA)", () => {
     it("rhA nao ve nem opera tabela da empresa B (404)", async () => {
       const { id: tabelaB } = await criarTabela(rhB, "So da B");
