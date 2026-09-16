@@ -639,6 +639,90 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
 
   // -------------------------------------------------------------------------
 
+  describe("T111 — fundação web: Pessoas > Colaboradores", () => {
+    it("admite via web (nome + matrícula + destino), confirma por GET individual e por vínculos", async () => {
+      const admissao = await post("/v1/colaboradores", rhA)
+        .send({
+          nome: "Pessoa Sintetica T111",
+          empresaId: empresaA,
+          matricula: "MAT-T111",
+          tipo: "clt",
+          dataAdmissao: ADMISSAO,
+          motivoCodigo: "admissao_inicial",
+          departamentoId: departamentoA,
+        })
+        .expect(201);
+
+      const colaboradorId: string = admissao.body.id;
+      expect(admissao.body.nome).toBe("Pessoa Sintetica T111");
+      expect(admissao.body.situacao).toBe("inativo");
+
+      const detalhe = await get(
+        `/v1/colaboradores/${colaboradorId}`,
+        rhA,
+      ).expect(200);
+      expect(detalhe.body.nome).toBe("Pessoa Sintetica T111");
+
+      const vinculos = await get(
+        `/v1/colaboradores/${colaboradorId}/vinculos`,
+        rhA,
+      ).expect(200);
+      expect(vinculos.body).toHaveLength(1);
+      expect(vinculos.body[0].matricula).toBe("MAT-T111");
+      expect(vinculos.body[0].tipo).toBe("clt");
+      expect(vinculos.body[0].situacao).toBe("previsto");
+    });
+
+    it("retifica o nome pela tela e o valor é refletido no GET individual", async () => {
+      const admissao = await post("/v1/colaboradores", rhA)
+        .send({
+          nome: "Nome Original T111",
+          empresaId: empresaA,
+          matricula: "MAT-T111-B",
+          tipo: "clt",
+          dataAdmissao: ADMISSAO,
+          motivoCodigo: "admissao_inicial",
+          departamentoId: departamentoA,
+        })
+        .expect(201);
+      const colaboradorId: string = admissao.body.id;
+
+      const retificado = await patch(`/v1/colaboradores/${colaboradorId}`, rhA)
+        .send({ nome: "Nome Corrigido T111" })
+        .expect(200);
+      expect(retificado.body.nome).toBe("Nome Corrigido T111");
+
+      const detalhe = await get(
+        `/v1/colaboradores/${colaboradorId}`,
+        rhA,
+      ).expect(200);
+      expect(detalhe.body.nome).toBe("Nome Corrigido T111");
+    });
+
+    it("IDOR: rhB não acessa colaborador nem vínculos de rhA (404 anti-enumeração)", async () => {
+      const admissao = await post("/v1/colaboradores", rhA)
+        .send({
+          nome: "Pessoa Sintetica T111 IDOR",
+          empresaId: empresaA,
+          matricula: "MAT-T111-C",
+          tipo: "clt",
+          dataAdmissao: ADMISSAO,
+          motivoCodigo: "admissao_inicial",
+          departamentoId: departamentoA,
+        })
+        .expect(201);
+      const colaboradorId: string = admissao.body.id;
+
+      await get(`/v1/colaboradores/${colaboradorId}`, rhB).expect(404);
+      await get(`/v1/colaboradores/${colaboradorId}/vinculos`, rhB).expect(404);
+      await patch(`/v1/colaboradores/${colaboradorId}`, rhB)
+        .send({ nome: "Nome Invasor" })
+        .expect(404);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+
   describe("garantias de integridade no banco", () => {
     it("recusa matrícula duplicada dentro da empresa", async () => {
       await post("/v1/colaboradores", rhA)
