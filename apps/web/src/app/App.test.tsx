@@ -777,6 +777,48 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("sem onLogout: não mostra o botão 'Segurança' (T126)", () => {
+    render(<App />);
+    expect(
+      screen.queryByRole("button", { name: "Segurança" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("com onLogout: abre e fecha o painel 'Segurança da conta' (T126)", () => {
+    render(<App onLogout={vi.fn()} />);
+
+    const botao = screen.getByRole("button", { name: "Segurança" });
+    expect(botao).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.click(botao);
+    expect(botao).toHaveAttribute("aria-expanded", "true");
+    expect(
+      screen.getByRole("heading", { name: "Segurança da conta" }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
+    expect(
+      screen.queryByRole("heading", { name: "Segurança da conta" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("abrir 'Segurança' fecha 'Sessões ativas' e vice-versa (painéis exclusivos, T126)", () => {
+    render(<App onLogout={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Sessões ativas" }));
+    expect(
+      screen.getByRole("heading", { name: "Sessões ativas" }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Segurança" }));
+    expect(
+      screen.getByRole("heading", { name: "Segurança da conta" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Sessões ativas" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("cada botão de navegação é um <button> nativo, operável por teclado", () => {
     render(<App />);
 

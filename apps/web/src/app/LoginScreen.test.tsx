@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { LoginScreen } from "./LoginScreen";
-import { ApiError, login } from "../api/authClient";
+import { ApiError, login, verifyMfa } from "../api/authClient";
 
 vi.mock("../api/authClient", async () => {
   const actual =
@@ -11,6 +11,7 @@ vi.mock("../api/authClient", async () => {
   return {
     ...actual,
     login: vi.fn(),
+    verifyMfa: vi.fn(),
   };
 });
 
@@ -43,7 +44,7 @@ describe("LoginScreen (T116)", () => {
   });
 
   it("envia e-mail e senha ao backend e chama onLoginSuccess ao entrar com sucesso", async () => {
-    vi.mocked(login).mockResolvedValueOnce(undefined);
+    vi.mocked(login).mockResolvedValueOnce({ mfaRequerido: false });
     const onLoginSuccess = vi.fn();
 
     render(<LoginScreen onLoginSuccess={onLoginSuccess} />);
@@ -185,7 +186,7 @@ describe("LoginScreen (T116)", () => {
 
   it("nunca grava e-mail ou senha em localStorage ou sessionStorage", async () => {
     const localStorageSpy = vi.spyOn(Storage.prototype, "setItem");
-    vi.mocked(login).mockResolvedValueOnce(undefined);
+    vi.mocked(login).mockResolvedValueOnce({ mfaRequerido: false });
 
     render(<LoginScreen onLoginSuccess={vi.fn()} />);
     fireEvent.change(screen.getByLabelText(/^E-mail\b/i), {
@@ -215,5 +216,118 @@ describe("LoginScreen (T116)", () => {
     ]) {
       expect(texto).not.toContain(termoProibido);
     }
+  });
+
+  describe("segundo fator (T126)", () => {
+    async function entrarComMfaRequerido() {
+      vi.mocked(login).mockResolvedValueOnce({
+        mfaRequerido: true,
+        challengeToken: "challenge-opaco-123",
+      });
+      render(<LoginScreen onLoginSuccess={vi.fn()} />);
+      fireEvent.change(screen.getByLabelText(/^E-mail\b/i), {
+        target: { value: EMAIL_SINTETICO },
+      });
+      fireEvent.change(screen.getByLabelText(/^Senha\b/i), {
+        target: { value: SENHA_SINTETICA },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "Entrar" }));
+      await screen.findByRole("heading", {
+        level: 1,
+        name: "Verificação em duas etapas",
+      });
+    }
+
+    it("MFA requerido: troca para a etapa do 2º fator, com h1 único e sem shell", async () => {
+      await entrarComMfaRequerido();
+      expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+      expect(
+        screen.getByLabelText(/Código de verificação/i),
+      ).toBeInTheDocument();
+      // Nenhuma sessão plena: onLoginSuccess não foi chamado ainda.
+      expect(
+        screen.queryByRole("navigation", { name: "Navegação do painel" }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("verificação válida chama verifyMfa com o challenge e libera onLoginSuccess", async () => {
+      vi.mocked(login).mockResolvedValueOnce({
+        mfaRequerido: true,
+        challengeToken: "challenge-opaco-123",
+      });
+      vi.mocked(verifyMfa).mockResolvedValueOnce(undefined);
+      const onLoginSuccess = vi.fn();
+      render(<LoginScreen onLoginSuccess={onLoginSuccess} />);
+      fireEvent.change(screen.getByLabelText(/^E-mail\b/i), {
+        target: { value: EMAIL_SINTETICO },
+      });
+      fireEvent.change(screen.getByLabelText(/^Senha\b/i), {
+        target: { value: SENHA_SINTETICA },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "Entrar" }));
+      await screen.findByLabelText(/Código de verificação/i);
+
+      fireEvent.change(screen.getByLabelText(/Código de verificação/i), {
+        target: { value: "123456" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "Verificar" }));
+
+      await waitFor(() =>
+        expect(verifyMfa).toHaveBeenCalledWith({
+          challengeToken: "challenge-opaco-123",
+          code: "123456",
+        }),
+      );
+      await waitFor(() => expect(onLoginSuccess).toHaveBeenCalledTimes(1));
+    });
+
+    it("verificação inválida (401): erro genérico e limpa o campo de código, sem liberar sessão", async () => {
+      await entrarComMfaRequerido();
+      vi.mocked(verifyMfa).mockRejectedValueOnce(
+        new ApiError(401, "Não autorizado."),
+      );
+
+      fireEvent.change(screen.getByLabelText(/Código de verificação/i), {
+        target: { value: "000000" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "Verificar" }));
+
+      const erro = await screen.findByRole("alert");
+      expect(erro).toHaveTextContent("Código inválido ou expirado.");
+      expect(erro.textContent).not.toMatch(
+        /conta|usad|existe|expirou o token/i,
+      );
+      expect(screen.getByLabelText(/Código de verificação/i)).toHaveValue("");
+    });
+
+    it("'Voltar' retorna à etapa de credenciais e limpa código/challenge", async () => {
+      await entrarComMfaRequerido();
+      fireEvent.change(screen.getByLabelText(/Código de verificação/i), {
+        target: { value: "999999" },
+      });
+
+      fireEvent.click(screen.getByRole("button", { name: "Voltar" }));
+
+      expect(
+        screen.getByRole("heading", { level: 1, name: "Entrar" }),
+      ).toBeInTheDocument();
+      // Senha foi limpa; e-mail preservado.
+      expect(screen.getByLabelText(/^Senha\b/i)).toHaveValue("");
+    });
+
+    it("nunca grava challenge ou código em localStorage/sessionStorage", async () => {
+      const setItemSpy = vi.spyOn(Storage.prototype, "setItem");
+      await entrarComMfaRequerido();
+      vi.mocked(verifyMfa).mockResolvedValueOnce(undefined);
+      fireEvent.change(screen.getByLabelText(/Código de verificação/i), {
+        target: { value: "123456" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "Verificar" }));
+      await waitFor(() => expect(verifyMfa).toHaveBeenCalled());
+
+      expect(setItemSpy).not.toHaveBeenCalled();
+      // O challenge não aparece em nenhum atributo de DOM persistente.
+      expect(document.body.innerHTML).not.toContain("challenge-opaco-123");
+    });
   });
 });

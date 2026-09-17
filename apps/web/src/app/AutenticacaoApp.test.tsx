@@ -108,7 +108,7 @@ describe("AutenticacaoApp (T116) — portão de sessão", () => {
 
   it("login bem-sucedido libera o shell (navegação e telas internas aparecem só depois)", async () => {
     vi.mocked(refreshCsrfToken).mockRejectedValueOnce(new Error("401"));
-    vi.mocked(login).mockResolvedValueOnce(undefined);
+    vi.mocked(login).mockResolvedValueOnce({ mfaRequerido: false });
 
     render(<AutenticacaoApp />);
     await screen.findByRole("heading", { level: 1, name: "Entrar" });
@@ -167,7 +167,7 @@ describe("AutenticacaoApp (T116) — portão de sessão", () => {
   it("nunca grava token CSRF, e-mail ou senha em localStorage/sessionStorage ao longo de todo o ciclo", async () => {
     const localStorageSpy = vi.spyOn(Storage.prototype, "setItem");
     vi.mocked(refreshCsrfToken).mockRejectedValueOnce(new Error("401"));
-    vi.mocked(login).mockResolvedValueOnce(undefined);
+    vi.mocked(login).mockResolvedValueOnce({ mfaRequerido: false });
     vi.mocked(logout).mockResolvedValueOnce(undefined);
 
     render(<AutenticacaoApp />);

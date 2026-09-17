@@ -68,11 +68,12 @@
   color: var(--color-on-dark-muted);
 }
 
-/* Botão "Sessões ativas" (T117) e botão "Sair" (T116) — só aparecem quando
-   `App` recebe `onLogout`. O primeiro dos dois (`app-shell__sessoes-ativas`)
-   é empurrado para a extremidade oposta da marca via `margin-left: auto` no
-   container flex (`app-shell__topbar-inner`); o `gap` do próprio container
-   cuida do espaçamento entre os dois botões. */
+/* Botões "Segurança" (T126), "Sessões ativas" (T117) e "Sair" (T116) — só
+   aparecem quando `App` recebe `onLogout`. O primeiro do grupo
+   (`app-shell__seguranca`) é empurrado para a extremidade oposta da marca via
+   `margin-left: auto` no container flex (`app-shell__topbar-inner`); o `gap`
+   do próprio container cuida do espaçamento entre os botões. */
+.app-shell__seguranca,
 .app-shell__sessoes-ativas,
 .app-shell__logout {
   min-height: var(--touch-target);
@@ -87,7 +88,7 @@
   cursor: pointer;
 }
 
-.app-shell__sessoes-ativas {
+.app-shell__seguranca {
   margin-left: auto;
 }
 
