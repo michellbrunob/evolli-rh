@@ -35,6 +35,12 @@ export const DESTINOS_PAINEL: readonly DestinoPainel[] = [
   { id: "portal-colaborador", label: "Portal do Colaborador" },
   { id: "solicitacoes-rh", label: "Solicitações" },
   { id: "relatorios", label: "Relatórios" },
+  // T121 — "Administração > Contas de acesso": único destino sem sub-rótulo
+  // (sem abas locais), porque hoje só há uma tela administrativa. A
+  // ocultação/seleção deste item continua sendo só conveniência de
+  // interface (spec §3.6) — quem realmente decide o que aparece DENTRO da
+  // tela é o backend, por papel (ver `ContasAcessoScreen`).
+  { id: "contas-acesso", label: "Contas de acesso" },
 ];
 
 /** Sub-rótulo exibido junto ao destino quando ele já tem tela própria. Para

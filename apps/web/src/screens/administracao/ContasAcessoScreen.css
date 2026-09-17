@@ -1,0 +1,100 @@
+/**
+ * Administração > Contas de acesso (T121) — só tokens já existentes
+ * (tokens.css); sem novo hexadecimal, sem sombra, sem gradiente. Layout
+ * responsivo: pilha vertical de seções, mesmo padrão de
+ * `ColaboradoresScreen.css`.
+ */
+
+.contas-acesso-screen {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  min-width: 0;
+}
+
+/* Sem `min-width: 0` aqui, a tabela (mais larga que o viewport em telas
+   estreitas) vazaria rolagem horizontal para a página inteira. */
+.contas-acesso-screen > * {
+  min-width: 0;
+}
+
+.contas-acesso-screen__section-title {
+  margin: 0 0 var(--space-sm);
+  font-size: var(--text-lead);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  font-weight: var(--weight-strong);
+  color: var(--color-ink);
+}
+
+/* Aviso fixo de MFA — tokens semânticos de "warning" (limite de operação,
+   nunca uma capacidade implementada). */
+.contas-acesso-screen__aviso-mfa {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+  background: var(--status-warning-surface);
+  border-color: var(--status-warning-border);
+}
+
+.contas-acesso-screen__aviso-texto {
+  margin: 0;
+  color: var(--color-ink);
+  flex: 1 1 16rem;
+}
+
+.contas-acesso-screen__erro {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  background: var(--status-danger-surface);
+  border-color: var(--status-danger-border);
+}
+
+.contas-acesso-screen__filtros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+}
+
+.contas-acesso-screen__carregando {
+  margin: 0;
+  color: var(--color-ink-subtle);
+}
+
+.contas-acesso-screen__paginacao {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.contas-acesso-screen__formulario {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.contas-acesso-screen__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  max-width: 40rem;
+}
+
+.contas-acesso-screen__form-erro {
+  margin: 0;
+  color: var(--status-danger-ink);
+}
+
+.contas-acesso-screen__acoes-linha {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+.contas-acesso-screen__sua-conta {
+  color: var(--color-ink-subtle);
+  font-style: italic;
+}
