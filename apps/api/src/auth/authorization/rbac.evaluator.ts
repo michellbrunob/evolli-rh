@@ -29,6 +29,8 @@ export function evaluatePermission(
       return evaluateAccessLog(subject, target);
     case "user_role":
       return evaluateUserRole(subject, target);
+    case "mfa":
+      return evaluateMfaReset(subject, target);
     default:
       // Recursos organizacionais (Etapa 1, Fatia 1), de pessoas (Fatia 2) e de
       // jornada/ponto (Etapa 3), cada um em seu próprio ramo. Mantém a negação
@@ -106,6 +108,40 @@ function evaluateOtherAccount(
   if (subject.role === "rh" || subject.role === "dp") {
     return isSameCompany(subject, target);
   }
+  return false;
+}
+
+/**
+ * Redefinição administrativa de MFA de OUTRA conta (T125).
+ *
+ * Escopo confirmado no ticket: só `master_tecnico` (instância inteira) e `rh`
+ * (própria empresa). `dp` é NEGADO — diferença deliberada em relação a
+ * `other_account/manage` (que permite `dp`), por isso esta capacidade é
+ * própria e não reusa `other_account`. Nunca é o próprio usuário (reset do
+ * próprio MFA não passa por aqui). O ato é sempre "remover fator + forçar nova
+ * configuração"; este avaliador só decide QUEM pode disparar isso sobre quem.
+ */
+function evaluateMfaReset(
+  subject: AuthorizationSubject,
+  target: AuthorizationTarget,
+): boolean {
+  if (target.action !== "reset") {
+    return false;
+  }
+  if (
+    target.targetUserId !== undefined &&
+    target.targetUserId === subject.userId
+  ) {
+    // Reset administrativo é sempre sobre outra conta.
+    return false;
+  }
+  if (subject.role === "master_tecnico") {
+    return true;
+  }
+  if (subject.role === "rh") {
+    return isSameCompany(subject, target);
+  }
+  // `dp` e todos os demais: negados.
   return false;
 }
 

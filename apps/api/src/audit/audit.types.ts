@@ -122,6 +122,16 @@ export const AUDIT_ACTIONS = [
   // nunca é bloqueada por falha de auditoria. Nunca registra e-mail, senha,
   // hash, token ou filtro sensível.
   "users_listed",
+
+  // T125 — MFA TOTP. Nunca registra segredo, URI otpauth, QR, código digitado,
+  // código de recuperação, token de challenge, hash nem material que permita
+  // reconstruí-los (ADR 0004 §5) — só ator, papel, empresa e id técnico.
+  "mfa_enrollment_started",
+  "mfa_confirmed",
+  "mfa_challenge_succeeded",
+  "mfa_challenge_failed",
+  "mfa_recovery_code_used",
+  "mfa_reset_by_admin",
 ] as const satisfies readonly AuditAction[];
 
 /**
@@ -169,7 +179,9 @@ export type AuditResource =
   // T038 — Cadastros: Horarios. Rótulos técnicos; nunca o nome/descrição da
   // tabela nem o dia/hora configurados.
   | "tabela_horario"
-  | "vinculo_horario";
+  | "vinculo_horario"
+  // T125 — MFA TOTP: rótulo técnico do recurso. Nunca segredo/URI/código.
+  | "access_mfa";
 
 export type RecordAuditEventInput =
   | {

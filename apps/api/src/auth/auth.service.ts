@@ -28,8 +28,18 @@ import {
 } from "./crypto/opaque-token.util";
 import { normalizeEmail } from "./normalize-email.util";
 import { AuditService } from "../audit/audit.service";
+import { MfaService } from "./mfa/mfa.service";
 
 const PASSWORD_RESET_TOKEN_TTL_MS = 20 * 60 * 1000; // 20 min (janela §4: 15–30 min)
+
+/**
+ * Desfecho do login (T125): ou uma sessão plena (conta sem MFA ativo), ou um
+ * challenge de 2º fator (conta com MFA ativo) — neste caso NENHUMA sessão nasce
+ * ainda, e `login_succeeded` só é auditado depois da verificação do fator.
+ */
+export type LoginOutcome =
+  | { kind: "session"; issued: IssuedSession }
+  | { kind: "mfa_required"; challengeToken: string };
 
 @Injectable()
 export class AuthService {
@@ -43,13 +53,14 @@ export class AuthService {
     private readonly passwordPolicyService: PasswordPolicyService,
     @Inject(EMAIL_NOTIFIER) private readonly emailNotifier: EmailNotifier,
     private readonly auditService: AuditService,
+    private readonly mfaService: MfaService,
   ) {}
 
   async login(
     email: string,
     password: string,
     metadata: SessionRequestMetadata,
-  ): Promise<IssuedSession> {
+  ): Promise<LoginOutcome> {
     await this.rateLimitService.assertNotRateLimited(
       email,
       metadata.ip,
@@ -100,6 +111,19 @@ export class AuthService {
 
     const user = result.user;
 
+    // T125 — MFA: se a conta tem 2º fator ATIVO, a senha correta NÃO cria
+    // sessão plena. Emite um challenge opaco (uso único, 5 min) e devolve;
+    // `login_succeeded` só será auditado após a verificação do fator
+    // (`MfaService.completeMfaLogin`). Contas sem MFA seguem o fluxo direto
+    // abaixo, inalterado.
+    if (await this.mfaService.hasActiveTotp(user.id)) {
+      const challengeToken = await this.mfaService.createLoginChallenge(
+        user.id,
+        metadata,
+      );
+      return { kind: "mfa_required", challengeToken };
+    }
+
     // Ação sensível bem-sucedida: emissão da sessão e evento de auditoria
     // na mesma transação (ADR 0004 §2) — ou os dois persistem, ou nenhum.
     // O cookie só é emitido pelo controller depois que este método retorna,
@@ -129,7 +153,7 @@ export class AuthService {
       return issuedSession;
     });
 
-    return issued;
+    return { kind: "session", issued };
   }
 
   async requestPasswordReset(

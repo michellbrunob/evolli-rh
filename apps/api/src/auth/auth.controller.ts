@@ -60,13 +60,19 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const metadata = extractRequestMetadata(req);
-    const issued = await this.authService.login(
+    const outcome = await this.authService.login(
       dto.email,
       dto.password,
       metadata,
     );
-    setSessionCookie(res, issued.token, this.configService);
-    return { csrfToken: issued.csrfToken };
+    // T125 — conta com MFA ativo: sem cookie de sessão; devolve o challenge
+    // para a 2ª etapa (`POST /v1/auth/mfa/verify`). A resposta não revela
+    // fator/estado além do necessário para o cliente prosseguir.
+    if (outcome.kind === "mfa_required") {
+      return { mfaRequired: true, challengeToken: outcome.challengeToken };
+    }
+    setSessionCookie(res, outcome.issued.token, this.configService);
+    return { csrfToken: outcome.issued.csrfToken };
   }
 
   @Post("logout")

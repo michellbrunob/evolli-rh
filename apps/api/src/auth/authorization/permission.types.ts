@@ -87,13 +87,24 @@ export type AuthorizationResource =
   | "other_account"
   | "access_log"
   | "user_role"
+  // T125 — Redefinição administrativa de MFA de OUTRA conta. Capacidade
+  // própria (não `other_account`) porque o escopo de atores é diferente: só
+  // `master_tecnico` (global) e `rh` (própria empresa) — `dp` é NEGADO aqui,
+  // ao contrário de `other_account/manage` (que permite `dp`).
+  | "mfa"
   | OrganizationalResource
   | PessoasResource
   | PontoResource
   | DocumentosResource
   | HorariosResource;
 
-export type AuthorizationAction = "read" | "manage" | "alter" | "create";
+export type AuthorizationAction =
+  | "read"
+  | "manage"
+  | "alter"
+  | "create"
+  // T125 — redefinição administrativa de MFA (só recurso "mfa").
+  | "reset";
 
 export interface AuthorizationSubject {
   userId: string;
