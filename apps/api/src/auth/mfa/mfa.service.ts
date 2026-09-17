@@ -304,10 +304,19 @@ export class MfaService {
       }
 
       if (usedRecovery && recoveryCodeId) {
-        await tx.accessMfaRecoveryCode.updateMany({
+        // Consumo atômico do código de recuperação (uso único), mesmo padrão
+        // do challenge acima: `count` PRECISA ser 1. Se outro verificador
+        // concorrente (challenge distinto, mesmo código) já o marcou usado,
+        // `count` volta 0 e abortamos — nenhuma sessão é emitida. O erro é
+        // genérico (não revela se o código já foi usado, expirou ou não
+        // existe): só uma das requisições concorrentes vence.
+        const consumedRecovery = await tx.accessMfaRecoveryCode.updateMany({
           where: { id: recoveryCodeId, usedAt: null },
           data: { usedAt: new Date() },
         });
+        if (consumedRecovery.count !== 1) {
+          throw new UnauthorizedException();
+        }
         await this.auditService.record(
           {
             actorType: "user",

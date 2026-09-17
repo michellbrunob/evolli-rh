@@ -357,6 +357,43 @@ describe("MFA TOTP (e2e)", () => {
       .expect(401);
   });
 
+  it("duas verificações concorrentes, challenges distintos e MESMO código: só uma sessão é emitida", async () => {
+    await criarColaborador("concorrente@example.test", "empresa-mfa-a");
+    const s = await login("concorrente@example.test", SENHA_SINTETICA);
+    const { recoveryCodes } = await configurarMfa(s.sessao!);
+    const codigo = recoveryCodes[0]!;
+
+    // Dois challenges DISTINTOS para a mesma conta.
+    const a = await login("concorrente@example.test", SENHA_SINTETICA);
+    const b = await login("concorrente@example.test", SENHA_SINTETICA);
+
+    // Disparadas em paralelo com o MESMO código de recuperação. O consumo
+    // atômico (updateMany + count === 1) garante que só uma vence; a outra
+    // recebe 401 genérico e não emite sessão.
+    const [r1, r2] = await Promise.all([
+      agent()
+        .post("/v1/auth/mfa/verify")
+        .send({ challengeToken: a.challengeToken, code: codigo }),
+      agent()
+        .post("/v1/auth/mfa/verify")
+        .send({ challengeToken: b.challengeToken, code: codigo }),
+    ]);
+
+    const statuses = [r1.status, r2.status].sort();
+    expect(statuses).toEqual([200, 401]);
+
+    // Exatamente uma resposta traz cookie de sessão.
+    const comCookie = [r1, r2].filter((r) => r.headers["set-cookie"]);
+    expect(comCookie).toHaveLength(1);
+
+    // O código não vale mais para um terceiro challenge.
+    const c = await login("concorrente@example.test", SENHA_SINTETICA);
+    await agent()
+      .post("/v1/auth/mfa/verify")
+      .send({ challengeToken: c.challengeToken, code: codigo })
+      .expect(401);
+  });
+
   it("código TOTP errado não cria sessão (401), sem enumerar", async () => {
     await criarColaborador("errado@example.test", "empresa-mfa-a");
     const s = await login("errado@example.test", SENHA_SINTETICA);
