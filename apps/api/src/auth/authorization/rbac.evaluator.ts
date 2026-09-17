@@ -70,6 +70,23 @@ function evaluateOtherAccount(
   subject: AuthorizationSubject,
   target: AuthorizationTarget,
 ): boolean {
+  if (target.action === "read") {
+    // T120 — Listagem paginada (`GET /v1/users`): não há alvo individual, só
+    // capacidade (mesmo padrão de fase 1 de `evaluateOrganizacao`/
+    // `evaluatePonto` — o escopo real, empresa própria vs. global, é aplicado
+    // no service a partir da SESSÃO, nunca de um `companyId` enviado pelo
+    // cliente). `admin_tecnico` fica de fora aqui pelo mesmo motivo de
+    // `manage` abaixo: convergiu para bootstrap/histórico (CG-RBAC-01, ADR
+    // 0012), não administra nem lista contas de terceiro.
+    if (subject.role === "master_tecnico") {
+      return true;
+    }
+    if (subject.role === "rh" || subject.role === "dp") {
+      return subject.companyId !== null;
+    }
+    return false;
+  }
+
   if (target.action !== "manage") {
     return false;
   }

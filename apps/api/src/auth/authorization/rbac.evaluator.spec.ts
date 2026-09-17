@@ -120,6 +120,65 @@ describe("evaluatePermission (RBAC/ABAC)", () => {
     });
   });
 
+  describe("other_account/read (T120 — listagem de contas)", () => {
+    it("master_tecnico lista em escopo global (sem targetCompanyId resolvido)", () => {
+      expect(
+        evaluatePermission(subject({ role: "master_tecnico" }), {
+          resource: "other_account",
+          action: "read",
+        }),
+      ).toBe(true);
+    });
+
+    it("rh e dp listam quando têm empresa própria", () => {
+      for (const role of ["rh", "dp"] as const) {
+        expect(
+          evaluatePermission(subject({ role, companyId: "empresa-a" }), {
+            resource: "other_account",
+            action: "read",
+          }),
+        ).toBe(true);
+      }
+    });
+
+    it("rh/dp sem empresa própria (companyId nulo) são negados", () => {
+      for (const role of ["rh", "dp"] as const) {
+        expect(
+          evaluatePermission(subject({ role, companyId: null }), {
+            resource: "other_account",
+            action: "read",
+          }),
+        ).toBe(false);
+      }
+    });
+
+    it("admin_tecnico NÃO lista contas (CG-RBAC-01, ADR 0012) — mesma negação de 'manage'", () => {
+      expect(
+        evaluatePermission(subject({ role: "admin_tecnico" }), {
+          resource: "other_account",
+          action: "read",
+        }),
+      ).toBe(false);
+    });
+
+    it("gestor/financeiro/colaborador/auditor/dpo nunca listam contas de terceiro", () => {
+      for (const role of [
+        "gestor",
+        "financeiro",
+        "colaborador",
+        "auditor",
+        "dpo",
+      ] as const) {
+        expect(
+          evaluatePermission(subject({ role, companyId: "empresa-a" }), {
+            resource: "other_account",
+            action: "read",
+          }),
+        ).toBe(false);
+      }
+    });
+  });
+
   describe("access_log", () => {
     it("permite leitura só para master_tecnico, auditor e dpo", () => {
       // `admin_tecnico` deixou de ler a trilha (CG-RBAC-01, ADR 0012).

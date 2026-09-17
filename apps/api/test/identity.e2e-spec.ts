@@ -1366,4 +1366,481 @@ describe("Identidade, sessão e autorização (e2e)", () => {
       await agent().get("/v1/auth/sessions").set("Cookie", cookieA).expect(401);
     });
   });
+
+  describe("T120 — GET /v1/users: listagem paginada de contas de acesso", () => {
+    let app: INestApplication;
+    const agent = () => request(app.getHttpServer());
+    let prisma: PrismaClient;
+
+    let masterCookie: string;
+    let masterCsrfToken: string;
+    let rhACookie: string;
+    let rhACsrfToken: string;
+    let rhAUserId: string;
+    let dpACookie: string;
+    let dpACsrfToken: string;
+    let colaboradorACookie: string;
+
+    let idColaboradorGestorA: string;
+    let idColaboradorDesativadoA: string;
+    let idColaboradorDesativadoB: string;
+
+    async function login(
+      email: string,
+      password: string,
+    ): Promise<{ cookie: string; csrfToken: string }> {
+      const response = await agent()
+        .post("/v1/auth/login")
+        .send({ email, password })
+        .expect(200);
+
+      const cookies = response.headers["set-cookie"] as unknown as string[];
+      const sessionCookie = cookies
+        .find((c) => c.startsWith("evolli_session="))!
+        .split(";")[0]!;
+      return { cookie: sessionCookie, csrfToken: response.body.csrfToken };
+    }
+
+    async function criarUsuario(
+      cookie: string,
+      csrfToken: string,
+      input: { email: string; role: string; companyId: string },
+    ): Promise<string> {
+      const response = await agent()
+        .post("/v1/users")
+        .set("Cookie", cookie)
+        .set("x-csrf-token", csrfToken)
+        .send({
+          email: input.email,
+          password: "senha-sintetica-bem-longa-t120",
+          role: input.role,
+          companyId: input.companyId,
+        })
+        .expect(201);
+      return response.body.id as string;
+    }
+
+    beforeAll(async () => {
+      app = await buildApp();
+      prisma = new PrismaClient({ datasources: { db: { url: appUrl } } });
+
+      const masterEmail = "master.t120@example.test";
+      const masterSenha = "uma-passphrase-de-master-t120-bem-longa";
+      const { PasswordHashService } =
+        await import("../src/auth/password/password-hash.service");
+      await prisma.accessUser.create({
+        data: {
+          email: masterEmail,
+          passwordHash: await new PasswordHashService().hash(masterSenha),
+          role: "master_tecnico",
+          status: "active",
+        },
+      });
+      const master = await login(masterEmail, masterSenha);
+      masterCookie = master.cookie;
+      masterCsrfToken = master.csrfToken;
+
+      // Empresa A: rh, dp e cinco colaboradores — o suficiente para exercitar
+      // paginação keyset com mais de uma página em `limit=2`.
+      const rhAEmail = "rh.t120a@example.test";
+      await criarUsuario(masterCookie, masterCsrfToken, {
+        email: rhAEmail,
+        role: "rh",
+        companyId: "empresa-t120-a",
+      });
+      const rhA = await login(rhAEmail, "senha-sintetica-bem-longa-t120");
+      rhACookie = rhA.cookie;
+      rhACsrfToken = rhA.csrfToken;
+      rhAUserId = (
+        await prisma.accessUser.findUniqueOrThrow({
+          where: { email: rhAEmail },
+        })
+      ).id;
+
+      const dpAEmail = "dp.t120a@example.test";
+      await criarUsuario(masterCookie, masterCsrfToken, {
+        email: dpAEmail,
+        role: "dp",
+        companyId: "empresa-t120-a",
+      });
+      const dpA = await login(dpAEmail, "senha-sintetica-bem-longa-t120");
+      dpACookie = dpA.cookie;
+      dpACsrfToken = dpA.csrfToken;
+
+      for (let i = 1; i <= 5; i += 1) {
+        await criarUsuario(masterCookie, masterCsrfToken, {
+          email: `colaborador${i}.t120a@example.test`,
+          role: "colaborador",
+          companyId: "empresa-t120-a",
+        });
+      }
+
+      idColaboradorGestorA = await criarUsuario(masterCookie, masterCsrfToken, {
+        email: "gestor.t120a@example.test",
+        role: "gestor",
+        companyId: "empresa-t120-a",
+      });
+
+      const colaboradorA = await login(
+        "colaborador1.t120a@example.test",
+        "senha-sintetica-bem-longa-t120",
+      );
+      colaboradorACookie = colaboradorA.cookie;
+
+      // Um colaborador desativado na empresa A, para exercitar o filtro
+      // `status` dentro do escopo do rh.
+      idColaboradorDesativadoA = await criarUsuario(
+        masterCookie,
+        masterCsrfToken,
+        {
+          email: "desativado.t120a@example.test",
+          role: "colaborador",
+          companyId: "empresa-t120-a",
+        },
+      );
+      await agent()
+        .post(`/v1/users/${idColaboradorDesativadoA}/disable`)
+        .set("Cookie", masterCookie)
+        .set("x-csrf-token", masterCsrfToken)
+        .expect(204);
+
+      // Empresa B: um colaborador ativo e um desativado — só para provar que
+      // filtro e escopo nunca vazam entre empresas.
+      await criarUsuario(masterCookie, masterCsrfToken, {
+        email: "colaborador1.t120b@example.test",
+        role: "colaborador",
+        companyId: "empresa-t120-b",
+      });
+      idColaboradorDesativadoB = await criarUsuario(
+        masterCookie,
+        masterCsrfToken,
+        {
+          email: "desativado.t120b@example.test",
+          role: "colaborador",
+          companyId: "empresa-t120-b",
+        },
+      );
+      await agent()
+        .post(`/v1/users/${idColaboradorDesativadoB}/disable`)
+        .set("Cookie", masterCookie)
+        .set("x-csrf-token", masterCsrfToken)
+        .expect(204);
+    });
+
+    afterAll(async () => {
+      await prisma.$disconnect();
+      await app.close();
+    });
+
+    it("master_tecnico lista contas de múltiplas empresas (sem filtro de companyId)", async () => {
+      const response = await agent()
+        .get("/v1/users?limit=100")
+        .set("Cookie", masterCookie)
+        .expect(200);
+
+      const empresas = new Set(
+        response.body.items.map(
+          (item: { companyId: string | null }) => item.companyId,
+        ),
+      );
+      expect(empresas.has("empresa-t120-a")).toBe(true);
+      expect(empresas.has("empresa-t120-b")).toBe(true);
+    });
+
+    it("master_tecnico filtra por companyId quando enviado", async () => {
+      const response = await agent()
+        .get("/v1/users?companyId=empresa-t120-b&limit=100")
+        .set("Cookie", masterCookie)
+        .expect(200);
+
+      const empresas = new Set(
+        response.body.items.map(
+          (item: { companyId: string | null }) => item.companyId,
+        ),
+      );
+      expect([...empresas]).toEqual(["empresa-t120-b"]);
+    });
+
+    it("rh lista somente a própria empresa", async () => {
+      const response = await agent()
+        .get("/v1/users?limit=100")
+        .set("Cookie", rhACookie)
+        .expect(200);
+
+      const empresas = new Set(
+        response.body.items.map(
+          (item: { companyId: string | null }) => item.companyId,
+        ),
+      );
+      expect([...empresas]).toEqual(["empresa-t120-a"]);
+
+      const emails = response.body.items.map(
+        (item: { email: string }) => item.email,
+      );
+      expect(emails).not.toContain("colaborador1.t120b@example.test");
+    });
+
+    it("companyId de outra empresa enviado por rh é ignorado (nunca usado como oráculo)", async () => {
+      const response = await agent()
+        .get("/v1/users?companyId=empresa-t120-b&limit=100")
+        .set("Cookie", rhACookie)
+        .expect(200);
+
+      const empresas = new Set(
+        response.body.items.map(
+          (item: { companyId: string | null }) => item.companyId,
+        ),
+      );
+      // Resultado permanece o da PRÓPRIA empresa do rh — nunca da empresa B.
+      expect([...empresas]).toEqual(["empresa-t120-a"]);
+    });
+
+    it("dp lista somente a própria empresa e continua sem criar ou alterar papel", async () => {
+      const response = await agent()
+        .get("/v1/users?limit=100")
+        .set("Cookie", dpACookie)
+        .expect(200);
+
+      const empresas = new Set(
+        response.body.items.map(
+          (item: { companyId: string | null }) => item.companyId,
+        ),
+      );
+      expect([...empresas]).toEqual(["empresa-t120-a"]);
+
+      // Regressão: dp ganhou LEITURA nesta tarefa — nada de escrita. Continua
+      // sem criar conta nem alterar papel (evaluateUserRole inalterado).
+      await agent()
+        .post("/v1/users")
+        .set("Cookie", dpACookie)
+        .set("x-csrf-token", dpACsrfToken)
+        .send({
+          email: "novo.dp-tentativa@example.test",
+          password: "senha-sintetica-bem-longa-t120",
+          role: "colaborador",
+          companyId: "empresa-t120-a",
+        })
+        .expect(403);
+
+      await agent()
+        .patch(`/v1/users/${idColaboradorGestorA}/role`)
+        .set("Cookie", dpACookie)
+        .set("x-csrf-token", dpACsrfToken)
+        .send({ role: "colaborador" })
+        .expect(403);
+    });
+
+    it("papel sem permissão (colaborador) recebe 403 ao tentar listar", async () => {
+      await agent()
+        .get("/v1/users")
+        .set("Cookie", colaboradorACookie)
+        .expect(403);
+    });
+
+    it("sem sessão, 401 genérico", async () => {
+      await agent().get("/v1/users").expect(401);
+    });
+
+    it("filtro status retorna só contas desativadas dentro do escopo — nunca de outra empresa", async () => {
+      const response = await agent()
+        .get("/v1/users?status=disabled&limit=100")
+        .set("Cookie", rhACookie)
+        .expect(200);
+
+      const items = response.body.items as Array<{
+        id: string;
+        status: string;
+      }>;
+      expect(items.every((item) => item.status === "disabled")).toBe(true);
+      const ids = items.map((item) => item.id);
+      expect(ids).toContain(idColaboradorDesativadoA);
+      expect(ids).not.toContain(idColaboradorDesativadoB);
+    });
+
+    it("filtro role retorna só contas do papel pedido dentro do escopo", async () => {
+      const response = await agent()
+        .get("/v1/users?role=gestor&limit=100")
+        .set("Cookie", rhACookie)
+        .expect(200);
+
+      const items = response.body.items as Array<{ id: string; role: string }>;
+      expect(items.every((item) => item.role === "gestor")).toBe(true);
+      expect(items.map((item) => item.id)).toContain(idColaboradorGestorA);
+    });
+
+    it("cursor inválido responde 400 genérico, sem detalhe interno", async () => {
+      // Construído deterministicamente (mesmo formato do util-spec): base64url
+      // de um payload SEM data parseável antes do separador — nunca depende de
+      // uma string arbitrária "por sorte" não decodificar em algo válido.
+      const cursorInvalido = Buffer.from(
+        "nao-e-uma-data|algum-id",
+        "utf8",
+      ).toString("base64url");
+
+      const response = await agent()
+        .get(`/v1/users?cursor=${encodeURIComponent(cursorInvalido)}`)
+        .set("Cookie", rhACookie)
+        .expect(400);
+
+      expect(response.body).toEqual({
+        status_code: 400,
+        message: "Requisição inválida.",
+        request_id: expect.any(String),
+        timestamp: expect.any(String),
+      });
+    });
+
+    it("paginação keyset: percorre todas as páginas sem duplicar nem pular registros", async () => {
+      const idsColetados: string[] = [];
+      let cursor: string | null = null;
+
+      do {
+        const query: string = cursor
+          ? `?limit=2&cursor=${encodeURIComponent(cursor)}`
+          : "?limit=2";
+        const response: {
+          body: { items: { id: string }[]; nextCursor: string | null };
+        } = await agent()
+          .get(`/v1/users${query}`)
+          .set("Cookie", rhACookie)
+          .expect(200);
+
+        expect(response.body.items.length).toBeLessThanOrEqual(2);
+        idsColetados.push(
+          ...response.body.items.map((item: { id: string }) => item.id),
+        );
+        cursor = response.body.nextCursor;
+      } while (cursor !== null);
+
+      // Sem duplicatas.
+      expect(new Set(idsColetados).size).toBe(idsColetados.length);
+
+      // Cobre TODAS as contas da empresa A vistas pelo rh (ele mesmo + dp +
+      // 5 colaboradores + 1 gestor + 1 desativado) — nenhuma pulada.
+      const totalEmpresaA = await prisma.accessUser.count({
+        where: { companyId: "empresa-t120-a" },
+      });
+      expect(idsColetados.length).toBe(totalEmpresaA);
+    });
+
+    it("resposta contém exclusivamente a projeção segura (toSafeUser)", async () => {
+      const response = await agent()
+        .get("/v1/users?limit=1")
+        .set("Cookie", rhACookie)
+        .expect(200);
+
+      const item = response.body.items[0];
+      expect(Object.keys(item).sort()).toEqual([
+        "companyId",
+        "createdAt",
+        "email",
+        "id",
+        "role",
+        "status",
+        "teamId",
+        "unitId",
+      ]);
+    });
+
+    it("nenhuma resposta (sucesso ou erro) vaza segredo, SQL ou stack trace", async () => {
+      const ok = await agent()
+        .get("/v1/users?limit=5")
+        .set("Cookie", rhACookie)
+        .expect(200);
+      const serializadoOk = JSON.stringify(ok.body);
+      expect(serializadoOk).not.toMatch(/passwordHash|senha|argon2|hash/i);
+      expect(serializadoOk).not.toMatch(/token|cookie|csrf/i);
+      expect(serializadoOk).not.toMatch(/userAgent|user-agent/i);
+
+      const cursorInvalido = Buffer.from(
+        "nao-e-uma-data|algum-id",
+        "utf8",
+      ).toString("base64url");
+      const erro = await agent()
+        .get(`/v1/users?cursor=${encodeURIComponent(cursorInvalido)}`)
+        .set("Cookie", rhACookie)
+        .expect(400);
+      const serializadoErro = JSON.stringify(erro.body);
+      expect(serializadoErro).not.toMatch(/select |from |where |prisma/i);
+      expect(serializadoErro).not.toMatch(/\bat .+\.ts:\d+/);
+    });
+
+    it("consulta gera evento de auditoria (users_listed) sem segredo", async () => {
+      const antes = await prisma.auditEvent.count({
+        where: { action: "users_listed", actorUserId: rhAUserId },
+      });
+
+      await agent()
+        .get("/v1/users?limit=1")
+        .set("Cookie", rhACookie)
+        .expect(200);
+
+      const eventos = await prisma.auditEvent.findMany({
+        where: { action: "users_listed", actorUserId: rhAUserId },
+        orderBy: { occurredAt: "desc" },
+      });
+
+      expect(eventos.length).toBe(antes + 1);
+      const ultimo = eventos[0]!;
+      expect(ultimo.actorRole).toBe("rh");
+      expect(ultimo.companyId).toBe("empresa-t120-a");
+      expect(ultimo.result).toBe("success");
+      expect(JSON.stringify(ultimo)).not.toMatch(/senha|password|hash|token/i);
+    });
+
+    it("regressão: autoelevação, papel privilegiado, autoatendimento e escopo entre empresas continuam bloqueados", async () => {
+      // Autoelevação: rh não altera o próprio papel.
+      await agent()
+        .patch(`/v1/users/${rhAUserId}/role`)
+        .set("Cookie", rhACookie)
+        .set("x-csrf-token", rhACsrfToken)
+        .send({ role: "master_tecnico" })
+        .expect(403);
+
+      // Papel privilegiado: rh não cria admin_tecnico.
+      await agent()
+        .post("/v1/users")
+        .set("Cookie", rhACookie)
+        .set("x-csrf-token", rhACsrfToken)
+        .send({
+          email: "tentativa-privilegiada@example.test",
+          password: "senha-sintetica-bem-longa-t120",
+          role: "admin_tecnico",
+          companyId: "empresa-t120-a",
+        })
+        .expect(403);
+
+      // Alteração da própria conta via other_account: rh não desativa a si
+      // mesmo por esta rota (evaluateOtherAccount nega "gerenciar" o próprio
+      // usuário, independentemente de ele agora também poder LISTAR contas).
+      await agent()
+        .post(`/v1/users/${rhAUserId}/disable`)
+        .set("Cookie", rhACookie)
+        .set("x-csrf-token", rhACsrfToken)
+        .expect(403);
+
+      // Escopo entre empresas: rh não desativa conta da empresa B — 404
+      // anti-enumeração, nunca 403 (mesmo que a listagem já mostre que ele
+      // não vê aquela empresa, a rota de gerenciamento não revela existência).
+      const colaboradorB = await prisma.accessUser.findUniqueOrThrow({
+        where: { email: "colaborador1.t120b@example.test" },
+      });
+      const negado = await agent()
+        .post(`/v1/users/${colaboradorB.id}/disable`)
+        .set("Cookie", rhACookie)
+        .set("x-csrf-token", rhACsrfToken)
+        .expect(404);
+      expect(negado.body).toEqual({
+        status_code: 404,
+        message: "Recurso não encontrado.",
+        request_id: expect.any(String),
+        timestamp: expect.any(String),
+      });
+
+      const aindaAtiva = await prisma.accessUser.findUniqueOrThrow({
+        where: { id: colaboradorB.id },
+      });
+      expect(aindaAtiva.status).toBe("active");
+    });
+  });
 });

@@ -309,6 +309,18 @@ enum AuditAction {
   horarios_vinculo_criado    @map("horarios.vinculo.criado")
   horarios_vinculo_encerrado @map("horarios.vinculo.encerrado")
   horarios_consultado        @map("horarios.consultado")
+
+  // T120 — Listagem paginada de contas de acesso (`GET /v1/users`). Mesma
+  // família do `user_created`/`user_role_changed`/`user_disabled` (Etapa 0 —
+  // Fatia 3): identificador direto, sem `@map`, porque este evento pertence ao
+  // domínio original de identidade/acesso, não a um módulo com convenção
+  // dotted própria. Registrado em regime fail-safe (mesmo critério de
+  // `ponto_consultado`/`organizacao_estrutura_consultada`): consultar contas é
+  // ação sensível por si, mas a leitura já autorizada nunca é bloqueada por
+  // falha de auditoria. Nunca registra e-mail, senha, hash ou token — só
+  // ator, papel, empresa de escopo (quando aplicável) e metadado da
+  // requisição.
+  users_listed
 }
 
 enum AuditResult {
