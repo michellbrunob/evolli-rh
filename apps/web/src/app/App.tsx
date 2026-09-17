@@ -56,6 +56,10 @@ import "./tokens.css";
 import "./app-shell.css";
 import { SessoesAtivasPanel } from "./SessoesAtivasPanel";
 import {
+  CONTAS_ACESSO_TITULO_ID,
+  ContasAcessoScreen,
+} from "../screens/administracao";
+import {
   DOCUMENTOS_METADADOS_TITULO_ID,
   DocumentosScreen,
 } from "../screens/documentos";
@@ -83,6 +87,7 @@ import { DESTINOS_PAINEL, PainelNavigation } from "./PainelNavigation";
 const TITULO_ID_POR_DESTINO: Record<string, string> = {
   inicio: "inicio-visao-geral-titulo",
   "solicitacoes-rh": "central-solicitacoes-rh-titulo",
+  "contas-acesso": CONTAS_ACESSO_TITULO_ID,
 };
 
 function conteudoDoDestino(
@@ -94,6 +99,7 @@ function conteudoDoDestino(
   onDocumentosTituloIdChange: (tituloId: string) => void,
   onPortalTituloIdChange: (tituloId: string) => void,
   onRelatoriosTituloIdChange: (tituloId: string) => void,
+  onSessaoAtualEncerrada: () => void,
 ) {
   if (destinoId === "inicio") {
     return <InicioVisaoGeralScreen onNavegar={onNavegar} />;
@@ -120,6 +126,11 @@ function conteudoDoDestino(
   }
   if (destinoId === "relatorios") {
     return <RelatoriosScreen onTituloIdChange={onRelatoriosTituloIdChange} />;
+  }
+  if (destinoId === "contas-acesso") {
+    return (
+      <ContasAcessoScreen onSessaoAtualEncerrada={onSessaoAtualEncerrada} />
+    );
   }
   const destino = DESTINOS_PAINEL.find((item) => item.id === destinoId);
   return (
@@ -243,6 +254,7 @@ export function App({ onLogout, onSessaoAtualEncerrada }: AppProps = {}) {
             setDocumentosTituloId,
             setPortalTituloId,
             setRelatoriosTituloId,
+            () => onSessaoAtualEncerrada?.(),
           )}
         </main>
       </div>

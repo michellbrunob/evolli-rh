@@ -225,7 +225,7 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     }
   });
 
-  it("apresenta a navegação com os oito destinos, Cadastros ativo por padrão", () => {
+  it("apresenta a navegação com os nove destinos, Cadastros ativo por padrão", () => {
     render(<App />);
 
     const nav = screen.getByRole("navigation", {
@@ -259,6 +259,9 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
       screen.getByRole("button", {
         name: /Relatórios.*Exceções de Ponto/,
       }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Contas de acesso" }),
     ).toBeInTheDocument();
 
     const cadastros = screen.getByRole("button", { name: /Cadastros/ });
@@ -302,6 +305,7 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
       /^Portal do Colaborador.*Visão geral — demonstração/,
       /^Solicitações.*Central do RH/,
       /^Relatórios.*Exceções de Ponto/,
+      /^Contas de acesso/,
     ]) {
       fireEvent.click(screen.getByRole("button", { name: rotulo }));
       expect(
@@ -640,6 +644,30 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     );
   });
 
+  it("renderiza Contas de acesso com h1 próprio (T121) — sem 'Módulo em preparação'", async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Contas de acesso" }));
+
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Contas de acesso" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Módulo em preparação")).not.toBeInTheDocument();
+
+    const main = screen.getByRole("main");
+    const rotuloId = main.getAttribute("aria-labelledby");
+    expect(document.getElementById(rotuloId!)).toHaveTextContent(
+      "Contas de acesso",
+    );
+
+    // Este arquivo testa só o shell, sem mockar rede: GET /v1/users/me real
+    // falha (sem servidor), e a tela cai no próprio estado de erro — nunca
+    // trava nem lança exceção não tratada. Cobertura detalhada por papel
+    // (master_tecnico/rh/dp) vive em ContasAcessoScreen.test.tsx.
+    await screen.findByText("Não foi possível identificar sua conta");
+  });
+
   it("Relatórios > aba local 'Relatórios disponíveis' continua acessível, sem regressão em Exceções de Ponto (T075)", () => {
     render(<App />);
 
@@ -756,7 +784,7 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
       name: "Navegação do painel",
     });
     const botoes = Array.from(nav.querySelectorAll("button"));
-    expect(botoes).toHaveLength(8);
+    expect(botoes).toHaveLength(9);
     for (const botao of botoes) {
       expect(botao.tagName).toBe("BUTTON");
       expect(botao).toHaveAttribute("type", "button");
