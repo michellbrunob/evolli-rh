@@ -12,11 +12,14 @@ import { CREDENTIAL_VERIFIER } from "./credential/credential-verifier.interface"
 import { LocalCredentialVerifier } from "./credential/local-credential-verifier.service";
 import { EMAIL_NOTIFIER } from "./email/email-notifier.interface";
 import { NoopEmailNotifier } from "./email/noop-email-notifier.service";
+import { MfaController } from "./mfa/mfa.controller";
+import { MfaService } from "./mfa/mfa.service";
+import { TotpSecretCipher } from "./mfa/crypto/totp-secret-cipher";
 import { AuditModule } from "../audit/audit.module";
 
 @Module({
   imports: [forwardRef(() => AuditModule)],
-  controllers: [AuthController],
+  controllers: [AuthController, MfaController],
   providers: [
     AuthService,
     PasswordHashService,
@@ -26,6 +29,11 @@ import { AuditModule } from "../audit/audit.module";
     CsrfGuard,
     RateLimitService,
     AuthorizationGuard,
+    // T125 — MFA TOTP no mesmo módulo (sem dependência circular): `MfaService`
+    // usa Session/PasswordHash/Audit já presentes aqui; `AuthService` usa
+    // `MfaService` no login.
+    MfaService,
+    TotpSecretCipher,
     { provide: CREDENTIAL_VERIFIER, useClass: LocalCredentialVerifier },
     { provide: EMAIL_NOTIFIER, useClass: NoopEmailNotifier },
   ],
@@ -37,6 +45,8 @@ import { AuditModule } from "../audit/audit.module";
     CsrfGuard,
     AuthorizationGuard,
     RateLimitService,
+    // Exportado para o `UsersModule` expor a rota de reset administrativo.
+    MfaService,
   ],
 })
 export class AuthModule {}

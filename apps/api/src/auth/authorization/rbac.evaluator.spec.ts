@@ -179,6 +179,91 @@ describe("evaluatePermission (RBAC/ABAC)", () => {
     });
   });
 
+  describe("mfa/reset (T125 — redefinição administrativa de MFA)", () => {
+    it("master_tecnico reseta MFA em qualquer empresa", () => {
+      expect(
+        evaluatePermission(subject({ role: "master_tecnico" }), {
+          resource: "mfa",
+          action: "reset",
+          targetUserId: "outro",
+          targetCompanyId: "empresa-b",
+        }),
+      ).toBe(true);
+    });
+
+    it("rh reseta MFA só na própria empresa", () => {
+      const rh = subject({ role: "rh", companyId: "empresa-a" });
+      expect(
+        evaluatePermission(rh, {
+          resource: "mfa",
+          action: "reset",
+          targetUserId: "outro",
+          targetCompanyId: "empresa-a",
+        }),
+      ).toBe(true);
+      expect(
+        evaluatePermission(rh, {
+          resource: "mfa",
+          action: "reset",
+          targetUserId: "outro",
+          targetCompanyId: "empresa-b",
+        }),
+      ).toBe(false);
+    });
+
+    it("dp NUNCA reseta MFA (diferença deliberada de other_account/manage)", () => {
+      expect(
+        evaluatePermission(subject({ role: "dp", companyId: "empresa-a" }), {
+          resource: "mfa",
+          action: "reset",
+          targetUserId: "outro",
+          targetCompanyId: "empresa-a",
+        }),
+      ).toBe(false);
+    });
+
+    it("gestor/financeiro/colaborador/admin_tecnico/auditor/dpo nunca resetam MFA", () => {
+      for (const role of [
+        "gestor",
+        "financeiro",
+        "colaborador",
+        "admin_tecnico",
+        "auditor",
+        "dpo",
+      ] as const) {
+        expect(
+          evaluatePermission(subject({ role, companyId: "empresa-a" }), {
+            resource: "mfa",
+            action: "reset",
+            targetUserId: "outro",
+            targetCompanyId: "empresa-a",
+          }),
+        ).toBe(false);
+      }
+    });
+
+    it("ninguém reseta o PRÓPRIO MFA por esta rota (é sempre sobre outra conta)", () => {
+      expect(
+        evaluatePermission(subject({ role: "master_tecnico", userId: "u1" }), {
+          resource: "mfa",
+          action: "reset",
+          targetUserId: "u1",
+          targetCompanyId: "empresa-a",
+        }),
+      ).toBe(false);
+    });
+
+    it("só a ação 'reset' é reconhecida no recurso mfa", () => {
+      expect(
+        evaluatePermission(subject({ role: "master_tecnico" }), {
+          resource: "mfa",
+          action: "manage",
+          targetUserId: "outro",
+        }),
+      ).toBe(false);
+    });
+  });
+
   describe("access_log", () => {
     it("permite leitura só para master_tecnico, auditor e dpo", () => {
       // `admin_tecnico` deixou de ler a trilha (CG-RBAC-01, ADR 0012).

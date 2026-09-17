@@ -25,12 +25,16 @@ import { RequirePermission } from "../auth/authorization/require-permission.deco
 import { CurrentUser } from "../auth/session/current-user.decorator";
 import { toSafeUser } from "../auth/safe-user.util";
 import { extractRequestMetadata } from "../auth/request-metadata.util";
+import { MfaService } from "../auth/mfa/mfa.service";
 
 @ApiTags("users")
 @Controller("users")
 @UseGuards(SessionGuard)
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly mfaService: MfaService,
+  ) {}
 
   @Get("me")
   getMe(@CurrentUser() user: AccessUser) {
@@ -102,6 +106,33 @@ export class UsersController {
     await this.usersService.disable(targetUserId, {
       actor,
       metadata: extractRequestMetadata(req),
+    });
+  }
+
+  /**
+   * Redefinição administrativa de MFA (T125). Capacidade `mfa`/`reset`: só
+   * `master_tecnico` (global) e `rh` (própria empresa) — `dp` e demais recebem
+   * negação (403 dentro do escopo; 404 anti-enumeração para alvo de outra
+   * empresa, aplicado pelo `AuthorizationGuard`). Remove o fator, invalida
+   * challenges, apaga códigos de recuperação e revoga as sessões do alvo,
+   * obrigando nova configuração. Nunca lê nem expõe segredo/códigos.
+   */
+  @Post(":id/mfa/reset")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @UseGuards(CsrfGuard, AuthorizationGuard)
+  @RequirePermission("mfa", "reset")
+  async resetMfa(
+    @CurrentUser() actor: AccessUser,
+    @Req() req: Request,
+  ): Promise<void> {
+    // O alvo já foi resolvido e validado (existência + escopo) pelo
+    // AuthorizationGuard a partir do `:id` de rota — nunca de um id do corpo.
+    const targetUser = req.authorizationTargetUser;
+    if (!targetUser) {
+      return;
+    }
+    await this.mfaService.resetForUser(targetUser, actor, {
+      ...extractRequestMetadata(req),
     });
   }
 }

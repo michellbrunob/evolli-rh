@@ -69,6 +69,10 @@ export class SessionService {
         expiresAt: new Date(now + SESSION_ABSOLUTE_TTL_MS),
         ip: metadata.ip ?? null,
         userAgent: metadata.userAgent ?? null,
+        // T125 — step-up: emitir sessão É a autenticação mais recente (login
+        // por senha para conta sem MFA, ou verificação do 2º fator). Ações
+        // sensíveis futuras comparam este carimbo contra `MFA_STEP_UP_TTL_MS`.
+        reauthenticatedAt: new Date(now),
       },
     });
 

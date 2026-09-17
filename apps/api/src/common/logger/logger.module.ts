@@ -20,6 +20,15 @@ const REDACT_PATHS = [
   "*.csrfTokenHash",
   "*.cpf",
   "*.salario",
+  // T125 — MFA TOTP: nenhum segredo/material de fator pode aparecer em log.
+  "*.secret",
+  "*.secretBase32",
+  "*.otpauthUri",
+  "*.recoveryCodes",
+  "*.recoveryCode",
+  "*.challengeToken",
+  "*.code",
+  "*.mfaCode",
 ];
 
 @Module({

@@ -73,6 +73,15 @@ model AccessUser {
   passwordResetTokens AccessPasswordResetToken[]
   auditEvents         AuditEvent[]
 
+  // Etapa 0 — Segurança (T125): MFA TOTP. Um fator TOTP por conta (no máximo),
+  // challenges temporarios de login e códigos de recuperação de uso único.
+  // Nenhuma coluna de MFA entra em `access_user`; tudo vive em tabelas
+  // proprias. O segredo TOTP nunca é persistido em claro (só ciphertext
+  // AES-256-GCM, ver `mfa/crypto/totp-secret-cipher.ts`).
+  mfaTotp          AccessMfaTotp?
+  mfaChallenges    AccessMfaChallenge[]
+  mfaRecoveryCodes AccessMfaRecoveryCode[]
+
   // Etapa 1 — Fatia 2: quem registrou e quem efetivou uma movimentacao
   // funcional. Relacao de leitura apenas no schema Prisma — nenhuma coluna
   // nova entra em `access_user`; as FKs ficam em `movimentacao_funcional`.
@@ -123,6 +132,12 @@ model AccessSession {
   revokedAt     DateTime? @map("revoked_at")
   revokedReason String?   @map("revoked_reason")
 
+  // T125 — step-up: instante da reautenticação mais recente desta sessão
+  // (login com MFA, ou o proprio login para conta sem MFA). Ações sensiveis
+  // futuras comparam contra `MFA_STEP_UP_TTL_MS`. Nao é credencial; é so um
+  // carimbo de tempo.
+  reauthenticatedAt DateTime? @map("reauthenticated_at")
+
   user AccessUser @relation(fields: [userId], references: [id])
 
   @@index([userId])
@@ -153,6 +168,78 @@ model AccessLoginAttempt {
 
   @@index([emailAttempted, createdAt])
   @@map("access_login_attempt")
+}
+
+// Etapa 0 — Segurança (T125): fator MFA TOTP. Um por conta (`user_id` unico).
+//
+// O segredo NUNCA é persistido em claro: `secretCiphertext`/`secretIv`/
+// `secretAuthTag` são o envelope AES-256-GCM (ADR 0003 decisão 7), com
+// `keyVersion` para rotação de chave (T123). A chave de cifragem vive so na
+// variavel de ambiente, jamais neste banco. Enquanto `status = pending` o
+// fator ainda nao autentica (aguarda confirmacao de um codigo TOTP);
+// `status = active` apos a confirmacao. Reset administrativo apaga a linha
+// (o fator deixa de existir e a conta precisa configurar de novo).
+enum AccessMfaTotpStatus {
+  pending
+  active
+}
+
+model AccessMfaTotp {
+  id     String @id @default(uuid())
+  userId String @unique @map("user_id")
+
+  status AccessMfaTotpStatus @default(pending)
+
+  secretCiphertext Bytes @map("secret_ciphertext")
+  secretIv         Bytes @map("secret_iv")
+  secretAuthTag    Bytes @map("secret_auth_tag")
+  keyVersion       Int   @map("key_version")
+
+  confirmedAt DateTime? @map("confirmed_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  user AccessUser @relation(fields: [userId], references: [id])
+
+  @@map("access_mfa_totp")
+}
+
+// Challenge temporario de login MFA (T125): emitido quando a senha esta
+// correta mas a conta tem MFA ativo — a sessao plena so nasce apos verificar
+// o segundo fator. Guarda so o hash do token opaco (mesmo padrao de sessao/
+// reset). Uso unico (`consumedAt`) e expiracao curta (`MFA_CHALLENGE_TTL_MS`,
+// 5 min). `attemptCount` da suporte a limitar tentativas por challenge.
+model AccessMfaChallenge {
+  id           String    @id @default(uuid())
+  userId       String    @map("user_id")
+  tokenHash    String    @unique @map("token_hash")
+  expiresAt    DateTime  @map("expires_at")
+  consumedAt   DateTime? @map("consumed_at")
+  attemptCount Int       @default(0) @map("attempt_count")
+  ip           String?   @db.Inet
+  userAgent    String?   @map("user_agent")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  user AccessUser @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("access_mfa_challenge")
+}
+
+// Codigos de recuperacao de uso unico (T125): exatamente 10 por conta, gerados
+// so na confirmacao do fator, exibidos uma unica vez. Guardados SO como hash
+// Argon2id (nunca em claro). `usedAt` garante uso unico.
+model AccessMfaRecoveryCode {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  codeHash  String    @map("code_hash")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user AccessUser @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("access_mfa_recovery_code")
 }
 
 // Etapa 0 — Fatia 4: trilha de auditoria formal (ADR 0004). Distinta do log
@@ -321,6 +408,19 @@ enum AuditAction {
   // ator, papel, empresa de escopo (quando aplicável) e metadado da
   // requisição.
   users_listed
+
+  // T125 — MFA TOTP. Mesma família snake_case direta do dominio de
+  // identidade/acesso. A trilha registra a ACAO e o id tecnico do usuario/
+  // recurso — NUNCA o segredo TOTP, o URI otpauth, o QR, o codigo digitado, o
+  // codigo de recuperacao, o token do challenge, nenhum hash nem qualquer
+  // material que permita reconstrui-los (ADR 0004 §5). `mfa_challenge_failed`
+  // e o unico `result: failure` do grupo; os demais registram sucesso da acao.
+  mfa_enrollment_started
+  mfa_confirmed
+  mfa_challenge_succeeded
+  mfa_challenge_failed
+  mfa_recovery_code_used
+  mfa_reset_by_admin
 }
 
 enum AuditResult {

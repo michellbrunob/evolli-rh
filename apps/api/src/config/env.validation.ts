@@ -15,6 +15,12 @@ const envSchema = z.object({
   // apps/api/.env.migrate, exclusivamente pelo subprocesso de migration —
   // nunca pela aplicação em runtime, por isso não entra neste schema).
   DB_READY_TIMEOUT_MS: z.coerce.number().int().positive().default(2000),
+  // T125 — chave de cifragem do segredo TOTP (AES-256-GCM), Base64 de 32
+  // bytes. Opcional em desenvolvimento/teste (MFA só é exercido quando
+  // configurado); o `TotpSecretCipher` falha de modo seguro no uso se ela
+  // estiver ausente/inválida. Em produção é OBRIGATÓRIA — ver refinamento
+  // abaixo. O valor NUNCA é logado (o schema só reporta o nome).
+  MFA_TOTP_ENCRYPTION_KEY: z.string().min(1).optional(),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;
@@ -42,6 +48,20 @@ export function validateEnv(config: Record<string, unknown>): EnvConfig {
       .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
       .join("; ");
     throw new Error(`Configuração de ambiente inválida: ${issues}`);
+  }
+
+  // T125 — fail-closed em produção: MFA é obrigatório antes de dado real, e a
+  // chave de cifragem do segredo TOTP é indispensável. Sem ela, a API não
+  // sobe em produção (mesmo espírito do bloqueio de MIGRATE_DATABASE_URL
+  // acima). A mensagem cita só o NOME da variável, nunca o valor.
+  if (
+    result.data.NODE_ENV === "production" &&
+    !result.data.MFA_TOTP_ENCRYPTION_KEY
+  ) {
+    throw new Error(
+      "Configuração de ambiente inválida: MFA_TOTP_ENCRYPTION_KEY é " +
+        "obrigatória em produção (chave de cifragem do segredo TOTP).",
+    );
   }
 
   return result.data;
