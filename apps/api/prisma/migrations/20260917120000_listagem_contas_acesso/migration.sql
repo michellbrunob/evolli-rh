@@ -1,0 +1,26 @@
+-- T120 — Fundação funcional segura: API de listagem de contas de acesso.
+--
+-- Migration ESTRITAMENTE ADITIVA: acrescenta um único valor ao enum de ação
+-- de auditoria. NENHUMA tabela, coluna, constraint, índice ou dado existente
+-- é alterado; nenhum GRANT novo é concedido a evolli_app/evolli_migrator;
+-- nenhum usuário é criado. Reproduzível a partir de banco vazio (Migration
+-- Smoke).
+--
+-- `GET /v1/users` (contrato aprovado na investigação T119) precisa de um
+-- evento de auditoria próprio para a consulta/listagem de contas — a mesma
+-- ação de negócio (ler contas de terceiro) nunca foi auditada até aqui,
+-- porque a rota não existia. O comportamento de escopo (global para
+-- `master_tecnico`; própria empresa para `rh`/`dp`; negado para os demais)
+-- vive na aplicação (`rbac.evaluator.ts`, `users.service.ts`) — o banco
+-- apenas passa a reconhecer o valor do enum.
+--
+-- ALTER TYPE ... ADD VALUE roda dentro da transação da migration: suportado a
+-- partir do PostgreSQL 12, e o valor novo não é usado nesta mesma migration.
+
+-- AlterEnum
+-- Valor acrescentado ao FIM do enum (mesma posição em schema.prisma), como o
+-- Prisma faz por padrão — evita divergência de ordem entre migrations e
+-- schema no check de drift do CI. Sem `@map`: mesma família de
+-- `user_created`/`user_role_changed`/`user_disabled` (identificador direto,
+-- sem valor persistido dotted).
+ALTER TYPE "AuditAction" ADD VALUE 'users_listed';

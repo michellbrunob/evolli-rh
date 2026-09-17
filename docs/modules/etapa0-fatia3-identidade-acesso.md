@@ -352,23 +352,40 @@ Notas para a implementação futura:
 
 ## 8. Contratos de API necessários (futuro — não implementados nesta fatia)
 
-| Método | Rota (proposta, sob `/v1`) | Descrição                                                 | Rate limit |
-| ------ | -------------------------- | --------------------------------------------------------- | ---------- |
-| POST   | `/v1/auth/login`           | E-mail + senha → sessão diretamente                       | Sim        |
-| POST   | `/v1/auth/logout`          | Encerra a sessão atual                                    | —          |
-| GET    | `/v1/auth/sessions`        | Lista sessões ativas do usuário autenticado               | —          |
-| DELETE | `/v1/auth/sessions/:id`    | Revoga uma sessão própria (ou de terceiro, se autorizado) | —          |
-| POST   | `/v1/auth/password/forgot` | Inicia recuperação de senha (resposta genérica sempre)    | Sim        |
-| POST   | `/v1/auth/password/reset`  | Conclui troca de senha via token                          | Sim        |
-| GET    | `/v1/users/me`             | Perfil do usuário autenticado (sem dado de RH)            | —          |
-| POST   | `/v1/users`                | Cria conta de acesso de terceiro (escopo conforme §3)     | Sim        |
-| PATCH  | `/v1/users/:id/role`       | Altera papel/escopo de terceiro (nunca o próprio)         | Sim        |
-| POST   | `/v1/users/:id/disable`    | Desativa conta de terceiro                                | Sim        |
+| Método | Rota (proposta, sob `/v1`) | Descrição                                                    | Rate limit |
+| ------ | -------------------------- | ------------------------------------------------------------ | ---------- |
+| POST   | `/v1/auth/login`           | E-mail + senha → sessão diretamente                          | Sim        |
+| POST   | `/v1/auth/logout`          | Encerra a sessão atual                                       | —          |
+| GET    | `/v1/auth/sessions`        | Lista sessões ativas do usuário autenticado                  | —          |
+| DELETE | `/v1/auth/sessions/:id`    | Revoga uma sessão própria (ou de terceiro, se autorizado)    | —          |
+| POST   | `/v1/auth/password/forgot` | Inicia recuperação de senha (resposta genérica sempre)       | Sim        |
+| POST   | `/v1/auth/password/reset`  | Conclui troca de senha via token                             | Sim        |
+| GET    | `/v1/users/me`             | Perfil do usuário autenticado (sem dado de RH)               | —          |
+| GET    | `/v1/users`                | **Implementado (T120).** Listagem paginada — ver nota abaixo | —          |
+| POST   | `/v1/users`                | Cria conta de acesso de terceiro (escopo conforme §3)        | Sim        |
+| PATCH  | `/v1/users/:id/role`       | Altera papel/escopo de terceiro (nunca o próprio)            | Sim        |
+| POST   | `/v1/users/:id/disable`    | Desativa conta de terceiro                                   | Sim        |
 
 Todas exigem CSRF (exceto onde N/A por não mudar estado) e todas as de
 autenticação/gestão de conta são candidatas a rate limiting (§6). Contratos
 completos (schema de request/response, `HttpStatus`, mensagens de erro fixas
 seguindo o padrão do `AllExceptionsFilter`) ficam para a implementação.
+
+**`GET /v1/users` (T120) — única rota desta tabela já implementada.** Leitura,
+sem CSRF, capacidade `other_account`/`read` (deny-by-default). Escopo:
+`master_tecnico` — instância inteira, com filtro opcional `companyId`;
+`rh`/`dp` — só a própria empresa, derivada sempre da sessão (`companyId` de
+query enviado por eles é ignorado, nunca usado como oráculo); demais papéis —
+`403`. Filtros permitidos, apenas enumerados: `status`
+(`active`/`disabled`/`locked`) e `role`; sem busca por e-mail, substring ou
+texto livre. Paginação **keyset** determinística por `(createdAt DESC, id
+DESC)` — nunca offset — com cursor opaco; limite padrão 25, máximo 100;
+resposta `{ items, nextCursor }`, sem contagem total. Projeção estritamente
+igual a `toSafeUser` (`id, email, role, companyId, unitId, teamId, status,
+createdAt`) — nunca senha, hash, token, cookie, sessão, IP ou user-agent.
+Consulta auditada em regime fail-safe (ação `users_listed`, mesmo critério de
+`ponto_consultado`). Não há listagem de sessões, MFA, e-mail ou reativação de
+conta associada a esta rota.
 
 ## 9. Estratégia de testes
 

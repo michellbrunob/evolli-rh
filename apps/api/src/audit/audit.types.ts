@@ -116,6 +116,12 @@ export const AUDIT_ACTIONS = [
   "horarios_vinculo_criado",
   "horarios_vinculo_encerrado",
   "horarios_consultado",
+
+  // T120 — Listagem paginada de contas de acesso (`GET /v1/users`). Regime
+  // fail-safe (mesmo critério de `ponto_consultado`): a leitura já autorizada
+  // nunca é bloqueada por falha de auditoria. Nunca registra e-mail, senha,
+  // hash, token ou filtro sensível.
+  "users_listed",
 ] as const satisfies readonly AuditAction[];
 
 /**
