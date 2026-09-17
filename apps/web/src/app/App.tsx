@@ -55,6 +55,7 @@ import { useState } from "react";
 import "./tokens.css";
 import "./app-shell.css";
 import { SessoesAtivasPanel } from "./SessoesAtivasPanel";
+import { SegurancaMfaPanel } from "./SegurancaMfaPanel";
 import {
   CONTAS_ACESSO_TITULO_ID,
   ContasAcessoScreen,
@@ -156,6 +157,7 @@ export interface AppProps {
 export function App({ onLogout, onSessaoAtualEncerrada }: AppProps = {}) {
   const [destinoAtivoId, setDestinoAtivoId] = useState("cadastros");
   const [sessoesAtivasAberto, setSessoesAtivasAberto] = useState(false);
+  const [segurancaAberto, setSegurancaAberto] = useState(false);
   // "Cadastros", "Pessoas", "Ponto", "Documentos", "Portal do Colaborador" e
   // "Relatórios" sempre voltam à aba padrão ao serem selecionados (o wrapper
   // de cada um remonta e reseta sua aba interna) — por isso o valor inicial
@@ -189,9 +191,25 @@ export function App({ onLogout, onSessaoAtualEncerrada }: AppProps = {}) {
           {onLogout ? (
             <button
               type="button"
+              className="app-shell__seguranca"
+              aria-expanded={segurancaAberto}
+              onClick={() => {
+                setSegurancaAberto((aberto) => !aberto);
+                setSessoesAtivasAberto(false);
+              }}
+            >
+              Segurança
+            </button>
+          ) : null}
+          {onLogout ? (
+            <button
+              type="button"
               className="app-shell__sessoes-ativas"
               aria-expanded={sessoesAtivasAberto}
-              onClick={() => setSessoesAtivasAberto((aberto) => !aberto)}
+              onClick={() => {
+                setSessoesAtivasAberto((aberto) => !aberto);
+                setSegurancaAberto(false);
+              }}
             >
               Sessões ativas
             </button>
@@ -207,6 +225,16 @@ export function App({ onLogout, onSessaoAtualEncerrada }: AppProps = {}) {
           ) : null}
         </div>
       </header>
+
+      {onLogout && segurancaAberto ? (
+        <div className="app-shell__sessoes-ativas-wrapper">
+          <SegurancaMfaPanel
+            aberto={segurancaAberto}
+            onFechar={() => setSegurancaAberto(false)}
+            onSessaoAtualEncerrada={() => onSessaoAtualEncerrada?.()}
+          />
+        </div>
+      ) : null}
 
       {onLogout && sessoesAtivasAberto ? (
         <div className="app-shell__sessoes-ativas-wrapper">

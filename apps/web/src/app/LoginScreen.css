@@ -52,6 +52,14 @@
   color: var(--status-danger-ink);
 }
 
+/* Ações da 2ª etapa (T126): "Voltar" e "Verificar" lado a lado, empilhando
+   no mobile. */
+.login-screen__mfa-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
 @media (max-width: 480px) {
   .login-screen {
     padding: var(--space-md);
@@ -63,5 +71,13 @@
 
   .login-screen__form > .evolli-button {
     align-self: stretch;
+  }
+
+  .login-screen__mfa-acoes {
+    flex-direction: column-reverse;
+  }
+
+  .login-screen__mfa-acoes > .evolli-button {
+    width: 100%;
   }
 }

@@ -15,6 +15,7 @@ import {
   desativarConta,
   listarUsuarios,
   obterUsuarioAtual,
+  resetarMfa,
 } from "../../api/usersClient";
 import { listarEmpresasMulti } from "../../api/organizacaoClient";
 
@@ -29,6 +30,7 @@ vi.mock("../../api/usersClient", async () => {
     criarConta: vi.fn(),
     alterarPapel: vi.fn(),
     desativarConta: vi.fn(),
+    resetarMfa: vi.fn(),
   };
 });
 
@@ -683,6 +685,127 @@ describe("ContasAcessoScreen (T121)", () => {
       expect(
         screen.queryByRole("button", { name: /reativar/i }),
       ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("redefinição de MFA (T126)", () => {
+    it("master e RH veem 'Redefinir MFA'; DP não", async () => {
+      for (const ator of [masterAtor, rhAtor]) {
+        vi.mocked(obterUsuarioAtual).mockResolvedValue(ator);
+        vi.mocked(listarUsuarios).mockResolvedValue({
+          items: [contaAtiva],
+          nextCursor: null,
+        });
+        vi.mocked(listarEmpresasMulti).mockResolvedValue({
+          itens: [],
+          pagina: 1,
+          tamanhoPagina: 100,
+          total: 0,
+        });
+        const { unmount } = render(<ContasAcessoScreen />);
+        await screen.findByText("pessoa1@example.test");
+        expect(
+          screen.getByRole("button", { name: "Redefinir MFA" }),
+        ).toBeInTheDocument();
+        unmount();
+        vi.clearAllMocks();
+      }
+
+      vi.mocked(obterUsuarioAtual).mockResolvedValue(dpAtor);
+      vi.mocked(listarUsuarios).mockResolvedValue({
+        items: [contaAtiva],
+        nextCursor: null,
+      });
+      render(<ContasAcessoScreen />);
+      await screen.findByText("pessoa1@example.test");
+      expect(
+        screen.queryByRole("button", { name: "Redefinir MFA" }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("a própria conta nunca oferece 'Redefinir MFA'", async () => {
+      vi.mocked(obterUsuarioAtual).mockResolvedValue(rhAtor);
+      vi.mocked(listarUsuarios).mockResolvedValue({
+        items: [rhAtor, contaAtiva],
+        nextCursor: null,
+      });
+
+      render(<ContasAcessoScreen />);
+      await screen.findByText("pessoa1@example.test");
+
+      const linhaPropria = screen.getByText("rh@example.test").closest("tr")!;
+      expect(
+        within(linhaPropria).queryByRole("button", { name: "Redefinir MFA" }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("exige confirmação explícita com aviso de revogação de fatores e sessões", async () => {
+      vi.mocked(obterUsuarioAtual).mockResolvedValue(rhAtor);
+      vi.mocked(listarUsuarios).mockResolvedValue({
+        items: [contaAtiva],
+        nextCursor: null,
+      });
+
+      render(<ContasAcessoScreen />);
+      await screen.findByText("pessoa1@example.test");
+      fireEvent.click(screen.getByRole("button", { name: "Redefinir MFA" }));
+
+      expect(
+        await screen.findByText(/remove o fator de autenticação/i),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/revoga imediatamente todas as sessões/i),
+      ).toBeInTheDocument();
+      expect(resetarMfa).not.toHaveBeenCalled();
+    });
+
+    it("confirmar chama resetarMfa com o id da linha e recarrega a lista", async () => {
+      vi.mocked(obterUsuarioAtual).mockResolvedValue(rhAtor);
+      vi.mocked(listarUsuarios).mockResolvedValue({
+        items: [contaAtiva],
+        nextCursor: null,
+      });
+      vi.mocked(resetarMfa).mockResolvedValue(undefined);
+
+      render(<ContasAcessoScreen />);
+      await screen.findByText("pessoa1@example.test");
+      fireEvent.click(screen.getByRole("button", { name: "Redefinir MFA" }));
+      await screen.findByText(/remove o fator de autenticação/i);
+
+      fireEvent.click(
+        screen.getByRole("button", { name: "Confirmar redefinição" }),
+      );
+
+      await waitFor(() =>
+        expect(resetarMfa).toHaveBeenCalledWith(contaAtiva.id),
+      );
+      await waitFor(() => expect(listarUsuarios).toHaveBeenCalledTimes(2));
+    });
+
+    it("backend nega (403): mostra erro genérico, sem exibir/gerar segredo", async () => {
+      vi.mocked(obterUsuarioAtual).mockResolvedValue(rhAtor);
+      vi.mocked(listarUsuarios).mockResolvedValue({
+        items: [contaAtiva],
+        nextCursor: null,
+      });
+      vi.mocked(resetarMfa).mockRejectedValue(
+        new ApiError(403, "Acesso negado."),
+      );
+
+      render(<ContasAcessoScreen />);
+      await screen.findByText("pessoa1@example.test");
+      fireEvent.click(screen.getByRole("button", { name: "Redefinir MFA" }));
+      await screen.findByText(/remove o fator de autenticação/i);
+      fireEvent.click(
+        screen.getByRole("button", { name: "Confirmar redefinição" }),
+      );
+
+      expect(
+        await screen.findByText(/não tem permissão para redefinir o MFA/i),
+      ).toBeInTheDocument();
+      const texto = document.body.innerHTML.toLowerCase();
+      expect(texto).not.toContain("secret");
+      expect(texto).not.toContain("otpauth");
     });
   });
 

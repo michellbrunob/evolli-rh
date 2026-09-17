@@ -7,6 +7,7 @@ import {
   desativarConta,
   listarUsuarios,
   obterUsuarioAtual,
+  resetarMfa,
 } from "./usersClient";
 import { clearCsrfToken, setCsrfToken } from "./csrfClient";
 
@@ -386,6 +387,68 @@ describe("usersClient", () => {
 
       const { getCsrfToken } = await import("./csrfClient");
       expect(getCsrfToken()).toBeNull();
+    });
+  });
+
+  describe("resetarMfa", () => {
+    it("envia POST /v1/users/:id/mfa/reset com x-csrf-token, sem corpo", async () => {
+      setCsrfToken("token-vigente");
+      const fetchMock = vi
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValue(new Response(null, { status: 204 }));
+
+      await resetarMfa(usuarioSintetico.id);
+
+      expect(fetchMock).toHaveBeenCalledWith(
+        `/v1/users/${usuarioSintetico.id}/mfa/reset`,
+        expect.objectContaining({
+          method: "POST",
+          credentials: "same-origin",
+          headers: expect.objectContaining({ "x-csrf-token": "token-vigente" }),
+        }),
+      );
+      const init = fetchMock.mock.calls[0]?.[1] as RequestInit;
+      expect(init.body).toBeUndefined();
+    });
+
+    it("codifica o id na URL (encodeURIComponent)", async () => {
+      setCsrfToken("token-vigente");
+      const fetchMock = vi
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValue(new Response(null, { status: 204 }));
+
+      await resetarMfa("id com espaço");
+
+      expect(fetchMock).toHaveBeenCalledWith(
+        `/v1/users/${encodeURIComponent("id com espaço")}/mfa/reset`,
+        expect.anything(),
+      );
+    });
+
+    it("lança ApiError 403 quando o backend nega (ex.: DP)", async () => {
+      setCsrfToken("token-vigente");
+      vi.spyOn(globalThis, "fetch").mockResolvedValue(
+        jsonResponse(403, { message: "Acesso negado." }),
+      );
+
+      const erro = await resetarMfa(usuarioSintetico.id).catch(
+        (e: unknown) => e,
+      );
+      expect(erro).toBeInstanceOf(ApiError);
+      expect((erro as ApiError).status).toBe(403);
+    });
+
+    it("lança ApiError 404 (anti-enumeração entre empresas)", async () => {
+      setCsrfToken("token-vigente");
+      vi.spyOn(globalThis, "fetch").mockResolvedValue(
+        jsonResponse(404, { message: "Recurso não encontrado." }),
+      );
+
+      const erro = await resetarMfa(usuarioSintetico.id).catch(
+        (e: unknown) => e,
+      );
+      expect(erro).toBeInstanceOf(ApiError);
+      expect((erro as ApiError).status).toBe(404);
     });
   });
 });

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ApiError, login, logout } from "./authClient";
+import { ApiError, login, logout, verifyMfa } from "./authClient";
 import { clearCsrfToken, getCsrfToken, setCsrfToken } from "./csrfClient";
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -98,6 +98,89 @@ describe("authClient", () => {
         () => undefined,
       );
 
+      expect(getCsrfToken()).toBeNull();
+    });
+
+    it("MFA requerido: devolve o challenge e NÃO cria sessão (nenhum token guardado)", async () => {
+      vi.spyOn(globalThis, "fetch").mockResolvedValue(
+        jsonResponse(200, {
+          mfaRequired: true,
+          challengeToken: "challenge-opaco-abc",
+        }),
+      );
+
+      const resultado = await login({
+        email: "pessoa@example.test",
+        password: "SenhaForte123!",
+      });
+
+      expect(resultado).toEqual({
+        mfaRequerido: true,
+        challengeToken: "challenge-opaco-abc",
+      });
+      // Nenhuma sessão criada ainda: sem token CSRF em memória.
+      expect(getCsrfToken()).toBeNull();
+    });
+
+    it("sem MFA: devolve mfaRequerido:false e guarda o token CSRF", async () => {
+      vi.spyOn(globalThis, "fetch").mockResolvedValue(
+        jsonResponse(200, { csrfToken: "token-sessao" }),
+      );
+
+      const resultado = await login({
+        email: "pessoa@example.test",
+        password: "SenhaForte123!",
+      });
+
+      expect(resultado).toEqual({ mfaRequerido: false });
+      expect(getCsrfToken()).toBe("token-sessao");
+    });
+  });
+
+  describe("verifyMfa", () => {
+    it("POST /v1/auth/mfa/verify com challenge + code, same-origin, sem CSRF", async () => {
+      const fetchMock = vi
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValue(jsonResponse(200, { csrfToken: "token-pos-mfa" }));
+
+      await verifyMfa({ challengeToken: "ch-1", code: "123456" });
+
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/v1/auth/mfa/verify",
+        expect.objectContaining({
+          method: "POST",
+          credentials: "same-origin",
+        }),
+      );
+      const init = fetchMock.mock.calls[0]?.[1] as RequestInit;
+      expect(init.headers).not.toHaveProperty("x-csrf-token");
+      const body = JSON.parse(init.body as string) as Record<string, unknown>;
+      expect(body).toEqual({ challengeToken: "ch-1", code: "123456" });
+    });
+
+    it("sucesso: guarda o token CSRF da sessão emitida", async () => {
+      vi.spyOn(globalThis, "fetch").mockResolvedValue(
+        jsonResponse(200, { csrfToken: "token-pos-mfa" }),
+      );
+
+      await verifyMfa({ challengeToken: "ch-1", code: "123456" });
+
+      expect(getCsrfToken()).toBe("token-pos-mfa");
+    });
+
+    it("falha (401): ApiError com status, sem repassar o texto do servidor; nenhum token", async () => {
+      vi.spyOn(globalThis, "fetch").mockResolvedValue(
+        jsonResponse(401, { message: "detalhe interno" }),
+      );
+
+      const erro = await verifyMfa({
+        challengeToken: "ch-1",
+        code: "000000",
+      }).catch((e: unknown) => e);
+
+      expect(erro).toBeInstanceOf(ApiError);
+      expect((erro as ApiError).status).toBe(401);
+      expect((erro as ApiError).message).not.toContain("detalhe interno");
       expect(getCsrfToken()).toBeNull();
     });
   });

@@ -73,6 +73,7 @@ import {
   desativarConta,
   listarUsuarios,
   obterUsuarioAtual,
+  resetarMfa,
 } from "../../api/usersClient";
 import {
   type EmpresaApi,
@@ -132,6 +133,13 @@ interface ConfirmacaoDesativacaoState {
   erro: string | null;
 }
 
+interface ConfirmacaoResetMfaState {
+  id: string;
+  email: string;
+  resetando: boolean;
+  erro: string | null;
+}
+
 export interface ContasAcessoScreenProps {
   /** Chamado quando qualquer chamada desta tela descobre (via 401) que a
    * sessão não é mais válida. A tela limpa só o próprio estado em memória —
@@ -170,10 +178,13 @@ export function ContasAcessoScreen({
   const [edicaoPapel, setEdicaoPapel] = useState<EdicaoPapelState | null>(null);
   const [confirmacaoDesativacao, setConfirmacaoDesativacao] =
     useState<ConfirmacaoDesativacaoState | null>(null);
+  const [confirmacaoResetMfa, setConfirmacaoResetMfa] =
+    useState<ConfirmacaoResetMfaState | null>(null);
 
   const formTituloId = useId();
   const edicaoTituloId = useId();
   const confirmacaoTituloId = useId();
+  const resetMfaTituloId = useId();
 
   const podeVerTela =
     ator !== null &&
@@ -183,6 +194,9 @@ export function ContasAcessoScreen({
   const podeCriarOuAlterarPapel =
     ator !== null && (ator.role === "master_tecnico" || ator.role === "rh");
   const podeDesativar = podeVerTela;
+  // Redefinição administrativa de MFA: só master_tecnico e RH (contrato T125);
+  // DP NÃO. O backend é a autoridade final — se negar, mostramos erro genérico.
+  const podeResetarMfa = podeCriarOuAlterarPapel;
 
   const tratarErroSessao = useCallback(
     (err: unknown): boolean => {
@@ -504,6 +518,54 @@ export function ContasAcessoScreen({
     }
   }
 
+  function abrirConfirmacaoResetMfa(usuario: SafeAccessUserApi) {
+    setFormulario(null);
+    setEdicaoPapel(null);
+    setConfirmacaoDesativacao(null);
+    setConfirmacaoResetMfa({
+      id: usuario.id,
+      email: usuario.email,
+      resetando: false,
+      erro: null,
+    });
+  }
+
+  function fecharConfirmacaoResetMfa() {
+    setConfirmacaoResetMfa(null);
+  }
+
+  function mensagemErroResetMfa(err: unknown): string {
+    if (err instanceof ApiError) {
+      if (err.status === 403) {
+        return "Você não tem permissão para redefinir o MFA desta conta.";
+      }
+      if (err.status === 404) {
+        return "Esta conta não foi encontrada. Atualize a lista e tente novamente.";
+      }
+      return "Não foi possível redefinir o MFA. Tente novamente em instantes.";
+    }
+    return "Não foi possível redefinir o MFA. Verifique sua conexão e tente novamente.";
+  }
+
+  async function handleConfirmarResetMfa() {
+    if (confirmacaoResetMfa === null || confirmacaoResetMfa.resetando) return;
+    setConfirmacaoResetMfa((prev) =>
+      prev ? { ...prev, resetando: true, erro: null } : prev,
+    );
+    try {
+      await resetarMfa(confirmacaoResetMfa.id);
+      setConfirmacaoResetMfa(null);
+      await carregarLista(cursorAtual);
+    } catch (err) {
+      if (tratarErroSessao(err)) return;
+      setConfirmacaoResetMfa((prev) =>
+        prev
+          ? { ...prev, resetando: false, erro: mensagemErroResetMfa(err) }
+          : prev,
+      );
+    }
+  }
+
   const nomeEmpresaPorId = new Map(
     empresasMaster.map((empresa) => [empresa.id, empresa.nome]),
   );
@@ -572,6 +634,14 @@ export function ContasAcessoScreen({
                 Desativar
               </Button>
             ) : null}
+            {podeResetarMfa ? (
+              <Button
+                variant="secondary"
+                onClick={() => abrirConfirmacaoResetMfa(u)}
+              >
+                Redefinir MFA
+              </Button>
+            ) : null}
           </div>
         );
       },
@@ -606,7 +676,9 @@ export function ContasAcessoScreen({
           className="contas-acesso-screen__aviso-texto"
         >
           MFA é pré-requisito antes de qualquer piloto com dados reais ou
-          produção — esta tela não implementa MFA nem substitui esse controle.
+          produção. Exigir MFA de forma obrigatória ainda depende de gates
+          operacionais externos (cofre de segredos e break-glass); esta tela não
+          os substitui.
         </p>
       </Surface>
 
@@ -1032,6 +1104,53 @@ export function ContasAcessoScreen({
               {confirmacaoDesativacao.desativando
                 ? "Desativando…"
                 : "Confirmar desativação"}
+            </Button>
+          </FormActions>
+        </Surface>
+      ) : null}
+
+      {confirmacaoResetMfa ? (
+        <Surface
+          as="section"
+          padding="lg"
+          className="contas-acesso-screen__formulario"
+          aria-labelledby={resetMfaTituloId}
+        >
+          <h2
+            id={resetMfaTituloId}
+            className="contas-acesso-screen__section-title"
+          >
+            Redefinir MFA — {confirmacaoResetMfa.email}
+          </h2>
+          <p role="alert" className="contas-acesso-screen__aviso-texto">
+            Esta ação remove o fator de autenticação em duas etapas desta conta
+            e revoga imediatamente todas as sessões ativas dela. A pessoa
+            precisará configurar o MFA de novo no próximo acesso. Nenhum segredo
+            ou código é exibido ou gerado aqui.
+          </p>
+
+          {confirmacaoResetMfa.erro ? (
+            <p className="contas-acesso-screen__form-erro" role="alert">
+              {confirmacaoResetMfa.erro}
+            </p>
+          ) : null}
+
+          <FormActions>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={fecharConfirmacaoResetMfa}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              onClick={() => void handleConfirmarResetMfa()}
+              disabled={confirmacaoResetMfa.resetando}
+            >
+              {confirmacaoResetMfa.resetando
+                ? "Redefinindo…"
+                : "Confirmar redefinição"}
             </Button>
           </FormActions>
         </Surface>

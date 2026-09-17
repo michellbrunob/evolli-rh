@@ -1,0 +1,108 @@
+/**
+ * Minha conta > Segurança (T126) — só tokens de tokens.css; sem hexadecimal
+ * novo, sem sombra, sem gradiente. Mesmo padrão de SessoesAtivasPanel.
+ */
+
+.seguranca-mfa-painel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  min-width: 0;
+}
+
+.seguranca-mfa-painel__cabecalho {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.seguranca-mfa-painel__titulo {
+  margin: 0;
+  font-size: var(--text-lead);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  font-weight: var(--weight-strong);
+  color: var(--color-ink);
+}
+
+.seguranca-mfa-painel__intro {
+  margin: 0;
+  color: var(--color-ink-subtle);
+}
+
+.seguranca-mfa-painel__subtitulo {
+  margin: var(--space-sm) 0 0;
+  font-size: var(--text-body);
+  font-weight: var(--weight-strong);
+  color: var(--color-ink);
+}
+
+.seguranca-mfa-painel__carregando {
+  margin: 0;
+  color: var(--color-ink-subtle);
+}
+
+.seguranca-mfa-painel__erro {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-sm);
+}
+
+.seguranca-mfa-painel__enroll,
+.seguranca-mfa-painel__codigos {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  min-width: 0;
+}
+
+.seguranca-mfa-painel__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  max-width: 24rem;
+}
+
+.seguranca-mfa-painel__acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.seguranca-mfa-painel__nota-qr {
+  margin: 0;
+  color: var(--color-ink-subtle);
+  font-size: var(--text-caption);
+}
+
+/* Lista de códigos de recuperação — monoespaçada, legível, sem transbordar
+   em telas estreitas. */
+.seguranca-mfa-painel__lista-codigos {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-xs) var(--space-md);
+}
+
+.seguranca-mfa-painel__codigo {
+  font-family: ui-monospace, "SFMono-Regular", "Menlo", "Consolas", monospace;
+  font-size: var(--text-body);
+  letter-spacing: var(--tracking-tight);
+  color: var(--color-ink);
+  padding: var(--space-xxs) 0;
+}
+
+@media (max-width: 480px) {
+  .seguranca-mfa-painel__lista-codigos {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .seguranca-mfa-painel__acoes > .evolli-button {
+    width: 100%;
+  }
+}

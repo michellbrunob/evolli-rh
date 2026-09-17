@@ -229,3 +229,31 @@ export async function desativarConta(id: string): Promise<void> {
     throw new ApiError(res.status, msg);
   }
 }
+
+/**
+ * Redefinição administrativa de MFA (`POST /v1/users/:id/mfa/reset`, T125).
+ * Remove o fator, invalida challenges, apaga os códigos de recuperação e
+ * revoga as sessões da conta — obrigando novo cadastro. O RBAC vive no
+ * backend (só `master_tecnico` e `rh`; `dp` e demais recebem 403/404); esta
+ * função nunca vê, gera ou substitui segredo/códigos. `id` sempre vem da
+ * listagem já autorizada, nunca digitado.
+ */
+export async function resetarMfa(id: string): Promise<void> {
+  const token = await getCsrf();
+  const res = await apiFetch(
+    `${USERS_ENDPOINT}/${encodeURIComponent(id)}/mfa/reset`,
+    {
+      method: "POST",
+      headers: { "x-csrf-token": token },
+    },
+  );
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as {
+      message?: string | string[];
+    };
+    const msg = Array.isArray(body.message)
+      ? (body.message[0] ?? "Não foi possível redefinir o MFA da conta.")
+      : (body.message ?? "Não foi possível redefinir o MFA da conta.");
+    throw new ApiError(res.status, msg);
+  }
+}
