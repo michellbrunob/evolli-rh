@@ -19,8 +19,17 @@ import { ConfigService } from "@nestjs/config";
 export class MfaConfigService {
   constructor(private readonly config: ConfigService) {}
 
-  /** `true` somente quando `MFA_ENABLED=true` foi validado no boot. */
+  /**
+   * `true` somente quando `MFA_ENABLED=true`.
+   *
+   * `env.validation.ts` já restringe o valor a `"true"`/`"false"` no boot (ou a
+   * API não sobe), então aqui basta reconhecer o "ligado". Aceita tanto o
+   * booleano validado quanto a string `"true"` porque o `ConfigService` pode
+   * devolver o valor cru de `process.env` (string) em vez do transformado —
+   * qualquer outro valor mantém o MFA DESLIGADO (nunca liga por engano).
+   */
   isEnabled(): boolean {
-    return this.config.get<boolean>("MFA_ENABLED") === true;
+    const valor = this.config.get<unknown>("MFA_ENABLED");
+    return valor === true || valor === "true";
   }
 }

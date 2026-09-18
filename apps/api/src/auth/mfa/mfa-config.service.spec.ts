@@ -14,21 +14,29 @@ function comConfig(valor: unknown): MfaConfigService {
 }
 
 describe("MfaConfigService", () => {
-  it("habilitado somente quando MFA_ENABLED validado é true", () => {
+  it("habilitado quando o booleano validado é true", () => {
     expect(comConfig(true).isEnabled()).toBe(true);
   });
 
-  it("desabilitado quando false", () => {
+  it('habilitado quando o ConfigService devolve a string "true" (valor cru de process.env)', () => {
+    // env.validation já restringe o valor a "true"/"false"; reconhecer a string
+    // "true" cobre o caso de o ConfigService devolver o valor cru, não o
+    // transformado.
+    expect(comConfig("true").isEnabled()).toBe(true);
+  });
+
+  it("desabilitado quando false (booleano ou string)", () => {
     expect(comConfig(false).isEnabled()).toBe(false);
+    expect(comConfig("false").isEnabled()).toBe(false);
   });
 
   it("desabilitado quando ausente (undefined)", () => {
     expect(comConfig(undefined).isEnabled()).toBe(false);
   });
 
-  it("não é ligado por valores truthy que não sejam o booleano true", () => {
-    // Defesa: mesmo que algo injete uma string, só o booleano true habilita.
-    expect(comConfig("true").isEnabled()).toBe(false);
+  it("não é ligado por outros valores truthy (nunca liga por engano)", () => {
     expect(comConfig(1).isEnabled()).toBe(false);
+    expect(comConfig("1").isEnabled()).toBe(false);
+    expect(comConfig("TRUE").isEnabled()).toBe(false);
   });
 });
