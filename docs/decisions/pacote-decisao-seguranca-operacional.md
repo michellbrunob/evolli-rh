@@ -1,13 +1,14 @@
 # Pacote de decisão — Segurança operacional (MFA, segredos, backup/recuperação e primeiro `master_tecnico`)
 
-- Status: **aguardando aprovação** — este é um **formulário de decisão** para os
+- Status: **parcialmente aprovado** — este é um **formulário de decisão** para os
   responsáveis de **Produto/TI** (inclui Segurança), **RH** e **Jurídico**.
-  **Nenhum item abaixo está aprovado.** O documento **estrutura** as escolhas em
+  **`DS-MFA-01` foi aprovada em 2026-09-18** (rollout de MFA — ver §8); **todos
+  os demais itens permanecem Pendentes.** O documento **estrutura** as escolhas em
   campos objetivos e num registro por evidência (§7). Ele **não decide, não
   infere e não escolhe** fornecedor, ferramenta, valor (RPO/RTO), prazo, base
   legal ou responsável nominal. Onde um valor específico é necessário, ele
   aparece como **campo a preencher**, nunca como valor sugerido.
-- Data de emissão: 2026-08-24
+- Data de emissão: 2026-08-24 · Última atualização: 2026-09-18 (T128)
 - Fase/tarefa: Fase 0 — Fundação e gates transversais; **T004** e
   provisionamento controlado do primeiro `master_tecnico` (**CG-PROV**).
 - Relação com o registro de pendências: este pacote é a **forma de aprovação**
@@ -72,13 +73,17 @@ gate **verificável**. Referências: `DS-MFA-01..05`.
 - Decisão: para **quais papéis** o MFA é obrigatório e **a partir de quando**.
   Nenhum papel é presumido isento.
 - Opções elegíveis (marcar uma; combinações possíveis):
-  - [ ] Todo usuário ativo, desde o primeiro login (linha da ADR 0003 original).
+  - [x] Todo usuário ativo, desde o primeiro login (linha da ADR 0003 original).
+        **Aprovada em 2026-09-18 (T128) — ver §8.**
   - [ ] Subconjunto por papel/risco: ________________________________________
         (papéis a listar — a preencher, não sugerido aqui).
 - Responsável: **Produto + TI/Segurança** (conjunta); **RH consultado** sobre
   quais funções de negócio são alcançadas.
 - Evidência: decisão registrada **+ teste de autorização** provando que ação
   sensível sem MFA é **negada** no servidor.
+- **Aprovado:** MFA **TOTP obrigatório para todos os usuários** antes do acesso a
+  dado real. A **ativação real** permanece **bloqueada** até os gates de segredos
+  (§2) e o gate-mestre `DS-OPS-01` (§6) serem satisfeitos — ver §8.
 
 ### 1.2 Método a escolher — `DS-MFA-01` (tecnologia herdada)
 
@@ -377,33 +382,111 @@ Campos **vazios**, a preencher no ato de aprovação. **Responsável** é a
 **área/função**, nunca pessoa nominada neste documento. Enquanto o campo "Opção
 aprovada" estiver vazio, o **Status** é **Pendente**.
 
-| ID         | Data | Responsáveis (área/função) | Opção aprovada | Evidência (referência) | Status   |
-| ---------- | ---- | -------------------------- | -------------- | ---------------------- | -------- |
-| DS-MFA-01  |      |                            |                |                        | Pendente |
-| DS-MFA-02  |      |                            |                |                        | Pendente |
-| DS-MFA-03  |      |                            |                |                        | Pendente |
-| DS-MFA-04  |      |                            |                |                        | Pendente |
-| DS-MFA-05  |      |                            |                |                        | Pendente |
-| DS-SEC-01  |      |                            |                |                        | Pendente |
-| DS-SEC-02  |      |                            |                |                        | Pendente |
-| DS-SEC-03  |      |                            |                |                        | Pendente |
-| DS-SEC-04  |      |                            |                |                        | Pendente |
-| DS-BKP-01  |      |                            |                |                        | Pendente |
-| DS-BKP-02  |      |                            |                |                        | Pendente |
-| DS-BKP-03  |      |                            |                |                        | Pendente |
-| DS-BKP-04  |      |                            |                |                        | Pendente |
-| DS-BKP-05  |      |                            |                |                        | Pendente |
-| DS-BKP-06  |      |                            |                |                        | Pendente |
-| DS-OPS-01  |      |                            |                |                        | Pendente |
-| CG-PROV-01 |      |                            |                |                        | Pendente |
-| CG-PROV-02 |      |                            |                |                        | Pendente |
+| ID         | Data       | Responsáveis (área/função)             | Opção aprovada                                               | Evidência (referência) | Status       |
+| ---------- | ---------- | -------------------------------------- | ------------------------------------------------------------ | ---------------------- | ------------ |
+| DS-MFA-01  | 2026-09-18 | Produto + TI/Segurança (RH consultado) | TOTP obrigatório para todo usuário ativo, antes de dado real | §8 (T128)              | **Aprovada** |
+| DS-MFA-02  |            |                                        |                                                              |                        | Pendente     |
+| DS-MFA-03  |            |                                        |                                                              |                        | Pendente     |
+| DS-MFA-04  |            |                                        |                                                              |                        | Pendente     |
+| DS-MFA-05  |            |                                        |                                                              |                        | Pendente     |
+| DS-SEC-01  |            |                                        |                                                              |                        | Pendente     |
+| DS-SEC-02  |            |                                        |                                                              |                        | Pendente     |
+| DS-SEC-03  |            |                                        |                                                              |                        | Pendente     |
+| DS-SEC-04  |            |                                        |                                                              |                        | Pendente     |
+| DS-BKP-01  |            |                                        |                                                              |                        | Pendente     |
+| DS-BKP-02  |            |                                        |                                                              |                        | Pendente     |
+| DS-BKP-03  |            |                                        |                                                              |                        | Pendente     |
+| DS-BKP-04  |            |                                        |                                                              |                        | Pendente     |
+| DS-BKP-05  |            |                                        |                                                              |                        | Pendente     |
+| DS-BKP-06  |            |                                        |                                                              |                        | Pendente     |
+| DS-OPS-01  |            |                                        |                                                              |                        | Pendente     |
+| CG-PROV-01 |            |                                        |                                                              |                        | Pendente     |
+| CG-PROV-02 |            |                                        |                                                              |                        | Pendente     |
 
 ### Declaração
 
-**Nenhuma decisão deste pacote está aprovada.** Cada item só passa de Pendente a
+**Somente `DS-MFA-01` está aprovada** (2026-09-18, T128 — ver §8); **todos os
+demais itens permanecem Pendentes.** Cada item pendente só passa de Pendente a
 decidido mediante **evidência formal** da área responsável, momento em que uma
 ADR (ou emenda à ADR 0003, para MFA) a registra e a fase Implementar do controle
-correspondente pode abrir. Este documento **não habilita** dado real, produção,
-exposição externa, MFA, cofre, backup, runbook ou provisionamento; **não declara
-conformidade legal**; e **não relaxa** a negação por padrão nem a obrigação de
-auditoria da Constituição.
+correspondente pode abrir. Aprovar `DS-MFA-01` **não habilita** dado real,
+produção, exposição externa nem ativa MFA no código; **não** conclui `DS-SEC-01`,
+cofre, backup, runbook ou provisionamento; **não declara conformidade legal**; e
+**não relaxa** a negação por padrão nem a obrigação de auditoria da Constituição.
+
+---
+
+## 8. Registro de aprovação — rollout de MFA e encaminhamento operacional (T128)
+
+- Data: 2026-09-18 · Decisão: **de produto**, tomada por **Produto + TI/Segurança**
+  (RH consultado). Reusa os identificadores já catalogados — **nenhum ID novo é
+  criado**.
+- Este registro **aprova o rollout** e **encaminha** a execução para TI/Segurança.
+  Ele **não** provisiona cofre, **não** cria segredo, **não** altera ambiente
+  remoto, **não** ativa MFA obrigatório no código e **não** conclui `DS-SEC-01`.
+
+### 8.1 Decisão aprovada
+
+- MFA **TOTP** será **obrigatório para todos os usuários** antes do acesso a dados
+  reais (`DS-MFA-01`).
+- A solução deve usar **cofre corporativo**, com **chave independente por
+  ambiente**, **acesso restrito e auditável** (diretriz que condiciona
+  `DS-SEC-01` e `DS-SEC-04`).
+- **Break-glass** exige **duas contas administrativas nominativas com MFA** e
+  **dupla autorização** (diretriz que condiciona `DS-SEC-03`).
+- Enquanto não houver suporte técnico a **múltiplas versões de chave e
+  recifragem**, a **rotação ocorrerá somente em incidente controlado** (diretriz
+  interina que condiciona `DS-SEC-02`; ver
+  [infra/secrets/README.md, §4](../../infra/secrets/README.md)).
+- **Piloto ou produção só poderão exigir MFA** após TI/Segurança **validar**
+  cofre, provisionamento, segregação por ambiente e runbook de break-glass
+  (reafirma o gate-mestre `DS-OPS-01`).
+
+### 8.2 Estado por responsabilidade
+
+| Item                                         | Referência              | Estado                                  |
+| -------------------------------------------- | ----------------------- | --------------------------------------- |
+| Decisão de produto (MFA universal, TOTP)     | `DS-MFA-01`             | **Aprovada**                            |
+| Escolha do provedor de cofre                 | `DS-SEC-01`             | **Pendente** (TI/Segurança)             |
+| Provisionamento segregado por ambiente       | `DS-SEC-01`/`DS-SEC-04` | **Pendente**                            |
+| Política de rotação (interina: só incidente) | `DS-SEC-02`             | Diretriz aprovada; execução pendente    |
+| Forma do break-glass (2 contas + dupla auth) | `DS-SEC-03`             | Diretriz aprovada; validação pendente   |
+| Validação do runbook de break-glass          | `DS-SEC-03`             | **Pendente**                            |
+| Ativação real de MFA (piloto/produção)       | `DS-OPS-01`             | **Bloqueada** até evidências concluídas |
+
+As diretrizes acima **condicionam** as decisões `DS-SEC-01/02/03/04`, que
+permanecem **Pendentes** quanto à execução e à validação por TI/Segurança.
+`DS-SEC-01` **não** é declarado concluído por este registro.
+
+### 8.3 Checklist de encaminhamento para TI/Segurança
+
+Marcável como **pendente**, **validado** ou **bloqueado**. Os critérios
+detalhados de cada item já estão na especificação operacional
+[infra/secrets/README.md](../../infra/secrets/README.md) — este checklist
+**não os reescreve**, apenas encaminha.
+
+- [ ] **Seleção do cofre** corporativo conforme os critérios já aprovados
+      ([infra/secrets/README.md, §2.1](../../infra/secrets/README.md); requisitos
+      de `DS-SEC-01` em [§2.4](etapa0-seguranca-operacional-pendente.md)).
+- [ ] **Responsáveis por função** definidos: operação do segredo, auditoria de
+      acesso/rotação e aprovação emergencial (break-glass) — por **área/função**,
+      nunca por nome.
+- [ ] **Provisionamento segregado por ambiente** (chave independente por
+      ambiente; sem reuso cruzado — `DS-SEC-04`;
+      [infra/secrets/README.md, §3](../../infra/secrets/README.md)).
+- [ ] **Teste de falha fechada** demonstrado em ambiente descartável, **sem
+      expor valor** ([infra/secrets/README.md, §3.5](../../infra/secrets/README.md)).
+- [ ] **Validação do break-glass**: duas contas administrativas nominativas com
+      MFA, dupla autorização, evidência e revisão posterior
+      ([infra/secrets/README.md, §5](../../infra/secrets/README.md)).
+- [ ] **Evidências mínimas para encerrar `DS-SEC-01`** reunidas
+      ([infra/secrets/README.md, §6](../../infra/secrets/README.md)) e a decisão
+      `DS-SEC-01` registrada como aprovada em §7.
+
+### 8.4 Condição de liberação
+
+A **ativação real do MFA** (exigi-lo para piloto/produção com dado real) só é
+liberada quando **todos** os itens de §8.3 estiverem **validados**, `DS-SEC-01`
+registrada como aprovada em §7 e o gate-mestre `DS-OPS-01` satisfeito. Até lá, a
+decisão de produto está **aprovada**, mas a **execução permanece bloqueada** —
+nenhuma mudança de código torna o MFA obrigatório neste momento.
