@@ -17,7 +17,7 @@
  * reinterpretada. Backend é autoritativo para RBAC, escopo e 404
  * anti-enumeração; nenhuma autorização depende do navegador.
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Button,
   DataTable,
@@ -144,6 +144,18 @@ export function DadosContratuaisScreen() {
   const [statusLinhaTempo, setStatusLinhaTempo] =
     useState<StatusCarregamento>("carregando");
 
+  // Guarda determinística contra respostas obsoletas: um contador monotônico
+  // por carregador. Cada carga captura o valor no início e só aplica o
+  // resultado (dados, estado de carregamento, erro, seleção derivada) se ainda
+  // for a tentativa mais recente daquele carregador. Trocar/limpar
+  // colaborador/vínculo e o "Tentar novamente" incrementam o contador,
+  // invalidando qualquer resposta anterior — inclusive uma segunda tentativa
+  // para o MESMO id, que compete com a original.
+  const seqVinculos = useRef(0);
+  const seqAlocacoes = useRef(0);
+  const seqHorarios = useRef(0);
+  const seqLinhaTempo = useRef(0);
+
   // Catálogos para resolver nomes (id → "código — nome"). Falha não quebra a
   // tela: os nomes caem para o id técnico.
   const [cargos, setCargos] = useState<CargoApi[]>([]);
@@ -218,20 +230,25 @@ export function DadosContratuaisScreen() {
 
   // ---- Vínculos do colaborador -------------------------------------------
   const carregarVinculos = useCallback(async (id: string) => {
+    const seq = ++seqVinculos.current;
     setStatusVinculos("carregando");
     try {
       const lista = await listarVinculosDoColaborador(id);
+      if (seq !== seqVinculos.current) return; // resposta superada: descarta
       setVinculos(lista);
       // Zero bloqueia; uma resolve automaticamente; múltiplas exigem escolha.
       setVinculoId(lista.length === 1 ? lista[0]!.id : "");
       setStatusVinculos("pronto");
     } catch {
+      if (seq !== seqVinculos.current) return;
       setStatusVinculos("erro");
     }
   }, []);
 
   useEffect(() => {
     if (!colaboradorId) {
+      // Sem colaborador: invalida cargas em voo e limpa tudo que depende dele.
+      seqVinculos.current++;
       setVinculos([]);
       setVinculoId("");
       return;
@@ -241,53 +258,97 @@ export function DadosContratuaisScreen() {
 
   // ---- Dados do vínculo selecionado --------------------------------------
   const carregarAlocacoes = useCallback(async (id: string) => {
+    const seq = ++seqAlocacoes.current;
     setStatusAlocacoes("carregando");
     try {
-      setAlocacoes(await listarAlocacoesVinculo(id));
+      const dados = await listarAlocacoesVinculo(id);
+      if (seq !== seqAlocacoes.current) return;
+      setAlocacoes(dados);
       setStatusAlocacoes("pronto");
     } catch {
+      if (seq !== seqAlocacoes.current) return;
       setStatusAlocacoes("erro");
     }
   }, []);
 
   const carregarHorarios = useCallback(async (colabId: string) => {
+    const seq = ++seqHorarios.current;
     setStatusHorarios("carregando");
     try {
       const res = await listarVinculosHorario({
         colaboradorId: colabId,
         tamanhoPagina: 100,
       });
+      if (seq !== seqHorarios.current) return;
       setHorarios(res.itens);
       setStatusHorarios("pronto");
     } catch {
+      if (seq !== seqHorarios.current) return;
       setStatusHorarios("erro");
     }
   }, []);
 
   const carregarLinhaTempo = useCallback(async (id: string) => {
+    const seq = ++seqLinhaTempo.current;
     setStatusLinhaTempo("carregando");
     try {
-      setLinhaTempo(await buscarLinhaDoTempo(id));
+      const dados = await buscarLinhaDoTempo(id);
+      if (seq !== seqLinhaTempo.current) return;
+      setLinhaTempo(dados);
       setStatusLinhaTempo("pronto");
     } catch {
+      if (seq !== seqLinhaTempo.current) return;
       setStatusLinhaTempo("erro");
     }
   }, []);
 
   useEffect(() => {
-    if (!vinculoId) return;
+    if (!vinculoId) {
+      // Sem vínculo: invalida cargas em voo e limpa o detalhe dependente dele.
+      seqAlocacoes.current++;
+      seqLinhaTempo.current++;
+      setAlocacoes([]);
+      setLinhaTempo([]);
+      return;
+    }
     void carregarAlocacoes(vinculoId);
     void carregarLinhaTempo(vinculoId);
   }, [vinculoId, carregarAlocacoes, carregarLinhaTempo]);
 
   useEffect(() => {
-    if (!colaboradorId) return;
+    if (!colaboradorId) {
+      seqHorarios.current++;
+      setHorarios([]);
+      return;
+    }
     void carregarHorarios(colaboradorId);
   }, [colaboradorId, carregarHorarios]);
 
+  // Troca de colaborador: invalida imediatamente TODAS as cargas em voo (mesmo
+  // antes de os efeitos re-dispararem) e limpa vínculos, vínculo selecionado,
+  // alocações, horários e linha do tempo — nada do colaborador anterior
+  // sobrevive à troca. Os efeitos acima recarregam a partir do novo estado.
   function selecionarColaborador(id: string) {
-    setColaboradorId(id);
+    seqVinculos.current++;
+    seqAlocacoes.current++;
+    seqHorarios.current++;
+    seqLinhaTempo.current++;
+    setVinculos([]);
     setVinculoId("");
+    setAlocacoes([]);
+    setHorarios([]);
+    setLinhaTempo([]);
+    setColaboradorId(id);
+  }
+
+  // Troca de vínculo: invalida alocações/linha do tempo em voo e limpa-as, para
+  // que a resposta tardia do vínculo anterior nunca apareça no detalhe do novo.
+  function selecionarVinculo(id: string) {
+    seqAlocacoes.current++;
+    seqLinhaTempo.current++;
+    setAlocacoes([]);
+    setLinhaTempo([]);
+    setVinculoId(id);
   }
 
   const cargosPorId = useMemo(() => {
@@ -502,7 +563,7 @@ export function DadosContratuaisScreen() {
                   {(control) => (
                     <select
                       value={vinculoId}
-                      onChange={(e) => setVinculoId(e.target.value)}
+                      onChange={(e) => selecionarVinculo(e.target.value)}
                       {...control}
                     >
                       <option value="">Selecione…</option>

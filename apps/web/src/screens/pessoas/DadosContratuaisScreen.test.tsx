@@ -352,3 +352,145 @@ describe("DadosContratuaisScreen (T134 — funcional, somente leitura)", () => {
     ).toBeInTheDocument();
   });
 });
+
+// Promessa controlável para forçar ordens de resolução deterministas.
+function deferred<T>() {
+  let resolver!: (value: T) => void;
+  const promise = new Promise<T>((r) => {
+    resolver = r;
+  });
+  return { promise, resolve: resolver };
+}
+
+const COLAB_A = { ...COLAB_1, id: "colab-A", nome: "Alice" };
+const COLAB_B = { ...COLAB_1, id: "colab-B", nome: "Bob" };
+
+describe("DadosContratuaisScreen (T134) — corridas assíncronas", () => {
+  it("troca de colaborador: resposta antiga (A) que chega após B não sobrescreve B", async () => {
+    const dVincA = deferred<unknown>();
+    const dVincB = deferred<unknown>();
+    const dHorA = deferred<unknown>();
+    const dHorB = deferred<unknown>();
+    vi.mocked(listarColaboradores).mockResolvedValue(
+      pagina([COLAB_A, COLAB_B]) as never,
+    );
+    vi.mocked(listarVinculosDoColaborador).mockImplementation(((id: string) =>
+      id === "colab-A" ? dVincA.promise : dVincB.promise) as never);
+    vi.mocked(listarVinculosHorario).mockImplementation(((q: {
+      colaboradorId?: string;
+    }) =>
+      q.colaboradorId === "colab-A" ? dHorA.promise : dHorB.promise) as never);
+
+    render(<DadosContratuaisScreen />);
+    const selColab = await screen.findByLabelText("Colaborador");
+    fireEvent.change(selColab, { target: { value: "colab-A" } });
+    fireEvent.change(selColab, { target: { value: "colab-B" } });
+
+    // Resolve B primeiro (mais recente), depois A (obsoleta).
+    dVincB.resolve([
+      vinculo({ id: "vb", matricula: "MB", colaboradorId: "colab-B" }),
+    ]);
+    dHorB.resolve(
+      pagina([{ ...HORARIO, id: "hb", vigenciaInicio: "2026-09-09" }]),
+    );
+    await screen.findByRole("heading", { name: "Vínculo — MB" });
+
+    dVincA.resolve([
+      vinculo({ id: "va", matricula: "MA", colaboradorId: "colab-A" }),
+    ]);
+    dHorA.resolve(
+      pagina([{ ...HORARIO, id: "ha", vigenciaInicio: "2020-01-01" }]),
+    );
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // Só B permanece visível; nada de A vaza para a tela.
+    expect(
+      screen.getByRole("heading", { name: "Vínculo — MB" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/MA/)).not.toBeInTheDocument();
+    expect(screen.queryByText("2020-01-01")).not.toBeInTheDocument();
+    expect(screen.getAllByText("2026-09-09").length).toBeGreaterThan(0);
+  });
+
+  it("troca de vínculo: alocações/linha do tempo tardias de V1 não aparecem no detalhe de V2", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue(
+      pagina([COLAB_1]) as never,
+    );
+    vi.mocked(listarVinculosDoColaborador).mockResolvedValue([
+      vinculo({ id: "v1", matricula: "V1" }),
+      vinculo({ id: "v2", matricula: "V2" }),
+    ] as never);
+    vi.mocked(listarCargos).mockResolvedValue(
+      pagina([
+        { id: "cargo-1", codigo: "ANL", nome: "Analista" },
+        { id: "cargo-2", codigo: "GER", nome: "Gerente" },
+      ]) as never,
+    );
+    const dAlocV1 = deferred<unknown>();
+    const dLinhaV1 = deferred<unknown>();
+    vi.mocked(listarAlocacoesVinculo).mockImplementation(((id: string) =>
+      id === "v1"
+        ? dAlocV1.promise
+        : Promise.resolve([
+            { ...ALOC, id: "av2", cargoId: "cargo-2" },
+          ])) as never);
+    vi.mocked(buscarLinhaDoTempo).mockImplementation(((id: string) =>
+      id === "v1" ? dLinhaV1.promise : Promise.resolve([MOV])) as never);
+
+    render(<DadosContratuaisScreen />);
+    const selVinc = await screen.findByLabelText("Vínculo");
+    fireEvent.change(selVinc, { target: { value: "v1" } });
+    fireEvent.change(selVinc, { target: { value: "v2" } });
+
+    await screen.findByRole("heading", { name: "Vínculo — V2" });
+    // V2 resolvido: mostra "Gerente"; V1 nunca deve aparecer.
+    expect((await screen.findAllByText(/Gerente/)).length).toBeGreaterThan(0);
+
+    dAlocV1.resolve([{ ...ALOC, id: "av1", cargoId: "cargo-1" }]);
+    dLinhaV1.resolve([MOV]);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(screen.queryByText(/Analista/)).not.toBeInTheDocument();
+    expect(screen.getAllByText(/Gerente/).length).toBeGreaterThan(0);
+  });
+
+  it("duas cargas para o MESMO colaborador (re-seleção): só a mais recente aplica", async () => {
+    const dA1 = deferred<unknown>();
+    const dA2 = deferred<unknown>();
+    const filaA = [dA1, dA2];
+    vi.mocked(listarColaboradores).mockResolvedValue(
+      pagina([COLAB_A, COLAB_B]) as never,
+    );
+    vi.mocked(listarVinculosDoColaborador).mockImplementation(((id: string) => {
+      if (id === "colab-A") return (filaA.shift() ?? dA2).promise;
+      return Promise.resolve([
+        vinculo({ id: "vb", matricula: "MB", colaboradorId: "colab-B" }),
+      ]);
+    }) as never);
+
+    render(<DadosContratuaisScreen />);
+    const selColab = await screen.findByLabelText("Colaborador");
+    fireEvent.change(selColab, { target: { value: "colab-A" } }); // carga A #1 (dA1)
+    fireEvent.change(selColab, { target: { value: "colab-B" } });
+    fireEvent.change(selColab, { target: { value: "colab-A" } }); // carga A #2 (dA2)
+
+    // Resolve a SEGUNDA carga de A primeiro, depois a primeira (obsoleta).
+    dA2.resolve([
+      vinculo({ id: "va2", matricula: "MA2", colaboradorId: "colab-A" }),
+    ]);
+    await screen.findByRole("heading", { name: "Vínculo — MA2" });
+
+    dA1.resolve([
+      vinculo({ id: "va1", matricula: "MA1", colaboradorId: "colab-A" }),
+    ]);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(
+      screen.getByRole("heading", { name: "Vínculo — MA2" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/MA1/)).not.toBeInTheDocument();
+  });
+});
