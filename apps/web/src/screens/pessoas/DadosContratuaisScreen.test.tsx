@@ -1,340 +1,354 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DadosContratuaisScreen } from "./DadosContratuaisScreen";
+import {
+  listarColaboradores,
+  listarVinculosDoColaborador,
+} from "../../api/colaboradoresClient";
+import {
+  ApiError,
+  listarAlocacoesVinculo,
+} from "../../api/vinculoContratualClient";
+import { buscarLinhaDoTempo } from "../../api/movimentacaoClient";
+import { listarVinculosHorario } from "../../api/vinculoHorarioClient";
+import { listarCargos } from "../../api/cargoClient";
+import {
+  listarAreas,
+  listarCentrosCusto,
+  listarDepartamentos,
+  listarEmpresasMulti,
+  listarEquipes,
+  listarUnidades,
+} from "../../api/organizacaoClient";
+import { listarTabelasHorario } from "../../api/horariosClient";
 
-describe("DadosContratuaisScreen (T089 — tela visual estática)", () => {
-  it("tem um único h1", () => {
+vi.mock("../../api/colaboradoresClient", async () => {
+  const actual = await vi.importActual<
+    typeof import("../../api/colaboradoresClient")
+  >("../../api/colaboradoresClient");
+  return {
+    ...actual,
+    listarColaboradores: vi.fn(),
+    listarVinculosDoColaborador: vi.fn(),
+  };
+});
+vi.mock("../../api/vinculoContratualClient", async () => {
+  const actual = await vi.importActual<
+    typeof import("../../api/vinculoContratualClient")
+  >("../../api/vinculoContratualClient");
+  return { ...actual, listarAlocacoesVinculo: vi.fn() };
+});
+vi.mock("../../api/movimentacaoClient", async () => {
+  const actual = await vi.importActual<
+    typeof import("../../api/movimentacaoClient")
+  >("../../api/movimentacaoClient");
+  return { ...actual, buscarLinhaDoTempo: vi.fn() };
+});
+vi.mock("../../api/vinculoHorarioClient", async () => {
+  const actual = await vi.importActual<
+    typeof import("../../api/vinculoHorarioClient")
+  >("../../api/vinculoHorarioClient");
+  return { ...actual, listarVinculosHorario: vi.fn() };
+});
+vi.mock("../../api/cargoClient", async () => {
+  const actual = await vi.importActual<typeof import("../../api/cargoClient")>(
+    "../../api/cargoClient",
+  );
+  return { ...actual, listarCargos: vi.fn() };
+});
+vi.mock("../../api/organizacaoClient", async () => {
+  const actual = await vi.importActual<
+    typeof import("../../api/organizacaoClient")
+  >("../../api/organizacaoClient");
+  return {
+    ...actual,
+    listarUnidades: vi.fn(),
+    listarDepartamentos: vi.fn(),
+    listarAreas: vi.fn(),
+    listarEquipes: vi.fn(),
+    listarCentrosCusto: vi.fn(),
+    listarEmpresasMulti: vi.fn(),
+  };
+});
+vi.mock("../../api/horariosClient", async () => {
+  const actual = await vi.importActual<
+    typeof import("../../api/horariosClient")
+  >("../../api/horariosClient");
+  return { ...actual, listarTabelasHorario: vi.fn() };
+});
+
+const COLAB_1 = {
+  id: "colab-1",
+  nome: "Colaborador Um",
+  situacao: "ativo" as const,
+  criadoEm: "2026-01-01T10:00:00.000Z",
+  atualizadoEm: "2026-01-01T10:00:00.000Z",
+};
+const COLAB_2 = { ...COLAB_1, id: "colab-2", nome: "Colaborador Dois" };
+
+function vinculo(over: Record<string, unknown> = {}) {
+  return {
+    id: "vinc-1",
+    colaboradorId: "colab-1",
+    empresaId: "emp-1",
+    matricula: "M-001",
+    tipo: "clt" as const,
+    situacao: "ativo" as const,
+    dataAdmissao: "2026-01-05",
+    dataDesligamento: null,
+    criadoEm: "2026-01-05T09:00:00.000Z",
+    atualizadoEm: "2026-01-05T09:00:00.000Z",
+    ...over,
+  };
+}
+
+const ALOC = {
+  id: "aloc-1",
+  vinculoId: "vinc-1",
+  empresaId: "emp-1",
+  unidadeOrganizacionalId: "un-1",
+  departamentoId: null,
+  areaId: null,
+  equipeId: null,
+  cargoId: "cargo-1",
+  centroCustoId: null,
+  vigenteDe: "2026-01-05",
+  vigenteAte: null,
+  movimentacaoOrigemId: "mov-1",
+  criadoEm: "2026-01-05T09:00:00.000Z",
+};
+
+const HORARIO = {
+  id: "vh-1",
+  colaboradorId: "colab-1",
+  empresaId: "emp-1",
+  tabelaHorarioId: "tab-1",
+  vigenciaInicio: "2026-01-05",
+  vigenciaFim: null,
+  criadoPorUserId: "rh-1",
+  criadoEm: "2026-01-05T09:00:00.000Z",
+  atualizadoEm: "2026-01-05T09:00:00.000Z",
+};
+
+const MOV = {
+  id: "mov-1",
+  vinculoId: "vinc-1",
+  empresaId: "emp-1",
+  tipo: "admissao" as const,
+  status: "efetivada" as const,
+  motivoCodigo: "admissao_inicial" as const,
+  registradaEm: "2026-01-05T09:00:00.000Z",
+  solicitanteUserId: "rh-1",
+  vigenciaInicio: "2026-01-05",
+  efetivadaEm: "2026-01-05T09:00:00.000Z",
+  executorUserId: "rh-1",
+  retificaId: null,
+  destinoUnidadeOrganizacionalId: "un-1",
+  destinoDepartamentoId: null,
+  destinoAreaId: null,
+  destinoEquipeId: null,
+  destinoCargoId: "cargo-1",
+  destinoCentroCustoId: null,
+  criadoEm: "2026-01-05T09:00:00.000Z",
+  atualizadoEm: "2026-01-05T09:00:00.000Z",
+};
+
+function pagina<T>(itens: T[]) {
+  return { itens, pagina: 1, tamanhoPagina: 100, total: itens.length };
+}
+
+function configurarPadrao(over?: {
+  colaboradores?: unknown[];
+  vinculos?: unknown[];
+}) {
+  vi.mocked(listarColaboradores).mockResolvedValue(
+    pagina(over?.colaboradores ?? [COLAB_1, COLAB_2]) as never,
+  );
+  vi.mocked(listarVinculosDoColaborador).mockResolvedValue(
+    (over?.vinculos ?? [vinculo()]) as never,
+  );
+  vi.mocked(listarAlocacoesVinculo).mockResolvedValue([ALOC] as never);
+  vi.mocked(buscarLinhaDoTempo).mockResolvedValue([MOV] as never);
+  vi.mocked(listarVinculosHorario).mockResolvedValue(
+    pagina([HORARIO]) as never,
+  );
+  vi.mocked(listarCargos).mockResolvedValue(
+    pagina([{ id: "cargo-1", codigo: "ANL", nome: "Analista" }]) as never,
+  );
+  vi.mocked(listarUnidades).mockResolvedValue(
+    pagina([{ id: "un-1", codigo: "MTZ", nome: "Matriz" }]) as never,
+  );
+  vi.mocked(listarDepartamentos).mockResolvedValue(pagina([]) as never);
+  vi.mocked(listarAreas).mockResolvedValue(pagina([]) as never);
+  vi.mocked(listarEquipes).mockResolvedValue(pagina([]) as never);
+  vi.mocked(listarCentrosCusto).mockResolvedValue(pagina([]) as never);
+  vi.mocked(listarTabelasHorario).mockResolvedValue(
+    pagina([{ id: "tab-1", nome: "Comercial 44h", ativo: true }]) as never,
+  );
+  vi.mocked(listarEmpresasMulti).mockResolvedValue(
+    pagina([{ id: "emp-1", codigo: "E1", nome: "Empresa Um" }]) as never,
+  );
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  configurarPadrao();
+});
+
+describe("DadosContratuaisScreen (T134 — funcional, somente leitura)", () => {
+  it("tem um único h1 'Dados contratuais'", async () => {
     render(<DadosContratuaisScreen />);
-
     expect(
-      screen.getAllByRole("heading", {
-        level: 1,
-        name: "Dados contratuais",
-      }),
+      screen.getAllByRole("heading", { level: 1, name: "Dados contratuais" }),
     ).toHaveLength(1);
+    await screen.findByLabelText("Colaborador");
   });
 
-  it("exibe o aviso de que a consulta é limitada à própria empresa e unidades autorizadas", () => {
+  it("múltiplos colaboradores: não seleciona em silêncio", async () => {
     render(<DadosContratuaisScreen />);
+    const sel = (await screen.findByLabelText(
+      "Colaborador",
+    )) as HTMLSelectElement;
+    expect(sel.value).toBe("");
+    expect(listarVinculosDoColaborador).not.toHaveBeenCalled();
+  });
 
-    expect(screen.getByText("Somente RH")).toBeInTheDocument();
+  it("um colaborador e um vínculo: resolve automaticamente e mostra o detalhe", async () => {
+    configurarPadrao({ colaboradores: [COLAB_1], vinculos: [vinculo()] });
+    render(<DadosContratuaisScreen />);
     expect(
-      screen.getByText(
-        /a consulta é limitada à própria empresa e às unidades autorizadas/i,
-      ),
+      await screen.findByRole("heading", { name: "Vínculo — M-001" }),
     ).toBeInTheDocument();
+    expect((await screen.findAllByText(/Analista/)).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText(/Matriz/)).length).toBeGreaterThan(0);
+    expect(
+      (await screen.findAllByText(/Comercial 44h/)).length,
+    ).toBeGreaterThan(0);
   });
 
-  it("exibe o aviso de que é só demonstração, sem login, API, persistência, alteração contratual, admissão, desligamento ou Folha", () => {
+  it("zero colaboradores: estado vazio", async () => {
+    configurarPadrao({ colaboradores: [] });
     render(<DadosContratuaisScreen />);
-
-    expect(screen.getByText("Somente demonstração")).toBeInTheDocument();
     expect(
-      screen.getByText(
-        /não há login, api, persistência, alteração contratual, admissão, desligamento ou folha/i,
-      ),
-    ).toBeInTheDocument();
-  });
-
-  it("exibe o aviso de que referência não é contrato e não cria/modifica/confirma vínculo, função, cargo, remuneração, benefício, jornada, ponto, Banco de Horas, documentos, permissões ou acessos", () => {
-    render(<DadosContratuaisScreen />);
-
-    expect(screen.getByText("Referência não é contrato")).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        /não criam, modificam ou confirmam vínculo, função, cargo, remuneração, benefício, jornada, ponto, banco de horas, documentos, permissões ou acessos/i,
-      ),
-    ).toBeInTheDocument();
-  });
-
-  it("exibe o aviso de dados reais bloqueados: MFA, DS-OPS-01, auditoria, retenção/base legal e validações aplicáveis", () => {
-    render(<DadosContratuaisScreen />);
-
-    expect(screen.getByText("Dados reais bloqueados")).toBeInTheDocument();
-    expect(screen.getByText(/MFA/)).toBeInTheDocument();
-    expect(screen.getByText("DS-OPS-01")).toBeInTheDocument();
-    expect(
-      screen.getByText(/auditoria, retenção\/base legal/i),
+      await screen.findByText("Nenhum colaborador no seu escopo"),
     ).toBeInTheDocument();
   });
 
-  it("mostra o resumo com os cinco indicadores (rótulo curto + contagem) e a nota de que não há cálculo financeiro, pagamento, desconto ou evento de Folha", () => {
+  it("erro ao carregar colaboradores oferece nova tentativa", async () => {
+    vi.mocked(listarColaboradores)
+      .mockRejectedValueOnce(new ApiError(500, "x"))
+      .mockResolvedValueOnce(pagina([COLAB_1]) as never);
     render(<DadosContratuaisScreen />);
-
-    const resumo = screen.getByText("Resumo (exemplo)").closest("section")!;
-    const dentroDoResumo = within(resumo);
-
-    expect(
-      dentroDoResumo.getByText("Referências técnicas"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDoResumo.getByText("7 referência(s) técnica(s) (exemplo)"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDoResumo.getByText("Vínculos de referência"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDoResumo.getByText("4 vínculo(s) de referência (exemplo)"),
-    ).toBeInTheDocument();
-    expect(dentroDoResumo.getByText("Em revisão")).toBeInTheDocument();
-    expect(
-      dentroDoResumo.getByText("3 item(ns) em revisão (exemplo)"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDoResumo.getByText("Pendentes de decisão"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDoResumo.getByText("2 item(ns) pendente(s) de decisão (exemplo)"),
-    ).toBeInTheDocument();
-    expect(dentroDoResumo.getByText("Itens históricos")).toBeInTheDocument();
-    expect(
-      dentroDoResumo.getByText("2 item(ns) histórico(s) (exemplo)"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDoResumo.getByText(
-        /não criam, alteram, reconhecem, aprovam ou encerram vínculo; não há cálculo financeiro, pagamento, desconto ou evento de folha/i,
-      ),
-    ).toBeInTheDocument();
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Tentar novamente" }),
+    );
+    expect(await screen.findByLabelText("Colaborador")).toBeInTheDocument();
   });
 
-  it("lista as referências com referência técnica, vínculo, modalidade, referência organizacional, período, situação, responsável e trilha", () => {
-    render(<DadosContratuaisScreen />);
-
-    const tabela = screen.getByRole("table", {
-      name: "Dados contratuais (exemplo)",
+  it("múltiplos vínculos exigem seleção explícita, sem escolher o primeiro", async () => {
+    configurarPadrao({
+      colaboradores: [COLAB_1],
+      vinculos: [vinculo(), vinculo({ id: "vinc-2", matricula: "M-002" })],
     });
-    const dentro = within(tabela);
-
-    const linha = dentro.getByText("DC-2026-0004").closest("tr")!;
-    const dentroDaLinha = within(linha);
-    expect(
-      dentroDaLinha.getByText("Vínculo V-03 (exemplo)"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDaLinha.getByText("Modalidade de estágio (exemplo)"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDaLinha.getByText("Escopo E-03 (exemplo)"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDaLinha.getByText("Período P-04 (exemplo)"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDaLinha.getByText("Aguardando decisão (exemplo)"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDaLinha.getByText("RT-Contratual-03 (exemplo)"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDaLinha.getByText("2 eventos registrados (exemplo)"),
-    ).toBeInTheDocument();
-  });
-
-  it("filtra localmente por modalidade de referência, situação e escopo/unidade técnica", () => {
     render(<DadosContratuaisScreen />);
-
-    fireEvent.change(screen.getByLabelText("Modalidade de referência"), {
-      target: { value: "Modalidade direta (exemplo)" },
-    });
-
-    const tabela = screen.getByRole("table", {
-      name: "Dados contratuais (exemplo)",
-    });
-    expect(within(tabela).getByText("DC-2026-0001")).toBeInTheDocument();
-    expect(within(tabela).getByText("DC-2026-0005")).toBeInTheDocument();
-    expect(within(tabela).getByText("DC-2025-0001")).toBeInTheDocument();
-    expect(within(tabela).queryByText("DC-2026-0002")).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Limpar filtros" }));
-    expect(screen.getByText("DC-2026-0002")).toBeInTheDocument();
-
-    fireEvent.change(screen.getByLabelText("Situação"), {
-      target: { value: "historico_ilustrativo" },
-    });
-    expect(screen.getByText("DC-2025-0001")).toBeInTheDocument();
-    expect(screen.getByText("DC-2025-0002")).toBeInTheDocument();
-    expect(screen.queryByText("DC-2026-0001")).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Limpar filtros" }));
-    fireEvent.change(screen.getByLabelText("Escopo/unidade técnica"), {
-      target: { value: "Escopo E-01 (exemplo)" },
-    });
-    expect(screen.getByText("DC-2026-0001")).toBeInTheDocument();
-    expect(screen.getByText("DC-2026-0003")).toBeInTheDocument();
-    expect(screen.getByText("DC-2025-0002")).toBeInTheDocument();
-    expect(screen.queryByText("DC-2026-0002")).not.toBeInTheDocument();
-  });
-
-  it("mostra EmptyState quando o filtro não corresponde a nenhuma referência", () => {
-    render(<DadosContratuaisScreen />);
-
-    fireEvent.change(screen.getByLabelText("Situação"), {
-      target: { value: "historico_ilustrativo" },
-    });
-    fireEvent.change(screen.getByLabelText("Escopo/unidade técnica"), {
-      target: { value: "Escopo E-02 (exemplo)" },
-    });
-
+    const selVinc = (await screen.findByLabelText(
+      "Vínculo",
+    )) as HTMLSelectElement;
+    expect(selVinc.value).toBe("");
     expect(
-      screen.getByRole("heading", {
-        name: "Nenhuma referência corresponde aos filtros",
-      }),
-    ).toBeInTheDocument();
-  });
-
-  it("abre o painel de detalhe ao clicar em 'Ver detalhe', somente leitura, com campos pendentes e único controle 'Fechar'", () => {
-    render(<DadosContratuaisScreen />);
-
-    const linha = screen.getByText("DC-2026-0001").closest("tr")!;
-    fireEvent.click(within(linha).getByRole("button", { name: /Ver detalhe/ }));
-
-    expect(screen.getByText("Detalhe demonstrativo")).toBeInTheDocument();
-    const tituloDetalhe = screen.getByRole("heading", {
-      name: "Detalhe da referência — DC-2026-0001",
-    });
-    expect(tituloDetalhe).toBeInTheDocument();
-    const painel = tituloDetalhe.closest("section")!;
-    const dentroDoPainel = within(painel);
-
-    expect(
-      dentroDoPainel.getByText("Vínculo V-01 (exemplo)"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDoPainel.getByText("Modalidade direta (exemplo)"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDoPainel.getByText("Validação RH (exemplo)"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDoPainel.getByText(
-        /registro de referência técnica de vínculo contratual e escopo organizacional \(exemplo ilustrativo, sem criação ou alteração real de contrato, remuneração ou jornada\)/i,
-      ),
-    ).toBeInTheDocument();
-    expect(
-      dentroDoPainel.getByText(
-        /este painel não cria, edita, admite, desliga, altera contrato, remuneração, jornada, ponto, folha, documentos, permissões, acessos, importa, exporta nem integra dados reais/i,
-      ),
-    ).toBeInTheDocument();
-
-    expect(
-      dentroDoPainel.getAllByRole("button").map((b) => b.textContent),
-    ).toEqual(["Fechar"]);
-
-    fireEvent.click(dentroDoPainel.getByRole("button", { name: "Fechar" }));
-    expect(screen.queryByText("Detalhe demonstrativo")).not.toBeInTheDocument();
-  });
-
-  it("mostra 'nenhum campo pendente' quando o item de exemplo não tem pendências", () => {
-    render(<DadosContratuaisScreen />);
-
-    const linha = screen.getByText("DC-2026-0002").closest("tr")!;
-    fireEvent.click(within(linha).getByRole("button", { name: /Ver detalhe/ }));
-
-    expect(
-      screen.getByText("Nenhum campo pendente (exemplo)."),
-    ).toBeInTheDocument();
-  });
-
-  it("alterna para o estado vazio e mostra o EmptyState", () => {
-    render(<DadosContratuaisScreen />);
-
-    fireEvent.click(screen.getByRole("button", { name: "Vazio" }));
-
-    expect(
-      screen.queryByRole("table", {
-        name: "Dados contratuais (exemplo)",
-      }),
+      screen.queryByRole("heading", { name: /^Vínculo — / }),
     ).not.toBeInTheDocument();
+    fireEvent.change(selVinc, { target: { value: "vinc-2" } });
     expect(
-      screen.getByRole("heading", {
-        level: 3,
-        name: "Nenhuma referência de dados contratuais cadastrada",
-      }),
+      await screen.findByRole("heading", { name: "Vínculo — M-002" }),
     ).toBeInTheDocument();
   });
 
-  it("alterna para o estado de erro com referência ilustrativa e ação de retorno", () => {
+  it("detalhe exibe matrícula, tipo, situação, admissão e desligamento", async () => {
+    configurarPadrao({
+      colaboradores: [COLAB_1],
+      vinculos: [
+        vinculo({ situacao: "encerrado", dataDesligamento: "2026-06-30" }),
+      ],
+    });
     render(<DadosContratuaisScreen />);
-
-    fireEvent.click(screen.getByRole("button", { name: "Erro" }));
-
-    expect(
-      screen.getByRole("heading", {
-        name: "Não foi possível carregar as referências de dados contratuais",
-      }),
-    ).toBeInTheDocument();
-    expect(screen.getByText(/REQ-DEMO-009021/)).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
-    expect(
-      screen.getByRole("table", {
-        name: "Dados contratuais (exemplo)",
-      }),
-    ).toBeInTheDocument();
+    await screen.findByRole("heading", { name: "Vínculo — M-001" });
+    expect(screen.getAllByText("2026-01-05").length).toBeGreaterThan(0);
+    expect(screen.getByText("2026-06-30")).toBeInTheDocument();
+    expect(screen.getAllByText("Encerrado").length).toBeGreaterThan(0);
   });
 
-  it("nenhum botão executa admissão, desligamento ou ação mutante/financeira (criar, admitir, desligar, salvar, importar, exportar, aprovar, editar)", () => {
+  it("linha do tempo é somente leitura e orienta para Histórico funcional", async () => {
+    configurarPadrao({ colaboradores: [COLAB_1], vinculos: [vinculo()] });
     render(<DadosContratuaisScreen />);
-
-    const linha = screen.getByText("DC-2026-0001").closest("tr")!;
-    fireEvent.click(within(linha).getByRole("button", { name: /Ver detalhe/ }));
-
-    const rotulos = screen
-      .getAllByRole("button")
-      .map((botao) => botao.textContent?.toLowerCase() ?? "");
-
-    for (const rotulo of rotulos) {
-      expect(rotulo).not.toMatch(
-        /criar|admitir|transferir|promover|desligar|salvar|importar|exportar|aprovar|excluir|editar/,
-      );
+    await screen.findByRole("heading", {
+      name: "Linha do tempo de movimentações",
+    });
+    expect(screen.getByText(/use a aba/i)).toBeInTheDocument();
+    expect(screen.getAllByText("Histórico funcional").length).toBeGreaterThan(
+      0,
+    );
+    // Nenhuma ação de mutação de movimentação/vínculo nesta aba.
+    for (const nome of [
+      "Registrar movimentação",
+      "Efetivar",
+      "Cancelar",
+      "Retificar",
+      "Editar",
+      "Desligar",
+      "Nova admissão",
+    ]) {
+      expect(
+        screen.queryByRole("button", { name: nome }),
+      ).not.toBeInTheDocument();
     }
   });
 
-  it("não contém nomes, empresa real, CPF, e-mail, telefone, IP, matrícula, salário, valor ou dado pessoal real", () => {
-    render(<DadosContratuaisScreen />);
-
-    expect(document.querySelectorAll('input[type="file"]')).toHaveLength(0);
-    expect(document.querySelectorAll("a")).toHaveLength(0);
-    expect(document.querySelectorAll("img")).toHaveLength(0);
-    expect(document.querySelectorAll("iframe")).toHaveLength(0);
-    expect(document.querySelectorAll("form")).toHaveLength(0);
-
-    const texto = document.body.innerHTML.toLowerCase();
-    for (const termoProibido of [
+  it("não expõe campos financeiros/sensíveis (salário, CPF, endereço)", async () => {
+    configurarPadrao({ colaboradores: [COLAB_1], vinculos: [vinculo()] });
+    const { container } = render(<DadosContratuaisScreen />);
+    await screen.findByRole("heading", { name: "Vínculo — M-001" });
+    const texto = (container.textContent ?? "").toLowerCase();
+    for (const termo of [
+      "salário",
+      "salario",
+      "remuneração",
       "cpf",
-      "cnpj",
-      "secullum",
-      "rwtech",
-      "bioprox",
-      "reserva fiscal",
-      "senha",
-      "sessão",
-      "telefone",
-      "matrícula",
-      "matricula",
-      "r$",
-      "localstorage",
-      "@",
-      "http://",
-      "https://",
+      "endereço",
+      "banco",
+      "pix",
     ]) {
-      expect(texto).not.toContain(termoProibido);
+      expect(texto).not.toContain(termo);
     }
   });
 
-  it("não declara conformidade com CLT, CCT/ACT, Portaria 671, LGPD ou eSocial", () => {
+  it("erro nas alocações oferece nova tentativa sem quebrar a tela", async () => {
+    configurarPadrao({ colaboradores: [COLAB_1], vinculos: [vinculo()] });
+    vi.mocked(listarAlocacoesVinculo)
+      .mockRejectedValueOnce(new ApiError(500, "x"))
+      .mockResolvedValueOnce([ALOC] as never);
     render(<DadosContratuaisScreen />);
+    await screen.findByRole("heading", { name: "Vínculo — M-001" });
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Tentar novamente" }),
+    );
+    await waitFor(() =>
+      expect(vi.mocked(listarAlocacoesVinculo).mock.calls.length).toBe(2),
+    );
+  });
 
-    const texto = document.body.innerHTML.toLowerCase();
-    for (const termoProibido of [
-      "clt",
-      "cct",
-      "act",
-      "portaria 671",
-      "lgpd",
-      "esocial",
-    ]) {
-      expect(texto).not.toContain(termoProibido);
-    }
+  it("tabelas de alocações e horário renderizam (vigências)", async () => {
+    configurarPadrao({ colaboradores: [COLAB_1], vinculos: [vinculo()] });
+    render(<DadosContratuaisScreen />);
+    await screen.findByRole("heading", { name: "Vínculo — M-001" });
+    expect(
+      screen.getByRole("table", { name: "Cargo e lotação por vigência" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("table", { name: "Horário por vigência" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("table", { name: "Movimentações do vínculo" }),
+    ).toBeInTheDocument();
   });
 });
