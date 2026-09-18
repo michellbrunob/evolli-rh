@@ -1,5 +1,4 @@
 import { Injectable } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
 
 /**
  * Configuração de servidor do MFA (T131).
@@ -10,6 +9,11 @@ import { ConfigService } from "@nestjs/config";
  * ligar/desligar o MFA é uma mudança de configuração técnica controlada, não
  * uma ação de UI.
  *
+ * Lê `process.env` diretamente (mesmo padrão de `TotpSecretCipher`): o
+ * `env.validation.ts` já restringe o valor a `"true"`/`"false"` no boot (ou a
+ * API não sobe), então aqui basta reconhecer o "ligado" — exatamente a string
+ * `"true"`. Qualquer outro valor mantém o MFA DESLIGADO (nunca liga por engano).
+ *
  * Enquanto desativado (lançamento inicial), o ecossistema opera sem 2º fator e
  * a chave de cifragem do segredo TOTP não é exigida no boot. Quando ativado, os
  * fluxos T125/T126 voltam a valer integralmente e a chave passa a ser
@@ -17,19 +21,10 @@ import { ConfigService } from "@nestjs/config";
  */
 @Injectable()
 export class MfaConfigService {
-  constructor(private readonly config: ConfigService) {}
+  constructor(private readonly env: NodeJS.ProcessEnv = process.env) {}
 
-  /**
-   * `true` somente quando `MFA_ENABLED=true`.
-   *
-   * `env.validation.ts` já restringe o valor a `"true"`/`"false"` no boot (ou a
-   * API não sobe), então aqui basta reconhecer o "ligado". Aceita tanto o
-   * booleano validado quanto a string `"true"` porque o `ConfigService` pode
-   * devolver o valor cru de `process.env` (string) em vez do transformado —
-   * qualquer outro valor mantém o MFA DESLIGADO (nunca liga por engano).
-   */
+  /** `true` somente quando `MFA_ENABLED` é exatamente `"true"`. */
   isEnabled(): boolean {
-    const valor = this.config.get<unknown>("MFA_ENABLED");
-    return valor === true || valor === "true";
+    return this.env.MFA_ENABLED === "true";
   }
 }
