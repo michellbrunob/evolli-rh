@@ -1,7 +1,7 @@
 /**
- * Pessoas > Documentos (T090) — só tokens já existentes (tokens.css); sem
+ * Pessoas > Documentos (T133) — só tokens já existentes (tokens.css); sem
  * hexadecimal novo, sem sombra, sem gradiente. Layout responsivo: pilha
- * vertical de seções.
+ * vertical de seções, sem rolagem horizontal na página (a tabela trata a sua).
  */
 
 .pessoas-documentos-screen {
@@ -11,11 +11,9 @@
   min-width: 0;
 }
 
-/* Sem `min-width: 0` aqui, a tabela (mais larga que o viewport em telas
-   estreitas) vazaria rolagem horizontal para a página inteira — mesma técnica
-   já usada em `DadosContratuaisScreen`/`HistoricoFuncionalScreen`/
-   `CentrosCustoScreen`/`TiposDocumentoScreen`/`MotivosDesligamentoScreen`/
-   `EscolaridadeScreen`/`CidadesLocalidadesScreen`. */
+/* Sem `min-width: 0`, a tabela (mais larga que o viewport em telas estreitas)
+   vazaria rolagem horizontal para a página inteira — mesma técnica das demais
+   telas de Pessoas. */
 .pessoas-documentos-screen > * {
   min-width: 0;
 }
@@ -29,6 +27,13 @@
   color: var(--color-ink);
 }
 
+.pessoas-documentos-screen__subtitulo {
+  margin: var(--space-sm) 0 var(--space-xs);
+  font-size: var(--text-body);
+  font-weight: var(--weight-strong);
+  color: var(--color-ink);
+}
+
 .pessoas-documentos-screen__aviso {
   display: flex;
   flex-wrap: wrap;
@@ -38,101 +43,52 @@
   border-color: var(--status-info-border);
 }
 
-.pessoas-documentos-screen__aviso--indisponivel {
-  background: var(--status-warning-surface);
-  border-color: var(--status-warning-border);
-}
-
 .pessoas-documentos-screen__aviso-texto {
   margin: 0;
   color: var(--color-ink);
   flex: 1 1 16rem;
 }
 
-.pessoas-documentos-screen__aviso-texto code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+.pessoas-documentos-screen__sucesso {
+  margin: 0;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-sm);
+  background: var(--status-success-surface);
+  color: var(--status-success-ink);
 }
 
-.pessoas-documentos-screen__resumo {
+.pessoas-documentos-screen__secao {
   display: flex;
   flex-direction: column;
-  gap: var(--space-xs);
-}
-
-.pessoas-documentos-screen__resumo-lista {
-  display: flex;
-  flex-wrap: wrap;
   gap: var(--space-sm);
-  margin: 0 0 var(--space-sm);
-  padding: 0;
-  list-style: none;
-}
-
-/* Item flexível (nunca `flex: 0 0 auto`): precisa poder encolher para não
-   vazar rolagem horizontal quando o texto do indicador é longo — mesma
-   correção validada em `FechamentoEspelhoScreen` (T079) e reaplicada em
-   `HistoricoFuncionalScreen` (T088)/`DadosContratuaisScreen` (T089). */
-.pessoas-documentos-screen__resumo-item {
-  flex: 1 1 16rem;
   min-width: 0;
 }
 
-.pessoas-documentos-screen__resumo-item-conteudo {
+/* Itens flex da seção (inclusive a DataTable, que tem `overflow-x: auto`
+   própria) precisam poder encolher; sem `min-width: 0` a tabela larga vazaria
+   rolagem horizontal para a página em telas estreitas. */
+.pessoas-documentos-screen__secao > * {
+  min-width: 0;
+}
+
+.pessoas-documentos-screen__secao-cabecalho {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: space-between;
   gap: var(--space-sm);
-  min-width: 0;
 }
 
-.pessoas-documentos-screen__resumo-item-texto {
-  margin: 0;
-  color: var(--color-ink);
-  flex: 1 1 10rem;
-  min-width: 0;
-}
-
-.pessoas-documentos-screen__nota {
-  margin: 0;
-  font-size: var(--text-caption);
-  color: var(--color-ink-subtle);
-}
-
-.pessoas-documentos-screen__demo {
+.pessoas-documentos-screen__vinculos {
   display: flex;
   flex-direction: column;
   gap: var(--space-xs);
 }
 
-.pessoas-documentos-screen__demo-texto {
+.pessoas-documentos-screen__vinculos-lista {
   margin: 0;
-  color: var(--color-ink-subtle);
-  font-size: var(--text-caption);
-}
-
-.pessoas-documentos-screen__demo-botoes {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-sm);
-}
-
-.pessoas-documentos-screen__erro {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-sm);
-  background: var(--status-danger-surface);
-  border-color: var(--status-danger-border);
-}
-
-.pessoas-documentos-screen__erro-referencia {
-  margin: 0;
-  font-size: var(--text-caption);
-  color: var(--color-ink-subtle);
-}
-
-.pessoas-documentos-screen__erro-referencia code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  padding-left: var(--space-lg);
+  color: var(--color-ink);
 }
 
 .pessoas-documentos-screen__filtros {
@@ -148,10 +104,35 @@
   min-width: 0;
 }
 
-.pessoas-documentos-screen__filtros-nota {
-  margin: 0 0 var(--space-md);
-  font-size: var(--text-caption);
+.pessoas-documentos-screen__paginacao {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-md);
+  margin-top: var(--space-sm);
   color: var(--color-ink-subtle);
+  font-size: var(--text-caption);
+}
+
+.pessoas-documentos-screen__acoes-linha {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+.pessoas-documentos-screen__erro {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  background: var(--status-danger-surface);
+  border-color: var(--status-danger-border);
+}
+
+.pessoas-documentos-screen__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
 }
 
 .pessoas-documentos-screen__detalhe {
@@ -178,25 +159,17 @@
   color: var(--color-ink);
 }
 
-.pessoas-documentos-screen__detalhe-subtitulo {
-  margin: 0;
-  font-size: var(--text-body);
-  font-weight: var(--weight-strong);
-  color: var(--color-ink);
-}
-
-.pessoas-documentos-screen__detalhe-lista-simples {
-  margin: 0;
-  padding-left: var(--space-lg);
-  color: var(--color-ink);
+.pessoas-documentos-screen__detalhe-lista dd code,
+.pessoas-documentos-screen__detalhe-aviso code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 .pessoas-documentos-screen__detalhe-aviso {
   margin: 0;
   padding: var(--space-sm) var(--space-md);
   border-radius: var(--radius-sm);
-  background: var(--status-warning-surface);
-  color: var(--status-warning-ink);
+  background: var(--status-info-surface);
+  color: var(--color-ink);
 }
 
 /* Texto só para leitores de tela (mesma técnica de `.evolli-field__sr`). */

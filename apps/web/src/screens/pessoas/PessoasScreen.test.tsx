@@ -139,12 +139,13 @@ describe("PessoasScreen — abas locais 'Colaboradores' / 'Horário de trabalho'
 
     fireEvent.click(screen.getByRole("tab", { name: "Documentos" }));
 
+    // T133 — a aba Documentos passou a ser funcional (carrega dados reais). Aqui
+    // (sem mocks de rede) só validamos o contrato de NAVEGAÇÃO: h1 único e o
+    // titleId reportado. O comportamento funcional é coberto por
+    // PessoasDocumentosScreen.test.tsx.
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     expect(
       screen.getByRole("heading", { level: 1, name: "Documentos" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", { name: "Documentos (exemplo)" }),
     ).toBeInTheDocument();
 
     expect(screen.getByRole("tab", { name: "Documentos" })).toHaveAttribute(

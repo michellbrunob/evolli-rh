@@ -1,344 +1,403 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PessoasDocumentosScreen } from "./PessoasDocumentosScreen";
+import { obterUsuarioAtual } from "../../api/usersClient";
+import {
+  listarColaboradores,
+  listarVinculosDoColaborador,
+} from "../../api/colaboradoresClient";
+import {
+  ApiError,
+  criarDocumento,
+  criarSolicitacaoDocumento,
+  listarDocumentos,
+  listarSolicitacoesDocumento,
+  listarTiposDocumento,
+  substituirDocumento,
+} from "../../api/documentosClient";
 
-describe("PessoasDocumentosScreen (T090 — tela visual estática)", () => {
-  it("tem um único h1", () => {
+vi.mock("../../api/usersClient", async () => {
+  const actual = await vi.importActual<typeof import("../../api/usersClient")>(
+    "../../api/usersClient",
+  );
+  return { ...actual, obterUsuarioAtual: vi.fn() };
+});
+
+vi.mock("../../api/colaboradoresClient", async () => {
+  const actual = await vi.importActual<
+    typeof import("../../api/colaboradoresClient")
+  >("../../api/colaboradoresClient");
+  return {
+    ...actual,
+    listarColaboradores: vi.fn(),
+    listarVinculosDoColaborador: vi.fn(),
+  };
+});
+
+vi.mock("../../api/documentosClient", async () => {
+  const actual = await vi.importActual<
+    typeof import("../../api/documentosClient")
+  >("../../api/documentosClient");
+  return {
+    ...actual,
+    listarTiposDocumento: vi.fn(),
+    listarDocumentos: vi.fn(),
+    listarSolicitacoesDocumento: vi.fn(),
+    criarDocumento: vi.fn(),
+    substituirDocumento: vi.fn(),
+    criarSolicitacaoDocumento: vi.fn(),
+  };
+});
+
+const RH = {
+  id: "rh-1",
+  email: "rh@example.test",
+  role: "rh",
+  companyId: "emp-1",
+  unitId: null,
+  teamId: null,
+  status: "active",
+  createdAt: "2026-01-01T10:00:00.000Z",
+};
+
+const COLAB_1 = {
+  id: "colab-1",
+  nome: "Colaborador Um",
+  situacao: "ativo" as const,
+  criadoEm: "2026-01-01T10:00:00.000Z",
+  atualizadoEm: "2026-01-01T10:00:00.000Z",
+};
+const COLAB_2 = { ...COLAB_1, id: "colab-2", nome: "Colaborador Dois" };
+
+const TIPO = {
+  id: "tipo-1",
+  empresaId: "emp-1",
+  codigo: "RG",
+  nome: "Documento de identidade",
+  classificacao: "restrito",
+  criadoEm: "2026-01-01T10:00:00.000Z",
+  atualizadoEm: "2026-01-01T10:00:00.000Z",
+};
+
+const DOC = {
+  id: "doc-1",
+  empresaId: "emp-1",
+  colaboradorId: "colab-1",
+  tipoDocumentoId: "tipo-1",
+  estado: "upload_desabilitado" as const,
+  substituiDocumentoId: null,
+  criadoEm: "2026-02-01T09:00:00.000Z",
+  atualizadoEm: "2026-02-01T09:00:00.000Z",
+};
+
+const SOLIC = {
+  id: "solic-1",
+  empresaId: "emp-1",
+  colaboradorId: "colab-1",
+  tipoDocumentoId: "tipo-1",
+  estado: "pendente" as const,
+  solicitanteUserId: "rh-1",
+  solicitadaEm: "2026-02-02T09:00:00.000Z",
+  criadoEm: "2026-02-02T09:00:00.000Z",
+  atualizadoEm: "2026-02-02T09:00:00.000Z",
+};
+
+function pagina<T>(itens: T[]) {
+  return { itens, pagina: 1, tamanhoPagina: 20, total: itens.length };
+}
+
+function configurarPadrao(overrides?: {
+  ator?: unknown;
+  colaboradores?: unknown[];
+}) {
+  vi.mocked(obterUsuarioAtual).mockResolvedValue(
+    (overrides?.ator ?? RH) as never,
+  );
+  vi.mocked(listarTiposDocumento).mockResolvedValue(pagina([TIPO]) as never);
+  vi.mocked(listarColaboradores).mockResolvedValue(
+    pagina(overrides?.colaboradores ?? [COLAB_1, COLAB_2]) as never,
+  );
+  vi.mocked(listarVinculosDoColaborador).mockResolvedValue([] as never);
+  vi.mocked(listarDocumentos).mockResolvedValue(pagina([DOC]) as never);
+  vi.mocked(listarSolicitacoesDocumento).mockResolvedValue(
+    pagina([SOLIC]) as never,
+  );
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  configurarPadrao();
+});
+
+describe("PessoasDocumentosScreen (T133 — funcional)", () => {
+  it("tem um único h1 'Documentos'", async () => {
     render(<PessoasDocumentosScreen />);
-
     expect(
-      screen.getAllByRole("heading", {
-        level: 1,
-        name: "Documentos",
-      }),
+      screen.getAllByRole("heading", { level: 1, name: "Documentos" }),
     ).toHaveLength(1);
+    await screen.findByLabelText("Selecione o colaborador");
   });
 
-  it("exibe o aviso de que a consulta é limitada à própria empresa e unidades autorizadas", () => {
+  it("múltiplos colaboradores: não seleciona em silêncio (nenhuma lista carregada)", async () => {
     render(<PessoasDocumentosScreen />);
+    const select = (await screen.findByLabelText(
+      "Selecione o colaborador",
+    )) as HTMLSelectElement;
+    expect(select.value).toBe("");
+    expect(listarDocumentos).not.toHaveBeenCalled();
+  });
 
-    expect(screen.getByText("Somente RH")).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        /a consulta é limitada à própria empresa e às unidades autorizadas/i,
+  it("um único colaborador: seleciona-o e carrega documentos e solicitações", async () => {
+    configurarPadrao({ colaboradores: [COLAB_1] });
+    render(<PessoasDocumentosScreen />);
+    await waitFor(() =>
+      expect(listarDocumentos).toHaveBeenCalledWith(
+        expect.objectContaining({ colaboradorId: "colab-1" }),
       ),
+    );
+    expect(
+      (await screen.findAllByText("Documento de identidade (RG)")).length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("zero colaboradores: estado vazio, sem seleção", async () => {
+    configurarPadrao({ colaboradores: [] });
+    render(<PessoasDocumentosScreen />);
+    expect(
+      await screen.findByText("Nenhum colaborador no seu escopo"),
     ).toBeInTheDocument();
   });
 
-  it("exibe o aviso de que é só demonstração, sem login, API, persistência, upload, download, visualização, assinatura, retenção ou integração", () => {
+  it("erro ao carregar colaboradores mostra nova tentativa e recarrega", async () => {
+    vi.mocked(listarColaboradores)
+      .mockRejectedValueOnce(new ApiError(500, "x"))
+      .mockResolvedValueOnce(pagina([COLAB_1]) as never);
     render(<PessoasDocumentosScreen />);
-
-    expect(screen.getByText("Somente demonstração")).toBeInTheDocument();
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Tentar novamente" }),
+    );
     expect(
-      screen.getByText(
-        /não há login, api, persistência, upload, download, visualização, assinatura, retenção ou integração real/i,
+      await screen.findByLabelText("Selecione o colaborador"),
+    ).toBeInTheDocument();
+  });
+
+  it("seleção de colaborador lista documentos com tipo, estado e detalhe só leitura", async () => {
+    render(<PessoasDocumentosScreen />);
+    fireEvent.change(await screen.findByLabelText("Selecione o colaborador"), {
+      target: { value: "colab-1" },
+    });
+    expect(
+      (await screen.findAllByText("Documento de identidade (RG)")).length,
+    ).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText("Registrado (sem conteúdo)").length,
+    ).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getAllByRole("button", { name: /Ver detalhe/ })[0]!);
+    expect(
+      await screen.findByRole("heading", { name: "Detalhe do documento" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/nenhum conteúdo, arquivo, upload, download/i),
+    ).toBeInTheDocument();
+  });
+
+  it("documentos vazios mostram estado vazio", async () => {
+    vi.mocked(listarDocumentos).mockResolvedValue(pagina([]) as never);
+    render(<PessoasDocumentosScreen />);
+    fireEvent.change(await screen.findByLabelText("Selecione o colaborador"), {
+      target: { value: "colab-1" },
+    });
+    expect(
+      await screen.findByText("Nenhum documento para este colaborador"),
+    ).toBeInTheDocument();
+  });
+
+  it("filtro por estado envia o estado ao backend", async () => {
+    render(<PessoasDocumentosScreen />);
+    fireEvent.change(await screen.findByLabelText("Selecione o colaborador"), {
+      target: { value: "colab-1" },
+    });
+    await screen.findAllByText("Documento de identidade (RG)");
+    fireEvent.change(screen.getByLabelText("Estado"), {
+      target: { value: "substituido" },
+    });
+    await waitFor(() =>
+      expect(listarDocumentos).toHaveBeenCalledWith(
+        expect.objectContaining({ estado: "substituido" }),
       ),
-    ).toBeInTheDocument();
+    );
   });
 
-  it("exibe o aviso de que referência não é documento e não recebe/abre/exibe/assina/aprova/publica/retém nenhum documento real", () => {
+  it("RH registra documento e a lista é recarregada", async () => {
+    vi.mocked(criarDocumento).mockResolvedValue(DOC as never);
     render(<PessoasDocumentosScreen />);
-
-    expect(screen.getByText("Referência não é documento")).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        /não recebem, abrem, exibem, assinam, aprovam, publicam, retêm ou substituem nenhum documento real/i,
-      ),
-    ).toBeInTheDocument();
-  });
-
-  it("exibe o aviso de dados/documentos reais bloqueados: MFA, DS-OPS-01, auditoria, retenção/base legal e validações aplicáveis", () => {
-    render(<PessoasDocumentosScreen />);
-
-    expect(
-      screen.getByText("Dados/documentos reais bloqueados"),
-    ).toBeInTheDocument();
-    expect(screen.getByText(/MFA/)).toBeInTheDocument();
-    expect(screen.getByText("DS-OPS-01")).toBeInTheDocument();
-    expect(
-      screen.getByText(/auditoria, retenção\/base legal/i),
-    ).toBeInTheDocument();
-  });
-
-  it("mostra o resumo com os cinco indicadores (rótulo curto + contagem) e a nota de que não recebe/exibe/valida/assina/publica/retém documentos", () => {
-    render(<PessoasDocumentosScreen />);
-
-    const resumo = screen.getByText("Resumo (exemplo)").closest("section")!;
-    const dentroDoResumo = within(resumo);
-
-    expect(
-      dentroDoResumo.getByText("Referências técnicas"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDoResumo.getByText("7 referência(s) técnica(s) (exemplo)"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDoResumo.getByText("Categorias documentais"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDoResumo.getByText("4 categoria(s) documental(is) (exemplo)"),
-    ).toBeInTheDocument();
-    expect(dentroDoResumo.getByText("Em revisão")).toBeInTheDocument();
-    expect(
-      dentroDoResumo.getByText("3 item(ns) em revisão (exemplo)"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDoResumo.getByText("Pendentes de decisão"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDoResumo.getByText("2 item(ns) pendente(s) de decisão (exemplo)"),
-    ).toBeInTheDocument();
-    expect(dentroDoResumo.getByText("Itens históricos")).toBeInTheDocument();
-    expect(
-      dentroDoResumo.getByText("2 item(ns) histórico(s) (exemplo)"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDoResumo.getByText(
-        /não recebem, exibem, validam, assinam, publicam ou retêm documentos; não representam arquivo, upload ou download real/i,
-      ),
-    ).toBeInTheDocument();
-  });
-
-  it("lista as referências com referência técnica, categoria, finalidade, visibilidade, escopo, situação, responsável e trilha", () => {
-    render(<PessoasDocumentosScreen />);
-
-    const tabela = screen.getByRole("table", {
-      name: "Documentos (exemplo)",
+    fireEvent.change(await screen.findByLabelText("Selecione o colaborador"), {
+      target: { value: "colab-1" },
     });
-    const dentro = within(tabela);
+    await screen.findAllByText("Documento de identidade (RG)");
+    const chamadasAntes = vi.mocked(listarDocumentos).mock.calls.length;
 
-    const linha = dentro.getByText("DOC-2026-0004").closest("tr")!;
-    const dentroDaLinha = within(linha);
-    expect(
-      dentroDaLinha.getByText("Categoria documental C-03 (exemplo)"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDaLinha.getByText("Finalidade F-04 (exemplo)"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDaLinha.getByText("RH da unidade (exemplo)"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDaLinha.getByText("Escopo E-03 (exemplo)"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDaLinha.getByText("Aguardando decisão (exemplo)"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDaLinha.getByText("RT-Documentos-03 (exemplo)"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDaLinha.getByText("2 eventos registrados (exemplo)"),
-    ).toBeInTheDocument();
-  });
-
-  it("filtra localmente por categoria de referência, situação e escopo técnico", () => {
-    render(<PessoasDocumentosScreen />);
-
-    fireEvent.change(screen.getByLabelText("Categoria de referência"), {
-      target: { value: "Categoria documental C-01 (exemplo)" },
-    });
-
-    const tabela = screen.getByRole("table", {
-      name: "Documentos (exemplo)",
-    });
-    expect(within(tabela).getByText("DOC-2026-0001")).toBeInTheDocument();
-    expect(within(tabela).getByText("DOC-2026-0003")).toBeInTheDocument();
-    expect(within(tabela).getByText("DOC-2025-0001")).toBeInTheDocument();
-    expect(within(tabela).queryByText("DOC-2026-0002")).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Limpar filtros" }));
-    expect(screen.getByText("DOC-2026-0002")).toBeInTheDocument();
-
-    fireEvent.change(screen.getByLabelText("Situação"), {
-      target: { value: "historico_ilustrativo" },
-    });
-    expect(screen.getByText("DOC-2025-0001")).toBeInTheDocument();
-    expect(screen.getByText("DOC-2025-0002")).toBeInTheDocument();
-    expect(screen.queryByText("DOC-2026-0001")).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Limpar filtros" }));
-    fireEvent.change(screen.getByLabelText("Escopo técnico"), {
-      target: { value: "Escopo E-01 (exemplo)" },
-    });
-    expect(screen.getByText("DOC-2026-0001")).toBeInTheDocument();
-    expect(screen.getByText("DOC-2026-0003")).toBeInTheDocument();
-    expect(screen.getByText("DOC-2025-0002")).toBeInTheDocument();
-    expect(screen.queryByText("DOC-2026-0002")).not.toBeInTheDocument();
-  });
-
-  it("mostra EmptyState quando o filtro não corresponde a nenhuma referência", () => {
-    render(<PessoasDocumentosScreen />);
-
-    fireEvent.change(screen.getByLabelText("Situação"), {
-      target: { value: "historico_ilustrativo" },
-    });
-    fireEvent.change(screen.getByLabelText("Escopo técnico"), {
-      target: { value: "Escopo E-02 (exemplo)" },
-    });
-
-    expect(
-      screen.getByRole("heading", {
-        name: "Nenhuma referência corresponde aos filtros",
+    fireEvent.click(
+      screen.getByRole("button", { name: "Registrar documento" }),
+    );
+    fireEvent.change(
+      await screen.findByLabelText(/Tipo do documento a registrar/, {
+        selector: "select",
       }),
-    ).toBeInTheDocument();
-  });
+      { target: { value: "tipo-1" } },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Registrar" }));
 
-  it("abre o painel de detalhe ao clicar em 'Ver detalhe', somente leitura, com campos pendentes e único controle 'Fechar'", () => {
-    render(<PessoasDocumentosScreen />);
-
-    const linha = screen.getByText("DOC-2026-0001").closest("tr")!;
-    fireEvent.click(within(linha).getByRole("button", { name: /Ver detalhe/ }));
-
-    expect(screen.getByText("Detalhe demonstrativo")).toBeInTheDocument();
-    const tituloDetalhe = screen.getByRole("heading", {
-      name: "Detalhe da referência — DOC-2026-0001",
-    });
-    expect(tituloDetalhe).toBeInTheDocument();
-    const painel = tituloDetalhe.closest("section")!;
-    const dentroDoPainel = within(painel);
-
-    expect(
-      dentroDoPainel.getByText("Categoria documental C-01 (exemplo)"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDoPainel.getByText("Finalidade F-01 (exemplo)"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDoPainel.getByText("Validação RH (exemplo)"),
-    ).toBeInTheDocument();
-    expect(
-      dentroDoPainel.getByText(
-        /registro de referência técnica de evidência documental \(exemplo ilustrativo, sem arquivo, upload, download ou visualização real\)/i,
-      ),
-    ).toBeInTheDocument();
-    expect(
-      dentroDoPainel.getByText(
-        /este painel não cria, edita, envia, anexa, recebe, abre, baixa, exibe, assina, aprova, publica, retém, exclui, compartilha, importa, exporta nem integra documentos reais/i,
-      ),
-    ).toBeInTheDocument();
-
-    expect(
-      dentroDoPainel.getAllByRole("button").map((b) => b.textContent),
-    ).toEqual(["Fechar"]);
-
-    fireEvent.click(dentroDoPainel.getByRole("button", { name: "Fechar" }));
-    expect(screen.queryByText("Detalhe demonstrativo")).not.toBeInTheDocument();
-  });
-
-  it("mostra 'nenhum campo pendente' quando o item de exemplo não tem pendências", () => {
-    render(<PessoasDocumentosScreen />);
-
-    const linha = screen.getByText("DOC-2026-0002").closest("tr")!;
-    fireEvent.click(within(linha).getByRole("button", { name: /Ver detalhe/ }));
-
-    expect(
-      screen.getByText("Nenhum campo pendente (exemplo)."),
-    ).toBeInTheDocument();
-  });
-
-  it("alterna para o estado vazio e mostra o EmptyState", () => {
-    render(<PessoasDocumentosScreen />);
-
-    fireEvent.click(screen.getByRole("button", { name: "Vazio" }));
-
-    expect(
-      screen.queryByRole("table", {
-        name: "Documentos (exemplo)",
+    await waitFor(() =>
+      expect(criarDocumento).toHaveBeenCalledWith({
+        empresaId: "emp-1",
+        colaboradorId: "colab-1",
+        tipoDocumentoId: "tipo-1",
       }),
+    );
+    await waitFor(() =>
+      expect(vi.mocked(listarDocumentos).mock.calls.length).toBeGreaterThan(
+        chamadasAntes,
+      ),
+    );
+    expect(
+      await screen.findByText("Documento registrado (sem conteúdo)."),
+    ).toBeInTheDocument();
+  });
+
+  it("substituição em conflito (409) mostra mensagem de conflito clara", async () => {
+    vi.mocked(substituirDocumento).mockRejectedValue(new ApiError(409, "x"));
+    render(<PessoasDocumentosScreen />);
+    fireEvent.change(await screen.findByLabelText("Selecione o colaborador"), {
+      target: { value: "colab-1" },
+    });
+    await screen.findAllByText("Documento de identidade (RG)");
+    fireEvent.click(screen.getByRole("button", { name: "Substituir" }));
+    fireEvent.change(
+      await screen.findByLabelText(/Novo tipo documental/, {
+        selector: "select",
+      }),
+      { target: { value: "tipo-1" } },
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Confirmar substituição" }),
+    );
+    expect(await screen.findByText(/já foi substituído/i)).toBeInTheDocument();
+  });
+
+  it("RH solicita documento e a lista de solicitações é recarregada", async () => {
+    vi.mocked(criarSolicitacaoDocumento).mockResolvedValue(SOLIC as never);
+    render(<PessoasDocumentosScreen />);
+    fireEvent.change(await screen.findByLabelText("Selecione o colaborador"), {
+      target: { value: "colab-1" },
+    });
+    await screen.findByText("Solicitações de documento");
+    const antes = vi.mocked(listarSolicitacoesDocumento).mock.calls.length;
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Solicitar documento" }),
+    );
+    fireEvent.change(
+      await screen.findByLabelText(/Tipo do documento a solicitar/, {
+        selector: "select",
+      }),
+      { target: { value: "tipo-1" } },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Solicitar" }));
+
+    await waitFor(() =>
+      expect(criarSolicitacaoDocumento).toHaveBeenCalledWith({
+        empresaId: "emp-1",
+        colaboradorId: "colab-1",
+        tipoDocumentoId: "tipo-1",
+      }),
+    );
+    await waitFor(() =>
+      expect(
+        vi.mocked(listarSolicitacoesDocumento).mock.calls.length,
+      ).toBeGreaterThan(antes),
+    );
+  });
+
+  it("papel sem mutação (master_tecnico) não vê ações de registrar/substituir/solicitar", async () => {
+    configurarPadrao({
+      ator: { ...RH, role: "master_tecnico", companyId: null },
+      colaboradores: [COLAB_1],
+    });
+    render(<PessoasDocumentosScreen />);
+    await screen.findAllByText("Documento de identidade (RG)");
+    expect(
+      screen.queryByRole("button", { name: "Registrar documento" }),
     ).not.toBeInTheDocument();
     expect(
-      screen.getByRole("heading", {
-        level: 3,
-        name: "Nenhuma referência de documento cadastrada",
-      }),
-    ).toBeInTheDocument();
-  });
-
-  it("alterna para o estado de erro com referência ilustrativa e ação de retorno", () => {
-    render(<PessoasDocumentosScreen />);
-
-    fireEvent.click(screen.getByRole("button", { name: "Erro" }));
-
+      screen.queryByRole("button", { name: "Substituir" }),
+    ).not.toBeInTheDocument();
     expect(
-      screen.getByRole("heading", {
-        name: "Não foi possível carregar as referências de documentos",
-      }),
-    ).toBeInTheDocument();
-    expect(screen.getByText(/REQ-DEMO-010037/)).toBeInTheDocument();
+      screen.queryByRole("button", { name: "Solicitar documento" }),
+    ).not.toBeInTheDocument();
+  });
 
-    fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
+  it("nunca oferece upload, download, visualização ou input de arquivo", async () => {
+    const { container } = render(<PessoasDocumentosScreen />);
+    fireEvent.change(await screen.findByLabelText("Selecione o colaborador"), {
+      target: { value: "colab-1" },
+    });
+    await screen.findAllByText("Documento de identidade (RG)");
+    expect(container.querySelector('input[type="file"]')).toBeNull();
+    const texto = container.textContent ?? "";
+    for (const termo of [
+      "Upload",
+      "Baixar",
+      "Download",
+      "Visualizar arquivo",
+    ]) {
+      expect(texto).not.toContain(termo);
+    }
+  });
+
+  it("exibe os vínculos do colaborador como relação autorizada", async () => {
+    vi.mocked(listarVinculosDoColaborador).mockResolvedValue([
+      {
+        id: "v1",
+        colaboradorId: "colab-1",
+        empresaId: "emp-1",
+        matricula: "M-001",
+        tipo: "clt",
+        situacao: "ativo",
+        dataAdmissao: "2026-01-01",
+        dataDesligamento: null,
+        criadoEm: "2026-01-01T10:00:00.000Z",
+        atualizadoEm: "2026-01-01T10:00:00.000Z",
+      },
+    ] as never);
+    render(<PessoasDocumentosScreen />);
+    fireEvent.change(await screen.findByLabelText("Selecione o colaborador"), {
+      target: { value: "colab-1" },
+    });
+    const vinculos = await screen.findByText(/matrícula M-001/);
+    expect(within(vinculos).getByText(/matrícula M-001/)).toBeInTheDocument();
+  });
+
+  it("erro ao carregar documentos mostra nova tentativa", async () => {
+    vi.mocked(listarDocumentos)
+      .mockRejectedValueOnce(new ApiError(500, "x"))
+      .mockResolvedValueOnce(pagina([DOC]) as never);
+    render(<PessoasDocumentosScreen />);
+    fireEvent.change(await screen.findByLabelText("Selecione o colaborador"), {
+      target: { value: "colab-1" },
+    });
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Tentar novamente" }),
+    );
     expect(
-      screen.getByRole("table", {
-        name: "Documentos (exemplo)",
-      }),
-    ).toBeInTheDocument();
-  });
-
-  it("nenhum botão executa envio, abertura, download, assinatura ou ação mutante (criar, enviar, anexar, receber, abrir, baixar, assinar, aprovar, publicar, reter, excluir, compartilhar, importar, exportar, editar)", () => {
-    render(<PessoasDocumentosScreen />);
-
-    const linha = screen.getByText("DOC-2026-0001").closest("tr")!;
-    fireEvent.click(within(linha).getByRole("button", { name: /Ver detalhe/ }));
-
-    const rotulos = screen
-      .getAllByRole("button")
-      .map((botao) => botao.textContent?.toLowerCase() ?? "");
-
-    for (const rotulo of rotulos) {
-      expect(rotulo).not.toMatch(
-        /criar|enviar|anexar|receber|abrir|baixar|assinar|aprovar|publicar|reter|excluir|compartilhar|importar|exportar|editar/,
-      );
-    }
-  });
-
-  it("não contém nomes, empresa real, CPF, e-mail, telefone, IP, matrícula, salário, valor ou dado pessoal real", () => {
-    render(<PessoasDocumentosScreen />);
-
-    expect(document.querySelectorAll('input[type="file"]')).toHaveLength(0);
-    expect(document.querySelectorAll("a")).toHaveLength(0);
-    expect(document.querySelectorAll("img")).toHaveLength(0);
-    expect(document.querySelectorAll("iframe")).toHaveLength(0);
-    expect(document.querySelectorAll("form")).toHaveLength(0);
-
-    const texto = document.body.innerHTML.toLowerCase();
-    for (const termoProibido of [
-      "cpf",
-      "cnpj",
-      "secullum",
-      "rwtech",
-      "bioprox",
-      "reserva fiscal",
-      "senha",
-      "sessão",
-      "telefone",
-      "matrícula",
-      "matricula",
-      "r$",
-      "localstorage",
-      "@",
-      "http://",
-      "https://",
-      ".pdf",
-    ]) {
-      expect(texto).not.toContain(termoProibido);
-    }
-  });
-
-  it("não declara conformidade com CLT, CCT/ACT, Portaria 671, LGPD ou eSocial e não menciona SLA", () => {
-    render(<PessoasDocumentosScreen />);
-
-    const texto = document.body.innerHTML.toLowerCase();
-    for (const termoProibido of [
-      "clt",
-      "cct",
-      "act",
-      "portaria 671",
-      "lgpd",
-      "esocial",
-      "sla",
-    ]) {
-      expect(texto).not.toContain(termoProibido);
-    }
+      (await screen.findAllByText("Documento de identidade (RG)")).length,
+    ).toBeGreaterThan(0);
   });
 });
