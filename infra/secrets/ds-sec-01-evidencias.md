@@ -176,13 +176,20 @@ Evidências necessárias (todas em estado inicial **`pendente`**). O fechamento
 
 ### 8.4 Estado dos gates relacionados
 
-- `DS-MFA-01` (rollout de MFA universal, TOTP): **já aprovada** (decisão de
-  produto, T128) — ver [pacote de decisão, §8](../../docs/decisions/pacote-decisao-seguranca-operacional.md).
+- `DS-MFA-01` (rollout de MFA, TOTP): **aprovada** (decisão de produto, T128),
+  **revisada em T132** — o **lançamento inicial é sem MFA obrigatório**
+  (`MFA_ENABLED=false`, aceitação de risco por orçamento); o alvo (MFA universal)
+  permanece e a exigência é adiada. Ver
+  [pacote de decisão, §8.5](../../docs/decisions/pacote-decisao-seguranca-operacional.md).
+- **Configuração operacional inicial:** `MFA_ENABLED=false`. Este formulário
+  reúne a evidência para **habilitar** o MFA depois; enquanto o gate não fechar,
+  o MFA permanece desativado.
 - `DS-SEC-01`: **pendente** até §8.1–§8.3 concluídos.
 - `DS-OPS-01` e a **ativação real de MFA** (exigi-lo para piloto/produção com
   dado real): **bloqueados** enquanto o `DS-SEC-01` não for formalmente encerrado
   (e dependem ainda dos demais gates). Nenhuma mudança de código torna o MFA
-  obrigatório enquanto este gate estiver aberto.
+  obrigatório enquanto este gate estiver aberto; ativar exige `MFA_ENABLED=true`
+  - chave provisionada via cofre + decisão de rollout.
 
 ---
 
