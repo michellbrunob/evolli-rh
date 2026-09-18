@@ -9,10 +9,11 @@ import { Injectable } from "@nestjs/common";
  * ligar/desligar o MFA é uma mudança de configuração técnica controlada, não
  * uma ação de UI.
  *
- * Lê `process.env` diretamente (mesmo padrão de `TotpSecretCipher`): o
- * `env.validation.ts` já restringe o valor a `"true"`/`"false"` no boot (ou a
- * API não sobe), então aqui basta reconhecer o "ligado" — exatamente a string
- * `"true"`. Qualquer outro valor mantém o MFA DESLIGADO (nunca liga por engano).
+ * Lê `process.env.MFA_ENABLED` diretamente, em tempo de request. Sem parâmetro
+ * de construtor (nenhuma dependência a resolver): o `env.validation.ts` já
+ * restringe o valor a `"true"`/`"false"` no boot (ou a API não sobe), então
+ * aqui basta reconhecer o "ligado" — exatamente a string `"true"`. Qualquer
+ * outro valor mantém o MFA DESLIGADO (nunca liga por engano).
  *
  * Enquanto desativado (lançamento inicial), o ecossistema opera sem 2º fator e
  * a chave de cifragem do segredo TOTP não é exigida no boot. Quando ativado, os
@@ -21,10 +22,8 @@ import { Injectable } from "@nestjs/common";
  */
 @Injectable()
 export class MfaConfigService {
-  constructor(private readonly env: NodeJS.ProcessEnv = process.env) {}
-
   /** `true` somente quando `MFA_ENABLED` é exatamente `"true"`. */
   isEnabled(): boolean {
-    return this.env.MFA_ENABLED === "true";
+    return process.env.MFA_ENABLED === "true";
   }
 }
