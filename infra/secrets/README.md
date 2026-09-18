@@ -45,13 +45,18 @@ na medida em que tocam essa chave.
 
 ### 1.1 Fronteira de dado real (não negociável)
 
-- **MFA obrigatório é pré-condição de dado real.** Nenhum piloto com dado real
-  de RH, nenhuma exposição externa e nenhuma produção ocorre antes de o gate
-  `DS-OPS-01` estar fechado (ADR 0003 decisão 3; Constituição II). Este
-  documento **não** fecha esse gate — ele prepara um dos controles (`DS-SEC-01`)
-  de que o gate depende.
-- Exigir MFA para dado real permanece **decisão de produto** (`DS-MFA-01`), a
-  ser tomada depois deste gate, não aqui (ver §7).
+- **MFA obrigatório é o alvo antes de dado real** (ADR 0003 decisão 3;
+  Constituição II). **Revisão de produto (T132):** o **lançamento inicial**
+  ocorrerá **sem MFA obrigatório** (`MFA_ENABLED=false`), como **aceitação de
+  risco** por indisponibilidade temporária de orçamento para o cofre — o gate
+  `DS-OPS-01` segue **aberto** e a exigência é **adiada**, não abandonada.
+  Registro canônico da revisão:
+  [pacote de decisão, §8.5](../../docs/decisions/pacote-decisao-seguranca-operacional.md).
+  Este documento **não** fecha gate algum — ele prepara um dos controles
+  (`DS-SEC-01`) de que a **ativação futura** depende.
+- Exigir MFA para dado real permanece **decisão de produto** (`DS-MFA-01`);
+  ativá-lo depois exige `MFA_ENABLED=true`, a chave provisionada via cofre,
+  `DS-SEC-01` encerrado e decisão de rollout (não aqui; ver §7).
 
 ### 1.2 Segredo da chave (invariável)
 
