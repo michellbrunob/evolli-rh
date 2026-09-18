@@ -68,11 +68,12 @@
   color: var(--color-on-dark-muted);
 }
 
-/* Botões "Segurança" (T126), "Sessões ativas" (T117) e "Sair" (T116) — só
-   aparecem quando `App` recebe `onLogout`. O primeiro do grupo
-   (`app-shell__seguranca`) é empurrado para a extremidade oposta da marca via
-   `margin-left: auto` no container flex (`app-shell__topbar-inner`); o `gap`
-   do próprio container cuida do espaçamento entre os botões. */
+/* Botões "Segurança" (T126/T131), "Sessões ativas" (T117) e "Sair" (T116) — só
+   aparecem quando `App` recebe `onLogout` (e "Segurança" só quando o MFA está
+   disponível no servidor, T131). O grupo é empurrado para a extremidade oposta
+   da marca via `margin-left: auto` no PRIMEIRO botão presente (regra
+   `button:first-of-type` abaixo) — assim o layout não depende de "Segurança"
+   existir; o `gap` do container cuida do espaçamento entre os botões. */
 .app-shell__seguranca,
 .app-shell__sessoes-ativas,
 .app-shell__logout {
@@ -88,7 +89,9 @@
   cursor: pointer;
 }
 
-.app-shell__seguranca {
+/* Primeiro botão do grupo (seja "Segurança", "Sessões ativas" ou "Sair",
+   conforme o que estiver presente) empurra o grupo para a direita. */
+.app-shell__topbar-inner > button:first-of-type {
   margin-left: auto;
 }
 

@@ -22,11 +22,16 @@ import { App } from "./App";
 import { LoginScreen } from "./LoginScreen";
 import { logout } from "../api/authClient";
 import { clearCsrfToken, refreshCsrfToken } from "../api/csrfClient";
+import { obterUsuarioAtual } from "../api/usersClient";
 
 type EstadoSessao = "verificando" | "login" | "autenticado";
 
 export function AutenticacaoApp() {
   const [estado, setEstado] = useState<EstadoSessao>("verificando");
+  // T131 — disponibilidade do MFA decidida pelo SERVIDOR (`GET /v1/users/me`).
+  // Padrão `false` (seguro): a UI de MFA só aparece após o servidor confirmar
+  // que o recurso está ativado. Nunca uma flag de frontend liga o recurso.
+  const [mfaDisponivel, setMfaDisponivel] = useState(false);
 
   useEffect(() => {
     let cancelado = false;
@@ -48,6 +53,29 @@ export function AutenticacaoApp() {
       cancelado = true;
     };
   }, []);
+
+  // T131 — ao autenticar, pergunta ao servidor se o MFA está disponível e
+  // repassa ao shell. Falha ou ausência do campo → mantém `false` (seguro: a UI
+  // de MFA fica oculta). O servidor permanece autoritativo de qualquer forma.
+  useEffect(() => {
+    if (estado !== "autenticado") {
+      setMfaDisponivel(false);
+      return;
+    }
+    let cancelado = false;
+    async function carregarDisponibilidadeMfa() {
+      try {
+        const eu = await obterUsuarioAtual();
+        if (!cancelado) setMfaDisponivel(eu.mfaAvailable === true);
+      } catch {
+        if (!cancelado) setMfaDisponivel(false);
+      }
+    }
+    void carregarDisponibilidadeMfa();
+    return () => {
+      cancelado = true;
+    };
+  }, [estado]);
 
   /**
    * Limpa só o estado em memória e volta ao login — nunca toca em
@@ -90,6 +118,7 @@ export function AutenticacaoApp() {
     <App
       onLogout={() => void handleLogout()}
       onSessaoAtualEncerrada={encerrarSessaoLocalmente}
+      mfaDisponivel={mfaDisponivel}
     />
   );
 }

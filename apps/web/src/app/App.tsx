@@ -152,9 +152,22 @@ export interface AppProps {
    * Sem `onLogout`, o botão "Sessões ativas" também não aparece, então esta
    * prop nunca é exercida — mesmo gate das duas capacidades. */
   onSessaoAtualEncerrada?: () => void;
+  /**
+   * T131 — disponibilidade REAL do MFA, decidida pelo servidor e repassada pelo
+   * `AutenticacaoApp` (via `GET /v1/users/me`). Controla se o botão/painel
+   * "Segurança" (cadastro de 2º fator) aparece. Padrão `false` (seguro): sem
+   * confirmação do servidor, a UI de MFA fica oculta — nunca uma flag de
+   * frontend liga o recurso. O servidor continua autoritativo (rotas de MFA
+   * respondem 404 quando desativado).
+   */
+  mfaDisponivel?: boolean;
 }
 
-export function App({ onLogout, onSessaoAtualEncerrada }: AppProps = {}) {
+export function App({
+  onLogout,
+  onSessaoAtualEncerrada,
+  mfaDisponivel = false,
+}: AppProps = {}) {
   const [destinoAtivoId, setDestinoAtivoId] = useState("cadastros");
   const [sessoesAtivasAberto, setSessoesAtivasAberto] = useState(false);
   const [segurancaAberto, setSegurancaAberto] = useState(false);
@@ -188,7 +201,7 @@ export function App({ onLogout, onSessaoAtualEncerrada }: AppProps = {}) {
         <div className="app-shell__topbar-inner">
           <span className="app-shell__brand">Evolli RH</span>
           <span className="app-shell__brand-tag">Painel Administrativo</span>
-          {onLogout ? (
+          {onLogout && mfaDisponivel ? (
             <button
               type="button"
               className="app-shell__seguranca"
@@ -226,7 +239,7 @@ export function App({ onLogout, onSessaoAtualEncerrada }: AppProps = {}) {
         </div>
       </header>
 
-      {onLogout && segurancaAberto ? (
+      {onLogout && mfaDisponivel && segurancaAberto ? (
         <div className="app-shell__sessoes-ativas-wrapper">
           <SegurancaMfaPanel
             aberto={segurancaAberto}

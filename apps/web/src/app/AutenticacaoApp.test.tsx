@@ -38,6 +38,20 @@ vi.mock("../api/sessoesClient", async () => {
   };
 });
 
+// T131 — ao autenticar, o `AutenticacaoApp` consulta `GET /v1/users/me` para
+// saber se o MFA está disponível. Mock padrão: MFA indisponível (lançamento
+// inicial), coerente com o servidor com `MFA_ENABLED=false`.
+vi.mock("../api/usersClient", async () => {
+  const actual =
+    await vi.importActual<typeof import("../api/usersClient")>(
+      "../api/usersClient",
+    );
+  return {
+    ...actual,
+    obterUsuarioAtual: vi.fn().mockResolvedValue({ mfaAvailable: false }),
+  };
+});
+
 const EMAIL_SINTETICO = "pessoa.teste@example.test";
 const SENHA_SINTETICA = "SenhaSintetica123!";
 

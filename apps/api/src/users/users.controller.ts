@@ -26,6 +26,8 @@ import { CurrentUser } from "../auth/session/current-user.decorator";
 import { toSafeUser } from "../auth/safe-user.util";
 import { extractRequestMetadata } from "../auth/request-metadata.util";
 import { MfaService } from "../auth/mfa/mfa.service";
+import { MfaConfigService } from "../auth/mfa/mfa-config.service";
+import { MfaEnabledGuard } from "../auth/mfa/mfa-enabled.guard";
 
 @ApiTags("users")
 @Controller("users")
@@ -34,11 +36,16 @@ export class UsersController {
   constructor(
     private readonly usersService: UsersService,
     private readonly mfaService: MfaService,
+    private readonly mfaConfig: MfaConfigService,
   ) {}
 
   @Get("me")
   getMe(@CurrentUser() user: AccessUser) {
-    return toSafeUser(user);
+    // `mfaAvailable` reflete o interruptor de servidor do MFA (T131). É a fonte
+    // que o SPA usa para exibir/ocultar as ações de MFA — mas o servidor
+    // continua autoritativo: as rotas de MFA respondem 404 quando desativado,
+    // independentemente do que a interface decidir mostrar.
+    return { ...toSafeUser(user), mfaAvailable: this.mfaConfig.isEnabled() };
   }
 
   /**
@@ -119,7 +126,10 @@ export class UsersController {
    */
   @Post(":id/mfa/reset")
   @HttpCode(HttpStatus.NO_CONTENT)
-  @UseGuards(CsrfGuard, AuthorizationGuard)
+  // T131 — `MfaEnabledGuard` primeiro: com o MFA desativado por configuração, o
+  // reset administrativo responde 404 (indisponível de forma coerente), antes
+  // de CSRF/autorização.
+  @UseGuards(MfaEnabledGuard, CsrfGuard, AuthorizationGuard)
   @RequirePermission("mfa", "reset")
   async resetMfa(
     @CurrentUser() actor: AccessUser,
