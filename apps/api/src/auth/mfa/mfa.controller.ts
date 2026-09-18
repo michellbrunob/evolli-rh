@@ -13,6 +13,7 @@ import { Request, Response } from "express";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import { AccessUser } from "@prisma/client";
 import { MfaService } from "./mfa.service";
+import { MfaEnabledGuard } from "./mfa-enabled.guard";
 import { MfaConfirmDto, MfaVerifyDto } from "./dto/mfa.dto";
 import { SessionGuard } from "../session/session.guard";
 import { CsrfGuard } from "../csrf/csrf.guard";
@@ -34,6 +35,10 @@ import { extractRequestMetadata } from "../request-metadata.util";
  */
 @ApiTags("auth")
 @Controller("auth/mfa")
+// T131 — quando o MFA está desativado por configuração de servidor, TODAS as
+// rotas de MFA respondem 404 (o portão roda antes de Session/CSRF). Ativado,
+// os fluxos T125/T126 valem integralmente.
+@UseGuards(MfaEnabledGuard)
 export class MfaController {
   constructor(
     private readonly mfaService: MfaService,

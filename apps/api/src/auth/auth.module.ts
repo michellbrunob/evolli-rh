@@ -14,6 +14,8 @@ import { EMAIL_NOTIFIER } from "./email/email-notifier.interface";
 import { NoopEmailNotifier } from "./email/noop-email-notifier.service";
 import { MfaController } from "./mfa/mfa.controller";
 import { MfaService } from "./mfa/mfa.service";
+import { MfaConfigService } from "./mfa/mfa-config.service";
+import { MfaEnabledGuard } from "./mfa/mfa-enabled.guard";
 import { TotpSecretCipher } from "./mfa/crypto/totp-secret-cipher";
 import { AuditModule } from "../audit/audit.module";
 
@@ -33,6 +35,10 @@ import { AuditModule } from "../audit/audit.module";
     // usa Session/PasswordHash/Audit já presentes aqui; `AuthService` usa
     // `MfaService` no login.
     MfaService,
+    // T131 — interruptor de servidor do MFA e o portão de disponibilidade das
+    // rotas (404 quando desativado).
+    MfaConfigService,
+    MfaEnabledGuard,
     TotpSecretCipher,
     { provide: CREDENTIAL_VERIFIER, useClass: LocalCredentialVerifier },
     { provide: EMAIL_NOTIFIER, useClass: NoopEmailNotifier },
@@ -47,6 +53,10 @@ import { AuditModule } from "../audit/audit.module";
     RateLimitService,
     // Exportado para o `UsersModule` expor a rota de reset administrativo.
     MfaService,
+    // Exportados para o `UsersModule` (reset administrativo e `mfaAvailable` em
+    // GET /users/me) refletirem o mesmo interruptor de servidor.
+    MfaConfigService,
+    MfaEnabledGuard,
   ],
 })
 export class AuthModule {}

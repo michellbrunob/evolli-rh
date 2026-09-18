@@ -18,6 +18,13 @@ export interface SafeAccessUserApi {
   teamId: string | null;
   status: string;
   createdAt: string;
+  /**
+   * T131 — disponibilidade do MFA definida pelo SERVIDOR (`GET /v1/users/me`).
+   * A interface usa isto para exibir/ocultar as ações de MFA; o servidor
+   * permanece autoritativo (rotas de MFA respondem 404 quando desativado).
+   * Opcional para compatibilidade: ausente é tratado como indisponível.
+   */
+  mfaAvailable?: boolean;
 }
 
 /**

@@ -215,6 +215,10 @@ describe("MFA TOTP (e2e)", () => {
     );
 
     process.env.DATABASE_URL = appUrl;
+    // T131 — esta suíte exercita os fluxos de MFA, então o interruptor de
+    // servidor precisa estar ATIVADO. O comportamento com MFA desativado
+    // (rotas 404, login por senha, anti-bypass) é coberto por testes unitários.
+    process.env.MFA_ENABLED = "true";
     // Chave de cifragem do segredo TOTP (32 bytes Base64). Sintética, só para
     // o ambiente efêmero deste teste — nunca uma chave real.
     process.env.MFA_TOTP_ENCRYPTION_KEY = randomBytes(32).toString("base64");

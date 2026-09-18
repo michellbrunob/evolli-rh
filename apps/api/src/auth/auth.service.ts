@@ -29,6 +29,7 @@ import {
 import { normalizeEmail } from "./normalize-email.util";
 import { AuditService } from "../audit/audit.service";
 import { MfaService } from "./mfa/mfa.service";
+import { MfaConfigService } from "./mfa/mfa-config.service";
 
 const PASSWORD_RESET_TOKEN_TTL_MS = 20 * 60 * 1000; // 20 min (janela §4: 15–30 min)
 
@@ -54,6 +55,7 @@ export class AuthService {
     @Inject(EMAIL_NOTIFIER) private readonly emailNotifier: EmailNotifier,
     private readonly auditService: AuditService,
     private readonly mfaService: MfaService,
+    private readonly mfaConfig: MfaConfigService,
   ) {}
 
   async login(
@@ -111,17 +113,40 @@ export class AuthService {
 
     const user = result.user;
 
-    // T125 — MFA: se a conta tem 2º fator ATIVO, a senha correta NÃO cria
-    // sessão plena. Emite um challenge opaco (uso único, 5 min) e devolve;
-    // `login_succeeded` só será auditado após a verificação do fator
-    // (`MfaService.completeMfaLogin`). Contas sem MFA seguem o fluxo direto
-    // abaixo, inalterado.
-    if (await this.mfaService.hasActiveTotp(user.id)) {
-      const challengeToken = await this.mfaService.createLoginChallenge(
-        user.id,
-        metadata,
-      );
-      return { kind: "mfa_required", challengeToken };
+    // T125/T131 — MFA: comportamento depende do interruptor de servidor.
+    const hasActiveFactor = await this.mfaService.hasActiveTotp(user.id);
+    if (hasActiveFactor) {
+      if (this.mfaConfig.isEnabled()) {
+        // MFA ativado: a senha correta NÃO cria sessão plena. Emite um challenge
+        // opaco (uso único, 5 min); `login_succeeded` só é auditado após a
+        // verificação do fator (`MfaService.completeMfaLogin`).
+        const challengeToken = await this.mfaService.createLoginChallenge(
+          user.id,
+          metadata,
+        );
+        return { kind: "mfa_required", challengeToken };
+      }
+
+      // MFA DESATIVADO por configuração, mas esta conta tem um fator ATIVO
+      // (ex.: cadastrou o 2º fator antes de o MFA ser desligado). Nunca rebaixar
+      // para senha simples — isso seria bypass silencioso do fator. Nega o
+      // acesso de forma segura e genérica (mesma resposta de credencial
+      // inválida, anti-enumeração); a recuperação passa por reconfiguração de
+      // servidor, nunca por degradar a conta.
+      await this.auditService.record({
+        actorType: "user",
+        actorUserId: user.id,
+        actorRole: user.role,
+        companyId: user.companyId,
+        action: "login_failed",
+        resource: "access_user",
+        resourceId: user.id,
+        ip: metadata.ip,
+        userAgent: metadata.userAgent,
+        result: "failure",
+        requestId: metadata.requestId,
+      });
+      throw new UnauthorizedException();
     }
 
     // Ação sensível bem-sucedida: emissão da sessão e evento de auditoria

@@ -36,9 +36,12 @@
  *   backend.
  * - Campo de ID digitado à mão — toda ação usa exclusivamente o `id` que já
  *   veio de `GET /v1/users` na própria listagem.
- * - Convite por e-mail, reset de senha, MFA ou sessão administrativa — fora
- *   do contrato desta entrega. MFA continua sendo pré-requisito antes de
- *   qualquer piloto com dados reais ou produção (aviso fixo na tela).
+ * - Convite por e-mail, reset de senha ou sessão administrativa — fora do
+ *   contrato desta entrega. O MFA está implementado, porém OPCIONAL no
+ *   lançamento inicial (T131): as ações de MFA (ex.: "Redefinir MFA") só
+ *   aparecem quando o servidor informa `mfaAvailable` em `GET /v1/users/me`;
+ *   torná-lo obrigatório depende de gates operacionais externos (aviso fixo na
+ *   tela).
  *
  * **Empresa no formulário de criação:** para `rh`, é sempre
  * `ator.companyId` (oculta, nunca um campo escolhido). Para
@@ -195,8 +198,11 @@ export function ContasAcessoScreen({
     ator !== null && (ator.role === "master_tecnico" || ator.role === "rh");
   const podeDesativar = podeVerTela;
   // Redefinição administrativa de MFA: só master_tecnico e RH (contrato T125);
-  // DP NÃO. O backend é a autoridade final — se negar, mostramos erro genérico.
-  const podeResetarMfa = podeCriarOuAlterarPapel;
+  // DP NÃO. Além disso (T131), só quando o SERVIDOR informa que o MFA está
+  // disponível (`mfaAvailable`) — com o MFA desativado no lançamento inicial, a
+  // ação some. O backend é a autoridade final: com MFA desativado a rota
+  // responde 404, e se negar por papel/escopo, mostramos erro genérico.
+  const podeResetarMfa = podeCriarOuAlterarPapel && ator?.mfaAvailable === true;
 
   const tratarErroSessao = useCallback(
     (err: unknown): boolean => {
@@ -675,10 +681,11 @@ export function ContasAcessoScreen({
           id="contas-acesso-mfa-titulo"
           className="contas-acesso-screen__aviso-texto"
         >
-          MFA é pré-requisito antes de qualquer piloto com dados reais ou
-          produção. Exigir MFA de forma obrigatória ainda depende de gates
-          operacionais externos (cofre de segredos e break-glass); esta tela não
-          os substitui.
+          O MFA está implementado, porém opcional no lançamento inicial
+          (aceitação de risco de produto). Torná-lo obrigatório depende de gates
+          operacionais externos (cofre de segredos e break-glass) e da decisão
+          de rollout; esta tela não os substitui. As ações de MFA aparecem
+          apenas quando o servidor as habilita.
         </p>
       </Surface>
 

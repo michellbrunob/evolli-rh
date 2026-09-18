@@ -784,8 +784,17 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("com onLogout: abre e fecha o painel 'Segurança da conta' (T126)", () => {
+  it("com onLogout mas MFA indisponível (padrão): não mostra 'Segurança' (T131)", () => {
+    // `mfaDisponivel` ausente = false: com o MFA desativado no servidor, o botão
+    // e o painel de Segurança não aparecem, mesmo com sessão ativa.
     render(<App onLogout={vi.fn()} />);
+    expect(
+      screen.queryByRole("button", { name: "Segurança" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("com onLogout e mfaDisponivel: abre e fecha o painel 'Segurança da conta' (T126/T131)", () => {
+    render(<App onLogout={vi.fn()} mfaDisponivel />);
 
     const botao = screen.getByRole("button", { name: "Segurança" });
     expect(botao).toHaveAttribute("aria-expanded", "false");
@@ -802,8 +811,8 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("abrir 'Segurança' fecha 'Sessões ativas' e vice-versa (painéis exclusivos, T126)", () => {
-    render(<App onLogout={vi.fn()} />);
+  it("abrir 'Segurança' fecha 'Sessões ativas' e vice-versa (painéis exclusivos, T126/T131)", () => {
+    render(<App onLogout={vi.fn()} mfaDisponivel />);
 
     fireEvent.click(screen.getByRole("button", { name: "Sessões ativas" }));
     expect(

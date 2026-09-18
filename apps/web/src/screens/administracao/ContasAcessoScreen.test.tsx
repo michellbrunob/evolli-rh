@@ -61,6 +61,10 @@ function usuario(overrides: Partial<SafeAccessUserApi>): SafeAccessUserApi {
     teamId: null,
     status: "active",
     createdAt: "2026-01-01T10:00:00.000Z",
+    // T131 — por padrão os fixtures assumem MFA disponível no servidor, para
+    // preservar a cobertura de "Redefinir MFA" (T126). Testes específicos
+    // sobrescrevem para `false` (lançamento inicial, MFA desativado).
+    mfaAvailable: true,
     ...overrides,
   };
 }
@@ -723,6 +727,30 @@ describe("ContasAcessoScreen (T121)", () => {
       ).not.toBeInTheDocument();
     });
 
+    it("MFA desativado no servidor (mfaAvailable=false): RH não vê 'Redefinir MFA' (T131)", async () => {
+      // Mesmo papel autorizado (RH), mas o servidor informa MFA indisponível —
+      // a ação some. O backend continua autoritativo (rota responde 404).
+      vi.mocked(obterUsuarioAtual).mockResolvedValue(
+        usuario({
+          id: "rh-1",
+          email: "rh@example.test",
+          role: "rh",
+          companyId: "empresa-a",
+          mfaAvailable: false,
+        }),
+      );
+      vi.mocked(listarUsuarios).mockResolvedValue({
+        items: [contaAtiva],
+        nextCursor: null,
+      });
+
+      render(<ContasAcessoScreen />);
+      await screen.findByText("pessoa1@example.test");
+      expect(
+        screen.queryByRole("button", { name: "Redefinir MFA" }),
+      ).not.toBeInTheDocument();
+    });
+
     it("a própria conta nunca oferece 'Redefinir MFA'", async () => {
       vi.mocked(obterUsuarioAtual).mockResolvedValue(rhAtor);
       vi.mocked(listarUsuarios).mockResolvedValue({
@@ -971,7 +999,7 @@ describe("ContasAcessoScreen (T121)", () => {
       render(<ContasAcessoScreen />);
 
       expect(
-        await screen.findByText(/MFA é pré-requisito/i),
+        await screen.findByText(/opcional no lançamento inicial/i),
       ).toBeInTheDocument();
     });
 
