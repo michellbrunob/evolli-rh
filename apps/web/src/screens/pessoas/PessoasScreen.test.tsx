@@ -115,12 +115,13 @@ describe("PessoasScreen — abas locais 'Colaboradores' / 'Horário de trabalho'
 
     fireEvent.click(screen.getByRole("tab", { name: "Dados contratuais" }));
 
+    // T134 — a aba Dados contratuais passou a ser funcional (carrega dados
+    // reais). Aqui (sem mocks de rede) validamos só o contrato de NAVEGAÇÃO: h1
+    // único e titleId reportado. O comportamento funcional é coberto por
+    // DadosContratuaisScreen.test.tsx.
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     expect(
       screen.getByRole("heading", { level: 1, name: "Dados contratuais" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", { name: "Dados contratuais (exemplo)" }),
     ).toBeInTheDocument();
 
     expect(
