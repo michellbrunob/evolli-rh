@@ -1,11 +1,15 @@
 # Etapa 0 — Segurança operacional (MFA, segredos e backup/recuperação): decisões pendentes (T004)
 
-- Status: **pendente** — este é um **pacote de decisão** para TI, Segurança,
-  DPO e Produto. **Nenhuma decisão abaixo está aprovada.** O documento
+- Status: **parcialmente aprovado** — este é um **pacote de decisão** para TI,
+  Segurança, DPO e Produto. **`DS-MFA-01` foi aprovada em 18/09/2026** (rollout
+  de MFA — registrada no
+  [pacote de decisão, §7–§8](pacote-decisao-seguranca-operacional.md)); **todas
+  as demais decisões abaixo permanecem pendentes ou bloqueadas.** O documento
   **registra** o que precisa ser decidido, por qual área, com qual evidência,
   e o que cada pendência bloqueia. Não decide, não infere, não escolhe
   fornecedor e não declara conformidade.
-- Data: 2026-08-18
+- Data: 2026-08-18 · Última atualização: 18/09/2026 (T130 — sincronização do
+  espelho de `DS-MFA-01`)
 - **Formulário de aprovação (T033):** as pendências deste registro
   (identificadores `DS-…`) foram convertidas em um **pacote de decisão** objetivo
   para Produto/TI, RH e Jurídico —
@@ -219,37 +223,43 @@ autorizado.
 ## 4. Registro consolidado de decisões
 
 Identificadores `DS-…` (Decisão de Segurança operacional). **Responsável** é a
-**área/função**, nunca pessoa nomeada. **Status** de todas: **Pendente** —
-nenhuma está aprovada. **Bloqueia** indica o que não pode ocorrer enquanto a
-decisão estiver aberta.
+**área/função**, nunca pessoa nomeada. **Status:** somente **`DS-MFA-01` está
+Aprovada** (18/09/2026 — ver [pacote de decisão, §7–§8](pacote-decisao-seguranca-operacional.md));
+**todas as demais permanecem Pendentes**. **Bloqueia** indica o que não pode
+ocorrer enquanto a decisão estiver aberta.
 
-| ID        | Decisão necessária                                                                            | Responsável (área)        | Evidência esperada                               | Impacto                                               | Bloqueia                              | Status   |
-| --------- | --------------------------------------------------------------------------------------------- | ------------------------- | ------------------------------------------------ | ----------------------------------------------------- | ------------------------------------- | -------- |
-| DS-MFA-01 | Perfis/papéis e momento em que o MFA é obrigatório                                            | Segurança + Produto       | Decisão registrada + teste de autorização        | Fronteira de quem precisa de MFA                      | Dado real / piloto / produção         | Pendente |
-| DS-MFA-02 | Mecanismo de recuperação de acesso sem bypass do fator                                        | Segurança + TI            | Fluxo aprovado + evidência de auditoria do fluxo | Bloqueio permanente de usuário vs. brecha             | Dado real / piloto / produção         | Pendente |
-| DS-MFA-03 | Ações que exigem step-up e TTL do step-up                                                     | Segurança + Produto       | Lista aprovada + testes                          | Reautenticação proporcional ao risco (Constituição V) | Ações de alto impacto sobre dado real | Pendente |
-| DS-MFA-04 | Proteção do segredo TOTP em repouso e ausência em log/trilha/repo                             | Segurança + TI            | Inspeção automatizada + revisão                  | Exposição de segredo de fator                         | Dado real / piloto / produção         | Pendente |
-| DS-MFA-05 | Eventos de auditoria de MFA (sem segredo em claro)                                            | Segurança + DPO           | Especificação + verificação na trilha            | Rastreabilidade de acesso                             | Dado real / piloto / produção         | Pendente |
-| DS-SEC-01 | Cofre de segredos **ou** configuração de ambiente protegida (requisitos §2.4)                 | TI + Segurança            | Requisitos §2.4 atendidos e verificados          | Onde e como segredos vivem                            | Dado real / produção                  | Pendente |
-| DS-SEC-02 | Política e periodicidade de rotação por tipo de segredo                                       | TI + Segurança            | Política aprovada + evidência de rotação         | Janela de uso de segredo comprometido                 | Produção                              | Pendente |
-| DS-SEC-03 | Processo de acesso emergencial (break-glass) auditado                                         | Segurança + TI            | Processo aprovado + trilha de uso                | Uso indevido de acesso privilegiado                   | Produção                              | Pendente |
-| DS-SEC-04 | Separação de segredos por ambiente e menor privilégio por credencial                          | TI + Segurança            | Inventário por ambiente + revisão de privilégio  | Vazamento cruzado entre ambientes                     | Dado real / produção                  | Pendente |
-| DS-BKP-01 | Escopo final de dados protegidos por backup                                                   | TI + Segurança + DPO      | Escopo aprovado                                  | O que é (e não é) protegido                           | Piloto / produção                     | Pendente |
-| DS-BKP-02 | Criptografia (ou controle compensatório aprovado) e segregação de acesso                      | TI + Segurança            | Configuração verificada + aprovação              | Confidencialidade do backup                           | Dado real / produção                  | Pendente |
-| DS-BKP-03 | **RPO** (valor a decidir)                                                                     | Produto + TI/Segurança    | Valor aprovado                                   | Perda máxima aceitável de dados                       | Produção                              | Pendente |
-| DS-BKP-04 | **RTO** (valor a decidir)                                                                     | Produto + TI/Segurança    | Valor aprovado                                   | Tempo máximo de indisponibilidade                     | Produção                              | Pendente |
-| DS-BKP-05 | Retenção e descarte de backups                                                                | DPO/Jurídico + TI         | Política aprovada                                | Conformidade LGPD do backup                           | Dado real / produção                  | Pendente |
-| DS-BKP-06 | Restauração testada com evidência periódica                                                   | TI + Segurança            | Registro de teste de restauração                 | Confiabilidade da recuperação                         | Produção                              | Pendente |
-| DS-OPS-01 | Confirmação de que nenhum dado real entra em qualquer ambiente/backup antes de todos os gates | Segurança + DPO + Produto | Declaração formal + verificação                  | Gate-mestre de dado real                              | Todo dado real                        | Pendente |
+| ID        | Decisão necessária                                                                            | Responsável (área)        | Evidência esperada                               | Impacto                                               | Bloqueia                              | Status                    |
+| --------- | --------------------------------------------------------------------------------------------- | ------------------------- | ------------------------------------------------ | ----------------------------------------------------- | ------------------------------------- | ------------------------- |
+| DS-MFA-01 | Perfis/papéis e momento em que o MFA é obrigatório                                            | Segurança + Produto       | Decisão registrada + teste de autorização        | Fronteira de quem precisa de MFA                      | Dado real / piloto / produção         | **Aprovada (18/09/2026)** |
+| DS-MFA-02 | Mecanismo de recuperação de acesso sem bypass do fator                                        | Segurança + TI            | Fluxo aprovado + evidência de auditoria do fluxo | Bloqueio permanente de usuário vs. brecha             | Dado real / piloto / produção         | Pendente                  |
+| DS-MFA-03 | Ações que exigem step-up e TTL do step-up                                                     | Segurança + Produto       | Lista aprovada + testes                          | Reautenticação proporcional ao risco (Constituição V) | Ações de alto impacto sobre dado real | Pendente                  |
+| DS-MFA-04 | Proteção do segredo TOTP em repouso e ausência em log/trilha/repo                             | Segurança + TI            | Inspeção automatizada + revisão                  | Exposição de segredo de fator                         | Dado real / piloto / produção         | Pendente                  |
+| DS-MFA-05 | Eventos de auditoria de MFA (sem segredo em claro)                                            | Segurança + DPO           | Especificação + verificação na trilha            | Rastreabilidade de acesso                             | Dado real / piloto / produção         | Pendente                  |
+| DS-SEC-01 | Cofre de segredos **ou** configuração de ambiente protegida (requisitos §2.4)                 | TI + Segurança            | Requisitos §2.4 atendidos e verificados          | Onde e como segredos vivem                            | Dado real / produção                  | Pendente                  |
+| DS-SEC-02 | Política e periodicidade de rotação por tipo de segredo                                       | TI + Segurança            | Política aprovada + evidência de rotação         | Janela de uso de segredo comprometido                 | Produção                              | Pendente                  |
+| DS-SEC-03 | Processo de acesso emergencial (break-glass) auditado                                         | Segurança + TI            | Processo aprovado + trilha de uso                | Uso indevido de acesso privilegiado                   | Produção                              | Pendente                  |
+| DS-SEC-04 | Separação de segredos por ambiente e menor privilégio por credencial                          | TI + Segurança            | Inventário por ambiente + revisão de privilégio  | Vazamento cruzado entre ambientes                     | Dado real / produção                  | Pendente                  |
+| DS-BKP-01 | Escopo final de dados protegidos por backup                                                   | TI + Segurança + DPO      | Escopo aprovado                                  | O que é (e não é) protegido                           | Piloto / produção                     | Pendente                  |
+| DS-BKP-02 | Criptografia (ou controle compensatório aprovado) e segregação de acesso                      | TI + Segurança            | Configuração verificada + aprovação              | Confidencialidade do backup                           | Dado real / produção                  | Pendente                  |
+| DS-BKP-03 | **RPO** (valor a decidir)                                                                     | Produto + TI/Segurança    | Valor aprovado                                   | Perda máxima aceitável de dados                       | Produção                              | Pendente                  |
+| DS-BKP-04 | **RTO** (valor a decidir)                                                                     | Produto + TI/Segurança    | Valor aprovado                                   | Tempo máximo de indisponibilidade                     | Produção                              | Pendente                  |
+| DS-BKP-05 | Retenção e descarte de backups                                                                | DPO/Jurídico + TI         | Política aprovada                                | Conformidade LGPD do backup                           | Dado real / produção                  | Pendente                  |
+| DS-BKP-06 | Restauração testada com evidência periódica                                                   | TI + Segurança            | Registro de teste de restauração                 | Confiabilidade da recuperação                         | Produção                              | Pendente                  |
+| DS-OPS-01 | Confirmação de que nenhum dado real entra em qualquer ambiente/backup antes de todos os gates | Segurança + DPO + Produto | Declaração formal + verificação                  | Gate-mestre de dado real                              | Todo dado real                        | Pendente                  |
 
 ## 5. Declaração
 
-**Nenhuma decisão deste documento está aprovada.** Cada item só passa de
-Pendente a decidido mediante **evidência formal** da área responsável,
-momento em que uma ADR (ou emenda à ADR 0003, para MFA) a registra e a fase
-Implementar da T004 pode abrir **para aquele controle específico**.
+**Somente `DS-MFA-01` está aprovada** (18/09/2026, registrada no
+[pacote de decisão, §7–§8](pacote-decisao-seguranca-operacional.md)); **todas as
+demais decisões deste documento permanecem pendentes ou bloqueadas.** Cada item
+pendente só passa de Pendente a decidido mediante **evidência formal** da área
+responsável, momento em que uma ADR (ou emenda à ADR 0003, para MFA) a registra e
+a fase Implementar da T004 pode abrir **para aquele controle específico**.
 
-Este documento **não habilita** dado real, produção, exposição externa,
-upload de conteúdo, MFA, cofre, backup ou qualquer credencial, e **não relaxa**
-a negação por padrão nem a obrigação de auditoria da Constituição. Enquanto
-`DS-OPS-01` estiver aberto, **nenhum dado real** entra em nenhum ambiente.
+Aprovar `DS-MFA-01` (decisão de produto sobre o escopo do rollout) **não habilita**
+dado real, produção, exposição externa, upload de conteúdo, ativação de MFA no
+código, cofre, backup ou qualquer credencial; em particular, **`DS-SEC-01`,
+`DS-SEC-02`, `DS-SEC-03`, `DS-SEC-04` e `DS-OPS-01` seguem pendentes/bloqueados**.
+Este documento **não relaxa** a negação por padrão nem a obrigação de auditoria da
+Constituição. Enquanto `DS-OPS-01` estiver aberto, **nenhum dado real** entra em
+nenhum ambiente.
