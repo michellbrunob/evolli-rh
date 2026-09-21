@@ -543,5 +543,5 @@ Pendente a decidido mediante **evidência formal** da área responsável,
 registrada nesta tabela. Este documento **não implementa** nada, **não
 decide** regra trabalhista, **não confunde** este domínio com
 `solicitacoes-documento` (T133, já funcional) nem com `ajuste_ponto` (correção
-direta do RH), **não declara conformidade legal** e **não libera** a T137
+direta do RH/DP), **não declara conformidade legal** e **não libera** a T137
 (fundação de backend), que depende do fechamento formal deste pacote.
