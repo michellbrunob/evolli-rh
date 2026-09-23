@@ -18,7 +18,7 @@
     {
       "id": "T138",
       "pullRequest": 130,
-      "status": "draft_ci_pending"
+      "status": "draft_ready_for_read_only_review"
     }
   ],
   "requiredArtifacts": [
