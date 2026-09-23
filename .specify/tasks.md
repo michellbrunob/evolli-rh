@@ -455,8 +455,8 @@ decisões e bloqueios, está no ledger versionado
 
 35. **T138 - Convergir, versionar e proteger o Spec Kit**
 
-    - **Estado:** implementada localmente na branch `codex/t138-convergencia-spec-kit`; PR e CI
-      pendentes neste marco.
+    - **Estado:** implementada na branch `codex/t138-convergencia-spec-kit`; PR #130 Draft, CI
+      pendente neste marco.
     - **Objetivo:** reconciliar Constituição, Spec, Plan e Tasks com o estado integrado até T134, as
       investigações T135/T136 e a política de MFA T131/T132; versionar o scaffold durável e os
       comandos; adicionar um gate de sincronização na CI.

@@ -17,7 +17,8 @@
     },
     {
       "id": "T138",
-      "status": "implemented_local_pending_pr_ci"
+      "pullRequest": 130,
+      "status": "draft_ci_pending"
     }
   ],
   "requiredArtifacts": [
