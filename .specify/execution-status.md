@@ -87,12 +87,12 @@ de Horas.
 
 ## Solicitações gerais de Pessoas e convergência — T135 a T138
 
-| Tarefa | Estado                                   | Resultado principal                                                                                                                 |
-| ------ | ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| T135   | Investigada/bloqueada                    | Não existe controller, persistência Prisma nem RBAC real para Solicitações gerais. Nenhum código foi criado.                        |
-| T136   | Implementada; PR #129 aberta             | Pacote `PD-SOL-01..05` preparado. A PR está Ready for review documental, mas ainda não integra `main` neste marco.                  |
-| T137   | Bloqueada/não iniciada                   | Fundação de backend depende da integração da T136 e das respostas formais de RH, Jurídico, Produto e Segurança.                     |
-| T138   | PR #130 Draft; revisão pendente           | Constituição, Spec, Plan, Tasks, ledger, comandos e CI do Spec Kit versionados e reconciliados para impedir novo desvio silencioso. |
+| Tarefa | Estado                          | Resultado principal                                                                                                                 |
+| ------ | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| T135   | Investigada/bloqueada           | Não existe controller, persistência Prisma nem RBAC real para Solicitações gerais. Nenhum código foi criado.                        |
+| T136   | Implementada; PR #129 aberta    | Pacote `PD-SOL-01..05` preparado. A PR está Ready for review documental, mas ainda não integra `main` neste marco.                  |
+| T137   | Bloqueada/não iniciada          | Fundação de backend depende da integração da T136 e das respostas formais de RH, Jurídico, Produto e Segurança.                     |
+| T138   | PR #130 Draft; revisão pendente | Constituição, Spec, Plan, Tasks, ledger, comandos e CI do Spec Kit versionados e reconciliados para impedir novo desvio silencioso. |
 
 ## Próxima ação autorizável
 
