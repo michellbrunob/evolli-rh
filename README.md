@@ -30,6 +30,8 @@ Ecossistema corporativo de RH e Departamento Pessoal, modular e multiempresa.
   para extração futura; **não** contêm hoje o schema, as migrations nem regras de
   negócio — estes vivem em `apps/api`.
 - `docs`: ADRs, decisões, requisitos, compliance e especificações de módulos.
+- `.specify`: Constituição, especificação, plano, tarefas, estado de execução, templates e scripts do
+  Spec Kit; os artefatos duráveis são versionados e verificados pela CI.
 
 ## Estado atual
 
@@ -44,18 +46,23 @@ Ecossistema corporativo de RH e Departamento Pessoal, modular e multiempresa.
   nem fechamento).
 - Documentos — V1 de metadados (sem conteúdo/upload; upload desabilitado por
   construção).
+- Interface administrativa funcional para autenticação, sessões ativas, contas de acesso e MFA TOTP
+  opcional por configuração do servidor.
 - Governança de perfis: `master_tecnico` como único acesso global permanente;
   `admin_tecnico` convergido para bootstrap/histórico; `dpo`/`auditor` legados
   preservados no enum, porém **não provisionáveis** (ADR 0012; CG-RBAC-01/CG-DPO).
 
-**Bloqueado até decisão/entrega** (nenhum dado real antes disso):
+**Gates e decisões ainda abertos:**
 
-- **MFA**, **cofre de segredos**, **backup/restauração testada**, decisões
-  operacionais da **T004** e o **runbook de provisionamento do primeiro
-  `master_tecnico`**.
+- O lançamento inicial mantém `MFA_ENABLED=false` conforme a aceitação de risco T132. MFA TOTP já está
+  implementado; sua ativação futura exige cofre/chave, evidências `DS-SEC-*` e decisão de rollout.
+- Cofre de segredos, backup/restauração testada, demais decisões operacionais da T004 e o runbook de
+  provisionamento do primeiro `master_tecnico` continuam pendentes conforme seus gates próprios.
 - Retenção, base legal e RIPD/DPIA por módulo (RH + Jurídico).
+- Solicitações gerais de Pessoas aguardam `PD-SOL-01..05`; a fundação de backend T137 não iniciou.
 
-Consulte [docs/ROADMAP.md](docs/ROADMAP.md).
+Consulte [docs/ROADMAP.md](docs/ROADMAP.md) e o
+[processo de desenvolvimento](docs/PROCESSO-DESENVOLVIMENTO.md).
 
 ## Pré-requisitos
 

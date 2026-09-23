@@ -29,6 +29,10 @@ jobs:
       # `package.json`, em vez de resolver silenciosamente uma árvore de
       # dependências diferente da validada localmente.
       - run: pnpm install --frozen-lockfile
+      - name: Verificar sincronização do Spec Kit
+        env:
+          SPEC_KIT_CHANGE_CONTEXT: ${{ github.event.pull_request.title || github.event.head_commit.message }}
+        run: pnpm spec:check
       - run: pnpm format:check
       - run: pnpm lint
       - run: pnpm typecheck

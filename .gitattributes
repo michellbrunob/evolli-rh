@@ -1,0 +1,7 @@
+# Spec Kit manifests hash generated artifacts byte a byte; keep their line endings deterministic.
+.specify/** text eol=lf
+.chatgpt_cmds/** text eol=lf
+
+# Cross-platform automation and CI definitions.
+*.mjs text eol=lf
+.github/workflows/*.yml text eol=lf
