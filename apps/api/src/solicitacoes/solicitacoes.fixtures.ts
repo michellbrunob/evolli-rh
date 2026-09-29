@@ -53,14 +53,21 @@ export const SOLICITACAO_CONTESTACAO: Solicitacao = {
   refAuditoria: "AUD-SOL-0000",
 };
 
-/** Solicitação sintética de documento, em `rascunho` (sem período aplicável). */
-export const SOLICITACAO_DOCUMENTO: Solicitacao = {
+/**
+ * Solicitação sintética de atestado, em `rascunho` (sem período aplicável).
+ *
+ * Substitui a antiga fixture do tipo `documento`, retirado do catálogo por
+ * `PD-SOL-01`. Mesmo sendo do tipo `atestado`, a fixture carrega **apenas
+ * referências técnicas**: nenhum diagnóstico, CID, descrição clínica, arquivo
+ * ou anexo — a minimização vale inclusive para os dados de teste.
+ */
+export const SOLICITACAO_ATESTADO: Solicitacao = {
   id: "SOL-DEMO-0002",
   empresaRef: "EMP-A",
   vinculoRef: "V-001",
-  tipo: "documento",
+  tipo: "atestado",
   periodoReferencia: null,
-  motivo: "segunda_via_documento",
+  motivo: "atestado_apresentado",
   situacao: "rascunho",
   refAuditoria: "AUD-SOL-0000",
 };
@@ -76,8 +83,19 @@ export const PERCURSO_CONTESTACAO_ENCAMINHADA: readonly PassoSolicitacao[] = [
   },
 ];
 
-/** Percurso: rascunho → enviada → em_revisao_rh (documento em revisão). */
-export const PERCURSO_DOCUMENTO_EM_REVISAO: readonly PassoSolicitacao[] = [
+/** Percurso: rascunho → enviada → em_revisao_rh (atestado em revisão). */
+export const PERCURSO_ATESTADO_EM_REVISAO: readonly PassoSolicitacao[] = [
   { acao: "enviar", ator: ATOR_COLABORADOR, refAuditoria: "AUD-SOL-1" },
   { acao: "iniciar_revisao", ator: ATOR_RH, refAuditoria: "AUD-SOL-2" },
+];
+
+/**
+ * Percurso de recusa e reabertura (`PD-SOL-03`): rascunho → enviada →
+ * em_revisao_rh → recusada → em_revisao_rh.
+ */
+export const PERCURSO_RECUSADA_E_REABERTA: readonly PassoSolicitacao[] = [
+  { acao: "enviar", ator: ATOR_COLABORADOR, refAuditoria: "AUD-SOL-1" },
+  { acao: "iniciar_revisao", ator: ATOR_RH, refAuditoria: "AUD-SOL-2" },
+  { acao: "recusar", ator: ATOR_RH, refAuditoria: "AUD-SOL-3" },
+  { acao: "reabrir", ator: ATOR_RH, refAuditoria: "AUD-SOL-4" },
 ];

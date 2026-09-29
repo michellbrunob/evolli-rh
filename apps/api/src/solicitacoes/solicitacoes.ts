@@ -26,19 +26,21 @@ import {
   AtorSolicitacao,
   EstadoSolicitacao,
   EventoAuditoriaSolicitacao,
+  ESTADOS_REABRIVEIS,
   ESTADOS_TERMINAIS,
   ResultadoTransicaoSolicitacao,
   Solicitacao,
   SolicitacoesErroCodigo,
 } from "./solicitacoes.types";
 
-/** Tipos conhecidos (catálogo fechado — T065 §2). */
+/** Tipos conhecidos (catálogo fechado — `PD-SOL-01`). */
 const TIPOS = new Set<string>([
   "contestacao_ajuste_ponto",
   "ausencia",
   "ferias",
   "atualizacao_cadastral",
-  "documento",
+  "atestado",
+  "beneficios",
 ]);
 
 /** Estados conhecidos (catálogo fechado — T065 §4). */
@@ -52,13 +54,20 @@ const ESTADOS = new Set<string>([
   "cancelada",
 ]);
 
-/** Motivos conhecidos (catálogo fechado). */
+/** Motivos conhecidos (catálogo fechado — ver `MotivoSolicitacao`). */
 const MOTIVOS = new Set<string>([
   "divergencia_marcacao",
   "ausencia_programada",
   "periodo_ferias",
   "dado_cadastral_desatualizado",
-  "segunda_via_documento",
+  "atestado_apresentado",
+  "beneficio_solicitado",
+  "informacao_insuficiente",
+  "fora_do_escopo_da_central",
+  "duplicidade",
+  "reanalise_administrativa",
+  "correcao_de_registro",
+  "outro_controlado",
 ]);
 
 /** Papéis conhecidos. */
@@ -73,6 +82,9 @@ const PAPEIS = new Set<string>([
 /** Estados terminais (derivado do catálogo do contrato). */
 const TERMINAIS = new Set<string>(ESTADOS_TERMINAIS);
 
+/** Terminais que o RH pode reabrir (`PD-SOL-03`) — `cancelada` fora. */
+const REABRIVEIS = new Set<string>(ESTADOS_REABRIVEIS);
+
 /** Papel operacional exigido por ação (só `colaborador`/`rh` operam — T065 §4.1/§5). */
 type PapelOperacional = "colaborador" | "rh";
 
@@ -84,13 +96,27 @@ const ACAO_PAPEL: Readonly<Record<AcaoSolicitacao, PapelOperacional>> = {
   retomar_revisao: "rh",
   encaminhar_para_operacao: "rh",
   recusar: "rh",
+  // `PD-SOL-03`: reabrir é exclusivo do RH.
+  reabrir: "rh",
 };
 
 /**
- * Máquina de estados (T065 §4.1): estado atual → ação → novo estado. O papel
- * exigido por ação vive em `ACAO_PAPEL` (conferido antes desta tabela). Os
- * estados terminais não aparecem como origem (sem saída) — encaminhamento,
- * recusa e cancelamento encerram o ciclo da Central **sem** mutação operacional.
+ * Máquina de estados (T065 §4.1, reconciliada por `PD-SOL-03`): estado atual →
+ * ação → novo estado. O papel exigido por ação vive em `ACAO_PAPEL` (conferido
+ * antes desta tabela). Encaminhamento, recusa e cancelamento encerram o ciclo
+ * da Central **sem** mutação operacional.
+ *
+ * Duas mudanças em relação ao desenho conceitual anterior:
+ *
+ * 1. **`aguardando_informacao` não cancela.** Esse estado só é alcançável
+ *    **depois** de `em_revisao_rh`, e `PD-SOL-03` fechou que o colaborador
+ *    cancela **somente antes** de `em_revisao_rh`. Manter a transição
+ *    transportaria para a fundação persistente uma regra que a decisão revogou.
+ * 2. **`reabrir` existe.** O RH reabre `encaminhada_para_operacao_rh` e
+ *    `recusada`, devolvendo-as a `em_revisao_rh` — único estado não terminal
+ *    sob responsabilidade do RH. A decisão aprova *que* o RH reabre e *com
+ *    justificativa auditada*; o estado de destino é derivado dela, não
+ *    inventado. `cancelada` permanece sem saída: exige nova solicitação.
  */
 const TRANSICOES: Readonly<
   Record<EstadoSolicitacao, Partial<Record<AcaoSolicitacao, EstadoSolicitacao>>>
@@ -110,10 +136,13 @@ const TRANSICOES: Readonly<
   },
   aguardando_informacao: {
     retomar_revisao: "em_revisao_rh",
-    cancelar: "cancelada",
   },
-  encaminhada_para_operacao_rh: {},
-  recusada: {},
+  encaminhada_para_operacao_rh: {
+    reabrir: "em_revisao_rh",
+  },
+  recusada: {
+    reabrir: "em_revisao_rh",
+  },
   cancelada: {},
 };
 
@@ -217,15 +246,19 @@ export function transicionarSolicitacao(
     return invalido("ATOR_FORA_DO_ESCOPO", idSeguro);
   }
 
-  // ---- Estado terminal não transiciona --------------------------------------
-  if (TERMINAIS.has(solicitacao.situacao)) {
-    return invalido("ESTADO_TERMINAL", idSeguro);
-  }
-
   // ---- Transição permitida? -------------------------------------------------
   const novoEstado = TRANSICOES[solicitacao.situacao][acao];
   if (novoEstado === undefined) {
-    return invalido("TRANSICAO_INVALIDA", idSeguro);
+    // Estado que encerra o ciclo e não oferece a ação pedida — inclui QUALQUER
+    // tentativa sobre `cancelada`, que não tem saída — é reportado como
+    // terminal; os demais casos são transição fora de ordem. A distinção
+    // importa porque só a segunda é recuperável mudando a ordem das operações.
+    return invalido(
+      TERMINAIS.has(solicitacao.situacao)
+        ? "ESTADO_TERMINAL"
+        : "TRANSICAO_INVALIDA",
+      idSeguro,
+    );
   }
 
   // ---- Nova versão imutável + evento de auditoria ---------------------------
@@ -273,9 +306,17 @@ function escopoCompativel(
   return false;
 }
 
-/** Indica se um estado é terminal (sem transição de saída). */
+/** Indica se um estado encerra o ciclo da Central (T065 §4). */
 export function ehTerminal(estado: EstadoSolicitacao): boolean {
   return TERMINAIS.has(estado);
+}
+
+/**
+ * Indica se um estado terminal pode ser **reaberto pelo RH** (`PD-SOL-03`).
+ * `cancelada` nunca pode: exige nova solicitação.
+ */
+export function ehReabrivel(estado: EstadoSolicitacao): boolean {
+  return REABRIVEIS.has(estado);
 }
 
 /** Um passo de transição (ação + ator + referência de auditoria). */
