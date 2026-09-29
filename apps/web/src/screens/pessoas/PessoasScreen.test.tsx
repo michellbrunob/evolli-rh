@@ -170,9 +170,10 @@ describe("PessoasScreen — abas locais 'Colaboradores' / 'Horário de trabalho'
     expect(
       screen.getByRole("heading", { level: 1, name: "Solicitações" }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", { name: "Solicitações (exemplo)" }),
-    ).toBeInTheDocument();
+    // T140: a aba deixou de ser demonstrativa. O que a identifica agora é o
+    // aviso de escopo da Central funcional, renderizado de forma síncrona —
+    // a listagem em si depende da API e é coberta em SolicitacoesScreen.test.
+    expect(screen.getByText(/Encaminhar é um repasse/)).toBeInTheDocument();
 
     expect(screen.getByRole("tab", { name: "Solicitações" })).toHaveAttribute(
       "aria-selected",

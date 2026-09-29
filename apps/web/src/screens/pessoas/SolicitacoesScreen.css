@@ -1,7 +1,7 @@
 /**
- * Pessoas > Solicitações (T091) — só tokens já existentes (tokens.css); sem
+ * Pessoas > Solicitações (T140) — só tokens já existentes (tokens.css); sem
  * hexadecimal novo, sem sombra, sem gradiente. Layout responsivo: pilha
- * vertical de seções.
+ * vertical de seções, sem rolagem horizontal na página (a tabela trata a sua).
  */
 
 .solicitacoes-screen {
@@ -11,11 +11,9 @@
   min-width: 0;
 }
 
-/* Sem `min-width: 0` aqui, a tabela (mais larga que o viewport em telas
-   estreitas) vazaria rolagem horizontal para a página inteira — mesma técnica
-   já usada em `PessoasDocumentosScreen`/`DadosContratuaisScreen`/
-   `HistoricoFuncionalScreen`/`CentrosCustoScreen`/`TiposDocumentoScreen`/
-   `MotivosDesligamentoScreen`/`EscolaridadeScreen`/`CidadesLocalidadesScreen`. */
+/* Sem `min-width: 0`, a tabela (mais larga que o viewport em telas estreitas)
+   vazaria rolagem horizontal para a página inteira — mesma técnica das demais
+   telas de Pessoas. */
 .solicitacoes-screen > * {
   min-width: 0;
 }
@@ -29,6 +27,19 @@
   color: var(--color-ink);
 }
 
+.solicitacoes-screen__subtitulo {
+  margin: var(--space-sm) 0 var(--space-xs);
+  font-size: var(--text-body);
+  font-weight: var(--weight-strong);
+  color: var(--color-ink);
+}
+
+.solicitacoes-screen__ajuda {
+  margin: 0;
+  color: var(--color-ink-subtle);
+  font-size: var(--text-caption);
+}
+
 .solicitacoes-screen__aviso {
   display: flex;
   flex-wrap: wrap;
@@ -38,102 +49,60 @@
   border-color: var(--status-info-border);
 }
 
-.solicitacoes-screen__aviso--indisponivel {
-  background: var(--status-warning-surface);
-  border-color: var(--status-warning-border);
-}
-
 .solicitacoes-screen__aviso-texto {
   margin: 0;
   color: var(--color-ink);
   flex: 1 1 16rem;
 }
 
-.solicitacoes-screen__aviso-texto code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+.solicitacoes-screen__somente-leitura {
+  margin: 0;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-sm);
+  background: var(--status-neutral-surface);
+  color: var(--status-neutral-ink);
 }
 
-.solicitacoes-screen__resumo {
+.solicitacoes-screen__sucesso {
+  margin: 0;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-sm);
+  background: var(--status-success-surface);
+  color: var(--status-success-ink);
+}
+
+.solicitacoes-screen__secao {
   display: flex;
   flex-direction: column;
-  gap: var(--space-xs);
-}
-
-.solicitacoes-screen__resumo-lista {
-  display: flex;
-  flex-wrap: wrap;
   gap: var(--space-sm);
-  margin: 0 0 var(--space-sm);
-  padding: 0;
-  list-style: none;
-}
-
-/* Item flexível (nunca `flex: 0 0 auto`): precisa poder encolher para não
-   vazar rolagem horizontal quando o texto do indicador é longo — mesma
-   correção validada em `FechamentoEspelhoScreen` (T079) e reaplicada em
-   `HistoricoFuncionalScreen` (T088)/`DadosContratuaisScreen` (T089)/
-   `PessoasDocumentosScreen` (T090). */
-.solicitacoes-screen__resumo-item {
-  flex: 1 1 16rem;
   min-width: 0;
 }
 
-.solicitacoes-screen__resumo-item-conteudo {
+/* Itens flex da seção (inclusive a DataTable, que tem `overflow-x: auto`
+   própria) precisam poder encolher; sem `min-width: 0` a tabela larga vazaria
+   rolagem horizontal para a página em telas estreitas. */
+.solicitacoes-screen__secao > * {
+  min-width: 0;
+}
+
+.solicitacoes-screen__secao-cabecalho {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: space-between;
   gap: var(--space-sm);
-  min-width: 0;
 }
 
-.solicitacoes-screen__resumo-item-texto {
-  margin: 0;
-  color: var(--color-ink);
-  flex: 1 1 10rem;
-  min-width: 0;
-}
-
-.solicitacoes-screen__nota {
-  margin: 0;
-  font-size: var(--text-caption);
-  color: var(--color-ink-subtle);
-}
-
-.solicitacoes-screen__demo {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xs);
-}
-
-.solicitacoes-screen__demo-texto {
-  margin: 0;
-  color: var(--color-ink-subtle);
-  font-size: var(--text-caption);
-}
-
-.solicitacoes-screen__demo-botoes {
+.solicitacoes-screen__selecao {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-sm);
+  align-items: flex-end;
+  gap: var(--space-md);
 }
 
-.solicitacoes-screen__erro {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-sm);
-  background: var(--status-danger-surface);
-  border-color: var(--status-danger-border);
-}
-
-.solicitacoes-screen__erro-referencia {
-  margin: 0;
-  font-size: var(--text-caption);
-  color: var(--color-ink-subtle);
-}
-
-.solicitacoes-screen__erro-referencia code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+.solicitacoes-screen__selecao > .evolli-field {
+  flex: 1 1 14rem;
+  min-width: 0;
 }
 
 .solicitacoes-screen__filtros {
@@ -149,10 +118,34 @@
   min-width: 0;
 }
 
-.solicitacoes-screen__filtros-nota {
-  margin: 0 0 var(--space-md);
-  font-size: var(--text-caption);
+.solicitacoes-screen__paginacao {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-md);
+  margin-top: var(--space-sm);
   color: var(--color-ink-subtle);
+  font-size: var(--text-caption);
+}
+
+.solicitacoes-screen__erro {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  background: var(--status-danger-surface);
+  border-color: var(--status-danger-border);
+}
+
+.solicitacoes-screen__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.solicitacoes-screen__form-erro {
+  margin: var(--space-xs) 0 0;
+  color: var(--status-danger-ink);
 }
 
 .solicitacoes-screen__detalhe {
@@ -161,60 +154,56 @@
   gap: var(--space-md);
 }
 
-.solicitacoes-screen__detalhe-lista {
+/* O título do painel recebe foco ao abrir; a marca de foco segue os tokens. */
+.solicitacoes-screen__detalhe
+  .solicitacoes-screen__section-title:focus-visible {
+  outline: var(--focus-width) solid var(--color-action);
+  outline-offset: var(--focus-offset);
+  border-radius: var(--radius-sm);
+}
+
+.solicitacoes-screen__campos {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
   gap: var(--space-sm) var(--space-lg);
   margin: 0;
 }
 
-.solicitacoes-screen__detalhe-lista dt {
+.solicitacoes-screen__campos dt {
   font-size: var(--text-caption);
   font-weight: var(--weight-strong);
   color: var(--color-ink-subtle);
 }
 
-.solicitacoes-screen__detalhe-lista dd {
+.solicitacoes-screen__campos dd {
   margin: 0;
   color: var(--color-ink);
 }
 
-.solicitacoes-screen__detalhe-subtitulo {
-  margin: 0;
-  font-size: var(--text-body);
-  font-weight: var(--weight-strong);
-  color: var(--color-ink);
+.solicitacoes-screen__acoes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
 }
 
-.solicitacoes-screen__detalhe-lista-simples {
-  margin: 0;
-  padding-left: var(--space-lg);
-  color: var(--color-ink);
+.solicitacoes-screen__historico {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  min-width: 0;
 }
 
-.solicitacoes-screen__detalhe-aviso {
-  margin: 0;
-  padding: var(--space-sm) var(--space-md);
-  border-radius: var(--radius-sm);
-  background: var(--status-warning-surface);
-  color: var(--status-warning-ink);
+.solicitacoes-screen__historico > * {
+  min-width: 0;
 }
 
-/* Texto só para leitores de tela (mesma técnica de `.evolli-field__sr`). */
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-  border: 0;
+.solicitacoes-screen code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 @media (max-width: 640px) {
-  .solicitacoes-screen__filtros {
+  .solicitacoes-screen__filtros,
+  .solicitacoes-screen__selecao {
     flex-direction: column;
     align-items: stretch;
   }
