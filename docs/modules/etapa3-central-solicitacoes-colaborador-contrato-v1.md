@@ -1,12 +1,14 @@
 # Etapa 3 — Contrato da futura Central de Solicitações do Colaborador (V1 conceitual)
 
-Status: **CONTRATO CONCEITUAL (especificação)** — não é decisão, não é
-autorização, não implementa nada e não declara conformidade.
+Status: **CONTRATO CONCEITUAL COM DECISÕES DE PRODUTO APROVADAS EM
+2026-09-29** — autoriza especificar e implementar a fundação, mas não habilita
+anexos, dado real, produção nem declara conformidade.
 
 Relacionado (contexto interno, sem alteração):
 [Jornada e Ponto V1 (detalhada)](etapa3-jornada-ponto-v1-detalhada.md),
 [Contrato da fila "Verificar folhas"](etapa3-fila-verificar-folhas-contrato-v1.md),
 [Documentos e Admissão Digital — V1 estrutural](etapa2-documentos-admissao-digital-estrutural.md),
+[Pacote de decisão da Central de Solicitações](../decisions/pacote-decisao-solicitacoes-pessoas.md),
 [Prontidão para operação real](../decisions/prontidao-operacao-real-evolli-rh.md),
 [Contrato de persistência e auditoria futura do Ponto](../decisions/contrato-persistencia-auditoria-ponto-v1.md);
 ADRs [0003](../adr/0003-identidade-sessao-e-autorizacao.md) (identidade/MFA),
@@ -15,7 +17,43 @@ ADRs [0003](../adr/0003-identidade-sessao-e-autorizacao.md) (identidade/MFA),
 empresa e 404 anti-enumeração),
 [0011](../adr/0011-documentos-privados-e-admissao-digital.md) (documentos),
 [0012](../adr/0012-convergencia-governanca-privacidade-e-perfis-globais.md)
-(governança de perfis).
+(governança de perfis) e
+[0013](../adr/0013-armazenamento-privado-cloudflare-r2.md) (armazenamento
+privado futuro).
+
+## Atualização de decisão — 2026-09-29
+
+As decisões `PD-SOL-01..05` foram aprovadas no
+[pacote de decisão](../decisions/pacote-decisao-solicitacoes-pessoas.md), cujo
+§7 é a fonte vigente. As marcações de "pendente" preservadas nas seções abaixo
+são o histórico do contrato anterior; em caso de divergência, esta atualização
+e o registro do pacote prevalecem.
+
+- Catálogo: contestação/ajuste de ponto, ausência, férias, atualização
+  cadastral, atestado e benefícios. Solicitação de documento permanece no
+  fluxo específico de `solicitacoes-documento`.
+- Decisão final: RH. Gestor participa apenas de forma consultiva nos temas de
+  organização da equipe; Diretoria atua excepcionalmente.
+- Central e fila "Verificar folhas" permanecem separadas, com referência futura
+  opcional e sem correção de ponto ou bloqueio automático de fechamento.
+- O colaborador cancela somente antes de `em_revisao_rh`. RH pode reabrir
+  solicitação recusada ou encerrada com justificativa auditada; solicitação
+  cancelada exige novo registro.
+- Objetivo de serviço: primeiro retorno do RH em dois dias úteis, com pausa
+  quando depender de informação do colaborador ou de outra área. A V1 registra
+  datas e eventos para acompanhamento, sem cronômetro automático nem promessa
+  de conclusão.
+- Evidências seguem os campos mínimos aprovados por tipo. Anexos permanecem
+  desabilitados até o fechamento dos portões técnicos e jurídicos de conteúdo.
+  Atestado não coleta diagnóstico ou CID no fluxo, e o gestor nunca acessa o
+  documento.
+- Cloudflare R2 foi aprovado como provedor privado futuro pela ADR 0013. Essa
+  escolha não habilita upload nem conteúdo real.
+
+O núcleo TypeScript puro da T066 deve ser reconciliado com essas decisões antes
+de ser conectado ao NestJS/Prisma. Em especial, a transição de cancelamento a
+partir de `aguardando_informacao` pertence ao desenho anterior e não deve ser
+transportada para a fundação persistente sem ajuste e novos testes.
 
 ## 0. Natureza e limites deste documento
 
