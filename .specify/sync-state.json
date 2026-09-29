@@ -2,18 +2,18 @@
   "schemaVersion": 1,
   "constitutionVersion": "1.4.0",
   "lastConvergedAt": "2026-09-29",
-  "lastIntegratedTask": 136,
+  "lastIntegratedTask": 138,
   "lastRecordedTask": 139,
   "nextTask": {
-    "id": "T139",
-    "status": "ready_after_t138_integration",
-    "reason": "T136 e PD-SOL-01..05 integradas; aguardar revisão e integração da convergência T138."
+    "id": "a definir",
+    "status": "pending_after_t139_integration",
+    "reason": "T139 implementada e em revisão. A próxima fatia só é aberta após a integração da T139 e recebe o próximo identificador disponível; escopo depende dos portões de conteúdo e de DP-23."
   },
   "openDeliveries": [
     {
-      "id": "T138",
-      "pullRequest": 130,
-      "status": "draft_updated_after_t136"
+      "id": "T139",
+      "pullRequest": 131,
+      "status": "draft_aguardando_revisao"
     }
   ],
   "requiredArtifacts": [

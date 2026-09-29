@@ -55,9 +55,13 @@ para o Master.
   Catálogo, alçadas, separação de "Verificar folhas", cancelamento/reabertura, objetivo de primeiro
   retorno e política mínima de evidências estão definidos. O Cloudflare R2 foi aprovado como provedor
   privado futuro pela ADR 0013, sem habilitar upload.
-- **Próxima fundação funcional:** a tarefa histórica T137 não foi executada e é substituída pela T139,
-  a iniciar somente após a integração da convergência T138. A T139 implementará backend sem anexos,
-  sem efeitos trabalhistas automáticos e sem bloqueio automático de fechamento.
+- **T138 / PR #130:** convergência do Spec Kit integrada, com gate `pnpm spec:check` na CI.
+- **T139 / PR #131:** fundação backend da Central implementada e em revisão. A tarefa histórica T137
+  não foi executada e foi substituída pela T139. A fundação registra e encaminha: não habilita anexo,
+  não produz efeito trabalhista automático, não bloqueia fechamento e não implementa cronômetro de
+  SLA. Não existe autoatendimento do colaborador enquanto `DP-23` (vínculo `AccessUser <->
+Colaborador`) não for decidido — o RH registra em nome do colaborador, como em
+  `solicitacoes-documento`.
 - **MFA:** núcleo e interface existem. O lançamento inicial usa `MFA_ENABLED=false` por decisão T132;
   MFA universal permanece como alvo. Conta que já tenha fator ativo falha fechada enquanto o recurso
   estiver desligado. Ativação futura depende da chave protegida, das evidências `DS-SEC-*` e de decisão
@@ -402,11 +406,10 @@ perda de dados.
 ## 12. Rastreabilidade e próximos passos
 
 Esta especificação deriva do PRD oficial no Notion e deve ser refinada por fatia antes da implementação.
-O próximo ciclo funcional é a T139, fundação de backend de Solicitações gerais de Pessoas sem anexos.
-As decisões `PD-SOL-01..05` estão integradas; antes de codificar a fatia, sua branch deve executar
-`/speckit.specify`, `/speckit.plan` e `/speckit.tasks`, reconciliando o núcleo puro T066 com a regra
-aprovada de cancelamento. O termo funcional "encerrada" corresponde ao estado terminal
-`encaminhada_para_operacao_rh`, sem criar um novo estado. Folha permanece em planejamento até a
-homologação das regras e responsáveis.
+A T139 entregou a fundação de backend de Solicitações gerais de Pessoas sem anexos, com o núcleo puro
+T066 já reconciliado à regra aprovada de cancelamento e reabertura; o termo funcional "encerrada"
+corresponde ao estado terminal `encaminhada_para_operacao_rh`, sem estado novo. A próxima fatia só é
+aberta após a integração da T139 e recebe o próximo identificador disponível. Folha permanece em
+planejamento até a homologação das regras e responsáveis.
 
 > Nota (T032): "Reserva Fiscal" é o nome da empresa/projeto, não um módulo (glossario-reserva-fiscal.md). Governança de privacidade = RH + Juridico (ADR 0012). Estado integrado e gates pendentes: ver README e ROADMAP.
