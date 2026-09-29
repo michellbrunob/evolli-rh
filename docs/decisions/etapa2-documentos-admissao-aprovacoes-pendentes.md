@@ -1,6 +1,7 @@
 # Etapa 2 — Documentos e Admissão Digital: aprovações pendentes
 
-- Status: **Nível 1 resolvido em 2026-08-14; Nível 2 pendente.** Este
+- Status: **Nível 1 resolvido em 2026-08-14; Nível 2 parcialmente resolvido
+  em 2026-09-29.** Este
   documento registra aprovações e bloqueios remanescentes; não declara
   conformidade LGPD nem habilita upload.
 - Data: 2026-08-14
@@ -11,7 +12,8 @@
   [ADR 0003](../adr/0003-identidade-sessao-e-autorizacao.md),
   [ADR 0004](../adr/0004-auditoria-formal-e-integridade.md),
   [ADR 0005](../adr/0005-escopo-interno-e-evolucao-multitenant.md),
-  [ADR 0007](../adr/0007-colaboradores-e-vida-funcional-baseline-v1.md).
+  [ADR 0007](../adr/0007-colaboradores-e-vida-funcional-baseline-v1.md),
+  [ADR 0013](../adr/0013-armazenamento-privado-cloudflare-r2.md).
 - Constituição v1.3.0: Princípio I (rastreabilidade e aprovação por dono de
   negócio), Princípio II (privacidade/menor privilégio), "Mandatory
   Architecture and Data Constraints" (inventário de tratamento por módulo
@@ -75,6 +77,19 @@ continuam bloqueando conteúdo e upload real.
 permitir catálogo executável e auditável. Toda entrada inicia restrita e só RH
 autorizado, com aprovação do DPO, pode criar ou alterar o catálogo.
 
+### Emenda 2 - armazenamento privado aprovado (2026-09-29)
+
+O item `DP-2E-03` foi aprovado com o **Cloudflare R2** como provedor de
+armazenamento privado e o desenho técnico registrado na
+[ADR 0013](../adr/0013-armazenamento-privado-cloudflare-r2.md): metadados no
+PostgreSQL, conteúdo binário em buckets privados separados por ambiente,
+credenciais somente no servidor e acesso temporário após autorização da API.
+
+Esta aprovação resolve apenas a escolha do provedor e a forma arquitetural de
+armazenamento. Ela **não habilita upload ou conteúdo real**: gestão de
+credenciais, limites técnicos, antivírus/quarentena, acesso ao conteúdo,
+retenção e descarte continuam pendentes no Nível 2.
+
 ## Decisões pendentes por nível e responsável
 
 Legenda de impacto: **N1** bloqueia a promoção da ADR e a fase Implementar da
@@ -98,7 +113,6 @@ bloqueia.
 
 | ID                  | Decisão pendente                                                                                                | Responsável          | Impacto |
 | ------------------- | --------------------------------------------------------------------------------------------------------------- | -------------------- | ------- |
-| DP-2E-03            | Provedor e forma do **armazenamento privado**; mecanismo de acesso temporário, se houver (nunca URL pública)    | TI/Infra + Segurança | N2      |
 | DP-2E-04            | Gestão da **credencial de armazenamento**, sem ampliar privilégio de banco (ADR 0002)                           | TI/Infra + Segurança | N2      |
 | DP-2E-05            | **Limites técnicos**: tamanho máximo, formatos aceitos, metadados técnicos coletados                            | Produto + Segurança  | N2      |
 | DP-2E-06            | **Prazos** de validade/expiração de documento e de solicitação                                                  | Produto + RH         | N2      |
@@ -168,7 +182,9 @@ mas todos são pré-requisito de qualquer upload.
 
 ## Declaração
 
-Este documento **não aprova nada, não infere prazo, base legal, categoria
-documental ou matriz de acesso, e não declara conformidade LGPD.** Ele
-registra o que precisa ser decidido e por quem, para que a promoção da
-ADR 0011 e o início da T008 sejam decisões verificáveis e rastreáveis.
+Este documento registra duas aprovações específicas: a materialização do
+catálogo (Emenda 1) e o armazenamento privado no Cloudflare R2 (Emenda 2).
+Ele **não infere prazo, base legal, categoria documental ou matriz de acesso,
+e não declara conformidade LGPD.** Os demais itens de Nível 2 continuam
+pendentes e o upload permanece desabilitado até que todos sejam formalmente
+resolvidos.

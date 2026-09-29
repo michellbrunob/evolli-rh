@@ -1,7 +1,9 @@
 # Decisões — Gestão de Documentos e Solicitações do Colaborador (V1, consolidação)
 
-Status: **REGISTRO DE DIRECIONAMENTOS RECEBIDOS DO RH** — não é decisão final,
-não é autorização, não implementa nada e não declara conformidade.
+Status: **DECISÕES DE SOLICITAÇÕES APROVADAS; DECISÕES DOCUMENTAIS PARCIAIS**.
+Os itens `PD-SOL-01..05` foram fechados em 2026-09-29 no
+[pacote de decisão da Central](pacote-decisao-solicitacoes-pessoas.md) §7.
+As pendências `PD-DOC-*` não resolvidas continuam bloqueando conteúdo real.
 
 Data: 2026-09-10 (T082).
 
@@ -27,6 +29,25 @@ por empresa e 404 anti-enumeração),
 [Pacote de decisão — Segurança operacional](pacote-decisao-seguranca-operacional.md)
 (`DS-OPS-01`, MFA),
 [Mapa de capacidades e roteiro de implantação do Ponto V1](mapa-capacidades-implantacao-ponto-v1.md).
+
+## Atualização de decisão — 2026-09-29
+
+- Catálogo aprovado da Central: ponto, ausência, férias, atualização
+  cadastral, atestado e benefícios. Solicitação de documento permanece no
+  fluxo específico de `solicitacoes-documento`.
+- RH decide; gestor participa de modo consultivo em temas de equipe; Diretoria
+  é escalonamento excepcional. Nenhum deles altera automaticamente ponto,
+  férias, cadastro ou benefício pela existência da solicitação.
+- Solicitações e "Verificar folhas" mantêm objetos separados, com referência
+  futura opcional e sem bloqueio automático de fechamento na primeira versão.
+- Cancelamento, reabertura e objetivo de primeiro retorno seguem o registro
+  aprovado do pacote §7.
+- Critérios mínimos de evidência foram aprovados, mas anexos continuam
+  dependentes dos portões de conteúdo. O provedor aprovado para armazenamento
+  privado futuro é o Cloudflare R2, conforme
+  [ADR 0013](../adr/0013-armazenamento-privado-cloudflare-r2.md).
+- A aprovação das decisões permite especificar e implementar a fundação da
+  Central sem anexos. Ela não autoriza upload, dado real ou produção.
 
 ## 0. Natureza e limites deste documento
 
@@ -333,24 +354,19 @@ em ADR, contrato ou pacote de decisão existente. Este documento apenas os
   auditoria (ADR 0004) e retenção/base legal (RH + Jurídico/privacidade,
   ADR 0012).
 
-## 5. Pendências formais
+## 5. Pendências formais remanescentes
 
-Cada pendência abaixo **requer confirmação formal** da área responsável antes
-de qualquer implementação operacional. Nenhuma delas é resolvida por este
-documento.
+Os itens `PD-SOL-01..05` foram removidos desta lista porque estão aprovados no
+pacote §7. Cada pendência documental abaixo **requer confirmação formal** da
+área responsável antes de conteúdo real.
 
-| ID        | Pendência                                                                                                                                                                                                                                                                                                                                                                | Responsável                                   |
-| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------- |
-| PD-DOC-01 | Matriz de acesso detalhada por tipo/categoria documental e por perfil — quem visualiza, quem solicita, quem substitui, o que é visível ao colaborador (§2.3, §2.4).                                                                                                                                                                                                      | RH + Jurídico/privacidade + TI/Segurança      |
-| PD-DOC-02 | Tratamento de documentos médicos/ocupacionais: base legal, minimização e **informação mínima ao gestor** (nunca o documento em si) (§2.5).                                                                                                                                                                                                                               | RH + Jurídico/privacidade + saúde ocupacional |
-| PD-DOC-03 | Retenção por categoria documental e destinação (arquivamento/descarte) após desligamento (§2.9).                                                                                                                                                                                                                                                                         | RH + Jurídico/privacidade                     |
-| PD-DOC-04 | Solução, escopo e evidência de assinatura digital — se, quando e com qual mecanismo, sem antecipar fornecedor (§2.2, §3.6).                                                                                                                                                                                                                                              | Jurídico + TI/Segurança + RH                  |
-| PD-DOC-05 | Definição de "encaminhar para processamento da Folha/DP" na fase inicial — o que exatamente é encaminhado, em que formato, para quem, sempre manual (§2.2, §4).                                                                                                                                                                                                          | RH + Folha/DP                                 |
-| PD-SOL-01 | Matriz de decisão RH/gestor/Diretoria por tipo de solicitação, incluindo o catálogo final de tipos (conciliando §3.1 com o catálogo já registrado) e as alçadas de aprovação.                                                                                                                                                                                            | RH + Jurídico                                 |
-| PD-SOL-02 | Conciliação dos rótulos de pendência/bloqueio usados nas telas demonstrativas de Ponto com o catálogo fechado de tipos de pendência já registrado no [contrato da fila "Verificar folhas"](../modules/etapa3-fila-verificar-folhas-contrato-v1.md) §3 — inclusive o tipo ainda não aprovado de bloqueio de fechamento, para não coexistirem duas taxonomias divergentes. | RH + Produto                                  |
-| PD-SOL-03 | Marco de início da análise de uma solicitação e regra de cancelamento após esse marco (§3.5).                                                                                                                                                                                                                                                                            | RH + Jurídico                                 |
-| PD-SOL-04 | Responsável pela contagem do SLA, forma de contagem de dias úteis e exceções (§3.7).                                                                                                                                                                                                                                                                                     | RH + Produto                                  |
-| PD-SOL-05 | Critérios de evidência por tipo de solicitação — quais tipos exigem evidência e o que conta como evidência aceitável, sem antecipar habilitação de anexo (§3.3).                                                                                                                                                                                                         | RH + Jurídico + Segurança                     |
+| ID        | Pendência                                                                                                                                                           | Responsável                                   |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| PD-DOC-01 | Matriz de acesso detalhada por tipo/categoria documental e por perfil — quem visualiza, quem solicita, quem substitui, o que é visível ao colaborador (§2.3, §2.4). | RH + Jurídico/privacidade + TI/Segurança      |
+| PD-DOC-02 | Tratamento de documentos médicos/ocupacionais: base legal, minimização e **informação mínima ao gestor** (nunca o documento em si) (§2.5).                          | RH + Jurídico/privacidade + saúde ocupacional |
+| PD-DOC-03 | Retenção por categoria documental e destinação (arquivamento/descarte) após desligamento (§2.9).                                                                    | RH + Jurídico/privacidade                     |
+| PD-DOC-04 | Solução, escopo e evidência de assinatura digital — se, quando e com qual mecanismo, sem antecipar fornecedor (§2.2, §3.6).                                         | Jurídico + TI/Segurança + RH                  |
+| PD-DOC-05 | Definição de "encaminhar para processamento da Folha/DP" na fase inicial — o que exatamente é encaminhado, em que formato, para quem, sempre manual (§2.2, §4).     | RH + Folha/DP                                 |
 
 ## 6. Dependências entre áreas
 
@@ -378,9 +394,8 @@ pendências do §5 — cada uma exige a combinação de responsáveis indicada.
 Ordem lógica; nenhuma data, prazo, percentual ou estimativa é atribuída.
 Cada passo só avança quando o anterior estiver satisfeito:
 
-1. **Consolidar as decisões e a matriz de acesso** — fechar PD-DOC-01 e
-   PD-SOL-01 antes de qualquer outro avanço, porque ambos condicionam o
-   restante.
+1. **Consolidar a matriz documental de acesso** — `PD-SOL-01` está fechada;
+   `PD-DOC-01` continua necessária antes de conteúdo real.
 2. **Definir segurança, retenção e auditoria** — resolver PD-DOC-02,
    PD-DOC-03 e os gates transversais já registrados (MFA, `DS-OPS-01`) antes
    de habilitar qualquer conteúdo ou evidência real.
@@ -390,9 +405,9 @@ Cada passo só avança quando o anterior estiver satisfeito:
 4. **Estruturar um repositório documental controlado** — avançar Documentos
    além do metadado (Nível 2) apenas depois dos passos 1 e 2, mantendo a
    segregação entre metadado e conteúdo já fixada (ADR 0011).
-5. **Estruturar a fila de solicitações e suas evidências** — avançar a
-   Central de Solicitações além do conceitual apenas depois de PD-SOL-01,
-   PD-SOL-02 e PD-SOL-05 fechados.
+5. **Estruturar a fila de solicitações** — `PD-SOL-01..05` estão fechadas e a
+   fundação sem anexos pode avançar. Evidência binária permanece bloqueada
+   pelos portões documentais e pela ADR 0013.
 6. **Definir assinatura e a interface manual com a Folha/DP** — resolver
    PD-DOC-04 e PD-DOC-05 como decisões formais próprias, sempre manuais nesta
    etapa.
@@ -404,8 +419,8 @@ Cada passo só avança quando o anterior estiver satisfeito:
 ## 8. Declaração
 
 Este documento **registra** direcionamentos recebidos do RH sobre Gestão de
-Documentos e Solicitações do Colaborador, separando definições recebidas,
-limites preservados, pendências formais, dependências entre áreas e um
+Documentos e Solicitações do Colaborador, separando decisões aprovadas,
+limites preservados, pendências documentais, dependências entre áreas e um
 roteiro sem cronograma. **Nenhuma linha de código, teste, schema, migration,
 endpoint, API, UI funcional, integração, permissão, SLA obrigatório, política
 de retenção ou assinatura eletrônica** é criada por este documento. Ele **não
