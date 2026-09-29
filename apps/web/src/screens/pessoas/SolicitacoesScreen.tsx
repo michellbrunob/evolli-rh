@@ -26,7 +26,14 @@
  * marcos registrados pelo servidor. A tela não calcula prazo, não conta tempo e
  * não promete conclusão.
  */
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Button,
   DataTable,
@@ -82,6 +89,25 @@ const TAMANHO_PAGINA = 20;
 const OPCAO_TODOS = "todos";
 
 type StatusCarregamento = "carregando" | "erro" | "pronto";
+
+/**
+ * Em que regime a listagem está. Existe porque a API filtra por **vínculo**,
+ * não por colaborador: com um colaborador escolhido e nenhum vínculo válido
+ * não há consulta possível, e cair na listagem geral mostraria solicitações de
+ * outras pessoas sob o nome do colaborador selecionado — a tabela não tem
+ * coluna de sujeito, então nada desmentiria essa leitura.
+ *
+ * Só `geral` e `filtrada` chamam a API. Os demais modos esvaziam a lista e
+ * explicam, para QUALQUER papel, por que não há dados.
+ */
+type ModoLista =
+  | { tipo: "aguardando_colaboradores" }
+  | { tipo: "geral" }
+  | { tipo: "aguardando_vinculos" }
+  | { tipo: "erro_vinculos" }
+  | { tipo: "sem_vinculo" }
+  | { tipo: "escolher_vinculo" }
+  | { tipo: "filtrada"; vinculoId: string };
 
 /**
  * Só o `rh` muta, e só com empresa na sessão (`PD-SOL-01`). `master_tecnico` lê
@@ -219,12 +245,16 @@ export function SolicitacoesScreen() {
     }
   }, []);
 
+  /**
+   * `vinculo` é `null` SOMENTE na visão geral da empresa (nenhum colaborador
+   * escolhido). Com colaborador escolhido, quem chama sempre passa um vínculo.
+   */
   const carregarLista = useCallback(
     async (
       paginaAlvo: number,
       tipo: string,
       situacao: string,
-      vinculo: string,
+      vinculo: string | null,
     ) => {
       const seq = ++seqLista.current;
       setStatusLista("carregando");
@@ -238,7 +268,7 @@ export function SolicitacoesScreen() {
           ...(situacao !== OPCAO_TODOS
             ? { situacao: situacao as SituacaoSolicitacaoPessoa }
             : {}),
-          ...(vinculo ? { vinculoId: vinculo } : {}),
+          ...(vinculo !== null ? { vinculoId: vinculo } : {}),
         });
         if (seq !== seqLista.current) return; // resposta superada: descarta
         setSolicitacoes(res.itens);
@@ -276,7 +306,9 @@ export function SolicitacoesScreen() {
     if (!colaboradorId) {
       // Sem colaborador: invalida cargas em voo e limpa o que depende dele.
       seqVinculos.current++;
-      setVinculos([]);
+      // Mantém a MESMA referência quando já está vazio: React descarta o
+      // update e a tela não re-renderiza à toa.
+      setVinculos((atual) => (atual.length === 0 ? atual : []));
       setVinculoId("");
       setStatusVinculos("pronto");
       return;
@@ -284,14 +316,69 @@ export function SolicitacoesScreen() {
     void carregarVinculos(colaboradorId);
   }, [colaboradorId, carregarVinculos]);
 
+  /**
+   * Só vale um vínculo que pertence à lista JÁ carregada do colaborador atual.
+   * Conferir a pertinência, e não apenas se há algo selecionado, fecha de vez
+   * a possibilidade de consultar ou submeter com o vínculo de um colaborador
+   * anterior.
+   */
+  const vinculoValido =
+    vinculoId !== "" && vinculos.some((v) => v.id === vinculoId);
+
+  const semVinculos = vinculos.length === 0;
+
+  /**
+   * Depende só de PRIMITIVOS. Depender do array `vinculos` faria a identidade
+   * de `modoLista` mudar a cada `setVinculos([])` — e o efeito da listagem
+   * dispararia uma segunda consulta idêntica em toda montagem.
+   */
+  const modoLista: ModoLista = useMemo(() => {
+    // Enquanto os colaboradores carregam não se sabe se um será resolvido
+    // automaticamente. Consultar a visão geral aqui gastaria uma requisição e
+    // piscaria dados de toda a empresa que seriam substituídos em seguida.
+    if (statusColaboradores === "carregando")
+      return { tipo: "aguardando_colaboradores" };
+    if (!colaboradorId) return { tipo: "geral" };
+    if (statusVinculos === "carregando") return { tipo: "aguardando_vinculos" };
+    if (statusVinculos === "erro") return { tipo: "erro_vinculos" };
+    if (semVinculos) return { tipo: "sem_vinculo" };
+    if (!vinculoValido) return { tipo: "escolher_vinculo" };
+    return { tipo: "filtrada", vinculoId };
+  }, [
+    statusColaboradores,
+    colaboradorId,
+    statusVinculos,
+    semVinculos,
+    vinculoId,
+    vinculoValido,
+  ]);
+
   useEffect(() => {
-    void carregarLista(pagina, filtroTipo, filtroSituacao, vinculoId);
+    if (modoLista.tipo === "geral") {
+      void carregarLista(pagina, filtroTipo, filtroSituacao, null);
+      return;
+    }
+    if (modoLista.tipo === "filtrada") {
+      void carregarLista(
+        pagina,
+        filtroTipo,
+        filtroSituacao,
+        modoLista.vinculoId,
+      );
+      return;
+    }
+    // Nenhuma consulta é possível neste modo. Invalida o que estiver em voo e
+    // esvazia a lista: nunca cair na listagem geral com colaborador escolhido.
+    seqLista.current += 1;
+    setSolicitacoes([]);
+    setTotal(0);
+    setStatusLista("pronto");
   }, [
     geracaoContexto,
     pagina,
     filtroTipo,
     filtroSituacao,
-    vinculoId,
+    modoLista,
     carregarLista,
   ]);
 
@@ -503,14 +590,6 @@ export function SolicitacoesScreen() {
   const acoesDisponiveis = detalhe ? ACOES_POR_SITUACAO[detalhe.situacao] : [];
 
   /**
-   * Só vale um vínculo que pertence à lista JÁ carregada do colaborador atual.
-   * Conferir a pertinência, e não apenas se há algo selecionado, fecha de vez
-   * a possibilidade de submeter com o vínculo de um colaborador anterior.
-   */
-  const vinculoValido =
-    vinculoId !== "" && vinculos.some((v) => v.id === vinculoId);
-
-  /**
    * Troca de colaborador — invalidação e limpeza acontecem NESTE evento, nunca
    * num efeito posterior.
    *
@@ -677,8 +756,9 @@ export function SolicitacoesScreen() {
           Colaborador e vínculo
         </h2>
         <p className="solicitacoes-screen__ajuda">
-          Escolher um colaborador filtra a lista pelo vínculo dele e habilita o
-          registro de uma solicitação em nome dele.
+          {colaboradorId
+            ? "Com um colaborador escolhido, é preciso selecionar um vínculo válido para ver as solicitações dessa pessoa — a consulta é sempre por vínculo."
+            : "Sem colaborador escolhido, a lista abaixo mostra a visão geral da empresa."}
         </p>
 
         {statusColaboradores === "carregando" ? (
@@ -788,6 +868,18 @@ export function SolicitacoesScreen() {
           ) : null}
         </div>
 
+        {/* Escopo da lista, visível para QUALQUER papel — inclusive
+            `master_tecnico`, que não vê a dica de registro abaixo. */}
+        <p className="solicitacoes-screen__ajuda">
+          {modoLista.tipo === "geral"
+            ? "Visão geral da empresa: todas as solicitações no seu escopo."
+            : modoLista.tipo === "aguardando_colaboradores"
+              ? "Definindo o escopo da consulta…"
+              : modoLista.tipo === "filtrada"
+                ? "Filtrado pelo vínculo selecionado deste colaborador."
+                : "Sem vínculo selecionado, não há solicitações a exibir para este colaborador."}
+        </p>
+
         {mutavel && !vinculoValido ? (
           <p className="solicitacoes-screen__ajuda">
             Selecione um colaborador e um vínculo para registrar uma
@@ -795,105 +887,138 @@ export function SolicitacoesScreen() {
           </p>
         ) : null}
 
-        <div className="solicitacoes-screen__filtros">
-          <FormField id="solicitacoes-filtro-tipo" label="Filtrar por tipo">
-            {(control) => (
-              <select
-                value={filtroTipo}
-                onChange={(e) => trocarFiltro("tipo", e.target.value)}
-                {...control}
-              >
-                <option value={OPCAO_TODOS}>Todos</option>
-                {TIPOS_SOLICITACAO_PESSOA.map((t) => (
-                  <option key={t} value={t}>
-                    {ROTULO_TIPO[t]}
-                  </option>
-                ))}
-              </select>
-            )}
-          </FormField>
-          <FormField
-            id="solicitacoes-filtro-situacao"
-            label="Filtrar por situação"
-          >
-            {(control) => (
-              <select
-                value={filtroSituacao}
-                onChange={(e) => trocarFiltro("situacao", e.target.value)}
-                {...control}
-              >
-                <option value={OPCAO_TODOS}>Todas</option>
-                {SITUACOES_SOLICITACAO_PESSOA.map((s) => (
-                  <option key={s} value={s}>
-                    {ROTULO_SITUACAO[s]}
-                  </option>
-                ))}
-              </select>
-            )}
-          </FormField>
-        </div>
-
-        {/* Enquanto há linhas, a tabela PERMANECE visível durante a recarga:
-            trocar de página ou de filtro não pode fazer a lista sumir e voltar,
-            e os controles de paginação continuam operáveis. */}
-        {statusLista === "carregando" && solicitacoes.length === 0 ? (
+        {modoLista.tipo === "aguardando_colaboradores" ? (
           <p role="status">Carregando solicitações…</p>
-        ) : statusLista === "erro" ? (
-          <Surface as="div" padding="md" className="solicitacoes-screen__erro">
-            <p role="alert">Não foi possível carregar as solicitações.</p>
-            <Button
-              variant="secondary"
-              onClick={() =>
-                void carregarLista(
-                  pagina,
-                  filtroTipo,
-                  filtroSituacao,
-                  vinculoId,
-                )
-              }
-            >
-              Tentar novamente
-            </Button>
-          </Surface>
-        ) : solicitacoes.length === 0 ? (
+        ) : modoLista.tipo === "aguardando_vinculos" ? (
+          <p role="status">Carregando os vínculos do colaborador…</p>
+        ) : modoLista.tipo === "erro_vinculos" ? (
+          <p role="alert">
+            Não foi possível carregar os vínculos deste colaborador, então não
+            há como listar as solicitações dele.
+          </p>
+        ) : modoLista.tipo === "sem_vinculo" ? (
           <EmptyState
             headingLevel={3}
             icon="—"
-            title="Nenhuma solicitação encontrada"
-            description="Quando houver solicitação no seu escopo que atenda aos filtros, ela aparece aqui."
+            title="Colaborador sem vínculo nesta empresa"
+            description="Não há vínculo disponível para consultar ou registrar solicitações deste colaborador."
+          />
+        ) : modoLista.tipo === "escolher_vinculo" ? (
+          <EmptyState
+            headingLevel={3}
+            icon="—"
+            title="Vínculo não selecionado"
+            description="Selecione um vínculo para visualizar as solicitações deste colaborador."
           />
         ) : (
           <>
-            {statusLista === "carregando" ? (
-              <p role="status" className="solicitacoes-screen__ajuda">
-                Atualizando solicitações…
-              </p>
-            ) : null}
-            <DataTable
-              caption="Solicitações de pessoas no seu escopo"
-              columns={colunas}
-              rows={solicitacoes}
-              rowKey={(s) => s.id}
-            />
-            <div className="solicitacoes-screen__paginacao">
-              <Button
-                variant="secondary"
-                onClick={() => setPagina((p) => Math.max(1, p - 1))}
-                disabled={pagina <= 1}
+            <div className="solicitacoes-screen__filtros">
+              <FormField id="solicitacoes-filtro-tipo" label="Filtrar por tipo">
+                {(control) => (
+                  <select
+                    value={filtroTipo}
+                    onChange={(e) => trocarFiltro("tipo", e.target.value)}
+                    {...control}
+                  >
+                    <option value={OPCAO_TODOS}>Todos</option>
+                    {TIPOS_SOLICITACAO_PESSOA.map((t) => (
+                      <option key={t} value={t}>
+                        {ROTULO_TIPO[t]}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </FormField>
+              <FormField
+                id="solicitacoes-filtro-situacao"
+                label="Filtrar por situação"
               >
-                Página anterior
-              </Button>
-              <p role="status">
-                Página {pagina} de {totalPaginas} · {total} no total
-              </p>
-              <Button
-                variant="secondary"
-                onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
-                disabled={pagina >= totalPaginas}
-              >
-                Próxima página
-              </Button>
+                {(control) => (
+                  <select
+                    value={filtroSituacao}
+                    onChange={(e) => trocarFiltro("situacao", e.target.value)}
+                    {...control}
+                  >
+                    <option value={OPCAO_TODOS}>Todas</option>
+                    {SITUACOES_SOLICITACAO_PESSOA.map((s) => (
+                      <option key={s} value={s}>
+                        {ROTULO_SITUACAO[s]}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </FormField>
             </div>
+
+            {/* Enquanto há linhas, a tabela PERMANECE visível durante a recarga:
+            trocar de página ou de filtro não pode fazer a lista sumir e voltar,
+            e os controles de paginação continuam operáveis. */}
+            {statusLista === "carregando" && solicitacoes.length === 0 ? (
+              <p role="status">Carregando solicitações…</p>
+            ) : statusLista === "erro" ? (
+              <Surface
+                as="div"
+                padding="md"
+                className="solicitacoes-screen__erro"
+              >
+                <p role="alert">Não foi possível carregar as solicitações.</p>
+                <Button
+                  variant="secondary"
+                  onClick={() =>
+                    void carregarLista(
+                      pagina,
+                      filtroTipo,
+                      filtroSituacao,
+                      vinculoId,
+                    )
+                  }
+                >
+                  Tentar novamente
+                </Button>
+              </Surface>
+            ) : solicitacoes.length === 0 ? (
+              <EmptyState
+                headingLevel={3}
+                icon="—"
+                title="Nenhuma solicitação encontrada"
+                description="Quando houver solicitação no seu escopo que atenda aos filtros, ela aparece aqui."
+              />
+            ) : (
+              <>
+                {statusLista === "carregando" ? (
+                  <p role="status" className="solicitacoes-screen__ajuda">
+                    Atualizando solicitações…
+                  </p>
+                ) : null}
+                <DataTable
+                  caption="Solicitações de pessoas no seu escopo"
+                  columns={colunas}
+                  rows={solicitacoes}
+                  rowKey={(s) => s.id}
+                />
+                <div className="solicitacoes-screen__paginacao">
+                  <Button
+                    variant="secondary"
+                    onClick={() => setPagina((p) => Math.max(1, p - 1))}
+                    disabled={pagina <= 1}
+                  >
+                    Página anterior
+                  </Button>
+                  <p role="status">
+                    Página {pagina} de {totalPaginas} · {total} no total
+                  </p>
+                  <Button
+                    variant="secondary"
+                    onClick={() =>
+                      setPagina((p) => Math.min(totalPaginas, p + 1))
+                    }
+                    disabled={pagina >= totalPaginas}
+                  >
+                    Próxima página
+                  </Button>
+                </div>
+              </>
+            )}
           </>
         )}
       </section>

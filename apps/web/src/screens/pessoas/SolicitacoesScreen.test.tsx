@@ -218,13 +218,17 @@ describe("SolicitacoesScreen (T140) — estrutura e acessibilidade", () => {
 
 describe("SolicitacoesScreen (T140) — carregamento, vazio e erro", () => {
   it("mostra estado de carregamento antes da resposta", async () => {
-    prepararBase();
+    // Visão geral (nenhum colaborador auto-resolvido): é o único modo em que
+    // a listagem é consultada sem vínculo.
+    prepararBase(ATOR_RH, [COLAB_A, COLAB_B]);
     const d = deferred<unknown>();
     vi.mocked(listarSolicitacoesPessoas).mockReturnValue(d.promise as never);
     render(<SolicitacoesScreen />);
-    expect(
-      await screen.findByText("Carregando solicitações…"),
-    ).toBeInTheDocument();
+    // Consulta fresca a cada tentativa: o nó é substituído quando o escopo
+    // deixa de ser "definindo" e passa a ser a visão geral, com o mesmo texto.
+    await waitFor(() =>
+      expect(screen.getByText("Carregando solicitações…")).toBeInTheDocument(),
+    );
     d.resolve(pagina([]));
     await screen.findByText("Nenhuma solicitação encontrada");
   });
@@ -235,9 +239,11 @@ describe("SolicitacoesScreen (T140) — carregamento, vazio e erro", () => {
     prepararBase(ATOR_RH, [COLAB_A, COLAB_B]);
     vi.mocked(listarSolicitacoesPessoas).mockResolvedValue(pagina([]) as never);
     render(<SolicitacoesScreen />);
-    expect(
-      await screen.findByText("Nenhuma solicitação encontrada"),
-    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        screen.getByText("Nenhuma solicitação encontrada"),
+      ).toBeInTheDocument(),
+    );
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
@@ -363,6 +369,134 @@ describe("SolicitacoesScreen (T140) — listagem, filtros e paginação", () => 
       "beneficios",
     ]);
     expect(valores).not.toContain("documento");
+  });
+});
+
+describe("SolicitacoesScreen (T140) — escopo da listagem por vínculo", () => {
+  /** Chamadas de listagem que foram feitas SEM filtro de vínculo. */
+  function chamadasSemVinculo() {
+    return vi
+      .mocked(listarSolicitacoesPessoas)
+      .mock.calls.filter((c) => c[0]?.vinculoId === undefined);
+  }
+
+  it("sem colaborador: visão geral da empresa, e só aí a consulta vai sem vínculo", async () => {
+    prepararBase(ATOR_RH, [COLAB_A, COLAB_B]);
+    render(<SolicitacoesScreen />);
+
+    await screen.findByRole("table", {
+      name: "Solicitações de pessoas no seu escopo",
+    });
+    expect(
+      screen.getByText(
+        "Visão geral da empresa: todas as solicitações no seu escopo.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Sem colaborador escolhido, a lista abaixo mostra/),
+    ).toBeInTheDocument();
+    expect(chamadasSemVinculo().length).toBeGreaterThan(0);
+  });
+
+  it("colaborador sem vínculo: estado vazio explícito, sem listagem geral", async () => {
+    prepararBase();
+    vi.mocked(listarVinculosDoColaborador).mockResolvedValue([] as never);
+    render(<SolicitacoesScreen />);
+
+    expect(
+      await screen.findByText("Colaborador sem vínculo nesta empresa"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Não há vínculo disponível para consultar ou registrar solicitações deste colaborador.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("table", {
+        name: "Solicitações de pessoas no seu escopo",
+      }),
+    ).not.toBeInTheDocument();
+    expect(chamadasSemVinculo()).toHaveLength(0);
+    expect(
+      screen.getByRole("button", { name: "Registrar solicitação" }),
+    ).toBeDisabled();
+  });
+
+  for (const [papel, ator] of [
+    ["rh", ATOR_RH],
+    ["master_tecnico", ATOR_MASTER],
+  ] as const) {
+    it(`múltiplos vínculos e nenhum escolhido: ${papel} vê a orientação e nenhum dado geral`, async () => {
+      prepararBase(ator);
+      vi.mocked(listarVinculosDoColaborador).mockResolvedValue([
+        vinculo({ id: "v1", matricula: "M1" }),
+        vinculo({ id: "v2", matricula: "M2" }),
+      ] as never);
+      render(<SolicitacoesScreen />);
+
+      // A orientação NÃO está sob condição de papel mutável.
+      expect(
+        await screen.findByText(
+          "Selecione um vínculo para visualizar as solicitações deste colaborador.",
+        ),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole("table", {
+          name: "Solicitações de pessoas no seu escopo",
+        }),
+      ).not.toBeInTheDocument();
+      expect(chamadasSemVinculo()).toHaveLength(0);
+    });
+  }
+
+  it("escolher o vínculo carrega a lista filtrada, e só ela", async () => {
+    prepararBase();
+    vi.mocked(listarVinculosDoColaborador).mockResolvedValue([
+      vinculo({ id: "v1", matricula: "M1" }),
+      vinculo({ id: "v2", matricula: "M2" }),
+    ] as never);
+    vi.mocked(listarSolicitacoesPessoas).mockImplementation(((q: {
+      vinculoId?: string;
+    }) =>
+      Promise.resolve(
+        pagina([
+          solicitacao({
+            tipo: q?.vinculoId === "v2" ? "beneficios" : "ferias",
+          }),
+        ]),
+      )) as never);
+
+    render(<SolicitacoesScreen />);
+    const selVinculo = (await screen.findByLabelText(
+      "Vínculo",
+    )) as HTMLSelectElement;
+    fireEvent.change(selVinculo, { target: { value: "v2" } });
+
+    const tabela = await screen.findByRole("table", {
+      name: "Solicitações de pessoas no seu escopo",
+    });
+    expect(within(tabela).getByText("Benefícios")).toBeInTheDocument();
+    expect(
+      screen.getByText("Filtrado pelo vínculo selecionado deste colaborador."),
+    ).toBeInTheDocument();
+    expect(chamadasSemVinculo()).toHaveLength(0);
+    expect(
+      vi.mocked(listarSolicitacoesPessoas).mock.calls.at(-1)?.[0],
+    ).toMatchObject({ vinculoId: "v2" });
+  });
+
+  it("um único vínculo resolve sozinho e a lista já vem filtrada", async () => {
+    prepararBase();
+    render(<SolicitacoesScreen />);
+    await screen.findByRole("table", {
+      name: "Solicitações de pessoas no seu escopo",
+    });
+    await waitFor(() =>
+      expect(
+        vi.mocked(listarSolicitacoesPessoas).mock.calls.at(-1)?.[0],
+      ).toMatchObject({ vinculoId: "vinc-1" }),
+    );
+    expect(chamadasSemVinculo()).toHaveLength(0);
   });
 });
 
@@ -1043,23 +1177,32 @@ describe("SolicitacoesScreen (T140) — corridas assíncronas", () => {
     // Troca para B, com os vínculos de B AINDA PENDENTES.
     fireEvent.change(sel, { target: { value: "colab-B" } });
 
-    // Nada de A pode sobreviver a este instante.
+    const chamadasAteAgora = vi.mocked(listarSolicitacoesPessoas).mock.calls
+      .length;
+
+    // Nada de A pode sobreviver a este instante — e NADA de ninguém entra no
+    // lugar: com colaborador escolhido e vínculo pendente não há consulta.
     await waitFor(() =>
       expect(screen.queryByText(/matrícula MA/)).not.toBeInTheDocument(),
     );
     expect(
-      within(
-        screen.getByRole("table", {
-          name: "Solicitações de pessoas no seu escopo",
-        }),
-      ).queryByText("Férias"),
+      screen.queryByRole("table", {
+        name: "Solicitações de pessoas no seu escopo",
+      }),
     ).not.toBeInTheDocument();
+    expect(
+      screen.getByText("Carregando os vínculos do colaborador…"),
+    ).toBeInTheDocument();
+    // A listagem NÃO é chamada sem vinculoId enquanto há colaborador escolhido.
+    expect(
+      vi
+        .mocked(listarSolicitacoesPessoas)
+        .mock.calls.slice(chamadasAteAgora)
+        .filter((c) => c[0]?.vinculoId === undefined),
+    ).toHaveLength(0);
     expect(
       screen.getByRole("button", { name: "Registrar solicitação" }),
     ).toBeDisabled();
-    expect(
-      screen.getByText(/Selecione um colaborador e um vínculo/),
-    ).toBeInTheDocument();
     // Sem formulário aberto, não há caminho de submissão com o vínculo de A.
     expect(
       screen.queryByRole("button", { name: "Registrar" }),
