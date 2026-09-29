@@ -16,6 +16,7 @@ import {
   AuthorizationTarget,
   isDocumentosResource,
   isOrganizationalResource,
+  isSolicitacoesPessoasResource,
 } from "./permission.types";
 import { AuditResource } from "../../audit/audit.types";
 import {
@@ -50,6 +51,13 @@ function toAuditResource(resource: AuthorizationResource): AuditResource {
   // documental (ADR 0011, decisão 10; DP-2E-12). Sem isso, uma negação de
   // capacidade seria registrada como `access_user`, produzindo trilha enganosa.
   if (isDocumentosResource(resource)) {
+    return resource;
+  }
+  // Mesma razão para a Central de Solicitações de Pessoas (T139): sem isto, a
+  // negação de capacidade viraria `access_user` na trilha. O rótulo é o tipo
+  // TÉCNICO do recurso — nunca o tipo da solicitação, que revelaria categoria
+  // sensível por inferência (`atestado` é dado de saúde).
+  if (isSolicitacoesPessoasResource(resource)) {
     return resource;
   }
   return "access_user";

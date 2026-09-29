@@ -96,6 +96,12 @@ model AccessUser {
   pontosRegistrados       EventoPonto[] @relation("PontoRegistradoPor")
   ajustesPontoRegistrados AjustePonto[] @relation("AjustePontoRegistradoPor")
 
+  // T139 — Central de Solicitacoes de Pessoas. Mesma natureza das relacoes
+  // acima: identifica o ATOR que registrou a solicitacao/transicao, nunca o
+  // colaborador sujeito dela (alcancado so via VinculoFuncional).
+  solicitacoesPessoaRegistradas       SolicitacaoPessoa[]       @relation("SolicitacaoPessoaRegistradaPor")
+  solicitacaoPessoaEventosRegistrados SolicitacaoPessoaEvento[] @relation("SolicitacaoPessoaEventoRegistradoPor")
+
   // Etapa 2 — Documentos: quem solicitou um documento. Relacao de leitura
   // apenas — nenhuma coluna nova entra em `access_user`; a FK vive em
   // `solicitacao_documento`. Identifica o ATOR, nunca o sujeito do documento.
@@ -421,6 +427,22 @@ enum AuditAction {
   mfa_challenge_failed
   mfa_recovery_code_used
   mfa_reset_by_admin
+
+  // T139 — Central de Solicitacoes de Pessoas. Convencao pontilhada de Pessoas,
+  // uma acao por transicao (mesmo criterio de `pessoas.movimentacao.*`): uma
+  // acao generica esconderia qual decisao o RH tomou. O evento carrega ator,
+  // papel, empresa e id TECNICO da solicitacao — nunca o tipo (`atestado`
+  // revelaria dado de saude por inferencia), o vinculo, o motivo ou conteudo.
+  pessoas_solicitacao_criada                @map("pessoas.solicitacao.criada")
+  pessoas_solicitacao_enviada               @map("pessoas.solicitacao.enviada")
+  pessoas_solicitacao_cancelada             @map("pessoas.solicitacao.cancelada")
+  pessoas_solicitacao_revisao_iniciada      @map("pessoas.solicitacao.revisao_iniciada")
+  pessoas_solicitacao_informacao_solicitada @map("pessoas.solicitacao.informacao_solicitada")
+  pessoas_solicitacao_revisao_retomada      @map("pessoas.solicitacao.revisao_retomada")
+  pessoas_solicitacao_encaminhada           @map("pessoas.solicitacao.encaminhada")
+  pessoas_solicitacao_recusada              @map("pessoas.solicitacao.recusada")
+  pessoas_solicitacao_reaberta              @map("pessoas.solicitacao.reaberta")
+  pessoas_solicitacao_consultada            @map("pessoas.solicitacao.consultada")
 }
 
 enum AuditResult {
@@ -540,6 +562,11 @@ model Empresa {
   // banco, que o vinculo nunca aponte para tabela de outra empresa.
   tabelasHorario  TabelaHorario[]
   vinculosHorario VinculoHorario[]
+
+  // T139 — Central de Solicitacoes de Pessoas. `empresa_id` redundante com o do
+  // vinculo pelo mesmo desenho de alocacao/movimentacao: e o que permite a FK
+  // COMPOSTA garantir, no banco, que solicitacao e vinculo nunca cruzam empresa.
+  solicitacoesPessoa SolicitacaoPessoa[]
 
   @@index([status])
   @@map("empresa")
@@ -877,6 +904,9 @@ model VinculoFuncional {
   alocacoes     AlocacaoOrganizacional[]
   movimentacoes MovimentacaoFuncional[]
   eventosPonto  EventoPonto[]
+
+  // T139 — o vinculo e o SUJEITO da solicitacao (e quem carrega `empresa_id`).
+  solicitacoesPessoa SolicitacaoPessoa[]
 
   @@unique([empresaId, matricula])
   /// Alvo das FKs compostas de alocacao e movimentacao: o banco garante que
@@ -1438,4 +1468,207 @@ model VinculoHorario {
   @@index([empresaId])
   @@index([tabelaHorarioId, empresaId])
   @@map("vinculo_horario")
+}
+
+// ---------------------------------------------------------------------------
+// T139 — Central de Solicitacoes de Pessoas (fundacao backend)
+// ---------------------------------------------------------------------------
+// Decisoes vinculantes: `PD-SOL-01..05`, aprovadas em 2026-09-29
+// (docs/decisions/pacote-decisao-solicitacoes-pessoas.md §7) e contrato
+// conceitual T065. A maquina de estados continua vivendo no nucleo puro
+// `src/solicitacoes/` — este schema so persiste o resultado dela.
+//
+// A Central REGISTRA e ENCAMINHA; ela nao executa nada. Encaminhar nao e
+// executar: nenhuma linha deste bloco toca ponto, ferias, cadastro, vinculo,
+// beneficio, Banco de Horas, Folha ou fechamento.
+//
+// O que NAO existe aqui, por decisao explicita:
+//   - anexo, arquivo, URL, bucket, chave de objeto, conteudo binario: anexos
+//     seguem bloqueados pelos portoes documentais, e a ADR 0013 (Cloudflare R2)
+//     aprovou o provedor privado futuro, nunca o upload;
+//   - diagnostico, CID, descricao clinica ou qualquer campo de saude —
+//     inclusive para `atestado`, que usa exatamente a mesma estrutura dos
+//     demais tipos (`PD-SOL-05`);
+//   - QUALQUER campo de texto livre: todo motivo e codigo de catalogo fechado,
+//     mesmo mecanismo de `MotivoMovimentacao`/`MotivoAjustePonto`;
+//   - prazo, vencimento, contador ou cronometro de SLA: `PD-SOL-04` aprovou o
+//     objetivo de primeiro retorno em dois dias uteis, e a V1 registra datas e
+//     eventos para acompanhamento, sem promessa automatica de conclusao;
+//   - FK para pendencia de "Verificar folhas": `PD-SOL-02` manteve os dois
+//     registros independentes, com referencia futura OPCIONAL ainda nao
+//     decidida. Criar a coluna agora seria estrutura especulativa;
+//   - `colaborador_id`: o sujeito e alcancado pelo VINCULO, que e quem carrega
+//     `empresa_id` e portanto a fronteira de autorizacao (ADR 0007, d. 11).
+
+/// Catalogo FECHADO de tipos (`PD-SOL-01`). `documento` NAO esta aqui: ele
+/// ficou fora da Central e permanece no fluxo real de `solicitacao_documento`
+/// (T133) — dois fluxos para a mesma intencao seria ambiguidade operacional.
+enum TipoSolicitacaoPessoa {
+  contestacao_ajuste_ponto
+  ausencia
+  ferias
+  atualizacao_cadastral
+  atestado
+  beneficios
+}
+
+/// Estados da solicitacao (contrato T065 §4). NAO existe estado `encerrada`: o
+/// termo funcional "encerrada" designa `encaminhada_para_operacao_rh`, e criar
+/// um estado homonimo produziria duas verdades para a mesma situacao.
+///
+/// `encaminhada_para_operacao_rh` e `recusada` encerram o ciclo mas sao
+/// REABRIVEIS pelo RH (`PD-SOL-03`); `cancelada` e terminal absoluto.
+enum SituacaoSolicitacaoPessoa {
+  rascunho
+  enviada
+  em_revisao_rh
+  aguardando_informacao
+  encaminhada_para_operacao_rh
+  recusada
+  cancelada
+}
+
+/// Motivo CODIFICADO — nunca texto livre. Mesmo mecanismo, e pela mesma razao,
+/// de `MotivoMovimentacao` e `MotivoAjustePonto`: um campo de observacao sem
+/// classificacao e por onde dado sensivel (ex.: diagnostico medico) entra sem
+/// controle.
+///
+/// O que `PD-SOL-05` fecha e o MECANISMO (codigo fechado, sem texto livre). O
+/// CONTEUDO desta lista e detalhe de implementacao, extensivel de forma aditiva
+/// e a validar com RH — mesma ressalva ja registrada nos dois enums acima.
+/// Nenhuma regra associa um motivo a um tipo: essa vinculacao nao foi decidida
+/// e nao e inventada aqui.
+enum MotivoSolicitacaoPessoa {
+  // Registro da intencao.
+  divergencia_marcacao
+  ausencia_programada
+  periodo_ferias
+  dado_cadastral_desatualizado
+  atestado_apresentado
+  beneficio_solicitado
+  // Decisao do RH e justificativa de reabertura (`PD-SOL-03`).
+  informacao_insuficiente
+  fora_do_escopo_da_central
+  duplicidade
+  reanalise_administrativa
+  correcao_de_registro
+  /// Escape do proprio catalogo — nunca texto livre.
+  outro_controlado
+}
+
+/// Acoes de transicao (contrato T065 §4.1, reconciliado por `PD-SOL-03`).
+/// Espelha `AcaoSolicitacao` do nucleo puro. `criar` nao e transicao: e o
+/// nascimento do registro em `rascunho`, e existe para que o primeiro evento do
+/// historico tenha acao propria em vez de um valor nulo.
+enum AcaoSolicitacaoPessoa {
+  criar
+  enviar
+  cancelar
+  iniciar_revisao
+  aguardar_informacao
+  retomar_revisao
+  encaminhar_para_operacao
+  recusar
+  reabrir
+}
+
+/// A solicitacao: a INTENCAO registrada, nunca a operacao executada.
+///
+/// Sem exclusao fisica — a migration REVOGA `DELETE` de `evolli_app`. `UPDATE`
+/// permanece porque `situacao` e os marcos de acompanhamento mudam ao longo do
+/// ciclo; o que nao pode ser reescrito e o HISTORICO, que vive na tabela
+/// propria abaixo.
+///
+/// INTEGRIDADE empresa<->vinculo garantida pelo BANCO, nao so pela aplicacao:
+/// a FK composta `(vinculo_id, empresa_id)` alcanca `vinculo_funcional(id,
+/// empresa_id)`, entao uma solicitacao nunca aponta para vinculo de outra
+/// empresa — o isolamento nao depende de o service lembrar de filtrar.
+model SolicitacaoPessoa {
+  id        String @id @default(uuid())
+  empresaId String @map("empresa_id")
+  vinculoId String @map("vinculo_id")
+
+  tipo     TipoSolicitacaoPessoa
+  motivo   MotivoSolicitacaoPessoa
+  situacao SituacaoSolicitacaoPessoa @default(rascunho)
+
+  /// Dia de referencia, quando o tipo o referencia (contrato T065 §3: "se
+  /// aplicavel"). Opcional para TODOS os tipos: nenhuma decisao fixou quais
+  /// tipos o exigem, e exigir por inferencia seria inventar elegibilidade.
+  periodoReferencia DateTime? @map("periodo_referencia") @db.Date
+
+  /// Ator que REGISTROU — `AccessUser`, nunca o colaborador (sujeito). Nao
+  /// existe vinculo autenticado AccessUser<->Colaborador (DP-23,
+  /// deliberadamente nao materializado), entao o RH registra em nome do
+  /// colaborador, como ja ocorre em `solicitacao_documento`.
+  registradoPorUserId String @map("registrado_por_user_id")
+
+  /// Marcos de ACOMPANHAMENTO (`PD-SOL-04`) — datas e eventos, nunca prazo.
+  /// `primeiraRevisaoEm` e gravado uma unica vez, na PRIMEIRA entrada em
+  /// `em_revisao_rh`: ele existe para permitir medir, no futuro, o objetivo de
+  /// primeiro retorno do RH. Uma reabertura posterior nao o reescreve, senao a
+  /// evidencia do primeiro retorno seria perdida.
+  enviadaEm         DateTime? @map("enviada_em")
+  primeiraRevisaoEm DateTime? @map("primeira_revisao_em")
+
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  empresa       Empresa          @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  vinculo       VinculoFuncional @relation(fields: [vinculoId, empresaId], references: [id, empresaId], onDelete: Restrict, onUpdate: Cascade)
+  registradoPor AccessUser       @relation("SolicitacaoPessoaRegistradaPor", fields: [registradoPorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  eventos SolicitacaoPessoaEvento[]
+
+  /// Alvo da FK composta do evento: o banco garante que um evento pertence a
+  /// solicitacao E a empresa certas.
+  @@unique([id, empresaId])
+  @@index([empresaId, vinculoId])
+  @@index([empresaId, situacao])
+  @@index([empresaId, tipo])
+  @@index([registradoPorUserId])
+  @@map("solicitacao_pessoa")
+}
+
+/// Historico da solicitacao: um evento por criacao e por transicao.
+///
+/// APPEND-ONLY, garantido pelo BANCO e nao pela disciplina do service: a
+/// migration REVOGA `UPDATE` e `DELETE` de `evolli_app`, mesmo tratamento que
+/// `audit_event` (ADR 0004) e `evento_ponto` recebem. Retificacao futura e
+/// evento NOVO, jamais edicao de evento anterior. Por isso NAO existe
+/// `atualizado_em` aqui: a ausencia da coluna e intencional e sinaliza que a
+/// linha nunca muda.
+///
+/// Distinto de `audit_event`: aquela e a trilha FORMAL de seguranca, de acesso
+/// restrito; esta e a linha do tempo do proprio negocio, visivel a quem ja pode
+/// ler a solicitacao. `request_id` correlaciona as duas sem duplicar conteudo.
+model SolicitacaoPessoaEvento {
+  id            String @id @default(uuid())
+  solicitacaoId String @map("solicitacao_id")
+  empresaId     String @map("empresa_id")
+
+  acao         AcaoSolicitacaoPessoa
+  /// Nulo apenas na criacao: nao havia estado anterior.
+  situacaoDe   SituacaoSolicitacaoPessoa? @map("situacao_de")
+  situacaoPara SituacaoSolicitacaoPessoa  @map("situacao_para")
+
+  /// Motivo codificado da transicao. Obrigatorio em `recusar` e `reabrir` (a
+  /// "justificativa auditada" de `PD-SOL-03`), validado na aplicacao; nulo nas
+  /// demais transicoes, que nao exigem justificativa propria.
+  motivo MotivoSolicitacaoPessoa?
+
+  registradoPorUserId String @map("registrado_por_user_id")
+
+  /// Correlacao com `audit_event.request_id` — mesma requisicao, duas trilhas.
+  requestId String @map("request_id")
+
+  ocorridoEm DateTime @default(now()) @map("ocorrido_em")
+
+  solicitacao   SolicitacaoPessoa @relation(fields: [solicitacaoId, empresaId], references: [id, empresaId], onDelete: Restrict, onUpdate: Cascade)
+  registradoPor AccessUser        @relation("SolicitacaoPessoaEventoRegistradoPor", fields: [registradoPorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([solicitacaoId, ocorridoEm])
+  @@index([empresaId, ocorridoEm])
+  @@index([registradoPorUserId])
+  @@map("solicitacao_pessoa_evento")
 }
