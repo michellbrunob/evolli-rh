@@ -1,4 +1,5 @@
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -140,6 +141,23 @@ function deferred<T>() {
     resolver = r;
   });
   return { promise, resolve: resolver };
+}
+
+/**
+ * Resolve uma promessa controlável e espera o React COMMITAR.
+ *
+ * Sequências de `await Promise.resolve()` só esvaziam microtasks; o React 18
+ * agenda o trabalho padrão num macrotask, então a asserção rodaria antes de
+ * qualquer repintura e passaria mesmo sem as guardas. `act` com um
+ * `setTimeout(0)` dentro esvazia as duas filas e garante que o que está na
+ * tela é o resultado final — é isso que dá poder de detecção aos testes de
+ * corrida.
+ */
+async function resolverECommitar(acao: () => void): Promise<void> {
+  await act(async () => {
+    acao();
+    await new Promise((r) => setTimeout(r, 0));
+  });
 }
 
 function prepararBase(
@@ -302,16 +320,28 @@ describe("SolicitacoesScreen (T140) — listagem, filtros e paginação", () => 
   });
 
   it("selecionar vínculo filtra a listagem por ele", async () => {
+    // Dois vínculos: nenhum resolve sozinho, então a seleção é de fato do
+    // VÍNCULO — e não um efeito colateral de escolher o colaborador.
     prepararBase();
+    vi.mocked(listarVinculosDoColaborador).mockResolvedValue([
+      vinculo({ id: "v1", matricula: "M1" }),
+      vinculo({ id: "v2", matricula: "M2" }),
+    ] as never);
     render(<SolicitacoesScreen />);
-    await screen.findByLabelText("Colaborador");
-    fireEvent.change(screen.getByLabelText("Colaborador"), {
+    fireEvent.change(await screen.findByLabelText("Colaborador"), {
       target: { value: "colab-A" },
     });
+
+    const selVinculo = (await screen.findByLabelText(
+      "Vínculo",
+    )) as HTMLSelectElement;
+    expect(selVinculo.value).toBe("");
+
+    fireEvent.change(selVinculo, { target: { value: "v2" } });
     await waitFor(() =>
       expect(
         vi.mocked(listarSolicitacoesPessoas).mock.calls.at(-1)?.[0],
-      ).toMatchObject({ vinculoId: "vinc-1" }),
+      ).toMatchObject({ vinculoId: "v2", pagina: 1 }),
     );
   });
 
@@ -734,7 +764,7 @@ describe("SolicitacoesScreen (T140) — conflito de transição", () => {
     );
   });
 
-  it("404 fecha o detalhe e atualiza a lista, sem revelar existência", async () => {
+  it("404 fecha o painel MAS mantém o alerta de falha visível", async () => {
     prepararBase();
     const s = solicitacao();
     vi.mocked(listarSolicitacoesPessoas).mockResolvedValue(
@@ -742,22 +772,99 @@ describe("SolicitacoesScreen (T140) — conflito de transição", () => {
     );
     vi.mocked(detalharSolicitacaoPessoa).mockResolvedValue(s as never);
     vi.mocked(transicionarSolicitacaoPessoa).mockRejectedValue(
-      new ApiError(404, "nao encontrado"),
+      new ApiError(404, "detalhe interno que NUNCA deve vazar"),
     );
     render(<SolicitacoesScreen />);
     fireEvent.click(await screen.findByRole("button", { name: /Ver detalhe/ }));
     await screen.findByRole("heading", { name: /^Solicitação aaaaaaaa/ });
+    const chamadasLista = vi.mocked(listarSolicitacoesPessoas).mock.calls
+      .length;
 
     fireEvent.click(screen.getByRole("button", { name: "Enviar" }));
     fireEvent.click(
       await screen.findByRole("button", { name: /Confirmar enviar/i }),
     );
 
+    // O alerta sobrevive ao mesmo lote que destrói o painel — é ele que
+    // diferencia a falha do caminho de sucesso, que também fecha o formulário.
+    const alerta = await screen.findByRole("alert");
+    expect(alerta).toHaveTextContent(/não está mais no seu escopo/i);
+
+    // Painel e formulário fechados.
     await waitFor(() =>
       expect(
         screen.queryByRole("heading", { name: /^Solicitação aaaaaaaa/ }),
       ).not.toBeInTheDocument(),
     );
+    expect(
+      screen.queryByRole("button", { name: /Confirmar enviar/i }),
+    ).not.toBeInTheDocument();
+
+    // Lista recarregada, nenhum sucesso projetado, nada do corpo interno.
+    await waitFor(() =>
+      expect(
+        vi.mocked(listarSolicitacoesPessoas).mock.calls.length,
+      ).toBeGreaterThan(chamadasLista),
+    );
+    expect(screen.queryByText(/Ação registrada/)).not.toBeInTheDocument();
+    expect(document.body.textContent).not.toContain("detalhe interno");
+
+    // E o alerta CONTINUA lá depois de tudo assentar.
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+  });
+
+  it("o alerta de falha só sai numa nova ação do operador", async () => {
+    prepararBase();
+    const s = solicitacao();
+    vi.mocked(listarSolicitacoesPessoas).mockResolvedValue(
+      pagina([s]) as never,
+    );
+    vi.mocked(detalharSolicitacaoPessoa).mockResolvedValue(s as never);
+    vi.mocked(transicionarSolicitacaoPessoa).mockRejectedValue(
+      new ApiError(404, "interno"),
+    );
+    render(<SolicitacoesScreen />);
+    fireEvent.click(await screen.findByRole("button", { name: /Ver detalhe/ }));
+    await screen.findByRole("heading", { name: /^Solicitação aaaaaaaa/ });
+    fireEvent.click(screen.getByRole("button", { name: "Enviar" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: /Confirmar enviar/i }),
+    );
+    await screen.findByRole("alert");
+
+    // Abrir outro detalhe é uma nova ação: aí sim o aviso sai.
+    fireEvent.click(screen.getByRole("button", { name: /Ver detalhe/ }));
+    await waitFor(() =>
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument(),
+    );
+  });
+
+  it("422 mantém o painel aberto para o operador entender o conflito", async () => {
+    prepararBase();
+    const s = solicitacao();
+    vi.mocked(listarSolicitacoesPessoas).mockResolvedValue(
+      pagina([s]) as never,
+    );
+    vi.mocked(detalharSolicitacaoPessoa).mockResolvedValue(s as never);
+    vi.mocked(transicionarSolicitacaoPessoa).mockRejectedValue(
+      new ApiError(422, "interno"),
+    );
+    render(<SolicitacoesScreen />);
+    fireEvent.click(await screen.findByRole("button", { name: /Ver detalhe/ }));
+    await screen.findByRole("heading", { name: /^Solicitação aaaaaaaa/ });
+    fireEvent.click(screen.getByRole("button", { name: "Enviar" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: /Confirmar enviar/i }),
+    );
+
+    expect(
+      await screen.findByText(/Esta ação não é mais possível/),
+    ).toBeInTheDocument();
+    // Diferente do 404: o contexto permanece.
+    expect(
+      screen.getByRole("heading", { name: /^Solicitação aaaaaaaa/ }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Ação registrada/)).not.toBeInTheDocument();
   });
 
   it("nunca exibe o corpo interno de erro do servidor", async () => {
@@ -895,6 +1002,165 @@ describe("SolicitacoesScreen (T140) — limites de domínio", () => {
 });
 
 describe("SolicitacoesScreen (T140) — corridas assíncronas", () => {
+  it("troca A -> B apaga TODO o contexto de A antes de B responder", async () => {
+    prepararBase(ATOR_RH, [COLAB_A, COLAB_B]);
+    const dVincB = deferred<unknown>();
+    vi.mocked(listarVinculosDoColaborador).mockImplementation(((id: string) =>
+      id === "colab-A"
+        ? Promise.resolve([
+            vinculo({ id: "va", matricula: "MA", colaboradorId: "colab-A" }),
+          ])
+        : dVincB.promise) as never);
+
+    // A lista responde conforme o filtro de vínculo, para distinguir o que é
+    // de A, o que é de B e o que é a lista sem filtro.
+    vi.mocked(listarSolicitacoesPessoas).mockImplementation(((q: {
+      vinculoId?: string;
+    }) => {
+      if (q?.vinculoId === "va")
+        return Promise.resolve(pagina([solicitacao({ tipo: "ferias" })]));
+      if (q?.vinculoId === "vb")
+        return Promise.resolve(pagina([solicitacao({ tipo: "beneficios" })]));
+      return Promise.resolve(pagina([solicitacao({ tipo: "ausencia" })]));
+    }) as never);
+
+    render(<SolicitacoesScreen />);
+    const sel = await screen.findByLabelText("Colaborador");
+
+    // Contexto A completo: vínculo resolvido, lista filtrada por ele.
+    fireEvent.change(sel, { target: { value: "colab-A" } });
+    const tabela = await screen.findByRole("table", {
+      name: "Solicitações de pessoas no seu escopo",
+    });
+    await waitFor(() =>
+      expect(within(tabela).getByText("Férias")).toBeInTheDocument(),
+    );
+    expect(await screen.findByText(/matrícula MA/)).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Registrar solicitação" }),
+    ).toBeEnabled();
+
+    // Troca para B, com os vínculos de B AINDA PENDENTES.
+    fireEvent.change(sel, { target: { value: "colab-B" } });
+
+    // Nada de A pode sobreviver a este instante.
+    await waitFor(() =>
+      expect(screen.queryByText(/matrícula MA/)).not.toBeInTheDocument(),
+    );
+    expect(
+      within(
+        screen.getByRole("table", {
+          name: "Solicitações de pessoas no seu escopo",
+        }),
+      ).queryByText("Férias"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Registrar solicitação" }),
+    ).toBeDisabled();
+    expect(
+      screen.getByText(/Selecione um colaborador e um vínculo/),
+    ).toBeInTheDocument();
+    // Sem formulário aberto, não há caminho de submissão com o vínculo de A.
+    expect(
+      screen.queryByRole("button", { name: "Registrar" }),
+    ).not.toBeInTheDocument();
+    expect(vi.mocked(registrarSolicitacaoPessoa)).not.toHaveBeenCalled();
+
+    // B responde: só os dados de B.
+    await resolverECommitar(() =>
+      dVincB.resolve([
+        vinculo({ id: "vb", matricula: "MB", colaboradorId: "colab-B" }),
+      ]),
+    );
+    expect(await screen.findByText(/matrícula MB/)).toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        within(
+          screen.getByRole("table", {
+            name: "Solicitações de pessoas no seu escopo",
+          }),
+        ).getByText("Benefícios"),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.queryByText(/matrícula MA/)).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Registrar solicitação" }),
+    ).toBeEnabled();
+  });
+
+  it("resposta tardia de vínculos de A não reidrata o contexto de B", async () => {
+    prepararBase(ATOR_RH, [COLAB_A, COLAB_B]);
+    const dVincA = deferred<unknown>();
+    vi.mocked(listarVinculosDoColaborador).mockImplementation(((id: string) =>
+      id === "colab-A"
+        ? dVincA.promise
+        : Promise.resolve([
+            vinculo({ id: "vb", matricula: "MB", colaboradorId: "colab-B" }),
+          ])) as never);
+
+    render(<SolicitacoesScreen />);
+    const sel = await screen.findByLabelText("Colaborador");
+    fireEvent.change(sel, { target: { value: "colab-A" } });
+    fireEvent.change(sel, { target: { value: "colab-B" } });
+
+    expect(await screen.findByText(/matrícula MB/)).toBeInTheDocument();
+
+    await resolverECommitar(() =>
+      dVincA.resolve([
+        vinculo({ id: "va", matricula: "MA", colaboradorId: "colab-A" }),
+      ]),
+    );
+
+    expect(screen.getByText(/matrícula MB/)).toBeInTheDocument();
+    expect(screen.queryByText(/matrícula MA/)).not.toBeInTheDocument();
+    expect((screen.getByLabelText("Vínculo") as HTMLSelectElement).value).toBe(
+      "vb",
+    );
+  });
+
+  it("A -> B -> A: o contador distingue duas cargas do MESMO colaborador", async () => {
+    prepararBase(ATOR_RH, [COLAB_A, COLAB_B]);
+    const primeiraA = deferred<unknown>();
+    const segundaA = deferred<unknown>();
+    let chamadasA = 0;
+    vi.mocked(listarVinculosDoColaborador).mockImplementation(((id: string) => {
+      if (id !== "colab-A")
+        return Promise.resolve([
+          vinculo({ id: "vb", matricula: "MB", colaboradorId: "colab-B" }),
+        ]);
+      chamadasA += 1;
+      return chamadasA === 1 ? primeiraA.promise : segundaA.promise;
+    }) as never);
+
+    render(<SolicitacoesScreen />);
+    const sel = await screen.findByLabelText("Colaborador");
+    fireEvent.change(sel, { target: { value: "colab-A" } }); // carga 1 de A
+    fireEvent.change(sel, { target: { value: "colab-B" } });
+    await screen.findByText(/matrícula MB/);
+    fireEvent.change(sel, { target: { value: "colab-A" } }); // carga 2 de A
+
+    // A segunda carga de A responde: é ela que vale.
+    await resolverECommitar(() =>
+      segundaA.resolve([
+        vinculo({ id: "va2", matricula: "MA-2", colaboradorId: "colab-A" }),
+      ]),
+    );
+    expect(await screen.findByText(/matrícula MA-2/)).toBeInTheDocument();
+
+    // A PRIMEIRA carga de A chega atrasada — mesmo id, carga obsoleta.
+    await resolverECommitar(() =>
+      primeiraA.resolve([
+        vinculo({ id: "va1", matricula: "MA-1", colaboradorId: "colab-A" }),
+      ]),
+    );
+
+    expect(screen.getByText(/matrícula MA-2/)).toBeInTheDocument();
+    expect(screen.queryByText(/matrícula MA-1/)).not.toBeInTheDocument();
+    expect((screen.getByLabelText("Vínculo") as HTMLSelectElement).value).toBe(
+      "va2",
+    );
+  });
+
   it("troca de colaborador: vínculos antigos (A) que chegam após B não vazam", async () => {
     prepararBase(ATOR_RH, [COLAB_A, COLAB_B]);
     const dA = deferred<unknown>();
@@ -907,17 +1173,21 @@ describe("SolicitacoesScreen (T140) — corridas assíncronas", () => {
     fireEvent.change(sel, { target: { value: "colab-A" } });
     fireEvent.change(sel, { target: { value: "colab-B" } });
 
-    dB.resolve([
-      vinculo({ id: "vb", matricula: "MB", colaboradorId: "colab-B" }),
-    ]);
-    await screen.findByText(/matrícula MB/);
+    await resolverECommitar(() =>
+      dB.resolve([
+        vinculo({ id: "vb", matricula: "MB", colaboradorId: "colab-B" }),
+      ]),
+    );
+    // Evidência POSITIVA do contexto atual.
+    expect(await screen.findByText(/matrícula MB/)).toBeInTheDocument();
 
-    dA.resolve([
-      vinculo({ id: "va", matricula: "MA", colaboradorId: "colab-A" }),
-    ]);
-    await Promise.resolve();
-    await Promise.resolve();
+    await resolverECommitar(() =>
+      dA.resolve([
+        vinculo({ id: "va", matricula: "MA", colaboradorId: "colab-A" }),
+      ]),
+    );
 
+    // Evidência NEGATIVA: o contexto antigo não reapareceu depois do commit.
     expect(screen.getByText(/matrícula MB/)).toBeInTheDocument();
     expect(screen.queryByText(/matrícula MA/)).not.toBeInTheDocument();
   });
@@ -935,15 +1205,17 @@ describe("SolicitacoesScreen (T140) — corridas assíncronas", () => {
       target: { value: "ferias" },
     });
 
-    dSegunda.resolve(pagina([solicitacao({ tipo: "ferias" })]));
+    await resolverECommitar(() =>
+      dSegunda.resolve(pagina([solicitacao({ tipo: "ferias" })])),
+    );
     const tabela = await screen.findByRole("table", {
       name: "Solicitações de pessoas no seu escopo",
     });
     expect(within(tabela).getByText("Férias")).toBeInTheDocument();
 
-    dPrimeira.resolve(pagina([solicitacao({ tipo: "atestado" })]));
-    await Promise.resolve();
-    await Promise.resolve();
+    await resolverECommitar(() =>
+      dPrimeira.resolve(pagina([solicitacao({ tipo: "atestado" })])),
+    );
 
     expect(within(tabela).getByText("Férias")).toBeInTheDocument();
     expect(within(tabela).queryByText("Atestado")).not.toBeInTheDocument();
@@ -969,17 +1241,89 @@ describe("SolicitacoesScreen (T140) — corridas assíncronas", () => {
     fireEvent.click(screen.getByRole("button", { name: "Próxima página" }));
     fireEvent.click(screen.getByRole("button", { name: "Próxima página" }));
 
-    dP2.resolve(pagina([solicitacao({ tipo: "beneficios" })], 60, 3));
+    await resolverECommitar(() =>
+      dP2.resolve(pagina([solicitacao({ tipo: "beneficios" })], 60, 3)),
+    );
     await waitFor(() =>
       expect(within(tabela).getByText("Benefícios")).toBeInTheDocument(),
     );
 
-    dP1.resolve(pagina([solicitacao({ tipo: "ausencia" })], 60, 2));
-    await Promise.resolve();
-    await Promise.resolve();
+    await resolverECommitar(() =>
+      dP1.resolve(pagina([solicitacao({ tipo: "ausencia" })], 60, 2)),
+    );
 
     expect(within(tabela).getByText("Benefícios")).toBeInTheDocument();
     expect(within(tabela).queryByText("Ausência")).not.toBeInTheDocument();
+  });
+
+  it("histórico tardio de A não aparece no painel já aberto de B", async () => {
+    // Exercita a guarda do HISTÓRICO com o painel ABERTO: se ela cair, os
+    // eventos de A pintam dentro do detalhe de B.
+    prepararBase();
+    const solA = solicitacao({ id: "aaaaaaaa-1111-4111-8111-111111111111" });
+    const solB = solicitacao({
+      id: "bbbbbbbb-2222-4222-8222-222222222222",
+      situacao: "cancelada",
+    });
+    vi.mocked(listarSolicitacoesPessoas).mockResolvedValue(
+      pagina([solA, solB]) as never,
+    );
+    vi.mocked(detalharSolicitacaoPessoa).mockImplementation(((id: string) =>
+      Promise.resolve(id === solA.id ? solA : solB)) as never);
+
+    const dHistA = deferred<unknown>();
+    vi.mocked(historicoSolicitacaoPessoa).mockImplementation(((id: string) =>
+      id === solA.id
+        ? dHistA.promise
+        : Promise.resolve([
+            evento({
+              id: "ev-b",
+              solicitacaoId: solB.id,
+              acao: "cancelar",
+              situacaoDe: "rascunho",
+              situacaoPara: "cancelada",
+            }),
+          ])) as never);
+
+    render(<SolicitacoesScreen />);
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: /Ver detalhe da solicitação aaaaaaaa/,
+      }),
+    );
+    await screen.findByRole("heading", { name: /^Solicitação aaaaaaaa/ });
+
+    fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: /Ver detalhe da solicitação bbbbbbbb/,
+      }),
+    );
+    await screen.findByRole("heading", { name: /^Solicitação bbbbbbbb/ });
+
+    const historicoB = await screen.findByRole("table", {
+      name: "Histórico da solicitação, em ordem cronológica",
+    });
+    expect(within(historicoB).getByText("Cancelada")).toBeInTheDocument();
+
+    // O histórico de A chega atrasado, com o painel de B aberto.
+    await resolverECommitar(() =>
+      dHistA.resolve([
+        evento({
+          id: "ev-a",
+          acao: "recusar",
+          situacaoDe: "em_revisao_rh",
+          situacaoPara: "recusada",
+        }),
+      ]),
+    );
+
+    const aindaB = screen.getByRole("table", {
+      name: "Histórico da solicitação, em ordem cronológica",
+    });
+    expect(within(aindaB).getByText("Cancelada")).toBeInTheDocument();
+    expect(within(aindaB).queryByText("Recusada")).not.toBeInTheDocument();
+    expect(within(aindaB).queryByText("Recusar")).not.toBeInTheDocument();
   });
 
   it("detalhe fechado não é repovoado por uma resposta atrasada", async () => {
@@ -1008,10 +1352,10 @@ describe("SolicitacoesScreen (T140) — corridas assíncronas", () => {
       ).not.toBeInTheDocument(),
     );
 
-    dDetalhe.resolve(solicitacao({ situacao: "recusada" }));
-    dHist.resolve([evento({ id: "ev-tardio", acao: "recusar" })]);
-    await Promise.resolve();
-    await Promise.resolve();
+    await resolverECommitar(() => {
+      dDetalhe.resolve(solicitacao({ situacao: "recusada" }));
+      dHist.resolve([evento({ id: "ev-tardio", acao: "recusar" })]);
+    });
 
     expect(
       screen.queryByRole("heading", { name: /^Solicitação aaaaaaaa/ }),

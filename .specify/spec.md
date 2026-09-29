@@ -43,10 +43,11 @@ para o Master.
 
 ### 1.1 Estado convergido em 29/09/2026
 
-- **Integrado em `main` até T136:** fundação de identidade/sessão/RBAC/auditoria; estrutura
+- **Integrado em `main` até T139:** fundação de identidade/sessão/RBAC/auditoria; estrutura
   organizacional; contas de acesso; autenticação web; sessões ativas; MFA TOTP opcional; cadastros
   funcionais de organização, cargos, centros de custo e horários; colaboradores, vínculos, histórico
-  funcional, documentos, dados contratuais e operações delimitadas de Ponto.
+  funcional, documentos, dados contratuais e operações delimitadas de Ponto; convergência e gate do
+  Spec Kit (T138); e a fundação backend da Central de Solicitações de Pessoas (T139, PR #131).
 - **Superfícies demonstrativas:** continuam sem persistência quando o contrato de backend ou a decisão
   de negócio não existe. A existência visual de uma aba não autoriza tratá-la como funcional.
 - **T135:** investigação de Solicitações gerais de Pessoas encerrada sem código porque não há contrato

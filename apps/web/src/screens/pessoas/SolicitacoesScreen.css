@@ -71,6 +71,15 @@
   color: var(--status-success-ink);
 }
 
+/* Aviso de falha que sobrevive ao fechamento do painel (404 em transição). */
+.solicitacoes-screen__falha {
+  margin: 0;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-sm);
+  background: var(--status-danger-surface);
+  color: var(--status-danger-ink);
+}
+
 .solicitacoes-screen__secao {
   display: flex;
   flex-direction: column;

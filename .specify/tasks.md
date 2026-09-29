@@ -482,8 +482,8 @@ decisões e bloqueios, está no ledger versionado
 
 37. **T140 - Interface web funcional da Central de Solicitações de Pessoas**
 
-    - **Estado:** implementada na branch `codex/t140-web-solicitacoes-pessoas`; PR Draft, aguardando
-      revisão somente leitura.
+    - **Estado:** implementada na branch `codex/t140-web-solicitacoes-pessoas`; **PR #132 Draft**,
+      aguardando revisão somente leitura. Não integrada — a integração só existe após o merge.
     - **Preparação executada:** `/speckit.specify`, `/speckit.plan` e `/speckit.tasks` em
       `specs/t140-web-solicitacoes-pessoas/`, antes de qualquer código.
     - **Objetivo:** transformar a aba demonstrativa Pessoas > Solicitações (T091) em interface

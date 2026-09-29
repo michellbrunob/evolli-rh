@@ -159,6 +159,23 @@ export function SolicitacoesScreen() {
   const [formTransicao, setFormTransicao] =
     useState<FormularioTransicao | null>(null);
   const [mensagemSucesso, setMensagemSucesso] = useState<string | null>(null);
+  /**
+   * Aviso de falha que pertence à TELA, não a um formulário.
+   *
+   * Existe porque o 404 de uma transição precisa fechar o painel — o recurso
+   * saiu do escopo e mantê-lo aberto seria mentira — e um erro guardado no
+   * formulário morreria no mesmo lote de atualizações que o destrói, deixando
+   * a mutação falhar em silêncio. `fecharDetalhe` não toca neste estado.
+   */
+  const [mensagemFalha, setMensagemFalha] = useState<string | null>(null);
+
+  /**
+   * Incrementado a cada troca de colaborador. Entra nas dependências do efeito
+   * da listagem para que ela SEMPRE recarregue na troca, mesmo quando `pagina`
+   * e `vinculoId` já estavam nos valores neutros — sem isso, limpar a lista no
+   * próprio evento deixaria a tela presa em "carregando".
+   */
+  const [geracaoContexto, setGeracaoContexto] = useState(0);
 
   // Cada carregador tem seu contador monotônico: só a tentativa MAIS RECENTE
   // pode escrever no estado. Uma resposta atrasada de uma seleção, de um filtro
@@ -269,7 +286,14 @@ export function SolicitacoesScreen() {
 
   useEffect(() => {
     void carregarLista(pagina, filtroTipo, filtroSituacao, vinculoId);
-  }, [pagina, filtroTipo, filtroSituacao, vinculoId, carregarLista]);
+  }, [
+    geracaoContexto,
+    pagina,
+    filtroTipo,
+    filtroSituacao,
+    vinculoId,
+    carregarLista,
+  ]);
 
   // ---- Detalhe e histórico ------------------------------------------------
 
@@ -310,6 +334,7 @@ export function SolicitacoesScreen() {
     setHistorico([]);
     setFormTransicao(null);
     setMensagemSucesso(null);
+    setMensagemFalha(null);
     void carregarDetalhe(solicitacao.id);
     void carregarHistorico(solicitacao.id);
   }
@@ -379,7 +404,9 @@ export function SolicitacoesScreen() {
   async function submeterRegistro(evento: React.FormEvent) {
     evento.preventDefault();
     if (!formRegistro || formRegistro.salvando || !empresaId) return;
-    if (!vinculoId) {
+    // Barreira final: o vínculo precisa ser do colaborador atualmente
+    // carregado, nunca um resíduo da seleção anterior.
+    if (!vinculoId || !vinculos.some((v) => v.id === vinculoId)) {
       setFormRegistro({ ...formRegistro, erro: "Selecione um vínculo." });
       return;
     }
@@ -428,6 +455,7 @@ export function SolicitacoesScreen() {
       return;
     }
     setFormTransicao({ ...formTransicao, salvando: true, erro: null });
+    setMensagemFalha(null);
     const alvoId = detalhe.id;
     try {
       await transicionarSolicitacaoPessoa(alvoId, {
@@ -435,20 +463,34 @@ export function SolicitacoesScreen() {
         ...(formTransicao.motivo ? { motivo: formTransicao.motivo } : {}),
       });
       setFormTransicao(null);
+      setMensagemFalha(null);
       setMensagemSucesso(
         `Ação registrada: ${ROTULO_ACAO[formTransicao.acao]}.`,
       );
       recarregarTudo(alvoId);
     } catch (err) {
-      setFormTransicao({
-        ...formTransicao,
-        salvando: false,
-        erro: mensagemErro(err),
-      });
-      // 404/409/422 significam que o estado local está velho: relê do servidor.
-      if (err instanceof ApiError && [404, 409, 422].includes(err.status)) {
-        recarregarTudo(err.status === 404 ? null : alvoId);
-        if (err.status === 404) fecharDetalhe();
+      const status = err instanceof ApiError ? err.status : null;
+      const mensagem = mensagemErro(err);
+
+      if (status === 404) {
+        // O recurso saiu do escopo: manter o painel aberto seria mentira, mas
+        // fechá-lo em silêncio faria a falha parecer sucesso — o caminho feliz
+        // também fecha o formulário. Por isso o aviso vai para o estado da
+        // TELA, que `fecharDetalhe` não limpa e que sobrevive ao mesmo lote de
+        // atualizações. Ele só sai numa próxima ação do operador.
+        setMensagemSucesso(null);
+        setMensagemFalha(mensagem);
+        recarregarTudo(null);
+        fecharDetalhe();
+        return;
+      }
+
+      setFormTransicao({ ...formTransicao, salvando: false, erro: mensagem });
+      // 409 e 422 mantêm o painel aberto: o operador precisa do contexto para
+      // entender o conflito. O estado real é relido do servidor, e nada é
+      // projetado localmente como se tivesse dado certo.
+      if (status === 409 || status === 422) {
+        recarregarTudo(alvoId);
       }
     }
   }
@@ -460,11 +502,60 @@ export function SolicitacoesScreen() {
   const totalPaginas = Math.max(1, Math.ceil(total / TAMANHO_PAGINA));
   const acoesDisponiveis = detalhe ? ACOES_POR_SITUACAO[detalhe.situacao] : [];
 
+  /**
+   * Só vale um vínculo que pertence à lista JÁ carregada do colaborador atual.
+   * Conferir a pertinência, e não apenas se há algo selecionado, fecha de vez
+   * a possibilidade de submeter com o vínculo de um colaborador anterior.
+   */
+  const vinculoValido =
+    vinculoId !== "" && vinculos.some((v) => v.id === vinculoId);
+
+  /**
+   * Troca de colaborador — invalidação e limpeza acontecem NESTE evento, nunca
+   * num efeito posterior.
+   *
+   * Depender do efeito abriria uma janela, do tamanho da requisição de
+   * vínculos, em que o seletor já mostra B enquanto `vinculoId` ainda aponta
+   * para o vínculo de A: a lista continuaria filtrada por A e o botão de
+   * registro continuaria habilitado com o vínculo de A.
+   */
   function trocarColaborador(id: string) {
+    // Reselecionar o MESMO colaborador não é troca de contexto. Sair aqui
+    // evita marcar "carregando" sem que o efeito de vínculos volte a rodar —
+    // o React descarta um `setColaboradorId` com valor idêntico, e a tela
+    // ficaria presa carregando para sempre.
+    if (id === colaboradorId) return;
+
+    // 1. Invalida toda carga em voo do contexto anterior, antes de qualquer
+    //    escrita de estado: uma resposta atrasada de A não pode reidratar
+    //    vínculo, lista, detalhe ou histórico já no contexto de B. Cada
+    //    contador também distingue duas cargas do MESMO id (A -> B -> A).
+    seqVinculos.current += 1;
+    seqLista.current += 1;
+    seqDetalhe.current += 1;
+    seqHistorico.current += 1;
+
+    // 2. Zera imediatamente tudo que dependia do colaborador anterior.
     setColaboradorId(id);
+    setVinculoId("");
+    setVinculos([]);
+    setStatusVinculos(id ? "carregando" : "pronto");
+
+    setSolicitacoes([]);
+    setTotal(0);
     setPagina(1);
+    setStatusLista("carregando");
+    setGeracaoContexto((geracao) => geracao + 1);
+
+    setDetalhe(null);
+    setHistorico([]);
+    setStatusDetalhe("pronto");
+    setStatusHistorico("pronto");
+
     setFormRegistro(null);
+    setFormTransicao(null);
     setMensagemSucesso(null);
+    setMensagemFalha(null);
   }
 
   function trocarVinculo(id: string) {
@@ -565,6 +656,12 @@ export function SolicitacoesScreen() {
       {mensagemSucesso ? (
         <p className="solicitacoes-screen__sucesso" role="status">
           {mensagemSucesso}
+        </p>
+      ) : null}
+
+      {mensagemFalha ? (
+        <p className="solicitacoes-screen__falha" role="alert">
+          {mensagemFalha}
         </p>
       ) : null}
 
@@ -682,15 +779,16 @@ export function SolicitacoesScreen() {
               onClick={() => {
                 setFormRegistro({ ...REGISTRO_VAZIO });
                 setMensagemSucesso(null);
+                setMensagemFalha(null);
               }}
-              disabled={!vinculoId}
+              disabled={!vinculoValido}
             >
               Registrar solicitação
             </Button>
           ) : null}
         </div>
 
-        {mutavel && !vinculoId ? (
+        {mutavel && !vinculoValido ? (
           <p className="solicitacoes-screen__ajuda">
             Selecione um colaborador e um vínculo para registrar uma
             solicitação.
