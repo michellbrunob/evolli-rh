@@ -1,24 +1,19 @@
 {
   "schemaVersion": 1,
   "constitutionVersion": "1.4.0",
-  "lastConvergedAt": "2026-09-23",
-  "lastIntegratedTask": 134,
-  "lastRecordedTask": 138,
+  "lastConvergedAt": "2026-09-29",
+  "lastIntegratedTask": 136,
+  "lastRecordedTask": 139,
   "nextTask": {
-    "id": "T137",
-    "status": "blocked",
-    "reason": "Aguardar integração da T136 e aprovação formal de PD-SOL-01..05."
+    "id": "T139",
+    "status": "ready_after_t138_integration",
+    "reason": "T136 e PD-SOL-01..05 integradas; aguardar revisão e integração da convergência T138."
   },
   "openDeliveries": [
     {
-      "id": "T136",
-      "pullRequest": 129,
-      "status": "ready_for_review_not_integrated"
-    },
-    {
       "id": "T138",
       "pullRequest": 130,
-      "status": "draft_ready_for_read_only_review"
+      "status": "draft_updated_after_t136"
     }
   ],
   "requiredArtifacts": [

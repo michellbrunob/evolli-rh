@@ -1,8 +1,8 @@
 # Estado de execução do Spec Kit — Evolli RH
 
-**Última convergência:** 2026-09-23
+**Última convergência:** 2026-09-29
 
-**Base Git verificada:** `origin/main` em `5fa199a` (T134 integrada)
+**Base Git verificada:** `origin/main` em `2609488` (T136 integrada)
 
 **Constituição:** v1.4.0
 
@@ -85,21 +85,23 @@ de Horas.
 | T133   | Integrada | Pessoas > Documentos funcional para metadados e solicitações documentais, sem upload/download inventado.         |
 | T134   | Integrada | Pessoas > Dados contratuais somente leitura, com guardas determinísticas contra respostas assíncronas obsoletas. |
 
-## Solicitações gerais de Pessoas e convergência — T135 a T138
+## Solicitações gerais de Pessoas e convergência — T135 a T139
 
-| Tarefa | Estado                          | Resultado principal                                                                                                                 |
-| ------ | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| T135   | Investigada/bloqueada           | Não existe controller, persistência Prisma nem RBAC real para Solicitações gerais. Nenhum código foi criado.                        |
-| T136   | Implementada; PR #129 aberta    | Pacote `PD-SOL-01..05` preparado. A PR está Ready for review documental, mas ainda não integra `main` neste marco.                  |
-| T137   | Bloqueada/não iniciada          | Fundação de backend depende da integração da T136 e das respostas formais de RH, Jurídico, Produto e Segurança.                     |
-| T138   | PR #130 Draft; revisão pendente | Constituição, Spec, Plan, Tasks, ledger, comandos e CI do Spec Kit versionados e reconciliados para impedir novo desvio silencioso. |
+| Tarefa | Estado                           | Resultado principal                                                                                                      |
+| ------ | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| T135   | Investigada/bloqueada            | Não existe controller, persistência Prisma nem RBAC real para Solicitações gerais. Nenhum código foi criado.             |
+| T136   | Integrada                        | `PD-SOL-01..05` aprovadas; ADR 0013 define Cloudflare R2 como provedor privado futuro sem habilitar upload.              |
+| T137   | Não iniciada; substituída        | Identificador histórico da fundação, substituído pela T139 após a convergência T138; nenhum código funcional foi criado. |
+| T138   | PR #130 Draft; atualização atual | Spec Kit versionado e agora reconciliado sobre `main` com T136, decisões aprovadas e ADR 0013.                           |
+| T139   | Pronta para especificação        | Próxima fundação backend da Central, sem anexos nem efeitos automáticos; inicia após integração e revisão da T138.       |
 
 ## Próxima ação autorizável
 
-1. Concluir a revisão/integração documental da T136 sem marcar `PD-SOL-01..05` como aprovadas.
-2. Registrar no pacote as respostas dos responsáveis.
-3. Executar `/speckit.specify` e `/speckit.plan` específicos da T137 somente após o fechamento.
-4. Atualizar este ledger e `sync-state.json` em toda tarefa futura.
+1. Revisar e integrar a T138/PR #130 sem implementar a Central nesta branch.
+2. Abrir a T139 a partir da `main` atualizada.
+3. Executar `/speckit.specify`, `/speckit.plan` e `/speckit.tasks` específicos da T139 antes do código.
+4. Reconciliar o núcleo T066 com a decisão de cancelamento/reabertura e manter anexos bloqueados.
+5. Atualizar este ledger e `sync-state.json` em toda tarefa futura.
 
 ## Evidência mínima por tarefa futura
 

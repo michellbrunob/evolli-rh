@@ -2,7 +2,7 @@
 
 **Versão:** 1.0
 
-**Data:** 2026-09-23
+**Data:** 2026-09-29
 
 **Método:** Spec Kit 0.16.3 + branches/PRs pequenas + revisão por evidência
 
@@ -74,10 +74,12 @@ dentro do comando copiável.
 
 ## 7. Estado no marco desta versão
 
-- Integrado em `main` até T134.
+- Integrado em `main` até T136.
 - T135 concluída como investigação bloqueada, sem código.
-- T136 implementada documentalmente na PR #129 e ainda não integrada neste marco.
-- T137 bloqueada por `PD-SOL-01..05`.
-- T138 é esta convergência e proteção do Spec Kit.
+- T136 integrada pela PR #129; `PD-SOL-01..05` aprovadas e ADR 0013 aceita.
+- T137 não foi iniciada e foi substituída pela T139 no sequenciamento atual.
+- T138 é esta convergência e proteção do Spec Kit, atualizada sobre a T136.
+- T139 é a próxima fundação funcional, condicionada à integração da T138 e à
+  geração de especificação, plano e tarefas próprios antes do código.
 
 O estado detalhado fica em [`.specify/execution-status.md`](../.specify/execution-status.md).

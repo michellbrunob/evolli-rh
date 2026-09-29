@@ -39,7 +39,8 @@ Cada etapa exige especificação aprovada, testes automatizados, revisão de seg
 > cada uma é decisão de Produto/RH. "Reserva Fiscal" é o **nome da empresa**, não
 > uma etapa/módulo (ver [glossário](decisions/glossario-reserva-fiscal.md)).
 
-> **Nota de convergência Spec Kit (T138, 23/09/2026).** O estado integrado chega à T134; T135 foi
-> investigação sem código; T136 está em revisão documental; T137 permanece bloqueada por
-> `PD-SOL-01..05`. O ledger versionado está em
+> **Nota de convergência Spec Kit (T138, 29/09/2026).** O estado integrado chega à T136;
+> `PD-SOL-01..05` estão aprovadas e a ADR 0013 define o Cloudflare R2 como provedor privado futuro,
+> sem habilitar upload. T137 não foi iniciada e foi substituída pela T139, próxima fundação backend
+> após a integração da T138. O ledger versionado está em
 > [`.specify/execution-status.md`](../.specify/execution-status.md).

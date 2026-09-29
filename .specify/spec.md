@@ -4,8 +4,8 @@
 
 **Criado:** 2026-08-13
 
-**Última convergência:** 2026-09-23
-**Fontes:** Constituição v1.4.0; PRD oficial no Notion; ADRs 0001-0012; decisões versionadas;
+**Última convergência:** 2026-09-29
+**Fontes:** Constituição v1.4.0; PRD oficial no Notion; ADRs 0001-0013; decisões versionadas;
 Diário Dev - Reserva Fiscal
 **Escopo:** Plataforma interna de RH e Reserva Fiscal. Esta especificação descreve comportamento e
 regras de negócio; decisões técnicas pertencem ao implementation plan.
@@ -41,9 +41,9 @@ para o Master.
 | P2         | Folha de pagamento                                 | Requer regras, fórmulas e responsáveis aprovados                                                 |
 | P2         | Relatórios gerenciais e operacionais confiáveis    | Requer definições de indicadores e fontes aprovadas                                              |
 
-### 1.1 Estado convergido em 23/09/2026
+### 1.1 Estado convergido em 29/09/2026
 
-- **Integrado em `main` até T134:** fundação de identidade/sessão/RBAC/auditoria; estrutura
+- **Integrado em `main` até T136:** fundação de identidade/sessão/RBAC/auditoria; estrutura
   organizacional; contas de acesso; autenticação web; sessões ativas; MFA TOTP opcional; cadastros
   funcionais de organização, cargos, centros de custo e horários; colaboradores, vínculos, histórico
   funcional, documentos, dados contratuais e operações delimitadas de Ponto.
@@ -51,8 +51,13 @@ para o Master.
   de negócio não existe. A existência visual de uma aba não autoriza tratá-la como funcional.
 - **T135:** investigação de Solicitações gerais de Pessoas encerrada sem código porque não há contrato
   HTTP, modelo persistente, RBAC nem decisões humanas suficientes.
-- **T136 / PR #129:** pacote de decisão de Solicitações gerais preparado; `PD-SOL-01..05` permanecem
-  pendentes. A futura T137 de backend não pode iniciar antes do fechamento formal dessas decisões.
+- **T136 / PR #129:** pacote de decisão integrado; `PD-SOL-01..05` foram aprovadas em 2026-09-29.
+  Catálogo, alçadas, separação de "Verificar folhas", cancelamento/reabertura, objetivo de primeiro
+  retorno e política mínima de evidências estão definidos. O Cloudflare R2 foi aprovado como provedor
+  privado futuro pela ADR 0013, sem habilitar upload.
+- **Próxima fundação funcional:** a tarefa histórica T137 não foi executada e é substituída pela T139,
+  a iniciar somente após a integração da convergência T138. A T139 implementará backend sem anexos,
+  sem efeitos trabalhistas automáticos e sem bloqueio automático de fechamento.
 - **MFA:** núcleo e interface existem. O lançamento inicial usa `MFA_ENABLED=false` por decisão T132;
   MFA universal permanece como alvo. Conta que já tenha fator ativo falha fechada enquanto o recurso
   estiver desligado. Ativação futura depende da chave protegida, das evidências `DS-SEC-*` e de decisão
@@ -130,7 +135,8 @@ necessárias aos processos autorizados de RH e folha.
   documentos comprobatórios e matriz de aprovação.
 - RH define o escopo de subordinados diretos/indiretos, campos, anexos, SLA e notificações dos fluxos
   do Portal do Gestor.
-- Storage privado, quarentena/antimalware e política de classificação são pré-requisitos para uploads
+- Cloudflare R2 é o provedor privado aprovado (ADR 0013). Credenciais por ambiente, limites,
+  quarentena/antimalware, matriz de acesso, retenção e descarte continuam pré-requisitos para uploads
   e documentos reais.
 - Integrações com folha, ponto, férias e benefícios dependem de contrato e homologação próprios.
 
@@ -396,10 +402,11 @@ perda de dados.
 ## 12. Rastreabilidade e próximos passos
 
 Esta especificação deriva do PRD oficial no Notion e deve ser refinada por fatia antes da implementação.
-O próximo ciclo funcional condicionado é a fundação de backend de Solicitações gerais de Pessoas
-(T137), mas ela permanece bloqueada até `PD-SOL-01..05` serem respondidas e formalmente registradas.
-Enquanto o bloqueio existir, uma nova fatia independente só pode iniciar após `/speckit.specify` e
-`/speckit.plan` próprios, sem reutilizar silenciosamente regras ainda pendentes. Folha permanece em
-planejamento até a homologação das regras e responsáveis.
+O próximo ciclo funcional é a T139, fundação de backend de Solicitações gerais de Pessoas sem anexos.
+As decisões `PD-SOL-01..05` estão integradas; antes de codificar a fatia, sua branch deve executar
+`/speckit.specify`, `/speckit.plan` e `/speckit.tasks`, reconciliando o núcleo puro T066 com a regra
+aprovada de cancelamento. O termo funcional "encerrada" corresponde ao estado terminal
+`encaminhada_para_operacao_rh`, sem criar um novo estado. Folha permanece em planejamento até a
+homologação das regras e responsáveis.
 
 > Nota (T032): "Reserva Fiscal" é o nome da empresa/projeto, não um módulo (glossario-reserva-fiscal.md). Governança de privacidade = RH + Juridico (ADR 0012). Estado integrado e gates pendentes: ver README e ROADMAP.

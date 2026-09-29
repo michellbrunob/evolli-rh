@@ -59,7 +59,8 @@ Ecossistema corporativo de RH e Departamento Pessoal, modular e multiempresa.
 - Cofre de segredos, backup/restauração testada, demais decisões operacionais da T004 e o runbook de
   provisionamento do primeiro `master_tecnico` continuam pendentes conforme seus gates próprios.
 - Retenção, base legal e RIPD/DPIA por módulo (RH + Jurídico).
-- Solicitações gerais de Pessoas aguardam `PD-SOL-01..05`; a fundação de backend T137 não iniciou.
+- Solicitações gerais de Pessoas têm `PD-SOL-01..05` aprovadas; a fundação backend T139, sem anexos,
+  é a próxima fatia após a integração da convergência Spec Kit T138.
 
 Consulte [docs/ROADMAP.md](docs/ROADMAP.md) e o
 [processo de desenvolvimento](docs/PROCESSO-DESENVOLVIMENTO.md).

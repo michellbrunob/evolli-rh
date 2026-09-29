@@ -3,7 +3,7 @@
 **Base:** Constituição v1.4.0, `.specify/spec.md`, `.specify/plan.md` e
 `.specify/execution-status.md`
 
-**Última convergência:** 2026-09-23
+**Última convergência:** 2026-09-29
 
 > **Glossário vinculante — 20/08/2026:** “Reserva Fiscal” é o nome da empresa e do projeto. Não é
 > módulo, produto, serviço nem escopo fiscal. T020–T023, que descreviam uma fatia fiscal por equívoco,
@@ -418,7 +418,7 @@
     - **Nota histórica:** este registro nasceu quando `.specify` ainda era local. Desde a convergência
       de 23/09/2026, os artefatos duráveis do Spec Kit são versionados no Git.
 
-## Horizonte atual após a convergência de 23/09/2026
+## Horizonte atual após a convergência de 29/09/2026
 
 O detalhamento histórico de T050 a T136, incluindo faixas integradas, investigações sem código,
 decisões e bloqueios, está no ledger versionado
@@ -436,22 +436,16 @@ decisões e bloqueios, está no ledger versionado
 
 33. **T136 - Pacote de decisão de Solicitações gerais de Pessoas**
 
-    - **Estado:** implementada documentalmente na PR #129; Ready for review, ainda não integrada em
-      `main` na data desta convergência.
-    - **Artefato:** `docs/decisions/pacote-decisao-solicitacoes-pessoas.md` na branch
-      `codex/t136-decisao-solicitacoes-pessoas`.
-    - **Pendências:** `PD-SOL-01..05` aguardam RH, Jurídico, Produto e Segurança. O documento não
-      aprova essas decisões.
+    - **Estado:** integrada em `main` pela PR #129 em 2026-09-29.
+    - **Artefatos:** `docs/decisions/pacote-decisao-solicitacoes-pessoas.md` e ADR 0013.
+    - **Resultado:** `PD-SOL-01..05` aprovadas; Cloudflare R2 definido como provedor privado futuro,
+      sem habilitar conteúdo ou upload.
 
 34. **T137 - Fundação real da Central de Solicitações de Pessoas**
 
-    - **Estado:** bloqueada; não iniciada.
-    - **Pré-condição obrigatória:** T136 integrada e `PD-SOL-01..05` formalmente respondidas e
-      aprovadas. Depois disso, executar `/speckit.specify` e `/speckit.plan` específicos antes de
-      decompor implementação com `/speckit.tasks`.
-    - **Escopo futuro indicativo, não autorizado:** módulo NestJS, modelo/migration Prisma, catálogo e
-      transições aprovados, RBAC deny-by-default por empresa, CSRF em mutações, auditoria fail-safe e
-      testes E2E. Nenhum desses itens pode ser implementado enquanto o bloqueio persistir.
+    - **Estado:** não iniciada; identificador histórico substituído pela T139 após a T138 ocupar a
+      convergência do Spec Kit.
+    - **Resultado:** nenhum código, branch ou PR funcional foi criado sob T137.
 
 35. **T138 - Convergir, versionar e proteger o Spec Kit**
 
@@ -464,6 +458,23 @@ decisões e bloqueios, está no ledger versionado
       migration, endpoint, ambiente, segredo, estado da PR #129 ou dado real.
     - **Aceite:** `pnpm spec:check`, Prettier, links/manifesto consistentes, CI verde e revisão somente
       leitura. A PR nasce Draft e não autoriza merge.
+
+36. **T139 - Fundação real da Central de Solicitações de Pessoas**
+
+    - **Estado:** pronta para especificação após integração da T138; implementação ainda não iniciada.
+    - **Pré-condições satisfeitas:** T136 integrada; `PD-SOL-01..05` aprovadas; catálogo, alçadas,
+      cancelamento/reabertura, objetivo de primeiro retorno e limites de evidência registrados.
+    - **Preparação obrigatória na branch:** executar `/speckit.specify`, `/speckit.plan` e
+      `/speckit.tasks` antes do código, atualizando os artefatos duráveis e este ledger.
+    - **Escopo autorizado indicativo:** módulo NestJS, modelo/migration Prisma, endpoints de listagem,
+      detalhe, criação e transições aprovadas, RBAC deny-by-default por empresa, CSRF nas mutações,
+      auditoria fail-safe e E2E de ciclo/IDOR.
+    - **Reconciliação obrigatória:** cancelamento somente antes de `em_revisao_rh`; o termo funcional
+      "encerrada" corresponde a `encaminhada_para_operacao_rh`; reabertura desse estado ou de
+      `recusada` é exclusiva do RH e exige justificativa auditada.
+    - **Fora de escopo:** anexos/upload/R2, correção automática de ponto, efeitos em férias,
+      benefícios, cadastro, Banco de Horas, Folha ou fechamento, cronômetro automático de SLA e dado
+      real.
 
 ## Regra obrigatória para as próximas tarefas
 

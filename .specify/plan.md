@@ -4,9 +4,9 @@
 
 **Data:** 2026-08-13
 
-**Última convergência:** 2026-09-23
+**Última convergência:** 2026-09-29
 **Entradas:** `.specify/memory/constitution.md` v1.4.0, `.specify/spec.md`,
-`.specify/execution-status.md`, PRD oficial no Notion, ADRs 0001-0012, decisões versionadas,
+`.specify/execution-status.md`, PRD oficial no Notion, ADRs 0001-0013, decisões versionadas,
 `docs/ARCHITECTURE.md`, `docs/CLAUDE_HANDOFF.md`.
 
 > **Glossário vinculante — 20/08/2026:** “Reserva Fiscal” identifica a empresa e integra o nome do
@@ -71,7 +71,7 @@ aprovação quando homologado. Enquanto uma alçada não estiver definida, a aç
 | Segurança                | `argon2`, `helmet`, cookies, `class-validator`, `zod`, `nestjs-pino` | senha/sessão, headers, validação e logs estruturados redigidos                                                                       |
 | UI                       | React + TypeScript + TSX; React/Vite                                 | `apps/web` possui o shell inicial do painel V1 e cliente CSRF em memória; telas de negócio dependem das respectivas fatias aprovadas |
 | Processamento assíncrono | PostgreSQL no núcleo; Redis/filas somente por necessidade medida     | jobs para importação, relatório e integração exigem idempotência, status e auditoria                                                 |
-| Documentos               | armazenamento privado ainda a selecionar                             | metadados no PostgreSQL; arquivo fora do repositório, com quarentena e controle de acesso                                            |
+| Documentos               | Cloudflare R2 aprovado pela ADR 0013; conteúdo ainda desabilitado    | metadados no PostgreSQL; objeto em bucket privado por ambiente, com autorização temporária, quarentena e controle de acesso          |
 
 Sessões permanecem no PostgreSQL até métrica real justificar Redis (ADR 0003). Não introduzir IdP,
 SSO, Redis, fila, storage ou outro provedor por antecipação: cada decisão material exige ADR.
@@ -276,31 +276,30 @@ documento real ou backup para repositório, testes ou ambiente de demonstração
 
 ## 9. Dependências e gates por módulo
 
-| Módulo                         | Gate de negócio/compliance que bloqueia código operacional                                                                                                |
-| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Documentos                     | classificação, retenção, matriz de acesso, storage privado e quarentena aprovados                                                                         |
-| Ponto                          | TXT anonimizado, layout REP, jornada, escala, fechamento e exceções homologados                                                                           |
-| Folha                          | rubricas, regras, incidências, alçadas, competência e integração aprovadas                                                                                |
-| Relatórios                     | fórmula, fonte, periodicidade, agregação, acesso e exportação aprovados                                                                                   |
-| Clima                          | limiar, anonimização, retenção e governança definidos por RH/Jurídico                                                                                     |
-| Desenvolvimento e Performance  | ciclos, competências, escalas, participantes, visibilidade, retenção, plano de melhoria e avaliação de impacto aprovados por RH/Jurídico                  |
-| Solicitações gerais de Pessoas | `PD-SOL-01..05` formalmente decididas por RH/Jurídico/Produto/Segurança antes da T137                                                                     |
-| Dados reais/produção           | privacidade, retenção/descarte, backup/restauração, infraestrutura, risco crítico zero, reteste e aceites de risco documentados; MFA segue a exceção T132 |
+| Módulo                         | Gate de negócio/compliance que bloqueia código operacional                                                                                                               |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Documentos                     | credenciais do R2, classificação, retenção, matriz de acesso e quarentena aprovadas                                                                                      |
+| Ponto                          | TXT anonimizado, layout REP, jornada, escala, fechamento e exceções homologados                                                                                          |
+| Folha                          | rubricas, regras, incidências, alçadas, competência e integração aprovadas                                                                                               |
+| Relatórios                     | fórmula, fonte, periodicidade, agregação, acesso e exportação aprovados                                                                                                  |
+| Clima                          | limiar, anonimização, retenção e governança definidos por RH/Jurídico                                                                                                    |
+| Desenvolvimento e Performance  | ciclos, competências, escalas, participantes, visibilidade, retenção, plano de melhoria e avaliação de impacto aprovados por RH/Jurídico                                 |
+| Solicitações gerais de Pessoas | `PD-SOL-01..05` integradas; T139 sem anexos depende da convergência T138 e de especificação/plano/tarefas próprios; conteúdo permanece bloqueado pelos gates documentais |
+| Dados reais/produção           | privacidade, retenção/descarte, backup/restauração, infraestrutura, risco crítico zero, reteste e aceites de risco documentados; MFA segue a exceção T132                |
 
 ## 10. Próximo ciclo recomendado
 
-1. Concluir a revisão documental da T136/PR #129 e obter as respostas formais de
-   `PD-SOL-01..05` junto a RH, Jurídico, Produto e Segurança.
-2. Enquanto as decisões estiverem pendentes, não iniciar a T137 nem criar schema, endpoint, estado ou
-   alçada de Solicitações gerais de Pessoas.
-3. Após o fechamento do pacote, executar `/speckit.specify` e `/speckit.plan` para a fundação de
-   backend da Central; só então gerar as tarefas pequenas com `/speckit.tasks`.
-4. Para qualquer fatia independente escolhida durante a espera, criar especificação e plano próprios,
-   atualizar o ledger e o manifesto do Spec Kit na mesma branch.
+1. Concluir e integrar a convergência T138/PR #130 sobre a base que já contém T136 e ADR 0013.
+2. Abrir a T139 a partir de `origin/main` atualizado e executar `/speckit.specify`, `/speckit.plan` e
+   `/speckit.tasks` específicos para a fundação backend da Central.
+3. Na T139, reconciliar o núcleo T066: cancelamento só antes de `em_revisao_rh`; "encerrada" mapeia
+   para `encaminhada_para_operacao_rh`; reabertura pelo RH exige justificativa auditada.
+4. Manter anexos, upload e efeitos automáticos fora da T139; R2 aprovado não elimina os portões de
+   credenciais, limites, quarentena, acesso, retenção e descarte.
 5. Rodar `/speckit.converge` antes de toda promoção para Ready for review, comparando código, Spec,
    Constituição, Plan, Tasks, ledger, ADRs, decisões, testes e documentação operacional.
 
-> Nota de convergência (2026-09-23): stack real = NestJS 10 (adaptador Express) + React 18/Vite +
+> Nota de convergência (2026-09-29): stack real = NestJS 10 (adaptador Express) + React 18/Vite +
 > PostgreSQL/Prisma + pnpm/Turborepo. `admin_tecnico` converge para bootstrap/histórico;
 > `master_tecnico` é o único perfil global standing (ADR 0012). Estado de execução: ver
 > [`.specify/execution-status.md`](execution-status.md).
