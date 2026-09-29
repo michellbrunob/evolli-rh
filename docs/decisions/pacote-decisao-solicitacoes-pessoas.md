@@ -1,17 +1,14 @@
 # Pacote de decisão — Solicitações gerais de Pessoas (T136)
 
-- Status: **aguardando aprovação** — este é um **formulário de decisão** para
-  **RH**, **Jurídico** e **Produto**. **Nenhum item abaixo está aprovado.** O
-  documento **estrutura** as escolhas em campos objetivos e num registro por
-  evidência (§7). Ele **não decide, não infere e não escolhe** catálogo final,
-  alçada, prazo, evidência aceitável ou responsável, nem declara conformidade
-  legal. Onde uma **recomendação técnica** aparece, ela é isso — uma proposta
-  não aprovada — nunca um valor já decidido.
+- Status: **decisões `PD-SOL-01..05` aprovadas em 2026-09-29** por RH,
+  Jurídico, Produto, Diretoria e TI/Segurança, conforme registro consolidado
+  em §7. As opções e recomendações de §2–§6 permanecem preservadas como
+  histórico do processo decisório; em caso de divergência, §7 prevalece.
 - Data de emissão: 2026-09-21 (T136).
-- Fase/tarefa: preparação de decisões de produto para a futura **Central de
-  Solicitações do Colaborador** (Pessoas > Solicitações), antes de qualquer
-  fundação de backend (T137, que **não** deve iniciar antes do fechamento
-  formal deste pacote).
+- Fase/tarefa: decisões de produto para a futura **Central de Solicitações do
+  Colaborador** (Pessoas > Solicitações). O fechamento formal deste pacote
+  remove o bloqueio decisório da fundação de backend; os portões técnicos de
+  conteúdo e produção permanecem independentes.
 - Relação com os registros-fonte: este pacote **operacionaliza**, em forma de
   formulário preenchível, as pendências **já catalogadas** em
   [decisões — Gestão de documentos e solicitações do colaborador](decisoes-gestao-documentos-e-solicitacoes-v1.md)
@@ -57,16 +54,20 @@
 3. O **quadro por tipo de solicitação** (§3) separa, para cada tipo, o que **já
    está especificado** (contrato T065 ou diretriz já recebida do RH) do que
    **exige decisão humana** — sem preencher a segunda coluna por conta própria.
-4. O **registro de decisão** (§7) tem campos **vazios**. Preenchê-lo é o ato de
-   aprovação; até então, o status de todo item permanece **Pendente**.
-5. Este pacote **não** libera a T137 (fundação de backend). O efeito de cada
-   decisão sobre essa fundação está mapeado em §6.
+4. O **registro de decisão** (§7) foi preenchido em 2026-09-29 e é a fonte
+   vigente. As perguntas e recomendações anteriores ficam preservadas para
+   rastreabilidade, sem substituir o resultado aprovado.
+5. Este pacote libera a especificação e a fundação de backend da Central, mas
+   não libera upload, dado real ou produção. O efeito de cada decisão sobre a
+   fundação está mapeado em §6.
 
 **Limites deste pacote (invioláveis):**
 
 - **Não implementa nada:** sem API, endpoint, schema, migration, UI funcional,
   dependência ou configuração.
-- **Não decide regra trabalhista, cronograma, fornecedor ou base legal.**
+- **Não decide regra trabalhista nem declara base legal ou conformidade.** A
+  escolha arquitetural do armazenamento privado foi formalizada separadamente
+  na [ADR 0013](../adr/0013-armazenamento-privado-cloudflare-r2.md).
 - **Não confunde domínios.** Este pacote trata **exclusivamente** da futura
   Central de Solicitações do Colaborador (Pessoas > Solicitações, tipos gerais
   como férias/ausência/contestação de ponto/atualização cadastral). Ele **não**
@@ -98,9 +99,46 @@
 Esta tabela é **evidência de código**, não decisão — reproduz o resultado da
 investigação T135. Nenhuma linha muda de status por este pacote.
 
+### 1.1 Resultado aprovado em 2026-09-29
+
+- Catálogo inicial: `contestacao_ajuste_ponto`, `ausencia`, `ferias`,
+  `atualizacao_cadastral`, `atestado` e `beneficios`. O tipo `documento` sai
+  deste catálogo e permanece no fluxo específico já funcional de
+  `solicitacoes-documento`.
+- RH recebe, analisa e registra a decisão final. Gestor participa de forma
+  consultiva em temas de organização da equipe, sem alterar registro
+  trabalhista. Diretoria é escalonamento excepcional; até matriz mais
+  detalhada, a decisão operacional final permanece com RH.
+- Solicitação de ponto e pendência de "Verificar folhas" são registros
+  independentes. Uma referência técnica futura poderá relacioná-los, sem
+  fundir ciclos de vida. Não haverá bloqueio automático de fechamento na
+  primeira versão; aplicar ou retirar bloqueio continua sendo decisão manual
+  de RH ou função formalmente autorizada.
+- O colaborador cancela somente antes de `em_revisao_rh`. Após esse marco, não
+  há cancelamento livre. RH pode reabrir solicitação `recusada` ou `encerrada`,
+  com justificativa auditada; solicitação `cancelada` exige novo registro.
+- O objetivo de serviço é primeiro retorno do RH em dois dias úteis, não
+  conclusão. A contagem pode ser pausada quando aguarda informação do
+  colaborador ou de outra área. Na primeira versão, datas e eventos são
+  registrados, mas não existe cronômetro automático nem promessa de conclusão
+  exibida ao colaborador.
+- Cada tipo coleta somente os campos mínimos aprovados. Anexo é permitido pela
+  política, mas só poderá ser habilitado depois dos portões técnicos e
+  jurídicos de conteúdo. `Atestado` não coleta diagnóstico, CID ou descrição
+  clínica; gestor recebe apenas a informação operacional mínima e nunca o
+  documento.
+- Cloudflare R2 é o provedor aprovado e já disponível para armazenamento
+  privado futuro. A escolha do provedor não equivale a upload habilitado; a
+  [ADR 0013](../adr/0013-armazenamento-privado-cloudflare-r2.md) preserva
+  credenciais, quarentena, retenção, autorização e auditoria como portões
+  próprios.
+
 ---
 
-## 2. Decisões pendentes (`PD-SOL-01` a `PD-SOL-05`)
+## 2. Histórico das alternativas avaliadas (`PD-SOL-01` a `PD-SOL-05`)
+
+> As subseções 2–6 registram o formulário e as recomendações anteriores à
+> aprovação. O resultado vigente está em §1.1 e §7.
 
 ### 2.1 Matriz RH/gestor/Diretoria, catálogo final e alçadas — `PD-SOL-01`
 
@@ -515,33 +553,34 @@ Legenda: **●** decide/co-decide · **○** consultado.
 | `PD-SOL-04` | Decide se T137 precisa de um campo de **prazo/vencimento** no schema e de um job/consulta de SLA, ou se nenhum desses existe nesta fase (reduzindo o escopo de T137).                                                                                                                 |
 | `PD-SOL-05` | Decide se T137 inclui **qualquer** campo de evidência (mesmo texto) no schema, ou se o schema fica idêntico à estrutura mínima do contrato T065 §3 (sem nenhum campo de evidência).                                                                                                   |
 
-Enquanto todas as linhas acima permanecerem **Pendente** em §7, a T137 não tem
-uma definição estável de catálogo, RBAC ou schema para implementar sem
-inventar regra — por isso a T137 **não deve iniciar** antes do fechamento
-formal deste pacote.
+As cinco decisões foram fechadas em §7. A fundação de backend originalmente
+referida como T137 pode ser reemitida sob o próximo identificador disponível,
+pois T137/T138 já foram usados pelo planejamento posterior. Essa fundação deve
+respeitar os limites aprovados: sem efeito trabalhista automático, sem anexo
+antes dos portões de conteúdo e sem bloquear fechamento automaticamente.
 
 ---
 
 ## 7. Registro de decisão
 
-Campos **vazios**, a preencher no ato de aprovação. **Responsável** é a
-**área/função**, nunca pessoa nomeada. Enquanto "Opção aprovada" estiver
-vazio, o **Status** é **Pendente**.
+Responsáveis são registrados por área/função, nunca por pessoa nomeada. A
+evidência é o retorno formal consolidado recebido pelo responsável do projeto
+em 2026-09-29, incluindo a confirmação de aprovação e da disponibilidade do
+Cloudflare R2 por TI/Segurança.
 
-| ID          | Data | Responsáveis (área/função) | Opção aprovada | Evidência (referência) | Status   |
-| ----------- | ---- | -------------------------- | -------------- | ---------------------- | -------- |
-| `PD-SOL-01` |      |                            |                |                        | Pendente |
-| `PD-SOL-02` |      |                            |                |                        | Pendente |
-| `PD-SOL-03` |      |                            |                |                        | Pendente |
-| `PD-SOL-04` |      |                            |                |                        | Pendente |
-| `PD-SOL-05` |      |                            |                |                        | Pendente |
+| ID          | Data       | Responsáveis (área/função)          | Opção aprovada                                                                                                                                                                                                     | Evidência (referência)                         | Status   |
+| ----------- | ---------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------- | -------- |
+| `PD-SOL-01` | 2026-09-29 | RH + Jurídico + Produto + Diretoria | Catálogo com ponto, ausência, férias, atualização cadastral, atestado e benefícios; documento fora da Central; RH decide, gestor consultivo e Diretoria excepcional.                                               | Retorno formal e consolidação aprovada (§1.1). | Aprovada |
+| `PD-SOL-02` | 2026-09-29 | RH + Produto + Diretoria            | Solicitação e "Verificar folhas" separados, com referência futura opcional; sem correção de ponto nem bloqueio automático de fechamento.                                                                           | Retorno formal e consolidação aprovada (§1.1). | Aprovada |
+| `PD-SOL-03` | 2026-09-29 | RH + Jurídico                       | Cancelamento pelo colaborador somente antes de `em_revisao_rh`; reabertura de recusada/encerrada somente pelo RH, com justificativa; cancelada exige nova solicitação.                                             | Retorno formal e consolidação aprovada (§1.1). | Aprovada |
+| `PD-SOL-04` | 2026-09-29 | RH + Produto                        | Dois dias úteis para primeiro retorno, com pausa por dependência externa; V1 registra eventos para acompanhamento interno, sem cronômetro automático nem promessa de conclusão.                                    | Retorno formal e consolidação aprovada (§1.1). | Aprovada |
+| `PD-SOL-05` | 2026-09-29 | RH + Jurídico + TI/Segurança        | Campos mínimos por tipo; anexos somente após portões de conteúdo; atestado sem diagnóstico/CID no fluxo e sem exposição do documento ao gestor; Cloudflare R2 como armazenamento privado futuro conforme ADR 0013. | Retorno formal + ADR 0013.                     | Aprovada |
 
 ### Declaração
 
-**Nenhuma decisão deste pacote está aprovada.** Cada item só passa de
-Pendente a decidido mediante **evidência formal** da área responsável,
-registrada nesta tabela. Este documento **não implementa** nada, **não
-decide** regra trabalhista, **não confunde** este domínio com
-`solicitacoes-documento` (T133, já funcional) nem com `ajuste_ponto` (correção
-direta do RH/DP), **não declara conformidade legal** e **não libera** a T137
-(fundação de backend), que depende do fechamento formal deste pacote.
+As decisões `PD-SOL-01..05` estão aprovadas e removem o bloqueio decisório da
+fundação de backend. Este documento **não implementa** nada, **não confunde**
+este domínio com `solicitacoes-documento` (T133, já funcional) nem com
+`ajuste_ponto` (correção direta do RH/DP), **não declara conformidade legal** e
+**não habilita upload, dado real ou produção**. Esses resultados dependem da
+implementação e da validação dos portões técnicos e jurídicos aplicáveis.
