@@ -13,14 +13,14 @@ provadas do repositório. Nenhuma segunda máquina de estados é criada.
 
 ## 2. Reconciliação do núcleo puro (`apps/api/src/solicitacoes/`)
 
-| Mudança                                                          | Razão                                     |
-| ---------------------------------------------------------------- | ----------------------------------------- |
-| Catálogo: remover `documento`; incluir `atestado`, `beneficios`  | `PD-SOL-01`                               |
-| Remover transição `aguardando_informacao → cancelada`            | `PD-SOL-03` (só antes de `em_revisao_rh`) |
-| Incluir ação `reabrir`: `encaminhada_para_operacao_rh`/`recusada` → `em_revisao_rh` | `PD-SOL-03`         |
-| `cancelada` permanece terminal absoluto (sem `reabrir`)          | `PD-SOL-03`                               |
-| Motivo: remover `segunda_via_documento`; incluir motivos de decisão e `outro_controlado` | catálogo fechado, sem texto livre |
-| `reabrir` exige motivo obrigatório na camada de aplicação        | "justificativa auditada"                  |
+| Mudança                                                                                  | Razão                                     |
+| ---------------------------------------------------------------------------------------- | ----------------------------------------- |
+| Catálogo: remover `documento`; incluir `atestado`, `beneficios`                          | `PD-SOL-01`                               |
+| Remover transição `aguardando_informacao → cancelada`                                    | `PD-SOL-03` (só antes de `em_revisao_rh`) |
+| Incluir ação `reabrir`: `encaminhada_para_operacao_rh`/`recusada` → `em_revisao_rh`      | `PD-SOL-03`                               |
+| `cancelada` permanece terminal absoluto (sem `reabrir`)                                  | `PD-SOL-03`                               |
+| Motivo: remover `segunda_via_documento`; incluir motivos de decisão e `outro_controlado` | catálogo fechado, sem texto livre         |
+| `reabrir` exige motivo obrigatório na camada de aplicação                                | "justificativa auditada"                  |
 
 O núcleo continua **puro**: sem NestJS, Prisma, I/O, relógio ou geração de id.
 
@@ -67,13 +67,13 @@ solicitacao-pessoa.service.ts
 
 Endpoints (`@Controller("solicitacoes-pessoas")`, versionamento URI global `/v1`):
 
-| Método | Rota                                | Guards                          | Permissão                  |
-| ------ | ----------------------------------- | ------------------------------- | -------------------------- |
-| POST   | `/`                                 | Session + Csrf + Authorization  | `solicitacao_pessoa:create` |
-| GET    | `/`                                 | Session + Authorization         | `solicitacao_pessoa:read`   |
-| GET    | `/:solicitacaoId`                   | Session + Authorization         | `solicitacao_pessoa:read`   |
-| POST   | `/:solicitacaoId/transicoes`        | Session + Csrf + Authorization  | `solicitacao_pessoa:alter`  |
-| GET    | `/:solicitacaoId/historico`         | Session + Authorization         | `solicitacao_pessoa:read`   |
+| Método | Rota                         | Guards                         | Permissão                   |
+| ------ | ---------------------------- | ------------------------------ | --------------------------- |
+| POST   | `/`                          | Session + Csrf + Authorization | `solicitacao_pessoa:create` |
+| GET    | `/`                          | Session + Authorization        | `solicitacao_pessoa:read`   |
+| GET    | `/:solicitacaoId`            | Session + Authorization        | `solicitacao_pessoa:read`   |
+| POST   | `/:solicitacaoId/transicoes` | Session + Csrf + Authorization | `solicitacao_pessoa:alter`  |
+| GET    | `/:solicitacaoId/historico`  | Session + Authorization        | `solicitacao_pessoa:read`   |
 
 Parâmetro nomeado `:solicitacaoId` (nunca `:id`, que dispara a busca de `AccessUser` no guard).
 
@@ -127,10 +127,10 @@ $transaction:
 
 ## 10. Riscos e mitigação
 
-| Risco                                        | Mitigação                                                          |
-| -------------------------------------------- | ------------------------------------------------------------------ |
-| Duas máquinas de estado divergentes          | Núcleo puro é a única fonte; o service não reimplementa transições |
-| Vazamento entre empresas                     | FK composta no banco + escopo por sessão + 404 anti-enumeração     |
-| Conteúdo sensível entrar por texto livre     | Nenhum campo de texto; todo motivo é enum fechado                  |
-| Auditoria órfã                               | `record(..., tx)` na mesma transação                               |
-| Efeito colateral em outro módulo             | Service escreve só nas 2 tabelas próprias + `audit_event`          |
+| Risco                                    | Mitigação                                                          |
+| ---------------------------------------- | ------------------------------------------------------------------ |
+| Duas máquinas de estado divergentes      | Núcleo puro é a única fonte; o service não reimplementa transições |
+| Vazamento entre empresas                 | FK composta no banco + escopo por sessão + 404 anti-enumeração     |
+| Conteúdo sensível entrar por texto livre | Nenhum campo de texto; todo motivo é enum fechado                  |
+| Auditoria órfã                           | `record(..., tx)` na mesma transação                               |
+| Efeito colateral em outro módulo         | Service escreve só nas 2 tabelas próprias + `audit_event`          |

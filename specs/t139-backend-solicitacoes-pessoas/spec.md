@@ -41,14 +41,14 @@ permanece no fluxo real e separado de `solicitacoes-documento` (T133).
 
 ## 4. Atores e autoridade (`PD-SOL-01`)
 
-| Ator             | Autoridade nesta fundação                                                              |
-| ---------------- | -------------------------------------------------------------------------------------- |
-| RH               | Registra, analisa, transiciona e decide. Único papel com mutação e leitura na Central.  |
-| Gestor           | Consultivo por decisão; **sem** capacidade de RBAC nesta fundação — negado por padrão.  |
+| Ator             | Autoridade nesta fundação                                                                 |
+| ---------------- | ----------------------------------------------------------------------------------------- |
+| RH               | Registra, analisa, transiciona e decide. Único papel com mutação e leitura na Central.    |
+| Gestor           | Consultivo por decisão; **sem** capacidade de RBAC nesta fundação — negado por padrão.    |
 | Diretoria        | Escalonamento excepcional fora do sistema; **nenhum** papel ou endpoint próprio é criado. |
-| DP               | Não recebe operação nesta Central (decisão não o contempla) — negado por padrão.        |
-| Colaborador      | Sujeito da solicitação; **não** opera (ver §4.1).                                        |
-| `master_tecnico` | Sem mutação trabalhista (ADR 0012 dec. 3; contrato T065 §5).                             |
+| DP               | Não recebe operação nesta Central (decisão não o contempla) — negado por padrão.          |
+| Colaborador      | Sujeito da solicitação; **não** opera (ver §4.1).                                         |
+| `master_tecnico` | Sem mutação trabalhista (ADR 0012 dec. 3; contrato T065 §5).                              |
 
 ### 4.1 Limite estrutural: não existe ESS autenticado
 
@@ -87,7 +87,7 @@ Nenhum estado literal `encerrada` existe.
 **Removido do desenho conceitual anterior:** `aguardando_informacao → cancelada`. Esse estado só é
 alcançável **depois** de `em_revisao_rh`, portanto cancelar a partir dele violaria `PD-SOL-03`.
 
-**Derivação registrada:** a decisão aprova *que* o RH reabre `encaminhada_para_operacao_rh` e
+**Derivação registrada:** a decisão aprova _que_ o RH reabre `encaminhada_para_operacao_rh` e
 `recusada`, mas não nomeia o estado de destino. O destino adotado é `em_revisao_rh` — único estado
 não terminal cujo responsável é o RH. Qualquer outro destino exigiria decisão nova.
 

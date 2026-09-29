@@ -1,9 +1,6 @@
 import { AccessRole } from "@prisma/client";
 import { evaluatePermission } from "./rbac.evaluator";
-import {
-  AuthorizationAction,
-  AuthorizationSubject,
-} from "./permission.types";
+import { AuthorizationAction, AuthorizationSubject } from "./permission.types";
 
 const EMPRESA_A = "empresa-a";
 const EMPRESA_B = "empresa-b";

@@ -11,6 +11,7 @@ import { PessoasModule } from "./pessoas/pessoas.module";
 import { PontoModule } from "./ponto/ponto.module";
 import { DocumentosModule } from "./documentos/documentos.module";
 import { HorariosModule } from "./horarios/horarios.module";
+import { SolicitacoesPessoasModule } from "./solicitacoes-pessoas/solicitacoes-pessoas.module";
 import { validateEnv } from "./config/env.validation";
 
 @Module({
@@ -30,6 +31,7 @@ import { validateEnv } from "./config/env.validation";
     PontoModule,
     DocumentosModule,
     HorariosModule,
+    SolicitacoesPessoasModule,
   ],
 })
 export class AppModule {}

@@ -413,7 +413,10 @@ describe("solicitacoes — cancelamento e reabertura (PD-SOL-03)", () => {
 
   it("não existe estado literal `encerrada`: o termo designa o encaminhamento", () => {
     const r = transicionarSolicitacao(
-      { ...SOLICITACAO_CONTESTACAO, situacao: "encerrada" as EstadoSolicitacao },
+      {
+        ...SOLICITACAO_CONTESTACAO,
+        situacao: "encerrada" as EstadoSolicitacao,
+      },
       "reabrir",
       ATOR_RH,
       "AUD-1",
