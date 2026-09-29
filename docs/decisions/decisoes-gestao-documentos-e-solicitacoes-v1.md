@@ -242,41 +242,33 @@ ponto, férias, ausência, atestado, atualização cadastral, documentos e
 benefícios**.
 
 O [contrato conceitual da Central de Solicitações do Colaborador](../modules/etapa3-central-solicitacoes-colaborador-contrato-v1.md)
-§2 já registra um catálogo inicial menor (`contestacao_ajuste_ponto`,
-`ausencia`, `ferias`, `atualizacao_cadastral`, `documento`). O direcionamento
-do RH **amplia** esse catálogo com **atestado** e **benefícios** — que, como
-já previsto naquele contrato ("novos tipos não são regra aprovada"), ficam
-como **pendência** (§5, PD-SOL-01: conciliar o catálogo do RH com o catálogo
-conceitual já registrado) até decisão formal de RH + Jurídico. Nenhum tipo
-novo é tratado como aprovado por este documento.
+§2 registrava um catálogo inicial menor. A decisão `PD-SOL-01`, aprovada no
+[pacote de decisão da Central](pacote-decisao-solicitacoes-pessoas.md) §1.1 e
+§7, consolidou o catálogo com `contestacao_ajuste_ponto`, `ausencia`,
+`ferias`, `atualizacao_cadastral`, `atestado` e `beneficios`. O tipo
+`documento` ficou fora da Central e permanece no fluxo específico já
+funcional de `solicitacoes-documento`.
 
 ### 3.2 Papéis por tipo de solicitação (definição recebida)
 
 - **RH recebe e analisa** toda solicitação, na própria empresa — coerente com
   o papel exclusivo do RH já registrado (contrato §5; ADR 0012).
-- **Gestor participa somente em temas de organização da equipe** — este é um
-  direcionamento **novo**: hoje o gestor é **negado** em toda operação
-  trabalhista de Ponto/Solicitações
-  ([mapa de capacidades](mapa-capacidades-implantacao-ponto-v1.md) §2.3:
-  "Papel de gestor... depende de decisão formal"). O direcionamento do RH
-  **não** libera essa participação por si só — o **escopo exato** do gestor
-  (quais tipos, o que "organização da equipe" cobre, se é aprovação ou só
-  recomendação) fica como pendência (§5, PD-SOL-01).
+- **Gestor participa somente de forma consultiva em temas de organização da
+  equipe**, sem aprovar, recusar ou alterar registro trabalhista. Esse limite
+  foi aprovado em `PD-SOL-01`; a autorização operacional continua
+  deny-by-default e depende do RBAC previsto para a fundação real.
 - **Diretoria é escalonamento excepcional** — participação **fora da rotina**,
-  só quando o fluxo RH/gestor não resolve. A **matriz de decisão** RH/gestor/
-  Diretoria por tipo de solicitação permanece pendente (§5, PD-SOL-01).
+  só quando o fluxo RH/gestor não resolve. Até existir matriz mais detalhada,
+  a decisão operacional final permanece com o RH, conforme `PD-SOL-01`.
 
 ### 3.3 Exigência de justificativa/evidência conforme o tipo (definição recebida)
 
-O RH indicou que **alguns** tipos de solicitação devem exigir justificativa ou
-evidência, e outros não — sem fixar, aqui, **quais** tipos exigem o quê. Isso
-é coerente com o bloqueio já registrado de anexos/evidências na Central de
-Solicitações (contrato §6): **nenhuma evidência é aceita, anexada ou
-armazenada nesta fase**, independentemente do tipo. Os **critérios de
-evidência por tipo** ficam pendentes (§5, PD-SOL-05) e só passam a valer
-depois que anexo/evidência forem habilitados (contrato §6, condicionado a
-base legal, retenção, minimização, segurança, auditoria, MFA e validação
-RH + Jurídico).
+`PD-SOL-05` aprovou a coleta somente dos **campos mínimos por tipo**. Anexos
+são permitidos pela política, mas continuam desabilitados até o fechamento
+dos portões técnicos e jurídicos de conteúdo. Para `atestado`, o fluxo não
+coleta diagnóstico, CID ou descrição clínica; o gestor recebe apenas a
+informação operacional mínima e nunca o documento. A aprovação do Cloudflare
+R2 como armazenamento privado futuro não habilita upload por si só.
 
 ### 3.4 Motivo de recusa visível ao colaborador (definição recebida, coerente com o já registrado)
 
@@ -286,14 +278,12 @@ já prevê **motivo codificado e auditoria** (contrato §4, §4.1). Este
 documento **reafirma** essa direção — a visibilidade ao colaborador depende
 do Portal do Colaborador existir de fato.
 
-### 3.5 Cancelamento antes da análise (definição recebida + pendência)
+### 3.5 Cancelamento antes da análise (decisão aprovada)
 
-O RH confirmou que o colaborador deve poder **cancelar antes da análise**.
-Isso já existe como transição conceitual (`enviada` → `cancelada`, contrato
-§4.1). A **regra posterior** — se e como cancelar **depois** de a análise ter
-começado (`em_revisao_rh` → `cancelada` já existe como transição condicionada
-a uma "janela pendente", contrato §4.1) — permanece **pendente**, incluindo o
-**marco exato** que define "início da análise" (§5, PD-SOL-03).
+`PD-SOL-03` definiu que o colaborador pode cancelar somente antes de
+`em_revisao_rh`. Depois desse marco, não há cancelamento livre. RH pode reabrir
+`encaminhada_para_operacao_rh` ou `recusada`, com justificativa auditada;
+`cancelada` exige uma nova solicitação.
 
 ### 3.6 Aprovação do RH e assinatura do colaborador (necessidades apontadas)
 
@@ -302,22 +292,19 @@ necessidades para (ao menos) parte das solicitações. Nenhuma das duas é
 implementada ou modelada aqui:
 
 - **Aprovação do RH** é coerente com o papel exclusivo já registrado (RH
-  encaminha/recusa, contrato §4); a **alçada exata** por tipo é a mesma
-  pendência de matriz de decisão (§5, PD-SOL-01).
+  encaminha/recusa, contrato §4); `PD-SOL-01` confirmou que a decisão
+  operacional final permanece com o RH.
 - **Assinatura do colaborador** depende da mesma solução de assinatura
   bloqueada para Documentos (§4; §5, PD-DOC-04) — não é resolvida aqui nem
   antecipada para Solicitações.
 
-### 3.7 SLA de "até dois dias úteis" — sugestão inicial, não regra aprovada
+### 3.7 Objetivo de primeiro retorno em dois dias úteis (decisão aprovada)
 
-O RH mencionou "até dois dias úteis" como uma referência de tempo de resposta.
-**Este documento trata esse valor explicitamente como sugestão inicial —
-ainda não uma regra operacional aprovada.** Antes de qualquer implementação,
-faltam, no mínimo: o **responsável** pela contagem, a **forma de contagem**
-(dia útil de qual calendário, a partir de qual marco) e as **exceções**
-(ex.: tipos que dependem de terceiros). Tudo isso é registrado como pendência
-própria (§5, PD-SOL-04), sem qualquer prazo se tornar exigível por este
-documento.
+`PD-SOL-04` aprovou o objetivo de **primeiro retorno do RH em dois dias úteis**,
+não de conclusão. A contagem pode ser pausada enquanto a solicitação aguarda
+informação do colaborador ou de outra área. Na primeira versão, datas e
+eventos serão registrados para acompanhamento interno, sem cronômetro
+automático nem promessa de conclusão exibida ao colaborador.
 
 ## 4. Limites obrigatórios (reafirmados, não alterados)
 

@@ -36,9 +36,10 @@ e o registro do pacote prevalecem.
   organização da equipe; Diretoria atua excepcionalmente.
 - Central e fila "Verificar folhas" permanecem separadas, com referência futura
   opcional e sem correção de ponto ou bloqueio automático de fechamento.
-- O colaborador cancela somente antes de `em_revisao_rh`. RH pode reabrir
-  solicitação recusada ou encerrada com justificativa auditada; solicitação
-  cancelada exige novo registro.
+- O colaborador cancela somente antes de `em_revisao_rh`. Na V1, "encerrada"
+  corresponde ao estado terminal `encaminhada_para_operacao_rh`; RH pode
+  reabrir esse estado ou `recusada` com justificativa auditada. Solicitação
+  `cancelada` exige novo registro.
 - Objetivo de serviço: primeiro retorno do RH em dois dias úteis, com pausa
   quando depender de informação do colaborador ou de outra área. A V1 registra
   datas e eventos para acompanhamento, sem cronômetro automático nem promessa
@@ -245,20 +246,22 @@ cancelada                    ──▶ (nenhuma)   terminal
   encaminha; a operação efetiva (ajuste, cadastro, documento) segue os fluxos
   próprios do RH, com suas próprias autorizações e auditoria.
 
-## 8. Pendências explícitas (RH / Jurídico / Produto)
+## 8. Decisões fechadas e portões remanescentes
 
-| Pendência                                                                       | Responsável               |
-| ------------------------------------------------------------------------------- | ------------------------- |
-| **Catálogo final** de tipos de solicitação (além do inicial §2).                | RH + Jurídico             |
-| **Prazos e elegibilidade** de cada tipo (quem pode, quando, janelas).           | RH + Jurídico             |
-| **Alçadas** de revisão/encaminhamento/recusa (segregação de funções).           | RH + Jurídico             |
-| **Evidências/anexos** (se, quando e como habilitar — §6).                       | RH + Jurídico + Segurança |
-| **Tratamento de dados sensíveis** (ex.: atestado) — base legal e minimização.   | RH + Jurídico             |
-| **Retenção, descarte e base legal** das solicitações (`DP-3J-11`).              | RH + Jurídico             |
-| **Notificações** ao colaborador/RH (canal, conteúdo mínimo, sem dado sensível). | RH + Produto              |
-| **Recusa e contestação** da recusa (existe? prazo? reabertura?).                | RH + Jurídico             |
-| **Integração** futura com Ponto, Documentos, Folha e eSocial.                   | RH + Produto              |
-| **MFA, `DS-OPS-01` e assinatura eletrônica** como pré-condições de dado real.   | Diretoria + TI + Jurídico |
+Catálogo, papéis de RH/gestor/Diretoria, separação de "Verificar folhas",
+cancelamento/reabertura, objetivo de primeiro retorno e política mínima de
+evidências foram fechados por `PD-SOL-01..05`. Permanecem fora da fundação sem
+anexos:
+
+| Portão remanescente                                                                                                                                                                            | Responsável               |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- |
+| **Detalhamento de elegibilidade** por tipo quando a operação de destino exigir regra ainda não aprovada.                                                                                       | RH + Jurídico             |
+| **Anexos e conteúdo real**: credenciais, limites, quarentena, autorização por objeto e auditoria.                                                                                              | RH + Jurídico + Segurança |
+| **Tratamento de dados sensíveis** (ex.: atestado): base legal, minimização, retenção e descarte.                                                                                               | RH + Jurídico             |
+| **Retenção e descarte** das solicitações e do eventual conteúdo (`DP-3J-11`).                                                                                                                  | RH + Jurídico             |
+| **Notificações** ao colaborador/RH: canal e conteúdo mínimo, sem dado sensível.                                                                                                                | RH + Produto              |
+| **Integrações operacionais** futuras com Ponto, Documentos, Folha e eSocial; a Central não as executa automaticamente.                                                                         | RH + Produto              |
+| **Gates operacionais `DS-OPS-01`, segurança de conteúdo e assinatura eletrônica**, quando aplicável. O lançamento inicial segue a exceção de MFA da T132; fator já ativo continua fail-closed. | Diretoria + TI + Jurídico |
 
 ## 9. Cenários sintéticos
 

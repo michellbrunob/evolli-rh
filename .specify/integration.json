@@ -1,0 +1,17 @@
+{
+  "version": "0.16.3",
+  "integration_state_schema": 1,
+  "installed_integrations": ["generic"],
+  "integration_settings": {
+    "generic": {
+      "script": "ps",
+      "raw_options": "--commands-dir .chatgpt_cmds",
+      "parsed_options": {
+        "commands_dir": ".chatgpt_cmds"
+      },
+      "invoke_separator": "."
+    }
+  },
+  "integration": "generic",
+  "default_integration": "generic"
+}

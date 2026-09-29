@@ -115,8 +115,10 @@ investigação T135. Nenhuma linha muda de status por este pacote.
   primeira versão; aplicar ou retirar bloqueio continua sendo decisão manual
   de RH ou função formalmente autorizada.
 - O colaborador cancela somente antes de `em_revisao_rh`. Após esse marco, não
-  há cancelamento livre. RH pode reabrir solicitação `recusada` ou `encerrada`,
-  com justificativa auditada; solicitação `cancelada` exige novo registro.
+  há cancelamento livre. Na V1, o termo funcional "encerrada" corresponde ao
+  estado terminal `encaminhada_para_operacao_rh`; RH pode reabrir esse estado
+  ou `recusada`, com justificativa auditada. Solicitação `cancelada` exige novo
+  registro.
 - O objetivo de serviço é primeiro retorno do RH em dois dias úteis, não
   conclusão. A contagem pode ser pausada quando aguarda informação do
   colaborador ou de outra área. Na primeira versão, datas e eventos são
@@ -568,13 +570,13 @@ evidência é o retorno formal consolidado recebido pelo responsável do projeto
 em 2026-09-29, incluindo a confirmação de aprovação e da disponibilidade do
 Cloudflare R2 por TI/Segurança.
 
-| ID          | Data       | Responsáveis (área/função)          | Opção aprovada                                                                                                                                                                                                     | Evidência (referência)                         | Status   |
-| ----------- | ---------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------- | -------- |
-| `PD-SOL-01` | 2026-09-29 | RH + Jurídico + Produto + Diretoria | Catálogo com ponto, ausência, férias, atualização cadastral, atestado e benefícios; documento fora da Central; RH decide, gestor consultivo e Diretoria excepcional.                                               | Retorno formal e consolidação aprovada (§1.1). | Aprovada |
-| `PD-SOL-02` | 2026-09-29 | RH + Produto + Diretoria            | Solicitação e "Verificar folhas" separados, com referência futura opcional; sem correção de ponto nem bloqueio automático de fechamento.                                                                           | Retorno formal e consolidação aprovada (§1.1). | Aprovada |
-| `PD-SOL-03` | 2026-09-29 | RH + Jurídico                       | Cancelamento pelo colaborador somente antes de `em_revisao_rh`; reabertura de recusada/encerrada somente pelo RH, com justificativa; cancelada exige nova solicitação.                                             | Retorno formal e consolidação aprovada (§1.1). | Aprovada |
-| `PD-SOL-04` | 2026-09-29 | RH + Produto                        | Dois dias úteis para primeiro retorno, com pausa por dependência externa; V1 registra eventos para acompanhamento interno, sem cronômetro automático nem promessa de conclusão.                                    | Retorno formal e consolidação aprovada (§1.1). | Aprovada |
-| `PD-SOL-05` | 2026-09-29 | RH + Jurídico + TI/Segurança        | Campos mínimos por tipo; anexos somente após portões de conteúdo; atestado sem diagnóstico/CID no fluxo e sem exposição do documento ao gestor; Cloudflare R2 como armazenamento privado futuro conforme ADR 0013. | Retorno formal + ADR 0013.                     | Aprovada |
+| ID          | Data       | Responsáveis (área/função)          | Opção aprovada                                                                                                                                                                                                                             | Evidência (referência)                         | Status   |
+| ----------- | ---------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------- | -------- |
+| `PD-SOL-01` | 2026-09-29 | RH + Jurídico + Produto + Diretoria | Catálogo com ponto, ausência, férias, atualização cadastral, atestado e benefícios; documento fora da Central; RH decide, gestor consultivo e Diretoria excepcional.                                                                       | Retorno formal e consolidação aprovada (§1.1). | Aprovada |
+| `PD-SOL-02` | 2026-09-29 | RH + Produto + Diretoria            | Solicitação e "Verificar folhas" separados, com referência futura opcional; sem correção de ponto nem bloqueio automático de fechamento.                                                                                                   | Retorno formal e consolidação aprovada (§1.1). | Aprovada |
+| `PD-SOL-03` | 2026-09-29 | RH + Jurídico                       | Cancelamento pelo colaborador somente antes de `em_revisao_rh`; "encerrada" corresponde a `encaminhada_para_operacao_rh`; reabertura desse estado ou de `recusada` somente pelo RH, com justificativa; `cancelada` exige nova solicitação. | Retorno formal e consolidação aprovada (§1.1). | Aprovada |
+| `PD-SOL-04` | 2026-09-29 | RH + Produto                        | Dois dias úteis para primeiro retorno, com pausa por dependência externa; V1 registra eventos para acompanhamento interno, sem cronômetro automático nem promessa de conclusão.                                                            | Retorno formal e consolidação aprovada (§1.1). | Aprovada |
+| `PD-SOL-05` | 2026-09-29 | RH + Jurídico + TI/Segurança        | Campos mínimos por tipo; anexos somente após portões de conteúdo; atestado sem diagnóstico/CID no fluxo e sem exposição do documento ao gestor; Cloudflare R2 como armazenamento privado futuro conforme ADR 0013.                         | Retorno formal + ADR 0013.                     | Aprovada |
 
 ### Declaração
 

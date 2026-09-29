@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "constitutionVersion": "1.4.0",
+  "lastConvergedAt": "2026-09-29",
+  "lastIntegratedTask": 136,
+  "lastRecordedTask": 139,
+  "nextTask": {
+    "id": "T139",
+    "status": "ready_after_t138_integration",
+    "reason": "T136 e PD-SOL-01..05 integradas; aguardar revisão e integração da convergência T138."
+  },
+  "openDeliveries": [
+    {
+      "id": "T138",
+      "pullRequest": 130,
+      "status": "draft_updated_after_t136"
+    }
+  ],
+  "requiredArtifacts": [
+    ".specify/memory/constitution.md",
+    ".specify/spec.md",
+    ".specify/plan.md",
+    ".specify/tasks.md",
+    ".specify/execution-status.md"
+  ]
+}

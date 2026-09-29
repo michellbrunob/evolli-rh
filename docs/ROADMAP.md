@@ -25,8 +25,11 @@ Cada etapa exige especificação aprovada, testes automatizados, revisão de seg
 > - **Entregue e integrado:** monorepo, CI, PostgreSQL/Prisma, identidade e
 >   sessão, RBAC/ABAC, auditoria formal append-only, documentos V1 de metadados
 >   (sem conteúdo).
-> - **Pendente (bloqueia dado real):** **MFA**; decisões operacionais da
->   **T004** (cofre de segredos, **backup/restauração testada**); **runbook de
+> - **MFA TOTP implementado e opcional no lançamento inicial:** `MFA_ENABLED=false` conforme T132;
+>   ativação futura depende de cofre/chave, evidências `DS-SEC-*` e decisão de rollout. Fator já ativo
+>   nunca é rebaixado para autenticação apenas por senha.
+> - **Pendente conforme gates próprios:** decisões operacionais da **T004** (cofre de segredos,
+>   **backup/restauração testada**); **runbook de
 >   provisionamento do primeiro `master_tecnico`**; definições de **retenção,
 >   base legal e RIPD/DPIA** por módulo (RH + Jurídico). Ver
 >   [decisões de segurança operacional (T004)](decisions/etapa0-seguranca-operacional-pendente.md)
@@ -35,3 +38,9 @@ Cada etapa exige especificação aprovada, testes automatizados, revisão de seg
 > As etapas 4–10 estão **planejadas**, sem especificação aprovada; o conteúdo de
 > cada uma é decisão de Produto/RH. "Reserva Fiscal" é o **nome da empresa**, não
 > uma etapa/módulo (ver [glossário](decisions/glossario-reserva-fiscal.md)).
+
+> **Nota de convergência Spec Kit (T138, 29/09/2026).** O estado integrado chega à T136;
+> `PD-SOL-01..05` estão aprovadas e a ADR 0013 define o Cloudflare R2 como provedor privado futuro,
+> sem habilitar upload. T137 não foi iniciada e foi substituída pela T139, próxima fundação backend
+> após a integração da T138. O ledger versionado está em
+> [`.specify/execution-status.md`](../.specify/execution-status.md).
