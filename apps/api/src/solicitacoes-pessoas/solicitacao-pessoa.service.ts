@@ -183,6 +183,35 @@ export class SolicitacaoPessoaService {
 
     try {
       return await this.prisma.$transaction(async (tx) => {
+        // ---- 1. LOCK -------------------------------------------------------
+        // `FOR UPDATE` serializa transições concorrentes sobre a MESMA
+        // solicitação (mesmo padrão de `movimentacao.efetivar`). Sem ele, duas
+        // requisições simultâneas leem o mesmo estado anterior, ambas validam
+        // contra ele e ambas confirmam: a última a gravar venceria e a linha do
+        // tempo registraria duas transições partindo do mesmo estado — inclusive
+        // um `cancelar` aplicado depois de `em_revisao_rh`, que `PD-SOL-03`
+        // proíbe. Lock em memória não serviria: a API roda em mais de um
+        // processo, e a serialização precisa ser do banco.
+        //
+        // O predicado casa `id` **e** `empresa_id` da sessão: solicitação
+        // inexistente e solicitação de outra empresa produzem as duas zero
+        // linhas — nenhuma espera pelo lock e nenhuma se distingue da outra, que
+        // é o que mantém o 404 anti-enumeração (ADR 0006).
+        const travada = await tx.$queryRaw<Array<{ id: string }>>`
+          SELECT id FROM solicitacao_pessoa
+          WHERE id = ${solicitacaoId}::text
+            AND empresa_id = ${escopo.empresaId}::text
+          FOR UPDATE
+        `;
+        if (travada.length === 0) {
+          return this.auditoria.negarAcesso(ctx, solicitacaoId, null);
+        }
+
+        // ---- 2. RELEITURA SOB O LOCK ---------------------------------------
+        // Statement novo em READ COMMITTED enxerga um snapshot novo: se uma
+        // transição concorrente commitou enquanto esperávamos o lock, é o estado
+        // DELA que chega aqui. A perdedora valida contra o estado já serializado
+        // e cai no 422 padrão da API, em vez de sobrescrever a vencedora.
         const atual = await tx.solicitacaoPessoa.findFirst({
           where: { id: solicitacaoId, empresaId: escopo.empresaId },
         });

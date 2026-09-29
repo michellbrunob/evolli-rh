@@ -6,7 +6,7 @@ import {
   VersioningType,
 } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
-import { PrismaClient } from "@prisma/client";
+import { AuditAction, PrismaClient } from "@prisma/client";
 import cookieParser from "cookie-parser";
 import request from "supertest";
 import { GenericContainer, StartedTestContainer, Wait } from "testcontainers";
@@ -45,6 +45,9 @@ const APP_PASSWORD = "app_test_pw";
 
 const SENHA_PADRAO = "Solicitacoes!Pessoas2026#Teste";
 const ADMISSAO = "2026-01-05";
+
+/** UUID válido que nunca é criado — o caso "não existe" da anti-enumeração. */
+const INEXISTENTE = "99999999-9999-4999-8999-999999999999";
 
 async function runInfraScript(
   container: StartedTestContainer,
@@ -319,6 +322,48 @@ describe("Central de Solicitações de Pessoas — fundação backend (e2e)", ()
       return id;
     }
     throw new Error(`situacao nao suportada no helper: ${situacao}`);
+  }
+
+  /** Conexão com o papel da APLICAÇÃO (`evolli_app`) — privilégios de DML. */
+  async function comApp<T>(fn: (p: PrismaClient) => Promise<T>): Promise<T> {
+    const prisma = new PrismaClient({ datasources: { db: { url: appUrl } } });
+    try {
+      return await fn(prisma);
+    } finally {
+      await prisma.$disconnect();
+    }
+  }
+
+  /**
+   * Conexão com o papel DONO das tabelas (`evolli_migrator`) — é o único que
+   * pode alterar privilégios. Usado para simular indisponibilidade da trilha de
+   * auditoria sem tocar em nada do código de produção.
+   */
+  async function comMigrator<T>(
+    fn: (p: PrismaClient) => Promise<T>,
+  ): Promise<T> {
+    const prisma = new PrismaClient({
+      datasources: { db: { url: migratorUrl } },
+    });
+    try {
+      return await fn(prisma);
+    } finally {
+      await prisma.$disconnect();
+    }
+  }
+
+  /** Fotografia das três trilhas que precisam permanecer coerentes entre si. */
+  async function lerEstado(id: string) {
+    return comApp(async (p) => ({
+      situacao: (await p.solicitacaoPessoa.findUniqueOrThrow({ where: { id } }))
+        .situacao,
+      eventos: await p.solicitacaoPessoaEvento.count({
+        where: { solicitacaoId: id },
+      }),
+      auditoria: await p.auditEvent.count({
+        where: { resource: "solicitacao_pessoa", resourceId: id },
+      }),
+    }));
   }
 
   beforeAll(async () => {
@@ -818,6 +863,158 @@ describe("Central de Solicitações de Pessoas — fundação backend (e2e)", ()
   });
 
   // -------------------------------------------------------------------------
+  // Serialização de transições concorrentes
+  // -------------------------------------------------------------------------
+
+  describe("transições concorrentes sobre a mesma solicitação", () => {
+    /**
+     * Repetir sobre solicitações independentes aumenta a chance de as duas
+     * transações realmente se sobreporem no banco. O invariante exigido é o
+     * mesmo em toda repetição e **não depende de qual das duas vence** — só de
+     * que exatamente uma vença.
+     */
+    const REPETICOES = 5;
+
+    /** Dispara as duas requisições antes de qualquer uma resolver. */
+    function emParalelo(
+      id: string,
+      a: [string, string?],
+      b: [string, string?],
+    ) {
+      return Promise.all([
+        transicionar(rhA, id, a[0]!, a[1]).ok(() => true),
+        transicionar(rhA, id, b[0]!, b[1]).ok(() => true),
+      ]);
+    }
+
+    /** Eventos de auditoria desta solicitação entre as ações disputadas. */
+    async function acoesAuditadas(
+      id: string,
+      acoes: readonly AuditAction[],
+    ): Promise<AuditAction[]> {
+      return comApp(async (p) => {
+        const eventos = await p.auditEvent.findMany({
+          where: {
+            resource: "solicitacao_pessoa",
+            resourceId: id,
+            action: { in: [...acoes] },
+          },
+        });
+        return eventos.map((e) => e.action);
+      });
+    }
+
+    it("cancelar × iniciar_revisao a partir de enviada: exatamente um sucesso", async () => {
+      for (let i = 0; i < REPETICOES; i += 1) {
+        const id = await levarAte("enviada");
+
+        const respostas = await emParalelo(
+          id,
+          ["cancelar"],
+          ["iniciar_revisao"],
+        );
+
+        const sucessos = respostas.filter((r) => r.status === 201);
+        const rejeitadas = respostas.filter((r) => r.status === 422);
+        expect(sucessos).toHaveLength(1);
+        expect(rejeitadas).toHaveLength(1);
+
+        const vencedora = sucessos[0]!.body.situacao as string;
+        expect(["cancelada", "em_revisao_rh"]).toContain(vencedora);
+
+        // O estado final é o da vencedora — a perdedora não sobrescreveu nada.
+        const detalhe = await get(`/v1/solicitacoes-pessoas/${id}`, rhA).expect(
+          200,
+        );
+        expect(detalhe.body.situacao).toBe(vencedora);
+
+        // Uma única transição parte de `enviada`: não há dois eventos
+        // contraditórios sobre o mesmo estado anterior.
+        const historico = await get(
+          `/v1/solicitacoes-pessoas/${id}/historico`,
+          rhA,
+        ).expect(200);
+        const partindoDeEnviada = (
+          historico.body as Array<Record<string, string>>
+        ).filter((e) => e.situacaoDe === "enviada");
+        expect(partindoDeEnviada).toHaveLength(1);
+        expect(partindoDeEnviada[0]!.situacaoPara).toBe(vencedora);
+
+        // Se a revisão venceu, o cancelamento não foi aplicado em lugar nenhum
+        // — nem como estado, nem como evento tardio.
+        if (vencedora === "em_revisao_rh") {
+          expect(
+            (historico.body as Array<Record<string, string>>).some(
+              (e) => e.situacaoPara === "cancelada",
+            ),
+          ).toBe(false);
+        }
+
+        // A auditoria registra a transição confirmada, e só ela.
+        expect(
+          await acoesAuditadas(id, [
+            "pessoas_solicitacao_cancelada",
+            "pessoas_solicitacao_revisao_iniciada",
+          ]),
+        ).toEqual([
+          vencedora === "cancelada"
+            ? "pessoas_solicitacao_cancelada"
+            : "pessoas_solicitacao_revisao_iniciada",
+        ]);
+      }
+    });
+
+    it("recusar × encaminhar_para_operacao a partir de em_revisao_rh: uma só decisão terminal", async () => {
+      for (let i = 0; i < REPETICOES; i += 1) {
+        const id = await levarAte("em_revisao_rh");
+
+        const respostas = await emParalelo(
+          id,
+          ["recusar", "duplicidade"],
+          ["encaminhar_para_operacao"],
+        );
+
+        const sucessos = respostas.filter((r) => r.status === 201);
+        const rejeitadas = respostas.filter((r) => r.status === 422);
+        expect(sucessos).toHaveLength(1);
+        expect(rejeitadas).toHaveLength(1);
+
+        const vencedora = sucessos[0]!.body.situacao as string;
+        expect(["recusada", "encaminhada_para_operacao_rh"]).toContain(
+          vencedora,
+        );
+
+        const detalhe = await get(`/v1/solicitacoes-pessoas/${id}`, rhA).expect(
+          200,
+        );
+        expect(detalhe.body.situacao).toBe(vencedora);
+
+        // Uma única decisão terminal efetiva partiu da revisão.
+        const historico = await get(
+          `/v1/solicitacoes-pessoas/${id}/historico`,
+          rhA,
+        ).expect(200);
+        const partindoDaRevisao = (
+          historico.body as Array<Record<string, string>>
+        ).filter((e) => e.situacaoDe === "em_revisao_rh");
+        expect(partindoDaRevisao).toHaveLength(1);
+        expect(partindoDaRevisao[0]!.situacaoPara).toBe(vencedora);
+
+        expect(
+          await acoesAuditadas(id, [
+            "pessoas_solicitacao_recusada",
+            "pessoas_solicitacao_encaminhada",
+          ]),
+        ).toEqual([
+          vencedora === "recusada"
+            ? "pessoas_solicitacao_recusada"
+            : "pessoas_solicitacao_encaminhada",
+        ]);
+      }
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // RBAC deny-by-default
   // -------------------------------------------------------------------------
 
@@ -831,7 +1028,13 @@ describe("Central de Solicitações de Pessoas — fundação backend (e2e)", ()
               ? gestorA
               : colaboradorUserA;
 
+        // Recurso REAL, da MESMA empresa do ator: a negação não pode ser
+        // confundida com "não existe" nem com "está fora do escopo".
+        const id = await levarAte("rascunho");
+
         await get("/v1/solicitacoes-pessoas", cred).expect(403);
+        await get(`/v1/solicitacoes-pessoas/${id}`, cred).expect(403);
+        await get(`/v1/solicitacoes-pessoas/${id}/historico`, cred).expect(403);
         await post("/v1/solicitacoes-pessoas", cred)
           .send({
             empresaId: empresaA,
@@ -840,6 +1043,13 @@ describe("Central de Solicitações de Pessoas — fundação backend (e2e)", ()
             motivo: "periodo_ferias",
           })
           .expect(403);
+        await transicionar(cred, id, "enviar").expect(403);
+
+        // E a transição negada não moveu nada.
+        const detalhe = await get(`/v1/solicitacoes-pessoas/${id}`, rhA).expect(
+          200,
+        );
+        expect(detalhe.body.situacao).toBe("rascunho");
       });
     }
 
@@ -874,6 +1084,31 @@ describe("Central de Solicitações de Pessoas — fundação backend (e2e)", ()
     it("rh de outra empresa recebe 404 no histórico", async () => {
       const id = await levarAte("rascunho");
       await get(`/v1/solicitacoes-pessoas/${id}/historico`, rhB).expect(404);
+    });
+
+    it("recurso inexistente e recurso real de outra empresa são indistinguíveis", async () => {
+      // Existe de verdade, mas é da empresa A; `rhB` não pode sabê-lo.
+      const real = await levarAte("rascunho");
+
+      for (const rota of [
+        (id: string) => `/v1/solicitacoes-pessoas/${id}`,
+        (id: string) => `/v1/solicitacoes-pessoas/${id}/historico`,
+      ]) {
+        const alheio = await get(rota(real), rhB).expect(404);
+        const inexistente = await get(rota(INEXISTENTE), rhB).expect(404);
+        // Mesmo corpo público: nada no 404 revela que um dos dois existe.
+        expect(alheio.body).toEqual(inexistente.body);
+      }
+
+      const transicaoAlheia = await transicionar(rhB, real, "enviar").expect(
+        404,
+      );
+      const transicaoInexistente = await transicionar(
+        rhB,
+        INEXISTENTE,
+        "enviar",
+      ).expect(404);
+      expect(transicaoAlheia.body).toEqual(transicaoInexistente.body);
     });
 
     it("rh de outra empresa recebe 404 ao tentar transicionar", async () => {
@@ -924,8 +1159,20 @@ describe("Central de Solicitações de Pessoas — fundação backend (e2e)", ()
 
   describe("auditoria e limites de domínio", () => {
     it("registra a trilha das mutações sem dado sensível no evento", async () => {
-      const id = await levarAte("rascunho");
+      // A solicitação É de `atestado`: só assim a asserção de que o tipo não
+      // vaza pode falhar de verdade. Com uma solicitação de `ferias` ela seria
+      // tautológica — passaria mesmo que a trilha carregasse o tipo.
+      const id = await registrar(rhA, empresaA, vinculoA1, {
+        tipo: "atestado",
+        motivo: "atestado_apresentado",
+      });
       await transicionar(rhA, id, "enviar").expect(201);
+
+      // A resposta pública também não devolve nada além dos campos mínimos.
+      const detalhe = await get(`/v1/solicitacoes-pessoas/${id}`, rhA).expect(
+        200,
+      );
+      assertSemConteudo(detalhe.body);
 
       const prisma = new PrismaClient({ datasources: { db: { url: appUrl } } });
       try {
@@ -942,7 +1189,10 @@ describe("Central de Solicitações de Pessoas — fundação backend (e2e)", ()
         for (const evento of eventos) {
           expect(evento.companyId).toBe(empresaA);
           expect(evento.result).toBe("success");
-          // Nunca o tipo (revelaria saúde por inferência), nunca o vínculo.
+          // Nenhum campo de conteúdo, anexo ou clínico na estrutura do evento.
+          assertSemConteudo(evento as unknown as Record<string, unknown>);
+          // E o tipo `atestado` — que revelaria condição de saúde por
+          // inferência — não aparece em valor nenhum, nem o vínculo.
           const texto = JSON.stringify(evento).toLowerCase();
           expect(texto).not.toContain("atestado");
           expect(texto).not.toContain(vinculoA1.toLowerCase());
@@ -950,6 +1200,35 @@ describe("Central de Solicitações de Pessoas — fundação backend (e2e)", ()
       } finally {
         await prisma.$disconnect();
       }
+    });
+
+    it("falha da auditoria obrigatória desfaz estado e histórico junto", async () => {
+      const id = await levarAte("rascunho");
+
+      const antes = await lerEstado(id);
+
+      // Auditoria indisponível para a APLICAÇÃO, por privilégio de banco —
+      // nenhum endpoint, flag ou gancho de teste foi criado no código de
+      // produção para provocar esta falha.
+      await comMigrator(
+        (p) =>
+          p.$executeRaw`REVOKE INSERT ON TABLE "audit_event" FROM evolli_app`,
+      );
+      let status: number;
+      try {
+        status = (await transicionar(rhA, id, "enviar").ok(() => true)).status;
+      } finally {
+        await comMigrator(
+          (p) =>
+            p.$executeRaw`GRANT INSERT ON TABLE "audit_event" TO evolli_app`,
+        );
+      }
+
+      // A mutação não é reportada como bem-sucedida...
+      expect(status).toBeGreaterThanOrEqual(500);
+      // ...e nada dela sobrevive: situação, histórico e trilha voltam ao ponto
+      // anterior, porque os três estavam na mesma transação.
+      expect(await lerEstado(id)).toEqual(antes);
     });
 
     it("audita a tentativa negada entre empresas como denied", async () => {

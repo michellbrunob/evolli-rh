@@ -43,18 +43,41 @@ function linha(overrides: Partial<SolicitacaoPessoa> = {}): SolicitacaoPessoa {
 }
 
 function montar(atual: SolicitacaoPessoa | null = linha()) {
+  /**
+   * Ordem real das chamadas dentro da transação. É o que permite provar que o
+   * lock vem **antes** da leitura da situação — a asserção que falha na
+   * implementação anterior, que lia e atualizava sem serializar.
+   */
+  const ordem: string[] = [];
+
   const tx = {
+    // `SELECT ... FOR UPDATE`: devolve a linha quando ela existe **no escopo**
+    // e zero linhas quando não existe ou é de outra empresa — os dois casos
+    // indistinguíveis, como exige o 404 anti-enumeração.
+    $queryRaw: jest.fn(async (..._args: unknown[]) => {
+      ordem.push("lock");
+      return atual === null ? [] : [{ id: atual.id }];
+    }),
     vinculoFuncional: {
       findFirst: jest.fn().mockResolvedValue({ id: VINCULO }),
     },
     solicitacaoPessoa: {
-      findFirst: jest.fn().mockResolvedValue(atual),
+      findFirst: jest.fn(async () => {
+        ordem.push("releitura");
+        return atual;
+      }),
       create: jest.fn().mockResolvedValue(linha()),
-      update: jest
-        .fn()
-        .mockImplementation(async ({ data }) => linha({ ...data })),
+      update: jest.fn().mockImplementation(async ({ data }) => {
+        ordem.push("update");
+        return linha({ ...data });
+      }),
     },
-    solicitacaoPessoaEvento: { create: jest.fn().mockResolvedValue({}) },
+    solicitacaoPessoaEvento: {
+      create: jest.fn().mockImplementation(async () => {
+        ordem.push("evento");
+        return {};
+      }),
+    },
   };
 
   const prisma = {
@@ -68,7 +91,9 @@ function montar(atual: SolicitacaoPessoa | null = linha()) {
   } as unknown as PrismaService;
 
   const auditoria = {
-    registrarMutacao: jest.fn().mockResolvedValue(undefined),
+    registrarMutacao: jest.fn().mockImplementation(async () => {
+      ordem.push("auditoria");
+    }),
     registrarLeitura: jest.fn().mockResolvedValue(undefined),
     negarAcesso: jest.fn().mockImplementation(async () => {
       throw new NotFoundException();
@@ -76,6 +101,7 @@ function montar(atual: SolicitacaoPessoa | null = linha()) {
   } as unknown as SolicitacoesPessoasAuditoriaService;
 
   return {
+    ordem,
     tx,
     prisma,
     auditoria,
@@ -284,6 +310,112 @@ describe("SolicitacaoPessoaService — transições", () => {
     ).rejects.toBeInstanceOf(UnprocessableEntityException);
 
     expect(tx.solicitacaoPessoa.update).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Serialização das transições concorrentes.
+ *
+ * A prova real de exclusão mútua exige dois processos e um PostgreSQL de
+ * verdade, e está no E2E (`solicitacoes-pessoas.e2e-spec.ts`). O que se prova
+ * aqui, de forma determinística e sem banco, é o **contrato de ordem** de que a
+ * exclusão mútua depende: o lock é adquirido antes de a situação ser lida, e
+ * estado, histórico e auditoria acontecem depois, dentro da mesma transação.
+ * Toda asserção deste bloco falha na implementação anterior, que ia direto ao
+ * `findFirst` sem `FOR UPDATE`.
+ */
+describe("SolicitacaoPessoaService — serialização de transições concorrentes", () => {
+  it("trava a linha com FOR UPDATE, por id E empresa da sessão, antes de ler a situação", async () => {
+    const { service, tx, ordem } = montar(linha({ situacao: "rascunho" }));
+
+    await service.transicionar(SOLICITACAO, { acao: "enviar" }, CTX);
+
+    expect(tx.$queryRaw).toHaveBeenCalledTimes(1);
+
+    const [fragmentos, ...valores] = tx.$queryRaw.mock.calls[0]! as [
+      readonly string[],
+      ...unknown[],
+    ];
+    const sql = fragmentos.join(" ? ").replace(/\s+/g, " ");
+
+    expect(sql).toContain("FOR UPDATE");
+    expect(sql).toContain("solicitacao_pessoa");
+    expect(sql).toContain("empresa_id");
+    // O predicado do lock carrega os DOIS valores: id do recurso e empresa
+    // derivada da sessão. Travar só por id deixaria o escopo fora da corrida.
+    expect(valores).toEqual([SOLICITACAO, EMPRESA_A]);
+
+    // Lock primeiro; só então a situação é lida.
+    expect(ordem.indexOf("lock")).toBe(0);
+    expect(ordem.indexOf("releitura")).toBe(1);
+  });
+
+  it("executa lock, releitura, atualização, histórico e auditoria nessa ordem, na mesma transação", async () => {
+    const { service, prisma, ordem } = montar(linha({ situacao: "rascunho" }));
+
+    await service.transicionar(SOLICITACAO, { acao: "enviar" }, CTX);
+
+    expect(ordem).toEqual([
+      "lock",
+      "releitura",
+      "update",
+      "evento",
+      "auditoria",
+    ]);
+    // Tudo dentro de uma única transação — nenhuma das etapas escapa dela.
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+  });
+
+  it("a perdedora da corrida valida contra o estado já serializado e cai no 422 padrão", async () => {
+    // Releitura sob o lock devolve `em_revisao_rh`: a concorrente venceu e já
+    // commitou. O `cancelar` que era válido em `enviada` agora não é.
+    const { service, tx, auditoria, ordem } = montar(
+      linha({ situacao: "em_revisao_rh" }),
+    );
+
+    await expect(
+      service.transicionar(SOLICITACAO, { acao: "cancelar" }, CTX),
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+
+    expect(ordem).toEqual(["lock", "releitura"]);
+    expect(tx.solicitacaoPessoa.update).not.toHaveBeenCalled();
+    expect(tx.solicitacaoPessoaEvento.create).not.toHaveBeenCalled();
+    expect(auditoria.registrarMutacao).not.toHaveBeenCalled();
+  });
+
+  it("solicitação inexistente e de outra empresa param no lock, sem releitura, com 404", async () => {
+    // Zero linhas travadas é o resultado dos DOIS casos: o predicado do lock
+    // não distingue "não existe" de "é de outra empresa".
+    const { service, tx, auditoria, ordem } = montar(null);
+
+    await expect(
+      service.transicionar(SOLICITACAO, { acao: "enviar" }, CTX),
+    ).rejects.toBeInstanceOf(NotFoundException);
+
+    expect(ordem).toEqual(["lock"]);
+    expect(tx.solicitacaoPessoa.findFirst).not.toHaveBeenCalled();
+    expect(tx.solicitacaoPessoa.update).not.toHaveBeenCalled();
+    expect(auditoria.negarAcesso).toHaveBeenCalledWith(CTX, SOLICITACAO, null);
+  });
+
+  it("falha da auditoria obrigatória propaga e impede a confirmação da mutação", async () => {
+    const { service, tx, auditoria } = montar(linha({ situacao: "rascunho" }));
+    const falha = new Error("auditoria indisponível");
+    (auditoria.registrarMutacao as unknown as jest.Mock).mockRejectedValueOnce(
+      falha,
+    );
+
+    // O erro NÃO é engolido: ele sobe do callback da transação, e é isso que
+    // faz o PostgreSQL desfazer estado e histórico junto com o evento.
+    await expect(
+      service.transicionar(SOLICITACAO, { acao: "enviar" }, CTX),
+    ).rejects.toBe(falha);
+
+    // As escritas chegaram a ser emitidas dentro da transação — o que as
+    // desfaz é justamente a exceção ter propagado, não o service tê-las
+    // evitado.
+    expect(tx.solicitacaoPessoa.update).toHaveBeenCalledTimes(1);
+    expect(tx.solicitacaoPessoaEvento.create).toHaveBeenCalledTimes(1);
   });
 });
 
