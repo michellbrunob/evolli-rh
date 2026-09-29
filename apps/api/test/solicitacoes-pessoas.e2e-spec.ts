@@ -163,6 +163,16 @@ const CHAVES_PROIBIDAS = [
   "sla",
 ];
 
+/**
+ * Parte do corpo de erro que pode DISCRIMINAR um recurso de outro.
+ * `request_id` e `timestamp` variam por requisição em qualquer resposta da API
+ * (ADR 0001) e por isso não carregam informação sobre o recurso — compará-los
+ * testaria o relógio, não a anti-enumeração.
+ */
+function parteDiscriminante(corpo: Record<string, unknown>) {
+  return { message: corpo.message, status_code: corpo.status_code };
+}
+
 function assertSemConteudo(corpo: Record<string, unknown>): void {
   const chaves = Object.keys(corpo).map((k) => k.toLowerCase());
   for (const proibida of CHAVES_PROIBIDAS) {
@@ -1096,8 +1106,10 @@ describe("Central de Solicitações de Pessoas — fundação backend (e2e)", ()
       ]) {
         const alheio = await get(rota(real), rhB).expect(404);
         const inexistente = await get(rota(INEXISTENTE), rhB).expect(404);
-        // Mesmo corpo público: nada no 404 revela que um dos dois existe.
-        expect(alheio.body).toEqual(inexistente.body);
+        // Mesma resposta pública: nada no 404 revela que um dos dois existe.
+        expect(parteDiscriminante(alheio.body)).toEqual(
+          parteDiscriminante(inexistente.body),
+        );
       }
 
       const transicaoAlheia = await transicionar(rhB, real, "enviar").expect(
@@ -1108,7 +1120,9 @@ describe("Central de Solicitações de Pessoas — fundação backend (e2e)", ()
         INEXISTENTE,
         "enviar",
       ).expect(404);
-      expect(transicaoAlheia.body).toEqual(transicaoInexistente.body);
+      expect(parteDiscriminante(transicaoAlheia.body)).toEqual(
+        parteDiscriminante(transicaoInexistente.body),
+      );
     });
 
     it("rh de outra empresa recebe 404 ao tentar transicionar", async () => {
@@ -1181,7 +1195,14 @@ describe("Central de Solicitações de Pessoas — fundação backend (e2e)", ()
           orderBy: { occurredAt: "asc" },
         });
 
-        expect(eventos.map((e) => e.action)).toEqual([
+        // A sequência das MUTAÇÕES é exatamente esta. A leitura do detalhe
+        // acima também é auditada (`pessoas_solicitacao_consultada`) e entra na
+        // varredura de vazamento abaixo, mas não na sequência de mutações.
+        expect(
+          eventos
+            .map((e) => e.action)
+            .filter((a) => a !== "pessoas_solicitacao_consultada"),
+        ).toEqual([
           "pessoas_solicitacao_criada",
           "pessoas_solicitacao_enviada",
         ]);
