@@ -276,26 +276,29 @@ documento real ou backup para repositório, testes ou ambiente de demonstração
 
 ## 9. Dependências e gates por módulo
 
-| Módulo                         | Gate de negócio/compliance que bloqueia código operacional                                                                                                               |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Documentos                     | credenciais do R2, classificação, retenção, matriz de acesso e quarentena aprovadas                                                                                      |
-| Ponto                          | TXT anonimizado, layout REP, jornada, escala, fechamento e exceções homologados                                                                                          |
-| Folha                          | rubricas, regras, incidências, alçadas, competência e integração aprovadas                                                                                               |
-| Relatórios                     | fórmula, fonte, periodicidade, agregação, acesso e exportação aprovados                                                                                                  |
-| Clima                          | limiar, anonimização, retenção e governança definidos por RH/Jurídico                                                                                                    |
-| Desenvolvimento e Performance  | ciclos, competências, escalas, participantes, visibilidade, retenção, plano de melhoria e avaliação de impacto aprovados por RH/Jurídico                                 |
-| Solicitações gerais de Pessoas | `PD-SOL-01..05` integradas; T139 sem anexos depende da convergência T138 e de especificação/plano/tarefas próprios; conteúdo permanece bloqueado pelos gates documentais |
-| Dados reais/produção           | privacidade, retenção/descarte, backup/restauração, infraestrutura, risco crítico zero, reteste e aceites de risco documentados; MFA segue a exceção T132                |
+| Módulo                         | Gate de negócio/compliance que bloqueia código operacional                                                                                                                                                                                                            |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Documentos                     | credenciais do R2, classificação, retenção, matriz de acesso e quarentena aprovadas                                                                                                                                                                                   |
+| Ponto                          | TXT anonimizado, layout REP, jornada, escala, fechamento e exceções homologados                                                                                                                                                                                       |
+| Folha                          | rubricas, regras, incidências, alçadas, competência e integração aprovadas                                                                                                                                                                                            |
+| Relatórios                     | fórmula, fonte, periodicidade, agregação, acesso e exportação aprovados                                                                                                                                                                                               |
+| Clima                          | limiar, anonimização, retenção e governança definidos por RH/Jurídico                                                                                                                                                                                                 |
+| Desenvolvimento e Performance  | ciclos, competências, escalas, participantes, visibilidade, retenção, plano de melhoria e avaliação de impacto aprovados por RH/Jurídico                                                                                                                              |
+| Solicitações gerais de Pessoas | `PD-SOL-01..05` integradas e implementadas na T139 (registro, triagem e encaminhamento, sem anexo). Conteúdo/anexo segue bloqueado pelos gates documentais; ESS do colaborador depende de `DP-23`; capacidade de RBAC do gestor consultivo depende de decisão própria |
+| Dados reais/produção           | privacidade, retenção/descarte, backup/restauração, infraestrutura, risco crítico zero, reteste e aceites de risco documentados; MFA segue a exceção T132                                                                                                             |
 
 ## 10. Próximo ciclo recomendado
 
-1. Concluir e integrar a convergência T138/PR #130 sobre a base que já contém T136 e ADR 0013.
-2. Abrir a T139 a partir de `origin/main` atualizado e executar `/speckit.specify`, `/speckit.plan` e
-   `/speckit.tasks` específicos para a fundação backend da Central.
-3. Na T139, reconciliar o núcleo T066: cancelamento só antes de `em_revisao_rh`; "encerrada" mapeia
-   para `encaminhada_para_operacao_rh`; reabertura pelo RH exige justificativa auditada.
-4. Manter anexos, upload e efeitos automáticos fora da T139; R2 aprovado não elimina os portões de
-   credenciais, limites, quarentena, acesso, retenção e descarte.
+1. Revisar em modo somente leitura e integrar a T139/PR #131, que entregou a fundação backend da
+   Central com o núcleo T066 já reconciliado (cancelamento só antes de `em_revisao_rh`; "encerrada"
+   mapeada para `encaminhada_para_operacao_rh`; reabertura pelo RH com justificativa auditada).
+2. Só depois abrir a próxima fatia, sob o próximo identificador disponível. Não reservar número antes
+   de a decisão de escopo existir: foi assim que a T137 virou identificador órfão.
+3. Manter anexos, upload, R2, dado real e efeitos automáticos fora de qualquer fatia até que os
+   portões de credenciais, limites, quarentena, acesso, retenção e descarte sejam fechados.
+4. Tratar como decisões próprias, não como pendência técnica: `DP-23` (vínculo `AccessUser <->
+Colaborador`, pré-condição de qualquer autoatendimento) e a capacidade de RBAC do gestor
+   consultivo.
 5. Rodar `/speckit.converge` antes de toda promoção para Ready for review, comparando código, Spec,
    Constituição, Plan, Tasks, ledger, ADRs, decisões, testes e documentação operacional.
 

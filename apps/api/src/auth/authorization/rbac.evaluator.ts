@@ -5,6 +5,7 @@ import {
   AuthorizationTarget,
   isDocumentosResource,
   isHorariosResource,
+  isSolicitacoesPessoasResource,
   isOrganizationalResource,
   isPessoasResource,
   isPontoResource,
@@ -49,6 +50,9 @@ export function evaluatePermission(
       }
       if (isHorariosResource(target.resource)) {
         return evaluateHorarios(subject, target);
+      }
+      if (isSolicitacoesPessoasResource(target.resource)) {
+        return evaluateSolicitacoesPessoas(subject, target);
       }
       return false;
   }
@@ -460,6 +464,61 @@ function evaluatePonto(
  *   (criar/ler);
  * - demais papéis: negados.
  */
+/**
+ * Central de Solicitações de Pessoas (T139) — matriz de `PD-SOL-01`.
+ *
+ * **Só `rh` opera.** A decisão fechou que "RH recebe, analisa e registra a
+ * decisão operacional final"; nenhum outro papel recebeu capacidade, e
+ * conceder por conveniência seria inventar alçada:
+ *
+ * - `dp` é negado. Ele opera `solicitacoes-documento` e `ajuste_ponto` porque
+ *   aquelas decisões o incluem — esta não o menciona, e negação por padrão
+ *   significa exatamente isso.
+ * - `gestor` é negado. `PD-SOL-01` o definiu como **consultivo**, e consultivo
+ *   não é uma capacidade de RBAC: ele não aprova, não recusa e não altera
+ *   registro trabalhista. Enquanto "consultivo" não virar uma capacidade
+ *   própria e segura (com escopo de equipe decidido), não há o que conceder.
+ * - `colaborador` é negado. Não existe vínculo autenticado
+ *   `AccessUser <-> Colaborador` (DP-23, deliberadamente não materializado),
+ *   então não há como provar que a solicitação é dele — conceder aqui seria
+ *   simular uma identidade que o sistema não tem. O RH registra em nome do
+ *   colaborador, como já ocorre em `solicitacoes-documento`.
+ * - Diretoria não existe como papel: escalonamento excepcional acontece fora do
+ *   sistema e não vira endpoint nem capacidade.
+ * - `master_tecnico` LÊ (escopo global, auditado) e **não muta** — mesma regra
+ *   dos demais domínios de dado pessoal e do contrato T065 §5, que o proíbe
+ *   explicitamente de enviar, revisar, encaminhar ou recusar.
+ */
+function evaluateSolicitacoesPessoas(
+  subject: AuthorizationSubject,
+  target: AuthorizationTarget,
+): boolean {
+  if (
+    target.action !== "create" &&
+    target.action !== "read" &&
+    // `alter` é a execução de uma transição de estado aprovada.
+    target.action !== "alter"
+  ) {
+    return false;
+  }
+
+  const escopoResolvido = target.targetCompanyId !== undefined;
+
+  switch (subject.role) {
+    case "master_tecnico":
+      return target.action === "read";
+
+    case "rh":
+      return escopoResolvido
+        ? isSameCompany(subject, target)
+        : subject.companyId !== null;
+
+    default:
+      // dp, gestor, colaborador, financeiro, admin_tecnico, auditor, dpo.
+      return false;
+  }
+}
+
 function evaluateDocumentos(
   subject: AuthorizationSubject,
   target: AuthorizationTarget,

@@ -14,13 +14,18 @@
  * documento/fechamento/Folha e o encaminhamento **não** executa mutação.
  */
 
-/** Tipos de solicitação (catálogo fechado — T065 §2). */
+/**
+ * Tipos de solicitação (catálogo fechado — `PD-SOL-01`, aprovada em
+ * 2026-09-29). `documento` **saiu** deste catálogo: solicitação de documento
+ * permanece no fluxo real e separado de `solicitacoes-documento` (T133).
+ */
 export type TipoSolicitacao =
   | "contestacao_ajuste_ponto"
   | "ausencia"
   | "ferias"
   | "atualizacao_cadastral"
-  | "documento";
+  | "atestado"
+  | "beneficios";
 
 /** Estados conceituais da solicitação (catálogo fechado — T065 §4). */
 export type EstadoSolicitacao =
@@ -32,7 +37,12 @@ export type EstadoSolicitacao =
   | "recusada"
   | "cancelada";
 
-/** Estados terminais — sem transição de saída (T065 §4). */
+/**
+ * Estados que **encerram o ciclo** da Central (T065 §4). Note que encerrar o
+ * ciclo não é mais sinônimo de "sem nenhuma saída": `PD-SOL-03` autorizou o RH
+ * a reabrir dois deles (ver `ESTADOS_REABRIVEIS`). `cancelada` continua
+ * terminal em sentido absoluto.
+ */
 export const ESTADOS_TERMINAIS = [
   "encaminhada_para_operacao_rh",
   "recusada",
@@ -40,15 +50,47 @@ export const ESTADOS_TERMINAIS = [
 ] as const;
 
 /**
+ * Estados terminais que o **RH** pode reabrir, com justificativa codificada e
+ * auditada (`PD-SOL-03`). `encaminhada_para_operacao_rh` é o estado que o termo
+ * funcional "encerrada" designa — nenhum estado literal `encerrada` existe.
+ * `cancelada` **não** está aqui: uma solicitação cancelada exige nova
+ * solicitação.
+ */
+export const ESTADOS_REABRIVEIS = [
+  "encaminhada_para_operacao_rh",
+  "recusada",
+] as const;
+
+/**
  * Motivo **codificado** (catálogo controlado, sem texto livre — ADR 0008 dec. 5).
- * Valores sintéticos e ilustrativos, não regra trabalhista aprovada.
+ *
+ * Mesmo mecanismo — e pela mesma razão — de `MotivoMovimentacao` (Fatia 2) e
+ * `MotivoAjustePonto` (Etapa 3): um campo de observação sem classificação é por
+ * onde dado sensível (ex.: diagnóstico médico) entra sem controle. O que
+ * `PD-SOL-05` fecha é o **mecanismo** (código fechado, sem texto livre); o
+ * **conteúdo** da lista é detalhe de implementação, extensível de forma aditiva
+ * e a validar com RH — a mesma ressalva já registrada nos dois enums acima.
+ *
+ * `segunda_via_documento` saiu junto com o tipo `documento` (`PD-SOL-01`).
+ * Nenhuma regra associa um motivo a um tipo: essa vinculação não foi decidida e
+ * não é inventada aqui.
  */
 export type MotivoSolicitacao =
+  // Registro da intenção.
   | "divergencia_marcacao"
   | "ausencia_programada"
   | "periodo_ferias"
   | "dado_cadastral_desatualizado"
-  | "segunda_via_documento";
+  | "atestado_apresentado"
+  | "beneficio_solicitado"
+  // Decisão do RH (recusa) e justificativa de reabertura — `PD-SOL-03`.
+  | "informacao_insuficiente"
+  | "fora_do_escopo_da_central"
+  | "duplicidade"
+  | "reanalise_administrativa"
+  | "correcao_de_registro"
+  /** Escape do próprio catálogo — nunca texto livre. */
+  | "outro_controlado";
 
 /**
  * Papel técnico **sintético** do ator. Neutro de autorização real (sem
@@ -99,7 +141,12 @@ export interface Solicitacao {
   readonly refAuditoria: string;
 }
 
-/** Ações de transição da máquina de estados (T065 §4.1). */
+/**
+ * Ações de transição da máquina de estados (T065 §4.1, reconciliado por
+ * `PD-SOL-03`). `reabrir` é a ação exclusiva do RH sobre
+ * `encaminhada_para_operacao_rh` ("encerrada", termo funcional) e `recusada`;
+ * `cancelada` **não** é reabrível — exige nova solicitação.
+ */
 export type AcaoSolicitacao =
   | "enviar"
   | "cancelar"
@@ -107,7 +154,8 @@ export type AcaoSolicitacao =
   | "aguardar_informacao"
   | "retomar_revisao"
   | "encaminhar_para_operacao"
-  | "recusar";
+  | "recusar"
+  | "reabrir";
 
 /**
  * Evento técnico de auditoria de uma transição — só endereçamento técnico, sem

@@ -449,8 +449,7 @@ decisões e bloqueios, está no ledger versionado
 
 35. **T138 - Convergir, versionar e proteger o Spec Kit**
 
-    - **Estado:** implementada na branch `codex/t138-convergencia-spec-kit`; PR #130 Draft,
-      aguardando revisão somente leitura.
+    - **Estado:** integrada em `main` pela PR #130 em 2026-09-29.
     - **Objetivo:** reconciliar Constituição, Spec, Plan e Tasks com o estado integrado até T134, as
       investigações T135/T136 e a política de MFA T131/T132; versionar o scaffold durável e os
       comandos; adicionar um gate de sincronização na CI.
@@ -461,20 +460,24 @@ decisões e bloqueios, está no ledger versionado
 
 36. **T139 - Fundação real da Central de Solicitações de Pessoas**
 
-    - **Estado:** pronta para especificação após integração da T138; implementação ainda não iniciada.
-    - **Pré-condições satisfeitas:** T136 integrada; `PD-SOL-01..05` aprovadas; catálogo, alçadas,
-      cancelamento/reabertura, objetivo de primeiro retorno e limites de evidência registrados.
-    - **Preparação obrigatória na branch:** executar `/speckit.specify`, `/speckit.plan` e
-      `/speckit.tasks` antes do código, atualizando os artefatos duráveis e este ledger.
-    - **Escopo autorizado indicativo:** módulo NestJS, modelo/migration Prisma, endpoints de listagem,
-      detalhe, criação e transições aprovadas, RBAC deny-by-default por empresa, CSRF nas mutações,
-      auditoria fail-safe e E2E de ciclo/IDOR.
-    - **Reconciliação obrigatória:** cancelamento somente antes de `em_revisao_rh`; o termo funcional
-      "encerrada" corresponde a `encaminhada_para_operacao_rh`; reabertura desse estado ou de
-      `recusada` é exclusiva do RH e exige justificativa auditada.
-    - **Fora de escopo:** anexos/upload/R2, correção automática de ponto, efeitos em férias,
-      benefícios, cadastro, Banco de Horas, Folha ou fechamento, cronômetro automático de SLA e dado
-      real.
+    - **Estado:** implementada na branch `codex/t139-backend-solicitacoes-pessoas`; PR #131 Draft,
+      aguardando revisão somente leitura.
+    - **Preparação executada:** `/speckit.specify`, `/speckit.plan` e `/speckit.tasks` em
+      `specs/t139-backend-solicitacoes-pessoas/`, antes de qualquer código.
+    - **Entregue:** módulo NestJS `solicitacoes-pessoas`; enums, dois modelos Prisma e migration
+      aditiva; cinco endpoints (`registrar`, `listar`, `detalhar`, `transicoes`, `historico`); RBAC
+      deny-by-default (`solicitacao_pessoa`); CSRF nas mutações; auditoria na mesma transação;
+      histórico append-only garantido por privilégio de banco; testes unitários do núcleo, do
+      avaliador RBAC e do service, além de E2E com PostgreSQL real.
+    - **Reconciliação do núcleo T066 concluída:** catálogo de `PD-SOL-01` (sem `documento`, com
+      `atestado` e `beneficios`); `aguardando_informacao → cancelada` removida; ação `reabrir`
+      exclusiva do RH de `encaminhada_para_operacao_rh` e `recusada` para `em_revisao_rh`;
+      `cancelada` sem saída. Uma única máquina de estados — o service delega ao núcleo.
+    - **Limite estrutural registrado:** sem `DP-23` não há ESS; o RH registra em nome do colaborador,
+      e a auditoria grava o RH como ator real. Nada foi simulado.
+    - **Fora de escopo, preservado:** anexos/upload/R2, correção automática de ponto, efeitos em
+      férias, benefícios, cadastro, Banco de Horas, Folha ou fechamento, bloqueio automático de
+      fechamento, cronômetro automático de SLA, interface web e dado real.
 
 ## Regra obrigatória para as próximas tarefas
 

@@ -24,6 +24,10 @@ export function setupOpenApi(
       "horarios",
       "Cadastros — Tabelas de horário por empresa e vínculo histórico ao colaborador (sem cálculo de jornada)",
     )
+    .addTag(
+      "solicitacoes-pessoas",
+      "Central de Solicitações de Pessoas — registro, triagem e encaminhamento (sem anexo e sem efeito operacional automático)",
+    )
     .build();
 
   const document = SwaggerModule.createDocument(app, config);

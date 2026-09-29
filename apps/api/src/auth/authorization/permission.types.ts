@@ -79,6 +79,22 @@ export const HORARIOS_RESOURCES = [
 export type HorariosResource = (typeof HORARIOS_RESOURCES)[number];
 
 /**
+ * Recurso da Central de Solicitações de Pessoas (T139, `PD-SOL-01..05`).
+ *
+ * Um só. Não existe `evento_solicitacao_pessoa`: o histórico é lido pelo mesmo
+ * `read` da própria solicitação — quem pode ver a solicitação pode ver como ela
+ * chegou ao estado atual, e criar um recurso separado sugeriria uma alçada de
+ * leitura que a decisão não criou. Também não existe recurso de "anexo" ou
+ * "evidência": conteúdo continua bloqueado pelos portões documentais, e
+ * declarar a superfície de autorização antes da capacidade repetiria o erro que
+ * `documento_metadado`/`conteudo_documento` evitou na Etapa 2.
+ */
+export const SOLICITACOES_PESSOAS_RESOURCES = ["solicitacao_pessoa"] as const;
+
+export type SolicitacoesPessoasResource =
+  (typeof SOLICITACOES_PESSOAS_RESOURCES)[number];
+
+/**
  * Recursos/ações desta fatia (matriz §3 da spec). Módulos futuros (Etapa 1+)
  * estendem este union — nunca reduzem o que já está aqui.
  */
@@ -96,7 +112,8 @@ export type AuthorizationResource =
   | PessoasResource
   | PontoResource
   | DocumentosResource
-  | HorariosResource;
+  | HorariosResource
+  | SolicitacoesPessoasResource;
 
 export type AuthorizationAction =
   | "read"
@@ -155,4 +172,12 @@ export function isHorariosResource(
   resource: AuthorizationResource,
 ): resource is HorariosResource {
   return (HORARIOS_RESOURCES as readonly string[]).includes(resource);
+}
+
+export function isSolicitacoesPessoasResource(
+  resource: AuthorizationResource,
+): resource is SolicitacoesPessoasResource {
+  return (SOLICITACOES_PESSOAS_RESOURCES as readonly string[]).includes(
+    resource,
+  );
 }

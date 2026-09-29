@@ -3,6 +3,7 @@ import { join } from "path";
 
 import {
   aplicarSequenciaSolicitacao,
+  ehReabrivel,
   ehTerminal,
   transicionarSolicitacao,
 } from "./solicitacoes";
@@ -11,10 +12,11 @@ import {
   ATOR_COLABORADOR_OUTRO,
   ATOR_RH,
   ATOR_RH_OUTRA_EMPRESA,
+  PERCURSO_ATESTADO_EM_REVISAO,
   PERCURSO_CONTESTACAO_ENCAMINHADA,
-  PERCURSO_DOCUMENTO_EM_REVISAO,
+  PERCURSO_RECUSADA_E_REABERTA,
+  SOLICITACAO_ATESTADO,
   SOLICITACAO_CONTESTACAO,
-  SOLICITACAO_DOCUMENTO,
 } from "./solicitacoes.fixtures";
 import {
   AcaoSolicitacao,
@@ -82,16 +84,18 @@ describe("solicitacoes — fluxo de contestação encaminhada pelo RH", () => {
   });
 });
 
-describe("solicitacoes — solicitação de documento sem anexo/armazenamento", () => {
-  it("documento anda por estado, sem período, anexo ou conteúdo documental", () => {
+describe("solicitacoes — atestado sem anexo e sem conteúdo clínico", () => {
+  it("atestado anda por estado, sem período, anexo ou dado de saúde", () => {
     const historico = aplicarSequenciaSolicitacao(
-      SOLICITACAO_DOCUMENTO,
-      PERCURSO_DOCUMENTO_EM_REVISAO,
+      SOLICITACAO_ATESTADO,
+      PERCURSO_ATESTADO_EM_REVISAO,
     );
     expect(historico.erro).toBeNull();
     expect(historico.solicitacao.situacao).toBe("em_revisao_rh");
     expect(historico.solicitacao.periodoReferencia).toBeNull();
 
+    // `PD-SOL-05`: atestado NÃO coleta diagnóstico, CID nem descrição clínica.
+    // O tipo é só um rótulo técnico do catálogo — nada de saúde trafega aqui.
     const texto = JSON.stringify(historico).toLowerCase();
     for (const termoProibido of [
       "anexo",
@@ -100,9 +104,17 @@ describe("solicitacoes — solicitação de documento sem anexo/armazenamento", 
       "download",
       "imagem",
       ".pdf",
-      "atestado",
       "assinatura",
       "base64",
+      "diagnostico",
+      "diagnóstico",
+      "cid-",
+      "clinic",
+      "clínic",
+      "doenca",
+      "doença",
+      "medic",
+      "médic",
     ]) {
       expect(texto).not.toContain(termoProibido);
     }
@@ -254,6 +266,164 @@ describe("solicitacoes — transições válidas, inválidas e terminais", () =>
       "aguardando_informacao",
     ] as const) {
       expect(ehTerminal(estado as EstadoSolicitacao)).toBe(false);
+    }
+  });
+});
+
+describe("solicitacoes — catálogo aprovado (PD-SOL-01)", () => {
+  it("aceita os seis tipos aprovados", () => {
+    for (const tipo of [
+      "contestacao_ajuste_ponto",
+      "ausencia",
+      "ferias",
+      "atualizacao_cadastral",
+      "atestado",
+      "beneficios",
+    ] as const) {
+      const r = transicionarSolicitacao(
+        { ...SOLICITACAO_CONTESTACAO, tipo },
+        "enviar",
+        ATOR_COLABORADOR,
+        "AUD-1",
+      );
+      expect(r.status).toBe("transicionada");
+    }
+  });
+
+  it("rejeita `documento`, que saiu do catálogo e ficou em solicitacoes-documento", () => {
+    const r = transicionarSolicitacao(
+      { ...SOLICITACAO_CONTESTACAO, tipo: "documento" as Solicitacao["tipo"] },
+      "enviar",
+      ATOR_COLABORADOR,
+      "AUD-1",
+    );
+    expect(r.status).toBe("invalido");
+    if (r.status === "invalido") {
+      expect(r.erro.codigo).toBe("TIPO_DESCONHECIDO");
+    }
+  });
+});
+
+describe("solicitacoes — cancelamento e reabertura (PD-SOL-03)", () => {
+  function em(situacao: EstadoSolicitacao): Solicitacao {
+    return { ...SOLICITACAO_CONTESTACAO, situacao };
+  }
+
+  it("cancela em rascunho e em enviada (antes de em_revisao_rh)", () => {
+    for (const situacao of ["rascunho", "enviada"] as const) {
+      const r = transicionada(
+        transicionarSolicitacao(
+          em(situacao),
+          "cancelar",
+          ATOR_COLABORADOR,
+          "AUD-1",
+        ),
+      );
+      expect(r.solicitacao.situacao).toBe("cancelada");
+    }
+  });
+
+  it("NÃO cancela em em_revisao_rh — depois do marco não há cancelamento livre", () => {
+    const r = transicionarSolicitacao(
+      em("em_revisao_rh"),
+      "cancelar",
+      ATOR_COLABORADOR,
+      "AUD-1",
+    );
+    expect(r.status).toBe("invalido");
+    if (r.status === "invalido") {
+      expect(r.erro.codigo).toBe("TRANSICAO_INVALIDA");
+    }
+  });
+
+  it("NÃO cancela em aguardando_informacao — transição do desenho anterior, revogada", () => {
+    const r = transicionarSolicitacao(
+      em("aguardando_informacao"),
+      "cancelar",
+      ATOR_COLABORADOR,
+      "AUD-1",
+    );
+    expect(r.status).toBe("invalido");
+    if (r.status === "invalido") {
+      expect(r.erro.codigo).toBe("TRANSICAO_INVALIDA");
+    }
+  });
+
+  it("RH reabre encaminhada_para_operacao_rh ('encerrada') para em_revisao_rh", () => {
+    const r = transicionada(
+      transicionarSolicitacao(
+        em("encaminhada_para_operacao_rh"),
+        "reabrir",
+        ATOR_RH,
+        "AUD-1",
+      ),
+    );
+    expect(r.solicitacao.situacao).toBe("em_revisao_rh");
+    expect(r.evento.estadoDe).toBe("encaminhada_para_operacao_rh");
+    expect(r.evento.papel).toBe("rh");
+  });
+
+  it("RH reabre recusada para em_revisao_rh, preservando o histórico", () => {
+    const historico = aplicarSequenciaSolicitacao(
+      SOLICITACAO_CONTESTACAO,
+      PERCURSO_RECUSADA_E_REABERTA,
+    );
+    expect(historico.erro).toBeNull();
+    expect(historico.solicitacao.situacao).toBe("em_revisao_rh");
+    expect(historico.eventos.map((e) => e.estadoPara)).toEqual([
+      "enviada",
+      "em_revisao_rh",
+      "recusada",
+      "em_revisao_rh",
+    ]);
+  });
+
+  it("NÃO reabre cancelada — exige nova solicitação", () => {
+    const r = transicionarSolicitacao(
+      em("cancelada"),
+      "reabrir",
+      ATOR_RH,
+      "AUD-1",
+    );
+    expect(r.status).toBe("invalido");
+    if (r.status === "invalido") {
+      expect(r.erro.codigo).toBe("ESTADO_TERMINAL");
+    }
+  });
+
+  it("colaborador não reabre: reabertura é exclusiva do RH", () => {
+    const r = transicionarSolicitacao(
+      em("recusada"),
+      "reabrir",
+      ATOR_COLABORADOR,
+      "AUD-1",
+    );
+    expect(r.status).toBe("invalido");
+    if (r.status === "invalido") {
+      expect(r.erro.codigo).toBe("PAPEL_NAO_AUTORIZADO");
+    }
+  });
+
+  it("ehReabrivel cobre os dois terminais reabríveis, nunca cancelada", () => {
+    expect(ehReabrivel("encaminhada_para_operacao_rh")).toBe(true);
+    expect(ehReabrivel("recusada")).toBe(true);
+    expect(ehReabrivel("cancelada")).toBe(false);
+    expect(ehReabrivel("rascunho")).toBe(false);
+  });
+
+  it("não existe estado literal `encerrada`: o termo designa o encaminhamento", () => {
+    const r = transicionarSolicitacao(
+      {
+        ...SOLICITACAO_CONTESTACAO,
+        situacao: "encerrada" as EstadoSolicitacao,
+      },
+      "reabrir",
+      ATOR_RH,
+      "AUD-1",
+    );
+    expect(r.status).toBe("invalido");
+    if (r.status === "invalido") {
+      expect(r.erro.codigo).toBe("ESTADO_DESCONHECIDO");
     }
   });
 });

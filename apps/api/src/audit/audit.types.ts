@@ -132,6 +132,30 @@ export const AUDIT_ACTIONS = [
   "mfa_challenge_failed",
   "mfa_recovery_code_used",
   "mfa_reset_by_admin",
+
+  // T139 — Central de Solicitações de Pessoas. Convenção pontilhada de Pessoas
+  // (`pessoas.*`), uma ação por transição, como em `pessoas.movimentacao.*`:
+  // uma única ação genérica esconderia, na trilha, qual decisão o RH tomou.
+  //
+  // O evento carrega ator, papel, empresa e o id TÉCNICO da solicitação —
+  // nunca o tipo da solicitação (`atestado` revelaria dado de saúde por
+  // inferência), nunca o vínculo/colaborador, nunca o motivo codificado e
+  // nunca conteúdo, que aliás não existe nesta fundação.
+  //
+  // `pessoas_solicitacao_consultada` existe (como `ponto_consultado` e
+  // `horarios_consultado`) porque saber que alguém consultou as solicitações de
+  // uma pessoa é por si um dado de interesse — leitura auditada em regime
+  // fail-safe.
+  "pessoas_solicitacao_criada",
+  "pessoas_solicitacao_enviada",
+  "pessoas_solicitacao_cancelada",
+  "pessoas_solicitacao_revisao_iniciada",
+  "pessoas_solicitacao_informacao_solicitada",
+  "pessoas_solicitacao_revisao_retomada",
+  "pessoas_solicitacao_encaminhada",
+  "pessoas_solicitacao_recusada",
+  "pessoas_solicitacao_reaberta",
+  "pessoas_solicitacao_consultada",
 ] as const satisfies readonly AuditAction[];
 
 /**
@@ -181,7 +205,11 @@ export type AuditResource =
   | "tabela_horario"
   | "vinculo_horario"
   // T125 — MFA TOTP: rótulo técnico do recurso. Nunca segredo/URI/código.
-  | "access_mfa";
+  | "access_mfa"
+  // T139 — Central de Solicitações de Pessoas: rótulo técnico do recurso.
+  // Nunca o tipo da solicitação, o motivo codificado ou o vínculo. Não há
+  // rótulo para o evento de histórico: ele é parte da própria solicitação.
+  | "solicitacao_pessoa";
 
 export type RecordAuditEventInput =
   | {
