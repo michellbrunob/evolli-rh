@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import {
   Button,
   DataTable,
@@ -135,6 +135,54 @@ export function ColaboradoresScreen() {
   const [detalhe, setDetalhe] = useState<DetalheState | null>(null);
   const formTituloId = useId();
   const detalheTituloId = useId();
+  // T142 (piloto) — o painel de trabalho precisa ser encontrável: quando abre,
+  // entra no campo de visão e recebe o foco; quando fecha, devolve o foco a
+  // quem o abriu. Sem isto o botão "Novo colaborador" parecia não fazer nada,
+  // porque o formulário nascia centenas de pixels abaixo da dobra.
+  const painelId = useId();
+  const tituloPainelRef = useRef<HTMLHeadingElement | null>(null);
+  const gatilhoRef = useRef<HTMLElement | null>(null);
+  // Identidade do painel aberto: muda quando ele abre, fecha ou troca de tipo
+  // (formulário ↔ detalhe). É o gatilho de "traga para a vista e foque".
+  const painelAtual =
+    formulario !== null
+      ? "formulario"
+      : detalhe !== null
+        ? `detalhe:${detalhe.colaborador.id}`
+        : null;
+  const painelAberto = painelAtual !== null;
+
+  useEffect(() => {
+    if (painelAtual === null) return;
+    const titulo = tituloPainelRef.current;
+    if (!titulo) return;
+    titulo.focus({ preventScroll: true });
+    // `scrollIntoView` não existe no jsdom; a chamada opcional mantém o
+    // comportamento no navegador sem quebrar o ambiente de teste.
+    titulo.scrollIntoView?.({ block: "start", behavior: "auto" });
+  }, [painelAtual]);
+
+  useEffect(() => {
+    if (!painelAberto) return;
+    function aoTeclar(evento: KeyboardEvent) {
+      if (evento.key !== "Escape") return;
+      // Escape só fecha o que é descartável sem perda silenciosa: um envio em
+      // andamento continua até terminar.
+      if (formulario?.salvando) return;
+      evento.preventDefault();
+      if (formulario) fecharFormulario();
+      else fecharDetalhe();
+    }
+    document.addEventListener("keydown", aoTeclar);
+    return () => document.removeEventListener("keydown", aoTeclar);
+  });
+
+  /** Devolve o foco ao botão que abriu o painel. */
+  function devolverFoco() {
+    const alvo = gatilhoRef.current;
+    if (alvo && document.contains(alvo)) alvo.focus();
+    gatilhoRef.current = null;
+  }
 
   const carregarDados = useCallback(
     async (
@@ -240,6 +288,7 @@ export function ColaboradoresScreen() {
 
   function fecharFormulario() {
     setFormulario(null);
+    devolverFoco();
   }
 
   async function selecionarDepartamentoArea(departamentoId: string) {
@@ -318,6 +367,7 @@ export function ColaboradoresScreen() {
 
   function fecharDetalhe() {
     setDetalhe(null);
+    devolverFoco();
   }
 
   async function handleSalvarNome() {
@@ -528,7 +578,15 @@ export function ColaboradoresScreen() {
       key: "acoes",
       header: "Ações",
       cell: (c) => (
-        <Button variant="secondary" onClick={() => abrirDetalhe(c)}>
+        <Button
+          variant="secondary"
+          onClick={(evento) => {
+            gatilhoRef.current = evento.currentTarget;
+            abrirDetalhe(c);
+          }}
+          aria-expanded={detalhe?.colaborador.id === c.id}
+          aria-controls={painelId}
+        >
           Ver detalhes
           <span className="sr-only"> — {c.nome}</span>
         </Button>
@@ -570,7 +628,14 @@ export function ColaboradoresScreen() {
         title="Colaboradores"
         description="Administre a admissão e o cadastro de colaboradores da sua empresa. Situação, vínculo e lotação seguem sempre a fonte de verdade do backend."
         actions={
-          <Button onClick={() => void abrirFormulario()}>
+          <Button
+            onClick={(evento) => {
+              gatilhoRef.current = evento.currentTarget;
+              void abrirFormulario();
+            }}
+            aria-expanded={formulario !== null}
+            aria-controls={painelId}
+          >
             Novo colaborador
           </Button>
         }
@@ -638,12 +703,17 @@ export function ColaboradoresScreen() {
           </Button>
         </Surface>
       ) : (
-        <section aria-labelledby="colaboradores-lista-titulo">
+        <section
+          className="colaboradores-screen__lista"
+          aria-labelledby="colaboradores-lista-titulo"
+        >
+          {/* O H1 da página já diz "Colaboradores"; repetir aqui só somava
+              ruído. A seção passa a nomear o que a lista realmente é. */}
           <h2
             id="colaboradores-lista-titulo"
             className="colaboradores-screen__section-title"
           >
-            Colaboradores
+            Colaboradores desta empresa
           </h2>
 
           <div className="colaboradores-screen__filtros">
@@ -699,7 +769,14 @@ export function ColaboradoresScreen() {
               title="Nenhum colaborador cadastrado"
               description="Registre a admissão do primeiro colaborador desta empresa."
               action={
-                <Button onClick={() => void abrirFormulario()}>
+                <Button
+                  onClick={(evento) => {
+                    gatilhoRef.current = evento.currentTarget;
+                    void abrirFormulario();
+                  }}
+                  aria-expanded={formulario !== null}
+                  aria-controls={painelId}
+                >
                   Novo colaborador
                 </Button>
               }
@@ -707,6 +784,7 @@ export function ColaboradoresScreen() {
           ) : (
             <DataTable
               caption="Colaboradores desta empresa"
+              captionVisible={false}
               columns={colunasColaboradores}
               rows={colaboradores}
               rowKey={(c) => c.id}
@@ -719,15 +797,23 @@ export function ColaboradoresScreen() {
         <Surface
           as="section"
           padding="lg"
-          className="colaboradores-screen__formulario"
+          className="colaboradores-screen__painel"
+          id={painelId}
           aria-labelledby={detalheTituloId}
         >
-          <h2
-            id={detalheTituloId}
-            className="colaboradores-screen__section-title"
-          >
-            {detalhe.colaborador.nome}
-          </h2>
+          <div className="colaboradores-screen__painel-cabecalho">
+            <h2
+              id={detalheTituloId}
+              ref={tituloPainelRef}
+              tabIndex={-1}
+              className="colaboradores-screen__painel-titulo"
+            >
+              {detalhe.colaborador.nome}
+            </h2>
+            <Button type="button" variant="secondary" onClick={fecharDetalhe}>
+              Fechar
+            </Button>
+          </div>
           <p>
             <StatusBadge
               variant={
@@ -810,11 +896,10 @@ export function ColaboradoresScreen() {
             )}
           </div>
 
-          <FormActions>
-            <Button variant="secondary" type="button" onClick={fecharDetalhe}>
-              Fechar
-            </Button>
-          </FormActions>
+          {/* A saída do painel é única e fica no cabeçalho, junto do título —
+              o mesmo lugar nos dois painéis desta tela. Duas saídas com o
+              mesmo rótulo em pontos diferentes era justamente parte da
+              desorganização relatada. */}
         </Surface>
       ) : null}
 
@@ -822,12 +907,28 @@ export function ColaboradoresScreen() {
         <Surface
           as="section"
           padding="lg"
-          className="colaboradores-screen__formulario"
+          className="colaboradores-screen__painel"
+          id={painelId}
           aria-labelledby={formTituloId}
         >
-          <h2 id={formTituloId} className="colaboradores-screen__section-title">
-            Novo colaborador
-          </h2>
+          <div className="colaboradores-screen__painel-cabecalho">
+            <h2
+              id={formTituloId}
+              ref={tituloPainelRef}
+              tabIndex={-1}
+              className="colaboradores-screen__painel-titulo"
+            >
+              Novo colaborador
+            </h2>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={fecharFormulario}
+              disabled={formulario.salvando}
+            >
+              Fechar
+            </Button>
+          </div>
           <p className="colaboradores-screen__aviso-texto">
             A admissão cria o colaborador e o primeiro vínculo em conjunto.
             Matrícula, tipo de vínculo, data de admissão e lotação inicial são

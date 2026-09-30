@@ -121,6 +121,16 @@ de Horas.
 - **Telas demonstrativas vizinhas preservadas.** T067 (Portal) e T068 (Central do RH) seguem
   demonstrativas e fora deste escopo, com teste de não regressão.
 
+## Qualidade visual — T142 (piloto aguardando aprovação)
+
+| Tarefa | Estado                                    | Resultado principal                                                                                                                                                                                                          |
+| ------ | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T142   | Piloto implementado; aguardando aprovação | Diagnóstico visual em navegador real e tela-piloto em `Pessoas › Colaboradores`. **Nada foi expandido para as demais telas**, e a correção compartilhada do `DataTable` está deliberadamente fora de escopo até a aprovação. |
+
+**Limites explícitos:** concluir o piloto **não** significa que o ecossistema foi revisado ou
+corrigido. O diagnóstico cobriu as telas funcionais; as demonstrativas não foram avaliadas como
+produto. A expansão do padrão depende de aprovação e recebe identificador próprio.
+
 ## Próxima ação autorizável
 
 1. Revisão somente leitura e integração da T140.

@@ -665,4 +665,75 @@ describe("ColaboradoresScreen (T111 — funcional)", () => {
       expect(texto).not.toContain(termoProibido);
     }
   });
+  // ---- T142 (piloto): o painel de trabalho precisa ser encontrável ---------
+
+  it("ao abrir o formulário, o foco vai para o título do painel", async () => {
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+
+    const abrir = screen.getByRole("button", { name: "Novo colaborador" });
+    expect(abrir).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.click(abrir);
+
+    const titulo = await screen.findByRole("heading", {
+      name: "Novo colaborador",
+      level: 2,
+    });
+    await waitFor(() => expect(document.activeElement).toBe(titulo));
+    expect(abrir).toHaveAttribute("aria-expanded", "true");
+    // O gatilho aponta para o painel, e o painel é nomeado pelo título focado.
+    const painel = titulo.closest("section");
+    expect(abrir.getAttribute("aria-controls")).toBe(painel?.id);
+    expect(painel).toHaveAttribute("aria-labelledby", titulo.id);
+  });
+
+  it("Escape fecha o painel e devolve o foco a quem o abriu", async () => {
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+
+    const abrir = screen.getByRole("button", { name: "Novo colaborador" });
+    fireEvent.click(abrir);
+    await screen.findByRole("heading", { name: "Novo colaborador", level: 2 });
+
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("heading", { name: "Novo colaborador", level: 2 }),
+      ).toBeNull(),
+    );
+    await waitFor(() => expect(document.activeElement).toBe(abrir));
+  });
+
+  it("o detalhe também recebe o foco e fecha com Escape", async () => {
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+
+    const linha = screen.getByText("Ana Colaboradora (teste)").closest("tr")!;
+    const verDetalhes = within(linha).getByRole("button", {
+      name: /Ver detalhes/,
+    });
+    fireEvent.click(verDetalhes);
+
+    const titulo = await screen.findByRole("heading", {
+      name: colaborador1.nome,
+      level: 2,
+    });
+    await waitFor(() => expect(document.activeElement).toBe(titulo));
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    await waitFor(() => expect(document.activeElement).toBe(verDetalhes));
+  });
+
+  it("o título da página não é repetido pela seção da lista", async () => {
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+
+    const titulos = screen
+      .getAllByRole("heading")
+      .map((h) => h.textContent?.trim());
+    const repetidos = titulos.filter((t) => t === "Colaboradores");
+    expect(repetidos).toHaveLength(1);
+  });
 });

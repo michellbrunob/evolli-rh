@@ -505,6 +505,33 @@ decisões e bloqueios, está no ledger versionado
       conformidade legal; roteador de URL, dependência nova e alteração das telas demonstrativas
       T067 e T068.
 
+38. **Reservado** — identificador ocupado pela tarefa do ambiente local de demonstração, que chega
+    por Pull Request própria ainda em revisão. Esta branch partiu de `main` e por isso não a contém;
+    as duas entradas são reconciliadas quando aquela PR for integrada.
+
+39. **T142 - Qualidade visual e experiência de uso: diagnóstico e tela-piloto**
+
+    - **Estado:** piloto implementado na branch `codex/t142-qualidade-visual-piloto`, **aguardando
+      aprovação visual do proprietário**. Sem PR aberta, sem expansão do padrão.
+    - **Origem:** o proprietário navegou no ambiente local real e relatou falta de organização
+      visual, conteúdo fora dos quadros e aparência inconsistente.
+    - **Base:** `origin/main` em `f2c1014`. **Não depende** da tarefa do ambiente de demonstração —
+      aquele ambiente foi usado apenas como ferramenta de diagnóstico.
+    - **Diagnóstico (navegador real, dados sintéticos, 1280 px e 375 px):** dois defeitos de uso com
+      causa compartilhada. (1) O botão de criar abre o formulário 301–601 px abaixo da dobra no
+      desktop e 678–932 px no celular, sem rolar, sem mover o foco e sem `aria-expanded` — em 5 de 5
+      telas funcionais com formulário. (2) A rolagem horizontal da página inteira vem de texto de
+      leitor de tela (`position: absolute`) dentro da tabela: como `.evolli-datatable` não é bloco
+      contêiner posicionado, esse texto ancora no bloco contêiner inicial e escapa do
+      `overflow-x: auto`. Provado em execução: escondê-lo zera o excesso; `position: relative` no
+      contêiner também zera.
+    - **Piloto:** `Pessoas › Colaboradores`, escolhida por reunir tabela, filtros, formulário e
+      detalhe na mesma tela e por ser o pior caso do defeito (1).
+    - **Fora de escopo até a aprovação:** correção compartilhada em `DataTable.css`, demais telas,
+      novas convenções visuais e qualquer dependência nova.
+    - **Preservado:** contratos HTTP, regras, permissões e comportamento funcional; nenhuma tela
+      além da piloto foi alterada.
+
 ## Regra obrigatória para as próximas tarefas
 
 1. Criar ou atualizar a entrada da tarefa neste arquivo antes da implementação.
