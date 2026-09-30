@@ -21,8 +21,10 @@ de `127.0.0.1` impede a API de subir, e o modo é recusado com
 
 - **Docker Desktop** em execução (o PostgreSQL vem do `docker-compose.yml` da raiz).
 - Node 22 e pnpm, como no resto do repositório.
-- As portas **3000** e **5173** livres. Elas são fixas de propósito: subir
-  calado em outra porta esconderia qual ambiente está aberto.
+- As portas da API e da web livres. Elas são **fixas por execução**, de
+  propósito: subir calado em outra porta esconderia qual ambiente está aberto.
+  A web é sempre **5173**; a API é **3000** por padrão e configurável por
+  `PORT` (ver "Escolher a porta da API").
 
 ## Preparação (uma vez) — Windows / PowerShell
 
@@ -93,7 +95,7 @@ Um comando, oito passos nomeados:
 | 2/8   | PostgreSQL local (`docker compose up -d`) e espera ficar pronto          |
 | 3/8   | Papéis, schema e extensões (`infra/postgres/`)                           |
 | 4/8   | Migrations (`prisma migrate deploy`), só com a credencial de migration   |
-| 5/8   | API em `127.0.0.1:3000` e espera `/v1/health/ready`                      |
+| 5/8   | API em `127.0.0.1:<PORT>` e espera `/v1/health/ready`                    |
 | 6/8   | Conta de bootstrap e seed sintético                                      |
 | 7/8   | Web em `127.0.0.1:5173`, com porta estrita, e verificação HTTP           |
 | 8/8   | Verificação final: banco, API e web respondendo — só então "pronto"      |
@@ -103,12 +105,29 @@ código diferente de zero dizendo **qual passo**, **qual causa** e **qual é o
 próximo procedimento seguro** — e encerra API e web antes de sair, para não
 deixar processo órfão. Senhas e strings de conexão nunca são impressas.
 
-Ao final, e só depois das três verificações:
+Ao final, e só depois das três verificações, o comando imprime os endereços
+que ele **realmente verificou** — a web em `127.0.0.1:5173` e a API em
+`127.0.0.1:<PORT>`.
 
-|     |                         |
-| --- | ----------------------- |
-| Web | <http://127.0.0.1:5173> |
-| API | <http://127.0.0.1:3000> |
+### Escolher a porta da API
+
+A porta 3000 é apenas o padrão. Se ela pertencer a outro serviço da máquina, o
+passo 1/8 **para antes de subir qualquer coisa**, dizendo qual porta está
+ocupada — ele não escorrega para outra porta calado. Escolha então uma livre:
+
+```powershell
+Get-NetTCPConnection -LocalPort 3000,3001,3002,5173 -State Listen | Select-Object LocalAddress, LocalPort, OwningProcess
+$env:PORT = "3002"
+pnpm demo:up
+```
+
+`PORT` vale para a execução inteira: a API escuta nela, a verificação de saúde
+bate nela e o proxy da web é apontado para ela — não há nada a ajustar à mão.
+
+> **Nesta máquina a demonstração usa `PORT=3002`.** As portas 3000 e 3001
+> pertencem a **outros serviços do proprietário** (a Intranet Reserva Fiscal e
+> mais um serviço Node), que ficam de pé e **não devem ser encerrados** para
+> dar lugar à demonstração. A 5173 está livre e continua sendo a da web.
 
 ## Encerrar
 
@@ -128,7 +147,7 @@ dois servidores.
 - Se por algum motivo sobrar algo escutando, confira e encerre:
 
   ```powershell
-  Get-NetTCPConnection -LocalPort 3000,5173 -State Listen | Select-Object LocalPort, OwningProcess
+  Get-NetTCPConnection -LocalPort 3002,5173 -State Listen | Select-Object LocalAddress, LocalPort, OwningProcess
   ```
 
 Subir de novo depois disso é só rodar `pnpm demo:up`. Se uma das portas ainda
@@ -228,7 +247,7 @@ conferir separadamente:
 
 ```powershell
 git rev-parse --short HEAD
-Invoke-RestMethod http://127.0.0.1:3000/v1/health/ready
+Invoke-RestMethod http://127.0.0.1:3002/v1/health/ready   # ajuste para a sua PORT
 ```
 
 ### Recriar os dados do zero
@@ -254,3 +273,8 @@ chamado por uma pessoa, e nenhum aponta para host que não seja local.
   depende de `DP-23`, que é decisão em aberto.
 - **Sem anexo, upload ou R2.** Continuam bloqueados pelos portões de conteúdo.
 - **Sem dado real, em nenhuma hipótese.**
+- **Uma tela estoura a largura da página.** `Pessoas › Histórico funcional`
+  (T115) gera rolagem horizontal do documento inteiro, em desktop e em 375 px.
+  É defeito preexistente, anterior a esta tarefa, registrado como pendência
+  própria no [guia visual](./GUIA-VISUAL-FUNCIONALIDADES.md#pend%C3%AAncia-visual-aberta).
+  As demais telas verificadas não estouram.

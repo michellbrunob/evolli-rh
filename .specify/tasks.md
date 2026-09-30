@@ -537,6 +537,17 @@ decisões e bloqueios, está no ledger versionado
       dependência nova) prova ordem dos passos, parada na primeira falha, limpeza de filhos,
       timeout de API e de web, porta ocupada, endereço permitido, repetição segura, caminho com
       espaço e ausência de segredo em argumento e em log.
+    - **Validação operacional real (Windows, Docker Desktop, Node 22 isolado):** os oito passos
+      completaram, o seed criou 20 registros na primeira execução, os perfis autenticaram, o
+      isolamento entre as duas empresas apareceu na tela e o Ctrl+C encerrou API e web sem deixar
+      órfão. A validação encontrou três defeitos, corrigidos em seguida: o `pnpm --filter ... exec`
+      normalizava para 1 o código dedicado do bootstrap (toda reexecução abortava no passo 6/8);
+      `apps/api/.env.example` trazia `MFA_TOTP_ENCRYPTION_KEY=` vazia, que reprova na validação e
+      impedia a API de subir para quem copiasse o arquivo como a documentação manda; e a espera de
+      60s pela API não cobria a primeira subida do dia, com o cache de disco frio.
+    - **Pendência registrada, não corrigida:** `Pessoas › Histórico funcional` (T115) estoura a
+      largura da página em 1280 px e em 375 px. Defeito preexistente, com evidência e medida no
+      guia visual; corrigi-lo aqui misturaria escopo.
     - **Fora de escopo, preservado:** MFA, ESS/MSS, anexo, upload, R2, serviço externo, dado real,
       rota de administração exposta no produto, regra de RH nova e alteração de CI.
 

@@ -43,6 +43,22 @@ export const CODIGO_SAIDA_ADMIN_JA_EXISTE = 3;
  * satisfazer a validação do schema do Prisma sem colocar a credencial de
  * runtime no processo que executa DDL.
  */
+/** Diretório do pacote da API, relativo à raiz do repositório. */
+export const DIRETORIO_API = "apps/api";
+
+/**
+ * Orçamentos de espera, finitos e distintos.
+ *
+ * A API paga uma compilação do Nest a cada subida (`deleteOutDir: true`), e a
+ * primeira do dia, com o cache de disco frio, é a mais cara — medida em 24s
+ * de compilação nesta máquina, contra 6s com o cache morno. 180s cobre o pior
+ * caso com folga e continua sendo um prazo, não uma espera indefinida; e a
+ * morte do processo interrompe a espera antes disso.
+ */
+export const SEGUNDOS_ESPERA_API = 180;
+/** O Vite sobe em segundos; 90s já é folga larga. */
+export const SEGUNDOS_ESPERA_WEB = 90;
+
 export const DESTINO_INALCANCAVEL =
   "postgresql://unused:unused@127.0.0.1:1/unused";
 
@@ -222,6 +238,7 @@ export async function subirAmbiente(deps) {
       comando,
       args,
       shell,
+      ...(opcoes.cwd ? { cwd: opcoes.cwd } : {}),
       ...(opcoes.env ? { env: opcoes.env } : {}),
       ...(opcoes.entrada !== undefined ? { entrada: opcoes.entrada } : {}),
     });
@@ -260,13 +277,30 @@ export async function subirAmbiente(deps) {
     return resposta !== null && resposta.ok === true;
   };
 
-  const esperar = async (rotulo, url, proximoPasso) => {
-    for (let i = 1; i <= tentativas; i += 1) {
+  /**
+   * Espera um servidor responder, com prazo SEMPRE finito.
+   *
+   * Se o processo morrer no caminho — erro de configuração, porta tomada,
+   * falha de compilação — não faz sentido continuar batendo na porta: a espera
+   * termina na hora, dizendo que o processo encerrou, em vez de gastar o
+   * orçamento inteiro para depois culpar um timeout que não foi a causa.
+   */
+  const esperar = async (rotulo, url, proximoPasso, opcoes = {}) => {
+    const limite = opcoes.segundos ?? tentativas;
+    const processo = opcoes.processo ?? null;
+
+    for (let i = 1; i <= limite; i += 1) {
       if (await verificarHttp(url)) return;
+      if (processo && typeof processo.vivo === "function" && !processo.vivo()) {
+        falhar(
+          `O processo de ${rotulo} encerrou antes de responder em ${url}.`,
+          proximoPasso,
+        );
+      }
       await dormir(1000);
     }
     falhar(
-      `${rotulo} não respondeu em ${url} dentro de ${tentativas}s.`,
+      `${rotulo} não respondeu em ${url} dentro de ${limite}s.`,
       proximoPasso,
     );
   };
@@ -499,6 +533,7 @@ export async function subirAmbiente(deps) {
       `${urlApi}/v1/health/ready`,
       "Veja o log da API acima. Causas comuns: senha do evolli_app diferente " +
         "da que está em apps/api/.env, ou migration não aplicada.",
+      { processo: processoApi, segundos: SEGUNDOS_ESPERA_API },
     );
 
     // ---- 6/8 ---------------------------------------------------------------
@@ -508,18 +543,18 @@ export async function subirAmbiente(deps) {
       DATABASE_URL: databaseUrl,
     };
 
+    // `pnpm --filter <pkg> exec` NORMALIZA qualquer falha do filho para 1
+    // (ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL), o que apagaria o código dedicado
+    // do bootstrap e faria toda reexecução do ambiente abortar aqui. Rodando
+    // DENTRO do pacote, sem a camada recursiva, o código real chega intacto —
+    // provado por subprocesso real em `demo-local.core.test.mjs`.
     exigirSucesso(
       "pnpm",
-      [
-        "--filter",
-        "@evolli/api",
-        "exec",
-        "ts-node",
-        "-T",
-        "src/bootstrap/bootstrap-admin.ts",
-      ],
+      ["exec", "ts-node", "-T", "src/bootstrap/bootstrap-admin.ts"],
       {
+        cwd: DIRETORIO_API,
         // 0 = criado agora; 3 = já existe, que é o caso de toda reexecução.
+        // Qualquer outro código interrompe o orquestrador.
         statusAceitos: [0, CODIGO_SAIDA_ADMIN_JA_EXISTE],
         env: {
           ...ambienteComandos,
@@ -534,15 +569,9 @@ export async function subirAmbiente(deps) {
 
     exigirSucesso(
       "pnpm",
-      [
-        "--filter",
-        "@evolli/api",
-        "exec",
-        "ts-node",
-        "-T",
-        "src/seed/demo-seed.cli.ts",
-      ],
+      ["exec", "ts-node", "-T", "src/seed/demo-seed.cli.ts"],
       {
+        cwd: DIRETORIO_API,
         ecoar: true,
         env: {
           ...ambienteComandos,
@@ -589,6 +618,7 @@ export async function subirAmbiente(deps) {
       `${urlWeb}/`,
       `A porta ${PORTA_WEB} é obrigatória e estrita. Encerre o que estiver ` +
         "usando essa porta e rode de novo.",
+      { processo: processoWeb, segundos: SEGUNDOS_ESPERA_WEB },
     );
 
     // ---- 8/8 ---------------------------------------------------------------

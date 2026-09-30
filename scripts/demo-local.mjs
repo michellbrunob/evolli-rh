@@ -36,9 +36,12 @@ function lerArquivo(relativo) {
  * comando — é o que faz um caminho com espaço ("C:\\MB\\Sistema RH\\...")
  * funcionar sem depender de aspas.
  */
-function executar({ comando, args, shell, env, entrada }) {
+function executar({ comando, args, shell, env, entrada, cwd }) {
   const resultado = spawnSync(comando, args, {
-    cwd: RAIZ,
+    // `cwd` relativo à raiz. Ele viaja pela API do spawn, nunca por argv, e é
+    // o que permite rodar dentro do pacote sem a camada recursiva do pnpm —
+    // que apagaria o código de saída do bootstrap.
+    cwd: cwd ? join(RAIZ, cwd) : RAIZ,
     encoding: "utf8",
     shell,
     ...(env ? { env } : {}),
@@ -81,6 +84,10 @@ function iniciar({ nome, comando, args, shell, env }) {
     nome,
     get pid() {
       return filho.pid;
+    },
+    /** O orquestrador para de esperar assim que o processo morre. */
+    vivo() {
+      return vivo;
     },
     matar() {
       if (!vivo || filho.pid === undefined) return;

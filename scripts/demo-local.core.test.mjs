@@ -14,9 +14,15 @@
  */
 import test from "node:test";
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 import {
   CODIGO_SAIDA_ADMIN_JA_EXISTE,
   DESTINO_INALCANCAVEL,
+  DIRETORIO_API,
+  SEGUNDOS_ESPERA_API,
+  SEGUNDOS_ESPERA_WEB,
   FalhaDePasso,
   HOST_LOCAL,
   NOMES_PASSOS,
@@ -492,4 +498,128 @@ test("a migration não recebe a credencial de runtime (ADR 0002)", async () => {
   const api = c.iniciados.find((p) => p.nome === "API");
   assert.equal(api.env.MIGRATE_DATABASE_URL, undefined);
   assert.ok(api.env.DATABASE_URL.includes("evolli_app"));
+});
+
+// ---------------------------------------------------------------------------
+// Subprocesso REAL: o mock de executor não enxerga este defeito
+// ---------------------------------------------------------------------------
+
+const RAIZ_REPO = join(dirname(fileURLToPath(import.meta.url)), "..");
+const COM_SHELL = process.platform === "win32";
+
+/** Roda pnpm de verdade e devolve o código de saída que chegou ao pai. */
+function codigoDeSaida(args, cwd) {
+  const r = spawnSync("pnpm", args, {
+    cwd,
+    shell: COM_SHELL,
+    stdio: "ignore",
+    timeout: 120_000,
+  });
+  return r.status;
+}
+
+test("a invocação do bootstrap preserva o código de saída do filho", () => {
+  // O bootstrap sinaliza "já existe um administrador" com o código 3, e o
+  // orquestrador precisa distinguir isso de falha real. Rodando DENTRO do
+  // pacote, sem a camada recursiva, o código chega intacto.
+  const codigo = codigoDeSaida(
+    ["exec", "node", "-e", `process.exit(${CODIGO_SAIDA_ADMIN_JA_EXISTE})`],
+    join(RAIZ_REPO, DIRETORIO_API),
+  );
+
+  assert.equal(
+    codigo,
+    CODIGO_SAIDA_ADMIN_JA_EXISTE,
+    "a invocação escolhida precisa propagar o código real do filho",
+  );
+});
+
+test("a forma antiga (--filter ... exec) perderia esse código", () => {
+  // Controle negativo, e a razão de a invocação ter mudado: o exec recursivo
+  // do pnpm normaliza qualquer falha do filho (ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL),
+  // apagando o 3 e fazendo toda reexecução do ambiente abortar no passo 6/8.
+  const codigo = codigoDeSaida(
+    [
+      "--filter",
+      "@evolli/api",
+      "exec",
+      "node",
+      "-e",
+      `process.exit(${CODIGO_SAIDA_ADMIN_JA_EXISTE})`,
+    ],
+    RAIZ_REPO,
+  );
+
+  assert.notEqual(
+    codigo,
+    CODIGO_SAIDA_ADMIN_JA_EXISTE,
+    "se o pnpm passar a propagar o código, esta ressalva pode ser revista",
+  );
+});
+
+test("o bootstrap é invocado dentro do pacote, sem exec recursivo", async () => {
+  const c = cenario();
+  await executarCenario(c);
+
+  const boot = c.chamadas.find((ch) =>
+    ch.args.includes("src/bootstrap/bootstrap-admin.ts"),
+  );
+  assert.ok(boot, "o passo de bootstrap não rodou");
+  assert.equal(boot.cwd, DIRETORIO_API);
+  assert.ok(!boot.args.includes("--filter"), "não pode usar exec recursivo");
+  assert.deepEqual(boot.args.slice(0, 2), ["exec", "ts-node"]);
+});
+
+test("só o código dedicado deixa o bootstrap seguir; outros interrompem", async () => {
+  for (const codigo of [1, 2, 4, 127]) {
+    const c = cenario({
+      statusPorComando: (ch) =>
+        ch.args.includes("src/bootstrap/bootstrap-admin.ts") ? codigo : 0,
+    });
+    const { erro, resultado } = await executarCenario(c);
+    assert.equal(resultado, undefined, `código ${codigo} deveria interromper`);
+    assert.ok(erro instanceof FalhaDePasso);
+    assert.equal(erro.passo, NOMES_PASSOS[5]);
+  }
+});
+
+test("a espera termina assim que o processo morre, sem gastar o orçamento", async () => {
+  let ticks = 0;
+  const c = cenario({ httpOk: () => false });
+  // A API sobe e morre logo em seguida; a espera não pode ficar batendo.
+  const iniciarOriginal = c.deps.iniciar;
+  c.deps.iniciar = (spec) => {
+    const p = iniciarOriginal(spec);
+    return { ...p, vivo: () => false, matar: p.matar };
+  };
+  c.deps.dormir = async () => {
+    ticks += 1;
+  };
+
+  const { erro } = await executarCenario(c);
+
+  assert.ok(erro instanceof FalhaDePasso);
+  assert.equal(erro.passo, NOMES_PASSOS[4]);
+  assert.match(erro.message, /O processo de A API encerrou/);
+  assert.ok(
+    ticks < 5,
+    `esperou demais para um processo morto (${ticks} ticks)`,
+  );
+});
+
+test("os orçamentos de espera são finitos e generosos com a subida fria", async () => {
+  let esperasApi = 0;
+  const c = cenario({ httpOk: (url) => !url.includes("/v1/health/ready") });
+  c.deps.dormir = async () => {
+    esperasApi += 1;
+  };
+
+  const { erro } = await executarCenario(c);
+
+  assert.ok(erro instanceof FalhaDePasso);
+  assert.match(erro.message, new RegExp(`dentro de ${SEGUNDOS_ESPERA_API}s`));
+  assert.equal(esperasApi, SEGUNDOS_ESPERA_API);
+  assert.ok(Number.isFinite(SEGUNDOS_ESPERA_API));
+  assert.ok(Number.isFinite(SEGUNDOS_ESPERA_WEB));
+  assert.ok(SEGUNDOS_ESPERA_API > 60, "precisa cobrir a compilação fria");
 });

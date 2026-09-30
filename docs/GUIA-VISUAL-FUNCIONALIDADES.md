@@ -173,6 +173,25 @@ padrão desativado, T131) e o seed não habilita segundo fator para nenhuma cont
 | Catálogo de motivos a validar com RH                | Conteúdo da lista de motivos (o mecanismo já está aprovado) |
 | Gates operacionais de MFA (`DS-OPS-01`)             | Segundo fator obrigatório                                   |
 
+## Pendência visual aberta
+
+Verificação feita em navegador real contra a `main` integrada, em **1280 px** e
+em **375 px**, com o ambiente local semeado.
+
+| Tela                            | Sintoma                                 | Medida                                                                          | Origem |
+| ------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------- | ------ |
+| `Pessoas › Histórico funcional` | Rolagem horizontal do documento inteiro | `scrollWidth` 1653 contra 1265 de viewport (**+388 px**); a 375 px, **+938 px** | T115   |
+
+O elemento que estoura é a tabela `evolli-datatable__table` ("Movimentações
+funcionais"), cuja borda direita fica em 1775 px. **Não foi corrigida nesta
+tarefa** — é defeito preexistente da T115, e corrigi-lo aqui misturaria escopo.
+
+As demais telas verificadas (Horários, Estrutura organizacional, Funções e
+cargos, Centros de custo, Colaboradores, Horário de trabalho, Dados
+contratuais, Documentos, Solicitações, Ponto › Visão do período e Contas de
+acesso) **não** apresentaram estouro em nenhuma das duas larguras. Isto não é
+uma afirmação sobre as telas não verificadas.
+
 ## O que este ambiente não prova
 
 Que o sistema está pronto para dado real, homologação ou produção. Ele prova

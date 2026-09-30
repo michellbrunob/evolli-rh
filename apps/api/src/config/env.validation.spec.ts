@@ -1,8 +1,21 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   HOST_DEMONSTRACAO_LOCAL,
   resolverHostDeEscuta,
   validateEnv,
 } from "./env.validation";
+
+/** Lê um arquivo de exemplo do jeito que `Copy-Item`/`cp` entregariam. */
+function lerExemplo(nome: string): Record<string, string> {
+  const bruto = readFileSync(join(__dirname, "..", "..", nome), "utf8");
+  const mapa: Record<string, string> = {};
+  for (const linha of bruto.split(/[\r\n]+/)) {
+    const m = /^([A-Z0-9_]+)=(.*?)\s*$/.exec(linha);
+    if (m) mapa[m[1]!] = m[2]!;
+  }
+  return mapa;
+}
 
 describe("validateEnv", () => {
   it("aceita configuração válida e aplica defaults", () => {
@@ -166,5 +179,48 @@ describe("validateEnv", () => {
     });
 
     expect(resolverHostDeEscuta(result)).toBe("0.0.0.0");
+  });
+  // ---- T141: o .env.example precisa subir a API como está -----------------
+
+  it("apps/api/.env.example, copiado literalmente, passa na validação", () => {
+    // O guia do ambiente local manda copiar este arquivo. Se ele não passar
+    // aqui, a API não sobe e o passo 5/8 falha como um timeout genérico.
+    const exemplo = lerExemplo(".env.example");
+    const result = validateEnv({
+      ...exemplo,
+      DATABASE_URL: "postgresql://evolli_app:x@127.0.0.1:5432/d?schema=app",
+    });
+
+    expect(result.MFA_ENABLED).toBe(false);
+    expect(result.MFA_TOTP_ENCRYPTION_KEY).toBeUndefined();
+  });
+
+  it("o exemplo não declara a chave TOTP vazia", () => {
+    const exemplo = lerExemplo(".env.example");
+    expect(
+      Object.prototype.hasOwnProperty.call(exemplo, "MFA_TOTP_ENCRYPTION_KEY"),
+    ).toBe(false);
+  });
+
+  it("chave TOTP declarada e vazia continua sendo recusada", () => {
+    // A validação não foi afrouxada: o que mudou foi o exemplo.
+    expect(() =>
+      validateEnv({
+        DATABASE_URL: "postgresql://user:pass@localhost:5432/db",
+        MFA_TOTP_ENCRYPTION_KEY: "",
+      }),
+    ).toThrow(/MFA_TOTP_ENCRYPTION_KEY/);
+  });
+
+  it("com MFA ligado em produção a chave continua obrigatória", () => {
+    const exemplo = lerExemplo(".env.example");
+    expect(() =>
+      validateEnv({
+        ...exemplo,
+        DATABASE_URL: "postgresql://evolli_app:x@127.0.0.1:5432/d?schema=app",
+        NODE_ENV: "production",
+        MFA_ENABLED: "true",
+      }),
+    ).toThrow(/MFA_TOTP_ENCRYPTION_KEY/);
   });
 });
