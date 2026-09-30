@@ -1,7 +1,13 @@
 # Direção visual aprovada — alternativa B com modais (T142)
 
-**Estado:** direção **aprovada** pelo proprietário. A implementação funcional
-ainda está **em validação** — aprovar a direção não aprova a tela.
+**Estado:** **aprovado** pelo proprietário, nos termos abaixo.
+
+> **Padrão visual B com modais aprovado para o piloto de Colaboradores.
+> Expansão para outras telas condicionada à decisão arquitetural sobre o
+> Frappe.**
+
+Esta aprovação é **visual**. Não autoriza merge, produção, migração, nem a
+aplicação do padrão a qualquer outra tela.
 
 > **Por que este arquivo existe, e não uma edição em `DESIGN-apple.md`.**
 > Aquele arquivo é a referência visual externa, mantida **intacta byte a byte**
@@ -52,8 +58,10 @@ nenhuma tela reimplemente acessibilidade de janela:
 
 ## Limites
 
-- Aplicado **apenas** em `Pessoas › Colaboradores` (piloto). As demais telas
-  seguem como estão até a avaliação do proprietário.
+- Aplicado **apenas** em `Pessoas › Colaboradores` (piloto). A expansão para as
+  demais telas está **condicionada à decisão arquitetural sobre o Frappe** —
+  não é questão de aprovação visual, e sim de saber sobre qual base o produto
+  vai crescer.
 - Nenhuma cor, fonte, raio ou escala nova: só tokens de `app/tokens.css`.
 - Nenhuma dependência nova. O `<dialog>` nativo foi descartado porque o suporte
   parcial no ambiente de teste custaria cobertura de comportamento.

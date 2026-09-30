@@ -511,6 +511,9 @@ decisões e bloqueios, está no ledger versionado
 
 39. **T142 - Qualidade visual e experiência de uso: diagnóstico e tela-piloto**
 
+    - **Aprovação registrada (visual, do proprietário):** "Padrão visual B com modais aprovado para
+      o piloto de Colaboradores. Expansão para outras telas condicionada à decisão arquitetural
+      sobre o Frappe." Não autoriza merge, produção nem migração.
     - **Estado:** **direção visual APROVADA** — alternativa B (navegação lateral agrupada,
       densidade confortável, filtros organizados, lista de B) **com modais** no lugar do painel
       lateral e da folha inferior, por escolha explícita do proprietário. A **implementação
