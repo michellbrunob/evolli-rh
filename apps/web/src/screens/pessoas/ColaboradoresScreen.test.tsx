@@ -736,4 +736,43 @@ describe("ColaboradoresScreen (T111 — funcional)", () => {
     const repetidos = titulos.filter((t) => t === "Colaboradores");
     expect(repetidos).toHaveLength(1);
   });
+  it("admitir confirma o resultado e devolve o foco a quem abriu", async () => {
+    vi.mocked(admitirColaborador).mockResolvedValue(colaborador1);
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+
+    const abrir = screen.getByRole("button", { name: "Novo colaborador" });
+    await abrirFormularioEAguardarOpcoes();
+
+    fireEvent.change(screen.getByLabelText(/Nome completo/i), {
+      target: { value: "Colaborador Novo" },
+    });
+    fireEvent.change(screen.getByLabelText(/Matrícula/i), {
+      target: { value: "mat-0099" },
+    });
+    fireEvent.change(screen.getByLabelText(/Tipo de vínculo/i), {
+      target: { value: "clt" },
+    });
+    fireEvent.change(screen.getByLabelText(/Data de admissão/i), {
+      target: { value: "2026-01-05" },
+    });
+    fireEvent.change(screen.getByLabelText(/Tipo de lotação inicial/i), {
+      target: { value: "departamento" },
+    });
+    fireEvent.change(screen.getByLabelText(/Departamento/i), {
+      target: { value: departamento1.id },
+    });
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Admitir colaborador" }),
+    );
+
+    const confirmacao = await screen.findByRole("status");
+    expect(confirmacao.textContent).toMatch(/admitido/i);
+    await waitFor(() => expect(document.activeElement).toBe(abrir));
+
+    // A confirmação sai de cena assim que outra tarefa começa.
+    fireEvent.click(screen.getByRole("button", { name: "Dispensar" }));
+    await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
+  });
 });

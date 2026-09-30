@@ -89,6 +89,16 @@
   gap: var(--space-md);
 }
 
+/* Texto de apoio do painel. NÃO reaproveita `__aviso-texto`: aquela classe
+   tem `flex: 1 1 16rem` para dividir a linha com o selo no banner de aviso, e
+   dentro do painel (coluna flex) o mesmo `flex-grow` esticava o parágrafo em
+   ~256px, abrindo um vão vazio entre a explicação e o primeiro campo. */
+.colaboradores-screen__painel-descricao {
+  margin: 0;
+  max-width: 60ch;
+  color: var(--color-ink-muted);
+}
+
 .colaboradores-screen__painel-cabecalho {
   display: flex;
   flex-wrap: wrap;
@@ -112,10 +122,28 @@
   scroll-margin-top: var(--space-lg);
 }
 
-/* O painel é o alvo do foco, não um controle: sem o contorno de teclado que
-   sugeriria interatividade. A borda do cabeçalho já delimita a região. */
-.colaboradores-screen__painel-titulo:focus {
-  outline: none;
+/* O anel de foco NÃO é suprimido: `:focus-visible` (tokens.css) só desenha
+   quando o foco vem do teclado, e o foco programático de abertura do painel
+   não dispara essa condição. Remover o anel seria antipadrão de acessibilidade
+   de prioridade 1. */
+
+/* Confirmação de escrita — tokens semânticos de sucesso, nunca só cor: o
+   texto diz o que aconteceu e onde ver o resultado. */
+.colaboradores-screen__sucesso {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm) var(--space-md);
+  background: var(--status-success-surface);
+  border-color: var(--status-success-border);
+}
+
+.colaboradores-screen__sucesso-texto {
+  margin: 0;
+  min-width: 0;
+  color: var(--status-success-ink);
+  font-weight: var(--weight-strong);
 }
 
 /* Rolagem horizontal da tabela CONTIDA no próprio contêiner.

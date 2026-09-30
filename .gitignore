@@ -33,3 +33,6 @@ tmp/
 Thumbs.db
 .idea/
 .vscode/
+
+# Skill de apoio visual instalada localmente (T142): consultiva, fora do versionamento.
+.claude/skills/

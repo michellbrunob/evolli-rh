@@ -133,6 +133,9 @@ export function ColaboradoresScreen() {
     useState<FiltroSituacaoVinculo>("todos");
   const [formulario, setFormulario] = useState<FormularioState | null>(null);
   const [detalhe, setDetalhe] = useState<DetalheState | null>(null);
+  // T142 — confirmação de escrita. Antes, admitir fechava o formulário em
+  // silêncio: a pessoa ficava olhando a lista sem saber se salvou.
+  const [mensagemSucesso, setMensagemSucesso] = useState<string | null>(null);
   const formTituloId = useId();
   const detalheTituloId = useId();
   // T142 (piloto) — o painel de trabalho precisa ser encontrável: quando abre,
@@ -213,6 +216,7 @@ export function ColaboradoresScreen() {
   }, [filtroSituacao, filtroSituacaoVinculo, carregarDados]);
 
   async function abrirFormulario() {
+    setMensagemSucesso(null);
     setDetalhe(null);
     setFormulario({
       nome: "",
@@ -339,6 +343,7 @@ export function ColaboradoresScreen() {
   }
 
   function abrirDetalhe(colaborador: ColaboradorApi) {
+    setMensagemSucesso(null);
     setFormulario(null);
     setDetalhe({
       colaborador,
@@ -505,7 +510,11 @@ export function ColaboradoresScreen() {
           : {}),
       };
       await admitirColaborador(dto);
-      setFormulario(null);
+      const nomeAdmitido = formulario.nome.trim();
+      fecharFormulario();
+      setMensagemSucesso(
+        `Colaborador ${nomeAdmitido} admitido. Ele já aparece na lista abaixo.`,
+      );
       await carregarDados(filtroSituacao, filtroSituacaoVinculo);
     } catch (err: unknown) {
       const mensagem =
@@ -640,6 +649,26 @@ export function ColaboradoresScreen() {
           </Button>
         }
       />
+
+      {mensagemSucesso ? (
+        <Surface
+          as="section"
+          padding="md"
+          className="colaboradores-screen__sucesso"
+        >
+          {/* `role="status"` anuncia sem roubar o foco de quem está digitando. */}
+          <p className="colaboradores-screen__sucesso-texto" role="status">
+            {mensagemSucesso}
+          </p>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => setMensagemSucesso(null)}
+          >
+            Dispensar
+          </Button>
+        </Surface>
+      ) : null}
 
       <Surface
         as="section"
@@ -929,7 +958,7 @@ export function ColaboradoresScreen() {
               Fechar
             </Button>
           </div>
-          <p className="colaboradores-screen__aviso-texto">
+          <p className="colaboradores-screen__painel-descricao">
             A admissão cria o colaborador e o primeiro vínculo em conjunto.
             Matrícula, tipo de vínculo, data de admissão e lotação inicial são
             imutáveis nesta tela — corrija apenas o nome depois, se necessário.

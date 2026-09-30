@@ -127,6 +127,10 @@ de Horas.
 | ------ | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | T142   | Piloto implementado; aguardando aprovação | Diagnóstico visual em navegador real e tela-piloto em `Pessoas › Colaboradores`. **Nada foi expandido para as demais telas**, e a correção compartilhada do `DataTable` está deliberadamente fora de escopo até a aprovação. |
 
+**Apoio externo:** skill `ui-ux-pro-max` (MIT, 2.13.0, commit `09170eec`), instalada localmente e
+fora do versionamento, usada como **checklist consultivo**. A fonte de verdade de design continua
+sendo `DESIGN-apple.md` + `tokens.css` + `src/components/`; nenhuma regra divergente foi criada.
+
 **Limites explícitos:** concluir o piloto **não** significa que o ecossistema foi revisado ou
 corrigido. O diagnóstico cobriu as telas funcionais; as demonstrativas não foram avaliadas como
 produto. A expansão do padrão depende de aprovação e recebe identificador próprio.

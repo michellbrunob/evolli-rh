@@ -529,6 +529,22 @@ decisões e bloqueios, está no ledger versionado
       detalhe na mesma tela e por ser o pior caso do defeito (1).
     - **Fora de escopo até a aprovação:** correção compartilhada em `DataTable.css`, demais telas,
       novas convenções visuais e qualquer dependência nova.
+    - **Apoio externo (consultivo, não normativo):** skill `ui-ux-pro-max`
+      (`github.com/nextlevelbuilder/ui-ux-pro-max-skill`, MIT, versão 2.13.0, commit fixado
+      `09170eec67eefd46a7ae85de61b40c194020f997`). Instalada **localmente e fora do versionamento**
+      em `.claude/skills/ui-ux-pro-max/` da worktree, copiada do tarball do commit fixado — o
+      instalador oficial (`npx ui-ux-pro-max-cli init`) **não** foi executado, para não rodar código
+      de terceiros nem sobrescrever configuração. Nenhuma dependência da aplicação foi alterada e
+      nenhuma skill existente foi substituída. Requisito próprio: Python 3 (presente, 3.14.7).
+    - **Fonte de verdade de design continua sendo o projeto:** `DESIGN-apple.md`, `app/tokens.css` e
+      `src/components/`. A skill foi usada como checklist consultivo; cada sugestão foi avaliada
+      contra esses documentos, e nada dela foi copiado como regra. Nenhuma fonte, biblioteca, efeito
+      ou framework externo entrou.
+    - **O que a skill acrescentou ao piloto:** confirmação de escrita após admitir (`role="status"`,
+      antes a admissão fechava o formulário em silêncio); manutenção do anel de foco no título do
+      painel (eu havia suprimido — é antipadrão de acessibilidade de prioridade 1); e o vão vazio de
+      ~256 px dentro do painel, causado por reaproveitar uma classe com `flex-grow` pensada para o
+      banner de aviso.
     - **Preservado:** contratos HTTP, regras, permissões e comportamento funcional; nenhuma tela
       além da piloto foi alterada.
 
