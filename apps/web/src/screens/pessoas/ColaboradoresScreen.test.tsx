@@ -335,7 +335,7 @@ describe("ColaboradoresScreen (T111 — funcional)", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("Informe a data de admissão.")).toBeInTheDocument();
     expect(
-      screen.getByText("Selecione a lotação inicial do colaborador."),
+      screen.getByText("Escolha o tipo de referência organizacional."),
     ).toBeInTheDocument();
     expect(admitirColaborador).not.toHaveBeenCalled();
   });
@@ -358,12 +358,18 @@ describe("ColaboradoresScreen (T111 — funcional)", () => {
     fireEvent.change(screen.getByLabelText(/Data de admissão/i), {
       target: { value: "2026-01-05" },
     });
-    fireEvent.change(screen.getByLabelText(/Tipo de lotação inicial/i), {
-      target: { value: "departamento" },
-    });
-    fireEvent.change(screen.getByLabelText(/Departamento/i), {
-      target: { value: departamento1.id },
-    });
+    fireEvent.change(
+      screen.getByLabelText(/Tipo de referência organizacional/i),
+      {
+        target: { value: "departamento" },
+      },
+    );
+    fireEvent.change(
+      screen.getByLabelText(/Registro da referência organizacional/i),
+      {
+        target: { value: departamento1.id },
+      },
+    );
 
     fireEvent.click(
       screen.getByRole("button", { name: "Admitir colaborador" }),
@@ -408,14 +414,20 @@ describe("ColaboradoresScreen (T111 — funcional)", () => {
     fireEvent.change(screen.getByLabelText(/Data de admissão/i), {
       target: { value: "2026-01-05" },
     });
-    fireEvent.change(screen.getByLabelText(/Tipo de lotação inicial/i), {
-      target: { value: "area" },
-    });
+    fireEvent.change(
+      screen.getByLabelText(/Tipo de referência organizacional/i),
+      {
+        target: { value: "area" },
+      },
+    );
 
-    const selectArea = screen.getByLabelText(/^Área/i);
-    expect(selectArea).toBeDisabled();
+    // O registro (a área) só libera depois do departamento que a qualifica —
+    // e cada um tem rótulo permanente e próprio.
+    expect(
+      screen.getByLabelText(/Registro da referência organizacional/i),
+    ).toBeDisabled();
 
-    fireEvent.change(screen.getByLabelText(/Departamento/i), {
+    fireEvent.change(screen.getByLabelText(/Departamento da área/i), {
       target: { value: departamento1.id },
     });
 
@@ -427,12 +439,17 @@ describe("ColaboradoresScreen (T111 — funcional)", () => {
       }),
     );
     await waitFor(() =>
-      expect(screen.getByLabelText(/^Área/i)).not.toBeDisabled(),
+      expect(
+        screen.getByLabelText(/Registro da referência organizacional/i),
+      ).not.toBeDisabled(),
     );
 
-    fireEvent.change(screen.getByLabelText(/^Área/i), {
-      target: { value: area1.id },
-    });
+    fireEvent.change(
+      screen.getByLabelText(/Registro da referência organizacional/i),
+      {
+        target: { value: area1.id },
+      },
+    );
     fireEvent.click(
       screen.getByRole("button", { name: "Admitir colaborador" }),
     );
@@ -467,12 +484,18 @@ describe("ColaboradoresScreen (T111 — funcional)", () => {
     fireEvent.change(screen.getByLabelText(/Data de admissão/i), {
       target: { value: "2026-01-05" },
     });
-    fireEvent.change(screen.getByLabelText(/Tipo de lotação inicial/i), {
-      target: { value: "departamento" },
-    });
-    fireEvent.change(screen.getByLabelText(/Departamento/i), {
-      target: { value: departamento1.id },
-    });
+    fireEvent.change(
+      screen.getByLabelText(/Tipo de referência organizacional/i),
+      {
+        target: { value: "departamento" },
+      },
+    );
+    fireEvent.change(
+      screen.getByLabelText(/Registro da referência organizacional/i),
+      {
+        target: { value: departamento1.id },
+      },
+    );
     fireEvent.click(
       screen.getByRole("button", { name: "Admitir colaborador" }),
     );
@@ -756,12 +779,18 @@ describe("ColaboradoresScreen (T111 — funcional)", () => {
     fireEvent.change(screen.getByLabelText(/Data de admissão/i), {
       target: { value: "2026-01-05" },
     });
-    fireEvent.change(screen.getByLabelText(/Tipo de lotação inicial/i), {
-      target: { value: "departamento" },
-    });
-    fireEvent.change(screen.getByLabelText(/Departamento/i), {
-      target: { value: departamento1.id },
-    });
+    fireEvent.change(
+      screen.getByLabelText(/Tipo de referência organizacional/i),
+      {
+        target: { value: "departamento" },
+      },
+    );
+    fireEvent.change(
+      screen.getByLabelText(/Registro da referência organizacional/i),
+      {
+        target: { value: departamento1.id },
+      },
+    );
 
     fireEvent.click(
       screen.getByRole("button", { name: "Admitir colaborador" }),
@@ -774,5 +803,90 @@ describe("ColaboradoresScreen (T111 — funcional)", () => {
     // A confirmação sai de cena assim que outra tarefa começa.
     fireEvent.click(screen.getByRole("button", { name: "Dispensar" }));
     await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
+  });
+  // ---- T142: o erro fica no campo que precisa ser preenchido --------------
+
+  it("com o tipo escolhido e o registro vazio, o erro marca o REGISTRO, não o tipo", async () => {
+    render(<ColaboradoresScreen />);
+    await abrirFormularioEAguardarOpcoes();
+
+    // Só o tipo (a categoria) é escolhido; o registro fica vazio.
+    fireEvent.change(
+      screen.getByLabelText(/Tipo de referência organizacional/i),
+      { target: { value: "cargo" } },
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Admitir colaborador" }),
+    );
+
+    const tipo = screen.getByLabelText(/Tipo de referência organizacional/i);
+    const registro = screen.getByLabelText(
+      /Registro da referência organizacional/i,
+    );
+
+    await waitFor(() =>
+      expect(registro).toHaveAttribute("aria-invalid", "true"),
+    );
+    // O campo JÁ preenchido não pode ser acusado.
+    expect(tipo).not.toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByText(/Selecione o registro de cargo\./i)).toBeTruthy();
+  });
+
+  it("sem tipo escolhido, o erro marca o TIPO", async () => {
+    render(<ColaboradoresScreen />);
+    await abrirFormularioEAguardarOpcoes();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Admitir colaborador" }),
+    );
+
+    const tipo = screen.getByLabelText(/Tipo de referência organizacional/i);
+    await waitFor(() => expect(tipo).toHaveAttribute("aria-invalid", "true"));
+    expect(
+      screen.getByText("Escolha o tipo de referência organizacional."),
+    ).toBeTruthy();
+  });
+
+  it("cargo sozinho é referência suficiente e vai no DTO como cargoId", async () => {
+    vi.mocked(admitirColaborador).mockResolvedValue(colaborador1);
+    render(<ColaboradoresScreen />);
+    await abrirFormularioEAguardarOpcoes();
+
+    fireEvent.change(screen.getByLabelText(/Nome completo/i), {
+      target: { value: "Colaborador Cargo" },
+    });
+    fireEvent.change(screen.getByLabelText(/Matrícula/i), {
+      target: { value: "mat-0101" },
+    });
+    fireEvent.change(screen.getByLabelText(/Tipo de vínculo/i), {
+      target: { value: "clt" },
+    });
+    fireEvent.change(screen.getByLabelText(/Data de admissão/i), {
+      target: { value: "2026-01-05" },
+    });
+    fireEvent.change(
+      screen.getByLabelText(/Tipo de referência organizacional/i),
+      { target: { value: "cargo" } },
+    );
+    fireEvent.change(
+      screen.getByLabelText(/Registro da referência organizacional/i),
+      { target: { value: cargo1.id } },
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Admitir colaborador" }),
+    );
+
+    await waitFor(() =>
+      expect(admitirColaborador).toHaveBeenCalledWith({
+        nome: "Colaborador Cargo",
+        empresaId: empresa1.id,
+        matricula: "MAT-0101",
+        tipo: "clt",
+        dataAdmissao: "2026-01-05",
+        motivoCodigo: "admissao_inicial",
+        cargoId: cargo1.id,
+      }),
+    );
   });
 });

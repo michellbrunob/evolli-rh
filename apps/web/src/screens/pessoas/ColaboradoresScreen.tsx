@@ -88,6 +88,11 @@ interface FormularioErros {
   matricula?: string;
   tipo?: string;
   dataAdmissao?: string;
+  /** Falta escolher o TIPO de referência (categoria). */
+  tipoDestino?: string;
+  /** Falta o departamento que qualifica a área escolhida. */
+  departamentoArea?: string;
+  /** Falta escolher o REGISTRO da referência. */
   destino?: string;
   geral?: string;
 }
@@ -121,6 +126,13 @@ interface DetalheState {
   nomeEdicao: string;
   salvandoNome: boolean;
   erroNome: string | null;
+}
+
+/** Rótulo do TIPO de referência organizacional (categoria), nunca do registro. */
+function rotuloTipoDestino(tipo: TipoDestino): string {
+  return (
+    OPCOES_TIPO_DESTINO.find((o) => o.valor === tipo)?.rotulo ?? "Registro"
+  );
 }
 
 export function ColaboradoresScreen() {
@@ -451,13 +463,20 @@ export function ColaboradoresScreen() {
     if (!formulario.dataAdmissao) {
       erros.dataAdmissao = "Informe a data de admissão.";
     }
-    if (!formulario.tipoDestino || !formulario.destinoId) {
-      erros.destino = "Selecione a lotação inicial do colaborador.";
+    // T142 — cada erro fica no campo que precisa ser preenchido. Antes, faltar
+    // o REGISTRO marcava o seletor de TIPO, que já estava preenchido: a tela
+    // apontava para o campo errado e deixava o campo vazio sem marcação.
+    if (!formulario.tipoDestino) {
+      erros.tipoDestino = "Escolha o tipo de referência organizacional.";
     } else if (
       formulario.tipoDestino === "area" &&
       !formulario.departamentoIdArea
     ) {
-      erros.destino = "Selecione o departamento da área.";
+      erros.departamentoArea = "Selecione o departamento da área.";
+    } else if (!formulario.destinoId) {
+      erros.destino = `Selecione o registro de ${rotuloTipoDestino(
+        formulario.tipoDestino,
+      ).toLowerCase()}.`;
     }
 
     if (
@@ -566,9 +585,9 @@ export function ColaboradoresScreen() {
                   })) ?? [])
                 : [];
 
-  const rotuloDestinoAtual =
-    OPCOES_TIPO_DESTINO.find((o) => o.valor === formulario?.tipoDestino)
-      ?.rotulo ?? "Registro";
+  const tipoDestinoEscolhido = formulario?.tipoDestino
+    ? rotuloTipoDestino(formulario.tipoDestino)
+    : null;
 
   const colunasColaboradores: DataTableColumn<ColaboradorApi>[] = [
     { key: "nome", header: "Nome", cell: (c) => c.nome },
@@ -1123,11 +1142,11 @@ export function ColaboradoresScreen() {
 
             <FormField
               id="colaboradores-tipo-destino"
-              label="Tipo de lotação inicial"
+              label="Tipo de referência organizacional"
               required
-              help="Ao menos uma referência organizacional é exigida para efetivar a admissão."
-              {...(formulario.erros.destino
-                ? { error: formulario.erros.destino }
+              help="Primeiro escolha o tipo; o registro é escolhido no campo seguinte."
+              {...(formulario.erros.tipoDestino
+                ? { error: formulario.erros.tipoDestino }
                 : {})}
             >
               {(control) => (
@@ -1152,8 +1171,12 @@ export function ColaboradoresScreen() {
             {formulario.tipoDestino === "area" ? (
               <FormField
                 id="colaboradores-departamento-area"
-                label="Departamento"
+                label="Departamento da área"
                 required
+                help="A área só identifica a lotação junto com o departamento a que pertence."
+                {...(formulario.erros.departamentoArea
+                  ? { error: formulario.erros.departamentoArea }
+                  : {})}
               >
                 {(control) => (
                   <select
@@ -1177,8 +1200,12 @@ export function ColaboradoresScreen() {
             {formulario.tipoDestino ? (
               <FormField
                 id="colaboradores-destino"
-                label={rotuloDestinoAtual}
+                label="Registro da referência organizacional"
                 required
+                help={`Tipo escolhido: ${tipoDestinoEscolhido}. Uma referência é suficiente para efetivar a admissão.`}
+                {...(formulario.erros.destino
+                  ? { error: formulario.erros.destino }
+                  : {})}
               >
                 {(control) => (
                   <select
