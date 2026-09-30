@@ -1,18 +1,18 @@
 {
   "schemaVersion": 1,
   "constitutionVersion": "1.4.0",
-  "lastConvergedAt": "2026-09-29",
-  "lastIntegratedTask": 139,
-  "lastRecordedTask": 140,
+  "lastConvergedAt": "2026-09-30",
+  "lastIntegratedTask": 140,
+  "lastRecordedTask": 141,
   "nextTask": {
     "id": "a definir",
-    "status": "pending_after_t140_integration",
-    "reason": "T140 implementada e em revisão. A próxima fatia só é aberta após a integração da T140 e recebe o próximo identificador disponível; escopo depende dos portões de conteúdo, de DP-23 e da decisão sobre o gestor consultivo."
+    "status": "pending_after_t141_integration",
+    "reason": "T141 cria acompanhamento local do que já existe; não abre capacidade de RH. A próxima fatia funcional recebe o próximo identificador disponível e depende de decisão própria: DP-23, capacidade do gestor consultivo ou validação do catálogo de motivos com o RH."
   },
   "openDeliveries": [
     {
-      "id": "T140",
-      "pullRequest": 132,
+      "id": "T141",
+      "pullRequest": 133,
       "status": "draft_aguardando_revisao"
     }
   ],

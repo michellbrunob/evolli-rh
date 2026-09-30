@@ -1,8 +1,8 @@
 # Estado de execução do Spec Kit — Evolli RH
 
-**Última convergência:** 2026-09-29
+**Última convergência:** 2026-09-30
 
-**Base Git verificada:** `origin/main` em `6eaa6f9` (T139 integrada)
+**Base Git verificada:** `origin/main` em `f2c1014` (T140 integrada)
 
 **Constituição:** v1.4.0
 
@@ -85,16 +85,17 @@ de Horas.
 | T133   | Integrada | Pessoas > Documentos funcional para metadados e solicitações documentais, sem upload/download inventado.         |
 | T134   | Integrada | Pessoas > Dados contratuais somente leitura, com guardas determinísticas contra respostas assíncronas obsoletas. |
 
-## Solicitações gerais de Pessoas e convergência — T135 a T140
+## Solicitações gerais de Pessoas e convergência — T135 a T141
 
-| Tarefa | Estado                      | Resultado principal                                                                                                                                                                                                                                           |
-| ------ | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| T135   | Investigada/bloqueada       | Não existe controller, persistência Prisma nem RBAC real para Solicitações gerais. Nenhum código foi criado.                                                                                                                                                  |
-| T136   | Integrada                   | `PD-SOL-01..05` aprovadas; ADR 0013 define Cloudflare R2 como provedor privado futuro sem habilitar upload.                                                                                                                                                   |
-| T137   | Não iniciada; substituída   | Identificador histórico da fundação, substituído pela T139 após a convergência T138; nenhum código funcional foi criado.                                                                                                                                      |
-| T138   | Integrada                   | Spec Kit versionado, protegido por gate na CI e reconciliado sobre `main` com T136, decisões aprovadas e ADR 0013.                                                                                                                                            |
-| T139   | Integrada                   | Fundação backend da Central: módulo NestJS, Prisma/migration, cinco endpoints, RBAC deny-by-default, CSRF, auditoria transacional e E2E. A revisão adversarial achou uma corrida de transições concorrentes, corrigida com lock de linha antes da integração. |
-| T140   | Implementada; PR #132 Draft | Interface web funcional de Pessoas > Solicitações sobre os cinco endpoints da T139. Cliente tipado, guarda contra respostas obsoletas e RBAC refletido na experiência. Nenhum contrato de backend alterado.                                                   |
+| Tarefa | Estado                      | Resultado principal                                                                                                                                                                                                                                                                    |
+| ------ | --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T135   | Investigada/bloqueada       | Não existe controller, persistência Prisma nem RBAC real para Solicitações gerais. Nenhum código foi criado.                                                                                                                                                                           |
+| T136   | Integrada                   | `PD-SOL-01..05` aprovadas; ADR 0013 define Cloudflare R2 como provedor privado futuro sem habilitar upload.                                                                                                                                                                            |
+| T137   | Não iniciada; substituída   | Identificador histórico da fundação, substituído pela T139 após a convergência T138; nenhum código funcional foi criado.                                                                                                                                                               |
+| T138   | Integrada                   | Spec Kit versionado, protegido por gate na CI e reconciliado sobre `main` com T136, decisões aprovadas e ADR 0013.                                                                                                                                                                     |
+| T139   | Integrada                   | Fundação backend da Central: módulo NestJS, Prisma/migration, cinco endpoints, RBAC deny-by-default, CSRF, auditoria transacional e E2E. A revisão adversarial achou uma corrida de transições concorrentes, corrigida com lock de linha antes da integração.                          |
+| T140   | Integrada                   | Interface web funcional de Pessoas > Solicitações sobre os cinco endpoints da T139. Cliente tipado, guarda contra respostas obsoletas e RBAC refletido na experiência. Nenhum contrato de backend alterado. Três bloqueios achados em revisão adversarial e corrigidos antes do merge. |
+| T141   | Implementada; PR #133 Draft | Ambiente local de demonstração e guia visual de acompanhamento. **Não é capacidade de RH**: é forma de olhar o que já existe, com dados sintéticos, numa máquina local.                                                                                                                |
 
 ## Limites da T139 e da T140 (implementados como limite, não como pendência esquecida)
 
@@ -123,14 +124,26 @@ de Horas.
 
 ## Próxima ação autorizável
 
-1. Revisão somente leitura e integração da T140.
-2. Só depois disso abrir a próxima fatia, sob o próximo identificador disponível — sem número
-   reservado aqui, porque reservar identificador antes da decisão de escopo já se mostrou fonte de
-   confusão (ver T137).
+1. Revisão somente leitura e integração da T141.
+2. Só depois disso abrir a próxima fatia funcional, sob o próximo identificador disponível — sem
+   número reservado aqui, porque reservar identificador antes da decisão de escopo já se mostrou
+   fonte de confusão (ver T137).
 3. Candidatos naturais da próxima fatia, todos dependentes de decisão própria: capacidade de RBAC
    para o gestor consultivo; `DP-23` como pré-condição de qualquer autoatendimento do colaborador; e
    a validação com RH do catálogo de motivos, cujo mecanismo (código fechado) já está aprovado.
 4. Atualizar este ledger e `sync-state.json` em toda tarefa futura.
+
+## Limites da T141 (ambiente de demonstração)
+
+- **Não é funcionalidade de RH.** A T141 não cria endpoint, regra, permissão ou estado novo: só
+  sobe o que já existe e explica, tela a tela, o que está integrado.
+- **Local e sintético.** Banco, API e web na própria máquina; o seed recusa host que não seja
+  local e exige `EVOLLI_DEMO_SEED` no ambiente do processo.
+- **Sem MFA, sem anexo, sem R2, sem serviço externo.** O seed não habilita segundo fator nem cria
+  conteúdo documental, biometria ou dado clínico.
+- **Não equivale a homologação nem a produção**, e não autoriza dado real.
+- **Idempotente e não destrutivo.** O seed procura antes de criar e nunca apaga — `DELETE` é
+  revogado no banco em `solicitacao_pessoa` e `audit_event`.
 
 ## Evidência mínima por tarefa futura
 

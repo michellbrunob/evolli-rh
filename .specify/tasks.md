@@ -482,8 +482,10 @@ decisões e bloqueios, está no ledger versionado
 
 37. **T140 - Interface web funcional da Central de Solicitações de Pessoas**
 
-    - **Estado:** implementada na branch `codex/t140-web-solicitacoes-pessoas`; **PR #132 Draft**,
-      aguardando revisão somente leitura. Não integrada — a integração só existe após o merge.
+    - **Estado:** integrada em `main` pela PR #132 em 2026-09-30 (squash `f2c1014`). A revisão
+      adversarial encontrou três bloqueios — vínculo do colaborador anterior sobrevivendo à troca,
+      alerta de 404 morrendo junto com o painel e listagem geral exibida sob colaborador escolhido —
+      todos corrigidos na própria branch antes da integração.
     - **Preparação executada:** `/speckit.specify`, `/speckit.plan` e `/speckit.tasks` em
       `specs/t140-web-solicitacoes-pessoas/`, antes de qualquer código.
     - **Objetivo:** transformar a aba demonstrativa Pessoas > Solicitações (T091) em interface
@@ -504,6 +506,27 @@ decisões e bloqueios, está no ledger versionado
       Folha ou fechamento; cronômetro de SLA ou cálculo de prazo no navegador; declaração de
       conformidade legal; roteador de URL, dependência nova e alteração das telas demonstrativas
       T067 e T068.
+
+38. **T141 - Ambiente local de demonstração e guia visual de acompanhamento**
+
+    - **Estado:** implementada na branch `codex/t141-ambiente-demonstracao-local`; **PR #133 Draft**,
+      aguardando revisão somente leitura.
+    - **Natureza:** NÃO é capacidade de RH. É forma de olhar o que já existe: nenhum endpoint,
+      permissão, estado, regra ou contrato novo, e nenhuma tela de produto alterada.
+    - **Entregue:** `pnpm demo:up`, que encadeia PostgreSQL do `docker-compose.yml`, papéis de
+      `infra/postgres/`, `prisma migrate deploy`, servidores, bootstrap e seed, com cada passo
+      nomeado e falha propagada; seed sintético idempotente (`apps/api/src/seed/`) que cria duas
+      empresas de demonstração, estrutura organizacional, horário, colaboradores com um e com dois
+      vínculos, e seis perfis de acesso — um por papel que o RBAC distingue; e dois documentos:
+      operação do ambiente e guia visual tela a tela.
+    - **Prova:** esta máquina não tem Docker, então a garantia não vem de execução manual e sim de
+      um E2E com PostgreSQL real (Testcontainers) que roda o seed DUAS vezes, verifica que a segunda
+      não cria nada, confere a ausência de duplicatas no banco, autentica cada perfil documentado e
+      checa o isolamento entre as duas empresas. Roda na CI a cada push.
+    - **Travas de segurança:** o seed exige `EVOLLI_DEMO_SEED="confirmo-ambiente-local"` e recusa
+      API ou banco cujo host não seja local. Nenhum segredo real é versionado.
+    - **Fora de escopo, preservado:** MFA, ESS/MSS, anexo, upload, R2, serviço externo, dado real,
+      rota de administração exposta no produto, regra de RH nova e alteração de CI.
 
 ## Regra obrigatória para as próximas tarefas
 

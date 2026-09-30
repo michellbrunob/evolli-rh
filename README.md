@@ -59,13 +59,18 @@ Ecossistema corporativo de RH e Departamento Pessoal, modular e multiempresa.
 - Cofre de segredos, backup/restauração testada, demais decisões operacionais da T004 e o runbook de
   provisionamento do primeiro `master_tecnico` continuam pendentes conforme seus gates próprios.
 - Retenção, base legal e RIPD/DPIA por módulo (RH + Jurídico).
-- Solicitações gerais de Pessoas têm `PD-SOL-01..05` aprovadas e a fundação backend T139 integrada,
-  sem anexos. A interface funcional de RH (T140) está em revisão. Autoatendimento do colaborador
+- Solicitações gerais de Pessoas têm `PD-SOL-01..05` aprovadas, com a fundação backend (T139) e a
+  interface funcional de RH (T140) integradas, sem anexos. Autoatendimento do colaborador
   (ESS) segue dependendo de `DP-23`, e a capacidade de RBAC do gestor consultivo, de decisão
   própria.
 
 Consulte [docs/ROADMAP.md](docs/ROADMAP.md) e o
 [processo de desenvolvimento](docs/PROCESSO-DESENVOLVIMENTO.md).
+
+Para abrir uma cópia local da `main` e navegar pelo que já está integrado, com
+dados exclusivamente sintéticos, veja o
+[ambiente local de demonstração](docs/AMBIENTE-DEMONSTRACAO-LOCAL.md) e o
+[guia visual de funcionalidades](docs/GUIA-VISUAL-FUNCIONALIDADES.md).
 
 ## Pré-requisitos
 
