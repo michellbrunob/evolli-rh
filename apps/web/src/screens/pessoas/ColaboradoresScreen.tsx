@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Button,
   DataTable,
   EmptyState,
   FormActions,
   FormField,
+  Modal,
   PageHeader,
   StatusBadge,
   Surface,
@@ -148,56 +149,23 @@ export function ColaboradoresScreen() {
   // T142 — confirmação de escrita. Antes, admitir fechava o formulário em
   // silêncio: a pessoa ficava olhando a lista sem saber se salvou.
   const [mensagemSucesso, setMensagemSucesso] = useState<string | null>(null);
-  const formTituloId = useId();
-  const detalheTituloId = useId();
   // T142 (piloto) — o painel de trabalho precisa ser encontrável: quando abre,
   // entra no campo de visão e recebe o foco; quando fecha, devolve o foco a
   // quem o abriu. Sem isto o botão "Novo colaborador" parecia não fazer nada,
   // porque o formulário nascia centenas de pixels abaixo da dobra.
-  const painelId = useId();
-  const tituloPainelRef = useRef<HTMLHeadingElement | null>(null);
-  const gatilhoRef = useRef<HTMLElement | null>(null);
-  // Identidade do painel aberto: muda quando ele abre, fecha ou troca de tipo
-  // (formulário ↔ detalhe). É o gatilho de "traga para a vista e foque".
-  const painelAtual =
-    formulario !== null
-      ? "formulario"
-      : detalhe !== null
-        ? `detalhe:${detalhe.colaborador.id}`
-        : null;
-  const painelAberto = painelAtual !== null;
+  // O foco inicial, o foco preso, o Escape e a devolução do foco ao acionador
+  // são responsabilidade do `Modal` (UI-F04) — a tela só diz o que abre.
+  /** Envio em curso — trava síncrona, ver `handleSubmit`. */
+  const enviandoRef = useRef(false);
 
-  useEffect(() => {
-    if (painelAtual === null) return;
-    const titulo = tituloPainelRef.current;
-    if (!titulo) return;
-    titulo.focus({ preventScroll: true });
-    // `scrollIntoView` não existe no jsdom; a chamada opcional mantém o
-    // comportamento no navegador sem quebrar o ambiente de teste.
-    titulo.scrollIntoView?.({ block: "start", behavior: "auto" });
-  }, [painelAtual]);
-
-  useEffect(() => {
-    if (!painelAberto) return;
-    function aoTeclar(evento: KeyboardEvent) {
-      if (evento.key !== "Escape") return;
-      // Escape só fecha o que é descartável sem perda silenciosa: um envio em
-      // andamento continua até terminar.
-      if (formulario?.salvando) return;
-      evento.preventDefault();
-      if (formulario) fecharFormulario();
-      else fecharDetalhe();
-    }
-    document.addEventListener("keydown", aoTeclar);
-    return () => document.removeEventListener("keydown", aoTeclar);
-  });
-
-  /** Devolve o foco ao botão que abriu o painel. */
-  function devolverFoco() {
-    const alvo = gatilhoRef.current;
-    if (alvo && document.contains(alvo)) alvo.focus();
-    gatilhoRef.current = null;
-  }
+  const formularioAlterado =
+    formulario !== null &&
+    (formulario.nome !== "" ||
+      formulario.matricula !== "" ||
+      formulario.tipo !== "" ||
+      formulario.dataAdmissao !== "" ||
+      formulario.tipoDestino !== "" ||
+      formulario.destinoId !== "");
 
   const carregarDados = useCallback(
     async (
@@ -299,12 +267,13 @@ export function ColaboradoresScreen() {
             }
           : prev,
       );
+    } finally {
+      enviandoRef.current = false;
     }
   }
 
   function fecharFormulario() {
     setFormulario(null);
-    devolverFoco();
   }
 
   async function selecionarDepartamentoArea(departamentoId: string) {
@@ -384,7 +353,6 @@ export function ColaboradoresScreen() {
 
   function fecharDetalhe() {
     setDetalhe(null);
-    devolverFoco();
   }
 
   async function handleSalvarNome() {
@@ -441,6 +409,11 @@ export function ColaboradoresScreen() {
   async function handleSubmit(evento: React.FormEvent) {
     evento.preventDefault();
     if (!formulario) return;
+    // Trava SÍNCRONA contra envio duplicado. `disabled` no botão depende de um
+    // `setState`, que só chega no próximo render: cliques repetidos no mesmo
+    // quadro escapariam dele — e escapavam, medido no navegador (três cliques,
+    // três requisições). O ref fecha a porta no mesmo instante.
+    if (enviandoRef.current) return;
 
     const erros: FormularioErros = {};
     const nome = formulario.nome.trim();
@@ -491,6 +464,7 @@ export function ColaboradoresScreen() {
       return;
     }
 
+    enviandoRef.current = true;
     setFormulario((prev) =>
       prev ? { ...prev, salvando: true, erros: {} } : prev,
     );
@@ -609,11 +583,11 @@ export function ColaboradoresScreen() {
         <Button
           variant="secondary"
           onClick={(evento) => {
-            gatilhoRef.current = evento.currentTarget;
+            evento.currentTarget.focus();
             abrirDetalhe(c);
           }}
+          aria-haspopup="dialog"
           aria-expanded={detalhe?.colaborador.id === c.id}
-          aria-controls={painelId}
         >
           Ver detalhes
           <span className="sr-only"> — {c.nome}</span>
@@ -658,11 +632,11 @@ export function ColaboradoresScreen() {
         actions={
           <Button
             onClick={(evento) => {
-              gatilhoRef.current = evento.currentTarget;
+              evento.currentTarget.focus();
               void abrirFormulario();
             }}
+            aria-haspopup="dialog"
             aria-expanded={formulario !== null}
-            aria-controls={painelId}
           >
             Novo colaborador
           </Button>
@@ -819,11 +793,11 @@ export function ColaboradoresScreen() {
               action={
                 <Button
                   onClick={(evento) => {
-                    gatilhoRef.current = evento.currentTarget;
+                    evento.currentTarget.focus();
                     void abrirFormulario();
                   }}
+                  aria-haspopup="dialog"
                   aria-expanded={formulario !== null}
-                  aria-controls={painelId}
                 >
                   Novo colaborador
                 </Button>
@@ -841,148 +815,111 @@ export function ColaboradoresScreen() {
         </section>
       )}
 
-      {detalhe ? (
-        <Surface
-          as="section"
-          padding="lg"
-          className="colaboradores-screen__painel"
-          id={painelId}
-          aria-labelledby={detalheTituloId}
-        >
-          <div className="colaboradores-screen__painel-cabecalho">
-            <h2
-              id={detalheTituloId}
-              ref={tituloPainelRef}
-              tabIndex={-1}
-              className="colaboradores-screen__painel-titulo"
-            >
-              {detalhe.colaborador.nome}
-            </h2>
-            <Button type="button" variant="secondary" onClick={fecharDetalhe}>
-              Fechar
-            </Button>
-          </div>
-          <p>
-            <StatusBadge
-              variant={
-                VARIANTE_SITUACAO_COLABORADOR[detalhe.colaborador.situacao] ??
-                "neutral"
-              }
-            >
-              {detalhe.colaborador.situacao === "ativo" ? "Ativo" : "Inativo"}
-            </StatusBadge>
-          </p>
-          <p className="colaboradores-screen__aviso-texto">
-            Matrícula, tipo de vínculo e data de admissão são imutáveis nesta
-            tela. Apenas o nome pode ser corrigido abaixo.
-          </p>
+      <Modal
+        aberto={detalhe !== null}
+        titulo={detalhe?.colaborador.nome ?? ""}
+        onFechar={fecharDetalhe}
+        largura="media"
+      >
+        {detalhe ? (
+          <>
+            <p>
+              <StatusBadge
+                variant={
+                  VARIANTE_SITUACAO_COLABORADOR[detalhe.colaborador.situacao] ??
+                  "neutral"
+                }
+              >
+                {detalhe.colaborador.situacao === "ativo" ? "Ativo" : "Inativo"}
+              </StatusBadge>
+            </p>
+            <p className="colaboradores-screen__aviso-texto">
+              Matrícula, tipo de vínculo e data de admissão são imutáveis nesta
+              tela. Apenas o nome pode ser corrigido abaixo.
+            </p>
 
-          <div className="colaboradores-screen__edicao-nome">
-            <FormField
-              id="colaboradores-detalhe-nome"
-              label="Nome"
-              {...(detalhe.erroNome ? { error: detalhe.erroNome } : {})}
-            >
-              {(control) => (
-                <input
-                  type="text"
-                  maxLength={160}
-                  value={detalhe.nomeEdicao}
-                  onChange={(e) =>
-                    setDetalhe((prev) =>
-                      prev
-                        ? {
-                            ...prev,
-                            nomeEdicao: e.target.value,
-                            erroNome: null,
-                          }
-                        : prev,
-                    )
-                  }
-                  {...control}
+            <div className="colaboradores-screen__edicao-nome">
+              <FormField
+                id="colaboradores-detalhe-nome"
+                label="Nome"
+                {...(detalhe.erroNome ? { error: detalhe.erroNome } : {})}
+              >
+                {(control) => (
+                  <input
+                    type="text"
+                    maxLength={160}
+                    value={detalhe.nomeEdicao}
+                    onChange={(e) =>
+                      setDetalhe((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              nomeEdicao: e.target.value,
+                              erroNome: null,
+                            }
+                          : prev,
+                      )
+                    }
+                    {...control}
+                  />
+                )}
+              </FormField>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => void handleSalvarNome()}
+                disabled={
+                  detalhe.salvandoNome ||
+                  detalhe.nomeEdicao.trim() === detalhe.colaborador.nome
+                }
+              >
+                {detalhe.salvandoNome ? "Salvando…" : "Salvar nome"}
+              </Button>
+            </div>
+
+            <div className="colaboradores-screen__vinculos">
+              <h3 className="colaboradores-screen__section-title">Vínculos</h3>
+              {detalhe.statusVinculos === "carregando" ? (
+                <p className="colaboradores-screen__carregando" role="status">
+                  Carregando vínculos…
+                </p>
+              ) : detalhe.statusVinculos === "erro" ? (
+                <p className="colaboradores-screen__form-erro" role="alert">
+                  Não foi possível carregar os vínculos deste colaborador.{" "}
+                  <Button
+                    variant="secondary"
+                    onClick={() =>
+                      void carregarVinculos(detalhe.colaborador.id)
+                    }
+                  >
+                    Tentar novamente
+                  </Button>
+                </p>
+              ) : detalhe.vinculos.length === 0 ? (
+                <p>Nenhum vínculo encontrado.</p>
+              ) : (
+                <DataTable
+                  caption={`Vínculos — ${detalhe.colaborador.nome}`}
+                  columns={colunasVinculos}
+                  rows={detalhe.vinculos}
+                  rowKey={(v) => v.id}
                 />
               )}
-            </FormField>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => void handleSalvarNome()}
-              disabled={
-                detalhe.salvandoNome ||
-                detalhe.nomeEdicao.trim() === detalhe.colaborador.nome
-              }
-            >
-              {detalhe.salvandoNome ? "Salvando…" : "Salvar nome"}
-            </Button>
-          </div>
+            </div>
+          </>
+        ) : null}
+      </Modal>
 
-          <div className="colaboradores-screen__vinculos">
-            <h3 className="colaboradores-screen__section-title">Vínculos</h3>
-            {detalhe.statusVinculos === "carregando" ? (
-              <p className="colaboradores-screen__carregando" role="status">
-                Carregando vínculos…
-              </p>
-            ) : detalhe.statusVinculos === "erro" ? (
-              <p className="colaboradores-screen__form-erro" role="alert">
-                Não foi possível carregar os vínculos deste colaborador.{" "}
-                <Button
-                  variant="secondary"
-                  onClick={() => void carregarVinculos(detalhe.colaborador.id)}
-                >
-                  Tentar novamente
-                </Button>
-              </p>
-            ) : detalhe.vinculos.length === 0 ? (
-              <p>Nenhum vínculo encontrado.</p>
-            ) : (
-              <DataTable
-                caption={`Vínculos — ${detalhe.colaborador.nome}`}
-                columns={colunasVinculos}
-                rows={detalhe.vinculos}
-                rowKey={(v) => v.id}
-              />
-            )}
-          </div>
-
-          {/* A saída do painel é única e fica no cabeçalho, junto do título —
-              o mesmo lugar nos dois painéis desta tela. Duas saídas com o
-              mesmo rótulo em pontos diferentes era justamente parte da
-              desorganização relatada. */}
-        </Surface>
-      ) : null}
-
-      {formulario ? (
-        <Surface
-          as="section"
-          padding="lg"
-          className="colaboradores-screen__painel"
-          id={painelId}
-          aria-labelledby={formTituloId}
-        >
-          <div className="colaboradores-screen__painel-cabecalho">
-            <h2
-              id={formTituloId}
-              ref={tituloPainelRef}
-              tabIndex={-1}
-              className="colaboradores-screen__painel-titulo"
-            >
-              Novo colaborador
-            </h2>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={fecharFormulario}
-              disabled={formulario.salvando}
-            >
-              Fechar
-            </Button>
-          </div>
-          <p className="colaboradores-screen__painel-descricao">
-            A admissão cria o colaborador e o primeiro vínculo em conjunto.
-            Matrícula, tipo de vínculo, data de admissão e lotação inicial são
-            imutáveis nesta tela — corrija apenas o nome depois, se necessário.
-          </p>
-
+      <Modal
+        aberto={formulario !== null}
+        titulo="Novo colaborador"
+        descricao="A admissão cria o colaborador e o primeiro vínculo em conjunto. Matrícula, tipo de vínculo, data de admissão e referência inicial são imutáveis nesta tela — corrija apenas o nome depois, se necessário."
+        onFechar={fecharFormulario}
+        bloqueado={formulario?.salvando ?? false}
+        alterado={formularioAlterado}
+        largura="larga"
+      >
+        {formulario ? (
           <form
             className="colaboradores-screen__form"
             aria-label="Formulário de novo colaborador"
@@ -1259,8 +1196,8 @@ export function ColaboradoresScreen() {
               </Button>
             </FormActions>
           </form>
-        </Surface>
-      ) : null}
+        ) : null}
+      </Modal>
     </div>
   );
 }

@@ -157,11 +157,26 @@
   position: relative;
 }
 
+/* Direção B + modais: o formulário de admissão ocupa DUAS COLUNAS quando há
+   espaço (modal largo) e UMA no celular. O `max-width` antigo, pensado para a
+   página, estreitava a janela sem necessidade. */
 .colaboradores-screen__form {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-lg);
-  max-width: 40rem;
+}
+
+/* Campos que merecem a linha inteira: texto longo e o par tipo/registro da
+   referência organizacional, que se lê melhor em sequência. */
+.colaboradores-screen__form > .colaboradores-screen__form-erro,
+.colaboradores-screen__form > .evolli-form-actions {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 640px) {
+  .colaboradores-screen__form {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 /* Erro inline no formulário (validação ou retorno da API). */

@@ -511,11 +511,15 @@ decisões e bloqueios, está no ledger versionado
 
 39. **T142 - Qualidade visual e experiência de uso: diagnóstico e tela-piloto**
 
-    - **Estado:** o primeiro piloto (painel contido em Colaboradores) foi **REPROVADO** pelo
-      proprietário — o pedido era de **duas propostas visuais de alta fidelidade**, e o que foi
-      entregue era refinamento de uma única tela. As duas propostas agora existem como protótipos
-      estáticos em `docs/prototipos/t142/`, **aguardando a escolha visual**. Sem PR aberta, sem
-      expansão do padrão, e o padrão do piloto reprovado **não** foi propagado.
+    - **Estado:** **direção visual APROVADA** — alternativa B (navegação lateral agrupada,
+      densidade confortável, filtros organizados, lista de B) **com modais** no lugar do painel
+      lateral e da folha inferior, por escolha explícita do proprietário. A **implementação
+      funcional está em validação**: aprovar a direção não aprovou a tela. O primeiro piloto (painel
+      contido) havia sido reprovado por não ser proposta, e não foi propagado. Sem PR aberta; a
+      expansão para as demais telas continua **pendente**.
+    - **Decisão registrada em** `docs/decisions/t142-direcao-visual-b-modais.md`. `DESIGN-apple.md`
+      NÃO foi editado: é referência externa mantida intacta byte a byte por decisão do projeto
+      (T032); as decisões próprias ficam no documento acima e nos tokens/componentes.
     - **Origem:** o proprietário navegou no ambiente local real e relatou falta de organização
       visual, conteúdo fora dos quadros e aparência inconsistente.
     - **Base:** `origin/main` em `f2c1014`. **Não depende** da tarefa do ambiente de demonstração —
@@ -566,8 +570,18 @@ decisões e bloqueios, está no ledger versionado
     - **Diretrizes de design:** nenhuma alteração proposta ainda. Os protótipos usam apenas os
       tokens já existentes, copiados de `tokens.css`. Se a alternativa B for escolhida, a navegação
       em coluna lateral é a única convenção nova a registrar em `DESIGN-apple.md`.
-    - **Preservado:** contratos HTTP, regras, permissões e comportamento funcional; nenhuma tela
-      além da piloto foi alterada.
+    - **Implementação do piloto (em validação):** componente `Modal` novo (UI-F04) concentrando
+      acessibilidade e comportamento de janela — `role="dialog"`, `aria-modal`, foco inicial, foco
+      preso, devolução do foco, Escape seguro, fundo sem rolagem, confirmação de descarte dentro da
+      própria janela e rolagem só no corpo. Cadastro e detalhe de Colaboradores passaram a abrir
+      nele; formulário em duas colunas no desktop e uma no celular, onde a janela ocupa a tela
+      inteira. Navegação agrupada em Operação/Consulta/Administração, sem mudar destino nem ordem.
+    - **Defeito achado na própria validação e corrigido:** o `disabled` do botão de envio não
+      impedia duplicação — medido no navegador, três cliques geravam três requisições, porque o
+      estado só chega no render seguinte. Trava síncrona por ref; reverificado: quatro cliques, uma
+      requisição.
+    - **Preservado:** contratos HTTP, regras, permissões e comportamento funcional; a separação
+      entre tipo e registro da referência organizacional; nenhuma tela além da piloto foi alterada.
 
 ## Regra obrigatória para as próximas tarefas
 

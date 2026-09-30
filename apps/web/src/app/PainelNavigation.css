@@ -10,6 +10,22 @@
   width: 220px;
 }
 
+/* Direção B (T142): grupos com rótulo, para separar operação de consulta e
+   administração sem mudar destino nem ordem. */
+.painel-nav__grupo + .painel-nav__grupo {
+  margin-top: var(--space-md);
+}
+
+.painel-nav__grupo-titulo {
+  margin: 0 0 var(--space-xxs);
+  padding: 0 var(--space-sm);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-strong);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-ink-subtle);
+}
+
 .painel-nav__lista {
   display: flex;
   flex-direction: column;

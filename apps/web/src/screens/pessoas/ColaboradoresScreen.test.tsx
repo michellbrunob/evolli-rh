@@ -705,13 +705,14 @@ describe("ColaboradoresScreen (T111 — funcional)", () => {
     });
     await waitFor(() => expect(document.activeElement).toBe(titulo));
     expect(abrir).toHaveAttribute("aria-expanded", "true");
-    // O gatilho aponta para o painel, e o painel é nomeado pelo título focado.
-    const painel = titulo.closest("section");
-    expect(abrir.getAttribute("aria-controls")).toBe(painel?.id);
-    expect(painel).toHaveAttribute("aria-labelledby", titulo.id);
+    expect(abrir).toHaveAttribute("aria-haspopup", "dialog");
+    // A janela é modal e é nomeada pelo título que recebeu o foco.
+    const dialogo = screen.getByRole("dialog");
+    expect(dialogo).toHaveAttribute("aria-modal", "true");
+    expect(dialogo).toHaveAttribute("aria-labelledby", titulo.id);
   });
 
-  it("Escape fecha o painel e devolve o foco a quem o abriu", async () => {
+  it("Escape fecha a janela vazia e devolve o foco a quem a abriu", async () => {
     render(<ColaboradoresScreen />);
     await screen.findByRole("table", { name: "Colaboradores desta empresa" });
 
@@ -729,7 +730,7 @@ describe("ColaboradoresScreen (T111 — funcional)", () => {
     await waitFor(() => expect(document.activeElement).toBe(abrir));
   });
 
-  it("o detalhe também recebe o foco e fecha com Escape", async () => {
+  it("o detalhe recebe o foco e fecha com Escape, devolvendo o foco", async () => {
     render(<ColaboradoresScreen />);
     await screen.findByRole("table", { name: "Colaboradores desta empresa" });
 
@@ -888,5 +889,50 @@ describe("ColaboradoresScreen (T111 — funcional)", () => {
         cargoId: cargo1.id,
       }),
     );
+  });
+  it("cliques repetidos no envio não duplicam a admissão", async () => {
+    let resolver: ((v: ColaboradorApi) => void) | null = null;
+    vi.mocked(admitirColaborador).mockImplementation(
+      () =>
+        new Promise<ColaboradorApi>((res) => {
+          resolver = res;
+        }),
+    );
+    render(<ColaboradoresScreen />);
+    await abrirFormularioEAguardarOpcoes();
+
+    fireEvent.change(screen.getByLabelText(/Nome completo/i), {
+      target: { value: "Colaborador Duplo" },
+    });
+    fireEvent.change(screen.getByLabelText(/Matrícula/i), {
+      target: { value: "mat-0202" },
+    });
+    fireEvent.change(screen.getByLabelText(/Tipo de vínculo/i), {
+      target: { value: "clt" },
+    });
+    fireEvent.change(screen.getByLabelText(/Data de admissão/i), {
+      target: { value: "2026-01-05" },
+    });
+    fireEvent.change(
+      screen.getByLabelText(/Tipo de referência organizacional/i),
+      { target: { value: "cargo" } },
+    );
+    fireEvent.change(
+      screen.getByLabelText(/Registro da referência organizacional/i),
+      { target: { value: cargo1.id } },
+    );
+
+    const antes = vi.mocked(admitirColaborador).mock.calls.length;
+    const enviar = screen.getByRole("button", { name: "Admitir colaborador" });
+    // Três cliques no mesmo quadro: o `disabled` só chega no próximo render,
+    // então a trava tem de ser síncrona.
+    fireEvent.click(enviar);
+    fireEvent.click(enviar);
+    fireEvent.click(enviar);
+
+    await waitFor(() =>
+      expect(vi.mocked(admitirColaborador).mock.calls.length - antes).toBe(1),
+    );
+    resolver?.(colaborador1);
   });
 });
