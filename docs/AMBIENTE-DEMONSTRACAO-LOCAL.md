@@ -60,6 +60,11 @@ Nenhuma senha vai para a linha de comando em nenhum passo: as credenciais dos
 papéis chegam ao `psql` por **entrada padrão**, e o orquestrador recusa, em
 tempo de execução, qualquer argumento que não seja literal.
 
+Os dois papéis também não se cruzam: o processo de migration recebe só a
+conexão do `evolli_migrator` (a do `evolli_app` é substituída por um destino
+inalcançável, como na CI), e o processo da API nunca recebe a credencial de
+DDL — `validateEnv` recusa subir se ela aparecer.
+
 <details>
 <summary>Alternativa: bash / zsh (Linux, macOS, Git Bash)</summary>
 
@@ -87,7 +92,7 @@ Um comando, oito passos nomeados:
 | 1/8   | Pré-requisitos: Docker, arquivos de conexão, hosts locais, portas livres |
 | 2/8   | PostgreSQL local (`docker compose up -d`) e espera ficar pronto          |
 | 3/8   | Papéis, schema e extensões (`infra/postgres/`)                           |
-| 4/8   | Migrations (`prisma migrate deploy`)                                     |
+| 4/8   | Migrations (`prisma migrate deploy`), só com a credencial de migration   |
 | 5/8   | API em `127.0.0.1:3000` e espera `/v1/health/ready`                      |
 | 6/8   | Conta de bootstrap e seed sintético                                      |
 | 7/8   | Web em `127.0.0.1:5173`, com porta estrita, e verificação HTTP           |

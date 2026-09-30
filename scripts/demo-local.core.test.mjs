@@ -16,6 +16,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   CODIGO_SAIDA_ADMIN_JA_EXISTE,
+  DESTINO_INALCANCAVEL,
   FalhaDePasso,
   HOST_LOCAL,
   NOMES_PASSOS,
@@ -473,4 +474,22 @@ test("a saída do seed é ecoada para virar evidência, já censurada", async ()
   assert.match(texto, /criados agora \.+ 17/);
   assert.ok(!texto.includes(SENHA_APP), "a senha vazou para a tela");
   assert.match(texto, /\*\*\*/);
+});
+
+test("a migration não recebe a credencial de runtime (ADR 0002)", async () => {
+  const c = cenario();
+  await executarCenario(c);
+
+  const migration = c.chamadas.find((ch) =>
+    ch.args.includes("db:migrate:deploy"),
+  );
+  assert.ok(migration, "o passo de migration não rodou");
+  // A conexão do evolli_app nunca entra no processo que executa DDL.
+  assert.equal(migration.env.DATABASE_URL, DESTINO_INALCANCAVEL);
+  assert.ok(!migration.env.DATABASE_URL.includes("evolli_app"));
+  assert.ok(migration.env.MIGRATE_DATABASE_URL.includes("evolli_migrator"));
+  // E a credencial de DDL, por sua vez, nunca entra no processo da API.
+  const api = c.iniciados.find((p) => p.nome === "API");
+  assert.equal(api.env.MIGRATE_DATABASE_URL, undefined);
+  assert.ok(api.env.DATABASE_URL.includes("evolli_app"));
 });

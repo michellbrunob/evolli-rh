@@ -37,6 +37,15 @@ export const SENHA_DEMO = "Demonstracao-Local-Evolli-2026";
  */
 export const CODIGO_SAIDA_ADMIN_JA_EXISTE = 3;
 
+/**
+ * Destino deliberadamente inalcançável e sem credencial, idêntico ao que a CI
+ * usa no passo de migration (ver `infra/postgres/README.md`). Serve para
+ * satisfazer a validação do schema do Prisma sem colocar a credencial de
+ * runtime no processo que executa DDL.
+ */
+export const DESTINO_INALCANCAVEL =
+  "postgresql://unused:unused@127.0.0.1:1/unused";
+
 export const NOMES_PASSOS = [
   "1/8 Pré-requisitos",
   "2/8 PostgreSQL local (docker compose)",
@@ -436,11 +445,23 @@ export async function subirAmbiente(deps) {
 
     // ---- 4/8 ---------------------------------------------------------------
     passo(NOMES_PASSOS[3]);
+    // O outro lado da ADR 0002: o processo que executa DDL não pode receber a
+    // credencial de RUNTIME. O Prisma 5 exige que `env("DATABASE_URL")`
+    // resolva antes de migrar — se não a declarássemos aqui, ele a carregaria
+    // sozinho de apps/api/.env e o `evolli_app` entraria no processo de
+    // migration. Declaramos o mesmo destino inalcançável que a CI usa: se a
+    // migration tentasse usá-lo, falharia na conexão; o sucesso do passo é,
+    // portanto, evidência de que só a conexão do `evolli_migrator` foi aberta.
     exigirSucesso(
       "pnpm",
       ["--filter", "@evolli/api", "run", "db:migrate:deploy"],
       {
         ecoar: true,
+        env: {
+          ...ambiente,
+          DATABASE_URL: DESTINO_INALCANCAVEL,
+          MIGRATE_DATABASE_URL: migrateUrl,
+        },
         proximoPasso:
           "A migration não foi aplicada. Corrija o erro acima e rode de novo.",
       },
