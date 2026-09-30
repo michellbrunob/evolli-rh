@@ -353,34 +353,47 @@ export function SolicitacoesScreen() {
     vinculoValido,
   ]);
 
+  /**
+   * ÚNICO ponto que decide se a lista pode ser consultada e com que escopo.
+   *
+   * Todo caminho de recarga passa por aqui — efeito, `recarregarTudo`, sucesso
+   * do registro e o botão de nova tentativa. Nenhum chamador monta o filtro por
+   * conta própria: deixar `vinculoId` cru chegar a `carregarLista` permitia que
+   * uma string vazia fosse silenciosamente descartada por `montarQuery` e a
+   * consulta saísse SEM filtro mesmo havendo colaborador escolhido.
+   *
+   * A visão geral sem `vinculoId` é permitida exclusivamente no modo `geral`,
+   * que por construção só existe sem colaborador escolhido. Não há fallback.
+   */
+  const recarregarLista = useCallback(
+    (paginaAlvo?: number) => {
+      const alvo = paginaAlvo ?? pagina;
+      if (modoLista.tipo === "geral") {
+        void carregarLista(alvo, filtroTipo, filtroSituacao, null);
+        return;
+      }
+      if (modoLista.tipo === "filtrada") {
+        void carregarLista(
+          alvo,
+          filtroTipo,
+          filtroSituacao,
+          modoLista.vinculoId,
+        );
+        return;
+      }
+      // Modo sem consulta possível: invalida o que estiver em voo, esvazia a
+      // lista e não deixa carregamento preso. Nunca cai na visão geral.
+      seqLista.current += 1;
+      setSolicitacoes([]);
+      setTotal(0);
+      setStatusLista("pronto");
+    },
+    [modoLista, pagina, filtroTipo, filtroSituacao, carregarLista],
+  );
+
   useEffect(() => {
-    if (modoLista.tipo === "geral") {
-      void carregarLista(pagina, filtroTipo, filtroSituacao, null);
-      return;
-    }
-    if (modoLista.tipo === "filtrada") {
-      void carregarLista(
-        pagina,
-        filtroTipo,
-        filtroSituacao,
-        modoLista.vinculoId,
-      );
-      return;
-    }
-    // Nenhuma consulta é possível neste modo. Invalida o que estiver em voo e
-    // esvazia a lista: nunca cair na listagem geral com colaborador escolhido.
-    seqLista.current += 1;
-    setSolicitacoes([]);
-    setTotal(0);
-    setStatusLista("pronto");
-  }, [
-    geracaoContexto,
-    pagina,
-    filtroTipo,
-    filtroSituacao,
-    modoLista,
-    carregarLista,
-  ]);
+    recarregarLista();
+  }, [geracaoContexto, recarregarLista]);
 
   // ---- Detalhe e histórico ------------------------------------------------
 
@@ -476,7 +489,7 @@ export function SolicitacoesScreen() {
    * estado visível é relido dele antes de o usuário decidir o próximo passo.
    */
   function recarregarTudo(solicitacaoId: string | null) {
-    void carregarLista(pagina, filtroTipo, filtroSituacao, vinculoId);
+    recarregarLista();
     if (solicitacaoId) {
       void carregarDetalhe(solicitacaoId);
       void carregarHistorico(solicitacaoId);
@@ -517,8 +530,10 @@ export function SolicitacoesScreen() {
       });
       setFormRegistro(null);
       setMensagemSucesso("Solicitação registrada em rascunho.");
+      // `setPagina(1)` já dispara o efeito, que passa pelo helper; se a
+      // página já era 1, recarrega pelo helper explicitamente.
       if (pagina !== 1) setPagina(1);
-      else void carregarLista(1, filtroTipo, filtroSituacao, vinculoId);
+      else recarregarLista(1);
     } catch (err) {
       setFormRegistro({
         ...formRegistro,
@@ -637,9 +652,43 @@ export function SolicitacoesScreen() {
     setMensagemFalha(null);
   }
 
+  /**
+   * Troca ou desmarca o vínculo. Mesma disciplina da troca de colaborador: o
+   * contexto anterior morre NESTE evento.
+   *
+   * Um detalhe aberto pertence ao vínculo anterior — mantê-lo deixaria as ações
+   * dele disponíveis depois da troca, e a recarga pós-transição consultaria a
+   * lista num modo que não admite consulta.
+   */
   function trocarVinculo(id: string) {
+    // Reselecionar o mesmo vínculo não é troca de contexto; sair aqui evita
+    // marcar "carregando" sem que o efeito volte a rodar.
+    if (id === vinculoId) return;
+
+    // Invalida antes de qualquer escrita: resposta em voo do vínculo anterior
+    // não pode reaparecer no novo.
+    seqLista.current += 1;
+    seqDetalhe.current += 1;
+    seqHistorico.current += 1;
+
     setVinculoId(id);
     setPagina(1);
+
+    setSolicitacoes([]);
+    setTotal(0);
+    setStatusLista(id ? "carregando" : "pronto");
+
+    setDetalhe(null);
+    setHistorico([]);
+    setStatusDetalhe("pronto");
+    setStatusHistorico("pronto");
+    setFormTransicao(null);
+    setFormRegistro(null);
+
+    // O aviso de 404 falava de uma solicitação do vínculo ANTERIOR: não pode
+    // ser carregado para o contexto novo.
+    setMensagemFalha(null);
+    setMensagemSucesso(null);
   }
 
   function trocarFiltro(qual: "tipo" | "situacao", valor: string) {
@@ -962,17 +1011,7 @@ export function SolicitacoesScreen() {
                 className="solicitacoes-screen__erro"
               >
                 <p role="alert">Não foi possível carregar as solicitações.</p>
-                <Button
-                  variant="secondary"
-                  onClick={() =>
-                    void carregarLista(
-                      pagina,
-                      filtroTipo,
-                      filtroSituacao,
-                      vinculoId,
-                    )
-                  }
-                >
+                <Button variant="secondary" onClick={() => recarregarLista()}>
                   Tentar novamente
                 </Button>
               </Surface>

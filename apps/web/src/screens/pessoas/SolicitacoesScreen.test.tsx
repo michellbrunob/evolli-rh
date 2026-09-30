@@ -500,6 +500,248 @@ describe("SolicitacoesScreen (T140) — escopo da listagem por vínculo", () => 
   });
 });
 
+describe("SolicitacoesScreen (T140) — toda recarga passa pelo helper central", () => {
+  /** Toda consulta de LISTA que saiu sem filtro de vínculo. */
+  function chamadasSemVinculo() {
+    return vi
+      .mocked(listarSolicitacoesPessoas)
+      .mock.calls.filter((c) => c[0]?.vinculoId === undefined);
+  }
+
+  /** Colaborador com dois vínculos, com a lista respondendo por vínculo. */
+  function prepararDoisVinculos(ator: unknown = ATOR_RH) {
+    prepararBase(ator);
+    vi.mocked(listarVinculosDoColaborador).mockResolvedValue([
+      vinculo({ id: "v1", matricula: "M1" }),
+      vinculo({ id: "v2", matricula: "M2" }),
+    ] as never);
+    vi.mocked(listarSolicitacoesPessoas).mockImplementation(((q: {
+      vinculoId?: string;
+    }) =>
+      Promise.resolve(
+        pagina([
+          solicitacao({
+            tipo:
+              q?.vinculoId === "v1"
+                ? "ferias"
+                : q?.vinculoId === "v2"
+                  ? "beneficios"
+                  : "atualizacao_cadastral",
+          }),
+        ]),
+      )) as never);
+  }
+
+  /**
+   * Ocorrências de um texto FORA de `<option>`: os rótulos de tipo também são
+   * opções dos seletores, e só as linhas renderizadas interessam aqui.
+   */
+  function linhasVisiveis(texto: string) {
+    return screen.queryAllByText(texto).filter((e) => e.tagName !== "OPTION");
+  }
+
+  async function escolherVinculo(valor: string) {
+    const sel = (await screen.findByLabelText("Vínculo")) as HTMLSelectElement;
+    fireEvent.change(sel, { target: { value: valor } });
+    return sel;
+  }
+
+  it("desmarcar o vínculo com detalhe aberto fecha tudo e não consulta a visão geral", async () => {
+    prepararDoisVinculos();
+    vi.mocked(detalharSolicitacaoPessoa).mockResolvedValue(
+      solicitacao() as never,
+    );
+    render(<SolicitacoesScreen />);
+
+    // v1 escolhido: lista filtrada, detalhe aberto e transição em curso.
+    await escolherVinculo("v1");
+    const tabela = await screen.findByRole("table", {
+      name: "Solicitações de pessoas no seu escopo",
+    });
+    await waitFor(() =>
+      expect(within(tabela).getByText("Férias")).toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Ver detalhe/ }));
+    await screen.findByRole("heading", { name: /^Solicitação aaaaaaaa/ });
+    fireEvent.click(screen.getByRole("button", { name: "Enviar" }));
+    await screen.findByRole("button", { name: /Confirmar enviar/i });
+
+    const antes = vi.mocked(listarSolicitacoesPessoas).mock.calls.length;
+
+    // Desmarcar o vínculo: o contexto anterior morre no ato.
+    fireEvent.change(screen.getByLabelText("Vínculo"), {
+      target: { value: "" },
+    });
+
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("heading", { name: /^Solicitação aaaaaaaa/ }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(
+      screen.queryByRole("button", { name: /Confirmar enviar/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("table", {
+        name: "Solicitações de pessoas no seu escopo",
+      }),
+    ).not.toBeInTheDocument();
+    expect(linhasVisiveis("Férias")).toHaveLength(0);
+    expect(
+      screen.getByRole("button", { name: "Registrar solicitação" }),
+    ).toBeDisabled();
+    // Nenhuma consulta escapou sem vínculo, e nenhuma consulta nova saiu.
+    expect(chamadasSemVinculo()).toHaveLength(0);
+    expect(vi.mocked(listarSolicitacoesPessoas).mock.calls.length).toBe(antes);
+
+    // Reescolher v2 com a resposta pendente: nada geral pode piscar.
+    const pendente = deferred<unknown>();
+    vi.mocked(listarSolicitacoesPessoas).mockReturnValueOnce(
+      pendente.promise as never,
+    );
+    fireEvent.change(screen.getByLabelText("Vínculo"), {
+      target: { value: "v2" },
+    });
+    await waitFor(() =>
+      expect(
+        vi.mocked(listarSolicitacoesPessoas).mock.calls.at(-1)?.[0],
+      ).toMatchObject({ vinculoId: "v2" }),
+    );
+    expect(
+      screen.queryByRole("table", {
+        name: "Solicitações de pessoas no seu escopo",
+      }),
+    ).not.toBeInTheDocument();
+    expect(linhasVisiveis("Férias")).toHaveLength(0);
+    expect(linhasVisiveis("Atualização cadastral")).toHaveLength(0);
+
+    await resolverECommitar(() =>
+      pendente.resolve(pagina([solicitacao({ tipo: "beneficios" })])),
+    );
+    const tabelaV2 = await screen.findByRole("table", {
+      name: "Solicitações de pessoas no seu escopo",
+    });
+    expect(within(tabelaV2).getByText("Benefícios")).toBeInTheDocument();
+    expect(within(tabelaV2).queryByText("Férias")).not.toBeInTheDocument();
+    expect(chamadasSemVinculo()).toHaveLength(0);
+  });
+
+  it("recarga após registro mantém o vínculo e nunca cai na visão geral", async () => {
+    prepararDoisVinculos();
+    vi.mocked(registrarSolicitacaoPessoa).mockResolvedValue(
+      solicitacao() as never,
+    );
+    render(<SolicitacoesScreen />);
+    await escolherVinculo("v1");
+    await screen.findByRole("table", {
+      name: "Solicitações de pessoas no seu escopo",
+    });
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Registrar solicitação" }),
+    );
+    fireEvent.change(await screen.findByLabelText(/^Tipo/), {
+      target: { value: "ferias" },
+    });
+    fireEvent.change(screen.getByLabelText(/^Motivo/), {
+      target: { value: "periodo_ferias" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Registrar" }));
+
+    await screen.findByText("Solicitação registrada em rascunho.");
+    expect(
+      vi.mocked(listarSolicitacoesPessoas).mock.calls.at(-1)?.[0],
+    ).toMatchObject({ vinculoId: "v1" });
+    expect(chamadasSemVinculo()).toHaveLength(0);
+  });
+
+  it("404 em transição recarrega mantendo o vínculo e preserva o alerta", async () => {
+    prepararDoisVinculos();
+    vi.mocked(detalharSolicitacaoPessoa).mockResolvedValue(
+      solicitacao() as never,
+    );
+    vi.mocked(transicionarSolicitacaoPessoa).mockRejectedValue(
+      new ApiError(404, "interno"),
+    );
+    render(<SolicitacoesScreen />);
+    await escolherVinculo("v1");
+    await screen.findByRole("table", {
+      name: "Solicitações de pessoas no seu escopo",
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Ver detalhe/ }));
+    await screen.findByRole("heading", { name: /^Solicitação aaaaaaaa/ });
+    fireEvent.click(screen.getByRole("button", { name: "Enviar" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: /Confirmar enviar/i }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /não está mais no seu escopo/i,
+    );
+    await waitFor(() =>
+      expect(
+        vi.mocked(listarSolicitacoesPessoas).mock.calls.at(-1)?.[0],
+      ).toMatchObject({ vinculoId: "v1" }),
+    );
+    expect(chamadasSemVinculo()).toHaveLength(0);
+    expect(screen.queryByText(/Ação registrada/)).not.toBeInTheDocument();
+  });
+
+  it("nova tentativa: sem vínculo na visão geral, com vínculo no modo filtrado", async () => {
+    prepararBase(ATOR_RH, [COLAB_A, COLAB_B]);
+    vi.mocked(listarSolicitacoesPessoas).mockRejectedValue(
+      new ApiError(500, "falhou"),
+    );
+    const { unmount } = render(<SolicitacoesScreen />);
+    await screen.findByText("Não foi possível carregar as solicitações.");
+    vi.mocked(listarSolicitacoesPessoas).mockResolvedValue(
+      pagina([solicitacao()]) as never,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
+    await screen.findByRole("table", {
+      name: "Solicitações de pessoas no seu escopo",
+    });
+    expect(chamadasSemVinculo().length).toBeGreaterThan(0);
+    unmount();
+
+    vi.resetAllMocks();
+    prepararDoisVinculos();
+    vi.mocked(listarSolicitacoesPessoas).mockRejectedValue(
+      new ApiError(500, "falhou"),
+    );
+    render(<SolicitacoesScreen />);
+    await escolherVinculo("v1");
+    await screen.findByText("Não foi possível carregar as solicitações.");
+    const antes = vi.mocked(listarSolicitacoesPessoas).mock.calls.length;
+    fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
+    await waitFor(() =>
+      expect(
+        vi.mocked(listarSolicitacoesPessoas).mock.calls.length,
+      ).toBeGreaterThan(antes),
+    );
+    expect(chamadasSemVinculo()).toHaveLength(0);
+  });
+
+  it("master_tecnico: desmarcar o vínculo também não consulta a visão geral", async () => {
+    prepararDoisVinculos(ATOR_MASTER);
+    render(<SolicitacoesScreen />);
+    await escolherVinculo("v1");
+    await screen.findByRole("table", {
+      name: "Solicitações de pessoas no seu escopo",
+    });
+
+    fireEvent.change(screen.getByLabelText("Vínculo"), {
+      target: { value: "" },
+    });
+    expect(
+      await screen.findByText(
+        "Selecione um vínculo para visualizar as solicitações deste colaborador.",
+      ),
+    ).toBeInTheDocument();
+    expect(chamadasSemVinculo()).toHaveLength(0);
+  });
+});
+
 describe("SolicitacoesScreen (T140) — seleção de colaborador e vínculo", () => {
   it("zero colaboradores bloqueia o registro e explica", async () => {
     prepararBase(ATOR_RH, []);
