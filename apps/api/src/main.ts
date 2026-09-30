@@ -9,6 +9,7 @@ import { AppModule } from "./app.module";
 import { AllExceptionsFilter } from "./common/filters/http-exception.filter";
 import { requestIdMiddleware } from "./common/request-id";
 import { setupOpenApi } from "./openapi/openapi";
+import { resolverHostDeEscuta } from "./config/env.validation";
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
@@ -37,7 +38,20 @@ async function bootstrap(): Promise<void> {
 
   setupOpenApi(app, version);
 
-  await app.listen(port);
+  // T141 — no modo de demonstração local a escuta é restrita a 127.0.0.1
+  // (`resolverHostDeEscuta`, validado em `validateEnv`). Fora dele, nada muda:
+  // `host` é `undefined` e o `app.listen(port)` histórico é preservado.
+  const hostConfigurado = configService.get<string>("HOST");
+  const host = resolverHostDeEscuta({
+    EVOLLI_DEMO_MODE: configService.get<boolean>("EVOLLI_DEMO_MODE", false),
+    ...(hostConfigurado !== undefined ? { HOST: hostConfigurado } : {}),
+  });
+
+  if (host === undefined) {
+    await app.listen(port);
+  } else {
+    await app.listen(port, host);
+  }
 }
 
 bootstrap().catch((error) => {
