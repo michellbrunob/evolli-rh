@@ -511,8 +511,11 @@ decisões e bloqueios, está no ledger versionado
 
 39. **T142 - Qualidade visual e experiência de uso: diagnóstico e tela-piloto**
 
-    - **Estado:** piloto implementado na branch `codex/t142-qualidade-visual-piloto`, **aguardando
-      aprovação visual do proprietário**. Sem PR aberta, sem expansão do padrão.
+    - **Estado:** o primeiro piloto (painel contido em Colaboradores) foi **REPROVADO** pelo
+      proprietário — o pedido era de **duas propostas visuais de alta fidelidade**, e o que foi
+      entregue era refinamento de uma única tela. As duas propostas agora existem como protótipos
+      estáticos em `docs/prototipos/t142/`, **aguardando a escolha visual**. Sem PR aberta, sem
+      expansão do padrão, e o padrão do piloto reprovado **não** foi propagado.
     - **Origem:** o proprietário navegou no ambiente local real e relatou falta de organização
       visual, conteúdo fora dos quadros e aparência inconsistente.
     - **Base:** `origin/main` em `f2c1014`. **Não depende** da tarefa do ambiente de demonstração —
@@ -545,6 +548,24 @@ decisões e bloqueios, está no ledger versionado
       painel (eu havia suprimido — é antipadrão de acessibilidade de prioridade 1); e o vão vazio de
       ~256 px dentro do painel, causado por reaproveitar uma classe com `flex-grow` pensada para o
       banner de aviso.
+    - **Investigação do formulário de admissão (a pedido do proprietário):** confrontada com o
+      contrato real. O backend aceita seis referências organizacionais independentes e exige **ao
+      menos uma**; `cargoId` está entre elas, então cargo sozinho **é** suficiente. Reproduzido no
+      navegador com admissão sintética: o DTO enviado foi `{…, cargoId}` e o servidor aceitou.
+      **Não há defeito funcional.** O defeito é de apresentação e foi medido: com o tipo escolhido e
+      o registro vazio, o seletor de TIPO (já preenchido) recebia `aria-invalid=true` e a mensagem,
+      enquanto o campo realmente vazio ficava sem marcação; e "Cargo" aparecia duas vezes, uma como
+      valor da categoria e outra como rótulo mutável do registro. Corrigido com rótulos permanentes
+      que separam categoria de registro e erro associado ao campo que precisa ser preenchido, com
+      três testes de regressão.
+    - **Duas propostas visuais (aguardando escolha):** A — corporativa compacta (navegação em faixa
+      superior, densidade alta, detalhe expandindo na própria linha, formulário em duas colunas);
+      B — corporativa espaçada (navegação em coluna lateral, densidade confortável, detalhe e
+      formulário em painel lateral ao lado da lista, folha inferior no celular). Protótipos
+      **estáticos**, sem API e sem gravação, servidos em porta própria.
+    - **Diretrizes de design:** nenhuma alteração proposta ainda. Os protótipos usam apenas os
+      tokens já existentes, copiados de `tokens.css`. Se a alternativa B for escolhida, a navegação
+      em coluna lateral é a única convenção nova a registrar em `DESIGN-apple.md`.
     - **Preservado:** contratos HTTP, regras, permissões e comportamento funcional; nenhuma tela
       além da piloto foi alterada.
 
