@@ -413,13 +413,15 @@ export async function semearDemonstracao(
       codigo: "ADM",
       nome: `Administrativo ${MARCA_DEMO}`,
     });
-    const area = await garantirCatalogo(ctx, rhAlfa, "/v1/areas", "SUPORTE", {
+    await garantirCatalogo(ctx, rhAlfa, "/v1/areas", "SUPORTE", {
       departamentoId: operacoes.id,
       codigo: "SUPORTE",
       nome: `Suporte ${MARCA_DEMO}`,
     });
+    // A equipe pendura no DEPARTAMENTO (a área é irmã, não pai) e a empresa é
+    // derivada dele — o cliente nunca informa `empresaId` aqui.
     await garantirCatalogo(ctx, rhAlfa, "/v1/equipes", "TURNOA", {
-      areaId: area.id,
+      departamentoId: operacoes.id,
       codigo: "TURNOA",
       nome: `Turno A ${MARCA_DEMO}`,
     });
