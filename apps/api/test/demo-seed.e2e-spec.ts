@@ -14,10 +14,12 @@ import { AppModule } from "../src/app.module";
 import { AllExceptionsFilter } from "../src/common/filters/http-exception.filter";
 import { requestIdMiddleware } from "../src/common/request-id";
 import {
+  MARCA_DEMO,
   PERFIS_DEMO,
   SENHA_DEMO,
   semearDemonstracao,
 } from "../src/seed/demo-seed";
+import type { ResumoSeed } from "../src/seed/demo-seed";
 
 /**
  * T141 — prova do seed de demonstração contra PostgreSQL REAL.
@@ -32,8 +34,15 @@ import {
  *  - cada perfil sintético documentado consegue autenticar;
  *  - os cenários que as telas distinguem existem (um vínculo x dois vínculos);
  *  - o isolamento entre as duas empresas de demonstração é real;
+ *  - a idempotência não depende do tamanho do banco: continua valendo com
+ *    mais de 100 registros anteriores, além de uma página de listagem;
  *  - nenhum dado é apagado (o seed nunca precisa de DELETE, que o banco revoga
  *    em `solicitacao_pessoa` e `audit_event`).
+ *
+ * **Independência de ordem:** as duas execuções do seed acontecem no
+ * `beforeAll`, não dentro de um `it`. Cada bloco abaixo declara o que exige e
+ * roda sozinho, em qualquer ordem, sem depender de um teste anterior ter
+ * semeado.
  *
  * Todos os dados são sintéticos.
  */
@@ -114,6 +123,27 @@ describe("Seed do ambiente local de demonstração (T141, e2e)", () => {
   let appUrl: string;
   let app: INestApplication;
   let baseUrl: string;
+  // Preparação explícita e idempotente: o seed roda DUAS vezes no beforeAll e
+  // os dois resumos ficam disponíveis para qualquer bloco, em qualquer ordem.
+  let primeira: ResumoSeed;
+  let segunda: ResumoSeed;
+
+  /** Sessão autenticada de um perfil sintético. */
+  async function entrarComo(
+    email: string,
+  ): Promise<{ cookie: string; csrfToken: string }> {
+    const res = await fetch(`${baseUrl}/v1/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password: SENHA_DEMO }),
+    });
+    if (!res.ok) throw new Error(`Login de ${email} respondeu ${res.status}`);
+    const cookie = (res.headers.getSetCookie?.() ?? [])
+      .find((c) => c.startsWith("evolli_session="))!
+      .split(";")[0]!;
+    const { csrfToken } = (await res.json()) as { csrfToken: string };
+    return { cookie, csrfToken };
+  }
 
   beforeAll(async () => {
     container = await new GenericContainer("postgres:16-alpine")
@@ -164,6 +194,11 @@ describe("Seed do ambiente local de demonstração (T141, e2e)", () => {
     await app.listen(0, "127.0.0.1");
     const endereco = app.getHttpServer().address() as AddressInfo;
     baseUrl = `http://127.0.0.1:${endereco.port}`;
+
+    // Execução dupla: a primeira semeia o banco vazio, a segunda precisa
+    // encontrar tudo e não escrever nada.
+    primeira = await semearDemonstracao(baseUrl, appUrl);
+    segunda = await semearDemonstracao(baseUrl, appUrl);
   });
 
   afterAll(async () => {
@@ -178,8 +213,7 @@ describe("Seed do ambiente local de demonstração (T141, e2e)", () => {
   });
 
   it("semeia um banco vazio e é idempotente na segunda execução", async () => {
-    const primeira = await semearDemonstracao(baseUrl, appUrl);
-
+    // Exige: as duas execuções do beforeAll.
     expect(primeira.criados).toBeGreaterThan(0);
     expect(primeira.empresas).toBe(2);
     expect(primeira.usuarios).toBe(PERFIS_DEMO.length);
@@ -187,8 +221,6 @@ describe("Seed do ambiente local de demonstração (T141, e2e)", () => {
     expect(primeira.vinculos).toBe(2);
 
     // Segunda execução: encontra tudo e não escreve nada.
-    const segunda = await semearDemonstracao(baseUrl, appUrl);
-
     expect(segunda.criados).toBe(0);
     expect(segunda.reaproveitados).toBeGreaterThan(0);
     expect(segunda.empresas).toBe(primeira.empresas);
@@ -306,20 +338,8 @@ describe("Seed do ambiente local de demonstração (T141, e2e)", () => {
   });
 
   it("as duas empresas de demonstração ficam isoladas entre si", async () => {
-    const entrar = async (email: string) => {
-      const res = await fetch(`${baseUrl}/v1/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password: SENHA_DEMO }),
-      });
-      const cookie = (res.headers.getSetCookie?.() ?? [])
-        .find((c) => c.startsWith("evolli_session="))!
-        .split(";")[0]!;
-      return cookie;
-    };
-
-    const cookieAlfa = await entrar(`rh.alfa@evolli.local`);
-    const cookieBeta = await entrar(`rh.beta@evolli.local`);
+    const { cookie: cookieAlfa } = await entrarComo("rh.alfa@evolli.local");
+    const { cookie: cookieBeta } = await entrarComo("rh.beta@evolli.local");
 
     const listar = async (cookie: string) => {
       const res = await fetch(`${baseUrl}/v1/colaboradores?tamanhoPagina=100`, {
@@ -347,6 +367,74 @@ describe("Seed do ambiente local de demonstração (T141, e2e)", () => {
       // própria, e ela precisa continuar vazia para estas contas.
       expect(await prisma.accessMfaTotp.count()).toBe(0);
       expect(await prisma.accessMfaRecoveryCode.count()).toBe(0);
+    } finally {
+      await prisma.$disconnect();
+    }
+  });
+  /**
+   * R7 — a idempotência não pode depender de caber na primeira página.
+   *
+   * Exige: o ambiente já semeado pelo beforeAll. Cria 101 cargos próprios
+   * (simulando o dono navegando e cadastrando durante a demonstração), o que
+   * empurra o cargo sintético `ANALISTA` para além de uma página de 100, e
+   * então roda o seed de novo.
+   */
+  it("continua idempotente com mais de 100 registros anteriores", async () => {
+    const { cookie, csrfToken } = await entrarComo("rh.alfa@evolli.local");
+    const prisma = new PrismaClient({ datasources: { db: { url: appUrl } } });
+
+    try {
+      const alfa = await prisma.empresa.findFirstOrThrow({
+        where: { codigo: "DEMOALFA" },
+        select: { id: true },
+      });
+
+      for (let i = 0; i < 101; i += 1) {
+        const codigo = `EXTRA${String(i).padStart(3, "0")}`;
+        const res = await fetch(`${baseUrl}/v1/cargos`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Cookie: cookie,
+            "x-csrf-token": csrfToken,
+          },
+          body: JSON.stringify({
+            empresaId: alfa.id,
+            codigo,
+            nome: `Cargo proprio ${codigo}`,
+          }),
+        });
+        expect([codigo, res.status]).toEqual([codigo, 201]);
+      }
+
+      // Mais de uma página de cargos existe agora.
+      expect(
+        await prisma.cargo.count({ where: { empresaId: alfa.id } }),
+      ).toBeGreaterThan(100);
+
+      // Com varredura de uma página só, o seed não acharia o ANALISTA e
+      // tentaria recriá-lo (409) ou duplicaria. Com varredura completa, não.
+      const terceira = await semearDemonstracao(baseUrl, appUrl);
+      expect(terceira.criados).toBe(0);
+      expect(terceira.reaproveitados).toBeGreaterThan(0);
+
+      expect(
+        await prisma.cargo.count({
+          where: { empresaId: alfa.id, codigo: "ANALISTA" },
+        }),
+      ).toBe(1);
+
+      // E não tocou no que não é dele: os 101 cargos próprios continuam
+      // intactos, com o nome original.
+      const proprios = await prisma.cargo.findMany({
+        where: { empresaId: alfa.id, codigo: { startsWith: "EXTRA" } },
+        select: { codigo: true, nome: true },
+      });
+      expect(proprios).toHaveLength(101);
+      expect(
+        proprios.every((c) => c.nome === `Cargo proprio ${c.codigo}`),
+      ).toBe(true);
+      expect(proprios.some((c) => c.nome.includes(MARCA_DEMO))).toBe(false);
     } finally {
       await prisma.$disconnect();
     }

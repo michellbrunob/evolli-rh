@@ -16,9 +16,12 @@
  * próprios testes E2E fazem.
  *
  * **Idempotente por construção:** cada passo procura antes de criar e reusa o
- * que achar. Nada é apagado — `solicitacao_pessoa` e `audit_event` têm `DELETE`
- * revogado no banco, e um seed que apagasse para recriar não teria como rodar
- * duas vezes. Rodar de novo converge para o mesmo conjunto.
+ * que achar, varrendo **todas** as páginas da listagem — não só a primeira,
+ * senão a idempotência acabaria no registro 101 e o seed passaria a duplicar
+ * num banco de demonstração já povoado. Nada é apagado —
+ * `solicitacao_pessoa` e `audit_event` têm `DELETE` revogado no banco, e um
+ * seed que apagasse para recriar não teria como rodar duas vezes. Rodar de
+ * novo converge para o mesmo conjunto.
  *
  * **Não cria:** conteúdo de documento, anexo, biometria, diagnóstico, CID, dado
  * clínico, MFA, segredo real ou qualquer acesso a serviço externo.
@@ -183,6 +186,118 @@ async function garantir<T>(
   return (await res.json()) as T;
 }
 
+// ---------------------------------------------------------------------------
+// Varredura completa (idempotência que não depende do tamanho do banco)
+// ---------------------------------------------------------------------------
+
+/** Teto de `tamanhoPagina` nos contratos de listagem (`*.types.ts`). */
+const TAMANHO_PAGINA = 100;
+/** Teto de `limit` em `GET /v1/users` (`listar-usuarios.util.ts`). */
+const LIMITE_USUARIOS = 100;
+/**
+ * Trava contra laço infinito se uma listagem devolver página cheia para
+ * sempre. Em 1000 páginas de 100, falha alto em vez de girar calado.
+ */
+const LIMITE_PAGINAS = 1000;
+
+/**
+ * Percorre **todas** as páginas de uma listagem, não só a primeira.
+ *
+ * Os contratos de listagem não têm filtro por código, nome ou texto livre —
+ * é decisão de segurança (sem enumeração), não esquecimento. Então a única
+ * busca exata possível é a varredura completa. Ela é o que garante que a
+ * segunda execução continue encontrando o conjunto sintético depois que o
+ * banco local passar de 100 registros de algum tipo; com uma página só, o
+ * seed deixaria de achar o que já criou e tentaria recriar.
+ */
+async function varrerPaginado<T>(
+  ctx: Contexto,
+  rota: string,
+  sessao: Sessao,
+  visitar: (item: T) => void,
+): Promise<void> {
+  const separador = rota.includes("?") ? "&" : "?";
+  let vistos = 0;
+
+  for (let pagina = 1; pagina <= LIMITE_PAGINAS; pagina += 1) {
+    const resposta = await ler<Paginado<T>>(
+      ctx,
+      `${rota}${separador}pagina=${pagina}&tamanhoPagina=${TAMANHO_PAGINA}`,
+      sessao,
+    );
+
+    for (const item of resposta.itens) {
+      vistos += 1;
+      visitar(item);
+    }
+
+    if (resposta.itens.length < TAMANHO_PAGINA) return;
+    if (typeof resposta.total === "number" && vistos >= resposta.total) return;
+  }
+
+  throw new Error(
+    `Listagem ${rota} passou de ${LIMITE_PAGINAS} páginas. O seed para em vez ` +
+      "de varrer indefinidamente.",
+  );
+}
+
+/** Primeiro item que casa, varrendo todas as páginas. */
+async function procurarPaginado<T>(
+  ctx: Contexto,
+  rota: string,
+  sessao: Sessao,
+  combina: (item: T) => boolean,
+): Promise<T | undefined> {
+  let achado: T | undefined;
+  await varrerPaginado<T>(ctx, rota, sessao, (item) => {
+    if (achado === undefined && combina(item)) achado = item;
+  });
+  return achado;
+}
+
+/** Conta, varrendo todas as páginas, os itens que casam. */
+async function contarPaginado<T>(
+  ctx: Contexto,
+  rota: string,
+  sessao: Sessao,
+  combina: (item: T) => boolean,
+): Promise<number> {
+  let total = 0;
+  await varrerPaginado<T>(ctx, rota, sessao, (item) => {
+    if (combina(item)) total += 1;
+  });
+  return total;
+}
+
+/**
+ * `GET /v1/users` é keyset puro (sem `total`, sem busca por e-mail — ambos
+ * deliberados no contrato T119/T120), então a varredura segue `nextCursor`.
+ */
+async function varrerUsuarios(
+  ctx: Contexto,
+  master: Sessao,
+  visitar: (usuario: UsuarioApi) => void,
+): Promise<void> {
+  let cursor: string | null = null;
+
+  for (let pagina = 1; pagina <= LIMITE_PAGINAS; pagina += 1) {
+    const sufixo: string =
+      cursor === null ? "" : `&cursor=${encodeURIComponent(cursor)}`;
+    const resposta: PaginadoPorCursor<UsuarioApi> = await ler<
+      PaginadoPorCursor<UsuarioApi>
+    >(ctx, `/v1/users?limit=${LIMITE_USUARIOS}${sufixo}`, master);
+
+    for (const usuario of resposta.items) visitar(usuario);
+    if (resposta.nextCursor === null) return;
+    cursor = resposta.nextCursor;
+  }
+
+  throw new Error(
+    `Listagem de contas passou de ${LIMITE_PAGINAS} páginas. O seed para em ` +
+      "vez de varrer indefinidamente.",
+  );
+}
+
 async function entrar(ctx: Contexto, email: string): Promise<Sessao> {
   const res = await pedir(ctx, "POST", "/v1/auth/login", undefined, {
     email,
@@ -212,6 +327,11 @@ interface ComCodigo extends ComId {
 }
 interface Paginado<T> {
   itens: T[];
+  total?: number;
+}
+interface PaginadoPorCursor<T> {
+  items: T[];
+  nextCursor: string | null;
 }
 interface ColaboradorApi extends ComId {
   nome: string;
@@ -257,14 +377,13 @@ async function garantirEmpresa(
   return garantir<ComCodigo>(
     ctx,
     `empresa ${codigo}`,
-    async () => {
-      const lista = await ler<Paginado<ComCodigo>>(
+    () =>
+      procurarPaginado<ComCodigo>(
         ctx,
-        "/v1/empresas?tamanhoPagina=100",
+        "/v1/empresas",
         master,
-      );
-      return lista.itens.find((e) => e.codigo === codigo);
-    },
+        (e) => e.codigo === codigo,
+      ),
     () => pedir(ctx, "POST", "/v1/empresas", master, { codigo, nome }),
   );
 }
@@ -279,12 +398,11 @@ async function garantirUsuario(
     ctx,
     `conta ${perfil.email}`,
     async () => {
-      const lista = await ler<{ items: UsuarioApi[] }>(
-        ctx,
-        "/v1/users?limit=100",
-        master,
-      );
-      return lista.items.find((u) => u.email === perfil.email);
+      let achado: UsuarioApi | undefined;
+      await varrerUsuarios(ctx, master, (u) => {
+        if (achado === undefined && u.email === perfil.email) achado = u;
+      });
+      return achado;
     },
     () =>
       pedir(ctx, "POST", "/v1/users", master, {
@@ -306,14 +424,8 @@ async function garantirCatalogo(
   return garantir<ComCodigo>(
     ctx,
     `${rota} ${codigo}`,
-    async () => {
-      const lista = await ler<Paginado<ComCodigo>>(
-        ctx,
-        `${rota}?tamanhoPagina=100`,
-        rh,
-      );
-      return lista.itens.find((i) => i.codigo === codigo);
-    },
+    () =>
+      procurarPaginado<ComCodigo>(ctx, rota, rh, (i) => i.codigo === codigo),
     () => pedir(ctx, "POST", rota, rh, corpo),
   );
 }
@@ -327,14 +439,13 @@ async function garantirColaborador(
   return garantir<ColaboradorApi>(
     ctx,
     `colaborador ${nome}`,
-    async () => {
-      const lista = await ler<Paginado<ColaboradorApi>>(
+    () =>
+      procurarPaginado<ColaboradorApi>(
         ctx,
-        "/v1/colaboradores?tamanhoPagina=100",
+        "/v1/colaboradores",
         rh,
-      );
-      return lista.itens.find((c) => c.nome === nome);
-    },
+        (c) => c.nome === nome,
+      ),
     () => pedir(ctx, "POST", "/v1/colaboradores", rh, corpo),
   );
 }
@@ -441,14 +552,13 @@ export async function semearDemonstracao(
     await garantir<HorarioApi>(
       ctx,
       `horario ${nomeHorario}`,
-      async () => {
-        const lista = await ler<Paginado<HorarioApi>>(
+      () =>
+        procurarPaginado<HorarioApi>(
           ctx,
-          "/v1/horarios?tamanhoPagina=100",
+          "/v1/horarios",
           rhAlfa,
-        );
-        return lista.itens.find((h) => h.nome === nomeHorario);
-      },
+          (h) => h.nome === nomeHorario,
+        ),
       () =>
         pedir(ctx, "POST", "/v1/horarios", rhAlfa, {
           nome: nomeHorario,
@@ -531,20 +641,24 @@ export async function semearDemonstracao(
     });
 
     // --- Resumo -----------------------------------------------------------
-    const empresas = await ler<Paginado<ComCodigo>>(
+    // Conta só o conjunto SINTÉTICO, varrendo todas as páginas: o número não
+    // pode mudar porque alguém criou registros próprios navegando na
+    // demonstração.
+    const empresas = await contarPaginado<ComCodigo>(
       ctx,
-      "/v1/empresas?tamanhoPagina=100",
+      "/v1/empresas",
       master,
+      (e) => e.codigo.startsWith("DEMO"),
     );
-    const usuarios = await ler<{ items: UsuarioApi[] }>(
+    let usuarios = 0;
+    await varrerUsuarios(ctx, master, (u) => {
+      if (u.email.endsWith(DOMINIO)) usuarios += 1;
+    });
+    const colaboradores = await contarPaginado<ColaboradorApi>(
       ctx,
-      "/v1/users?limit=100",
-      master,
-    );
-    const colaboradores = await ler<Paginado<ColaboradorApi>>(
-      ctx,
-      "/v1/colaboradores?tamanhoPagina=100",
+      "/v1/colaboradores",
       rhAlfa,
+      (c) => c.nome.includes(MARCA_DEMO),
     );
     const vinculosDois = await ler<VinculoApi[]>(
       ctx,
@@ -553,10 +667,9 @@ export async function semearDemonstracao(
     );
 
     return {
-      empresas: empresas.itens.filter((e) => e.codigo.startsWith("DEMO"))
-        .length,
-      usuarios: usuarios.items.filter((u) => u.email.endsWith(DOMINIO)).length,
-      colaboradores: colaboradores.itens.length,
+      empresas,
+      usuarios,
+      colaboradores,
       vinculos: vinculosDois.length,
       criados: ctx.criados,
       reaproveitados: ctx.reaproveitados,
