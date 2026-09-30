@@ -525,6 +525,18 @@ decisões e bloqueios, está no ledger versionado
       checa o isolamento entre as duas empresas. Roda na CI a cada push.
     - **Travas de segurança:** o seed exige `EVOLLI_DEMO_SEED="confirmo-ambiente-local"` e recusa
       API ou banco cujo host não seja local. Nenhum segredo real é versionado.
+    - **Endurecimento após a revisão somente leitura (mesma branch, sem rebase):** escuta da API
+      restrita a `127.0.0.1` por decisão de servidor (`EVOLLI_DEMO_MODE`, validado em
+      `env.validation.ts`, recusado em produção); web presa a `127.0.0.1:5173` com porta estrita e
+      verificação HTTP antes do "pronto"; encerramento da árvore de processos filhos em qualquer
+      falha, Ctrl+C ou sinal; nenhuma credencial em `argv` (as senhas dos papéis vão por stdin do
+      `psql`, e o orquestrador recusa argumento não literal sob shell); idempotência do seed por
+      varredura completa de páginas, não só a primeira; bootstrap com código de saída dedicado (3)
+      para "já existe"; E2E independente de ordem; e CLI do seed fora do artefato de build.
+    - **Cobertura nova:** `scripts/demo-local.core.test.mjs` (25 casos, `node --test`, sem
+      dependência nova) prova ordem dos passos, parada na primeira falha, limpeza de filhos,
+      timeout de API e de web, porta ocupada, endereço permitido, repetição segura, caminho com
+      espaço e ausência de segredo em argumento e em log.
     - **Fora de escopo, preservado:** MFA, ESS/MSS, anexo, upload, R2, serviço externo, dado real,
       rota de administração exposta no produto, regra de RH nova e alteração de CI.
 

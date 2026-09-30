@@ -143,7 +143,11 @@ de Horas.
   conteúdo documental, biometria ou dado clínico.
 - **Não equivale a homologação nem a produção**, e não autoriza dado real.
 - **Idempotente e não destrutivo.** O seed procura antes de criar e nunca apaga — `DELETE` é
-  revogado no banco em `solicitacao_pessoa` e `audit_event`.
+  revogado no banco em `solicitacao_pessoa` e `audit_event`. A busca varre todas as páginas, então
+  a idempotência não acaba no registro 101.
+- **Nada exposto na rede.** A API só escuta em `127.0.0.1` quando `EVOLLI_DEMO_MODE=true`, decisão
+  validada pelo servidor e proibida com `NODE_ENV=production`; a web é presa a `127.0.0.1:5173`
+  com porta estrita. Nenhuma credencial trafega em linha de comando.
 
 ## Evidência mínima por tarefa futura
 

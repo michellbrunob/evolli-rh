@@ -2,298 +2,197 @@
 /**
  * Ambiente LOCAL de demonstração do Evolli RH (T141).
  *
- * Sobe, numa sequência única e verificável, o que já existe no repositório:
- * PostgreSQL do `docker-compose.yml`, papéis de `infra/postgres/`, migrations
- * do Prisma, conta de bootstrap, seed sintético e os dois servidores de
- * desenvolvimento (API e web).
+ * Este arquivo é só a camada de efeitos: processo, rede e disco. A sequência
+ * dos oito passos, com todas as travas, vive em `demo-local.core.mjs` e é
+ * testada em `demo-local.core.test.mjs` sem Docker.
  *
- * **Não esconde falha.** Cada passo é nomeado; qualquer erro encerra o
- * processo com código diferente de zero e diz qual passo falhou. Nenhuma senha
- * ou string de conexão é impressa.
+ * **Não esconde falha.** Cada passo é nomeado; qualquer erro encerra os
+ * servidores que este comando subiu, diz qual passo quebrou e qual é o
+ * próximo procedimento seguro. Nenhuma senha é impressa.
  *
- * **É desenvolvimento, não homologação nem produção.** Só aceita banco e API
- * em `127.0.0.1`/`localhost`, e o seed exige `EVOLLI_DEMO_SEED`.
+ * **É desenvolvimento, não homologação nem produção.** Banco, API e web só
+ * sobem em 127.0.0.1, e o seed exige `EVOLLI_DEMO_SEED`.
  *
- * Uso: `pnpm demo:up`  (Ctrl+C encerra os servidores; o banco continua de pé)
+ * Uso: `pnpm demo:up`  (Ctrl+C encerra API e web; o banco continua de pé)
  */
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
+import { createServer } from "node:net";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { subirAmbiente, FalhaDePasso } from "./demo-local.core.mjs";
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), "..");
-const API_DIR = join(RAIZ, "apps", "api");
-const PORTA_API = process.env.PORT ?? "3000";
-const URL_API = `http://127.0.0.1:${PORTA_API}`;
-const URL_WEB = "http://127.0.0.1:5173";
-const CONFIRMACAO_SEED = "confirmo-ambiente-local";
+const EM_WINDOWS = process.platform === "win32";
 
-let passoAtual = "inicialização";
-
-function passo(nome) {
-  passoAtual = nome;
-  process.stdout.write(`\n── ${nome}\n`);
+/** Lê um arquivo do repositório; `null` quando não existe. */
+function lerArquivo(relativo) {
+  const caminho = join(RAIZ, relativo);
+  return existsSync(caminho) ? readFileSync(caminho, "utf8") : null;
 }
 
-function falhar(motivo) {
-  throw new Error(motivo);
-}
-
-/** Executa e propaga a falha com o passo nomeado. Nunca imprime segredo. */
-function executar(comando, args, opcoes = {}) {
-  const r = spawnSync(comando, args, {
-    cwd: RAIZ,
-    stdio: "inherit",
-    shell: process.platform === "win32",
-    ...opcoes,
-  });
-  if (r.error) falhar(`${comando} não pôde ser executado: ${r.error.message}`);
-  if (r.status !== 0) falhar(`${comando} terminou com código ${r.status}`);
-}
-
-function capturar(comando, args, opcoes = {}) {
-  const r = spawnSync(comando, args, {
+/**
+ * Executa e captura. `cwd` viaja pela API do `spawn`, nunca pela linha de
+ * comando — é o que faz um caminho com espaço ("C:\\MB\\Sistema RH\\...")
+ * funcionar sem depender de aspas.
+ */
+function executar({ comando, args, shell, env, entrada }) {
+  const resultado = spawnSync(comando, args, {
     cwd: RAIZ,
     encoding: "utf8",
-    shell: process.platform === "win32",
-    ...opcoes,
+    shell,
+    ...(env ? { env } : {}),
+    ...(entrada !== undefined ? { input: entrada } : {}),
   });
-  return { status: r.status ?? 1, saida: `${r.stdout ?? ""}${r.stderr ?? ""}` };
+  if (resultado.error) {
+    return { status: 127, saida: resultado.error.message };
+  }
+  return {
+    status: resultado.status ?? 1,
+    saida: `${resultado.stdout ?? ""}${resultado.stderr ?? ""}`,
+  };
 }
 
-function lerEnv(caminho) {
-  if (!existsSync(caminho)) return {};
-  const mapa = {};
-  for (const linha of readFileSync(caminho, "utf8").split(/\r?\n/)) {
-    const m = /^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/.exec(linha);
-    if (m) mapa[m[1]] = m[2].replace(/^["']|["']$/g, "");
-  }
-  return mapa;
+/**
+ * Sobe um servidor de desenvolvimento e devolve um manípulo que sabe matar a
+ * ÁRVORE inteira. No Windows, `shell: true` faz o filho direto ser o
+ * `cmd.exe`; matar só ele deixaria o node do Vite/Nest órfão, por isso
+ * `taskkill /T`. Fora do Windows, o filho vira líder de grupo (`detached`) e
+ * o sinal vai para o grupo.
+ */
+function iniciar({ nome, comando, args, shell, env }) {
+  const filho = spawn(comando, args, {
+    cwd: RAIZ,
+    stdio: "inherit",
+    shell,
+    ...(EM_WINDOWS ? {} : { detached: true }),
+    ...(env ? { env } : {}),
+  });
+
+  let vivo = true;
+  filho.on("exit", () => {
+    vivo = false;
+  });
+  filho.on("error", () => {
+    vivo = false;
+  });
+
+  return {
+    nome,
+    get pid() {
+      return filho.pid;
+    },
+    matar() {
+      if (!vivo || filho.pid === undefined) return;
+      vivo = false;
+      if (EM_WINDOWS) {
+        spawnSync("taskkill", ["/pid", String(filho.pid), "/t", "/f"], {
+          stdio: "ignore",
+        });
+        return;
+      }
+      try {
+        process.kill(-filho.pid, "SIGTERM");
+      } catch {
+        try {
+          filho.kill("SIGTERM");
+        } catch {
+          // Já morreu: encerrar é melhor-esforço.
+        }
+      }
+    },
+  };
 }
 
-async function esperar(rotulo, tentar, tentativas = 60, intervaloMs = 1000) {
-  for (let i = 1; i <= tentativas; i += 1) {
-    if (await tentar()) return;
-    await new Promise((r) => setTimeout(r, intervaloMs));
+/** `true` quando dá para abrir a porta — logo, ninguém a está usando. */
+function portaLivre(host, porta) {
+  return new Promise((resolver) => {
+    const servidor = createServer();
+    servidor.once("error", () => resolver(false));
+    servidor.once("listening", () => {
+      servidor.close(() => resolver(true));
+    });
+    servidor.listen(porta, host);
+  });
+}
+
+async function buscarHttp(url) {
+  try {
+    const resposta = await fetch(url);
+    return { ok: resposta.ok, status: resposta.status };
+  } catch {
+    return null;
   }
-  falhar(`${rotulo} não ficou disponível a tempo (${tentativas}s).`);
+}
+
+const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
+
+function shaAtual() {
+  const r = spawnSync("git", ["rev-parse", "--short", "HEAD"], {
+    cwd: RAIZ,
+    encoding: "utf8",
+  });
+  return r.status === 0 ? (r.stdout ?? "").trim() : null;
 }
 
 // ---------------------------------------------------------------------------
 
 async function main() {
-  passo("1/8 Pré-requisitos");
-  if (capturar("docker", ["--version"]).status !== 0) {
-    falhar(
-      "Docker não está disponível no PATH. Instale o Docker Desktop — o " +
-        "PostgreSQL local vem do docker-compose.yml da raiz.",
-    );
-  }
-  const envRaiz = lerEnv(join(RAIZ, ".env"));
-  if (
-    !envRaiz.POSTGRES_DB ||
-    !envRaiz.POSTGRES_USER ||
-    !envRaiz.POSTGRES_PASSWORD
-  ) {
-    falhar(
-      "Falta o .env da raiz. Copie .env.example para .env e defina " +
-        "POSTGRES_DB, POSTGRES_USER e POSTGRES_PASSWORD (valores locais).",
-    );
-  }
-  const envApi = lerEnv(join(API_DIR, ".env"));
-  const envMigrate = lerEnv(join(API_DIR, ".env.migrate"));
-  const databaseUrl = envApi.DATABASE_URL ?? process.env.DATABASE_URL;
-  const migrateUrl =
-    envMigrate.MIGRATE_DATABASE_URL ?? process.env.MIGRATE_DATABASE_URL;
-  if (!databaseUrl || !migrateUrl) {
-    falhar(
-      "Faltam as conexões da API. Crie apps/api/.env (DATABASE_URL, papel " +
-        "evolli_app) e apps/api/.env.migrate (MIGRATE_DATABASE_URL, papel " +
-        "evolli_migrator) conforme infra/postgres/README.md.",
-    );
-  }
-  for (const [rotulo, valor] of [
-    ["DATABASE_URL", databaseUrl],
-    ["MIGRATE_DATABASE_URL", migrateUrl],
-  ]) {
-    const host = new URL(valor).hostname.replace(/^\[|\]$/g, "");
-    if (!["127.0.0.1", "localhost", "::1"].includes(host)) {
-      falhar(
-        `${rotulo} aponta para "${host}". A demonstração só roda contra a ` +
-          "própria máquina — nunca homologação ou produção.",
-      );
-    }
-  }
-
-  passo("2/8 PostgreSQL local (docker compose)");
-  executar("docker", ["compose", "up", "-d"]);
-  await esperar("PostgreSQL", async () => {
-    const r = capturar("docker", [
-      "compose",
-      "exec",
-      "-T",
-      "postgres",
-      "pg_isready",
-      "-U",
-      envRaiz.POSTGRES_USER,
-      "-d",
-      envRaiz.POSTGRES_DB,
-    ]);
-    return r.status === 0;
+  const ambiente = await subirAmbiente({
+    raiz: RAIZ,
+    plataforma: process.platform,
+    ambiente: { ...process.env },
+    lerArquivo,
+    executar,
+    iniciar,
+    buscarHttp,
+    portaLivre,
+    dormir,
+    registrar: (linha) => process.stdout.write(`${linha}\n`),
+    sha: shaAtual(),
   });
 
-  passo("3/8 Papéis, schema e extensões (infra/postgres)");
-  const senhaMigrator = process.env.EVOLLI_MIGRATOR_PASSWORD;
-  const senhaApp = process.env.EVOLLI_APP_PASSWORD;
-  if (!senhaMigrator || !senhaApp) {
-    falhar(
-      "Exporte EVOLLI_MIGRATOR_PASSWORD e EVOLLI_APP_PASSWORD no shell " +
-        "(senhas locais quaisquer, coerentes com apps/api/.env). Elas nunca " +
-        "entram em arquivo versionado.",
-    );
-  }
-  const psql = (args, arquivo) =>
-    executar("docker", [
-      "compose",
-      "exec",
-      "-T",
-      "-e",
-      `PGPASSWORD=${envRaiz.POSTGRES_PASSWORD}`,
-      "postgres",
-      "psql",
-      "-U",
-      envRaiz.POSTGRES_USER,
-      "-d",
-      envRaiz.POSTGRES_DB,
-      "-v",
-      "ON_ERROR_STOP=1",
-      ...args,
-      "-f",
-      `/tmp/${arquivo}`,
-    ]);
-  for (const arquivo of [
-    "01_create_roles.sql",
-    "02_schema_and_grants.sql",
-    "04_extensions.sql",
-  ]) {
-    executar("docker", [
-      "compose",
-      "cp",
-      join("infra", "postgres", arquivo),
-      `postgres:/tmp/${arquivo}`,
-    ]);
-  }
-  psql(
-    [
-      "-v",
-      `migrator_password=${senhaMigrator}`,
-      "-v",
-      `app_password=${senhaApp}`,
-    ],
-    "01_create_roles.sql",
-  );
-  psql([], "02_schema_and_grants.sql");
-  psql([], "04_extensions.sql");
+  process.stdout.write(`${ambiente.resumo.join("\n")}\n`);
 
-  passo("4/8 Migrations (prisma migrate deploy)");
-  executar("pnpm", ["--filter", "@evolli/api", "run", "db:migrate:deploy"]);
+  // A partir daqui o comando fica vivo só para segurar os servidores. Todo
+  // caminho de saída — Ctrl+C, SIGTERM, Ctrl+Break, `process.exit` — passa
+  // por aqui antes de encerrar, então não sobra órfão.
+  let encerrando = false;
+  const encerrar = (codigo) => {
+    if (encerrando) return;
+    encerrando = true;
+    process.stdout.write("\nEncerrando API e web. O banco continua de pé.\n");
+    ambiente.encerrarProcessos();
+    process.exit(codigo);
+  };
 
-  passo("5/8 Servidores de desenvolvimento (API e web)");
-  const servidores = spawn("pnpm", ["dev"], {
-    cwd: RAIZ,
-    stdio: "inherit",
-    shell: process.platform === "win32",
-  });
-  servidores.on("exit", (codigo) => {
-    if (codigo !== 0 && codigo !== null) {
-      process.stderr.write(`\nServidores encerraram com código ${codigo}.\n`);
-      process.exitCode = codigo;
-    }
-  });
-  const encerrar = () => servidores.kill();
-  process.on("SIGINT", encerrar);
-  process.on("SIGTERM", encerrar);
-
-  await esperar("API", async () => {
+  for (const sinal of ["SIGINT", "SIGTERM", "SIGHUP", "SIGBREAK"]) {
     try {
-      const r = await fetch(`${URL_API}/v1/health/ready`);
-      return r.ok;
+      process.on(sinal, () => encerrar(0));
     } catch {
-      return false;
+      // Sinal indisponível nesta plataforma: os outros continuam valendo.
     }
-  });
-
-  passo("6/8 Conta de bootstrap (admin técnico)");
-  const bootstrap = capturar(
-    "pnpm",
-    [
-      "--filter",
-      "@evolli/api",
-      "exec",
-      "ts-node",
-      "-T",
-      "src/bootstrap/bootstrap-admin.ts",
-    ],
-    {
-      env: {
-        ...process.env,
-        DATABASE_URL: databaseUrl,
-        ADMIN_BOOTSTRAP_EMAIL: "admin.demo@evolli.local",
-        ADMIN_BOOTSTRAP_PASSWORD: "Demonstracao-Local-Evolli-2026",
-      },
-    },
-  );
-  if (bootstrap.status !== 0 && !/[Jj]á existe/.test(bootstrap.saida)) {
-    falhar(`bootstrap do admin falhou:\n${bootstrap.saida}`);
   }
-
-  passo("7/8 Seed sintético (idempotente)");
-  executar(
-    "pnpm",
-    [
-      "--filter",
-      "@evolli/api",
-      "exec",
-      "ts-node",
-      "-T",
-      "src/seed/demo-seed.cli.ts",
-    ],
-    {
-      env: {
-        ...process.env,
-        DATABASE_URL: databaseUrl,
-        EVOLLI_DEMO_SEED: CONFIRMACAO_SEED,
-        EVOLLI_DEMO_API_URL: URL_API,
-      },
-    },
-  );
-
-  passo("8/8 Pronto");
-  const sha = capturar("git", ["rev-parse", "--short", "HEAD"]).saida.trim();
-  process.stdout.write(
-    [
-      "",
-      "  AMBIENTE LOCAL DE DEMONSTRAÇÃO — dados exclusivamente sintéticos.",
-      "  Desenvolvimento. Não é homologação, não é produção, proibido dado real.",
-      "",
-      `  Web ......... ${URL_WEB}`,
-      `  API ......... ${URL_API}`,
-      `  SHA ......... ${sha}`,
-      "",
-      "  Perfis e senha: docs/AMBIENTE-DEMONSTRACAO-LOCAL.md",
-      "  O que já dá para navegar: docs/GUIA-VISUAL-FUNCIONALIDADES.md",
-      "",
-      "  Ctrl+C encerra os servidores. O banco continua de pé.",
-      "",
-    ].join("\n"),
-  );
+  process.on("uncaughtException", (erro) => {
+    process.stderr.write(`\nErro inesperado: ${erro.message}\n`);
+    encerrar(1);
+  });
+  process.on("exit", () => ambiente.encerrarProcessos());
 }
 
 main().catch((erro) => {
-  const mensagem = erro instanceof Error ? erro.message : String(erro);
+  const passo = erro instanceof FalhaDePasso ? erro.passo : "inicialização";
+  const proximo =
+    erro instanceof FalhaDePasso && erro.proximoPasso
+      ? erro.proximoPasso
+      : "Corrija a causa acima e rode `pnpm demo:up` de novo.";
+  const motivo = erro instanceof Error ? erro.message : String(erro);
+
   process.stderr.write(
-    `\nFALHOU no passo "${passoAtual}": ${mensagem}\n` +
-      "O ambiente NÃO está pronto. Corrija o passo acima e rode de novo.\n",
+    `\nFALHOU no passo "${passo}"\n` +
+      `  Causa .......... ${motivo}\n` +
+      `  Próximo passo .. ${proximo}\n\n` +
+      "O ambiente NÃO está pronto, e nada ficou rodando por trás deste erro.\n",
   );
   process.exit(1);
 });

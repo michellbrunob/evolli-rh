@@ -11,50 +11,123 @@ está integrado, enquanto o desenvolvimento continua em branches isoladas.
 O que já dá para navegar, tela a tela, está em
 [GUIA-VISUAL-FUNCIONALIDADES.md](./GUIA-VISUAL-FUNCIONALIDADES.md).
 
+**Nada é publicado na rede.** Banco, API e web escutam só em `127.0.0.1`. A
+restrição da API é verificada pelo próprio servidor (`EVOLLI_DEMO_MODE`), não
+pela documentação: com o modo de demonstração ligado, qualquer host diferente
+de `127.0.0.1` impede a API de subir, e o modo é recusado com
+`NODE_ENV=production`.
+
 ## Pré-requisitos
 
 - **Docker Desktop** em execução (o PostgreSQL vem do `docker-compose.yml` da raiz).
 - Node 22 e pnpm, como no resto do repositório.
+- As portas **3000** e **5173** livres. Elas são fixas de propósito: subir
+  calado em outra porta esconderia qual ambiente está aberto.
 
-## Preparação (uma vez)
+## Preparação (uma vez) — Windows / PowerShell
+
+Todos os comandos rodam na raiz do repositório. O caminho pode ter espaço
+(`C:\MB\Sistema RH\Evolli RH`) — nenhum passo depende de aspas manuais.
+
+```powershell
+Copy-Item .env.example .env
+Copy-Item apps\api\.env.example apps\api\.env
+Copy-Item apps\api\.env.migrate.example apps\api\.env.migrate
+```
+
+Agora escolha **duas senhas locais quaisquer** — uma para `evolli_migrator`,
+outra para `evolli_app` — e edite os três arquivos. Eles não são versionados.
+
+| Arquivo                 | Linha a ajustar                                                                                            |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `.env`                  | `POSTGRES_PASSWORD=` senha do usuário administrador do container                                           |
+| `apps\api\.env`         | `DATABASE_URL=postgresql://evolli_app:SENHA_APP@127.0.0.1:5432/evolli_rh_dev?schema=app`                   |
+| `apps\api\.env.migrate` | `MIGRATE_DATABASE_URL=postgresql://evolli_migrator:SENHA_MIGRATOR@127.0.0.1:5432/evolli_rh_dev?schema=app` |
+
+**Não é preciso exportar nada no shell.** O comando descobre as senhas dos dois
+papéis a partir dessas URLs, o que também impede que o papel do banco e o
+arquivo da API fiquem com senhas diferentes. Se a senha tiver caractere
+especial (`&`, `^`, `%`, espaço), escreva-a **percent-encoded** na URL — por
+exemplo `a&b` vira `a%26b`. Se preferir, defina `EVOLLI_MIGRATOR_PASSWORD` e
+`EVOLLI_APP_PASSWORD` no ambiente do processo e elas têm precedência:
+
+```powershell
+$env:EVOLLI_MIGRATOR_PASSWORD = "uma-senha-local-qualquer"
+$env:EVOLLI_APP_PASSWORD      = "outra-senha-local-qualquer"
+```
+
+Nenhuma senha vai para a linha de comando em nenhum passo: as credenciais dos
+papéis chegam ao `psql` por **entrada padrão**, e o orquestrador recusa, em
+tempo de execução, qualquer argumento que não seja literal.
+
+<details>
+<summary>Alternativa: bash / zsh (Linux, macOS, Git Bash)</summary>
 
 ```bash
 cp .env.example .env
-```
-
-Ajuste em `.env` as credenciais **locais** do container. Depois crie os dois
-arquivos de conexão da API, conforme [infra/postgres/README.md](../infra/postgres/README.md):
-`apps/api/.env` com `DATABASE_URL` (papel `evolli_app`) e `apps/api/.env.migrate`
-com `MIGRATE_DATABASE_URL` (papel `evolli_migrator`). Nenhum dos dois é versionado.
-
-Exporte no shell as senhas locais dos dois papéis — elas nunca entram em arquivo:
-
-```bash
+cp apps/api/.env.example apps/api/.env
+cp apps/api/.env.migrate.example apps/api/.env.migrate
+# opcional, só se não quiser a senha dentro das URLs:
 export EVOLLI_MIGRATOR_PASSWORD="uma-senha-local-qualquer"
 export EVOLLI_APP_PASSWORD="outra-senha-local-qualquer"
 ```
 
+</details>
+
 ## Subir o ambiente
 
-```bash
+```powershell
 pnpm demo:up
 ```
 
-Um comando, oito passos nomeados: pré-requisitos, PostgreSQL, papéis e schema,
-migrations, servidores, conta de bootstrap, seed sintético e resumo.
+Um comando, oito passos nomeados:
 
-**Nenhuma falha é escondida.** Se qualquer passo falhar, o comando encerra com
-código diferente de zero dizendo qual passo quebrou, e o ambiente não é
-apresentado como pronto. Senhas e strings de conexão nunca são impressas.
+| Passo | O que faz                                                                |
+| ----- | ------------------------------------------------------------------------ |
+| 1/8   | Pré-requisitos: Docker, arquivos de conexão, hosts locais, portas livres |
+| 2/8   | PostgreSQL local (`docker compose up -d`) e espera ficar pronto          |
+| 3/8   | Papéis, schema e extensões (`infra/postgres/`)                           |
+| 4/8   | Migrations (`prisma migrate deploy`)                                     |
+| 5/8   | API em `127.0.0.1:3000` e espera `/v1/health/ready`                      |
+| 6/8   | Conta de bootstrap e seed sintético                                      |
+| 7/8   | Web em `127.0.0.1:5173`, com porta estrita, e verificação HTTP           |
+| 8/8   | Verificação final: banco, API e web respondendo — só então "pronto"      |
 
-Ao final:
+**Nenhuma falha é escondida.** Qualquer passo que quebre encerra o comando com
+código diferente de zero dizendo **qual passo**, **qual causa** e **qual é o
+próximo procedimento seguro** — e encerra API e web antes de sair, para não
+deixar processo órfão. Senhas e strings de conexão nunca são impressas.
+
+Ao final, e só depois das três verificações:
 
 |     |                         |
 | --- | ----------------------- |
 | Web | <http://127.0.0.1:5173> |
 | API | <http://127.0.0.1:3000> |
 
-`Ctrl+C` encerra os servidores; o banco continua de pé.
+## Encerrar
+
+A janela em que você rodou `pnpm demo:up` **fica ocupada** enquanto o ambiente
+está no ar: é ela que segura a API e a web, e é nela que aparecem os logs dos
+dois servidores.
+
+- **`Ctrl+C` nessa janela** encerra API e web, inclusive os processos filhos
+  (no Windows a árvore inteira é encerrada, não só o `cmd.exe` intermediário).
+- **O banco continua de pé** de propósito, para a próxima subida ser rápida.
+  Para pará-lo também:
+
+  ```powershell
+  docker compose stop
+  ```
+
+- Se por algum motivo sobrar algo escutando, confira e encerre:
+
+  ```powershell
+  Get-NetTCPConnection -LocalPort 3000,5173 -State Listen | Select-Object LocalPort, OwningProcess
+  ```
+
+Subir de novo depois disso é só rodar `pnpm demo:up`. Se uma das portas ainda
+estiver ocupada, o passo 1/8 avisa e não sobe nada — de propósito.
 
 ## Perfis sintéticos
 
@@ -78,15 +151,19 @@ existe por exigência do provisionamento e **não** cria empresas.
 
 ### Por que estas credenciais não vazam para produção
 
-Três travas, todas verificadas em código:
+Quatro travas, todas verificadas em código:
 
 1. O seed exige `EVOLLI_DEMO_SEED="confirmo-ambiente-local"` no ambiente do
    processo. Nenhum pipeline dispara isso sem alguém escrever a frase.
 2. A API alvo precisa estar em `127.0.0.1`, `localhost` ou `::1` — conferido no
    CLI **e** dentro do módulo do seed.
 3. O `DATABASE_URL` precisa apontar para host local.
+4. `EVOLLI_DEMO_MODE=true` é **recusado** com `NODE_ENV=production`, e com ele
+   ligado a API só aceita escutar em `127.0.0.1`.
 
-Qualquer uma que falhe encerra o seed com erro. Nenhum segredo real é versionado.
+Qualquer uma que falhe encerra o processo com erro. Nenhum segredo real é
+versionado, e o CLI do seed é excluído do artefato de build da API
+(`tsconfig.build.json`), então não viaja para `dist/`.
 
 ## Dados sintéticos criados
 
@@ -100,15 +177,19 @@ isolamento.
 **Não são criados:** conteúdo de documento, anexo, biometria, diagnóstico, CID,
 dado clínico, MFA, nem qualquer acesso a serviço externo ou R2.
 
-O seed é **idempotente**: cada passo procura antes de criar e reusa o que achar.
-Rodar de novo converge para o mesmo conjunto, sem duplicar. Ele **nunca apaga** —
+O seed é **idempotente**: cada passo procura antes de criar e reusa o que achar,
+varrendo **todas** as páginas da listagem — inclusive depois que o banco local
+passar de 100 registros de algum tipo, por causa dos cadastros que você mesmo
+fizer navegando. Rodar de novo converge para o mesmo conjunto, sem duplicar, e
+sem tocar em nada que não seja do conjunto sintético. Ele **nunca apaga** —
 `solicitacao_pessoa` e `audit_event` têm `DELETE` revogado no banco, e um seed
 que apagasse para recriar não conseguiria rodar duas vezes.
 
 Rodar o seed isoladamente, com a API já de pé:
 
-```bash
-EVOLLI_DEMO_SEED=confirmo-ambiente-local pnpm --filter @evolli/api run seed:demo
+```powershell
+$env:EVOLLI_DEMO_SEED = "confirmo-ambiente-local"
+pnpm --filter @evolli/api run seed:demo
 ```
 
 ## Separação entre demonstração e desenvolvimento
@@ -124,30 +205,32 @@ EVOLLI_DEMO_SEED=confirmo-ambiente-local pnpm --filter @evolli/api run seed:demo
 
 ### Atualizar depois de um merge
 
-```bash
-# 1. Trazer a main integrada
-git checkout main && git pull --ff-only
+Encerre o ambiente (`Ctrl+C`) e, na mesma janela:
 
-# 2. Dependências: só quando o lockfile mudou
-git diff --name-only HEAD@{1} HEAD | grep -q pnpm-lock.yaml && pnpm install
-
-# 3. Subir tudo de novo (migrations e seed são idempotentes)
+```powershell
+git checkout main
+git pull --ff-only
+pnpm install
 pnpm demo:up
-
-# 4. Conferir a saúde e QUAL SHA está sendo demonstrado
-curl -s http://127.0.0.1:3000/v1/health/ready
-git rev-parse --short HEAD
 ```
 
-O passo 3 reaplica migrations pendentes e reexecuta o seed; como ambos são
-idempotentes, rodar de novo é seguro. O SHA demonstrado também é impresso pelo
-próprio `pnpm demo:up` no passo final.
+`pnpm install` é barato quando nada mudou; rodá-lo sempre evita o erro de
+esquecer que o lockfile mudou. O passo 4/8 reaplica migrations pendentes e o
+6/8 reexecuta o seed; como ambos são idempotentes, rodar de novo é seguro.
+
+O SHA demonstrado é impresso pelo próprio `pnpm demo:up` no passo final. Para
+conferir separadamente:
+
+```powershell
+git rev-parse --short HEAD
+Invoke-RestMethod http://127.0.0.1:3000/v1/health/ready
+```
 
 ### Recriar os dados do zero
 
 Destrutivo e **manual por decisão**, nunca automático:
 
-```bash
+```powershell
 docker compose down -v   # apaga o volume do Postgres LOCAL de demonstração
 pnpm demo:up
 ```
