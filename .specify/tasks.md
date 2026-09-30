@@ -460,8 +460,9 @@ decisões e bloqueios, está no ledger versionado
 
 36. **T139 - Fundação real da Central de Solicitações de Pessoas**
 
-    - **Estado:** implementada na branch `codex/t139-backend-solicitacoes-pessoas`; PR #131 Draft,
-      aguardando revisão somente leitura.
+    - **Estado:** integrada em `main` pela PR #131 em 2026-09-29 (squash `6eaa6f9`). A revisão
+      adversarial encontrou uma corrida de transições concorrentes, corrigida na mesma branch com
+      `SELECT ... FOR UPDATE` por `id` e `empresa_id` da sessão, antes da integração.
     - **Preparação executada:** `/speckit.specify`, `/speckit.plan` e `/speckit.tasks` em
       `specs/t139-backend-solicitacoes-pessoas/`, antes de qualquer código.
     - **Entregue:** módulo NestJS `solicitacoes-pessoas`; enums, dois modelos Prisma e migration
@@ -478,6 +479,31 @@ decisões e bloqueios, está no ledger versionado
     - **Fora de escopo, preservado:** anexos/upload/R2, correção automática de ponto, efeitos em
       férias, benefícios, cadastro, Banco de Horas, Folha ou fechamento, bloqueio automático de
       fechamento, cronômetro automático de SLA, interface web e dado real.
+
+37. **T140 - Interface web funcional da Central de Solicitações de Pessoas**
+
+    - **Estado:** implementada na branch `codex/t140-web-solicitacoes-pessoas`; **PR #132 Draft**,
+      aguardando revisão somente leitura. Não integrada — a integração só existe após o merge.
+    - **Preparação executada:** `/speckit.specify`, `/speckit.plan` e `/speckit.tasks` em
+      `specs/t140-web-solicitacoes-pessoas/`, antes de qualquer código.
+    - **Objetivo:** transformar a aba demonstrativa Pessoas > Solicitações (T091) em interface
+      funcional de RH sobre os cinco endpoints reais da T139. Nenhum contrato de backend foi
+      alterado; nenhum arquivo de `apps/api/` foi tocado.
+    - **Entregue:** cliente HTTP tipado `solicitacoesPessoasClient` (`credentials: "same-origin"`,
+      CSRF só nas mutações, nunca repassa corpo de erro do servidor); tela com carregamento, vazio,
+      erro com nova tentativa, listagem, filtros, paginação pelo contrato real, detalhe somente
+      leitura, histórico cronológico, registro e execução das transições permitidas ao RH; guarda
+      determinística contra respostas obsoletas por contador monotônico em cada carregador.
+    - **Papéis:** o ator vem de `GET /v1/users/me`, como já fazem T121 e T133 — sem endpoint novo,
+      sem sessão paralela e sem Context inédito. Só `rh` muta; `master_tecnico` lê em modo somente
+      leitura explícito; `dp`, `gestor` e `colaborador` não recebem ação de mutação. A interface não
+      é autoridade de segurança: esconder controle é usabilidade, o servidor decide.
+    - **Fora de escopo, preservado:** ESS/MSS e qualquer simulação de `DP-23`; capacidade de RBAC
+      para o gestor; anexo, upload, download, preview, assinatura e Cloudflare R2; diagnóstico, CID
+      ou descrição clínica; efeito em ponto, férias, cadastro, vínculo, benefícios, Banco de Horas,
+      Folha ou fechamento; cronômetro de SLA ou cálculo de prazo no navegador; declaração de
+      conformidade legal; roteador de URL, dependência nova e alteração das telas demonstrativas
+      T067 e T068.
 
 ## Regra obrigatória para as próximas tarefas
 

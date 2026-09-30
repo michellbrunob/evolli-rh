@@ -74,12 +74,14 @@ dentro do comando copiável.
 
 ## 7. Estado no marco desta versão
 
-- Integrado em `main` até T136.
+- Integrado em `main` até T139.
 - T135 concluída como investigação bloqueada, sem código.
 - T136 integrada pela PR #129; `PD-SOL-01..05` aprovadas e ADR 0013 aceita.
 - T137 não foi iniciada e foi substituída pela T139 no sequenciamento atual.
-- T138 é esta convergência e proteção do Spec Kit, atualizada sobre a T136.
-- T139 é a próxima fundação funcional, condicionada à integração da T138 e à
-  geração de especificação, plano e tarefas próprios antes do código.
+- T138 integrada pela PR #130: convergência e proteção do Spec Kit, com gate na CI.
+- T139 integrada pela PR #131: fundação backend da Central de Solicitações de
+  Pessoas, sem anexos e sem efeito automático em outros domínios.
+- T140 é a interface web funcional da Central sobre essa API, em revisão, com
+  especificação, plano e tarefas próprios gerados antes do código.
 
 O estado detalhado fica em [`.specify/execution-status.md`](../.specify/execution-status.md).

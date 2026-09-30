@@ -2,7 +2,7 @@
 
 **Última convergência:** 2026-09-29
 
-**Base Git verificada:** `origin/main` em `2142c80` (T138 integrada)
+**Base Git verificada:** `origin/main` em `6eaa6f9` (T139 integrada)
 
 **Constituição:** v1.4.0
 
@@ -85,17 +85,18 @@ de Horas.
 | T133   | Integrada | Pessoas > Documentos funcional para metadados e solicitações documentais, sem upload/download inventado.         |
 | T134   | Integrada | Pessoas > Dados contratuais somente leitura, com guardas determinísticas contra respostas assíncronas obsoletas. |
 
-## Solicitações gerais de Pessoas e convergência — T135 a T139
+## Solicitações gerais de Pessoas e convergência — T135 a T140
 
-| Tarefa | Estado                      | Resultado principal                                                                                                                                                                             |
-| ------ | --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| T135   | Investigada/bloqueada       | Não existe controller, persistência Prisma nem RBAC real para Solicitações gerais. Nenhum código foi criado.                                                                                    |
-| T136   | Integrada                   | `PD-SOL-01..05` aprovadas; ADR 0013 define Cloudflare R2 como provedor privado futuro sem habilitar upload.                                                                                     |
-| T137   | Não iniciada; substituída   | Identificador histórico da fundação, substituído pela T139 após a convergência T138; nenhum código funcional foi criado.                                                                        |
-| T138   | Integrada                   | Spec Kit versionado, protegido por gate na CI e reconciliado sobre `main` com T136, decisões aprovadas e ADR 0013.                                                                              |
-| T139   | Implementada; PR #131 Draft | Fundação backend da Central: módulo NestJS, Prisma/migration, cinco endpoints, RBAC deny-by-default, CSRF, auditoria transacional e E2E. Sem anexos e sem efeito automático em outros domínios. |
+| Tarefa | Estado                      | Resultado principal                                                                                                                                                                                                                                           |
+| ------ | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T135   | Investigada/bloqueada       | Não existe controller, persistência Prisma nem RBAC real para Solicitações gerais. Nenhum código foi criado.                                                                                                                                                  |
+| T136   | Integrada                   | `PD-SOL-01..05` aprovadas; ADR 0013 define Cloudflare R2 como provedor privado futuro sem habilitar upload.                                                                                                                                                   |
+| T137   | Não iniciada; substituída   | Identificador histórico da fundação, substituído pela T139 após a convergência T138; nenhum código funcional foi criado.                                                                                                                                      |
+| T138   | Integrada                   | Spec Kit versionado, protegido por gate na CI e reconciliado sobre `main` com T136, decisões aprovadas e ADR 0013.                                                                                                                                            |
+| T139   | Integrada                   | Fundação backend da Central: módulo NestJS, Prisma/migration, cinco endpoints, RBAC deny-by-default, CSRF, auditoria transacional e E2E. A revisão adversarial achou uma corrida de transições concorrentes, corrigida com lock de linha antes da integração. |
+| T140   | Implementada; PR #132 Draft | Interface web funcional de Pessoas > Solicitações sobre os cinco endpoints da T139. Cliente tipado, guarda contra respostas obsoletas e RBAC refletido na experiência. Nenhum contrato de backend alterado.                                                   |
 
-## Limites da T139 (implementados como limite, não como pendência esquecida)
+## Limites da T139 e da T140 (implementados como limite, não como pendência esquecida)
 
 - **Sem ESS.** Não existe vínculo autenticado `AccessUser <-> Colaborador`
   (`DP-23`, deliberadamente não materializado). O RH registra em nome do colaborador, como já ocorre em
@@ -109,17 +110,26 @@ de Horas.
 - **Sem cronômetro de SLA.** Só marcos de acompanhamento (`enviada_em`, `primeira_revisao_em`).
 - **Catálogo de motivos a validar com RH.** O mecanismo (código fechado, sem texto livre) é o que está
   aprovado; o conteúdo da lista é extensível de forma aditiva, como em `MotivoMovimentacao`.
-- **Sem interface web.** A T139 é backend; nenhuma tela foi alterada.
+- **Sem ESS na interface.** A T140 consome a mesma fundação: o RH registra em nome do
+  colaborador e continua sendo o ator auditado. Nenhum login de colaborador é simulado.
+- **A interface não é autoridade de segurança.** Ela esconde o que o servidor recusaria, por
+  usabilidade; RBAC, escopo, CSRF e anti-enumeração continuam decididos no backend.
+- **Sem anexo na tela.** Nenhum campo de arquivo, URL, conteúdo ou informação clínica é
+  renderizado ou coletado — nem para `atestado`.
+- **Sem prazo no navegador.** A tela exibe os marcos que o servidor gravou; não conta tempo,
+  não calcula prazo e não promete conclusão.
+- **Telas demonstrativas vizinhas preservadas.** T067 (Portal) e T068 (Central do RH) seguem
+  demonstrativas e fora deste escopo, com teste de não regressão.
 
 ## Próxima ação autorizável
 
-1. Revisão somente leitura e integração da T139/PR #131.
+1. Revisão somente leitura e integração da T140.
 2. Só depois disso abrir a próxima fatia, sob o próximo identificador disponível — sem número
    reservado aqui, porque reservar identificador antes da decisão de escopo já se mostrou fonte de
    confusão (ver T137).
-3. Candidatos naturais da próxima fatia, todos dependentes de decisão própria: interface web da
-   Central sobre esta API; capacidade de RBAC para o gestor consultivo; e `DP-23` como pré-condição de
-   qualquer autoatendimento do colaborador.
+3. Candidatos naturais da próxima fatia, todos dependentes de decisão própria: capacidade de RBAC
+   para o gestor consultivo; `DP-23` como pré-condição de qualquer autoatendimento do colaborador; e
+   a validação com RH do catálogo de motivos, cujo mecanismo (código fechado) já está aprovado.
 4. Atualizar este ledger e `sync-state.json` em toda tarefa futura.
 
 ## Evidência mínima por tarefa futura

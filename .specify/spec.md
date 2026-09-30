@@ -43,10 +43,11 @@ para o Master.
 
 ### 1.1 Estado convergido em 29/09/2026
 
-- **Integrado em `main` até T136:** fundação de identidade/sessão/RBAC/auditoria; estrutura
+- **Integrado em `main` até T139:** fundação de identidade/sessão/RBAC/auditoria; estrutura
   organizacional; contas de acesso; autenticação web; sessões ativas; MFA TOTP opcional; cadastros
   funcionais de organização, cargos, centros de custo e horários; colaboradores, vínculos, histórico
-  funcional, documentos, dados contratuais e operações delimitadas de Ponto.
+  funcional, documentos, dados contratuais e operações delimitadas de Ponto; convergência e gate do
+  Spec Kit (T138); e a fundação backend da Central de Solicitações de Pessoas (T139, PR #131).
 - **Superfícies demonstrativas:** continuam sem persistência quando o contrato de backend ou a decisão
   de negócio não existe. A existência visual de uma aba não autoriza tratá-la como funcional.
 - **T135:** investigação de Solicitações gerais de Pessoas encerrada sem código porque não há contrato
@@ -56,7 +57,12 @@ para o Master.
   retorno e política mínima de evidências estão definidos. O Cloudflare R2 foi aprovado como provedor
   privado futuro pela ADR 0013, sem habilitar upload.
 - **T138 / PR #130:** convergência do Spec Kit integrada, com gate `pnpm spec:check` na CI.
-- **T139 / PR #131:** fundação backend da Central implementada e em revisão. A tarefa histórica T137
+- **T140:** interface web funcional de Pessoas > Solicitações sobre os cinco endpoints da T139,
+  implementada e em revisão. Consome o contrato existente sem ampliá-lo; não implementa ESS/MSS, não
+  exibe anexo ou informação clínica e não calcula prazo no navegador.
+- **T139 / PR #131:** fundação backend da Central **integrada** em `main` (squash `6eaa6f9`). A
+  revisão adversarial encontrou uma corrida de transições concorrentes, corrigida com lock de linha
+  na própria branch antes da integração. A tarefa histórica T137
   não foi executada e foi substituída pela T139. A fundação registra e encaminha: não habilita anexo,
   não produz efeito trabalhista automático, não bloqueia fechamento e não implementa cronômetro de
   SLA. Não existe autoatendimento do colaborador enquanto `DP-23` (vínculo `AccessUser <->
@@ -408,8 +414,9 @@ perda de dados.
 Esta especificação deriva do PRD oficial no Notion e deve ser refinada por fatia antes da implementação.
 A T139 entregou a fundação de backend de Solicitações gerais de Pessoas sem anexos, com o núcleo puro
 T066 já reconciliado à regra aprovada de cancelamento e reabertura; o termo funcional "encerrada"
-corresponde ao estado terminal `encaminhada_para_operacao_rh`, sem estado novo. A próxima fatia só é
-aberta após a integração da T139 e recebe o próximo identificador disponível. Folha permanece em
+corresponde ao estado terminal `encaminhada_para_operacao_rh`, sem estado novo. A T140 colocou a
+interface funcional de RH sobre essa fundação, sem alterar contrato algum do backend. A próxima fatia
+só é aberta após a integração da T140 e recebe o próximo identificador disponível. Folha permanece em
 planejamento até a homologação das regras e responsáveis.
 
 > Nota (T032): "Reserva Fiscal" é o nome da empresa/projeto, não um módulo (glossario-reserva-fiscal.md). Governança de privacidade = RH + Juridico (ADR 0012). Estado integrado e gates pendentes: ver README e ROADMAP.
