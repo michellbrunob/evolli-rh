@@ -174,6 +174,10 @@ async function main() {
     buscarHttp,
     portaLivre,
     dormir,
+    // Relógio real e MONOTÔNICO: a partir da T145 os prazos dos passos são de
+    // parede, e um ajuste de relógio do sistema não pode esticar nem encurtar
+    // uma espera já em curso.
+    agora: () => performance.now(),
     registrar: (linha) => process.stdout.write(`${linha}\n`),
     sha: shaAtual(),
   });
