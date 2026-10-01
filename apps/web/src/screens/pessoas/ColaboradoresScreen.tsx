@@ -167,6 +167,15 @@ export function ColaboradoresScreen() {
       formulario.tipoDestino !== "" ||
       formulario.destinoId !== "");
 
+  // T144 (R1) — o detalhe também edita, e portanto também tem o que perder: o
+  // nome. Um só derivado governa a confirmação de descarte do `Modal` e o
+  // botão de salvar; se divergissem, a janela fecharia calada com o botão
+  // ainda habilitado. Compara o valor normalizado com o nome já carregado, e
+  // por isso volta sozinho a `false` depois de salvar, quando o nome gravado
+  // passa a ser o nome em edição.
+  const detalheNomeAlterado =
+    detalhe !== null && detalhe.nomeEdicao.trim() !== detalhe.colaborador.nome;
+
   const carregarDados = useCallback(
     async (
       situacao: FiltroSituacao,
@@ -828,6 +837,8 @@ export function ColaboradoresScreen() {
         aberto={detalhe !== null}
         titulo={detalhe?.colaborador.nome ?? ""}
         onFechar={fecharDetalhe}
+        bloqueado={detalhe?.salvandoNome ?? false}
+        alterado={detalheNomeAlterado}
         largura="media"
       >
         {detalhe ? (
@@ -877,10 +888,7 @@ export function ColaboradoresScreen() {
                 type="button"
                 variant="secondary"
                 onClick={() => void handleSalvarNome()}
-                disabled={
-                  detalhe.salvandoNome ||
-                  detalhe.nomeEdicao.trim() === detalhe.colaborador.nome
-                }
+                disabled={detalhe.salvandoNome || !detalheNomeAlterado}
               >
                 {detalhe.salvandoNome ? "Salvando…" : "Salvar nome"}
               </Button>

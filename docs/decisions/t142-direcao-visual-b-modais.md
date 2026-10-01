@@ -35,8 +35,11 @@ Depois de duas propostas de alta fidelidade (protótipos estáticos em
 alteração explícita: **modais** no lugar do painel lateral e da folha inferior.
 
 1. **Navegação lateral agrupada.** Coluna à esquerda, com rótulos de grupo
-   (Operação, Consulta, Administração). Os destinos, a ordem e as permissões
-   não mudam — o agrupamento é leitura, nunca controle de acesso.
+   (Operação, Consulta, Administração). Os destinos e as permissões não mudam —
+   o agrupamento é leitura, nunca controle de acesso. A ordem relativa muda
+   apenas pelo agrupamento (corrigido na T144, O1): "Solicitações" sobe de 7º
+   para 6º e "Portal do Colaborador" desce de 6º para 7º, por caírem em grupos
+   diferentes. Os nove destinos continuam presentes e alcançáveis.
 2. **Densidade confortável.** Menos colunas visíveis, mais respiro por linha.
 3. **Filtros organizados** em bloco próprio, acima da lista.
 4. **Lista conforme a proposta B.**

@@ -60,10 +60,13 @@ const SUB_ROTULO: Record<string, string> = {
 };
 
 /**
- * Agrupamento da navegação (T142, direção visual B aprovada). Não muda
- * destino, ordem nem permissão: é só leitura — separa o que se opera no dia a
- * dia do que é administração. Os rótulos de grupo não são focáveis e não
- * entram na ordem de tabulação.
+ * Agrupamento da navegação (T142, direção visual B aprovada). Não muda destino
+ * nem permissão: é só leitura — separa o que se opera no dia a dia do que é
+ * administração. A ordem relativa muda apenas pelo agrupamento (T144, O1):
+ * "Solicitações" sobe de 7º para 6º e "Portal do Colaborador" desce de 6º para
+ * 7º, por caírem em grupos diferentes. Nenhum destino sai da lista: os nove
+ * continuam presentes e alcançáveis. Os rótulos de grupo não são focáveis e
+ * não entram na ordem de tabulação.
  */
 const GRUPOS_NAVEGACAO: readonly {
   readonly titulo: string;

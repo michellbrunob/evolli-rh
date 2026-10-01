@@ -473,7 +473,9 @@ decisões e bloqueios, está no ledger versionado
     - **Reconciliação do núcleo T066 concluída:** catálogo de `PD-SOL-01` (sem `documento`, com
       `atestado` e `beneficios`); `aguardando_informacao → cancelada` removida; ação `reabrir`
       exclusiva do RH de `encaminhada_para_operacao_rh` e `recusada` para `em_revisao_rh`;
-      `cancelada` sem saída. Uma única máquina de estados — o service delega ao núcleo.
+      `cancelada` sem saída. Uma única máquina de estados — o service delega ao núcleo. O contrato
+      conceitual que originou esse núcleo é o da T065, cujos identificadores foram reusados, não
+      recriados (ver `docs/decisions/pacote-decisao-solicitacoes-pessoas.md`).
     - **Limite estrutural registrado:** sem `DP-23` não há ESS; o RH registra em nome do colaborador,
       e a auditoria grava o RH como ator real. Nada foi simulado.
     - **Fora de escopo, preservado:** anexos/upload/R2, correção automática de ponto, efeitos em
@@ -620,6 +622,48 @@ decisões e bloqueios, está no ledger versionado
     - **Efeito registrado:** a condição "expansão condicionada à decisão sobre o Frappe" da T142 sai
       e dá lugar a **expansão liberada de forma gradual, tela por tela, com validação visual antes
       de ampliar**. Liberada, não concluída.
+
+41. **T144 - Hardening do Modal e convergência do Spec Kit**
+
+    - **Origem:** as revisões somente leitura da T142 deixaram quatro pendências classificadas como
+      não bloqueantes (R1, R2, R3 e O1), e o proprietário as fixou como **pré-condição da expansão
+      visual** — nenhuma outra tela recebe o padrão B + modais antes delas. Soma-se a convergência
+      do ledger, que vinha derrubando a CI de `main`.
+    - **Estado:** implementada nesta branch. Não altera direção visual aprovada, contratos HTTP,
+      regras, permissões nem a regra do verificador do Spec Kit.
+    - **R1 — descarte silencioso no detalhe de Colaboradores.** O `Modal` de detalhe não recebia
+      `alterado` nem `bloqueado`: editar o nome e fechar descartava sem aviso, contra a própria
+      regra aprovada da T142 ("com alterações não salvas abre confirmação explícita dentro da
+      janela"). Um único derivado, `detalheNomeAlterado`, passou a governar a confirmação **e** o
+      botão de salvar — se divergissem, a janela fecharia calada com o botão ainda habilitado.
+      Durante a retificação a janela fica bloqueada; depois de salvar, o nome gravado passa a ser o
+      nome em edição e o estado deixa de ser alterado sozinho.
+    - **R2 — `alertdialog` sem nome acessível e sem foco.** A confirmação de descarte não tinha nome
+      acessível e não recebia foco: `alertdialog` não tem região viva implícita, então quem usa
+      leitor de tela não ficava sabendo que a pergunta existia, e podia concluir que o Escape havia
+      falhado. Agora é nomeada pelo próprio texto, recebe o foco ao aparecer e devolve o foco a quem
+      o tinha quando se escolhe continuar editando — por botão ou por Escape.
+    - **R3 — JSDoc inexato.** O comentário do `Modal` prometia `inert`, que nunca existiu no código.
+      Investigado: o fundo **não** estava alcançável — a camada fixa absorve os cliques, o `Tab` é
+      preso e `aria-modal` limita o leitor de tela. Era documentação errada, não defeito; o texto
+      passou a descrever os três mecanismos reais.
+    - **O1 — redação sobre a ordem da navegação.** O agrupamento da T142 dizia não mudar a ordem,
+      mas "Solicitações" subiu de 7º para 6º e "Portal do Colaborador" desceu de 6º para 7º, por
+      caírem em grupos diferentes. Sem impacto funcional: os nove destinos continuam presentes e
+      nenhuma permissão mudou. Corrigido o texto nos dois lugares que o afirmavam.
+    - **Convergência do ledger (T032, T065, T066).** `pnpm spec:check` procura cada identificador
+      citado na mudança por **texto literal** no ledger; uma faixa como "T001 a T049" não satisfaz.
+      Em Pull Request o contexto é só o título, mas no push para `main` é a mensagem inteira do
+      commit de squash — por isso a CI de `main` falhou em três pushes seguidos (T065 e T066 na
+      T139, T066 na T140, T032 na T142) sem nada de errado no código. Os três passaram a ser
+      nomeados nas faixas que já os cobriam, e a armadilha ficou registrada no próprio ledger. **A
+      regra do verificador não foi alterada.**
+    - **Testes:** 7 novos, confirmados contra `main` em `8c3d8c3` — falham lá, passam aqui. Cobrem
+      confirmação por botão e por Escape, preservação do texto digitado, devolução do foco,
+      descarte sem gravar, bloqueio durante o salvamento, fim do estado alterado após salvar, nome
+      acessível e foco do `alertdialog`.
+    - **Fora de escopo:** PR #133 e a branch da T141 não foram tocadas; a expansão visual não foi
+      iniciada; as observações O2–O5 das revisões continuam registradas, sem correção.
 
 ## Regra obrigatória para as próximas tarefas
 

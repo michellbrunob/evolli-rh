@@ -653,6 +653,182 @@ describe("ColaboradoresScreen (T111 — funcional)", () => {
     ).not.toBeInTheDocument();
   });
 
+  // ---- T144 (R1): o detalhe edita o nome, logo também tem o que perder.
+  // Fechar com alteração pendente precisa perguntar antes de descartar.
+  async function abrirDetalheDeAna() {
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+    const linha = screen.getByText("Ana Colaboradora (teste)").closest("tr")!;
+    fireEvent.click(
+      within(linha).getByRole("button", { name: /Ver detalhes/ }),
+    );
+    await screen.findByRole("table", {
+      name: `Vínculos — ${colaborador1.nome}`,
+    });
+  }
+
+  it("sem alterar o nome, o detalhe fecha direto — nada a confirmar", async () => {
+    await abrirDetalheDeAna();
+
+    fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
+
+    expect(screen.queryByText(/alterações não salvas/i)).toBeNull();
+    expect(
+      screen.queryByRole("table", { name: `Vínculos — ${colaborador1.nome}` }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("com o nome alterado, fechar pelo botão pede confirmação em vez de descartar", async () => {
+    // Mocks não são limpos entre testes neste arquivo: contagem por delta.
+    const antes = vi.mocked(retificarColaborador).mock.calls.length;
+    await abrirDetalheDeAna();
+
+    fireEvent.change(screen.getByLabelText("Nome"), {
+      target: { value: "Ana Corrigida (teste)" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
+
+    expect(screen.getByText(/alterações não salvas/i)).toBeInTheDocument();
+    // Não fechou: o detalhe continua aberto.
+    expect(
+      screen.getByRole("table", { name: `Vínculos — ${colaborador1.nome}` }),
+    ).toBeInTheDocument();
+    expect(vi.mocked(retificarColaborador).mock.calls.length).toBe(antes);
+  });
+
+  it("com o nome alterado, Escape também pede confirmação", async () => {
+    await abrirDetalheDeAna();
+
+    fireEvent.change(screen.getByLabelText("Nome"), {
+      target: { value: "Ana Corrigida (teste)" },
+    });
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    expect(screen.getByText(/alterações não salvas/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole("table", { name: `Vínculos — ${colaborador1.nome}` }),
+    ).toBeInTheDocument();
+  });
+
+  it("'Continuar editando' preserva o que foi digitado e devolve o foco ao campo", async () => {
+    await abrirDetalheDeAna();
+
+    const campo = screen.getByLabelText("Nome");
+    fireEvent.change(campo, { target: { value: "Ana Corrigida (teste)" } });
+    campo.focus();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.getByText(/alterações não salvas/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Continuar editando" }));
+
+    expect(screen.queryByText(/alterações não salvas/i)).toBeNull();
+    // O valor digitado continua lá, e o foco volta para onde se estava editando.
+    expect(screen.getByLabelText("Nome")).toHaveValue("Ana Corrigida (teste)");
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByLabelText("Nome")),
+    );
+    expect(
+      screen.getByRole("table", { name: `Vínculos — ${colaborador1.nome}` }),
+    ).toBeInTheDocument();
+  });
+
+  it("'Descartar alterações' fecha o detalhe sem gravar", async () => {
+    const antes = vi.mocked(retificarColaborador).mock.calls.length;
+    await abrirDetalheDeAna();
+
+    fireEvent.change(screen.getByLabelText("Nome"), {
+      target: { value: "Ana Corrigida (teste)" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Descartar alterações" }),
+    );
+
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("table", {
+          name: `Vínculos — ${colaborador1.nome}`,
+        }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(vi.mocked(retificarColaborador).mock.calls.length).toBe(antes);
+    // A lista preserva o nome original: nada foi gravado.
+    expect(
+      screen.getByRole("table", { name: "Colaboradores desta empresa" }),
+    ).toHaveTextContent("Ana Colaboradora (teste)");
+  });
+
+  it("durante a retificação, nenhuma forma de fechamento funciona", async () => {
+    const pendente: { current: ((v: ColaboradorApi) => void) | null } = {
+      current: null,
+    };
+    vi.mocked(retificarColaborador).mockImplementationOnce(
+      () =>
+        new Promise<ColaboradorApi>((res) => {
+          pendente.current = res;
+        }),
+    );
+    await abrirDetalheDeAna();
+
+    fireEvent.change(screen.getByLabelText("Nome"), {
+      target: { value: "Ana Corrigida (teste)" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar nome" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Salvando…" })).toBeDisabled(),
+    );
+
+    // Escape não fecha e não abre a confirmação; o botão Fechar fica inerte.
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByText(/alterações não salvas/i)).toBeNull();
+    expect(screen.getByRole("button", { name: "Fechar" })).toBeDisabled();
+    expect(
+      screen.getByRole("table", { name: `Vínculos — ${colaborador1.nome}` }),
+    ).toBeInTheDocument();
+
+    pendente.current?.({ ...colaborador1, nome: "Ana Corrigida (teste)" });
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Salvar nome" }),
+      ).toBeInTheDocument(),
+    );
+  });
+
+  it("depois de salvar, o nome deixa de contar como alteração pendente", async () => {
+    const atualizado: ColaboradorApi = {
+      ...colaborador1,
+      nome: "Ana Corrigida (teste)",
+    };
+    vi.mocked(retificarColaborador).mockResolvedValueOnce(atualizado);
+    await abrirDetalheDeAna();
+
+    fireEvent.change(screen.getByLabelText("Nome"), {
+      target: { value: "Ana Corrigida (teste)" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar nome" }));
+    await screen.findByRole("heading", { name: "Ana Corrigida (teste)" });
+
+    // Salvo: o botão volta a ficar inerte e fechar não pergunta mais nada.
+    expect(screen.getByRole("button", { name: "Salvar nome" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
+    expect(screen.queryByText(/alterações não salvas/i)).toBeNull();
+    expect(
+      screen.queryByRole("table", { name: `Vínculos — ${colaborador1.nome}` }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("só espaços em volta do nome não contam como alteração", async () => {
+    await abrirDetalheDeAna();
+
+    fireEvent.change(screen.getByLabelText("Nome"), {
+      target: { value: `  ${colaborador1.nome}  ` },
+    });
+
+    expect(screen.getByRole("button", { name: "Salvar nome" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
+    expect(screen.queryByText(/alterações não salvas/i)).toBeNull();
+  });
+
   it("abrir o formulário fecha um detalhe que estava aberto", async () => {
     render(<ColaboradoresScreen />);
     await screen.findByRole("table", { name: "Colaboradores desta empresa" });

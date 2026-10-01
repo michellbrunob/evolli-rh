@@ -29,18 +29,26 @@ versionadas. A condição de integração é comprovada por `main`, não por rel
 
 O planejamento detalhado permanece em `tasks.md`, e a evidência técnica está no histórico Git e nos
 ADRs/documentos indicados por cada tarefa. T020–T023 estão canceladas porque “Reserva Fiscal” é o nome
-da empresa/projeto, não um módulo. T049 encerra o primeiro caderno de homologação de jornada e Banco
-de Horas.
+da empresa/projeto, não um módulo. T032 alinhou repositório, Spec Kit e PRD ao estado real, e é a
+tarefa que mantém `DESIGN-apple.md` intacto byte a byte como referência externa. T049 encerra o
+primeiro caderno de homologação de jornada e Banco de Horas.
+
+> **Por que esta seção nomeia tarefas que uma faixa já cobre.** `pnpm spec:check` procura cada
+> `T###` citado na mudança por **texto literal** neste arquivo (`scripts/check-spec-kit-sync.mjs`);
+> uma faixa como “T001 a T049” não o satisfaz. Em Pull Request o contexto é só o título, mas no push
+> para `main` é a mensagem inteira do commit de squash, que concatena os commits da branch — por
+> isso T032, T065 e T066 derrubaram a CI de `main` sem nada de errado no código. A regra não foi
+> alterada (T144): quem citar um identificador aqui não coberto nominalmente deve nomeá-lo antes.
 
 ## Execução integrada — T050 a T073
 
-| Faixa     | Estado    | Resultado convergido                                                                                                                                                                                |
-| --------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| T050–T060 | Integrada | Motor puro de jornada/Banco de Horas, contratos de extrato/compensação/fechamento, fila Verificar folhas e orquestrador puro de Ponto, sempre limitados às regras homologadas e a dados sintéticos. |
-| T061–T062 | Integrada | Panorama de prontidão operacional e contrato de persistência/auditoria futura de Ponto.                                                                                                             |
-| T063–T070 | Integrada | Superfícies demonstrativas de Ponto, Portal, Central de Solicitações, Banco de Horas e Repositório documental; não equivalem a operações reais.                                                     |
-| T071      | Integrada | Rate limit efetivo na recuperação de senha. Canal real de entrega do token continua fora do contrato operacional.                                                                                   |
-| T072–T073 | Integrada | Superfícies demonstrativas de Colaboradores e Estrutura organizacional.                                                                                                                             |
+| Faixa     | Estado    | Resultado convergido                                                                                                                                                                                                                                                                                          |
+| --------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T050–T060 | Integrada | Motor puro de jornada/Banco de Horas, contratos de extrato/compensação/fechamento, fila Verificar folhas e orquestrador puro de Ponto, sempre limitados às regras homologadas e a dados sintéticos.                                                                                                           |
+| T061–T062 | Integrada | Panorama de prontidão operacional e contrato de persistência/auditoria futura de Ponto.                                                                                                                                                                                                                       |
+| T063–T070 | Integrada | Superfícies demonstrativas de Ponto, Portal, Central de Solicitações, Banco de Horas e Repositório documental; não equivalem a operações reais. Inclui o contrato conceitual (T065) e o núcleo puro (T066) da Central de Solicitações de Pessoas, depois reconciliados com `PD-SOL-01` e `PD-SOL-03` na T139. |
+| T071      | Integrada | Rate limit efetivo na recuperação de senha. Canal real de entrega do token continua fora do contrato operacional.                                                                                                                                                                                             |
+| T072–T073 | Integrada | Superfícies demonstrativas de Colaboradores e Estrutura organizacional.                                                                                                                                                                                                                                       |
 
 ## Execução integrada — T074 a T103
 
@@ -165,19 +173,43 @@ copiado para este repositório. As evidências ficam em `C:/MB/Sistema RH/frappe
 versionamento, por tamanho e por conterem um ambiente de execução. O ambiente de prova foi encerrado
 operacionalmente em 01/10/2026, com volumes, imagens e evidências preservados.
 
+## Hardening e convergência — T144 (implementada)
+
+| Tarefa | Estado                          | Resultado principal                                                                                                                                                                                                                                                                                                                       |
+| ------ | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T144   | **Implementada; aguardando PR** | Quita as quatro pendências não bloqueantes da T142 (R1, R2, R3 e O1), fixadas pelo proprietário como **pré-condição da expansão visual**, e converge o ledger para T032, T065 e T066, restaurando a CI de `main`. Nenhuma tela nova recebeu o padrão; a regra do verificador do Spec Kit **não** foi alterada. Base: `main` em `8c3d8c3`. |
+
+**O que mudou.** O `Modal` de detalhe de Colaboradores passou a declarar alteração pendente e
+bloqueio durante a gravação, encerrando o descarte silencioso do nome (R1). A confirmação de
+descarte virou um `alertdialog` nomeado pelo próprio texto, que recebe o foco ao aparecer e o
+devolve a quem editava ao continuar (R2). O comentário que prometia `inert` foi substituído pela
+descrição dos três mecanismos reais que deixam o fundo fora de alcance — camada fixa, foco preso e
+`aria-modal` (R3). O texto que afirmava ordem inalterada na navegação foi corrigido: a ordem
+relativa muda pelo agrupamento, sem perder destino nem permissão (O1).
+
+**Por que a CI de `main` caía.** `pnpm spec:check` procura cada `T###` citado na mudança por texto
+literal no ledger. Em Pull Request o contexto é o título; no push para `main` é a mensagem inteira
+do commit de squash, que concatena os commits da branch. Três pushes seguidos falharam assim — T065
+e T066 na T139, T066 na T140, T032 na T142 — sem nenhum defeito de código. Os três agora são
+nomeados nas faixas que já os cobriam.
+
+**Limites explícitos:** a T144 não inicia a expansão visual, não toca a PR #133 nem a branch da
+T141, e não trata as observações O2–O5 das revisões, que seguem registradas.
+
 ## Próxima ação autorizável
 
-1. **Planejar a expansão gradual do padrão B + modais para a próxima tela funcional prioritária** —
+1. Revisão somente leitura e integração da T144 — ela é pré-condição do item seguinte.
+2. **Planejar a expansão gradual do padrão B + modais para a próxima tela funcional prioritária** —
    uma tela só, com identificador próprio, e validação visual antes de ampliar para a seguinte.
    Planejar não é implementar: a escolha da tela e o escopo vêm antes do código.
-2. Revisão somente leitura e integração da T140.
-3. Só depois disso abrir a próxima fatia, sob o próximo identificador disponível — sem número
+3. Revisão somente leitura e integração da T140.
+4. Só depois disso abrir a próxima fatia, sob o próximo identificador disponível — sem número
    reservado aqui, porque reservar identificador antes da decisão de escopo já se mostrou fonte de
    confusão (ver T137).
-4. Candidatos naturais da próxima fatia, todos dependentes de decisão própria: capacidade de RBAC
+5. Candidatos naturais da próxima fatia, todos dependentes de decisão própria: capacidade de RBAC
    para o gestor consultivo; `DP-23` como pré-condição de qualquer autoatendimento do colaborador; e
    a validação com RH do catálogo de motivos, cujo mecanismo (código fechado) já está aprovado.
-5. Atualizar este ledger e `sync-state.json` em toda tarefa futura.
+6. Atualizar este ledger e `sync-state.json` em toda tarefa futura.
 
 ## Evidência mínima por tarefa futura
 

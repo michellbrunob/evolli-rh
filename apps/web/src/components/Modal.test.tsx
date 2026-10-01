@@ -102,6 +102,69 @@ describe("Modal (UI-F04)", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
 
+  // ---- T144 (R2): a confirmação é um `alertdialog`. Sem nome acessível e sem
+  // foco, quem usa leitor de tela não fica sabendo que a pergunta apareceu —
+  // `alertdialog` não tem região viva implícita e nada é anunciado sozinho.
+  it("a confirmação de descarte é um alertdialog nomeado pelo próprio texto", async () => {
+    render(<Palco alterado />);
+    fireEvent.click(screen.getByRole("button", { name: "Abrir" }));
+    await screen.findByRole("dialog");
+
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    const confirmacao = screen.getByRole("alertdialog");
+    expect(confirmacao).toHaveAccessibleName(
+      "Há alterações não salvas nesta janela. Descartar?",
+    );
+    expect(confirmacao).toHaveAttribute("aria-modal", "true");
+  });
+
+  it("a confirmação recebe o foco ao aparecer", async () => {
+    render(<Palco alterado />);
+    fireEvent.click(screen.getByRole("button", { name: "Abrir" }));
+    await screen.findByRole("dialog");
+
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByRole("alertdialog")),
+    );
+  });
+
+  it("continuar editando devolve o foco a quem o tinha antes da confirmação", async () => {
+    render(<Palco alterado />);
+    fireEvent.click(screen.getByRole("button", { name: "Abrir" }));
+    await screen.findByRole("dialog");
+
+    const campo = screen.getByLabelText("Campo A");
+    campo.focus();
+    fireEvent.keyDown(document, { key: "Escape" });
+    await screen.findByRole("alertdialog");
+
+    fireEvent.click(screen.getByRole("button", { name: "Continuar editando" }));
+
+    await waitFor(() => expect(document.activeElement).toBe(campo));
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(screen.getByRole("dialog")).toBeTruthy();
+  });
+
+  it("Escape na confirmação volta um nível e devolve o foco, sem fechar a janela", async () => {
+    render(<Palco alterado />);
+    fireEvent.click(screen.getByRole("button", { name: "Abrir" }));
+    await screen.findByRole("dialog");
+
+    const campo = screen.getByLabelText("Campo B");
+    campo.focus();
+    fireEvent.keyDown(document, { key: "Escape" });
+    await screen.findByRole("alertdialog");
+
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    await waitFor(() => expect(document.activeElement).toBe(campo));
+  });
+
   it("durante o envio, não fecha por Escape nem pelo botão", async () => {
     render(<Palco bloqueado />);
     fireEvent.click(screen.getByRole("button", { name: "Abrir" }));
