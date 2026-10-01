@@ -722,6 +722,41 @@ decisões e bloqueios, está no ledger versionado
     - **Fora de escopo:** PR #133 e a branch da T141 não foram tocadas; a expansão visual não foi
       iniciada; as observações O2–O5 das revisões continuam registradas, sem correção.
 
+42. **T145 - Hardening pós-T141: prazo de parede nas esperas e convergência do Spec Kit**
+
+    - **Origem:** a revisão final da PR #133 registrou duas ressalvas não bloqueantes que entraram
+      em `main` sem correção. Esta tarefa quita exatamente essas duas, e nada mais.
+    - **Estado:** implementada na branch `codex/t145-hardening-demo-timeouts`; **PR Draft**,
+      aguardando revisão somente leitura. Base: `main` em `8e3c15c`.
+    - **Ressalva 1 — Spec Kit autocontraditório.** `tasks.md` dava T141 e T144 como "PR Draft,
+      aguardando revisão" enquanto o ledger já dava a T144 como Integrada. Ambas estão em `main`
+      (T144 pela PR #135, squash `0699e3d`; T141 pela PR #133, squash `8e3c15c`) e passam a ser
+      registradas assim nos dois artefatos. É registro do estado terminal real, não reabertura.
+    - **Ressalva 2 — prazo declarado não era o prazo real.** Os laços de espera contavam
+      ITERAÇÕES, não segundos: cada volta gastava até 3s na requisição mais 1s de intervalo, então
+      "180s" valiam até 720s, "90s" até 360s e a janela de 10s do passo 8/8 até 39s — e a mensagem
+      de falha anunciava o prazo menor. Agora o orçamento é tempo de parede, lido do relógio a
+      cada volta: a tentativa recebe `min(timeout, o que resta)`, o intervalo sai do mesmo
+      orçamento, nenhuma tentativa nova começa sem orçamento, a morte do processo segue
+      interrompendo na hora, e um teto de voltas impede que um relógio parado vire espera infinita.
+      `esperar`, `confirmarProntoWeb` e o laço do `pg_isready` compartilham um só `aguardarComPrazo`.
+    - **Relógio monotônico.** O relógio entra por injeção (`deps.agora`) e o padrão é
+      `performance.now()`: `Date.now()` pode recuar num ajuste de NTP e esticar ou encurtar uma
+      espera de 180s já em curso.
+    - **Tolerância do passo 8/8 recalibrada.** `SEGUNDOS_CONFIRMACAO_FINAL_WEB` passa de 10 para 30. O número mudou de unidade, não de intenção: o Vite frio aceita a conexão e a segura
+      enquanto transforma o módulo, então cada tentativa custava o timeout inteiro e as 10 voltas
+      antigas davam até 39s de tolerância real. Mantido em 10, o prazo de parede reprovaria
+      ambiente que antes subia.
+    - **Testes:** relógio virtual no `cenario()` — `dormir` avança o tempo pedido e cada tentativa
+      HTTP cobra `min(custo, timeout recebido)`. 8 testes novos cobrem resposta no prazo,
+      requisição lenta consumindo o orçamento, prazo esgotado, processo morto durante a espera,
+      ausência de tentativa ou espera após o prazo, encurtamento da última tentativa, relógio
+      parado e a prova de que uma janela curta não se multiplica pelo timeout individual. Uma
+      asserção existente mudou de 9 para 10 ticks, pela mudança de semântica. 48/48 passam.
+    - **Fora de escopo:** API, web, Prisma, migrations, seed, dados sintéticos, credenciais,
+      dependências e lockfile intactos; nenhuma tela recebeu o padrão B + modais; nenhuma outra
+      branch ou PR foi tocada. O teste-guarda "sucesso não mata nenhum processo" foi mantido.
+
 ## Regra obrigatória para as próximas tarefas
 
 1. Criar ou atualizar a entrada da tarefa neste arquivo antes da implementação.
