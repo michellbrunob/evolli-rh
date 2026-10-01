@@ -20,7 +20,25 @@
  *  - as variáveis não estiverem no ambiente do processo;
  *  - a senha não atender à política mínima (§4);
  *  - já existir um usuário com papel admin_tecnico no banco.
+ *
+ * CÓDIGOS DE SAÍDA (contrato para quem automatiza):
+ *
+ *   0  administrador técnico criado agora;
+ *   3  JÁ EXISTE um administrador técnico — recusa esperada, não é defeito;
+ *   1  qualquer outra falha (variável ausente, senha fraca, banco fora).
+ *
+ * O código 3 existe para que um orquestrador distinga "já provisionado" de
+ * "quebrou" sem casar texto de mensagem em português. Ele NÃO enfraquece o
+ * bootstrap: a recusa continua acontecendo, a saída continua diferente de
+ * zero e nada é sobrescrito.
  */
+
+/** Ver "CÓDIGOS DE SAÍDA" no cabeçalho. Mantido em sincronia com o
+ * orquestrador do ambiente local (`scripts/demo-local.core.mjs`). */
+const CODIGO_SAIDA_ADMIN_JA_EXISTE = 3;
+
+/** Recusa esperada, distinta de falha real — carrega o código de saída. */
+class AdminJaExisteError extends Error {}
 
 const email = process.env.ADMIN_BOOTSTRAP_EMAIL;
 const password = process.env.ADMIN_BOOTSTRAP_PASSWORD;
@@ -66,7 +84,7 @@ async function main(): Promise<void> {
     });
 
     if (existingAdmin) {
-      throw new Error(
+      throw new AdminJaExisteError(
         "Já existe um administrador técnico cadastrado — bootstrap não " +
           "pode ser executado novamente.",
       );
@@ -97,7 +115,8 @@ async function main(): Promise<void> {
 
 main().catch((error: unknown) => {
   const message = error instanceof Error ? error.message : "Erro desconhecido.";
+  const jaExiste = error instanceof AdminJaExisteError;
   // eslint-disable-next-line no-console
   console.error(`Falha no bootstrap do administrador técnico: ${message}`);
-  process.exit(1);
+  process.exit(jaExiste ? CODIGO_SAIDA_ADMIN_JA_EXISTE : 1);
 });

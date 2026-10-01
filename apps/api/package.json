@@ -16,7 +16,8 @@
     "test:e2e": "jest --config test/jest-e2e.config.js",
     "db:migrate:dev": "node --env-file-if-exists=.env.migrate node_modules/prisma/build/index.js migrate dev --schema=prisma/schema.prisma",
     "db:migrate:deploy": "node --env-file-if-exists=.env.migrate node_modules/prisma/build/index.js migrate deploy --schema=prisma/schema.prisma",
-    "bootstrap:admin": "node dist/bootstrap/bootstrap-admin.js"
+    "bootstrap:admin": "node dist/bootstrap/bootstrap-admin.js",
+    "seed:demo": "ts-node -T src/seed/demo-seed.cli.ts"
   },
   "dependencies": {
     "@nestjs/common": "^10.4.15",
