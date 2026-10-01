@@ -891,11 +891,19 @@ describe("ColaboradoresScreen (T111 — funcional)", () => {
     );
   });
   it("cliques repetidos no envio não duplicam a admissão", async () => {
-    let resolver: ((v: ColaboradorApi) => void) | null = null;
+    // Objeto mutável, não `let`: o TypeScript não acompanha a atribuição de
+    // `resolver` feita dentro do executor da Promise (closure separada) e, na
+    // leitura abaixo, estreita a variável para `null` só por análise de fluxo
+    // — dar `resolver?.()` nela vira `never` ("not callable"). Guardando em
+    // `.current` o problema não existe: acesso a propriedade não sofre esse
+    // estreitamento.
+    const resolverRef: { current: ((v: ColaboradorApi) => void) | null } = {
+      current: null,
+    };
     vi.mocked(admitirColaborador).mockImplementation(
       () =>
         new Promise<ColaboradorApi>((res) => {
-          resolver = res;
+          resolverRef.current = res;
         }),
     );
     render(<ColaboradoresScreen />);
@@ -933,6 +941,6 @@ describe("ColaboradoresScreen (T111 — funcional)", () => {
     await waitFor(() =>
       expect(vi.mocked(admitirColaborador).mock.calls.length - antes).toBe(1),
     );
-    resolver?.(colaborador1);
+    resolverRef.current?.(colaborador1);
   });
 });
