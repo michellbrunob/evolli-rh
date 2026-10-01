@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "constitutionVersion": "1.4.0",
   "lastConvergedAt": "2026-10-01",
-  "lastIntegratedTask": 139,
-  "lastRecordedTask": 143,
+  "lastIntegratedTask": 142,
+  "lastRecordedTask": 144,
   "platformDecision": {
     "adr": "docs/adr/0014-evolli-plataforma-base-e-encerramento-do-frappe.md",
     "decidedAt": "2026-10-01",
@@ -12,8 +12,8 @@
   },
   "nextTask": {
     "id": "a definir",
-    "status": "pending_planejamento_expansao_visual",
-    "reason": "T143 encerrou a decisao arquitetural: o Evolli permanece como plataforma-base (ADR 0014). A expansao do padrao B + modais esta liberada de forma gradual, tela por tela, com validacao visual antes de ampliar. O proximo passo e planejar a expansao para a proxima tela funcional prioritaria, que recebe identificador proprio."
+    "status": "pending_integracao_t144",
+    "reason": "A T144 quita R1, R2, R3 e O1 da T142 e converge o ledger (T032, T065, T066), restaurando a CI de main. O proprietario fixou essas correcoes como pre-condicao da expansao visual: so depois de integrada a T144 se planeja a proxima tela do padrao B + modais, uma por vez, com identificador proprio e validacao visual antes de ampliar."
   },
   "openDeliveries": [
     {
@@ -22,9 +22,9 @@
       "status": "draft_aguardando_revisao"
     },
     {
-      "id": "T142",
-      "pullRequest": null,
-      "status": "piloto_aguardando_aprovacao_visual"
+      "id": "T144",
+      "pullRequest": 135,
+      "status": "draft_aguardando_revisao"
     }
   ],
   "requiredArtifacts": [

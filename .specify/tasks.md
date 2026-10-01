@@ -473,7 +473,9 @@ decisões e bloqueios, está no ledger versionado
     - **Reconciliação do núcleo T066 concluída:** catálogo de `PD-SOL-01` (sem `documento`, com
       `atestado` e `beneficios`); `aguardando_informacao → cancelada` removida; ação `reabrir`
       exclusiva do RH de `encaminhada_para_operacao_rh` e `recusada` para `em_revisao_rh`;
-      `cancelada` sem saída. Uma única máquina de estados — o service delega ao núcleo.
+      `cancelada` sem saída. Uma única máquina de estados — o service delega ao núcleo. O contrato
+      conceitual que originou esse núcleo é o da T065, cujos identificadores foram reusados, não
+      recriados (ver `docs/decisions/pacote-decisao-solicitacoes-pessoas.md`).
     - **Limite estrutural registrado:** sem `DP-23` não há ESS; o RH registra em nome do colaborador,
       e a auditoria grava o RH como ator real. Nada foi simulado.
     - **Fora de escopo, preservado:** anexos/upload/R2, correção automática de ponto, efeitos em
@@ -505,9 +507,49 @@ decisões e bloqueios, está no ledger versionado
       conformidade legal; roteador de URL, dependência nova e alteração das telas demonstrativas
       T067 e T068.
 
-38. **Reservado** — identificador ocupado pela tarefa do ambiente local de demonstração, que chega
-    por Pull Request própria ainda em revisão. Esta branch partiu de `main` e por isso não a contém;
-    as duas entradas são reconciliadas quando aquela PR for integrada.
+38. **T141 - Ambiente local de demonstração e guia visual de acompanhamento**
+
+    - **Estado:** implementada na branch `codex/t141-ambiente-demonstracao-local`; **PR #133 Draft**,
+      aguardando revisão somente leitura.
+    - **Natureza:** NÃO é capacidade de RH. É forma de olhar o que já existe: nenhum endpoint,
+      permissão, estado, regra ou contrato novo, e nenhuma tela de produto alterada.
+    - **Entregue:** `pnpm demo:up`, que encadeia PostgreSQL do `docker-compose.yml`, papéis de
+      `infra/postgres/`, `prisma migrate deploy`, servidores, bootstrap e seed, com cada passo
+      nomeado e falha propagada; seed sintético idempotente (`apps/api/src/seed/`) que cria duas
+      empresas de demonstração, estrutura organizacional, horário, colaboradores com um e com dois
+      vínculos, e seis perfis de acesso — um por papel que o RBAC distingue; e dois documentos:
+      operação do ambiente e guia visual tela a tela.
+    - **Prova:** esta máquina não tem Docker, então a garantia não vem de execução manual e sim de
+      um E2E com PostgreSQL real (Testcontainers) que roda o seed DUAS vezes, verifica que a segunda
+      não cria nada, confere a ausência de duplicatas no banco, autentica cada perfil documentado e
+      checa o isolamento entre as duas empresas. Roda na CI a cada push.
+    - **Travas de segurança:** o seed exige `EVOLLI_DEMO_SEED="confirmo-ambiente-local"` e recusa
+      API ou banco cujo host não seja local. Nenhum segredo real é versionado.
+    - **Endurecimento após a revisão somente leitura (mesma branch, sem rebase):** escuta da API
+      restrita a `127.0.0.1` por decisão de servidor (`EVOLLI_DEMO_MODE`, validado em
+      `env.validation.ts`, recusado em produção); web presa a `127.0.0.1:5173` com porta estrita e
+      verificação HTTP antes do "pronto"; encerramento da árvore de processos filhos em qualquer
+      falha, Ctrl+C ou sinal; nenhuma credencial em `argv` (as senhas dos papéis vão por stdin do
+      `psql`, e o orquestrador recusa argumento não literal sob shell); idempotência do seed por
+      varredura completa de páginas, não só a primeira; bootstrap com código de saída dedicado (3)
+      para "já existe"; E2E independente de ordem; e CLI do seed fora do artefato de build.
+    - **Cobertura nova:** `scripts/demo-local.core.test.mjs` (25 casos, `node --test`, sem
+      dependência nova) prova ordem dos passos, parada na primeira falha, limpeza de filhos,
+      timeout de API e de web, porta ocupada, endereço permitido, repetição segura, caminho com
+      espaço e ausência de segredo em argumento e em log.
+    - **Validação operacional real (Windows, Docker Desktop, Node 22 isolado):** os oito passos
+      completaram, o seed criou 20 registros na primeira execução, os perfis autenticaram, o
+      isolamento entre as duas empresas apareceu na tela e o Ctrl+C encerrou API e web sem deixar
+      órfão. A validação encontrou três defeitos, corrigidos em seguida: o `pnpm --filter ... exec`
+      normalizava para 1 o código dedicado do bootstrap (toda reexecução abortava no passo 6/8);
+      `apps/api/.env.example` trazia `MFA_TOTP_ENCRYPTION_KEY=` vazia, que reprova na validação e
+      impedia a API de subir para quem copiasse o arquivo como a documentação manda; e a espera de
+      60s pela API não cobria a primeira subida do dia, com o cache de disco frio.
+    - **Pendência registrada, não corrigida:** `Pessoas › Histórico funcional` (T115) estoura a
+      largura da página em 1280 px e em 375 px. Defeito preexistente, com evidência e medida no
+      guia visual; corrigi-lo aqui misturaria escopo.
+    - **Fora de escopo, preservado:** MFA, ESS/MSS, anexo, upload, R2, serviço externo, dado real,
+      rota de administração exposta no produto, regra de RH nova e alteração de CI.
 
 39. **T142 - Qualidade visual e experiência de uso: diagnóstico e tela-piloto**
 
@@ -522,8 +564,9 @@ decisões e bloqueios, está no ledger versionado
       densidade confortável, filtros organizados, lista de B) **com modais** no lugar do painel
       lateral e da folha inferior, por escolha explícita do proprietário. A **implementação
       funcional está em validação**: aprovar a direção não aprovou a tela. O primeiro piloto (painel
-      contido) havia sido reprovado por não ser proposta, e não foi propagado. Sem PR aberta; a
-      expansão para as demais telas está **liberada e ainda não iniciada**.
+      contido) havia sido reprovado por não ser proposta, e não foi propagado. **Integrada em
+      `main`** pela PR #134 (squash `8c3d8c3`), com a ADR 0014 da T143; a expansão para as demais
+      telas está **liberada e ainda não iniciada**.
     - **Decisão registrada em** `docs/decisions/t142-direcao-visual-b-modais.md`. `DESIGN-apple.md`
       NÃO foi editado: é referência externa mantida intacta byte a byte por decisão do projeto
       (T032); as decisões próprias ficam no documento acima e nos tokens/componentes.
@@ -620,6 +663,62 @@ decisões e bloqueios, está no ledger versionado
     - **Efeito registrado:** a condição "expansão condicionada à decisão sobre o Frappe" da T142 sai
       e dá lugar a **expansão liberada de forma gradual, tela por tela, com validação visual antes
       de ampliar**. Liberada, não concluída.
+
+41. **T144 - Hardening do Modal e convergência do Spec Kit**
+
+    - **Origem:** as revisões somente leitura da T142 deixaram quatro pendências classificadas como
+      não bloqueantes (R1, R2, R3 e O1), e o proprietário as fixou como **pré-condição da expansão
+      visual** — nenhuma outra tela recebe o padrão B + modais antes delas. Soma-se a convergência
+      do ledger, que vinha derrubando a CI de `main`.
+    - **Estado:** implementada na branch `codex/t144-hardening-modal-spec-kit`; **PR #135 Draft**,
+      aguardando revisão somente leitura. Não altera direção visual aprovada, contratos HTTP,
+      regras, permissões nem a regra do verificador do Spec Kit.
+    - **R1 — descarte silencioso no detalhe de Colaboradores.** O `Modal` de detalhe não recebia
+      `alterado` nem `bloqueado`: editar o nome e fechar descartava sem aviso, contra a própria
+      regra aprovada da T142 ("com alterações não salvas abre confirmação explícita dentro da
+      janela"). Um único derivado, `detalheNomeAlterado`, passou a governar a confirmação **e** o
+      botão de salvar — se divergissem, a janela fecharia calada com o botão ainda habilitado.
+      Durante a retificação a janela fica bloqueada; depois de salvar, o nome gravado passa a ser o
+      nome em edição e o estado deixa de ser alterado sozinho.
+    - **R2 — `alertdialog` sem nome acessível e sem foco.** A confirmação de descarte não tinha nome
+      acessível e não recebia foco: `alertdialog` não tem região viva implícita, então quem usa
+      leitor de tela não ficava sabendo que a pergunta existia, e podia concluir que o Escape havia
+      falhado. Agora é nomeada pelo próprio texto, recebe o foco ao aparecer e devolve o foco a quem
+      o tinha quando se escolhe continuar editando — por botão ou por Escape.
+    - **Contenção de foco na confirmação (achado da revisão da PR #135).** A confirmação
+      declarava `aria-modal`, mas o `Tab` continuava circulando pela caixa inteira e alcançava os
+      campos atrás dela — a mesma classe de defeito do R3, uma afirmação na árvore de
+      acessibilidade que o comportamento não sustentava. Enquanto a confirmação está aberta, o
+      escopo do `Tab` e do `Shift+Tab` passa a ser **só** o `alertdialog` ("Continuar editando" ↔
+      "Descartar alterações"); o foco abre direto na ação segura; o `Escape` e "Continuar
+      editando" fecham só a confirmação e devolvem o foco ao elemento anterior; e a referência
+      guardada desse elemento é descartada ao concluir a confirmação e ao fechar a janela.
+    - **R3 — JSDoc inexato.** O comentário do `Modal` prometia `inert`, que nunca existiu no código.
+      Investigado: o fundo **não** estava alcançável — a camada fixa absorve os cliques, o `Tab` é
+      preso e `aria-modal` limita o leitor de tela. Era documentação errada, não defeito; o texto
+      passou a descrever os três mecanismos reais.
+    - **O1 — redação sobre a ordem da navegação.** O agrupamento da T142 dizia não mudar a ordem,
+      mas "Solicitações" subiu de 7º para 6º e "Portal do Colaborador" desceu de 6º para 7º, por
+      caírem em grupos diferentes. Sem impacto funcional: os nove destinos continuam presentes e
+      nenhuma permissão mudou. Corrigido o texto nos dois lugares que o afirmavam.
+    - **Convergência do ledger (T032, T065, T066).** `pnpm spec:check` procura cada identificador
+      citado na mudança por **texto literal** no ledger; uma faixa como "T001 a T049" não satisfaz.
+      Em Pull Request o contexto é só o título, mas no push para `main` é a mensagem inteira do
+      commit de squash — por isso a CI de `main` falhou em três pushes seguidos (T065 e T066 na
+      T139, T066 na T140, T032 na T142) sem nada de errado no código. Os três passaram a ser
+      nomeados nas faixas que já os cobriam, e a armadilha ficou registrada no próprio ledger. **A
+      regra do verificador não foi alterada.**
+    - **Testes: 20 acrescentados** (12 na entrega original e 8 na correção da contenção de foco),
+      mais 1 teste existente da própria T144 reescrito para o novo foco inicial. Na entrega
+      original, 7 dos 12 falhavam em `main` em `8c3d8c3` e 5 eram guarda de regressão que passa
+      lá também — a descrição da PR dizia "7 novos", o que era impreciso. Na correção, os 8 novos
+      mais o reescrito (9 no total) falham no `Modal` de `678b5e3` e passam no atual. Cobrem
+      confirmação por botão e por Escape, preservação do texto digitado, devolução do foco,
+      descarte sem gravar, bloqueio durante o salvamento, fim do estado alterado após salvar, nome
+      acessível do `alertdialog`, foco inicial, ciclo de `Tab` e `Shift+Tab` e nada atrás da
+      confirmação recebendo foco.
+    - **Fora de escopo:** PR #133 e a branch da T141 não foram tocadas; a expansão visual não foi
+      iniciada; as observações O2–O5 das revisões continuam registradas, sem correção.
 
 ## Regra obrigatória para as próximas tarefas
 

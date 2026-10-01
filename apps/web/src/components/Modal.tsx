@@ -16,11 +16,22 @@
  *  - foco inicial no título, foco PRESO enquanto aberto, e foco devolvido a
  *    quem abriu;
  *  - `Escape` fecha — mas só quando é seguro (ver `bloqueado`);
- *  - fundo sem rolagem e sem interação (`inert` quando disponível);
+ *  - fundo sem rolagem e fora de alcance. Não usa `inert`: o alcance é cortado
+ *    por três mecanismos próprios — a camada `.evolli-modal` é `position:
+ *    fixed; inset: 0` e absorve todo clique antes da página; o `Tab` é preso
+ *    pelo manipulador abaixo, que devolve o foco à caixa mesmo quando ele
+ *    começa fora dela; e `aria-modal` limita a navegação virtual do leitor de
+ *    tela. Se um dia `inert` entrar aqui, ele substitui o segundo e o terceiro,
+ *    não se soma a eles;
  *  - rolagem do conteúdo longo DENTRO do corpo, com cabeçalho e ações sempre
  *    visíveis;
  *  - descarte de formulário alterado exige confirmação explícita, feita
- *    dentro da própria janela — nunca `window.confirm`.
+ *    dentro da própria janela — nunca `window.confirm`. A confirmação é um
+ *    `alertdialog` nomeado pelo próprio texto, que leva o foco direto à ação
+ *    segura ("Continuar editando") e o PRENDE: enquanto está aberta, `Tab` e
+ *    `Shift+Tab` circulam só entre as suas duas ações, e nada atrás dela
+ *    recebe foco. `Escape` e "Continuar editando" fecham só a confirmação e
+ *    devolvem o foco a quem o tinha antes dela.
  *
  * Não empilha: cada tela mantém uma instância e troca o conteúdo dela.
  */
@@ -71,9 +82,14 @@ export function Modal({
 }: ModalProps) {
   const tituloId = useId();
   const descricaoId = useId();
+  const confirmacaoId = useId();
   const caixaRef = useRef<HTMLDivElement | null>(null);
   const tituloRef = useRef<HTMLHeadingElement | null>(null);
   const acionadorRef = useRef<HTMLElement | null>(null);
+  const confirmacaoRef = useRef<HTMLDivElement | null>(null);
+  // Quem estava em foco quando a confirmação apareceu — para devolver o foco
+  // ao fluxo de edição quando a pessoa escolhe continuar editando.
+  const focoAntesDaConfirmacaoRef = useRef<HTMLElement | null>(null);
   const [confirmandoDescarte, setConfirmandoDescarte] = useState(false);
 
   // Guarda quem abriu, para devolver o foco ao fechar.
@@ -105,12 +121,48 @@ export function Modal({
   // Sai da confirmação de descarte quando a janela fecha ou deixa de estar
   // alterada — nunca reabre já perguntando.
   useEffect(() => {
-    if (!aberto || !alterado) setConfirmandoDescarte(false);
+    if (!aberto || !alterado) {
+      setConfirmandoDescarte(false);
+      focoAntesDaConfirmacaoRef.current = null;
+    }
   }, [aberto, alterado]);
+
+  // Referência de foco nunca sobrevive à confirmação que a criou: ao fechar a
+  // janela (ou desmontar), ela é descartada, para não devolver o foco a um
+  // elemento obsoleto na próxima vez.
+  useEffect(() => {
+    return () => {
+      focoAntesDaConfirmacaoRef.current = null;
+    };
+  }, [aberto]);
+
+  // A confirmação é um `alertdialog`: ao aparecer, o foco vai direto para a
+  // ação segura ("Continuar editando"). Além de tirar o foco do campo de trás,
+  // faz o leitor de tela anunciar o diálogo — `alertdialog` não tem região
+  // viva implícita e nada seria anunciado sozinho.
+  useEffect(() => {
+    if (!confirmandoDescarte) return;
+    const inicial = confirmacaoRef.current?.querySelector<HTMLElement>(
+      "[data-foco-inicial]",
+    );
+    (inicial ?? confirmacaoRef.current)?.focus({ preventScroll: true });
+  }, [confirmandoDescarte]);
+
+  /** Sai da confirmação devolvendo o foco a quem o tinha antes dela. */
+  const continuarEditando = useCallback(() => {
+    setConfirmandoDescarte(false);
+    const alvo = focoAntesDaConfirmacaoRef.current;
+    focoAntesDaConfirmacaoRef.current = null;
+    if (alvo && document.contains(alvo)) alvo.focus();
+    else tituloRef.current?.focus({ preventScroll: true });
+  }, []);
 
   const pedirFechamento = useCallback(() => {
     if (bloqueado) return;
     if (alterado) {
+      const ativo = document.activeElement;
+      focoAntesDaConfirmacaoRef.current =
+        ativo instanceof HTMLElement && ativo !== document.body ? ativo : null;
       setConfirmandoDescarte(true);
       return;
     }
@@ -124,47 +176,63 @@ export function Modal({
       if (evento.key === "Escape") {
         evento.preventDefault();
         if (confirmandoDescarte) {
-          setConfirmandoDescarte(false);
+          // Escape na confirmação volta um nível, como "Continuar editando":
+          // cancela a pergunta e devolve o foco a quem estava editando.
+          continuarEditando();
           return;
         }
         pedirFechamento();
         return;
       }
       if (evento.key !== "Tab") return;
-      const caixa = caixaRef.current;
-      if (!caixa) return;
+      // Escopo do foco: enquanto a confirmação de descarte está aberta, ele é
+      // EXCLUSIVAMENTE o `alertdialog` — declarar `aria-modal` nela e deixar o
+      // Tab alcançar os campos de trás seria afirmar uma coisa e permitir
+      // outra. Fora dela, volta a ser a caixa inteira.
+      const raiz = confirmandoDescarte
+        ? confirmacaoRef.current
+        : caixaRef.current;
+      if (!raiz) return;
       // Sem heurística de visibilidade por layout: o seletor já exclui o que
       // está desabilitado, e `hidden` remove o elemento da ordem de tabulação.
-      const focaveis = [
-        ...caixa.querySelectorAll<HTMLElement>(FOCAVEIS),
-      ].filter((el) => !el.hasAttribute("hidden"));
+      const focaveis = [...raiz.querySelectorAll<HTMLElement>(FOCAVEIS)].filter(
+        (el) => !el.hasAttribute("hidden"),
+      );
       if (focaveis.length === 0) {
         evento.preventDefault();
-        tituloRef.current?.focus();
+        (confirmandoDescarte ? raiz : tituloRef.current)?.focus();
         return;
       }
       const primeiro = focaveis[0]!;
       const ultimo = focaveis[focaveis.length - 1]!;
       const atual = document.activeElement;
-      if (!caixa.contains(atual)) {
+      if (!raiz.contains(atual)) {
         evento.preventDefault();
-        primeiro.focus();
+        (evento.shiftKey ? ultimo : primeiro).focus();
         return;
       }
+      // Posição "antes do primeiro": o título (caixa) ou o próprio contêiner
+      // da confirmação, ambos focáveis só por programa (`tabindex=-1`).
+      const antesDoPrimeiro = confirmandoDescarte ? raiz : tituloRef.current;
       if (
         evento.shiftKey &&
-        (atual === primeiro || atual === tituloRef.current)
+        (atual === primeiro || atual === antesDoPrimeiro)
       ) {
         evento.preventDefault();
         ultimo.focus();
       } else if (!evento.shiftKey && atual === ultimo) {
         evento.preventDefault();
         primeiro.focus();
+      } else if (!evento.shiftKey && atual === antesDoPrimeiro) {
+        // Sem esta ramificação o navegador decidiria sozinho para onde o Tab
+        // vai a partir de um contêiner `tabindex=-1`.
+        evento.preventDefault();
+        primeiro.focus();
       }
     }
     document.addEventListener("keydown", aoTeclar, true);
     return () => document.removeEventListener("keydown", aoTeclar, true);
-  }, [aberto, confirmandoDescarte, pedirFechamento]);
+  }, [aberto, confirmandoDescarte, pedirFechamento, continuarEditando]);
 
   if (!aberto) return null;
 
@@ -207,15 +275,23 @@ export function Modal({
         ) : null}
 
         {confirmandoDescarte ? (
-          <div className="evolli-modal__confirmacao" role="alertdialog">
-            <p className="evolli-modal__confirmacao-texto">
+          <div
+            className="evolli-modal__confirmacao"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby={confirmacaoId}
+            ref={confirmacaoRef}
+            tabIndex={-1}
+          >
+            <p className="evolli-modal__confirmacao-texto" id={confirmacaoId}>
               Há alterações não salvas nesta janela. Descartar?
             </p>
             <div className="evolli-modal__confirmacao-acoes">
               <Button
                 type="button"
                 variant="secondary"
-                onClick={() => setConfirmandoDescarte(false)}
+                onClick={continuarEditando}
+                data-foco-inicial
               >
                 Continuar editando
               </Button>
@@ -223,6 +299,7 @@ export function Modal({
                 type="button"
                 onClick={() => {
                   setConfirmandoDescarte(false);
+                  focoAntesDaConfirmacaoRef.current = null;
                   onFechar();
                 }}
               >
