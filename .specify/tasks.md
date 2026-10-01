@@ -511,8 +511,8 @@ decisões e bloqueios, está no ledger versionado
 
 38. **T141 - Ambiente local de demonstração e guia visual de acompanhamento**
 
-    - **Estado:** implementada na branch `codex/t141-ambiente-demonstracao-local`; **PR #133 Draft**,
-      aguardando revisão somente leitura.
+    - **Estado:** **integrada em `main`** pela PR #133 (squash `8e3c15c`), vinda da branch
+      `codex/t141-ambiente-demonstracao-local`.
     - **Natureza:** NÃO é capacidade de RH. É forma de olhar o que já existe: nenhum endpoint,
       permissão, estado, regra ou contrato novo, e nenhuma tela de produto alterada.
     - **Entregue:** `pnpm demo:up`, que encadeia PostgreSQL do `docker-compose.yml`, papéis de
@@ -672,8 +672,8 @@ decisões e bloqueios, está no ledger versionado
       não bloqueantes (R1, R2, R3 e O1), e o proprietário as fixou como **pré-condição da expansão
       visual** — nenhuma outra tela recebe o padrão B + modais antes delas. Soma-se a convergência
       do ledger, que vinha derrubando a CI de `main`.
-    - **Estado:** implementada na branch `codex/t144-hardening-modal-spec-kit`; **PR #135 Draft**,
-      aguardando revisão somente leitura. Não altera direção visual aprovada, contratos HTTP,
+    - **Estado:** **integrada em `main`** pela PR #135 (squash `0699e3d`), vinda da branch
+      `codex/t144-hardening-modal-spec-kit`. Não altera direção visual aprovada, contratos HTTP,
       regras, permissões nem a regra do verificador do Spec Kit.
     - **R1 — descarte silencioso no detalhe de Colaboradores.** O `Modal` de detalhe não recebia
       `alterado` nem `bloqueado`: editar o nome e fechar descartava sem aviso, contra a própria
