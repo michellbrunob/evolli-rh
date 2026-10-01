@@ -1,8 +1,12 @@
 # Estado de execução do Spec Kit — Evolli RH
 
-**Última convergência:** 2026-09-29
+**Última convergência:** 2026-10-01
 
 **Base Git verificada:** `origin/main` em `6eaa6f9` (T139 integrada)
+
+**Plataforma-base:** Evolli, por decisão de 2026-10-01
+([ADR 0014](../docs/adr/0014-evolli-plataforma-base-e-encerramento-do-frappe.md)). O Frappe HR está
+encerrado como candidato e permanece apenas como referência conceitual e visual.
 
 **Constituição:** v1.4.0
 
@@ -121,11 +125,11 @@ de Horas.
 - **Telas demonstrativas vizinhas preservadas.** T067 (Portal) e T068 (Central do RH) seguem
   demonstrativas e fora deste escopo, com teste de não regressão.
 
-## Qualidade visual — T142 (piloto aguardando aprovação)
+## Qualidade visual — T142 (piloto em validação; expansão liberada)
 
-| Tarefa | Estado                                                                                          | Resultado principal                                                                                                                                                                                                                                                                                                           |
-| ------ | ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| T142   | Padrão visual B + modais APROVADO para o piloto; expansão condicionada à decisão sobre o Frappe | Direção visual aprovada: alternativa B com modais. Piloto implementado em `Pessoas › Colaboradores` e **em validação pelo proprietário**. Expansão para as demais telas pendente. **Nada foi expandido para as demais telas**, e a correção compartilhada do `DataTable` está deliberadamente fora de escopo até a aprovação. |
+| Tarefa | Estado                                                                                  | Resultado principal                                                                                                                                                                                                                                                                                                                                                                  |
+| ------ | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| T142   | Padrão visual B + modais APROVADO para o piloto; expansão **liberada de forma gradual** | Direção visual aprovada: alternativa B com modais. Piloto implementado em `Pessoas › Colaboradores` e **em validação pelo proprietário**. A condição arquitetural caiu em 01/10/2026 (T143, ADR 0014): a expansão é agora **tela por tela, com validação visual antes de ampliar**. **Nada foi expandido até aqui**, e a correção compartilhada do `DataTable` segue fora de escopo. |
 
 **Apoio externo:** skill `ui-ux-pro-max` (MIT, 2.13.0, commit `09170eec`), instalada localmente e
 fora do versionamento, usada como **checklist consultivo**. A fonte de verdade de design continua
@@ -133,18 +137,47 @@ sendo `DESIGN-apple.md` + `tokens.css` + `src/components/`; nenhuma regra diverg
 
 **Limites explícitos:** concluir o piloto **não** significa que o ecossistema foi revisado ou
 corrigido. O diagnóstico cobriu as telas funcionais; as demonstrativas não foram avaliadas como
-produto. A expansão do padrão depende de aprovação e recebe identificador próprio.
+produto. Cada tela da expansão recebe identificador próprio e validação própria; liberar a expansão
+não a conclui.
+
+## Decisão arquitetural — T143 (investigada, concluída)
+
+| Tarefa | Estado                      | Resultado principal                                                                                                                                                                                                                                                                                                                          |
+| ------ | --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T143   | **Investigada — concluída** | Avaliação do Frappe HR como possível plataforma-base, em ambiente descartável fora do repositório e só com dados sintéticos. **Decisão do proprietário em 01/10/2026 (ADR 0014):** o Evolli permanece como plataforma-base; o Frappe HR está encerrado como candidato e fica só como referência de fluxos, portal, aprovações e experiência. |
+
+**Versões examinadas:** Frappe Framework 16.35.0 (MIT), ERPNext 16.36.0 (GPL-3.0), Frappe HR 16.20.0
+(GPL-3.0, tag `v16.20.0` = `c0a04b80eeb7214…d0da041`), construção pelo `frappe_docker` em `f09126b`.
+Base do Evolli na comparação: `origin/main` em `f2c1014`.
+
+**Evidência determinante:** uma conta com vários vínculos exige **extensão relevante**; a regra de
+"Employee único por conta" aparece em diversos pontos do HRMS e do ERPNext; no protótipo descartável,
+10 de 58 tipos de registro ficaram com contexto de vínculo e 48 não; relatórios, compartilhamentos,
+notificações e cinco endpoints do portal ainda exigiriam adaptação. Isolamento de queixas e
+autoaprovação são corrigíveis, mas não resolvem o ponto estrutural. Estimativa medida para o mesmo
+escopo de piloto sobre o Frappe: **≈ 30–50 dias**.
+
+**Limites explícitos:** a decisão **não** afirma que o Frappe é inseguro ou inadequado em geral —
+afirma que o custo de adaptação ao modelo do Evolli não compensa neste projeto. **Nenhuma migração**
+de dados ou módulos será feita. **Proibido copiar ou adaptar código GPL** (ERPNext e HRMS) sem
+análise específica de licença. Nenhum código do Evolli foi alterado nesta investigação, e nada foi
+copiado para este repositório. As evidências ficam em `C:/MB/Sistema RH/frappe-prova/`, fora do
+versionamento, por tamanho e por conterem um ambiente de execução. O ambiente de prova foi encerrado
+operacionalmente em 01/10/2026, com volumes, imagens e evidências preservados.
 
 ## Próxima ação autorizável
 
-1. Revisão somente leitura e integração da T140.
-2. Só depois disso abrir a próxima fatia, sob o próximo identificador disponível — sem número
+1. **Planejar a expansão gradual do padrão B + modais para a próxima tela funcional prioritária** —
+   uma tela só, com identificador próprio, e validação visual antes de ampliar para a seguinte.
+   Planejar não é implementar: a escolha da tela e o escopo vêm antes do código.
+2. Revisão somente leitura e integração da T140.
+3. Só depois disso abrir a próxima fatia, sob o próximo identificador disponível — sem número
    reservado aqui, porque reservar identificador antes da decisão de escopo já se mostrou fonte de
    confusão (ver T137).
-3. Candidatos naturais da próxima fatia, todos dependentes de decisão própria: capacidade de RBAC
+4. Candidatos naturais da próxima fatia, todos dependentes de decisão própria: capacidade de RBAC
    para o gestor consultivo; `DP-23` como pré-condição de qualquer autoatendimento do colaborador; e
    a validação com RH do catálogo de motivos, cujo mecanismo (código fechado) já está aprovado.
-4. Atualizar este ledger e `sync-state.json` em toda tarefa futura.
+5. Atualizar este ledger e `sync-state.json` em toda tarefa futura.
 
 ## Evidência mínima por tarefa futura
 

@@ -4,8 +4,8 @@
 
 **Criado:** 2026-08-13
 
-**Última convergência:** 2026-09-29
-**Fontes:** Constituição v1.4.0; PRD oficial no Notion; ADRs 0001-0013; decisões versionadas;
+**Última convergência:** 2026-10-01
+**Fontes:** Constituição v1.4.0; PRD oficial no Notion; ADRs 0001-0014; decisões versionadas;
 Diário Dev - Reserva Fiscal
 **Escopo:** Plataforma interna de RH e Reserva Fiscal. Esta especificação descreve comportamento e
 regras de negócio; decisões técnicas pertencem ao implementation plan.

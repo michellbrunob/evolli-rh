@@ -511,15 +511,19 @@ decisões e bloqueios, está no ledger versionado
 
 39. **T142 - Qualidade visual e experiência de uso: diagnóstico e tela-piloto**
 
-    - **Aprovação registrada (visual, do proprietário):** "Padrão visual B com modais aprovado para
-      o piloto de Colaboradores. Expansão para outras telas condicionada à decisão arquitetural
-      sobre o Frappe." Não autoriza merge, produção nem migração.
+    - **Aprovação registrada (visual, do proprietário), 30/09/2026:** "Padrão visual B com modais
+      aprovado para o piloto de Colaboradores. Expansão para outras telas condicionada à decisão
+      arquitetural sobre o Frappe." Não autoriza merge, produção nem migração.
+    - **Condição cumprida em 01/10/2026 (T143, ADR 0014):** o Evolli permanece como plataforma-base
+      e o Frappe foi encerrado como candidato. A aprovação visual **continua válida** e a expansão
+      passa de "condicionada" a **liberada de forma gradual, tela por tela, com validação visual
+      antes de ampliar** — cada tela com identificador próprio. Liberada, não concluída.
     - **Estado:** **direção visual APROVADA** — alternativa B (navegação lateral agrupada,
       densidade confortável, filtros organizados, lista de B) **com modais** no lugar do painel
       lateral e da folha inferior, por escolha explícita do proprietário. A **implementação
       funcional está em validação**: aprovar a direção não aprovou a tela. O primeiro piloto (painel
       contido) havia sido reprovado por não ser proposta, e não foi propagado. Sem PR aberta; a
-      expansão para as demais telas continua **pendente**.
+      expansão para as demais telas está **liberada e ainda não iniciada**.
     - **Decisão registrada em** `docs/decisions/t142-direcao-visual-b-modais.md`. `DESIGN-apple.md`
       NÃO foi editado: é referência externa mantida intacta byte a byte por decisão do projeto
       (T032); as decisões próprias ficam no documento acima e nos tokens/componentes.
@@ -585,6 +589,37 @@ decisões e bloqueios, está no ledger versionado
       requisição.
     - **Preservado:** contratos HTTP, regras, permissões e comportamento funcional; a separação
       entre tipo e registro da referência organizacional; nenhuma tela além da piloto foi alterada.
+
+40. **T143 - Investigação arquitetural: o Frappe HR como possível plataforma-base**
+
+    - **Estado:** **investigada — concluída.** Nenhum código funcional do Evolli foi alterado, e
+      nada foi migrado nem copiado. A investigação consumiu duas rodadas em ambiente descartável,
+      fora deste repositório, sempre com dados sintéticos.
+    - **Decisão do proprietário, 01/10/2026:** "Evolli permanece como plataforma-base. O Frappe HR
+      está encerrado como candidato à plataforma e poderá ser usado somente como referência de
+      fluxos, portal, aprovações e experiência funcional. O padrão visual B + modais está liberado
+      para evolução controlada no Evolli." Registrada na **ADR 0014**
+      (`docs/adr/0014-evolli-plataforma-base-e-encerramento-do-frappe.md`).
+    - **Versões examinadas:** Frappe Framework 16.35.0 (MIT), ERPNext 16.36.0 (GPL-3.0) e Frappe HR
+      16.20.0 (GPL-3.0, tag `v16.20.0` = `c0a04b80eeb7214…d0da041`); construção pelo `frappe_docker`
+      em `f09126b`. Base do Evolli na comparação: `origin/main` em `f2c1014`.
+    - **Evidência determinante:** uma conta com vários vínculos exige **extensão relevante**. A
+      regra de "Employee único por conta" aparece em diversos pontos do HRMS e do ERPNext; no
+      protótipo descartável, 10 de 58 tipos de registro ficaram com contexto de vínculo e 48 não;
+      relatórios, compartilhamentos, notificações e cinco endpoints do portal ainda exigiriam
+      adaptação. Isolamento de queixas e autoaprovação são corrigíveis — o primeiro por configuração
+      mais extensão pequena, o segundo só por configuração — mas não resolvem o ponto estrutural.
+      Estimativa medida para o mesmo escopo de piloto sobre o Frappe: **≈ 30–50 dias**.
+    - **Limite da conclusão:** a decisão **não** afirma que o Frappe é inseguro ou inadequado em
+      geral. Ela afirma que o custo de adaptação ao modelo do Evolli não compensa neste projeto.
+    - **Licenciamento:** proibido copiar ou adaptar código GPL (ERPNext e HRMS) sem análise
+      específica de licença, feita antes de qualquer entrada no repositório.
+    - **Evidências:** relatório, resultados JSON, capturas e verificações independentes ficam em
+      `C:/MB/Sistema RH/frappe-prova/` (fora do repositório, por tamanho e por conter ambiente de
+      execução). Nada de lá foi versionado.
+    - **Efeito registrado:** a condição "expansão condicionada à decisão sobre o Frappe" da T142 sai
+      e dá lugar a **expansão liberada de forma gradual, tela por tela, com validação visual antes
+      de ampliar**. Liberada, não concluída.
 
 ## Regra obrigatória para as próximas tarefas
 

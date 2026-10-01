@@ -1,13 +1,25 @@
 # Direção visual aprovada — alternativa B com modais (T142)
 
-**Estado:** **aprovado** pelo proprietário, nos termos abaixo.
+**Estado:** **aprovado** pelo proprietário, nos termos abaixo. **Condição
+arquitetural resolvida em 01/10/2026** (ver "Atualização" logo após a citação).
+
+Aprovação original, 30/09/2026, nas palavras do proprietário:
 
 > **Padrão visual B com modais aprovado para o piloto de Colaboradores.
 > Expansão para outras telas condicionada à decisão arquitetural sobre o
 > Frappe.**
 
-Esta aprovação é **visual**. Não autoriza merge, produção, migração, nem a
-aplicação do padrão a qualquer outra tela.
+**Atualização — 01/10/2026.** A condição acima **foi cumprida**: a
+[ADR 0014](../adr/0014-evolli-plataforma-base-e-encerramento-do-frappe.md)
+manteve o Evolli como plataforma-base e encerrou o Frappe HR como candidato. A
+citação permanece inalterada porque é registro do que foi dito na data. O que
+muda é só o efeito dela: a expansão deixa de estar condicionada e passa a ser
+**liberada de forma gradual, tela por tela, com validação visual antes de
+ampliar**.
+
+Esta aprovação é **visual**. Não autoriza merge, produção nem migração. A
+expansão é liberada, não concluída: cada tela recebe identificador próprio e
+validação própria.
 
 > **Por que este arquivo existe, e não uma edição em `DESIGN-apple.md`.**
 > Aquele arquivo é a referência visual externa, mantida **intacta byte a byte**
@@ -58,10 +70,12 @@ nenhuma tela reimplemente acessibilidade de janela:
 
 ## Limites
 
-- Aplicado **apenas** em `Pessoas › Colaboradores` (piloto). A expansão para as
-  demais telas está **condicionada à decisão arquitetural sobre o Frappe** —
-  não é questão de aprovação visual, e sim de saber sobre qual base o produto
-  vai crescer.
+- Implementado **até aqui apenas** em `Pessoas › Colaboradores` (piloto). Desde
+  01/10/2026 (ADR 0014), a expansão para as demais telas está **liberada de
+  forma gradual, tela por tela, com validação visual antes de ampliar**: uma
+  tela por vez, cada uma com identificador próprio, e a seguinte só começa
+  depois da validação da anterior. Liberada não é o mesmo que concluída —
+  nenhuma outra tela foi alterada até agora.
 - Nenhuma cor, fonte, raio ou escala nova: só tokens de `app/tokens.css`.
 - Nenhuma dependência nova. O `<dialog>` nativo foi descartado porque o suporte
   parcial no ambiente de teste custaria cobertura de comportamento.

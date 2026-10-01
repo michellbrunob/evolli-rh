@@ -1,13 +1,19 @@
 {
   "schemaVersion": 1,
   "constitutionVersion": "1.4.0",
-  "lastConvergedAt": "2026-09-30",
+  "lastConvergedAt": "2026-10-01",
   "lastIntegratedTask": 139,
-  "lastRecordedTask": 142,
+  "lastRecordedTask": 143,
+  "platformDecision": {
+    "adr": "docs/adr/0014-evolli-plataforma-base-e-encerramento-do-frappe.md",
+    "decidedAt": "2026-10-01",
+    "platform": "evolli",
+    "frappe": "encerrado_como_candidato_referencia_apenas"
+  },
   "nextTask": {
     "id": "a definir",
-    "status": "pending_after_piloto_visual",
-    "reason": "T142 abre com um piloto visual em uma tela; a expansao do padrao para as demais telas so e autorizada depois da aprovacao do proprietario, e recebe identificador proprio."
+    "status": "pending_planejamento_expansao_visual",
+    "reason": "T143 encerrou a decisao arquitetural: o Evolli permanece como plataforma-base (ADR 0014). A expansao do padrao B + modais esta liberada de forma gradual, tela por tela, com validacao visual antes de ampliar. O proximo passo e planejar a expansao para a proxima tela funcional prioritaria, que recebe identificador proprio."
   },
   "openDeliveries": [
     {
