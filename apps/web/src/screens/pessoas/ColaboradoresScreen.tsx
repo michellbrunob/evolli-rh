@@ -458,6 +458,8 @@ export function ColaboradoresScreen() {
       erros.matricula ??
       erros.tipo ??
       erros.dataAdmissao ??
+      erros.tipoDestino ??
+      erros.departamentoArea ??
       erros.destino
     ) {
       setFormulario((prev) => (prev ? { ...prev, erros } : prev));
@@ -523,6 +525,13 @@ export function ColaboradoresScreen() {
             }
           : prev,
       );
+    } finally {
+      // Libera a trava só aqui: depois que a tentativa termina de verdade
+      // (sucesso ou falha), nunca antes. Sem isto, uma falha deixava
+      // `enviandoRef.current` travado para sempre — o botão reaparecia
+      // habilitado, mas o próximo clique retornava em silêncio em `:416`,
+      // e não havia como corrigir o campo e reenviar sem fechar o modal.
+      enviandoRef.current = false;
     }
   }
 

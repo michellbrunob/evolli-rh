@@ -890,6 +890,82 @@ describe("ColaboradoresScreen (T111 — funcional)", () => {
       }),
     );
   });
+
+  // ---- B2: a validação da referência organizacional precisa BLOQUEAR o
+  // envio sozinha, sem depender de nenhum outro campo obrigatório estar
+  // faltando — testes isolados, com todo o resto do formulário válido.
+  it("com todos os demais campos válidos, sem tipo de referência escolhido, bloqueia o envio e marca o campo do TIPO", async () => {
+    // Mocks não são limpos entre testes neste arquivo: a contagem de
+    // chamadas é sempre relativa ao que já havia antes deste teste.
+    const antes = vi.mocked(admitirColaborador).mock.calls.length;
+    render(<ColaboradoresScreen />);
+    await abrirFormularioEAguardarOpcoes();
+
+    fireEvent.change(screen.getByLabelText(/Nome completo/i), {
+      target: { value: "Colaborador Sem Tipo" },
+    });
+    fireEvent.change(screen.getByLabelText(/Matrícula/i), {
+      target: { value: "mat-0303" },
+    });
+    fireEvent.change(screen.getByLabelText(/Tipo de vínculo/i), {
+      target: { value: "clt" },
+    });
+    fireEvent.change(screen.getByLabelText(/Data de admissão/i), {
+      target: { value: "2026-01-05" },
+    });
+    // Tipo de referência organizacional deliberadamente NÃO escolhido.
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Admitir colaborador" }),
+    );
+
+    const tipo = screen.getByLabelText(/Tipo de referência organizacional/i);
+    await waitFor(() => expect(tipo).toHaveAttribute("aria-invalid", "true"));
+    expect(
+      screen.getByText("Escolha o tipo de referência organizacional."),
+    ).toBeTruthy();
+    expect(vi.mocked(admitirColaborador).mock.calls.length).toBe(antes);
+  });
+
+  it("com todos os demais campos válidos, tipo Área sem departamento escolhido, bloqueia o envio e marca o campo do DEPARTAMENTO", async () => {
+    const antes = vi.mocked(admitirColaborador).mock.calls.length;
+    render(<ColaboradoresScreen />);
+    await abrirFormularioEAguardarOpcoes();
+
+    fireEvent.change(screen.getByLabelText(/Nome completo/i), {
+      target: { value: "Colaborador Área Sem Departamento" },
+    });
+    fireEvent.change(screen.getByLabelText(/Matrícula/i), {
+      target: { value: "mat-0304" },
+    });
+    fireEvent.change(screen.getByLabelText(/Tipo de vínculo/i), {
+      target: { value: "clt" },
+    });
+    fireEvent.change(screen.getByLabelText(/Data de admissão/i), {
+      target: { value: "2026-01-05" },
+    });
+    fireEvent.change(
+      screen.getByLabelText(/Tipo de referência organizacional/i),
+      { target: { value: "area" } },
+    );
+    // O registro (a área) só libera depois do departamento: continua vazio
+    // e desabilitado — não há como escolhê-lo sem o departamento primeiro.
+    expect(
+      screen.getByLabelText(/Registro da referência organizacional/i),
+    ).toBeDisabled();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Admitir colaborador" }),
+    );
+
+    const departamentoArea = screen.getByLabelText(/Departamento da área/i);
+    await waitFor(() =>
+      expect(departamentoArea).toHaveAttribute("aria-invalid", "true"),
+    );
+    expect(screen.getByText("Selecione o departamento da área.")).toBeTruthy();
+    expect(vi.mocked(admitirColaborador).mock.calls.length).toBe(antes);
+  });
+
   it("cliques repetidos no envio não duplicam a admissão", async () => {
     // Objeto mutável, não `let`: o TypeScript não acompanha a atribuição de
     // `resolver` feita dentro do executor da Promise (closure separada) e, na
@@ -942,5 +1018,92 @@ describe("ColaboradoresScreen (T111 — funcional)", () => {
       expect(vi.mocked(admitirColaborador).mock.calls.length - antes).toBe(1),
     );
     resolverRef.current?.(colaborador1);
+  });
+
+  // ---- B1: depois de uma falha, a trava síncrona de envio precisa ser
+  // liberada — senão o formulário fica preso: o botão volta a aparecer
+  // habilitado, mas o próximo clique não faz nada.
+  it("depois de uma falha, preserva os dados, libera o reenvio e admite com sucesso ao corrigir o campo", async () => {
+    // Mocks não são limpos entre testes neste arquivo (mesma convenção de
+    // "cliques repetidos..." e "admite um colaborador..."): a contagem é
+    // sempre relativa ao que já havia antes deste teste, nunca absoluta.
+    const antes = vi.mocked(admitirColaborador).mock.calls.length;
+    vi.mocked(admitirColaborador).mockRejectedValueOnce(
+      new Error("Matrícula já utilizada nesta empresa."),
+    );
+
+    render(<ColaboradoresScreen />);
+    await abrirFormularioEAguardarOpcoes();
+
+    fireEvent.change(screen.getByLabelText(/Nome completo/i), {
+      target: { value: "Colaborador Reenvio" },
+    });
+    fireEvent.change(screen.getByLabelText(/Matrícula/i), {
+      target: { value: "mat-0400" },
+    });
+    fireEvent.change(screen.getByLabelText(/Tipo de vínculo/i), {
+      target: { value: "clt" },
+    });
+    fireEvent.change(screen.getByLabelText(/Data de admissão/i), {
+      target: { value: "2026-01-05" },
+    });
+    fireEvent.change(
+      screen.getByLabelText(/Tipo de referência organizacional/i),
+      { target: { value: "departamento" } },
+    );
+    fireEvent.change(
+      screen.getByLabelText(/Registro da referência organizacional/i),
+      { target: { value: departamento1.id } },
+    );
+
+    // Primeira tentativa: a API recusa.
+    fireEvent.click(
+      screen.getByRole("button", { name: "Admitir colaborador" }),
+    );
+    expect(
+      await screen.findByText("Matrícula já utilizada nesta empresa."),
+    ).toBeInTheDocument();
+    expect(vi.mocked(admitirColaborador).mock.calls.length - antes).toBe(1);
+
+    // Os dados continuam no formulário — nada foi perdido na falha.
+    expect(screen.getByLabelText(/Nome completo/i)).toHaveValue(
+      "Colaborador Reenvio",
+    );
+    expect(screen.getByLabelText(/Matrícula/i)).toHaveValue("MAT-0400");
+    expect(
+      screen.getByRole("form", { name: "Formulário de novo colaborador" }),
+    ).toBeInTheDocument();
+    // O botão voltou ao estado normal — não ficou preso em "Admitindo…".
+    expect(
+      screen.getByRole("button", { name: "Admitir colaborador" }),
+    ).not.toBeDisabled();
+
+    // Corrige só a matrícula, sem fechar o modal, e reenvia.
+    fireEvent.change(screen.getByLabelText(/Matrícula/i), {
+      target: { value: "mat-0401" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Admitir colaborador" }),
+    );
+
+    // Segunda tentativa: sucesso (mock volta ao `mockResolvedValue` padrão).
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("form", { name: "Formulário de novo colaborador" }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(await screen.findByRole("status")).toHaveTextContent(/admitido/i);
+
+    // Uma chamada por tentativa: a primeira (recusada) e a segunda (aceita)
+    // com o campo já corrigido — nunca uma terceira, nem a duplicação do
+    // envio duplicado travado para sempre.
+    const chamadas = vi.mocked(admitirColaborador).mock.calls.slice(antes);
+    expect(chamadas).toHaveLength(2);
+    expect(chamadas[0]?.[0]).toEqual(
+      expect.objectContaining({ matricula: "MAT-0400" }),
+    );
+    expect(chamadas[1]?.[0]).toEqual(
+      expect.objectContaining({ matricula: "MAT-0401" }),
+    );
   });
 });
