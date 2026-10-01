@@ -4,10 +4,17 @@
 
 **Data:** 2026-08-13
 
-**Última convergência:** 2026-09-29
+**Última convergência:** 2026-10-01
 **Entradas:** `.specify/memory/constitution.md` v1.4.0, `.specify/spec.md`,
-`.specify/execution-status.md`, PRD oficial no Notion, ADRs 0001-0013, decisões versionadas,
+`.specify/execution-status.md`, PRD oficial no Notion, ADRs 0001-0014, decisões versionadas,
 `docs/ARCHITECTURE.md`, `docs/CLAUDE_HANDOFF.md`.
+
+> **Plataforma-base — 01/10/2026 (ADR 0014).** O Evolli é a plataforma-base oficial. O Frappe HR foi
+> avaliado como candidato e está **encerrado** nessa condição; permanece apenas como referência de
+> fluxos, portal, aprovações e experiência funcional. Nenhuma migração de dados ou módulos será
+> feita, e é proibido copiar ou adaptar código GPL (ERPNext, HRMS) sem análise específica de
+> licença. A decisão não afirma que o Frappe seja inadequado em geral: afirma que o custo de
+> adaptação ao modelo do Evolli não compensa neste projeto.
 
 > **Glossário vinculante — 20/08/2026:** “Reserva Fiscal” identifica a empresa e integra o nome do
 > projeto (**Evolli RH — Reserva Fiscal**). Não é módulo, produto, serviço, política, cálculo, crédito

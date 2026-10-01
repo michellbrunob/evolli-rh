@@ -335,7 +335,7 @@ describe("ColaboradoresScreen (T111 — funcional)", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("Informe a data de admissão.")).toBeInTheDocument();
     expect(
-      screen.getByText("Selecione a lotação inicial do colaborador."),
+      screen.getByText("Escolha o tipo de referência organizacional."),
     ).toBeInTheDocument();
     expect(admitirColaborador).not.toHaveBeenCalled();
   });
@@ -358,12 +358,18 @@ describe("ColaboradoresScreen (T111 — funcional)", () => {
     fireEvent.change(screen.getByLabelText(/Data de admissão/i), {
       target: { value: "2026-01-05" },
     });
-    fireEvent.change(screen.getByLabelText(/Tipo de lotação inicial/i), {
-      target: { value: "departamento" },
-    });
-    fireEvent.change(screen.getByLabelText(/Departamento/i), {
-      target: { value: departamento1.id },
-    });
+    fireEvent.change(
+      screen.getByLabelText(/Tipo de referência organizacional/i),
+      {
+        target: { value: "departamento" },
+      },
+    );
+    fireEvent.change(
+      screen.getByLabelText(/Registro da referência organizacional/i),
+      {
+        target: { value: departamento1.id },
+      },
+    );
 
     fireEvent.click(
       screen.getByRole("button", { name: "Admitir colaborador" }),
@@ -408,14 +414,20 @@ describe("ColaboradoresScreen (T111 — funcional)", () => {
     fireEvent.change(screen.getByLabelText(/Data de admissão/i), {
       target: { value: "2026-01-05" },
     });
-    fireEvent.change(screen.getByLabelText(/Tipo de lotação inicial/i), {
-      target: { value: "area" },
-    });
+    fireEvent.change(
+      screen.getByLabelText(/Tipo de referência organizacional/i),
+      {
+        target: { value: "area" },
+      },
+    );
 
-    const selectArea = screen.getByLabelText(/^Área/i);
-    expect(selectArea).toBeDisabled();
+    // O registro (a área) só libera depois do departamento que a qualifica —
+    // e cada um tem rótulo permanente e próprio.
+    expect(
+      screen.getByLabelText(/Registro da referência organizacional/i),
+    ).toBeDisabled();
 
-    fireEvent.change(screen.getByLabelText(/Departamento/i), {
+    fireEvent.change(screen.getByLabelText(/Departamento da área/i), {
       target: { value: departamento1.id },
     });
 
@@ -427,12 +439,17 @@ describe("ColaboradoresScreen (T111 — funcional)", () => {
       }),
     );
     await waitFor(() =>
-      expect(screen.getByLabelText(/^Área/i)).not.toBeDisabled(),
+      expect(
+        screen.getByLabelText(/Registro da referência organizacional/i),
+      ).not.toBeDisabled(),
     );
 
-    fireEvent.change(screen.getByLabelText(/^Área/i), {
-      target: { value: area1.id },
-    });
+    fireEvent.change(
+      screen.getByLabelText(/Registro da referência organizacional/i),
+      {
+        target: { value: area1.id },
+      },
+    );
     fireEvent.click(
       screen.getByRole("button", { name: "Admitir colaborador" }),
     );
@@ -467,12 +484,18 @@ describe("ColaboradoresScreen (T111 — funcional)", () => {
     fireEvent.change(screen.getByLabelText(/Data de admissão/i), {
       target: { value: "2026-01-05" },
     });
-    fireEvent.change(screen.getByLabelText(/Tipo de lotação inicial/i), {
-      target: { value: "departamento" },
-    });
-    fireEvent.change(screen.getByLabelText(/Departamento/i), {
-      target: { value: departamento1.id },
-    });
+    fireEvent.change(
+      screen.getByLabelText(/Tipo de referência organizacional/i),
+      {
+        target: { value: "departamento" },
+      },
+    );
+    fireEvent.change(
+      screen.getByLabelText(/Registro da referência organizacional/i),
+      {
+        target: { value: departamento1.id },
+      },
+    );
     fireEvent.click(
       screen.getByRole("button", { name: "Admitir colaborador" }),
     );
@@ -664,5 +687,423 @@ describe("ColaboradoresScreen (T111 — funcional)", () => {
     ]) {
       expect(texto).not.toContain(termoProibido);
     }
+  });
+  // ---- T142 (piloto): o painel de trabalho precisa ser encontrável ---------
+
+  it("ao abrir o formulário, o foco vai para o título do painel", async () => {
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+
+    const abrir = screen.getByRole("button", { name: "Novo colaborador" });
+    expect(abrir).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.click(abrir);
+
+    const titulo = await screen.findByRole("heading", {
+      name: "Novo colaborador",
+      level: 2,
+    });
+    await waitFor(() => expect(document.activeElement).toBe(titulo));
+    expect(abrir).toHaveAttribute("aria-expanded", "true");
+    expect(abrir).toHaveAttribute("aria-haspopup", "dialog");
+    // A janela é modal e é nomeada pelo título que recebeu o foco.
+    const dialogo = screen.getByRole("dialog");
+    expect(dialogo).toHaveAttribute("aria-modal", "true");
+    expect(dialogo).toHaveAttribute("aria-labelledby", titulo.id);
+  });
+
+  it("Escape fecha a janela vazia e devolve o foco a quem a abriu", async () => {
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+
+    const abrir = screen.getByRole("button", { name: "Novo colaborador" });
+    fireEvent.click(abrir);
+    await screen.findByRole("heading", { name: "Novo colaborador", level: 2 });
+
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("heading", { name: "Novo colaborador", level: 2 }),
+      ).toBeNull(),
+    );
+    await waitFor(() => expect(document.activeElement).toBe(abrir));
+  });
+
+  it("o detalhe recebe o foco e fecha com Escape, devolvendo o foco", async () => {
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+
+    const linha = screen.getByText("Ana Colaboradora (teste)").closest("tr")!;
+    const verDetalhes = within(linha).getByRole("button", {
+      name: /Ver detalhes/,
+    });
+    fireEvent.click(verDetalhes);
+
+    const titulo = await screen.findByRole("heading", {
+      name: colaborador1.nome,
+      level: 2,
+    });
+    await waitFor(() => expect(document.activeElement).toBe(titulo));
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    await waitFor(() => expect(document.activeElement).toBe(verDetalhes));
+  });
+
+  it("o título da página não é repetido pela seção da lista", async () => {
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+
+    const titulos = screen
+      .getAllByRole("heading")
+      .map((h) => h.textContent?.trim());
+    const repetidos = titulos.filter((t) => t === "Colaboradores");
+    expect(repetidos).toHaveLength(1);
+  });
+  it("admitir confirma o resultado e devolve o foco a quem abriu", async () => {
+    vi.mocked(admitirColaborador).mockResolvedValue(colaborador1);
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+
+    const abrir = screen.getByRole("button", { name: "Novo colaborador" });
+    await abrirFormularioEAguardarOpcoes();
+
+    fireEvent.change(screen.getByLabelText(/Nome completo/i), {
+      target: { value: "Colaborador Novo" },
+    });
+    fireEvent.change(screen.getByLabelText(/Matrícula/i), {
+      target: { value: "mat-0099" },
+    });
+    fireEvent.change(screen.getByLabelText(/Tipo de vínculo/i), {
+      target: { value: "clt" },
+    });
+    fireEvent.change(screen.getByLabelText(/Data de admissão/i), {
+      target: { value: "2026-01-05" },
+    });
+    fireEvent.change(
+      screen.getByLabelText(/Tipo de referência organizacional/i),
+      {
+        target: { value: "departamento" },
+      },
+    );
+    fireEvent.change(
+      screen.getByLabelText(/Registro da referência organizacional/i),
+      {
+        target: { value: departamento1.id },
+      },
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Admitir colaborador" }),
+    );
+
+    const confirmacao = await screen.findByRole("status");
+    expect(confirmacao.textContent).toMatch(/admitido/i);
+    await waitFor(() => expect(document.activeElement).toBe(abrir));
+
+    // A confirmação sai de cena assim que outra tarefa começa.
+    fireEvent.click(screen.getByRole("button", { name: "Dispensar" }));
+    await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
+  });
+  // ---- T142: o erro fica no campo que precisa ser preenchido --------------
+
+  it("com o tipo escolhido e o registro vazio, o erro marca o REGISTRO, não o tipo", async () => {
+    render(<ColaboradoresScreen />);
+    await abrirFormularioEAguardarOpcoes();
+
+    // Só o tipo (a categoria) é escolhido; o registro fica vazio.
+    fireEvent.change(
+      screen.getByLabelText(/Tipo de referência organizacional/i),
+      { target: { value: "cargo" } },
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Admitir colaborador" }),
+    );
+
+    const tipo = screen.getByLabelText(/Tipo de referência organizacional/i);
+    const registro = screen.getByLabelText(
+      /Registro da referência organizacional/i,
+    );
+
+    await waitFor(() =>
+      expect(registro).toHaveAttribute("aria-invalid", "true"),
+    );
+    // O campo JÁ preenchido não pode ser acusado.
+    expect(tipo).not.toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByText(/Selecione o registro de cargo\./i)).toBeTruthy();
+  });
+
+  it("sem tipo escolhido, o erro marca o TIPO", async () => {
+    render(<ColaboradoresScreen />);
+    await abrirFormularioEAguardarOpcoes();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Admitir colaborador" }),
+    );
+
+    const tipo = screen.getByLabelText(/Tipo de referência organizacional/i);
+    await waitFor(() => expect(tipo).toHaveAttribute("aria-invalid", "true"));
+    expect(
+      screen.getByText("Escolha o tipo de referência organizacional."),
+    ).toBeTruthy();
+  });
+
+  it("cargo sozinho é referência suficiente e vai no DTO como cargoId", async () => {
+    vi.mocked(admitirColaborador).mockResolvedValue(colaborador1);
+    render(<ColaboradoresScreen />);
+    await abrirFormularioEAguardarOpcoes();
+
+    fireEvent.change(screen.getByLabelText(/Nome completo/i), {
+      target: { value: "Colaborador Cargo" },
+    });
+    fireEvent.change(screen.getByLabelText(/Matrícula/i), {
+      target: { value: "mat-0101" },
+    });
+    fireEvent.change(screen.getByLabelText(/Tipo de vínculo/i), {
+      target: { value: "clt" },
+    });
+    fireEvent.change(screen.getByLabelText(/Data de admissão/i), {
+      target: { value: "2026-01-05" },
+    });
+    fireEvent.change(
+      screen.getByLabelText(/Tipo de referência organizacional/i),
+      { target: { value: "cargo" } },
+    );
+    fireEvent.change(
+      screen.getByLabelText(/Registro da referência organizacional/i),
+      { target: { value: cargo1.id } },
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Admitir colaborador" }),
+    );
+
+    await waitFor(() =>
+      expect(admitirColaborador).toHaveBeenCalledWith({
+        nome: "Colaborador Cargo",
+        empresaId: empresa1.id,
+        matricula: "MAT-0101",
+        tipo: "clt",
+        dataAdmissao: "2026-01-05",
+        motivoCodigo: "admissao_inicial",
+        cargoId: cargo1.id,
+      }),
+    );
+  });
+
+  // ---- B2: a validação da referência organizacional precisa BLOQUEAR o
+  // envio sozinha, sem depender de nenhum outro campo obrigatório estar
+  // faltando — testes isolados, com todo o resto do formulário válido.
+  it("com todos os demais campos válidos, sem tipo de referência escolhido, bloqueia o envio e marca o campo do TIPO", async () => {
+    // Mocks não são limpos entre testes neste arquivo: a contagem de
+    // chamadas é sempre relativa ao que já havia antes deste teste.
+    const antes = vi.mocked(admitirColaborador).mock.calls.length;
+    render(<ColaboradoresScreen />);
+    await abrirFormularioEAguardarOpcoes();
+
+    fireEvent.change(screen.getByLabelText(/Nome completo/i), {
+      target: { value: "Colaborador Sem Tipo" },
+    });
+    fireEvent.change(screen.getByLabelText(/Matrícula/i), {
+      target: { value: "mat-0303" },
+    });
+    fireEvent.change(screen.getByLabelText(/Tipo de vínculo/i), {
+      target: { value: "clt" },
+    });
+    fireEvent.change(screen.getByLabelText(/Data de admissão/i), {
+      target: { value: "2026-01-05" },
+    });
+    // Tipo de referência organizacional deliberadamente NÃO escolhido.
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Admitir colaborador" }),
+    );
+
+    const tipo = screen.getByLabelText(/Tipo de referência organizacional/i);
+    await waitFor(() => expect(tipo).toHaveAttribute("aria-invalid", "true"));
+    expect(
+      screen.getByText("Escolha o tipo de referência organizacional."),
+    ).toBeTruthy();
+    expect(vi.mocked(admitirColaborador).mock.calls.length).toBe(antes);
+  });
+
+  it("com todos os demais campos válidos, tipo Área sem departamento escolhido, bloqueia o envio e marca o campo do DEPARTAMENTO", async () => {
+    const antes = vi.mocked(admitirColaborador).mock.calls.length;
+    render(<ColaboradoresScreen />);
+    await abrirFormularioEAguardarOpcoes();
+
+    fireEvent.change(screen.getByLabelText(/Nome completo/i), {
+      target: { value: "Colaborador Área Sem Departamento" },
+    });
+    fireEvent.change(screen.getByLabelText(/Matrícula/i), {
+      target: { value: "mat-0304" },
+    });
+    fireEvent.change(screen.getByLabelText(/Tipo de vínculo/i), {
+      target: { value: "clt" },
+    });
+    fireEvent.change(screen.getByLabelText(/Data de admissão/i), {
+      target: { value: "2026-01-05" },
+    });
+    fireEvent.change(
+      screen.getByLabelText(/Tipo de referência organizacional/i),
+      { target: { value: "area" } },
+    );
+    // O registro (a área) só libera depois do departamento: continua vazio
+    // e desabilitado — não há como escolhê-lo sem o departamento primeiro.
+    expect(
+      screen.getByLabelText(/Registro da referência organizacional/i),
+    ).toBeDisabled();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Admitir colaborador" }),
+    );
+
+    const departamentoArea = screen.getByLabelText(/Departamento da área/i);
+    await waitFor(() =>
+      expect(departamentoArea).toHaveAttribute("aria-invalid", "true"),
+    );
+    expect(screen.getByText("Selecione o departamento da área.")).toBeTruthy();
+    expect(vi.mocked(admitirColaborador).mock.calls.length).toBe(antes);
+  });
+
+  it("cliques repetidos no envio não duplicam a admissão", async () => {
+    // Objeto mutável, não `let`: o TypeScript não acompanha a atribuição de
+    // `resolver` feita dentro do executor da Promise (closure separada) e, na
+    // leitura abaixo, estreita a variável para `null` só por análise de fluxo
+    // — dar `resolver?.()` nela vira `never` ("not callable"). Guardando em
+    // `.current` o problema não existe: acesso a propriedade não sofre esse
+    // estreitamento.
+    const resolverRef: { current: ((v: ColaboradorApi) => void) | null } = {
+      current: null,
+    };
+    vi.mocked(admitirColaborador).mockImplementation(
+      () =>
+        new Promise<ColaboradorApi>((res) => {
+          resolverRef.current = res;
+        }),
+    );
+    render(<ColaboradoresScreen />);
+    await abrirFormularioEAguardarOpcoes();
+
+    fireEvent.change(screen.getByLabelText(/Nome completo/i), {
+      target: { value: "Colaborador Duplo" },
+    });
+    fireEvent.change(screen.getByLabelText(/Matrícula/i), {
+      target: { value: "mat-0202" },
+    });
+    fireEvent.change(screen.getByLabelText(/Tipo de vínculo/i), {
+      target: { value: "clt" },
+    });
+    fireEvent.change(screen.getByLabelText(/Data de admissão/i), {
+      target: { value: "2026-01-05" },
+    });
+    fireEvent.change(
+      screen.getByLabelText(/Tipo de referência organizacional/i),
+      { target: { value: "cargo" } },
+    );
+    fireEvent.change(
+      screen.getByLabelText(/Registro da referência organizacional/i),
+      { target: { value: cargo1.id } },
+    );
+
+    const antes = vi.mocked(admitirColaborador).mock.calls.length;
+    const enviar = screen.getByRole("button", { name: "Admitir colaborador" });
+    // Três cliques no mesmo quadro: o `disabled` só chega no próximo render,
+    // então a trava tem de ser síncrona.
+    fireEvent.click(enviar);
+    fireEvent.click(enviar);
+    fireEvent.click(enviar);
+
+    await waitFor(() =>
+      expect(vi.mocked(admitirColaborador).mock.calls.length - antes).toBe(1),
+    );
+    resolverRef.current?.(colaborador1);
+  });
+
+  // ---- B1: depois de uma falha, a trava síncrona de envio precisa ser
+  // liberada — senão o formulário fica preso: o botão volta a aparecer
+  // habilitado, mas o próximo clique não faz nada.
+  it("depois de uma falha, preserva os dados, libera o reenvio e admite com sucesso ao corrigir o campo", async () => {
+    // Mocks não são limpos entre testes neste arquivo (mesma convenção de
+    // "cliques repetidos..." e "admite um colaborador..."): a contagem é
+    // sempre relativa ao que já havia antes deste teste, nunca absoluta.
+    const antes = vi.mocked(admitirColaborador).mock.calls.length;
+    vi.mocked(admitirColaborador).mockRejectedValueOnce(
+      new Error("Matrícula já utilizada nesta empresa."),
+    );
+
+    render(<ColaboradoresScreen />);
+    await abrirFormularioEAguardarOpcoes();
+
+    fireEvent.change(screen.getByLabelText(/Nome completo/i), {
+      target: { value: "Colaborador Reenvio" },
+    });
+    fireEvent.change(screen.getByLabelText(/Matrícula/i), {
+      target: { value: "mat-0400" },
+    });
+    fireEvent.change(screen.getByLabelText(/Tipo de vínculo/i), {
+      target: { value: "clt" },
+    });
+    fireEvent.change(screen.getByLabelText(/Data de admissão/i), {
+      target: { value: "2026-01-05" },
+    });
+    fireEvent.change(
+      screen.getByLabelText(/Tipo de referência organizacional/i),
+      { target: { value: "departamento" } },
+    );
+    fireEvent.change(
+      screen.getByLabelText(/Registro da referência organizacional/i),
+      { target: { value: departamento1.id } },
+    );
+
+    // Primeira tentativa: a API recusa.
+    fireEvent.click(
+      screen.getByRole("button", { name: "Admitir colaborador" }),
+    );
+    expect(
+      await screen.findByText("Matrícula já utilizada nesta empresa."),
+    ).toBeInTheDocument();
+    expect(vi.mocked(admitirColaborador).mock.calls.length - antes).toBe(1);
+
+    // Os dados continuam no formulário — nada foi perdido na falha.
+    expect(screen.getByLabelText(/Nome completo/i)).toHaveValue(
+      "Colaborador Reenvio",
+    );
+    expect(screen.getByLabelText(/Matrícula/i)).toHaveValue("MAT-0400");
+    expect(
+      screen.getByRole("form", { name: "Formulário de novo colaborador" }),
+    ).toBeInTheDocument();
+    // O botão voltou ao estado normal — não ficou preso em "Admitindo…".
+    expect(
+      screen.getByRole("button", { name: "Admitir colaborador" }),
+    ).not.toBeDisabled();
+
+    // Corrige só a matrícula, sem fechar o modal, e reenvia.
+    fireEvent.change(screen.getByLabelText(/Matrícula/i), {
+      target: { value: "mat-0401" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Admitir colaborador" }),
+    );
+
+    // Segunda tentativa: sucesso (mock volta ao `mockResolvedValue` padrão).
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("form", { name: "Formulário de novo colaborador" }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(await screen.findByRole("status")).toHaveTextContent(/admitido/i);
+
+    // Uma chamada por tentativa: a primeira (recusada) e a segunda (aceita)
+    // com o campo já corrigido — nunca uma terceira, nem a duplicação do
+    // envio duplicado travado para sempre.
+    const chamadas = vi.mocked(admitirColaborador).mock.calls.slice(antes);
+    expect(chamadas).toHaveLength(2);
+    expect(chamadas[0]?.[0]).toEqual(
+      expect.objectContaining({ matricula: "MAT-0400" }),
+    );
+    expect(chamadas[1]?.[0]).toEqual(
+      expect.objectContaining({ matricula: "MAT-0401" }),
+    );
   });
 });

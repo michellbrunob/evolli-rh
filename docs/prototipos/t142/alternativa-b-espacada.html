@@ -1,0 +1,540 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>
+      Evolli RH — Alternativa B (espaçada, detalhe em painel lateral)
+    </title>
+    <link rel="stylesheet" href="./tokens-prototipo.css" />
+    <style>
+      /* ---------------------------------------------------------------------
+         ALTERNATIVA B — CORPORATIVA ESPAÇADA, DETALHE EM PAINEL LATERAL
+         Composição: navegação em COLUNA LATERAL fixa à esquerda; densidade
+         confortável; filtros em cartão próprio; tabela com menos colunas;
+         DETALHE E FORMULÁRIO EM PAINEL LATERAL DIREITO, lado a lado com a
+         lista. No celular o painel vira folha inferior.
+         Objetivo: uma tarefa por vez, sem perder a lista de vista.
+         --------------------------------------------------------------------- */
+      .corpo {
+        display: grid;
+        grid-template-columns: 232px 1fr;
+        min-height: 80vh;
+      }
+
+      .lateral {
+        background: var(--surface-canvas);
+        border-right: 1px solid var(--hairline);
+        padding: var(--space-lg) var(--space-sm);
+      }
+      .lateral__grupo {
+        font-size: var(--text-caption);
+        color: var(--color-ink-subtle);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        padding: var(--space-sm) var(--space-sm) var(--space-xxs);
+      }
+      .lateral__lista {
+        list-style: none;
+        margin: 0 0 var(--space-md);
+        padding: 0;
+      }
+      .lateral__link {
+        display: block;
+        width: 100%;
+        text-align: left;
+        border: 0;
+        background: none;
+        font: inherit;
+        color: var(--color-ink-muted);
+        padding: var(--space-xs) var(--space-sm);
+        border-radius: var(--radius-sm);
+        min-height: var(--touch-target);
+        cursor: pointer;
+      }
+      .lateral__link[aria-current="page"] {
+        background: var(--status-info-surface);
+        color: var(--status-info-ink);
+        font-weight: var(--weight-strong);
+      }
+
+      .conteudo {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: var(--space-xl);
+        padding: var(--space-xl);
+        align-content: start;
+      }
+      .conteudo--com-painel {
+        grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
+      }
+
+      .cabecalho {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-xs);
+        margin-bottom: var(--space-lg);
+      }
+      .cabecalho__titulo {
+        margin: 0;
+        font-size: var(--text-title);
+        letter-spacing: var(--tracking-tight);
+        line-height: var(--leading-tight);
+      }
+      .cabecalho__descricao {
+        margin: 0;
+        color: var(--color-ink-muted);
+        max-width: 62ch;
+      }
+      .cabecalho__acoes {
+        margin-top: var(--space-sm);
+      }
+
+      /* Filtros com cartão próprio e respiro. */
+      .filtros {
+        background: var(--surface-canvas);
+        border: 1px solid var(--divider-soft);
+        border-radius: var(--radius-lg);
+        padding: var(--space-lg);
+        margin-bottom: var(--space-lg);
+      }
+      .filtros__titulo {
+        margin: 0 0 var(--space-md);
+        font-size: var(--text-caption);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--color-ink-subtle);
+      }
+      .filtros__grade {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: var(--space-md);
+      }
+
+      /* Densidade confortável e menos colunas. */
+      th,
+      td {
+        padding: var(--space-sm) var(--space-lg);
+      }
+      tbody tr[aria-selected="true"] td {
+        background: var(--status-info-surface);
+      }
+
+      /* Painel lateral: o detalhe e o formulário vivem aqui. */
+      .painel {
+        background: var(--surface-canvas);
+        border: 1px solid var(--hairline);
+        border-radius: var(--radius-lg);
+        padding: var(--space-lg);
+        align-self: start;
+        position: sticky;
+        top: var(--space-lg);
+      }
+      .painel__cabecalho {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: var(--space-sm);
+        border-bottom: 1px solid var(--divider-soft);
+        padding-bottom: var(--space-sm);
+        margin-bottom: var(--space-md);
+      }
+      .painel__titulo {
+        margin: 0;
+        font-size: var(--text-lead);
+        line-height: var(--leading-tight);
+      }
+      .painel__form {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-md);
+      }
+      .painel__acoes {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-xs);
+        margin-top: var(--space-lg);
+        padding-top: var(--space-md);
+        border-top: 1px solid var(--divider-soft);
+      }
+      .painel dl {
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-sm);
+      }
+      .painel dt {
+        font-size: var(--text-caption);
+        color: var(--color-ink-subtle);
+      }
+      .painel dd {
+        margin: 0;
+        font-weight: var(--weight-strong);
+      }
+
+      .oculto {
+        display: none;
+      }
+
+      @media (max-width: 900px) {
+        .corpo {
+          grid-template-columns: 1fr;
+        }
+        .lateral {
+          border-right: 0;
+          border-bottom: 1px solid var(--hairline);
+          padding: var(--space-sm);
+          overflow-x: auto;
+        }
+        .lateral__grupo {
+          display: none;
+        }
+        .lateral__lista {
+          display: flex;
+          gap: var(--space-xxs);
+          margin-bottom: 0;
+        }
+        .lateral__link {
+          white-space: nowrap;
+        }
+        /* O painel deixa de dividir a tela e vira folha inferior: em 375 px
+           não há largura para dois blocos lado a lado. */
+        .conteudo,
+        .conteudo--com-painel {
+          /* `1fr` é `minmax(auto, 1fr)` e recusa encolher abaixo do min-content
+             da tabela (células `nowrap`), vazando rolagem horizontal para a
+             página. `minmax(0, 1fr)` deixa a coluna encolher e a rolagem fica
+             contida no próprio envólucro da tabela. */
+          grid-template-columns: minmax(0, 1fr);
+          padding: var(--space-md);
+          gap: var(--space-lg);
+        }
+        .painel {
+          position: static;
+          border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+          border-bottom: 0;
+          margin: 0 calc(-1 * var(--space-md)) calc(-1 * var(--space-md));
+        }
+        .painel__acoes .botao {
+          width: 100%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <p class="faixa-prototipo">
+      <strong
+        >Protótipo B — corporativa espaçada, detalhe em painel lateral.</strong
+      >
+      Estático, dados fictícios, sem API e sem gravação. Não é a demonstração
+      funcional.
+    </p>
+
+    <header class="topbar">
+      <div class="topbar__inner">
+        <span class="topbar__marca">Evolli RH</span>
+        <span class="topbar__tag">Painel Administrativo</span>
+        <div class="topbar__acoes">
+          <button class="botao botao--fantasma" type="button">Sessões</button>
+          <button class="botao botao--fantasma" type="button">Sair</button>
+        </div>
+      </div>
+    </header>
+
+    <div class="corpo">
+      <nav class="lateral" aria-label="Módulos">
+        <p class="lateral__grupo">Operação</p>
+        <ul class="lateral__lista">
+          <li><button class="lateral__link" type="button">Início</button></li>
+          <li>
+            <button class="lateral__link" type="button">Cadastros</button>
+          </li>
+          <li>
+            <button class="lateral__link" type="button" aria-current="page">
+              Pessoas
+            </button>
+          </li>
+          <li><button class="lateral__link" type="button">Ponto</button></li>
+          <li>
+            <button class="lateral__link" type="button">Documentos</button>
+          </li>
+        </ul>
+        <p class="lateral__grupo">Administração</p>
+        <ul class="lateral__lista">
+          <li>
+            <button class="lateral__link" type="button">Relatórios</button>
+          </li>
+          <li>
+            <button class="lateral__link" type="button">
+              Contas de acesso
+            </button>
+          </li>
+        </ul>
+      </nav>
+
+      <main class="conteudo conteudo--com-painel" id="conteudo">
+        <section>
+          <div class="cabecalho">
+            <h1 class="cabecalho__titulo">Colaboradores</h1>
+            <p class="cabecalho__descricao">
+              Administre a admissão e o cadastro de colaboradores da sua
+              empresa. Situação, vínculo e lotação seguem sempre a fonte de
+              verdade do servidor.
+            </p>
+            <div class="cabecalho__acoes">
+              <button class="botao" type="button" onclick="abrir('form')">
+                Novo colaborador
+              </button>
+            </div>
+          </div>
+
+          <div class="filtros">
+            <p class="filtros__titulo">Filtros</p>
+            <div class="filtros__grade">
+              <div class="campo">
+                <label class="campo__rotulo" for="b-busca"
+                  >Buscar por nome</label
+                >
+                <input
+                  id="b-busca"
+                  type="search"
+                  placeholder="Nome do colaborador"
+                />
+              </div>
+              <div class="campo">
+                <label class="campo__rotulo" for="b-situacao">Situação</label>
+                <select id="b-situacao">
+                  <option>Todas as situações</option>
+                  <option>Ativo</option>
+                  <option>Inativo</option>
+                </select>
+              </div>
+              <div class="campo">
+                <label class="campo__rotulo" for="b-vinculo">
+                  Situação do vínculo
+                </label>
+                <select id="b-vinculo">
+                  <option>Todas</option>
+                  <option>Previsto</option>
+                  <option>Ativo</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="tabela-envolucro">
+            <table>
+              <caption class="sr-only">
+                Colaboradores desta empresa
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col">Nome</th>
+                  <th scope="col">Matrícula</th>
+                  <th scope="col">Situação</th>
+                  <th scope="col">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr aria-selected="true">
+                  <td>Pessoa Demo Alfa Um</td>
+                  <td>DEMO-A-0001</td>
+                  <td><span class="selo">Previsto</span></td>
+                  <td>
+                    <button
+                      class="botao botao--secundario botao--compacto"
+                      type="button"
+                      onclick="abrir('detalhe')"
+                    >
+                      Ver detalhes
+                    </button>
+                  </td>
+                </tr>
+                <tr>
+                  <td>Pessoa Demo Alfa Dois</td>
+                  <td>DEMO-A-0002</td>
+                  <td><span class="selo">Previsto</span></td>
+                  <td>
+                    <button
+                      class="botao botao--secundario botao--compacto"
+                      type="button"
+                      onclick="abrir('detalhe')"
+                    >
+                      Ver detalhes
+                    </button>
+                  </td>
+                </tr>
+                <tr>
+                  <td>Pessoa Demo Alfa Três</td>
+                  <td>DEMO-A-0004</td>
+                  <td><span class="selo selo--ok">Ativo</span></td>
+                  <td>
+                    <button
+                      class="botao botao--secundario botao--compacto"
+                      type="button"
+                      onclick="abrir('detalhe')"
+                    >
+                      Ver detalhes
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- PAINEL LATERAL: DETALHE ---------------------------------------- -->
+        <aside
+          class="painel"
+          id="painel-detalhe"
+          aria-labelledby="b-detalhe-titulo"
+        >
+          <div class="painel__cabecalho">
+            <h2 class="painel__titulo" id="b-detalhe-titulo">
+              Pessoa Demo Alfa Um
+            </h2>
+            <button
+              class="botao botao--secundario botao--compacto"
+              type="button"
+              onclick="abrir(null)"
+            >
+              Fechar
+            </button>
+          </div>
+          <p style="margin: 0 0 var(--space-md)">
+            <span class="selo">Previsto</span>
+            <span class="selo selo--info">CLT</span>
+          </p>
+          <dl>
+            <div>
+              <dt>Matrícula</dt>
+              <dd>DEMO-A-0001</dd>
+            </div>
+            <div>
+              <dt>Admissão</dt>
+              <dd>05/01/2026</dd>
+            </div>
+            <div>
+              <dt>Departamento</dt>
+              <dd>Operações Demo</dd>
+            </div>
+            <div>
+              <dt>Cargo</dt>
+              <dd>Analista Demo</dd>
+            </div>
+            <div>
+              <dt>Horário de referência</dt>
+              <dd>Comercial 44h Demo</dd>
+            </div>
+          </dl>
+          <div class="painel__acoes">
+            <button class="botao botao--secundario" type="button">
+              Alterar nome
+            </button>
+            <button class="botao botao--secundario" type="button">
+              Ver histórico funcional
+            </button>
+          </div>
+        </aside>
+
+        <!-- PAINEL LATERAL: FORMULÁRIO ------------------------------------- -->
+        <aside
+          class="painel oculto"
+          id="painel-form"
+          aria-labelledby="b-form-titulo"
+        >
+          <div class="painel__cabecalho">
+            <h2 class="painel__titulo" id="b-form-titulo">Novo colaborador</h2>
+            <button
+              class="botao botao--secundario botao--compacto"
+              type="button"
+              onclick="abrir(null)"
+            >
+              Fechar
+            </button>
+          </div>
+          <p style="margin: 0 0 var(--space-md); color: var(--color-ink-muted)">
+            A admissão cria o colaborador e o primeiro vínculo em conjunto.
+          </p>
+          <div class="painel__form">
+            <div class="campo">
+              <label class="campo__rotulo" for="b-nome">Nome completo *</label>
+              <input id="b-nome" value="Pessoa Demo Alfa Quatro" />
+              <span class="campo__ajuda">2 a 160 caracteres.</span>
+            </div>
+            <div class="campo">
+              <label class="campo__rotulo" for="b-mat">Matrícula *</label>
+              <input id="b-mat" value="DEMO-A-0005" />
+            </div>
+            <div class="campo">
+              <label class="campo__rotulo" for="b-tipo"
+                >Tipo de vínculo *</label
+              >
+              <select id="b-tipo">
+                <option>CLT</option>
+              </select>
+            </div>
+            <div class="campo">
+              <label class="campo__rotulo" for="b-data"
+                >Data de admissão *</label
+              >
+              <input id="b-data" type="date" value="2026-03-02" />
+            </div>
+            <div class="campo">
+              <label class="campo__rotulo" for="b-tiporef">
+                Tipo de referência organizacional *
+              </label>
+              <select id="b-tiporef">
+                <option>Cargo</option>
+              </select>
+              <span class="campo__ajuda">
+                Primeiro o tipo; o registro vem no campo seguinte.
+              </span>
+            </div>
+            <div class="campo campo--invalido">
+              <label class="campo__rotulo" for="b-reg">
+                Registro da referência organizacional *
+              </label>
+              <select
+                id="b-reg"
+                aria-invalid="true"
+                aria-describedby="b-reg-erro"
+              >
+                <option>Selecione…</option>
+              </select>
+              <span class="campo__erro" id="b-reg-erro">
+                Selecione o registro de cargo.
+              </span>
+            </div>
+          </div>
+          <div class="painel__acoes">
+            <button class="botao" type="button">Admitir colaborador</button>
+            <button
+              class="botao botao--secundario"
+              type="button"
+              onclick="abrir(null)"
+            >
+              Cancelar
+            </button>
+          </div>
+        </aside>
+      </main>
+    </div>
+
+    <script>
+      // Somente alternância de painel, para o proprietário ver os estados.
+      // Nenhuma rede, nenhum armazenamento, nenhuma gravação.
+      function abrir(qual) {
+        document
+          .getElementById("painel-detalhe")
+          .classList.toggle("oculto", qual !== "detalhe");
+        document
+          .getElementById("painel-form")
+          .classList.toggle("oculto", qual !== "form");
+        document
+          .getElementById("conteudo")
+          .classList.toggle("conteudo--com-painel", qual !== null);
+      }
+    </script>
+  </body>
+</html>

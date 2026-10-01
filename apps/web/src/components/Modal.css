@@ -1,0 +1,163 @@
+/**
+ * Modal (UI-F04, T142) — só tokens de `tokens.css`; sem cor, fonte, raio ou
+ * escala nova, sem gradiente e sem sombra decorativa.
+ *
+ * Direção visual aprovada: alternativa B (corporativa espaçada) com janelas
+ * modais no lugar do painel lateral e da folha inferior.
+ */
+
+.evolli-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-lg);
+}
+
+/* Fundo opaco o bastante para separar as camadas sem esconder o contexto. */
+.evolli-modal__fundo {
+  position: absolute;
+  inset: 0;
+  background: rgb(29 29 31 / 45%);
+}
+
+.evolli-modal__caixa {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  /* A janela nunca passa da área visível: o corpo rola por dentro. */
+  max-height: calc(100dvh - 2 * var(--space-lg));
+  background: var(--surface-canvas);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+}
+
+.evolli-modal__caixa--media {
+  max-width: 34rem;
+}
+
+/* Larga o suficiente para o formulário em duas colunas respirar. */
+.evolli-modal__caixa--larga {
+  max-width: 52rem;
+}
+
+.evolli-modal__cabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: var(--space-lg) var(--space-lg) var(--space-sm);
+  border-bottom: 1px solid var(--divider-soft);
+}
+
+.evolli-modal__titulo {
+  margin: 0;
+  min-width: 0;
+  font-size: var(--text-lead);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  font-weight: var(--weight-strong);
+  color: var(--color-ink);
+}
+
+/* O título é o alvo do foco inicial, não um controle: o anel de foco do
+   teclado (`:focus-visible`, em tokens.css) continua valendo e não dispara
+   em foco programático. Nada é suprimido aqui. */
+
+.evolli-modal__descricao {
+  margin: 0;
+  padding: var(--space-sm) var(--space-lg) 0;
+  max-width: 62ch;
+  color: var(--color-ink-muted);
+}
+
+/* Confirmação de descarte: dentro da janela, nunca `window.confirm`. */
+.evolli-modal__confirmacao {
+  margin: var(--space-md) var(--space-lg) 0;
+  padding: var(--space-md);
+  border: 1px solid var(--status-warning-border);
+  border-radius: var(--radius-md);
+  background: var(--status-warning-surface);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm) var(--space-md);
+}
+
+.evolli-modal__confirmacao-texto {
+  margin: 0;
+  min-width: 0;
+  color: var(--status-warning-ink);
+  font-weight: var(--weight-strong);
+}
+
+.evolli-modal__confirmacao-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+/* Só o corpo rola: cabeçalho e ações ficam sempre alcançáveis. */
+.evolli-modal__corpo {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-lg);
+}
+
+.evolli-modal__rodape {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-xs);
+  padding: var(--space-md) var(--space-lg);
+  border-top: 1px solid var(--divider-soft);
+}
+
+/* Celular: a janela ocupa a tela inteira, respeitando a área visível real
+   (`dvh` acompanha o teclado virtual) e as áreas seguras do aparelho. */
+@media (max-width: 640px) {
+  .evolli-modal {
+    padding: 0;
+    align-items: stretch;
+  }
+
+  .evolli-modal__caixa,
+  .evolli-modal__caixa--media,
+  .evolli-modal__caixa--larga {
+    max-width: none;
+    max-height: none;
+    height: 100dvh;
+    border: 0;
+    border-radius: 0;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .evolli-modal__cabecalho,
+  .evolli-modal__corpo,
+  .evolli-modal__rodape,
+  .evolli-modal__descricao {
+    padding-left: var(--space-md);
+    padding-right: var(--space-md);
+  }
+
+  .evolli-modal__confirmacao {
+    margin-left: var(--space-md);
+    margin-right: var(--space-md);
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .evolli-modal__rodape {
+    flex-direction: column-reverse;
+  }
+
+  .evolli-modal__rodape > * {
+    width: 100%;
+  }
+}

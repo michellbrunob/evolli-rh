@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useId, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Button,
   DataTable,
   EmptyState,
   FormActions,
   FormField,
+  Modal,
   PageHeader,
   StatusBadge,
   Surface,
@@ -88,6 +89,11 @@ interface FormularioErros {
   matricula?: string;
   tipo?: string;
   dataAdmissao?: string;
+  /** Falta escolher o TIPO de referência (categoria). */
+  tipoDestino?: string;
+  /** Falta o departamento que qualifica a área escolhida. */
+  departamentoArea?: string;
+  /** Falta escolher o REGISTRO da referência. */
   destino?: string;
   geral?: string;
 }
@@ -123,6 +129,13 @@ interface DetalheState {
   erroNome: string | null;
 }
 
+/** Rótulo do TIPO de referência organizacional (categoria), nunca do registro. */
+function rotuloTipoDestino(tipo: TipoDestino): string {
+  return (
+    OPCOES_TIPO_DESTINO.find((o) => o.valor === tipo)?.rotulo ?? "Registro"
+  );
+}
+
 export function ColaboradoresScreen() {
   const [statusCarregamento, setStatusCarregamento] = useState<
     "carregando" | "erro" | "dados"
@@ -133,8 +146,26 @@ export function ColaboradoresScreen() {
     useState<FiltroSituacaoVinculo>("todos");
   const [formulario, setFormulario] = useState<FormularioState | null>(null);
   const [detalhe, setDetalhe] = useState<DetalheState | null>(null);
-  const formTituloId = useId();
-  const detalheTituloId = useId();
+  // T142 — confirmação de escrita. Antes, admitir fechava o formulário em
+  // silêncio: a pessoa ficava olhando a lista sem saber se salvou.
+  const [mensagemSucesso, setMensagemSucesso] = useState<string | null>(null);
+  // T142 (piloto) — o painel de trabalho precisa ser encontrável: quando abre,
+  // entra no campo de visão e recebe o foco; quando fecha, devolve o foco a
+  // quem o abriu. Sem isto o botão "Novo colaborador" parecia não fazer nada,
+  // porque o formulário nascia centenas de pixels abaixo da dobra.
+  // O foco inicial, o foco preso, o Escape e a devolução do foco ao acionador
+  // são responsabilidade do `Modal` (UI-F04) — a tela só diz o que abre.
+  /** Envio em curso — trava síncrona, ver `handleSubmit`. */
+  const enviandoRef = useRef(false);
+
+  const formularioAlterado =
+    formulario !== null &&
+    (formulario.nome !== "" ||
+      formulario.matricula !== "" ||
+      formulario.tipo !== "" ||
+      formulario.dataAdmissao !== "" ||
+      formulario.tipoDestino !== "" ||
+      formulario.destinoId !== "");
 
   const carregarDados = useCallback(
     async (
@@ -165,6 +196,7 @@ export function ColaboradoresScreen() {
   }, [filtroSituacao, filtroSituacaoVinculo, carregarDados]);
 
   async function abrirFormulario() {
+    setMensagemSucesso(null);
     setDetalhe(null);
     setFormulario({
       nome: "",
@@ -235,6 +267,8 @@ export function ColaboradoresScreen() {
             }
           : prev,
       );
+    } finally {
+      enviandoRef.current = false;
     }
   }
 
@@ -290,6 +324,7 @@ export function ColaboradoresScreen() {
   }
 
   function abrirDetalhe(colaborador: ColaboradorApi) {
+    setMensagemSucesso(null);
     setFormulario(null);
     setDetalhe({
       colaborador,
@@ -374,6 +409,11 @@ export function ColaboradoresScreen() {
   async function handleSubmit(evento: React.FormEvent) {
     evento.preventDefault();
     if (!formulario) return;
+    // Trava SÍNCRONA contra envio duplicado. `disabled` no botão depende de um
+    // `setState`, que só chega no próximo render: cliques repetidos no mesmo
+    // quadro escapariam dele — e escapavam, medido no navegador (três cliques,
+    // três requisições). O ref fecha a porta no mesmo instante.
+    if (enviandoRef.current) return;
 
     const erros: FormularioErros = {};
     const nome = formulario.nome.trim();
@@ -396,13 +436,20 @@ export function ColaboradoresScreen() {
     if (!formulario.dataAdmissao) {
       erros.dataAdmissao = "Informe a data de admissão.";
     }
-    if (!formulario.tipoDestino || !formulario.destinoId) {
-      erros.destino = "Selecione a lotação inicial do colaborador.";
+    // T142 — cada erro fica no campo que precisa ser preenchido. Antes, faltar
+    // o REGISTRO marcava o seletor de TIPO, que já estava preenchido: a tela
+    // apontava para o campo errado e deixava o campo vazio sem marcação.
+    if (!formulario.tipoDestino) {
+      erros.tipoDestino = "Escolha o tipo de referência organizacional.";
     } else if (
       formulario.tipoDestino === "area" &&
       !formulario.departamentoIdArea
     ) {
-      erros.destino = "Selecione o departamento da área.";
+      erros.departamentoArea = "Selecione o departamento da área.";
+    } else if (!formulario.destinoId) {
+      erros.destino = `Selecione o registro de ${rotuloTipoDestino(
+        formulario.tipoDestino,
+      ).toLowerCase()}.`;
     }
 
     if (
@@ -411,12 +458,15 @@ export function ColaboradoresScreen() {
       erros.matricula ??
       erros.tipo ??
       erros.dataAdmissao ??
+      erros.tipoDestino ??
+      erros.departamentoArea ??
       erros.destino
     ) {
       setFormulario((prev) => (prev ? { ...prev, erros } : prev));
       return;
     }
 
+    enviandoRef.current = true;
     setFormulario((prev) =>
       prev ? { ...prev, salvando: true, erros: {} } : prev,
     );
@@ -455,7 +505,11 @@ export function ColaboradoresScreen() {
           : {}),
       };
       await admitirColaborador(dto);
-      setFormulario(null);
+      const nomeAdmitido = formulario.nome.trim();
+      fecharFormulario();
+      setMensagemSucesso(
+        `Colaborador ${nomeAdmitido} admitido. Ele já aparece na lista abaixo.`,
+      );
       await carregarDados(filtroSituacao, filtroSituacaoVinculo);
     } catch (err: unknown) {
       const mensagem =
@@ -471,6 +525,13 @@ export function ColaboradoresScreen() {
             }
           : prev,
       );
+    } finally {
+      // Libera a trava só aqui: depois que a tentativa termina de verdade
+      // (sucesso ou falha), nunca antes. Sem isto, uma falha deixava
+      // `enviandoRef.current` travado para sempre — o botão reaparecia
+      // habilitado, mas o próximo clique retornava em silêncio em `:416`,
+      // e não havia como corrigir o campo e reenviar sem fechar o modal.
+      enviandoRef.current = false;
     }
   }
 
@@ -507,9 +568,9 @@ export function ColaboradoresScreen() {
                   })) ?? [])
                 : [];
 
-  const rotuloDestinoAtual =
-    OPCOES_TIPO_DESTINO.find((o) => o.valor === formulario?.tipoDestino)
-      ?.rotulo ?? "Registro";
+  const tipoDestinoEscolhido = formulario?.tipoDestino
+    ? rotuloTipoDestino(formulario.tipoDestino)
+    : null;
 
   const colunasColaboradores: DataTableColumn<ColaboradorApi>[] = [
     { key: "nome", header: "Nome", cell: (c) => c.nome },
@@ -528,7 +589,15 @@ export function ColaboradoresScreen() {
       key: "acoes",
       header: "Ações",
       cell: (c) => (
-        <Button variant="secondary" onClick={() => abrirDetalhe(c)}>
+        <Button
+          variant="secondary"
+          onClick={(evento) => {
+            evento.currentTarget.focus();
+            abrirDetalhe(c);
+          }}
+          aria-haspopup="dialog"
+          aria-expanded={detalhe?.colaborador.id === c.id}
+        >
           Ver detalhes
           <span className="sr-only"> — {c.nome}</span>
         </Button>
@@ -570,11 +639,38 @@ export function ColaboradoresScreen() {
         title="Colaboradores"
         description="Administre a admissão e o cadastro de colaboradores da sua empresa. Situação, vínculo e lotação seguem sempre a fonte de verdade do backend."
         actions={
-          <Button onClick={() => void abrirFormulario()}>
+          <Button
+            onClick={(evento) => {
+              evento.currentTarget.focus();
+              void abrirFormulario();
+            }}
+            aria-haspopup="dialog"
+            aria-expanded={formulario !== null}
+          >
             Novo colaborador
           </Button>
         }
       />
+
+      {mensagemSucesso ? (
+        <Surface
+          as="section"
+          padding="md"
+          className="colaboradores-screen__sucesso"
+        >
+          {/* `role="status"` anuncia sem roubar o foco de quem está digitando. */}
+          <p className="colaboradores-screen__sucesso-texto" role="status">
+            {mensagemSucesso}
+          </p>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => setMensagemSucesso(null)}
+          >
+            Dispensar
+          </Button>
+        </Surface>
+      ) : null}
 
       <Surface
         as="section"
@@ -638,12 +734,17 @@ export function ColaboradoresScreen() {
           </Button>
         </Surface>
       ) : (
-        <section aria-labelledby="colaboradores-lista-titulo">
+        <section
+          className="colaboradores-screen__lista"
+          aria-labelledby="colaboradores-lista-titulo"
+        >
+          {/* O H1 da página já diz "Colaboradores"; repetir aqui só somava
+              ruído. A seção passa a nomear o que a lista realmente é. */}
           <h2
             id="colaboradores-lista-titulo"
             className="colaboradores-screen__section-title"
           >
-            Colaboradores
+            Colaboradores desta empresa
           </h2>
 
           <div className="colaboradores-screen__filtros">
@@ -699,7 +800,14 @@ export function ColaboradoresScreen() {
               title="Nenhum colaborador cadastrado"
               description="Registre a admissão do primeiro colaborador desta empresa."
               action={
-                <Button onClick={() => void abrirFormulario()}>
+                <Button
+                  onClick={(evento) => {
+                    evento.currentTarget.focus();
+                    void abrirFormulario();
+                  }}
+                  aria-haspopup="dialog"
+                  aria-expanded={formulario !== null}
+                >
                   Novo colaborador
                 </Button>
               }
@@ -707,6 +815,7 @@ export function ColaboradoresScreen() {
           ) : (
             <DataTable
               caption="Colaboradores desta empresa"
+              captionVisible={false}
               columns={colunasColaboradores}
               rows={colaboradores}
               rowKey={(c) => c.id}
@@ -715,125 +824,111 @@ export function ColaboradoresScreen() {
         </section>
       )}
 
-      {detalhe ? (
-        <Surface
-          as="section"
-          padding="lg"
-          className="colaboradores-screen__formulario"
-          aria-labelledby={detalheTituloId}
-        >
-          <h2
-            id={detalheTituloId}
-            className="colaboradores-screen__section-title"
-          >
-            {detalhe.colaborador.nome}
-          </h2>
-          <p>
-            <StatusBadge
-              variant={
-                VARIANTE_SITUACAO_COLABORADOR[detalhe.colaborador.situacao] ??
-                "neutral"
-              }
-            >
-              {detalhe.colaborador.situacao === "ativo" ? "Ativo" : "Inativo"}
-            </StatusBadge>
-          </p>
-          <p className="colaboradores-screen__aviso-texto">
-            Matrícula, tipo de vínculo e data de admissão são imutáveis nesta
-            tela. Apenas o nome pode ser corrigido abaixo.
-          </p>
+      <Modal
+        aberto={detalhe !== null}
+        titulo={detalhe?.colaborador.nome ?? ""}
+        onFechar={fecharDetalhe}
+        largura="media"
+      >
+        {detalhe ? (
+          <>
+            <p>
+              <StatusBadge
+                variant={
+                  VARIANTE_SITUACAO_COLABORADOR[detalhe.colaborador.situacao] ??
+                  "neutral"
+                }
+              >
+                {detalhe.colaborador.situacao === "ativo" ? "Ativo" : "Inativo"}
+              </StatusBadge>
+            </p>
+            <p className="colaboradores-screen__aviso-texto">
+              Matrícula, tipo de vínculo e data de admissão são imutáveis nesta
+              tela. Apenas o nome pode ser corrigido abaixo.
+            </p>
 
-          <div className="colaboradores-screen__edicao-nome">
-            <FormField
-              id="colaboradores-detalhe-nome"
-              label="Nome"
-              {...(detalhe.erroNome ? { error: detalhe.erroNome } : {})}
-            >
-              {(control) => (
-                <input
-                  type="text"
-                  maxLength={160}
-                  value={detalhe.nomeEdicao}
-                  onChange={(e) =>
-                    setDetalhe((prev) =>
-                      prev
-                        ? {
-                            ...prev,
-                            nomeEdicao: e.target.value,
-                            erroNome: null,
-                          }
-                        : prev,
-                    )
-                  }
-                  {...control}
+            <div className="colaboradores-screen__edicao-nome">
+              <FormField
+                id="colaboradores-detalhe-nome"
+                label="Nome"
+                {...(detalhe.erroNome ? { error: detalhe.erroNome } : {})}
+              >
+                {(control) => (
+                  <input
+                    type="text"
+                    maxLength={160}
+                    value={detalhe.nomeEdicao}
+                    onChange={(e) =>
+                      setDetalhe((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              nomeEdicao: e.target.value,
+                              erroNome: null,
+                            }
+                          : prev,
+                      )
+                    }
+                    {...control}
+                  />
+                )}
+              </FormField>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => void handleSalvarNome()}
+                disabled={
+                  detalhe.salvandoNome ||
+                  detalhe.nomeEdicao.trim() === detalhe.colaborador.nome
+                }
+              >
+                {detalhe.salvandoNome ? "Salvando…" : "Salvar nome"}
+              </Button>
+            </div>
+
+            <div className="colaboradores-screen__vinculos">
+              <h3 className="colaboradores-screen__section-title">Vínculos</h3>
+              {detalhe.statusVinculos === "carregando" ? (
+                <p className="colaboradores-screen__carregando" role="status">
+                  Carregando vínculos…
+                </p>
+              ) : detalhe.statusVinculos === "erro" ? (
+                <p className="colaboradores-screen__form-erro" role="alert">
+                  Não foi possível carregar os vínculos deste colaborador.{" "}
+                  <Button
+                    variant="secondary"
+                    onClick={() =>
+                      void carregarVinculos(detalhe.colaborador.id)
+                    }
+                  >
+                    Tentar novamente
+                  </Button>
+                </p>
+              ) : detalhe.vinculos.length === 0 ? (
+                <p>Nenhum vínculo encontrado.</p>
+              ) : (
+                <DataTable
+                  caption={`Vínculos — ${detalhe.colaborador.nome}`}
+                  columns={colunasVinculos}
+                  rows={detalhe.vinculos}
+                  rowKey={(v) => v.id}
                 />
               )}
-            </FormField>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => void handleSalvarNome()}
-              disabled={
-                detalhe.salvandoNome ||
-                detalhe.nomeEdicao.trim() === detalhe.colaborador.nome
-              }
-            >
-              {detalhe.salvandoNome ? "Salvando…" : "Salvar nome"}
-            </Button>
-          </div>
+            </div>
+          </>
+        ) : null}
+      </Modal>
 
-          <div className="colaboradores-screen__vinculos">
-            <h3 className="colaboradores-screen__section-title">Vínculos</h3>
-            {detalhe.statusVinculos === "carregando" ? (
-              <p className="colaboradores-screen__carregando" role="status">
-                Carregando vínculos…
-              </p>
-            ) : detalhe.statusVinculos === "erro" ? (
-              <p className="colaboradores-screen__form-erro" role="alert">
-                Não foi possível carregar os vínculos deste colaborador.{" "}
-                <Button
-                  variant="secondary"
-                  onClick={() => void carregarVinculos(detalhe.colaborador.id)}
-                >
-                  Tentar novamente
-                </Button>
-              </p>
-            ) : detalhe.vinculos.length === 0 ? (
-              <p>Nenhum vínculo encontrado.</p>
-            ) : (
-              <DataTable
-                caption={`Vínculos — ${detalhe.colaborador.nome}`}
-                columns={colunasVinculos}
-                rows={detalhe.vinculos}
-                rowKey={(v) => v.id}
-              />
-            )}
-          </div>
-
-          <FormActions>
-            <Button variant="secondary" type="button" onClick={fecharDetalhe}>
-              Fechar
-            </Button>
-          </FormActions>
-        </Surface>
-      ) : null}
-
-      {formulario ? (
-        <Surface
-          as="section"
-          padding="lg"
-          className="colaboradores-screen__formulario"
-          aria-labelledby={formTituloId}
-        >
-          <h2 id={formTituloId} className="colaboradores-screen__section-title">
-            Novo colaborador
-          </h2>
-          <p className="colaboradores-screen__aviso-texto">
-            A admissão cria o colaborador e o primeiro vínculo em conjunto.
-            Matrícula, tipo de vínculo, data de admissão e lotação inicial são
-            imutáveis nesta tela — corrija apenas o nome depois, se necessário.
-          </p>
-
+      <Modal
+        aberto={formulario !== null}
+        titulo="Novo colaborador"
+        descricao="A admissão cria o colaborador e o primeiro vínculo em conjunto. Matrícula, tipo de vínculo, data de admissão e referência inicial são imutáveis nesta tela — corrija apenas o nome depois, se necessário."
+        onFechar={fecharFormulario}
+        bloqueado={formulario?.salvando ?? false}
+        alterado={formularioAlterado}
+        largura="larga"
+      >
+        {formulario ? (
           <form
             className="colaboradores-screen__form"
             aria-label="Formulário de novo colaborador"
@@ -993,11 +1088,11 @@ export function ColaboradoresScreen() {
 
             <FormField
               id="colaboradores-tipo-destino"
-              label="Tipo de lotação inicial"
+              label="Tipo de referência organizacional"
               required
-              help="Ao menos uma referência organizacional é exigida para efetivar a admissão."
-              {...(formulario.erros.destino
-                ? { error: formulario.erros.destino }
+              help="Primeiro escolha o tipo; o registro é escolhido no campo seguinte."
+              {...(formulario.erros.tipoDestino
+                ? { error: formulario.erros.tipoDestino }
                 : {})}
             >
               {(control) => (
@@ -1022,8 +1117,12 @@ export function ColaboradoresScreen() {
             {formulario.tipoDestino === "area" ? (
               <FormField
                 id="colaboradores-departamento-area"
-                label="Departamento"
+                label="Departamento da área"
                 required
+                help="A área só identifica a lotação junto com o departamento a que pertence."
+                {...(formulario.erros.departamentoArea
+                  ? { error: formulario.erros.departamentoArea }
+                  : {})}
               >
                 {(control) => (
                   <select
@@ -1047,8 +1146,12 @@ export function ColaboradoresScreen() {
             {formulario.tipoDestino ? (
               <FormField
                 id="colaboradores-destino"
-                label={rotuloDestinoAtual}
+                label="Registro da referência organizacional"
                 required
+                help={`Tipo escolhido: ${tipoDestinoEscolhido}. Uma referência é suficiente para efetivar a admissão.`}
+                {...(formulario.erros.destino
+                  ? { error: formulario.erros.destino }
+                  : {})}
               >
                 {(control) => (
                   <select
@@ -1102,8 +1205,8 @@ export function ColaboradoresScreen() {
               </Button>
             </FormActions>
           </form>
-        </Surface>
-      ) : null}
+        ) : null}
+      </Modal>
     </div>
   );
 }
