@@ -20,7 +20,11 @@ import { existsSync, readFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { subirAmbiente, FalhaDePasso } from "./demo-local.core.mjs";
+import {
+  subirAmbiente,
+  FalhaDePasso,
+  MS_TIMEOUT_TENTATIVA_HTTP,
+} from "./demo-local.core.mjs";
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), "..");
 const EM_WINDOWS = process.platform === "win32";
@@ -123,9 +127,24 @@ function portaLivre(host, porta) {
   });
 }
 
-async function buscarHttp(url) {
+/**
+ * Prazo FINITO por tentativa, não para o orçamento inteiro — `AbortSignal.
+ * timeout` encerra a conexão sozinha se ninguém responder dentro do prazo.
+ * Sem isto, um servidor que aceita a conexão e nunca responde prenderia esta
+ * chamada indefinidamente: o laço de quem chama (`esperar`/
+ * `confirmarProntoWeb`) nunca voltaria a checar se o processo morreu, nem a
+ * decrementar o orçamento — o diagnóstico "não respondeu em Ns" seria falso,
+ * porque na prática ficou preso numa tentativa só.
+ *
+ * `timeoutMs` é parâmetro, não constante fixa, para que os testes exercitem
+ * o comportamento real de timeout com prazos curtos, sem esperar o valor de
+ * produção.
+ */
+export async function buscarHttp(url, timeoutMs = MS_TIMEOUT_TENTATIVA_HTTP) {
   try {
-    const resposta = await fetch(url);
+    const resposta = await fetch(url, {
+      signal: AbortSignal.timeout(timeoutMs),
+    });
     return { ok: resposta.ok, status: resposta.status };
   } catch {
     return null;
@@ -187,19 +206,26 @@ async function main() {
   process.on("exit", () => ambiente.encerrarProcessos());
 }
 
-main().catch((erro) => {
-  const passo = erro instanceof FalhaDePasso ? erro.passo : "inicialização";
-  const proximo =
-    erro instanceof FalhaDePasso && erro.proximoPasso
-      ? erro.proximoPasso
-      : "Corrija a causa acima e rode `pnpm demo:up` de novo.";
-  const motivo = erro instanceof Error ? erro.message : String(erro);
+// Só executa de verdade quando rodado diretamente (`pnpm demo:up`), nunca ao
+// ser importado — é o que permite testar `buscarHttp` (acima) em isolamento,
+// sem subir o ambiente inteiro de verdade.
+const ehExecucaoDireta = process.argv[1] === fileURLToPath(import.meta.url);
 
-  process.stderr.write(
-    `\nFALHOU no passo "${passo}"\n` +
-      `  Causa .......... ${motivo}\n` +
-      `  Próximo passo .. ${proximo}\n\n` +
-      "O ambiente NÃO está pronto, e nada ficou rodando por trás deste erro.\n",
-  );
-  process.exit(1);
-});
+if (ehExecucaoDireta) {
+  main().catch((erro) => {
+    const passo = erro instanceof FalhaDePasso ? erro.passo : "inicialização";
+    const proximo =
+      erro instanceof FalhaDePasso && erro.proximoPasso
+        ? erro.proximoPasso
+        : "Corrija a causa acima e rode `pnpm demo:up` de novo.";
+    const motivo = erro instanceof Error ? erro.message : String(erro);
+
+    process.stderr.write(
+      `\nFALHOU no passo "${passo}"\n` +
+        `  Causa .......... ${motivo}\n` +
+        `  Próximo passo .. ${proximo}\n\n` +
+        "O ambiente NÃO está pronto, e nada ficou rodando por trás deste erro.\n",
+    );
+    process.exit(1);
+  });
+}

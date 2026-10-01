@@ -21,6 +21,13 @@ Estado formal por tarefa: [`.specify/execution-status.md`](../.specify/execution
 Hoje: **12 telas funcionais** e **33 demonstrativas**. Uma aba existir no menu
 não significa que ela faça algo.
 
+**Navegação agrupada (T142).** O menu lateral está dividido em três grupos —
+**Operação** (Início, Cadastros, Pessoas, Ponto, Documentos, Solicitações),
+**Consulta** (Portal do Colaborador, Relatórios) e **Administração** (Contas
+de acesso). É só reorganização visual: nenhum destino saiu da lista, nenhuma
+permissão mudou. Os rótulos de grupo não são focáveis nem entram na ordem de
+tabulação.
+
 ## Início
 
 | Tela        | Caminho  | Status        | Perfil   | Origem |
@@ -65,6 +72,13 @@ da Alfa não aparecem.
 | Benefícios          | `Pessoas › Benefícios`          | Demonstrativa       | —                                                       | —         | T092                      |
 | Dependentes         | `Pessoas › Dependentes`         | Demonstrativa       | —                                                       | —         | T093                      |
 | Afastamentos        | `Pessoas › Afastamentos`        | Demonstrativa       | —                                                       | —         | T094                      |
+
+**Colaboradores usa o padrão visual B + modais (T142/T144).** O detalhe do
+colaborador abre numa janela modal com foco preso, em vez de navegar para uma
+página própria; editar o nome e tentar fechar com alteração não salva pede
+confirmação explícita dentro da própria janela, antes de descartar. É a
+primeira tela nessa direção — as demais telas funcionais desta tabela ainda
+não foram migradas, e nenhuma outra migração começou.
 
 ### Pessoas › Solicitações — o que olhar
 

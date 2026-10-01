@@ -23,6 +23,7 @@ import {
   DIRETORIO_API,
   SEGUNDOS_ESPERA_API,
   SEGUNDOS_ESPERA_WEB,
+  SEGUNDOS_CONFIRMACAO_FINAL_WEB,
   FalhaDePasso,
   HOST_LOCAL,
   NOMES_PASSOS,
@@ -622,4 +623,120 @@ test("os orçamentos de espera são finitos e generosos com a subida fria", asyn
   assert.ok(Number.isFinite(SEGUNDOS_ESPERA_API));
   assert.ok(Number.isFinite(SEGUNDOS_ESPERA_WEB));
   assert.ok(SEGUNDOS_ESPERA_API > 60, "precisa cobrir a compilação fria");
+});
+
+// ---------------------------------------------------------------------------
+// T144 (hardening): confirmação final (8/8) tolerante a Vite frio, com
+// polling LIMITADO e falha imediata se o processo morrer no meio dela.
+// ---------------------------------------------------------------------------
+
+test("a confirmação final tolera o Vite frio: responde depois de algumas tentativas, dentro do limite", async () => {
+  let chamadasWeb = 0;
+  let ticks = 0;
+  const c = cenario({
+    httpOk: (url) => {
+      if (!url.includes(`:${PORTA_WEB}`)) return true; // API sempre pronta
+      chamadasWeb += 1;
+      // 1ª chamada é o passo 7/8 (esperar): responde de cara. As duas
+      // seguintes são a confirmação final (8/8): falham, simulando o Vite
+      // ainda terminando a 1ª compilação a frio; a 4ª chamada responde.
+      return chamadasWeb === 1 || chamadasWeb >= 4;
+    },
+  });
+  c.deps.dormir = async () => {
+    ticks += 1;
+  };
+
+  const { resultado, erro } = await executarCenario(c);
+
+  assert.equal(erro, undefined);
+  assert.equal(resultado.verificacoes.web, true);
+  // 2 tentativas falhas na confirmação final = 2 esperas de 1s, nunca o
+  // orçamento inteiro de SEGUNDOS_CONFIRMACAO_FINAL_WEB.
+  assert.equal(ticks, 2);
+  assert.ok(
+    ticks < SEGUNDOS_CONFIRMACAO_FINAL_WEB,
+    `poliu além da tolerância (${ticks} ticks)`,
+  );
+});
+
+test("a confirmação final falha quando a tolerância se esgota sem resposta", async () => {
+  let ticks = 0;
+  const c = cenario({
+    // A web responde no passo 7/8 (primeira chamada) e nunca mais, na
+    // confirmação final — sem morte de processo, só ausência de resposta.
+    httpOk: (() => {
+      let chamadasWeb = 0;
+      return (url) => {
+        if (!url.includes(`:${PORTA_WEB}`)) return true;
+        chamadasWeb += 1;
+        return chamadasWeb === 1;
+      };
+    })(),
+  });
+  c.deps.dormir = async () => {
+    ticks += 1;
+  };
+
+  const { erro } = await executarCenario(c);
+
+  assert.ok(erro instanceof FalhaDePasso);
+  assert.equal(erro.passo, NOMES_PASSOS[7]);
+  assert.match(erro.message, /Na verificação final não respondeu: web/);
+  // Esgotou exatamente a tolerância: SEGUNDOS_CONFIRMACAO_FINAL_WEB - 1 ticks
+  // (a última tentativa não dorme mais, só retorna false e sai do laço).
+  assert.equal(ticks, SEGUNDOS_CONFIRMACAO_FINAL_WEB - 1);
+  // Falha no 8/8 encerra os processos antes de propagar: sem residual.
+  assert.deepEqual(c.mortos, ["Web", "API"]);
+});
+
+test("web encerra durante a confirmação final: falha NA HORA, sem esgotar a tolerância", async () => {
+  let estaVivo = true;
+  let chamadasWeb = 0;
+  let ticks = 0;
+  const c = cenario({
+    httpOk: (url) => {
+      if (!url.includes(`:${PORTA_WEB}`)) return true;
+      chamadasWeb += 1;
+      if (chamadasWeb === 1) return true; // passo 7/8 ok
+      estaVivo = false; // "morre" assim que a confirmação final começa
+      return false;
+    },
+  });
+  const iniciarOriginal = c.deps.iniciar;
+  c.deps.iniciar = (spec) => {
+    const p = iniciarOriginal(spec);
+    if (spec.nome !== "Web") return p;
+    return { ...p, vivo: () => estaVivo, matar: p.matar };
+  };
+  c.deps.dormir = async () => {
+    ticks += 1;
+  };
+
+  const { erro } = await executarCenario(c);
+
+  assert.ok(erro instanceof FalhaDePasso);
+  assert.equal(erro.passo, NOMES_PASSOS[7]);
+  assert.match(
+    erro.message,
+    /processo de A interface web encerrou antes da confirmação final/,
+  );
+  // Falhou na primeira checagem de vida: nenhuma espera consumida.
+  assert.equal(ticks, 0, `não deveria esperar após a morte (${ticks} ticks)`);
+  // Nenhum processo residual: tudo que subiu foi encerrado, nesta ordem.
+  assert.deepEqual(c.mortos, ["Web", "API"]);
+});
+
+test("sucesso não mata nenhum processo e devolve exatamente os que subiram, sem residual", async () => {
+  const c = cenario();
+  const { resultado, erro } = await executarCenario(c);
+
+  assert.equal(erro, undefined);
+  // Sucesso devolve os processos vivos para o chamador gerenciar — não há
+  // "terceiro" processo nem limpeza automática aqui.
+  assert.deepEqual(
+    resultado.processos.map((p) => p.nome),
+    ["API", "Web"],
+  );
+  assert.deepEqual(c.mortos, [], "nada deveria ter sido encerrado num sucesso");
 });

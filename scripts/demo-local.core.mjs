@@ -58,6 +58,21 @@ export const DIRETORIO_API = "apps/api";
 export const SEGUNDOS_ESPERA_API = 180;
 /** O Vite sobe em segundos; 90s já é folga larga. */
 export const SEGUNDOS_ESPERA_WEB = 90;
+/**
+ * Tolerância da confirmação FINAL (passo 8/8), não uma segunda espera longa:
+ * o passo 7/8 já provou que a web responde. Cobre só a oscilação momentânea
+ * de um Vite ainda terminando de compilar a primeira requisição a frio entre
+ * o fim daquele passo e esta releitura.
+ */
+export const SEGUNDOS_CONFIRMACAO_FINAL_WEB = 10;
+/**
+ * Prazo de CADA tentativa HTTP, não do orçamento inteiro. Sem isto, uma
+ * conexão aceita por um servidor que nunca responde prende a tentativa
+ * indefinidamente: o laço de `esperar`/`confirmarProntoWeb` nunca re-checa
+ * se o processo morreu nem decrementa o orçamento, e o diagnóstico "não
+ * respondeu em Ns" ficaria errado — na verdade ficou preso numa tentativa só.
+ */
+export const MS_TIMEOUT_TENTATIVA_HTTP = 3000;
 
 export const DESTINO_INALCANCAVEL =
   "postgresql://unused:unused@127.0.0.1:1/unused";
@@ -303,6 +318,29 @@ export async function subirAmbiente(deps) {
       `${rotulo} não respondeu em ${url} dentro de ${limite}s.`,
       proximoPasso,
     );
+  };
+
+  /**
+   * Confirmação FINAL da web (passo 8/8): polling LIMITADO, não uma segunda
+   * espera longa — o passo 7/8 já provou prontidão. Tolera só a oscilação
+   * momentânea de um Vite ainda terminando a primeira compilação a frio.
+   * Processo morto durante a confirmação falha NA HORA, como em `esperar`:
+   * nunca espera o orçamento inteiro para então culpar um timeout que não foi
+   * a causa. Dentro do orçamento, devolve `true`/`false` em vez de lançar,
+   * para compor o relatório agregado de `banco`/`api`/`web` do passo 8/8.
+   */
+  const confirmarProntoWeb = async (rotulo, url, processo) => {
+    for (let i = 1; i <= SEGUNDOS_CONFIRMACAO_FINAL_WEB; i += 1) {
+      if (await verificarHttp(url)) return true;
+      if (processo && typeof processo.vivo === "function" && !processo.vivo()) {
+        falhar(
+          `O processo de ${rotulo} encerrou antes da confirmação final em ${url}.`,
+          "O ambiente NÃO está pronto. Rode de novo depois de corrigir.",
+        );
+      }
+      if (i < SEGUNDOS_CONFIRMACAO_FINAL_WEB) await dormir(1000);
+    }
+    return false;
   };
 
   try {
@@ -626,7 +664,11 @@ export async function subirAmbiente(deps) {
     const verificacoes = {
       banco: await bancoDePe(),
       api: await verificarHttp(`${urlApi}/v1/health/ready`),
-      web: await verificarHttp(`${urlWeb}/`),
+      web: await confirmarProntoWeb(
+        "A interface web",
+        `${urlWeb}/`,
+        processoWeb,
+      ),
     };
     const falhas = Object.entries(verificacoes)
       .filter(([, ok]) => !ok)

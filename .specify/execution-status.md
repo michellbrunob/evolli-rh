@@ -183,11 +183,11 @@ copiado para este repositório. As evidências ficam em `C:/MB/Sistema RH/frappe
 versionamento, por tamanho e por conterem um ambiente de execução. O ambiente de prova foi encerrado
 operacionalmente em 01/10/2026, com volumes, imagens e evidências preservados.
 
-## Hardening e convergência — T144 (implementada; PR #135 Draft)
+## Hardening e convergência — T144 (integrada)
 
-| Tarefa | Estado                          | Resultado principal                                                                                                                                                                                                                                                                                                                       |
-| ------ | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| T144   | **Implementada; PR #135 Draft** | Quita as quatro pendências não bloqueantes da T142 (R1, R2, R3 e O1), fixadas pelo proprietário como **pré-condição da expansão visual**, e converge o ledger para T032, T065 e T066, restaurando a CI de `main`. Nenhuma tela nova recebeu o padrão; a regra do verificador do Spec Kit **não** foi alterada. Base: `main` em `8c3d8c3`. |
+| Tarefa | Estado                                    | Resultado principal                                                                                                                                                                                                                                                                                                                       |
+| ------ | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T144   | **Integrada** (PR #135, squash `0699e3d`) | Quita as quatro pendências não bloqueantes da T142 (R1, R2, R3 e O1), fixadas pelo proprietário como **pré-condição da expansão visual**, e converge o ledger para T032, T065 e T066, restaurando a CI de `main`. Nenhuma tela nova recebeu o padrão; a regra do verificador do Spec Kit **não** foi alterada. Base: `main` em `8c3d8c3`. |
 
 **O que mudou.** O `Modal` de detalhe de Colaboradores passou a declarar alteração pendente e
 bloqueio durante a gravação, encerrando o descarte silencioso do nome (R1). A confirmação de
@@ -213,18 +213,17 @@ T141, e não trata as observações O2–O5 das revisões, que seguem registrada
 
 ## Próxima ação autorizável
 
-1. Revisão somente leitura e integração da T144 — ela é pré-condição do item seguinte.
-2. **Planejar a expansão gradual do padrão B + modais para a próxima tela funcional prioritária** —
+1. **Planejar a expansão gradual do padrão B + modais para a próxima tela funcional prioritária** —
    uma tela só, com identificador próprio, e validação visual antes de ampliar para a seguinte.
    Planejar não é implementar: a escolha da tela e o escopo vêm antes do código.
-3. Revisão somente leitura e integração da T141 (PR #133, Draft).
-4. Só depois disso abrir a próxima fatia, sob o próximo identificador disponível — sem número
+2. Revisão somente leitura e integração da T141 (PR #133, Draft).
+3. Só depois disso abrir a próxima fatia, sob o próximo identificador disponível — sem número
    reservado aqui, porque reservar identificador antes da decisão de escopo já se mostrou fonte de
    confusão (ver T137).
-5. Candidatos naturais da próxima fatia, todos dependentes de decisão própria: capacidade de RBAC
+4. Candidatos naturais da próxima fatia, todos dependentes de decisão própria: capacidade de RBAC
    para o gestor consultivo; `DP-23` como pré-condição de qualquer autoatendimento do colaborador; e
    a validação com RH do catálogo de motivos, cujo mecanismo (código fechado) já está aprovado.
-6. Atualizar este ledger e `sync-state.json` em toda tarefa futura.
+5. Atualizar este ledger e `sync-state.json` em toda tarefa futura.
 
 ## Limites da T141 (ambiente de demonstração)
 
