@@ -23,8 +23,8 @@
     },
     {
       "id": "T144",
-      "pullRequest": null,
-      "status": "implementada_aguardando_pr"
+      "pullRequest": 135,
+      "status": "draft_aguardando_revisao"
     }
   ],
   "requiredArtifacts": [

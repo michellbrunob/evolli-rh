@@ -27,8 +27,11 @@
  *    visíveis;
  *  - descarte de formulário alterado exige confirmação explícita, feita
  *    dentro da própria janela — nunca `window.confirm`. A confirmação é um
- *    `alertdialog` nomeado pelo próprio texto e recebe o foco ao aparecer;
- *    continuar editando devolve o foco a quem o tinha antes dela.
+ *    `alertdialog` nomeado pelo próprio texto, que leva o foco direto à ação
+ *    segura ("Continuar editando") e o PRENDE: enquanto está aberta, `Tab` e
+ *    `Shift+Tab` circulam só entre as suas duas ações, e nada atrás dela
+ *    recebe foco. `Escape` e "Continuar editando" fecham só a confirmação e
+ *    devolvem o foco a quem o tinha antes dela.
  *
  * Não empilha: cada tela mantém uma instância e troca o conteúdo dela.
  */
@@ -118,15 +121,31 @@ export function Modal({
   // Sai da confirmação de descarte quando a janela fecha ou deixa de estar
   // alterada — nunca reabre já perguntando.
   useEffect(() => {
-    if (!aberto || !alterado) setConfirmandoDescarte(false);
+    if (!aberto || !alterado) {
+      setConfirmandoDescarte(false);
+      focoAntesDaConfirmacaoRef.current = null;
+    }
   }, [aberto, alterado]);
 
-  // A confirmação é um `alertdialog`: ao aparecer, recebe o foco, senão quem
-  // usa leitor de tela não fica sabendo que a pergunta existe — `alertdialog`
-  // não tem região viva implícita e nada seria anunciado sozinho.
+  // Referência de foco nunca sobrevive à confirmação que a criou: ao fechar a
+  // janela (ou desmontar), ela é descartada, para não devolver o foco a um
+  // elemento obsoleto na próxima vez.
+  useEffect(() => {
+    return () => {
+      focoAntesDaConfirmacaoRef.current = null;
+    };
+  }, [aberto]);
+
+  // A confirmação é um `alertdialog`: ao aparecer, o foco vai direto para a
+  // ação segura ("Continuar editando"). Além de tirar o foco do campo de trás,
+  // faz o leitor de tela anunciar o diálogo — `alertdialog` não tem região
+  // viva implícita e nada seria anunciado sozinho.
   useEffect(() => {
     if (!confirmandoDescarte) return;
-    confirmacaoRef.current?.focus({ preventScroll: true });
+    const inicial = confirmacaoRef.current?.querySelector<HTMLElement>(
+      "[data-foco-inicial]",
+    );
+    (inicial ?? confirmacaoRef.current)?.focus({ preventScroll: true });
   }, [confirmandoDescarte]);
 
   /** Sai da confirmação devolvendo o foco a quem o tinha antes dela. */
@@ -166,33 +185,47 @@ export function Modal({
         return;
       }
       if (evento.key !== "Tab") return;
-      const caixa = caixaRef.current;
-      if (!caixa) return;
+      // Escopo do foco: enquanto a confirmação de descarte está aberta, ele é
+      // EXCLUSIVAMENTE o `alertdialog` — declarar `aria-modal` nela e deixar o
+      // Tab alcançar os campos de trás seria afirmar uma coisa e permitir
+      // outra. Fora dela, volta a ser a caixa inteira.
+      const raiz = confirmandoDescarte
+        ? confirmacaoRef.current
+        : caixaRef.current;
+      if (!raiz) return;
       // Sem heurística de visibilidade por layout: o seletor já exclui o que
       // está desabilitado, e `hidden` remove o elemento da ordem de tabulação.
-      const focaveis = [
-        ...caixa.querySelectorAll<HTMLElement>(FOCAVEIS),
-      ].filter((el) => !el.hasAttribute("hidden"));
+      const focaveis = [...raiz.querySelectorAll<HTMLElement>(FOCAVEIS)].filter(
+        (el) => !el.hasAttribute("hidden"),
+      );
       if (focaveis.length === 0) {
         evento.preventDefault();
-        tituloRef.current?.focus();
+        (confirmandoDescarte ? raiz : tituloRef.current)?.focus();
         return;
       }
       const primeiro = focaveis[0]!;
       const ultimo = focaveis[focaveis.length - 1]!;
       const atual = document.activeElement;
-      if (!caixa.contains(atual)) {
+      if (!raiz.contains(atual)) {
         evento.preventDefault();
-        primeiro.focus();
+        (evento.shiftKey ? ultimo : primeiro).focus();
         return;
       }
+      // Posição "antes do primeiro": o título (caixa) ou o próprio contêiner
+      // da confirmação, ambos focáveis só por programa (`tabindex=-1`).
+      const antesDoPrimeiro = confirmandoDescarte ? raiz : tituloRef.current;
       if (
         evento.shiftKey &&
-        (atual === primeiro || atual === tituloRef.current)
+        (atual === primeiro || atual === antesDoPrimeiro)
       ) {
         evento.preventDefault();
         ultimo.focus();
       } else if (!evento.shiftKey && atual === ultimo) {
+        evento.preventDefault();
+        primeiro.focus();
+      } else if (!evento.shiftKey && atual === antesDoPrimeiro) {
+        // Sem esta ramificação o navegador decidiria sozinho para onde o Tab
+        // vai a partir de um contêiner `tabindex=-1`.
         evento.preventDefault();
         primeiro.focus();
       }
@@ -258,6 +291,7 @@ export function Modal({
                 type="button"
                 variant="secondary"
                 onClick={continuarEditando}
+                data-foco-inicial
               >
                 Continuar editando
               </Button>
