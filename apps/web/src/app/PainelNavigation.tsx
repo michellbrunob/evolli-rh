@@ -59,6 +59,37 @@ const SUB_ROTULO: Record<string, string> = {
   relatorios: "Exceções de Ponto",
 };
 
+/**
+ * Agrupamento da navegação (T142, direção visual B aprovada). Não muda
+ * destino, ordem nem permissão: é só leitura — separa o que se opera no dia a
+ * dia do que é administração. Os rótulos de grupo não são focáveis e não
+ * entram na ordem de tabulação.
+ */
+const GRUPOS_NAVEGACAO: readonly {
+  readonly titulo: string;
+  readonly destinos: readonly string[];
+}[] = [
+  {
+    titulo: "Operação",
+    destinos: [
+      "inicio",
+      "cadastros",
+      "pessoas",
+      "ponto",
+      "documentos",
+      "solicitacoes-rh",
+    ],
+  },
+  {
+    titulo: "Consulta",
+    destinos: ["portal-colaborador", "relatorios"],
+  },
+  {
+    titulo: "Administração",
+    destinos: ["contas-acesso"],
+  },
+];
+
 export interface PainelNavigationProps {
   destinoAtivoId: string;
   onSelecionar: (id: string) => void;
@@ -70,39 +101,54 @@ export function PainelNavigation({
 }: PainelNavigationProps) {
   return (
     <nav className="painel-nav" aria-label="Navegação do painel">
-      <ul className="painel-nav__lista">
-        {DESTINOS_PAINEL.map((destino) => {
-          const ativo = destino.id === destinoAtivoId;
-          return (
-            <li key={destino.id} className="painel-nav__item">
-              <button
-                type="button"
-                className={
-                  ativo
-                    ? "painel-nav__link painel-nav__link--ativo"
-                    : "painel-nav__link"
-                }
-                aria-current={ativo ? "page" : undefined}
-                onClick={() => onSelecionar(destino.id)}
-              >
-                {SUB_ROTULO[destino.id] ? (
-                  <>
-                    <span className="painel-nav__link-grupo">
-                      {destino.label}
-                    </span>
-                    <span className="painel-nav__link-sub">
-                      {" "}
-                      › {SUB_ROTULO[destino.id]}
-                    </span>
-                  </>
-                ) : (
-                  destino.label
-                )}
-              </button>
-            </li>
-          );
-        })}
-      </ul>
+      {GRUPOS_NAVEGACAO.map((grupo) => (
+        <div className="painel-nav__grupo" key={grupo.titulo}>
+          <p
+            className="painel-nav__grupo-titulo"
+            id={`nav-grupo-${grupo.titulo}`}
+          >
+            {grupo.titulo}
+          </p>
+          <ul
+            className="painel-nav__lista"
+            aria-labelledby={`nav-grupo-${grupo.titulo}`}
+          >
+            {grupo.destinos.map((id) => {
+              const destino = DESTINOS_PAINEL.find((d) => d.id === id);
+              if (!destino) return null;
+              const ativo = destino.id === destinoAtivoId;
+              return (
+                <li key={destino.id} className="painel-nav__item">
+                  <button
+                    type="button"
+                    className={
+                      ativo
+                        ? "painel-nav__link painel-nav__link--ativo"
+                        : "painel-nav__link"
+                    }
+                    aria-current={ativo ? "page" : undefined}
+                    onClick={() => onSelecionar(destino.id)}
+                  >
+                    {SUB_ROTULO[destino.id] ? (
+                      <>
+                        <span className="painel-nav__link-grupo">
+                          {destino.label}
+                        </span>
+                        <span className="painel-nav__link-sub">
+                          {" "}
+                          › {SUB_ROTULO[destino.id]}
+                        </span>
+                      </>
+                    ) : (
+                      destino.label
+                    )}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ))}
     </nav>
   );
 }

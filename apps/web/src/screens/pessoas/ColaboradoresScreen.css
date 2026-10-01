@@ -74,11 +74,109 @@
   gap: var(--space-sm);
 }
 
-.colaboradores-screen__form {
+/* ---------------------------------------------------------------------------
+   T142 (piloto) — painel de trabalho contido
+   ---------------------------------------------------------------------------
+   O formulário e o detalhe deixam de ser "mais conteúdo no fim da página" e
+   passam a ser um painel com começo e fim visíveis: cabeçalho próprio, título
+   focável e saída explícita. A lista é escondida enquanto ele está aberto
+   (`hidden` no TSX), então o painel fica logo abaixo do cabeçalho da página —
+   sem as centenas de pixels de rolagem que faziam o botão parecer inerte.
+   Só tokens existentes; sem sombra, sem gradiente, sem cor nova. */
+.colaboradores-screen__painel {
   display: flex;
   flex-direction: column;
+  gap: var(--space-md);
+}
+
+/* Texto de apoio do painel. NÃO reaproveita `__aviso-texto`: aquela classe
+   tem `flex: 1 1 16rem` para dividir a linha com o selo no banner de aviso, e
+   dentro do painel (coluna flex) o mesmo `flex-grow` esticava o parágrafo em
+   ~256px, abrindo um vão vazio entre a explicação e o primeiro campo. */
+.colaboradores-screen__painel-descricao {
+  margin: 0;
+  max-width: 60ch;
+  color: var(--color-ink-muted);
+}
+
+.colaboradores-screen__painel-cabecalho {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-sm) var(--space-md);
+  padding-bottom: var(--space-sm);
+  border-bottom: 1px solid var(--divider-soft);
+}
+
+.colaboradores-screen__painel-titulo {
+  margin: 0;
+  min-width: 0;
+  font-size: var(--text-title);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  font-weight: var(--weight-strong);
+  color: var(--color-ink);
+  /* O título recebe o foco ao abrir; a margem de rolagem evita que ele encoste
+     no topo da janela. */
+  scroll-margin-top: var(--space-lg);
+}
+
+/* O anel de foco NÃO é suprimido: `:focus-visible` (tokens.css) só desenha
+   quando o foco vem do teclado, e o foco programático de abertura do painel
+   não dispara essa condição. Remover o anel seria antipadrão de acessibilidade
+   de prioridade 1. */
+
+/* Confirmação de escrita — tokens semânticos de sucesso, nunca só cor: o
+   texto diz o que aconteceu e onde ver o resultado. */
+.colaboradores-screen__sucesso {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm) var(--space-md);
+  background: var(--status-success-surface);
+  border-color: var(--status-success-border);
+}
+
+.colaboradores-screen__sucesso-texto {
+  margin: 0;
+  min-width: 0;
+  color: var(--status-success-ink);
+  font-weight: var(--weight-strong);
+}
+
+/* Rolagem horizontal da tabela CONTIDA no próprio contêiner.
+   Sem este bloco contêiner posicionado, o texto de leitor de tela
+   (`.sr-only`, `position: absolute`) dentro da tabela ancora no bloco
+   contêiner inicial e escapa do `overflow-x: auto`, arrastando a rolagem
+   horizontal para a PÁGINA inteira. Escopo deliberadamente limitado a esta
+   tela: a correção compartilhada em `DataTable.css` depende da aprovação do
+   piloto. */
+.colaboradores-screen .evolli-datatable {
+  position: relative;
+}
+
+/* Direção B + modais: o formulário de admissão ocupa DUAS COLUNAS quando há
+   espaço (modal largo) e UMA no celular. O `max-width` antigo, pensado para a
+   página, estreitava a janela sem necessidade. */
+.colaboradores-screen__form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-lg);
-  max-width: 40rem;
+}
+
+/* Campos que merecem a linha inteira: texto longo e o par tipo/registro da
+   referência organizacional, que se lê melhor em sequência. */
+.colaboradores-screen__form > .colaboradores-screen__form-erro,
+.colaboradores-screen__form > .evolli-form-actions {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 640px) {
+  .colaboradores-screen__form {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 /* Erro inline no formulário (validação ou retorno da API). */
@@ -117,4 +215,30 @@
   clip: rect(0 0 0 0);
   white-space: nowrap;
   border: 0;
+}
+
+/* Celular: filtros em coluna e ações ocupando a largura, para alvos de toque
+   confortáveis sem espremer rótulo. */
+@media (max-width: 640px) {
+  .colaboradores-screen__filtros {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .colaboradores-screen__filtros > .evolli-field {
+    width: 100%;
+  }
+
+  /* No celular o título ocupa a linha inteira e a saída fica logo abaixo,
+     alinhada à esquerda — um botão esticado de ponta a ponta pareceria a ação
+     principal do painel, que não é. */
+  .colaboradores-screen__painel-cabecalho {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+
+  .colaboradores-screen__painel-titulo {
+    font-size: var(--text-lead);
+  }
 }

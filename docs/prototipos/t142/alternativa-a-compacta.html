@@ -1,0 +1,529 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Evolli RH — Alternativa A (corporativa compacta)</title>
+    <link rel="stylesheet" href="./tokens-prototipo.css" />
+    <style>
+      /* ---------------------------------------------------------------------
+         ALTERNATIVA A — CORPORATIVA COMPACTA
+         Composição: navegação em FAIXA HORIZONTAL no topo; densidade alta;
+         filtros numa barra única em linha; tabela com mais colunas visíveis;
+         DETALHE EXPANDE NA PRÓPRIA LINHA da tabela; formulário em DUAS COLUNAS.
+         Objetivo: ver muita informação de uma vez, com poucos cliques.
+         --------------------------------------------------------------------- */
+      .nav {
+        background: var(--surface-canvas);
+        border-bottom: 1px solid var(--hairline);
+        overflow-x: auto;
+      }
+      .nav__lista {
+        display: flex;
+        gap: 0;
+        list-style: none;
+        margin: 0 auto;
+        padding: 0 var(--space-lg);
+        max-width: var(--content-max);
+      }
+      .nav__link {
+        border: 0;
+        background: none;
+        font: inherit;
+        font-size: var(--text-caption);
+        color: var(--color-ink-muted);
+        padding: var(--space-sm) var(--space-md);
+        border-bottom: 3px solid transparent;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .nav__link[aria-current="page"] {
+        color: var(--color-action);
+        border-bottom-color: var(--color-action);
+        font-weight: var(--weight-strong);
+      }
+
+      .pagina {
+        max-width: var(--content-max);
+        margin: 0 auto;
+        padding: var(--space-lg);
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-md);
+      }
+
+      /* Cabeçalho compacto: título, contagem e ação na MESMA linha. */
+      .cabecalho {
+        display: flex;
+        align-items: center;
+        gap: var(--space-sm) var(--space-md);
+        flex-wrap: wrap;
+      }
+      .cabecalho__titulo {
+        margin: 0;
+        font-size: var(--text-lead);
+        letter-spacing: var(--tracking-tight);
+      }
+      .cabecalho__contagem {
+        font-size: var(--text-caption);
+        color: var(--color-ink-subtle);
+      }
+      .cabecalho__acoes {
+        margin-left: auto;
+        display: flex;
+        gap: var(--space-xs);
+      }
+
+      /* Filtros em UMA barra, sem cartão próprio. */
+      .filtros {
+        display: flex;
+        align-items: flex-end;
+        gap: var(--space-sm);
+        flex-wrap: wrap;
+        padding: var(--space-sm) var(--space-md);
+        background: var(--surface-canvas);
+        border: 1px solid var(--divider-soft);
+        border-radius: var(--radius-md);
+      }
+      .filtros .campo {
+        flex: 0 1 200px;
+      }
+      .filtros__busca {
+        flex: 1 1 240px;
+      }
+
+      /* Densidade alta. */
+      th,
+      td {
+        padding: var(--space-xs) var(--space-sm);
+        font-size: var(--text-caption);
+      }
+      tbody tr:hover {
+        background: var(--surface-pearl);
+      }
+      tr[aria-expanded="true"] > td {
+        background: var(--status-info-surface);
+      }
+
+      /* Detalhe DENTRO da linha: o contexto da lista nunca é perdido. */
+      .linha-detalhe td {
+        white-space: normal;
+        background: var(--surface-pearl);
+        padding: var(--space-md);
+      }
+      .detalhe-grade {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: var(--space-sm) var(--space-lg);
+      }
+      .detalhe-grade dt {
+        font-size: var(--text-caption);
+        color: var(--color-ink-subtle);
+      }
+      .detalhe-grade dd {
+        margin: 0 0 var(--space-xs);
+        font-weight: var(--weight-strong);
+      }
+
+      /* Formulário em DUAS COLUNAS, no lugar da lista. */
+      .form-painel {
+        background: var(--surface-canvas);
+        border: 1px solid var(--divider-soft);
+        border-radius: var(--radius-lg);
+        padding: var(--space-lg);
+      }
+      .form-painel__cabecalho {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: var(--space-md);
+        border-bottom: 1px solid var(--divider-soft);
+        padding-bottom: var(--space-sm);
+        margin-bottom: var(--space-md);
+      }
+      .form-painel__titulo {
+        margin: 0;
+        font-size: var(--text-lead);
+      }
+      .form-grade {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: var(--space-md);
+      }
+      .form-grade__largo {
+        grid-column: 1 / -1;
+      }
+      .form-acoes {
+        display: flex;
+        gap: var(--space-xs);
+        justify-content: flex-end;
+        margin-top: var(--space-lg);
+        padding-top: var(--space-md);
+        border-top: 1px solid var(--divider-soft);
+      }
+
+      .oculto {
+        display: none;
+      }
+
+      @media (max-width: 640px) {
+        .pagina {
+          padding: var(--space-md);
+        }
+        .filtros .campo,
+        .filtros__busca {
+          flex: 1 1 100%;
+        }
+        .cabecalho__acoes {
+          margin-left: 0;
+          width: 100%;
+        }
+        .cabecalho__acoes .botao {
+          flex: 1;
+        }
+        .form-grade {
+          grid-template-columns: 1fr;
+        }
+        .form-acoes {
+          flex-direction: column-reverse;
+        }
+        .form-acoes .botao {
+          width: 100%;
+        }
+        /* Densidade alta no celular vira lista de cartões: a tabela larga
+           deixaria de ser legível. */
+        .tabela-envolucro table,
+        .tabela-envolucro tbody,
+        .tabela-envolucro tr,
+        .tabela-envolucro td {
+          display: block;
+          width: 100%;
+        }
+        .tabela-envolucro thead {
+          display: none;
+        }
+        .tabela-envolucro tbody tr {
+          border-bottom: 1px solid var(--divider-soft);
+          padding: var(--space-sm);
+        }
+        .tabela-envolucro td {
+          white-space: normal;
+          border: 0;
+          padding: 2px 0;
+        }
+        .tabela-envolucro td::before {
+          content: attr(data-rotulo) ": ";
+          color: var(--color-ink-subtle);
+          font-size: var(--text-caption);
+        }
+        .tabela-envolucro td:first-child::before {
+          content: "";
+        }
+        .tabela-envolucro td:first-child {
+          font-weight: var(--weight-strong);
+          font-size: var(--text-body);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <p class="faixa-prototipo">
+      <strong>Protótipo A — corporativa compacta.</strong> Estático, dados
+      fictícios, sem API e sem gravação. Não é a demonstração funcional.
+    </p>
+
+    <header class="topbar">
+      <div class="topbar__inner">
+        <span class="topbar__marca">Evolli RH</span>
+        <span class="topbar__tag">Painel Administrativo</span>
+        <div class="topbar__acoes">
+          <button class="botao botao--fantasma" type="button">Sessões</button>
+          <button class="botao botao--fantasma" type="button">Sair</button>
+        </div>
+      </div>
+    </header>
+
+    <nav class="nav" aria-label="Módulos">
+      <ul class="nav__lista">
+        <li><button class="nav__link" type="button">Início</button></li>
+        <li><button class="nav__link" type="button">Cadastros</button></li>
+        <li>
+          <button class="nav__link" type="button" aria-current="page">
+            Pessoas
+          </button>
+        </li>
+        <li><button class="nav__link" type="button">Ponto</button></li>
+        <li><button class="nav__link" type="button">Documentos</button></li>
+        <li><button class="nav__link" type="button">Relatórios</button></li>
+        <li>
+          <button class="nav__link" type="button">Contas de acesso</button>
+        </li>
+      </ul>
+    </nav>
+
+    <main class="pagina">
+      <!-- LISTA ------------------------------------------------------------ -->
+      <section id="vista-lista">
+        <div class="cabecalho">
+          <h1 class="cabecalho__titulo">Colaboradores</h1>
+          <span class="cabecalho__contagem">3 de 3 no seu escopo</span>
+          <div class="cabecalho__acoes">
+            <button class="botao botao--secundario" type="button">
+              Exportar
+            </button>
+            <button class="botao" type="button" onclick="mostrar('form')">
+              Novo colaborador
+            </button>
+          </div>
+        </div>
+
+        <div class="filtros">
+          <div class="campo filtros__busca">
+            <label class="campo__rotulo" for="a-busca">Buscar por nome</label>
+            <input
+              id="a-busca"
+              type="search"
+              placeholder="Nome do colaborador"
+            />
+          </div>
+          <div class="campo">
+            <label class="campo__rotulo" for="a-situacao">Situação</label>
+            <select id="a-situacao">
+              <option>Todas</option>
+              <option>Ativo</option>
+              <option>Inativo</option>
+            </select>
+          </div>
+          <div class="campo">
+            <label class="campo__rotulo" for="a-vinculo">Vínculo</label>
+            <select id="a-vinculo">
+              <option>Todos</option>
+              <option>Previsto</option>
+              <option>Ativo</option>
+            </select>
+          </div>
+          <button class="botao botao--secundario botao--compacto" type="button">
+            Limpar
+          </button>
+        </div>
+
+        <div class="tabela-envolucro">
+          <table>
+            <caption class="sr-only">
+              Colaboradores desta empresa
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">Nome</th>
+                <th scope="col">Matrícula</th>
+                <th scope="col">Vínculo</th>
+                <th scope="col">Lotação</th>
+                <th scope="col">Admissão</th>
+                <th scope="col">Situação</th>
+                <th scope="col">Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr aria-expanded="true">
+                <td data-rotulo="Nome">Pessoa Demo Alfa Um</td>
+                <td data-rotulo="Matrícula">DEMO-A-0001</td>
+                <td data-rotulo="Vínculo">CLT</td>
+                <td data-rotulo="Lotação">Operações Demo</td>
+                <td data-rotulo="Admissão">05/01/2026</td>
+                <td data-rotulo="Situação">
+                  <span class="selo">Previsto</span>
+                </td>
+                <td>
+                  <button
+                    class="botao botao--secundario botao--compacto"
+                    type="button"
+                  >
+                    Recolher
+                  </button>
+                </td>
+              </tr>
+              <tr class="linha-detalhe">
+                <td colspan="7">
+                  <dl class="detalhe-grade">
+                    <div>
+                      <dt>Matrícula</dt>
+                      <dd>DEMO-A-0001</dd>
+                    </div>
+                    <div>
+                      <dt>Tipo de vínculo</dt>
+                      <dd>CLT</dd>
+                    </div>
+                    <div>
+                      <dt>Admissão</dt>
+                      <dd>05/01/2026</dd>
+                    </div>
+                    <div>
+                      <dt>Departamento</dt>
+                      <dd>Operações Demo</dd>
+                    </div>
+                    <div>
+                      <dt>Cargo</dt>
+                      <dd>Analista Demo</dd>
+                    </div>
+                    <div>
+                      <dt>Horário</dt>
+                      <dd>Comercial 44h Demo</dd>
+                    </div>
+                  </dl>
+                  <p style="margin: var(--space-md) 0 0">
+                    <button
+                      class="botao botao--secundario botao--compacto"
+                      type="button"
+                    >
+                      Alterar nome
+                    </button>
+                    <button
+                      class="botao botao--secundario botao--compacto"
+                      type="button"
+                    >
+                      Ver histórico funcional
+                    </button>
+                  </p>
+                </td>
+              </tr>
+              <tr>
+                <td data-rotulo="Nome">Pessoa Demo Alfa Dois</td>
+                <td data-rotulo="Matrícula">DEMO-A-0002</td>
+                <td data-rotulo="Vínculo">CLT · Temporário</td>
+                <td data-rotulo="Lotação">Operações Demo</td>
+                <td data-rotulo="Admissão">05/01/2026</td>
+                <td data-rotulo="Situação">
+                  <span class="selo">Previsto</span>
+                </td>
+                <td>
+                  <button
+                    class="botao botao--secundario botao--compacto"
+                    type="button"
+                  >
+                    Expandir
+                  </button>
+                </td>
+              </tr>
+              <tr>
+                <td data-rotulo="Nome">Pessoa Demo Alfa Três</td>
+                <td data-rotulo="Matrícula">DEMO-A-0004</td>
+                <td data-rotulo="Vínculo">CLT</td>
+                <td data-rotulo="Lotação">Administrativo Demo</td>
+                <td data-rotulo="Admissão">02/02/2026</td>
+                <td data-rotulo="Situação">
+                  <span class="selo selo--ok">Ativo</span>
+                </td>
+                <td>
+                  <button
+                    class="botao botao--secundario botao--compacto"
+                    type="button"
+                  >
+                    Expandir
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- FORMULÁRIO ------------------------------------------------------- -->
+      <section id="vista-form" class="form-painel oculto">
+        <div class="form-painel__cabecalho">
+          <h1 class="form-painel__titulo">Novo colaborador</h1>
+          <button
+            class="botao botao--secundario"
+            type="button"
+            onclick="mostrar('lista')"
+          >
+            Fechar
+          </button>
+        </div>
+        <p
+          style="
+            margin: 0 0 var(--space-md);
+            color: var(--color-ink-muted);
+            max-width: 60ch;
+          "
+        >
+          A admissão cria o colaborador e o primeiro vínculo em conjunto.
+          Matrícula, tipo de vínculo, data de admissão e referência inicial são
+          imutáveis nesta tela.
+        </p>
+
+        <div class="form-grade">
+          <div class="campo form-grade__largo">
+            <label class="campo__rotulo" for="a-nome">Nome completo *</label>
+            <input id="a-nome" value="Pessoa Demo Alfa Quatro" />
+            <span class="campo__ajuda">2 a 160 caracteres.</span>
+          </div>
+          <div class="campo">
+            <label class="campo__rotulo" for="a-mat">Matrícula *</label>
+            <input id="a-mat" value="DEMO-A-0005" />
+          </div>
+          <div class="campo">
+            <label class="campo__rotulo" for="a-tipo">Tipo de vínculo *</label>
+            <select id="a-tipo">
+              <option>CLT</option>
+            </select>
+          </div>
+          <div class="campo">
+            <label class="campo__rotulo" for="a-data">Data de admissão *</label>
+            <input id="a-data" type="date" value="2026-03-02" />
+          </div>
+          <div class="campo">
+            <label class="campo__rotulo" for="a-tiporef">
+              Tipo de referência organizacional *
+            </label>
+            <select id="a-tiporef">
+              <option>Cargo</option>
+            </select>
+            <span class="campo__ajuda">
+              Primeiro o tipo; o registro vem no campo seguinte.
+            </span>
+          </div>
+          <div class="campo campo--invalido">
+            <label class="campo__rotulo" for="a-reg">
+              Registro da referência organizacional *
+            </label>
+            <select
+              id="a-reg"
+              aria-invalid="true"
+              aria-describedby="a-reg-erro"
+            >
+              <option>Selecione…</option>
+            </select>
+            <span class="campo__erro" id="a-reg-erro">
+              Selecione o registro de cargo.
+            </span>
+          </div>
+        </div>
+
+        <div class="form-acoes">
+          <button
+            class="botao botao--secundario"
+            type="button"
+            onclick="mostrar('lista')"
+          >
+            Cancelar
+          </button>
+          <button class="botao" type="button">Admitir colaborador</button>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      // Somente alternância de vista, para o proprietário ver os estados.
+      // Nenhuma rede, nenhum armazenamento, nenhuma gravação.
+      function mostrar(vista) {
+        document
+          .getElementById("vista-lista")
+          .classList.toggle("oculto", vista !== "lista");
+        document
+          .getElementById("vista-form")
+          .classList.toggle("oculto", vista !== "form");
+        window.scrollTo(0, 0);
+      }
+    </script>
+  </body>
+</html>

@@ -505,6 +505,122 @@ decisões e bloqueios, está no ledger versionado
       conformidade legal; roteador de URL, dependência nova e alteração das telas demonstrativas
       T067 e T068.
 
+38. **Reservado** — identificador ocupado pela tarefa do ambiente local de demonstração, que chega
+    por Pull Request própria ainda em revisão. Esta branch partiu de `main` e por isso não a contém;
+    as duas entradas são reconciliadas quando aquela PR for integrada.
+
+39. **T142 - Qualidade visual e experiência de uso: diagnóstico e tela-piloto**
+
+    - **Aprovação registrada (visual, do proprietário), 30/09/2026:** "Padrão visual B com modais
+      aprovado para o piloto de Colaboradores. Expansão para outras telas condicionada à decisão
+      arquitetural sobre o Frappe." Não autoriza merge, produção nem migração.
+    - **Condição cumprida em 01/10/2026 (T143, ADR 0014):** o Evolli permanece como plataforma-base
+      e o Frappe foi encerrado como candidato. A aprovação visual **continua válida** e a expansão
+      passa de "condicionada" a **liberada de forma gradual, tela por tela, com validação visual
+      antes de ampliar** — cada tela com identificador próprio. Liberada, não concluída.
+    - **Estado:** **direção visual APROVADA** — alternativa B (navegação lateral agrupada,
+      densidade confortável, filtros organizados, lista de B) **com modais** no lugar do painel
+      lateral e da folha inferior, por escolha explícita do proprietário. A **implementação
+      funcional está em validação**: aprovar a direção não aprovou a tela. O primeiro piloto (painel
+      contido) havia sido reprovado por não ser proposta, e não foi propagado. Sem PR aberta; a
+      expansão para as demais telas está **liberada e ainda não iniciada**.
+    - **Decisão registrada em** `docs/decisions/t142-direcao-visual-b-modais.md`. `DESIGN-apple.md`
+      NÃO foi editado: é referência externa mantida intacta byte a byte por decisão do projeto
+      (T032); as decisões próprias ficam no documento acima e nos tokens/componentes.
+    - **Origem:** o proprietário navegou no ambiente local real e relatou falta de organização
+      visual, conteúdo fora dos quadros e aparência inconsistente.
+    - **Base:** `origin/main` em `f2c1014`. **Não depende** da tarefa do ambiente de demonstração —
+      aquele ambiente foi usado apenas como ferramenta de diagnóstico.
+    - **Diagnóstico (navegador real, dados sintéticos, 1280 px e 375 px):** dois defeitos de uso com
+      causa compartilhada. (1) O botão de criar abre o formulário 301–601 px abaixo da dobra no
+      desktop e 678–932 px no celular, sem rolar, sem mover o foco e sem `aria-expanded` — em 5 de 5
+      telas funcionais com formulário. (2) A rolagem horizontal da página inteira vem de texto de
+      leitor de tela (`position: absolute`) dentro da tabela: como `.evolli-datatable` não é bloco
+      contêiner posicionado, esse texto ancora no bloco contêiner inicial e escapa do
+      `overflow-x: auto`. Provado em execução: escondê-lo zera o excesso; `position: relative` no
+      contêiner também zera.
+    - **Piloto:** `Pessoas › Colaboradores`, escolhida por reunir tabela, filtros, formulário e
+      detalhe na mesma tela e por ser o pior caso do defeito (1).
+    - **Fora de escopo até a aprovação:** correção compartilhada em `DataTable.css`, demais telas,
+      novas convenções visuais e qualquer dependência nova.
+    - **Apoio externo (consultivo, não normativo):** skill `ui-ux-pro-max`
+      (`github.com/nextlevelbuilder/ui-ux-pro-max-skill`, MIT, versão 2.13.0, commit fixado
+      `09170eec67eefd46a7ae85de61b40c194020f997`). Instalada **localmente e fora do versionamento**
+      em `.claude/skills/ui-ux-pro-max/` da worktree, copiada do tarball do commit fixado — o
+      instalador oficial (`npx ui-ux-pro-max-cli init`) **não** foi executado, para não rodar código
+      de terceiros nem sobrescrever configuração. Nenhuma dependência da aplicação foi alterada e
+      nenhuma skill existente foi substituída. Requisito próprio: Python 3 (presente, 3.14.7).
+    - **Fonte de verdade de design continua sendo o projeto:** `DESIGN-apple.md`, `app/tokens.css` e
+      `src/components/`. A skill foi usada como checklist consultivo; cada sugestão foi avaliada
+      contra esses documentos, e nada dela foi copiado como regra. Nenhuma fonte, biblioteca, efeito
+      ou framework externo entrou.
+    - **O que a skill acrescentou ao piloto:** confirmação de escrita após admitir (`role="status"`,
+      antes a admissão fechava o formulário em silêncio); manutenção do anel de foco no título do
+      painel (eu havia suprimido — é antipadrão de acessibilidade de prioridade 1); e o vão vazio de
+      ~256 px dentro do painel, causado por reaproveitar uma classe com `flex-grow` pensada para o
+      banner de aviso.
+    - **Investigação do formulário de admissão (a pedido do proprietário):** confrontada com o
+      contrato real. O backend aceita seis referências organizacionais independentes e exige **ao
+      menos uma**; `cargoId` está entre elas, então cargo sozinho **é** suficiente. Reproduzido no
+      navegador com admissão sintética: o DTO enviado foi `{…, cargoId}` e o servidor aceitou.
+      **Não há defeito funcional.** O defeito é de apresentação e foi medido: com o tipo escolhido e
+      o registro vazio, o seletor de TIPO (já preenchido) recebia `aria-invalid=true` e a mensagem,
+      enquanto o campo realmente vazio ficava sem marcação; e "Cargo" aparecia duas vezes, uma como
+      valor da categoria e outra como rótulo mutável do registro. Corrigido com rótulos permanentes
+      que separam categoria de registro e erro associado ao campo que precisa ser preenchido, com
+      três testes de regressão.
+    - **Duas propostas visuais (aguardando escolha):** A — corporativa compacta (navegação em faixa
+      superior, densidade alta, detalhe expandindo na própria linha, formulário em duas colunas);
+      B — corporativa espaçada (navegação em coluna lateral, densidade confortável, detalhe e
+      formulário em painel lateral ao lado da lista, folha inferior no celular). Protótipos
+      **estáticos**, sem API e sem gravação, servidos em porta própria.
+    - **Diretrizes de design:** nenhuma alteração proposta ainda. Os protótipos usam apenas os
+      tokens já existentes, copiados de `tokens.css`. Se a alternativa B for escolhida, a navegação
+      em coluna lateral é a única convenção nova a registrar em `DESIGN-apple.md`.
+    - **Implementação do piloto (em validação):** componente `Modal` novo (UI-F04) concentrando
+      acessibilidade e comportamento de janela — `role="dialog"`, `aria-modal`, foco inicial, foco
+      preso, devolução do foco, Escape seguro, fundo sem rolagem, confirmação de descarte dentro da
+      própria janela e rolagem só no corpo. Cadastro e detalhe de Colaboradores passaram a abrir
+      nele; formulário em duas colunas no desktop e uma no celular, onde a janela ocupa a tela
+      inteira. Navegação agrupada em Operação/Consulta/Administração, sem mudar destino nem ordem.
+    - **Defeito achado na própria validação e corrigido:** o `disabled` do botão de envio não
+      impedia duplicação — medido no navegador, três cliques geravam três requisições, porque o
+      estado só chega no render seguinte. Trava síncrona por ref; reverificado: quatro cliques, uma
+      requisição.
+    - **Preservado:** contratos HTTP, regras, permissões e comportamento funcional; a separação
+      entre tipo e registro da referência organizacional; nenhuma tela além da piloto foi alterada.
+
+40. **T143 - Investigação arquitetural: o Frappe HR como possível plataforma-base**
+
+    - **Estado:** **investigada — concluída.** Nenhum código funcional do Evolli foi alterado, e
+      nada foi migrado nem copiado. A investigação consumiu duas rodadas em ambiente descartável,
+      fora deste repositório, sempre com dados sintéticos.
+    - **Decisão do proprietário, 01/10/2026:** "Evolli permanece como plataforma-base. O Frappe HR
+      está encerrado como candidato à plataforma e poderá ser usado somente como referência de
+      fluxos, portal, aprovações e experiência funcional. O padrão visual B + modais está liberado
+      para evolução controlada no Evolli." Registrada na **ADR 0014**
+      (`docs/adr/0014-evolli-plataforma-base-e-encerramento-do-frappe.md`).
+    - **Versões examinadas:** Frappe Framework 16.35.0 (MIT), ERPNext 16.36.0 (GPL-3.0) e Frappe HR
+      16.20.0 (GPL-3.0, tag `v16.20.0` = `c0a04b80eeb7214…d0da041`); construção pelo `frappe_docker`
+      em `f09126b`. Base do Evolli na comparação: `origin/main` em `f2c1014`.
+    - **Evidência determinante:** uma conta com vários vínculos exige **extensão relevante**. A
+      regra de "Employee único por conta" aparece em diversos pontos do HRMS e do ERPNext; no
+      protótipo descartável, 10 de 58 tipos de registro ficaram com contexto de vínculo e 48 não;
+      relatórios, compartilhamentos, notificações e cinco endpoints do portal ainda exigiriam
+      adaptação. Isolamento de queixas e autoaprovação são corrigíveis — o primeiro por configuração
+      mais extensão pequena, o segundo só por configuração — mas não resolvem o ponto estrutural.
+      Estimativa medida para o mesmo escopo de piloto sobre o Frappe: **≈ 30–50 dias**.
+    - **Limite da conclusão:** a decisão **não** afirma que o Frappe é inseguro ou inadequado em
+      geral. Ela afirma que o custo de adaptação ao modelo do Evolli não compensa neste projeto.
+    - **Licenciamento:** proibido copiar ou adaptar código GPL (ERPNext e HRMS) sem análise
+      específica de licença, feita antes de qualquer entrada no repositório.
+    - **Evidências:** relatório, resultados JSON, capturas e verificações independentes ficam em
+      `C:/MB/Sistema RH/frappe-prova/` (fora do repositório, por tamanho e por conter ambiente de
+      execução). Nada de lá foi versionado.
+    - **Efeito registrado:** a condição "expansão condicionada à decisão sobre o Frappe" da T142 sai
+      e dá lugar a **expansão liberada de forma gradual, tela por tela, com validação visual antes
+      de ampliar**. Liberada, não concluída.
+
 ## Regra obrigatória para as próximas tarefas
 
 1. Criar ou atualizar a entrada da tarefa neste arquivo antes da implementação.

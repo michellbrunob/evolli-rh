@@ -1,19 +1,30 @@
 {
   "schemaVersion": 1,
   "constitutionVersion": "1.4.0",
-  "lastConvergedAt": "2026-09-29",
+  "lastConvergedAt": "2026-10-01",
   "lastIntegratedTask": 139,
-  "lastRecordedTask": 140,
+  "lastRecordedTask": 143,
+  "platformDecision": {
+    "adr": "docs/adr/0014-evolli-plataforma-base-e-encerramento-do-frappe.md",
+    "decidedAt": "2026-10-01",
+    "platform": "evolli",
+    "frappe": "encerrado_como_candidato_referencia_apenas"
+  },
   "nextTask": {
     "id": "a definir",
-    "status": "pending_after_t140_integration",
-    "reason": "T140 implementada e em revisão. A próxima fatia só é aberta após a integração da T140 e recebe o próximo identificador disponível; escopo depende dos portões de conteúdo, de DP-23 e da decisão sobre o gestor consultivo."
+    "status": "pending_planejamento_expansao_visual",
+    "reason": "T143 encerrou a decisao arquitetural: o Evolli permanece como plataforma-base (ADR 0014). A expansao do padrao B + modais esta liberada de forma gradual, tela por tela, com validacao visual antes de ampliar. O proximo passo e planejar a expansao para a proxima tela funcional prioritaria, que recebe identificador proprio."
   },
   "openDeliveries": [
     {
-      "id": "T140",
-      "pullRequest": 132,
+      "id": "T141",
+      "pullRequest": 133,
       "status": "draft_aguardando_revisao"
+    },
+    {
+      "id": "T142",
+      "pullRequest": null,
+      "status": "piloto_aguardando_aprovacao_visual"
     }
   ],
   "requiredArtifacts": [
