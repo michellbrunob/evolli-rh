@@ -246,26 +246,6 @@ T141, e não trata as observações O2–O5 das revisões, que seguem registrada
   validada pelo servidor e proibida com `NODE_ENV=production`; a web é presa a `127.0.0.1:5173`
   com porta estrita. Nenhuma credencial trafega em linha de comando.
 
-## Limites da T141 (ambiente de demonstração)
-
-- **Não é funcionalidade de RH.** A T141 não cria endpoint, regra, permissão ou estado novo: só
-  sobe o que já existe e explica, tela a tela, o que está integrado.
-- **Local e sintético.** Banco, API e web na própria máquina; o seed recusa host que não seja
-  local e exige `EVOLLI_DEMO_SEED` no ambiente do processo.
-- **Sem MFA, sem anexo, sem R2, sem serviço externo.** O seed não habilita segundo fator nem cria
-  conteúdo documental, biometria ou dado clínico.
-- **Não equivale a homologação nem a produção**, e não autoriza dado real.
-- **Idempotente e não destrutivo.** O seed procura antes de criar e nunca apaga — `DELETE` é
-  revogado no banco em `solicitacao_pessoa` e `audit_event`. A busca varre todas as páginas, então
-  a idempotência não acaba no registro 101.
-- **Porta da API configurável, nunca silenciosa.** `PORT` decide a porta da API; a web é fixa em 5173. Porta ocupada para o comando no passo 1/8 em vez de escorregar para outra. A demonstração
-  desta máquina usa `PORT=3002` porque 3000 e 3001 pertencem a outros serviços do proprietário.
-- **Pendência visual aberta (T115, preexistente):** `Pessoas › Histórico funcional` estoura a
-  largura da página; medida e evidência no guia visual. Não corrigida nesta tarefa.
-- **Nada exposto na rede.** A API só escuta em `127.0.0.1` quando `EVOLLI_DEMO_MODE=true`, decisão
-  validada pelo servidor e proibida com `NODE_ENV=production`; a web é presa a `127.0.0.1:5173`
-  com porta estrita. Nenhuma credencial trafega em linha de comando.
-
 ## Evidência mínima por tarefa futura
 
 - ID, título, estado e pré-condições no `tasks.md`.
