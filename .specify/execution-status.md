@@ -25,22 +25,39 @@ versionadas. A condição de integração é comprovada por `main`, não por rel
 - **Cancelada:** tarefa retirada formalmente do escopo.
 - **Demonstrativa:** superfície visual sem capacidade operacional real.
 
+**Como ler `sync-state.json` quando as integrações chegam fora de ordem.** `lastIntegratedTask` é o
+**maior identificador no estado “Integrada”**, isto é, presente em `main` — não o último número
+registrado. Uma tarefa de número menor que ainda não entrou fica em `openDeliveries`, com a sua PR,
+e **não** puxa o campo para baixo: é o caso da T141, aberta na PR #133 enquanto a T142 já está em
+`main`. Uma tarefa “Investigada” (a T143) conta em `lastRecordedTask`, mas não em
+`lastIntegratedTask`, porque a legenda a distingue de “Integrada”. `lastRecordedTask` é o maior
+identificador registrado em qualquer estado. O verificador só exige `lastRecordedTask ≥
+lastIntegratedTask` e a presença literal dos identificadores citados na mudança.
+
 ## Marco integrado anterior — T001 a T049
 
 O planejamento detalhado permanece em `tasks.md`, e a evidência técnica está no histórico Git e nos
 ADRs/documentos indicados por cada tarefa. T020–T023 estão canceladas porque “Reserva Fiscal” é o nome
-da empresa/projeto, não um módulo. T049 encerra o primeiro caderno de homologação de jornada e Banco
-de Horas.
+da empresa/projeto, não um módulo. T032 alinhou repositório, Spec Kit e PRD ao estado real, e é a
+tarefa que mantém `DESIGN-apple.md` intacto byte a byte como referência externa. T049 encerra o
+primeiro caderno de homologação de jornada e Banco de Horas.
+
+> **Por que esta seção nomeia tarefas que uma faixa já cobre.** `pnpm spec:check` procura cada
+> `T###` citado na mudança por **texto literal** neste arquivo (`scripts/check-spec-kit-sync.mjs`);
+> uma faixa como “T001 a T049” não o satisfaz. Em Pull Request o contexto é só o título, mas no push
+> para `main` é a mensagem inteira do commit de squash, que concatena os commits da branch — por
+> isso T032, T065 e T066 derrubaram a CI de `main` sem nada de errado no código. A regra não foi
+> alterada (T144): quem citar um identificador aqui não coberto nominalmente deve nomeá-lo antes.
 
 ## Execução integrada — T050 a T073
 
-| Faixa     | Estado    | Resultado convergido                                                                                                                                                                                |
-| --------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| T050–T060 | Integrada | Motor puro de jornada/Banco de Horas, contratos de extrato/compensação/fechamento, fila Verificar folhas e orquestrador puro de Ponto, sempre limitados às regras homologadas e a dados sintéticos. |
-| T061–T062 | Integrada | Panorama de prontidão operacional e contrato de persistência/auditoria futura de Ponto.                                                                                                             |
-| T063–T070 | Integrada | Superfícies demonstrativas de Ponto, Portal, Central de Solicitações, Banco de Horas e Repositório documental; não equivalem a operações reais.                                                     |
-| T071      | Integrada | Rate limit efetivo na recuperação de senha. Canal real de entrega do token continua fora do contrato operacional.                                                                                   |
-| T072–T073 | Integrada | Superfícies demonstrativas de Colaboradores e Estrutura organizacional.                                                                                                                             |
+| Faixa     | Estado    | Resultado convergido                                                                                                                                                                                                                                                                                          |
+| --------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T050–T060 | Integrada | Motor puro de jornada/Banco de Horas, contratos de extrato/compensação/fechamento, fila Verificar folhas e orquestrador puro de Ponto, sempre limitados às regras homologadas e a dados sintéticos.                                                                                                           |
+| T061–T062 | Integrada | Panorama de prontidão operacional e contrato de persistência/auditoria futura de Ponto.                                                                                                                                                                                                                       |
+| T063–T070 | Integrada | Superfícies demonstrativas de Ponto, Portal, Central de Solicitações, Banco de Horas e Repositório documental; não equivalem a operações reais. Inclui o contrato conceitual (T065) e o núcleo puro (T066) da Central de Solicitações de Pessoas, depois reconciliados com `PD-SOL-01` e `PD-SOL-03` na T139. |
+| T071      | Integrada | Rate limit efetivo na recuperação de senha. Canal real de entrega do token continua fora do contrato operacional.                                                                                                                                                                                             |
+| T072–T073 | Integrada | Superfícies demonstrativas de Colaboradores e Estrutura organizacional.                                                                                                                                                                                                                                       |
 
 ## Execução integrada — T074 a T103
 
@@ -126,11 +143,11 @@ de Horas.
 - **Telas demonstrativas vizinhas preservadas.** T067 (Portal) e T068 (Central do RH) seguem
   demonstrativas e fora deste escopo, com teste de não regressão.
 
-## Qualidade visual — T142 (piloto em validação; expansão liberada)
+## Qualidade visual — T142 (integrada; expansão liberada)
 
-| Tarefa | Estado                                                                                  | Resultado principal                                                                                                                                                                                                                                                                                                                                                                  |
-| ------ | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| T142   | Padrão visual B + modais APROVADO para o piloto; expansão **liberada de forma gradual** | Direção visual aprovada: alternativa B com modais. Piloto implementado em `Pessoas › Colaboradores` e **em validação pelo proprietário**. A condição arquitetural caiu em 01/10/2026 (T143, ADR 0014): a expansão é agora **tela por tela, com validação visual antes de ampliar**. **Nada foi expandido até aqui**, e a correção compartilhada do `DataTable` segue fora de escopo. |
+| Tarefa | Estado                                                                                                               | Resultado principal                                                                                                                                                                                                                                                                                                                                                                                       |
+| ------ | -------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T142   | **Integrada** (PR #134, squash `8c3d8c3`); padrão visual B + modais aprovado; expansão **liberada de forma gradual** | Direção visual aprovada: alternativa B com modais. Piloto de `Pessoas › Colaboradores` **integrado em `main`**; a validação do proprietário segue tela a tela. A condição arquitetural caiu em 01/10/2026 (T143, ADR 0014): a expansão é agora **tela por tela, com validação visual antes de ampliar**. **Nada foi expandido até aqui**, e a correção compartilhada do `DataTable` segue fora de escopo. |
 
 **Apoio externo:** skill `ui-ux-pro-max` (MIT, 2.13.0, commit `09170eec`), instalada localmente e
 fora do versionamento, usada como **checklist consultivo**. A fonte de verdade de design continua
@@ -166,19 +183,68 @@ copiado para este repositório. As evidências ficam em `C:/MB/Sistema RH/frappe
 versionamento, por tamanho e por conterem um ambiente de execução. O ambiente de prova foi encerrado
 operacionalmente em 01/10/2026, com volumes, imagens e evidências preservados.
 
+## Hardening e convergência — T144 (implementada; PR #135 Draft)
+
+| Tarefa | Estado                          | Resultado principal                                                                                                                                                                                                                                                                                                                       |
+| ------ | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T144   | **Implementada; PR #135 Draft** | Quita as quatro pendências não bloqueantes da T142 (R1, R2, R3 e O1), fixadas pelo proprietário como **pré-condição da expansão visual**, e converge o ledger para T032, T065 e T066, restaurando a CI de `main`. Nenhuma tela nova recebeu o padrão; a regra do verificador do Spec Kit **não** foi alterada. Base: `main` em `8c3d8c3`. |
+
+**O que mudou.** O `Modal` de detalhe de Colaboradores passou a declarar alteração pendente e
+bloqueio durante a gravação, encerrando o descarte silencioso do nome (R1). A confirmação de
+descarte virou um `alertdialog` nomeado pelo próprio texto, que recebe o foco ao aparecer e o
+devolve a quem editava ao continuar (R2). O comentário que prometia `inert` foi substituído pela
+descrição dos três mecanismos reais que deixam o fundo fora de alcance — camada fixa, foco preso e
+`aria-modal` (R3). O texto que afirmava ordem inalterada na navegação foi corrigido: a ordem
+relativa muda pelo agrupamento, sem perder destino nem permissão (O1).
+
+**Contenção de foco.** A revisão da PR #135 achou que a confirmação declarava `aria-modal` mas deixava
+o `Tab` alcançar os campos atrás dela. Enquanto está aberta, o escopo do foco passa a ser só o
+`alertdialog`, que abre direto em “Continuar editando”; `Escape` e “Continuar editando” fecham só a
+confirmação e devolvem o foco ao elemento anterior.
+
+**Por que a CI de `main` caía.** `pnpm spec:check` procura cada `T###` citado na mudança por texto
+literal no ledger. Em Pull Request o contexto é o título; no push para `main` é a mensagem inteira
+do commit de squash, que concatena os commits da branch. Três pushes seguidos falharam assim — T065
+e T066 na T139, T066 na T140, T032 na T142 — sem nenhum defeito de código. Os três agora são
+nomeados nas faixas que já os cobriam.
+
+**Limites explícitos:** a T144 não inicia a expansão visual, não toca a PR #133 nem a branch da
+T141, e não trata as observações O2–O5 das revisões, que seguem registradas.
+
 ## Próxima ação autorizável
 
-1. **Planejar a expansão gradual do padrão B + modais para a próxima tela funcional prioritária** —
+1. Revisão somente leitura e integração da T144 — ela é pré-condição do item seguinte.
+2. **Planejar a expansão gradual do padrão B + modais para a próxima tela funcional prioritária** —
    uma tela só, com identificador próprio, e validação visual antes de ampliar para a seguinte.
    Planejar não é implementar: a escolha da tela e o escopo vêm antes do código.
-2. Revisão somente leitura e integração da T141.
-3. Só depois disso abrir a próxima fatia funcional, sob o próximo identificador disponível — sem
-   número reservado aqui, porque reservar identificador antes da decisão de escopo já se mostrou
-   fonte de confusão (ver T137).
-4. Candidatos naturais da próxima fatia, todos dependentes de decisão própria: capacidade de RBAC
+3. Revisão somente leitura e integração da T141 (PR #133, Draft).
+4. Só depois disso abrir a próxima fatia, sob o próximo identificador disponível — sem número
+   reservado aqui, porque reservar identificador antes da decisão de escopo já se mostrou fonte de
+   confusão (ver T137).
+5. Candidatos naturais da próxima fatia, todos dependentes de decisão própria: capacidade de RBAC
    para o gestor consultivo; `DP-23` como pré-condição de qualquer autoatendimento do colaborador; e
    a validação com RH do catálogo de motivos, cujo mecanismo (código fechado) já está aprovado.
-5. Atualizar este ledger e `sync-state.json` em toda tarefa futura.
+6. Atualizar este ledger e `sync-state.json` em toda tarefa futura.
+
+## Limites da T141 (ambiente de demonstração)
+
+- **Não é funcionalidade de RH.** A T141 não cria endpoint, regra, permissão ou estado novo: só
+  sobe o que já existe e explica, tela a tela, o que está integrado.
+- **Local e sintético.** Banco, API e web na própria máquina; o seed recusa host que não seja
+  local e exige `EVOLLI_DEMO_SEED` no ambiente do processo.
+- **Sem MFA, sem anexo, sem R2, sem serviço externo.** O seed não habilita segundo fator nem cria
+  conteúdo documental, biometria ou dado clínico.
+- **Não equivale a homologação nem a produção**, e não autoriza dado real.
+- **Idempotente e não destrutivo.** O seed procura antes de criar e nunca apaga — `DELETE` é
+  revogado no banco em `solicitacao_pessoa` e `audit_event`. A busca varre todas as páginas, então
+  a idempotência não acaba no registro 101.
+- **Porta da API configurável, nunca silenciosa.** `PORT` decide a porta da API; a web é fixa em 5173. Porta ocupada para o comando no passo 1/8 em vez de escorregar para outra. A demonstração
+  desta máquina usa `PORT=3002` porque 3000 e 3001 pertencem a outros serviços do proprietário.
+- **Pendência visual aberta (T115, preexistente):** `Pessoas › Histórico funcional` estoura a
+  largura da página; medida e evidência no guia visual. Não corrigida nesta tarefa.
+- **Nada exposto na rede.** A API só escuta em `127.0.0.1` quando `EVOLLI_DEMO_MODE=true`, decisão
+  validada pelo servidor e proibida com `NODE_ENV=production`; a web é presa a `127.0.0.1:5173`
+  com porta estrita. Nenhuma credencial trafega em linha de comando.
 
 ## Limites da T141 (ambiente de demonstração)
 
