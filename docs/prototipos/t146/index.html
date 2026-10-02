@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Protótipo T146 — arquitetura modular do Evolli RH</title>
+    <link rel="stylesheet" href="./tokens.css" />
+    <link rel="stylesheet" href="./shell.css" />
+  </head>
+  <body>
+    <p class="selo-prototipo">
+      <span>Protótipo sintético — não grava dados</span>
+      <span aria-hidden="true">·</span>
+      <span>Não é produção nem homologação</span>
+    </p>
+
+    <main class="conteudo" style="padding-block: var(--space-xl)">
+      <h1 style="letter-spacing: var(--tracking-tight)">
+        Arquitetura modular do Evolli RH
+      </h1>
+      <p>
+        Protótipo da tarefa <strong>T146</strong>. Ele mostra como o ecossistema
+        se organiza em módulos, como a navegação os agrupa e como cada módulo
+        apresenta atalhos, pendências e listas.
+      </p>
+
+      <div
+        class="cartao"
+        style="
+          margin-block: var(--space-lg);
+          background: var(--status-warning-surface);
+          border-color: var(--status-warning-border);
+        "
+      >
+        <p style="margin: 0; font-weight: var(--weight-strong)">
+          Aprovar o mapa modular não aprova nenhuma tela.
+        </p>
+        <p style="margin: var(--space-xs) 0 0">
+          O protótipo desenha <em>todos</em> os módulos do mapa, inclusive os
+          que ainda não têm uma linha de código. Por isso cada tela mostra em
+          que pé ela realmente está. A aparência aqui não é prova de que algo
+          funcione.
+        </p>
+      </div>
+
+      <p>
+        <a class="botao" href="./shell.html">Abrir o protótipo navegável</a>
+      </p>
+
+      <section class="secao" style="margin-top: var(--space-xl)">
+        <h2 class="secao__titulo">O que dá para fazer aqui</h2>
+        <ul>
+          <li>Navegar entre os nove módulos do mapa.</li>
+          <li>Recolher o menu lateral e usar a navegação do celular.</li>
+          <li>
+            Filtrar a lista de colaboradores — ela é navegável de verdade — e
+            abrir o detalhe em janela.
+          </li>
+          <li>
+            Abrir cadastro e detalhe em modal, digitar algo e tentar fechar: a
+            janela pede confirmação antes de descartar.
+          </li>
+          <li>Percorrer tudo pelo teclado, com foco sempre visível.</li>
+        </ul>
+      </section>
+
+      <section class="secao">
+        <h2 class="secao__titulo">O que ele não faz</h2>
+        <ul>
+          <li>Não fala com a API e não guarda nada.</li>
+          <li>
+            Não usa <code>localStorage</code>, <code>sessionStorage</code>,
+            cookie, <code>fetch</code> ou WebSocket.
+          </li>
+          <li>Não carrega dependência, framework, fonte ou imagem externa.</li>
+          <li>Não contém dado real de pessoa alguma.</li>
+        </ul>
+      </section>
+
+      <section class="secao">
+        <h2 class="secao__titulo">Documentos relacionados</h2>
+        <ul>
+          <li>
+            <a href="../../decisions/t146-arquitetura-modular-shell.md"
+              >Decisão da arquitetura modular (T146)</a
+            >
+          </li>
+          <li>
+            <a href="../../decisions/t142-direcao-visual-b-modais.md"
+              >Direção visual B com modais (T142)</a
+            >
+          </li>
+          <li>
+            <a
+              href="../../adr/0014-evolli-plataforma-base-e-encerramento-do-frappe.md"
+              >ADR 0014 — Evolli como plataforma-base</a
+            >
+          </li>
+          <li>
+            <a href="../t142/index.html">Protótipos anteriores (T142)</a>
+          </li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>

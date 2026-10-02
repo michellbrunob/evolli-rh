@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Shell modular — protótipo T146 — Evolli RH</title>
+    <link rel="stylesheet" href="./tokens.css" />
+    <link rel="stylesheet" href="./shell.css" />
+  </head>
+  <body>
+    <a class="sr-only" href="#conteudo">Pular para o conteúdo</a>
+
+    <div class="shell" id="shell" data-lateral="expandida">
+      <p class="selo-prototipo">
+        <span>Protótipo sintético — não grava dados</span>
+        <span aria-hidden="true">·</span>
+        <span>Não é produção nem homologação</span>
+      </p>
+
+      <!-- Fundo da gaveta no celular; some no desktop. -->
+      <div class="lateral__fundo" id="lateral-fundo" hidden></div>
+
+      <nav class="lateral" id="lateral" aria-label="Navegação por módulo">
+        <div class="lateral__marca">
+          <span class="lateral__marca-sigla" aria-hidden="true">EV</span>
+          <span class="lateral__marca-nome">Evolli RH</span>
+        </div>
+        <div id="lateral-grupos"></div>
+      </nav>
+
+      <div class="corpo">
+        <header class="cabecalho">
+          <button
+            type="button"
+            class="botao botao--secundario so-movel"
+            id="abrir-menu"
+            aria-controls="lateral"
+            aria-expanded="false"
+          >
+            Menu
+          </button>
+          <button
+            type="button"
+            class="botao botao--secundario"
+            id="alternar-lateral"
+            aria-controls="lateral"
+          >
+            Recolher menu
+          </button>
+
+          <div class="cabecalho__contexto">
+            <ol class="migalhas" id="migalhas"></ol>
+            <p class="cabecalho__titulo" id="contexto-titulo">Início</p>
+          </div>
+
+          <div class="campo">
+            <label class="campo__rotulo" for="busca-visual"
+              >Busca (apenas visual neste protótipo)</label
+            >
+            <input
+              id="busca-visual"
+              type="search"
+              placeholder="Esta busca não consulta nada"
+              aria-describedby="busca-aviso"
+            />
+            <span id="busca-aviso" class="sr-only"
+              >Campo de demonstração. Nenhuma busca real é executada e nenhum
+              dado é consultado.</span
+            >
+          </div>
+        </header>
+
+        <main class="conteudo" id="conteudo" tabindex="-1"></main>
+      </div>
+    </div>
+
+    <div id="raiz-modal"></div>
+
+    <script type="module" src="./shell.js"></script>
+  </body>
+</html>
