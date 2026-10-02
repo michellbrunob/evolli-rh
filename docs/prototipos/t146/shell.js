@@ -1,5 +1,5 @@
 /**
- * Comportamento do shell modular (T146) — protótipo ESTÁTICO.
+ * Comportamento do shell modular (T146, 2ª versão) — protótipo ESTÁTICO.
  *
  * Nenhuma dependência, nenhuma chamada de rede, nenhuma persistência: sem
  * `fetch`, `XMLHttpRequest`, WebSocket, `localStorage`, `sessionStorage` ou
@@ -18,6 +18,7 @@ import {
   INVENTARIO,
   COLABORADORES,
 } from "./dados.js";
+import { ICONES } from "./icones.js";
 
 const $ = (sel) => document.querySelector(sel);
 const shell = $("#shell");
@@ -32,8 +33,32 @@ const txt = (v) =>
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 
+/** Selo de estado: superfície + rótulo + ponto. A cor nunca carrega sozinha. */
 const selo = (estado) =>
-  `<span class="selo selo--${estado}">${txt(ESTADOS[estado].rotulo)}</span>`;
+  `<span class="selo selo--${estado}" title="${txt(ESTADOS[estado].explicacao)}"><span class="selo__rotulo">${txt(ESTADOS[estado].rotulo)}</span></span>`;
+
+const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`;
+
+/** Conta telas por estado num módulo. */
+function resumoDe(m) {
+  const conta = (e) => m.telas.filter((t) => t.estado === e).length;
+  return {
+    funcional: conta("funcional"),
+    parcial: conta("parcial"),
+    demonstrativo: conta("demonstrativo"),
+    planejado: conta("planejado"),
+    total: m.telas.length,
+  };
+}
+
+/** Prioridade de leitura: o que já dá para usar vem primeiro. */
+function prioridade(m) {
+  const r = resumoDe(m);
+  if (r.funcional > 0) return 0;
+  if (r.parcial > 0) return 1;
+  if (r.demonstrativo > 0) return 2;
+  return 3;
+}
 
 let moduloAtivo = "inicio";
 let filtroBusca = "";
@@ -49,25 +74,29 @@ function montarLateral() {
     g.itens.push(m);
   }
   $("#lateral-grupos").innerHTML = grupos
-    .map(
-      (g) => `
+    .map((g, i) => {
+      const idGrupo = `grupo-${i}`;
+      return `
       <div class="lateral__grupo">
-        <p class="lateral__rotulo-grupo" id="grupo-${txt(g.titulo)}">${txt(g.titulo)}</p>
-        <ul class="lateral__lista" aria-labelledby="grupo-${txt(g.titulo)}">
+        <p class="lateral__rotulo-grupo" id="${idGrupo}">${txt(g.titulo)}</p>
+        <ul class="lateral__lista" aria-labelledby="${idGrupo}">
           ${g.itens
-            .map(
-              (m) => `
+            .map((m) => {
+              const r = resumoDe(m);
+              return `
             <li>
               <button type="button" class="lateral__link" data-modulo="${txt(m.id)}">
-                <span class="lateral__glifo" aria-hidden="true">${txt(m.glifo)}</span>
+                ${ICONES[m.icone] ?? ""}
                 <span class="lateral__texto">${txt(m.nome)}</span>
+                <span class="lateral__contador" aria-hidden="true">${r.funcional}/${r.total}</span>
+                <span class="sr-only">${plural(r.funcional, "tela funcional", "telas funcionais")} de ${r.total}</span>
               </button>
-            </li>`,
-            )
+            </li>`;
+            })
             .join("")}
         </ul>
-      </div>`,
-    )
+      </div>`;
+    })
     .join("");
 
   for (const b of document.querySelectorAll("[data-modulo]")) {
@@ -82,37 +111,182 @@ function irPara(id) {
   moduloAtivo = id;
   const m = MODULOS.find((x) => x.id === id);
   for (const b of document.querySelectorAll("[data-modulo]")) {
-    const ativo = b.dataset.modulo === id;
-    if (ativo) b.setAttribute("aria-current", "page");
+    if (b.dataset.modulo === id) b.setAttribute("aria-current", "page");
     else b.removeAttribute("aria-current");
   }
-  $("#migalhas").innerHTML =
-    `<li>Evolli RH</li><li>${txt(m.grupo)}</li><li>${txt(m.nome)}</li>`;
+
   $("#contexto-titulo").textContent = m.nome;
+  $("#contexto-apoio").textContent =
+    id === "inicio"
+      ? "Onde o ecossistema está hoje, módulo a módulo, com o estado real de cada tela."
+      : m.resumo;
+  $("#contexto-acoes").innerHTML = acoesDoContexto(m);
   document.title = `${m.nome} — protótipo T146 — Evolli RH`;
+
   conteudo.innerHTML = id === "inicio" ? paginaInicial() : workspace(m);
   ligarAcoes();
-  conteudo.focus({ preventScroll: true });
+  $("#contexto-titulo").focus({ preventScroll: true });
   window.scrollTo({ top: 0 });
+}
+
+/** Uma ação primária por contexto — e só uma. */
+function acoesDoContexto(m) {
+  if (m.id === "pessoas") {
+    return `<button type="button" class="botao" data-acao="admissao">${ICONES.mais}Admitir colaborador</button>`;
+  }
+  if (m.id === "inicio") {
+    return `<button type="button" class="botao" data-ir="pessoas">Ver o que já funciona</button>`;
+  }
+  return `<span class="meta">Nenhuma ação operacional neste módulo do protótipo.</span>`;
 }
 
 // ------------------------------------------------------------- páginas
 
-function legenda() {
+function paginaInicial() {
+  const porPrioridade = [...MODULOS].sort(
+    (a, b) =>
+      prioridade(a) - prioridade(b) || a.nome.localeCompare(b.nome, "pt-BR"),
+  );
+  const totalReais =
+    INVENTARIO.funcional + INVENTARIO.parcial + INVENTARIO.demonstrativo;
+  const pct = (n) => (n / totalReais) * 100;
+
+  const cartoes = porPrioridade
+    .map((m) => {
+      const r = resumoDe(m);
+      const estadoTopo =
+        r.funcional > 0
+          ? "funcional"
+          : r.parcial > 0
+            ? "parcial"
+            : r.demonstrativo > 0
+              ? "demonstrativo"
+              : "planejado";
+      const destaque = r.funcional > 0 ? " modulo--destaque" : "";
+      return `
+      <button type="button" class="modulo${destaque}" data-ir="${txt(m.id)}">
+        <span class="modulo__topo">
+          ${ICONES[m.icone] ?? ""}
+          <span class="modulo__nome">${txt(m.nome)}</span>
+          ${selo(estadoTopo)}
+        </span>
+        <p class="modulo__resumo">${txt(m.resumo)}</p>
+        <span class="modulo__rodape">
+          <span class="modulo__progresso">${r.funcional}/${r.total}</span>
+          <span class="meta">${r.total === 1 ? "tela funcional" : "telas funcionais"}</span>
+        </span>
+      </button>`;
+    })
+    .join("");
+
+  const prontas = MODULOS.filter((m) => resumoDe(m).funcional > 0);
+
+  return `
+    <section class="painel-avanco" aria-labelledby="avanco-titulo">
+      <div>
+        <h2 class="sr-only" id="avanco-titulo">Avanço do ecossistema</h2>
+        <strong class="avanco__numero">${INVENTARIO.funcional}</strong>
+        <span class="avanco__rotulo">telas já funcionam de verdade</span>
+        <span class="avanco__apoio">
+          de ${totalReais} telas construídas. Contagem feita a partir do próprio
+          código, não é estimativa.
+        </span>
+      </div>
+      <div>
+        <div class="barra" role="img"
+             aria-label="De ${totalReais} telas construídas: ${INVENTARIO.funcional} funcionais, ${INVENTARIO.parcial} parcial e ${INVENTARIO.demonstrativo} demonstrativas.">
+          <span class="barra__parte barra__parte--funcional" style="width:${pct(INVENTARIO.funcional)}%"></span>
+          <span class="barra__parte barra__parte--parcial" style="width:${pct(INVENTARIO.parcial)}%"></span>
+          <span class="barra__parte barra__parte--demonstrativo" style="width:${pct(INVENTARIO.demonstrativo)}%"></span>
+        </div>
+        <ul class="barra-legenda">
+          <li><span class="barra-legenda__ponto" style="background:var(--status-success-ink)"></span>
+            <span class="barra-legenda__valor">${INVENTARIO.funcional}</span> funcionais</li>
+          <li><span class="barra-legenda__ponto" style="background:var(--status-info-ink)"></span>
+            <span class="barra-legenda__valor">${INVENTARIO.parcial}</span> parcial</li>
+          <li><span class="barra-legenda__ponto" style="background:var(--hairline)"></span>
+            <span class="barra-legenda__valor">${INVENTARIO.demonstrativo}</span> demonstrativas</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="secao" aria-labelledby="testar-titulo">
+      <div class="secao__cabecalho">
+        <h2 class="secao__titulo" id="testar-titulo">O que dá para testar agora</h2>
+        <span class="meta">${plural(prontas.length, "módulo", "módulos")} com tela funcional</span>
+      </div>
+      <p class="secao__apoio">
+        Nestes módulos existe pelo menos uma tela que fala com o servidor de
+        verdade. Os demais ainda são aparência ou plano.
+      </p>
+      <div class="pilha" style="margin-top: var(--space-sm)">
+        ${prontas
+          .map((m) => {
+            const r = resumoDe(m);
+            const funcionais = m.telas.filter((t) => t.estado === "funcional");
+            return `
+          <div class="linha">
+            <span class="linha__texto">
+              <span class="linha__titulo">${txt(m.nome)}</span>
+              <span class="linha__apoio">${txt(funcionais.map((t) => t.nome).join(" · "))}</span>
+            </span>
+            <span class="linha__fim">
+              <span class="modulo__progresso">${r.funcional}/${r.total}</span>
+              <button type="button" class="botao botao--discreto" data-ir="${txt(m.id)}">Abrir</button>
+            </span>
+          </div>`;
+          })
+          .join("")}
+      </div>
+    </section>
+
+    <section class="secao" aria-labelledby="modulos-titulo">
+      <div class="secao__cabecalho">
+        <h2 class="secao__titulo" id="modulos-titulo">Módulos do ecossistema</h2>
+        <span class="meta">em ordem de prontidão</span>
+      </div>
+      <div class="modulos">${cartoes}</div>
+    </section>
+
+    ${blocoLegenda()}
+
+    <section class="secao" aria-labelledby="futuro-titulo">
+      <div class="secao__cabecalho">
+        <h2 class="secao__titulo" id="futuro-titulo">Evolução futura</h2>
+        <span class="meta">fora da navegação</span>
+      </div>
+      <p class="secao__apoio">
+        Ficam fora do menu de propósito: um item na navegação é lido como algo
+        que já existe, e nenhum destes existe.
+      </p>
+      <div class="pilha" style="margin-top: var(--space-sm)">
+        ${EVOLUCAO_FUTURA.map(
+          (e) => `
+          <div class="linha">
+            <span class="linha__texto">
+              <span class="linha__titulo">${txt(e.nome)}</span>
+              <span class="linha__apoio">${txt(e.nota)}</span>
+            </span>
+            <span class="linha__fim">${selo("planejado")}</span>
+          </div>`,
+        ).join("")}
+      </div>
+    </section>`;
+}
+
+function blocoLegenda() {
   return `
     <section class="secao" aria-labelledby="legenda-titulo">
-      <h2 class="secao__titulo" id="legenda-titulo">O que cada marca quer dizer</h2>
-      <p class="secao__apoio">
-        Toda tela deste protótipo mostra em que pé ela realmente está. A aparência
-        aqui não quer dizer que a tela já exista.
-      </p>
-      <div class="grade">
+      <div class="secao__cabecalho">
+        <h2 class="secao__titulo" id="legenda-titulo">O que cada marca quer dizer</h2>
+      </div>
+      <div class="pilha">
         ${Object.entries(ESTADOS)
           .map(
             ([k, v]) => `
-          <div class="cartao">
-            ${selo(k)}
-            <p class="secao__apoio" style="margin-top: var(--space-xs)">${txt(v.explicacao)}</p>
+          <div class="linha">
+            <span class="linha__fim">${selo(k)}</span>
+            <span class="linha__texto"><span class="linha__apoio">${txt(v.explicacao)}</span></span>
           </div>`,
           )
           .join("")}
@@ -120,81 +294,27 @@ function legenda() {
     </section>`;
 }
 
-function paginaInicial() {
-  const porModulo = MODULOS.map((m) => {
-    const f = m.telas.filter((t) => t.estado === "funcional").length;
-    const total = m.telas.length;
-    return `
-      <div class="cartao">
-        <p style="margin:0 0 var(--space-xxs); font-weight: var(--weight-strong)">
-          <span aria-hidden="true">${txt(m.glifo)}</span> ${txt(m.nome)}
-        </p>
-        <p class="secao__apoio" style="margin:0 0 var(--space-xs)">${txt(m.resumo)}</p>
-        <p class="secao__apoio" style="margin:0">
-          ${f} de ${total} ${total === 1 ? "tela funciona" : "telas funcionam"} de verdade
-        </p>
-        <p style="margin: var(--space-xs) 0 0">
-          <button type="button" class="botao botao--secundario" data-ir="${txt(m.id)}">
-            Abrir ${txt(m.nome)}
-          </button>
-        </p>
-      </div>`;
-  }).join("");
-
-  return `
-    <h1 class="sr-only">Visão geral do ecossistema Evolli RH</h1>
-
-    <section class="secao" aria-labelledby="estado-titulo">
-      <h2 class="secao__titulo" id="estado-titulo">Onde o produto está hoje</h2>
-      <p class="secao__apoio">
-        Contagem real das ${INVENTARIO.totalFolhas} telas que existem, feita a partir do
-        próprio código. Não é estimativa.
-      </p>
-      <div class="grade">
-        <div class="cartao">${selo("funcional")}
-          <p style="margin: var(--space-xs) 0 0; font-size: var(--text-title); font-weight: var(--weight-bold)">${INVENTARIO.funcional}</p>
-          <p class="secao__apoio" style="margin:0">telas já funcionam de verdade</p></div>
-        <div class="cartao">${selo("parcial")}
-          <p style="margin: var(--space-xs) 0 0; font-size: var(--text-title); font-weight: var(--weight-bold)">${INVENTARIO.parcial}</p>
-          <p class="secao__apoio" style="margin:0">tela só mostra, ainda não deixa alterar</p></div>
-        <div class="cartao">${selo("demonstrativo")}
-          <p style="margin: var(--space-xs) 0 0; font-size: var(--text-title); font-weight: var(--weight-bold)">${INVENTARIO.demonstrativo}</p>
-          <p class="secao__apoio" style="margin:0">telas são só aparência, com dados de exemplo</p></div>
-      </div>
-    </section>
-
-    <section class="secao" aria-labelledby="modulos-titulo">
-      <h2 class="secao__titulo" id="modulos-titulo">Módulos do ecossistema</h2>
-      <div class="grade">${porModulo}</div>
-    </section>
-
-    ${legenda()}
-
-    <section class="secao" aria-labelledby="futuro-titulo">
-      <h2 class="secao__titulo" id="futuro-titulo">Evolução futura</h2>
-      <p class="secao__apoio">
-        Fora da navegação de propósito: um item no menu é lido como algo que já
-        existe, e nenhum destes existe.
-      </p>
-      ${EVOLUCAO_FUTURA.map(
-        (e) => `
-        <div class="pendencia">
-          <span><strong>${txt(e.nome)}</strong> — ${txt(e.nota)}</span>
-          ${selo("planejado")}
-        </div>`,
-      ).join("")}
-    </section>`;
-}
-
 function workspace(m) {
+  const r = resumoDe(m);
+
+  const proximoPasso =
+    r.funcional > 0
+      ? "Dá para usar o que já está funcional. As telas demonstrativas precisam de uma fatia própria para virar capacidade real."
+      : r.demonstrativo > 0
+        ? "Este módulo só tem aparência hoje. O próximo passo é escolher uma tela, dar identificador próprio a ela e construí-la de verdade."
+        : "Nada foi construído aqui ainda. O próximo passo é a decisão de escopo: o que este módulo precisa resolver primeiro.";
+
   const atalhos = m.atalhos.length
     ? `<section class="secao" aria-labelledby="atalhos-${txt(m.id)}">
-        <h2 class="secao__titulo" id="atalhos-${txt(m.id)}">Atalhos</h2>
+        <div class="secao__cabecalho">
+          <h2 class="secao__titulo" id="atalhos-${txt(m.id)}">Atalhos</h2>
+          <span class="meta">do protótipo</span>
+        </div>
         <div class="atalhos">
           ${m.atalhos
             .map(
               (a) =>
-                `<button type="button" class="botao" data-acao="${txt(a.acao)}">${txt(a.rotulo)}</button>`,
+                `<button type="button" class="botao botao--secundario" data-acao="${txt(a.acao)}">${txt(a.rotulo)}</button>`,
             )
             .join("")}
         </div>
@@ -203,55 +323,122 @@ function workspace(m) {
 
   const pendencias = m.pendencias.length
     ? `<section class="secao" aria-labelledby="pend-${txt(m.id)}">
-        <h2 class="secao__titulo" id="pend-${txt(m.id)}">Pendências</h2>
-        <p class="secao__apoio">Números de exemplo — nada aqui foi apurado.</p>
-        ${m.pendencias
-          .map(
-            (p) =>
-              `<div class="pendencia"><span>${txt(p.texto)}</span>${selo(p.selo)}</div>`,
-          )
-          .join("")}
+        <div class="secao__cabecalho">
+          <h2 class="secao__titulo" id="pend-${txt(m.id)}">Pendências</h2>
+          <span class="meta">números de exemplo</span>
+        </div>
+        <div class="pilha">
+          ${m.pendencias
+            .map(
+              (p) => `
+            <div class="linha">
+              <span class="linha__texto"><span class="linha__titulo">${txt(p.texto)}</span></span>
+              <span class="linha__fim">${selo(p.selo)}</span>
+            </div>`,
+            )
+            .join("")}
+        </div>
       </section>`
     : "";
 
-  const lista =
-    m.id === "pessoas"
-      ? listaColaboradores()
-      : `<section class="secao" aria-labelledby="telas-${txt(m.id)}">
-          <h2 class="secao__titulo" id="telas-${txt(m.id)}">Telas deste módulo</h2>
-          <div class="tabela-rolagem">
-            <table>
-              <caption class="sr-only">Telas do módulo ${txt(m.nome)} e o estado real de cada uma</caption>
-              <thead><tr><th scope="col">Tela</th><th scope="col">Estado</th><th scope="col">Observação</th></tr></thead>
-              <tbody>
-                ${m.telas
-                  .map(
-                    (t) => `
-                  <tr>
-                    <td>${txt(t.nome)}</td>
-                    <td>${selo(t.estado)}</td>
-                    <td>${txt(t.nota ?? "—")}</td>
-                  </tr>`,
-                  )
-                  .join("")}
-              </tbody>
-            </table>
-          </div>
-        </section>`;
+  const lista = m.id === "pessoas" ? listaColaboradores() : "";
 
-  const f = m.telas.filter((t) => t.estado === "funcional").length;
+  // Funcionalidades agrupadas por estado: o disponível vem antes do plano.
+  const ordem = ["funcional", "parcial", "demonstrativo", "planejado"];
+  const grupos = ordem
+    .map((e) => ({ estado: e, telas: m.telas.filter((t) => t.estado === e) }))
+    .filter((g) => g.telas.length > 0);
+
   return `
-    <h1 class="sr-only">${txt(m.nome)}</h1>
-    <section class="secao">
-      <p class="secao__apoio" style="margin:0 0 var(--space-xs)">${txt(m.resumo)}</p>
-      <p class="secao__apoio" style="margin:0">
-        ${f} de ${m.telas.length} ${m.telas.length === 1 ? "tela funciona" : "telas funcionam"} de verdade neste módulo.
-      </p>
+    <section class="secao" aria-labelledby="resumo-${txt(m.id)}">
+      <h2 class="sr-only" id="resumo-${txt(m.id)}">Resumo do módulo</h2>
+      <div class="aviso aviso--info">
+        ${ICONES.info}
+        <span>
+          <strong>${r.funcional} de ${r.total} ${r.total === 1 ? "tela funciona" : "telas funcionam"} de verdade.</strong>
+          ${txt(proximoPasso)}
+        </span>
+      </div>
     </section>
     ${atalhos}
     ${pendencias}
     ${lista}
-    ${legenda()}`;
+
+    <section class="secao" aria-labelledby="telas-${txt(m.id)}">
+      <div class="secao__cabecalho">
+        <h2 class="secao__titulo" id="telas-${txt(m.id)}">Funcionalidades</h2>
+        <span class="meta">${plural(r.total, "tela", "telas")}</span>
+      </div>
+      ${grupos
+        .map(
+          (g) => `
+        <div style="margin-bottom: var(--space-md)">
+          <p class="secao__apoio" style="margin-bottom: var(--space-xs)">
+            ${selo(g.estado)} <span>${txt(ESTADOS[g.estado].explicacao)}</span>
+          </p>
+          <div class="pilha">
+            ${g.telas
+              .map(
+                (t) => `
+              <div class="linha">
+                <span class="linha__texto">
+                  <span class="linha__titulo">${txt(t.nome)}</span>
+                  ${t.nota ? `<span class="linha__apoio">${txt(t.nota)}</span>` : ""}
+                </span>
+              </div>`,
+              )
+              .join("")}
+          </div>
+        </div>`,
+        )
+        .join("")}
+    </section>
+
+    ${m.id === "pessoas" ? blocoEstados() : ""}`;
+}
+
+/** Exemplos visuais de carregamento, vazio, erro e sucesso. Não simulam nada. */
+function blocoEstados() {
+  return `
+    <section class="secao" aria-labelledby="estados-titulo">
+      <div class="secao__cabecalho">
+        <h2 class="secao__titulo" id="estados-titulo">Estados da interface</h2>
+        <span class="meta">exemplos visuais</span>
+      </div>
+      <p class="secao__apoio">
+        Como a tela se comporta em cada situação. São amostras estáticas — nada
+        aqui está carregando, falhando ou salvando de verdade.
+      </p>
+      <div class="modulos" style="margin-top: var(--space-sm)">
+        <div class="cartao-registro">
+          <strong class="cartao-registro__nome">Carregando</strong>
+          <span class="esqueleto esqueleto--medio"></span>
+          <span class="esqueleto esqueleto--curto"></span>
+          <span class="esqueleto"></span>
+        </div>
+        <div class="cartao-registro">
+          <strong class="cartao-registro__nome">Sem resultado</strong>
+          <div class="estado" style="padding: var(--space-md) 0">
+            <p class="estado__titulo">Nenhum colaborador encontrado</p>
+            <p class="estado__texto">Tente outro nome ou limpe os filtros.</p>
+          </div>
+        </div>
+        <div class="cartao-registro">
+          <strong class="cartao-registro__nome">Erro</strong>
+          <div class="aviso aviso--erro">
+            ${ICONES.alerta}
+            <span>Não foi possível carregar a lista. Tente de novo em instantes.</span>
+          </div>
+        </div>
+        <div class="cartao-registro">
+          <strong class="cartao-registro__nome">Sucesso</strong>
+          <div class="aviso aviso--sucesso">
+            ${ICONES.certo}
+            <span>Nome atualizado.</span>
+          </div>
+        </div>
+      </div>
+    </section>`;
 }
 
 function listaColaboradores() {
@@ -268,70 +455,127 @@ function listaColaboradores() {
     .map(
       (c) => `
       <tr>
-        <td>${txt(c.id)}</td>
-        <td>${txt(c.nome)}</td>
+        <td class="tabela__mono">${txt(c.id)}</td>
+        <td class="tabela__principal">${txt(c.nome)}</td>
         <td>${txt(c.empresa)}</td>
         <td>${txt(c.departamento)}</td>
+        <td class="tabela__mono">${txt(c.admissao)}</td>
         <td>${c.situacao === "ativo" ? selo("funcional") : selo("demonstrativo")}</td>
-        <td><button type="button" class="botao botao--secundario" data-detalhe="${txt(c.id)}">Abrir</button></td>
+        <td class="tabela__acao">
+          <button type="button" class="botao botao--discreto" data-detalhe="${txt(c.id)}">Abrir</button>
+        </td>
       </tr>`,
     )
     .join("");
 
+  const cartoes = visiveis
+    .map(
+      (c) => `
+      <div class="cartao-registro">
+        <div class="cartao-registro__topo">
+          <span class="cartao-registro__nome">${txt(c.nome)}</span>
+          ${c.situacao === "ativo" ? selo("funcional") : selo("demonstrativo")}
+        </div>
+        <dl class="cartao-registro__dados">
+          <dt>Matrícula</dt><dd>${txt(c.id)}</dd>
+          <dt>Empresa</dt><dd>${txt(c.empresa)}</dd>
+          <dt>Departamento</dt><dd>${txt(c.departamento)}</dd>
+          <dt>Admissão</dt><dd>${txt(c.admissao)}</dd>
+        </dl>
+        <button type="button" class="botao botao--secundario" data-detalhe="${txt(c.id)}">Abrir detalhe</button>
+      </div>`,
+    )
+    .join("");
+
+  const corpoVazio = `
+    <div class="estado">
+      <p class="estado__titulo">Nenhum colaborador corresponde ao filtro</p>
+      <p class="estado__texto">
+        Ajuste o nome ou a situação para ver os registros sintéticos de novo.
+      </p>
+      <button type="button" class="botao botao--secundario" data-limpar>Limpar filtros</button>
+    </div>`;
+
   return `
     <section class="secao" aria-labelledby="lista-titulo">
-      <h2 class="secao__titulo" id="lista-titulo">Colaboradores</h2>
+      <div class="secao__cabecalho">
+        <h2 class="secao__titulo" id="lista-titulo">Colaboradores</h2>
+        <span class="meta" role="status">
+          ${plural(visiveis.length, "resultado", "resultados")} de ${COLABORADORES.length}
+        </span>
+      </div>
       <p class="secao__apoio">
         Lista navegável de verdade neste protótipo: o filtro funciona e o detalhe
         abre em janela. Os dados são sintéticos.
       </p>
 
-      <div class="filtros">
-        <div class="campo">
-          <label class="campo__rotulo" for="filtro-nome">Nome ou matrícula</label>
-          <input id="filtro-nome" type="search" value="${txt(filtroBusca)}" />
+      <div class="ferramentas" style="margin-top: var(--space-sm)">
+        <div class="ferramentas__campos">
+          <div class="campo">
+            <label class="campo__rotulo" for="filtro-nome">Nome ou matrícula</label>
+            <input id="filtro-nome" type="search" value="${txt(filtroBusca)}"
+                   placeholder="Ex.: Alfa" aria-describedby="filtro-nome-dica" />
+            <span class="campo__dica" id="filtro-nome-dica">Filtra nesta lista sintética.</span>
+          </div>
+          <div class="campo">
+            <label class="campo__rotulo" for="filtro-situacao">Situação</label>
+            <select id="filtro-situacao">
+              <option value="todos"${filtroSituacao === "todos" ? " selected" : ""}>Todas</option>
+              <option value="ativo"${filtroSituacao === "ativo" ? " selected" : ""}>Ativo</option>
+              <option value="inativo"${filtroSituacao === "inativo" ? " selected" : ""}>Inativo</option>
+            </select>
+          </div>
         </div>
-        <div class="campo">
-          <label class="campo__rotulo" for="filtro-situacao">Situação</label>
-          <select id="filtro-situacao">
-            <option value="todos"${filtroSituacao === "todos" ? " selected" : ""}>Todas</option>
-            <option value="ativo"${filtroSituacao === "ativo" ? " selected" : ""}>Ativo</option>
-            <option value="inativo"${filtroSituacao === "inativo" ? " selected" : ""}>Inativo</option>
-          </select>
-        </div>
-        <button type="button" class="botao" data-acao="admissao">Admitir colaborador</button>
       </div>
 
-      <div class="tabela-rolagem">
-        <table>
-          <caption class="sr-only">Colaboradores sintéticos do protótipo</caption>
-          <thead>
-            <tr>
-              <th scope="col">Matrícula</th><th scope="col">Nome</th><th scope="col">Empresa</th>
-              <th scope="col">Departamento</th><th scope="col">Situação</th><th scope="col">Ação</th>
-            </tr>
-          </thead>
-          <tbody>${linhas}</tbody>
-        </table>
-        ${visiveis.length === 0 ? '<p class="vazio">Nenhum colaborador corresponde ao filtro.</p>' : ""}
-      </div>
+      ${
+        visiveis.length === 0
+          ? corpoVazio
+          : `
+        <div class="tabela-envolucro">
+          <table class="tabela">
+            <caption class="sr-only">Colaboradores sintéticos do protótipo</caption>
+            <thead>
+              <tr>
+                <th scope="col">Matrícula</th><th scope="col">Nome</th>
+                <th scope="col">Empresa</th><th scope="col">Departamento</th>
+                <th scope="col">Admissão</th><th scope="col">Situação</th>
+                <th scope="col"><span class="sr-only">Ação</span></th>
+              </tr>
+            </thead>
+            <tbody>${linhas}</tbody>
+          </table>
+        </div>
+        <div class="cartoes-lista">${cartoes}</div>`
+      }
     </section>`;
 }
 
 // ---------------------------------------------------------------- ações
 
 function ligarAcoes() {
-  for (const b of conteudo.querySelectorAll("[data-ir]")) {
-    b.addEventListener("click", () => irPara(b.dataset.ir));
+  for (const raiz of [conteudo, $("#contexto-acoes")]) {
+    for (const b of raiz.querySelectorAll("[data-ir]")) {
+      b.addEventListener("click", () => irPara(b.dataset.ir));
+    }
+    for (const b of raiz.querySelectorAll('[data-acao="admissao"]')) {
+      b.addEventListener("click", () => abrirAdmissao());
+    }
+    for (const b of raiz.querySelectorAll('[data-acao="lista"]')) {
+      b.addEventListener("click", () => irPara("pessoas"));
+    }
+    for (const b of raiz.querySelectorAll("[data-detalhe]")) {
+      b.addEventListener("click", () => abrirDetalhe(b.dataset.detalhe));
+    }
   }
-  for (const b of conteudo.querySelectorAll('[data-acao="admissao"]')) {
-    b.addEventListener("click", () => abrirAdmissao(b));
-  }
-  for (const b of conteudo.querySelectorAll('[data-acao="lista"]')) {
-    b.addEventListener("click", () => irPara("pessoas"));
-  }
-  for (const b of conteudo.querySelectorAll("[data-detalhe]")) {
-    b.addEventListener("click", () => abrirDetalhe(b.dataset.detalhe, b));
+
+  const limpar = conteudo.querySelector("[data-limpar]");
+  if (limpar) {
+    limpar.addEventListener("click", () => {
+      filtroBusca = "";
+      filtroSituacao = "todos";
+      redesenharLista(null);
+    });
   }
 
   const nome = conteudo.querySelector("#filtro-nome");
@@ -350,10 +594,12 @@ function ligarAcoes() {
   }
 }
 
-/** Redesenha só a lista, devolvendo o foco a quem estava filtrando. */
+/** Redesenha a lista devolvendo o foco a quem estava filtrando. */
 function redesenharLista(posicaoCursor) {
   const focoEra = document.activeElement?.id;
-  irPara("pessoas");
+  const m = MODULOS.find((x) => x.id === moduloAtivo);
+  conteudo.innerHTML = workspace(m);
+  ligarAcoes();
   if (!focoEra) return;
   const alvo = conteudo.querySelector(`#${focoEra}`);
   if (!alvo) return;
@@ -379,6 +625,7 @@ function abrirModal({
   descricao,
   corpo,
   rodape,
+  larga = false,
   alterado = () => false,
 }) {
   const acionador = document.activeElement;
@@ -386,7 +633,8 @@ function abrirModal({
   caixa.className = "modal";
   caixa.innerHTML = `
     <div class="modal__fundo" data-fundo></div>
-    <div class="modal__caixa" role="dialog" aria-modal="true" aria-labelledby="modal-titulo"
+    <div class="modal__caixa${larga ? " modal__caixa--larga" : ""}" role="dialog"
+         aria-modal="true" aria-labelledby="modal-titulo"
          ${descricao ? 'aria-describedby="modal-descricao"' : ""}>
       <header class="modal__cabecalho">
         <div>
@@ -507,7 +755,7 @@ function abrirModal({
     .addEventListener("click", pedirFechamento);
 
   tituloEl.focus({ preventScroll: true });
-  modalAtual = { fechar, pedirFechamento };
+  modalAtual = { fechar, pedirFechamento, caixa };
   return modalAtual;
 }
 
@@ -517,36 +765,82 @@ function abrirAdmissao() {
     titulo: "Admitir colaborador",
     descricao:
       "Formulário de demonstração. Nada é gravado — nenhum colaborador será criado.",
+    larga: true,
     corpo: `
-      <div class="grade">
-        <div class="campo"><label class="campo__rotulo" for="adm-nome">Nome completo</label>
-          <input id="adm-nome" type="text" /></div>
-        <div class="campo"><label class="campo__rotulo" for="adm-matricula">Matrícula</label>
-          <input id="adm-matricula" type="text" /></div>
-        <div class="campo"><label class="campo__rotulo" for="adm-empresa">Empresa</label>
-          <select id="adm-empresa"><option>Alfa</option><option>Beta</option></select></div>
-        <div class="campo"><label class="campo__rotulo" for="adm-admissao">Data de admissão</label>
-          <input id="adm-admissao" type="date" /></div>
-      </div>
-      <p class="secao__apoio" style="margin-top: var(--space-md)">
-        Digite algo e tente fechar: a janela pede confirmação antes de descartar.
+      <fieldset class="grupo-campos">
+        <legend class="grupo-campos__titulo">Identificação</legend>
+        <div class="grade-campos">
+          <div class="campo">
+            <label class="campo__rotulo" for="adm-nome">Nome completo</label>
+            <input id="adm-nome" type="text" aria-describedby="adm-nome-erro" />
+            <span class="campo__erro" id="adm-nome-erro" hidden>
+              ${ICONES.alerta}<span>Informe o nome completo.</span>
+            </span>
+          </div>
+          <div class="campo">
+            <label class="campo__rotulo" for="adm-matricula">Matrícula</label>
+            <input id="adm-matricula" type="text" placeholder="Ex.: DEMO-A-0005" />
+            <span class="campo__dica">Única por empresa.</span>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset class="grupo-campos">
+        <legend class="grupo-campos__titulo">Vínculo</legend>
+        <div class="grade-campos">
+          <div class="campo">
+            <label class="campo__rotulo" for="adm-empresa">Empresa</label>
+            <select id="adm-empresa"><option>Alfa</option><option>Beta</option></select>
+          </div>
+          <div class="campo">
+            <label class="campo__rotulo" for="adm-departamento">Departamento</label>
+            <select id="adm-departamento">
+              <option>Operações</option><option>Administrativo</option><option>Comercial</option>
+            </select>
+          </div>
+          <div class="campo">
+            <label class="campo__rotulo" for="adm-admissao">Data de admissão</label>
+            <input id="adm-admissao" type="date" />
+          </div>
+        </div>
+      </fieldset>
+
+      <p class="secao__apoio">
+        O erro aparece junto do campo, não só no topo. Digite algo e tente
+        fechar: a janela pede confirmação antes de descartar.
       </p>`,
     rodape: `
       <button type="button" class="botao botao--secundario" data-cancelar>Cancelar</button>
-      <button type="button" class="botao" data-salvar>Salvar</button>`,
+      <button type="button" class="botao" data-salvar>Admitir</button>`,
     alterado: () => tocado,
   });
 
-  const caixa = raizModal.querySelector(".modal");
+  const caixa = m.caixa;
   for (const campo of caixa.querySelectorAll("input, select")) {
     campo.addEventListener("input", () => {
       tocado = true;
     });
   }
+
+  const nome = caixa.querySelector("#adm-nome");
+  const erroNome = caixa.querySelector("#adm-nome-erro");
+  // Valida ao sair do campo, não só ao enviar.
+  nome.addEventListener("blur", () => {
+    const vazio = nome.value.trim() === "";
+    erroNome.hidden = !vazio;
+    nome.setAttribute("aria-invalid", vazio ? "true" : "false");
+  });
+
   caixa
     .querySelector("[data-cancelar]")
     .addEventListener("click", () => m.pedirFechamento());
   caixa.querySelector("[data-salvar]").addEventListener("click", () => {
+    if (nome.value.trim() === "") {
+      erroNome.hidden = false;
+      nome.setAttribute("aria-invalid", "true");
+      nome.focus();
+      return;
+    }
     tocado = false;
     m.fechar();
   });
@@ -559,25 +853,28 @@ function abrirDetalhe(id) {
     titulo: c.nome,
     descricao: "Detalhe de demonstração. Alterações não são gravadas.",
     corpo: `
-      <div class="campo" style="margin-bottom: var(--space-md)">
-        <label class="campo__rotulo" for="det-nome">Nome</label>
-        <input id="det-nome" type="text" value="${txt(c.nome)}" />
-      </div>
-      <div class="tabela-rolagem tabela-rolagem--par">
-        <table>
-          <caption class="sr-only">Dados sintéticos de ${txt(c.nome)}</caption>
-          <tbody>
-            <tr><th scope="row">Matrícula</th><td>${txt(c.id)}</td></tr>
-            <tr><th scope="row">Empresa</th><td>${txt(c.empresa)}</td></tr>
-            <tr><th scope="row">Departamento</th><td>${txt(c.departamento)}</td></tr>
-            <tr><th scope="row">Admissão</th><td>${txt(c.admissao)}</td></tr>
-            <tr><th scope="row">Vínculos</th><td>${c.vinculos}</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p class="secao__apoio" style="margin-top: var(--space-md)">
-        Matrícula, empresa e data de admissão não são editáveis nesta janela —
-        o mesmo limite da tela funcional de Colaboradores.
+      <fieldset class="grupo-campos">
+        <legend class="grupo-campos__titulo">Editável</legend>
+        <div class="campo">
+          <label class="campo__rotulo" for="det-nome">Nome</label>
+          <input id="det-nome" type="text" value="${txt(c.nome)}" />
+        </div>
+      </fieldset>
+
+      <fieldset class="grupo-campos">
+        <legend class="grupo-campos__titulo">Imutável nesta janela</legend>
+        <dl class="cartao-registro__dados">
+          <dt>Matrícula</dt><dd>${txt(c.id)}</dd>
+          <dt>Empresa</dt><dd>${txt(c.empresa)}</dd>
+          <dt>Departamento</dt><dd>${txt(c.departamento)}</dd>
+          <dt>Admissão</dt><dd>${txt(c.admissao)}</dd>
+          <dt>Vínculos</dt><dd>${c.vinculos}</dd>
+        </dl>
+      </fieldset>
+
+      <p class="secao__apoio">
+        Matrícula, empresa e data de admissão não são editáveis aqui — o mesmo
+        limite da tela funcional de Colaboradores.
       </p>`,
     rodape: `
       <button type="button" class="botao botao--secundario" data-cancelar>Cancelar</button>
@@ -585,7 +882,7 @@ function abrirDetalhe(id) {
     alterado: () => tocado,
   });
 
-  const caixa = raizModal.querySelector(".modal");
+  const caixa = m.caixa;
   caixa.querySelector("#det-nome").addEventListener("input", () => {
     tocado = true;
   });
@@ -616,17 +913,6 @@ $("#abrir-menu").addEventListener("click", () => {
 });
 
 $("#lateral-fundo").addEventListener("click", fecharMenuMovel);
-
-$("#alternar-lateral").addEventListener("click", (e) => {
-  const recolhida = shell.getAttribute("data-lateral") === "recolhida";
-  shell.setAttribute("data-lateral", recolhida ? "expandida" : "recolhida");
-  e.currentTarget.textContent = recolhida ? "Recolher menu" : "Expandir menu";
-});
-
-// A busca é só visual, e o protótipo diz isso em voz alta.
-$("#busca-visual").addEventListener("keydown", (e) => {
-  if (e.key === "Enter") e.preventDefault();
-});
 
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && !modalAtual) fecharMenuMovel();

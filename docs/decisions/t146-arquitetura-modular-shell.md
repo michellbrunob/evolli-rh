@@ -177,6 +177,79 @@ informada.
 - [ ] Identificação de protótipo sintético permanente.
 - [ ] Nenhuma tela funcional de `apps/web` alterada.
 
+## Segunda versão visual — auditoria com o UI UX Pro Max
+
+### Referência metodológica
+
+A 2ª versão do protótipo passou por auditoria usando a skill
+[`ui-ux-pro-max`](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) (MIT)
+como **ferramenta de consulta**, instalada fora do versionamento desde a T142.
+Ela foi usada **somente em leitura**, pelo buscador local, nas consultas de
+painel corporativo de RH, admin B2B, densidade de dados, navegação lateral,
+tabelas e filtros responsivos, modal e validação acessíveis, estouro de selo,
+estados vazios, aplicação móvel e acessibilidade.
+
+**Ela não virou dependência do projeto**, nenhum arquivo dela foi versionado e o
+design system que ela gera **não foi persistido**. Cada recomendação passou pelo
+filtro das decisões já vinculantes do Evolli antes de virar código.
+
+### Princípios aceitos
+
+- **Acessibilidade em primeiro lugar** — contraste, foco visível, operação por
+  teclado e alvo de toque adequado valem mais que qualquer escolha estética.
+- **Rótulo compacto não quebra linha** — selo e contador ficam numa linha só,
+  com o texto completo disponível, em vez de embolar em duas.
+- **Erro junto do campo**, validado ao sair dele, não só ao enviar.
+- **Estado vazio orienta** — diz o que aconteceu e oferece a saída, em vez de
+  deixar a área em branco.
+- **Tabela larga vira lista no celular**, em vez de empurrar rolagem lateral.
+- **Densidade de painel operacional** — menos moldura, mais informação por tela,
+  cabeçalho de tabela fixo, tipografia compacta mas legível.
+- **Rótulo visível em todo campo**, nunca só `placeholder`.
+- **Ícone nunca sozinho** — sempre acompanha texto, e nunca é emoji.
+
+### Sugestões rejeitadas, e por quê
+
+- **Adotar os tokens e componentes do Shopify Polaris** (resultado de maior
+  pontuação para "admin B2B"): importaria a identidade de outro produto. O
+  Evolli tem tokens próprios, e a ADR 0014 e a decisão da T142 são vinculantes.
+- **Modo escuro (OLED)** como estilo secundário: os tokens do Evolli declaram
+  `color-scheme: light`. Mudar isso é decisão de produto, não de protótipo.
+- **Paleta de dados para gráficos**: não há gráfico no escopo, e cores novas
+  violariam a paleta aprovada.
+- **"Export functionality"** da lista do estilo data-dense: o protótipo não
+  exporta nada, e sugerir isso daria aparência de capacidade inexistente.
+- **Presets de animação GSAP**: dependência externa, proibida aqui.
+- **Ações em massa com seleção múltipla**: útil num produto real, mas no
+  protótipo seria encenação de operação que não existe.
+
+### Critérios visuais da 2ª versão
+
+1. **Hierarquia por peso e espaço, não por moldura.** A 1ª versão embrulhava
+   tudo em cartão com borda e o olho não tinha onde pousar. A borda virou
+   exceção.
+2. **Um número manda.** O que já funciona ganha escala tipográfica própria; o
+   restante é contexto, com barra de proporção e legenda — não três caixas de
+   mesmo peso.
+3. **Ordem por prontidão.** Os módulos aparecem na ordem do que dá para usar,
+   não em grade alfabética uniforme, e o que tem tela funcional ganha realce.
+4. **Uma ação primária por contexto**, no cabeçalho, sem competir com atalhos.
+5. **Ícones de sistema.** Os glifos tipográficos (◉ ◎ ◷) viraram SVG em traço,
+   desenhados no próprio protótipo, na mesma caixa e no mesmo peso.
+6. **Contadores na navegação** (funcionais/total) para o estado ser legível sem
+   entrar no módulo.
+7. **Espaço horizontal aproveitado** — a grade acompanha a largura em vez de
+   espremer colunas iguais num contêiner estreito.
+8. **375 px tem solução própria**, não é o desktop encolhido: a tabela dá lugar
+   a cartões.
+
+### Nada externo foi incorporado
+
+Nenhuma identidade, código, CSS, componente, ícone, imagem, fonte ou ativo de
+terceiros entrou no protótipo. Os ícones são SVG desenhados aqui; os tokens vêm
+do próprio Evolli; não há dependência, framework, CDN ou fonte externa. A skill
+foi consultada e descartada depois do uso.
+
 ## Limites e fora de escopo
 
 - **Não implementa** folha, eSocial, férias, benefícios ou clima.

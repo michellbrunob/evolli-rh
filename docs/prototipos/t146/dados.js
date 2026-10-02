@@ -38,9 +38,9 @@ export const ESTADOS = {
 export const MODULOS = [
   {
     id: "inicio",
+    icone: "inicio",
     nome: "Início",
     grupo: "Operação",
-    glifo: "◉",
     resumo: "Onde o ecossistema se apresenta: o que existe e o que falta.",
     atalhos: [],
     pendencias: [],
@@ -48,9 +48,9 @@ export const MODULOS = [
   },
   {
     id: "pessoas",
+    icone: "pessoas",
     nome: "Pessoas",
     grupo: "Operação",
-    glifo: "◎",
     resumo: "Quem trabalha na empresa, do primeiro dia ao histórico completo.",
     atalhos: [
       { rotulo: "Admitir colaborador", acao: "admissao" },
@@ -70,9 +70,9 @@ export const MODULOS = [
   },
   {
     id: "jornada",
+    icone: "jornada",
     nome: "Jornada",
     grupo: "Operação",
-    glifo: "◷",
     resumo: "Marcações, horários e o fechamento do período.",
     atalhos: [{ rotulo: "Abrir visão do período", acao: "nada" }],
     pendencias: [
@@ -96,9 +96,9 @@ export const MODULOS = [
   },
   {
     id: "ausencias",
+    icone: "ausencias",
     nome: "Ausências",
     grupo: "Operação",
-    glifo: "◌",
     resumo: "Férias, afastamentos, atestados e licenças.",
     atalhos: [],
     pendencias: [],
@@ -111,9 +111,9 @@ export const MODULOS = [
   },
   {
     id: "solicitacoes",
+    icone: "solicitacoes",
     nome: "Solicitações",
     grupo: "Operação",
-    glifo: "◈",
     resumo: "O que as pessoas pedem e como o RH responde.",
     atalhos: [{ rotulo: "Abrir central", acao: "nada" }],
     pendencias: [
@@ -127,9 +127,9 @@ export const MODULOS = [
   },
   {
     id: "beneficios",
+    icone: "beneficios",
     nome: "Benefícios",
     grupo: "Operação",
-    glifo: "◆",
     resumo: "Benefícios concedidos e dependentes.",
     atalhos: [],
     pendencias: [],
@@ -140,9 +140,9 @@ export const MODULOS = [
   },
   {
     id: "clima",
+    icone: "clima",
     nome: "Clima e desenvolvimento",
     grupo: "Consulta",
-    glifo: "◇",
     resumo: "Pesquisa de clima e trilha de desenvolvimento.",
     atalhos: [],
     pendencias: [],
@@ -153,9 +153,9 @@ export const MODULOS = [
   },
   {
     id: "relatorios",
+    icone: "relatorios",
     nome: "Relatórios",
     grupo: "Consulta",
-    glifo: "▤",
     resumo: "Leitura consolidada do que já foi registrado.",
     atalhos: [],
     pendencias: [],
@@ -171,9 +171,9 @@ export const MODULOS = [
   },
   {
     id: "administracao",
+    icone: "administracao",
     nome: "Administração",
     grupo: "Administração",
-    glifo: "⚙",
     resumo: "A estrutura da empresa e quem tem acesso ao sistema.",
     atalhos: [],
     pendencias: [],
