@@ -22,6 +22,7 @@ import {
   listarVinculosDoColaborador,
   retificarColaborador,
 } from "../../api/colaboradoresClient";
+import { formatarDia } from "../../format/dia";
 import {
   type AreaApi,
   type CentroCustoApi,
@@ -130,6 +131,23 @@ interface DetalheState {
 }
 
 /** Rótulo do TIPO de referência organizacional (categoria), nunca do registro. */
+/**
+ * Limpa o erro do campo que está sendo corrigido e PRESERVA `geral`.
+ *
+ * Antes, todo `onChange` fazia `erros: {}`. Como a mensagem devolvida pelo
+ * servidor (matrícula duplicada, por exemplo) vive em `geral`, começar a
+ * corrigir apagava a explicação do que havia dado errado — justamente no
+ * momento em que ela é necessária. `geral` só é limpo no próximo envio.
+ */
+function limparErroDoCampo(
+  erros: FormularioErros,
+  campo: keyof FormularioErros,
+): FormularioErros {
+  const restante: FormularioErros = { ...erros };
+  delete restante[campo];
+  return restante;
+}
+
 function rotuloTipoDestino(tipo: TipoDestino): string {
   return (
     OPCOES_TIPO_DESTINO.find((o) => o.valor === tipo)?.rotulo ?? "Registro"
@@ -157,6 +175,17 @@ export function ColaboradoresScreen() {
   // são responsabilidade do `Modal` (UI-F04) — a tela só diz o que abre.
   /** Envio em curso — trava síncrona, ver `handleSubmit`. */
   const enviandoRef = useRef(false);
+  /** Salvamento do nome em curso — mesma trava síncrona, ver `handleSalvarNome`. */
+  const salvandoNomeRef = useRef(false);
+  /**
+   * Sequência do pedido de lista em voo.
+   *
+   * Trocar um filtro dispara `carregarDados` sem cancelar o anterior. Se a
+   * primeira resposta chegar DEPOIS da segunda, ela sobrescreve a lista com
+   * dados que não correspondem ao filtro na tela. O contador resolve sem
+   * `AbortController`: a resposta só é aplicada se ainda for a mais recente.
+   */
+  const pedidoListaRef = useRef(0);
 
   const formularioAlterado =
     formulario !== null &&
@@ -181,6 +210,7 @@ export function ColaboradoresScreen() {
       situacao: FiltroSituacao,
       situacaoVinculo: FiltroSituacaoVinculo,
     ) => {
+      const pedido = ++pedidoListaRef.current;
       setStatusCarregamento("carregando");
       try {
         const query: {
@@ -191,10 +221,16 @@ export function ColaboradoresScreen() {
         if (situacaoVinculo !== "todos")
           query.situacaoVinculo = situacaoVinculo;
         const resp = await listarColaboradores(query);
+        // Resposta obsoleta: outro filtro já pediu a lista depois desta.
+        // Aplicá-la mostraria dados que não correspondem ao filtro na tela.
+        if (pedido !== pedidoListaRef.current) return null;
         setColaboradores(resp.itens);
         setStatusCarregamento("dados");
+        return resp.itens;
       } catch {
+        if (pedido !== pedidoListaRef.current) return null;
         setStatusCarregamento("erro");
+        return null;
       }
     },
     [],
@@ -294,7 +330,10 @@ export function ColaboradoresScreen() {
             destinoId: "",
             areasDoDepartamento: [],
             carregandoAreas: departamentoId !== "",
-            erros: {},
+            erros: limparErroDoCampo(
+              limparErroDoCampo(prev.erros, "departamentoArea"),
+              "destino",
+            ),
           }
         : prev,
     );
@@ -326,7 +365,13 @@ export function ColaboradoresScreen() {
             destinoId: "",
             departamentoIdArea: "",
             areasDoDepartamento: [],
-            erros: {},
+            erros: limparErroDoCampo(
+              limparErroDoCampo(
+                limparErroDoCampo(prev.erros, "tipoDestino"),
+                "departamentoArea",
+              ),
+              "destino",
+            ),
           }
         : prev,
     );
@@ -352,11 +397,21 @@ export function ColaboradoresScreen() {
     );
     try {
       const vinculos = await listarVinculosDoColaborador(colaboradorId);
+      // Só escreve se o detalhe aberto ainda for o MESMO colaborador. Sem esta
+      // conferência, fechar o detalhe de A e abrir o de B fazia a resposta
+      // atrasada de A gravar os vínculos de A no painel de B — dado de uma
+      // pessoa aparecendo na ficha de outra.
       setDetalhe((prev) =>
-        prev ? { ...prev, vinculos, statusVinculos: "dados" } : prev,
+        prev && prev.colaborador.id === colaboradorId
+          ? { ...prev, vinculos, statusVinculos: "dados" }
+          : prev,
       );
     } catch {
-      setDetalhe((prev) => (prev ? { ...prev, statusVinculos: "erro" } : prev));
+      setDetalhe((prev) =>
+        prev && prev.colaborador.id === colaboradorId
+          ? { ...prev, statusVinculos: "erro" }
+          : prev,
+      );
     }
   }
 
@@ -366,6 +421,9 @@ export function ColaboradoresScreen() {
 
   async function handleSalvarNome() {
     if (!detalhe) return;
+    // Mesma trava síncrona da admissão: `disabled` depende de um `setState`,
+    // que só chega no próximo render, e cliques no mesmo quadro escapam dele.
+    if (salvandoNomeRef.current) return;
     const nome = detalhe.nomeEdicao.trim();
     if (!nome) {
       setDetalhe((prev) =>
@@ -382,6 +440,7 @@ export function ColaboradoresScreen() {
       return;
     }
 
+    salvandoNomeRef.current = true;
     setDetalhe((prev) =>
       prev ? { ...prev, salvandoNome: true, erroNome: null } : prev,
     );
@@ -412,6 +471,10 @@ export function ColaboradoresScreen() {
       setDetalhe((prev) =>
         prev ? { ...prev, salvandoNome: false, erroNome: mensagem } : prev,
       );
+    } finally {
+      // Libera só depois que a tentativa termina — sucesso ou falha —, para
+      // que corrigir e reenviar continue possível.
+      salvandoNomeRef.current = false;
     }
   }
 
@@ -513,11 +576,23 @@ export function ColaboradoresScreen() {
           ? { centroCustoId: formulario.destinoId }
           : {}),
       };
-      await admitirColaborador(dto);
+      const admitido = await admitirColaborador(dto);
       const nomeAdmitido = formulario.nome.trim();
       fecharFormulario();
+      // A confirmação sai assim que o SERVIDOR confirma — não depende do
+      // refetch —, mas não pode mais afirmar que o registro está visível.
+      // A admissão nasce com colaborador `inativo` e vínculo `previsto`
+      // (contrato: só a efetivação ativa); com o filtro em "Ativo", o
+      // recém-admitido não volta na lista, e o texto antigo garantia que sim.
+      const ocultoPorSituacao =
+        filtroSituacao !== "todos" && filtroSituacao !== admitido.situacao;
+      const ocultoPorVinculo =
+        filtroSituacaoVinculo !== "todos" &&
+        filtroSituacaoVinculo !== "previsto";
       setMensagemSucesso(
-        `Colaborador ${nomeAdmitido} admitido. Ele já aparece na lista abaixo.`,
+        ocultoPorSituacao || ocultoPorVinculo
+          ? `Colaborador ${nomeAdmitido} admitido. Ele não aparece na lista porque os filtros atuais o excluem: a admissão começa com situação Inativo e vínculo Previsto.`
+          : `Colaborador ${nomeAdmitido} admitido. Ele já aparece na lista abaixo.`,
       );
       await carregarDados(filtroSituacao, filtroSituacaoVinculo);
     } catch (err: unknown) {
@@ -632,11 +707,15 @@ export function ColaboradoresScreen() {
         </StatusBadge>
       ),
     },
-    { key: "admissao", header: "Admissão", cell: (v) => v.dataAdmissao },
+    {
+      key: "admissao",
+      header: "Admissão",
+      cell: (v) => formatarDia(v.dataAdmissao),
+    },
     {
       key: "desligamento",
       header: "Desligamento",
-      cell: (v) => v.dataDesligamento ?? "—",
+      cell: (v) => formatarDia(v.dataDesligamento),
     },
   ];
 
@@ -959,7 +1038,11 @@ export function ColaboradoresScreen() {
                   onChange={(e) =>
                     setFormulario((prev) =>
                       prev
-                        ? { ...prev, nome: e.target.value, erros: {} }
+                        ? {
+                            ...prev,
+                            nome: e.target.value,
+                            erros: limparErroDoCampo(prev.erros, "nome"),
+                          }
                         : prev,
                     )
                   }
@@ -983,7 +1066,11 @@ export function ColaboradoresScreen() {
                     onChange={(e) =>
                       setFormulario((prev) =>
                         prev
-                          ? { ...prev, empresaId: e.target.value, erros: {} }
+                          ? {
+                              ...prev,
+                              empresaId: e.target.value,
+                              erros: limparErroDoCampo(prev.erros, "empresaId"),
+                            }
                           : prev,
                       )
                     }
@@ -1020,7 +1107,7 @@ export function ColaboradoresScreen() {
                         ? {
                             ...prev,
                             matricula: e.target.value.toUpperCase(),
-                            erros: {},
+                            erros: limparErroDoCampo(prev.erros, "matricula"),
                           }
                         : prev,
                     )
@@ -1047,7 +1134,7 @@ export function ColaboradoresScreen() {
                         ? {
                             ...prev,
                             tipo: e.target.value as TipoVinculo,
-                            erros: {},
+                            erros: limparErroDoCampo(prev.erros, "tipo"),
                           }
                         : prev,
                     )
@@ -1084,7 +1171,10 @@ export function ColaboradoresScreen() {
                         ? {
                             ...prev,
                             dataAdmissao: e.target.value,
-                            erros: {},
+                            erros: limparErroDoCampo(
+                              prev.erros,
+                              "dataAdmissao",
+                            ),
                           }
                         : prev,
                     )
@@ -1167,7 +1257,11 @@ export function ColaboradoresScreen() {
                     onChange={(e) =>
                       setFormulario((prev) =>
                         prev
-                          ? { ...prev, destinoId: e.target.value, erros: {} }
+                          ? {
+                              ...prev,
+                              destinoId: e.target.value,
+                              erros: limparErroDoCampo(prev.erros, "destino"),
+                            }
                           : prev,
                       )
                     }

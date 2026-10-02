@@ -37,6 +37,7 @@ import {
   listarColaboradores,
   listarVinculosDoColaborador,
 } from "../../api/colaboradoresClient";
+import { formatarDia } from "../../format/dia";
 import {
   type AreaApi,
   type CentroCustoApi,
@@ -768,7 +769,7 @@ export function HistoricoFuncionalScreen() {
     if (m.status === "retificada") {
       const correcao = linhaDoTempo?.itens.find((x) => x.retificaId === m.id);
       return correcao
-        ? `Corrigida — nova vigência ${correcao.vigenciaInicio}`
+        ? `Corrigida — nova vigência ${formatarDia(correcao.vigenciaInicio)}`
         : "Corrigida";
     }
     if (m.retificaId) return "É a correção de outra movimentação";
@@ -803,7 +804,7 @@ export function HistoricoFuncionalScreen() {
     {
       key: "vigencia",
       header: "Vigência início",
-      cell: (m) => m.vigenciaInicio,
+      cell: (m) => formatarDia(m.vigenciaInicio),
     },
     {
       key: "registrada",
@@ -856,7 +857,7 @@ export function HistoricoFuncionalScreen() {
     {
       key: "vigencia",
       header: "Vigência início",
-      cell: (m) => m.vigenciaInicio,
+      cell: (m) => formatarDia(m.vigenciaInicio),
     },
     {
       key: "registrada",
