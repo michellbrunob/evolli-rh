@@ -92,6 +92,9 @@ function cenario(opcoes = {}) {
   const custoHttpMs = opcoes.custoHttpMs ?? 0;
   /** Quanto tempo um subprocesso com prazo (hoje só o `pg_isready`) consome. */
   const custoSubprocessoMs = opcoes.custoSubprocessoMs ?? (() => 0);
+  /** Simula o SO recusando confirmar a morte do subprocesso que expirou. */
+  const encerramentoNaoConfirmado =
+    opcoes.encerramentoNaoConfirmado ?? (() => false);
 
   // Relógio falso: nada dorme de verdade, o tempo só anda quando o código sob
   // teste diz que andou. Sem isto, um prazo de parede ou girava sem fim (com
@@ -133,8 +136,22 @@ function cenario(opcoes = {}) {
       const expirou = custo > prazo;
       avancar(Math.min(custo, prazo));
       if (expirou) {
-        encerramentos.push({ comando: chamada.comando, args: chamada.args });
-        return { status: 1, saida: "", expirou: true };
+        // `encerramentoNaoConfirmado` simula o caso patológico em que o
+        // sistema operacional não confirma a morte do subprocesso, sem
+        // precisar de um processo real impossível de matar.
+        const confirmado = !encerramentoNaoConfirmado(chamada);
+        encerramentos.push({
+          comando: chamada.comando,
+          args: chamada.args,
+          confirmado,
+        });
+        return {
+          status: 1,
+          saida: "",
+          expirou: true,
+          encerramentoConfirmado: confirmado,
+          motivo: confirmado ? "expirado" : "expirado_sem_confirmacao",
+        };
       }
       const status = statusPorComando(chamada);
       return {
@@ -144,6 +161,8 @@ function cenario(opcoes = {}) {
             ? saidaPorComando(chamada)
             : `erro simulado; a senha ${SENHA_MIGRATOR} apareceu na saida`,
         expirou: false,
+        encerramentoConfirmado: true,
+        motivo: "normal",
       };
     },
     iniciar: (spec) => {
@@ -1195,4 +1214,81 @@ test("banco: a sondagem roda sem shell e sem segredo em argv", async () => {
     assert.equal(typeof ch.timeoutMs, "number");
     assert.ok(ch.timeoutMs > 0);
   }
+});
+
+// ---------------------------------------------------------------------------
+// T145 (correção do bloqueio) — encerramento NÃO confirmado.
+// Esperar `close` para sempre depois de mandar matar trocaria um travamento
+// por outro. Quando o executor devolve `encerramentoConfirmado: false`, o
+// passo tem de FALHAR com mensagem segura, nunca virar sucesso nem seguir
+// acumulando sondagens.
+// ---------------------------------------------------------------------------
+
+test("banco: encerramento não confirmado falha o passo com mensagem segura", async () => {
+  const c = cenario({
+    tentativas: 10,
+    custoSubprocessoMs: (ch) => (ehSondagemBanco(ch) ? 60_000 : 0),
+    encerramentoNaoConfirmado: ehSondagemBanco,
+  });
+
+  const { resultado, erro } = await executarCenario(c);
+
+  assert.equal(resultado, undefined, "não pode virar sucesso");
+  assert.ok(erro instanceof FalhaDePasso);
+  assert.equal(erro.passo, NOMES_PASSOS[1]);
+  assert.match(erro.message, /não foi possível confirmar o encerramento/i);
+  // Para na PRIMEIRA sondagem não confirmada, em vez de acumular processos
+  // presos a cada volta do laço.
+  assert.equal(c.chamadasComPrazo.filter(ehSondagemBanco).length, 1);
+});
+
+test("banco: a falha de encerramento não revela comando, argumento nem segredo", async () => {
+  const c = cenario({
+    tentativas: 10,
+    custoSubprocessoMs: (ch) => (ehSondagemBanco(ch) ? 60_000 : 0),
+    encerramentoNaoConfirmado: ehSondagemBanco,
+  });
+
+  const { erro } = await executarCenario(c);
+
+  const texto = `${erro.message}\n${erro.proximoPasso}`;
+  for (const segredo of [SENHA_ADMIN, SENHA_APP, SENHA_MIGRATOR]) {
+    assert.ok(!texto.includes(segredo), "vazou segredo na falha");
+  }
+  assert.ok(!texto.includes("pg_isready"), "não deve expor o argumento");
+  assert.ok(!texto.includes("docker compose exec"), "não deve expor o comando");
+  // Diz o passo e a condição, que é o que o operador precisa.
+  assert.equal(erro.passo, NOMES_PASSOS[1]);
+  assert.match(erro.proximoPasso, /processo/i);
+});
+
+test("banco: encerramento CONFIRMADO após timeout segue como tentativa sem sucesso", async () => {
+  // Mesmo cenário, mas o SO confirma a morte: o laço continua tentando dentro
+  // do orçamento, em vez de falhar o passo.
+  const c = cenario({
+    tentativas: 10,
+    custoSubprocessoMs: (ch) => (ehSondagemBanco(ch) ? 60_000 : 0),
+  });
+
+  const { erro } = await executarCenario(c);
+
+  assert.ok(erro instanceof FalhaDePasso);
+  assert.match(erro.message, /PostgreSQL não ficou disponível em 10s/);
+  assert.ok(
+    c.chamadasComPrazo.filter(ehSondagemBanco).length > 1,
+    "com encerramento confirmado o laço deveria continuar tentando",
+  );
+  assert.ok(
+    c.encerramentos.every((e) => e.confirmado),
+    "todos deveriam estar confirmados neste cenário",
+  );
+});
+
+test("banco: caminho normal não encerra nada e não reporta expiração", async () => {
+  const c = cenario();
+  const { resultado, erro } = await executarCenario(c);
+
+  assert.equal(erro, undefined);
+  assert.equal(resultado.verificacoes.banco, true);
+  assert.deepEqual(c.encerramentos, [], "nada a encerrar no caminho normal");
 });

@@ -72,24 +72,48 @@ function executar({ comando, args, shell, env, entrada, cwd }) {
  * quanto o subprocesso com prazo passam por aqui, para não existirem duas
  * disciplinas de kill divergindo com o tempo.
  */
-function matarArvore(filho, sinal = "SIGTERM") {
-  if (filho.pid === undefined) return;
+export function matarArvore(filho, sinal = "SIGTERM") {
+  // Só sinaliza PID real. `0` em POSIX significaria "todo o MEU grupo" e um
+  // negativo, "um grupo arbitrário": qualquer um dos dois derrubaria o próprio
+  // orquestrador. `undefined` é o que o Node devolve quando o spawn falhou.
+  const pid = filho?.pid;
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+
   if (EM_WINDOWS) {
-    spawnSync("taskkill", ["/pid", String(filho.pid), "/t", "/f"], {
+    // `/T` derruba a árvore (com `shell: true` o filho direto é o `cmd.exe`, e
+    // matar só ele deixaria o neto órfão); `/F` não dá chance de ignorar. No
+    // Windows não há distinção entre pedido e força — as duas fases do
+    // encerramento usam o mesmo comando, e a segunda vale como nova tentativa.
+    spawnSync("taskkill", ["/pid", String(pid), "/t", "/f"], {
       stdio: "ignore",
     });
-    return;
+    return true;
   }
   try {
-    process.kill(-filho.pid, sinal);
+    // Negativo = grupo do filho, seguro porque ele nasceu líder de grupo
+    // (`detached: true`). Nunca o nosso.
+    process.kill(-pid, sinal);
+    return true;
   } catch {
     try {
       filho.kill(sinal);
+      return true;
     } catch {
-      // Já morreu: encerrar é melhor-esforço.
+      // Já morreu, ou não dá para sinalizar: encerrar é melhor-esforço, e quem
+      // chamou decide o que fazer com isso.
+      return false;
     }
   }
 }
+
+/**
+ * Carência de cada fase do encerramento. Curta e FIXA: é só o tempo de o
+ * sistema operacional derrubar um processo que já recebeu o sinal, não uma
+ * nova espera pelo serviço. Duas fases, então a carência total é o dobro.
+ */
+export const MS_CARENCIA_ENCERRAMENTO = 1000;
+/** Teto do que o encerramento pode somar ao prazo da tentativa. */
+export const MS_CARENCIA_TOTAL = MS_CARENCIA_ENCERRAMENTO * 2;
 
 /**
  * Executa um comando com PRAZO e devolve o resultado, sem bloquear o event
@@ -97,56 +121,143 @@ function matarArvore(filho, sinal = "SIGTERM") {
  *
  * Existe porque `executar` é `spawnSync`: ele segura a thread até o filho
  * terminar, então um `docker compose exec ... pg_isready` travado furaria
- * qualquer orçamento, por mais correto que fosse o laço em volta. Aqui o
- * processo é assíncrono e, no estouro do prazo, a ÁRVORE é encerrada e o
- * encerramento é AGUARDADO (`close`, não `exit`): sem processo, listener ou
- * timer sobrando. O estouro vira `expirou: true` com status diferente de zero,
- * que o chamador lê como tentativa sem sucesso.
+ * qualquer orçamento, por mais correto que fosse o laço em volta.
+ *
+ * MÁQUINA DE ESTADOS DO ENCERRAMENTO. Esperar `close` para sempre depois de
+ * mandar matar seria trocar um travamento por outro: se o kill não surtir
+ * efeito, ninguém mais acorda esta Promise. Por isso o encerramento é em fases
+ * com teto:
+ *
+ *   1. o prazo expira           → pede o encerramento da árvore (SIGTERM)
+ *   2. carência de 1s sem `close` → repete, agora forçado (SIGKILL)
+ *   3. carência de 1s sem `close` → desiste de confirmar e devolve
+ *      `encerramentoConfirmado: false`, soltando tudo o que prendia o Node
+ *
+ * O caso 3 NUNCA vira sucesso: o passo falha com mensagem explícita. É melhor
+ * reportar "não consegui confirmar o encerramento" do que esperar para sempre
+ * por um processo que o sistema operacional se recusa a matar.
+ *
+ * O prazo da tentativa continua sendo o orçamento real do passo; a carência é
+ * um acréscimo fixo de no máximo `MS_CARENCIA_TOTAL`, e só existe no caminho
+ * patológico em que o processo não morre.
  */
-function executarComPrazo({ comando, args, shell, env, cwd, timeoutMs }) {
+export function executarComPrazo({
+  comando,
+  args,
+  shell,
+  env,
+  cwd,
+  timeoutMs,
+  // Injetáveis para o teste exercitar a máquina de estados sem precisar de um
+  // processo que o sistema operacional se recuse a matar — que é justamente o
+  // caso impossível de fabricar de propósito.
+  matar = matarArvore,
+  criar = spawn,
+}) {
   return new Promise((resolver) => {
-    const filho = spawn(comando, args, {
-      cwd: cwd ? join(RAIZ, cwd) : RAIZ,
-      shell,
-      ...(EM_WINDOWS ? {} : { detached: true }),
-      ...(env ? { env } : {}),
-    });
+    let filho;
+    try {
+      filho = criar(comando, args, {
+        cwd: cwd ? join(RAIZ, cwd) : RAIZ,
+        shell,
+        ...(EM_WINDOWS ? {} : { detached: true }),
+        ...(env ? { env } : {}),
+      });
+    } catch (erro) {
+      // `spawn` lança de forma SÍNCRONA em opção inválida. Sem este `catch` a
+      // Promise rejeitaria e o erro chegaria sem o nome do passo.
+      resolver({
+        status: 127,
+        saida: erro instanceof Error ? erro.message : String(erro),
+        expirou: false,
+        encerramentoConfirmado: true,
+        motivo: "falha_ao_iniciar",
+      });
+      return;
+    }
 
     let saida = "";
     let expirou = false;
     let concluido = false;
-    filho.stdout?.on("data", (p) => {
-      saida += p.toString();
-    });
-    filho.stderr?.on("data", (p) => {
-      saida += p.toString();
-    });
+    const cronometros = [];
 
-    const prazoMs = Math.max(1, Math.round(timeoutMs));
-    const cronometro = setTimeout(() => {
-      expirou = true;
-      // SIGKILL, não SIGTERM: um subprocesso que já furou o prazo é justamente
-      // o que pode estar travado e ignorar o pedido educado de sair.
-      matarArvore(filho, "SIGKILL");
-    }, prazoMs);
-    // O prazo não pode, ele próprio, segurar o processo vivo no fim do
-    // comando — nem aparecer como timer residual.
-    cronometro.unref?.();
+    const aoSair = (p) => {
+      saida += p.toString();
+    };
+    filho.stdout?.on("data", aoSair);
+    filho.stderr?.on("data", aoSair);
 
-    const terminar = (status) => {
-      if (concluido) return;
-      concluido = true;
-      clearTimeout(cronometro);
-      resolver({ status, saida, expirou });
+    /** Solta tudo o que este `executarComPrazo` instalou. */
+    const limpar = () => {
+      for (const c of cronometros.splice(0)) clearTimeout(c);
+      filho.removeListener("close", aoFechar);
+      filho.removeListener("error", aoErrar);
+      filho.stdout?.removeListener("data", aoSair);
+      filho.stderr?.removeListener("data", aoSair);
     };
 
-    // `close` e não `exit`: espera a confirmação do encerramento e o
-    // fechamento dos fluxos, que é o que garante não sobrar nada atrás.
-    filho.on("close", (codigo) => terminar(expirou ? 1 : (codigo ?? 1)));
-    filho.on("error", (erro) => {
+    const terminar = (status, motivo, encerramentoConfirmado = true) => {
+      if (concluido) return;
+      concluido = true;
+      limpar();
+      resolver({ status, saida, expirou, encerramentoConfirmado, motivo });
+    };
+
+    function aoFechar(codigo) {
+      // `close` e não `exit`: além da saída do processo, confirma o fechamento
+      // dos fluxos — é o que garante não sobrar pipe atrás.
+      terminar(
+        expirou ? 1 : (codigo ?? 1),
+        expirou ? "expirado" : "normal",
+        true,
+      );
+    }
+    function aoErrar(erro) {
       saida += erro.message;
-      terminar(127);
+      terminar(127, "falha_ao_iniciar", true);
+    }
+    filho.on("close", aoFechar);
+    filho.on("error", aoErrar);
+
+    /** Timer que não pode ser pulado: o watchdog depende dele. */
+    const agendar = (ms, acao) => {
+      const c = setTimeout(acao, ms);
+      cronometros.push(c);
+      return c;
+    };
+
+    // `timeoutMs` não finito, zero ou negativo vira o mínimo possível, antes
+    // de qualquer timer existir — `setTimeout(NaN)` seria "dispare já", com
+    // aviso do Node, em vez de um prazo.
+    const prazoMs = Number.isFinite(timeoutMs)
+      ? Math.max(1, Math.round(timeoutMs))
+      : 1;
+
+    const cronometro = agendar(prazoMs, () => {
+      expirou = true;
+      // Fase 1: pedido. Fase 2: força. (No Windows as duas são `taskkill /T /F`
+      // — a segunda vale como nova tentativa, não como escalada de sinal.)
+      matar(filho, "SIGTERM");
+
+      agendar(MS_CARENCIA_ENCERRAMENTO, () => {
+        matar(filho, "SIGKILL");
+
+        agendar(MS_CARENCIA_ENCERRAMENTO, () => {
+          // Nem o forçado confirmou. Em vez de esperar para sempre, solta o
+          // que prendia o Node e reporta a condição: pipes destruídos e filho
+          // desreferenciado, senão o handle do processo seguraria o event loop
+          // vivo mesmo depois de a Promise resolver.
+          filho.stdout?.destroy();
+          filho.stderr?.destroy();
+          filho.stdin?.destroy();
+          filho.unref?.();
+          terminar(1, "expirado_sem_confirmacao", false);
+        });
+      });
     });
+    // O prazo não pode, ele próprio, segurar o Node vivo: enquanto o filho
+    // existe é o handle DELE que mantém o laço, e é isso que garante o disparo.
+    cronometro.unref?.();
   });
 }
 

@@ -334,6 +334,10 @@ export async function subirAmbiente(deps) {
       status: resultado?.status ?? 1,
       saida: censurar(resultado?.saida ?? "", segredos),
       expirou: resultado?.expirou === true,
+      // Ausente é tratado como confirmado: só a negativa EXPLÍCITA do
+      // executor vira falha de passo.
+      encerramentoConfirmado: resultado?.encerramentoConfirmado !== false,
+      motivo: resultado?.motivo ?? "normal",
     };
   };
 
@@ -573,7 +577,7 @@ export async function subirAmbiente(deps) {
      * é encerrado em vez de segurar o passo além do prazo anunciado.
      */
     const bancoDePe = async (msTimeout) => {
-      const { status } = await rodarComPrazo(
+      const { status, encerramentoConfirmado } = await rodarComPrazo(
         "docker",
         [
           "compose",
@@ -589,6 +593,18 @@ export async function subirAmbiente(deps) {
         msTimeout,
         { shell: false },
       );
+      if (!encerramentoConfirmado) {
+        // O sistema operacional não confirmou a morte da sondagem. Insistir
+        // deixaria processos acumulando atrás de cada volta do laço, então o
+        // passo para aqui. A mensagem diz só a condição: nada de comando,
+        // argumento, ambiente ou saída do processo.
+        falhar(
+          "Não foi possível confirmar o encerramento do subprocesso de " +
+            "verificação do PostgreSQL.",
+          "Pode ter ficado um processo preso nesta máquina. Verifique os " +
+            "processos do Docker, encerre o que sobrou e rode de novo.",
+        );
+      }
       return status === 0;
     };
 
