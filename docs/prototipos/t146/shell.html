@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Shell modular — protótipo T146 — Evolli RH</title>
+    <link rel="stylesheet" href="./tokens.css" />
+    <link rel="stylesheet" href="./shell.css" />
+  </head>
+  <body>
+    <a class="pular" href="#conteudo" id="pular">Pular para o conteúdo</a>
+
+    <div class="shell" id="shell" data-lateral="expandida">
+      <p class="selo-prototipo">
+        <span>Protótipo sintético — não grava dados</span>
+        <span class="selo-prototipo__separador" aria-hidden="true">|</span>
+        <span>Não é produção nem homologação</span>
+      </p>
+
+      <!-- Fundo da gaveta no celular; some no desktop. -->
+      <div class="lateral__fundo" id="lateral-fundo" hidden></div>
+
+      <nav class="lateral" id="lateral" aria-label="Módulos do Evolli RH">
+        <div class="lateral__marca">
+          <span class="lateral__marca-sigla" aria-hidden="true">EV</span>
+          <span class="lateral__marca-bloco">
+            <span class="lateral__marca-nome">Evolli RH</span>
+            <span class="lateral__marca-apoio">Recursos Humanos e DP</span>
+          </span>
+        </div>
+        <div id="lateral-grupos"></div>
+      </nav>
+
+      <div class="corpo">
+        <header class="cabecalho">
+          <button
+            type="button"
+            class="botao botao--secundario so-movel"
+            id="abrir-menu"
+            aria-controls="lateral"
+            aria-expanded="false"
+          >
+            Módulos
+          </button>
+
+          <div class="cabecalho__contexto">
+            <h1 class="cabecalho__titulo" id="contexto-titulo" tabindex="-1">
+              Início
+            </h1>
+            <p class="cabecalho__apoio" id="contexto-apoio"></p>
+          </div>
+
+          <div class="cabecalho__acoes" id="contexto-acoes"></div>
+        </header>
+
+        <!-- `tabindex="-1"`: sem isso o "Pular para o conteúdo" move a âncora
+             mas não move o foco, e o próximo Tab volta ao topo. -->
+        <main class="conteudo" id="conteudo" tabindex="-1"></main>
+      </div>
+    </div>
+
+    <div id="raiz-modal"></div>
+
+    <script type="module" src="./shell.js"></script>
+  </body>
+</html>
