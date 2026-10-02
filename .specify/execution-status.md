@@ -211,11 +211,11 @@ nomeados nas faixas que já os cobriam.
 **Limites explícitos:** a T144 não inicia a expansão visual, não toca a PR #133 nem a branch da
 T141, e não trata as observações O2–O5 das revisões, que seguem registradas.
 
-## Hardening pós-T141 — T145 (implementada; PR Draft)
+## Hardening pós-T141 — T145 (integrada)
 
-| Tarefa | Estado                     | Resultado principal                                                                                                                                                                                                                                                                                                                        |
-| ------ | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| T145   | **Implementada; PR Draft** | Quita as duas ressalvas não bloqueantes que a revisão final da PR #133 registrou e que entraram em `main` sem correção: o Spec Kit autocontraditório sobre T141/T144 e o prazo declarado que não era o prazo real. Não toca API, web, Prisma, migrations, seed, credenciais, dependências nem a direção visual. Base: `main` em `8e3c15c`. |
+| Tarefa | Estado                                    | Resultado principal                                                                                                                                                                                                                                                                                                                        |
+| ------ | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| T145   | **Integrada** (PR #136, squash `bbb7942`) | Quita as duas ressalvas não bloqueantes que a revisão final da PR #133 registrou e que entraram em `main` sem correção: o Spec Kit autocontraditório sobre T141/T144 e o prazo declarado que não era o prazo real. Não toca API, web, Prisma, migrations, seed, credenciais, dependências nem a direção visual. Base: `main` em `8e3c15c`. |
 
 **Prazo de parede.** Os laços de espera contavam ITERAÇÕES, não segundos. Como cada volta gastava
 até `MS_TIMEOUT_TENTATIVA_HTTP` (3s) na requisição mais 1s de intervalo, o número anunciado valia
@@ -240,9 +240,43 @@ até 39s de tolerância real; mantido em 10, o prazo de parede reprovaria ambien
 **Limites explícitos:** a T145 não reabre T141–T144, não inicia a expansão visual e não trata as
 observações O2–O7 e O11 das revisões anteriores, que seguem registradas.
 
+## Arquitetura modular e protótipo do shell — T146 (protótipo em validação visual)
+
+| Tarefa | Estado                            | Resultado principal                                                                                                                                                                                                                                                          |
+| ------ | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T146   | **Protótipo em validação visual** | Mapa modular do ecossistema e protótipo navegável do shell, isolados em `docs/prototipos/t146/`. **Não é capacidade de RH e não altera tela funcional alguma**: só documentação e protótipo estático. Aguarda a avaliação visual do proprietário antes de qualquer expansão. |
+
+**O que a tarefa é — e o que não é.** A T146 organiza **arquitetura da informação**: quais módulos
+existem, como a navegação os agrupa, o que cada workspace mostra e onde entram atalhos, pendências e
+listas. Nenhuma tela funcional foi redesenhada, nenhum contrato mudou e nenhuma dependência entrou.
+O protótipo é estático: não fala com a API, não grava nada e se identifica permanentemente como
+sintético.
+
+**Referência ao Frappe, nos limites da ADR 0014.** Dele vieram **somente conceitos** de arquitetura
+da informação — workspace por módulo, agrupamento da navegação, atalhos, listas com filtros, fila de
+pendências e visão geral do ecossistema. Nenhum código, HTML, CSS, componente, texto, ícone, imagem
+ou ativo foi copiado, e nenhuma dependência foi adicionada. A decisão de plataforma **não** foi
+reaberta: o Evolli segue como plataforma-base.
+
+**Inventário real, derivado do código.** O protótipo mostra o estado verdadeiro de cada tela, não
+uma promessa. Contado nesta tarefa a partir de `apps/web/src/screens/` e da navegação, não
+reaproveitado de texto anterior: **45 telas folha** hoje — **11 funcionais** (leem e gravam pela
+API), **1 parcial** (`Pessoas › Dados contratuais`, consulta real sem escrita) e **33
+demonstrativas** (dados de exemplo no próprio código). Os módulos do mapa que ainda não têm tela
+aparecem como **planejados**. Nenhum indicador sugere produção ou homologação.
+
+**Folha, eSocial e obrigações fiscais** aparecem somente numa seção de evolução futura, fora da
+navegação operacional, justamente para não serem lidos como capacidade existente.
+
+**Limites explícitos:** a T146 não inicia a expansão do padrão B para outro módulo, não implementa
+folha, eSocial, férias, benefícios nem clima, não altera `apps/api`, Prisma, migrations, contratos,
+RBAC ou dados, e não toca nas telas funcionais de `apps/web`.
+
 ## Próxima ação autorizável
 
-1. Revisão somente leitura e integração da T145 (PR Draft).
+1. **Avaliação visual do protótipo da T146 pelo proprietário** — ela é pré-condição de tudo o que
+   vem abaixo. O protótipo é arquitetura da informação, não implementação: aprovar o mapa modular
+   não aprova nenhuma tela.
 2. **Planejar a expansão gradual do padrão B + modais para a próxima tela funcional prioritária** —
    uma tela só, com identificador próprio, e validação visual antes de ampliar para a seguinte.
    Planejar não é implementar: a escolha da tela e o escopo vêm antes do código.

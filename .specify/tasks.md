@@ -726,8 +726,8 @@ decisões e bloqueios, está no ledger versionado
 
     - **Origem:** a revisão final da PR #133 registrou duas ressalvas não bloqueantes que entraram
       em `main` sem correção. Esta tarefa quita exatamente essas duas, e nada mais.
-    - **Estado:** implementada na branch `codex/t145-hardening-demo-timeouts`; **PR Draft**,
-      aguardando revisão somente leitura. Base: `main` em `8e3c15c`.
+    - **Estado:** **integrada em `main`** pela PR #136 (squash `bbb7942`), vinda da branch
+      `codex/t145-hardening-demo-timeouts`. Base original: `main` em `8e3c15c`.
     - **Ressalva 1 — Spec Kit autocontraditório.** `tasks.md` dava T141 e T144 como "PR Draft,
       aguardando revisão" enquanto o ledger já dava a T144 como Integrada. Ambas estão em `main`
       (T144 pela PR #135, squash `0699e3d`; T141 pela PR #133, squash `8e3c15c`) e passam a ser
@@ -756,6 +756,35 @@ decisões e bloqueios, está no ledger versionado
     - **Fora de escopo:** API, web, Prisma, migrations, seed, dados sintéticos, credenciais,
       dependências e lockfile intactos; nenhuma tela recebeu o padrão B + modais; nenhuma outra
       branch ou PR foi tocada. O teste-guarda "sucesso não mata nenhum processo" foi mantido.
+
+43. **T146 - Arquitetura modular e protótipo navegável do shell**
+
+    - **Origem:** a prova do Frappe HR (T143) mostrou maturidade de **arquitetura da informação** —
+      workspace por módulo, agrupamento da navegação, atalhos, listas com filtros e fila de
+      pendências — que o Evolli ainda não organizou. A ADR 0014 manteve o Evolli como
+      plataforma-base e liberou o Frappe **só como referência conceitual**.
+    - **Estado:** **protótipo em validação visual**, na branch `codex/t146-arquitetura-modular-shell`;
+      PR Draft. **Nunca funcional e nunca integrada**: cria apenas documentação e protótipo
+      estático. Base: `main` em `bbb7942`.
+    - **Natureza:** NÃO é capacidade de RH. Nenhum endpoint, permissão, regra, contrato ou tela
+      funcional foi criado ou alterado. O protótipo não fala com a API, não grava nada e se
+      identifica permanentemente como sintético.
+    - **Mapa modular:** Início; Pessoas; Jornada; Ausências; Solicitações; Benefícios; Clima e
+      desenvolvimento; Relatórios; Administração. Folha, eSocial e obrigações fiscais ficam numa
+      seção de evolução futura, **fora da navegação operacional**, para não serem lidos como
+      capacidade existente.
+    - **Inventário real (derivado do código nesta tarefa, não reaproveitado):** 45 telas folha —
+      **11 funcionais**, **1 parcial** (`Pessoas › Dados contratuais`, consulta sem escrita) e
+      **33 demonstrativas**. Módulos do mapa sem tela aparecem como **planejados**.
+    - **Referência ao Frappe:** somente conceitos de arquitetura da informação. Nenhum código,
+      HTML, CSS, componente, texto, ícone, imagem ou ativo copiado; nenhuma dependência; a decisão
+      de plataforma não foi reaberta.
+    - **Padrão visual:** tokens, padrão B e regras de modal do Evolli preservados;
+      `DESIGN-apple.md` intocado; nenhuma paleta, fonte, raio ou escala nova; nenhuma dependência,
+      framework, CDN ou fonte externa.
+    - **Fora de escopo:** expansão do padrão para outro módulo; folha, eSocial, férias, benefícios
+      e clima; `apps/api`, Prisma, migrations, contratos, RBAC e dados; telas funcionais de
+      `apps/web`.
 
 ## Regra obrigatória para as próximas tarefas
 
