@@ -337,6 +337,63 @@ describe("Seed do ambiente local de demonstração (T141, e2e)", () => {
     }
   });
 
+  /**
+   * T147. Admitir não ativa ninguém: o colaborador nasce `inativo`, o vínculo
+   * `previsto`, e a alocação organizacional só existe depois de efetivar. Sem
+   * esse passo o ambiente de demonstração exibia todo mundo inativo e "Sem
+   * alocação registrada" — não havia o que homologar nas três telas.
+   *
+   * Falha antes desta tarefa: o seed nunca chamava `/efetivar`, então
+   * `alocacao_organizacional` ficava vazia e todo vínculo ficava `previsto`.
+   */
+  it("efetiva as admissões sintéticas e produz alocação vigente", async () => {
+    const prisma = new PrismaClient({ datasources: { db: { url: appUrl } } });
+    try {
+      const ativos = await prisma.vinculoFuncional.findMany({
+        where: { matricula: { startsWith: "DEMO-" }, situacao: "ativo" },
+        select: { matricula: true },
+      });
+      // Um por (colaborador, empresa): DEMO-A-0003 fica `previsto` de
+      // propósito, porque o índice de vínculo ativo único recusaria o segundo.
+      expect(ativos.map((v) => v.matricula).sort()).toEqual([
+        "DEMO-A-0001",
+        "DEMO-A-0002",
+        "DEMO-B-0001",
+      ]);
+
+      const previstos = await prisma.vinculoFuncional.findMany({
+        where: { matricula: { startsWith: "DEMO-" }, situacao: "previsto" },
+        select: { matricula: true },
+      });
+      expect(previstos.map((v) => v.matricula)).toEqual(["DEMO-A-0003"]);
+
+      // Cada vínculo ativo tem exatamente UMA alocação vigente (sem fim).
+      for (const matricula of ["DEMO-A-0001", "DEMO-A-0002", "DEMO-B-0001"]) {
+        const vinculo = await prisma.vinculoFuncional.findFirstOrThrow({
+          where: { matricula },
+          select: { id: true },
+        });
+        const vigentes = await prisma.alocacaoOrganizacional.count({
+          where: { vinculoId: vinculo.id, vigenteAte: null },
+        });
+        expect([matricula, vigentes]).toEqual([matricula, 1]);
+      }
+
+      // DEMO-A-0001 recebeu cargo: é o que faz "Cargo vigente" deixar de ser
+      // "—" em Dados contratuais.
+      const comCargo = await prisma.vinculoFuncional.findFirstOrThrow({
+        where: { matricula: "DEMO-A-0001" },
+        select: { id: true },
+      });
+      const alocacao = await prisma.alocacaoOrganizacional.findFirstOrThrow({
+        where: { vinculoId: comCargo.id, vigenteAte: null },
+      });
+      expect(alocacao.cargoId).not.toBeNull();
+    } finally {
+      await prisma.$disconnect();
+    }
+  });
+
   it("as duas empresas de demonstração ficam isoladas entre si", async () => {
     const { cookie: cookieAlfa } = await entrarComo("rh.alfa@evolli.local");
     const { cookie: cookieBeta } = await entrarComo("rh.beta@evolli.local");

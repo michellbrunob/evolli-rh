@@ -345,6 +345,10 @@ interface UsuarioApi extends ComId {
 interface HorarioApi extends ComId {
   nome: string;
 }
+interface MovimentacaoApi extends ComId {
+  tipo: string;
+  status: string;
+}
 
 // ---------------------------------------------------------------------------
 // Seed
@@ -451,6 +455,81 @@ async function garantirColaborador(
 }
 
 /**
+ * Efetiva a admissão de um vínculo, se ela ainda não estiver efetivada.
+ *
+ * Por que isto existe: admitir NÃO ativa ninguém. `POST /v1/colaboradores`
+ * cria o colaborador `inativo`, o vínculo `previsto` e a movimentação de
+ * admissão `solicitada` — a **alocação organizacional** (cargo e lotação
+ * vigentes) só nasce em `POST /v1/movimentacoes/:id/efetivar`. Sem este passo,
+ * o ambiente de demonstração exibia todo mundo inativo, com "Cargo vigente —",
+ * "Lotação vigente —" e "Sem alocação registrada" em Dados contratuais: o
+ * conjunto sintético não conseguia mostrar o estado que as telas existem para
+ * mostrar.
+ *
+ * Idempotência pela ALOCAÇÃO, não pela movimentação: a alocação é o efeito que
+ * se quer garantir, e conferi-la é o que torna a segunda execução inerte.
+ * Efetivar de novo responderia 409 e derrubaria o seed.
+ */
+async function garantirAdmissaoEfetivada(
+  ctx: Contexto,
+  rh: Sessao,
+  colaboradorId: string,
+  matricula: string,
+): Promise<void> {
+  const vinculos = await ler<VinculoApi[]>(
+    ctx,
+    `/v1/colaboradores/${colaboradorId}/vinculos`,
+    rh,
+  );
+  const vinculo = vinculos.find((v) => v.matricula === matricula);
+  if (!vinculo) {
+    throw new Error(
+      `Vínculo ${matricula} não encontrado para efetivar a admissão.`,
+    );
+  }
+
+  const alocacoes = await ler<ComId[]>(
+    ctx,
+    `/v1/vinculos/${vinculo.id}/alocacoes`,
+    rh,
+  );
+  if (alocacoes.length > 0) {
+    ctx.reaproveitados += 1;
+    return;
+  }
+
+  const linha = await ler<MovimentacaoApi[]>(
+    ctx,
+    `/v1/vinculos/${vinculo.id}/linha-do-tempo`,
+    rh,
+  );
+  const admissao = linha.find(
+    (m) =>
+      m.tipo === "admissao" &&
+      (m.status === "solicitada" || m.status === "programada"),
+  );
+  if (!admissao) {
+    throw new Error(
+      `Movimentação de admissão pendente não encontrada para ${matricula}.`,
+    );
+  }
+
+  const res = await pedir(
+    ctx,
+    "POST",
+    `/v1/movimentacoes/${admissao.id}/efetivar`,
+    rh,
+  );
+  if (!res.ok) {
+    throw new Error(
+      `Falha ao efetivar a admissão de ${matricula}: a API respondeu ${res.status}. ` +
+        "O seed não continua com o ambiente pela metade.",
+    );
+  }
+  ctx.criados += 1;
+}
+
+/**
  * Popula um banco LOCAL com dados sintéticos e devolve o resumo.
  *
  * @param baseUrl origem da API já em execução (ex.: `http://127.0.0.1:3000`).
@@ -536,11 +615,17 @@ export async function semearDemonstracao(
       codigo: "TURNOA",
       nome: `Turno A ${MARCA_DEMO}`,
     });
-    await garantirCatalogo(ctx, rhAlfa, "/v1/cargos", "ANALISTA", {
-      empresaId: alfa.id,
-      codigo: "ANALISTA",
-      nome: `Analista ${MARCA_DEMO}`,
-    });
+    const analista = await garantirCatalogo(
+      ctx,
+      rhAlfa,
+      "/v1/cargos",
+      "ANALISTA",
+      {
+        empresaId: alfa.id,
+        codigo: "ANALISTA",
+        nome: `Analista ${MARCA_DEMO}`,
+      },
+    );
     await garantirCatalogo(ctx, rhAlfa, "/v1/centros-de-custo", "CCDEMO", {
       empresaId: alfa.id,
       codigo: "CCDEMO",
@@ -574,13 +659,14 @@ export async function semearDemonstracao(
     const umVinculo = `Pessoa ${MARCA_DEMO} Alfa Um`;
     const doisVinculos = `Pessoa ${MARCA_DEMO} Alfa Dois`;
 
-    await garantirColaborador(ctx, rhAlfa, umVinculo, {
+    const colabUm = await garantirColaborador(ctx, rhAlfa, umVinculo, {
       nome: umVinculo,
       empresaId: alfa.id,
       matricula: "DEMO-A-0001",
       tipo: "clt",
       dataAdmissao: "2026-01-05",
       motivoCodigo: "admissao_inicial",
+      cargoId: analista.id,
       departamentoId: operacoes.id,
     });
 
@@ -617,6 +703,19 @@ export async function semearDemonstracao(
         }),
     );
 
+    // --- Efetivação das admissões -----------------------------------------
+    // Sem este passo o conjunto sintético fica inteiro em `previsto`/`inativo`
+    // e sem nenhuma alocação: Dados contratuais mostraria "Sem alocação
+    // registrada" para todo mundo, e não haveria o que homologar.
+    //
+    // UM vínculo efetivado por (colaborador, empresa): o índice parcial
+    // `vinculo_funcional_ativo_unico` recusa o segundo com 409. O
+    // `DEMO-A-0003` fica deliberadamente em `previsto` — é ele que dá à
+    // demonstração um exemplo de vínculo ainda não efetivado, ao lado de um
+    // já ativo do mesmo colaborador.
+    await garantirAdmissaoEfetivada(ctx, rhAlfa, colabUm.id, "DEMO-A-0001");
+    await garantirAdmissaoEfetivada(ctx, rhAlfa, colabDois.id, "DEMO-A-0002");
+
     // --- Empresa Beta: mínimo para provar isolamento ----------------------
     const departamentoBeta = await garantirCatalogo(
       ctx,
@@ -630,7 +729,7 @@ export async function semearDemonstracao(
       },
     );
     const colabBeta = `Pessoa ${MARCA_DEMO} Beta Um`;
-    await garantirColaborador(ctx, rhBeta, colabBeta, {
+    const registroBeta = await garantirColaborador(ctx, rhBeta, colabBeta, {
       nome: colabBeta,
       empresaId: beta.id,
       matricula: "DEMO-B-0001",
@@ -639,6 +738,12 @@ export async function semearDemonstracao(
       motivoCodigo: "admissao_inicial",
       departamentoId: departamentoBeta.id,
     });
+    await garantirAdmissaoEfetivada(
+      ctx,
+      rhBeta,
+      registroBeta.id,
+      "DEMO-B-0001",
+    );
 
     // --- Resumo -----------------------------------------------------------
     // Conta só o conjunto SINTÉTICO, varrendo todas as páginas: o número não
