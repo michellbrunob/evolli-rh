@@ -763,10 +763,10 @@ decisões e bloqueios, está no ledger versionado
       workspace por módulo, agrupamento da navegação, atalhos, listas com filtros e fila de
       pendências — que o Evolli ainda não organizou. A ADR 0014 manteve o Evolli como
       plataforma-base e liberou o Frappe **só como referência conceitual**.
-    - **Estado:** **fundação visual aprovada e congelada pelo proprietário — ainda não integrada**,
-      na branch `codex/t146-arquitetura-modular-shell`; PR #137 Draft, aguardando revisão final.
-      **Nunca funcional e nunca integrada**: cria apenas documentação e protótipo estático. Base:
-      `main` em `bbb7942`.
+    - **Estado:** **Integrada** em `main` pela PR #137 (squash `2e55837`), com a CI de `main`
+      verde. A fundação visual foi aprovada e congelada pelo proprietário antes da integração.
+      **Nunca funcional**: entregou apenas documentação e protótipo estático. Base: `main` em
+      `bbb7942`.
     - **Decisão do proprietário:** _"Aprovo a evolução visual da T146, porém devemos focar agora na
       entrega dos módulos funcionais e testados, deixando o acabamento visual final para o fim."_
       Shell, tokens, padrão B, sidebar e modais ficam aprovados como fundação visual e
@@ -794,6 +794,30 @@ decisões e bloqueios, está no ledger versionado
     - **Fora de escopo:** expansão do padrão para outro módulo; folha, eSocial, férias, benefícios
       e clima; `apps/api`, Prisma, migrations, contratos, RBAC e dados; telas funcionais de
       `apps/web`.
+
+44. **T147 - Homologação funcional de Admissão e vida funcional inicial**
+
+    - **Origem:** com a fundação visual congelada (T146) e a decisão do proprietário de priorizar
+      módulos funcionais, a primeira fatia é **homologar** o fluxo que já existe em código — a
+      admissão — provando que ela funciona de ponta a ponta com dado sintético, em vez de criar
+      capacidade nova.
+    - **Estado:** **em execução**, na branch `codex/t147-homologacao-admissao`; PR Draft para
+      `main`. Base: `main` em `2e55837`.
+    - **Natureza:** endurecimento e homologação sobre contratos existentes. Não inventa
+      funcionalidade sem contrato real e não amplia o redesenho visual.
+    - **Cenário de aceite:** RH abre `Pessoas › Colaboradores`, registra uma admissão em modal com
+      referência organizacional inicial válida, e o registro aparece coerente em **Colaboradores**,
+      **Dados contratuais** e **Histórico funcional**, sem recarregar a página inteira.
+    - **Segurança provada por teste:** CSRF em toda mutação, `credentials: same-origin`, escopo
+      derivado da sessão, isolamento entre empresas, 404 indistinguível entre inexistente e fora de
+      escopo, RBAC pelo avaliador real, auditoria com ator real e sem PII.
+    - **Identificador reutilizado:** uma investigação anterior de importação de marcações de ponto
+      parou no gate técnico sem gerar branch, commit ou alteração de Spec Kit; não é entrega e não
+      ocupa o identificador. A importação AFD segue bloqueada pela ADR 0008 (decisão 4) e pelas
+      pendências `DP-3J-07`, `DP-3J-20`, `DP-3J-09`, `DP-3J-11` e `DS-OPS-01`.
+    - **Fora de escopo:** importação de ponto/AFD, REP, banco de horas, férias, benefícios, clima,
+      dependentes, folha, eSocial, obrigações fiscais, R2/anexos, MFA, ESS/MSS, mudança de
+      arquitetura visual e cópia de código ou ativo do Frappe.
 
 ## Regra obrigatória para as próximas tarefas
 

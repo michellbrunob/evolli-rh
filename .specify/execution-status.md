@@ -240,11 +240,11 @@ até 39s de tolerância real; mantido em 10, o prazo de parede reprovaria ambien
 **Limites explícitos:** a T145 não reabre T141–T144, não inicia a expansão visual e não trata as
 observações O2–O7 e O11 das revisões anteriores, que seguem registradas.
 
-## Arquitetura modular e protótipo do shell — T146 (fundação visual aprovada e congelada)
+## Arquitetura modular e protótipo do shell — T146 (integrada)
 
-| Tarefa | Estado                                                   | Resultado principal                                                                                                                                                                                                                                                                                                                                      |
-| ------ | -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| T146   | **Fundação visual aprovada e congelada — não integrada** | Mapa modular do ecossistema e protótipo navegável do shell, isolados em `docs/prototipos/t146/`. **Não é capacidade de RH e não altera tela funcional alguma**: só documentação e protótipo estático. O proprietário aprovou a evolução visual e congelou a fundação (ver decisão abaixo); prioridade passa a ser a implementação de módulos funcionais. |
+| Tarefa | Estado                                    | Resultado principal                                                                                                                                                                                                                                                                                                                                        |
+| ------ | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T146   | **Integrada** (PR #137, squash `2e55837`) | Mapa modular do ecossistema e protótipo navegável do shell, isolados em `docs/prototipos/t146/`. **Não é capacidade de RH e não altera tela funcional alguma**: só documentação e protótipo estático. O proprietário aprovou a evolução visual e congelou a fundação (ver decisão abaixo); a prioridade passa a ser a implementação de módulos funcionais. |
 
 **O que a tarefa é — e o que não é.** A T146 organiza **arquitetura da informação**: quais módulos
 existem, como a navegação os agrupa, o que cada workspace mostra e onde entram atalhos, pendências e
@@ -289,16 +289,37 @@ a arquitetura modular, o shell, os tokens, o padrão B, a sidebar e os modais fi
 Durante a implementação dos módulos, só correção necessária de usabilidade, acessibilidade,
 responsividade ou bloqueio operacional pode alterar a interface; refinamento estético e acabamento
 visual final ficam para uma etapa posterior. A prioridade passa a ser entregar **módulos
-funcionais, testados e homologáveis com dados sintéticos**. A aprovação é visual, não de
-integração: a T146 segue **não integrada** e a PR #137 segue **Draft**.
+funcionais, testados e homologáveis com dados sintéticos**. A aprovação foi visual; a integração
+veio depois, pela PR #137 (squash `2e55837`), com a CI de `main` verde.
+
+## Homologação funcional da Admissão — T147 (em execução)
+
+| Tarefa | Estado          | Resultado principal                                                                                                                                                                                                                                         |
+| ------ | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T147   | **Em execução** | Primeira fatia funcional depois do congelamento da fundação visual: homologar a **admissão** (colaborador, vínculo e referência organizacional inicial) de ponta a ponta, com prova de coerência em Colaboradores, Dados contratuais e Histórico funcional. |
+
+**O que a tarefa é.** A T147 não inventa capacidade: ela **endurece e homologa** o fluxo de
+admissão sobre os contratos que já existem em `apps/api` e nas telas funcionais de `apps/web`.
+O critério de pronto é um cenário sintético completo, provado por teste e verificado em navegador
+real — não a existência de código.
+
+**Limites explícitos:** a T147 não implementa importação de ponto/AFD, REP, banco de horas, férias,
+benefícios, clima, dependentes, folha, eSocial, obrigações fiscais, R2/anexos, MFA, ESS/MSS; não
+redesenha a arquitetura visual; e não copia código ou ativo do Frappe.
+
+**Nota de escopo — investigação anterior sob o mesmo identificador.** Houve uma investigação de
+importação de marcações de ponto que **parou no gate técnico** e não produziu branch, commit nem
+alteração de Spec Kit. Ela não é entrega e não ocupa o identificador: a importação AFD segue
+bloqueada pela ADR 0008 (decisão 4 — origem única manual) e pelas pendências `DP-3J-07`,
+`DP-3J-20`, `DP-3J-09`, `DP-3J-11` e `DS-OPS-01`.
 
 ## Próxima ação autorizável
 
-1. **Revisão final da PR #137** — pré-condição para a integração da T146.
-2. Após a integração, **iniciar o módulo funcional prioritário**, sob o próximo identificador
-   disponível — sem número reservado aqui, porque reservar identificador antes da decisão de
-   escopo já se mostrou fonte de confusão (ver T137). A implementação usa a fundação visual já
-   congelada, sem reabrir o shell, os tokens, o padrão B ou os modais.
+1. **Concluir a T147** — homologação funcional da admissão, com PR Draft e CI verde.
+2. Após a revisão e a integração da T147, **escolher a próxima fatia funcional**, sob o próximo
+   identificador disponível — sem número reservado aqui, porque reservar identificador antes da
+   decisão de escopo já se mostrou fonte de confusão (ver T137). A implementação usa a fundação
+   visual já congelada, sem reabrir o shell, os tokens, o padrão B ou os modais.
 3. Candidatos naturais do módulo prioritário, todos dependentes de decisão própria: capacidade de
    RBAC para o gestor consultivo; `DP-23` como pré-condição de qualquer autoatendimento do
    colaborador; e a validação com RH do catálogo de motivos, cujo mecanismo (código fechado) já
