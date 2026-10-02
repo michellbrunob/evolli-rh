@@ -22,18 +22,28 @@ import {
   MS_CARENCIA_TOTAL,
 } from "./demo-local.mjs";
 
-/** Todo teste tem teto externo: nenhum pode pendurar o runner. */
+/**
+ * Todo teste tem teto externo: nenhum pode pendurar o runner.
+ *
+ * O temporizador do teto NÃO é `unref`, e isso é deliberado. Num cenário real
+ * é o handle do processo filho que mantém o event loop vivo enquanto o prazo
+ * corre; aqui o filho é um `EventEmitter` e não segura nada, então sem um
+ * temporizador referenciado o Node concluiria que não há mais trabalho e o
+ * runner cancelaria o teste com "event loop has already resolved" — foi o que
+ * aconteceu no Linux da CI. Ele é sempre limpo no `finally`, então não segura
+ * a suíte depois que o teste termina.
+ */
 const TETO_EXTERNO_MS = 15_000;
-const comTeto = (promessa, rotulo) =>
-  Promise.race([
-    promessa,
-    new Promise((_, rejeitar) =>
-      setTimeout(
-        () => rejeitar(new Error(`PENDUROU: ${rotulo}`)),
-        TETO_EXTERNO_MS,
-      ).unref?.(),
-    ),
-  ]);
+function comTeto(promessa, rotulo) {
+  let cronometro;
+  const teto = new Promise((_, rejeitar) => {
+    cronometro = setTimeout(
+      () => rejeitar(new Error(`PENDUROU: ${rotulo}`)),
+      TETO_EXTERNO_MS,
+    );
+  });
+  return Promise.race([promessa, teto]).finally(() => clearTimeout(cronometro));
+}
 
 /** Fluxo falso que registra se foi destruído, como um pipe de verdade. */
 function fluxoFalso() {
@@ -282,21 +292,20 @@ test("matarArvore: PID ausente, zero, negativo ou inválido nunca é sinalizado"
 });
 
 test("matarArvore: chamadas repetidas são idempotentes", () => {
-  let mortes = 0;
-  const filho = {
-    pid: 999_999,
-    kill: () => {
-      mortes += 1;
-      return true;
-    },
-  };
-  // Em POSIX a primeira via é o grupo; no Windows é o `taskkill`. Em qualquer
-  // caso, repetir não pode lançar nem mudar o resultado.
-  const primeira = matarArvore(filho, "SIGTERM");
-  const segunda = matarArvore(filho, "SIGTERM");
-  assert.equal(typeof primeira, "boolean");
-  assert.equal(primeira, segunda);
-  assert.ok(mortes >= 0);
+  // De propósito NÃO se usa um PID numérico "provavelmente livre" aqui: em
+  // POSIX a primeira via é `process.kill(-pid)`, e um palpite que por acaso
+  // exista sinalizaria o grupo de processos de outra pessoa na máquina de CI.
+  // A idempotência é exercida pela via que nunca chega ao sistema operacional.
+  const invalido = { pid: 0, kill: () => assert.fail("não deveria sinalizar") };
+  for (let i = 0; i < 3; i += 1) {
+    assert.equal(
+      matarArvore(invalido, "SIGTERM"),
+      false,
+      "repetir não pode lançar nem mudar o resultado",
+    );
+  }
+  // A via que chega ao SO é coberta pelos testes da máquina de estados, onde
+  // `matar` é injetado e observado (SIGTERM e depois SIGKILL).
 });
 
 test("encerramento: a carência total é curta, fixa e declarada", () => {
