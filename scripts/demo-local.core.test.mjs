@@ -24,6 +24,9 @@ import {
   SEGUNDOS_ESPERA_API,
   SEGUNDOS_ESPERA_WEB,
   SEGUNDOS_CONFIRMACAO_FINAL_WEB,
+  MS_TIMEOUT_TENTATIVA_HTTP,
+  MS_TIMEOUT_TENTATIVA_BANCO,
+  MS_INTERVALO_TENTATIVA,
   FalhaDePasso,
   HOST_LOCAL,
   NOMES_PASSOS,
@@ -70,12 +73,36 @@ function cenario(opcoes = {}) {
   const mortos = [];
   const urlsVerificadas = [];
   const logs = [];
+  const timeoutsPedidos = [];
+  const chamadasComPrazo = [];
+  const encerramentos = [];
 
   const arquivos = { ...ARQUIVOS_PADRAO, ...(opcoes.arquivos ?? {}) };
   const portasOcupadas = new Set(opcoes.portasOcupadas ?? []);
   const statusPorComando = opcoes.statusPorComando ?? (() => 0);
   const saidaPorComando = opcoes.saidaPorComando ?? (() => "");
   const httpOk = opcoes.httpOk ?? (() => true);
+  /**
+   * Quanto tempo CADA tentativa HTTP consome, em ms. Os prazos passaram a ser
+   * de parede (T145), então o custo da requisição precisa entrar no relógio —
+   * é o que permite provar que uma janela curta não se multiplica pelo timeout
+   * individual. O orquestrador encurta o prazo perto do fim, e a tentativa
+   * nunca gasta mais do que o prazo que recebeu.
+   */
+  const custoHttpMs = opcoes.custoHttpMs ?? 0;
+  /** Quanto tempo um subprocesso com prazo (hoje só o `pg_isready`) consome. */
+  const custoSubprocessoMs = opcoes.custoSubprocessoMs ?? (() => 0);
+  /** Simula o SO recusando confirmar a morte do subprocesso que expirou. */
+  const encerramentoNaoConfirmado =
+    opcoes.encerramentoNaoConfirmado ?? (() => false);
+
+  // Relógio falso: nada dorme de verdade, o tempo só anda quando o código sob
+  // teste diz que andou. Sem isto, um prazo de parede ou girava sem fim (com
+  // `dormir` instantâneo) ou dependeria do relógio da máquina.
+  const relogio = { ms: 0 };
+  const avancar = (ms) => {
+    relogio.ms += ms;
+  };
 
   const deps = {
     raiz: RAIZ,
@@ -95,6 +122,49 @@ function cenario(opcoes = {}) {
             : `erro simulado; a senha ${SENHA_MIGRATOR} apareceu na saida`,
       };
     },
+    /**
+     * Subprocesso COM prazo. O falso cobra do relógio virtual o que o
+     * subprocesso levaria, limitado ao prazo recebido — e, quando o custo
+     * passa do prazo, reporta `expirou` e registra o encerramento, que é o que
+     * o `pg_isready` travado faria de verdade.
+     */
+    executarComPrazo: async (chamada) => {
+      chamadas.push(chamada);
+      chamadasComPrazo.push(chamada);
+      const custo = custoSubprocessoMs(chamada);
+      const prazo = chamada.timeoutMs ?? custo;
+      const expirou = custo > prazo;
+      avancar(Math.min(custo, prazo));
+      if (expirou) {
+        // `encerramentoNaoConfirmado` simula o caso patológico em que o
+        // sistema operacional não confirma a morte do subprocesso, sem
+        // precisar de um processo real impossível de matar.
+        const confirmado = !encerramentoNaoConfirmado(chamada);
+        encerramentos.push({
+          comando: chamada.comando,
+          args: chamada.args,
+          confirmado,
+        });
+        return {
+          status: 1,
+          saida: "",
+          expirou: true,
+          encerramentoConfirmado: confirmado,
+          motivo: confirmado ? "expirado" : "expirado_sem_confirmacao",
+        };
+      }
+      const status = statusPorComando(chamada);
+      return {
+        status,
+        saida:
+          status === 0
+            ? saidaPorComando(chamada)
+            : `erro simulado; a senha ${SENHA_MIGRATOR} apareceu na saida`,
+        expirou: false,
+        encerramentoConfirmado: true,
+        motivo: "normal",
+      };
+    },
     iniciar: (spec) => {
       iniciados.push(spec);
       return {
@@ -102,16 +172,32 @@ function cenario(opcoes = {}) {
         matar: () => mortos.push(spec.nome),
       };
     },
-    buscarHttp: async (url) => {
+    buscarHttp: async (url, timeoutMs) => {
       urlsVerificadas.push(url);
+      timeoutsPedidos.push(timeoutMs);
+      // Uma tentativa nunca gasta mais do que o prazo que recebeu.
+      avancar(Math.min(custoHttpMs, timeoutMs ?? custoHttpMs));
       return httpOk(url) ? { ok: true, status: 200 } : null;
     },
     portaLivre: async (host, porta) => !portasOcupadas.has(porta),
-    dormir: async () => {},
+    dormir: async (ms) => avancar(ms ?? 0),
+    agora: () => relogio.ms,
     registrar: (linha) => logs.push(linha),
   };
 
-  return { deps, chamadas, iniciados, mortos, urlsVerificadas, logs };
+  return {
+    deps,
+    chamadas,
+    iniciados,
+    mortos,
+    urlsVerificadas,
+    timeoutsPedidos,
+    chamadasComPrazo,
+    encerramentos,
+    logs,
+    relogio,
+    avancar,
+  };
 }
 
 /** Roda e devolve `{ resultado }` ou `{ erro }`, sem estourar o teste. */
@@ -593,8 +679,9 @@ test("a espera termina assim que o processo morre, sem gastar o orçamento", asy
     const p = iniciarOriginal(spec);
     return { ...p, vivo: () => false, matar: p.matar };
   };
-  c.deps.dormir = async () => {
+  c.deps.dormir = async (ms) => {
     ticks += 1;
+    c.avancar(ms ?? 0);
   };
 
   const { erro } = await executarCenario(c);
@@ -611,8 +698,9 @@ test("a espera termina assim que o processo morre, sem gastar o orçamento", asy
 test("os orçamentos de espera são finitos e generosos com a subida fria", async () => {
   let esperasApi = 0;
   const c = cenario({ httpOk: (url) => !url.includes("/v1/health/ready") });
-  c.deps.dormir = async () => {
+  c.deps.dormir = async (ms) => {
     esperasApi += 1;
+    c.avancar(ms ?? 0);
   };
 
   const { erro } = await executarCenario(c);
@@ -643,8 +731,9 @@ test("a confirmação final tolera o Vite frio: responde depois de algumas tenta
       return chamadasWeb === 1 || chamadasWeb >= 4;
     },
   });
-  c.deps.dormir = async () => {
+  c.deps.dormir = async (ms) => {
     ticks += 1;
+    c.avancar(ms ?? 0);
   };
 
   const { resultado, erro } = await executarCenario(c);
@@ -674,8 +763,9 @@ test("a confirmação final falha quando a tolerância se esgota sem resposta", 
       };
     })(),
   });
-  c.deps.dormir = async () => {
+  c.deps.dormir = async (ms) => {
     ticks += 1;
+    c.avancar(ms ?? 0);
   };
 
   const { erro } = await executarCenario(c);
@@ -683,9 +773,13 @@ test("a confirmação final falha quando a tolerância se esgota sem resposta", 
   assert.ok(erro instanceof FalhaDePasso);
   assert.equal(erro.passo, NOMES_PASSOS[7]);
   assert.match(erro.message, /Na verificação final não respondeu: web/);
-  // Esgotou exatamente a tolerância: SEGUNDOS_CONFIRMACAO_FINAL_WEB - 1 ticks
-  // (a última tentativa não dorme mais, só retorna false e sai do laço).
-  assert.equal(ticks, SEGUNDOS_CONFIRMACAO_FINAL_WEB - 1);
+  // O prazo é de PAREDE (T145): o laço consome exatamente a janela declarada,
+  // em intervalos de 1s. Antes da T145 eram 9 ticks porque o laço contava 10
+  // VOLTAS e pulava o último intervalo — e, com tentativas lentas, a janela
+  // "de 10s" chegava a 39s reais. Agora são 10 intervalos de 1s que somam
+  // exatamente os 10s anunciados.
+  assert.equal(ticks, SEGUNDOS_CONFIRMACAO_FINAL_WEB);
+  assert.equal(c.relogio.ms, SEGUNDOS_CONFIRMACAO_FINAL_WEB * 1000);
   // Falha no 8/8 encerra os processos antes de propagar: sem residual.
   assert.deepEqual(c.mortos, ["Web", "API"]);
 });
@@ -709,8 +803,9 @@ test("web encerra durante a confirmação final: falha NA HORA, sem esgotar a to
     if (spec.nome !== "Web") return p;
     return { ...p, vivo: () => estaVivo, matar: p.matar };
   };
-  c.deps.dormir = async () => {
+  c.deps.dormir = async (ms) => {
     ticks += 1;
+    c.avancar(ms ?? 0);
   };
 
   const { erro } = await executarCenario(c);
@@ -739,4 +834,461 @@ test("sucesso não mata nenhum processo e devolve exatamente os que subiram, sem
     ["API", "Web"],
   );
   assert.deepEqual(c.mortos, [], "nada deveria ter sido encerrado num sucesso");
+});
+
+// ---------------------------------------------------------------------------
+// T145 — prazo de PAREDE. O orçamento declarado em segundos é tempo real:
+// inclui o que a requisição gasta e o que os intervalos gastam. Antes, o laço
+// contava voltas, e uma janela "de 10s" com tentativas de 3s levava 39s.
+// O relógio aqui é falso e só anda quando o código sob teste o faz andar.
+// ---------------------------------------------------------------------------
+
+test("prazo de parede: uma janela curta NÃO se multiplica pelo timeout individual", async () => {
+  // Cada tentativa HTTP custa o timeout individual inteiro (3s) e a web nunca
+  // responde na confirmação final. Com o laço antigo, 10 voltas x (3s + 1s)
+  // dariam 39s reais para uma janela anunciada de 10s.
+  const c = cenario({
+    custoHttpMs: MS_TIMEOUT_TENTATIVA_HTTP,
+    httpOk: (() => {
+      let chamadasWeb = 0;
+      return (url) => {
+        if (!url.includes(`:${PORTA_WEB}`)) return true;
+        chamadasWeb += 1;
+        return chamadasWeb === 1; // só o passo 7/8 responde
+      };
+    })(),
+  });
+
+  // Relógio no INÍCIO de cada requisição à web. A 1ª é o passo 7/8; a 2ª é a
+  // primeira da confirmação final, e é dela que a janela de 10s começa a
+  // contar. (Sentinela `null`, não `0`: o relógio começa em zero.)
+  const inicioDeCadaWeb = [];
+  const buscarOriginal = c.deps.buscarHttp;
+  c.deps.buscarHttp = async (url, timeoutMs) => {
+    if (url.includes(`:${PORTA_WEB}`)) inicioDeCadaWeb.push(c.relogio.ms);
+    return buscarOriginal(url, timeoutMs);
+  };
+
+  const { erro } = await executarCenario(c);
+
+  assert.ok(erro instanceof FalhaDePasso);
+  assert.equal(erro.passo, NOMES_PASSOS[7]);
+  const inicioDaConfirmacao = inicioDeCadaWeb[1];
+  assert.ok(
+    inicioDaConfirmacao !== undefined,
+    "a confirmação final nem chegou a tentar",
+  );
+  const gastoNaConfirmacao = c.relogio.ms - inicioDaConfirmacao;
+  assert.equal(
+    gastoNaConfirmacao,
+    SEGUNDOS_CONFIRMACAO_FINAL_WEB * 1000,
+    `a janela de ${SEGUNDOS_CONFIRMACAO_FINAL_WEB}s virou ${gastoNaConfirmacao}ms`,
+  );
+  // Contando VOLTAS, como antes da T145, o mesmo cenário gastaria
+  // N x (timeout da tentativa) + (N-1) x intervalo — bem mais que a janela.
+  const tetoAntigoContandoVoltas =
+    SEGUNDOS_CONFIRMACAO_FINAL_WEB * MS_TIMEOUT_TENTATIVA_HTTP +
+    (SEGUNDOS_CONFIRMACAO_FINAL_WEB - 1) * MS_INTERVALO_TENTATIVA;
+  assert.ok(
+    gastoNaConfirmacao < tetoAntigoContandoVoltas,
+    "voltou a contar voltas em vez de tempo",
+  );
+});
+
+test("prazo de parede: a última tentativa é ENCURTADA para não estourar o orçamento", async () => {
+  const c = cenario({
+    custoHttpMs: MS_TIMEOUT_TENTATIVA_HTTP,
+    httpOk: (() => {
+      let chamadasWeb = 0;
+      return (url) => {
+        if (!url.includes(`:${PORTA_WEB}`)) return true;
+        chamadasWeb += 1;
+        return chamadasWeb === 1;
+      };
+    })(),
+  });
+
+  await executarCenario(c);
+
+  // Com tentativas de 3s e intervalos de 1s, a janela cabe um número inteiro
+  // de ciclos de 4s mais uma sobra — e é essa sobra que a última tentativa
+  // recebe, em vez do timeout cheio.
+  const janelaMs = SEGUNDOS_CONFIRMACAO_FINAL_WEB * 1000;
+  const porCiclo = MS_TIMEOUT_TENTATIVA_HTTP + MS_INTERVALO_TENTATIVA;
+  const cheias = Math.floor(janelaMs / porCiclo);
+  const daConfirmacao = c.timeoutsPedidos.slice(-(cheias + 1));
+
+  assert.deepEqual(
+    daConfirmacao.slice(0, cheias),
+    Array(cheias).fill(MS_TIMEOUT_TENTATIVA_HTTP),
+    "as tentativas com orçamento folgado pedem o timeout cheio",
+  );
+  const ultimo = daConfirmacao[cheias];
+  assert.ok(
+    ultimo < MS_TIMEOUT_TENTATIVA_HTTP && ultimo > 0,
+    `a última tentativa deveria ser encurtada; pediu ${ultimo}ms`,
+  );
+  assert.ok(
+    c.timeoutsPedidos.every((t) => t <= MS_TIMEOUT_TENTATIVA_HTTP),
+    "nenhuma tentativa pode pedir mais que o timeout individual",
+  );
+});
+
+test("prazo de parede: relógio parado não vira espera infinita", async () => {
+  // Um `agora` que nunca anda é defeito de quem injeta (teste mal montado,
+  // ambiente exótico). O laço precisa terminar assim mesmo, em vez de pendurar
+  // a suíte — foi o que aconteceu durante o desenvolvimento da T145.
+  const c = cenario({ httpOk: (url) => !url.includes("/v1/health/ready") });
+  c.deps.agora = () => 0;
+  c.deps.dormir = async () => {};
+
+  const { erro } = await executarCenario(c);
+
+  assert.ok(erro instanceof FalhaDePasso);
+  assert.equal(erro.passo, NOMES_PASSOS[4]);
+  assert.match(erro.message, new RegExp(`dentro de ${SEGUNDOS_ESPERA_API}s`));
+  // Terminou pelo teto de voltas, não pelo relógio: número finito e próximo
+  // do orçamento declarado, nunca um laço eterno.
+  const tentativasApi = c.urlsVerificadas.filter((u) =>
+    u.includes("/v1/health/ready"),
+  ).length;
+  assert.ok(
+    tentativasApi <= SEGUNDOS_ESPERA_API + 2,
+    `teto não segurou: ${tentativasApi} tentativas`,
+  );
+  assert.deepEqual(c.mortos, ["API"], "sem processo residual");
+});
+
+test("prazo de parede: resposta dentro do prazo encerra sem consumir o orçamento", async () => {
+  const c = cenario({ custoHttpMs: 250 });
+  const { resultado, erro } = await executarCenario(c);
+
+  assert.equal(erro, undefined);
+  assert.equal(resultado.verificacoes.web, true);
+  // Tudo respondeu de primeira: o relógio mal andou, muito longe de qualquer
+  // um dos orçamentos (o menor deles é a confirmação final, 10s).
+  assert.ok(
+    c.relogio.ms < SEGUNDOS_CONFIRMACAO_FINAL_WEB * 1000,
+    `gastou ${c.relogio.ms}ms sem precisar`,
+  );
+});
+
+test("prazo de parede: requisição lenta consome o orçamento global da API", async () => {
+  // A API nunca responde e cada tentativa custa o timeout inteiro.
+  const c = cenario({
+    custoHttpMs: MS_TIMEOUT_TENTATIVA_HTTP,
+    httpOk: (url) => !url.includes("/v1/health/ready"),
+  });
+
+  const { erro } = await executarCenario(c);
+
+  assert.ok(erro instanceof FalhaDePasso);
+  assert.equal(erro.passo, NOMES_PASSOS[4]);
+  assert.match(erro.message, new RegExp(`dentro de ${SEGUNDOS_ESPERA_API}s`));
+  // O prazo anunciado na mensagem é o prazo realmente gasto.
+  assert.equal(c.relogio.ms, SEGUNDOS_ESPERA_API * 1000);
+  // Com requisições lentas cabem menos tentativas no mesmo prazo — é o
+  // orçamento que manda, não um número fixo de voltas.
+  const tentativasApi = c.urlsVerificadas.filter((u) =>
+    u.includes("/v1/health/ready"),
+  ).length;
+  assert.ok(
+    tentativasApi < SEGUNDOS_ESPERA_API,
+    `requisição lenta deveria caber menos vezes; coube ${tentativasApi}`,
+  );
+});
+
+test("prazo de parede: nenhuma tentativa nem espera depois do prazo esgotado", async () => {
+  const c = cenario({
+    custoHttpMs: MS_TIMEOUT_TENTATIVA_HTTP,
+    httpOk: (url) => !url.includes("/v1/health/ready"),
+  });
+
+  const { erro } = await executarCenario(c);
+
+  assert.ok(erro instanceof FalhaDePasso);
+  // Nada foi verificado depois do instante do prazo: o relógio parou nele.
+  assert.equal(c.relogio.ms, SEGUNDOS_ESPERA_API * 1000);
+  // E a web nunca chegou a subir, porque o passo 5/8 falhou antes.
+  assert.deepEqual(
+    c.iniciados.map((p) => p.nome),
+    ["API"],
+  );
+  assert.deepEqual(c.mortos, ["API"], "sem processo residual");
+});
+
+test("prazo de parede: processo morto encerra a espera sem gastar o orçamento", async () => {
+  const c = cenario({
+    custoHttpMs: MS_TIMEOUT_TENTATIVA_HTTP,
+    httpOk: (url) => !url.includes("/v1/health/ready"),
+  });
+  const iniciarOriginal = c.deps.iniciar;
+  c.deps.iniciar = (spec) => {
+    const p = iniciarOriginal(spec);
+    return { ...p, vivo: () => false, matar: p.matar };
+  };
+
+  const { erro } = await executarCenario(c);
+
+  assert.ok(erro instanceof FalhaDePasso);
+  assert.match(erro.message, /O processo de A API encerrou/);
+  // Uma única tentativa (3s) e nenhum intervalo: muito longe dos 180s.
+  assert.equal(c.relogio.ms, MS_TIMEOUT_TENTATIVA_HTTP);
+  assert.ok(c.relogio.ms < SEGUNDOS_ESPERA_API * 1000);
+  assert.deepEqual(c.mortos, ["API"], "sem processo residual");
+});
+
+test("prazo de parede: o intervalo entre tentativas também sai do orçamento", async () => {
+  // Requisição instantânea: o orçamento é consumido só pelos intervalos, e o
+  // número de intervalos é exatamente o orçamento dividido pelo intervalo.
+  const c = cenario({ httpOk: (url) => !url.includes("/v1/health/ready") });
+  let intervalos = 0;
+  const dormirOriginal = c.deps.dormir;
+  c.deps.dormir = async (ms) => {
+    intervalos += 1;
+    assert.ok(
+      ms <= MS_INTERVALO_TENTATIVA,
+      `intervalo não pode passar de ${MS_INTERVALO_TENTATIVA}ms; veio ${ms}`,
+    );
+    return dormirOriginal(ms);
+  };
+
+  const { erro } = await executarCenario(c);
+
+  assert.ok(erro instanceof FalhaDePasso);
+  assert.equal(c.relogio.ms, SEGUNDOS_ESPERA_API * 1000);
+  assert.equal(
+    intervalos,
+    (SEGUNDOS_ESPERA_API * 1000) / MS_INTERVALO_TENTATIVA,
+  );
+});
+
+// ---------------------------------------------------------------------------
+// T145 (correção) — o passo 2/8 ganhou a MESMA disciplina de prazo dos laços
+// HTTP. Antes, `executar` era `spawnSync`: bloqueava o event loop, então um
+// `docker compose exec ... pg_isready` travado furava o orçamento por mais
+// correto que fosse o laço em volta, e o laço em si não tinha teto.
+// ---------------------------------------------------------------------------
+
+/** O `pg_isready` é o único subprocesso que roda com prazo próprio. */
+const ehSondagemBanco = (ch) =>
+  Array.isArray(ch.args) && ch.args.includes("pg_isready");
+
+test("banco: relógio congelado não vira laço infinito", async () => {
+  const c = cenario({
+    statusPorComando: (ch) => (ehSondagemBanco(ch) ? 1 : 0), // nunca fica de pé
+    tentativas: 60,
+  });
+  c.deps.agora = () => 0; // CONGELADO
+  c.deps.dormir = async () => {}; // e nada o faz andar
+
+  const { erro } = await executarCenario(c);
+
+  assert.ok(erro instanceof FalhaDePasso);
+  assert.equal(erro.passo, NOMES_PASSOS[1]);
+  assert.match(erro.message, /PostgreSQL não ficou disponível em 60s/);
+  // Terminou pelo teto estrutural, não pelo relógio: finito e perto do
+  // orçamento declarado. Antes desta correção o laço era infinito.
+  const sondagens = c.chamadasComPrazo.filter(ehSondagemBanco).length;
+  assert.ok(
+    sondagens > 0 && sondagens <= 60 + 2,
+    `teto não segurou: ${sondagens} sondagens`,
+  );
+});
+
+test("banco: pg_isready lento recebe SOMENTE o orçamento restante", async () => {
+  // Cada sondagem custa mais do que o timeout por tentativa: o prazo entregue
+  // nunca pode passar do teto individual nem do que sobra do orçamento.
+  const c = cenario({
+    tentativas: 10,
+    custoSubprocessoMs: (ch) => (ehSondagemBanco(ch) ? 60_000 : 0),
+  });
+
+  const { erro } = await executarCenario(c);
+
+  assert.ok(erro instanceof FalhaDePasso);
+  assert.equal(erro.passo, NOMES_PASSOS[1]);
+  const prazos = c.chamadasComPrazo
+    .filter(ehSondagemBanco)
+    .map((ch) => ch.timeoutMs);
+  assert.ok(prazos.length > 0, "nenhuma sondagem aconteceu");
+  assert.ok(
+    prazos.every((p) => p <= MS_TIMEOUT_TENTATIVA_BANCO),
+    `sondagem pediu mais que o teto individual: ${prazos}`,
+  );
+  // A última encolhe: recebe só a sobra, não o teto cheio.
+  assert.ok(
+    prazos[prazos.length - 1] < MS_TIMEOUT_TENTATIVA_BANCO,
+    `a última sondagem deveria encolher; pediu ${prazos[prazos.length - 1]}ms`,
+  );
+});
+
+test("banco: subprocesso travado é encerrado e conta como tentativa sem sucesso", async () => {
+  const c = cenario({
+    tentativas: 10,
+    custoSubprocessoMs: (ch) => (ehSondagemBanco(ch) ? 60_000 : 0),
+  });
+
+  await executarCenario(c);
+
+  // Toda sondagem que furou o prazo foi encerrada — nenhuma ficou pendurada.
+  const sondagens = c.chamadasComPrazo.filter(ehSondagemBanco).length;
+  // Sem esta linha a asserção seguinte passaria vazia (0 === 0) num código que
+  // nem roda a sondagem com prazo.
+  assert.ok(sondagens > 0, "nenhuma sondagem com prazo aconteceu");
+  assert.equal(
+    c.encerramentos.length,
+    sondagens,
+    "toda sondagem que estourou o prazo deveria ter sido encerrada",
+  );
+  assert.ok(
+    c.encerramentos.every((e) => e.comando === "docker"),
+    "só o subprocesso do banco deveria ser encerrado",
+  );
+});
+
+test("banco: prazo global não é ultrapassado de forma material", async () => {
+  const c = cenario({
+    tentativas: 10,
+    custoSubprocessoMs: (ch) => (ehSondagemBanco(ch) ? 60_000 : 0),
+  });
+
+  await executarCenario(c);
+
+  // Antes da correção, uma sondagem de 60s sozinha estourava o orçamento de
+  // 10s. Agora o passo inteiro cabe nele.
+  assert.equal(c.relogio.ms, 10 * 1000);
+});
+
+test("banco: nenhuma sondagem nem espera depois do prazo", async () => {
+  const c = cenario({
+    tentativas: 5,
+    statusPorComando: (ch) => (ehSondagemBanco(ch) ? 1 : 0),
+  });
+  let intervalos = 0;
+  const dormirOriginal = c.deps.dormir;
+  c.deps.dormir = async (ms) => {
+    intervalos += 1;
+    assert.ok(ms <= MS_INTERVALO_TENTATIVA, `intervalo grande demais: ${ms}`);
+    return dormirOriginal(ms);
+  };
+
+  const { erro } = await executarCenario(c);
+
+  assert.ok(erro instanceof FalhaDePasso);
+  assert.equal(erro.passo, NOMES_PASSOS[1]);
+  // Sondagem instantânea + intervalos de 1s: o orçamento é consumido só pelos
+  // intervalos, e o relógio para exatamente no prazo.
+  assert.equal(c.relogio.ms, 5 * 1000);
+  assert.equal(intervalos, 5);
+});
+
+test("banco: pronto na primeira sondagem segue o caminho normal, sem encerramento", async () => {
+  const c = cenario(); // tudo responde
+  const { resultado, erro } = await executarCenario(c);
+
+  assert.equal(erro, undefined);
+  assert.equal(resultado.verificacoes.banco, true);
+  assert.deepEqual(c.encerramentos, [], "nada deveria ter sido encerrado");
+  assert.deepEqual(c.mortos, [], "nenhum processo residual no sucesso");
+  // Uma sondagem no passo 2/8 e outra na verificação final 8/8.
+  assert.equal(c.chamadasComPrazo.filter(ehSondagemBanco).length, 2);
+});
+
+test("banco: a sondagem roda sem shell e sem segredo em argv", async () => {
+  const c = cenario({
+    tentativas: 3,
+    statusPorComando: (ch) => (ehSondagemBanco(ch) ? 1 : 0),
+  });
+
+  await executarCenario(c);
+
+  const sondagens = c.chamadasComPrazo.filter(ehSondagemBanco);
+  assert.ok(sondagens.length > 0);
+  for (const ch of sondagens) {
+    assert.equal(ch.shell, false, "a sondagem do banco não usa shell");
+    assert.ok(
+      !ch.args.some((a) => String(a).includes(SENHA_ADMIN)),
+      "nenhuma senha pode viajar em argv",
+    );
+    assert.equal(typeof ch.timeoutMs, "number");
+    assert.ok(ch.timeoutMs > 0);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// T145 (correção do bloqueio) — encerramento NÃO confirmado.
+// Esperar `close` para sempre depois de mandar matar trocaria um travamento
+// por outro. Quando o executor devolve `encerramentoConfirmado: false`, o
+// passo tem de FALHAR com mensagem segura, nunca virar sucesso nem seguir
+// acumulando sondagens.
+// ---------------------------------------------------------------------------
+
+test("banco: encerramento não confirmado falha o passo com mensagem segura", async () => {
+  const c = cenario({
+    tentativas: 10,
+    custoSubprocessoMs: (ch) => (ehSondagemBanco(ch) ? 60_000 : 0),
+    encerramentoNaoConfirmado: ehSondagemBanco,
+  });
+
+  const { resultado, erro } = await executarCenario(c);
+
+  assert.equal(resultado, undefined, "não pode virar sucesso");
+  assert.ok(erro instanceof FalhaDePasso);
+  assert.equal(erro.passo, NOMES_PASSOS[1]);
+  assert.match(erro.message, /não foi possível confirmar o encerramento/i);
+  // Para na PRIMEIRA sondagem não confirmada, em vez de acumular processos
+  // presos a cada volta do laço.
+  assert.equal(c.chamadasComPrazo.filter(ehSondagemBanco).length, 1);
+});
+
+test("banco: a falha de encerramento não revela comando, argumento nem segredo", async () => {
+  const c = cenario({
+    tentativas: 10,
+    custoSubprocessoMs: (ch) => (ehSondagemBanco(ch) ? 60_000 : 0),
+    encerramentoNaoConfirmado: ehSondagemBanco,
+  });
+
+  const { erro } = await executarCenario(c);
+
+  const texto = `${erro.message}\n${erro.proximoPasso}`;
+  for (const segredo of [SENHA_ADMIN, SENHA_APP, SENHA_MIGRATOR]) {
+    assert.ok(!texto.includes(segredo), "vazou segredo na falha");
+  }
+  assert.ok(!texto.includes("pg_isready"), "não deve expor o argumento");
+  assert.ok(!texto.includes("docker compose exec"), "não deve expor o comando");
+  // Diz o passo e a condição, que é o que o operador precisa.
+  assert.equal(erro.passo, NOMES_PASSOS[1]);
+  assert.match(erro.proximoPasso, /processo/i);
+});
+
+test("banco: encerramento CONFIRMADO após timeout segue como tentativa sem sucesso", async () => {
+  // Mesmo cenário, mas o SO confirma a morte: o laço continua tentando dentro
+  // do orçamento, em vez de falhar o passo.
+  const c = cenario({
+    tentativas: 10,
+    custoSubprocessoMs: (ch) => (ehSondagemBanco(ch) ? 60_000 : 0),
+  });
+
+  const { erro } = await executarCenario(c);
+
+  assert.ok(erro instanceof FalhaDePasso);
+  assert.match(erro.message, /PostgreSQL não ficou disponível em 10s/);
+  assert.ok(
+    c.chamadasComPrazo.filter(ehSondagemBanco).length > 1,
+    "com encerramento confirmado o laço deveria continuar tentando",
+  );
+  assert.ok(
+    c.encerramentos.every((e) => e.confirmado),
+    "todos deveriam estar confirmados neste cenário",
+  );
+});
+
+test("banco: caminho normal não encerra nada e não reporta expiração", async () => {
+  const c = cenario();
+  const { resultado, erro } = await executarCenario(c);
+
+  assert.equal(erro, undefined);
+  assert.equal(resultado.verificacoes.banco, true);
+  assert.deepEqual(c.encerramentos, [], "nada a encerrar no caminho normal");
 });

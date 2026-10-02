@@ -47,7 +47,14 @@ export const CODIGO_SAIDA_ADMIN_JA_EXISTE = 3;
 export const DIRETORIO_API = "apps/api";
 
 /**
- * Orçamentos de espera, finitos e distintos.
+ * Orçamentos de espera, finitos e distintos. São PRAZOS DE PAREDE: o valor em
+ * segundos é o tempo máximo real que o passo pode levar, já incluído o tempo
+ * gasto dentro de cada tentativa e nos intervalos entre elas (T145).
+ *
+ * Antes da T145 estes números contavam ITERAÇÕES, não segundos. Como cada
+ * iteração podia gastar até `MS_TIMEOUT_TENTATIVA_HTTP` na requisição mais
+ * `MS_INTERVALO_TENTATIVA` no intervalo, "180s" chegava a 720s reais e a
+ * mensagem de falha mentia sobre o prazo. Agora o laço olha o relógio.
  *
  * A API paga uma compilação do Nest a cada subida (`deleteOutDir: true`), e a
  * primeira do dia, com o cache de disco frio, é a mais cara — medida em 24s
@@ -63,16 +70,45 @@ export const SEGUNDOS_ESPERA_WEB = 90;
  * o passo 7/8 já provou que a web responde. Cobre só a oscilação momentânea
  * de um Vite ainda terminando de compilar a primeira requisição a frio entre
  * o fim daquele passo e esta releitura.
+ *
+ * Por que 30s e não os 10 de antes: o número mudou de UNIDADE na T145, não de
+ * intenção. Antes eram 10 TENTATIVAS, e a tolerância real que elas davam
+ * chegava a 39s — o Vite frio aceita a conexão e a segura enquanto transforma
+ * o módulo, então cada tentativa custava o timeout inteiro, não uma recusa
+ * instantânea. Mantido em 10, o prazo de parede cortaria essa tolerância para
+ * menos de um quarto e passaria a reprovar ambiente que antes subia. 30s
+ * preserva a tolerância que a T144 de fato oferecia, agora dita em segundos
+ * verdadeiros.
  */
-export const SEGUNDOS_CONFIRMACAO_FINAL_WEB = 10;
+export const SEGUNDOS_CONFIRMACAO_FINAL_WEB = 30;
+/** Prazo do banco no passo 2/8, também de parede. */
+export const SEGUNDOS_ESPERA_BANCO = 60;
 /**
  * Prazo de CADA tentativa HTTP, não do orçamento inteiro. Sem isto, uma
  * conexão aceita por um servidor que nunca responde prende a tentativa
- * indefinidamente: o laço de `esperar`/`confirmarProntoWeb` nunca re-checa
- * se o processo morreu nem decrementa o orçamento, e o diagnóstico "não
- * respondeu em Ns" ficaria errado — na verdade ficou preso numa tentativa só.
+ * indefinidamente: o laço de espera nunca re-checa se o processo morreu nem
+ * reavalia o relógio, e o diagnóstico "não respondeu em Ns" ficaria errado —
+ * na verdade ficou preso numa tentativa só.
+ *
+ * O prazo efetivo de uma tentativa é o MENOR entre este valor e o que sobra do
+ * orçamento global: perto do fim, a tentativa encurta em vez de estourar o
+ * prazo declarado.
  */
 export const MS_TIMEOUT_TENTATIVA_HTTP = 3000;
+/**
+ * Prazo de CADA sondagem do banco (`pg_isready` num subprocesso). Existe pela
+ * mesma razão do timeout HTTP, com um agravante: `executar` é `spawnSync` e
+ * bloqueia o event loop, então um `docker compose exec` travado não seria
+ * interrompido por prazo nenhum escrito em JavaScript. A sondagem com prazo
+ * roda em subprocesso assíncrono e é encerrada com os descendentes.
+ *
+ * O `pg_isready` responde em milissegundos quando o container está de pé; 3s
+ * é folga larga, e o prazo efetivo é o menor entre este valor e o que sobra do
+ * orçamento do passo.
+ */
+export const MS_TIMEOUT_TENTATIVA_BANCO = 3000;
+/** Intervalo entre tentativas, também descontado do orçamento global. */
+export const MS_INTERVALO_TENTATIVA = 1000;
 
 export const DESTINO_INALCANCAVEL =
   "postgresql://unused:unused@127.0.0.1:1/unused";
@@ -208,12 +244,21 @@ export async function subirAmbiente(deps) {
     ambiente,
     lerArquivo,
     executar,
+    // Subprocesso com prazo próprio e encerramento da árvore. Separado de
+    // `executar` porque este precisa ser assíncrono para o prazo valer.
+    executarComPrazo,
     iniciar,
     buscarHttp,
     portaLivre,
     dormir,
     registrar = () => {},
-    tentativas = 60,
+    // Relógio injetável: os prazos passaram a ser de parede (T145), então o
+    // teste precisa controlar o tempo para provar o orçamento sem dormir de
+    // verdade. O padrão é MONOTÔNICO de propósito — `Date.now()` pode andar
+    // para trás num ajuste de NTP ou de horário, o que esticaria ou encurtaria
+    // uma espera; `performance.now()` só avança.
+    agora = () => performance.now(),
+    tentativas = SEGUNDOS_ESPERA_BANCO,
     sha = null,
   } = deps;
 
@@ -262,6 +307,40 @@ export async function subirAmbiente(deps) {
     return { status, saida };
   };
 
+  /**
+   * Como `rodar`, mas com prazo PRÓPRIO para o subprocesso.
+   *
+   * `executar` é `spawnSync`: ele bloqueia o event loop até o filho terminar,
+   * e por isso nenhum prazo escrito em JavaScript consegue interrompê-lo — era
+   * exatamente assim que um `docker compose exec ... pg_isready` lento ou
+   * travado furava o orçamento anunciado do passo 2/8, por mais correto que
+   * fosse o laço em volta dele. Aqui o subprocesso é assíncrono: se estourar o
+   * prazo, é encerrado com os descendentes e a tentativa conta como sem
+   * sucesso, em vez de segurar o passo inteiro.
+   */
+  const rodarComPrazo = async (comando, args, timeoutMs, opcoes = {}) => {
+    const shell = opcoes.shell ?? usarShell;
+    exigirArgumentosLiterais(passoAtual, comando, args, shell);
+    const resultado = await executarComPrazo({
+      passo: passoAtual,
+      comando,
+      args,
+      shell,
+      timeoutMs,
+      ...(opcoes.cwd ? { cwd: opcoes.cwd } : {}),
+      ...(opcoes.env ? { env: opcoes.env } : {}),
+    });
+    return {
+      status: resultado?.status ?? 1,
+      saida: censurar(resultado?.saida ?? "", segredos),
+      expirou: resultado?.expirou === true,
+      // Ausente é tratado como confirmado: só a negativa EXPLÍCITA do
+      // executor vira falha de passo.
+      encerramentoConfirmado: resultado?.encerramentoConfirmado !== false,
+      motivo: resultado?.motivo ?? "normal",
+    };
+  };
+
   const exigirSucesso = (comando, args, opcoes = {}) => {
     const { status, saida } = rodar(comando, args, opcoes);
     const aceitos = opcoes.statusAceitos ?? [0];
@@ -280,68 +359,118 @@ export async function subirAmbiente(deps) {
     return { status, saida };
   };
 
-  /** Toda verificação HTTP é local, por construção. */
-  const verificarHttp = async (url) => {
+  /**
+   * Toda verificação HTTP é local, por construção. `timeoutMs` é o prazo DESTA
+   * tentativa — quem chama o encurta perto do fim do orçamento global, para
+   * que uma única tentativa não estoure o prazo declarado do passo.
+   */
+  const verificarHttp = async (url, timeoutMs = MS_TIMEOUT_TENTATIVA_HTTP) => {
     if (!url.startsWith(`http://${HOST_LOCAL}:`)) {
       falhar(
         `Verificação HTTP fora de ${HOST_LOCAL} ("${url}").`,
         "Isto é defeito do orquestrador, não do ambiente: reporte.",
       );
     }
-    const resposta = await buscarHttp(url);
+    const resposta = await buscarHttp(url, timeoutMs);
     return resposta !== null && resposta.ok === true;
   };
 
   /**
-   * Espera um servidor responder, com prazo SEMPRE finito.
+   * Espera algo ficar pronto dentro de um PRAZO DE PAREDE (T145).
+   *
+   * O orçamento é tempo real, não contagem de voltas: o relógio é lido a cada
+   * passagem, e tanto a requisição quanto o intervalo saem do mesmo bolso. Daí
+   * as três consequências que o laço antigo não tinha:
+   *
+   *  - a tentativa é encurtada quando sobra menos que `MS_TIMEOUT_TENTATIVA_HTTP`,
+   *    em vez de estourar o prazo;
+   *  - nenhuma tentativa NOVA começa com o orçamento zerado;
+   *  - o intervalo nunca passa do que resta, então o laço termina exatamente
+   *    no prazo anunciado — "dentro de 10s" quer dizer 10s, não 39s.
    *
    * Se o processo morrer no caminho — erro de configuração, porta tomada,
    * falha de compilação — não faz sentido continuar batendo na porta: a espera
    * termina na hora, dizendo que o processo encerrou, em vez de gastar o
-   * orçamento inteiro para depois culpar um timeout que não foi a causa.
+   * orçamento inteiro para depois culpar um prazo que não foi a causa.
+   *
+   * Devolve `true` se ficou pronto e `false` se o prazo acabou. Quem chama
+   * decide se isso vira falha (passos 5/8 e 7/8) ou uma linha do relatório
+   * agregado (passo 8/8).
    */
-  const esperar = async (rotulo, url, proximoPasso, opcoes = {}) => {
-    const limite = opcoes.segundos ?? tentativas;
-    const processo = opcoes.processo ?? null;
+  const aguardarComPrazo = async ({
+    tentar,
+    segundos,
+    msTimeoutTentativa = MS_TIMEOUT_TENTATIVA_HTTP,
+    processo = null,
+    aoMorrer,
+  }) => {
+    const prazoFinal = agora() + segundos * 1000;
+    const restante = () => prazoFinal - agora();
 
-    for (let i = 1; i <= limite; i += 1) {
-      if (await verificarHttp(url)) return;
-      if (processo && typeof processo.vivo === "function" && !processo.vivo()) {
-        falhar(
-          `O processo de ${rotulo} encerrou antes de responder em ${url}.`,
-          proximoPasso,
-        );
-      }
-      await dormir(1000);
-    }
-    falhar(
-      `${rotulo} não respondeu em ${url} dentro de ${limite}s.`,
-      proximoPasso,
-    );
-  };
+    // Teto de voltas: rede de segurança para um relógio que NÃO anda — um
+    // `agora` injetado que devolve sempre o mesmo valor, por exemplo. Quem
+    // decide o fim é o prazo; isto só impede que um relógio parado vire espera
+    // infinita. Em execução real nunca é alcançado: a tentativa mais barata
+    // que existe (conexão recusada) ainda paga um intervalo inteiro.
+    const teto = Math.ceil((segundos * 1000) / MS_INTERVALO_TENTATIVA) + 2;
 
-  /**
-   * Confirmação FINAL da web (passo 8/8): polling LIMITADO, não uma segunda
-   * espera longa — o passo 7/8 já provou prontidão. Tolera só a oscilação
-   * momentânea de um Vite ainda terminando a primeira compilação a frio.
-   * Processo morto durante a confirmação falha NA HORA, como em `esperar`:
-   * nunca espera o orçamento inteiro para então culpar um timeout que não foi
-   * a causa. Dentro do orçamento, devolve `true`/`false` em vez de lançar,
-   * para compor o relatório agregado de `banco`/`api`/`web` do passo 8/8.
-   */
-  const confirmarProntoWeb = async (rotulo, url, processo) => {
-    for (let i = 1; i <= SEGUNDOS_CONFIRMACAO_FINAL_WEB; i += 1) {
-      if (await verificarHttp(url)) return true;
+    for (let volta = 1; volta <= teto; volta += 1) {
+      const sobra = restante();
+      // Orçamento esgotado: não inicia tentativa nova.
+      if (sobra <= 0) return false;
+
+      if (await tentar(Math.min(msTimeoutTentativa, sobra))) return true;
+
       if (processo && typeof processo.vivo === "function" && !processo.vivo()) {
-        falhar(
-          `O processo de ${rotulo} encerrou antes da confirmação final em ${url}.`,
-          "O ambiente NÃO está pronto. Rode de novo depois de corrigir.",
-        );
+        aoMorrer();
       }
-      if (i < SEGUNDOS_CONFIRMACAO_FINAL_WEB) await dormir(1000);
+
+      const sobraParaDormir = restante();
+      if (sobraParaDormir <= 0) return false;
+      await dormir(Math.min(MS_INTERVALO_TENTATIVA, sobraParaDormir));
     }
     return false;
   };
+
+  /** Espera um servidor responder; o prazo esgotado é falha do passo. */
+  const esperar = async (rotulo, url, proximoPasso, opcoes = {}) => {
+    const segundos = opcoes.segundos ?? tentativas;
+    const pronto = await aguardarComPrazo({
+      tentar: (msTimeout) => verificarHttp(url, msTimeout),
+      segundos,
+      processo: opcoes.processo ?? null,
+      aoMorrer: () =>
+        falhar(
+          `O processo de ${rotulo} encerrou antes de responder em ${url}.`,
+          proximoPasso,
+        ),
+    });
+    if (!pronto) {
+      falhar(
+        `${rotulo} não respondeu em ${url} dentro de ${segundos}s.`,
+        proximoPasso,
+      );
+    }
+  };
+
+  /**
+   * Confirmação FINAL da web (passo 8/8): prazo CURTO, não uma segunda espera
+   * longa — o passo 7/8 já provou prontidão. Tolera só a oscilação momentânea
+   * de um Vite ainda terminando a primeira compilação a frio. Devolve
+   * `true`/`false` em vez de lançar, para compor o relatório agregado de
+   * `banco`/`api`/`web`; processo morto, esse sim, falha na hora.
+   */
+  const confirmarProntoWeb = (rotulo, url, processo) =>
+    aguardarComPrazo({
+      tentar: (msTimeout) => verificarHttp(url, msTimeout),
+      segundos: SEGUNDOS_CONFIRMACAO_FINAL_WEB,
+      processo,
+      aoMorrer: () =>
+        falhar(
+          `O processo de ${rotulo} encerrou antes da confirmação final em ${url}.`,
+          "O ambiente NÃO está pronto. Rode de novo depois de corrigir.",
+        ),
+    });
 
   try {
     // ---- 1/8 ---------------------------------------------------------------
@@ -442,8 +571,13 @@ export async function subirAmbiente(deps) {
         "Confirme que o Docker Desktop está em execução e rode de novo.",
     });
 
-    const bancoDePe = async () =>
-      rodar(
+    /**
+     * Uma sondagem do banco, com prazo próprio. O `msTimeout` vem do mesmo
+     * orçamento do passo: perto do fim ele encolhe, e um `pg_isready` travado
+     * é encerrado em vez de segurar o passo além do prazo anunciado.
+     */
+    const bancoDePe = async (msTimeout) => {
+      const { status, encerramentoConfirmado } = await rodarComPrazo(
         "docker",
         [
           "compose",
@@ -456,15 +590,35 @@ export async function subirAmbiente(deps) {
           "-d",
           envRaiz.POSTGRES_DB,
         ],
+        msTimeout,
         { shell: false },
-      ).status === 0;
+      );
+      if (!encerramentoConfirmado) {
+        // O sistema operacional não confirmou a morte da sondagem. Insistir
+        // deixaria processos acumulando atrás de cada volta do laço, então o
+        // passo para aqui. A mensagem diz só a condição: nada de comando,
+        // argumento, ambiente ou saída do processo.
+        falhar(
+          "Não foi possível confirmar o encerramento do subprocesso de " +
+            "verificação do PostgreSQL.",
+          "Pode ter ficado um processo preso nesta máquina. Verifique os " +
+            "processos do Docker, encerre o que sobrou e rode de novo.",
+        );
+      }
+      return status === 0;
+    };
 
-    let pronto = false;
-    for (let i = 1; i <= tentativas && !pronto; i += 1) {
-      pronto = await bancoDePe();
-      if (!pronto) await dormir(1000);
-    }
-    if (!pronto) {
+    // O banco usa a MESMA disciplina de prazo dos passos 5/8, 7/8 e 8/8
+    // (T145): prazo de parede absoluto, teto estrutural contra relógio parado,
+    // nenhuma tentativa ou intervalo depois do orçamento, e o intervalo saindo
+    // do mesmo bolso. Não há processo gerenciado aqui — o PostgreSQL é um
+    // container —, então não há morte de processo a vigiar.
+    const bancoPronto = await aguardarComPrazo({
+      tentar: bancoDePe,
+      segundos: tentativas,
+      msTimeoutTentativa: MS_TIMEOUT_TENTATIVA_BANCO,
+    });
+    if (!bancoPronto) {
       falhar(
         `PostgreSQL não ficou disponível em ${tentativas}s.`,
         'Veja "docker compose logs postgres" e rode de novo.',
@@ -662,7 +816,7 @@ export async function subirAmbiente(deps) {
     // ---- 8/8 ---------------------------------------------------------------
     passo(NOMES_PASSOS[7]);
     const verificacoes = {
-      banco: await bancoDePe(),
+      banco: await bancoDePe(MS_TIMEOUT_TENTATIVA_BANCO),
       api: await verificarHttp(`${urlApi}/v1/health/ready`),
       web: await confirmarProntoWeb(
         "A interface web",

@@ -108,15 +108,15 @@ primeiro caderno de homologação de jornada e Banco de Horas.
 
 ## Solicitações gerais de Pessoas e convergência — T135 a T141
 
-| Tarefa | Estado                      | Resultado principal                                                                                                                                                                                                                                                                    |
-| ------ | --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| T135   | Investigada/bloqueada       | Não existe controller, persistência Prisma nem RBAC real para Solicitações gerais. Nenhum código foi criado.                                                                                                                                                                           |
-| T136   | Integrada                   | `PD-SOL-01..05` aprovadas; ADR 0013 define Cloudflare R2 como provedor privado futuro sem habilitar upload.                                                                                                                                                                            |
-| T137   | Não iniciada; substituída   | Identificador histórico da fundação, substituído pela T139 após a convergência T138; nenhum código funcional foi criado.                                                                                                                                                               |
-| T138   | Integrada                   | Spec Kit versionado, protegido por gate na CI e reconciliado sobre `main` com T136, decisões aprovadas e ADR 0013.                                                                                                                                                                     |
-| T139   | Integrada                   | Fundação backend da Central: módulo NestJS, Prisma/migration, cinco endpoints, RBAC deny-by-default, CSRF, auditoria transacional e E2E. A revisão adversarial achou uma corrida de transições concorrentes, corrigida com lock de linha antes da integração.                          |
-| T140   | Integrada                   | Interface web funcional de Pessoas > Solicitações sobre os cinco endpoints da T139. Cliente tipado, guarda contra respostas obsoletas e RBAC refletido na experiência. Nenhum contrato de backend alterado. Três bloqueios achados em revisão adversarial e corrigidos antes do merge. |
-| T141   | Implementada; PR #133 Draft | Ambiente local de demonstração e guia visual de acompanhamento. **Não é capacidade de RH**: é forma de olhar o que já existe, com dados sintéticos, numa máquina local.                                                                                                                |
+| Tarefa | Estado                                    | Resultado principal                                                                                                                                                                                                                                                                    |
+| ------ | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T135   | Investigada/bloqueada                     | Não existe controller, persistência Prisma nem RBAC real para Solicitações gerais. Nenhum código foi criado.                                                                                                                                                                           |
+| T136   | Integrada                                 | `PD-SOL-01..05` aprovadas; ADR 0013 define Cloudflare R2 como provedor privado futuro sem habilitar upload.                                                                                                                                                                            |
+| T137   | Não iniciada; substituída                 | Identificador histórico da fundação, substituído pela T139 após a convergência T138; nenhum código funcional foi criado.                                                                                                                                                               |
+| T138   | Integrada                                 | Spec Kit versionado, protegido por gate na CI e reconciliado sobre `main` com T136, decisões aprovadas e ADR 0013.                                                                                                                                                                     |
+| T139   | Integrada                                 | Fundação backend da Central: módulo NestJS, Prisma/migration, cinco endpoints, RBAC deny-by-default, CSRF, auditoria transacional e E2E. A revisão adversarial achou uma corrida de transições concorrentes, corrigida com lock de linha antes da integração.                          |
+| T140   | Integrada                                 | Interface web funcional de Pessoas > Solicitações sobre os cinco endpoints da T139. Cliente tipado, guarda contra respostas obsoletas e RBAC refletido na experiência. Nenhum contrato de backend alterado. Três bloqueios achados em revisão adversarial e corrigidos antes do merge. |
+| T141   | **Integrada** (PR #133, squash `8e3c15c`) | Ambiente local de demonstração e guia visual de acompanhamento. **Não é capacidade de RH**: é forma de olhar o que já existe, com dados sintéticos, numa máquina local.                                                                                                                |
 
 ## Limites da T139 e da T140 (implementados como limite, não como pendência esquecida)
 
@@ -211,12 +211,41 @@ nomeados nas faixas que já os cobriam.
 **Limites explícitos:** a T144 não inicia a expansão visual, não toca a PR #133 nem a branch da
 T141, e não trata as observações O2–O5 das revisões, que seguem registradas.
 
+## Hardening pós-T141 — T145 (implementada; PR Draft)
+
+| Tarefa | Estado                     | Resultado principal                                                                                                                                                                                                                                                                                                                        |
+| ------ | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| T145   | **Implementada; PR Draft** | Quita as duas ressalvas não bloqueantes que a revisão final da PR #133 registrou e que entraram em `main` sem correção: o Spec Kit autocontraditório sobre T141/T144 e o prazo declarado que não era o prazo real. Não toca API, web, Prisma, migrations, seed, credenciais, dependências nem a direção visual. Base: `main` em `8e3c15c`. |
+
+**Prazo de parede.** Os laços de espera contavam ITERAÇÕES, não segundos. Como cada volta gastava
+até `MS_TIMEOUT_TENTATIVA_HTTP` (3s) na requisição mais 1s de intervalo, o número anunciado valia
+até quatro vezes mais: "180s" da API chegavam a 720s, "90s" da web a 360s e a janela de 10s do
+passo 8/8 a 39s — e a mensagem de falha anunciava o prazo menor, o que atrapalhava o diagnóstico.
+Agora o orçamento é tempo real: a tentativa HTTP recebe `min(timeout, o que resta)`, o intervalo
+sai do mesmo orçamento, nenhuma tentativa nova começa sem orçamento, a morte do processo segue
+interrompendo a espera na hora, e um teto de voltas impede que um relógio que não anda vire espera
+infinita. `esperar`, `confirmarProntoWeb` e o laço do `pg_isready` passam a compartilhar um único
+`aguardarComPrazo`.
+
+**Relógio monotônico e injetável.** O relógio entra por `deps.agora`, com padrão
+`performance.now()`: `Date.now()` pode recuar num ajuste de NTP e esticar ou encurtar uma espera de
+180s já em curso. A injeção é o que torna o teste determinístico — nenhum milissegundo real é
+gasto para provar um orçamento de 180s.
+
+**Tolerância do passo 8/8 recalibrada.** `SEGUNDOS_CONFIRMACAO_FINAL_WEB` passa de 10 para 30: o
+número mudou de unidade, não de intenção. O Vite frio aceita a conexão e a segura enquanto
+transforma o módulo, então cada tentativa custava o timeout inteiro e as 10 voltas antigas davam
+até 39s de tolerância real; mantido em 10, o prazo de parede reprovaria ambiente que antes subia.
+
+**Limites explícitos:** a T145 não reabre T141–T144, não inicia a expansão visual e não trata as
+observações O2–O7 e O11 das revisões anteriores, que seguem registradas.
+
 ## Próxima ação autorizável
 
-1. **Planejar a expansão gradual do padrão B + modais para a próxima tela funcional prioritária** —
+1. Revisão somente leitura e integração da T145 (PR Draft).
+2. **Planejar a expansão gradual do padrão B + modais para a próxima tela funcional prioritária** —
    uma tela só, com identificador próprio, e validação visual antes de ampliar para a seguinte.
    Planejar não é implementar: a escolha da tela e o escopo vêm antes do código.
-2. Revisão somente leitura e integração da T141 (PR #133, Draft).
 3. Só depois disso abrir a próxima fatia, sob o próximo identificador disponível — sem número
    reservado aqui, porque reservar identificador antes da decisão de escopo já se mostrou fonte de
    confusão (ver T137).
