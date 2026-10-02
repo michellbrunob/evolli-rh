@@ -12,14 +12,14 @@
   },
   "nextTask": {
     "id": "a definir",
-    "status": "pending_validacao_visual_t146",
-    "reason": "T145 integrada em main (PR #136, squash bbb7942). A T146 organiza a arquitetura modular do ecossistema e entrega um prototipo navegavel do shell, isolado em docs/prototipos/t146/ — somente documentacao e prototipo estatico, nunca capacidade funcional. O proximo passo e a avaliacao visual do proprietario; aprovar o mapa modular nao aprova tela alguma. So depois disso se planeja a proxima tela funcional do padrao B + modais, uma por vez, com validacao visual antes de ampliar."
+    "status": "pending_revisao_final_t146",
+    "reason": "T145 integrada em main (PR #136, squash bbb7942). A T146 organiza a arquitetura modular do ecossistema e entrega um prototipo navegavel do shell, isolado em docs/prototipos/t146/ — somente documentacao e prototipo estatico, nunca capacidade funcional. O proprietario aprovou a evolucao visual e congelou a fundacao (shell, tokens, padrao B, sidebar e modais): so correcao necessaria de usabilidade, acessibilidade, responsividade ou bloqueio operacional pode altera-la antes do acabamento final. Prioridade passa a ser entregar modulos funcionais, testados e homologaveis com dados sinteticos. Proximo passo: revisao final da PR #137 e, apos a integracao, iniciar o modulo funcional prioritario."
   },
   "openDeliveries": [
     {
       "id": "T146",
       "pullRequest": null,
-      "status": "draft_prototipo_em_validacao_visual"
+      "status": "draft_fundacao_visual_aprovada_congelada"
     }
   ],
   "requiredArtifacts": [

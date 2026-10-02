@@ -763,9 +763,18 @@ decisões e bloqueios, está no ledger versionado
       workspace por módulo, agrupamento da navegação, atalhos, listas com filtros e fila de
       pendências — que o Evolli ainda não organizou. A ADR 0014 manteve o Evolli como
       plataforma-base e liberou o Frappe **só como referência conceitual**.
-    - **Estado:** **protótipo em validação visual**, na branch `codex/t146-arquitetura-modular-shell`;
-      PR Draft. **Nunca funcional e nunca integrada**: cria apenas documentação e protótipo
-      estático. Base: `main` em `bbb7942`.
+    - **Estado:** **fundação visual aprovada e congelada pelo proprietário — ainda não integrada**,
+      na branch `codex/t146-arquitetura-modular-shell`; PR #137 Draft, aguardando revisão final.
+      **Nunca funcional e nunca integrada**: cria apenas documentação e protótipo estático. Base:
+      `main` em `bbb7942`.
+    - **Decisão do proprietário:** _"Aprovo a evolução visual da T146, porém devemos focar agora na
+      entrega dos módulos funcionais e testados, deixando o acabamento visual final para o fim."_
+      Shell, tokens, padrão B, sidebar e modais ficam aprovados como fundação visual e
+      **congelados**: só correção necessária de usabilidade, acessibilidade, responsividade ou
+      bloqueio operacional pode tocá-los antes do acabamento final. Prioridade passa a ser entregar
+      módulos funcionais, testados e homologáveis com dados sintéticos; nenhuma aparência de
+      protótipo é prova de capacidade funcional. Detalhe completo em
+      `docs/decisions/t146-arquitetura-modular-shell.md`.
     - **Natureza:** NÃO é capacidade de RH. Nenhum endpoint, permissão, regra, contrato ou tela
       funcional foi criado ou alterado. O protótipo não fala com a API, não grava nada e se
       identifica permanentemente como sintético.

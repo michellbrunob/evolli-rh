@@ -250,6 +250,34 @@ terceiros entrou no protótipo. Os ícones são SVG desenhados aqui; os tokens v
 do próprio Evolli; não há dependência, framework, CDN ou fonte externa. A skill
 foi consultada e descartada depois do uso.
 
+## Decisão do proprietário — aprovação visual e congelamento da fundação
+
+> "Aprovo a evolução visual da T146, porém devemos focar agora na entrega dos
+> módulos funcionais e testados, deixando o acabamento visual final para o
+> fim."
+
+**Interpretação vinculante:**
+
+- a arquitetura modular, o shell, os tokens, o padrão B, a sidebar e os modais
+  ficam **aprovados como fundação visual**;
+- a fundação visual fica **congelada**;
+- não haverá expansão ou redesenho amplo agora;
+- durante a implementação dos módulos, somente correções necessárias de
+  usabilidade, acessibilidade, responsividade ou bloqueio operacional poderão
+  alterar a interface;
+- refinamento estético, uniformização completa e acabamento visual final ficam
+  para uma etapa posterior;
+- a prioridade passa a ser entregar **módulos funcionais, testados e
+  homologáveis com dados sintéticos**;
+- **nenhuma aparência de protótipo constitui prova de capacidade funcional** —
+  o inventário real (11 funcionais, 1 parcial, 33 demonstrativas) continua
+  sendo a única fonte da verdade sobre o que já funciona.
+
+Esta aprovação é **visual**, não de integração: a T146 segue **não integrada**
+e a PR #137 segue **Draft**, aguardando a revisão final. O protótipo isolado em
+`docs/prototipos/t146/` não muda com esta decisão — ela só congela o que já
+existe como base e redireciona o esforço seguinte para módulos funcionais.
+
 ## Limites e fora de escopo
 
 - **Não implementa** folha, eSocial, férias, benefícios ou clima.
@@ -260,3 +288,6 @@ foi consultada e descartada depois do uso.
 - **Não altera** `DESIGN-apple.md`, que segue intacto por decisão da T032.
 - **Não habilita** dado real, produção ou homologação.
 - **Não reabre** a decisão de plataforma da ADR 0014.
+- **Não reabre** a fundação visual aprovada acima: só correção necessária de
+  usabilidade, acessibilidade, responsividade ou bloqueio operacional a
+  altera antes do acabamento final.

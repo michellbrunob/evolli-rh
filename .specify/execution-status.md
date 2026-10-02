@@ -240,11 +240,11 @@ até 39s de tolerância real; mantido em 10, o prazo de parede reprovaria ambien
 **Limites explícitos:** a T145 não reabre T141–T144, não inicia a expansão visual e não trata as
 observações O2–O7 e O11 das revisões anteriores, que seguem registradas.
 
-## Arquitetura modular e protótipo do shell — T146 (protótipo em validação visual)
+## Arquitetura modular e protótipo do shell — T146 (fundação visual aprovada e congelada)
 
-| Tarefa | Estado                            | Resultado principal                                                                                                                                                                                                                                                          |
-| ------ | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| T146   | **Protótipo em validação visual** | Mapa modular do ecossistema e protótipo navegável do shell, isolados em `docs/prototipos/t146/`. **Não é capacidade de RH e não altera tela funcional alguma**: só documentação e protótipo estático. Aguarda a avaliação visual do proprietário antes de qualquer expansão. |
+| Tarefa | Estado                                                   | Resultado principal                                                                                                                                                                                                                                                                                                                                      |
+| ------ | -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T146   | **Fundação visual aprovada e congelada — não integrada** | Mapa modular do ecossistema e protótipo navegável do shell, isolados em `docs/prototipos/t146/`. **Não é capacidade de RH e não altera tela funcional alguma**: só documentação e protótipo estático. O proprietário aprovou a evolução visual e congelou a fundação (ver decisão abaixo); prioridade passa a ser a implementação de módulos funcionais. |
 
 **O que a tarefa é — e o que não é.** A T146 organiza **arquitetura da informação**: quais módulos
 existem, como a navegação os agrupa, o que cada workspace mostra e onde entram atalhos, pendências e
@@ -272,20 +272,31 @@ navegação operacional, justamente para não serem lidos como capacidade existe
 folha, eSocial, férias, benefícios nem clima, não altera `apps/api`, Prisma, migrations, contratos,
 RBAC ou dados, e não toca nas telas funcionais de `apps/web`.
 
+**Decisão do proprietário — aprovação visual e congelamento da fundação.** _"Aprovo a evolução
+visual da T146, porém devemos focar agora na entrega dos módulos funcionais e testados, deixando o
+acabamento visual final para o fim."_ Interpretação vinculante, registrada por extenso em
+[`docs/decisions/t146-arquitetura-modular-shell.md`](../docs/decisions/t146-arquitetura-modular-shell.md):
+a arquitetura modular, o shell, os tokens, o padrão B, a sidebar e os modais ficam aprovados como
+**fundação visual**, e essa fundação fica **congelada** — sem expansão ou redesenho amplo agora.
+Durante a implementação dos módulos, só correção necessária de usabilidade, acessibilidade,
+responsividade ou bloqueio operacional pode alterar a interface; refinamento estético e acabamento
+visual final ficam para uma etapa posterior. A prioridade passa a ser entregar **módulos
+funcionais, testados e homologáveis com dados sintéticos**. A aprovação é visual, não de
+integração: a T146 segue **não integrada** e a PR #137 segue **Draft**.
+
 ## Próxima ação autorizável
 
-1. **Avaliação visual do protótipo da T146 pelo proprietário** — ela é pré-condição de tudo o que
-   vem abaixo. O protótipo é arquitetura da informação, não implementação: aprovar o mapa modular
-   não aprova nenhuma tela.
-2. **Planejar a expansão gradual do padrão B + modais para a próxima tela funcional prioritária** —
-   uma tela só, com identificador próprio, e validação visual antes de ampliar para a seguinte.
-   Planejar não é implementar: a escolha da tela e o escopo vêm antes do código.
-3. Só depois disso abrir a próxima fatia, sob o próximo identificador disponível — sem número
-   reservado aqui, porque reservar identificador antes da decisão de escopo já se mostrou fonte de
-   confusão (ver T137).
-4. Candidatos naturais da próxima fatia, todos dependentes de decisão própria: capacidade de RBAC
-   para o gestor consultivo; `DP-23` como pré-condição de qualquer autoatendimento do colaborador; e
-   a validação com RH do catálogo de motivos, cujo mecanismo (código fechado) já está aprovado.
+1. **Revisão final da PR #137** — pré-condição para a integração da T146.
+2. Após a integração, **iniciar o módulo funcional prioritário**, sob o próximo identificador
+   disponível — sem número reservado aqui, porque reservar identificador antes da decisão de
+   escopo já se mostrou fonte de confusão (ver T137). A implementação usa a fundação visual já
+   congelada, sem reabrir o shell, os tokens, o padrão B ou os modais.
+3. Candidatos naturais do módulo prioritário, todos dependentes de decisão própria: capacidade de
+   RBAC para o gestor consultivo; `DP-23` como pré-condição de qualquer autoatendimento do
+   colaborador; e a validação com RH do catálogo de motivos, cujo mecanismo (código fechado) já
+   está aprovado.
+4. Refinamento estético e acabamento visual final da fundação ficam para uma etapa posterior,
+   depois dos módulos funcionais.
 5. Atualizar este ledger e `sync-state.json` em toda tarefa futura.
 
 ## Limites da T141 (ambiente de demonstração)
