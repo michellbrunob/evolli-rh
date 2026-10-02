@@ -4,8 +4,23 @@
  * Tudo aqui é SINTÉTICO e estático. Não há chamada de rede, persistência,
  * `localStorage`, `sessionStorage`, cookie ou API — o protótipo só desenha.
  *
- * O campo `estado` de cada tela foi derivado do código em
- * `apps/web/src/screens/` e da navegação, na própria T146:
+ * DUAS ESCALAS, QUE NUNCA SE MISTURAM NO MESMO NÚMERO
+ *
+ *   TELA REAL  — arquivo de tela-folha que existe hoje em
+ *                `apps/web/src/screens/`. É a escala do que está no ar.
+ *                `TELAS_REAIS` abaixo é a ÚNICA fonte dessa contagem.
+ *
+ *   CAPACIDADE — item do mapa modular proposto. Pode ser um fluxo dentro de
+ *                uma tela real (Admissão vive dentro de Colaboradores), pode
+ *                ser aparência sem código atrás, pode ser plano. É escala de
+ *                arquitetura, não de prontidão.
+ *
+ * Uma capacidade com `telaReal` herda o estado da tela real — é por isso que
+ * manchete, lista, lateral e workspaces não conseguem divergir: o estado tem
+ * um dono só. Duas capacidades podem apontar para a MESMA tela real sem
+ * inflar contagem alguma, porque telas reais são contadas por identificador.
+ *
+ * Estados:
  *   funcional     — lê e grava pela API real
  *   parcial       — consulta real, sem escrita nesta fatia
  *   demonstrativo — dados de exemplo no próprio código
@@ -35,6 +50,147 @@ export const ESTADOS = {
   },
 };
 
+/**
+ * FONTE ÚNICA das telas-folha reais que não são demonstrativas.
+ *
+ * Contadas na T146 em `apps/web/src/screens/`, descontados os seis contêineres
+ * de abas (Pessoas, Ponto, Cadastros, Documentos, Relatórios e Portal do
+ * colaborador), que são moldura de navegação e não tela.
+ *
+ * `areaHoje` é onde a tela vive HOJE no aplicativo; `moduloFuturo` é onde o
+ * mapa proposto a colocaria. As duas colunas não coincidem de propósito: o
+ * mapa é proposta, o aplicativo é o que está no ar.
+ */
+export const TELAS_REAIS = [
+  {
+    id: "cadastro-horarios",
+    nome: "Horários",
+    areaHoje: "Cadastros",
+    estado: "funcional",
+    moduloFuturo: "administracao",
+  },
+  {
+    id: "estrutura-organizacional",
+    nome: "Estrutura organizacional",
+    areaHoje: "Cadastros",
+    estado: "funcional",
+    moduloFuturo: "administracao",
+  },
+  {
+    id: "cargos",
+    nome: "Cargos",
+    areaHoje: "Cadastros",
+    estado: "funcional",
+    moduloFuturo: "administracao",
+  },
+  {
+    id: "centros-custo",
+    nome: "Centros de custo",
+    areaHoje: "Cadastros",
+    estado: "funcional",
+    moduloFuturo: "administracao",
+  },
+  {
+    id: "colaboradores",
+    nome: "Colaboradores",
+    areaHoje: "Pessoas",
+    estado: "funcional",
+    moduloFuturo: "pessoas",
+    inclui: "o fluxo de admissão acontece dentro desta tela",
+  },
+  {
+    id: "pessoas-horario",
+    nome: "Horário do colaborador",
+    areaHoje: "Pessoas",
+    estado: "funcional",
+    moduloFuturo: "jornada",
+  },
+  {
+    id: "historico-funcional",
+    nome: "Histórico funcional",
+    areaHoje: "Pessoas",
+    estado: "funcional",
+    moduloFuturo: "pessoas",
+  },
+  {
+    id: "pessoas-documentos",
+    nome: "Documentos",
+    areaHoje: "Pessoas",
+    estado: "funcional",
+    moduloFuturo: "pessoas",
+  },
+  {
+    id: "pessoas-solicitacoes",
+    nome: "Solicitações",
+    areaHoje: "Pessoas",
+    estado: "funcional",
+    moduloFuturo: "solicitacoes",
+  },
+  {
+    id: "visao-periodo",
+    nome: "Visão do período",
+    areaHoje: "Ponto",
+    estado: "funcional",
+    moduloFuturo: "jornada",
+    inclui: "as marcações são exibidas dentro desta tela",
+  },
+  {
+    id: "contas-acesso",
+    nome: "Contas de acesso",
+    areaHoje: "Administração",
+    estado: "funcional",
+    moduloFuturo: "administracao",
+  },
+  {
+    id: "dados-contratuais",
+    nome: "Dados contratuais e vínculos",
+    areaHoje: "Pessoas",
+    estado: "parcial",
+    moduloFuturo: "pessoas",
+  },
+];
+
+/**
+ * Telas-folha restantes, que só têm aparência: dados de exemplo no próprio
+ * código. Não estão nomeadas aqui porque nenhuma leitura do protótipo depende
+ * do nome delas — só da contagem, que fecha o total de 45.
+ */
+export const DEMONSTRATIVAS_NO_CODIGO = 33;
+
+const indicePorId = new Map(TELAS_REAIS.map((t) => [t.id, t]));
+
+/** Inventário derivado. Nenhum número é digitado duas vezes. */
+export const INVENTARIO = {
+  funcional: TELAS_REAIS.filter((t) => t.estado === "funcional").length,
+  parcial: TELAS_REAIS.filter((t) => t.estado === "parcial").length,
+  demonstrativo: DEMONSTRATIVAS_NO_CODIGO,
+  get totalFolhas() {
+    return this.funcional + this.parcial + this.demonstrativo;
+  },
+};
+
+/** A tela real por trás de uma capacidade, quando existe uma. */
+export const telaRealDe = (capacidade) =>
+  capacidade.telaReal ? indicePorId.get(capacidade.telaReal) : undefined;
+
+/** Estado de uma capacidade: herdado da tela real, quando há uma. */
+export const estadoDaCapacidade = (capacidade) =>
+  telaRealDe(capacidade)?.estado ?? capacidade.estado;
+
+/** Telas REAIS de um módulo, sem repetição — duas capacidades podem citar uma só. */
+export const telasReaisDoModulo = (modulo) => {
+  const vistas = new Set();
+  const telas = [];
+  for (const c of modulo.capacidades) {
+    const t = telaRealDe(c);
+    if (t && !vistas.has(t.id)) {
+      vistas.add(t.id);
+      telas.push(t);
+    }
+  }
+  return telas;
+};
+
 export const MODULOS = [
   {
     id: "inicio",
@@ -44,7 +200,7 @@ export const MODULOS = [
     resumo: "Onde o ecossistema se apresenta: o que existe e o que falta.",
     atalhos: [],
     pendencias: [],
-    telas: [{ nome: "Visão geral", estado: "demonstrativo" }],
+    capacidades: [{ nome: "Visão geral", estado: "demonstrativo" }],
   },
   {
     id: "pessoas",
@@ -60,12 +216,16 @@ export const MODULOS = [
       { texto: "2 admissões aguardando documentos", selo: "demonstrativo" },
       { texto: "1 retificação de nome em análise", selo: "demonstrativo" },
     ],
-    telas: [
-      { nome: "Colaboradores", estado: "funcional" },
-      { nome: "Admissão", estado: "funcional", nota: "parte de Colaboradores" },
-      { nome: "Dados contratuais e vínculos", estado: "parcial" },
-      { nome: "Histórico funcional", estado: "funcional" },
-      { nome: "Documentos", estado: "funcional" },
+    capacidades: [
+      { nome: "Colaboradores", telaReal: "colaboradores" },
+      {
+        nome: "Admissão",
+        telaReal: "colaboradores",
+        nota: "fluxo dentro de Colaboradores — não é uma segunda tela",
+      },
+      { nome: "Dados contratuais e vínculos", telaReal: "dados-contratuais" },
+      { nome: "Histórico funcional", telaReal: "historico-funcional" },
+      { nome: "Documentos", telaReal: "pessoas-documentos" },
     ],
   },
   {
@@ -81,14 +241,27 @@ export const MODULOS = [
         selo: "demonstrativo",
       },
     ],
-    telas: [
+    capacidades: [
+      {
+        nome: "Visão do período",
+        telaReal: "visao-periodo",
+        nota: "hoje em Ponto › Visão do período",
+      },
       {
         nome: "Marcações",
-        estado: "funcional",
-        nota: "parte da Visão do período",
+        telaReal: "visao-periodo",
+        nota: "exibidas dentro da Visão do período — não é uma segunda tela",
       },
-      { nome: "Visão do período", estado: "funcional" },
-      { nome: "Horários e escalas", estado: "funcional" },
+      {
+        nome: "Horário do colaborador",
+        telaReal: "pessoas-horario",
+        nota: "hoje em Pessoas › Horário do colaborador; o mapa a traria para Jornada",
+      },
+      {
+        nome: "Escalas",
+        estado: "demonstrativo",
+        nota: "tela separada da anterior: hoje em Ponto › Escalas, só com dados de exemplo",
+      },
       { nome: "Ajustes", estado: "demonstrativo" },
       { nome: "Banco de horas", estado: "demonstrativo" },
       { nome: "Espelho de ponto", estado: "demonstrativo" },
@@ -102,7 +275,7 @@ export const MODULOS = [
     resumo: "Férias, afastamentos, atestados e licenças.",
     atalhos: [],
     pendencias: [],
-    telas: [
+    capacidades: [
       { nome: "Férias", estado: "planejado" },
       { nome: "Afastamentos", estado: "demonstrativo" },
       { nome: "Atestados", estado: "planejado" },
@@ -115,12 +288,21 @@ export const MODULOS = [
     nome: "Solicitações",
     grupo: "Operação",
     resumo: "O que as pessoas pedem e como o RH responde.",
-    atalhos: [{ rotulo: "Abrir central", acao: "nada" }],
+    atalhos: [{ rotulo: "Abrir solicitações", acao: "nada" }],
     pendencias: [
       { texto: "4 solicitações aguardando análise", selo: "demonstrativo" },
     ],
-    telas: [
-      { nome: "Central", estado: "funcional" },
+    capacidades: [
+      {
+        nome: "Solicitações de pessoas",
+        telaReal: "pessoas-solicitacoes",
+        nota: "hoje em Pessoas › Solicitações; é esta a tela que funciona",
+      },
+      {
+        nome: "Central de solicitações RH",
+        estado: "demonstrativo",
+        nota: "tela própria, separada da anterior, só com dados de exemplo",
+      },
       { nome: "Fila de análise", estado: "demonstrativo" },
       { nome: "Histórico", estado: "demonstrativo" },
     ],
@@ -133,7 +315,7 @@ export const MODULOS = [
     resumo: "Benefícios concedidos e dependentes.",
     atalhos: [],
     pendencias: [],
-    telas: [
+    capacidades: [
       { nome: "Benefícios", estado: "demonstrativo" },
       { nome: "Dependentes", estado: "demonstrativo" },
     ],
@@ -146,7 +328,7 @@ export const MODULOS = [
     resumo: "Pesquisa de clima e trilha de desenvolvimento.",
     atalhos: [],
     pendencias: [],
-    telas: [
+    capacidades: [
       { nome: "Pesquisa de clima", estado: "planejado" },
       { nome: "Desenvolvimento", estado: "planejado" },
     ],
@@ -159,7 +341,7 @@ export const MODULOS = [
     resumo: "Leitura consolidada do que já foi registrado.",
     atalhos: [],
     pendencias: [],
-    telas: [
+    capacidades: [
       { nome: "Exceções de ponto", estado: "demonstrativo" },
       { nome: "Extrato de banco de horas", estado: "demonstrativo" },
       { nome: "Espelho de ponto", estado: "demonstrativo" },
@@ -177,12 +359,28 @@ export const MODULOS = [
     resumo: "A estrutura da empresa e quem tem acesso ao sistema.",
     atalhos: [],
     pendencias: [],
-    telas: [
-      { nome: "Estrutura organizacional", estado: "funcional" },
-      { nome: "Cargos", estado: "funcional" },
-      { nome: "Centros de custo", estado: "funcional" },
-      { nome: "Horários", estado: "funcional" },
-      { nome: "Contas e acessos", estado: "funcional" },
+    capacidades: [
+      {
+        nome: "Estrutura organizacional",
+        telaReal: "estrutura-organizacional",
+        nota: "hoje em Cadastros › Estrutura organizacional",
+      },
+      {
+        nome: "Cargos",
+        telaReal: "cargos",
+        nota: "hoje em Cadastros › Cargos",
+      },
+      {
+        nome: "Centros de custo",
+        telaReal: "centros-custo",
+        nota: "hoje em Cadastros › Centros de custo",
+      },
+      {
+        nome: "Horários",
+        telaReal: "cadastro-horarios",
+        nota: "hoje em Cadastros › Horários",
+      },
+      { nome: "Contas de acesso", telaReal: "contas-acesso" },
       { nome: "Configurações", estado: "planejado" },
     ],
   },
@@ -206,17 +404,6 @@ export const EVOLUCAO_FUTURA = [
     nota: "Fora do escopo das fatias atuais; nenhuma regra fiscal foi modelada.",
   },
 ];
-
-/**
- * Inventário REAL das telas que existem hoje, contado na T146 a partir de
- * `apps/web/src/screens/` e da navegação — não reaproveitado de texto anterior.
- */
-export const INVENTARIO = {
-  totalFolhas: 45,
-  funcional: 11,
-  parcial: 1,
-  demonstrativo: 33,
-};
 
 /** Lista sintética navegável de verdade: filtra e abre detalhe. */
 export const COLABORADORES = [

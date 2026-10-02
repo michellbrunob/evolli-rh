@@ -1,7 +1,15 @@
 /**
- * Tokens do Evolli RH copiados de `apps/web/src/app/tokens.css` para que os
- * protótipos usem exatamente as mesmas variáveis do produto — nenhuma cor,
- * fonte, raio ou escala nova foi inventada aqui.
+ * Tokens do protótipo.
+ *
+ * Este arquivo é o mesmo de `docs/prototipos/t142/tokens-prototipo.css`, já
+ * aprovado e em `main`, reaproveitado sem alteração — NÃO é cópia direta do
+ * arquivo atual do produto. Ele reutiliza os valores de
+ * `apps/web/src/app/tokens.css` e acrescenta uma camada enxuta de componentes
+ * que só existe em protótipo (`.botao`, `.selo`, `.campo`, tabela, `.sr-only`).
+ *
+ * Nenhuma cor, fonte, raio, escala ou espaçamento novo foi inventado aqui: a
+ * única declaração do produto ausente é `--text-display`, que os protótipos não
+ * usam.
  *
  * Os protótipos são ESTÁTICOS: não falam com a API, não gravam nada e não
  * compartilham sessão com a demonstração funcional.

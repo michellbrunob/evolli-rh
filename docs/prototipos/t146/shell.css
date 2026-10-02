@@ -2,7 +2,8 @@
  * Shell modular do Evolli RH (T146, 2ª versão) — protótipo ESTÁTICO.
  *
  * Nenhuma cor, fonte, raio, espaçamento ou escala nova: tudo sai das variáveis
- * de `tokens.css`, copiadas do produto. Nenhuma dependência, framework, CDN,
+ * de `tokens.css`, que reaproveita o arquivo de tokens do protótipo da T142 e
+ * reutiliza os valores do produto. Nenhuma dependência, framework, CDN,
  * fonte externa, imagem ou ativo de terceiros. Os ícones são SVG desenhados
  * aqui mesmo, em traço — não há emoji nem biblioteca.
  *
@@ -1031,6 +1032,50 @@ body[data-modal-aberto="sim"] {
    depois e deixava o botão de menu inalcançável em 768 px. */
 .so-movel {
   display: none;
+}
+
+/* Pular para o conteúdo: escondido até receber foco, e então visível de
+   verdade. Antes usava `.sr-only`, que o mantinha invisível mesmo focado — o
+   atalho existia só para quem já sabia que ele estava lá. */
+.pular {
+  position: fixed;
+  top: var(--space-xs);
+  left: var(--space-xs);
+  z-index: 60;
+  transform: translateY(-250%);
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-target);
+  padding: 0 var(--space-md);
+  background: var(--color-action);
+  color: var(--color-on-action);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-strong);
+  text-decoration: none;
+}
+
+.pular:focus,
+.pular:focus-visible {
+  transform: translateY(0);
+}
+
+/* O foco programático no conteúdo não desenha contorno: ele veio de uma ação
+   explícita e um retângulo em volta da página inteira só confundiria. */
+.conteudo:focus {
+  outline: none;
+}
+
+/* Telas reais agrupadas pela área onde vivem hoje no aplicativo. */
+.area-real + .area-real {
+  margin-top: var(--space-md);
+}
+
+.area-real__titulo {
+  margin-bottom: var(--space-xxs);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-strong);
+  color: var(--color-ink-subtle);
 }
 
 /* ------------------------------------------------- larguras intermediárias */

@@ -16,7 +16,10 @@ import {
   MODULOS,
   EVOLUCAO_FUTURA,
   INVENTARIO,
+  TELAS_REAIS,
   COLABORADORES,
+  estadoDaCapacidade,
+  telasReaisDoModulo,
 } from "./dados.js";
 import { ICONES } from "./icones.js";
 
@@ -39,24 +42,44 @@ const selo = (estado) =>
 
 const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`;
 
-/** Conta telas por estado num módulo. */
-function resumoDe(m) {
-  const conta = (e) => m.telas.filter((t) => t.estado === e).length;
+/**
+ * Duas contagens, nunca somadas uma à outra.
+ *
+ * `reais` fala de telas que existem no código e é a mesma escala da manchete;
+ * `capacidades` fala do mapa proposto. Todo número exibido declara de qual das
+ * duas veio — foi a mistura silenciosa delas que fez a 1ª versão anunciar 11 e
+ * listar 13.
+ */
+function contagensDe(m) {
+  const reais = telasReaisDoModulo(m);
+  const porEstado = (lista, e, ler) => lista.filter((x) => ler(x) === e).length;
   return {
-    funcional: conta("funcional"),
-    parcial: conta("parcial"),
-    demonstrativo: conta("demonstrativo"),
-    planejado: conta("planejado"),
-    total: m.telas.length,
+    reais: {
+      total: reais.length,
+      funcional: porEstado(reais, "funcional", (t) => t.estado),
+      parcial: porEstado(reais, "parcial", (t) => t.estado),
+      lista: reais,
+    },
+    capacidades: {
+      total: m.capacidades.length,
+      funcional: porEstado(m.capacidades, "funcional", estadoDaCapacidade),
+      parcial: porEstado(m.capacidades, "parcial", estadoDaCapacidade),
+      demonstrativo: porEstado(
+        m.capacidades,
+        "demonstrativo",
+        estadoDaCapacidade,
+      ),
+      planejado: porEstado(m.capacidades, "planejado", estadoDaCapacidade),
+    },
   };
 }
 
 /** Prioridade de leitura: o que já dá para usar vem primeiro. */
 function prioridade(m) {
-  const r = resumoDe(m);
-  if (r.funcional > 0) return 0;
-  if (r.parcial > 0) return 1;
-  if (r.demonstrativo > 0) return 2;
+  const c = contagensDe(m);
+  if (c.reais.funcional > 0) return 0;
+  if (c.reais.parcial > 0) return 1;
+  if (c.capacidades.demonstrativo > 0) return 2;
   return 3;
 }
 
@@ -82,14 +105,20 @@ function montarLateral() {
         <ul class="lateral__lista" aria-labelledby="${idGrupo}">
           ${g.itens
             .map((m) => {
-              const r = resumoDe(m);
+              const { reais } = contagensDe(m);
+              // Uma escala só: telas reais funcionais. Sem denominador, porque
+              // o denominador natural (45) é do aplicativo inteiro, não do
+              // módulo. Módulo sem tela real não exibe número nenhum.
+              const contador = reais.funcional
+                ? `<span class="lateral__contador" aria-hidden="true">${reais.funcional}</span>
+                   <span class="sr-only">${plural(reais.funcional, "tela real já funciona", "telas reais já funcionam")}</span>`
+                : `<span class="sr-only">nenhuma tela real ainda</span>`;
               return `
             <li>
               <button type="button" class="lateral__link" data-modulo="${txt(m.id)}">
                 ${ICONES[m.icone] ?? ""}
                 <span class="lateral__texto">${txt(m.nome)}</span>
-                <span class="lateral__contador" aria-hidden="true">${r.funcional}/${r.total}</span>
-                <span class="sr-only">${plural(r.funcional, "tela funcional", "telas funcionais")} de ${r.total}</span>
+                ${contador}
               </button>
             </li>`;
             })
@@ -107,7 +136,14 @@ function montarLateral() {
   }
 }
 
-function irPara(id) {
+/**
+ * `focarTitulo` existe por causa da primeira pintura: mover o foco para o
+ * título ao abrir a página empurra o ponto de partida do Tab para o cabeçalho,
+ * e o primeiro Tab do usuário pula o "Pular para o conteúdo" e a lateral
+ * inteira. Na troca de módulo o foco no título é o certo — o conteúdo mudou e
+ * o leitor de tela precisa saber para onde foi.
+ */
+function irPara(id, { focarTitulo = true } = {}) {
   moduloAtivo = id;
   const m = MODULOS.find((x) => x.id === id);
   for (const b of document.querySelectorAll("[data-modulo]")) {
@@ -125,7 +161,7 @@ function irPara(id) {
 
   conteudo.innerHTML = id === "inicio" ? paginaInicial() : workspace(m);
   ligarAcoes();
-  $("#contexto-titulo").focus({ preventScroll: true });
+  if (focarTitulo) $("#contexto-titulo").focus({ preventScroll: true });
   window.scrollTo({ top: 0 });
 }
 
@@ -153,16 +189,16 @@ function paginaInicial() {
 
   const cartoes = porPrioridade
     .map((m) => {
-      const r = resumoDe(m);
+      const { reais, capacidades } = contagensDe(m);
       const estadoTopo =
-        r.funcional > 0
+        reais.funcional > 0
           ? "funcional"
-          : r.parcial > 0
+          : reais.parcial > 0
             ? "parcial"
-            : r.demonstrativo > 0
+            : capacidades.demonstrativo > 0
               ? "demonstrativo"
               : "planejado";
-      const destaque = r.funcional > 0 ? " modulo--destaque" : "";
+      const destaque = reais.funcional > 0 ? " modulo--destaque" : "";
       return `
       <button type="button" class="modulo${destaque}" data-ir="${txt(m.id)}">
         <span class="modulo__topo">
@@ -172,14 +208,25 @@ function paginaInicial() {
         </span>
         <p class="modulo__resumo">${txt(m.resumo)}</p>
         <span class="modulo__rodape">
-          <span class="modulo__progresso">${r.funcional}/${r.total}</span>
-          <span class="meta">${r.total === 1 ? "tela funcional" : "telas funcionais"}</span>
+          <span class="modulo__progresso">${reais.funcional}</span>
+          <span class="meta">${plural(reais.funcional, "tela real funcional", "telas reais funcionais")}</span>
+          <span class="meta">·&nbsp;${plural(capacidades.total, "capacidade mapeada", "capacidades mapeadas")}</span>
         </span>
       </button>`;
     })
     .join("");
 
-  const prontas = MODULOS.filter((m) => resumoDe(m).funcional > 0);
+  // Agrupa as telas REAIS pela área em que elas vivem HOJE no aplicativo — não
+  // pelo módulo que o mapa propõe. Quem vai testar precisa saber onde clicar
+  // agora, e o mapa ainda é proposta.
+  const funcionais = TELAS_REAIS.filter((t) => t.estado === "funcional");
+  const areas = [];
+  for (const t of funcionais) {
+    let a = areas.find((x) => x.nome === t.areaHoje);
+    if (!a) areas.push((a = { nome: t.areaHoje, telas: [] }));
+    a.telas.push(t);
+  }
+  const nomeDoModulo = (id) => MODULOS.find((m) => m.id === id)?.nome ?? id;
 
   return `
     <section class="painel-avanco" aria-labelledby="avanco-titulo">
@@ -213,31 +260,49 @@ function paginaInicial() {
     <section class="secao" aria-labelledby="testar-titulo">
       <div class="secao__cabecalho">
         <h2 class="secao__titulo" id="testar-titulo">O que dá para testar agora</h2>
-        <span class="meta">${plural(prontas.length, "módulo", "módulos")} com tela funcional</span>
+        <span class="meta">${plural(funcionais.length, "tela real", "telas reais")}</span>
       </div>
       <p class="secao__apoio">
-        Nestes módulos existe pelo menos uma tela que fala com o servidor de
-        verdade. Os demais ainda são aparência ou plano.
+        Estas são as telas que falam com o servidor de verdade, nomeadas pelo
+        lugar onde estão <strong>hoje</strong> no aplicativo. Quando o mapa
+        modular for implementado, algumas mudam de endereço — está anotado em
+        cada uma.
       </p>
       <div class="pilha" style="margin-top: var(--space-sm)">
-        ${prontas
-          .map((m) => {
-            const r = resumoDe(m);
-            const funcionais = m.telas.filter((t) => t.estado === "funcional");
-            return `
-          <div class="linha">
-            <span class="linha__texto">
-              <span class="linha__titulo">${txt(m.nome)}</span>
-              <span class="linha__apoio">${txt(funcionais.map((t) => t.nome).join(" · "))}</span>
-            </span>
-            <span class="linha__fim">
-              <span class="modulo__progresso">${r.funcional}/${r.total}</span>
-              <button type="button" class="botao botao--discreto" data-ir="${txt(m.id)}">Abrir</button>
-            </span>
-          </div>`;
-          })
+        ${areas
+          .map(
+            (a) => `
+          <div class="area-real">
+            <p class="area-real__titulo">${txt(a.nome)}</p>
+            ${a.telas
+              .map((t) => {
+                const mudanca =
+                  t.moduloFuturo && nomeDoModulo(t.moduloFuturo) !== a.nome
+                    ? `o mapa a levaria para ${txt(nomeDoModulo(t.moduloFuturo))}`
+                    : "";
+                const apoio = [t.inclui, mudanca].filter(Boolean).join(" · ");
+                return `
+              <div class="linha">
+                <span class="linha__texto">
+                  <span class="linha__titulo">${txt(t.nome)}</span>
+                  ${apoio ? `<span class="linha__apoio">${txt(apoio)}</span>` : ""}
+                </span>
+                <span class="linha__fim">${selo("funcional")}</span>
+              </div>`;
+              })
+              .join("")}
+          </div>`,
+          )
           .join("")}
       </div>
+      <p class="secao__apoio" style="margin-top: var(--space-sm)">
+        <strong>${plural(INVENTARIO.parcial, "tela é parcial", "telas são parciais")}:</strong>
+        ${txt(
+          TELAS_REAIS.filter((t) => t.estado === "parcial")
+            .map((t) => `${t.areaHoje} › ${t.nome}`)
+            .join(", "),
+        )} — mostra informação real e não deixa alterar nada.
+      </p>
     </section>
 
     <section class="secao" aria-labelledby="modulos-titulo">
@@ -295,13 +360,13 @@ function blocoLegenda() {
 }
 
 function workspace(m) {
-  const r = resumoDe(m);
+  const { reais, capacidades } = contagensDe(m);
 
   const proximoPasso =
-    r.funcional > 0
-      ? "Dá para usar o que já está funcional. As telas demonstrativas precisam de uma fatia própria para virar capacidade real."
-      : r.demonstrativo > 0
-        ? "Este módulo só tem aparência hoje. O próximo passo é escolher uma tela, dar identificador próprio a ela e construí-la de verdade."
+    reais.funcional > 0
+      ? "Dá para usar o que já está funcional. As capacidades demonstrativas precisam de uma fatia própria para virar tela real."
+      : capacidades.demonstrativo > 0
+        ? "Este módulo só tem aparência hoje. O próximo passo é escolher uma capacidade, dar identificador próprio a ela e construí-la de verdade."
         : "Nada foi construído aqui ainda. O próximo passo é a decisão de escopo: o que este módulo precisa resolver primeiro.";
 
   const atalhos = m.atalhos.length
@@ -343,11 +408,18 @@ function workspace(m) {
 
   const lista = m.id === "pessoas" ? listaColaboradores() : "";
 
-  // Funcionalidades agrupadas por estado: o disponível vem antes do plano.
+  // Capacidades agrupadas por estado: o disponível vem antes do plano.
   const ordem = ["funcional", "parcial", "demonstrativo", "planejado"];
   const grupos = ordem
-    .map((e) => ({ estado: e, telas: m.telas.filter((t) => t.estado === e) }))
-    .filter((g) => g.telas.length > 0);
+    .map((e) => ({
+      estado: e,
+      itens: m.capacidades.filter((c) => estadoDaCapacidade(c) === e),
+    }))
+    .filter((g) => g.itens.length > 0);
+
+  const leituraReal = reais.funcional
+    ? `<strong>${plural(reais.funcional, "tela real deste módulo já funciona", "telas reais deste módulo já funcionam")}.</strong>`
+    : `<strong>Nenhuma tela real deste módulo funciona ainda.</strong>`;
 
   return `
     <section class="secao" aria-labelledby="resumo-${txt(m.id)}">
@@ -355,7 +427,9 @@ function workspace(m) {
       <div class="aviso aviso--info">
         ${ICONES.info}
         <span>
-          <strong>${r.funcional} de ${r.total} ${r.total === 1 ? "tela funciona" : "telas funcionam"} de verdade.</strong>
+          ${leituraReal}
+          O mapa lista <strong>${plural(capacidades.total, "capacidade", "capacidades")}</strong>
+          aqui — número de arquitetura, não de telas prontas.
           ${txt(proximoPasso)}
         </span>
       </div>
@@ -366,9 +440,14 @@ function workspace(m) {
 
     <section class="secao" aria-labelledby="telas-${txt(m.id)}">
       <div class="secao__cabecalho">
-        <h2 class="secao__titulo" id="telas-${txt(m.id)}">Funcionalidades</h2>
-        <span class="meta">${plural(r.total, "tela", "telas")}</span>
+        <h2 class="secao__titulo" id="telas-${txt(m.id)}">Capacidades mapeadas</h2>
+        <span class="meta">${plural(capacidades.total, "capacidade", "capacidades")}</span>
       </div>
+      <p class="secao__apoio">
+        Capacidade é item do mapa proposto, não arquivo de tela: uma capacidade
+        pode ser um fluxo dentro de outra tela, e duas delas podem apontar para
+        a mesma tela real.
+      </p>
       ${grupos
         .map(
           (g) => `
@@ -377,13 +456,13 @@ function workspace(m) {
             ${selo(g.estado)} <span>${txt(ESTADOS[g.estado].explicacao)}</span>
           </p>
           <div class="pilha">
-            ${g.telas
+            ${g.itens
               .map(
-                (t) => `
+                (c) => `
               <div class="linha">
                 <span class="linha__texto">
-                  <span class="linha__titulo">${txt(t.nome)}</span>
-                  ${t.nota ? `<span class="linha__apoio">${txt(t.nota)}</span>` : ""}
+                  <span class="linha__titulo">${txt(c.nome)}</span>
+                  ${c.nota ? `<span class="linha__apoio">${txt(c.nota)}</span>` : ""}
                 </span>
               </div>`,
               )
@@ -897,26 +976,87 @@ function abrirDetalhe(id) {
 
 // ------------------------------------------------------------- sidebar
 
-function fecharMenuMovel() {
-  shell.removeAttribute("data-lateral-movel");
-  $("#lateral-fundo").hidden = true;
-  $("#abrir-menu").setAttribute("aria-expanded", "false");
+/**
+ * Gaveta fechada no celular é gaveta FORA de alcance.
+ *
+ * Na 1ª versão ela só saía de vista por `translateX(-102%)`: continuava no
+ * caminho do Tab, e quem navegava por teclado em 375 px atravessava nove
+ * botões invisíveis antes de chegar ao conteúdo. `inert` resolve de verdade —
+ * tira do foco, do leitor de tela e do clique de uma vez só.
+ *
+ * No desktop ela NUNCA é inerte: lá a lateral está visível e é a navegação.
+ */
+const lateral = $("#lateral");
+const botaoMenu = $("#abrir-menu");
+const fundoLateral = $("#lateral-fundo");
+const faixaMovel = window.matchMedia("(max-width: 860px)");
+
+const gavetaAberta = () =>
+  shell.getAttribute("data-lateral-movel") === "aberta";
+
+function aplicarAlcanceDaLateral() {
+  const esconder = faixaMovel.matches && !gavetaAberta();
+  if (esconder) {
+    // O foco sai ANTES de o elemento ficar inerte: foco preso dentro de algo
+    // inerte é foco que some, e o Tab seguinte recomeça do topo da página.
+    if (lateral.contains(document.activeElement)) {
+      botaoMenu.focus({ preventScroll: true });
+    }
+    lateral.inert = true;
+    lateral.setAttribute("aria-hidden", "true");
+  } else {
+    lateral.inert = false;
+    lateral.removeAttribute("aria-hidden");
+  }
 }
 
-$("#abrir-menu").addEventListener("click", () => {
-  const aberta = shell.getAttribute("data-lateral-movel") === "aberta";
-  if (aberta) return fecharMenuMovel();
+function fecharMenuMovel() {
+  shell.removeAttribute("data-lateral-movel");
+  fundoLateral.hidden = true;
+  botaoMenu.setAttribute("aria-expanded", "false");
+  aplicarAlcanceDaLateral();
+}
+
+function abrirMenuMovel() {
   shell.setAttribute("data-lateral-movel", "aberta");
-  $("#lateral-fundo").hidden = false;
-  $("#abrir-menu").setAttribute("aria-expanded", "true");
-  $("#lateral").querySelector("[data-modulo]")?.focus();
+  fundoLateral.hidden = false;
+  botaoMenu.setAttribute("aria-expanded", "true");
+  // Tira a inércia primeiro; focar um filho de elemento inerte não faz nada.
+  aplicarAlcanceDaLateral();
+  lateral.querySelector("[data-modulo]")?.focus({ preventScroll: true });
+}
+
+botaoMenu.addEventListener("click", () => {
+  if (gavetaAberta()) fecharMenuMovel();
+  else abrirMenuMovel();
 });
 
-$("#lateral-fundo").addEventListener("click", fecharMenuMovel);
+fundoLateral.addEventListener("click", fecharMenuMovel);
 
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && !modalAtual) fecharMenuMovel();
+  if (e.key === "Escape" && !modalAtual && gavetaAberta()) fecharMenuMovel();
+});
+
+// Mudança de largura com a gaveta em qualquer estado: ao voltar ao desktop a
+// lateral precisa deixar de ser gaveta e de ser inerte; ao entrar no celular
+// ela fecha, e o foco volta para o botão que a controla.
+faixaMovel.addEventListener("change", () => {
+  if (!faixaMovel.matches) {
+    shell.removeAttribute("data-lateral-movel");
+    fundoLateral.hidden = true;
+    botaoMenu.setAttribute("aria-expanded", "false");
+  }
+  aplicarAlcanceDaLateral();
+});
+
+// O destino do atalho recebe o foco de fato. Só a âncora moveria a rolagem e
+// deixaria o foco no link, e o Tab seguinte voltaria para o começo da página.
+$("#pular").addEventListener("click", (evento) => {
+  evento.preventDefault();
+  conteudo.focus();
+  conteudo.scrollIntoView({ block: "start" });
 });
 
 montarLateral();
-irPara("inicio");
+irPara("inicio", { focarTitulo: false });
+aplicarAlcanceDaLateral();

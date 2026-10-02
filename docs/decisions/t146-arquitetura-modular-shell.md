@@ -1,15 +1,21 @@
 # Arquitetura modular e shell do Evolli RH (T146)
 
-**Estado:** **protótipo em validação visual**. Este documento registra a
-arquitetura da informação proposta e o protótipo que a demonstra. **Não aprova
-tela alguma, não autoriza implementação, merge, produção nem dado real.**
+**Estado:** **fundação visual aprovada e congelada pelo proprietário — ainda
+não integrada.** Este documento registra a arquitetura da informação proposta,
+o protótipo que a demonstra e a decisão do proprietário sobre ele, no fim.
+**Aprovar a fundação visual não aprova tela alguma e não autoriza
+implementação, merge, produção nem dado real.**
 
 > **Aprovar o mapa modular não aprova nenhuma tela.** O protótipo mostra como o
 > ecossistema se organiza, não o que ele já faz. O que cada tela faz hoje está
 > no inventário real, mais abaixo, e aparece marcado dentro do próprio
 > protótipo.
 
-## Decisão a ser validada pelo proprietário
+## Decisão aprovada pelo proprietário
+
+> A aprovação literal e a sua interpretação vinculante estão em
+> [Decisão do proprietário](#decisão-do-proprietário--aprovação-visual-e-congelamento-da-fundação),
+> no fim deste documento.
 
 Organizar os módulos, a navegação e as janelas do Evolli com a maturidade de
 arquitetura da informação observada na prova do Frappe HR (T143), **preservando
@@ -65,11 +71,33 @@ de **evolução futura**, separada da navegação. A separação é deliberada: 
 no menu é lido como capacidade existente, e nenhum desses três existe. Colocá-los
 na navegação criaria expectativa que o produto não sustenta.
 
+## Duas escalas que não se somam: tela real e capacidade
+
+Esta distinção existe porque a primeira versão do protótipo não a tinha, e o
+resultado foi uma manchete anunciando **11 telas funcionais** acima de uma
+lista que nomeava **13**.
+
+**Tela real** é arquivo de tela-folha que existe hoje em
+`apps/web/src/screens/`. É a escala do que está no ar, e é a única que a
+manchete usa.
+
+**Capacidade** é item do mapa modular proposto. Pode ser um fluxo dentro de
+uma tela real — Admissão acontece dentro de Colaboradores, as marcações são
+exibidas dentro da Visão do período —, pode ser aparência sem código atrás, ou
+pode ser plano. É escala de arquitetura, não de prontidão.
+
+No protótipo, **todo número declara a sua escala**, e uma capacidade que
+aponta para uma tela real **herda o estado dela**. Duas capacidades podem citar
+a mesma tela real sem inflar contagem alguma, porque telas reais são contadas
+por identificador. A contagem tem uma fonte só, em `docs/prototipos/t146/dados.js`.
+
 ## Inventário real
 
 Derivado **nesta tarefa** a partir de `apps/web/src/screens/` e da navegação —
 não reaproveitado de texto anterior. O critério é objetivo: a tela fala com a API
-real ou usa dados de exemplo no próprio código.
+real ou usa dados de exemplo no próprio código. Os seis contêineres de abas
+(Pessoas, Ponto, Cadastros, Documentos, Relatórios e Portal do colaborador) são
+moldura de navegação e **não** entram como tela.
 
 | Estado            | Quantidade | Significado                                                                                  |
 | ----------------- | ---------- | -------------------------------------------------------------------------------------------- |
@@ -80,13 +108,28 @@ real ou usa dados de exemplo no próprio código.
 
 **Total de telas folha hoje: 45.**
 
-As 11 funcionais: `Pessoas › Colaboradores`, `Horário de trabalho`,
-`Histórico funcional`, `Documentos` e `Solicitações`; `Jornada › Visão do
-período`; `Administração › Estrutura organizacional`, `Cargos`,
-`Centros de custo` e `Horários`; e `Contas e acessos`.
+As 11 funcionais, nomeadas pelo lugar onde estão **hoje** no aplicativo — não
+pelo módulo que o mapa propõe:
 
-A única parcial é `Pessoas › Dados contratuais`: lê vínculos, alocações e linha
-do tempo pela API, mas não grava nesta fatia.
+| #   | Onde está hoje | Tela                     | Observação                                                                     | Para onde o mapa a levaria |
+| --- | -------------- | ------------------------ | ------------------------------------------------------------------------------ | -------------------------- |
+| 1   | Cadastros      | Horários                 |                                                                                | Administração              |
+| 2   | Cadastros      | Estrutura organizacional |                                                                                | Administração              |
+| 3   | Cadastros      | Cargos                   |                                                                                | Administração              |
+| 4   | Cadastros      | Centros de custo         |                                                                                | Administração              |
+| 5   | Pessoas        | Colaboradores            | o fluxo de admissão acontece **dentro** desta tela                             | Pessoas                    |
+| 6   | Pessoas        | Horário do colaborador   | não confundir com `Ponto › Escalas`, que é demonstrativa                       | Jornada                    |
+| 7   | Pessoas        | Histórico funcional      |                                                                                | Pessoas                    |
+| 8   | Pessoas        | Documentos               |                                                                                | Pessoas                    |
+| 9   | Pessoas        | Solicitações             | é esta que funciona, **não** a Central de solicitações RH, que é demonstrativa | Solicitações               |
+| 10  | Ponto          | Visão do período         | as marcações são exibidas **dentro** desta tela                                | Jornada                    |
+| 11  | Administração  | Contas de acesso         |                                                                                | Administração              |
+
+Admissão e marcações **não** são contadas como telas: são capacidades que
+vivem dentro das telas 5 e 10.
+
+A única parcial é `Pessoas › Dados contratuais e vínculos`: lê vínculos,
+alocações e linha do tempo pela API, mas não grava nesta fatia.
 
 **Nenhum indicador do protótipo sugere produção ou homologação.** A legenda é
 escrita para quem não é técnico, e a identificação "Protótipo sintético — não
@@ -99,10 +142,13 @@ grava dados" é permanente em todas as telas.
 Cada módulo tem uma página própria com, nesta ordem:
 
 1. **cabeçalho** com o nome do módulo e uma frase do que ele resolve;
-2. **estado real** do módulo, somando as telas por estado;
+2. **estado real** do módulo, com as duas escalas nomeadas lado a lado —
+   quantas **telas reais** dele já funcionam e quantas **capacidades** o mapa
+   lista ali;
 3. **atalhos** para as ações mais frequentes;
 4. **pendências** — o que espera ação de alguém;
-5. **lista** das telas do módulo, cada uma com o seu estado.
+5. **lista das capacidades** do módulo, agrupadas por estado, cada uma dizendo
+   onde a tela correspondente vive hoje quando ela existe em outra área.
 
 A ordem não é arbitrária: quem abre um módulo quer primeiro saber o que precisa
 de ação, e só depois navegar.
@@ -163,19 +209,30 @@ informada.
 
 ## Critérios de aceite
 
-- [ ] O mapa modular representa os nove módulos e os submódulos listados.
-- [ ] Folha, eSocial e obrigações fiscais ficam fora da navegação operacional.
-- [ ] Todo módulo e toda tela exibem estado real, com legenda compreensível.
-- [ ] O protótipo navega entre todos os módulos, com sidebar recolhível e
+Marcado significa **verificado no protótipo**, não homologado: nenhum item
+abaixo afirma que uma capacidade de RH funciona, que algo está em produção ou
+que a T146 está integrada.
+
+- [x] O mapa modular representa os nove módulos e os submódulos listados.
+- [x] Folha, eSocial e obrigações fiscais ficam fora da navegação operacional.
+- [x] Todo módulo e toda tela exibem estado real, com legenda compreensível.
+- [x] O protótipo navega entre todos os módulos, com sidebar recolhível e
       navegação móvel.
-- [ ] Ao menos uma lista é navegável de verdade, com filtro e detalhe.
-- [ ] Cadastro, detalhe e confirmação acontecem em modal, com foco preso,
+- [x] Ao menos uma lista é navegável de verdade, com filtro e detalhe.
+- [x] Cadastro, detalhe e confirmação acontecem em modal, com foco preso,
       devolução de foco e confirmação de descarte.
-- [ ] Sem rolagem horizontal em 1280 px e 375 px.
-- [ ] Nenhuma dependência, framework, CDN, fonte ou ativo externo.
-- [ ] Nenhuma chamada de rede, nenhuma persistência, nenhum dado real.
-- [ ] Identificação de protótipo sintético permanente.
-- [ ] Nenhuma tela funcional de `apps/web` alterada.
+- [x] Sem rolagem horizontal em 1280 px e 375 px.
+- [x] Nenhuma dependência, framework, CDN, fonte ou ativo externo.
+- [x] Nenhuma chamada de rede, nenhuma persistência, nenhum dado real.
+- [x] Identificação de protótipo sintético permanente.
+- [x] Nenhuma tela funcional de `apps/web` alterada.
+
+Dependem de etapa futura e seguem **em aberto**:
+
+- [ ] Revisão final da PR #137.
+- [ ] Integração da T146 em `main`.
+- [ ] Implementação do primeiro módulo funcional sobre esta fundação.
+- [ ] Acabamento visual final, depois dos módulos funcionais.
 
 ## Segunda versão visual — auditoria com o UI UX Pro Max
 
@@ -249,6 +306,20 @@ Nenhuma identidade, código, CSS, componente, ícone, imagem, fonte ou ativo de
 terceiros entrou no protótipo. Os ícones são SVG desenhados aqui; os tokens vêm
 do próprio Evolli; não há dependência, framework, CDN ou fonte externa. A skill
 foi consultada e descartada depois do uso.
+
+### De onde vem `docs/prototipos/t146/tokens.css`, exatamente
+
+Ele **não** é cópia direta do arquivo atual do produto. É o mesmo arquivo de
+tokens do protótipo da T142 (`docs/prototipos/t142/tokens-prototipo.css`), já
+em `main`, reaproveitado sem alteração — e aquele, por sua vez, reutiliza os
+valores de `apps/web/src/app/tokens.css` e acrescenta uma camada enxuta de
+componentes só de protótipo (`.botao`, `.selo`, `.campo`, tabela, `.sr-only`).
+
+O que importa é verificável: **nenhum valor de token novo foi criado**. Entre o
+arquivo do produto e o do protótipo há uma única diferença de declaração —
+`--text-display`, que existe no produto e simplesmente não é usada aqui.
+Nenhuma cor, fonte, raio, escala ou espaçamento foi inventado, e nenhuma
+identidade nova entrou.
 
 ## Decisão do proprietário — aprovação visual e congelamento da fundação
 

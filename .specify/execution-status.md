@@ -265,6 +265,14 @@ API), **1 parcial** (`Pessoas › Dados contratuais`, consulta real sem escrita)
 demonstrativas** (dados de exemplo no próprio código). Os módulos do mapa que ainda não têm tela
 aparecem como **planejados**. Nenhum indicador sugere produção ou homologação.
 
+**Tela real e capacidade são escalas distintas, e o protótipo nomeia cada uma.** Tela real é
+arquivo de tela-folha em `apps/web/src/screens/` — a escala da manchete, com os seis contêineres
+de abas descontados. Capacidade é item do mapa proposto: pode ser fluxo dentro de outra tela
+(admissão vive dentro de Colaboradores; as marcações, dentro da Visão do período), aparência sem
+código atrás, ou plano. Uma capacidade que aponta para uma tela real herda o estado dela, e a
+contagem tem fonte única em `docs/prototipos/t146/dados.js` — foi a mistura silenciosa das duas
+escalas que fez a 1ª versão anunciar 11 telas funcionais acima de uma lista com 13 nomes.
+
 **Folha, eSocial e obrigações fiscais** aparecem somente numa seção de evolução futura, fora da
 navegação operacional, justamente para não serem lidos como capacidade existente.
 

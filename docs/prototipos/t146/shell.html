@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="./shell.css" />
   </head>
   <body>
-    <a class="sr-only" href="#conteudo">Pular para o conteúdo</a>
+    <a class="pular" href="#conteudo" id="pular">Pular para o conteúdo</a>
 
     <div class="shell" id="shell" data-lateral="expandida">
       <p class="selo-prototipo">
@@ -53,7 +53,9 @@
           <div class="cabecalho__acoes" id="contexto-acoes"></div>
         </header>
 
-        <main class="conteudo" id="conteudo"></main>
+        <!-- `tabindex="-1"`: sem isso o "Pular para o conteúdo" move a âncora
+             mas não move o foco, e o próximo Tab volta ao topo. -->
+        <main class="conteudo" id="conteudo" tabindex="-1"></main>
       </div>
     </div>
 

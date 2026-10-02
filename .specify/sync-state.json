@@ -18,7 +18,7 @@
   "openDeliveries": [
     {
       "id": "T146",
-      "pullRequest": null,
+      "pullRequest": 137,
       "status": "draft_fundacao_visual_aprovada_congelada"
     }
   ],
