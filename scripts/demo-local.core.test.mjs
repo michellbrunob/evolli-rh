@@ -25,6 +25,7 @@ import {
   SEGUNDOS_ESPERA_WEB,
   SEGUNDOS_CONFIRMACAO_FINAL_WEB,
   MS_TIMEOUT_TENTATIVA_HTTP,
+  MS_TIMEOUT_TENTATIVA_BANCO,
   MS_INTERVALO_TENTATIVA,
   FalhaDePasso,
   HOST_LOCAL,
@@ -73,6 +74,8 @@ function cenario(opcoes = {}) {
   const urlsVerificadas = [];
   const logs = [];
   const timeoutsPedidos = [];
+  const chamadasComPrazo = [];
+  const encerramentos = [];
 
   const arquivos = { ...ARQUIVOS_PADRAO, ...(opcoes.arquivos ?? {}) };
   const portasOcupadas = new Set(opcoes.portasOcupadas ?? []);
@@ -87,6 +90,8 @@ function cenario(opcoes = {}) {
    * nunca gasta mais do que o prazo que recebeu.
    */
   const custoHttpMs = opcoes.custoHttpMs ?? 0;
+  /** Quanto tempo um subprocesso com prazo (hoje só o `pg_isready`) consome. */
+  const custoSubprocessoMs = opcoes.custoSubprocessoMs ?? (() => 0);
 
   // Relógio falso: nada dorme de verdade, o tempo só anda quando o código sob
   // teste diz que andou. Sem isto, um prazo de parede ou girava sem fim (com
@@ -112,6 +117,33 @@ function cenario(opcoes = {}) {
           status === 0
             ? saidaPorComando(chamada)
             : `erro simulado; a senha ${SENHA_MIGRATOR} apareceu na saida`,
+      };
+    },
+    /**
+     * Subprocesso COM prazo. O falso cobra do relógio virtual o que o
+     * subprocesso levaria, limitado ao prazo recebido — e, quando o custo
+     * passa do prazo, reporta `expirou` e registra o encerramento, que é o que
+     * o `pg_isready` travado faria de verdade.
+     */
+    executarComPrazo: async (chamada) => {
+      chamadas.push(chamada);
+      chamadasComPrazo.push(chamada);
+      const custo = custoSubprocessoMs(chamada);
+      const prazo = chamada.timeoutMs ?? custo;
+      const expirou = custo > prazo;
+      avancar(Math.min(custo, prazo));
+      if (expirou) {
+        encerramentos.push({ comando: chamada.comando, args: chamada.args });
+        return { status: 1, saida: "", expirou: true };
+      }
+      const status = statusPorComando(chamada);
+      return {
+        status,
+        saida:
+          status === 0
+            ? saidaPorComando(chamada)
+            : `erro simulado; a senha ${SENHA_MIGRATOR} apareceu na saida`,
+        expirou: false,
       };
     },
     iniciar: (spec) => {
@@ -141,6 +173,8 @@ function cenario(opcoes = {}) {
     mortos,
     urlsVerificadas,
     timeoutsPedidos,
+    chamadasComPrazo,
+    encerramentos,
     logs,
     relogio,
     avancar,
@@ -1008,4 +1042,157 @@ test("prazo de parede: o intervalo entre tentativas também sai do orçamento", 
     intervalos,
     (SEGUNDOS_ESPERA_API * 1000) / MS_INTERVALO_TENTATIVA,
   );
+});
+
+// ---------------------------------------------------------------------------
+// T145 (correção) — o passo 2/8 ganhou a MESMA disciplina de prazo dos laços
+// HTTP. Antes, `executar` era `spawnSync`: bloqueava o event loop, então um
+// `docker compose exec ... pg_isready` travado furava o orçamento por mais
+// correto que fosse o laço em volta, e o laço em si não tinha teto.
+// ---------------------------------------------------------------------------
+
+/** O `pg_isready` é o único subprocesso que roda com prazo próprio. */
+const ehSondagemBanco = (ch) =>
+  Array.isArray(ch.args) && ch.args.includes("pg_isready");
+
+test("banco: relógio congelado não vira laço infinito", async () => {
+  const c = cenario({
+    statusPorComando: (ch) => (ehSondagemBanco(ch) ? 1 : 0), // nunca fica de pé
+    tentativas: 60,
+  });
+  c.deps.agora = () => 0; // CONGELADO
+  c.deps.dormir = async () => {}; // e nada o faz andar
+
+  const { erro } = await executarCenario(c);
+
+  assert.ok(erro instanceof FalhaDePasso);
+  assert.equal(erro.passo, NOMES_PASSOS[1]);
+  assert.match(erro.message, /PostgreSQL não ficou disponível em 60s/);
+  // Terminou pelo teto estrutural, não pelo relógio: finito e perto do
+  // orçamento declarado. Antes desta correção o laço era infinito.
+  const sondagens = c.chamadasComPrazo.filter(ehSondagemBanco).length;
+  assert.ok(
+    sondagens > 0 && sondagens <= 60 + 2,
+    `teto não segurou: ${sondagens} sondagens`,
+  );
+});
+
+test("banco: pg_isready lento recebe SOMENTE o orçamento restante", async () => {
+  // Cada sondagem custa mais do que o timeout por tentativa: o prazo entregue
+  // nunca pode passar do teto individual nem do que sobra do orçamento.
+  const c = cenario({
+    tentativas: 10,
+    custoSubprocessoMs: (ch) => (ehSondagemBanco(ch) ? 60_000 : 0),
+  });
+
+  const { erro } = await executarCenario(c);
+
+  assert.ok(erro instanceof FalhaDePasso);
+  assert.equal(erro.passo, NOMES_PASSOS[1]);
+  const prazos = c.chamadasComPrazo
+    .filter(ehSondagemBanco)
+    .map((ch) => ch.timeoutMs);
+  assert.ok(prazos.length > 0, "nenhuma sondagem aconteceu");
+  assert.ok(
+    prazos.every((p) => p <= MS_TIMEOUT_TENTATIVA_BANCO),
+    `sondagem pediu mais que o teto individual: ${prazos}`,
+  );
+  // A última encolhe: recebe só a sobra, não o teto cheio.
+  assert.ok(
+    prazos[prazos.length - 1] < MS_TIMEOUT_TENTATIVA_BANCO,
+    `a última sondagem deveria encolher; pediu ${prazos[prazos.length - 1]}ms`,
+  );
+});
+
+test("banco: subprocesso travado é encerrado e conta como tentativa sem sucesso", async () => {
+  const c = cenario({
+    tentativas: 10,
+    custoSubprocessoMs: (ch) => (ehSondagemBanco(ch) ? 60_000 : 0),
+  });
+
+  await executarCenario(c);
+
+  // Toda sondagem que furou o prazo foi encerrada — nenhuma ficou pendurada.
+  const sondagens = c.chamadasComPrazo.filter(ehSondagemBanco).length;
+  // Sem esta linha a asserção seguinte passaria vazia (0 === 0) num código que
+  // nem roda a sondagem com prazo.
+  assert.ok(sondagens > 0, "nenhuma sondagem com prazo aconteceu");
+  assert.equal(
+    c.encerramentos.length,
+    sondagens,
+    "toda sondagem que estourou o prazo deveria ter sido encerrada",
+  );
+  assert.ok(
+    c.encerramentos.every((e) => e.comando === "docker"),
+    "só o subprocesso do banco deveria ser encerrado",
+  );
+});
+
+test("banco: prazo global não é ultrapassado de forma material", async () => {
+  const c = cenario({
+    tentativas: 10,
+    custoSubprocessoMs: (ch) => (ehSondagemBanco(ch) ? 60_000 : 0),
+  });
+
+  await executarCenario(c);
+
+  // Antes da correção, uma sondagem de 60s sozinha estourava o orçamento de
+  // 10s. Agora o passo inteiro cabe nele.
+  assert.equal(c.relogio.ms, 10 * 1000);
+});
+
+test("banco: nenhuma sondagem nem espera depois do prazo", async () => {
+  const c = cenario({
+    tentativas: 5,
+    statusPorComando: (ch) => (ehSondagemBanco(ch) ? 1 : 0),
+  });
+  let intervalos = 0;
+  const dormirOriginal = c.deps.dormir;
+  c.deps.dormir = async (ms) => {
+    intervalos += 1;
+    assert.ok(ms <= MS_INTERVALO_TENTATIVA, `intervalo grande demais: ${ms}`);
+    return dormirOriginal(ms);
+  };
+
+  const { erro } = await executarCenario(c);
+
+  assert.ok(erro instanceof FalhaDePasso);
+  assert.equal(erro.passo, NOMES_PASSOS[1]);
+  // Sondagem instantânea + intervalos de 1s: o orçamento é consumido só pelos
+  // intervalos, e o relógio para exatamente no prazo.
+  assert.equal(c.relogio.ms, 5 * 1000);
+  assert.equal(intervalos, 5);
+});
+
+test("banco: pronto na primeira sondagem segue o caminho normal, sem encerramento", async () => {
+  const c = cenario(); // tudo responde
+  const { resultado, erro } = await executarCenario(c);
+
+  assert.equal(erro, undefined);
+  assert.equal(resultado.verificacoes.banco, true);
+  assert.deepEqual(c.encerramentos, [], "nada deveria ter sido encerrado");
+  assert.deepEqual(c.mortos, [], "nenhum processo residual no sucesso");
+  // Uma sondagem no passo 2/8 e outra na verificação final 8/8.
+  assert.equal(c.chamadasComPrazo.filter(ehSondagemBanco).length, 2);
+});
+
+test("banco: a sondagem roda sem shell e sem segredo em argv", async () => {
+  const c = cenario({
+    tentativas: 3,
+    statusPorComando: (ch) => (ehSondagemBanco(ch) ? 1 : 0),
+  });
+
+  await executarCenario(c);
+
+  const sondagens = c.chamadasComPrazo.filter(ehSondagemBanco);
+  assert.ok(sondagens.length > 0);
+  for (const ch of sondagens) {
+    assert.equal(ch.shell, false, "a sondagem do banco não usa shell");
+    assert.ok(
+      !ch.args.some((a) => String(a).includes(SENHA_ADMIN)),
+      "nenhuma senha pode viajar em argv",
+    );
+    assert.equal(typeof ch.timeoutMs, "number");
+    assert.ok(ch.timeoutMs > 0);
+  }
 });

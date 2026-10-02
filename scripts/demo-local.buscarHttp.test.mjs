@@ -31,34 +31,65 @@ function enderecoDe(servidor) {
   return `http://127.0.0.1:${port}/`;
 }
 
+/**
+ * Margem alta de propósito. Estes três testes dependem de temporizador REAL, e
+ * `node --test` roda os arquivos em paralelo: sob carga, um atraso de dezenas
+ * de ms vira centenas, e um limite apertado reprovaria por contenção de CPU em
+ * vez de por defeito — foi o que a revisão observou. A prova de cada um não
+ * está no número exato, e sim na RELAÇÃO (respondeu dentro do prazo / abortou
+ * perto do prazo / falhou muito antes dele), então o teto generoso preserva a
+ * prova e remove a flutuação. Nenhum teste fica lento: no caminho normal todos
+ * terminam em dezenas de ms.
+ */
+const TETO_FOLGADO_MS = 10_000;
+
 test("buscarHttp: resposta atrasada, mas dentro do prazo da tentativa, ainda é sucesso", async () => {
+  const ATRASO_MS = 50;
+  const PRAZO_MS = TETO_FOLGADO_MS; // muito acima do atraso: o prazo não é o limite aqui
   const servidor = await subirServidorLocal((req, res) => {
     setTimeout(() => {
       res.writeHead(200);
       res.end("ok");
-    }, 50);
+    }, ATRASO_MS);
   });
   try {
-    const resposta = await buscarHttp(enderecoDe(servidor), 500);
+    const inicio = Date.now();
+    const resposta = await buscarHttp(enderecoDe(servidor), PRAZO_MS);
+    const duracao = Date.now() - inicio;
+    // A prova: uma resposta que demora, mas cabe no prazo, é sucesso — e não
+    // foi confundida com timeout.
     assert.equal(resposta?.ok, true);
+    assert.equal(resposta?.status, 200);
+    assert.ok(
+      duracao >= ATRASO_MS,
+      `deveria ter esperado o atraso do servidor; levou ${duracao}ms`,
+    );
   } finally {
     await encerrar(servidor);
   }
 });
 
 test("buscarHttp: servidor que nunca responde estoura o prazo DA TENTATIVA, não trava a chamada", async () => {
+  const PRAZO_MS = 150;
   const servidor = await subirServidorLocal(() => {
     // Nunca chama res.end — simula uma conexão aceita que nunca responde,
     // o cenário exato que travaria a chamada sem o timeout por tentativa.
   });
   try {
     const inicio = Date.now();
-    const resposta = await buscarHttp(enderecoDe(servidor), 100);
+    const resposta = await buscarHttp(enderecoDe(servidor), PRAZO_MS);
     const duracao = Date.now() - inicio;
     assert.equal(resposta, null);
+    // Esperou o prazo (não desistiu antes por outro motivo) e DEVOLVEU
+    // (não travou). O teto é folgado porque o que se prova é o retorno, não a
+    // pontualidade do relógio da máquina.
     assert.ok(
-      duracao < 1000,
-      `deveria abortar perto de 100ms; levou ${duracao}ms (travou na tentativa)`,
+      duracao >= PRAZO_MS,
+      `deveria ter aguardado o prazo de ${PRAZO_MS}ms; levou ${duracao}ms`,
+    );
+    assert.ok(
+      duracao < TETO_FOLGADO_MS,
+      `travou na tentativa: ${duracao}ms sem devolver`,
     );
   } finally {
     await encerrar(servidor);
@@ -67,12 +98,13 @@ test("buscarHttp: servidor que nunca responde estoura o prazo DA TENTATIVA, não
 
 test("buscarHttp: recusa de conexão falha rápido, sem esperar o timeout inteiro", async () => {
   // Porta 1 não tem nada escutando: conexão recusada de imediato pelo SO.
+  const PRAZO_MS = 60_000; // prazo enorme: só a recusa pode encerrar isto cedo
   const inicio = Date.now();
-  const resposta = await buscarHttp("http://127.0.0.1:1/", 2000);
+  const resposta = await buscarHttp("http://127.0.0.1:1/", PRAZO_MS);
   const duracao = Date.now() - inicio;
   assert.equal(resposta, null);
   assert.ok(
-    duracao < 2000,
-    `recusa de conexão não deveria esperar o timeout inteiro (${duracao}ms)`,
+    duracao < TETO_FOLGADO_MS,
+    `recusa de conexão não deveria esperar o timeout inteiro (${duracao}ms de ${PRAZO_MS}ms)`,
   );
 });

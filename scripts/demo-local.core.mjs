@@ -95,6 +95,18 @@ export const SEGUNDOS_ESPERA_BANCO = 60;
  * prazo declarado.
  */
 export const MS_TIMEOUT_TENTATIVA_HTTP = 3000;
+/**
+ * Prazo de CADA sondagem do banco (`pg_isready` num subprocesso). Existe pela
+ * mesma razão do timeout HTTP, com um agravante: `executar` é `spawnSync` e
+ * bloqueia o event loop, então um `docker compose exec` travado não seria
+ * interrompido por prazo nenhum escrito em JavaScript. A sondagem com prazo
+ * roda em subprocesso assíncrono e é encerrada com os descendentes.
+ *
+ * O `pg_isready` responde em milissegundos quando o container está de pé; 3s
+ * é folga larga, e o prazo efetivo é o menor entre este valor e o que sobra do
+ * orçamento do passo.
+ */
+export const MS_TIMEOUT_TENTATIVA_BANCO = 3000;
 /** Intervalo entre tentativas, também descontado do orçamento global. */
 export const MS_INTERVALO_TENTATIVA = 1000;
 
@@ -232,6 +244,9 @@ export async function subirAmbiente(deps) {
     ambiente,
     lerArquivo,
     executar,
+    // Subprocesso com prazo próprio e encerramento da árvore. Separado de
+    // `executar` porque este precisa ser assíncrono para o prazo valer.
+    executarComPrazo,
     iniciar,
     buscarHttp,
     portaLivre,
@@ -292,6 +307,36 @@ export async function subirAmbiente(deps) {
     return { status, saida };
   };
 
+  /**
+   * Como `rodar`, mas com prazo PRÓPRIO para o subprocesso.
+   *
+   * `executar` é `spawnSync`: ele bloqueia o event loop até o filho terminar,
+   * e por isso nenhum prazo escrito em JavaScript consegue interrompê-lo — era
+   * exatamente assim que um `docker compose exec ... pg_isready` lento ou
+   * travado furava o orçamento anunciado do passo 2/8, por mais correto que
+   * fosse o laço em volta dele. Aqui o subprocesso é assíncrono: se estourar o
+   * prazo, é encerrado com os descendentes e a tentativa conta como sem
+   * sucesso, em vez de segurar o passo inteiro.
+   */
+  const rodarComPrazo = async (comando, args, timeoutMs, opcoes = {}) => {
+    const shell = opcoes.shell ?? usarShell;
+    exigirArgumentosLiterais(passoAtual, comando, args, shell);
+    const resultado = await executarComPrazo({
+      passo: passoAtual,
+      comando,
+      args,
+      shell,
+      timeoutMs,
+      ...(opcoes.cwd ? { cwd: opcoes.cwd } : {}),
+      ...(opcoes.env ? { env: opcoes.env } : {}),
+    });
+    return {
+      status: resultado?.status ?? 1,
+      saida: censurar(resultado?.saida ?? "", segredos),
+      expirou: resultado?.expirou === true,
+    };
+  };
+
   const exigirSucesso = (comando, args, opcoes = {}) => {
     const { status, saida } = rodar(comando, args, opcoes);
     const aceitos = opcoes.statusAceitos ?? [0];
@@ -349,8 +394,9 @@ export async function subirAmbiente(deps) {
    * agregado (passo 8/8).
    */
   const aguardarComPrazo = async ({
-    url,
+    tentar,
     segundos,
+    msTimeoutTentativa = MS_TIMEOUT_TENTATIVA_HTTP,
     processo = null,
     aoMorrer,
   }) => {
@@ -369,11 +415,8 @@ export async function subirAmbiente(deps) {
       // Orçamento esgotado: não inicia tentativa nova.
       if (sobra <= 0) return false;
 
-      if (
-        await verificarHttp(url, Math.min(MS_TIMEOUT_TENTATIVA_HTTP, sobra))
-      ) {
-        return true;
-      }
+      if (await tentar(Math.min(msTimeoutTentativa, sobra))) return true;
+
       if (processo && typeof processo.vivo === "function" && !processo.vivo()) {
         aoMorrer();
       }
@@ -389,7 +432,7 @@ export async function subirAmbiente(deps) {
   const esperar = async (rotulo, url, proximoPasso, opcoes = {}) => {
     const segundos = opcoes.segundos ?? tentativas;
     const pronto = await aguardarComPrazo({
-      url,
+      tentar: (msTimeout) => verificarHttp(url, msTimeout),
       segundos,
       processo: opcoes.processo ?? null,
       aoMorrer: () =>
@@ -415,7 +458,7 @@ export async function subirAmbiente(deps) {
    */
   const confirmarProntoWeb = (rotulo, url, processo) =>
     aguardarComPrazo({
-      url,
+      tentar: (msTimeout) => verificarHttp(url, msTimeout),
       segundos: SEGUNDOS_CONFIRMACAO_FINAL_WEB,
       processo,
       aoMorrer: () =>
@@ -524,8 +567,13 @@ export async function subirAmbiente(deps) {
         "Confirme que o Docker Desktop está em execução e rode de novo.",
     });
 
-    const bancoDePe = async () =>
-      rodar(
+    /**
+     * Uma sondagem do banco, com prazo próprio. O `msTimeout` vem do mesmo
+     * orçamento do passo: perto do fim ele encolhe, e um `pg_isready` travado
+     * é encerrado em vez de segurar o passo além do prazo anunciado.
+     */
+    const bancoDePe = async (msTimeout) => {
+      const { status } = await rodarComPrazo(
         "docker",
         [
           "compose",
@@ -538,22 +586,23 @@ export async function subirAmbiente(deps) {
           "-d",
           envRaiz.POSTGRES_DB,
         ],
+        msTimeout,
         { shell: false },
-      ).status === 0;
+      );
+      return status === 0;
+    };
 
-    // Mesmo prazo de parede dos demais passos (T145): o `pg_isready` roda num
-    // subprocesso e também consome tempo, então contar voltas faria "60s"
-    // significar bem mais do que 60s.
-    const prazoBanco = agora() + tentativas * 1000;
-    let pronto = false;
-    while (!pronto && agora() < prazoBanco) {
-      pronto = await bancoDePe();
-      if (pronto) break;
-      const sobra = prazoBanco - agora();
-      if (sobra <= 0) break;
-      await dormir(Math.min(MS_INTERVALO_TENTATIVA, sobra));
-    }
-    if (!pronto) {
+    // O banco usa a MESMA disciplina de prazo dos passos 5/8, 7/8 e 8/8
+    // (T145): prazo de parede absoluto, teto estrutural contra relógio parado,
+    // nenhuma tentativa ou intervalo depois do orçamento, e o intervalo saindo
+    // do mesmo bolso. Não há processo gerenciado aqui — o PostgreSQL é um
+    // container —, então não há morte de processo a vigiar.
+    const bancoPronto = await aguardarComPrazo({
+      tentar: bancoDePe,
+      segundos: tentativas,
+      msTimeoutTentativa: MS_TIMEOUT_TENTATIVA_BANCO,
+    });
+    if (!bancoPronto) {
       falhar(
         `PostgreSQL não ficou disponível em ${tentativas}s.`,
         'Veja "docker compose logs postgres" e rode de novo.',
@@ -751,7 +800,7 @@ export async function subirAmbiente(deps) {
     // ---- 8/8 ---------------------------------------------------------------
     passo(NOMES_PASSOS[7]);
     const verificacoes = {
-      banco: await bancoDePe(),
+      banco: await bancoDePe(MS_TIMEOUT_TENTATIVA_BANCO),
       api: await verificarHttp(`${urlApi}/v1/health/ready`),
       web: await confirmarProntoWeb(
         "A interface web",

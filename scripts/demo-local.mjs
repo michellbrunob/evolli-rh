@@ -61,11 +61,98 @@ function executar({ comando, args, shell, env, entrada, cwd }) {
 }
 
 /**
+ * Encerra um filho e TODOS os descendentes dele.
+ *
+ * No Windows, `shell: true` faz o filho direto ser o `cmd.exe`; matar só ele
+ * deixaria o neto (node do Vite/Nest, ou o `docker`) órfão — daí `taskkill /T`,
+ * que derruba a árvore. Fora do Windows, o filho nasce líder de grupo
+ * (`detached: true`) e o sinal vai para o grupo inteiro, com o mesmo efeito.
+ *
+ * Único ponto de encerramento do arquivo: tanto os servidores de longa duração
+ * quanto o subprocesso com prazo passam por aqui, para não existirem duas
+ * disciplinas de kill divergindo com o tempo.
+ */
+function matarArvore(filho, sinal = "SIGTERM") {
+  if (filho.pid === undefined) return;
+  if (EM_WINDOWS) {
+    spawnSync("taskkill", ["/pid", String(filho.pid), "/t", "/f"], {
+      stdio: "ignore",
+    });
+    return;
+  }
+  try {
+    process.kill(-filho.pid, sinal);
+  } catch {
+    try {
+      filho.kill(sinal);
+    } catch {
+      // Já morreu: encerrar é melhor-esforço.
+    }
+  }
+}
+
+/**
+ * Executa um comando com PRAZO e devolve o resultado, sem bloquear o event
+ * loop.
+ *
+ * Existe porque `executar` é `spawnSync`: ele segura a thread até o filho
+ * terminar, então um `docker compose exec ... pg_isready` travado furaria
+ * qualquer orçamento, por mais correto que fosse o laço em volta. Aqui o
+ * processo é assíncrono e, no estouro do prazo, a ÁRVORE é encerrada e o
+ * encerramento é AGUARDADO (`close`, não `exit`): sem processo, listener ou
+ * timer sobrando. O estouro vira `expirou: true` com status diferente de zero,
+ * que o chamador lê como tentativa sem sucesso.
+ */
+function executarComPrazo({ comando, args, shell, env, cwd, timeoutMs }) {
+  return new Promise((resolver) => {
+    const filho = spawn(comando, args, {
+      cwd: cwd ? join(RAIZ, cwd) : RAIZ,
+      shell,
+      ...(EM_WINDOWS ? {} : { detached: true }),
+      ...(env ? { env } : {}),
+    });
+
+    let saida = "";
+    let expirou = false;
+    let concluido = false;
+    filho.stdout?.on("data", (p) => {
+      saida += p.toString();
+    });
+    filho.stderr?.on("data", (p) => {
+      saida += p.toString();
+    });
+
+    const prazoMs = Math.max(1, Math.round(timeoutMs));
+    const cronometro = setTimeout(() => {
+      expirou = true;
+      // SIGKILL, não SIGTERM: um subprocesso que já furou o prazo é justamente
+      // o que pode estar travado e ignorar o pedido educado de sair.
+      matarArvore(filho, "SIGKILL");
+    }, prazoMs);
+    // O prazo não pode, ele próprio, segurar o processo vivo no fim do
+    // comando — nem aparecer como timer residual.
+    cronometro.unref?.();
+
+    const terminar = (status) => {
+      if (concluido) return;
+      concluido = true;
+      clearTimeout(cronometro);
+      resolver({ status, saida, expirou });
+    };
+
+    // `close` e não `exit`: espera a confirmação do encerramento e o
+    // fechamento dos fluxos, que é o que garante não sobrar nada atrás.
+    filho.on("close", (codigo) => terminar(expirou ? 1 : (codigo ?? 1)));
+    filho.on("error", (erro) => {
+      saida += erro.message;
+      terminar(127);
+    });
+  });
+}
+
+/**
  * Sobe um servidor de desenvolvimento e devolve um manípulo que sabe matar a
- * ÁRVORE inteira. No Windows, `shell: true` faz o filho direto ser o
- * `cmd.exe`; matar só ele deixaria o node do Vite/Nest órfão, por isso
- * `taskkill /T`. Fora do Windows, o filho vira líder de grupo (`detached`) e
- * o sinal vai para o grupo.
+ * ÁRVORE inteira.
  */
 function iniciar({ nome, comando, args, shell, env }) {
   const filho = spawn(comando, args, {
@@ -96,21 +183,7 @@ function iniciar({ nome, comando, args, shell, env }) {
     matar() {
       if (!vivo || filho.pid === undefined) return;
       vivo = false;
-      if (EM_WINDOWS) {
-        spawnSync("taskkill", ["/pid", String(filho.pid), "/t", "/f"], {
-          stdio: "ignore",
-        });
-        return;
-      }
-      try {
-        process.kill(-filho.pid, "SIGTERM");
-      } catch {
-        try {
-          filho.kill("SIGTERM");
-        } catch {
-          // Já morreu: encerrar é melhor-esforço.
-        }
-      }
+      matarArvore(filho);
     },
   };
 }
@@ -170,6 +243,7 @@ async function main() {
     ambiente: { ...process.env },
     lerArquivo,
     executar,
+    executarComPrazo,
     iniciar,
     buscarHttp,
     portaLivre,
