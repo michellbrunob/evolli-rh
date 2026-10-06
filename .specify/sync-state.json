@@ -11,15 +11,15 @@
     "frappe": "encerrado_como_candidato_referencia_apenas"
   },
   "nextTask": {
-    "id": "T148",
-    "status": "em_execucao_integracao_registros_ponto",
-    "reason": "T147 integrada em main (PR #138, squash 1d7531c), com a CI de main verde: a admissao foi homologada de ponta a ponta, com seis defeitos reais corrigidos e regressao provada, e o seed passou a efetivar as admissoes sinteticas. A T148 converge esse resultado e avalia a fundacao segura para o Evolli RECEBER registros de ponto do sistema em uso. Ela nao pressupoe que isso seja implementavel: so ha codigo se os contratos existentes definirem, sem invencao, origem, formato, autenticacao, idempotencia, relacao com empresa/colaborador/vinculo, comportamento de duplicatas, preservacao da marcacao original, auditoria e resposta a erro. Com qualquer item essencial aberto, o resultado e um pacote de decisao, sem endpoint, schema ou regra provisoria. A importacao AFD segue bloqueada pela ADR 0008 (decisao 4 — origem unica manual) e pelas pendencias DP-3J-07, DP-3J-20, DP-3J-09, DP-3J-11 e DS-OPS-01."
+    "id": "a definir",
+    "status": "pending_decisao_pacote_integracao_ponto",
+    "reason": "T147 integrada em main (PR #138, squash 1d7531c), com a CI de main verde. A T148 convergiu esse resultado e investigou exaustivamente (sete eixos) a fundacao para o Evolli RECEBER registros de ponto do sistema em uso. A investigacao confirmou que o gate da propria tarefa reprova a implementacao: nao ha chave de idempotencia possivel sem inventa-la (unico @@unique de evento_ponto e (id, empresaId), inutil para deduplicar marcacao externa) e nao existe mecanismo de autenticacao para ator nao humano (registrado_por_user_id e obrigatorio e aponta para AccessUser humano; o CsrfGuard exige sessao). A origem automatizada segue proibida pela ADR 0008 decisao 4. Resultado: pacote de decisao em docs/decisions/pacote-decisao-integracao-registros-ponto.md, sem nenhum endpoint, schema, migration ou regra provisoria criados. A importacao AFD segue bloqueada pelas pendencias DP-3J-07, DP-3J-20, DP-3J-09, DP-3J-11 e DS-OPS-01, mais a lacuna inedita de identidade de ator nao humano, registrada pela primeira vez neste pacote. Proximo passo: levar o pacote a Produto/TI/RH/Juridico/DPO e a RWTech/Secullum; em paralelo, escolher uma fatia funcional independente da integracao de ponto."
   },
   "openDeliveries": [
     {
       "id": "T148",
       "pullRequest": null,
-      "status": "em_execucao_integracao_registros_ponto"
+      "status": "pacote_de_decisao_entregue_sem_codigo"
     }
   ],
   "requiredArtifacts": [

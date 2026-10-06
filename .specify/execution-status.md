@@ -319,30 +319,36 @@ ainda refletia o seed anterior (a efetivação só aparece depois de reexecutar 
 movimentação; e o formulário admite por **uma** referência organizacional, embora a API aceite as
 seis.
 
-## Integração de registros de ponto — T148 (em execução)
+## Integração de registros de ponto — T148 (pacote de decisão entregue)
 
-| Tarefa | Estado          | Resultado principal                                                                                                                                                                                 |
-| ------ | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| T148   | **Em execução** | Converge a T147 e avalia a **fundação segura** para receber registros de ponto do sistema atual. Implementa somente se os contratos existentes bastarem; caso contrário, entrega pacote de decisão. |
+| Tarefa | Estado                             | Resultado principal                                                                                                                                                                                                                                                                                                                                                      |
+| ------ | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| T148   | **Pacote de decisão — sem código** | Convergiu a T147 e avaliou a fundação para receber registros de ponto do sistema atual. A investigação confirmou que os contratos existentes não definem, sem invenção, chave de idempotência nem autenticação de ator não humano — por isso não há implementação: o resultado é um [pacote de decisão](../docs/decisions/pacote-decisao-integracao-registros-ponto.md). |
 
-**Regra que governa a tarefa.** Só há implementação se os contratos existentes definirem, **sem
-invenção**: origem, formato, autenticação, idempotência, relação com empresa/colaborador/vínculo,
-comportamento de duplicatas, preservação da marcação original, auditoria e resposta a erro. Com
-qualquer item essencial em aberto, nada de endpoint, schema ou regra provisória — o resultado é um
-pacote de decisão.
+**Por que não houve implementação.** A regra da tarefa exige que origem, formato, autenticação,
+idempotência, relação com empresa/colaborador/vínculo, duplicatas, preservação da marcação original,
+auditoria e resposta a erro estejam definidos nos contratos existentes, sem invenção. Dois pontos
+fecham o caminho de código, confirmados em código e documento: (1) o único `@@unique` de
+`evento_ponto` é `(id, empresaId)` — não serve para deduplicar marcação externa, e o contrato do
+lote AFD (T042 §7) proíbe inferir a chave natural; (2) não existe, em nenhuma rota do produto,
+mecanismo de autenticação para um ator não humano — `evento_ponto.registrado_por_user_id` é
+obrigatório e aponta para `AccessUser` humano, e o `CsrfGuard` exige sessão para emitir o token.
+A origem automatizada também segue proibida pela ADR 0008, decisão 4, até ADR nova ou emenda formal.
 
 **Limites explícitos:** a T148 não implementa folha, banco de horas, adicional noturno, DSR,
 fechamento, transmissão fiscal, REP-P, PAdES, AEJ nem integração externa real sem contrato e
-autorização próprios.
+autorização próprios — nenhum desses limites foi tocado, porque nenhum código foi escrito.
 
 ## Próxima ação autorizável
 
-1. **Concluir a T148** — convergência, atualização do ambiente de demonstração e a decisão entre
-   implementação mínima e pacote de decisão sobre integração de ponto.
-2. Depois dela, **escolher a próxima fatia funcional** sob o próximo identificador disponível —
-   sem número reservado aqui, porque reservar identificador antes da decisão de escopo já se
-   mostrou fonte de confusão (ver T137). A implementação usa a fundação visual já congelada, sem
-   reabrir o shell, os tokens, o padrão B ou os modais.
+1. **Decidir o pacote da T148** — levar `docs/decisions/pacote-decisao-integracao-registros-ponto.md`
+   a Produto, TI, RH, Jurídico/DPO e, quanto às perguntas ao fornecedor, à RWTech/Secullum. Nenhuma
+   implementação de integração de ponto começa antes de §2–§6 desse pacote serem decididos e de a
+   ADR 0008 (decisão 4) ser reaberta por ADR nova ou emenda formal.
+2. Em paralelo, **escolher a próxima fatia funcional independente da integração de ponto**, sob o
+   próximo identificador disponível — sem número reservado aqui, porque reservar identificador antes
+   da decisão de escopo já se mostrou fonte de confusão (ver T137). A implementação usa a fundação
+   visual já congelada, sem reabrir o shell, os tokens, o padrão B ou os modais.
 3. Candidatos naturais, todos dependentes de decisão própria: capacidade de RBAC para o gestor
    consultivo; `DP-23` como pré-condição de qualquer autoatendimento do colaborador; e a validação
    com RH do catálogo de motivos, cujo mecanismo (código fechado) já está aprovado.
