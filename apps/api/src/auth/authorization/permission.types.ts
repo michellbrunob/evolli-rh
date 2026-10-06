@@ -36,6 +36,30 @@ export const PESSOAS_RESOURCES = [
 export type PessoasResource = (typeof PESSOAS_RESOURCES)[number];
 
 /**
+ * Recursos do Gestor consultivo (T151, ADR 0015).
+ *
+ * Dois recursos, com atores opostos de proposito:
+ *
+ * - `gestor_atribuicao` e ADMINISTRACAO: o RH liga conta a colaborador,
+ *   atribui equipes e concede excecoes. O proprio gestor NAO acessa este
+ *   recurso — quem define o escopo nunca pode ser quem e escopado por ele.
+ * - `gestor_equipe` e CONSULTA: o gestor le as pessoas dentro do escopo que o
+ *   RH definiu. Acao `read` apenas; nao existe `create`/`alter`/`manage`,
+ *   porque `PD-SOL-01` fixou o papel como consultivo e a decisao 7 da
+ *   ADR 0015 nao abriu nenhuma mutacao.
+ *
+ * O ESCOPO de equipe nao cabe no avaliador puro: `AuthorizationSubject` tem
+ * tres campos e nenhum deles e equipe. Isso e deliberado e segue a avaliacao
+ * em DUAS FASES ja estabelecida — capacidade aqui, escopo no service, sempre
+ * a partir da sessao. Conceder `gestor_equipe/read` NAO concede acesso a
+ * ninguem: concede o direito de perguntar, e o service responde apenas o que
+ * a atribuicao vigente sustenta.
+ */
+export const GESTOR_RESOURCES = ["gestor_atribuicao", "gestor_equipe"] as const;
+
+export type GestorResource = (typeof GESTOR_RESOURCES)[number];
+
+/**
  * Recursos de Jornada e Ponto (Etapa 3, ADR 0008, Baseline Jornada V1).
  *
  * Só dois. Não existe `periodo_apuracao` nem `fechamento_ponto`: competência é
@@ -113,7 +137,8 @@ export type AuthorizationResource =
   | PontoResource
   | DocumentosResource
   | HorariosResource
-  | SolicitacoesPessoasResource;
+  | SolicitacoesPessoasResource
+  | GestorResource;
 
 export type AuthorizationAction =
   | "read"
@@ -154,6 +179,12 @@ export function isPessoasResource(
   resource: AuthorizationResource,
 ): resource is PessoasResource {
   return (PESSOAS_RESOURCES as readonly string[]).includes(resource);
+}
+
+export function isGestorResource(
+  resource: AuthorizationResource,
+): resource is GestorResource {
+  return (GESTOR_RESOURCES as readonly string[]).includes(resource);
 }
 
 export function isPontoResource(

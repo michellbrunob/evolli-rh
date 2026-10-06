@@ -1,7 +1,29 @@
 # Pacote de decisão — escopo do papel `gestor` (DP-8)
 
-**Status: pendente — nenhum item aprovado.** Este documento não implementa nada, não concede
-permissão e não cria relação organizacional. Ele existe porque a T150 pediu um Portal da Liderança
+**Status: APROVADO em 06/10/2026.** Decisão do proprietário do produto, registrada literalmente:
+
+> **"Aprovo as recomendações 1 a 9 para o escopo do gestor e DP-23"**
+
+A aprovação foi formalizada na
+[ADR 0015](../adr/0015-escopo-do-gestor-consultivo-e-vinculo-conta-colaborador.md) e implementada
+pela T151. `DP-8` e `DP-23` passam a **resolvidas — e somente no recorte da ADR 0015**: gestão por
+equipe, múltiplas equipes por gestor, subordinados diretos, um principal e no máximo um substituto
+vigentes. **Continuam NÃO aprovados** e não foram habilitados: gestão matricial permanente,
+autorização por departamento inteiro e autorização por empresa inteira.
+
+Dois itens da decisão 7 ficaram **fora da primeira entrega** por ausência de contrato seguro, e não
+por esquecimento: **resumo de jornada** (não existe como dado nem como rota; `DP-3J-12` segue
+pendente) e **andamento de solicitações** (`tipo` e `motivo` revelam condição de saúde por
+inferência, e `PD-SOL-05` só autoriza "informação operacional mínima", ainda não definida).
+
+O texto abaixo é preservado como o **registro do raciocínio que levou à decisão** — inclusive a
+recomendação técnica da §8, que era não aprovada quando escrita e foi acolhida. Nada nele é
+reescrito retroativamente.
+
+---
+
+**Contexto original (T150).** Este documento não implementava nada, não concedia
+permissão e não criava relação organizacional. Ele existe porque a T150 pediu um Portal da Liderança
 somente leitura e o gate técnico da própria tarefa reprovou a implementação.
 
 - **Tarefa de origem:** T150 — Gestor consultivo, com escopo real e somente leitura.
@@ -213,6 +235,10 @@ Sem estas respostas não há implementação segura:
 
 ## 8. Recomendação técnica — **não aprovada**
 
+> **ACOLHIDA em 06/10/2026 pela ADR 0015.** O aviso abaixo é o texto original, preservado como
+> registro: quando escrito, isto era recomendação e não decisão. As decisões 1 a 9 da ADR 0015
+> seguem esta direção.
+>
 > **Esta seção não é decisão.** É a direção que a engenharia considera mais defensável à luz do
 > schema atual e das opções das §2–§6. **Não aprova `DP-8` nem `DP-23`**, não autoriza migration,
 > endpoint, regra de RBAC nem interface, depende das respostas de Produto, RH e Jurídico (§7), e

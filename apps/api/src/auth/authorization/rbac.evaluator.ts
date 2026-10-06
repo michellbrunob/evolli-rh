@@ -7,6 +7,7 @@ import {
   isHorariosResource,
   isSolicitacoesPessoasResource,
   isOrganizationalResource,
+  isGestorResource,
   isPessoasResource,
   isPontoResource,
 } from "./permission.types";
@@ -41,6 +42,9 @@ export function evaluatePermission(
       }
       if (isPessoasResource(target.resource)) {
         return evaluatePessoas(subject, target);
+      }
+      if (isGestorResource(target.resource)) {
+        return evaluateGestor(subject, target);
       }
       if (isPontoResource(target.resource)) {
         return evaluatePonto(subject, target);
@@ -296,10 +300,10 @@ function evaluateOrganizacao(
         ? isSameCompany(subject, target)
         : subject.companyId !== null;
 
-    // `gestor`: a matriz marca leitura "restrita", mas o escopo exato é
-    // pendência declarada (DP-8) e depende da entidade colaborador, que não
-    // existe nesta fatia. Sem escopo definido, conceder leitura seria
-    // escolher a fronteira por conta própria — negado por padrão.
+    // `gestor`: a matriz marca leitura "restrita". A ADR 0015 (T151) resolveu
+    // DP-8 — mas SOMENTE para o recurso `gestor_equipe`, por atribuição
+    // explícita a equipes. A estrutura organizacional em si continua negada:
+    // ver a equipe que se gerencia não é administrar o catálogo de equipes.
     //
     // `auditor` e `dpo`: não são provisionados nesta fatia e seu escopo é
     // pendência declarada (DP-7, Emenda 1 da ADR 0005, item 3). O critério de
@@ -361,15 +365,111 @@ function evaluatePessoas(
     // Negados por decisão explícita, cada um por um motivo distinto:
     //
     // `admin_tecnico` — Baseline V1, item 8 (ver bloco acima).
-    // `gestor`        — escopo pendente (DP-8/DP-16); conceder exigiria
-    //                   escolher a fronteira (equipe? departamento? direto ou
-    //                   indireto?) por conta própria.
+    // `gestor`        — a ADR 0015 (T151) resolveu DP-8 criando o recurso
+    //                   próprio `gestor_equipe`, com escopo por atribuição
+    //                   explícita. Aqui continua negado: `colaborador` e
+    //                   `vinculo_funcional` são a superfície ADMINISTRATIVA de
+    //                   Pessoas (admitir, efetivar, movimentar), e DP-16 segue
+    //                   pendente. A consulta do gestor tem rota e projeção
+    //                   próprias, restritas aos campos da decisão 7.
     // `auditor`/`dpo` — não provisionados; escopo pendente (DP-7). A leitura
     //                   da trilha (`access_log`) que já possuem fica intacta.
     // `financeiro`    — nada na Baseline concede acesso a pessoas; mantém só
     //                   `centro_custo` da Fatia 1.
     // `colaborador`   — o que ele acessaria é o Portal do Colaborador, que não
     //                   existe (DP-23); conceder aqui exporia dado de terceiro.
+    default:
+      return false;
+  }
+}
+
+/**
+ * Gestor consultivo (T151, ADR 0015) — primeira capacidade concedida ao papel
+ * `gestor` em todo o produto.
+ *
+ * Até a T150 o `gestor` era negado em todos os ramos, sempre pelo mesmo
+ * motivo: conceder exigiria escolher a fronteira (equipe? departamento?
+ * direto ou indireto?) por conta própria. A ADR 0015 escolheu — **equipe**,
+ * subordinados **diretos**, com atribuição explícita e historiada —, e é só
+ * esse recorte que este ramo abre. `DP-8` segue resolvida apenas aqui:
+ * nenhum outro ramo muda, e o `gestor` continua negado em pessoas, ponto,
+ * documentos, horários, solicitações e estrutura organizacional.
+ *
+ * DUAS FASES, e a distinção importa para a segurança:
+ *
+ *   fase 1 (aqui) — CAPACIDADE: o `gestor` pode *perguntar* por `gestor_equipe`
+ *     na própria empresa. Isso não lhe dá nenhuma pessoa.
+ *   fase 2 (service) — ESCOPO: quem ele vê sai de `atribuicao_gestor_equipe`
+ *     vigente + alocação vigente do colaborador, resolvido a partir da sessão.
+ *     Sem atribuição, a lista é vazia — **nunca** cai para a empresa inteira.
+ *
+ * `gestor_atribuicao` é o recurso ADMINISTRATIVO e pertence ao RH. O `gestor`
+ * é negado nele de propósito: quem define o escopo não pode ser quem é
+ * escopado por ele. `dp` também é negado — a decisão 9 da ADR 0015 atribui a
+ * concessão de exceção ao RH, nominalmente, e negação por padrão significa
+ * exatamente isso.
+ */
+function evaluateGestor(
+  subject: AuthorizationSubject,
+  target: AuthorizationTarget,
+): boolean {
+  const escopoResolvido = target.targetCompanyId !== undefined;
+  const naPropriaEmpresa = escopoResolvido
+    ? isSameCompany(subject, target)
+    : subject.companyId !== null;
+
+  if (target.resource === "gestor_atribuicao") {
+    switch (subject.role) {
+      // `master_tecnico` é NEGADO aqui, e a exceção ao padrão é deliberada.
+      //
+      // Nos demais domínios ele lê em escopo global. Aqui não há escopo global
+      // a ler: toda consulta de configuração parte da empresa do ator, e uma
+      // conta global não tem empresa. Conceder `read` produziria uma permissão
+      // que a rota não consegue honrar — o service responderia 404 de qualquer
+      // modo —, e permissão concedida que não funciona é pior que permissão
+      // negada: ela mente na matriz.
+      //
+      // Dar leitura global de verdade exigiria decidir QUAL empresa um leitor
+      // sem empresa lista (parâmetro na query? todas, paginadas?). Isso é
+      // desenho, e a ADR 0015 não o decidiu. Fica para quem decidir.
+
+      // RH administra o escopo do gestor, restrito à própria empresa
+      // (ADR 0015, decisões 6 e 9). `create` liga conta/atribui/concede;
+      // `alter` encerra; `read` consulta o que está vigente.
+      case "rh":
+        return naPropriaEmpresa;
+
+      // Negados, cada um por um motivo próprio:
+      //
+      // `gestor`        — é o SUJEITO do escopo, não o administrador dele.
+      // `dp`            — a decisão 9 nomeia o RH; negação por padrão.
+      // `admin_tecnico` — sem exceção global, mesmo critério de pessoas/ponto.
+      // `master_tecnico`— ver o bloco acima: não há escopo global a ler.
+      // demais          — nada na ADR 0015 lhes concede nada.
+      default:
+        return false;
+    }
+  }
+
+  // `gestor_equipe` — consulta. Só leitura existe.
+  if (target.action !== "read") return false;
+
+  switch (subject.role) {
+    // `master_tecnico` é NEGADO pelo mesmo motivo do recurso irmão: a consulta
+    // resolve o escopo a partir da sessão, e uma conta sem empresa resolve
+    // para vazio. Conceder devolveria sempre lista vazia — uma permissão que
+    // não permite nada.
+
+    // O gestor consulta o próprio escopo. A empresa vem da sessão; a equipe,
+    // da atribuição vigente — nenhuma das duas do cliente.
+    case "gestor":
+      return naPropriaEmpresa;
+
+    // RH lê para conferir o que configurou, na própria empresa — sem isso,
+    // administrar o escopo às cegas seria a única opção.
+    case "rh":
+      return naPropriaEmpresa;
+
     default:
       return false;
   }
@@ -428,10 +528,12 @@ function evaluatePonto(
     // Negados, cada um por um motivo próprio já registrado:
     //
     // `admin_tecnico` — Baseline Jornada V1, decisão 5 (ver bloco acima).
-    // `gestor`        — escopo pendente (DP-8/DP-3J-12). "Gestor aprova o
-    //                   ponto da equipe" é o fluxo natural do domínio, e é
-    //                   exatamente por isso que conceder aqui sem a decisão
-    //                   seria escolher a fronteira por conta própria.
+    // `gestor`        — DP-3J-12 segue PENDENTE. A ADR 0015 resolveu DP-8
+    //                   (quem é a equipe), não o que o gestor vê de ponto:
+    //                   "gestor aprova o ponto da equipe" é o fluxo natural do
+    //                   domínio e continua sem decisão. O "resumo de jornada"
+    //                   da decisão 7 não existe como contrato — adiado para a
+    //                   T152, deliberadamente fora da T151.
     // `colaborador`   — o que ele acessaria é o Portal do Colaborador, fora de
     //                   escopo (spec §4); conceder exporia dado de terceiro.
     // `auditor`/`dpo` — leem a trilha (`access_log`), que é outro escopo; o
@@ -629,7 +731,10 @@ function evaluateHorarios(
     // `dp`            — a alçada de ponto/horário no V1 é exclusiva de RH
     //                   (T037). DP não opera horários, ao contrário de ponto.
     // `admin_tecnico` — mesmo raciocínio de pessoas/ponto: sem exceção global.
-    // `gestor`        — escopo pendente (DP-8).
+    // `gestor`        — a ADR 0015 resolveu DP-8, mas a leitura de HORÁRIO
+    //                   pelo gestor tem rota própria em `gestor_equipe`, com
+    //                   projeção restrita. Administrar tabelas de horário
+    //                   segue exclusivo de RH (T037).
     // `colaborador`   — Portal do Colaborador fora de escopo.
     // `financeiro`/`auditor`/`dpo` — nada concede acesso a horários.
     default:

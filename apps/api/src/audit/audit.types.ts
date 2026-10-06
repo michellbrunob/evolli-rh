@@ -156,6 +156,18 @@ export const AUDIT_ACTIONS = [
   "pessoas_solicitacao_recusada",
   "pessoas_solicitacao_reaberta",
   "pessoas_solicitacao_consultada",
+
+  // T151 — Gestor consultivo (ADR 0015). As quatro primeiras registram a
+  // CONFIGURACAO do escopo pelo RH; `gestor_equipe_consultada` registra a
+  // leitura feita dentro dele, em regime fail-safe, como `ponto_consultado`.
+  // Nenhuma carrega nome, matricula ou a justificativa em texto.
+  "gestor_conta_vinculada",
+  "gestor_conta_desvinculada",
+  "gestor_atribuicao_criada",
+  "gestor_atribuicao_encerrada",
+  "gestor_excecao_criada",
+  "gestor_excecao_encerrada",
+  "gestor_equipe_consultada",
 ] as const satisfies readonly AuditAction[];
 
 /**
@@ -167,6 +179,13 @@ export const AUDIT_ACTIONS = [
  * `resource` é só a etiqueta do tipo de dado afetado.
  */
 export type AuditResource =
+  // T151 — Gestor consultivo (ADR 0015). Entram sem migration, por `resource`
+  // ser uniao no codigo. Identificam a CONFIGURACAO de escopo e a consulta
+  // feita dentro dele — nunca a pessoa consultada.
+  | "access_user_colaborador"
+  | "atribuicao_gestor_equipe"
+  | "excecao_acesso_gestor"
+  | "gestor_equipe"
   | "access_user"
   | "access_session"
   | "access_password_reset_token"

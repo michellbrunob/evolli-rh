@@ -161,14 +161,14 @@ O domínio `evolli.local` é reservado e não roteável — nenhum destes e-mail
 existe. A senha é deliberadamente autodescritiva: quem a vir num log sabe que é
 de demonstração.
 
-| E-mail                          | Papel            | Empresa    | Para que serve                                                            | Limite esperado                                                                               |
-| ------------------------------- | ---------------- | ---------- | ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| `master.demo@evolli.local`      | `master_tecnico` | — (global) | Criar empresas e contas; enxergar as duas empresas                        | Nas Solicitações de Pessoas, lê e **não muta**                                                |
-| `rh.alfa@evolli.local`          | `rh`             | Demo Alfa  | Papel operador da maior parte das telas funcionais                        | Só enxerga a Alfa                                                                             |
-| `rh.beta@evolli.local`          | `rh`             | Demo Beta  | Contraprova de isolamento: mesmas telas, outro escopo                     | Recursos da Alfa respondem 404, nunca 403                                                     |
-| `dp.alfa@evolli.local`          | `dp`             | Demo Alfa  | Diferença de capacidade entre DP e RH                                     | Sem capacidade nas Solicitações de Pessoas                                                    |
-| `gestor.alfa@evolli.local`      | `gestor`         | Demo Alfa  | Papel consultivo (`PD-SOL-01`) — serve para ver o que **não** é oferecido | Sem capacidade nas Solicitações de Pessoas                                                    |
-| `colaborador.alfa@evolli.local` | `colaborador`    | Demo Alfa  | Demonstrar a negação por papel                                            | **Não é autoatendimento**: não existe vínculo autenticado entre conta e colaborador (`DP-23`) |
+| E-mail                          | Papel            | Empresa    | Para que serve                                                                                                                                           | Limite esperado                                                                                                                                                   |
+| ------------------------------- | ---------------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `master.demo@evolli.local`      | `master_tecnico` | — (global) | Criar empresas e contas; enxergar as duas empresas                                                                                                       | Nas Solicitações de Pessoas, lê e **não muta**                                                                                                                    |
+| `rh.alfa@evolli.local`          | `rh`             | Demo Alfa  | Papel operador da maior parte das telas funcionais                                                                                                       | Só enxerga a Alfa                                                                                                                                                 |
+| `rh.beta@evolli.local`          | `rh`             | Demo Beta  | Contraprova de isolamento: mesmas telas, outro escopo                                                                                                    | Recursos da Alfa respondem 404, nunca 403                                                                                                                         |
+| `dp.alfa@evolli.local`          | `dp`             | Demo Alfa  | Diferença de capacidade entre DP e RH                                                                                                                    | Sem capacidade nas Solicitações de Pessoas                                                                                                                        |
+| `gestor.alfa@evolli.local`      | `gestor`         | Demo Alfa  | Papel consultivo (`PD-SOL-01`, ADR 0015). Desde a T151 **tem escopo real**: enxerga, por API, os colaboradores da equipe `TURNOA` que o seed lhe atribui | Somente leitura, e só dentro da equipe atribuída. Sem interface web (T151 é backend); sem resumo de jornada e sem andamento de solicitações (adiados para a T152) |
+| `colaborador.alfa@evolli.local` | `colaborador`    | Demo Alfa  | Demonstrar a negação por papel                                                                                                                           | **Não é autoatendimento**: não existe vínculo autenticado entre conta e colaborador (`DP-23`)                                                                     |
 
 Há ainda `admin.demo@evolli.local` (`admin_tecnico`), criada pelo bootstrap. Ela
 existe por exigência do provisionamento e **não** cria empresas.
@@ -282,8 +282,13 @@ chamado por uma pessoa, e nenhum aponta para host que não seja local.
   demonstrativa, sem persistência. O
   [guia visual](./GUIA-VISUAL-FUNCIONALIDADES.md) diz, tela a tela, o que é o quê.
 - **Sem MFA.** O seed não habilita segundo fator para nenhuma conta.
-- **Sem ESS/MSS.** Não há autoatendimento do colaborador nem visão de gestor:
-  depende de `DP-23`, que é decisão em aberto.
+- **Sem ESS.** Não há autoatendimento do colaborador. O vínculo `DP-23` entre conta
+  e pessoa passou a existir na T151, mas é pré-condição do Portal do Colaborador,
+  não autorização: o autoatendimento continua sem decisão própria.
+- **MSS parcial, e só por API.** A T151 entregou a fundação do gestor consultivo
+  (ADR 0015): o gestor enxerga a equipe atribuída em `GET /v1/gestor/equipe`.
+  **Não há tela** — a interface é tarefa posterior. Um gestor sem atribuição vê
+  lista vazia, que é o comportamento correto, não um defeito.
 - **Sem anexo, upload ou R2.** Continuam bloqueados pelos portões de conteúdo.
 - **Sem dado real, em nenhuma hipótese.**
 - **Uma tela estoura a largura da página.** `Pessoas › Histórico funcional`

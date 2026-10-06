@@ -530,6 +530,150 @@ async function garantirAdmissaoEfetivada(
 }
 
 /**
+ * Monta o escopo sintético do gestor consultivo (T151, ADR 0015).
+ *
+ * Por que isto existe: sem atribuição, `gestor.alfa` loga e vê lista vazia —
+ * que é o comportamento CORRETO, e justamente por isso não demonstra nada. O
+ * cenário mínimo precisa de alguém DENTRO da equipe e alguém FORA dela, para
+ * que a diferença seja visível na tela em vez de precisar ser explicada.
+ *
+ * Idempotente pelo EFEITO, como `garantirAdmissaoEfetivada`: confere se a
+ * ligação e a atribuição já existem antes de criar. A segunda execução não
+ * duplica e não derruba o seed — o banco recusaria com 409 (EXCLUSION
+ * CONSTRAINT), e um seed que quebra na segunda execução é pior que um seed que
+ * não roda.
+ *
+ * Não toca `DEMO-A-0001`/`cargoId`: a dívida de convergência de atributos é
+ * anterior e tem tarefa própria. Aqui ela não é corrigida nem agravada.
+ */
+async function garantirEscopoDeGestor(
+  ctx: Contexto,
+  rh: Sessao,
+  master: Sessao,
+  alvo: {
+    gestorEmail: string;
+    gestorMatricula: string;
+    equipeId: string;
+    matriculaNaEquipe: string;
+  },
+): Promise<void> {
+  // 1. a conta do gestor
+  let gestorUserId: string | null = null;
+  await varrerUsuarios(ctx, master, (u) => {
+    if (u.email === alvo.gestorEmail) gestorUserId = u.id;
+  });
+  if (!gestorUserId) {
+    throw new Error(
+      `Conta ${alvo.gestorEmail} não encontrada para montar o escopo do gestor.`,
+    );
+  }
+
+  // 2. a PESSOA do gestor, alcançada pela matrícula — nunca pelo e-mail. A
+  //    ADR 0015, decisão 6, proíbe inferir a pessoa por campo textual, e o
+  //    seed segue a mesma regra que a aplicação.
+  const colaboradorDoGestor = await colaboradorPorMatricula(
+    ctx,
+    rh,
+    alvo.gestorMatricula,
+  );
+  if (!colaboradorDoGestor) {
+    throw new Error(
+      `Matrícula ${alvo.gestorMatricula} não encontrada para o gestor sintético.`,
+    );
+  }
+
+  // 3. ligação conta ↔ colaborador (DP-23)
+  const ligacoes = await ler<{ userId: string; vigenciaFim: string | null }[]>(
+    ctx,
+    "/v1/gestor/administracao/ligacoes",
+    rh,
+  );
+  const jaLigado = ligacoes.some(
+    (l) => l.userId === gestorUserId && l.vigenciaFim === null,
+  );
+  if (jaLigado) {
+    ctx.reaproveitados += 1;
+  } else {
+    const res = await pedir(
+      ctx,
+      "POST",
+      "/v1/gestor/administracao/ligacoes",
+      rh,
+      {
+        userId: gestorUserId,
+        colaboradorId: colaboradorDoGestor.colaboradorId,
+        vigenciaInicio: "2026-01-05",
+      },
+    );
+    if (!res.ok) {
+      throw new Error(
+        `Falha ao ligar a conta do gestor ao colaborador: a API respondeu ${res.status}.`,
+      );
+    }
+    ctx.criados += 1;
+  }
+
+  // 4. atribuição da equipe
+  const atribuicoes = await ler<
+    { equipeId: string; papel: string; vigenciaFim: string | null }[]
+  >(ctx, "/v1/gestor/administracao/atribuicoes", rh);
+  const jaAtribuido = atribuicoes.some(
+    (a) =>
+      a.equipeId === alvo.equipeId &&
+      a.papel === "principal" &&
+      a.vigenciaFim === null,
+  );
+  if (jaAtribuido) {
+    ctx.reaproveitados += 1;
+    return;
+  }
+
+  const res = await pedir(
+    ctx,
+    "POST",
+    "/v1/gestor/administracao/atribuicoes",
+    rh,
+    {
+      equipeId: alvo.equipeId,
+      gestorColaboradorId: colaboradorDoGestor.colaboradorId,
+      papel: "principal",
+      vigenciaInicio: "2026-01-05",
+    },
+  );
+  if (!res.ok) {
+    throw new Error(
+      `Falha ao atribuir a equipe ao gestor: a API respondeu ${res.status}.`,
+    );
+  }
+  ctx.criados += 1;
+}
+
+/** Resolve `colaboradorId` a partir de uma matrícula sintética. */
+async function colaboradorPorMatricula(
+  ctx: Contexto,
+  rh: Sessao,
+  matricula: string,
+): Promise<{ colaboradorId: string; vinculoId: string } | null> {
+  const colaboradores = await ler<{ itens: ColaboradorApi[] }>(
+    ctx,
+    "/v1/colaboradores?tamanhoPagina=100",
+    rh,
+  );
+  for (const colaborador of colaboradores.itens ?? []) {
+    const vinculos = await ler<VinculoApi[]>(
+      ctx,
+      `/v1/colaboradores/${colaborador.id}/vinculos`,
+      rh,
+    );
+    const alvo = vinculos.find((v) => v.matricula === matricula);
+    if (alvo) {
+      return { colaboradorId: colaborador.id, vinculoId: alvo.id };
+    }
+  }
+  return null;
+}
+
+/**
  * Popula um banco LOCAL com dados sintéticos e devolve o resumo.
  *
  * @param baseUrl origem da API já em execução (ex.: `http://127.0.0.1:3000`).
@@ -610,11 +754,17 @@ export async function semearDemonstracao(
     });
     // A equipe pendura no DEPARTAMENTO (a área é irmã, não pai) e a empresa é
     // derivada dele — o cliente nunca informa `empresaId` aqui.
-    await garantirCatalogo(ctx, rhAlfa, "/v1/equipes", "TURNOA", {
-      departamentoId: operacoes.id,
-      codigo: "TURNOA",
-      nome: `Turno A ${MARCA_DEMO}`,
-    });
+    const turnoA = await garantirCatalogo(
+      ctx,
+      rhAlfa,
+      "/v1/equipes",
+      "TURNOA",
+      {
+        departamentoId: operacoes.id,
+        codigo: "TURNOA",
+        nome: `Turno A ${MARCA_DEMO}`,
+      },
+    );
     const analista = await garantirCatalogo(
       ctx,
       rhAlfa,
@@ -744,6 +894,19 @@ export async function semearDemonstracao(
       registroBeta.id,
       "DEMO-B-0001",
     );
+
+    // --- Gestor consultivo (T151, ADR 0015) -------------------------------
+    // Sem isto, `gestor.alfa` continua logando e vendo lista vazia — que e o
+    // comportamento CORRETO de um gestor sem atribuicao, mas nao demonstra a
+    // capacidade. O conjunto abaixo monta o cenario minimo que a prova exige:
+    // alguem DENTRO da equipe, alguem FORA dela e uma segunda empresa como
+    // contraprova de isolamento.
+    await garantirEscopoDeGestor(ctx, rhAlfa, master, {
+      gestorEmail: `gestor.alfa@${DOMINIO}`,
+      gestorMatricula: "DEMO-A-0001",
+      equipeId: turnoA.id,
+      matriculaNaEquipe: "DEMO-A-0002",
+    });
 
     // --- Resumo -----------------------------------------------------------
     // Conta só o conjunto SINTÉTICO, varrendo todas as páginas: o número não

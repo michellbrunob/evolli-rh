@@ -910,8 +910,11 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       ponto, autenticação, auditoria, RBAC e qualquer decisão do pacote da T148 — nenhum tocado.
 
 47. **T150 - Gestor consultivo: investigação do escopo e pacote de decisão (`DP-8`)**
-    - **Estado:** em revisão. Branch `codex/t150-gestor-consultivo`, a partir do squash
+    - **Estado:** **Integrada** (PR #141, squash `ba80157`). Branch
+      `codex/t150-gestor-consultivo`, a partir do squash
       `078fde5702a6a776d1f9b87e834d96fff4f6a8ba` (T149, PR #140).
+    - **Desfecho:** o pacote foi **APROVADO** pelo proprietário em 06/10/2026 e formalizado na
+      ADR 0015 pela T151.
     - **Regra de implementação:** só há código se já existir contrato **seguro e inequívoco** para
       determinar a equipe do gestor. É proibido derivar subordinação de cargo, nome, papel, e-mail,
       empresa inteira ou heurística de lotação. Sem o contrato, o resultado é **pacote de decisão**.
@@ -952,6 +955,37 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       pendentes da integração de ponto (pacote da T148).
     - **Fora de escopo:** nenhum endpoint, controller, model Prisma, migration, regra de RBAC, ação
       de auditoria, alteração de seed ou tela; nenhuma negação vigente afrouxada.
+
+48. **T151 - Formalização e fundação segura do Gestor consultivo (ADR 0015)**
+    - **Estado:** em revisão. Branch `codex/t151-fundacao-gestor-consultivo`, a partir do squash
+      `ba8015763188e575c97bd2bb088765ac5cd38ae8` (T150, PR #141).
+    - **Decisão aprovada, literalmente (06/10/2026):** _"Aprovo as recomendações 1 a 9 para o
+      escopo do gestor e DP-23"_. Formalizada na
+      [ADR 0015](../docs/adr/0015-escopo-do-gestor-consultivo-e-vinculo-conta-colaborador.md).
+    - **`DP-8` e `DP-23` RESOLVIDAS** — e somente no recorte aprovado. Gestão matricial permanente,
+      departamento inteiro e empresa inteira **continuam não aprovados**.
+    - **Modelagem:** três tabelas (`access_user_colaborador`, `atribuicao_gestor_equipe`,
+      `excecao_acesso_gestor`) com as invariantes no **banco**: FK composta por empresa, EXCLUSION
+      CONSTRAINT sobre `daterange` (inclusive `(equipe, papel, período)`, que permite principal e
+      substituto sem admitir dois principais), índices parciais únicos como complemento para 409
+      estável, CHECK de intervalo e de justificativa não vazia, e CONSTRAINT TRIGGERS de duas portas
+      para o que atravessa tabelas. Provadas contra PostgreSQL real antes do código de aplicação.
+    - **RBAC:** dois recursos próprios — `gestor_atribuicao` (administração pelo RH; o gestor é
+      negado, pois quem define o escopo não pode ser quem é escopado por ele) e `gestor_equipe`
+      (consulta, somente `read`). Primeira capacidade concedida ao papel `gestor` no produto;
+      nenhuma negação anterior foi afrouxada, e há teste que prova isso recurso a recurso.
+    - **Escopo nunca cai para "tudo":** sessão → ligação conta-pessoa → atribuição vigente →
+      alocação vigente. Falha em qualquer passo produz **lista vazia**, com retorno antes da
+      consulta — o fallback para a empresa inteira é impossível por construção.
+    - **Fora desta entrega, por ausência de contrato seguro:** resumo de jornada (não existe como
+      dado nem rota; `DP-3J-12` pendente) e andamento de solicitações (`tipo`/`motivo` revelam
+      condição de saúde por inferência; `PD-SOL-05` só autoriza "informação operacional mínima",
+      não definida). Ambos para a **T152**.
+    - **Limites:** sem interface web, sem redesenho, sem integração de ponto, sem gestão matricial,
+      sem departamento ou empresa inteiros, sem folha/eSocial/benefícios/documentos.
+    - **Dívidas mantidas, não tratadas:** FK de `unit_id`/`team_id` (ADR 0003, nunca adicionada);
+      convergência de atributos do seed (`DEMO-A-0001`/`cargoId`); caixa baixa e zero-width no
+      verificador; decisões do pacote de integração de ponto (T148).
 
 ## Regra obrigatória para as próximas tarefas
 
