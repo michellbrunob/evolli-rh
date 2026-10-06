@@ -48,6 +48,12 @@ primeiro caderno de homologação de jornada e Banco de Horas.
 > para `main` é a mensagem inteira do commit de squash, que concatena os commits da branch — por
 > isso T032, T065 e T066 derrubaram a CI de `main` sem nada de errado no código. A regra não foi
 > alterada (T144): quem citar um identificador aqui não coberto nominalmente deve nomeá-lo antes.
+>
+> **Nota histórica — orientação superada pela T149.** O parágrafo acima descreve a regra que
+> vigorou até a T148 e a instrução que a T144 deixou. Ambas estão **obsoletas**: desde a T149 o
+> verificador fiscaliza a janela de entrega declarada em `sync-state.json`, e **citar um
+> identificador em prosa não exige mais nomeá-lo aqui**. O texto permanece por ser o registro
+> fiel do que se decidiu na época; não o siga como instrução. Ver a seção da T149.
 
 ## Execução integrada — T050 a T073
 
@@ -321,9 +327,9 @@ seis.
 
 ## Integração de registros de ponto — T148 (pacote de decisão entregue)
 
-| Tarefa | Estado                             | Resultado principal                                                                                                                                                                                                                                                                                                                                                      |
-| ------ | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| T148   | **Pacote de decisão — sem código** | Convergiu a T147 e avaliou a fundação para receber registros de ponto do sistema atual. A investigação confirmou que os contratos existentes não definem, sem invenção, chave de idempotência nem autenticação de ator não humano — por isso não há implementação: o resultado é um [pacote de decisão](../docs/decisions/pacote-decisao-integracao-registros-ponto.md). |
+| Tarefa | Estado                                    | Resultado principal                                                                                                                                                                                                                                                                                                                                                      |
+| ------ | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| T148   | **Integrada** (PR #139, squash `9521e32`) | Convergiu a T147 e avaliou a fundação para receber registros de ponto do sistema atual. A investigação confirmou que os contratos existentes não definem, sem invenção, chave de idempotência nem autenticação de ator não humano — por isso não há implementação: o resultado é um [pacote de decisão](../docs/decisions/pacote-decisao-integracao-registros-ponto.md). |
 
 **Por que não houve implementação.** A regra da tarefa exige que origem, formato, autenticação,
 idempotência, relação com empresa/colaborador/vínculo, duplicatas, preservação da marcação original,
@@ -338,6 +344,93 @@ A origem automatizada também segue proibida pela ADR 0008, decisão 4, até ADR
 **Limites explícitos:** a T148 não implementa folha, banco de horas, adicional noturno, DSR,
 fechamento, transmissão fiscal, REP-P, PAdES, AEJ nem integração externa real sem contrato e
 autorização próprios — nenhum desses limites foi tocado, porque nenhum código foi escrito.
+
+## Verificador do Spec Kit — T149 (hardening da regra de identificadores)
+
+| Tarefa | Estado         | Resultado principal                                                                                                                                                                                                                                             |
+| ------ | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T149   | **Em revisão** | Corrigiu na origem o falso positivo que derrubou a CI de `main` quatro vezes. A regra deixa de exigir registro literal de todo `T###` citado em prosa e passa a fiscalizar a janela de entrega declarada em `sync-state.json`. Primeiros testes do verificador. |
+
+**A decisão da T144 foi revertida, e isto é deliberado.** A T144 escolheu curar os identificadores
+já queimados e registrou três vezes — ledger:190, `tasks.md`:677 e `tasks.md`:712 — que **a regra do
+verificador não foi alterada**. Aquela escolha não segurou: duas referências históricas ao parser
+AFD, citadas em prosa, derrubaram a CI de `main` no push do squash `9521e32` (T148) — a quarta
+ocorrência, três integrações depois da advertência. A T149
+muda a regra, com autorização explícita do proprietário no enunciado da tarefa, porque o defeito
+estava no gerador e não nos identificadores.
+
+**Causa raiz, confirmada em execução e não só por leitura.** Dois defeitos estruturais somados:
+
+1. **Escopo.** `.github/workflows/ci.yml:34` define
+   `SPEC_KIT_CHANGE_CONTEXT: ${{ github.event.pull_request.title || github.event.head_commit.message }}`.
+   Em Pull Request isso é só o título; no push para `main` é a mensagem inteira do squash, que
+   concatena os commits da branch. Toda prosa explicativa virava exigência de registro — citar uma
+   tarefa antiga não é entregá-la. É por isso que a PR #139 passou 3/3 em `ea9cea6` e o mesmo
+   conteúdo reprovou em `9521e32`.
+2. **Busca.** A extração usava fronteira de palavra (`\b`), mas a verificação usava
+   `String.includes`, que é substring. Numa faixa `T104–T109` a string `T104` existe e passa,
+   `T105` não existe e reprova: **o extremo de uma faixa passava por acidente e o miolo nunca
+   passava**. Medido com `String.includes` sobre os artefatos da base `9521e32`, estado em que a
+   CI quebrou — e não sobre o head desta branch: **118 dos 149 identificadores reprovariam se
+   citados**.
+
+**A regra nova.** "Quais tarefas esta mudança entrega?" não é pergunta para texto livre — é o
+próprio Spec Kit que responde, em `sync-state.json`:
+
+- **Tarefas entregues** = a janela `(lastIntegratedTask, lastRecordedTask]`, lida e não inferida.
+  Todas continuam obrigatórias nos dois artefatos. Suporta mais de uma entrega aberta e não presume
+  que a de maior número seja a corrente.
+- **Identificadores citados** no contexto respondem a uma única pergunta: são futuros
+  (`> lastRecordedTask`)? Se sim, há trabalho citado e não registrado — reprova. Se não, são
+  referência histórica legítima, cujo registro já foi fiscalizado quando aquela tarefa era a
+  corrente.
+- **Cobertura** passa a expandir faixas (`T104–T109`, `T001 a T049`) e a casar por fronteira de
+  palavra — **mais estrito** que `includes`, não menos.
+- **Contexto ausente é fail-closed.** Em `workflow_dispatch` os dois lados do `||` são nulos, o
+  GitHub injeta `""`, e `??` não caía no fallback: o gate virava **no-op silencioso**. Fechado.
+
+**Por que não enfraquece o gate.** A tarefa efetivamente entregue continua obrigatória nos dois
+artefatos; citar tarefa futura continua reprovando; a busca ficou mais rígida. O que deixou de ser
+fiscalizado — menção narrativa a tarefa antiga — nunca foi sinal de entrega. Nenhuma lista de
+exceções e nenhum identificador tratado como caso especial: as duas referências históricas ao
+parser AFD **não** ganharam entrada autônoma neste ledger, nem whitelist, nem qualquer mecanismo
+de compatibilidade. Esta seção evita nomeá-las justamente para que o ledger não as registre como
+efeito colateral da própria explicação.
+
+**Prova.** `scripts/spec-kit-sync.core.test.mjs` reproduz literalmente a mensagem do squash
+`9521e32` e inclui o caso `1b`, que reimplementa a regra anterior e prova que ela reprovava as duas
+referências históricas no mesmo texto em que a regra nova passa — os identificadores aparecem lá,
+como fixture de regressão, que é o lugar certo para eles. Os testes 2, 3 e 3b provam que tarefa
+entregue ausente de um dos artefatos ainda reprova, nomeando o arquivo que falta.
+
+**Estado malformado é fail-closed.** A primeira versão desta tarefa fechou o no-op do contexto e
+abriu um equivalente no estado: sem validar `sync-state.json`, um `lastRecordedTask` ausente,
+`NaN`, `Infinity`, decimal ou string não numérica fazia `tarefasEntregues` devolver lista vazia e
+`numero > NaN` ser sempre falso — **os dois braços do gate desligavam**, e o verificador aprovava
+com os dois artefatos vazios. A regra anterior à T149 falhava fechado por acidente, ao procurar o
+literal `"Tundefined"`. `validarEstado` é a validação **única**, chamada pelo núcleo antes de
+calcular a janela e pelo CLI antes de ler artefato: exige os dois campos, inteiros seguros e não
+negativos, com `lastIntegratedTask <= lastRecordedTask`. A mensagem nomeia o campo e o tipo
+recusado, nunca o conteúdo nem um stack, e o CLI encerra com código não zero. No caminho, o CLI
+deixou de derrubar o processo diante de manifest ou artefato de governança ilegível — agora vira
+diagnóstico.
+
+**Limitações conhecidas, deliberadamente não tratadas:** identificador em caixa baixa (`t151`) e
+caracteres zero-width entre as letras escapam da detecção de tarefa futura. Valem igualmente para
+a regra anterior — nenhuma das duas é regressão desta tarefa.
+
+**Limites explícitos:** a T149 não toca código funcional de RH, banco, seed, Prisma, migrations,
+integração de ponto, autenticação, auditoria nem RBAC; não aprova nenhuma decisão do pacote da
+T148; e não reescreve nenhuma mensagem de commit já integrada.
+
+**Dívida registrada e não tratada aqui — convergência de atributos do seed.** O seed de
+demonstração é idempotente **por existência**: `garantirColaborador` confere se o registro já
+existe e, se existir, não aplica o payload declarado. Quando a T147 passou a enviar
+`cargoId: analista.id` para `DEMO-A-0001`, o registro já existia de uma execução anterior e o
+atributo nunca foi aplicado — a alocação vigente ficou sem cargo, silenciosamente divergente da
+intenção do seed atual. Caso conhecido: `DEMO-A-0001` e `cargoId`. Precisa de tarefa própria para
+decidir entre convergir atributos de registros preexistentes ou documentar a limitação; **não foi
+corrigida na T149**.
 
 ## Próxima ação autorizável
 

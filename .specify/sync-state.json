@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "constitutionVersion": "1.4.0",
   "lastConvergedAt": "2026-10-06",
-  "lastIntegratedTask": 147,
-  "lastRecordedTask": 148,
+  "lastIntegratedTask": 148,
+  "lastRecordedTask": 149,
   "platformDecision": {
     "adr": "docs/adr/0014-evolli-plataforma-base-e-encerramento-do-frappe.md",
     "decidedAt": "2026-10-01",
@@ -13,13 +13,13 @@
   "nextTask": {
     "id": "a definir",
     "status": "pending_decisao_pacote_integracao_ponto",
-    "reason": "T147 integrada em main (PR #138, squash 1d7531c), com a CI de main verde. A T148 convergiu esse resultado e investigou exaustivamente (sete eixos) a fundacao para o Evolli RECEBER registros de ponto do sistema em uso. A investigacao confirmou que o gate da propria tarefa reprova a implementacao: nao ha chave de idempotencia possivel sem inventa-la (unico @@unique de evento_ponto e (id, empresaId), inutil para deduplicar marcacao externa) e nao existe mecanismo de autenticacao para ator nao humano (registrado_por_user_id e obrigatorio e aponta para AccessUser humano; o CsrfGuard exige sessao). A origem automatizada segue proibida pela ADR 0008 decisao 4. Resultado: pacote de decisao em docs/decisions/pacote-decisao-integracao-registros-ponto.md, sem nenhum endpoint, schema, migration ou regra provisoria criados. A importacao AFD segue bloqueada pelas pendencias DP-3J-07, DP-3J-20, DP-3J-09, DP-3J-11 e DS-OPS-01, mais a lacuna inedita de identidade de ator nao humano, registrada pela primeira vez neste pacote. Proximo passo: levar o pacote a Produto/TI/RH/Juridico/DPO e a RWTech/Secullum; em paralelo, escolher uma fatia funcional independente da integracao de ponto."
+    "reason": "T148 integrada em main (PR #139, squash 9521e324188d8b1ef1a1ca3db662b889738aadc2), mas a CI de main ficou vermelha no passo Verificar sincronizacao do Spec Kit: T040 e T041, citados apenas em prosa na mensagem do squash, nao constam de execution-status.md. A T149 corrigiu o defeito na origem. Causa raiz dupla: (1) escopo, porque ci.yml:34 passa o titulo em Pull Request e a mensagem inteira do squash no push para main, entao prosa narrativa virava exigencia de registro; (2) busca, porque a extracao usava fronteira de palavra mas a verificacao usava String.includes, de modo que numa faixa T104 a T109 os extremos passavam por acidente e o miolo nunca passava (118 dos 149 identificadores reprovariam se citados). Esta foi a quarta ocorrencia: T065/T066 na T139, T066 na T140, T032 na T142, T040/T041 na T148. A T144 curou os tres primeiros nomeando-os no ledger e registrou tres vezes que a regra nao seria alterada; a T149 reverte essa decisao com autorizacao explicita do proprietario, porque o defeito esta no gerador e nao nos identificadores. Regra nova: tarefas entregues sao a janela aberta por lastIntegratedTask e fechada por lastRecordedTask, declarada aqui, lida e nao inferida de texto livre, e continuam obrigatorias nos dois artefatos; identificadores citados so reprovam quando sao futuros, acima de lastRecordedTask; a cobertura expande faixas e casa por fronteira de palavra, ficando mais estrita que includes; contexto ausente ou vazio e fail-closed, fechando o no-op silencioso do workflow_dispatch. Nenhuma whitelist: T040 e T041 nao foram adicionados ao ledger, e nenhuma mensagem de commit integrada foi reescrita. Primeiros testes do verificador em todo o projeto, em scripts/spec-kit-sync.core.test.mjs, incluindo a reproducao literal do squash 9521e32 e um caso que prova que a regra anterior reprovava o mesmo texto. Divida separada, nao tratada: o seed de demonstracao e idempotente por existencia e nao converge atributos declarados de registros sinteticos preexistentes (caso conhecido DEMO-A-0001 e cargoId). Proximo passo: levar o pacote da T148 a Produto/TI/RH/Juridico/DPO e a RWTech/Secullum; em paralelo, escolher uma fatia funcional independente da integracao de ponto."
   },
   "openDeliveries": [
     {
-      "id": "T148",
-      "pullRequest": null,
-      "status": "pacote_de_decisao_entregue_sem_codigo"
+      "id": "T149",
+      "pullRequest": 140,
+      "status": "hardening_do_verificador_em_revisao"
     }
   ],
   "requiredArtifacts": [

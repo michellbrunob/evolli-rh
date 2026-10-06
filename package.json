@@ -15,7 +15,7 @@
     "demo:up": "node scripts/demo-local.mjs",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test && pnpm run test:scripts",
-    "test:scripts": "node --test scripts/demo-local.core.test.mjs scripts/demo-local.buscarHttp.test.mjs scripts/demo-local.encerramento.test.mjs",
+    "test:scripts": "node --test scripts/demo-local.core.test.mjs scripts/demo-local.buscarHttp.test.mjs scripts/demo-local.encerramento.test.mjs scripts/spec-kit-sync.core.test.mjs",
     "format:check": "prettier --check ."
   },
   "devDependencies": {

@@ -1,21 +1,59 @@
+/**
+ * CLI do verificador de sincronia do Spec Kit.
+ *
+ * A decisão sobre tarefas entregues, identificadores citados e cobertura dos
+ * artefatos mora em `spec-kit-sync.core.mjs`, que é puro e tem testes. Aqui
+ * ficam só os efeitos: ler arquivos, consultar o git, imprimir e encerrar.
+ */
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 
+import {
+  avaliarSincronia,
+  resolverContexto,
+  validarEstado,
+} from "./spec-kit-sync.core.mjs";
+
 const failures = [];
 const read = (path) => readFileSync(path, "utf8");
+
+/**
+ * Lê um artefato de governança, registrando falha em vez de derrubar o
+ * processo. Um arquivo ausente deve virar diagnóstico, não stack trace.
+ */
+function lerOuVazio(path) {
+  try {
+    return read(path);
+  } catch {
+    failures.push(`Artefato de governança ilegível: ${path}`);
+    return "";
+  }
+}
 
 const statePath = ".specify/sync-state.json";
 if (!existsSync(statePath)) {
   failures.push(`${statePath} ausente.`);
 }
 
+// `lido` separa "não deu para ler/parsear" de "leu e veio null": sem essa
+// distinção, um arquivo contendo apenas `null` passaria pelo `if (state)` e
+// deixaria o gate inteiro sem executar.
 let state;
+let lido = false;
 try {
   state = JSON.parse(read(statePath));
-} catch (error) {
-  failures.push(`${statePath} inválido: ${error.message}`);
+  lido = true;
+} catch {
+  // A mensagem do parser pode ecoar trecho do arquivo; o log da CI é público.
+  failures.push(`${statePath} ausente ou não é JSON válido.`);
 }
+
+// Validação ÚNICA, a mesma que o núcleo aplica: o CLI não pode ter uma noção
+// própria de estado válido que divirja da usada para decidir.
+const falhasDeEstado = lido ? validarEstado(state) : [];
+failures.push(...falhasDeEstado);
+const estadoUtilizavel = lido && falhasDeEstado.length === 0;
 
 const durableFiles = [
   ".specify/memory/constitution.md",
@@ -52,7 +90,15 @@ for (const manifestPath of [
   ".specify/integrations/generic.manifest.json",
   ".specify/integrations/speckit.manifest.json",
 ]) {
-  const manifest = JSON.parse(read(manifestPath));
+  // Sem este try, um manifest ausente ou corrompido derrubava o processo com
+  // stack antes de qualquer falha ser impressa — ruído em vez de diagnóstico.
+  let manifest;
+  try {
+    manifest = JSON.parse(read(manifestPath));
+  } catch {
+    failures.push(`${manifestPath} ausente ou não é JSON válido.`);
+    continue;
+  }
   for (const [path, expectedHash] of Object.entries(manifest.files ?? {})) {
     if (!existsSync(path)) {
       failures.push(`Arquivo do manifest ausente: ${path}`);
@@ -71,7 +117,7 @@ for (const manifestPath of [
   }
 }
 
-if (state) {
+if (estadoUtilizavel) {
   const constitution = read(".specify/memory/constitution.md");
   const versionMatch = constitution.match(
     /\*\*Version\*\*:\s*([0-9]+\.[0-9]+\.[0-9]+)/,
@@ -82,19 +128,8 @@ if (state) {
     );
   }
 
-  if (state.lastRecordedTask < state.lastIntegratedTask) {
-    failures.push(
-      "lastRecordedTask não pode ser menor que lastIntegratedTask.",
-    );
-  }
-
-  const taskId = `T${String(state.lastRecordedTask).padStart(3, "0")}`;
   const tasks = read(".specify/tasks.md");
   const ledger = read(".specify/execution-status.md");
-  if (!tasks.includes(taskId))
-    failures.push(`${taskId} não aparece em tasks.md.`);
-  if (!ledger.includes(taskId))
-    failures.push(`${taskId} não aparece em execution-status.md.`);
 
   for (const artifact of state.requiredArtifacts ?? []) {
     if (!durableFiles.includes(artifact) || !existsSync(artifact)) {
@@ -104,30 +139,18 @@ if (state) {
     }
   }
 
-  const context =
-    process.env.SPEC_KIT_CHANGE_CONTEXT ??
-    execFileSync("git", ["log", "-1", "--pretty=%s"], {
-      encoding: "utf8",
-    }).trim();
-  const ids = [...context.matchAll(/\bT(\d{3})\b/g)].map((match) => ({
-    id: match[0],
-    number: Number(match[1]),
-  }));
+  const { contexto } = resolverContexto({
+    variavelDeAmbiente: process.env.SPEC_KIT_CHANGE_CONTEXT,
+    lerSubject: () =>
+      execFileSync("git", ["log", "-1", "--pretty=%s"], {
+        encoding: "utf8",
+      }),
+  });
 
-  for (const { id, number } of ids) {
-    if (number > state.lastRecordedTask) {
-      failures.push(
-        `${id} aparece na mudança, mas lastRecordedTask=${state.lastRecordedTask}.`,
-      );
-    }
-    if (!tasks.includes(id))
-      failures.push(`${id} aparece na mudança, mas não em tasks.md.`);
-    if (!ledger.includes(id))
-      failures.push(`${id} aparece na mudança, mas não no ledger.`);
-  }
+  failures.push(...avaliarSincronia({ state, tasks, ledger, contexto }));
 }
 
-const workflow = read(".specify/workflows/speckit/workflow.yml");
+const workflow = lerOuVazio(".specify/workflows/speckit/workflow.yml");
 if (!workflow.includes("command: speckit.converge")) {
   failures.push("Workflow do Spec Kit não executa speckit.converge.");
 }
@@ -136,7 +159,7 @@ const activeGovernance = [
   ".specify/memory/constitution.md",
   ".specify/spec.md",
   ".specify/plan.md",
-].map(read);
+].map(lerOuVazio);
 const obsoleteMfaStatements = [
   "MFA MUST be mandatory before any real HR data pilot or production use",
   "MFA é obrigatório antes de dados reais ou produção",
