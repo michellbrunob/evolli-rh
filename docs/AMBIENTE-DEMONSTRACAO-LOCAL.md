@@ -198,6 +198,19 @@ outro com **dois** —, que é exatamente a diferença que as telas tratam (um
 resolve sozinho; dois exigem escolha explícita). Na Beta, o mínimo para provar
 isolamento.
 
+**As admissões sintéticas vêm efetivadas (T147).** Admitir, por contrato, não
+ativa ninguém: o colaborador nasce `inativo`, o vínculo nasce `previsto` e a
+**alocação organizacional** — cargo e lotação vigentes — só existe depois de
+efetivar a movimentação de admissão. Enquanto o seed não efetivava, a
+demonstração abria com todo mundo inativo e com "Sem alocação registrada" em
+Dados contratuais: parecia defeito, e não era.
+
+O seed efetiva **um** vínculo por colaborador — o índice de vínculo ativo único
+recusaria o segundo. `DEMO-A-0003` fica deliberadamente em `previsto`: é ele
+que dá à demonstração um exemplo de vínculo ainda não efetivado ao lado de um
+já ativo do mesmo colaborador. `DEMO-A-0001` recebe cargo, para que "Cargo
+vigente" apareça preenchido em pelo menos um caso.
+
 **Não são criados:** conteúdo de documento, anexo, biometria, diagnóstico, CID,
 dado clínico, MFA, nem qualquer acesso a serviço externo ou R2.
 

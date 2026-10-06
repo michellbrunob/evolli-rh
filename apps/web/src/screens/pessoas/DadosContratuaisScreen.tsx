@@ -36,6 +36,7 @@ import {
   type TipoVinculo,
   type VinculoApi,
 } from "../../api/colaboradoresClient";
+import { formatarDia } from "../../format/dia";
 import {
   listarAlocacoesVinculo,
   type AlocacaoOrganizacionalApi,
@@ -112,10 +113,11 @@ const VARIANTE_STATUS_MOV: Record<StatusMovimentacao, StatusVariant> = {
   retificada: "neutral",
 };
 
-function formatarData(iso: string | null): string {
-  if (!iso) return "—";
-  return iso.slice(0, 10);
-}
+/**
+ * Mesma data, mesma forma nas três telas: aponta para o formatador
+ * compartilhado em vez de manter uma segunda definição que pode divergir.
+ */
+const formatarData = formatarDia;
 
 function formatarDataHora(iso: string): string {
   return iso.replace("T", " ").slice(0, 16);

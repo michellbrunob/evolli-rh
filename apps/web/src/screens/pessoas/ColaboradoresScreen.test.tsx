@@ -1,4 +1,5 @@
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -1281,5 +1282,310 @@ describe("ColaboradoresScreen (T111 — funcional)", () => {
     expect(chamadas[1]?.[0]).toEqual(
       expect.objectContaining({ matricula: "MAT-0401" }),
     );
+  });
+});
+
+// ---- T147: homologação da admissão — regressões provadas -----------------
+
+/**
+ * Promessa que o teste resolve na hora que quiser — é assim que se encena uma
+ * resposta que chega ATRASADA. Declarar o  com `!` evita o
+ * estreitamento para `never` que o TypeScript faz quando a variável só é
+ * atribuída dentro do callback do construtor.
+ */
+function adiado<T>(): { promessa: Promise<T>; resolver: (valor: T) => void } {
+  let resolver!: (valor: T) => void;
+  const promessa = new Promise<T>((resolve) => {
+    resolver = resolve;
+  });
+  return { promessa, resolver };
+}
+
+describe("ColaboradoresScreen (T147 — homologação da admissão)", () => {
+  /**
+   * D1. Trocar o filtro duas vezes dispara duas listagens. Se a PRIMEIRA
+   * resposta chegar depois da segunda, ela não pode sobrescrever a lista: o
+   * usuário veria registros que não correspondem ao filtro selecionado.
+   *
+   * Falha na implementação anterior: sem o contador de sequência,
+   * `setColaboradores` era aplicado por qualquer resposta que chegasse.
+   */
+  it("resposta obsoleta da lista não sobrescreve a resposta do filtro atual", async () => {
+    const atrasada = adiado<ResultadoPaginadoTeste<ColaboradorApi>>();
+
+    vi.mocked(listarColaboradores)
+      // 1ª: carga inicial, resolve normalmente.
+      .mockResolvedValueOnce(paginado([colaborador1, colaborador2]))
+      // 2ª: filtro "Ativo" — fica PENDENTE de propósito.
+      .mockImplementationOnce(() => atrasada.promessa)
+      // 3ª: filtro "Inativo" — resolve antes da anterior.
+      .mockResolvedValueOnce(paginado([colaborador2]));
+
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+
+    const filtro = screen.getByLabelText("Situação");
+    fireEvent.change(filtro, { target: { value: "ativo" } });
+    fireEvent.change(filtro, { target: { value: "inativo" } });
+
+    // A terceira chamada já respondeu: só Bruno está na tela.
+    await waitFor(() =>
+      expect(screen.queryByText("Ana Colaboradora (teste)")).toBeNull(),
+    );
+
+    // Agora a resposta ATRASADA do filtro "Ativo" chega, trazendo Ana.
+    atrasada.resolver(paginado([colaborador1]));
+
+    // Ela precisa ser descartada: a tela continua mostrando o filtro atual.
+    await waitFor(() =>
+      expect(screen.getByText("Bruno Colaborador (teste)")).toBeInTheDocument(),
+    );
+    expect(screen.queryByText("Ana Colaboradora (teste)")).toBeNull();
+  });
+
+  /**
+   * D2. Abrir o detalhe de A, fechar, abrir o de B e a resposta atrasada de A
+   * chegar depois: os vínculos de A não podem aparecer na ficha de B — é dado
+   * de uma pessoa exibido na ficha de outra.
+   *
+   * Falha na implementação anterior: `setDetalhe` escrevia em `prev` sem
+   * conferir de quem era a resposta.
+   */
+  it("vínculos de um colaborador não contaminam o detalhe de outro", async () => {
+    const vinculoDeBruno: VinculoApi = {
+      ...vinculo1,
+      id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+      colaboradorId: colaborador2.id,
+      matricula: "MAT-0002",
+    };
+
+    const deAna = adiado<VinculoApi[]>();
+    vi.mocked(listarVinculosDoColaborador).mockImplementation(
+      (colaboradorId: string) =>
+        colaboradorId === colaborador1.id
+          ? deAna.promessa
+          : Promise.resolve([vinculoDeBruno]),
+    );
+
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+
+    const linhaAna = screen
+      .getByText("Ana Colaboradora (teste)")
+      .closest("tr")!;
+    fireEvent.click(
+      within(linhaAna).getByRole("button", { name: /Ver detalhes/ }),
+    );
+    // Fecha o detalhe de Ana com a requisição dela ainda em voo.
+    fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
+
+    const linhaBruno = screen
+      .getByText("Bruno Colaborador (teste)")
+      .closest("tr")!;
+    fireEvent.click(
+      within(linhaBruno).getByRole("button", { name: /Ver detalhes/ }),
+    );
+
+    const tabela = await screen.findByRole("table", {
+      name: `Vínculos — ${colaborador2.nome}`,
+    });
+    expect(within(tabela).getByText("MAT-0002")).toBeInTheDocument();
+
+    // A resposta atrasada de Ana chega AGORA, com o detalhe de Bruno aberto.
+    deAna.resolver([vinculo1]);
+
+    await waitFor(() =>
+      expect(within(tabela).getByText("MAT-0002")).toBeInTheDocument(),
+    );
+    // A matrícula de Ana não pode ter entrado na ficha de Bruno.
+    expect(within(tabela).queryByText("MAT-0001")).toBeNull();
+  });
+
+  /**
+   * D3. `disabled` depende de um `setState`, que só chega no próximo render:
+   * dois cliques no mesmo quadro escapam dele. A admissão já tinha trava
+   * síncrona; salvar o nome no detalhe, não.
+   *
+   * Falha na implementação anterior: dois PATCH para um duplo clique.
+   */
+  it("duplo clique em salvar nome dispara uma única requisição", async () => {
+    const patch = adiado<ColaboradorApi>();
+    vi.mocked(retificarColaborador).mockImplementation(() => patch.promessa);
+
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+
+    const linha = screen.getByText("Ana Colaboradora (teste)").closest("tr")!;
+    fireEvent.click(
+      within(linha).getByRole("button", { name: /Ver detalhes/ }),
+    );
+    await screen.findByRole("table", {
+      name: `Vínculos — ${colaborador1.nome}`,
+    });
+
+    fireEvent.change(screen.getByLabelText("Nome"), {
+      target: { value: "Ana Corrigida (teste)" },
+    });
+
+    // Os mocks não são limpos entre os testes deste arquivo: conta a partir
+    // daqui, como já faz o teste de envio duplicado da admissão.
+    const antes = vi.mocked(retificarColaborador).mock.calls.length;
+    const salvar = screen.getByRole("button", { name: "Salvar nome" });
+
+    // Os três cliques acontecem dentro do MESMO `act`, sem render entre eles —
+    // é o que um duplo clique real faz. Com `fireEvent.click` o React
+    // re-renderiza a cada evento, o botão já volta `disabled` e a corrida nunca
+    // chega a existir: o teste mediria o `disabled`, não a trava síncrona.
+    await act(async () => {
+      salvar.click();
+      salvar.click();
+      salvar.click();
+    });
+
+    expect(
+      vi.mocked(retificarColaborador).mock.calls.slice(antes),
+    ).toHaveLength(1);
+    patch.resolver({ ...colaborador1, nome: "Ana Corrigida (teste)" });
+  });
+
+  /**
+   * D5. A admissão nasce com colaborador `inativo` e vínculo `previsto`. Com o
+   * filtro em "Ativo", o recém-admitido NÃO volta no refetch — e a confirmação
+   * antiga afirmava, incondicionalmente, que ele já aparecia na lista.
+   *
+   * Falha na implementação anterior: a frase "já aparece na lista abaixo" era
+   * exibida mesmo quando o filtro o escondia.
+   */
+  it("a confirmação não afirma visibilidade quando o filtro esconde o admitido", async () => {
+    vi.mocked(admitirColaborador).mockResolvedValue({
+      ...colaborador1,
+      id: "cccccccc-cccc-cccc-cccc-cccccccccccc",
+      nome: "Recem Admitido (teste)",
+      situacao: "inativo",
+    });
+
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+
+    fireEvent.change(screen.getByLabelText("Situação"), {
+      target: { value: "ativo" },
+    });
+    await waitFor(() =>
+      expect(vi.mocked(listarColaboradores).mock.calls.length).toBeGreaterThan(
+        1,
+      ),
+    );
+
+    await abrirFormularioEAguardarOpcoes();
+    fireEvent.change(screen.getByLabelText(/Nome completo/i), {
+      target: { value: "Recem Admitido (teste)" },
+    });
+    fireEvent.change(screen.getByLabelText(/Matrícula/i), {
+      target: { value: "MAT-0777" },
+    });
+    fireEvent.change(screen.getByLabelText(/Tipo de vínculo/i), {
+      target: { value: "clt" },
+    });
+    fireEvent.change(screen.getByLabelText(/Data de admissão/i), {
+      target: { value: "2026-01-05" },
+    });
+    fireEvent.change(
+      screen.getByLabelText(/Tipo de referência organizacional/i),
+      { target: { value: "departamento" } },
+    );
+    fireEvent.change(
+      screen.getByLabelText(/Registro da referência organizacional/i),
+      { target: { value: departamento1.id } },
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Admitir colaborador" }),
+    );
+
+    await waitFor(() => expect(admitirColaborador).toHaveBeenCalled());
+    const confirmacao = await screen.findByText(/admitido/i);
+    expect(confirmacao.textContent).toMatch(/não aparece na lista/i);
+    expect(confirmacao.textContent).not.toMatch(/já aparece na lista/i);
+  });
+
+  /**
+   * D6. Todo `onChange` fazia `erros: {}`. Como a mensagem do servidor vive em
+   * `geral`, começar a corrigir apagava a explicação do que deu errado — no
+   * momento exato em que ela é necessária.
+   *
+   * Falha na implementação anterior: um caractere digitado sumia com o texto.
+   */
+  it("corrigir um campo preserva a mensagem de erro devolvida pelo servidor", async () => {
+    vi.mocked(admitirColaborador).mockRejectedValueOnce(
+      new Error("Conflito ao processar a requisição."),
+    );
+
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+    await abrirFormularioEAguardarOpcoes();
+
+    fireEvent.change(screen.getByLabelText(/Nome completo/i), {
+      target: { value: "Nome Teste (teste)" },
+    });
+    fireEvent.change(screen.getByLabelText(/Matrícula/i), {
+      target: { value: "MAT-0500" },
+    });
+    fireEvent.change(screen.getByLabelText(/Tipo de vínculo/i), {
+      target: { value: "clt" },
+    });
+    fireEvent.change(screen.getByLabelText(/Data de admissão/i), {
+      target: { value: "2026-01-05" },
+    });
+    fireEvent.change(
+      screen.getByLabelText(/Tipo de referência organizacional/i),
+      { target: { value: "departamento" } },
+    );
+    fireEvent.change(
+      screen.getByLabelText(/Registro da referência organizacional/i),
+      { target: { value: departamento1.id } },
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Admitir colaborador" }),
+    );
+
+    const erro = await screen.findByText(/Conflito ao processar a requisição/i);
+    expect(erro).toBeInTheDocument();
+
+    // Corrige a matrícula — o motivo da recusa precisa continuar legível.
+    fireEvent.change(screen.getByLabelText(/Matrícula/i), {
+      target: { value: "MAT-0501" },
+    });
+
+    expect(
+      screen.getByText(/Conflito ao processar a requisição/i),
+    ).toBeInTheDocument();
+  });
+
+  /**
+   * D4. `dataAdmissao` é coluna `@db.Date`, mas o Prisma a devolve como `Date`:
+   * chega ao navegador como datetime ISO completo. Dados contratuais
+   * normalizava; Colaboradores e Histórico funcional exibiam cru — a mesma
+   * admissão aparecia em formatos diferentes em telas diferentes.
+   *
+   * Falha na implementação anterior: a célula mostrava
+   * "2026-01-05T00:00:00.000Z".
+   */
+  it("exibe a data de admissão como dia, no formato do servidor real", async () => {
+    vi.mocked(listarVinculosDoColaborador).mockResolvedValue([
+      { ...vinculo1, dataAdmissao: "2026-01-05T00:00:00.000Z" },
+    ]);
+
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+
+    const linha = screen.getByText("Ana Colaboradora (teste)").closest("tr")!;
+    fireEvent.click(
+      within(linha).getByRole("button", { name: /Ver detalhes/ }),
+    );
+
+    const tabela = await screen.findByRole("table", {
+      name: `Vínculos — ${colaborador1.nome}`,
+    });
+    expect(within(tabela).getByText("2026-01-05")).toBeInTheDocument();
+    expect(within(tabela).queryByText("2026-01-05T00:00:00.000Z")).toBeNull();
   });
 });

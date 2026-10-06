@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "constitutionVersion": "1.4.0",
   "lastConvergedAt": "2026-10-02",
-  "lastIntegratedTask": 145,
-  "lastRecordedTask": 146,
+  "lastIntegratedTask": 146,
+  "lastRecordedTask": 147,
   "platformDecision": {
     "adr": "docs/adr/0014-evolli-plataforma-base-e-encerramento-do-frappe.md",
     "decidedAt": "2026-10-01",
@@ -11,15 +11,15 @@
     "frappe": "encerrado_como_candidato_referencia_apenas"
   },
   "nextTask": {
-    "id": "a definir",
-    "status": "pending_revisao_final_t146",
-    "reason": "T145 integrada em main (PR #136, squash bbb7942). A T146 organiza a arquitetura modular do ecossistema e entrega um prototipo navegavel do shell, isolado em docs/prototipos/t146/ — somente documentacao e prototipo estatico, nunca capacidade funcional. O proprietario aprovou a evolucao visual e congelou a fundacao (shell, tokens, padrao B, sidebar e modais): so correcao necessaria de usabilidade, acessibilidade, responsividade ou bloqueio operacional pode altera-la antes do acabamento final. Prioridade passa a ser entregar modulos funcionais, testados e homologaveis com dados sinteticos. Proximo passo: revisao final da PR #137 e, apos a integracao, iniciar o modulo funcional prioritario."
+    "id": "T147",
+    "status": "em_execucao_homologacao_admissao",
+    "reason": "T146 integrada em main (PR #137, squash 2e55837), com a CI de main verde; a fundacao visual foi aprovada e congelada pelo proprietario antes da integracao. A T147 abre a primeira fatia funcional depois desse congelamento: homologar a admissao (colaborador, vinculo e referencia organizacional inicial) de ponta a ponta, com dado sintetico, provando coerencia em Colaboradores, Dados contratuais e Historico funcional. Ela endurece contratos que ja existem — nao inventa capacidade nova e nao amplia o redesenho visual. Uma investigacao anterior de importacao de marcacoes de ponto parou no gate tecnico sem gerar branch, commit ou alteracao de Spec Kit: nao e entrega e nao ocupa o identificador; a importacao AFD segue bloqueada pela ADR 0008 (decisao 4) e pelas pendencias DP-3J-07, DP-3J-20, DP-3J-09, DP-3J-11 e DS-OPS-01."
   },
   "openDeliveries": [
     {
-      "id": "T146",
-      "pullRequest": 137,
-      "status": "draft_fundacao_visual_aprovada_congelada"
+      "id": "T147",
+      "pullRequest": null,
+      "status": "em_execucao_homologacao_admissao"
     }
   ],
   "requiredArtifacts": [
