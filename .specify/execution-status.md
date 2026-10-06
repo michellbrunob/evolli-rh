@@ -292,11 +292,11 @@ visual final ficam para uma etapa posterior. A prioridade passa a ser entregar *
 funcionais, testados e homologáveis com dados sintéticos**. A aprovação foi visual; a integração
 veio depois, pela PR #137 (squash `2e55837`), com a CI de `main` verde.
 
-## Homologação funcional da Admissão — T147 (em execução)
+## Homologação funcional da Admissão — T147 (integrada)
 
-| Tarefa | Estado          | Resultado principal                                                                                                                                                                                                                                         |
-| ------ | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| T147   | **Em execução** | Primeira fatia funcional depois do congelamento da fundação visual: homologar a **admissão** (colaborador, vínculo e referência organizacional inicial) de ponta a ponta, com prova de coerência em Colaboradores, Dados contratuais e Histórico funcional. |
+| Tarefa | Estado                                    | Resultado principal                                                                                                                                                                                                                                         |
+| ------ | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T147   | **Integrada** (PR #138, squash `1d7531c`) | Primeira fatia funcional depois do congelamento da fundação visual: homologou a **admissão** (colaborador, vínculo e referência organizacional inicial) de ponta a ponta, com prova de coerência em Colaboradores, Dados contratuais e Histórico funcional. |
 
 **O que a tarefa é.** A T147 não inventa capacidade: ela **endurece e homologa** o fluxo de
 admissão sobre os contratos que já existem em `apps/api` e nas telas funcionais de `apps/web`.
@@ -313,17 +313,45 @@ alteração de Spec Kit. Ela não é entrega e não ocupa o identificador: a imp
 bloqueada pela ADR 0008 (decisão 4 — origem única manual) e pelas pendências `DP-3J-07`,
 `DP-3J-20`, `DP-3J-09`, `DP-3J-11` e `DS-OPS-01`.
 
+**Ressalvas registradas na revisão final, não tratadas na T147:** o banco local de demonstração
+ainda refletia o seed anterior (a efetivação só aparece depois de reexecutar `seed:demo`); o
+`POST /v1/colaboradores` devolve apenas o colaborador, exigindo dois GETs para alcançar vínculo e
+movimentação; e o formulário admite por **uma** referência organizacional, embora a API aceite as
+seis.
+
+## Integração de registros de ponto — T148 (pacote de decisão entregue)
+
+| Tarefa | Estado                             | Resultado principal                                                                                                                                                                                                                                                                                                                                                      |
+| ------ | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| T148   | **Pacote de decisão — sem código** | Convergiu a T147 e avaliou a fundação para receber registros de ponto do sistema atual. A investigação confirmou que os contratos existentes não definem, sem invenção, chave de idempotência nem autenticação de ator não humano — por isso não há implementação: o resultado é um [pacote de decisão](../docs/decisions/pacote-decisao-integracao-registros-ponto.md). |
+
+**Por que não houve implementação.** A regra da tarefa exige que origem, formato, autenticação,
+idempotência, relação com empresa/colaborador/vínculo, duplicatas, preservação da marcação original,
+auditoria e resposta a erro estejam definidos nos contratos existentes, sem invenção. Dois pontos
+fecham o caminho de código, confirmados em código e documento: (1) o único `@@unique` de
+`evento_ponto` é `(id, empresaId)` — não serve para deduplicar marcação externa, e o contrato do
+lote AFD (T042 §7) proíbe inferir a chave natural; (2) não existe, em nenhuma rota do produto,
+mecanismo de autenticação para um ator não humano — `evento_ponto.registrado_por_user_id` é
+obrigatório e aponta para `AccessUser` humano, e o `CsrfGuard` exige sessão para emitir o token.
+A origem automatizada também segue proibida pela ADR 0008, decisão 4, até ADR nova ou emenda formal.
+
+**Limites explícitos:** a T148 não implementa folha, banco de horas, adicional noturno, DSR,
+fechamento, transmissão fiscal, REP-P, PAdES, AEJ nem integração externa real sem contrato e
+autorização próprios — nenhum desses limites foi tocado, porque nenhum código foi escrito.
+
 ## Próxima ação autorizável
 
-1. **Concluir a T147** — homologação funcional da admissão, com PR Draft e CI verde.
-2. Após a revisão e a integração da T147, **escolher a próxima fatia funcional**, sob o próximo
-   identificador disponível — sem número reservado aqui, porque reservar identificador antes da
-   decisão de escopo já se mostrou fonte de confusão (ver T137). A implementação usa a fundação
+1. **Decidir o pacote da T148** — levar `docs/decisions/pacote-decisao-integracao-registros-ponto.md`
+   a Produto, TI, RH, Jurídico/DPO e, quanto às perguntas ao fornecedor, à RWTech/Secullum. Nenhuma
+   implementação de integração de ponto começa antes de §2–§6 desse pacote serem decididos e de a
+   ADR 0008 (decisão 4) ser reaberta por ADR nova ou emenda formal.
+2. Em paralelo, **escolher a próxima fatia funcional independente da integração de ponto**, sob o
+   próximo identificador disponível — sem número reservado aqui, porque reservar identificador antes
+   da decisão de escopo já se mostrou fonte de confusão (ver T137). A implementação usa a fundação
    visual já congelada, sem reabrir o shell, os tokens, o padrão B ou os modais.
-3. Candidatos naturais do módulo prioritário, todos dependentes de decisão própria: capacidade de
-   RBAC para o gestor consultivo; `DP-23` como pré-condição de qualquer autoatendimento do
-   colaborador; e a validação com RH do catálogo de motivos, cujo mecanismo (código fechado) já
-   está aprovado.
+3. Candidatos naturais, todos dependentes de decisão própria: capacidade de RBAC para o gestor
+   consultivo; `DP-23` como pré-condição de qualquer autoatendimento do colaborador; e a validação
+   com RH do catálogo de motivos, cujo mecanismo (código fechado) já está aprovado.
 4. Refinamento estético e acabamento visual final da fundação ficam para uma etapa posterior,
    depois dos módulos funcionais.
 5. Atualizar este ledger e `sync-state.json` em toda tarefa futura.
