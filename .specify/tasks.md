@@ -851,11 +851,13 @@ decisões e bloqueios, está no ledger versionado
       nenhum foi tocado, porque nenhum código foi escrito.
 
 46. **T149 - Correção do falso positivo do verificador do Spec Kit e convergência da T148**
-    - **Estado:** em revisão. Branch `codex/t149-hardening-spec-check`, a partir do squash
+    - **Estado:** **Integrada** (PR #140, squash `078fde5`). Branch
+      `codex/t149-hardening-spec-check`, a partir do squash
       `9521e324188d8b1ef1a1ca3db662b889738aadc2` (T148, PR #139).
     - **Pré-condição:** a T148 entrou em `main` pela PR #139, mas a CI de `main` ficou vermelha no
-      passo _Verificar sincronização do Spec Kit_ — `T040` e `T041`, citados em prosa na mensagem
-      do squash, não constam de `execution-status.md`. Os outros dois jobs passaram.
+      passo _Verificar sincronização do Spec Kit_ — duas referências históricas ao parser AFD,
+      citadas em prosa na mensagem do squash, não constavam de `execution-status.md`. Os outros
+      dois jobs passaram.
     - **Causa raiz:** dois defeitos somados em `scripts/check-spec-kit-sync.mjs`. (1) **Escopo** —
       `ci.yml:34` passa o título em Pull Request e a **mensagem inteira do squash** no push para
       `main`, então prosa narrativa virava exigência de registro; é por isso que a PR passou 3/3 e
@@ -906,6 +908,44 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       própria.
     - **Fora de escopo:** código funcional de RH, banco, seed, Prisma, migrations, integração de
       ponto, autenticação, auditoria, RBAC e qualquer decisão do pacote da T148 — nenhum tocado.
+
+47. **T150 - Gestor consultivo: investigação do escopo e pacote de decisão (`DP-8`)**
+    - **Estado:** em revisão. Branch `codex/t150-gestor-consultivo`, a partir do squash
+      `078fde5702a6a776d1f9b87e834d96fff4f6a8ba` (T149, PR #140).
+    - **Regra de implementação:** só há código se já existir contrato **seguro e inequívoco** para
+      determinar a equipe do gestor. É proibido derivar subordinação de cargo, nome, papel, e-mail,
+      empresa inteira ou heurística de lotação. Sem o contrato, o resultado é **pacote de decisão**.
+    - **Resultado: o gate reprovou.** Faltam três elos independentes, cada um ausente por decisão
+      registrada: (1) nenhuma relação gestor/subordinado existe, nem estruturalmente — ADR 0006
+      decisão 8, reafirmada nas ADRs 0007, 0008 e 0010 e em dois comentários do schema, com zero
+      campos de liderança em todo o modelo e em todas as migrations; (2) nenhum vínculo
+      `AccessUser` ↔ `Colaborador` (`DP-23`), de modo que o sistema não sabe qual pessoa é o gestor
+      autenticado; (3) estrutura organizacional **não é fronteira de autorização** — `empresaId` é a
+      única, e a ADR 0006 antecipou literalmente este caso, exigindo ADR nova ou emenda formal com
+      migration própria.
+    - **O código já recusava pelo mesmo motivo:** o avaliador RBAC nega o `gestor` em seis ramos,
+      nominalmente, e **dezoito testes provam a negação** — um deles em um `describe` chamado
+      `"gestor: negado enquanto DP-8 nao for decidida"`.
+    - **Campo que parece resolver e não resolve:** `AccessUser.unit_id`/`team_id` são `TEXT` sem FK,
+      aceitos por `@IsString()` sem validação contra a empresa, ausentes do `AuthorizationSubject`
+      e sem semântica definida. Usá-los seria inventar a relação e abrir vazamento entre empresas.
+    - **Fato novo registrado:** a ADR 0006 condicionou responder `P8.2` a _"quando a entidade
+      colaborador existir"_. **A pré-condição foi satisfeita** pelas T104–T117 e T147 — `DP-8` não
+      está mais bloqueada por ausência de modelo, só por decisão de negócio.
+    - **Entrega:** [`docs/decisions/pacote-decisao-escopo-do-gestor.md`](../docs/decisions/pacote-decisao-escopo-do-gestor.md),
+      reusando `DP-8` e `P8.2` em vez de criar identificadores novos — opções de modelagem,
+      recomendação marcada como não aprovada, perguntas para RH/Produto, impacto sobre schema,
+      RBAC, auditoria, seed e interface, e critérios de aceite de uma tarefa futura.
+    - **Convergência:** T149 registrada como **Integrada** (PR #140, squash `078fde5`), com a CI de
+      `main` 3/3 verde no primeiro push de squash depois da correção do verificador.
+    - **Limpeza factual:** corrigido o resíduo editorial da entrada 46, que afirmava evitar os
+      identificadores históricos do parser AFD enquanto ainda os nomeava. A regra do verificador
+      **não** foi alterada.
+    - **Mantidas registradas, não corrigidas aqui:** dívida de convergência do seed
+      (`DEMO-A-0001`/`cargoId`); limitações de caixa baixa e zero-width no verificador; decisões
+      pendentes da integração de ponto (pacote da T148).
+    - **Fora de escopo:** nenhum endpoint, controller, model Prisma, migration, regra de RBAC, ação
+      de auditoria, alteração de seed ou tela; nenhuma negação vigente afrouxada.
 
 ## Regra obrigatória para as próximas tarefas
 

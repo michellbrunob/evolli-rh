@@ -347,9 +347,14 @@ autorização próprios — nenhum desses limites foi tocado, porque nenhum cód
 
 ## Verificador do Spec Kit — T149 (hardening da regra de identificadores)
 
-| Tarefa | Estado         | Resultado principal                                                                                                                                                                                                                                             |
-| ------ | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| T149   | **Em revisão** | Corrigiu na origem o falso positivo que derrubou a CI de `main` quatro vezes. A regra deixa de exigir registro literal de todo `T###` citado em prosa e passa a fiscalizar a janela de entrega declarada em `sync-state.json`. Primeiros testes do verificador. |
+| Tarefa | Estado                                    | Resultado principal                                                                                                                                                                                                                                             |
+| ------ | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T149   | **Integrada** (PR #140, squash `078fde5`) | Corrigiu na origem o falso positivo que derrubou a CI de `main` quatro vezes. A regra deixa de exigir registro literal de todo `T###` citado em prosa e passa a fiscalizar a janela de entrega declarada em `sync-state.json`. Primeiros testes do verificador. |
+
+**Prova em produção.** O próprio squash `078fde5` cita em prosa narrativa os identificadores que
+derrubavam a CI — as duas referências ao parser AFD, além de T032, T065 e T066 — e a CI de `main`
+passou **3/3** (run `37483858437`), com `pnpm spec:check` imprimindo _"Spec Kit sincronizado"_. O
+primeiro push real de squash depois da correção é também a demonstração de que ela funciona.
 
 **A decisão da T144 foi revertida, e isto é deliberado.** A T144 escolheu curar os identificadores
 já queimados e registrou três vezes — ledger:190, `tasks.md`:677 e `tasks.md`:712 — que **a regra do
@@ -432,22 +437,71 @@ intenção do seed atual. Caso conhecido: `DEMO-A-0001` e `cargoId`. Precisa de 
 decidir entre convergir atributos de registros preexistentes ou documentar a limitação; **não foi
 corrigida na T149**.
 
+## Gestor consultivo — T150 (pacote de decisão entregue)
+
+| Tarefa | Estado                             | Resultado principal                                                                                                                                                                                                                                                                                  |
+| ------ | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T150   | **Pacote de decisão — sem código** | Convergiu a T149 e avaliou a fundação para um Portal da Liderança somente leitura. O gate da própria tarefa reprovou a implementação: não existe contrato que determine a equipe de um gestor. Resultado: [pacote de decisão](../docs/decisions/pacote-decisao-escopo-do-gestor.md) reusando `DP-8`. |
+
+**Por que não houve implementação.** A tarefa condiciona o código a já existir contrato seguro e
+inequívoco para determinar a equipe do gestor, e proíbe derivá-la de cargo, nome, papel, e-mail,
+empresa inteira ou heurística de lotação. Faltam **três elos independentes**, e a ausência de cada
+um é decisão registrada, não lacuna:
+
+1. **Nenhuma relação gestor/subordinado existe, nem estruturalmente** — ADR 0006, decisão 8,
+   reafirmada nas ADRs 0007, 0008 e 0010 e em dois comentários do próprio schema
+   (`schema.prisma:515` e `:765`). Varredura por `gestorId`, `responsavelId`, `liderId`,
+   `managerId`, `supervisorId`, `chefeId`, `reportaA` e `parentId` em todo o schema e em todas as
+   migrations: **zero campos**.
+2. **Nenhum vínculo entre conta e pessoa** — `DP-23`, descrito no schema como "deliberadamente nao
+   materializado". O sistema não sabe qual colaborador é o gestor autenticado.
+3. **Estrutura não é fronteira de autorização** — `escopo.util.ts:8-9`: `empresaId` é a única
+   fronteira. A ADR 0006 antecipou literalmente este caso e determinou que transformar departamento
+   ou área em fronteira exige **ADR nova ou emenda formal, com migration própria**.
+
+**O código já recusava, pelo mesmo motivo.** O avaliador RBAC nega o `gestor` em seis ramos,
+nominalmente, registrando que "conceder exigiria escolher a fronteira (equipe? departamento?
+direto ou indireto?) por conta própria". **Dezoito testes provam a negação**, entre eles um
+`describe` chamado `"gestor: negado enquanto DP-8 nao for decidida"`. Implementar exigiria reverter
+testes escritos de propósito para impedir exatamente isso.
+
+**O campo que parece resolver e não resolve.** `AccessUser` tem `unit_id` e `team_id`, mas são
+`TEXT` sem FK, aceitos por `@IsString()` sem validação contra a empresa, ausentes do
+`AuthorizationSubject` (que tem só `userId`, `role`, `companyId`) e sem semântica definida —
+"equipe que lidera" ou "equipe a que pertence" são opostos para efeito de escopo. Usá-los seria
+inventar a relação e abrir vetor de vazamento entre empresas.
+
+**Fato novo que a T150 registra.** A ADR 0006 classificou `P8.2` (o escopo do gestor tende a ser
+por equipe?) como "genuinamente futura", condicionada a _"quando a entidade colaborador existir"_.
+**Essa pré-condição foi satisfeita** — `Colaborador`, `VinculoFuncional` e `AlocacaoOrganizacional`
+existem e são funcionais desde as T104–T117 e a T147. `DP-8` deixou de estar bloqueada por ausência
+de modelo; está pendente apenas de **decisão de negócio**.
+
+**Limites explícitos:** a T150 não cria endpoint, controller, model, migration, regra de RBAC, ação
+de auditoria, alteração de seed nem tela; não afrouxa nenhuma negação vigente; não reinterpreta
+campo existente; e não aprova nenhum item do pacote da T148.
+
 ## Próxima ação autorizável
 
-1. **Decidir o pacote da T148** — levar `docs/decisions/pacote-decisao-integracao-registros-ponto.md`
+1. **Decidir o pacote da T150** — levar `docs/decisions/pacote-decisao-escopo-do-gestor.md` a
+   Produto e RH (quem é a equipe de um gestor), TI e Segurança (como o escopo é aplicado) e
+   RH + Jurídico (limites de LGPD). Resolver `DP-8` e `DP-23` por ADR nova ou emenda formal antes
+   de qualquer código de Portal da Liderança.
+2. **Decidir o pacote da T148** — levar `docs/decisions/pacote-decisao-integracao-registros-ponto.md`
    a Produto, TI, RH, Jurídico/DPO e, quanto às perguntas ao fornecedor, à RWTech/Secullum. Nenhuma
    implementação de integração de ponto começa antes de §2–§6 desse pacote serem decididos e de a
    ADR 0008 (decisão 4) ser reaberta por ADR nova ou emenda formal.
-2. Em paralelo, **escolher a próxima fatia funcional independente da integração de ponto**, sob o
+3. Em paralelo, **escolher a próxima fatia funcional independente de ambos os pacotes**, sob o
    próximo identificador disponível — sem número reservado aqui, porque reservar identificador antes
    da decisão de escopo já se mostrou fonte de confusão (ver T137). A implementação usa a fundação
    visual já congelada, sem reabrir o shell, os tokens, o padrão B ou os modais.
-3. Candidatos naturais, todos dependentes de decisão própria: capacidade de RBAC para o gestor
-   consultivo; `DP-23` como pré-condição de qualquer autoatendimento do colaborador; e a validação
-   com RH do catálogo de motivos, cujo mecanismo (código fechado) já está aprovado.
-4. Refinamento estético e acabamento visual final da fundação ficam para uma etapa posterior,
+4. Candidatos remanescentes: a validação com RH do catálogo de motivos, cujo mecanismo (código
+   fechado) já está aprovado. **Gestor consultivo e autoatendimento do colaborador saem desta lista
+   de candidatos imediatos** — a T150 confirmou que ambos dependem de `DP-8` e `DP-23`, decisões de
+   negócio ainda não tomadas.
+5. Refinamento estético e acabamento visual final da fundação ficam para uma etapa posterior,
    depois dos módulos funcionais.
-5. Atualizar este ledger e `sync-state.json` em toda tarefa futura.
+6. Atualizar este ledger e `sync-state.json` em toda tarefa futura.
 
 ## Limites da T141 (ambiente de demonstração)
 

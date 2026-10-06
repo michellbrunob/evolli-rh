@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "constitutionVersion": "1.4.0",
   "lastConvergedAt": "2026-10-06",
-  "lastIntegratedTask": 148,
-  "lastRecordedTask": 149,
+  "lastIntegratedTask": 149,
+  "lastRecordedTask": 150,
   "platformDecision": {
     "adr": "docs/adr/0014-evolli-plataforma-base-e-encerramento-do-frappe.md",
     "decidedAt": "2026-10-01",
@@ -12,14 +12,14 @@
   },
   "nextTask": {
     "id": "a definir",
-    "status": "pending_decisao_pacote_integracao_ponto",
-    "reason": "T148 integrada em main (PR #139, squash 9521e324188d8b1ef1a1ca3db662b889738aadc2), mas a CI de main ficou vermelha no passo Verificar sincronizacao do Spec Kit: T040 e T041, citados apenas em prosa na mensagem do squash, nao constam de execution-status.md. A T149 corrigiu o defeito na origem. Causa raiz dupla: (1) escopo, porque ci.yml:34 passa o titulo em Pull Request e a mensagem inteira do squash no push para main, entao prosa narrativa virava exigencia de registro; (2) busca, porque a extracao usava fronteira de palavra mas a verificacao usava String.includes, de modo que numa faixa T104 a T109 os extremos passavam por acidente e o miolo nunca passava (118 dos 149 identificadores reprovariam se citados). Esta foi a quarta ocorrencia: T065/T066 na T139, T066 na T140, T032 na T142, T040/T041 na T148. A T144 curou os tres primeiros nomeando-os no ledger e registrou tres vezes que a regra nao seria alterada; a T149 reverte essa decisao com autorizacao explicita do proprietario, porque o defeito esta no gerador e nao nos identificadores. Regra nova: tarefas entregues sao a janela aberta por lastIntegratedTask e fechada por lastRecordedTask, declarada aqui, lida e nao inferida de texto livre, e continuam obrigatorias nos dois artefatos; identificadores citados so reprovam quando sao futuros, acima de lastRecordedTask; a cobertura expande faixas e casa por fronteira de palavra, ficando mais estrita que includes; contexto ausente ou vazio e fail-closed, fechando o no-op silencioso do workflow_dispatch. Nenhuma whitelist: T040 e T041 nao foram adicionados ao ledger, e nenhuma mensagem de commit integrada foi reescrita. Primeiros testes do verificador em todo o projeto, em scripts/spec-kit-sync.core.test.mjs, incluindo a reproducao literal do squash 9521e32 e um caso que prova que a regra anterior reprovava o mesmo texto. Divida separada, nao tratada: o seed de demonstracao e idempotente por existencia e nao converge atributos declarados de registros sinteticos preexistentes (caso conhecido DEMO-A-0001 e cargoId). Proximo passo: levar o pacote da T148 a Produto/TI/RH/Juridico/DPO e a RWTech/Secullum; em paralelo, escolher uma fatia funcional independente da integracao de ponto."
+    "status": "pending_decisao_dp8_escopo_do_gestor",
+    "reason": "T149 integrada em main (PR #140, squash 078fde5702a6a776d1f9b87e834d96fff4f6a8ba), com a CI de main 3/3 verde no primeiro push de squash depois da correcao do verificador. Esse push cita em prosa os identificadores que antes derrubavam a CI e passou, o que e a prova em producao de que a correcao funciona. A T150 convergiu esse resultado e investigou a fundacao para um Portal da Lideranca somente leitura. O gate da propria tarefa reprovou a implementacao: nao existe contrato seguro e inequivoco para determinar a equipe de um gestor. Faltam tres elos independentes, cada um ausente por decisao registrada e nao por lacuna. Primeiro, nenhuma relacao gestor/subordinado existe nem estruturalmente, por ADR 0006 decisao 8, reafirmada nas ADRs 0007, 0008 e 0010 e em dois comentarios do schema; uma varredura por campos de lideranca em todo o modelo e em todas as migrations retorna zero campos. Segundo, nao existe vinculo AccessUser para Colaborador (DP-23, deliberadamente nao materializado), entao o sistema nao sabe qual pessoa e o gestor autenticado. Terceiro, estrutura organizacional nao e fronteira de autorizacao: empresaId e a unica, e a ADR 0006 antecipou literalmente o caso de um gestor restrito ao proprio departamento, exigindo ADR nova ou emenda formal com migration propria. O proprio codigo ja recusava pelo mesmo motivo: o avaliador RBAC nega o gestor em seis ramos, nominalmente, e dezoito testes provam a negacao, um deles num describe chamado gestor negado enquanto DP-8 nao for decidida. Os campos AccessUser.unit_id e team_id parecem resolver mas nao resolvem: sao TEXT sem FK, aceitos sem validacao contra a empresa, ausentes do AuthorizationSubject e sem semantica definida entre equipe que lidera e equipe a que pertence. Fato novo registrado pela T150: a ADR 0006 condicionou responder P8.2 a quando a entidade colaborador existir, e essa pre-condicao foi satisfeita pelas T104 a T117 e pela T147, de modo que DP-8 nao esta mais bloqueada por ausencia de modelo, apenas por decisao de negocio. Resultado: pacote de decisao em docs/decisions/pacote-decisao-escopo-do-gestor.md, reusando DP-8 e P8.2, sem nenhum endpoint, schema, migration, regra de RBAC, alteracao de seed ou tela. Dividas mantidas e nao tratadas: convergencia de atributos do seed para registros sinteticos preexistentes (DEMO-A-0001 e cargoId); limitacoes de caixa baixa e zero-width na deteccao de tarefa futura; decisoes pendentes da integracao de ponto no pacote da T148. Proximo passo: levar o pacote da T150 a Produto e RH, a TI e Seguranca e a RH mais Juridico, resolvendo DP-8 e DP-23 por ADR nova ou emenda formal antes de qualquer codigo de Portal da Lideranca; em paralelo, decidir o pacote da T148 e escolher uma fatia funcional independente de ambos."
   },
   "openDeliveries": [
     {
-      "id": "T149",
-      "pullRequest": 140,
-      "status": "hardening_do_verificador_em_revisao"
+      "id": "T150",
+      "pullRequest": null,
+      "status": "pacote_de_decisao_entregue_sem_codigo"
     }
   ],
   "requiredArtifacts": [
