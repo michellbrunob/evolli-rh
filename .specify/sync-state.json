@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "constitutionVersion": "1.4.0",
-  "lastConvergedAt": "2026-10-02",
-  "lastIntegratedTask": 146,
-  "lastRecordedTask": 147,
+  "lastConvergedAt": "2026-10-06",
+  "lastIntegratedTask": 147,
+  "lastRecordedTask": 148,
   "platformDecision": {
     "adr": "docs/adr/0014-evolli-plataforma-base-e-encerramento-do-frappe.md",
     "decidedAt": "2026-10-01",
@@ -11,15 +11,15 @@
     "frappe": "encerrado_como_candidato_referencia_apenas"
   },
   "nextTask": {
-    "id": "T147",
-    "status": "em_execucao_homologacao_admissao",
-    "reason": "T146 integrada em main (PR #137, squash 2e55837), com a CI de main verde; a fundacao visual foi aprovada e congelada pelo proprietario antes da integracao. A T147 abre a primeira fatia funcional depois desse congelamento: homologar a admissao (colaborador, vinculo e referencia organizacional inicial) de ponta a ponta, com dado sintetico, provando coerencia em Colaboradores, Dados contratuais e Historico funcional. Ela endurece contratos que ja existem — nao inventa capacidade nova e nao amplia o redesenho visual. Uma investigacao anterior de importacao de marcacoes de ponto parou no gate tecnico sem gerar branch, commit ou alteracao de Spec Kit: nao e entrega e nao ocupa o identificador; a importacao AFD segue bloqueada pela ADR 0008 (decisao 4) e pelas pendencias DP-3J-07, DP-3J-20, DP-3J-09, DP-3J-11 e DS-OPS-01."
+    "id": "T148",
+    "status": "em_execucao_integracao_registros_ponto",
+    "reason": "T147 integrada em main (PR #138, squash 1d7531c), com a CI de main verde: a admissao foi homologada de ponta a ponta, com seis defeitos reais corrigidos e regressao provada, e o seed passou a efetivar as admissoes sinteticas. A T148 converge esse resultado e avalia a fundacao segura para o Evolli RECEBER registros de ponto do sistema em uso. Ela nao pressupoe que isso seja implementavel: so ha codigo se os contratos existentes definirem, sem invencao, origem, formato, autenticacao, idempotencia, relacao com empresa/colaborador/vinculo, comportamento de duplicatas, preservacao da marcacao original, auditoria e resposta a erro. Com qualquer item essencial aberto, o resultado e um pacote de decisao, sem endpoint, schema ou regra provisoria. A importacao AFD segue bloqueada pela ADR 0008 (decisao 4 — origem unica manual) e pelas pendencias DP-3J-07, DP-3J-20, DP-3J-09, DP-3J-11 e DS-OPS-01."
   },
   "openDeliveries": [
     {
-      "id": "T147",
+      "id": "T148",
       "pullRequest": null,
-      "status": "em_execucao_homologacao_admissao"
+      "status": "em_execucao_integracao_registros_ponto"
     }
   ],
   "requiredArtifacts": [

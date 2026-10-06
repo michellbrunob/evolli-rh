@@ -801,8 +801,8 @@ decisões e bloqueios, está no ledger versionado
       módulos funcionais, a primeira fatia é **homologar** o fluxo que já existe em código — a
       admissão — provando que ela funciona de ponta a ponta com dado sintético, em vez de criar
       capacidade nova.
-    - **Estado:** **em execução**, na branch `codex/t147-homologacao-admissao`; PR Draft para
-      `main`. Base: `main` em `2e55837`.
+    - **Estado:** **Integrada** em `main` pela PR #138 (squash `1d7531c`), com a CI de `main`
+      verde. Base: `main` em `2e55837`.
     - **Natureza:** endurecimento e homologação sobre contratos existentes. Não inventa
       funcionalidade sem contrato real e não amplia o redesenho visual.
     - **Cenário de aceite:** RH abre `Pessoas › Colaboradores`, registra uma admissão em modal com
@@ -818,6 +818,25 @@ decisões e bloqueios, está no ledger versionado
     - **Fora de escopo:** importação de ponto/AFD, REP, banco de horas, férias, benefícios, clima,
       dependentes, folha, eSocial, obrigações fiscais, R2/anexos, MFA, ESS/MSS, mudança de
       arquitetura visual e cópia de código ou ativo do Frappe.
+
+45. **T148 - Convergência da T147 e fundação segura da integração de registros de ponto**
+
+    - **Origem:** com a admissão homologada e integrada (T147), a pergunta seguinte é como o Evolli
+      passa a **receber registros de ponto** do sistema em uso. A T148 não parte do pressuposto de
+      que isso é implementável: ela converge o Spec Kit, atualiza o ambiente de demonstração e
+      submete a integração a um gate de contrato.
+    - **Estado:** **em execução**, na branch `codex/t148-integracao-registros-ponto`; PR Draft para
+      `main`. Base: `main` em `1d7531c`.
+    - **Regra de implementação:** só há código se os contratos existentes definirem, **sem
+      invenção**, origem, formato, autenticação, idempotência, relação com empresa/colaborador/
+      vínculo, comportamento de duplicatas, preservação da marcação original, auditoria e resposta
+      a erro/reprocessamento. Com qualquer item essencial aberto, o resultado é um **pacote de
+      decisão** — nenhum endpoint, schema ou regra provisória.
+    - **Comparação de canais exigida:** polling/REST, webhook HTTP, importação de arquivo e
+      WebSocket, decididos pelo fluxo real. Registro histórico e durável pede entrega idempotente e
+      reprocessável; tempo real pode ser atualização de tela, não o canal oficial de persistência.
+    - **Fora de escopo:** folha, banco de horas, adicional noturno, DSR, fechamento, transmissão
+      fiscal, REP-P, PAdES, AEJ e integração externa real sem contrato e autorização próprios.
 
 ## Regra obrigatória para as próximas tarefas
 
