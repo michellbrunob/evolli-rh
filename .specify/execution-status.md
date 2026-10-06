@@ -461,15 +461,22 @@ um é decisão registrada, não lacuna:
 
 **O código já recusava, pelo mesmo motivo.** O avaliador RBAC nega o `gestor` em seis ramos,
 nominalmente, registrando que "conceder exigiria escolher a fronteira (equipe? departamento?
-direto ou indireto?) por conta própria". **Dezoito testes provam a negação**, entre eles um
-`describe` chamado `"gestor: negado enquanto DP-8 nao for decidida"`. Implementar exigiria reverter
-testes escritos de propósito para impedir exatamente isso.
+direto ou indireto?) por conta própria". O RBAC contém **seis testes cujo título nomeia
+explicitamente o gestor em cenários de negação** — um deles em um `describe` chamado
+`"gestor: negado enquanto DP-8 nao for decidida"` — além de casos parametrizados que o incluem em
+listas de papéis negados. **Não há concessão de capacidade ao gestor**: nenhum ramo `case "gestor"`
+concessivo existe em `apps/api/src`. Implementar exigiria reverter testes escritos de propósito
+para impedir exatamente isso.
 
 **O campo que parece resolver e não resolve.** `AccessUser` tem `unit_id` e `team_id`, mas são
 `TEXT` sem FK, aceitos por `@IsString()` sem validação contra a empresa, ausentes do
 `AuthorizationSubject` (que tem só `userId`, `role`, `companyId`) e sem semântica definida —
 "equipe que lidera" ou "equipe a que pertence" são opostos para efeito de escopo. Usá-los seria
-inventar a relação e abrir vetor de vazamento entre empresas.
+inventar a relação e abrir vetor de vazamento entre empresas. **A ausência de FK é original e
+deliberada:** a ADR 0003, decisão 8, a condicionou a _"até a Etapa 1 criar essas entidades de
+fato"_. A condição já se cumpriu — `Equipe` e `UnidadeOrganizacional` existem desde as T104–T109 —
+mas **a FK nunca foi adicionada**. Dívida de integridade referencial preexistente, registrada aqui
+e **não tratada** por esta tarefa.
 
 **Fato novo que a T150 registra.** A ADR 0006 classificou `P8.2` (o escopo do gestor tende a ser
 por equipe?) como "genuinamente futura", condicionada a _"quando a entidade colaborador existir"_.

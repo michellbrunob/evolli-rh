@@ -924,11 +924,17 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       única, e a ADR 0006 antecipou literalmente este caso, exigindo ADR nova ou emenda formal com
       migration própria.
     - **O código já recusava pelo mesmo motivo:** o avaliador RBAC nega o `gestor` em seis ramos,
-      nominalmente, e **dezoito testes provam a negação** — um deles em um `describe` chamado
-      `"gestor: negado enquanto DP-8 nao for decidida"`.
+      nominalmente. O RBAC contém **seis testes cujo título nomeia explicitamente o gestor em
+      cenários de negação** — um deles em um `describe` chamado
+      `"gestor: negado enquanto DP-8 nao for decidida"` — além de casos parametrizados que o
+      incluem em listas de papéis negados. **Não há concessão de capacidade ao gestor**: nenhum
+      ramo `case "gestor"` concessivo existe em `apps/api/src`.
     - **Campo que parece resolver e não resolve:** `AccessUser.unit_id`/`team_id` são `TEXT` sem FK,
       aceitos por `@IsString()` sem validação contra a empresa, ausentes do `AuthorizationSubject`
       e sem semântica definida. Usá-los seria inventar a relação e abrir vazamento entre empresas.
+      A ausência de FK é original e deliberada — ADR 0003 decisão 8 a condicionou a _"até a Etapa 1
+      criar essas entidades de fato"_. A condição já se cumpriu (T104–T109), mas **a FK nunca foi
+      adicionada**: dívida de integridade referencial preexistente, registrada e não tratada aqui.
     - **Fato novo registrado:** a ADR 0006 condicionou responder `P8.2` a _"quando a entidade
       colaborador existir"_. **A pré-condição foi satisfeita** pelas T104–T117 e T147 — `DP-8` não
       está mais bloqueada por ausência de modelo, só por decisão de negócio.
