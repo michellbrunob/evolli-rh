@@ -850,6 +850,46 @@ decisões e bloqueios, está no ledger versionado
       fiscal, REP-P, PAdES, AEJ e integração externa real sem contrato e autorização próprios —
       nenhum foi tocado, porque nenhum código foi escrito.
 
+46. **T149 - Correção do falso positivo do verificador do Spec Kit e convergência da T148**
+    - **Estado:** em revisão. Branch `codex/t149-hardening-spec-check`, a partir do squash
+      `9521e324188d8b1ef1a1ca3db662b889738aadc2` (T148, PR #139).
+    - **Pré-condição:** a T148 entrou em `main` pela PR #139, mas a CI de `main` ficou vermelha no
+      passo _Verificar sincronização do Spec Kit_ — `T040` e `T041`, citados em prosa na mensagem
+      do squash, não constam de `execution-status.md`. Os outros dois jobs passaram.
+    - **Causa raiz:** dois defeitos somados em `scripts/check-spec-kit-sync.mjs`. (1) **Escopo** —
+      `ci.yml:34` passa o título em Pull Request e a **mensagem inteira do squash** no push para
+      `main`, então prosa narrativa virava exigência de registro; é por isso que a PR passou 3/3 e
+      o mesmo conteúdo reprovou no push. (2) **Busca** — extração com `\b`, mas verificação com
+      `String.includes` (substring): numa faixa `T104–T109` os extremos passavam por acidente e o
+      miolo nunca passava. Medido: **118 dos 149 identificadores reprovariam se citados**.
+    - **Quarta ocorrência.** T065/T066 na T139, T066 na T140, T032 na T142, T040/T041 na T148. A
+      T144 curou os três primeiros nomeando-os no ledger e registrou três vezes que **a regra não
+      seria alterada**. A T149 reverte essa decisão, com autorização explícita do proprietário,
+      porque o defeito está no gerador e não nos identificadores.
+    - **Regra nova:** as tarefas entregues passam a ser a janela `(lastIntegratedTask,
+lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a partir de texto
+      livre — e continuam obrigatórias nos dois artefatos. Identificadores citados no contexto só
+      reprovam quando são **futuros** (`> lastRecordedTask`), isto é, trabalho citado sem registro.
+      A cobertura expande faixas e casa por fronteira de palavra, ficando **mais estrita** que
+      `includes`. Contexto ausente ou vazio é **fail-closed** — fecha o no-op silencioso que o
+      `workflow_dispatch` produzia.
+    - **Nada de whitelist.** `T040` e `T041` **não** foram adicionados ao ledger para satisfazer o
+      verificador, e nenhuma mensagem de commit já integrada foi reescrita.
+    - **Testes:** `scripts/spec-kit-sync.core.test.mjs`, os primeiros do verificador em todo o
+      projeto. Reproduz literalmente a mensagem do squash `9521e32`; o caso `1b` reimplementa a
+      regra anterior e prova que ela reprovava T040/T041 no mesmo texto em que a nova passa. Cobre
+      tarefa entregue ausente, ausente em só um artefato (nomeando qual), referência histórica não
+      registrada, contexto de PR, contexto de push, contexto ausente/vazio e duas tarefas na mesma
+      janela.
+    - **Convergência:** T148 registrada como **Integrada** (PR #139, squash `9521e32`),
+      `lastIntegratedTask: 148`, `lastRecordedTask: 149`, T148 fora de `openDeliveries`.
+    - **Dívida registrada, não tratada aqui:** o seed de demonstração é idempotente por existência
+      e **não converge atributos declarados de registros sintéticos preexistentes** — caso
+      conhecido `DEMO-A-0001` e `cargoId`, cuja alocação vigente ficou sem cargo. Precisa de tarefa
+      própria.
+    - **Fora de escopo:** código funcional de RH, banco, seed, Prisma, migrations, integração de
+      ponto, autenticação, auditoria, RBAC e qualquer decisão do pacote da T148 — nenhum tocado.
+
 ## Regra obrigatória para as próximas tarefas
 
 1. Criar ou atualizar a entrada da tarefa neste arquivo antes da implementação.
@@ -857,3 +897,5 @@ decisões e bloqueios, está no ledger versionado
 3. Se houver mudança de regra, atualizar Spec, Plan e Constituição conforme o impacto semântico.
 4. Executar `/speckit.converge` e `pnpm spec:check` antes de promover a PR para Ready for review.
 5. Revisão e CI verdes não substituem decisão humana pendente nem autorizam merge ou produção.
+6. Citar uma tarefa antiga em prosa **não** exige mais registrá-la: desde a T149 o verificador
+   fiscaliza a janela de entrega declarada em `sync-state.json`, não todo `T###` do texto.

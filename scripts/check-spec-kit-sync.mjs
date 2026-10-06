@@ -1,6 +1,15 @@
+/**
+ * CLI do verificador de sincronia do Spec Kit.
+ *
+ * A decisão sobre tarefas entregues, identificadores citados e cobertura dos
+ * artefatos mora em `spec-kit-sync.core.mjs`, que é puro e tem testes. Aqui
+ * ficam só os efeitos: ler arquivos, consultar o git, imprimir e encerrar.
+ */
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
+
+import { avaliarSincronia, resolverContexto } from "./spec-kit-sync.core.mjs";
 
 const failures = [];
 const read = (path) => readFileSync(path, "utf8");
@@ -82,19 +91,8 @@ if (state) {
     );
   }
 
-  if (state.lastRecordedTask < state.lastIntegratedTask) {
-    failures.push(
-      "lastRecordedTask não pode ser menor que lastIntegratedTask.",
-    );
-  }
-
-  const taskId = `T${String(state.lastRecordedTask).padStart(3, "0")}`;
   const tasks = read(".specify/tasks.md");
   const ledger = read(".specify/execution-status.md");
-  if (!tasks.includes(taskId))
-    failures.push(`${taskId} não aparece em tasks.md.`);
-  if (!ledger.includes(taskId))
-    failures.push(`${taskId} não aparece em execution-status.md.`);
 
   for (const artifact of state.requiredArtifacts ?? []) {
     if (!durableFiles.includes(artifact) || !existsSync(artifact)) {
@@ -104,27 +102,15 @@ if (state) {
     }
   }
 
-  const context =
-    process.env.SPEC_KIT_CHANGE_CONTEXT ??
-    execFileSync("git", ["log", "-1", "--pretty=%s"], {
-      encoding: "utf8",
-    }).trim();
-  const ids = [...context.matchAll(/\bT(\d{3})\b/g)].map((match) => ({
-    id: match[0],
-    number: Number(match[1]),
-  }));
+  const { contexto } = resolverContexto({
+    variavelDeAmbiente: process.env.SPEC_KIT_CHANGE_CONTEXT,
+    lerSubject: () =>
+      execFileSync("git", ["log", "-1", "--pretty=%s"], {
+        encoding: "utf8",
+      }),
+  });
 
-  for (const { id, number } of ids) {
-    if (number > state.lastRecordedTask) {
-      failures.push(
-        `${id} aparece na mudança, mas lastRecordedTask=${state.lastRecordedTask}.`,
-      );
-    }
-    if (!tasks.includes(id))
-      failures.push(`${id} aparece na mudança, mas não em tasks.md.`);
-    if (!ledger.includes(id))
-      failures.push(`${id} aparece na mudança, mas não no ledger.`);
-  }
+  failures.push(...avaliarSincronia({ state, tasks, ledger, contexto }));
 }
 
 const workflow = read(".specify/workflows/speckit/workflow.yml");
