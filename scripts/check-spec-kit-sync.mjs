@@ -9,22 +9,51 @@ import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 
-import { avaliarSincronia, resolverContexto } from "./spec-kit-sync.core.mjs";
+import {
+  avaliarSincronia,
+  resolverContexto,
+  validarEstado,
+} from "./spec-kit-sync.core.mjs";
 
 const failures = [];
 const read = (path) => readFileSync(path, "utf8");
+
+/**
+ * Lê um artefato de governança, registrando falha em vez de derrubar o
+ * processo. Um arquivo ausente deve virar diagnóstico, não stack trace.
+ */
+function lerOuVazio(path) {
+  try {
+    return read(path);
+  } catch {
+    failures.push(`Artefato de governança ilegível: ${path}`);
+    return "";
+  }
+}
 
 const statePath = ".specify/sync-state.json";
 if (!existsSync(statePath)) {
   failures.push(`${statePath} ausente.`);
 }
 
+// `lido` separa "não deu para ler/parsear" de "leu e veio null": sem essa
+// distinção, um arquivo contendo apenas `null` passaria pelo `if (state)` e
+// deixaria o gate inteiro sem executar.
 let state;
+let lido = false;
 try {
   state = JSON.parse(read(statePath));
-} catch (error) {
-  failures.push(`${statePath} inválido: ${error.message}`);
+  lido = true;
+} catch {
+  // A mensagem do parser pode ecoar trecho do arquivo; o log da CI é público.
+  failures.push(`${statePath} ausente ou não é JSON válido.`);
 }
+
+// Validação ÚNICA, a mesma que o núcleo aplica: o CLI não pode ter uma noção
+// própria de estado válido que divirja da usada para decidir.
+const falhasDeEstado = lido ? validarEstado(state) : [];
+failures.push(...falhasDeEstado);
+const estadoUtilizavel = lido && falhasDeEstado.length === 0;
 
 const durableFiles = [
   ".specify/memory/constitution.md",
@@ -61,7 +90,15 @@ for (const manifestPath of [
   ".specify/integrations/generic.manifest.json",
   ".specify/integrations/speckit.manifest.json",
 ]) {
-  const manifest = JSON.parse(read(manifestPath));
+  // Sem este try, um manifest ausente ou corrompido derrubava o processo com
+  // stack antes de qualquer falha ser impressa — ruído em vez de diagnóstico.
+  let manifest;
+  try {
+    manifest = JSON.parse(read(manifestPath));
+  } catch {
+    failures.push(`${manifestPath} ausente ou não é JSON válido.`);
+    continue;
+  }
   for (const [path, expectedHash] of Object.entries(manifest.files ?? {})) {
     if (!existsSync(path)) {
       failures.push(`Arquivo do manifest ausente: ${path}`);
@@ -80,7 +117,7 @@ for (const manifestPath of [
   }
 }
 
-if (state) {
+if (estadoUtilizavel) {
   const constitution = read(".specify/memory/constitution.md");
   const versionMatch = constitution.match(
     /\*\*Version\*\*:\s*([0-9]+\.[0-9]+\.[0-9]+)/,
@@ -113,7 +150,7 @@ if (state) {
   failures.push(...avaliarSincronia({ state, tasks, ledger, contexto }));
 }
 
-const workflow = read(".specify/workflows/speckit/workflow.yml");
+const workflow = lerOuVazio(".specify/workflows/speckit/workflow.yml");
 if (!workflow.includes("command: speckit.converge")) {
   failures.push("Workflow do Spec Kit não executa speckit.converge.");
 }
@@ -122,7 +159,7 @@ const activeGovernance = [
   ".specify/memory/constitution.md",
   ".specify/spec.md",
   ".specify/plan.md",
-].map(read);
+].map(lerOuVazio);
 const obsoleteMfaStatements = [
   "MFA MUST be mandatory before any real HR data pilot or production use",
   "MFA é obrigatório antes de dados reais ou produção",

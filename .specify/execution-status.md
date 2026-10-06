@@ -48,6 +48,12 @@ primeiro caderno de homologação de jornada e Banco de Horas.
 > para `main` é a mensagem inteira do commit de squash, que concatena os commits da branch — por
 > isso T032, T065 e T066 derrubaram a CI de `main` sem nada de errado no código. A regra não foi
 > alterada (T144): quem citar um identificador aqui não coberto nominalmente deve nomeá-lo antes.
+>
+> **Nota histórica — orientação superada pela T149.** O parágrafo acima descreve a regra que
+> vigorou até a T148 e a instrução que a T144 deixou. Ambas estão **obsoletas**: desde a T149 o
+> verificador fiscaliza a janela de entrega declarada em `sync-state.json`, e **citar um
+> identificador em prosa não exige mais nomeá-lo aqui**. O texto permanece por ser o registro
+> fiel do que se decidiu na época; não o siga como instrução. Ver a seção da T149.
 
 ## Execução integrada — T050 a T073
 
@@ -347,8 +353,9 @@ autorização próprios — nenhum desses limites foi tocado, porque nenhum cód
 
 **A decisão da T144 foi revertida, e isto é deliberado.** A T144 escolheu curar os identificadores
 já queimados e registrou três vezes — ledger:190, `tasks.md`:677 e `tasks.md`:712 — que **a regra do
-verificador não foi alterada**. Aquela escolha não segurou: T040/T041 derrubaram a CI de `main` no
-push do squash `9521e32` (T148), a quarta ocorrência, três integrações depois da advertência. A T149
+verificador não foi alterada**. Aquela escolha não segurou: duas referências históricas ao parser
+AFD, citadas em prosa, derrubaram a CI de `main` no push do squash `9521e32` (T148) — a quarta
+ocorrência, três integrações depois da advertência. A T149
 muda a regra, com autorização explícita do proprietário no enunciado da tarefa, porque o defeito
 estava no gerador e não nos identificadores.
 
@@ -363,7 +370,9 @@ estava no gerador e não nos identificadores.
 2. **Busca.** A extração usava fronteira de palavra (`\b`), mas a verificação usava
    `String.includes`, que é substring. Numa faixa `T104–T109` a string `T104` existe e passa,
    `T105` não existe e reprova: **o extremo de uma faixa passava por acidente e o miolo nunca
-   passava**. Medido no ledger desta data: **118 dos 149 identificadores reprovariam se citados**.
+   passava**. Medido com `String.includes` sobre os artefatos da base `9521e32`, estado em que a
+   CI quebrou — e não sobre o head desta branch: **118 dos 149 identificadores reprovariam se
+   citados**.
 
 **A regra nova.** "Quais tarefas esta mudança entrega?" não é pergunta para texto livre — é o
 próprio Spec Kit que responde, em `sync-state.json`:
@@ -383,13 +392,32 @@ próprio Spec Kit que responde, em `sync-state.json`:
 **Por que não enfraquece o gate.** A tarefa efetivamente entregue continua obrigatória nos dois
 artefatos; citar tarefa futura continua reprovando; a busca ficou mais rígida. O que deixou de ser
 fiscalizado — menção narrativa a tarefa antiga — nunca foi sinal de entrega. Nenhuma lista de
-exceções e nenhum identificador tratado como caso especial: `T040` e `T041` **não** foram
-adicionados ao ledger para satisfazer o verificador.
+exceções e nenhum identificador tratado como caso especial: as duas referências históricas ao
+parser AFD **não** ganharam entrada autônoma neste ledger, nem whitelist, nem qualquer mecanismo
+de compatibilidade. Esta seção evita nomeá-las justamente para que o ledger não as registre como
+efeito colateral da própria explicação.
 
 **Prova.** `scripts/spec-kit-sync.core.test.mjs` reproduz literalmente a mensagem do squash
-`9521e32` e inclui o caso `1b`, que reimplementa a regra anterior e prova que ela reprovava T040 e
-T041 no mesmo texto em que a regra nova passa. Os testes 2, 3 e 3b provam que tarefa entregue
-ausente de um dos artefatos ainda reprova, nomeando o arquivo que falta.
+`9521e32` e inclui o caso `1b`, que reimplementa a regra anterior e prova que ela reprovava as duas
+referências históricas no mesmo texto em que a regra nova passa — os identificadores aparecem lá,
+como fixture de regressão, que é o lugar certo para eles. Os testes 2, 3 e 3b provam que tarefa
+entregue ausente de um dos artefatos ainda reprova, nomeando o arquivo que falta.
+
+**Estado malformado é fail-closed.** A primeira versão desta tarefa fechou o no-op do contexto e
+abriu um equivalente no estado: sem validar `sync-state.json`, um `lastRecordedTask` ausente,
+`NaN`, `Infinity`, decimal ou string não numérica fazia `tarefasEntregues` devolver lista vazia e
+`numero > NaN` ser sempre falso — **os dois braços do gate desligavam**, e o verificador aprovava
+com os dois artefatos vazios. A regra anterior à T149 falhava fechado por acidente, ao procurar o
+literal `"Tundefined"`. `validarEstado` é a validação **única**, chamada pelo núcleo antes de
+calcular a janela e pelo CLI antes de ler artefato: exige os dois campos, inteiros seguros e não
+negativos, com `lastIntegratedTask <= lastRecordedTask`. A mensagem nomeia o campo e o tipo
+recusado, nunca o conteúdo nem um stack, e o CLI encerra com código não zero. No caminho, o CLI
+deixou de derrubar o processo diante de manifest ou artefato de governança ilegível — agora vira
+diagnóstico.
+
+**Limitações conhecidas, deliberadamente não tratadas:** identificador em caixa baixa (`t151`) e
+caracteres zero-width entre as letras escapam da detecção de tarefa futura. Valem igualmente para
+a regra anterior — nenhuma das duas é regressão desta tarefa.
 
 **Limites explícitos:** a T149 não toca código funcional de RH, banco, seed, Prisma, migrations,
 integração de ponto, autenticação, auditoria nem RBAC; não aprova nenhuma decisão do pacote da

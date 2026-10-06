@@ -77,6 +77,79 @@ export function identificadorDe(numero) {
   return `T${String(numero).padStart(3, "0")}`;
 }
 
+/** Campos de `sync-state.json` sem os quais não há o que fiscalizar. */
+const CAMPOS_DE_JANELA = ["lastIntegratedTask", "lastRecordedTask"];
+
+/**
+ * Descreve um valor recusado sem ecoar o conteúdo.
+ *
+ * A mensagem de erro vai para o log público da CI: ela nomeia o campo e o tipo,
+ * nunca o conteúdo de uma string nem um stack.
+ */
+function descreverValor(valor) {
+  if (valor === null) return "null";
+  if (valor === undefined) return "ausente";
+  if (Array.isArray(valor)) return "lista";
+  if (typeof valor === "number") {
+    if (!Number.isFinite(valor)) return "número não finito";
+    return Number.isInteger(valor) ? String(valor) : "número decimal";
+  }
+  return typeof valor;
+}
+
+/**
+ * Valida o estado de `sync-state.json` antes de qualquer decisão.
+ *
+ * Por que isto existe: a primeira versão da T149 derivava a janela de entrega
+ * de `lastIntegratedTask`/`lastRecordedTask` sem conferir nada. Com o campo
+ * ausente, `NaN`, decimal ou string não numérica, `tarefasEntregues` devolvia
+ * uma lista vazia e `numero > NaN` era sempre falso: **os dois braços do gate
+ * desligavam em silêncio** e o verificador aprovava até com os dois artefatos
+ * vazios. A regra anterior à T149 falhava fechado por acidente, ao procurar o
+ * literal `"Tundefined"`. Esta função transforma esse acidente em garantia.
+ *
+ * É a validação ÚNICA: `avaliarSincronia` a chama antes de calcular a janela e
+ * o CLI a chama antes de ler artefato, para que não existam duas noções de
+ * estado válido que possam divergir.
+ */
+export function validarEstado(state) {
+  if (state === null || typeof state !== "object" || Array.isArray(state)) {
+    return [
+      `sync-state.json não contém um objeto de estado (veio ${descreverValor(state)}).`,
+    ];
+  }
+
+  const falhas = [];
+  for (const campo of CAMPOS_DE_JANELA) {
+    const valor = state[campo];
+    if (!(campo in state) || valor === undefined) {
+      falhas.push(`${campo} ausente em sync-state.json.`);
+      continue;
+    }
+    if (typeof valor !== "number" || !Number.isSafeInteger(valor)) {
+      falhas.push(
+        `${campo} deve ser um inteiro seguro em sync-state.json (veio ${descreverValor(valor)}).`,
+      );
+      continue;
+    }
+    if (valor < 0) {
+      falhas.push(
+        `${campo} não pode ser negativo em sync-state.json (veio ${valor}).`,
+      );
+    }
+  }
+
+  // A coerência entre os dois só faz sentido se ambos forem válidos.
+  if (falhas.length > 0) return falhas;
+
+  if (state.lastIntegratedTask > state.lastRecordedTask) {
+    falhas.push(
+      `lastIntegratedTask (${state.lastIntegratedTask}) não pode ser maior que lastRecordedTask (${state.lastRecordedTask}).`,
+    );
+  }
+  return falhas;
+}
+
 /**
  * Conjunto de tarefas que um artefato cobre, expandindo faixas.
  *
@@ -165,12 +238,13 @@ export function tarefasEntregues(state) {
  * não encerra o processo: quem decide isso é o CLI.
  */
 export function avaliarSincronia({ state, tasks, ledger, contexto }) {
+  // Estado inválido encerra aqui: sem janela confiável, nada mais pode ser
+  // concluído, e prosseguir produziria uma lista vazia de tarefas entregues
+  // — o fail-open que esta validação existe para impedir.
+  const falhasDeEstado = validarEstado(state);
+  if (falhasDeEstado.length > 0) return falhasDeEstado;
+
   const falhas = [];
-
-  if (state?.lastRecordedTask < state?.lastIntegratedTask) {
-    falhas.push("lastRecordedTask não pode ser menor que lastIntegratedTask.");
-  }
-
   const emTasks = coberturaDeTarefas(tasks);
   const noLedger = coberturaDeTarefas(ledger);
 

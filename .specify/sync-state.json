@@ -18,7 +18,7 @@
   "openDeliveries": [
     {
       "id": "T149",
-      "pullRequest": null,
+      "pullRequest": 140,
       "status": "hardening_do_verificador_em_revisao"
     }
   ],

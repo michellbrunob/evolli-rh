@@ -12,6 +12,11 @@
  */
 import test from "node:test";
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import {
   avaliarSincronia,
@@ -19,6 +24,7 @@ import {
   identificadoresCitados,
   resolverContexto,
   tarefasEntregues,
+  validarEstado,
 } from "./spec-kit-sync.core.mjs";
 
 /**
@@ -263,12 +269,13 @@ test("8b. janela fechada ainda fiscaliza a última registrada", () => {
   assert.match(falhas[0], /^T150 é tarefa entregue/);
 });
 
-test("8c. lastRecordedTask menor que lastIntegratedTask reprova", () => {
+test("8c. lastIntegratedTask maior que lastRecordedTask reprova", () => {
   const falhas = avaliar({
     state: { lastIntegratedTask: 148, lastRecordedTask: 147 },
     contexto: "T147 — regressão de estado",
   });
-  assert.ok(falhas.some((f) => /não pode ser menor/.test(f)));
+  assert.equal(falhas.length, 1);
+  assert.match(falhas[0], /lastIntegratedTask \(148\) não pode ser maior/);
 });
 
 // --------------------------------------------------------------------------
@@ -300,8 +307,20 @@ test("cobertura casa por fronteira de palavra, não por substring", () => {
 });
 
 test("faixa invertida ou absurda não é expandida", () => {
-  assert.ok(!coberturaDeTarefas("T109–T104").has("T106"));
-  assert.ok(!coberturaDeTarefas("T001–T999").has("T500"));
+  // Conjunto EXATO, não só a ausência do miolo: sem a guarda `ate < de` o
+  // trecho é consumido pelo replace e nem os extremos sobrevivem, e uma
+  // asserção que olhasse apenas `T106` passaria nos dois casos.
+  assert.deepEqual([...coberturaDeTarefas("T109–T104")].sort(), [
+    "T104",
+    "T109",
+  ]);
+  assert.deepEqual([...coberturaDeTarefas("T001–T999")].sort(), [
+    "T001",
+    "T999",
+  ]);
+  // E a faixa no limite ainda expande, para que a guarda de tamanho não possa
+  // ser trocada por uma recusa geral.
+  assert.ok(coberturaDeTarefas("T001–T201").has("T100"));
 });
 
 test("identificadores citados não repetem e preservam a ordem", () => {
@@ -311,4 +330,153 @@ test("identificadores citados não repetem e preservam a ordem", () => {
     ),
     ["T148", "T040", "T041"],
   );
+});
+
+// --------------------------------------------------------------------------
+// B1 — estado malformado é fail-closed.
+//
+// A primeira versão da T149 derivava a janela sem validar nada. Com o campo
+// ausente, NaN, Infinity, string não numérica ou o próprio estado nulo,
+// `tarefasEntregues` devolvia [] e `numero > NaN` era sempre falso: o gate
+// aprovava com os DOIS artefatos vazios. Seis dos casos abaixo passavam
+// silenciosamente antes desta correção.
+// --------------------------------------------------------------------------
+
+/** Avalia com artefatos vazios e um id futuro: só um estado válido salva. */
+const comEstado = (state) =>
+  avaliarSincronia({ state, tasks: "", ledger: "", contexto: "T999 futura" });
+
+const INVALIDOS = [
+  [
+    "B1.1 lastRecordedTask ausente",
+    { lastIntegratedTask: 148 },
+    /lastRecordedTask ausente/,
+  ],
+  [
+    "B1.2 lastRecordedTask null",
+    { lastIntegratedTask: 148, lastRecordedTask: null },
+    /lastRecordedTask deve ser um inteiro seguro.*null/,
+  ],
+  [
+    "B1.3 string numérica",
+    { lastIntegratedTask: 148, lastRecordedTask: "149" },
+    /lastRecordedTask deve ser um inteiro seguro.*string/,
+  ],
+  [
+    "B1.4 string não numérica",
+    { lastIntegratedTask: 148, lastRecordedTask: "abc" },
+    /lastRecordedTask deve ser um inteiro seguro.*string/,
+  ],
+  [
+    "B1.5 decimal",
+    { lastIntegratedTask: 148, lastRecordedTask: 149.5 },
+    /lastRecordedTask deve ser um inteiro seguro.*número decimal/,
+  ],
+  [
+    "B1.6 negativo",
+    { lastIntegratedTask: -1, lastRecordedTask: 149 },
+    /lastIntegratedTask não pode ser negativo/,
+  ],
+  [
+    "B1.7 lastIntegratedTask ausente",
+    { lastRecordedTask: 149 },
+    /lastIntegratedTask ausente/,
+  ],
+  [
+    "B1.8 lastIntegratedTask > lastRecordedTask",
+    { lastIntegratedTask: 149, lastRecordedTask: 148 },
+    /lastIntegratedTask \(149\) não pode ser maior que lastRecordedTask \(148\)/,
+  ],
+  [
+    "B1.x NaN",
+    { lastIntegratedTask: 148, lastRecordedTask: NaN },
+    /lastRecordedTask deve ser um inteiro seguro.*número não finito/,
+  ],
+  [
+    "B1.x Infinity",
+    { lastIntegratedTask: 148, lastRecordedTask: Infinity },
+    /número não finito/,
+  ],
+  ["B1.x estado null", null, /não contém um objeto de estado.*null/],
+  ["B1.x estado lista", [148, 149], /não contém um objeto de estado.*lista/],
+];
+
+for (const [nome, estado, mensagem] of INVALIDOS) {
+  test(`${nome} reprova, sem liberar o gate`, () => {
+    const falhas = comEstado(estado);
+    assert.ok(
+      falhas.length > 0,
+      `estado inválido não pode produzir zero falhas: ${JSON.stringify(falhas)}`,
+    );
+    assert.ok(
+      falhas.some((f) => mensagem.test(f)),
+      `nenhuma falha casou ${mensagem}; vieram: ${JSON.stringify(falhas)}`,
+    );
+    // Nenhuma mensagem pode carregar stack ou conteúdo de arquivo.
+    for (const f of falhas) {
+      assert.ok(!/\n\s+at\s/.test(f), `mensagem com stack: ${f}`);
+    }
+  });
+}
+
+test("B1.9 estado válido com janela fechada (integrada == registrada) é aceito", () => {
+  assert.deepEqual(
+    validarEstado({ lastIntegratedTask: 149, lastRecordedTask: 149 }),
+    [],
+  );
+  assert.deepEqual(
+    tarefasEntregues({ lastIntegratedTask: 149, lastRecordedTask: 149 }),
+    ["T149"],
+  );
+});
+
+test("B1.10 estado válido com janela de uma tarefa é aceito", () => {
+  assert.deepEqual(
+    validarEstado({ lastIntegratedTask: 148, lastRecordedTask: 149 }),
+    [],
+  );
+  assert.deepEqual(
+    tarefasEntregues({ lastIntegratedTask: 148, lastRecordedTask: 149 }),
+    ["T149"],
+  );
+});
+
+test("B1.11 estado inválido + artefatos vazios + T999 no contexto reprova", () => {
+  // O caso exato do fail-open: antes desta correção, zero falhas.
+  const falhas = avaliarSincronia({
+    state: {},
+    tasks: "",
+    ledger: "",
+    contexto: "T999 tarefa futura inexistente",
+  });
+  assert.ok(falhas.length >= 2, JSON.stringify(falhas));
+  assert.ok(falhas.every((f) => /sync-state\.json/.test(f)));
+});
+
+test("B1.12 o CLI reprova sync-state.json inválido, sem vazar o conteúdo", () => {
+  const raiz = mkdtempSync(join(tmpdir(), "spec-kit-"));
+  try {
+    mkdirSync(join(raiz, ".specify"), { recursive: true });
+    writeFileSync(
+      join(raiz, ".specify", "sync-state.json"),
+      '{ "lastRecordedTask": 149, SEGREDO_NAO_DEVE_VAZAR',
+      "utf8",
+    );
+    const cli = fileURLToPath(
+      new URL("./check-spec-kit-sync.mjs", import.meta.url),
+    );
+    const r = spawnSync(process.execPath, [cli], {
+      cwd: raiz,
+      encoding: "utf8",
+    });
+    assert.notEqual(r.status, 0, "o CLI precisa encerrar com código não zero");
+    const saida = `${r.stdout}${r.stderr}`;
+    assert.match(saida, /não é JSON válido/);
+    assert.ok(
+      !saida.includes("SEGREDO_NAO_DEVE_VAZAR"),
+      "a mensagem não pode ecoar o conteúdo do arquivo",
+    );
+  } finally {
+    rmSync(raiz, { recursive: true, force: true });
+  }
 });
