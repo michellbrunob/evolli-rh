@@ -6,6 +6,14 @@ import {
   GESTOR_RESOURCES,
   GestorResource,
 } from "./permission.types";
+import {
+  DOCUMENTOS_RESOURCES,
+  HORARIOS_RESOURCES,
+  ORGANIZATIONAL_RESOURCES,
+  PESSOAS_RESOURCES,
+  PONTO_RESOURCES,
+  SOLICITACOES_PESSOAS_RESOURCES,
+} from "./permission.types";
 
 /**
  * Matriz de acesso do Gestor consultivo (T151, ADR 0015), célula a célula, nas
@@ -180,19 +188,27 @@ describe("a T151 não afrouxou nenhuma negação anterior do gestor", () => {
    * destes voltar a passar, o recorte vazou para um domínio que nenhuma
    * decisão abriu.
    */
+  /**
+   * DERIVADA, não escrita à mão.
+   *
+   * A versão anterior era uma lista literal de doze nomes — e **omitia os três
+   * recursos de documentos**, que é precisamente o domínio mais sensível a um
+   * gestor por conter atestado e laudo. Uma lista manual de "tudo o que
+   * continua negado" é a forma errada de expressar a regra: ela envelhece em
+   * silêncio a cada recurso novo, e o que falta nela nunca aparece como teste
+   * vermelho.
+   *
+   * Derivar da união faz o contrário: um recurso criado amanhã entra aqui
+   * sozinho, e quem quiser liberá-lo ao gestor terá de dizer isso
+   * explicitamente, removendo-o de `GESTOR_RESOURCES`.
+   */
   const AINDA_NEGADOS = [
-    "colaborador",
-    "vinculo_funcional",
-    "movimentacao_funcional",
-    "alocacao_organizacional",
-    "evento_ponto",
-    "ajuste_ponto",
-    "empresa",
-    "departamento",
-    "equipe",
-    "cargo",
-    "tabela_horario",
-    "solicitacao_pessoa",
+    ...ORGANIZATIONAL_RESOURCES,
+    ...PESSOAS_RESOURCES,
+    ...PONTO_RESOURCES,
+    ...DOCUMENTOS_RESOURCES,
+    ...HORARIOS_RESOURCES,
+    ...SOLICITACOES_PESSOAS_RESOURCES,
   ] as const;
 
   it.each(AINDA_NEGADOS)("gestor continua negado em %s", (recurso) => {
