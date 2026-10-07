@@ -525,6 +525,27 @@ modelo seguro mas `tipo`/`motivo` revelam condição de saúde por inferência �
 "informação operacional mínima", que ainda não está definida. Ambos para a **T152**, com decisão
 própria. Criar consulta paralela sem contrato seria inventar a fronteira, que é o que a T150 recusou.
 
+**Correções da revisão adversarial (mesma T151, segunda rodada).** A revisão encontrou dois
+bloqueios e uma ressalva forte, todos fechados nesta branch:
+
+- **A data de autorização vinha do cliente.** `GET /v1/gestor/equipe` aceitava `?dataReferencia=`, e
+  o serviço resolvia com ela a ligação e as atribuições **do próprio ator** — `hoje()` era apenas o
+  padrão, nunca um teto. Um gestor encerrado recuperava a equipe informando data da janela antiga, o
+  que contradiz a decisão 8 da ADR 0015 (_"Decisões de acesso usam o estado vigente"_). O parâmetro
+  foi **removido** das duas rotas consultivas; enviá-lo responde 400, e o dia civil passou a sair de
+  `America/Sao_Paulo` em vez de UTC. O teste E2E que cristalizava o comportamento como correto foi
+  substituído por cinco que provam o contrário, e eles falham no SHA anterior.
+- **A equipe de demonstração estava vazia.** `matriculaNaEquipe` era recebida e nunca usada, nenhuma
+  admissão do seed informava `equipeId`, e `gestor.alfa` via lista vazia enquanto o guia afirmava o
+  contrário. Entrou `DEMO-A-0201`, único registro sintético com equipe, e o seed agora **confere** a
+  composição ao final em vez de só executar os passos.
+- **O histórico não era append-only de verdade.** A garantia se apoiava em "não há rota `DELETE`" —
+  que protege o pai, não a linha. A migration `20261007120000` revoga `DELETE` de `evolli_app` nas
+  três tabelas e adiciona gatilhos que limitam o `UPDATE` ao encerramento, uma vez só.
+- **TOCTOU nos três encerramentos.** `findFirst` conferia e `update` escrevia por `id`: dois `PATCH`
+  simultâneos sobrescreviam autor e data. O predicado passou para dentro do `updateMany`, o segundo
+  recebe 409 genérico e a auditoria da perdedora reverte junto.
+
 **Limites explícitos:** sem interface web; sem alteração na integração de ponto; sem gestão
 matricial; sem liberar departamento ou empresa; sem folha, eSocial, benefícios ou documentos.
 

@@ -136,6 +136,45 @@ Nenhum escopo retroativo é criado silenciosamente: inserir atribuição com
 vigência passada colide com a EXCLUSION se houver sobreposição, e qualquer
 criação gera evento de auditoria na mesma transação.
 
+#### "Estado vigente" é do servidor, e a rota não aceita data
+
+A primeira implementação desta decisão a contradizia. `GET /v1/gestor/equipe`
+aceitava `?dataReferencia=`, e o serviço usava essa data para resolver a
+ligação conta-pessoa e as atribuições **do próprio ator** — a data corrente era
+só o valor padrão, nunca um teto. Um gestor cuja atribuição terminou voltava a
+ler a equipe informando uma data de dentro da janela antiga: quem perguntava
+escolhia em que data estava autorizado.
+
+A rota passou a **não aceitar parâmetro algum**. `?dataReferencia=` responde
+`400`, e não é ignorada em silêncio — ignorar faria o cliente acreditar que a
+data foi aceita. Validar o intervalo em vez de remover o parâmetro seria
+circular: a vigência é exatamente o que estaria sendo decidido.
+
+"Vigente" é o dia civil em `America/Sao_Paulo`, pelo mesmo utilitário que o
+ponto usa. Resolver em UTC deslocaria a fronteira em três horas todas as
+noites.
+
+**Consulta histórica** — ver a equipe como era em outra data — não é esta
+capacidade e não está decidida aqui: exigiria dizer quem pode olhar para trás,
+até quando, e o que acontece com quem saiu da equipe desde então. Entra como
+capacidade própria quando houver decisão.
+
+#### A imutabilidade é do banco, não da disciplina do serviço
+
+"Encerrar nunca apaga" também se apoiava apenas na ausência de rota `DELETE` e
+em `ON DELETE RESTRICT` — que protege o registro **pai**, não a própria linha.
+`DELETE FROM atribuicao_gestor_equipe` funcionava, e uma atribuição encerrada
+podia ser reaberta com `vigencia_fim = NULL`.
+
+O papel de aplicação perdeu `DELETE` nas três tabelas, e gatilhos limitam o
+`UPDATE` à transição de encerramento: identidade, empresa, equipe, papel,
+início, criador e justificativa são imutáveis, e o encerramento acontece uma
+vez só. `UPDATE` permanece concedido porque encerrar depende dele.
+
+Privilégio não alcança o dono da tabela nem superusuário — correção deliberada
+por DBA continua possível, como deve ser, mas exige ato administrativo
+explícito.
+
 ### 9. Exceções individuais somente pelo RH, com justificativa, prazo e auditoria
 
 A exceção alcança um **vínculo** nominal fora das equipes do gestor. Exige
