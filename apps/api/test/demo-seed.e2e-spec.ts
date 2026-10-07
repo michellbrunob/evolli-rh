@@ -217,7 +217,12 @@ describe("Seed do ambiente local de demonstração (T141, e2e)", () => {
     expect(primeira.criados).toBeGreaterThan(0);
     expect(primeira.empresas).toBe(2);
     expect(primeira.usuarios).toBe(PERFIS_DEMO.length);
-    expect(primeira.colaboradores).toBe(2);
+    // Três colaboradores: os dois do cenário de vínculos (um e dois) mais
+    // `DEMO-A-0201`, que existe só para o escopo do gestor ter gente dentro
+    // da equipe.
+    expect(primeira.colaboradores).toBe(3);
+    // `vinculos` no resumo é quantos vínculos tem o colaborador DE DOIS —
+    // não o total do conjunto. Continua 2.
     expect(primeira.vinculos).toBe(2);
 
     // Segunda execução: encontra tudo e não escreve nada.
@@ -255,6 +260,7 @@ describe("Seed do ambiente local de demonstração (T141, e2e)", () => {
         "DEMO-A-0001",
         "DEMO-A-0002",
         "DEMO-A-0003",
+        "DEMO-A-0201",
         "DEMO-B-0001",
       ]);
     } finally {
@@ -358,6 +364,7 @@ describe("Seed do ambiente local de demonstração (T141, e2e)", () => {
       expect(ativos.map((v) => v.matricula).sort()).toEqual([
         "DEMO-A-0001",
         "DEMO-A-0002",
+        "DEMO-A-0201",
         "DEMO-B-0001",
       ]);
 
@@ -368,7 +375,12 @@ describe("Seed do ambiente local de demonstração (T141, e2e)", () => {
       expect(previstos.map((v) => v.matricula)).toEqual(["DEMO-A-0003"]);
 
       // Cada vínculo ativo tem exatamente UMA alocação vigente (sem fim).
-      for (const matricula of ["DEMO-A-0001", "DEMO-A-0002", "DEMO-B-0001"]) {
+      for (const matricula of [
+        "DEMO-A-0001",
+        "DEMO-A-0002",
+        "DEMO-A-0201",
+        "DEMO-B-0001",
+      ]) {
         const vinculo = await prisma.vinculoFuncional.findFirstOrThrow({
           where: { matricula },
           select: { id: true },
@@ -389,6 +401,22 @@ describe("Seed do ambiente local de demonstração (T141, e2e)", () => {
         where: { vinculoId: comCargo.id, vigenteAte: null },
       });
       expect(alocacao.cargoId).not.toBeNull();
+
+      // E DEMO-A-0201 é o único com equipe — a asserção que faltava, e cuja
+      // ausência deixou a equipe do gestor vazia sem nenhum teste reclamar.
+      const naEquipe = await prisma.vinculoFuncional.findFirstOrThrow({
+        where: { matricula: "DEMO-A-0201" },
+        select: { id: true },
+      });
+      const comEquipe = await prisma.alocacaoOrganizacional.findFirstOrThrow({
+        where: { vinculoId: naEquipe.id, vigenteAte: null },
+      });
+      expect(comEquipe.equipeId).not.toBeNull();
+
+      const semEquipe = await prisma.alocacaoOrganizacional.findFirstOrThrow({
+        where: { vinculoId: comCargo.id, vigenteAte: null },
+      });
+      expect(semEquipe.equipeId).toBeNull();
     } finally {
       await prisma.$disconnect();
     }
@@ -413,6 +441,49 @@ describe("Seed do ambiente local de demonstração (T141, e2e)", () => {
     expect(daAlfa.some((n) => n.includes("Beta"))).toBe(false);
     expect(daBeta.some((n) => n.includes("Beta"))).toBe(true);
     expect(daBeta.some((n) => n.includes("Alfa"))).toBe(false);
+  });
+
+  /**
+   * B2 — a demonstração do gestor precisa demonstrar alguma coisa.
+   *
+   * O seed atribuía `gestor.alfa` à equipe `TURNOA` e parava aí: nenhuma
+   * admissão informava `equipeId`, o parâmetro `matriculaNaEquipe` era
+   * recebido e nunca usado, e a equipe ficava vazia. O gestor logava, a lista
+   * vinha vazia — comportamento correto para equipe sem gente — e o guia
+   * afirmava o contrário. Este teste é a diferença entre as duas coisas.
+   */
+  it("o gestor sintético enxerga quem está na equipe, e só quem está", async () => {
+    const { cookie } = await entrarComo("gestor.alfa@evolli.local");
+
+    const res = await fetch(`${baseUrl}/v1/gestor/equipe`, {
+      headers: { Cookie: cookie, Accept: "application/json" },
+    });
+    expect(res.status).toBe(200);
+
+    const corpo = (await res.json()) as {
+      itens: { matricula: string; nome: string }[];
+    };
+    const matriculas = corpo.itens.map((i) => i.matricula);
+
+    // DENTRO da equipe: o registro dedicado ao cenário.
+    expect(matriculas).toContain("DEMO-A-0201");
+    // FORA da equipe, mesma empresa: invisível.
+    expect(matriculas).not.toContain("DEMO-A-0002");
+    // Outra empresa: invisível.
+    expect(matriculas).not.toContain("DEMO-B-0001");
+    // E o gestor não enxerga a si próprio, que também está fora da equipe.
+    expect(matriculas).not.toContain("DEMO-A-0001");
+  });
+
+  it("a consulta do gestor sintético recusa parâmetro de data", async () => {
+    // A rota não aceita `dataReferencia` — ver ADR 0015, decisão 8. Recusar é
+    // melhor que ignorar: um 200 faria o cliente acreditar na data enviada.
+    const { cookie } = await entrarComo("gestor.alfa@evolli.local");
+    const res = await fetch(
+      `${baseUrl}/v1/gestor/equipe?dataReferencia=2026-01-01`,
+      { headers: { Cookie: cookie, Accept: "application/json" } },
+    );
+    expect(res.status).toBe(400);
   });
 
   it("não cria conteúdo documental, anexo nem dado clínico", async () => {

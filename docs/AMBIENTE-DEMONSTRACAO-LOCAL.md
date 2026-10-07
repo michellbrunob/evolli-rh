@@ -161,14 +161,14 @@ O domínio `evolli.local` é reservado e não roteável — nenhum destes e-mail
 existe. A senha é deliberadamente autodescritiva: quem a vir num log sabe que é
 de demonstração.
 
-| E-mail                          | Papel            | Empresa    | Para que serve                                                                                                                                           | Limite esperado                                                                                                                                                   |
-| ------------------------------- | ---------------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `master.demo@evolli.local`      | `master_tecnico` | — (global) | Criar empresas e contas; enxergar as duas empresas                                                                                                       | Nas Solicitações de Pessoas, lê e **não muta**                                                                                                                    |
-| `rh.alfa@evolli.local`          | `rh`             | Demo Alfa  | Papel operador da maior parte das telas funcionais                                                                                                       | Só enxerga a Alfa                                                                                                                                                 |
-| `rh.beta@evolli.local`          | `rh`             | Demo Beta  | Contraprova de isolamento: mesmas telas, outro escopo                                                                                                    | Recursos da Alfa respondem 404, nunca 403                                                                                                                         |
-| `dp.alfa@evolli.local`          | `dp`             | Demo Alfa  | Diferença de capacidade entre DP e RH                                                                                                                    | Sem capacidade nas Solicitações de Pessoas                                                                                                                        |
-| `gestor.alfa@evolli.local`      | `gestor`         | Demo Alfa  | Papel consultivo (`PD-SOL-01`, ADR 0015). Desde a T151 **tem escopo real**: enxerga, por API, os colaboradores da equipe `TURNOA` que o seed lhe atribui | Somente leitura, e só dentro da equipe atribuída. Sem interface web (T151 é backend); sem resumo de jornada e sem andamento de solicitações (adiados para a T152) |
-| `colaborador.alfa@evolli.local` | `colaborador`    | Demo Alfa  | Demonstrar a negação por papel                                                                                                                           | **Não é autoatendimento**: não existe vínculo autenticado entre conta e colaborador (`DP-23`)                                                                     |
+| E-mail                          | Papel            | Empresa    | Para que serve                                                                                                                                                                                                                                              | Limite esperado                                                                                                                                                   |
+| ------------------------------- | ---------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `master.demo@evolli.local`      | `master_tecnico` | — (global) | Criar empresas e contas; enxergar as duas empresas                                                                                                                                                                                                          | Nas Solicitações de Pessoas, lê e **não muta**                                                                                                                    |
+| `rh.alfa@evolli.local`          | `rh`             | Demo Alfa  | Papel operador da maior parte das telas funcionais                                                                                                                                                                                                          | Só enxerga a Alfa                                                                                                                                                 |
+| `rh.beta@evolli.local`          | `rh`             | Demo Beta  | Contraprova de isolamento: mesmas telas, outro escopo                                                                                                                                                                                                       | Recursos da Alfa respondem 404, nunca 403                                                                                                                         |
+| `dp.alfa@evolli.local`          | `dp`             | Demo Alfa  | Diferença de capacidade entre DP e RH                                                                                                                                                                                                                       | Sem capacidade nas Solicitações de Pessoas                                                                                                                        |
+| `gestor.alfa@evolli.local`      | `gestor`         | Demo Alfa  | Papel consultivo (`PD-SOL-01`, ADR 0015). Desde a T151 **tem escopo real**: enxerga, por API, `DEMO-A-0201` — o único colaborador alocado na equipe `TURNOA`, que o seed lhe atribui. Não enxerga `DEMO-A-0002`, que está na mesma empresa e fora da equipe | Somente leitura, e só dentro da equipe atribuída. Sem interface web (T151 é backend); sem resumo de jornada e sem andamento de solicitações (adiados para a T152) |
+| `colaborador.alfa@evolli.local` | `colaborador`    | Demo Alfa  | Demonstrar a negação por papel                                                                                                                                                                                                                              | **Não é autoatendimento**: não existe vínculo autenticado entre conta e colaborador (`DP-23`)                                                                     |
 
 Há ainda `admin.demo@evolli.local` (`admin_tecnico`), criada pelo bootstrap. Ela
 existe por exigência do provisionamento e **não** cria empresas.
@@ -193,10 +193,10 @@ versionado, e o CLI do seed é excluído do artefato de build da API
 
 Duas empresas (**Demo Alfa** e **Demo Beta**), cada registro com a marca `Demo`
 no nome. Na Alfa: unidade, dois departamentos, área, equipe, cargo, centro de
-custo e uma tabela de horário. Dois colaboradores — um com **um** vínculo e
-outro com **dois** —, que é exatamente a diferença que as telas tratam (um
-resolve sozinho; dois exigem escolha explícita). Na Beta, o mínimo para provar
-isolamento.
+custo e uma tabela de horário. Três colaboradores: um com **um** vínculo e
+outro com **dois** — que é exatamente a diferença que as telas tratam (um
+resolve sozinho; dois exigem escolha explícita) — mais `DEMO-A-0201`, criado
+para o cenário do gestor. Na Beta, o mínimo para provar isolamento.
 
 **As admissões sintéticas vêm efetivadas (T147).** Admitir, por contrato, não
 ativa ninguém: o colaborador nasce `inativo`, o vínculo nasce `previsto` e a
@@ -210,6 +210,15 @@ recusaria o segundo. `DEMO-A-0003` fica deliberadamente em `previsto`: é ele
 que dá à demonstração um exemplo de vínculo ainda não efetivado ao lado de um
 já ativo do mesmo colaborador. `DEMO-A-0001` recebe cargo, para que "Cargo
 vigente" apareça preenchido em pelo menos um caso.
+
+`DEMO-A-0201` é o **único** registro sintético que nasce com `equipeId`, e
+existe só para o cenário do gestor. Separado dos demais de propósito: o seed é
+idempotente pelo efeito, então acrescentar equipe ao corpo da admissão de
+`DEMO-A-0002` não mudaria nada nos bancos onde ele já foi criado — e são
+justamente esses que precisam convergir. O par fica explícito: `DEMO-A-0201`
+**dentro** da equipe `TURNOA`, `DEMO-A-0002` **fora** dela na mesma empresa,
+`DEMO-B-0001` em outra empresa. O seed **confere** essa composição ao final e
+falha se ela não se confirmar, em vez de entregar um gestor com equipe vazia.
 
 **Não são criados:** conteúdo de documento, anexo, biometria, diagnóstico, CID,
 dado clínico, MFA, nem qualquer acesso a serviço externo ou R2.
@@ -289,6 +298,10 @@ chamado por uma pessoa, e nenhum aponta para host que não seja local.
   (ADR 0015): o gestor enxerga a equipe atribuída em `GET /v1/gestor/equipe`.
   **Não há tela** — a interface é tarefa posterior. Um gestor sem atribuição vê
   lista vazia, que é o comportamento correto, não um defeito.
+  A rota **não aceita parâmetro**: o escopo é sempre o vigente na data do
+  servidor, e `?dataReferencia=...` responde 400. Consultar como a equipe era
+  em outra data não é capacidade decidida — e, enquanto data vinha do cliente,
+  era também uma forma de recuperar acesso já encerrado.
 - **Sem anexo, upload ou R2.** Continuam bloqueados pelos portões de conteúdo.
 - **Sem dado real, em nenhuma hipótese.**
 - **Uma tela estoura a largura da página.** `Pessoas › Histórico funcional`

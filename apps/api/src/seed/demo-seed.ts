@@ -434,6 +434,15 @@ async function garantirCatalogo(
   );
 }
 
+/**
+ * Matrícula do registro sintético que existe para o cenário do gestor.
+ *
+ * Fora da faixa `DEMO-A-000x` de propósito: aquelas são as pessoas da
+ * demonstração geral, e emendar a equipe nelas reescreveria o conjunto que as
+ * telas de pessoas já usam.
+ */
+const MATRICULA_NA_EQUIPE = "DEMO-A-0201";
+
 async function garantirColaborador(
   ctx: Contexto,
   rh: Sessao,
@@ -554,7 +563,10 @@ async function garantirEscopoDeGestor(
     gestorEmail: string;
     gestorMatricula: string;
     equipeId: string;
+    /** Quem o gestor DEVE ver. Verificada no passo 5. */
     matriculaNaEquipe: string;
+    /** Quem o gestor NÃO deve ver, na mesma empresa. Verificada no passo 5. */
+    matriculaForaDaEquipe: string;
   },
 ): Promise<void> {
   // 1. a conta do gestor
@@ -625,27 +637,91 @@ async function garantirEscopoDeGestor(
   );
   if (jaAtribuido) {
     ctx.reaproveitados += 1;
-    return;
+  } else {
+    const res = await pedir(
+      ctx,
+      "POST",
+      "/v1/gestor/administracao/atribuicoes",
+      rh,
+      {
+        equipeId: alvo.equipeId,
+        gestorColaboradorId: colaboradorDoGestor.colaboradorId,
+        papel: "principal",
+        vigenciaInicio: "2026-01-05",
+      },
+    );
+    if (!res.ok) {
+      throw new Error(
+        `Falha ao atribuir a equipe ao gestor: a API respondeu ${res.status}.`,
+      );
+    }
+    ctx.criados += 1;
   }
 
-  const res = await pedir(
-    ctx,
-    "POST",
-    "/v1/gestor/administracao/atribuicoes",
-    rh,
-    {
-      equipeId: alvo.equipeId,
-      gestorColaboradorId: colaboradorDoGestor.colaboradorId,
-      papel: "principal",
-      vigenciaInicio: "2026-01-05",
-    },
-  );
-  if (!res.ok) {
+  // 5. CONFERIR que a equipe tem gente dentro.
+  //
+  // Este passo existe porque a ausência dele já custou caro: `matriculaNaEquipe`
+  // era recebida e nunca usada, nenhuma admissão informava `equipeId`, e o
+  // resultado era um gestor corretamente atribuído a uma equipe VAZIA — lista
+  // vazia na tela, enquanto o guia afirmava que ele enxergaria a equipe. O
+  // seed terminava com sucesso e a demonstração não demonstrava nada.
+  //
+  // Conferir o EFEITO, e não só executar os passos, é o que transforma a
+  // promessa do guia em invariante: se alguém remover o `equipeId` da
+  // admissão, o seed para aqui em vez de entregar um ambiente mudo.
+  await conferirComposicaoDaEquipe(ctx, rh, alvo);
+}
+
+/**
+ * Prova, lendo o banco pela API, que a equipe do gestor tem exatamente a
+ * composição que a demonstração promete: a pessoa de dentro está alocada
+ * nela, e a de fora não está.
+ */
+async function conferirComposicaoDaEquipe(
+  ctx: Contexto,
+  rh: Sessao,
+  alvo: {
+    equipeId: string;
+    matriculaNaEquipe: string;
+    matriculaForaDaEquipe: string;
+  },
+): Promise<void> {
+  const naEquipe = await alocacaoVigenteDe(ctx, rh, alvo.matriculaNaEquipe);
+  if (naEquipe?.equipeId !== alvo.equipeId) {
     throw new Error(
-      `Falha ao atribuir a equipe ao gestor: a API respondeu ${res.status}.`,
+      `O ambiente ficaria mudo: ${alvo.matriculaNaEquipe} deveria ter alocação ` +
+        `vigente na equipe do gestor, mas está em ` +
+        `${naEquipe?.equipeId ?? "nenhuma equipe"}. O gestor veria lista vazia.`,
     );
   }
-  ctx.criados += 1;
+
+  const fora = await alocacaoVigenteDe(ctx, rh, alvo.matriculaForaDaEquipe);
+  if (fora?.equipeId === alvo.equipeId) {
+    throw new Error(
+      `A contraprova sumiu: ${alvo.matriculaForaDaEquipe} deveria estar FORA ` +
+        "da equipe do gestor, para que a demonstração mostre a diferença.",
+    );
+  }
+}
+
+/** Alocação vigente (`vigenteAte === null`) do vínculo de uma matrícula. */
+async function alocacaoVigenteDe(
+  ctx: Contexto,
+  rh: Sessao,
+  matricula: string,
+): Promise<{ equipeId: string | null } | null> {
+  const encontrado = await colaboradorPorMatricula(ctx, rh, matricula);
+  if (!encontrado) {
+    throw new Error(
+      `Matrícula ${matricula} não encontrada ao conferir a equipe do gestor.`,
+    );
+  }
+
+  const alocacoes = await ler<
+    { equipeId: string | null; vigenteAte: string | null }[]
+  >(ctx, `/v1/vinculos/${encontrado.vinculoId}/alocacoes`, rh);
+
+  return alocacoes.find((a) => a.vigenteAte === null) ?? null;
 }
 
 /** Resolve `colaboradorId` a partir de uma matrícula sintética. */
@@ -853,6 +929,27 @@ export async function semearDemonstracao(
         }),
     );
 
+    // Registro DEDICADO ao cenário do gestor: o único do conjunto sintético
+    // que nasce com `equipeId`. Separado de `DEMO-A-0001`/`DEMO-A-0002` de
+    // propósito — aqueles já existem nos bancos de demonstração sem equipe, e
+    // o seed é idempotente pelo EFEITO: mudar o corpo da admissão deles não
+    // alteraria nada onde já foram criados, e o cenário continuaria vazio
+    // justamente nas instalações antigas, que são as que importam. Criar um
+    // registro novo converge em qualquer banco, velho ou novo, sem reescrever
+    // histórico de ninguém.
+    const naEquipe = `Pessoa ${MARCA_DEMO} Alfa Turno A`;
+    const colabEquipe = await garantirColaborador(ctx, rhAlfa, naEquipe, {
+      nome: naEquipe,
+      empresaId: alfa.id,
+      matricula: MATRICULA_NA_EQUIPE,
+      tipo: "clt",
+      dataAdmissao: "2026-01-05",
+      motivoCodigo: "admissao_inicial",
+      cargoId: analista.id,
+      departamentoId: operacoes.id,
+      equipeId: turnoA.id,
+    });
+
     // --- Efetivação das admissões -----------------------------------------
     // Sem este passo o conjunto sintético fica inteiro em `previsto`/`inativo`
     // e sem nenhuma alocação: Dados contratuais mostraria "Sem alocação
@@ -865,6 +962,15 @@ export async function semearDemonstracao(
     // já ativo do mesmo colaborador.
     await garantirAdmissaoEfetivada(ctx, rhAlfa, colabUm.id, "DEMO-A-0001");
     await garantirAdmissaoEfetivada(ctx, rhAlfa, colabDois.id, "DEMO-A-0002");
+    // Sem efetivar, não nasce alocação — e sem alocação vigente apontando
+    // para a equipe, o gestor continua vendo lista vazia. É a efetivação, não
+    // a admissão, que coloca alguém numa equipe.
+    await garantirAdmissaoEfetivada(
+      ctx,
+      rhAlfa,
+      colabEquipe.id,
+      MATRICULA_NA_EQUIPE,
+    );
 
     // --- Empresa Beta: mínimo para provar isolamento ----------------------
     const departamentoBeta = await garantirCatalogo(
@@ -905,7 +1011,8 @@ export async function semearDemonstracao(
       gestorEmail: `gestor.alfa@${DOMINIO}`,
       gestorMatricula: "DEMO-A-0001",
       equipeId: turnoA.id,
-      matriculaNaEquipe: "DEMO-A-0002",
+      matriculaNaEquipe: MATRICULA_NA_EQUIPE,
+      matriculaForaDaEquipe: "DEMO-A-0002",
     });
 
     // --- Resumo -----------------------------------------------------------
