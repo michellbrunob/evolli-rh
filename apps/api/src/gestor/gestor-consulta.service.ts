@@ -106,17 +106,25 @@ export class GestorConsultaService {
    * `master_tecnico` e `rh` não têm atribuição de equipe — eles consultam para
    * conferir configuração, e o fazem informando o gestor explicitamente. Este
    * método é sempre sobre **o próprio ator**.
+   *
+   * `dataReferencia` é parâmetro, mas **não** é o `dataReferencia` que foi
+   * removido da rota, e a diferença é toda: aquele vinha da query string;
+   * este só pode vir de `consultarEscopo`, que o obteve de `hoje()` linhas
+   * antes. O método é `private`, o único chamador é aquele, e nenhuma função
+   * pública desta classe aceita data — então não há como um valor do cliente
+   * chegar aqui. Ele existe para garantir o oposto do que o parâmetro antigo
+   * permitia: que a requisição inteira use **uma única** leitura de relógio.
    */
-  private async escopoDoAtor(ctx: GestorConsultaContext): Promise<{
+  private async escopoDoAtor(
+    ctx: GestorConsultaContext,
+    dataReferencia: string,
+  ): Promise<{
     empresaId: string;
     colaboradorId: string;
-    dataReferencia: string;
     escopo: EscopoDoGestor;
   } | null> {
     const empresaId = ctx.actor.companyId;
     if (!empresaId) return null;
-
-    const dataReferencia = this.hoje();
 
     // Passo 2: conta -> pessoa. Sem ligação vigente, o gestor não é ninguém no
     // cadastro, e portanto não alcança ninguém.
@@ -173,12 +181,7 @@ export class GestorConsultaService {
       dataReferencia,
     );
 
-    return {
-      empresaId,
-      colaboradorId: ligacao.colaboradorId,
-      dataReferencia,
-      escopo,
-    };
+    return { empresaId, colaboradorId: ligacao.colaboradorId, escopo };
   }
 
   /**
@@ -195,7 +198,16 @@ export class GestorConsultaService {
     dataReferencia: string;
     itens: ReturnType<GestorConsultaService["comoItem"]>[];
   }> {
-    const resolvido = await this.escopoDoAtor(ctx);
+    // RELÓGIO LIDO UMA VEZ POR REQUISIÇÃO, e esta é a única leitura.
+    //
+    // Os três usos abaixo — resolver o escopo, filtrar as alocações vigentes e
+    // preencher o campo informativo da resposta — precisam concordar. Ler
+    // `hoje()` de novo em qualquer um deles abriria uma janela estreita, mas
+    // real, na virada do dia: o escopo seria resolvido em 31/01 e os vínculos
+    // lidos em 01/02, e a resposta citaria uma terceira data. Uma requisição
+    // que atravessa a meia-noite tem de responder por um instante só.
+    const data = this.hoje();
+    const resolvido = await this.escopoDoAtor(ctx, data);
 
     // Sem ligação, sem atribuição, sem exceção: lista vazia. NUNCA empresa
     // inteira. Retornar antes de consultar torna o vazamento impossível por
@@ -203,16 +215,12 @@ export class GestorConsultaService {
     if (!resolvido || resolvido.escopo.vazio) {
       return {
         empresaId: resolvido?.empresaId ?? null,
-        dataReferencia: resolvido?.dataReferencia ?? this.hoje(),
+        dataReferencia: data,
         itens: [],
       };
     }
 
-    const { empresaId, escopo, dataReferencia: data } = resolvido;
-    // A MESMA data que autorizou é a que filtra as alocações. Derivá-la de
-    // novo abriria a janela em que `hoje()` muda entre as duas chamadas — na
-    // virada do dia, o escopo seria resolvido numa data e os vínculos lidos
-    // noutra.
+    const { empresaId, escopo } = resolvido;
     const limite = new Date(`${data}T00:00:00.000Z`);
 
     const vinculos = await this.prisma.vinculoFuncional.findMany({

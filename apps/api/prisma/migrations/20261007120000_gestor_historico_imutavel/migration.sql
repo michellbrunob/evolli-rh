@@ -9,10 +9,25 @@
 -- quem criou o registro e quando.
 --
 -- O criterio do repositorio e explicito desde a T139: historico append-only
--- garantido pelo BANCO e nao pela disciplina do service. Cinco migrations
--- anteriores ja revogam DELETE em tabelas de historico (audit_event,
--- evento_ponto, ajuste_ponto, periodo_horario, vinculo_horario,
--- solicitacao_pessoa). Estas tres estavam fora, e isto as alinha.
+-- garantido pelo BANCO e nao pela disciplina do service. Migrations anteriores
+-- do projeto ja aplicam REVOKE DELETE a tabelas cujo historico deve ser
+-- preservado; esta migration mantem o mesmo principio para as estruturas da
+-- T151, que estavam fora dele.
+--
+-- Os precedentes, conferidos como SQL EXECUTAVEL (nao mencao em comentario),
+-- sao oito tabelas em quatro migrations:
+--   20260805120000  audit_event                 (UPDATE, DELETE)
+--   20260810120000  evento_ponto                (UPDATE, DELETE)
+--   20260810120000  ajuste_ponto                (UPDATE, DELETE)
+--   20260826120000  tabela_horario              (DELETE)
+--   20260826120000  periodo_horario             (UPDATE, DELETE)
+--   20260826120000  vinculo_horario             (DELETE)
+--   20260929120000  solicitacao_pessoa          (DELETE)
+--   20260929120000  solicitacao_pessoa_evento   (UPDATE, DELETE)
+--
+-- A distincao importa: 20260814120000 (documentos) CITA REVOKE, mas apenas num
+-- comentario que explica por que NAO revoga UPDATE ali. Contar arquivos por
+-- `grep REVOKE` daria cinco migrations e estaria errado.
 --
 -- POR QUE PRIVILEGIO **E** TRIGGER, e nao so um dos dois:
 --

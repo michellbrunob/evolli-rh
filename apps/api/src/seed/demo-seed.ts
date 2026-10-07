@@ -443,6 +443,17 @@ async function garantirCatalogo(
  */
 const MATRICULA_NA_EQUIPE = "DEMO-A-0201";
 
+/**
+ * Matrícula da CONTRAPROVA: mesma empresa, equipe diferente.
+ *
+ * Precisa estar numa outra equipe — não apenas fora da do gestor. `DEMO-A-0002`
+ * serviria como "não aparece na lista", mas tem alocação vigente SEM equipe, e
+ * uma contraprova assim não distingue "o filtro por equipe funciona" de "não
+ * havia dado para mostrar". Com `DEMO-A-0202` em `TURNOB`, o gestor de
+ * `TURNOA` deixa de vê-lo porque a equipe é outra, que é o que se quer provar.
+ */
+const MATRICULA_FORA_DA_EQUIPE = "DEMO-A-0202";
+
 async function garantirColaborador(
   ctx: Contexto,
   rh: Sessao,
@@ -672,10 +683,74 @@ async function garantirEscopoDeGestor(
   await conferirComposicaoDaEquipe(ctx, rh, alvo);
 }
 
+/** Alocação vigente como o seed precisa vê-la, ou `null` se não houver. */
+export interface AlocacaoConferida {
+  readonly equipeId: string | null;
+}
+
 /**
- * Prova, lendo o banco pela API, que a equipe do gestor tem exatamente a
- * composição que a demonstração promete: a pessoa de dentro está alocada
- * nela, e a de fora não está.
+ * Regra de composição da equipe do gestor — pura, para ser testável sem API.
+ *
+ * Devolve a mensagem de erro, ou `null` quando a composição está correta.
+ *
+ * A CONTRAPROVA É EXIGENTE DE PROPÓSITO. A versão anterior só recusava
+ * `fora.equipeId === equipeAlvo`, e com isso "está em outra equipe" e "não
+ * está em equipe nenhuma" passavam igual — inclusive "não tem alocação
+ * vigente". Uma contraprova que passa por ausência de dado não prova que a
+ * consulta filtra por equipe; prova apenas que não há o que mostrar. Agora
+ * são cinco condições cumulativas: vínculo encontrado, alocação vigente
+ * encontrada, `equipeId` presente, e diferente da equipe do gestor.
+ */
+export function validarComposicaoDaEquipe(entrada: {
+  equipeAlvo: string;
+  matriculaNaEquipe: string;
+  naEquipe: AlocacaoConferida | null;
+  matriculaForaDaEquipe: string;
+  foraDaEquipe: AlocacaoConferida | null;
+}): string | null {
+  const { equipeAlvo, naEquipe, foraDaEquipe } = entrada;
+
+  if (naEquipe === null) {
+    return (
+      `O ambiente ficaria mudo: ${entrada.matriculaNaEquipe} não tem alocação ` +
+      "vigente. O gestor veria lista vazia."
+    );
+  }
+  if (naEquipe.equipeId !== equipeAlvo) {
+    return (
+      `O ambiente ficaria mudo: ${entrada.matriculaNaEquipe} deveria estar na ` +
+      `equipe do gestor, mas está em ${naEquipe.equipeId ?? "nenhuma equipe"}. ` +
+      "O gestor veria lista vazia."
+    );
+  }
+
+  if (foraDaEquipe === null) {
+    return (
+      `A contraprova é fraca: ${entrada.matriculaForaDaEquipe} não tem alocação ` +
+      "vigente, então não demonstra que a consulta filtra por EQUIPE — apenas " +
+      "que não há o que mostrar."
+    );
+  }
+  if (foraDaEquipe.equipeId === null) {
+    return (
+      `A contraprova é fraca: ${entrada.matriculaForaDaEquipe} está alocado sem ` +
+      "equipe. Para provar o filtro, ele precisa estar em OUTRA equipe."
+    );
+  }
+  if (foraDaEquipe.equipeId === equipeAlvo) {
+    return (
+      `A contraprova sumiu: ${entrada.matriculaForaDaEquipe} está DENTRO da ` +
+      "equipe do gestor, então não há diferença a demonstrar."
+    );
+  }
+
+  return null;
+}
+
+/**
+ * Prova, lendo o banco pela API, que a equipe do gestor tem a composição que a
+ * demonstração promete. O I/O mora aqui; a regra, em
+ * `validarComposicaoDaEquipe`.
  */
 async function conferirComposicaoDaEquipe(
   ctx: Contexto,
@@ -686,22 +761,14 @@ async function conferirComposicaoDaEquipe(
     matriculaForaDaEquipe: string;
   },
 ): Promise<void> {
-  const naEquipe = await alocacaoVigenteDe(ctx, rh, alvo.matriculaNaEquipe);
-  if (naEquipe?.equipeId !== alvo.equipeId) {
-    throw new Error(
-      `O ambiente ficaria mudo: ${alvo.matriculaNaEquipe} deveria ter alocação ` +
-        `vigente na equipe do gestor, mas está em ` +
-        `${naEquipe?.equipeId ?? "nenhuma equipe"}. O gestor veria lista vazia.`,
-    );
-  }
-
-  const fora = await alocacaoVigenteDe(ctx, rh, alvo.matriculaForaDaEquipe);
-  if (fora?.equipeId === alvo.equipeId) {
-    throw new Error(
-      `A contraprova sumiu: ${alvo.matriculaForaDaEquipe} deveria estar FORA ` +
-        "da equipe do gestor, para que a demonstração mostre a diferença.",
-    );
-  }
+  const erro = validarComposicaoDaEquipe({
+    equipeAlvo: alvo.equipeId,
+    matriculaNaEquipe: alvo.matriculaNaEquipe,
+    naEquipe: await alocacaoVigenteDe(ctx, rh, alvo.matriculaNaEquipe),
+    matriculaForaDaEquipe: alvo.matriculaForaDaEquipe,
+    foraDaEquipe: await alocacaoVigenteDe(ctx, rh, alvo.matriculaForaDaEquipe),
+  });
+  if (erro) throw new Error(erro);
 }
 
 /** Alocação vigente (`vigenteAte === null`) do vínculo de uma matrícula. */
@@ -841,6 +908,20 @@ export async function semearDemonstracao(
         nome: `Turno A ${MARCA_DEMO}`,
       },
     );
+    // Segunda equipe, só para a contraprova do gestor ter onde morar: sem ela,
+    // o único jeito de alguém estar "fora de TURNOA" seria não estar em equipe
+    // nenhuma — o que não prova que a consulta filtra por equipe.
+    const turnoB = await garantirCatalogo(
+      ctx,
+      rhAlfa,
+      "/v1/equipes",
+      "TURNOB",
+      {
+        departamentoId: operacoes.id,
+        codigo: "TURNOB",
+        nome: `Turno B ${MARCA_DEMO}`,
+      },
+    );
     const analista = await garantirCatalogo(
       ctx,
       rhAlfa,
@@ -950,6 +1031,24 @@ export async function semearDemonstracao(
       equipeId: turnoA.id,
     });
 
+    const foraDaEquipe = `Pessoa ${MARCA_DEMO} Alfa Turno B`;
+    const colabForaDaEquipe = await garantirColaborador(
+      ctx,
+      rhAlfa,
+      foraDaEquipe,
+      {
+        nome: foraDaEquipe,
+        empresaId: alfa.id,
+        matricula: MATRICULA_FORA_DA_EQUIPE,
+        tipo: "clt",
+        dataAdmissao: "2026-01-05",
+        motivoCodigo: "admissao_inicial",
+        cargoId: analista.id,
+        departamentoId: operacoes.id,
+        equipeId: turnoB.id,
+      },
+    );
+
     // --- Efetivação das admissões -----------------------------------------
     // Sem este passo o conjunto sintético fica inteiro em `previsto`/`inativo`
     // e sem nenhuma alocação: Dados contratuais mostraria "Sem alocação
@@ -970,6 +1069,12 @@ export async function semearDemonstracao(
       rhAlfa,
       colabEquipe.id,
       MATRICULA_NA_EQUIPE,
+    );
+    await garantirAdmissaoEfetivada(
+      ctx,
+      rhAlfa,
+      colabForaDaEquipe.id,
+      MATRICULA_FORA_DA_EQUIPE,
     );
 
     // --- Empresa Beta: mínimo para provar isolamento ----------------------
@@ -1012,7 +1117,7 @@ export async function semearDemonstracao(
       gestorMatricula: "DEMO-A-0001",
       equipeId: turnoA.id,
       matriculaNaEquipe: MATRICULA_NA_EQUIPE,
-      matriculaForaDaEquipe: "DEMO-A-0002",
+      matriculaForaDaEquipe: MATRICULA_FORA_DA_EQUIPE,
     });
 
     // --- Resumo -----------------------------------------------------------
