@@ -20,6 +20,31 @@ export interface GestorAuditContext {
 }
 
 /**
+ * Resposta única para "este registro já está encerrado".
+ *
+ * Genérica de propósito, e idêntica nos três encerramentos: distinguir "você
+ * perdeu a corrida" de "isto já estava encerrado desde ontem" não muda nada
+ * para quem chamou — nos dois casos a operação não aconteceu e o estado final
+ * é o mesmo — e descrever qual foi o caso revelaria atividade de outro
+ * operador do RH.
+ */
+const MENSAGEM_JA_ENCERRADO = "O registro já está encerrado.";
+
+/**
+ * CHECKs desta família cuja violação é conflito de negócio, não defeito.
+ *
+ * Lista fechada, conferida contra a migration 20261006120000. Nomes de
+ * constraint de outras tabelas não entram aqui, e por isso continuam virando
+ * 500 — que é a resposta honesta para "isto não devia ter acontecido".
+ */
+export const CHECKS_DA_FAMILIA_GESTOR = [
+  "access_user_colaborador_intervalo_coerente",
+  "atribuicao_gestor_equipe_intervalo_coerente",
+  "excecao_acesso_gestor_intervalo_coerente",
+  "excecao_acesso_gestor_justificativa_nao_vazia",
+] as const;
+
+/**
  * Administração do escopo do gestor, pelo RH (T151, ADR 0015, decisões 6 e 9).
  *
  * Três capacidades, nenhuma delas destrutiva:
@@ -96,6 +121,20 @@ export class GestorAdminService {
    * colidiu revelaria configuração de outra equipe a quem perguntou.
    */
   private comoConflito(erro: unknown, mensagem: string): never {
+    // Exceções HTTP que o próprio service levantou (o 409 do encerramento
+    // perdido, o 404 anti-enumeração) atravessam intactas.
+    //
+    // Redundante hoje — o `throw erro` do fim já as devolveria sem tocar — e
+    // mantida mesmo assim: a garantia passaria a depender de nenhuma cláusula
+    // futura casar antes, e "o 404 anti-enumeração não pode virar 409" é
+    // forte demais para ficar valendo por acidente de ordenação.
+    if (
+      erro instanceof ConflictException ||
+      erro instanceof NotFoundException
+    ) {
+      throw erro;
+    }
+
     // `P2002` é o único dos dois que o Prisma tipifica. A EXCLUSION chega como
     // erro NÃO tipificado, com o SQLSTATE apenas no texto — e, como o índice
     // GiST é criado ANTES do índice único parcial, é ele quem dispara primeiro
@@ -117,6 +156,24 @@ export class GestorAdminService {
         /violates exclusion constraint/i.test(erro.message) ||
         /23505/.test(erro.message) ||
         /violates unique constraint/i.test(erro.message)
+      ) {
+        throw new ConflictException(mensagem);
+      }
+
+      // 23514 — CHECK, e SÓ os desta família.
+      //
+      // O nome da constraint tem de aparecer: um CHECK violado é uma classe
+      // enorme de erros, e traduzir a classe inteira para 409 transformaria
+      // qualquer defeito futuro de outra tabela numa resposta tranquilizadora.
+      // Reconhecer `operação + constraint`, como pede o critério do
+      // repositório, significa casar o nome — o resto continua 500.
+      //
+      // O caso real é encerrar com `vigenciaFim` anterior ao início já
+      // gravado: o pedido conflita com o estado do registro, que é 409, e
+      // escapava como 500 antes disto.
+      if (
+        /23514/.test(erro.message) &&
+        CHECKS_DA_FAMILIA_GESTOR.some((nome) => erro.message.includes(nome))
       ) {
         throw new ConflictException(mensagem);
       }
@@ -184,7 +241,11 @@ export class GestorAdminService {
     }
   }
 
-  /** Encerra a ligação. Não apaga: preenche `vigencia_fim`. */
+  /**
+   * Encerra a ligação. Não apaga: preenche `vigencia_fim`, e a linha histórica
+   * permanece — o banco agora recusa `DELETE` para `evolli_app` e recusa
+   * reabrir o que já foi encerrado (migration 20261007120000).
+   */
   async desvincularConta(
     ctx: GestorAuditContext,
     ligacaoId: string,
@@ -192,37 +253,64 @@ export class GestorAdminService {
   ) {
     const empresaId = this.empresaDoAtor(ctx);
 
-    const atual = await this.prisma.accessUserColaborador.findFirst({
+    // 404 anti-enumeração, e SÓ isso: registro de outra empresa é
+    // indistinguível de inexistente. Esta leitura não decide o encerramento —
+    // quem decide é o predicado do `updateMany` abaixo.
+    const existe = await this.prisma.accessUserColaborador.findFirst({
       where: { id: ligacaoId, empresaId },
+      select: { id: true },
     });
-    if (!atual || atual.vigenciaFim !== null) throw new NotFoundException();
+    if (!existe) throw new NotFoundException();
 
-    return this.prisma.$transaction(async (tx) => {
-      const encerrada = await tx.accessUserColaborador.update({
-        where: { id: ligacaoId },
-        data: {
-          vigenciaFim: new Date(`${vigenciaFim}T00:00:00.000Z`),
-          encerradoPorUserId: ctx.actor.id,
-        },
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const alteradas = await tx.accessUserColaborador.updateMany({
+          where: { id: ligacaoId, empresaId, vigenciaFim: null },
+          data: {
+            vigenciaFim: new Date(`${vigenciaFim}T00:00:00.000Z`),
+            encerradoPorUserId: ctx.actor.id,
+          },
+        });
+        if (alteradas.count === 0) {
+          throw new ConflictException(MENSAGEM_JA_ENCERRADO);
+        }
+
+        const encerrada = await tx.accessUserColaborador.findUniqueOrThrow({
+          where: { id: ligacaoId },
+        });
+
+        await this.auditar(
+          tx,
+          ctx,
+          "gestor_conta_desvinculada",
+          "access_user_colaborador",
+          encerrada.id,
+          empresaId,
+        );
+
+        return this.comoLigacao(encerrada);
       });
-
-      await this.auditar(
-        tx,
-        ctx,
-        "gestor_conta_desvinculada",
-        "access_user_colaborador",
-        encerrada.id,
-        empresaId,
-      );
-
-      return this.comoLigacao(encerrada);
-    });
+    } catch (erro) {
+      return this.comoConflito(erro, MENSAGEM_JA_ENCERRADO);
+    }
   }
 
   async listarLigacoes(ctx: GestorAuditContext) {
     const empresaId = this.empresaDoAtor(ctx);
+    // `select` explícito, não a linha inteira: as colunas que não aparecem
+    // na projeção não precisam sair do banco. `criadoPorUserId` e
+    // `encerradoPorUserId` ficam de fora de propósito — a autoria da
+    // configuração é dado de trilha, e quem precisa dela consulta a
+    // auditoria, onde a leitura fica registrada.
     const ligacoes = await this.prisma.accessUserColaborador.findMany({
       where: { empresaId },
+      select: {
+        id: true,
+        userId: true,
+        colaboradorId: true,
+        vigenciaInicio: true,
+        vigenciaFim: true,
+      },
       orderBy: [{ vigenciaInicio: "desc" }, { id: "asc" }],
     });
     return ligacoes.map((l) => this.comoLigacao(l));
@@ -284,6 +372,27 @@ export class GestorAdminService {
     }
   }
 
+  /**
+   * Encerra a atribuição. **Atômico**: o encerramento é o próprio `UPDATE`
+   * condicionado, não uma leitura seguida de escrita.
+   *
+   * O que havia antes era um TOCTOU clássico: `findFirst` conferia
+   * `vigenciaFim === null`, e o `update` seguinte endereçava só o `id`. Dois
+   * `PATCH` simultâneos passavam os dois pela conferência e os dois
+   * escreviam — o segundo sobrescrevia autor e data do primeiro, e a trilha
+   * ficava com dois eventos de encerramento para um encerramento só.
+   *
+   * Com o predicado dentro do `updateMany`, o PostgreSQL resolve: em READ
+   * COMMITTED, a segunda transação espera o lock da linha e, ao ser liberada,
+   * **reavalia o predicado sobre a versão nova** da tupla. `vigenciaFim` já
+   * não é nula, nada casa, `count` é zero, e o 409 é levantado DENTRO da
+   * transação — então a auditoria da perdedora também reverte. Exatamente um
+   * encerramento, exatamente um evento.
+   *
+   * O banco diz o mesmo de forma independente: o trigger
+   * `atribuicao_gestor_equipe_encerramento_unico` recusa reabrir ou reescrever
+   * o encerramento mesmo que este predicado seja removido por engano.
+   */
   async encerrarAtribuicao(
     ctx: GestorAuditContext,
     atribuicaoId: string,
@@ -291,19 +400,27 @@ export class GestorAdminService {
   ) {
     const empresaId = this.empresaDoAtor(ctx);
 
-    const atual = await this.prisma.atribuicaoGestorEquipe.findFirst({
+    const existe = await this.prisma.atribuicaoGestorEquipe.findFirst({
       where: { id: atribuicaoId, empresaId },
+      select: { id: true },
     });
-    if (!atual || atual.vigenciaFim !== null) throw new NotFoundException();
+    if (!existe) throw new NotFoundException();
 
     try {
       return await this.prisma.$transaction(async (tx) => {
-        const encerrada = await tx.atribuicaoGestorEquipe.update({
-          where: { id: atribuicaoId },
+        const alteradas = await tx.atribuicaoGestorEquipe.updateMany({
+          where: { id: atribuicaoId, empresaId, vigenciaFim: null },
           data: {
             vigenciaFim: new Date(`${vigenciaFim}T00:00:00.000Z`),
             encerradoPorUserId: ctx.actor.id,
           },
+        });
+        if (alteradas.count === 0) {
+          throw new ConflictException(MENSAGEM_JA_ENCERRADO);
+        }
+
+        const encerrada = await tx.atribuicaoGestorEquipe.findUniqueOrThrow({
+          where: { id: atribuicaoId },
         });
 
         await this.auditar(
@@ -329,6 +446,14 @@ export class GestorAdminService {
     const empresaId = this.empresaDoAtor(ctx);
     const atribuicoes = await this.prisma.atribuicaoGestorEquipe.findMany({
       where: { empresaId, ...(equipeId ? { equipeId } : {}) },
+      select: {
+        id: true,
+        equipeId: true,
+        gestorColaboradorId: true,
+        papel: true,
+        vigenciaInicio: true,
+        vigenciaFim: true,
+      },
       orderBy: [{ vigenciaInicio: "desc" }, { id: "asc" }],
     });
     return atribuicoes.map((a) => this.comoAtribuicao(a));
@@ -395,39 +520,69 @@ export class GestorAdminService {
   async encerrarExcecao(ctx: GestorAuditContext, excecaoId: string) {
     const empresaId = this.empresaDoAtor(ctx);
 
-    const atual = await this.prisma.excecaoAcessoGestor.findFirst({
+    const existe = await this.prisma.excecaoAcessoGestor.findFirst({
       where: { id: excecaoId, empresaId },
+      select: { id: true },
     });
-    if (!atual || atual.encerradaEm !== null) throw new NotFoundException();
+    if (!existe) throw new NotFoundException();
 
-    return this.prisma.$transaction(async (tx) => {
-      const encerrada = await tx.excecaoAcessoGestor.update({
-        where: { id: excecaoId },
-        data: {
-          encerradaEm: new Date(),
-          encerradoPorUserId: ctx.actor.id,
-        },
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        // Mesmo encerramento atômico de `encerrarAtribuicao` — aqui o marco é
+        // `encerradaEm`, não `vigenciaFim`: o prazo acordado permanece
+        // gravado, e a revogação apenas o encurta. Reescrever `vigenciaFim`
+        // apagaria o que o RH havia concedido.
+        const alteradas = await tx.excecaoAcessoGestor.updateMany({
+          where: { id: excecaoId, empresaId, encerradaEm: null },
+          data: {
+            encerradaEm: new Date(),
+            encerradoPorUserId: ctx.actor.id,
+          },
+        });
+        if (alteradas.count === 0) {
+          throw new ConflictException(MENSAGEM_JA_ENCERRADO);
+        }
+
+        const encerrada = await tx.excecaoAcessoGestor.findUniqueOrThrow({
+          where: { id: excecaoId },
+        });
+
+        await this.auditar(
+          tx,
+          ctx,
+          "gestor_excecao_encerrada",
+          "excecao_acesso_gestor",
+          encerrada.id,
+          empresaId,
+        );
+
+        return this.comoExcecao(encerrada);
       });
-
-      await this.auditar(
-        tx,
-        ctx,
-        "gestor_excecao_encerrada",
-        "excecao_acesso_gestor",
-        encerrada.id,
-        empresaId,
-      );
-
-      return this.comoExcecao(encerrada);
-    });
+    } catch (erro) {
+      return this.comoConflito(erro, MENSAGEM_JA_ENCERRADO);
+    }
   }
 
   async listarExcecoes(ctx: GestorAuditContext, gestorColaboradorId?: string) {
     const empresaId = this.empresaDoAtor(ctx);
+    // A `justificativa` SAI aqui, e isso é deliberado: a decisão 9 exige que
+    // o RH possa auditar por que cada exceção existe, e esconder o motivo de
+    // quem administra as exceções inutilizaria a listagem. A rota é
+    // `gestor_atribuicao/read`, negada ao gestor e a todos os outros papéis.
     const excecoes = await this.prisma.excecaoAcessoGestor.findMany({
       where: {
         empresaId,
         ...(gestorColaboradorId ? { gestorColaboradorId } : {}),
+      },
+      select: {
+        id: true,
+        gestorColaboradorId: true,
+        vinculoId: true,
+        motivoCodigo: true,
+        justificativa: true,
+        vigenciaInicio: true,
+        vigenciaFim: true,
+        encerradaEm: true,
       },
       orderBy: [{ vigenciaInicio: "desc" }, { id: "asc" }],
     });
