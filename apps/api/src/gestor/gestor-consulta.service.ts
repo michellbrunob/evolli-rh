@@ -82,8 +82,13 @@ export class GestorConsultaService {
   }
 
   /**
-   * Resolve o escopo do ator **no estado vigente**. Público para que o E2E
-   * possa exercitar a resolução sem passar por HTTP.
+   * Resolve o escopo do ator **no estado vigente**.
+   *
+   * `private` desde que o parâmetro de data saiu. Era público "para que o E2E
+   * pudesse exercitar a resolução sem passar por HTTP" — mas nenhum teste o
+   * chamava, e exercitá-lo direto é justamente o que deixaria de provar o que
+   * importa: a garantia é que **não existe caminho** por onde uma data
+   * entre, e isso só se verifica pela rota.
    *
    * NÃO RECEBE DATA, e isso é a correção de uma falha de autorização real.
    * Antes, a data vinha do cliente e governava os três passos abaixo — a
@@ -102,7 +107,7 @@ export class GestorConsultaService {
    * conferir configuração, e o fazem informando o gestor explicitamente. Este
    * método é sempre sobre **o próprio ator**.
    */
-  async escopoDoAtor(ctx: GestorConsultaContext): Promise<{
+  private async escopoDoAtor(ctx: GestorConsultaContext): Promise<{
     empresaId: string;
     colaboradorId: string;
     dataReferencia: string;
