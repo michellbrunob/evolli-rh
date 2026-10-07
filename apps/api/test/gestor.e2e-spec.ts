@@ -13,6 +13,7 @@ import { GenericContainer, StartedTestContainer, Wait } from "testcontainers";
 import { AppModule } from "../src/app.module";
 import { AllExceptionsFilter } from "../src/common/filters/http-exception.filter";
 import { requestIdMiddleware } from "../src/common/request-id";
+import { dataLocalDe } from "../src/ponto/competencia.util";
 
 /**
  * T151 — Gestor consultivo: escopo por equipe, exceção individual e DP-23.
@@ -53,20 +54,36 @@ const APP_PASSWORD = "app_test_pw";
 const SENHA_PADRAO = "Gestor!Consultivo2026#Teste";
 
 /**
- * Linha do tempo sintetica. Todas as datas sao `YYYY-MM-DD` puras: uma hora
- * aqui tornaria a fronteira de um escopo de autorizacao dependente de fuso.
+ * Linha do tempo sintetica, ANCORADA EM HOJE.
+ *
+ * Antes estas eram datas fixas (`2026-06-15` etc.) e a consulta recebia
+ * `?dataReferencia=`, o que permitia ao teste "viajar no tempo" para exercitar
+ * as fronteiras de vigencia. Esse parametro era uma falha de autorizacao — ele
+ * deixava o cliente escolher a data em que era autorizado — e foi removido.
+ *
+ * As fronteiras continuam sendo exercitadas, mas pelo lado certo: o que se
+ * move agora e a VIGENCIA dos registros em relacao ao dia corrente, nunca a
+ * data da pergunta. Um teste que precise de "atribuicao ja encerrada" cria uma
+ * atribuicao que termina ontem, em vez de perguntar sobre ontem.
+ *
+ * `dataLocalDe` e a mesma funcao que o service usa (`FUSO_COMPETENCIA`,
+ * America/Sao_Paulo). Usar `toISOString()` aqui faria o teste discordar do
+ * codigo entre 21h e 24h de Brasilia, quando UTC ja virou o dia.
  */
-const ADMISSAO = "2026-01-05";
+const HOJE = dataLocalDe(new Date());
+
+/** `YYYY-MM-DD` a N dias de hoje (negativo = passado). */
+function dia(deslocamento: number): string {
+  const d = new Date(`${HOJE}T12:00:00.000Z`);
+  d.setUTCDate(d.getUTCDate() + deslocamento);
+  return d.toISOString().slice(0, 10);
+}
+
+const ADMISSAO = dia(-300);
 /** Inicio das ligacoes e atribuicoes "permanentes" do cenario base. */
-const INICIO_ESCOPO = "2026-02-01";
-/** Data de referencia principal das consultas. */
-const DATA_REF = "2026-06-15";
-/** Antes da transferencia do cenario 5. */
-const DATA_REF_ANTES = "2026-05-01";
+const INICIO_ESCOPO = dia(-200);
 /** Dia em que a pessoa movel muda de equipe (fim exclusivo, inicio inclusivo). */
-const TRANSFERENCIA = "2026-06-01";
-/** Hoje em UTC — unica data em que uma revogacao "agora" pode ser observada. */
-const HOJE = new Date().toISOString().slice(0, 10);
+const TRANSFERENCIA = dia(-30);
 
 /**
  * Campos que a projecao fechada (ADR 0015, decisao 7) NAO pode conter. Sao
@@ -200,6 +217,8 @@ describe("Gestor consultivo: escopo por equipe e administracao pelo RH (e2e)", (
   let equipeFora: string;
   let equipeConcorrencia: string;
   let equipeVigencia: string;
+  /** Atribuicao reaproveitada pela serie 7: criada, encerrada e recriada. */
+  let atribuicaoVigencia: string;
   let equipeAdmin: string;
   let equipeHistorico: string;
   let equipeAuditoria: string;
@@ -394,30 +413,24 @@ describe("Gestor consultivo: escopo por equipe e administracao pelo RH (e2e)", (
     });
   }
 
+  /**
+   * Consulta a equipe no estado VIGENTE. Sem parametro de data, por desenho —
+   * ver a nota da linha do tempo no topo do arquivo.
+   */
   async function consultarEquipe(
     cred: Credencial,
-    dataReferencia: string,
   ): Promise<{ dataReferencia: string; itens: ItemDeEquipe[] }> {
-    const resposta = await get(
-      `/v1/gestor/equipe?dataReferencia=${dataReferencia}`,
-      cred,
-    ).expect(200);
+    const resposta = await get("/v1/gestor/equipe", cred).expect(200);
     return resposta.body;
   }
 
-  async function vinculosVisiveis(
-    cred: Credencial,
-    dataReferencia: string,
-  ): Promise<string[]> {
-    const { itens } = await consultarEquipe(cred, dataReferencia);
+  async function vinculosVisiveis(cred: Credencial): Promise<string[]> {
+    const { itens } = await consultarEquipe(cred);
     return itens.map((i) => i.vinculoId).sort();
   }
 
-  async function colaboradoresVisiveis(
-    cred: Credencial,
-    dataReferencia: string,
-  ): Promise<string[]> {
-    const { itens } = await consultarEquipe(cred, dataReferencia);
+  async function colaboradoresVisiveis(cred: Credencial): Promise<string[]> {
+    const { itens } = await consultarEquipe(cred);
     return itens.map((i) => i.colaboradorId).sort();
   }
 
@@ -766,16 +779,16 @@ describe("Gestor consultivo: escopo por equipe e administracao pelo RH (e2e)", (
       rhA,
       gestorSemLigacao.userId,
       pessoaAlfa.colaboradorId,
-      "2026-09-01",
+      dia(-20),
     ).expect(201);
-    expect(aceita.body.vigenciaInicio).toBe("2026-09-01");
-    // Encerra na sequencia para que o cenario 2 continue valendo em DATA_REF
-    // (a ligacao comeca depois dele, mas o encerramento deixa o estado limpo).
+    expect(aceita.body.vigenciaInicio).toBe(dia(-20));
+    // Encerra na sequencia para que o cenario 2 continue valendo: `gestorSemLigacao`
+    // precisa seguir sem ligacao VIGENTE quando aquele teste rodar.
     await patch(
       `/v1/gestor/administracao/ligacoes/${aceita.body.id}/encerrar`,
       rhA,
     )
-      .send({ vigenciaFim: "2026-09-02" })
+      .send({ vigenciaFim: dia(-19) })
       .expect(200);
   });
 
@@ -786,9 +799,11 @@ describe("Gestor consultivo: escopo por equipe e administracao pelo RH (e2e)", (
     // Este e o cenario que separa "filtro de autorizacao" de "vazamento": o
     // modo classico de falha e um `where` que, sem escopo resolvido, deixa de
     // filtrar e devolve tudo. Aqui a resposta correta e o conjunto vazio.
-    const corpo = await consultarEquipe(gestorSemLigacao, DATA_REF);
+    const corpo = await consultarEquipe(gestorSemLigacao);
     expect(corpo.itens).toEqual([]);
-    expect(corpo.dataReferencia).toBe(DATA_REF);
+    // A data devolvida e a do SERVIDOR, sempre — e nunca uma escolhida por
+    // quem perguntou.
+    expect(corpo.dataReferencia).toBe(HOJE);
   });
 
   // -------------------------------------------------------------------------
@@ -798,7 +813,7 @@ describe("Gestor consultivo: escopo por equipe e administracao pelo RH (e2e)", (
     // A ADR 0015 (decisao 2) admite varias equipes por gestor. Se a resolucao
     // de escopo parasse na primeira atribuicao encontrada, metade da equipe
     // desapareceria sem erro nenhum — falha silenciosa.
-    const visiveis = await colaboradoresVisiveis(gestorPrincipal, DATA_REF);
+    const visiveis = await colaboradoresVisiveis(gestorPrincipal);
     expect(visiveis).toContain(pessoaAlfa.colaboradorId);
     expect(visiveis).toContain(pessoaBeta.colaboradorId);
   });
@@ -810,7 +825,7 @@ describe("Gestor consultivo: escopo por equipe e administracao pelo RH (e2e)", (
     // A fronteira do escopo e a EQUIPE, nao o departamento: as tres pessoas
     // deste teste compartilham o mesmo departamento de proposito, para que a
     // unica diferenca entre ser visto e nao ser visto seja a equipe.
-    const visiveis = await colaboradoresVisiveis(gestorPrincipal, DATA_REF);
+    const visiveis = await colaboradoresVisiveis(gestorPrincipal);
     expect(visiveis).toContain(pessoaAlfa.colaboradorId);
     expect(visiveis).not.toContain(pessoaFora.colaboradorId);
     // A propria gestora nao tem equipe: tampouco aparece.
@@ -824,10 +839,7 @@ describe("Gestor consultivo: escopo por equipe e administracao pelo RH (e2e)", (
     // O escopo acompanha a ALOCACAO VIGENTE, nao um retrato tirado na
     // atribuicao. Sem isto, quem muda de area continuaria exposto ao gestor
     // antigo indefinidamente — e o historico diria que estava tudo certo.
-    const antesDaMudanca = await colaboradoresVisiveis(
-      gestorPrincipal,
-      DATA_REF_ANTES,
-    );
+    const antesDaMudanca = await colaboradoresVisiveis(gestorPrincipal);
     expect(antesDaMudanca).toContain(pessoaMovel.colaboradorId);
 
     await movimentar(rhA, {
@@ -839,18 +851,25 @@ describe("Gestor consultivo: escopo por equipe e administracao pelo RH (e2e)", (
       equipeId: equipeFora,
     });
 
-    // Antes da transferencia a visao historica nao muda: a alocacao anterior
-    // continua gravada e continua valendo naquela data.
-    expect(
-      await colaboradoresVisiveis(gestorPrincipal, DATA_REF_ANTES),
-    ).toContain(pessoaMovel.colaboradorId);
-    // No dia da transferencia o limite superior e exclusivo: ja vale a nova.
-    expect(
-      await colaboradoresVisiveis(gestorPrincipal, TRANSFERENCIA),
-    ).not.toContain(pessoaMovel.colaboradorId);
-    expect(
-      await colaboradoresVisiveis(gestorPrincipal, DATA_REF),
-    ).not.toContain(pessoaMovel.colaboradorId);
+    // A transferencia ja esta vigente (comecou ha 30 dias), entao a pessoa
+    // sai do escopo AGORA. A alocacao antiga continua gravada — o teste 18
+    // prova que nada foi apagado —, mas o acesso segue o estado vigente, e
+    // nao ha mais como perguntar "e antes da transferencia?" pela API.
+    expect(await colaboradoresVisiveis(gestorPrincipal)).not.toContain(
+      pessoaMovel.colaboradorId,
+    );
+
+    // A linha anterior continua la, com o fim exclusivo marcado no dia da
+    // transferencia: o historico nao foi reescrito para produzir o efeito.
+    const alocacoes = await prisma.alocacaoOrganizacional.findMany({
+      where: { vinculoId: pessoaMovel.vinculoId },
+      orderBy: { vigenteDe: "asc" },
+      select: { equipeId: true, vigenteAte: true },
+    });
+    expect(alocacoes.length).toBeGreaterThanOrEqual(2);
+    expect(alocacoes[0]!.vigenteAte?.toISOString().slice(0, 10)).toBe(
+      TRANSFERENCIA,
+    );
   });
 
   // -------------------------------------------------------------------------
@@ -860,8 +879,8 @@ describe("Gestor consultivo: escopo por equipe e administracao pelo RH (e2e)", (
     // Cobertura que enxerga menos nao cobre (ADR 0015, decisao 4). A diferenca
     // entre os dois papeis e de REGISTRO — quem respondia pela equipe e
     // quando —, nunca de visibilidade.
-    const doPrincipal = await vinculosVisiveis(gestorPrincipal, DATA_REF);
-    const doSubstituto = await vinculosVisiveis(gestorSubstituto, DATA_REF);
+    const doPrincipal = await vinculosVisiveis(gestorPrincipal);
+    const doSubstituto = await vinculosVisiveis(gestorSubstituto);
     expect(doSubstituto).toEqual(doPrincipal);
     expect(doPrincipal.length).toBeGreaterThan(0);
   });
@@ -869,34 +888,138 @@ describe("Gestor consultivo: escopo por equipe e administracao pelo RH (e2e)", (
   // -------------------------------------------------------------------------
   // 7. Vigencia futura, atual e encerrada
   // -------------------------------------------------------------------------
-  it("7. atribuicao futura nao da acesso, vigente da, e encerrada deixa de dar", async () => {
-    // Acesso tem comeco e fim. Uma atribuicao cadastrada com antecedencia nao
-    // pode valer antes da hora, e uma encerrada nao pode sobreviver ao proprio
-    // fim — e os dois erros sao invisiveis sem consulta datada.
+  it("7. atribuicao VIGENTE da acesso", async () => {
+    // Controle positivo da serie: sem ele, os tres testes seguintes passariam
+    // mesmo se a consulta estivesse sempre vazia por outro motivo.
+    const criada = await atribuir(rhA, {
+      equipeId: equipeVigencia,
+      gestorColaboradorId: pessoaGestorVigencia.colaboradorId,
+      papel: "principal",
+      vigenciaInicio: dia(-5),
+    }).expect(201);
+    atribuicaoVigencia = criada.body.id;
+
+    expect(await colaboradoresVisiveis(gestorVigencia)).toEqual([
+      pessoaVigencia.colaboradorId,
+    ]);
+  });
+
+  it("7b. atribuicao ENCERRADA deixa de dar acesso imediatamente", async () => {
+    // Fim exclusivo: encerrar com `vigenciaFim = HOJE` tira o acesso hoje
+    // mesmo, nao amanha.
+    await patch(
+      `/v1/gestor/administracao/atribuicoes/${atribuicaoVigencia}/encerrar`,
+      rhA,
+    )
+      .send({ vigenciaFim: HOJE })
+      .expect(200);
+
+    expect(await colaboradoresVisiveis(gestorVigencia)).toEqual([]);
+  });
+
+  it("7c. o ex-gestor NAO recupera acesso informando data da vigencia antiga", async () => {
+    // ESTE e o teste da correcao de B1, e ele falha no SHA anterior.
+    //
+    // Antes, `escopoDoAtor` resolvia a ligacao e as atribuicoes DO PROPRIO
+    // ATOR na data que o cliente mandasse, e `hoje()` era so o padrao — nunca
+    // um teto. Bastava a um gestor encerrado pedir
+    // `?dataReferencia=<dentro da janela antiga>` para a equipe reaparecer.
+    //
+    // Hoje a rota nao tem parametro e `forbidNonWhitelisted` recusa o que
+    // sobrar. Recusar e melhor que ignorar: um 200 com lista vazia deixaria o
+    // cliente concluir que a data foi aceita e que a equipe esvaziou.
+    const dentroDaJanelaAntiga = dia(-3);
+
+    await get(
+      `/v1/gestor/equipe?dataReferencia=${dentroDaJanelaAntiga}`,
+      gestorVigencia,
+    ).expect(400);
+
+    await get(
+      `/v1/gestor/equipe/vinculos/${pessoaVigencia.vinculoId}?dataReferencia=${dentroDaJanelaAntiga}`,
+      gestorVigencia,
+    ).expect(400);
+
+    // E, sem parametro nenhum, continua vazio: a recusa acima nao e a unica
+    // defesa — mesmo que o parametro passasse, nao ha onde ele entrar.
+    expect(await colaboradoresVisiveis(gestorVigencia)).toEqual([]);
+  });
+
+  it("7d. atribuicao FUTURA nao antecipa acesso, nem com data futura", async () => {
+    // O periodo [dia(10), infinito) nao colide com o ja encerrado
+    // [dia(-5), HOJE): a EXCLUSION aceita, e e justamente o caso de um gestor
+    // que volta a responder pela equipe mais adiante.
     await atribuir(rhA, {
       equipeId: equipeVigencia,
       gestorColaboradorId: pessoaGestorVigencia.colaboradorId,
       papel: "principal",
-      vigenciaInicio: "2026-05-01",
-      vigenciaFim: "2026-06-01",
+      vigenciaInicio: dia(10),
     }).expect(201);
 
-    // Futura: a atribuicao existe no cadastro, mas ainda nao comecou.
-    expect(await colaboradoresVisiveis(gestorVigencia, "2026-04-30")).toEqual(
-      [],
-    );
-    // Vigente: inicio inclusivo.
-    expect(await colaboradoresVisiveis(gestorVigencia, "2026-05-01")).toEqual([
+    expect(await colaboradoresVisiveis(gestorVigencia)).toEqual([]);
+    await get(
+      `/v1/gestor/equipe?dataReferencia=${dia(11)}`,
+      gestorVigencia,
+    ).expect(400);
+  });
+
+  it("7e. nem o SUBSTITUTO encerrado recupera acesso", async () => {
+    // A mesma fronteira vale para os dois papeis: um substituto cuja
+    // cobertura terminou e um ex-gestor como qualquer outro.
+    const criada = await atribuir(rhA, {
+      equipeId: equipeVigencia,
+      gestorColaboradorId: pessoaGestorVigencia.colaboradorId,
+      papel: "substituto",
+      vigenciaInicio: dia(-5),
+    }).expect(201);
+
+    expect(await colaboradoresVisiveis(gestorVigencia)).toEqual([
       pessoaVigencia.colaboradorId,
     ]);
-    expect(await colaboradoresVisiveis(gestorVigencia, "2026-05-15")).toEqual([
-      pessoaVigencia.colaboradorId,
-    ]);
-    // Encerrada: fim exclusivo, entao no proprio dia do fim ja nao vale.
-    expect(await colaboradoresVisiveis(gestorVigencia, "2026-06-01")).toEqual(
-      [],
-    );
-    expect(await colaboradoresVisiveis(gestorVigencia, DATA_REF)).toEqual([]);
+
+    await patch(
+      `/v1/gestor/administracao/atribuicoes/${criada.body.id}/encerrar`,
+      rhA,
+    )
+      .send({ vigenciaFim: HOJE })
+      .expect(200);
+
+    expect(await colaboradoresVisiveis(gestorVigencia)).toEqual([]);
+    await get(
+      `/v1/gestor/equipe?dataReferencia=${dia(-3)}`,
+      gestorVigencia,
+    ).expect(400);
+  });
+
+  it("7f. encerrar com fim anterior ao inicio e 409, nao 500", async () => {
+    // Violacao do CHECK `*_intervalo_coerente`. Escapava como 500 porque
+    // `comoConflito` so reconhecia EXCLUSION e UNIQUE — e um 500 aqui diria
+    // "defeito do servidor" para o que e um pedido incoerente do cliente.
+    const criada = await atribuir(rhA, {
+      equipeId: equipeHistorico,
+      gestorColaboradorId: pessoaGestorVigencia.colaboradorId,
+      papel: "substituto",
+      vigenciaInicio: dia(-5),
+    }).expect(201);
+
+    const resposta = await patch(
+      `/v1/gestor/administracao/atribuicoes/${criada.body.id}/encerrar`,
+      rhA,
+    )
+      .send({ vigenciaFim: dia(-30) })
+      .expect(409);
+
+    // E nada de Prisma, PostgreSQL ou SQLSTATE vaza na resposta.
+    const texto = JSON.stringify(resposta.body);
+    for (const proibido of [
+      "Prisma",
+      "prisma",
+      "23514",
+      "constraint",
+      "app.",
+    ]) {
+      expect(texto).not.toContain(proibido);
+    }
   });
 
   // -------------------------------------------------------------------------
@@ -984,55 +1107,52 @@ describe("Gestor consultivo: escopo por equipe e administracao pelo RH (e2e)", (
     // precisa ser a coisa mais datada do modulo: prazo obrigatorio, sem
     // renovacao por inercia e revogavel na hora. `gestorExcecao` nao tem
     // nenhuma equipe atribuida — tudo o que ela enxerga vem daqui.
-    expect(await colaboradoresVisiveis(gestorExcecao, DATA_REF)).toEqual([]);
+    expect(await colaboradoresVisiveis(gestorExcecao)).toEqual([]);
 
-    const passada = await post("/v1/gestor/administracao/excecoes", rhA)
+    // FUTURA: cadastrada, mas comeca daqui a dez dias.
+    const futura = await post("/v1/gestor/administracao/excecoes", rhA)
       .send({
         gestorColaboradorId: pessoaGestorExcecao.colaboradorId,
         vinculoId: pessoaExcecaoPassada.vinculoId,
         motivoCodigo: "cobertura_de_ausencia",
         justificativa: "Cobertura sintetica de ausencia, apenas para teste.",
-        vigenciaInicio: "2026-06-01",
-        vigenciaFim: "2026-07-01",
+        vigenciaInicio: dia(10),
+        vigenciaFim: dia(40),
       })
       .expect(201);
-    expect(passada.body.vigenciaInicio).toBe("2026-06-01");
-    expect(passada.body.vigenciaFim).toBe("2026-07-01");
-    expect(passada.body.encerradaEm).toBeNull();
+    expect(futura.body.encerradaEm).toBeNull();
+    expect(await colaboradoresVisiveis(gestorExcecao)).toEqual([]);
 
-    // Futura: ainda nao comecou.
-    expect(await colaboradoresVisiveis(gestorExcecao, "2026-05-31")).toEqual(
-      [],
-    );
-    // Vigente: ve a pessoa de FORA da equipe, e so ela.
-    expect(await colaboradoresVisiveis(gestorExcecao, DATA_REF)).toEqual([
-      pessoaExcecaoPassada.colaboradorId,
-    ]);
-    // Expirada: fim exclusivo.
-    expect(await colaboradoresVisiveis(gestorExcecao, "2026-07-01")).toEqual(
-      [],
-    );
-    expect(await colaboradoresVisiveis(gestorExcecao, "2026-08-01")).toEqual(
-      [],
-    );
+    // EXPIRADA: o prazo ja passou. Fim exclusivo, entao terminar ontem basta.
+    await post("/v1/gestor/administracao/excecoes", rhA)
+      .send({
+        gestorColaboradorId: pessoaGestorExcecao.colaboradorId,
+        vinculoId: pessoaExcecaoPassada.vinculoId,
+        motivoCodigo: "projeto_temporario",
+        justificativa: "Projeto sintetico ja encerrado, apenas para teste.",
+        vigenciaInicio: dia(-40),
+        vigenciaFim: dia(-1),
+      })
+      .expect(201);
+    expect(await colaboradoresVisiveis(gestorExcecao)).toEqual([]);
 
-    // Revogacao: so e observavel numa data em que a excecao AINDA valeria,
-    // senao o teste confundiria "revogada" com "expirada".
+    // VIGENTE: ve a pessoa de FORA da equipe, e so ela.
     const atual = await post("/v1/gestor/administracao/excecoes", rhA)
       .send({
         gestorColaboradorId: pessoaGestorExcecao.colaboradorId,
         vinculoId: pessoaExcecaoAtual.vinculoId,
         motivoCodigo: "apuracao_formal",
         justificativa: "Apuracao sintetica em curso, apenas para teste.",
-        vigenciaInicio: "2026-09-01",
-        vigenciaFim: "2026-12-01",
+        vigenciaInicio: dia(-5),
+        vigenciaFim: dia(60),
       })
       .expect(201);
 
-    expect(await colaboradoresVisiveis(gestorExcecao, HOJE)).toEqual([
+    expect(await colaboradoresVisiveis(gestorExcecao)).toEqual([
       pessoaExcecaoAtual.colaboradorId,
     ]);
 
+    // REVOGADA: cai na hora, mesmo faltando prazo.
     const revogada = await patch(
       `/v1/gestor/administracao/excecoes/${atual.body.id}/encerrar`,
       rhA,
@@ -1042,10 +1162,16 @@ describe("Gestor consultivo: escopo por equipe e administracao pelo RH (e2e)", (
     expect(revogada.body.encerradaEm).not.toBeNull();
     // O periodo original permanece gravado: revogar encurta o alcance, nao
     // reescreve o que foi concedido.
-    expect(revogada.body.vigenciaInicio).toBe("2026-09-01");
-    expect(revogada.body.vigenciaFim).toBe("2026-12-01");
+    expect(revogada.body.vigenciaInicio).toBe(dia(-5));
+    expect(revogada.body.vigenciaFim).toBe(dia(60));
 
-    expect(await colaboradoresVisiveis(gestorExcecao, HOJE)).toEqual([]);
+    expect(await colaboradoresVisiveis(gestorExcecao)).toEqual([]);
+
+    // E a excecao revogada tambem nao volta por data historica.
+    await get(
+      `/v1/gestor/equipe?dataReferencia=${dia(-2)}`,
+      gestorExcecao,
+    ).expect(400);
   });
 
   // -------------------------------------------------------------------------
@@ -1064,17 +1190,17 @@ describe("Gestor consultivo: escopo por equipe e administracao pelo RH (e2e)", (
       equipeId: equipeFora,
     });
 
-    // Em 2026-02-01 existe um unico vinculo, ativo, e ele esta FORA da equipe
-    // da gestora: invisivel.
-    expect(
-      await colaboradoresVisiveis(gestorPrincipal, INICIO_ESCOPO),
-    ).not.toContain(primeiro.colaboradorId);
+    // Enquanto so existe o primeiro vinculo, que esta FORA da equipe da
+    // gestora, a pessoa e invisivel.
+    expect(await colaboradoresVisiveis(gestorPrincipal)).not.toContain(
+      primeiro.colaboradorId,
+    );
 
     await movimentar(rhA, {
       vinculoId: primeiro.vinculoId,
       tipo: "desligamento",
       motivoCodigo: "encerramento_de_vinculo",
-      vigenciaInicio: "2026-03-01",
+      vigenciaInicio: dia(-100),
     });
 
     const segundoVinculo = (
@@ -1084,7 +1210,7 @@ describe("Gestor consultivo: escopo por equipe e administracao pelo RH (e2e)", (
           empresaId: empresaA,
           matricula: "MAT-DUP-DOIS",
           tipo: "clt",
-          dataAdmissao: "2026-03-02",
+          dataAdmissao: dia(-99),
           motivoCodigo: "admissao_inicial",
           departamentoId: departamentoA,
           equipeId: equipeAlfa,
@@ -1093,7 +1219,7 @@ describe("Gestor consultivo: escopo por equipe e administracao pelo RH (e2e)", (
     ).body.id as string;
     await efetivarAdmissao(rhA, segundoVinculo);
 
-    const itens = (await consultarEquipe(gestorPrincipal, DATA_REF)).itens;
+    const itens = (await consultarEquipe(gestorPrincipal)).itens;
     const daPessoa = itens.filter(
       (i) => i.colaboradorId === primeiro.colaboradorId,
     );
@@ -1110,11 +1236,11 @@ describe("Gestor consultivo: escopo por equipe e administracao pelo RH (e2e)", (
     // A empresa vem da SESSAO, nunca do cliente, e a consulta repete o filtro
     // de empresa mesmo depois de o escopo ja estar resolvido. Redundancia
     // deliberada: um erro na resolucao nao pode virar leitura entre empresas.
-    const daEmpresaA = await colaboradoresVisiveis(gestorPrincipal, DATA_REF);
+    const daEmpresaA = await colaboradoresVisiveis(gestorPrincipal);
     expect(daEmpresaA).not.toContain(pessoaEmpresaB.colaboradorId);
     expect(daEmpresaA).not.toContain(pessoaGestorB.colaboradorId);
 
-    const daEmpresaB = await colaboradoresVisiveis(gestorB, DATA_REF);
+    const daEmpresaB = await colaboradoresVisiveis(gestorB);
     expect(daEmpresaB).toEqual([pessoaEmpresaB.colaboradorId]);
     expect(daEmpresaB).not.toContain(pessoaAlfa.colaboradorId);
     expect(daEmpresaB).not.toContain(pessoaBeta.colaboradorId);
@@ -1129,25 +1255,25 @@ describe("Gestor consultivo: escopo por equipe e administracao pelo RH (e2e)", (
     // esconder — caso contrario um gestor varre identificadores e descobre
     // quem trabalha na empresa, mesmo sem ler nenhum dado.
     const dentro = await get(
-      `/v1/gestor/equipe/vinculos/${pessoaAlfa.vinculoId}?dataReferencia=${DATA_REF}`,
+      `/v1/gestor/equipe/vinculos/${pessoaAlfa.vinculoId}`,
       gestorPrincipal,
     ).expect(200);
     expect(dentro.body.vinculoId).toBe(pessoaAlfa.vinculoId);
 
     // Outra equipe, mesma empresa.
     await get(
-      `/v1/gestor/equipe/vinculos/${pessoaFora.vinculoId}?dataReferencia=${DATA_REF}`,
+      `/v1/gestor/equipe/vinculos/${pessoaFora.vinculoId}`,
       gestorPrincipal,
     ).expect(404);
     // Outra empresa.
     await get(
-      `/v1/gestor/equipe/vinculos/${pessoaEmpresaB.vinculoId}?dataReferencia=${DATA_REF}`,
+      `/v1/gestor/equipe/vinculos/${pessoaEmpresaB.vinculoId}`,
       gestorPrincipal,
     ).expect(404);
     // Identificador bem formado e inexistente: resposta indistinguivel das
     // duas acima, que e o ponto.
     await get(
-      `/v1/gestor/equipe/vinculos/00000000-0000-4000-8000-000000000000?dataReferencia=${DATA_REF}`,
+      `/v1/gestor/equipe/vinculos/00000000-0000-4000-8000-000000000000`,
       gestorPrincipal,
     ).expect(404);
   });
@@ -1179,8 +1305,8 @@ describe("Gestor consultivo: escopo por equipe e administracao pelo RH (e2e)", (
         vinculoId: pessoaFora.vinculoId,
         motivoCodigo: "projeto_temporario",
         justificativa: "Tentativa sintetica de autoconcessao.",
-        vigenciaInicio: "2026-06-01",
-        vigenciaFim: "2026-07-01",
+        vigenciaInicio: dia(-5),
+        vigenciaFim: dia(25),
       })
       .expect(403);
 
@@ -1254,8 +1380,8 @@ describe("Gestor consultivo: escopo por equipe e administracao pelo RH (e2e)", (
         vinculoId: pessoaAlfa.vinculoId,
         motivoCodigo: "transicao_organizacional",
         justificativa: "Tentativa sintetica de alcance entre empresas.",
-        vigenciaInicio: "2026-06-01",
-        vigenciaFim: "2026-07-01",
+        vigenciaInicio: dia(-5),
+        vigenciaFim: dia(25),
       })
       .expect(404);
 
@@ -1286,9 +1412,9 @@ describe("Gestor consultivo: escopo por equipe e administracao pelo RH (e2e)", (
       `/v1/gestor/administracao/atribuicoes/${criada.body.id}/encerrar`,
       rhA,
     )
-      .send({ vigenciaFim: "2026-08-01" })
+      .send({ vigenciaFim: dia(-10) })
       .expect(200);
-    expect(encerrada.body.vigenciaFim).toBe("2026-08-01");
+    expect(encerrada.body.vigenciaFim).toBe(dia(-10));
     expect(encerrada.body.vigenciaInicio).toBe(INICIO_ESCOPO);
 
     const listadas = await get(
@@ -1299,16 +1425,23 @@ describe("Gestor consultivo: escopo por equipe e administracao pelo RH (e2e)", (
       listadas.body as { id: string; vigenciaFim: string | null }[]
     ).find((a) => a.id === criada.body.id);
     expect(historica).toBeDefined();
-    expect(historica!.vigenciaFim).toBe("2026-08-01");
+    expect(historica!.vigenciaFim).toBe(dia(-10));
 
     // Encerrar duas vezes nao e idempotente nem silencioso: a segunda tentativa
-    // nao encontra atribuicao ABERTA para encerrar.
+    // recebe 409.
+    //
+    // Era 404 antes, e o 404 vinha de uma leitura previa que conferia
+    // `vigenciaFim === null` — a mesma leitura que abria o TOCTOU. Agora quem
+    // decide e o predicado do `updateMany`, e ele nao distingue "ja estava
+    // encerrada" de "outro PATCH chegou primeiro": os dois sao 409, com a
+    // mesma mensagem generica. 404 continua reservado ao que o ator nao pode
+    // ver (outra empresa, inexistente), que e o caso anti-enumeracao.
     await patch(
       `/v1/gestor/administracao/atribuicoes/${criada.body.id}/encerrar`,
       rhA,
     )
-      .send({ vigenciaFim: "2026-09-01" })
-      .expect(404);
+      .send({ vigenciaFim: dia(-9) })
+      .expect(409);
   });
 
   // -------------------------------------------------------------------------
@@ -1319,12 +1452,9 @@ describe("Gestor consultivo: escopo por equipe e administracao pelo RH (e2e)", (
     // vinculo") vazaria por acrescimo futuro: bastaria uma coluna nova no
     // modelo para o gestor passar a ver remuneracao ou dado clinico sem que
     // ninguem tivesse decidido isso.
-    const lista = await get(
-      `/v1/gestor/equipe?dataReferencia=${DATA_REF}`,
-      gestorPrincipal,
-    ).expect(200);
+    const lista = await get(`/v1/gestor/equipe`, gestorPrincipal).expect(200);
     const detalhe = await get(
-      `/v1/gestor/equipe/vinculos/${pessoaAlfa.vinculoId}?dataReferencia=${DATA_REF}`,
+      `/v1/gestor/equipe/vinculos/${pessoaAlfa.vinculoId}`,
       gestorPrincipal,
     ).expect(200);
 
@@ -1415,7 +1545,7 @@ describe("Gestor consultivo: escopo por equipe e administracao pelo RH (e2e)", (
       `/v1/gestor/administracao/atribuicoes/${criada.body.id}/encerrar`,
       rhA,
     )
-      .send({ vigenciaFim: "2026-09-01" })
+      .send({ vigenciaFim: dia(-1) })
       .expect(200);
 
     const depois = await prisma.auditEvent.findMany({
@@ -1426,5 +1556,194 @@ describe("Gestor consultivo: escopo por equipe e administracao pelo RH (e2e)", (
       "gestor_atribuicao_criada",
       "gestor_atribuicao_encerrada",
     ]);
+  });
+
+  // =========================================================================
+  // 21-27. Integridade historica garantida pelo BANCO
+  //
+  // Estes testes falam com o PostgreSQL pelo papel `evolli_app` — o mesmo com
+  // que a aplicacao roda. Nao exercitam rota: exercitam a garantia que
+  // sobrevive a um service com defeito, a um script de correcao distraido e a
+  // um modulo futuro que nao conheca estas regras.
+  // =========================================================================
+  describe("integridade historica (migration 20261007120000)", () => {
+    /** Equipe propria: as anteriores ja tem vigencias que colidiriam. */
+    let equipeIntegridade: string;
+    let alvo: string;
+
+    beforeAll(async () => {
+      equipeIntegridade = await criarEquipe(
+        "EQP_INTEG",
+        "Equipe Sintetica Integridade",
+        departamentoA,
+      );
+      const criada = await atribuir(rhA, {
+        equipeId: equipeIntegridade,
+        gestorColaboradorId: pessoaGestorExcecao.colaboradorId,
+        papel: "principal",
+        vigenciaInicio: dia(-50),
+      }).expect(201);
+      alvo = criada.body.id;
+    });
+
+    it("21. evolli_app NAO consegue DELETE em nenhuma das tres tabelas", async () => {
+      // A afirmacao "o historico nao e apagavel" se apoiava em "nao ha rota
+      // DELETE" — que protege contra a aplicacao, nao contra o banco. Sem o
+      // REVOKE, um `DELETE FROM atribuicao_gestor_equipe` funcionava.
+      for (const tabela of [
+        "access_user_colaborador",
+        "atribuicao_gestor_equipe",
+        "excecao_acesso_gestor",
+      ]) {
+        await expect(
+          prisma.$executeRawUnsafe(`DELETE FROM app.${tabela}`),
+        ).rejects.toThrow(/permission denied/i);
+      }
+    });
+
+    it("22. evolli_app CONSEGUE ler e encerrar (controle positivo)", async () => {
+      // Sem isto, o teste 21 passaria tambem se o papel tivesse perdido todos
+      // os privilegios, ou se as tabelas nao existissem.
+      const linhas = await prisma.$queryRawUnsafe<{ n: bigint }[]>(
+        "SELECT count(*) AS n FROM app.atribuicao_gestor_equipe",
+      );
+      expect(Number(linhas[0]!.n)).toBeGreaterThan(0);
+
+      await patch(`/v1/gestor/administracao/atribuicoes/${alvo}/encerrar`, rhA)
+        .send({ vigenciaFim: dia(-2) })
+        .expect(200);
+    });
+
+    it("23. nao se reabre uma atribuicao encerrada, nem por SQL direto", async () => {
+      await expect(
+        prisma.$executeRawUnsafe(
+          `UPDATE app.atribuicao_gestor_equipe SET vigencia_fim = NULL WHERE id = '${alvo}'`,
+        ),
+      ).rejects.toThrow(/nao admite reabertura/i);
+
+      // E a data gravada tambem nao se reescreve.
+      await expect(
+        prisma.$executeRawUnsafe(
+          `UPDATE app.atribuicao_gestor_equipe SET vigencia_fim = '2099-01-01' WHERE id = '${alvo}'`,
+        ),
+      ).rejects.toThrow(/nao admite reabertura/i);
+    });
+
+    it("24. campos imutaveis recusam reescrita, nas tres tabelas", async () => {
+      const tentativas: [string, string][] = [
+        [
+          "atribuicao_gestor_equipe",
+          `UPDATE app.atribuicao_gestor_equipe SET papel = 'substituto' WHERE id = '${alvo}'`,
+        ],
+        [
+          "atribuicao_gestor_equipe",
+          `UPDATE app.atribuicao_gestor_equipe SET vigencia_inicio = '2000-01-01' WHERE id = '${alvo}'`,
+        ],
+        [
+          "access_user_colaborador",
+          "UPDATE app.access_user_colaborador SET criado_por_user_id = user_id",
+        ],
+        [
+          "excecao_acesso_gestor",
+          "UPDATE app.excecao_acesso_gestor SET justificativa = 'reescrita'",
+        ],
+        [
+          "excecao_acesso_gestor",
+          "UPDATE app.excecao_acesso_gestor SET vigencia_fim = '2099-01-01'",
+        ],
+      ];
+
+      for (const [, sql] of tentativas) {
+        await expect(prisma.$executeRawUnsafe(sql)).rejects.toThrow(
+          /coluna imutavel alterada/i,
+        );
+      }
+    });
+
+    it("25. dois encerramentos CONCORRENTES: exatamente um vence, 409 para o outro", async () => {
+      const criada = await atribuir(rhA, {
+        equipeId: equipeIntegridade,
+        gestorColaboradorId: pessoaGestorExcecao.colaboradorId,
+        papel: "substituto",
+        vigenciaInicio: dia(-50),
+      }).expect(201);
+      const id = criada.body.id as string;
+
+      // Disparados juntos, sem await entre eles: e a corrida que o TOCTOU
+      // perdia silenciosamente, sobrescrevendo autor e data do vencedor.
+      const [a, b] = await Promise.all([
+        patch(`/v1/gestor/administracao/atribuicoes/${id}/encerrar`, rhA)
+          .send({ vigenciaFim: dia(-3) })
+          .then((r) => r.status),
+        patch(`/v1/gestor/administracao/atribuicoes/${id}/encerrar`, rhA)
+          .send({ vigenciaFim: dia(-1) })
+          .then((r) => r.status),
+      ]);
+
+      expect([a, b].filter((s) => s === 200)).toHaveLength(1);
+      expect([a, b].filter((s) => s === 409)).toHaveLength(1);
+
+      // Um unico evento na trilha: a perdedora reverteu junto com a auditoria.
+      const eventos = await prisma.auditEvent.findMany({
+        where: { resourceId: id, action: "gestor_atribuicao_encerrada" },
+      });
+      expect(eventos).toHaveLength(1);
+
+      // E exatamente uma data gravada, coerente com quem venceu.
+      const linha = await prisma.atribuicaoGestorEquipe.findUniqueOrThrow({
+        where: { id },
+        select: { vigenciaFim: true, encerradoPorUserId: true },
+      });
+      expect(linha.vigenciaFim).not.toBeNull();
+      expect(linha.encerradoPorUserId).toBe(rhA.userId);
+    });
+
+    it("26. justificativa so com espacos e barrada pelo CHECK, com 409", async () => {
+      // O DTO exige `MinLength(5)`, que cinco espacos satisfazem; o service
+      // apara a string, e quem recusa e o CHECK do banco. Prova que a
+      // validacao nao mora so no DTO — e que o CHECK reconhecido vira 409,
+      // nao 500.
+      //
+      // A regra oposta — erro NAO reconhecido tem de continuar 500 — e
+      // provada em `gestor-conflito.spec.ts`, onde cada ramo de traducao e
+      // exercitado diretamente. Pela API nao ha como provocar um erro
+      // desconhecido sem falsificar o driver, e um teste que so verifica
+      // "rejeitou" nao distinguiria 409 de 500.
+      const resposta = await post("/v1/gestor/administracao/excecoes", rhA)
+        .send({
+          gestorColaboradorId: pessoaGestorExcecao.colaboradorId,
+          vinculoId: pessoaAlfa.vinculoId,
+          motivoCodigo: "apuracao_formal",
+          justificativa: "      ",
+          vigenciaInicio: dia(-5),
+          vigenciaFim: dia(30),
+        })
+        .expect(409);
+
+      expect(JSON.stringify(resposta.body)).not.toContain("constraint");
+    });
+
+    it("27. a resposta de conflito nao cita Prisma, PostgreSQL nem SQLSTATE", async () => {
+      const resposta = await patch(
+        `/v1/gestor/administracao/atribuicoes/${alvo}/encerrar`,
+        rhA,
+      )
+        .send({ vigenciaFim: dia(-1) })
+        .expect(409);
+
+      const texto = JSON.stringify(resposta.body).toLowerCase();
+      for (const proibido of [
+        "prisma",
+        "postgres",
+        "23p01",
+        "23505",
+        "23514",
+        "constraint",
+        "app.",
+        "evolli_app",
+      ]) {
+        expect(texto).not.toContain(proibido);
+      }
+    });
   });
 });

@@ -103,11 +103,32 @@ export class CriarExcecaoDto {
   vigenciaFim!: string;
 }
 
-export class ConsultaEquipeQueryDto {
-  @IsOptional()
-  @IsString()
-  dataReferencia?: string;
-}
+/**
+ * Consulta consultiva do gestor: **nenhum parâmetro**.
+ *
+ * `dataReferencia` existia aqui e foi REMOVIDA — não por simplificação, mas
+ * porque era uma falha de autorização. O serviço a usava para resolver a
+ * ligação e as atribuições **do próprio ator**, de modo que um gestor cuja
+ * atribuição já terminou recuperava o acesso bastando informar uma data de
+ * dentro da janela antiga. Quem é autorizado passava a ser escolhido por quem
+ * pergunta.
+ *
+ * A ADR 0015, decisão 8, é literal: *"Decisões de acesso usam o estado
+ * vigente"*. Vigente é o do servidor, e não há segunda data que o cliente
+ * possa oferecer.
+ *
+ * A classe continua existindo, vazia, de propósito: com `whitelist` e
+ * `forbidNonWhitelisted` (ver `main.ts`), qualquer `?dataReferencia=...` passa
+ * a responder **400**. Apagar o DTO faria o parâmetro ser silenciosamente
+ * ignorado, e um cliente que o enviasse acreditaria estar consultando outra
+ * data. Recusar é mais honesto que ignorar.
+ *
+ * Consulta histórica ("como estava a equipe em maio") não é isto, e não é
+ * decisão tomada: exigiria dizer quem pode olhar para trás, até onde, e o que
+ * acontece com quem saiu da equipe desde então. A ADR 0015 não cobriu nada
+ * disso. Quando houver decisão, ela entra como capacidade própria.
+ */
+export class ConsultaEquipeQueryDto {}
 
 export class ListarAtribuicoesQueryDto {
   @IsOptional()

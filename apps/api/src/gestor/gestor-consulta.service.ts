@@ -3,6 +3,7 @@ import { AccessUser } from "@prisma/client";
 import { PrismaService } from "../database/prisma.service";
 import { AuditService } from "../audit/audit.service";
 import { SessionRequestMetadata } from "../auth/session/session.service";
+import { dataLocalDe } from "../ponto/competencia.util";
 import {
   AtribuicaoDeEquipe,
   EscopoDoGestor,
@@ -26,6 +27,8 @@ export interface GestorConsultaContext {
  *
  * COMO O ESCOPO É RESOLVIDO, e por que nesta ordem:
  *
+ *   0. a DATA sai do **servidor** (`hoje()`), nunca do cliente — ver
+ *      `escopoDoAtor`. Quem pergunta não escolhe em que data é autorizado;
  *   1. empresa e identidade saem da **sessão** (`ctx.actor`), nunca do cliente;
  *   2. a conta vira pessoa por `access_user_colaborador` vigente (DP-23);
  *   3. a pessoa vira equipes por `atribuicao_gestor_equipe` vigente;
@@ -59,28 +62,56 @@ export class GestorConsultaService {
     private readonly auditService: AuditService,
   ) {}
 
+  /**
+   * A data de autorização. **Única** fonte de "quando" nesta classe.
+   *
+   * Usa `dataLocalDe`, o mesmo utilitário de `FUSO_COMPETENCIA`
+   * (`America/Sao_Paulo`) que o ponto já usa para decidir em que dia civil um
+   * instante caiu. `toISOString().slice(0, 10)` — o que estava aqui antes —
+   * responde em UTC: das 21h às 24h de Brasília o servidor já diria que é
+   * amanhã, e uma atribuição que termina hoje expiraria três horas cedo.
+   * Deslocar o dia desloca a fronteira de um escopo de autorização.
+   *
+   * O fuso é importado em vez de redeclarado: dois fusos no mesmo produto
+   * fariam ponto e gestor discordarem sobre que dia é hoje. É uma função
+   * pura, sem injeção — o acoplamento é de constante, não de módulo. A
+   * limitação de fuso único para todas as empresas está registrada lá.
+   */
   private hoje(): string {
-    return new Date().toISOString().slice(0, 10);
+    return dataLocalDe(new Date());
   }
 
   /**
-   * Resolve o escopo do ator na data. Público para que o E2E possa exercitar
-   * a resolução sem passar por HTTP.
+   * Resolve o escopo do ator **no estado vigente**. Público para que o E2E
+   * possa exercitar a resolução sem passar por HTTP.
+   *
+   * NÃO RECEBE DATA, e isso é a correção de uma falha de autorização real.
+   * Antes, a data vinha do cliente e governava os três passos abaixo — a
+   * ligação conta-pessoa, as atribuições e as exceções —, todos sobre o
+   * PRÓPRIO ator. Um gestor cuja atribuição terminou em junho voltava a ler a
+   * equipe enviando `?dataReferencia=2026-05-15`: a fronteira temporal da
+   * autorização era escolhida por quem pedia. A ADR 0015, decisão 8, diz o
+   * contrário com todas as letras — *"Decisões de acesso usam o estado
+   * vigente"*.
+   *
+   * Fechar isso por validação de intervalo (recusar datas fora da vigência)
+   * seria circular: a vigência é justamente o que está sendo decidido. A
+   * única fronteira que não se pode negociar é não haver parâmetro.
    *
    * `master_tecnico` e `rh` não têm atribuição de equipe — eles consultam para
    * conferir configuração, e o fazem informando o gestor explicitamente. Este
    * método é sempre sobre **o próprio ator**.
    */
-  async escopoDoAtor(
-    ctx: GestorConsultaContext,
-    dataReferencia: string,
-  ): Promise<{
+  async escopoDoAtor(ctx: GestorConsultaContext): Promise<{
     empresaId: string;
     colaboradorId: string;
+    dataReferencia: string;
     escopo: EscopoDoGestor;
   } | null> {
     const empresaId = ctx.actor.companyId;
     if (!empresaId) return null;
+
+    const dataReferencia = this.hoje();
 
     // Passo 2: conta -> pessoa. Sem ligação vigente, o gestor não é ninguém no
     // cadastro, e portanto não alcança ninguém.
@@ -137,7 +168,12 @@ export class GestorConsultaService {
       dataReferencia,
     );
 
-    return { empresaId, colaboradorId: ligacao.colaboradorId, escopo };
+    return {
+      empresaId,
+      colaboradorId: ligacao.colaboradorId,
+      dataReferencia,
+      escopo,
+    };
   }
 
   /**
@@ -149,16 +185,12 @@ export class GestorConsultaService {
    * deliberada, para que um erro na resolução do escopo não produza leitura
    * fora da empresa.
    */
-  private async consultarEscopo(
-    ctx: GestorConsultaContext,
-    dataReferencia?: string,
-  ): Promise<{
+  private async consultarEscopo(ctx: GestorConsultaContext): Promise<{
     empresaId: string | null;
     dataReferencia: string;
     itens: ReturnType<GestorConsultaService["comoItem"]>[];
   }> {
-    const data = dataReferencia ?? this.hoje();
-    const resolvido = await this.escopoDoAtor(ctx, data);
+    const resolvido = await this.escopoDoAtor(ctx);
 
     // Sem ligação, sem atribuição, sem exceção: lista vazia. NUNCA empresa
     // inteira. Retornar antes de consultar torna o vazamento impossível por
@@ -166,12 +198,16 @@ export class GestorConsultaService {
     if (!resolvido || resolvido.escopo.vazio) {
       return {
         empresaId: resolvido?.empresaId ?? null,
-        dataReferencia: data,
+        dataReferencia: resolvido?.dataReferencia ?? this.hoje(),
         itens: [],
       };
     }
 
-    const { empresaId, escopo } = resolvido;
+    const { empresaId, escopo, dataReferencia: data } = resolvido;
+    // A MESMA data que autorizou é a que filtra as alocações. Derivá-la de
+    // novo abriria a janela em que `hoje()` muda entre as duas chamadas — na
+    // virada do dia, o escopo seria resolvido numa data e os vínculos lidos
+    // noutra.
     const limite = new Date(`${data}T00:00:00.000Z`);
 
     const vinculos = await this.prisma.vinculoFuncional.findMany({
@@ -211,6 +247,14 @@ export class GestorConsultaService {
             unidadeOrganizacional: { select: { id: true, nome: true } },
             vigenteDe: true,
           },
+          // `take: 1` sem ordem deixa o PostgreSQL escolher a linha, e o
+          // plano pode mudar com o volume: o cargo e a lotação exibidos
+          // passariam a variar entre chamadas idênticas. A alocação vigente
+          // deve ser única por construção, mas o filtro acima aceita mais de
+          // uma se houver sobreposição histórica — e, havendo, a correta é a
+          // mais recente. `id` desempata para que a resposta seja estável
+          // mesmo com duas na mesma data.
+          orderBy: [{ vigenteDe: "desc" }, { id: "asc" }],
           take: 1,
         },
       },
@@ -228,14 +272,18 @@ export class GestorConsultaService {
    * Lista a equipe e registra a consulta como LISTA (sem id de recurso: a
    * leitura foi do conjunto, não de uma pessoa).
    */
-  async listarEquipe(ctx: GestorConsultaContext, dataReferencia?: string) {
-    const {
-      empresaId,
-      dataReferencia: data,
-      itens,
-    } = await this.consultarEscopo(ctx, dataReferencia);
-    if (empresaId) {
-      await this.registrarConsulta(ctx, empresaId, null);
+  async listarEquipe(ctx: GestorConsultaContext) {
+    const { dataReferencia: data, itens } = await this.consultarEscopo(ctx);
+
+    // A empresa vem do ATOR, não do escopo resolvido. Antes vinha do escopo, e
+    // por isso a consulta de um gestor SEM ligação conta-pessoa não deixava
+    // rastro nenhum: `escopoDoAtor` devolvia `null` antes de chegar à empresa,
+    // a trilha era pulada, e a leitura — autorizada, respondida com 200 —
+    // ficava invisível. Lista vazia é um resultado, não uma consulta que não
+    // aconteceu, e quem varre à procura de acesso é exatamente quem recebe
+    // vazio toda vez.
+    if (ctx.actor.companyId) {
+      await this.registrarConsulta(ctx, ctx.actor.companyId, null);
     }
     return { dataReferencia: data, itens };
   }
@@ -248,21 +296,33 @@ export class GestorConsultaService {
    * exatamente o que a anti-enumeração precisa esconder. Vale igualmente para
    * vínculo de outra equipe e de outra empresa.
    */
-  async detalharVinculo(
-    ctx: GestorConsultaContext,
-    vinculoId: string,
-    dataReferencia?: string,
-  ) {
-    const data = dataReferencia ?? this.hoje();
+  async detalharVinculo(ctx: GestorConsultaContext, vinculoId: string) {
     // Usa `consultarEscopo`, não `listarEquipe`: esta é uma leitura de
     // DETALHE, e precisa deixar na trilha o id do vínculo consultado. Chamar a
     // listagem gravaria um evento com a forma de consulta de lista, perdendo
     // justamente a informação que torna a trilha útil depois.
-    const lista = await this.consultarEscopo(ctx, data);
+    const lista = await this.consultarEscopo(ctx);
+    const data = lista.dataReferencia;
     const item = lista.itens.find((i) => i.vinculoId === vinculoId);
-    // Fora do escopo: 404, nunca 403 — e ANTES de qualquer evento, para que a
-    // trilha não registre consulta a algo que o ator não podia ver.
-    if (!item) throw new NotFoundException();
+
+    // Fora do escopo: 404, nunca 403 — e a TENTATIVA é registrada como
+    // `denied`, não descartada.
+    //
+    // O comentário anterior dizia o contrário ("antes de qualquer evento, para
+    // que a trilha não registre consulta a algo que o ator não podia ver") e
+    // estava errado em relação ao padrão da casa. Ponto, documentos, pessoas,
+    // horários, organização e solicitações têm todos um `negarAcesso` que
+    // grava `authorization_denied` com o `resourceId` TÉCNICO tentado,
+    // precisamente porque, nas palavras do ponto, é isso "que torna uma
+    // varredura entre empresas detectável depois". Sem o registro, mil
+    // tentativas de enumeração são indistinguíveis de nenhuma.
+    //
+    // O evento guarda só o id técnico tentado — nunca nome, matrícula ou
+    // qualquer dado da pessoa, que o ator de todo modo não chegou a ver.
+    if (!item) {
+      await this.registrarNegacao(ctx, vinculoId);
+      throw new NotFoundException();
+    }
 
     const limite = new Date(`${data}T00:00:00.000Z`);
     const horario = await this.prisma.vinculoHorario.findFirst({
@@ -325,6 +385,36 @@ export class GestorConsultaService {
       ip: ctx.metadata.ip,
       userAgent: ctx.metadata.userAgent,
       result: "success",
+      requestId: ctx.metadata.requestId,
+    });
+  }
+
+  /**
+   * Tentativa de ler um vínculo fora do escopo.
+   *
+   * `authorization_denied` + `result: "denied"` é a mesma forma de
+   * `PontoAuditoriaService.negarAcesso` e das cinco outras famílias que já
+   * registram negação. A resposta pública continua 404 indistinguível; a
+   * diferença está só na trilha interna, que é onde uma varredura aparece.
+   *
+   * **Best-effort**, como as demais negações (ADR 0004 §2): a recusa já foi
+   * decidida e não é revertida se o evento não puder ser gravado.
+   */
+  private async registrarNegacao(
+    ctx: GestorConsultaContext,
+    vinculoIdTentado: string,
+  ): Promise<void> {
+    await this.auditService.record({
+      actorType: "user",
+      actorUserId: ctx.actor.id,
+      actorRole: ctx.actor.role,
+      companyId: ctx.actor.companyId,
+      action: "authorization_denied",
+      resource: "gestor_equipe",
+      resourceId: vinculoIdTentado,
+      ip: ctx.metadata.ip,
+      userAgent: ctx.metadata.userAgent,
+      result: "denied",
       requestId: ctx.metadata.requestId,
     });
   }

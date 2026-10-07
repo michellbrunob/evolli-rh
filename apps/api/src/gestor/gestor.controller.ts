@@ -198,6 +198,12 @@ export class GestorAdminController {
  * não abriu nenhuma mutação. O RBAC reforça concedendo apenas `read` em
  * `gestor_equipe`, de modo que a ausência de rota e a ausência de permissão
  * se confirmam mutuamente.
+ *
+ * **E nenhum parâmetro de data.** As duas rotas resolvem o escopo pela data
+ * corrente do servidor; `ConsultaEquipeQueryDto` é vazio justamente para que
+ * `?dataReferencia=...` responda 400 em vez de ser ignorado em silêncio. Ver
+ * a justificativa completa no DTO: quem pergunta não escolhe em que data é
+ * autorizado.
  */
 @ApiTags("gestor")
 @Controller("gestor/equipe")
@@ -216,19 +222,11 @@ export class GestorConsultaController {
     summary: "Lista os colaboradores dentro do escopo do gestor na data",
   })
   async listar(
-    @Query() query: ConsultaEquipeQueryDto,
+    @Query() _query: ConsultaEquipeQueryDto,
     @CurrentUser() actor: AccessUser,
     @Req() req: Request,
   ) {
-    if (!ehDiaIso(query.dataReferencia)) {
-      throw new BadRequestException(
-        "dataReferencia deve ser YYYY-MM-DD, sem hora.",
-      );
-    }
-    return this.service.listarEquipe(
-      this.contexto(actor, req),
-      query.dataReferencia,
-    );
+    return this.service.listarEquipe(this.contexto(actor, req));
   }
 
   @Get("vinculos/:vinculoId")
@@ -239,19 +237,10 @@ export class GestorConsultaController {
   })
   async detalhar(
     @Param("vinculoId", ParseUUIDPipe) vinculoId: string,
-    @Query() query: ConsultaEquipeQueryDto,
+    @Query() _query: ConsultaEquipeQueryDto,
     @CurrentUser() actor: AccessUser,
     @Req() req: Request,
   ) {
-    if (!ehDiaIso(query.dataReferencia)) {
-      throw new BadRequestException(
-        "dataReferencia deve ser YYYY-MM-DD, sem hora.",
-      );
-    }
-    return this.service.detalharVinculo(
-      this.contexto(actor, req),
-      vinculoId,
-      query.dataReferencia,
-    );
+    return this.service.detalharVinculo(this.contexto(actor, req), vinculoId);
   }
 }
