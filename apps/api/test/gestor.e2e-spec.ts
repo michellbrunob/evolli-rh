@@ -1745,5 +1745,61 @@ describe("Gestor consultivo: escopo por equipe e administracao pelo RH (e2e)", (
         expect(texto).not.toContain(proibido);
       }
     });
+
+    it("28. se a auditoria nao puder ser gravada, a atribuicao NAO e criada", async () => {
+      // ADR 0004 §2: toda mutacao audita na MESMA transacao. Uma concessao de
+      // acesso registrada sem trilha e pior que uma concessao que falhou —
+      // ninguem saberia depois quem deu acesso a quem.
+      //
+      // Mesmo instrumento de `audit.e2e-spec.ts`: o papel migrator revoga
+      // INSERT em `audit_event`, o que faz `AuditService.record` lancar
+      // DENTRO da transacao. Nao e simulacao — e a falha real.
+      // Equipe exclusiva deste teste: as vigencias dos anteriores colidiriam
+      // na EXCLUSION e o 409 mascararia o 500 que se quer observar.
+      const equipeRollback = await criarEquipe(
+        "EQP_ROLLB",
+        "Equipe Sintetica Rollback",
+        departamentoA,
+      );
+      const migrator = new PrismaClient({
+        datasources: { db: { url: migratorUrl } },
+      });
+      const antes = await prisma.atribuicaoGestorEquipe.count({
+        where: { equipeId: equipeRollback },
+      });
+
+      try {
+        await migrator.$executeRawUnsafe(
+          "REVOKE INSERT ON TABLE app.audit_event FROM evolli_app",
+        );
+
+        await atribuir(rhA, {
+          equipeId: equipeRollback,
+          gestorColaboradorId: pessoaGestorVigencia.colaboradorId,
+          papel: "substituto",
+          vigenciaInicio: dia(-40),
+        }).expect(500);
+      } finally {
+        await migrator.$executeRawUnsafe(
+          "GRANT INSERT ON TABLE app.audit_event TO evolli_app",
+        );
+        await migrator.$disconnect();
+      }
+
+      const depois = await prisma.atribuicaoGestorEquipe.count({
+        where: { equipeId: equipeRollback },
+      });
+      expect(depois).toBe(antes);
+
+      // Controle positivo: com a auditoria de volta, a MESMA operacao passa.
+      // Sem isto, o teste acima passaria tambem se a criacao estivesse
+      // quebrada por qualquer outro motivo.
+      await atribuir(rhA, {
+        equipeId: equipeRollback,
+        gestorColaboradorId: pessoaGestorVigencia.colaboradorId,
+        papel: "substituto",
+        vigenciaInicio: dia(-40),
+      }).expect(201);
+    });
   });
 });
