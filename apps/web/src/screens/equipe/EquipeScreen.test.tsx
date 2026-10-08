@@ -785,6 +785,43 @@ describe("acessibilidade", () => {
     expect(regiao).toHaveAttribute("tabindex", "0");
   });
 
+  it("T153.24 os rótulos cobrem os enums REAIS do schema, sem inventar valor", () => {
+    // Regressão da validação visual: a primeira versão mapeava `efetivo`,
+    // `afastado` e `desligado` — nenhum deles existe. O resultado foi a tela
+    // mostrando o enum cru "clt". Enum do schema:
+    //   SituacaoVinculo = previsto | ativo | encerrado
+    //   TipoVinculo     = clt | estagio | pj | temporario | outro_controlado
+    const fonte = readFileSync("src/screens/equipe/EquipeScreen.tsx", "utf8");
+    const bloco = (nome: string) =>
+      fonte.slice(
+        fonte.indexOf(nome),
+        fonte.indexOf("};", fonte.indexOf(nome)),
+      );
+
+    const situacao = bloco("const ROTULO_SITUACAO");
+    for (const v of ["previsto", "ativo", "encerrado"]) {
+      expect(situacao).toContain(`${v}:`);
+    }
+    // E nada além deles: valor inventado vira rótulo que nunca aparece.
+    for (const v of ["afastado", "desligado", "suspenso"]) {
+      expect(situacao).not.toContain(`${v}:`);
+    }
+
+    const tipo = bloco("const ROTULO_TIPO");
+    for (const v of [
+      "clt",
+      "estagio",
+      "pj",
+      "temporario",
+      "outro_controlado",
+    ]) {
+      expect(tipo).toContain(`${v}:`);
+    }
+    for (const v of ["efetivo", "aprendiz"]) {
+      expect(tipo).not.toContain(`${v}:`);
+    }
+  });
+
   it("T153.23 o CSS mantém o contrato que impede overflow da página em 375 px", () => {
     // Teste de CONTRATO, no mesmo espírito do teste de workflow da T152: o
     // runner não mede largura, mas pode exigir que o mecanismo que de fato

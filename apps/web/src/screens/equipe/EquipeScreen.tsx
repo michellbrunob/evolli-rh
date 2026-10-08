@@ -97,25 +97,31 @@ type StatusCarregamento = "carregando" | "erro" | "pronto";
  * O enum cru do backend nunca vai à tela. Situação desconhecida cai no próprio
  * valor — melhor mostrar o código do que mentir um rótulo.
  */
+// Valores do enum `SituacaoVinculo` do schema: previsto | ativo | encerrado.
+// Conferidos na fonte depois de a validação visual mostrar o enum cru na tela
+// — a primeira versão deste mapa tinha `afastado` e `desligado`, que NÃO
+// existem (o schema registra, em comentário, que `suspenso` ficou de fora de
+// propósito). Inventar rótulo é tão errado quanto exibir o código.
 const ROTULO_SITUACAO: Record<string, string> = {
   previsto: "Previsto",
   ativo: "Ativo",
-  afastado: "Afastado",
-  desligado: "Desligado",
+  encerrado: "Encerrado",
 };
 
 const VARIANTE_SITUACAO: Record<string, StatusVariant> = {
   previsto: "info",
   ativo: "success",
-  afastado: "warning",
-  desligado: "neutral",
+  encerrado: "neutral",
 };
 
+// Valores do enum `TipoVinculo`: clt | estagio | pj | temporario |
+// outro_controlado.
 const ROTULO_TIPO: Record<string, string> = {
-  efetivo: "Efetivo",
-  temporario: "Temporário",
+  clt: "CLT",
   estagio: "Estágio",
-  aprendiz: "Aprendiz",
+  pj: "PJ",
+  temporario: "Temporário",
+  outro_controlado: "Outro (controlado)",
 };
 
 function rotuloSituacao(valor: string): string {

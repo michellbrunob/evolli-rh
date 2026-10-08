@@ -699,6 +699,78 @@ vazio nem dado fictício. O módulo funcional antes cogitado sob o número da T1
 jornada** (`DP-3J-12`) e **andamento de solicitações** (`PD-SOL-05`) — **não foi iniciado** e segue
 sem contrato seguro.
 
+**Contratos consumidos, conferidos na fonte.** `GET /v1/gestor/equipe` devolve
+`{ dataReferencia, itens }`; cada item tem os dez campos de `comoItem`.
+`GET /v1/gestor/equipe/vinculos/:vinculoId` devolve o item mais `horarioVigente`
+e os dois campos declarados `null`. O prefixo `/v1` vem de `enableVersioning`
+(URI, `defaultVersion: "1"`), não de `setGlobalPrefix` — detalhe que, errado,
+daria 404 em produção e teste verde em jsdom. Datas chegam como ISO completo e
+são exibidas por `formatarDia`, que corta os dez primeiros caracteres sem
+recalcular fuso.
+
+**Papéis, espelhando o avaliador e nada além dele.** O RBAC concede
+`gestor_equipe`/`read` a **dois** papéis, ambos na própria empresa: `gestor` e
+`rh`. Negar `rh` na interface seria inventar restrição que o contrato não tem;
+conceder a `dp`, `colaborador`, `master_tecnico`, `admin_tecnico`,
+`financeiro`, `auditor` ou `dpo` seria conveniência contra o contrato. A
+constante `PAPEIS_COM_CONSULTA_DE_EQUIPE` é exportada justamente para que um
+teste prenda a lista.
+
+**Prova por mutação, cinco direções.** Remover a guarda monotônica do detalhe
+mata `T153.15` e `T153.16`; removê-la da lista mata `T153.14`; liberar `dp`
+mata `T153.11`, `T153.12` e `T153.A2`; parar de ocultar o destino condicional
+mata `T153.A1` e `T153.A2`.
+
+**A quinta mutação sobreviveu, e isso está registrado em vez de escondido.**
+Remover `seqDetalhe.current += 1` de `fecharDetalhe` não quebra teste nenhum.
+Investiguei a causa em vez de inventar um teste que a justificasse: com
+`vinculoAberto` nulo o modal não renderiza, e **toda** abertura já incrementa o
+contador, de modo que a resposta vencida seria descartada de qualquer forma. A
+linha permanece como defesa em profundidade — ela é o que mantém a proteção
+independente de `abrirDetalhe` continuar recarregando sempre, premissa que um
+cache futuro quebraria em silêncio — e o código diz isso com todas as letras.
+
+**375 px não tem teste automatizado, e a razão é do ambiente.** O Vitest roda
+em jsdom com `css: false` (`apps/web/vite.config.ts`): não há motor de layout,
+e nenhum teste do projeto pode medir largura, `scrollWidth` ou overflow. O que
+o teste prende é o **contrato de CSS** que de fato impede o vazamento —
+`min-width: 0` na raiz e nos filhos diretos, `position: relative` na tabela —
+mais a semântica da região rolável. A medição real fica na verificação visual,
+como o guia visual do projeto já estabelece.
+
+**Validação visual, em navegador real, contra a API real.** Ambiente local de
+demonstração, banco existente reaproveitado — nenhum volume foi destruído ou
+recriado. Com `gestor.alfa@evolli.local`: a lista traz **apenas**
+`DEMO-A-0201` (Pessoa Demo Alfa Turno A). Estão **ausentes**, conferidos um a
+um no DOM: `DEMO-A-0202` (outra equipe), `DEMO-A-0002` (sem equipe),
+`DEMO-A-0001` (a pessoa do próprio gestor) e `DEMO-B-0001` (empresa Beta).
+Detalhe abre em modal somente leitura; `Escape` fecha e o foco volta ao botão
+que abriu. Rede: só `GET /v1/gestor/equipe` e
+`GET /v1/gestor/equipe/vinculos/:id`, todas 200, **sem uma única query string**
+e **sem uma única mutação**. Sem overflow horizontal da página em 1265 px
+(`scrollWidth` 1265 = `clientWidth`) nem em 375 px (375 = 375), com e sem o
+modal aberto; a tabela rola por dentro (`scrollWidth` 889 contra 339).
+
+**O papel `rh` foi verificado no ambiente, e confirmou a leitura do contrato.**
+Como o RBAC também lhe concede `gestor_equipe`/`read`, ele vê o destino e
+recebe 200 — com lista vazia, porque não tem atribuição de equipe. A tela
+mostra a explicação que a ADR 0015 exigiu, não "Sem permissão". Negar `rh` na
+interface teria sido inventar uma restrição. Já `dp.alfa` vê **nove** destinos:
+"Minha equipe" não aparece.
+
+**Defeito próprio encontrado pela validação visual, e corrigido.** Os mapas de
+rótulo tinham valores que **não existem** no schema (`efetivo`, `afastado`,
+`desligado`), e a tela exibiu o enum cru `clt`. Os enums reais são
+`SituacaoVinculo = previsto | ativo | encerrado` e
+`TipoVinculo = clt | estagio | pj | temporario | outro_controlado`. Corrigido
+contra a fonte, com teste (`T153.24`) que falha se alguém reintroduzir um
+valor inventado — inventar rótulo é tão errado quanto exibir o código.
+
+**Observação pré-existente, não tratada:** o shell abre em "Cadastros" para
+todo mundo, e um `gestor` recebe 403 em `GET /v1/horarios` logo ao entrar.
+É comportamento do shell anterior a esta tarefa; mudar o destino padrão
+afetaria todos os papéis e não cabe aqui.
+
 **Fora desta entrega, explicitamente:** banco de horas, espelho de ponto, atestado, diagnóstico,
 CID ou qualquer informação de saúde, aprovações, alterações cadastrais, qualquer `POST`, `PATCH`,
 `PUT` ou `DELETE`, visão por departamento ou empresa inteira, gestão matricial, exceções
