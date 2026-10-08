@@ -1011,11 +1011,14 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       posição e têm sentidos opostos.
     - **Protocolo estruturado, que a substituiu.** O autor declara, em trailer auditável:
       `Spec-Kit-Entrega: T###` e `Spec-Kit-Nao-Entrega: T###`. Quando obrigatório:
-      (1) existe exatamente um `Spec-Kit-Entrega`, não vazio; (2) toda tarefa declarada existe em
-      `tasks.md` **e** em `execution-status.md` e não está acima de `lastRecordedTask`;
+      (1) existe exatamente **uma declaração lógica** de entrega — um `Spec-Kit-Entrega` não vazio,
+      que pode listar uma ou mais tarefas; (2) toda tarefa declarada existe em `tasks.md` **e** em
+      `execution-status.md` e não está acima de `lastRecordedTask`;
       (3) **todo** identificador acima de `lastRecordedTask`, em **qualquer** posição do contexto,
       está classificado num dos dois trailers; (4) nenhum identificador nos dois ao mesmo tempo;
-      (5) trailer ausente, duplicado, malformado ou contraditório **reprova**.
+      (5) trailers **idênticos após normalização em conjunto são idempotentes** (a mesma declaração
+      repetida, não duas decisões); trailer **com conteúdo divergente**, vazio, malformado, ausente
+      ou com o mesmo identificador nas duas classificações **reprova**.
     - **Corte de adoção, objetivo e sem hash:** obrigatório quando
       `lastRecordedTask >= 152` (`TAREFA_DE_ADOCAO_DO_PROTOCOLO`). Abaixo disso, **modo histórico**:
       só a regra (a), porque exigir trailer de commit que já está em `main` seria exigir reescrita

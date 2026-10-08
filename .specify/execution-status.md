@@ -598,12 +598,15 @@ Spec-Kit-Entrega: T152
 Spec-Kit-Nao-Entrega: T153
 ```
 
-Quando obrigatório: existe exatamente um `Spec-Kit-Entrega`, não vazio; toda tarefa declarada existe
-nos **dois** artefatos e não está acima de `lastRecordedTask`; **todo** identificador acima de
-`lastRecordedTask`, em **qualquer** posição, está classificado num dos dois trailers; nenhum aparece
-nos dois; e trailer ausente, duplicado, malformado ou contraditório **reprova**. O corpo volta a ser
-varrido inteiro — o bypass some porque a menção deixa de ser julgada pelo lugar e passa a depender
-de o autor dizer o que ela é. Esquecer de classificar falha **fechado**.
+Quando obrigatório: existe exatamente **uma declaração lógica** de entrega — um `Spec-Kit-Entrega`
+não vazio, que pode listar uma ou mais tarefas; toda tarefa declarada existe nos **dois** artefatos e
+não está acima de `lastRecordedTask`; **todo** identificador acima de `lastRecordedTask`, em
+**qualquer** posição, está classificado num dos dois trailers; nenhum aparece nos dois; trailers
+**idênticos após normalização em conjunto são idempotentes** (a mesma declaração repetida, não duas
+decisões); e trailer **com conteúdo divergente**, vazio, malformado, ausente ou com o mesmo
+identificador nas duas classificações **reprova**. O corpo volta a ser varrido inteiro — o bypass
+some porque a menção deixa de ser julgada pelo lugar e passa a depender de o autor dizer o que ela é.
+Esquecer de classificar falha **fechado**.
 
 **Corte de adoção, objetivo e sem hash:** obrigatório quando `lastRecordedTask >= 152`
 (`TAREFA_DE_ADOCAO_DO_PROTOCOLO`). Abaixo disso, **modo histórico** — só a regra (a), porque exigir
