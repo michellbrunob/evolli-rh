@@ -10,7 +10,9 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 
 import {
+  TAREFA_DE_ADOCAO_DO_PROTOCOLO,
   avaliarSincronia,
+  montarContextoDeSquash,
   resolverContexto,
   validarEstado,
 } from "./spec-kit-sync.core.mjs";
@@ -118,6 +120,26 @@ for (const manifestPath of [
 }
 
 if (estadoUtilizavel) {
+  // -------------------------------------------------------------------
+  // B3 — o estado não pode recuar para antes da adoção do protocolo.
+  //
+  // `protocoloObrigatorio` olha só `lastRecordedTask`, e isso basta para o
+  // núcleo puro, que precisa reproduzir contextos anteriores à T152 em teste.
+  // No CLI REAL a conclusão é outra: este arquivo faz parte da árvore que
+  // CONTÉM o protocolo, então um ledger abaixo do corte não é "modo
+  // histórico" — é estado incoerente. Sem esta guarda, a mesma mudança que
+  // entrega uma tarefa nova poderia baixar `lastRecordedTask` e desligar a
+  // fiscalização junto, em silêncio.
+  //
+  // O modo histórico continua existindo, e só onde tem sentido: no núcleo,
+  // para replay de integrações anteriores à adoção.
+  // -------------------------------------------------------------------
+  if (state.lastRecordedTask < TAREFA_DE_ADOCAO_DO_PROTOCOLO) {
+    failures.push(
+      `lastRecordedTask=${state.lastRecordedTask} está abaixo da adoção do protocolo (T${TAREFA_DE_ADOCAO_DO_PROTOCOLO}): o estado não pode recuar para antes dela.`,
+    );
+  }
+
   const constitution = read(".specify/memory/constitution.md");
   const versionMatch = constitution.match(
     /\*\*Version\*\*:\s*([0-9]+\.[0-9]+\.[0-9]+)/,
@@ -139,18 +161,68 @@ if (estadoUtilizavel) {
     }
   }
 
-  // `%B` (mensagem INTEIRA), nao `%s` (so o assunto): o push para `main`
-  // injeta `head_commit.message`, que tambem e a mensagem inteira, e os
-  // trailers `Spec-Kit-Entrega` vivem no CORPO. Com `%s` o verificador local
-  // nao os enxergava e dava veredito diferente da CI para o mesmo commit —
-  // duas nocoes de contexto no mesmo programa.
-  const { contexto } = resolverContexto({
-    variavelDeAmbiente: process.env.SPEC_KIT_CHANGE_CONTEXT,
-    lerSubject: () =>
-      execFileSync("git", ["log", "-1", "--pretty=%B"], {
-        encoding: "utf8",
-      }),
-  });
+  // -------------------------------------------------------------------
+  // Dois contextos, duas perguntas distintas.
+  //
+  // `--squash-preview` monta a mensagem que o squash desta PR produzirá e a
+  // valida ANTES do merge. É o que impede a forma de falha que já quebrou a
+  // `main` duas vezes nesta linha de trabalho: PR verde porque o contexto da
+  // revisão (título + descrição) não é o contexto do push (título + mensagens
+  // de todos os commits).
+  //
+  // Nada vem de shell: o título chega por ambiente e o histórico é lido pelo
+  // próprio script com argumentos FIXOS. Título, descrição e mensagens de
+  // commit são conteúdo não confiável e nunca são interpolados num comando.
+  // -------------------------------------------------------------------
+  const preverSquash = process.argv.includes("--squash-preview");
+
+  let contexto;
+  if (preverSquash) {
+    const base = process.env.SPEC_KIT_BASE_SHA;
+    if (!base) {
+      failures.push(
+        "SPEC_KIT_BASE_SHA ausente: a previsão do squash precisa da base da PR.",
+      );
+    } else {
+      let mensagens = [];
+      try {
+        mensagens = execFileSync(
+          "git",
+          ["log", "--reverse", "--pretty=%B%x00", `${base}..HEAD`],
+          { encoding: "utf8" },
+        )
+          .split("\u0000")
+          .map((m) => m.trim())
+          .filter(Boolean);
+      } catch {
+        failures.push(
+          "Não foi possível ler o histórico da PR: a previsão do squash exige checkout com histórico (fetch-depth: 0).",
+        );
+      }
+      if (mensagens.length === 0) {
+        failures.push(
+          "Nenhum commit na faixa base..HEAD: a previsão do squash não tem o que validar.",
+        );
+      }
+      contexto = montarContextoDeSquash({
+        titulo: process.env.SPEC_KIT_PR_TITLE ?? "",
+        numeroPr: process.env.SPEC_KIT_PR_NUMBER,
+        mensagens,
+      });
+    }
+  } else {
+    // `%B` (mensagem INTEIRA), não `%s`: o push para `main` injeta
+    // `head_commit.message`, que também é a mensagem inteira, e os trailers
+    // vivem no CORPO. Com `%s` o verificador local não os enxergava e dava
+    // veredito diferente da CI para o mesmo commit.
+    contexto = resolverContexto({
+      variavelDeAmbiente: process.env.SPEC_KIT_CHANGE_CONTEXT,
+      lerSubject: () =>
+        execFileSync("git", ["log", "-1", "--pretty=%B"], {
+          encoding: "utf8",
+        }),
+    }).contexto;
+  }
 
   failures.push(...avaliarSincronia({ state, tasks, ledger, contexto }));
 }

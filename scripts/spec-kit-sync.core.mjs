@@ -346,35 +346,91 @@ export function protocoloObrigatorio(state) {
   );
 }
 
+/** Conjunto canônico: sem repetidos e em ordem, para comparar equivalência. */
+function normalizarConjunto(ids) {
+  return [...new Set(ids)].sort();
+}
+
 /**
- * Lê os trailers do contexto.
+ * Monta a mensagem que o squash do GitHub produzirá para uma PR.
  *
- * Devolve `{ entrega, naoEntrega, falhas }`. `falhas` não vazio significa
- * protocolo malformado — e, quando ele é obrigatório, isso basta para reprovar.
+ * Pura, para que a CI possa VALIDAR ANTES DO MERGE o texto que só existiria
+ * depois dele. As duas quebras da `main` nesta linha de trabalho — a T151 e a
+ * primeira versão da T152 — tinham a mesma forma: PR verde, `main` vermelha,
+ * porque o contexto da revisão não é o contexto do push.
  *
- * Trata como MALFORMADO, e não como ausência:
- *   - trailer repetido (duas linhas `Spec-Kit-Entrega`);
- *   - valor vazio;
- *   - qualquer token que não seja exatamente `T###`.
- * Tolerar qualquer um deles transformaria erro de digitação em dispensa
- * silenciosa, que é precisamente o modo de falha que este protocolo existe
- * para fechar.
+ * Formato conferido contra o squash real `a356418`: o assunto é o título da PR
+ * com `(#N)`, e o corpo concatena cada commit como `* <assunto>` seguido do
+ * próprio corpo. É uma aproximação do que o GitHub gera, e serve ao que
+ * importa aqui: todos os trailers aparecem, na coluna zero, como aparecerão
+ * depois do merge.
+ */
+export function montarContextoDeSquash({ titulo, numeroPr, mensagens }) {
+  const cabecalho = numeroPr
+    ? `${titulo} (#${numeroPr})`
+    : String(titulo ?? "");
+  const corpo = (mensagens ?? [])
+    .map((m) => String(m ?? "").trim())
+    .filter(Boolean)
+    .map((m) => {
+      const linhas = m.split(/\r?\n/);
+      const assunto = linhas[0];
+      const restante = linhas.slice(1).join("\n").trim();
+      return restante ? `* ${assunto}\n\n${restante}` : `* ${assunto}`;
+    })
+    .join("\n\n");
+  return corpo ? `${cabecalho}\n\n${corpo}\n` : `${cabecalho}\n`;
+}
+
+/**
+ * Lê os trailers do contexto, com UNIÃO IDEMPOTENTE por classe.
+ *
+ * Devolve `{ entrega, naoEntrega, declarouEntrega, falhas }`. `falhas` não
+ * vazio significa protocolo violado — e, quando ele é obrigatório, isso basta
+ * para reprovar.
+ *
+ * ### Por que repetição idêntica NÃO é duas decisões
+ *
+ * A mesma declaração chega ao verificador por canais diferentes: o evento
+ * `pull_request` traz título e descrição; o push traz a mensagem do squash,
+ * que o GitHub monta **concatenando as mensagens de todos os commits**. Uma PR
+ * de três commits em que dois declaram `Spec-Kit-Entrega: T152` produz duas
+ * linhas idênticas no squash — e isso não é contradição, é a mesma frase dita
+ * duas vezes pelo mesmo autor sobre a mesma entrega.
+ *
+ * A primeira versão desta função reprovava qualquer repetição. Testado contra
+ * o squash real previsto desta própria PR, isso deixava a PR verde e quebrava
+ * `main` depois do merge — exatamente o modo de falha que a T152 existe para
+ * eliminar. A regra passou a comparar CONJUNTOS normalizados: repetições
+ * equivalentes se fundem, divergência continua sendo contradição.
+ *
+ * Normalizar é ordenar e remover repetidos, então `T151, T152` e `T152 T151`
+ * são a mesma declaração — a ordem em que o autor listou não carrega sentido.
+ *
+ * ### O que continua falhando
+ *
+ *   - conteúdo divergente entre trailers da mesma classe (duas decisões);
+ *   - o mesmo identificador nas duas classes (classificação impossível);
+ *   - valor vazio, token fora de `T###`, separador inválido;
+ *   - trailer indentado — não é trailer, é prosa (ver `texto` abaixo).
  */
 export function lerTrailers(contexto) {
   const falhas = [];
-  const achados = { entrega: null, naoEntrega: null };
+  /** Conjuntos normalizados vistos por classe, para comparar equivalência. */
+  const vistos = { entrega: [], naoEntrega: [] };
+  const tocado = { entrega: false, naoEntrega: false };
 
   if (typeof contexto !== "string") {
-    return { entrega: [], naoEntrega: [], falhas };
+    return { entrega: [], naoEntrega: [], declarouEntrega: false, falhas };
   }
 
   for (const linha of contexto.split(/\r?\n/)) {
-    // COLUNA ZERO, sem aparar a esquerda. Um trailer e declaracao; um
-    // exemplo indentado dentro da prosa — como o do commit que documenta
-    // este protocolo — e texto. Sem essa exigencia, explicar o protocolo
-    // numa mensagem de commit disparava "trailer duplicado", e a unica
-    // saida seria nao poder falar dele. E tambem a convencao do git:
-    // trailer vive na margem.
+    // COLUNA ZERO, sem aparar à esquerda. Um trailer é declaração; um exemplo
+    // indentado dentro da prosa — como o do commit que documenta este
+    // protocolo — é texto. Sem essa exigência, explicar o protocolo numa
+    // mensagem de commit disparava "trailer duplicado", e a única saída seria
+    // não poder falar dele. É também a convenção do git: trailer vive na
+    // margem.
     const texto = linha.replace(/\s+$/, "");
     for (const [chave, padrao, rotulo] of [
       ["entrega", TRAILER_ENTREGA, "Spec-Kit-Entrega"],
@@ -383,12 +439,9 @@ export function lerTrailers(contexto) {
       const casado = texto.match(padrao);
       if (!casado) continue;
 
-      if (achados[chave] !== null) {
-        falhas.push(
-          `Trailer ${rotulo} aparece mais de uma vez: declare todas as tarefas numa linha só.`,
-        );
-        continue;
-      }
+      // Marca a classe como declarada mesmo se o valor for inválido: assim o
+      // erro reportado é "malformado", e não também "ausente".
+      tocado[chave] = true;
 
       const tokens = casado[1]
         .split(/[,\s]+/)
@@ -397,36 +450,61 @@ export function lerTrailers(contexto) {
 
       if (tokens.length === 0) {
         falhas.push(`Trailer ${rotulo} está vazio.`);
-        achados[chave] = [];
         continue;
       }
 
       const invalidos = tokens.filter((t) => !VALOR_DE_TRAILER.test(t));
       if (invalidos.length > 0) {
         falhas.push(
-          `Trailer ${rotulo} tem valor malformado (${invalidos.join(", ")}): use o formato T000.`,
+          `Trailer ${rotulo} tem valor malformado (${invalidos.join(", ")}): use o formato T000, separado por vírgula ou espaço.`,
         );
+        // Linha inválida não entra na comparação de equivalência: ela já
+        // reprovou, e deixá-la participar produziria um segundo erro de
+        // "divergência" sobre o mesmo defeito.
+        continue;
       }
-      achados[chave] = tokens.filter((t) => VALOR_DE_TRAILER.test(t));
+
+      vistos[chave].push(normalizarConjunto(tokens));
     }
   }
 
-  const entrega = achados.entrega ?? [];
-  const naoEntrega = achados.naoEntrega ?? [];
+  const resolvido = {};
+  for (const [chave, rotulo] of [
+    ["entrega", "Spec-Kit-Entrega"],
+    ["naoEntrega", "Spec-Kit-Nao-Entrega"],
+  ]) {
+    const conjuntos = vistos[chave];
+    if (conjuntos.length === 0) {
+      resolvido[chave] = [];
+      continue;
+    }
+    const distintos = [...new Set(conjuntos.map((c) => c.join(",")))];
+    if (distintos.length > 1) {
+      falhas.push(
+        `Trailer ${rotulo} aparece com conteúdos divergentes (${distintos.map((d) => `[${d}]`).join(" vs ")}): a declaração precisa ser uma só.`,
+      );
+    }
+    // União idempotente: equivalentes se fundem. Em caso de divergência o
+    // conjunto resolvido não é usado para aprovar — a falha acima já reprova.
+    resolvido[chave] = normalizarConjunto(conjuntos.flat());
+  }
 
-  // Contradição: o mesmo identificador nos dois lados não tem leitura possível,
-  // e escolher um deles seria inventar a intenção do autor.
-  const nosDois = entrega.filter((id) => naoEntrega.includes(id));
-  for (const id of new Set(nosDois)) {
+  // Contradição entre classes: o mesmo identificador declarado como entrega e
+  // como não-entrega não tem leitura possível, e escolher um lado seria
+  // inventar a intenção do autor.
+  const nosDois = resolvido.entrega.filter((id) =>
+    resolvido.naoEntrega.includes(id),
+  );
+  for (const id of nosDois) {
     falhas.push(
       `${id} está declarado como entrega E como não-entrega: a classificação precisa ser uma só.`,
     );
   }
 
   return {
-    entrega: [...new Set(entrega)],
-    naoEntrega: [...new Set(naoEntrega)],
-    declarouEntrega: achados.entrega !== null,
+    entrega: resolvido.entrega,
+    naoEntrega: resolvido.naoEntrega,
+    declarouEntrega: tocado.entrega,
     falhas,
   };
 }

@@ -12,6 +12,7 @@
     "dev": "turbo run dev --parallel",
     "lint": "turbo run lint",
     "spec:check": "node scripts/check-spec-kit-sync.mjs",
+    "spec:check:squash": "node scripts/check-spec-kit-sync.mjs --squash-preview",
     "demo:up": "node scripts/demo-local.mjs",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test && pnpm run test:scripts",

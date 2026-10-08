@@ -617,9 +617,30 @@ descrição. Os trailers vão, portanto, **na mensagem de commit** e **na descri
 passou a fornecer título + corpo no evento de PR, e o fallback local passou de `--pretty=%s` para
 `--pretty=%B`: antes, o mesmo commit tinha veredito diferente local e na CI.
 
-**Preso por mutação, nos três sentidos.** Voltar à regra por posição faz o teste do bypass falhar;
-ignorar identificador futuro não classificado faz outro falhar; tornar o trailer opcional depois do
-corte faz um terceiro falhar.
+**Duplicidade é união idempotente, não duas decisões.** A mesma declaração chega por canais
+diferentes — o evento de PR traz título e descrição; o push traz o squash, que concatena as
+mensagens de **todos** os commits. Uma PR de três commits em que dois declaram
+`Spec-Kit-Entrega: T152` produz duas linhas iguais, e isso não é contradição. A primeira versão
+reprovava qualquer repetição, e isso deixava a PR verde e quebrava `main` no merge — o mesmo modo
+de falha que a tarefa existe para eliminar. A regra compara **conjuntos normalizados**: equivalentes
+se fundem (inclusive em ordem diferente), divergentes continuam sendo contradição.
+
+**A CI da PR valida também a mensagem PREVISTA do squash.** Duas perguntas distintas, dois passos:
+o contexto de revisão (título + descrição) e o texto que existirá depois do merge (título + todas as
+mensagens de commit, lidas de `base..HEAD`). Qualquer um que falhe derruba o Quality gate antes do
+merge. Título e número chegam por ambiente; o histórico é lido pelo próprio script com argumentos
+fixos — conteúdo de PR nunca entra em comando de shell.
+
+**O estado não recua.** O CLI real recusa `lastRecordedTask` abaixo da adoção: ele vive numa árvore
+que já contém o protocolo, então um ledger abaixo do corte não é modo histórico, é estado
+incoerente. Sem essa guarda, a mesma mudança que entrega uma tarefa nova poderia rebaixar o ledger
+e desligar a fiscalização junto. O modo histórico permanece **só no núcleo puro**, para replay de
+integrações anteriores à adoção em teste.
+
+**Preso por mutação, nos cinco sentidos.** Voltar a reprovar duplicidade idêntica quebra o contexto
+real do squash; aceitar divergência quebra outro; remover a validação do squash na PR quebra a
+guarda do workflow; remover a guarda de rebaixamento quebra o teste do CLI; ignorar futura não
+classificada quebra um quinto.
 
 **Não tratado, e declarado:** caixa baixa (`t153`) e zero-width continuam escapando de
 `IDENTIFICADOR`, exatamente como antes desta tarefa. É dívida anterior, já registrada, com teste

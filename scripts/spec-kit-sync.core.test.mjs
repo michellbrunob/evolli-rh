@@ -29,6 +29,7 @@ import {
   coberturaDeTarefas,
   TAREFA_DE_ADOCAO_DO_PROTOCOLO,
   lerTrailers,
+  montarContextoDeSquash,
   protocoloObrigatorio,
   identificadoresCitados,
   resolverContexto,
@@ -675,7 +676,12 @@ test("T152.6 mesmo identificador em entrega e não-entrega: falha", () => {
   assert.ok(falhas.some((f) => /classificação precisa ser uma só/.test(f)));
 });
 
-test("T152.7 trailer duplicado: falha", () => {
+test("T152.7 trailer com conteudos DIVERGENTES: falha", () => {
+  // Ate a correcao de B2 este teste exigia falha para duplicidade IDENTICA.
+  // A exigencia foi substituida conscientemente depois de provar contra o
+  // squash real: dois commits declarando a mesma entrega produzem duas linhas
+  // iguais, e reprova-las deixava a PR verde e quebrava `main` no merge.
+  // Divergencia, que e duas decisoes de verdade, continua reprovando.
   const falhas = comProtocolo({
     contexto: [
       "T152",
@@ -684,7 +690,7 @@ test("T152.7 trailer duplicado: falha", () => {
       "Spec-Kit-Entrega: T151",
     ].join("\n"),
   });
-  assert.ok(falhas.some((f) => /aparece mais de uma vez/.test(f)));
+  assert.ok(falhas.some((f) => /conte/.test(f) && /divergentes/.test(f)));
 });
 
 test("T152.8 trailer malformado ou vazio: falha", () => {
@@ -878,4 +884,302 @@ test("T152.21 o workflow fornece titulo E corpo ao verificador", () => {
     /pull_request\.body/,
     "falta o CORPO da PR: os trailers vivem nele",
   );
+
+  // E o segundo passo: a PR tambem valida a mensagem PREVISTA do squash.
+  // Sem ele, um defeito presente so nas mensagens dos commits passa na
+  // revisao e quebra a main no merge — ja aconteceu duas vezes.
+  assert.match(
+    yml,
+    /pnpm spec:check:squash/,
+    "falta o passo que valida a mensagem prevista do squash",
+  );
+  assert.match(
+    yml,
+    /^\s+fetch-depth:\s*0\s*$/m,
+    "a previsao do squash precisa do historico (fetch-depth: 0)",
+  );
+});
+
+// --------------------------------------------------------------------------
+// B2. União idempotente de trailers, e a previsão do squash que a motivou.
+// --------------------------------------------------------------------------
+
+const comTrailers = (...linhas) =>
+  comProtocolo({ contexto: ["T152 - assunto", "", ...linhas].join("\n") });
+
+test("B2.1 duas declarações IDÊNTICAS de entrega valem por uma", () => {
+  // Era a regra anterior que reprovava aqui. Trocada conscientemente depois
+  // de provar contra o squash real: uma PR de três commits em que dois
+  // declaram a mesma entrega produz duas linhas idênticas, e isso não é
+  // contradição — é a mesma frase dita duas vezes pelo mesmo autor.
+  assert.deepEqual(
+    comTrailers("Spec-Kit-Entrega: T152", "Spec-Kit-Entrega: T152"),
+    [],
+  );
+});
+
+test("B2.2 mesmos IDs em ordem diferente são a mesma declaração", () => {
+  assert.deepEqual(
+    comTrailers("Spec-Kit-Entrega: T151, T152", "Spec-Kit-Entrega: T152 T151"),
+    [],
+  );
+  assert.deepEqual(
+    lerTrailers("Spec-Kit-Entrega: T152, T151").entrega,
+    ["T151", "T152"],
+    "o conjunto resolvido é canônico",
+  );
+});
+
+test("B2.3 declarações DIVERGENTES de entrega falham como contradição", () => {
+  const falhas = comTrailers(
+    "Spec-Kit-Entrega: T152",
+    "Spec-Kit-Entrega: T151, T152",
+  );
+  assert.ok(falhas.some((f) => /conteúdos divergentes/.test(f)));
+});
+
+test("B2.4 duas não-entregas idênticas valem por uma; divergentes falham", () => {
+  assert.deepEqual(
+    comTrailers(
+      "Fica para a T153.",
+      "Spec-Kit-Entrega: T152",
+      "Spec-Kit-Nao-Entrega: T153",
+      "Spec-Kit-Nao-Entrega: T153",
+    ),
+    [],
+  );
+  const falhas = comTrailers(
+    "Spec-Kit-Entrega: T152",
+    "Spec-Kit-Nao-Entrega: T153",
+    "Spec-Kit-Nao-Entrega: T154",
+  );
+  assert.ok(falhas.some((f) => /conteúdos divergentes/.test(f)));
+});
+
+test("B2.5 mesmo ID nas duas classes continua falhando", () => {
+  const falhas = comTrailers(
+    "Spec-Kit-Entrega: T152",
+    "Spec-Kit-Nao-Entrega: T152",
+  );
+  assert.ok(falhas.some((f) => /classificação precisa ser uma só/.test(f)));
+});
+
+test("B2.6 vazio, malformado, separador inválido e indentado continuam falhando", () => {
+  for (const linha of [
+    "Spec-Kit-Entrega:",
+    "Spec-Kit-Entrega: T15",
+    "Spec-Kit-Entrega: T151;T152",
+    "    Spec-Kit-Entrega: T152",
+  ]) {
+    assert.ok(comTrailers(linha).length > 0, `devia reprovar: ${linha}`);
+  }
+});
+
+test("B2.7 repetição não dispensa classificar futura", () => {
+  const falhas = comTrailers(
+    "Fica para a T153.",
+    "Spec-Kit-Entrega: T152",
+    "Spec-Kit-Entrega: T152",
+  );
+  assert.ok(falhas.some((f) => /T153 aparece no contexto/.test(f)));
+});
+
+// --- previsão do squash ----------------------------------------------------
+
+/** Mensagens dos três commits reais desta PR, reduzidas ao que importa. */
+const COMMITS_DA_PR = [
+  "T152 - hardening do verificador do Spec Kit: declaracao de entrega vs. citacao\n\nPrimeiro commit, anterior ao protocolo: sem trailer.",
+  "fix(spec-kit): declarar entrega por trailer, fechando o bypass de posicao\n\nCorpo.\n\nSpec-Kit-Entrega: T152",
+  "test(spec-kit): prender o contrato entre o workflow e o verificador\n\nCorpo.\n\nSpec-Kit-Entrega: T152",
+];
+
+test("B2.8 squash previsto da PR atual passa, fundindo os dois trailers", () => {
+  const ctx = montarContextoDeSquash({
+    titulo: "T152 — Hardening do verificador do Spec Kit",
+    numeroPr: 143,
+    mensagens: COMMITS_DA_PR,
+  });
+  const lido = lerTrailers(ctx);
+  assert.deepEqual(lido.entrega, ["T152"], "dois trailers, uma declaração");
+  assert.deepEqual(lido.falhas, []);
+  assert.deepEqual(comProtocolo({ contexto: ctx }), []);
+});
+
+test("B2.9 mutar um dos trailers do squash para outro conjunto faz falhar", () => {
+  const mutadas = [...COMMITS_DA_PR];
+  mutadas[2] = mutadas[2].replace(
+    "Spec-Kit-Entrega: T152",
+    "Spec-Kit-Entrega: T151",
+  );
+  const ctx = montarContextoDeSquash({
+    titulo: "T152 — Hardening",
+    numeroPr: 143,
+    mensagens: mutadas,
+  });
+  const falhas = comProtocolo({ contexto: ctx });
+  assert.ok(falhas.some((f) => /conteúdos divergentes/.test(f)));
+});
+
+test("B2.10 a PR detecta problema presente SÓ nas mensagens dos commits", () => {
+  // O contexto de revisão (título + descrição) está limpo; o defeito mora num
+  // commit. Sem a previsão do squash, isso passaria na PR e quebraria `main`.
+  const descricao = ["T152 — Hardening", "", "Spec-Kit-Entrega: T152"].join(
+    "\n",
+  );
+  assert.deepEqual(comProtocolo({ contexto: descricao }), [], "revisão limpa");
+
+  const comDefeito = [...COMMITS_DA_PR];
+  comDefeito[1] = comDefeito[1].replace(
+    "Spec-Kit-Entrega: T152",
+    "Spec-Kit-Entrega: T153",
+  );
+  const ctxSquash = montarContextoDeSquash({
+    titulo: "T152 — Hardening",
+    numeroPr: 143,
+    mensagens: comDefeito,
+  });
+  assert.ok(
+    comProtocolo({ contexto: ctxSquash }).length > 0,
+    "a previsão do squash tem de pegar",
+  );
+});
+
+test("B2.11 push real e squash previsto dão o mesmo conjunto normalizado", () => {
+  const ctx = montarContextoDeSquash({
+    titulo: "T152 — Hardening",
+    numeroPr: 143,
+    mensagens: COMMITS_DA_PR,
+  });
+  // O push injeta exatamente este texto como `head_commit.message`.
+  assert.deepEqual(lerTrailers(ctx).entrega, ["T152"]);
+  assert.deepEqual(comProtocolo({ contexto: ctx }), []);
+});
+
+test("B2.12 montarContextoDeSquash preserva os trailers na coluna zero", () => {
+  const ctx = montarContextoDeSquash({
+    titulo: "T",
+    numeroPr: 1,
+    mensagens: ["assunto\n\ncorpo\n\nSpec-Kit-Entrega: T152"],
+  });
+  assert.ok(
+    ctx.split("\n").includes("Spec-Kit-Entrega: T152"),
+    "o trailer não pode ser indentado nem transformado",
+  );
+});
+
+// --------------------------------------------------------------------------
+// B3. O estado não recua para antes da adoção.
+// --------------------------------------------------------------------------
+
+/**
+ * Repositório mínimo em diretório temporário, só com o estado. Os demais
+ * artefatos faltam de propósito: o que estes testes observam é a guarda de
+ * rebaixamento, e ela precisa valer mesmo num tree incompleto.
+ */
+function repositorioDeTeste(estado) {
+  const diretorio = mkdtempSync(join(tmpdir(), "spec-kit-b3-"));
+  mkdirSync(join(diretorio, ".specify", "memory"), { recursive: true });
+  writeFileSync(
+    join(diretorio, ".specify", "sync-state.json"),
+    JSON.stringify({ constitutionVersion: "1.4.0", ...estado }),
+    "utf8",
+  );
+  // O CLI LÊ estes três (não apenas confere existência): sem eles ele quebra
+  // antes de chegar à decisão que estes testes observam.
+  writeFileSync(
+    join(diretorio, ".specify", "memory", "constitution.md"),
+    "**Version**: 1.4.0\n",
+    "utf8",
+  );
+  writeFileSync(join(diretorio, ".specify", "tasks.md"), "T151 T152\n", "utf8");
+  writeFileSync(
+    join(diretorio, ".specify", "execution-status.md"),
+    "| T151 | Integrada |\n| T152 | Em revisao |\n",
+    "utf8",
+  );
+  return {
+    diretorio,
+    limpar: () => rmSync(diretorio, { recursive: true, force: true }),
+  };
+}
+
+function rodarCli(cwd, env) {
+  const cli = fileURLToPath(
+    new URL("./check-spec-kit-sync.mjs", import.meta.url),
+  );
+  const r = spawnSync(process.execPath, [cli], {
+    cwd,
+    encoding: "utf8",
+    env: { ...process.env, ...env },
+  });
+  return { status: r.status, stderr: `${r.stdout}${r.stderr}` };
+}
+
+test("B3.1 o núcleo puro ainda reproduz a356418 em modo histórico", () => {
+  // A separação é deliberada: o núcleo precisa validar contextos anteriores à
+  // adoção, o CLI real não — ele vive numa árvore que já tem o protocolo.
+  assert.equal(protocoloObrigatorio({ lastRecordedTask: 151 }), false);
+  assert.deepEqual(
+    avaliarSincronia({
+      state: ESTADO_HISTORICO,
+      tasks: "T151 ok",
+      ledger: "| T151 | Integrada |",
+      contexto: SQUASH_T151,
+    }),
+    [],
+  );
+});
+
+test("B3.2 o CLI recusa ledger abaixo de 152, com mensagem segura", () => {
+  const { diretorio, limpar } = repositorioDeTeste({
+    lastIntegratedTask: 150,
+    lastRecordedTask: 151,
+  });
+  try {
+    const r = rodarCli(diretorio, { SPEC_KIT_CHANGE_CONTEXT: "T151 — x" });
+    assert.notEqual(r.status, 0, "tem de encerrar com codigo nao zero");
+    assert.match(r.stderr, /abaixo da adoção do protocolo/);
+    assert.doesNotMatch(r.stderr, /at .*\.mjs:\d+/, "sem stack no log público");
+  } finally {
+    limpar();
+  }
+});
+
+test("B3.3 estado 151 + entrega real de tarefa posterior nunca passa pelo CLI", () => {
+  const { diretorio, limpar } = repositorioDeTeste({
+    lastIntegratedTask: 150,
+    lastRecordedTask: 151,
+  });
+  try {
+    const r = rodarCli(diretorio, {
+      SPEC_KIT_CHANGE_CONTEXT: "T151 — x\n\nEsta mudanca entrega a T153.",
+    });
+    assert.notEqual(r.status, 0);
+  } finally {
+    limpar();
+  }
+});
+
+test("B3.4 ledger 152 exige o protocolo no CLI", () => {
+  const { diretorio, limpar } = repositorioDeTeste({
+    lastIntegratedTask: 151,
+    lastRecordedTask: 152,
+  });
+  try {
+    const semTrailer = rodarCli(diretorio, {
+      SPEC_KIT_CHANGE_CONTEXT: "T152 — x",
+    });
+    assert.notEqual(semTrailer.status, 0);
+    assert.match(semTrailer.stderr, /Spec-Kit-Entrega ausente/);
+
+    const comTrailer = rodarCli(diretorio, {
+      SPEC_KIT_CHANGE_CONTEXT: "T152 — x\n\nSpec-Kit-Entrega: T152",
+    });
+    // Nao se afirma `status 0`: este tree temporario nao tem os artefatos
+    // duraveis, e eles produzem falhas proprias, alheias ao que se observa.
+    assert.doesNotMatch(comTrailer.stderr, /Spec-Kit-Entrega ausente/);
+    assert.doesNotMatch(comTrailer.stderr, /abaixo da adoção do protocolo/);
+  } finally {
+    limpar();
+  }
 });

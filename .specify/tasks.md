@@ -1029,6 +1029,13 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       `--pretty=%B` pelo mesmo motivo: uma noção só de contexto.
     - **Sem perda de detecção:** as 40 integrações de `main` seguem válidas em modo histórico, sem
       hash listado. Entrega declarada acima do ledger **continua reprovando**.
+    - **Duplicidade é união idempotente.** A mesma declaração chega por canais diferentes, e o
+      squash concatena as mensagens de todos os commits: duas linhas iguais são uma declaração, não
+      duas decisões. Conteúdos divergentes continuam falhando como contradição.
+    - **A CI da PR valida a mensagem prevista do squash**, além do contexto de revisão. É o que
+      impede "PR verde, `main` vermelha" — a forma que já quebrou a `main` duas vezes aqui.
+    - **O estado não recua:** o CLI recusa `lastRecordedTask` abaixo da adoção. Modo histórico
+      existe só no núcleo puro, para replay em teste.
     - **Não tratado, e declarado:** caixa baixa (`t153`) e zero-width continuam escapando de
       `IDENTIFICADOR`, como antes desta tarefa. Dívida anterior, com teste que a torna explícita.
     - **Preserva a T149:** as proteções contra estado inválido (`validarEstado`) e o fail-closed de
