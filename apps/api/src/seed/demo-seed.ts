@@ -434,6 +434,26 @@ async function garantirCatalogo(
   );
 }
 
+/**
+ * Matrícula do registro sintético que existe para o cenário do gestor.
+ *
+ * Fora da faixa `DEMO-A-000x` de propósito: aquelas são as pessoas da
+ * demonstração geral, e emendar a equipe nelas reescreveria o conjunto que as
+ * telas de pessoas já usam.
+ */
+const MATRICULA_NA_EQUIPE = "DEMO-A-0201";
+
+/**
+ * Matrícula da CONTRAPROVA: mesma empresa, equipe diferente.
+ *
+ * Precisa estar numa outra equipe — não apenas fora da do gestor. `DEMO-A-0002`
+ * serviria como "não aparece na lista", mas tem alocação vigente SEM equipe, e
+ * uma contraprova assim não distingue "o filtro por equipe funciona" de "não
+ * havia dado para mostrar". Com `DEMO-A-0202` em `TURNOB`, o gestor de
+ * `TURNOA` deixa de vê-lo porque a equipe é outra, que é o que se quer provar.
+ */
+const MATRICULA_FORA_DA_EQUIPE = "DEMO-A-0202";
+
 async function garantirColaborador(
   ctx: Contexto,
   rh: Sessao,
@@ -530,6 +550,273 @@ async function garantirAdmissaoEfetivada(
 }
 
 /**
+ * Monta o escopo sintético do gestor consultivo (T151, ADR 0015).
+ *
+ * Por que isto existe: sem atribuição, `gestor.alfa` loga e vê lista vazia —
+ * que é o comportamento CORRETO, e justamente por isso não demonstra nada. O
+ * cenário mínimo precisa de alguém DENTRO da equipe e alguém FORA dela, para
+ * que a diferença seja visível na tela em vez de precisar ser explicada.
+ *
+ * Idempotente pelo EFEITO, como `garantirAdmissaoEfetivada`: confere se a
+ * ligação e a atribuição já existem antes de criar. A segunda execução não
+ * duplica e não derruba o seed — o banco recusaria com 409 (EXCLUSION
+ * CONSTRAINT), e um seed que quebra na segunda execução é pior que um seed que
+ * não roda.
+ *
+ * Não toca `DEMO-A-0001`/`cargoId`: a dívida de convergência de atributos é
+ * anterior e tem tarefa própria. Aqui ela não é corrigida nem agravada.
+ */
+async function garantirEscopoDeGestor(
+  ctx: Contexto,
+  rh: Sessao,
+  master: Sessao,
+  alvo: {
+    gestorEmail: string;
+    gestorMatricula: string;
+    equipeId: string;
+    /** Quem o gestor DEVE ver. Verificada no passo 5. */
+    matriculaNaEquipe: string;
+    /** Quem o gestor NÃO deve ver, na mesma empresa. Verificada no passo 5. */
+    matriculaForaDaEquipe: string;
+  },
+): Promise<void> {
+  // 1. a conta do gestor
+  let gestorUserId: string | null = null;
+  await varrerUsuarios(ctx, master, (u) => {
+    if (u.email === alvo.gestorEmail) gestorUserId = u.id;
+  });
+  if (!gestorUserId) {
+    throw new Error(
+      `Conta ${alvo.gestorEmail} não encontrada para montar o escopo do gestor.`,
+    );
+  }
+
+  // 2. a PESSOA do gestor, alcançada pela matrícula — nunca pelo e-mail. A
+  //    ADR 0015, decisão 6, proíbe inferir a pessoa por campo textual, e o
+  //    seed segue a mesma regra que a aplicação.
+  const colaboradorDoGestor = await colaboradorPorMatricula(
+    ctx,
+    rh,
+    alvo.gestorMatricula,
+  );
+  if (!colaboradorDoGestor) {
+    throw new Error(
+      `Matrícula ${alvo.gestorMatricula} não encontrada para o gestor sintético.`,
+    );
+  }
+
+  // 3. ligação conta ↔ colaborador (DP-23)
+  const ligacoes = await ler<{ userId: string; vigenciaFim: string | null }[]>(
+    ctx,
+    "/v1/gestor/administracao/ligacoes",
+    rh,
+  );
+  const jaLigado = ligacoes.some(
+    (l) => l.userId === gestorUserId && l.vigenciaFim === null,
+  );
+  if (jaLigado) {
+    ctx.reaproveitados += 1;
+  } else {
+    const res = await pedir(
+      ctx,
+      "POST",
+      "/v1/gestor/administracao/ligacoes",
+      rh,
+      {
+        userId: gestorUserId,
+        colaboradorId: colaboradorDoGestor.colaboradorId,
+        vigenciaInicio: "2026-01-05",
+      },
+    );
+    if (!res.ok) {
+      throw new Error(
+        `Falha ao ligar a conta do gestor ao colaborador: a API respondeu ${res.status}.`,
+      );
+    }
+    ctx.criados += 1;
+  }
+
+  // 4. atribuição da equipe
+  const atribuicoes = await ler<
+    { equipeId: string; papel: string; vigenciaFim: string | null }[]
+  >(ctx, "/v1/gestor/administracao/atribuicoes", rh);
+  const jaAtribuido = atribuicoes.some(
+    (a) =>
+      a.equipeId === alvo.equipeId &&
+      a.papel === "principal" &&
+      a.vigenciaFim === null,
+  );
+  if (jaAtribuido) {
+    ctx.reaproveitados += 1;
+  } else {
+    const res = await pedir(
+      ctx,
+      "POST",
+      "/v1/gestor/administracao/atribuicoes",
+      rh,
+      {
+        equipeId: alvo.equipeId,
+        gestorColaboradorId: colaboradorDoGestor.colaboradorId,
+        papel: "principal",
+        vigenciaInicio: "2026-01-05",
+      },
+    );
+    if (!res.ok) {
+      throw new Error(
+        `Falha ao atribuir a equipe ao gestor: a API respondeu ${res.status}.`,
+      );
+    }
+    ctx.criados += 1;
+  }
+
+  // 5. CONFERIR que a equipe tem gente dentro.
+  //
+  // Este passo existe porque a ausência dele já custou caro: `matriculaNaEquipe`
+  // era recebida e nunca usada, nenhuma admissão informava `equipeId`, e o
+  // resultado era um gestor corretamente atribuído a uma equipe VAZIA — lista
+  // vazia na tela, enquanto o guia afirmava que ele enxergaria a equipe. O
+  // seed terminava com sucesso e a demonstração não demonstrava nada.
+  //
+  // Conferir o EFEITO, e não só executar os passos, é o que transforma a
+  // promessa do guia em invariante: se alguém remover o `equipeId` da
+  // admissão, o seed para aqui em vez de entregar um ambiente mudo.
+  await conferirComposicaoDaEquipe(ctx, rh, alvo);
+}
+
+/** Alocação vigente como o seed precisa vê-la, ou `null` se não houver. */
+export interface AlocacaoConferida {
+  readonly equipeId: string | null;
+}
+
+/**
+ * Regra de composição da equipe do gestor — pura, para ser testável sem API.
+ *
+ * Devolve a mensagem de erro, ou `null` quando a composição está correta.
+ *
+ * A CONTRAPROVA É EXIGENTE DE PROPÓSITO. A versão anterior só recusava
+ * `fora.equipeId === equipeAlvo`, e com isso "está em outra equipe" e "não
+ * está em equipe nenhuma" passavam igual — inclusive "não tem alocação
+ * vigente". Uma contraprova que passa por ausência de dado não prova que a
+ * consulta filtra por equipe; prova apenas que não há o que mostrar. Agora
+ * são cinco condições cumulativas: vínculo encontrado, alocação vigente
+ * encontrada, `equipeId` presente, e diferente da equipe do gestor.
+ */
+export function validarComposicaoDaEquipe(entrada: {
+  equipeAlvo: string;
+  matriculaNaEquipe: string;
+  naEquipe: AlocacaoConferida | null;
+  matriculaForaDaEquipe: string;
+  foraDaEquipe: AlocacaoConferida | null;
+}): string | null {
+  const { equipeAlvo, naEquipe, foraDaEquipe } = entrada;
+
+  if (naEquipe === null) {
+    return (
+      `O ambiente ficaria mudo: ${entrada.matriculaNaEquipe} não tem alocação ` +
+      "vigente. O gestor veria lista vazia."
+    );
+  }
+  if (naEquipe.equipeId !== equipeAlvo) {
+    return (
+      `O ambiente ficaria mudo: ${entrada.matriculaNaEquipe} deveria estar na ` +
+      `equipe do gestor, mas está em ${naEquipe.equipeId ?? "nenhuma equipe"}. ` +
+      "O gestor veria lista vazia."
+    );
+  }
+
+  if (foraDaEquipe === null) {
+    return (
+      `A contraprova é fraca: ${entrada.matriculaForaDaEquipe} não tem alocação ` +
+      "vigente, então não demonstra que a consulta filtra por EQUIPE — apenas " +
+      "que não há o que mostrar."
+    );
+  }
+  if (foraDaEquipe.equipeId === null) {
+    return (
+      `A contraprova é fraca: ${entrada.matriculaForaDaEquipe} está alocado sem ` +
+      "equipe. Para provar o filtro, ele precisa estar em OUTRA equipe."
+    );
+  }
+  if (foraDaEquipe.equipeId === equipeAlvo) {
+    return (
+      `A contraprova sumiu: ${entrada.matriculaForaDaEquipe} está DENTRO da ` +
+      "equipe do gestor, então não há diferença a demonstrar."
+    );
+  }
+
+  return null;
+}
+
+/**
+ * Prova, lendo o banco pela API, que a equipe do gestor tem a composição que a
+ * demonstração promete. O I/O mora aqui; a regra, em
+ * `validarComposicaoDaEquipe`.
+ */
+async function conferirComposicaoDaEquipe(
+  ctx: Contexto,
+  rh: Sessao,
+  alvo: {
+    equipeId: string;
+    matriculaNaEquipe: string;
+    matriculaForaDaEquipe: string;
+  },
+): Promise<void> {
+  const erro = validarComposicaoDaEquipe({
+    equipeAlvo: alvo.equipeId,
+    matriculaNaEquipe: alvo.matriculaNaEquipe,
+    naEquipe: await alocacaoVigenteDe(ctx, rh, alvo.matriculaNaEquipe),
+    matriculaForaDaEquipe: alvo.matriculaForaDaEquipe,
+    foraDaEquipe: await alocacaoVigenteDe(ctx, rh, alvo.matriculaForaDaEquipe),
+  });
+  if (erro) throw new Error(erro);
+}
+
+/** Alocação vigente (`vigenteAte === null`) do vínculo de uma matrícula. */
+async function alocacaoVigenteDe(
+  ctx: Contexto,
+  rh: Sessao,
+  matricula: string,
+): Promise<{ equipeId: string | null } | null> {
+  const encontrado = await colaboradorPorMatricula(ctx, rh, matricula);
+  if (!encontrado) {
+    throw new Error(
+      `Matrícula ${matricula} não encontrada ao conferir a equipe do gestor.`,
+    );
+  }
+
+  const alocacoes = await ler<
+    { equipeId: string | null; vigenteAte: string | null }[]
+  >(ctx, `/v1/vinculos/${encontrado.vinculoId}/alocacoes`, rh);
+
+  return alocacoes.find((a) => a.vigenteAte === null) ?? null;
+}
+
+/** Resolve `colaboradorId` a partir de uma matrícula sintética. */
+async function colaboradorPorMatricula(
+  ctx: Contexto,
+  rh: Sessao,
+  matricula: string,
+): Promise<{ colaboradorId: string; vinculoId: string } | null> {
+  const colaboradores = await ler<{ itens: ColaboradorApi[] }>(
+    ctx,
+    "/v1/colaboradores?tamanhoPagina=100",
+    rh,
+  );
+  for (const colaborador of colaboradores.itens ?? []) {
+    const vinculos = await ler<VinculoApi[]>(
+      ctx,
+      `/v1/colaboradores/${colaborador.id}/vinculos`,
+      rh,
+    );
+    const alvo = vinculos.find((v) => v.matricula === matricula);
+    if (alvo) {
+      return { colaboradorId: colaborador.id, vinculoId: alvo.id };
+    }
+  }
+  return null;
+}
+
+/**
  * Popula um banco LOCAL com dados sintéticos e devolve o resumo.
  *
  * @param baseUrl origem da API já em execução (ex.: `http://127.0.0.1:3000`).
@@ -610,11 +897,31 @@ export async function semearDemonstracao(
     });
     // A equipe pendura no DEPARTAMENTO (a área é irmã, não pai) e a empresa é
     // derivada dele — o cliente nunca informa `empresaId` aqui.
-    await garantirCatalogo(ctx, rhAlfa, "/v1/equipes", "TURNOA", {
-      departamentoId: operacoes.id,
-      codigo: "TURNOA",
-      nome: `Turno A ${MARCA_DEMO}`,
-    });
+    const turnoA = await garantirCatalogo(
+      ctx,
+      rhAlfa,
+      "/v1/equipes",
+      "TURNOA",
+      {
+        departamentoId: operacoes.id,
+        codigo: "TURNOA",
+        nome: `Turno A ${MARCA_DEMO}`,
+      },
+    );
+    // Segunda equipe, só para a contraprova do gestor ter onde morar: sem ela,
+    // o único jeito de alguém estar "fora de TURNOA" seria não estar em equipe
+    // nenhuma — o que não prova que a consulta filtra por equipe.
+    const turnoB = await garantirCatalogo(
+      ctx,
+      rhAlfa,
+      "/v1/equipes",
+      "TURNOB",
+      {
+        departamentoId: operacoes.id,
+        codigo: "TURNOB",
+        nome: `Turno B ${MARCA_DEMO}`,
+      },
+    );
     const analista = await garantirCatalogo(
       ctx,
       rhAlfa,
@@ -703,6 +1010,45 @@ export async function semearDemonstracao(
         }),
     );
 
+    // Registro DEDICADO ao cenário do gestor: o único do conjunto sintético
+    // que nasce com `equipeId`. Separado de `DEMO-A-0001`/`DEMO-A-0002` de
+    // propósito — aqueles já existem nos bancos de demonstração sem equipe, e
+    // o seed é idempotente pelo EFEITO: mudar o corpo da admissão deles não
+    // alteraria nada onde já foram criados, e o cenário continuaria vazio
+    // justamente nas instalações antigas, que são as que importam. Criar um
+    // registro novo converge em qualquer banco, velho ou novo, sem reescrever
+    // histórico de ninguém.
+    const naEquipe = `Pessoa ${MARCA_DEMO} Alfa Turno A`;
+    const colabEquipe = await garantirColaborador(ctx, rhAlfa, naEquipe, {
+      nome: naEquipe,
+      empresaId: alfa.id,
+      matricula: MATRICULA_NA_EQUIPE,
+      tipo: "clt",
+      dataAdmissao: "2026-01-05",
+      motivoCodigo: "admissao_inicial",
+      cargoId: analista.id,
+      departamentoId: operacoes.id,
+      equipeId: turnoA.id,
+    });
+
+    const foraDaEquipe = `Pessoa ${MARCA_DEMO} Alfa Turno B`;
+    const colabForaDaEquipe = await garantirColaborador(
+      ctx,
+      rhAlfa,
+      foraDaEquipe,
+      {
+        nome: foraDaEquipe,
+        empresaId: alfa.id,
+        matricula: MATRICULA_FORA_DA_EQUIPE,
+        tipo: "clt",
+        dataAdmissao: "2026-01-05",
+        motivoCodigo: "admissao_inicial",
+        cargoId: analista.id,
+        departamentoId: operacoes.id,
+        equipeId: turnoB.id,
+      },
+    );
+
     // --- Efetivação das admissões -----------------------------------------
     // Sem este passo o conjunto sintético fica inteiro em `previsto`/`inativo`
     // e sem nenhuma alocação: Dados contratuais mostraria "Sem alocação
@@ -715,6 +1061,21 @@ export async function semearDemonstracao(
     // já ativo do mesmo colaborador.
     await garantirAdmissaoEfetivada(ctx, rhAlfa, colabUm.id, "DEMO-A-0001");
     await garantirAdmissaoEfetivada(ctx, rhAlfa, colabDois.id, "DEMO-A-0002");
+    // Sem efetivar, não nasce alocação — e sem alocação vigente apontando
+    // para a equipe, o gestor continua vendo lista vazia. É a efetivação, não
+    // a admissão, que coloca alguém numa equipe.
+    await garantirAdmissaoEfetivada(
+      ctx,
+      rhAlfa,
+      colabEquipe.id,
+      MATRICULA_NA_EQUIPE,
+    );
+    await garantirAdmissaoEfetivada(
+      ctx,
+      rhAlfa,
+      colabForaDaEquipe.id,
+      MATRICULA_FORA_DA_EQUIPE,
+    );
 
     // --- Empresa Beta: mínimo para provar isolamento ----------------------
     const departamentoBeta = await garantirCatalogo(
@@ -744,6 +1105,20 @@ export async function semearDemonstracao(
       registroBeta.id,
       "DEMO-B-0001",
     );
+
+    // --- Gestor consultivo (T151, ADR 0015) -------------------------------
+    // Sem isto, `gestor.alfa` continua logando e vendo lista vazia — que e o
+    // comportamento CORRETO de um gestor sem atribuicao, mas nao demonstra a
+    // capacidade. O conjunto abaixo monta o cenario minimo que a prova exige:
+    // alguem DENTRO da equipe, alguem FORA dela e uma segunda empresa como
+    // contraprova de isolamento.
+    await garantirEscopoDeGestor(ctx, rhAlfa, master, {
+      gestorEmail: `gestor.alfa@${DOMINIO}`,
+      gestorMatricula: "DEMO-A-0001",
+      equipeId: turnoA.id,
+      matriculaNaEquipe: MATRICULA_NA_EQUIPE,
+      matriculaForaDaEquipe: MATRICULA_FORA_DA_EQUIPE,
+    });
 
     // --- Resumo -----------------------------------------------------------
     // Conta só o conjunto SINTÉTICO, varrendo todas as páginas: o número não

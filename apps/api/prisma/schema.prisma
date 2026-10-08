@@ -113,6 +113,17 @@ model AccessUser {
   tabelasHorarioCriadas  TabelaHorario[]  @relation("HorarioTabelaCriadaPor")
   vinculosHorarioCriados VinculoHorario[] @relation("HorarioVinculoCriadoPor")
 
+  // T151 — Gestor consultivo. `contaColaborador` e o vinculo DP-23 desta
+  // propria conta com a pessoa; os demais identificam o ATOR administrativo
+  // (RH) que criou ou encerrou um registro, mesma natureza das relacoes acima.
+  contaColaborador                AccessUserColaborador[]  @relation("ContaDoColaborador")
+  contasColaboradorCriadas        AccessUserColaborador[]  @relation("ContaDoColaboradorCriadaPor")
+  contasColaboradorEncerradas     AccessUserColaborador[]  @relation("ContaDoColaboradorEncerradaPor")
+  atribuicoesGestorCriadas        AtribuicaoGestorEquipe[] @relation("AtribuicaoGestorCriadaPor")
+  atribuicoesGestorEncerradas     AtribuicaoGestorEquipe[] @relation("AtribuicaoGestorEncerradaPor")
+  excecoesAcessoGestorCriadas     ExcecaoAcessoGestor[]    @relation("ExcecaoGestorCriadaPor")
+  excecoesAcessoGestorEncerradas  ExcecaoAcessoGestor[]    @relation("ExcecaoGestorEncerradaPor")
+
   @@index([companyId])
   @@map("access_user")
 }
@@ -443,6 +454,27 @@ enum AuditAction {
   pessoas_solicitacao_recusada              @map("pessoas.solicitacao.recusada")
   pessoas_solicitacao_reaberta              @map("pessoas.solicitacao.reaberta")
   pessoas_solicitacao_consultada            @map("pessoas.solicitacao.consultada")
+
+  // T151 — Gestor consultivo (ADR 0015). Convencao pontilhada, uma acao por
+  // transicao, pelo mesmo criterio de `pessoas.movimentacao.*`: uma acao
+  // generica esconderia qual decisao o RH tomou sobre acesso a dado de
+  // terceiro. O evento carrega ator, papel, empresa e id TECNICO do registro —
+  // nunca nome, matricula, e-mail do vinculado nem a justificativa em texto.
+  //
+  // `gestor.equipe.consultada` segue o criterio fail-safe ja usado em
+  // `ponto.consultado` e `organizacao.estrutura.consultada`: ver dado de
+  // terceiro e, em si, acao sensivel. Diferente das mutacoes, a leitura ja
+  // autorizada nunca e bloqueada por falha de auditoria.
+  //
+  // Verbos deliberadamente AUSENTES: `.excluida` e `.alterada` — historico nao
+  // e apagavel nem reescrito; encerrar e sempre transicao de vigencia.
+  gestor_conta_vinculada      @map("gestor.conta.vinculada")
+  gestor_conta_desvinculada   @map("gestor.conta.desvinculada")
+  gestor_atribuicao_criada    @map("gestor.atribuicao.criada")
+  gestor_atribuicao_encerrada @map("gestor.atribuicao.encerrada")
+  gestor_excecao_criada       @map("gestor.excecao.criada")
+  gestor_excecao_encerrada    @map("gestor.excecao.encerrada")
+  gestor_equipe_consultada    @map("gestor.equipe.consultada")
 }
 
 enum AuditResult {
@@ -568,6 +600,11 @@ model Empresa {
   // COMPOSTA garantir, no banco, que solicitacao e vinculo nunca cruzam empresa.
   solicitacoesPessoa SolicitacaoPessoa[]
 
+  // T151 — Gestor consultivo.
+  contasColaborador        AccessUserColaborador[]
+  atribuicoesGestorEquipe  AtribuicaoGestorEquipe[]
+  excecoesAcessoGestor     ExcecaoAcessoGestor[]
+
   @@index([status])
   @@map("empresa")
 }
@@ -680,8 +717,12 @@ model Equipe {
   alocacoes         AlocacaoOrganizacional[]
   movimentacoesAlvo MovimentacaoFuncional[]
 
+  // T151 — Gestor consultivo: atribuicoes de lideranca desta equipe.
+  atribuicoesGestor AtribuicaoGestorEquipe[]
+
   @@unique([departamentoId, codigo])
-  /// Alvo da FK composta da Fatia 2 (equipe_id, empresa_id).
+  /// Alvo da FK composta da Fatia 2 (equipe_id, empresa_id) e da T151
+  /// (atribuicao_gestor_equipe).
   @@unique([id, empresaId])
   @@index([empresaId, status])
   @@index([departamentoId])
@@ -870,6 +911,13 @@ model Colaborador {
   // CONSTRAINT TRIGGER na migration, alem da checagem na aplicacao.
   vinculosHorario VinculoHorario[]
 
+  // T151 — Gestor consultivo. `contasDeAcesso` e o elo DP-23 (quem acessa o
+  // sistema como esta pessoa); `equipesQueGerencia` e `excecoesDeAcesso`
+  // existem quando esta pessoa e gestora.
+  contasDeAcesso     AccessUserColaborador[]  @relation("ColaboradorDaConta")
+  equipesQueGerencia AtribuicaoGestorEquipe[] @relation("GestorDaEquipe")
+  excecoesDeAcesso   ExcecaoAcessoGestor[]    @relation("GestorDaExcecao")
+
   @@index([situacao])
   @@map("colaborador")
 }
@@ -907,6 +955,9 @@ model VinculoFuncional {
 
   // T139 — o vinculo e o SUJEITO da solicitacao (e quem carrega `empresa_id`).
   solicitacoesPessoa SolicitacaoPessoa[]
+
+  // T151 — excecoes de acesso de gestor que tem ESTE vinculo como sujeito.
+  excecoesAcessoGestor ExcecaoAcessoGestor[]
 
   @@unique([empresaId, matricula])
   /// Alvo das FKs compostas de alocacao e movimentacao: o banco garante que
@@ -1671,4 +1722,177 @@ model SolicitacaoPessoaEvento {
   @@index([empresaId, ocorridoEm])
   @@index([registradoPorUserId])
   @@map("solicitacao_pessoa_evento")
+}
+
+// ---------------------------------------------------------------------------
+// T151 — Fundacao segura do Gestor consultivo.
+//
+// Decisao do proprietario, 06/10/2026: "Aprovo as recomendacoes 1 a 9 para o
+// escopo do gestor e DP-23" (ADR 0015). Resolve DP-8 e DP-23 — e SOMENTE no
+// recorte aprovado: gestao por EQUIPE, com multiplas equipes por gestor,
+// apenas subordinados DIRETOS das equipes atribuidas, um principal e no maximo
+// um substituto vigentes por equipe. Gestao matricial permanente, departamento
+// inteiro e empresa inteira continuam NAO aprovados (ADR 0015, decisao 5).
+//
+// Tres tabelas, cada uma com uma pergunta propria:
+//   1. `access_user_colaborador` — QUEM e a pessoa por tras da conta (DP-23).
+//   2. `atribuicao_gestor_equipe` — DE QUE equipes essa pessoa responde.
+//   3. `excecao_acesso_gestor`    — que pessoa FORA da equipe ela ve, por
+//      decisao formal do RH, sempre com prazo.
+//
+// `AccessUser.team_id`/`unit_id` continuam SEM uso de autorizacao: sao TEXT
+// sem FK, sem validacao de empresa e sem semantica definida (ADR 0003 d. 8;
+// pacote da T150 §1.1). Nenhuma das tabelas abaixo os le.
+// ---------------------------------------------------------------------------
+
+/// Papel do gestor numa equipe. O piloto admite UM principal e, opcionalmente,
+/// UM substituto vigentes ao mesmo tempo (ADR 0015, decisao 5) — garantido por
+/// EXCLUSION CONSTRAINT sobre (equipe, papel, periodo).
+enum PapelGestorEquipe {
+  principal
+  substituto
+}
+
+/// Catalogo fechado de motivos de excecao individual. Codigo fechado pelo mesmo
+/// criterio de `MotivoMovimentacao`: texto livre nao e auditavel nem agregavel,
+/// e o RH precisa justificar por categoria.
+enum MotivoExcecaoGestor {
+  cobertura_de_ausencia
+  projeto_temporario
+  transicao_organizacional
+  apuracao_formal
+}
+
+/// DP-23 — vinculo explicito entre a CONTA de acesso e a PESSOA.
+///
+/// Por que existe: ate a T150 o produto nao sabia qual colaborador estava por
+/// tras de um `AccessUser`, e a ausencia era deliberada. Sem este elo, escopo
+/// de gestor e autoatendimento sao inalcancaveis em tempo de execucao.
+///
+/// Nunca inferido: a ligacao e sempre um registro explicito criado pelo RH.
+/// E-mail, nome, cargo e qualquer campo textual sao IRRELEVANTES para resolve-la
+/// — igualdade de e-mail entre conta e cadastro nao e prova de identidade.
+///
+/// Empresa garantida no banco por CONSTRAINT TRIGGER: o colaborador precisa ter
+/// vinculo funcional na empresa (mesmo padrao de `documento_metadado`), e a
+/// conta precisa ter `company_id` igual a `empresa_id`. `Colaborador` nao
+/// carrega `empresa_id` proprio, entao FK composta direta e inexprimivel aqui —
+/// a invariante vira trigger, nunca disciplina de aplicacao.
+///
+/// Historiado: a ligacao tem vigencia, e encerrar nao apaga. Conta tecnica ou
+/// global simplesmente nao tem linha — o vinculo e opcional por ausencia.
+model AccessUserColaborador {
+  id            String @id @default(uuid())
+  userId        String @map("user_id")
+  colaboradorId String @map("colaborador_id")
+  empresaId     String @map("empresa_id")
+
+  vigenciaInicio DateTime  @map("vigencia_inicio") @db.Date
+  vigenciaFim    DateTime? @map("vigencia_fim") @db.Date
+
+  criadoPorUserId    String  @map("criado_por_user_id")
+  encerradoPorUserId String? @map("encerrado_por_user_id")
+
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  user         AccessUser  @relation("ContaDoColaborador", fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  colaborador  Colaborador @relation("ColaboradorDaConta", fields: [colaboradorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  empresa      Empresa     @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  criadoPor    AccessUser  @relation("ContaDoColaboradorCriadaPor", fields: [criadoPorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  encerradoPor AccessUser? @relation("ContaDoColaboradorEncerradaPor", fields: [encerradoPorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([userId])
+  @@index([colaboradorId, empresaId])
+  @@index([empresaId])
+  @@index([criadoPorUserId])
+  @@index([encerradoPorUserId])
+  @@map("access_user_colaborador")
+}
+
+/// Atribuicao explicita e historiada de um gestor a uma EQUIPE.
+///
+/// A lideranca e da PESSOA, nao da conta: aponta para `Colaborador`, de modo que
+/// trocar a conta de acesso nao perde a atribuicao. A resolucao em tempo de
+/// execucao e sessao -> `access_user_colaborador` -> atribuicoes.
+///
+/// Empresa garantida por FK COMPOSTA `(equipe_id, empresa_id)` contra
+/// `equipe(id, empresa_id)` — o banco recusa atribuir equipe de outra empresa,
+/// sem depender da aplicacao.
+///
+/// Um gestor pode ter MUITAS equipes (ADR 0015, decisao 2). Por equipe, no
+/// maximo um `principal` e um `substituto` VIGENTES no mesmo periodo
+/// (decisao 5) — EXCLUSION CONSTRAINT sobre (equipe, papel, daterange), o mesmo
+/// mecanismo de `alocacao_organizacional_sem_sobreposicao`.
+model AtribuicaoGestorEquipe {
+  id                  String @id @default(uuid())
+  empresaId           String @map("empresa_id")
+  equipeId            String @map("equipe_id")
+  gestorColaboradorId String @map("gestor_colaborador_id")
+
+  papel PapelGestorEquipe
+
+  vigenciaInicio DateTime  @map("vigencia_inicio") @db.Date
+  vigenciaFim    DateTime? @map("vigencia_fim") @db.Date
+
+  criadoPorUserId    String  @map("criado_por_user_id")
+  encerradoPorUserId String? @map("encerrado_por_user_id")
+
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  empresa      Empresa     @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  equipe       Equipe      @relation(fields: [equipeId, empresaId], references: [id, empresaId], onDelete: Restrict, onUpdate: Cascade)
+  gestor       Colaborador @relation("GestorDaEquipe", fields: [gestorColaboradorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  criadoPor    AccessUser  @relation("AtribuicaoGestorCriadaPor", fields: [criadoPorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  encerradoPor AccessUser? @relation("AtribuicaoGestorEncerradaPor", fields: [encerradoPorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([gestorColaboradorId, empresaId])
+  @@index([equipeId])
+  @@index([empresaId])
+  @@index([criadoPorUserId])
+  @@index([encerradoPorUserId])
+  @@map("atribuicao_gestor_equipe")
+}
+
+/// Excecao individual: um colaborador FORA das equipes do gestor que ele passa a
+/// ver, por decisao formal do RH (ADR 0015, decisao 9).
+///
+/// Aponta para o VINCULO FUNCIONAL, nao para o colaborador: um colaborador com
+/// vinculos em empresas diferentes tornaria "qual pessoa" ambiguo, e o vinculo
+/// carrega `empresa_id`, o que permite FK COMPOSTA de verdade.
+///
+/// `vigencia_fim` e OBRIGATORIA: excecao sem prazo vira regra permanente por
+/// inercia, que e exatamente o que a decisao 9 recusa.
+model ExcecaoAcessoGestor {
+  id                  String @id @default(uuid())
+  empresaId           String @map("empresa_id")
+  gestorColaboradorId String @map("gestor_colaborador_id")
+  vinculoId           String @map("vinculo_id")
+
+  motivoCodigo  MotivoExcecaoGestor @map("motivo_codigo")
+  justificativa String
+
+  vigenciaInicio DateTime @map("vigencia_inicio") @db.Date
+  vigenciaFim    DateTime @map("vigencia_fim") @db.Date
+
+  criadoPorUserId    String    @map("criado_por_user_id")
+  encerradoPorUserId String?   @map("encerrado_por_user_id")
+  encerradaEm        DateTime? @map("encerrada_em")
+
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  empresa      Empresa          @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  vinculo      VinculoFuncional @relation(fields: [vinculoId, empresaId], references: [id, empresaId], onDelete: Restrict, onUpdate: Cascade)
+  gestor       Colaborador      @relation("GestorDaExcecao", fields: [gestorColaboradorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  criadoPor    AccessUser       @relation("ExcecaoGestorCriadaPor", fields: [criadoPorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  encerradoPor AccessUser?      @relation("ExcecaoGestorEncerradaPor", fields: [encerradoPorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([gestorColaboradorId, empresaId])
+  @@index([vinculoId])
+  @@index([empresaId])
+  @@index([criadoPorUserId])
+  @@index([encerradoPorUserId])
+  @@map("excecao_acesso_gestor")
 }

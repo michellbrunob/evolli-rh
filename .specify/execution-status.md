@@ -439,9 +439,9 @@ corrigida na T149**.
 
 ## Gestor consultivo — T150 (pacote de decisão entregue)
 
-| Tarefa | Estado                             | Resultado principal                                                                                                                                                                                                                                                                                  |
-| ------ | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| T150   | **Pacote de decisão — sem código** | Convergiu a T149 e avaliou a fundação para um Portal da Liderança somente leitura. O gate da própria tarefa reprovou a implementação: não existe contrato que determine a equipe de um gestor. Resultado: [pacote de decisão](../docs/decisions/pacote-decisao-escopo-do-gestor.md) reusando `DP-8`. |
+| Tarefa | Estado                                    | Resultado principal                                                                                                                                                                                                                                                                                  |
+| ------ | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T150   | **Integrada** (PR #141, squash `ba80157`) | Convergiu a T149 e avaliou a fundação para um Portal da Liderança somente leitura. O gate da própria tarefa reprovou a implementação: não existe contrato que determine a equipe de um gestor. Resultado: [pacote de decisão](../docs/decisions/pacote-decisao-escopo-do-gestor.md) reusando `DP-8`. |
 
 **Por que não houve implementação.** A tarefa condiciona o código a já existir contrato seguro e
 inequívoco para determinar a equipe do gestor, e proíbe derivá-la de cargo, nome, papel, e-mail,
@@ -487,6 +487,72 @@ de modelo; está pendente apenas de **decisão de negócio**.
 **Limites explícitos:** a T150 não cria endpoint, controller, model, migration, regra de RBAC, ação
 de auditoria, alteração de seed nem tela; não afrouxa nenhuma negação vigente; não reinterpreta
 campo existente; e não aprova nenhum item do pacote da T148.
+
+## Gestor consultivo — T151 (fundação segura, decisão aprovada)
+
+| Tarefa | Estado         | Resultado principal                                                                                                                                                                                                                       |
+| ------ | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T151   | **Em revisão** | Formaliza a decisão do proprietário na [ADR 0015](../docs/adr/0015-escopo-do-gestor-consultivo-e-vinculo-conta-colaborador.md) e entrega a fundação: três tabelas, RBAC próprio, administração pelo RH e consulta consultiva pelo gestor. |
+
+**A decisão, literalmente.** Em **06/10/2026** o proprietário aprovou:
+_"Aprovo as recomendações 1 a 9 para o escopo do gestor e DP-23"_. A ADR 0015 registra as nove
+decisões vinculantes; o [pacote da T150](../docs/decisions/pacote-decisao-escopo-do-gestor.md) passa
+a **Aprovado**, com o texto original preservado como registro do raciocínio.
+
+**`DP-8` e `DP-23` passam a RESOLVIDAS — e somente no recorte aprovado:** gestão por equipe,
+múltiplas equipes por gestor, subordinados diretos, um principal e no máximo um substituto vigentes,
+conta ligada explicitamente ao colaborador da mesma empresa, vigência e histórico auditável,
+exceções só pelo RH com justificativa e prazo. **Continuam NÃO aprovados e não foram habilitados:**
+gestão matricial permanente, departamento inteiro e empresa inteira.
+
+**As invariantes vivem no banco, não na aplicação.** FK composta `(equipe_id, empresa_id)` contra
+`equipe(id, empresa_id)`; EXCLUSION CONSTRAINT sobre `daterange` para sobreposição temporal —
+inclusive `(equipe, papel, período)`, que é o que permite principal e substituto coexistirem sem
+admitir dois principais; índices parciais únicos como complemento, para que a colisão concorrente
+devolva 409 estável; CHECK de intervalo coerente e de justificativa não vazia; e CONSTRAINT TRIGGERS
+de **duas portas** para o que atravessa tabelas — porque uma invariante entre tabelas só fica
+garantida se toda porta capaz de quebrá-la disparar a verificação. Todas foram **provadas contra
+PostgreSQL real antes de escrever a primeira linha de service**.
+
+**O escopo nunca cai para "tudo".** A resolução é sessão → `access_user_colaborador` →
+`atribuicao_gestor_equipe` → alocação vigente. Em qualquer passo que falhe, o resultado é **lista
+vazia** — a função retorna antes de consultar, de modo que o fallback para a empresa inteira é
+impossível por construção, não por cuidado no `where`.
+
+**Fora desta entrega, por ausência de contrato seguro e não por esquecimento:** **resumo de jornada**
+não existe como dado nem como rota (`DP-3J-12` segue pendente), e **andamento de solicitações** tem
+modelo seguro mas `tipo`/`motivo` revelam condição de saúde por inferência — `PD-SOL-05` só autoriza
+"informação operacional mínima", que ainda não está definida. Ambos para a **T152**, com decisão
+própria. Criar consulta paralela sem contrato seria inventar a fronteira, que é o que a T150 recusou.
+
+**Correções da revisão adversarial (mesma T151, segunda rodada).** A revisão encontrou dois
+bloqueios e uma ressalva forte, todos fechados nesta branch:
+
+- **A data de autorização vinha do cliente.** `GET /v1/gestor/equipe` aceitava `?dataReferencia=`, e
+  o serviço resolvia com ela a ligação e as atribuições **do próprio ator** — `hoje()` era apenas o
+  padrão, nunca um teto. Um gestor encerrado recuperava a equipe informando data da janela antiga, o
+  que contradiz a decisão 8 da ADR 0015 (_"Decisões de acesso usam o estado vigente"_). O parâmetro
+  foi **removido** das duas rotas consultivas; enviá-lo responde 400, e o dia civil passou a sair de
+  `America/Sao_Paulo` em vez de UTC. O teste E2E que cristalizava o comportamento como correto foi
+  substituído por cinco que provam o contrário, e eles falham no SHA anterior.
+- **A equipe de demonstração estava vazia.** `matriculaNaEquipe` era recebida e nunca usada, nenhuma
+  admissão do seed informava `equipeId`, e `gestor.alfa` via lista vazia enquanto o guia afirmava o
+  contrário. Entrou `DEMO-A-0201`, único registro sintético com equipe, e o seed agora **confere** a
+  composição ao final em vez de só executar os passos.
+- **O histórico não era append-only de verdade.** A garantia se apoiava em "não há rota `DELETE`" —
+  que protege o pai, não a linha. A migration `20261007120000` revoga `DELETE` de `evolli_app` nas
+  três tabelas e adiciona gatilhos que limitam o `UPDATE` ao encerramento, uma vez só.
+- **TOCTOU nos três encerramentos.** `findFirst` conferia e `update` escrevia por `id`: dois `PATCH`
+  simultâneos sobrescreviam autor e data. O predicado passou para dentro do `updateMany`, o segundo
+  recebe 409 genérico e a auditoria da perdedora reverte junto.
+
+**Limites explícitos:** sem interface web; sem alteração na integração de ponto; sem gestão
+matricial; sem liberar departamento ou empresa; sem folha, eSocial, benefícios ou documentos.
+
+**Dívidas mantidas, não tratadas aqui:** a FK de `unit_id`/`team_id` que a ADR 0003 postergou
+_"até a Etapa 1 criar essas entidades"_ — condição cumprida, FK nunca adicionada; a convergência de
+atributos do seed (`DEMO-A-0001`/`cargoId`); as limitações de caixa baixa e zero-width no
+verificador; e as decisões do pacote de integração de ponto (T148).
 
 ## Próxima ação autorizável
 
