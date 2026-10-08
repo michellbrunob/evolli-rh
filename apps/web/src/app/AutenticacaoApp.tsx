@@ -32,6 +32,12 @@ export function AutenticacaoApp() {
   // Padrão `false` (seguro): a UI de MFA só aparece após o servidor confirmar
   // que o recurso está ativado. Nunca uma flag de frontend liga o recurso.
   const [mfaDisponivel, setMfaDisponivel] = useState(false);
+  // T153 — papel do ator, da MESMA leitura de `GET /v1/users/me` que já traz
+  // `mfaAvailable`: nenhuma requisição a mais. Padrão `null` (seguro): sem
+  // confirmação do servidor, o destino condicional "Minha equipe" não
+  // aparece. Trocar de sessão zera isto junto com `mfaDisponivel`, no efeito
+  // abaixo — o shell nunca mostra a capacidade do usuário anterior.
+  const [papelDoAtor, setPapelDoAtor] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelado = false;
@@ -60,15 +66,20 @@ export function AutenticacaoApp() {
   useEffect(() => {
     if (estado !== "autenticado") {
       setMfaDisponivel(false);
+      setPapelDoAtor(null);
       return;
     }
     let cancelado = false;
     async function carregarDisponibilidadeMfa() {
       try {
         const eu = await obterUsuarioAtual();
-        if (!cancelado) setMfaDisponivel(eu.mfaAvailable === true);
+        if (cancelado) return;
+        setMfaDisponivel(eu.mfaAvailable === true);
+        setPapelDoAtor(typeof eu.role === "string" ? eu.role : null);
       } catch {
-        if (!cancelado) setMfaDisponivel(false);
+        if (cancelado) return;
+        setMfaDisponivel(false);
+        setPapelDoAtor(null);
       }
     }
     void carregarDisponibilidadeMfa();
@@ -119,6 +130,7 @@ export function AutenticacaoApp() {
       onLogout={() => void handleLogout()}
       onSessaoAtualEncerrada={encerrarSessaoLocalmente}
       mfaDisponivel={mfaDisponivel}
+      papelDoAtor={papelDoAtor}
     />
   );
 }

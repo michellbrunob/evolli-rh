@@ -842,3 +842,47 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     }
   });
 });
+
+describe("App — capacidade condicional do gestor (T153)", () => {
+  // O destino "Minha equipe" é a primeira capacidade do shell decidida pelo
+  // SERVIDOR, no mesmo molde de `mfaDisponivel` (T131): sem confirmação, não
+  // aparece. Isto NÃO é autorização — a `EquipeScreen` reverifica e o RBAC
+  // continua sendo a fronteira real —, é não oferecer uma porta que levaria a
+  // "Sem permissão".
+  it("T153.A1 sem papel confirmado pelo servidor, o destino não aparece", () => {
+    render(<App />);
+    expect(screen.queryByRole("button", { name: /Minha equipe/ })).toBeNull();
+  });
+
+  it.each(["dp", "colaborador", "master_tecnico", "financeiro"])(
+    "T153.A2 papel %s sem a capacidade não vê o destino",
+    (papel) => {
+      render(<App papelDoAtor={papel} />);
+      expect(screen.queryByRole("button", { name: /Minha equipe/ })).toBeNull();
+    },
+  );
+
+  it.each(["gestor", "rh"])(
+    "T153.A3 papel %s, concedido pelo contrato, vê o destino",
+    (papel) => {
+      render(<App papelDoAtor={papel} />);
+      expect(
+        screen.getByRole("button", { name: /Minha equipe/ }),
+      ).toBeInTheDocument();
+    },
+  );
+
+  it("T153.A4 selecionar o destino monta a tela do gestor", () => {
+    render(<App papelDoAtor="gestor" />);
+    fireEvent.click(screen.getByRole("button", { name: /Minha equipe/ }));
+
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Minha equipe" }),
+    ).toBeInTheDocument();
+    // O <main> é rotulado pelo h1 da tela, como os demais destinos.
+    expect(screen.getByRole("main")).toHaveAttribute(
+      "aria-labelledby",
+      "equipe-titulo",
+    );
+  });
+});

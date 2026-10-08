@@ -41,6 +41,13 @@ export const DESTINOS_PAINEL: readonly DestinoPainel[] = [
   // interface (spec §3.6) — quem realmente decide o que aparece DENTRO da
   // tela é o backend, por papel (ver `ContasAcessoScreen`).
   { id: "contas-acesso", label: "Contas de acesso" },
+  // T153 — "Minha equipe". Diferente de todos os anteriores, este destino é
+  // CONDICIONAL: só entra na navegação quando o SERVIDOR informa um papel a
+  // que o RBAC concede `gestor_equipe`/`read`. Ver `destinosCondicionais`
+  // abaixo e o precedente `mfaDisponivel` (T131) — nunca uma flag de
+  // frontend liga a capacidade. Continua valendo o §3.6: isto é conveniência
+  // de interface, e quem decide de verdade é o backend.
+  { id: "equipe", label: "Minha equipe" },
 ];
 
 /** Sub-rótulo exibido junto ao destino quando ele já tem tela própria. Para
@@ -57,6 +64,7 @@ const SUB_ROTULO: Record<string, string> = {
   "portal-colaborador": "Visão geral — demonstração",
   "solicitacoes-rh": "Central do RH",
   relatorios: "Exceções de Ponto",
+  equipe: "Consulta do gestor",
 };
 
 /**
@@ -85,7 +93,7 @@ const GRUPOS_NAVEGACAO: readonly {
   },
   {
     titulo: "Consulta",
-    destinos: ["portal-colaborador", "relatorios"],
+    destinos: ["portal-colaborador", "relatorios", "equipe"],
   },
   {
     titulo: "Administração",
@@ -96,11 +104,22 @@ const GRUPOS_NAVEGACAO: readonly {
 export interface PainelNavigationProps {
   destinoAtivoId: string;
   onSelecionar: (id: string) => void;
+  /**
+   * T153 — destinos condicionados a uma capacidade que o SERVIDOR concede.
+   * Chave: id do destino. Ausente do mapa = incondicional (os nove de
+   * sempre). Presente e `false` = não renderizado.
+   *
+   * Padrão `{}`: um destino condicional só some quando alguém diz
+   * explicitamente `false`, e quem monta o shell parte de `false` até o
+   * servidor confirmar — mesmo critério seguro de `mfaDisponivel`.
+   */
+  destinosCondicionais?: Readonly<Record<string, boolean>>;
 }
 
 export function PainelNavigation({
   destinoAtivoId,
   onSelecionar,
+  destinosCondicionais = {},
 }: PainelNavigationProps) {
   return (
     <nav className="painel-nav" aria-label="Navegação do painel">
@@ -119,6 +138,9 @@ export function PainelNavigation({
             {grupo.destinos.map((id) => {
               const destino = DESTINOS_PAINEL.find((d) => d.id === id);
               if (!destino) return null;
+              // Destino condicional não concedido pelo servidor: nem botão,
+              // nem item de lista, nem posição na ordem de tabulação.
+              if (destinosCondicionais[destino.id] === false) return null;
               const ativo = destino.id === destinoAtivoId;
               return (
                 <li key={destino.id} className="painel-nav__item">

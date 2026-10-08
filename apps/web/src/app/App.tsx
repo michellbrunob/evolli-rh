@@ -64,6 +64,11 @@ import {
   DOCUMENTOS_METADADOS_TITULO_ID,
   DocumentosScreen,
 } from "../screens/documentos";
+import {
+  EQUIPE_TITULO_ID,
+  EquipeScreen,
+  PAPEIS_COM_CONSULTA_DE_EQUIPE,
+} from "../screens/equipe";
 import { CadastrosScreen, HORARIOS_TITULO_ID } from "../screens/horarios";
 import { InicioVisaoGeralScreen } from "../screens/inicio";
 import { COLABORADORES_TITULO_ID, PessoasScreen } from "../screens/pessoas";
@@ -89,6 +94,7 @@ const TITULO_ID_POR_DESTINO: Record<string, string> = {
   inicio: "inicio-visao-geral-titulo",
   "solicitacoes-rh": "central-solicitacoes-rh-titulo",
   "contas-acesso": CONTAS_ACESSO_TITULO_ID,
+  equipe: EQUIPE_TITULO_ID,
 };
 
 function conteudoDoDestino(
@@ -133,6 +139,9 @@ function conteudoDoDestino(
       <ContasAcessoScreen onSessaoAtualEncerrada={onSessaoAtualEncerrada} />
     );
   }
+  if (destinoId === "equipe") {
+    return <EquipeScreen onSessaoAtualEncerrada={onSessaoAtualEncerrada} />;
+  }
   const destino = DESTINOS_PAINEL.find((item) => item.id === destinoId);
   return (
     <ModuloEmPreparacao
@@ -161,12 +170,24 @@ export interface AppProps {
    * respondem 404 quando desativado).
    */
   mfaDisponivel?: boolean;
+  /**
+   * T153 — papel do ator, decidido pelo SERVIDOR e repassado pelo
+   * `AutenticacaoApp` (via `GET /v1/users/me`, a mesma leitura que já traz
+   * `mfaAvailable`). Serve só para decidir se o destino "Minha equipe"
+   * aparece na navegação. Padrão `null` (seguro): sem confirmação do
+   * servidor, o destino fica oculto.
+   *
+   * Não é autorização — a `EquipeScreen` refaz a verificação por conta
+   * própria e o RBAC continua sendo a única fronteira real.
+   */
+  papelDoAtor?: string | null;
 }
 
 export function App({
   onLogout,
   onSessaoAtualEncerrada,
   mfaDisponivel = false,
+  papelDoAtor = null,
 }: AppProps = {}) {
   const [destinoAtivoId, setDestinoAtivoId] = useState("cadastros");
   const [sessoesAtivasAberto, setSessoesAtivasAberto] = useState(false);
@@ -263,6 +284,11 @@ export function App({
         <PainelNavigation
           destinoAtivoId={destinoAtivoId}
           onSelecionar={setDestinoAtivoId}
+          destinosCondicionais={{
+            equipe:
+              papelDoAtor !== null &&
+              PAPEIS_COM_CONSULTA_DE_EQUIPE.includes(papelDoAtor),
+          }}
         />
 
         <main
