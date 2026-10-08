@@ -1002,18 +1002,35 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       squash menciona a T152 justamente para dizer que ela **não foi iniciada**. O fallback local do
       próprio CLI usa `git log -1 --pretty=%s`, só o assunto: o mesmo commit recebia **três
       vereditos** — passava no PR, passava local e reprovava no push.
-    - **Regra nova.** Distingue **declaração** de **citação**: a declaração é a **primeira linha não
-      vazia que nomeia uma tarefa**; o que vem depois é prosa. Só a declaração responde "o que esta
-      mudança entrega".
-    - **Por que a primeira linha _com identificador_**, e não simplesmente a primeira: seis
-      integrações reais (`#121` a `#127`) têm assunto literal `@` e o assunto verdadeiro na primeira
-      linha do corpo. Uma regra "só o assunto" ficaria cega nelas.
-    - **Sem perda de detecção, verificado:** a regra foi aplicada às 40 integrações de `main` e em
-      todas a declaração extraída é exatamente a tarefa entregue. Entrega realmente identificada
-      como T152 com o ledger em 151 **continua reprovando**.
-    - **Limite declarado:** uma mudança cuja declaração anuncia T151 enquanto o corpo entrega T152
-      em silêncio deixa de ser detectada por esta regra. Exige violar a convenção de propósito, e
-      continua barrada pela regra (a), que fiscaliza a janela de `sync-state.json` sem ler texto.
+    - **Regra por posição, tentada e descartada.** A primeira versão tratava a "primeira linha com
+      identificador" como declaração. A revisão adversarial derrubou com um caso que não exige
+      má-fé: primeira linha cita `T151` (histórico), linha posterior entrega `T153`, ledger em
+      `T152` — e passava. Citar a tarefa anterior no assunto é padrão aqui
+      (`T145 — Hardening pós-T141`), então o bypass estava a um commit de distância. Posição é
+      determinística, mas não é declaração: "fica para a T153" e "entrega a T153" ocupam a mesma
+      posição e têm sentidos opostos.
+    - **Protocolo estruturado, que a substituiu.** O autor declara, em trailer auditável:
+      `Spec-Kit-Entrega: T###` e `Spec-Kit-Nao-Entrega: T###`. Quando obrigatório:
+      (1) existe exatamente um `Spec-Kit-Entrega`, não vazio; (2) toda tarefa declarada existe em
+      `tasks.md` **e** em `execution-status.md` e não está acima de `lastRecordedTask`;
+      (3) **todo** identificador acima de `lastRecordedTask`, em **qualquer** posição do contexto,
+      está classificado num dos dois trailers; (4) nenhum identificador nos dois ao mesmo tempo;
+      (5) trailer ausente, duplicado, malformado ou contraditório **reprova**.
+    - **Corte de adoção, objetivo e sem hash:** obrigatório quando
+      `lastRecordedTask >= 152` (`TAREFA_DE_ADOCAO_DO_PROTOCOLO`). Abaixo disso, **modo histórico**:
+      só a regra (a), porque exigir trailer de commit que já está em `main` seria exigir reescrita
+      de histórico. A constante vive no código, não em `sync-state.json` — em estado, a mesma
+      mudança a fiscalizar poderia baixar o corte e desligar o protocolo junto.
+    - **Onde os trailers precisam estar:** o squash do GitHub monta a mensagem com o título da PR
+      mais as mensagens dos **commits** (não a descrição da PR); o evento `pull_request` entrega
+      título e descrição. Como o verificador roda nos dois, os trailers vão **na mensagem de
+      commit** e **na descrição da PR**. O workflow passou a fornecer título + corpo no evento de
+      PR para que os dois vejam a mesma informação, e o fallback local passou de `--pretty=%s` para
+      `--pretty=%B` pelo mesmo motivo: uma noção só de contexto.
+    - **Sem perda de detecção:** as 40 integrações de `main` seguem válidas em modo histórico, sem
+      hash listado. Entrega declarada acima do ledger **continua reprovando**.
+    - **Não tratado, e declarado:** caixa baixa (`t153`) e zero-width continuam escapando de
+      `IDENTIFICADOR`, como antes desta tarefa. Dívida anterior, com teste que a torna explícita.
     - **Preserva a T149:** as proteções contra estado inválido (`validarEstado`) e o fail-closed de
       contexto ausente seguem intactos e têm teste próprio.
     - **Sem whitelist de identificadores** e sem resolver por avanço de `lastRecordedTask`.

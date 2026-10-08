@@ -139,10 +139,15 @@ if (estadoUtilizavel) {
     }
   }
 
+  // `%B` (mensagem INTEIRA), nao `%s` (so o assunto): o push para `main`
+  // injeta `head_commit.message`, que tambem e a mensagem inteira, e os
+  // trailers `Spec-Kit-Entrega` vivem no CORPO. Com `%s` o verificador local
+  // nao os enxergava e dava veredito diferente da CI para o mesmo commit —
+  // duas nocoes de contexto no mesmo programa.
   const { contexto } = resolverContexto({
     variavelDeAmbiente: process.env.SPEC_KIT_CHANGE_CONTEXT,
     lerSubject: () =>
-      execFileSync("git", ["log", "-1", "--pretty=%s"], {
+      execFileSync("git", ["log", "-1", "--pretty=%B"], {
         encoding: "utf8",
       }),
   });

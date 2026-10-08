@@ -576,28 +576,54 @@ O mesmo commit recebia **três vereditos**: passava no PR, passava na execução
 CLI usa `git log -1 --pretty=%s`, só o assunto — e reprovava no push. Um portão que muda de resposta
 conforme o evento não é mais rigoroso; é não determinístico.
 
-**A regra nova.** Declaração é a **primeira linha não vazia que nomeia uma tarefa**; o que vem
-depois é narrativa. Só a declaração responde "o que esta mudança entrega".
+**A regra por posição foi tentada e descartada.** A primeira versão tratava a "primeira linha com
+identificador" como declaração. A revisão adversarial da PR #143 derrubou com um caso que não exige
+má-fé nenhuma:
 
-A primeira linha **com identificador**, e não simplesmente a primeira: em seis integrações reais
-(`#121` a `#127`) o GitHub gravou `@` como assunto e empurrou o assunto verdadeiro para a primeira
-linha do corpo (`feat(web): Pessoas > Documentos funcional (T133)`). Uma regra "só o assunto"
-ficaria cega justamente nessas seis.
+```
+Retoma o critério da T151 e ajusta o verificador   <- 1ª linha, histórico
 
-**Sem perda de detecção, verificado contra a história real.** A regra foi aplicada às **40**
-integrações de `main`: em todas a declaração extraída é exatamente a tarefa entregue, incluindo as
-seis de assunto `@`. O que desapareceu foi o ruído — o squash da T149 citava onze identificadores em
-prosa, e todos eram exigência de registro.
+Esta mudança entrega a T153.                       <- entrega real
+```
 
-**Preso por mutação, nos dois sentidos.** Voltar a varrer o texto inteiro faz cinco testes falharem
-e o caso real `a356418` reprovar de novo; afrouxar para "só o assunto literal" deixa escapar uma
-entrega de T152 declarada no corpo, e o teste `T152.8` falha.
+Com o ledger em T152, a T153 passava sem registro. Citar a tarefa anterior no assunto é padrão aqui
+(`T145 — Hardening pós-T141`, `T148 — Convergência da T147`), então o bypass estava a um commit de
+distância. **Posição é determinística, mas não é declaração:** "fica para a T153" e "entrega a T153"
+ocupam a mesma posição e têm sentidos opostos, e nenhuma heurística de texto os separa.
 
-**Limite declarado, não escondido.** Uma mudança cuja declaração anuncia T151 enquanto o corpo
-entrega T152 em silêncio deixa de ser detectada por esta regra. Isso exige violar a convenção de
-propósito, e continua barrado do outro lado: entregar T152 obriga registrá-la em `tasks.md`, em
-`execution-status.md` e a mover `lastRecordedTask`, e a regra (a) — que não lê texto nenhum —
-fiscaliza essa janela.
+**O protocolo que a substituiu.** O autor declara, em trailer estruturado e auditável:
+
+```
+Spec-Kit-Entrega: T152
+Spec-Kit-Nao-Entrega: T153
+```
+
+Quando obrigatório: existe exatamente um `Spec-Kit-Entrega`, não vazio; toda tarefa declarada existe
+nos **dois** artefatos e não está acima de `lastRecordedTask`; **todo** identificador acima de
+`lastRecordedTask`, em **qualquer** posição, está classificado num dos dois trailers; nenhum aparece
+nos dois; e trailer ausente, duplicado, malformado ou contraditório **reprova**. O corpo volta a ser
+varrido inteiro — o bypass some porque a menção deixa de ser julgada pelo lugar e passa a depender
+de o autor dizer o que ela é. Esquecer de classificar falha **fechado**.
+
+**Corte de adoção, objetivo e sem hash:** obrigatório quando `lastRecordedTask >= 152`
+(`TAREFA_DE_ADOCAO_DO_PROTOCOLO`). Abaixo disso, **modo histórico** — só a regra (a), porque exigir
+trailer de commit que já está em `main` seria exigir reescrita de histórico. Não há lista de hashes
+nem exceção por identificador. A constante vive no **código**, não em `sync-state.json`: em estado,
+a mesma mudança que deveria ser fiscalizada poderia baixar o corte e desligar o protocolo junto.
+
+**Uma noção só de contexto.** O squash do GitHub monta a mensagem com o título da PR mais as
+mensagens dos **commits** — não a descrição da PR; o evento `pull_request` entrega título e
+descrição. Os trailers vão, portanto, **na mensagem de commit** e **na descrição da PR**. O workflow
+passou a fornecer título + corpo no evento de PR, e o fallback local passou de `--pretty=%s` para
+`--pretty=%B`: antes, o mesmo commit tinha veredito diferente local e na CI.
+
+**Preso por mutação, nos três sentidos.** Voltar à regra por posição faz o teste do bypass falhar;
+ignorar identificador futuro não classificado faz outro falhar; tornar o trailer opcional depois do
+corte faz um terceiro falhar.
+
+**Não tratado, e declarado:** caixa baixa (`t153`) e zero-width continuam escapando de
+`IDENTIFICADOR`, exatamente como antes desta tarefa. É dívida anterior, já registrada, com teste
+próprio que a torna explícita em vez de silenciosa.
 
 **Proteções da T149 preservadas:** `validarEstado` (estado inválido falha fechado) e o fail-closed
 de contexto ausente seguem intactos, com teste próprio nesta tarefa.

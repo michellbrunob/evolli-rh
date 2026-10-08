@@ -31,7 +31,14 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Verificar sincronização do Spec Kit
         env:
-          SPEC_KIT_CHANGE_CONTEXT: ${{ github.event.pull_request.title || github.event.head_commit.message }}
+          # Titulo + corpo nos dois eventos. No push `pull_request.body` e
+          # vazio e `head_commit.message` ja traz assunto e corpo do squash;
+          # no PR, as duas linhas se somam. Sem isso o evento de PR via so o
+          # titulo e nao enxergava os trailers Spec-Kit-Entrega da descricao.
+          SPEC_KIT_CHANGE_CONTEXT: |
+            ${{ github.event.pull_request.title || github.event.head_commit.message }}
+
+            ${{ github.event.pull_request.body }}
         run: pnpm spec:check
       - run: pnpm format:check
       - run: pnpm lint
