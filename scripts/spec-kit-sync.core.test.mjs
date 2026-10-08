@@ -13,7 +13,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -850,4 +856,26 @@ test("T152.20 exemplo INDENTADO na prosa nao e trailer (coluna zero)", () => {
   assert.deepEqual(lido.entrega, ["T152"], "o indentado e texto, nao trailer");
   assert.deepEqual(lido.falhas, []);
   assert.deepEqual(comProtocolo({ contexto: ctx }), []);
+});
+
+test("T152.21 o workflow fornece titulo E corpo ao verificador", () => {
+  // Guarda do contrato entre o workflow e o nucleo. Os trailers vivem no
+  // CORPO: se alguem reverter a linha `pull_request.body`, o evento de PR
+  // volta a ver so o titulo, o trailer some e toda PR passa a reprovar por
+  // "declaracao ausente" — um modo de falha barulhento, mas que so apareceria
+  // na CI. Este teste o pega antes.
+  const yml = readFileSync(
+    new URL("../.github/workflows/ci.yml", import.meta.url),
+    "utf8",
+  );
+  const bloco = yml.slice(yml.indexOf("SPEC_KIT_CHANGE_CONTEXT"));
+  const ate = bloco.slice(0, bloco.indexOf("run:"));
+
+  assert.match(ate, /pull_request\.title/, "falta o titulo da PR");
+  assert.match(ate, /head_commit\.message/, "falta a mensagem do push");
+  assert.match(
+    ate,
+    /pull_request\.body/,
+    "falta o CORPO da PR: os trailers vivem nele",
+  );
 });
