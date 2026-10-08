@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "constitutionVersion": "1.4.0",
-  "lastConvergedAt": "2026-10-06",
-  "lastIntegratedTask": 150,
-  "lastRecordedTask": 151,
+  "lastConvergedAt": "2026-10-08",
+  "lastIntegratedTask": 151,
+  "lastRecordedTask": 152,
   "platformDecision": {
     "adr": "docs/adr/0014-evolli-plataforma-base-e-encerramento-do-frappe.md",
     "decidedAt": "2026-10-01",
@@ -11,15 +11,15 @@
     "frappe": "encerrado_como_candidato_referencia_apenas"
   },
   "nextTask": {
-    "id": "T151",
-    "status": "em_execucao_t151_fundacao_gestor",
-    "reason": "T150 integrada em main (PR #141, squash ba8015763188e575c97bd2bb088765ac5cd38ae8), com a CI de main 3/3 verde. Em 06/10/2026 o proprietario aprovou literalmente: Aprovo as recomendacoes 1 a 9 para o escopo do gestor e DP-23. A T151 formaliza essa decisao na ADR 0015 e entrega a fundacao segura. DP-8 e DP-23 passam a RESOLVIDAS, e somente no recorte aprovado: gestao por equipe, multiplas equipes por gestor, subordinados diretos, um principal e no maximo um substituto vigentes por equipe, conta ligada explicitamente ao colaborador da mesma empresa, atribuicoes com vigencia e historico auditavel, excecoes individuais so pelo RH com justificativa e prazo. Continuam NAO aprovados e nao foram habilitados: gestao matricial permanente, departamento inteiro e empresa inteira. Modelagem: tres tabelas novas (access_user_colaborador, atribuicao_gestor_equipe, excecao_acesso_gestor), com invariantes no banco e nao na aplicacao — FK composta por empresa, EXCLUSION CONSTRAINT sobre daterange para sobreposicao temporal, indices parciais unicos como complemento, CHECK de intervalo e justificativa nao vazia, e CONSTRAINT TRIGGERS de duas portas para as invariantes que atravessam tabelas. Todas foram provadas contra PostgreSQL real antes do codigo. RBAC ganha dois recursos proprios: gestor_atribuicao (administracao pelo RH) e gestor_equipe (consulta pelo gestor, somente read). O escopo e resolvido no servidor a partir da sessao, e a ausencia de atribuicao produz lista VAZIA, nunca a empresa inteira. Dois itens da decisao 7 ficaram fora por ausencia de contrato seguro, documentados para a T152: resumo de jornada (nao existe como dado nem como rota; DP-3J-12 segue pendente) e andamento de solicitacoes (tipo e motivo revelam condicao de saude por inferencia; PD-SOL-05 so autoriza informacao operacional minima, ainda nao definida). Dividas mantidas e nao tratadas: FK de unit_id/team_id prometida pela ADR 0003 e nunca adicionada; convergencia de atributos do seed (DEMO-A-0001 e cargoId); limitacoes de caixa baixa e zero-width no verificador; decisoes pendentes da integracao de ponto (pacote da T148)."
+    "id": "T152",
+    "status": "em_execucao_t152_hardening_verificador",
+    "reason": "T151 integrada em main pela PR #142 (squash a356418abb34568cf7cdde20348c1cf042a5828f). A CI de main ficou com E2E e Migration smoke verdes e Quality gates vermelho em um unico ponto: o spec:check. Causa provada por reproducao, nao por hipotese — o workflow injeta SPEC_KIT_CHANGE_CONTEXT como github.event.pull_request.title || github.event.head_commit.message. No Pull Request isso e UMA linha; no push para main e a mensagem INTEIRA do squash (348 linhas). A regra (b) da T149 varria todo o texto atras de identificador futuro, e o corpo do squash menciona a T152 justamente para dizer que ela NAO foi iniciada. O mesmo commit passava no PR, passava localmente (o fallback do CLI usa git log --pretty=%s, so o assunto) e reprovava no push: tres vereditos para o mesmo conteudo. A T152 e EXCLUSIVAMENTE o hardening desse verificador. A regra passa a distinguir DECLARACAO de CITACAO: declaracao e a primeira linha nao vazia que nomeia uma tarefa; o que vem depois e prosa. A primeira linha COM IDENTIFICADOR, e nao simplesmente a primeira linha, porque seis integracoes reais (#121 a #127) tem assunto literal @ e o assunto verdadeiro na primeira linha do corpo. A regra foi conferida contra as 40 integracoes de main: em todas a declaracao extraida e exatamente a tarefa entregue, sem perda de deteccao. O modulo funcional antes cogitado para a T152 — resumo de jornada (DP-3J-12) e andamento de solicitacoes (PD-SOL-05) — NAO foi iniciado e segue sem contrato seguro."
   },
   "openDeliveries": [
     {
-      "id": "T151",
+      "id": "T152",
       "pullRequest": null,
-      "status": "fundacao_gestor_em_revisao"
+      "status": "hardening_verificador_em_revisao"
     }
   ],
   "requiredArtifacts": [

@@ -490,9 +490,9 @@ campo existente; e não aprova nenhum item do pacote da T148.
 
 ## Gestor consultivo — T151 (fundação segura, decisão aprovada)
 
-| Tarefa | Estado         | Resultado principal                                                                                                                                                                                                                       |
-| ------ | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| T151   | **Em revisão** | Formaliza a decisão do proprietário na [ADR 0015](../docs/adr/0015-escopo-do-gestor-consultivo-e-vinculo-conta-colaborador.md) e entrega a fundação: três tabelas, RBAC próprio, administração pelo RH e consulta consultiva pelo gestor. |
+| Tarefa | Estado                                    | Resultado principal                                                                                                                                                                                                                       |
+| ------ | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T151   | **Integrada** (PR #142, squash `a356418`) | Formaliza a decisão do proprietário na [ADR 0015](../docs/adr/0015-escopo-do-gestor-consultivo-e-vinculo-conta-colaborador.md) e entrega a fundação: três tabelas, RBAC próprio, administração pelo RH e consulta consultiva pelo gestor. |
 
 **A decisão, literalmente.** Em **06/10/2026** o proprietário aprovou:
 _"Aprovo as recomendações 1 a 9 para o escopo do gestor e DP-23"_. A ADR 0015 registra as nove
@@ -553,6 +553,57 @@ matricial; sem liberar departamento ou empresa; sem folha, eSocial, benefícios 
 _"até a Etapa 1 criar essas entidades"_ — condição cumprida, FK nunca adicionada; a convergência de
 atributos do seed (`DEMO-A-0001`/`cargoId`); as limitações de caixa baixa e zero-width no
 verificador; e as decisões do pacote de integração de ponto (T148).
+
+## Verificador do Spec Kit — T152 (hardening, declaração vs. citação)
+
+| Tarefa | Estado         | Resultado principal                                                                                                                                   |
+| ------ | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T152   | **Em revisão** | Separa **declaração de entrega** de **citação em prosa** no verificador, recuperando a CI de `main` sem afrouxar a detecção de tarefa não registrada. |
+
+**Escopo, explicitamente.** A T152 é **somente** o hardening do verificador. O módulo funcional
+antes cogitado sob este número — **resumo de jornada** (`DP-3J-12`) e **andamento de solicitações**
+(`PD-SOL-05`) — **não foi iniciado**, continua sem contrato seguro e permanece fora.
+
+**O que quebrou, provado por reprodução e não por hipótese.** O squash da T151 (`a356418`) entrou em
+`main` com E2E e Migration smoke verdes, e Quality gates vermelho num ponto só: `spec:check` disse
+_"T152 aparece na mudança, mas lastRecordedTask=151"_. O workflow injeta
+`github.event.pull_request.title || github.event.head_commit.message`. Em Pull Request isso é **uma
+linha**; no push para `main` é a **mensagem inteira** — 348 linhas. A regra (b) da T149 varria todo
+o texto atrás de identificador futuro, e o corpo do squash cita a T152 exatamente para registrar que
+ela **não foi iniciada**. Dizer "isto fica para a T152" virava "estou entregando a T152".
+
+O mesmo commit recebia **três vereditos**: passava no PR, passava na execução local — o fallback do
+CLI usa `git log -1 --pretty=%s`, só o assunto — e reprovava no push. Um portão que muda de resposta
+conforme o evento não é mais rigoroso; é não determinístico.
+
+**A regra nova.** Declaração é a **primeira linha não vazia que nomeia uma tarefa**; o que vem
+depois é narrativa. Só a declaração responde "o que esta mudança entrega".
+
+A primeira linha **com identificador**, e não simplesmente a primeira: em seis integrações reais
+(`#121` a `#127`) o GitHub gravou `@` como assunto e empurrou o assunto verdadeiro para a primeira
+linha do corpo (`feat(web): Pessoas > Documentos funcional (T133)`). Uma regra "só o assunto"
+ficaria cega justamente nessas seis.
+
+**Sem perda de detecção, verificado contra a história real.** A regra foi aplicada às **40**
+integrações de `main`: em todas a declaração extraída é exatamente a tarefa entregue, incluindo as
+seis de assunto `@`. O que desapareceu foi o ruído — o squash da T149 citava onze identificadores em
+prosa, e todos eram exigência de registro.
+
+**Preso por mutação, nos dois sentidos.** Voltar a varrer o texto inteiro faz cinco testes falharem
+e o caso real `a356418` reprovar de novo; afrouxar para "só o assunto literal" deixa escapar uma
+entrega de T152 declarada no corpo, e o teste `T152.8` falha.
+
+**Limite declarado, não escondido.** Uma mudança cuja declaração anuncia T151 enquanto o corpo
+entrega T152 em silêncio deixa de ser detectada por esta regra. Isso exige violar a convenção de
+propósito, e continua barrado do outro lado: entregar T152 obriga registrá-la em `tasks.md`, em
+`execution-status.md` e a mover `lastRecordedTask`, e a regra (a) — que não lê texto nenhum —
+fiscaliza essa janela.
+
+**Proteções da T149 preservadas:** `validarEstado` (estado inválido falha fechado) e o fail-closed
+de contexto ausente seguem intactos, com teste próprio nesta tarefa.
+
+**Nada funcional foi tocado:** sem alteração em API de negócio, schema Prisma, migrations de
+negócio, seed, Docker ou interface web.
 
 ## Próxima ação autorizável
 

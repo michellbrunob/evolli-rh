@@ -957,7 +957,9 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       de auditoria, alteração de seed ou tela; nenhuma negação vigente afrouxada.
 
 48. **T151 - Formalização e fundação segura do Gestor consultivo (ADR 0015)**
-    - **Estado:** em revisão. Branch `codex/t151-fundacao-gestor-consultivo`, a partir do squash
+    - **Estado:** **Integrada** em `main` pela PR #142, squash
+      `a356418abb34568cf7cdde20348c1cf042a5828f`. Branch
+      `codex/t151-fundacao-gestor-consultivo`, a partir do squash
       `ba8015763188e575c97bd2bb088765ac5cd38ae8` (T150, PR #141).
     - **Decisão aprovada, literalmente (06/10/2026):** _"Aprovo as recomendações 1 a 9 para o
       escopo do gestor e DP-23"_. Formalizada na
@@ -986,6 +988,35 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
     - **Dívidas mantidas, não tratadas:** FK de `unit_id`/`team_id` (ADR 0003, nunca adicionada);
       convergência de atributos do seed (`DEMO-A-0001`/`cargoId`); caixa baixa e zero-width no
       verificador; decisões do pacote de integração de ponto (T148).
+
+49. **T152 - Hardening do verificador do Spec Kit: declaração de entrega vs. citação**
+    - **Estado:** em revisão. Branch `codex/t152-hardening-spec-kit-squash`, a partir do squash
+      `a356418abb34568cf7cdde20348c1cf042a5828f` (T151, PR #142).
+    - **Escopo:** exclusivamente o verificador e a recuperação da CI de `main`. O módulo funcional
+      antes cogitado para a T152 — **resumo de jornada** (`DP-3J-12`) e **andamento de
+      solicitações** (`PD-SOL-05`) — **não foi iniciado** e segue sem contrato seguro.
+    - **Causa, provada por reprodução.** O workflow injeta
+      `github.event.pull_request.title || github.event.head_commit.message`. Em Pull Request isso é
+      **uma linha**; no push para `main` é a **mensagem inteira** do squash — 348 linhas no caso da
+      T151. A regra (b) da T149 varria todo o texto atrás de identificador futuro, e o corpo do
+      squash menciona a T152 justamente para dizer que ela **não foi iniciada**. O fallback local do
+      próprio CLI usa `git log -1 --pretty=%s`, só o assunto: o mesmo commit recebia **três
+      vereditos** — passava no PR, passava local e reprovava no push.
+    - **Regra nova.** Distingue **declaração** de **citação**: a declaração é a **primeira linha não
+      vazia que nomeia uma tarefa**; o que vem depois é prosa. Só a declaração responde "o que esta
+      mudança entrega".
+    - **Por que a primeira linha _com identificador_**, e não simplesmente a primeira: seis
+      integrações reais (`#121` a `#127`) têm assunto literal `@` e o assunto verdadeiro na primeira
+      linha do corpo. Uma regra "só o assunto" ficaria cega nelas.
+    - **Sem perda de detecção, verificado:** a regra foi aplicada às 40 integrações de `main` e em
+      todas a declaração extraída é exatamente a tarefa entregue. Entrega realmente identificada
+      como T152 com o ledger em 151 **continua reprovando**.
+    - **Limite declarado:** uma mudança cuja declaração anuncia T151 enquanto o corpo entrega T152
+      em silêncio deixa de ser detectada por esta regra. Exige violar a convenção de propósito, e
+      continua barrada pela regra (a), que fiscaliza a janela de `sync-state.json` sem ler texto.
+    - **Preserva a T149:** as proteções contra estado inválido (`validarEstado`) e o fail-closed de
+      contexto ausente seguem intactos e têm teste próprio.
+    - **Sem whitelist de identificadores** e sem resolver por avanço de `lastRecordedTask`.
 
 ## Regra obrigatória para as próximas tarefas
 

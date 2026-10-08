@@ -61,6 +61,52 @@
  * O que NÃO muda: a tarefa efetivamente entregue continua obrigatória nos dois
  * artefatos, e citar tarefa futura continua reprovando. Nenhuma lista de
  * exceções, nenhum identificador tratado como caso especial.
+ *
+ * ---------------------------------------------------------------------------
+ * A CORREÇÃO DA T152: ONDE MORA A DECLARAÇÃO DE ENTREGA
+ *
+ * A T149 resolveu metade do problema de escopo. Ela parou de cobrar registro de
+ * referência HISTÓRICA citada em prosa, mas manteve a cobrança sobre referência
+ * FUTURA em qualquer posição do texto. O squash da T151 (`a356418`) caiu
+ * exatamente aí: o assunto entrega T151, e o corpo — 348 linhas — menciona a
+ * T152 para dizer que ela **não foi iniciada**. Dizer "isto fica para a T152"
+ * virava "estou entregando a T152".
+ *
+ * O defeito é verificável e não depende de interpretação: o workflow injeta
+ * `github.event.pull_request.title || github.event.head_commit.message`. No
+ * Pull Request isso é UMA linha; no push para `main` é a mensagem INTEIRA. E o
+ * fallback local deste mesmo verificador usa `git log -1 --pretty=%s`, que é só
+ * o assunto. O mesmo commit, com o mesmo conteúdo, recebia TRÊS vereditos:
+ * passava no PR, passava local e reprovava no push. Um portão que muda de
+ * resposta conforme o evento não é mais rigoroso — é não determinístico.
+ *
+ * A regra agora distingue DECLARAÇÃO de CITAÇÃO:
+ *
+ *   DECLARAÇÃO = a primeira linha não vazia que nomeia alguma tarefa.
+ *   CITAÇÃO    = tudo o que vier depois dela.
+ *
+ * Só a declaração responde "o que esta mudança entrega". O resto é prosa.
+ *
+ * POR QUE A PRIMEIRA LINHA *COM IDENTIFICADOR*, e não simplesmente a primeira
+ * linha: em seis integrações reais deste repositório (`#121` a `#127`) o GitHub
+ * gravou `@` como assunto e empurrou o assunto verdadeiro para a primeira linha
+ * do corpo — `feat(web): Pessoas > Documentos funcional (T133)`. Uma regra
+ * "só o assunto" ficaria cega justamente nesses seis. Procurar a primeira linha
+ * que nomeia tarefa cobre os dois formatos sem tratar nenhum como exceção.
+ *
+ * A regra foi conferida contra as 40 integrações em `main`: em todas elas a
+ * declaração extraída é exatamente a tarefa entregue, incluindo as seis de
+ * assunto `@`. Nenhuma detecção foi perdida; o que sumiu foi o ruído — o squash
+ * da T149 citava onze identificadores em prosa, e todos eram exigência.
+ *
+ * LIMITE CONHECIDO, declarado e não escondido: uma mudança cuja linha de
+ * declaração anuncia T151 enquanto o corpo entrega T152 em silêncio deixa de
+ * ser detectada por esta regra. Isso exige violar a convenção de propósito, e
+ * continua barrado do outro lado: entregar T152 obriga registrá-la em
+ * `tasks.md`, em `execution-status.md` e a mover `lastRecordedTask`, e a regra
+ * (a) — que não lê texto nenhum — fiscaliza essa janela. Trocar um falso
+ * positivo garantido em toda integração por um falso negativo que depende de
+ * má-fé deliberada é o balanço que esta tarefa escolhe, explicitamente.
  */
 
 /** Faixas: `T104–T109`, `T104—T109`, `T104-T109` e a forma textual `T001 a T049`. */
@@ -209,6 +255,29 @@ export function resolverContexto({ variavelDeAmbiente, lerSubject }) {
 }
 
 /**
+ * A linha que DECLARA a entrega: a primeira não vazia que nomeia uma tarefa.
+ *
+ * Devolve `null` quando nenhuma linha nomeia tarefa — o que não libera nada: a
+ * regra (a) continua fiscalizando a janela declarada em `sync-state.json`, que
+ * não depende de texto.
+ *
+ * Trabalha sobre linhas, nunca sobre o texto inteiro, porque é a quebra de
+ * linha que separa o assunto da prosa nos três fluxos reais do projeto (título
+ * de PR, mensagem de squash e push direto).
+ */
+export function declaracaoDeEntrega(contexto) {
+  if (typeof contexto !== "string") return null;
+  for (const linha of contexto.split(/\r?\n/)) {
+    const texto = linha.trim();
+    // `identificadoresCitados` em vez de `IDENTIFICADOR.test`: o regexp é
+    // global e `.test` guarda `lastIndex` entre chamadas, o que faria a
+    // varredura pular linhas de forma dependente da ordem.
+    if (texto && identificadoresCitados(texto).length > 0) return texto;
+  }
+  return null;
+}
+
+/**
  * Tarefas que a mudança entrega, segundo o Spec Kit — não segundo o texto.
  *
  * Janela `(lastIntegratedTask, lastRecordedTask]`. Quando nada está aberto
@@ -269,12 +338,15 @@ export function avaliarSincronia({ state, tasks, ledger, contexto }) {
     return falhas;
   }
 
-  // (b) Do texto livre, só interessa o que é futuro: tarefa citada e não
-  //     registrada. Referência histórica é narrativa legítima.
-  for (const { id, numero } of identificadoresCitados(contexto)) {
+  // (b) Só a DECLARAÇÃO é lida — a primeira linha que nomeia tarefa. Dentro
+  //     dela, interessa o que é futuro: entrega anunciada e não registrada.
+  //     Referência histórica e menção a trabalho futuro feitas na prosa que
+  //     vem depois são narrativa legítima, e não são entrega.
+  const declaracao = declaracaoDeEntrega(contexto);
+  for (const { id, numero } of identificadoresCitados(declaracao ?? "")) {
     if (numero > Number(state?.lastRecordedTask)) {
       falhas.push(
-        `${id} aparece na mudança, mas lastRecordedTask=${state?.lastRecordedTask}: registre a tarefa no Spec Kit antes de citá-la como entrega.`,
+        `${id} é declarado como entrega desta mudança, mas lastRecordedTask=${state?.lastRecordedTask}: registre a tarefa no Spec Kit antes de entregá-la.`,
       );
     }
   }

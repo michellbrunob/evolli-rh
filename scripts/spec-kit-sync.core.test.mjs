@@ -21,6 +21,7 @@ import { fileURLToPath } from "node:url";
 import {
   avaliarSincronia,
   coberturaDeTarefas,
+  declaracaoDeEntrega,
   identificadoresCitados,
   resolverContexto,
   tarefasEntregues,
@@ -167,13 +168,30 @@ test("4. referência histórica não registrada, citada em prosa, não cria fals
   assert.deepEqual(falhas, []);
 });
 
-test("4b. tarefa FUTURA citada em prosa continua reprovando", () => {
+test("4b. tarefa futura citada na PROSA e narrativa, nao entrega", () => {
+  // Ate a T151 isto reprovava, e foi o que derrubou a CI de `main` no squash
+  // `a356418`: o corpo dizia que a T152 NAO fora iniciada, e o verificador
+  // lia a mencao como anuncio de entrega.
   const falhas = avaliar({
-    contexto:
-      "T148 — convergência\n\nIsto prepara a T151, ainda não registrada.",
+    contexto: [
+      "T148 - convergencia",
+      "",
+      "Isto prepara a T151, ainda nao registrada.",
+    ].join("\n"),
+  });
+  assert.deepEqual(falhas, []);
+});
+
+test("4c. tarefa futura na DECLARACAO continua reprovando - falha fechada", () => {
+  // A contrapartida de 4b: o que muda e a POSICAO da mencao, nao a severidade.
+  const falhas = avaliar({
+    contexto: ["T151 - nova fatia", "", "Corpo qualquer."].join("\n"),
   });
   assert.equal(falhas.length, 1);
-  assert.match(falhas[0], /^T151 aparece na mudança/);
+  assert.match(
+    falhas[0],
+    /^T151 e declarado como entrega|^T151 é declarado como entrega/,
+  );
   assert.match(falhas[0], /lastRecordedTask=148/);
 });
 
@@ -479,4 +497,217 @@ test("B1.12 o CLI reprova sync-state.json inválido, sem vazar o conteúdo", () 
   } finally {
     rmSync(raiz, { recursive: true, force: true });
   }
+});
+
+// --------------------------------------------------------------------------
+// T152. O caso real que derrubou a CI de `main`: squash `a356418`.
+// --------------------------------------------------------------------------
+
+/**
+ * Fixture sanitizada do squash real `a356418` (T151, PR #142).
+ *
+ * Reproduz a estrutura que importa, com as linhas nas posicoes originais: a
+ * primeira linha declara a entrega da T151, e o corpo — 348 linhas no commit
+ * real — cita T150 e T139 como historico e T152 como trabalho NAO INICIADO.
+ * E este texto, injetado pelo workflow como `head_commit.message` no push para
+ * `main`, que produziu "T152 aparece na mudanca, mas lastRecordedTask=151".
+ */
+const SQUASH_T151 = [
+  "T151 - Fundacao segura do Gestor consultivo (ADR 0015, resolve DP-8 e DP-23) (#142)",
+  "",
+  "* feat(gestor): garantir o historico das tres tabelas pelo banco",
+  "",
+  "esta documentado para a T152: resumo de jornada nao existe como dado nem como",
+  "rota, e andamento de solicitacoes nao tem contrato seguro. Ambos ficam fora.",
+  "",
+  "Converge a T150 como integrada (PR #141, squash ba80157) e marca o pacote de",
+  "decisao como aprovado.",
+  "",
+  "tres estavam fora. A T139 fixou o criterio: append-only garantido pelo BANCO",
+].join("\n");
+
+/** Estado real no momento do squash: T151 registrada, T150 integrada. */
+const ESTADO_T151 = { lastIntegratedTask: 150, lastRecordedTask: 151 };
+
+const TASKS_T151 = [
+  "45. **T148 - Convergencia e pacote de decisao.**",
+  "46. **T149 - Verificador do Spec Kit.**",
+  "47. **T150 - Pacote de decisao do escopo do gestor.**",
+  "48. **T151 - Fundacao segura do Gestor consultivo.**",
+].join("\n");
+
+const LEDGER_T151 = [
+  "| Tarefa | Status | Observacao |",
+  "| --- | --- | --- |",
+  "| T148 | Integrada | Pacote de decisao de integracao de ponto. |",
+  "| T149 | Integrada | Verificador corrigido na origem. |",
+  "| T150 | Integrada | Pacote de decisao do escopo do gestor. |",
+  "| T151 | Integrada | Fundacao segura do Gestor consultivo. |",
+].join("\n");
+
+const avaliarT151 = (parcial) =>
+  avaliarSincronia({
+    state: ESTADO_T151,
+    tasks: TASKS_T151,
+    ledger: LEDGER_T151,
+    contexto: "",
+    ...parcial,
+  });
+
+test("T152.1 squash real a356418 passa: entrega T151, cita T152 como futura", () => {
+  assert.deepEqual(avaliarT151({ contexto: SQUASH_T151 }), []);
+});
+
+test("T152.1b a REGRA ANTERIOR reprovaria o mesmo texto - prova da regressao", () => {
+  // Regra anterior: varria o texto INTEIRO atras de identificador futuro.
+  const anterior = identificadoresCitados(SQUASH_T151)
+    .filter(({ numero }) => numero > ESTADO_T151.lastRecordedTask)
+    .map(({ id }) => id);
+  assert.deepEqual(anterior, ["T152"], "a regra antiga via T152 como entrega");
+
+  // Regra nova: so a declaracao conta, e ela nomeia apenas T151.
+  const declarados = identificadoresCitados(declaracaoDeEntrega(SQUASH_T151));
+  assert.deepEqual(
+    declarados.map(({ id }) => id),
+    ["T151"],
+  );
+});
+
+test("T152.2 entrega realmente identificada como T152 com ledger em 151 reprova", () => {
+  const falhas = avaliarT151({
+    contexto: [
+      "T152 - hardening do verificador do Spec Kit (#143)",
+      "",
+      "Corpo narrativo qualquer.",
+    ].join("\n"),
+  });
+  assert.equal(falhas.length, 1);
+  assert.match(falhas[0], /T152/);
+  assert.match(falhas[0], /lastRecordedTask=151/);
+});
+
+test("T152.3 referencia historica no corpo nao cria entrega", () => {
+  const falhas = avaliarT151({
+    contexto: [
+      "T151 - fundacao",
+      "",
+      "Retoma o criterio da T139 e converge a T150.",
+    ].join("\n"),
+  });
+  assert.deepEqual(falhas, []);
+});
+
+test("T152.4 tarefa entregue ausente de execution-status.md reprova", () => {
+  const falhas = avaliarT151({
+    contexto: SQUASH_T151,
+    ledger: LEDGER_T151.replace(
+      "| T151 | Integrada | Fundacao segura do Gestor consultivo. |",
+      "",
+    ),
+  });
+  assert.equal(falhas.length, 1);
+  assert.match(falhas[0], /^T151 e tarefa entregue|^T151 é tarefa entregue/);
+  assert.match(falhas[0], /execution-status\.md/);
+});
+
+test("T152.5 tarefa entregue ausente de tasks.md reprova", () => {
+  const falhas = avaliarT151({
+    contexto: SQUASH_T151,
+    tasks: TASKS_T151.replace(
+      "48. **T151 - Fundacao segura do Gestor consultivo.**",
+      "",
+    ),
+  });
+  assert.equal(falhas.length, 1);
+  assert.match(falhas[0], /tasks\.md/);
+});
+
+test("T152.6 estado invalido continua falhando fechado, mesmo com declaracao limpa", () => {
+  // Protecao da T149 preservada: estado invalido encerra antes de qualquer
+  // conclusao, e a declaracao bem-formada nao a desliga.
+  for (const state of [
+    null,
+    {},
+    { lastIntegratedTask: 150 },
+    { lastIntegratedTask: 150, lastRecordedTask: "151" },
+    { lastIntegratedTask: 150, lastRecordedTask: Number.NaN },
+    { lastIntegratedTask: 152, lastRecordedTask: 151 },
+  ]) {
+    const falhas = avaliarSincronia({
+      state,
+      tasks: "",
+      ledger: "",
+      contexto: SQUASH_T151,
+    });
+    assert.ok(
+      falhas.length > 0,
+      `estado invalido devia reprovar: ${JSON.stringify(state)}`,
+    );
+  }
+});
+
+test("T152.7 contexto sem identificador nenhum nao libera alteracao relevante", () => {
+  // Nao ha declaracao a ler, e isso NAO vira passe livre: a regra (a) continua
+  // exigindo a tarefa da janela nos dois artefatos.
+  assert.equal(
+    declaracaoDeEntrega("chore: ajustes diversos\n\nSem IDs."),
+    null,
+  );
+
+  const falhas = avaliarSincronia({
+    state: ESTADO_T151,
+    tasks: "",
+    ledger: "",
+    contexto: "chore: ajustes diversos\n\nSem IDs.",
+  });
+  assert.ok(falhas.length > 0, "janela nao registrada tem de reprovar");
+  assert.match(falhas[0], /T151/);
+});
+
+test("T152.7b contexto ausente continua fail-closed (protecao da T149)", () => {
+  const falhas = avaliarT151({ contexto: null });
+  assert.ok(
+    falhas.some((f) =>
+      /Contexto da mudanca ausente|Contexto da mudança ausente/.test(f),
+    ),
+  );
+});
+
+test("T152.8 assunto '@' do GitHub: a declaracao cai na primeira linha do corpo", () => {
+  // Seis integracoes reais (#121 a #127) tem assunto literal "@" e o assunto
+  // verdadeiro na primeira linha do corpo. Uma regra "so o assunto" ficaria
+  // cega nelas; esta encontra a declaracao e segue fiscalizando.
+  const comArroba = [
+    "@ (#143)",
+    "",
+    "feat(gestor): modulo novo (T152)",
+    "",
+    "Corpo narrativo.",
+  ].join("\n");
+  assert.equal(
+    declaracaoDeEntrega(comArroba),
+    "feat(gestor): modulo novo (T152)",
+  );
+
+  const falhas = avaliarT151({ contexto: comArroba });
+  assert.equal(falhas.length, 1);
+  assert.match(falhas[0], /T152/);
+});
+
+test("T152.9 PR e push do mesmo conteudo dao o MESMO veredito", () => {
+  // Era exatamente esta invariante que a T151 quebrou: o workflow injeta
+  // `pull_request.title || head_commit.message`, e os dois divergiam.
+  const titulo = SQUASH_T151.split("\n")[0];
+  assert.deepEqual(
+    avaliarT151({ contexto: SQUASH_T151 }),
+    avaliarT151({ contexto: titulo }),
+    "PR e push do mesmo conteudo nao podem divergir",
+  );
+});
+
+test("T152.10 declaracao e a PRIMEIRA linha com identificador, nao qualquer uma", () => {
+  assert.equal(declaracaoDeEntrega("T151 - a\nT152 - b"), "T151 - a");
+  assert.equal(declaracaoDeEntrega("  \n\nT151 - a"), "T151 - a");
+  assert.equal(declaracaoDeEntrega(""), null);
+  assert.equal(declaracaoDeEntrega(null), null);
 });
