@@ -556,9 +556,9 @@ verificador; e as decisões do pacote de integração de ponto (T148).
 
 ## Verificador do Spec Kit — T152 (hardening, declaração vs. citação)
 
-| Tarefa | Estado         | Resultado principal                                                                                                                                   |
-| ------ | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| T152   | **Em revisão** | Separa **declaração de entrega** de **citação em prosa** no verificador, recuperando a CI de `main` sem afrouxar a detecção de tarefa não registrada. |
+| Tarefa | Estado                                    | Resultado principal                                                                                                                                   |
+| ------ | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T152   | **Integrada** (PR #143, squash `3f73f4e`) | Separa **declaração de entrega** de **citação em prosa** no verificador, recuperando a CI de `main` sem afrouxar a detecção de tarefa não registrada. |
 
 **Escopo, explicitamente.** A T152 é **somente** o hardening do verificador. O módulo funcional
 antes cogitado sob este número — **resumo de jornada** (`DP-3J-12`) e **andamento de solicitações**
@@ -655,12 +655,63 @@ de contexto ausente seguem intactos, com teste próprio nesta tarefa.
 **Nada funcional foi tocado:** sem alteração em API de negócio, schema Prisma, migrations de
 negócio, seed, Docker ou interface web.
 
+## Interface web do Gestor Consultivo — T153 (somente leitura)
+
+| Tarefa | Estado               | Resultado principal                                                                                                          |
+| ------ | -------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| T153   | **Em implementação** | Interface web consultiva do gestor sobre a fundação da T151: lista da equipe autorizada e detalhe em modal, somente leitura. |
+
+**Escopo, explicitamente.** A T153 é **somente a interface web**. Consome os dois endpoints que a
+T151 já integrou e **não altera** API, schema Prisma, migration, seed, RBAC, Docker, dependências
+ou lockfile. Nenhuma capacidade nova é criada: a tela mostra o que o servidor já autoriza, e só.
+
+**O bloqueio anterior caiu, e isto é registro, não atalho.** Até a T150 o Gestor consultivo estava
+fora dos candidatos imediatos porque dependia de `DP-8` e `DP-23`. A T151 **resolveu as duas** pela
+[ADR 0015](../docs/adr/0015-escopo-do-gestor-consultivo-e-vinculo-conta-colaborador.md), no recorte
+aprovado literalmente pelo proprietário em 06/10/2026, e entregou a fundação com as invariantes no
+banco. A seção "Próxima ação autorizável" abaixo ainda carregava a leitura anterior à T151 —
+corrigida nesta convergência.
+
+**Autorização não é decidida no frontend.** O escopo sai da sessão no servidor; a `dataReferencia`
+vem na resposta e é **informativa**. A interface não oferece — e não pode oferecer — parâmetro de
+data: a ADR 0015, decisão 8, fixa que decisões de acesso usam o estado vigente, e a rota responde
+400 a qualquer query desconhecida. Esconder botão não é controle de acesso; a porta continua sendo
+`gestor_equipe` `read` no RBAC. A tela **não infere subordinação** por e-mail, nome, `unit_id`,
+`team_id` textual ou lotação: a lista é exatamente o que o servidor devolveu.
+
+**Projeção fechada, sem invenção.** A tela exibe apenas os campos da decisão 7 que a API devolve.
+Campo que a API não manda, a tela não mostra — e não preenche com placeholder.
+
+**404 é indisponibilidade, nunca enumeração.** Fora do escopo a API responde 404 (não 403, que
+confirmaria existência). A tela apresenta "não disponível", sem distinguir inexistente de alheio,
+e **nunca** exibe corpo interno de erro.
+
+**Concorrência por guarda monotônica por carregador.** Resposta obsoleta não atualiza dados, erro
+nem carregamento. Troca rápida de vínculo descarta o detalhe anterior; fechar o detalhe invalida
+sua requisição; nova tentativa mantém só a mais recente; troca de sessão limpa e invalida tudo.
+O risco que isso fecha é concreto: uma resposta tardia fazendo o dado de uma pessoa reaparecer sob
+o nome de outra.
+
+**Capacidades ausentes continuam ausentes, e declaradas.** A API devolve `resumoJornada` e
+`andamentoSolicitacoes` como `null` **de propósito**, para que o cliente não precise adivinhar se
+a capacidade existe e falhou ou se nunca existiu. A interface honra isso: **não** desenha cartão
+vazio nem dado fictício. O módulo funcional antes cogitado sob o número da T152 — **resumo de
+jornada** (`DP-3J-12`) e **andamento de solicitações** (`PD-SOL-05`) — **não foi iniciado** e segue
+sem contrato seguro.
+
+**Fora desta entrega, explicitamente:** banco de horas, espelho de ponto, atestado, diagnóstico,
+CID ou qualquer informação de saúde, aprovações, alterações cadastrais, qualquer `POST`, `PATCH`,
+`PUT` ou `DELETE`, visão por departamento ou empresa inteira, gestão matricial, exceções
+administradas pela interface e ESS.
+
 ## Próxima ação autorizável
 
-1. **Decidir o pacote da T150** — levar `docs/decisions/pacote-decisao-escopo-do-gestor.md` a
-   Produto e RH (quem é a equipe de um gestor), TI e Segurança (como o escopo é aplicado) e
-   RH + Jurídico (limites de LGPD). Resolver `DP-8` e `DP-23` por ADR nova ou emenda formal antes
-   de qualquer código de Portal da Liderança.
+1. ~~**Decidir o pacote da T150**~~ — **cumprido pela T151.** O proprietário aprovou o recorte em
+   06/10/2026 e a decisão foi formalizada na
+   [ADR 0015](../docs/adr/0015-escopo-do-gestor-consultivo-e-vinculo-conta-colaborador.md):
+   `DP-8` e `DP-23` estão **resolvidas**, e somente no recorte aprovado. Gestão matricial
+   permanente, departamento inteiro e empresa inteira **continuam não aprovados** e seguem
+   dependendo de decisão nova.
 2. **Decidir o pacote da T148** — levar `docs/decisions/pacote-decisao-integracao-registros-ponto.md`
    a Produto, TI, RH, Jurídico/DPO e, quanto às perguntas ao fornecedor, à RWTech/Secullum. Nenhuma
    implementação de integração de ponto começa antes de §2–§6 desse pacote serem decididos e de a
@@ -670,9 +721,10 @@ negócio, seed, Docker ou interface web.
    da decisão de escopo já se mostrou fonte de confusão (ver T137). A implementação usa a fundação
    visual já congelada, sem reabrir o shell, os tokens, o padrão B ou os modais.
 4. Candidatos remanescentes: a validação com RH do catálogo de motivos, cujo mecanismo (código
-   fechado) já está aprovado. **Gestor consultivo e autoatendimento do colaborador saem desta lista
-   de candidatos imediatos** — a T150 confirmou que ambos dependem de `DP-8` e `DP-23`, decisões de
-   negócio ainda não tomadas.
+   fechado) já está aprovado. **O Gestor consultivo saiu desta lista por estar em execução na
+   T153** — a leitura anterior, de que ele dependia de `DP-8` e `DP-23`, valia até a T150 e foi
+   superada pela ADR 0015. **O autoatendimento do colaborador (ESS) continua fora**: nada na
+   ADR 0015 o autoriza, e ele não foi iniciado.
 5. Refinamento estético e acabamento visual final da fundação ficam para uma etapa posterior,
    depois dos módulos funcionais.
 6. Atualizar este ledger e `sync-state.json` em toda tarefa futura.
