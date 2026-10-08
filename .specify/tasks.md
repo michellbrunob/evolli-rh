@@ -957,7 +957,9 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       de auditoria, alteração de seed ou tela; nenhuma negação vigente afrouxada.
 
 48. **T151 - Formalização e fundação segura do Gestor consultivo (ADR 0015)**
-    - **Estado:** em revisão. Branch `codex/t151-fundacao-gestor-consultivo`, a partir do squash
+    - **Estado:** **Integrada** em `main` pela PR #142, squash
+      `a356418abb34568cf7cdde20348c1cf042a5828f`. Branch
+      `codex/t151-fundacao-gestor-consultivo`, a partir do squash
       `ba8015763188e575c97bd2bb088765ac5cd38ae8` (T150, PR #141).
     - **Decisão aprovada, literalmente (06/10/2026):** _"Aprovo as recomendações 1 a 9 para o
       escopo do gestor e DP-23"_. Formalizada na
@@ -986,6 +988,62 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
     - **Dívidas mantidas, não tratadas:** FK de `unit_id`/`team_id` (ADR 0003, nunca adicionada);
       convergência de atributos do seed (`DEMO-A-0001`/`cargoId`); caixa baixa e zero-width no
       verificador; decisões do pacote de integração de ponto (T148).
+
+49. **T152 - Hardening do verificador do Spec Kit: declaração de entrega vs. citação**
+    - **Estado:** em revisão. Branch `codex/t152-hardening-spec-kit-squash`, a partir do squash
+      `a356418abb34568cf7cdde20348c1cf042a5828f` (T151, PR #142).
+    - **Escopo:** exclusivamente o verificador e a recuperação da CI de `main`. O módulo funcional
+      antes cogitado para a T152 — **resumo de jornada** (`DP-3J-12`) e **andamento de
+      solicitações** (`PD-SOL-05`) — **não foi iniciado** e segue sem contrato seguro.
+    - **Causa, provada por reprodução.** O workflow injeta
+      `github.event.pull_request.title || github.event.head_commit.message`. Em Pull Request isso é
+      **uma linha**; no push para `main` é a **mensagem inteira** do squash — 348 linhas no caso da
+      T151. A regra (b) da T149 varria todo o texto atrás de identificador futuro, e o corpo do
+      squash menciona a T152 justamente para dizer que ela **não foi iniciada**. O fallback local do
+      próprio CLI usa `git log -1 --pretty=%s`, só o assunto: o mesmo commit recebia **três
+      vereditos** — passava no PR, passava local e reprovava no push.
+    - **Regra por posição, tentada e descartada.** A primeira versão tratava a "primeira linha com
+      identificador" como declaração. A revisão adversarial derrubou com um caso que não exige
+      má-fé: primeira linha cita `T151` (histórico), linha posterior entrega `T153`, ledger em
+      `T152` — e passava. Citar a tarefa anterior no assunto é padrão aqui
+      (`T145 — Hardening pós-T141`), então o bypass estava a um commit de distância. Posição é
+      determinística, mas não é declaração: "fica para a T153" e "entrega a T153" ocupam a mesma
+      posição e têm sentidos opostos.
+    - **Protocolo estruturado, que a substituiu.** O autor declara, em trailer auditável:
+      `Spec-Kit-Entrega: T###` e `Spec-Kit-Nao-Entrega: T###`. Quando obrigatório:
+      (1) existe exatamente **uma declaração lógica** de entrega — um `Spec-Kit-Entrega` não vazio,
+      que pode listar uma ou mais tarefas; (2) toda tarefa declarada existe em `tasks.md` **e** em
+      `execution-status.md` e não está acima de `lastRecordedTask`;
+      (3) **todo** identificador acima de `lastRecordedTask`, em **qualquer** posição do contexto,
+      está classificado num dos dois trailers; (4) nenhum identificador nos dois ao mesmo tempo;
+      (5) trailers **idênticos após normalização em conjunto são idempotentes** (a mesma declaração
+      repetida, não duas decisões); trailer **com conteúdo divergente**, vazio, malformado, ausente
+      ou com o mesmo identificador nas duas classificações **reprova**.
+    - **Corte de adoção, objetivo e sem hash:** obrigatório quando
+      `lastRecordedTask >= 152` (`TAREFA_DE_ADOCAO_DO_PROTOCOLO`). Abaixo disso, **modo histórico**:
+      só a regra (a), porque exigir trailer de commit que já está em `main` seria exigir reescrita
+      de histórico. A constante vive no código, não em `sync-state.json` — em estado, a mesma
+      mudança a fiscalizar poderia baixar o corte e desligar o protocolo junto.
+    - **Onde os trailers precisam estar:** o squash do GitHub monta a mensagem com o título da PR
+      mais as mensagens dos **commits** (não a descrição da PR); o evento `pull_request` entrega
+      título e descrição. Como o verificador roda nos dois, os trailers vão **na mensagem de
+      commit** e **na descrição da PR**. O workflow passou a fornecer título + corpo no evento de
+      PR para que os dois vejam a mesma informação, e o fallback local passou de `--pretty=%s` para
+      `--pretty=%B` pelo mesmo motivo: uma noção só de contexto.
+    - **Sem perda de detecção:** as 40 integrações de `main` seguem válidas em modo histórico, sem
+      hash listado. Entrega declarada acima do ledger **continua reprovando**.
+    - **Duplicidade é união idempotente.** A mesma declaração chega por canais diferentes, e o
+      squash concatena as mensagens de todos os commits: duas linhas iguais são uma declaração, não
+      duas decisões. Conteúdos divergentes continuam falhando como contradição.
+    - **A CI da PR valida a mensagem prevista do squash**, além do contexto de revisão. É o que
+      impede "PR verde, `main` vermelha" — a forma que já quebrou a `main` duas vezes aqui.
+    - **O estado não recua:** o CLI recusa `lastRecordedTask` abaixo da adoção. Modo histórico
+      existe só no núcleo puro, para replay em teste.
+    - **Não tratado, e declarado:** caixa baixa (`t153`) e zero-width continuam escapando de
+      `IDENTIFICADOR`, como antes desta tarefa. Dívida anterior, com teste que a torna explícita.
+    - **Preserva a T149:** as proteções contra estado inválido (`validarEstado`) e o fail-closed de
+      contexto ausente seguem intactos e têm teste próprio.
+    - **Sem whitelist de identificadores** e sem resolver por avanço de `lastRecordedTask`.
 
 ## Regra obrigatória para as próximas tarefas
 

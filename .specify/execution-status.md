@@ -490,9 +490,9 @@ campo existente; e não aprova nenhum item do pacote da T148.
 
 ## Gestor consultivo — T151 (fundação segura, decisão aprovada)
 
-| Tarefa | Estado         | Resultado principal                                                                                                                                                                                                                       |
-| ------ | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| T151   | **Em revisão** | Formaliza a decisão do proprietário na [ADR 0015](../docs/adr/0015-escopo-do-gestor-consultivo-e-vinculo-conta-colaborador.md) e entrega a fundação: três tabelas, RBAC próprio, administração pelo RH e consulta consultiva pelo gestor. |
+| Tarefa | Estado                                    | Resultado principal                                                                                                                                                                                                                       |
+| ------ | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T151   | **Integrada** (PR #142, squash `a356418`) | Formaliza a decisão do proprietário na [ADR 0015](../docs/adr/0015-escopo-do-gestor-consultivo-e-vinculo-conta-colaborador.md) e entrega a fundação: três tabelas, RBAC próprio, administração pelo RH e consulta consultiva pelo gestor. |
 
 **A decisão, literalmente.** Em **06/10/2026** o proprietário aprovou:
 _"Aprovo as recomendações 1 a 9 para o escopo do gestor e DP-23"_. A ADR 0015 registra as nove
@@ -553,6 +553,107 @@ matricial; sem liberar departamento ou empresa; sem folha, eSocial, benefícios 
 _"até a Etapa 1 criar essas entidades"_ — condição cumprida, FK nunca adicionada; a convergência de
 atributos do seed (`DEMO-A-0001`/`cargoId`); as limitações de caixa baixa e zero-width no
 verificador; e as decisões do pacote de integração de ponto (T148).
+
+## Verificador do Spec Kit — T152 (hardening, declaração vs. citação)
+
+| Tarefa | Estado         | Resultado principal                                                                                                                                   |
+| ------ | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T152   | **Em revisão** | Separa **declaração de entrega** de **citação em prosa** no verificador, recuperando a CI de `main` sem afrouxar a detecção de tarefa não registrada. |
+
+**Escopo, explicitamente.** A T152 é **somente** o hardening do verificador. O módulo funcional
+antes cogitado sob este número — **resumo de jornada** (`DP-3J-12`) e **andamento de solicitações**
+(`PD-SOL-05`) — **não foi iniciado**, continua sem contrato seguro e permanece fora.
+
+**O que quebrou, provado por reprodução e não por hipótese.** O squash da T151 (`a356418`) entrou em
+`main` com E2E e Migration smoke verdes, e Quality gates vermelho num ponto só: `spec:check` disse
+_"T152 aparece na mudança, mas lastRecordedTask=151"_. O workflow injeta
+`github.event.pull_request.title || github.event.head_commit.message`. Em Pull Request isso é **uma
+linha**; no push para `main` é a **mensagem inteira** — 348 linhas. A regra (b) da T149 varria todo
+o texto atrás de identificador futuro, e o corpo do squash cita a T152 exatamente para registrar que
+ela **não foi iniciada**. Dizer "isto fica para a T152" virava "estou entregando a T152".
+
+O mesmo commit recebia **três vereditos**: passava no PR, passava na execução local — o fallback do
+CLI usa `git log -1 --pretty=%s`, só o assunto — e reprovava no push. Um portão que muda de resposta
+conforme o evento não é mais rigoroso; é não determinístico.
+
+**A regra por posição foi tentada e descartada.** A primeira versão tratava a "primeira linha com
+identificador" como declaração. A revisão adversarial da PR #143 derrubou com um caso que não exige
+má-fé nenhuma:
+
+```
+Retoma o critério da T151 e ajusta o verificador   <- 1ª linha, histórico
+
+Esta mudança entrega a T153.                       <- entrega real
+```
+
+Com o ledger em T152, a T153 passava sem registro. Citar a tarefa anterior no assunto é padrão aqui
+(`T145 — Hardening pós-T141`, `T148 — Convergência da T147`), então o bypass estava a um commit de
+distância. **Posição é determinística, mas não é declaração:** "fica para a T153" e "entrega a T153"
+ocupam a mesma posição e têm sentidos opostos, e nenhuma heurística de texto os separa.
+
+**O protocolo que a substituiu.** O autor declara, em trailer estruturado e auditável:
+
+```
+Spec-Kit-Entrega: T152
+Spec-Kit-Nao-Entrega: T153
+```
+
+Quando obrigatório: existe exatamente **uma declaração lógica** de entrega — um `Spec-Kit-Entrega`
+não vazio, que pode listar uma ou mais tarefas; toda tarefa declarada existe nos **dois** artefatos e
+não está acima de `lastRecordedTask`; **todo** identificador acima de `lastRecordedTask`, em
+**qualquer** posição, está classificado num dos dois trailers; nenhum aparece nos dois; trailers
+**idênticos após normalização em conjunto são idempotentes** (a mesma declaração repetida, não duas
+decisões); e trailer **com conteúdo divergente**, vazio, malformado, ausente ou com o mesmo
+identificador nas duas classificações **reprova**. O corpo volta a ser varrido inteiro — o bypass
+some porque a menção deixa de ser julgada pelo lugar e passa a depender de o autor dizer o que ela é.
+Esquecer de classificar falha **fechado**.
+
+**Corte de adoção, objetivo e sem hash:** obrigatório quando `lastRecordedTask >= 152`
+(`TAREFA_DE_ADOCAO_DO_PROTOCOLO`). Abaixo disso, **modo histórico** — só a regra (a), porque exigir
+trailer de commit que já está em `main` seria exigir reescrita de histórico. Não há lista de hashes
+nem exceção por identificador. A constante vive no **código**, não em `sync-state.json`: em estado,
+a mesma mudança que deveria ser fiscalizada poderia baixar o corte e desligar o protocolo junto.
+
+**Uma noção só de contexto.** O squash do GitHub monta a mensagem com o título da PR mais as
+mensagens dos **commits** — não a descrição da PR; o evento `pull_request` entrega título e
+descrição. Os trailers vão, portanto, **na mensagem de commit** e **na descrição da PR**. O workflow
+passou a fornecer título + corpo no evento de PR, e o fallback local passou de `--pretty=%s` para
+`--pretty=%B`: antes, o mesmo commit tinha veredito diferente local e na CI.
+
+**Duplicidade é união idempotente, não duas decisões.** A mesma declaração chega por canais
+diferentes — o evento de PR traz título e descrição; o push traz o squash, que concatena as
+mensagens de **todos** os commits. Uma PR de três commits em que dois declaram
+`Spec-Kit-Entrega: T152` produz duas linhas iguais, e isso não é contradição. A primeira versão
+reprovava qualquer repetição, e isso deixava a PR verde e quebrava `main` no merge — o mesmo modo
+de falha que a tarefa existe para eliminar. A regra compara **conjuntos normalizados**: equivalentes
+se fundem (inclusive em ordem diferente), divergentes continuam sendo contradição.
+
+**A CI da PR valida também a mensagem PREVISTA do squash.** Duas perguntas distintas, dois passos:
+o contexto de revisão (título + descrição) e o texto que existirá depois do merge (título + todas as
+mensagens de commit, lidas de `base..HEAD`). Qualquer um que falhe derruba o Quality gate antes do
+merge. Título e número chegam por ambiente; o histórico é lido pelo próprio script com argumentos
+fixos — conteúdo de PR nunca entra em comando de shell.
+
+**O estado não recua.** O CLI real recusa `lastRecordedTask` abaixo da adoção: ele vive numa árvore
+que já contém o protocolo, então um ledger abaixo do corte não é modo histórico, é estado
+incoerente. Sem essa guarda, a mesma mudança que entrega uma tarefa nova poderia rebaixar o ledger
+e desligar a fiscalização junto. O modo histórico permanece **só no núcleo puro**, para replay de
+integrações anteriores à adoção em teste.
+
+**Preso por mutação, nos cinco sentidos.** Voltar a reprovar duplicidade idêntica quebra o contexto
+real do squash; aceitar divergência quebra outro; remover a validação do squash na PR quebra a
+guarda do workflow; remover a guarda de rebaixamento quebra o teste do CLI; ignorar futura não
+classificada quebra um quinto.
+
+**Não tratado, e declarado:** caixa baixa (`t153`) e zero-width continuam escapando de
+`IDENTIFICADOR`, exatamente como antes desta tarefa. É dívida anterior, já registrada, com teste
+próprio que a torna explícita em vez de silenciosa.
+
+**Proteções da T149 preservadas:** `validarEstado` (estado inválido falha fechado) e o fail-closed
+de contexto ausente seguem intactos, com teste próprio nesta tarefa.
+
+**Nada funcional foi tocado:** sem alteração em API de negócio, schema Prisma, migrations de
+negócio, seed, Docker ou interface web.
 
 ## Próxima ação autorizável
 

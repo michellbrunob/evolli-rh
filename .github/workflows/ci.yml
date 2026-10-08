@@ -19,7 +19,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
+      # `fetch-depth: 0`: a previsao do squash le `base..HEAD`, e o checkout
+      # raso (padrao 1) nao tem esse historico. Vale so neste job.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -31,8 +35,30 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Verificar sincronização do Spec Kit
         env:
-          SPEC_KIT_CHANGE_CONTEXT: ${{ github.event.pull_request.title || github.event.head_commit.message }}
+          # Titulo + corpo nos dois eventos. No push `pull_request.body` e
+          # vazio e `head_commit.message` ja traz assunto e corpo do squash;
+          # no PR, as duas linhas se somam. Sem isso o evento de PR via so o
+          # titulo e nao enxergava os trailers Spec-Kit-Entrega da descricao.
+          SPEC_KIT_CHANGE_CONTEXT: |
+            ${{ github.event.pull_request.title || github.event.head_commit.message }}
+
+            ${{ github.event.pull_request.body }}
         run: pnpm spec:check
+      # Segunda pergunta, distinta da primeira: o texto que EXISTIRA depois do
+      # merge tambem passa? O squash concatena as mensagens de todos os
+      # commits, e e nesse texto que `main` sera validada. Sem este passo, uma
+      # PR fica verde e a `main` quebra — o que ja aconteceu duas vezes nesta
+      # linha de trabalho (T151 e a primeira versao da T152).
+      #
+      # Titulo e numero chegam por AMBIENTE; o historico e lido pelo proprio
+      # script com argumentos fixos. Conteudo de PR nunca entra em comando.
+      - name: Validar a mensagem prevista do squash
+        if: github.event_name == 'pull_request'
+        env:
+          SPEC_KIT_PR_TITLE: ${{ github.event.pull_request.title }}
+          SPEC_KIT_PR_NUMBER: ${{ github.event.pull_request.number }}
+          SPEC_KIT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: pnpm spec:check:squash
       - run: pnpm format:check
       - run: pnpm lint
       - run: pnpm typecheck

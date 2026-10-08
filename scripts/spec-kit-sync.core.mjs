@@ -61,6 +61,104 @@
  * O que NÃO muda: a tarefa efetivamente entregue continua obrigatória nos dois
  * artefatos, e citar tarefa futura continua reprovando. Nenhuma lista de
  * exceções, nenhum identificador tratado como caso especial.
+ *
+ * ---------------------------------------------------------------------------
+ * A CORREÇÃO DA T152: ONDE MORA A DECLARAÇÃO DE ENTREGA
+ *
+ * A T149 resolveu metade do problema de escopo. Ela parou de cobrar registro de
+ * referência HISTÓRICA citada em prosa, mas manteve a cobrança sobre referência
+ * FUTURA em qualquer posição do texto. O squash da T151 (`a356418`) caiu
+ * exatamente aí: o assunto entrega T151, e o corpo — 348 linhas — menciona a
+ * T152 para dizer que ela **não foi iniciada**. Dizer "isto fica para a T152"
+ * virava "estou entregando a T152".
+ *
+ * O defeito é verificável e não depende de interpretação: o workflow injeta
+ * `github.event.pull_request.title || github.event.head_commit.message`. No
+ * Pull Request isso é UMA linha; no push para `main` é a mensagem INTEIRA. E o
+ * fallback local deste mesmo verificador usa `git log -1 --pretty=%s`, que é só
+ * o assunto. O mesmo commit, com o mesmo conteúdo, recebia TRÊS vereditos:
+ * passava no PR, passava local e reprovava no push. Um portão que muda de
+ * resposta conforme o evento não é mais rigoroso — é não determinístico.
+ *
+ * A regra agora distingue DECLARAÇÃO de CITAÇÃO:
+ *
+ *   DECLARAÇÃO = a primeira linha não vazia que nomeia alguma tarefa.
+ *   CITAÇÃO    = tudo o que vier depois dela.
+ *
+ * Só a declaração responde "o que esta mudança entrega". O resto é prosa.
+ *
+ * POR QUE A PRIMEIRA LINHA *COM IDENTIFICADOR*, e não simplesmente a primeira
+ * linha: em seis integrações reais deste repositório (`#121` a `#127`) o GitHub
+ * gravou `@` como assunto e empurrou o assunto verdadeiro para a primeira linha
+ * do corpo — `feat(web): Pessoas > Documentos funcional (T133)`. Uma regra
+ * "só o assunto" ficaria cega justamente nesses seis. Procurar a primeira linha
+ * que nomeia tarefa cobre os dois formatos sem tratar nenhum como exceção.
+ *
+ * A regra foi conferida contra as 40 integrações em `main`: em todas elas a
+ * declaração extraída é exatamente a tarefa entregue, incluindo as seis de
+ * assunto `@`. Nenhuma detecção foi perdida; o que sumiu foi o ruído — o squash
+ * da T149 citava onze identificadores em prosa, e todos eram exigência.
+ *
+ * ---------------------------------------------------------------------------
+ * POR QUE A POSIÇÃO NÃO BASTOU, E O QUE A SUBSTITUIU (correção de B1)
+ *
+ * A revisão adversarial da PR #143 derrubou a regra por posição com um caso
+ * que não exige má-fé nenhuma:
+ *
+ *     Retoma o critério da T151 e ajusta o verificador   <- 1ª linha, histórico
+ *
+ *     Esta mudança entrega a T153.                       <- entrega real
+ *
+ * Com o ledger em T152, a T153 passava sem registro. O assunto citar a tarefa
+ * anterior é padrão neste repositório (`T145 — Hardening pós-T141`,
+ * `T148 — Convergência da T147`), então o bypass estava a um commit de
+ * distância. Posição é determinística, mas não é declaração: "fica para a
+ * T153" e "entrega a T153" ocupam a mesma posição e têm sentidos opostos.
+ *
+ * Nenhuma heurística de texto separa os dois. O que separa é o AUTOR dizer,
+ * de forma estruturada e auditável, o que está entregando:
+ *
+ *     Spec-Kit-Entrega: T152
+ *     Spec-Kit-Nao-Entrega: T153
+ *
+ * REGRA, quando o protocolo é obrigatório:
+ *
+ *   1. há exatamente um trailer `Spec-Kit-Entrega`, com ao menos um `T###`;
+ *   2. toda tarefa declarada como entrega existe em `tasks.md` E em
+ *      `execution-status.md`, e não está acima de `lastRecordedTask`;
+ *   3. TODO identificador acima de `lastRecordedTask` encontrado em QUALQUER
+ *      posição do contexto está classificado — em entrega ou em não-entrega.
+ *      Citar sem classificar reprova;
+ *   4. nenhum identificador aparece nos dois trailers ao mesmo tempo;
+ *   5. trailer ausente, duplicado, malformado ou contraditório reprova.
+ *
+ * O corpo volta a ser varrido por inteiro (item 3): o bypass some porque a
+ * menção não é mais julgada pelo lugar onde aparece, e sim pela classificação
+ * que o autor deu a ela. Esquecer de classificar falha FECHADO.
+ *
+ * ONDE OS TRAILERS PRECISAM ESTAR. O squash do GitHub monta a mensagem com o
+ * título da PR mais as mensagens dos COMMITS — não a descrição da PR. Já o
+ * evento `pull_request` entrega título e descrição. Como o verificador roda
+ * nos dois, os trailers precisam aparecer **na mensagem de commit** (para o
+ * push do squash) **e na descrição da PR** (para o evento de PR). O workflow
+ * passou a fornecer título + descrição no evento de PR exatamente para que os
+ * dois eventos vejam a mesma informação.
+ *
+ * CORTE DE ADOÇÃO, objetivo e sem hash: o protocolo é obrigatório quando
+ * `lastRecordedTask >= TAREFA_DE_ADOCAO_DO_PROTOCOLO` (a T152, que o
+ * introduziu). Abaixo disso o contexto é MODO HISTÓRICO: só a regra (a) vale,
+ * porque exigir trailer de commit que já está em `main` seria exigir reescrita
+ * de histórico. Não há lista de hashes nem exceção por identificador — o corte
+ * é um número de tarefa, versionado neste arquivo, e movê-lo exige PR.
+ *
+ * A constante vive no CÓDIGO e não em `sync-state.json` de propósito: em
+ * estado, a mesma mudança que deveria ser fiscalizada poderia baixar o corte
+ * e desligar o protocolo junto.
+ *
+ * NÃO TRATADO, e declarado: identificador em caixa baixa (`t153`) e com
+ * caractere de largura zero continuam escapando de `IDENTIFICADOR`, exatamente
+ * como antes desta tarefa. É dívida anterior, já registrada no ledger, e esta
+ * tarefa não a corrige nem alega corrigir.
  */
 
 /** Faixas: `T104–T109`, `T104—T109`, `T104-T109` e a forma textual `T001 a T049`. */
@@ -209,6 +307,209 @@ export function resolverContexto({ variavelDeAmbiente, lerSubject }) {
 }
 
 /**
+ * Tarefa que introduziu o protocolo de trailers. A partir dela, declarar é
+ * obrigatório.
+ *
+ * Corte por NÚMERO DE TAREFA, nunca por hash: listar commits exigiria manter a
+ * lista, e uma lista que envelhece é a forma mais silenciosa de um gate
+ * afrouxar. Abaixo do corte o contexto é histórico — aqueles commits já estão
+ * em `main` e não podem ganhar trailer sem reescrita de histórico.
+ */
+export const TAREFA_DE_ADOCAO_DO_PROTOCOLO = 152;
+
+/** `Spec-Kit-Entrega: T152, T153` — chave no início da linha, sem indentação. */
+const TRAILER_ENTREGA = /^Spec-Kit-Entrega:(.*)$/i;
+/** `Spec-Kit-Nao-Entrega: T153` — citação deliberada, não entrega. */
+const TRAILER_NAO_ENTREGA = /^Spec-Kit-Nao-Entrega:(.*)$/i;
+
+/** Valor aceito num trailer: `T###`, separados por vírgula e/ou espaço. */
+const VALOR_DE_TRAILER = /^T\d{3}$/;
+
+/**
+ * O protocolo é obrigatório para este estado?
+ *
+ * Lê `lastRecordedTask`, que é a tarefa que a mudança declara ter registrado.
+ * Um contexto histórico (replay de squash antigo, cujo estado tinha
+ * `lastRecordedTask` menor) cai em modo histórico sozinho, sem exceção
+ * codificada.
+ */
+export function protocoloObrigatorio(state) {
+  // Tipo ESTRITO, sem coerção: `Number("152")` daria 152 e ligaria o protocolo
+  // a partir de um estado que `validarEstado` recusa. Quem decide sobre estado
+  // inválido é `validarEstado`, que roda antes e encerra a avaliação — aqui a
+  // resposta para entrada inválida é simplesmente "não sei dizer".
+  const registrada = state?.lastRecordedTask;
+  return (
+    typeof registrada === "number" &&
+    Number.isSafeInteger(registrada) &&
+    registrada >= TAREFA_DE_ADOCAO_DO_PROTOCOLO
+  );
+}
+
+/** Conjunto canônico: sem repetidos e em ordem, para comparar equivalência. */
+function normalizarConjunto(ids) {
+  return [...new Set(ids)].sort();
+}
+
+/**
+ * Monta a mensagem que o squash do GitHub produzirá para uma PR.
+ *
+ * Pura, para que a CI possa VALIDAR ANTES DO MERGE o texto que só existiria
+ * depois dele. As duas quebras da `main` nesta linha de trabalho — a T151 e a
+ * primeira versão da T152 — tinham a mesma forma: PR verde, `main` vermelha,
+ * porque o contexto da revisão não é o contexto do push.
+ *
+ * Formato conferido contra o squash real `a356418`: o assunto é o título da PR
+ * com `(#N)`, e o corpo concatena cada commit como `* <assunto>` seguido do
+ * próprio corpo. É uma aproximação do que o GitHub gera, e serve ao que
+ * importa aqui: todos os trailers aparecem, na coluna zero, como aparecerão
+ * depois do merge.
+ */
+export function montarContextoDeSquash({ titulo, numeroPr, mensagens }) {
+  const cabecalho = numeroPr
+    ? `${titulo} (#${numeroPr})`
+    : String(titulo ?? "");
+  const corpo = (mensagens ?? [])
+    .map((m) => String(m ?? "").trim())
+    .filter(Boolean)
+    .map((m) => {
+      const linhas = m.split(/\r?\n/);
+      const assunto = linhas[0];
+      const restante = linhas.slice(1).join("\n").trim();
+      return restante ? `* ${assunto}\n\n${restante}` : `* ${assunto}`;
+    })
+    .join("\n\n");
+  return corpo ? `${cabecalho}\n\n${corpo}\n` : `${cabecalho}\n`;
+}
+
+/**
+ * Lê os trailers do contexto, com UNIÃO IDEMPOTENTE por classe.
+ *
+ * Devolve `{ entrega, naoEntrega, declarouEntrega, falhas }`. `falhas` não
+ * vazio significa protocolo violado — e, quando ele é obrigatório, isso basta
+ * para reprovar.
+ *
+ * ### Por que repetição idêntica NÃO é duas decisões
+ *
+ * A mesma declaração chega ao verificador por canais diferentes: o evento
+ * `pull_request` traz título e descrição; o push traz a mensagem do squash,
+ * que o GitHub monta **concatenando as mensagens de todos os commits**. Uma PR
+ * de três commits em que dois declaram `Spec-Kit-Entrega: T152` produz duas
+ * linhas idênticas no squash — e isso não é contradição, é a mesma frase dita
+ * duas vezes pelo mesmo autor sobre a mesma entrega.
+ *
+ * A primeira versão desta função reprovava qualquer repetição. Testado contra
+ * o squash real previsto desta própria PR, isso deixava a PR verde e quebrava
+ * `main` depois do merge — exatamente o modo de falha que a T152 existe para
+ * eliminar. A regra passou a comparar CONJUNTOS normalizados: repetições
+ * equivalentes se fundem, divergência continua sendo contradição.
+ *
+ * Normalizar é ordenar e remover repetidos, então `T151, T152` e `T152 T151`
+ * são a mesma declaração — a ordem em que o autor listou não carrega sentido.
+ *
+ * ### O que continua falhando
+ *
+ *   - conteúdo divergente entre trailers da mesma classe (duas decisões);
+ *   - o mesmo identificador nas duas classes (classificação impossível);
+ *   - valor vazio, token fora de `T###`, separador inválido;
+ *   - trailer indentado — não é trailer, é prosa (ver `texto` abaixo).
+ */
+export function lerTrailers(contexto) {
+  const falhas = [];
+  /** Conjuntos normalizados vistos por classe, para comparar equivalência. */
+  const vistos = { entrega: [], naoEntrega: [] };
+  const tocado = { entrega: false, naoEntrega: false };
+
+  if (typeof contexto !== "string") {
+    return { entrega: [], naoEntrega: [], declarouEntrega: false, falhas };
+  }
+
+  for (const linha of contexto.split(/\r?\n/)) {
+    // COLUNA ZERO, sem aparar à esquerda. Um trailer é declaração; um exemplo
+    // indentado dentro da prosa — como o do commit que documenta este
+    // protocolo — é texto. Sem essa exigência, explicar o protocolo numa
+    // mensagem de commit disparava "trailer duplicado", e a única saída seria
+    // não poder falar dele. É também a convenção do git: trailer vive na
+    // margem.
+    const texto = linha.replace(/\s+$/, "");
+    for (const [chave, padrao, rotulo] of [
+      ["entrega", TRAILER_ENTREGA, "Spec-Kit-Entrega"],
+      ["naoEntrega", TRAILER_NAO_ENTREGA, "Spec-Kit-Nao-Entrega"],
+    ]) {
+      const casado = texto.match(padrao);
+      if (!casado) continue;
+
+      // Marca a classe como declarada mesmo se o valor for inválido: assim o
+      // erro reportado é "malformado", e não também "ausente".
+      tocado[chave] = true;
+
+      const tokens = casado[1]
+        .split(/[,\s]+/)
+        .map((t) => t.trim())
+        .filter(Boolean);
+
+      if (tokens.length === 0) {
+        falhas.push(`Trailer ${rotulo} está vazio.`);
+        continue;
+      }
+
+      const invalidos = tokens.filter((t) => !VALOR_DE_TRAILER.test(t));
+      if (invalidos.length > 0) {
+        falhas.push(
+          `Trailer ${rotulo} tem valor malformado (${invalidos.join(", ")}): use o formato T000, separado por vírgula ou espaço.`,
+        );
+        // Linha inválida não entra na comparação de equivalência: ela já
+        // reprovou, e deixá-la participar produziria um segundo erro de
+        // "divergência" sobre o mesmo defeito.
+        continue;
+      }
+
+      vistos[chave].push(normalizarConjunto(tokens));
+    }
+  }
+
+  const resolvido = {};
+  for (const [chave, rotulo] of [
+    ["entrega", "Spec-Kit-Entrega"],
+    ["naoEntrega", "Spec-Kit-Nao-Entrega"],
+  ]) {
+    const conjuntos = vistos[chave];
+    if (conjuntos.length === 0) {
+      resolvido[chave] = [];
+      continue;
+    }
+    const distintos = [...new Set(conjuntos.map((c) => c.join(",")))];
+    if (distintos.length > 1) {
+      falhas.push(
+        `Trailer ${rotulo} aparece com conteúdos divergentes (${distintos.map((d) => `[${d}]`).join(" vs ")}): a declaração precisa ser uma só.`,
+      );
+    }
+    // União idempotente: equivalentes se fundem. Em caso de divergência o
+    // conjunto resolvido não é usado para aprovar — a falha acima já reprova.
+    resolvido[chave] = normalizarConjunto(conjuntos.flat());
+  }
+
+  // Contradição entre classes: o mesmo identificador declarado como entrega e
+  // como não-entrega não tem leitura possível, e escolher um lado seria
+  // inventar a intenção do autor.
+  const nosDois = resolvido.entrega.filter((id) =>
+    resolvido.naoEntrega.includes(id),
+  );
+  for (const id of nosDois) {
+    falhas.push(
+      `${id} está declarado como entrega E como não-entrega: a classificação precisa ser uma só.`,
+    );
+  }
+
+  return {
+    entrega: resolvido.entrega,
+    naoEntrega: resolvido.naoEntrega,
+    declarouEntrega: tocado.entrega,
+    falhas,
+  };
+}
+
+/**
  * Tarefas que a mudança entrega, segundo o Spec Kit — não segundo o texto.
  *
  * Janela `(lastIntegratedTask, lastRecordedTask]`. Quando nada está aberto
@@ -269,12 +570,58 @@ export function avaliarSincronia({ state, tasks, ledger, contexto }) {
     return falhas;
   }
 
-  // (b) Do texto livre, só interessa o que é futuro: tarefa citada e não
-  //     registrada. Referência histórica é narrativa legítima.
-  for (const { id, numero } of identificadoresCitados(contexto)) {
-    if (numero > Number(state?.lastRecordedTask)) {
+  // (b) MODO HISTÓRICO x PROTOCOLO. Abaixo do corte de adoção não há trailer a
+  //     exigir — aqueles commits já estão em `main`. Acima dele, declarar é
+  //     obrigatório e a ausência falha fechado.
+  if (!protocoloObrigatorio(state)) return falhas;
+
+  const registrada = Number(state?.lastRecordedTask);
+  const {
+    entrega,
+    naoEntrega,
+    declarouEntrega,
+    falhas: falhasDeTrailer,
+  } = lerTrailers(contexto);
+  falhas.push(...falhasDeTrailer);
+
+  if (!declarouEntrega) {
+    falhas.push(
+      `Trailer Spec-Kit-Entrega ausente: a partir da T${TAREFA_DE_ADOCAO_DO_PROTOCOLO} toda mudança declara o que entrega.`,
+    );
+    // Sem declaração não há o que conferir contra os artefatos, e varrer
+    // citações só produziria ruído sobre um protocolo já violado.
+    return falhas;
+  }
+
+  // (b1) O que foi declarado como entrega precisa existir nos dois artefatos e
+  //      não pode estar acima do que o Spec Kit registra.
+  for (const id of entrega) {
+    const numero = Number(id.slice(1));
+    if (numero > registrada) {
       falhas.push(
-        `${id} aparece na mudança, mas lastRecordedTask=${state?.lastRecordedTask}: registre a tarefa no Spec Kit antes de citá-la como entrega.`,
+        `${id} está declarado em Spec-Kit-Entrega, mas lastRecordedTask=${registrada}: registre a tarefa no Spec Kit antes de entregá-la.`,
+      );
+      continue;
+    }
+    const faltas = [];
+    if (!emTasks.has(id)) faltas.push("tasks.md");
+    if (!noLedger.has(id)) faltas.push("execution-status.md");
+    if (faltas.length > 0) {
+      falhas.push(
+        `${id} está declarado em Spec-Kit-Entrega, mas não está registrado em ${faltas.join(" nem em ")}.`,
+      );
+    }
+  }
+
+  // (b2) Todo identificador FUTURO citado em qualquer posição precisa estar
+  //      classificado. É isto que fecha o bypass da posição: a menção deixa de
+  //      ser julgada pelo lugar onde aparece e passa a depender de o autor
+  //      dizer o que ela é. Esquecer de classificar reprova.
+  const classificados = new Set([...entrega, ...naoEntrega]);
+  for (const { id, numero } of identificadoresCitados(contexto)) {
+    if (numero > registrada && !classificados.has(id)) {
+      falhas.push(
+        `${id} aparece no contexto, está acima de lastRecordedTask=${registrada} e não foi classificado: declare-o em Spec-Kit-Entrega ou em Spec-Kit-Nao-Entrega.`,
       );
     }
   }
