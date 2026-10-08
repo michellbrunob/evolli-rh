@@ -64,6 +64,11 @@ import {
   DOCUMENTOS_METADADOS_TITULO_ID,
   DocumentosScreen,
 } from "../screens/documentos";
+import {
+  EQUIPE_TITULO_ID,
+  EquipeScreen,
+  PAPEIS_COM_CONSULTA_DE_EQUIPE,
+} from "../screens/equipe";
 import { CadastrosScreen, HORARIOS_TITULO_ID } from "../screens/horarios";
 import { InicioVisaoGeralScreen } from "../screens/inicio";
 import { COLABORADORES_TITULO_ID, PessoasScreen } from "../screens/pessoas";
@@ -89,6 +94,7 @@ const TITULO_ID_POR_DESTINO: Record<string, string> = {
   inicio: "inicio-visao-geral-titulo",
   "solicitacoes-rh": "central-solicitacoes-rh-titulo",
   "contas-acesso": CONTAS_ACESSO_TITULO_ID,
+  equipe: EQUIPE_TITULO_ID,
 };
 
 function conteudoDoDestino(
@@ -133,6 +139,9 @@ function conteudoDoDestino(
       <ContasAcessoScreen onSessaoAtualEncerrada={onSessaoAtualEncerrada} />
     );
   }
+  if (destinoId === "equipe") {
+    return <EquipeScreen onSessaoAtualEncerrada={onSessaoAtualEncerrada} />;
+  }
   const destino = DESTINOS_PAINEL.find((item) => item.id === destinoId);
   return (
     <ModuloEmPreparacao
@@ -140,6 +149,41 @@ function conteudoDoDestino(
       descricao="Este módulo ainda está em preparação."
     />
   );
+}
+
+/**
+ * Destino em que cada papel ATERRISSA. Não é autorização, e a distinção é a
+ * coisa mais importante deste arquivo: este mapa não concede nem nega nada.
+ * O RBAC decide cada requisição no servidor, e a `EquipeScreen` reverifica o
+ * papel por conta própria. Aqui só se escolhe onde a pessoa começa.
+ *
+ * Por que existe (T153): o `gestor` caía em "Cadastros", cuja tela dispara
+ * `GET /v1/horarios` — capacidade que ele não tem. O resultado medido era
+ * 403 na aterrissagem e uma tela "Somente RH" como primeira impressão do
+ * produto, justamente na tarefa que lhe dá a primeira capacidade real.
+ *
+ * Só `gestor` entra aqui. Todos os demais papéis continuam em "cadastros",
+ * byte por byte como antes — esta correção não move `rh`, `dp`,
+ * `colaborador` nem `master_tecnico`.
+ */
+const DESTINO_INICIAL_POR_PAPEL: Readonly<Record<string, string>> = {
+  gestor: "equipe",
+};
+
+/** Destino padrão, inalterado desde o T044. */
+const DESTINO_PADRAO = "cadastros";
+
+/**
+ * Resolve o destino inicial a partir do papel JÁ conhecido.
+ *
+ * Síncrono de propósito: é usado como inicializador de `useState`, não como
+ * efeito. Corrigir o destino depois da montagem produziria exatamente o que
+ * esta correção elimina — o flash da tela errada e a requisição que ela
+ * dispara antes de ser trocada.
+ */
+export function destinoInicialPara(papel: string | null | undefined): string {
+  if (typeof papel !== "string") return DESTINO_PADRAO;
+  return DESTINO_INICIAL_POR_PAPEL[papel] ?? DESTINO_PADRAO;
 }
 
 export interface AppProps {
@@ -161,14 +205,38 @@ export interface AppProps {
    * respondem 404 quando desativado).
    */
   mfaDisponivel?: boolean;
+  /**
+   * T153 — papel do ator, decidido pelo SERVIDOR e repassado pelo
+   * `AutenticacaoApp` (via `GET /v1/users/me`, a mesma leitura que já traz
+   * `mfaAvailable`). Serve só para decidir se o destino "Minha equipe"
+   * aparece na navegação. Padrão `null` (seguro): sem confirmação do
+   * servidor, o destino fica oculto.
+   *
+   * Não é autorização — a `EquipeScreen` refaz a verificação por conta
+   * própria e o RBAC continua sendo a única fronteira real.
+   */
+  papelDoAtor?: string | null;
 }
 
 export function App({
   onLogout,
   onSessaoAtualEncerrada,
   mfaDisponivel = false,
+  papelDoAtor = null,
 }: AppProps = {}) {
-  const [destinoAtivoId, setDestinoAtivoId] = useState("cadastros");
+  // Inicialização SÍNCRONA com o papel já resolvido. O `AutenticacaoApp` só
+  // monta este componente depois de `GET /v1/users/me` concluir com sucesso,
+  // então `papelDoAtor` já é conhecido no primeiro render: não há destino
+  // intermediário, não há efeito de correção e, portanto, não há como a tela
+  // errada montar e disparar a requisição dela.
+  //
+  // Nunca é recalculado depois: quem navegou escolheu, e sobrescrever a
+  // escolha seria um redirecionamento surpresa. Trocar de ator remonta o
+  // componente (ver a `key` em `AutenticacaoApp`), e aí o inicializador roda
+  // de novo com o papel novo.
+  const [destinoAtivoId, setDestinoAtivoId] = useState(() =>
+    destinoInicialPara(papelDoAtor),
+  );
   const [sessoesAtivasAberto, setSessoesAtivasAberto] = useState(false);
   const [segurancaAberto, setSegurancaAberto] = useState(false);
   // "Cadastros", "Pessoas", "Ponto", "Documentos", "Portal do Colaborador" e
@@ -263,6 +331,11 @@ export function App({
         <PainelNavigation
           destinoAtivoId={destinoAtivoId}
           onSelecionar={setDestinoAtivoId}
+          destinosCondicionais={{
+            equipe:
+              papelDoAtor !== null &&
+              PAPEIS_COM_CONSULTA_DE_EQUIPE.includes(papelDoAtor),
+          }}
         />
 
         <main

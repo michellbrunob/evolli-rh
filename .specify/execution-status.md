@@ -556,9 +556,9 @@ verificador; e as decisões do pacote de integração de ponto (T148).
 
 ## Verificador do Spec Kit — T152 (hardening, declaração vs. citação)
 
-| Tarefa | Estado         | Resultado principal                                                                                                                                   |
-| ------ | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| T152   | **Em revisão** | Separa **declaração de entrega** de **citação em prosa** no verificador, recuperando a CI de `main` sem afrouxar a detecção de tarefa não registrada. |
+| Tarefa | Estado                                    | Resultado principal                                                                                                                                   |
+| ------ | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T152   | **Integrada** (PR #143, squash `3f73f4e`) | Separa **declaração de entrega** de **citação em prosa** no verificador, recuperando a CI de `main` sem afrouxar a detecção de tarefa não registrada. |
 
 **Escopo, explicitamente.** A T152 é **somente** o hardening do verificador. O módulo funcional
 antes cogitado sob este número — **resumo de jornada** (`DP-3J-12`) e **andamento de solicitações**
@@ -655,12 +655,181 @@ de contexto ausente seguem intactos, com teste próprio nesta tarefa.
 **Nada funcional foi tocado:** sem alteração em API de negócio, schema Prisma, migrations de
 negócio, seed, Docker ou interface web.
 
+## Interface web do Gestor Consultivo — T153 (somente leitura)
+
+| Tarefa | Estado               | Resultado principal                                                                                                          |
+| ------ | -------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| T153   | **Em implementação** | Interface web consultiva do gestor sobre a fundação da T151: lista da equipe autorizada e detalhe em modal, somente leitura. |
+
+**Escopo, explicitamente.** A T153 é **somente a interface web**. Consome os dois endpoints que a
+T151 já integrou e **não altera** API, schema Prisma, migration, seed, RBAC, Docker, dependências
+ou lockfile. Nenhuma capacidade nova é criada: a tela mostra o que o servidor já autoriza, e só.
+
+**O bloqueio anterior caiu, e isto é registro, não atalho.** Até a T150 o Gestor consultivo estava
+fora dos candidatos imediatos porque dependia de `DP-8` e `DP-23`. A T151 **resolveu as duas** pela
+[ADR 0015](../docs/adr/0015-escopo-do-gestor-consultivo-e-vinculo-conta-colaborador.md), no recorte
+aprovado literalmente pelo proprietário em 06/10/2026, e entregou a fundação com as invariantes no
+banco. A seção "Próxima ação autorizável" abaixo ainda carregava a leitura anterior à T151 —
+corrigida nesta convergência.
+
+**Autorização não é decidida no frontend.** O escopo sai da sessão no servidor; a `dataReferencia`
+vem na resposta e é **informativa**. A interface não oferece — e não pode oferecer — parâmetro de
+data: a ADR 0015, decisão 8, fixa que decisões de acesso usam o estado vigente, e a rota responde
+400 a qualquer query desconhecida. Esconder botão não é controle de acesso; a porta continua sendo
+`gestor_equipe` `read` no RBAC. A tela **não infere subordinação** por e-mail, nome, `unit_id`,
+`team_id` textual ou lotação: a lista é exatamente o que o servidor devolveu.
+
+**Projeção fechada, sem invenção.** A tela exibe apenas os campos da decisão 7 que a API devolve.
+Campo que a API não manda, a tela não mostra — e não preenche com placeholder.
+
+**404 é indisponibilidade, nunca enumeração.** Fora do escopo a API responde 404 (não 403, que
+confirmaria existência). A tela apresenta "não disponível", sem distinguir inexistente de alheio,
+e **nunca** exibe corpo interno de erro.
+
+**Concorrência por guarda monotônica por carregador.** Resposta obsoleta não atualiza dados, erro
+nem carregamento. Troca rápida de vínculo descarta o detalhe anterior; fechar o detalhe invalida
+sua requisição; nova tentativa mantém só a mais recente; troca de sessão limpa e invalida tudo.
+O risco que isso fecha é concreto: uma resposta tardia fazendo o dado de uma pessoa reaparecer sob
+o nome de outra.
+
+**Capacidades ausentes continuam ausentes, e declaradas.** A API devolve `resumoJornada` e
+`andamentoSolicitacoes` como `null` **de propósito**, para que o cliente não precise adivinhar se
+a capacidade existe e falhou ou se nunca existiu. A interface honra isso: **não** desenha cartão
+vazio nem dado fictício. O módulo funcional antes cogitado sob o número da T152 — **resumo de
+jornada** (`DP-3J-12`) e **andamento de solicitações** (`PD-SOL-05`) — **não foi iniciado** e segue
+sem contrato seguro.
+
+**Contratos consumidos, conferidos na fonte.** `GET /v1/gestor/equipe` devolve
+`{ dataReferencia, itens }`; cada item tem os dez campos de `comoItem`.
+`GET /v1/gestor/equipe/vinculos/:vinculoId` devolve o item mais `horarioVigente`
+e os dois campos declarados `null`. O prefixo `/v1` vem de `enableVersioning`
+(URI, `defaultVersion: "1"`), não de `setGlobalPrefix` — detalhe que, errado,
+daria 404 em produção e teste verde em jsdom. Datas chegam como ISO completo e
+são exibidas por `formatarDia`, que corta os dez primeiros caracteres sem
+recalcular fuso.
+
+**Papéis, espelhando o avaliador e nada além dele.** O RBAC concede
+`gestor_equipe`/`read` a **dois** papéis, ambos na própria empresa: `gestor` e
+`rh`. Negar `rh` na interface seria inventar restrição que o contrato não tem;
+conceder a `dp`, `colaborador`, `master_tecnico`, `admin_tecnico`,
+`financeiro`, `auditor` ou `dpo` seria conveniência contra o contrato. A
+constante `PAPEIS_COM_CONSULTA_DE_EQUIPE` é exportada justamente para que um
+teste prenda a lista.
+
+**Prova por mutação, cinco direções.** Remover a guarda monotônica do detalhe
+mata `T153.15` e `T153.16`; removê-la da lista mata `T153.14`; liberar `dp`
+mata `T153.11`, `T153.12` e `T153.A2`; parar de ocultar o destino condicional
+mata `T153.A1` e `T153.A2`.
+
+**A quinta mutação sobreviveu, e isso está registrado em vez de escondido.**
+Remover `seqDetalhe.current += 1` de `fecharDetalhe` não quebra teste nenhum.
+Investiguei a causa em vez de inventar um teste que a justificasse: com
+`vinculoAberto` nulo o modal não renderiza, e **toda** abertura já incrementa o
+contador, de modo que a resposta vencida seria descartada de qualquer forma. A
+linha permanece como defesa em profundidade — ela é o que mantém a proteção
+independente de `abrirDetalhe` continuar recarregando sempre, premissa que um
+cache futuro quebraria em silêncio — e o código diz isso com todas as letras.
+
+**375 px não tem teste automatizado, e a razão é do ambiente.** O Vitest roda
+em jsdom com `css: false` (`apps/web/vite.config.ts`): não há motor de layout,
+e nenhum teste do projeto pode medir largura, `scrollWidth` ou overflow. O que
+o teste prende é o **contrato de CSS** que de fato impede o vazamento —
+`min-width: 0` na raiz e nos filhos diretos, `position: relative` na tabela —
+mais a semântica da região rolável. A medição real fica na verificação visual,
+como o guia visual do projeto já estabelece.
+
+**B1 — o papel autorizado aterrissava numa tela proibida.** Achado pela
+revisão adversarial, medido em navegador: ao entrar, o `gestor` caía em
+"Cadastros › Horários", uma tela rotulada **"Somente RH"**, e recebia dois
+`403` em `GET /v1/horarios` antes de qualquer clique. No refresh a ordem era
+pior — `/v1/horarios` saía **antes** de `/v1/users/me`, isto é, a requisição
+proibida partia antes de o papel sequer ser conhecido.
+
+A causa não era o destino padrão: era a **fronteira de autenticação**. O
+`AutenticacaoApp` tinha três estados e tratava "sessão válida" como "pronto",
+montando o shell na hora; a leitura do ator corria em paralelo, só para
+alimentar `mfaDisponivel`. O shell montava no destino padrão e a tela dele
+disparava a consulta antes de existir papel.
+
+Corrigir só a aterrissagem não bastaria: o flash e o 403 já teriam
+acontecido. A fronteira passou a ter **cinco estados explícitos** —
+`verificando-sessao`, `login`, `resolvendo-ator`, `pronto`, `falha-ator` — e
+`<App>` só existe em `pronto`. Enquanto o ator não é conhecido, nada
+funcional monta; só um estado de carregamento acessível.
+
+**Falha fechado.** Erro em `GET /v1/users/me` — ou resposta sem `role`
+utilizável — não cai no shell com papel desconhecido: cai numa tela segura com
+nova tentativa e saída, sem expor corpo interno da API. Papel desconhecido era
+precisamente o estado que produzia o 403.
+
+**Destino inicial por papel, síncrono.** Com o ator já resolvido no primeiro
+render, `destinoInicialPara` é usado como inicializador de `useState`, não
+como efeito: não há destino intermediário, não há correção posterior e,
+portanto, não há flash nem requisição da tela errada. O mapa tem **uma
+entrada** (`gestor → equipe`) e **não é autorização** — o RBAC decide cada
+requisição e a tela reverifica o papel. `rh`, `dp`, `colaborador`,
+`master_tecnico` e os demais permanecem em "Cadastros", sem alteração. A ordem
+do menu não muda. Quem já navegou nunca é redirecionado, porque não existe
+efeito que o faça; trocar de ator remonta o shell (chave por `id`) e recalcula.
+
+**Prova de regressão:** 14 dos 19 testes novos falham na implementação
+anterior e passam na corrigida. Os 5 que passam nos dois casos são justamente
+os de **preservação** (`rh` e os quatro papéis sem a capacidade) — corretivos e
+guardas separados por construção.
+
+**Linha morta removida.** O `seqDetalhe.current += 1` de `fecharDetalhe` era
+inobservável: duas rodadas de mutação mostraram que removê-lo não quebrava
+nenhum teste, incluindo as sondas de fechar-e-reabrir. A invalidação real mora
+em `carregarDetalhe`, que incrementa em toda abertura. Removido em vez de
+justificado por teste fabricado — um guarda que não guarda nada cria confiança
+falsa.
+
+**Validação visual, em navegador real, contra a API real.** Ambiente local de
+demonstração, banco existente reaproveitado — nenhum volume foi destruído ou
+recriado. Com `gestor.alfa@evolli.local`: a lista traz **apenas**
+`DEMO-A-0201` (Pessoa Demo Alfa Turno A). Estão **ausentes**, conferidos um a
+um no DOM: `DEMO-A-0202` (outra equipe), `DEMO-A-0002` (sem equipe),
+`DEMO-A-0001` (a pessoa do próprio gestor) e `DEMO-B-0001` (empresa Beta).
+Detalhe abre em modal somente leitura; `Escape` fecha e o foco volta ao botão
+que abriu. Rede: só `GET /v1/gestor/equipe` e
+`GET /v1/gestor/equipe/vinculos/:id`, todas 200, **sem uma única query string**
+e **sem uma única mutação**. Sem overflow horizontal da página em 1265 px
+(`scrollWidth` 1265 = `clientWidth`) nem em 375 px (375 = 375), com e sem o
+modal aberto; a tabela rola por dentro (`scrollWidth` 889 contra 339).
+
+**O papel `rh` foi verificado no ambiente, e confirmou a leitura do contrato.**
+Como o RBAC também lhe concede `gestor_equipe`/`read`, ele vê o destino e
+recebe 200 — com lista vazia, porque não tem atribuição de equipe. A tela
+mostra a explicação que a ADR 0015 exigiu, não "Sem permissão". Negar `rh` na
+interface teria sido inventar uma restrição. Já `dp.alfa` vê **nove** destinos:
+"Minha equipe" não aparece.
+
+**Defeito próprio encontrado pela validação visual, e corrigido.** Os mapas de
+rótulo tinham valores que **não existem** no schema (`efetivo`, `afastado`,
+`desligado`), e a tela exibiu o enum cru `clt`. Os enums reais são
+`SituacaoVinculo = previsto | ativo | encerrado` e
+`TipoVinculo = clt | estagio | pj | temporario | outro_controlado`. Corrigido
+contra a fonte, com teste (`T153.24`) que falha se alguém reintroduzir um
+valor inventado — inventar rótulo é tão errado quanto exibir o código.
+
+**Observação pré-existente, não tratada:** o shell abre em "Cadastros" para
+todo mundo, e um `gestor` recebe 403 em `GET /v1/horarios` logo ao entrar.
+É comportamento do shell anterior a esta tarefa; mudar o destino padrão
+afetaria todos os papéis e não cabe aqui.
+
+**Fora desta entrega, explicitamente:** banco de horas, espelho de ponto, atestado, diagnóstico,
+CID ou qualquer informação de saúde, aprovações, alterações cadastrais, qualquer `POST`, `PATCH`,
+`PUT` ou `DELETE`, visão por departamento ou empresa inteira, gestão matricial, exceções
+administradas pela interface e ESS.
+
 ## Próxima ação autorizável
 
-1. **Decidir o pacote da T150** — levar `docs/decisions/pacote-decisao-escopo-do-gestor.md` a
-   Produto e RH (quem é a equipe de um gestor), TI e Segurança (como o escopo é aplicado) e
-   RH + Jurídico (limites de LGPD). Resolver `DP-8` e `DP-23` por ADR nova ou emenda formal antes
-   de qualquer código de Portal da Liderança.
+1. ~~**Decidir o pacote da T150**~~ — **cumprido pela T151.** O proprietário aprovou o recorte em
+   06/10/2026 e a decisão foi formalizada na
+   [ADR 0015](../docs/adr/0015-escopo-do-gestor-consultivo-e-vinculo-conta-colaborador.md):
+   `DP-8` e `DP-23` estão **resolvidas**, e somente no recorte aprovado. Gestão matricial
+   permanente, departamento inteiro e empresa inteira **continuam não aprovados** e seguem
+   dependendo de decisão nova.
 2. **Decidir o pacote da T148** — levar `docs/decisions/pacote-decisao-integracao-registros-ponto.md`
    a Produto, TI, RH, Jurídico/DPO e, quanto às perguntas ao fornecedor, à RWTech/Secullum. Nenhuma
    implementação de integração de ponto começa antes de §2–§6 desse pacote serem decididos e de a
@@ -670,9 +839,10 @@ negócio, seed, Docker ou interface web.
    da decisão de escopo já se mostrou fonte de confusão (ver T137). A implementação usa a fundação
    visual já congelada, sem reabrir o shell, os tokens, o padrão B ou os modais.
 4. Candidatos remanescentes: a validação com RH do catálogo de motivos, cujo mecanismo (código
-   fechado) já está aprovado. **Gestor consultivo e autoatendimento do colaborador saem desta lista
-   de candidatos imediatos** — a T150 confirmou que ambos dependem de `DP-8` e `DP-23`, decisões de
-   negócio ainda não tomadas.
+   fechado) já está aprovado. **O Gestor consultivo saiu desta lista por estar em execução na
+   T153** — a leitura anterior, de que ele dependia de `DP-8` e `DP-23`, valia até a T150 e foi
+   superada pela ADR 0015. **O autoatendimento do colaborador (ESS) continua fora**: nada na
+   ADR 0015 o autoriza, e ele não foi iniciado.
 5. Refinamento estético e acabamento visual final da fundação ficam para uma etapa posterior,
    depois dos módulos funcionais.
 6. Atualizar este ledger e `sync-state.json` em toda tarefa futura.

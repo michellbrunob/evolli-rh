@@ -1,0 +1,149 @@
+/**
+ * Minha equipe (T153) — só tokens já existentes (tokens.css); sem novo
+ * hexadecimal, sem sombra, sem gradiente. Layout responsivo: pilha vertical
+ * de seções, no mesmo molde de `ColaboradoresScreen`.
+ */
+
+.equipe-screen {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  min-width: 0;
+}
+
+/* CONTRATO ANTI-OVERFLOW, copiado de `ColaboradoresScreen.css`.
+   Sem `min-width: 0` na raiz E em todos os filhos diretos, um item flex
+   recusa encolher abaixo do `min-content` da tabela, e a rolagem horizontal
+   que deveria ficar CONTIDA no `.evolli-datatable` vaza para a página
+   inteira. Em 375 px é a diferença entre a tabela rolar por dentro e a página
+   inteira deslizar. Não é media query: é o mecanismo real. */
+.equipe-screen > * {
+  min-width: 0;
+}
+
+/* `position: relative` para que qualquer texto só-para-leitor-de-tela
+   posicionado de forma absoluta dentro da tabela ancore AQUI e não no bloco
+   contêiner inicial — armadilha já documentada e corrigida em
+   `ColaboradoresScreen.css`, onde escapar do `overflow-x: auto` arrastava a
+   rolagem horizontal para a página. */
+.equipe-screen .evolli-datatable {
+  position: relative;
+}
+
+/* Aviso "somente leitura" — reaproveita os tokens semânticos de "info". */
+.equipe-screen__aviso {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+  border: 1px solid var(--status-info-border);
+  background: var(--status-info-surface);
+}
+
+.equipe-screen__aviso-texto {
+  margin: 0;
+  min-width: 0;
+  flex: 1 1 18rem;
+  font-size: var(--text-caption);
+  line-height: var(--leading-body);
+  color: var(--status-info-ink);
+}
+
+.equipe-screen__lista {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  min-width: 0;
+}
+
+.equipe-screen__lista > h2 {
+  margin: 0;
+  font-size: var(--text-lead);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  font-weight: var(--weight-strong);
+  color: var(--color-ink);
+}
+
+/* Busca local. Bloco próprio acima da lista, como o padrão B pede para
+   filtros. */
+.equipe-screen__busca {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+  min-width: 0;
+}
+
+.equipe-screen__busca label {
+  font-size: var(--text-caption);
+  font-weight: var(--weight-strong);
+  color: var(--color-ink);
+}
+
+.equipe-screen__busca input {
+  /* `width: 100%` com `box-sizing: border-box` e `max-width` em `ch`: cresce
+     até um limite legível e encolhe até caber em 375 px sem empurrar a
+     página. */
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 40ch;
+  min-width: 0;
+  min-height: var(--touch-target);
+  padding: var(--space-xs) var(--space-sm);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  background: var(--surface-canvas);
+  color: var(--color-ink);
+  font: inherit;
+}
+
+.equipe-screen__busca-ajuda {
+  margin: 0;
+  font-size: var(--text-caption);
+  color: var(--color-ink-subtle);
+}
+
+/* Erro + nova tentativa, no mesmo arranjo das demais telas. */
+.equipe-screen__erro {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+
+.equipe-screen__erro p {
+  margin: 0;
+  min-width: 0;
+  color: var(--status-danger-ink);
+}
+
+/* Detalhe somente leitura, dentro do modal. Grid que cai para uma coluna
+   sozinho em telas estreitas — `auto-fit` com `minmax` dispensa media query e
+   nunca força largura maior que o contêiner. */
+.equipe-screen__detalhe {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: var(--space-md);
+  margin: 0;
+  min-width: 0;
+}
+
+.equipe-screen__detalhe > div {
+  min-width: 0;
+}
+
+.equipe-screen__detalhe dt {
+  margin: 0 0 var(--space-xxs);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-strong);
+  color: var(--color-ink-subtle);
+}
+
+.equipe-screen__detalhe dd {
+  margin: 0;
+  /* Nome de cargo, equipe ou tabela de horário pode ser longo e sem espaços:
+     sem isto, a palavra empurraria a largura do modal em 375 px. */
+  overflow-wrap: anywhere;
+  color: var(--color-ink);
+}

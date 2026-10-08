@@ -3,7 +3,10 @@ import { describe, expect, it, vi } from "vitest";
 import { DESTINOS_PAINEL, PainelNavigation } from "./PainelNavigation";
 
 describe("PainelNavigation (T044)", () => {
-  it("lista os nove destinos dentro de um <nav> rotulado", () => {
+  it("lista os dez destinos dentro de um <nav> rotulado", () => {
+    // Dez desde a T153: os nove incondicionais mais "Minha equipe", que é
+    // CONDICIONAL. Sem `destinosCondicionais`, nada é ocultado — a omissão
+    // significa "incondicional", e quem monta o shell é que decide.
     render(
       <PainelNavigation destinoAtivoId="cadastros" onSelecionar={() => {}} />,
     );
@@ -13,7 +16,48 @@ describe("PainelNavigation (T044)", () => {
     });
     const itens = nav.querySelectorAll("li");
     expect(itens).toHaveLength(DESTINOS_PAINEL.length);
-    expect(DESTINOS_PAINEL).toHaveLength(9);
+    expect(DESTINOS_PAINEL).toHaveLength(10);
+  });
+
+  it("T153 oculta um destino condicional que o servidor não concedeu", () => {
+    render(
+      <PainelNavigation
+        destinoAtivoId="cadastros"
+        onSelecionar={() => {}}
+        destinosCondicionais={{ equipe: false }}
+      />,
+    );
+
+    // Nem botão, nem item de lista, nem posição na ordem de tabulação.
+    expect(screen.queryByRole("button", { name: /Minha equipe/ })).toBeNull();
+    const nav = screen.getByRole("navigation", { name: "Navegação do painel" });
+    expect(nav.querySelectorAll("li")).toHaveLength(DESTINOS_PAINEL.length - 1);
+    // Os demais continuam todos lá: ocultar um condicional não mexe no resto.
+    expect(
+      screen.getByRole("button", { name: /^Pessoas/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /^Relatórios/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("T153 mostra o destino condicional quando o servidor concedeu", () => {
+    render(
+      <PainelNavigation
+        destinoAtivoId="cadastros"
+        onSelecionar={() => {}}
+        destinosCondicionais={{ equipe: true }}
+      />,
+    );
+
+    expect(
+      screen.getByRole("button", { name: /Minha equipe/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen
+        .getByRole("navigation", { name: "Navegação do painel" })
+        .querySelectorAll("li"),
+    ).toHaveLength(DESTINOS_PAINEL.length);
   });
 
   it("marca somente o destino ativo com aria-current='page'", () => {

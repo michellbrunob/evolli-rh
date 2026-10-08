@@ -990,7 +990,10 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       verificador; decisões do pacote de integração de ponto (T148).
 
 49. **T152 - Hardening do verificador do Spec Kit: declaração de entrega vs. citação**
-    - **Estado:** em revisão. Branch `codex/t152-hardening-spec-kit-squash`, a partir do squash
+    - **Estado:** **Integrada** em `main` pela PR #143, squash
+      `3f73f4ed0e690fe9d020468bba40388be2e6f8f9`, com a CI de `main` 3/3 verde — a primeira vez
+      nesta linha de trabalho em que o push para `main` passa no `spec:check` sob o protocolo de
+      trailers. Branch `codex/t152-hardening-spec-kit-squash`, a partir do squash
       `a356418abb34568cf7cdde20348c1cf042a5828f` (T151, PR #142).
     - **Escopo:** exclusivamente o verificador e a recuperação da CI de `main`. O módulo funcional
       antes cogitado para a T152 — **resumo de jornada** (`DP-3J-12`) e **andamento de
@@ -1044,6 +1047,45 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
     - **Preserva a T149:** as proteções contra estado inválido (`validarEstado`) e o fail-closed de
       contexto ausente seguem intactos e têm teste próprio.
     - **Sem whitelist de identificadores** e sem resolver por avanço de `lastRecordedTask`.
+
+50. **T153 - Interface web funcional do Gestor Consultivo (somente leitura)**
+    - **Estado:** em implementação. Branch `codex/t153-web-gestor-consultivo`, a partir do squash
+      `3f73f4ed0e690fe9d020468bba40388be2e6f8f9` (T152, PR #143).
+    - **Escopo:** exclusivamente a **interface web** sobre a fundação já integrada pela T151.
+      Consome os dois endpoints que já existem — `GET /gestor/equipe` e
+      `GET /gestor/equipe/vinculos/:vinculoId` — e **não altera** API, schema Prisma, migration,
+      seed, RBAC, Docker, dependências ou lockfile.
+    - **Por que agora:** a T151 resolveu `DP-8` e `DP-23` pela [ADR 0015](../docs/adr/0015-escopo-do-gestor-consultivo-e-vinculo-conta-colaborador.md),
+      no recorte aprovado pelo proprietário em 06/10/2026. O ledger ainda listava o Gestor
+      consultivo como bloqueado por essas decisões — leitura anterior à T151, corrigida nesta
+      convergência.
+    - **Entrega:** lista da equipe (carregando, vazio, erro com nova tentativa, busca/filtro
+      **local** apenas sobre o que o servidor já devolveu) e **detalhe consultivo em modal** do
+      padrão B, somente leitura, restrito à projeção fechada da decisão 7.
+    - **Autorização não é decidida no frontend.** O escopo e a `dataReferencia` vêm do servidor; a
+      interface **não oferece parâmetro de data**, porque quem pergunta não escolhe em que data é
+      autorizado (ADR 0015, decisão 8). Esconder controle não é controle de acesso: a porta
+      continua sendo `gestor_equipe` `read` no RBAC, e a tela não infere subordinação por e-mail,
+      nome, `unit_id`, `team_id` textual ou lotação.
+    - **404 é indisponibilidade, nunca enumeração.** Vínculo fora do escopo responde 404 na API; a
+      tela o apresenta como "não disponível", sem distinguir inexistente de alheio e sem exibir
+      corpo interno de erro.
+    - **Concorrência por guarda monotônica por carregador:** resposta obsoleta não atualiza dados,
+      erro nem carregamento. Troca de vínculo, fechamento do detalhe, nova tentativa e troca de
+      sessão invalidam o que estava em trânsito — para que dado de uma pessoa nunca reapareça sob
+      o nome de outra.
+    - **Capacidades ausentes continuam ausentes, e declaradas.** `resumoJornada` e
+      `andamentoSolicitacoes` chegam `null` da API de propósito; a interface **não** desenha cartão
+      vazio nem dado fictício fingindo que existem. O módulo funcional antes cogitado sob o número
+      da T152 — **resumo de jornada** (`DP-3J-12`) e **andamento de solicitações** (`PD-SOL-05`) —
+      **não foi iniciado** e segue sem contrato seguro.
+    - **Fora de escopo, explicitamente:** banco de horas, espelho de ponto, atestado, diagnóstico,
+      CID ou qualquer informação de saúde, aprovações, alterações cadastrais, qualquer `POST`,
+      `PATCH`, `PUT` ou `DELETE`, visão por departamento ou empresa inteira, gestão matricial,
+      exceções administradas pela interface e ESS.
+    - **Dívidas mantidas, não tratadas:** FK de `unit_id`/`team_id` (ADR 0003); convergência de
+      atributos do seed; caixa baixa e zero-width no verificador; decisões do pacote de integração
+      de ponto (T148); `Pessoas › Histórico funcional` estoura a largura (T115, preexistente).
 
 ## Regra obrigatória para as próximas tarefas
 
