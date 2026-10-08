@@ -304,19 +304,18 @@ export function EquipeScreen({
   );
 
   const fecharDetalhe = useCallback(() => {
-    // Fechar invalida a requisição pendente: se a resposta chegar depois, ela
-    // não reabre a janela nem escreve estado.
+    // Fechar descarta o detalhe. A INVALIDAÇÃO da requisição pendente não
+    // mora aqui: mora em `carregarDetalhe`, que incrementa `seqDetalhe` em
+    // TODA abertura — então a resposta de uma consulta já fechada chega com
+    // sequência vencida e é descartada lá, e com `vinculoAberto` nulo o modal
+    // nem renderiza.
     //
-    // HONESTIDADE SOBRE ESTA LINHA: ela é defesa em profundidade, não a única
-    // proteção. Provei por mutação que removê-la não quebra nenhum teste, e
-    // investiguei o motivo em vez de inventar um teste que a justificasse —
-    // com `vinculoAberto` nulo o modal não renderiza, e `abrirDetalhe`
-    // incrementa o contador de novo em TODA abertura, então a resposta
-    // vencida já seria descartada lá. O bump fica porque a invalidação ao
-    // fechar é requisito explícito desta tarefa e porque ele é o que torna a
-    // proteção independente de `abrirDetalhe` continuar recarregando sempre
-    // (um cache futuro quebraria essa premissa em silêncio).
-    seqDetalhe.current += 1;
+    // Havia um `seqDetalhe.current += 1` nesta função. Duas rodadas de
+    // mutação mostraram que removê-lo não quebrava teste nenhum — nem os seis
+    // cenários de corrida, nem as sondas de fechar-e-reabrir. Era código
+    // inobservável, e um guarda que não guarda nada é pior que a ausência
+    // dele: cria confiança falsa. Removido em vez de justificado por teste
+    // fabricado.
     setVinculoAberto(null);
     setDetalhe(null);
     setErroDetalhe(null);

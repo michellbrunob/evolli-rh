@@ -18,7 +18,7 @@
   "openDeliveries": [
     {
       "id": "T153",
-      "pullRequest": null,
+      "pullRequest": 144,
       "status": "web_gestor_consultivo_em_implementacao"
     }
   ],

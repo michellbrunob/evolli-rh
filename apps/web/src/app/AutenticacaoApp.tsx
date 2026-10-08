@@ -1,7 +1,8 @@
 /**
- * Portão de sessão (T116) — decide entre "Verificando…", a tela de login e o
- * shell autenticado (`App`). Este é o componente montado por `main.tsx`;
- * `App` nunca é montado diretamente fora daqui.
+ * Portão de sessão (T116; estados explícitos na T153) — decide entre
+ * "Verificando…", a tela de login, a resolução do ator e o shell autenticado
+ * (`App`). Este é o componente montado por `main.tsx`; `App` nunca é montado
+ * diretamente fora daqui.
  *
  * Restauração de sessão ao recarregar a página: o único caminho suportado
  * pela API é `GET /v1/auth/csrf` (exige `SessionGuard` — cookie de sessão
@@ -12,32 +13,60 @@
  * duas funções. Nunca usa localStorage, sessionStorage ou cookie legível
  * por script para isso.
  *
- * Enquanto a sessão não está confirmada ("verificando"), NADA do shell —
- * nem `PainelNavigation`, nem qualquer tela interna — é renderizado.
+ * ## Por que existe um estado a mais desde a T153
+ *
+ * Antes havia três estados, e "sessão válida" montava o shell **na hora**.
+ * A leitura de `GET /v1/users/me` corria em paralelo, só para alimentar
+ * `mfaDisponivel`. Consequência medida em navegador: o shell montava no
+ * destino padrão "Cadastros", a tela de horários disparava
+ * `GET /v1/horarios` e um `gestor` — que não tem essa capacidade — recebia
+ * **403 antes mesmo de o papel dele ser conhecido**. No refresh a ordem era
+ * literalmente `/v1/horarios` **antes** de `/v1/users/me`.
+ *
+ * Esconder o destino depois, por efeito, não resolveria: a requisição
+ * proibida já teria saído e a tela proibida já teria piscado. A única
+ * correção que elimina as duas coisas é **não montar nada funcional
+ * enquanto o ator não for conhecido** — e é isso que o estado
+ * `resolvendo-ator` faz.
+ *
+ * ## Fail-closed
+ *
+ * Falha ao resolver o ator **não** cai no shell com papel desconhecido: cai
+ * numa tela segura, com nova tentativa e saída. Resposta que chega sem um
+ * `role` utilizável conta como falha — "montar com o papel conhecido" exige
+ * conhecê-lo, e um shell montado sem papel é exatamente o estado que
+ * produzia o 403.
  */
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import "./tokens.css";
 import "./AutenticacaoApp.css";
 import { App } from "./App";
 import { LoginScreen } from "./LoginScreen";
 import { logout } from "../api/authClient";
 import { clearCsrfToken, refreshCsrfToken } from "../api/csrfClient";
-import { obterUsuarioAtual } from "../api/usersClient";
+import { obterUsuarioAtual, type SafeAccessUserApi } from "../api/usersClient";
 
-type EstadoSessao = "verificando" | "login" | "autenticado";
+type EstadoSessao =
+  /** Checando o cookie de sessão. Nada do shell existe. */
+  | "verificando-sessao"
+  /** Sem sessão: tela de login. */
+  | "login"
+  /** Sessão válida, lendo o ator. **Nada funcional monta aqui.** */
+  | "resolvendo-ator"
+  /** Ator resolvido: só agora o shell existe, já com o papel conhecido. */
+  | "pronto"
+  /** Não foi possível resolver o ator: falha fechado, sem shell. */
+  | "falha-ator";
 
 export function AutenticacaoApp() {
-  const [estado, setEstado] = useState<EstadoSessao>("verificando");
-  // T131 — disponibilidade do MFA decidida pelo SERVIDOR (`GET /v1/users/me`).
-  // Padrão `false` (seguro): a UI de MFA só aparece após o servidor confirmar
-  // que o recurso está ativado. Nunca uma flag de frontend liga o recurso.
-  const [mfaDisponivel, setMfaDisponivel] = useState(false);
-  // T153 — papel do ator, da MESMA leitura de `GET /v1/users/me` que já traz
-  // `mfaAvailable`: nenhuma requisição a mais. Padrão `null` (seguro): sem
-  // confirmação do servidor, o destino condicional "Minha equipe" não
-  // aparece. Trocar de sessão zera isto junto com `mfaDisponivel`, no efeito
-  // abaixo — o shell nunca mostra a capacidade do usuário anterior.
-  const [papelDoAtor, setPapelDoAtor] = useState<string | null>(null);
+  const [estado, setEstado] = useState<EstadoSessao>("verificando-sessao");
+  /**
+   * O ator resolvido. É a ÚNICA fonte de `mfaDisponivel` e do papel — os dois
+   * saem da mesma leitura, sem requisição extra. Nulo em qualquer estado que
+   * não seja `pronto`, de modo que não exista caminho em que o shell veja o
+   * ator da sessão anterior.
+   */
+  const [ator, setAtor] = useState<SafeAccessUserApi | null>(null);
 
   useEffect(() => {
     let cancelado = false;
@@ -45,7 +74,9 @@ export function AutenticacaoApp() {
     async function verificarSessao() {
       try {
         await refreshCsrfToken();
-        if (!cancelado) setEstado("autenticado");
+        // Sessão válida não é o fim: agora o ator precisa ser resolvido
+        // ANTES de qualquer tela funcional montar.
+        if (!cancelado) setEstado("resolvendo-ator");
       } catch {
         // Sessão ausente, expirada ou qualquer outra falha na verificação:
         // trata como não autenticado — a própria tela de login permite
@@ -60,29 +91,36 @@ export function AutenticacaoApp() {
     };
   }, []);
 
-  // T131 — ao autenticar, pergunta ao servidor se o MFA está disponível e
-  // repassa ao shell. Falha ou ausência do campo → mantém `false` (seguro: a UI
-  // de MFA fica oculta). O servidor permanece autoritativo de qualquer forma.
+  // Resolução do ator. Roda só em `resolvendo-ator`, e é o único caminho
+  // para `pronto` — não há como o shell montar sem passar por aqui.
   useEffect(() => {
-    if (estado !== "autenticado") {
-      setMfaDisponivel(false);
-      setPapelDoAtor(null);
-      return;
-    }
+    if (estado !== "resolvendo-ator") return;
     let cancelado = false;
-    async function carregarDisponibilidadeMfa() {
+
+    async function resolverAtor() {
       try {
         const eu = await obterUsuarioAtual();
         if (cancelado) return;
-        setMfaDisponivel(eu.mfaAvailable === true);
-        setPapelDoAtor(typeof eu.role === "string" ? eu.role : null);
+        // Papel ausente ou vazio é falha, não "papel nulo": seguir com o
+        // shell montado e papel desconhecido é o estado que esta correção
+        // existe para eliminar.
+        if (typeof eu?.role !== "string" || eu.role.trim() === "") {
+          setAtor(null);
+          setEstado("falha-ator");
+          return;
+        }
+        setAtor(eu);
+        setEstado("pronto");
       } catch {
+        // Nada do corpo da resposta é lido nem exibido: a mensagem da tela
+        // de falha é escrita por nós.
         if (cancelado) return;
-        setMfaDisponivel(false);
-        setPapelDoAtor(null);
+        setAtor(null);
+        setEstado("falha-ator");
       }
     }
-    void carregarDisponibilidadeMfa();
+
+    void resolverAtor();
     return () => {
       cancelado = true;
     };
@@ -96,12 +134,16 @@ export function AutenticacaoApp() {
    * sessão desta aba já não é válida (foi a sessão revogada em "Sessões
    * ativas", ou expirou por outro motivo).
    */
-  function encerrarSessaoLocalmente() {
+  const encerrarSessaoLocalmente = useCallback(() => {
     clearCsrfToken();
+    // O ator sai JUNTO com a sessão. Sem isto, uma nova sessão poderia
+    // montar o shell com o papel — e o destino inicial — do usuário
+    // anterior.
+    setAtor(null);
     setEstado("login");
-  }
+  }, []);
 
-  async function handleLogout() {
+  const handleLogout = useCallback(async () => {
     try {
       await logout();
     } catch {
@@ -111,9 +153,9 @@ export function AutenticacaoApp() {
     } finally {
       encerrarSessaoLocalmente();
     }
-  }
+  }, [encerrarSessaoLocalmente]);
 
-  if (estado === "verificando") {
+  if (estado === "verificando-sessao") {
     return (
       <div className="autenticacao-app__verificando" role="status">
         Verificando sessão…
@@ -122,15 +164,50 @@ export function AutenticacaoApp() {
   }
 
   if (estado === "login") {
-    return <LoginScreen onLoginSuccess={() => setEstado("autenticado")} />;
+    return <LoginScreen onLoginSuccess={() => setEstado("resolvendo-ator")} />;
+  }
+
+  if (estado === "resolvendo-ator") {
+    return (
+      <div className="autenticacao-app__verificando" role="status">
+        Carregando seu acesso…
+      </div>
+    );
+  }
+
+  if (estado === "falha-ator" || ator === null) {
+    // `ator === null` no mesmo ramo não é redundância defensiva: é o que
+    // torna impossível, por tipo, renderizar `<App>` sem ator — o `ator.role`
+    // abaixo não compila de outro jeito.
+    return (
+      <div className="autenticacao-app__falha" role="alert">
+        <p>Não foi possível carregar seu acesso.</p>
+        <p>
+          Sua sessão continua ativa. Tente novamente ou saia e entre de novo.
+        </p>
+        <div className="autenticacao-app__falha-acoes">
+          <button type="button" onClick={() => setEstado("resolvendo-ator")}>
+            Tentar novamente
+          </button>
+          <button type="button" onClick={() => void handleLogout()}>
+            Sair
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
     <App
+      // Ator diferente força remontagem, e com ela o recálculo do destino
+      // inicial. O caminho normal (logout → login) já desmonta o `App`; a
+      // chave cobre qualquer caminho futuro que troque o ator sem passar
+      // pelo login.
+      key={ator.id}
       onLogout={() => void handleLogout()}
       onSessaoAtualEncerrada={encerrarSessaoLocalmente}
-      mfaDisponivel={mfaDisponivel}
-      papelDoAtor={papelDoAtor}
+      mfaDisponivel={ator.mfaAvailable === true}
+      papelDoAtor={ator.role}
     />
   );
 }

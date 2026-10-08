@@ -14,3 +14,52 @@
   background: var(--surface-neutral);
   text-align: center;
 }
+
+/**
+ * Falha ao resolver o ator (T153). Mesma moldura de tela inteira do estado
+ * "verificando", porque é o mesmo momento do ciclo: antes de existir shell.
+ * Nenhum detalhe interno da API aparece aqui — o texto é escrito no
+ * componente, nunca lido da resposta.
+ */
+.autenticacao-app__falha {
+  min-height: 100vh;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  padding: var(--space-lg);
+  color: var(--color-ink);
+  background: var(--surface-neutral);
+  text-align: center;
+}
+
+.autenticacao-app__falha p {
+  margin: 0;
+  max-width: 44ch;
+}
+
+.autenticacao-app__falha p + p {
+  color: var(--color-ink-subtle);
+  font-size: var(--text-caption);
+}
+
+.autenticacao-app__falha-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  justify-content: center;
+  margin-top: var(--space-xs);
+}
+
+.autenticacao-app__falha-acoes button {
+  min-height: var(--touch-target);
+  padding: var(--space-xs) var(--space-md);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-pill);
+  background: var(--surface-canvas);
+  color: var(--color-ink);
+  font: inherit;
+  cursor: pointer;
+}

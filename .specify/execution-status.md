@@ -738,6 +738,52 @@ o teste prende é o **contrato de CSS** que de fato impede o vazamento —
 mais a semântica da região rolável. A medição real fica na verificação visual,
 como o guia visual do projeto já estabelece.
 
+**B1 — o papel autorizado aterrissava numa tela proibida.** Achado pela
+revisão adversarial, medido em navegador: ao entrar, o `gestor` caía em
+"Cadastros › Horários", uma tela rotulada **"Somente RH"**, e recebia dois
+`403` em `GET /v1/horarios` antes de qualquer clique. No refresh a ordem era
+pior — `/v1/horarios` saía **antes** de `/v1/users/me`, isto é, a requisição
+proibida partia antes de o papel sequer ser conhecido.
+
+A causa não era o destino padrão: era a **fronteira de autenticação**. O
+`AutenticacaoApp` tinha três estados e tratava "sessão válida" como "pronto",
+montando o shell na hora; a leitura do ator corria em paralelo, só para
+alimentar `mfaDisponivel`. O shell montava no destino padrão e a tela dele
+disparava a consulta antes de existir papel.
+
+Corrigir só a aterrissagem não bastaria: o flash e o 403 já teriam
+acontecido. A fronteira passou a ter **cinco estados explícitos** —
+`verificando-sessao`, `login`, `resolvendo-ator`, `pronto`, `falha-ator` — e
+`<App>` só existe em `pronto`. Enquanto o ator não é conhecido, nada
+funcional monta; só um estado de carregamento acessível.
+
+**Falha fechado.** Erro em `GET /v1/users/me` — ou resposta sem `role`
+utilizável — não cai no shell com papel desconhecido: cai numa tela segura com
+nova tentativa e saída, sem expor corpo interno da API. Papel desconhecido era
+precisamente o estado que produzia o 403.
+
+**Destino inicial por papel, síncrono.** Com o ator já resolvido no primeiro
+render, `destinoInicialPara` é usado como inicializador de `useState`, não
+como efeito: não há destino intermediário, não há correção posterior e,
+portanto, não há flash nem requisição da tela errada. O mapa tem **uma
+entrada** (`gestor → equipe`) e **não é autorização** — o RBAC decide cada
+requisição e a tela reverifica o papel. `rh`, `dp`, `colaborador`,
+`master_tecnico` e os demais permanecem em "Cadastros", sem alteração. A ordem
+do menu não muda. Quem já navegou nunca é redirecionado, porque não existe
+efeito que o faça; trocar de ator remonta o shell (chave por `id`) e recalcula.
+
+**Prova de regressão:** 14 dos 19 testes novos falham na implementação
+anterior e passam na corrigida. Os 5 que passam nos dois casos são justamente
+os de **preservação** (`rh` e os quatro papéis sem a capacidade) — corretivos e
+guardas separados por construção.
+
+**Linha morta removida.** O `seqDetalhe.current += 1` de `fecharDetalhe` era
+inobservável: duas rodadas de mutação mostraram que removê-lo não quebrava
+nenhum teste, incluindo as sondas de fechar-e-reabrir. A invalidação real mora
+em `carregarDetalhe`, que incrementa em toda abertura. Removido em vez de
+justificado por teste fabricado — um guarda que não guarda nada cria confiança
+falsa.
+
 **Validação visual, em navegador real, contra a API real.** Ambiente local de
 demonstração, banco existente reaproveitado — nenhum volume foi destruído ou
 recriado. Com `gestor.alfa@evolli.local`: a lista traz **apenas**
