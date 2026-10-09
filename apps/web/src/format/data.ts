@@ -61,42 +61,83 @@ export const AUSENTE = "—";
 /** Fuso de negócio. Mesmo valor que `FUSO_COMPETENCIA` fixa no servidor. */
 export const FUSO_DE_NEGOCIO = "America/Sao_Paulo";
 
-/** `AAAA-MM-DD` no início da string — aceita ISO completo, de onde corta o dia. */
-const DIA_CIVIL = /^(\d{4})-(\d{2})-(\d{2})/;
+/**
+ * ## As gramáticas aceitas
+ *
+ * Nenhuma delas é prefixo: as três são **ancoradas no fim**. Um prefixo
+ * permissivo aceita lixo e devolve uma data confiante, que é pior do que
+ * recusar — `2026-10-08T99:99:99Z` não é um dia, e exibi-lo como `08/10/2026`
+ * esconde a corrupção em vez de mostrá-la.
+ *
+ * O que cada função aceita saiu de uma MEDIÇÃO do que os call sites reais
+ * entregam, com a suíte inteira instrumentada:
+ *
+ *   `formatarDiaCivil`       `AAAA-MM-DD` (2761x) · `null` (365x) ·
+ *                            `AAAA-MM-DDT00:00:00.000Z` (153x)
+ *   `formatarMesReferencia`  `AAAA-MM` (388x) — e **nada mais**
+ *   `formatarInstante`       sempre com `Z`, vindo da API
+ *
+ * Daí as duas decisões:
+ *
+ * - a data civil aceita a forma serializada do Prisma, porque ela EXISTE nos
+ *   contratos (coluna `@db.Date` volta como `Date` e serializa em meia-noite
+ *   UTC) — mas só na forma estrita `T00:00:00`, com fração opcional e `Z`;
+ *   qualquer outro horário ou offset é um instante disfarçado e é recusado;
+ * - o mês de referência aceita **só** `AAAA-MM`, porque nenhum call site real
+ *   entrega outra coisa. A competência vem de `<input type="month">`.
+ */
 
-/** `AAAA-MM` no início da string. */
-const MES_REFERENCIA = /^(\d{4})-(\d{2})/;
+/** `AAAA-MM-DD` exato. */
+const CIVIL_EXATA = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/**
+ * Data civil serializada pelo Prisma: meia-noite UTC, fração opcional, `Z`.
+ *
+ * `T00:00:00` é literal de propósito. `2026-01-05T09:00:00Z` não é um dia
+ * civil — é um instante — e cai fora.
+ */
+const CIVIL_SERIALIZADA = /^(\d{4})-(\d{2})-(\d{2})T00:00:00(?:\.\d{1,9})?Z$/;
+
+/** `AAAA-MM` exato. Nenhum call site real entrega outra forma. */
+const MES_EXATO = /^(\d{4})-(\d{2})$/;
+
+/** Regra gregoriana, sem `Date` e sem fuso. */
+function ehBissexto(ano: number): boolean {
+  return (ano % 4 === 0 && ano % 100 !== 0) || ano % 400 === 0;
+}
+
+const DIAS_POR_MES = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31] as const;
 
 /**
  * O valor é um dia que existe no calendário?
  *
- * Usa `Date.UTC`, que é aritmética pura em UTC e **não** interpreta string:
- * nenhuma conversão de fuso acontece aqui, e o resultado nunca alimenta a
- * exibição. Serve só para recusar `2026-02-30` e `2026-13-01`, que o regex
- * sozinho aceitaria.
+ * Aritmética civil pura. A versão anterior usava `Date.UTC`, e isso apagava
+ * silenciosamente os anos 0–99: `Date.UTC(50, 0, 1)` devolve **1950**, pelo
+ * mapeamento legado de ano de dois dígitos do JavaScript, então o round-trip
+ * nunca batia e `0050-06-15` virava `—`. Sem `Date` no caminho, o século não
+ * importa — e o calendário continua sendo o calendário.
  */
 function diaExiste(ano: number, mes: number, dia: number): boolean {
-  if (mes < 1 || mes > 12 || dia < 1 || dia > 31) return false;
-  const d = new Date(Date.UTC(ano, mes - 1, dia));
-  return (
-    d.getUTCFullYear() === ano &&
-    d.getUTCMonth() === mes - 1 &&
-    d.getUTCDate() === dia
-  );
+  if (!Number.isInteger(ano) || ano < 1) return false;
+  if (mes < 1 || mes > 12) return false;
+  if (dia < 1) return false;
+  const limite = mes === 2 && ehBissexto(ano) ? 29 : DIAS_POR_MES[mes - 1]!;
+  return dia <= limite;
 }
 
 /**
  * Data civil → `DD/MM/AAAA`.
  *
- * Aceita `AAAA-MM-DD` e também o ISO completo que o Prisma devolve para
- * colunas `@db.Date` (`2026-01-05T00:00:00.000Z`): os dez primeiros caracteres
- * **já são** o dia gravado, e cortá-los não recalcula fuso nenhum.
+ * Aceita `AAAA-MM-DD` e a forma serializada estrita do Prisma. Recusa tudo
+ * mais, inclusive o que **parece** uma data com sobra: `2026-10-08lixo`,
+ * `2026-10-08-01`, `2026-10-08T09:00:00Z`, `2026-10-08T99:99:99Z` e valores
+ * com espaço. Dia inexistente também recusa.
  *
- * Nunca lança. Ausente, malformado ou dia inexistente devolvem `—`.
+ * Nunca lança. Qualquer recusa devolve `—`.
  */
 export function formatarDiaCivil(valor: string | null | undefined): string {
   if (typeof valor !== "string") return AUSENTE;
-  const casado = DIA_CIVIL.exec(valor.trim());
+  const casado = CIVIL_EXATA.exec(valor) ?? CIVIL_SERIALIZADA.exec(valor);
   if (!casado) return AUSENTE;
   const [, ano, mes, dia] = casado as unknown as [
     string,
@@ -111,18 +152,20 @@ export function formatarDiaCivil(valor: string | null | undefined): string {
 /**
  * Mês de referência → `MM/AAAA`.
  *
- * Aceita `AAAA-MM`, `AAAA-MM-DD` e ISO completo. Mesmo critério: componentes
- * lidos da string, sem `Date` no caminho de exibição.
+ * Aceita **só** `AAAA-MM`. Não deriva competência de data completa: nenhum
+ * call site real precisa disso, e aceitar prefixo era o que fazia
+ * `2026-10-xx` e `2026-1013` renderizarem `10/2026` como se fossem válidos.
  */
 export function formatarMesReferencia(
   valor: string | null | undefined,
 ): string {
   if (typeof valor !== "string") return AUSENTE;
-  const casado = MES_REFERENCIA.exec(valor.trim());
+  const casado = MES_EXATO.exec(valor);
   if (!casado) return AUSENTE;
   const [, ano, mes] = casado as unknown as [string, string, string];
   const m = Number(mes);
   if (m < 1 || m > 12) return AUSENTE;
+  if (Number(ano) < 1) return AUSENTE;
   return `${mes}/${ano}`;
 }
 
@@ -144,10 +187,21 @@ const INSTANTE_INEQUIVOCO =
   /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,9})?)?(?:Z|[+-](\d{2}):(\d{2}))$/;
 
 /**
+ * Offset máximo que existe de verdade.
+ *
+ * A gramática do ECMAScript aceita hora de offset de `00` a `23`, mas fuso
+ * nenhum passa de `±14:00` (Kiritimati, na ponta positiva; a negativa não
+ * chega a `-13:00`). `+23:59` não é um fuso, é lixo com forma de fuso — e o
+ * ponto desta função é recusar o que não dá para interpretar com confiança.
+ * No limite de 14 horas os minutos têm de ser `00`: não existe `+14:01`.
+ */
+const OFFSET_HORA_MAXIMA = 14;
+
+/**
  * Valida o instante e devolve o `Date` correspondente, ou `null`.
  *
- * O regex sozinho aceitaria `2026-02-31T25:99:99Z`; os limites de calendário e
- * de relógio são conferidos aqui. O offset também: `+25:00` não existe.
+ * O regex sozinho aceitaria `2026-02-31T25:99:99Z`; os limites de calendário,
+ * de relógio e de offset são conferidos aqui.
  */
 function instanteDe(bruto: string): Date | null {
   const casado = INSTANTE_INEQUIVOCO.exec(bruto);
@@ -157,11 +211,13 @@ function instanteDe(bruto: string): Date | null {
   if (!diaExiste(Number(ano), Number(mes), Number(dia))) return null;
   if (Number(hora) > 23 || Number(minuto) > 59) return null;
   if (segundo !== undefined && Number(segundo) > 59) return null;
-  if (
-    offHora !== undefined &&
-    (Number(offHora) > 23 || Number(offMinuto) > 59)
-  ) {
-    return null;
+
+  if (offHora !== undefined) {
+    const oh = Number(offHora);
+    const om = Number(offMinuto);
+    if (om > 59) return null;
+    if (oh > OFFSET_HORA_MAXIMA) return null;
+    if (oh === OFFSET_HORA_MAXIMA && om !== 0) return null;
   }
 
   const instante = new Date(bruto);
@@ -211,12 +267,20 @@ function obterFormatador(): Intl.DateTimeFormat | null {
  * **Só aceita instante inequívoco** — com `Z` ou com offset explícito. Recusa,
  * devolvendo `—`:
  *
- *   `2026-10-08T15:30:00`     sem fuso: a saída dependeria da máquina
- *   `2026-10-08 15:30:00Z`    espaço no lugar do `T`: nenhuma API nossa emite
- *   `2026-10-08`              data civil: é de `formatarDiaCivil`
- *   `2026-10-08T15:30:00+25:00`  offset que não existe
+ *   `2026-10-08T15:30:00`        sem fuso: a saída dependeria da máquina
+ *   `2026-10-08 15:30:00Z`       espaço no lugar do `T`: nenhuma API emite
+ *   `2026-10-08`                 data civil: é de `formatarDiaCivil`
+ *   `2026-10-08T15:30:00+15:00`  offset que não existe (máximo real: ±14:00)
+ *   `2026-10-08T15:30:00+14:01`  no limite de 14 horas, minuto tem de ser 00
+ *   `2026-10-08T15:30:00+23:59`  aceito pela gramática da linguagem, mas não
+ *                                é fuso nenhum
  *
  * Nunca lança. Ausente, ambíguo ou malformado devolvem `—`.
+ *
+ * **Espaço em volta:** esta função apara, e a data civil e o mês **não**. Não
+ * é descuido: o `trim` do instante é contrato fixado por teste desde a
+ * primeira rodada, e as duas gramáticas civis nasceram estritas nesta — onde
+ * `" 2026-10-08 "` nunca chega de call site real.
  */
 export function formatarInstante(valor: string | null | undefined): string {
   if (typeof valor !== "string") return AUSENTE;
@@ -237,5 +301,8 @@ export function formatarInstante(valor: string | null | undefined): string {
   const minuto = partes.get("minute");
   if (!dia || !mes || !ano || !hora || !minuto) return AUSENTE;
 
-  return `${dia}/${mes}/${ano} às ${hora}:${minuto}`;
+  // `year: "numeric"` NÃO preenche com zero — ao contrário de `month` e `day`,
+  // que são `2-digit`. Sem este `padStart`, o ano 99 sai como "99" e o formato
+  // prometido (`DD/MM/AAAA`) quebra justamente onde ninguém olha.
+  return `${dia}/${mes}/${ano.padStart(4, "0")} às ${hora}:${minuto}`;
 }
