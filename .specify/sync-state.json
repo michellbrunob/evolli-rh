@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "constitutionVersion": "1.4.0",
   "lastConvergedAt": "2026-10-09",
-  "lastIntegratedTask": 153,
-  "lastRecordedTask": 154,
+  "lastIntegratedTask": 154,
+  "lastRecordedTask": 155,
   "platformDecision": {
     "adr": "docs/adr/0014-evolli-plataforma-base-e-encerramento-do-frappe.md",
     "decidedAt": "2026-10-01",
@@ -11,15 +11,15 @@
     "frappe": "encerrado_como_candidato_referencia_apenas"
   },
   "nextTask": {
-    "id": "T154",
-    "status": "em_execucao_t154_datas_padrao_brasileiro",
-    "reason": "T153 integrada em main pela PR #144 (squash 94bdededc481d3aa45e6970161090ff4d21da10b), com a CI de main 3/3 verde. A T154 padroniza a APRESENTACAO de datas na interface web para o formato brasileiro: data completa DD/MM/AAAA, mes e ano MM/AAAA, data e hora DD/MM/AAAA as HH:mm, relogio de 24 horas, locale pt-BR e fuso de negocio America/Sao_Paulo para instantes. E alteracao de APRESENTACAO, nao de armazenamento nem de transporte: contratos HTTP, banco e o valor de <input type=\"date\"> continuam em ISO. A distincao que sustenta a regra e semantica, nao cosmetica: DATA CIVIL (AAAA-MM-DD, sem hora) nunca passa por new Date(), porque a string seria lida como meia-noite UTC e, a oeste de Greenwich, exibiria o dia anterior; os componentes sao interpretados diretamente. INSTANTE (ISO com hora ou offset) passa por Intl.DateTimeFormat com timeZone America/Sao_Paulo, porque ai converter e exatamente o certo. Valor ausente usa o tracinho ja adotado no produto; valor invalido nao quebra a tela nem exibe Invalid Date. Escopo: somente apps/web. Nao altera backend, Prisma, migrations, regras trabalhistas, calculos, RBAC, seed, contratos HTTP, dependencias ou lockfile. Continuam pendentes e nao iniciados: resumo de jornada (DP-3J-12) e andamento de solicitacoes (PD-SOL-05), alem das decisoes de negocio e do RH ja registradas."
+    "id": "T155",
+    "status": "investigacao_checklists_contratacao_desligamento",
+    "reason": "T154 integrada em main pela PR #145 (squash cd80ea9ab8cbae0a25706f1d248dc027a1cd40c2), com CI 3/3 verde. A T155 investiga e especifica o dominio de checklists operacionais de contratacao e desligamento antes de qualquer implementacao. Admissao e desligamento continuam sendo movimentacoes funcionais existentes; o checklist nao cria, efetiva, bloqueia, cancela ou retifica vinculo. Nao trata documentos reais, upload, assinatura, folha, eSocial, beneficios, saude ou calculos legais. O escopo so pode abrir implementacao depois de RH aprovar templates, itens, responsaveis, prazos, regras de conclusao, excecoes e visibilidade."
   },
   "openDeliveries": [
     {
-      "id": "T154",
+      "id": "T155",
       "pullRequest": null,
-      "status": "datas_padrao_brasileiro_em_implementacao"
+      "status": "investigacao_e_especificacao_checklists_rh"
     }
   ],
   "requiredArtifacts": [

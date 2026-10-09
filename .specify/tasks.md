@@ -1090,7 +1090,9 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       de ponto (T148); `Pessoas › Histórico funcional` estoura a largura (T115, preexistente).
 
 51. **T154 - Padronização brasileira de datas na interface**
-    - **Estado:** em implementação. Branch `codex/t154-datas-padrao-brasileiro`, a partir do squash
+    - **Estado:** **Integrada** em `main` pela PR #145, squash
+      `cd80ea9ab8cbae0a25706f1d248dc027a1cd40c2`, com CI de `main` 3/3 verde. Branch
+      `codex/t154-datas-padrao-brasileiro`, a partir do squash
       `94bdededc481d3aa45e6970161090ff4d21da10b` (T153, PR #144).
     - **Escopo:** exclusivamente **apresentação** de datas em `apps/web`. Não altera backend,
       Prisma, migrations, regras trabalhistas, cálculos, RBAC, seed, contratos HTTP, dependências
@@ -1132,6 +1134,25 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       atributos do seed; caixa baixa e zero-width no verificador; decisões do pacote de integração
       de ponto (T148); `Pessoas › Histórico funcional` estoura a largura (T115, preexistente);
       ausência de timeout em `GET /v1/users/me` no portão de sessão (T153).
+
+52. **T155 - Investigação e especificação de checklists de contratação e desligamento**
+    - **Estado:** investigação em curso. Branch `codex/t155-checklists-rh`, a partir do squash
+      `cd80ea9ab8cbae0a25706f1d248dc027a1cd40c2` (T154, PR #145).
+    - **Objetivo:** delimitar um domínio operacional de checklist para contratação e desligamento,
+      separado de admissão, movimentação funcional e documentos. A tarefa não cria funcionalidade
+      antes de RH aprovar o processo real.
+    - **Contrato já confirmado:** a admissão cria colaborador e vínculo previsto; a efetivação da
+      movimentação de admissão ativa o vínculo; desligamento é movimentação explícita que encerra o
+      vínculo. Nenhum desses atos tem checklist próprio no modelo atual.
+    - **Limite obrigatório:** checklist não pode, nesta tarefa, criar, efetivar, bloquear, cancelar
+      ou retificar admissão ou desligamento; não materializa documento, upload, assinatura,
+      informação de saúde, folha, eSocial, benefício, cálculo ou integração externa.
+    - **Decisões necessárias de RH antes de código:** templates por empresa e fluxo; itens,
+      responsáveis e prazos; status e exceções; relação com a efetivação do vínculo; evidência
+      permitida; visibilidade por papel; reabertura, dispensa e auditoria.
+    - **Aceite desta investigação:** documento de decisão com o inventário de contratos existentes,
+      fronteiras de privacidade e perguntas objetivas ao RH; nenhum endpoint, migration, tela ou
+      regra de negócio implementada enquanto faltar aprovação.
 
 ## Regra obrigatória para as próximas tarefas
 

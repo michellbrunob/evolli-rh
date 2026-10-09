@@ -822,11 +822,11 @@ CID ou qualquer informação de saúde, aprovações, alterações cadastrais, q
 `PUT` ou `DELETE`, visão por departamento ou empresa inteira, gestão matricial, exceções
 administradas pela interface e ESS.
 
-## Datas no padrão brasileiro — T154 (apresentação)
+## Datas no padrão brasileiro — T154 (integrada)
 
 | Tarefa | Estado               | Resultado principal                                                                                                |
 | ------ | -------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| T154   | **Em implementação** | Padroniza a apresentação de datas em `apps/web` para o formato brasileiro, sem tocar transporte nem armazenamento. |
+| T154   | **Integrada** (PR #145, squash `cd80ea9`) | Padroniza a apresentação de datas em `apps/web` para o formato brasileiro, sem tocar transporte nem armazenamento. |
 
 **Escopo, explicitamente.** A T154 é **somente apresentação**, e somente em `apps/web`. Contratos
 HTTP, banco e o `value` de `<input type="date">` continuam em ISO (`AAAA-MM-DD`). Nenhuma regra
@@ -862,6 +862,22 @@ payload, `key`, `id`), todos os quais **continuam** em ISO por contrato.
 
 **Pendências preservadas.** `DP-3J-12` e `PD-SOL-05` seguem **não iniciados** e sem contrato
 seguro. As decisões de negócio e do RH já registradas permanecem abertas, e nada aqui as antecipa.
+
+## Checklists de contratação e desligamento — T155 (investigação)
+
+**Ponto de partida confirmado.** Admissão e desligamento já existem como atos de vida funcional:
+admissão cria colaborador e vínculo previsto; sua efetivação ativa o vínculo; desligamento efetivado
+encerra o vínculo. Não existe domínio, tabela, endpoint, permissão ou tela de checklist operacional.
+
+**Fronteira da investigação.** Checklist é acompanhamento de tarefas do processo, e não condição
+automática de validade do vínculo. A T155 não cria, efetiva, bloqueia, cancela ou retifica admissão ou
+desligamento; não introduz conteúdo documental, upload, assinatura, folha, eSocial, benefício, saúde,
+cálculo trabalhista ou integração externa.
+
+**Gate humano.** Antes de código, RH precisa aprovar templates e itens, responsáveis, prazos,
+estados, exceções, evidências permitidas, relação com a efetivação e visibilidade. A decisão será
+registrada em documento próprio; enquanto ela faltar, a T155 permanece investigativa e não autoriza
+migration, endpoint ou interface.
 
 ## Próxima ação autorizável
 
