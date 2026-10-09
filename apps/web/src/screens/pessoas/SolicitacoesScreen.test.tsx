@@ -1353,7 +1353,7 @@ describe("SolicitacoesScreen (T140) — limites de domínio", () => {
     expect(container.querySelector("a[download]")).toBeNull();
   });
 
-  it("reexibe o dia de referência como foi gravado, sem recalcular fuso", async () => {
+  it("exibe o dia de referência em DD/MM/AAAA, sem recalcular fuso", async () => {
     prepararBase();
     vi.mocked(listarSolicitacoesPessoas).mockResolvedValue(
       pagina([
@@ -1361,7 +1361,20 @@ describe("SolicitacoesScreen (T140) — limites de domínio", () => {
       ]) as never,
     );
     render(<SolicitacoesScreen />);
-    expect(await screen.findByText("2026-08-10")).toBeInTheDocument();
+    // É data civil: o dia 10 permanece 10. Converter para o fuso local
+    // devolveria 09/08/2026 — justamente o defeito que `formatarDiaCivil` evita.
+    expect(await screen.findByText("10/08/2026")).toBeInTheDocument();
+  });
+
+  it("exibe o instante do registro no fuso de São Paulo, não em UTC", async () => {
+    prepararBase();
+    vi.mocked(listarSolicitacoesPessoas).mockResolvedValue(
+      pagina([solicitacao({ criadoEm: "2026-09-29T10:00:00.000Z" })]) as never,
+    );
+    render(<SolicitacoesScreen />);
+    // `criadoEm` é instante: 10:00Z são 07:00 em São Paulo. A forma anterior
+    // fatiava o ISO cru e mostrava 10:00 — três horas erradas para quem lê aqui.
+    expect(await screen.findByText("29/09/2026 às 07:00")).toBeInTheDocument();
   });
 
   it("não chama nenhuma API de ponto, férias, folha ou cadastro", async () => {

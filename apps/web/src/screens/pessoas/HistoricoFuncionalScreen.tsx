@@ -37,7 +37,7 @@ import {
   listarColaboradores,
   listarVinculosDoColaborador,
 } from "../../api/colaboradoresClient";
-import { formatarDia } from "../../format/dia";
+import { formatarDiaCivil, formatarInstante } from "../../format/data";
 import {
   type AreaApi,
   type CentroCustoApi,
@@ -223,10 +223,6 @@ function montarDestinoDto(
     default:
       return {};
   }
-}
-
-function formatarDataHora(iso: string): string {
-  return iso.replace("T", " ").slice(0, 16);
 }
 
 export function HistoricoFuncionalScreen() {
@@ -769,7 +765,7 @@ export function HistoricoFuncionalScreen() {
     if (m.status === "retificada") {
       const correcao = linhaDoTempo?.itens.find((x) => x.retificaId === m.id);
       return correcao
-        ? `Corrigida — nova vigência ${formatarDia(correcao.vigenciaInicio)}`
+        ? `Corrigida — nova vigência ${formatarDiaCivil(correcao.vigenciaInicio)}`
         : "Corrigida";
     }
     if (m.retificaId) return "É a correção de outra movimentação";
@@ -804,17 +800,17 @@ export function HistoricoFuncionalScreen() {
     {
       key: "vigencia",
       header: "Vigência início",
-      cell: (m) => formatarDia(m.vigenciaInicio),
+      cell: (m) => formatarDiaCivil(m.vigenciaInicio),
     },
     {
       key: "registrada",
       header: "Registrada em",
-      cell: (m) => formatarDataHora(m.registradaEm),
+      cell: (m) => formatarInstante(m.registradaEm),
     },
     {
       key: "efetivada",
       header: "Efetivada em",
-      cell: (m) => (m.efetivadaEm ? formatarDataHora(m.efetivadaEm) : "—"),
+      cell: (m) => formatarInstante(m.efetivadaEm),
     },
     {
       key: "acoes",
@@ -857,17 +853,17 @@ export function HistoricoFuncionalScreen() {
     {
       key: "vigencia",
       header: "Vigência início",
-      cell: (m) => formatarDia(m.vigenciaInicio),
+      cell: (m) => formatarDiaCivil(m.vigenciaInicio),
     },
     {
       key: "registrada",
       header: "Registrada em",
-      cell: (m) => formatarDataHora(m.registradaEm),
+      cell: (m) => formatarInstante(m.registradaEm),
     },
     {
       key: "efetivada",
       header: "Efetivada em",
-      cell: (m) => (m.efetivadaEm ? formatarDataHora(m.efetivadaEm) : "—"),
+      cell: (m) => formatarInstante(m.efetivadaEm),
     },
     {
       key: "retificacao",

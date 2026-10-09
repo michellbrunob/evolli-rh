@@ -22,7 +22,7 @@ import {
   listarVinculosDoColaborador,
   retificarColaborador,
 } from "../../api/colaboradoresClient";
-import { formatarDia } from "../../format/dia";
+import { formatarDiaCivil } from "../../format/data";
 import {
   type AreaApi,
   type CentroCustoApi,
@@ -708,14 +708,17 @@ export function ColaboradoresScreen() {
       ),
     },
     {
+      // Dias civis (`@db.Date`): o Prisma os entrega como datetime ISO, e
+      // `formatarDiaCivil` lê os componentes direto da string — `Date` não
+      // entra no caminho, logo o dia exibido nunca recua a oeste de Greenwich.
       key: "admissao",
       header: "Admissão",
-      cell: (v) => formatarDia(v.dataAdmissao),
+      cell: (v) => formatarDiaCivil(v.dataAdmissao),
     },
     {
       key: "desligamento",
       header: "Desligamento",
-      cell: (v) => formatarDia(v.dataDesligamento),
+      cell: (v) => formatarDiaCivil(v.dataDesligamento),
     },
   ];
 

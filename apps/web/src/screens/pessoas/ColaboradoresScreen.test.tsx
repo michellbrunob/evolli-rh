@@ -1568,8 +1568,12 @@ describe("ColaboradoresScreen (T147 — homologação da admissão)", () => {
    *
    * Falha na implementação anterior: a célula mostrava
    * "2026-01-05T00:00:00.000Z".
+   *
+   * T154: o dia passa a ser exibido em `DD/MM/AAAA`. O corte continua sendo
+   * textual — nada de `new Date()` —, então `2026-01-05T00:00:00.000Z` vira
+   * `05/01/2026` e não recua para 04/01 no fuso brasileiro.
    */
-  it("exibe a data de admissão como dia, no formato do servidor real", async () => {
+  it("exibe a data de admissão como dia brasileiro, no formato do servidor real", async () => {
     vi.mocked(listarVinculosDoColaborador).mockResolvedValue([
       { ...vinculo1, dataAdmissao: "2026-01-05T00:00:00.000Z" },
     ]);
@@ -1585,7 +1589,10 @@ describe("ColaboradoresScreen (T147 — homologação da admissão)", () => {
     const tabela = await screen.findByRole("table", {
       name: `Vínculos — ${colaborador1.nome}`,
     });
-    expect(within(tabela).getByText("2026-01-05")).toBeInTheDocument();
+    expect(within(tabela).getByText("05/01/2026")).toBeInTheDocument();
+    expect(within(tabela).queryByText("2026-01-05")).toBeNull();
     expect(within(tabela).queryByText("2026-01-05T00:00:00.000Z")).toBeNull();
+    // O dia NÃO recua: 05, nunca 04/01/2026.
+    expect(within(tabela).queryByText("04/01/2026")).toBeNull();
   });
 });

@@ -1016,4 +1016,23 @@ describe("ContasAcessoScreen (T121)", () => {
       }
     });
   });
+
+  describe("apresentação de datas (T154)", () => {
+    it("'Criada em' mostra o instante em America/Sao_Paulo, não o UTC cru", async () => {
+      vi.mocked(obterUsuarioAtual).mockResolvedValue(rhAtor);
+      vi.mocked(listarUsuarios).mockResolvedValue({
+        items: [contaAtiva],
+        nextCursor: null,
+      });
+
+      render(<ContasAcessoScreen />);
+      await screen.findByText("pessoa1@example.test");
+
+      // `createdAt` é `2026-01-05T10:00:00.000Z`. Em São Paulo (UTC-3, sem
+      // horário de verão desde 2019) são 07:00 do dia 05. Antes da T154 a
+      // tela fatiava o ISO e exibia "2026-01-05 10:00" — três horas a mais.
+      expect(screen.getByText("05/01/2026 às 07:00")).toBeInTheDocument();
+      expect(screen.queryByText("2026-01-05 10:00")).not.toBeInTheDocument();
+    });
+  });
 });

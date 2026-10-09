@@ -36,7 +36,7 @@ import {
   type TipoVinculo,
   type VinculoApi,
 } from "../../api/colaboradoresClient";
-import { formatarDia } from "../../format/dia";
+import { formatarDiaCivil, formatarInstante } from "../../format/data";
 import {
   listarAlocacoesVinculo,
   type AlocacaoOrganizacionalApi,
@@ -113,15 +113,12 @@ const VARIANTE_STATUS_MOV: Record<StatusMovimentacao, StatusVariant> = {
   retificada: "neutral",
 };
 
-/**
- * Mesma data, mesma forma nas três telas: aponta para o formatador
- * compartilhado em vez de manter uma segunda definição que pode divergir.
- */
-const formatarData = formatarDia;
-
-function formatarDataHora(iso: string): string {
-  return iso.replace("T", " ").slice(0, 16);
-}
+// Datas e horas vêm de `format/data` (T154) e são usadas pelo nome delas:
+// `formatarDiaCivil` para dia de calendário (`@db.Date` — admissão, vigências)
+// e `formatarInstante` para ponto no tempo (`criadoEm`, `registradaEm`), que é
+// convertido para America/Sao_Paulo. O alias local `formatarData` sumiu de
+// propósito: ele escondia qual das duas semânticas estava em jogo em cada
+// célula, que é exatamente a distinção que esta tela precisa deixar visível.
 
 export function DadosContratuaisScreen() {
   const [colaboradores, setColaboradores] = useState<ColaboradorApi[]>([]);
@@ -408,11 +405,17 @@ export function DadosContratuaisScreen() {
   );
 
   const colunasAlocacoes: DataTableColumn<AlocacaoOrganizacionalApi>[] = [
-    { key: "de", header: "Vigente de", cell: (a) => formatarData(a.vigenteDe) },
     {
+      key: "de",
+      header: "Vigente de",
+      cell: (a) => formatarDiaCivil(a.vigenteDe),
+    },
+    {
+      // Nulo aqui NÃO é ausência: é vigência aberta. Por decisão de domínio a
+      // célula diz "Vigente", e não o traço de valor ausente.
       key: "ate",
       header: "Vigente até",
-      cell: (a) => (a.vigenteAte ? formatarData(a.vigenteAte) : "Vigente"),
+      cell: (a) => (a.vigenteAte ? formatarDiaCivil(a.vigenteAte) : "Vigente"),
     },
     { key: "cargo", header: "Cargo", cell: (a) => rotuloCargo(a.cargoId) },
     { key: "lotacao", header: "Lotação", cell: (a) => rotuloLotacao(a) },
@@ -427,12 +430,13 @@ export function DadosContratuaisScreen() {
     {
       key: "de",
       header: "Vigência início",
-      cell: (h) => formatarData(h.vigenciaInicio),
+      cell: (h) => formatarDiaCivil(h.vigenciaInicio),
     },
     {
       key: "ate",
       header: "Vigência fim",
-      cell: (h) => (h.vigenciaFim ? formatarData(h.vigenciaFim) : "Vigente"),
+      cell: (h) =>
+        h.vigenciaFim ? formatarDiaCivil(h.vigenciaFim) : "Vigente",
     },
   ];
 
@@ -440,7 +444,7 @@ export function DadosContratuaisScreen() {
     {
       key: "vigencia",
       header: "Vigência",
-      cell: (m) => formatarData(m.vigenciaInicio),
+      cell: (m) => formatarDiaCivil(m.vigenciaInicio),
     },
     { key: "tipo", header: "Tipo", cell: (m) => ROTULO_TIPO_MOV[m.tipo] },
     {
@@ -455,7 +459,7 @@ export function DadosContratuaisScreen() {
     {
       key: "registrada",
       header: "Registrada em",
-      cell: (m) => formatarDataHora(m.registradaEm),
+      cell: (m) => formatarInstante(m.registradaEm),
     },
   ];
 
@@ -619,11 +623,11 @@ export function DadosContratuaisScreen() {
               </div>
               <div>
                 <dt>Admissão</dt>
-                <dd>{formatarData(vinculoSelecionado.dataAdmissao)}</dd>
+                <dd>{formatarDiaCivil(vinculoSelecionado.dataAdmissao)}</dd>
               </div>
               <div>
                 <dt>Desligamento</dt>
-                <dd>{formatarData(vinculoSelecionado.dataDesligamento)}</dd>
+                <dd>{formatarDiaCivil(vinculoSelecionado.dataDesligamento)}</dd>
               </div>
               <div>
                 <dt>Empresa</dt>
@@ -660,11 +664,11 @@ export function DadosContratuaisScreen() {
               </div>
               <div>
                 <dt>Criado em</dt>
-                <dd>{formatarDataHora(vinculoSelecionado.criadoEm)}</dd>
+                <dd>{formatarInstante(vinculoSelecionado.criadoEm)}</dd>
               </div>
               <div>
                 <dt>Atualizado em</dt>
-                <dd>{formatarDataHora(vinculoSelecionado.atualizadoEm)}</dd>
+                <dd>{formatarInstante(vinculoSelecionado.atualizadoEm)}</dd>
               </div>
             </dl>
           </Surface>

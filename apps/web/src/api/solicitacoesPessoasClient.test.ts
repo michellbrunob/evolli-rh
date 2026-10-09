@@ -10,8 +10,6 @@ import {
   SITUACOES_SOLICITACAO_PESSOA,
   TIPOS_SOLICITACAO_PESSOA,
   detalharSolicitacaoPessoa,
-  formatarDiaReferencia,
-  formatarMomento,
   historicoSolicitacaoPessoa,
   listarSolicitacoesPessoas,
   registrarSolicitacaoPessoa,
@@ -307,19 +305,5 @@ describe("solicitacoesPessoasClient — catálogos e rótulos", () => {
   });
 });
 
-describe("solicitacoesPessoasClient — formatação", () => {
-  it("reexibe o dia de referência sem recalcular fuso", () => {
-    // Entra "2026-08-10", volta datetime ISO: a tela mostra o dia gravado.
-    expect(formatarDiaReferencia("2026-08-10T00:00:00.000Z")).toBe(
-      "2026-08-10",
-    );
-    expect(formatarDiaReferencia(null)).toBe("—");
-  });
-
-  it("formata marcos e trata ausência", () => {
-    expect(formatarMomento("2026-09-29T10:30:00.000Z")).toBe(
-      "2026-09-29 10:30",
-    );
-    expect(formatarMomento(null)).toBe("—");
-  });
-});
+// A formatação de datas saiu deste cliente na T154 (era erro de camada) e mora
+// em `src/format/data.ts`; a cobertura equivalente está em `format/data.test.ts`.

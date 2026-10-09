@@ -154,6 +154,30 @@ describe("CentralSolicitacoesRHScreen (T068 — tela visual estática)", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("usa o mesmo traço para período ausente na tabela e no detalhe (T154)", () => {
+    render(<CentralSolicitacoesRHScreen />);
+
+    // SOL-DEMO-0002 tem `periodoReferencia: null`.
+    const tabela = screen.getByRole("table", {
+      name: "Solicitações para revisão do RH",
+    });
+    const linha = within(tabela).getByText("SOL-DEMO-0002").closest("tr")!;
+    expect(within(linha).getByText("—")).toBeInTheDocument();
+
+    fireEvent.click(
+      within(linha).getByRole("button", {
+        name: /Ver detalhe — SOL-DEMO-0002/,
+      }),
+    );
+
+    const detalhe = screen
+      .getByText(/Detalhe da solicitação —/)
+      .closest("section")!;
+    const campoPeriodo = within(detalhe).getByText("Período").closest("div")!;
+    expect(within(campoPeriodo).getByText("—")).toBeInTheDocument();
+    expect(screen.queryByText("Não aplicável")).not.toBeInTheDocument();
+  });
+
   it("filtra localmente por tipo, situação e prioridade", () => {
     render(<CentralSolicitacoesRHScreen />);
 

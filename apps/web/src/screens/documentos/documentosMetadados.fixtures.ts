@@ -24,6 +24,7 @@
  * validade/expiração de documento (DP-2E-06) ainda não foi decidida pelo
  * produto — esta tela não declara nem antecipa essa decisão.
  */
+import { formatarDiaCivil } from "../../format/data";
 
 export type SituacaoRegistroDocumento =
   "metadado_ativo" | "metadado_substituido" | "solicitacao_pendente";
@@ -58,15 +59,17 @@ export const ROTULO_CATEGORIA: Record<CategoriaRegistro, string> = {
   solicitacao: "Solicitação",
 };
 
-/** `dd/mm/aaaa` a partir de `AAAA-MM-DD` — só formatação, sem fuso/hora. */
-export function formatarDataBr(iso: string): string {
-  const [ano, mes, dia] = iso.split("-");
-  return `${dia}/${mes}/${ano}`;
-}
-
+/**
+ * Validade do registro — data civil em `DD/MM/AAAA` (T154).
+ *
+ * A ausência **não** usa o traço padrão de propósito: a validade desta tela é
+ * ilustrativa (vide a nota abaixo da tabela em `DocumentosMetadadosScreen`), e
+ * o texto longo é o que sinaliza isso dentro da célula. Trocá-lo pelo traço é
+ * decisão de produto, não de formatação — e a T154 só uniformiza formatação.
+ */
 export function formatarValidade(item: RegistroDocumentoExemplo): string {
   return item.validade
-    ? formatarDataBr(item.validade)
+    ? formatarDiaCivil(item.validade)
     : "Sem validade definida (exemplo)";
 }
 

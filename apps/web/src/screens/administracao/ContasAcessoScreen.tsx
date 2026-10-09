@@ -82,6 +82,7 @@ import {
   type EmpresaApi,
   listarEmpresasMulti,
 } from "../../api/organizacaoClient";
+import { formatarInstante } from "../../format/data";
 import "./ContasAcessoScreen.css";
 
 export const CONTAS_ACESSO_TITULO_ID = "contas-acesso-titulo";
@@ -93,10 +94,6 @@ const VARIANTE_STATUS: Record<StatusContaApi, StatusVariant> = {
   disabled: "neutral",
   locked: "warning",
 };
-
-function formatarData(iso: string): string {
-  return iso.replace("T", " ").slice(0, 16);
-}
 
 function ehPapelComum(role: string): role is PapelComum {
   return (PAPEIS_COMUNS as readonly string[]).includes(role);
@@ -609,9 +606,14 @@ export function ContasAcessoScreen({
       ),
     },
     {
+      // `AccessUser.createdAt` é INSTANTE (`DateTime` sem `@db.Date`), então
+      // vai pelo `formatarInstante`, que converte para `America/Sao_Paulo`.
+      // Antes da T154 esta célula fatiava o ISO em UTC e exibia três horas a
+      // mais — o formatador local que fazia isso era cópia literal do de
+      // `SessoesAtivasPanel`, com outro nome.
       key: "criada",
       header: "Criada em",
-      cell: (u) => formatarData(u.createdAt),
+      cell: (u) => formatarInstante(u.createdAt),
     },
     {
       key: "acoes",

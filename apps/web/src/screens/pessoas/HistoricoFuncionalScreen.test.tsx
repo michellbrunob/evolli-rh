@@ -309,7 +309,9 @@ describe("HistoricoFuncionalScreen (T115 — funcional)", () => {
     expect(dentro.getByText("Efetivada")).toBeInTheDocument();
     expect(dentro.getByText("Cancelada")).toBeInTheDocument();
     expect(dentro.getByText("Realocação interna")).toBeInTheDocument();
-    expect(dentro.getByText("2026-01-10")).toBeInTheDocument();
+    expect(dentro.getByText("10/01/2026")).toBeInTheDocument();
+    // `registradaEm` é INSTANTE: 2026-01-05T10:00Z lido em America/Sao_Paulo.
+    expect(dentro.getByText("05/01/2026 às 07:00")).toBeInTheDocument();
   });
 
   it("mostra o estado de carregamento antes das movimentações chegarem", async () => {
@@ -753,7 +755,7 @@ describe("HistoricoFuncionalScreen (T115 — funcional)", () => {
     );
     expect(within(painel).getAllByText("Solicitada").length).toBeGreaterThan(0);
     expect(
-      within(painel).getByText(/Corrigida — nova vigência 2026-01-20/),
+      within(painel).getByText("Corrigida — nova vigência 20/01/2026"),
     ).toBeInTheDocument();
     expect(
       within(painel).getByText("É a correção de outra movimentação"),

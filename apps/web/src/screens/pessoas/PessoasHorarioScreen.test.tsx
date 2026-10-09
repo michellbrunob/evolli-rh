@@ -100,8 +100,12 @@ const vinculoEncerrado: VinculoHorarioApi = {
   colaboradorId: colaboradorInativo.id,
   empresaId: tabelaAtiva.empresaId,
   tabelaHorarioId: tabelaAtiva.id,
-  vigenciaInicio: "2024-01-01",
-  vigenciaFim: "2024-12-31",
+  // Forma REAL do fio: `vigenciaInicio`/`vigenciaFim` são `@db.Date`, e o
+  // Prisma as entrega como `Date` — chegam ao navegador em ISO completo.
+  // A fixture antiga usava "2024-01-01" puro e por isso não pegava o ISO cru
+  // vazando para a coluna "Vigência".
+  vigenciaInicio: "2024-01-01T00:00:00.000Z",
+  vigenciaFim: "2024-12-31T00:00:00.000Z",
   criadoPorUserId: "88888888-8888-8888-8888-888888888888",
   criadoEm: "2024-01-01T12:00:00.000Z",
   atualizadoEm: "2024-12-31T12:00:00.000Z",
@@ -144,8 +148,8 @@ describe("PessoasHorarioScreen (T112 — funcional)", () => {
     expect(dentro.getByText("Ana Colaboradora (teste)")).toBeInTheDocument();
     expect(dentro.getByText("Carla Inativa (teste)")).toBeInTheDocument();
     expect(dentro.getAllByText("Tabela Comercial (teste)").length).toBe(2);
-    expect(dentro.getByText("2025-01-10 – vigente")).toBeInTheDocument();
-    expect(dentro.getByText("2024-01-01 – 2024-12-31")).toBeInTheDocument();
+    expect(dentro.getByText("10/01/2025 – vigente")).toBeInTheDocument();
+    expect(dentro.getByText("01/01/2024 – 31/12/2024")).toBeInTheDocument();
     expect(dentro.getByText("Vigente")).toBeInTheDocument();
     expect(dentro.getByText("Encerrada")).toBeInTheDocument();
   });
@@ -425,6 +429,10 @@ describe("PessoasHorarioScreen (T112 — funcional)", () => {
     ).toBeInTheDocument();
     expect(screen.getByText(/Tabela de horário:/)).toHaveTextContent(
       "Tabela Comercial (teste)",
+    );
+    // Vigência é DATA CIVIL: o painel não pode mais vazar o ISO cru.
+    expect(screen.getByText(/Tabela de horário:/)).toHaveTextContent(
+      "Vigência: 10/01/2025 – vigente",
     );
     expect(screen.queryByLabelText(/^Colaborador\b/i)).not.toBeInTheDocument();
     expect(

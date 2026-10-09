@@ -62,12 +62,6 @@ export const ROTULO_PRIORIDADE_RH: Record<PrioridadeSolicitacaoRH, string> = {
   critica: "Crítica",
 };
 
-/** `dd/mm/aaaa` a partir de `AAAA-MM-DD` — sem fuso/hora. */
-export function formatarDataBr(iso: string): string {
-  const [ano, mes, dia] = iso.split("-");
-  return `${dia}/${mes}/${ano}`;
-}
-
 export const SOLICITACOES_RH_EXEMPLO: readonly SolicitacaoRHExemplo[] = [
   {
     id: "SOL-DEMO-0001",

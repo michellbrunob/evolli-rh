@@ -273,9 +273,33 @@ describe("DadosContratuaisScreen (T134 — funcional, somente leitura)", () => {
     });
     render(<DadosContratuaisScreen />);
     await screen.findByRole("heading", { name: "Vínculo — M-001" });
-    expect(screen.getAllByText("2026-01-05").length).toBeGreaterThan(0);
-    expect(screen.getByText("2026-06-30")).toBeInTheDocument();
+    expect(screen.getAllByText("05/01/2026").length).toBeGreaterThan(0);
+    expect(screen.getByText("30/06/2026")).toBeInTheDocument();
     expect(screen.getAllByText("Encerrado").length).toBeGreaterThan(0);
+    // Nenhum ISO cru sobra na tela (T154).
+    expect(screen.queryByText("2026-01-05")).toBeNull();
+    expect(screen.queryByText("2026-06-30")).toBeNull();
+  });
+
+  /**
+   * T154. `criadoEm`/`atualizadoEm`/`registradaEm` são `DateTime` sem
+   * `@db.Date` — instantes de verdade. A implementação anterior fatiava o ISO
+   * e mostrava a hora **UTC**: `2026-01-05T09:00:00.000Z` aparecia como
+   * "2026-01-05 09:00", três horas adiantada para quem lê no Brasil. Agora o
+   * instante é convertido para America/Sao_Paulo e exibido com `às` e relógio
+   * de 24 horas: "05/01/2026 às 06:00".
+   */
+  it("instantes são exibidos no fuso de São Paulo, não em UTC", async () => {
+    configurarPadrao({ colaboradores: [COLAB_1], vinculos: [vinculo()] });
+    render(<DadosContratuaisScreen />);
+    await screen.findByRole("heading", { name: "Vínculo — M-001" });
+
+    // "Criado em", "Atualizado em" (detalhe) e "Registrada em" (linha do
+    // tempo) partem todos de 2026-01-05T09:00:00.000Z.
+    expect(screen.getAllByText("05/01/2026 às 06:00").length).toBe(3);
+    // A hora UTC não sobra em lugar nenhum, em nenhuma das duas grafias.
+    expect(screen.queryByText("2026-01-05 09:00")).toBeNull();
+    expect(screen.queryByText("05/01/2026 às 09:00")).toBeNull();
   });
 
   it("linha do tempo é somente leitura e orienta para Histórico funcional", async () => {
@@ -409,8 +433,8 @@ describe("DadosContratuaisScreen (T134) — corridas assíncronas", () => {
       screen.getByRole("heading", { name: "Vínculo — MB" }),
     ).toBeInTheDocument();
     expect(screen.queryByText(/MA/)).not.toBeInTheDocument();
-    expect(screen.queryByText("2020-01-01")).not.toBeInTheDocument();
-    expect(screen.getAllByText("2026-09-09").length).toBeGreaterThan(0);
+    expect(screen.queryByText("01/01/2020")).not.toBeInTheDocument();
+    expect(screen.getAllByText("09/09/2026").length).toBeGreaterThan(0);
   });
 
   it("troca de vínculo: alocações/linha do tempo tardias de V1 não aparecem no detalhe de V2", async () => {
