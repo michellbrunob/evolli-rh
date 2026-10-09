@@ -72,3 +72,7 @@ dados, permissões, auditoria e critérios de aceite próprios.
 Pesquisas de mercado podem inspirar a separação visual entre contratação e desligamento e o conceito de
 template operacional. Elas não definem regras do Evolli, não autorizam cópia de interface, conteúdo,
 código ou regras privadas de terceiros, e não substituem as decisões de RH acima.
+
+O inventário ampliado de capacidades de Gestão de Talentos observadas como
+referência está em [Mapa funcional de Gestão de Talentos](t155-mapa-funcional-gestao-talentos-referencia-mercado.md).
+Ele mantém a mesma limitação: é insumo para decisão, não requisito aprovado.

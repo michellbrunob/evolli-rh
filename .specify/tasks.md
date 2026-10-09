@@ -1150,6 +1150,10 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
     - **Decisões necessárias de RH antes de código:** templates por empresa e fluxo; itens,
       responsáveis e prazos; status e exceções; relação com a efetivação do vínculo; evidência
       permitida; visibilidade por papel; reabertura, dispensa e auditoria.
+    - **Referência funcional registrada:** o inventário de Pessoas, Estrutura, Registros, Feedbacks,
+      Checklists, Saúde, Motivos de desligamento e Métricas foi consolidado em
+      `docs/decisions/t155-mapa-funcional-gestao-talentos-referencia-mercado.md`. É referência
+      descritiva, não requisito aprovado nem autorização para copiar solução de terceiros.
     - **Aceite desta investigação:** documento de decisão com o inventário de contratos existentes,
       fronteiras de privacidade e perguntas objetivas ao RH; nenhum endpoint, migration, tela ou
       regra de negócio implementada enquanto faltar aprovação.

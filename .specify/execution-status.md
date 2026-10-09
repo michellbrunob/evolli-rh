@@ -879,6 +879,11 @@ estados, exceções, evidências permitidas, relação com a efetivação e visi
 registrada em documento próprio; enquanto ela faltar, a T155 permanece investigativa e não autoriza
 migration, endpoint ou interface.
 
+**Referência de produto registrada.** A navegação somente leitura de uma solução de mercado também
+foi consolidada no [mapa funcional de Gestão de Talentos](../docs/decisions/t155-mapa-funcional-gestao-talentos-referencia-mercado.md).
+O mapa separa o que foi observado de decisões pendentes e preserva a proibição de copiar código,
+marca, interface, textos ou regras privadas. Ele não amplia o escopo implementável da T155.
+
 ## Próxima ação autorizável
 
 1. ~~**Decidir o pacote da T150**~~ — **cumprido pela T151.** O proprietário aprovou o recorte em
