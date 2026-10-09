@@ -13,6 +13,7 @@ import {
   listarSessoesAtivas,
   revogarSessao,
 } from "../api/sessoesClient";
+import { expectSemIsoVisivel } from "../test/semIsoVisivel";
 
 vi.mock("../api/sessoesClient", async () => {
   const actual = await vi.importActual<typeof import("../api/sessoesClient")>(
@@ -123,6 +124,12 @@ describe("SessoesAtivasPanel (T117)", () => {
 
     expect(tabela).not.toHaveTextContent("2026-01-01 10:00");
     expect(tabela).not.toHaveTextContent("2026-01-08 10:00");
+
+    // As asserções acima nomeiam três instantes; a guarda cobre o texto
+    // visível inteiro do painel — cabeçalho, avisos e qualquer coluna futura.
+    // O `value` de campo de formulário fica fora do alcance dela por ser
+    // atributo: ali o ISO é contrato, não apresentação.
+    expectSemIsoVisivel(document.body);
   });
 
   it("mostra o estado de carregamento antes das sessões chegarem", async () => {

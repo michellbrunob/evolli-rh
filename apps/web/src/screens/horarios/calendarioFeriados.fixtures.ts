@@ -48,12 +48,6 @@ export const ROTULO_SITUACAO_FERIADO: Record<SituacaoFeriado, string> = {
  * real associado. */
 export const ANOS_ILUSTRATIVOS_DISPONIVEIS: readonly number[] = [2025, 2026];
 
-/** `dd/mm/aaaa` a partir de `AAAA-MM-DD` — só formatação, sem fuso/hora. */
-export function formatarDataBr(iso: string): string {
-  const [ano, mes, dia] = iso.split("-");
-  return `${dia}/${mes}/${ano}`;
-}
-
 export const FERIADOS_EXEMPLO: readonly FeriadoExemplo[] = [
   {
     id: "feriado-exemplo-1",

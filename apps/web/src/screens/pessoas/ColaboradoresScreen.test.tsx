@@ -32,6 +32,7 @@ import {
   listarUnidades,
 } from "../../api/organizacaoClient";
 import { type CargoApi, listarCargos } from "../../api/cargoClient";
+import { expectSemIsoVisivel } from "../../test/semIsoVisivel";
 
 vi.mock("../../api/colaboradoresClient");
 vi.mock("../../api/organizacaoClient");
@@ -526,6 +527,16 @@ describe("ColaboradoresScreen (T111 — funcional)", () => {
     const dentro = within(tabelaVinculos);
     expect(dentro.getByText("MAT-0001")).toBeInTheDocument();
     expect(dentro.getByText("CLT")).toBeInTheDocument();
+    // Admissão e desligamento são os únicos dias exibidos nesta tela, e vivem
+    // aqui no detalhe — por isso a guarda da T154 é chamada com a lista E o
+    // detalhe na tela, e não só com a listagem.
+    expect(dentro.getByText("10/01/2025")).toBeInTheDocument();
+
+    // Guarda da T154: varre o texto visível INTEIRO — cabeçalho, filtros,
+    // tabela da lista e painel de detalhe entram junto. O `value` de campo de
+    // formulário fica fora do alcance por ser atributo, e não texto: ali o ISO
+    // é contrato com o `<input type="date">`, não apresentação.
+    expectSemIsoVisivel(document.body);
   });
 
   it("não expõe campos para alterar matrícula, tipo ou data de admissão no detalhe", async () => {

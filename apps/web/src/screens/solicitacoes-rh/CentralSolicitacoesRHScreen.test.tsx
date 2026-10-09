@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+import { expectSemIsoVisivel } from "../../test/semIsoVisivel";
 import { CentralSolicitacoesRHScreen } from "./CentralSolicitacoesRHScreen";
 
 describe("CentralSolicitacoesRHScreen (T068 — tela visual estática)", () => {
@@ -176,6 +177,26 @@ describe("CentralSolicitacoesRHScreen (T068 — tela visual estática)", () => {
     const campoPeriodo = within(detalhe).getByText("Período").closest("div")!;
     expect(within(campoPeriodo).getByText("—")).toBeInTheDocument();
     expect(screen.queryByText("Não aplicável")).not.toBeInTheDocument();
+  });
+
+  it("não deixa data ISO visível no estado normal com dados (T154)", () => {
+    render(<CentralSolicitacoesRHScreen />);
+
+    // Os dados da amostra já estão na tela: a tela é estática, sem busca
+    // assíncrona, então basta confirmar que a tabela veio com a linha e o
+    // período no formato brasileiro antes de rodar a guarda.
+    const tabela = screen.getByRole("table", {
+      name: "Solicitações para revisão do RH",
+    });
+    const linha = within(tabela).getByText("SOL-DEMO-0001").closest("tr")!;
+    // `periodoReferencia: "2026-08-10"` na fixture — o usuário lê 10/08/2026.
+    expect(within(linha).getByText("10/08/2026")).toBeInTheDocument();
+
+    // Guarda ampla: varre o TEXTO VISÍVEL inteiro da tela, não só a célula
+    // acima. Como olha o DOM renderizado, o `value` de campo de formulário
+    // fica naturalmente fora do alcance — é atributo, e atributo é contrato,
+    // não apresentação.
+    expectSemIsoVisivel(document.body);
   });
 
   it("filtra localmente por tipo, situação e prioridade", () => {

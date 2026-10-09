@@ -21,6 +21,7 @@ import {
   listarTiposDocumento,
   substituirDocumento,
 } from "../../api/documentosClient";
+import { expectSemIsoVisivel } from "../../test/semIsoVisivel";
 
 vi.mock("../../api/usersClient", async () => {
   const actual = await vi.importActual<typeof import("../../api/usersClient")>(
@@ -206,6 +207,13 @@ describe("PessoasDocumentosScreen (T133 — funcional)", () => {
     expect(
       screen.getByText(/nenhum conteúdo, arquivo, upload, download/i),
     ).toBeInTheDocument();
+
+    // Guarda da T154: varre o texto visível inteiro da tela — tabela de
+    // documentos, tabela de solicitações e o detalhe aberto acima —, não só
+    // os trechos que este teste nomeia. O `value` de campo de formulário fica
+    // fora do alcance por ser atributo: ali o ISO é contrato, não
+    // apresentação, e deve continuar cru.
+    expectSemIsoVisivel(document.body);
   });
 
   it("documentos vazios mostram estado vazio", async () => {

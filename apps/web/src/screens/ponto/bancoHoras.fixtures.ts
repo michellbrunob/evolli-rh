@@ -36,12 +36,6 @@ export const ROTULO_ORIGEM_MOVIMENTO: Record<OrigemMovimentoExemplo, string> = {
   movimento_sintetico: "Movimento sintético (exemplo avulso)",
 };
 
-/** `dd/mm/aaaa` a partir de `AAAA-MM-DD` — sem fuso/hora. */
-export function formatarDataBr(iso: string): string {
-  const [ano, mes, dia] = iso.split("-");
-  return `${dia}/${mes}/${ano}`;
-}
-
 export const EXTRATO_BANCO_HORAS_EXEMPLO: readonly MovimentoBancoHorasExemplo[] =
   [
     {

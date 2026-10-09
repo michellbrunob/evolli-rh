@@ -6,9 +6,9 @@
  * cálculo real. Todo dado é sintético.
  */
 import { PageHeader, StatusBadge, Surface } from "../../components";
+import { formatarDiaCivil } from "../../format/data";
 import {
   APONTAMENTOS_PORTAL_EXEMPLO,
-  formatarDataBr,
   PERIODO_JORNADA_EXEMPLO,
   RESUMO_BANCO_HORAS_PORTAL_EXEMPLO,
   RESUMO_JORNADA_PORTAL_EXEMPLO,
@@ -55,8 +55,8 @@ export function MinhaJornadaScreen() {
           Período de referência (exemplo)
         </h2>
         <p className="minha-jornada-screen__periodo">
-          {formatarDataBr(PERIODO_JORNADA_EXEMPLO.inicio)} –{" "}
-          {formatarDataBr(PERIODO_JORNADA_EXEMPLO.fim)}
+          {formatarDiaCivil(PERIODO_JORNADA_EXEMPLO.inicio)} –{" "}
+          {formatarDiaCivil(PERIODO_JORNADA_EXEMPLO.fim)}
         </p>
       </section>
 
@@ -128,7 +128,7 @@ export function MinhaJornadaScreen() {
         <ul className="minha-jornada-screen__apontamentos">
           {APONTAMENTOS_PORTAL_EXEMPLO.map((item) => (
             <li key={item.dia}>
-              {formatarDataBr(item.dia)} — {item.rotulo}
+              {formatarDiaCivil(item.dia)} — {item.rotulo}
             </li>
           ))}
         </ul>

@@ -57,12 +57,6 @@ export const ROTULO_VALIDACAO_GESTOR: Record<ValidacaoGestorAjuste, string> = {
   nao_recomendado: "Não recomendado pelo gestor",
 };
 
-/** `dd/mm/aaaa` a partir de `AAAA-MM-DD` — sem fuso/hora. */
-export function formatarDataBr(iso: string): string {
-  const [ano, mes, dia] = iso.split("-");
-  return `${dia}/${mes}/${ano}`;
-}
-
 export const AJUSTES_MANUAIS_EXEMPLO: readonly AjusteManualExemplo[] = [
   {
     id: "AJU-2026-0001",

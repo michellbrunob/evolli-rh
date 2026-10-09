@@ -8,6 +8,8 @@
  * rascunho, aguardando validação ou versão histórica de exemplo.
  */
 
+import { formatarDiaCivil } from "../../format/data";
+
 export type SituacaoPoliticaBancoHoras =
   "rascunho" | "aguardando_validacao" | "versao_historica_exemplo";
 
@@ -32,19 +34,13 @@ export const ROTULO_SITUACAO_POLITICA: Record<
   versao_historica_exemplo: "Versão histórica de exemplo",
 };
 
-/** `dd/mm/aaaa` a partir de `AAAA-MM-DD` — sem fuso/hora. */
-export function formatarDataBr(iso: string): string {
-  const [ano, mes, dia] = iso.split("-");
-  return `${dia}/${mes}/${ano}`;
-}
-
 export function formatarVigenciaIlustrativa(
   politica: Pick<
     PoliticaBancoHorasExemplo,
     "vigenciaInicioIlustrativa" | "vigenciaFimIlustrativa"
   >,
 ): string {
-  return `${formatarDataBr(politica.vigenciaInicioIlustrativa)} a ${formatarDataBr(
+  return `${formatarDiaCivil(politica.vigenciaInicioIlustrativa)} a ${formatarDiaCivil(
     politica.vigenciaFimIlustrativa,
   )} (ilustrativa)`;
 }

@@ -35,6 +35,7 @@ import {
   registrarMovimentacao,
   retificarMovimentacao,
 } from "../../api/movimentacaoClient";
+import { expectSemIsoVisivel } from "../../test/semIsoVisivel";
 
 vi.mock("../../api/colaboradoresClient");
 vi.mock("../../api/organizacaoClient");
@@ -312,6 +313,12 @@ describe("HistoricoFuncionalScreen (T115 — funcional)", () => {
     expect(dentro.getByText("10/01/2026")).toBeInTheDocument();
     // `registradaEm` é INSTANTE: 2026-01-05T10:00Z lido em America/Sao_Paulo.
     expect(dentro.getByText("05/01/2026 às 07:00")).toBeInTheDocument();
+
+    // Guarda da T154: varre o texto visível INTEIRO da tela, não só a tabela —
+    // filtros, cabeçalho e disclaimer entram junto. O `value` de campo de
+    // formulário fica fora do alcance por ser atributo, e não texto: ali o ISO
+    // é contrato com o `<input type="date">`, não apresentação.
+    expectSemIsoVisivel(document.body);
   });
 
   it("mostra o estado de carregamento antes das movimentações chegarem", async () => {

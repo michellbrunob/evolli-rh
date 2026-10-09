@@ -21,6 +21,7 @@ import {
   encerrarVinculoHorario,
   listarVinculosHorario,
 } from "../../api/vinculoHorarioClient";
+import { expectSemIsoVisivel } from "../../test/semIsoVisivel";
 
 vi.mock("../../api/colaboradoresClient");
 vi.mock("../../api/horariosClient");
@@ -152,6 +153,11 @@ describe("PessoasHorarioScreen (T112 — funcional)", () => {
     expect(dentro.getByText("01/01/2024 – 31/12/2024")).toBeInTheDocument();
     expect(dentro.getByText("Vigente")).toBeInTheDocument();
     expect(dentro.getByText("Encerrada")).toBeInTheDocument();
+
+    // Guarda da T154: varre o texto visível inteiro da tela, não só a tabela.
+    // O `value` de campo de formulário fica fora do alcance por ser atributo —
+    // ali o ISO é contrato com o `<input type="date">`, não apresentação.
+    expectSemIsoVisivel(document.body);
   });
 
   it("mostra o estado de carregamento antes dos dados chegarem", async () => {

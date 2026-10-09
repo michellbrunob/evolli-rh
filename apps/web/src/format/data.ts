@@ -43,6 +43,11 @@
  * `Intl.DateTimeFormat` com `timeZone: "America/Sao_Paulo"` — o mesmo fuso de
  * negócio que o ponto já fixa no servidor.
  *
+ * Instante **exige** designador de fuso (`Z` ou `±HH:mm`). Um valor sem fuso
+ * seria lido como hora local do processo, e a tela mostraria horas diferentes
+ * conforme a máquina — o defeito que esta tarefa fecha, não um que ela aceita.
+ * Entrada ambígua devolve `—`.
+ *
  * **Consequência visível e pretendida:** instantes que antes eram exibidos
  * fatiando o ISO em UTC passam a mostrar a hora de São Paulo. Um registro
  * gravado às `2026-01-05T00:30:00.000Z` aparecia como `2026-01-05 00:30` e
@@ -122,6 +127,48 @@ export function formatarMesReferencia(
 }
 
 /**
+ * Instante **inequívoco**: `AAAA-MM-DDTHH:mm`, segundos e fração opcionais, e
+ * designador de fuso OBRIGATÓRIO — `Z` ou `±HH:mm`.
+ *
+ * O designador não é firula de validação: sem ele, `new Date("2026-10-08T15:30:00")`
+ * é lido como **hora local do processo**. O mesmo valor renderiza `12:30` numa
+ * máquina em UTC, `15:30` em São Paulo e `03:30` em Tóquio — a saída passaria a
+ * depender de onde o código roda, que é exatamente o defeito que a T154 existe
+ * para eliminar. Entrada ambígua devolve `—`: errar visivelmente é melhor que
+ * exibir uma hora plausível e errada.
+ *
+ * Exigimos o `:` no offset (`+01:00`, não `+0100`): é a forma do perfil ISO
+ * 8601 que a especificação da linguagem define, e é a única que a API emite.
+ */
+const INSTANTE_INEQUIVOCO =
+  /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,9})?)?(?:Z|[+-](\d{2}):(\d{2}))$/;
+
+/**
+ * Valida o instante e devolve o `Date` correspondente, ou `null`.
+ *
+ * O regex sozinho aceitaria `2026-02-31T25:99:99Z`; os limites de calendário e
+ * de relógio são conferidos aqui. O offset também: `+25:00` não existe.
+ */
+function instanteDe(bruto: string): Date | null {
+  const casado = INSTANTE_INEQUIVOCO.exec(bruto);
+  if (!casado) return null;
+
+  const [, ano, mes, dia, hora, minuto, segundo, offHora, offMinuto] = casado;
+  if (!diaExiste(Number(ano), Number(mes), Number(dia))) return null;
+  if (Number(hora) > 23 || Number(minuto) > 59) return null;
+  if (segundo !== undefined && Number(segundo) > 59) return null;
+  if (
+    offHora !== undefined &&
+    (Number(offHora) > 23 || Number(offMinuto) > 59)
+  ) {
+    return null;
+  }
+
+  const instante = new Date(bruto);
+  return Number.isNaN(instante.getTime()) ? null : instante;
+}
+
+/**
  * Formatador de instante, criado uma vez.
  *
  * `hourCycle: "h23"` é explícito de propósito: `hour12: false` sozinho produz
@@ -161,13 +208,21 @@ function obterFormatador(): Intl.DateTimeFormat | null {
  * pronta: a pontuação que o `pt-BR` insere entre data e hora varia por versão
  * do ICU (vírgula, espaço estreito), e o contrato desta função é `às`.
  *
- * Nunca lança. Ausente, malformado ou `Invalid Date` devolvem `—`.
+ * **Só aceita instante inequívoco** — com `Z` ou com offset explícito. Recusa,
+ * devolvendo `—`:
+ *
+ *   `2026-10-08T15:30:00`     sem fuso: a saída dependeria da máquina
+ *   `2026-10-08 15:30:00Z`    espaço no lugar do `T`: nenhuma API nossa emite
+ *   `2026-10-08`              data civil: é de `formatarDiaCivil`
+ *   `2026-10-08T15:30:00+25:00`  offset que não existe
+ *
+ * Nunca lança. Ausente, ambíguo ou malformado devolvem `—`.
  */
 export function formatarInstante(valor: string | null | undefined): string {
-  if (typeof valor !== "string" || valor.trim() === "") return AUSENTE;
+  if (typeof valor !== "string") return AUSENTE;
 
-  const instante = new Date(valor);
-  if (Number.isNaN(instante.getTime())) return AUSENTE;
+  const instante = instanteDe(valor.trim());
+  if (!instante) return AUSENTE;
 
   const formatador = obterFormatador();
   if (!formatador) return AUSENTE;

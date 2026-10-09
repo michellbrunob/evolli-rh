@@ -18,6 +18,7 @@ import {
   resetarMfa,
 } from "../../api/usersClient";
 import { listarEmpresasMulti } from "../../api/organizacaoClient";
+import { expectSemIsoVisivel } from "../../test/semIsoVisivel";
 
 vi.mock("../../api/usersClient", async () => {
   const actual = await vi.importActual<typeof import("../../api/usersClient")>(
@@ -1033,6 +1034,12 @@ describe("ContasAcessoScreen (T121)", () => {
       // tela fatiava o ISO e exibia "2026-01-05 10:00" — três horas a mais.
       expect(screen.getByText("05/01/2026 às 07:00")).toBeInTheDocument();
       expect(screen.queryByText("2026-01-05 10:00")).not.toBeInTheDocument();
+
+      // Guarda de regressão: varre o texto visível inteiro da tela, não só a
+      // célula acima — qualquer ISO que reapareça em outra coluna, badge ou
+      // rodapé reprova aqui. O `value` de campo de formulário fica fora do
+      // alcance por ser atributo: é contrato com a API, não apresentação.
+      expectSemIsoVisivel(document.body);
     });
   });
 });

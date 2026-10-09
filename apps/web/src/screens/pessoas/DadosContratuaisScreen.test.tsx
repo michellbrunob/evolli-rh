@@ -21,6 +21,7 @@ import {
   listarUnidades,
 } from "../../api/organizacaoClient";
 import { listarTabelasHorario } from "../../api/horariosClient";
+import { expectSemIsoVisivel } from "../../test/semIsoVisivel";
 
 vi.mock("../../api/colaboradoresClient", async () => {
   const actual = await vi.importActual<
@@ -300,6 +301,12 @@ describe("DadosContratuaisScreen (T134 — funcional, somente leitura)", () => {
     // A hora UTC não sobra em lugar nenhum, em nenhuma das duas grafias.
     expect(screen.queryByText("2026-01-05 09:00")).toBeNull();
     expect(screen.queryByText("05/01/2026 às 09:00")).toBeNull();
+
+    // Guarda da T154: varre o texto visível inteiro da tela, não só os
+    // trechos que este teste nomeia. O `value` de campo de formulário fica
+    // fora do alcance por ser atributo — ali o ISO é contrato, não
+    // apresentação, e deve continuar cru.
+    expectSemIsoVisivel(document.body);
   });
 
   it("linha do tempo é somente leitura e orienta para Histórico funcional", async () => {

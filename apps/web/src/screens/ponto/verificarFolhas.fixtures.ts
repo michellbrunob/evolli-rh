@@ -51,12 +51,6 @@ export const ROTULO_ESTADO: Record<EstadoPendencia, string> = {
   resolvido: "Resolvido",
 };
 
-/** `dd/mm/aaaa` a partir de `AAAA-MM-DD` — só formatação, sem fuso/hora. */
-export function formatarDataBr(iso: string): string {
-  const [ano, mes, dia] = iso.split("-");
-  return `${dia}/${mes}/${ano}`;
-}
-
 export const PENDENCIAS_EXEMPLO: readonly PendenciaExemplo[] = [
   {
     id: "pendencia-exemplo-1",

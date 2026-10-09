@@ -217,6 +217,155 @@ describe("formatarInstante", () => {
   it("T154.18 o fuso de negócio é o mesmo que o servidor usa", () => {
     expect(FUSO_DE_NEGOCIO).toBe("America/Sao_Paulo");
   });
+
+  it("T154.21 horário de verão histórico sai do IANA, não de um offset fixo", () => {
+    // O Brasil teve horário de verão até 2019. Em janeiro de 2018 São Paulo
+    // estava em UTC-2; em julho, UTC-3. Quem subtrai três horas na mão erra
+    // metade do ano — por isso a conversão é do `Intl`, com o fuso IANA.
+    expect(formatarInstante("2018-01-15T12:00:00.000Z")).toBe(
+      "15/01/2018 às 10:00",
+    );
+    expect(formatarInstante("2018-07-15T12:00:00.000Z")).toBe(
+      "15/07/2018 às 09:00",
+    );
+    // Depois de 2019 não há mais verão: janeiro e julho ficam ambos em UTC-3.
+    expect(formatarInstante("2026-01-15T12:00:00.000Z")).toBe(
+      "15/01/2026 às 09:00",
+    );
+    expect(formatarInstante("2026-07-15T12:00:00.000Z")).toBe(
+      "15/07/2026 às 09:00",
+    );
+  });
+});
+
+/**
+ * R1 — o instante precisa ser inequívoco.
+ *
+ * `new Date("2026-10-08T15:30:00")` é lido como hora LOCAL do processo. O
+ * mesmo valor renderizaria 12:30 numa máquina em UTC e 03:30 em Tóquio: a
+ * tela passaria a depender de onde o código roda. A função recusa a entrada
+ * em vez de exibir uma hora plausível e errada.
+ */
+describe("formatarInstante — só aceita instante inequívoco", () => {
+  const FUSOS = [
+    "UTC",
+    "America/Sao_Paulo",
+    "Asia/Tokyo",
+    "Pacific/Niue",
+    "Pacific/Kiritimati",
+    "Europe/Lisbon",
+    "America/Los_Angeles",
+  ];
+
+  it("T154.22 com Z, a saída é a mesma em qualquer fuso de processo", () => {
+    for (const tz of FUSOS) {
+      expect(
+        comFuso(tz, () => formatarInstante("2026-10-08T15:30:00.000Z")),
+      ).toBe("08/10/2026 às 12:30");
+      expect(comFuso(tz, () => formatarInstante("2026-01-05T00:30:00Z"))).toBe(
+        "04/01/2026 às 21:30",
+      );
+    }
+  });
+
+  it("T154.23 com offset explícito, a saída é a mesma em qualquer fuso", () => {
+    // Três grafias do MESMO instante — têm de dar exatamente o mesmo texto.
+    const grafias = [
+      "2026-06-10T09:00:00+01:00",
+      "2026-06-10T05:00:00-03:00",
+      "2026-06-10T08:00:00.000Z",
+    ];
+    for (const tz of FUSOS) {
+      for (const g of grafias) {
+        expect(comFuso(tz, () => formatarInstante(g))).toBe(
+          "10/06/2026 às 05:00",
+        );
+      }
+    }
+  });
+
+  it("T154.24 instante SEM fuso devolve o traço — em qualquer fuso de processo", () => {
+    const ambiguos = [
+      "2026-10-08T15:30:00",
+      "2026-10-08T15:30",
+      "2026-10-08T15:30:00.000",
+      "2026-01-05T00:30:00",
+    ];
+    for (const tz of FUSOS) {
+      for (const v of ambiguos) {
+        expect(comFuso(tz, () => formatarInstante(v))).toBe(AUSENTE);
+      }
+    }
+  });
+
+  it("T154.25 data civil não é instante", () => {
+    for (const v of ["2026-10-08", "2026-10", "2026"]) {
+      expect(formatarInstante(v)).toBe(AUSENTE);
+    }
+    // E continua sendo tratada pela função certa.
+    expect(formatarDiaCivil("2026-10-08")).toBe("08/10/2026");
+  });
+
+  it("T154.26 espaço no lugar do T é recusado — nenhuma API nossa emite isso", () => {
+    for (const v of [
+      "2026-10-08 15:30:00Z",
+      "2026-10-08 15:30:00",
+      "2026-10-08 15:30:00-03:00",
+    ]) {
+      expect(formatarInstante(v)).toBe(AUSENTE);
+    }
+  });
+
+  it("T154.27 valores parcialmente válidos são recusados", () => {
+    for (const v of [
+      "2026-10-08T15Z", // sem minutos
+      "2026-10-08T15:Z", // minuto vazio
+      "2026-10-08T15:30:00ZZ", // sufixo duplicado
+      "2026-10-08T15:30:00Z extra", // lixo depois
+      "antes 2026-10-08T15:30:00Z", // lixo antes
+      "2026-10-08T15:30:00+03", // offset sem minutos
+      "2026-10-08T15:30:00+0300", // offset sem dois-pontos
+      "2026-13-08T15:30:00Z", // mês inexistente
+      "2026-02-30T15:30:00Z", // dia inexistente
+      "2026-10-08T24:00:00Z", // hora 24
+      "2026-10-08T15:60:00Z", // minuto 60
+      "2026-10-08T15:30:60Z", // segundo 60
+    ]) {
+      expect(formatarInstante(v)).toBe(AUSENTE);
+      expect(formatarInstante(v)).not.toContain("Invalid");
+    }
+  });
+
+  it("T154.28 offset impossível é recusado", () => {
+    for (const v of [
+      "2026-10-08T15:30:00+25:00",
+      "2026-10-08T15:30:00-24:00",
+      "2026-10-08T15:30:00+05:99",
+      "2026-10-08T15:30:00+99:99",
+    ]) {
+      expect(formatarInstante(v)).toBe(AUSENTE);
+    }
+    // O limite válido continua passando.
+    expect(formatarInstante("2026-10-08T15:30:00+23:59")).not.toBe(AUSENTE);
+  });
+
+  it("T154.29 fração de segundo em qualquer precisão é aceita", () => {
+    for (const v of [
+      "2026-10-08T15:30:00.0Z",
+      "2026-10-08T15:30:00.000Z",
+      "2026-10-08T15:30:00.123456Z",
+      "2026-10-08T15:30:00Z",
+      "2026-10-08T15:30Z",
+    ]) {
+      expect(formatarInstante(v)).toBe("08/10/2026 às 12:30");
+    }
+  });
+
+  it("T154.30 espaço em volta não muda o resultado", () => {
+    expect(formatarInstante("  2026-10-08T15:30:00Z  ")).toBe(
+      "08/10/2026 às 12:30",
+    );
+  });
 });
 
 describe("contrato do módulo", () => {
