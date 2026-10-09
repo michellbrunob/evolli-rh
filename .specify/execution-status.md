@@ -657,9 +657,9 @@ negócio, seed, Docker ou interface web.
 
 ## Interface web do Gestor Consultivo — T153 (somente leitura)
 
-| Tarefa | Estado               | Resultado principal                                                                                                          |
-| ------ | -------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| T153   | **Em implementação** | Interface web consultiva do gestor sobre a fundação da T151: lista da equipe autorizada e detalhe em modal, somente leitura. |
+| Tarefa | Estado                                     | Resultado principal                                                                                                          |
+| ------ | ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| T153   | **Integrada** (PR #144, squash `94bdeded`) | Interface web consultiva do gestor sobre a fundação da T151: lista da equipe autorizada e detalhe em modal, somente leitura. |
 
 **Escopo, explicitamente.** A T153 é **somente a interface web**. Consome os dois endpoints que a
 T151 já integrou e **não altera** API, schema Prisma, migration, seed, RBAC, Docker, dependências
@@ -821,6 +821,47 @@ afetaria todos os papéis e não cabe aqui.
 CID ou qualquer informação de saúde, aprovações, alterações cadastrais, qualquer `POST`, `PATCH`,
 `PUT` ou `DELETE`, visão por departamento ou empresa inteira, gestão matricial, exceções
 administradas pela interface e ESS.
+
+## Datas no padrão brasileiro — T154 (apresentação)
+
+| Tarefa | Estado               | Resultado principal                                                                                                |
+| ------ | -------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| T154   | **Em implementação** | Padroniza a apresentação de datas em `apps/web` para o formato brasileiro, sem tocar transporte nem armazenamento. |
+
+**Escopo, explicitamente.** A T154 é **somente apresentação**, e somente em `apps/web`. Contratos
+HTTP, banco e o `value` de `<input type="date">` continuam em ISO (`AAAA-MM-DD`). Nenhuma regra
+trabalhista, cálculo, permissão ou migração é tocada.
+
+**A regra vinculante.** Data completa `DD/MM/AAAA`; mês e ano `MM/AAAA`; data e hora
+`DD/MM/AAAA às HH:mm` em relógio de **24 horas**; locale `pt-BR`; fuso de negócio
+`America/Sao_Paulo` para instantes; ausente exibe `—`; inválido não quebra a tela nem mostra
+`Invalid Date`.
+
+**Por que a distinção entre data civil e instante não é cosmética.** `new Date("2026-10-08")` é
+lido pela especificação como meia-noite **UTC**. A oeste de Greenwich — onde o Brasil inteiro
+está — a mesma data renderizada por `toLocaleDateString` vira **07/10/2026**. Uma admissão, uma
+vigência ou a `dataReferencia` que o servidor resolveu deslocam um dia. Isso não é um detalhe de
+formatação: é informação funcional errada, na mesma classe do defeito que a T151 corrigiu no
+servidor ao trocar `toISOString().slice(0, 10)` por `dataLocalDe` com `FUSO_COMPETENCIA`.
+
+Por isso o utilitário separa os dois casos por **semântica do dado**, não por conveniência:
+
+- **data civil** (`AAAA-MM-DD`, sem hora) — componentes lidos direto da string, sem `Date`;
+- **instante** (ISO com hora ou offset) — `Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo" })`,
+  porque aqui converter é exatamente o correto;
+- **mês de referência** — `MM/AAAA`.
+
+**Um só ponto de formatação.** O `apps/web/src/format/dia.ts`, que já existia e já documentava a
+armadilha do fuso, é consolidado e ampliado. `split`, `substring`, `slice` e formatadores próprios
+saem das telas: formatação espalhada é como a mesma data chega a aparecer em dois formatos
+diferentes em telas vizinhas.
+
+**Guarda de regressão por saída visual.** Um teste recusa ISO cru onde a tela deveria formatar —
+sem varredura global ingênua, que bloquearia campo técnico legítimo (`value` de `<input>`,
+payload, `key`, `id`), todos os quais **continuam** em ISO por contrato.
+
+**Pendências preservadas.** `DP-3J-12` e `PD-SOL-05` seguem **não iniciados** e sem contrato
+seguro. As decisões de negócio e do RH já registradas permanecem abertas, e nada aqui as antecipa.
 
 ## Próxima ação autorizável
 
