@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "constitutionVersion": "1.4.0",
-  "lastConvergedAt": "2026-10-08",
-  "lastIntegratedTask": 152,
-  "lastRecordedTask": 153,
+  "lastConvergedAt": "2026-10-09",
+  "lastIntegratedTask": 153,
+  "lastRecordedTask": 154,
   "platformDecision": {
     "adr": "docs/adr/0014-evolli-plataforma-base-e-encerramento-do-frappe.md",
     "decidedAt": "2026-10-01",
@@ -11,15 +11,15 @@
     "frappe": "encerrado_como_candidato_referencia_apenas"
   },
   "nextTask": {
-    "id": "T153",
-    "status": "em_execucao_t153_web_gestor_consultivo",
-    "reason": "T152 integrada em main pela PR #143 (squash 3f73f4ed0e690fe9d020468bba40388be2e6f8f9), com a CI de main 3/3 verde — a primeira vez nesta linha de trabalho em que o push para main passou no spec:check sob o protocolo de trailers. A T153 entrega a INTERFACE WEB consultiva do gestor sobre a fundacao ja integrada pela T151: consome exclusivamente GET /gestor/equipe e GET /gestor/equipe/vinculos/:vinculoId, sem tocar em API, schema Prisma, migration, seed ou Docker. Escopo: lista da equipe autorizada pelo servidor (carregando, vazio, erro com nova tentativa, busca local apenas sobre o que ja veio) e detalhe consultivo em modal do padrao B, somente leitura, restrito a projecao fechada da decisao 7 da ADR 0015. Autorizacao NAO e decidida no frontend: o escopo e a data de referencia vem do servidor, a interface nao oferece parametro de data, e esconder controle nao substitui o RBAC — gestor_equipe read continua sendo a unica porta. Concorrencia por guarda monotonica por carregador: resposta obsoleta nao atualiza dados, erro nem carregamento; troca de vinculo, fechamento do detalhe, retry e troca de sessao invalidam o que estava em transito, para que dado de uma pessoa nunca reapareca sob o nome de outra. Permanece explicitamente NAO INICIADO o modulo funcional antes cogitado sob o numero da T152 — resumo de jornada (DP-3J-12) e andamento de solicitacoes (PD-SOL-05) —, que segue sem contrato seguro: a API declara resumoJornada e andamentoSolicitacoes como null de proposito, e a interface nao apresenta cartao vazio nem dado ficticio fingindo que a capacidade existe. Tambem fora: banco de horas, espelho de ponto, atestado, diagnostico, CID, aprovacao, alteracao cadastral, qualquer mutacao HTTP, visao por departamento ou empresa inteira, gestao matricial, excecoes administradas pela interface e ESS."
+    "id": "T154",
+    "status": "em_execucao_t154_datas_padrao_brasileiro",
+    "reason": "T153 integrada em main pela PR #144 (squash 94bdededc481d3aa45e6970161090ff4d21da10b), com a CI de main 3/3 verde. A T154 padroniza a APRESENTACAO de datas na interface web para o formato brasileiro: data completa DD/MM/AAAA, mes e ano MM/AAAA, data e hora DD/MM/AAAA as HH:mm, relogio de 24 horas, locale pt-BR e fuso de negocio America/Sao_Paulo para instantes. E alteracao de APRESENTACAO, nao de armazenamento nem de transporte: contratos HTTP, banco e o valor de <input type=\"date\"> continuam em ISO. A distincao que sustenta a regra e semantica, nao cosmetica: DATA CIVIL (AAAA-MM-DD, sem hora) nunca passa por new Date(), porque a string seria lida como meia-noite UTC e, a oeste de Greenwich, exibiria o dia anterior; os componentes sao interpretados diretamente. INSTANTE (ISO com hora ou offset) passa por Intl.DateTimeFormat com timeZone America/Sao_Paulo, porque ai converter e exatamente o certo. Valor ausente usa o tracinho ja adotado no produto; valor invalido nao quebra a tela nem exibe Invalid Date. Escopo: somente apps/web. Nao altera backend, Prisma, migrations, regras trabalhistas, calculos, RBAC, seed, contratos HTTP, dependencias ou lockfile. Continuam pendentes e nao iniciados: resumo de jornada (DP-3J-12) e andamento de solicitacoes (PD-SOL-05), alem das decisoes de negocio e do RH ja registradas."
   },
   "openDeliveries": [
     {
-      "id": "T153",
-      "pullRequest": 144,
-      "status": "web_gestor_consultivo_em_implementacao"
+      "id": "T154",
+      "pullRequest": null,
+      "status": "datas_padrao_brasileiro_em_implementacao"
     }
   ],
   "requiredArtifacts": [

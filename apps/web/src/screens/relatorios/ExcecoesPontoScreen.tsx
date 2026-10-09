@@ -27,10 +27,10 @@ import {
   Surface,
 } from "../../components";
 import type { DataTableColumn, StatusVariant } from "../../components";
+import { formatarDiaCivil } from "../../format/data";
 import {
   EXCECOES_PONTO_EXEMPLO,
   type ExcecaoPontoExemplo,
-  formatarDataBr,
   type PrioridadeExcecao,
   ROTULO_ENCAMINHAMENTO_POR_SITUACAO,
   ROTULO_PRIORIDADE_EXCECAO,
@@ -114,7 +114,7 @@ export function ExcecoesPontoScreen() {
     {
       key: "periodo",
       header: "Período/dia",
-      cell: (linha) => formatarDataBr(linha.periodoReferencia),
+      cell: (linha) => formatarDiaCivil(linha.periodoReferencia),
     },
     {
       key: "vinculo",

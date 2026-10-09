@@ -30,6 +30,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { EquipeScreen, PAPEIS_COM_CONSULTA_DE_EQUIPE } from "./EquipeScreen";
 import { ApiError } from "../../api/gestorClient";
+import { expectSemIsoVisivel } from "../../test/semIsoVisivel";
 import { detalharVinculo, listarEquipe } from "../../api/gestorClient";
 import { obterUsuarioAtual } from "../../api/usersClient";
 
@@ -239,7 +240,16 @@ describe("lista da equipe", () => {
     const { container } = render(<EquipeScreen />);
     await screen.findByText("Pessoa Demo Alfa Turno A");
 
-    expect(screen.getByText("2026-10-08")).toBeInTheDocument();
+    // A data de referência é DATA CIVIL e aparece no formato brasileiro
+    // (T154). O valor que o servidor envia continua `2026-10-08` — só a
+    // exibição muda, e o ISO cru não pode sobrar em lugar nenhum da tela.
+    expect(screen.getByText("08/10/2026")).toBeInTheDocument();
+    expect(screen.queryByText("2026-10-08")).not.toBeInTheDocument();
+    // Guarda ampla: nenhuma data ISO em NENHUM ponto do texto visível da
+    // tela — não só nesta frase. Olha o DOM renderizado, então o `value` de
+    // um campo de formulário (contrato, que segue ISO) fica naturalmente
+    // fora do alcance.
+    expectSemIsoVisivel(document.body);
     // Nenhum CONTROLE de data: nem input, nem select, nem seletor. A
     // fronteira de autorização não é negociável pelo cliente (ADR 0015,
     // decisão 8). A asserção é sobre controles, não sobre o texto — o aviso
@@ -531,7 +541,10 @@ describe("corrida e invalidação", () => {
 
     expect(screen.getByText("RESPOSTA ATUAL")).toBeInTheDocument();
     expect(screen.queryByText("RESPOSTA OBSOLETA")).not.toBeInTheDocument();
-    expect(screen.queryByText("1999-01-01")).not.toBeInTheDocument();
+    // `1999-01-01` da resposta obsoleta seria exibido como `01/01/1999`
+    // (T154): é esse texto que não pode aparecer. Procurar pelo ISO cru aqui
+    // passaria mesmo com a data vencida na tela.
+    expect(screen.queryByText("01/01/1999")).not.toBeInTheDocument();
     expect(screen.queryByText(/Carregando sua equipe/)).not.toBeInTheDocument();
   });
 

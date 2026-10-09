@@ -24,12 +24,12 @@ import {
   Surface,
 } from "../../components";
 import type { DataTableColumn, StatusVariant } from "../../components";
+import { formatarDiaCivil } from "../../format/data";
 import {
   ANOS_ILUSTRATIVOS_DISPONIVEIS,
   type EscopoFeriado,
   FERIADOS_EXEMPLO,
   type FeriadoExemplo,
-  formatarDataBr,
   ROTULO_ESCOPO_FERIADO,
   ROTULO_SITUACAO_FERIADO,
   type SituacaoFeriado,
@@ -116,7 +116,7 @@ export function CalendarioFeriadosScreen() {
     {
       key: "data",
       header: "Data ilustrativa",
-      cell: (linha) => formatarDataBr(linha.dataIlustrativa),
+      cell: (linha) => formatarDiaCivil(linha.dataIlustrativa),
     },
     {
       key: "descricao",

@@ -1049,7 +1049,9 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
     - **Sem whitelist de identificadores** e sem resolver por avanço de `lastRecordedTask`.
 
 50. **T153 - Interface web funcional do Gestor Consultivo (somente leitura)**
-    - **Estado:** em implementação. Branch `codex/t153-web-gestor-consultivo`, a partir do squash
+    - **Estado:** **Integrada** em `main` pela PR #144, squash
+      `94bdededc481d3aa45e6970161090ff4d21da10b`, com a CI de `main` 3/3 verde. Branch
+      `codex/t153-web-gestor-consultivo`, a partir do squash
       `3f73f4ed0e690fe9d020468bba40388be2e6f8f9` (T152, PR #143).
     - **Escopo:** exclusivamente a **interface web** sobre a fundação já integrada pela T151.
       Consome os dois endpoints que já existem — `GET /gestor/equipe` e
@@ -1086,6 +1088,50 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
     - **Dívidas mantidas, não tratadas:** FK de `unit_id`/`team_id` (ADR 0003); convergência de
       atributos do seed; caixa baixa e zero-width no verificador; decisões do pacote de integração
       de ponto (T148); `Pessoas › Histórico funcional` estoura a largura (T115, preexistente).
+
+51. **T154 - Padronização brasileira de datas na interface**
+    - **Estado:** em implementação. Branch `codex/t154-datas-padrao-brasileiro`, a partir do squash
+      `94bdededc481d3aa45e6970161090ff4d21da10b` (T153, PR #144).
+    - **Escopo:** exclusivamente **apresentação** de datas em `apps/web`. Não altera backend,
+      Prisma, migrations, regras trabalhistas, cálculos, RBAC, seed, contratos HTTP, dependências
+      ou lockfile.
+    - **Regra vinculante de interface:**
+      (1) data completa `DD/MM/AAAA`; (2) mês e ano `MM/AAAA`;
+      (3) data e hora `DD/MM/AAAA às HH:mm`, em relógio de **24 horas**;
+      (4) locale `pt-BR`; (5) fuso de negócio `America/Sao_Paulo` para **instantes**;
+      (6) valor ausente usa o traço `—`, padrão visual já adotado;
+      (7) valor inválido **não quebra a tela** e **nunca** exibe `Invalid Date`.
+    - **O que NÃO muda:** contratos HTTP, banco e o `value` de `<input type="date">` continuam em
+      ISO (`AAAA-MM-DD`). A alteração é de apresentação, não de armazenamento ou transporte.
+    - **A distinção que sustenta a regra é semântica, não cosmética.** Existem dois tipos de valor
+      temporal no produto, e tratá-los igual é o defeito:
+      - **Data civil** (`AAAA-MM-DD`, sem hora): admissão, desligamento, vigência, `dataReferencia`.
+        Os componentes são lidos **diretamente da string**. `new Date("2026-10-08")` é interpretado
+        como meia-noite **UTC**, e a oeste de Greenwich exibiria **07/10/2026** — um dia a menos.
+        Deslocar o dia de uma admissão ou de uma vigência não é detalhe visual: é informação
+        funcional errada.
+      - **Instante** (ISO com hora ou offset): criação de registro, trilha de auditoria. Aqui
+        converter é exatamente o certo, e a conversão usa `Intl.DateTimeFormat` com
+        `timeZone: "America/Sao_Paulo"` — o mesmo fuso de negócio que o `FUSO_COMPETENCIA` do
+        ponto já fixa no servidor.
+    - **Um só ponto de formatação.** O utilitário existente `apps/web/src/format/dia.ts` é
+      consolidado e ampliado; `split`, `substring`, `slice`, `toLocaleDateString` e formatadores
+      próprios saem das telas. Formatação espalhada é como a mesma data passou a aparecer em dois
+      formatos diferentes em telas vizinhas.
+    - **Correção inicial obrigatória:** em "Minha equipe", a frase "data de referência 2026-10-08"
+      passa a exibir "data de referência **08/10/2026**". O valor que a API envia continua
+      `2026-10-08`.
+    - **Guarda de regressão por saída visual:** teste que recusa ISO cru onde a tela deveria usar o
+      formatador, **sem** varredura global ingênua — campo técnico legítimo (`value` de input,
+      payload, `key`, `id`) continua ISO e não pode ser bloqueado.
+    - **Pendências preservadas:** `DP-3J-12` (resumo de jornada) e `PD-SOL-05` (andamento de
+      solicitações) seguem **não iniciados** e sem contrato seguro; decisões de negócio e do RH já
+      registradas permanecem abertas. `DP-8` e `DP-23` seguem resolvidas apenas no recorte da
+      ADR 0015.
+    - **Dívidas mantidas, não tratadas:** FK de `unit_id`/`team_id` (ADR 0003); convergência de
+      atributos do seed; caixa baixa e zero-width no verificador; decisões do pacote de integração
+      de ponto (T148); `Pessoas › Histórico funcional` estoura a largura (T115, preexistente);
+      ausência de timeout em `GET /v1/users/me` no portão de sessão (T153).
 
 ## Regra obrigatória para as próximas tarefas
 

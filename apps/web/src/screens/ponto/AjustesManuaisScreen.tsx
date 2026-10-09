@@ -22,10 +22,10 @@ import {
   Surface,
 } from "../../components";
 import type { DataTableColumn, StatusVariant } from "../../components";
+import { formatarDiaCivil } from "../../format/data";
 import {
   AJUSTES_MANUAIS_EXEMPLO,
   type AjusteManualExemplo,
-  formatarDataBr,
   ROTULO_SITUACAO_AJUSTE,
   ROTULO_TIPO_AJUSTE,
   ROTULO_VALIDACAO_GESTOR,
@@ -117,7 +117,7 @@ export function AjustesManuaisScreen() {
     {
       key: "periodo",
       header: "Período/dia ilustrativo",
-      cell: (linha) => formatarDataBr(linha.periodoIlustrativo),
+      cell: (linha) => formatarDiaCivil(linha.periodoIlustrativo),
     },
     {
       key: "vinculo",
@@ -483,7 +483,7 @@ export function AjustesManuaisScreen() {
             </div>
             <div>
               <dt>Período/dia ilustrativo</dt>
-              <dd>{formatarDataBr(detalheAberto.periodoIlustrativo)}</dd>
+              <dd>{formatarDiaCivil(detalheAberto.periodoIlustrativo)}</dd>
             </div>
             <div>
               <dt>Situação</dt>

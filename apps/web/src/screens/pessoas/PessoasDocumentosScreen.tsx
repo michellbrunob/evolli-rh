@@ -60,6 +60,7 @@ import {
   type SolicitacaoDocumentoApi,
   type TipoDocumentoApi,
 } from "../../api/documentosClient";
+import { formatarInstante } from "../../format/data";
 import "./PessoasDocumentosScreen.css";
 
 export const PESSOAS_DOCUMENTOS_TITULO_ID = "pessoas-documentos-titulo";
@@ -73,10 +74,6 @@ const VARIANTE_ESTADO_DOC: Record<EstadoDocumento, StatusVariant> = {
 };
 
 type StatusCarregamento = "carregando" | "erro" | "pronto";
-
-function formatarData(iso: string): string {
-  return iso.replace("T", " ").slice(0, 16);
-}
 
 /** Papéis que podem mutar documentos (RH e DP); backend reconfere. */
 function podeMutar(ator: SafeAccessUserApi | null): boolean {
@@ -431,7 +428,7 @@ export function PessoasDocumentosScreen() {
     {
       key: "criado",
       header: "Registrado em",
-      cell: (d) => formatarData(d.criadoEm),
+      cell: (d) => formatarInstante(d.criadoEm),
     },
     {
       key: "acoes",
@@ -481,7 +478,7 @@ export function PessoasDocumentosScreen() {
     {
       key: "solicitada",
       header: "Solicitada em",
-      cell: (s) => formatarData(s.solicitadaEm),
+      cell: (s) => formatarInstante(s.solicitadaEm),
     },
     {
       key: "acoes",
@@ -1052,7 +1049,7 @@ export function PessoasDocumentosScreen() {
             </div>
             <div>
               <dt>Registrado em</dt>
-              <dd>{formatarData(detalheDoc.criadoEm)}</dd>
+              <dd>{formatarInstante(detalheDoc.criadoEm)}</dd>
             </div>
             <div>
               <dt>Referência técnica</dt>
@@ -1107,7 +1104,7 @@ export function PessoasDocumentosScreen() {
             </div>
             <div>
               <dt>Solicitada em</dt>
-              <dd>{formatarData(detalheSolic.solicitadaEm)}</dd>
+              <dd>{formatarInstante(detalheSolic.solicitadaEm)}</dd>
             </div>
             <div>
               <dt>Referência técnica</dt>

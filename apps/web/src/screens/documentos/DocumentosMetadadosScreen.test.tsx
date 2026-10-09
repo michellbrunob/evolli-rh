@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+import { expectSemIsoVisivel } from "../../test/semIsoVisivel";
 import { DocumentosMetadadosScreen } from "./DocumentosMetadadosScreen";
 
 describe("DocumentosMetadadosScreen (T047 — tela visual estática)", () => {
@@ -68,6 +69,12 @@ describe("DocumentosMetadadosScreen (T047 — tela visual estática)", () => {
     ).toBeGreaterThan(0);
     expect(dentro.getByText("DOC-0001")).toBeInTheDocument();
     expect(dentro.getByText("SOL-0001")).toBeInTheDocument();
+
+    // Guarda da T154: varre o texto visível inteiro da tela, não só esta
+    // tabela — nenhuma data pode escapar em ISO para quem lê. O `value` de
+    // campo de formulário fica fora do alcance por ser atributo: ali o ISO é
+    // contrato, não apresentação.
+    expectSemIsoVisivel(document.body);
   });
 
   it("alterna para o estado vazio e mostra o EmptyState", () => {

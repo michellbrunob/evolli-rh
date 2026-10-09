@@ -13,6 +13,7 @@
  * O3). "Responsável técnico" é um identificador abstrato de equipe/papel
  * (nunca nome de pessoa). Validade é sempre ilustrativa.
  */
+import { formatarDiaCivil } from "../../format/data";
 
 export interface TipoRepositorioExemplo {
   readonly id: string;
@@ -41,17 +42,19 @@ export const ROTULO_SITUACAO_REPOSITORIO: Record<SituacaoRepositorio, string> =
     pendente_verificacao: "Pendente de verificação",
   };
 
-/** `dd/mm/aaaa` a partir de `AAAA-MM-DD` — só formatação, sem fuso/hora. */
-export function formatarDataBr(iso: string): string {
-  const [ano, mes, dia] = iso.split("-");
-  return `${dia}/${mes}/${ano}`;
-}
-
+/**
+ * Validade do registro — data civil em `DD/MM/AAAA` (T154).
+ *
+ * Mesma ressalva de `formatarValidade` (`documentosMetadados.fixtures.ts`): a
+ * ausência mantém o texto longo em vez do traço porque a coluna desta tela é
+ * declaradamente ilustrativa (o próprio cabeçalho diz "(ilustrativa)"). A T154
+ * uniformiza o formato da data, não o vocabulário de ausência desta amostra.
+ */
 export function formatarValidadeRepositorio(
   item: RegistroRepositorioExemplo,
 ): string {
   return item.validade
-    ? formatarDataBr(item.validade)
+    ? formatarDiaCivil(item.validade)
     : "Sem validade definida (exemplo)";
 }
 

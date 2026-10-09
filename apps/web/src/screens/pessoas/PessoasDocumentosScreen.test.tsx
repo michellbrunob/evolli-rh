@@ -21,6 +21,7 @@ import {
   listarTiposDocumento,
   substituirDocumento,
 } from "../../api/documentosClient";
+import { expectSemIsoVisivel } from "../../test/semIsoVisivel";
 
 vi.mock("../../api/usersClient", async () => {
   const actual = await vi.importActual<typeof import("../../api/usersClient")>(
@@ -206,6 +207,25 @@ describe("PessoasDocumentosScreen (T133 — funcional)", () => {
     expect(
       screen.getByText(/nenhum conteúdo, arquivo, upload, download/i),
     ).toBeInTheDocument();
+
+    // Asserção POSITIVA de data — e vem ANTES da guarda, de propósito.
+    // A guarda só sabe dizer que não há ISO na tela; ela passa igualmente se
+    // TODAS as datas virarem `—`. Sem a linha abaixo, apertar a gramática do
+    // formatador até quebrar esta tela não faria nenhum teste falhar.
+    // `criadoEm` é `2026-02-01T09:00:00.000Z`; em São Paulo são 06:00 do dia 1.
+    expect(screen.getAllByText("01/02/2026 às 06:00").length).toBeGreaterThan(
+      0,
+    );
+    expect(
+      screen.getAllByText(/^\d{2}\/\d{2}\/\d{4} às \d{2}:\d{2}$/).length,
+    ).toBeGreaterThanOrEqual(2);
+
+    // Guarda da T154: varre o texto visível inteiro da tela — tabela de
+    // documentos, tabela de solicitações e o detalhe aberto acima —, não só
+    // os trechos que este teste nomeia. O `value` de campo de formulário fica
+    // fora do alcance por ser atributo: ali o ISO é contrato, não
+    // apresentação, e deve continuar cru.
+    expectSemIsoVisivel(document.body);
   });
 
   it("documentos vazios mostram estado vazio", async () => {

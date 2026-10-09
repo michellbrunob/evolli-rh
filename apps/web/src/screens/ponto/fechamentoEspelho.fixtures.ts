@@ -9,6 +9,8 @@
  * executado; todas seguem como exemplos ilustrativos.
  */
 
+import { formatarDiaCivil } from "../../format/data";
+
 export type SituacaoFechamento =
   | "em_revisao_exemplo"
   | "aguardando_validacao_exemplo"
@@ -37,19 +39,13 @@ export const ROTULO_SITUACAO_FECHAMENTO: Record<SituacaoFechamento, string> = {
   historico_ilustrativo: "Histórico ilustrativo",
 };
 
-/** `dd/mm/aaaa` a partir de `AAAA-MM-DD` — sem fuso/hora. */
-export function formatarDataBr(iso: string): string {
-  const [ano, mes, dia] = iso.split("-");
-  return `${dia}/${mes}/${ano}`;
-}
-
 export function formatarPeriodoIlustrativo(
   fechamento: Pick<
     FechamentoEspelhoExemplo,
     "periodoInicioIlustrativo" | "periodoFimIlustrativo"
   >,
 ): string {
-  return `${formatarDataBr(fechamento.periodoInicioIlustrativo)} a ${formatarDataBr(
+  return `${formatarDiaCivil(fechamento.periodoInicioIlustrativo)} a ${formatarDiaCivil(
     fechamento.periodoFimIlustrativo,
   )} (ilustrativo)`;
 }

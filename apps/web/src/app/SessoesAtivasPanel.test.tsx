@@ -13,6 +13,7 @@ import {
   listarSessoesAtivas,
   revogarSessao,
 } from "../api/sessoesClient";
+import { expectSemIsoVisivel } from "../test/semIsoVisivel";
 
 vi.mock("../api/sessoesClient", async () => {
   const actual = await vi.importActual<typeof import("../api/sessoesClient")>(
@@ -96,6 +97,39 @@ describe("SessoesAtivasPanel (T117)", () => {
     ]) {
       expect(texto).not.toContain(termoProibido);
     }
+  });
+
+  it("T154 exibe os instantes em America/Sao_Paulo, não o UTC cru", async () => {
+    vi.mocked(listarSessoesAtivas).mockResolvedValueOnce([sessaoAtual]);
+
+    render(
+      <SessoesAtivasPanel
+        aberto={true}
+        onFechar={vi.fn()}
+        onSessaoAtualEncerrada={vi.fn()}
+      />,
+    );
+
+    const tabela = await screen.findByRole("table", {
+      name: "Sessões ativas da sua conta",
+    });
+
+    // Os três são INSTANTES. Em São Paulo (UTC-3, sem horário de verão desde
+    // 2019) a hora exibida é três a menos que o `Z` da API. Antes da T154 a
+    // tela fatiava o ISO e mostrava o horário de Greenwich — em "Expira em"
+    // isso fazia a sessão parecer durar mais do que dura.
+    expect(tabela).toHaveTextContent("01/01/2026 às 07:00"); // criada
+    expect(tabela).toHaveTextContent("05/01/2026 às 06:30"); // última atividade
+    expect(tabela).toHaveTextContent("08/01/2026 às 07:00"); // expira
+
+    expect(tabela).not.toHaveTextContent("2026-01-01 10:00");
+    expect(tabela).not.toHaveTextContent("2026-01-08 10:00");
+
+    // As asserções acima nomeiam três instantes; a guarda cobre o texto
+    // visível inteiro do painel — cabeçalho, avisos e qualquer coluna futura.
+    // O `value` de campo de formulário fica fora do alcance dela por ser
+    // atributo: ali o ISO é contrato, não apresentação.
+    expectSemIsoVisivel(document.body);
   });
 
   it("mostra o estado de carregamento antes das sessões chegarem", async () => {

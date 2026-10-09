@@ -29,6 +29,7 @@ import {
   type VinculoHorarioApi,
   listarVinculosHorario,
 } from "../../api/vinculoHorarioClient";
+import { expectSemIsoVisivel } from "../../test/semIsoVisivel";
 
 vi.mock("../../api/colaboradoresClient");
 vi.mock("../../api/pontoClient");
@@ -251,8 +252,9 @@ describe("VisaoPeriodoScreen (T113 — funcional)", () => {
     const dentro = within(tabela);
     expect(dentro.getByText(/Ana Colaboradora \(teste\)/)).toBeInTheDocument();
     expect(dentro.getByText("Entrada")).toBeInTheDocument();
-    expect(dentro.getByText("2026-03-10 11:00")).toBeInTheDocument();
-    expect(dentro.getAllByText("2026-03").length).toBeGreaterThan(0);
+    // `2026-03-10T11:00:00.000Z` são 08:00 em America/Sao_Paulo (T154).
+    expect(dentro.getByText("10/03/2026 às 08:00")).toBeInTheDocument();
+    expect(dentro.getAllByText("03/2026").length).toBeGreaterThan(0);
     expect(dentro.getByText("Original")).toBeInTheDocument();
     expect(dentro.getByText("Ajustada")).toBeInTheDocument();
   });
@@ -461,9 +463,10 @@ describe("VisaoPeriodoScreen (T113 — funcional)", () => {
     await screen.findByRole("heading", { name: "Detalhe da marcação" });
 
     expect(screen.getByText("Registro original")).toBeInTheDocument();
-    expect(screen.getByText(/Saída · 2026-03-11 20:00/)).toBeInTheDocument();
+    // 20:00Z → 17:00 e 18:00Z → 15:00 em America/Sao_Paulo (T154).
+    expect(screen.getByText("Saída · 11/03/2026 às 17:00")).toBeInTheDocument();
     expect(screen.getByText("Valor efetivo")).toBeInTheDocument();
-    expect(screen.getByText(/Saída · 2026-03-11 18:00/)).toBeInTheDocument();
+    expect(screen.getByText("Saída · 11/03/2026 às 15:00")).toBeInTheDocument();
 
     const historico = screen.getByRole("table", {
       name: /Histórico de ajustes/,
@@ -471,6 +474,13 @@ describe("VisaoPeriodoScreen (T113 — funcional)", () => {
     expect(within(historico).getByText("Correção")).toBeInTheDocument();
     expect(
       within(historico).getByText("Erro de digitação"),
+    ).toBeInTheDocument();
+    // "Novo momento" (18:00Z) e "Registrado em" (21:00Z) em America/Sao_Paulo.
+    expect(
+      within(historico).getByText("11/03/2026 às 15:00"),
+    ).toBeInTheDocument();
+    expect(
+      within(historico).getByText("11/03/2026 às 18:00"),
     ).toBeInTheDocument();
   });
 
@@ -593,8 +603,10 @@ describe("VisaoPeriodoScreen (T113 — funcional)", () => {
     );
     await screen.findByRole("heading", { name: "Detalhe da marcação" });
 
-    // original preservado
-    expect(screen.getByText(/Entrada · 2026-03-10 11:00/)).toBeInTheDocument();
+    // original preservado (11:00Z = 08:00 em America/Sao_Paulo — T154)
+    expect(
+      screen.getByText("Entrada · 10/03/2026 às 08:00"),
+    ).toBeInTheDocument();
     // efetivo anulado, sem formulário de novo ajuste
     expect(
       screen.getByText(/anulação é terminal e não aceita novos ajustes/i),
@@ -670,6 +682,41 @@ describe("VisaoPeriodoScreen (T113 — funcional)", () => {
     ]) {
       expect(texto).not.toContain(termoProibido);
     }
+  });
+
+  it("não deixa nenhuma data ISO chegar à tela (T154)", async () => {
+    vi.mocked(buscarPonto).mockResolvedValueOnce(detalheAjustado);
+
+    render(<VisaoPeriodoScreen />);
+    await aguardarLista();
+    expectSemIsoVisivel(document.body);
+
+    // Detalhe com histórico de ajustes: momento, momentoCorrigido,
+    // registradoEm e competência.
+    const linha = screen.getByText("Ajustada").closest("tr")!;
+    fireEvent.click(
+      within(linha).getByRole("button", { name: /Ver detalhes/ }),
+    );
+    await screen.findByText("Registro original");
+    expectSemIsoVisivel(document.body);
+
+    // Painel de horários de referência: competência no título e vigências.
+    fireEvent.change(screen.getByLabelText("Vínculo"), {
+      target: { value: vinculo1.id },
+    });
+    fireEvent.change(screen.getByLabelText("Competência"), {
+      target: { value: "2026-03" },
+    });
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Ver horários de referência" }),
+      ).not.toBeDisabled(),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Ver horários de referência" }),
+    );
+    await screen.findByText("Tabela Comercial (teste)");
+    expectSemIsoVisivel(document.body);
   });
 
   describe("Ver horários de referência (T114 — somente leitura)", () => {
@@ -750,12 +797,15 @@ describe("VisaoPeriodoScreen (T113 — funcional)", () => {
         screen.getByRole("button", { name: "Ver horários de referência" }),
       );
 
-      await screen.findByRole("heading", {
+      const tituloPainel = await screen.findByRole("heading", {
         name: /Horários de referência/,
       });
+      // Competência no título do painel: "2026-03" vira "03/2026" (T154).
+      expect(tituloPainel).toHaveTextContent("· 03/2026");
       expect(screen.getByText("Tabela Comercial (teste)")).toBeInTheDocument();
+      // Data civil: 2026-01-01 continua sendo o dia 01, sem deslocar (T154).
       expect(
-        screen.getByText(/Vigência: 2026-01-01 – vigente/),
+        screen.getByText("Vigência: 01/01/2026 – vigente"),
       ).toBeInTheDocument();
 
       const tabelaPeriodos = screen.getByRole("table", {
@@ -928,10 +978,10 @@ describe("VisaoPeriodoScreen (T113 — funcional)", () => {
       expect(posicaoMeioPeriodo).toBeGreaterThan(posicaoComercial);
 
       expect(
-        screen.getByText(/Vigência: 2025-06-01 – 2026-03-15/),
+        screen.getByText("Vigência: 01/06/2025 – 15/03/2026"),
       ).toBeInTheDocument();
       expect(
-        screen.getByText(/Vigência: 2026-03-15 – vigente/),
+        screen.getByText("Vigência: 15/03/2026 – vigente"),
       ).toBeInTheDocument();
     });
 

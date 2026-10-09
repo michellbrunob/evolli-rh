@@ -32,6 +32,7 @@ import {
   listarUnidades,
 } from "../../api/organizacaoClient";
 import { type CargoApi, listarCargos } from "../../api/cargoClient";
+import { expectSemIsoVisivel } from "../../test/semIsoVisivel";
 
 vi.mock("../../api/colaboradoresClient");
 vi.mock("../../api/organizacaoClient");
@@ -526,6 +527,16 @@ describe("ColaboradoresScreen (T111 — funcional)", () => {
     const dentro = within(tabelaVinculos);
     expect(dentro.getByText("MAT-0001")).toBeInTheDocument();
     expect(dentro.getByText("CLT")).toBeInTheDocument();
+    // Admissão e desligamento são os únicos dias exibidos nesta tela, e vivem
+    // aqui no detalhe — por isso a guarda da T154 é chamada com a lista E o
+    // detalhe na tela, e não só com a listagem.
+    expect(dentro.getByText("10/01/2025")).toBeInTheDocument();
+
+    // Guarda da T154: varre o texto visível INTEIRO — cabeçalho, filtros,
+    // tabela da lista e painel de detalhe entram junto. O `value` de campo de
+    // formulário fica fora do alcance por ser atributo, e não texto: ali o ISO
+    // é contrato com o `<input type="date">`, não apresentação.
+    expectSemIsoVisivel(document.body);
   });
 
   it("não expõe campos para alterar matrícula, tipo ou data de admissão no detalhe", async () => {
@@ -1568,8 +1579,12 @@ describe("ColaboradoresScreen (T147 — homologação da admissão)", () => {
    *
    * Falha na implementação anterior: a célula mostrava
    * "2026-01-05T00:00:00.000Z".
+   *
+   * T154: o dia passa a ser exibido em `DD/MM/AAAA`. O corte continua sendo
+   * textual — nada de `new Date()` —, então `2026-01-05T00:00:00.000Z` vira
+   * `05/01/2026` e não recua para 04/01 no fuso brasileiro.
    */
-  it("exibe a data de admissão como dia, no formato do servidor real", async () => {
+  it("exibe a data de admissão como dia brasileiro, no formato do servidor real", async () => {
     vi.mocked(listarVinculosDoColaborador).mockResolvedValue([
       { ...vinculo1, dataAdmissao: "2026-01-05T00:00:00.000Z" },
     ]);
@@ -1585,7 +1600,10 @@ describe("ColaboradoresScreen (T147 — homologação da admissão)", () => {
     const tabela = await screen.findByRole("table", {
       name: `Vínculos — ${colaborador1.nome}`,
     });
-    expect(within(tabela).getByText("2026-01-05")).toBeInTheDocument();
+    expect(within(tabela).getByText("05/01/2026")).toBeInTheDocument();
+    expect(within(tabela).queryByText("2026-01-05")).toBeNull();
     expect(within(tabela).queryByText("2026-01-05T00:00:00.000Z")).toBeNull();
+    // O dia NÃO recua: 05, nunca 04/01/2026.
+    expect(within(tabela).queryByText("04/01/2026")).toBeNull();
   });
 });

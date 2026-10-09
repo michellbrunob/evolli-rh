@@ -32,6 +32,7 @@ import {
   listarSessoesAtivas,
   revogarSessao,
 } from "../api/sessoesClient";
+import { formatarInstante } from "../format/data";
 import "./SessoesAtivasPanel.css";
 
 export interface SessoesAtivasPanelProps {
@@ -41,10 +42,6 @@ export interface SessoesAtivasPanelProps {
    * sessão revogada, ou já havia expirado). Nunca chamado por revogar a
    * sessão de outra aba/dispositivo da mesma conta. */
   onSessaoAtualEncerrada: () => void;
-}
-
-function formatarDataHora(iso: string): string {
-  return iso.replace("T", " ").slice(0, 16);
 }
 
 export function SessoesAtivasPanel({
@@ -115,20 +112,26 @@ export function SessoesAtivasPanel({
       cell: (s) => s.userAgent ?? "—",
     },
     { key: "ip", header: "IP", cell: (s) => s.ip ?? "—" },
+    // Os três campos temporais são INSTANTES (`DateTime` sem `@db.Date` em
+    // `AccessSession`), e `formatarInstante` os converte para
+    // `America/Sao_Paulo`. Até a T154 esta tela fatiava o ISO em UTC, o que
+    // exibia três horas a mais — e, para qualquer instante entre 00:00Z e
+    // 03:00Z, um dia a mais. Em "Expira em" isso não era cosmético: a sessão
+    // parecia durar mais do que dura.
     {
       key: "criada",
       header: "Criada em",
-      cell: (s) => formatarDataHora(s.createdAt),
+      cell: (s) => formatarInstante(s.createdAt),
     },
     {
       key: "ultimaAtividade",
       header: "Última atividade",
-      cell: (s) => formatarDataHora(s.lastSeenAt),
+      cell: (s) => formatarInstante(s.lastSeenAt),
     },
     {
       key: "expira",
       header: "Expira em",
-      cell: (s) => formatarDataHora(s.expiresAt),
+      cell: (s) => formatarInstante(s.expiresAt),
     },
     {
       key: "acoes",

@@ -68,8 +68,6 @@ import {
   TIPOS_SOLICITACAO_PESSOA,
   VARIANTE_SITUACAO,
   detalharSolicitacaoPessoa,
-  formatarDiaReferencia,
-  formatarMomento,
   historicoSolicitacaoPessoa,
   listarSolicitacoesPessoas,
   registrarSolicitacaoPessoa,
@@ -81,6 +79,7 @@ import {
   type SolicitacaoPessoaEventoApi,
   type TipoSolicitacaoPessoa,
 } from "../../api/solicitacoesPessoasClient";
+import { formatarDiaCivil, formatarInstante } from "../../format/data";
 import "./SolicitacoesScreen.css";
 
 export const SOLICITACOES_TITULO_ID = "solicitacoes-titulo";
@@ -721,12 +720,12 @@ export function SolicitacoesScreen() {
     {
       key: "periodo",
       header: "Dia de referência",
-      cell: (s) => formatarDiaReferencia(s.periodoReferencia),
+      cell: (s) => formatarDiaCivil(s.periodoReferencia),
     },
     {
       key: "criado",
       header: "Registrada em",
-      cell: (s) => formatarMomento(s.criadoEm),
+      cell: (s) => formatarInstante(s.criadoEm),
     },
     {
       key: "acoes",
@@ -1219,19 +1218,19 @@ export function SolicitacoesScreen() {
             </div>
             <div>
               <dt>Dia de referência</dt>
-              <dd>{formatarDiaReferencia(detalhe.periodoReferencia)}</dd>
+              <dd>{formatarDiaCivil(detalhe.periodoReferencia)}</dd>
             </div>
             <div>
               <dt>Registrada em</dt>
-              <dd>{formatarMomento(detalhe.criadoEm)}</dd>
+              <dd>{formatarInstante(detalhe.criadoEm)}</dd>
             </div>
             <div>
               <dt>Enviada em</dt>
-              <dd>{formatarMomento(detalhe.enviadaEm)}</dd>
+              <dd>{formatarInstante(detalhe.enviadaEm)}</dd>
             </div>
             <div>
               <dt>Primeiro retorno do RH</dt>
-              <dd>{formatarMomento(detalhe.primeiraRevisaoEm)}</dd>
+              <dd>{formatarInstante(detalhe.primeiraRevisaoEm)}</dd>
             </div>
           </dl>
 
@@ -1356,7 +1355,7 @@ export function SolicitacoesScreen() {
                     key: "quando",
                     header: "Quando",
                     cell: (e: SolicitacaoPessoaEventoApi) =>
-                      formatarMomento(e.ocorridoEm),
+                      formatarInstante(e.ocorridoEm),
                   },
                   {
                     key: "acao",

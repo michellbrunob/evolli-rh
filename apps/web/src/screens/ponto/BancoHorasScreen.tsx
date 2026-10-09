@@ -23,9 +23,9 @@ import {
   Surface,
 } from "../../components";
 import type { DataTableColumn, StatusVariant } from "../../components";
+import { formatarDiaCivil } from "../../format/data";
 import {
   EXTRATO_BANCO_HORAS_EXEMPLO,
-  formatarDataBr,
   LIMIAR_ALERTA_ALTO_MINUTOS,
   LIMIAR_ALERTA_NEGATIVO_MINUTOS,
   type MovimentoBancoHorasExemplo,
@@ -72,7 +72,7 @@ export function BancoHorasScreen() {
     {
       key: "data",
       header: "Data",
-      cell: (linha) => formatarDataBr(linha.dataReferencia),
+      cell: (linha) => formatarDiaCivil(linha.dataReferencia),
     },
     {
       key: "natureza",

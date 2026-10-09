@@ -55,12 +55,6 @@ export const ROTULO_ESTADO_SOLICITACAO: Record<
   cancelada: "Cancelada",
 };
 
-/** `dd/mm/aaaa` a partir de `AAAA-MM-DD` — sem fuso/hora. */
-export function formatarDataBr(iso: string): string {
-  const [ano, mes, dia] = iso.split("-");
-  return `${dia}/${mes}/${ano}`;
-}
-
 export const SOLICITACOES_EXEMPLO: readonly SolicitacaoExemplo[] = [
   {
     id: "SOL-DEMO-0001",

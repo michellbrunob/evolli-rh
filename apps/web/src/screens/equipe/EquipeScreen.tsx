@@ -71,7 +71,7 @@ import {
   type DataTableColumn,
   type StatusVariant,
 } from "../../components";
-import { formatarDia } from "../../format/dia";
+import { formatarDiaCivil } from "../../format/data";
 import "./EquipeScreen.css";
 
 export const EQUIPE_TITULO_ID = "equipe-titulo";
@@ -414,7 +414,7 @@ export function EquipeScreen({
               {dataReferencia ? (
                 <>
                   Escopo resolvido pelo servidor na data de referência{" "}
-                  <strong>{formatarDia(dataReferencia)}</strong>.
+                  <strong>{formatarDiaCivil(dataReferencia)}</strong>.
                 </>
               ) : null}
             </p>
@@ -533,11 +533,11 @@ export function EquipeScreen({
             </div>
             <div>
               <dt>Admissão</dt>
-              <dd>{formatarDia(detalhe.dataAdmissao)}</dd>
+              <dd>{formatarDiaCivil(detalhe.dataAdmissao)}</dd>
             </div>
             <div>
               <dt>Desligamento</dt>
-              <dd>{formatarDia(detalhe.dataDesligamento)}</dd>
+              <dd>{formatarDiaCivil(detalhe.dataDesligamento)}</dd>
             </div>
             <div>
               <dt>Cargo vigente</dt>
@@ -561,7 +561,7 @@ export function EquipeScreen({
               <dt>Horário vigente</dt>
               <dd>
                 {detalhe.horarioVigente
-                  ? `${detalhe.horarioVigente.nome} (desde ${formatarDia(
+                  ? `${detalhe.horarioVigente.nome} (desde ${formatarDiaCivil(
                       detalhe.horarioVigente.vigenciaInicio,
                     )})`
                   : "—"}

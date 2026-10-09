@@ -41,9 +41,3 @@ export interface ApontamentoPortalExemplo {
 
 export const APONTAMENTOS_PORTAL_EXEMPLO: readonly ApontamentoPortalExemplo[] =
   [{ dia: "2026-07-10", rotulo: "Jornada acima do limite diário (alerta)" }];
-
-/** `dd/mm/aaaa` a partir de `AAAA-MM-DD` — sem fuso/hora. */
-export function formatarDataBr(iso: string): string {
-  const [ano, mes, dia] = iso.split("-");
-  return `${dia}/${mes}/${ano}`;
-}

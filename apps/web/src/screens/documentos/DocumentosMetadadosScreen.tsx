@@ -28,9 +28,9 @@ import {
   Surface,
 } from "../../components";
 import type { DataTableColumn, StatusVariant } from "../../components";
+import { formatarDiaCivil } from "../../format/data";
 import {
   type CategoriaRegistro,
-  formatarDataBr,
   formatarValidade,
   REGISTROS_DOCUMENTO_EXEMPLO,
   type RegistroDocumentoExemplo,
@@ -105,7 +105,7 @@ export function DocumentosMetadadosScreen() {
     {
       key: "data",
       header: "Data",
-      cell: (linha) => formatarDataBr(linha.data),
+      cell: (linha) => formatarDiaCivil(linha.data),
     },
     {
       key: "validade",

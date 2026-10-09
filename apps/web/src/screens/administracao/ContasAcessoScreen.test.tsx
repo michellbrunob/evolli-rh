@@ -18,6 +18,7 @@ import {
   resetarMfa,
 } from "../../api/usersClient";
 import { listarEmpresasMulti } from "../../api/organizacaoClient";
+import { expectSemIsoVisivel } from "../../test/semIsoVisivel";
 
 vi.mock("../../api/usersClient", async () => {
   const actual = await vi.importActual<typeof import("../../api/usersClient")>(
@@ -1014,6 +1015,31 @@ describe("ContasAcessoScreen (T121)", () => {
       for (const termo of ["lgpd", "conformidade", "compliance", "legal"]) {
         expect(texto).not.toContain(termo);
       }
+    });
+  });
+
+  describe("apresentação de datas (T154)", () => {
+    it("'Criada em' mostra o instante em America/Sao_Paulo, não o UTC cru", async () => {
+      vi.mocked(obterUsuarioAtual).mockResolvedValue(rhAtor);
+      vi.mocked(listarUsuarios).mockResolvedValue({
+        items: [contaAtiva],
+        nextCursor: null,
+      });
+
+      render(<ContasAcessoScreen />);
+      await screen.findByText("pessoa1@example.test");
+
+      // `createdAt` é `2026-01-05T10:00:00.000Z`. Em São Paulo (UTC-3, sem
+      // horário de verão desde 2019) são 07:00 do dia 05. Antes da T154 a
+      // tela fatiava o ISO e exibia "2026-01-05 10:00" — três horas a mais.
+      expect(screen.getByText("05/01/2026 às 07:00")).toBeInTheDocument();
+      expect(screen.queryByText("2026-01-05 10:00")).not.toBeInTheDocument();
+
+      // Guarda de regressão: varre o texto visível inteiro da tela, não só a
+      // célula acima — qualquer ISO que reapareça em outra coluna, badge ou
+      // rodapé reprova aqui. O `value` de campo de formulário fica fora do
+      // alcance por ser atributo: é contrato com a API, não apresentação.
+      expectSemIsoVisivel(document.body);
     });
   });
 });

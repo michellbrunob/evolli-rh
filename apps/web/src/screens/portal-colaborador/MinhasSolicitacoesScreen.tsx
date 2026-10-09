@@ -22,9 +22,9 @@ import {
   Surface,
 } from "../../components";
 import type { DataTableColumn, StatusVariant } from "../../components";
+import { formatarDiaCivil } from "../../format/data";
 import {
   type EstadoSolicitacaoExemplo,
-  formatarDataBr,
   ROTULO_ESTADO_SOLICITACAO,
   ROTULO_TIPO_SOLICITACAO,
   SOLICITACOES_EXEMPLO,
@@ -80,7 +80,9 @@ export function MinhasSolicitacoesScreen() {
       key: "periodo",
       header: "Período de referência",
       cell: (linha) =>
-        linha.periodoReferencia ? formatarDataBr(linha.periodoReferencia) : "—",
+        linha.periodoReferencia
+          ? formatarDiaCivil(linha.periodoReferencia)
+          : "—",
     },
     {
       key: "situacao",
@@ -333,7 +335,7 @@ export function MinhasSolicitacoesScreen() {
               <dt>Período de referência</dt>
               <dd>
                 {detalheAberto.periodoReferencia
-                  ? formatarDataBr(detalheAberto.periodoReferencia)
+                  ? formatarDiaCivil(detalheAberto.periodoReferencia)
                   : "Não aplicável"}
               </dd>
             </div>

@@ -26,6 +26,7 @@ import {
   encerrarVinculoHorario,
   listarVinculosHorario,
 } from "../../api/vinculoHorarioClient";
+import { formatarDiaCivil } from "../../format/data";
 import "./PessoasHorarioScreen.css";
 
 export const PESSOAS_HORARIO_TITULO_ID = "pessoas-horario-titulo";
@@ -290,8 +291,8 @@ export function PessoasHorarioScreen() {
       header: "Vigência",
       cell: (v) =>
         v.vigenciaFim
-          ? `${v.vigenciaInicio} – ${v.vigenciaFim}`
-          : `${v.vigenciaInicio} – vigente`,
+          ? `${formatarDiaCivil(v.vigenciaInicio)} – ${formatarDiaCivil(v.vigenciaFim)}`
+          : `${formatarDiaCivil(v.vigenciaInicio)} – vigente`,
     },
     {
       key: "situacao",
@@ -447,8 +448,10 @@ export function PessoasHorarioScreen() {
           <p className="pessoas-horario-screen__aviso-texto">
             Tabela de horário: {nomeTabela(detalhe.vinculo.tabelaHorarioId)}
             <br />
-            Vigência: {detalhe.vinculo.vigenciaInicio} –{" "}
-            {detalhe.vinculo.vigenciaFim ?? "vigente"}
+            Vigência: {formatarDiaCivil(detalhe.vinculo.vigenciaInicio)} –{" "}
+            {detalhe.vinculo.vigenciaFim
+              ? formatarDiaCivil(detalhe.vinculo.vigenciaFim)
+              : "vigente"}
           </p>
           <p className="pessoas-horario-screen__aviso-texto">
             Colaborador, tabela e início da vigência são imutáveis. Apenas o fim

@@ -26,9 +26,9 @@ import {
   Surface,
 } from "../../components";
 import type { DataTableColumn, StatusVariant } from "../../components";
+import { formatarDiaCivil } from "../../format/data";
 import {
   type EstadoSolicitacaoRH,
-  formatarDataBr,
   type PrioridadeSolicitacaoRH,
   ROTULO_ESTADO_RH,
   ROTULO_PRIORIDADE_RH,
@@ -148,8 +148,7 @@ export function CentralSolicitacoesRHScreen() {
     {
       key: "periodo",
       header: "Período",
-      cell: (linha) =>
-        linha.periodoReferencia ? formatarDataBr(linha.periodoReferencia) : "—",
+      cell: (linha) => formatarDiaCivil(linha.periodoReferencia),
     },
     {
       key: "situacao",
@@ -451,11 +450,13 @@ export function CentralSolicitacoesRHScreen() {
             </div>
             <div>
               <dt>Período</dt>
-              <dd>
-                {detalheAberto.periodoReferencia
-                  ? formatarDataBr(detalheAberto.periodoReferencia)
-                  : "Não aplicável"}
-              </dd>
+              {/*
+                Mesmo campo, mesma solicitação: o detalhe mostrava "Não
+                aplicável" onde a tabela mostra o traço, então clicar em "Ver
+                detalhe" de uma linha vazia trocava o texto da ausência. A T154
+                unifica os dois no mesmo traço.
+              */}
+              <dd>{formatarDiaCivil(detalheAberto.periodoReferencia)}</dd>
             </div>
             <div>
               <dt>Situação</dt>

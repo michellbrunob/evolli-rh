@@ -26,6 +26,7 @@ import {
   Surface,
 } from "../../components";
 import type { DataTableColumn, StatusVariant } from "../../components";
+import { formatarDiaCivil } from "../../format/data";
 import {
   type EstadoPendencia,
   type PendenciaExemplo,
@@ -35,7 +36,6 @@ import {
   ROTULO_TIPO,
   type SeveridadePendencia,
   type TipoPendencia,
-  formatarDataBr,
 } from "./verificarFolhas.fixtures";
 import "./VerificarFolhasScreen.css";
 
@@ -127,7 +127,7 @@ export function VerificarFolhasScreen() {
     {
       key: "dia",
       header: "Dia",
-      cell: (linha) => formatarDataBr(linha.dia),
+      cell: (linha) => formatarDiaCivil(linha.dia),
     },
     {
       key: "tipo",
@@ -416,7 +416,7 @@ export function VerificarFolhasScreen() {
           <dl className="verificar-folhas-screen__detalhe-lista">
             <div>
               <dt>Dia</dt>
-              <dd>{formatarDataBr(detalheAberto.dia)}</dd>
+              <dd>{formatarDiaCivil(detalheAberto.dia)}</dd>
             </div>
             <div>
               <dt>Tipo</dt>

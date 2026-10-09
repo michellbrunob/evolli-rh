@@ -72,12 +72,6 @@ export const ROTULO_ENCAMINHAMENTO_POR_SITUACAO: Record<
   resolvida: "Revisão concluída, sem alteração automática (exemplo)",
 };
 
-/** `dd/mm/aaaa` a partir de `AAAA-MM-DD` — só formatação, sem fuso/hora. */
-export function formatarDataBr(iso: string): string {
-  const [ano, mes, dia] = iso.split("-");
-  return `${dia}/${mes}/${ano}`;
-}
-
 export const EXCECOES_PONTO_EXEMPLO: readonly ExcecaoPontoExemplo[] = [
   {
     id: "excecao-exemplo-1",

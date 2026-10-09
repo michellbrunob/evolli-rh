@@ -137,7 +137,8 @@ export interface SolicitacaoPessoaApi {
   situacao: SituacaoSolicitacaoPessoa;
   /**
    * ENTRA como `"AAAA-MM-DD"` e SAI como datetime ISO completo: a coluna é
-   * `@db.Date`, mas o Prisma devolve `Date`. Use `formatarDiaReferencia`.
+   * `@db.Date`, mas o Prisma devolve `Date`. Para EXIBIR, use
+   * `formatarDiaCivil` de `src/format/data.ts` — é data civil, não instante.
    */
   periodoReferencia: string | null;
   /** Ator que REGISTROU (conta de acesso), nunca o colaborador (sujeito). */
@@ -392,16 +393,9 @@ export const VARIANTE_SITUACAO: Record<
   cancelada: "neutral",
 };
 
-/**
- * `periodoReferencia` volta do servidor como datetime ISO (coluna `@db.Date`,
- * valor `Date` no Prisma). Reexibe o dia, sem recalcular fuso: os 10 primeiros
- * caracteres já são a data UTC que foi gravada.
- */
-export function formatarDiaReferencia(iso: string | null): string {
-  return iso ? iso.slice(0, 10) : "—";
-}
-
-/** Data e hora de um marco, sem conversão de fuso (mesma forma da T133). */
-export function formatarMomento(iso: string | null): string {
-  return iso ? iso.replace("T", " ").slice(0, 16) : "—";
-}
+// Formatação de data NÃO mora aqui (T154). Um cliente HTTP transporta ISO; quem
+// traduz para `DD/MM/AAAA` e `DD/MM/AAAA às HH:mm` é `src/format/data.ts`.
+// Manter o formatador neste módulo era erro de camada com consequência de teste:
+// as telas mockam o cliente INTEIRO com `vi.mock`, e o formatador exportado
+// daqui viraria `undefined` dentro do teste — a célula renderizaria vazio e o
+// teste passaria a medir o mock, não a tela.

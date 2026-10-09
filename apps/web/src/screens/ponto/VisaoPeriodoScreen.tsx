@@ -44,6 +44,11 @@ import {
   type VinculoHorarioApi,
   listarVinculosHorario,
 } from "../../api/vinculoHorarioClient";
+import {
+  formatarDiaCivil,
+  formatarInstante,
+  formatarMesReferencia,
+} from "../../format/data";
 import "./VisaoPeriodoScreen.css";
 
 export const VISAO_PERIODO_TITULO_ID = "visao-periodo-titulo";
@@ -126,13 +131,13 @@ function vigenciaSeSobrepoe(
   return comecaAntesDoFim && terminaDepoisDoInicio;
 }
 
-/** ISO → "AAAA-MM-DD HH:MM" (fatiado em UTC, estável e sem dependência de locale). */
-function formatarMomento(iso: string): string {
-  if (iso.length < 16) return iso;
-  return `${iso.slice(0, 10)} ${iso.slice(11, 16)}`;
-}
-
-/** "AAAA-MM-DDTHH:MM" (datetime-local) → ISO completo com fuso. */
+/**
+ * "AAAA-MM-DDTHH:MM" (datetime-local) → ISO completo com fuso.
+ *
+ * TRANSPORTE, não apresentação: alimenta o payload da API. A exibição de
+ * instantes é de `formatarInstante` (`format/data`), que converte para
+ * `America/Sao_Paulo`.
+ */
 function paraIso(local: string): string {
   return new Date(local).toISOString();
 }
@@ -553,9 +558,13 @@ export function VisaoPeriodoScreen() {
     {
       key: "momento",
       header: "Momento",
-      cell: (e) => formatarMomento(e.momento),
+      cell: (e) => formatarInstante(e.momento),
     },
-    { key: "competencia", header: "Competência", cell: (e) => e.competencia },
+    {
+      key: "competencia",
+      header: "Competência",
+      cell: (e) => formatarMesReferencia(e.competencia),
+    },
     {
       key: "situacao",
       header: "Situação",
@@ -570,7 +579,7 @@ export function VisaoPeriodoScreen() {
       cell: (e) => (
         <Button variant="secondary" onClick={() => void abrirDetalhe(e.id)}>
           Ver detalhes
-          <span className="sr-only"> — {formatarMomento(e.momento)}</span>
+          <span className="sr-only"> — {formatarInstante(e.momento)}</span>
         </Button>
       ),
     },
@@ -590,8 +599,8 @@ export function VisaoPeriodoScreen() {
     {
       key: "novoMomento",
       header: "Novo momento",
-      cell: (a) =>
-        a.momentoCorrigido ? formatarMomento(a.momentoCorrigido) : "—",
+      // `formatarInstante` já devolve o traço quando não há correção de momento.
+      cell: (a) => formatarInstante(a.momentoCorrigido),
     },
     {
       key: "novoTipo",
@@ -604,7 +613,7 @@ export function VisaoPeriodoScreen() {
     {
       key: "registradoEm",
       header: "Registrado em",
-      cell: (a) => formatarMomento(a.registradoEm),
+      cell: (a) => formatarInstante(a.registradoEm),
     },
   ];
 
@@ -833,13 +842,13 @@ export function VisaoPeriodoScreen() {
                 </div>
                 <div>
                   <dt>Competência</dt>
-                  <dd>{detalhe.evento.competencia}</dd>
+                  <dd>{formatarMesReferencia(detalhe.evento.competencia)}</dd>
                 </div>
                 <div>
                   <dt>Registro original</dt>
                   <dd>
                     {ROTULO_TIPO[detalhe.evento.tipo] ?? detalhe.evento.tipo} ·{" "}
-                    {formatarMomento(detalhe.evento.momento)}
+                    {formatarInstante(detalhe.evento.momento)}
                   </dd>
                 </div>
                 <div>
@@ -847,7 +856,7 @@ export function VisaoPeriodoScreen() {
                   <dd>
                     {detalhe.evento.efetivo.anulado
                       ? "Anulada"
-                      : `${ROTULO_TIPO[detalhe.evento.efetivo.tipo] ?? detalhe.evento.efetivo.tipo} · ${formatarMomento(detalhe.evento.efetivo.momento)}`}
+                      : `${ROTULO_TIPO[detalhe.evento.efetivo.tipo] ?? detalhe.evento.efetivo.tipo} · ${formatarInstante(detalhe.evento.efetivo.momento)}`}
                   </dd>
                 </div>
               </dl>
@@ -865,7 +874,7 @@ export function VisaoPeriodoScreen() {
                   <p>Nenhum ajuste — vale o registro original.</p>
                 ) : (
                   <DataTable
-                    caption={`Histórico de ajustes — ${formatarMomento(detalhe.evento.momento)}`}
+                    caption={`Histórico de ajustes — ${formatarInstante(detalhe.evento.momento)}`}
                     columns={colunasAjustes}
                     rows={detalhe.evento.ajustes}
                     rowKey={(a) => a.id}
@@ -1207,7 +1216,7 @@ export function VisaoPeriodoScreen() {
           >
             Horários de referência —{" "}
             {nomePorVinculoId(referenciaHorario.vinculoId)} ·{" "}
-            {referenciaHorario.competencia}
+            {formatarMesReferencia(referenciaHorario.competencia)}
           </h2>
           <p className="visao-periodo-screen__nota">
             Consulta somente leitura: não corrige marcação, não calcula jornada,
@@ -1249,9 +1258,15 @@ export function VisaoPeriodoScreen() {
                       ? item.tabela.nome
                       : `Tabela ${item.tabelaHorarioId.slice(0, 8)}`}
                   </h3>
+                  {/* Datas civis (`@db.Date`): formatadas direto da string,
+                      sem `Date`, para não deslocar o dia. O fim ausente
+                      continua "vigente" — é semântico (vigência aberta) e,
+                      por isso, não vira traço. */}
                   <p className="visao-periodo-screen__nota">
-                    Vigência: {item.vigenciaInicio} –{" "}
-                    {item.vigenciaFim ?? "vigente"}
+                    Vigência: {formatarDiaCivil(item.vigenciaInicio)} –{" "}
+                    {item.vigenciaFim
+                      ? formatarDiaCivil(item.vigenciaFim)
+                      : "vigente"}
                   </p>
                   {!item.tabela || item.tabela.periodos.length === 0 ? (
                     <p>Nenhum período cadastrado nesta tabela.</p>
