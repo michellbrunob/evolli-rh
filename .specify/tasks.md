@@ -1158,6 +1158,35 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       fronteiras de privacidade e perguntas objetivas ao RH; nenhum endpoint, migration, tela ou
       regra de negócio implementada enquanto faltar aprovação.
 
+53. **T156 - Matriz Evolli × referência de mercado e priorização funcional**
+    - **Estado:** investigação concluída, em revisão. Branch `codex/t156-matriz-referencia-mercado`,
+      a partir do squash `25ce08716744f32db04393a9a645787f83d5fe5f` (T155, PR #147).
+    - **Objetivo:** formalizar, módulo a módulo, a diferença entre o que o Evolli faz hoje e as
+      capacidades observadas como referência de mercado; registrar cada lacuna com objetivo, dados
+      necessários, regras de negócio indefinidas, dependências, riscos e prioridade; e recomendar
+      **uma única** próxima fatia funcional independente das respostas pendentes do RH.
+    - **Método obrigatório:** o estado de cada frente é **derivado do código** — `apps/`,
+      `packages/`, schema Prisma, migrations e navegação da web — nunca de texto anterior. Toda
+      classificação cita evidência. Onde não houve verificação, o documento diz que não houve.
+    - **Vocabulário:** `funcional`, `parcial`, `demonstrativo` e `planejado`, já vigentes na legenda
+      do ledger, mais `bloqueado` para ausência que tem gate registrado. Ausência deliberada não é
+      dívida, e o documento não a trata como tal.
+    - **Convergência:** registra a T155 como Integrada (PR #147, squash `25ce087`), move
+      `lastIntegratedTask` para 155 e `lastRecordedTask` para 156.
+    - **Versiona junto** `docs/decisions/referencia-funcional-solides-mapa-evolli.md`, que sustenta
+      a coluna de comparação e até aqui não estava versionado, depois de auditado quanto a código,
+      captura, dado pessoal, credencial e conteúdo proprietário copiado.
+    - **Limite obrigatório:** tarefa documental. Não implementa código, UI, API, migration, seed,
+      teste funcional nem alteração visual; não toca Docker, banco, dependências ou lockfile; não
+      altera ADR, gate ou decisão; não copia identidade visual, conteúdo ou código de terceiros; e
+      **não inicia a T157**. A recomendação é insumo de decisão, não autorização de implementação.
+    - **Aceite:** matriz versionada com estado por módulo, lacunas, dependências técnicas e de
+      negócio, riscos CLT/LGPD/segurança, prioridade, critérios mínimos de pronto e uma única
+      recomendação de próxima fatia; Spec Kit convergido; CI verde.
+    - **Pendências preservadas:** `DP-3J-12` (resumo de jornada) e `PD-SOL-05` (andamento de
+      solicitações) seguem não iniciados. As decisões de negócio e do RH já registradas permanecem
+      abertas, e nada aqui as antecipa.
+
 ## Regra obrigatória para as próximas tarefas
 
 1. Criar ou atualizar a entrada da tarefa neste arquivo antes da implementação.
