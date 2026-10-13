@@ -25,6 +25,7 @@
  * sólida (mesmo princípio do `PainelNavigation`/`StatusBadge`).
  */
 import { useEffect, useState } from "react";
+import type { EstadoDestino } from "../../app/mapaNavegacao";
 import {
   CadastroHorariosScreen,
   HORARIOS_TITULO_ID,
@@ -89,6 +90,8 @@ type AbaCadastros =
 interface AbaDefinicao {
   readonly id: AbaCadastros;
   readonly rotulo: string;
+  /** T159 — funcional fala com a API; demonstrativo lê fixtures. */
+  readonly estado: EstadoDestino;
   readonly tituloId: string;
 }
 
@@ -97,70 +100,100 @@ const ABAS: readonly AbaDefinicao[] = [
     id: "horarios",
     rotulo: "Horários",
     tituloId: HORARIOS_TITULO_ID,
+    estado: "funcional",
   },
   {
     id: "estrutura",
     rotulo: "Estrutura organizacional",
     tituloId: ESTRUTURA_ORGANIZACIONAL_TITULO_ID,
+    estado: "funcional",
   },
   {
     id: "feriados",
     rotulo: "Calendário de feriados",
     tituloId: CALENDARIO_FERIADOS_TITULO_ID,
+    estado: "demonstrativo",
   },
   {
     id: "politicas_bh",
     rotulo: "Políticas de Banco de Horas",
     tituloId: POLITICAS_BANCO_HORAS_TITULO_ID,
+    estado: "demonstrativo",
   },
   {
     id: "funcoes_cargos",
     rotulo: "Funções e cargos",
     tituloId: FUNCOES_CARGOS_TITULO_ID,
+    estado: "funcional",
   },
   {
     id: "motivos_ausencia_justificativas",
     rotulo: "Motivos de ausência e justificativas",
     tituloId: MOTIVOS_AUSENCIA_JUSTIFICATIVAS_TITULO_ID,
+    estado: "demonstrativo",
   },
   {
     id: "centros_custo",
     rotulo: "Centros de custo",
     tituloId: CENTROS_CUSTO_TITULO_ID,
+    estado: "funcional",
   },
   {
     id: "tipos_documento",
     rotulo: "Tipos de documento",
     tituloId: TIPOS_DOCUMENTO_TITULO_ID,
+    estado: "demonstrativo",
   },
   {
     id: "motivos_desligamento",
     rotulo: "Motivos de desligamento",
     tituloId: MOTIVOS_DESLIGAMENTO_TITULO_ID,
+    estado: "demonstrativo",
   },
   {
     id: "escolaridade",
     rotulo: "Escolaridade",
     tituloId: ESCOLARIDADE_TITULO_ID,
+    estado: "demonstrativo",
   },
   {
     id: "cidades_localidades",
     rotulo: "Cidades e localidades",
     tituloId: CIDADES_LOCALIDADES_TITULO_ID,
+    estado: "demonstrativo",
   },
 ];
 
 export interface CadastrosScreenProps {
+  /**
+   * T159 — quais abas este contêiner mostra.
+   *
+   * `funcional` lista só as abas que falam com o servidor; `demonstrativo`,
+   * só as de exemplo. A separação é de arquitetura de informação: nenhuma
+   * tela mudou, e nenhuma deixou de ser alcançável — as demonstrativas vivem
+   * no grupo Demonstração da navegação, nomeado como tal.
+   *
+   * O padrão é `funcional`: quem renderizar este contêiner sem dizer o modo
+   * recebe a navegação primária, nunca a maquete.
+   */
+  modo?: EstadoDestino;
   /** Informa o `id` do `h1` atualmente visível, para o shell rotular o
    * `<main>` (`aria-labelledby`) mesmo quando a aba muda sem trocar de
    * destino. Não é navegação real — só sincroniza o rótulo de acessibilidade. */
   onTituloIdChange?: (tituloId: string) => void;
 }
 
-export function CadastrosScreen({ onTituloIdChange }: CadastrosScreenProps) {
-  const [abaAtiva, setAbaAtiva] = useState<AbaCadastros>("horarios");
+export function CadastrosScreen({
+  onTituloIdChange,
+  modo = "funcional",
+}: CadastrosScreenProps) {
+  // Só as abas do modo. `ABAS` continua sendo a fonte única; o filtro é
+  // de apresentação, e a primeira aba do conjunto vira o padrão — assim
+  // o contêiner nunca abre numa aba que ele mesmo não lista.
+  const abas = ABAS.filter((aba) => aba.estado === modo);
+  const [abaAtiva, setAbaAtiva] = useState<AbaCadastros>(abas[0]!.id);
 
-  const definicaoAtiva = ABAS.find((aba) => aba.id === abaAtiva) ?? ABAS[0]!;
+  const definicaoAtiva = abas.find((aba) => aba.id === abaAtiva) ?? abas[0]!;
 
   useEffect(() => {
     onTituloIdChange?.(definicaoAtiva.tituloId);
@@ -173,7 +206,7 @@ export function CadastrosScreen({ onTituloIdChange }: CadastrosScreenProps) {
         aria-label="Seções de Cadastros"
         className="cadastros-screen__tabs"
       >
-        {ABAS.map((aba) => {
+        {abas.map((aba) => {
           const selecionada = aba.id === abaAtiva;
           return (
             <button

@@ -21,166 +21,105 @@
  */
 import "./PainelNavigation.css";
 
-export interface DestinoPainel {
-  readonly id: string;
-  readonly label: string;
-}
-
-export const DESTINOS_PAINEL: readonly DestinoPainel[] = [
-  { id: "inicio", label: "Início" },
-  { id: "cadastros", label: "Cadastros" },
-  { id: "pessoas", label: "Pessoas" },
-  { id: "ponto", label: "Ponto" },
-  { id: "documentos", label: "Documentos" },
-  { id: "portal-colaborador", label: "Portal do Colaborador" },
-  { id: "solicitacoes-rh", label: "Solicitações" },
-  { id: "relatorios", label: "Relatórios" },
-  // T121 — "Administração > Contas de acesso": único destino sem sub-rótulo
-  // (sem abas locais), porque hoje só há uma tela administrativa. A
-  // ocultação/seleção deste item continua sendo só conveniência de
-  // interface (spec §3.6) — quem realmente decide o que aparece DENTRO da
-  // tela é o backend, por papel (ver `ContasAcessoScreen`).
-  { id: "contas-acesso", label: "Contas de acesso" },
-  // T153 — "Minha equipe". Diferente de todos os anteriores, este destino é
-  // CONDICIONAL: só entra na navegação quando o SERVIDOR informa um papel a
-  // que o RBAC concede `gestor_equipe`/`read`. Ver `destinosCondicionais`
-  // abaixo e o precedente `mfaDisponivel` (T131) — nunca uma flag de
-  // frontend liga a capacidade. Continua valendo o §3.6: isto é conveniência
-  // de interface, e quem decide de verdade é o backend.
-  { id: "equipe", label: "Minha equipe" },
-  // T157 — "Administração da liderança". CONDICIONAL pelo mesmo mecanismo do
-  // destino anterior: só entra quando o SERVIDOR informa um papel a que o RBAC
-  // concede `gestor_atribuicao`. Continua valendo o §3.6 — isto é conveniência
-  // de interface, e quem decide de verdade é o backend, que responde 403 a
-  // quem chamar a rota sem a capacidade.
-  { id: "administracao-lideranca", label: "Administração da liderança" },
-];
-
-/** Sub-rótulo exibido junto ao destino quando ele já tem tela própria. Para
- * "cadastros", "pessoas", "ponto", "portal-colaborador" e "relatorios",
- * reflete a aba padrão mostrada ao selecionar o destino (T075/T073/T072/
- * T063/T067) — não a aba interna eventualmente ativa: a navegação aqui é só
- * a de destino principal, sem conhecer o estado local de abas de cada tela. */
-const SUB_ROTULO: Record<string, string> = {
-  inicio: "Visão geral",
-  cadastros: "Horários",
-  pessoas: "Colaboradores",
-  ponto: "Visão do período",
-  documentos: "Metadados",
-  "portal-colaborador": "Visão geral — demonstração",
-  "solicitacoes-rh": "Central do RH",
-  relatorios: "Exceções de Ponto",
-  equipe: "Consulta do gestor",
-  "administracao-lideranca": "Vínculos e equipes",
-};
+import {
+  DESTINOS,
+  GRUPOS,
+  destinoVisivelPara,
+  type DestinoNavegacao,
+} from "./mapaNavegacao";
 
 /**
- * Agrupamento da navegação (T142, direção visual B aprovada). Não muda destino
- * nem permissão: é só leitura — separa o que se opera no dia a dia do que é
- * administração. A ordem relativa muda apenas pelo agrupamento (T144, O1):
- * "Solicitações" sobe de 7º para 6º e "Portal do Colaborador" desce de 6º para
- * 7º, por caírem em grupos diferentes. Nenhum destino sai da lista: os nove
- * continuam presentes e alcançáveis. Os rótulos de grupo não são focáveis e
- * não entram na ordem de tabulação.
+ * T159 — os destinos e os grupos deixam de ser declarados aqui.
+ *
+ * A fonte única passou a ser `mapaNavegacao.ts`, porque a mesma informação era
+ * precisa em três lugares (lista, sub-rótulo e agrupamento) e já tinha
+ * divergido entre eles. Reexportado para não quebrar quem importava daqui.
  */
-const GRUPOS_NAVEGACAO: readonly {
-  readonly titulo: string;
-  readonly destinos: readonly string[];
-}[] = [
-  {
-    titulo: "Operação",
-    destinos: [
-      "inicio",
-      "cadastros",
-      "pessoas",
-      "ponto",
-      "documentos",
-      "solicitacoes-rh",
-    ],
-  },
-  {
-    titulo: "Consulta",
-    destinos: ["portal-colaborador", "relatorios", "equipe"],
-  },
-  {
-    titulo: "Administração",
-    destinos: ["contas-acesso", "administracao-lideranca"],
-  },
-];
+export type DestinoPainel = DestinoNavegacao;
+export const DESTINOS_PAINEL = DESTINOS;
 
 export interface PainelNavigationProps {
   destinoAtivoId: string;
   onSelecionar: (id: string) => void;
   /**
-   * T153 — destinos condicionados a uma capacidade que o SERVIDOR concede.
-   * Chave: id do destino. Ausente do mapa = incondicional (os nove de
-   * sempre). Presente e `false` = não renderizado.
+   * Papel que o SERVIDOR informou. Decide quais destinos condicionados a uma
+   * capacidade aparecem — `null` enquanto não se sabe, que é o padrão seguro:
+   * na dúvida não se oferece.
    *
-   * Padrão `{}`: um destino condicional só some quando alguém diz
-   * explicitamente `false`, e quem monta o shell parte de `false` até o
-   * servidor confirmar — mesmo critério seguro de `mfaDisponivel`.
+   * Isto é conveniência de interface, nunca autorização (spec §3.6). Esconder
+   * um item não protege nada; o RBAC decide cada requisição. O que se evita é
+   * oferecer um caminho que sempre responderia 403.
    */
-  destinosCondicionais?: Readonly<Record<string, boolean>>;
+  papel?: string | null;
 }
 
 export function PainelNavigation({
   destinoAtivoId,
   onSelecionar,
-  destinosCondicionais = {},
+  papel = null,
 }: PainelNavigationProps) {
   return (
     <nav className="painel-nav" aria-label="Navegação do painel">
-      {GRUPOS_NAVEGACAO.map((grupo) => (
-        <div className="painel-nav__grupo" key={grupo.titulo}>
-          <p
-            className="painel-nav__grupo-titulo"
-            id={`nav-grupo-${grupo.titulo}`}
-          >
-            {grupo.titulo}
-          </p>
-          <ul
-            className="painel-nav__lista"
-            aria-labelledby={`nav-grupo-${grupo.titulo}`}
-          >
-            {grupo.destinos.map((id) => {
-              const destino = DESTINOS_PAINEL.find((d) => d.id === id);
-              if (!destino) return null;
-              // Destino condicional não concedido pelo servidor: nem botão,
-              // nem item de lista, nem posição na ordem de tabulação.
-              if (destinosCondicionais[destino.id] === false) return null;
-              const ativo = destino.id === destinoAtivoId;
-              return (
-                <li key={destino.id} className="painel-nav__item">
-                  <button
-                    type="button"
-                    className={
-                      ativo
-                        ? "painel-nav__link painel-nav__link--ativo"
-                        : "painel-nav__link"
-                    }
-                    aria-current={ativo ? "page" : undefined}
-                    onClick={() => onSelecionar(destino.id)}
-                  >
-                    {SUB_ROTULO[destino.id] ? (
-                      <>
-                        <span className="painel-nav__link-grupo">
-                          {destino.label}
-                        </span>
-                        <span className="painel-nav__link-sub">
-                          {" "}
-                          › {SUB_ROTULO[destino.id]}
-                        </span>
-                      </>
-                    ) : (
-                      destino.label
-                    )}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      ))}
+      {GRUPOS.map((grupo) => {
+        const visiveis = grupo.destinos.filter((d) =>
+          destinoVisivelPara(d, papel),
+        );
+        // Grupo que ficou sem destino não vira cabeçalho órfão.
+        if (visiveis.length === 0) return null;
+        const tituloId = `nav-grupo-${grupo.titulo}`;
+        const descricaoId = grupo.descricao
+          ? `${tituloId}-descricao`
+          : undefined;
+        return (
+          <div className="painel-nav__grupo" key={grupo.titulo}>
+            <p className="painel-nav__grupo-titulo" id={tituloId}>
+              {grupo.titulo}
+            </p>
+            {grupo.descricao ? (
+              <p className="painel-nav__grupo-descricao" id={descricaoId}>
+                {grupo.descricao}
+              </p>
+            ) : null}
+            <ul
+              className="painel-nav__lista"
+              aria-labelledby={tituloId}
+              {...(descricaoId ? { "aria-describedby": descricaoId } : {})}
+            >
+              {visiveis.map((destino) => {
+                const ativo = destino.id === destinoAtivoId;
+                return (
+                  <li key={destino.id} className="painel-nav__item">
+                    <button
+                      type="button"
+                      className={
+                        ativo
+                          ? "painel-nav__link painel-nav__link--ativo"
+                          : "painel-nav__link"
+                      }
+                      aria-current={ativo ? "page" : undefined}
+                      onClick={() => onSelecionar(destino.id)}
+                    >
+                      {destino.subRotulo ? (
+                        <>
+                          <span className="painel-nav__link-grupo">
+                            {destino.label}
+                          </span>
+                          <span className="painel-nav__link-sub">
+                            {" "}
+                            › {destino.subRotulo}
+                          </span>
+                        </>
+                      ) : (
+                        destino.label
+                      )}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        );
+      })}
     </nav>
   );
 }

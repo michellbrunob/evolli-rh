@@ -122,3 +122,12 @@
     content: " ";
   }
 }
+
+/* T159 — descrição do grupo Demonstração. Só tokens existentes. */
+.painel-nav__grupo-descricao {
+  margin: 0 0 var(--space-xs);
+  padding: 0 var(--space-sm);
+  font-size: var(--text-caption);
+  line-height: var(--leading-body);
+  color: var(--color-ink-subtle);
+}

@@ -1,0 +1,262 @@
+/**
+ * Mapa de navegação (T159) — fonte única dos módulos, destinos e estados.
+ *
+ * ## O problema que este módulo resolve
+ *
+ * Menu é promessa. Até a T158 a navegação listava, lado a lado e sem
+ * distinção, destinos que gravam no servidor e superfícies que só desenham
+ * dados de exemplo. Quem navegava não tinha como saber qual era qual — e a
+ * matriz da T156 mediu a proporção: a maior parte das telas-folha é estática.
+ *
+ * A T159 não apaga nem altera nenhuma dessas telas. Ela separa as duas coisas
+ * na **arquitetura de informação**: o que opera fica na navegação primária, o
+ * que é maquete fica num grupo chamado **Demonstração**, nomeado como tal.
+ *
+ * ## O estado vem do código, não deste arquivo
+ *
+ * `funcional` aqui significa, literalmente: a tela importa um cliente de
+ * `src/api/` e fala com o servidor. `demonstrativo` significa que a tela lê um
+ * `*.fixtures` e não emite requisição nenhuma. A classificação foi derivada da
+ * fonte, tela por tela, e os testes a prendem contra o próprio código — se uma
+ * tela demonstrativa passar a falar com a API, ou o contrário, o teste quebra
+ * antes de o menu mentir.
+ *
+ * ## O que este módulo NÃO é
+ *
+ * **Não é autorização.** `papeis` existe para não oferecer um destino que o
+ * servidor recusaria — conveniência de interface, como a spec do painel fixou
+ * em §3.6. Quem decide continua sendo o RBAC, a cada requisição. Esconder um
+ * item não protege nada; mostrar um item que sempre dá 403 é que atrapalha.
+ *
+ * **Não é roteador.** Continua não havendo URL nem `history`: destino é estado
+ * do shell, como desde a T044.
+ */
+
+/** Estado real de um destino, derivado da origem dos dados das suas telas. */
+export type EstadoDestino = "funcional" | "demonstrativo";
+
+export interface DestinoNavegacao {
+  readonly id: string;
+  readonly label: string;
+  /** Sub-rótulo exibido junto ao destino, quando ajuda a situar. */
+  readonly subRotulo?: string;
+  readonly estado: EstadoDestino;
+  /**
+   * Papéis a que o servidor concede a capacidade deste destino. Ausente =
+   * incondicional na interface (o servidor segue decidindo cada requisição).
+   */
+  readonly papeis?: readonly string[];
+}
+
+export interface GrupoNavegacao {
+  readonly titulo: string;
+  /** Explica o grupo para leitor de tela; obrigatório em Demonstração. */
+  readonly descricao?: string;
+  readonly destinos: readonly DestinoNavegacao[];
+}
+
+/**
+ * Papéis a que o RBAC concede `gestor_equipe`/`read` — `gestor` consulta o
+ * próprio escopo, `rh` confere o que configurou. Espelha `rbac.evaluator.ts`.
+ */
+export const PAPEIS_MINHA_EQUIPE: readonly string[] = ["gestor", "rh"];
+
+/**
+ * Papéis a que o RBAC concede `gestor_atribuicao` — só `rh`, na própria
+ * empresa. `master_tecnico` é negado de propósito: não tem empresa, e toda
+ * consulta ali parte da empresa do ator.
+ */
+export const PAPEIS_ADMINISTRACAO_LIDERANCA: readonly string[] = ["rh"];
+
+/**
+ * Os cinco módulos da navegação primária, mais Demonstração.
+ *
+ * A ordem é de uso: quem se opera no dia a dia vem antes do que se administra,
+ * e o que é maquete vem por último, separado e nomeado.
+ */
+export const GRUPOS: readonly GrupoNavegacao[] = [
+  {
+    titulo: "Pessoas",
+    destinos: [
+      {
+        id: "pessoas",
+        label: "Pessoas",
+        subRotulo: "Colaboradores",
+        estado: "funcional",
+      },
+    ],
+  },
+  {
+    titulo: "Estrutura",
+    destinos: [
+      {
+        id: "cadastros",
+        label: "Estrutura",
+        subRotulo: "Horários",
+        estado: "funcional",
+      },
+    ],
+  },
+  {
+    titulo: "Jornada",
+    destinos: [
+      {
+        id: "ponto",
+        label: "Jornada",
+        subRotulo: "Visão do período",
+        estado: "funcional",
+      },
+    ],
+  },
+  {
+    titulo: "Liderança",
+    destinos: [
+      {
+        id: "equipe",
+        label: "Minha equipe",
+        subRotulo: "Consulta do gestor",
+        estado: "funcional",
+        papeis: PAPEIS_MINHA_EQUIPE,
+      },
+      {
+        id: "administracao-lideranca",
+        label: "Administração da liderança",
+        subRotulo: "Vínculos e equipes",
+        estado: "funcional",
+        papeis: PAPEIS_ADMINISTRACAO_LIDERANCA,
+      },
+    ],
+  },
+  {
+    titulo: "Administração",
+    destinos: [
+      {
+        id: "contas-acesso",
+        label: "Contas de acesso",
+        estado: "funcional",
+      },
+      // Auditoria NÃO entra aqui. A API existe (`GET /v1/audit`), mas não há
+      // tela — e um item de menu sem tela é exatamente a promessa vazia que
+      // esta tarefa existe para eliminar. Configurações idem: não há tela.
+    ],
+  },
+  {
+    titulo: "Demonstração",
+    descricao:
+      "Superfícies de exemplo. Nada aqui grava, consulta o servidor ou representa capacidade disponível.",
+    destinos: [
+      {
+        id: "inicio",
+        label: "Visão geral",
+        estado: "demonstrativo",
+      },
+      // Rótulos próprios, não "Pessoas (demonstração)". Repetir o nome do
+      // módulo funcional criaria dois itens cujo nome acessível começa igual,
+      // e quem navega por leitor de tela ouviria "Pessoas" duas vezes antes de
+      // chegar ao que os distingue.
+      {
+        id: "pessoas-demonstracao",
+        label: "Benefícios e dependentes",
+        subRotulo: "Inclui afastamentos",
+        estado: "demonstrativo",
+      },
+      {
+        id: "cadastros-demonstracao",
+        label: "Catálogos de apoio",
+        subRotulo: "Feriados, motivos, escolaridade",
+        estado: "demonstrativo",
+      },
+      {
+        id: "ponto-demonstracao",
+        label: "Apuração e banco de horas",
+        subRotulo: "Fechamento, escalas, inconsistências",
+        estado: "demonstrativo",
+      },
+      {
+        id: "documentos",
+        label: "Documentos",
+        subRotulo: "Metadados e repositório",
+        estado: "demonstrativo",
+      },
+      {
+        id: "solicitacoes-rh",
+        label: "Central de solicitações",
+        estado: "demonstrativo",
+      },
+      {
+        id: "relatorios",
+        label: "Relatórios",
+        estado: "demonstrativo",
+      },
+      {
+        id: "portal-colaborador",
+        label: "Portal do Colaborador",
+        estado: "demonstrativo",
+      },
+    ],
+  },
+];
+
+/** Todos os destinos, achatados, na ordem em que aparecem. */
+export const DESTINOS: readonly DestinoNavegacao[] = GRUPOS.flatMap(
+  (g) => g.destinos,
+);
+
+export function destinoPorId(id: string): DestinoNavegacao | undefined {
+  return DESTINOS.find((d) => d.id === id);
+}
+
+/** O destino é oferecido a este papel? Papel desconhecido vê só o incondicional. */
+export function destinoVisivelPara(
+  destino: DestinoNavegacao,
+  papel: string | null,
+): boolean {
+  if (!destino.papeis) return true;
+  return papel !== null && destino.papeis.includes(papel);
+}
+
+/**
+ * Onde cada papel aterrissa.
+ *
+ * Tabela explícita, e não regra inferida, porque "o primeiro destino que o
+ * papel vê" daria a resposta errada: os contêineres funcionais permanecem
+ * incondicionais no menu — esconder `Pessoas` de quem pode usar uma aba dela
+ * removeria acesso real —, então "primeiro visível" não é o mesmo que
+ * "primeiro utilizável".
+ *
+ * Cada linha foi conferida em `rbac.evaluator.ts`, contra o recurso que a
+ * **aba padrão** do destino consulta na primeira requisição:
+ *
+ * | Papel            | Aterrissa em | Por quê                                              |
+ * | ---------------- | ------------ | ---------------------------------------------------- |
+ * | `rh`             | `pessoas`    | lê `colaborador` na própria empresa                   |
+ * | `dp`             | `pessoas`    | idem                                                  |
+ * | `master_tecnico` | `pessoas`    | lê `colaborador` em escopo global                     |
+ * | `gestor`         | `equipe`     | único destino funcional que o RBAC lhe concede        |
+ * | demais           | `inicio`     | nenhuma capacidade funcional — e `inicio` não chama nada |
+ *
+ * **Isto corrige um defeito antigo sem inventar capacidade.** O padrão era
+ * `cadastros` para todo mundo, cuja aba inicial consulta `tabela_horario` —
+ * concedida só a `rh` e `master_tecnico`. Seis papéis abriam o produto numa
+ * tela que respondia 403 na primeira requisição: a primeira impressão do
+ * sistema era uma negação. `financeiro` é o caso menos óbvio e por isso vale
+ * dizer: ele lê `centro_custo`, que é uma aba de Estrutura, mas **não** a aba
+ * padrão — mandá-lo para lá continuaria produzindo 403 antes de ele trocar de
+ * aba.
+ *
+ * `inicio` é demonstrativo e **não importa nenhum cliente de API**: aterrissar
+ * ali não dispara requisição alguma, então não há como gerar 403.
+ */
+export const DESTINO_SEM_CAPACIDADE = "inicio";
+
+const DESTINO_INICIAL_POR_PAPEL: Readonly<Record<string, string>> = {
+  rh: "pessoas",
+  dp: "pessoas",
+  master_tecnico: "pessoas",
+  gestor: "equipe",
+};
+
+export function destinoInicialPara(papel: string | null): string {
+  if (papel === null) return DESTINO_SEM_CAPACIDADE;
+  return DESTINO_INICIAL_POR_PAPEL[papel] ?? DESTINO_SEM_CAPACIDADE;
+}

@@ -62,16 +62,11 @@ import {
   CONTAS_ACESSO_TITULO_ID,
   ContasAcessoScreen,
 } from "../screens/administracao";
-import { PAPEIS_COM_ADMINISTRACAO_DE_LIDERANCA } from "../api/gestorAdminClient";
 import {
   DOCUMENTOS_METADADOS_TITULO_ID,
   DocumentosScreen,
 } from "../screens/documentos";
-import {
-  EQUIPE_TITULO_ID,
-  EquipeScreen,
-  PAPEIS_COM_CONSULTA_DE_EQUIPE,
-} from "../screens/equipe";
+import { EQUIPE_TITULO_ID, EquipeScreen } from "../screens/equipe";
 import { CadastrosScreen, HORARIOS_TITULO_ID } from "../screens/horarios";
 import { InicioVisaoGeralScreen } from "../screens/inicio";
 import { COLABORADORES_TITULO_ID, PessoasScreen } from "../screens/pessoas";
@@ -85,7 +80,8 @@ import {
 } from "../screens/relatorios";
 import { CentralSolicitacoesRHScreen } from "../screens/solicitacoes-rh/CentralSolicitacoesRHScreen";
 import { ModuloEmPreparacao } from "./ModuloEmPreparacao";
-import { DESTINOS_PAINEL, PainelNavigation } from "./PainelNavigation";
+import { PainelNavigation } from "./PainelNavigation";
+import { destinoInicialPara, destinoPorId } from "./mapaNavegacao";
 
 /** `titleId` do `h1` de cada destino, para `aria-labelledby` do `<main>`.
  * "cadastros", "pessoas", "ponto", "documentos", "portal-colaborador" e
@@ -118,11 +114,38 @@ function conteudoDoDestino(
   if (destinoId === "cadastros") {
     return <CadastrosScreen onTituloIdChange={onCadastrosTituloIdChange} />;
   }
+  if (destinoId === "cadastros-demonstracao") {
+    return (
+      <CadastrosScreen
+        modo="demonstrativo"
+        onTituloIdChange={onCadastrosTituloIdChange}
+      />
+    );
+  }
   if (destinoId === "pessoas") {
     return <PessoasScreen onTituloIdChange={onPessoasTituloIdChange} />;
   }
+  // T159 — os destinos `*-demonstracao` reusam o MESMO contêiner, em modo
+  // demonstrativo. Nenhuma tela foi duplicada: o que muda é qual subconjunto
+  // de abas o contêiner lista.
+  if (destinoId === "pessoas-demonstracao") {
+    return (
+      <PessoasScreen
+        modo="demonstrativo"
+        onTituloIdChange={onPessoasTituloIdChange}
+      />
+    );
+  }
   if (destinoId === "ponto") {
     return <PontoScreen onTituloIdChange={onPontoTituloIdChange} />;
+  }
+  if (destinoId === "ponto-demonstracao") {
+    return (
+      <PontoScreen
+        modo="demonstrativo"
+        onTituloIdChange={onPontoTituloIdChange}
+      />
+    );
   }
   if (destinoId === "documentos") {
     return <DocumentosScreen onTituloIdChange={onDocumentosTituloIdChange} />;
@@ -153,7 +176,7 @@ function conteudoDoDestino(
       />
     );
   }
-  const destino = DESTINOS_PAINEL.find((item) => item.id === destinoId);
+  const destino = destinoPorId(destinoId);
   return (
     <ModuloEmPreparacao
       titulo={destino?.label ?? "Módulo"}
@@ -177,25 +200,21 @@ function conteudoDoDestino(
  * byte por byte como antes — esta correção não move `rh`, `dp`,
  * `colaborador` nem `master_tecnico`.
  */
-const DESTINO_INICIAL_POR_PAPEL: Readonly<Record<string, string>> = {
-  gestor: "equipe",
-};
-
-/** Destino padrão, inalterado desde o T044. */
-const DESTINO_PADRAO = "cadastros";
-
 /**
  * Resolve o destino inicial a partir do papel JÁ conhecido.
  *
  * Síncrono de propósito: é usado como inicializador de `useState`, não como
  * efeito. Corrigir o destino depois da montagem produziria exatamente o que
- * esta correção elimina — o flash da tela errada e a requisição que ela
- * dispara antes de ser trocada.
+ * esta regra elimina — o flash da tela errada e a requisição que ela dispara
+ * antes de ser trocada.
+ *
+ * T159: a tabela mudou de lugar, não de natureza. Mora em `mapaNavegacao.ts`,
+ * junto dos destinos, e deixou de ser uma exceção só para `gestor`: cada papel
+ * aterrissa onde o RBAC lhe concede a primeira requisição, e quem não tem
+ * capacidade funcional nenhuma cai em `inicio`, que não chama nada. Antes
+ * disso, seis papéis abriam o produto num 403.
  */
-export function destinoInicialPara(papel: string | null | undefined): string {
-  if (typeof papel !== "string") return DESTINO_PADRAO;
-  return DESTINO_INICIAL_POR_PAPEL[papel] ?? DESTINO_PADRAO;
-}
+export { destinoInicialPara };
 
 export interface AppProps {
   /** Presente só quando há sessão autenticada (ver `AutenticacaoApp`). Sem
@@ -339,17 +358,14 @@ export function App({
       ) : null}
 
       <div className="app-shell__body">
+        {/* T159 — o shell passa o papel e a navegação decide sozinha quais
+            destinos condicionados oferecer, lendo os papéis declarados no
+            mapa. Antes a lista de capacidades era remontada aqui, longe dos
+            destinos, e já havia divergido deles. */}
         <PainelNavigation
           destinoAtivoId={destinoAtivoId}
           onSelecionar={setDestinoAtivoId}
-          destinosCondicionais={{
-            equipe:
-              papelDoAtor !== null &&
-              PAPEIS_COM_CONSULTA_DE_EQUIPE.includes(papelDoAtor),
-            "administracao-lideranca":
-              papelDoAtor !== null &&
-              PAPEIS_COM_ADMINISTRACAO_DE_LIDERANCA.includes(papelDoAtor),
-          }}
+          papel={papelDoAtor}
         />
 
         <main

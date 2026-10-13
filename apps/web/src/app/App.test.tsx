@@ -4,7 +4,7 @@ import { App } from "./App";
 
 describe("App — shell administrativo + navegação visual (T044)", () => {
   it("usa marcos semânticos e um único banner (a barra do shell)", () => {
-    render(<App />);
+    render(<App papelDoAtor="rh" />);
 
     // Exatamente um banner: a barra superior do shell. A tela de domínio não
     // introduz landmark próprio, então não há segundo banner competindo.
@@ -16,22 +16,22 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
   });
 
   it("exibe a marca textual 'Evolli RH' e o rótulo do painel", () => {
-    render(<App />);
+    render(<App papelDoAtor="rh" />);
 
     expect(screen.getAllByText("Evolli RH").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Painel Administrativo")).toBeInTheDocument();
   });
 
-  it("tem exatamente um título de nível 1: o da tela Horários", () => {
-    render(<App />);
+  it("tem exatamente um título de nível 1: o da tela de aterrissagem", () => {
+    render(<App papelDoAtor="rh" />);
 
     const titulos = screen.getAllByRole("heading", { level: 1 });
     expect(titulos).toHaveLength(1);
-    expect(titulos[0]).toHaveTextContent("Horários");
+    expect(titulos[0]).toHaveTextContent("Colaboradores");
   });
 
   it("oferece um link 'pular para o conteúdo' que aponta para o <main>", () => {
-    render(<App />);
+    render(<App papelDoAtor="rh" />);
 
     const skip = screen.getByRole("link", { name: /pular para o conteúdo/i });
     expect(skip.getAttribute("href")).toBe("#conteudo-principal");
@@ -42,18 +42,19 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
   });
 
   it("o <main> é rotulado pelo título da tela (aria-labelledby)", () => {
-    render(<App />);
+    render(<App papelDoAtor="rh" />);
 
     const main = screen.getByRole("main");
     const rotuloId = main.getAttribute("aria-labelledby");
     expect(rotuloId).toBeTruthy();
     const rotulo = document.getElementById(rotuloId!);
     expect(rotulo?.tagName).toBe("H1");
-    expect(rotulo).toHaveTextContent("Horários");
+    expect(rotulo).toHaveTextContent("Colaboradores");
   });
 
-  it("renderiza a tela Cadastros > Horários dentro do <main>", () => {
-    render(<App />);
+  it("renderiza Estrutura > Horários dentro do <main>", () => {
+    render(<App papelDoAtor="rh" />);
+    fireEvent.click(screen.getByRole("button", { name: /^Estrutura/ }));
 
     const main = screen.getByRole("main");
     expect(screen.getByText("Somente RH")).toBeInTheDocument();
@@ -61,7 +62,8 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
   });
 
   it("Cadastros > aba local 'Estrutura organizacional' continua acessível, sem regressão em Horários (T043/T073)", () => {
-    render(<App />);
+    render(<App papelDoAtor="rh" />);
+    fireEvent.click(screen.getByRole("button", { name: /^Estrutura/ }));
 
     fireEvent.click(
       screen.getByRole("tab", { name: "Estrutura organizacional" }),
@@ -83,110 +85,44 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     );
   });
 
-  it("Cadastros > aba local 'Calendário de feriados' continua acessível, sem regressão em Horários/Estrutura organizacional (T076)", () => {
-    render(<App />);
+  it("os catálogos de apoio NÃO estão em Estrutura — estão em Demonstração", () => {
+    // Substitui as três cadeias de "sem regressão" que guardavam a
+    // coexistência das onze abas. A coexistência acabou de propósito, e o
+    // percurso completo de cada modo é coberto em `CadastrosScreen.test.tsx`.
+    // O que se prova aqui é o roteamento: cada conjunto no seu destino.
+    render(<App papelDoAtor="rh" />);
 
-    fireEvent.click(
-      screen.getByRole("tab", { name: "Calendário de feriados" }),
-    );
-
-    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
-    expect(
-      screen.getByRole("heading", {
-        level: 1,
-        name: "Calendário de feriados",
-      }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", { name: "Calendário de feriados (exemplo)" }),
-    ).toBeInTheDocument();
-
-    const main = screen.getByRole("main");
-    const rotuloId = main.getAttribute("aria-labelledby");
-    expect(document.getElementById(rotuloId!)).toHaveTextContent(
+    fireEvent.click(screen.getByRole("button", { name: /^Estrutura/ }));
+    for (const demonstrativa of [
       "Calendário de feriados",
-    );
-  });
-
-  it("Cadastros > aba local 'Políticas de Banco de Horas' continua acessível, sem regressão em Horários/Estrutura organizacional/Calendário de feriados (T078)", () => {
-    render(<App />);
-
-    fireEvent.click(
-      screen.getByRole("tab", { name: "Políticas de Banco de Horas" }),
-    );
-
-    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
-    expect(
-      screen.getByRole("heading", {
-        level: 1,
-        name: "Políticas de Banco de Horas",
-      }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", {
-        name: "Políticas de Banco de Horas (exemplo)",
-      }),
-    ).toBeInTheDocument();
-
-    const main = screen.getByRole("main");
-    const rotuloId = main.getAttribute("aria-labelledby");
-    expect(document.getElementById(rotuloId!)).toHaveTextContent(
       "Políticas de Banco de Horas",
-    );
-  });
-
-  it("Cadastros > aba local 'Funções e cargos' continua acessível, sem regressão em Horários/Estrutura organizacional/Calendário de feriados/Políticas de Banco de Horas (T080)", () => {
-    render(<App />);
-
-    fireEvent.click(screen.getByRole("tab", { name: "Funções e cargos" }));
-
-    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
-    expect(
-      screen.getByRole("heading", {
-        level: 1,
-        name: "Funções e cargos",
-      }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Somente RH")).toBeInTheDocument();
-
-    const main = screen.getByRole("main");
-    const rotuloId = main.getAttribute("aria-labelledby");
-    expect(document.getElementById(rotuloId!)).toHaveTextContent(
-      "Funções e cargos",
-    );
-  });
-
-  it("Cadastros > aba local 'Motivos de ausência e justificativas' continua acessível, sem regressão em Horários/Estrutura organizacional/Calendário de feriados/Políticas de Banco de Horas/Funções e cargos (T081)", () => {
-    render(<App />);
+      "Motivos de ausência e justificativas",
+      "Tipos de documento",
+      "Motivos de desligamento",
+      "Escolaridade",
+      "Cidades e localidades",
+    ]) {
+      expect(screen.queryByRole("tab", { name: demonstrativa })).toBeNull();
+    }
 
     fireEvent.click(
-      screen.getByRole("tab", {
-        name: "Motivos de ausência e justificativas",
-      }),
+      screen.getByRole("button", { name: /^Catálogos de apoio/ }),
     );
-
-    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
-    expect(
-      screen.getByRole("heading", {
-        level: 1,
-        name: "Motivos de ausência e justificativas",
-      }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", {
-        name: "Motivos de ausência e justificativas (exemplo)",
-      }),
-    ).toBeInTheDocument();
-
-    const main = screen.getByRole("main");
-    const rotuloId = main.getAttribute("aria-labelledby");
-    expect(document.getElementById(rotuloId!)).toHaveTextContent(
+    for (const demonstrativa of [
+      "Calendário de feriados",
+      "Políticas de Banco de Horas",
       "Motivos de ausência e justificativas",
-    );
+    ]) {
+      expect(
+        screen.getByRole("tab", { name: demonstrativa }),
+      ).toBeInTheDocument();
+    }
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
   });
 
   it("Cadastros volta para 'Horários' ao sair e voltar ao destino (T073)", () => {
-    render(<App />);
+    render(<App papelDoAtor="rh" />);
+    fireEvent.click(screen.getByRole("button", { name: /^Estrutura/ }));
 
     fireEvent.click(
       screen.getByRole("tab", { name: "Estrutura organizacional" }),
@@ -199,7 +135,7 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /^Pessoas/ }));
-    fireEvent.click(screen.getByRole("button", { name: /^Cadastros/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^Estrutura/ }));
 
     expect(
       screen.getByRole("heading", { level: 1, name: "Horários" }),
@@ -207,7 +143,7 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
   });
 
   it("não referencia autenticação, sessão real ou dado sensível no shell", () => {
-    render(<App />);
+    render(<App papelDoAtor="rh" />);
 
     const texto = document.body.innerHTML.toLowerCase();
     for (const termoProibido of [
@@ -225,8 +161,8 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     }
   });
 
-  it("apresenta a navegação com os nove destinos, Cadastros ativo por padrão", () => {
-    render(<App />);
+  it("apresenta a navegação com todos os destinos do mapa, Pessoas ativo por padrão", () => {
+    render(<App papelDoAtor="rh" />);
 
     const nav = screen.getByRole("navigation", {
       name: "Navegação do painel",
@@ -234,49 +170,48 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     expect(nav).toBeInTheDocument();
 
     expect(
-      screen.getByRole("button", { name: /Início.*Visão geral/ }),
+      screen.getByRole("button", { name: /^Visão geral/ }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: /Pessoas.*Colaboradores/ }),
+      screen.getByRole("button", { name: /^Pessoas/ }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: /Ponto.*Visão do período/ }),
+      screen.getByRole("button", { name: /^Jornada/ }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: /Documentos.*Metadados/ }),
+      screen.getByRole("button", { name: /^Documentos/ }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", {
-        name: /Portal do Colaborador.*Visão geral — demonstração/,
+        name: /^Portal do Colaborador/,
       }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", {
-        name: /Solicitações.*Central do RH/,
+        name: /^Central de solicitações/,
       }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", {
-        name: /Relatórios.*Exceções de Ponto/,
+        name: /^Relatórios/,
       }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Contas de acesso" }),
     ).toBeInTheDocument();
 
-    const cadastros = screen.getByRole("button", { name: /Cadastros/ });
-    expect(cadastros).toHaveAttribute("aria-current", "page");
+    // Pessoas é a aterrissagem funcional de `rh` desde a T159.
+    const pessoas = screen.getByRole("button", { name: /^Pessoas/ });
+    expect(pessoas).toHaveAttribute("aria-current", "page");
     expect(
-      screen.getByRole("button", { name: /Início.*Visão geral/ }),
+      screen.getByRole("button", { name: /^Visão geral/ }),
     ).not.toHaveAttribute("aria-current");
   });
 
   it("troca o conteúdo do <main> ao selecionar outro destino, com h1 único", () => {
-    render(<App />);
+    render(<App papelDoAtor="rh" />);
 
-    fireEvent.click(
-      screen.getByRole("button", { name: /Início.*Visão geral/ }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: /^Visão geral/ }));
 
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     expect(
@@ -285,27 +220,34 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     expect(screen.queryByText("Módulo em preparação")).not.toBeInTheDocument();
 
     const inicioBtn = screen.getByRole("button", {
-      name: /Início.*Visão geral/,
+      name: /^Visão geral/,
     });
     expect(inicioBtn).toHaveAttribute("aria-current", "page");
     expect(
-      screen.getByRole("button", { name: /^Cadastros/ }),
+      screen.getByRole("button", { name: /^Estrutura/ }),
     ).not.toHaveAttribute("aria-current");
   });
 
   it("nenhum destino mostra mais 'Módulo em preparação' — todos têm tela própria (T048)", () => {
-    render(<App />);
+    render(<App papelDoAtor="rh" />);
 
+    // Todos os catorze destinos do mapa da T159 — operacionais e de
+    // demonstração. Nenhum pode cair no placeholder.
     for (const rotulo of [
-      /^Início.*Visão geral/,
-      /^Cadastros/,
-      /^Pessoas.*Colaboradores/,
-      /^Ponto.*Visão do período/,
-      /^Documentos.*Metadados/,
-      /^Portal do Colaborador.*Visão geral — demonstração/,
-      /^Solicitações.*Central do RH/,
-      /^Relatórios.*Exceções de Ponto/,
+      /^Pessoas/,
+      /^Estrutura/,
+      /^Jornada/,
+      /^Minha equipe/,
+      /^Administração da liderança/,
       /^Contas de acesso/,
+      /^Visão geral/,
+      /^Benefícios e dependentes/,
+      /^Catálogos de apoio/,
+      /^Apuração e banco de horas/,
+      /^Documentos/,
+      /^Central de solicitações/,
+      /^Relatórios/,
+      /^Portal do Colaborador/,
     ]) {
       fireEvent.click(screen.getByRole("button", { name: rotulo }));
       expect(
@@ -315,11 +257,9 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
   });
 
   it("renderiza a tela Início > Visão geral com h1 único e atalhos que trocam o destino local", () => {
-    render(<App />);
+    render(<App papelDoAtor="rh" />);
 
-    fireEvent.click(
-      screen.getByRole("button", { name: /Início.*Visão geral/ }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: /^Visão geral/ }));
 
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     expect(
@@ -338,17 +278,15 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
         name: "Metadados de documentos",
       }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /Documentos.*Metadados/ }),
-    ).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("button", { name: /^Documentos/ })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
   });
 
-  it("renderiza a tela Ponto > Visão do período por padrão, com h1 único (T063)", () => {
-    render(<App />);
-
-    fireEvent.click(
-      screen.getByRole("button", { name: /Ponto.*Visão do período/ }),
-    );
+  it("renderiza Jornada > Visão do período, com h1 único (T063)", () => {
+    render(<App papelDoAtor="rh" />);
+    fireEvent.click(screen.getByRole("button", { name: /^Jornada/ }));
 
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     expect(
@@ -363,108 +301,58 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     );
   });
 
-  it("Ponto > aba local 'Verificar folhas' continua acessível, sem regressão (T063)", () => {
-    render(<App />);
+  it("a apuração e o banco de horas NÃO estão em Jornada — estão em Demonstração", () => {
+    render(<App papelDoAtor="rh" />);
 
-    fireEvent.click(
-      screen.getByRole("button", { name: /Ponto.*Visão do período/ }),
-    );
-    fireEvent.click(screen.getByRole("tab", { name: "Verificar folhas" }));
-
-    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Verificar folhas" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", {
-        name: "Pendências da fila de verificação",
-      }),
-    ).toBeInTheDocument();
-
-    const main = screen.getByRole("main");
-    const rotuloId = main.getAttribute("aria-labelledby");
-    expect(document.getElementById(rotuloId!)).toHaveTextContent(
+    fireEvent.click(screen.getByRole("button", { name: /^Jornada/ }));
+    for (const demonstrativa of [
       "Verificar folhas",
-    );
-  });
-
-  it("Ponto > aba local 'Ajustes manuais' continua acessível, sem regressão em Visão do período/Verificar folhas/Banco de Horas (T077)", () => {
-    render(<App />);
-
-    fireEvent.click(
-      screen.getByRole("button", { name: /Ponto.*Visão do período/ }),
-    );
-    fireEvent.click(screen.getByRole("tab", { name: "Ajustes manuais" }));
-
-    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Ajustes manuais" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", {
-        name: "Ajustes manuais de marcação (exemplo)",
-      }),
-    ).toBeInTheDocument();
-
-    const main = screen.getByRole("main");
-    const rotuloId = main.getAttribute("aria-labelledby");
-    expect(document.getElementById(rotuloId!)).toHaveTextContent(
+      "Banco de Horas",
       "Ajustes manuais",
-    );
-  });
-
-  it("Ponto > aba local 'Fechamento e Espelho' continua acessível, sem regressão em Visão do período/Verificar folhas/Banco de Horas/Ajustes manuais (T079)", () => {
-    render(<App />);
-
-    fireEvent.click(
-      screen.getByRole("button", { name: /Ponto.*Visão do período/ }),
-    );
-    fireEvent.click(screen.getByRole("tab", { name: "Fechamento e Espelho" }));
-
-    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Fechamento e Espelho" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", {
-        name: "Fechamento e Espelho — períodos (exemplo)",
-      }),
-    ).toBeInTheDocument();
-
-    const main = screen.getByRole("main");
-    const rotuloId = main.getAttribute("aria-labelledby");
-    expect(document.getElementById(rotuloId!)).toHaveTextContent(
       "Fechamento e Espelho",
+      "Escalas e jornadas",
+      "Inconsistências",
+      "Justificativas",
+    ]) {
+      expect(screen.queryByRole("tab", { name: demonstrativa })).toBeNull();
+    }
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /^Apuração e banco de horas/ }),
     );
+    for (const demonstrativa of [
+      "Verificar folhas",
+      "Ajustes manuais",
+      "Fechamento e Espelho",
+    ]) {
+      expect(
+        screen.getByRole("tab", { name: demonstrativa }),
+      ).toBeInTheDocument();
+    }
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
   });
 
-  it("Ponto volta para 'Visão do período' ao sair e voltar ao destino (T063)", () => {
-    render(<App />);
+  it("Jornada volta para 'Visão do período' ao sair e voltar ao destino (T063)", () => {
+    render(<App papelDoAtor="rh" />);
 
-    fireEvent.click(
-      screen.getByRole("button", { name: /Ponto.*Visão do período/ }),
-    );
-    fireEvent.click(screen.getByRole("tab", { name: "Verificar folhas" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Jornada/ }));
     expect(
-      screen.getByRole("heading", { level: 1, name: "Verificar folhas" }),
+      screen.getByRole("heading", { level: 1, name: "Visão do período" }),
     ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /^Cadastros/ }));
-    fireEvent.click(
-      screen.getByRole("button", { name: /Ponto.*Visão do período/ }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: /^Pessoas/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^Jornada/ }));
 
     expect(
       screen.getByRole("heading", { level: 1, name: "Visão do período" }),
     ).toBeInTheDocument();
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
   });
 
   it("renderiza a tela Pessoas > Colaboradores por padrão, com h1 único (T111)", () => {
-    render(<App />);
+    render(<App papelDoAtor="rh" />);
 
-    fireEvent.click(
-      screen.getByRole("button", { name: /Pessoas.*Colaboradores/ }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: /^Pessoas/ }));
 
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     expect(
@@ -481,11 +369,9 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
   });
 
   it("Pessoas > aba local 'Horário de trabalho' continua acessível, sem regressão (T112)", () => {
-    render(<App />);
+    render(<App papelDoAtor="rh" />);
 
-    fireEvent.click(
-      screen.getByRole("button", { name: /Pessoas.*Colaboradores/ }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: /^Pessoas/ }));
     fireEvent.click(screen.getByRole("tab", { name: "Horário de trabalho" }));
 
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
@@ -502,20 +388,16 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
   });
 
   it("Pessoas volta para 'Colaboradores' ao sair e voltar ao destino (T072)", () => {
-    render(<App />);
+    render(<App papelDoAtor="rh" />);
 
-    fireEvent.click(
-      screen.getByRole("button", { name: /Pessoas.*Colaboradores/ }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: /^Pessoas/ }));
     fireEvent.click(screen.getByRole("tab", { name: "Horário de trabalho" }));
     expect(
       screen.getByRole("heading", { level: 1, name: "Horário de trabalho" }),
     ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /^Cadastros/ }));
-    fireEvent.click(
-      screen.getByRole("button", { name: /Pessoas.*Colaboradores/ }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: /^Estrutura/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^Pessoas/ }));
 
     expect(
       screen.getByRole("heading", { level: 1, name: "Colaboradores" }),
@@ -523,11 +405,9 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
   });
 
   it("renderiza a tela Documentos > Metadados com h1 único", () => {
-    render(<App />);
+    render(<App papelDoAtor="rh" />);
 
-    fireEvent.click(
-      screen.getByRole("button", { name: /Documentos.*Metadados/ }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: /^Documentos/ }));
 
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     expect(
@@ -549,11 +429,11 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
   });
 
   it("renderiza o Portal do Colaborador > Visão geral por padrão, com h1 único (T067)", () => {
-    render(<App />);
+    render(<App papelDoAtor="rh" />);
 
     fireEvent.click(
       screen.getByRole("button", {
-        name: /Portal do Colaborador.*Visão geral — demonstração/,
+        name: /^Portal do Colaborador/,
       }),
     );
 
@@ -572,11 +452,11 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
   });
 
   it("Portal do Colaborador > troca de aba local não é regressão e reseta ao sair/voltar (T067)", () => {
-    render(<App />);
+    render(<App papelDoAtor="rh" />);
 
     fireEvent.click(
       screen.getByRole("button", {
-        name: /Portal do Colaborador.*Visão geral — demonstração/,
+        name: /^Portal do Colaborador/,
       }),
     );
     fireEvent.click(screen.getByRole("tab", { name: "Meus documentos" }));
@@ -584,10 +464,10 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
       screen.getByRole("heading", { level: 1, name: "Meus documentos" }),
     ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /^Cadastros/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^Estrutura/ }));
     fireEvent.click(
       screen.getByRole("button", {
-        name: /Portal do Colaborador.*Visão geral — demonstração/,
+        name: /^Portal do Colaborador/,
       }),
     );
 
@@ -597,10 +477,10 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
   });
 
   it("renderiza Solicitações > Central do RH com h1 único (T068)", () => {
-    render(<App />);
+    render(<App papelDoAtor="rh" />);
 
     fireEvent.click(
-      screen.getByRole("button", { name: /Solicitações.*Central do RH/ }),
+      screen.getByRole("button", { name: /^Central de solicitações/ }),
     );
 
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
@@ -620,11 +500,9 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
   });
 
   it("renderiza Relatórios > Exceções de Ponto por padrão, com h1 único (T075)", () => {
-    render(<App />);
+    render(<App papelDoAtor="rh" />);
 
-    fireEvent.click(
-      screen.getByRole("button", { name: /Relatórios.*Exceções de Ponto/ }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: /^Relatórios/ }));
 
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     expect(
@@ -645,7 +523,7 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
   });
 
   it("renderiza Contas de acesso com h1 próprio (T121) — sem 'Módulo em preparação'", async () => {
-    render(<App />);
+    render(<App papelDoAtor="rh" />);
 
     fireEvent.click(screen.getByRole("button", { name: "Contas de acesso" }));
 
@@ -669,11 +547,9 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
   });
 
   it("Relatórios > aba local 'Relatórios disponíveis' continua acessível, sem regressão em Exceções de Ponto (T075)", () => {
-    render(<App />);
+    render(<App papelDoAtor="rh" />);
 
-    fireEvent.click(
-      screen.getByRole("button", { name: /Relatórios.*Exceções de Ponto/ }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: /^Relatórios/ }));
     fireEvent.click(
       screen.getByRole("tab", { name: "Relatórios disponíveis" }),
     );
@@ -699,11 +575,9 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
   });
 
   it("Relatórios volta para 'Exceções de Ponto' ao sair e voltar ao destino (T075)", () => {
-    render(<App />);
+    render(<App papelDoAtor="rh" />);
 
-    fireEvent.click(
-      screen.getByRole("button", { name: /Relatórios.*Exceções de Ponto/ }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: /^Relatórios/ }));
     fireEvent.click(
       screen.getByRole("tab", { name: "Relatórios disponíveis" }),
     );
@@ -714,10 +588,8 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
       }),
     ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /^Cadastros/ }));
-    fireEvent.click(
-      screen.getByRole("button", { name: /Relatórios.*Exceções de Ponto/ }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: /^Estrutura/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^Relatórios/ }));
 
     expect(
       screen.getByRole("heading", { level: 1, name: "Exceções de Ponto" }),
@@ -725,7 +597,7 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
   });
 
   it("sem onLogout (uso direto, como em todo teste acima): não mostra nenhum botão 'Sair' (T116)", () => {
-    render(<App />);
+    render(<App papelDoAtor="rh" />);
 
     expect(
       screen.queryByRole("button", { name: "Sair" }),
@@ -734,7 +606,7 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
 
   it("com onLogout informado, mostra o botão 'Sair' na barra superior e o aciona ao clicar (T116)", () => {
     const onLogout = vi.fn();
-    render(<App onLogout={onLogout} />);
+    render(<App papelDoAtor="rh" onLogout={onLogout} />);
 
     const botaoSair = screen.getByRole("button", { name: "Sair" });
     expect(botaoSair).toBeInTheDocument();
@@ -744,7 +616,7 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
   });
 
   it("sem onLogout: não mostra o botão 'Sessões ativas' nem o painel (T117)", () => {
-    render(<App />);
+    render(<App papelDoAtor="rh" />);
 
     expect(
       screen.queryByRole("button", { name: "Sessões ativas" }),
@@ -755,7 +627,7 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
   });
 
   it("com onLogout informado, mostra e abre o painel 'Sessões ativas' ao clicar, e fecha ao clicar em Fechar (T117)", () => {
-    render(<App onLogout={vi.fn()} />);
+    render(<App papelDoAtor="rh" onLogout={vi.fn()} />);
 
     const botaoAbrir = screen.getByRole("button", { name: "Sessões ativas" });
     expect(botaoAbrir).toHaveAttribute("aria-expanded", "false");
@@ -778,7 +650,7 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
   });
 
   it("sem onLogout: não mostra o botão 'Segurança' (T126)", () => {
-    render(<App />);
+    render(<App papelDoAtor="rh" />);
     expect(
       screen.queryByRole("button", { name: "Segurança" }),
     ).not.toBeInTheDocument();
@@ -787,14 +659,14 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
   it("com onLogout mas MFA indisponível (padrão): não mostra 'Segurança' (T131)", () => {
     // `mfaDisponivel` ausente = false: com o MFA desativado no servidor, o botão
     // e o painel de Segurança não aparecem, mesmo com sessão ativa.
-    render(<App onLogout={vi.fn()} />);
+    render(<App papelDoAtor="rh" onLogout={vi.fn()} />);
     expect(
       screen.queryByRole("button", { name: "Segurança" }),
     ).not.toBeInTheDocument();
   });
 
   it("com onLogout e mfaDisponivel: abre e fecha o painel 'Segurança da conta' (T126/T131)", () => {
-    render(<App onLogout={vi.fn()} mfaDisponivel />);
+    render(<App papelDoAtor="rh" onLogout={vi.fn()} mfaDisponivel />);
 
     const botao = screen.getByRole("button", { name: "Segurança" });
     expect(botao).toHaveAttribute("aria-expanded", "false");
@@ -812,7 +684,7 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
   });
 
   it("abrir 'Segurança' fecha 'Sessões ativas' e vice-versa (painéis exclusivos, T126/T131)", () => {
-    render(<App onLogout={vi.fn()} mfaDisponivel />);
+    render(<App papelDoAtor="rh" onLogout={vi.fn()} mfaDisponivel />);
 
     fireEvent.click(screen.getByRole("button", { name: "Sessões ativas" }));
     expect(
@@ -829,13 +701,14 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
   });
 
   it("cada botão de navegação é um <button> nativo, operável por teclado", () => {
-    render(<App />);
+    render(<App papelDoAtor="rh" />);
 
     const nav = screen.getByRole("navigation", {
       name: "Navegação do painel",
     });
     const botoes = Array.from(nav.querySelectorAll("button"));
-    expect(botoes).toHaveLength(9);
+    // Catorze destinos: `rh` enxerga o mapa inteiro.
+    expect(botoes).toHaveLength(14);
     for (const botao of botoes) {
       expect(botao.tagName).toBe("BUTTON");
       expect(botao).toHaveAttribute("type", "button");

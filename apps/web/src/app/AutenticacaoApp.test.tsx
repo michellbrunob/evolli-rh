@@ -427,30 +427,43 @@ describe("T153 — aterrissagem segura por papel", () => {
     expect(vi.mocked(listarTabelasHorario)).not.toHaveBeenCalled();
   });
 
-  it("B1.8 rh mantém o destino inicial anterior ('Cadastros › Horários')", async () => {
+  it("B1.8 rh aterrissa em 'Pessoas › Colaboradores' (T159)", async () => {
     vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
     vi.mocked(obterUsuarioAtual).mockResolvedValueOnce(ator("rh"));
 
     render(<AutenticacaoApp />);
     await screen.findByRole("navigation");
 
-    expect(destinosAtivos()).toEqual(["Cadastros › Horários"]);
+    expect(destinosAtivos()).toEqual(["Pessoas › Colaboradores"]);
     // E continua vendo "Minha equipe", porque o contrato lhe concede.
     expect(
       screen.getByRole("button", { name: /Minha equipe/ }),
     ).toBeInTheDocument();
   });
 
-  it.each(["dp", "colaborador", "master_tecnico", "financeiro"])(
-    "B1.9 papel %s mantém o destino anterior e não ganha a capacidade",
-    async (papel) => {
+  /**
+   * T159 — a aterrissagem deixou de ser "Cadastros para todos".
+   *
+   * `dp` e `master_tecnico` leem colaborador e vão para Pessoas. `colaborador`
+   * e `financeiro` não têm destino funcional algum: vão para a Visão geral,
+   * que é demonstrativa e **não faz requisição** — antes caíam em Cadastros e
+   * tomavam 403 na primeira chamada, que era a primeira impressão do produto.
+   */
+  it.each([
+    ["dp", "Pessoas › Colaboradores"],
+    ["master_tecnico", "Pessoas › Colaboradores"],
+    ["colaborador", "Visão geral"],
+    ["financeiro", "Visão geral"],
+  ])(
+    "B1.9 papel %s aterrissa em %s e não ganha a capacidade",
+    async (papel, destino) => {
       vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
       vi.mocked(obterUsuarioAtual).mockResolvedValueOnce(ator(papel));
 
       render(<AutenticacaoApp />);
       await screen.findByRole("navigation");
 
-      expect(destinosAtivos()).toEqual(["Cadastros › Horários"]);
+      expect(destinosAtivos()).toEqual([destino]);
       expect(screen.queryByRole("button", { name: /Minha equipe/ })).toBeNull();
     },
   );
@@ -511,7 +524,7 @@ describe("T153 — aterrissagem segura por papel", () => {
 
     await screen.findByRole("navigation");
     // Recalculado para o ator NOVO, não herdado do gestor anterior.
-    expect(destinosAtivos()).toEqual(["Cadastros › Horários"]);
+    expect(destinosAtivos()).toEqual(["Pessoas › Colaboradores"]);
   });
 
   it("B1.13 quem já navegou não é redirecionado de novo", async () => {
@@ -528,7 +541,7 @@ describe("T153 — aterrissagem segura por papel", () => {
     await act(async () => {
       await new Promise((r) => setTimeout(r, 50));
     });
-    expect(destinosAtivos()).toEqual(["Relatórios › Exceções de Ponto"]);
+    expect(destinosAtivos()).toEqual(["Relatórios"]);
     expect(
       screen.queryByRole("heading", { level: 1, name: "Minha equipe" }),
     ).toBeNull();

@@ -20,6 +20,7 @@
  * sólida (mesmo princípio do `PainelNavigation`/`StatusBadge`).
  */
 import { useEffect, useState } from "react";
+import type { EstadoDestino } from "../../app/mapaNavegacao";
 import {
   VISAO_PERIODO_TITULO_ID,
   VisaoPeriodoScreen,
@@ -63,6 +64,8 @@ type AbaPonto =
 interface AbaDefinicao {
   readonly id: AbaPonto;
   readonly rotulo: string;
+  /** T159 — funcional fala com a API; demonstrativo lê fixtures. */
+  readonly estado: EstadoDestino;
   readonly tituloId: string;
 }
 
@@ -71,55 +74,82 @@ const ABAS: readonly AbaDefinicao[] = [
     id: "periodo",
     rotulo: "Visão do período",
     tituloId: VISAO_PERIODO_TITULO_ID,
+    estado: "funcional",
   },
   {
     id: "verificar_folhas",
     rotulo: "Verificar folhas",
     tituloId: VERIFICAR_FOLHAS_TITULO_ID,
+    estado: "demonstrativo",
   },
   {
     id: "banco_horas",
     rotulo: "Banco de Horas",
     tituloId: BANCO_HORAS_TITULO_ID,
+    estado: "demonstrativo",
   },
   {
     id: "ajustes_manuais",
     rotulo: "Ajustes manuais",
     tituloId: AJUSTES_MANUAIS_TITULO_ID,
+    estado: "demonstrativo",
   },
   {
     id: "fechamento_espelho",
     rotulo: "Fechamento e Espelho",
     tituloId: FECHAMENTO_ESPELHO_TITULO_ID,
+    estado: "demonstrativo",
   },
   {
     id: "escalas_jornadas",
     rotulo: "Escalas e jornadas",
     tituloId: ESCALAS_JORNADAS_TITULO_ID,
+    estado: "demonstrativo",
   },
   {
     id: "inconsistencias",
     rotulo: "Inconsistências",
     tituloId: INCONSISTENCIAS_TITULO_ID,
+    estado: "demonstrativo",
   },
   {
     id: "justificativas",
     rotulo: "Justificativas",
     tituloId: JUSTIFICATIVAS_TITULO_ID,
+    estado: "demonstrativo",
   },
 ];
 
 export interface PontoScreenProps {
+  /**
+   * T159 — quais abas este contêiner mostra.
+   *
+   * `funcional` lista só as abas que falam com o servidor; `demonstrativo`,
+   * só as de exemplo. A separação é de arquitetura de informação: nenhuma
+   * tela mudou, e nenhuma deixou de ser alcançável — as demonstrativas vivem
+   * no grupo Demonstração da navegação, nomeado como tal.
+   *
+   * O padrão é `funcional`: quem renderizar este contêiner sem dizer o modo
+   * recebe a navegação primária, nunca a maquete.
+   */
+  modo?: EstadoDestino;
   /** Informa o `id` do `h1` atualmente visível, para o shell rotular o
    * `<main>` (`aria-labelledby`) mesmo quando a aba muda sem trocar de
    * destino. Não é navegação real — só sincroniza o rótulo de acessibilidade. */
   onTituloIdChange?: (tituloId: string) => void;
 }
 
-export function PontoScreen({ onTituloIdChange }: PontoScreenProps) {
-  const [abaAtiva, setAbaAtiva] = useState<AbaPonto>("periodo");
+export function PontoScreen({
+  onTituloIdChange,
+  modo = "funcional",
+}: PontoScreenProps) {
+  // Só as abas do modo. `ABAS` continua sendo a fonte única; o filtro é
+  // de apresentação, e a primeira aba do conjunto vira o padrão — assim
+  // o contêiner nunca abre numa aba que ele mesmo não lista.
+  const abas = ABAS.filter((aba) => aba.estado === modo);
+  const [abaAtiva, setAbaAtiva] = useState<AbaPonto>(abas[0]!.id);
 
-  const definicaoAtiva = ABAS.find((aba) => aba.id === abaAtiva) ?? ABAS[0]!;
+  const definicaoAtiva = abas.find((aba) => aba.id === abaAtiva) ?? abas[0]!;
 
   useEffect(() => {
     onTituloIdChange?.(definicaoAtiva.tituloId);
@@ -132,7 +162,7 @@ export function PontoScreen({ onTituloIdChange }: PontoScreenProps) {
         aria-label="Seções de Ponto"
         className="ponto-screen__tabs"
       >
-        {ABAS.map((aba) => {
+        {abas.map((aba) => {
           const selecionada = aba.id === abaAtiva;
           return (
             <button
