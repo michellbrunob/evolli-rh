@@ -216,3 +216,23 @@
     align-items: stretch;
   }
 }
+
+/* T158 — confirmação de mudança de situação e aviso de sucesso. Só tokens
+   existentes; nenhuma cor nova. */
+.centros-custo-screen__acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+.centros-custo-screen__resultado {
+  margin: 0;
+  min-width: 0;
+  padding: var(--space-xs) var(--space-sm);
+  border: 1px solid var(--status-success-border);
+  border-radius: var(--radius-sm);
+  background: var(--status-success-surface);
+  color: var(--status-success-ink);
+  font-size: var(--text-caption);
+}

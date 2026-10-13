@@ -45,7 +45,16 @@ import {
   listarEquipes,
   listarUnidades,
   listarUnidadesParaEquipe,
+  inativarArea,
+  inativarDepartamento,
+  inativarEquipe,
+  inativarUnidade,
+  reativarArea,
+  reativarDepartamento,
+  reativarEquipe,
+  reativarUnidade,
 } from "../../api/organizacaoClient";
+import { AcaoSituacao } from "./AcaoSituacao";
 import "./EstruturaOrganizacionalScreen.css";
 
 export const ESTRUTURA_ORGANIZACIONAL_TITULO_ID =
@@ -144,6 +153,7 @@ export function EstruturaOrganizacionalScreen() {
   const [unidades, setUnidades] = useState<UnidadeOrganizacionalApi[]>([]);
   const [empresa, setEmpresa] = useState<EmpresaApi | null>(null);
   const [filtroStatus, setFiltroStatus] = useState<StatusFiltro>("todos");
+  const [aviso, setAviso] = useState<string | null>(null);
   const [formulario, setFormulario] = useState<FormularioState | null>(null);
   const formTituloId = useId();
 
@@ -683,9 +693,24 @@ export function EstruturaOrganizacionalScreen() {
       key: "acoes",
       header: "Ações",
       cell: (linha) => (
-        <Button variant="secondary" onClick={() => abrirEditar(linha)}>
-          Editar
-        </Button>
+        <div className="estrutura-organizacional-screen__acoes">
+          <Button variant="secondary" onClick={() => abrirEditar(linha)}>
+            Editar
+          </Button>
+          <AcaoSituacao
+            registro={linha}
+            entidade="unidade"
+            inativar={inativarUnidade}
+            reativar={reativarUnidade}
+            onConcluido={(atualizado, mensagem) => {
+              setUnidades((prev) =>
+                prev.map((x) => (x.id === atualizado.id ? atualizado : x)),
+              );
+              setAviso(mensagem);
+              if (filtroStatus !== "todos") void carregarDados(filtroStatus);
+            }}
+          />
+        </div>
       ),
     },
   ];
@@ -710,9 +735,25 @@ export function EstruturaOrganizacionalScreen() {
       key: "acoes",
       header: "Ações",
       cell: (linha) => (
-        <Button variant="secondary" onClick={() => abrirEditarDep(linha)}>
-          Editar
-        </Button>
+        <div className="estrutura-organizacional-screen__acoes">
+          <Button variant="secondary" onClick={() => abrirEditarDep(linha)}>
+            Editar
+          </Button>
+          <AcaoSituacao
+            registro={linha}
+            entidade="departamento"
+            inativar={inativarDepartamento}
+            reativar={reativarDepartamento}
+            onConcluido={(atualizado, mensagem) => {
+              setDepartamentos((prev) =>
+                prev.map((x) => (x.id === atualizado.id ? atualizado : x)),
+              );
+              setAviso(mensagem);
+              if (filtroDepStatus !== "todos")
+                void carregarDepartamentos(filtroDepStatus);
+            }}
+          />
+        </div>
       ),
     },
   ];
@@ -747,9 +788,25 @@ export function EstruturaOrganizacionalScreen() {
       key: "acoes",
       header: "Ações",
       cell: (linha) => (
-        <Button variant="secondary" onClick={() => abrirEditarArea(linha)}>
-          Editar
-        </Button>
+        <div className="estrutura-organizacional-screen__acoes">
+          <Button variant="secondary" onClick={() => abrirEditarArea(linha)}>
+            Editar
+          </Button>
+          <AcaoSituacao
+            registro={linha}
+            entidade="área"
+            inativar={inativarArea}
+            reativar={reativarArea}
+            onConcluido={(atualizado, mensagem) => {
+              setAreas((prev) =>
+                prev.map((x) => (x.id === atualizado.id ? atualizado : x)),
+              );
+              setAviso(mensagem);
+              if (filtroAreaStatus !== "todos")
+                void carregarAreas(filtroAreaStatus);
+            }}
+          />
+        </div>
       ),
     },
   ];
@@ -795,9 +852,25 @@ export function EstruturaOrganizacionalScreen() {
       key: "acoes",
       header: "Ações",
       cell: (linha) => (
-        <Button variant="secondary" onClick={() => abrirEditarEquipe(linha)}>
-          Editar
-        </Button>
+        <div className="estrutura-organizacional-screen__acoes">
+          <Button variant="secondary" onClick={() => abrirEditarEquipe(linha)}>
+            Editar
+          </Button>
+          <AcaoSituacao
+            registro={linha}
+            entidade="equipe"
+            inativar={inativarEquipe}
+            reativar={reativarEquipe}
+            onConcluido={(atualizado, mensagem) => {
+              setEquipes((prev) =>
+                prev.map((x) => (x.id === atualizado.id ? atualizado : x)),
+              );
+              setAviso(mensagem);
+              if (filtroEquipeStatus !== "todos")
+                void carregarEquipes(filtroEquipeStatus);
+            }}
+          />
+        </div>
       ),
     },
   ];
@@ -909,6 +982,15 @@ export function EstruturaOrganizacionalScreen() {
           Equipes
         </button>
       </div>
+
+      {/* Resultado da última mudança de situação. Fica fora das abas de
+          propósito: a confirmação pode acontecer em qualquer uma delas, e
+          repetir o bloco quatro vezes só multiplicaria o mesmo estado. */}
+      {aviso ? (
+        <p className="estrutura-organizacional-screen__resultado" role="status">
+          {aviso}
+        </p>
+      ) : null}
 
       {abaAtiva === "unidades" ? (
         statusCarregamento === "erro" ? (

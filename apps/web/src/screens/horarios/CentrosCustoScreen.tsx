@@ -10,6 +10,7 @@ import {
   Surface,
 } from "../../components";
 import type { DataTableColumn, StatusVariant } from "../../components";
+import { AcaoSituacao } from "./AcaoSituacao";
 import {
   type AtualizarCentroCustoDto,
   type CentroCustoApi,
@@ -18,7 +19,9 @@ import {
   type ListarCentrosCustoQuery,
   atualizarCentroCusto,
   criarCentroCusto,
+  inativarCentroCusto,
   listarCentrosCusto,
+  reativarCentroCusto,
   listarEmpresasParaCentroCusto,
 } from "../../api/organizacaoClient";
 import "./CentrosCustoScreen.css";
@@ -65,6 +68,7 @@ export function CentrosCustoScreen() {
   const [empresas, setEmpresas] = useState<EmpresaApi[]>([]);
   const [filtroStatus, setFiltroStatus] = useState<StatusFiltro>("todos");
   const [formulario, setFormulario] = useState<FormularioState | null>(null);
+  const [aviso, setAviso] = useState<string | null>(null);
   const formTituloId = useId();
 
   const carregarDados = useCallback(async (status: StatusFiltro) => {
@@ -206,9 +210,29 @@ export function CentrosCustoScreen() {
       key: "acoes",
       header: "Ações",
       cell: (linha) => (
-        <Button variant="secondary" onClick={() => abrirEditar(linha)}>
-          Editar
-        </Button>
+        <div className="centros-custo-screen__acoes">
+          <Button variant="secondary" onClick={() => abrirEditar(linha)}>
+            Editar
+          </Button>
+          <AcaoSituacao
+            registro={linha}
+            entidade="centro de custo"
+            inativar={inativarCentroCusto}
+            reativar={reativarCentroCusto}
+            onConcluido={(atualizado, mensagem) => {
+              // A lista reflete a mudança sem esconder a linha: o registro
+              // continua visível, com a nova situação. Só o filtro do usuário
+              // decide o que aparece, e por isso ele é recarregado quando não
+              // é "todos" — a linha sairia da consulta, e mantê-la na tela
+              // seria mostrar um resultado que o filtro já não contempla.
+              setCentrosCusto((prev) =>
+                prev.map((c) => (c.id === atualizado.id ? atualizado : c)),
+              );
+              setAviso(mensagem);
+              if (filtroStatus !== "todos") void carregarDados(filtroStatus);
+            }}
+          />
+        </div>
       ),
     },
   ];
@@ -313,6 +337,12 @@ export function CentrosCustoScreen() {
           >
             Centros de custo
           </h2>
+
+          {aviso ? (
+            <p className="centros-custo-screen__resultado" role="status">
+              {aviso}
+            </p>
+          ) : null}
 
           <div className="centros-custo-screen__filtros">
             <FormField id="centros-custo-filtro-status" label="Situação">

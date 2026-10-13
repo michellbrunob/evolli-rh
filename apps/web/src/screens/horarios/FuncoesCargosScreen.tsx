@@ -20,7 +20,10 @@ import {
   criarCargo,
   listarCargos,
   listarEmpresas,
+  inativarCargo,
+  reativarCargo,
 } from "../../api/cargoClient";
+import { AcaoSituacao } from "./AcaoSituacao";
 import "./FuncoesCargosScreen.css";
 
 export const FUNCOES_CARGOS_TITULO_ID = "funcoes-cargos-titulo";
@@ -65,6 +68,7 @@ export function FuncoesCargosScreen() {
   const [empresas, setEmpresas] = useState<EmpresaApi[]>([]);
   const [filtroStatus, setFiltroStatus] = useState<StatusFiltro>("todos");
   const [formulario, setFormulario] = useState<FormularioState | null>(null);
+  const [aviso, setAviso] = useState<string | null>(null);
   const formTituloId = useId();
 
   const carregarDados = useCallback(async (status: StatusFiltro) => {
@@ -206,9 +210,27 @@ export function FuncoesCargosScreen() {
       key: "acoes",
       header: "Ações",
       cell: (linha) => (
-        <Button variant="secondary" onClick={() => abrirEditar(linha)}>
-          Editar
-        </Button>
+        <div className="funcoes-cargos-screen__acoes">
+          <Button variant="secondary" onClick={() => abrirEditar(linha)}>
+            Editar
+          </Button>
+          <AcaoSituacao
+            registro={linha}
+            entidade="cargo"
+            inativar={inativarCargo}
+            reativar={reativarCargo}
+            onConcluido={(atualizado, mensagem) => {
+              setCargos((prev) =>
+                prev.map((c) => (c.id === atualizado.id ? atualizado : c)),
+              );
+              setAviso(mensagem);
+              // Com filtro por situação, a linha sai da consulta: recarrega em
+              // vez de deixar na tela um resultado que o filtro já não
+              // contempla. Com "todos", a linha fica e só muda de selo.
+              if (filtroStatus !== "todos") void carregarDados(filtroStatus);
+            }}
+          />
+        </div>
       ),
     },
   ];
@@ -312,6 +334,12 @@ export function FuncoesCargosScreen() {
           >
             Cargos
           </h2>
+
+          {aviso ? (
+            <p className="funcoes-cargos-screen__resultado" role="status">
+              {aviso}
+            </p>
+          ) : null}
 
           <div className="funcoes-cargos-screen__filtros">
             <FormField id="funcoes-cargos-filtro-status" label="Situação">
