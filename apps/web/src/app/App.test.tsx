@@ -1,5 +1,6 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
 import { App } from "./App";
 
 describe("App — shell administrativo + navegação visual (T044)", () => {
@@ -707,8 +708,15 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
       name: "Navegação do painel",
     });
     const botoes = Array.from(nav.querySelectorAll("button"));
-    // Catorze destinos: `rh` enxerga o mapa inteiro.
-    expect(botoes).toHaveLength(14);
+    // Catorze destinos (`rh` enxerga o mapa inteiro) mais os dois cabeçalhos
+    // de módulo expansível — Liderança e Demonstração, os únicos com mais de
+    // um destino.
+    expect(botoes).toHaveLength(16);
+    expect(
+      botoes
+        .filter((b) => b.hasAttribute("aria-expanded"))
+        .map((b) => b.textContent),
+    ).toEqual(["Liderança", "Demonstração"]);
     for (const botao of botoes) {
       expect(botao.tagName).toBe("BUTTON");
       expect(botao).toHaveAttribute("type", "button");
@@ -757,5 +765,192 @@ describe("App — capacidade condicional do gestor (T153)", () => {
       "aria-labelledby",
       "equipe-titulo",
     );
+  });
+});
+
+describe("App — cabeçalho enxuto (T159 — evolução visual)", () => {
+  function acoesDoCabecalho() {
+    return within(screen.getByRole("banner"))
+      .getAllByRole("button")
+      .map((b) => b.textContent?.trim());
+  }
+
+  it("oferece exatamente as ações que existem — e nada mais", () => {
+    render(<App papelDoAtor="rh" onLogout={() => {}} mfaDisponivel />);
+    expect(acoesDoCabecalho()).toEqual([
+      "Menu",
+      "Segurança",
+      "Sessões ativas",
+      "Sair",
+    ]);
+  });
+
+  it("não inventa marketplace, busca global, notificação, favorito nem suporte", () => {
+    render(<App papelDoAtor="rh" onLogout={() => {}} mfaDisponivel />);
+    const cabecalho = screen.getByRole("banner").innerHTML.toLowerCase();
+    for (const ficticia of [
+      "marketplace",
+      "favorito",
+      "notifica",
+      "suporte",
+      "central de ajuda",
+      "novidade",
+      "pesquisar",
+      'type="search"',
+    ]) {
+      expect(cabecalho).not.toContain(ficticia);
+    }
+  });
+
+  it("sem sessão, o cabeçalho só tem o botão da gaveta", () => {
+    render(<App papelDoAtor="rh" />);
+    expect(acoesDoCabecalho()).toEqual(["Menu"]);
+  });
+
+  it("mostra como contexto o papel que o SERVIDOR informou", () => {
+    render(<App papelDoAtor="gestor" />);
+    expect(
+      within(screen.getByRole("banner")).getByText("Gestor"),
+    ).toBeInTheDocument();
+  });
+
+  it("sem papel confirmado, não inventa contexto nenhum", () => {
+    render(<App />);
+    const cabecalho = within(screen.getByRole("banner"));
+    for (const rotulo of ["RH", "DP", "Gestor", "Master técnico"]) {
+      expect(cabecalho.queryByText(rotulo)).toBeNull();
+    }
+  });
+
+  it("a marca do painel é própria e textual, não um ativo de terceiro", () => {
+    render(<App papelDoAtor="rh" />);
+    expect(screen.getAllByText("Evolli RH").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("Painel Administrativo")).toBeInTheDocument();
+    // Nenhuma imagem externa: o símbolo é SVG inline, desenhado no projeto.
+    expect(document.querySelectorAll("img")).toHaveLength(0);
+  });
+});
+
+describe("App — gaveta de navegação do mobile (T159 — evolução visual)", () => {
+  function gaveta() {
+    return document.getElementById("navegacao-lateral")!;
+  }
+
+  function focaveisDaGaveta() {
+    return [...gaveta().querySelectorAll<HTMLElement>("button")].filter(
+      (b) => b.closest("[hidden]") === null,
+    );
+  }
+
+  it("o botão declara o que controla e começa fechado", () => {
+    render(<App papelDoAtor="rh" />);
+    const menu = screen.getByRole("button", { name: "Menu" });
+    expect(menu).toHaveAttribute("aria-expanded", "false");
+    expect(menu).toHaveAttribute("aria-controls", "navegacao-lateral");
+    expect(gaveta()).toBeInTheDocument();
+  });
+
+  it("abrir leva o foco para dentro da gaveta", () => {
+    render(<App papelDoAtor="rh" />);
+    fireEvent.click(screen.getByRole("button", { name: "Menu" }));
+
+    expect(screen.getByRole("button", { name: "Menu" })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+    expect(gaveta().contains(document.activeElement)).toBe(true);
+  });
+
+  it("Escape fecha e devolve o foco a quem abriu", () => {
+    render(<App papelDoAtor="rh" />);
+    const menu = screen.getByRole("button", { name: "Menu" });
+    fireEvent.click(menu);
+
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    expect(menu).toHaveAttribute("aria-expanded", "false");
+    expect(document.activeElement).toBe(menu);
+  });
+
+  it("o Tab circula dentro da gaveta e não escapa para o cabeçalho", () => {
+    render(<App papelDoAtor="rh" />);
+    fireEvent.click(screen.getByRole("button", { name: "Menu" }));
+
+    const focaveis = focaveisDaGaveta();
+    expect(focaveis.length).toBeGreaterThan(1);
+    const primeiro = focaveis[0]!;
+    const ultimo = focaveis[focaveis.length - 1]!;
+
+    ultimo.focus();
+    fireEvent.keyDown(document, { key: "Tab" });
+    expect(document.activeElement).toBe(primeiro);
+
+    primeiro.focus();
+    fireEvent.keyDown(document, { key: "Tab", shiftKey: true });
+    expect(document.activeElement).toBe(ultimo);
+  });
+
+  it("escolher um destino fecha a gaveta e troca o conteúdo", () => {
+    render(<App papelDoAtor="rh" />);
+    fireEvent.click(screen.getByRole("button", { name: "Menu" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Jornada/ }));
+
+    expect(screen.getByRole("button", { name: "Menu" })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Visão do período" }),
+    ).toBeInTheDocument();
+  });
+
+  it("o fundo fecha a gaveta, e só existe enquanto ela está aberta", () => {
+    render(<App papelDoAtor="rh" />);
+    expect(screen.queryByRole("button", { name: "Fechar menu" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Menu" }));
+    fireEvent.click(screen.getByRole("button", { name: "Fechar menu" }));
+
+    expect(screen.getByRole("button", { name: "Menu" })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+  });
+
+  it("a gaveta aberta continua com um único h1 — o da tela", () => {
+    render(<App papelDoAtor="rh" />);
+    fireEvent.click(screen.getByRole("button", { name: "Menu" }));
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+  });
+});
+
+describe("App — contrato responsivo do shell (T159 — evolução visual)", () => {
+  // O jsdom não aplica media query: o que se prende aqui é o CONTRATO escrito
+  // no CSS. A conferência visual em 375px e no desktop é feita no navegador,
+  // e está registrada na PR.
+  const css = readFileSync("src/app/app-shell.css", "utf8");
+  const mobile = css.slice(css.indexOf("@media (max-width: 834px)"));
+
+  it("abaixo de 835px a barra sai do fluxo e só aparece aberta", () => {
+    expect(mobile).toMatch(/\.app-shell__sidebar\s*\{[^}]*display:\s*none/);
+    expect(mobile).toMatch(
+      /\.app-shell--gaveta-aberta \.app-shell__sidebar\s*\{[^}]*display:\s*flex/,
+    );
+  });
+
+  it("o botão da gaveta só aparece no mobile", () => {
+    expect(css).toMatch(/\.app-shell__menu\s*\{[^}]*display:\s*none/);
+    expect(mobile).toMatch(
+      /\.app-shell__menu[^{]*\{[^}]*display:\s*inline-flex/,
+    );
+  });
+
+  it("nenhum deslocamento lateral por transform — origem clássica de rolagem horizontal", () => {
+    expect(css).not.toMatch(/translateX/);
+    expect(css).not.toMatch(/translate3d/);
+  });
+
+  it("a gaveta nunca passa da largura da tela", () => {
+    expect(mobile).toMatch(/width:\s*min\(300px,\s*86vw\)/);
   });
 });

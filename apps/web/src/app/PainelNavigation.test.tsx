@@ -32,6 +32,16 @@ function navegacao() {
   return screen.getByRole("navigation", { name: "Navegação do painel" });
 }
 
+/**
+ * Botões que levam a um destino — exclui o cabeçalho do módulo expansível,
+ * que abre e fecha o submenu em vez de navegar.
+ */
+function botoesDeDestino(): HTMLElement[] {
+  return [...navegacao().querySelectorAll<HTMLElement>("button")].filter(
+    (botao) => !botao.hasAttribute("aria-expanded"),
+  );
+}
+
 describe("estrutura dos grupos", () => {
   it("os cinco módulos operacionais vêm antes de Demonstração", () => {
     expect(GRUPOS.map((g) => g.titulo)).toEqual([
@@ -229,7 +239,10 @@ describe("destinos preservados", () => {
         papel="rh"
       />,
     );
-    expect(navegacao().querySelectorAll("li")).toHaveLength(DESTINOS.length);
+    // Conta DESTINOS, não `<li>`: desde a evolução visual da T159 o módulo
+    // com submenu tem um `<li>` próprio além do de cada destino, e contar
+    // marcação faria o teste falhar por motivo errado.
+    expect(botoesDeDestino()).toHaveLength(DESTINOS.length);
   });
 });
 
@@ -324,5 +337,186 @@ describe("aterrissagem por papel", () => {
     ]) {
       expect(destinoPorId(destinoInicialPara(papel))).toBeDefined();
     }
+  });
+});
+
+describe("módulo, submenu e destino ativo (T159 — evolução visual)", () => {
+  it("módulo de um destino só É o destino: nenhum clique sem informação", () => {
+    render(
+      <PainelNavigation
+        destinoAtivoId="pessoas"
+        onSelecionar={() => {}}
+        papel="rh"
+      />,
+    );
+    const pessoas = screen.getByRole("button", { name: /^Pessoas/ });
+    expect(pessoas).not.toHaveAttribute("aria-expanded");
+    expect(pessoas).toHaveAttribute("aria-current", "page");
+  });
+
+  it("módulo com mais de um destino é um disclosure que controla o seu submenu", () => {
+    render(
+      <PainelNavigation
+        destinoAtivoId="pessoas"
+        onSelecionar={() => {}}
+        papel="rh"
+      />,
+    );
+    const lideranca = screen.getByRole("button", { name: "Liderança" });
+    expect(lideranca).toHaveAttribute("aria-expanded", "true");
+
+    const lista = document.getElementById(
+      lideranca.getAttribute("aria-controls")!,
+    )!;
+    expect(lista.getAttribute("aria-labelledby")).toBe(lideranca.id);
+    expect(
+      within(lista as HTMLElement)
+        .getAllByRole("button")
+        .map((b) => b.textContent),
+    ).toEqual([
+      "Minha equipe Consulta do gestor",
+      "Administração da liderança Vínculos e equipes",
+    ]);
+  });
+
+  it("fechar o módulo tira os destinos da árvore de acessibilidade e da tabulação", () => {
+    render(
+      <PainelNavigation
+        destinoAtivoId="pessoas"
+        onSelecionar={() => {}}
+        papel="rh"
+      />,
+    );
+    const lideranca = screen.getByRole("button", { name: "Liderança" });
+    fireEvent.click(lideranca);
+
+    expect(lideranca).toHaveAttribute("aria-expanded", "false");
+    // `hidden` no <ul> é o que remove de uma vez a árvore e a ordem de
+    // tabulação — esconder só por CSS deixaria os botões alcançáveis.
+    expect(screen.queryByRole("button", { name: /Minha equipe/ })).toBeNull();
+    expect(
+      document.getElementById(lideranca.getAttribute("aria-controls")!),
+    ).toHaveAttribute("hidden");
+  });
+
+  it("módulo fechado que contém o ativo mantém a seleção visível no cabeçalho", () => {
+    // Senão a seleção some da tela e quem navega perde a referência.
+    render(
+      <PainelNavigation
+        destinoAtivoId="equipe"
+        onSelecionar={() => {}}
+        papel="rh"
+      />,
+    );
+    const lideranca = screen.getByRole("button", { name: "Liderança" });
+    fireEvent.click(lideranca);
+    expect(lideranca).toHaveClass("painel-nav__cabecalho--contem-ativo");
+  });
+
+  it("o destino ativo não depende só de cor: semântica, peso e forma juntos", () => {
+    render(
+      <PainelNavigation
+        destinoAtivoId="pessoas"
+        onSelecionar={() => {}}
+        papel="rh"
+      />,
+    );
+    const pessoas = screen.getByRole("button", { name: /^Pessoas/ });
+    // `aria-current` (semântica) + a classe que soma superfície, peso de
+    // fonte e barra indicadora (ver PainelNavigation.css).
+    expect(pessoas).toHaveAttribute("aria-current", "page");
+    expect(pessoas).toHaveClass("painel-nav__destino--ativo");
+    for (const outro of botoesDeDestino().filter((b) => b !== pessoas)) {
+      expect(outro).not.toHaveClass("painel-nav__destino--ativo");
+      expect(outro).not.toHaveAttribute("aria-current");
+    }
+  });
+
+  it("cada módulo tem ícone próprio, e o ícone nunca é o nome acessível", () => {
+    render(
+      <PainelNavigation
+        destinoAtivoId="pessoas"
+        onSelecionar={() => {}}
+        papel="rh"
+      />,
+    );
+    const icones = navegacao().querySelectorAll("svg.painel-nav__icone");
+    expect(icones.length).toBe(GRUPOS.length);
+    for (const icone of icones) {
+      expect(icone).toHaveAttribute("aria-hidden", "true");
+      expect(icone).toHaveAttribute("focusable", "false");
+    }
+  });
+});
+
+describe("Demonstração é separada e secundária (T159 — evolução visual)", () => {
+  function listasDeModulo() {
+    return [
+      ...navegacao().querySelectorAll<HTMLElement>("ul.painel-nav__modulos"),
+    ];
+  }
+
+  it("fica numa lista própria, depois de todos os módulos operacionais", () => {
+    render(
+      <PainelNavigation
+        destinoAtivoId="pessoas"
+        onSelecionar={() => {}}
+        papel="rh"
+      />,
+    );
+    const listas = listasDeModulo();
+    expect(listas).toHaveLength(2);
+
+    const operacionais = listas[0]!;
+    const secundaria = listas[1]!;
+    expect(secundaria).toHaveClass("painel-nav__modulos--secundario");
+    // Ordem no documento: a lista secundária vem depois.
+    expect(
+      operacionais.compareDocumentPosition(secundaria) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+
+    expect(
+      within(secundaria).getByRole("button", { name: "Demonstração" }),
+    ).toBeInTheDocument();
+  });
+
+  it("nenhum destino demonstrativo aparece entre os módulos operacionais", () => {
+    render(
+      <PainelNavigation
+        destinoAtivoId="pessoas"
+        onSelecionar={() => {}}
+        papel="rh"
+      />,
+    );
+    const operacionais = listasDeModulo()[0]!;
+    for (const destino of DESTINOS.filter(
+      (d) => d.estado === "demonstrativo",
+    )) {
+      expect(
+        within(operacionais).queryByRole("button", {
+          name: new RegExp(`^${destino.label}`),
+        }),
+      ).toBeNull();
+    }
+  });
+
+  it("o aviso é texto, fica antes da lista e é lido junto com ela", () => {
+    render(
+      <PainelNavigation destinoAtivoId="pessoas" onSelecionar={() => {}} />,
+    );
+    const cabecalho = screen.getByRole("button", { name: "Demonstração" });
+    const lista = document.getElementById(
+      cabecalho.getAttribute("aria-controls")!,
+    )!;
+    const aviso = document.getElementById(
+      lista.getAttribute("aria-describedby")!,
+    )!;
+    expect(aviso.textContent).toMatch(
+      /Nada aqui grava, consulta o servidor ou representa capacidade disponível/,
+    );
+    expect(
+      aviso.compareDocumentPosition(lista) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 });

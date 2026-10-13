@@ -32,6 +32,8 @@
  * do shell, como desde a T044.
  */
 
+import type { IconeModuloId } from "./IconeModulo";
+
 /** Estado real de um destino, derivado da origem dos dados das suas telas. */
 export type EstadoDestino = "funcional" | "demonstrativo";
 
@@ -52,6 +54,18 @@ export interface GrupoNavegacao {
   readonly titulo: string;
   /** Explica o grupo para leitor de tela; obrigatório em Demonstração. */
   readonly descricao?: string;
+  /**
+   * Ícone do módulo na barra lateral. Desenho próprio (`IconeModulo.tsx`),
+   * nunca conjunto de terceiro — ver
+   * `docs/decisions/t159-direcao-visual-navegacao.md`.
+   */
+  readonly icone: IconeModuloId;
+  /**
+   * Grupo de segunda ordem: vai ao pé da barra, separado do que opera, com
+   * tratamento visual mais discreto. Só Demonstração é secundário, e não por
+   * estética: é a tradução visual de "isto não é capacidade disponível".
+   */
+  readonly secundario?: boolean;
   readonly destinos: readonly DestinoNavegacao[];
 }
 
@@ -77,6 +91,7 @@ export const PAPEIS_ADMINISTRACAO_LIDERANCA: readonly string[] = ["rh"];
 export const GRUPOS: readonly GrupoNavegacao[] = [
   {
     titulo: "Pessoas",
+    icone: "pessoas",
     destinos: [
       {
         id: "pessoas",
@@ -88,6 +103,7 @@ export const GRUPOS: readonly GrupoNavegacao[] = [
   },
   {
     titulo: "Estrutura",
+    icone: "estrutura",
     destinos: [
       {
         id: "cadastros",
@@ -99,6 +115,7 @@ export const GRUPOS: readonly GrupoNavegacao[] = [
   },
   {
     titulo: "Jornada",
+    icone: "jornada",
     destinos: [
       {
         id: "ponto",
@@ -110,6 +127,7 @@ export const GRUPOS: readonly GrupoNavegacao[] = [
   },
   {
     titulo: "Liderança",
+    icone: "lideranca",
     destinos: [
       {
         id: "equipe",
@@ -129,6 +147,7 @@ export const GRUPOS: readonly GrupoNavegacao[] = [
   },
   {
     titulo: "Administração",
+    icone: "administracao",
     destinos: [
       {
         id: "contas-acesso",
@@ -142,6 +161,8 @@ export const GRUPOS: readonly GrupoNavegacao[] = [
   },
   {
     titulo: "Demonstração",
+    icone: "demonstracao",
+    secundario: true,
     descricao:
       "Superfícies de exemplo. Nada aqui grava, consulta o servidor ou representa capacidade disponível.",
     destinos: [

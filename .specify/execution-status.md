@@ -1003,14 +1003,34 @@ separa as duas coisas na arquitetura de informação, **sem** tocar em nenhuma d
 — cliente de API real contra `*.fixtures`, permissão exigida e estado. A matriz da T156 é
 insumo; onde documento e código divergirem, vale o código, e a divergência fica registrada.
 
-**Limites explícitos:** sem redesenho — tokens, padrão B e componentes seguem como estão;
-sem copiar marca, texto, código, ícone, tela ou identidade de terceiros; sem alterar regra
-de negócio, RBAC, API, backend, Prisma, migrations, seed, Docker, dependências ou lockfile.
-Telas internas só mudam no estritamente necessário para preservar roteamento, título, foco
-ou navegação. A entrada direta do gestor em "Minha equipe" é preservada e não pode disparar
-rota proibida nem 403 na inicialização. A dívida **L3** não é iniciada nem declarada
-resolvida, e seguem abertas **S-1 a S-4** (T158), **R-A, R-B e R-C** (T157) e o registro
-`teste michell`.
+**Evolução visual aprovada em 13/10/2026, depois da primeira prévia.** O proprietário
+reviu a navegação já reorganizada e autorizou recompor o shell: barra lateral branca,
+estável e espaçosa com a marca própria do Evolli; módulos com ícone SVG **original**,
+desenhado no projeto; hierarquia entre módulo, submenu e destino ativo por superfície,
+borda indicadora, peso tipográfico e espaço — nunca só por cor; grupo **Demonstração** ao
+pé da barra, visualmente secundário e com o aviso em texto; cabeçalho claro com **apenas
+as ações que existem** (contexto do ator, Segurança quando o servidor informa MFA, Sessões
+ativas e Sair); e, no mobile, **gaveta** com foco preso, `Escape` e botão de abertura
+sempre alcançável. A decisão e seus limites estão em
+[`docs/decisions/t159-direcao-visual-navegacao.md`](../docs/decisions/t159-direcao-visual-navegacao.md).
+
+**A referência de mercado entra só como princípio.** Arquitetura de informação e composição
+visual observadas, sim; marca, logotipo, texto, foto, ilustração, ícone proprietário, paleta
+exata, código ou layout pixel a pixel, **nunca**. A identidade, os tokens, os componentes, o
+padrão B e os modais continuam sendo do Evolli.
+
+**A tela de login não faz parte desta tarefa.** Será fatia própria: painel institucional
+original mais autenticação, sem CPF, captcha, cadastro, registro de ponto ou recuperação de
+senha enquanto não houver contrato funcional para cada um.
+
+**Limites explícitos:** sem alterar escopo funcional, regra de negócio, RBAC, rotas, API,
+backend, Prisma, migrations, seed, Docker, dependências ou lockfile. Telas internas só mudam
+no estritamente necessário para preservar roteamento, título, foco ou navegação. A entrada
+direta do gestor em "Minha equipe" é preservada e não pode disparar rota proibida nem 403 na
+inicialização — conferido no navegador: o gestor aterrissa em `Minha equipe`, e a única
+chamada da aterrissagem é `GET /v1/gestor/equipe` → 200. A dívida **L3** não é iniciada nem
+declarada resolvida, e seguem abertas **S-1 a S-4** (T158), **R-A, R-B e R-C** (T157) e o
+registro `teste michell`.
 
 ## Próxima ação autorizável
 

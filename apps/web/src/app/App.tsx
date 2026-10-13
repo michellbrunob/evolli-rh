@@ -51,9 +51,11 @@
  * `cadastrosTituloId`/`pessoasTituloId`/`pontoTituloId`/`documentosTituloId`/`portalTituloId`/`relatoriosTituloId`
  * — os demais destinos continuam usando o mapa estático `TITULO_ID_POR_DESTINO`.
  */
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import "./tokens.css";
 import "./app-shell.css";
+import { ROTULO_PAPEL } from "../api/usersClient";
+import { MarcaEvolli } from "./IconeModulo";
 import { SessoesAtivasPanel } from "./SessoesAtivasPanel";
 import { SegurancaMfaPanel } from "./SegurancaMfaPanel";
 import {
@@ -96,6 +98,37 @@ const TITULO_ID_POR_DESTINO: Record<string, string> = {
   equipe: EQUIPE_TITULO_ID,
   "administracao-lideranca": ADMINISTRACAO_LIDERANCA_TITULO_ID,
 };
+
+/**
+ * Seletor de elemento focável, para prender o foco dentro da gaveta no
+ * mobile. Igual ao do `Modal` (UI-F04) de propósito: duas definições
+ * diferentes de "focável" no mesmo produto divergiriam na primeira exceção.
+ */
+const FOCAVEIS_GAVETA =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/**
+ * Ícone do botão da gaveta. Três traços — desenho próprio, elementar, sem
+ * conjunto de terceiro (ver `docs/decisions/t159-direcao-visual-navegacao.md`).
+ * `aria-hidden` porque o botão já se chama "Menu" em texto.
+ */
+function IconeMenu() {
+  return (
+    <svg
+      viewBox="0 0 20 20"
+      width="18"
+      height="18"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="M3.5 5.5h13M3.5 10h13M3.5 14.5h13" />
+    </svg>
+  );
+}
 
 function conteudoDoDestino(
   destinoId: string,
@@ -289,51 +322,145 @@ export function App({
     EXCECOES_PONTO_TITULO_ID,
   );
 
+  // Gaveta do mobile. No desktop ela nunca abre: o único botão que a abre é
+  // `display: none` acima de 834px, e a barra lateral é permanente.
+  const [gavetaAberta, setGavetaAberta] = useState(false);
+  const botaoMenuRef = useRef<HTMLButtonElement | null>(null);
+  const sidebarRef = useRef<HTMLDivElement | null>(null);
+
+  // Navegar fecha a gaveta — no desktop isto não tem efeito, porque ela já
+  // está fechada. Vale para a barra e para os atalhos da Visão geral.
+  const irPara = useCallback((destinoId: string) => {
+    setDestinoAtivoId(destinoId);
+    setGavetaAberta(false);
+  }, []);
+
+  // Foco preso, `Escape` e devolução de foco — mesma disciplina do `Modal`
+  // (UI-F04). Enquanto a gaveta está aberta ela é a única região alcançável:
+  // deixá-la por cima da página e permitir que o `Tab` fosse para trás seria
+  // afirmar uma coisa e permitir outra.
+  useEffect(() => {
+    if (!gavetaAberta) return;
+    const caixa = sidebarRef.current;
+    // Capturado agora, e nao na limpeza: na limpeza o ref ja pode apontar
+    // para outro no (regra react-hooks/exhaustive-deps).
+    const acionador = botaoMenuRef.current;
+
+    function focaveisDaGaveta(): HTMLElement[] {
+      if (!caixa) return [];
+      return [...caixa.querySelectorAll<HTMLElement>(FOCAVEIS_GAVETA)].filter(
+        // `closest` e não `hasAttribute`: o submenu fechado é um `<ul hidden>`
+        // e os botões dentro dele não carregam o atributo.
+        (elemento) => elemento.closest("[hidden]") === null,
+      );
+    }
+
+    focaveisDaGaveta()[0]?.focus();
+
+    function aoTeclar(evento: KeyboardEvent) {
+      if (evento.key === "Escape") {
+        evento.preventDefault();
+        setGavetaAberta(false);
+        return;
+      }
+      if (evento.key !== "Tab" || !caixa) return;
+      const focaveis = focaveisDaGaveta();
+      if (focaveis.length === 0) return;
+      const primeiro = focaveis[0]!;
+      const ultimo = focaveis[focaveis.length - 1]!;
+      const atual = document.activeElement;
+      if (!caixa.contains(atual)) {
+        evento.preventDefault();
+        (evento.shiftKey ? ultimo : primeiro).focus();
+      } else if (evento.shiftKey && atual === primeiro) {
+        evento.preventDefault();
+        ultimo.focus();
+      } else if (!evento.shiftKey && atual === ultimo) {
+        evento.preventDefault();
+        primeiro.focus();
+      }
+    }
+
+    document.addEventListener("keydown", aoTeclar, true);
+    return () => {
+      document.removeEventListener("keydown", aoTeclar, true);
+      if (acionador && document.contains(acionador)) acionador.focus();
+    };
+  }, [gavetaAberta]);
+
+  const rotuloDoPapel = papelDoAtor ? ROTULO_PAPEL[papelDoAtor] : undefined;
+
   return (
-    <div className="app-shell">
+    <div
+      className={
+        gavetaAberta ? "app-shell app-shell--gaveta-aberta" : "app-shell"
+      }
+    >
       <a className="app-shell__skip-link" href="#conteudo-principal">
         Pular para o conteúdo
       </a>
 
       <header className="app-shell__topbar">
         <div className="app-shell__topbar-inner">
-          <span className="app-shell__brand">Evolli RH</span>
-          <span className="app-shell__brand-tag">Painel Administrativo</span>
-          {onLogout && mfaDisponivel ? (
-            <button
-              type="button"
-              className="app-shell__seguranca"
-              aria-expanded={segurancaAberto}
-              onClick={() => {
-                setSegurancaAberto((aberto) => !aberto);
-                setSessoesAtivasAberto(false);
-              }}
-            >
-              Segurança
-            </button>
-          ) : null}
-          {onLogout ? (
-            <button
-              type="button"
-              className="app-shell__sessoes-ativas"
-              aria-expanded={sessoesAtivasAberto}
-              onClick={() => {
-                setSessoesAtivasAberto((aberto) => !aberto);
-                setSegurancaAberto(false);
-              }}
-            >
-              Sessões ativas
-            </button>
-          ) : null}
-          {onLogout ? (
-            <button
-              type="button"
-              className="app-shell__logout"
-              onClick={onLogout}
-            >
-              Sair
-            </button>
-          ) : null}
+          <button
+            type="button"
+            className="app-shell__menu"
+            ref={botaoMenuRef}
+            aria-expanded={gavetaAberta}
+            aria-controls="navegacao-lateral"
+            onClick={() => setGavetaAberta((aberta) => !aberta)}
+          >
+            <IconeMenu />
+            Menu
+          </button>
+
+          <span className="app-shell__marca-compacta">
+            <MarcaEvolli />
+            <span className="app-shell__marca-nome">Evolli RH</span>
+          </span>
+
+          <div className="app-shell__acoes">
+            {/* Contexto do ator: o papel que o SERVIDOR informou. Nada de
+                menu de conta, foto nem nome inventado — só o que existe. */}
+            {rotuloDoPapel ? (
+              <span className="app-shell__contexto">{rotuloDoPapel}</span>
+            ) : null}
+            {onLogout && mfaDisponivel ? (
+              <button
+                type="button"
+                className="app-shell__seguranca"
+                aria-expanded={segurancaAberto}
+                onClick={() => {
+                  setSegurancaAberto((aberto) => !aberto);
+                  setSessoesAtivasAberto(false);
+                }}
+              >
+                Segurança
+              </button>
+            ) : null}
+            {onLogout ? (
+              <button
+                type="button"
+                className="app-shell__sessoes-ativas"
+                aria-expanded={sessoesAtivasAberto}
+                onClick={() => {
+                  setSessoesAtivasAberto((aberto) => !aberto);
+                  setSegurancaAberto(false);
+                }}
+              >
+                Sessões ativas
+              </button>
+            ) : null}
+            {onLogout ? (
+              <button
+                type="button"
+                className="app-shell__logout"
+                onClick={onLogout}
+              >
+                Sair
+              </button>
+            ) : null}
+          </div>
         </div>
       </header>
 
@@ -358,15 +485,40 @@ export function App({
       ) : null}
 
       <div className="app-shell__body">
-        {/* T159 — o shell passa o papel e a navegação decide sozinha quais
-            destinos condicionados oferecer, lendo os papéis declarados no
-            mapa. Antes a lista de capacidades era remontada aqui, longe dos
-            destinos, e já havia divergido deles. */}
-        <PainelNavigation
-          destinoAtivoId={destinoAtivoId}
-          onSelecionar={setDestinoAtivoId}
-          papel={papelDoAtor}
-        />
+        {gavetaAberta ? (
+          <button
+            type="button"
+            className="app-shell__fundo-gaveta"
+            aria-label="Fechar menu"
+            onClick={() => setGavetaAberta(false)}
+          />
+        ) : null}
+
+        <div
+          className="app-shell__sidebar"
+          id="navegacao-lateral"
+          ref={sidebarRef}
+        >
+          <span className="app-shell__marca">
+            <MarcaEvolli />
+            <span className="app-shell__marca-texto">
+              <span className="app-shell__marca-nome">Evolli RH</span>
+              <span className="app-shell__marca-tag">
+                Painel Administrativo
+              </span>
+            </span>
+          </span>
+
+          {/* T159 — o shell passa o papel e a navegação decide sozinha quais
+              destinos condicionados oferecer, lendo os papéis declarados no
+              mapa. Antes a lista de capacidades era remontada aqui, longe dos
+              destinos, e já havia divergido deles. */}
+          <PainelNavigation
+            destinoAtivoId={destinoAtivoId}
+            onSelecionar={irPara}
+            papel={papelDoAtor}
+          />
+        </div>
 
         <main
           id="conteudo-principal"
@@ -391,7 +543,7 @@ export function App({
         >
           {conteudoDoDestino(
             destinoAtivoId,
-            setDestinoAtivoId,
+            irPara,
             setCadastrosTituloId,
             setPessoasTituloId,
             setPontoTituloId,
@@ -406,7 +558,6 @@ export function App({
       <footer className="app-shell__footer">
         <div className="app-shell__footer-inner">
           <span className="app-shell__footer-brand">Evolli RH</span>
-          <span>Painel Administrativo — fundação visual</span>
           <span>Ambiente interno · sem dados reais</span>
         </div>
       </footer>

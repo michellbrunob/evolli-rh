@@ -1,31 +1,41 @@
 /**
- * PainelNavigation (T044) — navegação visual do painel administrativo.
+ * PainelNavigation (T044; reorganizada e recomposta visualmente na T159).
  *
- * Lista os oito destinos previstos para o painel (Início, Cadastros,
- * Pessoas, Ponto, Documentos, Portal do Colaborador, Solicitações,
- * Relatórios), sem rota real: a navegação troca apenas o
- * estado local de "destino selecionado" — não há React Router, `history`,
- * `<a href>` real, API nem fetch. É coerente com
- * `docs/modules/painel-administrativo-web-v1.md` (§3.6): a ocultação/seleção
- * de item é conveniência de interface, nunca controle de autorização — cada
- * tela futura seguirá dependendo da decisão do servidor.
+ * ## O que esta navegação afirma
  *
- * Layout responsivo por CSS apenas: a MESMA lista de botões vira uma barra
- * lateral vertical em telas largas e uma faixa horizontal (com rolagem
- * própria, contida) em telas estreitas — nunca dois DOMs paralelos, para não
- * duplicar a ordem de tabulação.
+ * Cada item é uma promessa. Os cinco módulos operacionais afirmam capacidade
+ * real; o grupo **Demonstração**, ao pé da barra, afirma o contrário — e diz
+ * isso em texto, não só em estilo. Nenhum item existe aqui sem tela.
  *
- * Item ativo nunca depende só de cor: usa `aria-current="page"` (semântica),
- * peso de fonte maior e uma barra lateral sólida (forma), reforçando o
- * mesmo princípio já usado no `StatusBadge` (texto + glifo + cor).
+ * ## Estrutura
+ *
+ * Uma lista de módulos. O módulo com **um** destino é o próprio botão de
+ * destino; o módulo com **mais de um** vira um "disclosure" — cabeçalho com
+ * `aria-expanded`/`aria-controls` e submenu em `<ul hidden>` quando fechado,
+ * que é o que tira os itens da ordem de tabulação e da árvore de
+ * acessibilidade de uma vez só.
+ *
+ * O destino ativo **nunca** depende só de cor: soma `aria-current="page"`
+ * (semântica), peso de fonte (tipografia), superfície (fundo) e uma barra
+ * indicadora (forma) — o mesmo princípio do `StatusBadge`.
+ *
+ * ## O que continua não sendo
+ *
+ * Não é rota: não há URL, `history` nem `<a href>` — destino é estado do
+ * shell, como desde a T044. E não é autorização: `papeis` evita oferecer uma
+ * porta que o servidor recusaria (spec §3.6), mas quem decide é o RBAC, a
+ * cada requisição.
  */
+import { useState } from "react";
 import "./PainelNavigation.css";
 
+import { IconeModulo } from "./IconeModulo";
 import {
   DESTINOS,
   GRUPOS,
   destinoVisivelPara,
   type DestinoNavegacao,
+  type GrupoNavegacao,
 } from "./mapaNavegacao";
 
 /**
@@ -53,73 +63,209 @@ export interface PainelNavigationProps {
   papel?: string | null;
 }
 
+/** Seta do disclosure. Desenho próprio, elementar; gira por CSS ao abrir. */
+function SetaExpansao() {
+  return (
+    <svg
+      className="painel-nav__seta"
+      viewBox="0 0 16 16"
+      width="16"
+      height="16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="m5.5 3.5 5 4.5-5 4.5" />
+    </svg>
+  );
+}
+
+interface BotaoDestinoProps {
+  readonly destino: DestinoNavegacao;
+  readonly ativo: boolean;
+  readonly nivel: "modulo" | "sub";
+  readonly icone?: GrupoNavegacao["icone"];
+  readonly onSelecionar: (id: string) => void;
+}
+
+function BotaoDestino({
+  destino,
+  ativo,
+  nivel,
+  icone,
+  onSelecionar,
+}: BotaoDestinoProps) {
+  return (
+    <button
+      type="button"
+      className={[
+        "painel-nav__destino",
+        `painel-nav__destino--${nivel}`,
+        ativo ? "painel-nav__destino--ativo" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+      aria-current={ativo ? "page" : undefined}
+      onClick={() => onSelecionar(destino.id)}
+    >
+      {icone ? <IconeModulo nome={icone} /> : null}
+      <span className="painel-nav__texto">
+        <span className="painel-nav__rotulo">{destino.label}</span>
+        {destino.subRotulo ? (
+          <span className="painel-nav__sub"> {destino.subRotulo}</span>
+        ) : null}
+      </span>
+    </button>
+  );
+}
+
+interface ModuloProps {
+  readonly grupo: GrupoNavegacao;
+  readonly visiveis: readonly DestinoNavegacao[];
+  readonly destinoAtivoId: string;
+  readonly aberto: boolean;
+  readonly onAlternar: () => void;
+  readonly onSelecionar: (id: string) => void;
+}
+
+function Modulo({
+  grupo,
+  visiveis,
+  destinoAtivoId,
+  aberto,
+  onAlternar,
+  onSelecionar,
+}: ModuloProps) {
+  const tituloId = `nav-grupo-${grupo.titulo}`;
+  const listaId = `${tituloId}-lista`;
+  const descricaoId = grupo.descricao ? `${tituloId}-descricao` : undefined;
+  const contemAtivo = visiveis.some((d) => d.id === destinoAtivoId);
+
+  // Módulo de um destino só: o item É o destino. Um cabeçalho que expandisse
+  // para revelar exatamente um filho seria um clique sem informação — e dois
+  // nomes acessíveis quase iguais para a mesma coisa.
+  if (visiveis.length === 1) {
+    const unico = visiveis[0]!;
+    return (
+      <li className="painel-nav__modulo">
+        <BotaoDestino
+          destino={unico}
+          ativo={unico.id === destinoAtivoId}
+          nivel="modulo"
+          icone={grupo.icone}
+          onSelecionar={onSelecionar}
+        />
+      </li>
+    );
+  }
+
+  return (
+    <li className="painel-nav__modulo">
+      <button
+        type="button"
+        id={tituloId}
+        className={[
+          "painel-nav__cabecalho",
+          contemAtivo && !aberto ? "painel-nav__cabecalho--contem-ativo" : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
+        aria-expanded={aberto}
+        aria-controls={listaId}
+        onClick={onAlternar}
+      >
+        <IconeModulo nome={grupo.icone} />
+        <span className="painel-nav__texto">
+          <span className="painel-nav__rotulo">{grupo.titulo}</span>
+        </span>
+        <SetaExpansao />
+      </button>
+
+      {grupo.descricao ? (
+        <p className="painel-nav__descricao" id={descricaoId}>
+          {grupo.descricao}
+        </p>
+      ) : null}
+
+      <ul
+        className="painel-nav__submenu"
+        id={listaId}
+        aria-labelledby={tituloId}
+        hidden={!aberto}
+        {...(descricaoId ? { "aria-describedby": descricaoId } : {})}
+      >
+        {visiveis.map((destino) => (
+          <li className="painel-nav__item" key={destino.id}>
+            <BotaoDestino
+              destino={destino}
+              ativo={destino.id === destinoAtivoId}
+              nivel="sub"
+              onSelecionar={onSelecionar}
+            />
+          </li>
+        ))}
+      </ul>
+    </li>
+  );
+}
+
 export function PainelNavigation({
   destinoAtivoId,
   onSelecionar,
   papel = null,
 }: PainelNavigationProps) {
+  // Só o que a pessoa fechou à mão entra aqui. Tudo começa aberto, inclusive
+  // Demonstração: escondê-la por padrão a tornaria difícil de alcançar, e o
+  // que a faz secundária é a posição, o tratamento visual e o aviso — não
+  // sumir com ela.
+  const [fechados, setFechados] = useState<Readonly<Record<string, boolean>>>(
+    {},
+  );
+
+  const grupos = GRUPOS.map((grupo) => ({
+    grupo,
+    visiveis: grupo.destinos.filter((d) => destinoVisivelPara(d, papel)),
+  })).filter(({ visiveis }) => visiveis.length > 0);
+
+  const renderizar = ({
+    grupo,
+    visiveis,
+  }: {
+    grupo: GrupoNavegacao;
+    visiveis: readonly DestinoNavegacao[];
+  }) => (
+    <Modulo
+      key={grupo.titulo}
+      grupo={grupo}
+      visiveis={visiveis}
+      destinoAtivoId={destinoAtivoId}
+      aberto={!fechados[grupo.titulo]}
+      onAlternar={() =>
+        setFechados((atual) => ({
+          ...atual,
+          [grupo.titulo]: !atual[grupo.titulo],
+        }))
+      }
+      onSelecionar={onSelecionar}
+    />
+  );
+
+  const principais = grupos.filter(({ grupo }) => !grupo.secundario);
+  const secundarios = grupos.filter(({ grupo }) => grupo.secundario);
+
   return (
     <nav className="painel-nav" aria-label="Navegação do painel">
-      {GRUPOS.map((grupo) => {
-        const visiveis = grupo.destinos.filter((d) =>
-          destinoVisivelPara(d, papel),
-        );
-        // Grupo que ficou sem destino não vira cabeçalho órfão.
-        if (visiveis.length === 0) return null;
-        const tituloId = `nav-grupo-${grupo.titulo}`;
-        const descricaoId = grupo.descricao
-          ? `${tituloId}-descricao`
-          : undefined;
-        return (
-          <div className="painel-nav__grupo" key={grupo.titulo}>
-            <p className="painel-nav__grupo-titulo" id={tituloId}>
-              {grupo.titulo}
-            </p>
-            {grupo.descricao ? (
-              <p className="painel-nav__grupo-descricao" id={descricaoId}>
-                {grupo.descricao}
-              </p>
-            ) : null}
-            <ul
-              className="painel-nav__lista"
-              aria-labelledby={tituloId}
-              {...(descricaoId ? { "aria-describedby": descricaoId } : {})}
-            >
-              {visiveis.map((destino) => {
-                const ativo = destino.id === destinoAtivoId;
-                return (
-                  <li key={destino.id} className="painel-nav__item">
-                    <button
-                      type="button"
-                      className={
-                        ativo
-                          ? "painel-nav__link painel-nav__link--ativo"
-                          : "painel-nav__link"
-                      }
-                      aria-current={ativo ? "page" : undefined}
-                      onClick={() => onSelecionar(destino.id)}
-                    >
-                      {destino.subRotulo ? (
-                        <>
-                          <span className="painel-nav__link-grupo">
-                            {destino.label}
-                          </span>
-                          <span className="painel-nav__link-sub">
-                            {" "}
-                            › {destino.subRotulo}
-                          </span>
-                        </>
-                      ) : (
-                        destino.label
-                      )}
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        );
-      })}
+      <ul className="painel-nav__modulos">{principais.map(renderizar)}</ul>
+
+      {secundarios.length > 0 ? (
+        <ul className="painel-nav__modulos painel-nav__modulos--secundario">
+          {secundarios.map(renderizar)}
+        </ul>
+      ) : null}
     </nav>
   );
 }
