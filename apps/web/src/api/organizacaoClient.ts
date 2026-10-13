@@ -422,3 +422,92 @@ export async function atualizarUnidade(
   });
   return jsonOrThrow(res);
 }
+
+// ---------------------------------------------------------------------------
+// Ciclo de vida: inativar e reativar (T158)
+// ---------------------------------------------------------------------------
+
+/**
+ * Transições de situação dos nós organizacionais.
+ *
+ * As rotas existem desde as T104–T109 e nenhuma tela as alcançava. Nada aqui
+ * é contrato novo: `POST /<recurso>/:id/inativar` e `POST /<recurso>/:id/reativar`,
+ * sem corpo, exigindo `manage` no recurso e devolvendo a entidade atualizada.
+ *
+ * **Não existe exclusão de nó organizacional.** Nenhum dos sete controllers
+ * de `organizacao` declara `DELETE`, e nenhuma função deste módulo emite esse
+ * método — inativar é transição de estado, e o registro permanece. (O produto
+ * tem um `DELETE`, em `sessoesClient`, para revogar sessão: outro domínio,
+ * outra decisão, e nada aqui o alcança.)
+ *
+ * **Sem corpo na requisição.** O servidor não lê payload nestas rotas; mandar
+ * um seria inventar contrato. O cabeçalho CSRF continua obrigatório, porque
+ * são mutações.
+ *
+ * **O que o servidor responde, e que a interface não deve reinterpretar:**
+ * `409` quando a situação já é a pretendida ou quando a inativação esbarra em
+ * dependente ativo — e o servidor **não distingue os dois casos de propósito**,
+ * para não revelar o dependente; `422` quando a reativação encontra o nível
+ * superior inativo; `404` para inexistente ou fora da empresa, que respondem
+ * igual por anti-enumeração.
+ */
+async function transicao<T>(caminho: string): Promise<T> {
+  const token = await getCsrf();
+  const res = await apiFetch(caminho, {
+    method: "POST",
+    headers: { "x-csrf-token": token },
+  });
+  return jsonOrThrow(res);
+}
+
+export async function inativarUnidade(
+  id: string,
+): Promise<UnidadeOrganizacionalApi> {
+  return transicao(
+    `/unidades-organizacionais/${encodeURIComponent(id)}/inativar`,
+  );
+}
+
+export async function reativarUnidade(
+  id: string,
+): Promise<UnidadeOrganizacionalApi> {
+  return transicao(
+    `/unidades-organizacionais/${encodeURIComponent(id)}/reativar`,
+  );
+}
+
+export async function inativarDepartamento(
+  id: string,
+): Promise<DepartamentoApi> {
+  return transicao(`/departamentos/${encodeURIComponent(id)}/inativar`);
+}
+
+export async function reativarDepartamento(
+  id: string,
+): Promise<DepartamentoApi> {
+  return transicao(`/departamentos/${encodeURIComponent(id)}/reativar`);
+}
+
+export async function inativarArea(id: string): Promise<AreaApi> {
+  return transicao(`/areas/${encodeURIComponent(id)}/inativar`);
+}
+
+export async function reativarArea(id: string): Promise<AreaApi> {
+  return transicao(`/areas/${encodeURIComponent(id)}/reativar`);
+}
+
+export async function inativarEquipe(id: string): Promise<EquipeApi> {
+  return transicao(`/equipes/${encodeURIComponent(id)}/inativar`);
+}
+
+export async function reativarEquipe(id: string): Promise<EquipeApi> {
+  return transicao(`/equipes/${encodeURIComponent(id)}/reativar`);
+}
+
+export async function inativarCentroCusto(id: string): Promise<CentroCustoApi> {
+  return transicao(`/centros-de-custo/${encodeURIComponent(id)}/inativar`);
+}
+
+export async function reativarCentroCusto(id: string): Promise<CentroCustoApi> {
+  return transicao(`/centros-de-custo/${encodeURIComponent(id)}/reativar`);
+}

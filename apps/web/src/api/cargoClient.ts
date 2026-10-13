@@ -128,3 +128,33 @@ export async function atualizarCargo(
   });
   return jsonOrThrow(res);
 }
+
+// ---------------------------------------------------------------------------
+// Ciclo de vida: inativar e reativar (T158)
+// ---------------------------------------------------------------------------
+
+/**
+ * `POST /cargos/:id/inativar` e `POST /cargos/:id/reativar`, existentes desde
+ * as T104–T109 e até aqui sem tela. Sem corpo, exigindo `manage` em `cargo` e
+ * devolvendo o cargo atualizado. Não existe rota de exclusão.
+ *
+ * Mora aqui, e não em `organizacaoClient`, porque cargo já tem cliente
+ * próprio — e cada módulo de `apps/web/src/api` carrega o seu `apiFetch` e o
+ * seu `ApiError`, por convenção vigente no projeto.
+ */
+async function transicaoCargo(caminho: string): Promise<CargoApi> {
+  const token = await getCsrf();
+  const res = await apiFetch(caminho, {
+    method: "POST",
+    headers: { "x-csrf-token": token },
+  });
+  return jsonOrThrow(res);
+}
+
+export async function inativarCargo(id: string): Promise<CargoApi> {
+  return transicaoCargo(`/cargos/${encodeURIComponent(id)}/inativar`);
+}
+
+export async function reativarCargo(id: string): Promise<CargoApi> {
+  return transicaoCargo(`/cargos/${encodeURIComponent(id)}/reativar`);
+}
