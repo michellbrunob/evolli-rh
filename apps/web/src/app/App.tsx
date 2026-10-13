@@ -57,9 +57,12 @@ import "./app-shell.css";
 import { SessoesAtivasPanel } from "./SessoesAtivasPanel";
 import { SegurancaMfaPanel } from "./SegurancaMfaPanel";
 import {
+  ADMINISTRACAO_LIDERANCA_TITULO_ID,
+  AdministracaoLiderancaScreen,
   CONTAS_ACESSO_TITULO_ID,
   ContasAcessoScreen,
 } from "../screens/administracao";
+import { PAPEIS_COM_ADMINISTRACAO_DE_LIDERANCA } from "../api/gestorAdminClient";
 import {
   DOCUMENTOS_METADADOS_TITULO_ID,
   DocumentosScreen,
@@ -95,6 +98,7 @@ const TITULO_ID_POR_DESTINO: Record<string, string> = {
   "solicitacoes-rh": "central-solicitacoes-rh-titulo",
   "contas-acesso": CONTAS_ACESSO_TITULO_ID,
   equipe: EQUIPE_TITULO_ID,
+  "administracao-lideranca": ADMINISTRACAO_LIDERANCA_TITULO_ID,
 };
 
 function conteudoDoDestino(
@@ -141,6 +145,13 @@ function conteudoDoDestino(
   }
   if (destinoId === "equipe") {
     return <EquipeScreen onSessaoAtualEncerrada={onSessaoAtualEncerrada} />;
+  }
+  if (destinoId === "administracao-lideranca") {
+    return (
+      <AdministracaoLiderancaScreen
+        onSessaoAtualEncerrada={onSessaoAtualEncerrada}
+      />
+    );
   }
   const destino = DESTINOS_PAINEL.find((item) => item.id === destinoId);
   return (
@@ -335,6 +346,9 @@ export function App({
             equipe:
               papelDoAtor !== null &&
               PAPEIS_COM_CONSULTA_DE_EQUIPE.includes(papelDoAtor),
+            "administracao-lideranca":
+              papelDoAtor !== null &&
+              PAPEIS_COM_ADMINISTRACAO_DE_LIDERANCA.includes(papelDoAtor),
           }}
         />
 

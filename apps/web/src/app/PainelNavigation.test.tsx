@@ -3,10 +3,11 @@ import { describe, expect, it, vi } from "vitest";
 import { DESTINOS_PAINEL, PainelNavigation } from "./PainelNavigation";
 
 describe("PainelNavigation (T044)", () => {
-  it("lista os dez destinos dentro de um <nav> rotulado", () => {
-    // Dez desde a T153: os nove incondicionais mais "Minha equipe", que é
-    // CONDICIONAL. Sem `destinosCondicionais`, nada é ocultado — a omissão
-    // significa "incondicional", e quem monta o shell é que decide.
+  it("lista os onze destinos dentro de um <nav> rotulado", () => {
+    // Onze desde a T157: os nove incondicionais mais "Minha equipe" (T153) e
+    // "Administração da liderança" (T157), ambos CONDICIONAIS. Sem
+    // `destinosCondicionais`, nada é ocultado — a omissão significa
+    // "incondicional", e quem monta o shell é que decide.
     render(
       <PainelNavigation destinoAtivoId="cadastros" onSelecionar={() => {}} />,
     );
@@ -16,7 +17,27 @@ describe("PainelNavigation (T044)", () => {
     });
     const itens = nav.querySelectorAll("li");
     expect(itens).toHaveLength(DESTINOS_PAINEL.length);
-    expect(DESTINOS_PAINEL).toHaveLength(10);
+    expect(DESTINOS_PAINEL).toHaveLength(11);
+  });
+
+  it("T157 oculta a administração da liderança quando o servidor não concede", () => {
+    render(
+      <PainelNavigation
+        destinoAtivoId="cadastros"
+        onSelecionar={() => {}}
+        destinosCondicionais={{ "administracao-lideranca": false }}
+      />,
+    );
+
+    expect(
+      screen.queryByRole("button", { name: /Administração da liderança/ }),
+    ).toBeNull();
+    const nav = screen.getByRole("navigation", { name: "Navegação do painel" });
+    expect(nav.querySelectorAll("li")).toHaveLength(DESTINOS_PAINEL.length - 1);
+    // "Contas de acesso" fica: ocultar um condicional não mexe no grupo.
+    expect(
+      screen.getByRole("button", { name: /^Contas de acesso/ }),
+    ).toBeInTheDocument();
   });
 
   it("T153 oculta um destino condicional que o servidor não concedeu", () => {

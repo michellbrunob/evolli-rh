@@ -1187,6 +1187,39 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       solicitações) seguem não iniciados. As decisões de negócio e do RH já registradas permanecem
       abertas, e nada aqui as antecipa.
 
+54. **T157 - Administração da Liderança: vínculos e atribuições de equipe**
+    - **Estado:** em implementação. Branch `codex/t157-administracao-lideranca`, a partir do squash
+      `92c559081d661306f2d4aef30020e8cbcb8f482c` (T156, PR #148).
+    - **Objetivo:** tornar utilizável pela interface web a capacidade administrativa que a T151 já
+      entregou e que a ADR 0015 já governa — ligar conta de acesso a colaborador, atribuir gestor a
+      equipe com vigência, listar estado vigente e histórico, e encerrar por vigência.
+    - **Por que esta fatia:** é a recomendação única da matriz da T156. A T151 entregou a fundação e
+      a T153 a consulta, mas configurar um gestor só era possível por HTTP cru ou pelo seed — então
+      todo gestor real via lista vazia em `Minha equipe`. A fatia fecha esse elo.
+    - **Contratos usados, nenhum criado:** `POST /v1/gestor/administracao/ligacoes`,
+      `PATCH /v1/gestor/administracao/ligacoes/:ligacaoId/encerrar`,
+      `GET /v1/gestor/administracao/ligacoes`, `POST /v1/gestor/administracao/atribuicoes`,
+      `PATCH /v1/gestor/administracao/atribuicoes/:atribuicaoId/encerrar` e
+      `GET /v1/gestor/administracao/atribuicoes`. RBAC `gestor_atribuicao` com `create`, `alter` e
+      `read`, concedido apenas a `rh` na própria empresa.
+    - **Catálogos de apoio, já existentes:** `GET /v1/users` (cursor), `GET /v1/colaboradores` e
+      `GET /v1/equipes` (página/tamanho) — consumidos **até o fim**, para que nenhum registro fique
+      oculto além da primeira página.
+    - **Limite obrigatório:** **exceções de acesso ficam fora**. As três rotas de `excecoes` existem
+      e permanecem sem interface enquanto o catálogo de `motivoCodigo` depender de validação com RH
+      (ADR 0015, decisão 9). Também fora: gestão matricial, departamento ou empresa inteira, ESS,
+      mutação pelo gestor, ponto, férias, folha, saúde e dado sensível.
+    - **Sem backend:** não altera `apps/api`, Prisma, migrations, seed, RBAC, contratos HTTP,
+      Docker, banco, dependências ou lockfile.
+    - **Padrão visual:** alternativa B com modais, já aprovada; sem redesenho e sem ampliar a
+      fundação congelada na T146. Datas no padrão brasileiro consolidado pela T154.
+    - **Aceite:** o RH liga uma conta a um colaborador e atribui essa conta como gestor de uma
+      equipe pela interface; a tela `Minha equipe` daquele gestor, antes vazia, passa a listar o
+      time; encerrar devolve a lista a vazio; atribuição sobreposta recebe recusa estável; registro
+      de outra empresa continua respondendo 404; toda mutação aparece na trilha.
+    - **Pendências preservadas:** `DP-3J-12` e `PD-SOL-05` seguem não iniciados; as decisões de
+      negócio e do RH já registradas permanecem abertas.
+
 ## Regra obrigatória para as próximas tarefas
 
 1. Criar ou atualizar a entrada da tarefa neste arquivo antes da implementação.

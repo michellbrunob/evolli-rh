@@ -48,6 +48,12 @@ export const DESTINOS_PAINEL: readonly DestinoPainel[] = [
   // frontend liga a capacidade. Continua valendo o §3.6: isto é conveniência
   // de interface, e quem decide de verdade é o backend.
   { id: "equipe", label: "Minha equipe" },
+  // T157 — "Administração da liderança". CONDICIONAL pelo mesmo mecanismo do
+  // destino anterior: só entra quando o SERVIDOR informa um papel a que o RBAC
+  // concede `gestor_atribuicao`. Continua valendo o §3.6 — isto é conveniência
+  // de interface, e quem decide de verdade é o backend, que responde 403 a
+  // quem chamar a rota sem a capacidade.
+  { id: "administracao-lideranca", label: "Administração da liderança" },
 ];
 
 /** Sub-rótulo exibido junto ao destino quando ele já tem tela própria. Para
@@ -65,6 +71,7 @@ const SUB_ROTULO: Record<string, string> = {
   "solicitacoes-rh": "Central do RH",
   relatorios: "Exceções de Ponto",
   equipe: "Consulta do gestor",
+  "administracao-lideranca": "Vínculos e equipes",
 };
 
 /**
@@ -97,7 +104,7 @@ const GRUPOS_NAVEGACAO: readonly {
   },
   {
     titulo: "Administração",
-    destinos: ["contas-acesso"],
+    destinos: ["contas-acesso", "administracao-lideranca"],
   },
 ];
 
