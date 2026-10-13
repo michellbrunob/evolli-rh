@@ -1220,6 +1220,40 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
     - **Pendências preservadas:** `DP-3J-12` e `PD-SOL-05` seguem não iniciados; as decisões de
       negócio e do RH já registradas permanecem abertas.
 
+55. **T158 - Interface de inativação e reativação da estrutura organizacional**
+    - **Estado:** em implementação. Branch `codex/t158-ciclo-vida-estrutura-organizacional`,
+      a partir do squash `99e3363fd3e2a24e071a5fb240db9cf479713678` (T157, PR #149).
+    - **Objetivo:** expor na interface web as ações de inativar e reativar dos cadastros
+      organizacionais que já possuem rota, capacidade de RBAC e cobertura E2E no backend
+      desde as T104–T109. A T156 registrou que essas rotas existem e que nenhuma tela as
+      alcança.
+    - **Por que importa:** o RH enxerga o filtro de inativos sem conseguir colocar nem
+      retirar registro desse estado. Três telas anunciam em texto que "não é possível
+      excluir, apenas inativar" e não oferecem o botão correspondente.
+    - **Investigação obrigatória antes do código:** confirmar na fonte, entidade por
+      entidade, o método, o caminho, a permissão exigida, a forma da resposta, a semântica
+      de estado, o tratamento de item já no estado alvo e eventuais restrições por
+      referência. Semelhança de nome não autoriza presumir contrato igual; qualquer
+      ambiguidade interrompe a tarefa e vira relato.
+    - **Limite obrigatório:** exclusão física permanece fora da interface — não existe rota
+      `DELETE` no produto e nenhuma é inventada. Sem ação em massa, sem alteração de regra
+      de negócio, sem backend, Prisma, migrations, seed, RBAC, contratos HTTP, dependências
+      ou lockfile.
+    - **Padrão visual:** alternativa B com os componentes existentes; confirmação acessível
+      antes da mutação, com nome claro, foco inicial, `Escape` seguro, devolução de foco e
+      mensagem de sucesso ou de erro. Sem redesenho.
+    - **Erros:** 403, 404, 409 e falha de rede tratados sem inventar explicação ou regra. O
+      servidor continua sendo a autoridade, e o isolamento por empresa é preservado.
+    - **Dívida preservada:** a paginação geral das telas existentes (L3, registrada na T156)
+      **não** é resolvida aqui. A tarefa não cria lista nova que a omita e não inventa
+      parâmetro onde o contrato não o oferece.
+    - **Aceite:** cada entidade coberta tem teste de cliente e de tela para sucesso, recusa
+      do servidor e erro de rede; prova de que nenhum endpoint de exclusão é chamado;
+      acessibilidade do modal e do teclado; typecheck, lint, build, testes, Prettier,
+      `spec:check` e `git diff --check` verdes.
+    - **Pendências preservadas:** `DP-3J-12` e `PD-SOL-05` seguem não iniciados; as
+      ressalvas R-A, R-B e R-C da T157 continuam abertas e não são tratadas aqui.
+
 ## Regra obrigatória para as próximas tarefas
 
 1. Criar ou atualizar a entrada da tarefa neste arquivo antes da implementação.

@@ -930,11 +930,11 @@ alteração visual; não toca Docker, banco, dependências ou lockfile; não alt
 não aprova requisito novo; e **não inicia a T157** — a recomendação é insumo de decisão, e a
 implementação depende de autorização própria sob identificador próprio.
 
-## Administração da Liderança — T157 (interface web)
+## Administração da Liderança — T157 (integrada)
 
-| Tarefa | Estado               | Resultado principal                                                                                                                                                                        |
-| ------ | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| T157   | **Em implementação** | Interface web de RH para ligação conta↔colaborador e atribuição gestor↔equipe, sobre as rotas administrativas que a T151 já entregou. Torna operável a capacidade que estava inalcançável. |
+| Tarefa | Estado                                    | Resultado principal                                                                                                                                                                        |
+| ------ | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| T157   | **Integrada** (PR #149, squash `99e3363`) | Interface web de RH para ligação conta↔colaborador e atribuição gestor↔equipe, sobre as rotas administrativas que a T151 já entregou. Torna operável a capacidade que estava inalcançável. |
 
 **O problema que a tarefa resolve.** A T151 entregou as tabelas, o RBAC e as rotas; a T153 entregou
 a consulta do gestor. Faltava o elo: **configurar** quem é gestor de qual equipe só era possível por
@@ -959,6 +959,34 @@ parâmetro foi inventado onde o contrato não o oferece.
 **Limites explícitos:** sem gestão matricial, departamento inteiro ou empresa inteira; sem ESS; sem
 mutação pelo gestor, que permanece consultivo; sem ponto, férias, folha, saúde ou dado sensível; sem
 alteração visual fora das telas desta tarefa, e sem ampliar a fundação congelada na T146.
+
+## Ciclo de vida da estrutura organizacional — T158 (interface web)
+
+| Tarefa | Estado               | Resultado principal                                                                                                                         |
+| ------ | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| T158   | **Em implementação** | Expõe na interface as ações de inativar e reativar dos cadastros organizacionais que já têm rota, RBAC e E2E no backend desde as T104–T109. |
+
+**A lacuna que a tarefa fecha.** A T156 registrou que existem rotas de inativação e
+reativação para as entidades organizacionais e **nenhuma tela as expõe**. O efeito prático é
+que o RH enxerga o filtro de inativos e não tem como colocar nem retirar registro desse
+estado — três telas chegam a anunciar em texto que "não é possível excluir, apenas inativar"
+sem oferecer o botão.
+
+**Nenhum contrato novo.** As rotas, as capacidades de RBAC e a semântica de estado já
+existem. Antes de qualquer código, cada entidade é conferida **na fonte**, uma a uma:
+método, caminho, permissão exigida, forma da resposta, tratamento de item já no estado alvo
+e eventuais restrições por referência. Semelhança de nome não é presunção de contrato igual.
+
+**Exclusão física continua fora.** Não existe rota `DELETE` no produto, e a interface não
+inventa uma. Inativar é transição de estado; o registro permanece.
+
+**Limites explícitos:** sem backend, Prisma, migrations, seed, RBAC, contratos HTTP,
+dependências ou lockfile; sem ação em massa; sem alterar regra de negócio. A **paginação
+geral das telas existentes (L3) permanece dívida registrada e não é resolvida aqui** — a
+tarefa não cria lista nova que a omita, e não inventa parâmetro onde o contrato não o
+oferece. Ficam fora exceções de acesso do gestor, ESS, férias, ponto, folha, eSocial e
+catálogo de motivos de desligamento. As ressalvas **R-A, R-B e R-C** da T157 seguem abertas
+e não são tratadas aqui.
 
 ## Próxima ação autorizável
 
