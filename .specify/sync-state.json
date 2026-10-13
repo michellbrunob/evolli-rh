@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "constitutionVersion": "1.4.0",
   "lastConvergedAt": "2026-10-13",
-  "lastIntegratedTask": 155,
-  "lastRecordedTask": 156,
+  "lastIntegratedTask": 156,
+  "lastRecordedTask": 157,
   "platformDecision": {
     "adr": "docs/adr/0014-evolli-plataforma-base-e-encerramento-do-frappe.md",
     "decidedAt": "2026-10-01",
@@ -11,15 +11,15 @@
     "frappe": "encerrado_como_candidato_referencia_apenas"
   },
   "nextTask": {
-    "id": "T156",
-    "status": "matriz_evolli_referencia_mercado_e_priorizacao",
-    "reason": "T155 integrada em main pela PR #147 (squash 25ce08716744f32db04393a9a645787f83d5fe5f), com a CI de main 3/3 verde. A T156 formaliza a matriz Evolli x referencia de mercado: classifica cada frente como funcional, parcial, demonstrativa, planejada ou bloqueada, derivando o estado do codigo e nao de texto anterior; registra as lacunas com objetivo, dados necessarios, regras de negocio indefinidas, dependencias, riscos CLT/LGPD/seguranca e prioridade; e recomenda UMA proxima fatia funcional independente das respostas pendentes do RH. A recomendacao e a interface de Administracao da Lideranca (ligacao conta-colaborador e atribuicao gestor-equipe), excluindo as excecoes de acesso enquanto dependerem do catalogo de motivos a validar com RH. E tarefa documental: nao implementa codigo, UI, API, migration, seed, teste funcional nem alteracao visual, nao toca Docker, banco, dependencias ou lockfile, nao aprova requisito novo e nao inicia a T157. Versiona tambem a referencia funcional de mercado que sustenta a coluna de comparacao, ate aqui nao versionada. Continuam pendentes e nao iniciados: resumo de jornada (DP-3J-12) e andamento de solicitacoes (PD-SOL-05), alem das decisoes de negocio e do RH ja registradas."
+    "id": "T157",
+    "status": "administracao_lideranca_interface_web",
+    "reason": "T156 integrada em main pela PR #148 (squash 92c559081d661306f2d4aef30020e8cbcb8f482c), com a CI de main 3/3 verde. A T157 implementa a fatia recomendada pela matriz da T156: a interface web de Administracao da Lideranca, que torna utilizavel pelo RH a capacidade ja entregue pela T151 e governada pela ADR 0015. Escopo: ligacao conta-colaborador e atribuicao gestor-equipe, com listagem, estado vigente, historico e encerramento por vigencia, sobre as seis rotas administrativas que ja existem. EXCECOES DE ACESSO FICAM FORA: as tres rotas de excecao permanecem sem interface enquanto o catalogo de motivoCodigo depender de validacao com RH. E tarefa de interface: nao altera backend, Prisma, migrations, seed, RBAC, contratos HTTP, Docker, banco, dependencias ou lockfile. Nao implementa gestao matricial, departamento ou empresa inteira, ESS, ponto, ferias, folha, saude ou dado sensivel, e nao amplia a fundacao visual congelada na T146. Continuam pendentes e nao iniciados: resumo de jornada (DP-3J-12) e andamento de solicitacoes (PD-SOL-05), alem das decisoes de negocio e do RH ja registradas."
   },
   "openDeliveries": [
     {
-      "id": "T156",
+      "id": "T157",
       "pullRequest": null,
-      "status": "matriz_e_priorizacao_em_revisao"
+      "status": "administracao_lideranca_em_implementacao"
     }
   ],
   "requiredArtifacts": [

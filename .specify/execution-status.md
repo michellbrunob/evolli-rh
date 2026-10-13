@@ -888,11 +888,11 @@ foi consolidada no [mapa funcional de Gestão de Talentos](../docs/decisions/t15
 O mapa separa o que foi observado de decisões pendentes e preserva a proibição de copiar código,
 marca, interface, textos ou regras privadas. Ele não amplia o escopo implementável da T155.
 
-## Matriz Evolli × referência de mercado — T156 (investigação)
+## Matriz Evolli × referência de mercado — T156 (integrada)
 
-| Tarefa | Estado         | Resultado principal                                                                                                                                                                                |
-| ------ | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| T156   | **Em revisão** | Matriz de 28 frentes classificadas contra referência de mercado, 13 lacunas com dependências e riscos, e uma única recomendação de próxima fatia funcional. Documental: nenhum código foi escrito. |
+| Tarefa | Estado                                    | Resultado principal                                                                                                                                                                                |
+| ------ | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T156   | **Integrada** (PR #148, squash `92c5590`) | Matriz de 28 frentes classificadas contra referência de mercado, 13 lacunas com dependências e riscos, e uma única recomendação de próxima fatia funcional. Documental: nenhum código foi escrito. |
 
 **O estado vem do código, não de texto anterior.** A classificação de cada frente foi derivada de
 `apps/`, `packages/`, do schema Prisma e das migrations na base `cd80ea9`, e revalidada em
@@ -929,6 +929,36 @@ própria e links públicos, mesmo padrão das referências de mercado já integr
 alteração visual; não toca Docker, banco, dependências ou lockfile; não altera ADR, gate ou decisão;
 não aprova requisito novo; e **não inicia a T157** — a recomendação é insumo de decisão, e a
 implementação depende de autorização própria sob identificador próprio.
+
+## Administração da Liderança — T157 (interface web)
+
+| Tarefa | Estado               | Resultado principal                                                                                                                                                                        |
+| ------ | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| T157   | **Em implementação** | Interface web de RH para ligação conta↔colaborador e atribuição gestor↔equipe, sobre as rotas administrativas que a T151 já entregou. Torna operável a capacidade que estava inalcançável. |
+
+**O problema que a tarefa resolve.** A T151 entregou as tabelas, o RBAC e as rotas; a T153 entregou
+a consulta do gestor. Faltava o elo: **configurar** quem é gestor de qual equipe só era possível por
+chamada HTTP crua ou pelo seed de demonstração. Na prática, todo gestor real via lista vazia em
+"Minha equipe". A T157 fecha esse elo e não acrescenta capacidade nova.
+
+**Nenhum contrato novo.** As seis rotas usadas já existem e estão cobertas por E2E desde a T151:
+`POST`/`GET` e `PATCH …/encerrar` para `ligacoes` e para `atribuicoes`. Nenhum endpoint, campo,
+parâmetro de consulta, regra de autorização ou fluxo foi inventado. Backend, Prisma, migrations,
+seed, RBAC e contratos HTTP **não foram tocados**.
+
+**Exceções de acesso ficam fora, declaradamente.** As três rotas de `excecoes` existem e continuam
+sem interface: o catálogo de `motivoCodigo` depende de validação com RH (ADR 0015, decisão 9), e
+oferecer o formulário antes disso seria escolher conteúdo de catálogo por conta própria.
+
+**Paginação: o que o contrato expõe e o que não expõe.** `GET …/ligacoes` e `GET …/atribuicoes`
+devolvem **array simples**, sem envelope de paginação — não há página além da primeira, e portanto
+nada fica oculto. Já os catálogos de apoio **são paginados** e a tela os consome **até o fim**:
+contas por cursor (`nextCursor`), colaboradores e equipes por `pagina`/`tamanhoPagina`. Nenhum
+parâmetro foi inventado onde o contrato não o oferece.
+
+**Limites explícitos:** sem gestão matricial, departamento inteiro ou empresa inteira; sem ESS; sem
+mutação pelo gestor, que permanece consultivo; sem ponto, férias, folha, saúde ou dado sensível; sem
+alteração visual fora das telas desta tarefa, e sem ampliar a fundação congelada na T146.
 
 ## Próxima ação autorizável
 
