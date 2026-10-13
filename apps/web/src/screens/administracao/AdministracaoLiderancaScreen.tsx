@@ -114,6 +114,47 @@ export function diaDeHoje(agora: Date = new Date()): string {
 const DIA = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
+ * Dia civil seguinte, em `AAAA-MM-DD`.
+ *
+ * A aritmética acontece em UTC de propósito: `Date.UTC` mais 24 h não atravessa
+ * horário de verão, enquanto somar um dia em horário local pode cair na mesma
+ * data ou pular duas, dependendo do fuso. Como entra e sai um dia civil puro,
+ * UTC aqui é só um calendário — nenhum instante é representado.
+ */
+export function proximoDiaCivil(dia: string): string {
+  const base = Date.UTC(
+    Number(dia.slice(0, 4)),
+    Number(dia.slice(5, 7)) - 1,
+    Number(dia.slice(8, 10)),
+  );
+  const d = new Date(base + 24 * 60 * 60 * 1000);
+  const ano = String(d.getUTCFullYear()).padStart(4, "0");
+  const mes = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const diaDoMes = String(d.getUTCDate()).padStart(2, "0");
+  return `${ano}-${mes}-${diaDoMes}`;
+}
+
+/**
+ * Primeira data de encerramento que o servidor aceitaria.
+ *
+ * O banco exige `vigencia_fim > vigencia_inicio` (CHECK
+ * `*_intervalo_coerente`, nas duas tabelas). Sugerir "hoje" num registro que
+ * começou hoje produz um 409 garantido, com mensagem genérica de conflito que
+ * não explica o motivo — exatamente a ressalva R1. Hoje continua sendo a
+ * sugestão sempre que já for posterior ao início; quando não for, a sugestão
+ * é o dia seguinte ao início, que é a menor data válida.
+ *
+ * Isto **não** reimplementa a regra do servidor: ele continua sendo quem
+ * decide. Aqui só se evita oferecer de saída um valor que já se sabe inválido.
+ */
+export function primeiroFimValido(
+  vigenciaInicio: string,
+  hoje: string,
+): string {
+  return hoje > vigenciaInicio ? hoje : proximoDiaCivil(vigenciaInicio);
+}
+
+/**
  * Mesma regra do `ehDiaIso` do servidor: dia puro, sem hora e sem fuso.
  *
  * A validação não para no formato: `2026-02-29` casa com o padrão e não
@@ -195,6 +236,8 @@ export function AdministracaoLiderancaScreen({
     tipo: Aba;
     id: string;
     descricao: string;
+    /** Início do registro: define a menor data de encerramento aceitável. */
+    vigenciaInicio: string;
   } | null>(null);
 
   const seqAtor = useRef(0);
@@ -386,6 +429,7 @@ export function AdministracaoLiderancaScreen({
                   tipo: "ligacoes",
                   id: l.id,
                   descricao: `a ligação de ${nomeDaConta(l.userId)} com ${nomeDoColaborador(l.colaboradorId)}`,
+                  vigenciaInicio: l.vigenciaInicio,
                 })
               }
             >
@@ -448,6 +492,7 @@ export function AdministracaoLiderancaScreen({
                   tipo: "atribuicoes",
                   id: a.id,
                   descricao: `a atribuição de ${nomeDoColaborador(a.gestorColaboradorId)} na equipe ${nomeDaEquipe(a.equipeId)}`,
+                  vigenciaInicio: a.vigenciaInicio,
                 })
               }
             >
@@ -1071,12 +1116,16 @@ function FormularioAtribuicao({
 }
 
 interface FormularioEncerramentoProps {
-  alvo: { tipo: Aba; id: string; descricao: string };
+  alvo: { tipo: Aba; id: string; descricao: string; vigenciaInicio: string };
   hoje: string;
   onFechar: () => void;
   onSucesso: () => void;
   onSessaoEncerrada: (err: unknown) => boolean;
 }
+
+/** Mensagem única do caso "fim não é posterior ao início". */
+export const ERRO_FIM_NAO_POSTERIOR =
+  "A data de encerramento deve ser posterior ao início da vigência.";
 
 function FormularioEncerramento({
   alvo,
@@ -1085,7 +1134,10 @@ function FormularioEncerramento({
   onSucesso,
   onSessaoEncerrada,
 }: FormularioEncerramentoProps) {
-  const [vigenciaFim, setVigenciaFim] = useState(hoje);
+  // Sugestão inicial que o servidor já aceitaria: hoje quando ele for
+  // posterior ao início, o dia seguinte ao início quando não for.
+  const sugestao = primeiroFimValido(alvo.vigenciaInicio, hoje);
+  const [vigenciaFim, setVigenciaFim] = useState(sugestao);
   const [erro, setErro] = useState<string | undefined>();
   const [erroGeral, setErroGeral] = useState<string | null>(null);
   const { enviando, iniciar, encerrar } = useEnvio();
@@ -1093,6 +1145,18 @@ function FormularioEncerramento({
   const enviar = useCallback(async () => {
     if (!ehDiaValido(vigenciaFim)) {
       setErro("Informe uma data válida.");
+      return;
+    }
+    // Comparação lexicográfica entre dois `AAAA-MM-DD` é ordenação de
+    // calendário — formato de largura fixa, componentes do mais significativo
+    // ao menos. Nenhum `Date` é construído, então não há fuso a deslocar.
+    //
+    // Isto NÃO duplica a regra do servidor como decisão: o CHECK do banco
+    // continua sendo a autoridade. Aqui o cliente só deixa de emitir uma
+    // requisição que ele já sabe que será recusada, e cuja recusa chegaria
+    // como 409 genérico, sem campo a que se prender.
+    if (vigenciaFim <= alvo.vigenciaInicio) {
+      setErro(ERRO_FIM_NAO_POSTERIOR);
       return;
     }
     setErro(undefined);
@@ -1124,7 +1188,7 @@ function FormularioEncerramento({
       descricao={`Encerrar ${alvo.descricao}. O registro permanece no histórico.`}
       onFechar={onFechar}
       bloqueado={enviando}
-      alterado={vigenciaFim !== hoje}
+      alterado={vigenciaFim !== sugestao}
       rodape={
         <FormActions>
           <Button variant="secondary" onClick={onFechar} disabled={enviando}>
@@ -1141,7 +1205,7 @@ function FormularioEncerramento({
         id="encerramento-fim"
         label="Fim da vigência"
         required
-        help="Último dia em que o registro ainda vale."
+        help={`Precisa ser posterior ao início da vigência, ${formatarDiaCivil(alvo.vigenciaInicio)}.`}
         {...(erro ? { error: erro } : {})}
         disabled={enviando}
       >
@@ -1149,6 +1213,10 @@ function FormularioEncerramento({
           <input
             {...control}
             type="date"
+            // `min` deixa o próprio seletor nativo recusar data inválida, no
+            // teclado e no leitor de tela. É conveniência: a validação em
+            // `enviar` continua, porque `min` não impede digitação.
+            min={proximoDiaCivil(alvo.vigenciaInicio)}
             value={vigenciaFim}
             onChange={(e) => setVigenciaFim(e.target.value)}
           />

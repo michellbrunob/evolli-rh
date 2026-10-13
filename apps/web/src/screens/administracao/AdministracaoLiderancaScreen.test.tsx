@@ -29,9 +29,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import {
   AdministracaoLiderancaScreen,
+  ERRO_FIM_NAO_POSTERIOR,
   diaDeHoje,
   ehDiaValido,
   estaVigente,
+  primeiroFimValido,
+  proximoDiaCivil,
 } from "./AdministracaoLiderancaScreen";
 import {
   ApiError,
@@ -490,6 +493,151 @@ describe("criação de atribuição", () => {
     expect(
       await screen.findByText("Já existe registro vigente para este período."),
     ).toBeInTheDocument();
+  });
+});
+
+describe("R1 — data de encerramento nunca nasce inválida", () => {
+  /**
+   * O banco exige `vigencia_fim > vigencia_inicio` (CHECK
+   * `*_intervalo_coerente`, nas duas tabelas). Sugerir "hoje" num registro que
+   * começou hoje produzia 409 garantido, com mensagem genérica de conflito.
+   * Estes testes prendem a sugestão e a recusa local; o 409 do servidor
+   * continua reservado a conflito real.
+   */
+  async function abrirEncerramento(vigenciaInicio: string) {
+    prepararFeliz();
+    vi.mocked(listarLigacoes).mockResolvedValue([
+      { ...LIGACAO_VIGENTE, vigenciaInicio },
+    ] as never);
+    render(<AdministracaoLiderancaScreen />);
+    await screen.findByText("pessoa.dois@evolli.local");
+    fireEvent.click(screen.getByRole("button", { name: "Encerrar" }));
+    await screen.findByRole("dialog");
+    return screen.getByLabelText(/Fim da vigência/) as HTMLInputElement;
+  }
+
+  function encerrar() {
+    fireEvent.click(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: "Encerrar",
+      }),
+    );
+  }
+
+  it("proximoDiaCivil atravessa mês, ano e 29 de fevereiro sem deslocar fuso", () => {
+    expect(proximoDiaCivil("2026-10-13")).toBe("2026-10-14");
+    expect(proximoDiaCivil("2026-10-31")).toBe("2026-11-01");
+    expect(proximoDiaCivil("2026-12-31")).toBe("2027-01-01");
+    expect(proximoDiaCivil("2024-02-28")).toBe("2024-02-29");
+    expect(proximoDiaCivil("2026-02-28")).toBe("2026-03-01");
+  });
+
+  it("primeiroFimValido devolve o dia seguinte quando começou hoje", () => {
+    expect(primeiroFimValido("2026-10-13", "2026-10-13")).toBe("2026-10-14");
+  });
+
+  it("primeiroFimValido mantém hoje quando o início é anterior", () => {
+    expect(primeiroFimValido("2026-01-05", "2026-10-13")).toBe("2026-10-13");
+  });
+
+  it("primeiroFimValido nunca sugere data que o servidor recusaria", () => {
+    // Início no futuro é estado possível (atribuição agendada). A sugestão
+    // precisa seguir sendo posterior ao início, não "hoje".
+    expect(primeiroFimValido("2027-03-01", "2026-10-13")).toBe("2027-03-02");
+  });
+
+  it("início HOJE: o campo já abre com amanhã, não com hoje", async () => {
+    const campo = await abrirEncerramento(HOJE);
+    expect(campo.value).toBe(proximoDiaCivil(HOJE));
+    expect(campo.value).not.toBe(HOJE);
+  });
+
+  it("início ANTERIOR: o campo abre com hoje, que já é válido", async () => {
+    const campo = await abrirEncerramento("2026-01-05");
+    expect(campo.value).toBe(HOJE);
+  });
+
+  it("o seletor nativo recusa data inválida pelo atributo min", async () => {
+    const campo = await abrirEncerramento("2026-01-05");
+    expect(campo.min).toBe("2026-01-06");
+  });
+
+  it("fim IGUAL ao início: erro no campo e nenhuma requisição", async () => {
+    const campo = await abrirEncerramento("2026-01-05");
+    fireEvent.change(campo, { target: { value: "2026-01-05" } });
+    encerrar();
+    expect(await screen.findByText(ERRO_FIM_NAO_POSTERIOR)).toBeInTheDocument();
+    expect(encerrarLigacao).not.toHaveBeenCalled();
+  });
+
+  it("fim ANTERIOR ao início: erro no campo e nenhuma requisição", async () => {
+    const campo = await abrirEncerramento("2026-01-05");
+    fireEvent.change(campo, { target: { value: "2025-12-31" } });
+    encerrar();
+    expect(await screen.findByText(ERRO_FIM_NAO_POSTERIOR)).toBeInTheDocument();
+    expect(encerrarLigacao).not.toHaveBeenCalled();
+  });
+
+  it("o erro é ligado ao campo, não solto na janela", async () => {
+    const campo = await abrirEncerramento("2026-01-05");
+    fireEvent.change(campo, { target: { value: "2026-01-05" } });
+    encerrar();
+    await screen.findByText(ERRO_FIM_NAO_POSTERIOR);
+    expect(campo.getAttribute("aria-invalid")).toBe("true");
+    const descrito = campo.getAttribute("aria-describedby") ?? "";
+    const alvo = descrito
+      .split(" ")
+      .map((id) => document.getElementById(id)?.textContent ?? "")
+      .join(" ");
+    expect(alvo).toContain(ERRO_FIM_NAO_POSTERIOR);
+  });
+
+  it("fim POSTERIOR: envia e conclui", async () => {
+    const campo = await abrirEncerramento("2026-01-05");
+    vi.mocked(encerrarLigacao).mockResolvedValue(LIGACAO_VIGENTE as never);
+    fireEvent.change(campo, { target: { value: "2026-11-30" } });
+    encerrar();
+    await waitFor(() =>
+      expect(encerrarLigacao).toHaveBeenCalledWith("l-1", {
+        vigenciaFim: "2026-11-30",
+      }),
+    );
+    expect(await screen.findByText("Registro encerrado.")).toBeInTheDocument();
+  });
+
+  it("conflito REAL do servidor continua tratado como conflito, não como erro de data", async () => {
+    const campo = await abrirEncerramento("2026-01-05");
+    vi.mocked(encerrarLigacao).mockRejectedValue(
+      new ApiError(409, "Conflito ao processar a requisição."),
+    );
+    fireEvent.change(campo, { target: { value: "2026-11-30" } });
+    encerrar();
+    expect(
+      await screen.findByText("Conflito ao processar a requisição."),
+    ).toBeInTheDocument();
+    // A mensagem do servidor não é reescrita como erro de data, e o campo não
+    // é acusado por um conflito que não é dele.
+    expect(screen.queryByText(ERRO_FIM_NAO_POSTERIOR)).toBeNull();
+    expect(campo.getAttribute("aria-invalid")).not.toBe("true");
+  });
+
+  it("a regra vale também para atribuições", async () => {
+    prepararFeliz();
+    vi.mocked(listarAtribuicoes).mockResolvedValue([
+      { ...ATRIBUICAO_VIGENTE, vigenciaInicio: HOJE },
+    ] as never);
+    render(<AdministracaoLiderancaScreen />);
+    await screen.findByText("pessoa.dois@evolli.local");
+    fireEvent.click(screen.getByRole("tab", { name: "Gestores e equipes" }));
+    await screen.findByText("Turno A");
+    fireEvent.click(screen.getByRole("button", { name: "Encerrar" }));
+    await screen.findByRole("dialog");
+    const campo = screen.getByLabelText(/Fim da vigência/) as HTMLInputElement;
+    expect(campo.value).toBe(proximoDiaCivil(HOJE));
+    fireEvent.change(campo, { target: { value: HOJE } });
+    encerrar();
+    expect(await screen.findByText(ERRO_FIM_NAO_POSTERIOR)).toBeInTheDocument();
+    expect(encerrarAtribuicao).not.toHaveBeenCalled();
   });
 });
 
