@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "constitutionVersion": "1.4.0",
   "lastConvergedAt": "2026-10-13",
-  "lastIntegratedTask": 157,
-  "lastRecordedTask": 158,
+  "lastIntegratedTask": 158,
+  "lastRecordedTask": 159,
   "platformDecision": {
     "adr": "docs/adr/0014-evolli-plataforma-base-e-encerramento-do-frappe.md",
     "decidedAt": "2026-10-01",
@@ -11,15 +11,15 @@
     "frappe": "encerrado_como_candidato_referencia_apenas"
   },
   "nextTask": {
-    "id": "T158",
-    "status": "ciclo_vida_estrutura_organizacional_interface",
-    "reason": "T157 integrada em main pela PR #149 (squash 99e3363fd3e2a24e071a5fb240db9cf479713678), com a CI de main 3/3 verde. A T158 entrega na interface web as acoes de INATIVAR e REATIVAR dos cadastros organizacionais que ja possuem rota, RBAC e E2E no backend desde as T104-T109. A T156 registrou a lacuna: existem rotas de inativacao e reativacao para as entidades organizacionais e nenhuma tela as expoe, de modo que o RH enxerga o filtro de inativos sem conseguir colocar ou retirar registro desse estado. Escopo: somente apps/web. Nao altera backend, Prisma, migrations, seed, RBAC, contratos HTTP, dependencias ou lockfile. Exclusao fisica continua fora da interface, e nao existe rota DELETE no produto. Fora de escopo: acoes em massa, paginacao geral das telas existentes (dividao L3, registrada e nao resolvida aqui), excecoes de acesso do gestor, ESS, ferias, ponto, folha, eSocial e catalogo de motivos de desligamento. Continuam pendentes e nao iniciados: resumo de jornada (DP-3J-12) e andamento de solicitacoes (PD-SOL-05). As ressalvas R-A, R-B e R-C da T157 seguem abertas e nao sao tratadas aqui."
+    "id": "T159",
+    "status": "navegacao_modular_funcional",
+    "reason": "T158 integrada em main pela PR #150 (squash 3755ae251509553608accabddf3141ad785e7431), com a CI de main 3/3 verde. A T159 reorganiza a NAVEGACAO GLOBAL do Evolli em modulos e submenus coerentes com a capacidade que de fato existe, usando a matriz da T156 como inventario e a referencia de mercado apenas como inspiracao de arquitetura de informacao. Preserva integralmente identidade visual, tokens, padrao B e linguagem do Evolli; nao copia marca, texto, codigo, icone, tela ou identidade de terceiros. A regra que governa a tarefa: menu nao promete capacidade que nao existe. Item demonstrativo nao convive com capacidade operacional como se fosse equivalente, e item bloqueado por decisao, LGPD, CLT ou contrato pendente nao entra como funcionalidade disponivel. Escopo: apps/web, no shell de navegacao. Nao altera regra de negocio, RBAC, API, backend, Prisma, migrations, seed, Docker, dependencias ou lockfile, e so toca tela interna no estritamente necessario para preservar roteamento, titulo, foco ou navegacao. A entrada direta do gestor em Minha equipe e preservada e nao pode disparar rota proibida nem 403 na inicializacao. A dividas L3 de paginacao nao e iniciada nem declarada resolvida. Seguem abertas e intocadas: S-1, S-2, S-3 e S-4 da T158, R-A, R-B e R-C da T157, e o registro teste michell do banco de demonstracao."
   },
   "openDeliveries": [
     {
-      "id": "T158",
+      "id": "T159",
       "pullRequest": null,
-      "status": "ciclo_vida_estrutura_em_implementacao"
+      "status": "navegacao_modular_em_implementacao"
     }
   ],
   "requiredArtifacts": [

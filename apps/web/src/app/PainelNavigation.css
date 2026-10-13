@@ -1,37 +1,169 @@
 /**
- * PainelNavigation (T044) — só tokens já existentes (tokens.css); sem hex
- * novo, sem sombra, sem gradiente. Uma única lista de botões: em telas largas
- * vira uma coluna lateral; em telas estreitas vira uma faixa horizontal com
- * rolagem própria e contida (mesma técnica já usada pelo `DataTable`).
+ * PainelNavigation — só tokens de `tokens.css`; sem hex novo, sem sombra, sem
+ * gradiente, nenhuma cor amostrada de produto de terceiro
+ * (`docs/decisions/t159-direcao-visual-navegacao.md`).
+ *
+ * A hierarquia é construída por quatro meios somados, nunca por cor sozinha:
+ *
+ *  - **espaço**: módulo respira; submenu é indentado e guiado por um filete;
+ *  - **peso**: módulo em peso forte, submenu em caixa menor e peso normal;
+ *  - **superfície**: o item ativo troca de fundo;
+ *  - **forma**: o item ativo ganha uma barra indicadora sólida.
+ *
+ * Em cima disso, `aria-current="page"` carrega o mesmo sinal na semântica.
  */
 
 .painel-nav {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-lg);
+  min-height: 0;
+}
+
+.painel-nav__modulos {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Demonstração desce para o pé da barra e se separa por um filete. A
+   distância é informação: o que não é capacidade não divide faixa com o que
+   é. */
+.painel-nav__modulos--secundario {
+  margin-top: auto;
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--divider-soft);
+}
+
+.painel-nav__modulo {
+  margin: 0;
+}
+
+/* Base comum do item de módulo (destino único) e do cabeçalho expansível. */
+.painel-nav__destino,
+.painel-nav__cabecalho {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  min-height: var(--touch-target);
+  padding: var(--space-xs) var(--space-sm) var(--space-xs) var(--space-md);
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-ink-muted);
+  font: inherit;
+  font-size: var(--text-ui);
+  font-weight: var(--weight-regular);
+  text-align: left;
+  cursor: pointer;
+}
+
+.painel-nav__destino:hover,
+.painel-nav__cabecalho:hover {
+  background: var(--surface-neutral);
+  color: var(--color-ink);
+}
+
+.painel-nav__icone {
   flex: 0 0 auto;
-  width: 220px;
-}
-
-/* Direção B (T142): grupos com rótulo, para separar operação de consulta e
-   administração sem mudar destino nem ordem. */
-.painel-nav__grupo + .painel-nav__grupo {
-  margin-top: var(--space-md);
-}
-
-.painel-nav__grupo-titulo {
-  margin: 0 0 var(--space-xxs);
-  padding: 0 var(--space-sm);
-  font-size: var(--text-caption);
-  font-weight: var(--weight-strong);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
   color: var(--color-ink-subtle);
 }
 
-.painel-nav__lista {
+.painel-nav__texto {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.painel-nav__rotulo {
+  overflow-wrap: anywhere;
+}
+
+.painel-nav__sub {
+  font-size: var(--text-caption);
+  font-weight: var(--weight-regular);
+  color: var(--color-ink-subtle);
+}
+
+/* Item ativo: superfície + peso + barra indicadora. A barra é a parte que
+   sobrevive a daltonismo, alto contraste forçado e impressão em cinza. */
+.painel-nav__destino--ativo {
+  background: var(--surface-neutral);
+  color: var(--color-ink);
+  font-weight: var(--weight-strong);
+}
+
+.painel-nav__destino--ativo .painel-nav__icone {
+  color: var(--color-action);
+}
+
+.painel-nav__destino--ativo .painel-nav__sub {
+  color: var(--color-ink-muted);
+}
+
+.painel-nav__destino--ativo::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 3px;
+  height: 60%;
+  transform: translateY(-50%);
+  border-radius: var(--radius-pill);
+  background: var(--color-action);
+}
+
+/* Cabeçalho de módulo com submenu fechado que contém o destino ativo: o
+   indicador sobe para o cabeçalho, senão a seleção desapareceria da tela. */
+.painel-nav__cabecalho--contem-ativo {
+  color: var(--color-ink);
+  font-weight: var(--weight-strong);
+}
+
+.painel-nav__cabecalho--contem-ativo::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 3px;
+  height: 60%;
+  transform: translateY(-50%);
+  border-radius: var(--radius-pill);
+  background: var(--color-action);
+}
+
+.painel-nav__seta {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--color-ink-subtle);
+}
+
+.painel-nav__cabecalho[aria-expanded="true"] .painel-nav__seta {
+  transform: rotate(90deg);
+}
+
+/* Região recolhível do módulo: aviso (quando há) e submenu viajam juntos.
+   `hidden` nela tira os dois da árvore de acessibilidade e da tabulação de
+   uma vez — e impede o parágrafo órfão com o módulo fechado (R4). */
+.painel-nav__regiao[hidden] {
+  display: none;
+}
+
+/* Submenu: indentado sob o ícone do módulo e guiado por um filete vertical,
+   para que a subordinação seja visível sem depender de cor. */
+.painel-nav__submenu {
   display: flex;
   flex-direction: column;
-  gap: var(--space-xxs);
-  margin: 0;
-  padding: 0;
+  gap: 2px;
+  margin: 2px 0 var(--space-xs) calc(var(--space-md) + 9px);
+  padding: 0 0 0 var(--space-sm);
+  border-left: 1px solid var(--divider-soft);
   list-style: none;
 }
 
@@ -39,86 +171,44 @@
   margin: 0;
 }
 
-.painel-nav__link {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  width: 100%;
-  min-height: var(--touch-target);
-  padding: var(--space-sm) var(--space-md);
-  border: none;
-  border-left: 3px solid transparent;
+.painel-nav__destino--sub {
+  min-height: 38px;
+  padding: var(--space-xs) var(--space-sm);
   border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--color-ink-muted);
-  font: inherit;
-  font-weight: var(--weight-regular);
-  text-align: left;
-  cursor: pointer;
-}
-
-.painel-nav__link:hover {
-  background: var(--surface-canvas);
-}
-
-/* Item ativo: nunca só cor — soma peso de fonte, fundo e uma barra lateral
-   sólida (forma), além do sinal semântico `aria-current="page"`. */
-.painel-nav__link--ativo {
-  border-left-color: var(--color-action);
-  background: var(--surface-canvas);
-  color: var(--color-ink);
-  font-weight: var(--weight-strong);
-}
-
-.painel-nav__link-grupo {
   font-size: var(--text-caption);
 }
 
-.painel-nav__link-sub {
+/* No submenu o indicador substitui o filete no trecho do item ativo. */
+.painel-nav__destino--sub.painel-nav__destino--ativo::before {
+  left: calc(-1 * var(--space-sm) - 2px);
+  width: 2px;
+  height: 100%;
+}
+
+/* Aviso do grupo Demonstração: texto, não só estilo. Fica acima da lista e é
+   associado a ela por `aria-describedby`, então quem usa leitor de tela ouve
+   a ressalva ao entrar no grupo. */
+.painel-nav__descricao {
+  margin: var(--space-xxs) 0 var(--space-xs);
+  padding: 0 var(--space-sm) 0 calc(var(--space-md) + 9px);
   font-size: var(--text-caption);
+  line-height: var(--leading-body);
   color: var(--color-ink-subtle);
 }
 
-.painel-nav__link--ativo .painel-nav__link-sub {
-  color: var(--color-ink-muted);
+/* O grupo secundário é mais discreto — sem deixar de passar contraste AA. */
+.painel-nav__modulos--secundario .painel-nav__cabecalho,
+.painel-nav__modulos--secundario .painel-nav__destino {
+  color: var(--color-ink-subtle);
 }
 
-/* A partir daqui a navegação vira uma faixa horizontal com rolagem própria
-   (nunca a rolagem da página inteira — mesmo princípio do `DataTable`). */
-@media (max-width: 834px) {
-  .painel-nav {
-    width: 100%;
-    overflow-x: auto;
-    border-bottom: 1px solid var(--hairline);
-    background: var(--surface-canvas);
-  }
+.painel-nav__modulos--secundario .painel-nav__destino--ativo,
+.painel-nav__modulos--secundario .painel-nav__cabecalho--contem-ativo {
+  color: var(--color-ink);
+}
 
-  .painel-nav__lista {
-    flex-direction: row;
-    gap: var(--space-xs);
-    padding: var(--space-xs) clamp(var(--space-md), 4vw, var(--space-xl));
-  }
-
-  .painel-nav__item {
-    flex: 0 0 auto;
-  }
-
-  .painel-nav__link {
-    flex-direction: row;
-    align-items: center;
-    width: auto;
-    white-space: nowrap;
-    border-left: none;
-    border-bottom: 3px solid transparent;
-    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-  }
-
-  .painel-nav__link--ativo {
-    border-left-color: transparent;
-    border-bottom-color: var(--color-action);
-  }
-
-  .painel-nav__link-grupo::after {
-    content: " ";
+@media (prefers-reduced-motion: no-preference) {
+  .painel-nav__seta {
+    transition: transform 140ms ease;
   }
 }

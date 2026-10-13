@@ -51,9 +51,11 @@
  * `cadastrosTituloId`/`pessoasTituloId`/`pontoTituloId`/`documentosTituloId`/`portalTituloId`/`relatoriosTituloId`
  * — os demais destinos continuam usando o mapa estático `TITULO_ID_POR_DESTINO`.
  */
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import "./tokens.css";
 import "./app-shell.css";
+import { ROTULO_PAPEL } from "../api/usersClient";
+import { MarcaEvolli } from "./IconeModulo";
 import { SessoesAtivasPanel } from "./SessoesAtivasPanel";
 import { SegurancaMfaPanel } from "./SegurancaMfaPanel";
 import {
@@ -62,16 +64,11 @@ import {
   CONTAS_ACESSO_TITULO_ID,
   ContasAcessoScreen,
 } from "../screens/administracao";
-import { PAPEIS_COM_ADMINISTRACAO_DE_LIDERANCA } from "../api/gestorAdminClient";
 import {
   DOCUMENTOS_METADADOS_TITULO_ID,
   DocumentosScreen,
 } from "../screens/documentos";
-import {
-  EQUIPE_TITULO_ID,
-  EquipeScreen,
-  PAPEIS_COM_CONSULTA_DE_EQUIPE,
-} from "../screens/equipe";
+import { EQUIPE_TITULO_ID, EquipeScreen } from "../screens/equipe";
 import { CadastrosScreen, HORARIOS_TITULO_ID } from "../screens/horarios";
 import { InicioVisaoGeralScreen } from "../screens/inicio";
 import { COLABORADORES_TITULO_ID, PessoasScreen } from "../screens/pessoas";
@@ -85,7 +82,8 @@ import {
 } from "../screens/relatorios";
 import { CentralSolicitacoesRHScreen } from "../screens/solicitacoes-rh/CentralSolicitacoesRHScreen";
 import { ModuloEmPreparacao } from "./ModuloEmPreparacao";
-import { DESTINOS_PAINEL, PainelNavigation } from "./PainelNavigation";
+import { PainelNavigation } from "./PainelNavigation";
+import { destinoInicialPara, destinoPorId } from "./mapaNavegacao";
 
 /** `titleId` do `h1` de cada destino, para `aria-labelledby` do `<main>`.
  * "cadastros", "pessoas", "ponto", "documentos", "portal-colaborador" e
@@ -100,6 +98,100 @@ const TITULO_ID_POR_DESTINO: Record<string, string> = {
   equipe: EQUIPE_TITULO_ID,
   "administracao-lideranca": ADMINISTRACAO_LIDERANCA_TITULO_ID,
 };
+
+/**
+ * Seletor de elemento focável, para prender o foco dentro da gaveta no
+ * mobile. Igual ao do `Modal` (UI-F04) de propósito: duas definições
+ * diferentes de "focável" no mesmo produto divergiriam na primeira exceção.
+ */
+const FOCAVEIS_GAVETA =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/**
+ * Mesmo `max-width` do `app-shell.css`. Declarado uma vez, em um lugar: se o
+ * CSS e o JavaScript discordassem do breakpoint, existiria uma faixa de
+ * largura em que a barra é permanente e o shell ainda se julga em modo
+ * gaveta — que é precisamente o defeito R1.
+ */
+export const CONSULTA_MODO_GAVETA = "(max-width: 834px)";
+
+/**
+ * Atributos que tiram uma região do alcance enquanto a gaveta é modal.
+ *
+ * `inert` corta foco, clique e leitura; `aria-hidden` é a rede para o
+ * navegador que ainda não implementa `inert`. Os dois juntos porque prometer
+ * modalidade e deixar o fundo alcançável é o erro que o `Modal` (UI-F04) já
+ * documenta: afirmar uma coisa e permitir outra.
+ *
+ * Tipado como atributos soltos porque `inert` ainda não existe nos tipos do
+ * React 18 — o atributo é real e os navegadores o respeitam.
+ */
+const FUNDO_INERTE: Record<string, string> = {
+  inert: "",
+  "aria-hidden": "true",
+};
+
+/** `true` enquanto a janela está na faixa em que a barra lateral é gaveta. */
+function avaliarModoGaveta(): boolean {
+  // Sem `matchMedia` o modo gaveta é o padrão: é o que mantém a navegação
+  // alcançável. O CSS continua decidindo o que aparece.
+  return window.matchMedia?.(CONSULTA_MODO_GAVETA)?.matches ?? true;
+}
+
+/**
+ * Acompanha o breakpoint. Reavalia na montagem (entre o primeiro render e o
+ * efeito a janela pode ter mudado) e remove o ouvinte ao desmontar.
+ */
+function useModoGaveta(): boolean {
+  const [modoGaveta, setModoGaveta] = useState(avaliarModoGaveta);
+
+  useEffect(() => {
+    const consulta = window.matchMedia?.(CONSULTA_MODO_GAVETA);
+    if (!consulta) return;
+
+    const reavaliar = () => setModoGaveta(avaliarModoGaveta());
+    reavaliar();
+
+    // Dois sinais, de propósito. `change` é o correto e basta num navegador
+    // comum. `resize` é a rede: em ambiente com viewport emulado (o painel de
+    // prévia deste projeto, entre outros) `matches` muda e o evento `change`
+    // NUNCA chega — medido. Sem a rede, a janela cresceria e o shell
+    // continuaria se julgando em modo gaveta, que é o defeito R1 de novo,
+    // por outro caminho. Reavaliar é idempotente: `setState` com o mesmo
+    // valor não re-renderiza.
+    consulta.addEventListener("change", reavaliar);
+    window.addEventListener("resize", reavaliar);
+    return () => {
+      consulta.removeEventListener("change", reavaliar);
+      window.removeEventListener("resize", reavaliar);
+    };
+  }, []);
+
+  return modoGaveta;
+}
+
+/**
+ * Ícone do botão da gaveta. Três traços — desenho próprio, elementar, sem
+ * conjunto de terceiro (ver `docs/decisions/t159-direcao-visual-navegacao.md`).
+ * `aria-hidden` porque o botão já se chama "Menu" em texto.
+ */
+function IconeMenu() {
+  return (
+    <svg
+      viewBox="0 0 20 20"
+      width="18"
+      height="18"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="M3.5 5.5h13M3.5 10h13M3.5 14.5h13" />
+    </svg>
+  );
+}
 
 function conteudoDoDestino(
   destinoId: string,
@@ -118,11 +210,38 @@ function conteudoDoDestino(
   if (destinoId === "cadastros") {
     return <CadastrosScreen onTituloIdChange={onCadastrosTituloIdChange} />;
   }
+  if (destinoId === "cadastros-demonstracao") {
+    return (
+      <CadastrosScreen
+        modo="demonstrativo"
+        onTituloIdChange={onCadastrosTituloIdChange}
+      />
+    );
+  }
   if (destinoId === "pessoas") {
     return <PessoasScreen onTituloIdChange={onPessoasTituloIdChange} />;
   }
+  // T159 — os destinos `*-demonstracao` reusam o MESMO contêiner, em modo
+  // demonstrativo. Nenhuma tela foi duplicada: o que muda é qual subconjunto
+  // de abas o contêiner lista.
+  if (destinoId === "pessoas-demonstracao") {
+    return (
+      <PessoasScreen
+        modo="demonstrativo"
+        onTituloIdChange={onPessoasTituloIdChange}
+      />
+    );
+  }
   if (destinoId === "ponto") {
     return <PontoScreen onTituloIdChange={onPontoTituloIdChange} />;
+  }
+  if (destinoId === "ponto-demonstracao") {
+    return (
+      <PontoScreen
+        modo="demonstrativo"
+        onTituloIdChange={onPontoTituloIdChange}
+      />
+    );
   }
   if (destinoId === "documentos") {
     return <DocumentosScreen onTituloIdChange={onDocumentosTituloIdChange} />;
@@ -153,7 +272,7 @@ function conteudoDoDestino(
       />
     );
   }
-  const destino = DESTINOS_PAINEL.find((item) => item.id === destinoId);
+  const destino = destinoPorId(destinoId);
   return (
     <ModuloEmPreparacao
       titulo={destino?.label ?? "Módulo"}
@@ -177,25 +296,21 @@ function conteudoDoDestino(
  * byte por byte como antes — esta correção não move `rh`, `dp`,
  * `colaborador` nem `master_tecnico`.
  */
-const DESTINO_INICIAL_POR_PAPEL: Readonly<Record<string, string>> = {
-  gestor: "equipe",
-};
-
-/** Destino padrão, inalterado desde o T044. */
-const DESTINO_PADRAO = "cadastros";
-
 /**
  * Resolve o destino inicial a partir do papel JÁ conhecido.
  *
  * Síncrono de propósito: é usado como inicializador de `useState`, não como
  * efeito. Corrigir o destino depois da montagem produziria exatamente o que
- * esta correção elimina — o flash da tela errada e a requisição que ela
- * dispara antes de ser trocada.
+ * esta regra elimina — o flash da tela errada e a requisição que ela dispara
+ * antes de ser trocada.
+ *
+ * T159: a tabela mudou de lugar, não de natureza. Mora em `mapaNavegacao.ts`,
+ * junto dos destinos, e deixou de ser uma exceção só para `gestor`: cada papel
+ * aterrissa onde o RBAC lhe concede a primeira requisição, e quem não tem
+ * capacidade funcional nenhuma cai em `inicio`, que não chama nada. Antes
+ * disso, seis papéis abriam o produto num 403.
  */
-export function destinoInicialPara(papel: string | null | undefined): string {
-  if (typeof papel !== "string") return DESTINO_PADRAO;
-  return DESTINO_INICIAL_POR_PAPEL[papel] ?? DESTINO_PADRAO;
-}
+export { destinoInicialPara };
 
 export interface AppProps {
   /** Presente só quando há sessão autenticada (ver `AutenticacaoApp`). Sem
@@ -270,56 +385,190 @@ export function App({
     EXCECOES_PONTO_TITULO_ID,
   );
 
+  // Gaveta do mobile. `modoGaveta` é a largura da janela, não a intenção de
+  // quem navega: a gaveta só é modal quando as duas coisas valem.
+  const modoGaveta = useModoGaveta();
+  const [gavetaAberta, setGavetaAberta] = useState(false);
+  const gavetaModal = modoGaveta && gavetaAberta;
+  const botaoMenuRef = useRef<HTMLButtonElement | null>(null);
+  const sidebarRef = useRef<HTMLDivElement | null>(null);
+
+  // R1 — atravessar o breakpoint para o desktop desfaz o estado móvel por
+  // completo: sem gaveta aberta, sem scrim, sem foco preso, sem semântica de
+  // diálogo. Antes disto, girar um tablet de 768 para 1024 com a gaveta
+  // aberta deixava um scrim de página inteira por cima da barra já normal.
+  useEffect(() => {
+    if (modoGaveta) return;
+    setGavetaAberta(false);
+  }, [modoGaveta]);
+
+  /**
+   * S2 — fora do modo gaveta o acionador não mexe em nada.
+   *
+   * O botão existe no DOM em qualquer largura (quem o esconde no desktop é o
+   * CSS), então um acionamento ali é possível por programa, por extensão ou
+   * por teste. Sem esta guarda, `gavetaAberta` ficaria `true` de forma
+   * invisível e a gaveta abriria SOZINHA na primeira vez que a janela
+   * encolhesse — estado móvel latente, nascido no desktop.
+   */
+  const alternarGaveta = useCallback(() => {
+    if (!avaliarModoGaveta()) return;
+    setGavetaAberta((aberta) => !aberta);
+  }, []);
+
+  // Navegar fecha a gaveta — no desktop isto não tem efeito, porque ela já
+  // está fechada. Vale para a barra e para os atalhos da Visão geral.
+  const irPara = useCallback((destinoId: string) => {
+    setDestinoAtivoId(destinoId);
+    setGavetaAberta(false);
+  }, []);
+
+  // Foco preso, `Escape` e devolução de foco — mesma disciplina do `Modal`
+  // (UI-F04). Enquanto a gaveta está aberta ela é a única região alcançável:
+  // deixá-la por cima da página e permitir que o `Tab` fosse para trás seria
+  // afirmar uma coisa e permitir outra.
+  useEffect(() => {
+    if (!gavetaModal) return;
+    const caixa = sidebarRef.current;
+    // Capturado agora, e nao na limpeza: na limpeza o ref ja pode apontar
+    // para outro no (regra react-hooks/exhaustive-deps).
+    const acionador = botaoMenuRef.current;
+
+    function focaveisDaGaveta(): HTMLElement[] {
+      if (!caixa) return [];
+      return [...caixa.querySelectorAll<HTMLElement>(FOCAVEIS_GAVETA)].filter(
+        // `closest` e não `hasAttribute`: o submenu fechado é um `<ul hidden>`
+        // e os botões dentro dele não carregam o atributo.
+        (elemento) => elemento.closest("[hidden]") === null,
+      );
+    }
+
+    focaveisDaGaveta()[0]?.focus();
+
+    function aoTeclar(evento: KeyboardEvent) {
+      if (evento.key === "Escape") {
+        evento.preventDefault();
+        setGavetaAberta(false);
+        return;
+      }
+      if (evento.key !== "Tab" || !caixa) return;
+      const focaveis = focaveisDaGaveta();
+      if (focaveis.length === 0) return;
+      const primeiro = focaveis[0]!;
+      const ultimo = focaveis[focaveis.length - 1]!;
+      const atual = document.activeElement;
+      if (!caixa.contains(atual)) {
+        evento.preventDefault();
+        (evento.shiftKey ? ultimo : primeiro).focus();
+      } else if (evento.shiftKey && atual === primeiro) {
+        evento.preventDefault();
+        ultimo.focus();
+      } else if (!evento.shiftKey && atual === ultimo) {
+        evento.preventDefault();
+        primeiro.focus();
+      }
+    }
+
+    document.addEventListener("keydown", aoTeclar, true);
+    return () => {
+      document.removeEventListener("keydown", aoTeclar, true);
+      // Devolver o foco a quem abriu é certo quando a gaveta FECHA; é
+      // errado quando ela some porque a janela cresceu — ali o acionador
+      // acabou de virar `display: none`, e focá-lo jogaria o foco para o
+      // `body`. A pergunta é feita ao `matchMedia` na hora, e não a um
+      // sinalizador guardado antes: numa mesma renderização a limpeza roda
+      // ANTES do efeito que reagiria ao breakpoint, e o sinalizador chegaria
+      // tarde.
+      if (avaliarModoGaveta() && acionador && document.contains(acionador)) {
+        acionador.focus();
+      }
+    };
+  }, [gavetaModal]);
+
+  const rotuloDoPapel = papelDoAtor ? ROTULO_PAPEL[papelDoAtor] : undefined;
+
   return (
-    <div className="app-shell">
+    <div
+      className={
+        gavetaModal ? "app-shell app-shell--gaveta-aberta" : "app-shell"
+      }
+    >
       <a className="app-shell__skip-link" href="#conteudo-principal">
         Pular para o conteúdo
       </a>
 
-      <header className="app-shell__topbar">
+      <header
+        className="app-shell__topbar"
+        {...(gavetaModal ? FUNDO_INERTE : {})}
+      >
         <div className="app-shell__topbar-inner">
-          <span className="app-shell__brand">Evolli RH</span>
-          <span className="app-shell__brand-tag">Painel Administrativo</span>
-          {onLogout && mfaDisponivel ? (
-            <button
-              type="button"
-              className="app-shell__seguranca"
-              aria-expanded={segurancaAberto}
-              onClick={() => {
-                setSegurancaAberto((aberto) => !aberto);
-                setSessoesAtivasAberto(false);
-              }}
-            >
-              Segurança
-            </button>
-          ) : null}
-          {onLogout ? (
-            <button
-              type="button"
-              className="app-shell__sessoes-ativas"
-              aria-expanded={sessoesAtivasAberto}
-              onClick={() => {
-                setSessoesAtivasAberto((aberto) => !aberto);
-                setSegurancaAberto(false);
-              }}
-            >
-              Sessões ativas
-            </button>
-          ) : null}
-          {onLogout ? (
-            <button
-              type="button"
-              className="app-shell__logout"
-              onClick={onLogout}
-            >
-              Sair
-            </button>
-          ) : null}
+          <button
+            type="button"
+            className="app-shell__menu"
+            ref={botaoMenuRef}
+            aria-expanded={gavetaModal}
+            aria-controls="navegacao-lateral"
+            onClick={alternarGaveta}
+          >
+            <IconeMenu />
+            Menu
+          </button>
+
+          <span className="app-shell__marca-compacta">
+            <MarcaEvolli />
+            <span className="app-shell__marca-nome">Evolli RH</span>
+          </span>
+
+          <div className="app-shell__acoes">
+            {/* Contexto do ator: o papel que o SERVIDOR informou. Nada de
+                menu de conta, foto nem nome inventado — só o que existe. */}
+            {rotuloDoPapel ? (
+              <span className="app-shell__contexto">{rotuloDoPapel}</span>
+            ) : null}
+            {onLogout && mfaDisponivel ? (
+              <button
+                type="button"
+                className="app-shell__seguranca"
+                aria-expanded={segurancaAberto}
+                onClick={() => {
+                  setSegurancaAberto((aberto) => !aberto);
+                  setSessoesAtivasAberto(false);
+                }}
+              >
+                Segurança
+              </button>
+            ) : null}
+            {onLogout ? (
+              <button
+                type="button"
+                className="app-shell__sessoes-ativas"
+                aria-expanded={sessoesAtivasAberto}
+                onClick={() => {
+                  setSessoesAtivasAberto((aberto) => !aberto);
+                  setSegurancaAberto(false);
+                }}
+              >
+                Sessões ativas
+              </button>
+            ) : null}
+            {onLogout ? (
+              <button
+                type="button"
+                className="app-shell__logout"
+                onClick={onLogout}
+              >
+                Sair
+              </button>
+            ) : null}
+          </div>
         </div>
       </header>
 
       {onLogout && mfaDisponivel && segurancaAberto ? (
-        <div className="app-shell__sessoes-ativas-wrapper">
+        <div
+          className="app-shell__sessoes-ativas-wrapper"
+          {...(gavetaModal ? FUNDO_INERTE : {})}
+        >
           <SegurancaMfaPanel
             aberto={segurancaAberto}
             onFechar={() => setSegurancaAberto(false)}
@@ -329,7 +578,10 @@ export function App({
       ) : null}
 
       {onLogout && sessoesAtivasAberto ? (
-        <div className="app-shell__sessoes-ativas-wrapper">
+        <div
+          className="app-shell__sessoes-ativas-wrapper"
+          {...(gavetaModal ? FUNDO_INERTE : {})}
+        >
           <SessoesAtivasPanel
             aberto={sessoesAtivasAberto}
             onFechar={() => setSessoesAtivasAberto(false)}
@@ -339,23 +591,57 @@ export function App({
       ) : null}
 
       <div className="app-shell__body">
-        <PainelNavigation
-          destinoAtivoId={destinoAtivoId}
-          onSelecionar={setDestinoAtivoId}
-          destinosCondicionais={{
-            equipe:
-              papelDoAtor !== null &&
-              PAPEIS_COM_CONSULTA_DE_EQUIPE.includes(papelDoAtor),
-            "administracao-lideranca":
-              papelDoAtor !== null &&
-              PAPEIS_COM_ADMINISTRACAO_DE_LIDERANCA.includes(papelDoAtor),
-          }}
-        />
+        {gavetaModal ? (
+          <button
+            type="button"
+            className="app-shell__fundo-gaveta"
+            aria-label="Fechar menu"
+            onClick={() => setGavetaAberta(false)}
+          />
+        ) : null}
+
+        {/* R3 — a semântica de diálogo existe SÓ enquanto a gaveta é modal.
+            No desktop este mesmo nó é a barra lateral permanente, e anunciar
+            uma barra permanente como janela modal seria mentir para quem usa
+            leitor de tela. */}
+        <div
+          className="app-shell__sidebar"
+          id="navegacao-lateral"
+          ref={sidebarRef}
+          {...(gavetaModal
+            ? {
+                role: "dialog",
+                "aria-modal": true,
+                "aria-label": "Menu de navegação",
+              }
+            : {})}
+        >
+          <span className="app-shell__marca">
+            <MarcaEvolli />
+            <span className="app-shell__marca-texto">
+              <span className="app-shell__marca-nome">Evolli RH</span>
+              <span className="app-shell__marca-tag">
+                Painel Administrativo
+              </span>
+            </span>
+          </span>
+
+          {/* T159 — o shell passa o papel e a navegação decide sozinha quais
+              destinos condicionados oferecer, lendo os papéis declarados no
+              mapa. Antes a lista de capacidades era remontada aqui, longe dos
+              destinos, e já havia divergido deles. */}
+          <PainelNavigation
+            destinoAtivoId={destinoAtivoId}
+            onSelecionar={irPara}
+            papel={papelDoAtor}
+          />
+        </div>
 
         <main
           id="conteudo-principal"
           className="app-shell__main"
           tabIndex={-1}
+          {...(gavetaModal ? FUNDO_INERTE : {})}
           aria-labelledby={
             destinoAtivoId === "cadastros"
               ? cadastrosTituloId
@@ -375,7 +661,7 @@ export function App({
         >
           {conteudoDoDestino(
             destinoAtivoId,
-            setDestinoAtivoId,
+            irPara,
             setCadastrosTituloId,
             setPessoasTituloId,
             setPontoTituloId,
@@ -387,10 +673,12 @@ export function App({
         </main>
       </div>
 
-      <footer className="app-shell__footer">
+      <footer
+        className="app-shell__footer"
+        {...(gavetaModal ? FUNDO_INERTE : {})}
+      >
         <div className="app-shell__footer-inner">
           <span className="app-shell__footer-brand">Evolli RH</span>
-          <span>Painel Administrativo — fundação visual</span>
           <span>Ambiente interno · sem dados reais</span>
         </div>
       </footer>

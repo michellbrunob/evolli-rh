@@ -1254,6 +1254,47 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
     - **Pendências preservadas:** `DP-3J-12` e `PD-SOL-05` seguem não iniciados; as
       ressalvas R-A, R-B e R-C da T157 continuam abertas e não são tratadas aqui.
 
+56. **T159 - Reorganização funcional da navegação e menus**
+    - **Estado:** em implementação. Branch `codex/t159-navegacao-modular-funcional`, a
+      partir do squash `3755ae251509553608accabddf3141ad785e7431` (T158, PR #150).
+    - **Objetivo:** reorganizar a navegação global em módulos e submenus coerentes com a
+      capacidade que de fato existe, usando a matriz da T156 como inventário e a referência
+      de mercado apenas como inspiração de arquitetura de informação.
+    - **Princípio:** menu é promessa. Item demonstrativo não convive com capacidade
+      operacional como se fosse equivalente, e item bloqueado por decisão, LGPD, CLT ou
+      contrato pendente não entra como funcionalidade disponível.
+    - **Inventário obrigatório antes do código:** cada destino classificado a partir da
+      fonte — tela, origem dos dados (API real ou fixture), permissão exigida e estado.
+      Onde documento e código divergirem, vale o código; a divergência é registrada, e a
+      tarefa para se ela impedir classificar algum destino.
+    - **Evolução visual aprovada (13/10/2026, após a primeira prévia):** o proprietário
+      autorizou recompor o shell e os menus — barra lateral branca e espaçosa com a marca
+      própria, módulos com ícone SVG original, hierarquia entre módulo/submenu/destino
+      ativo por superfície, borda indicadora, peso e espaço, grupo Demonstração ao pé da
+      barra e cabeçalho só com ações que existem. Registro e limites em
+      [`docs/decisions/t159-direcao-visual-navegacao.md`](../docs/decisions/t159-direcao-visual-navegacao.md).
+      A referência de mercado entra **apenas** como princípio de arquitetura e composição.
+    - **Limite obrigatório:** sem copiar marca, logotipo, texto, foto, ilustração, ícone
+      proprietário, paleta exata, código ou layout pixel a pixel de terceiros; sem alterar
+      escopo funcional, regra de negócio, RBAC, rotas, API, backend, Prisma, migrations,
+      seed, Docker, dependências ou lockfile. Tela interna só muda no estritamente
+      necessário para preservar roteamento, título, foco ou navegação.
+    - **Tela de login:** fica para fatia própria futura — painel institucional original
+      mais autenticação, sem CPF, captcha, cadastro, registro de ponto ou recuperação de
+      senha enquanto não houver contrato funcional para cada um deles.
+    - **Preservações duras:** a entrada direta do gestor em "Minha equipe" continua
+      funcionando e não dispara rota proibida nem 403 na inicialização; os destinos de RH,
+      DP, financeiro, colaborador e `master_tecnico` seguem respeitando as permissões reais.
+    - **Acessibilidade:** sidebar recolhível e gaveta mobile seguem acessíveis; grupo e
+      destino ativos com nome acessível, foco visível e teclado coerente; um `h1` por
+      workspace; sem rolagem horizontal em desktop e em 375 px.
+    - **Aceite:** testes de mapa de navegação por papel, visibilidade por capacidade,
+      destino inicial do gestor, ausência de chamada proibida na inicialização, preservação
+      dos destinos funcionais, gaveta mobile e foco por teclado, e garantia de que destino
+      demonstrativo não se apresenta como funcional.
+    - **Dívida preservada:** L3 não é iniciada nem declarada resolvida. Seguem abertas S-1 a
+      S-4 (T158), R-A, R-B e R-C (T157) e o registro `teste michell`.
+
 ## Regra obrigatória para as próximas tarefas
 
 1. Criar ou atualizar a entrada da tarefa neste arquivo antes da implementação.

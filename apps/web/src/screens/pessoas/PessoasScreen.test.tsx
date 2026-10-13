@@ -2,7 +2,18 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { PessoasScreen } from "./PessoasScreen";
 
-describe("PessoasScreen — abas locais 'Colaboradores' / 'Horário de trabalho' / 'Histórico funcional' / 'Dados contratuais' / 'Documentos' / 'Solicitações' / 'Benefícios' / 'Dependentes' / 'Afastamentos' (T072/T088/T089/T090/T091/T092/T093/T094)", () => {
+/**
+ * PessoasScreen — contêiner de abas (T072…T094, separado por modo na T159).
+ *
+ * A T159 dividiu as abas por ESTADO: o modo `funcional` (padrão) lista só as
+ * seis que falam com o servidor; o modo `demonstrativo` lista as três de
+ * exemplo, alcançáveis pelo grupo Demonstração da navegação.
+ *
+ * Nenhuma tela foi removida, e nenhuma deixou de ser testada: os casos das
+ * abas demonstrativas continuam aqui, exercitados no modo em que elas vivem.
+ * O que some é a mistura — e há teste explícito provando que ela sumiu.
+ */
+describe("PessoasScreen — modo funcional (T072/T088/T089/T090/T091)", () => {
   it("mostra 'Colaboradores' por padrão, com h1 único", () => {
     render(<PessoasScreen />);
 
@@ -12,57 +23,39 @@ describe("PessoasScreen — abas locais 'Colaboradores' / 'Horário de trabalho'
     ).toBeInTheDocument();
   });
 
-  it("expõe as nove abas com role='tab' e aria-selected correto por padrão", () => {
+  it("expõe as seis abas funcionais, com aria-selected correto por padrão", () => {
     render(<PessoasScreen />);
 
     const tablist = screen.getByRole("tablist", { name: "Seções de Pessoas" });
     expect(tablist).toBeInTheDocument();
 
-    const abaColaboradores = screen.getByRole("tab", {
-      name: "Colaboradores",
-    });
-    const abaHorario = screen.getByRole("tab", {
-      name: "Horário de trabalho",
-    });
-    const abaHistoricoFuncional = screen.getByRole("tab", {
-      name: "Histórico funcional",
-    });
-    const abaDadosContratuais = screen.getByRole("tab", {
-      name: "Dados contratuais",
-    });
-    const abaDocumentos = screen.getByRole("tab", {
-      name: "Documentos",
-    });
-    const abaSolicitacoes = screen.getByRole("tab", {
-      name: "Solicitações",
-    });
-    const abaBeneficios = screen.getByRole("tab", {
-      name: "Benefícios",
-    });
-    const abaDependentes = screen.getByRole("tab", {
-      name: "Dependentes",
-    });
-    const abaAfastamentos = screen.getByRole("tab", {
-      name: "Afastamentos",
-    });
-    expect(abaColaboradores).toHaveAttribute("aria-selected", "true");
-    expect(abaHorario).toHaveAttribute("aria-selected", "false");
-    expect(abaHistoricoFuncional).toHaveAttribute("aria-selected", "false");
-    expect(abaDadosContratuais).toHaveAttribute("aria-selected", "false");
-    expect(abaDocumentos).toHaveAttribute("aria-selected", "false");
-    expect(abaSolicitacoes).toHaveAttribute("aria-selected", "false");
-    expect(abaBeneficios).toHaveAttribute("aria-selected", "false");
-    expect(abaDependentes).toHaveAttribute("aria-selected", "false");
-    expect(abaAfastamentos).toHaveAttribute("aria-selected", "false");
-    expect(abaColaboradores.tagName).toBe("BUTTON");
-    expect(abaHorario.tagName).toBe("BUTTON");
-    expect(abaHistoricoFuncional.tagName).toBe("BUTTON");
-    expect(abaDadosContratuais.tagName).toBe("BUTTON");
-    expect(abaDocumentos.tagName).toBe("BUTTON");
-    expect(abaSolicitacoes.tagName).toBe("BUTTON");
-    expect(abaBeneficios.tagName).toBe("BUTTON");
-    expect(abaDependentes.tagName).toBe("BUTTON");
-    expect(abaAfastamentos.tagName).toBe("BUTTON");
+    const esperadas = [
+      "Colaboradores",
+      "Horário de trabalho",
+      "Histórico funcional",
+      "Dados contratuais",
+      "Documentos",
+      "Solicitações",
+    ];
+    const abas = screen.getAllByRole("tab");
+    expect(abas.map((a) => a.textContent)).toEqual(esperadas);
+
+    for (const aba of abas) {
+      expect(aba.tagName).toBe("BUTTON");
+      expect(aba).toHaveAttribute(
+        "aria-selected",
+        aba.textContent === "Colaboradores" ? "true" : "false",
+      );
+    }
+  });
+
+  it("NÃO oferece nenhuma aba demonstrativa — nem desabilitada, nem oculta", () => {
+    render(<PessoasScreen />);
+    for (const demonstrativa of ["Benefícios", "Dependentes", "Afastamentos"]) {
+      expect(screen.queryByRole("tab", { name: demonstrativa })).toBeNull();
+    }
+    // E o conteúdo delas também não é montado: nenhuma tabela de exemplo.
+    expect(screen.queryByText(/\(exemplo\)/)).toBeNull();
   });
 
   it("troca para 'Horário de trabalho' ao clicar na aba — preservado sem regressão (T112)", () => {
@@ -188,7 +181,12 @@ describe("PessoasScreen — abas locais 'Colaboradores' / 'Horário de trabalho'
 
   it("troca para 'Benefícios' ao clicar na aba, com h1 único e informa o titleId", () => {
     const onTituloIdChange = vi.fn();
-    render(<PessoasScreen onTituloIdChange={onTituloIdChange} />);
+    render(
+      <PessoasScreen
+        modo="demonstrativo"
+        onTituloIdChange={onTituloIdChange}
+      />,
+    );
 
     fireEvent.click(screen.getByRole("tab", { name: "Benefícios" }));
 
@@ -204,7 +202,7 @@ describe("PessoasScreen — abas locais 'Colaboradores' / 'Horário de trabalho'
       "aria-selected",
       "true",
     );
-    expect(screen.getByRole("tab", { name: "Colaboradores" })).toHaveAttribute(
+    expect(screen.getByRole("tab", { name: "Dependentes" })).toHaveAttribute(
       "aria-selected",
       "false",
     );
@@ -213,7 +211,12 @@ describe("PessoasScreen — abas locais 'Colaboradores' / 'Horário de trabalho'
 
   it("troca para 'Dependentes' ao clicar na aba, com h1 único e informa o titleId", () => {
     const onTituloIdChange = vi.fn();
-    render(<PessoasScreen onTituloIdChange={onTituloIdChange} />);
+    render(
+      <PessoasScreen
+        modo="demonstrativo"
+        onTituloIdChange={onTituloIdChange}
+      />,
+    );
 
     fireEvent.click(screen.getByRole("tab", { name: "Dependentes" }));
 
@@ -229,7 +232,7 @@ describe("PessoasScreen — abas locais 'Colaboradores' / 'Horário de trabalho'
       "aria-selected",
       "true",
     );
-    expect(screen.getByRole("tab", { name: "Colaboradores" })).toHaveAttribute(
+    expect(screen.getByRole("tab", { name: "Benefícios" })).toHaveAttribute(
       "aria-selected",
       "false",
     );
@@ -238,7 +241,12 @@ describe("PessoasScreen — abas locais 'Colaboradores' / 'Horário de trabalho'
 
   it("troca para 'Afastamentos' ao clicar na aba, com h1 único e informa o titleId", () => {
     const onTituloIdChange = vi.fn();
-    render(<PessoasScreen onTituloIdChange={onTituloIdChange} />);
+    render(
+      <PessoasScreen
+        modo="demonstrativo"
+        onTituloIdChange={onTituloIdChange}
+      />,
+    );
 
     fireEvent.click(screen.getByRole("tab", { name: "Afastamentos" }));
 
@@ -254,7 +262,7 @@ describe("PessoasScreen — abas locais 'Colaboradores' / 'Horário de trabalho'
       "aria-selected",
       "true",
     );
-    expect(screen.getByRole("tab", { name: "Colaboradores" })).toHaveAttribute(
+    expect(screen.getByRole("tab", { name: "Benefícios" })).toHaveAttribute(
       "aria-selected",
       "false",
     );
@@ -305,17 +313,18 @@ describe("PessoasScreen — abas locais 'Colaboradores' / 'Horário de trabalho'
     expect(h1.id).toBe("pessoas-horario-titulo");
   });
 
-  it("não referencia autenticação, sessão, CPF, dinheiro ou dado real em nenhuma das abas", () => {
+  it("não referencia autenticação, sessão, CPF, dinheiro ou dado real", () => {
     render(<PessoasScreen />);
-    fireEvent.click(screen.getByRole("tab", { name: "Horário de trabalho" }));
-    fireEvent.click(screen.getByRole("tab", { name: "Histórico funcional" }));
-    fireEvent.click(screen.getByRole("tab", { name: "Dados contratuais" }));
-    fireEvent.click(screen.getByRole("tab", { name: "Documentos" }));
-    fireEvent.click(screen.getByRole("tab", { name: "Solicitações" }));
-    fireEvent.click(screen.getByRole("tab", { name: "Benefícios" }));
-    fireEvent.click(screen.getByRole("tab", { name: "Dependentes" }));
-    fireEvent.click(screen.getByRole("tab", { name: "Afastamentos" }));
-    fireEvent.click(screen.getByRole("tab", { name: "Colaboradores" }));
+    for (const aba of [
+      "Horário de trabalho",
+      "Histórico funcional",
+      "Dados contratuais",
+      "Documentos",
+      "Solicitações",
+      "Colaboradores",
+    ]) {
+      fireEvent.click(screen.getByRole("tab", { name: aba }));
+    }
 
     const texto = document.body.innerHTML.toLowerCase();
     for (const termoProibido of [
@@ -328,6 +337,74 @@ describe("PessoasScreen — abas locais 'Colaboradores' / 'Horário de trabalho'
       "sessão",
     ]) {
       expect(texto).not.toContain(termoProibido);
+    }
+  });
+});
+
+describe("PessoasScreen — modo demonstrativo (T092/T093/T094)", () => {
+  it("abre em 'Benefícios' e lista só as três abas de exemplo", () => {
+    render(<PessoasScreen modo="demonstrativo" />);
+
+    expect(screen.getAllByRole("tab").map((a) => a.textContent)).toEqual([
+      "Benefícios",
+      "Dependentes",
+      "Afastamentos",
+    ]);
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Benefícios" }),
+    ).toBeInTheDocument();
+  });
+
+  it("NÃO oferece nenhuma aba funcional", () => {
+    render(<PessoasScreen modo="demonstrativo" />);
+    for (const funcional of [
+      "Colaboradores",
+      "Horário de trabalho",
+      "Histórico funcional",
+      "Dados contratuais",
+      "Documentos",
+      "Solicitações",
+    ]) {
+      expect(screen.queryByRole("tab", { name: funcional })).toBeNull();
+    }
+  });
+
+  it("não referencia autenticação, sessão, empresa, fornecedor nem dado real", () => {
+    // `login` é o ÚNICO termo fora desta lista, e por um motivo verificado:
+    // as três telas o usam dentro da própria negação — "Não há login, API,
+    // persistência…". Proibi-lo reprovaria o aviso que torna a tela honesta,
+    // e há teste exigindo que toda ocorrência esteja nessa negação
+    // (`superficiesDemonstrativas.test.tsx`).
+    //
+    // `senha` e `sessão` NÃO têm essa desculpa: nenhuma das três os contém.
+    // Uma versão anterior da T159 os tirou daqui junto com `login`, como se
+    // o mesmo motivo valesse para os três. Não valia.
+    render(<PessoasScreen modo="demonstrativo" />);
+    for (const aba of ["Dependentes", "Afastamentos", "Benefícios"]) {
+      fireEvent.click(screen.getByRole("tab", { name: aba }));
+    }
+
+    const texto = document.body.innerHTML.toLowerCase();
+    for (const termoProibido of [
+      "reserva fiscal",
+      "secullum",
+      "rwtech",
+      "bioprox",
+      "senha",
+      "sessão",
+    ]) {
+      expect(texto).not.toContain(termoProibido);
+    }
+  });
+
+  it("cada aba de exemplo declara, ela mesma, que não persiste nada", () => {
+    render(<PessoasScreen modo="demonstrativo" />);
+    for (const aba of ["Benefícios", "Dependentes", "Afastamentos"]) {
+      fireEvent.click(screen.getByRole("tab", { name: aba }));
+      expect(
+        screen.getAllByText(/demonstraç|exemplo|ilustrativ/i).length,
+      ).toBeGreaterThan(0);
     }
   });
 });

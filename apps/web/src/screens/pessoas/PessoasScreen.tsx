@@ -22,6 +22,7 @@
  * sólida (mesmo princípio do `PainelNavigation`/`StatusBadge`).
  */
 import { useEffect, useState } from "react";
+import type { EstadoDestino } from "../../app/mapaNavegacao";
 import {
   AFASTAMENTOS_TITULO_ID,
   AfastamentosScreen,
@@ -70,6 +71,8 @@ type AbaPessoas =
 interface AbaDefinicao {
   readonly id: AbaPessoas;
   readonly rotulo: string;
+  /** T159 — funcional fala com a API; demonstrativo lê fixtures. */
+  readonly estado: EstadoDestino;
   readonly tituloId: string;
 }
 
@@ -78,60 +81,88 @@ const ABAS: readonly AbaDefinicao[] = [
     id: "colaboradores",
     rotulo: "Colaboradores",
     tituloId: COLABORADORES_TITULO_ID,
+    estado: "funcional",
   },
   {
     id: "horario",
     rotulo: "Horário de trabalho",
     tituloId: PESSOAS_HORARIO_TITULO_ID,
+    estado: "funcional",
   },
   {
     id: "historico_funcional",
     rotulo: "Histórico funcional",
     tituloId: HISTORICO_FUNCIONAL_TITULO_ID,
+    estado: "funcional",
   },
   {
     id: "dados_contratuais",
     rotulo: "Dados contratuais",
     tituloId: DADOS_CONTRATUAIS_TITULO_ID,
+    estado: "funcional",
   },
   {
     id: "documentos",
     rotulo: "Documentos",
     tituloId: PESSOAS_DOCUMENTOS_TITULO_ID,
+    estado: "funcional",
   },
   {
     id: "solicitacoes",
     rotulo: "Solicitações",
     tituloId: SOLICITACOES_TITULO_ID,
+    estado: "funcional",
   },
   {
     id: "beneficios",
     rotulo: "Benefícios",
     tituloId: BENEFICIOS_TITULO_ID,
+    estado: "demonstrativo",
   },
   {
     id: "dependentes",
     rotulo: "Dependentes",
     tituloId: DEPENDENTES_TITULO_ID,
+    estado: "demonstrativo",
   },
   {
     id: "afastamentos",
     rotulo: "Afastamentos",
     tituloId: AFASTAMENTOS_TITULO_ID,
+    estado: "demonstrativo",
   },
 ];
 
 export interface PessoasScreenProps {
+  /**
+   * T159 — quais abas este contêiner mostra.
+   *
+   * `funcional` lista só as abas que falam com o servidor; `demonstrativo`,
+   * só as de exemplo. A separação é de arquitetura de informação: nenhuma
+   * tela mudou, e nenhuma deixou de ser alcançável — as demonstrativas vivem
+   * no grupo Demonstração da navegação, nomeado como tal.
+   *
+   * O padrão é `funcional`: quem renderizar este contêiner sem dizer o modo
+   * recebe a navegação primária, nunca a maquete.
+   */
+  modo?: EstadoDestino;
   /** Informa o `id` do `h1` atualmente visível, para o shell rotular o
    * `<main>` (`aria-labelledby`) mesmo quando a aba muda sem trocar de
    * destino. Não é navegação real — só sincroniza o rótulo de acessibilidade. */
   onTituloIdChange?: (tituloId: string) => void;
 }
 
-export function PessoasScreen({ onTituloIdChange }: PessoasScreenProps) {
-  const [abaAtiva, setAbaAtiva] = useState<AbaPessoas>("colaboradores");
+export function PessoasScreen({
+  onTituloIdChange,
+  modo = "funcional",
+}: PessoasScreenProps) {
+  // Só as abas do modo. `ABAS` continua sendo a fonte única; o filtro é
+  // de apresentação, e a primeira aba do conjunto vira o padrão — assim
+  // o contêiner nunca abre numa aba que ele mesmo não lista.
+  const abas = ABAS.filter((aba) => aba.estado === modo);
+  const [abaAtiva, setAbaAtiva] = useState<AbaPessoas>(abas[0]!.id);
 
-  const definicaoAtiva = ABAS.find((aba) => aba.id === abaAtiva) ?? ABAS[0]!;
+  const definicaoAtiva = abas.find((aba) => aba.id === abaAtiva) ?? abas[0]!;
 
   useEffect(() => {
     onTituloIdChange?.(definicaoAtiva.tituloId);
@@ -144,7 +175,7 @@ export function PessoasScreen({ onTituloIdChange }: PessoasScreenProps) {
         aria-label="Seções de Pessoas"
         className="pessoas-screen__tabs"
       >
-        {ABAS.map((aba) => {
+        {abas.map((aba) => {
           const selecionada = aba.id === abaAtiva;
           return (
             <button

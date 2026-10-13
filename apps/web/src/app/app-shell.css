@@ -1,14 +1,31 @@
 /**
- * Shell administrativo (UI-F01) — estrutura visual neutra e reutilizável.
+ * Shell administrativo (UI-F01; recomposto visualmente na T159).
  *
- * Apenas o envoltório (banner, skip-link, área principal, rodapé); a tela de
- * domínio renderizada dentro de `.app-shell__main` define seu próprio layout
- * interno (ver `src/screens/`). Consome apenas os tokens de `tokens.css`. Sem
- * sombras (cards/botões/texto) e sem gradientes decorativos, conforme a
- * referência.
+ * Só tokens de `tokens.css`: nenhum hex novo, nenhuma sombra, nenhum
+ * gradiente, nenhuma cor, ícone, texto ou layout vindo de produto de terceiro
+ * (`docs/decisions/t159-direcao-visual-navegacao.md`).
+ *
+ * ## O que mudou na T159, e por quê
+ *
+ * A barra lateral passou a ser **branca, estável e espaçosa**, com a marca
+ * ancorada nela: é a superfície de orientação permanente do produto, e
+ * competia com um cabeçalho escuro que não tinha nada a dizer. O cabeçalho
+ * ficou claro e enxuto, com **apenas ações que existem** — contexto do ator,
+ * Segurança (quando o servidor informa MFA), Sessões ativas e Sair. Não há,
+ * nem pode haver, busca global, notificações, favoritos ou suporte: nenhuma
+ * dessas capacidades existe no produto.
+ *
+ * ## Mobile
+ *
+ * Abaixo de 835px a barra vira **gaveta**: fica fora do fluxo e só aparece
+ * quando aberta. Fechada, ela é `display: none` — não é empurrada para fora
+ * da tela com `transform`, justamente para não criar rolagem horizontal nem
+ * deixar botões invisíveis na ordem de tabulação. O foco preso, o `Escape` e
+ * a devolução de foco ficam no `App`, que é quem conhece o acionador.
  */
 
 .app-shell {
+  --topbar-altura: 60px;
   min-height: 100vh;
   min-height: 100svh;
   display: flex;
@@ -21,7 +38,7 @@
   position: absolute;
   top: var(--space-sm);
   left: var(--space-sm);
-  z-index: 20;
+  z-index: 60;
   transform: translateY(calc(-100% - var(--space-lg)));
   display: inline-flex;
   align-items: center;
@@ -38,99 +55,183 @@
   transform: translateY(0);
 }
 
-/* Barra superior discreta — uso PONTUAL de superfície escura. */
+/* Cabeçalho claro e fixo: o botão da gaveta precisa estar sempre alcançável
+   no mobile, inclusive depois de rolar a página. */
 .app-shell__topbar {
-  background: var(--surface-dark);
-  color: var(--color-on-dark);
-  border-bottom: 1px solid #000000;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: var(--surface-canvas);
+  border-bottom: 1px solid var(--divider-soft);
 }
 
 .app-shell__topbar-inner {
-  max-width: var(--content-max);
+  max-width: var(--shell-max);
   margin: 0 auto;
-  min-height: 56px;
+  min-height: var(--topbar-altura);
   display: flex;
-  align-items: baseline;
-  gap: var(--space-sm);
-  padding: var(--space-sm) clamp(var(--space-md), 4vw, var(--space-xl));
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs) clamp(var(--space-md), 3vw, var(--space-lg));
 }
 
-.app-shell__brand {
-  font-size: var(--text-lead);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-tight);
-  color: var(--color-on-dark);
+/* Botão da gaveta — some no desktop, onde a barra é permanente. */
+.app-shell__menu {
+  display: none;
+  align-items: center;
+  gap: var(--space-xs);
+  min-height: var(--touch-target);
+  padding: 0 var(--space-sm);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-ink);
+  font: inherit;
+  font-size: var(--text-ui);
+  font-weight: var(--weight-strong);
+  cursor: pointer;
 }
 
-.app-shell__brand-tag {
+/* Marca compacta do cabeçalho: só no mobile, onde a marca da barra lateral
+   está dentro da gaveta fechada. */
+.app-shell__marca-compacta {
+  display: none;
+  align-items: center;
+  gap: var(--space-xs);
+  color: var(--color-action);
+}
+
+.app-shell__marca-compacta .app-shell__marca-nome {
+  color: var(--color-ink);
+}
+
+/* Grupo de ações reais, encostado na borda oposta. */
+.app-shell__acoes {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-left: auto;
+}
+
+/* Contexto do ator: o papel que o SERVIDOR informou. É informação, não
+   controle — não abre menu, porque não há menu de conta a abrir. */
+.app-shell__contexto {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 var(--space-sm);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-pill);
+  background: var(--surface-neutral);
   font-size: var(--text-caption);
-  font-weight: var(--weight-regular);
-  color: var(--color-on-dark-muted);
+  font-weight: var(--weight-strong);
+  color: var(--color-ink-muted);
+  white-space: nowrap;
 }
 
-/* Botões "Segurança" (T126/T131), "Sessões ativas" (T117) e "Sair" (T116) — só
-   aparecem quando `App` recebe `onLogout` (e "Segurança" só quando o MFA está
-   disponível no servidor, T131). O grupo é empurrado para a extremidade oposta
-   da marca via `margin-left: auto` no PRIMEIRO botão presente (regra
-   `button:first-of-type` abaixo) — assim o layout não depende de "Segurança"
-   existir; o `gap` do container cuida do espaçamento entre os botões. */
 .app-shell__seguranca,
 .app-shell__sessoes-ativas,
 .app-shell__logout {
   min-height: var(--touch-target);
   padding: 0 var(--space-md);
-  border: 1px solid var(--color-on-dark-muted);
+  border: 1px solid var(--hairline);
   border-radius: var(--radius-pill);
   background: transparent;
-  color: var(--color-on-dark);
+  color: var(--color-ink-muted);
   font-family: inherit;
   font-size: var(--text-caption);
   font-weight: var(--weight-strong);
   cursor: pointer;
 }
 
-/* Primeiro botão do grupo (seja "Segurança", "Sessões ativas" ou "Sair",
-   conforme o que estiver presente) empurra o grupo para a direita. */
-.app-shell__topbar-inner > button:first-of-type {
-  margin-left: auto;
+.app-shell__seguranca:hover,
+.app-shell__sessoes-ativas:hover,
+.app-shell__logout:hover {
+  background: var(--surface-neutral);
+  color: var(--color-ink);
 }
 
-/* Container do painel "Sessões ativas" — mesma trava de largura e mesmo
-   padding lateral de `app-shell__topbar-inner`/`app-shell__body`, para que o
-   painel se alinhe com o resto do shell em qualquer largura. */
+/* Container dos painéis "Segurança"/"Sessões ativas" — mesma trava de largura
+   e mesmo padding lateral do resto do shell. */
 .app-shell__sessoes-ativas-wrapper {
-  max-width: var(--content-max);
+  max-width: var(--shell-max);
   margin: 0 auto;
   width: 100%;
-  padding: var(--space-md) clamp(var(--space-md), 4vw, var(--space-xl)) 0;
+  padding: var(--space-md) clamp(var(--space-md), 3vw, var(--space-lg)) 0;
 }
 
-/* Corpo do painel: navegação (`PainelNavigation`) + área principal, lado a
-   lado em telas largas. `min-width: 0` por ser flex container dentro de
-   `.app-shell` (também flex em coluna) — mesmo motivo do item abaixo. */
+/* Corpo: barra lateral + área principal. */
 .app-shell__body {
   flex: 1 1 auto;
   display: flex;
   flex-direction: row;
-  align-items: flex-start;
+  align-items: stretch;
   min-width: 0;
   width: 100%;
-  max-width: var(--content-max);
+  max-width: var(--shell-max);
   margin: 0 auto;
-  gap: clamp(var(--space-md), 3vw, var(--space-xl));
-  padding: 0 clamp(var(--space-md), 4vw, var(--space-xl));
 }
 
-/* Área principal responsiva. `min-width: 0` é necessário porque o item flex
-   (esta área) recusaria, por padrão, encolher abaixo do min-content de seus
-   descendentes (ex.: uma tabela larga com rolagem própria), o que vazaria a
-   rolagem horizontal para a página inteira em vez de ficar contida no
-   componente que já a trata. */
+/* Barra lateral branca, estável e espaçosa. Acompanha a rolagem e rola por
+   dentro quando a lista é mais alta que a janela. */
+.app-shell__sidebar {
+  flex: 0 0 var(--sidebar-width);
+  width: var(--sidebar-width);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  padding: var(--space-lg) var(--space-sm);
+  background: var(--surface-canvas);
+  border-right: 1px solid var(--divider-soft);
+  position: sticky;
+  top: var(--topbar-altura);
+  align-self: flex-start;
+  max-height: calc(100vh - var(--topbar-altura));
+  max-height: calc(100svh - var(--topbar-altura));
+  overflow-y: auto;
+}
+
+.app-shell__marca {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 0 var(--space-sm);
+  color: var(--color-action);
+}
+
+.app-shell__marca-simbolo {
+  flex: 0 0 auto;
+}
+
+.app-shell__marca-texto {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.app-shell__marca-nome {
+  font-size: var(--text-lead);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-tight);
+  line-height: var(--leading-tight);
+  color: var(--color-ink);
+}
+
+.app-shell__marca-tag {
+  font-size: var(--text-caption);
+  font-weight: var(--weight-regular);
+  color: var(--color-ink-subtle);
+}
+
+/* Área principal. `min-width: 0` impede que uma tabela larga com rolagem
+   própria vaze a rolagem para a página inteira. */
 .app-shell__main {
   flex: 1 1 auto;
   min-width: 0;
   width: 100%;
-  padding: clamp(var(--space-lg), 5vw, var(--space-3xl)) 0;
+  max-width: calc(var(--content-max) + 2 * var(--space-xl));
+  padding: clamp(var(--space-lg), 4vw, var(--space-2xl))
+    clamp(var(--space-md), 3vw, var(--space-xl));
   outline: none; /* alvo do skip-link; foco não desenha contorno na região */
 }
 
@@ -141,9 +242,9 @@
 }
 
 .app-shell__footer-inner {
-  max-width: var(--content-max);
+  max-width: var(--shell-max);
   margin: 0 auto;
-  padding: var(--space-md) clamp(var(--space-md), 4vw, var(--space-xl));
+  padding: var(--space-md) clamp(var(--space-md), 3vw, var(--space-lg));
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-xs) var(--space-md);
@@ -157,39 +258,77 @@
   color: var(--color-ink-muted);
 }
 
-/* Transição do skip-link SÓ quando o usuário não pediu menos movimento.
-   Os componentes reutilizáveis (Button, Surface, EmptyState, StatusBadge,
-   PageHeader, DataTable, FormField, FormActions) vivem em `src/components/`
-   (UI-F02/UI-F03), cada um com seu CSS; as telas de domínio vivem em
-   `src/screens/`, cada uma com o seu. */
 @media (prefers-reduced-motion: no-preference) {
   .app-shell__skip-link {
     transition: transform 120ms ease;
   }
 }
 
-/* Ajustes por breakpoint (referência: 834px / 640px). Abaixo de 834px a
-   navegação vira faixa horizontal (`PainelNavigation.css`) acima do
-   conteúdo — o corpo empilha em coluna. */
+/* Abaixo de 835px a barra lateral vira gaveta. */
 @media (max-width: 834px) {
-  .app-shell__topbar-inner {
-    min-height: 52px;
+  .app-shell {
+    --topbar-altura: 56px;
+  }
+
+  .app-shell__menu,
+  .app-shell__marca-compacta {
+    display: inline-flex;
   }
 
   .app-shell__body {
     flex-direction: column;
-    gap: 0;
+  }
+
+  /* Fechada, a gaveta sai do layout por completo: nada de `transform` para
+     fora da tela, que criaria rolagem horizontal e deixaria botões
+     invisíveis na ordem de tabulação. */
+  .app-shell__sidebar {
+    display: none;
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 40;
+    width: min(300px, 86vw);
+    flex-basis: auto;
+    max-height: none;
+    border-right: 1px solid var(--hairline);
+  }
+
+  .app-shell--gaveta-aberta .app-shell__sidebar {
+    display: flex;
+  }
+
+  /* Fundo da gaveta. Mesma opacidade do `Modal` (UI-F04).
+
+     Mora DENTRO da media query de propósito (R1): o `App` já desfaz o estado
+     móvel ao atravessar o breakpoint, e esta regra é a segunda barreira — se
+     a classe sobrevivesse por qualquer caminho, ainda assim não haveria
+     scrim de página inteira no desktop. */
+  .app-shell__fundo-gaveta {
+    position: fixed;
+    inset: 0;
+    z-index: 35;
+    background: rgb(29 29 31 / 45%);
+    border: none;
     padding: 0;
+    cursor: pointer;
   }
 
   .app-shell__main {
-    padding: clamp(var(--space-lg), 5vw, var(--space-3xl))
-      clamp(var(--space-md), 4vw, var(--space-xl));
+    max-width: none;
   }
 }
 
 @media (max-width: 640px) {
   .app-shell__footer-inner {
     flex-direction: column;
+  }
+
+  /* Em telas muito estreitas as ações quebram em duas linhas em vez de
+     empurrar a largura da página. */
+  .app-shell__acoes {
+    flex-wrap: wrap;
+    justify-content: flex-end;
   }
 }

@@ -79,6 +79,7 @@
   --font-sans:
     system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --text-caption: 0.875rem; /* 14px */
+  --text-ui: 0.9375rem; /* 15px — item de navegação e ação de cabeçalho */
   --text-body: 1.0625rem; /* 17px — o "passo de leitura" da referência */
   --text-lead: 1.3125rem; /* 21px */
   --text-title: 1.75rem; /* 28px */
@@ -100,6 +101,14 @@
 
   /* Largura máxima de conteúdo (trava responsiva). */
   --content-max: 1120px;
+
+  /* Shell do painel (T159 — evolução visual). A barra lateral branca
+     precisa de largura própria e estável, e o conjunto barra+conteúdo
+     precisa de uma trava maior que `--content-max`, senão a barra comeria
+     a largura de leitura do conteúdo. `--content-max` segue valendo DENTRO
+     da área principal, que é onde a medida de leitura importa. */
+  --sidebar-width: 272px;
+  --shell-max: 1440px;
 }
 
 *,

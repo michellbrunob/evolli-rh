@@ -1,8 +1,94 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+/**
+ * CadastrosScreen → módulo Estrutura (T073…T087, separado por modo na T159).
+ *
+ * A T159 dividiu as abas por ESTADO: quatro falam com o servidor — Horários,
+ * Estrutura organizacional, Funções e cargos e Centros de custo — e sete são
+ * catálogos de apoio que só desenham exemplos.
+ *
+ * ## Por que os onze testes de "sem regressão" viraram dois
+ *
+ * O arquivo antigo tinha uma cadeia cumulativa: cada aba nova ganhava um teste
+ * que reconferia todas as anteriores. Essa cadeia existia para garantir a
+ * **coexistência** das onze abas — exatamente o que esta tarefa desfaz.
+ *
+ * Em lugar dela, cada modo tem um teste que percorre **todas** as suas abas e
+ * exige, a cada passo, um `h1` único e o título da aba ativa. É mais forte que
+ * a cadeia antiga, não mais fraco: a cadeia conferia pares escolhidos à mão e
+ * crescia por acréscimo; o laço cobre o conjunto inteiro e não pode esquecer
+ * uma aba nova.
+ */
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { CadastrosScreen } from "./CadastrosScreen";
 
-describe("CadastrosScreen — abas locais 'Horários' / 'Estrutura organizacional' / 'Calendário de feriados' / 'Políticas de Banco de Horas' / 'Funções e cargos' / 'Motivos de ausência e justificativas' / 'Centros de custo' / 'Tipos de documento' / 'Motivos de desligamento' / 'Escolaridade' / 'Cidades e localidades' (T073/T076/T078/T080/T081/T083/T084/T085/T086/T087)", () => {
+/**
+ * Abas DESTE contêiner, não as de telas aninhadas.
+ *
+ * `Estrutura organizacional` tem um tablist próprio (unidades, departamentos,
+ * áreas, equipes). Uma busca global por `role="tab"` encontra os dois níveis e
+ * acusa duas abas selecionadas — o que seria um falso positivo, porque cada
+ * tablist tem a sua seleção.
+ */
+function abasDoContainer() {
+  return within(
+    screen.getByRole("tablist", { name: "Seções de Cadastros" }),
+  ).getAllByRole("tab");
+}
+
+const FUNCIONAIS = [
+  { aba: "Horários", titulo: "Horários", id: "horarios-titulo" },
+  {
+    aba: "Estrutura organizacional",
+    titulo: "Estrutura organizacional",
+    id: "estrutura-organizacional-titulo",
+  },
+  {
+    aba: "Funções e cargos",
+    titulo: "Funções e cargos",
+    id: "funcoes-cargos-titulo",
+  },
+  {
+    aba: "Centros de custo",
+    titulo: "Centros de custo",
+    id: "centros-custo-titulo",
+  },
+] as const;
+
+const DEMONSTRATIVAS = [
+  {
+    aba: "Calendário de feriados",
+    titulo: "Calendário de feriados",
+    id: "calendario-feriados-titulo",
+  },
+  {
+    aba: "Políticas de Banco de Horas",
+    titulo: "Políticas de Banco de Horas",
+    id: "politicas-banco-horas-titulo",
+  },
+  {
+    aba: "Motivos de ausência e justificativas",
+    titulo: "Motivos de ausência e justificativas",
+    id: "motivos-ausencia-justificativas-titulo",
+  },
+  {
+    aba: "Tipos de documento",
+    titulo: "Tipos de documento",
+    id: "tipos-documento-titulo",
+  },
+  {
+    aba: "Motivos de desligamento",
+    titulo: "Motivos de desligamento",
+    id: "motivos-desligamento-titulo",
+  },
+  { aba: "Escolaridade", titulo: "Escolaridade", id: "escolaridade-titulo" },
+  {
+    aba: "Cidades e localidades",
+    titulo: "Cidades e localidades",
+    id: "cidades-localidades-titulo",
+  },
+] as const;
+
+describe("CadastrosScreen — modo funcional (T073/T080/T083/T110)", () => {
   it("mostra 'Horários' por padrão, com h1 único", () => {
     render(<CadastrosScreen />);
 
@@ -12,1086 +98,90 @@ describe("CadastrosScreen — abas locais 'Horários' / 'Estrutura organizaciona
     ).toBeInTheDocument();
   });
 
-  it("expõe as onze abas com role='tab' e aria-selected correto por padrão", () => {
+  it("expõe as quatro abas funcionais, na ordem, com aria-selected correto", () => {
     render(<CadastrosScreen />);
 
-    const tablist = screen.getByRole("tablist", {
-      name: "Seções de Cadastros",
-    });
-    expect(tablist).toBeInTheDocument();
-
-    const abaHorarios = screen.getByRole("tab", { name: "Horários" });
-    const abaEstrutura = screen.getByRole("tab", {
-      name: "Estrutura organizacional",
-    });
-    const abaFeriados = screen.getByRole("tab", {
-      name: "Calendário de feriados",
-    });
-    const abaPoliticas = screen.getByRole("tab", {
-      name: "Políticas de Banco de Horas",
-    });
-    const abaFuncoes = screen.getByRole("tab", {
-      name: "Funções e cargos",
-    });
-    const abaMotivos = screen.getByRole("tab", {
-      name: "Motivos de ausência e justificativas",
-    });
-    const abaCentrosCusto = screen.getByRole("tab", {
-      name: "Centros de custo",
-    });
-    const abaTiposDocumento = screen.getByRole("tab", {
-      name: "Tipos de documento",
-    });
-    const abaMotivosDesligamento = screen.getByRole("tab", {
-      name: "Motivos de desligamento",
-    });
-    const abaEscolaridade = screen.getByRole("tab", {
-      name: "Escolaridade",
-    });
-    const abaCidadesLocalidades = screen.getByRole("tab", {
-      name: "Cidades e localidades",
-    });
-    expect(abaHorarios).toHaveAttribute("aria-selected", "true");
-    expect(abaEstrutura).toHaveAttribute("aria-selected", "false");
-    expect(abaFeriados).toHaveAttribute("aria-selected", "false");
-    expect(abaPoliticas).toHaveAttribute("aria-selected", "false");
-    expect(abaFuncoes).toHaveAttribute("aria-selected", "false");
-    expect(abaMotivos).toHaveAttribute("aria-selected", "false");
-    expect(abaCentrosCusto).toHaveAttribute("aria-selected", "false");
-    expect(abaTiposDocumento).toHaveAttribute("aria-selected", "false");
-    expect(abaMotivosDesligamento).toHaveAttribute("aria-selected", "false");
-    expect(abaEscolaridade).toHaveAttribute("aria-selected", "false");
-    expect(abaCidadesLocalidades).toHaveAttribute("aria-selected", "false");
-    expect(abaHorarios.tagName).toBe("BUTTON");
-    expect(abaEstrutura.tagName).toBe("BUTTON");
-    expect(abaFeriados.tagName).toBe("BUTTON");
-    expect(abaPoliticas.tagName).toBe("BUTTON");
-    expect(abaFuncoes.tagName).toBe("BUTTON");
-    expect(abaMotivos.tagName).toBe("BUTTON");
-    expect(abaCentrosCusto.tagName).toBe("BUTTON");
-    expect(abaTiposDocumento.tagName).toBe("BUTTON");
-    expect(abaMotivosDesligamento.tagName).toBe("BUTTON");
-    expect(abaEscolaridade.tagName).toBe("BUTTON");
-    expect(abaCidadesLocalidades.tagName).toBe("BUTTON");
+    expect(
+      screen.getByRole("tablist", { name: "Seções de Cadastros" }),
+    ).toBeInTheDocument();
+    const abas = abasDoContainer();
+    expect(abas.map((a) => a.textContent)).toEqual(
+      FUNCIONAIS.map((f) => f.aba),
+    );
+    for (const aba of abas) {
+      expect(aba.tagName).toBe("BUTTON");
+      expect(aba).toHaveAttribute(
+        "aria-selected",
+        aba.textContent === "Horários" ? "true" : "false",
+      );
+    }
   });
 
-  it("troca para 'Calendário de feriados' ao clicar na aba, com h1 único e informa o titleId", () => {
-    const onTituloIdChange = vi.fn();
-    render(<CadastrosScreen onTituloIdChange={onTituloIdChange} />);
-
-    fireEvent.click(
-      screen.getByRole("tab", { name: "Calendário de feriados" }),
-    );
-
-    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
-    expect(
-      screen.getByRole("heading", {
-        level: 1,
-        name: "Calendário de feriados",
-      }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", { name: "Calendário de feriados (exemplo)" }),
-    ).toBeInTheDocument();
-
-    expect(
-      screen.getByRole("tab", { name: "Calendário de feriados" }),
-    ).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("tab", { name: "Horários" })).toHaveAttribute(
-      "aria-selected",
-      "false",
-    );
-    expect(
-      screen.getByRole("tab", { name: "Estrutura organizacional" }),
-    ).toHaveAttribute("aria-selected", "false");
-    expect(onTituloIdChange).toHaveBeenCalledWith("calendario-feriados-titulo");
-  });
-
-  it("troca para 'Políticas de Banco de Horas' ao clicar na aba, com h1 único e informa o titleId", () => {
-    const onTituloIdChange = vi.fn();
-    render(<CadastrosScreen onTituloIdChange={onTituloIdChange} />);
-
-    fireEvent.click(
-      screen.getByRole("tab", { name: "Políticas de Banco de Horas" }),
-    );
-
-    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
-    expect(
-      screen.getByRole("heading", {
-        level: 1,
-        name: "Políticas de Banco de Horas",
-      }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", {
-        name: "Políticas de Banco de Horas (exemplo)",
-      }),
-    ).toBeInTheDocument();
-
-    expect(
-      screen.getByRole("tab", { name: "Políticas de Banco de Horas" }),
-    ).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("tab", { name: "Horários" })).toHaveAttribute(
-      "aria-selected",
-      "false",
-    );
-    expect(onTituloIdChange).toHaveBeenCalledWith(
-      "politicas-banco-horas-titulo",
-    );
-  });
-
-  it("troca para 'Funções e cargos' ao clicar na aba, com h1 único e informa o titleId", () => {
-    const onTituloIdChange = vi.fn();
-    render(<CadastrosScreen onTituloIdChange={onTituloIdChange} />);
-
-    fireEvent.click(screen.getByRole("tab", { name: "Funções e cargos" }));
-
-    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
-    expect(
-      screen.getByRole("heading", {
-        level: 1,
-        name: "Funções e cargos",
-      }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Somente RH")).toBeInTheDocument();
-
-    expect(
-      screen.getByRole("tab", { name: "Funções e cargos" }),
-    ).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("tab", { name: "Horários" })).toHaveAttribute(
-      "aria-selected",
-      "false",
-    );
-    expect(onTituloIdChange).toHaveBeenCalledWith("funcoes-cargos-titulo");
-  });
-
-  it("troca para 'Motivos de ausência e justificativas' ao clicar na aba, com h1 único e informa o titleId", () => {
-    const onTituloIdChange = vi.fn();
-    render(<CadastrosScreen onTituloIdChange={onTituloIdChange} />);
-
-    fireEvent.click(
-      screen.getByRole("tab", {
-        name: "Motivos de ausência e justificativas",
-      }),
-    );
-
-    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
-    expect(
-      screen.getByRole("heading", {
-        level: 1,
-        name: "Motivos de ausência e justificativas",
-      }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", {
-        name: "Motivos de ausência e justificativas (exemplo)",
-      }),
-    ).toBeInTheDocument();
-
-    expect(
-      screen.getByRole("tab", {
-        name: "Motivos de ausência e justificativas",
-      }),
-    ).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("tab", { name: "Horários" })).toHaveAttribute(
-      "aria-selected",
-      "false",
-    );
-    expect(onTituloIdChange).toHaveBeenCalledWith(
-      "motivos-ausencia-justificativas-titulo",
-    );
-  });
-
-  it("troca para 'Estrutura organizacional' ao clicar na aba, com h1 único e informa o titleId", () => {
-    const onTituloIdChange = vi.fn();
-    render(<CadastrosScreen onTituloIdChange={onTituloIdChange} />);
-
-    fireEvent.click(
-      screen.getByRole("tab", { name: "Estrutura organizacional" }),
-    );
-
-    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
-    expect(
-      screen.getByRole("heading", {
-        level: 1,
-        name: "Estrutura organizacional",
-      }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Somente RH")).toBeInTheDocument();
-
-    expect(
-      screen.getByRole("tab", { name: "Estrutura organizacional" }),
-    ).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("tab", { name: "Horários" })).toHaveAttribute(
-      "aria-selected",
-      "false",
-    );
-    expect(onTituloIdChange).toHaveBeenCalledWith(
-      "estrutura-organizacional-titulo",
-    );
-  });
-
-  it("troca para 'Centros de custo' ao clicar na aba, com h1 único e informa o titleId", () => {
-    const onTituloIdChange = vi.fn();
-    render(<CadastrosScreen onTituloIdChange={onTituloIdChange} />);
-
-    fireEvent.click(screen.getByRole("tab", { name: "Centros de custo" }));
-
-    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
-    expect(
-      screen.getByRole("heading", {
-        level: 1,
-        name: "Centros de custo",
-      }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Somente RH")).toBeInTheDocument();
-
-    expect(
-      screen.getByRole("tab", { name: "Centros de custo" }),
-    ).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("tab", { name: "Horários" })).toHaveAttribute(
-      "aria-selected",
-      "false",
-    );
-    expect(onTituloIdChange).toHaveBeenCalledWith("centros-custo-titulo");
-  });
-
-  it("troca para 'Tipos de documento' ao clicar na aba, com h1 único e informa o titleId", () => {
-    const onTituloIdChange = vi.fn();
-    render(<CadastrosScreen onTituloIdChange={onTituloIdChange} />);
-
-    fireEvent.click(screen.getByRole("tab", { name: "Tipos de documento" }));
-
-    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
-    expect(
-      screen.getByRole("heading", {
-        level: 1,
-        name: "Tipos de documento",
-      }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", { name: "Tipos de documento (exemplo)" }),
-    ).toBeInTheDocument();
-
-    expect(
-      screen.getByRole("tab", { name: "Tipos de documento" }),
-    ).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("tab", { name: "Horários" })).toHaveAttribute(
-      "aria-selected",
-      "false",
-    );
-    expect(onTituloIdChange).toHaveBeenCalledWith("tipos-documento-titulo");
-  });
-
-  it("troca para 'Motivos de desligamento' ao clicar na aba, com h1 único e informa o titleId", () => {
-    const onTituloIdChange = vi.fn();
-    render(<CadastrosScreen onTituloIdChange={onTituloIdChange} />);
-
-    fireEvent.click(
-      screen.getByRole("tab", { name: "Motivos de desligamento" }),
-    );
-
-    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
-    expect(
-      screen.getByRole("heading", {
-        level: 1,
-        name: "Motivos de desligamento",
-      }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", { name: "Motivos de desligamento (exemplo)" }),
-    ).toBeInTheDocument();
-
-    expect(
-      screen.getByRole("tab", { name: "Motivos de desligamento" }),
-    ).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("tab", { name: "Horários" })).toHaveAttribute(
-      "aria-selected",
-      "false",
-    );
-    expect(onTituloIdChange).toHaveBeenCalledWith(
-      "motivos-desligamento-titulo",
-    );
-  });
-
-  it("troca para 'Escolaridade' ao clicar na aba, com h1 único e informa o titleId", () => {
-    const onTituloIdChange = vi.fn();
-    render(<CadastrosScreen onTituloIdChange={onTituloIdChange} />);
-
-    fireEvent.click(screen.getByRole("tab", { name: "Escolaridade" }));
-
-    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
-    expect(
-      screen.getByRole("heading", {
-        level: 1,
-        name: "Escolaridade",
-      }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", { name: "Escolaridade (exemplo)" }),
-    ).toBeInTheDocument();
-
-    expect(screen.getByRole("tab", { name: "Escolaridade" })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
-    expect(screen.getByRole("tab", { name: "Horários" })).toHaveAttribute(
-      "aria-selected",
-      "false",
-    );
-    expect(onTituloIdChange).toHaveBeenCalledWith("escolaridade-titulo");
-  });
-
-  it("troca para 'Cidades e localidades' ao clicar na aba, com h1 único e informa o titleId", () => {
-    const onTituloIdChange = vi.fn();
-    render(<CadastrosScreen onTituloIdChange={onTituloIdChange} />);
-
-    fireEvent.click(screen.getByRole("tab", { name: "Cidades e localidades" }));
-
-    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
-    expect(
-      screen.getByRole("heading", {
-        level: 1,
-        name: "Cidades e localidades",
-      }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", { name: "Cidades e localidades (exemplo)" }),
-    ).toBeInTheDocument();
-
-    expect(
-      screen.getByRole("tab", { name: "Cidades e localidades" }),
-    ).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("tab", { name: "Horários" })).toHaveAttribute(
-      "aria-selected",
-      "false",
-    );
-    expect(onTituloIdChange).toHaveBeenCalledWith("cidades-localidades-titulo");
-  });
-
-  it("volta para 'Horários' ao clicar de novo na aba, preservando a tela T110 sem regressão", () => {
+  it("NÃO oferece nenhum catálogo de apoio demonstrativo", () => {
     render(<CadastrosScreen />);
-
-    fireEvent.click(
-      screen.getByRole("tab", { name: "Estrutura organizacional" }),
-    );
-    fireEvent.click(screen.getByRole("tab", { name: "Horários" }));
-
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Horários" }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Somente RH")).toBeInTheDocument();
+    for (const { aba } of DEMONSTRATIVAS) {
+      expect(screen.queryByRole("tab", { name: aba })).toBeNull();
+    }
   });
 
-  it("passa por 'Calendário de feriados' e volta para 'Horários', preservando 'Estrutura organizacional' sem regressão", () => {
+  it("não monta o conteúdo de nenhuma maquete", () => {
     render(<CadastrosScreen />);
+    for (const { titulo } of DEMONSTRATIVAS) {
+      expect(
+        screen.queryByRole("heading", { level: 1, name: titulo }),
+      ).toBeNull();
+    }
+  });
 
-    fireEvent.click(
-      screen.getByRole("tab", { name: "Calendário de feriados" }),
-    );
-    expect(
-      screen.getByRole("heading", {
-        level: 1,
-        name: "Calendário de feriados",
-      }),
-    ).toBeInTheDocument();
+  for (const { aba, titulo, id } of FUNCIONAIS) {
+    it(`troca para '${aba}' com h1 único e informa o titleId`, () => {
+      const onTituloIdChange = vi.fn();
+      render(<CadastrosScreen onTituloIdChange={onTituloIdChange} />);
 
-    fireEvent.click(
-      screen.getByRole("tab", { name: "Estrutura organizacional" }),
-    );
-    expect(
-      screen.getByRole("heading", {
-        level: 1,
-        name: "Estrutura organizacional",
-      }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Somente RH")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("tab", { name: aba }));
 
+      expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+      expect(
+        screen.getByRole("heading", { level: 1, name: titulo }),
+      ).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: aba })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
+      expect(
+        abasDoContainer().filter(
+          (t) => t.getAttribute("aria-selected") === "true",
+        ),
+      ).toHaveLength(1);
+      expect(onTituloIdChange).toHaveBeenCalledWith(id);
+    });
+  }
+
+  it("percorrer todas as abas e voltar não deixa resíduo", () => {
+    render(<CadastrosScreen />);
+    for (const { aba, titulo } of FUNCIONAIS) {
+      fireEvent.click(screen.getByRole("tab", { name: aba }));
+      const titulos = screen.getAllByRole("heading", { level: 1 });
+      expect(titulos).toHaveLength(1);
+      expect(titulos[0]!.textContent).toBe(titulo);
+    }
     fireEvent.click(screen.getByRole("tab", { name: "Horários" }));
     expect(
       screen.getByRole("heading", { level: 1, name: "Horários" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("Somente RH")).toBeInTheDocument();
   });
 
-  it("passa por 'Políticas de Banco de Horas' e volta para 'Horários', preservando 'Estrutura organizacional' e 'Calendário de feriados' sem regressão", () => {
+  it("clicar de novo na aba ativa não duplica o h1", () => {
     render(<CadastrosScreen />);
-
-    fireEvent.click(
-      screen.getByRole("tab", { name: "Políticas de Banco de Horas" }),
-    );
-    expect(
-      screen.getByRole("heading", {
-        level: 1,
-        name: "Políticas de Banco de Horas",
-      }),
-    ).toBeInTheDocument();
-
-    fireEvent.click(
-      screen.getByRole("tab", { name: "Calendário de feriados" }),
-    );
-    expect(
-      screen.getByRole("heading", {
-        level: 1,
-        name: "Calendário de feriados",
-      }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", { name: "Calendário de feriados (exemplo)" }),
-    ).toBeInTheDocument();
-
-    fireEvent.click(
-      screen.getByRole("tab", { name: "Estrutura organizacional" }),
-    );
-    expect(
-      screen.getByRole("heading", {
-        level: 1,
-        name: "Estrutura organizacional",
-      }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Somente RH")).toBeInTheDocument();
-
     fireEvent.click(screen.getByRole("tab", { name: "Horários" }));
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Horários" }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Somente RH")).toBeInTheDocument();
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
   });
 
-  it("passa por 'Funções e cargos' e volta para 'Horários', preservando 'Estrutura organizacional'/'Calendário de feriados'/'Políticas de Banco de Horas' sem regressão", () => {
+  it("não referencia autenticação, sessão, razão social nem dado real", () => {
     render(<CadastrosScreen />);
-
-    fireEvent.click(screen.getByRole("tab", { name: "Funções e cargos" }));
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Funções e cargos" }),
-    ).toBeInTheDocument();
-
-    fireEvent.click(
-      screen.getByRole("tab", { name: "Políticas de Banco de Horas" }),
-    );
-    expect(
-      screen.getByRole("heading", {
-        level: 1,
-        name: "Políticas de Banco de Horas",
-      }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", {
-        name: "Políticas de Banco de Horas (exemplo)",
-      }),
-    ).toBeInTheDocument();
-
-    fireEvent.click(
-      screen.getByRole("tab", { name: "Calendário de feriados" }),
-    );
-    expect(
-      screen.getByRole("heading", {
-        level: 1,
-        name: "Calendário de feriados",
-      }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", { name: "Calendário de feriados (exemplo)" }),
-    ).toBeInTheDocument();
-
-    fireEvent.click(
-      screen.getByRole("tab", { name: "Estrutura organizacional" }),
-    );
-    expect(
-      screen.getByRole("heading", {
-        level: 1,
-        name: "Estrutura organizacional",
-      }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Somente RH")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("tab", { name: "Horários" }));
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Horários" }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Somente RH")).toBeInTheDocument();
-  });
-
-  it("passa por 'Motivos de ausência e justificativas' e volta para 'Horários', preservando 'Funções e cargos'/'Políticas de Banco de Horas'/'Calendário de feriados'/'Estrutura organizacional' sem regressão", () => {
-    render(<CadastrosScreen />);
-
-    fireEvent.click(
-      screen.getByRole("tab", {
-        name: "Motivos de ausência e justificativas",
-      }),
-    );
-    expect(
-      screen.getByRole("heading", {
-        level: 1,
-        name: "Motivos de ausência e justificativas",
-      }),
-    ).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("tab", { name: "Funções e cargos" }));
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Funções e cargos" }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Somente RH")).toBeInTheDocument();
-
-    fireEvent.click(
-      screen.getByRole("tab", { name: "Políticas de Banco de Horas" }),
-    );
-    expect(
-      screen.getByRole("heading", {
-        level: 1,
-        name: "Políticas de Banco de Horas",
-      }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", {
-        name: "Políticas de Banco de Horas (exemplo)",
-      }),
-    ).toBeInTheDocument();
-
-    fireEvent.click(
-      screen.getByRole("tab", { name: "Calendário de feriados" }),
-    );
-    expect(
-      screen.getByRole("heading", {
-        level: 1,
-        name: "Calendário de feriados",
-      }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", { name: "Calendário de feriados (exemplo)" }),
-    ).toBeInTheDocument();
-
-    fireEvent.click(
-      screen.getByRole("tab", { name: "Estrutura organizacional" }),
-    );
-    expect(
-      screen.getByRole("heading", {
-        level: 1,
-        name: "Estrutura organizacional",
-      }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Somente RH")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("tab", { name: "Horários" }));
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Horários" }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Somente RH")).toBeInTheDocument();
-  });
-
-  it("passa por 'Centros de custo' e volta para 'Horários', preservando 'Motivos de ausência e justificativas'/'Funções e cargos'/'Políticas de Banco de Horas'/'Calendário de feriados'/'Estrutura organizacional' sem regressão", () => {
-    render(<CadastrosScreen />);
-
-    fireEvent.click(screen.getByRole("tab", { name: "Centros de custo" }));
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Centros de custo" }),
-    ).toBeInTheDocument();
-
-    fireEvent.click(
-      screen.getByRole("tab", {
-        name: "Motivos de ausência e justificativas",
-      }),
-    );
-    expect(
-      screen.getByRole("heading", {
-        level: 1,
-        name: "Motivos de ausência e justificativas",
-      }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", {
-        name: "Motivos de ausência e justificativas (exemplo)",
-      }),
-    ).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("tab", { name: "Funções e cargos" }));
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Funções e cargos" }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Somente RH")).toBeInTheDocument();
-
-    fireEvent.click(
-      screen.getByRole("tab", { name: "Políticas de Banco de Horas" }),
-    );
-    expect(
-      screen.getByRole("heading", {
-        level: 1,
-        name: "Políticas de Banco de Horas",
-      }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", {
-        name: "Políticas de Banco de Horas (exemplo)",
-      }),
-    ).toBeInTheDocument();
-
-    fireEvent.click(
-      screen.getByRole("tab", { name: "Calendário de feriados" }),
-    );
-    expect(
-      screen.getByRole("heading", {
-        level: 1,
-        name: "Calendário de feriados",
-      }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", { name: "Calendário de feriados (exemplo)" }),
-    ).toBeInTheDocument();
-
-    fireEvent.click(
-      screen.getByRole("tab", { name: "Estrutura organizacional" }),
-    );
-    expect(
-      screen.getByRole("heading", {
-        level: 1,
-        name: "Estrutura organizacional",
-      }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Somente RH")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("tab", { name: "Horários" }));
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Horários" }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Somente RH")).toBeInTheDocument();
-  });
-
-  it("passa por 'Tipos de documento' e volta para 'Horários', preservando 'Centros de custo'/'Motivos de ausência e justificativas'/'Funções e cargos'/'Políticas de Banco de Horas'/'Calendário de feriados'/'Estrutura organizacional' sem regressão", () => {
-    render(<CadastrosScreen />);
-
-    fireEvent.click(screen.getByRole("tab", { name: "Tipos de documento" }));
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Tipos de documento" }),
-    ).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("tab", { name: "Centros de custo" }));
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Centros de custo" }),
-    ).toBeInTheDocument();
-
-    fireEvent.click(
-      screen.getByRole("tab", {
-        name: "Motivos de ausência e justificativas",
-      }),
-    );
-    expect(
-      screen.getByRole("heading", {
-        level: 1,
-        name: "Motivos de ausência e justificativas",
-      }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", {
-        name: "Motivos de ausência e justificativas (exemplo)",
-      }),
-    ).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("tab", { name: "Funções e cargos" }));
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Funções e cargos" }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Somente RH")).toBeInTheDocument();
-
-    fireEvent.click(
-      screen.getByRole("tab", { name: "Políticas de Banco de Horas" }),
-    );
-    expect(
-      screen.getByRole("heading", {
-        level: 1,
-        name: "Políticas de Banco de Horas",
-      }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", {
-        name: "Políticas de Banco de Horas (exemplo)",
-      }),
-    ).toBeInTheDocument();
-
-    fireEvent.click(
-      screen.getByRole("tab", { name: "Calendário de feriados" }),
-    );
-    expect(
-      screen.getByRole("heading", {
-        level: 1,
-        name: "Calendário de feriados",
-      }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", { name: "Calendário de feriados (exemplo)" }),
-    ).toBeInTheDocument();
-
-    fireEvent.click(
-      screen.getByRole("tab", { name: "Estrutura organizacional" }),
-    );
-    expect(
-      screen.getByRole("heading", {
-        level: 1,
-        name: "Estrutura organizacional",
-      }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Somente RH")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("tab", { name: "Horários" }));
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Horários" }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Somente RH")).toBeInTheDocument();
-  });
-
-  it("passa por 'Motivos de desligamento' e volta para 'Horários', preservando 'Tipos de documento'/'Centros de custo'/'Motivos de ausência e justificativas'/'Funções e cargos'/'Políticas de Banco de Horas'/'Calendário de feriados'/'Estrutura organizacional' sem regressão", () => {
-    render(<CadastrosScreen />);
-
-    fireEvent.click(
-      screen.getByRole("tab", { name: "Motivos de desligamento" }),
-    );
-    expect(
-      screen.getByRole("heading", {
-        level: 1,
-        name: "Motivos de desligamento",
-      }),
-    ).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("tab", { name: "Tipos de documento" }));
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Tipos de documento" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", { name: "Tipos de documento (exemplo)" }),
-    ).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("tab", { name: "Centros de custo" }));
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Centros de custo" }),
-    ).toBeInTheDocument();
-
-    fireEvent.click(
-      screen.getByRole("tab", {
-        name: "Motivos de ausência e justificativas",
-      }),
-    );
-    expect(
-      screen.getByRole("heading", {
-        level: 1,
-        name: "Motivos de ausência e justificativas",
-      }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", {
-        name: "Motivos de ausência e justificativas (exemplo)",
-      }),
-    ).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("tab", { name: "Funções e cargos" }));
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Funções e cargos" }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Somente RH")).toBeInTheDocument();
-
-    fireEvent.click(
-      screen.getByRole("tab", { name: "Políticas de Banco de Horas" }),
-    );
-    expect(
-      screen.getByRole("heading", {
-        level: 1,
-        name: "Políticas de Banco de Horas",
-      }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", {
-        name: "Políticas de Banco de Horas (exemplo)",
-      }),
-    ).toBeInTheDocument();
-
-    fireEvent.click(
-      screen.getByRole("tab", { name: "Calendário de feriados" }),
-    );
-    expect(
-      screen.getByRole("heading", {
-        level: 1,
-        name: "Calendário de feriados",
-      }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", { name: "Calendário de feriados (exemplo)" }),
-    ).toBeInTheDocument();
-
-    fireEvent.click(
-      screen.getByRole("tab", { name: "Estrutura organizacional" }),
-    );
-    expect(
-      screen.getByRole("heading", {
-        level: 1,
-        name: "Estrutura organizacional",
-      }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Somente RH")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("tab", { name: "Horários" }));
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Horários" }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Somente RH")).toBeInTheDocument();
-  });
-
-  it("passa por 'Escolaridade' e volta para 'Horários', preservando 'Motivos de desligamento'/'Tipos de documento'/'Centros de custo'/'Motivos de ausência e justificativas'/'Funções e cargos'/'Políticas de Banco de Horas'/'Calendário de feriados'/'Estrutura organizacional' sem regressão", () => {
-    render(<CadastrosScreen />);
-
-    fireEvent.click(screen.getByRole("tab", { name: "Escolaridade" }));
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Escolaridade" }),
-    ).toBeInTheDocument();
-
-    fireEvent.click(
-      screen.getByRole("tab", { name: "Motivos de desligamento" }),
-    );
-    expect(
-      screen.getByRole("heading", {
-        level: 1,
-        name: "Motivos de desligamento",
-      }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", { name: "Motivos de desligamento (exemplo)" }),
-    ).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("tab", { name: "Tipos de documento" }));
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Tipos de documento" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", { name: "Tipos de documento (exemplo)" }),
-    ).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("tab", { name: "Centros de custo" }));
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Centros de custo" }),
-    ).toBeInTheDocument();
-
-    fireEvent.click(
-      screen.getByRole("tab", {
-        name: "Motivos de ausência e justificativas",
-      }),
-    );
-    expect(
-      screen.getByRole("heading", {
-        level: 1,
-        name: "Motivos de ausência e justificativas",
-      }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", {
-        name: "Motivos de ausência e justificativas (exemplo)",
-      }),
-    ).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("tab", { name: "Funções e cargos" }));
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Funções e cargos" }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Somente RH")).toBeInTheDocument();
-
-    fireEvent.click(
-      screen.getByRole("tab", { name: "Políticas de Banco de Horas" }),
-    );
-    expect(
-      screen.getByRole("heading", {
-        level: 1,
-        name: "Políticas de Banco de Horas",
-      }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", {
-        name: "Políticas de Banco de Horas (exemplo)",
-      }),
-    ).toBeInTheDocument();
-
-    fireEvent.click(
-      screen.getByRole("tab", { name: "Calendário de feriados" }),
-    );
-    expect(
-      screen.getByRole("heading", {
-        level: 1,
-        name: "Calendário de feriados",
-      }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", { name: "Calendário de feriados (exemplo)" }),
-    ).toBeInTheDocument();
-
-    fireEvent.click(
-      screen.getByRole("tab", { name: "Estrutura organizacional" }),
-    );
-    expect(
-      screen.getByRole("heading", {
-        level: 1,
-        name: "Estrutura organizacional",
-      }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Somente RH")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("tab", { name: "Horários" }));
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Horários" }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Somente RH")).toBeInTheDocument();
-  });
-
-  it("passa por 'Cidades e localidades' e volta para 'Horários', preservando 'Escolaridade'/'Motivos de desligamento'/'Tipos de documento'/'Centros de custo'/'Motivos de ausência e justificativas'/'Funções e cargos'/'Políticas de Banco de Horas'/'Calendário de feriados'/'Estrutura organizacional' sem regressão", () => {
-    render(<CadastrosScreen />);
-
-    fireEvent.click(screen.getByRole("tab", { name: "Cidades e localidades" }));
-    expect(
-      screen.getByRole("heading", {
-        level: 1,
-        name: "Cidades e localidades",
-      }),
-    ).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("tab", { name: "Escolaridade" }));
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Escolaridade" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", { name: "Escolaridade (exemplo)" }),
-    ).toBeInTheDocument();
-
-    fireEvent.click(
-      screen.getByRole("tab", { name: "Motivos de desligamento" }),
-    );
-    expect(
-      screen.getByRole("heading", {
-        level: 1,
-        name: "Motivos de desligamento",
-      }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", { name: "Motivos de desligamento (exemplo)" }),
-    ).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("tab", { name: "Tipos de documento" }));
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Tipos de documento" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", { name: "Tipos de documento (exemplo)" }),
-    ).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("tab", { name: "Centros de custo" }));
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Centros de custo" }),
-    ).toBeInTheDocument();
-
-    fireEvent.click(
-      screen.getByRole("tab", {
-        name: "Motivos de ausência e justificativas",
-      }),
-    );
-    expect(
-      screen.getByRole("heading", {
-        level: 1,
-        name: "Motivos de ausência e justificativas",
-      }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", {
-        name: "Motivos de ausência e justificativas (exemplo)",
-      }),
-    ).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("tab", { name: "Funções e cargos" }));
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Funções e cargos" }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Somente RH")).toBeInTheDocument();
-
-    fireEvent.click(
-      screen.getByRole("tab", { name: "Políticas de Banco de Horas" }),
-    );
-    expect(
-      screen.getByRole("heading", {
-        level: 1,
-        name: "Políticas de Banco de Horas",
-      }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", {
-        name: "Políticas de Banco de Horas (exemplo)",
-      }),
-    ).toBeInTheDocument();
-
-    fireEvent.click(
-      screen.getByRole("tab", { name: "Calendário de feriados" }),
-    );
-    expect(
-      screen.getByRole("heading", {
-        level: 1,
-        name: "Calendário de feriados",
-      }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", { name: "Calendário de feriados (exemplo)" }),
-    ).toBeInTheDocument();
-
-    fireEvent.click(
-      screen.getByRole("tab", { name: "Estrutura organizacional" }),
-    );
-    expect(
-      screen.getByRole("heading", {
-        level: 1,
-        name: "Estrutura organizacional",
-      }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Somente RH")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("tab", { name: "Horários" }));
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Horários" }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Somente RH")).toBeInTheDocument();
-  });
-
-  it("informa o titleId do h1 visível via onTituloIdChange, inclusive ao trocar de aba", () => {
-    const onTituloIdChange = vi.fn();
-    render(<CadastrosScreen onTituloIdChange={onTituloIdChange} />);
-
-    expect(onTituloIdChange).toHaveBeenCalledWith("horarios-titulo");
-
-    fireEvent.click(
-      screen.getByRole("tab", { name: "Estrutura organizacional" }),
-    );
-    expect(onTituloIdChange).toHaveBeenCalledWith(
-      "estrutura-organizacional-titulo",
-    );
-
-    const h1 = screen.getByRole("heading", { level: 1 });
-    expect(h1.id).toBe("estrutura-organizacional-titulo");
-  });
-
-  it("não referencia autenticação, sessão, CNPJ, razão social, dinheiro ou dado real em nenhuma das abas", () => {
-    render(<CadastrosScreen />);
-    fireEvent.click(
-      screen.getByRole("tab", { name: "Estrutura organizacional" }),
-    );
-    fireEvent.click(
-      screen.getByRole("tab", { name: "Calendário de feriados" }),
-    );
-    fireEvent.click(
-      screen.getByRole("tab", { name: "Políticas de Banco de Horas" }),
-    );
-    fireEvent.click(screen.getByRole("tab", { name: "Funções e cargos" }));
-    fireEvent.click(
-      screen.getByRole("tab", {
-        name: "Motivos de ausência e justificativas",
-      }),
-    );
-    fireEvent.click(screen.getByRole("tab", { name: "Centros de custo" }));
-    fireEvent.click(screen.getByRole("tab", { name: "Tipos de documento" }));
-    fireEvent.click(
-      screen.getByRole("tab", { name: "Motivos de desligamento" }),
-    );
-    fireEvent.click(screen.getByRole("tab", { name: "Escolaridade" }));
-    fireEvent.click(screen.getByRole("tab", { name: "Cidades e localidades" }));
-    fireEvent.click(screen.getByRole("tab", { name: "Horários" }));
+    for (const { aba } of FUNCIONAIS) {
+      fireEvent.click(screen.getByRole("tab", { name: aba }));
+    }
 
     const texto = document.body.innerHTML.toLowerCase();
     for (const termoProibido of [
@@ -1104,6 +194,103 @@ describe("CadastrosScreen — abas locais 'Horários' / 'Estrutura organizaciona
       "razão social",
     ]) {
       expect(texto).not.toContain(termoProibido);
+    }
+  });
+});
+
+describe("CadastrosScreen — modo demonstrativo (T076/T078/T081/T084/T085/T086/T087)", () => {
+  it("abre no primeiro catálogo e lista os sete, na ordem", () => {
+    render(<CadastrosScreen modo="demonstrativo" />);
+
+    expect(abasDoContainer().map((a) => a.textContent)).toEqual(
+      DEMONSTRATIVAS.map((d) => d.aba),
+    );
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Calendário de feriados" }),
+    ).toBeInTheDocument();
+  });
+
+  it("NÃO oferece nenhuma aba funcional", () => {
+    render(<CadastrosScreen modo="demonstrativo" />);
+    for (const { aba } of FUNCIONAIS) {
+      expect(screen.queryByRole("tab", { name: aba })).toBeNull();
+    }
+  });
+
+  for (const { aba, titulo, id } of DEMONSTRATIVAS) {
+    it(`troca para '${aba}' com h1 único e informa o titleId`, () => {
+      const onTituloIdChange = vi.fn();
+      render(
+        <CadastrosScreen
+          modo="demonstrativo"
+          onTituloIdChange={onTituloIdChange}
+        />,
+      );
+
+      fireEvent.click(screen.getByRole("tab", { name: aba }));
+
+      expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+      expect(
+        screen.getByRole("heading", { level: 1, name: titulo }),
+      ).toBeInTheDocument();
+      expect(
+        abasDoContainer().filter(
+          (t) => t.getAttribute("aria-selected") === "true",
+        ),
+      ).toHaveLength(1);
+      expect(onTituloIdChange).toHaveBeenCalledWith(id);
+    });
+  }
+
+  it("percorrer os sete catálogos e voltar não deixa resíduo", () => {
+    render(<CadastrosScreen modo="demonstrativo" />);
+    for (const { aba, titulo } of DEMONSTRATIVAS) {
+      fireEvent.click(screen.getByRole("tab", { name: aba }));
+      const titulos = screen.getAllByRole("heading", { level: 1 });
+      expect(titulos).toHaveLength(1);
+      expect(titulos[0]!.textContent).toBe(titulo);
+    }
+    fireEvent.click(
+      screen.getByRole("tab", { name: "Calendário de feriados" }),
+    );
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Calendário de feriados" }),
+    ).toBeInTheDocument();
+  });
+
+  it("não referencia autenticação, sessão, empresa, fornecedor nem dado real", () => {
+    // Lista IDÊNTICA à do modo funcional e à que existia antes da T159. Uma
+    // versão anterior desta tarefa tirou "senha" e "sessão" daqui alegando
+    // que as telas de exemplo contêm as palavras no próprio aviso — o aviso
+    // diz "Não há login, API, persistência…", e nenhuma das sete contém
+    // "senha" nem "sessão". A alegação era falsa e a guarda voltou.
+    render(<CadastrosScreen modo="demonstrativo" />);
+    for (const { aba } of DEMONSTRATIVAS) {
+      fireEvent.click(screen.getByRole("tab", { name: aba }));
+    }
+
+    const texto = document.body.innerHTML.toLowerCase();
+    for (const termoProibido of [
+      "reserva fiscal",
+      "secullum",
+      "rwtech",
+      "bioprox",
+      "senha",
+      "sessão",
+      "razão social",
+    ]) {
+      expect(texto).not.toContain(termoProibido);
+    }
+  });
+
+  it("cada catálogo se identifica como exemplo", () => {
+    render(<CadastrosScreen modo="demonstrativo" />);
+    for (const { aba } of DEMONSTRATIVAS) {
+      fireEvent.click(screen.getByRole("tab", { name: aba }));
+      expect(
+        screen.getAllByText(/demonstraç|exemplo|ilustrativ/i).length,
+      ).toBeGreaterThan(0);
     }
   });
 });
