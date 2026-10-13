@@ -863,7 +863,11 @@ payload, `key`, `id`), todos os quais **continuam** em ISO por contrato.
 **Pendências preservadas.** `DP-3J-12` e `PD-SOL-05` seguem **não iniciados** e sem contrato
 seguro. As decisões de negócio e do RH já registradas permanecem abertas, e nada aqui as antecipa.
 
-## Checklists de contratação e desligamento — T155 (investigação)
+## Checklists de contratação e desligamento — T155 (integrada)
+
+| Tarefa | Estado                                    | Resultado principal                                                                                                                                                                 |
+| ------ | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T155   | **Integrada** (PR #147, squash `25ce087`) | Investigação e especificação preliminar do domínio de checklists de contratação e desligamento, mais o mapa funcional de Gestão de Talentos. Documental: nenhum código foi escrito. |
 
 **Ponto de partida confirmado.** Admissão e desligamento já existem como atos de vida funcional:
 admissão cria colaborador e vínculo previsto; sua efetivação ativa o vínculo; desligamento efetivado
@@ -883,6 +887,48 @@ migration, endpoint ou interface.
 foi consolidada no [mapa funcional de Gestão de Talentos](../docs/decisions/t155-mapa-funcional-gestao-talentos-referencia-mercado.md).
 O mapa separa o que foi observado de decisões pendentes e preserva a proibição de copiar código,
 marca, interface, textos ou regras privadas. Ele não amplia o escopo implementável da T155.
+
+## Matriz Evolli × referência de mercado — T156 (investigação)
+
+| Tarefa | Estado         | Resultado principal                                                                                                                                                                                |
+| ------ | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T156   | **Em revisão** | Matriz de 28 frentes classificadas contra referência de mercado, 13 lacunas com dependências e riscos, e uma única recomendação de próxima fatia funcional. Documental: nenhum código foi escrito. |
+
+**O estado vem do código, não de texto anterior.** A classificação de cada frente foi derivada de
+`apps/`, `packages/`, do schema Prisma e das migrations na base `cd80ea9`, e revalidada em
+`25ce087` — o intervalo entre as duas bases alterou somente documentação e Spec Kit. Vocabulário:
+**funcional**, **parcial**, **demonstrativo** e **planejado**, já vigentes na legenda deste ledger,
+mais **bloqueado** para ausência que tem gate registrado.
+
+**Fotografia que a matriz fixa.** 52 telas-folha: **13 ligadas à API**, **33 cascas com fixtures** e
+6 contêineres de abas. Os quatro pacotes em `packages/` têm só `README.md`. Sete núcleos puros de
+Ponto — apuração, banco de horas, compensação, fechamento, fila, orquestração e parser AFD — existem
+testados e **não estão ligados a controller, persistência ou tela**.
+
+**Correção de contagem registrada, não aplicada.** O inventário da T146 anuncia 45 telas-folha e não
+inclui a `EquipeScreen` da T153. A fonte única `docs/prototipos/t146/dados.js` precisa convergir;
+a T156 **não a corrige** e deixa a dívida registrada.
+
+**Lacuna de governança achada.** Todas as frentes têm identificador de decisão (`DP-`, `BH-`, `PD-`,
+`DS-`) — **exceto férias**, que não tem gate nomeado, não está no mapa de capacidades e não tem tela.
+A ação imediata ali é de governança, não de engenharia.
+
+**Recomendação única, independente das respostas pendentes do RH.** Interface de **Administração da
+Liderança**: ligação conta↔colaborador e atribuição gestor↔equipe, sobre as nove rotas que a T151 já
+entregou e que a ADR 0015 já governa. **Exceções de acesso ficam fora** enquanto dependerem do
+catálogo de `motivoCodigo` a validar com RH. Hoje configurar um gestor exige HTTP cru ou o seed, e
+por isso todo gestor real vê lista vazia — a capacidade das T151/T153 está entregue e inoperante.
+A matriz fixa oito critérios mínimos de pronto para essa fatia.
+
+**Referência funcional versionada junto.** `docs/decisions/referencia-funcional-solides-mapa-evolli.md`
+sustenta a coluna de comparação e até aqui não estava versionado. Foi auditado antes de entrar: sem
+código, captura, dado pessoal, credencial ou conteúdo proprietário copiado; só descrição funcional
+própria e links públicos, mesmo padrão das referências de mercado já integradas.
+
+**Limites explícitos:** a T156 não implementa código, UI, API, migration, seed, teste funcional nem
+alteração visual; não toca Docker, banco, dependências ou lockfile; não altera ADR, gate ou decisão;
+não aprova requisito novo; e **não inicia a T157** — a recomendação é insumo de decisão, e a
+implementação depende de autorização própria sob identificador próprio.
 
 ## Próxima ação autorizável
 
