@@ -960,11 +960,11 @@ parâmetro foi inventado onde o contrato não o oferece.
 mutação pelo gestor, que permanece consultivo; sem ponto, férias, folha, saúde ou dado sensível; sem
 alteração visual fora das telas desta tarefa, e sem ampliar a fundação congelada na T146.
 
-## Ciclo de vida da estrutura organizacional — T158 (interface web)
+## Ciclo de vida da estrutura organizacional — T158 (integrada)
 
-| Tarefa | Estado               | Resultado principal                                                                                                                         |
-| ------ | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| T158   | **Em implementação** | Expõe na interface as ações de inativar e reativar dos cadastros organizacionais que já têm rota, RBAC e E2E no backend desde as T104–T109. |
+| Tarefa | Estado                                    | Resultado principal                                                                                                                         |
+| ------ | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| T158   | **Integrada** (PR #150, squash `3755ae2`) | Expõe na interface as ações de inativar e reativar dos cadastros organizacionais que já têm rota, RBAC e E2E no backend desde as T104–T109. |
 
 **A lacuna que a tarefa fecha.** A T156 registrou que existem rotas de inativação e
 reativação para as entidades organizacionais e **nenhuma tela as expõe**. O efeito prático é
@@ -987,6 +987,30 @@ tarefa não cria lista nova que a omita, e não inventa parâmetro onde o contra
 oferece. Ficam fora exceções de acesso do gestor, ESS, férias, ponto, folha, eSocial e
 catálogo de motivos de desligamento. As ressalvas **R-A, R-B e R-C** da T157 seguem abertas
 e não são tratadas aqui.
+
+## Navegação modular e funcional — T159 (interface web)
+
+| Tarefa | Estado               | Resultado principal                                                                                                    |
+| ------ | -------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| T159   | **Em implementação** | Reorganiza a navegação global em módulos coerentes com a capacidade que de fato existe, sem prometer o que não existe. |
+
+**A regra que governa a tarefa.** Menu é promessa: um item na navegação é lido como
+capacidade disponível. Hoje 39 superfícies estáticas convivem com as funcionais na mesma
+lista, sem distinção — quem navega não tem como saber o que grava e o que é maquete. A T159
+separa as duas coisas na arquitetura de informação, **sem** tocar em nenhuma das telas.
+
+**Inventário antes de qualquer menu.** Os destinos são classificados a partir do **código**
+— cliente de API real contra `*.fixtures`, permissão exigida e estado. A matriz da T156 é
+insumo; onde documento e código divergirem, vale o código, e a divergência fica registrada.
+
+**Limites explícitos:** sem redesenho — tokens, padrão B e componentes seguem como estão;
+sem copiar marca, texto, código, ícone, tela ou identidade de terceiros; sem alterar regra
+de negócio, RBAC, API, backend, Prisma, migrations, seed, Docker, dependências ou lockfile.
+Telas internas só mudam no estritamente necessário para preservar roteamento, título, foco
+ou navegação. A entrada direta do gestor em "Minha equipe" é preservada e não pode disparar
+rota proibida nem 403 na inicialização. A dívida **L3** não é iniciada nem declarada
+resolvida, e seguem abertas **S-1 a S-4** (T158), **R-A, R-B e R-C** (T157) e o registro
+`teste michell`.
 
 ## Próxima ação autorizável
 
