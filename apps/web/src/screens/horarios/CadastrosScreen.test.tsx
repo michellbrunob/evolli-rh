@@ -259,7 +259,12 @@ describe("CadastrosScreen — modo demonstrativo (T076/T078/T081/T084/T085/T086/
     ).toBeInTheDocument();
   });
 
-  it("não referencia empresa, fornecedor nem dado real", () => {
+  it("não referencia autenticação, sessão, empresa, fornecedor nem dado real", () => {
+    // Lista IDÊNTICA à do modo funcional e à que existia antes da T159. Uma
+    // versão anterior desta tarefa tirou "senha" e "sessão" daqui alegando
+    // que as telas de exemplo contêm as palavras no próprio aviso — o aviso
+    // diz "Não há login, API, persistência…", e nenhuma das sete contém
+    // "senha" nem "sessão". A alegação era falsa e a guarda voltou.
     render(<CadastrosScreen modo="demonstrativo" />);
     for (const { aba } of DEMONSTRATIVAS) {
       fireEvent.click(screen.getByRole("tab", { name: aba }));
@@ -271,6 +276,8 @@ describe("CadastrosScreen — modo demonstrativo (T076/T078/T081/T084/T085/T086/
       "secullum",
       "rwtech",
       "bioprox",
+      "senha",
+      "sessão",
       "razão social",
     ]) {
       expect(texto).not.toContain(termoProibido);
@@ -278,9 +285,6 @@ describe("CadastrosScreen — modo demonstrativo (T076/T078/T081/T084/T085/T086/
   });
 
   it("cada catálogo se identifica como exemplo", () => {
-    // "senha" e "sessão" saem da lista proibida neste modo: aparecem na
-    // própria negação dessas telas ("não há login, senha…"). Proibir o termo
-    // reprovaria o aviso que as torna honestas; o que se exige é que ele exista.
     render(<CadastrosScreen modo="demonstrativo" />);
     for (const { aba } of DEMONSTRATIVAS) {
       fireEvent.click(screen.getByRole("tab", { name: aba }));

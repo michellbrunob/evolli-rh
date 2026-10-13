@@ -223,18 +223,6 @@
   color: var(--color-ink-subtle);
 }
 
-/* Fundo da gaveta: existe só quando ela está aberta, e só no mobile (no
-   desktop o `App` nunca abre a gaveta). Mesma opacidade do `Modal`. */
-.app-shell__fundo-gaveta {
-  position: fixed;
-  inset: 0;
-  z-index: 35;
-  background: rgb(29 29 31 / 45%);
-  border: none;
-  padding: 0;
-  cursor: pointer;
-}
-
 /* Área principal. `min-width: 0` impede que uma tabela larga com rolagem
    própria vaze a rolagem para a página inteira. */
 .app-shell__main {
@@ -309,6 +297,22 @@
 
   .app-shell--gaveta-aberta .app-shell__sidebar {
     display: flex;
+  }
+
+  /* Fundo da gaveta. Mesma opacidade do `Modal` (UI-F04).
+
+     Mora DENTRO da media query de propósito (R1): o `App` já desfaz o estado
+     móvel ao atravessar o breakpoint, e esta regra é a segunda barreira — se
+     a classe sobrevivesse por qualquer caminho, ainda assim não haveria
+     scrim de página inteira no desktop. */
+  .app-shell__fundo-gaveta {
+    position: fixed;
+    inset: 0;
+    z-index: 35;
+    background: rgb(29 29 31 / 45%);
+    border: none;
+    padding: 0;
+    cursor: pointer;
   }
 
   .app-shell__main {

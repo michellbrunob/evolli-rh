@@ -148,6 +148,13 @@
   transform: rotate(90deg);
 }
 
+/* Região recolhível do módulo: aviso (quando há) e submenu viajam juntos.
+   `hidden` nela tira os dois da árvore de acessibilidade e da tabulação de
+   uma vez — e impede o parágrafo órfão com o módulo fechado (R4). */
+.painel-nav__regiao[hidden] {
+  display: none;
+}
+
 /* Submenu: indentado sob o ícone do módulo e guiado por um filete vertical,
    para que a subordinação seja visível sem depender de cor. */
 .painel-nav__submenu {

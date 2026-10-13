@@ -1,7 +1,11 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { App } from "./App";
+import {
+  definirLarguraDaJanela,
+  redefinirLarguraDaJanela,
+} from "../test/viewport";
 
 describe("App — shell administrativo + navegação visual (T044)", () => {
   it("usa marcos semânticos e um único banner (a barra do shell)", () => {
@@ -832,8 +836,23 @@ describe("App — cabeçalho enxuto (T159 — evolução visual)", () => {
 });
 
 describe("App — gaveta de navegação do mobile (T159 — evolução visual)", () => {
+  // A gaveta só existe abaixo de 835px. Antes da correção da R1 o shell não
+  // olhava a largura: abria em qualquer viewport e continuava aberta depois
+  // de a janela crescer.
+  beforeEach(() => {
+    definirLarguraDaJanela(375);
+  });
+
+  afterEach(() => {
+    redefinirLarguraDaJanela();
+  });
+
   function gaveta() {
     return document.getElementById("navegacao-lateral")!;
+  }
+
+  function botaoMenu() {
+    return document.querySelector<HTMLButtonElement>(".app-shell__menu")!;
   }
 
   function focaveisDaGaveta() {
@@ -854,10 +873,7 @@ describe("App — gaveta de navegação do mobile (T159 — evolução visual)",
     render(<App papelDoAtor="rh" />);
     fireEvent.click(screen.getByRole("button", { name: "Menu" }));
 
-    expect(screen.getByRole("button", { name: "Menu" })).toHaveAttribute(
-      "aria-expanded",
-      "true",
-    );
+    expect(botaoMenu()).toHaveAttribute("aria-expanded", "true");
     expect(gaveta().contains(document.activeElement)).toBe(true);
   });
 
@@ -895,10 +911,7 @@ describe("App — gaveta de navegação do mobile (T159 — evolução visual)",
     fireEvent.click(screen.getByRole("button", { name: "Menu" }));
     fireEvent.click(screen.getByRole("button", { name: /^Jornada/ }));
 
-    expect(screen.getByRole("button", { name: "Menu" })).toHaveAttribute(
-      "aria-expanded",
-      "false",
-    );
+    expect(botaoMenu()).toHaveAttribute("aria-expanded", "false");
     expect(
       screen.getByRole("heading", { level: 1, name: "Visão do período" }),
     ).toBeInTheDocument();
@@ -906,21 +919,230 @@ describe("App — gaveta de navegação do mobile (T159 — evolução visual)",
 
   it("o fundo fecha a gaveta, e só existe enquanto ela está aberta", () => {
     render(<App papelDoAtor="rh" />);
-    expect(screen.queryByRole("button", { name: "Fechar menu" })).toBeNull();
+    expect(document.querySelector(".app-shell__fundo-gaveta")).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Menu" }));
     fireEvent.click(screen.getByRole("button", { name: "Fechar menu" }));
 
+    expect(botaoMenu()).toHaveAttribute("aria-expanded", "false");
+    expect(document.querySelector(".app-shell__fundo-gaveta")).toBeNull();
+  });
+
+  it("a gaveta aberta não duplica o h1 do fundo", () => {
+    render(<App papelDoAtor="rh" />);
+    fireEvent.click(screen.getByRole("button", { name: "Menu" }));
+    expect(document.querySelectorAll("h1")).toHaveLength(1);
+  });
+});
+
+describe("App — R3: modalidade real da gaveta", () => {
+  function gaveta() {
+    return document.getElementById("navegacao-lateral")!;
+  }
+
+  afterEach(() => {
+    redefinirLarguraDaJanela();
+  });
+
+  it("aberta no mobile, a gaveta é um diálogo modal com nome acessível", () => {
+    definirLarguraDaJanela(375);
+    render(<App papelDoAtor="rh" />);
+    fireEvent.click(screen.getByRole("button", { name: "Menu" }));
+
+    const dialogo = screen.getByRole("dialog", { name: "Menu de navegação" });
+    expect(dialogo).toBe(gaveta());
+    expect(dialogo).toHaveAttribute("aria-modal", "true");
+    // A navegação continua sendo uma navegação DENTRO do diálogo.
+    expect(
+      within(dialogo).getByRole("navigation", {
+        name: "Navegação do painel",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("o fundo fica inacessível enquanto é modal e volta inteiro ao fechar", () => {
+    definirLarguraDaJanela(375);
+    render(<App papelDoAtor="rh" onLogout={() => {}} />);
+    const cabecalho = document.querySelector("header")!;
+    const principal = document.querySelector("main")!;
+    const rodape = document.querySelector("footer")!;
+
+    fireEvent.click(screen.getByRole("button", { name: "Menu" }));
+
+    for (const regiao of [cabecalho, principal, rodape]) {
+      // `inert` corta foco e clique; `aria-hidden` é a rede para quem ainda
+      // não implementa `inert`.
+      expect(regiao).toHaveAttribute("inert");
+      expect(regiao).toHaveAttribute("aria-hidden", "true");
+    }
+    // A árvore de acessibilidade perde mesmo o fundo...
+    expect(screen.queryByRole("main")).toBeNull();
+    expect(screen.queryAllByRole("heading", { level: 1 })).toHaveLength(0);
+    expect(screen.queryByRole("contentinfo")).toBeNull();
+    // ...sem que o DOM seja mutilado: o h1 continua lá, único.
+    expect(document.querySelectorAll("h1")).toHaveLength(1);
+
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    for (const regiao of [cabecalho, principal, rodape]) {
+      expect(regiao).not.toHaveAttribute("inert");
+      expect(regiao).not.toHaveAttribute("aria-hidden");
+    }
+    expect(screen.getByRole("main")).toBe(principal);
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+  });
+
+  it("no desktop a barra permanente NÃO tem semântica de diálogo", () => {
+    definirLarguraDaJanela(1280);
+    render(<App papelDoAtor="rh" />);
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(gaveta()).not.toHaveAttribute("role");
+    expect(gaveta()).not.toHaveAttribute("aria-modal");
+    expect(screen.getByRole("main")).not.toHaveAttribute("inert");
+    expect(screen.getByRole("main")).not.toHaveAttribute("aria-hidden");
+  });
+
+  it("no desktop o botão da gaveta não abre nada", () => {
+    // O botão existe no DOM em qualquer largura (o CSS é que o esconde). Se
+    // alguém o acionar fora do modo gaveta, nada de modal pode acontecer.
+    definirLarguraDaJanela(1280);
+    render(<App papelDoAtor="rh" />);
+    fireEvent.click(screen.getByRole("button", { name: "Menu" }));
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.querySelector(".app-shell__fundo-gaveta")).toBeNull();
+    expect(screen.getByRole("main")).not.toHaveAttribute("inert");
+  });
+});
+
+describe("App — R1: atravessar o breakpoint com a gaveta aberta", () => {
+  function gaveta() {
+    return document.getElementById("navegacao-lateral")!;
+  }
+
+  afterEach(() => {
+    redefinirLarguraDaJanela();
+  });
+
+  it("mobile → desktop desfaz gaveta, scrim, diálogo e estado móvel", () => {
+    // O caso real: girar um tablet de 768 para 1024 com a gaveta aberta.
+    // Antes da correção sobrava um scrim de página inteira por cima de uma
+    // barra lateral que já estava no fluxo normal.
+    definirLarguraDaJanela(768);
+    render(<App papelDoAtor="rh" />);
+    fireEvent.click(screen.getByRole("button", { name: "Menu" }));
+    expect(
+      screen.getByRole("dialog", { name: "Menu de navegação" }),
+    ).toBeInTheDocument();
+    expect(document.querySelector(".app-shell__fundo-gaveta")).not.toBeNull();
+
+    act(() => {
+      definirLarguraDaJanela(1024);
+    });
+
+    expect(document.querySelector(".app-shell__fundo-gaveta")).toBeNull();
+    expect(document.querySelector(".app-shell--gaveta-aberta")).toBeNull();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(gaveta()).not.toHaveAttribute("role");
+    expect(gaveta()).not.toHaveAttribute("aria-modal");
     expect(screen.getByRole("button", { name: "Menu" })).toHaveAttribute(
       "aria-expanded",
       "false",
     );
   });
 
-  it("a gaveta aberta continua com um único h1 — o da tela", () => {
+  it("o fundo volta a ser alcançável depois do redimensionamento", () => {
+    definirLarguraDaJanela(375);
+    render(<App papelDoAtor="rh" onLogout={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: "Menu" }));
+
+    act(() => {
+      definirLarguraDaJanela(1366);
+    });
+
+    for (const seletor of ["header", "main", "footer"]) {
+      const regiao = document.querySelector(seletor)!;
+      expect(regiao).not.toHaveAttribute("inert");
+      expect(regiao).not.toHaveAttribute("aria-hidden");
+    }
+    expect(screen.getByRole("main")).toBeInTheDocument();
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Sair" })).toBeInTheDocument();
+  });
+
+  it("o foco deixa de ser preso: Tab a partir do conteúdo não volta à barra", () => {
+    definirLarguraDaJanela(375);
     render(<App papelDoAtor="rh" />);
     fireEvent.click(screen.getByRole("button", { name: "Menu" }));
-    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+
+    act(() => {
+      definirLarguraDaJanela(1366);
+    });
+
+    const principal = screen.getByRole("main");
+    principal.focus();
+    fireEvent.keyDown(document, { key: "Tab" });
+
+    // Com a armadilha ativa, o Tab a partir de fora da caixa puxaria o foco
+    // para o primeiro botão dela. Sem ela, o foco fica onde estava.
+    expect(gaveta().contains(document.activeElement)).toBe(false);
+    expect(document.activeElement).toBe(principal);
+  });
+
+  it("não rouba o foco para um botão que o desktop esconde", () => {
+    definirLarguraDaJanela(375);
+    render(<App papelDoAtor="rh" />);
+    fireEvent.click(screen.getByRole("button", { name: "Menu" }));
+    const dentro = document.activeElement;
+    expect(gaveta().contains(dentro)).toBe(true);
+
+    act(() => {
+      definirLarguraDaJanela(1366);
+    });
+
+    // Fechar POR REDIMENSIONAMENTO não devolve o foco ao botão "Menu" — ele
+    // acabou de virar `display: none`, e focá-lo jogaria o foco para o body.
+    // O foco fica onde está, na barra que agora é permanente.
+    expect(document.activeElement).not.toBe(
+      document.querySelector(".app-shell__menu"),
+    );
+    expect(document.activeElement).toBe(dentro);
+  });
+
+  it("fecha mesmo quando só o `resize` chega, sem evento `change`", () => {
+    // Medido no painel de prévia deste projeto: com viewport emulado,
+    // `matchMedia().matches` muda e `change` nunca é disparado. Se o shell
+    // dependesse só de `change`, a janela cresceria e ele continuaria em
+    // modo gaveta — o defeito R1 por outro caminho.
+    definirLarguraDaJanela(375);
+    render(<App papelDoAtor="rh" />);
+    fireEvent.click(screen.getByRole("button", { name: "Menu" }));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+
+    act(() => {
+      definirLarguraDaJanela(1366, { silencioso: true });
+      window.dispatchEvent(new Event("resize"));
+    });
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.querySelector(".app-shell__fundo-gaveta")).toBeNull();
+    expect(screen.getByRole("main")).not.toHaveAttribute("inert");
+  });
+
+  it("desktop → mobile não abre nada sozinho", () => {
+    definirLarguraDaJanela(1280);
+    render(<App papelDoAtor="rh" />);
+
+    act(() => {
+      definirLarguraDaJanela(375);
+    });
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByRole("button", { name: "Menu" })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
   });
 });
 
@@ -952,5 +1174,16 @@ describe("App — contrato responsivo do shell (T159 — evolução visual)", ()
 
   it("a gaveta nunca passa da largura da tela", () => {
     expect(mobile).toMatch(/width:\s*min\(300px,\s*86vw\)/);
+  });
+
+  it("R1 — o scrim é declarado SÓ dentro da media query do mobile", () => {
+    // Segunda barreira, independente do JavaScript: mesmo que a classe de
+    // estado móvel sobrevivesse por qualquer caminho, não haveria overlay de
+    // página inteira no desktop.
+    const forcaDaMobile = mobile.includes(".app-shell__fundo-gaveta");
+    const ocorrencias = (css.match(/\.app-shell__fundo-gaveta\s*\{/g) ?? [])
+      .length;
+    expect(forcaDaMobile).toBe(true);
+    expect(ocorrencias).toBe(1);
   });
 });

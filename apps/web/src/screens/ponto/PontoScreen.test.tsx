@@ -180,7 +180,12 @@ describe("PontoScreen — modo demonstrativo (T069/T077/T079/T095/T096/T097)", (
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
   });
 
-  it("não referencia CPF, salário, empresa, fornecedor nem dado real", () => {
+  it("não referencia CPF, salário, senha, sessão nem dado real", () => {
+    // Lista IDÊNTICA à que existia antes da T159. Uma versão anterior desta
+    // tarefa tirou "senha" e "sessão" daqui alegando que as telas contêm as
+    // palavras no próprio aviso — o aviso diz "Não há login, API,
+    // persistência…", e nenhuma das sete contém "senha" nem "sessão". A
+    // alegação era falsa e a guarda voltou.
     render(<PontoScreen modo="demonstrativo" />);
     for (const { aba } of DEMONSTRATIVAS) {
       fireEvent.click(screen.getByRole("tab", { name: aba }));
@@ -193,6 +198,8 @@ describe("PontoScreen — modo demonstrativo (T069/T077/T079/T095/T096/T097)", (
       "secullum",
       "rwtech",
       "bioprox",
+      "senha",
+      "sessão",
       "salário",
       "salario",
     ]) {
@@ -201,10 +208,6 @@ describe("PontoScreen — modo demonstrativo (T069/T077/T079/T095/T096/T097)", (
   });
 
   it("cada aba de exemplo se identifica como exemplo", () => {
-    // "senha" e "sessão" saíram da lista proibida deste modo: nestas telas as
-    // palavras aparecem **na própria negação** ("não há login, senha…"), e
-    // proibir o termo reprovaria o aviso que torna a tela honesta. O que se
-    // exige aqui é o contrário — que o aviso exista.
     render(<PontoScreen modo="demonstrativo" />);
     for (const { aba } of DEMONSTRATIVAS) {
       fireEvent.click(screen.getByRole("tab", { name: aba }));

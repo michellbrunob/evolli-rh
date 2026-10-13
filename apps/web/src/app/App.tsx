@@ -108,6 +108,69 @@ const FOCAVEIS_GAVETA =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 /**
+ * Mesmo `max-width` do `app-shell.css`. Declarado uma vez, em um lugar: se o
+ * CSS e o JavaScript discordassem do breakpoint, existiria uma faixa de
+ * largura em que a barra é permanente e o shell ainda se julga em modo
+ * gaveta — que é precisamente o defeito R1.
+ */
+export const CONSULTA_MODO_GAVETA = "(max-width: 834px)";
+
+/**
+ * Atributos que tiram uma região do alcance enquanto a gaveta é modal.
+ *
+ * `inert` corta foco, clique e leitura; `aria-hidden` é a rede para o
+ * navegador que ainda não implementa `inert`. Os dois juntos porque prometer
+ * modalidade e deixar o fundo alcançável é o erro que o `Modal` (UI-F04) já
+ * documenta: afirmar uma coisa e permitir outra.
+ *
+ * Tipado como atributos soltos porque `inert` ainda não existe nos tipos do
+ * React 18 — o atributo é real e os navegadores o respeitam.
+ */
+const FUNDO_INERTE: Record<string, string> = {
+  inert: "",
+  "aria-hidden": "true",
+};
+
+/** `true` enquanto a janela está na faixa em que a barra lateral é gaveta. */
+function avaliarModoGaveta(): boolean {
+  // Sem `matchMedia` o modo gaveta é o padrão: é o que mantém a navegação
+  // alcançável. O CSS continua decidindo o que aparece.
+  return window.matchMedia?.(CONSULTA_MODO_GAVETA)?.matches ?? true;
+}
+
+/**
+ * Acompanha o breakpoint. Reavalia na montagem (entre o primeiro render e o
+ * efeito a janela pode ter mudado) e remove o ouvinte ao desmontar.
+ */
+function useModoGaveta(): boolean {
+  const [modoGaveta, setModoGaveta] = useState(avaliarModoGaveta);
+
+  useEffect(() => {
+    const consulta = window.matchMedia?.(CONSULTA_MODO_GAVETA);
+    if (!consulta) return;
+
+    const reavaliar = () => setModoGaveta(avaliarModoGaveta());
+    reavaliar();
+
+    // Dois sinais, de propósito. `change` é o correto e basta num navegador
+    // comum. `resize` é a rede: em ambiente com viewport emulado (o painel de
+    // prévia deste projeto, entre outros) `matches` muda e o evento `change`
+    // NUNCA chega — medido. Sem a rede, a janela cresceria e o shell
+    // continuaria se julgando em modo gaveta, que é o defeito R1 de novo,
+    // por outro caminho. Reavaliar é idempotente: `setState` com o mesmo
+    // valor não re-renderiza.
+    consulta.addEventListener("change", reavaliar);
+    window.addEventListener("resize", reavaliar);
+    return () => {
+      consulta.removeEventListener("change", reavaliar);
+      window.removeEventListener("resize", reavaliar);
+    };
+  }, []);
+
+  return modoGaveta;
+}
+
+/**
  * Ícone do botão da gaveta. Três traços — desenho próprio, elementar, sem
  * conjunto de terceiro (ver `docs/decisions/t159-direcao-visual-navegacao.md`).
  * `aria-hidden` porque o botão já se chama "Menu" em texto.
@@ -322,11 +385,22 @@ export function App({
     EXCECOES_PONTO_TITULO_ID,
   );
 
-  // Gaveta do mobile. No desktop ela nunca abre: o único botão que a abre é
-  // `display: none` acima de 834px, e a barra lateral é permanente.
+  // Gaveta do mobile. `modoGaveta` é a largura da janela, não a intenção de
+  // quem navega: a gaveta só é modal quando as duas coisas valem.
+  const modoGaveta = useModoGaveta();
   const [gavetaAberta, setGavetaAberta] = useState(false);
+  const gavetaModal = modoGaveta && gavetaAberta;
   const botaoMenuRef = useRef<HTMLButtonElement | null>(null);
   const sidebarRef = useRef<HTMLDivElement | null>(null);
+
+  // R1 — atravessar o breakpoint para o desktop desfaz o estado móvel por
+  // completo: sem gaveta aberta, sem scrim, sem foco preso, sem semântica de
+  // diálogo. Antes disto, girar um tablet de 768 para 1024 com a gaveta
+  // aberta deixava um scrim de página inteira por cima da barra já normal.
+  useEffect(() => {
+    if (modoGaveta) return;
+    setGavetaAberta(false);
+  }, [modoGaveta]);
 
   // Navegar fecha a gaveta — no desktop isto não tem efeito, porque ela já
   // está fechada. Vale para a barra e para os atalhos da Visão geral.
@@ -340,7 +414,7 @@ export function App({
   // deixá-la por cima da página e permitir que o `Tab` fosse para trás seria
   // afirmar uma coisa e permitir outra.
   useEffect(() => {
-    if (!gavetaAberta) return;
+    if (!gavetaModal) return;
     const caixa = sidebarRef.current;
     // Capturado agora, e nao na limpeza: na limpeza o ref ja pode apontar
     // para outro no (regra react-hooks/exhaustive-deps).
@@ -384,29 +458,41 @@ export function App({
     document.addEventListener("keydown", aoTeclar, true);
     return () => {
       document.removeEventListener("keydown", aoTeclar, true);
-      if (acionador && document.contains(acionador)) acionador.focus();
+      // Devolver o foco a quem abriu é certo quando a gaveta FECHA; é
+      // errado quando ela some porque a janela cresceu — ali o acionador
+      // acabou de virar `display: none`, e focá-lo jogaria o foco para o
+      // `body`. A pergunta é feita ao `matchMedia` na hora, e não a um
+      // sinalizador guardado antes: numa mesma renderização a limpeza roda
+      // ANTES do efeito que reagiria ao breakpoint, e o sinalizador chegaria
+      // tarde.
+      if (avaliarModoGaveta() && acionador && document.contains(acionador)) {
+        acionador.focus();
+      }
     };
-  }, [gavetaAberta]);
+  }, [gavetaModal]);
 
   const rotuloDoPapel = papelDoAtor ? ROTULO_PAPEL[papelDoAtor] : undefined;
 
   return (
     <div
       className={
-        gavetaAberta ? "app-shell app-shell--gaveta-aberta" : "app-shell"
+        gavetaModal ? "app-shell app-shell--gaveta-aberta" : "app-shell"
       }
     >
       <a className="app-shell__skip-link" href="#conteudo-principal">
         Pular para o conteúdo
       </a>
 
-      <header className="app-shell__topbar">
+      <header
+        className="app-shell__topbar"
+        {...(gavetaModal ? FUNDO_INERTE : {})}
+      >
         <div className="app-shell__topbar-inner">
           <button
             type="button"
             className="app-shell__menu"
             ref={botaoMenuRef}
-            aria-expanded={gavetaAberta}
+            aria-expanded={gavetaModal}
             aria-controls="navegacao-lateral"
             onClick={() => setGavetaAberta((aberta) => !aberta)}
           >
@@ -465,7 +551,10 @@ export function App({
       </header>
 
       {onLogout && mfaDisponivel && segurancaAberto ? (
-        <div className="app-shell__sessoes-ativas-wrapper">
+        <div
+          className="app-shell__sessoes-ativas-wrapper"
+          {...(gavetaModal ? FUNDO_INERTE : {})}
+        >
           <SegurancaMfaPanel
             aberto={segurancaAberto}
             onFechar={() => setSegurancaAberto(false)}
@@ -475,7 +564,10 @@ export function App({
       ) : null}
 
       {onLogout && sessoesAtivasAberto ? (
-        <div className="app-shell__sessoes-ativas-wrapper">
+        <div
+          className="app-shell__sessoes-ativas-wrapper"
+          {...(gavetaModal ? FUNDO_INERTE : {})}
+        >
           <SessoesAtivasPanel
             aberto={sessoesAtivasAberto}
             onFechar={() => setSessoesAtivasAberto(false)}
@@ -485,7 +577,7 @@ export function App({
       ) : null}
 
       <div className="app-shell__body">
-        {gavetaAberta ? (
+        {gavetaModal ? (
           <button
             type="button"
             className="app-shell__fundo-gaveta"
@@ -494,10 +586,21 @@ export function App({
           />
         ) : null}
 
+        {/* R3 — a semântica de diálogo existe SÓ enquanto a gaveta é modal.
+            No desktop este mesmo nó é a barra lateral permanente, e anunciar
+            uma barra permanente como janela modal seria mentir para quem usa
+            leitor de tela. */}
         <div
           className="app-shell__sidebar"
           id="navegacao-lateral"
           ref={sidebarRef}
+          {...(gavetaModal
+            ? {
+                role: "dialog",
+                "aria-modal": true,
+                "aria-label": "Menu de navegação",
+              }
+            : {})}
         >
           <span className="app-shell__marca">
             <MarcaEvolli />
@@ -524,6 +627,7 @@ export function App({
           id="conteudo-principal"
           className="app-shell__main"
           tabIndex={-1}
+          {...(gavetaModal ? FUNDO_INERTE : {})}
           aria-labelledby={
             destinoAtivoId === "cadastros"
               ? cadastrosTituloId
@@ -555,7 +659,10 @@ export function App({
         </main>
       </div>
 
-      <footer className="app-shell__footer">
+      <footer
+        className="app-shell__footer"
+        {...(gavetaModal ? FUNDO_INERTE : {})}
+      >
         <div className="app-shell__footer-inner">
           <span className="app-shell__footer-brand">Evolli RH</span>
           <span>Ambiente interno · sem dados reais</span>

@@ -365,12 +365,15 @@ describe("módulo, submenu e destino ativo (T159 — evolução visual)", () => 
     const lideranca = screen.getByRole("button", { name: "Liderança" });
     expect(lideranca).toHaveAttribute("aria-expanded", "true");
 
-    const lista = document.getElementById(
+    // O cabeçalho controla a REGIÃO recolhível (aviso + lista), não só a
+    // lista — ver R4.
+    const regiao = document.getElementById(
       lideranca.getAttribute("aria-controls")!,
     )!;
+    const lista = regiao.querySelector("ul")!;
     expect(lista.getAttribute("aria-labelledby")).toBe(lideranca.id);
     expect(
-      within(lista as HTMLElement)
+      within(regiao as HTMLElement)
         .getAllByRole("button")
         .map((b) => b.textContent),
     ).toEqual([
@@ -506,9 +509,10 @@ describe("Demonstração é separada e secundária (T159 — evolução visual)"
       <PainelNavigation destinoAtivoId="pessoas" onSelecionar={() => {}} />,
     );
     const cabecalho = screen.getByRole("button", { name: "Demonstração" });
-    const lista = document.getElementById(
+    const regiao = document.getElementById(
       cabecalho.getAttribute("aria-controls")!,
     )!;
+    const lista = regiao.querySelector("ul")!;
     const aviso = document.getElementById(
       lista.getAttribute("aria-describedby")!,
     )!;
@@ -518,5 +522,36 @@ describe("Demonstração é separada e secundária (T159 — evolução visual)"
     expect(
       aviso.compareDocumentPosition(lista) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
+    // Aviso e lista moram na MESMA região recolhível (R4).
+    expect(regiao.contains(aviso)).toBe(true);
+    expect(regiao.contains(lista)).toBe(true);
+  });
+
+  it("R4 — fechado, aviso e lista somem juntos: nenhum parágrafo órfão", () => {
+    render(
+      <PainelNavigation destinoAtivoId="pessoas" onSelecionar={() => {}} />,
+    );
+    const cabecalho = screen.getByRole("button", { name: "Demonstração" });
+    const regiao = document.getElementById(
+      cabecalho.getAttribute("aria-controls")!,
+    )!;
+
+    expect(regiao).not.toHaveAttribute("hidden");
+    expect(
+      screen.getByText(/Nada aqui grava, consulta o servidor/),
+    ).toBeInTheDocument();
+
+    fireEvent.click(cabecalho);
+
+    expect(regiao).toHaveAttribute("hidden");
+    // `hidden` na região tira o aviso E a lista da árvore de acessibilidade
+    // de uma vez — nada de parágrafo anunciando um grupo que não está à
+    // vista. (`queryByText` não filtra por `hidden`, então o que se afirma é
+    // o fato estrutural: o aviso está DENTRO do que foi escondido.)
+    const aviso = screen.getByText(/Nada aqui grava, consulta o servidor/);
+    expect(aviso.closest("[hidden]")).toBe(regiao);
+    expect(screen.queryByRole("button", { name: /^Visão geral/ })).toBeNull();
+    // Antes da R4 o aviso ficava FORA da região e sobrava sozinho na tela.
+    expect(regiao.contains(aviso)).toBe(true);
   });
 });

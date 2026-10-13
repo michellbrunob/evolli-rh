@@ -141,7 +141,10 @@ function Modulo({
   onSelecionar,
 }: ModuloProps) {
   const tituloId = `nav-grupo-${grupo.titulo}`;
-  const listaId = `${tituloId}-lista`;
+  // O que o cabeçalho controla é a REGIÃO inteira — aviso e lista —, não só a
+  // lista. Com o módulo fechado não pode sobrar um parágrafo anunciando um
+  // grupo que não está à vista (R4).
+  const regiaoId = `${tituloId}-conteudo`;
   const descricaoId = grupo.descricao ? `${tituloId}-descricao` : undefined;
   const contemAtivo = visiveis.some((d) => d.id === destinoAtivoId);
 
@@ -175,7 +178,7 @@ function Modulo({
           .filter(Boolean)
           .join(" ")}
         aria-expanded={aberto}
-        aria-controls={listaId}
+        aria-controls={regiaoId}
         onClick={onAlternar}
       >
         <IconeModulo nome={grupo.icone} />
@@ -185,30 +188,30 @@ function Modulo({
         <SetaExpansao />
       </button>
 
-      {grupo.descricao ? (
-        <p className="painel-nav__descricao" id={descricaoId}>
-          {grupo.descricao}
-        </p>
-      ) : null}
+      <div className="painel-nav__regiao" id={regiaoId} hidden={!aberto}>
+        {grupo.descricao ? (
+          <p className="painel-nav__descricao" id={descricaoId}>
+            {grupo.descricao}
+          </p>
+        ) : null}
 
-      <ul
-        className="painel-nav__submenu"
-        id={listaId}
-        aria-labelledby={tituloId}
-        hidden={!aberto}
-        {...(descricaoId ? { "aria-describedby": descricaoId } : {})}
-      >
-        {visiveis.map((destino) => (
-          <li className="painel-nav__item" key={destino.id}>
-            <BotaoDestino
-              destino={destino}
-              ativo={destino.id === destinoAtivoId}
-              nivel="sub"
-              onSelecionar={onSelecionar}
-            />
-          </li>
-        ))}
-      </ul>
+        <ul
+          className="painel-nav__submenu"
+          aria-labelledby={tituloId}
+          {...(descricaoId ? { "aria-describedby": descricaoId } : {})}
+        >
+          {visiveis.map((destino) => (
+            <li className="painel-nav__item" key={destino.id}>
+              <BotaoDestino
+                destino={destino}
+                ativo={destino.id === destinoAtivoId}
+                nivel="sub"
+                onSelecionar={onSelecionar}
+              />
+            </li>
+          ))}
+        </ul>
+      </div>
     </li>
   );
 }
