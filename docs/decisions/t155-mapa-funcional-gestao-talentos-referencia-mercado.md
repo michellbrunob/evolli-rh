@@ -218,16 +218,16 @@ Estas são hipóteses de produto, não decisões:
 
 ## 5. Prioridade sugerida, sem iniciar implementação
 
-| Frente | Estado no Evolli | Próxima dependência |
-| --- | --- | --- |
-| Checklists de contratação/desligamento | investigação T155 em curso | respostas de RH às 12 perguntas |
-| Motivos de desligamento | candidato simples | catálogo e semântica aprovados por RH/DP |
-| Departamentos e unidades | estrutura parcialmente existente | definição corporativa e relação com alocações |
-| Registros internos | não iniciado | política de tipo, conteúdo e visibilidade |
-| Feedbacks | não iniciado | decisão de exposição, notificação e auditoria |
-| Métricas | futuro | contratos de indicadores e privacidade |
-| Férias | futuro regulamentado | decisão RH/Jurídico própria |
-| Saúde e segurança | futuro sensível | parecer Jurídico/DPO/Segurança e desenho segregado |
+| Frente                                 | Estado no Evolli                 | Próxima dependência                                |
+| -------------------------------------- | -------------------------------- | -------------------------------------------------- |
+| Checklists de contratação/desligamento | investigação T155 em curso       | respostas de RH às 12 perguntas                    |
+| Motivos de desligamento                | candidato simples                | catálogo e semântica aprovados por RH/DP           |
+| Departamentos e unidades               | estrutura parcialmente existente | definição corporativa e relação com alocações      |
+| Registros internos                     | não iniciado                     | política de tipo, conteúdo e visibilidade          |
+| Feedbacks                              | não iniciado                     | decisão de exposição, notificação e auditoria      |
+| Métricas                               | futuro                           | contratos de indicadores e privacidade             |
+| Férias                                 | futuro regulamentado             | decisão RH/Jurídico própria                        |
+| Saúde e segurança                      | futuro sensível                  | parecer Jurídico/DPO/Segurança e desenho segregado |
 
 ## 6. Próxima decisão necessária
 

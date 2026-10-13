@@ -824,8 +824,8 @@ administradas pela interface e ESS.
 
 ## Datas no padrão brasileiro — T154 (integrada)
 
-| Tarefa | Estado               | Resultado principal                                                                                                |
-| ------ | -------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Tarefa | Estado                                    | Resultado principal                                                                                                |
+| ------ | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | T154   | **Integrada** (PR #145, squash `cd80ea9`) | Padroniza a apresentação de datas em `apps/web` para o formato brasileiro, sem tocar transporte nem armazenamento. |
 
 **Escopo, explicitamente.** A T154 é **somente apresentação**, e somente em `apps/web`. Contratos
