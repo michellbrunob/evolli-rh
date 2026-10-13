@@ -370,7 +370,16 @@ describe("PessoasScreen — modo demonstrativo (T092/T093/T094)", () => {
     }
   });
 
-  it("não referencia empresa, fornecedor nem dado real", () => {
+  it("não referencia autenticação, sessão, empresa, fornecedor nem dado real", () => {
+    // `login` é o ÚNICO termo fora desta lista, e por um motivo verificado:
+    // as três telas o usam dentro da própria negação — "Não há login, API,
+    // persistência…". Proibi-lo reprovaria o aviso que torna a tela honesta,
+    // e há teste exigindo que toda ocorrência esteja nessa negação
+    // (`superficiesDemonstrativas.test.tsx`).
+    //
+    // `senha` e `sessão` NÃO têm essa desculpa: nenhuma das três os contém.
+    // Uma versão anterior da T159 os tirou daqui junto com `login`, como se
+    // o mesmo motivo valesse para os três. Não valia.
     render(<PessoasScreen modo="demonstrativo" />);
     for (const aba of ["Dependentes", "Afastamentos", "Benefícios"]) {
       fireEvent.click(screen.getByRole("tab", { name: aba }));
@@ -382,17 +391,14 @@ describe("PessoasScreen — modo demonstrativo (T092/T093/T094)", () => {
       "secullum",
       "rwtech",
       "bioprox",
+      "senha",
+      "sessão",
     ]) {
       expect(texto).not.toContain(termoProibido);
     }
   });
 
   it("cada aba de exemplo declara, ela mesma, que não persiste nada", () => {
-    // Por que a lista de termos acima não inclui "login", "senha" e "sessão",
-    // como a do modo funcional: nestas telas essas palavras aparecem **na
-    // própria negação** — "não há login, api, persistência…". Proibir o termo
-    // reprovaria justamente o aviso que torna a tela honesta. O que se exige
-    // aqui é o contrário: que o aviso exista.
     render(<PessoasScreen modo="demonstrativo" />);
     for (const aba of ["Benefícios", "Dependentes", "Afastamentos"]) {
       fireEvent.click(screen.getByRole("tab", { name: aba }));

@@ -1144,6 +1144,51 @@ describe("App — R1: atravessar o breakpoint com a gaveta aberta", () => {
       "false",
     );
   });
+
+  it("S2 — acionar no desktop e DEPOIS encolher não abre a gaveta", () => {
+    // O botão existe no DOM em qualquer largura (quem o esconde é o CSS),
+    // então um acionamento no desktop é possível por programa. Sem a guarda,
+    // `gavetaAberta` ficava `true` de forma invisível e a gaveta abria
+    // sozinha na primeira vez que a janela encolhesse.
+    definirLarguraDaJanela(1280);
+    render(<App papelDoAtor="rh" />);
+
+    const menu = screen.getByRole("button", { name: "Menu" });
+    fireEvent.click(menu);
+    fireEvent.click(menu);
+    fireEvent.click(menu);
+    expect(screen.queryByRole("dialog")).toBeNull();
+
+    act(() => {
+      definirLarguraDaJanela(375);
+    });
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.querySelector(".app-shell__fundo-gaveta")).toBeNull();
+    expect(document.querySelector(".app-shell--gaveta-aberta")).toBeNull();
+    expect(menu).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByRole("main")).not.toHaveAttribute("inert");
+  });
+
+  it("S2 — depois disso a gaveta ainda abre normalmente no mobile", () => {
+    // A guarda não pode custar a função: um clique inútil no desktop não
+    // deixa o acionador travado depois.
+    definirLarguraDaJanela(1280);
+    render(<App papelDoAtor="rh" />);
+    fireEvent.click(screen.getByRole("button", { name: "Menu" }));
+
+    act(() => {
+      definirLarguraDaJanela(375);
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Menu" }));
+
+    expect(
+      screen.getByRole("dialog", { name: "Menu de navegação" }),
+    ).toBeInTheDocument();
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
 });
 
 describe("App — contrato responsivo do shell (T159 — evolução visual)", () => {
@@ -1151,17 +1196,59 @@ describe("App — contrato responsivo do shell (T159 — evolução visual)", ()
   // no CSS. A conferência visual em 375px e no desktop é feita no navegador,
   // e está registrada na PR.
   const css = readFileSync("src/app/app-shell.css", "utf8");
-  const mobile = css.slice(css.indexOf("@media (max-width: 834px)"));
+
+  /**
+   * Conteúdo EXATO de um bloco `@media`, delimitado por casamento de chaves.
+   *
+   * S3 — a versão anterior fatiava do início do bloco até o fim do arquivo,
+   * então "está no mobile" também aceitava uma regra escrita no bloco de
+   * 640px. O cabeçalho é casado por expressão regular tolerante a espaço,
+   * para o teste não quebrar com uma reformatação do Prettier.
+   */
+  function blocoDeMedia(largura: number): string {
+    const cabecalho = new RegExp(
+      `@media\\s*\\(\\s*max-width:\\s*${largura}px\\s*\\)\\s*\\{`,
+    );
+    const encontrado = cabecalho.exec(css);
+    if (!encontrado) throw new Error(`bloco @media ${largura}px não existe`);
+
+    const abre = encontrado.index + encontrado[0].length - 1;
+    let profundidade = 0;
+    for (let i = abre; i < css.length; i += 1) {
+      if (css[i] === "{") profundidade += 1;
+      else if (css[i] === "}") {
+        profundidade -= 1;
+        if (profundidade === 0) return css.slice(abre + 1, i);
+      }
+    }
+    throw new Error(`bloco @media ${largura}px não fecha`);
+  }
+
+  const mobile = blocoDeMedia(834);
+  const estreito = blocoDeMedia(640);
+  /** Tudo o que NÃO está dentro do bloco do modo gaveta. */
+  const foraDoMobile = css.replace(mobile, "");
+
+  it("o extrator de bloco realmente delimita — e não varre o arquivo inteiro", () => {
+    // Sem esta verificação, um extrator quebrado faria as asserções abaixo
+    // passarem por acidente.
+    expect(mobile.length).toBeGreaterThan(0);
+    expect(mobile.length).toBeLessThan(css.length);
+    expect(mobile).not.toContain("@media");
+    expect(mobile).not.toContain(".app-shell__footer-inner");
+    expect(estreito).toContain(".app-shell__footer-inner");
+    expect(mobile).not.toContain(estreito);
+  });
 
   it("abaixo de 835px a barra sai do fluxo e só aparece aberta", () => {
     expect(mobile).toMatch(/\.app-shell__sidebar\s*\{[^}]*display:\s*none/);
     expect(mobile).toMatch(
-      /\.app-shell--gaveta-aberta \.app-shell__sidebar\s*\{[^}]*display:\s*flex/,
+      /\.app-shell--gaveta-aberta\s+\.app-shell__sidebar\s*\{[^}]*display:\s*flex/,
     );
   });
 
   it("o botão da gaveta só aparece no mobile", () => {
-    expect(css).toMatch(/\.app-shell__menu\s*\{[^}]*display:\s*none/);
+    expect(foraDoMobile).toMatch(/\.app-shell__menu\s*\{[^}]*display:\s*none/);
     expect(mobile).toMatch(
       /\.app-shell__menu[^{]*\{[^}]*display:\s*inline-flex/,
     );
@@ -1173,17 +1260,17 @@ describe("App — contrato responsivo do shell (T159 — evolução visual)", ()
   });
 
   it("a gaveta nunca passa da largura da tela", () => {
-    expect(mobile).toMatch(/width:\s*min\(300px,\s*86vw\)/);
+    expect(mobile).toMatch(/width:\s*min\(\s*300px\s*,\s*86vw\s*\)/);
   });
 
-  it("R1 — o scrim é declarado SÓ dentro da media query do mobile", () => {
+  it("R1 — o scrim existe SÓ dentro do bloco do modo gaveta", () => {
     // Segunda barreira, independente do JavaScript: mesmo que a classe de
     // estado móvel sobrevivesse por qualquer caminho, não haveria overlay de
     // página inteira no desktop.
-    const forcaDaMobile = mobile.includes(".app-shell__fundo-gaveta");
-    const ocorrencias = (css.match(/\.app-shell__fundo-gaveta\s*\{/g) ?? [])
-      .length;
-    expect(forcaDaMobile).toBe(true);
-    expect(ocorrencias).toBe(1);
+    const regra = /\.app-shell__fundo-gaveta\s*\{/g;
+    expect(css.match(regra) ?? []).toHaveLength(1);
+    expect(mobile).toMatch(regra);
+    // E em lugar nenhum fora dele — nem no bloco de 640px, nem no topo.
+    expect(foraDoMobile).not.toMatch(/\.app-shell__fundo-gaveta/);
   });
 });

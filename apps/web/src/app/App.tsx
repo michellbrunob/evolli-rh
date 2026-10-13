@@ -402,6 +402,20 @@ export function App({
     setGavetaAberta(false);
   }, [modoGaveta]);
 
+  /**
+   * S2 — fora do modo gaveta o acionador não mexe em nada.
+   *
+   * O botão existe no DOM em qualquer largura (quem o esconde no desktop é o
+   * CSS), então um acionamento ali é possível por programa, por extensão ou
+   * por teste. Sem esta guarda, `gavetaAberta` ficaria `true` de forma
+   * invisível e a gaveta abriria SOZINHA na primeira vez que a janela
+   * encolhesse — estado móvel latente, nascido no desktop.
+   */
+  const alternarGaveta = useCallback(() => {
+    if (!avaliarModoGaveta()) return;
+    setGavetaAberta((aberta) => !aberta);
+  }, []);
+
   // Navegar fecha a gaveta — no desktop isto não tem efeito, porque ela já
   // está fechada. Vale para a barra e para os atalhos da Visão geral.
   const irPara = useCallback((destinoId: string) => {
@@ -494,7 +508,7 @@ export function App({
             ref={botaoMenuRef}
             aria-expanded={gavetaModal}
             aria-controls="navegacao-lateral"
-            onClick={() => setGavetaAberta((aberta) => !aberta)}
+            onClick={alternarGaveta}
           >
             <IconeMenu />
             Menu
