@@ -25,6 +25,29 @@ export interface SafeAccessUserApi {
    * Opcional para compatibilidade: ausente é tratado como indisponível.
    */
   mfaAvailable?: boolean;
+  /**
+   * T163 — o papel pode ESCOLHER a empresa de trabalho?
+   *
+   * Decidido pelo servidor, como `mfaAvailable`. Controla se o Hub desenha o
+   * seletor. A LISTA de empresas nao vem nesta leitura, e sim em
+   * `GET /v1/auth/contexto/empresas`, que recusa papel sem poder de selecao —
+   * assim quem nao seleciona nunca recebe nome de empresa, nem por engano.
+   *
+   * Opcional por compatibilidade: ausente e tratado como `false` (seguro).
+   *
+   * Note que `companyId`, acima, passou a ser a empresa ATIVA desta sessao, e
+   * nao mais a coluna fixa da conta.
+   */
+  podeTrocarEmpresa?: boolean;
+  /**
+   * T163 — a empresa ATIVA desta sessao, com nome e codigo, resolvida pelo
+   * servidor. Nula em escopo global (master_tecnico sem selecao).
+   *
+   * Vem junto com o ator de proposito: e o que permitiu o Hub parar de ler
+   * `GET /v1/empresas` a cada montagem so para descobrir o nome — a ressalva
+   * R-2 da T162.
+   */
+  empresaAtiva?: { id: string; codigo: string; nome: string } | null;
 }
 
 /**

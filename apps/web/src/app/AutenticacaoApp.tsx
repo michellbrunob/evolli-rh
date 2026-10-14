@@ -37,6 +37,24 @@
  * conhecê-lo, e um shell montado sem papel é exatamente o estado que
  * produzia o 403.
  *
+ * ## Troca de empresa remonta a árvore (T163)
+ *
+ * Quando o servidor confirma uma troca de contexto empresarial, não basta
+ * atualizar um pedaço da tela: **tudo** o que estava montado foi desenhado
+ * com dados da empresa anterior. Então o ator é resolvido de novo — a mesma
+ * passagem por `resolvendo-ator` do login — e a `key` da árvore passa a
+ * incluir a empresa ativa.
+ *
+ * Trocar a `key` desmonta e remonta Hub e shell. É assim que nenhum dado da
+ * empresa anterior sobra na tela: não há o que limpar, porque os componentes
+ * que o exibiam deixaram de existir. Limpar estado "na mão" dependeria de
+ * lembrar de cada lugar — e o primeiro esquecido seria vazamento entre
+ * empresas.
+ *
+ * O produto aberto também volta ao Hub na troca. Continuar dentro de
+ * "Pessoas" depois de mudar de empresa mostraria a mesma tela com outro
+ * universo de dados, sem que nada na interface marcasse a mudança.
+ *
  * ## O Hub entra entre o ator resolvido e o shell (T162)
  *
  * `pronto` deixou de significar "monta o shell" e passou a significar "o ator
@@ -163,6 +181,23 @@ export function AutenticacaoApp() {
     setEstado("login");
   }, []);
 
+  /**
+   * T163 — o servidor confirmou uma troca de empresa; reresolve o ator.
+   *
+   * Volta a `resolvendo-ator`, exatamente o caminho do login. Duas coisas
+   * acontecem por isso: `/v1/users/me` devolve a empresa ativa NOVA, e nada
+   * funcional fica montado durante a transição — a mesma garantia da T153,
+   * agora valendo também para a troca de contexto.
+   *
+   * O produto aberto volta a `null`: depois de mudar de empresa, a pessoa
+   * reentra pelo Hub, e não no meio de um módulo cujo conteúdo acabou de
+   * trocar de universo sem aviso.
+   */
+  const recarregarContexto = useCallback(() => {
+    setDestinoAberto(null);
+    setEstado("resolvendo-ator");
+  }, []);
+
   const handleLogout = useCallback(async () => {
     try {
       await logout();
@@ -217,14 +252,20 @@ export function AutenticacaoApp() {
     );
   }
 
+  // T163 — a chave inclui a empresa ATIVA. Trocar de empresa remonta tudo,
+  // e com isso nenhum dado da empresa anterior sobrevive na tela.
+  const chaveDaArvore = `${ator.id}:${ator.companyId ?? "global"}`;
+
   if (destinoAberto === null) {
     return (
       <HubPosLogin
-        key={ator.id}
+        key={chaveDaArvore}
         papelDoAtor={ator.role}
-        empresaDoAtor={ator.companyId}
+        empresaAtiva={ator.empresaAtiva ?? null}
+        podeTrocarEmpresa={ator.podeTrocarEmpresa === true}
         emailDoAtor={ator.email}
         onAbrirDestino={setDestinoAberto}
+        onEmpresaTrocada={recarregarContexto}
         onLogout={() => void handleLogout()}
       />
     );
@@ -235,8 +276,8 @@ export function AutenticacaoApp() {
       // Ator diferente força remontagem, e com ela o recálculo do destino
       // inicial. O caminho normal (logout → login) já desmonta o `App`; a
       // chave cobre qualquer caminho futuro que troque o ator sem passar
-      // pelo login.
-      key={ator.id}
+      // pelo login. Desde a T163 ela inclui também a empresa ativa.
+      key={chaveDaArvore}
       onLogout={() => void handleLogout()}
       onSessaoAtualEncerrada={encerrarSessaoLocalmente}
       mfaDisponivel={ator.mfaAvailable === true}

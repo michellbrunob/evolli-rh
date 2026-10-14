@@ -16,6 +16,13 @@ export const AUDIT_ACTIONS = [
   "rate_limit_blocked",
   "audit_log_read",
 
+  // T163 — contexto empresarial ativo. A troca e um ato sensivel: muda o
+  // escopo de TODA leitura e mutacao seguinte da sessao, entao deixa trilha.
+  // Mesma convencao de valor persistido em portugues separado por ponto.
+  "acesso_contexto_empresa_trocado",
+  "acesso_empresa_autorizada_concedida",
+  "acesso_empresa_autorizada_revogada",
+
   // Etapa 1 — Fatia 1: Núcleo Organizacional. O valor **persistido** segue a
   // convenção aprovada em português separada por ponto
   // (`organizacao.empresa.criada`); o identificador abaixo é o nome Prisma do

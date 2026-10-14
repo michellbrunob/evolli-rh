@@ -1,5 +1,9 @@
 import { BadRequestException, ForbiddenException } from "@nestjs/common";
 import { AccessUser } from "@prisma/client";
+import {
+  atorOperaEmEscopoGlobal,
+  papelTemPoliticaGlobal,
+} from "../auth/session/contexto-empresarial";
 
 /**
  * Escopo de leitura de `GET /v1/users` (T120) — mesmo desenho de
@@ -31,8 +35,24 @@ export function resolverEscopoListagemUsuarios(
   actor: AccessUser,
   companyIdFiltroSolicitado: string | undefined,
 ): EscopoListagemUsuarios {
-  if (actor.role === "master_tecnico") {
+  // T163 — global é condição de CONTEXTO, não de papel.
+  //
+  // Antes desta tarefa a condição era `actor.role === "master_tecnico"`, e o
+  // E2E da T163 mediu o efeito: o Master selecionava a empresa D e continuava
+  // enxergando as duas, porque o ramo global curto-circuitava o contexto. Com
+  // empresa ativa, o Master opera DENTRO dela — sem seleção, `companyId` é
+  // nulo e o comportamento é idêntico ao anterior.
+  if (atorOperaEmEscopoGlobal(actor)) {
     return { global: true, companyId: companyIdFiltroSolicitado };
+  }
+  // T163 — Master COM empresa ativa lista contas daquela empresa. O filtro
+  // `companyId` de query e ignorado aqui de proposito: dentro de um contexto
+  // escolhido, o escopo e o contexto, nunca o parametro do cliente.
+  if (papelTemPoliticaGlobal(actor.role)) {
+    if (actor.companyId === null) {
+      throw new ForbiddenException();
+    }
+    return { global: false, companyId: actor.companyId };
   }
   if (actor.role === "rh" || actor.role === "dp") {
     if (actor.companyId === null) {

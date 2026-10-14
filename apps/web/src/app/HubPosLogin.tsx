@@ -25,36 +25,51 @@
  * alcançável pelo shell, e aqui aparece num bloco separado e nomeado — nunca
  * anunciada como produto entregue.
  *
- * ## Empresa: contexto, nunca seletor
+ * ## Empresa: contexto do servidor, e agora também troca (T163)
  *
- * **Não existe contrato de troca de empresa ou de escopo de sessão.** A
- * empresa do ator é `access_user.companyId`, uma coluna da conta; o
- * controlador de autenticação tem apenas login, logout, CSRF, sessões e
- * redefinição de senha. Então aqui a empresa é texto: sem seletor clicável,
- * sem empresa fictícia, sem simulação de troca. Implementar troca exigiria
- * contrato de servidor que não existe, e inventá-lo no frontend seria inventar
- * escopo de acesso.
+ * Na T162 este bloco dizia que **não existia contrato de troca de empresa**, e
+ * por isso a empresa aparecia só como texto. A T163 criou o contrato, e o que
+ * mudou aqui é exatamente o que o contrato passou a permitir — nada além.
  *
- * O nome vem de `GET /v1/empresas`, guardado por `empresa:read` e com o escopo
- * resolvido **no servidor** (`filtroDeEscopo`): para `rh` e `dp` a resposta já
- * contém apenas a própria empresa. Nada é carregado "para depois filtrar".
+ * **A empresa ativa não é escolhida pelo navegador.** Ela vive em
+ * `access_session.empresa_ativa_id`, e chega pronta em `GET /v1/users/me`
+ * como `empresaAtiva`. Não há `localStorage`, `sessionStorage`, query string
+ * nem cookie escrito por script nesta tela — procurar por eles neste arquivo
+ * é um teste da suíte, e ele falha se algum aparecer.
  *
- * Três consequências de contrato, todas visíveis na tela:
+ * **Quem vê seletor é quem o servidor diz que pode.** `podeTrocarEmpresa` vem
+ * de `/users/me`; as opções vêm de `GET /v1/auth/contexto/empresas`, que
+ * responde **403** a papel sem poder de seleção. O frontend não decide isso, e
+ * nem teria como: a rota recusa gestor e colaborador mesmo que esta tela
+ * pedisse a lista.
  *
- * - `gestor` e `colaborador` **não têm `empresa:read`**. Para eles não há como
- *   ler o nome da empresa — e o Hub diz isso, em vez de inventar um.
- * - `master_tecnico` **não tem empresa**: `companyId` é nulo e o escopo é
- *   global. Mostrar "a empresa dele" seria escolher uma entre várias.
- * - se o item devolvido não for a empresa da sessão, o nome **não** é exibido.
- *   A conferência é barata e fecha a única porta por onde um nome fora do
- *   escopo poderia aparecer.
+ * **A troca remonta tudo.** Depois do `POST /v1/auth/contexto/empresa`, o
+ * `AutenticacaoApp` reresolve o ator e troca a `key` da árvore — Hub e
+ * módulos nascem de novo no contexto novo. É assim que nenhum dado da empresa
+ * anterior sobra na tela: não há o que limpar, porque os componentes que o
+ * exibiam deixaram de existir.
+ *
+ * ### A R-2 da T162 morreu aqui, e dá para verificar
+ *
+ * A ressalva era: o Hub lia `GET /v1/empresas` **a cada montagem**, e aquela
+ * rota chama `registrarConsultaAmpla` — um registro de auditoria por visita.
+ * Agora o nome vem dentro de `/users/me`, leitura direta por id que o SPA já
+ * fazia de qualquer jeito. Este arquivo **não importa mais
+ * `organizacaoClient`**, e há teste que prende isso.
+ *
+ * ### O que continua valendo da T162
+ *
+ * - `gestor` e `colaborador` seguem sem seletor e sem lista de empresas;
+ * - `master_tecnico` **sem seleção** continua em escopo global, e a tela diz
+ *   isso em vez de escolher uma empresa por ele;
+ * - nenhum nome de empresa fora do escopo da sessão chega à tela, porque o
+ *   único nome exibido é o que o servidor devolveu como empresa ativa.
  *
  * ## Fail-closed
  *
- * Falha ao ler a empresa **não** monta o shell nem esconde o problema: o Hub
- * continua na tela, diz que o contexto não pôde ser carregado e oferece nova
- * tentativa. Os produtos seguem listados — eles dependem do papel, que já foi
- * resolvido pelo `AutenticacaoApp`, não desta leitura.
+ * Falha ao carregar as opções de troca **não** monta o shell nem esconde o
+ * problema: o Hub continua na tela, informa e oferece nova tentativa. Os
+ * produtos seguem listados — eles dependem do papel, não desta leitura.
  */
 import { useCallback, useEffect, useState } from "react";
 import "./HubPosLogin.css";
@@ -67,24 +82,24 @@ import {
   type DestinoNavegacao,
 } from "./mapaNavegacao";
 import { ROTULO_PAPEL } from "../api/usersClient";
-import { listarEmpresas } from "../api/organizacaoClient";
+import {
+  listarEmpresasDoContexto,
+  trocarEmpresaDoContexto,
+  type EmpresaDoContextoApi,
+} from "../api/contextoEmpresarialClient";
 
-/**
- * Papéis a que `evaluateOrganizacao` concede `empresa`/`read`.
+/*
+ * T163 — as duas listas de papéis que existiam aqui foram REMOVIDAS, e isso é
+ * a melhoria, não uma omissão.
  *
- * `financeiro` fica de fora de propósito: o ramo dele exige
- * `resource === "centro_custo"`, então `empresa:read` é negado. Pedir a lista
- * para quem o servidor vai recusar renderia um 403 garantido a cada abertura
- * do Hub — ruído no log de auditoria e nada na tela.
+ * `PAPEIS_COM_LEITURA_DE_EMPRESA` espelhava `evaluateOrganizacao` à mão, para
+ * não pedir `/v1/empresas` a quem levaria 403. `PAPEIS_DE_ESCOPO_GLOBAL`
+ * espelhava a política do Master. Duas cópias de regra de servidor vivendo no
+ * frontend, que silenciosamente ficariam erradas quando o RBAC mudasse.
+ *
+ * Agora o servidor responde as duas perguntas: `podeTrocarEmpresa` e
+ * `empresaAtiva` vêm de `/users/me`. O frontend não espelha mais nada.
  */
-const PAPEIS_COM_LEITURA_DE_EMPRESA: readonly string[] = [
-  "rh",
-  "dp",
-  "master_tecnico",
-];
-
-/** Papéis cujo escopo é a instância inteira, sem empresa de contexto. */
-const PAPEIS_DE_ESCOPO_GLOBAL: readonly string[] = ["master_tecnico"];
 
 /**
  * O que cada produto faz. Frases descritivas do que a tela já entrega hoje —
@@ -111,77 +126,82 @@ const ICONE_DO_DESTINO: Readonly<Record<string, IconeModuloId>> =
     ),
   );
 
-/** Estado da leitura do contexto de empresa. */
-type EstadoEmpresa =
-  /** O papel não tem `empresa:read`, ou o escopo é global: nada a buscar. */
+/**
+ * Estado das OPÇÕES de troca — não da empresa ativa.
+ *
+ * A empresa ativa não tem estado de carregamento aqui: ela chega pronta em
+ * `/users/me`, antes de esta tela montar. O que carrega é a lista de para
+ * onde se pode ir.
+ */
+type EstadoOpcoes =
+  /** O papel não seleciona empresa: não há o que buscar, nem seletor. */
   | { readonly tipo: "nao-aplicavel" }
   | { readonly tipo: "carregando" }
-  | {
-      readonly tipo: "carregada";
-      readonly nome: string;
-      readonly codigo: string;
-    }
-  /** Leitura concluída sem a empresa da sessão: não se exibe nome nenhum. */
-  | { readonly tipo: "indisponivel" }
+  | { readonly tipo: "carregadas"; readonly itens: EmpresaDoContextoApi[] }
+  | { readonly tipo: "falha" };
+
+/** A troca em si, que é uma mutação e pode falhar. */
+type EstadoTroca =
+  | { readonly tipo: "ocioso" }
+  | { readonly tipo: "trocando"; readonly empresaId: string }
   | { readonly tipo: "falha" };
 
 export interface HubPosLoginProps {
   /** Papel decidido pelo SERVIDOR (`GET /v1/users/me`), já resolvido. */
   readonly papelDoAtor: string;
-  /** Empresa da sessão, da mesma leitura. Nulo em escopo global. */
-  readonly empresaDoAtor: string | null;
+  /**
+   * T163 — a empresa **ATIVA** desta sessão, resolvida pelo servidor, já com
+   * nome e código. Nula em escopo global (`master_tecnico` sem seleção).
+   */
+  readonly empresaAtiva: EmpresaDoContextoApi | null;
+  /**
+   * T163 — o servidor diz se este papel escolhe empresa. O frontend não
+   * deduz: a rota de opções recusaria quem não pode, de todo modo.
+   */
+  readonly podeTrocarEmpresa: boolean;
   /** E-mail do ator — o único identificador pessoal que a API devolve. */
   readonly emailDoAtor: string;
   /** Abre um destino no shell. Só recebe id que veio de um item desta tela. */
   readonly onAbrirDestino: (destinoId: string) => void;
+  /**
+   * Chamado depois de o SERVIDOR confirmar a troca. Quem monta esta tela
+   * reresolve o ator e remonta a árvore — é isso que garante que nada da
+   * empresa anterior siga na tela.
+   */
+  readonly onEmpresaTrocada: () => void;
   readonly onLogout: () => void;
 }
 
 export function HubPosLogin({
   papelDoAtor,
-  empresaDoAtor,
+  empresaAtiva,
+  podeTrocarEmpresa,
   emailDoAtor,
   onAbrirDestino,
+  onEmpresaTrocada,
   onLogout,
 }: HubPosLoginProps) {
   const produtos = capacidadeFuncionalDe(papelDoAtor);
-  const escopoGlobal = PAPEIS_DE_ESCOPO_GLOBAL.includes(papelDoAtor);
-  const podeLerEmpresa =
-    PAPEIS_COM_LEITURA_DE_EMPRESA.includes(papelDoAtor) &&
-    !escopoGlobal &&
-    empresaDoAtor !== null;
 
-  const [empresa, setEmpresa] = useState<EstadoEmpresa>(() =>
-    podeLerEmpresa ? { tipo: "carregando" } : { tipo: "nao-aplicavel" },
+  const [opcoes, setOpcoes] = useState<EstadoOpcoes>(() =>
+    podeTrocarEmpresa ? { tipo: "carregando" } : { tipo: "nao-aplicavel" },
   );
+  const [troca, setTroca] = useState<EstadoTroca>({ tipo: "ocioso" });
   /** Incrementado pelo botão "Tentar novamente"; redispara o efeito. */
   const [tentativa, setTentativa] = useState(0);
 
   useEffect(() => {
-    if (!podeLerEmpresa) return;
+    if (!podeTrocarEmpresa) return;
     let cancelado = false;
-    setEmpresa({ tipo: "carregando" });
+    setOpcoes({ tipo: "carregando" });
 
     async function carregar() {
       try {
-        const pagina = await listarEmpresas();
-        if (cancelado) return;
-        // Conferência de escopo, não formalidade: só é exibido o nome da
-        // empresa da PRÓPRIA sessão. Qualquer outra coisa que chegasse aqui
-        // seria dado fora do escopo, e some em vez de aparecer.
-        const minha = pagina.itens.find((e) => e.id === empresaDoAtor);
-        if (minha === undefined) {
-          setEmpresa({ tipo: "indisponivel" });
-          return;
-        }
-        setEmpresa({
-          tipo: "carregada",
-          nome: minha.nome,
-          codigo: minha.codigo,
-        });
+        const itens = await listarEmpresasDoContexto();
+        if (!cancelado) setOpcoes({ tipo: "carregadas", itens });
       } catch {
         // Nada do corpo da resposta é lido nem exibido: a mensagem é nossa.
-        if (!cancelado) setEmpresa({ tipo: "falha" });
+        if (!cancelado) setOpcoes({ tipo: "falha" });
       }
     }
 
@@ -189,11 +209,34 @@ export function HubPosLogin({
     return () => {
       cancelado = true;
     };
-  }, [podeLerEmpresa, empresaDoAtor, tentativa]);
+  }, [podeTrocarEmpresa, tentativa]);
 
   const tentarDeNovo = useCallback(() => {
     setTentativa((n) => n + 1);
   }, []);
+
+  /**
+   * Troca de empresa.
+   *
+   * Só avisa quem monta esta tela **depois** de o servidor confirmar. Não há
+   * atualização otimista aqui de propósito: mostrar a empresa nova antes da
+   * confirmação seria o frontend afirmando um escopo que o servidor ainda não
+   * concedeu — e, se a troca falhasse, a tela estaria mentindo sobre onde a
+   * sessão opera.
+   */
+  const trocarEmpresa = useCallback(
+    async (empresaId: string) => {
+      if (empresaId === empresaAtiva?.id) return;
+      setTroca({ tipo: "trocando", empresaId });
+      try {
+        await trocarEmpresaDoContexto(empresaId);
+        onEmpresaTrocada();
+      } catch {
+        setTroca({ tipo: "falha" });
+      }
+    },
+    [empresaAtiva, onEmpresaTrocada],
+  );
 
   const rotuloDoPapel = ROTULO_PAPEL[papelDoAtor] ?? papelDoAtor;
 
@@ -229,9 +272,12 @@ export function HubPosLogin({
           <ContextoDaSessao
             email={emailDoAtor}
             rotuloDoPapel={rotuloDoPapel}
-            escopoGlobal={escopoGlobal}
-            empresa={empresa}
+            empresaAtiva={empresaAtiva}
+            podeTrocarEmpresa={podeTrocarEmpresa}
+            opcoes={opcoes}
+            troca={troca}
             onTentarDeNovo={tentarDeNovo}
+            onTrocar={(id) => void trocarEmpresa(id)}
           />
 
           <section className="hub__secao" aria-labelledby="hub-produtos">
@@ -289,22 +335,36 @@ export function HubPosLogin({
 interface ContextoDaSessaoProps {
   readonly email: string;
   readonly rotuloDoPapel: string;
-  readonly escopoGlobal: boolean;
-  readonly empresa: EstadoEmpresa;
+  readonly empresaAtiva: EmpresaDoContextoApi | null;
+  readonly podeTrocarEmpresa: boolean;
+  readonly opcoes: EstadoOpcoes;
+  readonly troca: EstadoTroca;
   readonly onTentarDeNovo: () => void;
+  readonly onTrocar: (empresaId: string) => void;
 }
 
 /**
- * O contexto da sessão, em texto. É deliberadamente uma `<dl>` e não um menu:
- * nada aqui é editável, porque não há contrato que permita editar.
+ * O contexto da sessão.
+ *
+ * `Conta` e `Perfil` continuam sendo texto, porque nada neles é editável.
+ * `Empresa` passou a ser editável **para quem o servidor autoriza** — e só
+ * nesse caso vira um `<select>` de verdade, com `<label>` associado, em vez
+ * de um menu desenhado à mão. Um `<select>` nativo já traz teclado, leitor de
+ * tela e comportamento em toque sem que precisemos reimplementar nada disso,
+ * e reimplementar seria a forma mais provável de errar.
  */
 function ContextoDaSessao({
   email,
   rotuloDoPapel,
-  escopoGlobal,
-  empresa,
+  empresaAtiva,
+  podeTrocarEmpresa,
+  opcoes,
+  troca,
   onTentarDeNovo,
+  onTrocar,
 }: ContextoDaSessaoProps) {
+  const trocando = troca.tipo === "trocando";
+
   return (
     <dl className="hub__contexto">
       <div className="hub__contexto-item">
@@ -315,33 +375,86 @@ function ContextoDaSessao({
         <dt>Perfil</dt>
         <dd>{rotuloDoPapel}</dd>
       </div>
-      <div className="hub__contexto-item">
-        <dt>Empresa</dt>
-        <dd>
-          {escopoGlobal ? (
-            "Acesso global — não vinculado a uma empresa"
-          ) : empresa.tipo === "carregando" ? (
-            <span role="status">Carregando…</span>
-          ) : empresa.tipo === "carregada" ? (
-            <>
-              {empresa.nome}{" "}
-              <span className="hub__contexto-codigo">({empresa.codigo})</span>
-            </>
-          ) : empresa.tipo === "falha" ? (
-            <span className="hub__contexto-falha">
-              <span role="alert">Não foi possível carregar.</span>{" "}
-              <button
-                type="button"
-                className="hub__contexto-retry"
-                onClick={onTentarDeNovo}
-              >
-                Tentar novamente
-              </button>
-            </span>
-          ) : (
-            "Não disponível para o seu perfil"
-          )}
-        </dd>
+      <div className="hub__contexto-item hub__contexto-item--empresa">
+        {podeTrocarEmpresa ? (
+          // `dt` vira `label` do próprio controle: o nome acessível do
+          // `<select>` é "Empresa", sem rótulo duplicado nem `aria-label`
+          // competindo com o texto visível.
+          <>
+            <dt>
+              <label htmlFor="hub-empresa-ativa">Empresa</label>
+            </dt>
+            <dd>
+              {opcoes.tipo === "carregando" ? (
+                <span role="status">Carregando empresas…</span>
+              ) : opcoes.tipo === "falha" ? (
+                <span className="hub__contexto-falha">
+                  <span role="alert">
+                    Não foi possível carregar as empresas.
+                  </span>{" "}
+                  <button
+                    type="button"
+                    className="hub__contexto-retry"
+                    onClick={onTentarDeNovo}
+                  >
+                    Tentar novamente
+                  </button>
+                </span>
+              ) : (
+                <select
+                  id="hub-empresa-ativa"
+                  className="hub__empresa-select"
+                  // Em escopo global não há empresa ativa, e a opção neutra
+                  // abaixo é o que o `select` mostra — nunca uma empresa
+                  // qualquer escolhida por nós.
+                  value={empresaAtiva?.id ?? ""}
+                  disabled={trocando}
+                  onChange={(e) => onTrocar(e.target.value)}
+                >
+                  {empresaAtiva === null ? (
+                    <option value="">Acesso global — todas as empresas</option>
+                  ) : null}
+                  {opcoes.tipo === "carregadas"
+                    ? opcoes.itens.map((e) => (
+                        <option key={e.id} value={e.id}>
+                          {e.nome} ({e.codigo})
+                        </option>
+                      ))
+                    : null}
+                </select>
+              )}
+              {trocando ? (
+                <span className="hub__empresa-status" role="status">
+                  Trocando…
+                </span>
+              ) : null}
+              {troca.tipo === "falha" ? (
+                <span className="hub__contexto-falha" role="alert">
+                  Não foi possível trocar de empresa.
+                </span>
+              ) : null}
+            </dd>
+          </>
+        ) : (
+          <>
+            <dt>Empresa</dt>
+            <dd>
+              {empresaAtiva === null ? (
+                // Sem empresa ativa e sem poder de seleção: o perfil opera
+                // num escopo que esta tela não tem como nomear, e dizer isso
+                // é mais honesto que inventar um nome.
+                "Não disponível para o seu perfil"
+              ) : (
+                <>
+                  {empresaAtiva.nome}{" "}
+                  <span className="hub__contexto-codigo">
+                    ({empresaAtiva.codigo})
+                  </span>
+                </>
+              )}
+            </dd>
+          </>
+        )}
       </div>
     </dl>
   );

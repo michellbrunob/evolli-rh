@@ -1,5 +1,5 @@
 /**
- * Hub pós-login (T162).
+ * Hub pós-login (T162) e contexto empresarial ativo (T163).
  *
  * O que estes testes prendem, em uma frase cada:
  *
@@ -7,12 +7,16 @@
  *   concede ao papel, e nenhum a mais. A tabela de referência aqui é escrita à
  *   mão de propósito: se alguém editar `CAPACIDADE_FUNCIONAL_POR_PAPEL` sem
  *   decisão, o teste reprova em vez de concordar com a edição.
- * - **Escopo** — nenhum nome de empresa fora da sessão chega à tela, e nenhuma
- *   requisição de empresa sai para quem o servidor recusaria.
- * - **Ausência de seletor** — não existe contrato de troca de empresa, então
- *   não pode existir controle que a prometa.
- * - **Fail-closed** — falha na leitura do contexto não esconde o problema nem
- *   monta nada funcional.
+ * - **Quem troca, e quem não troca** (T163) — o seletor só existe quando o
+ *   SERVIDOR diz que o papel seleciona, e a lista de empresas nunca é pedida
+ *   por quem não seleciona.
+ * - **O navegador não é autoridade** (T163) — nada de `localStorage`,
+ *   `sessionStorage`, query string ou cookie para escolher empresa. Há teste
+ *   que varre o módulo atrás disso.
+ * - **A troca não é otimista** — a tela só muda depois de o servidor
+ *   confirmar, e quem avisa a troca é o componente de cima, que remonta tudo.
+ * - **Fail-closed** — falha ao carregar ou ao trocar não esconde o problema e
+ *   não monta nada funcional.
  */
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -24,47 +28,62 @@ import {
   destinoInicialPara,
   DESTINO_SEM_CAPACIDADE,
 } from "./mapaNavegacao";
-import { listarEmpresas } from "../api/organizacaoClient";
+import { readFileSync } from "node:fs";
+import {
+  listarEmpresasDoContexto,
+  trocarEmpresaDoContexto,
+} from "../api/contextoEmpresarialClient";
 
-vi.mock("../api/organizacaoClient", async () => {
+vi.mock("../api/contextoEmpresarialClient", async () => {
   const actual = await vi.importActual<
-    typeof import("../api/organizacaoClient")
-  >("../api/organizacaoClient");
-  return { ...actual, listarEmpresas: vi.fn() };
+    typeof import("../api/contextoEmpresarialClient")
+  >("../api/contextoEmpresarialClient");
+  return {
+    ...actual,
+    listarEmpresasDoContexto: vi.fn(),
+    trocarEmpresaDoContexto: vi.fn(),
+  };
 });
 
-const EMPRESA_DA_SESSAO = "11111111-1111-4111-8111-111111111111";
-const OUTRA_EMPRESA = "22222222-2222-4222-8222-222222222222";
 const EMAIL_SINTETICO = "pessoa.teste@example.test";
 
-function paginaCom(id: string, nome: string, codigo: string) {
-  return {
-    itens: [{ id, nome, codigo, status: "ativa" }],
-    pagina: 1,
-    tamanhoPagina: 1,
-    total: 1,
-  };
-}
+/** Duas empresas sintéticas distintas, como no E2E. */
+const EMPRESA_B = {
+  id: "22222222-2222-4222-8222-222222222222",
+  codigo: "EMPB",
+  nome: "Empresa B",
+};
+const EMPRESA_D = {
+  id: "44444444-4444-4444-8444-444444444444",
+  codigo: "EMPD",
+  nome: "Empresa D",
+};
 
 interface Opcoes {
   readonly papel: string;
-  readonly empresa?: string | null;
+  readonly empresaAtiva?: { id: string; codigo: string; nome: string } | null;
+  readonly podeTrocarEmpresa?: boolean;
   readonly onAbrirDestino?: (id: string) => void;
+  readonly onEmpresaTrocada?: () => void;
   readonly onLogout?: () => void;
 }
 
 function montar({
   papel,
-  empresa = EMPRESA_DA_SESSAO,
+  empresaAtiva = EMPRESA_B,
+  podeTrocarEmpresa = papel === "rh" || papel === "master_tecnico",
   onAbrirDestino = () => undefined,
+  onEmpresaTrocada = () => undefined,
   onLogout = () => undefined,
 }: Opcoes) {
   return render(
     <HubPosLogin
       papelDoAtor={papel}
-      empresaDoAtor={empresa}
+      empresaAtiva={empresaAtiva}
+      podeTrocarEmpresa={podeTrocarEmpresa}
       emailDoAtor={EMAIL_SINTETICO}
       onAbrirDestino={onAbrirDestino}
+      onEmpresaTrocada={onEmpresaTrocada}
       onLogout={onLogout}
     />,
   );
@@ -80,9 +99,8 @@ function cartoesVisiveis(): string[] {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(listarEmpresas).mockResolvedValue(
-    paginaCom(EMPRESA_DA_SESSAO, "Empresa Sintética", "EMP-001") as never,
-  );
+  vi.mocked(listarEmpresasDoContexto).mockResolvedValue([EMPRESA_B, EMPRESA_D]);
+  vi.mocked(trocarEmpresaDoContexto).mockResolvedValue(EMPRESA_D);
 });
 
 describe("T162 — o Hub oferece só o que o servidor autoriza", () => {
@@ -122,7 +140,7 @@ describe("T162 — o Hub oferece só o que o servidor autoriza", () => {
   );
 
   it("papel sem capacidade funcional vê o aviso, e nenhum cartão", async () => {
-    montar({ papel: "colaborador", empresa: EMPRESA_DA_SESSAO });
+    montar({ papel: "colaborador", podeTrocarEmpresa: false });
     expect(
       await screen.findByText(
         /Nenhum produto está liberado para o seu perfil/i,
@@ -184,97 +202,190 @@ describe("T162 — o Hub oferece só o que o servidor autoriza", () => {
   });
 });
 
-describe("T162 — empresa é contexto, nunca seletor", () => {
-  it("rh vê o nome da própria empresa, lido do servidor", async () => {
+describe("T163 — quem troca de empresa, e quem não troca", () => {
+  it("rh vê o seletor, rotulado como Empresa, com as autorizadas", async () => {
     montar({ papel: "rh" });
-    expect(await screen.findByText(/Empresa Sintética/)).toBeInTheDocument();
-    expect(screen.getByText("(EMP-001)")).toBeInTheDocument();
-  });
-
-  it("dp também lê a empresa — o RBAC concede `empresa:read` a ele", async () => {
-    montar({ papel: "dp" });
-    expect(await screen.findByText(/Empresa Sintética/)).toBeInTheDocument();
-  });
-
-  it("master_tecnico não tem empresa: diz escopo global e NÃO consulta /empresas", async () => {
-    montar({ papel: "master_tecnico", empresa: null });
-    expect(await screen.findByText(/Acesso global/i)).toBeInTheDocument();
-    expect(listarEmpresas).not.toHaveBeenCalled();
-  });
-
-  it("gestor não tem `empresa:read`: nenhuma requisição sai, e nenhum nome é inventado", async () => {
-    montar({ papel: "gestor" });
-    expect(
-      await screen.findByText(/Não disponível para o seu perfil/i),
-    ).toBeInTheDocument();
-    expect(listarEmpresas).not.toHaveBeenCalled();
-  });
-
-  it("financeiro não tem `empresa:read`: nenhuma requisição sai", async () => {
-    montar({ papel: "financeiro" });
-    await screen.findByText(/Não disponível para o seu perfil/i);
-    expect(listarEmpresas).not.toHaveBeenCalled();
-  });
-
-  it("empresa devolvida fora da sessão NÃO é exibida", async () => {
-    // O servidor já restringe o escopo (`filtroDeEscopo`). Esta é a segunda
-    // tranca: se algo fora do escopo chegasse, some em vez de aparecer.
-    vi.mocked(listarEmpresas).mockResolvedValue(
-      paginaCom(OUTRA_EMPRESA, "Empresa De Terceiro", "EMP-999") as never,
+    const seletor = await screen.findByLabelText("Empresa");
+    expect(seletor.tagName).toBe("SELECT");
+    await waitFor(() =>
+      expect(
+        [...(seletor as HTMLSelectElement).options].map((o) => o.textContent),
+      ).toEqual(["Empresa B (EMPB)", "Empresa D (EMPD)"]),
     );
-    montar({ papel: "rh" });
-    await screen.findByText(/Não disponível para o seu perfil/i);
-    expect(screen.queryByText(/Empresa De Terceiro/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/EMP-999/)).not.toBeInTheDocument();
+    expect((seletor as HTMLSelectElement).value).toBe(EMPRESA_B.id);
   });
 
-  it("não existe seletor, menu ou qualquer controle de troca de empresa", async () => {
-    montar({ papel: "rh" });
-    await screen.findByText(/Empresa Sintética/);
-    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
-    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
-    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
-    for (const botao of screen.getAllByRole("button")) {
-      expect(botao.textContent ?? "").not.toMatch(
-        /trocar|alternar|mudar empresa/i,
-      );
-    }
-    // A empresa é texto dentro de uma `<dd>`, não um controle.
-    const valor = screen.getByText(/Empresa Sintética/);
+  it.each(["dp", "gestor", "colaborador", "financeiro"])(
+    "%s NÃO vê seletor e NÃO pede a lista de empresas",
+    async (papel) => {
+      montar({ papel, podeTrocarEmpresa: false });
+      await screen.findByText(/Empresa B/);
+      expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+      expect(listarEmpresasDoContexto).not.toHaveBeenCalled();
+    },
+  );
+
+  it("quem não troca vê a empresa como TEXTO, não como controle", async () => {
+    montar({ papel: "dp", podeTrocarEmpresa: false });
+    const valor = await screen.findByText(/Empresa B/);
     expect(valor.closest("button")).toBeNull();
+    expect(valor.closest("select")).toBeNull();
     expect(valor.closest("a")).toBeNull();
   });
 
-  it("falha na leitura: diz que não carregou, oferece retry e não mostra nome nenhum", async () => {
-    vi.mocked(listarEmpresas).mockRejectedValueOnce(new Error("rede"));
-    montar({ papel: "rh" });
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      /Não foi possível carregar/i,
-    );
-    expect(screen.queryByText(/Empresa Sintética/)).not.toBeInTheDocument();
-    // Os produtos continuam listados: eles dependem do papel, não desta leitura.
-    expect(cartoesVisiveis().length).toBeGreaterThan(0);
-
-    fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
-    expect(await screen.findByText(/Empresa Sintética/)).toBeInTheDocument();
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  it("sem empresa ativa e sem poder de troca, diz indisponível — não inventa nome", async () => {
+    montar({ papel: "gestor", empresaAtiva: null, podeTrocarEmpresa: false });
+    expect(
+      await screen.findByText(/Não disponível para o seu perfil/i),
+    ).toBeInTheDocument();
+    expect(listarEmpresasDoContexto).not.toHaveBeenCalled();
   });
 
-  it("o corpo interno do erro nunca chega à tela", async () => {
-    vi.mocked(listarEmpresas).mockRejectedValueOnce(
-      new Error("PrismaClientKnownRequestError: P2002 em empresa.codigo"),
+  it("master_tecnico sem seleção mostra o escopo global como opção neutra", async () => {
+    montar({ papel: "master_tecnico", empresaAtiva: null });
+    const seletor = await screen.findByLabelText("Empresa");
+    expect((seletor as HTMLSelectElement).value).toBe("");
+    await waitFor(() =>
+      expect(
+        [...(seletor as HTMLSelectElement).options][0]!.textContent,
+      ).toMatch(/Acesso global/i),
+    );
+  });
+});
+
+describe("T163 — a troca passa pelo servidor, e nada nela é otimista", () => {
+  it("escolher outra empresa chama o servidor com o id certo", async () => {
+    montar({ papel: "rh" });
+    const seletor = await screen.findByLabelText("Empresa");
+    await waitFor(() =>
+      expect((seletor as HTMLSelectElement).options.length).toBe(2),
+    );
+
+    fireEvent.change(seletor, { target: { value: EMPRESA_D.id } });
+
+    await waitFor(() =>
+      expect(trocarEmpresaDoContexto).toHaveBeenCalledWith(EMPRESA_D.id),
+    );
+  });
+
+  it("só avisa a troca DEPOIS de o servidor confirmar", async () => {
+    let confirmar!: (e: typeof EMPRESA_D) => void;
+    vi.mocked(trocarEmpresaDoContexto).mockReturnValue(
+      new Promise((r) => {
+        confirmar = r;
+      }),
+    );
+    const avisou = vi.fn();
+    montar({ papel: "rh", onEmpresaTrocada: avisou });
+    const seletor = await screen.findByLabelText("Empresa");
+    await waitFor(() =>
+      expect((seletor as HTMLSelectElement).options.length).toBe(2),
+    );
+
+    fireEvent.change(seletor, { target: { value: EMPRESA_D.id } });
+    // Servidor ainda pensando: ninguém foi avisado, e o controle está inerte.
+    await screen.findByText(/Trocando/i);
+    expect(avisou).not.toHaveBeenCalled();
+    expect(seletor).toBeDisabled();
+
+    confirmar(EMPRESA_D);
+    await waitFor(() => expect(avisou).toHaveBeenCalledTimes(1));
+  });
+
+  it("escolher a empresa que já está ativa não chama o servidor", async () => {
+    montar({ papel: "rh" });
+    const seletor = await screen.findByLabelText("Empresa");
+    await waitFor(() =>
+      expect((seletor as HTMLSelectElement).options.length).toBe(2),
+    );
+    fireEvent.change(seletor, { target: { value: EMPRESA_B.id } });
+    expect(trocarEmpresaDoContexto).not.toHaveBeenCalled();
+  });
+
+  it("troca recusada pelo servidor avisa, e NÃO finge que trocou", async () => {
+    vi.mocked(trocarEmpresaDoContexto).mockRejectedValue(
+      new Error("404 — empresa não autorizada"),
+    );
+    const avisou = vi.fn();
+    montar({ papel: "rh", onEmpresaTrocada: avisou });
+    const seletor = await screen.findByLabelText("Empresa");
+    await waitFor(() =>
+      expect((seletor as HTMLSelectElement).options.length).toBe(2),
+    );
+
+    fireEvent.change(seletor, { target: { value: EMPRESA_D.id } });
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /Não foi possível trocar de empresa/i,
+    );
+    expect(avisou).not.toHaveBeenCalled();
+    // O corpo do erro do servidor nunca chega à tela.
+    expect(document.body.textContent ?? "").not.toMatch(/404|autorizada/);
+  });
+
+  it("falha ao CARREGAR as opções oferece retry, e os produtos continuam", async () => {
+    vi.mocked(listarEmpresasDoContexto).mockRejectedValueOnce(
+      new Error("rede"),
     );
     montar({ papel: "rh" });
-    await screen.findByRole("alert");
-    const texto = document.body.textContent ?? "";
-    expect(texto).not.toMatch(/Prisma|P2002|codigo/i);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /Não foi possível carregar as empresas/i,
+    );
+    expect(cartoesVisiveis().length).toBeGreaterThan(0);
+
+    vi.mocked(listarEmpresasDoContexto).mockResolvedValue([
+      EMPRESA_B,
+      EMPRESA_D,
+    ]);
+    fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
+    expect(await screen.findByLabelText("Empresa")).toBeInTheDocument();
+  });
+});
+
+describe("T163 — o navegador não é autoridade sobre a empresa", () => {
+  /**
+   * Varredura do PRÓPRIO módulo, não do comportamento em tempo de execução.
+   *
+   * Um teste de comportamento diria "não gravou em localStorage nesta
+   * sequência de cliques"; este diz "o código não tem como gravar". É a
+   * diferença entre não ter acontecido e não ser possível — e o requisito é
+   * o segundo.
+   */
+  const FONTE = readFileSync("src/app/HubPosLogin.tsx", "utf8");
+  const semComentarios = FONTE.replace(/\/\*[\s\S]*?\*\//g, "").replace(
+    /^\s*\/\/.*$/gm,
+    "",
+  );
+
+  it.each([
+    ["localStorage", /\blocalStorage\b/],
+    ["sessionStorage", /\bsessionStorage\b/],
+    ["document.cookie", /document\s*\.\s*cookie/],
+    ["URLSearchParams", /\bURLSearchParams\b/],
+    ["window.location", /\bwindow\s*\.\s*location\b/],
+    ["history", /\bhistory\s*\.\s*(push|replace)State\b/],
+  ])("o Hub não usa %s para escolher empresa", (_nome, padrao) => {
+    expect(semComentarios).not.toMatch(padrao);
+  });
+
+  it("o Hub não lê mais `/v1/empresas` — a ressalva R-2 da T162", () => {
+    // A leitura por montagem gerava um registro de auditoria por visita.
+    // O nome da empresa ativa agora chega dentro de `/users/me`.
+    expect(semComentarios).not.toMatch(/organizacaoClient/);
+    expect(semComentarios).not.toMatch(/\blistarEmpresas\b/);
+  });
+
+  it("nenhum nome de empresa é escrito no código do Hub", () => {
+    // A tela só exibe o que o servidor devolveu; empresa fictícia não existe.
+    expect(semComentarios).not.toMatch(/Empresa\s+[A-Z]\b/);
   });
 });
 
 describe("T162 — acessibilidade e estrutura", () => {
   it("há exatamente um h1", async () => {
     montar({ papel: "rh" });
-    await screen.findByText(/Empresa Sintética/);
+    await screen.findByLabelText("Empresa");
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
   });
 
@@ -288,12 +399,22 @@ describe("T162 — acessibilidade e estrutura", () => {
     }
   });
 
-  it("o estado de carregamento do contexto é anunciado", () => {
-    vi.mocked(listarEmpresas).mockReturnValue(
-      new Promise(() => undefined) as never,
+  it("o estado de carregamento das opções é anunciado", () => {
+    vi.mocked(listarEmpresasDoContexto).mockReturnValue(
+      new Promise(() => undefined),
     );
     montar({ papel: "rh" });
     expect(screen.getByRole("status")).toHaveTextContent(/Carregando/i);
+  });
+
+  it("o seletor é alcançável por teclado e tem nome acessível", async () => {
+    montar({ papel: "rh" });
+    const seletor = await screen.findByLabelText("Empresa");
+    // `<select>` nativo: foco, teclado e leitor de tela vêm do navegador.
+    expect(seletor).not.toHaveAttribute("tabindex", "-1");
+    expect(seletor).toBeEnabled();
+    (seletor as HTMLSelectElement).focus();
+    expect(document.activeElement).toBe(seletor);
   });
 
   it("Sair chama o encerramento da sessão", async () => {

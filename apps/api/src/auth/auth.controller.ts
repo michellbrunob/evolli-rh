@@ -27,6 +27,7 @@ import { AuthService } from "./auth.service";
 import { LoginDto } from "./dto/login.dto";
 import { PasswordForgotDto } from "./dto/password-forgot.dto";
 import { PasswordResetDto } from "./dto/password-reset.dto";
+import { TrocarEmpresaDto } from "./dto/trocar-empresa.dto";
 import { SessionGuard } from "./session/session.guard";
 import { CsrfGuard } from "./csrf/csrf.guard";
 import { CurrentSession, CurrentUser } from "./session/current-user.decorator";
@@ -40,6 +41,7 @@ import { evaluatePermission } from "./authorization/rbac.evaluator";
 import { AccessSession, AccessUser } from "@prisma/client";
 import { AuditService } from "../audit/audit.service";
 import { PrismaService } from "../database/prisma.service";
+import { ContextoEmpresarialService } from "./contexto-empresarial.service";
 
 @ApiTags("auth")
 @Controller("auth")
@@ -50,6 +52,7 @@ export class AuthController {
     private readonly configService: ConfigService,
     private readonly auditService: AuditService,
     private readonly prisma: PrismaService,
+    private readonly contextoEmpresarial: ContextoEmpresarialService,
   ) {}
 
   @Post("login")
@@ -226,6 +229,56 @@ export class AuthController {
         tx,
       );
     });
+  }
+
+  /**
+   * T163 — empresas que esta conta pode usar como contexto de trabalho.
+   *
+   * Leitura, então sem CSRF — mesma disciplina de `GET /auth/sessions`.
+   *
+   * **Papel sem poder de seleção recebe 403, não lista vazia.** É o princípio
+   * 10 aplicado no servidor: empresa autorizada não é exposta a quem não
+   * seleciona, e a interface não precisa lembrar de esconder. Gestor e
+   * colaborador param aqui mesmo chamando a rota direto.
+   */
+  @Get("contexto/empresas")
+  @UseGuards(SessionGuard)
+  @ApiOperation({ summary: "Empresas autorizadas para o contexto de trabalho" })
+  async listarEmpresasDoContexto(@CurrentUser() actor: AccessUser) {
+    return { itens: await this.contextoEmpresarial.listar(actor) };
+  }
+
+  /**
+   * T163 — troca o contexto empresarial ativo DESTA sessão.
+   *
+   * Mutação: exige CSRF. O contexto é gravado em `access_session`, não num
+   * cookie escrito pelo frontend nem em storage do navegador — então outra
+   * aba da mesma pessoa **não** muda de contexto, e um logout leva a seleção
+   * embora junto com a sessão.
+   *
+   * Empresa inexistente, inativa ou não autorizada respondem **404**, todas
+   * iguais: 403 confirmaria a existência da empresa.
+   */
+  @Post("contexto/empresa")
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(SessionGuard, CsrfGuard)
+  @ApiOperation({ summary: "Troca a empresa ativa da sessão" })
+  async trocarEmpresaDoContexto(
+    @Body() dto: TrocarEmpresaDto,
+    @CurrentUser() actor: AccessUser,
+    @CurrentSession() session: AccessSession,
+    @Req() req: Request,
+  ) {
+    const empresa = await this.contextoEmpresarial.trocar(
+      session.id,
+      dto.empresaId,
+      {
+        actor,
+        metadata: extractRequestMetadata(req),
+        requestId: req.requestId,
+      },
+    );
+    return { empresaAtiva: empresa };
   }
 
   @Post("password/forgot")

@@ -1,5 +1,6 @@
 import { ForbiddenException } from "@nestjs/common";
 import { AccessUser } from "@prisma/client";
+import { atorOperaEmEscopoGlobal } from "../auth/session/contexto-empresarial";
 
 /**
  * Escopo organizacional efetivo do ator (spec §5).
@@ -16,7 +17,14 @@ export type EscopoOrganizacional =
  * requisição (spec §10, "escopo nunca vem do cliente").
  */
 export function resolverEscopo(actor: AccessUser): EscopoOrganizacional {
-  if (actor.role === "master_tecnico") {
+  // T163 — global é condição de CONTEXTO, não de papel.
+  //
+  // Antes desta tarefa a condição era `actor.role === "master_tecnico"`, e o
+  // E2E da T163 mediu o efeito: o Master selecionava a empresa D e continuava
+  // enxergando as duas, porque o ramo global curto-circuitava o contexto. Com
+  // empresa ativa, o Master opera DENTRO dela — sem seleção, `companyId` é
+  // nulo e o comportamento é idêntico ao anterior.
+  if (atorOperaEmEscopoGlobal(actor)) {
     // `master_tecnico`: perfil global controlado (T030; Constituição, Princípio
     // II) — o ÚNICO acesso global standing (ADR 0012). Opera a estrutura em
     // escopo global; toda consulta ampla gera evento (spec §9, RI-2;
