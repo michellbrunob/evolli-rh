@@ -7,19 +7,6 @@ import {
   CHECKS_DA_FAMILIA_GESTOR,
 } from "./gestor-admin.service";
 
-/**
- * Tradução de erro de banco em resposta HTTP (T151).
- *
- * Esta é a fronteira em que um defeito vira silêncio: traduzir demais
- * transforma qualquer falha num 409 tranquilizador ("já existe"), e quem lê o
- * log nunca descobre que havia bug. Traduzir de menos devolve 500 para pedidos
- * que o cliente podia ter corrigido.
- *
- * O método é privado de propósito — ninguém fora da classe deve chamá-lo — e
- * aqui é alcançado por índice para que a regra seja testável sem afrouxar a
- * API pública. O service é instanciado sem dependências reais: `comoConflito`
- * é pura, não toca Prisma nem auditoria.
- */
 describe("GestorAdminService.comoConflito", () => {
   const service = new GestorAdminService(
     undefined as never,

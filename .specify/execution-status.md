@@ -1105,11 +1105,29 @@ principal devolveram **um 201 e nenhum 409**. O log do runner trazia apenas
 
 **O que a investigação descartou**, com PostgreSQL real e efêmero:
 
-| Hipótese                                         | Medição                                                     | Resultado                  |
-| ------------------------------------------------ | ----------------------------------------------------------- | -------------------------- |
-| Mapeamento de sobreposição ausente               | 23P01, 23505, P2002 e 23514 já viram 409 desde a T157       | **não procede**            |
-| Expiração da transação por espera de lock        | 9 s de contenção forçada pelo caminho real da API           | devolveu **409**           |
-| Deadlock (40P01) / falha de serialização (40001) | chegam como `PrismaClientKnownRequestError` (P2010 / P2034) | **incompatível** com o log |
+| Hipótese                                  | Medição                                               | Resultado        |
+| ----------------------------------------- | ----------------------------------------------------- | ---------------- |
+| Mapeamento de sobreposição ausente        | 23P01, 23505, P2002 e 23514 já viram 409 desde a T157 | **não procede**  |
+| Expiração da transação por espera de lock | 9 s de contenção forçada pelo caminho real da API     | devolveu **409** |
+
+**A causa raiz foi encontrada ainda nesta tarefa, pelo próprio diagnóstico
+acrescentado:** o perdedor da corrida morre em **deadlock — SQLSTATE
+`40P01`**, que chega como `PrismaClientUnknownRequestError` e portanto não é
+reconhecido como conflito.
+
+Reproduzido localmente com o cenário repetido: **2 falhas em 8 execuções** do
+arquivo, e `40P01` aparece **exatamente** nas duas que falharam, em nenhuma
+das seis verdes.
+
+Uma medição intermediária quase descartou a causa certa e vale registro:
+deadlock chega como `PrismaClientKnownRequestError` (P2010) **apenas no
+caminho de consulta crua**. Pelo caminho tipado, que é o que o service usa,
+chega como `Unknown`.
+
+**O que fazer com o `40P01` é decisão de produto, e esta tarefa não a tem.**
+Mapeá-lo para 409 é defensável — na disputa por esta invariante, o perdedor é
+exatamente quem perdeu a corrida — e é também exatamente o que a decisão
+vigente proíbe sem autorização nova. Fica aberto.
 
 **A decisão do proprietário, registrada:** **nenhum SQLSTATE novo vira 409 sem
 prova direta.** P2028, P2034, 40P01 e 23000 continuam **500**. Chamar lentidão
@@ -1126,7 +1144,15 @@ uma resposta tranquilizadora — o oposto do que o repositório exige.
    escreveria nada justamente na CI;
 3. **E2E com diagnóstico**: o cenário concorrente repetido, e um conflito com
    contenção forçada. Quando falham, a mensagem traz status e corpo das duas
-   respostas — antes dizia apenas "esperava 1, recebeu 0".
+   respostas — antes dizia apenas "esperava 1, recebeu 0". O cenário repetido
+   **reproduz o defeito fora da CI**, o que o cenário de uma rodada nunca
+   fazia.
+
+**A CI desta PR expõe o defeito de propósito.** Com o cenário repetido, o E2E
+fica vermelho sempre que o deadlock ocorre — cerca de uma execução em quatro.
+Isso não é instabilidade nova: é o mesmo defeito que derrubou `main`, agora
+visível e explicado em vez de raro e mudo. O verde depende da decisão sobre o
+`40P01`.
 
 **Nunca sai no log:** mensagem do banco, `DETAIL` (que carrega os valores
 enviados), parâmetros, conteúdo da requisição ou stack. A resposta HTTP não

@@ -1342,8 +1342,12 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       de supor código ou mensagem.
     - **O que a investigação descartou:** o mapeamento de 23P01/23505/P2002/
       23514 já existe e funciona; expiração de transação por espera de lock
-      devolve 409 mesmo com 9 s de contenção forçada; deadlock e falha de
-      serialização chegam como `PrismaClientKnownRequestError`.
+      devolve 409 mesmo com 9 s de contenção forçada.
+    - **Causa raiz encontrada pelo próprio diagnóstico:** o perdedor da corrida
+      morre em **deadlock (`40P01`)**, que chega como
+      `PrismaClientUnknownRequestError`. Reproduzido localmente em 2 de 8
+      execuções, com o SQLSTATE aparecendo só nas que falharam. O que fazer
+      com ele é decisão de produto, ainda em aberto.
     - **Decisão do proprietário:** **nenhum SQLSTATE novo vira 409 sem prova
       direta.** P2028, P2034, 40P01 e 23000 continuam 500. Sem retry para
       mascarar a corrida, sem enfraquecer ou remover o E2E existente.
