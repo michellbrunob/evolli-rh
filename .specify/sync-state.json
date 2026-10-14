@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "constitutionVersion": "1.4.0",
   "lastConvergedAt": "2026-10-14",
-  "lastIntegratedTask": 159,
-  "lastRecordedTask": 160,
+  "lastIntegratedTask": 160,
+  "lastRecordedTask": 161,
   "platformDecision": {
     "adr": "docs/adr/0014-evolli-plataforma-base-e-encerramento-do-frappe.md",
     "decidedAt": "2026-10-01",
@@ -11,15 +11,15 @@
     "frappe": "encerrado_como_candidato_referencia_apenas"
   },
   "nextTask": {
-    "id": "T160",
-    "status": "login_institucional",
-    "reason": "T159 integrada em main pela PR #151 (squash c849b0192390c2db63fb78e0e305e97ab40d1f0f), com a CI de main 3/3 verde. A T160 renova SOMENTE a tela e o fluxo visual de login: experiencia institucional propria, com cartao central, fundo abstrato original, marca Evolli e composicao moderna, responsiva e acessivel. Referencia de mercado entra apenas como principio de composicao; nao se copia marca, texto, ilustracao, paleta exata, asset, icone nem layout pixel a pixel de terceiro. O contrato de autenticacao por e-mail e senha e preservado byte a byte, assim como a segunda etapa de MFA ja existente, o comportamento de sessao e o redirecionamento apos o login. NAO entram CPF, CAPTCHA, lembrar-me, cadastro, recuperacao de senha, registro de ponto ou qualquer acao sem contrato funcional. Nao altera API, Prisma, migrations, seed, Docker, banco, dependencias nem lockfile. Acessibilidade obrigatoria: teclado, foco visivel, mensagens de erro acessiveis, contraste, leitor de tela, prefers-reduced-motion e ausencia de rolagem horizontal em 375px. A decisao do Hub pos-login (T161) fica registrada em docs/decisions/t161-hub-pos-login.md e NAO autoriza implementacao. Seguem abertas e intocadas: T1, T2 e T3 da revisao final da T159, a divida L3 de paginacao, S-1 a S-4 da T158, R-A, R-B e R-C da T157, e o registro teste michell do banco de demonstracao."
+    "id": "T161",
+    "status": "concorrencia_gestor_diagnostico",
+    "reason": "T160 integrada em main pela PR #152 (squash 0db3d7059160b97699ca3077190618e6a972449e). A CI de main ficou 2/3: Quality gates e Migration smoke verdes, E2E vermelho em 1 de 481 testes - duas criacoes simultaneas de atribuicao de gestor principal devolveram UM 201 e NENHUM 409. A T161 e corretiva e DIAGNOSTICA, nao especulativa. Investigacao com PostgreSQL real efemero descartou as hipoteses obvias: o mapeamento de 23P01, 23505, P2002 e 23514 ja existe e funciona; expiracao de transacao por espera de lock devolve 409 mesmo com 9s de contencao forcada; e deadlock e falha de serializacao chegam como PrismaClientKnownRequestError (P2010 e P2034), incompativeis com o PrismaClientUnknownRequestError do log. Por decisao do proprietario, NENHUM SQLSTATE novo vira 409 sem prova direta - em especial P2028, P2034, 40P01 e 23000 continuam 500. O escopo e: preservar a regra correta, eliminar o diagnostico insuficiente do E2E e fazer a proxima ocorrencia revelar a causa. O Hub pos-login segue registrado em docs/decisions/t161-hub-pos-login.md e NAO e iniciado; RH/DP e Gestao de Pessoas seguem apenas planejados. Seguem abertas e intocadas: R1, R2 e R3 da revisao da T160, a divida L3 de paginacao, S-1 a S-4 da T158, R-A, R-B e R-C da T157, e o registro teste michell do banco de demonstracao."
   },
   "openDeliveries": [
     {
-      "id": "T160",
+      "id": "T161",
       "pullRequest": null,
-      "status": "login_institucional_em_implementacao"
+      "status": "concorrencia_gestor_diagnostico_em_implementacao"
     }
   ],
   "requiredArtifacts": [

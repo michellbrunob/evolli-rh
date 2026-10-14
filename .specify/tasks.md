@@ -1297,8 +1297,10 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       S-4 (T158), R-A, R-B e R-C (T157) e o registro `teste michell`.
 
 57. **T160 - Login institucional do Evolli**
-    - **Estado:** em implementação. Branch `codex/t160-login-institucional`, a
-      partir do squash `c849b0192390c2db63fb78e0e305e97ab40d1f0f` (T159, PR #151).
+    - **Estado:** **integrada** em `main` pela PR #152, squash
+      `0db3d7059160b97699ca3077190618e6a972449e`. A CI de `main` ficou 2/3
+      nesse squash, por falha pré-existente do E2E de concorrência do gestor —
+      tratada pela T161. Branch `codex/t160-login-institucional` preservada.
     - **Objetivo:** renovar somente a tela e o fluxo visual de login, com uma
       experiência institucional própria — cartão central, fundo abstrato
       original, marca Evolli e composição moderna, responsiva e acessível.
@@ -1328,6 +1330,35 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       [`docs/decisions/t161-hub-pos-login.md`](../docs/decisions/t161-hub-pos-login.md).
     - **Dívida preservada:** T1, T2 e T3 da revisão final da T159, L3, S-1 a S-4
       (T158), R-A, R-B e R-C (T157) e o registro `teste michell`.
+
+58. **T161 - Concorrência do gestor: diagnóstico antes de correção**
+    - **Estado:** em implementação. Branch `codex/t161-concorrencia-gestor-409`,
+      a partir do squash `0db3d7059160b97699ca3077190618e6a972449e` (T160, PR #152).
+    - **Motivo:** a CI de `main` ficou 2/3 — duas criações simultâneas de
+      atribuição de gestor principal devolveram um 201 e nenhum 409, e o log
+      trazia só `PrismaClientUnknownRequestError`.
+    - **Investigação obrigatória antes de qualquer correção:** PostgreSQL real
+      e efêmero, inspeção da forma exata do erro e do nome da constraint. Nada
+      de supor código ou mensagem.
+    - **O que a investigação descartou:** o mapeamento de 23P01/23505/P2002/
+      23514 já existe e funciona; expiração de transação por espera de lock
+      devolve 409 mesmo com 9 s de contenção forçada; deadlock e falha de
+      serialização chegam como `PrismaClientKnownRequestError`.
+    - **Decisão do proprietário:** **nenhum SQLSTATE novo vira 409 sem prova
+      direta.** P2028, P2034, 40P01 e 23000 continuam 500. Sem retry para
+      mascarar a corrida, sem enfraquecer ou remover o E2E existente.
+    - **Entrega:** regra preservada em função pura e testada; diagnóstico
+      seguro no `AllExceptionsFilter` (classe, código do Prisma, SQLSTATE,
+      constraint/trigger); E2E com cenário concorrente repetido e conflito
+      com contenção forçada, ambos reportando status e corpo na falha.
+    - **Limite de privacidade:** o log nunca carrega mensagem do banco,
+      `DETAIL`, parâmetros, conteúdo de requisição ou stack; a resposta HTTP
+      não muda.
+    - **Planejados, não iniciados:** Hub pós-login (T161 de produto, registrada
+      em [`docs/decisions/t161-hub-pos-login.md`](../docs/decisions/t161-hub-pos-login.md)),
+      RH/DP e Gestão de Pessoas.
+    - **Dívida preservada:** R1, R2 e R3 da T160, L3, S-1 a S-4 (T158),
+      R-A a R-C (T157) e o registro `teste michell`.
 
 ## Regra obrigatória para as próximas tarefas
 
