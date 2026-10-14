@@ -1095,8 +1095,8 @@ da T159 (precisão documental e de teste), **L3** (paginação), **S-1 a S-4**
 
 ## Concorrência do gestor: diagnóstico antes de correção — T161 (integrada)
 
-| Tarefa | Estado               | Resultado principal                                                                                                 |
-| ------ | -------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Tarefa | Estado                                    | Resultado principal                                                                                                 |
+| ------ | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | T161   | **Integrada** (PR #153, squash `07cdfca`) | Preserva a regra de conflito que já funciona e faz o erro que escapa dela se identificar no log, sem mascarar nada. |
 
 **O que aconteceu.** No squash `0db3d70`, duas criações simultâneas de gestor
@@ -1187,11 +1187,11 @@ produto funcional separado de superfície demonstrativa.
 
 **Contratos levantados na fonte, antes de qualquer interface:**
 
-| Pergunta                    | Contrato                                                       |
-| --------------------------- | -------------------------------------------------------------- |
+| Pergunta                    | Contrato                                                                |
+| --------------------------- | ----------------------------------------------------------------------- |
 | Ator, papel e empresa atual | `GET /v1/users/me` → `id`, `email`, `role`, `companyId`, `mfaAvailable` |
 | Empresas acessíveis         | `GET /v1/empresas`, sob `empresa:read` — escopo resolvido no servidor   |
-| **Troca de empresa/escopo** | **não existe**                                                  |
+| **Troca de empresa/escopo** | **não existe**                                                          |
 
 **O bloqueio, declarado:** a empresa do ator é `access_user.companyId`, uma
 coluna da conta, lida na sessão. Não há rota que troque o escopo, e o
