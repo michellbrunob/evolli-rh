@@ -1093,11 +1093,11 @@ funcionalidade é reservada sem contrato.
 da T159 (precisão documental e de teste), **L3** (paginação), **S-1 a S-4**
 (T158), **R-A, R-B e R-C** (T157) e o registro `teste michell`.
 
-## Concorrência do gestor: diagnóstico antes de correção — T161 (backend)
+## Concorrência do gestor: diagnóstico antes de correção — T161 (integrada)
 
 | Tarefa | Estado               | Resultado principal                                                                                                 |
 | ------ | -------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| T161   | **Em implementação** | Preserva a regra de conflito que já funciona e faz o erro que escapa dela se identificar no log, sem mascarar nada. |
+| T161   | **Integrada** (PR #153, squash `07cdfca`) | Preserva a regra de conflito que já funciona e faz o erro que escapa dela se identificar no log, sem mascarar nada. |
 
 **O que aconteceu.** No squash `0db3d70`, duas criações simultâneas de gestor
 principal devolveram **um 201 e nenhum 409**. O log do runner trazia apenas
@@ -1148,11 +1148,17 @@ uma resposta tranquilizadora — o oposto do que o repositório exige.
    **reproduz o defeito fora da CI**, o que o cenário de uma rodada nunca
    fazia.
 
-**A CI desta PR expõe o defeito de propósito.** Com o cenário repetido, o E2E
-fica vermelho sempre que o deadlock ocorre — cerca de uma execução em quatro.
-Isso não é instabilidade nova: é o mesmo defeito que derrubou `main`, agora
-visível e explicado em vez de raro e mudo. O verde depende da decisão sobre o
-`40P01`.
+**Desfecho.** A decisão sobre o `40P01` veio: repetição **limitada a uma**,
+só em `criarAtribuicao`, só com o SQLSTATE confirmado, e **sem** traduzir
+`40P01` em 409 — na segunda tentativa o vencedor já commitou e o conflito volta
+pela EXCLUSION, que o classificador já mapeava. A bateria que reprovava 2 em 8
+passou 8 em 8, e a **CI de push em `main` ficou 3/3 verde** no squash
+`07cdfca`.
+
+**Ressalva aberta (S2):** o confinamento da repetição a `criarAtribuicao` é
+garantido por inspeção — 6 `$transaction` no service, 1 envolvido —, **sem
+teste próprio**. Nada impede que uma operação futura seja envolvida por
+engano.
 
 **Nunca sai no log:** mensagem do banco, `DETAIL` (que carrega os valores
 enviados), parâmetros, conteúdo da requisição ou stack. A resposta HTTP não
@@ -1167,6 +1173,43 @@ implementação nesta tarefa.
 
 **Dívidas preservadas:** **R1, R2 e R3** da revisão da T160, **L3**, **S-1 a
 S-4** (T158), **R-A, R-B e R-C** (T157) e o registro `teste michell`.
+
+## Hub pós-login — T162 (interface web)
+
+| Tarefa | Estado               | Resultado principal                                                                                 |
+| ------ | -------------------- | --------------------------------------------------------------------------------------------------- |
+| T162   | **Em implementação** | Depois do login, a pessoa entra no Hub — que mostra só o que o servidor autoriza no contexto atual. |
+
+**A regra é a da T159, um nível acima.** Menu é promessa, e cartão de produto
+também. O Hub só oferece o que o papel do ator de fato consegue abrir, com
+capacidade derivada do `rbac.evaluator` — nunca de lista escrita à mão — e com
+produto funcional separado de superfície demonstrativa.
+
+**Contratos levantados na fonte, antes de qualquer interface:**
+
+| Pergunta                    | Contrato                                                       |
+| --------------------------- | -------------------------------------------------------------- |
+| Ator, papel e empresa atual | `GET /v1/users/me` → `id`, `email`, `role`, `companyId`, `mfaAvailable` |
+| Empresas acessíveis         | `GET /v1/empresas`, sob `empresa:read` — escopo resolvido no servidor   |
+| **Troca de empresa/escopo** | **não existe**                                                  |
+
+**O bloqueio, declarado:** a empresa do ator é `access_user.companyId`, uma
+coluna da conta, lida na sessão. Não há rota que troque o escopo, e o
+controlador de autenticação tem apenas login, logout, CSRF, sessões e
+redefinição de senha. Portanto a empresa aparece como **contexto não
+editável** — sem seletor clicável, sem empresa fictícia, sem simulação de
+troca. Implementar troca exigiria contrato de servidor que não existe.
+
+**Segunda consequência de contrato:** `empresa:read` é concedido a `rh`, `dp`
+e `master_tecnico`. Para `gestor` e `colaborador` **não há como ler o nome da
+empresa** — e o Hub não inventa um.
+
+**Limites:** sem alterar login, RBAC, schema, migrations, seed, Docker, banco,
+dependências ou lockfile. O frontend não é autorização: cada requisição segue
+decidida pelo servidor.
+
+**Dívidas preservadas:** **S2** (T161), **R1, R2 e R3** (T160), **L3**, **S-1 a
+S-4** (T158), **R-A a R-C** (T157) e o registro `teste michell`.
 
 ## Próxima ação autorizável
 
