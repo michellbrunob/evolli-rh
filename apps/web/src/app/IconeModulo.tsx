@@ -121,8 +121,20 @@ export function IconeModulo({ nome }: IconeModuloProps) {
  *
  * `aria-hidden` porque o nome "Evolli RH" aparece em texto ao lado; o leitor
  * de tela não deve ouvir a marca duas vezes.
+ *
+ * Dois tons, um desenho só (T160): `acao` é o padrão histórico — quadrado na
+ * cor do texto ao redor, barras brancas — e serve sobre superfície clara.
+ * `clara` inverte para superfície da cor de ação, onde o padrão desapareceria
+ * (quadrado branco com barras brancas). Duplicar o desenho num segundo
+ * componente faria a marca divergir de si mesma na primeira alteração.
  */
-export function MarcaEvolli() {
+export interface MarcaEvolliProps {
+  readonly tom?: "acao" | "clara";
+}
+
+export function MarcaEvolli({ tom = "acao" }: MarcaEvolliProps = {}) {
+  const fundo = tom === "clara" ? "var(--surface-canvas)" : "currentColor";
+  const barras = tom === "clara" ? "var(--color-action)" : "#ffffff";
   return (
     <svg
       className="app-shell__marca-simbolo"
@@ -132,8 +144,8 @@ export function MarcaEvolli() {
       aria-hidden="true"
       focusable="false"
     >
-      <rect width="28" height="28" rx="7" fill="currentColor" />
-      <g fill="#ffffff">
+      <rect width="28" height="28" rx="7" fill={fundo} />
+      <g fill={barras}>
         <rect x="7" y="8" width="14" height="2.75" rx="1.375" />
         <rect x="7" y="12.625" width="10" height="2.75" rx="1.375" />
         <rect x="7" y="17.25" width="6" height="2.75" rx="1.375" />

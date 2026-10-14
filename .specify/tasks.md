@@ -1255,8 +1255,9 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       ressalvas R-A, R-B e R-C da T157 continuam abertas e não são tratadas aqui.
 
 56. **T159 - Reorganização funcional da navegação e menus**
-    - **Estado:** em implementação. Branch `codex/t159-navegacao-modular-funcional`, a
-      partir do squash `3755ae251509553608accabddf3141ad785e7431` (T158, PR #150).
+    - **Estado:** **integrada** em `main` pela PR #151, squash
+      `c849b0192390c2db63fb78e0e305e97ab40d1f0f`, com a CI de `main` 3/3 verde.
+      Branch `codex/t159-navegacao-modular-funcional` preservada em `06157a4`.
     - **Objetivo:** reorganizar a navegação global em módulos e submenus coerentes com a
       capacidade que de fato existe, usando a matriz da T156 como inventário e a referência
       de mercado apenas como inspiração de arquitetura de informação.
@@ -1294,6 +1295,39 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       demonstrativo não se apresenta como funcional.
     - **Dívida preservada:** L3 não é iniciada nem declarada resolvida. Seguem abertas S-1 a
       S-4 (T158), R-A, R-B e R-C (T157) e o registro `teste michell`.
+
+57. **T160 - Login institucional do Evolli**
+    - **Estado:** em implementação. Branch `codex/t160-login-institucional`, a
+      partir do squash `c849b0192390c2db63fb78e0e305e97ab40d1f0f` (T159, PR #151).
+    - **Objetivo:** renovar somente a tela e o fluxo visual de login, com uma
+      experiência institucional própria — cartão central, fundo abstrato
+      original, marca Evolli e composição moderna, responsiva e acessível.
+    - **Princípio:** a porta de entrada apresenta o produto; ela não pode
+      prometer o que o produto não faz. Referência de mercado entra como
+      princípio de composição, nunca como material copiado.
+    - **Contrato preservado:** autenticação por **e-mail e senha**, a segunda
+      etapa de MFA já existente, o comportamento de sessão e o redirecionamento
+      após o login. `onLoginSuccess` e o portão `AutenticacaoApp` seguem
+      intactos.
+    - **Proibido sem contrato funcional:** CPF, CAPTCHA, "lembrar-me", cadastro,
+      recuperação de senha, registro de ponto, SSO e qualquer outra ação nova.
+    - **Proibido copiar:** marca, logotipo, texto, foto, ilustração, ícone
+      proprietário, paleta exata, asset, código ou layout pixel a pixel de
+      terceiros.
+    - **Limite obrigatório:** sem alterar API, Prisma, migrations, seed, Docker,
+      banco, dependências ou lockfile. Necessidade comprovada fora disso para a
+      tarefa e vira relato.
+    - **Acessibilidade:** teclado, foco visível, mensagens de erro acessíveis
+      com `role="alert"`, contraste AA, leitor de tela,
+      `prefers-reduced-motion` e nenhuma rolagem horizontal em 375 px; um `h1`
+      por tela.
+    - **Aceite:** testes que falham antes e passam depois, cobrindo contrato de
+      autenticação preservado, ausência das ações proibidas, acessibilidade e
+      composição responsiva; validação visual em desktop e 375 px.
+    - **Decisão registrada junto, sem implementar:** o Hub pós-login (T161), em
+      [`docs/decisions/t161-hub-pos-login.md`](../docs/decisions/t161-hub-pos-login.md).
+    - **Dívida preservada:** T1, T2 e T3 da revisão final da T159, L3, S-1 a S-4
+      (T158), R-A, R-B e R-C (T157) e o registro `teste michell`.
 
 ## Regra obrigatória para as próximas tarefas
 
