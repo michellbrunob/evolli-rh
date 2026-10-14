@@ -988,11 +988,11 @@ oferece. Ficam fora exceções de acesso do gestor, ESS, férias, ponto, folha, 
 catálogo de motivos de desligamento. As ressalvas **R-A, R-B e R-C** da T157 seguem abertas
 e não são tratadas aqui.
 
-## Navegação modular e funcional — T159 (interface web)
+## Navegação modular e funcional — T159 (integrada)
 
-| Tarefa | Estado               | Resultado principal                                                                                                    |
-| ------ | -------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| T159   | **Em implementação** | Reorganiza a navegação global em módulos coerentes com a capacidade que de fato existe, sem prometer o que não existe. |
+| Tarefa | Estado                                    | Resultado principal                                                                                                    |
+| ------ | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| T159   | **Integrada** (PR #151, squash `c849b01`) | Reorganiza a navegação global em módulos coerentes com a capacidade que de fato existe, sem prometer o que não existe. |
 
 **A regra que governa a tarefa.** Menu é promessa: um item na navegação é lido como
 capacidade disponível. Hoje 39 superfícies estáticas convivem com as funcionais na mesma
@@ -1031,6 +1031,44 @@ inicialização — conferido no navegador: o gestor aterrissa em `Minha equipe`
 chamada da aterrissagem é `GET /v1/gestor/equipe` → 200. A dívida **L3** não é iniciada nem
 declarada resolvida, e seguem abertas **S-1 a S-4** (T158), **R-A, R-B e R-C** (T157) e o
 registro `teste michell`.
+
+## Login institucional — T160 (interface web)
+
+| Tarefa | Estado               | Resultado principal                                                                                                                 |
+| ------ | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| T160   | **Em implementação** | Renova a tela e o fluxo visual de login com uma experiência institucional própria do Evolli, sem tocar no contrato de autenticação. |
+
+**O que muda.** Só a composição visual da porta de entrada: cartão central,
+fundo abstrato **original**, marca Evolli e layout moderno, responsivo e
+acessível. A referência de mercado entra como **princípio de composição**;
+marca, texto, ilustração, paleta exata, asset, ícone e layout pixel a pixel de
+terceiros, nunca — mesma regra registrada na
+[decisão visual da T159](../docs/decisions/t159-direcao-visual-navegacao.md).
+
+**O que NÃO muda.** O contrato de autenticação por e-mail e senha, a segunda
+etapa de MFA já existente, o comportamento de sessão e o redirecionamento
+depois do login. Nada de CPF, CAPTCHA, "lembrar-me", cadastro, recuperação de
+senha ou registro de ponto: nenhum desses tem contrato funcional, e oferecê-los
+seria a promessa vazia que a T159 passou a tarefa inteira eliminando.
+
+**Acessibilidade obrigatória:** teclado, foco visível, mensagens de erro
+acessíveis, contraste, leitor de tela, `prefers-reduced-motion` e ausência de
+rolagem horizontal em 375 px. Um `h1` por tela.
+
+**Limites:** sem alterar API, Prisma, migrations, seed, Docker, banco,
+dependências ou lockfile. Se aparecer necessidade fora disso, a tarefa para e
+reporta.
+
+**Hub pós-login (T161): decisão registrada, implementação não autorizada.** Em
+[`docs/decisions/t161-hub-pos-login.md`](../docs/decisions/t161-hub-pos-login.md):
+empresa ativa e troca de empresa só com validação e autorização do servidor;
+subsistemas exibidos conforme permissão real; produto funcional separado de
+planejado e demonstrativo. Nada do Hub é implementado agora, e nenhuma
+funcionalidade é reservada sem contrato.
+
+**Dívidas preservadas, nenhuma tratada aqui:** **T1, T2 e T3** da revisão final
+da T159 (precisão documental e de teste), **L3** (paginação), **S-1 a S-4**
+(T158), **R-A, R-B e R-C** (T157) e o registro `teste michell`.
 
 ## Próxima ação autorizável
 
