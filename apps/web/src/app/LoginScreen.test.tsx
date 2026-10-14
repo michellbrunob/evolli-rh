@@ -1,5 +1,12 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
 import { LoginScreen } from "./LoginScreen";
 import { ApiError, login, verifyMfa } from "../api/authClient";
 
@@ -205,16 +212,32 @@ describe("LoginScreen (T116)", () => {
     render(<LoginScreen onLoginSuccess={vi.fn()} />);
 
     const texto = document.body.innerHTML.toLowerCase();
-    for (const termoProibido of [
+
+    // Prefixos: pegam a família inteira da palavra ("cadastro", "cadastre-se",
+    // "cadastrar"), que é o ponto — a ação não entra sob nenhuma flexão.
+    for (const trechoProibido of [
       "cadastr",
       "esqueci",
       "redefinir",
       "recuper",
-      "mfa",
-      "sso",
       "cpf",
+      // T160 — a renovação visual não pode trazer ação sem contrato junto.
+      // Cada um destes é uma promessa que o servidor não honra hoje.
+      "captcha",
+      "lembrar",
+      "registro de ponto",
+      "bater ponto",
+      "google",
+      "microsoft",
     ]) {
-      expect(texto).not.toContain(termoProibido);
+      expect(texto).not.toContain(trechoProibido);
+    }
+
+    // Palavras inteiras: "sso" e "mfa" são siglas, e como trecho solto davam
+    // falso positivo em palavra legítima — "acesso" contém "sso". Medido
+    // na T160: a guarda por trecho reprovava a frase "acesso restrito".
+    for (const siglaProibida of ["sso", "mfa"]) {
+      expect(texto).not.toMatch(new RegExp(`\b${siglaProibida}\b`));
     }
   });
 
@@ -328,6 +351,183 @@ describe("LoginScreen (T116)", () => {
       expect(setItemSpy).not.toHaveBeenCalled();
       // O challenge não aparece em nenhum atributo de DOM persistente.
       expect(document.body.innerHTML).not.toContain("challenge-opaco-123");
+    });
+  });
+});
+
+/**
+ * T160 — composição institucional da porta de entrada.
+ *
+ * O que estes testes prendem não é estética: é que a renovação visual **não
+ * trouxe promessa junto**. Uma tela de login é o lugar mais fácil do produto
+ * para alguém acrescentar "entrar com Google", "lembrar-me" ou "esqueci minha
+ * senha" — nenhum dos três tem contrato, e os três parecem inofensivos.
+ */
+describe("LoginScreen — composição institucional (T160)", () => {
+  const css = readFileSync("src/app/LoginScreen.css", "utf8");
+
+  it("apresenta a marca Evolli em texto, não em imagem", () => {
+    render(<LoginScreen onLoginSuccess={vi.fn()} />);
+    expect(screen.getByText("Evolli RH")).toBeInTheDocument();
+    // Nenhum ativo externo: o símbolo é SVG desenhado no projeto.
+    expect(document.querySelectorAll("img")).toHaveLength(0);
+  });
+
+  it("o fundo abstrato é decorativo e não entra na árvore de acessibilidade", () => {
+    render(<LoginScreen onLoginSuccess={vi.fn()} />);
+    const decorativos = document.querySelectorAll("svg");
+    expect(decorativos.length).toBeGreaterThan(0);
+    for (const svg of decorativos) {
+      expect(svg).toHaveAttribute("aria-hidden", "true");
+      expect(svg).toHaveAttribute("focusable", "false");
+    }
+    expect(screen.queryAllByRole("img")).toHaveLength(0);
+  });
+
+  it("o conteúdo da entrada vive num <main>, com um único h1", () => {
+    render(<LoginScreen onLoginSuccess={vi.fn()} />);
+    const principal = screen.getByRole("main");
+    const titulos = screen.getAllByRole("heading", { level: 1 });
+    expect(titulos).toHaveLength(1);
+    expect(principal).toContainElement(titulos[0]!);
+  });
+
+  it("o painel institucional não vira segundo h1", () => {
+    render(<LoginScreen onLoginSuccess={vi.fn()} />);
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+  });
+
+  it("não há link nenhum na porta de entrada", () => {
+    // Um link aqui seria ou uma ação sem contrato ("esqueci minha senha") ou
+    // saída para fora do produto. Nenhuma das duas existe.
+    render(<LoginScreen onLoginSuccess={vi.fn()} />);
+    expect(screen.queryAllByRole("link")).toHaveLength(0);
+  });
+
+  it("a única ação da etapa de credenciais é Entrar", () => {
+    render(<LoginScreen onLoginSuccess={vi.fn()} />);
+    expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual([
+      "Entrar",
+    ]);
+  });
+
+  it("a ordem de foco é e-mail, senha, Entrar", () => {
+    render(<LoginScreen onLoginSuccess={vi.fn()} />);
+    const formulario = screen.getByRole("form", { name: /login/i });
+    const focaveis = [
+      ...formulario.querySelectorAll<HTMLElement>("input, button"),
+    ];
+    expect(focaveis).toHaveLength(3);
+    expect(focaveis[0]).toHaveAttribute("type", "email");
+    expect(focaveis[1]).toHaveAttribute("type", "password");
+    expect(focaveis[2]).toHaveTextContent("Entrar");
+    for (const elemento of focaveis) {
+      expect(elemento.getAttribute("tabindex")).not.toBe("-1");
+    }
+  });
+
+  it("o painel institucional continua na etapa do 2º fator", async () => {
+    vi.mocked(login).mockResolvedValueOnce({
+      mfaRequerido: true,
+      challengeToken: "challenge-opaco-123",
+    });
+    render(<LoginScreen onLoginSuccess={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText(/^E-mail\b/i), {
+      target: { value: EMAIL_SINTETICO },
+    });
+    fireEvent.change(screen.getByLabelText(/^Senha\b/i), {
+      target: { value: SENHA_SINTETICA },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Entrar" }));
+    await screen.findByRole("heading", {
+      level: 1,
+      name: "Verificação em duas etapas",
+    });
+
+    expect(screen.getByText("Evolli RH")).toBeInTheDocument();
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(screen.getByRole("main")).toBeInTheDocument();
+  });
+
+  it("o erro continua anunciado por role=alert dentro do cartão", async () => {
+    vi.mocked(login).mockRejectedValueOnce(new ApiError(401, "nao importa"));
+    render(<LoginScreen onLoginSuccess={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText(/^E-mail\b/i), {
+      target: { value: EMAIL_SINTETICO },
+    });
+    fireEvent.change(screen.getByLabelText(/^Senha\b/i), {
+      target: { value: SENHA_SINTETICA },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Entrar" }));
+
+    const alerta = await screen.findByRole("alert");
+    expect(alerta).toHaveTextContent("E-mail ou senha inválidos.");
+    expect(within(screen.getByRole("main")).getByRole("alert")).toBe(alerta);
+  });
+
+  describe("contrato visual escrito no CSS", () => {
+    /** O CSS sem comentários — o que o navegador de fato aplica. */
+    const cssSemComentarios = css.replace(/\/\*[\s\S]*?\*\//g, "");
+
+    /** Conteúdo exato de um bloco `@media`, por casamento de chaves. */
+    function blocoDeMedia(consulta: RegExp): string {
+      const fonte = cssSemComentarios;
+      const encontrado = consulta.exec(fonte);
+      if (!encontrado) throw new Error(`bloco ausente: ${consulta}`);
+      const abre = encontrado.index + encontrado[0].length - 1;
+      let profundidade = 0;
+      for (let i = abre; i < fonte.length; i += 1) {
+        if (fonte[i] === "{") profundidade += 1;
+        else if (fonte[i] === "}") {
+          profundidade -= 1;
+          if (profundidade === 0) return fonte.slice(abre + 1, i);
+        }
+      }
+      throw new Error(`bloco não fecha: ${consulta}`);
+    }
+
+    it("nenhum ativo de terceiro: sem @import, sem url() remota, sem fonte externa", () => {
+      // Sem os comentários: o cabeçalho do arquivo *fala sobre* `@import` para
+      // explicar a regra, e uma guarda que lê comentário reprova a própria
+      // documentação dela. Medido na T160.
+      expect(cssSemComentarios).not.toMatch(/@import/);
+      expect(cssSemComentarios).not.toMatch(/url\(\s*["']?https?:/);
+      expect(cssSemComentarios).not.toMatch(
+        /fonts\.googleapis|typekit|fontawesome/i,
+      );
+    });
+
+    it("sem gradiente decorativo — a fundação do produto não os usa", () => {
+      expect(css).not.toMatch(/linear-gradient|radial-gradient|conic-gradient/);
+    });
+
+    it("toda animação está atrás de prefers-reduced-motion", () => {
+      // Hoje esta tela não tem movimento nenhum, e a asserção continua
+      // valendo: o que ela proíbe é movimento FORA do bloco de preferência.
+      // Com o bloco ausente, `foraDoBloco` é o arquivo inteiro — então
+      // qualquer `transition` acrescentada em qualquer lugar reprova.
+      const consulta =
+        /@media\s*\(\s*prefers-reduced-motion:\s*no-preference\s*\)\s*\{/;
+      const comMovimento = consulta.test(cssSemComentarios)
+        ? blocoDeMedia(consulta)
+        : "";
+      const foraDoBloco = comMovimento
+        ? cssSemComentarios.replace(comMovimento, "")
+        : cssSemComentarios;
+
+      expect(foraDoBloco).not.toMatch(/\btransition\s*:/);
+      expect(foraDoBloco).not.toMatch(/\banimation\s*:/);
+      if (comMovimento) {
+        // Se o bloco existir, o extrator precisa ter delimitado mesmo.
+        expect(comMovimento.length).toBeLessThan(cssSemComentarios.length);
+      }
+    });
+
+    it("nada força largura maior que a tela em 375px", () => {
+      // Rolagem horizontal no mobile nasce de largura fixa e de deslocamento
+      // lateral; nenhum dos dois entra aqui.
+      expect(css).not.toMatch(/translateX|translate3d/);
+      expect(css).not.toMatch(/min-width:\s*\d{3,}px\s*;/);
     });
   });
 });

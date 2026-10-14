@@ -1,17 +1,106 @@
 /**
- * Login web (T116) — só tokens já existentes (tokens.css); sem hexadecimal
- * novo, sem sombra, sem gradiente. Cartão centralizado, responsivo desde
- * 375px.
+ * Login web (T116; composição institucional na T160).
+ *
+ * Só tokens de `tokens.css`: nenhum hexadecimal novo além do branco já
+ * previsto como `--color-on-action`, **sem gradiente**, sem sombra, sem fonte
+ * ou imagem externa, sem `@import`. Nada aqui foi amostrado de produto de
+ * terceiro — a regra está registrada em
+ * `docs/decisions/t159-direcao-visual-navegacao.md` e vale igual para a porta
+ * de entrada.
+ *
+ * ## A composição
+ *
+ * Duas faixas. À esquerda, no desktop, o **painel institucional**: superfície
+ * na cor de ação, marca, uma frase e o aviso de ambiente interno, sobre um
+ * fundo abstrato desenhado em SVG. À direita, o **cartão** de credenciais,
+ * sobre a superfície neutra de sempre. Abaixo de 900px as duas viram uma
+ * coluna só: o painel encolhe para uma faixa de topo e o cartão ocupa a
+ * largura, sem nunca passar da tela.
+ *
+ * ## Contraste
+ *
+ * Todo texto do painel é branco puro sobre `--color-action` (#0066cc),
+ * ≈5,6:1 — AA com folga. Nenhum texto usa branco esmaecido ali: a hierarquia
+ * vem de tamanho e peso, não de opacidade, justamente porque opacidade sobre
+ * essa cor cairia abaixo de 4,5:1.
  */
 
 .login-screen {
   min-height: 100vh;
   min-height: 100svh;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  background: var(--surface-neutral);
+}
+
+/* ---------------------------------------------------------- painel esquerdo */
+
+.login-screen__painel {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: var(--space-lg) clamp(var(--space-md), 5vw, var(--space-2xl));
+  background: var(--color-action);
+  color: var(--color-on-action);
+}
+
+/* Decoração: fica atrás do conteúdo do painel e nunca escapa dele (o
+   `isolation` acima cria o contexto de empilhamento). */
+.login-screen__fundo {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  width: 100%;
+  height: 100%;
+}
+
+.login-screen__painel-conteudo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  max-width: 30rem;
+}
+
+.login-screen__marca {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.login-screen__marca-nome {
+  font-size: var(--text-lead);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-tight);
+  line-height: var(--leading-tight);
+}
+
+.login-screen__lema {
+  margin: var(--space-xs) 0 0;
+  font-size: var(--text-lead);
+  font-weight: var(--weight-regular);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  text-wrap: balance;
+}
+
+.login-screen__nota {
+  margin: 0;
+  font-size: var(--text-caption);
+  /* Branco puro, não esmaecido: ver a nota de contraste no topo. */
+  color: var(--color-on-action);
+}
+
+/* ----------------------------------------------------------- cartão direito */
+
+.login-screen__area {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--space-lg);
-  background: var(--surface-neutral);
+  padding: clamp(var(--space-lg), 5vw, var(--space-2xl))
+    clamp(var(--space-md), 4vw, var(--space-xl));
 }
 
 .login-screen__card {
@@ -44,7 +133,7 @@
 }
 
 .login-screen__form > .evolli-button {
-  align-self: flex-start;
+  align-self: stretch;
 }
 
 .login-screen__erro {
@@ -60,8 +149,42 @@
   gap: var(--space-sm);
 }
 
-@media (max-width: 480px) {
+.login-screen__mfa-acoes > .evolli-button {
+  flex: 1 1 auto;
+}
+
+/* ----------------------------------------------------------------- desktop */
+
+@media (min-width: 900px) {
   .login-screen {
+    grid-template-rows: none;
+    /* O cartão manda na largura; o painel fica com o resto, sem espremer o
+       formulário em tela estreita de notebook. */
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1fr);
+  }
+
+  .login-screen__painel {
+    justify-content: center;
+    padding: var(--space-3xl) clamp(var(--space-xl), 6vw, var(--space-3xl));
+  }
+
+  .login-screen__lema {
+    font-size: var(--text-display);
+  }
+
+  .login-screen__nota {
+    margin-top: var(--space-sm);
+  }
+}
+
+/* ---------------------------------------------------------------- estreito */
+
+@media (max-width: 480px) {
+  .login-screen__painel {
+    padding: var(--space-md);
+  }
+
+  .login-screen__area {
     padding: var(--space-md);
   }
 
@@ -69,15 +192,26 @@
     padding: var(--space-lg);
   }
 
-  .login-screen__form > .evolli-button {
-    align-self: stretch;
-  }
-
   .login-screen__mfa-acoes {
     flex-direction: column-reverse;
   }
-
-  .login-screen__mfa-acoes > .evolli-button {
-    width: 100%;
-  }
 }
+
+/* Sem movimento nenhum nesta tela, de propósito.
+ *
+ * Houve uma tentativa de reforçar o foco mudando a borda do cartão em
+ * `:focus-within`, com transição atrás de `prefers-reduced-motion`. A regra
+ * casava (`matches(':focus-within')` verdadeiro, documento com foco) e mesmo
+ * assim a borda não mudava no navegador — nem com `!important`, enquanto
+ * `:focus-within` aplicado ao formulário funcionava na mesma página. Sem
+ * explicação verificada, a regra saiu: publicar enfeite que não se consegue
+ * demonstrar é pior do que não ter enfeite.
+ *
+ * O sinal de foco que importa continua existindo e foi medido: o anel do
+ * próprio campo, `2px solid #0066cc`, vindo do `:focus-visible` global de
+ * `tokens.css`. Ele não depende de nada deste arquivo.
+ *
+ * O teste `toda animação está atrás de prefers-reduced-motion` segue valendo:
+ * hoje não há `transition` nem `animation` aqui, e se alguém acrescentar uma
+ * fora do bloco de preferência de movimento, ele reprova.
+ */
