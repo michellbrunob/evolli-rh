@@ -197,21 +197,62 @@
   }
 }
 
-/* Sem movimento nenhum nesta tela, de propósito.
+/* --------------------------------------------------------------- movimento
  *
- * Houve uma tentativa de reforçar o foco mudando a borda do cartão em
- * `:focus-within`, com transição atrás de `prefers-reduced-motion`. A regra
- * casava (`matches(':focus-within')` verdadeiro, documento com foco) e mesmo
- * assim a borda não mudava no navegador — nem com `!important`, enquanto
- * `:focus-within` aplicado ao formulário funcionava na mesma página. Sem
- * explicação verificada, a regra saiu: publicar enfeite que não se consegue
- * demonstrar é pior do que não ter enfeite.
+ * Uma entrada curta do painel: a marca aparece primeiro, a frase logo atrás,
+ * o aviso por último. É a única animação do produto inteiro, e existe por um
+ * motivo estreito — a porta de entrada é o primeiro contato, e a marca
+ * chegando antes do resto diz de quem é a casa.
  *
- * O sinal de foco que importa continua existindo e foi medido: o anel do
- * próprio campo, `2px solid #0066cc`, vindo do `:focus-visible` global de
- * `tokens.css`. Ele não depende de nada deste arquivo.
+ * Quatro regras que a mantêm honesta:
  *
- * O teste `toda animação está atrás de prefers-reduced-motion` segue valendo:
- * hoje não há `transition` nem `animation` aqui, e se alguém acrescentar uma
- * fora do bloco de preferência de movimento, ele reprova.
+ * 1. **Dispara uma vez.** Nada de laço: conteúdo em movimento perpétuo por
+ *    mais de cinco segundos cairia na WCAG 2.2.2, que exigiria um controle de
+ *    pausa — controle que esta tela não tem e não deveria ter.
+ * 2. **Mora inteira atrás de `prefers-reduced-motion: no-preference`.** Quem
+ *    pediu menos movimento vê o painel pronto, sem atraso e sem deslocamento.
+ * 3. **Nunca mexe em `opacity` nem em `visibility`.** Esta é a regra que
+ *    custou uma medição: com `opacity: 0` no quadro inicial e
+ *    `animation-fill-mode: both`, uma animação que NÃO avança deixa o
+ *    conteúdo preso em transparente. Medi isso no navegador — documento sem
+ *    pintar, animação em `running` e marca invisível por tempo indefinido.
+ *    Animando só o deslocamento, o pior caso vira "o texto ficou 10px mais
+ *    baixo", e não "a marca sumiu".
+ * 4. **Deslocamento só na vertical**, de 10px. `translateX` está proibido por
+ *    teste neste arquivo: é a origem clássica de rolagem horizontal no mobile.
+ *
+ * Fora daqui a tela não tem movimento nenhum. A tentativa de animar a borda
+ * do cartão em `:focus-within` foi descartada: a regra casava
+ * (`matches(':focus-within')` verdadeiro, documento com foco, regra no
+ * CSSOM) e mesmo assim a borda não mudava no navegador — nem com
+ * `!important` —, enquanto `:focus-within` aplicado ao formulário funcionava
+ * na mesma página. Sem explicação verificada, saiu. O sinal de foco que
+ * importa é o anel do próprio campo, `2px solid #0066cc`, vindo do
+ * `:focus-visible` global de `tokens.css`, e não depende deste arquivo.
  */
+
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes login-entrada {
+    from {
+      transform: translateY(10px);
+    }
+
+    to {
+      transform: none;
+    }
+  }
+
+  .login-screen__marca,
+  .login-screen__lema,
+  .login-screen__nota {
+    animation: login-entrada 420ms ease-out both;
+  }
+
+  .login-screen__lema {
+    animation-delay: 90ms;
+  }
+
+  .login-screen__nota {
+    animation-delay: 180ms;
+  }
+}

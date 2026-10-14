@@ -498,7 +498,9 @@ describe("LoginScreen — composição institucional (T160)", () => {
     });
 
     it("sem gradiente decorativo — a fundação do produto não os usa", () => {
-      expect(css).not.toMatch(/linear-gradient|radial-gradient|conic-gradient/);
+      expect(cssSemComentarios).not.toMatch(
+        /linear-gradient|radial-gradient|conic-gradient/,
+      );
     });
 
     it("toda animação está atrás de prefers-reduced-motion", () => {
@@ -523,11 +525,41 @@ describe("LoginScreen — composição institucional (T160)", () => {
       }
     });
 
+    it("a entrada do painel dispara uma vez — nada de laço", () => {
+      // Movimento perpétuo por mais de cinco segundos cairia na WCAG 2.2.2 e
+      // exigiria um controle de pausa que esta tela não tem.
+      expect(cssSemComentarios).not.toMatch(/\binfinite\b/);
+      expect(cssSemComentarios).toMatch(/@keyframes\s+login-entrada/);
+    });
+
+    it("animação que não avança não pode esconder a marca", () => {
+      // Medido no navegador, e é o motivo de esta asserção existir: com
+      // `opacity: 0` no quadro inicial e `fill-mode: both`, uma animação que
+      // não avança — documento sem pintar — prende o conteúdo em
+      // transparente, e a marca some por tempo indefinido. Animando só o
+      // deslocamento, o pior caso é o texto 10px mais baixo.
+      //
+      // A guarda cobre o arquivo inteiro de propósito: nem dentro do bloco de
+      // movimento pode haver `opacity` ou `visibility` animados.
+      expect(cssSemComentarios).not.toMatch(/opacity:\s*0\b/);
+      expect(cssSemComentarios).not.toMatch(/visibility:\s*hidden/);
+
+      const consulta =
+        /@media\s*\(\s*prefers-reduced-motion:\s*no-preference\s*\)\s*\{/;
+      const comMovimento = blocoDeMedia(consulta);
+      // O que a animação mexe é só transform — e o quadro inicial existe.
+      expect(comMovimento).toMatch(/transform:\s*translateY\(/);
+      expect(comMovimento).not.toMatch(/\bopacity\b/);
+      expect(comMovimento).not.toMatch(/\bvisibility\b/);
+    });
+
     it("nada força largura maior que a tela em 375px", () => {
       // Rolagem horizontal no mobile nasce de largura fixa e de deslocamento
-      // lateral; nenhum dos dois entra aqui.
-      expect(css).not.toMatch(/translateX|translate3d/);
-      expect(css).not.toMatch(/min-width:\s*\d{3,}px\s*;/);
+      // lateral; nenhum dos dois entra aqui. Sem comentários, pelo mesmo
+      // motivo do `@import`: o arquivo EXPLICA que `translateX` é proibido, e
+      // a guarda não pode reprovar a própria explicação.
+      expect(cssSemComentarios).not.toMatch(/translateX|translate3d/);
+      expect(cssSemComentarios).not.toMatch(/min-width:\s*\d{3,}px\s*;/);
     });
   });
 });
