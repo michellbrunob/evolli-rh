@@ -1371,8 +1371,14 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       R-A a R-C (T157) e o registro `teste michell`.
 
 59. **T162 - Hub pós-login do Evolli**
-    - **Estado:** em implementação. Branch `codex/t162-hub-pos-login`, a partir
-      do squash `07cdfca25fb2b7b5e2dceead94e73c4a2181b659` (T161, PR #153).
+    - **Estado:** **integrada** em `main` pela PR #154, squash
+      `61e5f9005e072a7e5583fb2ffbaa722240ea0ff9`, com a CI de push 3/3 verde.
+      Branch `codex/t162-hub-pos-login` preservada.
+    - **Ressalvas abertas (revisão adversarial):** **R-2** — o Hub lê
+      `GET /v1/empresas` a cada montagem, e `registrarConsultaAmpla` grava um
+      registro de auditoria por visita; **R-3** — `dp` dentro de Jornada pode
+      esbarrar em `tabela_horario` por interação (o mount está limpo; defeito
+      pré-existente da tela, não introduzido pela T162). Nenhuma foi corrigida.
     - **Objetivo:** depois do login e da resolução segura do ator, a pessoa
       entra primeiro no Hub, não direto no shell de módulos. O Hub mostra
       **somente** produtos que o servidor autoriza no contexto atual.
@@ -1403,6 +1409,45 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       banco, dependências ou lockfile.
     - **Dívida preservada:** S2 (T161), R1 a R3 (T160), L3, S-1 a S-4 (T158),
       R-A a R-C (T157) e o registro `teste michell`.
+
+60. **T163 - Contexto empresarial ativo e troca segura de empresa**
+    - **Estado:** em implementação. Branch
+      `codex/t163-contexto-empresarial-ativo`, a partir do squash
+      `61e5f9005e072a7e5583fb2ffbaa722240ea0ff9` (T162, PR #154).
+    - **Origem:** a T162 entrou **sem** troca de empresa porque não havia
+      contrato — a empresa era `access_user.companyId`, coluna fixa da conta.
+      Esta tarefa cria o contrato.
+    - **Regra aprovada:** `rh` e `master_tecnico` escolhem empresa de trabalho
+      somente entre as **autorizadas pelo servidor**; gestor, colaborador e
+      demais papéis ficam na empresa do próprio vínculo e **não listam nem
+      trocam**, inclusive por requisição forjada.
+    - **Princípios:** associação usuário–empresa de servidor e auditável;
+      empresa ativa na **sessão**, nunca em `localStorage`, `sessionStorage`,
+      query string, cookie de frontend ou parâmetro livre de rota; `companyId`
+      do cliente nunca amplia escopo; contexto resolvido **centralmente** em
+      leituras e mutações; troca valida no servidor, atualiza a sessão e gera
+      **evento de auditoria** sem dado sensível; empresa não autorizada,
+      inexistente ou revogada segue o padrão **anti-enumeração**; login novo
+      começa em contexto previsível; sessões simultâneas mantêm contextos
+      independentes; empresas autorizadas não são expostas a quem não seleciona.
+    - **Política do `master_tecnico`:** pode receber as empresas permitidas pela
+      política existente, mas isso precisa ficar **explícito e coberto por
+      teste** — nunca por lista inventada no frontend.
+    - **Hub:** só muda depois de o contrato existir. `rh` e administrador veem a
+      empresa ativa e um seletor acessível; a troca recarrega Hub e módulos no
+      novo contexto, sem reter dado da empresa anterior; gestor/colaborador
+      continuam com texto não editável. **R-2 só pode ser declarada resolvida
+      com evidência.**
+    - **Prova de isolamento exigida:** duas empresas sintéticas distintas —
+      funcionário da empresa B não aparece na D, e o da D não aparece na B.
+    - **Parada obrigatória:** se o contexto não puder ser aplicado centralmente
+      sem deixar rota funcional desprotegida, parar e reportar antes de
+      publicar. Sem seletor ou endpoint fingido.
+    - **Limite:** sem novos módulos de RH/DP, cartão fictício, portal do
+      colaborador ou funcionalidade demonstrativa; login só muda no
+      estritamente necessário ao contrato de sessão.
+    - **Dívida preservada:** R-2 e R-3 (T162), S2 (T161), R1 a R3 (T160), L3,
+      S-1 a S-4 (T158), R-A a R-C (T157) e o registro `teste michell`.
 
 ## Regra obrigatória para as próximas tarefas
 

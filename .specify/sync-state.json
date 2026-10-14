@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "constitutionVersion": "1.4.0",
   "lastConvergedAt": "2026-10-14",
-  "lastIntegratedTask": 161,
-  "lastRecordedTask": 162,
+  "lastIntegratedTask": 162,
+  "lastRecordedTask": 163,
   "platformDecision": {
     "adr": "docs/adr/0014-evolli-plataforma-base-e-encerramento-do-frappe.md",
     "decidedAt": "2026-10-01",
@@ -11,15 +11,15 @@
     "frappe": "encerrado_como_candidato_referencia_apenas"
   },
   "nextTask": {
-    "id": "T162",
-    "status": "hub_pos_login",
-    "reason": "T161 integrada em main pela PR #153 (squash 07cdfca25fb2b7b5e2dceead94e73c4a2181b659), com a CI de push 3/3 verde - o E2E de concorrencia que derrubava main voltou ao verde. A T162 entrega o HUB POS-LOGIN: depois do login e da resolucao segura do ator, a pessoa entra primeiro no Hub, e nao direto no shell de modulos. O Hub mostra SOMENTE produtos que o servidor autoriza no contexto atual, conforme a decisao ja registrada em docs/decisions/t162-hub-pos-login.md. Capacidade por papel e derivada do rbac.evaluator, nunca de lista escrita a mao, e produto funcional fica separado de demonstrativo - mesma regra da T159. Investigacao de contrato feita antes de qualquer interface: GET /v1/users/me da ator, papel e companyId; GET /v1/empresas lista o escopo do ator sob empresa:read; e NAO EXISTE contrato de troca de empresa ou de escopo de sessao - a empresa vem de access_user.companyId e e fixa por conta. Por isso a empresa aparece como contexto NAO EDITAVEL, sem seletor clicavel, sem empresa ficticia e sem simulacao de troca. Nao altera login, RBAC, schema, migrations, seed, Docker, banco, dependencias nem lockfile. Segue aberta a ressalva S2 da T161: o confinamento do retry pos-deadlock a criarAtribuicao e garantido por inspecao, sem teste proprio. Seguem abertas e intocadas: R1, R2 e R3 da T160, a divida L3 de paginacao, S-1 a S-4 da T158, R-A, R-B e R-C da T157, e o registro teste michell do banco de demonstracao."
+    "id": "T163",
+    "status": "contexto_empresarial_ativo",
+    "reason": "T162 integrada em main pela PR #154 (squash 61e5f9005e072a7e5583fb2ffbaa722240ea0ff9), com a CI de push 3/3 verde. O Hub pos-login entrou mostrando so o que o servidor autoriza - e entrou SEM entregar troca de empresa, porque nao havia contrato: a empresa era access_user.companyId, coluna fixa da conta. A T163 cria esse contrato. Regra de negocio aprovada: rh e master_tecnico escolhem uma empresa de trabalho SOMENTE entre as empresas que o servidor autoriza; gestor, colaborador e demais papeis ficam restritos a empresa do proprio vinculo; toda leitura e toda mutacao usam o contexto empresarial ativo resolvido no servidor; o navegador nunca e autoridade para definir empresa nem carrega dados de varias empresas para filtrar localmente; e toda troca deixa trilha de auditoria. A associacao usuario-empresa passa a ser de servidor e auditavel, a empresa ativa vive na sessao (nunca em localStorage, query string, cookie escrito pelo frontend ou parametro livre de rota), e companyId enviado pelo cliente nunca amplia escopo. Destino inexistente, empresa nao autorizada e associacao revogada seguem o padrao anti-enumeracao ja usado pelo produto. Seguem abertas as ressalvas R-2 e R-3 da revisao da T162: R-2 e a leitura de GET /v1/empresas a cada montagem do Hub, que grava registro de auditoria por visita; R-3 e o dp podendo esbarrar em tabela_horario por interacao dentro de Jornada, defeito pre-existente da tela, nao introduzido pela T162. Seguem abertas e intocadas: S2 da T161, R1 a R3 da T160, a divida L3 de paginacao, S-1 a S-4 da T158, R-A, R-B e R-C da T157, e o registro teste michell do banco de demonstracao."
   },
   "openDeliveries": [
     {
-      "id": "T162",
+      "id": "T163",
       "pullRequest": null,
-      "status": "hub_pos_login_em_implementacao"
+      "status": "contexto_empresarial_ativo_em_implementacao"
     }
   ],
   "requiredArtifacts": [
