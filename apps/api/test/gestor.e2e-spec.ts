@@ -1106,6 +1106,12 @@ describe("Gestor consultivo: escopo por equipe e administracao pelo RH (e2e)", (
   // Repetir em equipes novas, na mesma transacao de carga, e o que separa
   // "passou" de "passa sempre".
   //
+  // Foi este cenario que achou a causa: antes da correcao ele reprovava em 2
+  // de 8 execucoes, e o SQLSTATE 40P01 (deadlock) aparecia exatamente nas
+  // duas que falharam. Depois da repeticao limitada, ele passa — e e a prova
+  // de que o perdedor da corrida volta ao caminho normal e recebe 409 pela
+  // EXCLUSION, nao por traducao direta de 40P01.
+  //
   // Quando um par sai do esperado, a mensagem traz os STATUS e os CORPOS das
   // duas respostas. Sem isso, a falha diz apenas "esperava 1, recebeu 0" e
   // some sem dizer o que o servidor respondeu — foi exatamente o que
@@ -1165,6 +1171,11 @@ describe("Gestor consultivo: escopo por equipe e administracao pelo RH (e2e)", (
   //
   // Aqui a contencao e forcada, entao o cenario e deterministico: um
   // escritor segura a chave por mais tempo que o orcamento padrao de 5s.
+  //
+  // Medido na T161: esta hipotese NAO era a causa da falha de `main` — com
+  // 9s de contencao a resposta ja era 409. O cenario fica como guarda: se
+  // alguem encurtar o orcamento da transacao, ou puser um `sleep` dentro
+  // dela, o conflito legitimo volta a virar 500 e este teste reprova.
   it("10c. conflito que demora a se resolver ainda responde 409, nunca 500", async () => {
     const equipe = await criarEquipe(
       "EQP_CONC_LENTA",

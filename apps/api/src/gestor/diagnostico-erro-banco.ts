@@ -34,6 +34,7 @@
  * ponta a ponta.
  */
 import { Prisma } from "@prisma/client";
+import { descreverErroDeBanco } from "../common/diagnostico-banco";
 
 /**
  * CHECKs desta família cuja violação é conflito de negócio, não defeito.
@@ -93,4 +94,69 @@ export function classificarErroDeBanco(erro: unknown): ClassificacaoErroBanco {
   }
 
   return "desconhecido";
+}
+
+/** SQLSTATE de `deadlock detected`. */
+export const SQLSTATE_DEADLOCK = "40P01";
+
+/**
+ * O erro é um deadlock confirmado pelo diagnóstico?
+ *
+ * Decidido pelo **SQLSTATE extraído**, nunca por procurar a palavra
+ * "deadlock" no texto: a mensagem varia com a versão do driver e com o
+ * caminho usado, e casar texto solto é como a T161 quase descartou a causa
+ * certa. `descreverErroDeBanco` já faz a extração estreita e validada.
+ */
+export function ehDeadlockDeBanco(erro: unknown): boolean {
+  return descreverErroDeBanco(erro).sqlstate === SQLSTATE_DEADLOCK;
+}
+
+/** Quantas vezes a operação pode rodar no total. Duas: a original e UMA repetição. */
+export const TENTATIVAS_APOS_DEADLOCK = 2;
+
+/**
+ * Repete a operação **uma única vez**, e só depois de um deadlock.
+ *
+ * ## Por que repetir, e por que isto não é mascarar
+ *
+ * Medido na T161: quando duas requisições disputam a mesma atribuição de
+ * gestor principal, o PostgreSQL às vezes resolve a disputa matando uma
+ * delas com `40P01` em vez de deixá-la esperar e falhar na EXCLUSION. As
+ * duas saídas descrevem o mesmo fato — alguém perdeu a corrida —, mas só a
+ * segunda chega ao classificador como conflito.
+ *
+ * A repetição **não decide nada sobre o resultado**. Ela devolve a operação
+ * ao caminho normal: na segunda tentativa o vencedor já commitou, a linha
+ * dele já está lá, e a inserção colide na EXCLUSION — `23P01`, que o
+ * classificador já traduz em 409 desde a T157. O 409 continua vindo da
+ * invariante do banco, nunca de uma tradução direta de `40P01`.
+ *
+ * ## Os limites, que são a parte importante
+ *
+ * **Uma repetição, nunca duas.** Se a segunda tentativa também morrer em
+ * deadlock, o erro é preservado como está e a resposta continua 500 — porque
+ * aí não se trata mais de uma corrida comum, e insistir esconderia um
+ * problema de verdade.
+ *
+ * **Só deadlock.** Qualquer outro erro sai na primeira tentativa, intacto.
+ *
+ * **Sem espera entre as tentativas.** O deadlock já foi resolvido pelo
+ * PostgreSQL no instante em que ele abortou esta transação; o vencedor
+ * commitou ou está prestes a commitar. Dormir aqui só atrasaria a resposta.
+ *
+ * Nada disto é genérico: quem chama é exclusivamente a criação de atribuição
+ * de gestor, onde a disputa possível é uma só e está declarada em
+ * constraint.
+ */
+export async function comRepeticaoAposDeadlock<T>(
+  operacao: (tentativa: number) => Promise<T>,
+): Promise<T> {
+  for (let tentativa = 1; ; tentativa += 1) {
+    try {
+      return await operacao(tentativa);
+    } catch (erro) {
+      const ultima = tentativa >= TENTATIVAS_APOS_DEADLOCK;
+      if (ultima || !ehDeadlockDeBanco(erro)) throw erro;
+    }
+  }
 }

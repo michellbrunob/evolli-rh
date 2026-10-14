@@ -8,7 +8,10 @@ import { PrismaService } from "../database/prisma.service";
 import { AuditService } from "../audit/audit.service";
 import { SessionRequestMetadata } from "../auth/session/session.service";
 import { comoDiaIso } from "./gestor-escopo";
-import { classificarErroDeBanco } from "./diagnostico-erro-banco";
+import {
+  classificarErroDeBanco,
+  comRepeticaoAposDeadlock,
+} from "./diagnostico-erro-banco";
 import {
   CriarAtribuicaoDto,
   CriarExcecaoDto,
@@ -304,32 +307,47 @@ export class GestorAdminService {
     if (!gestorTemVinculo) throw new NotFoundException();
 
     try {
-      return await this.prisma.$transaction(async (tx) => {
-        const criada = await tx.atribuicaoGestorEquipe.create({
-          data: {
+      // T161 — UMA repetição, e só depois de deadlock confirmado.
+      //
+      // Medido: na disputa por esta atribuição o PostgreSQL às vezes resolve
+      // a corrida matando o perdedor com `40P01`, em vez de deixá-lo esperar
+      // e falhar na EXCLUSION. Os dois desfechos dizem a mesma coisa —
+      // alguém perdeu —, mas só o segundo chega ao classificador como
+      // conflito.
+      //
+      // A repetição NÃO decide o resultado: ela devolve a operação ao
+      // caminho normal. Na segunda tentativa o vencedor já commitou, e a
+      // inserção colide em `23P01` — o 409 continua vindo da invariante do
+      // banco, nunca de uma tradução direta de `40P01`. Se o deadlock se
+      // repetir, o erro é preservado e a resposta continua 500.
+      return await comRepeticaoAposDeadlock(() =>
+        this.prisma.$transaction(async (tx) => {
+          const criada = await tx.atribuicaoGestorEquipe.create({
+            data: {
+              empresaId,
+              equipeId: dto.equipeId,
+              gestorColaboradorId: dto.gestorColaboradorId,
+              papel: dto.papel,
+              vigenciaInicio: new Date(`${dto.vigenciaInicio}T00:00:00.000Z`),
+              vigenciaFim: dto.vigenciaFim
+                ? new Date(`${dto.vigenciaFim}T00:00:00.000Z`)
+                : null,
+              criadoPorUserId: ctx.actor.id,
+            },
+          });
+
+          await this.auditar(
+            tx,
+            ctx,
+            "gestor_atribuicao_criada",
+            "atribuicao_gestor_equipe",
+            criada.id,
             empresaId,
-            equipeId: dto.equipeId,
-            gestorColaboradorId: dto.gestorColaboradorId,
-            papel: dto.papel,
-            vigenciaInicio: new Date(`${dto.vigenciaInicio}T00:00:00.000Z`),
-            vigenciaFim: dto.vigenciaFim
-              ? new Date(`${dto.vigenciaFim}T00:00:00.000Z`)
-              : null,
-            criadoPorUserId: ctx.actor.id,
-          },
-        });
+          );
 
-        await this.auditar(
-          tx,
-          ctx,
-          "gestor_atribuicao_criada",
-          "atribuicao_gestor_equipe",
-          criada.id,
-          empresaId,
-        );
-
-        return this.comoAtribuicao(criada);
-      });
+          return this.comoAtribuicao(criada);
+        }),
+      );
     } catch (erro) {
       return this.comoConflito(
         erro,
