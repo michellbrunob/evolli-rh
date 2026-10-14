@@ -255,4 +255,62 @@
   .login-screen__nota {
     animation-delay: 180ms;
   }
+
+  /* Profundidade do fundo.
+   *
+   * As seis formas abstratas sobem alguns pixels ao entrar, cada uma no seu
+   * tempo. A diferença entre as durações é o que cria a sensação de camadas:
+   * a forma grande acomoda devagar, o ponto pequeno chega rápido. Não é
+   * paralaxe — nada reage ao ponteiro, ao scroll ou ao relógio.
+   *
+   * Mesmas restrições do bloco acima, pelos mesmos motivos: uma execução,
+   * só deslocamento vertical, nenhum `opacity`/`visibility`. O deslocamento
+   * é em unidades do `viewBox` (600×900), que com o recorte deste painel dá
+   * aproximadamente o mesmo número em pixels.
+   *
+   * Se a animação não avançar, as formas ficam alguns pixels fora do lugar —
+   * e ninguém percebe, porque são decoração sem contorno de referência. Era
+   * exatamente o risco que o `opacity` trazia e que esta escolha evita. */
+  @keyframes login-fundo {
+    from {
+      transform: translateY(16px);
+    }
+
+    to {
+      transform: none;
+    }
+  }
+
+  .login-screen__forma {
+    animation: login-fundo 900ms ease-out both;
+  }
+
+  .login-screen__forma--1 {
+    animation-duration: 1100ms;
+  }
+
+  .login-screen__forma--2 {
+    animation-duration: 980ms;
+    animation-delay: 120ms;
+  }
+
+  .login-screen__forma--3 {
+    animation-duration: 860ms;
+    animation-delay: 60ms;
+  }
+
+  .login-screen__forma--4 {
+    animation-duration: 760ms;
+    animation-delay: 200ms;
+  }
+
+  .login-screen__forma--5 {
+    animation-duration: 620ms;
+    animation-delay: 260ms;
+  }
+
+  .login-screen__forma--6 {
+    animation-duration: 540ms;
+    animation-delay: 160ms;
+  }
 }

@@ -373,6 +373,25 @@ describe("LoginScreen — composição institucional (T160)", () => {
     expect(document.querySelectorAll("img")).toHaveLength(0);
   });
 
+  it("o fundo é geometria própria: nada de imagem, uso externo ou referência", () => {
+    render(<LoginScreen onLoginSuccess={vi.fn()} />);
+    const fundo = document.querySelector(".login-screen__fundo")!;
+
+    // Só primitivas desenhadas aqui.
+    const tags = [...fundo.querySelectorAll("*")].map((e) =>
+      e.tagName.toLowerCase(),
+    );
+    expect(new Set(tags)).toEqual(new Set(["g", "circle", "rect", "path"]));
+
+    // Nada que puxe arquivo de fora: sem <image>, sem <use>, sem href.
+    expect(fundo.querySelectorAll("image, use, foreignObject")).toHaveLength(0);
+    expect(fundo.innerHTML).not.toMatch(/https?:/);
+    expect(fundo.innerHTML).not.toMatch(/url\(/);
+
+    // Seis formas, cada uma no seu grupo — é o que o CSS escalona.
+    expect(fundo.querySelectorAll(".login-screen__forma")).toHaveLength(6);
+  });
+
   it("o fundo abstrato é decorativo e não entra na árvore de acessibilidade", () => {
     render(<LoginScreen onLoginSuccess={vi.fn()} />);
     const decorativos = document.querySelectorAll("svg");
@@ -553,12 +572,59 @@ describe("LoginScreen — composição institucional (T160)", () => {
       expect(comMovimento).not.toMatch(/\bvisibility\b/);
     });
 
+    it("nenhuma regra usa opacity, visibility ou translateX — em lugar nenhum", () => {
+      // As três juntas, no arquivo inteiro, porque as três compartilham o
+      // mesmo modo de falhar: escondem conteúdo ou empurram a página para o
+      // lado quando a animação não avança.
+      expect(cssSemComentarios).not.toMatch(/\bopacity\b/);
+      expect(cssSemComentarios).not.toMatch(/\bvisibility\b/);
+      expect(cssSemComentarios).not.toMatch(/translateX|translate3d/);
+    });
+
+    it("sem animação, o painel já está no estado final", () => {
+      // É isto que garante a regra de `prefers-reduced-motion: reduce`: fora
+      // do bloco de movimento nada declara `transform`, então quem não roda
+      // animação nenhuma vê exatamente o quadro `to` — painel completo, no
+      // lugar certo.
+      const consulta =
+        /@media\s*\(\s*prefers-reduced-motion:\s*no-preference\s*\)\s*\{/;
+      const comMovimento = blocoDeMedia(consulta);
+      const foraDoBloco = cssSemComentarios.replace(comMovimento, "");
+
+      expect(foraDoBloco).not.toMatch(/\btransform\s*:/);
+      expect(foraDoBloco).not.toMatch(/\banimation\b/);
+      expect(comMovimento).toMatch(/transform:\s*none/);
+    });
+
+    it("a profundidade do fundo tem tempos diferentes por forma", () => {
+      // O que cria a sensação de camadas é a diferença entre as durações; se
+      // todas entrarem juntas, o fundo vira um bloco só se mexendo.
+      const consulta =
+        /@media\s*\(\s*prefers-reduced-motion:\s*no-preference\s*\)\s*\{/;
+      const comMovimento = blocoDeMedia(consulta);
+
+      expect(comMovimento).toMatch(/@keyframes\s+login-fundo/);
+      const duracoes = new Set(
+        [...comMovimento.matchAll(/animation-duration:\s*(\d+)ms/g)].map(
+          (m) => m[1],
+        ),
+      );
+      expect(duracoes.size).toBeGreaterThanOrEqual(4);
+
+      const atrasos = new Set(
+        [...comMovimento.matchAll(/animation-delay:\s*(\d+)ms/g)].map(
+          (m) => m[1],
+        ),
+      );
+      expect(atrasos.size).toBeGreaterThanOrEqual(4);
+    });
+
     it("nada força largura maior que a tela em 375px", () => {
       // Rolagem horizontal no mobile nasce de largura fixa e de deslocamento
-      // lateral; nenhum dos dois entra aqui. Sem comentários, pelo mesmo
-      // motivo do `@import`: o arquivo EXPLICA que `translateX` é proibido, e
-      // a guarda não pode reprovar a própria explicação.
-      expect(cssSemComentarios).not.toMatch(/translateX|translate3d/);
+      // lateral. O lateral está coberto pela guarda acima; aqui fica a
+      // largura fixa. Sem comentários, pelo mesmo motivo do `@import`: o
+      // arquivo EXPLICA o que é proibido, e a guarda não pode reprovar a
+      // própria explicação.
       expect(cssSemComentarios).not.toMatch(/min-width:\s*\d{3,}px\s*;/);
     });
   });

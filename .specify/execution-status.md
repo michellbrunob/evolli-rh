@@ -1055,6 +1055,24 @@ seria a promessa vazia que a T159 passou a tarefa inteira eliminando.
 acessíveis, contraste, leitor de tela, `prefers-reduced-motion` e ausência de
 rolagem horizontal em 375 px. Um `h1` por tela.
 
+**Contrato de movimento da porta de entrada.** A tela tem uma entrada curta — a
+marca, a frase e o aviso sobem alguns pixels, e as seis formas do fundo abstrato
+entram escalonadas, dando profundidade. Cinco regras, fixadas em teste:
+
+1. **uma execução por carga**, nunca laço — movimento perpétuo acima de cinco
+   segundos cairia na WCAG 2.2.2 e exigiria controle de pausa;
+2. **tudo atrás de `prefers-reduced-motion: no-preference`**; fora desse bloco
+   não há `animation` nem `transform`, de modo que quem pede menos movimento vê
+   o painel já no estado final;
+3. **nenhum `opacity`, `visibility` ou `translateX`** em regra alguma. Medido no
+   navegador: com `opacity: 0` no quadro inicial e `fill-mode: both`, uma
+   animação que não avança prende o conteúdo em transparente — a marca some.
+   Animando só o deslocamento vertical, o pior caso é alguns pixels de
+   diferença em decoração;
+4. **sem partícula, brilho pulsante, paralaxe de ponteiro ou reação a scroll**;
+5. **sem gradiente, imagem externa, `@import` ou fonte de terceiro** — o fundo é
+   SVG embutido, composto só de círculo, retângulo e caminho desenhados aqui.
+
 **Limites:** sem alterar API, Prisma, migrations, seed, Docker, banco,
 dependências ou lockfile. Se aparecer necessidade fora disso, a tarefa para e
 reporta.
