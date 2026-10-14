@@ -7,6 +7,7 @@ import {
   Logger,
 } from "@nestjs/common";
 import { Request, Response } from "express";
+import { descreverErroDeBanco } from "../diagnostico-banco";
 
 interface ErrorBody {
   status_code: number;
@@ -53,11 +54,22 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const message = this.resolvePublicMessage(statusCode);
 
     if (!isHttpException || statusCode >= HttpStatus.INTERNAL_SERVER_ERROR) {
+      // T161 — o log ganha SQLSTATE e identificador de constraint/trigger.
+      //
+      // Antes dizia so `errorName`, e isso bastava para saber que algo
+      // quebrou, nunca O QUE quebrou: a falha de `main` em `0db3d70` chegou
+      // como `PrismaClientUnknownRequestError` e a investigacao parou ali.
+      //
+      // `descreverErroDeBanco` extrai apenas artefatos de SCHEMA — classe,
+      // codigo do Prisma, SQLSTATE, nome da constraint. Mensagem do banco,
+      // `DETAIL` (que carrega os valores enviados), parametros e stack NAO
+      // entram, e nada disto toca a resposta HTTP.
       this.logger.error({
         msg: "Erro não tratado na requisição",
         requestId,
         statusCode,
         errorName: exception instanceof Error ? exception.name : "UnknownError",
+        ...descreverErroDeBanco(exception),
       });
     }
 

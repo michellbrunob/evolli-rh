@@ -1032,11 +1032,16 @@ chamada da aterrissagem é `GET /v1/gestor/equipe` → 200. A dívida **L3** nã
 declarada resolvida, e seguem abertas **S-1 a S-4** (T158), **R-A, R-B e R-C** (T157) e o
 registro `teste michell`.
 
-## Login institucional — T160 (interface web)
+## Login institucional — T160 (integrada)
 
-| Tarefa | Estado               | Resultado principal                                                                                                                 |
-| ------ | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| T160   | **Em implementação** | Renova a tela e o fluxo visual de login com uma experiência institucional própria do Evolli, sem tocar no contrato de autenticação. |
+| Tarefa | Estado                                    | Resultado principal                                                                                                                 |
+| ------ | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| T160   | **Integrada** (PR #152, squash `0db3d70`) | Renova a tela e o fluxo visual de login com uma experiência institucional própria do Evolli, sem tocar no contrato de autenticação. |
+
+**A CI de `main` ficou 2/3 neste squash.** Quality gates e Migration smoke
+verdes; E2E vermelho em **1 de 481** testes, no cenário de concorrência do
+gestor — defeito pré-existente da T157, em nada causado pela T160, cujo diff
+não toca um único arquivo de backend. Tratado pela T161.
 
 **O que muda.** Só a composição visual da porta de entrada: cartão central,
 fundo abstrato **original**, marca Evolli e layout moderno, responsivo e
@@ -1077,8 +1082,8 @@ entram escalonadas, dando profundidade. Cinco regras, fixadas em teste:
 dependências ou lockfile. Se aparecer necessidade fora disso, a tarefa para e
 reporta.
 
-**Hub pós-login (T161): decisão registrada, implementação não autorizada.** Em
-[`docs/decisions/t161-hub-pos-login.md`](../docs/decisions/t161-hub-pos-login.md):
+**Hub pós-login (T162): decisão registrada, implementação não autorizada.** Em
+[`docs/decisions/t162-hub-pos-login.md`](../docs/decisions/t162-hub-pos-login.md):
 empresa ativa e troca de empresa só com validação e autorização do servidor;
 subsistemas exibidos conforme permissão real; produto funcional separado de
 planejado e demonstrativo. Nada do Hub é implementado agora, e nenhuma
@@ -1087,6 +1092,81 @@ funcionalidade é reservada sem contrato.
 **Dívidas preservadas, nenhuma tratada aqui:** **T1, T2 e T3** da revisão final
 da T159 (precisão documental e de teste), **L3** (paginação), **S-1 a S-4**
 (T158), **R-A, R-B e R-C** (T157) e o registro `teste michell`.
+
+## Concorrência do gestor: diagnóstico antes de correção — T161 (backend)
+
+| Tarefa | Estado               | Resultado principal                                                                                                 |
+| ------ | -------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| T161   | **Em implementação** | Preserva a regra de conflito que já funciona e faz o erro que escapa dela se identificar no log, sem mascarar nada. |
+
+**O que aconteceu.** No squash `0db3d70`, duas criações simultâneas de gestor
+principal devolveram **um 201 e nenhum 409**. O log do runner trazia apenas
+`errorName: "PrismaClientUnknownRequestError"` e `statusCode: 500`.
+
+**O que a investigação descartou**, com PostgreSQL real e efêmero:
+
+| Hipótese                                  | Medição                                               | Resultado        |
+| ----------------------------------------- | ----------------------------------------------------- | ---------------- |
+| Mapeamento de sobreposição ausente        | 23P01, 23505, P2002 e 23514 já viram 409 desde a T157 | **não procede**  |
+| Expiração da transação por espera de lock | 9 s de contenção forçada pelo caminho real da API     | devolveu **409** |
+
+**A causa raiz foi encontrada ainda nesta tarefa, pelo próprio diagnóstico
+acrescentado:** o perdedor da corrida morre em **deadlock — SQLSTATE
+`40P01`**, que chega como `PrismaClientUnknownRequestError` e portanto não é
+reconhecido como conflito.
+
+Reproduzido localmente com o cenário repetido: **2 falhas em 8 execuções** do
+arquivo, e `40P01` aparece **exatamente** nas duas que falharam, em nenhuma
+das seis verdes.
+
+Uma medição intermediária quase descartou a causa certa e vale registro:
+deadlock chega como `PrismaClientKnownRequestError` (P2010) **apenas no
+caminho de consulta crua**. Pelo caminho tipado, que é o que o service usa,
+chega como `Unknown`.
+
+**O que fazer com o `40P01` é decisão de produto, e esta tarefa não a tem.**
+Mapeá-lo para 409 é defensável — na disputa por esta invariante, o perdedor é
+exatamente quem perdeu a corrida — e é também exatamente o que a decisão
+vigente proíbe sem autorização nova. Fica aberto.
+
+**A decisão do proprietário, registrada:** **nenhum SQLSTATE novo vira 409 sem
+prova direta.** P2028, P2034, 40P01 e 23000 continuam **500**. Chamar lentidão
+ou defeito de "já existe atribuição vigente" seria trocar um problema real por
+uma resposta tranquilizadora — o oposto do que o repositório exige.
+
+**O que a tarefa entrega**, então:
+
+1. a regra de conflito **preservada**, extraída para função pura e exercitada
+   diretamente;
+2. **diagnóstico seguro** no `AllExceptionsFilter` — classe, código do Prisma,
+   SQLSTATE e identificador de constraint/trigger. Mora ali, e não nos
+   services, porque o E2E roda com `LOG_LEVEL=silent`: o `PinoLogger` não
+   escreveria nada justamente na CI;
+3. **E2E com diagnóstico**: o cenário concorrente repetido, e um conflito com
+   contenção forçada. Quando falham, a mensagem traz status e corpo das duas
+   respostas — antes dizia apenas "esperava 1, recebeu 0". O cenário repetido
+   **reproduz o defeito fora da CI**, o que o cenário de uma rodada nunca
+   fazia.
+
+**A CI desta PR expõe o defeito de propósito.** Com o cenário repetido, o E2E
+fica vermelho sempre que o deadlock ocorre — cerca de uma execução em quatro.
+Isso não é instabilidade nova: é o mesmo defeito que derrubou `main`, agora
+visível e explicado em vez de raro e mudo. O verde depende da decisão sobre o
+`40P01`.
+
+**Nunca sai no log:** mensagem do banco, `DETAIL` (que carrega os valores
+enviados), parâmetros, conteúdo da requisição ou stack. A resposta HTTP não
+muda: segue sem citar Prisma, PostgreSQL ou SQLSTATE.
+
+**Planejados, não iniciados:** o **Hub pós-login (T162)** segue só como decisão
+em
+[`docs/decisions/t162-hub-pos-login.md`](../docs/decisions/t162-hub-pos-login.md)
+— sem branch, sem PR e sem código;
+**RH/DP** e **Gestão de Pessoas** seguem apenas planejados. Nenhum deles tem
+implementação nesta tarefa.
+
+**Dívidas preservadas:** **R1, R2 e R3** da revisão da T160, **L3**, **S-1 a
+S-4** (T158), **R-A, R-B e R-C** (T157) e o registro `teste michell`.
 
 ## Próxima ação autorizável
 

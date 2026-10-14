@@ -1099,6 +1099,142 @@ describe("Gestor consultivo: escopo por equipe e administracao pelo RH (e2e)", (
     expect(gravadas).toBe(1);
   });
 
+  // T161 — o cenario 10 rodando MUITAS vezes.
+  //
+  // Uma rodada so nao prova estabilidade: a corrida que derrubou a CI de
+  // `main` no squash 0db3d70 aparecia em uma execucao e sumia na seguinte.
+  // Repetir em equipes novas, na mesma transacao de carga, e o que separa
+  // "passou" de "passa sempre".
+  //
+  // Foi este cenario que achou a causa: antes da correcao ele reprovava em 2
+  // de 8 execucoes, e o SQLSTATE 40P01 (deadlock) aparecia exatamente nas
+  // duas que falharam. Depois da repeticao limitada, ele passa — e e a prova
+  // de que o perdedor da corrida volta ao caminho normal e recebe 409 pela
+  // EXCLUSION, nao por traducao direta de 40P01.
+  //
+  // Quando um par sai do esperado, a mensagem traz os STATUS e os CORPOS das
+  // duas respostas. Sem isso, a falha diz apenas "esperava 1, recebeu 0" e
+  // some sem dizer o que o servidor respondeu — foi exatamente o que
+  // aconteceu na CI, e custou uma investigacao inteira.
+  it("10b. o cenario concorrente se repete estavel: sempre UM 201 e UM 409", async () => {
+    const RODADAS = 12;
+
+    for (let rodada = 0; rodada < RODADAS; rodada += 1) {
+      const equipe = await criarEquipe(
+        `EQP_CONC_R${rodada}`,
+        `Equipe Sintetica Concorrente ${rodada}`,
+        departamentoA,
+      );
+
+      const corpo = {
+        equipeId: equipe,
+        gestorColaboradorId: pessoaFora.colaboradorId,
+        papel: "principal",
+        vigenciaInicio: INICIO_ESCOPO,
+      };
+
+      const respostas = await Promise.all([
+        post("/v1/gestor/administracao/atribuicoes", rhA).send(corpo),
+        post("/v1/gestor/administracao/atribuicoes", rhA).send(corpo),
+      ]);
+
+      const observado = respostas
+        .map((r) => `${r.status} ${JSON.stringify(r.body)}`)
+        .join(" | ");
+      const criadas = respostas.filter((r) => r.status === 201).length;
+      const conflitos = respostas.filter((r) => r.status === 409).length;
+
+      expect(`rodada ${rodada}: ${criadas} criada(s) :: ${observado}`).toBe(
+        `rodada ${rodada}: 1 criada(s) :: ${observado}`,
+      );
+      expect(`rodada ${rodada}: ${conflitos} conflito(s) :: ${observado}`).toBe(
+        `rodada ${rodada}: 1 conflito(s) :: ${observado}`,
+      );
+
+      const gravadas = await prisma.atribuicaoGestorEquipe.count({
+        where: { equipeId: equipe },
+      });
+      expect(`rodada ${rodada}: ${gravadas} linha(s)`).toBe(
+        `rodada ${rodada}: 1 linha(s)`,
+      );
+    }
+  });
+
+  // T161 — o conflito que demora a se resolver.
+  //
+  // Reproduz o mecanismo exato que derrubou a CI de `main` no squash
+  // 0db3d70, e que NAO reproduz em maquina ociosa: a colisao e real, mas o
+  // perdedor fica bloqueado no indice GiST esperando o vencedor commitar.
+  // Enquanto espera, o relogio da transacao interativa do Prisma corre. Se a
+  // espera passar do orcamento, o Prisma aborta com P2028 ANTES de o
+  // PostgreSQL chegar a levantar o 23P01 — e um conflito legitimo vira 500.
+  //
+  // Aqui a contencao e forcada, entao o cenario e deterministico: um
+  // escritor segura a chave por mais tempo que o orcamento padrao de 5s.
+  //
+  // Medido na T161: esta hipotese NAO era a causa da falha de `main` — com
+  // 9s de contencao a resposta ja era 409. O cenario fica como guarda: se
+  // alguem encurtar o orcamento da transacao, ou puser um `sleep` dentro
+  // dela, o conflito legitimo volta a virar 500 e este teste reprova.
+  it("10c. conflito que demora a se resolver ainda responde 409, nunca 500", async () => {
+    const equipe = await criarEquipe(
+      "EQP_CONC_LENTA",
+      "Equipe Sintetica Concorrente Lenta",
+      departamentoA,
+    );
+
+    let liberar: () => void = () => {};
+    const segurado = new Promise<void>((resolver) => {
+      liberar = resolver;
+    });
+
+    // Escritor que vence a corrida e demora a commitar.
+    const segurador = prisma.$transaction(
+      async (tx) => {
+        await tx.atribuicaoGestorEquipe.create({
+          data: {
+            empresaId: empresaA,
+            equipeId: equipe,
+            gestorColaboradorId: pessoaFora.colaboradorId,
+            papel: "principal",
+            vigenciaInicio: new Date(`${INICIO_ESCOPO}T00:00:00.000Z`),
+            criadoPorUserId: rhA.userId,
+          },
+        });
+        await segurado;
+      },
+      { timeout: 120_000, maxWait: 120_000 },
+    );
+
+    // Deixa o escritor pegar a chave antes de o perdedor tentar.
+    await new Promise((r) => setTimeout(r, 500));
+
+    const pedido = post("/v1/gestor/administracao/atribuicoes", rhA).send({
+      equipeId: equipe,
+      gestorColaboradorId: pessoaFora.colaboradorId,
+      papel: "principal",
+      vigenciaInicio: INICIO_ESCOPO,
+    });
+
+    // Segura bem alem do orcamento padrao da transacao interativa (5s).
+    await new Promise((r) => setTimeout(r, 9_000));
+    liberar();
+    await segurador;
+
+    const resposta = await pedido;
+
+    // Mensagem com corpo: se voltar a falhar, o relatorio diz o que o
+    // servidor respondeu, em vez de so "esperava 409".
+    expect(`${resposta.status} ${JSON.stringify(resposta.body)}`).toContain(
+      "409",
+    );
+
+    const gravadas = await prisma.atribuicaoGestorEquipe.count({
+      where: { equipeId: equipe },
+    });
+    expect(gravadas).toBe(1);
+  });
+
   // -------------------------------------------------------------------------
   // 11. Excecao individual
   // -------------------------------------------------------------------------

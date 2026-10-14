@@ -9,6 +9,10 @@ import { AuditService } from "../audit/audit.service";
 import { SessionRequestMetadata } from "../auth/session/session.service";
 import { comoDiaIso } from "./gestor-escopo";
 import {
+  classificarErroDeBanco,
+  comRepeticaoAposDeadlock,
+} from "./diagnostico-erro-banco";
+import {
   CriarAtribuicaoDto,
   CriarExcecaoDto,
   VincularContaDto,
@@ -31,18 +35,11 @@ export interface GestorAuditContext {
 const MENSAGEM_JA_ENCERRADO = "O registro já está encerrado.";
 
 /**
- * CHECKs desta família cuja violação é conflito de negócio, não defeito.
- *
- * Lista fechada, conferida contra a migration 20261006120000. Nomes de
- * constraint de outras tabelas não entram aqui, e por isso continuam virando
- * 500 — que é a resposta honesta para "isto não devia ter acontecido".
+ * A lista fechada de CHECKs mudou para `diagnostico-erro-banco.ts`, junto da
+ * regra que a usa. Reexportada porque é parte do contrato público deste
+ * módulo desde a T157.
  */
-export const CHECKS_DA_FAMILIA_GESTOR = [
-  "access_user_colaborador_intervalo_coerente",
-  "atribuicao_gestor_equipe_intervalo_coerente",
-  "excecao_acesso_gestor_intervalo_coerente",
-  "excecao_acesso_gestor_justificativa_nao_vazia",
-] as const;
+export { CHECKS_DA_FAMILIA_GESTOR } from "./diagnostico-erro-banco";
 
 /**
  * Administração do escopo do gestor, pelo RH (T151, ADR 0015, decisões 6 e 9).
@@ -135,49 +132,21 @@ export class GestorAdminService {
       throw erro;
     }
 
-    // `P2002` é o único dos dois que o Prisma tipifica. A EXCLUSION chega como
-    // erro NÃO tipificado, com o SQLSTATE apenas no texto — e, como o índice
-    // GiST é criado ANTES do índice único parcial, é ele quem dispara primeiro
-    // na colisão mais comum (duas vigências abertas). Procurar o código numa
-    // propriedade `code` que esse erro não tem deixaria o conflito escapar
-    // como 500, que é o mesmo critério já aplicado em pessoas, horários e
-    // ponto — por isso a detecção aqui é por tipo + texto, como lá.
-    if (
-      erro instanceof Prisma.PrismaClientKnownRequestError &&
-      erro.code === "P2002"
-    ) {
+    // A regra em si vive em `diagnostico-erro-banco.ts` e **não mudou na
+    // T161**: `P2002`, `23P01`/`23505` por texto e `23514` só com o nome de
+    // um CHECK desta família. Nenhum SQLSTATE novo virou conflito.
+    if (classificarErroDeBanco(erro) === "conflito") {
       throw new ConflictException(mensagem);
     }
-    if (erro instanceof Prisma.PrismaClientUnknownRequestError) {
-      // 23P01 — EXCLUSION: períodos de vigência se sobrepõem.
-      // 23505 — UNIQUE: índice parcial sobre a vigência aberta.
-      if (
-        /23P01/.test(erro.message) ||
-        /violates exclusion constraint/i.test(erro.message) ||
-        /23505/.test(erro.message) ||
-        /violates unique constraint/i.test(erro.message)
-      ) {
-        throw new ConflictException(mensagem);
-      }
 
-      // 23514 — CHECK, e SÓ os desta família.
-      //
-      // O nome da constraint tem de aparecer: um CHECK violado é uma classe
-      // enorme de erros, e traduzir a classe inteira para 409 transformaria
-      // qualquer defeito futuro de outra tabela numa resposta tranquilizadora.
-      // Reconhecer `operação + constraint`, como pede o critério do
-      // repositório, significa casar o nome — o resto continua 500.
-      //
-      // O caso real é encerrar com `vigenciaFim` anterior ao início já
-      // gravado: o pedido conflita com o estado do registro, que é 409, e
-      // escapava como 500 antes disto.
-      if (
-        /23514/.test(erro.message) &&
-        CHECKS_DA_FAMILIA_GESTOR.some((nome) => erro.message.includes(nome))
-      ) {
-        throw new ConflictException(mensagem);
-      }
-    }
+    // T161 — o que escapa daqui vira 500, e o `AllExceptionsFilter` é quem
+    // o identifica no log (classe, código do Prisma, SQLSTATE e constraint).
+    //
+    // O diagnóstico NÃO mora aqui de propósito: o E2E roda com
+    // `LOG_LEVEL=silent`, então um `PinoLogger` neste ponto não escreveria
+    // nada justamente na CI, que é onde a falha aparece. O `Logger` do Nest,
+    // usado pelo filtro, escreve — foi ele que produziu a única pista que
+    // existiu em `0db3d70`.
     throw erro;
   }
 
@@ -338,32 +307,47 @@ export class GestorAdminService {
     if (!gestorTemVinculo) throw new NotFoundException();
 
     try {
-      return await this.prisma.$transaction(async (tx) => {
-        const criada = await tx.atribuicaoGestorEquipe.create({
-          data: {
+      // T161 — UMA repetição, e só depois de deadlock confirmado.
+      //
+      // Medido: na disputa por esta atribuição o PostgreSQL às vezes resolve
+      // a corrida matando o perdedor com `40P01`, em vez de deixá-lo esperar
+      // e falhar na EXCLUSION. Os dois desfechos dizem a mesma coisa —
+      // alguém perdeu —, mas só o segundo chega ao classificador como
+      // conflito.
+      //
+      // A repetição NÃO decide o resultado: ela devolve a operação ao
+      // caminho normal. Na segunda tentativa o vencedor já commitou, e a
+      // inserção colide em `23P01` — o 409 continua vindo da invariante do
+      // banco, nunca de uma tradução direta de `40P01`. Se o deadlock se
+      // repetir, o erro é preservado e a resposta continua 500.
+      return await comRepeticaoAposDeadlock(() =>
+        this.prisma.$transaction(async (tx) => {
+          const criada = await tx.atribuicaoGestorEquipe.create({
+            data: {
+              empresaId,
+              equipeId: dto.equipeId,
+              gestorColaboradorId: dto.gestorColaboradorId,
+              papel: dto.papel,
+              vigenciaInicio: new Date(`${dto.vigenciaInicio}T00:00:00.000Z`),
+              vigenciaFim: dto.vigenciaFim
+                ? new Date(`${dto.vigenciaFim}T00:00:00.000Z`)
+                : null,
+              criadoPorUserId: ctx.actor.id,
+            },
+          });
+
+          await this.auditar(
+            tx,
+            ctx,
+            "gestor_atribuicao_criada",
+            "atribuicao_gestor_equipe",
+            criada.id,
             empresaId,
-            equipeId: dto.equipeId,
-            gestorColaboradorId: dto.gestorColaboradorId,
-            papel: dto.papel,
-            vigenciaInicio: new Date(`${dto.vigenciaInicio}T00:00:00.000Z`),
-            vigenciaFim: dto.vigenciaFim
-              ? new Date(`${dto.vigenciaFim}T00:00:00.000Z`)
-              : null,
-            criadoPorUserId: ctx.actor.id,
-          },
-        });
+          );
 
-        await this.auditar(
-          tx,
-          ctx,
-          "gestor_atribuicao_criada",
-          "atribuicao_gestor_equipe",
-          criada.id,
-          empresaId,
-        );
-
-        return this.comoAtribuicao(criada);
-      });
+          return this.comoAtribuicao(criada);
+        }),
+      );
     } catch (erro) {
       return this.comoConflito(
         erro,
