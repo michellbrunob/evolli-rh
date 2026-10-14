@@ -1,8 +1,9 @@
-# T161 — Hub pós-login: decisão registrada, implementação não autorizada
+# T162 — Hub pós-login: decisão registrada, implementação não autorizada
 
 Status: **decisão do proprietário, registrada. Não autoriza implementação.**
 Data: 2026-10-14.
 Registrada na: **T160** (login institucional), antes de qualquer código do Hub.
+Renumerada na: **T161**, por colisão de identificador (ver §7).
 
 Este documento existe para que a T160 saiba onde desemboca, sem antecipar nada.
 A T160 renova **apenas** a tela de login; o Hub é fatia própria, futura.
@@ -52,9 +53,23 @@ aparece como se existisse.
 - **Não altera** regra de negócio, RBAC, API, Prisma, migrations, seed, Docker,
   banco, dependências ou lockfile.
 
-## 6. Pré-condição para abrir a T161
+## 6. Pré-condição para abrir a T162
 
 Levantar, a partir do **código**, quais contratos de servidor existem hoje para
 empresa ativa e para escopo por empresa — e quais faltam. Onde faltar contrato,
-a T161 para e reporta, em vez de inventar. É a mesma disciplina que a T158 e a
+a T162 para e reporta, em vez de inventar. É a mesma disciplina que a T158 e a
 T159 seguiram.
+
+## 7. Por que este documento foi renumerado
+
+Nasceu como "T161" na T160, quando o Hub era o próximo passo previsto. Depois
+a CI de `main` ficou 2/3 por um defeito de concorrência, e o número **T161**
+passou a identificar a tarefa corretiva que o trata — deixando o mesmo
+identificador apontando para duas coisas diferentes no ledger.
+
+A revisão adversarial da PR #153 apontou a ambiguidade, e ela foi desfeita
+aqui: **T161 é a correção de concorrência; T162 é esta proposta do Hub.**
+
+O Hub **continua apenas planejado**: sem branch, sem PR, sem código, sem
+endpoint, sem teste. Só este documento existe, e ele não autoriza
+implementação.

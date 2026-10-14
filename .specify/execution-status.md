@@ -1082,8 +1082,8 @@ entram escalonadas, dando profundidade. Cinco regras, fixadas em teste:
 dependências ou lockfile. Se aparecer necessidade fora disso, a tarefa para e
 reporta.
 
-**Hub pós-login (T161): decisão registrada, implementação não autorizada.** Em
-[`docs/decisions/t161-hub-pos-login.md`](../docs/decisions/t161-hub-pos-login.md):
+**Hub pós-login (T162): decisão registrada, implementação não autorizada.** Em
+[`docs/decisions/t162-hub-pos-login.md`](../docs/decisions/t162-hub-pos-login.md):
 empresa ativa e troca de empresa só com validação e autorização do servidor;
 subsistemas exibidos conforme permissão real; produto funcional separado de
 planejado e demonstrativo. Nada do Hub é implementado agora, e nenhuma
@@ -1158,8 +1158,10 @@ visível e explicado em vez de raro e mudo. O verde depende da decisão sobre o
 enviados), parâmetros, conteúdo da requisição ou stack. A resposta HTTP não
 muda: segue sem citar Prisma, PostgreSQL ou SQLSTATE.
 
-**Planejados, não iniciados:** o **Hub pós-login** segue só como decisão em
-[`docs/decisions/t161-hub-pos-login.md`](../docs/decisions/t161-hub-pos-login.md);
+**Planejados, não iniciados:** o **Hub pós-login (T162)** segue só como decisão
+em
+[`docs/decisions/t162-hub-pos-login.md`](../docs/decisions/t162-hub-pos-login.md)
+— sem branch, sem PR e sem código;
 **RH/DP** e **Gestão de Pessoas** seguem apenas planejados. Nenhum deles tem
 implementação nesta tarefa.
 

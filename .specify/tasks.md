@@ -1326,8 +1326,10 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
     - **Aceite:** testes que falham antes e passam depois, cobrindo contrato de
       autenticação preservado, ausência das ações proibidas, acessibilidade e
       composição responsiva; validação visual em desktop e 375 px.
-    - **Decisão registrada junto, sem implementar:** o Hub pós-login (T161), em
-      [`docs/decisions/t161-hub-pos-login.md`](../docs/decisions/t161-hub-pos-login.md).
+    - **Decisão registrada junto, sem implementar:** o Hub pós-login, em
+      [`docs/decisions/t162-hub-pos-login.md`](../docs/decisions/t162-hub-pos-login.md).
+      Registrado como "T161" na época; renumerado para **T162** na T161, por
+      colisão de identificador.
     - **Dívida preservada:** T1, T2 e T3 da revisão final da T159, L3, S-1 a S-4
       (T158), R-A, R-B e R-C (T157) e o registro `teste michell`.
 
@@ -1358,9 +1360,9 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
     - **Limite de privacidade:** o log nunca carrega mensagem do banco,
       `DETAIL`, parâmetros, conteúdo de requisição ou stack; a resposta HTTP
       não muda.
-    - **Planejados, não iniciados:** Hub pós-login (T161 de produto, registrada
-      em [`docs/decisions/t161-hub-pos-login.md`](../docs/decisions/t161-hub-pos-login.md)),
-      RH/DP e Gestão de Pessoas.
+    - **Planejados, não iniciados:** Hub pós-login (**T162**, registrado em
+      [`docs/decisions/t162-hub-pos-login.md`](../docs/decisions/t162-hub-pos-login.md),
+      sem branch, sem PR e sem código), RH/DP e Gestão de Pessoas.
     - **Dívida preservada:** R1, R2 e R3 da T160, L3, S-1 a S-4 (T158),
       R-A a R-C (T157) e o registro `teste michell`.
 
