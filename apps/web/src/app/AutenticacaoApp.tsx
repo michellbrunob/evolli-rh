@@ -36,11 +36,22 @@
  * `role` utilizável conta como falha — "montar com o papel conhecido" exige
  * conhecê-lo, e um shell montado sem papel é exatamente o estado que
  * produzia o 403.
+ *
+ * ## O Hub entra entre o ator resolvido e o shell (T162)
+ *
+ * `pronto` deixou de significar "monta o shell" e passou a significar "o ator
+ * é conhecido". Com o ator conhecido, a primeira tela é o **Hub**, que diz o
+ * que este acesso abre; o shell só monta quando alguém escolhe um produto
+ * ali. Os quatro estados anteriores não mudaram, e a ordem que a T153 fixou
+ * continua valendo — o Hub não dispara nenhuma requisição funcional, e a
+ * única leitura que faz (`GET /v1/empresas`, para o nome da empresa) acontece
+ * só para papéis a que o RBAC concede `empresa:read`.
  */
 import { useCallback, useEffect, useState } from "react";
 import "./tokens.css";
 import "./AutenticacaoApp.css";
 import { App } from "./App";
+import { HubPosLogin } from "./HubPosLogin";
 import { LoginScreen } from "./LoginScreen";
 import { logout } from "../api/authClient";
 import { clearCsrfToken, refreshCsrfToken } from "../api/csrfClient";
@@ -67,6 +78,12 @@ export function AutenticacaoApp() {
    * ator da sessão anterior.
    */
   const [ator, setAtor] = useState<SafeAccessUserApi | null>(null);
+  /**
+   * Produto aberto a partir do Hub. `null` é o Hub — o estado em que a sessão
+   * nasce e ao qual ela volta. Não é rota: continua não havendo URL nem
+   * `history`, como desde a T044.
+   */
+  const [destinoAberto, setDestinoAberto] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelado = false;
@@ -140,6 +157,9 @@ export function AutenticacaoApp() {
     // montar o shell com o papel — e o destino inicial — do usuário
     // anterior.
     setAtor(null);
+    // E o produto aberto sai junto com os dois: a sessão seguinte começa no
+    // Hub, nunca dentro do módulo em que a anterior estava.
+    setDestinoAberto(null);
     setEstado("login");
   }, []);
 
@@ -197,6 +217,19 @@ export function AutenticacaoApp() {
     );
   }
 
+  if (destinoAberto === null) {
+    return (
+      <HubPosLogin
+        key={ator.id}
+        papelDoAtor={ator.role}
+        empresaDoAtor={ator.companyId}
+        emailDoAtor={ator.email}
+        onAbrirDestino={setDestinoAberto}
+        onLogout={() => void handleLogout()}
+      />
+    );
+  }
+
   return (
     <App
       // Ator diferente força remontagem, e com ela o recálculo do destino
@@ -208,6 +241,8 @@ export function AutenticacaoApp() {
       onSessaoAtualEncerrada={encerrarSessaoLocalmente}
       mfaDisponivel={ator.mfaAvailable === true}
       papelDoAtor={ator.role}
+      destinoInicial={destinoAberto}
+      onVoltarAoHub={() => setDestinoAberto(null)}
     />
   );
 }

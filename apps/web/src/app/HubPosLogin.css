@@ -1,0 +1,328 @@
+/**
+ * Hub pós-login (T162).
+ *
+ * Mesma gramática visual da T159: hierarquia por superfície, borda, peso e
+ * espaço — nunca por cor sozinha. Sem gradiente, sem sombra colorida, sem
+ * animação de entrada. O cartão de produto é uma superfície branca sobre a
+ * tela neutra, e o que o distingue do bloco de Demonstração é a superfície,
+ * não um tom de aviso.
+ *
+ * Todos os valores saem de `tokens.css`. Nenhuma cor literal aqui.
+ */
+
+.hub {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--surface-neutral);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+.hub__skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  background: var(--surface-canvas);
+  color: var(--color-action);
+  padding: var(--space-xs) var(--space-md);
+  border-radius: var(--radius-sm);
+  z-index: 2;
+}
+
+.hub__skip-link:focus {
+  left: var(--space-md);
+  top: var(--space-xs);
+}
+
+/* ---------------------------------------------------------------- cabeçalho */
+
+.hub__topo {
+  background: var(--surface-canvas);
+  border-bottom: 1px solid var(--divider-soft);
+}
+
+.hub__topo-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: var(--space-sm) var(--space-md);
+}
+
+.hub__marca {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.hub__marca-nome {
+  font-size: var(--text-body);
+  font-weight: var(--weight-strong);
+  letter-spacing: var(--tracking-tight);
+}
+
+.hub__acoes {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.hub__papel {
+  font-size: var(--text-caption);
+  color: var(--color-ink-subtle);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-pill);
+  padding: var(--space-xxs) var(--space-sm);
+  white-space: nowrap;
+}
+
+.hub__sair {
+  min-height: var(--touch-target);
+  padding: 0 var(--space-md);
+  font: inherit;
+  font-size: var(--text-ui);
+  color: var(--color-ink-muted);
+  background: transparent;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.hub__sair:hover {
+  border-color: var(--color-ink-subtle);
+}
+
+/* ------------------------------------------------------------------- corpo */
+
+.hub__area {
+  flex: 1;
+}
+
+.hub__area-inner {
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: var(--space-xl) var(--space-md) var(--space-2xl);
+}
+
+.hub__titulo {
+  margin: 0;
+  font-size: var(--text-display);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+}
+
+.hub__intro {
+  margin: var(--space-sm) 0 0;
+  max-width: 62ch;
+  font-size: var(--text-body);
+  line-height: var(--leading-body);
+  color: var(--color-ink-muted);
+}
+
+/* ------------------------------------------------------ contexto da sessão */
+
+.hub__contexto {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-lg);
+  margin: var(--space-lg) 0 0;
+  padding: var(--space-md);
+  background: var(--surface-canvas);
+  border: 1px solid var(--divider-soft);
+  border-radius: var(--radius-md);
+}
+
+.hub__contexto-item {
+  min-width: 0;
+}
+
+.hub__contexto dt {
+  font-size: var(--text-caption);
+  color: var(--color-ink-subtle);
+}
+
+.hub__contexto dd {
+  margin: var(--space-xxs) 0 0;
+  font-size: var(--text-ui);
+  font-weight: var(--weight-strong);
+  /* O e-mail e o nome da empresa podem ser longos; quebram em vez de empurrar
+     a página para o lado. */
+  overflow-wrap: anywhere;
+}
+
+.hub__contexto-codigo {
+  font-weight: var(--weight-regular);
+  color: var(--color-ink-subtle);
+}
+
+.hub__contexto-falha {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+  font-weight: var(--weight-regular);
+  color: var(--status-danger-ink);
+}
+
+.hub__contexto-retry {
+  font: inherit;
+  font-weight: var(--weight-strong);
+  color: var(--color-action);
+  background: none;
+  border: 0;
+  padding: 0;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* ----------------------------------------------------------------- seções */
+
+.hub__secao {
+  margin-top: var(--space-xl);
+}
+
+.hub__secao-titulo {
+  margin: 0 0 var(--space-md);
+  font-size: var(--text-lead);
+  font-weight: var(--weight-strong);
+  letter-spacing: var(--tracking-tight);
+}
+
+.hub__vazio {
+  margin: 0;
+  max-width: 62ch;
+  padding: var(--space-md);
+  background: var(--surface-canvas);
+  border: 1px solid var(--divider-soft);
+  border-radius: var(--radius-md);
+  font-size: var(--text-body);
+  line-height: var(--leading-body);
+  color: var(--color-ink-muted);
+}
+
+/* -------------------------------------------------------- cartões (produto) */
+
+.hub__cartoes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--space-md);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hub__cartao {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  width: 100%;
+  height: 100%;
+  min-height: var(--touch-target);
+  padding: var(--space-md);
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: var(--surface-canvas);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.hub__cartao:hover {
+  border-color: var(--color-action);
+}
+
+.hub__cartao-icone {
+  flex: none;
+  display: inline-flex;
+  color: var(--color-action);
+}
+
+.hub__cartao-texto {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+  min-width: 0;
+}
+
+.hub__cartao-titulo {
+  font-size: var(--text-body);
+  font-weight: var(--weight-strong);
+  letter-spacing: var(--tracking-tight);
+}
+
+.hub__cartao-sub {
+  font-size: var(--text-caption);
+  color: var(--color-ink-subtle);
+}
+
+.hub__cartao-descricao {
+  margin-top: var(--space-xxs);
+  font-size: var(--text-caption);
+  line-height: var(--leading-body);
+  color: var(--color-ink-muted);
+}
+
+/* -------------------------------------------------------------- demonstração
+   Grupo de segunda ordem, como na barra lateral da T159: superfície mais
+   discreta que o cartão de produto, e aviso antes da lista — não depois. */
+
+.hub__aviso-demonstracao {
+  margin: 0 0 var(--space-sm);
+  max-width: 62ch;
+  font-size: var(--text-caption);
+  line-height: var(--leading-body);
+  color: var(--color-ink-subtle);
+}
+
+.hub__lista-demonstracao {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hub__item-demonstracao {
+  min-height: var(--touch-target);
+  padding: 0 var(--space-md);
+  font: inherit;
+  font-size: var(--text-ui);
+  color: var(--color-ink-muted);
+  background: transparent;
+  border: 1px dashed var(--hairline);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.hub__item-demonstracao:hover {
+  border-style: solid;
+  border-color: var(--color-ink-subtle);
+}
+
+/* ------------------------------------------------------------------- foco */
+
+.hub a:focus-visible,
+.hub button:focus-visible {
+  outline: var(--focus-width) solid var(--color-action);
+  outline-offset: var(--focus-offset);
+}
+
+@media (max-width: 600px) {
+  .hub__area-inner {
+    padding: var(--space-lg) var(--space-md) var(--space-xl);
+  }
+
+  .hub__cartoes {
+    grid-template-columns: 1fr;
+  }
+
+  .hub__contexto {
+    gap: var(--space-md);
+  }
+}
