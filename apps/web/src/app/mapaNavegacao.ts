@@ -281,3 +281,99 @@ export function destinoInicialPara(papel: string | null): string {
   if (papel === null) return DESTINO_SEM_CAPACIDADE;
   return DESTINO_INICIAL_POR_PAPEL[papel] ?? DESTINO_SEM_CAPACIDADE;
 }
+
+/**
+ * Destinos **funcionais que o papel de fato consegue abrir** — a lista que o
+ * Hub pós-login (T162) oferece.
+ *
+ * ## Por que não dá para reusar `destinoVisivelPara`
+ *
+ * São duas perguntas diferentes, e confundi-las produziria exatamente a
+ * promessa vazia que a T159 eliminou da barra lateral.
+ *
+ * `destinoVisivelPara` responde "mostro este item no menu?". Os contêineres
+ * funcionais — `pessoas`, `cadastros`, `ponto`, `contas-acesso` — não declaram
+ * `papeis` de propósito: cada um reúne várias abas, e esconder o contêiner
+ * inteiro de quem pode usar **uma** delas removeria acesso real. No menu isso
+ * é correto; a aba é escolhida por quem navega.
+ *
+ * `capacidadeFuncionalDe` responde "ofereço este produto como um cartão?". Um
+ * cartão não tem abas: ele leva ao destino, que abre na **aba padrão** e
+ * dispara a primeira requisição dela. Oferecer um cartão que aterrissa num 403
+ * é prometer capacidade que não existe — e num Hub, cuja única função é dizer
+ * o que o acesso abre, a mentira é o conteúdo inteiro da tela.
+ *
+ * ## A tabela sai do avaliador, conferida recurso por recurso
+ *
+ * Mesma disciplina de `destinoInicialPara`, estendida a todos os destinos. Cada
+ * linha foi lida em `rbac.evaluator.ts`, contra o recurso que a **aba padrão**
+ * do destino consulta na primeira requisição:
+ *
+ * | Destino                   | Recurso da aba padrão   | Papéis concedidos                |
+ * | ------------------------- | ----------------------- | -------------------------------- |
+ * | `pessoas`                 | `colaborador` read      | `rh`, `dp`, `master_tecnico`     |
+ * | `cadastros`               | `tabela_horario` read   | `rh`, `master_tecnico`           |
+ * | `ponto`                   | `evento_ponto` read     | `rh`, `dp`, `master_tecnico`     |
+ * | `equipe`                  | `gestor_equipe` read    | `gestor`, `rh`                   |
+ * | `administracao-lideranca` | `gestor_atribuicao`     | `rh`                             |
+ * | `contas-acesso`           | `other_account` read    | `rh`, `dp`, `master_tecnico`     |
+ *
+ * Os dois casos que surpreendem, e por isso valem dito:
+ *
+ * - **`dp` não recebe `cadastros`.** `evaluateHorarios` concede `tabela_horario`
+ *   só a `rh` e `master_tecnico` — a alçada de horários é exclusiva do RH desde
+ *   a T037. `dp` lê a estrutura organizacional, que é **outra aba** do mesmo
+ *   destino; como o cartão abre na aba padrão, oferecê-lo produziria 403 na
+ *   primeira requisição. É a mesma razão pela qual `destinoInicialPara` não
+ *   manda `financeiro` para lá.
+ * - **`master_tecnico` não recebe `equipe` nem `administracao-lideranca`.**
+ *   Ambos partem da empresa do ator, e `master_tecnico` não tem empresa. Já
+ *   está registrado em `PAPEIS_MINHA_EQUIPE` e
+ *   `PAPEIS_ADMINISTRACAO_LIDERANCA`.
+ *
+ * **Papel ausente da tabela recebe lista vazia** — negação por padrão, igual ao
+ * avaliador. `financeiro` lê `centro_custo`, que é aba de Estrutura mas não a
+ * padrão; `colaborador`, `auditor`, `dpo` e `admin_tecnico` não têm capacidade
+ * funcional nenhuma hoje. Para todos eles o Hub diz isso, em vez de inventar um
+ * produto.
+ *
+ * **Continua não sendo autorização.** O servidor decide cada requisição; esta
+ * tabela só evita oferecer o que ele recusaria.
+ */
+const CAPACIDADE_FUNCIONAL_POR_PAPEL: Readonly<
+  Record<string, readonly string[]>
+> = {
+  rh: [
+    "pessoas",
+    "cadastros",
+    "ponto",
+    "equipe",
+    "administracao-lideranca",
+    "contas-acesso",
+  ],
+  dp: ["pessoas", "ponto", "contas-acesso"],
+  master_tecnico: ["pessoas", "cadastros", "ponto", "contas-acesso"],
+  gestor: ["equipe"],
+};
+
+/**
+ * Os destinos funcionais do papel, na ordem em que aparecem em `GRUPOS`.
+ *
+ * Filtra contra `DESTINOS` em vez de devolver os identificadores crus: um id
+ * digitado errado, ou um destino removido do mapa, vira ausência silenciosa de
+ * cartão — nunca um cartão que não leva a lugar nenhum.
+ */
+export function capacidadeFuncionalDe(
+  papel: string | null,
+): readonly DestinoNavegacao[] {
+  if (papel === null) return [];
+  const permitidos = CAPACIDADE_FUNCIONAL_POR_PAPEL[papel];
+  if (permitidos === undefined) return [];
+  return DESTINOS.filter(
+    (d) => d.estado === "funcional" && permitidos.includes(d.id),
+  );
+}
+
+/** Os destinos demonstrativos, na ordem do mapa. Iguais para todo papel. */
+export const DESTINOS_DEMONSTRATIVOS: readonly DestinoNavegacao[] =
+  DESTINOS.filter((d) => d.estado === "demonstrativo");

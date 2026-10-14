@@ -14,6 +14,7 @@ import { ApiError, listarSessoesAtivas } from "../api/sessoesClient";
 import { obterUsuarioAtual } from "../api/usersClient";
 import { listarTabelasHorario } from "../api/horariosClient";
 import { listarEquipe } from "../api/gestorClient";
+import { listarEmpresas } from "../api/organizacaoClient";
 
 vi.mock("../api/authClient", async () => {
   const actual =
@@ -86,6 +87,17 @@ vi.mock("../api/usersClient", async () => {
 // "Cadastros" dispara ao montar e o que produzia 403 para o gestor;
 // `listarEquipe` é a consulta que ele de fato pode fazer. Mockados aqui para
 // que os testes possam afirmar QUAL chamada saiu, e quando.
+// T162 — o Hub lê o nome da empresa para os papéis a que o RBAC concede
+// `empresa:read`. Sem este mock a leitura cairia no `fetch` real do ambiente
+// de teste; o estado de falha do Hub não quebraria nenhuma asserção daqui,
+// mas o ruído esconderia uma regressão de verdade.
+vi.mock("../api/organizacaoClient", async () => {
+  const actual = await vi.importActual<
+    typeof import("../api/organizacaoClient")
+  >("../api/organizacaoClient");
+  return { ...actual, listarEmpresas: vi.fn() };
+});
+
 vi.mock("../api/horariosClient", async () => {
   const actual = await vi.importActual<typeof import("../api/horariosClient")>(
     "../api/horariosClient",
@@ -116,9 +128,33 @@ beforeEach(() => {
     dataReferencia: "2026-10-08",
     itens: [],
   } as never);
+  vi.mocked(listarEmpresas).mockResolvedValue({
+    itens: [
+      {
+        id: ATOR_PADRAO.companyId,
+        nome: "Empresa Sintética",
+        codigo: "EMP-001",
+        status: "ativa",
+      },
+    ],
+    pagina: 1,
+    tamanhoPagina: 1,
+    total: 1,
+  } as never);
 });
 
-async function entrar() {
+/**
+ * T162 — o login leva ao **Hub**, não mais ao shell.
+ *
+ * Os testes que exercitam o shell passaram a atravessar o Hub em vez de pular
+ * por cima dele: nenhuma asserção foi removida, só deixou de valer o atalho
+ * "entrar = shell montado". Onde o teste provava que algo NÃO é chamado antes
+ * do shell, a garantia ficou mais forte — agora existe uma tela inteira entre
+ * as duas coisas, e nela nada funcional roda.
+ */
+const TITULO_DO_HUB = "Seu acesso";
+
+function preencherEEntrar() {
   fireEvent.change(screen.getByLabelText(/^E-mail\b/i), {
     target: { value: EMAIL_SINTETICO },
   });
@@ -126,7 +162,24 @@ async function entrar() {
     target: { value: SENHA_SINTETICA },
   });
   fireEvent.click(screen.getByRole("button", { name: "Entrar" }));
+}
+
+/** Do login até o Hub — a primeira tela depois de o ator ser resolvido. */
+async function entrarNoHub() {
+  preencherEEntrar();
+  await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
+}
+
+/** Abre um produto do Hub e espera o shell montar. */
+async function abrirProduto(rotulo: RegExp | string) {
+  fireEvent.click(screen.getByRole("button", { name: rotulo }));
   await screen.findByRole("navigation", { name: "Navegação do painel" });
+}
+
+/** Caminho completo do ator padrão (`rh`): login, Hub e produto aberto. */
+async function entrar() {
+  await entrarNoHub();
+  await abrirProduto(/^Pessoas/);
 }
 
 describe("AutenticacaoApp (T116) — portão de sessão", () => {
@@ -149,7 +202,11 @@ describe("AutenticacaoApp (T116) — portão de sessão", () => {
     ).not.toBeInTheDocument();
 
     resolver!();
-    await screen.findByRole("navigation", { name: "Navegação do painel" });
+    // Sessão válida leva ao Hub (T162), e nunca ao login.
+    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
+    expect(
+      screen.queryByRole("navigation", { name: "Navegação do painel" }),
+    ).not.toBeInTheDocument();
   });
 
   it("sessão ausente (401 em /auth/csrf): mostra a tela de login, shell completamente oculto", async () => {
@@ -166,17 +223,22 @@ describe("AutenticacaoApp (T116) — portão de sessão", () => {
     expect(screen.queryByRole("banner")).not.toBeInTheDocument();
   });
 
-  it("sessão válida ao recarregar: shell aparece direto, nunca mostra login", async () => {
+  it("sessão válida ao recarregar: o Hub aparece direto, nunca mostra login (T162)", async () => {
     vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token-restaurado");
 
     render(<AutenticacaoApp />);
 
     expect(
-      await screen.findByRole("navigation", { name: "Navegação do painel" }),
+      await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB }),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole("heading", { level: 1, name: "Entrar" }),
     ).not.toBeInTheDocument();
+    // E dali o shell continua a um clique de distância.
+    await abrirProduto(/^Pessoas/);
+    expect(
+      screen.getByRole("navigation", { name: "Navegação do painel" }),
+    ).toBeInTheDocument();
   });
 
   it("login bem-sucedido libera o shell (navegação e telas internas aparecem só depois)", async () => {
@@ -194,12 +256,51 @@ describe("AutenticacaoApp (T116) — portão de sessão", () => {
     expect(screen.getByRole("button", { name: "Sair" })).toBeInTheDocument();
   });
 
+  it("T162: o login leva ao Hub, e o shell só monta quando um produto é aberto", async () => {
+    vi.mocked(refreshCsrfToken).mockRejectedValueOnce(new Error("401"));
+    vi.mocked(login).mockResolvedValueOnce({ mfaRequerido: false });
+
+    render(<AutenticacaoApp />);
+    await screen.findByRole("heading", { level: 1, name: "Entrar" });
+    await entrarNoHub();
+
+    // Nada do shell existe ainda, e nenhuma tela funcional foi montada.
+    expect(
+      screen.queryByRole("navigation", { name: "Navegação do painel" }),
+    ).not.toBeInTheDocument();
+    expect(vi.mocked(listarTabelasHorario)).not.toHaveBeenCalled();
+    expect(vi.mocked(listarEquipe)).not.toHaveBeenCalled();
+
+    await abrirProduto(/^Pessoas/);
+    expect(
+      screen.getByRole("navigation", { name: "Navegação do painel" }),
+    ).toBeInTheDocument();
+  });
+
+  it("T162: 'Hub' volta ao ponto de entrada e desmonta o shell", async () => {
+    vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token-restaurado");
+
+    render(<AutenticacaoApp />);
+    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
+    await abrirProduto(/^Pessoas/);
+
+    fireEvent.click(screen.getByRole("button", { name: "Hub" }));
+
+    expect(
+      await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("navigation", { name: "Navegação do painel" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("logout real: chama o endpoint via authClient, limpa o estado e volta ao login", async () => {
     vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token-restaurado");
     vi.mocked(logout).mockResolvedValueOnce(undefined);
 
     render(<AutenticacaoApp />);
-    await screen.findByRole("navigation", { name: "Navegação do painel" });
+    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
+    await abrirProduto(/^Pessoas/);
 
     fireEvent.click(screen.getByRole("button", { name: "Sair" }));
 
@@ -217,7 +318,8 @@ describe("AutenticacaoApp (T116) — portão de sessão", () => {
     vi.mocked(logout).mockRejectedValueOnce(new Error("401"));
 
     render(<AutenticacaoApp />);
-    await screen.findByRole("navigation", { name: "Navegação do painel" });
+    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
+    await abrirProduto(/^Pessoas/);
 
     fireEvent.click(screen.getByRole("button", { name: "Sair" }));
 
@@ -259,7 +361,8 @@ describe("AutenticacaoApp (T116) — portão de sessão", () => {
     );
 
     render(<AutenticacaoApp />);
-    await screen.findByRole("navigation", { name: "Navegação do painel" });
+    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
+    await abrirProduto(/^Pessoas/);
 
     fireEvent.click(screen.getByRole("button", { name: "Sessões ativas" }));
     await screen.findByRole("heading", { name: "Sessões ativas" });
@@ -287,6 +390,16 @@ describe("AutenticacaoApp (T116) — portão de sessão", () => {
 // ---------------------------------------------------------------------------
 // T153 — B1: o papel autorizado não pode aterrissar numa tela proibida, e
 // nenhuma requisição funcional pode sair antes de o ator ser conhecido.
+//
+// T162 — o Hub entrou entre o ator resolvido e o shell, e por isso os casos
+// deste bloco passaram a dizer DUAS coisas onde antes diziam uma:
+//
+//   1. no Hub, nada funcional é chamado — nem o que o papel poderia chamar;
+//   2. ao abrir o produto, a aterrissagem continua sendo a que a T153 fixou.
+//
+// A asserção que importa — "este papel nunca toca no recurso proibido" — não
+// foi afrouxada em nenhum caso: ela agora vale do login até depois de o shell
+// montar, e não só no instante da montagem.
 // ---------------------------------------------------------------------------
 
 function ator(role: string, over: Record<string, unknown> = {}) {
@@ -333,7 +446,13 @@ describe("T153 — aterrissagem segura por papel", () => {
     expect(screen.queryByRole("button", { name: "Sair" })).toBeNull();
 
     await commitar(() => d.resolve(ator("rh")));
-    expect(await screen.findByRole("navigation")).toBeInTheDocument();
+    // Ator conhecido: o Hub monta. O shell ainda não — e isso é o ponto.
+    expect(
+      await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("navigation")).toBeNull();
+    await abrirProduto(/^Pessoas/);
+    expect(screen.getByRole("navigation")).toBeInTheDocument();
   });
 
   it("B1.2 nenhum cliente funcional é chamado antes de o ator ser conhecido", async () => {
@@ -350,17 +469,24 @@ describe("T153 — aterrissagem segura por papel", () => {
     expect(vi.mocked(listarEquipe)).not.toHaveBeenCalled();
 
     await commitar(() => d.resolve(ator("gestor")));
-    await screen.findByRole("navigation");
+    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
+    // T162 — no Hub ainda não saiu NENHUMA chamada funcional, nem a permitida.
+    expect(vi.mocked(listarTabelasHorario)).not.toHaveBeenCalled();
+    expect(vi.mocked(listarEquipe)).not.toHaveBeenCalled();
+
+    await abrirProduto(/Minha equipe/);
     // Agora sim: a primeira (e única) chamada funcional é a permitida.
     expect(vi.mocked(listarTabelasHorario)).not.toHaveBeenCalled();
     expect(vi.mocked(listarEquipe)).toHaveBeenCalled();
   });
 
-  it("B1.3 gestor entra DIRETO na consulta da equipe", async () => {
+  it("B1.3 gestor entra DIRETO na consulta da equipe — o único produto que o Hub lhe oferece", async () => {
     vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
     vi.mocked(obterUsuarioAtual).mockResolvedValueOnce(ator("gestor"));
 
     render(<AutenticacaoApp />);
+    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
+    await abrirProduto(/Minha equipe/);
 
     expect(
       await screen.findByRole("heading", { level: 1, name: "Minha equipe" }),
@@ -375,15 +501,13 @@ describe("T153 — aterrissagem segura por papel", () => {
 
     render(<AutenticacaoApp />);
     await screen.findByRole("button", { name: "Entrar" });
-    fireEvent.change(screen.getByLabelText(/^E-mail\b/i), {
-      target: { value: EMAIL_SINTETICO },
-    });
-    fireEvent.change(screen.getByLabelText(/^Senha\b/i), {
-      target: { value: SENHA_SINTETICA },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Entrar" }));
+    await entrarNoHub();
+    // Nem no Hub...
+    expect(vi.mocked(listarTabelasHorario)).not.toHaveBeenCalled();
 
+    await abrirProduto(/Minha equipe/);
     await screen.findByRole("heading", { level: 1, name: "Minha equipe" });
+    // ...nem depois de abrir o produto.
     expect(vi.mocked(listarTabelasHorario)).not.toHaveBeenCalled();
   });
 
@@ -393,6 +517,10 @@ describe("T153 — aterrissagem segura por papel", () => {
     vi.mocked(obterUsuarioAtual).mockResolvedValueOnce(ator("gestor"));
 
     render(<AutenticacaoApp />);
+    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
+    expect(vi.mocked(listarTabelasHorario)).not.toHaveBeenCalled();
+
+    await abrirProduto(/Minha equipe/);
     await screen.findByRole("heading", { level: 1, name: "Minha equipe" });
 
     expect(vi.mocked(listarTabelasHorario)).not.toHaveBeenCalled();
@@ -409,6 +537,11 @@ describe("T153 — aterrissagem segura por papel", () => {
     expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
 
     await commitar(() => d.resolve(ator("gestor")));
+    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
+    // O Hub tampouco oferece horários ao gestor — a capacidade não existe.
+    expect(screen.getByRole("main").textContent).not.toContain("Horários");
+
+    await abrirProduto(/Minha equipe/);
     await screen.findByRole("heading", { level: 1, name: "Minha equipe" });
 
     const main = screen.getByRole("main");
@@ -421,6 +554,8 @@ describe("T153 — aterrissagem segura por papel", () => {
     vi.mocked(obterUsuarioAtual).mockResolvedValueOnce(ator("gestor"));
 
     render(<AutenticacaoApp />);
+    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
+    await abrirProduto(/Minha equipe/);
     await screen.findByRole("heading", { level: 1, name: "Minha equipe" });
 
     expect(vi.mocked(listarEquipe)).toHaveBeenCalled();
@@ -432,7 +567,13 @@ describe("T153 — aterrissagem segura por papel", () => {
     vi.mocked(obterUsuarioAtual).mockResolvedValueOnce(ator("rh"));
 
     render(<AutenticacaoApp />);
-    await screen.findByRole("navigation");
+    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
+    // O Hub já oferece "Minha equipe" ao rh, porque o contrato lhe concede.
+    expect(
+      screen.getByRole("button", { name: /Minha equipe/ }),
+    ).toBeInTheDocument();
+
+    await abrirProduto(/^Pessoas/);
 
     expect(destinosAtivos()).toEqual(["Pessoas Colaboradores"]);
     // E continua vendo "Minha equipe", porque o contrato lhe concede.
@@ -450,18 +591,22 @@ describe("T153 — aterrissagem segura por papel", () => {
    * tomavam 403 na primeira chamada, que era a primeira impressão do produto.
    */
   it.each([
-    ["dp", "Pessoas Colaboradores"],
-    ["master_tecnico", "Pessoas Colaboradores"],
-    ["colaborador", "Visão geral"],
-    ["financeiro", "Visão geral"],
+    ["dp", "Pessoas Colaboradores", /^Pessoas/],
+    ["master_tecnico", "Pessoas Colaboradores", /^Pessoas/],
+    ["colaborador", "Visão geral", /Visão geral/],
+    ["financeiro", "Visão geral", /Visão geral/],
   ])(
     "B1.9 papel %s aterrissa em %s e não ganha a capacidade",
-    async (papel, destino) => {
+    async (papel, destino, abrir) => {
       vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
       vi.mocked(obterUsuarioAtual).mockResolvedValueOnce(ator(papel));
 
       render(<AutenticacaoApp />);
-      await screen.findByRole("navigation");
+      await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
+      // Nem no Hub o destino de liderança é oferecido a estes papéis.
+      expect(screen.queryByRole("button", { name: /Minha equipe/ })).toBeNull();
+
+      await abrirProduto(abrir);
 
       expect(destinosAtivos()).toEqual([destino]);
       expect(screen.queryByRole("button", { name: /Minha equipe/ })).toBeNull();
@@ -494,6 +639,8 @@ describe("T153 — aterrissagem segura por papel", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
 
+    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
+    await abrirProduto(/Minha equipe/);
     await screen.findByRole("heading", { level: 1, name: "Minha equipe" });
     expect(screen.queryByRole("alert")).toBeNull();
     // Uma aplicação, não duas: um <main>, uma navegação.
@@ -508,6 +655,8 @@ describe("T153 — aterrissagem segura por papel", () => {
     vi.mocked(login).mockResolvedValueOnce({ mfaRequerido: false });
 
     render(<AutenticacaoApp />);
+    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
+    await abrirProduto(/Minha equipe/);
     await screen.findByRole("heading", { level: 1, name: "Minha equipe" });
 
     fireEvent.click(screen.getByRole("button", { name: "Sair" }));
@@ -522,7 +671,11 @@ describe("T153 — aterrissagem segura por papel", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Entrar" }));
 
-    await screen.findByRole("navigation");
+    // T162 — a sessão nova começa no Hub, nunca dentro do produto em que a
+    // anterior estava. Era "Minha equipe", e o gestor saiu.
+    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
+    await abrirProduto(/^Pessoas/);
+
     // Recalculado para o ator NOVO, não herdado do gestor anterior.
     expect(destinosAtivos()).toEqual(["Pessoas Colaboradores"]);
   });
@@ -532,6 +685,8 @@ describe("T153 — aterrissagem segura por papel", () => {
     vi.mocked(obterUsuarioAtual).mockResolvedValue(ator("gestor"));
 
     render(<AutenticacaoApp />);
+    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
+    await abrirProduto(/Minha equipe/);
     await screen.findByRole("heading", { level: 1, name: "Minha equipe" });
 
     fireEvent.click(screen.getByRole("button", { name: /^Relatórios/ }));
@@ -556,6 +711,8 @@ describe("T153 — aterrissagem segura por papel", () => {
         <AutenticacaoApp />
       </StrictMode>,
     );
+    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
+    await abrirProduto(/Minha equipe/);
     await screen.findByRole("heading", { level: 1, name: "Minha equipe" });
 
     expect(vi.mocked(listarTabelasHorario)).not.toHaveBeenCalled();

@@ -83,7 +83,11 @@ import {
 import { CentralSolicitacoesRHScreen } from "../screens/solicitacoes-rh/CentralSolicitacoesRHScreen";
 import { ModuloEmPreparacao } from "./ModuloEmPreparacao";
 import { PainelNavigation } from "./PainelNavigation";
-import { destinoInicialPara, destinoPorId } from "./mapaNavegacao";
+import {
+  destinoInicialPara,
+  destinoPorId,
+  capacidadeFuncionalDe,
+} from "./mapaNavegacao";
 
 /** `titleId` do `h1` de cada destino, para `aria-labelledby` do `<main>`.
  * "cadastros", "pessoas", "ponto", "documentos", "portal-colaborador" e
@@ -312,6 +316,34 @@ function conteudoDoDestino(
  */
 export { destinoInicialPara };
 
+/**
+ * Onde o shell monta: o destino que o Hub pediu, quando ele é legítimo para
+ * este papel; o destino inicial do papel, em qualquer outro caso.
+ *
+ * Fail-closed por construção. Um destino **funcional** só passa se estiver na
+ * capacidade do papel — a mesma tabela derivada do `rbac.evaluator` que o Hub
+ * usa para decidir o que oferecer. Assim, nem um id inventado, nem um estado
+ * antigo, nem uma regressão no Hub conseguem montar aqui a tela que
+ * responderia 403 na primeira requisição.
+ *
+ * Destino **demonstrativo** passa para qualquer papel: ele não importa cliente
+ * de API nenhum, então não há requisição a ser negada. É o mesmo motivo pelo
+ * qual `inicio` é o destino de quem não tem capacidade funcional.
+ */
+function resolverEntrada(
+  destinoInicial: string | null,
+  papelDoAtor: string | null,
+): string {
+  if (destinoInicial === null) return destinoInicialPara(papelDoAtor);
+  const destino = destinoPorId(destinoInicial);
+  if (destino === undefined) return destinoInicialPara(papelDoAtor);
+  if (destino.estado === "demonstrativo") return destino.id;
+  const permitido = capacidadeFuncionalDe(papelDoAtor).some(
+    (d) => d.id === destino.id,
+  );
+  return permitido ? destino.id : destinoInicialPara(papelDoAtor);
+}
+
 export interface AppProps {
   /** Presente só quando há sessão autenticada (ver `AutenticacaoApp`). Sem
    * ele, nenhum botão "Sair" aparece — comportamento idêntico ao de antes
@@ -342,6 +374,24 @@ export interface AppProps {
    * própria e o RBAC continua sendo a única fronteira real.
    */
   papelDoAtor?: string | null;
+  /**
+   * T162 — destino escolhido no Hub pós-login. Substitui `destinoInicialPara`
+   * como ponto de entrada quando presente.
+   *
+   * **Validado aqui, e não só na origem.** O Hub só oferece destino que o
+   * papel abre, mas esta prop é a fronteira do componente: um id inexistente,
+   * ou um destino funcional que o papel NÃO abre, cai no destino inicial do
+   * papel em vez de montar a tela que responderia 403. É a mesma regra da
+   * T153, aplicada a um caminho novo.
+   *
+   * Destino demonstrativo é aceito de qualquer papel: ele não chama a API.
+   */
+  destinoInicial?: string | null;
+  /**
+   * T162 — volta ao Hub. Ausente significa que não há Hub acima deste shell
+   * (é o caso dos testes que montam `App` sozinho), e aí o botão não aparece.
+   */
+  onVoltarAoHub?: () => void;
 }
 
 export function App({
@@ -349,6 +399,8 @@ export function App({
   onSessaoAtualEncerrada,
   mfaDisponivel = false,
   papelDoAtor = null,
+  destinoInicial = null,
+  onVoltarAoHub,
 }: AppProps = {}) {
   // Inicialização SÍNCRONA com o papel já resolvido. O `AutenticacaoApp` só
   // monta este componente depois de `GET /v1/users/me` concluir com sucesso,
@@ -361,7 +413,7 @@ export function App({
   // componente (ver a `key` em `AutenticacaoApp`), e aí o inicializador roda
   // de novo com o papel novo.
   const [destinoAtivoId, setDestinoAtivoId] = useState(() =>
-    destinoInicialPara(papelDoAtor),
+    resolverEntrada(destinoInicial, papelDoAtor),
   );
   const [sessoesAtivasAberto, setSessoesAtivasAberto] = useState(false);
   const [segurancaAberto, setSegurancaAberto] = useState(false);
@@ -549,6 +601,15 @@ export function App({
                 }}
               >
                 Sessões ativas
+              </button>
+            ) : null}
+            {onVoltarAoHub ? (
+              <button
+                type="button"
+                className="app-shell__hub"
+                onClick={onVoltarAoHub}
+              >
+                Hub
               </button>
             ) : null}
             {onLogout ? (

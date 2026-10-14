@@ -1274,3 +1274,74 @@ describe("App — contrato responsivo do shell (T159 — evolução visual)", ()
     expect(foraDoMobile).not.toMatch(/\.app-shell__fundo-gaveta/);
   });
 });
+
+/**
+ * T162 — `destinoInicial` é a entrada vinda do Hub, e esta é a fronteira do
+ * componente.
+ *
+ * O Hub só oferece o que o papel abre. Isto aqui prova que, mesmo se ele
+ * oferecesse errado — por regressão, por estado antigo, por id inventado —, o
+ * shell não montaria a tela que responderia 403: ele cai na aterrissagem do
+ * papel, que a T153 já fixou. Fail-closed nos dois lados, não só na origem.
+ */
+describe("T162 — entrada vinda do Hub é validada no shell", () => {
+  it("destino funcional permitido ao papel é respeitado", () => {
+    render(<App papelDoAtor="rh" destinoInicial="cadastros" />);
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+      "Horários",
+    );
+  });
+
+  it("destino funcional NÃO concedido ao papel cai na aterrissagem do papel", () => {
+    // `dp` não lê `tabela_horario` (exclusivo de RH desde a T037), e a aba
+    // padrão de "Estrutura" é justamente essa. Montar ali seria 403.
+    render(<App papelDoAtor="dp" destinoInicial="cadastros" />);
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+      "Colaboradores",
+    );
+  });
+
+  it("destino de liderança não cai no colo de quem não o tem", () => {
+    render(<App papelDoAtor="dp" destinoInicial="administracao-lideranca" />);
+    expect(screen.getByRole("heading", { level: 1 })).not.toHaveTextContent(
+      "Administração da liderança",
+    );
+  });
+
+  it("id inexistente cai na aterrissagem do papel, sem quebrar", () => {
+    render(<App papelDoAtor="gestor" destinoInicial="nao-existe" />);
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+      "Minha equipe",
+    );
+  });
+
+  it("destino demonstrativo é aceito de qualquer papel — não chama a API", () => {
+    render(<App papelDoAtor="colaborador" destinoInicial="relatorios" />);
+    // O h1 é o da aba padrão do destino, e o destino ativo é Relatórios.
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+      "Exceções de Ponto",
+    );
+    expect(screen.getByRole("button", { name: /^Relatórios/ })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+  });
+
+  it("sem `destinoInicial`, nada muda em relação à T153", () => {
+    render(<App papelDoAtor="gestor" />);
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+      "Minha equipe",
+    );
+  });
+
+  it("o botão 'Hub' só existe quando há Hub acima do shell", () => {
+    const { unmount } = render(<App papelDoAtor="rh" />);
+    expect(screen.queryByRole("button", { name: "Hub" })).toBeNull();
+    unmount();
+
+    const voltar = vi.fn();
+    render(<App papelDoAtor="rh" onVoltarAoHub={voltar} />);
+    fireEvent.click(screen.getByRole("button", { name: "Hub" }));
+    expect(voltar).toHaveBeenCalledTimes(1);
+  });
+});

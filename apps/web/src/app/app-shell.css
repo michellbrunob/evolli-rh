@@ -129,6 +129,10 @@
   white-space: nowrap;
 }
 
+/* "Hub" (T162) é a volta ao ponto de entrada, e usa exatamente o mesmo
+   tratamento das demais ações do cabeçalho: nenhuma delas é mais importante
+   que as outras, e destacar esta por cor criaria uma hierarquia falsa. */
+.app-shell__hub,
 .app-shell__seguranca,
 .app-shell__sessoes-ativas,
 .app-shell__logout {
@@ -144,6 +148,7 @@
   cursor: pointer;
 }
 
+.app-shell__hub:hover,
 .app-shell__seguranca:hover,
 .app-shell__sessoes-ativas:hover,
 .app-shell__logout:hover {

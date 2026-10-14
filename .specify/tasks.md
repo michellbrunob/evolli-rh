@@ -1334,8 +1334,12 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       (T158), R-A, R-B e R-C (T157) e o registro `teste michell`.
 
 58. **T161 - Concorrência do gestor: diagnóstico antes de correção**
-    - **Estado:** em implementação. Branch `codex/t161-concorrencia-gestor-409`,
-      a partir do squash `0db3d7059160b97699ca3077190618e6a972449e` (T160, PR #152).
+    - **Estado:** **integrada** em `main` pela PR #153, squash
+      `07cdfca25fb2b7b5e2dceead94e73c4a2181b659`, com a CI de push 3/3 verde —
+      o E2E de concorrência que derrubava `main` voltou ao verde. Branch
+      `codex/t161-concorrencia-gestor-409` preservada.
+    - **Ressalva aberta (S2):** o confinamento da repetição a `criarAtribuicao`
+      é garantido por inspeção, sem teste próprio.
     - **Motivo:** a CI de `main` ficou 2/3 — duas criações simultâneas de
       atribuição de gestor principal devolveram um 201 e nenhum 409, e o log
       trazia só `PrismaClientUnknownRequestError`.
@@ -1364,6 +1368,40 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       [`docs/decisions/t162-hub-pos-login.md`](../docs/decisions/t162-hub-pos-login.md),
       sem branch, sem PR e sem código), RH/DP e Gestão de Pessoas.
     - **Dívida preservada:** R1, R2 e R3 da T160, L3, S-1 a S-4 (T158),
+      R-A a R-C (T157) e o registro `teste michell`.
+
+59. **T162 - Hub pós-login do Evolli**
+    - **Estado:** em implementação. Branch `codex/t162-hub-pos-login`, a partir
+      do squash `07cdfca25fb2b7b5e2dceead94e73c4a2181b659` (T161, PR #153).
+    - **Objetivo:** depois do login e da resolução segura do ator, a pessoa
+      entra primeiro no Hub, não direto no shell de módulos. O Hub mostra
+      **somente** produtos que o servidor autoriza no contexto atual.
+    - **Princípio:** o mesmo da T159, um nível acima — cartão de produto é
+      promessa. Capacidade por papel derivada do `rbac.evaluator`, nunca de
+      lista escrita à mão; funcional separado de demonstrativo.
+    - **Contratos levantados antes da interface:** `GET /v1/users/me` (ator,
+      papel, `companyId`); `GET /v1/empresas` sob `empresa:read`, com escopo
+      resolvido no servidor.
+    - **Bloqueio declarado:** **não existe contrato de troca de empresa ou de
+      escopo de sessão.** A empresa é `access_user.companyId`, coluna da conta.
+      A empresa aparece como contexto **não editável** — sem seletor clicável,
+      sem empresa fictícia, sem simulação de troca.
+    - **Segunda consequência:** `empresa:read` é de `rh`, `dp` e
+      `master_tecnico`; para `gestor` e `colaborador` não há como ler o nome da
+      empresa, e o Hub não inventa um.
+    - **Proibido:** inventar endpoint, query, cookie, seleção local de empresa
+      ou escopo no frontend; anunciar superfície demonstrativa como entregue;
+      "em breve", link morto ou produto fictício.
+    - **Acessibilidade:** um `h1`, foco visível, teclado integral, nomes
+      acessíveis, estados de carregamento/erro/retry e nenhuma rolagem
+      horizontal em 375 px e desktop.
+    - **Aceite:** redirecionamento pós-login para o Hub; visibilidade por
+      papel; ausência de destino não autorizado; empresa atual correta;
+      falha e retry sem montar shell indevido; navegação de cartão para
+      destino autorizado; retorno ao Hub; 375 px sem overflow.
+    - **Limite:** sem alterar login, RBAC, schema, migrations, seed, Docker,
+      banco, dependências ou lockfile.
+    - **Dívida preservada:** S2 (T161), R1 a R3 (T160), L3, S-1 a S-4 (T158),
       R-A a R-C (T157) e o registro `teste michell`.
 
 ## Regra obrigatória para as próximas tarefas
