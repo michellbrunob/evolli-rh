@@ -22,7 +22,7 @@ import {
   listarVinculosDoColaborador,
   retificarColaborador,
 } from "../../api/colaboradoresClient";
-import { formatarDiaCivil } from "../../format/data";
+import { formatarDiaCivil, formatarInstante } from "../../format/data";
 import {
   type AreaApi,
   type CentroCustoApi,
@@ -154,7 +154,57 @@ function rotuloTipoDestino(tipo: TipoDestino): string {
   );
 }
 
-export function ColaboradoresScreen() {
+/**
+ * Quantas linhas por página.
+ *
+ * Explícito, e não herdado do padrão do servidor, porque a paginação só é
+ * honesta se a tela souber o tamanho que pediu: é esse número que faz
+ * "Página 2 de 5" significar alguma coisa. Vinte é o padrão do backend
+ * (`TAMANHO_PAGINA_PADRAO`), bem abaixo do teto de 100.
+ */
+const TAMANHO_PAGINA = 20;
+
+/**
+ * R-1 — o tamanho de página da resposta, quando ele é utilizável.
+ *
+ * Recusa o que não serve para dividir: ausente, não numérico, zero, negativo,
+ * fracionário ou não finito. Qualquer um deles produziria uma contagem de
+ * páginas sem sentido — `Infinity`, `NaN` ou uma divisão por zero —, e uma
+ * paginação inventada é pior que nenhuma.
+ *
+ * A recusa **volta ao tamanho pedido**, que é o que a tela de fato usou na
+ * requisição. Não há degradação para "sem paginação": o comportamento fica
+ * exatamente o de antes desta correção.
+ */
+function tamanhoDePaginaValido(valor: unknown): number {
+  return typeof valor === "number" &&
+    Number.isInteger(valor) &&
+    valor > 0 &&
+    Number.isFinite(valor)
+    ? valor
+    : TAMANHO_PAGINA;
+}
+
+export interface ColaboradoresScreenProps {
+  /**
+   * T164 — a empresa de trabalho ATIVA, resolvida pelo servidor e repassada
+   * pelo shell. É contexto, não controle: quem troca de empresa é o Hub, e só
+   * para os papéis que o servidor autoriza.
+   *
+   * Vem por prop em vez de uma leitura própria porque o `AutenticacaoApp` já
+   * tem o ator — pedir `/v1/users/me` de novo aqui seria uma requisição a mais
+   * para um dado que já está em memória.
+   */
+  readonly empresaAtiva?: {
+    readonly nome: string;
+    readonly codigo: string;
+  } | null;
+  readonly onTituloIdChange?: (tituloId: string) => void;
+}
+
+export function ColaboradoresScreen({
+  empresaAtiva = null,
+}: ColaboradoresScreenProps = {}) {
   const [statusCarregamento, setStatusCarregamento] = useState<
     "carregando" | "erro" | "dados"
   >("carregando");
@@ -162,6 +212,34 @@ export function ColaboradoresScreen() {
   const [filtroSituacao, setFiltroSituacao] = useState<FiltroSituacao>("todos");
   const [filtroSituacaoVinculo, setFiltroSituacaoVinculo] =
     useState<FiltroSituacaoVinculo>("todos");
+  /**
+   * T164 — paginação real.
+   *
+   * Antes desta tarefa a tela pedia a lista **sem** `pagina`, recebia a
+   * primeira página do servidor e descartava o `total`. O efeito era silencioso
+   * e grave: a partir do vigésimo primeiro colaborador, as pessoas seguintes
+   * simplesmente não existiam na interface, sem nada na tela sugerindo que
+   * houvesse mais. Uma lista que esconde registros é pior que uma lista vazia,
+   * porque parece completa.
+   *
+   * `pagina` e `total` vêm da RESPOSTA, não do que a tela pediu: o servidor é
+   * quem sabe quantos registros o escopo ativo tem.
+   */
+  const [pagina, setPagina] = useState(1);
+  const [total, setTotal] = useState(0);
+  /**
+   * R-1 — o tamanho de página que o SERVIDOR aplicou.
+   *
+   * Contar as páginas com a constante local assumia que o servidor sempre
+   * honra o tamanho pedido. Ele honra hoje, mas a resposta carrega o valor
+   * efetivo justamente para que o cliente não precise supor: no dia em que a
+   * rota limitar a página, contar com 20 um conjunto servido de 10 em 10
+   * ofereceria metade das páginas — e cada uma delas voltaria vazia.
+   *
+   * Começa na constante porque é o que foi pedido na primeira carga.
+   */
+  const [tamanhoPaginaEfetivo, setTamanhoPaginaEfetivo] =
+    useState(TAMANHO_PAGINA);
   const [formulario, setFormulario] = useState<FormularioState | null>(null);
   const [detalhe, setDetalhe] = useState<DetalheState | null>(null);
   // T142 — confirmação de escrita. Antes, admitir fechava o formulário em
@@ -209,6 +287,7 @@ export function ColaboradoresScreen() {
     async (
       situacao: FiltroSituacao,
       situacaoVinculo: FiltroSituacaoVinculo,
+      paginaPedida: number,
     ) => {
       const pedido = ++pedidoListaRef.current;
       setStatusCarregamento("carregando");
@@ -216,7 +295,9 @@ export function ColaboradoresScreen() {
         const query: {
           situacao?: "ativo" | "inativo";
           situacaoVinculo?: "previsto" | "ativo" | "encerrado";
-        } = {};
+          pagina: number;
+          tamanhoPagina: number;
+        } = { pagina: paginaPedida, tamanhoPagina: TAMANHO_PAGINA };
         if (situacao !== "todos") query.situacao = situacao;
         if (situacaoVinculo !== "todos")
           query.situacaoVinculo = situacaoVinculo;
@@ -225,6 +306,12 @@ export function ColaboradoresScreen() {
         // Aplicá-la mostraria dados que não correspondem ao filtro na tela.
         if (pedido !== pedidoListaRef.current) return null;
         setColaboradores(resp.itens);
+        // Página e total saem da RESPOSTA. Se a tela guardasse o que pediu, um
+        // servidor que ajustasse a página (ou um filtro que encolhesse o
+        // conjunto) deixaria o rodapé mentindo sobre onde a pessoa está.
+        setPagina(resp.pagina);
+        setTotal(resp.total);
+        setTamanhoPaginaEfetivo(tamanhoDePaginaValido(resp.tamanhoPagina));
         setStatusCarregamento("dados");
         return resp.itens;
       } catch {
@@ -236,9 +323,26 @@ export function ColaboradoresScreen() {
     [],
   );
 
+  /**
+   * Trocar de filtro volta para a PRIMEIRA página.
+   *
+   * Sem isto, quem estivesse na página 3 e filtrasse por "Ativo" pediria a
+   * página 3 de um conjunto que talvez tenha uma só — e receberia uma lista
+   * vazia que parece "nenhum colaborador ativo", quando na verdade há vários
+   * na página 1. O filtro muda o conjunto; a posição dentro dele não
+   * sobrevive à mudança.
+   */
   useEffect(() => {
-    void carregarDados(filtroSituacao, filtroSituacaoVinculo);
+    void carregarDados(filtroSituacao, filtroSituacaoVinculo, 1);
   }, [filtroSituacao, filtroSituacaoVinculo, carregarDados]);
+
+  const totalPaginas = Math.max(1, Math.ceil(total / tamanhoPaginaEfetivo));
+  const carregando = statusCarregamento === "carregando";
+
+  function irParaPagina(destino: number) {
+    if (destino < 1 || destino > totalPaginas || carregando) return;
+    void carregarDados(filtroSituacao, filtroSituacaoVinculo, destino);
+  }
 
   async function abrirFormulario() {
     setMensagemSucesso(null);
@@ -594,7 +698,7 @@ export function ColaboradoresScreen() {
           ? `Colaborador ${nomeAdmitido} admitido. Ele não aparece na lista porque os filtros atuais o excluem: a admissão começa com situação Inativo e vínculo Previsto.`
           : `Colaborador ${nomeAdmitido} admitido. Ele já aparece na lista abaixo.`,
       );
-      await carregarDados(filtroSituacao, filtroSituacaoVinculo);
+      await carregarDados(filtroSituacao, filtroSituacaoVinculo, pagina);
     } catch (err: unknown) {
       const mensagem =
         err instanceof Error
@@ -668,6 +772,14 @@ export function ColaboradoresScreen() {
           {c.situacao === "ativo" ? "Ativo" : "Inativo"}
         </StatusBadge>
       ),
+    },
+    {
+      // T164 — `criadoEm` é quando o CADASTRO nasceu, e o rótulo diz isso.
+      // Não é data de admissão: admissão vive no vínculo, que esta rota não
+      // projeta. Chamar de "Admissão" seria barato e errado.
+      key: "criadoEm",
+      header: "Cadastrado em",
+      cell: (c) => formatarInstante(c.criadoEm),
     },
     {
       key: "acoes",
@@ -818,7 +930,7 @@ export function ColaboradoresScreen() {
           <Button
             variant="secondary"
             onClick={() =>
-              void carregarDados(filtroSituacao, filtroSituacaoVinculo)
+              void carregarDados(filtroSituacao, filtroSituacaoVinculo, pagina)
             }
           >
             Tentar novamente
@@ -835,8 +947,42 @@ export function ColaboradoresScreen() {
             id="colaboradores-lista-titulo"
             className="colaboradores-screen__section-title"
           >
-            Colaboradores desta empresa
+            {empresaAtiva
+              ? `Colaboradores de ${empresaAtiva.nome}`
+              : "Colaboradores desta empresa"}
           </h2>
+
+          {/* T164 — contexto e tamanho do conjunto, lado a lado.
+
+              O total vem do SERVIDOR, do mesmo `total` que paginou a consulta.
+              Não é `colaboradores.length`: esse número seria o da página, e
+              exibi-lo como total faria "20" significar "vinte pessoas" numa
+              empresa com duzentas.
+
+              Não há contagem por situação porque a API não a oferece — só o
+              total do conjunto já filtrado. Desenhar contadores por faixa
+              exigiria somá-los no cliente, o que obrigaria a baixar tudo. */}
+          <p className="colaboradores-screen__contexto">
+            {empresaAtiva ? (
+              <span className="colaboradores-screen__empresa">
+                {empresaAtiva.nome}{" "}
+                <span className="colaboradores-screen__empresa-codigo">
+                  ({empresaAtiva.codigo})
+                </span>
+              </span>
+            ) : null}
+            {/* Sem `role="status"`: a tela ja tem duas regioes vivas - a
+                mensagem de carregamento e a posicao da paginacao. Uma terceira
+                faria o leitor de tela anunciar o total a cada filtro, por cima
+                das outras duas, e tres avisos simultaneos nao informam: atropelam. */}
+            <span className="colaboradores-screen__total">
+              {statusCarregamento === "dados"
+                ? total === 1
+                  ? "1 colaborador no filtro atual"
+                  : `${total} colaboradores no filtro atual`
+                : "Contando…"}
+            </span>
+          </p>
 
           <div className="colaboradores-screen__filtros">
             <FormField id="colaboradores-filtro-situacao" label="Situação">
@@ -912,6 +1058,55 @@ export function ColaboradoresScreen() {
               rowKey={(c) => c.id}
             />
           )}
+
+          {/* T164, com a correção R-2 da revisão adversarial.
+
+              A navegação fica FORA do ramo que troca durante o carregamento.
+              Antes ela vivia junto da tabela, dentro do `else`: acionar
+              "Próxima página" desmontava o botão que tinha o foco, e o foco
+              caía no `<body>` — quem navega por teclado perdia a posição a
+              cada troca de página e tinha de tabular de volta.
+
+              Os controles ficam inertes por `aria-disabled`, e não por
+              `disabled`. A diferença é exatamente o ponto: um botão
+              `disabled` que tem o foco também o perde, porque deixa de ser
+              focalizável. Com `aria-disabled` ele permanece no foco e na
+              ordem de tabulação, anuncia o estado ao leitor de tela, e quem
+              recusa a ação é `irParaPagina` — que já retorna cedo quando a
+              página é inválida ou há carga em voo.
+
+              `aria-busy` no `<nav>` informa o carregamento sem depender de o
+              texto mudar. */}
+          {totalPaginas > 1 ? (
+            <nav
+              className="colaboradores-screen__paginacao"
+              aria-label="Paginação de colaboradores"
+              aria-busy={carregando}
+            >
+              <Button
+                variant="secondary"
+                onClick={() => irParaPagina(pagina - 1)}
+                aria-disabled={pagina <= 1 || carregando}
+              >
+                Página anterior
+              </Button>
+              <span
+                role="status"
+                className="colaboradores-screen__paginacao-posicao"
+              >
+                {carregando
+                  ? "Carregando página…"
+                  : `Página ${pagina} de ${totalPaginas}`}
+              </span>
+              <Button
+                variant="secondary"
+                onClick={() => irParaPagina(pagina + 1)}
+                aria-disabled={pagina >= totalPaginas || carregando}
+              >
+                Próxima página
+              </Button>
+            </nav>
+          ) : null}
         </section>
       )}
 

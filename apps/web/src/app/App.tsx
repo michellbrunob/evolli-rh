@@ -207,6 +207,9 @@ function conteudoDoDestino(
   onPortalTituloIdChange: (tituloId: string) => void,
   onRelatoriosTituloIdChange: (tituloId: string) => void,
   onSessaoAtualEncerrada: () => void,
+  // T164 — ultimo parametro de proposito: acrescentar no fim preserva todas as
+  // posicoes existentes, entao nenhuma chamada muda de significado por engano.
+  empresaAtiva: { readonly nome: string; readonly codigo: string } | null,
 ) {
   if (destinoId === "inicio") {
     return <InicioVisaoGeralScreen onNavegar={onNavegar} />;
@@ -223,7 +226,12 @@ function conteudoDoDestino(
     );
   }
   if (destinoId === "pessoas") {
-    return <PessoasScreen onTituloIdChange={onPessoasTituloIdChange} />;
+    return (
+      <PessoasScreen
+        onTituloIdChange={onPessoasTituloIdChange}
+        empresaAtiva={empresaAtiva}
+      />
+    );
   }
   // T159 — os destinos `*-demonstracao` reusam o MESMO contêiner, em modo
   // demonstrativo. Nenhuma tela foi duplicada: o que muda é qual subconjunto
@@ -386,6 +394,15 @@ export interface AppProps {
    *
    * Destino demonstrativo é aceito de qualquer papel: ele não chama a API.
    */
+  /**
+   * T164 — a empresa de trabalho ATIVA, para as telas que precisam dizer em
+   * qual empresa o que está na tela foi lido. Desce do `AutenticacaoApp`, que
+   * já tem o ator; nenhuma tela faz leitura própria para obtê-la.
+   *
+   * É contexto, nunca controle: a troca acontece no Hub, e só para os papéis
+   * que o servidor autoriza.
+   */
+  empresaAtiva?: { readonly nome: string; readonly codigo: string } | null;
   destinoInicial?: string | null;
   /**
    * T162 — volta ao Hub. Ausente significa que não há Hub acima deste shell
@@ -399,6 +416,7 @@ export function App({
   onSessaoAtualEncerrada,
   mfaDisponivel = false,
   papelDoAtor = null,
+  empresaAtiva = null,
   destinoInicial = null,
   onVoltarAoHub,
 }: AppProps = {}) {
@@ -730,6 +748,7 @@ export function App({
             setPortalTituloId,
             setRelatoriosTituloId,
             () => onSessaoAtualEncerrada?.(),
+            empresaAtiva,
           )}
         </main>
       </div>

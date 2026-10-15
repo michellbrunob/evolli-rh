@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "constitutionVersion": "1.4.0",
-  "lastConvergedAt": "2026-10-14",
-  "lastIntegratedTask": 162,
-  "lastRecordedTask": 163,
+  "lastConvergedAt": "2026-10-15",
+  "lastIntegratedTask": 163,
+  "lastRecordedTask": 164,
   "platformDecision": {
     "adr": "docs/adr/0014-evolli-plataforma-base-e-encerramento-do-frappe.md",
     "decidedAt": "2026-10-01",
@@ -11,15 +11,15 @@
     "frappe": "encerrado_como_candidato_referencia_apenas"
   },
   "nextTask": {
-    "id": "T163",
-    "status": "contexto_empresarial_ativo",
-    "reason": "T162 integrada em main pela PR #154 (squash 61e5f9005e072a7e5583fb2ffbaa722240ea0ff9), com a CI de push 3/3 verde. O Hub pos-login entrou mostrando so o que o servidor autoriza - e entrou SEM entregar troca de empresa, porque nao havia contrato: a empresa era access_user.companyId, coluna fixa da conta. A T163 cria esse contrato. Regra de negocio aprovada: rh e master_tecnico escolhem uma empresa de trabalho SOMENTE entre as empresas que o servidor autoriza; gestor, colaborador e demais papeis ficam restritos a empresa do proprio vinculo; toda leitura e toda mutacao usam o contexto empresarial ativo resolvido no servidor; o navegador nunca e autoridade para definir empresa nem carrega dados de varias empresas para filtrar localmente; e toda troca deixa trilha de auditoria. A associacao usuario-empresa passa a ser de servidor e auditavel, a empresa ativa vive na sessao (nunca em localStorage, query string, cookie escrito pelo frontend ou parametro livre de rota), e companyId enviado pelo cliente nunca amplia escopo. Destino inexistente, empresa nao autorizada e associacao revogada seguem o padrao anti-enumeracao ja usado pelo produto. A ressalva R-2 da revisao da T162 foi RESOLVIDA por esta tarefa: o Hub lia GET /v1/empresas a cada montagem, e registrarConsultaAmpla gravava um registro de auditoria por visita; agora o Hub nao importa mais organizacaoClient, a empresa ativa vem de GET /v1/users/me pelo campo empresaAtiva, ha teste-guarda que reprova se organizacaoClient voltar, e a medicao de navegador contou ZERO chamadas a /v1/empresas na sessao. A ressalva R-3 da T162 CONTINUA ABERTA e nao foi tratada aqui: e o dp podendo esbarrar em tabela_horario por interacao dentro de Jornada, defeito pre-existente da tela, nao introduzido pela T162. Seguem abertas e intocadas: S2 da T161, R1 a R3 da T160, a divida L3 de paginacao, S-1 a S-4 da T158, R-A, R-B e R-C da T157, e o registro teste michell do banco de demonstracao."
+    "id": "T164",
+    "status": "pessoas_colaboradores_consulta_operacional",
+    "reason": "T163 integrada em main pela PR #155 (squash 0da0950289dfb3d6104206471ade75a74ff2827a), com a CI de push 3/3 verde. A empresa de trabalho deixou de ser coluna da conta e passou a ser contexto de sessao resolvido e revalidado no servidor; selecao de empresa existe apenas para rh e master_tecnico. A T164 entrega a PRIMEIRA FATIA OPERACIONAL DE COLABORADORES, e ela e exclusivamente DE CONSULTA. Mostra titulo com a empresa ativa, o total devolvido pelo servidor, os dois filtros que a API realmente suporta (situacao do colaborador e situacao do vinculo), tabela com Nome, Situacao e data de cadastro em padrao brasileiro, paginacao real e os estados de carregamento, vazio, erro e nova tentativa. Troca de empresa no Hub recarrega a tela sem dado residual. QUATRO LIMITACOES DE CONTRATO foram levantadas na fonte e sao respeitadas em vez de contornadas: nao ha busca por nome ou matricula; nao ha contagem agregada por situacao, so o total do conjunto ja filtrado; a projecao da listagem traz apenas id, nome, situacao, criadoEm e atualizadoEm; e matricula, cargo, departamento e admissao vivem no vinculo, alcancaveis so por uma chamada por pessoa - entao nao entram, porque N+1 e proibido e inventar coluna vazia seria promessa falsa. Qualquer um desses campos depois exigira projecao propria no servidor. FORA DE ESCOPO, por decisao do proprietario: novo colaborador, cadastro, edicao, exclusao, admissao, desligamento, importacao em massa, exportacao, solicitacao de preenchimento, link de preenchimento, autopreenchimento pelo funcionario e banco de horas na tabela, que e capacidade de DP e depende de contrato proprio. O proximo ciclo e o cadastro, preenchido exclusivamente pelo RH. Seguem abertas e intocadas: R-3 da T162 (dp/Jornada e tabela de horario), S2 da T161, R1 a R3 da T160, a divida L3 de paginacao, S-1 a S-4 da T158, R-A a R-C da T157 e o registro teste michell do banco de demonstracao."
   },
   "openDeliveries": [
     {
-      "id": "T163",
+      "id": "T164",
       "pullRequest": null,
-      "status": "contexto_empresarial_ativo_em_implementacao"
+      "status": "colaboradores_consulta_operacional_em_implementacao"
     }
   ],
   "requiredArtifacts": [

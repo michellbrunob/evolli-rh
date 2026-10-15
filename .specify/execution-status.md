@@ -1247,11 +1247,11 @@ por decisão do proprietário.
 **Dívidas preservadas:** **S2** (T161), **R1, R2 e R3** (T160), **L3**, **S-1 a
 S-4** (T158), **R-A a R-C** (T157) e o registro `teste michell`.
 
-## Contexto empresarial ativo e troca segura — T163 (backend + web)
+## Contexto empresarial ativo e troca segura — T163 (integrada)
 
-| Tarefa | Estado               | Resultado principal                                                                    |
-| ------ | -------------------- | -------------------------------------------------------------------------------------- |
-| T163   | **Em implementação** | A empresa de trabalho passa a ser contexto de sessão resolvido e auditado no servidor. |
+| Tarefa | Estado                                    | Resultado principal                                                                    |
+| ------ | ----------------------------------------- | -------------------------------------------------------------------------------------- |
+| T163   | **Integrada** (PR #155, squash `0da0950`) | A empresa de trabalho passa a ser contexto de sessão resolvido e auditado no servidor. |
 
 **O que a T162 deixou explicitamente em aberto.** O Hub entrou sem troca de
 empresa porque **não havia contrato**: a empresa era `access_user.companyId`,
@@ -1296,6 +1296,55 @@ passou a vir de `/v1/users/me`, há teste-guarda contra o retorno de
 tabela de horário), **S2** (T161, confinamento da repetição pós-deadlock sem
 teste próprio), **R1 a R3** (T160), **L3**, **S-1 a S-4** (T158), **R-A a R-C**
 (T157) e o registro `teste michell`.
+
+**Desfecho.** Entrou com a CI de push 3/3 verde no squash `0da0950`. A revisão
+adversarial confirmou, contra a fonte: os **7** resolvedores de leitura ficaram
+sob `atorOperaEmEscopoGlobal`, os de **mutação** continuam recusando quem não é
+`rh`/`dp`, e nenhum serviço de domínio lê `contaEmpresaId` — logo toda leitura e
+toda mutação operam na empresa ativa.
+
+## Colaboradores: primeira fatia operacional — T164 (interface web)
+
+| Tarefa | Estado               | Resultado principal                                                              |
+| ------ | -------------------- | -------------------------------------------------------------------------------- |
+| T164   | **Em implementação** | A primeira tela de Colaboradores que é produto, e não maquete — e é só consulta. |
+
+**A fatia é exclusivamente de consulta operacional.** Ficam **fora de escopo**,
+por decisão do proprietário: novo colaborador, cadastro, edição, exclusão,
+admissão, desligamento, importação em massa, exportação, solicitação de
+preenchimento, link de preenchimento, autopreenchimento pelo funcionário e
+banco de horas na tabela — este último é capacidade de **DP** e depende de
+contrato próprio. O **próximo** ciclo é o cadastro, preenchido exclusivamente
+pelo RH; o funcionário não preenche dado cadastral nesta etapa.
+
+**O que a tela entrega:** título com a empresa ativa, o **total devolvido pelo
+servidor**, os filtros de situação do colaborador e situação do vínculo, tabela
+com **Nome, Situação e data de cadastro** em padrão brasileiro, paginação real
+e os estados de carregamento, vazio, erro e nova tentativa. Trocar de empresa
+no Hub recarrega a tela **sem dado residual**.
+
+### Quatro limitações de contrato, respeitadas em vez de contornadas
+
+Levantadas na fonte antes de desenhar a tela:
+
+| Limitação                                                                                | Consequência na tela                                                |
+| ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `GET /v1/colaboradores` **não tem busca** por nome ou matrícula                          | sem caixa de busca                                                  |
+| **Não há contagem agregada** por situação — só o `total` do conjunto já filtrado         | sem contadores por faixa                                            |
+| A projeção da lista traz **só** `id`, `nome`, `situacao`, `criadoEm`, `atualizadoEm`     | só as colunas que existem                                           |
+| Matrícula, cargo, departamento e admissão vivem no **vínculo**, a uma chamada por pessoa | não entram: **N+1 é proibido**, e coluna vazia seria promessa falsa |
+
+A regra é a mesma da T159 e da T162: **controle aparente é promessa**. Desenhar
+busca que não filtra, ou contador que não conta, seria pior que não ter. Se
+algum desses campos for necessário depois, exigirá **projeção própria no
+servidor** — outra tarefa, com contrato próprio.
+
+**Referência visual:** usada apenas como princípio de clareza de tabela e
+hierarquia de ações. Sem copiar marca, texto, paleta, layout ou componente de
+terceiro.
+
+**Dívidas preservadas:** **R-3** (T162), **S2** (T161), **R1 a R3** (T160),
+**L3**, **S-1 a S-4** (T158), **R-A a R-C** (T157) e o registro `teste michell`.
 
 ## Próxima ação autorizável
 

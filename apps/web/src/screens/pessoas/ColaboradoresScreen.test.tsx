@@ -251,6 +251,10 @@ describe("ColaboradoresScreen (T111 — funcional)", () => {
     await waitFor(() =>
       expect(listarColaboradores).toHaveBeenLastCalledWith({
         situacao: "ativo",
+        // T164 — a paginacao viaja JUNTO com o filtro, e volta a pagina 1:
+        // filtrar muda o conjunto, e a posicao dentro dele nao sobrevive.
+        pagina: 1,
+        tamanhoPagina: 20,
       }),
     );
   });
@@ -266,6 +270,8 @@ describe("ColaboradoresScreen (T111 — funcional)", () => {
     await waitFor(() =>
       expect(listarColaboradores).toHaveBeenLastCalledWith({
         situacaoVinculo: "previsto",
+        pagina: 1,
+        tamanhoPagina: 20,
       }),
     );
   });
@@ -397,7 +403,10 @@ describe("ColaboradoresScreen (T111 — funcional)", () => {
     expect(vi.mocked(listarColaboradores).mock.calls.length).toBe(
       chamadasAntes + 1,
     );
-    expect(listarColaboradores).toHaveBeenLastCalledWith({});
+    expect(listarColaboradores).toHaveBeenLastCalledWith({
+      pagina: 1,
+      tamanhoPagina: 20,
+    });
   });
 
   it("exige departamento antes de liberar a seleção de área, e envia ambos ao admitir", async () => {
@@ -1605,5 +1614,495 @@ describe("ColaboradoresScreen (T147 — homologação da admissão)", () => {
     expect(within(tabela).queryByText("2026-01-05T00:00:00.000Z")).toBeNull();
     // O dia NÃO recua: 05, nunca 04/01/2026.
     expect(within(tabela).queryByText("04/01/2026")).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T164 — primeira fatia operacional: paginação real, total do servidor,
+// data de cadastro e contexto de empresa.
+//
+// O defeito que esta fatia corrige é silencioso e por isso perigoso: a tela
+// pedia a lista SEM página, recebia a primeira e descartava o `total`. A
+// partir do vigésimo primeiro colaborador, as pessoas seguintes simplesmente
+// não existiam na interface — e nada sugeria que houvesse mais. Uma lista que
+// esconde registros é pior que uma vazia, porque parece completa.
+// ---------------------------------------------------------------------------
+
+/** Resposta paginada com página e total escolhidos — o servidor manda. */
+function pagina<T>(
+  itens: T[],
+  paginaAtual: number,
+  total: number,
+): ResultadoPaginadoTeste<T> {
+  return { itens, pagina: paginaAtual, tamanhoPagina: 20, total };
+}
+
+describe("T164 — paginação real", () => {
+  it("pede a primeira página com tamanho explícito já na montagem", async () => {
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+
+    expect(listarColaboradores).toHaveBeenCalledWith({
+      pagina: 1,
+      tamanhoPagina: 20,
+    });
+  });
+
+  it("mostra a posição e avança para a página seguinte", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue(
+      pagina([colaborador1, colaborador2], 1, 45),
+    );
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+
+    // 45 registros em páginas de 20 são três páginas — a terceira com cinco.
+    // Re-consultado a cada asserção: a referência capturada antes do
+    // re-render aponta para um nó que o React já substituiu.
+    const navegacao = () =>
+      screen.getByRole("navigation", { name: "Paginação de colaboradores" });
+    expect(navegacao()).toHaveTextContent("Página 1 de 3");
+
+    vi.mocked(listarColaboradores).mockResolvedValue(
+      pagina([colaborador2], 2, 45),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Próxima página" }));
+
+    await waitFor(() =>
+      expect(listarColaboradores).toHaveBeenLastCalledWith({
+        pagina: 2,
+        tamanhoPagina: 20,
+      }),
+    );
+    await waitFor(() => expect(navegacao()).toHaveTextContent("Página 2 de 3"));
+  });
+
+  it("a posição vem da RESPOSTA, não do que a tela pediu", async () => {
+    // Servidor devolve a página 1 embora a tela tenha pedido a 2 — pode
+    // acontecer se o conjunto encolher entre uma leitura e outra. Guardar o
+    // que foi pedido deixaria o rodapé mentindo sobre onde a pessoa está.
+    vi.mocked(listarColaboradores).mockResolvedValue(
+      pagina([colaborador1], 1, 45),
+    );
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+
+    vi.mocked(listarColaboradores).mockResolvedValue(
+      pagina([colaborador1], 1, 21),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Próxima página" }));
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole("navigation", { name: "Paginação de colaboradores" }),
+      ).toHaveTextContent("Página 1 de 2"),
+    );
+  });
+
+  it("nos extremos, o botão correspondente fica desabilitado", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue(
+      pagina([colaborador1], 1, 25),
+    );
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+
+    // `aria-disabled`, e nao `disabled`: um botao desabilitado de verdade sai
+    // da ordem de tabulacao e PERDE o foco ao ser desabilitado — que e
+    // exatamente o defeito da R-2. Inerte, mas focalizavel.
+    expect(
+      screen.getByRole("button", { name: "Página anterior" }),
+    ).toHaveAttribute("aria-disabled", "true");
+    expect(
+      screen.getByRole("button", { name: "Próxima página" }),
+    ).toHaveAttribute("aria-disabled", "false");
+
+    vi.mocked(listarColaboradores).mockResolvedValue(
+      pagina([colaborador2], 2, 25),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Próxima página" }));
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Próxima página" }),
+      ).toHaveAttribute("aria-disabled", "true"),
+    );
+    expect(
+      screen.getByRole("button", { name: "Página anterior" }),
+    ).toHaveAttribute("aria-disabled", "false");
+  });
+
+  it("com uma página só, não desenha navegação que não navega", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue(
+      pagina([colaborador1, colaborador2], 1, 2),
+    );
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+
+    expect(
+      screen.queryByRole("navigation", { name: "Paginação de colaboradores" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("trocar de filtro volta para a página 1", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue(
+      pagina([colaborador1], 3, 45),
+    );
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+
+    fireEvent.change(screen.getByLabelText("Situação"), {
+      target: { value: "ativo" },
+    });
+
+    // Sem isto, filtrar na página 3 pediria a página 3 de um conjunto que
+    // talvez tenha uma só — e a lista vazia pareceria "nenhum ativo".
+    await waitFor(() =>
+      expect(listarColaboradores).toHaveBeenLastCalledWith({
+        situacao: "ativo",
+        pagina: 1,
+        tamanhoPagina: 20,
+      }),
+    );
+  });
+});
+
+describe("T164 — total, data e contexto de empresa", () => {
+  it("mostra o total do SERVIDOR, não o tamanho da página", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue(
+      pagina([colaborador1, colaborador2], 1, 45),
+    );
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+
+    // Dois na tela, quarenta e cinco no conjunto. Exibir "2" como total faria
+    // o número mentir sobre o tamanho da empresa.
+    expect(
+      await screen.findByText("45 colaboradores no filtro atual"),
+    ).toBeInTheDocument();
+  });
+
+  it("concorda o singular quando há um só", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue(
+      pagina([colaborador1], 1, 1),
+    );
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+
+    expect(
+      await screen.findByText("1 colaborador no filtro atual"),
+    ).toBeInTheDocument();
+  });
+
+  it("exibe a data de cadastro em padrão brasileiro, nunca ISO", async () => {
+    render(<ColaboradoresScreen />);
+    const tabela = await screen.findByRole("table", {
+      name: "Colaboradores desta empresa",
+    });
+
+    expect(
+      screen.getByRole("columnheader", { name: "Cadastrado em" }),
+    ).toBeInTheDocument();
+    // `criadoEm` é 2025-01-10T12:00:00.000Z — meio-dia UTC é 09:00 em
+    // São Paulo, o fuso de negócio do formatador central.
+    expect(tabela).toHaveTextContent("10/01/2025");
+    expectSemIsoVisivel(tabela);
+  });
+
+  it("nomeia a empresa ativa quando o shell a informa", async () => {
+    render(
+      <ColaboradoresScreen
+        empresaAtiva={{ nome: "Empresa Demo Alfa", codigo: "DEMOALFA" }}
+      />,
+    );
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+
+    expect(
+      screen.getByRole("heading", {
+        name: "Colaboradores de Empresa Demo Alfa",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("(DEMOALFA)")).toBeInTheDocument();
+  });
+
+  it("sem empresa informada, não inventa nome", async () => {
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+
+    expect(
+      screen.getByRole("heading", { name: "Colaboradores desta empresa" }),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("T164 — o que NÃO existe nesta fatia", () => {
+  /**
+   * A fatia é de consulta, e a API não oferece busca nem contagem por
+   * situação. Controle aparente é promessa: uma caixa que não filtra ou um
+   * contador que não conta são piores que a ausência deles, porque parecem
+   * funcionar. Este bloco prende essa decisão.
+   */
+  it("não há caixa de busca — a API não tem busca por nome ou matrícula", async () => {
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+
+    expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
+    for (const campo of screen.queryAllByRole("textbox")) {
+      expect(campo.getAttribute("placeholder") ?? "").not.toMatch(
+        /buscar|pesquisar/i,
+      );
+    }
+  });
+
+  it("não há contadores por situação — a API só devolve o total do filtro", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue(
+      pagina([colaborador1, colaborador2], 1, 45),
+    );
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+
+    const corpo = document.body.textContent ?? "";
+    expect(corpo).not.toMatch(/\bAtivos\s*\(?\d/i);
+    expect(corpo).not.toMatch(/\bInativos\s*\(?\d/i);
+  });
+
+  it("a tabela não promete matrícula, cargo, departamento nem admissão", async () => {
+    // Esses campos vivem no VÍNCULO, a uma chamada por pessoa. Entrariam só
+    // por N+1 — proibido — ou por coluna vazia, que é promessa falsa.
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+
+    const cabecalhos = screen
+      .getAllByRole("columnheader")
+      .map((c) => c.textContent?.trim() ?? "");
+    expect(cabecalhos).toEqual(["Nome", "Situação", "Cadastrado em", "Ações"]);
+  });
+
+  it("uma montagem da lista é UMA requisição — nada de N+1 por pessoa", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue(
+      pagina([colaborador1, colaborador2], 1, 2),
+    );
+    // Delta, e não total: este arquivo não limpa os mocks entre casos, então
+    // um número absoluto mediria a suíte inteira em vez desta montagem.
+    const antes = vi.mocked(listarColaboradores).mock.calls.length;
+    const antesVinculos = vi.mocked(listarVinculosDoColaborador).mock.calls
+      .length;
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+
+    expect(vi.mocked(listarColaboradores).mock.calls.length - antes).toBe(1);
+    // O vínculo só é lido quando alguém abre o detalhe de UMA pessoa — montar
+    // a lista com duas não dispara nenhuma leitura de vínculo.
+    expect(
+      vi.mocked(listarVinculosDoColaborador).mock.calls.length - antesVinculos,
+    ).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// R-1 e R-2 — ressalvas da revisão adversarial da PR #156.
+//
+// Os dois blocos abaixo FALHAM na versão anterior da tela: o primeiro porque
+// a contagem de páginas usava uma constante local em vez do tamanho que o
+// servidor aplicou; o segundo porque a navegação vivia dentro do ramo que
+// desmonta durante o carregamento, levando o foco junto.
+// ---------------------------------------------------------------------------
+
+describe("R-1 — a contagem de páginas segue o tamanho que o SERVIDOR aplicou", () => {
+  it("servidor servindo de 10 em 10: 45 registros são 5 páginas, não 3", async () => {
+    // Pedimos 20 e o servidor aplicou 10. Contar com a constante daria
+    // ceil(45/20) = 3 — e as páginas 4 e 5 ficariam inalcançáveis.
+    vi.mocked(listarColaboradores).mockResolvedValue({
+      itens: [colaborador1],
+      pagina: 1,
+      tamanhoPagina: 10,
+      total: 45,
+    });
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+
+    expect(
+      screen.getByRole("navigation", { name: "Paginação de colaboradores" }),
+    ).toHaveTextContent("Página 1 de 5");
+  });
+
+  it("servidor servindo de 50 em 50: 45 registros são uma página só", async () => {
+    // Com a constante, ceil(45/20) = 3 páginas — e as duas últimas voltariam
+    // vazias, porque o servidor já mandou tudo na primeira.
+    vi.mocked(listarColaboradores).mockResolvedValue({
+      itens: [colaborador1, colaborador2],
+      pagina: 1,
+      tamanhoPagina: 50,
+      total: 45,
+    });
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+
+    expect(
+      screen.queryByRole("navigation", { name: "Paginação de colaboradores" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["ausente", undefined],
+    ["zero", 0],
+    ["negativo", -20],
+    ["fracionário", 7.5],
+    ["não numérico", "20"],
+    ["não finito", Number.POSITIVE_INFINITY],
+  ])(
+    "tamanhoPagina %s cai no tamanho pedido, sem inventar paginação",
+    async (_nome, valor) => {
+      vi.mocked(listarColaboradores).mockResolvedValue({
+        itens: [colaborador1],
+        pagina: 1,
+        tamanhoPagina: valor,
+        total: 45,
+      } as never);
+      render(<ColaboradoresScreen />);
+      await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+
+      // Volta ao tamanho que a tela pediu: ceil(45/20) = 3. Nunca Infinity,
+      // NaN ou divisão por zero.
+      expect(
+        screen.getByRole("navigation", { name: "Paginação de colaboradores" }),
+      ).toHaveTextContent("Página 1 de 3");
+    },
+  );
+});
+
+describe("R-2 — trocar de página não derruba o foco", () => {
+  /** Resolve a próxima listagem só quando quisermos — segura o carregamento. */
+  function listagemControlada(
+    resposta: ResultadoPaginadoTeste<ColaboradorApi>,
+  ) {
+    let liberar!: () => void;
+    const promessa = new Promise<ResultadoPaginadoTeste<ColaboradorApi>>(
+      (r) => {
+        liberar = () => r(resposta);
+      },
+    );
+    vi.mocked(listarColaboradores).mockReturnValue(promessa as never);
+    return liberar;
+  }
+
+  it("a navegação NÃO desmonta durante o carregamento", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue(
+      pagina([colaborador1], 1, 45),
+    );
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+
+    const liberar = listagemControlada(pagina([colaborador2], 2, 45));
+    fireEvent.click(screen.getByRole("button", { name: "Próxima página" }));
+
+    // Enquanto a resposta não chega, a navegação continua na tela.
+    await waitFor(() =>
+      expect(
+        screen.getByRole("navigation", { name: "Paginação de colaboradores" }),
+      ).toHaveAttribute("aria-busy", "true"),
+    );
+    expect(
+      screen.getByRole("button", { name: "Próxima página" }),
+    ).toBeInTheDocument();
+
+    liberar();
+    await waitFor(() =>
+      expect(
+        screen.getByRole("navigation", { name: "Paginação de colaboradores" }),
+      ).toHaveTextContent("Página 2 de 3"),
+    );
+  });
+
+  it("o foco permanece no botão acionado — nunca cai no body", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue(
+      pagina([colaborador1], 1, 45),
+    );
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+
+    const proxima = screen.getByRole("button", { name: "Próxima página" });
+    proxima.focus();
+    expect(document.activeElement).toBe(proxima);
+
+    const liberar = listagemControlada(pagina([colaborador2], 2, 45));
+    fireEvent.click(proxima);
+
+    // Durante o carregamento: o foco segue onde a pessoa o deixou.
+    await waitFor(() =>
+      expect(
+        screen.getByRole("navigation", { name: "Paginação de colaboradores" }),
+      ).toHaveAttribute("aria-busy", "true"),
+    );
+    expect(document.activeElement).not.toBe(document.body);
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "Próxima página" }),
+    );
+
+    liberar();
+    // E depois do carregamento também.
+    await waitFor(() =>
+      expect(
+        screen.getByRole("navigation", { name: "Paginação de colaboradores" }),
+      ).toHaveTextContent("Página 2 de 3"),
+    );
+    expect(document.activeElement).not.toBe(document.body);
+  });
+
+  it("durante o carregamento, acionar de novo NÃO dispara outra requisição", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue(
+      pagina([colaborador1], 1, 45),
+    );
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+
+    const liberar = listagemControlada(pagina([colaborador2], 2, 45));
+    const proxima = screen.getByRole("button", { name: "Próxima página" });
+    fireEvent.click(proxima);
+    await waitFor(() =>
+      expect(
+        screen.getByRole("navigation", { name: "Paginação de colaboradores" }),
+      ).toHaveAttribute("aria-busy", "true"),
+    );
+
+    const antes = vi.mocked(listarColaboradores).mock.calls.length;
+    fireEvent.click(screen.getByRole("button", { name: "Próxima página" }));
+    fireEvent.click(screen.getByRole("button", { name: "Página anterior" }));
+
+    // Inerte por `aria-disabled` + guarda em `irParaPagina`: o controle segue
+    // focalizável, mas nenhuma ação nova atravessa.
+    expect(vi.mocked(listarColaboradores).mock.calls.length).toBe(antes);
+    expect(
+      screen.getByRole("button", { name: "Próxima página" }),
+    ).toHaveAttribute("aria-disabled", "true");
+
+    liberar();
+    await waitFor(() =>
+      expect(
+        screen.getByRole("navigation", { name: "Paginação de colaboradores" }),
+      ).toHaveTextContent("Página 2 de 3"),
+    );
+  });
+
+  it("a posição anuncia o carregamento em vez de mentir a página antiga", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue(
+      pagina([colaborador1], 1, 45),
+    );
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+
+    const liberar = listagemControlada(pagina([colaborador2], 2, 45));
+    fireEvent.click(screen.getByRole("button", { name: "Próxima página" }));
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole("navigation", { name: "Paginação de colaboradores" }),
+      ).toHaveTextContent("Carregando página…"),
+    );
+
+    liberar();
+    await waitFor(() =>
+      expect(
+        screen.getByRole("navigation", { name: "Paginação de colaboradores" }),
+      ).toHaveTextContent("Página 2 de 3"),
+    );
   });
 });

@@ -135,6 +135,18 @@ const ABAS: readonly AbaDefinicao[] = [
 
 export interface PessoasScreenProps {
   /**
+   * T164 — a empresa de trabalho ATIVA, resolvida pelo servidor.
+   *
+   * Desce pelo shell em vez de ser lida aqui: o `AutenticacaoApp` já tem o
+   * ator, e pedir `/v1/users/me` de novo seria uma requisição a mais para um
+   * dado que já está em memória. É contexto, nunca controle — quem troca de
+   * empresa é o Hub, e só para os papéis que o servidor autoriza.
+   */
+  readonly empresaAtiva?: {
+    readonly nome: string;
+    readonly codigo: string;
+  } | null;
+  /**
    * T159 — quais abas este contêiner mostra.
    *
    * `funcional` lista só as abas que falam com o servidor; `demonstrativo`,
@@ -155,6 +167,7 @@ export interface PessoasScreenProps {
 export function PessoasScreen({
   onTituloIdChange,
   modo = "funcional",
+  empresaAtiva = null,
 }: PessoasScreenProps) {
   // Só as abas do modo. `ABAS` continua sendo a fonte única; o filtro é
   // de apresentação, e a primeira aba do conjunto vira o padrão — assim
@@ -205,7 +218,7 @@ export function PessoasScreen({
         className="pessoas-screen__panel"
       >
         {abaAtiva === "colaboradores" ? (
-          <ColaboradoresScreen />
+          <ColaboradoresScreen empresaAtiva={empresaAtiva} />
         ) : abaAtiva === "horario" ? (
           <PessoasHorarioScreen />
         ) : abaAtiva === "historico_funcional" ? (
