@@ -1215,17 +1215,29 @@ Estrutura**, porque `tabela_horario` é exclusivo de RH; `gestor` vê um produto
 e **nenhuma** requisição a `/v1/empresas`; `colaborador` vê o aviso de perfil
 sem produto. **Zero 403 em toda a sessão.**
 
-**Duas ressalvas ficaram abertas, e nenhuma foi corrigida:**
+**Duas ressalvas ficaram abertas na entrega da T162. Uma delas já foi
+resolvida pela T163; a outra continua aberta.**
 
-- **R-2** — o Hub lê `GET /v1/empresas` a cada montagem, inclusive a cada
-  retorno pelo botão "Hub". `EmpresaService.listar` chama
-  `registrarConsultaAmpla`, então cada visita grava um registro de auditoria.
-  É leitura legítima do próprio escopo, não vazamento, mas é ruído novo na
-  trilha, proporcional à navegação.
-- **R-3** — `dp` dentro de Jornada ainda pode esbarrar em `tabela_horario` por
-  interação. O mount está limpo (medido: 13 requisições, todas 200), mas
-  `buscarTabelaHorario` é alcançável dentro da tela. **Não foi introduzida pela
-  T162**: o destino `ponto` já era incondicional na barra lateral desde a T159.
+- **R-2 — RESOLVIDA pela T163.** O que foi encontrado: o Hub lia
+  `GET /v1/empresas` a cada montagem, inclusive a cada retorno pelo botão
+  "Hub", e `EmpresaService.listar` chama `registrarConsultaAmpla` — um
+  registro de auditoria por visita. Era leitura legítima do próprio escopo,
+  não vazamento, mas ruído novo na trilha, proporcional à navegação.
+
+  Como foi resolvida, e a evidência de cada parte:
+
+  | O que mudou                                                   | Evidência                                                                            |
+  | ------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+  | O Hub **não chama mais** `/v1/empresas` ao montar             | `HubPosLogin.tsx` não importa `organizacaoClient`                                    |
+  | A **empresa ativa** (nome e código) vem de `GET /v1/users/me` | campo `empresaAtiva`, leitura direta por id, sem consulta ampla                      |
+  | **Teste-guarda** contra reincidência                          | varre o próprio módulo e reprova se `organizacaoClient` ou `listarEmpresas` voltarem |
+  | Medição no navegador                                          | **zero** chamadas a `/v1/empresas` em toda a sessão                                  |
+
+- **R-3 — CONTINUA ABERTA.** `dp` dentro de Jornada ainda pode esbarrar em
+  `tabela_horario` por interação. O mount está limpo (medido: 13 requisições,
+  todas 200), mas `buscarTabelaHorario` é alcançável dentro da tela. **Não foi
+  introduzida pela T162**: o destino `ponto` já era incondicional na barra
+  lateral desde a T159. A T163 **não** a tratou.
 
 **Uma divergência registrada em vez de escondida:** a mensagem do squash em
 `main` diz "1530 no web, 38 novos"; a contagem correta é **37** (28 + 7 + 2),
@@ -1275,9 +1287,15 @@ publicar. Nada de seletor ou endpoint fingido.
 colaborador, sem transformar Demonstração em produto. A tela de login só muda
 no estritamente necessário ao contrato de sessão.
 
-**Dívidas preservadas:** **R-2** e **R-3** (T162), **S2** (T161), **R1 a R3**
-(T160), **L3**, **S-1 a S-4** (T158), **R-A a R-C** (T157) e o registro
-`teste michell`.
+**R-2 da T162: resolvida por esta tarefa**, com a evidência registrada na
+seção da T162 — o Hub deixou de ler `/v1/empresas` ao montar, a empresa ativa
+passou a vir de `/v1/users/me`, há teste-guarda contra o retorno de
+`organizacaoClient` e a medição de navegador contou **zero** chamadas à rota.
+
+**Dívidas preservadas, nenhuma tratada aqui:** **R-3** (T162, `dp`/Jornada e
+tabela de horário), **S2** (T161, confinamento da repetição pós-deadlock sem
+teste próprio), **R1 a R3** (T160), **L3**, **S-1 a S-4** (T158), **R-A a R-C**
+(T157) e o registro `teste michell`.
 
 ## Próxima ação autorizável
 

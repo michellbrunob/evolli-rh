@@ -1374,11 +1374,18 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
     - **Estado:** **integrada** em `main` pela PR #154, squash
       `61e5f9005e072a7e5583fb2ffbaa722240ea0ff9`, com a CI de push 3/3 verde.
       Branch `codex/t162-hub-pos-login` preservada.
-    - **Ressalvas abertas (revisão adversarial):** **R-2** — o Hub lê
-      `GET /v1/empresas` a cada montagem, e `registrarConsultaAmpla` grava um
-      registro de auditoria por visita; **R-3** — `dp` dentro de Jornada pode
-      esbarrar em `tabela_horario` por interação (o mount está limpo; defeito
-      pré-existente da tela, não introduzido pela T162). Nenhuma foi corrigida.
+    - **Ressalvas da revisão adversarial, e o estado de cada uma:**
+      - **R-2 — RESOLVIDA pela T163.** O Hub lia `GET /v1/empresas` a cada
+        montagem, e `registrarConsultaAmpla` gravava um registro de auditoria
+        por visita. A T163 removeu a leitura: o Hub não importa mais
+        `organizacaoClient`, a empresa ativa vem de `GET /v1/users/me`
+        (`empresaAtiva`), há teste-guarda que reprova se `organizacaoClient`
+        voltar, e a medição de navegador contou **zero** chamadas a
+        `/v1/empresas` na sessão.
+      - **R-3 — ABERTA.** `dp` dentro de Jornada pode esbarrar em
+        `tabela_horario` por interação (o mount está limpo; defeito
+        pré-existente da tela, não introduzido pela T162). **A T163 não a
+        tratou.**
     - **Objetivo:** depois do login e da resolução segura do ator, a pessoa
       entra primeiro no Hub, não direto no shell de módulos. O Hub mostra
       **somente** produtos que o servidor autoriza no contexto atual.
@@ -1436,8 +1443,10 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
     - **Hub:** só muda depois de o contrato existir. `rh` e administrador veem a
       empresa ativa e um seletor acessível; a troca recarrega Hub e módulos no
       novo contexto, sem reter dado da empresa anterior; gestor/colaborador
-      continuam com texto não editável. **R-2 só pode ser declarada resolvida
-      com evidência.**
+      continuam com texto não editável — mas passam a **ver o nome da própria
+      empresa**, vindo de `empresaAtiva`; isso não amplia escopo nem autoriza
+      troca. **R-2 foi declarada resolvida COM evidência**, conforme exigido:
+      ver o estado das ressalvas na entrada da T162 acima.
     - **Prova de isolamento exigida:** duas empresas sintéticas distintas —
       funcionário da empresa B não aparece na D, e o da D não aparece na B.
     - **Parada obrigatória:** se o contexto não puder ser aplicado centralmente
@@ -1446,8 +1455,10 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
     - **Limite:** sem novos módulos de RH/DP, cartão fictício, portal do
       colaborador ou funcionalidade demonstrativa; login só muda no
       estritamente necessário ao contrato de sessão.
-    - **Dívida preservada:** R-2 e R-3 (T162), S2 (T161), R1 a R3 (T160), L3,
-      S-1 a S-4 (T158), R-A a R-C (T157) e o registro `teste michell`.
+    - **Resolvida por esta tarefa:** R-2 (T162), com evidência registrada.
+    - **Dívida preservada, nenhuma tratada aqui:** R-3 (T162, `dp`/Jornada e
+      tabela de horário), S2 (T161), R1 a R3 (T160), L3, S-1 a S-4 (T158),
+      R-A a R-C (T157) e o registro `teste michell`.
 
 ## Regra obrigatória para as próximas tarefas
 
