@@ -282,6 +282,9 @@ export function AutenticacaoApp() {
       onSessaoAtualEncerrada={encerrarSessaoLocalmente}
       mfaDisponivel={ator.mfaAvailable === true}
       papelDoAtor={ator.role}
+      // T164 — a empresa ATIVA desce para as telas que precisam dizer em qual
+      // empresa o que esta visivel foi lido. Mesma fonte do Hub: o ator.
+      empresaAtiva={ator.empresaAtiva ?? null}
       destinoInicial={destinoAberto}
       onVoltarAoHub={() => setDestinoAberto(null)}
     />
