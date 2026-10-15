@@ -1519,6 +1519,30 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       em duas etapas (exige ADR de modelo); C melhorias no formulário atual;
       D cobrir com teste a negação de mutação ao `master_tecnico`; E projeção
       própria da listagem.
+    - **DECISÃO DO PROPRIETÁRIO, registrada (não autoriza implementação):**
+      - o fluxo passa a se chamar **"Admitir colaborador"**, porque criação,
+        primeiro vínculo e empresa ativa são **atômicos** — o **B1 vira
+        premissa**;
+      - **`rh` e `dp` admitem**; `master_tecnico` não cria, edita nem admite
+        pessoas; o funcionário não recebe link nem autopreenchimento. **Resolve
+        o B2 a favor do contrato atual, sem mudar RBAC**;
+      - o formulário será **progressivo**, em cinco blocos: admissão e vínculo;
+        dados pessoais e contatos; organização; documentos e dados bancários;
+        dependentes e complementos. **Só o primeiro tem contrato hoje**;
+      - a **empresa vem da sessão ativa**, como contexto não editável, e não
+        pode ser forjada no corpo;
+      - **CPF, documentos, dados bancários, raça/etnia, deficiência, gênero,
+        foto e dependentes** exigem **finalidade, acesso restrito, auditoria,
+        retenção e contrato próprios** antes de qualquer implementação — o
+        **B3 vira sequência de trabalho**;
+      - as imagens de referência servem só para **agrupamento e clareza**, sem
+        copiar marca, texto, identidade visual, layout, paleta, ícone ou
+        componente.
+    - **Ordem aprovada:** **A** integrar a decisão documental da T165;
+      **B** T166 — ADR de modelo, finalidade e acesso aos dados; **C**
+      contrato, API e migrations; **D** admissão mínima; **E** expansão
+      progressiva dos blocos. O **B4 continua válido**: o formulário atual é o
+      ponto de partida da etapa D, não algo a refazer.
     - **Quem cadastra:** somente `rh` e `master_tecnico`. O funcionário **não**
       preenche, **não** recebe link e **não** participa de autopreenchimento.
     - **Fora de escopo:** importação, exportação, admissão, desligamento,

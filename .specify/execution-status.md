@@ -1366,9 +1366,9 @@ testes que reprovam sem a correção e três mutações verificadas uma a uma:
 
 ## Cadastro de colaborador pelo RH — T165 (interface web)
 
-| Tarefa | Estado                         | Resultado principal                                                                        |
-| ------ | ------------------------------ | ------------------------------------------------------------------------------------------ |
-| T165   | **Parada por regra declarada** | O contrato não permite cadastro sem admissão. Diagnóstico entregue, interface não escrita. |
+| Tarefa | Estado                                             | Resultado principal                                                                                                            |
+| ------ | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| T165   | **Parada por regra declarada; decisão registrada** | O contrato não permite cadastro sem admissão. Diagnóstico entregue, decisão do proprietário registrada, interface não escrita. |
 
 **Quem cadastra:** somente `rh` e `master_tecnico`. O funcionário **não**
 preenche, **não** recebe link e **não** participa de autopreenchimento — a
@@ -1409,6 +1409,52 @@ de que o formulário permitiria escolher empresa diferente da ativa. Medido no
 navegador com conta autorizada em duas empresas, `GET /v1/empresas` devolve
 `total: 1` — só a ativa —, então o seletor nunca aparece. A T163 já havia
 fechado esse buraco.
+
+### A decisão do proprietário, registrada
+
+Veio em resposta ao diagnóstico, e **não autoriza implementação** — fixa o rumo
+para que a próxima tarefa não precise supor.
+
+**O fluxo passa a se chamar "Admitir colaborador".** Criação, primeiro vínculo
+e empresa ativa são **atômicos**; "cadastro" prometia uma etapa separada que o
+modelo nunca teve. O **B1 vira premissa**, não bloqueio.
+
+**Quem admite:** `rh` e `dp`. O `master_tecnico` **não** cria, edita ou admite
+pessoas; o funcionário **não** recebe link nem autopreenchimento. Isso
+**resolve o B2 a favor do contrato que já existe** — nenhuma mudança de RBAC é
+necessária, porque `rh` + `dp` é exatamente o que o avaliador concede hoje.
+
+**O formulário será progressivo**, em cinco blocos: admissão e vínculo; dados
+pessoais e contatos; organização; documentos e dados bancários; dependentes e
+complementos. **Só o primeiro tem contrato hoje.**
+
+**A empresa vem da sessão ativa**, como contexto **não editável**, e não pode
+ser forjada no corpo — que é o que o servidor já garante.
+
+**Dado pessoal exige contrato próprio antes de existir.** CPF, documentos,
+dados bancários, raça/etnia, deficiência, gênero, foto e dependentes só entram
+depois de **finalidade, acesso restrito, auditoria, retenção e contrato**
+declarados. Isso converte o **B3** de bloqueio em **sequência**: os campos
+faltam porque ainda não foram decididos.
+
+**As imagens de referência** servem só como inspiração de agrupamento e
+clareza — sem marca, texto, identidade visual, layout, paleta, ícone ou
+componente copiados.
+
+**A ordem aprovada:**
+
+|       | Etapa                                                   | Natureza                  |
+| ----- | ------------------------------------------------------- | ------------------------- |
+| **A** | Integrar a decisão documental da T165                   | documentação — feito aqui |
+| **B** | **T166** — ADR de modelo, finalidade e acesso aos dados | decisão                   |
+| **C** | Contrato, API e migrations                              | servidor                  |
+| **D** | Admissão mínima                                         | primeira tela real        |
+| **E** | Expansão progressiva dos blocos                         | iterativo                 |
+
+Nenhuma tela é desenhada antes do contrato que a sustenta, e nenhum dado
+pessoal nasce antes da ADR que declara sua finalidade — a mesma disciplina que
+fez esta tarefa parar. O **B4 continua válido**: o formulário atual é o ponto
+de partida da etapa D, não algo a refazer.
 
 **Dívidas preservadas:** **R-3** (T162), **R-3 da revisão da T164**, **S2**
 (T161), **R1 a R3** (T160), **L3**, **S-1 a S-4** (T158), **R-A a R-C** (T157)

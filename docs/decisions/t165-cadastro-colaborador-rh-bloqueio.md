@@ -1,8 +1,13 @@
 # T165 — Cadastro de colaborador pelo RH: diagnóstico de bloqueio
 
-Status: **parada por regra declarada.** Nenhuma interface foi escrita.
+Status: **parada por regra declarada; decisão do proprietário registrada.**
+Nenhuma interface foi escrita.
 Data: 2026-10-15.
 Base: `9df47566c3741bdeff68ae65bd6ffe1191a3a70b` (T164, PR #156).
+
+> **A decisão chegou, e está na §5.** O diagnóstico das §1–§4 é preservado como
+> foi escrito: ele é o que motivou a decisão, e apagá-lo deixaria a escolha sem
+> o problema que a explica.
 
 A tarefa autorizava parar se o contrato não permitisse uma criação correta
 pelo RH **sem inventar campo, relação ou regra**. Não permite — e por quatro
@@ -205,3 +210,108 @@ Kit. **Nenhuma linha de interface, endpoint, migration, campo ou regra.**
 As dívidas seguem abertas: **R-3** (T162), **R-3 da revisão da T164**, **S2**
 (T161), **R1 a R3** (T160), **L3**, **S-1 a S-4** (T158), **R-A a R-C** (T157)
 e o registro `teste michell`.
+
+---
+
+## 5. A decisão do proprietário
+
+Aprovada em 2026-10-15, em resposta ao diagnóstico acima. **Esta seção não
+autoriza implementação** — ela fixa o rumo para que a próxima tarefa não
+precise supor.
+
+### 5.1 O fluxo se chama "Admitir colaborador"
+
+O nome muda porque o modelo nunca permitiu outra coisa: criação do
+colaborador, primeiro vínculo e empresa ativa são **atômicos**, numa só
+transação. Chamar de "cadastro" prometia uma etapa separada que não existe —
+era o **B1** deste documento.
+
+Com isso, o B1 deixa de ser bloqueio e passa a ser **premissa**: a tarefa
+seguinte parte da admissão, não de um cadastro sem vínculo.
+
+### 5.2 Quem admite
+
+| Papel            | Pode admitir?                                      |
+| ---------------- | -------------------------------------------------- |
+| `rh`             | **sim**                                            |
+| `dp`             | **sim**                                            |
+| `master_tecnico` | **não** — não cria, não edita e não admite pessoas |
+| funcionário      | **não** — sem link, sem autopreenchimento          |
+
+Isto **resolve o B2** a favor do contrato que já existe: `rh` + `dp` é
+exatamente o que o `rbac.evaluator` e o `resolverEscopoPessoas` concedem hoje,
+e a negação do `master_tecnico` fica confirmada como regra de produto, não só
+como herança da T030. **Nenhuma mudança de RBAC é necessária.**
+
+Permanece verdadeiro o achado da Fatia D: essa negação **não tem teste
+próprio**. Agora que ela é regra declarada, cobri-la deixa de ser higiene e
+passa a ser proteção de uma decisão.
+
+### 5.3 O formulário será progressivo, em cinco blocos
+
+1. **Admissão e vínculo**
+2. **Dados pessoais e contatos**
+3. **Organização**
+4. **Documentos e dados bancários**
+5. **Dependentes e complementos**
+
+Só o **bloco 1** tem contrato hoje. Os blocos 2 a 5 dependem do que a §5.5
+exige, e nenhum deles pode ser desenhado antes disso.
+
+### 5.4 A empresa vem da sessão
+
+Exclusivamente da **sessão ativa**. Aparece como **contexto não editável** e
+**não pode ser forjada no corpo** da requisição.
+
+O servidor já se comporta assim: `dto.empresaId` nunca é persistido — o escopo
+sai da sessão, e divergência produz **404**. A decisão alinha a interface ao
+que o servidor já garante, em vez de pedir garantia nova.
+
+### 5.5 Dado pessoal exige contrato próprio antes de existir
+
+**CPF, documentos, dados bancários, raça/etnia, deficiência, gênero, foto e
+dependentes** exigem, antes de qualquer implementação:
+
+- **finalidade** declarada;
+- **acesso restrito**;
+- **auditoria**;
+- **retenção**;
+- **contrato próprio**.
+
+Isto converte o **B3** — "não há dado cadastral para cadastrar" — de bloqueio
+em **sequência de trabalho**: os campos faltam porque ainda não foram
+decididos, e serão decididos antes de serem criados. Raça/etnia, deficiência e
+gênero são dado sensível na LGPD, e dado bancário é alvo de fraude; nenhum
+deles entra por conveniência de formulário.
+
+### 5.6 As imagens de referência
+
+Servem **apenas** como inspiração de **agrupamento e clareza**. Não se copia
+marca, texto, identidade visual, layout, paleta, ícone ou componente.
+
+### 5.7 A ordem aprovada
+
+|       | Etapa                                                   | Natureza                   |
+| ----- | ------------------------------------------------------- | -------------------------- |
+| **A** | Integrar a decisão documental da T165                   | documentação — **esta PR** |
+| **B** | **T166** — ADR de modelo, finalidade e acesso aos dados | decisão                    |
+| **C** | Contrato, API e migrations                              | implementação de servidor  |
+| **D** | Admissão mínima                                         | primeira tela real         |
+| **E** | Expansão progressiva dos blocos                         | iterativo                  |
+
+A ordem tem uma propriedade que vale nomear: **nenhuma tela é desenhada antes
+do contrato que a sustenta**, e nenhum dado pessoal nasce antes da ADR que
+declara sua finalidade. É a mesma disciplina que fez esta tarefa parar.
+
+### 5.8 O que a decisão faz com cada bloqueio
+
+| Bloqueio                                    | Destino                                                                                     |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| **B1** — não existe criação sem admissão    | **vira premissa**: o fluxo passa a se chamar "Admitir colaborador"                          |
+| **B2** — papel aprovado não bate com o RBAC | **resolvido** a favor do contrato atual: `rh` + `dp`, sem mudar RBAC                        |
+| **B3** — não há dado cadastral              | **vira sequência**: §5.5 define o que precede a criação dos campos                          |
+| **B4** — a fatia pedida já existe           | **continua válido**: o formulário atual é o ponto de partida da etapa D, não algo a refazer |
+
+A **refutação** registrada na Fatia C permanece: o seletor de empresa do
+formulário atual **não** permite escolher empresa errada, porque
+`GET /v1/empresas` devolve só a ativa.
