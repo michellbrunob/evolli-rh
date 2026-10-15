@@ -1469,9 +1469,9 @@ e o registro `teste michell`.
 
 ## Modelo e governança dos dados de admissão e perfil do colaborador — T166 (ADR)
 
-| Tarefa | Estado           | Resultado principal                                                                                           |
-| ------ | ---------------- | ------------------------------------------------------------------------------------------------------------- |
-| T166   | **Em andamento** | ADR e diagnóstico técnico do modelo, da finalidade e do acesso aos dados de admissão e perfil do colaborador. |
+| Tarefa | Estado                              | Resultado principal                                                                                                |
+| ------ | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| T166   | **ADR proposta; aguarda aprovação** | ADR 0016 e diagnóstico técnico do modelo, da finalidade e do acesso aos dados de admissão e perfil do colaborador. |
 
 **É a etapa B da ordem aprovada na T165.** Branch
 `codex/t166-adr-dados-colaborador`, a partir do squash
@@ -1507,6 +1507,59 @@ vez de afirmar.
 
 **As imagens de referência** servem só para agrupamento e clareza — sem
 identidade, texto, marca, ícone, paleta, layout ou componente de terceiros.
+
+### O que a T166 entregou
+
+A [ADR 0016](../docs/adr/0016-modelo-e-governanca-dos-dados-de-admissao-e-perfil-do-colaborador.md) e o
+[diagnóstico técnico](../docs/decisions/t166-dados-admissao-perfil-diagnostico.md). A ADR está **proposta**: aguarda a aprovação
+do proprietário (`DP-ADM-01`) e não autoriza implementação.
+
+- **Modelo-alvo.** `Colaborador` continua mínimo. Todo dado pessoal novo mora
+  em agregado próprio — perfil pessoal, contatos e endereço, identificação
+  documental, dados bancários, declarações sensíveis, dependentes —, com
+  `empresa_id` próprio vindo da sessão, recurso de autorização e rota
+  próprios, e fora da listagem e da projeção do gestor. O número do documento
+  e o arquivo do documento são agregados diferentes. Horário e jornada é agregado próprio, ligado ao vínculo por orientação do proprietário — o que reabre decisões do RH (`DP-3J-19`, T037) e por isso é `DP-ADM-17`; hoje `vinculo_horario` aponta para o colaborador, e só o `rh` opera Horários.
+- **Classes de acesso.** A1 funcional (a que existe), A2 pessoal e A3
+  restrito, com leitura auditada bloqueante. O `master_tecnico` fora de A2 e A3
+  é proposta, não fato.
+- **Matriz de campos.** Cada campo da referência tem bloco, agregado,
+  finalidade, acesso, classe e dependência, inclusive retenção. "Admissão"
+  quer dizer exigido pelo contrato do Evolli, nunca por lei. Campo sem
+  finalidade e sem módulo consumidor fica fora de escopo; o que ainda depende
+  de uma decisão anterior à ficha — finalidade, consumidor, semântica ou
+  caminho técnico — fica **bloqueado**: nome social, gênero, raça/etnia,
+  deficiência, foto, dados bancários, dependentes, filial, estrangeiro, tipo
+  de contrato e os campos de modalidade contratual. Nenhuma regra trabalhista é inferida: experiência e contrato
+  por prazo ficam fora, e "tipo de contrato" não é presumido igual a tipo de
+  vínculo.
+- **Governança.** Uma categoria só existe depois de uma **ficha de tratamento**
+  aprovada. Nenhuma base legal nem prazo de retenção foi afirmado.
+- **UX futuro.** Admitir envia só o bloco 1, de forma atômica, já com a
+  lotação completa — completá-la depois criaria movimentação fictícia no
+  histórico. O bloco 3 é de leitura; os blocos 2, 4 e 5 complementam depois,
+  cada um com seu salvamento.
+- **Pendências.** Dezoito decisões (`DP-ADM-01` a `DP-ADM-18`), cada uma com
+  responsável; finalidade, base legal, classificação e retenção são de RH +
+  Jurídico.
+- **Plano técnico.** Etapas C, D e E, nenhuma iniciada.
+
+**Achados registrados, nenhum corrigido aqui** (diagnóstico, §3): a empresa não
+aparece no formulário quando só há uma (D1); o "Cancelar" descarta sem
+confirmar (D2); o servidor aceita qualquer motivo na admissão (D3); o erro não
+diz qual campo falhou (D4); a Spec ainda diz que o gestor inicia admissão
+(D5); o conflito de MFA para dado bancário (D6); a leitura do `master_tecnico`
+com empresa ativa sem evento (D7); uma possível falta de caminho para corrigir
+a admissão, ainda não reproduzida (D8); o Plan desatualizado sobre `DP-23`
+(D9); e a classificação legal de gênero e deficiência (D10).
+
+**Correção à T165.** A Proposta original 4 afirmou que a recusa de mutação ao
+`master_tecnico` não tinha teste. O avaliador
+(`rbac.evaluator.master-tecnico.spec.ts:73-86`) e um E2E
+(`documentos.e2e-spec.ts:1022-1034`) já a cobrem; falta só o teste unitário de
+`resolverEscopoPessoas`. A T165 também afirmou que gênero e deficiência são
+dado sensível "na LGPD", o que a lista do art. 5º, II não diz literalmente.
+Três notas aditivas no documento da T165 — na Proposta original 4, na §5.2 e na §5.5 —, texto original preservado.
 
 **Dívidas preservadas:** **R-3** (T162), **R-3 da revisão da T164**, **S2** (T161), **R1 a R3** (T160), **L3**, **S-1 a S-4** (T158), **R-A a R-C** (T157) e o registro `teste michell`.
 

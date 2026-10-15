@@ -1575,9 +1575,20 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       `teste michell`.
 
 63. **T166 - Modelo e governança dos dados de admissão e perfil do colaborador**
-    - **Estado:** em andamento. Branch `codex/t166-adr-dados-colaborador`, a
-      partir do squash `9db194e6ee5fa25f82017557a8d77be3b6048d58` (T165,
-      PR #157). É a **etapa B** da ordem aprovada na T165.
+    - **Estado:** **ADR proposta, aguardando aprovação do proprietário**
+      (`DP-ADM-01`). Branch `codex/t166-adr-dados-colaborador`, a partir do
+      squash `9db194e6ee5fa25f82017557a8d77be3b6048d58` (T165, PR #157). É a
+      **etapa B** da ordem aprovada na T165.
+    - **Entregas:** [ADR 0016](../docs/adr/0016-modelo-e-governanca-dos-dados-de-admissao-e-perfil-do-colaborador.md), com o modelo-alvo, as classes de
+      acesso, a matriz de campos, a governança, o UX futuro, o plano técnico e
+      dezoito decisões pendentes (`DP-ADM-01` a `DP-ADM-18`); e o
+      [diagnóstico técnico](../docs/decisions/t166-dados-admissao-perfil-diagnostico.md), com a evidência na fonte e os achados
+      D1 a D10, nenhum corrigido aqui.
+    - **Correção registrada:** a Proposta original 4 da T165 errou duas de
+      três afirmações — o avaliador e um E2E já cobrem a recusa de mutação ao
+      `master_tecnico`; falta só o teste unitário de `resolverEscopoPessoas`.
+      E a afirmação de que gênero e deficiência são dado sensível "na LGPD"
+      não tem a lista do art. 5º, II a sustentá-la literalmente. Três notas aditivas no documento da T165 — na Proposta original 4, na §5.2 e na §5.5 —, texto original preservado.
     - **Natureza:** **ADR e diagnóstico técnico**. Nenhuma interface, API,
       endpoint, migration, schema, seed, banco ou alteração de RBAC. O cadastro
       visual não começa aqui.
@@ -1609,8 +1620,6 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       de cada dado ter permissão e contrato próprios.
     - **Referência visual:** agrupamento e clareza apenas. Sem identidade,
       texto, marca, ícone, paleta, layout ou componente de terceiros.
-    - **Registro externo:** decisão também registrada no Diário de
-      Desenvolvimento do Notion.
     - **Dívida preservada:** R-3 (T162), R-3 da revisão da T164, S2 (T161),
       R1 a R3 (T160), L3, S-1 a S-4 (T158), R-A a R-C (T157) e o registro
       `teste michell`.

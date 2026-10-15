@@ -201,6 +201,15 @@ exercita `colaborador`/`create`; e nenhum E2E cobre o caso. A garantia existe
 em duas camadas de código, e nenhuma delas é guardada — uma edição futura
 poderia abrir a mutação sem que nada reprovasse.
 
+> **Nota de correção (T166, 2026-10-15).** Duas das três afirmações acima
+> estão erradas: `rbac.evaluator.master-tecnico.spec.ts:73-86` nega `create`,
+> `alter` e `manage` ao `master_tecnico` nos quatro recursos de pessoas, e
+> `documentos.e2e-spec.ts:1022-1034` espera **403** quando ele tenta
+> `POST /v1/colaboradores`. Continua verdadeiro só que `resolverEscopoPessoas`
+> não tem teste unitário próprio. Detalhe no
+> [diagnóstico da T166](t166-dados-admissao-perfil-diagnostico.md#4-correção-ao-diagnóstico-da-t165).
+> O texto original acima foi preservado.
+
 ### Proposta original 5 — Projeção própria da listagem
 
 Pendência já registrada na T164: matrícula, cargo, departamento e admissão
@@ -253,6 +262,13 @@ Permanece verdadeiro o achado da Proposta original 4: essa negação **não tem 
 próprio**. Agora que ela é regra declarada, cobri-la deixa de ser higiene e
 passa a ser proteção de uma decisão.
 
+> **Nota de correção (T166, 2026-10-15).** A negação tem teste no avaliador
+> (`rbac.evaluator.master-tecnico.spec.ts:73-86`) e de ponta a ponta
+> (`documentos.e2e-spec.ts:1022-1034`). Falta só o teste unitário de
+> `resolverEscopoPessoas`. Detalhe no
+> [diagnóstico da T166](t166-dados-admissao-perfil-diagnostico.md#4-correção-ao-diagnóstico-da-t165).
+> O texto original acima foi preservado.
+
 ### 5.3 O formulário será progressivo, em cinco blocos
 
 1. **Admissão e vínculo**
@@ -289,6 +305,13 @@ em **sequência de trabalho**: os campos faltam porque ainda não foram
 decididos, e serão decididos antes de serem criados. Raça/etnia, deficiência e
 gênero são dado sensível na LGPD, e dado bancário é alvo de fraude; nenhum
 deles entra por conveniência de formulário.
+
+> **Nota de correção (T166, 2026-10-15).** A LGPD (art. 5º, II) lista origem
+> racial ou étnica e dado referente à saúde; **gênero e deficiência não
+> aparecem literalmente** na lista. A classificação de cada um é de RH +
+> Jurídico. Detalhe no
+> [diagnóstico da T166](t166-dados-admissao-perfil-diagnostico.md#3-achados-e-contradições),
+> achado D10. O texto original acima foi preservado.
 
 ### 5.6 As imagens de referência
 
