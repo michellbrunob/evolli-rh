@@ -293,7 +293,7 @@ pessoa admitida em duas empresas terá dois registros de perfil, e unificá-los
     declaração é colhida e evidenciada (`DP-ADM-09`); sem isso, eles não são
     coletados — o RH não infere nem atribui nenhum deles.
 11. **Deficiência não é simples autodeclaração.** Ela pode exigir comprovação,
-    e a comprovação seria, ela mesma, dado referente à saúde. **Formato,
+    e a comprovação, conforme o conteúdo, pode revelar dado referente à saúde. **Formato,
     obrigatoriedade, acesso, finalidade, retenção e auditoria** dessa
     informação — e de qualquer comprovação — dependem de decisão e contrato
     próprios (`DP-ADM-16`). Esta ADR não cria nenhuma dessas regras: até lá,
@@ -304,8 +304,14 @@ os dados sensíveis, o dado sobre **origem racial ou étnica** e o **dado
 referente à saúde**. Gênero e deficiência não aparecem literalmente nessa
 lista. A Fatia 2 (§5.3) já classifica internamente a identidade de gênero como
 "Sensível", e esta ADR mantém essa classificação **interna**, por precaução,
-sem atribuí-la à lei. Se deficiência se enquadra como dado referente à saúde,
-e a classificação final de cada categoria, são decisões de RH + Jurídico.
+sem atribuí-la à lei. A informação sobre deficiência, porém, pode revelar dado
+referente à saúde, conforme o conteúdo efetivamente tratado. Por isso esta ADR
+não conclui que toda informação sobre deficiência seja automaticamente dado
+sensível: o enquadramento depende do conteúdo e da decisão de RH + Jurídico.
+Até essa decisão, deficiência permanece restrita (A3) e bloqueada, dependente
+de finalidade, necessidade, evidência comprobatória, acesso, auditoria,
+retenção e contrato aplicável (`DP-ADM-16`). A classificação final de cada
+categoria é de RH + Jurídico.
 Dados de criança e adolescente, prováveis entre dependentes, seguem o art. 14
 da LGPD — melhor interesse e regras específicas. A base legal e as medidas para
 cumpri-lo são decisão de RH + Jurídico.
