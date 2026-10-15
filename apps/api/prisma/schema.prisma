@@ -116,13 +116,19 @@ model AccessUser {
   // T151 — Gestor consultivo. `contaColaborador` e o vinculo DP-23 desta
   // propria conta com a pessoa; os demais identificam o ATOR administrativo
   // (RH) que criou ou encerrou um registro, mesma natureza das relacoes acima.
-  contaColaborador                AccessUserColaborador[]  @relation("ContaDoColaborador")
-  contasColaboradorCriadas        AccessUserColaborador[]  @relation("ContaDoColaboradorCriadaPor")
-  contasColaboradorEncerradas     AccessUserColaborador[]  @relation("ContaDoColaboradorEncerradaPor")
-  atribuicoesGestorCriadas        AtribuicaoGestorEquipe[] @relation("AtribuicaoGestorCriadaPor")
-  atribuicoesGestorEncerradas     AtribuicaoGestorEquipe[] @relation("AtribuicaoGestorEncerradaPor")
-  excecoesAcessoGestorCriadas     ExcecaoAcessoGestor[]    @relation("ExcecaoGestorCriadaPor")
-  excecoesAcessoGestorEncerradas  ExcecaoAcessoGestor[]    @relation("ExcecaoGestorEncerradaPor")
+  contaColaborador               AccessUserColaborador[]  @relation("ContaDoColaborador")
+  contasColaboradorCriadas       AccessUserColaborador[]  @relation("ContaDoColaboradorCriadaPor")
+  contasColaboradorEncerradas    AccessUserColaborador[]  @relation("ContaDoColaboradorEncerradaPor")
+  atribuicoesGestorCriadas       AtribuicaoGestorEquipe[] @relation("AtribuicaoGestorCriadaPor")
+  atribuicoesGestorEncerradas    AtribuicaoGestorEquipe[] @relation("AtribuicaoGestorEncerradaPor")
+  excecoesAcessoGestorCriadas    ExcecaoAcessoGestor[]    @relation("ExcecaoGestorCriadaPor")
+  excecoesAcessoGestorEncerradas ExcecaoAcessoGestor[]    @relation("ExcecaoGestorEncerradaPor")
+
+  // T163 — empresas que esta conta esta autorizada a usar como contexto de
+  // trabalho, e as concessoes/revogacoes que ela mesma assinou.
+  empresasAutorizadas          AccessUserEmpresa[] @relation("EmpresaAutorizadaDaConta")
+  empresasAutorizadasDadas     AccessUserEmpresa[] @relation("EmpresaAutorizadaConcedidaPor")
+  empresasAutorizadasRevogadas AccessUserEmpresa[] @relation("EmpresaAutorizadaRevogadaPor")
 
   @@index([companyId])
   @@map("access_user")
@@ -155,10 +161,65 @@ model AccessSession {
   // carimbo de tempo.
   reauthenticatedAt DateTime? @map("reauthenticated_at")
 
-  user AccessUser @relation(fields: [userId], references: [id])
+  /// T163 — empresa de trabalho ATIVA desta sessao.
+  ///
+  /// Mora na SESSAO, e nao na conta, por tres razoes: duas abas da mesma
+  /// pessoa mantem contextos independentes; revogar uma sessao nao mexe na
+  /// outra; e um login novo nasce com NULL, isto e, no padrao previsivel do
+  /// papel. NULL significa "sem selecao" — o contexto cai em
+  /// `access_user.company_id`, que e exatamente o comportamento anterior a
+  /// esta tarefa (para `master_tecnico`, nulo, ou seja, escopo global).
+  ///
+  /// A autorizacao e reconferida a CADA requisicao contra
+  /// `access_user_empresa`: revogacao derruba o contexto de volta ao padrao,
+  /// nunca para um escopo mais amplo.
+  empresaAtivaId String? @map("empresa_ativa_id")
+
+  user         AccessUser @relation(fields: [userId], references: [id])
+  empresaAtiva Empresa?   @relation("SessaoComEmpresaAtiva", fields: [empresaAtivaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
   @@index([userId])
+  @@index([empresaAtivaId])
   @@map("access_session")
+}
+
+/// T163 — empresas que uma conta esta autorizada a usar como contexto de
+/// trabalho.
+///
+/// Existe porque a empresa deixou de ser atributo fixo da conta
+/// (`access_user.company_id`) e passou a ser escolha dentro de um conjunto
+/// que o SERVIDOR autoriza. Sem esta tabela, "empresas autorizadas" so
+/// poderia vir de lista no frontend — que nao e autoridade.
+///
+/// REVOGACAO E SOFT. Apagar a linha destruiria a trilha de quem teve acesso a
+/// que, e quando; por isso `revogado_em` e a tabela recebe REVOKE DELETE,
+/// como as demais tabelas historiadas do projeto. Vigente e
+/// `revogado_em IS NULL`.
+///
+/// `master_tecnico` NAO depende desta tabela: a politica dele ja e global
+/// (ADR 0012) e continua sendo — ver `contexto-empresarial.ts`.
+model AccessUserEmpresa {
+  id        String @id @default(uuid())
+  userId    String @map("user_id")
+  empresaId String @map("empresa_id")
+
+  concedidoEm        DateTime @default(now()) @map("concedido_em")
+  concedidoPorUserId String   @map("concedido_por_user_id")
+
+  revogadoEm        DateTime? @map("revogado_em")
+  revogadoPorUserId String?   @map("revogado_por_user_id")
+
+  user         AccessUser  @relation("EmpresaAutorizadaDaConta", fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  empresa      Empresa     @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  concedidoPor AccessUser  @relation("EmpresaAutorizadaConcedidaPor", fields: [concedidoPorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  revogadoPor  AccessUser? @relation("EmpresaAutorizadaRevogadaPor", fields: [revogadoPorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([userId, empresaId])
+  @@index([userId, revogadoEm])
+  @@index([empresaId])
+  @@index([concedidoPorUserId])
+  @@index([revogadoPorUserId])
+  @@map("access_user_empresa")
 }
 
 model AccessPasswordResetToken {
@@ -293,6 +354,12 @@ enum AuditAction {
   authorization_denied
   rate_limit_blocked
   audit_log_read
+
+  // T163 — contexto empresarial ativo. A troca e um ato sensivel: muda o
+  // escopo de TODA leitura e mutacao seguinte da sessao, entao deixa trilha.
+  acesso_contexto_empresa_trocado     @map("acesso.contexto_empresa.trocado")
+  acesso_empresa_autorizada_concedida @map("acesso.empresa_autorizada.concedida")
+  acesso_empresa_autorizada_revogada  @map("acesso.empresa_autorizada.revogada")
 
   organizacao_empresa_criada     @map("organizacao.empresa.criada")
   organizacao_empresa_atualizada @map("organizacao.empresa.atualizada")
@@ -601,9 +668,13 @@ model Empresa {
   solicitacoesPessoa SolicitacaoPessoa[]
 
   // T151 — Gestor consultivo.
-  contasColaborador        AccessUserColaborador[]
-  atribuicoesGestorEquipe  AtribuicaoGestorEquipe[]
-  excecoesAcessoGestor     ExcecaoAcessoGestor[]
+  contasColaborador       AccessUserColaborador[]
+  atribuicoesGestorEquipe AtribuicaoGestorEquipe[]
+  excecoesAcessoGestor    ExcecaoAcessoGestor[]
+
+  // T163 — contexto empresarial ativo.
+  contasAutorizadas AccessUserEmpresa[]
+  sessoesAtivasAqui AccessSession[]     @relation("SessaoComEmpresaAtiva")
 
   @@index([status])
   @@map("empresa")

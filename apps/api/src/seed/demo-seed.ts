@@ -81,6 +81,15 @@ export const PERFIS_DEMO: readonly PerfilDemo[] = [
     limitacoes: "Recursos da Alfa respondem 404, nunca 403.",
   },
   {
+    email: `rh.multi@${DOMINIO}`,
+    papel: "rh",
+    empresa: "alfa",
+    finalidade:
+      "T163 — contexto empresarial ativo: a única conta autorizada nas DUAS empresas. Serve para ver a troca de empresa e provar que o universo de dados troca junto.",
+    limitacoes:
+      "A autorização na Beta é explícita em `access_user_empresa`; revogá-la devolve a sessão à Alfa, nunca a escopo global.",
+  },
+  {
     email: `dp.alfa@${DOMINIO}`,
     papel: "dp",
     empresa: "alfa",
@@ -358,6 +367,39 @@ interface MovimentacaoApi extends ComId {
  * A conta `master_tecnico` não tem endpoint de criação. É gravada aqui, pelo
  * mesmo caminho que `bootstrap-admin.ts` usa para o `admin_tecnico`.
  */
+/**
+ * T163 — garante autorização de empresa para uma conta, de forma idempotente.
+ *
+ * `upsert` com `revogadoEm: null` no update: rodar o seed de novo **reativa**
+ * uma autorização revogada à mão durante uma demonstração, em vez de deixar o
+ * ambiente num meio-termo silencioso. A linha é a mesma, então a trilha de
+ * quando foi concedida pela primeira vez não se perde.
+ */
+async function garantirEmpresaAutorizada(
+  prisma: PrismaClient,
+  email: string,
+  empresaId: string,
+): Promise<void> {
+  const user = await prisma.accessUser.findUnique({ where: { email } });
+  if (user === null) return;
+
+  const concedente = await prisma.accessUser.findFirst({
+    where: { role: "master_tecnico" },
+    orderBy: { createdAt: "asc" },
+  });
+  if (concedente === null) return;
+
+  await prisma.accessUserEmpresa.upsert({
+    where: { userId_empresaId: { userId: user.id, empresaId } },
+    create: {
+      userId: user.id,
+      empresaId,
+      concedidoPorUserId: concedente.id,
+    },
+    update: { revogadoEm: null, revogadoPorUserId: null },
+  });
+}
+
 async function garantirMaster(prisma: PrismaClient): Promise<void> {
   const email = PERFIS_DEMO[0]!.email;
   const existente = await prisma.accessUser.findFirst({
@@ -862,6 +904,16 @@ export async function semearDemonstracao(
       const empresaId = perfil.empresa === "beta" ? beta.id : alfa.id;
       await garantirUsuario(ctx, master, perfil, empresaId);
     }
+
+    // T163 — a conta multiempresa recebe autorização EXPLÍCITA na Beta.
+    //
+    // `rh.alfa` e `rh.beta` continuam intocadas: elas são a contraprova de
+    // isolamento desde a T030, e dar acesso cruzado a elas destruiria
+    // justamente o que elas demonstram. A conta nova existe para o caso novo.
+    //
+    // A própria empresa (Alfa) não precisa de linha: a política já a inclui
+    // por padrão, e gravá-la aqui sugeriria o contrário.
+    await garantirEmpresaAutorizada(prisma, `rh.multi@${DOMINIO}`, beta.id);
 
     const rhAlfa = await entrar(ctx, `rh.alfa@${DOMINIO}`);
     const rhBeta = await entrar(ctx, `rh.beta@${DOMINIO}`);

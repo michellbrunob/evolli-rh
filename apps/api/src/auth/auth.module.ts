@@ -1,5 +1,6 @@
 import { forwardRef, Module } from "@nestjs/common";
 import { AuthController } from "./auth.controller";
+import { ContextoEmpresarialService } from "./contexto-empresarial.service";
 import { AuthService } from "./auth.service";
 import { PasswordHashService } from "./password/password-hash.service";
 import { PasswordPolicyService } from "./password/password-policy.service";
@@ -27,6 +28,8 @@ import { AuditModule } from "../audit/audit.module";
     PasswordHashService,
     PasswordPolicyService,
     SessionService,
+    // T163 — politica e troca do contexto empresarial ativo.
+    ContextoEmpresarialService,
     SessionGuard,
     CsrfGuard,
     RateLimitService,

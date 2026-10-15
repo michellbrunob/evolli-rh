@@ -326,3 +326,52 @@
     gap: var(--space-md);
   }
 }
+
+/* --------------------------------------------------------------- T163
+   Seletor de empresa ativa.
+
+   Um `<select>` nativo, não um menu desenhado: teclado, leitor de tela e
+   comportamento em toque vêm de graça e corretos. O tratamento visual é o
+   mesmo das demais superfícies de contexto — borda e superfície, nunca cor
+   sozinha. */
+
+.hub__contexto-item--empresa {
+  /* A coluna da empresa é a única que cresce: o nome pode ser longo e o
+     controle precisa de largura clicável. */
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+.hub__empresa-select {
+  width: 100%;
+  max-width: 420px;
+  min-height: var(--touch-target);
+  padding: 0 var(--space-sm);
+  font: inherit;
+  font-size: var(--text-ui);
+  font-weight: var(--weight-strong);
+  color: var(--color-ink);
+  background: var(--surface-canvas);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.hub__empresa-select:hover:not(:disabled) {
+  border-color: var(--color-action);
+}
+
+.hub__empresa-select:disabled {
+  /* Durante a troca o controle fica inerte, mas segue legível: esmaecer o
+     texto esconderia justamente a empresa que a pessoa acabou de escolher. */
+  cursor: progress;
+  background: var(--surface-neutral);
+}
+
+.hub__empresa-status {
+  display: inline-block;
+  margin-top: var(--space-xxs);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-regular);
+  color: var(--color-ink-subtle);
+}

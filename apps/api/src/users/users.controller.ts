@@ -28,6 +28,7 @@ import { extractRequestMetadata } from "../auth/request-metadata.util";
 import { MfaService } from "../auth/mfa/mfa.service";
 import { MfaConfigService } from "../auth/mfa/mfa-config.service";
 import { MfaEnabledGuard } from "../auth/mfa/mfa-enabled.guard";
+import { PrismaService } from "../database/prisma.service";
 
 @ApiTags("users")
 @Controller("users")
@@ -37,15 +38,47 @@ export class UsersController {
     private readonly usersService: UsersService,
     private readonly mfaService: MfaService,
     private readonly mfaConfig: MfaConfigService,
+    private readonly prisma: PrismaService,
   ) {}
 
+  /**
+   * O ator da sessão, como o SPA o enxerga.
+   *
+   * T163 — três coisas aqui mudaram de significado ou nasceram:
+   *
+   * - `companyId` é a empresa **ATIVA** desta sessão, não mais a coluna fixa
+   *   da conta: o ator já chega com o contexto resolvido pelo `SessionGuard`;
+   * - `empresaAtiva` traz **nome e código** dessa empresa. Existe para matar a
+   *   ressalva R-2 da T162: o Hub lia `GET /v1/empresas` a cada montagem só
+   *   para descobrir o nome, e aquela rota chama `registrarConsultaAmpla` —
+   *   um registro de auditoria por visita ao Hub. Aqui a leitura é direta, por
+   *   id, sem auditoria de consulta ampla, e acontece numa rota que o SPA já
+   *   chamava de qualquer forma;
+   * - `podeTrocarEmpresa` diz se o Hub deve desenhar seletor.
+   *
+   * A **lista** de empresas continua fora daqui, em
+   * `GET /v1/auth/contexto/empresas`, que recusa papel sem poder de seleção.
+   * Assim quem não seleciona nunca recebe nomes de outras empresas — nem por
+   * engano, nem por campo esquecido nesta projeção.
+   */
   @Get("me")
-  getMe(@CurrentUser() user: AccessUser) {
-    // `mfaAvailable` reflete o interruptor de servidor do MFA (T131). É a fonte
-    // que o SPA usa para exibir/ocultar as ações de MFA — mas o servidor
-    // continua autoritativo: as rotas de MFA respondem 404 quando desativado,
-    // independentemente do que a interface decidir mostrar.
-    return { ...toSafeUser(user), mfaAvailable: this.mfaConfig.isEnabled() };
+  async getMe(@CurrentUser() user: AccessUser) {
+    const comContexto = user as AccessUser & { podeTrocarEmpresa?: boolean };
+
+    const empresaAtiva =
+      user.companyId === null
+        ? null
+        : await this.prisma.empresa.findUnique({
+            where: { id: user.companyId },
+            select: { id: true, codigo: true, nome: true },
+          });
+
+    return {
+      ...toSafeUser(user),
+      mfaAvailable: this.mfaConfig.isEnabled(),
+      podeTrocarEmpresa: comContexto.podeTrocarEmpresa === true,
+      empresaAtiva,
+    };
   }
 
   /**

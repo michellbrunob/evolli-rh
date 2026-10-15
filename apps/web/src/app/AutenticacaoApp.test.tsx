@@ -14,7 +14,10 @@ import { ApiError, listarSessoesAtivas } from "../api/sessoesClient";
 import { obterUsuarioAtual } from "../api/usersClient";
 import { listarTabelasHorario } from "../api/horariosClient";
 import { listarEquipe } from "../api/gestorClient";
-import { listarEmpresas } from "../api/organizacaoClient";
+import {
+  listarEmpresasDoContexto,
+  trocarEmpresaDoContexto,
+} from "../api/contextoEmpresarialClient";
 
 vi.mock("../api/authClient", async () => {
   const actual =
@@ -60,6 +63,18 @@ vi.mock("../api/sessoesClient", async () => {
 // propósito: montar com papel desconhecido é exatamente o estado que
 // produzia 403 na aterrissagem. O papel `rh` mantém o destino inicial
 // histórico ("Cadastros"), então nenhum teste anterior muda de comportamento.
+/** Duas empresas sintéticas distintas, como no E2E do backend. */
+export const EMPRESA_ALFA = {
+  id: "empresa-sintetica",
+  codigo: "ALFA",
+  nome: "Empresa Alfa",
+};
+export const EMPRESA_BETA = {
+  id: "empresa-sintetica-beta",
+  codigo: "BETA",
+  nome: "Empresa Beta",
+};
+
 export const ATOR_PADRAO = {
   id: "ator-sintetico-1",
   email: "pessoa.teste@example.test",
@@ -70,6 +85,9 @@ export const ATOR_PADRAO = {
   status: "active",
   createdAt: "2026-01-01T00:00:00.000Z",
   mfaAvailable: false,
+  // T163 — o ator já chega com o contexto empresarial resolvido.
+  podeTrocarEmpresa: true,
+  empresaAtiva: EMPRESA_ALFA,
 };
 
 vi.mock("../api/usersClient", async () => {
@@ -87,15 +105,18 @@ vi.mock("../api/usersClient", async () => {
 // "Cadastros" dispara ao montar e o que produzia 403 para o gestor;
 // `listarEquipe` é a consulta que ele de fato pode fazer. Mockados aqui para
 // que os testes possam afirmar QUAL chamada saiu, e quando.
-// T162 — o Hub lê o nome da empresa para os papéis a que o RBAC concede
-// `empresa:read`. Sem este mock a leitura cairia no `fetch` real do ambiente
-// de teste; o estado de falha do Hub não quebraria nenhuma asserção daqui,
-// mas o ruído esconderia uma regressão de verdade.
-vi.mock("../api/organizacaoClient", async () => {
+// T163 — o Hub não lê mais `/v1/empresas` (ressalva R-2 da T162): a empresa
+// ativa chega dentro de `/v1/users/me`. O que ele consulta agora é a lista de
+// empresas AUTORIZADAS, e só quando o servidor diz que o papel seleciona.
+vi.mock("../api/contextoEmpresarialClient", async () => {
   const actual = await vi.importActual<
-    typeof import("../api/organizacaoClient")
-  >("../api/organizacaoClient");
-  return { ...actual, listarEmpresas: vi.fn() };
+    typeof import("../api/contextoEmpresarialClient")
+  >("../api/contextoEmpresarialClient");
+  return {
+    ...actual,
+    listarEmpresasDoContexto: vi.fn(),
+    trocarEmpresaDoContexto: vi.fn(),
+  };
 });
 
 vi.mock("../api/horariosClient", async () => {
@@ -128,19 +149,11 @@ beforeEach(() => {
     dataReferencia: "2026-10-08",
     itens: [],
   } as never);
-  vi.mocked(listarEmpresas).mockResolvedValue({
-    itens: [
-      {
-        id: ATOR_PADRAO.companyId,
-        nome: "Empresa Sintética",
-        codigo: "EMP-001",
-        status: "ativa",
-      },
-    ],
-    pagina: 1,
-    tamanhoPagina: 1,
-    total: 1,
-  } as never);
+  vi.mocked(listarEmpresasDoContexto).mockResolvedValue([
+    EMPRESA_ALFA,
+    EMPRESA_BETA,
+  ]);
+  vi.mocked(trocarEmpresaDoContexto).mockResolvedValue(EMPRESA_BETA);
 });
 
 /**
@@ -755,5 +768,151 @@ describe("T153 — aterrissagem segura por papel", () => {
     expect(await screen.findByRole("alert")).toBeInTheDocument();
     expect(screen.queryByRole("navigation")).toBeNull();
     expect(vi.mocked(listarTabelasHorario)).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T163 — a troca de empresa remonta a árvore inteira.
+// ---------------------------------------------------------------------------
+
+describe("T163 — contexto empresarial ativo", () => {
+  /**
+   * Faz o "servidor" passar a responder com a empresa Beta ativa a partir da
+   * confirmação da troca — e não antes. É o que permite afirmar que a tela
+   * mudou porque o servidor mudou, e não porque ela se adiantou.
+   */
+  function trocarParaBetaNoServidor() {
+    vi.mocked(obterUsuarioAtual).mockResolvedValue({ ...ATOR_PADRAO } as never);
+    vi.mocked(trocarEmpresaDoContexto).mockImplementation(async () => {
+      vi.mocked(obterUsuarioAtual).mockResolvedValue({
+        ...ATOR_PADRAO,
+        companyId: EMPRESA_BETA.id,
+        empresaAtiva: EMPRESA_BETA,
+      } as never);
+      return EMPRESA_BETA;
+    });
+  }
+
+  it("o Hub mostra a empresa ATIVA que o servidor resolveu", async () => {
+    vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
+
+    render(<AutenticacaoApp />);
+    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
+
+    const seletor = await screen.findByLabelText("Empresa");
+    expect((seletor as HTMLSelectElement).value).toBe(EMPRESA_ALFA.id);
+  });
+
+  it("trocar de empresa reresolve o ator e remonta no contexto novo", async () => {
+    vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
+    // A segunda leitura do ator traz a empresa nova — é o servidor que diz
+    // onde a sessão passou a operar, não a tela.
+    // O servidor é quem muda: a troca altera o contexto, e QUALQUER leitura
+    // seguinte do ator já vê a empresa nova. Encadear `mockResolvedValueOnce`
+    // suporia um número exato de leituras — suposição frágil, e que esconde
+    // uma releitura a mais em vez de tolerá-la.
+    trocarParaBetaNoServidor();
+
+    render(<AutenticacaoApp />);
+    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
+    const seletor = await screen.findByLabelText("Empresa");
+    await waitFor(() =>
+      expect((seletor as HTMLSelectElement).options.length).toBe(2),
+    );
+
+    fireEvent.change(seletor, { target: { value: EMPRESA_BETA.id } });
+
+    await waitFor(() =>
+      expect(trocarEmpresaDoContexto).toHaveBeenCalledWith(EMPRESA_BETA.id),
+    );
+    // O ator foi lido de NOVO depois da troca — é daí que vem a empresa
+    // nova, e não de estado local da tela.
+    await waitFor(() =>
+      expect(
+        vi.mocked(obterUsuarioAtual).mock.calls.length,
+      ).toBeGreaterThanOrEqual(2),
+    );
+    const depois = await screen.findByLabelText("Empresa");
+    expect((depois as HTMLSelectElement).value).toBe(EMPRESA_BETA.id);
+  });
+
+  it("trocar de empresa DENTRO de um módulo devolve ao Hub", async () => {
+    vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
+    // O servidor é quem muda: a troca altera o contexto, e QUALQUER leitura
+    // seguinte do ator já vê a empresa nova. Encadear `mockResolvedValueOnce`
+    // suporia um número exato de leituras — suposição frágil, e que esconde
+    // uma releitura a mais em vez de tolerá-la.
+    trocarParaBetaNoServidor();
+
+    render(<AutenticacaoApp />);
+    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
+    await abrirProduto(/^Pessoas/);
+
+    // De volta ao Hub só para trocar — e a troca não deixa ninguém dentro de
+    // um módulo cujo universo de dados acabou de mudar sem aviso.
+    fireEvent.click(screen.getByRole("button", { name: "Hub" }));
+    const seletor = await screen.findByLabelText("Empresa");
+    await waitFor(() =>
+      expect((seletor as HTMLSelectElement).options.length).toBe(2),
+    );
+    fireEvent.change(seletor, { target: { value: EMPRESA_BETA.id } });
+    await waitFor(() => expect(trocarEmpresaDoContexto).toHaveBeenCalled());
+
+    expect(
+      await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("navigation", { name: "Navegação do painel" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("papel que não troca não recebe seletor nem pede a lista", async () => {
+    vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
+    vi.mocked(obterUsuarioAtual).mockResolvedValueOnce({
+      ...ATOR_PADRAO,
+      role: "gestor",
+      podeTrocarEmpresa: false,
+    } as never);
+
+    render(<AutenticacaoApp />);
+    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
+
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    expect(listarEmpresasDoContexto).not.toHaveBeenCalled();
+  });
+
+  it("logout limpa o contexto junto com a sessão", async () => {
+    vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
+    vi.mocked(logout).mockResolvedValueOnce(undefined);
+
+    render(<AutenticacaoApp />);
+    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
+    fireEvent.click(screen.getByRole("button", { name: "Sair" }));
+
+    await screen.findByRole("heading", { level: 1, name: "Entrar" });
+    // Nenhum resquício de empresa na tela de login.
+    expect(document.body.textContent ?? "").not.toContain(EMPRESA_ALFA.nome);
+    expect(document.body.textContent ?? "").not.toContain(EMPRESA_BETA.nome);
+  });
+
+  it("nada de storage do navegador em todo o ciclo com troca de empresa", async () => {
+    const gravou = vi.spyOn(Storage.prototype, "setItem");
+    vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
+    // O servidor é quem muda: a troca altera o contexto, e QUALQUER leitura
+    // seguinte do ator já vê a empresa nova. Encadear `mockResolvedValueOnce`
+    // suporia um número exato de leituras — suposição frágil, e que esconde
+    // uma releitura a mais em vez de tolerá-la.
+    trocarParaBetaNoServidor();
+
+    render(<AutenticacaoApp />);
+    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
+    const seletor = await screen.findByLabelText("Empresa");
+    await waitFor(() =>
+      expect((seletor as HTMLSelectElement).options.length).toBe(2),
+    );
+    fireEvent.change(seletor, { target: { value: EMPRESA_BETA.id } });
+    await waitFor(() => expect(trocarEmpresaDoContexto).toHaveBeenCalled());
+
+    expect(gravou).not.toHaveBeenCalled();
   });
 });

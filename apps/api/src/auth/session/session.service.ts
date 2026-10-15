@@ -10,6 +10,11 @@ import {
   SESSION_INACTIVITY_TTL_MS,
 } from "./session.constants";
 import { AuditService } from "../../audit/audit.service";
+import {
+  aplicarContextoAoAtor,
+  AtorDaRequisicao,
+  resolverContextoEmpresarial,
+} from "./contexto-empresarial";
 
 export interface IssuedSession {
   session: AccessSession;
@@ -19,7 +24,8 @@ export interface IssuedSession {
 
 export interface ValidatedSession {
   session: AccessSession;
-  user: AccessUser;
+  /** T163 — ator com `companyId` ja resolvido para a empresa ATIVA. */
+  user: AtorDaRequisicao;
 }
 
 export interface SessionRequestMetadata {
@@ -113,12 +119,34 @@ export class SessionService {
       return null;
     }
 
+    // T163 — contexto empresarial ATIVO, resolvido e **revalidado** aqui, uma
+    // vez por requisição autenticada e antes de qualquer controlador. É este
+    // ponto único que cobre as 45 chamadas de resolvedor de escopo do produto
+    // sem tocar nenhuma delas: o ator que sai daqui já carrega, em
+    // `companyId`, a empresa em que a requisição opera.
+    const contexto = await resolverContextoEmpresarial(
+      this.prisma,
+      user,
+      session.empresaAtivaId,
+    );
+
     const touched = await this.prisma.accessSession.update({
       where: { id: session.id },
-      data: { lastSeenAt: now },
+      data: {
+        lastSeenAt: now,
+        // Seleção que deixou de valer (autorização revogada, empresa
+        // inativada, papel que perdeu o direito de selecionar) é LIMPA, não
+        // mantida à espera de voltar a valer. O contexto já foi rebaixado ao
+        // padrão do papel por `resolverContextoEmpresarial`; apagar a coluna
+        // só faz o banco contar a mesma história.
+        ...(contexto.selecaoInvalidada ? { empresaAtivaId: null } : {}),
+      },
     });
 
-    return { session: touched, user };
+    return {
+      session: touched,
+      user: aplicarContextoAoAtor(user, contexto),
+    };
   }
 
   /**

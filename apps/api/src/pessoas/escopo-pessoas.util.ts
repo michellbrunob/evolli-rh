@@ -1,5 +1,9 @@
 import { ForbiddenException } from "@nestjs/common";
 import { AccessUser } from "@prisma/client";
+import {
+  atorOperaEmEscopoGlobal,
+  papelTemPoliticaGlobal,
+} from "../auth/session/contexto-empresarial";
 import { evaluatePermission } from "../auth/authorization/rbac.evaluator";
 import {
   AuthorizationAction,
@@ -59,10 +63,26 @@ export type EscopoLeituraPessoas =
 export function resolverEscopoLeituraPessoas(
   actor: AccessUser,
 ): EscopoLeituraPessoas {
-  if (actor.role === "master_tecnico") {
+  // T163 — global é condição de CONTEXTO, não de papel.
+  //
+  // Antes desta tarefa a condição era `actor.role === "master_tecnico"`, e o
+  // E2E da T163 mediu o efeito: o Master selecionava a empresa D e continuava
+  // enxergando as duas, porque o ramo global curto-circuitava o contexto. Com
+  // empresa ativa, o Master opera DENTRO dela — sem seleção, `companyId` é
+  // nulo e o comportamento é idêntico ao anterior.
+  if (atorOperaEmEscopoGlobal(actor)) {
     return { global: true };
   }
-  if (actor.role !== "rh" && actor.role !== "dp") {
+  // T163 — o papel de politica global (Master) continua passando aqui quando
+  // esta ESCOPADO por contexto. Sem esta clausula, selecionar uma empresa
+  // transformaria o acesso global dele em 403: ele deixaria de ser global sem
+  // passar a ser escopado, isto e, perderia a leitura por completo. Com
+  // empresa ativa ele le DENTRO dela, que e a regra de negocio aprovada.
+  if (
+    !papelTemPoliticaGlobal(actor.role) &&
+    actor.role !== "rh" &&
+    actor.role !== "dp"
+  ) {
     throw new ForbiddenException();
   }
   if (actor.companyId === null) {

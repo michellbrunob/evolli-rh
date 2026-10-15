@@ -1174,11 +1174,11 @@ implementação nesta tarefa.
 **Dívidas preservadas:** **R1, R2 e R3** da revisão da T160, **L3**, **S-1 a
 S-4** (T158), **R-A, R-B e R-C** (T157) e o registro `teste michell`.
 
-## Hub pós-login — T162 (interface web)
+## Hub pós-login — T162 (integrada)
 
-| Tarefa | Estado               | Resultado principal                                                                                 |
-| ------ | -------------------- | --------------------------------------------------------------------------------------------------- |
-| T162   | **Em implementação** | Depois do login, a pessoa entra no Hub — que mostra só o que o servidor autoriza no contexto atual. |
+| Tarefa | Estado                                     | Resultado principal                                                                                 |
+| ------ | ------------------------------------------ | --------------------------------------------------------------------------------------------------- |
+| T162   | **Integrada** (PR #154, squash `61e5f900`) | Depois do login, a pessoa entra no Hub — que mostra só o que o servidor autoriza no contexto atual. |
 
 **A regra é a da T159, um nível acima.** Menu é promessa, e cartão de produto
 também. O Hub só oferece o que o papel do ator de fato consegue abrir, com
@@ -1208,8 +1208,94 @@ empresa** — e o Hub não inventa um.
 dependências ou lockfile. O frontend não é autorização: cada requisição segue
 decidida pelo servidor.
 
+**Desfecho.** Entrou com a CI de push 3/3 verde no squash `61e5f900`. A
+revisão adversarial confirmou, contra a API real e com as contas sintéticas:
+`rh` vê seis produtos e o nome da própria empresa; `dp` vê três — **sem
+Estrutura**, porque `tabela_horario` é exclusivo de RH; `gestor` vê um produto
+e **nenhuma** requisição a `/v1/empresas`; `colaborador` vê o aviso de perfil
+sem produto. **Zero 403 em toda a sessão.**
+
+**Duas ressalvas ficaram abertas na entrega da T162. Uma delas já foi
+resolvida pela T163; a outra continua aberta.**
+
+- **R-2 — RESOLVIDA pela T163.** O que foi encontrado: o Hub lia
+  `GET /v1/empresas` a cada montagem, inclusive a cada retorno pelo botão
+  "Hub", e `EmpresaService.listar` chama `registrarConsultaAmpla` — um
+  registro de auditoria por visita. Era leitura legítima do próprio escopo,
+  não vazamento, mas ruído novo na trilha, proporcional à navegação.
+
+  Como foi resolvida, e a evidência de cada parte:
+
+  | O que mudou                                                   | Evidência                                                                            |
+  | ------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+  | O Hub **não chama mais** `/v1/empresas` ao montar             | `HubPosLogin.tsx` não importa `organizacaoClient`                                    |
+  | A **empresa ativa** (nome e código) vem de `GET /v1/users/me` | campo `empresaAtiva`, leitura direta por id, sem consulta ampla                      |
+  | **Teste-guarda** contra reincidência                          | varre o próprio módulo e reprova se `organizacaoClient` ou `listarEmpresas` voltarem |
+  | Medição no navegador                                          | **zero** chamadas a `/v1/empresas` em toda a sessão                                  |
+
+- **R-3 — CONTINUA ABERTA.** `dp` dentro de Jornada ainda pode esbarrar em
+  `tabela_horario` por interação. O mount está limpo (medido: 13 requisições,
+  todas 200), mas `buscarTabelaHorario` é alcançável dentro da tela. **Não foi
+  introduzida pela T162**: o destino `ponto` já era incondicional na barra
+  lateral desde a T159. A T163 **não** a tratou.
+
+**Uma divergência registrada em vez de escondida:** a mensagem do squash em
+`main` diz "1530 no web, 38 novos"; a contagem correta é **37** (28 + 7 + 2),
+e é o que a descrição da PR #154 diz. A mensagem publicada não foi reescrita
+por decisão do proprietário.
+
 **Dívidas preservadas:** **S2** (T161), **R1, R2 e R3** (T160), **L3**, **S-1 a
 S-4** (T158), **R-A a R-C** (T157) e o registro `teste michell`.
+
+## Contexto empresarial ativo e troca segura — T163 (backend + web)
+
+| Tarefa | Estado               | Resultado principal                                                                    |
+| ------ | -------------------- | -------------------------------------------------------------------------------------- |
+| T163   | **Em implementação** | A empresa de trabalho passa a ser contexto de sessão resolvido e auditado no servidor. |
+
+**O que a T162 deixou explicitamente em aberto.** O Hub entrou sem troca de
+empresa porque **não havia contrato**: a empresa era `access_user.companyId`,
+coluna fixa da conta, e o controlador de autenticação só tinha login, logout,
+CSRF, sessões e redefinição de senha. A T163 cria o contrato que faltava.
+
+**A regra de negócio aprovada:**
+
+| Quem                        | Pode                                                            |
+| --------------------------- | --------------------------------------------------------------- |
+| `rh` e `master_tecnico`     | escolher empresa **somente** entre as autorizadas pelo servidor |
+| gestor, colaborador, demais | ficam na empresa do próprio vínculo — **não listam nem trocam** |
+
+**Os princípios que a implementação tem de honrar:**
+
+- a associação usuário–empresa é **de servidor e auditável**;
+- a empresa ativa vive na **sessão**, nunca em `localStorage`, `sessionStorage`,
+  query string, cookie escrito pelo frontend ou parâmetro livre de rota;
+- `companyId` vindo do cliente **nunca amplia escopo**;
+- toda leitura e toda mutação usam o contexto ativo, resolvido centralmente;
+- troca valida autorização, atualiza a sessão e **produz evento de auditoria**;
+- empresa não autorizada, inexistente ou revogada segue o padrão
+  **anti-enumeração** já usado pelo produto;
+- login novo começa em contexto seguro e previsível, e **sessões simultâneas
+  mantêm contextos independentes**;
+- empresas autorizadas **não são expostas** a perfil sem poder de seleção.
+
+**Parada obrigatória:** se o contexto não puder ser aplicado centralmente sem
+deixar rota funcional fora da proteção, a tarefa **para e reporta** antes de
+publicar. Nada de seletor ou endpoint fingido.
+
+**Limites:** sem novos módulos de RH/DP, sem cartão fictício, sem portal do
+colaborador, sem transformar Demonstração em produto. A tela de login só muda
+no estritamente necessário ao contrato de sessão.
+
+**R-2 da T162: resolvida por esta tarefa**, com a evidência registrada na
+seção da T162 — o Hub deixou de ler `/v1/empresas` ao montar, a empresa ativa
+passou a vir de `/v1/users/me`, há teste-guarda contra o retorno de
+`organizacaoClient` e a medição de navegador contou **zero** chamadas à rota.
+
+**Dívidas preservadas, nenhuma tratada aqui:** **R-3** (T162, `dp`/Jornada e
+tabela de horário), **S2** (T161, confinamento da repetição pós-deadlock sem
+teste próprio), **R1 a R3** (T160), **L3**, **S-1 a S-4** (T158), **R-A a R-C**
+(T157) e o registro `teste michell`.
 
 ## Próxima ação autorizável
 
