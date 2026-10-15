@@ -1389,7 +1389,7 @@ outra empresa. O servidor já recusa isso; a interface não tenta contorná-lo.
 
 O inventário na fonte encontrou **quatro bloqueios independentes**, cada um
 suficiente por si. Nenhuma linha de interface foi escrita. O diagnóstico
-completo, com evidência e proposta de cinco fatias, está em
+completo, com evidência e as cinco propostas originais, está em
 [`docs/decisions/t165-cadastro-colaborador-rh-bloqueio.md`](../docs/decisions/t165-cadastro-colaborador-rh-bloqueio.md).
 
 | #      | Bloqueio                                                                                                                                                                            | Evidência                                                                                                                                                     |
@@ -1443,13 +1443,19 @@ componente copiados.
 
 **A ordem aprovada:**
 
-|       | Etapa                                                   | Natureza                  |
-| ----- | ------------------------------------------------------- | ------------------------- |
-| **A** | Integrar a decisão documental da T165                   | documentação — feito aqui |
-| **B** | **T166** — ADR de modelo, finalidade e acesso aos dados | decisão                   |
-| **C** | Contrato, API e migrations                              | servidor                  |
-| **D** | Admissão mínima                                         | primeira tela real        |
-| **E** | Expansão progressiva dos blocos                         | iterativo                 |
+|       | Etapa                                                   | Natureza                                                        |
+| ----- | ------------------------------------------------------- | --------------------------------------------------------------- |
+| **A** | Integrar a decisão documental da T165                   | documentada nesta PR; integração em `main` pendente até o merge |
+| **B** | **T166** — ADR de modelo, finalidade e acesso aos dados | decisão                                                         |
+| **C** | Contrato, API e migrations                              | servidor                                                        |
+| **D** | Admissão mínima                                         | primeira tela real                                              |
+| **E** | Expansão progressiva dos blocos                         | iterativo                                                       |
+
+As letras **A a E** são exclusivas desta sequência; a lista histórica do
+diagnóstico usa numeração **1 a 5** (Propostas originais). A decisão está
+**documentada nesta PR**, mas a etapa A só se cumpre com o **merge**: até lá,
+a integração em `main` está pendente. **Nenhuma implementação da T166
+começou** — sem branch, sem PR, sem ADR escrita, sem código.
 
 Nenhuma tela é desenhada antes do contrato que a sustenta, e nenhum dado
 pessoal nasce antes da ADR que declara sua finalidade — a mesma disciplina que

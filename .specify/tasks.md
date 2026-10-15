@@ -1515,10 +1515,12 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       e nega `master_tecnico` em duas camadas (T030); **B3** não há dado
       cadastral além de `nome`; **B4** o formulário pedido já existe, com sete
       testes.
-    - **Fatias propostas, nenhuma iniciada:** A decisão de papel; B cadastro
-      em duas etapas (exige ADR de modelo); C melhorias no formulário atual;
-      D cobrir com teste a negação de mutação ao `master_tecnico`; E projeção
-      própria da listagem.
+    - **Propostas originais 1 a 5, nenhuma iniciada:** 1 decisão de papel;
+      2 cadastro em duas etapas (exige ADR de modelo); 3 melhorias no
+      formulário atual; 4 cobrir com teste a negação de mutação ao
+      `master_tecnico`; 5 projeção própria da listagem. Lista histórica do
+      diagnóstico, numerada de 1 a 5 de propósito: as letras **A a E**
+      pertencem exclusivamente à ordem aprovada, abaixo.
     - **DECISÃO DO PROPRIETÁRIO, registrada (não autoriza implementação):**
       - o fluxo passa a se chamar **"Admitir colaborador"**, porque criação,
         primeiro vínculo e empresa ativa são **atômicos** — o **B1 vira
@@ -1538,7 +1540,10 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       - as imagens de referência servem só para **agrupamento e clareza**, sem
         copiar marca, texto, identidade visual, layout, paleta, ícone ou
         componente.
-    - **Ordem aprovada:** **A** integrar a decisão documental da T165;
+    - **Ordem aprovada (letras A a E, exclusivas desta sequência):** **A**
+      integrar a decisão documental da T165 — a decisão está **documentada
+      nesta PR**, mas a **integração em `main` permanece pendente até o
+      merge**;
       **B** T166 — ADR de modelo, finalidade e acesso aos dados; **C**
       contrato, API e migrations; **D** admissão mínima; **E** expansão
       progressiva dos blocos. O **B4 continua válido**: o formulário atual é o

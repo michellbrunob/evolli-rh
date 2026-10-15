@@ -137,11 +137,17 @@ atualizado à lista" seria reentregar o que já está em produção.
 
 ---
 
-## 3. Proposta de fatias
+## 3. Propostas originais
 
 Nenhuma delas é iniciada aqui. Cada uma precisa de decisão do proprietário.
 
-### Fatia A — Decisão de papel (sem código)
+> **Sobre a numeração.** Esta é a lista **histórica** do diagnóstico, escrita
+> antes da decisão da §5. Seus itens são numerados **1 a 5** de propósito: as
+> letras **A a E** pertencem **exclusivamente** à sequência aprovada da §5.7, e
+> usar as mesmas letras para as duas listas fazia "B" significar, conforme o
+> lugar, "cadastro em duas etapas" ou "T166".
+
+### Proposta original 1 — Decisão de papel (sem código)
 
 Resolver o conflito do B2 antes de qualquer tela. Três saídas possíveis, e a
 escolha é de negócio:
@@ -152,7 +158,7 @@ escolha é de negócio:
 3. revogar `create` do `dp` — exige revisar a Baseline V1, item 12, que lhe
    atribui registro e efetivação.
 
-### Fatia B — Cadastro em duas etapas, se for mesmo desejado
+### Proposta original 2 — Cadastro em duas etapas, se for mesmo desejado
 
 Se "cadastrar sem admitir" é requisito de negócio, ele precisa de **decisão de
 modelo** antes de código: onde vive um colaborador sem vínculo, e sob qual
@@ -160,7 +166,7 @@ escopo de autorização ele é visível. Hoje a resposta é "em lugar nenhum".
 Opções que exigiriam ADR: dar `empresa_id` ao colaborador; ou criar um estado
 de rascunho com escopo próprio. **Nenhuma deve ser escolhida por suposição.**
 
-### Fatia C — Melhorias no formulário que já existe
+### Proposta original 3 — Melhorias no formulário que já existe
 
 Sem contrato novo, dentro do que a API já oferece. Três candidatos observados
 no inventário, todos a confirmar com o proprietário:
@@ -186,7 +192,7 @@ navegador com a conta autorizada em **duas** empresas: a rota devolve
 escolher errado. A T163 fechou esse buraco sozinha, ao escopar a listagem pela
 empresa ativa.
 
-### Fatia D — Cobrir a negação do `master_tecnico` com teste
+### Proposta original 4 — Cobrir a negação do `master_tecnico` com teste
 
 Achado colateral do inventário, e o mais barato de resolver: a recusa de
 mutação ao `master_tecnico` em pessoas **não tem teste próprio**. Não há
@@ -195,7 +201,7 @@ exercita `colaborador`/`create`; e nenhum E2E cobre o caso. A garantia existe
 em duas camadas de código, e nenhuma delas é guardada — uma edição futura
 poderia abrir a mutação sem que nada reprovasse.
 
-### Fatia E — Projeção própria da listagem
+### Proposta original 5 — Projeção própria da listagem
 
 Pendência já registrada na T164: matrícula, cargo, departamento e admissão
 vivem no vínculo, e só entrariam na lista por projeção nova no servidor.
@@ -243,7 +249,7 @@ exatamente o que o `rbac.evaluator` e o `resolverEscopoPessoas` concedem hoje,
 e a negação do `master_tecnico` fica confirmada como regra de produto, não só
 como herança da T030. **Nenhuma mudança de RBAC é necessária.**
 
-Permanece verdadeiro o achado da Fatia D: essa negação **não tem teste
+Permanece verdadeiro o achado da Proposta original 4: essa negação **não tem teste
 próprio**. Agora que ela é regra declarada, cobri-la deixa de ser higiene e
 passa a ser proteção de uma decisão.
 
@@ -299,6 +305,9 @@ marca, texto, identidade visual, layout, paleta, ícone ou componente.
 | **D** | Admissão mínima                                         | primeira tela real         |
 | **E** | Expansão progressiva dos blocos                         | iterativo                  |
 
+> **As letras A a E são exclusivas desta sequência.** A lista histórica da §3
+> usa numeração **1 a 5** (Propostas originais).
+
 A ordem tem uma propriedade que vale nomear: **nenhuma tela é desenhada antes
 do contrato que a sustenta**, e nenhum dado pessoal nasce antes da ADR que
 declara sua finalidade. É a mesma disciplina que fez esta tarefa parar.
@@ -318,6 +327,6 @@ declara sua finalidade. É a mesma disciplina que fez esta tarefa parar.
 | **B3** — não há dado cadastral              | **vira sequência**: §5.5 define o que precede a criação dos campos                          |
 | **B4** — a fatia pedida já existe           | **continua válido**: o formulário atual é o ponto de partida da etapa D, não algo a refazer |
 
-A **refutação** registrada na Fatia C permanece: o seletor de empresa do
+A **refutação** registrada na Proposta original 3 permanece: o seletor de empresa do
 formulário atual **não** permite escolher empresa errada, porque
 `GET /v1/empresas` devolve só a ativa.
