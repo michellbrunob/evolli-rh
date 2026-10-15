@@ -1502,8 +1502,11 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       S-1 a S-4 (T158), R-A a R-C (T157) e o registro `teste michell`.
 
 62. **T165 - Cadastro de colaborador pelo RH**
-    - **Estado:** **parada por regra declarada**. Branch
-      `codex/t165-cadastro-colaborador-rh`, a partir do squash
+    - **Estado:** **integrada** em `main` pela PR #157, squash
+      `9db194e6ee5fa25f82017557a8d77be3b6048d58`, com a CI de push 3/3 verde.
+      Encerrada como **parada por regra declarada, com a decisão do
+      proprietário registrada**. Branch `codex/t165-cadastro-colaborador-rh`
+      preservada, criada a partir do squash
       `9df47566c3741bdeff68ae65bd6ffe1191a3a70b` (T164, PR #156). O inventário
       encontrou **quatro bloqueios independentes** e nenhuma interface foi
       escrita; o diagnóstico está em
@@ -1541,9 +1544,8 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         copiar marca, texto, identidade visual, layout, paleta, ícone ou
         componente.
     - **Ordem aprovada (letras A a E, exclusivas desta sequência):** **A**
-      integrar a decisão documental da T165 — a decisão está **documentada
-      nesta PR**, mas a **integração em `main` permanece pendente até o
-      merge**;
+      integrar a decisão documental da T165 — **cumprida** pela integração da
+      PR #157, squash `9db194e`;
       **B** T166 — ADR de modelo, finalidade e acesso aos dados; **C**
       contrato, API e migrations; **D** admissão mínima; **E** expansão
       progressiva dos blocos. O **B4 continua válido**: o formulário atual é o
@@ -1568,6 +1570,47 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       requisição não pode forjar outra empresa.
     - **Referência visual:** hierarquia e clareza apenas. Sem marca, texto,
       layout, paleta ou componente externo.
+    - **Dívida preservada:** R-3 (T162), R-3 da revisão da T164, S2 (T161),
+      R1 a R3 (T160), L3, S-1 a S-4 (T158), R-A a R-C (T157) e o registro
+      `teste michell`.
+
+63. **T166 - Modelo e governança dos dados de admissão e perfil do colaborador**
+    - **Estado:** em andamento. Branch `codex/t166-adr-dados-colaborador`, a
+      partir do squash `9db194e6ee5fa25f82017557a8d77be3b6048d58` (T165,
+      PR #157). É a **etapa B** da ordem aprovada na T165.
+    - **Natureza:** **ADR e diagnóstico técnico**. Nenhuma interface, API,
+      endpoint, migration, schema, seed, banco ou alteração de RBAC. O cadastro
+      visual não começa aqui.
+    - **Investigação na fonte:** schema, contratos atuais, RBAC e a decisão
+      da T165.
+    - **Modelo-alvo separado por responsabilidade:** colaborador; vínculo e
+      admissão; contatos e endereço; organização; documentos; dados bancários;
+      dependentes; anexos e foto, se forem aprovados.
+    - **Matriz de campos:** para cada campo pedido nas referências, o bloco, a
+      finalidade de negócio, o perfil que lê e o que altera, a classificação
+      (obrigatório para admissão, complementar, condicional ou fora de escopo)
+      e a dependência de catálogo, contrato, decisão de retenção ou regra
+      adicional.
+    - **Governança:** `rh` e `dp` admitem; `master_tecnico` não cria, edita
+      nem admite; empresa exclusivamente da sessão ativa; funcionário não
+      preenche dado nesta fase; dado pessoal sensível, documento, foto e dado
+      bancário exigem propósito explícito, acesso restrito, auditoria,
+      retenção e contrato próprio.
+    - **Sem suposição jurídica:** nenhuma base legal nem prazo de retenção é
+      afirmado por suposição; o que depender de decisão jurídica ou do
+      proprietário vira **decisão pendente**.
+    - **UX futuro, só registrado:** admissão progressiva por blocos; contexto
+      de empresa travado; campos condicionais; validação acessível; revisão
+      antes de admitir; alerta de saída com dado não salvo; nenhuma seção
+      vazia nem campo sem persistência.
+    - **Plano técnico posterior, não iniciado:** contratos e migrations;
+      admissão mínima; dados pessoais, contatos e organização; documentos e
+      dados bancários; dependentes e anexos; portal do colaborador só depois
+      de cada dado ter permissão e contrato próprios.
+    - **Referência visual:** agrupamento e clareza apenas. Sem identidade,
+      texto, marca, ícone, paleta, layout ou componente de terceiros.
+    - **Registro externo:** decisão também registrada no Diário de
+      Desenvolvimento do Notion.
     - **Dívida preservada:** R-3 (T162), R-3 da revisão da T164, S2 (T161),
       R1 a R3 (T160), L3, S-1 a S-4 (T158), R-A a R-C (T157) e o registro
       `teste michell`.
