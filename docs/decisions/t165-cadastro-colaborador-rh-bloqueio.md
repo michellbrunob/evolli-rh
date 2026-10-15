@@ -303,6 +303,12 @@ A ordem tem uma propriedade que vale nomear: **nenhuma tela é desenhada antes
 do contrato que a sustenta**, e nenhum dado pessoal nasce antes da ADR que
 declara sua finalidade. É a mesma disciplina que fez esta tarefa parar.
 
+> **A T166 é apenas a próxima etapa prevista.** Não foi iniciada: sem branch,
+> sem PR, sem ADR escrita, sem código. Ela é citada aqui porque a ordem
+> aprovada a nomeia — e por isso aparece classificada como
+> `Spec-Kit-Nao-Entrega` nos commits desta tarefa, que entrega **somente** a
+> etapa A.
+
 ### 5.8 O que a decisão faz com cada bloqueio
 
 | Bloqueio                                    | Destino                                                                                     |
