@@ -1366,9 +1366,9 @@ testes que reprovam sem a correção e três mutações verificadas uma a uma:
 
 ## Cadastro de colaborador pelo RH — T165 (interface web)
 
-| Tarefa | Estado               | Resultado principal                                                    |
-| ------ | -------------------- | ---------------------------------------------------------------------- |
-| T165   | **Em implementação** | O RH passa a cadastrar colaborador pela tela, dentro da empresa ativa. |
+| Tarefa | Estado                         | Resultado principal                                                                        |
+| ------ | ------------------------------ | ------------------------------------------------------------------------------------------ |
+| T165   | **Parada por regra declarada** | O contrato não permite cadastro sem admissão. Diagnóstico entregue, interface não escrita. |
 
 **Quem cadastra:** somente `rh` e `master_tecnico`. O funcionário **não**
 preenche, **não** recebe link e **não** participa de autopreenchimento — a
@@ -1385,13 +1385,30 @@ opções precisa de rota que o `rh` realmente possa ler.
 acontece dentro dela — sem permitir que o corpo da requisição aponte para
 outra empresa. O servidor já recusa isso; a interface não tenta contorná-lo.
 
-### Regra de parada declarada
+### A regra de parada foi acionada
 
-Se o contrato **não** permitir uma criação correta pelo RH sem inventar campo,
-relação ou regra, a tarefa **para** e entrega diagnóstico com proposta de
-fatias. Não se cria endpoint, migration, campo nem regra por suposição — a
-mesma disciplina que a T162 seguiu ao declarar a ausência de contrato de troca
-de empresa em vez de desenhar um seletor falso.
+O inventário na fonte encontrou **quatro bloqueios independentes**, cada um
+suficiente por si. Nenhuma linha de interface foi escrita. O diagnóstico
+completo, com evidência e proposta de cinco fatias, está em
+[`docs/decisions/t165-cadastro-colaborador-rh-bloqueio.md`](../docs/decisions/t165-cadastro-colaborador-rh-bloqueio.md).
+
+| #      | Bloqueio                                                                                                                                                                            | Evidência                                                                                                                                                     |
+| ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **B1** | **Não existe criação sem admissão.** A única rota é `POST /v1/colaboradores` com `AdmitirColaboradorDto`, e quatro dos seis campos obrigatórios são de admissão — que a T165 exclui | `pessoas.dto.ts:123`; o porquê está no próprio DTO: `Colaborador` não tem `empresa_id`, então cadastro sem vínculo ficaria fora de todo escopo de autorização |
+| **B2** | **O papel aprovado não bate com o RBAC.** A direção diz `rh` + `master_tecnico`; o contrato diz `rh` + `dp`, negando `master_tecnico` em duas camadas                               | `rbac.evaluator.ts` (só `read`) e `escopo-pessoas.util.ts` (`ForbiddenException`), por decisão registrada na T030                                             |
+| **B3** | **Não há dado cadastral para cadastrar.** O modelo guarda `nome`, `situacao` e carimbos — sem CPF, nascimento, contato ou endereço                                                  | `schema.prisma`, `model Colaborador`                                                                                                                          |
+| **B4** | **A "primeira fatia" já existe.** O formulário de Novo colaborador já coleta, valida, envia, confirma, trata erro e recarrega a lista                                               | `ColaboradoresScreen.tsx`, com **sete** testes dedicados                                                                                                      |
+
+Honrar a tarefa ao pé da letra exigiria criar endpoint, migration, campo e
+regra de RBAC — exatamente o que a regra proíbe. É a mesma disciplina que a
+T162 seguiu ao declarar a ausência de contrato de troca de empresa em vez de
+desenhar um seletor falso.
+
+**Um achado foi levantado e refutado**, registrado para não voltar: a suspeita
+de que o formulário permitiria escolher empresa diferente da ativa. Medido no
+navegador com conta autorizada em duas empresas, `GET /v1/empresas` devolve
+`total: 1` — só a ativa —, então o seletor nunca aparece. A T163 já havia
+fechado esse buraco.
 
 **Dívidas preservadas:** **R-3** (T162), **R-3 da revisão da T164**, **S2**
 (T161), **R1 a R3** (T160), **L3**, **S-1 a S-4** (T158), **R-A a R-C** (T157)

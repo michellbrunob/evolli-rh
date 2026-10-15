@@ -1502,9 +1502,23 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       S-1 a S-4 (T158), R-A a R-C (T157) e o registro `teste michell`.
 
 62. **T165 - Cadastro de colaborador pelo RH**
-    - **Estado:** em implementação. Branch `codex/t165-cadastro-colaborador-rh`,
-      a partir do squash `9df47566c3741bdeff68ae65bd6ffe1191a3a70b`
-      (T164, PR #156).
+    - **Estado:** **parada por regra declarada**. Branch
+      `codex/t165-cadastro-colaborador-rh`, a partir do squash
+      `9df47566c3741bdeff68ae65bd6ffe1191a3a70b` (T164, PR #156). O inventário
+      encontrou **quatro bloqueios independentes** e nenhuma interface foi
+      escrita; o diagnóstico está em
+      [`docs/decisions/t165-cadastro-colaborador-rh-bloqueio.md`](../docs/decisions/t165-cadastro-colaborador-rh-bloqueio.md).
+    - **Bloqueios:** **B1** não existe criação sem admissão (única rota é
+      `POST /v1/colaboradores` com `AdmitirColaboradorDto`; `Colaborador` não
+      tem `empresa_id`, e cadastro sem vínculo ficaria fora de todo escopo);
+      **B2** a direção diz `rh` + `master_tecnico`, o contrato diz `rh` + `dp`
+      e nega `master_tecnico` em duas camadas (T030); **B3** não há dado
+      cadastral além de `nome`; **B4** o formulário pedido já existe, com sete
+      testes.
+    - **Fatias propostas, nenhuma iniciada:** A decisão de papel; B cadastro
+      em duas etapas (exige ADR de modelo); C melhorias no formulário atual;
+      D cobrir com teste a negação de mutação ao `master_tecnico`; E projeção
+      própria da listagem.
     - **Quem cadastra:** somente `rh` e `master_tecnico`. O funcionário **não**
       preenche, **não** recebe link e **não** participa de autopreenchimento.
     - **Fora de escopo:** importação, exportação, admissão, desligamento,
