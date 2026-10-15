@@ -1467,11 +1467,11 @@ de partida da etapa D, não algo a refazer.
 (T161), **R1 a R3** (T160), **L3**, **S-1 a S-4** (T158), **R-A a R-C** (T157)
 e o registro `teste michell`.
 
-## Modelo e governança dos dados de admissão e perfil do colaborador — T166 (ADR)
+## Modelo e governança dos dados de admissão e perfil do colaborador — T166 (integrada)
 
-| Tarefa | Estado                              | Resultado principal                                                                                                |
-| ------ | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| T166   | **ADR proposta; aguarda aprovação** | ADR 0016 e diagnóstico técnico do modelo, da finalidade e do acesso aos dados de admissão e perfil do colaborador. |
+| Tarefa | Estado                                                                   | Resultado principal                                                                                                |
+| ------ | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| T166   | **Integrada** (PR #158, squash `0c00afd`); a ADR 0016 segue **proposta** | ADR 0016 e diagnóstico técnico do modelo, da finalidade e do acesso aos dados de admissão e perfil do colaborador. |
 
 **É a etapa B da ordem aprovada na T165.** Branch
 `codex/t166-adr-dados-colaborador`, a partir do squash
@@ -1560,6 +1560,39 @@ a admissão, ainda não reproduzida (D8); o Plan desatualizado sobre `DP-23`
 `resolverEscopoPessoas`. A T165 também afirmou que gênero e deficiência são
 dado sensível "na LGPD", o que a lista do art. 5º, II não diz literalmente.
 Três notas aditivas no documento da T165 — na Proposta original 4, na §5.2 e na §5.5 —, texto original preservado.
+
+**Dívidas preservadas:** **R-3** (T162), **R-3 da revisão da T164**, **S2** (T161), **R1 a R3** (T160), **L3**, **S-1 a S-4** (T158), **R-A a R-C** (T157) e o registro `teste michell`.
+
+## Admissão mínima segura — T167 (em implementação)
+
+| Tarefa | Estado               | Resultado principal                                                                   |
+| ------ | -------------------- | ------------------------------------------------------------------------------------- |
+| T167   | **Em implementação** | Estabilizar o contrato existente de admissão antes de expandir qualquer dado pessoal. |
+
+**A T166 foi integrada** em `main` pela PR #158, squash
+`0c00afdc479193506e80eff0150dc4ddb785a41f`, com a CI de push 3/3 verde. **A
+ADR 0016 continua proposta** — integrar o documento não aprova o seu conteúdo,
+e `DP-ADM-01` segue aberto.
+
+**A T167 trabalha só sobre o contrato que já existe.** Branch
+`codex/t167-admissao-minima-segura`. Escopo autorizado pelo proprietário:
+admissão atômica preservada; `motivoCodigo` restrito aos motivos válidos para
+admissão; resposta de sucesso que confirma colaborador e vínculo sem dado
+pessoal novo; formulário com erro por campo, foco no primeiro erro, dados
+preservados em falha recuperável, sucesso que confirma e leva a rota coerente,
+e aviso antes de descartar; testes de API, E2E e web, com negação explícita a
+`master_tecnico`, `gestor` e `colaborador`.
+
+**Regras preservadas:** só `rh` e `dp` admitem; `master_tecnico` não cria, não
+edita e não admite; o colaborador não recebe convite, link nem
+autopreenchimento; a empresa vem só da sessão ativa; admissão em empresa
+divergente do contexto ativo é recusada.
+
+**Fora de escopo:** qualquer campo novo de perfil; schema, migration, seed e
+novos agregados; portal do colaborador; RBAC além da admissão atual.
+
+**Regra de parada:** o que o contrato atual não permitir sem inventar regra de
+negócio para, com evidência, e espera decisão.
 
 **Dívidas preservadas:** **R-3** (T162), **R-3 da revisão da T164**, **S2** (T161), **R1 a R3** (T160), **L3**, **S-1 a S-4** (T158), **R-A a R-C** (T157) e o registro `teste michell`.
 
