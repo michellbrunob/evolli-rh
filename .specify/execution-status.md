@@ -1364,11 +1364,11 @@ testes que reprovam sem a correção e três mutações verificadas uma a uma:
   demonstração tem 9 registros na Alfa e 1 na Beta, nunca mais de 20, então a
   troca de página não chega a aparecer na prévia.
 
-## Cadastro de colaborador pelo RH — T165 (interface web)
+## Cadastro de colaborador pelo RH — T165 (integrada)
 
-| Tarefa | Estado                                             | Resultado principal                                                                                                            |
-| ------ | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| T165   | **Parada por regra declarada; decisão registrada** | O contrato não permite cadastro sem admissão. Diagnóstico entregue, decisão do proprietário registrada, interface não escrita. |
+| Tarefa | Estado                                                                                    | Resultado principal                                                                                                            |
+| ------ | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| T165   | **Integrada** (PR #157, squash `9db194e`): parada por regra declarada, decisão registrada | O contrato não permite cadastro sem admissão. Diagnóstico entregue, decisão do proprietário registrada, interface não escrita. |
 
 **Quem cadastra:** somente `rh` e `master_tecnico`. O funcionário **não**
 preenche, **não** recebe link e **não** participa de autopreenchimento — a
@@ -1443,19 +1443,20 @@ componente copiados.
 
 **A ordem aprovada:**
 
-|       | Etapa                                                   | Natureza                                                        |
-| ----- | ------------------------------------------------------- | --------------------------------------------------------------- |
-| **A** | Integrar a decisão documental da T165                   | documentada nesta PR; integração em `main` pendente até o merge |
-| **B** | **T166** — ADR de modelo, finalidade e acesso aos dados | decisão                                                         |
-| **C** | Contrato, API e migrations                              | servidor                                                        |
-| **D** | Admissão mínima                                         | primeira tela real                                              |
-| **E** | Expansão progressiva dos blocos                         | iterativo                                                       |
+|       | Etapa                                                   | Natureza                                                         |
+| ----- | ------------------------------------------------------- | ---------------------------------------------------------------- |
+| **A** | Integrar a decisão documental da T165                   | **cumprida**: integrada em `main` pela PR #157, squash `9db194e` |
+| **B** | **T166** — ADR de modelo, finalidade e acesso aos dados | decisão — **aberta**, na seção seguinte                          |
+| **C** | Contrato, API e migrations                              | servidor                                                         |
+| **D** | Admissão mínima                                         | primeira tela real                                               |
+| **E** | Expansão progressiva dos blocos                         | iterativo                                                        |
 
 As letras **A a E** são exclusivas desta sequência; a lista histórica do
-diagnóstico usa numeração **1 a 5** (Propostas originais). A decisão está
-**documentada nesta PR**, mas a etapa A só se cumpre com o **merge**: até lá,
-a integração em `main` está pendente. **Nenhuma implementação da T166
-começou** — sem branch, sem PR, sem ADR escrita, sem código.
+diagnóstico usa numeração **1 a 5** (Propostas originais). A etapa A **foi
+cumprida** com o merge da PR #157, squash
+`9db194e6ee5fa25f82017557a8d77be3b6048d58`, com a CI de push 3/3 verde. Até
+esse merge, nenhuma implementação da T166 havia começado; ela abre na seção
+seguinte.
 
 Nenhuma tela é desenhada antes do contrato que a sustenta, e nenhum dado
 pessoal nasce antes da ADR que declara sua finalidade — a mesma disciplina que
@@ -1465,6 +1466,102 @@ de partida da etapa D, não algo a refazer.
 **Dívidas preservadas:** **R-3** (T162), **R-3 da revisão da T164**, **S2**
 (T161), **R1 a R3** (T160), **L3**, **S-1 a S-4** (T158), **R-A a R-C** (T157)
 e o registro `teste michell`.
+
+## Modelo e governança dos dados de admissão e perfil do colaborador — T166 (ADR)
+
+| Tarefa | Estado                              | Resultado principal                                                                                                |
+| ------ | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| T166   | **ADR proposta; aguarda aprovação** | ADR 0016 e diagnóstico técnico do modelo, da finalidade e do acesso aos dados de admissão e perfil do colaborador. |
+
+**É a etapa B da ordem aprovada na T165.** Branch
+`codex/t166-adr-dados-colaborador`, a partir do squash
+`9db194e6ee5fa25f82017557a8d77be3b6048d58` (T165, PR #157).
+
+**Natureza: ADR e diagnóstico técnico.** Nenhuma interface, API, endpoint,
+migration, schema, seed, banco ou alteração de RBAC. O cadastro visual
+**não** começa aqui.
+
+**O que a ADR precisa fixar:**
+
+- o **modelo-alvo separado por responsabilidade**: colaborador; vínculo e
+  admissão; contatos e endereço; organização; documentos; dados bancários;
+  dependentes; anexos e foto, se forem aprovados;
+- a **matriz de cada campo** pedido nas referências: bloco, finalidade de
+  negócio, perfil que lê e que altera, se é obrigatório para admissão,
+  complementar, condicional ou fora de escopo, e de que catálogo, contrato,
+  decisão de retenção ou regra adicional depende;
+- a **governança**: `rh` e `dp` admitem; `master_tecnico` não cria, edita
+  nem admite; a empresa vem exclusivamente da sessão ativa; o funcionário não
+  preenche dado nesta fase; dado pessoal sensível, documento, foto e dado
+  bancário exigem propósito explícito, acesso restrito, auditoria, retenção e
+  contrato próprio;
+- o **UX futuro**: admissão progressiva por blocos, contexto de empresa
+  travado, campos condicionais, validação acessível, revisão antes de admitir,
+  alerta de saída com dado não salvo, e nenhuma seção vazia nem campo sem
+  persistência;
+- o **plano técnico posterior**, sem iniciá-lo.
+
+**Nada de base legal ou prazo de retenção por suposição.** Onde depender de
+decisão jurídica ou do proprietário, a ADR registra **decisão pendente** em
+vez de afirmar.
+
+**As imagens de referência** servem só para agrupamento e clareza — sem
+identidade, texto, marca, ícone, paleta, layout ou componente de terceiros.
+
+### O que a T166 entregou
+
+A [ADR 0016](../docs/adr/0016-modelo-e-governanca-dos-dados-de-admissao-e-perfil-do-colaborador.md) e o
+[diagnóstico técnico](../docs/decisions/t166-dados-admissao-perfil-diagnostico.md). A ADR está **proposta**: aguarda a aprovação
+do proprietário (`DP-ADM-01`) e não autoriza implementação.
+
+- **Modelo-alvo.** `Colaborador` continua mínimo. Todo dado pessoal novo mora
+  em agregado próprio — perfil pessoal, contatos e endereço, identificação
+  documental, dados bancários, declarações sensíveis, dependentes —, com
+  `empresa_id` próprio vindo da sessão, recurso de autorização e rota
+  próprios, e fora da listagem e da projeção do gestor. O número do documento
+  e o arquivo do documento são agregados diferentes. Horário e jornada é agregado próprio, ligado ao vínculo por orientação do proprietário — o que reabre decisões do RH (`DP-3J-19`, T037) e por isso é `DP-ADM-17`; hoje `vinculo_horario` aponta para o colaborador, e só o `rh` opera Horários.
+- **Classes de acesso.** A1 funcional (a que existe), A2 pessoal e A3
+  restrito, com leitura auditada bloqueante. O `master_tecnico` fora de A2 e A3
+  é proposta, não fato.
+- **Matriz de campos.** Cada campo da referência tem bloco, agregado,
+  finalidade, acesso, classe e dependência, inclusive retenção. "Admissão"
+  quer dizer exigido pelo contrato do Evolli, nunca por lei. Campo sem
+  finalidade e sem módulo consumidor fica fora de escopo; o que ainda depende
+  de uma decisão anterior à ficha — finalidade, consumidor, semântica ou
+  caminho técnico — fica **bloqueado**: nome social, gênero, raça/etnia,
+  deficiência, foto, dados bancários, dependentes, filial, estrangeiro, tipo
+  de contrato e os campos de modalidade contratual. Nenhuma regra trabalhista é inferida: experiência e contrato
+  por prazo ficam fora, e "tipo de contrato" não é presumido igual a tipo de
+  vínculo.
+- **Governança.** Uma categoria só existe depois de uma **ficha de tratamento**
+  aprovada. Nenhuma base legal nem prazo de retenção foi afirmado.
+- **UX futuro.** Admitir envia só o bloco 1, de forma atômica, já com a
+  lotação completa — completá-la depois criaria movimentação fictícia no
+  histórico. O bloco 3 é de leitura; os blocos 2, 4 e 5 complementam depois,
+  cada um com seu salvamento.
+- **Pendências.** Dezoito decisões (`DP-ADM-01` a `DP-ADM-18`), cada uma com
+  responsável; finalidade, base legal, classificação e retenção são de RH +
+  Jurídico.
+- **Plano técnico.** Etapas C, D e E, nenhuma iniciada.
+
+**Achados registrados, nenhum corrigido aqui** (diagnóstico, §3): a empresa não
+aparece no formulário quando só há uma (D1); o "Cancelar" descarta sem
+confirmar (D2); o servidor aceita qualquer motivo na admissão (D3); o erro não
+diz qual campo falhou (D4); a Spec ainda diz que o gestor inicia admissão
+(D5); o conflito de MFA para dado bancário (D6); a leitura do `master_tecnico`
+com empresa ativa sem evento (D7); uma possível falta de caminho para corrigir
+a admissão, ainda não reproduzida (D8); o Plan desatualizado sobre `DP-23`
+(D9); e a classificação legal de gênero e deficiência (D10).
+
+**Correção à T165.** A Proposta original 4 afirmou que a recusa de mutação ao
+`master_tecnico` não tinha teste. O avaliador
+(`rbac.evaluator.master-tecnico.spec.ts:73-86`) e um E2E
+(`documentos.e2e-spec.ts:1022-1034`) já a cobrem; falta só o teste unitário de
+`resolverEscopoPessoas`. A T165 também afirmou que gênero e deficiência são
+dado sensível "na LGPD", o que a lista do art. 5º, II não diz literalmente.
+Três notas aditivas no documento da T165 — na Proposta original 4, na §5.2 e na §5.5 —, texto original preservado.
+
+**Dívidas preservadas:** **R-3** (T162), **R-3 da revisão da T164**, **S2** (T161), **R1 a R3** (T160), **L3**, **S-1 a S-4** (T158), **R-A a R-C** (T157) e o registro `teste michell`.
 
 ## Próxima ação autorizável
 
