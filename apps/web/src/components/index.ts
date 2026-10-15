@@ -29,5 +29,5 @@ export type { FormFieldProps, FormFieldControl } from "./FormField";
 export { FormActions } from "./FormActions";
 export type { FormActionsProps } from "./FormActions";
 
-export { Modal } from "./Modal";
+export { Modal, usePedirFechamentoModal } from "./Modal";
 export type { ModalProps } from "./Modal";

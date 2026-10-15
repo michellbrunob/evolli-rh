@@ -1563,11 +1563,11 @@ Três notas aditivas no documento da T165 — na Proposta original 4, na §5.2 e
 
 **Dívidas preservadas:** **R-3** (T162), **R-3 da revisão da T164**, **S2** (T161), **R1 a R3** (T160), **L3**, **S-1 a S-4** (T158), **R-A a R-C** (T157) e o registro `teste michell`.
 
-## Admissão mínima segura — T167 (em implementação)
+## Admissão mínima segura — T167 (implementada em Draft)
 
-| Tarefa | Estado               | Resultado principal                                                                   |
-| ------ | -------------------- | ------------------------------------------------------------------------------------- |
-| T167   | **Em implementação** | Estabilizar o contrato existente de admissão antes de expandir qualquer dado pessoal. |
+| Tarefa | Estado                    | Resultado principal                                                                  |
+| ------ | ------------------------- | ------------------------------------------------------------------------------------ |
+| T167   | **Implementada em Draft** | Contrato existente de admissão estabilizado antes de expandir qualquer dado pessoal. |
 
 **A T166 foi integrada** em `main` pela PR #158, squash
 `0c00afdc479193506e80eff0150dc4ddb785a41f`, com a CI de push 3/3 verde. **A
@@ -1593,6 +1593,38 @@ novos agregados; portal do colaborador; RBAC além da admissão atual.
 
 **Regra de parada:** o que o contrato atual não permitir sem inventar regra de
 negócio para, com evidência, e espera decisão.
+
+### O que a T167 entregou
+
+- **Motivo da admissão.** `POST /v1/colaboradores` aceita só
+  `admissao_inicial` e `outro_controlado`. Os cinco motivos que pressupõem um
+  vínculo existente recebem 400 — a admissão sempre cria o primeiro vínculo.
+- **Resposta que confirma.** O colaborador continua no topo; entram `vinculo`
+  e `movimentacao`, em projeção fechada, só com dado já aprovado e
+  identificadores. A lotação é o destino da movimentação: a alocação só nasce
+  na efetivação (ADR 0007), e a resposta não finge o contrário.
+- **Empresa só da sessão.** O seletor de empresa saiu do formulário. A empresa
+  aparece em leitura, e o formulário não envia se o servidor não devolver
+  exatamente uma.
+- **Formulário.** Recusa do servidor vira erro no campo certo (409 →
+  matrícula; 422 → referência organizacional; 404 → empresa ativa mudou), o
+  foco vai ao primeiro erro, os dados ficam em falha recuperável, o sucesso
+  confirma com o que o servidor gravou e oferece abrir a ficha, e "Cancelar"
+  pede confirmação antes de descartar.
+- **Testes.** Unitários da API para as duas camadas de autorização e para os
+  motivos; E2E com negação explícita a `master_tecnico` (global e com empresa
+  ativa), `gestor` e `colaborador`; testes web da tela e do `Modal`.
+
+**Achados da T166 tratados:** D1, D2, D3 e o teste unitário de
+`resolverEscopoPessoas`. D4 foi mitigado no cliente; o servidor segue sem erro
+por campo (`DP-ADM-15`).
+
+**Decisão pendente do proprietário:** se `outro_controlado` vale para
+admissão. Ficou aceito, como já era, porque retirá-lo seria decidir o conteúdo
+do catálogo de motivos por tipo, que está com o RH (`DP-29`).
+
+**Fora desta entrega:** a readmissão (`POST /v1/vinculos`) não foi alterada;
+D7 e D8 seguem abertos.
 
 **Dívidas preservadas:** **R-3** (T162), **R-3 da revisão da T164**, **S2** (T161), **R1 a R3** (T160), **L3**, **S-1 a S-4** (T158), **R-A a R-C** (T157) e o registro `teste michell`.
 

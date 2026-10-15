@@ -7,7 +7,7 @@ import {
 } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { useState } from "react";
-import { Modal } from "./Modal";
+import { Modal, usePedirFechamentoModal } from "./Modal";
 import { Button } from "./Button";
 
 /**
@@ -432,5 +432,73 @@ describe("Modal (UI-F04)", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
     expect(aoFechar).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * T167 — ação de DENTRO da janela (um "Cancelar" de formulário) pede o
+ * fechamento pelo mesmo caminho do "Fechar": com alteração, confirma antes de
+ * descartar; sem alteração, fecha direto; bloqueada, não fecha.
+ */
+describe("Modal — usePedirFechamentoModal (T167)", () => {
+  function CancelarInterno() {
+    const pedir = usePedirFechamentoModal();
+    return <Button onClick={pedir}>Cancelar</Button>;
+  }
+
+  function janela(props: {
+    alterado?: boolean;
+    bloqueado?: boolean;
+    aoFechar: () => void;
+  }) {
+    return (
+      <Modal
+        aberto
+        titulo="Formulário"
+        onFechar={props.aoFechar}
+        alterado={props.alterado ?? false}
+        bloqueado={props.bloqueado ?? false}
+      >
+        <CancelarInterno />
+      </Modal>
+    );
+  }
+
+  it("com alteração, o Cancelar interno pede confirmação e não fecha", () => {
+    const aoFechar = vi.fn();
+    render(janela({ alterado: true, aoFechar }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    expect(aoFechar).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole("alertdialog", {
+        name: "Há alterações não salvas nesta janela. Descartar?",
+      }),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Descartar alterações" }),
+    );
+    expect(aoFechar).toHaveBeenCalledTimes(1);
+  });
+
+  it("sem alteração, o Cancelar interno fecha direto", () => {
+    const aoFechar = vi.fn();
+    render(janela({ aoFechar }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    expect(aoFechar).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+  });
+
+  it("bloqueada, o Cancelar interno não fecha", () => {
+    const aoFechar = vi.fn();
+    render(janela({ bloqueado: true, alterado: true, aoFechar }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    expect(aoFechar).not.toHaveBeenCalled();
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+  });
+
+  it("fora de um Modal, falha alto em vez de virar botão que não faz nada", () => {
+    const erroConsole = vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(() => render(<CancelarInterno />)).toThrow(/dentro de Modal/);
+    erroConsole.mockRestore();
   });
 });

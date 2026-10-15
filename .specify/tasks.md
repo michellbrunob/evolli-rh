@@ -1626,10 +1626,38 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       R1 a R3 (T160), L3, S-1 a S-4 (T158), R-A a R-C (T157) e o registro
       `teste michell`.
 
-64. **T167 - Admissão mínima segura: estabilizar o contrato existente**
-    - **Estado:** em implementação. Branch `codex/t167-admissao-minima-segura`,
-      a partir do squash `0c00afdc479193506e80eff0150dc4ddb785a41f` (T166,
-      PR #158).
+64. **T167 - Admissão mínima segura: estabilizar o contrato existente** - **Estado:** **implementada em Draft**. Branch
+    `codex/t167-admissao-minima-segura`, a partir do squash
+    `0c00afdc479193506e80eff0150dc4ddb785a41f` (T166, PR #158).
+    - **API:** `motivoCodigo` da admissão aceita só `admissao_inicial` e
+      `outro_controlado` (`MOTIVOS_ADMISSAO`); os cinco motivos que pressupõem
+      um vínculo existente — mudança de lotação, de cargo, correção e fim de
+      vínculo — recebem 400. A resposta de `POST /v1/colaboradores` mantém o
+      colaborador no topo e acrescenta `vinculo` e `movimentacao` em projeção
+      fechada, sem dado pessoal novo. A admissão continua atômica; a lotação é
+      o destino gravado na movimentação, e a alocação só nasce na efetivação
+      (ADR 0007).
+    - **Web:** a empresa da admissão é só a da sessão — o seletor saiu, a
+      empresa aparece em leitura, e o formulário não envia se o servidor não
+      devolver exatamente uma. Recusa do servidor vira erro no campo certo
+      (409 → matrícula; 422 → referência organizacional; 404 → empresa ativa
+      mudou); foco no primeiro erro; dados mantidos em falha recuperável;
+      sucesso confirma com o que o servidor gravou e oferece abrir a ficha do
+      admitido; "Cancelar" pede confirmação antes de descartar.
+    - **Testes:** unitários da API (28: as duas camadas de autorização da
+      admissão, incluindo `resolverEscopoPessoas`, e os motivos); E2E da
+      admissão (resposta, motivos, `dp`, empresa divergente, negação a
+      `master_tecnico` — global e com empresa ativa —, `gestor` e
+      `colaborador`); web (tela e `Modal`).
+    - **Achados da T166 tratados:** D1 (empresa no formulário), D2
+      ("Cancelar"), D3 (motivo na admissão) e o teste unitário de
+      `resolverEscopoPessoas`. D4 foi mitigado no cliente: o servidor continua
+      sem erro por campo (`DP-ADM-15` aberto).
+    - **Decisão pendente:** se `outro_controlado` vale para admissão. Ficou
+      aceito, como antes, porque retirá-lo seria decidir o conteúdo do
+      catálogo por tipo (`DP-29`, RH).
+    - **Fora desta entrega, registrado:** readmissão (`POST /v1/vinculos`) não
+      foi alterada; D7 e D8 seguem abertos.
     - **Objetivo:** estabilizar o contrato **que já existe** de admissão de
       colaborador antes de expandir qualquer dado pessoal previsto na ADR 0016.
     - **Escopo autorizado pelo proprietário:**

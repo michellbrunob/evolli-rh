@@ -3,7 +3,10 @@ import {
   Colaborador,
   Prisma,
   SituacaoColaborador,
+  SituacaoVinculo,
   StatusMovimentacao,
+  TipoMovimentacao,
+  TipoVinculo,
 } from "@prisma/client";
 import { PrismaService } from "../../database/prisma.service";
 import { PessoasAuditoriaService } from "../pessoas-auditoria.service";
@@ -29,6 +32,45 @@ import {
   ListarColaboradoresQueryDto,
   RetificarColaboradorDto,
 } from "../dto/pessoas.dto";
+
+/**
+ * Resposta da admissão (T167).
+ *
+ * Mantém os campos do `Colaborador` no topo — quem já lia `id`, `nome` e
+ * `situacao` continua lendo —, e ACRESCENTA a confirmação do vínculo e do ato
+ * de admissão criados na mesma transação. Antes, o cliente precisava de dois
+ * GETs para saber que vínculo tinha nascido.
+ *
+ * Projeção FECHADA: cada campo é escolhido aqui, nunca a entidade inteira. Só
+ * entram dados já aprovados (nome, matrícula, tipo, situação, datas
+ * funcionais) e identificadores técnicos. A lotação aparece como os ids do
+ * destino gravado na movimentação: a alocação só nasce na efetivação (ADR 0007,
+ * ato × estado), e afirmar uma lotação vigente aqui seria falso.
+ */
+export interface AdmissaoRegistrada extends Colaborador {
+  vinculo: {
+    id: string;
+    empresaId: string;
+    matricula: string;
+    tipo: TipoVinculo;
+    situacao: SituacaoVinculo;
+    dataAdmissao: Date;
+  };
+  movimentacao: {
+    id: string;
+    tipo: TipoMovimentacao;
+    status: StatusMovimentacao;
+    vigenciaInicio: Date;
+    destino: {
+      unidadeOrganizacionalId: string | null;
+      departamentoId: string | null;
+      areaId: string | null;
+      equipeId: string | null;
+      cargoId: string | null;
+      centroCustoId: string | null;
+    };
+  };
+}
 
 /**
  * Colaborador — a pessoa. Carrega **apenas** os dados aprovados na Baseline V1
@@ -60,7 +102,7 @@ export class ColaboradorService {
   async admitir(
     dto: AdmitirColaboradorDto,
     ctx: PessoasAuditContext,
-  ): Promise<Colaborador> {
+  ): Promise<AdmissaoRegistrada> {
     const escopo = resolverEscopoPessoas(ctx.actor);
 
     if (dto.empresaId !== escopo.empresaId) {
@@ -155,7 +197,32 @@ export class ColaboradorService {
           escopo.empresaId,
         );
 
-        return colaborador;
+        return {
+          ...colaborador,
+          vinculo: {
+            id: vinculo.id,
+            empresaId: vinculo.empresaId,
+            matricula: vinculo.matricula,
+            tipo: vinculo.tipo,
+            situacao: vinculo.situacao,
+            dataAdmissao: vinculo.dataAdmissao,
+          },
+          movimentacao: {
+            id: movimentacao.id,
+            tipo: movimentacao.tipo,
+            status: movimentacao.status,
+            vigenciaInicio: movimentacao.vigenciaInicio,
+            destino: {
+              unidadeOrganizacionalId:
+                movimentacao.destinoUnidadeOrganizacionalId,
+              departamentoId: movimentacao.destinoDepartamentoId,
+              areaId: movimentacao.destinoAreaId,
+              equipeId: movimentacao.destinoEquipeId,
+              cargoId: movimentacao.destinoCargoId,
+              centroCustoId: movimentacao.destinoCentroCustoId,
+            },
+          },
+        };
       });
     } catch (error) {
       traduzirErroPessoas(error);

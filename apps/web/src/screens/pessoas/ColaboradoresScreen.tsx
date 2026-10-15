@@ -9,9 +9,12 @@ import {
   PageHeader,
   StatusBadge,
   Surface,
+  usePedirFechamentoModal,
 } from "../../components";
 import type { DataTableColumn, StatusVariant } from "../../components";
 import {
+  ApiError,
+  type AdmissaoRegistradaApi,
   type AdmitirColaboradorDto,
   type ColaboradorApi,
   type RetificarColaboradorDto,
@@ -86,7 +89,6 @@ const OPCOES_TIPO_DESTINO: { valor: TipoDestino; rotulo: string }[] = [
 
 interface FormularioErros {
   nome?: string;
-  empresaId?: string;
   matricula?: string;
   tipo?: string;
   dataAdmissao?: string;
@@ -146,6 +148,133 @@ function limparErroDoCampo(
   const restante: FormularioErros = { ...erros };
   delete restante[campo];
   return restante;
+}
+
+/**
+ * T167 — a empresa da admissão vem SÓ da sessão. Se o servidor não devolver
+ * exatamente uma empresa para ela, o formulário não tem como saber onde
+ * admitir, e não oferece escolha: recusa enviar e diz por quê.
+ */
+const MENSAGEM_EMPRESA_INDEFINIDA =
+  "Não foi possível confirmar a empresa ativa em que você está trabalhando. Nada será enviado. Feche a janela e tente novamente.";
+
+/** `id` da mensagem geral do formulário — alvo de foco quando é o único erro. */
+const ERRO_GERAL_ID = "colaboradores-form-erro-geral";
+
+/**
+ * T167 — ordem VISUAL dos campos do formulário. Depois de um envio com erro, o
+ * foco vai ao primeiro desta lista que tiver mensagem: quem usa teclado ou
+ * leitor de tela chega direto ao que precisa corrigir, em vez de procurar a
+ * marca vermelha numa janela longa.
+ */
+const ORDEM_DOS_ERROS: readonly (keyof FormularioErros)[] = [
+  "nome",
+  "matricula",
+  "tipo",
+  "dataAdmissao",
+  "tipoDestino",
+  "departamentoArea",
+  "destino",
+  "geral",
+];
+
+const ID_DO_ERRO: Record<keyof FormularioErros, string> = {
+  nome: "colaboradores-nome",
+  matricula: "colaboradores-matricula",
+  tipo: "colaboradores-tipo-vinculo",
+  dataAdmissao: "colaboradores-data-admissao",
+  tipoDestino: "colaboradores-tipo-destino",
+  departamentoArea: "colaboradores-departamento-area",
+  destino: "colaboradores-destino",
+  geral: ERRO_GERAL_ID,
+};
+
+/**
+ * T167 — traduz a recusa do servidor para o campo que a causou.
+ *
+ * O servidor responde com mensagem FIXA por status (`AllExceptionsFilter`),
+ * sem dizer o campo; antes, a tela mostrava essa mensagem crua — "Conflito ao
+ * processar a requisição." — no rodapé, sem apontar o que corrigir. O
+ * mapeamento abaixo vale SÓ para `POST /v1/colaboradores` e se apoia no que o
+ * código do servidor pode produzir nessa rota, não em suposição:
+ *
+ *  - 409 — a admissão cria um colaborador NOVO, então a única unicidade que ela
+ *    pode violar é a da matrícula dentro da empresa (`traduzirErroPessoas`,
+ *    P2002). Nenhum período de alocação é gravado na admissão, então a
+ *    exclusão de sobreposição (23P01) não ocorre nela.
+ *  - 422 — destino incoerente, inexistente, de outra empresa ou inativo
+ *    (`assertDestinoCoerente`, `assertDestinoValidoEAtivo`, FK composta).
+ *  - 404 — a empresa enviada não é a empresa ativa da sessão: o contexto mudou
+ *    depois que a janela abriu (em outra aba, por exemplo).
+ *
+ * Em todos os casos os dados digitados ficam no formulário.
+ */
+function errosDaAdmissaoRecusada(
+  erro: unknown,
+  temDestino: boolean,
+): FormularioErros {
+  const status = erro instanceof ApiError ? erro.status : null;
+  switch (status) {
+    case 409:
+      return {
+        matricula:
+          "Esta matrícula já está em uso nesta empresa. Informe outra.",
+      };
+    case 422:
+      return temDestino
+        ? {
+            destino:
+              "A referência organizacional escolhida não foi aceita: ela pode ter sido inativada ou não pertencer à empresa ativa. Escolha outra.",
+          }
+        : {
+            geral:
+              "O servidor recusou a referência organizacional. Revise a lotação e tente de novo.",
+          };
+    case 404:
+      return {
+        geral:
+          "A empresa ativa mudou desde que esta janela foi aberta. Nada foi salvo. Feche a janela e abra de novo para admitir na empresa atual.",
+      };
+    case 403:
+      return {
+        geral:
+          "Seu perfil não tem permissão para admitir colaboradores. Nada foi salvo.",
+      };
+    case 401:
+      return {
+        geral:
+          "Seu acesso expirou. Nada foi salvo. Entre novamente para concluir a admissão.",
+      };
+    case 400:
+      return {
+        geral:
+          "O servidor recusou algum dos dados informados. Revise os campos e tente de novo.",
+      };
+    default:
+      return {
+        geral:
+          "Não foi possível admitir o colaborador agora. Os dados digitados foram mantidos; tente de novo.",
+      };
+  }
+}
+
+/**
+ * "Cancelar" do formulário, ligado ao pedido de fechamento do `Modal` (T167).
+ * Chamava o fechamento da tela direto e descartava, sem perguntar, o que já
+ * estava digitado — só "Fechar" e Escape pediam confirmação.
+ */
+function CancelarFormulario({ desabilitado }: { desabilitado: boolean }) {
+  const pedirFechamento = usePedirFechamentoModal();
+  return (
+    <Button
+      type="button"
+      variant="secondary"
+      onClick={pedirFechamento}
+      disabled={desabilitado}
+    >
+      Cancelar
+    </Button>
+  );
 }
 
 function rotuloTipoDestino(tipo: TipoDestino): string {
@@ -245,6 +374,17 @@ export function ColaboradoresScreen({
   // T142 — confirmação de escrita. Antes, admitir fechava o formulário em
   // silêncio: a pessoa ficava olhando a lista sem saber se salvou.
   const [mensagemSucesso, setMensagemSucesso] = useState<string | null>(null);
+  // T167 — o colaborador recém-admitido, para a confirmação oferecer o
+  // caminho até a ficha dele. Vem da RESPOSTA da admissão, não de nova busca.
+  const [admitidoRecente, setAdmitidoRecente] = useState<ColaboradorApi | null>(
+    null,
+  );
+  /**
+   * Pedido de foco no primeiro erro, atendido depois que o React desenha as
+   * mensagens. Um ref, e não estado: é um gatilho de uma vez só, e não deve
+   * causar outro desenho.
+   */
+  const focarPrimeiroErroRef = useRef(false);
   // T142 (piloto) — o painel de trabalho precisa ser encontrável: quando abre,
   // entra no campo de visão e recebe o foco; quando fecha, devolve o foco a
   // quem o abriu. Sem isto o botão "Novo colaborador" parecia não fazer nada,
@@ -264,6 +404,15 @@ export function ColaboradoresScreen({
    * `AbortController`: a resposta só é aplicada se ainda for a mais recente.
    */
   const pedidoListaRef = useRef(0);
+
+  // T167 — foco no primeiro campo com erro, depois que as mensagens existem.
+  useEffect(() => {
+    if (!focarPrimeiroErroRef.current || !formulario) return;
+    focarPrimeiroErroRef.current = false;
+    const campo = ORDEM_DOS_ERROS.find((c) => formulario.erros[c]);
+    if (!campo) return;
+    document.getElementById(ID_DO_ERRO[campo])?.focus();
+  }, [formulario]);
 
   const formularioAlterado =
     formulario !== null &&
@@ -346,6 +495,7 @@ export function ColaboradoresScreen({
 
   async function abrirFormulario() {
     setMensagemSucesso(null);
+    setAdmitidoRecente(null);
     setDetalhe(null);
     setFormulario({
       nome: "",
@@ -390,10 +540,17 @@ export function ColaboradoresScreen({
           ? {
               ...prev,
               empresas: empresasResp.itens,
+              // T167 — a empresa da admissão é a ÚNICA que o servidor devolve
+              // para a sessão (`GET /v1/empresas` já vem escopado pela empresa
+              // ativa). Nenhuma, ou mais de uma, não é escolha a oferecer: é
+              // estado que o formulário não sabe resolver, e ele não envia.
               empresaId:
                 empresasResp.itens.length === 1
                   ? (empresasResp.itens[0]?.id ?? "")
                   : "",
+              ...(empresasResp.itens.length === 1
+                ? {}
+                : { erros: { geral: MENSAGEM_EMPRESA_INDEFINIDA } }),
               departamentos: departamentosResp.itens,
               unidades: unidadesResp.itens,
               equipes: equipesResp.itens,
@@ -483,6 +640,7 @@ export function ColaboradoresScreen({
 
   function abrirDetalhe(colaborador: ColaboradorApi) {
     setMensagemSucesso(null);
+    setAdmitidoRecente(null);
     setFormulario(null);
     setDetalhe({
       colaborador,
@@ -598,8 +756,8 @@ export function ColaboradoresScreen({
     } else if (nome.length < 2 || nome.length > 160) {
       erros.nome = "Nome deve ter entre 2 e 160 caracteres.";
     }
-    if (formulario.empresas.length > 1 && !formulario.empresaId) {
-      erros.empresaId = "Selecione a empresa.";
+    if (!formulario.empresaId) {
+      erros.geral = MENSAGEM_EMPRESA_INDEFINIDA;
     }
     const matricula = formulario.matricula.trim().toUpperCase();
     if (!MATRICULA_PATTERN.test(matricula)) {
@@ -630,7 +788,7 @@ export function ColaboradoresScreen({
 
     if (
       erros.nome ??
-      erros.empresaId ??
+      erros.geral ??
       erros.matricula ??
       erros.tipo ??
       erros.dataAdmissao ??
@@ -638,6 +796,7 @@ export function ColaboradoresScreen({
       erros.departamentoArea ??
       erros.destino
     ) {
+      focarPrimeiroErroRef.current = true;
       setFormulario((prev) => (prev ? { ...prev, erros } : prev));
       return;
     }
@@ -648,8 +807,8 @@ export function ColaboradoresScreen({
     );
 
     try {
-      const empresaId =
-        formulario.empresaId || (formulario.empresas[0]?.id ?? "");
+      // Só a empresa que o servidor devolveu para a sessão — nunca escolha.
+      const empresaId = formulario.empresaId;
 
       const dto: AdmitirColaboradorDto = {
         nome,
@@ -680,8 +839,8 @@ export function ColaboradoresScreen({
           ? { centroCustoId: formulario.destinoId }
           : {}),
       };
-      const admitido = await admitirColaborador(dto);
-      const nomeAdmitido = formulario.nome.trim();
+      const admitido: AdmissaoRegistradaApi = await admitirColaborador(dto);
+      const nomeAdmitido = admitido.nome;
       fecharFormulario();
       // A confirmação sai assim que o SERVIDOR confirma — não depende do
       // refetch —, mas não pode mais afirmar que o registro está visível.
@@ -693,25 +852,28 @@ export function ColaboradoresScreen({
       const ocultoPorVinculo =
         filtroSituacaoVinculo !== "todos" &&
         filtroSituacaoVinculo !== "previsto";
+      // T167 — a confirmação usa o que o SERVIDOR gravou (matrícula e
+      // situação do vínculo vêm da resposta), não o que estava digitado.
+      const confirmacao = `Colaborador ${nomeAdmitido} admitido com a matrícula ${admitido.vinculo.matricula}. O vínculo começa ${ROTULO_SITUACAO_VINCULO[admitido.vinculo.situacao] ?? admitido.vinculo.situacao} e o colaborador ${admitido.situacao === "ativo" ? "Ativo" : "Inativo"} até a efetivação da admissão.`;
       setMensagemSucesso(
         ocultoPorSituacao || ocultoPorVinculo
-          ? `Colaborador ${nomeAdmitido} admitido. Ele não aparece na lista porque os filtros atuais o excluem: a admissão começa com situação Inativo e vínculo Previsto.`
-          : `Colaborador ${nomeAdmitido} admitido. Ele já aparece na lista abaixo.`,
+          ? `${confirmacao} Ele não aparece na lista porque os filtros atuais o excluem.`
+          : `${confirmacao} Ele já aparece na lista abaixo.`,
       );
+      setAdmitidoRecente({
+        id: admitido.id,
+        nome: admitido.nome,
+        situacao: admitido.situacao,
+        criadoEm: admitido.criadoEm,
+        atualizadoEm: admitido.atualizadoEm,
+      });
       await carregarDados(filtroSituacao, filtroSituacaoVinculo, pagina);
     } catch (err: unknown) {
-      const mensagem =
-        err instanceof Error
-          ? err.message
-          : "Não foi possível admitir o colaborador. Tente novamente.";
+      // Os dados digitados ficam: só o estado de envio e as mensagens mudam.
+      const erros = errosDaAdmissaoRecusada(err, formulario.tipoDestino !== "");
+      focarPrimeiroErroRef.current = true;
       setFormulario((prev) =>
-        prev
-          ? {
-              ...prev,
-              salvando: false,
-              erros: { ...prev.erros, geral: mensagem },
-            }
-          : prev,
+        prev ? { ...prev, salvando: false, erros } : prev,
       );
     } finally {
       // Libera a trava só aqui: depois que a tentativa termina de verdade
@@ -865,10 +1027,23 @@ export function ColaboradoresScreen({
           <p className="colaboradores-screen__sucesso-texto" role="status">
             {mensagemSucesso}
           </p>
+          {admitidoRecente ? (
+            <Button
+              type="button"
+              variant="primary"
+              aria-haspopup="dialog"
+              onClick={() => abrirDetalhe(admitidoRecente)}
+            >
+              Abrir ficha de {admitidoRecente.nome}
+            </Button>
+          ) : null}
           <Button
             type="button"
             variant="secondary"
-            onClick={() => setMensagemSucesso(null)}
+            onClick={() => {
+              setMensagemSucesso(null);
+              setAdmitidoRecente(null);
+            }}
           >
             Dispensar
           </Button>
@@ -1249,40 +1424,16 @@ export function ColaboradoresScreen({
               )}
             </FormField>
 
-            {formulario.empresas.length > 1 ? (
-              <FormField
-                id="colaboradores-empresa"
-                label="Empresa"
-                required
-                {...(formulario.erros.empresaId
-                  ? { error: formulario.erros.empresaId }
-                  : {})}
+            {formulario.empresas.length === 1 && formulario.empresas[0] ? (
+              <p
+                className="colaboradores-screen__aviso-texto"
+                id="colaboradores-empresa-contexto"
               >
-                {(control) => (
-                  <select
-                    value={formulario.empresaId}
-                    onChange={(e) =>
-                      setFormulario((prev) =>
-                        prev
-                          ? {
-                              ...prev,
-                              empresaId: e.target.value,
-                              erros: limparErroDoCampo(prev.erros, "empresaId"),
-                            }
-                          : prev,
-                      )
-                    }
-                    {...control}
-                  >
-                    <option value="">Selecione…</option>
-                    {formulario.empresas.map((empresa) => (
-                      <option key={empresa.id} value={empresa.id}>
-                        {empresa.nome}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </FormField>
+                Empresa da admissão:{" "}
+                <strong>{formulario.empresas[0].nome}</strong> (
+                {formulario.empresas[0].codigo}) — a empresa ativa em que você
+                está trabalhando. Não é editável aqui.
+              </p>
             ) : null}
 
             <FormField
@@ -1482,20 +1633,18 @@ export function ColaboradoresScreen({
             ) : null}
 
             {formulario.erros.geral ? (
-              <p className="colaboradores-screen__form-erro" role="alert">
+              <p
+                className="colaboradores-screen__form-erro"
+                role="alert"
+                id={ERRO_GERAL_ID}
+                tabIndex={-1}
+              >
                 {formulario.erros.geral}
               </p>
             ) : null}
 
             <FormActions>
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={fecharFormulario}
-                disabled={formulario.salvando}
-              >
-                Cancelar
-              </Button>
+              <CancelarFormulario desabilitado={formulario.salvando} />
               <Button
                 type="submit"
                 variant="primary"
