@@ -164,6 +164,27 @@ function rotuloTipoDestino(tipo: TipoDestino): string {
  */
 const TAMANHO_PAGINA = 20;
 
+/**
+ * R-1 — o tamanho de página da resposta, quando ele é utilizável.
+ *
+ * Recusa o que não serve para dividir: ausente, não numérico, zero, negativo,
+ * fracionário ou não finito. Qualquer um deles produziria uma contagem de
+ * páginas sem sentido — `Infinity`, `NaN` ou uma divisão por zero —, e uma
+ * paginação inventada é pior que nenhuma.
+ *
+ * A recusa **volta ao tamanho pedido**, que é o que a tela de fato usou na
+ * requisição. Não há degradação para "sem paginação": o comportamento fica
+ * exatamente o de antes desta correção.
+ */
+function tamanhoDePaginaValido(valor: unknown): number {
+  return typeof valor === "number" &&
+    Number.isInteger(valor) &&
+    valor > 0 &&
+    Number.isFinite(valor)
+    ? valor
+    : TAMANHO_PAGINA;
+}
+
 export interface ColaboradoresScreenProps {
   /**
    * T164 — a empresa de trabalho ATIVA, resolvida pelo servidor e repassada
@@ -206,6 +227,19 @@ export function ColaboradoresScreen({
    */
   const [pagina, setPagina] = useState(1);
   const [total, setTotal] = useState(0);
+  /**
+   * R-1 — o tamanho de página que o SERVIDOR aplicou.
+   *
+   * Contar as páginas com a constante local assumia que o servidor sempre
+   * honra o tamanho pedido. Ele honra hoje, mas a resposta carrega o valor
+   * efetivo justamente para que o cliente não precise supor: no dia em que a
+   * rota limitar a página, contar com 20 um conjunto servido de 10 em 10
+   * ofereceria metade das páginas — e cada uma delas voltaria vazia.
+   *
+   * Começa na constante porque é o que foi pedido na primeira carga.
+   */
+  const [tamanhoPaginaEfetivo, setTamanhoPaginaEfetivo] =
+    useState(TAMANHO_PAGINA);
   const [formulario, setFormulario] = useState<FormularioState | null>(null);
   const [detalhe, setDetalhe] = useState<DetalheState | null>(null);
   // T142 — confirmação de escrita. Antes, admitir fechava o formulário em
@@ -277,6 +311,7 @@ export function ColaboradoresScreen({
         // conjunto) deixaria o rodapé mentindo sobre onde a pessoa está.
         setPagina(resp.pagina);
         setTotal(resp.total);
+        setTamanhoPaginaEfetivo(tamanhoDePaginaValido(resp.tamanhoPagina));
         setStatusCarregamento("dados");
         return resp.itens;
       } catch {
@@ -301,7 +336,7 @@ export function ColaboradoresScreen({
     void carregarDados(filtroSituacao, filtroSituacaoVinculo, 1);
   }, [filtroSituacao, filtroSituacaoVinculo, carregarDados]);
 
-  const totalPaginas = Math.max(1, Math.ceil(total / TAMANHO_PAGINA));
+  const totalPaginas = Math.max(1, Math.ceil(total / tamanhoPaginaEfetivo));
   const carregando = statusCarregamento === "carregando";
 
   function irParaPagina(destino: number) {
@@ -1015,55 +1050,63 @@ export function ColaboradoresScreen({
               }
             />
           ) : (
-            <>
-              <DataTable
-                caption="Colaboradores desta empresa"
-                captionVisible={false}
-                columns={colunasColaboradores}
-                rows={colaboradores}
-                rowKey={(c) => c.id}
-              />
-
-              {/* T164 — paginação real.
-
-                  Antes, a tela pedia a lista sem página e mostrava o que viesse:
-                  a partir do vigésimo primeiro colaborador as pessoas sumiam, e
-                  nada na interface dizia que havia mais. Uma lista que esconde
-                  registros é pior que uma vazia, porque parece completa.
-
-                  `<nav>` com nome acessível, porque é navegação de verdade; e a
-                  posição vai num `role="status"` para que quem usa leitor de
-                  tela ouça a mudança de página — sem isso, acionar "Próxima"
-                  move o conteúdo sem anunciar nada. */}
-              {totalPaginas > 1 ? (
-                <nav
-                  className="colaboradores-screen__paginacao"
-                  aria-label="Paginação de colaboradores"
-                >
-                  <Button
-                    variant="secondary"
-                    onClick={() => irParaPagina(pagina - 1)}
-                    disabled={pagina <= 1 || carregando}
-                  >
-                    Página anterior
-                  </Button>
-                  <span
-                    role="status"
-                    className="colaboradores-screen__paginacao-posicao"
-                  >
-                    Página {pagina} de {totalPaginas}
-                  </span>
-                  <Button
-                    variant="secondary"
-                    onClick={() => irParaPagina(pagina + 1)}
-                    disabled={pagina >= totalPaginas || carregando}
-                  >
-                    Próxima página
-                  </Button>
-                </nav>
-              ) : null}
-            </>
+            <DataTable
+              caption="Colaboradores desta empresa"
+              captionVisible={false}
+              columns={colunasColaboradores}
+              rows={colaboradores}
+              rowKey={(c) => c.id}
+            />
           )}
+
+          {/* T164, com a correção R-2 da revisão adversarial.
+
+              A navegação fica FORA do ramo que troca durante o carregamento.
+              Antes ela vivia junto da tabela, dentro do `else`: acionar
+              "Próxima página" desmontava o botão que tinha o foco, e o foco
+              caía no `<body>` — quem navega por teclado perdia a posição a
+              cada troca de página e tinha de tabular de volta.
+
+              Os controles ficam inertes por `aria-disabled`, e não por
+              `disabled`. A diferença é exatamente o ponto: um botão
+              `disabled` que tem o foco também o perde, porque deixa de ser
+              focalizável. Com `aria-disabled` ele permanece no foco e na
+              ordem de tabulação, anuncia o estado ao leitor de tela, e quem
+              recusa a ação é `irParaPagina` — que já retorna cedo quando a
+              página é inválida ou há carga em voo.
+
+              `aria-busy` no `<nav>` informa o carregamento sem depender de o
+              texto mudar. */}
+          {totalPaginas > 1 ? (
+            <nav
+              className="colaboradores-screen__paginacao"
+              aria-label="Paginação de colaboradores"
+              aria-busy={carregando}
+            >
+              <Button
+                variant="secondary"
+                onClick={() => irParaPagina(pagina - 1)}
+                aria-disabled={pagina <= 1 || carregando}
+              >
+                Página anterior
+              </Button>
+              <span
+                role="status"
+                className="colaboradores-screen__paginacao-posicao"
+              >
+                {carregando
+                  ? "Carregando página…"
+                  : `Página ${pagina} de ${totalPaginas}`}
+              </span>
+              <Button
+                variant="secondary"
+                onClick={() => irParaPagina(pagina + 1)}
+                aria-disabled={pagina >= totalPaginas || carregando}
+              >
+                Próxima página
+              </Button>
+            </nav>
+          ) : null}
         </section>
       )}
 

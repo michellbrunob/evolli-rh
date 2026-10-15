@@ -1705,12 +1705,15 @@ describe("T164 — paginação real", () => {
     render(<ColaboradoresScreen />);
     await screen.findByRole("table", { name: "Colaboradores desta empresa" });
 
+    // `aria-disabled`, e nao `disabled`: um botao desabilitado de verdade sai
+    // da ordem de tabulacao e PERDE o foco ao ser desabilitado — que e
+    // exatamente o defeito da R-2. Inerte, mas focalizavel.
     expect(
       screen.getByRole("button", { name: "Página anterior" }),
-    ).toBeDisabled();
+    ).toHaveAttribute("aria-disabled", "true");
     expect(
       screen.getByRole("button", { name: "Próxima página" }),
-    ).toBeEnabled();
+    ).toHaveAttribute("aria-disabled", "false");
 
     vi.mocked(listarColaboradores).mockResolvedValue(
       pagina([colaborador2], 2, 25),
@@ -1720,11 +1723,11 @@ describe("T164 — paginação real", () => {
     await waitFor(() =>
       expect(
         screen.getByRole("button", { name: "Próxima página" }),
-      ).toBeDisabled(),
+      ).toHaveAttribute("aria-disabled", "true"),
     );
     expect(
       screen.getByRole("button", { name: "Página anterior" }),
-    ).toBeEnabled();
+    ).toHaveAttribute("aria-disabled", "false");
   });
 
   it("com uma página só, não desenha navegação que não navega", async () => {
@@ -1891,5 +1894,215 @@ describe("T164 — o que NÃO existe nesta fatia", () => {
     expect(
       vi.mocked(listarVinculosDoColaborador).mock.calls.length - antesVinculos,
     ).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// R-1 e R-2 — ressalvas da revisão adversarial da PR #156.
+//
+// Os dois blocos abaixo FALHAM na versão anterior da tela: o primeiro porque
+// a contagem de páginas usava uma constante local em vez do tamanho que o
+// servidor aplicou; o segundo porque a navegação vivia dentro do ramo que
+// desmonta durante o carregamento, levando o foco junto.
+// ---------------------------------------------------------------------------
+
+describe("R-1 — a contagem de páginas segue o tamanho que o SERVIDOR aplicou", () => {
+  it("servidor servindo de 10 em 10: 45 registros são 5 páginas, não 3", async () => {
+    // Pedimos 20 e o servidor aplicou 10. Contar com a constante daria
+    // ceil(45/20) = 3 — e as páginas 4 e 5 ficariam inalcançáveis.
+    vi.mocked(listarColaboradores).mockResolvedValue({
+      itens: [colaborador1],
+      pagina: 1,
+      tamanhoPagina: 10,
+      total: 45,
+    });
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+
+    expect(
+      screen.getByRole("navigation", { name: "Paginação de colaboradores" }),
+    ).toHaveTextContent("Página 1 de 5");
+  });
+
+  it("servidor servindo de 50 em 50: 45 registros são uma página só", async () => {
+    // Com a constante, ceil(45/20) = 3 páginas — e as duas últimas voltariam
+    // vazias, porque o servidor já mandou tudo na primeira.
+    vi.mocked(listarColaboradores).mockResolvedValue({
+      itens: [colaborador1, colaborador2],
+      pagina: 1,
+      tamanhoPagina: 50,
+      total: 45,
+    });
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+
+    expect(
+      screen.queryByRole("navigation", { name: "Paginação de colaboradores" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["ausente", undefined],
+    ["zero", 0],
+    ["negativo", -20],
+    ["fracionário", 7.5],
+    ["não numérico", "20"],
+    ["não finito", Number.POSITIVE_INFINITY],
+  ])(
+    "tamanhoPagina %s cai no tamanho pedido, sem inventar paginação",
+    async (_nome, valor) => {
+      vi.mocked(listarColaboradores).mockResolvedValue({
+        itens: [colaborador1],
+        pagina: 1,
+        tamanhoPagina: valor,
+        total: 45,
+      } as never);
+      render(<ColaboradoresScreen />);
+      await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+
+      // Volta ao tamanho que a tela pediu: ceil(45/20) = 3. Nunca Infinity,
+      // NaN ou divisão por zero.
+      expect(
+        screen.getByRole("navigation", { name: "Paginação de colaboradores" }),
+      ).toHaveTextContent("Página 1 de 3");
+    },
+  );
+});
+
+describe("R-2 — trocar de página não derruba o foco", () => {
+  /** Resolve a próxima listagem só quando quisermos — segura o carregamento. */
+  function listagemControlada(
+    resposta: ResultadoPaginadoTeste<ColaboradorApi>,
+  ) {
+    let liberar!: () => void;
+    const promessa = new Promise<ResultadoPaginadoTeste<ColaboradorApi>>(
+      (r) => {
+        liberar = () => r(resposta);
+      },
+    );
+    vi.mocked(listarColaboradores).mockReturnValue(promessa as never);
+    return liberar;
+  }
+
+  it("a navegação NÃO desmonta durante o carregamento", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue(
+      pagina([colaborador1], 1, 45),
+    );
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+
+    const liberar = listagemControlada(pagina([colaborador2], 2, 45));
+    fireEvent.click(screen.getByRole("button", { name: "Próxima página" }));
+
+    // Enquanto a resposta não chega, a navegação continua na tela.
+    await waitFor(() =>
+      expect(
+        screen.getByRole("navigation", { name: "Paginação de colaboradores" }),
+      ).toHaveAttribute("aria-busy", "true"),
+    );
+    expect(
+      screen.getByRole("button", { name: "Próxima página" }),
+    ).toBeInTheDocument();
+
+    liberar();
+    await waitFor(() =>
+      expect(
+        screen.getByRole("navigation", { name: "Paginação de colaboradores" }),
+      ).toHaveTextContent("Página 2 de 3"),
+    );
+  });
+
+  it("o foco permanece no botão acionado — nunca cai no body", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue(
+      pagina([colaborador1], 1, 45),
+    );
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+
+    const proxima = screen.getByRole("button", { name: "Próxima página" });
+    proxima.focus();
+    expect(document.activeElement).toBe(proxima);
+
+    const liberar = listagemControlada(pagina([colaborador2], 2, 45));
+    fireEvent.click(proxima);
+
+    // Durante o carregamento: o foco segue onde a pessoa o deixou.
+    await waitFor(() =>
+      expect(
+        screen.getByRole("navigation", { name: "Paginação de colaboradores" }),
+      ).toHaveAttribute("aria-busy", "true"),
+    );
+    expect(document.activeElement).not.toBe(document.body);
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "Próxima página" }),
+    );
+
+    liberar();
+    // E depois do carregamento também.
+    await waitFor(() =>
+      expect(
+        screen.getByRole("navigation", { name: "Paginação de colaboradores" }),
+      ).toHaveTextContent("Página 2 de 3"),
+    );
+    expect(document.activeElement).not.toBe(document.body);
+  });
+
+  it("durante o carregamento, acionar de novo NÃO dispara outra requisição", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue(
+      pagina([colaborador1], 1, 45),
+    );
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+
+    const liberar = listagemControlada(pagina([colaborador2], 2, 45));
+    const proxima = screen.getByRole("button", { name: "Próxima página" });
+    fireEvent.click(proxima);
+    await waitFor(() =>
+      expect(
+        screen.getByRole("navigation", { name: "Paginação de colaboradores" }),
+      ).toHaveAttribute("aria-busy", "true"),
+    );
+
+    const antes = vi.mocked(listarColaboradores).mock.calls.length;
+    fireEvent.click(screen.getByRole("button", { name: "Próxima página" }));
+    fireEvent.click(screen.getByRole("button", { name: "Página anterior" }));
+
+    // Inerte por `aria-disabled` + guarda em `irParaPagina`: o controle segue
+    // focalizável, mas nenhuma ação nova atravessa.
+    expect(vi.mocked(listarColaboradores).mock.calls.length).toBe(antes);
+    expect(
+      screen.getByRole("button", { name: "Próxima página" }),
+    ).toHaveAttribute("aria-disabled", "true");
+
+    liberar();
+    await waitFor(() =>
+      expect(
+        screen.getByRole("navigation", { name: "Paginação de colaboradores" }),
+      ).toHaveTextContent("Página 2 de 3"),
+    );
+  });
+
+  it("a posição anuncia o carregamento em vez de mentir a página antiga", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue(
+      pagina([colaborador1], 1, 45),
+    );
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+
+    const liberar = listagemControlada(pagina([colaborador2], 2, 45));
+    fireEvent.click(screen.getByRole("button", { name: "Próxima página" }));
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole("navigation", { name: "Paginação de colaboradores" }),
+      ).toHaveTextContent("Carregando página…"),
+    );
+
+    liberar();
+    await waitFor(() =>
+      expect(
+        screen.getByRole("navigation", { name: "Paginação de colaboradores" }),
+      ).toHaveTextContent("Página 2 de 3"),
+    );
   });
 });
