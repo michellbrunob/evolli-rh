@@ -1418,9 +1418,9 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       R-A a R-C (T157) e o registro `teste michell`.
 
 60. **T163 - Contexto empresarial ativo e troca segura de empresa**
-    - **Estado:** em implementação. Branch
-      `codex/t163-contexto-empresarial-ativo`, a partir do squash
-      `61e5f9005e072a7e5583fb2ffbaa722240ea0ff9` (T162, PR #154).
+    - **Estado:** **integrada** em `main` pela PR #155, squash
+      `0da0950289dfb3d6104206471ade75a74ff2827a`, com a CI de push 3/3 verde.
+      Branch `codex/t163-contexto-empresarial-ativo` preservada.
     - **Origem:** a T162 entrou **sem** troca de empresa porque não havia
       contrato — a empresa era `access_user.companyId`, coluna fixa da conta.
       Esta tarefa cria o contrato.
@@ -1459,6 +1459,40 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
     - **Dívida preservada, nenhuma tratada aqui:** R-3 (T162, `dp`/Jornada e
       tabela de horário), S2 (T161), R1 a R3 (T160), L3, S-1 a S-4 (T158),
       R-A a R-C (T157) e o registro `teste michell`.
+
+61. **T164 - Colaboradores: primeira fatia operacional (consulta)**
+    - **Estado:** em implementação. Branch
+      `codex/t164-pessoas-colaboradores-operacionais`, a partir do squash
+      `0da0950289dfb3d6104206471ade75a74ff2827a` (T163, PR #155).
+    - **Natureza:** **exclusivamente consulta operacional**. É a primeira tela
+      de Colaboradores que é produto, e não maquete.
+    - **Entrega:** título com a empresa ativa; **total devolvido pelo
+      servidor**; filtros de situação do colaborador e situação do vínculo;
+      tabela com **Nome, Situação e data de cadastro** em padrão brasileiro;
+      paginação real, acessível e sem ocultar registro depois da primeira
+      página; estados de carregamento, vazio, erro e nova tentativa;
+      recarregamento limpo ao trocar de empresa no Hub, sem dado residual.
+    - **Contrato que sustenta a tela:** `GET /v1/colaboradores`, sob
+      `colaborador:read`, com `pagina`/`tamanhoPagina` (máx. 100, padrão 20) e
+      resposta `{ itens, pagina, tamanhoPagina, total }`.
+    - **Quatro limitações levantadas na fonte, respeitadas:** sem busca por
+      nome/matrícula; sem contagem agregada por situação (só o `total` do
+      conjunto filtrado); projeção da lista restrita a `id`, `nome`,
+      `situacao`, `criadoEm`, `atualizadoEm`; matrícula, cargo, departamento e
+      admissão vivem no vínculo, a uma chamada por pessoa. Nenhuma é
+      contornada — **N+1 é proibido** e controle que não funciona não é
+      desenhado.
+    - **Fora de escopo, por decisão do proprietário:** novo colaborador,
+      cadastro, edição, exclusão, admissão, desligamento, importação em massa,
+      exportação, solicitação de preenchimento, link de preenchimento,
+      autopreenchimento pelo funcionário e banco de horas na tabela
+      (capacidade de DP, contrato próprio). O próximo ciclo é o cadastro,
+      preenchido **exclusivamente pelo RH**.
+    - **Referência visual:** princípio de clareza de tabela e hierarquia de
+      ações, apenas. Sem marca, texto, paleta, layout ou componente de
+      terceiro.
+    - **Dívida preservada:** R-3 (T162), S2 (T161), R1 a R3 (T160), L3,
+      S-1 a S-4 (T158), R-A a R-C (T157) e o registro `teste michell`.
 
 ## Regra obrigatória para as próximas tarefas
 
