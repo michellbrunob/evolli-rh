@@ -1303,11 +1303,11 @@ sob `atorOperaEmEscopoGlobal`, os de **mutação** continuam recusando quem não
 `rh`/`dp`, e nenhum serviço de domínio lê `contaEmpresaId` — logo toda leitura e
 toda mutação operam na empresa ativa.
 
-## Colaboradores: primeira fatia operacional — T164 (interface web)
+## Colaboradores: primeira fatia operacional — T164 (integrada)
 
-| Tarefa | Estado               | Resultado principal                                                              |
-| ------ | -------------------- | -------------------------------------------------------------------------------- |
-| T164   | **Em implementação** | A primeira tela de Colaboradores que é produto, e não maquete — e é só consulta. |
+| Tarefa | Estado                                    | Resultado principal                                                              |
+| ------ | ----------------------------------------- | -------------------------------------------------------------------------------- |
+| T164   | **Integrada** (PR #156, squash `9df4756`) | A primeira tela de Colaboradores que é produto, e não maquete — e é só consulta. |
 
 **A fatia é exclusivamente de consulta operacional.** Ficam **fora de escopo**,
 por decisão do proprietário: novo colaborador, cadastro, edição, exclusão,
@@ -1345,6 +1345,126 @@ terceiro.
 
 **Dívidas preservadas:** **R-3** (T162), **S2** (T161), **R1 a R3** (T160),
 **L3**, **S-1 a S-4** (T158), **R-A a R-C** (T157) e o registro `teste michell`.
+
+**Desfecho.** Entrou com a CI 3/3 verde no squash `9df4756`, confirmada também
+por um disparo manual do workflow sobre `main`. A revisão adversarial levantou
+três ressalvas; **R-1 e R-2 foram corrigidas em commit próprio**, com doze
+testes que reprovam sem a correção e três mutações verificadas uma a uma:
+
+- **R-1** — a contagem de páginas usava a constante local em vez do
+  `tamanhoPagina` da resposta. Corrigida, com recusa de valor inválido de volta
+  ao tamanho pedido — sem `NaN`, `Infinity` nem paginação falsa.
+- **R-2** — a navegação vivia dentro do ramo que o carregamento substitui, e
+  paginar derrubava o foco para o `body`. Corrigida mantendo a navegação
+  montada, com `aria-busy`, anúncio de carregamento e `aria-disabled` no lugar
+  de `disabled` — um botão desabilitado de verdade perde o foco, que era o
+  defeito por outro caminho.
+- **R-3 — ABERTA, não bloqueante.** A paginação de múltiplas páginas está
+  comprovada por **teste**, não por observação no navegador: o banco de
+  demonstração tem 9 registros na Alfa e 1 na Beta, nunca mais de 20, então a
+  troca de página não chega a aparecer na prévia.
+
+## Cadastro de colaborador pelo RH — T165 (interface web)
+
+| Tarefa | Estado                                             | Resultado principal                                                                                                            |
+| ------ | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| T165   | **Parada por regra declarada; decisão registrada** | O contrato não permite cadastro sem admissão. Diagnóstico entregue, decisão do proprietário registrada, interface não escrita. |
+
+**Quem cadastra:** somente `rh` e `master_tecnico`. O funcionário **não**
+preenche, **não** recebe link e **não** participa de autopreenchimento — a
+decisão do proprietário é explícita, e esta tarefa não abre exceção.
+
+**Fora de escopo:** importação, exportação, admissão, desligamento, banco de
+horas e edição.
+
+**O formulário usa apenas o que o servidor oferece.** Nenhum campo, opção ou
+regra nasce de suposição: cada entrada precisa de contrato, e cada lista de
+opções precisa de rota que o `rh` realmente possa ler.
+
+**A empresa ativa é contexto, e é respeitada.** Aparece na tela, e a criação
+acontece dentro dela — sem permitir que o corpo da requisição aponte para
+outra empresa. O servidor já recusa isso; a interface não tenta contorná-lo.
+
+### A regra de parada foi acionada
+
+O inventário na fonte encontrou **quatro bloqueios independentes**, cada um
+suficiente por si. Nenhuma linha de interface foi escrita. O diagnóstico
+completo, com evidência e as cinco propostas originais, está em
+[`docs/decisions/t165-cadastro-colaborador-rh-bloqueio.md`](../docs/decisions/t165-cadastro-colaborador-rh-bloqueio.md).
+
+| #      | Bloqueio                                                                                                                                                                            | Evidência                                                                                                                                                     |
+| ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **B1** | **Não existe criação sem admissão.** A única rota é `POST /v1/colaboradores` com `AdmitirColaboradorDto`, e quatro dos seis campos obrigatórios são de admissão — que a T165 exclui | `pessoas.dto.ts:123`; o porquê está no próprio DTO: `Colaborador` não tem `empresa_id`, então cadastro sem vínculo ficaria fora de todo escopo de autorização |
+| **B2** | **O papel aprovado não bate com o RBAC.** A direção diz `rh` + `master_tecnico`; o contrato diz `rh` + `dp`, negando `master_tecnico` em duas camadas                               | `rbac.evaluator.ts` (só `read`) e `escopo-pessoas.util.ts` (`ForbiddenException`), por decisão registrada na T030                                             |
+| **B3** | **Não há dado cadastral para cadastrar.** O modelo guarda `nome`, `situacao` e carimbos — sem CPF, nascimento, contato ou endereço                                                  | `schema.prisma`, `model Colaborador`                                                                                                                          |
+| **B4** | **A "primeira fatia" já existe.** O formulário de Novo colaborador já coleta, valida, envia, confirma, trata erro e recarrega a lista                                               | `ColaboradoresScreen.tsx`, com **sete** testes dedicados                                                                                                      |
+
+Honrar a tarefa ao pé da letra exigiria criar endpoint, migration, campo e
+regra de RBAC — exatamente o que a regra proíbe. É a mesma disciplina que a
+T162 seguiu ao declarar a ausência de contrato de troca de empresa em vez de
+desenhar um seletor falso.
+
+**Um achado foi levantado e refutado**, registrado para não voltar: a suspeita
+de que o formulário permitiria escolher empresa diferente da ativa. Medido no
+navegador com conta autorizada em duas empresas, `GET /v1/empresas` devolve
+`total: 1` — só a ativa —, então o seletor nunca aparece. A T163 já havia
+fechado esse buraco.
+
+### A decisão do proprietário, registrada
+
+Veio em resposta ao diagnóstico, e **não autoriza implementação** — fixa o rumo
+para que a próxima tarefa não precise supor.
+
+**O fluxo passa a se chamar "Admitir colaborador".** Criação, primeiro vínculo
+e empresa ativa são **atômicos**; "cadastro" prometia uma etapa separada que o
+modelo nunca teve. O **B1 vira premissa**, não bloqueio.
+
+**Quem admite:** `rh` e `dp`. O `master_tecnico` **não** cria, edita ou admite
+pessoas; o funcionário **não** recebe link nem autopreenchimento. Isso
+**resolve o B2 a favor do contrato que já existe** — nenhuma mudança de RBAC é
+necessária, porque `rh` + `dp` é exatamente o que o avaliador concede hoje.
+
+**O formulário será progressivo**, em cinco blocos: admissão e vínculo; dados
+pessoais e contatos; organização; documentos e dados bancários; dependentes e
+complementos. **Só o primeiro tem contrato hoje.**
+
+**A empresa vem da sessão ativa**, como contexto **não editável**, e não pode
+ser forjada no corpo — que é o que o servidor já garante.
+
+**Dado pessoal exige contrato próprio antes de existir.** CPF, documentos,
+dados bancários, raça/etnia, deficiência, gênero, foto e dependentes só entram
+depois de **finalidade, acesso restrito, auditoria, retenção e contrato**
+declarados. Isso converte o **B3** de bloqueio em **sequência**: os campos
+faltam porque ainda não foram decididos.
+
+**As imagens de referência** servem só como inspiração de agrupamento e
+clareza — sem marca, texto, identidade visual, layout, paleta, ícone ou
+componente copiados.
+
+**A ordem aprovada:**
+
+|       | Etapa                                                   | Natureza                                                        |
+| ----- | ------------------------------------------------------- | --------------------------------------------------------------- |
+| **A** | Integrar a decisão documental da T165                   | documentada nesta PR; integração em `main` pendente até o merge |
+| **B** | **T166** — ADR de modelo, finalidade e acesso aos dados | decisão                                                         |
+| **C** | Contrato, API e migrations                              | servidor                                                        |
+| **D** | Admissão mínima                                         | primeira tela real                                              |
+| **E** | Expansão progressiva dos blocos                         | iterativo                                                       |
+
+As letras **A a E** são exclusivas desta sequência; a lista histórica do
+diagnóstico usa numeração **1 a 5** (Propostas originais). A decisão está
+**documentada nesta PR**, mas a etapa A só se cumpre com o **merge**: até lá,
+a integração em `main` está pendente. **Nenhuma implementação da T166
+começou** — sem branch, sem PR, sem ADR escrita, sem código.
+
+Nenhuma tela é desenhada antes do contrato que a sustenta, e nenhum dado
+pessoal nasce antes da ADR que declara sua finalidade — a mesma disciplina que
+fez esta tarefa parar. O **B4 continua válido**: o formulário atual é o ponto
+de partida da etapa D, não algo a refazer.
+
+**Dívidas preservadas:** **R-3** (T162), **R-3 da revisão da T164**, **S2**
+(T161), **R1 a R3** (T160), **L3**, **S-1 a S-4** (T158), **R-A a R-C** (T157)
+e o registro `teste michell`.
 
 ## Próxima ação autorizável
 

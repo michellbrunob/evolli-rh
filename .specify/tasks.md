@@ -1461,9 +1461,16 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       R-A a R-C (T157) e o registro `teste michell`.
 
 61. **T164 - Colaboradores: primeira fatia operacional (consulta)**
-    - **Estado:** em implementação. Branch
-      `codex/t164-pessoas-colaboradores-operacionais`, a partir do squash
-      `0da0950289dfb3d6104206471ade75a74ff2827a` (T163, PR #155).
+    - **Estado:** **integrada** em `main` pela PR #156, squash
+      `9df47566c3741bdeff68ae65bd6ffe1191a3a70b`, com a CI 3/3 verde — também
+      confirmada por disparo manual do workflow sobre `main`. Branch
+      `codex/t164-pessoas-colaboradores-operacionais` preservada.
+    - **Ressalvas da revisão adversarial:** **R-1** (contagem de páginas pela
+      constante local) e **R-2** (foco perdido ao paginar) **resolvidas** em
+      commit próprio, com 12 testes que reprovam sem a correção; **R-3
+      ABERTA** — paginação de múltiplas páginas comprovada por teste, não
+      observada em navegador, porque o banco de demonstração nunca passa de
+      20 registros.
     - **Natureza:** **exclusivamente consulta operacional**. É a primeira tela
       de Colaboradores que é produto, e não maquete.
     - **Entrega:** título com a empresa ativa; **total devolvido pelo
@@ -1493,6 +1500,77 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       terceiro.
     - **Dívida preservada:** R-3 (T162), S2 (T161), R1 a R3 (T160), L3,
       S-1 a S-4 (T158), R-A a R-C (T157) e o registro `teste michell`.
+
+62. **T165 - Cadastro de colaborador pelo RH**
+    - **Estado:** **parada por regra declarada**. Branch
+      `codex/t165-cadastro-colaborador-rh`, a partir do squash
+      `9df47566c3741bdeff68ae65bd6ffe1191a3a70b` (T164, PR #156). O inventário
+      encontrou **quatro bloqueios independentes** e nenhuma interface foi
+      escrita; o diagnóstico está em
+      [`docs/decisions/t165-cadastro-colaborador-rh-bloqueio.md`](../docs/decisions/t165-cadastro-colaborador-rh-bloqueio.md).
+    - **Bloqueios:** **B1** não existe criação sem admissão (única rota é
+      `POST /v1/colaboradores` com `AdmitirColaboradorDto`; `Colaborador` não
+      tem `empresa_id`, e cadastro sem vínculo ficaria fora de todo escopo);
+      **B2** a direção diz `rh` + `master_tecnico`, o contrato diz `rh` + `dp`
+      e nega `master_tecnico` em duas camadas (T030); **B3** não há dado
+      cadastral além de `nome`; **B4** o formulário pedido já existe, com sete
+      testes.
+    - **Propostas originais 1 a 5, nenhuma iniciada:** 1 decisão de papel;
+      2 cadastro em duas etapas (exige ADR de modelo); 3 melhorias no
+      formulário atual; 4 cobrir com teste a negação de mutação ao
+      `master_tecnico`; 5 projeção própria da listagem. Lista histórica do
+      diagnóstico, numerada de 1 a 5 de propósito: as letras **A a E**
+      pertencem exclusivamente à ordem aprovada, abaixo.
+    - **DECISÃO DO PROPRIETÁRIO, registrada (não autoriza implementação):**
+      - o fluxo passa a se chamar **"Admitir colaborador"**, porque criação,
+        primeiro vínculo e empresa ativa são **atômicos** — o **B1 vira
+        premissa**;
+      - **`rh` e `dp` admitem**; `master_tecnico` não cria, edita nem admite
+        pessoas; o funcionário não recebe link nem autopreenchimento. **Resolve
+        o B2 a favor do contrato atual, sem mudar RBAC**;
+      - o formulário será **progressivo**, em cinco blocos: admissão e vínculo;
+        dados pessoais e contatos; organização; documentos e dados bancários;
+        dependentes e complementos. **Só o primeiro tem contrato hoje**;
+      - a **empresa vem da sessão ativa**, como contexto não editável, e não
+        pode ser forjada no corpo;
+      - **CPF, documentos, dados bancários, raça/etnia, deficiência, gênero,
+        foto e dependentes** exigem **finalidade, acesso restrito, auditoria,
+        retenção e contrato próprios** antes de qualquer implementação — o
+        **B3 vira sequência de trabalho**;
+      - as imagens de referência servem só para **agrupamento e clareza**, sem
+        copiar marca, texto, identidade visual, layout, paleta, ícone ou
+        componente.
+    - **Ordem aprovada (letras A a E, exclusivas desta sequência):** **A**
+      integrar a decisão documental da T165 — a decisão está **documentada
+      nesta PR**, mas a **integração em `main` permanece pendente até o
+      merge**;
+      **B** T166 — ADR de modelo, finalidade e acesso aos dados; **C**
+      contrato, API e migrations; **D** admissão mínima; **E** expansão
+      progressiva dos blocos. O **B4 continua válido**: o formulário atual é o
+      ponto de partida da etapa D, não algo a refazer.
+    - **Quem cadastra:** somente `rh` e `master_tecnico`. O funcionário **não**
+      preenche, **não** recebe link e **não** participa de autopreenchimento.
+    - **Fora de escopo:** importação, exportação, admissão, desligamento,
+      banco de horas e edição.
+    - **Contrato antes de interface:** inventário na fonte de rota, DTO,
+      campos, obrigatoriedade, validações, resposta e RBAC; de como a empresa
+      ativa participa da criação; das relações obrigatórias (vínculo
+      funcional, cargo, departamento, unidade, equipe); e de qual fluxo de
+      admissão já existe e quais campos pertencem a ele.
+    - **Regra de parada:** se o contrato não permitir criação correta pelo RH
+      sem inventar campo, relação ou regra, **parar** e entregar diagnóstico
+      com proposta de fatias. Nenhum endpoint, migration, campo ou regra por
+      suposição.
+    - **Se houver contrato suficiente:** primeira fatia de "Novo colaborador"
+      alcançável da tela atual — formulário do RH, validação de campos, envio
+      seguro, sucesso, erro e retorno atualizado à lista.
+    - **Empresa ativa:** aparece como contexto e é respeitada; o corpo da
+      requisição não pode forjar outra empresa.
+    - **Referência visual:** hierarquia e clareza apenas. Sem marca, texto,
+      layout, paleta ou componente externo.
+    - **Dívida preservada:** R-3 (T162), R-3 da revisão da T164, S2 (T161),
+      R1 a R3 (T160), L3, S-1 a S-4 (T158), R-A a R-C (T157) e o registro
+      `teste michell`.
 
 ## Regra obrigatória para as próximas tarefas
 
