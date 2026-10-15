@@ -1303,11 +1303,11 @@ sob `atorOperaEmEscopoGlobal`, os de **mutação** continuam recusando quem não
 `rh`/`dp`, e nenhum serviço de domínio lê `contaEmpresaId` — logo toda leitura e
 toda mutação operam na empresa ativa.
 
-## Colaboradores: primeira fatia operacional — T164 (interface web)
+## Colaboradores: primeira fatia operacional — T164 (integrada)
 
-| Tarefa | Estado               | Resultado principal                                                              |
-| ------ | -------------------- | -------------------------------------------------------------------------------- |
-| T164   | **Em implementação** | A primeira tela de Colaboradores que é produto, e não maquete — e é só consulta. |
+| Tarefa | Estado                                    | Resultado principal                                                              |
+| ------ | ----------------------------------------- | -------------------------------------------------------------------------------- |
+| T164   | **Integrada** (PR #156, squash `9df4756`) | A primeira tela de Colaboradores que é produto, e não maquete — e é só consulta. |
 
 **A fatia é exclusivamente de consulta operacional.** Ficam **fora de escopo**,
 por decisão do proprietário: novo colaborador, cadastro, edição, exclusão,
@@ -1345,6 +1345,57 @@ terceiro.
 
 **Dívidas preservadas:** **R-3** (T162), **S2** (T161), **R1 a R3** (T160),
 **L3**, **S-1 a S-4** (T158), **R-A a R-C** (T157) e o registro `teste michell`.
+
+**Desfecho.** Entrou com a CI 3/3 verde no squash `9df4756`, confirmada também
+por um disparo manual do workflow sobre `main`. A revisão adversarial levantou
+três ressalvas; **R-1 e R-2 foram corrigidas em commit próprio**, com doze
+testes que reprovam sem a correção e três mutações verificadas uma a uma:
+
+- **R-1** — a contagem de páginas usava a constante local em vez do
+  `tamanhoPagina` da resposta. Corrigida, com recusa de valor inválido de volta
+  ao tamanho pedido — sem `NaN`, `Infinity` nem paginação falsa.
+- **R-2** — a navegação vivia dentro do ramo que o carregamento substitui, e
+  paginar derrubava o foco para o `body`. Corrigida mantendo a navegação
+  montada, com `aria-busy`, anúncio de carregamento e `aria-disabled` no lugar
+  de `disabled` — um botão desabilitado de verdade perde o foco, que era o
+  defeito por outro caminho.
+- **R-3 — ABERTA, não bloqueante.** A paginação de múltiplas páginas está
+  comprovada por **teste**, não por observação no navegador: o banco de
+  demonstração tem 9 registros na Alfa e 1 na Beta, nunca mais de 20, então a
+  troca de página não chega a aparecer na prévia.
+
+## Cadastro de colaborador pelo RH — T165 (interface web)
+
+| Tarefa | Estado               | Resultado principal                                                    |
+| ------ | -------------------- | ---------------------------------------------------------------------- |
+| T165   | **Em implementação** | O RH passa a cadastrar colaborador pela tela, dentro da empresa ativa. |
+
+**Quem cadastra:** somente `rh` e `master_tecnico`. O funcionário **não**
+preenche, **não** recebe link e **não** participa de autopreenchimento — a
+decisão do proprietário é explícita, e esta tarefa não abre exceção.
+
+**Fora de escopo:** importação, exportação, admissão, desligamento, banco de
+horas e edição.
+
+**O formulário usa apenas o que o servidor oferece.** Nenhum campo, opção ou
+regra nasce de suposição: cada entrada precisa de contrato, e cada lista de
+opções precisa de rota que o `rh` realmente possa ler.
+
+**A empresa ativa é contexto, e é respeitada.** Aparece na tela, e a criação
+acontece dentro dela — sem permitir que o corpo da requisição aponte para
+outra empresa. O servidor já recusa isso; a interface não tenta contorná-lo.
+
+### Regra de parada declarada
+
+Se o contrato **não** permitir uma criação correta pelo RH sem inventar campo,
+relação ou regra, a tarefa **para** e entrega diagnóstico com proposta de
+fatias. Não se cria endpoint, migration, campo nem regra por suposição — a
+mesma disciplina que a T162 seguiu ao declarar a ausência de contrato de troca
+de empresa em vez de desenhar um seletor falso.
+
+**Dívidas preservadas:** **R-3** (T162), **R-3 da revisão da T164**, **S2**
+(T161), **R1 a R3** (T160), **L3**, **S-1 a S-4** (T158), **R-A a R-C** (T157)
+e o registro `teste michell`.
 
 ## Próxima ação autorizável
 
