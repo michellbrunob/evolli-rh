@@ -1713,14 +1713,20 @@ que ele lê e edita, auditado; para todo o resto, a regra da T165 continua.
 - **Banco.** Migration `20261016120000_contatos_colaborador`, **criada e não aplicada localmente**:
   `contato_colaborador` (valor vigente por colaborador e empresa, com CHECK da
   normalização e triggers diferidos que exigem vínculo na empresa) e
-  `contato_colaborador_evento` (criação, leitura e edição com campos
-  afetados, nunca valores, append-only). `Colaborador` não ganhou coluna.
+  `contato_colaborador_evento` (toda consulta, criação e edição, com
+  resultado e nomes de campos, nunca valores, append-only). Migration `20261016130000_contatos_auditoria_toda_consulta`,
+  também **criada e não aplicada localmente**, permite o evento sem contato e,
+  só na empresa ambígua, sem empresa. `Colaborador` não ganhou coluna.
 - **API.** `GET` e `PUT /v1/colaboradores/:colaboradorId/contatos`, recurso
   próprio `contato_colaborador`. `rh` e `dp` na empresa ativa;
   `master_tecnico` em qualquer empresa, ou só na ativa quando selecionada;
   `gestor`, `colaborador` e demais negados. A empresa real vem do vínculo e é
   auditada em cada operação. Estados `sem_registro`, `registrado` e
   `bloqueado`. Validação e normalização no servidor, sem presumir país.
+- **Trilha de toda consulta.** Com valor, sem registro, bloqueada, o `PUT` sem
+  alteração (registrado como leitura) e a tentativa do `master_tecnico` com
+  empresa ambígua (sem empresa, `failure`) deixam `audit_event` e evento de
+  tratamento, na mesma transação. Nunca valores, corpo nem cabeçalhos brutos.
 - **Web.** Seção "Contatos" no detalhe do colaborador: três campos
   obrigatórios, erro por campo, foco no primeiro erro, dados preservados em
   falha, confirmação de sucesso e de descarte.
@@ -1728,11 +1734,9 @@ que ele lê e edita, auditado; para todo o resto, a regra da T165 continua.
   e web.
 
 **Limites registrados:** a eliminação ou anonimização após 2 anos não tem
-processo nesta fatia; exportação e exclusão não têm rota; leitura de
-`sem_registro` e `bloqueado` não é auditada, porque nenhum valor é lido;
-`master_tecnico` sem empresa ativa diante de colaborador com vínculo em mais
-de uma empresa recebe 409; os E2E rodam só na CI; sem validação visual em
-navegador.
+processo nesta fatia; exportação e exclusão não têm rota; a origem e a
+evidência da coleta não foram especificadas pela ficha (lacuna registrada);
+os E2E rodam só na CI; sem validação visual em navegador.
 
 **Fora de escopo:** endereço, contato de emergência, CPF, documentos, foto,
 nome social, sexo, gênero, raça/etnia, deficiência, escolaridade, dados

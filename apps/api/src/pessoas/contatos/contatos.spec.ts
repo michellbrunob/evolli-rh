@@ -57,7 +57,14 @@ async function errosDe(corpo: Record<string, unknown>) {
     whitelist: true,
     forbidNonWhitelisted: true,
   });
-  return { dto, campos: erros.map((e) => e.property).sort() };
+  return {
+    dto,
+    campos: erros.map((e) => e.property).sort(),
+    /** Quais regras recusaram cada campo — prova QUAL decorador agiu. */
+    regras: Object.fromEntries(
+      erros.map((e) => [e.property, Object.keys(e.constraints ?? {}).sort()]),
+    ),
+  };
 }
 
 const CORPO_VALIDO = {
@@ -132,12 +139,33 @@ describe("Contatos — validação do corpo", () => {
     },
   );
 
-  it("e-mail acima de 254 caracteres é recusado", async () => {
-    const emailPessoal = `${"a".repeat(64)}@${"b".repeat(186)}.test`;
-    expect(emailPessoal.length).toBeGreaterThan(254);
-    expect((await errosDe({ ...CORPO_VALIDO, emailPessoal })).campos).toEqual([
-      "emailPessoal",
-    ]);
+  // E-mails SINTATICAMENTE válidos: parte local de 64 e rótulos de até 63.
+  // `@IsEmail` também recusa acima de 254, então o teste confere QUAL regra
+  // agiu — sem `@MaxLength(254)`, a lista de regras não traria `maxLength`.
+  const emailComTamanho = (total: number) => {
+    const local = "a".repeat(64);
+    const fim = ".test";
+    const meio = total - local.length - 1 - fim.length - 2 * 64;
+    return `${local}@${"b".repeat(63)}.${"c".repeat(63)}.${"d".repeat(meio)}${fim}`;
+  };
+
+  it("e-mail válido com exatamente 254 caracteres é aceito", async () => {
+    const emailPessoal = emailComTamanho(254);
+    expect(emailPessoal).toHaveLength(254);
+    expect((await errosDe({ ...CORPO_VALIDO, emailPessoal })).campos).toEqual(
+      [],
+    );
+  });
+
+  it("e-mail válido com 255 caracteres é recusado pelo limite de 254", async () => {
+    const emailPessoal = emailComTamanho(255);
+    expect(emailPessoal).toHaveLength(255);
+    const { campos, regras } = await errosDe({
+      ...CORPO_VALIDO,
+      emailPessoal,
+    });
+    expect(campos).toEqual(["emailPessoal"]);
+    expect(regras["emailPessoal"]).toContain("maxLength");
   });
 
   it.each([
@@ -302,7 +330,7 @@ describe("Contatos — matriz de acesso da ficha", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Serviço — empresa real, estados e auditoria sem valores
+// Serviço — empresa real, estados e trilha de TODA consulta, sem valores
 // ---------------------------------------------------------------------------
 
 type Vinculo = {
@@ -314,23 +342,28 @@ function montar(opcoes: {
   vinculos: Vinculo[];
   contato?: Record<string, unknown> | null;
   falhaAuditoria?: boolean;
+  /**
+   * O banco devolve os vínculos IGNORANDO o filtro de empresa. Só existe para
+   * isolar a fase 2 (`podeAcessarPessoas`): com o filtro correto, ela nunca é
+   * a camada que nega.
+   */
+  ignorarFiltroDeEmpresa?: boolean;
 }) {
   const contatoGravado =
-    opcoes.contato === undefined
+    opcoes.contato === undefined || opcoes.contato === null
       ? null
-      : opcoes.contato === null
-        ? null
-        : {
-            id: CONTATO_ID,
-            atualizadoEm: new Date("2026-10-16T12:00:00Z"),
-            ...opcoes.contato,
-          };
+      : {
+          id: CONTATO_ID,
+          atualizadoEm: new Date("2026-10-16T12:00:00Z"),
+          ...opcoes.contato,
+        };
 
   const prisma = {
     vinculoFuncional: {
       findMany: jest.fn(async (args: { where: { empresaId?: string } }) =>
         opcoes.vinculos.filter(
           (v) =>
+            opcoes.ignorarFiltroDeEmpresa ||
             args.where.empresaId === undefined ||
             v.empresaId === args.where.empresaId,
         ),
@@ -391,6 +424,36 @@ function semValores(texto: string) {
   }
 }
 
+/** A única linha de `audit_event` gravada com sucesso (não a de negação). */
+function eventoFormal(m: ReturnType<typeof montar>) {
+  const chamadas = m.auditService.record.mock.calls as unknown as [
+    Record<string, unknown>,
+    unknown,
+  ][];
+  expect(chamadas).toHaveLength(1);
+  const [entrada, tx] = chamadas[0]!;
+  // Sempre dentro da transação: sem `tx`, a trilha seria best-effort.
+  expect(tx).toBe(m.prisma);
+  return entrada;
+}
+
+function eventoDeTratamento(m: ReturnType<typeof montar>) {
+  const chamadas = m.prisma.contatoColaboradorEvento.create.mock
+    .calls as unknown as [{ data: Record<string, unknown> }][];
+  expect(chamadas).toHaveLength(1);
+  return chamadas[0]![0].data;
+}
+
+const COM_VALOR = { emailPessoal: EMAIL, celular: CELULAR, telefone: TELEFONE };
+const ATIVO_A: Vinculo[] = [{ empresaId: EMPRESA_A, situacao: "ativo" }];
+const ENCERRADO_A: Vinculo[] = [
+  { empresaId: EMPRESA_A, situacao: "encerrado" },
+];
+const DUAS_EMPRESAS: Vinculo[] = [
+  { empresaId: EMPRESA_A, situacao: "ativo" },
+  { empresaId: EMPRESA_B, situacao: "ativo" },
+];
+
 describe("Contatos — serviço", () => {
   describe("colaborador fora do alcance", () => {
     it("rh sem vínculo do colaborador na empresa ativa: 404, negação auditada, nada lido", async () => {
@@ -431,40 +494,41 @@ describe("Contatos — serviço", () => {
     it.each(["gestor", "colaborador"] as const)(
       "%s é recusado antes de qualquer consulta",
       async (role) => {
-        const m = montar({
-          vinculos: [{ empresaId: EMPRESA_A, situacao: "ativo" }],
-        });
+        const m = montar({ vinculos: ATIVO_A });
         await expect(
           m.service.consultar(COLABORADOR, ctx(ator(role, EMPRESA_A))),
         ).rejects.toBeInstanceOf(ForbiddenException);
         expect(m.prisma.vinculoFuncional.findMany).not.toHaveBeenCalled();
       },
     );
-  });
 
-  describe("leitura", () => {
-    it("colaborador existente sem registro: sem_registro, sem erro e sem auditoria de leitura", async () => {
+    it("fase 2 isolada: vínculo de outra empresa que escape do filtro é negado (404), sem ler contato", async () => {
+      // Com o filtro de empresa correto, este caso não é alcançável. O mock
+      // devolve o vínculo da empresa B mesmo assim, para provar que a segunda
+      // camada (`podeAcessarPessoas` com a empresa do vínculo) nega sozinha.
       const m = montar({
-        vinculos: [{ empresaId: EMPRESA_A, situacao: "ativo" }],
-        contato: null,
+        vinculos: [{ empresaId: EMPRESA_B, situacao: "ativo" }],
+        contato: COM_VALOR,
+        ignorarFiltroDeEmpresa: true,
       });
       await expect(
         m.service.consultar(COLABORADOR, ctx(ator("rh", EMPRESA_A))),
-      ).resolves.toEqual({
-        colaboradorId: COLABORADOR,
-        empresaId: EMPRESA_A,
-        situacao: "sem_registro",
-        contatos: null,
-      });
-      expect(m.auditService.record).not.toHaveBeenCalled();
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(m.auditService.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: "authorization_denied",
+          result: "denied",
+          companyId: EMPRESA_B,
+        }),
+      );
+      expect(m.prisma.contatoColaborador.findUnique).not.toHaveBeenCalled();
       expect(m.prisma.contatoColaboradorEvento.create).not.toHaveBeenCalled();
     });
+  });
 
-    it("registrado: devolve só os três campos e audita a leitura com a empresa real, sem valores", async () => {
-      const m = montar({
-        vinculos: [{ empresaId: EMPRESA_A, situacao: "ativo" }],
-        contato: { emailPessoal: EMAIL, celular: CELULAR, telefone: TELEFONE },
-      });
+  describe("toda consulta deixa trilha (GET)", () => {
+    it("com valor: devolve só os três campos; trilha consultado/success e evento valores_devolvidos, sem valores", async () => {
+      const m = montar({ vinculos: ATIVO_A, contato: COM_VALOR });
       const resposta = await m.service.consultar(
         COLABORADOR,
         ctx(ator("dp", EMPRESA_A)),
@@ -480,48 +544,62 @@ describe("Contatos — serviço", () => {
           atualizadoEm: new Date("2026-10-16T12:00:00Z"),
         },
       });
-      expect(m.auditService.record).toHaveBeenCalledTimes(1);
-      expect(m.auditService.record).toHaveBeenCalledWith(
+      expect(eventoFormal(m)).toEqual(
         expect.objectContaining({
           action: "pessoas_contato_consultado",
           resource: "contato_colaborador",
-          resourceId: CONTATO_ID,
+          resourceId: COLABORADOR,
           companyId: EMPRESA_A,
           actorRole: "dp",
           result: "success",
           requestId: "req-t169",
         }),
-        m.prisma,
       );
-      expect(m.prisma.contatoColaboradorEvento.create).toHaveBeenCalledWith({
-        data: {
-          contatoId: CONTATO_ID,
-          empresaId: EMPRESA_A,
-          acao: "leitura",
-          campos: ["email_pessoal", "celular", "telefone"],
-          atorUserId: "ator-dp",
-          requestId: "req-t169",
-        },
+      expect(eventoDeTratamento(m)).toEqual({
+        colaboradorId: COLABORADOR,
+        empresaId: EMPRESA_A,
+        contatoId: CONTATO_ID,
+        acao: "leitura",
+        resultado: "valores_devolvidos",
+        campos: ["email_pessoal", "celular", "telefone"],
+        atorUserId: "ator-dp",
+        requestId: "req-t169",
       });
       semValores(trilha(m));
     });
 
-    it("fail-safe: se a trilha falha, a leitura falha e nenhum valor é respondido", async () => {
-      const m = montar({
-        vinculos: [{ empresaId: EMPRESA_A, situacao: "ativo" }],
-        contato: { emailPessoal: EMAIL, celular: CELULAR, telefone: TELEFONE },
-        falhaAuditoria: true,
-      });
+    it("sem registro: sem erro, sem valor — e COM trilha (sem_registro, sem contato, nenhum campo)", async () => {
+      const m = montar({ vinculos: ATIVO_A, contato: null });
       await expect(
         m.service.consultar(COLABORADOR, ctx(ator("rh", EMPRESA_A))),
-      ).rejects.toThrow("trilha indisponível");
+      ).resolves.toEqual({
+        colaboradorId: COLABORADOR,
+        empresaId: EMPRESA_A,
+        situacao: "sem_registro",
+        contatos: null,
+      });
+      expect(eventoFormal(m)).toEqual(
+        expect.objectContaining({
+          action: "pessoas_contato_consultado",
+          resourceId: COLABORADOR,
+          companyId: EMPRESA_A,
+          result: "success",
+        }),
+      );
+      expect(eventoDeTratamento(m)).toEqual(
+        expect.objectContaining({
+          colaboradorId: COLABORADOR,
+          empresaId: EMPRESA_A,
+          contatoId: null,
+          acao: "leitura",
+          resultado: "sem_registro",
+          campos: [],
+        }),
+      );
     });
 
-    it("desligado (todos os vínculos encerrados): bloqueado, sem valor e sem ler o registro", async () => {
-      const m = montar({
-        vinculos: [{ empresaId: EMPRESA_A, situacao: "encerrado" }],
-        contato: { emailPessoal: EMAIL, celular: CELULAR, telefone: TELEFONE },
-      });
+    it("bloqueado (desligado): sem valor, valor NÃO lido — e COM trilha apontando o contato existente", async () => {
+      const m = montar({ vinculos: ENCERRADO_A, contato: COM_VALOR });
       await expect(
         m.service.consultar(COLABORADOR, ctx(ator("rh", EMPRESA_A))),
       ).resolves.toEqual({
@@ -530,7 +608,34 @@ describe("Contatos — serviço", () => {
         situacao: "bloqueado",
         contatos: null,
       });
-      expect(m.prisma.contatoColaborador.findUnique).not.toHaveBeenCalled();
+      // Só o id do contato é buscado; os valores, nunca.
+      expect(m.prisma.contatoColaborador.findUnique).toHaveBeenCalledTimes(1);
+      expect(m.prisma.contatoColaborador.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({ select: { id: true } }),
+      );
+      expect(eventoFormal(m)).toEqual(
+        expect.objectContaining({
+          action: "pessoas_contato_consultado",
+          companyId: EMPRESA_A,
+          result: "success",
+        }),
+      );
+      expect(eventoDeTratamento(m)).toEqual(
+        expect.objectContaining({
+          contatoId: CONTATO_ID,
+          acao: "leitura",
+          resultado: "bloqueado",
+          campos: [],
+        }),
+      );
+    });
+
+    it("bloqueado sem contato gravado: trilha sem contato", async () => {
+      const m = montar({ vinculos: ENCERRADO_A, contato: null });
+      await m.service.consultar(COLABORADOR, ctx(ator("rh", EMPRESA_A)));
+      expect(eventoDeTratamento(m)).toEqual(
+        expect.objectContaining({ contatoId: null, resultado: "bloqueado" }),
+      );
     });
 
     it("vínculo previsto (admitido, ainda não ativo) é uso operacional", async () => {
@@ -542,13 +647,32 @@ describe("Contatos — serviço", () => {
         m.service.consultar(COLABORADOR, ctx(ator("rh", EMPRESA_A))),
       ).resolves.toMatchObject({ situacao: "sem_registro" });
     });
+
+    it.each([
+      ["com valor", ATIVO_A, COM_VALOR],
+      ["sem registro", ATIVO_A, null],
+      ["bloqueado", ENCERRADO_A, COM_VALOR],
+    ] as const)(
+      "fail-safe (%s): se a trilha falha, nada é respondido",
+      async (_caso, vinculos, contato) => {
+        const m = montar({
+          vinculos: [...vinculos],
+          contato,
+          falhaAuditoria: true,
+        });
+        await expect(
+          m.service.consultar(COLABORADOR, ctx(ator("rh", EMPRESA_A))),
+        ).rejects.toThrow("trilha indisponível");
+        expect(m.prisma.contatoColaboradorEvento.create).not.toHaveBeenCalled();
+      },
+    );
   });
 
   describe("master_tecnico", () => {
     it("sem empresa ativa: resolve e audita a empresa REAL do vínculo", async () => {
       const m = montar({
         vinculos: [{ empresaId: EMPRESA_B, situacao: "ativo" }],
-        contato: { emailPessoal: EMAIL, celular: CELULAR, telefone: TELEFONE },
+        contato: COM_VALOR,
       });
       const resposta = await m.service.consultar(
         COLABORADOR,
@@ -558,27 +682,92 @@ describe("Contatos — serviço", () => {
       expect(m.prisma.vinculoFuncional.findMany).toHaveBeenCalledWith(
         expect.objectContaining({ where: { colaboradorId: COLABORADOR } }),
       );
-      expect(m.auditService.record).toHaveBeenCalledWith(
+      expect(eventoFormal(m)).toEqual(
         expect.objectContaining({
           action: "pessoas_contato_consultado",
           companyId: EMPRESA_B,
           actorRole: "master_tecnico",
         }),
-        m.prisma,
       );
     });
 
-    it("sem empresa ativa e colaborador em duas empresas: 409, nada lido", async () => {
+    it("sem empresa ativa e sem registro: também deixa trilha, com a empresa real", async () => {
       const m = montar({
-        vinculos: [
-          { empresaId: EMPRESA_A, situacao: "ativo" },
-          { empresaId: EMPRESA_B, situacao: "ativo" },
-        ],
+        vinculos: [{ empresaId: EMPRESA_B, situacao: "ativo" }],
+        contato: null,
       });
+      await m.service.consultar(COLABORADOR, ctx(ator("master_tecnico", null)));
+      expect(eventoFormal(m)).toEqual(
+        expect.objectContaining({ companyId: EMPRESA_B, result: "success" }),
+      );
+      expect(eventoDeTratamento(m)).toEqual(
+        expect.objectContaining({
+          empresaId: EMPRESA_B,
+          resultado: "sem_registro",
+        }),
+      );
+    });
+
+    it("GET ambíguo (duas empresas): 409, nada lido, trilha SEM empresa e com resultado de falha", async () => {
+      const m = montar({ vinculos: DUAS_EMPRESAS, contato: COM_VALOR });
       await expect(
         m.service.consultar(COLABORADOR, ctx(ator("master_tecnico", null))),
       ).rejects.toBeInstanceOf(ConflictException);
       expect(m.prisma.contatoColaborador.findUnique).not.toHaveBeenCalled();
+      expect(eventoFormal(m)).toEqual(
+        expect.objectContaining({
+          action: "pessoas_contato_consultado",
+          resource: "contato_colaborador",
+          resourceId: COLABORADOR,
+          companyId: null,
+          actorRole: "master_tecnico",
+          result: "failure",
+        }),
+      );
+      expect(eventoDeTratamento(m)).toEqual({
+        colaboradorId: COLABORADOR,
+        empresaId: null,
+        contatoId: null,
+        acao: "leitura",
+        resultado: "empresa_ambigua",
+        campos: [],
+        atorUserId: "ator-master_tecnico",
+        requestId: "req-t169",
+      });
+    });
+
+    it("PUT ambíguo: 409, nada gravado, trilha de edição SEM empresa e com falha", async () => {
+      const m = montar({ vinculos: DUAS_EMPRESAS, contato: null });
+      await expect(
+        m.service.registrar(
+          COLABORADOR,
+          CORPO_VALIDO as RegistrarContatosColaboradorDto,
+          ctx(ator("master_tecnico", null)),
+        ),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(m.prisma.contatoColaborador.create).not.toHaveBeenCalled();
+      expect(eventoFormal(m)).toEqual(
+        expect.objectContaining({
+          action: "pessoas_contato_atualizado",
+          companyId: null,
+          result: "failure",
+        }),
+      );
+      expect(eventoDeTratamento(m)).toEqual(
+        expect.objectContaining({
+          acao: "edicao",
+          resultado: "empresa_ambigua",
+          empresaId: null,
+        }),
+      );
+      semValores(trilha(m));
+    });
+
+    it("ambíguo e trilha indisponível: erro, nunca o 409 silencioso", async () => {
+      const m = montar({ vinculos: DUAS_EMPRESAS, falhaAuditoria: true });
+      await expect(
+        m.service.consultar(COLABORADOR, ctx(ator("master_tecnico", null))),
+      ).rejects.toThrow("trilha indisponível");
     });
 
     it("com empresa ativa: só ela — colaborador de outra empresa é 404", async () => {
@@ -609,23 +798,19 @@ describe("Contatos — serviço", () => {
           data: expect.objectContaining({ empresaId: EMPRESA_B }),
         }),
       );
-      expect(m.auditService.record).toHaveBeenCalledWith(
+      expect(eventoFormal(m)).toEqual(
         expect.objectContaining({
           action: "pessoas_contato_criado",
           companyId: EMPRESA_B,
           actorRole: "master_tecnico",
         }),
-        m.prisma,
       );
     });
   });
 
   describe("gravação", () => {
-    it("criação: empresa do VÍNCULO, autoria da sessão, evento com os três campos, sem valores na trilha", async () => {
-      const m = montar({
-        vinculos: [{ empresaId: EMPRESA_A, situacao: "ativo" }],
-        contato: null,
-      });
+    it("criação: empresa do VÍNCULO, autoria da sessão, evento gravado com os três campos, sem valores na trilha", async () => {
+      const m = montar({ vinculos: ATIVO_A, contato: null });
       const resposta = await m.service.registrar(
         COLABORADOR,
         CORPO_VALIDO as RegistrarContatosColaboradorDto,
@@ -656,21 +841,26 @@ describe("Contatos — serviço", () => {
           },
         }),
       );
-      expect(m.prisma.contatoColaboradorEvento.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
+      expect(eventoFormal(m)).toEqual(
+        expect.objectContaining({
+          action: "pessoas_contato_criado",
+          result: "success",
+        }),
+      );
+      expect(eventoDeTratamento(m)).toEqual(
+        expect.objectContaining({
+          contatoId: CONTATO_ID,
           acao: "criacao",
+          resultado: "gravado",
           campos: ["email_pessoal", "celular", "telefone"],
           empresaId: EMPRESA_A,
         }),
-      });
+      );
       semValores(trilha(m));
     });
 
     it("edição: o evento registra SÓ os campos que mudaram", async () => {
-      const m = montar({
-        vinculos: [{ empresaId: EMPRESA_A, situacao: "ativo" }],
-        contato: { emailPessoal: EMAIL, celular: CELULAR, telefone: TELEFONE },
-      });
+      const m = montar({ vinculos: ATIVO_A, contato: COM_VALOR });
       const resposta = await m.service.registrar(
         COLABORADOR,
         { ...CORPO_VALIDO, telefone: "1144445555" },
@@ -683,36 +873,53 @@ describe("Contatos — serviço", () => {
           data: expect.objectContaining({ atualizadoPorUserId: "ator-dp" }),
         }),
       );
-      expect(m.auditService.record).toHaveBeenCalledWith(
+      expect(eventoFormal(m)).toEqual(
         expect.objectContaining({ action: "pessoas_contato_atualizado" }),
-        m.prisma,
       );
-      expect(m.prisma.contatoColaboradorEvento.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({ acao: "edicao", campos: ["telefone"] }),
-      });
+      expect(eventoDeTratamento(m)).toEqual(
+        expect.objectContaining({
+          acao: "edicao",
+          resultado: "gravado",
+          campos: ["telefone"],
+        }),
+      );
       semValores(trilha(m));
       expect(trilha(m)).not.toContain("1144445555");
     });
 
-    it("sem alteração: nada gravado, nada auditado", async () => {
-      const m = montar({
-        vinculos: [{ empresaId: EMPRESA_A, situacao: "ativo" }],
-        contato: { emailPessoal: EMAIL, celular: CELULAR, telefone: TELEFONE },
-      });
+    it("PUT sem alteração: nada gravado, mas a devolução dos valores fica na trilha como leitura", async () => {
+      const m = montar({ vinculos: ATIVO_A, contato: COM_VALOR });
       const resposta = await m.service.registrar(
         COLABORADOR,
         CORPO_VALIDO as RegistrarContatosColaboradorDto,
         ctx(ator("rh", EMPRESA_A)),
       );
       expect(resposta.resultado).toBe("sem_alteracao");
+      expect(resposta.contatos).toMatchObject(COM_VALOR);
       expect(m.prisma.contatoColaborador.update).not.toHaveBeenCalled();
-      expect(m.auditService.record).not.toHaveBeenCalled();
+      expect(eventoFormal(m)).toEqual(
+        expect.objectContaining({
+          action: "pessoas_contato_consultado",
+          companyId: EMPRESA_A,
+          result: "success",
+        }),
+      );
+      expect(eventoDeTratamento(m)).toEqual(
+        expect.objectContaining({
+          contatoId: CONTATO_ID,
+          acao: "leitura",
+          resultado: "sem_alteracao",
+          campos: ["email_pessoal", "celular", "telefone"],
+        }),
+      );
+      semValores(trilha(m));
     });
 
-    it("desligado: edição recusada (409), nada gravado", async () => {
+    it("PUT sem alteração e trilha indisponível: nada é devolvido", async () => {
       const m = montar({
-        vinculos: [{ empresaId: EMPRESA_A, situacao: "encerrado" }],
-        contato: null,
+        vinculos: ATIVO_A,
+        contato: COM_VALOR,
+        falhaAuditoria: true,
       });
       await expect(
         m.service.registrar(
@@ -720,15 +927,43 @@ describe("Contatos — serviço", () => {
           CORPO_VALIDO as RegistrarContatosColaboradorDto,
           ctx(ator("rh", EMPRESA_A)),
         ),
+      ).rejects.toThrow("trilha indisponível");
+    });
+
+    it("desligado: edição recusada (409), nada gravado — e a tentativa fica na trilha", async () => {
+      const m = montar({ vinculos: ENCERRADO_A, contato: COM_VALOR });
+      await expect(
+        m.service.registrar(
+          COLABORADOR,
+          CORPO_VALIDO as RegistrarContatosColaboradorDto,
+          ctx(ator("rh", EMPRESA_A)),
+        ),
       ).rejects.toBeInstanceOf(ConflictException);
-      expect(m.prisma.$transaction).not.toHaveBeenCalled();
+      expect(m.prisma.contatoColaborador.create).not.toHaveBeenCalled();
+      expect(m.prisma.contatoColaborador.update).not.toHaveBeenCalled();
+      expect(m.prisma.contatoColaborador.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({ select: { id: true } }),
+      );
+      expect(eventoFormal(m)).toEqual(
+        expect.objectContaining({
+          action: "pessoas_contato_atualizado",
+          companyId: EMPRESA_A,
+          result: "failure",
+        }),
+      );
+      expect(eventoDeTratamento(m)).toEqual(
+        expect.objectContaining({
+          contatoId: CONTATO_ID,
+          acao: "edicao",
+          resultado: "bloqueado",
+          campos: [],
+        }),
+      );
+      semValores(trilha(m));
     });
 
     it("criação concorrente perdida na unicidade do banco vira 409", async () => {
-      const m = montar({
-        vinculos: [{ empresaId: EMPRESA_A, situacao: "ativo" }],
-        contato: null,
-      });
+      const m = montar({ vinculos: ATIVO_A, contato: null });
       m.prisma.contatoColaborador.create.mockRejectedValueOnce(
         new Prisma.PrismaClientKnownRequestError("unique", {
           code: "P2002",
@@ -746,7 +981,7 @@ describe("Contatos — serviço", () => {
 
     it("falha na trilha desfaz a gravação (mesma transação)", async () => {
       const m = montar({
-        vinculos: [{ empresaId: EMPRESA_A, situacao: "ativo" }],
+        vinculos: ATIVO_A,
         contato: null,
         falhaAuditoria: true,
       });

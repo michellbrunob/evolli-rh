@@ -552,9 +552,11 @@ enum AuditAction {
   // T169 — Contatos do colaborador (ficha aprovada em 2026-10-16). A ficha
   // exige auditar criacao, LEITURA, edicao, exportacao e exclusao. Exportacao e
   // exclusao nao tem rota nesta fatia, entao nao ha verbo para elas: o verbo
-  // nasce com a capacidade, nunca antes. O evento carrega ator, papel, a
-  // empresa REAL do colaborador e o id tecnico do registro de contato — nunca
-  // e-mail, celular ou telefone. Os CAMPOS afetados vivem em
+  // nasce com a capacidade, nunca antes. TODA consulta deixa evento, com valor
+  // devolvido ou nao. O evento carrega ator, papel, a empresa REAL do
+  // colaborador (ausente so quando ela nao pode ser resolvida, com resultado
+  // `failure`) e o id tecnico do colaborador — nunca e-mail, celular ou
+  // telefone. Resultado e NOMES dos campos vivem em
   // `contato_colaborador_evento`, correlacionados por `request_id`, porque
   // `audit_event` nao tem coluna de detalhe (ADR 0004 §5).
   pessoas_contato_criado     @map("pessoas.contato.criado")
@@ -696,7 +698,8 @@ model Empresa {
 
   // T169 — contatos do colaborador. `empresa_id` proprio: a fronteira de
   // autorizacao e a empresa, nunca a pessoa (ADR 0016, decisao 3).
-  contatosColaborador ContatoColaborador[]
+  contatosColaborador       ContatoColaborador[]
+  eventosContatoColaborador ContatoColaboradorEvento[]
 
   @@index([status])
   @@map("empresa")
@@ -1013,8 +1016,10 @@ model Colaborador {
 
   // T169 — contatos do colaborador, em agregado PROPRIO (ADR 0016, decisao 3;
   // ADR 0007, Emenda 4). `Colaborador` continua com `nome` e `situacao` e
-  // nenhuma coluna de contato.
-  contatos ContatoColaborador[]
+  // nenhuma coluna de contato. `eventosContato` e a trilha de tratamento, que
+  // existe mesmo quando o colaborador nao tem contato gravado.
+  contatos       ContatoColaborador[]
+  eventosContato ContatoColaboradorEvento[]
 
   @@index([situacao])
   @@map("colaborador")
@@ -2029,6 +2034,30 @@ enum CampoContatoColaborador {
   telefone
 }
 
+/// Resultado do tratamento registrado. TODA consulta aos contatos deixa
+/// evento — com valor devolvido ou nao (ficha de tratamento; Emenda 1 da ADR
+/// 0012: "toda leitura e toda edicao [...] sao auditadas").
+///
+///   gravado            criacao ou edicao que gravou valores
+///   valores_devolvidos leitura que devolveu os tres valores
+///   sem_alteracao      PUT sem mudanca efetiva: nada gravado, os tres valores
+///                      devolvidos
+///   sem_registro       consulta respondida sem valor: nao ha contato gravado
+///   bloqueado          consulta ou edicao sem uso operacional (sem vinculo
+///                      previsto ou ativo na empresa): nenhum valor devolvido
+///                      nem gravado
+///   empresa_ambigua    tentativa recusada antes de resolver a empresa:
+///                      `master_tecnico` sem empresa ativa diante de
+///                      colaborador com vinculo em mais de uma empresa
+enum ResultadoEventoContato {
+  gravado
+  valores_devolvidos
+  sem_alteracao
+  sem_registro
+  bloqueado
+  empresa_ambigua
+}
+
 /// Contatos de um colaborador DENTRO de uma empresa.
 ///
 /// POR QUE POR EMPRESA, E NAO POR PESSOA. O colaborador nao tem `empresa_id`
@@ -2070,31 +2099,43 @@ model ContatoColaborador {
 
   /// Um registro de contato por colaborador e empresa.
   @@unique([colaboradorId, empresaId])
-  /// Alvo da FK composta do evento: o banco garante que um evento pertence ao
-  /// contato E a empresa certos.
-  @@unique([id, empresaId])
+  /// Alvo da FK composta do evento: o banco garante que um evento que aponta
+  /// um contato pertence a ele, a empresa dele E ao colaborador dele.
+  @@unique([id, empresaId, colaboradorId])
   @@index([empresaId])
   @@index([criadoPorUserId])
   @@index([atualizadoPorUserId])
   @@map("contato_colaborador")
 }
 
-/// Evento de tratamento do contato: criacao, leitura e edicao, com os CAMPOS
-/// afetados — nunca os valores.
+/// Evento de tratamento do contato: TODA consulta, criacao e edicao, com o
+/// resultado e os NOMES dos campos alcancados — nunca os valores.
+///
+/// Identifica sempre o colaborador, o ator, a acao e o resultado. A empresa
+/// fica ausente SO quando nao pode ser resolvida (`empresa_ambigua`); o
+/// contato fica ausente SO quando nao existe contato naquela empresa, ou
+/// quando a empresa nao foi resolvida. A coerencia entre resultado, empresa,
+/// contato e campos e garantida por CHECK, e a existencia do vinculo e a
+/// ausencia de contato por CONSTRAINT TRIGGER, ambos na migration.
 ///
 /// APPEND-ONLY, garantido pelo BANCO: a migration REVOGA `UPDATE` e `DELETE`
 /// de `evolli_app`, como em `solicitacao_pessoa_evento`. Sem `atualizado_em`:
 /// a linha nunca muda. `request_id` correlaciona com `audit_event`, a trilha
 /// formal, sem duplicar conteudo.
 model ContatoColaboradorEvento {
-  id        String @id @default(uuid())
-  contatoId String @map("contato_id")
-  empresaId String @map("empresa_id")
+  id            String  @id @default(uuid())
+  colaboradorId String  @map("colaborador_id")
+  /// Ausente so em `empresa_ambigua`.
+  empresaId     String? @map("empresa_id")
+  /// Ausente so quando nao existe contato na empresa, ou sem empresa.
+  contatoId     String? @map("contato_id")
 
-  acao   AcaoContatoColaborador
-  /// Nomes dos campos afetados. Leitura e criacao afetam os tres; edicao, so
-  /// os que mudaram.
-  campos CampoContatoColaborador[]
+  acao      AcaoContatoColaborador
+  resultado ResultadoEventoContato
+  /// Nomes dos campos cujo valor o tratamento ALCANCOU: gravados na criacao,
+  /// alterados na edicao, devolvidos na leitura e no PUT sem alteracao. Vazio
+  /// quando nenhum valor foi devolvido nem gravado.
+  campos    CampoContatoColaborador[]
 
   atorUserId String @map("ator_user_id")
 
@@ -2103,9 +2144,12 @@ model ContatoColaboradorEvento {
 
   ocorridoEm DateTime @default(now()) @map("ocorrido_em")
 
-  contato ContatoColaborador @relation(fields: [contatoId, empresaId], references: [id, empresaId], onDelete: Restrict, onUpdate: Cascade)
-  ator    AccessUser         @relation("ContatoColaboradorEventoAtor", fields: [atorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  colaborador Colaborador         @relation(fields: [colaboradorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  empresa     Empresa?            @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  contato     ContatoColaborador? @relation(fields: [contatoId, empresaId, colaboradorId], references: [id, empresaId, colaboradorId], onDelete: Restrict, onUpdate: Cascade)
+  ator        AccessUser          @relation("ContatoColaboradorEventoAtor", fields: [atorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
+  @@index([colaboradorId, ocorridoEm])
   @@index([contatoId, ocorridoEm])
   @@index([empresaId, ocorridoEm])
   @@index([atorUserId])

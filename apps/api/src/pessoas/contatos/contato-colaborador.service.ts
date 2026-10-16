@@ -2,8 +2,10 @@ import { ConflictException, Injectable } from "@nestjs/common";
 import {
   AcaoContatoColaborador,
   AuditAction,
+  AuditResult,
   CampoContatoColaborador,
   Prisma,
+  ResultadoEventoContato,
 } from "@prisma/client";
 import { PrismaService } from "../../database/prisma.service";
 import { PessoasAuditoriaService } from "../pessoas-auditoria.service";
@@ -49,12 +51,14 @@ export interface ContatosRegistrados extends ContatosDoColaborador {
   resultado: ResultadoRegistroContatos;
 }
 
-/** Leitura e criação afetam os três campos. */
+/** Os três campos — gravados na criação, devolvidos na leitura. */
 const TODOS_OS_CAMPOS: readonly CampoContatoColaborador[] = [
   "email_pessoal",
   "celular",
   "telefone",
 ];
+
+const NENHUM_CAMPO: readonly CampoContatoColaborador[] = [];
 
 /** Projeção do registro: sem autoria, sem ids de conta. */
 const PROJECAO_CONTATO = {
@@ -69,11 +73,34 @@ type ContatoProjetado = Prisma.ContatoColaboradorGetPayload<{
   select: typeof PROJECAO_CONTATO;
 }>;
 
-interface AlvoContatos {
+/** Colaborador no escopo, com a empresa REAL resolvida pelo vínculo. */
+interface AlvoResolvido {
+  tipo: "resolvido";
   colaboradorId: string;
   empresaId: string;
   /** Há vínculo previsto ou ativo na empresa — uso operacional permitido. */
   operacional: boolean;
+}
+
+/**
+ * `master_tecnico` sem empresa ativa diante de colaborador com vínculo em mais
+ * de uma empresa. NENHUMA empresa foi resolvida — e não há como resolver
+ * naquele ponto —, então nada é lido nem gravado.
+ */
+interface AlvoAmbiguo {
+  tipo: "ambiguo";
+  colaboradorId: string;
+}
+
+type AlvoContatos = AlvoResolvido | AlvoAmbiguo;
+
+/** O que um evento de tratamento registra — nunca um valor de contato. */
+interface EventoContato {
+  acao: AcaoContatoColaborador;
+  resultado: ResultadoEventoContato;
+  campos: readonly CampoContatoColaborador[];
+  auditAction: AuditAction;
+  auditResult: AuditResult;
 }
 
 /**
@@ -120,9 +147,28 @@ function eUnicidadeVioladaNoBanco(erro: unknown): boolean {
  * vínculo, e é ela que vai para a autorização, para o registro e para a
  * trilha. Nenhum id de empresa vem do navegador.
  *
- * Auditoria (ficha): criação, leitura e edição, cada uma com `audit_event`
- * (trilha formal) e `contato_colaborador_evento` (campos afetados), na MESMA
- * transação do dado. Nenhum dos dois carrega valor de contato.
+ * TRILHA DE TODA CONSULTA (ficha; Emenda 1 da ADR 0012). Cada operação que
+ * chega ao serviço com o colaborador no escopo deixa `audit_event` (trilha
+ * formal) e `contato_colaborador_evento` (resultado e nomes dos campos), na
+ * MESMA transação do dado — com valor devolvido ou não:
+ *
+ *   GET com valor            consultado/success      leitura  valores_devolvidos
+ *   GET sem registro         consultado/success      leitura  sem_registro
+ *   GET bloqueado            consultado/success      leitura  bloqueado
+ *   GET empresa ambígua      consultado/failure      leitura  empresa_ambigua
+ *   PUT criação              criado/success          criacao  gravado
+ *   PUT edição               atualizado/success      edicao   gravado
+ *   PUT sem alteração        consultado/success      leitura  sem_alteracao
+ *   PUT bloqueado            atualizado/failure      edicao   bloqueado
+ *   PUT empresa ambígua      atualizado/failure      edicao   empresa_ambigua
+ *
+ * O PUT sem alteração é registrado como LEITURA: nada é gravado, e os três
+ * valores gravados voltam na resposta. Inexistente, fora do escopo e perfil
+ * sem acesso deixam `authorization_denied` pela regra existente (ADR 0004).
+ *
+ * Em `audit_event`, o recurso é `contato_colaborador` e o `resourceId` é o id
+ * do COLABORADOR — o mesmo da negação, e o único que existe em todos os
+ * casos. O id do contato, quando há, fica no evento de tratamento.
  */
 @Injectable()
 export class ContatoColaboradorService {
@@ -136,13 +182,27 @@ export class ContatoColaboradorService {
     ctx: PessoasAuditContext,
   ): Promise<ContatosDoColaborador> {
     const alvo = await this.resolverAlvo(colaboradorId, ctx, "read");
-    if (!alvo.operacional) {
-      return this.resposta(alvo, "bloqueado", null);
+    if (alvo.tipo === "ambiguo") {
+      await this.registrarAmbiguidade(ctx, alvo, "leitura");
+      throw new ConflictException();
     }
 
     // Leitura e evento na mesma transação: se a trilha não puder ser gravada,
-    // o valor não é respondido (fail-safe).
+    // nada é respondido (fail-safe) — nem valor, nem estado.
     return this.prisma.$transaction(async (tx) => {
+      if (!alvo.operacional) {
+        // Só o id: o valor de um contato bloqueado não é lido.
+        const existente = await this.idDoContato(tx, alvo);
+        await this.registrarEvento(tx, ctx, alvo, existente, {
+          acao: "leitura",
+          resultado: "bloqueado",
+          campos: NENHUM_CAMPO,
+          auditAction: "pessoas_contato_consultado",
+          auditResult: "success",
+        });
+        return this.resposta(alvo, "bloqueado", null);
+      }
+
       const contato = await tx.contatoColaborador.findUnique({
         where: {
           colaboradorId_empresaId: {
@@ -153,14 +213,22 @@ export class ContatoColaboradorService {
         select: PROJECAO_CONTATO,
       });
       if (!contato) {
-        // Nada foi lido: não há valor a auditar.
+        await this.registrarEvento(tx, ctx, alvo, null, {
+          acao: "leitura",
+          resultado: "sem_registro",
+          campos: NENHUM_CAMPO,
+          auditAction: "pessoas_contato_consultado",
+          auditResult: "success",
+        });
         return this.resposta(alvo, "sem_registro", null);
       }
 
       await this.registrarEvento(tx, ctx, alvo, contato.id, {
         acao: "leitura",
+        resultado: "valores_devolvidos",
         campos: TODOS_OS_CAMPOS,
         auditAction: "pessoas_contato_consultado",
+        auditResult: "success",
       });
       return this.resposta(alvo, "registrado", valores(contato));
     });
@@ -172,8 +240,24 @@ export class ContatoColaboradorService {
     ctx: PessoasAuditContext,
   ): Promise<ContatosRegistrados> {
     const alvo = await this.resolverAlvo(colaboradorId, ctx, "alter");
+    if (alvo.tipo === "ambiguo") {
+      await this.registrarAmbiguidade(ctx, alvo, "edicao");
+      throw new ConflictException();
+    }
     if (!alvo.operacional) {
-      // Uso operacional bloqueado após o desligamento (ficha).
+      // Uso operacional bloqueado após o desligamento (ficha). A tentativa
+      // fica na trilha ANTES da recusa: a transação confirma o evento, e só
+      // então a resposta é 409.
+      await this.prisma.$transaction(async (tx) => {
+        const existente = await this.idDoContato(tx, alvo);
+        await this.registrarEvento(tx, ctx, alvo, existente, {
+          acao: "edicao",
+          resultado: "bloqueado",
+          campos: NENHUM_CAMPO,
+          auditAction: "pessoas_contato_atualizado",
+          auditResult: "failure",
+        });
+      });
       throw new ConflictException();
     }
 
@@ -204,8 +288,10 @@ export class ContatoColaboradorService {
           });
           await this.registrarEvento(tx, ctx, alvo, criado.id, {
             acao: "criacao",
+            resultado: "gravado",
             campos: TODOS_OS_CAMPOS,
             auditAction: "pessoas_contato_criado",
+            auditResult: "success",
           });
           return {
             ...this.resposta(alvo, "registrado", valores(criado)),
@@ -215,7 +301,15 @@ export class ContatoColaboradorService {
 
         const campos = camposAlterados(atual, dto);
         if (campos.length === 0) {
-          // Nada mudou: nada a gravar, nada a auditar.
+          // Nada a gravar, mas os valores gravados voltam na resposta: é uma
+          // LEITURA, e fica na trilha como tal.
+          await this.registrarEvento(tx, ctx, alvo, atual.id, {
+            acao: "leitura",
+            resultado: "sem_alteracao",
+            campos: TODOS_OS_CAMPOS,
+            auditAction: "pessoas_contato_consultado",
+            auditResult: "success",
+          });
           return {
             ...this.resposta(alvo, "registrado", valores(atual)),
             resultado: "sem_alteracao" as const,
@@ -234,8 +328,10 @@ export class ContatoColaboradorService {
         });
         await this.registrarEvento(tx, ctx, alvo, atualizado.id, {
           acao: "edicao",
+          resultado: "gravado",
           campos,
           auditAction: "pessoas_contato_atualizado",
+          auditResult: "success",
         });
         return {
           ...this.resposta(alvo, "registrado", valores(atualizado)),
@@ -259,10 +355,15 @@ export class ContatoColaboradorService {
    *   da empresa da sessão.
    * - Global (`master_tecnico` sem empresa ativa): os vínculos do colaborador
    *   em qualquer empresa. Se houver mais de uma empresa, a operação seria
-   *   ambígua — 409, e a empresa se escolhe pelo contexto ativo (T163).
+   *   ambígua — o chamador registra a tentativa e responde 409; a empresa se
+   *   escolhe pelo contexto ativo (T163).
    *
    * Inexistente e fora do escopo respondem igual (404, `negarAcesso`): a
    * distinção vazaria a existência de uma pessoa em outra empresa.
+   *
+   * A fase 2 (`podeAcessarPessoas` com a empresa do vínculo) é defesa em
+   * profundidade: com o filtro acima, ela não nega nenhum caso alcançável hoje.
+   * Protege o dia em que o filtro mudar — e tem teste próprio que a isola.
    */
   private async resolverAlvo(
     colaboradorId: string,
@@ -291,8 +392,16 @@ export class ContatoColaboradorService {
     const [empresaId, ...outras] = [
       ...new Set(vinculos.map((v) => v.empresaId)),
     ];
-    if (empresaId === undefined || outras.length > 0) {
-      throw new ConflictException();
+    if (empresaId === undefined) {
+      return this.auditoria.negarAcesso(
+        ctx,
+        "contato_colaborador",
+        colaboradorId,
+        null,
+      );
+    }
+    if (outras.length > 0) {
+      return { tipo: "ambiguo", colaboradorId };
     }
 
     // Fase 2: a permissão reavaliada com a empresa do vínculo.
@@ -308,48 +417,88 @@ export class ContatoColaboradorService {
     }
 
     return {
+      tipo: "resolvido",
       colaboradorId,
       empresaId,
       operacional: vinculos.some((v) => v.situacao !== "encerrado"),
     };
   }
 
+  /** Id do contato do par, sem ler valor nenhum. */
+  private async idDoContato(
+    tx: Prisma.TransactionClient,
+    alvo: AlvoResolvido,
+  ): Promise<string | null> {
+    const existente = await tx.contatoColaborador.findUnique({
+      where: {
+        colaboradorId_empresaId: {
+          colaboradorId: alvo.colaboradorId,
+          empresaId: alvo.empresaId,
+        },
+      },
+      select: { id: true },
+    });
+    return existente?.id ?? null;
+  }
+
+  /**
+   * Tentativa recusada por empresa ambígua. Registrada SEM empresa — nenhuma
+   * foi resolvida —, com resultado `failure`, e confirmada antes da recusa: se
+   * a trilha falhar, a resposta é erro, nunca o 409 silencioso.
+   */
+  private async registrarAmbiguidade(
+    ctx: PessoasAuditContext,
+    alvo: AlvoAmbiguo,
+    acao: "leitura" | "edicao",
+  ): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      await this.auditoria.registrarNaTransacao(tx, ctx, {
+        action:
+          acao === "leitura"
+            ? "pessoas_contato_consultado"
+            : "pessoas_contato_atualizado",
+        resource: "contato_colaborador",
+        resourceId: alvo.colaboradorId,
+        empresaId: null,
+        result: "failure",
+      });
+      await tx.contatoColaboradorEvento.create({
+        data: {
+          colaboradorId: alvo.colaboradorId,
+          empresaId: null,
+          contatoId: null,
+          acao,
+          resultado: "empresa_ambigua",
+          campos: [],
+          atorUserId: ctx.actor.id,
+          requestId: ctx.metadata.requestId,
+        },
+      });
+    });
+  }
+
   private async registrarEvento(
     tx: Prisma.TransactionClient,
     ctx: PessoasAuditContext,
-    alvo: AlvoContatos,
-    contatoId: string,
-    evento: {
-      acao: AcaoContatoColaborador;
-      campos: readonly CampoContatoColaborador[];
-      auditAction: AuditAction;
-    },
+    alvo: AlvoResolvido,
+    contatoId: string | null,
+    evento: EventoContato,
   ): Promise<void> {
-    if (evento.acao === "leitura") {
-      await this.auditoria.registrarLeitura(
-        tx,
-        ctx,
-        evento.auditAction,
-        "contato_colaborador",
-        contatoId,
-        alvo.empresaId,
-      );
-    } else {
-      await this.auditoria.registrarMutacao(
-        tx,
-        ctx,
-        evento.auditAction,
-        "contato_colaborador",
-        contatoId,
-        alvo.empresaId,
-      );
-    }
+    await this.auditoria.registrarNaTransacao(tx, ctx, {
+      action: evento.auditAction,
+      resource: "contato_colaborador",
+      resourceId: alvo.colaboradorId,
+      empresaId: alvo.empresaId,
+      result: evento.auditResult,
+    });
 
     await tx.contatoColaboradorEvento.create({
       data: {
-        contatoId,
+        colaboradorId: alvo.colaboradorId,
         empresaId: alvo.empresaId,
+        contatoId,
         acao: evento.acao,
+        resultado: evento.resultado,
         campos: [...evento.campos],
         atorUserId: ctx.actor.id,
         requestId: ctx.metadata.requestId,
@@ -358,7 +507,7 @@ export class ContatoColaboradorService {
   }
 
   private resposta(
-    alvo: AlvoContatos,
+    alvo: AlvoResolvido,
     situacao: SituacaoContatos,
     contatos: ValoresContatos | null,
   ): ContatosDoColaborador {

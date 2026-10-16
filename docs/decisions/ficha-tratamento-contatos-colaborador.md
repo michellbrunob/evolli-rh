@@ -95,7 +95,8 @@ formalizada na Emenda 1 da ADR 0012.
 
 ## 6. Como a T169 aplicou a ficha
 
-Decisões de implementação, todas dentro do que a ficha aprovou:
+Escolhas de implementação. Nenhuma delas muda o que o proprietário aprovou;
+onde a ficha é literal, a implementação a segue ao pé da letra.
 
 - **Por colaborador e empresa.** O contato tem `empresa_id` próprio e é único
   por par. Um colaborador com vínculo em duas empresas tem dois registros: o RH
@@ -103,17 +104,46 @@ Decisões de implementação, todas dentro do que a ficha aprovou:
 - **Bloqueio após o desligamento.** Sem vínculo previsto ou ativo na empresa, a
   leitura responde `bloqueado`, sem valor, e a edição é recusada (409). O valor
   continua guardado, como manda a retenção.
-- **Auditoria de leitura.** Registrada quando um valor é devolvido. Leitura de
-  `sem_registro` ou `bloqueado` não lê valor e não gera evento de leitura.
-- **Campos afetados.** Vivem em `contato_colaborador_evento`, porque
-  `audit_event` não tem coluna de detalhe; as duas trilhas se ligam por
-  `request_id`. Criação e leitura afetam os três campos; edição, só os que
-  mudaram; salvar sem mudança não gera evento.
-- **`master_tecnico` sem empresa ativa** atua na empresa do vínculo. Se o
-  colaborador tiver vínculo em mais de uma, a operação seria ambígua: 409, e a
-  empresa se escolhe pelo contexto ativo.
-- **Exclusão.** `evolli_app` não tem `DELETE` no contato. O processo de
-  eliminação dos 2 anos, quando existir, recebe o privilégio junto da sua
-  própria auditoria (§5).
+- **Trilha de toda consulta.** A ficha audita a leitura sem distinguir leitura
+  com valor de leitura sem valor, e a Emenda 1 da ADR 0012 diz que "toda
+  leitura e toda edição" são auditadas. Por isso **toda consulta** aos
+  contatos deixa trilha, com o resultado explícito:
 
-Migration: `20261016120000_contatos_colaborador`, criada e não aplicada localmente.
+  | Operação                                                                            | Resultado no evento                          | `audit_event`                                            |
+  | ----------------------------------------------------------------------------------- | -------------------------------------------- | -------------------------------------------------------- |
+  | `GET` com valor                                                                     | `valores_devolvidos`                         | `pessoas.contato.consultado`, `success`                  |
+  | `GET` sem contato gravado                                                           | `sem_registro`                               | `pessoas.contato.consultado`, `success`                  |
+  | `GET` de contato bloqueado                                                          | `bloqueado`                                  | `pessoas.contato.consultado`, `success`                  |
+  | `GET` do `master_tecnico` sem empresa ativa, com colaborador em mais de uma empresa | `empresa_ambigua`                            | `pessoas.contato.consultado`, `failure`, **sem empresa** |
+  | `PUT` que cria                                                                      | `gravado`                                    | `pessoas.contato.criado`, `success`                      |
+  | `PUT` que altera                                                                    | `gravado`                                    | `pessoas.contato.atualizado`, `success`                  |
+  | `PUT` sem mudança efetiva (devolve os valores gravados)                             | `sem_alteracao`, registrado como **leitura** | `pessoas.contato.consultado`, `success`                  |
+  | `PUT` de contato bloqueado                                                          | `bloqueado`                                  | `pessoas.contato.atualizado`, `failure`                  |
+  | `PUT` com empresa ambígua                                                           | `empresa_ambigua`                            | `pessoas.contato.atualizado`, `failure`, **sem empresa** |
+
+  A trilha é gravada na **mesma transação** da operação: se ela falhar, nada é
+  devolvido nem gravado. A tentativa com empresa ambígua é registrada **sem
+  empresa**, porque nenhuma pôde ser resolvida naquele ponto. Colaborador
+  inexistente, fora do escopo ou perfil sem acesso deixam `authorization_denied`,
+  pela regra já existente (ADR 0004).
+
+  **Correção registrada.** A primeira versão desta seção, no commit `ae2544c`,
+  dizia que só a leitura com valor devolvido era auditada. Esse critério **não
+  foi aprovado** pelo proprietário e foi retirado; o modelo de eventos foi
+  corrigido pela migration `20261016130000_contatos_auditoria_toda_consulta`.
+
+- **Conteúdo da trilha.** O evento de tratamento (`contato_colaborador_evento`)
+  guarda o colaborador, a empresa quando conhecida, o contato quando existe, a
+  ação, o resultado, os **nomes** dos campos alcançados, o ator e o
+  `request_id`. A trilha formal (`audit_event`) guarda o ator, o papel, a
+  empresa real (ou nenhuma, quando não resolvida), a ação, o resultado, o
+  recurso `contato_colaborador`, o id do colaborador e o `request_id`. Como em
+  todo evento da trilha formal (ADR 0004), ela também guarda o **IP de origem**
+  e o **user-agent truncado a 300 caracteres**: metadados de segurança herdados
+  da infraestrutura de auditoria, não conteúdo dos contatos nem cabeçalho bruto.
+  **Nunca** entram valores de contato, corpo da requisição ou cabeçalhos brutos.
+- **Exclusão.** `evolli_app` não tem `DELETE` no contato nem `UPDATE`/`DELETE`
+  no evento. O processo de eliminação dos 2 anos, quando existir, recebe o
+  privilégio junto com a sua própria auditoria (§5).
+
+Migrations: `20261016120000_contatos_colaborador` e `20261016130000_contatos_auditoria_toda_consulta`, criadas e não aplicadas localmente.

@@ -2293,6 +2293,27 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
       }
     }
 
+    /**
+     * As duas trilhas da ÚLTIMA operação sobre os contatos de um colaborador:
+     * o evento de tratamento e a linha de `audit_event` da mesma requisição.
+     */
+    async function ultimaTrilha(colaboradorId: string) {
+      return comPrisma(async (p) => {
+        const evento = await p.contatoColaboradorEvento.findFirstOrThrow({
+          where: { colaboradorId },
+          orderBy: { ocorridoEm: "desc" },
+        });
+        const formal = await p.auditEvent.findMany({
+          where: {
+            requestId: evento.requestId,
+            resource: "contato_colaborador",
+          },
+        });
+        expect(formal).toHaveLength(1);
+        return { evento, formal: formal[0]! };
+      });
+    }
+
     beforeAll(async () => {
       pessoaA = (
         await admitirEEfetivar(rhA, {
@@ -2319,7 +2340,7 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
         .expect(200);
     });
 
-    it("colaborador existente sem contato: sem_registro, sem erro", async () => {
+    it("colaborador existente sem contato: sem_registro, sem erro — e a consulta deixa trilha", async () => {
       const r = await get(rota(pessoaA), rhA).expect(200);
       expect(r.body).toEqual({
         colaboradorId: pessoaA,
@@ -2328,6 +2349,22 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
         contatos: null,
       });
       expect(r.headers["cache-control"]).toBe("no-store");
+
+      const { evento, formal } = await ultimaTrilha(pessoaA);
+      expect(evento).toMatchObject({
+        empresaId: empresaA,
+        contatoId: null,
+        acao: "leitura",
+        resultado: "sem_registro",
+        campos: [],
+      });
+      expect(formal).toMatchObject({
+        action: "pessoas_contato_consultado",
+        resourceId: pessoaA,
+        companyId: empresaA,
+        actorRole: "rh",
+        result: "success",
+      });
     });
 
     it("rh grava os três campos, NORMALIZADOS no servidor, na empresa da sessão", async () => {
@@ -2446,31 +2483,57 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
       });
     });
 
-    it("edição registra só o campo que mudou; repetir não grava nem audita", async () => {
+    it("edição registra só o campo que mudou; repetir não grava, mas a devolução fica na trilha", async () => {
       const r = await put(rota(pessoaA), dpA)
         .send(corpo({ telefone: "(11) 3333-0002" }))
         .expect(200);
       expect(r.body.resultado).toBe("atualizado");
       expect(r.body.contatos.telefone).toBe(TELEFONE_NOVO);
 
-      const contarEventos = () =>
-        comPrisma((p) =>
-          p.contatoColaboradorEvento.count({ where: { empresaId: empresaA } }),
-        );
-      const antes = await contarEventos();
+      const edicao = await ultimaTrilha(pessoaA);
+      expect(edicao.evento).toMatchObject({
+        acao: "edicao",
+        resultado: "gravado",
+        campos: ["telefone"],
+      });
+      expect(edicao.formal).toMatchObject({
+        action: "pessoas_contato_atualizado",
+        result: "success",
+      });
+
+      const atualizadoEm = await comPrisma(
+        async (p) =>
+          (
+            await p.contatoColaborador.findFirstOrThrow({
+              where: { colaboradorId: pessoaA },
+            })
+          ).atualizadoEm,
+      );
       const repetido = await put(rota(pessoaA), dpA)
         .send(corpo({ telefone: TELEFONE_NOVO }))
         .expect(200);
       expect(repetido.body.resultado).toBe("sem_alteracao");
-      expect(await contarEventos()).toBe(antes);
 
-      const edicao = await comPrisma((p) =>
-        p.contatoColaboradorEvento.findFirstOrThrow({
-          where: { acao: "edicao", empresaId: empresaA },
-          orderBy: { ocorridoEm: "desc" },
+      // Nada gravado no contato...
+      const depois = await comPrisma((p) =>
+        p.contatoColaborador.findFirstOrThrow({
+          where: { colaboradorId: pessoaA },
         }),
       );
-      expect(edicao.campos).toEqual(["telefone"]);
+      expect(depois.atualizadoEm).toEqual(atualizadoEm);
+      // ...mas os valores devolvidos ficam na trilha, como leitura.
+      const repeticao = await ultimaTrilha(pessoaA);
+      expect(repeticao.evento).toMatchObject({
+        contatoId: depois.id,
+        acao: "leitura",
+        resultado: "sem_alteracao",
+        campos: ["email_pessoal", "celular", "telefone"],
+      });
+      expect(repeticao.formal).toMatchObject({
+        action: "pessoas_contato_consultado",
+        companyId: empresaA,
+        result: "success",
+      });
     });
 
     it("master sem empresa ativa lê e grava em outra empresa, auditado com a empresa REAL", async () => {
@@ -2478,6 +2541,17 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
       expect(leitura.body).toMatchObject({
         empresaId: empresaB,
         situacao: "sem_registro",
+      });
+      // Consulta sem valor, global: trilha com a empresa REAL.
+      const consulta = await ultimaTrilha(pessoaB);
+      expect(consulta.evento).toMatchObject({
+        empresaId: empresaB,
+        resultado: "sem_registro",
+      });
+      expect(consulta.formal).toMatchObject({
+        companyId: empresaB,
+        actorRole: "master_tecnico",
+        result: "success",
       });
 
       const gravacao = await put(rota(pessoaB), master)
@@ -2542,7 +2616,36 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
         contatos: null,
       });
       expect(JSON.stringify(r.body)).not.toContain("11987650009");
+      const contato = await comPrisma((p) =>
+        p.contatoColaborador.findFirstOrThrow({
+          where: { colaboradorId: pessoaDesligada },
+        }),
+      );
+      const consulta = await ultimaTrilha(pessoaDesligada);
+      expect(consulta.evento).toMatchObject({
+        contatoId: contato.id,
+        acao: "leitura",
+        resultado: "bloqueado",
+        campos: [],
+      });
+      expect(consulta.formal).toMatchObject({
+        action: "pessoas_contato_consultado",
+        companyId: empresaA,
+        result: "success",
+      });
+
       await put(rota(pessoaDesligada), rhA).send(corpo()).expect(409);
+      const tentativa = await ultimaTrilha(pessoaDesligada);
+      expect(tentativa.evento).toMatchObject({
+        acao: "edicao",
+        resultado: "bloqueado",
+        campos: [],
+      });
+      expect(tentativa.formal).toMatchObject({
+        action: "pessoas_contato_atualizado",
+        companyId: empresaA,
+        result: "failure",
+      });
 
       // O valor continua guardado (retenção da ficha), só não é usado.
       const linha = await comPrisma((p) =>
@@ -2581,16 +2684,21 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
           "pessoas_contato_consultado",
           "pessoas_contato_atualizado",
         ] as const) {
+          // Filtra o sucesso: tentativas recusadas (PUT bloqueado) também
+          // deixam linha nesta empresa, com `failure`.
           const evento = await p.auditEvent.findFirst({
-            where: { action, companyId: empresaA },
+            where: { action, companyId: empresaA, result: "success" },
           });
           expect(evento).not.toBeNull();
           expect(evento!.resource).toBe("contato_colaborador");
-          expect(evento!.result).toBe("success");
         }
 
         const leitura = await p.contatoColaboradorEvento.findFirstOrThrow({
-          where: { acao: "leitura", empresaId: empresaA },
+          where: {
+            acao: "leitura",
+            resultado: "valores_devolvidos",
+            empresaId: empresaA,
+          },
         });
         expect(leitura.campos).toEqual([
           "email_pessoal",
@@ -2615,10 +2723,19 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
         });
         expect(negada).not.toBeNull();
 
+        // Em `audit_event`, o recurso aponta o COLABORADOR, nunca o contato.
+        const formais = await p.auditEvent.findMany({
+          where: { resource: "contato_colaborador" },
+        });
+        const idsDeContato = (
+          await p.contatoColaborador.findMany({ select: { id: true } })
+        ).map((c) => c.id);
+        for (const formal of formais) {
+          expect(idsDeContato).not.toContain(formal.resourceId);
+        }
+
         const tudo = JSON.stringify([
-          await p.auditEvent.findMany({
-            where: { resource: "contato_colaborador" },
-          }),
+          formais,
           await p.contatoColaboradorEvento.findMany(),
         ]);
         for (const valor of [
@@ -2631,6 +2748,180 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
         ]) {
           expect(tudo).not.toContain(valor);
         }
+      });
+    });
+
+    it("master sem empresa ativa diante de vínculo em duas empresas: 409, nada lido nem gravado, tentativa na trilha SEM empresa", async () => {
+      const { colaboradorId: pessoaAmbigua } = await admitirEEfetivar(rhA, {
+        nome: "Pessoa Sintetica Contato Ambigua",
+        empresaId: empresaA,
+        matricula: "T169-AMB",
+        departamentoId: departamentoA,
+      });
+      await put(rota(pessoaAmbigua), rhA).send(corpo()).expect(200);
+      // A API não cria vínculo em outra empresa para quem não está nela: o
+      // segundo vínculo entra direto no banco, como nos E2E de documentos.
+      const segundoVinculo = await comPrisma(async (p) => {
+        const linhas = await p.$queryRawUnsafe<{ id: string }[]>(
+          `INSERT INTO app.vinculo_funcional
+             (id, colaborador_id, empresa_id, matricula, tipo, situacao,
+              data_admissao, criado_em, atualizado_em)
+           VALUES (gen_random_uuid()::text, $1, $2, 'T169-AMB-B', 'clt',
+                   'previsto', DATE '2026-01-05', now(), now())
+           RETURNING id`,
+          pessoaAmbigua,
+          empresaB,
+        );
+        return linhas[0]!.id;
+      });
+      try {
+        const antes = await comPrisma((p) =>
+          p.contatoColaborador.findFirstOrThrow({
+            where: { colaboradorId: pessoaAmbigua },
+          }),
+        );
+
+        const leitura = await get(rota(pessoaAmbigua), master).expect(409);
+        expect(JSON.stringify(leitura.body)).not.toContain(EMAIL);
+        const consulta = await ultimaTrilha(pessoaAmbigua);
+        expect(consulta.evento).toMatchObject({
+          empresaId: null,
+          contatoId: null,
+          acao: "leitura",
+          resultado: "empresa_ambigua",
+          campos: [],
+        });
+        expect(consulta.formal).toMatchObject({
+          action: "pessoas_contato_consultado",
+          resourceId: pessoaAmbigua,
+          companyId: null,
+          actorRole: "master_tecnico",
+          result: "failure",
+        });
+
+        await put(rota(pessoaAmbigua), master)
+          .send(corpo({ telefone: "1199990000" }))
+          .expect(409);
+        const tentativa = await ultimaTrilha(pessoaAmbigua);
+        expect(tentativa.evento).toMatchObject({
+          empresaId: null,
+          acao: "edicao",
+          resultado: "empresa_ambigua",
+        });
+        expect(tentativa.formal).toMatchObject({
+          action: "pessoas_contato_atualizado",
+          companyId: null,
+          result: "failure",
+        });
+
+        const depois = await comPrisma((p) =>
+          p.contatoColaborador.findFirstOrThrow({
+            where: { colaboradorId: pessoaAmbigua },
+          }),
+        );
+        expect(depois).toEqual(antes);
+      } finally {
+        // O vínculo extra não pode vazar para os testes seguintes.
+        await comPrisma((p) =>
+          p.$executeRawUnsafe(
+            "DELETE FROM app.vinculo_funcional WHERE id = $1",
+            segundoVinculo,
+          ),
+        );
+      }
+    });
+
+    it("banco: evento incoerente com resultado, empresa ou contato é recusado", async () => {
+      const { colaboradorId: pessoaD } = await admitirEEfetivar(rhA, {
+        nome: "Pessoa Sintetica Contato D",
+        empresaId: empresaA,
+        matricula: "T169-D",
+        departamentoId: departamentoA,
+      });
+      await comPrisma(async (p) => {
+        const ator = await p.accessUser.findFirstOrThrow({
+          where: { email: "rh.pa@example.test" },
+        });
+        const contatoA = await p.contatoColaborador.findFirstOrThrow({
+          where: { colaboradorId: pessoaA, empresaId: empresaA },
+        });
+        const inserir = (
+          colaboradorId: string,
+          empresaId: string | null,
+          contatoId: string | null,
+          acao: string,
+          resultado: string,
+          campos: string,
+        ) =>
+          p.$executeRawUnsafe(
+            `INSERT INTO app.contato_colaborador_evento
+               (id, colaborador_id, empresa_id, contato_id, acao, resultado,
+                campos, ator_user_id, request_id)
+             VALUES (gen_random_uuid()::text, $1, $2, $3,
+                     $4::app."AcaoContatoColaborador",
+                     $5::app."ResultadoEventoContato",
+                     $6::app."CampoContatoColaborador"[], $7, 'req-t169-banco')`,
+            colaboradorId,
+            empresaId,
+            contatoId,
+            acao,
+            resultado,
+            campos,
+            ator.id,
+          );
+
+        // Valor devolvido sem contato.
+        await expect(
+          inserir(
+            pessoaD,
+            empresaA,
+            null,
+            "leitura",
+            "valores_devolvidos",
+            "{email_pessoal,celular,telefone}",
+          ),
+        ).rejects.toThrow();
+        // Ambíguo COM empresa.
+        await expect(
+          inserir(pessoaD, empresaA, null, "leitura", "empresa_ambigua", "{}"),
+        ).rejects.toThrow();
+        // Sem registro com campo.
+        await expect(
+          inserir(
+            pessoaD,
+            empresaA,
+            null,
+            "leitura",
+            "sem_registro",
+            "{celular}",
+          ),
+        ).rejects.toThrow();
+        // Contato de OUTRO colaborador (FK composta).
+        await expect(
+          inserir(
+            pessoaD,
+            empresaA,
+            contatoA.id,
+            "leitura",
+            "valores_devolvidos",
+            "{email_pessoal,celular,telefone}",
+          ),
+        ).rejects.toThrow();
+        // Sem contato, mas o colaborador TEM contato na empresa (trigger).
+        await expect(
+          inserir(pessoaA, empresaA, null, "leitura", "sem_registro", "{}"),
+        ).rejects.toThrow();
+        // Empresa sem vínculo do colaborador (trigger).
+        await expect(
+          inserir(pessoaD, empresaB, null, "leitura", "sem_registro", "{}"),
+        ).rejects.toThrow();
+        // Controles: os mesmos formatos, coerentes, passam.
+        await expect(
+          inserir(pessoaD, empresaA, null, "leitura", "sem_registro", "{}"),
+        ).resolves.toBe(1);
+        await expect(
+          inserir(pessoaD, null, null, "leitura", "empresa_ambigua", "{}"),
+        ).resolves.toBe(1);
       });
     });
 

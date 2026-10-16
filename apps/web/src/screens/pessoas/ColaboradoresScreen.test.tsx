@@ -2782,7 +2782,15 @@ describe("ColaboradoresScreen (T169 — contatos do colaborador)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Salvar contatos" }));
 
     await within(secao).findByRole("button", { name: "Salvando…" });
-    fireEvent.keyDown(document, { key: "Escape" });
+    // A janela fica TRAVADA, não apenas pedindo confirmação: "Fechar" está
+    // desabilitado e clicar nele não abre o diálogo de descarte nem fecha.
+    // (Sem a trava, o mesmo clique abriria a confirmação — há edição não
+    // salva —, e o teste falharia aqui.)
+    const fechar = screen.getByRole("button", { name: "Fechar" });
+    expect(fechar).toBeDisabled();
+    fireEvent.click(fechar);
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(screen.queryByText(/alterações não salvas/i)).toBeNull();
     expect(
       screen.getByRole("region", { name: "Contatos" }),
     ).toBeInTheDocument();

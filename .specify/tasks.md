@@ -1773,10 +1773,13 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       empresa** (`empresa_id` próprio, único por par), com CHECK da
       normalização e CONSTRAINT TRIGGERS diferidos que exigem vínculo do
       colaborador na empresa, nos dois lados. `contato_colaborador_evento`
-      registra criação, leitura e edição com os **campos** afetados, nunca
-      valores, correlacionado a `audit_event` por `request_id`. `evolli_app`
-      perde `DELETE` no contato e `UPDATE`/`DELETE` no evento. `Colaborador`
-      não ganhou coluna.
+      registra **toda consulta**, criação e edição, com colaborador, empresa
+      quando conhecida, contato quando existe, ação, resultado e **nomes** dos
+      campos — nunca valores —, correlacionado a `audit_event` por
+      `request_id`; a coerência entre resultado, empresa, contato e campos é
+      garantida por CHECK e trigger (migration `20261016130000_contatos_auditoria_toda_consulta`, criada e não aplicada
+      localmente). `evolli_app` perde `DELETE` no contato e `UPDATE`/`DELETE`
+      no evento. `Colaborador` não ganhou coluna.
     - **API:** `GET` e `PUT /v1/colaboradores/:colaboradorId/contatos`, com
       recurso de autorização próprio `contato_colaborador` (`read`/`alter`):
       `rh` e `dp` na empresa ativa; `master_tecnico` em qualquer empresa sem
@@ -1787,22 +1790,27 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       Validação e normalização no servidor: e-mail aparado e minúsculo, até 254
       caracteres; celular e telefone só com dígitos, `+` opcional, 8 a 15
       dígitos, sem presumir país. Auditoria `pessoas.contato.criado`,
-      `.atualizado` e `.consultado`, na mesma transação do dado. `no-store` e
-      redação dos três campos no logger.
+      `.atualizado` e `.consultado` na mesma transação da operação, para
+      **toda consulta** — com valor, sem registro, bloqueada, o `PUT` sem
+      alteração (registrado como leitura) e a tentativa do `master_tecnico`
+      com empresa ambígua (registrada sem empresa, com `failure`). Nunca
+      valores, corpo nem cabeçalhos brutos; IP e user-agent truncado são os
+      metadados de segurança herdados da ADR 0004. `no-store` e redação dos
+      três campos no logger.
     - **Web:** seção "Contatos" no detalhe do colaborador, com os três campos
       obrigatórios, erro por campo, foco no primeiro erro, dados preservados em
       falha, confirmação de sucesso e confirmação de descarte pelo `Modal`.
       Listagem, Hub, portal e visão do gestor não recebem contato.
-    - **Testes:** unitários da API (78: normalização, validação, matriz nas
-      duas camadas, serviço, auditoria sem valores); E2E no bloco da T169 de
+    - **Testes:** unitários da API (87: normalização, validação, limite de
+      254 do e-mail, matriz nas duas camadas, fase 2 isolada, serviço, trilha
+      de cada cenário, auditoria sem valores); E2E no bloco da T169 de
       `pessoas.e2e-spec.ts`; web (11 da tela e 13 da regra no cliente).
     - **Limites:** a eliminação ou anonimização após 2 anos não tem processo
-      nesta fatia; exportação e exclusão não têm rota, então não há o que
-      auditar; leitura de `sem_registro` e `bloqueado` não é auditada, porque
-      nenhum valor é lido; `master_tecnico` sem empresa ativa diante de
-      colaborador com vínculo em mais de uma empresa recebe 409 e escolhe pelo
-      contexto ativo; os E2E rodam só na CI; sem validação visual em
-      navegador, porque processos estão fora do escopo.
+      nesta fatia; exportação e exclusão não têm rota, então ainda não há o que
+      auditar; a origem e a evidência da coleta não foram especificadas pela
+      ficha (lacuna registrada, sem solução proposta); os E2E rodam só na CI;
+      sem validação visual em navegador, porque processos estão fora do
+      escopo.
     - **Fora de escopo:** endereço, contato de emergência, CPF, documentos,
       foto, nome social, sexo, gênero, raça/etnia, deficiência, escolaridade,
       dados bancários, dependentes, dados contratuais, portal do colaborador,
