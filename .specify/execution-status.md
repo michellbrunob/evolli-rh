@@ -1637,11 +1637,11 @@ declarada como feita.
 
 **Dívidas preservadas:** **R-3** (T162), **R-3 da revisão da T164**, **S2** (T161), **R1 a R3** (T160), **L3**, **S-1 a S-4** (T158), **R-A a R-C** (T157) e o registro `teste michell`.
 
-## Perfil do colaborador: dados de contato — T168 (em andamento)
+## Perfil do colaborador: dados de contato — T168 (parada por regra declarada)
 
-| Tarefa | Estado           | Resultado principal                                                                                        |
-| ------ | ---------------- | ---------------------------------------------------------------------------------------------------------- |
-| T168   | **Em andamento** | Primeiro bloco complementar do cadastro: dados de contato, preenchidos só por RH ou DP depois da admissão. |
+| Tarefa | Estado                         | Resultado principal                                                                           |
+| ------ | ------------------------------ | --------------------------------------------------------------------------------------------- |
+| T168   | **Parada por regra declarada** | Nenhum dos quatro campos de contato atende à condição do proprietário; nada foi implementado. |
 
 **A T167 foi integrada** em `main` pela PR #159, squash
 `dcef62706399126b934c51e7d2955941cf9f06b3`, com a CI de push 3/3 verde.
@@ -1649,11 +1649,28 @@ declarada como feita.
 **A ADR 0016 foi aprovada pelo proprietário** em 2026-10-16 (`DP-ADM-01`).
 **A aprovação não fecha as demais decisões** — `DP-ADM-02` a `DP-ADM-18` seguem abertas — e **não dispensa a ficha de tratamento** de cada categoria (decisão 5.4).
 
-**A T168 começa pela investigação**, antes de qualquer migration ou interface:
-só entra o campo que a ADR classificar como A2, complementar e não bloqueado, e
-cuja finalidade, acesso, auditoria e retenção estejam definidos nos artefatos
-aprovados. Campos pretendidos: e-mail pessoal, e-mail corporativo, celular e
-telefone. O que depender de decisão não aprovada **não é implementado**.
+**A T168 começou pela investigação**, antes de qualquer migration ou interface:
+só entraria o campo que a ADR classificasse como A2, complementar e não
+bloqueado, e cuja finalidade, acesso, auditoria e retenção estivessem definidos
+nos artefatos aprovados. Campos pretendidos: e-mail pessoal, e-mail corporativo,
+celular e telefone.
+
+**A regra de parada foi acionada nos quatro.** Diagnóstico completo, com a
+ficha em branco, em
+[`docs/decisions/t168-contatos-bloqueio-ficha.md`](../docs/decisions/t168-contatos-bloqueio-ficha.md).
+
+- **E-mail pessoal, celular e telefone:** A2, Complementar, dependem de `FT`,
+  `CTR` e `RET`. **Nenhuma ficha de tratamento existe**, e `DP-ADM-02` e
+  `DP-ADM-03` seguem abertas. O acesso (`rh` e `dp` da empresa ativa) e a
+  auditoria (escrita sem valores) de A2 já estão definidos; faltam finalidade,
+  base legal, classificação e retenção, que são de RH + Jurídico.
+- **E-mail corporativo:** **Derivado** da conta de acesso — é o login, não um
+  campo de contato —, e o servidor não tem rota que altere o e-mail de uma conta.
+  Pede decisão própria do domínio de contas.
+
+**Nada foi implementado:** nenhuma migration, API, interface, teste de produto
+ou alteração de RBAC. **Para retomar:** a ficha respondida, a emenda à ADR 0007
+e, se o `master_tecnico` fica fora de A2, a emenda à ADR 0012.
 
 **Regras do proprietário preservadas:** `rh` e `dp` consultam e editam na
 empresa ativa; `master_tecnico`, `gestor` e `colaborador` não; empresa só da

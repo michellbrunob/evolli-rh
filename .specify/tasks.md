@@ -1698,9 +1698,24 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       `teste michell`.
 
 65. **T168 - Perfil do colaborador: dados de contato**
-    - **Estado:** em andamento. Branch `codex/t168-perfil-colaborador-contatos`,
-      a partir do squash `dcef62706399126b934c51e7d2955941cf9f06b3` (T167,
-      PR #159).
+    - **Estado:** **parada por regra declarada, nos quatro campos.** Branch
+      `codex/t168-perfil-colaborador-contatos`, a partir do squash
+      `dcef62706399126b934c51e7d2955941cf9f06b3` (T167, PR #159). Nenhuma
+      migration, API, interface, teste de produto ou RBAC foi escrito.
+    - **Evidência:** [`docs/decisions/t168-contatos-bloqueio-ficha.md`](../docs/decisions/t168-contatos-bloqueio-ficha.md). **E-mail pessoal, celular e telefone** são A2
+      e Complementar, e dependem de ficha de tratamento (`FT`), contrato (`CTR`)
+      e retenção (`RET`): **não existe ficha aprovada para nenhuma categoria**, e
+      `DP-ADM-02` (finalidade e base legal) e `DP-ADM-03` (retenção) seguem
+      abertas, com RH + Jurídico. **E-mail corporativo** é **Derivado** da conta
+      de acesso (`access_user.email`, o login), não um campo de contato; o
+      servidor não tem rota que altere o e-mail de uma conta.
+    - **Acesso e auditoria de A2 já estão definidos** (`rh` e `dp` da empresa
+      ativa; escrita auditada sem valores). Faltam finalidade, base legal,
+      classificação, retenção e contrato, que são de RH + Jurídico.
+    - **Para retomar:** a ficha em branco da §4.1 do documento, respondida por RH
+      - Jurídico e Segurança; a emenda à ADR 0007; e, se o `master_tecnico` deve
+        ficar fora de A2, a emenda à ADR 0012. O e-mail corporativo pede decisão
+        própria do domínio de contas.
     - **Objetivo do proprietário:** o primeiro bloco complementar real do
       cadastro — **dados de contato do próprio colaborador**, preenchidos só
       por `rh` ou `dp`, depois da admissão. Campos pretendidos: e-mail
