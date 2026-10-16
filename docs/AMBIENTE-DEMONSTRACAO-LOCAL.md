@@ -20,7 +20,7 @@ de `127.0.0.1` impede a API de subir, e o modo é recusado com
 ## Pré-requisitos
 
 - **Docker Desktop** em execução (o PostgreSQL vem do `docker-compose.yml` da raiz).
-- Node 22 e pnpm, como no resto do repositório.
+- Node 24 LTS e pnpm 10, como no resto do repositório (versão em `.nvmrc`).
 - As portas da API e da web livres. Elas são **fixas por execução**, de
   propósito: subir calado em outra porta esconderia qual ambiente está aberto.
   A web é sempre **5173**; a API é **3000** por padrão e configurável por

@@ -74,7 +74,7 @@ dados exclusivamente sintéticos, veja o
 
 ## Pré-requisitos
 
-- Node.js 22 LTS (`>=22 <23`)
+- Node.js 24 LTS (`>=24 <25`), versão fixada em [`.nvmrc`](.nvmrc)
 - pnpm 10
 
 ## Instalar dependências

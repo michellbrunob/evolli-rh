@@ -1745,11 +1745,11 @@ corporativo persistido e o fluxo de admissão.
 
 **Dívidas preservadas:** R-3 (T162), R-3 da revisão da T164, S2 (T161), R1 a R3 (T160), L3, S-1 a S-4 (T158), R-A a R-C (T157), o registro `teste michell`, a decisão `DP-29` (se `outro_controlado` vale para admissão) e a limitação de validação em navegador da T167.
 
-## Node 24 LTS — T170 (em implementação)
+## Node 24 LTS — T170 (implementada em Draft)
 
-| Tarefa | Estado               | Resultado principal                                                               |
-| ------ | -------------------- | --------------------------------------------------------------------------------- |
-| T170   | **Em implementação** | Migração controlada da política do projeto para Node 24 LTS, com pnpm 10 mantido. |
+| Tarefa | Estado                    | Resultado principal                                                               |
+| ------ | ------------------------- | --------------------------------------------------------------------------------- |
+| T170   | **Implementada em Draft** | Migração controlada da política do projeto para Node 24 LTS, com pnpm 10 mantido. |
 
 **A T169 foi integrada** em `main` pela PR #161, squash
 `0fa2e1e930bc86f545d37839c42a385b3ed05cfa`, com a CI de push 3/3 verde: contatos do
@@ -1764,6 +1764,24 @@ fica registrado.
 
 **Fora de escopo:** pnpm 11, migration aplicada localmente, seed e banco de
 demonstração.
+
+### O que a T170 entregou
+
+- **Política.** `.nvmrc` em `24`; `engines.node` em `>=24 <25` nos três
+  `package.json`; a CI lê o `.nvmrc` nos três jobs; README, guia de
+  demonstração e `plan.md` atualizados. pnpm `10.0.0`, lockfile e dependências
+  inalterados (`@types/node` segue em `^22`).
+- **Compatibilidade.** Nenhuma incompatibilidade causada pelo Node 24; nenhuma
+  correção de código. Instalação limpa, `argon2`, engines do Prisma, lint,
+  typecheck, build e testes passam no Node 24.19.0, sem aviso de depreciação.
+  As medições do `tsc` deram o mesmo resultado no Node 22.23.3.
+- **Rollback.** Reverter o squash, ou voltar `.nvmrc` e `engines` para 22 e
+  reinstalar. Detalhes em [decisão da T170](../docs/decisions/t170-node-24-lts.md).
+
+**Pendência nova, de ambiente:** no Windows, o `prisma generate` do
+`postinstall` grava o client na raiz de `node_modules`, e o `tsc` da API
+estoura a pilha até rodar `pnpm --filter @evolli/api exec prisma generate`.
+Idêntico no Node 22; não aparece na CI em Linux.
 
 **Dívidas preservadas:** R-3 (T162), R-3 da revisão da T164, S2 (T161), R1 a R3 (T160), L3, S-1 a S-4 (T158), R-A a R-C (T157), o registro `teste michell`, a decisão `DP-29` (se `outro_controlado` vale para admissão) e a limitação de validação em navegador da T167. As pendências da T169 seguem abertas: o processo de eliminação ou anonimização após 2 anos do desligamento; as rotas de exportação e exclusão de contatos, cuja auditoria é obrigatória quando existirem; a origem e a evidência da coleta, lacuna da ficha; a validação visual em navegador; e as observações N-2 (criação concorrente de contato que perde na unicidade responde 409 sem trilha), N-3 (`ON UPDATE CASCADE` nas FKs do evento de contato permite reescrita indireta) e N-4 (CHECK do evento mais frouxo que o serviço), além da docstring do serviço de contatos que ainda descreve o `resourceId` de forma absoluta.
 

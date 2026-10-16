@@ -1821,8 +1821,29 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
     - **Dívida preservada:** R-3 (T162), R-3 da revisão da T164, S2 (T161), R1 a R3 (T160), L3, S-1 a S-4 (T158), R-A a R-C (T157), o registro `teste michell`, a decisão `DP-29` (se `outro_controlado` vale para admissão) e a limitação de validação em navegador da T167.
 
 67. **T170 - Migração controlada para Node 24 LTS**
-    - **Estado:** em implementação. Branch `codex/t170-node-24-lts`, a partir
-      do squash `0fa2e1e930bc86f545d37839c42a385b3ed05cfa` (T169, PR #161).
+    - **Estado:** **implementada em Draft**. Branch `codex/t170-node-24-lts`, a
+      partir do squash `0fa2e1e930bc86f545d37839c42a385b3ed05cfa` (T169, PR #161).
+      Detalhes e evidências em [decisão da T170](../docs/decisions/t170-node-24-lts.md).
+    - **Entregue:** `.nvmrc` em `24`; `engines.node` em `>=24 <25` nos três
+      `package.json`; os três jobs da CI leem a versão do `.nvmrc`
+      (`node-version-file`), a fonte única; README, guia de demonstração e
+      `plan.md` atualizados. pnpm segue `10.0.0`, o lockfile não muda e nenhuma
+      dependência troca de versão — `@types/node` segue em `^22`, como decisão
+      separada.
+    - **Compatibilidade:** nenhuma incompatibilidade causada pelo Node 24 foi
+      encontrada, então não há correção de código. No Node 24.19.0, instalação
+      limpa com lockfile congelado, `argon2` nativo e engines do Prisma 5.22
+      funcionam; lint, typecheck, build e testes passam (API 968, web 1614,
+      scripts 151), sem aviso de depreciação do runtime. As medições do `tsc`
+      foram repetidas no Node 22.23.3, com resultado idêntico.
+    - **Rollback:** reverter o squash, ou voltar `.nvmrc` e `engines` para 22 (a
+      CI acompanha o `.nvmrc`) e refazer `pnpm install --frozen-lockfile`. Não
+      há migration, dado nem dependência a desfazer.
+    - **Pendência nova, de ambiente, não causada pelo Node 24:** no Windows, o
+      `prisma generate` do `postinstall` grava o client em `node_modules/.prisma`
+      na raiz, e o `tsc` da API estoura a pilha até rodar
+      `pnpm --filter @evolli/api exec prisma generate`. Idêntico no Node 22; não
+      aparece na CI em Linux.
     - **Objetivo:** levar a política do projeto para Node 24 LTS em tudo o que
       declara ou executa Node — `.nvmrc`, `engines`, CI e documentação —,
       mantendo pnpm 10.
