@@ -1684,11 +1684,11 @@ do colaborador, RBAC global.
 
 **Dívidas preservadas:** **R-3** (T162), **R-3 da revisão da T164**, **S2** (T161), **R1 a R3** (T160), **L3**, **S-1 a S-4** (T158), **R-A a R-C** (T157), o registro `teste michell`, a decisão **`DP-29`** (se `outro_controlado` vale para admissão) e a **limitação de validação em navegador da T167**.
 
-## Contatos do colaborador — T169 (implementada em Draft)
+## Contatos do colaborador — T169 (integrada)
 
-| Tarefa | Estado                    | Resultado principal                                                               |
-| ------ | ------------------------- | --------------------------------------------------------------------------------- |
-| T169   | **Implementada em Draft** | Agregado próprio de contatos do colaborador — e-mail pessoal, celular e telefone. |
+| Tarefa | Estado                                    | Resultado principal                                                               |
+| ------ | ----------------------------------------- | --------------------------------------------------------------------------------- |
+| T169   | **Integrada** (PR #161, squash `0fa2e1e`) | Agregado próprio de contatos do colaborador — e-mail pessoal, celular e telefone. |
 
 **A T168 foi integrada** em `main` pela PR #160, squash
 `db9b023dc11c9fcfa2397b016713939f119c0a6f`, com a CI de push 3/3 verde.
@@ -1744,6 +1744,28 @@ bancários, dependentes, dados contratuais, portal do colaborador, e-mail
 corporativo persistido e o fluxo de admissão.
 
 **Dívidas preservadas:** R-3 (T162), R-3 da revisão da T164, S2 (T161), R1 a R3 (T160), L3, S-1 a S-4 (T158), R-A a R-C (T157), o registro `teste michell`, a decisão `DP-29` (se `outro_controlado` vale para admissão) e a limitação de validação em navegador da T167.
+
+## Node 24 LTS — T170 (em implementação)
+
+| Tarefa | Estado               | Resultado principal                                                               |
+| ------ | -------------------- | --------------------------------------------------------------------------------- |
+| T170   | **Em implementação** | Migração controlada da política do projeto para Node 24 LTS, com pnpm 10 mantido. |
+
+**A T169 foi integrada** em `main` pela PR #161, squash
+`0fa2e1e930bc86f545d37839c42a385b3ed05cfa`, com a CI de push 3/3 verde: contatos do
+colaborador (e-mail pessoal, celular e telefone) em agregado próprio, com
+trilha de toda consulta.
+
+**Escopo da T170:** `.nvmrc`, `engines`, CI e documentação que declaram ou
+executam Node passam a Node 24 LTS. pnpm 10 é mantido. Nenhuma dependência de
+produto é atualizada, nenhuma funcionalidade muda, e só se corrige
+incompatibilidade comprovadamente causada pelo Node 24. O rollback para Node 22
+fica registrado.
+
+**Fora de escopo:** pnpm 11, migration aplicada localmente, seed e banco de
+demonstração.
+
+**Dívidas preservadas:** R-3 (T162), R-3 da revisão da T164, S2 (T161), R1 a R3 (T160), L3, S-1 a S-4 (T158), R-A a R-C (T157), o registro `teste michell`, a decisão `DP-29` (se `outro_controlado` vale para admissão) e a limitação de validação em navegador da T167. As pendências da T169 seguem abertas: o processo de eliminação ou anonimização após 2 anos do desligamento; as rotas de exportação e exclusão de contatos, cuja auditoria é obrigatória quando existirem; a origem e a evidência da coleta, lacuna da ficha; a validação visual em navegador; e as observações N-2 (criação concorrente de contato que perde na unicidade responde 409 sem trilha), N-3 (`ON UPDATE CASCADE` nas FKs do evento de contato permite reescrita indireta) e N-4 (CHECK do evento mais frouxo que o serviço), além da docstring do serviço de contatos que ainda descreve o `resourceId` de forma absoluta.
 
 ## Próxima ação autorizável
 

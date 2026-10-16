@@ -1747,9 +1747,11 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
     - **Dívida preservada:** R-3 (T162), R-3 da revisão da T164, S2 (T161), R1 a R3 (T160), L3, S-1 a S-4 (T158), R-A a R-C (T157), o registro `teste michell`, a decisão `DP-29` (se `outro_controlado` vale para admissão) e a limitação de validação em navegador da T167.
 
 66. **T169 - Contatos do colaborador**
-    - **Estado:** **implementada em Draft**. Branch
-      `codex/t169-contatos-colaborador`, a partir do squash
+    - **Estado:** **integrada** em `main` pela PR #161, squash
+      `0fa2e1e930bc86f545d37839c42a385b3ed05cfa`, com a CI de push 3/3 verde. Branch
+      `codex/t169-contatos-colaborador` preservada, criada a partir do squash
       `db9b023dc11c9fcfa2397b016713939f119c0a6f` (T168, PR #160).
+    - **Pendências preservadas:** o processo de eliminação ou anonimização após 2 anos do desligamento; as rotas de exportação e exclusão de contatos, cuja auditoria é obrigatória quando existirem; a origem e a evidência da coleta, lacuna da ficha; a validação visual em navegador; e as observações N-2 (criação concorrente de contato que perde na unicidade responde 409 sem trilha), N-3 (`ON UPDATE CASCADE` nas FKs do evento de contato permite reescrita indireta) e N-4 (CHECK do evento mais frouxo que o serviço), além da docstring do serviço de contatos que ainda descreve o `resourceId` de forma absoluta.
     - **Ficha aprovada pelo proprietário em 2026-10-16**, formalizada em
       [ficha de tratamento dos contatos](../docs/decisions/ficha-tratamento-contatos-colaborador.md): e-mail pessoal, celular e telefone; finalidade de cadastro e
       comunicação operacional durante a relação de trabalho; execução do
@@ -1817,6 +1819,21 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       e-mail corporativo persistido no perfil, fluxo de admissão, Docker, banco
       de demonstração, seed e processos.
     - **Dívida preservada:** R-3 (T162), R-3 da revisão da T164, S2 (T161), R1 a R3 (T160), L3, S-1 a S-4 (T158), R-A a R-C (T157), o registro `teste michell`, a decisão `DP-29` (se `outro_controlado` vale para admissão) e a limitação de validação em navegador da T167.
+
+67. **T170 - Migração controlada para Node 24 LTS**
+    - **Estado:** em implementação. Branch `codex/t170-node-24-lts`, a partir
+      do squash `0fa2e1e930bc86f545d37839c42a385b3ed05cfa` (T169, PR #161).
+    - **Objetivo:** levar a política do projeto para Node 24 LTS em tudo o que
+      declara ou executa Node — `.nvmrc`, `engines`, CI e documentação —,
+      mantendo pnpm 10.
+    - **Regras:** nenhuma dependência de produto atualizada (Prisma, Nest,
+      React, Vite, TypeScript e demais); nenhuma mudança funcional de RH,
+      contatos, auditoria, RBAC, schema ou migrations de negócio; só se
+      corrige incompatibilidade comprovadamente causada pelo Node 24; a
+      estratégia de rollback para Node 22 fica registrada.
+    - **Fora de escopo:** pnpm 11, migration aplicada localmente, seed e banco
+      de demonstração.
+    - **Dívida preservada:** R-3 (T162), R-3 da revisão da T164, S2 (T161), R1 a R3 (T160), L3, S-1 a S-4 (T158), R-A a R-C (T157), o registro `teste michell`, a decisão `DP-29` (se `outro_controlado` vale para admissão) e a limitação de validação em navegador da T167. As pendências da T169 seguem abertas: o processo de eliminação ou anonimização após 2 anos do desligamento; as rotas de exportação e exclusão de contatos, cuja auditoria é obrigatória quando existirem; a origem e a evidência da coleta, lacuna da ficha; a validação visual em navegador; e as observações N-2 (criação concorrente de contato que perde na unicidade responde 409 sem trilha), N-3 (`ON UPDATE CASCADE` nas FKs do evento de contato permite reescrita indireta) e N-4 (CHECK do evento mais frouxo que o serviço), além da docstring do serviço de contatos que ainda descreve o `resourceId` de forma absoluta.
 
 ## Regra obrigatória para as próximas tarefas
 
