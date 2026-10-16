@@ -2415,17 +2415,24 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
         .expect(403);
     });
 
+    // `extra` é função: a empresa B só existe depois do `beforeAll`, e um valor
+    // lido na montagem do `it.each` seria `undefined` — o JSON o descartaria e
+    // o caso deixaria de enviar empresa nenhuma.
     it.each([
-      ["sem e-mail", { emailPessoal: undefined }],
-      ["sem celular", { celular: undefined }],
-      ["sem telefone", { telefone: undefined }],
-      ["e-mail inválido", { emailPessoal: "sem-arroba" }],
-      ["celular curto", { celular: "1234567" }],
-      ["telefone com letra", { telefone: "11 3333-ABCD" }],
-      ["empresa vinda do navegador", { empresaId: empresaB }],
-      ["e-mail corporativo", { emailCorporativo: "x@empresa.test" }],
+      ["sem e-mail", () => ({ emailPessoal: undefined })],
+      ["sem celular", () => ({ celular: undefined })],
+      ["sem telefone", () => ({ telefone: undefined })],
+      ["e-mail inválido", () => ({ emailPessoal: "sem-arroba" })],
+      ["celular curto", () => ({ celular: "1234567" })],
+      ["telefone com letra", () => ({ telefone: "11 3333-ABCD" })],
+      ["empresa vinda do navegador", () => ({ empresaId: empresaB })],
+      ["e-mail corporativo", () => ({ emailCorporativo: "x@empresa.test" })],
     ])("%s: 400 e nada muda", async (_caso, extra) => {
-      await put(rota(pessoaA), rhA).send(corpo(extra)).expect(400);
+      const enviado: Record<string, unknown> = corpo(extra());
+      if (_caso === "empresa vinda do navegador") {
+        expect(enviado["empresaId"]).toEqual(expect.any(String));
+      }
+      await put(rota(pessoaA), rhA).send(enviado).expect(400);
       const linha = await comPrisma((p) =>
         p.contatoColaborador.findFirstOrThrow({
           where: { colaboradorId: pessoaA },
