@@ -1,8 +1,11 @@
 # ADR 0016 — Modelo e governança dos dados de admissão e perfil do colaborador
 
-- Status: **Proposto** em 2026-10-15. Aguarda aprovação do proprietário
-  (`DP-ADM-01`). **Não autoriza implementação**: nenhuma interface, API,
-  endpoint, migration, schema, seed ou alteração de RBAC nasce desta ADR.
+- Status: **Aceito** em 2026-10-16, por aprovação do proprietário
+  (`DP-ADM-01`); proposto em 2026-10-15. **A aprovação não fecha as demais
+  decisões** (`DP-ADM-02` a `DP-ADM-18`) **e não dispensa a ficha de
+  tratamento** de cada categoria (decisão 5.4): nenhuma interface, API,
+  endpoint, migration, schema, seed ou alteração de RBAC de categoria nova
+  nasce desta ADR sem a sua ficha aprovada.
 - Data: 2026-10-15
 - Tarefa: T166 — etapa **B** da ordem aprovada na T165.
 - Relacionado:
@@ -679,3 +682,15 @@ ADR 0012, decisão 3.
   diferentes numa só transação, e a falha de uma derrubaria a admissão.
   Rejeitada em favor de admitir pelo bloco 1 e complementar depois.
 - **Autopreenchimento pelo funcionário.** Rejeitada pelo proprietário na T165.
+
+## Nota de aprovação (2026-10-16)
+
+O proprietário aprovou esta ADR, resolvendo `DP-ADM-01`: o modelo-alvo, as
+classes de acesso A1, A2 e A3, a matriz de campos e as regras de UX. O texto
+original foi preservado.
+
+**O que a aprovação não faz.** Não escolhe base legal nem prazo de retenção;
+não fecha `DP-ADM-02` a `DP-ADM-18`; não aprova nenhuma ficha de tratamento;
+e não dispensa a emenda à ADR 0007 (ou ADR própria) que a decisão 5.4 exige
+para todo dado pessoal além dos quatro aprovados. Campo "Complementar" da
+matriz continua entrando só depois da ficha da sua categoria.

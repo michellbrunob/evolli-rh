@@ -1469,9 +1469,9 @@ e o registro `teste michell`.
 
 ## Modelo e governança dos dados de admissão e perfil do colaborador — T166 (integrada)
 
-| Tarefa | Estado                                                                   | Resultado principal                                                                                                |
-| ------ | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
-| T166   | **Integrada** (PR #158, squash `0c00afd`); a ADR 0016 segue **proposta** | ADR 0016 e diagnóstico técnico do modelo, da finalidade e do acesso aos dados de admissão e perfil do colaborador. |
+| Tarefa | Estado                                                                               | Resultado principal                                                                                                |
+| ------ | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| T166   | **Integrada** (PR #158, squash `0c00afd`); a ADR 0016 foi **aprovada** em 2026-10-16 | ADR 0016 e diagnóstico técnico do modelo, da finalidade e do acesso aos dados de admissão e perfil do colaborador. |
 
 **É a etapa B da ordem aprovada na T165.** Branch
 `codex/t166-adr-dados-colaborador`, a partir do squash
@@ -1512,7 +1512,9 @@ identidade, texto, marca, ícone, paleta, layout ou componente de terceiros.
 
 A [ADR 0016](../docs/adr/0016-modelo-e-governanca-dos-dados-de-admissao-e-perfil-do-colaborador.md) e o
 [diagnóstico técnico](../docs/decisions/t166-dados-admissao-perfil-diagnostico.md). A ADR está **proposta**: aguarda a aprovação
-do proprietário (`DP-ADM-01`) e não autoriza implementação.
+do proprietário (`DP-ADM-01`) e não autoriza implementação. **Atualização
+(2026-10-16): a ADR foi aprovada pelo proprietário (`DP-ADM-01`), sem fechar
+`DP-ADM-02` a `DP-ADM-18` nem dispensar a ficha de tratamento por categoria.**
 
 - **Modelo-alvo.** `Colaborador` continua mínimo. Todo dado pessoal novo mora
   em agregado próprio — perfil pessoal, contatos e endereço, identificação
@@ -1563,16 +1565,16 @@ Três notas aditivas no documento da T165 — na Proposta original 4, na §5.2 e
 
 **Dívidas preservadas:** **R-3** (T162), **R-3 da revisão da T164**, **S2** (T161), **R1 a R3** (T160), **L3**, **S-1 a S-4** (T158), **R-A a R-C** (T157) e o registro `teste michell`.
 
-## Admissão mínima segura — T167 (implementada em Draft)
+## Admissão mínima segura — T167 (integrada)
 
-| Tarefa | Estado                    | Resultado principal                                                                  |
-| ------ | ------------------------- | ------------------------------------------------------------------------------------ |
-| T167   | **Implementada em Draft** | Contrato existente de admissão estabilizado antes de expandir qualquer dado pessoal. |
+| Tarefa | Estado                                    | Resultado principal                                                                  |
+| ------ | ----------------------------------------- | ------------------------------------------------------------------------------------ |
+| T167   | **Integrada** (PR #159, squash `dcef627`) | Contrato existente de admissão estabilizado antes de expandir qualquer dado pessoal. |
 
 **A T166 foi integrada** em `main` pela PR #158, squash
 `0c00afdc479193506e80eff0150dc4ddb785a41f`, com a CI de push 3/3 verde. **A
-ADR 0016 continua proposta** — integrar o documento não aprova o seu conteúdo,
-e `DP-ADM-01` segue aberto.
+ADR 0016 continuava proposta** — integrar o documento não aprovava o seu
+conteúdo —; **o proprietário a aprovou em 2026-10-16 (`DP-ADM-01`)**.
 
 **A T167 trabalha só sobre o contrato que já existe.** Branch
 `codex/t167-admissao-minima-segura`. Escopo autorizado pelo proprietário:
@@ -1634,6 +1636,36 @@ automatizados (web, API e E2E na CI), e nenhuma verificação visual é
 declarada como feita.
 
 **Dívidas preservadas:** **R-3** (T162), **R-3 da revisão da T164**, **S2** (T161), **R1 a R3** (T160), **L3**, **S-1 a S-4** (T158), **R-A a R-C** (T157) e o registro `teste michell`.
+
+## Perfil do colaborador: dados de contato — T168 (em andamento)
+
+| Tarefa | Estado           | Resultado principal                                                                                        |
+| ------ | ---------------- | ---------------------------------------------------------------------------------------------------------- |
+| T168   | **Em andamento** | Primeiro bloco complementar do cadastro: dados de contato, preenchidos só por RH ou DP depois da admissão. |
+
+**A T167 foi integrada** em `main` pela PR #159, squash
+`dcef62706399126b934c51e7d2955941cf9f06b3`, com a CI de push 3/3 verde.
+
+**A ADR 0016 foi aprovada pelo proprietário** em 2026-10-16 (`DP-ADM-01`).
+**A aprovação não fecha as demais decisões** — `DP-ADM-02` a `DP-ADM-18` seguem abertas — e **não dispensa a ficha de tratamento** de cada categoria (decisão 5.4).
+
+**A T168 começa pela investigação**, antes de qualquer migration ou interface:
+só entra o campo que a ADR classificar como A2, complementar e não bloqueado, e
+cuja finalidade, acesso, auditoria e retenção estejam definidos nos artefatos
+aprovados. Campos pretendidos: e-mail pessoal, e-mail corporativo, celular e
+telefone. O que depender de decisão não aprovada **não é implementado**.
+
+**Regras do proprietário preservadas:** `rh` e `dp` consultam e editam na
+empresa ativa; `master_tecnico`, `gestor` e `colaborador` não; empresa só da
+sessão; nada na listagem, no Hub, no portal ou na liderança; escritas
+auditadas; validação no servidor.
+
+**Fora de escopo:** endereço, contato de emergência, documentos, CPF, foto,
+nome social, sexo, gênero, raça/etnia, deficiência, nacionalidade, estado
+civil, escolaridade, dados bancários, dependentes, dados contratuais, portal
+do colaborador, RBAC global.
+
+**Dívidas preservadas:** **R-3** (T162), **R-3 da revisão da T164**, **S2** (T161), **R1 a R3** (T160), **L3**, **S-1 a S-4** (T158), **R-A a R-C** (T157), o registro `teste michell`, a decisão **`DP-29`** (se `outro_controlado` vale para admissão) e a **limitação de validação em navegador da T167**.
 
 ## Próxima ação autorizável
 
