@@ -52,6 +52,33 @@ export class PessoasAuditoriaService {
   }
 
   /**
+   * Leitura de dado A2 cuja ficha de tratamento exige auditoria de LEITURA
+   * (T169, contatos do colaborador), **dentro da transação** que lê o dado.
+   *
+   * Fail-safe por construção: se o evento não puder ser gravado, a transação
+   * falha e o valor não é respondido. Mesmo conteúdo de `registrarMutacao` —
+   * ator, papel, a empresa REAL do registro, ação e id técnico —, nunca o valor
+   * lido.
+   */
+  async registrarLeitura(
+    tx: Prisma.TransactionClient,
+    ctx: PessoasAuditContext,
+    action: AuditAction,
+    resource: AuditResource,
+    resourceId: string,
+    empresaId: string,
+  ): Promise<void> {
+    await this.registrarMutacao(
+      tx,
+      ctx,
+      action,
+      resource,
+      resourceId,
+      empresaId,
+    );
+  }
+
+  /**
    * Consulta em escopo **GLOBAL** feita pelo `master_tecnico` (T030). A leitura
    * da própria empresa por rh/dp NÃO gera evento (seria log de tráfego); só a
    * leitura ampla, que é a exceção controlada, é registrada.

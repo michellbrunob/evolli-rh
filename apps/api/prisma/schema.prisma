@@ -130,6 +130,12 @@ model AccessUser {
   empresasAutorizadasDadas     AccessUserEmpresa[] @relation("EmpresaAutorizadaConcedidaPor")
   empresasAutorizadasRevogadas AccessUserEmpresa[] @relation("EmpresaAutorizadaRevogadaPor")
 
+  // T169 — contatos do colaborador que esta conta gravou, e os eventos de
+  // tratamento (criacao, leitura, edicao) que ela praticou.
+  contatosColaboradorCriados     ContatoColaborador[]       @relation("ContatoColaboradorCriadoPor")
+  contatosColaboradorAtualizados ContatoColaborador[]       @relation("ContatoColaboradorAtualizadoPor")
+  contatoColaboradorEventos      ContatoColaboradorEvento[] @relation("ContatoColaboradorEventoAtor")
+
   @@index([companyId])
   @@map("access_user")
 }
@@ -542,6 +548,18 @@ enum AuditAction {
   gestor_excecao_criada       @map("gestor.excecao.criada")
   gestor_excecao_encerrada    @map("gestor.excecao.encerrada")
   gestor_equipe_consultada    @map("gestor.equipe.consultada")
+
+  // T169 — Contatos do colaborador (ficha aprovada em 2026-10-16). A ficha
+  // exige auditar criacao, LEITURA, edicao, exportacao e exclusao. Exportacao e
+  // exclusao nao tem rota nesta fatia, entao nao ha verbo para elas: o verbo
+  // nasce com a capacidade, nunca antes. O evento carrega ator, papel, a
+  // empresa REAL do colaborador e o id tecnico do registro de contato — nunca
+  // e-mail, celular ou telefone. Os CAMPOS afetados vivem em
+  // `contato_colaborador_evento`, correlacionados por `request_id`, porque
+  // `audit_event` nao tem coluna de detalhe (ADR 0004 §5).
+  pessoas_contato_criado     @map("pessoas.contato.criado")
+  pessoas_contato_atualizado @map("pessoas.contato.atualizado")
+  pessoas_contato_consultado @map("pessoas.contato.consultado")
 }
 
 enum AuditResult {
@@ -675,6 +693,10 @@ model Empresa {
   // T163 — contexto empresarial ativo.
   contasAutorizadas AccessUserEmpresa[]
   sessoesAtivasAqui AccessSession[]     @relation("SessaoComEmpresaAtiva")
+
+  // T169 — contatos do colaborador. `empresa_id` proprio: a fronteira de
+  // autorizacao e a empresa, nunca a pessoa (ADR 0016, decisao 3).
+  contatosColaborador ContatoColaborador[]
 
   @@index([status])
   @@map("empresa")
@@ -988,6 +1010,11 @@ model Colaborador {
   contasDeAcesso     AccessUserColaborador[]  @relation("ColaboradorDaConta")
   equipesQueGerencia AtribuicaoGestorEquipe[] @relation("GestorDaEquipe")
   excecoesDeAcesso   ExcecaoAcessoGestor[]    @relation("GestorDaExcecao")
+
+  // T169 — contatos do colaborador, em agregado PROPRIO (ADR 0016, decisao 3;
+  // ADR 0007, Emenda 4). `Colaborador` continua com `nome` e `situacao` e
+  // nenhuma coluna de contato.
+  contatos ContatoColaborador[]
 
   @@index([situacao])
   @@map("colaborador")
@@ -1966,4 +1993,121 @@ model ExcecaoAcessoGestor {
   @@index([criadoPorUserId])
   @@index([encerradoPorUserId])
   @@map("excecao_acesso_gestor")
+}
+
+// ---------------------------------------------------------------------------
+// T169 — Contatos do colaborador.
+//
+// Ficha de tratamento aprovada pelo proprietario em 2026-10-16
+// (docs/decisions/ficha-tratamento-contatos-colaborador.md), autorizada pela
+// Emenda 4 da ADR 0007 e pela Emenda 1 da ADR 0012. Tres campos, e so eles:
+// e-mail pessoal, celular e telefone. Classe A2 restrita.
+//
+// AUSENCIAS DELIBERADAS:
+//   - e-mail CORPORATIVO: segue derivado de `access_user.email`. Sem coluna,
+//     copia ou formulario aqui — um segundo e-mail corporativo poderia
+//     divergir do login.
+//   - endereco e contato de emergencia: mesmo agregado da ADR 0016, mas fora
+//     da ficha.
+//   - historico de valores: a ficha guarda so o valor vigente. Os eventos
+//     registram QUE campo mudou, nunca o valor anterior nem o novo.
+// ---------------------------------------------------------------------------
+
+/// Natureza do tratamento registrado. Exportacao e exclusao sao auditadas pela
+/// ficha, mas nao tem rota nesta fatia — o valor de enum nasce com a
+/// capacidade.
+enum AcaoContatoColaborador {
+  criacao
+  leitura
+  edicao
+}
+
+/// Campo de contato afetado por um evento. E o NOME do campo, nunca o valor.
+enum CampoContatoColaborador {
+  email_pessoal
+  celular
+  telefone
+}
+
+/// Contatos de um colaborador DENTRO de uma empresa.
+///
+/// POR QUE POR EMPRESA, E NAO POR PESSOA. O colaborador nao tem `empresa_id`
+/// (a empresa e do vinculo) e pode ter vinculos em empresas diferentes. Se o
+/// contato fosse da pessoa, o RH de uma empresa leria o que o RH de outra
+/// gravou. Com `empresa_id` proprio e unicidade por (colaborador, empresa), o
+/// isolamento entre empresas e o mesmo do resto do produto.
+///
+/// INTEGRIDADE empresa<->colaborador garantida pelo BANCO: CONSTRAINT TRIGGERS
+/// diferidos exigem que o colaborador tenha vinculo na empresa do contato, nos
+/// dois lados (mesmo desenho de `documento_metadado`). Sem exclusao fisica: a
+/// migration REVOGA `DELETE` de `evolli_app` — exclusao e ato auditado pela
+/// ficha, e nenhuma rota a oferece nesta fatia.
+///
+/// Valores ja NORMALIZADOS pelo servidor (ficha, §3): e-mail em caixa baixa e
+/// sem espacos nas pontas; celular e telefone so com digitos, precedidos de
+/// `+` quando informado.
+model ContatoColaborador {
+  id            String @id @default(uuid())
+  empresaId     String @map("empresa_id")
+  colaboradorId String @map("colaborador_id")
+
+  emailPessoal String @map("email_pessoal")
+  celular      String
+  telefone     String
+
+  criadoPorUserId     String @map("criado_por_user_id")
+  atualizadoPorUserId String @map("atualizado_por_user_id")
+
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  empresa       Empresa     @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  colaborador   Colaborador @relation(fields: [colaboradorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  criadoPor     AccessUser  @relation("ContatoColaboradorCriadoPor", fields: [criadoPorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  atualizadoPor AccessUser  @relation("ContatoColaboradorAtualizadoPor", fields: [atualizadoPorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  eventos ContatoColaboradorEvento[]
+
+  /// Um registro de contato por colaborador e empresa.
+  @@unique([colaboradorId, empresaId])
+  /// Alvo da FK composta do evento: o banco garante que um evento pertence ao
+  /// contato E a empresa certos.
+  @@unique([id, empresaId])
+  @@index([empresaId])
+  @@index([criadoPorUserId])
+  @@index([atualizadoPorUserId])
+  @@map("contato_colaborador")
+}
+
+/// Evento de tratamento do contato: criacao, leitura e edicao, com os CAMPOS
+/// afetados — nunca os valores.
+///
+/// APPEND-ONLY, garantido pelo BANCO: a migration REVOGA `UPDATE` e `DELETE`
+/// de `evolli_app`, como em `solicitacao_pessoa_evento`. Sem `atualizado_em`:
+/// a linha nunca muda. `request_id` correlaciona com `audit_event`, a trilha
+/// formal, sem duplicar conteudo.
+model ContatoColaboradorEvento {
+  id        String @id @default(uuid())
+  contatoId String @map("contato_id")
+  empresaId String @map("empresa_id")
+
+  acao   AcaoContatoColaborador
+  /// Nomes dos campos afetados. Leitura e criacao afetam os tres; edicao, so
+  /// os que mudaram.
+  campos CampoContatoColaborador[]
+
+  atorUserId String @map("ator_user_id")
+
+  /// Correlacao com `audit_event.request_id` — mesma requisicao, duas trilhas.
+  requestId String @map("request_id")
+
+  ocorridoEm DateTime @default(now()) @map("ocorrido_em")
+
+  contato ContatoColaborador @relation(fields: [contatoId, empresaId], references: [id, empresaId], onDelete: Restrict, onUpdate: Cascade)
+  ator    AccessUser         @relation("ContatoColaboradorEventoAtor", fields: [atorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([contatoId, ocorridoEm])
+  @@index([empresaId, ocorridoEm])
+  @@index([atorUserId])
+  @@map("contato_colaborador_evento")
 }

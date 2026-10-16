@@ -17,6 +17,7 @@ import {
   isDocumentosResource,
   isOrganizationalResource,
   isSolicitacoesPessoasResource,
+  isContatosResource,
 } from "./permission.types";
 import { AuditResource } from "../../audit/audit.types";
 import {
@@ -58,6 +59,11 @@ function toAuditResource(resource: AuthorizationResource): AuditResource {
   // TÉCNICO do recurso — nunca o tipo da solicitação, que revelaria categoria
   // sensível por inferência (`atestado` é dado de saúde).
   if (isSolicitacoesPessoasResource(resource)) {
+    return resource;
+  }
+  // T169 — mesma razão: a negação de capacidade em contatos não pode virar
+  // `access_user` na trilha.
+  if (isContatosResource(resource)) {
     return resource;
   }
   return "access_user";

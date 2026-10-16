@@ -175,6 +175,14 @@ export const AUDIT_ACTIONS = [
   "gestor_excecao_criada",
   "gestor_excecao_encerrada",
   "gestor_equipe_consultada",
+
+  // T169 — Contatos do colaborador (ficha aprovada em 2026-10-16). Leitura
+  // tambem e auditada, por decisao da ficha. Nenhum evento carrega e-mail,
+  // celular ou telefone: os CAMPOS afetados vivem em
+  // `contato_colaborador_evento`, correlacionados por `request_id`.
+  "pessoas_contato_criado",
+  "pessoas_contato_atualizado",
+  "pessoas_contato_consultado",
 ] as const satisfies readonly AuditAction[];
 
 /**
@@ -235,7 +243,10 @@ export type AuditResource =
   // T139 — Central de Solicitações de Pessoas: rótulo técnico do recurso.
   // Nunca o tipo da solicitação, o motivo codificado ou o vínculo. Não há
   // rótulo para o evento de histórico: ele é parte da própria solicitação.
-  | "solicitacao_pessoa";
+  | "solicitacao_pessoa"
+  // T169 — Contatos do colaborador: rotulo tecnico do recurso. Nunca o valor
+  // de e-mail, celular ou telefone.
+  | "contato_colaborador";
 
 export type RecordAuditEventInput =
   | {

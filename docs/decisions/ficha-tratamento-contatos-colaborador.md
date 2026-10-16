@@ -92,3 +92,28 @@ formalizada na Emenda 1 da ADR 0012.
 - **Exportação e exclusão:** não há rota de nenhuma das duas nesta fatia, então
   não há evento a auditar. A auditoria delas é obrigatória quando existirem.
 - **Origem e evidência da coleta:** lacuna da ficha, registrada na §1.
+
+## 6. Como a T169 aplicou a ficha
+
+Decisões de implementação, todas dentro do que a ficha aprovou:
+
+- **Por colaborador e empresa.** O contato tem `empresa_id` próprio e é único
+  por par. Um colaborador com vínculo em duas empresas tem dois registros: o RH
+  de uma nunca lê o que o RH da outra gravou.
+- **Bloqueio após o desligamento.** Sem vínculo previsto ou ativo na empresa, a
+  leitura responde `bloqueado`, sem valor, e a edição é recusada (409). O valor
+  continua guardado, como manda a retenção.
+- **Auditoria de leitura.** Registrada quando um valor é devolvido. Leitura de
+  `sem_registro` ou `bloqueado` não lê valor e não gera evento de leitura.
+- **Campos afetados.** Vivem em `contato_colaborador_evento`, porque
+  `audit_event` não tem coluna de detalhe; as duas trilhas se ligam por
+  `request_id`. Criação e leitura afetam os três campos; edição, só os que
+  mudaram; salvar sem mudança não gera evento.
+- **`master_tecnico` sem empresa ativa** atua na empresa do vínculo. Se o
+  colaborador tiver vínculo em mais de uma, a operação seria ambígua: 409, e a
+  empresa se escolhe pelo contexto ativo.
+- **Exclusão.** `evolli_app` não tem `DELETE` no contato. O processo de
+  eliminação dos 2 anos, quando existir, recebe o privilégio junto da sua
+  própria auditoria (§5).
+
+Migration: `20261016120000_contatos_colaborador`, criada e não aplicada localmente.

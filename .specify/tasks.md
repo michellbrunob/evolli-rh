@@ -1747,9 +1747,9 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
     - **Dívida preservada:** R-3 (T162), R-3 da revisão da T164, S2 (T161), R1 a R3 (T160), L3, S-1 a S-4 (T158), R-A a R-C (T157), o registro `teste michell`, a decisão `DP-29` (se `outro_controlado` vale para admissão) e a limitação de validação em navegador da T167.
 
 66. **T169 - Contatos do colaborador**
-    - **Estado:** em implementação. Branch `codex/t169-contatos-colaborador`, a
-      partir do squash `db9b023dc11c9fcfa2397b016713939f119c0a6f` (T168,
-      PR #160).
+    - **Estado:** **implementada em Draft**. Branch
+      `codex/t169-contatos-colaborador`, a partir do squash
+      `db9b023dc11c9fcfa2397b016713939f119c0a6f` (T168, PR #160).
     - **Ficha aprovada pelo proprietário em 2026-10-16**, formalizada em
       [ficha de tratamento dos contatos](../docs/decisions/ficha-tratamento-contatos-colaborador.md): e-mail pessoal, celular e telefone; finalidade de cadastro e
       comunicação operacional durante a relação de trabalho; execução do
@@ -1768,6 +1768,41 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
     - **Objetivo:** o agregado próprio de contatos do colaborador, fora de
       `Colaborador`, sem alterar a admissão atômica da T167. E-mail corporativo
       continua derivado de `access_user.email`.
+    - **Banco:** migration `20261016120000_contatos_colaborador` **criada e não aplicada localmente**.
+      `contato_colaborador` guarda o valor vigente por colaborador **e
+      empresa** (`empresa_id` próprio, único por par), com CHECK da
+      normalização e CONSTRAINT TRIGGERS diferidos que exigem vínculo do
+      colaborador na empresa, nos dois lados. `contato_colaborador_evento`
+      registra criação, leitura e edição com os **campos** afetados, nunca
+      valores, correlacionado a `audit_event` por `request_id`. `evolli_app`
+      perde `DELETE` no contato e `UPDATE`/`DELETE` no evento. `Colaborador`
+      não ganhou coluna.
+    - **API:** `GET` e `PUT /v1/colaboradores/:colaboradorId/contatos`, com
+      recurso de autorização próprio `contato_colaborador` (`read`/`alter`):
+      `rh` e `dp` na empresa ativa; `master_tecnico` em qualquer empresa sem
+      seleção e só na ativa com seleção; demais negados. A empresa real vem do
+      vínculo, nunca do navegador. Estados `sem_registro`, `registrado` e
+      `bloqueado` (nenhum vínculo previsto ou ativo na empresa: sem valor na
+      leitura, 409 na edição). Inexistente e fora do escopo: o mesmo 404.
+      Validação e normalização no servidor: e-mail aparado e minúsculo, até 254
+      caracteres; celular e telefone só com dígitos, `+` opcional, 8 a 15
+      dígitos, sem presumir país. Auditoria `pessoas.contato.criado`,
+      `.atualizado` e `.consultado`, na mesma transação do dado. `no-store` e
+      redação dos três campos no logger.
+    - **Web:** seção "Contatos" no detalhe do colaborador, com os três campos
+      obrigatórios, erro por campo, foco no primeiro erro, dados preservados em
+      falha, confirmação de sucesso e confirmação de descarte pelo `Modal`.
+      Listagem, Hub, portal e visão do gestor não recebem contato.
+    - **Testes:** unitários da API (78: normalização, validação, matriz nas
+      duas camadas, serviço, auditoria sem valores); E2E no bloco da T169 de
+      `pessoas.e2e-spec.ts`; web (11 da tela e 13 da regra no cliente).
+    - **Limites:** a eliminação ou anonimização após 2 anos não tem processo
+      nesta fatia; exportação e exclusão não têm rota, então não há o que
+      auditar; leitura de `sem_registro` e `bloqueado` não é auditada, porque
+      nenhum valor é lido; `master_tecnico` sem empresa ativa diante de
+      colaborador com vínculo em mais de uma empresa recebe 409 e escolhe pelo
+      contexto ativo; os E2E rodam só na CI; sem validação visual em
+      navegador, porque processos estão fora do escopo.
     - **Fora de escopo:** endereço, contato de emergência, CPF, documentos,
       foto, nome social, sexo, gênero, raça/etnia, deficiência, escolaridade,
       dados bancários, dependentes, dados contratuais, portal do colaborador,

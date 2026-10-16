@@ -2250,6 +2250,448 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
 
   // -------------------------------------------------------------------------
 
+  // -------------------------------------------------------------------------
+  // T169 — Contatos do colaborador (ficha aprovada em 2026-10-16).
+  //
+  // E-mail pessoal, celular e telefone em agregado próprio, com rotas
+  // próprias. Valores sintéticos: domínio reservado `example.test` e números
+  // sem titular.
+  // -------------------------------------------------------------------------
+  describe("T169 — contatos do colaborador", () => {
+    const EMAIL_ENTRADA = "  Pessoa.Contato@EXAMPLE.test ";
+    const EMAIL = "pessoa.contato@example.test";
+    const CELULAR = "+5511987650001";
+    const TELEFONE = "1133330001";
+    const TELEFONE_NOVO = "1133330002";
+
+    let pessoaA: string;
+    let pessoaB: string;
+    let pessoaDesligada: string;
+    let masterEscopado: Credencial;
+
+    function put(rota: string, cred: Credencial) {
+      return agent()
+        .put(rota)
+        .set("Cookie", cred.cookie)
+        .set("x-csrf-token", cred.csrfToken);
+    }
+    const rota = (colaboradorId: string) =>
+      `/v1/colaboradores/${colaboradorId}/contatos`;
+    const corpo = (extra: Record<string, unknown> = {}) => ({
+      emailPessoal: EMAIL_ENTRADA,
+      celular: "+55 (11) 98765-0001",
+      telefone: "(11) 3333-0001",
+      ...extra,
+    });
+
+    async function comPrisma<T>(fn: (p: PrismaClient) => Promise<T>) {
+      const prisma = new PrismaClient({ datasources: { db: { url: appUrl } } });
+      try {
+        return await fn(prisma);
+      } finally {
+        await prisma.$disconnect();
+      }
+    }
+
+    beforeAll(async () => {
+      pessoaA = (
+        await admitirEEfetivar(rhA, {
+          nome: "Pessoa Sintetica Contato A",
+          empresaId: empresaA,
+          matricula: "T169-A",
+          departamentoId: departamentoA,
+        })
+      ).colaboradorId;
+      pessoaB = (
+        await admitirEEfetivar(rhB, {
+          nome: "Pessoa Sintetica Contato B",
+          empresaId: empresaB,
+          matricula: "T169-B",
+          departamentoId: departamentoB,
+        })
+      ).colaboradorId;
+
+      // Conta própria: trocar o contexto do `master` compartilhado mudaria o
+      // escopo dos testes seguintes.
+      masterEscopado = await seedMaster("master.t169@example.test");
+      await post("/v1/auth/contexto/empresa", masterEscopado)
+        .send({ empresaId: empresaA })
+        .expect(200);
+    });
+
+    it("colaborador existente sem contato: sem_registro, sem erro", async () => {
+      const r = await get(rota(pessoaA), rhA).expect(200);
+      expect(r.body).toEqual({
+        colaboradorId: pessoaA,
+        empresaId: empresaA,
+        situacao: "sem_registro",
+        contatos: null,
+      });
+      expect(r.headers["cache-control"]).toBe("no-store");
+    });
+
+    it("rh grava os três campos, NORMALIZADOS no servidor, na empresa da sessão", async () => {
+      const r = await put(rota(pessoaA), rhA).send(corpo()).expect(200);
+      expect(r.body).toMatchObject({
+        colaboradorId: pessoaA,
+        empresaId: empresaA,
+        situacao: "registrado",
+        resultado: "criado",
+        contatos: { emailPessoal: EMAIL, celular: CELULAR, telefone: TELEFONE },
+      });
+      expect(Object.keys(r.body.contatos).sort()).toEqual([
+        "atualizadoEm",
+        "celular",
+        "emailPessoal",
+        "telefone",
+      ]);
+
+      const linha = await comPrisma((p) =>
+        p.contatoColaborador.findUniqueOrThrow({
+          where: {
+            colaboradorId_empresaId: {
+              colaboradorId: pessoaA,
+              empresaId: empresaA,
+            },
+          },
+        }),
+      );
+      expect(linha).toMatchObject({
+        emailPessoal: EMAIL,
+        celular: CELULAR,
+        telefone: TELEFONE,
+      });
+    });
+
+    it("dp lê na empresa ativa", async () => {
+      const r = await get(rota(pessoaA), dpA).expect(200);
+      expect(r.body).toMatchObject({
+        situacao: "registrado",
+        contatos: { emailPessoal: EMAIL, celular: CELULAR, telefone: TELEFONE },
+      });
+    });
+
+    it("isolamento: rh de outra empresa recebe o MESMO 404 de colaborador inexistente", async () => {
+      const foraDoEscopo = await get(rota(pessoaA), rhB).expect(404);
+      const inexistente = await get(
+        rota("99999999-9999-4999-8999-999999999999"),
+        rhB,
+      ).expect(404);
+      expect(foraDoEscopo.body.message).toBe(inexistente.body.message);
+      expect(JSON.stringify(foraDoEscopo.body)).not.toContain(EMAIL);
+
+      await put(rota(pessoaA), rhB)
+        .send(corpo({ telefone: "1199999999" }))
+        .expect(404);
+      const linha = await comPrisma((p) =>
+        p.contatoColaborador.findFirstOrThrow({
+          where: { colaboradorId: pessoaA },
+        }),
+      );
+      expect(linha.telefone).toBe(TELEFONE);
+    });
+
+    it("identificador que não é UUID é recusado (400)", async () => {
+      await get("/v1/colaboradores/nao-e-uuid/contatos", rhA).expect(400);
+    });
+
+    it.each([
+      ["gestor", () => gestorA],
+      ["colaborador", () => colaboradorA],
+      ["financeiro", () => financeiroA],
+      ["auditor", () => auditorA],
+      ["admin_tecnico", () => admin],
+    ])("%s não lê nem grava (403)", async (_papel, cred) => {
+      const leitura = await get(rota(pessoaA), cred()).expect(403);
+      expect(JSON.stringify(leitura.body)).not.toContain(EMAIL);
+      await put(rota(pessoaA), cred()).send(corpo()).expect(403);
+    });
+
+    it("gravar exige CSRF", async () => {
+      await agent()
+        .put(rota(pessoaA))
+        .set("Cookie", rhA.cookie)
+        .send(corpo())
+        .expect(403);
+    });
+
+    it.each([
+      ["sem e-mail", { emailPessoal: undefined }],
+      ["sem celular", { celular: undefined }],
+      ["sem telefone", { telefone: undefined }],
+      ["e-mail inválido", { emailPessoal: "sem-arroba" }],
+      ["celular curto", { celular: "1234567" }],
+      ["telefone com letra", { telefone: "11 3333-ABCD" }],
+      ["empresa vinda do navegador", { empresaId: empresaB }],
+      ["e-mail corporativo", { emailCorporativo: "x@empresa.test" }],
+    ])("%s: 400 e nada muda", async (_caso, extra) => {
+      await put(rota(pessoaA), rhA).send(corpo(extra)).expect(400);
+      const linha = await comPrisma((p) =>
+        p.contatoColaborador.findFirstOrThrow({
+          where: { colaboradorId: pessoaA },
+        }),
+      );
+      expect(linha).toMatchObject({
+        emailPessoal: EMAIL,
+        celular: CELULAR,
+        telefone: TELEFONE,
+        empresaId: empresaA,
+      });
+    });
+
+    it("edição registra só o campo que mudou; repetir não grava nem audita", async () => {
+      const r = await put(rota(pessoaA), dpA)
+        .send(corpo({ telefone: "(11) 3333-0002" }))
+        .expect(200);
+      expect(r.body.resultado).toBe("atualizado");
+      expect(r.body.contatos.telefone).toBe(TELEFONE_NOVO);
+
+      const contarEventos = () =>
+        comPrisma((p) =>
+          p.contatoColaboradorEvento.count({ where: { empresaId: empresaA } }),
+        );
+      const antes = await contarEventos();
+      const repetido = await put(rota(pessoaA), dpA)
+        .send(corpo({ telefone: TELEFONE_NOVO }))
+        .expect(200);
+      expect(repetido.body.resultado).toBe("sem_alteracao");
+      expect(await contarEventos()).toBe(antes);
+
+      const edicao = await comPrisma((p) =>
+        p.contatoColaboradorEvento.findFirstOrThrow({
+          where: { acao: "edicao", empresaId: empresaA },
+          orderBy: { ocorridoEm: "desc" },
+        }),
+      );
+      expect(edicao.campos).toEqual(["telefone"]);
+    });
+
+    it("master sem empresa ativa lê e grava em outra empresa, auditado com a empresa REAL", async () => {
+      const leitura = await get(rota(pessoaB), master).expect(200);
+      expect(leitura.body).toMatchObject({
+        empresaId: empresaB,
+        situacao: "sem_registro",
+      });
+
+      const gravacao = await put(rota(pessoaB), master)
+        .send(corpo())
+        .expect(200);
+      expect(gravacao.body).toMatchObject({
+        empresaId: empresaB,
+        resultado: "criado",
+      });
+
+      const evento = await comPrisma((p) =>
+        p.auditEvent.findFirstOrThrow({
+          where: {
+            action: "pessoas_contato_criado",
+            actorRole: "master_tecnico",
+          },
+        }),
+      );
+      expect(evento.companyId).toBe(empresaB);
+      expect(evento.resource).toBe("contato_colaborador");
+
+      // E o rh da empresa B lê o que o master gravou — a mesma empresa.
+      await get(rota(pessoaB), rhB).expect(200);
+    });
+
+    it("master com empresa ativa atua só dentro dela", async () => {
+      await get(rota(pessoaB), masterEscopado).expect(404);
+      await put(rota(pessoaB), masterEscopado).send(corpo()).expect(404);
+      const r = await get(rota(pessoaA), masterEscopado).expect(200);
+      expect(r.body.empresaId).toBe(empresaA);
+    });
+
+    it("desligado: uso operacional bloqueado — sem valor na leitura, edição recusada", async () => {
+      const { colaboradorId, vinculoId } = await admitirEEfetivar(rhA, {
+        nome: "Pessoa Sintetica Contato Desligada",
+        empresaId: empresaA,
+        matricula: "T169-DESL",
+        departamentoId: departamentoA,
+      });
+      pessoaDesligada = colaboradorId;
+      await put(rota(pessoaDesligada), rhA)
+        .send(corpo({ celular: "11987650009" }))
+        .expect(200);
+
+      const desligamento = await post("/v1/movimentacoes", rhA)
+        .send({
+          vinculoId,
+          tipo: "desligamento",
+          motivoCodigo: "encerramento_de_vinculo",
+          vigenciaInicio: DESLIGAMENTO,
+        })
+        .expect(201);
+      await post(`/v1/movimentacoes/${desligamento.body.id}/efetivar`, rhA)
+        .send()
+        .expect(201);
+
+      const r = await get(rota(pessoaDesligada), rhA).expect(200);
+      expect(r.body).toEqual({
+        colaboradorId: pessoaDesligada,
+        empresaId: empresaA,
+        situacao: "bloqueado",
+        contatos: null,
+      });
+      expect(JSON.stringify(r.body)).not.toContain("11987650009");
+      await put(rota(pessoaDesligada), rhA).send(corpo()).expect(409);
+
+      // O valor continua guardado (retenção da ficha), só não é usado.
+      const linha = await comPrisma((p) =>
+        p.contatoColaborador.findFirstOrThrow({
+          where: { colaboradorId: pessoaDesligada },
+        }),
+      );
+      expect(linha.celular).toBe("11987650009");
+    });
+
+    it("listagem e detalhe do colaborador NÃO expõem contatos", async () => {
+      const lista = await get("/v1/colaboradores", rhA).expect(200);
+      const detalhe = await get(`/v1/colaboradores/${pessoaA}`, rhA).expect(
+        200,
+      );
+      for (const corpoResposta of [lista.body, detalhe.body]) {
+        const texto = JSON.stringify(corpoResposta);
+        for (const proibido of [
+          EMAIL,
+          CELULAR,
+          TELEFONE_NOVO,
+          "emailPessoal",
+          "celular",
+          "telefone",
+          "contatos",
+        ]) {
+          expect(texto).not.toContain(proibido);
+        }
+      }
+    });
+
+    it("auditoria: criação, leitura e edição com empresa real e campos — NUNCA valores", async () => {
+      await comPrisma(async (p) => {
+        for (const action of [
+          "pessoas_contato_criado",
+          "pessoas_contato_consultado",
+          "pessoas_contato_atualizado",
+        ] as const) {
+          const evento = await p.auditEvent.findFirst({
+            where: { action, companyId: empresaA },
+          });
+          expect(evento).not.toBeNull();
+          expect(evento!.resource).toBe("contato_colaborador");
+          expect(evento!.result).toBe("success");
+        }
+
+        const leitura = await p.contatoColaboradorEvento.findFirstOrThrow({
+          where: { acao: "leitura", empresaId: empresaA },
+        });
+        expect(leitura.campos).toEqual([
+          "email_pessoal",
+          "celular",
+          "telefone",
+        ]);
+        // Mesma requisição, duas trilhas.
+        expect(
+          await p.auditEvent.count({
+            where: {
+              requestId: leitura.requestId,
+              action: "pessoas_contato_consultado",
+            },
+          }),
+        ).toBe(1);
+
+        const negada = await p.auditEvent.findFirst({
+          where: {
+            action: "authorization_denied",
+            resource: "contato_colaborador",
+          },
+        });
+        expect(negada).not.toBeNull();
+
+        const tudo = JSON.stringify([
+          await p.auditEvent.findMany({
+            where: { resource: "contato_colaborador" },
+          }),
+          await p.contatoColaboradorEvento.findMany(),
+        ]);
+        for (const valor of [
+          EMAIL,
+          CELULAR,
+          TELEFONE,
+          TELEFONE_NOVO,
+          "11987650009",
+          "5511987650001",
+        ]) {
+          expect(tudo).not.toContain(valor);
+        }
+      });
+    });
+
+    it("banco: sem DELETE do contato, evento append-only", async () => {
+      const privilegios = await comPrisma((p) =>
+        p.$queryRawUnsafe<{ table_name: string; privilege_type: string }[]>(
+          `SELECT table_name, privilege_type
+             FROM information_schema.role_table_grants
+            WHERE grantee = 'evolli_app'
+              AND table_schema = 'app'
+              AND table_name IN ('contato_colaborador',
+                                 'contato_colaborador_evento')
+            ORDER BY table_name, privilege_type`,
+        ),
+      );
+      const de = (tabela: string) =>
+        privilegios
+          .filter((l) => l.table_name === tabela)
+          .map((l) => l.privilege_type);
+      expect(de("contato_colaborador")).toEqual(["INSERT", "SELECT", "UPDATE"]);
+      expect(de("contato_colaborador_evento")).toEqual(["INSERT", "SELECT"]);
+    });
+
+    it("banco: recusa valor não normalizado e contato sem vínculo na empresa", async () => {
+      const { colaboradorId: pessoaC } = await admitirEEfetivar(rhA, {
+        nome: "Pessoa Sintetica Contato C",
+        empresaId: empresaA,
+        matricula: "T169-C",
+        departamentoId: departamentoA,
+      });
+      await comPrisma(async (p) => {
+        const autor = await p.accessUser.findFirstOrThrow({
+          where: { email: "rh.pa@example.test" },
+        });
+        const inserir = (empresaId: string, email: string, celular: string) =>
+          p.$executeRawUnsafe(
+            `INSERT INTO app.contato_colaborador
+               (id, empresa_id, colaborador_id, email_pessoal, celular, telefone,
+                criado_por_user_id, atualizado_por_user_id, atualizado_em)
+             VALUES (gen_random_uuid()::text, $1, $2, $3, $4, '1133330003', $5, $5, now())`,
+            empresaId,
+            pessoaC,
+            email,
+            celular,
+            autor.id,
+          );
+
+        // Celular com separador: a normalização não aconteceu.
+        await expect(
+          inserir(empresaA, "x@example.test", "(11) 98765-0003"),
+        ).rejects.toThrow();
+        // E-mail com espaço nas pontas.
+        await expect(
+          inserir(empresaA, " x@example.test", "11987650003"),
+        ).rejects.toThrow();
+        // Colaborador sem vínculo na empresa B: o trigger diferido recusa.
+        await expect(
+          inserir(empresaB, "x@example.test", "11987650003"),
+        ).rejects.toThrow();
+        // Controle: o mesmo INSERT, normalizado e na empresa do vínculo, passa
+        // — as recusas acima vêm de cada regra, não de outra coisa.
+        await expect(
+          inserir(empresaA, "x@example.test", "11987650003"),
+        ).resolves.toBe(1);
+      });
+    });
+  });
+
   describe("autorização: admin_tecnico negado em todo o domínio", () => {
     const ROTAS_LEITURA = ["/v1/colaboradores", "/v1/movimentacoes"];
 
