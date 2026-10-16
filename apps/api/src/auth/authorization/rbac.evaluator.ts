@@ -3,6 +3,7 @@ import {
   AuthorizationResource,
   AuthorizationSubject,
   AuthorizationTarget,
+  isContatosResource,
   isDocumentosResource,
   isHorariosResource,
   isSolicitacoesPessoasResource,
@@ -57,6 +58,9 @@ export function evaluatePermission(
       }
       if (isSolicitacoesPessoasResource(target.resource)) {
         return evaluateSolicitacoesPessoas(subject, target);
+      }
+      if (isContatosResource(target.resource)) {
+        return evaluateContatos(subject, target);
       }
       return false;
   }
@@ -617,6 +621,58 @@ function evaluateSolicitacoesPessoas(
 
     default:
       // dp, gestor, colaborador, financeiro, admin_tecnico, auditor, dpo.
+      return false;
+  }
+}
+
+/**
+ * Contatos do colaborador (T169) — matriz da ficha de tratamento aprovada em
+ * 2026-10-16 (A2 restrita).
+ *
+ * - `rh` e `dp` leem e editam na **empresa ativa**.
+ * - `master_tecnico` lê e edita em **qualquer empresa** (Emenda 1 da ADR
+ *   0012). Com empresa ativa, atua **dentro dela**, como em todo o resto
+ *   (T163); sem seleção, atua na empresa do vínculo do colaborador, que o
+ *   service resolve e audita.
+ * - `gestor`, `colaborador` e os demais: sem acesso.
+ *
+ * Só `read` e `alter`. `create` não é ação própria — gravar contato pela
+ * primeira vez é a mesma edição do registro, sob o mesmo `alter` —, e
+ * exportação e exclusão não têm rota, então não têm ação.
+ *
+ * DUAS FASES, como nos ramos de pessoas e documentos: sem empresa-alvo, decide
+ * a CAPACIDADE; com a empresa do vínculo já resolvida pelo service, decide a
+ * FRONTEIRA.
+ */
+function evaluateContatos(
+  subject: AuthorizationSubject,
+  target: AuthorizationTarget,
+): boolean {
+  if (target.action !== "read" && target.action !== "alter") {
+    return false;
+  }
+
+  const escopoResolvido = target.targetCompanyId !== undefined;
+
+  switch (subject.role) {
+    case "master_tecnico":
+      if (!escopoResolvido) {
+        return true;
+      }
+      if (target.targetCompanyId === null) {
+        return false;
+      }
+      // Sem empresa ativa, global; com empresa ativa, só ela.
+      return subject.companyId === null || isSameCompany(subject, target);
+
+    case "rh":
+    case "dp":
+      return escopoResolvido
+        ? isSameCompany(subject, target)
+        : subject.companyId !== null;
+
+    default:
+      // gestor, colaborador, financeiro, admin_tecnico, auditor, dpo.
       return false;
   }
 }

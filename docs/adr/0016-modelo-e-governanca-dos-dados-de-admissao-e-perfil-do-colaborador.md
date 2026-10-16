@@ -616,25 +616,25 @@ apagada, para preservar o histórico.
 **Abertas.** `DP-ADM-02` a `DP-ADM-18`, na tabela abaixo, continuam pendentes e
 inalteradas.
 
-| ID          | Decisão pendente                                                                                                                                                                                  | Responsável                    | Liga-se a                                          |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ | -------------------------------------------------- |
-| `DP-ADM-02` | Finalidade e base legal de cada categoria, pela ficha de tratamento                                                                                                                               | RH + Jurídico                  | `DP-11 (V2)`, `DP-14`, `DP-25 (V2)`                |
-| `DP-ADM-03` | Retenção, descarte e exportação de cada categoria, e se o histórico de valores é guardado                                                                                                         | RH + Jurídico                  | `DP-15`, `DP-2E-15`, `PD-DOC-03`, RI-F2-3          |
-| `DP-ADM-04` | Se o CPF passa a ser exigido para admitir                                                                                                                                                         | proprietário + RH + Jurídico   | `DP-2E-11`                                         |
-| `DP-ADM-05` | Como detectar admissão duplicada sem usar documento como chave                                                                                                                                    | proprietário + engenharia      | ADR 0007, decisão 2                                |
-| `DP-ADM-06` | Matriz fina de A2 e A3 por categoria, inclusive se o `master_tecnico` fica fora — o que exige emenda à ADR 0012, decisão 3                                                                        | proprietário + RH              | `PD-DOC-01`; ADR 0012                              |
-| `DP-ADM-07` | MFA imposto e reautenticação para dado bancário e documento pessoal                                                                                                                               | Segurança + Produto            | `DS-MFA-01`, `DS-MFA-03`, `DP-19`                  |
-| `DP-ADM-08` | Se filial é a unidade organizacional                                                                                                                                                              | RH                             | `DP-4`                                             |
-| `DP-ADM-09` | Como colher e evidenciar dado autodeclarado (nome social, gênero, raça/etnia) enquanto o titular não participa do sistema                                                                         | RH + Jurídico                  | `DP-25 (V2)`                                       |
-| `DP-ADM-10` | Modalidade contratual (prazo indeterminado ou determinado, experiência e outras) e se ela se relaciona com o tipo de vínculo; inclui período de experiência e data, duração e término de contrato | RH + Jurídico                  | ADR 0007 (tipo de vínculo sem enquadramento legal) |
-| `DP-ADM-11` | Se a foto existe, para quê, e por qual caminho de upload                                                                                                                                          | proprietário + RH + Jurídico   | `DP-2E-04`, `-05`, `-09`                           |
-| `DP-ADM-12` | Catálogos de localidade e consulta de endereço por CEP (integração externa)                                                                                                                       | proprietário + Segurança       | Constituição, integrações                          |
-| `DP-ADM-13` | Proteção em repouso de identificação documental e dado bancário — decisão nova, sem gate existente equivalente                                                                                    | Segurança + engenharia         | gestão de chaves: `DS-SEC-01`, `DS-SEC-02`         |
-| `DP-ADM-14` | Campos, finalidade e base legal de dependentes                                                                                                                                                    | RH + Jurídico                  | `DP-14`                                            |
-| `DP-ADM-15` | Formato do erro por campo no contrato HTTP, sem refletir o valor enviado                                                                                                                          | engenharia + Segurança         | filtro global de exceções                          |
-| `DP-ADM-16` | Deficiência: se e como se comprova, e formato, obrigatoriedade, acesso, finalidade, retenção e auditoria da informação e da comprovação                                                           | RH + Jurídico                  | `DP-14`, `PD-DOC-02`                               |
-| `DP-ADM-17` | Ligar o horário ao vínculo funcional em vez de (colaborador, empresa), reabrindo decisões do RH, e quem opera horário na admissão                                                                 | RH + proprietário + engenharia | `DP-3J-19` (T035); T037                            |
-| `DP-ADM-18` | Como associar marcações de ponto ao colaborador pelo CPF sem usá-lo como chave nem unicidade (decisão 5.8), e o regime de auditoria dessa leitura em lote                                         | proprietário + RH + engenharia | `DP-3J-20`; pacote da T148                         |
+| ID          | Decisão pendente                                                                                                                                                                                                                                             | Responsável                    | Liga-se a                                          |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------ | -------------------------------------------------- |
+| `DP-ADM-02` | Finalidade e base legal de cada categoria, pela ficha de tratamento — **resolvida para Contatos** (e-mail pessoal, celular e telefone) em 2026-10-16, pela ficha da T169; **aberta para as demais categorias**                                               | RH + Jurídico                  | `DP-11 (V2)`, `DP-14`, `DP-25 (V2)`                |
+| `DP-ADM-03` | Retenção, descarte e exportação de cada categoria, e se o histórico de valores é guardado — **resolvida para Contatos** quanto a retenção e descarte, em 2026-10-16, pela ficha da T169; **aberta para as demais categorias**                                | RH + Jurídico                  | `DP-15`, `DP-2E-15`, `PD-DOC-03`, RI-F2-3          |
+| `DP-ADM-04` | Se o CPF passa a ser exigido para admitir                                                                                                                                                                                                                    | proprietário + RH + Jurídico   | `DP-2E-11`                                         |
+| `DP-ADM-05` | Como detectar admissão duplicada sem usar documento como chave                                                                                                                                                                                               | proprietário + engenharia      | ADR 0007, decisão 2                                |
+| `DP-ADM-06` | Matriz fina de A2 e A3 por categoria, inclusive se o `master_tecnico` fica fora — o que exige emenda à ADR 0012, decisão 3 — **resolvida para Contatos** em 2026-10-16, pela ficha da T169 e pela Emenda 1 da ADR 0012; **aberta para as demais categorias** | proprietário + RH              | `PD-DOC-01`; ADR 0012                              |
+| `DP-ADM-07` | MFA imposto e reautenticação para dado bancário e documento pessoal                                                                                                                                                                                          | Segurança + Produto            | `DS-MFA-01`, `DS-MFA-03`, `DP-19`                  |
+| `DP-ADM-08` | Se filial é a unidade organizacional                                                                                                                                                                                                                         | RH                             | `DP-4`                                             |
+| `DP-ADM-09` | Como colher e evidenciar dado autodeclarado (nome social, gênero, raça/etnia) enquanto o titular não participa do sistema                                                                                                                                    | RH + Jurídico                  | `DP-25 (V2)`                                       |
+| `DP-ADM-10` | Modalidade contratual (prazo indeterminado ou determinado, experiência e outras) e se ela se relaciona com o tipo de vínculo; inclui período de experiência e data, duração e término de contrato                                                            | RH + Jurídico                  | ADR 0007 (tipo de vínculo sem enquadramento legal) |
+| `DP-ADM-11` | Se a foto existe, para quê, e por qual caminho de upload                                                                                                                                                                                                     | proprietário + RH + Jurídico   | `DP-2E-04`, `-05`, `-09`                           |
+| `DP-ADM-12` | Catálogos de localidade e consulta de endereço por CEP (integração externa)                                                                                                                                                                                  | proprietário + Segurança       | Constituição, integrações                          |
+| `DP-ADM-13` | Proteção em repouso de identificação documental e dado bancário — decisão nova, sem gate existente equivalente                                                                                                                                               | Segurança + engenharia         | gestão de chaves: `DS-SEC-01`, `DS-SEC-02`         |
+| `DP-ADM-14` | Campos, finalidade e base legal de dependentes                                                                                                                                                                                                               | RH + Jurídico                  | `DP-14`                                            |
+| `DP-ADM-15` | Formato do erro por campo no contrato HTTP, sem refletir o valor enviado                                                                                                                                                                                     | engenharia + Segurança         | filtro global de exceções                          |
+| `DP-ADM-16` | Deficiência: se e como se comprova, e formato, obrigatoriedade, acesso, finalidade, retenção e auditoria da informação e da comprovação                                                                                                                      | RH + Jurídico                  | `DP-14`, `PD-DOC-02`                               |
+| `DP-ADM-17` | Ligar o horário ao vínculo funcional em vez de (colaborador, empresa), reabrindo decisões do RH, e quem opera horário na admissão                                                                                                                            | RH + proprietário + engenharia | `DP-3J-19` (T035); T037                            |
+| `DP-ADM-18` | Como associar marcações de ponto ao colaborador pelo CPF sem usá-lo como chave nem unicidade (decisão 5.8), e o regime de auditoria dessa leitura em lote                                                                                                    | proprietário + RH + engenharia | `DP-3J-20`; pacote da T148                         |
 
 ## O que esta ADR **não** decide
 
@@ -702,3 +702,26 @@ não fecha `DP-ADM-02` a `DP-ADM-18`; não aprova nenhuma ficha de tratamento;
 e não dispensa a emenda à ADR 0007 (ou ADR própria) que a decisão 5.4 exige
 para todo dado pessoal além dos quatro aprovados. Campo "Complementar" da
 matriz continua entrando só depois da ficha da sua categoria.
+
+## Nota de convergência (T169, 2026-10-16) — ficha de Contatos
+
+A primeira ficha de tratamento foi aprovada pelo proprietário: a da categoria
+**Contatos do colaborador**, recortada a **e-mail pessoal**, **celular** e
+**telefone** ([ficha](../decisions/ficha-tratamento-contatos-colaborador.md)). Com ela, e com a Emenda 4 da ADR 0007, essa
+categoria pode ganhar schema e contrato (decisão 5.4).
+
+- **`DP-ADM-02`, `DP-ADM-03` e `DP-ADM-06`** ficam **resolvidas só para
+  Contatos**, e continuam abertas para todas as outras categorias.
+- **Classe de acesso:** a categoria é **A2 restrita**, com uma diferença da
+  decisão 4, decidida pelo proprietário: o `master_tecnico` **lê e edita**,
+  auditado, em qualquer empresa (Emenda 1 da ADR 0012). `rh` e `dp` leem e
+  editam na empresa ativa; `gestor`, `colaborador` e os demais não têm acesso.
+- **Auditoria:** a ficha amplia a decisão 5.5 para esta categoria: **leitura**
+  também é auditada, além de criação, edição, exportação e exclusão, sempre com
+  campos afetados e **nunca** valores.
+- **E-mail corporativo** continua **Derivado** de `access_user.email`, sem
+  coluna nem formulário no perfil.
+- **Endereço e contato de emergência**, do mesmo agregado, **não** entram: não
+  fazem parte da ficha.
+
+O texto original desta ADR foi preservado.

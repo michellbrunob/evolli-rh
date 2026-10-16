@@ -641,3 +641,29 @@ lugar — sem migration corretiva.
 - **Não declara conformidade LGPD concluída** — retenção/descarte (DP-15),
   confirmação de DPO e MFA continuam gates obrigatórios antes de piloto com
   dado real ou produção.
+
+## Emenda 4 (2026-10-16) — categoria Contatos do colaborador
+
+**Aditivo.** Nenhuma decisão anterior é revogada nem reescrita. Esta emenda
+cumpre o que a própria ADR exige para todo dado pessoal além dos quatro
+aprovados — decisão própria, com ADR ou emenda — e o que a ADR 0016 (decisão
+5.4) exige de cada categoria nova: ficha de tratamento aprovada.
+
+**O que passa a ser permitido:** três campos de contato do colaborador —
+**e-mail pessoal**, **celular** e **telefone** —, aprovados pelo proprietário em
+2026-10-16 na [ficha de tratamento](../decisions/ficha-tratamento-contatos-colaborador.md).
+
+**Como:** em agregado próprio, **fora** de `Colaborador`, com `empresa_id`
+próprio e garantia no banco de que o colaborador tem vínculo naquela empresa
+(ADR 0016, decisão 3). `Colaborador` continua com `nome` e `situacao`, e os
+"quatro dados aprovados" continuam sendo os únicos do cadastro mínimo.
+
+**O que continua fora:** todo o resto da lista dos Limites desta ADR —
+documento, data de nascimento, endereço, dado bancário, salário, dado médico,
+dependente, benefício, nome social e identidade de gênero. Endereço e contato
+de emergência, embora no mesmo agregado da ADR 0016, **não** fazem parte desta
+ficha.
+
+**Para o revisor:** o bloqueio de "campo de dado pessoal além dos quatro
+aprovados" passa a ter **uma** exceção, nestes três campos e neste agregado.
+Qualquer outro campo continua bloqueado sem ficha e emenda próprias.

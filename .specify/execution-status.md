@@ -1637,11 +1637,11 @@ declarada como feita.
 
 **Dívidas preservadas:** **R-3** (T162), **R-3 da revisão da T164**, **S2** (T161), **R1 a R3** (T160), **L3**, **S-1 a S-4** (T158), **R-A a R-C** (T157) e o registro `teste michell`.
 
-## Perfil do colaborador: dados de contato — T168 (parada por regra declarada)
+## Perfil do colaborador: dados de contato — T168 (integrada)
 
-| Tarefa | Estado                         | Resultado principal                                                                           |
-| ------ | ------------------------------ | --------------------------------------------------------------------------------------------- |
-| T168   | **Parada por regra declarada** | Nenhum dos quatro campos de contato atende à condição do proprietário; nada foi implementado. |
+| Tarefa | Estado                                                                     | Resultado principal                                                                           |
+| ------ | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| T168   | **Integrada** (PR #160, squash `db9b023`), como parada por regra declarada | Nenhum dos quatro campos de contato atende à condição do proprietário; nada foi implementado. |
 
 **A T167 foi integrada** em `main` pela PR #159, squash
 `dcef62706399126b934c51e7d2955941cf9f06b3`, com a CI de push 3/3 verde.
@@ -1683,6 +1683,67 @@ civil, escolaridade, dados bancários, dependentes, dados contratuais, portal
 do colaborador, RBAC global.
 
 **Dívidas preservadas:** **R-3** (T162), **R-3 da revisão da T164**, **S2** (T161), **R1 a R3** (T160), **L3**, **S-1 a S-4** (T158), **R-A a R-C** (T157), o registro `teste michell`, a decisão **`DP-29`** (se `outro_controlado` vale para admissão) e a **limitação de validação em navegador da T167**.
+
+## Contatos do colaborador — T169 (implementada em Draft)
+
+| Tarefa | Estado                    | Resultado principal                                                               |
+| ------ | ------------------------- | --------------------------------------------------------------------------------- |
+| T169   | **Implementada em Draft** | Agregado próprio de contatos do colaborador — e-mail pessoal, celular e telefone. |
+
+**A T168 foi integrada** em `main` pela PR #160, squash
+`db9b023dc11c9fcfa2397b016713939f119c0a6f`, com a CI de push 3/3 verde.
+
+**A ficha de tratamento dos contatos foi aprovada pelo proprietário** em
+2026-10-16 e está formalizada em [ficha de tratamento dos contatos](../docs/decisions/ficha-tratamento-contatos-colaborador.md). Ela libera **e-mail pessoal, celular
+e telefone**, como A2 restrita, com finalidade, base legal, retenção,
+auditoria e perfis definidos. A proteção em repouso foi avaliada antes da
+migration e é adequada ao padrão atual do projeto para esta classe, com dado
+real ainda barrado pelos gates de segurança operacional.
+
+**Emendas formais:** ADR 0007, Emenda 4; ADR 0012, Emenda 1. Na ADR 0016,
+`DP-ADM-02`, `DP-ADM-03` e `DP-ADM-06` ficam resolvidas só para Contatos; as
+demais seguem abertas.
+
+**Revisão de decisão anterior, registrada:** a T165 (§5.2) dizia que o
+`master_tecnico` não edita pessoas. Para **contatos**, o proprietário decidiu
+que ele lê e edita, auditado; para todo o resto, a regra da T165 continua.
+
+### O que a T169 entregou
+
+- **Banco.** Migration `20261016120000_contatos_colaborador`, **criada e não aplicada localmente**:
+  `contato_colaborador` (valor vigente por colaborador e empresa, com CHECK da
+  normalização e triggers diferidos que exigem vínculo na empresa) e
+  `contato_colaborador_evento` (toda consulta, criação e edição, com
+  resultado e nomes de campos, nunca valores, append-only). Migration `20261016130000_contatos_auditoria_toda_consulta`,
+  também **criada e não aplicada localmente**, permite o evento sem contato e,
+  só na empresa ambígua, sem empresa. `Colaborador` não ganhou coluna.
+- **API.** `GET` e `PUT /v1/colaboradores/:colaboradorId/contatos`, recurso
+  próprio `contato_colaborador`. `rh` e `dp` na empresa ativa;
+  `master_tecnico` em qualquer empresa, ou só na ativa quando selecionada;
+  `gestor`, `colaborador` e demais negados. A empresa real vem do vínculo e é
+  auditada em cada operação. Estados `sem_registro`, `registrado` e
+  `bloqueado`. Validação e normalização no servidor, sem presumir país.
+- **Trilha de toda consulta.** Com valor, sem registro, bloqueada, o `PUT` sem
+  alteração (registrado como leitura) e a tentativa do `master_tecnico` com
+  empresa ambígua (sem empresa, `failure`) deixam `audit_event` e evento de
+  tratamento, na mesma transação. Nunca valores, corpo nem cabeçalhos brutos.
+- **Web.** Seção "Contatos" no detalhe do colaborador: três campos
+  obrigatórios, erro por campo, foco no primeiro erro, dados preservados em
+  falha, confirmação de sucesso e de descarte.
+- **Testes.** Unitários da API, E2E no bloco da T169 de `pessoas.e2e-spec.ts`
+  e web.
+
+**Limites registrados:** a eliminação ou anonimização após 2 anos não tem
+processo nesta fatia; exportação e exclusão não têm rota; a origem e a
+evidência da coleta não foram especificadas pela ficha (lacuna registrada);
+os E2E rodam só na CI; sem validação visual em navegador.
+
+**Fora de escopo:** endereço, contato de emergência, CPF, documentos, foto,
+nome social, sexo, gênero, raça/etnia, deficiência, escolaridade, dados
+bancários, dependentes, dados contratuais, portal do colaborador, e-mail
+corporativo persistido e o fluxo de admissão.
+
+**Dívidas preservadas:** R-3 (T162), R-3 da revisão da T164, S2 (T161), R1 a R3 (T160), L3, S-1 a S-4 (T158), R-A a R-C (T157), o registro `teste michell`, a decisão `DP-29` (se `outro_controlado` vale para admissão) e a limitação de validação em navegador da T167.
 
 ## Próxima ação autorizável
 

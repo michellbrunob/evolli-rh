@@ -192,6 +192,14 @@
   gap: var(--space-sm);
 }
 
+/* T169 — subseção "Contatos" dentro do painel de detalhe. */
+.colaboradores-screen__contatos,
+.colaboradores-screen__contatos-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
 /* Bloco de edição de nome dentro do painel de detalhe. */
 .colaboradores-screen__edicao-nome {
   display: flex;

@@ -29,6 +29,11 @@ const REDACT_PATHS = [
   "*.challengeToken",
   "*.code",
   "*.mfaCode",
+  // T169 — contatos do colaborador: nenhum valor de contato aparece em log,
+  // nem se um objeto que o contenha for logado por engano.
+  "*.emailPessoal",
+  "*.celular",
+  "*.telefone",
 ];
 
 @Module({

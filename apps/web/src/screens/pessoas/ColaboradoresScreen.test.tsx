@@ -34,11 +34,18 @@ import {
   listarUnidades,
 } from "../../api/organizacaoClient";
 import { type CargoApi, listarCargos } from "../../api/cargoClient";
+import {
+  type ContatosDoColaboradorApi,
+  type ContatosRegistradosApi,
+  consultarContatosDoColaborador,
+  registrarContatosDoColaborador,
+} from "../../api/contatosColaboradorClient";
 import { expectSemIsoVisivel } from "../../test/semIsoVisivel";
 
 vi.mock("../../api/colaboradoresClient");
 vi.mock("../../api/organizacaoClient");
 vi.mock("../../api/cargoClient");
+vi.mock("../../api/contatosColaboradorClient");
 
 interface ResultadoPaginadoTeste<T> {
   itens: T[];
@@ -208,7 +215,21 @@ beforeEach(() => {
   vi.mocked(listarCentrosCusto).mockResolvedValue(paginado([centroCusto1]));
   vi.mocked(listarAreas).mockResolvedValue(paginado([area1]));
   vi.mocked(listarCargos).mockResolvedValue(paginado([cargo1]));
+
+  // T169 — por padrão, o colaborador aberto não tem contato registrado.
+  vi.mocked(consultarContatosDoColaborador).mockImplementation(
+    async (colaboradorId) => semContatos(colaboradorId),
+  );
 });
+
+function semContatos(colaboradorId: string): ContatosDoColaboradorApi {
+  return {
+    colaboradorId,
+    empresaId: "44444444-4444-4444-4444-444444444444",
+    situacao: "sem_registro",
+    contatos: null,
+  };
+}
 
 async function abrirFormularioEAguardarOpcoes() {
   fireEvent.click(screen.getByRole("button", { name: "Novo colaborador" }));
@@ -2502,5 +2523,290 @@ describe("ColaboradoresScreen (T167 — empresa só da sessão)", () => {
       ),
     );
     expect(vi.mocked(admitirColaborador).mock.calls.length).toBe(antes);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T169 — contatos do colaborador, no detalhe.
+//
+// Valores sintéticos: domínio reservado `example.test` e números sem titular.
+// ---------------------------------------------------------------------------
+describe("ColaboradoresScreen (T169 — contatos do colaborador)", () => {
+  const registrado: ContatosDoColaboradorApi = {
+    colaboradorId: colaborador1.id,
+    empresaId: "44444444-4444-4444-4444-444444444444",
+    situacao: "registrado",
+    contatos: {
+      emailPessoal: "ana.contato@example.test",
+      celular: "+5511987650001",
+      telefone: "1133330001",
+      atualizadoEm: "2026-10-16T12:00:00.000Z",
+    },
+  };
+
+  function gravacao(
+    resultado: ContatosRegistradosApi["resultado"],
+    contatos: ContatosRegistradosApi["contatos"],
+  ): ContatosRegistradosApi {
+    return { ...registrado, situacao: "registrado", resultado, contatos };
+  }
+
+  async function abrirDetalheDeAna() {
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+    const linha = screen.getByText("Ana Colaboradora (teste)").closest("tr")!;
+    fireEvent.click(
+      within(linha).getByRole("button", { name: /Ver detalhes/ }),
+    );
+    return screen.findByRole("region", { name: "Contatos" });
+  }
+
+  const email = () => screen.getByLabelText(/^E-mail pessoal/);
+  const celular = () => screen.getByLabelText(/^Celular/);
+  const telefone = () => screen.getByLabelText(/^Telefone/);
+
+  it("a lista não pede contatos: só o detalhe, pela rota própria e sem empresa", async () => {
+    const antes = vi.mocked(consultarContatosDoColaborador).mock.calls.length;
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+    expect(vi.mocked(consultarContatosDoColaborador).mock.calls.length).toBe(
+      antes,
+    );
+
+    const linha = screen.getByText("Ana Colaboradora (teste)").closest("tr")!;
+    fireEvent.click(
+      within(linha).getByRole("button", { name: /Ver detalhes/ }),
+    );
+    await screen.findByRole("region", { name: "Contatos" });
+    const chamadas = vi.mocked(consultarContatosDoColaborador).mock.calls;
+    expect(chamadas[chamadas.length - 1]).toEqual([colaborador1.id]);
+  });
+
+  it("sem registro: três campos obrigatórios, vazios, com aviso — e sem erro", async () => {
+    const secao = await abrirDetalheDeAna();
+    await within(secao).findByText(/Nenhum contato registrado/);
+
+    for (const campo of [email(), celular(), telefone()]) {
+      expect(campo).toHaveValue("");
+      expect(campo).toHaveAttribute("aria-required", "true");
+    }
+    expect(
+      within(secao).getAllByText("(obrigatório)", { exact: false }),
+    ).toHaveLength(3);
+    expect(within(secao).queryByRole("alert")).toBeNull();
+  });
+
+  it("registrado: os campos chegam preenchidos com o valor gravado", async () => {
+    vi.mocked(consultarContatosDoColaborador).mockResolvedValueOnce(registrado);
+    await abrirDetalheDeAna();
+    await waitFor(() =>
+      expect(email()).toHaveValue("ana.contato@example.test"),
+    );
+    expect(celular()).toHaveValue("+5511987650001");
+    expect(telefone()).toHaveValue("1133330001");
+    // Nada a salvar enquanto nada mudou.
+    expect(
+      screen.getByRole("button", { name: "Salvar contatos" }),
+    ).toBeDisabled();
+  });
+
+  it("bloqueado (desligado): nenhum valor nem campo, só o aviso", async () => {
+    vi.mocked(consultarContatosDoColaborador).mockResolvedValueOnce({
+      ...registrado,
+      situacao: "bloqueado",
+      contatos: null,
+    });
+    const secao = await abrirDetalheDeAna();
+    await within(secao).findByText(/estão bloqueados/);
+    expect(within(secao).queryByRole("textbox")).toBeNull();
+    expect(
+      within(secao).queryByRole("button", { name: "Salvar contatos" }),
+    ).toBeNull();
+  });
+
+  it("leitura recusada mostra o motivo e permite tentar de novo", async () => {
+    vi.mocked(consultarContatosDoColaborador).mockRejectedValueOnce(
+      recusa(403, "Acesso negado."),
+    );
+    const secao = await abrirDetalheDeAna();
+    expect(await within(secao).findByRole("alert")).toHaveTextContent(
+      "Seu perfil não tem acesso aos contatos deste colaborador.",
+    );
+    fireEvent.click(
+      within(secao).getByRole("button", { name: "Tentar novamente" }),
+    );
+    await within(secao).findByText(/Nenhum contato registrado/);
+  });
+
+  it("enviar vazio: erro em cada campo, foco no primeiro, nada enviado", async () => {
+    const antes = vi.mocked(registrarContatosDoColaborador).mock.calls.length;
+    const secao = await abrirDetalheDeAna();
+    await within(secao).findByText(/Nenhum contato registrado/);
+
+    fireEvent.click(screen.getByRole("button", { name: "Salvar contatos" }));
+
+    expect(
+      await within(secao).findByText("E-mail pessoal é obrigatório."),
+    ).toBeInTheDocument();
+    expect(
+      within(secao).getByText("Celular é obrigatório."),
+    ).toBeInTheDocument();
+    expect(
+      within(secao).getByText("Telefone é obrigatório."),
+    ).toBeInTheDocument();
+    for (const campo of [email(), celular(), telefone()]) {
+      expect(campo).toHaveAttribute("aria-invalid", "true");
+    }
+    await waitFor(() => expect(document.activeElement).toBe(email()));
+    expect(vi.mocked(registrarContatosDoColaborador).mock.calls.length).toBe(
+      antes,
+    );
+  });
+
+  it("um campo inválido: erro só nele, foco nele, o resto preservado", async () => {
+    await abrirDetalheDeAna();
+    await screen.findByText(/Nenhum contato registrado/);
+    fireEvent.change(email(), { target: { value: "ana@example.test" } });
+    fireEvent.change(celular(), { target: { value: "11 9876-ABCD" } });
+    fireEvent.change(telefone(), { target: { value: "(11) 3333-0001" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Salvar contatos" }));
+
+    expect(
+      await screen.findByText(/Celular aceita só dígitos/),
+    ).toBeInTheDocument();
+    expect(email()).not.toHaveAttribute("aria-invalid");
+    expect(telefone()).not.toHaveAttribute("aria-invalid");
+    await waitFor(() => expect(document.activeElement).toBe(celular()));
+    expect(email()).toHaveValue("ana@example.test");
+  });
+
+  it("salvar envia os valores normalizados, confirma e mostra o que foi gravado", async () => {
+    vi.mocked(registrarContatosDoColaborador).mockResolvedValueOnce(
+      gravacao("criado", {
+        emailPessoal: "ana@example.test",
+        celular: "+5511987650001",
+        telefone: "1133330001",
+        atualizadoEm: "2026-10-16T12:00:00.000Z",
+      }),
+    );
+    const secao = await abrirDetalheDeAna();
+    await within(secao).findByText(/Nenhum contato registrado/);
+    fireEvent.change(email(), { target: { value: "  Ana@EXAMPLE.test " } });
+    fireEvent.change(celular(), { target: { value: "+55 (11) 98765-0001" } });
+    fireEvent.change(telefone(), { target: { value: "(11) 3333-0001" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Salvar contatos" }));
+
+    expect(await within(secao).findByText("Contatos salvos.")).toHaveAttribute(
+      "role",
+      "status",
+    );
+    const chamadas = vi.mocked(registrarContatosDoColaborador).mock.calls;
+    // Só o colaborador e os três campos — nenhuma empresa sai do navegador.
+    expect(chamadas[chamadas.length - 1]).toEqual([
+      colaborador1.id,
+      {
+        emailPessoal: "ana@example.test",
+        celular: "+5511987650001",
+        telefone: "1133330001",
+      },
+    ]);
+    expect(celular()).toHaveValue("+5511987650001");
+
+    // Salvo: fechar não pede confirmação.
+    fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
+    expect(screen.queryByText(/alterações não salvas/i)).toBeNull();
+  });
+
+  it("gravação recusada: mensagem geral, foco nela e os dados digitados ficam", async () => {
+    vi.mocked(registrarContatosDoColaborador).mockRejectedValueOnce(
+      recusa(409, "Conflito ao processar a requisição."),
+    );
+    const secao = await abrirDetalheDeAna();
+    await within(secao).findByText(/Nenhum contato registrado/);
+    fireEvent.change(email(), { target: { value: "ana@example.test" } });
+    fireEvent.change(celular(), { target: { value: "11987650001" } });
+    fireEvent.change(telefone(), { target: { value: "1133330001" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Salvar contatos" }));
+
+    const alerta = await within(secao).findByRole("alert");
+    expect(alerta).toHaveTextContent(/Os contatos não foram salvos/);
+    await waitFor(() => expect(document.activeElement).toBe(alerta));
+    expect(email()).toHaveValue("ana@example.test");
+    expect(celular()).toHaveValue("11987650001");
+    expect(telefone()).toHaveValue("1133330001");
+  });
+
+  it("contato editado e não salvo: fechar pede confirmação; descartar fecha sem gravar", async () => {
+    const antes = vi.mocked(registrarContatosDoColaborador).mock.calls.length;
+    vi.mocked(consultarContatosDoColaborador).mockResolvedValueOnce(registrado);
+    await abrirDetalheDeAna();
+    await waitFor(() =>
+      expect(email()).toHaveValue("ana.contato@example.test"),
+    );
+
+    fireEvent.change(telefone(), { target: { value: "1133330002" } });
+    fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
+
+    expect(screen.getByText(/alterações não salvas/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Continuar editando" }));
+    expect(telefone()).toHaveValue("1133330002");
+
+    fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Descartar alterações" }),
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole("region", { name: "Contatos" })).toBeNull(),
+    );
+    expect(vi.mocked(registrarContatosDoColaborador).mock.calls.length).toBe(
+      antes,
+    );
+  });
+
+  it("durante a gravação, a janela não fecha", async () => {
+    let concluir: (v: ContatosRegistradosApi) => void = () => {};
+    vi.mocked(registrarContatosDoColaborador).mockImplementationOnce(
+      () =>
+        new Promise<ContatosRegistradosApi>((resolve) => {
+          concluir = resolve;
+        }),
+    );
+    const secao = await abrirDetalheDeAna();
+    await within(secao).findByText(/Nenhum contato registrado/);
+    fireEvent.change(email(), { target: { value: "ana@example.test" } });
+    fireEvent.change(celular(), { target: { value: "11987650001" } });
+    fireEvent.change(telefone(), { target: { value: "1133330001" } });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar contatos" }));
+
+    await within(secao).findByRole("button", { name: "Salvando…" });
+    // A janela fica TRAVADA, não apenas pedindo confirmação: "Fechar" está
+    // desabilitado e clicar nele não abre o diálogo de descarte nem fecha.
+    // (Sem a trava, o mesmo clique abriria a confirmação — há edição não
+    // salva —, e o teste falharia aqui.)
+    const fechar = screen.getByRole("button", { name: "Fechar" });
+    expect(fechar).toBeDisabled();
+    fireEvent.click(fechar);
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(screen.queryByText(/alterações não salvas/i)).toBeNull();
+    expect(
+      screen.getByRole("region", { name: "Contatos" }),
+    ).toBeInTheDocument();
+
+    await act(async () => {
+      concluir(
+        gravacao("criado", {
+          emailPessoal: "ana@example.test",
+          celular: "11987650001",
+          telefone: "1133330001",
+          atualizadoEm: "2026-10-16T12:00:00.000Z",
+        }),
+      );
+    });
+    expect(
+      await within(secao).findByText("Contatos salvos."),
+    ).toBeInTheDocument();
   });
 });

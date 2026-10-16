@@ -119,6 +119,19 @@ export type SolicitacoesPessoasResource =
   (typeof SOLICITACOES_PESSOAS_RESOURCES)[number];
 
 /**
+ * Recurso de Contatos do colaborador (T169).
+ *
+ * Um só, separado de `PESSOAS_RESOURCES` porque a matriz é OUTRA: a ficha de
+ * tratamento aprovada em 2026-10-16 deu ao `master_tecnico` leitura **e
+ * edição** auditadas em qualquer empresa (Emenda 1 da ADR 0012), enquanto em
+ * `colaborador`/`vinculo_funcional` ele continua só lendo. Pôr o recurso no
+ * ramo de pessoas estenderia a exceção a todo o domínio por herança.
+ */
+export const CONTATOS_RESOURCES = ["contato_colaborador"] as const;
+
+export type ContatosResource = (typeof CONTATOS_RESOURCES)[number];
+
+/**
  * Recursos/ações desta fatia (matriz §3 da spec). Módulos futuros (Etapa 1+)
  * estendem este union — nunca reduzem o que já está aqui.
  */
@@ -138,7 +151,8 @@ export type AuthorizationResource =
   | DocumentosResource
   | HorariosResource
   | SolicitacoesPessoasResource
-  | GestorResource;
+  | GestorResource
+  | ContatosResource;
 
 export type AuthorizationAction =
   | "read"
@@ -211,4 +225,10 @@ export function isSolicitacoesPessoasResource(
   return (SOLICITACOES_PESSOAS_RESOURCES as readonly string[]).includes(
     resource,
   );
+}
+
+export function isContatosResource(
+  resource: AuthorizationResource,
+): resource is ContatosResource {
+  return (CONTATOS_RESOURCES as readonly string[]).includes(resource);
 }

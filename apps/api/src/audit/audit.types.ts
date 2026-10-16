@@ -175,6 +175,15 @@ export const AUDIT_ACTIONS = [
   "gestor_excecao_criada",
   "gestor_excecao_encerrada",
   "gestor_equipe_consultada",
+
+  // T169 — Contatos do colaborador (ficha aprovada em 2026-10-16). TODA
+  // consulta e auditada, com valor devolvido ou nao, alem de criacao e edicao;
+  // tentativa recusada leva `result` diferente de `success`. Nenhum evento
+  // carrega e-mail, celular ou telefone: resultado e NOMES de campos vivem em
+  // `contato_colaborador_evento`, correlacionados por `request_id`.
+  "pessoas_contato_criado",
+  "pessoas_contato_atualizado",
+  "pessoas_contato_consultado",
 ] as const satisfies readonly AuditAction[];
 
 /**
@@ -235,7 +244,14 @@ export type AuditResource =
   // T139 — Central de Solicitações de Pessoas: rótulo técnico do recurso.
   // Nunca o tipo da solicitação, o motivo codificado ou o vínculo. Não há
   // rótulo para o evento de histórico: ele é parte da própria solicitação.
-  | "solicitacao_pessoa";
+  | "solicitacao_pessoa"
+  // T169 — Contatos do colaborador: rotulo tecnico do recurso. Nos eventos de
+  // tratamento e nas negacoes produzidas pelo servico de contatos, o
+  // `resourceId` e o id do COLABORADOR, inclusive sem contato gravado. As
+  // negacoes genericas do `AuthorizationGuard` seguem o padrao transversal
+  // existente e podem registrar `resourceId: null`. Nunca o valor de e-mail,
+  // celular ou telefone.
+  | "contato_colaborador";
 
 export type RecordAuditEventInput =
   | {

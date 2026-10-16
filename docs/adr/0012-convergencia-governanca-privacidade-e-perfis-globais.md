@@ -252,3 +252,25 @@ Esta decisão deve ser reaberta — com ADR nova ou emenda formal — quando
 - **Não altera** o comportamento atual de `master_tecnico` (T030) nem de
   `admin_tecnico` — a convergência de RBAC é trabalho posterior, com aceite
   próprio.
+
+## Emenda 1 (2026-10-16) — `master_tecnico` em contatos do colaborador
+
+**Aditivo e restrito a uma categoria.** A decisão 3 desta ADR dá ao
+`master_tecnico` leitura global nos módulos e **nega** toda mutação sensível de
+negócio. O proprietário decidiu, na
+[ficha de tratamento dos contatos](../decisions/ficha-tratamento-contatos-colaborador.md), que **nos contatos do
+colaborador** — e-mail pessoal, celular e telefone — o `master_tecnico` é
+administrador global confiável, com **leitura e edição em qualquer empresa**.
+
+**Condições da exceção:**
+
+- vale **só** para o recurso de contatos do colaborador;
+- toda leitura e toda edição identificam a **empresa real do colaborador** e
+  são **auditadas** com ela;
+- com empresa ativa selecionada, o `master_tecnico` atua dentro dela, como em
+  todo o resto (T163); sem seleção, atua na empresa do vínculo do colaborador.
+
+**O que não muda:** a negação de mutação ao `master_tecnico` em admissão,
+vínculo, movimentação, ponto, documentos, folha, exportação e qualquer outro
+recurso. A decisão da T165 (§5.2) — "o `master_tecnico` não cria, não edita e
+não admite pessoas" — continua valendo para tudo, **exceto** os contatos.

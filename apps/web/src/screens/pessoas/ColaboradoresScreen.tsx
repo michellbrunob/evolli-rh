@@ -41,6 +41,7 @@ import {
   listarUnidades,
 } from "../../api/organizacaoClient";
 import { type CargoApi, listarCargos } from "../../api/cargoClient";
+import { ContatosColaboradorSecao } from "./ContatosColaboradorSecao";
 import "./ColaboradoresScreen.css";
 
 export const COLABORADORES_TITULO_ID = "colaboradores-titulo";
@@ -371,6 +372,11 @@ export function ColaboradoresScreen({
     useState(TAMANHO_PAGINA);
   const [formulario, setFormulario] = useState<FormularioState | null>(null);
   const [detalhe, setDetalhe] = useState<DetalheState | null>(null);
+  // T169 — a seção de contatos do detalhe edita por conta própria e avisa
+  // aqui quando há edição não salva e quando está gravando, para que o
+  // `Modal` peça confirmação de descarte e não feche no meio da gravação.
+  const [contatosAlterados, setContatosAlterados] = useState(false);
+  const [salvandoContatos, setSalvandoContatos] = useState(false);
   // T142 — confirmação de escrita. Antes, admitir fechava o formulário em
   // silêncio: a pessoa ficava olhando a lista sem saber se salvou.
   const [mensagemSucesso, setMensagemSucesso] = useState<string | null>(null);
@@ -1289,8 +1295,8 @@ export function ColaboradoresScreen({
         aberto={detalhe !== null}
         titulo={detalhe?.colaborador.nome ?? ""}
         onFechar={fecharDetalhe}
-        bloqueado={detalhe?.salvandoNome ?? false}
-        alterado={detalheNomeAlterado}
+        bloqueado={(detalhe?.salvandoNome ?? false) || salvandoContatos}
+        alterado={detalheNomeAlterado || contatosAlterados}
         largura="media"
       >
         {detalhe ? (
@@ -1307,7 +1313,7 @@ export function ColaboradoresScreen({
             </p>
             <p className="colaboradores-screen__aviso-texto">
               Matrícula, tipo de vínculo e data de admissão são imutáveis nesta
-              tela. Apenas o nome pode ser corrigido abaixo.
+              tela. Apenas o nome e os contatos podem ser corrigidos abaixo.
             </p>
 
             <div className="colaboradores-screen__edicao-nome">
@@ -1345,6 +1351,13 @@ export function ColaboradoresScreen({
                 {detalhe.salvandoNome ? "Salvando…" : "Salvar nome"}
               </Button>
             </div>
+
+            <ContatosColaboradorSecao
+              key={detalhe.colaborador.id}
+              colaboradorId={detalhe.colaborador.id}
+              onAlteradoChange={setContatosAlterados}
+              onSalvandoChange={setSalvandoContatos}
+            />
 
             <div className="colaboradores-screen__vinculos">
               <h3 className="colaboradores-screen__section-title">Vínculos</h3>

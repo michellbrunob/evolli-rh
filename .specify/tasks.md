@@ -1697,11 +1697,14 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       R1 a R3 (T160), L3, S-1 a S-4 (T158), R-A a R-C (T157) e o registro
       `teste michell`.
 
-65. **T168 - Perfil do colaborador: dados de contato**
-    - **Estado:** **parada por regra declarada, nos quatro campos.** Branch
-      `codex/t168-perfil-colaborador-contatos`, a partir do squash
-      `dcef62706399126b934c51e7d2955941cf9f06b3` (T167, PR #159). Nenhuma
-      migration, API, interface, teste de produto ou RBAC foi escrito.
+65. **T168 - Perfil do colaborador: dados de contato** - **Estado:** **integrada** em `main` pela PR #160, squash
+    `db9b023dc11c9fcfa2397b016713939f119c0a6f`, com a CI de push 3/3 verde,
+    como **parada por regra declarada, nos quatro campos**. Branch
+    `codex/t168-perfil-colaborador-contatos` preservada, criada a partir do
+    squash `dcef62706399126b934c51e7d2955941cf9f06b3` (T167, PR #159). A
+    ficha que ela pedia foi aprovada pelo proprietário em 2026-10-16 e é
+    formalizada na T169. Nenhuma
+    migration, API, interface, teste de produto ou RBAC foi escrito.
     - **Evidência:** [`docs/decisions/t168-contatos-bloqueio-ficha.md`](../docs/decisions/t168-contatos-bloqueio-ficha.md). **E-mail pessoal, celular e telefone** são A2
       e Complementar, e dependem de ficha de tratamento (`FT`), contrato (`CTR`)
       e retenção (`RET`): **não existe ficha aprovada para nenhuma categoria**, e
@@ -1741,6 +1744,78 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
     - **Regra de parada:** o campo que ainda depender de finalidade, acesso,
       auditoria, retenção ou contrato não aprovado **não é implementado** nem
       tem regra inventada; registra-se a evidência e para só aquele item.
+    - **Dívida preservada:** R-3 (T162), R-3 da revisão da T164, S2 (T161), R1 a R3 (T160), L3, S-1 a S-4 (T158), R-A a R-C (T157), o registro `teste michell`, a decisão `DP-29` (se `outro_controlado` vale para admissão) e a limitação de validação em navegador da T167.
+
+66. **T169 - Contatos do colaborador**
+    - **Estado:** **implementada em Draft**. Branch
+      `codex/t169-contatos-colaborador`, a partir do squash
+      `db9b023dc11c9fcfa2397b016713939f119c0a6f` (T168, PR #160).
+    - **Ficha aprovada pelo proprietário em 2026-10-16**, formalizada em
+      [ficha de tratamento dos contatos](../docs/decisions/ficha-tratamento-contatos-colaborador.md): e-mail pessoal, celular e telefone; finalidade de cadastro e
+      comunicação operacional durante a relação de trabalho; execução do
+      contrato; retenção enquanto o vínculo estiver ativo e, após o
+      desligamento, uso operacional bloqueado, 2 anos de guarda e então
+      eliminação ou anonimização, salvo litígio, ordem judicial ou obrigação
+      formal; A2 restrita; sem compartilhamento externo; sem RIPD nem MFA
+      adicional nesta fase; auditoria de criação, leitura, edição, exportação e
+      exclusão com campos afetados e nunca valores; `rh` e `dp` na empresa
+      ativa; `master_tecnico` em qualquer empresa, auditado; `gestor`,
+      `colaborador` e demais sem acesso.
+    - **Emendas:** ADR 0007, Emenda 4 (a categoria além dos quatro dados
+      aprovados); ADR 0012, Emenda 1 (`master_tecnico` em contatos). Na ADR
+      0016, `DP-ADM-02`, `DP-ADM-03` e `DP-ADM-06` ficam resolvidas **só para
+      Contatos**.
+    - **Objetivo:** o agregado próprio de contatos do colaborador, fora de
+      `Colaborador`, sem alterar a admissão atômica da T167. E-mail corporativo
+      continua derivado de `access_user.email`.
+    - **Banco:** migration `20261016120000_contatos_colaborador` **criada e não aplicada localmente**.
+      `contato_colaborador` guarda o valor vigente por colaborador **e
+      empresa** (`empresa_id` próprio, único por par), com CHECK da
+      normalização e CONSTRAINT TRIGGERS diferidos que exigem vínculo do
+      colaborador na empresa, nos dois lados. `contato_colaborador_evento`
+      registra **toda consulta**, criação e edição, com colaborador, empresa
+      quando conhecida, contato quando existe, ação, resultado e **nomes** dos
+      campos — nunca valores —, correlacionado a `audit_event` por
+      `request_id`; a coerência entre resultado, empresa, contato e campos é
+      garantida por CHECK e trigger (migration `20261016130000_contatos_auditoria_toda_consulta`, criada e não aplicada
+      localmente). `evolli_app` perde `DELETE` no contato e `UPDATE`/`DELETE`
+      no evento. `Colaborador` não ganhou coluna.
+    - **API:** `GET` e `PUT /v1/colaboradores/:colaboradorId/contatos`, com
+      recurso de autorização próprio `contato_colaborador` (`read`/`alter`):
+      `rh` e `dp` na empresa ativa; `master_tecnico` em qualquer empresa sem
+      seleção e só na ativa com seleção; demais negados. A empresa real vem do
+      vínculo, nunca do navegador. Estados `sem_registro`, `registrado` e
+      `bloqueado` (nenhum vínculo previsto ou ativo na empresa: sem valor na
+      leitura, 409 na edição). Inexistente e fora do escopo: o mesmo 404.
+      Validação e normalização no servidor: e-mail aparado e minúsculo, até 254
+      caracteres; celular e telefone só com dígitos, `+` opcional, 8 a 15
+      dígitos, sem presumir país. Auditoria `pessoas.contato.criado`,
+      `.atualizado` e `.consultado` na mesma transação da operação, para
+      **toda consulta** — com valor, sem registro, bloqueada, o `PUT` sem
+      alteração (registrado como leitura) e a tentativa do `master_tecnico`
+      com empresa ambígua (registrada sem empresa, com `failure`). Nunca
+      valores, corpo nem cabeçalhos brutos; IP e user-agent truncado são os
+      metadados de segurança herdados da ADR 0004. `no-store` e redação dos
+      três campos no logger.
+    - **Web:** seção "Contatos" no detalhe do colaborador, com os três campos
+      obrigatórios, erro por campo, foco no primeiro erro, dados preservados em
+      falha, confirmação de sucesso e confirmação de descarte pelo `Modal`.
+      Listagem, Hub, portal e visão do gestor não recebem contato.
+    - **Testes:** unitários da API (87: normalização, validação, limite de
+      254 do e-mail, matriz nas duas camadas, fase 2 isolada, serviço, trilha
+      de cada cenário, auditoria sem valores); E2E no bloco da T169 de
+      `pessoas.e2e-spec.ts`; web (11 da tela e 13 da regra no cliente).
+    - **Limites:** a eliminação ou anonimização após 2 anos não tem processo
+      nesta fatia; exportação e exclusão não têm rota, então ainda não há o que
+      auditar; a origem e a evidência da coleta não foram especificadas pela
+      ficha (lacuna registrada, sem solução proposta); os E2E rodam só na CI;
+      sem validação visual em navegador, porque processos estão fora do
+      escopo.
+    - **Fora de escopo:** endereço, contato de emergência, CPF, documentos,
+      foto, nome social, sexo, gênero, raça/etnia, deficiência, escolaridade,
+      dados bancários, dependentes, dados contratuais, portal do colaborador,
+      e-mail corporativo persistido no perfil, fluxo de admissão, Docker, banco
+      de demonstração, seed e processos.
     - **Dívida preservada:** R-3 (T162), R-3 da revisão da T164, S2 (T161), R1 a R3 (T160), L3, S-1 a S-4 (T158), R-A a R-C (T157), o registro `teste michell`, a decisão `DP-29` (se `outro_controlado` vale para admissão) e a limitação de validação em navegador da T167.
 
 ## Regra obrigatória para as próximas tarefas

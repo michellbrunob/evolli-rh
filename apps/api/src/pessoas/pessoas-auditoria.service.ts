@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import { AuditAction, Prisma } from "@prisma/client";
+import { AuditAction, AuditResult, Prisma } from "@prisma/client";
 import { AuditService } from "../audit/audit.service";
 import { AuditResource } from "../audit/audit.types";
 import { PessoasAuditContext } from "./pessoas.types";
@@ -45,6 +45,47 @@ export class PessoasAuditoriaService {
         ip: ctx.metadata.ip,
         userAgent: ctx.metadata.userAgent,
         result: "success",
+        requestId: ctx.metadata.requestId,
+      },
+      tx,
+    );
+  }
+
+  /**
+   * Evento de tratamento de dado A2 cuja ficha exige trilha de TODA operação,
+   * inclusive consulta sem valor devolvido e tentativa recusada (T169,
+   * contatos do colaborador), **dentro da transação** da operação.
+   *
+   * Fail-safe por construção: se o evento não puder ser gravado, a transação
+   * falha e nada é respondido nem gravado.
+   *
+   * `empresaId` é a empresa REAL do registro, ou `null` quando ela não pôde ser
+   * resolvida — e então o `result` não é `success`. O evento carrega ator,
+   * papel, empresa, ação, resultado e id técnico; nunca valor de contato.
+   */
+  async registrarNaTransacao(
+    tx: Prisma.TransactionClient,
+    ctx: PessoasAuditContext,
+    evento: {
+      action: AuditAction;
+      resource: AuditResource;
+      resourceId: string;
+      empresaId: string | null;
+      result: AuditResult;
+    },
+  ): Promise<void> {
+    await this.auditService.record(
+      {
+        actorType: "user",
+        actorUserId: ctx.actor.id,
+        actorRole: ctx.actor.role,
+        companyId: evento.empresaId,
+        action: evento.action,
+        resource: evento.resource,
+        resourceId: evento.resourceId,
+        ip: ctx.metadata.ip,
+        userAgent: ctx.metadata.userAgent,
+        result: evento.result,
         requestId: ctx.metadata.requestId,
       },
       tx,

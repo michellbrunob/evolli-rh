@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "constitutionVersion": "1.4.0",
   "lastConvergedAt": "2026-10-16",
-  "lastIntegratedTask": 167,
-  "lastRecordedTask": 168,
+  "lastIntegratedTask": 168,
+  "lastRecordedTask": 169,
   "platformDecision": {
     "adr": "docs/adr/0014-evolli-plataforma-base-e-encerramento-do-frappe.md",
     "decidedAt": "2026-10-01",
@@ -11,15 +11,15 @@
     "frappe": "encerrado_como_candidato_referencia_apenas"
   },
   "nextTask": {
-    "id": "T168",
-    "status": "perfil_contatos_parado_ficha_pendente",
-    "reason": "T167 integrada em main pela PR #159 (squash dcef62706399126b934c51e7d2955941cf9f06b3), com a CI de push 3/3 verde. A ADR 0016 FOI APROVADA pelo proprietario em 2026-10-16 (DP-ADM-01): modelo-alvo, classes de acesso, matriz de campos e regras de UX. A aprovacao NAO fecha DP-ADM-02 a DP-ADM-18 e NAO dispensa a ficha de tratamento de cada categoria. A T168 e o primeiro bloco complementar do cadastro: dados de contato do proprio colaborador, preenchidos so por rh ou dp depois da admissao; campos pretendidos: e-mail pessoal, e-mail corporativo, celular e telefone. So entra o campo que a ADR classificar como A2, complementar e nao bloqueado, e cuja finalidade, acesso, auditoria e retencao estejam definidos nos artefatos aprovados; isso se investiga ANTES de qualquer migration ou interface, e o que depender de decisao nao aprovada nao e implementado. Regras do proprietario: rh e dp consultam e editam na empresa ativa; master_tecnico, gestor e colaborador nao; empresa so da sessao; nada na listagem, no Hub, no portal ou na lideranca; escritas auditadas; validacao no servidor. Fora de escopo: endereco, contato de emergencia, documentos, CPF, foto, nome social, sexo, genero, raca/etnia, deficiencia, nacionalidade, estado civil, escolaridade, dados bancarios, dependentes, dados contratuais, portal do colaborador e RBAC global. REGRA DE PARADA ACIONADA nos quatro campos (docs/decisions/t168-contatos-bloqueio-ficha.md): e-mail pessoal, celular e telefone sao A2 e Complementar e dependem de ficha de tratamento, contrato e retencao, e nao existe ficha aprovada para nenhuma categoria, com DP-ADM-02 e DP-ADM-03 abertas; o e-mail corporativo e Derivado da conta de acesso (o login), nao um campo de contato, e o servidor nao tem rota que altere o e-mail de uma conta. Acesso e auditoria de A2 ja estao definidos; faltam finalidade, base legal, classificacao e retencao, de RH e Juridico. Nada foi implementado. Para retomar: a ficha respondida, a emenda a ADR 0007 e, se o master_tecnico fica fora de A2, a emenda a ADR 0012. Seguem abertas e intocadas: R-3 da T162, a R-3 da revisao da T164, S2 da T161, R1 a R3 da T160, a divida L3 de paginacao, S-1 a S-4 da T158, R-A a R-C da T157, o registro teste michell, a decisao DP-29 (se outro_controlado vale para admissao) e a limitacao de validacao em navegador da T167."
+    "id": "T169",
+    "status": "contatos_colaborador_implementada",
+    "reason": "T168 integrada em main pela PR #160 (squash db9b023dc11c9fcfa2397b016713939f119c0a6f), com a CI de push 3/3 verde, como parada por regra declarada. A FICHA DE TRATAMENTO DOS CONTATOS foi aprovada pelo proprietario em 2026-10-16 e esta formalizada em docs/decisions/ficha-tratamento-contatos-colaborador.md: e-mail pessoal, celular e telefone; finalidade de cadastro e comunicacao operacional durante a relacao de trabalho; execucao do contrato; retencao enquanto o vinculo estiver ativo e, apos o desligamento, uso operacional bloqueado, 2 anos de guarda e entao eliminacao ou anonimizacao, salvo litigio, ordem judicial ou obrigacao formal; A2 restrita; sem compartilhamento externo; sem RIPD nem MFA adicional nesta fase; auditoria de criacao, leitura, edicao, exportacao e exclusao, com campos afetados e nunca valores; rh e dp na empresa ativa; master_tecnico em qualquer empresa, auditado; gestor, colaborador e demais sem acesso. Emendas: ADR 0007, Emenda 4; ADR 0012, Emenda 1. Na ADR 0016, DP-ADM-02, DP-ADM-03 e DP-ADM-06 ficam resolvidas so para Contatos. A T169 entrega o agregado proprio de contatos do colaborador, fora de Colaborador, sem alterar a admissao atomica da T167; e-mail corporativo continua derivado de access_user.email. Seguem abertas e intocadas: R-3 da T162, a R-3 da revisao da T164, S2 da T161, R1 a R3 da T160, a divida L3 de paginacao, S-1 a S-4 da T158, R-A a R-C da T157, o registro teste michell, a decisao DP-29 e a limitacao de validacao em navegador da T167. ENTREGUE em Draft: migration 20261016120000_contatos_colaborador criada e nao aplicada localmente, com contato_colaborador (valor vigente por colaborador e empresa, CHECK da normalizacao, triggers diferidos de vinculo na empresa, sem DELETE para evolli_app) e contato_colaborador_evento (criacao, leitura e edicao com campos afetados, nunca valores, append-only); GET e PUT /v1/colaboradores/:colaboradorId/contatos com recurso proprio contato_colaborador, empresa real resolvida pelo vinculo e auditada, estados sem_registro, registrado e bloqueado, validacao e normalizacao no servidor sem presumir pais; secao Contatos no detalhe do colaborador com campos obrigatorios, erro por campo, foco, preservacao, sucesso e confirmacao de descarte; testes unitarios, E2E e web. Trilha de TODA consulta (ficha e Emenda 1 da ADR 0012): com valor, sem registro, bloqueada, PUT sem alteracao (registrado como leitura) e a tentativa do master_tecnico com empresa ambigua (sem empresa, failure), na mesma transacao, pela migration 20261016130000_contatos_auditoria_toda_consulta, criada e nao aplicada localmente; nunca valores, corpo nem cabecalhos brutos. Limites: processo de eliminacao apos 2 anos inexistente; exportacao e exclusao sem rota; origem e evidencia da coleta nao especificadas pela ficha; E2E so na CI; sem validacao visual em navegador."
   },
   "openDeliveries": [
     {
-      "id": "T168",
+      "id": "T169",
       "pullRequest": null,
-      "status": "perfil_contatos_parado_ficha_pendente"
+      "status": "contatos_colaborador_implementada"
     }
   ],
   "requiredArtifacts": [
