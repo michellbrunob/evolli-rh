@@ -607,9 +607,17 @@ com escopo, aceite e validação próprios. **Nada aqui começa nesta tarefa.**
 Os responsáveis seguem a ADR 0012: finalidade, base legal, classificação,
 retenção e descarte são de **RH + Jurídico**.
 
+**Resolvida.** `DP-ADM-01` — aprovar esta ADR: modelo-alvo, classes de acesso,
+matriz e regras de UX (responsável: proprietário) — foi **aprovada pelo
+proprietário em 2026-10-16**, por instrução dele na abertura da T168. Ver o
+`Status` e a nota de aprovação ao final. A decisão fica registrada aqui, e não
+apagada, para preservar o histórico.
+
+**Abertas.** `DP-ADM-02` a `DP-ADM-18`, na tabela abaixo, continuam pendentes e
+inalteradas.
+
 | ID          | Decisão pendente                                                                                                                                                                                  | Responsável                    | Liga-se a                                          |
 | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ | -------------------------------------------------- |
-| `DP-ADM-01` | Aprovar esta ADR: modelo-alvo, classes de acesso, matriz e regras de UX                                                                                                                           | proprietário                   | —                                                  |
 | `DP-ADM-02` | Finalidade e base legal de cada categoria, pela ficha de tratamento                                                                                                                               | RH + Jurídico                  | `DP-11 (V2)`, `DP-14`, `DP-25 (V2)`                |
 | `DP-ADM-03` | Retenção, descarte e exportação de cada categoria, e se o histórico de valores é guardado                                                                                                         | RH + Jurídico                  | `DP-15`, `DP-2E-15`, `PD-DOC-03`, RI-F2-3          |
 | `DP-ADM-04` | Se o CPF passa a ser exigido para admitir                                                                                                                                                         | proprietário + RH + Jurídico   | `DP-2E-11`                                         |
