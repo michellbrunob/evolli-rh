@@ -1697,11 +1697,14 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       R1 a R3 (T160), L3, S-1 a S-4 (T158), R-A a R-C (T157) e o registro
       `teste michell`.
 
-65. **T168 - Perfil do colaborador: dados de contato**
-    - **Estado:** **parada por regra declarada, nos quatro campos.** Branch
-      `codex/t168-perfil-colaborador-contatos`, a partir do squash
-      `dcef62706399126b934c51e7d2955941cf9f06b3` (T167, PR #159). Nenhuma
-      migration, API, interface, teste de produto ou RBAC foi escrito.
+65. **T168 - Perfil do colaborador: dados de contato** - **Estado:** **integrada** em `main` pela PR #160, squash
+    `db9b023dc11c9fcfa2397b016713939f119c0a6f`, com a CI de push 3/3 verde,
+    como **parada por regra declarada, nos quatro campos**. Branch
+    `codex/t168-perfil-colaborador-contatos` preservada, criada a partir do
+    squash `dcef62706399126b934c51e7d2955941cf9f06b3` (T167, PR #159). A
+    ficha que ela pedia foi aprovada pelo proprietário em 2026-10-16 e é
+    formalizada na T169. Nenhuma
+    migration, API, interface, teste de produto ou RBAC foi escrito.
     - **Evidência:** [`docs/decisions/t168-contatos-bloqueio-ficha.md`](../docs/decisions/t168-contatos-bloqueio-ficha.md). **E-mail pessoal, celular e telefone** são A2
       e Complementar, e dependem de ficha de tratamento (`FT`), contrato (`CTR`)
       e retenção (`RET`): **não existe ficha aprovada para nenhuma categoria**, e
@@ -1741,6 +1744,35 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
     - **Regra de parada:** o campo que ainda depender de finalidade, acesso,
       auditoria, retenção ou contrato não aprovado **não é implementado** nem
       tem regra inventada; registra-se a evidência e para só aquele item.
+    - **Dívida preservada:** R-3 (T162), R-3 da revisão da T164, S2 (T161), R1 a R3 (T160), L3, S-1 a S-4 (T158), R-A a R-C (T157), o registro `teste michell`, a decisão `DP-29` (se `outro_controlado` vale para admissão) e a limitação de validação em navegador da T167.
+
+66. **T169 - Contatos do colaborador**
+    - **Estado:** em implementação. Branch `codex/t169-contatos-colaborador`, a
+      partir do squash `db9b023dc11c9fcfa2397b016713939f119c0a6f` (T168,
+      PR #160).
+    - **Ficha aprovada pelo proprietário em 2026-10-16**, formalizada em
+      [ficha de tratamento dos contatos](../docs/decisions/ficha-tratamento-contatos-colaborador.md): e-mail pessoal, celular e telefone; finalidade de cadastro e
+      comunicação operacional durante a relação de trabalho; execução do
+      contrato; retenção enquanto o vínculo estiver ativo e, após o
+      desligamento, uso operacional bloqueado, 2 anos de guarda e então
+      eliminação ou anonimização, salvo litígio, ordem judicial ou obrigação
+      formal; A2 restrita; sem compartilhamento externo; sem RIPD nem MFA
+      adicional nesta fase; auditoria de criação, leitura, edição, exportação e
+      exclusão com campos afetados e nunca valores; `rh` e `dp` na empresa
+      ativa; `master_tecnico` em qualquer empresa, auditado; `gestor`,
+      `colaborador` e demais sem acesso.
+    - **Emendas:** ADR 0007, Emenda 4 (a categoria além dos quatro dados
+      aprovados); ADR 0012, Emenda 1 (`master_tecnico` em contatos). Na ADR
+      0016, `DP-ADM-02`, `DP-ADM-03` e `DP-ADM-06` ficam resolvidas **só para
+      Contatos**.
+    - **Objetivo:** o agregado próprio de contatos do colaborador, fora de
+      `Colaborador`, sem alterar a admissão atômica da T167. E-mail corporativo
+      continua derivado de `access_user.email`.
+    - **Fora de escopo:** endereço, contato de emergência, CPF, documentos,
+      foto, nome social, sexo, gênero, raça/etnia, deficiência, escolaridade,
+      dados bancários, dependentes, dados contratuais, portal do colaborador,
+      e-mail corporativo persistido no perfil, fluxo de admissão, Docker, banco
+      de demonstração, seed e processos.
     - **Dívida preservada:** R-3 (T162), R-3 da revisão da T164, S2 (T161), R1 a R3 (T160), L3, S-1 a S-4 (T158), R-A a R-C (T157), o registro `teste michell`, a decisão `DP-29` (se `outro_controlado` vale para admissão) e a limitação de validação em navegador da T167.
 
 ## Regra obrigatória para as próximas tarefas
