@@ -46,8 +46,14 @@ import {
  * funcionais) e identificadores técnicos. A lotação aparece como os ids do
  * destino gravado na movimentação: a alocação só nasce na efetivação (ADR 0007,
  * ato × estado), e afirmar uma lotação vigente aqui seria falso.
+ *
+ * O topo também é escolhido campo a campo — e não `...colaborador` —, para que
+ * uma coluna futura no `Colaborador` não passe para esta resposta sem decisão.
  */
-export interface AdmissaoRegistrada extends Colaborador {
+export interface AdmissaoRegistrada extends Pick<
+  Colaborador,
+  "id" | "nome" | "situacao" | "criadoEm" | "atualizadoEm"
+> {
   vinculo: {
     id: string;
     empresaId: string;
@@ -198,7 +204,11 @@ export class ColaboradorService {
         );
 
         return {
-          ...colaborador,
+          id: colaborador.id,
+          nome: colaborador.nome,
+          situacao: colaborador.situacao,
+          criadoEm: colaborador.criadoEm,
+          atualizadoEm: colaborador.atualizadoEm,
           vinculo: {
             id: vinculo.id,
             empresaId: vinculo.empresaId,

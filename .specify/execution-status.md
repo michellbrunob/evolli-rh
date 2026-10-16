@@ -1626,6 +1626,13 @@ do catálogo de motivos por tipo, que está com o RH (`DP-29`).
 **Fora desta entrega:** a readmissão (`POST /v1/vinculos`) não foi alterada;
 D7 e D8 seguem abertos.
 
+**Limitação autorizada de validação: não houve validação em navegador.** A
+tarefa proibia iniciar ou alterar a API, o banco de demonstração e os
+processos que essa validação exige. É limitação da validação desta entrega,
+não defeito do produto: o comportamento da tela está coberto por testes
+automatizados (web, API e E2E na CI), e nenhuma verificação visual é
+declarada como feita.
+
 **Dívidas preservadas:** **R-3** (T162), **R-3 da revisão da T164**, **S2** (T161), **R1 a R3** (T160), **L3**, **S-1 a S-4** (T158), **R-A a R-C** (T157) e o registro `teste michell`.
 
 ## Próxima ação autorizável

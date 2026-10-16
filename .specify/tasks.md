@@ -1658,6 +1658,11 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       catálogo por tipo (`DP-29`, RH).
     - **Fora desta entrega, registrado:** readmissão (`POST /v1/vinculos`) não
       foi alterada; D7 e D8 seguem abertos.
+    - **Limitação autorizada de validação:** **não houve validação em
+      navegador.** A tarefa proibia iniciar ou alterar a API, o banco de
+      demonstração e os processos que essa validação exige. O comportamento
+      da tela está coberto por testes automatizados (web, API e E2E na CI);
+      nenhuma verificação visual é declarada como feita.
     - **Objetivo:** estabilizar o contrato **que já existe** de admissão de
       colaborador antes de expandir qualquer dado pessoal previsto na ADR 0016.
     - **Escopo autorizado pelo proprietário:**
