@@ -1578,9 +1578,10 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
     `0c00afdc479193506e80eff0150dc4ddb785a41f`, com a CI de push 3/3 verde.
     Branch `codex/t166-adr-dados-colaborador` preservada, criada a partir do
     squash `9db194e6ee5fa25f82017557a8d77be3b6048d58` (T165, PR #157). É a
-    **etapa B** da ordem aprovada na T165. **A tarefa está integrada; a ADR
-    0016 continua proposta**, aguardando a aprovação do proprietário
-    (`DP-ADM-01`) — integrar o documento não aprova o seu conteúdo.
+    **etapa B** da ordem aprovada na T165. **A tarefa foi integrada com a ADR
+    0016 ainda proposta; o proprietário a aprovou em 2026-10-16
+    (`DP-ADM-01`)**, sem fechar `DP-ADM-02` a `DP-ADM-18` nem dispensar a ficha
+    de tratamento por categoria.
     - **Entregas:** [ADR 0016](../docs/adr/0016-modelo-e-governanca-dos-dados-de-admissao-e-perfil-do-colaborador.md), com o modelo-alvo, as classes de
       acesso, a matriz de campos, a governança, o UX futuro, o plano técnico e
       dezoito decisões pendentes (`DP-ADM-01` a `DP-ADM-18`); e o
@@ -1626,9 +1627,10 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       R1 a R3 (T160), L3, S-1 a S-4 (T158), R-A a R-C (T157) e o registro
       `teste michell`.
 
-64. **T167 - Admissão mínima segura: estabilizar o contrato existente** - **Estado:** **implementada em Draft**. Branch
-    `codex/t167-admissao-minima-segura`, a partir do squash
-    `0c00afdc479193506e80eff0150dc4ddb785a41f` (T166, PR #158).
+64. **T167 - Admissão mínima segura: estabilizar o contrato existente** - **Estado:** **integrada** em `main` pela PR #159, squash
+    `dcef62706399126b934c51e7d2955941cf9f06b3`, com a CI de push 3/3 verde.
+    Branch `codex/t167-admissao-minima-segura` preservada, criada a partir do
+    squash `0c00afdc479193506e80eff0150dc4ddb785a41f` (T166, PR #158).
     - **API:** `motivoCodigo` da admissão aceita só `admissao_inicial` e
       `outro_controlado` (`MOTIVOS_ADMISSAO`); os cinco motivos que pressupõem
       um vínculo existente — mudança de lotação, de cargo, correção e fim de
@@ -1694,6 +1696,52 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
     - **Dívida preservada:** R-3 (T162), R-3 da revisão da T164, S2 (T161),
       R1 a R3 (T160), L3, S-1 a S-4 (T158), R-A a R-C (T157) e o registro
       `teste michell`.
+
+65. **T168 - Perfil do colaborador: dados de contato**
+    - **Estado:** **parada por regra declarada, nos quatro campos.** Branch
+      `codex/t168-perfil-colaborador-contatos`, a partir do squash
+      `dcef62706399126b934c51e7d2955941cf9f06b3` (T167, PR #159). Nenhuma
+      migration, API, interface, teste de produto ou RBAC foi escrito.
+    - **Evidência:** [`docs/decisions/t168-contatos-bloqueio-ficha.md`](../docs/decisions/t168-contatos-bloqueio-ficha.md). **E-mail pessoal, celular e telefone** são A2
+      e Complementar, e dependem de ficha de tratamento (`FT`), contrato (`CTR`)
+      e retenção (`RET`): **não existe ficha aprovada para nenhuma categoria**, e
+      `DP-ADM-02` (finalidade e base legal) e `DP-ADM-03` (retenção) seguem
+      abertas, com RH + Jurídico. **E-mail corporativo** é **Derivado** da conta
+      de acesso (`access_user.email`, o login), não um campo de contato; o
+      servidor não tem rota que altere o e-mail de uma conta.
+    - **Acesso e auditoria de A2 já estão definidos** (`rh` e `dp` da empresa
+      ativa; escrita auditada sem valores). Faltam finalidade, base legal,
+      classificação, retenção e contrato, que são de RH + Jurídico.
+    - **Para retomar:** a ficha em branco da §4.1 do documento, respondida por RH
+      - Jurídico e Segurança; a emenda à ADR 0007; e, se o `master_tecnico` deve
+        ficar fora de A2, a emenda à ADR 0012. O e-mail corporativo pede decisão
+        própria do domínio de contas.
+    - **Objetivo do proprietário:** o primeiro bloco complementar real do
+      cadastro — **dados de contato do próprio colaborador**, preenchidos só
+      por `rh` ou `dp`, depois da admissão. Campos pretendidos: e-mail
+      pessoal, e-mail corporativo, celular e telefone.
+    - **Condição:** só entra o campo que a ADR 0016 classificar como A2,
+      complementar e **não bloqueado**, e cuja finalidade, acesso, auditoria e
+      retenção estejam suficientemente definidos nos artefatos aprovados. Isso
+      se **investiga antes** de criar migration ou interface.
+    - **Regras do proprietário:** tela parte de colaborador já admitido, sem
+      alterar a admissão atômica da T167; `rh` e `dp` consultam e editam na
+      empresa ativa; `master_tecnico`, `gestor` e `colaborador` não consultam
+      nem alteram; empresa e escopo só da sessão e do vínculo autorizado; nada
+      na listagem, no Hub, no portal ou na visão de liderança; escritas
+      auditadas no nível que a ADR prevê para A2; validação, limite e
+      normalização no servidor; UX com seção própria, erro por campo, foco no
+      primeiro erro, dados preservados em falha, confirmação de sucesso e aviso
+      antes de descartar.
+    - **Fora de escopo:** endereço, contato de emergência, documentos, CPF,
+      foto, nome social, sexo, gênero, raça/etnia, deficiência, nacionalidade,
+      estado civil, escolaridade, dados bancários, dependentes, dados
+      contratuais, portal do colaborador, RBAC global, Docker, banco, seed e
+      processos.
+    - **Regra de parada:** o campo que ainda depender de finalidade, acesso,
+      auditoria, retenção ou contrato não aprovado **não é implementado** nem
+      tem regra inventada; registra-se a evidência e para só aquele item.
+    - **Dívida preservada:** R-3 (T162), R-3 da revisão da T164, S2 (T161), R1 a R3 (T160), L3, S-1 a S-4 (T158), R-A a R-C (T157), o registro `teste michell`, a decisão `DP-29` (se `outro_controlado` vale para admissão) e a limitação de validação em navegador da T167.
 
 ## Regra obrigatória para as próximas tarefas
 
