@@ -35,7 +35,15 @@
  *
  * Não empilha: cada tela mantém uma instância e troca o conteúdo dela.
  */
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from "react";
 import type { ReactNode } from "react";
 import { Button } from "./Button";
 import "./Modal.css";
@@ -64,6 +72,32 @@ export interface ModalProps {
   /** Ações fixas no rodapé (não rolam com o conteúdo). */
   rodape?: ReactNode;
   children: ReactNode;
+}
+
+/**
+ * Pedido de fechamento da janela, oferecido ao conteúdo dela (T167).
+ *
+ * Um botão "Cancelar" dentro do formulário que chamasse o `onFechar` da tela
+ * direto passaria POR FORA da confirmação de descarte — e passava: com dados
+ * digitados, "Fechar" e Escape pediam confirmação, mas "Cancelar" descartava
+ * calado. Por este contexto, qualquer ação de dentro da janela pede o
+ * fechamento pelo MESMO caminho, que respeita `bloqueado` e `alterado`.
+ */
+const PedirFechamentoContext = createContext<(() => void) | null>(null);
+
+/**
+ * Devolve a função que pede o fechamento da janela que envolve o componente.
+ * Só funciona dentro de um `Modal`: fora dele, falha alto — um "Cancelar" sem
+ * janela seria um botão que não faz o que diz.
+ */
+export function usePedirFechamentoModal(): () => void {
+  const pedir = useContext(PedirFechamentoContext);
+  if (!pedir) {
+    throw new Error(
+      "usePedirFechamentoModal só pode ser usado dentro de Modal.",
+    );
+  }
+  return pedir;
 }
 
 const FOCAVEIS =
@@ -309,11 +343,13 @@ export function Modal({
           </div>
         ) : null}
 
-        <div className="evolli-modal__corpo">{children}</div>
+        <PedirFechamentoContext.Provider value={pedirFechamento}>
+          <div className="evolli-modal__corpo">{children}</div>
 
-        {rodape ? (
-          <footer className="evolli-modal__rodape">{rodape}</footer>
-        ) : null}
+          {rodape ? (
+            <footer className="evolli-modal__rodape">{rodape}</footer>
+          ) : null}
+        </PedirFechamentoContext.Provider>
       </div>
     </div>
   );

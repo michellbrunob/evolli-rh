@@ -60,6 +60,26 @@ const MOTIVOS = [
   "outro_controlado",
 ] as const satisfies readonly MotivoMovimentacao[];
 
+/**
+ * Motivos aceitos na ADMISSÃO (T167). `POST /v1/colaboradores` sempre cria um
+ * colaborador NOVO com o seu PRIMEIRO vínculo, então ficam de fora, pelo
+ * próprio sentido do catálogo, os motivos que pressupõem um vínculo que ainda
+ * não existe: mudança de lotação (`reestruturacao_organizacional`,
+ * `realocacao_interna`), de cargo (`promocao`), correção de um registro
+ * anterior (`correcao_cadastral`) e fim de vínculo (`encerramento_de_vinculo`).
+ *
+ * `outro_controlado` continua aceito: é genérico, não é incompatível pelo nome,
+ * e já era aceito antes desta tarefa. Retirá-lo seria decidir o conteúdo do
+ * catálogo por tipo, que segue pendente com o RH (DP-29) — fica registrado
+ * como decisão do proprietário, não presumido aqui.
+ */
+export const MOTIVOS_ADMISSAO = [
+  "admissao_inicial",
+  "outro_controlado",
+] as const satisfies readonly MotivoMovimentacao[];
+
+export type MotivoAdmissao = (typeof MOTIVOS_ADMISSAO)[number];
+
 const SITUACOES_VINCULO = [
   "previsto",
   "ativo",
@@ -139,8 +159,9 @@ export class AdmitirColaboradorDto extends DestinoOrganizacionalDto {
   @IsDateString({ strict: true })
   dataAdmissao!: string;
 
-  @IsIn(MOTIVOS)
-  motivoCodigo!: MotivoMovimentacao;
+  /** Só motivos compatíveis com uma primeira admissão (`MOTIVOS_ADMISSAO`). */
+  @IsIn(MOTIVOS_ADMISSAO)
+  motivoCodigo!: MotivoAdmissao;
 }
 
 /**

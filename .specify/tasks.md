@@ -1574,11 +1574,13 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       R1 a R3 (T160), L3, S-1 a S-4 (T158), R-A a R-C (T157) e o registro
       `teste michell`.
 
-63. **T166 - Modelo e governança dos dados de admissão e perfil do colaborador**
-    - **Estado:** **ADR proposta, aguardando aprovação do proprietário**
-      (`DP-ADM-01`). Branch `codex/t166-adr-dados-colaborador`, a partir do
-      squash `9db194e6ee5fa25f82017557a8d77be3b6048d58` (T165, PR #157). É a
-      **etapa B** da ordem aprovada na T165.
+63. **T166 - Modelo e governança dos dados de admissão e perfil do colaborador** - **Estado:** **integrada** em `main` pela PR #158, squash
+    `0c00afdc479193506e80eff0150dc4ddb785a41f`, com a CI de push 3/3 verde.
+    Branch `codex/t166-adr-dados-colaborador` preservada, criada a partir do
+    squash `9db194e6ee5fa25f82017557a8d77be3b6048d58` (T165, PR #157). É a
+    **etapa B** da ordem aprovada na T165. **A tarefa está integrada; a ADR
+    0016 continua proposta**, aguardando a aprovação do proprietário
+    (`DP-ADM-01`) — integrar o documento não aprova o seu conteúdo.
     - **Entregas:** [ADR 0016](../docs/adr/0016-modelo-e-governanca-dos-dados-de-admissao-e-perfil-do-colaborador.md), com o modelo-alvo, as classes de
       acesso, a matriz de campos, a governança, o UX futuro, o plano técnico e
       dezoito decisões pendentes (`DP-ADM-01` a `DP-ADM-18`); e o
@@ -1620,6 +1622,75 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       de cada dado ter permissão e contrato próprios.
     - **Referência visual:** agrupamento e clareza apenas. Sem identidade,
       texto, marca, ícone, paleta, layout ou componente de terceiros.
+    - **Dívida preservada:** R-3 (T162), R-3 da revisão da T164, S2 (T161),
+      R1 a R3 (T160), L3, S-1 a S-4 (T158), R-A a R-C (T157) e o registro
+      `teste michell`.
+
+64. **T167 - Admissão mínima segura: estabilizar o contrato existente** - **Estado:** **implementada em Draft**. Branch
+    `codex/t167-admissao-minima-segura`, a partir do squash
+    `0c00afdc479193506e80eff0150dc4ddb785a41f` (T166, PR #158).
+    - **API:** `motivoCodigo` da admissão aceita só `admissao_inicial` e
+      `outro_controlado` (`MOTIVOS_ADMISSAO`); os cinco motivos que pressupõem
+      um vínculo existente — mudança de lotação, de cargo, correção e fim de
+      vínculo — recebem 400. A resposta de `POST /v1/colaboradores` mantém o
+      colaborador no topo e acrescenta `vinculo` e `movimentacao` em projeção
+      fechada, sem dado pessoal novo. A admissão continua atômica; a lotação é
+      o destino gravado na movimentação, e a alocação só nasce na efetivação
+      (ADR 0007).
+    - **Web:** a empresa da admissão é só a da sessão — o seletor saiu, a
+      empresa aparece em leitura, e o formulário não envia se o servidor não
+      devolver exatamente uma. Recusa do servidor vira erro no campo certo
+      (409 → matrícula; 422 → referência organizacional; 404 → empresa ativa
+      mudou); foco no primeiro erro; dados mantidos em falha recuperável;
+      sucesso confirma com o que o servidor gravou e oferece abrir a ficha do
+      admitido; "Cancelar" pede confirmação antes de descartar.
+    - **Testes:** unitários da API (28: as duas camadas de autorização da
+      admissão, incluindo `resolverEscopoPessoas`, e os motivos); E2E da
+      admissão (resposta, motivos, `dp`, empresa divergente, negação a
+      `master_tecnico` — global e com empresa ativa —, `gestor` e
+      `colaborador`); web (tela e `Modal`).
+    - **Achados da T166 tratados:** D1 (empresa no formulário), D2
+      ("Cancelar"), D3 (motivo na admissão) e o teste unitário de
+      `resolverEscopoPessoas`. D4 foi mitigado no cliente: o servidor continua
+      sem erro por campo (`DP-ADM-15` aberto).
+    - **Decisão pendente:** se `outro_controlado` vale para admissão. Ficou
+      aceito, como antes, porque retirá-lo seria decidir o conteúdo do
+      catálogo por tipo (`DP-29`, RH).
+    - **Fora desta entrega, registrado:** readmissão (`POST /v1/vinculos`) não
+      foi alterada; D7 e D8 seguem abertos.
+    - **Limitação autorizada de validação:** **não houve validação em
+      navegador.** A tarefa proibia iniciar ou alterar a API, o banco de
+      demonstração e os processos que essa validação exige. O comportamento
+      da tela está coberto por testes automatizados (web, API e E2E na CI);
+      nenhuma verificação visual é declarada como feita.
+    - **Objetivo:** estabilizar o contrato **que já existe** de admissão de
+      colaborador antes de expandir qualquer dado pessoal previsto na ADR 0016.
+    - **Escopo autorizado pelo proprietário:**
+      - confirmar na fonte o fluxo de `POST /v1/colaboradores` — DTO, serviço,
+        RBAC, formulário web e testes;
+      - manter a admissão **atômica**: colaborador, primeiro vínculo, lotação e
+        movimentação de admissão coerentes na mesma transação;
+      - aceitar em `motivoCodigo` **somente** motivos válidos para admissão;
+      - fazer a resposta de sucesso confirmar o colaborador e o vínculo
+        criados, sem vazar dado pessoal novo ou restrito;
+      - melhorar o formulário existente **dentro do contrato atual**: erro
+        associado ao campo, foco no primeiro erro, dados preservados em falha
+        recuperável, sucesso que confirma e leva a rota coerente, e aviso antes
+        de descartar alterações;
+      - testes de API, E2E e web proporcionais, incluindo negação explícita a
+        `master_tecnico`, `gestor` e `colaborador`.
+    - **Regras preservadas:** só `rh` e `dp` admitem; `master_tecnico` não cria,
+      não edita e não admite; o colaborador não recebe convite, link nem
+      autopreenchimento; a empresa vem só da sessão ativa e nunca de campo
+      manipulável; admissão em empresa divergente do contexto ativo é recusada.
+    - **Fora de escopo:** qualquer campo novo de perfil (CPF, documentos,
+      endereço, contatos, foto, dados bancários, dependentes, deficiência,
+      raça/etnia, gênero, nome social); schema, migration, seed e novos
+      agregados; portal do colaborador; RBAC além das guardas e testes da
+      admissão atual.
+    - **Regra de parada:** se o contrato atual não permitir uma correção sem
+      inventar regra de negócio, parar naquele ponto, registrar a evidência e
+      pedir decisão. Sem dado simulado, sem campo vazio, sem N+1.
     - **Dívida preservada:** R-3 (T162), R-3 da revisão da T164, S2 (T161),
       R1 a R3 (T160), L3, S-1 a S-4 (T158), R-A a R-C (T157) e o registro
       `teste michell`.

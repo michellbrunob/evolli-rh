@@ -74,6 +74,31 @@ export interface AdmitirColaboradorDto extends DestinoOrganizacionalDto {
   motivoCodigo: "admissao_inicial";
 }
 
+/**
+ * Resposta da admissão (T167): o colaborador no topo, como antes, mais a
+ * confirmação do vínculo e do ato de admissão criados na mesma transação.
+ * Projeção fechada no servidor — nenhum dado pessoal além dos aprovados.
+ */
+export interface AdmissaoRegistradaApi extends ColaboradorApi {
+  vinculo: {
+    id: string;
+    empresaId: string;
+    matricula: string;
+    tipo: TipoVinculo;
+    situacao: SituacaoVinculo;
+    dataAdmissao: string;
+  };
+  movimentacao: {
+    id: string;
+    tipo: "admissao";
+    status: "solicitada" | "programada";
+    vigenciaInicio: string;
+    destino: Required<{
+      [K in keyof DestinoOrganizacionalDto]: string | null;
+    }>;
+  };
+}
+
 export interface RetificarColaboradorDto {
   nome: string;
 }
@@ -153,7 +178,7 @@ export async function listarVinculosDoColaborador(
 
 export async function admitirColaborador(
   dto: AdmitirColaboradorDto,
-): Promise<ColaboradorApi> {
+): Promise<AdmissaoRegistradaApi> {
   const token = await getCsrf();
   const res = await apiFetch("/colaboradores", {
     method: "POST",

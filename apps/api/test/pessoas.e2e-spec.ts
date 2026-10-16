@@ -2079,6 +2079,177 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
 
   // -------------------------------------------------------------------------
 
+  describe("T167 — admissão mínima segura", () => {
+    /** Corpo válido de admissão; só a matrícula muda entre os casos. */
+    function admissao(matricula: string, extra: Record<string, unknown> = {}) {
+      return {
+        nome: `Pessoa Sintetica ${matricula}`,
+        empresaId: empresaA,
+        matricula,
+        tipo: "clt",
+        dataAdmissao: ADMISSAO,
+        motivoCodigo: "admissao_inicial",
+        departamentoId: departamentoA,
+        cargoId: cargoA,
+        ...extra,
+      };
+    }
+
+    /** Quantos vínculos existem com a matrícula — prova de "nada foi criado". */
+    async function vinculosComMatricula(matricula: string): Promise<number> {
+      const prisma = new PrismaClient({ datasources: { db: { url: appUrl } } });
+      try {
+        return await prisma.vinculoFuncional.count({ where: { matricula } });
+      } finally {
+        await prisma.$disconnect();
+      }
+    }
+
+    it("a resposta confirma colaborador, vínculo e ato de admissão — e nada além", async () => {
+      const resposta = await post("/v1/colaboradores", rhA)
+        .send(admissao("T167-001"))
+        .expect(201);
+
+      // Compatível com quem já lia o colaborador no topo.
+      expect(resposta.body.id).toEqual(expect.any(String));
+      expect(resposta.body.nome).toBe("Pessoa Sintetica T167-001");
+      expect(resposta.body.situacao).toBe("inativo");
+
+      // Projeção FECHADA: nenhuma chave além das aprovadas.
+      expect(Object.keys(resposta.body).sort()).toEqual(
+        [
+          "atualizadoEm",
+          "criadoEm",
+          "id",
+          "movimentacao",
+          "nome",
+          "situacao",
+          "vinculo",
+        ].sort(),
+      );
+      expect(Object.keys(resposta.body.vinculo).sort()).toEqual(
+        [
+          "dataAdmissao",
+          "empresaId",
+          "id",
+          "matricula",
+          "situacao",
+          "tipo",
+        ].sort(),
+      );
+      expect(Object.keys(resposta.body.movimentacao).sort()).toEqual(
+        ["destino", "id", "status", "tipo", "vigenciaInicio"].sort(),
+      );
+
+      expect(resposta.body.vinculo).toMatchObject({
+        empresaId: empresaA,
+        matricula: "T167-001",
+        tipo: "clt",
+        situacao: "previsto",
+      });
+      expect(String(resposta.body.vinculo.dataAdmissao)).toMatch(
+        new RegExp(`^${ADMISSAO}`),
+      );
+      expect(resposta.body.movimentacao).toMatchObject({
+        tipo: "admissao",
+        destino: {
+          unidadeOrganizacionalId: null,
+          departamentoId: departamentoA,
+          areaId: null,
+          equipeId: null,
+          cargoId: cargoA,
+          centroCustoId: null,
+        },
+      });
+
+      // Os identificadores devolvidos são os que o servidor gravou.
+      const vinculos = await get(
+        `/v1/colaboradores/${resposta.body.id}/vinculos`,
+        rhA,
+      ).expect(200);
+      expect(vinculos.body).toHaveLength(1);
+      expect(vinculos.body[0].id).toBe(resposta.body.vinculo.id);
+      const linha = await get(
+        `/v1/vinculos/${resposta.body.vinculo.id}/linha-do-tempo`,
+        rhA,
+      ).expect(200);
+      expect(linha.body).toHaveLength(1);
+      expect(linha.body[0].id).toBe(resposta.body.movimentacao.id);
+
+      // Admitir não cria alocação: ela só nasce na efetivação (ato × estado).
+      const alocacoes = await get(
+        `/v1/vinculos/${resposta.body.vinculo.id}/alocacoes`,
+        rhA,
+      ).expect(200);
+      expect(alocacoes.body).toEqual([]);
+    });
+
+    it.each([
+      "reestruturacao_organizacional",
+      "realocacao_interna",
+      "promocao",
+      "correcao_cadastral",
+      "encerramento_de_vinculo",
+    ])(
+      "recusa motivo incompatível com admissão (%s) e não cria nada",
+      async (motivo) => {
+        const matricula = `T167-M-${motivo.slice(0, 8).toUpperCase()}`;
+        await post("/v1/colaboradores", rhA)
+          .send(admissao(matricula, { motivoCodigo: motivo }))
+          .expect(400);
+        expect(await vinculosComMatricula(matricula)).toBe(0);
+      },
+    );
+
+    it("continua aceitando outro_controlado — o conteúdo do catálogo por tipo segue com o RH (DP-29)", async () => {
+      await post("/v1/colaboradores", rhA)
+        .send(admissao("T167-OUTRO", { motivoCodigo: "outro_controlado" }))
+        .expect(201);
+    });
+
+    it("dp admite na própria empresa e recebe a mesma confirmação", async () => {
+      const resposta = await post("/v1/colaboradores", dpA)
+        .send(admissao("T167-DP"))
+        .expect(201);
+      expect(resposta.body.vinculo.empresaId).toBe(empresaA);
+      expect(resposta.body.movimentacao.tipo).toBe("admissao");
+    });
+
+    it("empresa divergente do contexto ativo é recusada com 404 e nada é criado", async () => {
+      await post("/v1/colaboradores", rhA)
+        .send(admissao("T167-DIVERGE", { empresaId: empresaB }))
+        .expect(404);
+      expect(await vinculosComMatricula("T167-DIVERGE")).toBe(0);
+    });
+
+    it.each([
+      ["master_tecnico (global)", () => master],
+      ["gestor", () => gestorA],
+      ["colaborador", () => colaboradorA],
+    ])("nega %s ao admitir, sem criar nada", async (_papel, cred) => {
+      const matricula = `T167-NEG-${_papel.slice(0, 4).toUpperCase()}`;
+      await post("/v1/colaboradores", cred())
+        .send(admissao(matricula))
+        .expect(403);
+      expect(await vinculosComMatricula(matricula)).toBe(0);
+    });
+
+    it("nega master_tecnico mesmo com empresa ativa selecionada", async () => {
+      // Conta própria: trocar o contexto do `master` compartilhado mudaria o
+      // escopo de leitura de todos os testes que vêm depois.
+      const masterEscopado = await seedMaster("master.t167@example.test");
+      await post("/v1/auth/contexto/empresa", masterEscopado)
+        .send({ empresaId: empresaA })
+        .expect(200);
+      await post("/v1/colaboradores", masterEscopado)
+        .send(admissao("T167-NEG-MCTX"))
+        .expect(403);
+      expect(await vinculosComMatricula("T167-NEG-MCTX")).toBe(0);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+
   describe("autorização: admin_tecnico negado em todo o domínio", () => {
     const ROTAS_LEITURA = ["/v1/colaboradores", "/v1/movimentacoes"];
 
