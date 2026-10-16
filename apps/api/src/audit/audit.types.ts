@@ -245,10 +245,12 @@ export type AuditResource =
   // Nunca o tipo da solicitação, o motivo codificado ou o vínculo. Não há
   // rótulo para o evento de histórico: ele é parte da própria solicitação.
   | "solicitacao_pessoa"
-  // T169 — Contatos do colaborador: rotulo tecnico do recurso. O
-  // `resourceId` e o id do COLABORADOR, o unico que existe em todos os casos
-  // (inclusive sem contato gravado). Nunca o valor de e-mail, celular ou
-  // telefone.
+  // T169 — Contatos do colaborador: rotulo tecnico do recurso. Nos eventos de
+  // tratamento e nas negacoes produzidas pelo servico de contatos, o
+  // `resourceId` e o id do COLABORADOR, inclusive sem contato gravado. As
+  // negacoes genericas do `AuthorizationGuard` seguem o padrao transversal
+  // existente e podem registrar `resourceId: null`. Nunca o valor de e-mail,
+  // celular ou telefone.
   | "contato_colaborador";
 
 export type RecordAuditEventInput =
