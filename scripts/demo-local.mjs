@@ -347,8 +347,13 @@ function shaAtual() {
 
 // ---------------------------------------------------------------------------
 
-async function main() {
-  const ambiente = await subirAmbiente({
+/**
+ * Dependências REAIS de `subirAmbiente` (T171). Exportada para que o teste
+ * prove o que a CLI entrega ao núcleo — em especial a versão do Node que a
+ * trava do passo 1/8 confere — sem subir o ambiente.
+ */
+export function dependenciasReais() {
+  return {
     raiz: RAIZ,
     plataforma: process.platform,
     ambiente: { ...process.env },
@@ -365,7 +370,12 @@ async function main() {
     agora: () => performance.now(),
     registrar: (linha) => process.stdout.write(`${linha}\n`),
     sha: shaAtual(),
-  });
+    versaoNode: process.version,
+  };
+}
+
+async function main() {
+  const ambiente = await subirAmbiente(dependenciasReais());
 
   process.stdout.write(`${ambiente.resumo.join("\n")}\n`);
 

@@ -1821,8 +1821,10 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
     - **Dívida preservada:** R-3 (T162), R-3 da revisão da T164, S2 (T161), R1 a R3 (T160), L3, S-1 a S-4 (T158), R-A a R-C (T157), o registro `teste michell`, a decisão `DP-29` (se `outro_controlado` vale para admissão) e a limitação de validação em navegador da T167.
 
 67. **T170 - Migração controlada para Node 24 LTS**
-    - **Estado:** **implementada em Draft**. Branch `codex/t170-node-24-lts`, a
-      partir do squash `0fa2e1e930bc86f545d37839c42a385b3ed05cfa` (T169, PR #161).
+    - **Estado:** **integrada** em `main` pela PR #162, squash
+      `2fd19df9a86427cd3454d8d40ee282641ec83b65`, com a CI de push 3/3 verde em Node 24. Branch
+      `codex/t170-node-24-lts` preservada, criada a partir do squash
+      `0fa2e1e930bc86f545d37839c42a385b3ed05cfa` (T169, PR #161).
       Detalhes e evidências em [decisão da T170](../docs/decisions/t170-node-24-lts.md).
     - **Entregue:** `.nvmrc` em `24`; `engines.node` em `>=24 <25` nos três
       `package.json`; os três jobs da CI leem a versão do `.nvmrc`
@@ -1862,6 +1864,51 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
     - **Fora de escopo:** pnpm 11, migration aplicada localmente, seed e banco
       de demonstração.
     - **Dívida preservada:** R-3 (T162), R-3 da revisão da T164, S2 (T161), R1 a R3 (T160), L3, S-1 a S-4 (T158), R-A a R-C (T157), o registro `teste michell`, a decisão `DP-29` (se `outro_controlado` vale para admissão) e a limitação de validação em navegador da T167. As pendências da T169 seguem abertas: o processo de eliminação ou anonimização após 2 anos do desligamento; as rotas de exportação e exclusão de contatos, cuja auditoria é obrigatória quando existirem; a origem e a evidência da coleta, lacuna da ficha; a validação visual em navegador; e as observações N-2 (criação concorrente de contato que perde na unicidade responde 409 sem trilha), N-3 (`ON UPDATE CASCADE` nas FKs do evento de contato permite reescrita indireta) e N-4 (CHECK do evento mais frouxo que o serviço), além da docstring do serviço de contatos que ainda descreve o `resourceId` de forma absoluta.
+
+68. **T171 - Ambiente local Windows em Node 24 e pnpm 10, com prévia validada** - **Estado:** **implementada em Draft**. Branch
+    `codex/t171-ambiente-local-node24`, a partir do squash
+    `2fd19df9a86427cd3454d8d40ee282641ec83b65` (T170, PR #162). Detalhes e
+    evidências em [decisão da T171](../docs/decisions/t171-ambiente-local-node24.md).
+    - **Causa comprovada:** no Prisma 5.22, `getDefaultOutdir` compara o
+      caminho com barra normal (falha no Windows) e, no `postinstall`, grava em
+      `INIT_CWD/node_modules/.prisma/client` — a raiz do repositório, onde o
+      `@prisma/client` não encontra o client.
+    - **Correção:** o `postinstall` da API roda o mesmo `prisma generate` por
+      `scripts/prisma-generate-api.mjs`, sem `INIT_CWD`, e confere no fim que o
+      client desta rodada ficou ao lado do `@prisma/client`; se não ficou, a
+      instalação falha com a causa. Nenhuma dependência muda. O passo 1/8 da
+      demonstração passou a exigir o Node do `.nvmrc` e o pnpm do
+      `packageManager`. Testes em `test:scripts`, sem Prisma real: 16 da execução do
+      wrapper com efeitos injetados, 5 dos efeitos reais, 8 da trava e 2 da CLI
+      da demonstração; restaurar o `INIT_CWD`, remover a falha de client
+      ausente ou antigo e omitir a versão do Node reprovam.
+    - **Prévia validada no navegador** em `http://127.0.0.1:5173` (API em
+      `127.0.0.1:3100`, banco de demonstração em `127.0.0.1:5433`): oito passos,
+      17 migrations do zero e seed sintético; login, Hub, colaboradores, contatos
+      (erro por campo, gravação normalizada) e troca de empresa sem resíduo, com
+      404 do servidor para o colaborador da empresa anterior.
+    - **Pendências novas:** a seção Contatos tem um vão vertical de 256 px
+      (defeito visual da T169: o aviso reaproveita `colaboradores-screen__aviso-texto`,
+      com `flex: 1 1 16rem`); o Node 24 emite `[DEP0190]` no orquestrador da
+      demonstração no Windows (`shell: true` com argumentos), só aviso.
+    - **Objetivo:** fazer a prévia local funcionar no Windows com Node 24 e pnpm
+      10, sem depender de Node 22 nem de `prisma generate` manual depois da
+      instalação, e validar no navegador a versão atual da `main`.
+    - **Escopo:** diagnosticar e resolver o fluxo de instalação e preparação
+      que hoje exige `prisma generate` manual; garantir uso local reproduzível
+      de Node 24 e pnpm 10; alterar scripts, testes e documentação só se
+      necessário; subir o ambiente de demonstração local, com migrations e seed
+      apenas no banco local de demonstração; validar no navegador login, Hub,
+      troca de empresa autorizada, listagem de colaboradores e contatos.
+    - **Regras:** nenhuma dependência atualizada; pnpm 11 fora; nenhuma mudança
+      em funcionalidade de RH, contatos, RBAC, schema ou migrations de negócio,
+      salvo correção estritamente necessária ao ambiente e comprovada; nada de
+      produção, credencial real, banco ou Docker externos; `.env`,
+      `node_modules`, gerados, credenciais, caches e alterações automáticas de
+      `pnpm-workspace.yaml` não são versionados.
+    - **Dívida preservada:** R-3 (T162), R-3 da revisão da T164, S2 (T161), R1 a R3 (T160), L3, S-1 a S-4 (T158), R-A a R-C (T157), o registro `teste michell`, a decisão `DP-29` (se `outro_controlado` vale para admissão) e a limitação de validação em navegador da T167. Pendências da T169: o processo de eliminação ou anonimização após 2 anos; as rotas de exportação e exclusão de contatos; a origem e a evidência da coleta; a validação visual em navegador; as observações N-2, N-3 e N-4 da revisão final; e a docstring do serviço de contatos sobre `resourceId`. A
+      pendência da T170 (client do Prisma na raiz de `node_modules` no Windows)
+      foi o objeto desta tarefa e está resolvida.
 
 ## Regra obrigatória para as próximas tarefas
 

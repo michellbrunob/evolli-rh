@@ -34,8 +34,10 @@ import {
   censurar,
   comoLiteralPsql,
   lerEnv,
+  majorDaVersao,
   senhaDoPapel,
   subirAmbiente,
+  versoesExigidas,
 } from "./demo-local.core.mjs";
 
 /** Raiz com espaço, como a do proprietário. */
@@ -51,6 +53,9 @@ function urlDe(usuario, senha) {
 }
 
 const ARQUIVOS_PADRAO = {
+  // T171 — as fontes de verdade das versões exigidas.
+  ".nvmrc": "24\n",
+  "package.json": JSON.stringify({ packageManager: "pnpm@10.0.0" }),
   ".env": [
     "POSTGRES_DB=evolli_rh_dev",
     "POSTGRES_USER=postgres_local_admin",
@@ -110,9 +115,20 @@ function cenario(opcoes = {}) {
     ambiente: { PATH: "/usr/bin", ...(opcoes.ambiente ?? {}) },
     tentativas: opcoes.tentativas ?? 3,
     sha: "abc1234",
+    versaoNode:
+      opcoes.versaoNode === undefined ? "v24.19.0" : opcoes.versaoNode,
     lerArquivo: (relativo) => arquivos[relativo] ?? null,
     executar: (chamada) => {
       chamadas.push(chamada);
+      // T171 — `pnpm --version` responde a versão do cenário; o resto segue o
+      // roteiro de status/saída de cada teste.
+      if (chamada.comando === "pnpm" && chamada.args.includes("--version")) {
+        const statusPnpm = opcoes.statusPnpm ?? 0;
+        return {
+          status: statusPnpm,
+          saida: statusPnpm === 0 ? (opcoes.versaoPnpm ?? "10.0.0") : "",
+        };
+      }
       const status = statusPorComando(chamada);
       return {
         status,
@@ -1291,4 +1307,103 @@ test("banco: caminho normal não encerra nada e não reporta expiração", async
   assert.equal(erro, undefined);
   assert.equal(resultado.verificacoes.banco, true);
   assert.deepEqual(c.encerramentos, [], "nada a encerrar no caminho normal");
+});
+
+// ---------------------------------------------------------------------------
+// T171 — Node e pnpm na versão que o repositório declara
+// ---------------------------------------------------------------------------
+
+test("majorDaVersao lê o major das formas que o repositório usa", () => {
+  assert.equal(majorDaVersao("v24.19.0"), 24);
+  assert.equal(majorDaVersao("24\n"), 24);
+  assert.equal(majorDaVersao("10.0.0"), 10);
+  assert.equal(majorDaVersao("pnpm@10.0.0"), 10);
+  assert.equal(majorDaVersao("x24"), null);
+  assert.equal(majorDaVersao(""), null);
+  assert.equal(majorDaVersao(null), null);
+});
+
+test("as versões exigidas vêm do .nvmrc e do packageManager, sem número fixo", () => {
+  const ler = (arquivos) => (r) => arquivos[r] ?? null;
+  assert.deepEqual(
+    versoesExigidas(
+      ler({
+        ".nvmrc": "24\n",
+        "package.json": '{"packageManager":"pnpm@10.0.0"}',
+      }),
+    ),
+    { node: 24, pnpm: 10 },
+  );
+  assert.deepEqual(
+    versoesExigidas(
+      ler({
+        ".nvmrc": "22",
+        "package.json": '{"packageManager":"pnpm@9.15.0"}',
+      }),
+    ),
+    { node: 22, pnpm: 9 },
+  );
+  assert.deepEqual(versoesExigidas(ler({})), { node: null, pnpm: null });
+  assert.deepEqual(
+    versoesExigidas(ler({ ".nvmrc": "24", "package.json": "não é json" })),
+    { node: 24, pnpm: null },
+  );
+});
+
+test("Node e pnpm certos: o passo 1 confere o pnpm e segue para os oito passos", async () => {
+  const c = cenario();
+  const { resultado, erro } = await executarCenario(c);
+  assert.equal(erro, undefined);
+  assert.deepEqual(resultado.passos, NOMES_PASSOS);
+  assert.ok(c.chamadas.some((ch) => ehPnpm(ch, "--version")));
+});
+
+test("Node de outro major para no passo 1, antes de qualquer efeito", async () => {
+  const c = cenario({ versaoNode: "v22.23.3" });
+  const { erro } = await executarCenario(c);
+  assert.ok(erro instanceof FalhaDePasso);
+  assert.equal(erro.passo, NOMES_PASSOS[0]);
+  assert.match(
+    erro.message,
+    /Node em uso é v22\.23\.3; o repositório exige Node 24/,
+  );
+  assert.match(erro.proximoPasso, /Ative o Node 24/);
+  assert.match(erro.proximoPasso, /pnpm install --frozen-lockfile/);
+  // Nada foi chamado nem iniciado: nem docker, nem banco, nem servidores.
+  assert.equal(c.chamadas.length, 0);
+  assert.equal(c.iniciados.length, 0);
+});
+
+test("Node desconhecido também para no passo 1", async () => {
+  const c = cenario({ versaoNode: null });
+  const { erro } = await executarCenario(c);
+  assert.equal(erro.passo, NOMES_PASSOS[0]);
+  assert.match(erro.message, /Node em uso é desconhecido/);
+});
+
+test("pnpm de outro major para no passo 1, antes do docker", async () => {
+  const c = cenario({ versaoPnpm: "11.0.0" });
+  const { erro } = await executarCenario(c);
+  assert.equal(erro.passo, NOMES_PASSOS[0]);
+  assert.match(
+    erro.message,
+    /pnpm em uso é 11\.0\.0; o repositório exige pnpm 10/,
+  );
+  assert.ok(!c.chamadas.some((ch) => ch.comando === "docker"));
+  assert.equal(c.iniciados.length, 0);
+});
+
+test("pnpm ausente do PATH para no passo 1, com a causa", async () => {
+  const c = cenario({ statusPnpm: 1 });
+  const { erro } = await executarCenario(c);
+  assert.equal(erro.passo, NOMES_PASSOS[0]);
+  assert.match(erro.message, /pnpm não está disponível no PATH/);
+});
+
+test("sem .nvmrc ou packageManager, o passo 1 não adivinha versão", async () => {
+  const c = cenario({ arquivos: { ".nvmrc": null } });
+  const { erro } = await executarCenario(c);
+  assert.equal(erro.passo, NOMES_PASSOS[0]);
+  assert.match(erro.message, /Não foi possível ler as versões exigidas/);
+  assert.equal(c.chamadas.length, 0);
 });

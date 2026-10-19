@@ -81,6 +81,21 @@ export EVOLLI_APP_PASSWORD="outra-senha-local-qualquer"
 
 </details>
 
+### Instalar as dependências
+
+Com **Node 24** (o do `.nvmrc`) e **pnpm 10** (o major do `packageManager`):
+
+```powershell
+pnpm install --frozen-lockfile
+```
+
+**Não é preciso rodar `prisma generate` à mão.** No Windows, o Prisma 5.22
+gravava o client do banco na raiz de `node_modules` durante a instalação, e o
+typecheck da API quebrava até um `generate` manual. Desde a T171, o
+`postinstall` da API gera o client no lugar certo em qualquer sistema e, se não
+conseguir, a instalação **falha com a causa** em vez de seguir quebrada. Detalhes
+em [`docs/decisions/t171-ambiente-local-node24.md`](./decisions/t171-ambiente-local-node24.md).
+
 ## Subir o ambiente
 
 ```powershell
@@ -89,16 +104,16 @@ pnpm demo:up
 
 Um comando, oito passos nomeados:
 
-| Passo | O que faz                                                                |
-| ----- | ------------------------------------------------------------------------ |
-| 1/8   | Pré-requisitos: Docker, arquivos de conexão, hosts locais, portas livres |
-| 2/8   | PostgreSQL local (`docker compose up -d`) e espera ficar pronto          |
-| 3/8   | Papéis, schema e extensões (`infra/postgres/`)                           |
-| 4/8   | Migrations (`prisma migrate deploy`), só com a credencial de migration   |
-| 5/8   | API em `127.0.0.1:<PORT>` e espera `/v1/health/ready`                    |
-| 6/8   | Conta de bootstrap e seed sintético                                      |
-| 7/8   | Web em `127.0.0.1:5173`, com porta estrita, e verificação HTTP           |
-| 8/8   | Verificação final: banco, API e web respondendo — só então "pronto"      |
+| Passo | O que faz                                                                                                        |
+| ----- | ---------------------------------------------------------------------------------------------------------------- |
+| 1/8   | Pré-requisitos: Node e pnpm nas versões do repositório, Docker, arquivos de conexão, hosts locais, portas livres |
+| 2/8   | PostgreSQL local (`docker compose up -d`) e espera ficar pronto                                                  |
+| 3/8   | Papéis, schema e extensões (`infra/postgres/`)                                                                   |
+| 4/8   | Migrations (`prisma migrate deploy`), só com a credencial de migration                                           |
+| 5/8   | API em `127.0.0.1:<PORT>` e espera `/v1/health/ready`                                                            |
+| 6/8   | Conta de bootstrap e seed sintético                                                                              |
+| 7/8   | Web em `127.0.0.1:5173`, com porta estrita, e verificação HTTP                                                   |
+| 8/8   | Verificação final: banco, API e web respondendo — só então "pronto"                                              |
 
 **Nenhuma falha é escondida.** Qualquer passo que quebre encerra o comando com
 código diferente de zero dizendo **qual passo**, **qual causa** e **qual é o
@@ -310,6 +325,19 @@ chamado por uma pessoa, e nenhum aponta para host que não seja local.
   era também uma forma de recuperar acesso já encerrado.
 - **Sem anexo, upload ou R2.** Continuam bloqueados pelos portões de conteúdo.
 - **Sem dado real, em nenhuma hipótese.**
+- **Node e pnpm são conferidos no passo 1/8.** O comando para se o Node em uso
+  não for o major do `.nvmrc` ou se o pnpm não for o major do `packageManager`
+  — ou não estiver no `PATH` do processo. É de propósito: `engines` só avisa, e
+  um runtime errado aparecia lá na frente, disfarçado de outro erro.
+- **Aviso `[DEP0190]` do Node 24 no Windows.** Para chamar `pnpm` e `docker` no
+  Windows, o orquestrador usa `shell: true`, e o Node 24 avisa que argumentos
+  com shell não são escapados. É só aviso: os argumentos já são exigidos
+  literais em tempo de execução (o orquestrador recusa qualquer metacaractere),
+  e o comportamento não muda.
+- **A seção Contatos tem um vão vertical.** No detalhe do colaborador, o aviso
+  "Nenhum contato registrado" reaproveita uma classe que, dentro do formulário
+  em coluna, ocupa 256 px de altura. É defeito visual da T169, registrado como
+  pendência; não afeta leitura nem gravação.
 - **Uma tela estoura a largura da página.** `Pessoas › Histórico funcional`
   (T115) gera rolagem horizontal do documento inteiro, em desktop e em 375 px.
   É defeito preexistente, anterior a esta tarefa, registrado como pendência
