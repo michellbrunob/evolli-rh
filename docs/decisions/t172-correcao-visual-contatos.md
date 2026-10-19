@@ -97,7 +97,36 @@ movimentações é imutável por desenho, então o registro cancelado permanece.
 isso é dado sintético do banco local da T172, descartável com
 `docker compose down -v` no worktree, e não tem relação com a PR.
 
-## 7. O que não mudou
+## 7. Correção pós-revisão: B-1 resolvido por autorização do proprietário
+
+A revisão adversarial da PR #164, no head `7606715`, apontou um único bloqueio,
+**B-1**: o escopo da T172 era o estado "Nenhum contato registrado", e a PR também
+corrige o aviso do estado **bloqueado** (seção 3).
+
+Em **2026-10-19**, o proprietário autorizou expressamente a extensão:
+
+> “A T172 pode corrigir o vão vertical do aviso nos dois estados equivalentes da seção Contatos: sem registro e bloqueado. Ambos usam o mesmo padrão inadequado dentro do mesmo componente; a extensão não autoriza outras correções visuais.”
+
+**B-1 está resolvido por essa autorização.** O código revisado não mudou: nenhum
+arquivo de produto, CSS ou teste foi tocado depois da revisão. A extensão vale só
+para os dois avisos da seção Contatos; qualquer outro uso de
+`colaboradores-screen__aviso-texto` segue fora do escopo.
+
+As observações **O-1 a O-5** da mesma revisão continuam **não bloqueantes** e
+**não foram tratadas**:
+
+- **O-1:** o descarte protegido tem teste unitário, mas não foi exercitado no
+  navegador.
+- **O-2:** os testes de contrato de CSS leem a fonte com regex e podem quebrar
+  com reformatação, sem mudança de comportamento.
+- **O-3:** a validação alterou o banco sintético local (desligamento de "Alfa
+  Turno B" e um desligamento cancelado, imutável, em "Alfa Dois").
+- **O-4:** a mesma tela ainda usa `aviso-texto` em outros quatro pontos, fora do
+  escopo e não medidos.
+- **O-5:** `openDeliveries.pullRequest` está `null` com a PR aberta, a mesma
+  convenção da T171.
+
+## 8. O que não mudou
 
 Rotas, permissões, auditoria, normalização, validação, dados, schema,
 migrations, banco, seed e gravação dos contatos; as três obrigatoriedades e os

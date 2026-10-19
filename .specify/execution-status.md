@@ -1865,6 +1865,12 @@ T111, com testes e validação no navegador no ambiente local de demonstração.
   foco; salvar normaliza e confirma; o estado com contatos segue correto; a troca
   Alfa → Beta segue sem resíduo. Detalhes em [decisão da T172](../docs/decisions/t172-correcao-visual-contatos.md).
 
+**B-1 resolvido por autorização do proprietário (2026-10-19).** A revisão
+adversarial da PR #164, no head `7606715`, apontou como único bloqueio a extensão
+da correção ao estado bloqueado. O proprietário autorizou: “A T172 pode corrigir o vão vertical do aviso nos dois estados equivalentes da seção Contatos: sem registro e bloqueado. Ambos usam o mesmo padrão inadequado dentro do mesmo componente; a extensão não autoriza outras correções visuais.” O código
+revisado não mudou. As observações O-1 a O-5 seguem não bloqueantes e não foram
+tratadas.
+
 **Fora de escopo:** qualquer outra pendência; rotas, permissões, auditoria,
 normalização, validação, dados, schema, migrations, banco, seed e gravação dos
 contatos; Node, pnpm, Prisma e scripts de ambiente.

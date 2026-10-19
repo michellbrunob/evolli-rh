@@ -1920,6 +1920,10 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       `margin: 0` e a cor de antes, sem nenhuma propriedade `flex`; a regra
       compartilhada da T111 não foi tocada. Aviso do estado vazio de 256 px para
       25 px e formulário de 664 px para 433 px, medidos no navegador.
+    - **B-1 resolvido por autorização do proprietário (2026-10-19):** a revisão
+      adversarial no head `7606715` apontou como bloqueio a extensão ao estado
+      bloqueado. O proprietário autorizou: “A T172 pode corrigir o vão vertical do aviso nos dois estados equivalentes da seção Contatos: sem registro e bloqueado. Ambos usam o mesmo padrão inadequado dentro do mesmo componente; a extensão não autoriza outras correções visuais.” O código revisado não mudou.
+      As observações O-1 a O-5 seguem não bloqueantes e não foram tratadas.
     - **Achado, mesma causa:** o aviso do estado **bloqueado** usava a mesma classe
       flexível na mesma seção em coluna e também media 256 px (75 px depois); a
       correção cobre os dois estados.
