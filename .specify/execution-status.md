@@ -1878,11 +1878,11 @@ contatos; Node, pnpm, Prisma e scripts de ambiente.
 **Dívidas preservadas:** R-3 (T162), R-3 da revisão da T164, S2 (T161), R1 a R3 (T160), L3, S-1 a S-4 (T158), R-A a R-C (T157), o registro `teste michell`, a decisão `DP-29` (se `outro_controlado` vale para admissão) e a limitação de validação em navegador da T167. Pendências da T169: o processo de eliminação ou anonimização após 2 anos; as rotas de exportação e exclusão de contatos; a origem e a evidência da coleta; a validação visual em navegador; as observações N-2 (criação concorrente de contato que perde na unicidade responde 409 sem trilha), N-3 (`ON UPDATE CASCADE` nas FKs do evento de contato permite reescrita indireta) e N-4 (CHECK do evento mais frouxo que o serviço); e a docstring do serviço de contatos sobre `resourceId`. Pendências
 da T171: o aviso `[DEP0190]` do Node 24 no orquestrador da demonstração, no Windows (`shell: true` com argumentos), só aviso; e as observações O-1 (a CLI fina do `prisma generate` não tem teste próprio), O-2 (caminho inválido sem teste explícito) e O-3 (efeitos leves nos testes).
 
-## Fluxo de admissão, vínculo e desligamento — T173 (implementada em Draft)
+## Fluxo de admissão, vínculo e desligamento — T173 (integrada)
 
-| Tarefa | Estado                    | Resultado principal                                                                                                  |
-| ------ | ------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| T173   | **Implementada em Draft** | ADR e diagnóstico de reconciliação do fluxo de admissão, vínculo e desligamento, a partir das 40 respostas de RH/DP. |
+| Tarefa | Estado                                    | Resultado principal                                                                                                  |
+| ------ | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| T173   | **Integrada** (PR #165, squash `2a90720`) | ADR e diagnóstico de reconciliação do fluxo de admissão, vínculo e desligamento, a partir das 40 respostas de RH/DP. |
 
 **A T172 foi integrada** em `main` pela PR #164, squash `ecf3cbebcf8e7dd856750468a42c284c5525755e`, com a CI de
 push 3/3 verde em Node 24: o aviso da seção Contatos, nos estados sem registro e
@@ -1935,6 +1935,30 @@ mudança em RBAC, API, schema, migration, banco, seed, Docker ou interface.
 
 **Dívidas preservadas:** R-3 (T162), R-3 da revisão da T164, S2 (T161), R1 a R3 (T160), L3, S-1 a S-4 (T158), R-A a R-C (T157), o registro `teste michell`, a decisão `DP-29` (se `outro_controlado` vale para admissão) e a limitação de validação em navegador da T167. Pendências da T169: o processo de eliminação ou anonimização após 2 anos; as rotas de exportação e exclusão de contatos; a origem e a evidência da coleta; a validação visual em navegador; as observações N-2 (criação concorrente de contato que perde na unicidade responde 409 sem trilha), N-3 (`ON UPDATE CASCADE` nas FKs do evento de contato permite reescrita indireta) e N-4 (CHECK do evento mais frouxo que o serviço); e a docstring do serviço de contatos sobre `resourceId`. Pendências
 da T171: o aviso `[DEP0190]` do Node 24 no orquestrador da demonstração, no Windows (`shell: true` com argumentos), só aviso; e as observações O-1 (a CLI fina do `prisma generate` não tem teste próprio), O-2 (caminho inválido sem teste explícito) e O-3 (efeitos leves nos testes). Pendências da T172: as observações não bloqueantes O-1 (descarte protegido sem exercício no navegador), O-2 (contrato de CSS lido por regex), O-3 (banco sintético local alterado na validação), O-4 (outros quatro usos de `colaboradores-screen__aviso-texto` na mesma tela, não medidos) e O-5 (`openDeliveries.pullRequest` nulo com PR aberta), e as de redação O-a a O-c.
+
+## Dossiê de decisões da Fatia 0 — T174 (em implementação)
+
+| Tarefa | Estado               | Resultado principal                                                                                                                                                                    |
+| ------ | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T174   | **Em implementação** | Dossiê de decisões da Fatia 0 da ADR 0017: priorização dos gates, decisão exata, alternativas, impacto, responsável e evidência de cada um, e a recomendação de qual decidir primeiro. |
+
+**A T173 foi integrada** em `main` pela PR #165, squash `2a9072040d64daa50326aa18f1602bb160eaae30`, com a CI de
+push 3/3 verde em Node 24. Ficam **abertos** os 13 conflitos com decisões
+fechadas (8 firmes e 5 condicionais) e os 22 gates `DP-FLX-01` a `DP-FLX-22`; a
+ADR 0017 continua **Proposta**. A integração não aceitou a ADR nem fechou gate.
+
+**Escopo da T174:** etapa exclusivamente decisória e documental. O dossiê usa só
+a ADR 0017, o diagnóstico e o registro R1 a R40 da T173, as ADRs e os contratos
+existentes, e o código e os testes atuais como evidência. Começa por
+`DP-FLX-01`; trata `DP-FLX-05`, `-09`, `-10`, `-02`, `-03` e `-21` como decisões
+candidatas, sem resolvê-las; e recomenda qual decisão tomar primeiro.
+
+**Fora de escopo:** schema, endpoint, tela, RBAC, teste de produto, seed, Docker,
+processo e integração; aceitar a ADR 0017; resolver gate; fonte externa, Notion e
+referência de Sólides além do documentado.
+
+**Dívidas preservadas:** R-3 (T162), R-3 da revisão da T164, S2 (T161), R1 a R3 (T160), L3, S-1 a S-4 (T158), R-A a R-C (T157), o registro `teste michell`, a decisão `DP-29` (se `outro_controlado` vale para admissão) e a limitação de validação em navegador da T167. Pendências da T169: o processo de eliminação ou anonimização após 2 anos; as rotas de exportação e exclusão de contatos; a origem e a evidência da coleta; a validação visual em navegador; as observações N-2 (criação concorrente de contato que perde na unicidade responde 409 sem trilha), N-3 (`ON UPDATE CASCADE` nas FKs do evento de contato permite reescrita indireta) e N-4 (CHECK do evento mais frouxo que o serviço); e a docstring do serviço de contatos sobre `resourceId`. Pendências
+da T171: o aviso `[DEP0190]` do Node 24 no orquestrador da demonstração, no Windows (`shell: true` com argumentos), só aviso; e as observações O-1 (a CLI fina do `prisma generate` não tem teste próprio), O-2 (caminho inválido sem teste explícito) e O-3 (efeitos leves nos testes). Pendências da T172: as observações não bloqueantes O-1 (descarte protegido sem exercício no navegador), O-2 (contrato de CSS lido por regex), O-3 (banco sintético local alterado na validação), O-4 (outros quatro usos de `colaboradores-screen__aviso-texto` na mesma tela, não medidos) e O-5 (`openDeliveries.pullRequest` nulo com PR aberta), e as de redação O-a a O-c. Pendências da T173: os 13 conflitos com decisões fechadas (8 firmes e 5 condicionais) e os 22 gates `DP-FLX-01` a `DP-FLX-22`, **todos abertos**; a ADR 0017, que continua **Proposta**; e as observações não bloqueantes O-1 (a linha 9 do corpo da PR diz "mesmo hash", exato só até `fca0fe7`), O-2 (a célula "Reabre ou depende de" do `DP-FLX-21` cita a T146 sem o qualificador "ainda não integrada"), O-3 (quebra de linha curta na ADR) e O-4 ("proposta aprovada" × "fundação visual aprovada" para a T146).
 
 ## Próxima ação autorizável
 
