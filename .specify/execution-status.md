@@ -1790,11 +1790,11 @@ Idêntico no Node 22; não aparece na CI em Linux.
 
 **Dívidas preservadas:** R-3 (T162), R-3 da revisão da T164, S2 (T161), R1 a R3 (T160), L3, S-1 a S-4 (T158), R-A a R-C (T157), o registro `teste michell`, a decisão `DP-29` (se `outro_controlado` vale para admissão) e a limitação de validação em navegador da T167. As pendências da T169 seguem abertas: o processo de eliminação ou anonimização após 2 anos do desligamento; as rotas de exportação e exclusão de contatos, cuja auditoria é obrigatória quando existirem; a origem e a evidência da coleta, lacuna da ficha; a validação visual em navegador; e as observações N-2 (criação concorrente de contato que perde na unicidade responde 409 sem trilha), N-3 (`ON UPDATE CASCADE` nas FKs do evento de contato permite reescrita indireta) e N-4 (CHECK do evento mais frouxo que o serviço), além da docstring do serviço de contatos que ainda descreve o `resourceId` de forma absoluta.
 
-## Ambiente local Node 24 — T171 (implementada em Draft)
+## Ambiente local Node 24 — T171 (integrada)
 
-| Tarefa | Estado                    | Resultado principal                                                                                            |
-| ------ | ------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| T171   | **Implementada em Draft** | Instalação local no Windows em Node 24 e pnpm 10 sem `prisma generate` manual, e prévia validada no navegador. |
+| Tarefa | Estado                                    | Resultado principal                                                                                            |
+| ------ | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| T171   | **Integrada** (PR #163, squash `bd860b0`) | Instalação local no Windows em Node 24 e pnpm 10 sem `prisma generate` manual, e prévia validada no navegador. |
 
 **A T170 foi integrada** em `main` pela PR #162, squash `2fd19df9a86427cd3454d8d40ee282641ec83b65`,
 com a CI de push 3/3 verde em Node 24: `.nvmrc` em `24` como fonte única,
@@ -1833,6 +1833,30 @@ Windows, só aviso.
 **Dívidas preservadas:** R-3 (T162), R-3 da revisão da T164, S2 (T161), R1 a R3 (T160), L3, S-1 a S-4 (T158), R-A a R-C (T157), o registro `teste michell`, a decisão `DP-29` (se `outro_controlado` vale para admissão) e a limitação de validação em navegador da T167. Pendências da T169: o processo de eliminação ou anonimização após 2 anos; as rotas de exportação e exclusão de contatos; a origem e a evidência da coleta; a validação visual em navegador; as observações N-2, N-3 e N-4 da revisão final; e a docstring do serviço de contatos sobre `resourceId`. A
 pendência da T170 (client do Prisma na raiz de `node_modules` no Windows) foi o
 objeto desta tarefa e está resolvida.
+
+## Correção visual de Contatos — T172 (em implementação)
+
+| Tarefa | Estado               | Resultado principal                                                          |
+| ------ | -------------------- | ---------------------------------------------------------------------------- |
+| T172   | **Em implementação** | Remover o vão vertical de cerca de 256 px do estado vazio da seção Contatos. |
+
+**A T171 foi integrada** em `main` pela PR #163, squash `bd860b0d303c97e59aed0f85f540db8303380092`, com a CI de
+push 3/3 verde em Node 24: o `postinstall` da API gera o client do Prisma no
+lugar certo no Windows, e a demonstração local exige Node e pnpm nas versões do
+repositório.
+
+**Escopo da T172:** o aviso "Nenhum contato registrado" reaproveita
+`colaboradores-screen__aviso-texto`, com `flex: 1 1 16rem`, dentro de um
+formulário em coluna, e ocupa cerca de 256 px de altura. A correção é de estilo e
+estrutura próprios para o estado vazio, sem tocar o estilo compartilhado da
+T111, com testes e validação no navegador no ambiente local de demonstração.
+
+**Fora de escopo:** qualquer outra pendência; rotas, permissões, auditoria,
+normalização, validação, dados, schema, migrations, banco, seed e gravação dos
+contatos; Node, pnpm, Prisma e scripts de ambiente.
+
+**Dívidas preservadas:** R-3 (T162), R-3 da revisão da T164, S2 (T161), R1 a R3 (T160), L3, S-1 a S-4 (T158), R-A a R-C (T157), o registro `teste michell`, a decisão `DP-29` (se `outro_controlado` vale para admissão) e a limitação de validação em navegador da T167. Pendências da T169: o processo de eliminação ou anonimização após 2 anos; as rotas de exportação e exclusão de contatos; a origem e a evidência da coleta; a validação visual em navegador; as observações N-2 (criação concorrente de contato que perde na unicidade responde 409 sem trilha), N-3 (`ON UPDATE CASCADE` nas FKs do evento de contato permite reescrita indireta) e N-4 (CHECK do evento mais frouxo que o serviço); e a docstring do serviço de contatos sobre `resourceId`. Pendências
+da T171: o aviso `[DEP0190]` do Node 24 no orquestrador da demonstração, no Windows (`shell: true` com argumentos), só aviso; e as observações O-1 (a CLI fina do `prisma generate` não tem teste próprio), O-2 (caminho inválido sem teste explícito) e O-3 (efeitos leves nos testes).
 
 ## Próxima ação autorizável
 

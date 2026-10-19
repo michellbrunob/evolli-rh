@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "constitutionVersion": "1.4.0",
   "lastConvergedAt": "2026-10-19",
-  "lastIntegratedTask": 170,
-  "lastRecordedTask": 171,
+  "lastIntegratedTask": 171,
+  "lastRecordedTask": 172,
   "platformDecision": {
     "adr": "docs/adr/0014-evolli-plataforma-base-e-encerramento-do-frappe.md",
     "decidedAt": "2026-10-01",
@@ -11,15 +11,15 @@
     "frappe": "encerrado_como_candidato_referencia_apenas"
   },
   "nextTask": {
-    "id": "T171",
-    "status": "ambiente_local_node24_implementada",
-    "reason": "T170 integrada em main pela PR #162 (squash 2fd19df9a86427cd3454d8d40ee282641ec83b65), com a CI de push 3/3 verde em Node 24: .nvmrc em 24 como fonte unica, engines em >=24 <25, pnpm 10 mantido. A T171 faz a previa local funcionar no Windows com Node 24 e pnpm 10, sem depender de Node 22 nem de prisma generate manual depois da instalacao, e valida no navegador a versao atual da main: login, Hub, troca de empresa autorizada, colaboradores e contatos. Migrations e seed so no banco local de demonstracao. Regras: nenhuma dependencia atualizada; pnpm 11 fora; nenhuma mudanca funcional de RH, contatos, RBAC, schema ou migrations de negocio sem necessidade comprovada; nada de producao, credencial real, banco ou Docker externos; .env, node_modules, gerados, credenciais, caches e alteracoes automaticas de pnpm-workspace.yaml nao sao versionados. Seguem abertas e intocadas: R-3 da T162, a R-3 da revisao da T164, S2 da T161, R1 a R3 da T160, a divida L3 de paginacao, S-1 a S-4 da T158, R-A a R-C da T157, o registro teste michell, a decisao DP-29 e a limitacao de validacao em navegador da T167. Pendencias da T169: eliminacao apos 2 anos, exportacao e exclusao, origem e evidencia da coleta, validacao visual, N-2, N-3, N-4 e a docstring sobre resourceId. A pendencia da T170 (client do Prisma na raiz de node_modules no Windows) foi o objeto desta tarefa e esta resolvida. ENTREGUE em Draft: causa comprovada na fonte do Prisma 5.22 (getDefaultOutdir compara caminho com barra normal e, no postinstall, grava em INIT_CWD/node_modules/.prisma/client, a raiz do repositorio); o postinstall da API roda o mesmo prisma generate sem INIT_CWD por scripts/prisma-generate-api.mjs e confere que o client ficou ao lado do @prisma/client, falhando com a causa se nao ficou; nenhuma dependencia muda. O passo 1/8 da demonstracao exige o Node do .nvmrc e o pnpm do packageManager. Previa validada no navegador em http://127.0.0.1:5173: login, Hub, colaboradores, contatos e troca de empresa sem residuo. Pendencias novas: vao vertical de 256 px na secao Contatos (defeito visual da T169) e aviso DEP0190 do Node 24 no orquestrador da demonstracao no Windows."
+    "id": "T172",
+    "status": "correcao_visual_contatos_em_implementacao",
+    "reason": "T171 integrada em main pela PR #163 (squash bd860b0d303c97e59aed0f85f540db8303380092), com a CI de push 3/3 verde em Node 24: o postinstall da API gera o client do Prisma no lugar certo no Windows e a demonstracao local exige Node e pnpm nas versoes do repositorio. A T172 corrige, e so isso, o vao vertical de cerca de 256 px do estado vazio da secao Contatos do detalhe de Colaborador: o aviso reaproveita colaboradores-screen__aviso-texto, com flex 1 1 16rem, dentro de um formulario em coluna; a correcao usa estilo e estrutura proprios, sem alterar o estilo compartilhado da T111, com testes do estado vazio e validacao no navegador so no ambiente local de demonstracao. Preservados integralmente: rotas, permissoes, auditoria, normalizacao, validacao, dados, schema, migrations, banco, seed e gravacao dos contatos; as tres obrigatoriedades e os erros por campo; isolamento por empresa ativa e tratamento do master tecnico; Node 24, pnpm 10, Prisma e scripts de ambiente. Seguem abertas e intocadas: R-3 da T162, a R-3 da revisao da T164, S2 da T161, R1 a R3 da T160, a divida L3 de paginacao, S-1 a S-4 da T158, R-A a R-C da T157, o registro teste michell, a decisao DP-29 e a limitacao de validacao em navegador da T167. Pendencias da T169: eliminacao apos 2 anos, exportacao e exclusao, origem e evidencia da coleta, validacao visual, N-2, N-3, N-4 e a docstring sobre resourceId. Pendencias da T171: aviso DEP0190 do Node 24 no orquestrador da demonstracao e as observacoes O-1, O-2 e O-3 do prisma generate."
   },
   "openDeliveries": [
     {
-      "id": "T171",
+      "id": "T172",
       "pullRequest": null,
-      "status": "ambiente_local_node24_implementada"
+      "status": "correcao_visual_contatos_em_implementacao"
     }
   ],
   "requiredArtifacts": [
