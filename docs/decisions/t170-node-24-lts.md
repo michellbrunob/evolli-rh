@@ -87,20 +87,34 @@ esses arquivos foram apagados antes de cada medição.
 
 ## 6. Rollback para Node 22
 
-A migração não toca dependência, lockfile, código, schema ou dados, então
-voltar é só desfazer a política:
+A migração não toca dependência, lockfile, código, schema nem dados. Há duas
+rotas de volta, e elas **não são equivalentes**.
 
-1. **Pela história:** `git revert` do squash desta tarefa em `main`.
-2. **Ou à mão**, com o mesmo efeito:
-   - `.nvmrc` volta a `22`; a CI acompanha sozinha, porque lê o arquivo;
-   - `engines.node` volta a `>=22 <23` nos três `package.json`;
-   - README, guia de demonstração e `plan.md` voltam a dizer Node 22.
-3. Em cada máquina: trocar o runtime para Node 22 e refazer
+### Rota preferida — reversão manual
+
+1. `.nvmrc` volta a `22`; a CI acompanha sozinha, porque lê o arquivo.
+2. `engines.node` volta a `>=22 <23` nos três `package.json`.
+3. README, guia do ambiente local (`docs/AMBIENTE-DEMONSTRACAO-LOCAL.md`),
+   `.specify/plan.md` e os três comentários de `.github/workflows/ci.yml` que
+   mencionam Node 24 LTS voltam a dizer Node 22.
+4. Em cada máquina: trocar o runtime para Node 22 e refazer
    `pnpm install --frozen-lockfile`.
 
-Não há migration, dado ou artefato a desfazer. O Node 22 já foi validado pela
-CI da `main` até o squash `0fa2e1e`, e as medições da §4 mostram que o
-comportamento local é o mesmo nos dois runtimes.
+Esta rota **não toca o restante do Spec Kit**: a T169 continua registrada como
+integrada, e a T170 continua registrada como foi entregue. Não há migration,
+dado nem dependência a desfazer.
+
+### Rota excepcional — `git revert` do squash
+
+Desfaz a política, mas desfaz **também** a convergência da T169, o registro da
+T170 nos artefatos do Spec Kit (`tasks.md`, `execution-status.md`,
+`sync-state.json` e `plan.md`) e este documento de decisão. Depois dele, é
+**obrigatória uma nova convergência documental**, para que o Spec Kit volte a
+registrar a T169 como integrada e preserve o histórico correto. Só vale quando
+a rota manual não for viável.
+
+O Node 22 já foi validado pela CI da `main` até o squash `0fa2e1e`, e as
+medições da §4 mostram que o comportamento local é o mesmo nos dois runtimes.
 
 **Quando acionar:** uma falha na CI ou em execução cuja causa comprovada seja o
 Node 24, sem correção pequena e segura dentro do escopo.

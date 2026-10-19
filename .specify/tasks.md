@@ -1836,9 +1836,16 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       funcionam; lint, typecheck, build e testes passam (API 968, web 1614,
       scripts 151), sem aviso de depreciação do runtime. As medições do `tsc`
       foram repetidas no Node 22.23.3, com resultado idêntico.
-    - **Rollback:** reverter o squash, ou voltar `.nvmrc` e `engines` para 22 (a
-      CI acompanha o `.nvmrc`) e refazer `pnpm install --frozen-lockfile`. Não
-      há migration, dado nem dependência a desfazer.
+    - **Rollback, rota preferida (manual):** voltar `.nvmrc` e `engines` para
+      Node 22 (a CI acompanha o `.nvmrc`); atualizar README, guia local,
+      `plan.md` e os três comentários da CI que mencionam Node 24 LTS; refazer
+      `pnpm install --frozen-lockfile`. Não toca o restante do Spec Kit — T169 e
+      T170 continuam registradas. Não há migration, dado nem dependência a
+      desfazer.
+    - **Rollback, rota excepcional (`git revert` do squash):** não equivale à
+      manual. Desfaz também a convergência da T169, o registro da T170 e o
+      documento de decisão, e exige depois uma nova convergência documental
+      para preservar a T169 como integrada.
     - **Pendência nova, de ambiente, não causada pelo Node 24:** no Windows, o
       `prisma generate` do `postinstall` grava o client em `node_modules/.prisma`
       na raiz, e o `tsc` da API estoura a pilha até rodar

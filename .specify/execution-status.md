@@ -1775,8 +1775,13 @@ demonstração.
   correção de código. Instalação limpa, `argon2`, engines do Prisma, lint,
   typecheck, build e testes passam no Node 24.19.0, sem aviso de depreciação.
   As medições do `tsc` deram o mesmo resultado no Node 22.23.3.
-- **Rollback.** Reverter o squash, ou voltar `.nvmrc` e `engines` para 22 e
-  reinstalar. Detalhes em [decisão da T170](../docs/decisions/t170-node-24-lts.md).
+- **Rollback.** Rota preferida, manual: voltar `.nvmrc` e `engines` para Node
+  22, atualizar README, guia local, `plan.md` e os três comentários da CI que
+  mencionam Node 24 LTS, e reinstalar com `pnpm install --frozen-lockfile`,
+  sem tocar o restante do Spec Kit. Rota excepcional, `git revert` do squash:
+  não equivale à manual, porque desfaz também a convergência da T169, o
+  registro da T170 e o documento de decisão, e exige nova convergência
+  documental. Detalhes em [decisão da T170](../docs/decisions/t170-node-24-lts.md).
 
 **Pendência nova, de ambiente:** no Windows, o `prisma generate` do
 `postinstall` grava o client na raiz de `node_modules`, e o `tsc` da API
