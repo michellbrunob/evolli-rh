@@ -25,7 +25,7 @@ jobs:
         with:
           fetch-depth: 0
       - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           # T170 — a versão vem do `.nvmrc` (Node 24 LTS), a fonte única: o
           # rollback para Node 22 é trocar aquele arquivo e os `engines`, sem
@@ -75,7 +75,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           # T170 — a versão vem do `.nvmrc` (Node 24 LTS), a fonte única: o
           # rollback para Node 22 é trocar aquele arquivo e os `engines`, sem
@@ -101,7 +101,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           # T170 — a versão vem do `.nvmrc` (Node 24 LTS), a fonte única: o
           # rollback para Node 22 é trocar aquele arquivo e os `engines`, sem
