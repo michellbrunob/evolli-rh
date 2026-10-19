@@ -1909,12 +1909,12 @@ a qualquer implementação, sem resolvê-los.
 - **Diretriz de UX proposta pelo proprietário**, sem autorização de
   implementação: cadastro completo e admissão em tela própria e rota dedicada,
   sem modal; modal só para o que é curto; admissão progressiva em oito grupos de
-  referência, que não autorizam campo. Conflita com a T142 e a T146
+  referência, que não autorizam campo. Conflita com a T142, implementada; a T146, ainda não integrada, repete a regra
   (`DP-FLX-21`); fuso e dados adicionais ficam em `DP-FLX-22`.
 - **Sequência proposta de fatias**, de 0 a 10, como proposta, não autorização.
 - **Correção pós-revisão (2026-10-19).** A revisão adversarial no head `7059db6`
   apontou B-1 a B-5 e O-1 a O-7, corrigidos num commit só documental, com R1 a
-  R40 literalmente idênticas:
+  R40 de conteúdo literal e semanticamente idêntico, preservadas as normalizações editoriais declaradas:
   - B-1: a R4 é ambígua quanto à mesma empresa; vínculos ativos em empresas
     diferentes já são compatíveis com o índice, e mais de um na mesma empresa só
     por decisão explícita;

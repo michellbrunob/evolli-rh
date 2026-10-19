@@ -1967,7 +1967,7 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       atuais e lista, sem resolvê-los, os gates anteriores a qualquer
       implementação.
     - **Entregue:** [ADR 0017](../docs/adr/0017-fluxo-admissao-vinculo-desligamento-rh-dp.md), proposta, com o fluxo de oito etapas, a separação
-      de nove conceitos e os papéis segundo as respostas; o [diagnóstico de reconciliação](../docs/decisions/t173-reconciliacao-fluxo-rh-dp.md), com a
+      dos conceitos que as respostas distinguem (dez linhas na tabela da ADR, sem fixar como domínio os que estão em conflito) e os papéis segundo as respostas; o [diagnóstico de reconciliação](../docs/decisions/t173-reconciliacao-fluxo-rh-dp.md), com a
       matriz por tema, **13 conflitos com decisões fechadas** e **22 gates**
       (`DP-FLX-01` a `DP-FLX-22`), nenhum resolvido; e o [registro literal das respostas](../docs/decisions/t173-respostas-rh-dp.md), R1 a R40.
     - **Conflitos nomeados (13; 5 condicionais; o 13, da diretriz de UX, está no item seguinte):** CPF como identificação da
@@ -1989,7 +1989,7 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       diretoria como escalonamento fora do sistema é tensão com a R8.
     - **Correção pós-revisão (2026-10-19):** a revisão adversarial no head
       `7059db6` apontou B-1 a B-5 e O-1 a O-7, corrigidos num commit só
-      documental, com R1 a R40 literalmente idênticas. A ADR 0017 passou a
+      documental, com R1 a R40 de conteúdo literal e semanticamente idêntico, preservadas as normalizações editoriais declaradas. A ADR 0017 passou a
       separar fato recebido, conflito técnico e decisão pendente, e deixou de
       fixar como domínio os conceitos em conflito. O gestor ficou expressamente
       sem mutação até decisão e RBAC próprios. A R31 foi reconciliada com o
@@ -2003,7 +2003,7 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       confirmação, seleção curta ou edição pontual autorizada; o mesmo
       princípio nos demais cadastros extensos; admissão progressiva em oito
       grupos de referência, que não autorizam campo; imagens só para
-      agrupamento. Conflita com a T142 e a T146 (cadastro e detalhe em modal)
+      agrupamento. Conflita com a T142, implementada (cadastro e detalhe em modal); a T146, ainda não integrada, repete a regra
       — conflito 13, `DP-FLX-21` —, e os grupos de fuso e dados adicionais
       ficam em `DP-FLX-22`.
     - **Sequência proposta de fatias:** 0 a 10, só como proposta; cada fatia

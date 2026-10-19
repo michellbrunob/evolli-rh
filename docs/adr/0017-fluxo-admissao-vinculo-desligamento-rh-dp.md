@@ -100,7 +100,7 @@ implícita** da ADR 0007 ou de qualquer outra decisão.
 | Conceito                    | Fato recebido                                                                                                                                                                           | Conflito técnico ou lacuna, e decisão pendente                                                                                                                                                                                                    |
 | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Pessoa**                  | "O cadastro pessoal deverá ser único" (R4). "O CPF poderá ser utilizado para identificar a pessoa, com os cuidados necessários de segurança e proteção de dados" (R37).                 | **Direcionamento recebido.** Usar o CPF para reconhecer a mesma pessoa conflita com a ADR 0007, decisão 2. `DP-FLX-05`, `DP-FLX-09`.                                                                                                              |
-| **Vínculo contratual**      | Cada vínculo tem informações contratuais, empresa, cargo, remuneração, jornada, gestor e situação próprios (R4), e identificador próprio, matrícula ou código interno (R37).            | Remuneração, gestor por vínculo e local de trabalho não existem hoje (lacuna). `DP-FLX-08`.                                                                                                                                                       |
+| **Vínculo contratual**      | Cada vínculo tem informações contratuais, empresa, cargo, remuneração, jornada, gestor e situação próprios (R4), e identificador próprio, matrícula ou código interno (R37).            | **Lacuna parcial:** remuneração e local de trabalho não existem hoje. **Conflito condicional:** "gestor" próprio do vínculo, se for essa a leitura, contraria a ADR 0015, decisão 1 (o gestor vem da equipe). `DP-FLX-08`.                        |
 | **Mais de um vínculo**      | "Sim": a pessoa pode estar vinculada "a mais de uma empresa do grupo ou possua mais de um vínculo, quando aplicável" (R4).                                                              | **Direcionamento recebido, ambíguo.** Em empresas diferentes, já é compatível com o índice atual, desde que a pessoa seja reconhecida (lacuna). Mais de um ativo **na mesma empresa** a R4 não afirma; depende de decisão explícita. `DP-FLX-09`. |
 | **Solicitação de admissão** | O gestor "poderá solicitar a contratação" (R7), com aprovações (R8), como primeira etapa (R9).                                                                                          | Não existe; o gestor hoje não registra nem solicitação (conflito). `DP-FLX-02`, `DP-FLX-03`.                                                                                                                                                      |
 | **Admissão em andamento**   | O sistema deve diferenciar admissão prevista e admissão em andamento, para que uma pessoa em processo não seja tratada como ativa (R11); há devolução e cancelamento (R12).             | Hoje é só vínculo `previsto` e movimentação `solicitada` (lacuna). `DP-FLX-04`.                                                                                                                                                                   |
@@ -237,9 +237,12 @@ rota, modal, campo ou componente.
    texto, identidade visual, paleta, layout, ícone ou componente de terceiros.
 
 **Conflito técnico:** os itens 1 a 3 contrariam a direção visual **aprovada
-pelo proprietário** na T142 ("Cadastro, edição e detalhe em janelas modais") e
-mantida na fundação visual da T146 ("cadastro, detalhe e ações operacionais
-usam modal"). Hoje a admissão e o detalhe do colaborador são modais. Além
+pelo proprietário** na T142 ("Cadastro, edição e detalhe em janelas modais"),
+que está implementada em Colaboradores e é fundamento suficiente do conflito.
+A fundação visual da T146 repete a regra, mas é **proposta aprovada e
+congelada, ainda não integrada, e não aprova tela alguma**; ela é referência
+complementar, não fundamento. Hoje a admissão e o detalhe do colaborador são
+modais. Além
 disso, o painel web não tem rota por URL: a navegação é estado da aplicação.
 Os dois pontos ficam em `DP-FLX-21`. O grupo **Fuso horário** e o grupo
 **Dados adicionais** estão "Fora de escopo" na ADR 0016 (6.7) — o fuso é tratado
@@ -264,7 +267,7 @@ ali como da operação, não da pessoa —, e ficam em `DP-FLX-22`.
 - Nenhum formato de integração com a folha ou o eSocial.
 - Nenhuma alteração da exceção do `master_tecnico` em contatos.
 - Nenhuma tela, rota, modal ou componente: a diretriz de UX da decisão 6 é
-  proposta, e a direção visual da T142 e da T146 continua valendo até
+  proposta, e a direção visual da T142, implementada, continua valendo até
   `DP-FLX-21`. Nenhum grupo da futura tela de admissão autoriza campo.
 
 ## Consequências

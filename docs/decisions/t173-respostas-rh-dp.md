@@ -6,10 +6,15 @@ Uso: a [ADR 0017](../adr/0017-fluxo-admissao-vinculo-desligamento-rh-dp.md) e o
 [diagnóstico de reconciliação](t173-reconciliacao-fluxo-rh-dp.md) citam cada
 resposta como **R1** a **R40**, pelo número da pergunta.
 
-Este arquivo transcreve as respostas sem edição de conteúdo. Ele não é decisão
-de produto, não é interpretação jurídica e não autoriza implementação: o que
-cada resposta muda, confirma ou deixa em aberto no modelo atual está no
-diagnóstico.
+Este arquivo transcreve as respostas **sem edição de conteúdo**: o texto é
+literal e semanticamente idêntico ao entregue. Há apenas normalizações
+editoriais, todas declaradas aqui: quebra de linha, negrito nas perguntas, o
+prefixo "R" no número de cada pergunta, títulos de seção em Markdown e `-` no
+lugar de `*` nos marcadores da R23. Não é uma cópia byte a byte do original.
+
+Este registro não é decisão de produto, não é interpretação jurídica e não
+autoriza implementação: o que cada resposta muda, confirma ou deixa em aberto no
+modelo atual está no diagnóstico.
 
 ## 1. Cadastro do colaborador
 
