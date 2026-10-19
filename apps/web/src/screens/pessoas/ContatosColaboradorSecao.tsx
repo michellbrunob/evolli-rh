@@ -282,7 +282,7 @@ export function ContatosColaboradorSecao({
           </Button>
         </p>
       ) : carga.status === "bloqueado" ? (
-        <p className="colaboradores-screen__aviso-texto" role="status">
+        <p className="colaboradores-screen__contatos-aviso" role="status">
           Os contatos deste colaborador estão bloqueados: ele não tem vínculo
           previsto ou ativo nesta empresa. Depois do desligamento, os contatos
           ficam guardados, mas não são exibidos nem alterados.
@@ -294,7 +294,7 @@ export function ContatosColaboradorSecao({
           onSubmit={(e) => void salvar(e)}
         >
           {gravado === null ? (
-            <p className="colaboradores-screen__aviso-texto">
+            <p className="colaboradores-screen__contatos-aviso">
               Nenhum contato registrado. Informe os três campos para salvar.
             </p>
           ) : null}

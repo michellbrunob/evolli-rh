@@ -1912,9 +1912,25 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       pendência da T170 (client do Prisma na raiz de `node_modules` no Windows)
       foi o objeto desta tarefa e está resolvida.
 
-69. **T172 - Correção visual da seção Contatos do detalhe de Colaborador**
-    - **Estado:** em implementação. Branch `codex/t172-correcao-visual-contatos`,
-      a partir do squash `bd860b0d303c97e59aed0f85f540db8303380092` (T171, PR #163).
+69. **T172 - Correção visual da seção Contatos do detalhe de Colaborador** - **Estado:** **implementada em Draft**. Branch
+    `codex/t172-correcao-visual-contatos`, a partir do squash
+    `bd860b0d303c97e59aed0f85f540db8303380092` (T171, PR #163). Detalhes e
+    evidências em [decisão da T172](../docs/decisions/t172-correcao-visual-contatos.md).
+    - **Entregue:** classe própria `colaboradores-screen__contatos-aviso`, só com
+      `margin: 0` e a cor de antes, sem nenhuma propriedade `flex`; a regra
+      compartilhada da T111 não foi tocada. Aviso do estado vazio de 256 px para
+      25 px e formulário de 664 px para 433 px, medidos no navegador.
+    - **Achado, mesma causa:** o aviso do estado **bloqueado** usava a mesma classe
+      flexível na mesma seção em coluna e também media 256 px (75 px depois); a
+      correção cobre os dois estados.
+    - **Testes:** 3 de componente (vazio, bloqueado e com contatos) e 4 de contrato
+      de CSS (a classe própria sem `flex*` nem altura, só token de cor, a regra da
+      T111 intacta e a seção ainda coluna flex); 9 mutações reprovam, entre elas
+      reintroduzir a classe flexível e "consertar" alterando a regra da T111.
+    - **Validação no navegador**, só no ambiente local de demonstração: envio vazio
+      mantém erros e foco; salvar normaliza e confirma; o estado com contatos
+      continua correto; a troca Alfa → Beta segue sem resíduo, com 404 do servidor
+      para as pessoas da Alfa na empresa Beta.
     - **Objetivo:** corrigir o vão vertical de cerca de 256 px que a seção
       Contatos mostra quando não há registro. A causa já está confirmada: o
       aviso reaproveita `colaboradores-screen__aviso-texto`, com

@@ -1834,11 +1834,11 @@ Windows, só aviso.
 pendência da T170 (client do Prisma na raiz de `node_modules` no Windows) foi o
 objeto desta tarefa e está resolvida.
 
-## Correção visual de Contatos — T172 (em implementação)
+## Correção visual de Contatos — T172 (implementada em Draft)
 
-| Tarefa | Estado               | Resultado principal                                                          |
-| ------ | -------------------- | ---------------------------------------------------------------------------- |
-| T172   | **Em implementação** | Remover o vão vertical de cerca de 256 px do estado vazio da seção Contatos. |
+| Tarefa | Estado                    | Resultado principal                                                          |
+| ------ | ------------------------- | ---------------------------------------------------------------------------- |
+| T172   | **Implementada em Draft** | Remover o vão vertical de cerca de 256 px do estado vazio da seção Contatos. |
 
 **A T171 foi integrada** em `main` pela PR #163, squash `bd860b0d303c97e59aed0f85f540db8303380092`, com a CI de
 push 3/3 verde em Node 24: o `postinstall` da API gera o client do Prisma no
@@ -1850,6 +1850,20 @@ repositório.
 formulário em coluna, e ocupa cerca de 256 px de altura. A correção é de estilo e
 estrutura próprios para o estado vazio, sem tocar o estilo compartilhado da
 T111, com testes e validação no navegador no ambiente local de demonstração.
+
+### O que a T172 entregou
+
+- **Correção.** O aviso passou a usar a classe própria
+  `colaboradores-screen__contatos-aviso`, sem nenhuma propriedade `flex`; a regra
+  compartilhada da T111 não foi alterada. No navegador, o aviso do estado vazio
+  foi de 256 px para 25 px, e o formulário, de 664 px para 433 px.
+- **Achado, mesma causa.** O estado **bloqueado** usava a mesma classe flexível e
+  também media 256 px (75 px depois); a correção cobre os dois.
+- **Testes.** 3 de componente e 4 de contrato de CSS; 9 mutações reprovam, entre
+  elas reintroduzir a classe flexível e "consertar" alterando a regra da T111.
+- **Navegador, no ambiente local de demonstração.** Envio vazio mantém erros e
+  foco; salvar normaliza e confirma; o estado com contatos segue correto; a troca
+  Alfa → Beta segue sem resíduo. Detalhes em [decisão da T172](../docs/decisions/t172-correcao-visual-contatos.md).
 
 **Fora de escopo:** qualquer outra pendência; rotas, permissões, auditoria,
 normalização, validação, dados, schema, migrations, banco, seed e gravação dos
