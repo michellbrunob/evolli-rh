@@ -1790,11 +1790,11 @@ Idêntico no Node 22; não aparece na CI em Linux.
 
 **Dívidas preservadas:** R-3 (T162), R-3 da revisão da T164, S2 (T161), R1 a R3 (T160), L3, S-1 a S-4 (T158), R-A a R-C (T157), o registro `teste michell`, a decisão `DP-29` (se `outro_controlado` vale para admissão) e a limitação de validação em navegador da T167. As pendências da T169 seguem abertas: o processo de eliminação ou anonimização após 2 anos do desligamento; as rotas de exportação e exclusão de contatos, cuja auditoria é obrigatória quando existirem; a origem e a evidência da coleta, lacuna da ficha; a validação visual em navegador; e as observações N-2 (criação concorrente de contato que perde na unicidade responde 409 sem trilha), N-3 (`ON UPDATE CASCADE` nas FKs do evento de contato permite reescrita indireta) e N-4 (CHECK do evento mais frouxo que o serviço), além da docstring do serviço de contatos que ainda descreve o `resourceId` de forma absoluta.
 
-## Ambiente local Node 24 — T171 (em implementação)
+## Ambiente local Node 24 — T171 (implementada em Draft)
 
-| Tarefa | Estado               | Resultado principal                                                                                            |
-| ------ | -------------------- | -------------------------------------------------------------------------------------------------------------- |
-| T171   | **Em implementação** | Instalação local no Windows em Node 24 e pnpm 10 sem `prisma generate` manual, e prévia validada no navegador. |
+| Tarefa | Estado                    | Resultado principal                                                                                            |
+| ------ | ------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| T171   | **Implementada em Draft** | Instalação local no Windows em Node 24 e pnpm 10 sem `prisma generate` manual, e prévia validada no navegador. |
 
 **A T170 foi integrada** em `main` pela PR #162, squash `2fd19df9a86427cd3454d8d40ee282641ec83b65`,
 com a CI de push 3/3 verde em Node 24: `.nvmrc` em `24` como fonte única,
@@ -1810,8 +1810,29 @@ colaboradores e contatos.
 RH, contatos, RBAC, schema ou migrations de negócio sem necessidade comprovada,
 e qualquer ambiente fora do demonstrativo local.
 
-**Dívidas preservadas:** R-3 (T162), R-3 da revisão da T164, S2 (T161), R1 a R3 (T160), L3, S-1 a S-4 (T158), R-A a R-C (T157), o registro `teste michell`, a decisão `DP-29` (se `outro_controlado` vale para admissão) e a limitação de validação em navegador da T167. Pendências da T169: o processo de eliminação ou anonimização após 2 anos; as rotas de exportação e exclusão de contatos; a origem e a evidência da coleta; a validação visual em navegador; as observações N-2, N-3 e N-4 da revisão final; e a docstring do serviço de contatos sobre `resourceId`. Pendência
-da T170: no Windows, o `prisma generate` do `postinstall` grava o client na raiz de `node_modules`, e o `tsc` da API estoura a pilha até rodar `pnpm --filter @evolli/api exec prisma generate` — objeto desta tarefa.
+### O que a T171 entregou
+
+- **Causa comprovada** na fonte do Prisma 5.22 (`getDefaultOutdir`): no
+  Windows, o teste de caminho com barra normal falha e, no `postinstall`, o
+  client vai para `INIT_CWD/node_modules/.prisma/client`, a raiz do
+  repositório.
+- **Correção sem trocar dependência:** o `postinstall` da API roda o mesmo
+  `prisma generate` sem `INIT_CWD` (`scripts/prisma-generate-api.mjs`) e confere
+  que o client ficou ao lado do `@prisma/client`, falhando com a causa se não
+  ficou. Instalação limpa no Windows: client no lugar certo, `tsc` da API sem
+  erro e `require('@prisma/client')` funcionando, sem `generate` manual.
+- **Node 24 e pnpm 10 exigidos** no passo 1/8 da demonstração, lidos do
+  `.nvmrc` e do `packageManager`.
+- **Prévia validada no navegador** em `http://127.0.0.1:5173`: login, Hub,
+  colaboradores, contatos e troca de empresa sem resíduo. Detalhes em [decisão da T171](../docs/decisions/t171-ambiente-local-node24.md).
+
+**Pendências novas:** vão vertical de 256 px na seção Contatos (defeito visual
+da T169); aviso `[DEP0190]` do Node 24 no orquestrador da demonstração no
+Windows, só aviso.
+
+**Dívidas preservadas:** R-3 (T162), R-3 da revisão da T164, S2 (T161), R1 a R3 (T160), L3, S-1 a S-4 (T158), R-A a R-C (T157), o registro `teste michell`, a decisão `DP-29` (se `outro_controlado` vale para admissão) e a limitação de validação em navegador da T167. Pendências da T169: o processo de eliminação ou anonimização após 2 anos; as rotas de exportação e exclusão de contatos; a origem e a evidência da coleta; a validação visual em navegador; as observações N-2, N-3 e N-4 da revisão final; e a docstring do serviço de contatos sobre `resourceId`. A
+pendência da T170 (client do Prisma na raiz de `node_modules` no Windows) foi o
+objeto desta tarefa e está resolvida.
 
 ## Próxima ação autorizável
 

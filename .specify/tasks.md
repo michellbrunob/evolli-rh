@@ -1865,9 +1865,29 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       de demonstração.
     - **Dívida preservada:** R-3 (T162), R-3 da revisão da T164, S2 (T161), R1 a R3 (T160), L3, S-1 a S-4 (T158), R-A a R-C (T157), o registro `teste michell`, a decisão `DP-29` (se `outro_controlado` vale para admissão) e a limitação de validação em navegador da T167. As pendências da T169 seguem abertas: o processo de eliminação ou anonimização após 2 anos do desligamento; as rotas de exportação e exclusão de contatos, cuja auditoria é obrigatória quando existirem; a origem e a evidência da coleta, lacuna da ficha; a validação visual em navegador; e as observações N-2 (criação concorrente de contato que perde na unicidade responde 409 sem trilha), N-3 (`ON UPDATE CASCADE` nas FKs do evento de contato permite reescrita indireta) e N-4 (CHECK do evento mais frouxo que o serviço), além da docstring do serviço de contatos que ainda descreve o `resourceId` de forma absoluta.
 
-68. **T171 - Ambiente local Windows em Node 24 e pnpm 10, com prévia validada**
-    - **Estado:** em implementação. Branch `codex/t171-ambiente-local-node24`, a
-      partir do squash `2fd19df9a86427cd3454d8d40ee282641ec83b65` (T170, PR #162).
+68. **T171 - Ambiente local Windows em Node 24 e pnpm 10, com prévia validada** - **Estado:** **implementada em Draft**. Branch
+    `codex/t171-ambiente-local-node24`, a partir do squash
+    `2fd19df9a86427cd3454d8d40ee282641ec83b65` (T170, PR #162). Detalhes e
+    evidências em [decisão da T171](../docs/decisions/t171-ambiente-local-node24.md).
+    - **Causa comprovada:** no Prisma 5.22, `getDefaultOutdir` compara o
+      caminho com barra normal (falha no Windows) e, no `postinstall`, grava em
+      `INIT_CWD/node_modules/.prisma/client` — a raiz do repositório, onde o
+      `@prisma/client` não encontra o client.
+    - **Correção:** o `postinstall` da API roda o mesmo `prisma generate` por
+      `scripts/prisma-generate-api.mjs`, sem `INIT_CWD`, e confere no fim que o
+      client desta rodada ficou ao lado do `@prisma/client`; se não ficou, a
+      instalação falha com a causa. Nenhuma dependência muda. O passo 1/8 da
+      demonstração passou a exigir o Node do `.nvmrc` e o pnpm do
+      `packageManager`. Testes: 8 do wrapper e 8 da trava, em `test:scripts`.
+    - **Prévia validada no navegador** em `http://127.0.0.1:5173` (API em
+      `127.0.0.1:3100`, banco de demonstração em `127.0.0.1:5433`): oito passos,
+      17 migrations do zero e seed sintético; login, Hub, colaboradores, contatos
+      (erro por campo, gravação normalizada) e troca de empresa sem resíduo, com
+      404 do servidor para o colaborador da empresa anterior.
+    - **Pendências novas:** a seção Contatos tem um vão vertical de 256 px
+      (defeito visual da T169: o aviso reaproveita `colaboradores-screen__aviso-texto`,
+      com `flex: 1 1 16rem`); o Node 24 emite `[DEP0190]` no orquestrador da
+      demonstração no Windows (`shell: true` com argumentos), só aviso.
     - **Objetivo:** fazer a prévia local funcionar no Windows com Node 24 e pnpm
       10, sem depender de Node 22 nem de `prisma generate` manual depois da
       instalação, e validar no navegador a versão atual da `main`.
@@ -1883,8 +1903,9 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       produção, credencial real, banco ou Docker externos; `.env`,
       `node_modules`, gerados, credenciais, caches e alterações automáticas de
       `pnpm-workspace.yaml` não são versionados.
-    - **Dívida preservada:** R-3 (T162), R-3 da revisão da T164, S2 (T161), R1 a R3 (T160), L3, S-1 a S-4 (T158), R-A a R-C (T157), o registro `teste michell`, a decisão `DP-29` (se `outro_controlado` vale para admissão) e a limitação de validação em navegador da T167. Pendências da T169: o processo de eliminação ou anonimização após 2 anos; as rotas de exportação e exclusão de contatos; a origem e a evidência da coleta; a validação visual em navegador; as observações N-2, N-3 e N-4 da revisão final; e a docstring do serviço de contatos sobre `resourceId`. Pendência
-      da T170: no Windows, o `prisma generate` do `postinstall` grava o client na raiz de `node_modules`, e o `tsc` da API estoura a pilha até rodar `pnpm --filter @evolli/api exec prisma generate` — objeto desta tarefa.
+    - **Dívida preservada:** R-3 (T162), R-3 da revisão da T164, S2 (T161), R1 a R3 (T160), L3, S-1 a S-4 (T158), R-A a R-C (T157), o registro `teste michell`, a decisão `DP-29` (se `outro_controlado` vale para admissão) e a limitação de validação em navegador da T167. Pendências da T169: o processo de eliminação ou anonimização após 2 anos; as rotas de exportação e exclusão de contatos; a origem e a evidência da coleta; a validação visual em navegador; as observações N-2, N-3 e N-4 da revisão final; e a docstring do serviço de contatos sobre `resourceId`. A
+      pendência da T170 (client do Prisma na raiz de `node_modules` no Windows)
+      foi o objeto desta tarefa e está resolvida.
 
 ## Regra obrigatória para as próximas tarefas
 

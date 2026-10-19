@@ -228,6 +228,31 @@ export function senhaDoPapel(doAmbiente, url) {
   }
 }
 
+/** Major de uma versão (`v24.19.0`, `24`, `10.0.0`, `pnpm@10.0.0`); ou `null`. */
+export function majorDaVersao(texto) {
+  if (typeof texto !== "string") return null;
+  const m = /^\s*(?:pnpm@)?v?(\d+)(?:[.\s]|$)/.exec(texto);
+  return m ? Number(m[1]) : null;
+}
+
+/**
+ * Versões que o repositório exige (T171), lidas das próprias fontes de
+ * verdade: o Node do `.nvmrc` (T170) e o pnpm do `packageManager` do
+ * `package.json` da raiz. Nenhum número fica fixo aqui.
+ */
+export function versoesExigidas(lerArquivo) {
+  const node = majorDaVersao(lerArquivo(".nvmrc"));
+  let pnpm = null;
+  try {
+    pnpm = majorDaVersao(
+      JSON.parse(lerArquivo("package.json") ?? "").packageManager,
+    );
+  } catch {
+    pnpm = null;
+  }
+  return { node, pnpm };
+}
+
 // ---------------------------------------------------------------------------
 
 /**
@@ -260,6 +285,8 @@ export async function subirAmbiente(deps) {
     agora = () => performance.now(),
     tentativas = SEGUNDOS_ESPERA_BANCO,
     sha = null,
+    // Versão do Node que roda ESTE processo (`process.version` na CLI).
+    versaoNode = null,
   } = deps;
 
   const usarShell = plataforma === "win32";
@@ -475,6 +502,34 @@ export async function subirAmbiente(deps) {
   try {
     // ---- 1/8 ---------------------------------------------------------------
     passo(NOMES_PASSOS[0]);
+
+    // T171 — Node e pnpm da versão que o repositório declara. `engines` só
+    // AVISA; sem esta trava, a demonstração subia em qualquer runtime e um
+    // problema de ambiente aparecia lá na frente, disfarçado de outra coisa.
+    const exigidas = versoesExigidas(lerArquivo);
+    if (exigidas.node === null || exigidas.pnpm === null) {
+      falhar(
+        "Não foi possível ler as versões exigidas (.nvmrc e packageManager do package.json).",
+        "Rode o comando na raiz do repositório, com o checkout completo.",
+      );
+    }
+    if (majorDaVersao(versaoNode) !== exigidas.node) {
+      falhar(
+        `O Node em uso é ${versaoNode ?? "desconhecido"}; o repositório exige Node ${exigidas.node} (.nvmrc).`,
+        `Ative o Node ${exigidas.node} no terminal, refaça "pnpm install --frozen-lockfile" e rode de novo.`,
+      );
+    }
+    const pnpmVersao = rodar("pnpm", ["--version"]);
+    const majorPnpm =
+      pnpmVersao.status === 0 ? majorDaVersao(pnpmVersao.saida.trim()) : null;
+    if (majorPnpm !== exigidas.pnpm) {
+      falhar(
+        pnpmVersao.status === 0
+          ? `O pnpm em uso é ${pnpmVersao.saida.trim()}; o repositório exige pnpm ${exigidas.pnpm} (packageManager).`
+          : "O pnpm não está disponível no PATH.",
+        `Instale o pnpm ${exigidas.pnpm} (o mesmo major do packageManager), refaça "pnpm install --frozen-lockfile" e rode de novo.`,
+      );
+    }
 
     if (rodar("docker", ["--version"]).status !== 0) {
       falhar(

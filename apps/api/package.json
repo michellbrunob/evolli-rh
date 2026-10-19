@@ -6,7 +6,7 @@
     "node": ">=24 <25"
   },
   "scripts": {
-    "postinstall": "prisma generate --schema=prisma/schema.prisma --allow-no-models",
+    "postinstall": "node ../../scripts/prisma-generate-api.mjs",
     "dev": "nest start --watch",
     "build": "nest build",
     "start": "node dist/main.js",

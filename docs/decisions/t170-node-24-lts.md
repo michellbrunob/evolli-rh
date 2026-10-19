@@ -85,6 +85,11 @@ O `incremental: true` do `tsconfig` da API guarda o estado em
 `apps/api/dist/*.tsbuildinfo`; para medir o `tsc` sem herdar resultado anterior,
 esses arquivos foram apagados antes de cada medição.
 
+**Atualização (T171):** a causa foi encontrada na fonte do Prisma 5.22 e
+corrigida sem trocar dependência — ver
+[`t171-ambiente-local-node24.md`](t171-ambiente-local-node24.md). O contorno
+acima deixou de ser necessário.
+
 ## 6. Rollback para Node 22
 
 A migração não toca dependência, lockfile, código, schema nem dados. Há duas

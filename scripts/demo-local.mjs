@@ -365,6 +365,7 @@ async function main() {
     agora: () => performance.now(),
     registrar: (linha) => process.stdout.write(`${linha}\n`),
     sha: shaAtual(),
+    versaoNode: process.version,
   });
 
   process.stdout.write(`${ambiente.resumo.join("\n")}\n`);
