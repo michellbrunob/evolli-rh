@@ -1904,8 +1904,13 @@ a qualquer implementação, sem resolvê-los.
   autoriza implementação. Detalhes em [ADR 0017](../docs/adr/0017-fluxo-admissao-vinculo-desligamento-rh-dp.md).
 - **Diagnóstico de reconciliação:** cada tema confrontado com o schema, os DTOs,
   as validações, a matriz RBAC e as decisões registradas, com citação por linha;
-  **12 conflitos com decisões fechadas** nomeados, 5 deles condicionais, e **20 gates** (`DP-FLX-01` a `DP-FLX-20`) abertos, nenhum resolvido. Detalhes no [diagnóstico de reconciliação](../docs/decisions/t173-reconciliacao-fluxo-rh-dp.md).
+  **13 conflitos com decisões fechadas** nomeados, 5 deles condicionais, e **22 gates** (`DP-FLX-01` a `DP-FLX-22`) abertos, nenhum resolvido. Detalhes no [diagnóstico de reconciliação](../docs/decisions/t173-reconciliacao-fluxo-rh-dp.md).
 - **Fonte rastreável:** o [registro literal das respostas](../docs/decisions/t173-respostas-rh-dp.md), R1 a R40.
+- **Diretriz de UX proposta pelo proprietário**, sem autorização de
+  implementação: cadastro completo e admissão em tela própria e rota dedicada,
+  sem modal; modal só para o que é curto; admissão progressiva em oito grupos de
+  referência, que não autorizam campo. Conflita com a T142 e a T146
+  (`DP-FLX-21`); fuso e dados adicionais ficam em `DP-FLX-22`.
 - **Sequência proposta de fatias**, de 0 a 10, como proposta, não autorização.
 - **Correção pós-revisão (2026-10-19).** A revisão adversarial no head `7059db6`
   apontou B-1 a B-5 e O-1 a O-7, corrigidos num commit só documental, com R1 a

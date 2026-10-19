@@ -1968,9 +1968,9 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       implementação.
     - **Entregue:** [ADR 0017](../docs/adr/0017-fluxo-admissao-vinculo-desligamento-rh-dp.md), proposta, com o fluxo de oito etapas, a separação
       de nove conceitos e os papéis segundo as respostas; o [diagnóstico de reconciliação](../docs/decisions/t173-reconciliacao-fluxo-rh-dp.md), com a
-      matriz por tema, **12 conflitos com decisões fechadas** e **20 gates**
-      (`DP-FLX-01` a `DP-FLX-20`), nenhum resolvido; e o [registro literal das respostas](../docs/decisions/t173-respostas-rh-dp.md), R1 a R40.
-    - **Conflitos nomeados (12; 5 condicionais):** CPF como identificação da
+      matriz por tema, **13 conflitos com decisões fechadas** e **22 gates**
+      (`DP-FLX-01` a `DP-FLX-22`), nenhum resolvido; e o [registro literal das respostas](../docs/decisions/t173-respostas-rh-dp.md), R1 a R40.
+    - **Conflitos nomeados (13; 5 condicionais; o 13, da diretriz de UX, está no item seguinte):** CPF como identificação da
       pessoa, pela R37 (ADR 0007, decisão 2); matrícula só na efetivação
       (Baseline V1, decisão 15, e matrícula obrigatória do vínculo; a decisão 2
       não é contrariada); mais de um vínculo ativo na **mesma** empresa,
@@ -1997,6 +1997,15 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       exceção dos contatos A2 continua como está. Os gates passaram a separar
       responsável vindo das respostas, de decisão anterior ou a definir, e
       ganharam o `DP-FLX-20`.
+    - **Diretriz de UX proposta pelo proprietário (2026-10-19), sem
+      autorização de implementação:** cadastro completo e admissão em tela
+      própria e rota dedicada, sem modal; modal só para consulta rápida,
+      confirmação, seleção curta ou edição pontual autorizada; o mesmo
+      princípio nos demais cadastros extensos; admissão progressiva em oito
+      grupos de referência, que não autorizam campo; imagens só para
+      agrupamento. Conflita com a T142 e a T146 (cadastro e detalhe em modal)
+      — conflito 13, `DP-FLX-21` —, e os grupos de fuso e dados adicionais
+      ficam em `DP-FLX-22`.
     - **Sequência proposta de fatias:** 0 a 10, só como proposta; cada fatia
       depende dos seus gates e de autorização expressa.
     - **Fora de escopo, declarado:** autopreenchimento pelo colaborador; acesso

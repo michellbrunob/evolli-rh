@@ -207,6 +207,44 @@ São fatos recebidos. Cada um só vira regra do sistema pelo gate correspondente
 4. **Nenhuma mudança está autorizada** em RBAC, API, schema, migration, banco,
    seed, Docker ou interface.
 
+### 6. Diretriz de UX proposta pelo proprietário
+
+**Proposta de UX do proprietário, registrada em 2026-10-19. Não autoriza
+implementação.** Ela não vem das respostas de RH/DP: é uma diretriz de
+experiência entregue pelo proprietário na mesma tarefa, e entra aqui com
+camada própria. Aceitá-la é `DP-FLX-21`; nada nela cria, migra ou remove tela,
+rota, modal, campo ou componente.
+
+1. **Cadastro completo e admissão em tela própria.** O cadastro completo de
+   colaborador e o fluxo de admissão usam **tela própria, em rota dedicada**;
+   não usam modal.
+2. **Modal só para o que é curto.** Modal fica restrito a consulta rápida,
+   confirmação, seleção curta ou edição pontual autorizada — nunca a formulário
+   extenso nem a processo com etapas.
+3. **O mesmo princípio nos demais módulos.** Cadastros extensos de horários,
+   jornadas, estrutura organizacional e demais módulos também usam tela
+   própria.
+4. **Admissão progressiva, em grupos de referência.** A futura tela de admissão
+   será progressiva e organizada, como **referência funcional**, nestes grupos:
+   Dados pessoais; Endereço; Contatos; Dados contratuais; Documentos; Fuso
+   horário; Dados adicionais; Dependentes.
+5. **Organização não é autorização.** Essa organização **não autoriza criar,
+   exibir ou exigir campo algum**. Cada grupo só pode ser materializado depois
+   dos seus gates, fichas de tratamento, contratos e decisões aprovadas (ver o
+   diagnóstico, 3.13).
+6. **Imagens de referência só para agrupamento.** Imagens de referência servem
+   apenas para agrupamento, clareza e hierarquia de UX. Não se copia marca,
+   texto, identidade visual, paleta, layout, ícone ou componente de terceiros.
+
+**Conflito técnico:** os itens 1 a 3 contrariam a direção visual **aprovada
+pelo proprietário** na T142 ("Cadastro, edição e detalhe em janelas modais") e
+mantida na fundação visual da T146 ("cadastro, detalhe e ações operacionais
+usam modal"). Hoje a admissão e o detalhe do colaborador são modais. Além
+disso, o painel web não tem rota por URL: a navegação é estado da aplicação.
+Os dois pontos ficam em `DP-FLX-21`. O grupo **Fuso horário** e o grupo
+**Dados adicionais** estão "Fora de escopo" na ADR 0016 (6.7) — o fuso é tratado
+ali como da operação, não da pessoa —, e ficam em `DP-FLX-22`.
+
 ## O que esta ADR **não** decide
 
 - Nenhuma emenda às ADRs 0004, 0007, 0011, 0012, 0015 e 0016, à Baseline V1 ou a
@@ -225,6 +263,9 @@ São fatos recebidos. Cada um só vira regra do sistema pelo gate correspondente
 - Nenhuma alçada concreta de aprovação, nem quem é "diretoria" no sistema.
 - Nenhum formato de integração com a folha ou o eSocial.
 - Nenhuma alteração da exceção do `master_tecnico` em contatos.
+- Nenhuma tela, rota, modal ou componente: a diretriz de UX da decisão 6 é
+  proposta, e a direção visual da T142 e da T146 continua valendo até
+  `DP-FLX-21`. Nenhum grupo da futura tela de admissão autoriza campo.
 
 ## Consequências
 
