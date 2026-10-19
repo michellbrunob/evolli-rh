@@ -1904,10 +1904,24 @@ a qualquer implementação, sem resolvê-los.
   autoriza implementação. Detalhes em [ADR 0017](../docs/adr/0017-fluxo-admissao-vinculo-desligamento-rh-dp.md).
 - **Diagnóstico de reconciliação:** cada tema confrontado com o schema, os DTOs,
   as validações, a matriz RBAC e as decisões registradas, com citação por linha;
-  **12 conflitos com decisões fechadas** nomeados e **19 gates**
-  (`DP-FLX-01` a `DP-FLX-19`) abertos, nenhum resolvido. Detalhes no [diagnóstico de reconciliação](../docs/decisions/t173-reconciliacao-fluxo-rh-dp.md).
+  **12 conflitos com decisões fechadas** nomeados, 5 deles condicionais, e **20 gates** (`DP-FLX-01` a `DP-FLX-20`) abertos, nenhum resolvido. Detalhes no [diagnóstico de reconciliação](../docs/decisions/t173-reconciliacao-fluxo-rh-dp.md).
 - **Fonte rastreável:** o [registro literal das respostas](../docs/decisions/t173-respostas-rh-dp.md), R1 a R40.
 - **Sequência proposta de fatias**, de 0 a 10, como proposta, não autorização.
+- **Correção pós-revisão (2026-10-19).** A revisão adversarial no head `7059db6`
+  apontou B-1 a B-5 e O-1 a O-7, corrigidos num commit só documental, com R1 a
+  R40 literalmente idênticas:
+  - B-1: a R4 é ambígua quanto à mesma empresa; vínculos ativos em empresas
+    diferentes já são compatíveis com o índice, e mais de um na mesma empresa só
+    por decisão explícita;
+  - B-2: solicitar é distinto de criar, editar, aprovar e efetivar; o gestor
+    continua sem mutação até decisão e RBAC próprios;
+  - B-3: a R31 trata de conteúdo documental, que não existe; a exceção do
+    `master_tecnico` em contatos A2 continua como está, e a reavaliação futura é
+    o `DP-FLX-20`;
+  - B-4: a ADR 0017 separa fato recebido, conflito técnico e decisão pendente, e
+    não fixa como domínio os conceitos em conflito;
+  - B-5: os gates separam responsável vindo das respostas, de decisão anterior
+    ou a definir.
 
 **Fora de escopo:** autopreenchimento pelo colaborador; acesso do gestor a dados
 pessoais, bancários, médicos ou contratuais restritos; upload documental,

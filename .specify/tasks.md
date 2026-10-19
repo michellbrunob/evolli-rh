@@ -1968,18 +1968,35 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       implementação.
     - **Entregue:** [ADR 0017](../docs/adr/0017-fluxo-admissao-vinculo-desligamento-rh-dp.md), proposta, com o fluxo de oito etapas, a separação
       de nove conceitos e os papéis segundo as respostas; o [diagnóstico de reconciliação](../docs/decisions/t173-reconciliacao-fluxo-rh-dp.md), com a
-      matriz por tema, **12 conflitos com decisões fechadas** e **19 gates**
-      (`DP-FLX-01` a `DP-FLX-19`), nenhum resolvido; e o [registro literal das respostas](../docs/decisions/t173-respostas-rh-dp.md), R1 a R40.
-    - **Conflitos nomeados:** CPF como identificação da pessoa (ADR 0007,
-      decisão 2); matrícula só na efetivação (Baseline V1, decisões 2 e 15);
-      mais de um vínculo ativo na mesma empresa (decisão 3); gestor solicitante
-      (ADR 0015, `PD-SOL-01`); workflow de aprovação (decisão 7); tipo que
-      determina obrigatoriedade (ADR 0007, decisão 4); gestor como atributo do
-      vínculo, se essa for a leitura; justificativa em texto livre, se essa for
-      a leitura (decisão 11); valores antes/depois (ADR 0004, decisão 5) e a
-      correção de nome que sobrescreve; motivos de desligamento com
+      matriz por tema, **12 conflitos com decisões fechadas** e **20 gates**
+      (`DP-FLX-01` a `DP-FLX-20`), nenhum resolvido; e o [registro literal das respostas](../docs/decisions/t173-respostas-rh-dp.md), R1 a R40.
+    - **Conflitos nomeados (12; 5 condicionais):** CPF como identificação da
+      pessoa, pela R37 (ADR 0007, decisão 2); matrícula só na efetivação
+      (Baseline V1, decisão 15, e matrícula obrigatória do vínculo; a decisão 2
+      não é contrariada); mais de um vínculo ativo na **mesma** empresa,
+      **condicional**, porque a R4 não o afirma (decisão 3) — em empresas
+      diferentes o índice atual já é compatível, e falta só reconhecer a
+      pessoa; gestor **registrar** solicitação e **aprovar** (ADR 0015,
+      `PD-SOL-01` e a negação na Central), sem nunca criar, editar ou efetivar;
+      workflow de aprovação (decisão 7); tipo que determina obrigatoriedade,
+      **condicional** à leitura de "comportamento" (ADR 0007, decisão 4); gestor
+      como atributo do vínculo, **condicional**; justificativa em texto livre,
+      **condicional** (decisão 11); valores antes/depois **na trilha formal**,
+      **condicional** (ADR 0004, decisão 5); motivos de desligamento com
       classificação trabalhista; projeção do desligamento ao gestor (ADR 0015,
-      decisão 7); documento por vínculo e período (`DP-2E-07`).
+      decisão 7); documento por vínculo e período (`DP-2E-07`). Fora da lista: a
+      correção de nome que sobrescreve é divergência de comportamento, e a
+      diretoria como escalonamento fora do sistema é tensão com a R8.
+    - **Correção pós-revisão (2026-10-19):** a revisão adversarial no head
+      `7059db6` apontou B-1 a B-5 e O-1 a O-7, corrigidos num commit só
+      documental, com R1 a R40 literalmente idênticas. A ADR 0017 passou a
+      separar fato recebido, conflito técnico e decisão pendente, e deixou de
+      fixar como domínio os conceitos em conflito. O gestor ficou expressamente
+      sem mutação até decisão e RBAC próprios. A R31 foi reconciliada com o
+      `master_tecnico`: trata de conteúdo documental, que não existe, e a
+      exceção dos contatos A2 continua como está. Os gates passaram a separar
+      responsável vindo das respostas, de decisão anterior ou a definir, e
+      ganharam o `DP-FLX-20`.
     - **Sequência proposta de fatias:** 0 a 10, só como proposta; cada fatia
       depende dos seus gates e de autorização expressa.
     - **Fora de escopo, declarado:** autopreenchimento pelo colaborador; acesso

@@ -17,12 +17,15 @@ jurídica foi feita. Citações de código e documentos seguem o formato
 
 Cada ponto recebe uma situação:
 
-| Situação        | Significado                                                                                                    |
-| --------------- | -------------------------------------------------------------------------------------------------------------- |
-| **Convergente** | A resposta confirma o que o modelo ou uma decisão já faz.                                                      |
-| **Lacuna**      | O modelo não tem o que a resposta pede, e nenhuma decisão fechada o proíbe.                                    |
-| **Conflito**    | A resposta contraria uma **decisão fechada**. Exige emenda formal antes de qualquer código.                    |
-| **Insumo**      | A resposta informa uma **pendência já aberta**. A pendência continua aberta até decisão formal do responsável. |
+| Situação                         | Significado                                                                                                    |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| **Convergente**                  | A resposta confirma o que o modelo ou uma decisão já faz.                                                      |
+| **Lacuna**                       | O modelo não tem o que a resposta pede, e nenhuma decisão fechada o proíbe.                                    |
+| **Conflito**                     | A resposta contraria uma **decisão fechada**. Exige emenda formal antes de qualquer código.                    |
+| **Insumo**                       | A resposta informa uma **pendência já aberta**. A pendência continua aberta até decisão formal do responsável. |
+| **Conflito condicional**         | Só há conflito numa das leituras possíveis da resposta, ou da decisão. A leitura cabe ao responsável do gate.  |
+| **Divergência de comportamento** | A resposta diverge do que o código faz hoje, sem decisão fechada que imponha esse comportamento.               |
+| **Tensão**                       | A resposta e uma decisão fechada de outro escopo apontam em direções diferentes, sem contradição direta.       |
 
 O diagnóstico **não resolve** nenhum conflito nem fecha nenhuma pendência. Cada
 item aponta o gate (`DP-FLX-xx`, seção 4) que precisa ser decidido.
@@ -36,17 +39,17 @@ Abreviações de caminho: `schema` = `apps/api/prisma/schema.prisma`; `dto` =
 
 ## 2. Os conceitos da ADR 0017 no modelo atual
 
-| Conceito (ADR 0017, decisão 2) | Hoje no modelo                                                                                                                                                                                       | Situação                                 |
-| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
-| Pessoa, cadastro único         | `Colaborador` só com `nome` e `situacao` (`schema:983`). Sem identificador pessoal, a mesma pessoa admitida em duas empresas vira **dois** colaboradores (`A16:184-192`; `dto:166-171`).             | **Conflito** e **Lacuna** (3.1, 3.3)     |
-| Vínculo contratual             | `VinculoFuncional` com empresa, matrícula, tipo, situação e datas (`schema:1038`). Sem remuneração (`schema:896`), sem gestor próprio (gestor vem da equipe, `A15:52-57`) e sem local de trabalho.   | **Lacuna** parcial (3.7)                 |
-| Solicitação de admissão        | Não existe. A Central de Solicitações não tem tipo de admissão (`schema:1660`), e o gestor não faz mutação (`A15:197-198`).                                                                          | **Lacuna** e **Conflito** (3.4)          |
-| Admissão em andamento          | Representada só por vínculo `previsto` e movimentação `admissao` `solicitada` ou `programada` (`schema:930`, `schema:948`). Não há etapas, devolução nem status por etapa.                           | **Lacuna** (gate `DP-FLX-04`)            |
-| Admissão efetivada             | A efetivação existe, por ato explícito do RH/DP (`A7:115-118`).                                                                                                                                      | **Convergente**                          |
-| Vínculo ativo                  | A efetivação é **recusada antes da data de vigência** (`validacao:247-253`) e torna o vínculo `ativo` no mesmo ato. "Efetivada, aguardando início" não é representável.                              | **Lacuna** (gate `DP-FLX-04`)            |
-| Movimentação futura            | `programada` existe, sem efetivação automática (`A7:424`), e o dado vigente só muda na efetivação.                                                                                                   | **Convergente**; aprovação ausente (3.8) |
-| Correção                       | Retificação append-only de movimentação (`A7:107-113`). Admissão efetivada sem correção viável (T166, D8). O nome é sobrescrito (`apps/api/src/pessoas/colaborador/colaborador.service.ts:336-338`). | **Convergente** e **Conflito** (3.8)     |
-| Desligamento                   | Movimentação `desligamento` com motivo `encerramento_de_vinculo`, registrada e efetivada direto pelo RH/DP.                                                                                          | **Lacuna** e **Conflito** (3.9)          |
+| Conceito (ADR 0017, decisão 2) | Hoje no modelo                                                                                                                                                                                       | Situação                                                                           |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Pessoa, cadastro único         | `Colaborador` só com `nome` e `situacao` (`schema:983`). Sem identificador pessoal, a mesma pessoa admitida em duas empresas vira **dois** colaboradores (`A16:184-192`; `dto:166-171`).             | **Conflito** e **Lacuna** (3.1, 3.3)                                               |
+| Vínculo contratual             | `VinculoFuncional` com empresa, matrícula, tipo, situação e datas (`schema:1038`). Sem remuneração (`schema:896`), sem gestor próprio (gestor vem da equipe, `A15:52-57`) e sem local de trabalho.   | **Lacuna** parcial (3.7)                                                           |
+| Solicitação de admissão        | Não existe. A Central de Solicitações não tem tipo de admissão (`schema:1660`), o gestor não faz mutação (`A15:197-198`) e é negado até na Central (`rbac:583-586`).                                 | **Lacuna** e **Conflito** (3.4)                                                    |
+| Admissão em andamento          | Representada só por vínculo `previsto` e movimentação `admissao` `solicitada` ou `programada` (`schema:930`, `schema:948`). Não há etapas, devolução nem status por etapa.                           | **Lacuna** (gate `DP-FLX-04`)                                                      |
+| Admissão efetivada             | A efetivação existe, por ato explícito do RH/DP (`A7:115-118`).                                                                                                                                      | **Convergente**                                                                    |
+| Vínculo ativo                  | A efetivação é **recusada antes da data de vigência** (`validacao:247-253`) e torna o vínculo `ativo` no mesmo ato. "Efetivada, aguardando início" não é representável.                              | **Lacuna** (gate `DP-FLX-04`)                                                      |
+| Movimentação futura            | `programada` existe, sem efetivação automática (`A7:424`), e o dado vigente só muda na efetivação.                                                                                                   | **Convergente**; aprovação ausente (3.8)                                           |
+| Correção                       | Retificação append-only de movimentação (`A7:107-113`). Admissão efetivada sem correção viável (T166, D8). O nome é sobrescrito (`apps/api/src/pessoas/colaborador/colaborador.service.ts:336-338`). | **Convergente**, **Conflito** condicional e **divergência de comportamento** (3.8) |
+| Desligamento                   | Movimentação `desligamento` com motivo `encerramento_de_vinculo`, registrada e efetivada direto pelo RH/DP.                                                                                          | **Lacuna** e **Conflito** (3.9)                                                    |
 
 ## 3. Confronto por tema
 
@@ -54,8 +57,10 @@ Abreviações de caminho: `schema` = `apps/api/prisma/schema.prisma`; `dto` =
 
 **As respostas:** o cadastro inicial exige nome completo, **CPF**, data de
 nascimento, telefone **ou** e-mail e tipo de vínculo pretendido; a abertura de
-vínculo exige ainda empresa e cargo (R1). O CPF identifica a **pessoa**, com os
-cuidados de segurança e proteção de dados, e nunca sozinho o vínculo (R37).
+vínculo exige ainda empresa e cargo (R1). A R1 torna o CPF **obrigatório**; ela
+não diz como ele é usado. Quem fala em identificação é só a R37: "O CPF poderá
+ser utilizado para identificar a pessoa, com os cuidados necessários de
+segurança e proteção de dados", e nunca somente como identificador do vínculo.
 
 **Hoje:**
 
@@ -79,9 +84,12 @@ cuidados de segurança e proteção de dados, e nunca sozinho o vínculo (R37).
 **Situação:**
 
 - **Conflito** com `A7:67-70`, se o CPF for usado para reconhecer a mesma pessoa,
-  o que R4 e R37 pedem. Reconhecer é tratar o CPF como critério de unicidade da
-  pessoa, e a ADR 0016 já registra que detectar duplicidade por CPF "exigiria
-  emenda" (`A16:279-282`).
+  como a R37 admite e o cadastro pessoal único da R4 pressupõe. Reconhecer é
+  tratar o CPF como critério de unicidade da pessoa, e a ADR 0016 já registra
+  que detectar duplicidade por CPF "exigiria emenda" (`A16:279-282`). Este
+  diagnóstico **não** resolve o conflito: a emenda, se houver, é `DP-FLX-05`.
+- **Lacuna**, não conflito, na obrigatoriedade da R1: coletar CPF exige ficha
+  aprovada e decisão própria (`BV1:60-62`; `A16:261`), um caminho já previsto.
 - **Insumo** para `DP-ADM-04` e `DP-ADM-05`.
 - **Divergência** com a T169: R1 pede telefone **ou** e-mail no cadastro inicial;
   hoje o contato não entra na admissão, e quando entra exige os três campos.
@@ -100,24 +108,35 @@ vínculo tem identificador próprio, matrícula ou código interno (R37).
   (`dto:143-155`), no formato `^[A-Z0-9_-]{2,32}$` (`dto:31`).
 - É única por empresa (`schema:1033`; `BV1`, decisão 2, que resolve DP-22) e
   imutável: o vínculo não tem `PATCH` (`A16:453`; T166).
+- É coluna obrigatória do vínculo: "`matricula` vive em `vinculo_funcional`,
+  única por empresa" (`A7:352-353`, Emenda 1).
 - Não há geração automática, nem regra vinda de outro sistema.
 - O vínculo nasce **junto** da admissão, com matrícula, por decisão fechada:
-  admissão atômica, sem colaborador órfão (`BV1:441-446`).
+  admissão atômica, sem colaborador órfão (`BV1:441-446`, decisão 15).
 
-**Situação:** **Conflito** com a admissão atômica e com a obrigatoriedade da
-matrícula na criação. Se o vínculo só pode ter matrícula na efetivação, ou o
-vínculo deixa de nascer na admissão, ou passa a existir sem matrícula definitiva.
-Qualquer dos dois caminhos reabre `BV1` (decisões 2 e 15). A "regra do sistema de
-folha" (R10) não é conhecida neste repositório.
+**Situação:** **Conflito** com a `BV1` **decisão 15** (admissão atômica, que cria
+o vínculo na admissão) somada à matrícula obrigatória do vínculo (`dto:143-155`;
+`schema:1033`; `A7:352-353`). Se a matrícula só nasce na efetivação, ou o vínculo
+deixa de nascer na admissão, ou passa a existir sem matrícula definitiva; os dois
+caminhos reabrem a decisão 15. A **decisão 2** (matrícula funcional, única por
+empresa) **não** é contrariada: a R10 muda o momento da matrícula, não a sua
+unicidade, e a R37 confirma o identificador próprio do vínculo. A "regra do
+sistema de folha" (R10) não é conhecida neste repositório.
 
 **Gate:** `DP-FLX-10`.
 
 ### 3.3 Múltiplos vínculos ativos
 
-**As respostas:** uma mesma pessoa pode estar vinculada a mais de uma empresa do
-grupo **ou ter mais de um vínculo**, quando aplicável. O cadastro pessoal é único
-e cada vínculo tem contrato, empresa, cargo, remuneração, jornada, gestor e
-situação próprios (R4, R37).
+**As respostas:** à pergunta "Um colaborador poderá possuir mais de um vínculo
+ativo?", a R4 responde "Sim" e explica: a pessoa pode estar vinculada "a mais de
+uma empresa do grupo ou possua mais de um vínculo, quando aplicável". O cadastro
+pessoal é único e cada vínculo tem contrato, empresa, cargo, remuneração,
+jornada, gestor e situação próprios (R4, R37).
+
+**A resposta é ambígua quanto à mesma empresa.** O trecho "mais de uma empresa do
+grupo" é explícito. O trecho "possua mais de um vínculo, quando aplicável" pode ou não incluir dois
+vínculos ativos na **mesma** empresa; a resposta não diz, e este diagnóstico não
+presume.
 
 **Hoje:**
 
@@ -135,21 +154,37 @@ situação próprios (R4, R37).
 
 **Situação:**
 
-- **Conflito** com `BV1` decisão 3 e `A7:74-78`, para mais de um vínculo ativo
-  na **mesma** empresa.
-- **Lacuna** para a mesma pessoa em empresas diferentes. Depende do gate do CPF
-  (3.1), porque sem identificador pessoal não há como reconhecê-la.
+- **Em empresas diferentes: compatível com o índice atual, com lacuna.** O
+  índice é por (colaborador, empresa), então vínculos ativos da mesma pessoa em
+  empresas diferentes **não** o violam. O que falta é **reconhecer** a mesma
+  pessoa, sem o que cada empresa cria outro `Colaborador`. Isso depende do gate
+  do CPF (3.1, `DP-FLX-05`).
+- **Na mesma empresa: hipótese, não afirmação da R4.** Se a decisão vier a
+  admitir mais de um vínculo ativo na mesma empresa, ela entra em **conflito**
+  com `BV1` decisão 3, `A7:74-78` e o índice `vinculo_funcional_ativo_unico`, e
+  esbarra no "duplo vínculo" fora de escopo (`A16:460`). Essa hipótese só existe
+  por **decisão explícita**.
 
 **Gate:** `DP-FLX-09`.
 
 ### 3.4 Gestor solicita; RH/DP conduz e efetiva; aprovações
 
-**As respostas:** o gestor solicita contratação (R7), alterações (R17) e
+**As respostas:** o gestor **solicita** a contratação (R7), alterações (R17) e o
 desligamento (R21). O RH recebe, confere e conduz (R7, R22). Há aprovação do
 gestor solicitante, validação do RH e diretoria quando exigida; a aprovação
 financeira depende da estrutura de alçadas da empresa (R8, R17, R22). RH/DP
 efetivam (R11, R22), e solicitação, aprovação e efetivação são etapas distintas
 (R22).
+
+**Quatro atos distintos.** As respostas dão ao gestor dois deles e deixam dois
+com RH/DP. Este diagnóstico os separa porque cada um tem situação própria:
+
+| Ato do gestor                                       | O que as respostas dizem             | Hoje                                             |
+| --------------------------------------------------- | ------------------------------------ | ------------------------------------------------ |
+| **Solicitar** (registrar o pedido)                  | Sim (R7, R17, R21)                   | Negado, inclusive na Central (`rbac:583-586`)    |
+| **Aprovar** o que solicitou                         | Sim, como uma das aprovações (R8)    | Negado: consultivo "não aprova" (`rbac:583-586`) |
+| **Criar ou editar** pessoa, vínculo ou movimentação | Não dizem; quem conduz é o RH (R7)   | Negado (`rbac:372-378`)                          |
+| **Efetivar**                                        | Não; quem efetiva é RH/DP (R11, R22) | Negado; só RH/DP efetivam (`A7:115-118`)         |
 
 **Hoje:**
 
@@ -157,29 +192,44 @@ efetivam (R11, R22), e solicitação, aprovação e efetivação são etapas dis
   pelo gestor** — `PD-SOL-01` o fixou como consultivo, e nada aqui o altera"
   (`A15:197-198`). A matriz nega `gestor` em toda a superfície administrativa de
   Pessoas (`rbac:372-378`).
-- Só `rh` e `dp` admitem (T165, §5.2).
+- Ele é negado **até na Central de Solicitações**, porque "consultivo não é uma
+  capacidade de RBAC: ele não aprova, não recusa e não altera registro
+  trabalhista" (`rbac:583-586`). Registrar uma solicitação já é escrita, e hoje
+  ele não a tem.
 - A T166 já registrou a divergência como achado aberto **D5**: a especificação
   diz que o gestor inicia a solicitação de admissão (`.specify/spec.md:112-113`),
-  e a T165 e a `PD-SOL-01` dizem o contrário.
+  enquanto a `PD-SOL-01` o fixa como consultivo.
 - Aprovação: "não implementar workflow de aprovação nesta V1" (`BV1:165-170`,
   decisão 7, que resolve DP-17; `A7:115-118`). `StatusMovimentacao` não tem
   `aprovada` nem `rejeitada` (`schema:945`).
-- Não existe papel de diretoria (`schema:26-46`). O papel `financeiro` não tem
-  nenhum acesso a Pessoas (`rbac:381-382`).
-- A única máquina de estados com análise do RH é a Central de Solicitações, e
-  nela o RH decide e "encaminhar não é executar"
-  (`docs/decisions/pacote-decisao-solicitacoes-pessoas.md:108-111`).
+- Diretoria: "não existe como papel: escalonamento excepcional acontece fora do
+  sistema e não vira endpoint nem capacidade" (`rbac:592-593`), coerente com a
+  `PD-SOL-01`: "Diretoria é escalonamento excepcional; até matriz mais
+  detalhada, a decisão operacional final permanece com RH"
+  (`docs/decisions/pacote-decisao-solicitacoes-pessoas.md:108-111`). A
+  `PD-SOL-01` foi aprovada em 2026-09-29 por RH, Jurídico, Produto, Diretoria e
+  TI/Segurança (mesmo arquivo, linhas 3-6).
+- O papel `financeiro` não tem nenhum acesso a Pessoas (`rbac:381-382`).
 - RH e DP efetivam: `A7:115-118`; `BV1` decisão 12.
 
 **Situação:**
 
-- **Conflito** com `A15:197-198`, `PD-SOL-01` e T165 §5.2 no gestor solicitante.
-  R7 é **insumo** para fechar o D5 da T166.
-- **Conflito** com `BV1` decisão 7 e `A7:115-118` na aprovação.
-- **Lacuna** de papel para "diretoria" e de alçada financeira.
-- **Convergente** na efetivação por RH/DP.
+- **Conflito** com `A15:197-198`, a `PD-SOL-01` e a negação em `rbac:583-586`,
+  em o gestor **registrar** solicitação. R7 é **insumo** para fechar o D5 da
+  T166.
+- **Conflito** com os mesmos três pontos em o gestor **aprovar** (R8). É decisão
+  específica, separada da solicitação.
+- **Conflito** com `BV1` decisão 7 e `A7:115-118` na aprovação por alçada.
+- **Tensão** entre a diretoria como escalonamento excepcional fora do sistema
+  (`PD-SOL-01`; `rbac:592-593`) e a diretoria como etapa de aprovação (R8).
+- **Lacuna** de alçada financeira.
+- **Convergente** em criar, editar e efetivar, que continuam com RH/DP.
 
-**Gates:** `DP-FLX-02` (gestor solicitante) e `DP-FLX-03` (alçadas).
+**Enquanto não houver decisão e alteração própria de RBAC, o gestor continua sem
+nenhuma mutação**, inclusive registrar solicitação.
+
+**Gates:** `DP-FLX-02` (gestor solicitante e gestor aprovador) e `DP-FLX-03`
+(alçadas e diretoria).
 
 ### 3.5 Tipos iniciais de vínculo
 
@@ -210,8 +260,13 @@ documentos obrigatórios variam por tipo (R3).
 **Situação:**
 
 - **Lacuna** de três tipos e da equivalência entre prestador e `pj`.
-- **Conflito** com `A7:82-86`: R3 faz o tipo determinar campos e documentos, e a
-  decisão diz que nenhum tipo altera comportamento.
+- **Conflito condicional** com `A7:82-86`. A R3 faz o tipo determinar campos e
+  documentos obrigatórios. A decisão diz que "nenhum tipo altera comportamento do
+  sistema", mas enumera o que entende por isso: "sem cálculo de direito, saldo,
+  período aquisitivo/concessivo, rescisão ou enquadramento legal". Se
+  obrigatoriedade de campo e de documento estiver dentro desse "comportamento",
+  há conflito; se a decisão só alcança os cálculos e enquadramentos enumerados,
+  não há. A leitura é do responsável por `DP-FLX-07`, não deste diagnóstico.
 - Nota sobre a `DP-29`: nos documentos da Fatia 2, a `DP-29` é o catálogo de
   **motivos** (`BV1`, decisão 11). No Spec Kit, ela aparece como "se
   `outro_controlado` vale para admissão", no catálogo de motivos de admissão
@@ -310,10 +365,18 @@ análise do DP quando afetar folha ou eSocial (R19). Nada do histórico é apaga
 - **Lacuna** nos tipos de alteração e na data de aprovação.
 - **Conflito** com `BV1` decisão 11, se a "justificativa" de R12, R19, R21 e R28
   for texto livre. Pode não ser: a resposta não diz.
-- **Conflito** com a ADR 0004, decisão 5, se "valores anteriores e posteriores"
-  (R19) tiverem de ficar na trilha formal.
-- **Conflito** com o comportamento atual da correção de nome, que perde o valor
-  anterior que R20 manda preservar.
+- **Regra formal de auditoria — conflito condicional.** A ADR 0004, decisão 5,
+  manda a trilha formal guardar metadados seguros, **sem** valores antes/depois.
+  Se os "valores anteriores e posteriores" da R19 tiverem de ficar **nessa
+  trilha**, há conflito. A R19 não diz onde eles ficam; guardá-los no histórico
+  do próprio negócio, como a retificação de movimentação já faz, não conflita
+  com a decisão 5.
+- **Comportamento atual da correção de nome — divergência, não conflito com
+  decisão fechada.** O `PATCH` de nome sobrescreve o valor
+  (`colaborador.service.ts:336-338`), e a trilha registra o ato sem o valor
+  anterior. Isso diverge da R20 ("alterações cadastrais que afetem os registros
+  oficiais" nunca apagadas), mas nenhuma decisão fechada citada aqui exige o
+  sobrescrever: é comportamento de código, tratado em `DP-FLX-11`.
 
 **Gate:** `DP-FLX-11`.
 
@@ -337,9 +400,10 @@ pendências e tarefas de transição (R29).
 
 - Desligamento é uma movimentação, registrada e efetivada direto por RH/DP, com
   motivo `encerramento_de_vinculo` e `data_desligamento` no vínculo.
-- Os motivos são deliberadamente organizacionais: "não há 'justa causa',
-  'pedido de demissão' ou equivalente, porque isso seria enquadramento
-  trabalhista" (`schema:956-962`; `A7:388-390`).
+- Os motivos são deliberadamente organizacionais. O comentário do schema, em
+  ASCII no original, diz: "Rotulos deliberadamente ORGANIZACIONAIS, nunca
+  classificacao juridica", sem "justa causa" nem "pedido de demissao", porque
+  isso seria "enquadramento trabalhista" (`schema:956-962`; `A7:388-390`).
 - Não há aprovação (3.4), nem campos de aviso-prévio, comunicação ou último dia.
 - Não há checklist: "o domínio atual não possui checklist, modelo de tarefa,
   template, responsável, prazo ou evento de conclusão"
@@ -357,8 +421,11 @@ pendências e tarefas de transição (R29).
 
 - **Conflito** com `schema:956-962` e `A7:388-390` nos motivos com classificação
   trabalhista. R23 condiciona a lista à validação do DP.
-- **Conflito** com `A15:197-198` no gestor solicitante, e com `BV1` decisão 7 na
-  aprovação.
+- **Conflito** com `A15:197-198`, a `PD-SOL-01` e `rbac:583-586` em o gestor
+  **registrar** a solicitação de desligamento (R21), e com `BV1` decisão 7 na
+  aprovação. Como na admissão (3.4), solicitar não é criar, editar, aprovar nem
+  efetivar: a efetivação fica com RH/DP (R22), e o gestor segue sem mutação até
+  decisão e RBAC próprios.
 - **Conflito** com `A15:104-107` na projeção do desligamento ao gestor.
 - **Lacuna** nas etapas, nos campos por tipo e no checklist.
 - **Insumo** para as 12 perguntas da T155: R26 responde à pergunta 6 (o
@@ -392,8 +459,27 @@ pendências e tarefas de transição (R29).
   documental separada para saúde não está decidida.
 - Validade é `DP-2E-06` e documentos por tipo é `DP-2E-11`, ambos pendentes.
 - O `admin_tecnico` não lê Pessoas (`A7`, decisão 10).
+- O `master_tecnico`, perfil técnico global, só **lê** metadado de documento
+  (`rbac:684-689`). Nos **contatos do colaborador** (classe A2), e só neles, tem
+  leitura e edição em qualquer empresa, auditadas, por exceção que o
+  proprietário decidiu na ficha de Contatos (ADR 0012, Emenda 1, linhas
+  256-276).
 - Não há exclusão física (`A11:206-212`), e nenhum fluxo apaga conteúdo antes da
   política (ADR 0013, decisão 12).
+
+**Reconciliação da R31 com o `master_tecnico`:**
+
+- A R31 trata de **conteúdo documental**: a TI administra acessos técnicos "sem
+  acesso irrestrito ao conteúdo dos documentos por padrão".
+- Hoje **não existe conteúdo documental** no Evolli, só metadado (ADR 0011,
+  decisões 1 e 2). Nenhum perfil técnico tem acesso a conteúdo, porque não há
+  conteúdo; a R31 é, por ora, **convergente**.
+- Contatos não são documento. A exceção do `master_tecnico` em contatos A2
+  **continua exatamente como está**: este diagnóstico **não a amplia nem a
+  revoga**.
+- Se o princípio de menor privilégio da R31, estendido a dado pessoal fora dos
+  documentos, exige reavaliar essa exceção no futuro, é decisão pendente
+  (`DP-FLX-20`). Até ela, nada muda.
 
 **Situação:**
 
@@ -401,10 +487,10 @@ pendências e tarefas de transição (R29).
   o colaborador.
 - **Lacuna** em categoria e na separação de saúde, que tocam `DP-2E-02`.
 - **Insumo** para `DP-2E-06` e `DP-2E-11`.
-- **Convergente** na ausência de exclusão automática e no colaborador sem envio
-  agora.
+- **Convergente** na ausência de exclusão automática, no colaborador sem envio
+  agora e na R31 frente ao conteúdo documental, que não existe.
 
-**Gates:** `DP-FLX-14` e `DP-FLX-15`.
+**Gates:** `DP-FLX-14`, `DP-FLX-15` e `DP-FLX-20`.
 
 ### 3.11 O sistema de folha atual como fonte oficial na transição
 
@@ -455,75 +541,100 @@ fica no plano de implantação (R40).
 
 ## 4. Gates anteriores a qualquer implementação
 
-Nenhum gate abaixo está resolvido. "Quem decide" registra só o que as próprias
-respostas atribuem; onde elas não atribuem, a decisão é do proprietário.
+Nenhum gate abaixo está resolvido. A coluna **Responsável** separa três origens,
+e só elas:
 
-| Gate        | Decisão pendente                                                                                                                                                                     | Reabre ou depende de                                                                                 | Quem decide, segundo as respostas           |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- | ------------------------------------------- |
-| `DP-FLX-01` | Aceite da ADR 0017.                                                                                                                                                                  | —                                                                                                    | Proprietário                                |
-| `DP-FLX-02` | Gestor como solicitante de contratação, alteração e desligamento, e o que ele vê do processo.                                                                                        | Emenda à ADR 0015 (`A15:197-198`) e à `PD-SOL-01`; T165 §5.2; fecha T166 D5; RBAC novo.              | Proprietário                                |
-| `DP-FLX-03` | Alçadas de aprovação: gestor, RH, diretoria e financeira, por empresa; quem é "diretoria" no sistema; aprovação como etapa distinta da efetivação.                                   | Emenda à `BV1` decisão 7 e à `A7` decisão 8; papel inexistente.                                      | Estrutura de alçadas da empresa (R8)        |
-| `DP-FLX-04` | Estados e transições do processo admissional: oito etapas, devolução, cancelamento, "efetivada aguardando início", correção pós-efetivação (inclui T166 D8).                         | `BV1` decisões 2 e 15 (admissão atômica); `validacao:247-253`.                                       | Proprietário                                |
-| `DP-FLX-05` | Ficha de tratamento do CPF: finalidade, base legal, acesso, mascaramento, proteção em repouso, retenção; e o uso do CPF para reconhecer a mesma pessoa.                              | Emenda à `A7:67-70`; `DP-ADM-04`, `-05`, `-07`, `-13`; ADR 0016, decisões 5.4, 5.8 e 5.9.            | RH + Jurídico (ADR 0012, decisão 1)         |
-| `DP-FLX-06` | Fichas das demais categorias pessoais do cadastro e da admissão: data de nascimento, endereço, contato de emergência, e contato "telefone ou e-mail" frente aos três campos da T169. | `BV1:60-62`; `DP-ADM-02`, `-03`; ficha da T169.                                                      | RH + Jurídico                               |
-| `DP-FLX-07` | Catálogo de tipos de vínculo: aprendiz, autônomo, sócio, prestador frente a `pj`, destino de `outro_controlado`; e se o tipo passa a determinar obrigatoriedade.                     | Emenda à `A7:82-86` e à `BV1` decisão 4; `DP-ADM-10`.                                                | Proprietário, com RH/DP                     |
-| `DP-FLX-08` | Catálogo de campos e regras por tipo, empresa, cargo e etapa, inclusive local de trabalho e gestor por vínculo ou por equipe.                                                        | `DP-28`; `DP-2E-10`, `-11`; `DP-ADM-08`, `-17`; `A15:52-57`.                                         | RH/DP                                       |
-| `DP-FLX-09` | Modelo de múltiplos vínculos ativos: na mesma empresa e entre empresas, com cadastro pessoal único.                                                                                  | Emenda à `BV1` decisão 3 e à `A7:74-78`; `A16:460` (`DP-18`); `A16:184-192`; depende de `DP-FLX-05`. | Proprietário                                |
-| `DP-FLX-10` | Transição da matrícula informada na admissão para matrícula gerada na efetivação; identificador provisório; regra do sistema de folha; tratamento das matrículas já existentes.      | `BV1` decisões 2 e 15; `dto:143-155`; `schema:1033`; regra de folha não conhecida.                   | Regra do sistema de folha (R10)             |
-| `DP-FLX-11` | Movimentações ampliadas e correção: tipos novos, correção simples × movimentação com aprovação, forma da justificativa, valores antes/depois, análise do DP com impacto em eSocial.  | `BV1` decisão 11; ADR 0004 decisão 5; `A7:422`; `DP-14`, `DP-18`; correção de nome.                  | Proprietário; análise do DP (R19)           |
-| `DP-FLX-12` | Desligamento: etapas, campos por tipo, motivos com classificação trabalhista e o checklist da T155.                                                                                  | `schema:956-962`; `A7:388-390`; T155 (perguntas 1 a 12).                                             | Classificação validada pelo DP (R23)        |
-| `DP-FLX-13` | Retenção, temporalidade e descarte: tabela por documento e informação, marco inicial, suspensões e descarte seguro.                                                                  | `DP-15`, `DP-ADM-03`, `DP-2E-15`, `PD-DOC-03`, retenção de `audit_event`.                            | DP e jurídico (R35)                         |
-| `DP-FLX-14` | Documentos por vínculo, categoria e período; validade e alertas; checklist documental por tipo; upload.                                                                              | Emenda a `DP-2E-07`; `DP-2E-02`, `-06`, `-10`, `-11`; Nível 2 da Etapa 2; ADR 0013.                  | Proprietário, RH + Jurídico                 |
-| `DP-FLX-15` | Saúde ocupacional: categoria própria para atestados, exames e ASO, e quem acessa.                                                                                                    | `DP-2E-02`; `PD-SOL-05`; `PD-DOC-02`; ADR 0016 (declarações sensíveis, A3).                          | RH + Jurídico                               |
-| `DP-FLX-16` | Dados bancários, sindicais e de dependentes: campos, finalidade, base legal e acesso.                                                                                                | ADR 0016 (bloqueados); `DP-14`, `DP-18`, `DP-ADM-07`, `-13`, `-14`.                                  | Requisitos do DP e do sistema de folha (R6) |
-| `DP-FLX-17` | Integração com a folha e o eSocial: fonte oficial de cada dado, importação com origem, conciliação e plano de implantação.                                                           | `DP-18`; `A16:459`, `A16:489`, `A16:508-510`; levantamento técnico (R36).                            | Plano de implantação (R40)                  |
-| `DP-FLX-18` | Notificações: eventos, destinatários e conteúdo mínimo por permissão.                                                                                                                | Exclusão da T155 (`t155:36-37`); pendência não numerada da Central.                                  | Proprietário                                |
-| `DP-FLX-19` | Projeção do gestor para admissão e desligamento: status, datas previstas, pendências e tarefas sob sua responsabilidade.                                                             | Emenda à `A15:104-107` (decisão 7).                                                                  | Proprietário                                |
+- **Respostas (R)** — quando a própria resposta de RH/DP diz quem decide ou
+  valida;
+- **Decisão anterior** — quando uma ADR ou decisão já registrada atribui o tema,
+  como complemento, distinta do que veio das respostas;
+- **Responsável a definir** — quando nem as respostas nem uma decisão anterior
+  dizem quem decide.
+
+Instrumentos, regras, planos e critérios citados nas respostas — "estrutura de
+alçadas", "regra do sistema de folha", "plano de implantação" — **não são
+responsáveis**: ficam na coluna **Insumos**.
+
+| Gate        | Decisão pendente                                                                                                                                                                                                                                                      | Reabre ou depende de                                                                                                                                        | Responsável                                                                                                                                                                                                                                                                                                          | Insumos                                                                                                      |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `DP-FLX-01` | Aceite da ADR 0017.                                                                                                                                                                                                                                                   | —                                                                                                                                                           | Proprietário — **decisão anterior**: status da própria ADR e precedente de aceite da ADR 0016 (`DP-ADM-01`).                                                                                                                                                                                                         | —                                                                                                            |
+| `DP-FLX-02` | Gestor **registrar** solicitação de contratação, alteração e desligamento; e, como decisão **separada**, gestor **aprovar** o que solicitou (R8). Em nenhum caso criar, editar ou efetivar. Exige alteração própria de RBAC.                                          | Emenda à ADR 0015 (`A15:197-198`) e à `PD-SOL-01`; `rbac:583-586`; fecha o D5 da T166.                                                                      | **Responsável a definir.** Decisão anterior, como complemento: a ADR 0015 foi aprovada pelo proprietário (`A15:40`), e a `PD-SOL-01` por RH, Jurídico, Produto, Diretoria e TI/Segurança (`pacote-decisao-solicitacoes-pessoas.md:3-6`).                                                                             | R7, R8, R17, R21, R22                                                                                        |
+| `DP-FLX-03` | Alçadas de aprovação: gestor, RH, diretoria e financeira, por empresa; aprovação como etapa distinta da efetivação; e a diretoria, hoje escalonamento excepcional fora do sistema, como etapa de aprovação.                                                           | Emenda à `BV1` decisão 7 e à `A7` decisão 8; `rbac:592-593`; `PD-SOL-01`.                                                                                   | **Responsável a definir.**                                                                                                                                                                                                                                                                                           | "estrutura de alçadas da empresa" e "regras internas, orçamento ou nível da vaga" (R8); R17, R22             |
+| `DP-FLX-04` | Estados e transições do processo admissional: oito etapas, devolução, cancelamento, "efetivada aguardando início", correção pós-efetivação (inclui T166 D8); quem opera cada transição, inclusive as etapas 3, 6 e 7, que a ADR 0017 marca como proposta de operação. | `BV1` decisão 15 (admissão atômica); `validacao:247-253`.                                                                                                   | **Responsável a definir.**                                                                                                                                                                                                                                                                                           | R9, R11, R12                                                                                                 |
+| `DP-FLX-05` | Ficha de tratamento do CPF: finalidade, base legal, acesso, mascaramento, proteção em repouso, retenção; e se o CPF passa a reconhecer a mesma pessoa.                                                                                                                | Emenda à `A7:67-70`; `DP-ADM-04`, `-05`, `-07`, `-13`; ADR 0016, decisões 5.4, 5.8 e 5.9.                                                                   | **Responsável a definir pelas respostas.** Decisão anterior, como complemento: a ficha tem responsáveis por item (`A16:245-259`) — finalidade, base legal, classificação e retenção com RH + Jurídico (ADR 0012, decisão 1); campos e perfis com proprietário + RH; proteção em repouso com Segurança (`DP-ADM-13`). | R1 (obrigatoriedade), R37 ("com os cuidados necessários de segurança e proteção de dados")                   |
+| `DP-FLX-06` | Fichas das demais categorias pessoais do cadastro e da admissão: data de nascimento, endereço, contato de emergência; e o contato "telefone ou e-mail" frente aos três campos da T169.                                                                                | `BV1:60-62`; `DP-ADM-02`, `-03`; ficha da T169.                                                                                                             | **Responsável a definir pelas respostas.** Decisão anterior, como complemento: a mesma divisão por item da ficha (`A16:245-259`; ADR 0012, decisão 1).                                                                                                                                                               | R1, R2                                                                                                       |
+| `DP-FLX-07` | Catálogo de tipos de vínculo: aprendiz, autônomo, sócio, prestador frente a `pj`, destino de `outro_controlado`; e se o tipo passa a determinar obrigatoriedade, conforme a leitura de "comportamento" na `A7:82-86`.                                                 | Emenda à `A7:82-86`, se for conflito, e à `BV1` decisão 4; `DP-ADM-10`.                                                                                     | **Responsável a definir.**                                                                                                                                                                                                                                                                                           | "conforme os vínculos efetivamente utilizados pelas empresas" (R3)                                           |
+| `DP-FLX-08` | Catálogo de campos e regras por tipo, empresa, cargo e etapa, inclusive local de trabalho e gestor por vínculo ou por equipe.                                                                                                                                         | `DP-28`; `DP-2E-10`, `-11`; `DP-ADM-08`, `-17`; `A15:52-57`.                                                                                                | **Responsável a definir.**                                                                                                                                                                                                                                                                                           | R1 a R3, R5, R13, R14, R24                                                                                   |
+| `DP-FLX-09` | Vínculos múltiplos, em duas questões separadas: (a) reconhecer a mesma pessoa em empresas diferentes, já compatível com o índice atual; (b) só por decisão explícita, se cabe mais de um vínculo ativo na **mesma** empresa — hipótese que a R4 não afirma.           | (a) depende de `DP-FLX-05` e de `A16:184-192`; (b) emenda à `BV1` decisão 3, à `A7:74-78` e ao índice `vinculo_funcional_ativo_unico`; `A16:460` (`DP-18`). | **Responsável a definir.**                                                                                                                                                                                                                                                                                           | R4 ("quando aplicável"), R37                                                                                 |
+| `DP-FLX-10` | Transição da matrícula informada na admissão para matrícula gerada na efetivação; identificador provisório; tratamento das matrículas já existentes.                                                                                                                  | `BV1` decisão 15; `dto:143-155`; `schema:1033`; `A7:352-353`. A `BV1` decisão 2 (unicidade por empresa) permanece compatível.                               | **Responsável a definir.**                                                                                                                                                                                                                                                                                           | "conforme a regra do sistema de folha" (R10), regra não conhecida neste repositório; R37                     |
+| `DP-FLX-11` | Movimentações ampliadas e correção: tipos novos, correção simples × movimentação com aprovação, forma da justificativa, onde ficam os valores antes/depois, análise do DP com impacto em eSocial, e a correção de nome que sobrescreve.                               | `BV1` decisão 11; ADR 0004 decisão 5, se os valores tiverem de ir à trilha formal; `A7:422`; `DP-14`, `DP-18`; `colaborador.service.ts:336-338`.            | **Responsável a definir.**                                                                                                                                                                                                                                                                                           | R16 a R20; "etapa de análise pelo DP antes da conclusão" (R19), que é etapa do processo, não decisão do gate |
+| `DP-FLX-12` | Desligamento: etapas, campos por tipo, motivos com classificação trabalhista e o checklist da T155.                                                                                                                                                                   | `schema:956-962`; `A7:388-390`; T155 (perguntas 1 a 12).                                                                                                    | **Respostas (R23)**, só para a classificação dos motivos: "deverá ser validada pelo DP". Etapas, campos e checklist: **responsável a definir**.                                                                                                                                                                      | R21 a R28                                                                                                    |
+| `DP-FLX-13` | Retenção, temporalidade e descarte: tabela por documento e informação, marco inicial, suspensões e descarte seguro.                                                                                                                                                   | `DP-15`, `DP-ADM-03`, `DP-2E-15`, `PD-DOC-03`, retenção de `audit_event`.                                                                                   | **Respostas (R35)**: a tabela é "validada com o DP e o jurídico". Decisão anterior, como complemento: retenção e descarte são de RH + Jurídico (ADR 0012, decisão 1; `A16:245-259`). As duas origens não coincidem, e este diagnóstico não escolhe.                                                                  | R20, R35                                                                                                     |
+| `DP-FLX-14` | Documentos por vínculo, categoria e período; validade e alertas; checklist documental por tipo; upload.                                                                                                                                                               | Emenda a `DP-2E-07`; `DP-2E-02`, `-06`, `-10`, `-11`; Nível 2 da Etapa 2; ADR 0013.                                                                         | **Responsável a definir pelas respostas.** Decisão anterior, como complemento: `DP-2E-11` está com RH + Jurídico (`etapa2-documentos-admissao-aprovacoes-pendentes.md:121`), e classificação com RH + Jurídico (ADR 0012, decisão 1).                                                                                | R13, R14, R30, R33, R34                                                                                      |
+| `DP-FLX-15` | Saúde ocupacional: categoria própria para atestados, exames e ASO, e quem acessa.                                                                                                                                                                                     | `DP-2E-02`; `PD-SOL-05`; `PD-DOC-02`; ADR 0016 (declarações sensíveis, A3).                                                                                 | **Responsável a definir pelas respostas.** Decisão anterior, como complemento: classificação e base legal com RH + Jurídico (ADR 0012, decisão 1).                                                                                                                                                                   | R13, R32                                                                                                     |
+| `DP-FLX-16` | Dados bancários, sindicais e de dependentes: campos, finalidade, base legal e acesso.                                                                                                                                                                                 | ADR 0016 (bloqueados); `DP-14`, `DP-18`, `DP-ADM-07`, `-13`, `-14`.                                                                                         | **Responsável a definir pelas respostas.** Decisão anterior, como complemento: finalidade e base legal com RH + Jurídico (ADR 0012, decisão 1).                                                                                                                                                                      | "A obrigatoriedade e os campos específicos devem seguir os requisitos do DP e do sistema de folha" (R6); R2  |
+| `DP-FLX-17` | Integração com a folha e o eSocial: fonte oficial de cada dado, importação com origem, conciliação e plano de implantação.                                                                                                                                            | `DP-18`; `A16:459`, `A16:489`, `A16:508-510`.                                                                                                               | **Responsável a definir.**                                                                                                                                                                                                                                                                                           | levantamento técnico do sistema de folha (R36); plano de implantação "com responsáveis" (R40); R38, R39      |
+| `DP-FLX-18` | Notificações: eventos, destinatários e conteúdo mínimo por permissão.                                                                                                                                                                                                 | Exclusão da T155 (`t155:36-37`); pendência não numerada da Central.                                                                                         | **Responsável a definir.**                                                                                                                                                                                                                                                                                           | R15                                                                                                          |
+| `DP-FLX-19` | Projeção do gestor para admissão e desligamento: status, datas previstas, pendências e tarefas sob sua responsabilidade.                                                                                                                                              | Emenda à `A15:104-107` (decisão 7).                                                                                                                         | **Responsável a definir pelas respostas.** Decisão anterior, como complemento: a ADR 0015 foi aprovada pelo proprietário (`A15:40`).                                                                                                                                                                                 | R29, R31                                                                                                     |
+| `DP-FLX-20` | Se o menor privilégio da R31 exige, no futuro, reavaliar a exceção do `master_tecnico` em contatos A2. Até a decisão, a exceção permanece **exatamente** como está.                                                                                                   | ADR 0012, Emenda 1; ficha de Contatos.                                                                                                                      | **Responsável a definir pelas respostas.** Decisão anterior, como complemento: a exceção foi decidida pelo proprietário na ficha de Contatos (ADR 0012, Emenda 1).                                                                                                                                                   | R31                                                                                                          |
 
 ## 5. Conflitos com decisões fechadas
 
-Lista consolidada, para que nenhum fique escondido em uma seção:
+Lista consolidada, para que nenhum fique escondido em uma seção. Os itens
+marcados **condicional** só são conflito numa das leituras possíveis da resposta;
+a leitura cabe ao responsável do gate, não a este diagnóstico.
 
-1. **CPF como identificação da pessoa** × `A7:67-70` ("não é chave [...] de
-   unicidade [...] em nenhuma hipótese") — 3.1.
-2. **Matrícula só na efetivação** × admissão atômica com matrícula obrigatória
-   (`BV1`, decisões 2 e 15; `dto:143-155`) — 3.2.
-3. **Mais de um vínculo ativo na mesma empresa** × `BV1` decisão 3, `A7:74-78`
-   e o índice `vinculo_funcional_ativo_unico` — 3.3.
-4. **Gestor solicitante** × `A15:197-198`, `PD-SOL-01` e T165 §5.2 — 3.4 e 3.9.
-5. **Workflow de aprovação** × `BV1` decisão 7 e `A7:115-118` — 3.4 e 3.9.
-6. **Tipo de vínculo que determina obrigatoriedade** × `A7:82-86` — 3.5.
-7. **Gestor como atributo do vínculo**, se for essa a leitura de R5 ×
-   `A15:52-57` — 3.7.
-8. **Justificativa em texto livre**, se for essa a leitura de R12, R19, R21 e
-   R28 × `BV1` decisão 11 — 3.8.
-9. **Valores antes/depois na trilha** × ADR 0004 decisão 5; e a correção de nome
-   que sobrescreve o valor × R20 — 3.8.
-10. **Motivos de desligamento com classificação trabalhista** ×
-    `schema:956-962` e `A7:388-390` — 3.9.
-11. **Projeção do desligamento ao gestor** × `A15:104-107` — 3.9.
-12. **Documento por vínculo e período** × `DP-2E-07` — 3.10.
+| #   | Resposta                                                                                  | Decisão que contraria                                                                                | Tipo        | Seção    | Gate                     |
+| --- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | ----------- | -------- | ------------------------ |
+| 1   | CPF como identificação da pessoa (R37)                                                    | `A7:67-70`: documento "não é chave [...] de unicidade [...] em nenhuma hipótese"                     | firme       | 3.1      | `DP-FLX-05`              |
+| 2   | Matrícula só na efetivação (R10)                                                          | `BV1` decisão 15 (admissão atômica) e matrícula obrigatória do vínculo (`dto:143-155`; `A7:352-353`) | firme       | 3.2      | `DP-FLX-04`, `DP-FLX-10` |
+| 3   | Mais de um vínculo ativo na **mesma** empresa, se vier a ser decidido — a R4 não o afirma | `BV1` decisão 3, `A7:74-78` e o índice `vinculo_funcional_ativo_unico`                               | condicional | 3.3      | `DP-FLX-09`              |
+| 4   | Gestor **registrar** solicitação (R7, R17, R21) e **aprovar** (R8)                        | `A15:197-198`, `PD-SOL-01` e `rbac:583-586`                                                          | firme       | 3.4, 3.9 | `DP-FLX-02`              |
+| 5   | Aprovação por alçada (R8, R17, R22)                                                       | `BV1` decisão 7 e `A7:115-118`                                                                       | firme       | 3.4, 3.9 | `DP-FLX-03`              |
+| 6   | Tipo de vínculo que determina campos e documentos (R3)                                    | `A7:82-86`, conforme a leitura de "comportamento"                                                    | condicional | 3.5      | `DP-FLX-07`              |
+| 7   | Gestor como atributo do vínculo, se for essa a leitura de R5                              | `A15:52-57`                                                                                          | condicional | 3.7      | `DP-FLX-08`              |
+| 8   | Justificativa em texto livre, se for essa a leitura de R12, R19, R21 e R28                | `BV1` decisão 11                                                                                     | condicional | 3.8      | `DP-FLX-11`              |
+| 9   | Valores antes/depois **na trilha formal**, se a R19 o exigir                              | ADR 0004, decisão 5                                                                                  | condicional | 3.8      | `DP-FLX-11`              |
+| 10  | Motivos de desligamento com classificação trabalhista (R23)                               | `schema:956-962` e `A7:388-390`                                                                      | firme       | 3.9      | `DP-FLX-12`              |
+| 11  | Projeção do desligamento ao gestor (R29)                                                  | `A15:104-107`                                                                                        | firme       | 3.9      | `DP-FLX-19`              |
+| 12  | Documento por vínculo e período (R30)                                                     | `DP-2E-07`                                                                                           | firme       | 3.10     | `DP-FLX-14`              |
+
+**Fora da lista, por não serem conflito com decisão fechada:**
+
+- vínculos ativos em **empresas diferentes**: compatíveis com o índice atual, com
+  lacuna de reconhecimento da pessoa (3.3);
+- a correção de nome que sobrescreve o valor: **divergência de comportamento** de
+  código em relação à R20 (3.8);
+- a diretoria como escalonamento excepcional fora do sistema (`PD-SOL-01`, que
+  trata da Central de Solicitações; `rbac:592-593`) frente à diretoria como
+  etapa de aprovação (R8): **tensão**, tratada em `DP-FLX-03` (3.4);
+- a R31 frente à exceção do `master_tecnico` em contatos: **convergente** hoje,
+  com reavaliação futura em `DP-FLX-20` (3.10).
 
 ## 6. Sequência proposta de fatias
 
-**É proposta, não autorização.** Cada fatia só começa com os seus gates decididos
-e com pedido expresso do proprietário. A ordem põe primeiro o que reorganiza o
-processo sem dado pessoal novo, e deixa para o fim o que depende de upload, de
-fichas de categorias A3 ou de integração externa.
+**É proposta, não autorização.** Nenhuma fatia começa automaticamente: cada uma
+só começa com os seus gates decididos **e** com pedido expresso do proprietário.
+A ordem põe primeiro o que reorganiza o processo sem dado pessoal novo, e deixa
+para o fim o que depende de upload, de fichas de categorias A3 ou de integração
+externa.
 
-| Ordem | Fatia                                                                                                                                                                                           | Gates prévios                                                  |
-| ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| 0     | Decisões, sem código: aceite da ADR 0017 e as emendas dos conflitos 1 a 12.                                                                                                                     | `DP-FLX-01` a `-03`, `-05`, `-07`, `-09`, `-10`                |
-| 1     | Processo de admissão como entidade própria, separada do vínculo, com etapas, devolução e cancelamento, operado só por RH/DP.                                                                    | `DP-FLX-01`, `-04`                                             |
-| 2     | Identificador provisório e matrícula definitiva na efetivação; "efetivada, aguardando início" distinta de vínculo ativo.                                                                        | `DP-FLX-04`, `-10`                                             |
-| 3     | Solicitação de admissão pelo gestor e aprovações por alçada.                                                                                                                                    | `DP-FLX-02`, `-03`, `-19`                                      |
-| 4     | Catálogo de tipos de vínculo e regras de obrigatoriedade configuráveis por tipo, empresa, cargo e etapa.                                                                                        | `DP-FLX-07`, `-08`                                             |
-| 5     | CPF e demais dados do cadastro inicial, cada um com a sua ficha aprovada e o MFA imposto onde a ADR 0016 exige.                                                                                 | `DP-FLX-05`, `-06`; `DP-ADM-07`                                |
-| 6     | Múltiplos vínculos ativos, com cadastro pessoal único entre empresas.                                                                                                                           | `DP-FLX-09`, depois da fatia 5                                 |
-| 7     | Movimentações ampliadas (gestor, local de trabalho, jornada, empresa contratante), com aprovação e correção rastreável; salário só depois de `DP-14` e `DP-18`.                                 | `DP-FLX-03`, `-11`                                             |
-| 8     | Desligamento com solicitação, aprovação, efetivação e campos por tipo.                                                                                                                          | `DP-FLX-02`, `-03`, `-12`, `-19`                               |
-| 9     | Checklists de admissão e desligamento (T155), sem bloqueio automático da efetivação sem regra validada.                                                                                         | `DP-FLX-08`, `-12`                                             |
-| 10    | Bloqueados por portões externos: documentos por vínculo e categoria, upload, saúde ocupacional, bancário, sindical, dependentes, notificações, integração com folha e eSocial, autoatendimento. | `DP-FLX-13` a `-18`; Nível 2 da Etapa 2; Portal do Colaborador |
+| Ordem | Fatia                                                                                                                                                                                                 | Gates prévios                                                                                                             |
+| ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| 0     | Decisões, sem código: aceite da ADR 0017 e a decisão de cada um dos 12 conflitos da seção 5 (emenda, recusa ou leitura que dissolva o condicional).                                                   | `DP-FLX-01`; e os gates dos conflitos: `-02`, `-03`, `-04`, `-05`, `-07`, `-08`, `-09`, `-10`, `-11`, `-12`, `-14`, `-19` |
+| 1     | Processo de admissão como entidade própria, separada do vínculo, com etapas, devolução e cancelamento, operado só por RH/DP.                                                                          | `DP-FLX-01`, `-04`                                                                                                        |
+| 2     | Identificador provisório e matrícula definitiva na efetivação; "efetivada, aguardando início" distinta de vínculo ativo.                                                                              | `DP-FLX-04`, `-10`                                                                                                        |
+| 3     | Solicitação pelo gestor — registro do pedido, sem criar, editar nem efetivar — e aprovações por alçada, inclusive a do gestor solicitante se for decidida; com alteração própria de RBAC.             | `DP-FLX-02`, `-03`, `-19`                                                                                                 |
+| 4     | Catálogo de tipos de vínculo e regras de obrigatoriedade configuráveis por tipo, empresa, cargo e etapa.                                                                                              | `DP-FLX-07`, `-08`                                                                                                        |
+| 5     | CPF e demais dados do cadastro inicial, cada um com a sua ficha aprovada e o MFA imposto onde a ADR 0016 exige.                                                                                       | `DP-FLX-05`, `-06`; `DP-ADM-07`                                                                                           |
+| 6     | Mesma pessoa reconhecida entre empresas, com cadastro pessoal único e vínculos ativos em empresas diferentes. Mais de um ativo na **mesma** empresa só entra se `DP-FLX-09` o decidir explicitamente. | `DP-FLX-05`, `-09`; depois da fatia 5                                                                                     |
+| 7     | Movimentações ampliadas (gestor, local de trabalho, jornada, empresa contratante), com aprovação e correção rastreável; salário só depois de `DP-14` e `DP-18`.                                       | `DP-FLX-03`, `-11`                                                                                                        |
+| 8     | Desligamento com solicitação, aprovação, efetivação e campos por tipo.                                                                                                                                | `DP-FLX-02`, `-03`, `-12`, `-19`                                                                                          |
+| 9     | Checklists de admissão e desligamento (T155), sem bloqueio automático da efetivação sem regra validada.                                                                                               | `DP-FLX-08`, `-12`                                                                                                        |
+| 10    | Bloqueados por portões externos: documentos por vínculo e categoria, upload, saúde ocupacional, bancário, sindical, dependentes, notificações, integração com folha e eSocial, autoatendimento.       | `DP-FLX-13` a `-18`; Nível 2 da Etapa 2; Portal do Colaborador                                                            |
+
+`DP-FLX-20` não condiciona nenhuma fatia: é reavaliação futura de uma exceção
+que continua valendo como está.
 
 ## 7. Declarações desta tarefa
 
