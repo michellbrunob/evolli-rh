@@ -17,6 +17,7 @@ import {
   ambienteParaGerar,
   avaliarGeracao,
   destinoEsperadoDoClient,
+  executarGeracao,
 } from "./prisma-generate-api.core.mjs";
 
 test("o generate roda sem INIT_CWD — é o que tira o Prisma do ramo que grava na raiz", () => {
@@ -107,6 +108,170 @@ test("a tolerância de relógio de arquivo é de 2 s, e só isso", () => {
   );
   assert.equal(
     avaliarGeracao({ destino: "d", geradoEmMs: 7_999, inicioMs: 10_000 }).ok,
+    false,
+  );
+});
+
+// ---------------------------------------------------------------------------
+// executarGeracao — a camada de efeitos, com efeitos falsos (T171, B-1)
+// ---------------------------------------------------------------------------
+
+const PACOTE_REAL = join(
+  "repo",
+  "node_modules",
+  ".pnpm",
+  "@prisma+client@5.22.0_prisma@5.22.0",
+  "node_modules",
+  "@prisma",
+  "client",
+);
+// Caminho pelo link (junction/symlink) que a resolução de módulo devolve; o
+// destino só é certo se calculado a partir do caminho REAL.
+const PACOTE_LINK = join(
+  "repo",
+  "apps",
+  "api",
+  "node_modules",
+  "@prisma",
+  "client",
+);
+const DESTINO = destinoEsperadoDoClient(PACOTE_REAL);
+const CLI_PRISMA = join("repo", "node_modules", "prisma", "build", "index.js");
+
+function efeitosFalsos({
+  status = 0,
+  signal = null,
+  error = null,
+  geradoEmMs = 10_500,
+  inicioMs = 10_000,
+  // Quanto tempo o generate "leva": o relógio avança quando o executor roda.
+  depoisMs = 99_999,
+} = {}) {
+  const chamadas = [];
+  const lidas = [];
+  const ambiente = {
+    INIT_CWD: "C:\\repo",
+    npm_lifecycle_event: "postinstall",
+    PATH: "C:\\bin",
+    DATABASE_URL: "postgresql://x",
+  };
+  let tempo = inicioMs;
+  const deps = {
+    dirApi: join("repo", "apps", "api"),
+    ambiente,
+    executar: (args, opcoes) => {
+      chamadas.push({ args, opcoes });
+      tempo = depoisMs;
+      return { status, signal, error };
+    },
+    resolverModulo: (especificador) => {
+      if (especificador === "prisma/build/index.js") return CLI_PRISMA;
+      if (especificador === "@prisma/client/package.json") {
+        return join(PACOTE_LINK, "package.json");
+      }
+      throw new Error(`resolução inesperada: ${especificador}`);
+    },
+    caminhoReal: (caminho) =>
+      caminho === join(PACOTE_LINK, "package.json")
+        ? join(PACOTE_REAL, "package.json")
+        : caminho,
+    dataDeModificacao: (caminho) => {
+      lidas.push(caminho);
+      return caminho === join(DESTINO, "index.d.ts") ? geradoEmMs : null;
+    },
+    // O relógio AVANÇA enquanto o generate roda: se o instante de início fosse
+    // lido depois dele, um client recente pareceria antigo e a geração falharia.
+    agora: () => tempo,
+  };
+  return { deps, chamadas, lidas, ambiente };
+}
+
+test("o generate roda na API, com os argumentos oficiais e o ambiente original menos INIT_CWD", () => {
+  const f = efeitosFalsos();
+  executarGeracao(f.deps);
+  assert.equal(f.chamadas.length, 1);
+  const [{ args, opcoes }] = f.chamadas;
+  assert.deepEqual(args, [CLI_PRISMA, ...ARGUMENTOS_GENERATE]);
+  assert.deepEqual(args.slice(1), [
+    "generate",
+    "--schema=prisma/schema.prisma",
+    "--allow-no-models",
+  ]);
+  assert.equal(opcoes.cwd, join("repo", "apps", "api"));
+  assert.deepEqual(opcoes.env, {
+    npm_lifecycle_event: "postinstall",
+    PATH: "C:\\bin",
+    DATABASE_URL: "postgresql://x",
+  });
+  // O ambiente do processo não é alterado.
+  assert.equal(f.ambiente.INIT_CWD, "C:\\repo");
+});
+
+test("client recente no destino certo (calculado pelo caminho real): sucesso", () => {
+  const f = efeitosFalsos();
+  assert.deepEqual(executarGeracao(f.deps), {
+    ok: true,
+    codigo: 0,
+    mensagem: null,
+  });
+  assert.deepEqual(f.lidas, [join(DESTINO, "index.d.ts")]);
+});
+
+test("saída diferente de zero falha com o mesmo código, sem conferir o destino", () => {
+  for (const status of [1, 3]) {
+    const f = efeitosFalsos({ status });
+    assert.deepEqual(executarGeracao(f.deps), {
+      ok: false,
+      codigo: status,
+      mensagem: null,
+    });
+    assert.equal(f.lidas.length, 0);
+  }
+});
+
+test("término por sinal (status nulo) falha com código 1", () => {
+  const f = efeitosFalsos({ status: null, signal: "SIGTERM" });
+  assert.deepEqual(executarGeracao(f.deps), {
+    ok: false,
+    codigo: 1,
+    mensagem: null,
+  });
+});
+
+test("generate que nem executa falha com código 1 e a causa", () => {
+  const f = efeitosFalsos({ status: null, error: new Error("spawn EPERM") });
+  const r = executarGeracao(f.deps);
+  assert.equal(r.ok, false);
+  assert.equal(r.codigo, 1);
+  assert.match(r.mensagem, /prisma generate não executou: spawn EPERM/);
+});
+
+test("client ausente do destino falha com código 1 e a causa", () => {
+  const f = efeitosFalsos({ geradoEmMs: null });
+  const r = executarGeracao(f.deps);
+  assert.equal(r.ok, false);
+  assert.equal(r.codigo, 1);
+  assert.match(r.mensagem, /não gerou o client em/);
+  assert.ok(r.mensagem.includes(DESTINO));
+});
+
+test("client antigo no destino, segundo o relógio injetado, falha", () => {
+  const f = efeitosFalsos({ geradoEmMs: 1_000, inicioMs: 60_000 });
+  const r = executarGeracao(f.deps);
+  assert.equal(r.ok, false);
+  assert.equal(r.codigo, 1);
+  assert.match(r.mensagem, /anterior a esta geração/);
+});
+
+test("a tolerância continua de 2 s também na execução", () => {
+  assert.equal(
+    executarGeracao(efeitosFalsos({ geradoEmMs: 8_000, inicioMs: 10_000 }).deps)
+      .ok,
+    true,
+  );
+  assert.equal(
+    executarGeracao(efeitosFalsos({ geradoEmMs: 7_999, inicioMs: 10_000 }).deps)
+      .ok,
     false,
   );
 });

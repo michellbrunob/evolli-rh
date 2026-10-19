@@ -24,7 +24,7 @@
  * Prisma cai no ramo 3 em qualquer sistema. No Linux nada muda: o ramo 1 já
  * acertava antes. Nenhuma dependência é alterada.
  */
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 /** Argumentos do `prisma generate`, iguais aos do `postinstall` anterior. */
 export const ARGUMENTOS_GENERATE = Object.freeze([
@@ -80,4 +80,66 @@ export function avaliarGeracao({ destino, geradoEmMs, inicioMs }) {
     };
   }
   return { ok: true, motivo: null };
+}
+
+/**
+ * Executa o `prisma generate` da API e confere o resultado (T171, B-1).
+ *
+ * Toda a lógica da camada de efeitos vive aqui, com os efeitos INJETADOS, para
+ * que o teste prove a correção sem Prisma real: é nesta função que o
+ * `INIT_CWD` sai do ambiente e que o destino do client é verificado. A CLI
+ * (`prisma-generate-api.mjs`) só liga esta função aos efeitos reais
+ * (`prisma-generate-api.efeitos.mjs`) e traduz o resultado em código de saída.
+ *
+ * Dependências:
+ * - `dirApi` — diretório da API (`cwd` do `generate`);
+ * - `ambiente` — ambiente ORIGINAL do processo; o `generate` recebe uma cópia
+ *   sem `INIT_CWD`;
+ * - `executar(args, { cwd, env })` — roda `node <args>` e devolve
+ *   `{ status, signal, error }`, como o `spawnSync`;
+ * - `resolverModulo(especificador)` — resolve a partir da API;
+ * - `caminhoReal(caminho)` — o `realpath`;
+ * - `dataDeModificacao(caminho)` — ms de época, ou `null` se não existe;
+ * - `agora()` — ms de época.
+ *
+ * Devolve `{ ok, codigo, mensagem }`: `codigo` é o código de saída do processo,
+ * e `mensagem` é o texto a escrever em stderr (ou `null`).
+ */
+export function executarGeracao({
+  dirApi,
+  ambiente,
+  executar,
+  resolverModulo,
+  caminhoReal,
+  dataDeModificacao,
+  agora,
+}) {
+  const inicioMs = agora();
+  const cli = resolverModulo("prisma/build/index.js");
+  const resultado = executar([cli, ...ARGUMENTOS_GENERATE], {
+    cwd: dirApi,
+    env: ambienteParaGerar(ambiente),
+  });
+  if (resultado.error) {
+    return {
+      ok: false,
+      codigo: 1,
+      mensagem: `prisma generate não executou: ${resultado.error.message}\n`,
+    };
+  }
+  // `status` nulo é término por sinal: falha, com código 1.
+  if (resultado.status !== 0) {
+    return { ok: false, codigo: resultado.status ?? 1, mensagem: null };
+  }
+
+  const dirPacoteClient = dirname(
+    caminhoReal(resolverModulo("@prisma/client/package.json")),
+  );
+  const destino = destinoEsperadoDoClient(dirPacoteClient);
+  const geradoEmMs = dataDeModificacao(join(destino, "index.d.ts"));
+  const avaliacao = avaliarGeracao({ destino, geradoEmMs, inicioMs });
+  if (!avaliacao.ok) {
+    return { ok: false, codigo: 1, mensagem: `\n${avaliacao.motivo}\n` };
+  }
+  return { ok: true, codigo: 0, mensagem: null };
 }

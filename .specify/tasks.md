@@ -1878,7 +1878,10 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       client desta rodada ficou ao lado do `@prisma/client`; se não ficou, a
       instalação falha com a causa. Nenhuma dependência muda. O passo 1/8 da
       demonstração passou a exigir o Node do `.nvmrc` e o pnpm do
-      `packageManager`. Testes: 8 do wrapper e 8 da trava, em `test:scripts`.
+      `packageManager`. Testes em `test:scripts`, sem Prisma real: 16 da execução do
+      wrapper com efeitos injetados, 5 dos efeitos reais, 8 da trava e 2 da CLI
+      da demonstração; restaurar o `INIT_CWD`, remover a falha de client
+      ausente ou antigo e omitir a versão do Node reprovam.
     - **Prévia validada no navegador** em `http://127.0.0.1:5173` (API em
       `127.0.0.1:3100`, banco de demonstração em `127.0.0.1:5433`): oito passos,
       17 migrations do zero e seed sintético; login, Hub, colaboradores, contatos
