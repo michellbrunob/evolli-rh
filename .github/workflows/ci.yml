@@ -27,7 +27,10 @@ jobs:
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          # T170 — a versão vem do `.nvmrc` (Node 24 LTS), a fonte única: o
+          # rollback para Node 22 é trocar aquele arquivo e os `engines`, sem
+          # editar os jobs.
+          node-version-file: .nvmrc
           cache: pnpm
       # `--frozen-lockfile`: a instalação falha se `pnpm-lock.yaml` divergir do
       # `package.json`, em vez de resolver silenciosamente uma árvore de
@@ -74,7 +77,10 @@ jobs:
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          # T170 — a versão vem do `.nvmrc` (Node 24 LTS), a fonte única: o
+          # rollback para Node 22 é trocar aquele arquivo e os `engines`, sem
+          # editar os jobs.
+          node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
 
@@ -97,7 +103,10 @@ jobs:
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          # T170 — a versão vem do `.nvmrc` (Node 24 LTS), a fonte única: o
+          # rollback para Node 22 é trocar aquele arquivo e os `engines`, sem
+          # editar os jobs.
+          node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
 

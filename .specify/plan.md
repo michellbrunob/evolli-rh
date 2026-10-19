@@ -71,7 +71,7 @@ aprovação quando homologado. Enquanto uma alçada não estiver definida, a aç
 
 | Camada                   | Atual no repositório                                                 | Uso e diretriz                                                                                                                       |
 | ------------------------ | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| Linguagem e monorepo     | Node.js 22, TypeScript 5.7 em modo estrito, pnpm 10, Turborepo 2     | código compartilhado, build e verificações consistentes                                                                              |
+| Linguagem e monorepo     | Node.js 24 LTS, TypeScript 5.7 em modo estrito, pnpm 10, Turborepo 2 | código compartilhado, build e verificações consistentes                                                                              |
 | API                      | NestJS 10, API REST versionada em `/v1`, OpenAPI/Swagger             | módulos de domínio, validação, guards e casos de uso                                                                                 |
 | Persistência             | PostgreSQL 16, Prisma 5, migrations versionadas                      | fonte transacional; migrations aditivas e revisadas                                                                                  |
 | Testes                   | Jest, Supertest, Testcontainers                                      | unitários, E2E/integração e banco PostgreSQL efêmero real                                                                            |

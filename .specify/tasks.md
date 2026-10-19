@@ -1747,9 +1747,11 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
     - **Dívida preservada:** R-3 (T162), R-3 da revisão da T164, S2 (T161), R1 a R3 (T160), L3, S-1 a S-4 (T158), R-A a R-C (T157), o registro `teste michell`, a decisão `DP-29` (se `outro_controlado` vale para admissão) e a limitação de validação em navegador da T167.
 
 66. **T169 - Contatos do colaborador**
-    - **Estado:** **implementada em Draft**. Branch
-      `codex/t169-contatos-colaborador`, a partir do squash
+    - **Estado:** **integrada** em `main` pela PR #161, squash
+      `0fa2e1e930bc86f545d37839c42a385b3ed05cfa`, com a CI de push 3/3 verde. Branch
+      `codex/t169-contatos-colaborador` preservada, criada a partir do squash
       `db9b023dc11c9fcfa2397b016713939f119c0a6f` (T168, PR #160).
+    - **Pendências preservadas:** o processo de eliminação ou anonimização após 2 anos do desligamento; as rotas de exportação e exclusão de contatos, cuja auditoria é obrigatória quando existirem; a origem e a evidência da coleta, lacuna da ficha; a validação visual em navegador; e as observações N-2 (criação concorrente de contato que perde na unicidade responde 409 sem trilha), N-3 (`ON UPDATE CASCADE` nas FKs do evento de contato permite reescrita indireta) e N-4 (CHECK do evento mais frouxo que o serviço), além da docstring do serviço de contatos que ainda descreve o `resourceId` de forma absoluta.
     - **Ficha aprovada pelo proprietário em 2026-10-16**, formalizada em
       [ficha de tratamento dos contatos](../docs/decisions/ficha-tratamento-contatos-colaborador.md): e-mail pessoal, celular e telefone; finalidade de cadastro e
       comunicação operacional durante a relação de trabalho; execução do
@@ -1817,6 +1819,49 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       e-mail corporativo persistido no perfil, fluxo de admissão, Docker, banco
       de demonstração, seed e processos.
     - **Dívida preservada:** R-3 (T162), R-3 da revisão da T164, S2 (T161), R1 a R3 (T160), L3, S-1 a S-4 (T158), R-A a R-C (T157), o registro `teste michell`, a decisão `DP-29` (se `outro_controlado` vale para admissão) e a limitação de validação em navegador da T167.
+
+67. **T170 - Migração controlada para Node 24 LTS**
+    - **Estado:** **implementada em Draft**. Branch `codex/t170-node-24-lts`, a
+      partir do squash `0fa2e1e930bc86f545d37839c42a385b3ed05cfa` (T169, PR #161).
+      Detalhes e evidências em [decisão da T170](../docs/decisions/t170-node-24-lts.md).
+    - **Entregue:** `.nvmrc` em `24`; `engines.node` em `>=24 <25` nos três
+      `package.json`; os três jobs da CI leem a versão do `.nvmrc`
+      (`node-version-file`), a fonte única; README, guia de demonstração e
+      `plan.md` atualizados. pnpm segue `10.0.0`, o lockfile não muda e nenhuma
+      dependência troca de versão — `@types/node` segue em `^22`, como decisão
+      separada.
+    - **Compatibilidade:** nenhuma incompatibilidade causada pelo Node 24 foi
+      encontrada, então não há correção de código. No Node 24.19.0, instalação
+      limpa com lockfile congelado, `argon2` nativo e engines do Prisma 5.22
+      funcionam; lint, typecheck, build e testes passam (API 968, web 1614,
+      scripts 151), sem aviso de depreciação do runtime. As medições do `tsc`
+      foram repetidas no Node 22.23.3, com resultado idêntico.
+    - **Rollback, rota preferida (manual):** voltar `.nvmrc` e `engines` para
+      Node 22 (a CI acompanha o `.nvmrc`); atualizar README, guia local,
+      `plan.md` e os três comentários da CI que mencionam Node 24 LTS; refazer
+      `pnpm install --frozen-lockfile`. Não toca o restante do Spec Kit — T169 e
+      T170 continuam registradas. Não há migration, dado nem dependência a
+      desfazer.
+    - **Rollback, rota excepcional (`git revert` do squash):** não equivale à
+      manual. Desfaz também a convergência da T169, o registro da T170 e o
+      documento de decisão, e exige depois uma nova convergência documental
+      para preservar a T169 como integrada.
+    - **Pendência nova, de ambiente, não causada pelo Node 24:** no Windows, o
+      `prisma generate` do `postinstall` grava o client em `node_modules/.prisma`
+      na raiz, e o `tsc` da API estoura a pilha até rodar
+      `pnpm --filter @evolli/api exec prisma generate`. Idêntico no Node 22; não
+      aparece na CI em Linux.
+    - **Objetivo:** levar a política do projeto para Node 24 LTS em tudo o que
+      declara ou executa Node — `.nvmrc`, `engines`, CI e documentação —,
+      mantendo pnpm 10.
+    - **Regras:** nenhuma dependência de produto atualizada (Prisma, Nest,
+      React, Vite, TypeScript e demais); nenhuma mudança funcional de RH,
+      contatos, auditoria, RBAC, schema ou migrations de negócio; só se
+      corrige incompatibilidade comprovadamente causada pelo Node 24; a
+      estratégia de rollback para Node 22 fica registrada.
+    - **Fora de escopo:** pnpm 11, migration aplicada localmente, seed e banco
+      de demonstração.
+    - **Dívida preservada:** R-3 (T162), R-3 da revisão da T164, S2 (T161), R1 a R3 (T160), L3, S-1 a S-4 (T158), R-A a R-C (T157), o registro `teste michell`, a decisão `DP-29` (se `outro_controlado` vale para admissão) e a limitação de validação em navegador da T167. As pendências da T169 seguem abertas: o processo de eliminação ou anonimização após 2 anos do desligamento; as rotas de exportação e exclusão de contatos, cuja auditoria é obrigatória quando existirem; a origem e a evidência da coleta, lacuna da ficha; a validação visual em navegador; e as observações N-2 (criação concorrente de contato que perde na unicidade responde 409 sem trilha), N-3 (`ON UPDATE CASCADE` nas FKs do evento de contato permite reescrita indireta) e N-4 (CHECK do evento mais frouxo que o serviço), além da docstring do serviço de contatos que ainda descreve o `resourceId` de forma absoluta.
 
 ## Regra obrigatória para as próximas tarefas
 
