@@ -6,6 +6,7 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
+import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ColaboradoresScreen } from "./ColaboradoresScreen";
 import {
@@ -2624,6 +2625,68 @@ describe("ColaboradoresScreen (T169 — contatos do colaborador)", () => {
     ).toBeNull();
   });
 
+  // ---- T172 — o aviso da seção tem classe PRÓPRIA --------------------------
+  //
+  // `colaboradores-screen__aviso-texto` (T111) tem `flex: 1 1 16rem`, feito
+  // para dividir a linha com o selo no banner. Dentro da seção Contatos, que é
+  // uma coluna flex, o `flex-basis` virava ALTURA: o aviso ocupava 256 px e
+  // abria um vão sob o texto. O jsdom não mede layout, então o teste prende o
+  // que o causa — a classe — e o contrato de CSS (bloco no fim do arquivo)
+  // prende o que a classe nova NÃO pode ter.
+
+  it("T172 — sem registro: o aviso usa a classe própria e não a flexível da T111", async () => {
+    const secao = await abrirDetalheDeAna();
+    const aviso = await within(secao).findByText(/Nenhum contato registrado/);
+
+    expect(aviso.tagName).toBe("P");
+    expect(aviso).toHaveClass("colaboradores-screen__contatos-aviso");
+    expect(aviso).not.toHaveClass("colaboradores-screen__aviso-texto");
+    // Nada na seção inteira — incluindo o formulário — usa a classe da T111.
+    expect(
+      secao.querySelector(".colaboradores-screen__aviso-texto"),
+    ).toBeNull();
+    // O texto e os campos obrigatórios continuam os mesmos.
+    expect(aviso).toHaveTextContent(
+      "Nenhum contato registrado. Informe os três campos para salvar.",
+    );
+    expect(email()).toHaveAttribute("aria-required", "true");
+  });
+
+  it("T172 — bloqueado: o aviso usa a classe própria, mantém o status e não usa a da T111", async () => {
+    vi.mocked(consultarContatosDoColaborador).mockResolvedValueOnce({
+      ...registrado,
+      situacao: "bloqueado",
+      contatos: null,
+    });
+    const secao = await abrirDetalheDeAna();
+    const aviso = await within(secao).findByText(/estão bloqueados/);
+
+    expect(aviso.tagName).toBe("P");
+    expect(aviso).toHaveClass("colaboradores-screen__contatos-aviso");
+    expect(aviso).not.toHaveClass("colaboradores-screen__aviso-texto");
+    expect(
+      secao.querySelector(".colaboradores-screen__aviso-texto"),
+    ).toBeNull();
+    // O anúncio para leitor de tela é o de antes.
+    expect(aviso).toHaveAttribute("role", "status");
+  });
+
+  it("T172 — com contatos: não há aviso de vazio, e a seção segue sem a classe da T111", async () => {
+    vi.mocked(consultarContatosDoColaborador).mockResolvedValueOnce(registrado);
+    const secao = await abrirDetalheDeAna();
+    await waitFor(() =>
+      expect(email()).toHaveValue("ana.contato@example.test"),
+    );
+
+    expect(within(secao).queryByText(/Nenhum contato registrado/)).toBeNull();
+    expect(
+      secao.querySelector(".colaboradores-screen__contatos-aviso"),
+    ).toBeNull();
+    expect(
+      secao.querySelector(".colaboradores-screen__aviso-texto"),
+    ).toBeNull();
+  });
+
   it("leitura recusada mostra o motivo e permite tentar de novo", async () => {
     vi.mocked(consultarContatosDoColaborador).mockRejectedValueOnce(
       recusa(403, "Acesso negado."),
@@ -2808,5 +2871,66 @@ describe("ColaboradoresScreen (T169 — contatos do colaborador)", () => {
     expect(
       await within(secao).findByText("Contatos salvos."),
     ).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T172 — contrato de CSS da seção Contatos (jsdom não mede layout)
+//
+// O vão de 256 px nasceu de uma regra de CSS, não de lógica. Estes casos
+// prendem a regra: a classe própria do aviso NÃO pode ter nenhuma propriedade
+// `flex*` (com `flex-basis` numa coluna flex, ela voltaria a virar altura), e a
+// regra compartilhada da T111 NÃO pode ter sido alterada para consertar o
+// problema por cima dela.
+// ---------------------------------------------------------------------------
+describe("T172 — contrato de CSS da seção Contatos", () => {
+  // Caminho relativo à raiz do pacote, como nos demais testes de CSS:
+  // `import.meta.url` não é um URL `file:` sob esta configuração do Vitest.
+  const css = readFileSync(
+    "src/screens/pessoas/ColaboradoresScreen.css",
+    "utf8",
+  );
+
+  /** Corpo da regra cujo seletor é exatamente `seletor`, ou `null`. */
+  function corpoDaRegra(seletor: string): string | null {
+    const escapado = seletor.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const m = new RegExp(
+      String.raw`(?:^|\})\s*${escapado}\s*\{([^}]*)\}`,
+      "m",
+    ).exec(css);
+    return m ? (m[1] ?? "") : null;
+  }
+
+  it("a classe própria do aviso existe e não tem nenhuma propriedade flex", () => {
+    const corpo = corpoDaRegra(".colaboradores-screen__contatos-aviso");
+    expect(corpo).not.toBeNull();
+    expect(corpo).not.toMatch(/(?:^|[;\s])flex(?:-grow|-basis|-shrink)?\s*:/);
+    expect(corpo).not.toMatch(/(?:^|[;\s])height\s*:|min-height\s*:/);
+  });
+
+  it("a classe própria usa só token de cor e não define margem além de zero", () => {
+    const corpo = corpoDaRegra(".colaboradores-screen__contatos-aviso") ?? "";
+    expect(corpo).toMatch(/color:\s*var\(--/);
+    expect(corpo).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+    expect(corpo).toMatch(/margin:\s*0\s*;/);
+  });
+
+  it("a regra compartilhada da T111 continua intacta, com o flex que ela sempre teve", () => {
+    const corpo = corpoDaRegra(".colaboradores-screen__aviso-texto");
+    expect(corpo).not.toBeNull();
+    expect(corpo).toMatch(/flex:\s*1\s+1\s+16rem\s*;/);
+    expect(corpo).toMatch(/color:\s*var\(--color-ink\)\s*;/);
+  });
+
+  it("a seção e o formulário de Contatos continuam colunas flex, que é o que explica o vão", () => {
+    // Documenta a premissa do defeito: se a seção deixasse de ser coluna flex, a
+    // classe flexível não abriria vão, e a regra própria perderia o motivo.
+    const m =
+      /\.colaboradores-screen__contatos,\s*\.colaboradores-screen__contatos-form\s*\{([^}]*)\}/.exec(
+        css,
+      );
+    expect(m).not.toBeNull();
+    expect(m?.[1]).toMatch(/display:\s*flex/);
+    expect(m?.[1]).toMatch(/flex-direction:\s*column/);
   });
 });

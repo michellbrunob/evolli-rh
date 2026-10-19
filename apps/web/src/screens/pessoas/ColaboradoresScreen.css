@@ -200,6 +200,17 @@
   gap: var(--space-sm);
 }
 
+/* T172 — aviso da seção Contatos (estado vazio e estado bloqueado). NÃO
+   reaproveita `__aviso-texto`: aquela classe (T111) tem `flex: 1 1 16rem` para
+   dividir a linha com o selo no banner de aviso. A seção Contatos e o
+   formulário dela são colunas flex, e nelas o `flex-basis` vira ALTURA: o
+   parágrafo ocupava 256 px e abria um vão vazio sob o texto. Aqui o parágrafo
+   tem a altura do próprio texto. */
+.colaboradores-screen__contatos-aviso {
+  margin: 0;
+  color: var(--color-ink);
+}
+
 /* Bloco de edição de nome dentro do painel de detalhe. */
 .colaboradores-screen__edicao-nome {
   display: flex;
