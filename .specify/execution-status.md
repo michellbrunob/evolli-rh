@@ -1878,11 +1878,11 @@ contatos; Node, pnpm, Prisma e scripts de ambiente.
 **Dívidas preservadas:** R-3 (T162), R-3 da revisão da T164, S2 (T161), R1 a R3 (T160), L3, S-1 a S-4 (T158), R-A a R-C (T157), o registro `teste michell`, a decisão `DP-29` (se `outro_controlado` vale para admissão) e a limitação de validação em navegador da T167. Pendências da T169: o processo de eliminação ou anonimização após 2 anos; as rotas de exportação e exclusão de contatos; a origem e a evidência da coleta; a validação visual em navegador; as observações N-2 (criação concorrente de contato que perde na unicidade responde 409 sem trilha), N-3 (`ON UPDATE CASCADE` nas FKs do evento de contato permite reescrita indireta) e N-4 (CHECK do evento mais frouxo que o serviço); e a docstring do serviço de contatos sobre `resourceId`. Pendências
 da T171: o aviso `[DEP0190]` do Node 24 no orquestrador da demonstração, no Windows (`shell: true` com argumentos), só aviso; e as observações O-1 (a CLI fina do `prisma generate` não tem teste próprio), O-2 (caminho inválido sem teste explícito) e O-3 (efeitos leves nos testes).
 
-## Fluxo de admissão, vínculo e desligamento — T173 (em implementação)
+## Fluxo de admissão, vínculo e desligamento — T173 (implementada em Draft)
 
-| Tarefa | Estado               | Resultado principal                                                                                                  |
-| ------ | -------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| T173   | **Em implementação** | ADR e diagnóstico de reconciliação do fluxo de admissão, vínculo e desligamento, a partir das 40 respostas de RH/DP. |
+| Tarefa | Estado                    | Resultado principal                                                                                                  |
+| ------ | ------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| T173   | **Implementada em Draft** | ADR e diagnóstico de reconciliação do fluxo de admissão, vínculo e desligamento, a partir das 40 respostas de RH/DP. |
 
 **A T172 foi integrada** em `main` pela PR #164, squash `ecf3cbebcf8e7dd856750468a42c284c5525755e`, com a CI de
 push 3/3 verde em Node 24: o aviso da seção Contatos, nos estados sem registro e
@@ -1894,6 +1894,20 @@ respostas de RH/DP entregues pelo proprietário em 2026-10-19. A ADR registra o
 fluxo aprovado e separa os conceitos; o diagnóstico confronta as respostas com o
 modelo e os contratos atuais, sem esconder conflito, e lista os gates anteriores
 a qualquer implementação, sem resolvê-los.
+
+### O que a T173 entregou
+
+- **ADR 0017**, proposta: fluxo de admissão em oito etapas, a separação entre
+  pessoa, vínculo, solicitação, admissão em andamento, admissão efetivada,
+  vínculo ativo, movimentação futura, correção e desligamento, e os papéis
+  segundo as respostas. O aceite (`DP-FLX-01`) não emenda decisão fechada nem
+  autoriza implementação. Detalhes em [ADR 0017](../docs/adr/0017-fluxo-admissao-vinculo-desligamento-rh-dp.md).
+- **Diagnóstico de reconciliação:** cada tema confrontado com o schema, os DTOs,
+  as validações, a matriz RBAC e as decisões registradas, com citação por linha;
+  **12 conflitos com decisões fechadas** nomeados e **19 gates**
+  (`DP-FLX-01` a `DP-FLX-19`) abertos, nenhum resolvido. Detalhes no [diagnóstico de reconciliação](../docs/decisions/t173-reconciliacao-fluxo-rh-dp.md).
+- **Fonte rastreável:** o [registro literal das respostas](../docs/decisions/t173-respostas-rh-dp.md), R1 a R40.
+- **Sequência proposta de fatias**, de 0 a 10, como proposta, não autorização.
 
 **Fora de escopo:** autopreenchimento pelo colaborador; acesso do gestor a dados
 pessoais, bancários, médicos ou contratuais restritos; upload documental,

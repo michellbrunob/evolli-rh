@@ -1954,7 +1954,7 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       da T171: o aviso `[DEP0190]` do Node 24 no orquestrador da demonstração, no Windows (`shell: true` com argumentos), só aviso; e as observações O-1 (a CLI fina do `prisma generate` não tem teste próprio), O-2 (caminho inválido sem teste explícito) e O-3 (efeitos leves nos testes).
 
 70. **T173 - Consolidação do fluxo de admissão, vínculo e desligamento conforme respostas RH/DP**
-    - **Estado:** em implementação. Branch
+    - **Estado:** **implementada em Draft**. Branch
       `codex/t173-fluxo-admissao-vinculo-desligamento`, a partir do squash
       `ecf3cbebcf8e7dd856750468a42c284c5525755e` (T172, PR #164).
     - **Natureza:** tarefa **exclusivamente documental**. Fonte primária: as 40
@@ -1966,6 +1966,22 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       reconciliação que confronta as respostas com os contratos e o modelo
       atuais e lista, sem resolvê-los, os gates anteriores a qualquer
       implementação.
+    - **Entregue:** [ADR 0017](../docs/adr/0017-fluxo-admissao-vinculo-desligamento-rh-dp.md), proposta, com o fluxo de oito etapas, a separação
+      de nove conceitos e os papéis segundo as respostas; o [diagnóstico de reconciliação](../docs/decisions/t173-reconciliacao-fluxo-rh-dp.md), com a
+      matriz por tema, **12 conflitos com decisões fechadas** e **19 gates**
+      (`DP-FLX-01` a `DP-FLX-19`), nenhum resolvido; e o [registro literal das respostas](../docs/decisions/t173-respostas-rh-dp.md), R1 a R40.
+    - **Conflitos nomeados:** CPF como identificação da pessoa (ADR 0007,
+      decisão 2); matrícula só na efetivação (Baseline V1, decisões 2 e 15);
+      mais de um vínculo ativo na mesma empresa (decisão 3); gestor solicitante
+      (ADR 0015, `PD-SOL-01`); workflow de aprovação (decisão 7); tipo que
+      determina obrigatoriedade (ADR 0007, decisão 4); gestor como atributo do
+      vínculo, se essa for a leitura; justificativa em texto livre, se essa for
+      a leitura (decisão 11); valores antes/depois (ADR 0004, decisão 5) e a
+      correção de nome que sobrescreve; motivos de desligamento com
+      classificação trabalhista; projeção do desligamento ao gestor (ADR 0015,
+      decisão 7); documento por vínculo e período (`DP-2E-07`).
+    - **Sequência proposta de fatias:** 0 a 10, só como proposta; cada fatia
+      depende dos seus gates e de autorização expressa.
     - **Fora de escopo, declarado:** autopreenchimento pelo colaborador; acesso
       do gestor a dados pessoais, bancários, médicos ou contratuais restritos;
       upload documental, integração de folha, notificação operacional,
