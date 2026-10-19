@@ -774,9 +774,11 @@ respostas, que não atribuem:
 #### O que continua bloqueado sem resposta
 
 - As **fatias 5 e 6**.
-- **Nenhum dado de CPF pode ser coletado**, nem em ambiente de teste com valor
-  real, enquanto o portão do MFA não for atendido.
-- A `DP-FLX-06` (demais categorias) e a `DP-FLX-09`, parte (a).
+- **O número do CPF não pode ser coletado** enquanto o portão do MFA não for
+  atendido, conforme a decisão 5.9 da ADR 0016 (citada acima).
+- A `DP-FLX-09`, parte (a). A `DP-FLX-06` **não** fica bloqueada por esta
+  decisão: as categorias dela são A2 e a ADR 0016 não as liga ao CPF nem ao MFA
+  (seção 5).
 
 #### Como a decisão seria registrada
 
