@@ -2017,10 +2017,9 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
     - **Dívida preservada:** R-3 (T162), R-3 da revisão da T164, S2 (T161), R1 a R3 (T160), L3, S-1 a S-4 (T158), R-A a R-C (T157), o registro `teste michell`, a decisão `DP-29` (se `outro_controlado` vale para admissão) e a limitação de validação em navegador da T167. Pendências da T169: o processo de eliminação ou anonimização após 2 anos; as rotas de exportação e exclusão de contatos; a origem e a evidência da coleta; a validação visual em navegador; as observações N-2 (criação concorrente de contato que perde na unicidade responde 409 sem trilha), N-3 (`ON UPDATE CASCADE` nas FKs do evento de contato permite reescrita indireta) e N-4 (CHECK do evento mais frouxo que o serviço); e a docstring do serviço de contatos sobre `resourceId`. Pendências
       da T171: o aviso `[DEP0190]` do Node 24 no orquestrador da demonstração, no Windows (`shell: true` com argumentos), só aviso; e as observações O-1 (a CLI fina do `prisma generate` não tem teste próprio), O-2 (caminho inválido sem teste explícito) e O-3 (efeitos leves nos testes). Pendências da T172: as observações não bloqueantes O-1 (descarte protegido sem exercício no navegador), O-2 (contrato de CSS lido por regex), O-3 (banco sintético local alterado na validação), O-4 (outros quatro usos de `colaboradores-screen__aviso-texto` na mesma tela, não medidos) e O-5 (`openDeliveries.pullRequest` nulo com PR aberta), e as de redação O-a a O-c.
 
-71. **T174 - Dossiê de decisões da Fatia 0 da ADR 0017**
-    - **Estado:** em implementação. Branch
-      `codex/t174-dossie-decisoes-fatia-0`, a partir do squash
-      `2a9072040d64daa50326aa18f1602bb160eaae30` (T173, PR #165).
+71. **T174 - Dossiê de decisões da Fatia 0 da ADR 0017** - **Estado:** **implementada em Draft**. Branch
+    `codex/t174-dossie-decisoes-fatia-0`, a partir do squash
+    `2a9072040d64daa50326aa18f1602bb160eaae30` (T173, PR #165).
     - **Natureza:** etapa **exclusivamente decisória e documental**. Fontes
       permitidas: a ADR 0017; o diagnóstico e o registro R1 a R40 da T173; as
       ADRs e os contratos existentes; e o código e os testes atuais, só como
@@ -2035,6 +2034,21 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       proprietário. `DP-FLX-05`, `-09`, `-10`, `-02`, `-03` e `-21` entram como
       decisões candidatas seguintes, **sem serem resolvidas**. Termina com uma
       recomendação de qual decisão tomar primeiro.
+      - **Entregue:** o [dossiê de decisões](../docs/decisions/t174-dossie-decisoes-fatia-0.md), com a priorização dos 22 gates por
+        desbloqueio técnico, risco, insumo externo e decisão fechada que reabrem, e
+        oito fichas de decisão (`DP-FLX-01`, `-04`, `-21`, `-10`, `-02`, `-03`,
+        `-05` e `-09`), cada uma com decisão exata, alternativas reais, impacto por
+        alternativa em regras atuais, dados e migração, RBAC, auditoria e UX,
+        responsável, evidência e o que continua bloqueado. 132 citações
+        `caminho:linha` e 41 conferências de conteúdo foram verificadas por script.
+    - **Acréscimo à lista pedida:** o `DP-FLX-04` (estados do processo
+      admissional) ganhou ficha própria, porque a análise de dependências o põe
+      antes de matrícula, gestor e alçadas.
+    - **Recomendação, não decisão:** decidir primeiro o `DP-FLX-01`, aceitando a
+      ADR 0017 como está, e depois o `DP-FLX-04`; deixar `DP-FLX-05` e `DP-FLX-09`
+      para o fim por risco e portões externos; e levar a RH/DP quatro perguntas de
+      esclarecimento (R4, R10, R8 e R7/R17). **Nada foi decidido**, a ADR 0017
+      continua **Proposta** e os 13 conflitos e os 22 gates seguem abertos.
     - **Fora de escopo:** criar, editar ou migrar schema; criar endpoint, tela,
       RBAC, teste de produto, seed, Docker, processo ou integração; aceitar a
       ADR 0017; e resolver qualquer gate.
