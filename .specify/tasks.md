@@ -2026,7 +2026,7 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       evidência. Sem fonte externa, sem Notion e sem referência de Sólides além
       do que já está documentado.
     - **Entrega prevista:** um dossiê de decisões que prioriza os gates por
-      desbloqueio técnico e menor risco e, para cada gate priorizado, traz a
+      faixas de decisão, com os fatores e o desempate explicados, e, para cada gate priorizado, traz a
       decisão exata, as alternativas reais, o impacto (regras atuais, dados,
       RBAC, auditoria, UX e migração), o responsável, a evidência e o que
       continua bloqueado. Começa por `DP-FLX-01`, deixando explícito que a ADR
@@ -2034,16 +2034,32 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       proprietário. `DP-FLX-05`, `-09`, `-10`, `-02`, `-03` e `-21` entram como
       decisões candidatas seguintes, **sem serem resolvidas**. Termina com uma
       recomendação de qual decisão tomar primeiro.
-      - **Entregue:** o [dossiê de decisões](../docs/decisions/t174-dossie-decisoes-fatia-0.md), com a priorização dos 22 gates por
-        desbloqueio técnico, risco, insumo externo e decisão fechada que reabrem, e
-        oito fichas de decisão (`DP-FLX-01`, `-04`, `-21`, `-10`, `-02`, `-03`,
-        `-05` e `-09`), cada uma com decisão exata, alternativas reais, impacto por
-        alternativa em regras atuais, dados e migração, RBAC, auditoria e UX,
-        responsável, evidência e o que continua bloqueado. 132 citações
-        `caminho:linha` e 41 conferências de conteúdo foram verificadas por script.
+    - **Entregue:** o [dossiê de decisões](../docs/decisions/t174-dossie-decisoes-fatia-0.md), com a priorização dos 22 gates por
+      **faixas de decisão**, fatores (dependência, risco, insumo externo e
+      desbloqueio de comportamento) e desempate explicados, **sem alegar ordenação
+      matemática total**, e oito fichas de decisão (`DP-FLX-01`, `-04`, `-21`,
+      `-10`, `-02`, `-03`, `-05` e `-09`), cada uma com decisão exata, alternativas
+      reais, impacto por alternativa (rotulado como análise técnica do dossiê) em
+      regras atuais, dados e migração, RBAC, auditoria e UX, responsável,
+      evidência e o que continua bloqueado. 149 citações `caminho:linha` e 63
+      conferências de conteúdo foram verificadas por script.
     - **Acréscimo à lista pedida:** o `DP-FLX-04` (estados do processo
       admissional) ganhou ficha própria, porque a análise de dependências o põe
       antes de matrícula, gestor e alçadas.
+      - **Correção pós-revisão (2026-10-19):** a revisão adversarial no head
+        `54143b4` apontou três bloqueios e três observações, corrigidos sem reescrever
+        commits. (1) A regra de priorização passou a descrever o método realmente
+        usado, por faixas, com a única exceção de julgamento declarada (`DP-FLX-10`
+        na faixa 3), e a afirmação de que só as ordens 12 a 14 tinham portão externo
+        foi retirada. (2) O `DP-FLX-06` foi reclassificado como risco Médio: nascimento,
+        endereço e contato de emergência são A2 na ADR 0016, e o MFA imposto vale só
+        para número de documento e dado bancário; a dependência `DP-FLX-05` →
+        `DP-FLX-06` saiu. (3) As perguntas a RH/DP sobre R8 e R7/R17 ficaram abertas,
+        sem hipótese embutida, e as de R4 e R10 passaram a citar a resposta. Também: a
+        lista de fontes só traz o que as fichas citam, o aceite do `DP-FLX-01` não
+        autoriza, por nome, CPF, vínculos múltiplos, matrícula, solicitação ou
+        aprovação pelo gestor, alçadas nem UX, e o impacto de cada ficha é rotulado
+        como análise técnica.
     - **Recomendação, não decisão:** decidir primeiro o `DP-FLX-01`, aceitando a
       ADR 0017 como está, e depois o `DP-FLX-04`; deixar `DP-FLX-05` e `DP-FLX-09`
       para o fim por risco e portões externos; e levar a RH/DP quatro perguntas de

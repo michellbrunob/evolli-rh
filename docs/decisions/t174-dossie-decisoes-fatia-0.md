@@ -14,21 +14,21 @@ fica parado enquanto não houver resposta. **A resposta é sua.**
 
 ## 1. O que este dossiê é e não é
 
-| É                                                                                       | Não é                                                                                               |
-| --------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| Uma priorização dos 22 gates, com critérios explícitos e verificáveis.                  | Uma decisão. Nenhum gate foi resolvido, e nenhuma alternativa foi escolhida por você.               |
-| Oito fichas de decisão, cada uma com alternativas reais e impacto por alternativa.      | A aceitação da ADR 0017: o status dela não mudou, e só você pode mudá-lo.                           |
-| Uma recomendação de qual decisão tomar primeiro (seção 6), claramente marcada como tal. | Autorização de schema, endpoint, tela, RBAC, teste de produto, seed, Docker ou integração.          |
-| Documentação: um arquivo novo, mais o Spec Kit.                                         | Parecer jurídico. Onde há tema trabalhista, fiscal ou de proteção de dados, ele aponta quem decide. |
+| É                                                                                                                   | Não é                                                                                               |
+| ------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Uma priorização dos 22 gates por faixas de decisão, com fatores e desempate explicados. Não é ordenação matemática. | Uma decisão. Nenhum gate foi resolvido, e nenhuma alternativa foi escolhida por você.               |
+| Oito fichas de decisão, cada uma com alternativas reais e impacto por alternativa.                                  | A aceitação da ADR 0017: o status dela não mudou, e só você pode mudá-lo.                           |
+| Uma recomendação de qual decisão tomar primeiro (seção 6), claramente marcada como tal.                             | Autorização de schema, endpoint, tela, RBAC, teste de produto, seed, Docker ou integração.          |
+| Documentação: um arquivo novo, mais o Spec Kit.                                                                     | Parecer jurídico. Onde há tema trabalhista, fiscal ou de proteção de dados, ele aponta quem decide. |
 
 **Fontes usadas, e só elas:**
 
 - a ADR 0017;
 - o [diagnóstico de reconciliação](t173-reconciliacao-fluxo-rh-dp.md) e o
   [registro R1 a R40](t173-respostas-rh-dp.md) da T173;
-- as ADRs e os contratos existentes (ADRs 0004, 0005, 0007, 0011, 0012, 0013,
-  0014, 0015 e 0016, a Baseline V1, as decisões T142, T146, T165, T166 e a
-  `PD-SOL-01`);
+- as ADRs e os contratos existentes que as fichas citam (ADRs 0004, 0005, 0007,
+  0012, 0013, 0014, 0015 e 0016, a Baseline V1, as decisões T142, T146 e T166 e
+  a `PD-SOL-01`);
 - o código e os testes atuais, **só como evidência** do que existe hoje.
 
 **Não usei:** fonte externa, Notion, nem a referência de Sólides. Nenhum arquivo
@@ -67,8 +67,8 @@ de produto, teste, schema, seed ou configuração foi alterado.
 `pessoas/vinculo/vinculo.service.ts`; `gestor-consulta.service.ts` =
 `gestor/gestor-consulta.service.ts`; `audit.types.ts` = `audit/audit.types.ts`;
 `logger.module.ts` = `common/logger/logger.module.ts`; `mfa-config.service.ts` =
-`auth/mfa/mfa-config.service.ts`. `A7`, `A11`, `A12`,
-`A13`, `A15`, `A16` e `A17` = ADRs 0007, 0011, 0012, 0013, 0015, 0016 e 0017 em
+`auth/mfa/mfa-config.service.ts`. `A7`, `A12`,
+`A13`, `A15`, `A16` e `A17` = ADRs 0007, 0012, 0013, 0015, 0016 e 0017 em
 `docs/adr/`; `BV1` = `docs/decisions/etapa1-fatia2-colaboradores-baseline-v1.md`;
 `T142` = `docs/decisions/t142-direcao-visual-b-modais.md`; `T146` =
 `docs/decisions/t146-arquitetura-modular-shell.md`; `T166` =
@@ -78,55 +78,116 @@ da T173.
 
 ## 3. Priorização dos 22 gates
 
-**Critérios, nesta ordem de peso:**
+**Esta priorização não é uma ordenação matemática total.** Não existe pontuação nem
+fórmula que reproduza a ordem da tabela. É um **julgamento do dossiê**, em duas
+camadas, com os fatores e o desempate escritos abaixo para que você possa discordar
+de um ponto específico.
 
-1. **Desbloqueio técnico** — quantas fatias da sequência proposta dependem do
-   gate (`DIAG`, seção 6).
-2. **Risco** — pela tabela da seção 2.
-3. **Insumo externo** — se a decisão depende de informação que não está no
-   repositório (regra da folha, alçadas das empresas, ficha de RH + Jurídico).
-4. **Reabre decisão fechada** — se qualquer alternativa exige emenda.
+### 3.1 Faixas de decisão
 
-Um gate vem antes de outro quando desbloqueia mais, ou o mesmo, com menos risco,
-ou quando o outro depende dele.
+As faixas agrupam os gates pela natureza do que se decide e pelo que a decisão
+precisa para ser tomada. Seguem do que depende só de você para o que depende de
+terceiros e de portões externos, e do que desbloqueia as primeiras fatias para o
+que desbloqueia as últimas.
 
-| Ordem | Gate        | Tema                                                | Desbloqueia                    | Risco | Insumo externo                                         | Reabre decisão fechada?                        |
-| ----- | ----------- | --------------------------------------------------- | ------------------------------ | ----- | ------------------------------------------------------ | ---------------------------------------------- |
-| 1     | `DP-FLX-01` | Aceite da ADR 0017                                  | pré-condição da Fatia 0 e da 1 | Baixo | nenhum                                                 | não                                            |
-| 2     | `DP-FLX-04` | Estados e transições do processo admissional        | fatias 1 e 2                   | Baixo | nenhum                                                 | só nas alternativas B e C (BV1, decisão 15)    |
-| 3     | `DP-FLX-21` | Tela própria × modal                                | forma das fatias 1, 3, 5, 8    | Baixo | nenhum                                                 | T142 (item 5); T146, ainda não integrada       |
-| 4     | `DP-FLX-10` | Matrícula na efetivação                             | fatia 2                        | Médio | **regra da folha para a matrícula**                    | BV1, decisão 15; matrícula imutável            |
-| 5     | `DP-FLX-02` | Gestor solicitante                                  | fatias 3 e 8                   | Médio | nenhum para a alternativa A                            | A15 e `PD-SOL-01`, nas alternativas B e C      |
-| 6     | `DP-FLX-03` | Alçadas de aprovação                                | fatias 3, 7 e 8                | Médio | **alçadas de cada empresa**                            | BV1, decisão 7; A7, decisão 8                  |
-| 7     | `DP-FLX-19` | Projeção do gestor no processo                      | fatias 3 e 8                   | Médio | nenhum                                                 | A15, decisão 7                                 |
-| 8     | `DP-FLX-07` | Catálogo de tipos de vínculo                        | fatia 4                        | Médio | tipos realmente usados pelas empresas                  | A7, decisão 4, conforme a leitura              |
-| 9     | `DP-FLX-08` | Catálogo de campos e regras por tipo e etapa        | fatias 4 e 9                   | Médio | RH/DP: obrigatoriedade por campo                       | `DP-28`; A15, decisão 1, se gestor por vínculo |
-| 10    | `DP-FLX-11` | Movimentações ampliadas e correção                  | fatia 7                        | Médio | DP: impacto em folha e eSocial                         | BV1, decisão 11, e ADR 0004, conforme leitura  |
-| 11    | `DP-FLX-12` | Desligamento: etapas, campos, motivos, checklist    | fatias 8 e 9                   | Alto  | **DP valida a classificação dos motivos**              | catálogo neutro de motivos                     |
-| 12    | `DP-FLX-05` | CPF                                                 | fatias 5 e 6                   | Alto  | **ficha de RH + Jurídico; MFA imposto**                | A7, decisão 2                                  |
-| 13    | `DP-FLX-06` | Demais categorias do cadastro inicial               | fatia 5                        | Alto  | ficha por categoria (RH + Jurídico)                    | BV1, decisão 1                                 |
-| 14    | `DP-FLX-09` | Múltiplos vínculos                                  | fatia 6                        | Alto  | depende de `DP-FLX-05`; semântica trabalhista e fiscal | BV1, decisão 3; A7, decisão 3                  |
-| 15    | `DP-FLX-14` | Documentos por vínculo, categoria e período         | fatia 10                       | Alto  | Nível 2 da Etapa 2                                     | `DP-2E-07`                                     |
-| 16    | `DP-FLX-15` | Saúde ocupacional                                   | fatia 10                       | Alto  | RH + Jurídico                                          | `DP-2E-02`                                     |
-| 17    | `DP-FLX-16` | Bancário, sindical e dependentes                    | fatia 10                       | Alto  | requisitos do DP e da folha                            | ADR 0016 (bloqueados)                          |
-| 18    | `DP-FLX-13` | Retenção, temporalidade e descarte                  | fatia 10                       | Alto  | DP e jurídico                                          | `DP-15` e correlatos                           |
-| 19    | `DP-FLX-17` | Folha e eSocial                                     | fatia 10                       | Alto  | levantamento técnico da folha                          | `DP-18`                                        |
-| 20    | `DP-FLX-18` | Notificações                                        | fatia 10                       | Médio | nenhum                                                 | exclusão da T155                               |
-| 21    | `DP-FLX-22` | Grupos "Fuso horário" e "Dados adicionais"          | fatia 10                       | Médio | decisão de produto e consumidor                        | ADR 0016, 6.7 (fora de escopo)                 |
-| 22    | `DP-FLX-20` | Reavaliar a exceção do `master_tecnico` em contatos | nenhuma                        | Médio | RH + Jurídico                                          | ADR 0012, Emenda 1                             |
+| Faixa | Gates                                           | O que os une                                                                                  | O que a decisão precisa                                                                          |
+| ----- | ----------------------------------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| 1     | `-01`                                           | Aceite documental, que não muda regra, dado nem sistema.                                      | Só de você.                                                                                      |
+| 2     | `-04`, `-21`                                    | Como o processo é modelado e como a tela é feita, sem dado pessoal novo.                      | Só de você; sem insumo externo.                                                                  |
+| 3     | `-10`, `-02`, `-19`, `-03`                      | Mexem em identificador, papéis e aprovação, e reabrem decisões fechadas.                      | Você e, em parte, insumo externo (regra da folha, alçadas das empresas).                         |
+| 4     | `-07`, `-08`, `-06`, `-11`, `-12`               | Catálogos, campos e regras que RH/DP alimentam; fichas de categorias A2 (`-06`); sem dado A3. | RH/DP, e RH + Jurídico nas fichas e na classificação dos motivos de desligamento.                |
+| 5     | `-05`, `-09`                                    | Dado restrito (CPF, A3) e vínculos múltiplos, que desbloqueiam as fatias 5 e 6.               | Ficha de RH + Jurídico, MFA imposto e `DS-OPS-01` (CPF); semântica trabalhista e fiscal (`-09`). |
+| 6     | `-18`, `-22`, `-13`, `-14`, `-15`, `-16`, `-17` | Só desbloqueiam a fatia 10, que já está atrás de portões externos.                            | Nível 2 da Etapa 2, DP e jurídico, levantamento da folha, decisão de produto.                    |
+| 7     | `-20`                                           | Reavaliação futura de uma exceção que continua valendo como está.                             | RH + Jurídico; sem urgência e sem fatia dependente.                                              |
+
+### 3.2 Fatores considerados
+
+- **Dependência.** Se a decisão de um gate precisa de outra, ou é moldada por ela.
+- **Risco**, pela tabela da seção 2.
+- **Insumo externo.** Se a decisão precisa de informação que não está no repositório
+  (regra da folha, alçadas das empresas, ficha de RH + Jurídico).
+- **Desbloqueio de comportamento.** Quantas fatias têm o modelo ou a regra
+  condicionados pelo gate (`DIAG`, seção 6). O desbloqueio de **forma** da
+  `DP-FLX-21` (a interface das fatias 1, 3, 5 e 8) aparece na coluna, mas **não
+  entra** nessa contagem.
+- **Decisão fechada que o gate reabre.** É informada na última coluna, mas **não
+  é usada para ordenar**.
+
+### 3.3 Desempate dentro de cada faixa
+
+Dentro da faixa, a ordem sai destas considerações, nesta sequência e **com
+julgamento, sem pontuação**:
+
+1. **Dependência.** O gate de que outro depende vem antes do dependente.
+2. **Menor risco** antes do maior.
+3. **Menor insumo externo.** A decisão que pode ser tomada com o que já está no
+   repositório vem antes da que precisa de informação de fora.
+4. **Maior desbloqueio de comportamento**, pela contagem acima.
+5. **Ordem numérica** do gate, **sem significado de prioridade**, só para
+   persistir o empate.
+
+Aplicando as considerações 2 a 5 e depois subindo cada gate de que outro depende
+para antes do seu dependente, a ordem das faixas 2, 4, 5 e 6 sai sem exceção.
+Onde duas considerações apontam em sentidos opostos, o dossiê diz qual pesou:
+
+- **Faixa 2.** `DP-FLX-04` antes de `-21` pela consideração 4: a `-04` desbloqueia o
+  comportamento de duas fatias, e a `-21`, só a forma.
+- **Faixa 3 — única exceção.** `DP-FLX-10` vem **primeiro**, embora dependa de
+  insumo externo (consideração 3) e desbloqueie menos (consideração 4) do que
+  `-02` e `-03`. Pesou a **afinidade** com a `DP-FLX-04`: as alternativas da `-10`
+  são moldadas pela escolha da `-04` (a alternativa D só existe com a `-04`,
+  alternativa B), e decidi-las perto uma da outra evita retrabalho. Sem essa
+  exceção, a ordem da faixa seria `-02`, `-19`, `-03`, `-10`.
+- **Faixa 4.** `DP-FLX-07` antes de `-08` por dependência. Sem ela, a `-08`
+  (desbloqueia duas fatias) viria primeiro. `-06` e `-11` empatam até a
+  consideração 5. `-12` fica por último pelo risco.
+- **Faixa 6.** `DP-FLX-18` e `-22` (risco Médio) antes dos de risco Alto pela
+  consideração 2, e `-18` antes de `-22` pela consideração 3. Os de risco Alto
+  empatam até a consideração 5.
+
+| Ordem | Faixa | Gate        | Tema                                                | Desbloqueia                    | Risco | Insumo externo                                                                                                | Reabre decisão fechada?                        |
+| ----- | ----- | ----------- | --------------------------------------------------- | ------------------------------ | ----- | ------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| 1     | 1     | `DP-FLX-01` | Aceite da ADR 0017                                  | pré-condição da Fatia 0 e da 1 | Baixo | nenhum                                                                                                        | não                                            |
+| 2     | 2     | `DP-FLX-04` | Estados e transições do processo admissional        | fatias 1 e 2                   | Baixo | nenhum                                                                                                        | só nas alternativas B e C (BV1, decisão 15)    |
+| 3     | 2     | `DP-FLX-21` | Tela própria × modal                                | forma das fatias 1, 3, 5, 8    | Baixo | nenhum                                                                                                        | T142 (item 5); T146, ainda não integrada       |
+| 4     | 3     | `DP-FLX-10` | Matrícula na efetivação                             | fatia 2                        | Médio | **regra da folha para a matrícula**                                                                           | BV1, decisão 15; matrícula imutável            |
+| 5     | 3     | `DP-FLX-02` | Gestor solicitante                                  | fatias 3 e 8                   | Médio | nenhum para a alternativa A                                                                                   | A15 e `PD-SOL-01`, nas alternativas B e C      |
+| 6     | 3     | `DP-FLX-19` | Projeção do gestor no processo                      | fatias 3 e 8                   | Médio | nenhum                                                                                                        | A15, decisão 7                                 |
+| 7     | 3     | `DP-FLX-03` | Alçadas de aprovação                                | fatias 3, 7 e 8                | Médio | **alçadas de cada empresa**                                                                                   | BV1, decisão 7; A7, decisão 8                  |
+| 8     | 4     | `DP-FLX-07` | Catálogo de tipos de vínculo                        | fatia 4                        | Médio | tipos realmente usados pelas empresas                                                                         | A7, decisão 4, conforme a leitura              |
+| 9     | 4     | `DP-FLX-08` | Catálogo de campos e regras por tipo e etapa        | fatias 4 e 9                   | Médio | RH/DP: obrigatoriedade por campo                                                                              | `DP-28`; A15, decisão 1, se gestor por vínculo |
+| 10    | 4     | `DP-FLX-06` | Demais categorias do cadastro inicial               | fatia 5                        | Médio | ficha de cada categoria (RH + Jurídico); `DS-OPS-01` e emenda à ADR 0007, válidos para todo dado pessoal novo | BV1, decisão 1                                 |
+| 11    | 4     | `DP-FLX-11` | Movimentações ampliadas e correção                  | fatia 7                        | Médio | DP: impacto em folha e eSocial                                                                                | BV1, decisão 11, e ADR 0004, conforme leitura  |
+| 12    | 4     | `DP-FLX-12` | Desligamento: etapas, campos, motivos, checklist    | fatias 8 e 9                   | Alto  | **DP valida a classificação dos motivos**                                                                     | catálogo neutro de motivos                     |
+| 13    | 5     | `DP-FLX-05` | CPF                                                 | fatias 5 e 6                   | Alto  | **ficha de RH + Jurídico; MFA imposto**                                                                       | A7, decisão 2                                  |
+| 14    | 5     | `DP-FLX-09` | Múltiplos vínculos                                  | fatia 6                        | Alto  | depende de `DP-FLX-05`; semântica trabalhista e fiscal                                                        | BV1, decisão 3; A7, decisão 3                  |
+| 15    | 6     | `DP-FLX-18` | Notificações                                        | fatia 10                       | Médio | nenhum                                                                                                        | exclusão da T155                               |
+| 16    | 6     | `DP-FLX-22` | Grupos "Fuso horário" e "Dados adicionais"          | fatia 10                       | Médio | decisão de produto e consumidor                                                                               | ADR 0016, 6.7 (fora de escopo)                 |
+| 17    | 6     | `DP-FLX-13` | Retenção, temporalidade e descarte                  | fatia 10                       | Alto  | DP e jurídico                                                                                                 | `DP-15` e correlatos                           |
+| 18    | 6     | `DP-FLX-14` | Documentos por vínculo, categoria e período         | fatia 10                       | Alto  | Nível 2 da Etapa 2                                                                                            | `DP-2E-07`                                     |
+| 19    | 6     | `DP-FLX-15` | Saúde ocupacional                                   | fatia 10                       | Alto  | RH + Jurídico                                                                                                 | `DP-2E-02`                                     |
+| 20    | 6     | `DP-FLX-16` | Bancário, sindical e dependentes                    | fatia 10                       | Alto  | requisitos do DP e da folha                                                                                   | ADR 0016 (bloqueados)                          |
+| 21    | 6     | `DP-FLX-17` | Folha e eSocial                                     | fatia 10                       | Alto  | levantamento técnico da folha                                                                                 | `DP-18`                                        |
+| 22    | 7     | `DP-FLX-20` | Reavaliar a exceção do `master_tecnico` em contatos | nenhuma                        | Médio | RH + Jurídico                                                                                                 | ADR 0012, Emenda 1                             |
 
 **Leitura da ordem.**
 
-- **Ordens 1 a 3** não tocam dado pessoal, não precisam de insumo externo e
-  dependem só de você. Fixam vocabulário, modelo de processo e forma de tela.
-- **Ordens 4 a 7** mexem em identificador, papéis e aprovação. São decididas
-  melhor depois da ordem 2, porque a `DP-FLX-04` define onde essas coisas moram.
-- **Ordens 8 a 11** são catálogos e regras que RH/DP precisam alimentar.
-- **Ordens 12 a 14** são as de maior risco e as únicas com **portão duro
-  externo** (MFA imposto, ficha de RH + Jurídico). Resolvê-las cedo não
-  desbloqueia nada além das fatias 5 e 6.
-- **Ordens 15 a 22** só destravam a fatia 10, já bloqueada por portões externos,
-  ou não condicionam fatia alguma.
+- **Faixas 1 e 2** não tocam dado pessoal, não precisam de insumo externo e
+  dependem só de você. Fixam o vocabulário, o modelo de processo e a forma da tela.
+- **Faixa 3** mexe em identificador, papéis e aprovação. Fica melhor depois da
+  `DP-FLX-04`, porque ela define onde essas coisas moram.
+- **Faixa 4** reúne catálogos, campos e regras que RH/DP precisam alimentar, e as
+  fichas das categorias A2 do cadastro inicial.
+- **Faixa 5** reúne o CPF e os vínculos múltiplos. Resolvê-los cedo não desbloqueia
+  nada além das fatias 5 e 6.
+- **Faixas 6 e 7** só destravam a fatia 10, já atrás de portões externos, ou não
+  condicionam fatia alguma.
+
+**Portões externos não são exclusivos de uma faixa.** Aparecem a partir da faixa 3:
+regra da folha (`-10`, `-17`), alçadas das empresas (`-03`), validação do DP
+(`-11`, `-12`, `-13`), fichas de RH + Jurídico (`-05`, `-06`, `-14`, `-15`, `-16`),
+Nível 2 da Etapa 2 (`-14`) e o MFA imposto, que a decisão 5.9 da ADR 0016 aplica a
+número de documento e dado bancário (`-05`, `-16`; `A16:358-363`, `A16:283-292`).
 
 **Dependências entre gates** (o que precisa estar decidido antes de quê):
 
@@ -136,16 +197,18 @@ ou quando o outro depende dele.
   prévios da fatia 3 no diagnóstico.
 - `DP-FLX-02` → `DP-FLX-19` (o que o gestor vê do processo só faz sentido depois
   de saber se ele solicita).
-- `DP-FLX-05` → `DP-FLX-09`, parte (a), e → `DP-FLX-06`.
+- `DP-FLX-05` → `DP-FLX-09`, parte (a).
+- `DP-FLX-07` → `DP-FLX-08` (o catálogo de campos depende do catálogo de tipos).
 - `DP-FLX-21` condiciona a forma das telas das fatias 1, 3, 5 e 8, mas **não**
   o comportamento delas.
 
 **Não incluí `DP-FLX-04` na sua lista de candidatas, e o dossiê o prioriza em
 segundo lugar.** Você listou CPF, múltiplos vínculos, matrícula, gestor e
 alçadas, e UX. A análise de dependências coloca o `DP-FLX-04` antes de três
-delas (matrícula, gestor e alçadas), e ele é o de menor risco com maior
-desbloqueio. Por isso tem ficha própria (4.2). Se preferir ficar só com a sua
-lista, as demais fichas continuam valendo, na ordem 1, 3, 4, 5, 6, 12 e 14.
+delas (matrícula, gestor e alçadas). Ele é de risco baixo, não precisa de insumo
+externo e desbloqueia o comportamento de duas fatias. Por isso tem ficha própria
+(4.2). Se preferir ficar só com a sua lista, as demais fichas continuam valendo,
+nas ordens 1, 3, 4, 5, 7, 13 e 14.
 
 ## 4. Fichas de decisão
 
@@ -159,15 +222,24 @@ fluxo e de vocabulário da admissão, do vínculo e do desligamento.**
 O que o aceite **é**: marcar a ADR como Aceita por uma nota de aprovação, no
 mesmo formato da que a ADR 0016 recebeu (`A16:694-705`).
 
-O que o aceite **não é**, pelo texto da própria ADR:
+O que o aceite **não é**, pelo texto da própria ADR. **Aceitar o `DP-FLX-01` não
+autoriza:**
 
-- não emenda nenhuma decisão fechada (`A17:3-8`, `A17:251-272`);
-- não aceita a diretriz de UX da decisão 6, cujo aceite é `DP-FLX-21`
-  (`A17:210-250`);
-- não faz do CPF um critério de identificação da pessoa nem autoriza mais de um
-  vínculo ativo na mesma empresa (`A17:251-272`);
-- não resolve nenhum dos 13 conflitos nem os outros 21 gates;
-- não autoriza código.
+- o **CPF** como critério de identificação da pessoa, que segue em `DP-FLX-05`
+  (`A17:251-272`);
+- **vínculos múltiplos**, nem na mesma empresa nem o reconhecimento da pessoa
+  entre empresas, que seguem em `DP-FLX-09` (`A17:92-116`, `A17:251-272`);
+- a **matrícula na efetivação**, que a ADR marca como "sujeito a `DP-FLX-10`"
+  (`A17:65-91`);
+- a **solicitação ou a aprovação pelo gestor**, que seguem em `DP-FLX-02`: a ADR
+  diz que o gestor continua "sem nenhuma mutação" até haver decisão e alteração
+  própria de RBAC (`A17:117-169`);
+- as **alçadas** e a diretoria no sistema, que seguem em `DP-FLX-03`
+  (`A17:65-91`, `A17:251-272`);
+- a **diretriz de UX** da decisão 6, cujo aceite é `DP-FLX-21` (`A17:210-250`).
+
+Também não emenda nenhuma decisão fechada (`A17:3-8`), não resolve nenhum dos 13
+conflitos nem os outros 21 gates, e não autoriza código.
 
 #### Alternativas reais
 
@@ -178,7 +250,10 @@ O que o aceite **não é**, pelo texto da própria ADR:
 | **C** | Adiar o aceite e aceitar junto com as decisões `DP-FLX-04` e `DP-FLX-21`.                                              |
 | **D** | Não aceitar; devolver a pontos ambíguos de RH/DP (R4, R7/R8, R10) e só então voltar à ADR.                             |
 
-#### Impacto por alternativa
+#### Impacto por alternativa — análise técnica do dossiê
+
+_Análise técnica do dossiê, apoiada na evidência da própria ficha. Não é decisão
+aprovada, nem informação recebida de RH/DP._
 
 **Em nenhuma alternativa muda regra atual, dado, RBAC, auditoria, UX ou
 migração.** A ADR é documental. A diferença está só no repositório e no ritmo:
@@ -259,7 +334,10 @@ Subalternativas para a pergunta 2, combináveis com qualquer das três:
 | **2.ii**  | Permitir efetivar antes da vigência e exigir **ato explícito** de ativação, por RH/DP, na data de início.     |
 | **2.iii** | Ativar **automaticamente** na data, por job. Reabre a decisão de que "nenhum job efetiva sozinho" (`A7:424`). |
 
-#### Impacto por alternativa
+#### Impacto por alternativa — análise técnica do dossiê
+
+_Análise técnica do dossiê, apoiada na evidência da própria ficha. Não é decisão
+aprovada, nem informação recebida de RH/DP._
 
 | Alternativa | Regras atuais                                                                                                                                                          | Dados e migração                                                                                                                                                                                                | RBAC                                                                                           | Auditoria                                                                                           | UX                                                                                                                                  |
 | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
@@ -351,7 +429,10 @@ Subalternativas de rota, combináveis com B, C e D:
 | **r.y** | Roteamento mínimo próprio, sobre a API `history` do navegador, **sem dependência nova**.                               |
 | **r.z** | Biblioteca de roteamento: é **dependência nova**, e pede decisão própria (a T142 recusou dependência nova, `T142:83`). |
 
-#### Impacto por alternativa
+#### Impacto por alternativa — análise técnica do dossiê
+
+_Análise técnica do dossiê, apoiada na evidência da própria ficha. Não é decisão
+aprovada, nem informação recebida de RH/DP._
 
 | Alternativa | Regras atuais                                                                                                                                                                           | Dados e migração                                                                                                                            | RBAC                                                                                                            | Auditoria | UX                                                                                                                                  |
 | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------- |
@@ -429,7 +510,10 @@ Não decide: o que a folha faz, nem a integração (`DP-FLX-17`).
 | **C** | Identificador provisório + matrícula definitiva **gerada** pelo Evolli na efetivação (sequência por empresa), seguindo a regra da folha quando conhecida. |
 | **D** | O vínculo e a matrícula só nascem na efetivação (exige `DP-FLX-04`, alternativa B); o processo tem o seu próprio código.                                  |
 
-#### Impacto por alternativa
+#### Impacto por alternativa — análise técnica do dossiê
+
+_Análise técnica do dossiê, apoiada na evidência da própria ficha. Não é decisão
+aprovada, nem informação recebida de RH/DP._
 
 | Alternativa  | Regras atuais                                                                                                                                                                                                                                                                                | Dados e migração                                                                                                                                                                                                                                                                                                       | RBAC                 | Auditoria                                                                                                                                                                                          | UX                                                                                                                                                                                         |
 | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -486,15 +570,16 @@ regra da folha.
 #### Decisão exata
 
 **O gestor passa a poder _registrar_ no Evolli a solicitação de contratação, de
-alteração e de desligamento (R7, R17, R21)? E, como decisão separada, passa a
-_aprovar_ o que solicitou (R8)?**
+alteração e de desligamento (R7, R17, R21)? E, como decisão separada, o gestor
+passa a ter uma _etapa de aprovação_ (R8: "aprovação do gestor solicitante")?**
 
 Em nenhum caso a pergunta inclui criar, editar ou efetivar pessoa, vínculo ou
 movimentação: as respostas deixam isso com RH/DP (R7, R11, R22).
 
-Há uma ambiguidade da R8 que a decisão precisa fechar: "aprovação do gestor
-solicitante" pode ser o gestor confirmar o próprio pedido, ou o gestor dele
-aprovar o pedido de um subordinado. As respostas não dizem.
+Dois pontos que as respostas não dizem, e que a decisão precisa ver esclarecidos
+(seção 6): a R8 não diz **quem aprova nem o que é aprovado** na etapa "aprovação
+do gestor solicitante"; e a R7 diz que o gestor "poderá solicitar" e que o RH
+"deverá receber a solicitação", mas **não diz como** o gestor a faz.
 
 #### Alternativas reais
 
@@ -502,13 +587,16 @@ aprovar o pedido de um subordinado. As respostas não dizem.
 | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **A** | O gestor **segue consultivo**. A solicitação acontece fora do sistema, e o RH a registra, informando **quem solicitou**. O gestor é identificado como pessoa pela ligação conta↔colaborador (`DP-23`). |
 | **B** | O gestor **registra** a solicitação, num recurso novo, com escopo por equipe e sem criar, editar ou efetivar. O RH recebe e conduz.                                                                    |
-| **C** | B, e o gestor também **aprova** o que solicitou (R8), conforme a leitura que você der à ambiguidade acima.                                                                                             |
+| **C** | B, mais uma **etapa de aprovação** atribuída ao gestor (R8), nos termos que o esclarecimento da R8 definir.                                                                                            |
 
 Subpergunta de B e C: reaproveitar a Central de Solicitações, ou entidade própria.
 A Central tem 6 tipos e nenhum é de admissão ou desligamento (`schema:1660-1667`),
 e foi desenhada para o colaborador pedir ao RH, o que muda o domínio.
 
-#### Impacto por alternativa
+#### Impacto por alternativa — análise técnica do dossiê
+
+_Análise técnica do dossiê, apoiada na evidência da própria ficha. Não é decisão
+aprovada, nem informação recebida de RH/DP._
 
 | Alternativa | Regras atuais                                                                                                                                          | Dados e migração                                                                                                                                                 | RBAC                                                                                                                            | Auditoria                                                                       | UX                                                                           |
 | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
@@ -571,7 +659,10 @@ Não decide: se o gestor registra a solicitação (`DP-FLX-02`).
 | **B** | **Alçada fixa e única**: gestor → RH → diretoria, sempre, com papel ou capacidade nova para a diretoria.                                                                                          |
 | **C** | **Alçadas configuráveis por empresa**, por tipo de movimentação, nível da vaga ou orçamento.                                                                                                      |
 
-#### Impacto por alternativa
+#### Impacto por alternativa — análise técnica do dossiê
+
+_Análise técnica do dossiê, apoiada na evidência da própria ficha. Não é decisão
+aprovada, nem informação recebida de RH/DP._
 
 | Alternativa | Regras atuais                                                                                                                                               | Dados e migração                                                                                                | RBAC                                                                                                                                             | Auditoria                                                          | UX                                             |
 | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------ | ---------------------------------------------- |
@@ -634,7 +725,10 @@ múltiplos (`DP-FLX-09`).
 | **C** | B, e o CPF **alerta** o RH sobre possível pessoa já cadastrada (busca assistida), sem unicidade nem chave. A ADR 0016 diz que detectar duplicidade por CPF exigiria emenda à decisão 2.                        |
 | **D** | CPF como **critério de unicidade e reconhecimento** da pessoa (R37). Emenda à ADR 0007, decisão 2, índice único e unificação de Colaborador entre empresas.                                                    |
 
-#### Impacto por alternativa
+#### Impacto por alternativa — análise técnica do dossiê
+
+_Análise técnica do dossiê, apoiada na evidência da própria ficha. Não é decisão
+aprovada, nem informação recebida de RH/DP._
 
 | Alternativa | Regras atuais                                                                                                                                                         | Dados e migração                                                                                                                                                                               | RBAC                                                                                                                                                                                                                            | Auditoria                                                                                   | UX                                                                                                    |
 | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
@@ -724,7 +818,10 @@ vínculo (`A16:460`).
 | **b2** | Permitir vários, distinguíveis por um discriminador (por exemplo, tipo de vínculo ou cargo) que você definir. |
 | **b3** | Permitir vários, sem restrição.                                                                               |
 
-#### Impacto por alternativa
+#### Impacto por alternativa — análise técnica do dossiê
+
+_Análise técnica do dossiê, apoiada na evidência da própria ficha. Não é decisão
+aprovada, nem informação recebida de RH/DP._
 
 | Alternativa    | Regras atuais                                                                                                                                                                                                    | Dados e migração                                                                                                                                                                                                  | RBAC                                                                                                                                                                                                                                 | Auditoria                                                                       | UX                                                                         |
 | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
@@ -770,36 +867,43 @@ e Jurídico dizerem se o caso existe.
 
 ## 5. Gates fora das fichas: por que esperam
 
-| Gate        | Por que não tem ficha agora                                                                                                                                | O que precisa existir antes                                         |
-| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| `DP-FLX-19` | Depende de `DP-FLX-02`: o que o gestor vê do processo só faz sentido depois de saber se ele solicita.                                                      | `DP-FLX-02`.                                                        |
-| `DP-FLX-07` | Catálogo vem de RH/DP: quais tipos as empresas usam (R3). A leitura de "comportamento" na ADR 0007, decisão 4, também precisa ser definida.                | Lista de tipos efetivamente usados; leitura da decisão 4.           |
-| `DP-FLX-08` | Depende do catálogo de tipos e do modelo de processo.                                                                                                      | `DP-FLX-04`, `DP-FLX-07`.                                           |
-| `DP-FLX-11` | Depende das alçadas, e salário depende de `DP-14` e `DP-18`.                                                                                               | `DP-FLX-03`, `DP-FLX-04`.                                           |
-| `DP-FLX-12` | O DP valida a classificação dos motivos (R23), e o checklist da T155 tem 12 perguntas, das quais R26 e R27 respondem duas.                                 | Validação do DP; `DP-FLX-02`, `-03`.                                |
-| `DP-FLX-06` | Uma ficha por categoria (data de nascimento, endereço, contato de emergência), e todas ficam atrás do mesmo portão do CPF.                                 | `DP-FLX-05` e o portão do MFA.                                      |
-| `DP-FLX-14` | Documentos exigem o Nível 2 da Etapa 2 (upload) e emenda ao sujeito do documento (`DP-2E-07`).                                                             | Nível 2 da Etapa 2; ADR 0013.                                       |
-| `DP-FLX-15` | Saúde ocupacional exige categoria própria e decisão de RH + Jurídico sobre classificação.                                                                  | `DP-2E-02`; `PD-SOL-05`.                                            |
-| `DP-FLX-16` | Bancário, sindical e dependentes estão **bloqueados** na ADR 0016, sem consumidor no Evolli.                                                               | `DP-ADM-07`, `-13`, `-14`; requisitos do DP e da folha.             |
-| `DP-FLX-13` | Tabela de temporalidade é de DP e jurídico (R35); nenhum dado de pessoas tem retenção decidida (`A16:364-366`).                                            | Tabela de temporalidade; `DP-15`, `DP-ADM-03`.                      |
-| `DP-FLX-17` | Depende do levantamento técnico da folha (R36), que não está no repositório.                                                                               | Levantamento técnico; plano de implantação (R40).                   |
-| `DP-FLX-18` | Notificação está fora do recorte da T155 e não tem decisão de eventos nem de conteúdo.                                                                     | Decisão de eventos e destinatários.                                 |
-| `DP-FLX-22` | "Fuso horário" e "Dados adicionais" estão fora de escopo na ADR 0016 (6.7): o fuso é da operação, não da pessoa, e os dados adicionais não têm consumidor. | Decisão de produto sobre fuso; consumidor para cada dado adicional. |
-| `DP-FLX-20` | Não condiciona fatia alguma. A exceção do `master_tecnico` em contatos continua exatamente como está.                                                      | Nada. É reavaliação futura da R31.                                  |
+| Gate        | Por que não tem ficha agora                                                                                                                                                                                      | O que precisa existir antes                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DP-FLX-19` | Depende de `DP-FLX-02`: o que o gestor vê do processo só faz sentido depois de saber se ele solicita.                                                                                                            | `DP-FLX-02`.                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `DP-FLX-07` | Catálogo vem de RH/DP: quais tipos as empresas usam (R3). A leitura de "comportamento" na ADR 0007, decisão 4, também precisa ser definida.                                                                      | Lista de tipos efetivamente usados; leitura da decisão 4.                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `DP-FLX-08` | Depende do catálogo de tipos e do modelo de processo.                                                                                                                                                            | `DP-FLX-04`, `DP-FLX-07`.                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `DP-FLX-11` | Depende das alçadas, e salário depende de `DP-14` e `DP-18`.                                                                                                                                                     | `DP-FLX-03`, `DP-FLX-04`.                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `DP-FLX-12` | O DP valida a classificação dos motivos (R23), e o checklist da T155 tem 12 perguntas, das quais R26 e R27 respondem duas.                                                                                       | Validação do DP; `DP-FLX-02`, `-03`.                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `DP-FLX-06` | Uma ficha por categoria (data de nascimento, endereço, contato de emergência), todas **A2, "Complementar"** na ADR 0016 (`A16:378`, `A16:406`, `A16:424`). O contato de emergência envolve **dado de terceiro**. | Ficha aprovada de cada categoria (`FT`), contrato novo (`CTR`) e decisão de retenção (`RET`) (`A16:378`, `A16:406`, `A16:424`), mais `DS-OPS-01` e a emenda à ADR 0007, que valem para todo dado pessoal novo (`A16:358-363`). A consulta de CEP por serviço externo depende de `DP-ADM-12` (`A16:406`). A ADR 0016 **não lista** MFA imposto nem CPF entre as dependências dessas categorias: o MFA vale para número de documento e dado bancário (`A16:358-363`). |
+| `DP-FLX-14` | Documentos exigem o Nível 2 da Etapa 2 (upload) e emenda ao sujeito do documento (`DP-2E-07`).                                                                                                                   | Nível 2 da Etapa 2; ADR 0013.                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `DP-FLX-15` | Saúde ocupacional exige categoria própria e decisão de RH + Jurídico sobre classificação.                                                                                                                        | `DP-2E-02`; `PD-SOL-05`.                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `DP-FLX-16` | Bancário, sindical e dependentes estão **bloqueados** na ADR 0016, sem consumidor no Evolli.                                                                                                                     | `DP-ADM-07`, `-13`, `-14`; requisitos do DP e da folha.                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `DP-FLX-13` | Tabela de temporalidade é de DP e jurídico (R35); nenhum dado de pessoas tem retenção decidida (`A16:364-366`).                                                                                                  | Tabela de temporalidade; `DP-15`, `DP-ADM-03`.                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `DP-FLX-17` | Depende do levantamento técnico da folha (R36), que não está no repositório.                                                                                                                                     | Levantamento técnico; plano de implantação (R40).                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `DP-FLX-18` | Notificação está fora do recorte da T155 e não tem decisão de eventos nem de conteúdo.                                                                                                                           | Decisão de eventos e destinatários.                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `DP-FLX-22` | "Fuso horário" e "Dados adicionais" estão fora de escopo na ADR 0016 (6.7): o fuso é da operação, não da pessoa, e os dados adicionais não têm consumidor.                                                       | Decisão de produto sobre fuso; consumidor para cada dado adicional.                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `DP-FLX-20` | Não condiciona fatia alguma. A exceção do `master_tecnico` em contatos continua exatamente como está.                                                                                                            | Nada. É reavaliação futura da R31.                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 
 ## 6. Recomendação: qual decisão tomar primeiro
 
 **Decida primeiro `DP-FLX-01`, na alternativa A: aceitar a ADR 0017 como está.**
+
+Esta recomendação é **análise do dossiê**. Não é decisão, não é fórmula e não
+autoriza nada.
 
 Por quê:
 
 1. É a **única** decisão que depende só de você, e de nada externo.
 2. Tem **custo e risco zero** em regra, dado, RBAC, auditoria, UX e migração.
    Muda o status de um arquivo, e uma emenda pode reverter.
-3. O próprio texto da ADR já fecha os dois riscos que um aceite poderia abrir: ela
-   diz que o aceite não emenda decisão fechada (`A17:3-8`), que a diretriz de UX é
-   proposta (`A17:210-250`) e que CPF e vínculos múltiplos são direcionamentos, não
-   decisões (`A17:251-272`).
+3. O aceite **não autoriza**, por nome: o CPF (`DP-FLX-05`), vínculos múltiplos
+   (`DP-FLX-09`), a matrícula na efetivação (`DP-FLX-10`), a solicitação ou a
+   aprovação pelo gestor (`DP-FLX-02`), as alçadas (`DP-FLX-03`) nem a diretriz de
+   UX (`DP-FLX-21`). A própria ADR já marca esses seis pontos: a matrícula, o
+   gestor e as alçadas como "sujeito a" gate (`A17:65-91`); o CPF e os vínculos
+   como direcionamentos (`A17:92-116`); o gestor como sem mutação até haver
+   decisão e RBAC próprios (`A17:117-169`); e a UX como proposta
+   (`A17:210-250`).
 4. É a pré-condição formal que a Fatia 0 e a fatia 1 citam.
 5. Dá um vocabulário fixo para decidir todos os outros.
 
@@ -823,18 +927,19 @@ resolvê-las antes das outras não destrava nada além das fatias 5 e 6.
 
 **Ordem sugerida, para você confirmar ou trocar:**
 `DP-FLX-01` → `DP-FLX-04` → `DP-FLX-21` → `DP-FLX-10` (pergunta 1) → `DP-FLX-02` →
-`DP-FLX-03` → catálogos (`-07`, `-08`, `-11`, `-12`) → `DP-FLX-05` → `DP-FLX-09`.
+`DP-FLX-19` → `DP-FLX-03` → catálogos e regras (`-07`, `-08`, `-06`, `-11`, `-12`)
+→ `DP-FLX-05` → `DP-FLX-09`. É a ordem da tabela da seção 3, até a faixa 5.
 
 **Quatro perguntas de esclarecimento a RH/DP**, que **não dependem de decisão
-sua** e que destravam fichas deste dossiê. Elas não são fonte nova, são pedidos de
-esclarecimento:
+sua** e que destravam fichas deste dossiê. Cada uma cita a resposta e pergunta de
+forma aberta. Elas não são fonte nova nem trazem hipótese do dossiê:
 
-| Pergunta                                                                                                                               | Destrava                     |
-| -------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
-| R4: existe caso real de **dois vínculos ativos na mesma empresa** para a mesma pessoa?                                                 | `DP-FLX-09`, parte (b)       |
-| R10: a matrícula da folha é informada ou gerada pela folha? Em que formato, e existe matrícula provisória na folha?                    | `DP-FLX-10`, perguntas 2 e 3 |
-| R8: "aprovação do gestor solicitante" é o gestor **confirmar o próprio pedido**, ou o **gestor dele aprovar** o pedido do subordinado? | `DP-FLX-02` e `DP-FLX-03`    |
-| R7 e R17: "o gestor solicita" significa **registrar no sistema**, ou comunicar ao RH, que registra?                                    | `DP-FLX-02`                  |
+| Pergunta                                                                                                                                            | Destrava                     |
+| --------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| R4 diz "ou possua mais de um vínculo, quando aplicável". Quando isso se aplica, e inclui mais de um vínculo ativo da mesma pessoa na mesma empresa? | `DP-FLX-09`, parte (b)       |
+| R10 diz "conforme a regra do sistema de folha". Qual é essa regra, e o que ela diz sobre o identificador provisório que a R10 menciona?             | `DP-FLX-10`, perguntas 2 e 3 |
+| R8: quem aprova, e o que é aprovado, na etapa "aprovação do gestor solicitante"?                                                                    | `DP-FLX-02` e `DP-FLX-03`    |
+| R7 e R17: como o gestor faz a solicitação que o RH recebe?                                                                                          | `DP-FLX-02`                  |
 
 ## 7. Como responder
 
@@ -856,8 +961,12 @@ com pedido expresso.
 
 - **Nada foi decidido.** A ADR 0017 continua Proposta, e os 13 conflitos e os 22
   gates continuam abertos.
-- A análise de **impacto** é minha, a partir da evidência citada. Onde não pude
-  verificar, digo (por exemplo, o mecanismo de permissão por rota do shell).
+- A análise de **impacto** é minha, a partir da evidência citada, e cada ficha a
+  rotula como análise técnica do dossiê. Onde não pude verificar, digo (por
+  exemplo, o mecanismo de permissão por rota do shell).
+- A **priorização** e a **recomendação** são **julgamento do dossiê**: não há
+  fórmula nem pontuação, e a seção 3 lista o único ponto em que o julgamento
+  prevaleceu sobre a ordem das considerações (`DP-FLX-10` na faixa 3).
 - As **contagens de arquivos** foram medidas com busca textual no commit da base
   (`2a90720`).
 - **Não verifiquei ambiente de produção**, nem a existência de dados reais. O
@@ -866,5 +975,9 @@ com pedido expresso.
 - A **regra da folha** (R10), o **levantamento técnico** (R36) e as **alçadas das
   empresas** (R8) não estão no repositório. Os gates que dependem deles dependem
   de insumo seu ou de RH/DP.
+- **Registro histórico preexistente, fora desta PR:** o `tasks.md` mantém as
+  entradas antigas da T157 e da T158 com "Estado: em implementação". Já estavam
+  na `main`, não foram alteradas aqui, e a entrega aberta que vale é a do
+  `sync-state` (só a T174).
 - Nada aqui é **parecer jurídico**. Onde o tema é trabalhista, fiscal ou de
   proteção de dados, o dossiê só aponta quem decide.

@@ -1955,15 +1955,24 @@ candidatas, sem resolvê-las; e recomenda qual decisão tomar primeiro.
 
 ### O que a T174 entregou
 
-- O [dossiê de decisões](../docs/decisions/t174-dossie-decisoes-fatia-0.md): priorização dos 22 gates, com critérios explícitos, e oito fichas de
+- O [dossiê de decisões](../docs/decisions/t174-dossie-decisoes-fatia-0.md): priorização dos 22 gates por faixas de decisão, com fatores e
+  desempate explicados e sem alegar ordenação matemática total, e oito fichas de
   decisão (`DP-FLX-01`, `-04`, `-21`, `-10`, `-02`, `-03`, `-05` e `-09`), cada
-  uma com decisão exata, alternativas reais, impacto por alternativa, responsável,
-  evidência e o que continua bloqueado.
-- Verificação por script: 132 citações `caminho:linha` e 41 conferências de
+  uma com decisão exata, alternativas reais, impacto por alternativa (rotulado
+  como análise técnica do dossiê), responsável, evidência e o que continua
+  bloqueado.
+- Verificação por script: 149 citações `caminho:linha` e 63 conferências de
   conteúdo; a coluna "desbloqueia" bate com a sequência de fatias do diagnóstico.
 - O `DP-FLX-04` ganhou ficha própria, fora da lista pedida, pela análise de
   dependências.
-- **Recomendação:** decidir primeiro o `DP-FLX-01` (aceitar a ADR 0017 como está) e
+- **Correção pós-revisão (2026-10-19).** A revisão adversarial no head `54143b4`
+  apontou três bloqueios, corrigidos sem reescrever commits: o método de
+  priorização passou a ser descrito como faixas, com uma exceção de julgamento
+  declarada; o `DP-FLX-06` passou a risco Médio, sem dependência do MFA nem do
+  CPF, porque suas categorias são A2; e as perguntas a RH/DP sobre R8 e R7/R17
+  ficaram abertas, sem hipótese embutida.
+- **Recomendação** (análise do dossiê, não decisão): decidir primeiro o `DP-FLX-01`
+  (aceitar a ADR 0017 como está) e
   depois o `DP-FLX-04`; `DP-FLX-05` e `DP-FLX-09` ficam para o fim. Quatro
   perguntas de esclarecimento a RH/DP (R4, R10, R8 e R7/R17) não dependem de
   decisão do proprietário.
