@@ -1821,8 +1821,10 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
     - **Dívida preservada:** R-3 (T162), R-3 da revisão da T164, S2 (T161), R1 a R3 (T160), L3, S-1 a S-4 (T158), R-A a R-C (T157), o registro `teste michell`, a decisão `DP-29` (se `outro_controlado` vale para admissão) e a limitação de validação em navegador da T167.
 
 67. **T170 - Migração controlada para Node 24 LTS**
-    - **Estado:** **implementada em Draft**. Branch `codex/t170-node-24-lts`, a
-      partir do squash `0fa2e1e930bc86f545d37839c42a385b3ed05cfa` (T169, PR #161).
+    - **Estado:** **integrada** em `main` pela PR #162, squash
+      `2fd19df9a86427cd3454d8d40ee282641ec83b65`, com a CI de push 3/3 verde em Node 24. Branch
+      `codex/t170-node-24-lts` preservada, criada a partir do squash
+      `0fa2e1e930bc86f545d37839c42a385b3ed05cfa` (T169, PR #161).
       Detalhes e evidências em [decisão da T170](../docs/decisions/t170-node-24-lts.md).
     - **Entregue:** `.nvmrc` em `24`; `engines.node` em `>=24 <25` nos três
       `package.json`; os três jobs da CI leem a versão do `.nvmrc`
@@ -1862,6 +1864,27 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
     - **Fora de escopo:** pnpm 11, migration aplicada localmente, seed e banco
       de demonstração.
     - **Dívida preservada:** R-3 (T162), R-3 da revisão da T164, S2 (T161), R1 a R3 (T160), L3, S-1 a S-4 (T158), R-A a R-C (T157), o registro `teste michell`, a decisão `DP-29` (se `outro_controlado` vale para admissão) e a limitação de validação em navegador da T167. As pendências da T169 seguem abertas: o processo de eliminação ou anonimização após 2 anos do desligamento; as rotas de exportação e exclusão de contatos, cuja auditoria é obrigatória quando existirem; a origem e a evidência da coleta, lacuna da ficha; a validação visual em navegador; e as observações N-2 (criação concorrente de contato que perde na unicidade responde 409 sem trilha), N-3 (`ON UPDATE CASCADE` nas FKs do evento de contato permite reescrita indireta) e N-4 (CHECK do evento mais frouxo que o serviço), além da docstring do serviço de contatos que ainda descreve o `resourceId` de forma absoluta.
+
+68. **T171 - Ambiente local Windows em Node 24 e pnpm 10, com prévia validada**
+    - **Estado:** em implementação. Branch `codex/t171-ambiente-local-node24`, a
+      partir do squash `2fd19df9a86427cd3454d8d40ee282641ec83b65` (T170, PR #162).
+    - **Objetivo:** fazer a prévia local funcionar no Windows com Node 24 e pnpm
+      10, sem depender de Node 22 nem de `prisma generate` manual depois da
+      instalação, e validar no navegador a versão atual da `main`.
+    - **Escopo:** diagnosticar e resolver o fluxo de instalação e preparação
+      que hoje exige `prisma generate` manual; garantir uso local reproduzível
+      de Node 24 e pnpm 10; alterar scripts, testes e documentação só se
+      necessário; subir o ambiente de demonstração local, com migrations e seed
+      apenas no banco local de demonstração; validar no navegador login, Hub,
+      troca de empresa autorizada, listagem de colaboradores e contatos.
+    - **Regras:** nenhuma dependência atualizada; pnpm 11 fora; nenhuma mudança
+      em funcionalidade de RH, contatos, RBAC, schema ou migrations de negócio,
+      salvo correção estritamente necessária ao ambiente e comprovada; nada de
+      produção, credencial real, banco ou Docker externos; `.env`,
+      `node_modules`, gerados, credenciais, caches e alterações automáticas de
+      `pnpm-workspace.yaml` não são versionados.
+    - **Dívida preservada:** R-3 (T162), R-3 da revisão da T164, S2 (T161), R1 a R3 (T160), L3, S-1 a S-4 (T158), R-A a R-C (T157), o registro `teste michell`, a decisão `DP-29` (se `outro_controlado` vale para admissão) e a limitação de validação em navegador da T167. Pendências da T169: o processo de eliminação ou anonimização após 2 anos; as rotas de exportação e exclusão de contatos; a origem e a evidência da coleta; a validação visual em navegador; as observações N-2, N-3 e N-4 da revisão final; e a docstring do serviço de contatos sobre `resourceId`. Pendência
+      da T170: no Windows, o `prisma generate` do `postinstall` grava o client na raiz de `node_modules`, e o `tsc` da API estoura a pilha até rodar `pnpm --filter @evolli/api exec prisma generate` — objeto desta tarefa.
 
 ## Regra obrigatória para as próximas tarefas
 
