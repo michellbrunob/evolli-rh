@@ -601,6 +601,13 @@ por inteiro; o que existe é só o que já foi aprovado antes.
 
 ## 4. Gates anteriores a qualquer implementação
 
+**Atualização (T175, 2026-10-20).** O `DP-FLX-01` foi **resolvido**: o
+proprietário aprovou a [ADR 0017](../adr/0017-fluxo-admissao-vinculo-desligamento-rh-dp.md).
+A linha dele continua na tabela, para preservar o histórico de decisões. Os
+demais 21 gates (`DP-FLX-02` a `DP-FLX-22`) e os 13 conflitos da seção 5
+continuam **abertos**, e esta atualização não autoriza implementação. O texto
+a seguir é o original de 2026-10-19.
+
 Nenhum gate abaixo está resolvido. A coluna **Responsável** separa três origens,
 e só elas:
 

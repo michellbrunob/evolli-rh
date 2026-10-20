@@ -1,11 +1,14 @@
 # ADR 0017 — Fluxo de admissão, vínculo e desligamento conforme respostas de RH/DP
 
-- Status: **Proposto** em 2026-10-19. O aceite cabe ao proprietário
-  (`DP-FLX-01`). **O aceite não emenda nenhuma decisão fechada e não autoriza
-  implementação**: cada conflito listado no
-  [diagnóstico de reconciliação](../decisions/t173-reconciliacao-fluxo-rh-dp.md)
-  exige decisão própria, e nada desta ADR nasce como interface, API, schema,
-  migration, banco, seed, RBAC ou Docker.
+- Status: **Aceito** em 2026-10-20, por aprovação do proprietário, que
+  resolveu o gate `DP-FLX-01` na abertura da T175; proposto em 2026-10-19.
+  **O aceite não emenda nenhuma decisão fechada e não autoriza
+  implementação**: não fecha os demais 21 gates (`DP-FLX-02` a `DP-FLX-22`),
+  não resolve nenhum dos 13 conflitos listados no
+  [diagnóstico de reconciliação](../decisions/t173-reconciliacao-fluxo-rh-dp.md),
+  cada um dos quais exige decisão própria, e nada desta ADR nasce como
+  interface, API, schema, migration, banco, seed, RBAC ou Docker. Ver a nota
+  de aceite ao final.
 - Data: 2026-10-19
 - Tarefa: T173 — tarefa exclusivamente documental.
 - Fonte primária: as 40 respostas de RH/DP entregues pelo proprietário em
@@ -292,3 +295,46 @@ ali como da operação, não da pessoa —, e ficam em `DP-FLX-22`.
 - **Uma ADR que já emendasse as decisões em conflito.** Recusada: cada emenda
   tem responsável, ficha ou gate próprio, e juntá-las numa só ADR esconderia o
   que está sendo reaberto.
+
+## Nota de aceite (2026-10-20)
+
+O proprietário aprovou esta ADR em 2026-10-20, na abertura da T175, resolvendo
+o gate `DP-FLX-01`. O texto proposto foi preservado: só o `Status` mudou, e esta
+nota foi acrescentada. O `DP-FLX-01` continua listado na seção 4 do
+[diagnóstico de reconciliação](../decisions/t173-reconciliacao-fluxo-rh-dp.md),
+onde uma atualização datada o registra como resolvido, para preservar o
+histórico de decisões.
+
+**O que o aceite registra.** Passa a valer como referência o que esta ADR
+registra — o fluxo descrito pelo RH/DP, os conceitos e os papéis —, cada
+afirmação na camada em que está escrita: fato recebido, conflito técnico,
+decisão pendente ou proposta de operação. Proposta de operação continua sem
+valor de decisão, e a diretriz de UX da decisão 6 continua proposta.
+
+**O que o aceite não faz.**
+
+- **Não fecha os demais 21 gates** (`DP-FLX-02` a `DP-FLX-22`), que continuam
+  abertos e inalterados.
+- **Não resolve nenhum dos 13 conflitos** com decisões fechadas (8 firmes e 5
+  condicionais). As decisões fechadas que eles citam continuam valendo até
+  decisão própria.
+- **Não autoriza implementação.** Nenhuma interface, API, endpoint, schema,
+  migration, banco, seed, RBAC, Docker ou teste de produto nasce deste aceite,
+  e nenhuma fatia da sequência proposta no diagnóstico começa por ele.
+- **Não aprova**, cada um com o seu gate ainda aberto:
+  - o CPF (`DP-FLX-05`);
+  - múltiplos vínculos (`DP-FLX-09`);
+  - a matrícula na efetivação (`DP-FLX-10`);
+  - a solicitação ou a aprovação pelo gestor (`DP-FLX-02`);
+  - as alçadas de aprovação (`DP-FLX-03`);
+  - documentos (`DP-FLX-14`);
+  - dados sensíveis ou restritos: saúde ocupacional (`DP-FLX-15`), dados
+    bancários, sindicais e de dependentes (`DP-FLX-16`) e as demais categorias
+    pessoais (`DP-FLX-06`), que seguem sem ficha (ADR 0016, decisão 5.4);
+  - a diretriz de UX da decisão 6 (`DP-FLX-21`). A direção visual da T142
+    continua valendo até esse gate.
+
+**Próxima decisão de conteúdo recomendada.** O `DP-FLX-04` (estados e
+transições do processo admissional), como recomenda a seção 6 do
+[dossiê de decisões da T174](../decisions/t174-dossie-decisoes-fatia-0.md).
+**Não está resolvido**: é recomendação, não decisão.
