@@ -692,6 +692,11 @@ A ordem põe primeiro o que reorganiza o processo sem dado pessoal novo, e deixa
 para o fim o que depende de upload, de fichas de categorias A3 ou de integração
 externa.
 
+**Remissão (T175, 2026-10-20).** O aceite da ADR 0017 (`DP-FLX-01`), listado na
+fatia 0 abaixo, foi resolvido pela T175. A tabela é o registro original de
+2026-10-19; as demais decisões da fatia 0 e os outros gates continuam
+pendentes.
+
 | Ordem | Fatia                                                                                                                                                                                                                                                                | Gates prévios                                                                                                                    |
 | ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
 | 0     | Decisões, sem código: aceite da ADR 0017 e a decisão de cada um dos 13 conflitos da seção 5 (emenda, recusa ou leitura que dissolva o condicional).                                                                                                                  | `DP-FLX-01`; e os gates dos conflitos: `-02`, `-03`, `-04`, `-05`, `-07`, `-08`, `-09`, `-10`, `-11`, `-12`, `-14`, `-19`, `-21` |

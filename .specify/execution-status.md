@@ -1938,9 +1938,9 @@ da T171: o aviso `[DEP0190]` do Node 24 no orquestrador da demonstração, no Wi
 
 ## Dossiê de decisões da Fatia 0 — T174 (integrada)
 
-| Tarefa | Estado                  | Resultado principal                                                                                                                                                                    |
-| ------ | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| T174   | **Integrada** (PR #166) | Dossiê de decisões da Fatia 0 da ADR 0017: priorização dos gates, decisão exata, alternativas, impacto, responsável e evidência de cada um, e a recomendação de qual decidir primeiro. |
+| Tarefa | Estado                                                                     | Resultado principal                                                                                                                                                                    |
+| ------ | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T174   | **Integrada** (PR #166, squash `34b95cfde73f33dfc1200f1c846f6b8d7d14a1b8`) | Dossiê de decisões da Fatia 0 da ADR 0017: priorização dos gates, decisão exata, alternativas, impacto, responsável e evidência de cada um, e a recomendação de qual decidir primeiro. |
 
 **A T173 foi integrada** em `main` pela PR #165, squash `2a9072040d64daa50326aa18f1602bb160eaae30`, com a CI de
 push 3/3 verde em Node 24. Ficam **abertos** os 13 conflitos com decisões
@@ -2018,6 +2018,14 @@ decisão de conteúdo recomendada, sem ser resolvido.
   a diretriz de UX.
 - O `DP-FLX-04` continua como a próxima decisão de conteúdo recomendada, **sem
   ser resolvido**.
+- **Correção pós-revisão (2026-10-20).** A revisão adversarial no head `0c06781`
+  apontou um bloqueio, corrigido sem reescrever commits: a nota de aceite punha
+  as categorias do `DP-FLX-06` entre os dados sensíveis ou restritos. Agora esse
+  item cita só o `DP-FLX-15` e o `DP-FLX-16`, com o enquadramento legal como
+  sensível a cargo de RH + Jurídico, e o `DP-FLX-06` tem item próprio: data de
+  nascimento, endereço e contato de emergência, classe A2 na ADR 0016, ainda
+  sem ficha de tratamento aprovada. Também: remissão histórica na seção 6 do
+  diagnóstico da T173 e o squash completo da T174 na tabela deste arquivo.
 
 **Fora de escopo:** código, API, schema, migration, RBAC, teste de produto,
 Docker, banco, seed, dependência e lockfile; resolver qualquer outro gate ou

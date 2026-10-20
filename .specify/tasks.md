@@ -2096,6 +2096,15 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       efetivação, solicitação ou aprovação pelo gestor, alçadas, documentos,
       dados sensíveis nem a diretriz de UX. O `DP-FLX-04` continua como a próxima
       decisão de conteúdo recomendada, **sem ser resolvido**.
+    - **Correção pós-revisão (2026-10-20):** a revisão adversarial no head
+      `0c06781` apontou um bloqueio, corrigido sem reescrever commits: a nota de
+      aceite punha as categorias do `DP-FLX-06` entre os dados sensíveis ou
+      restritos. Agora esse item cita só o `DP-FLX-15` e o `DP-FLX-16`, com o
+      enquadramento legal como sensível a cargo de RH + Jurídico (ADR 0016,
+      decisão 5), e o `DP-FLX-06` tem item próprio: data de nascimento, endereço
+      e contato de emergência, classe A2 na ADR 0016, ainda sem ficha de
+      tratamento aprovada. Também: remissão histórica na seção 6 do diagnóstico
+      da T173 e o squash completo da T174 na tabela do `execution-status.md`.
     - **Fora de escopo:** código, API, schema, migration, RBAC, teste de produto,
       Docker, banco, seed, dependência e lockfile; resolver qualquer outro gate ou
       conflito; e autorizar implementação.

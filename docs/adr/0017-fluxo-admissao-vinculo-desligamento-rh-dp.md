@@ -328,9 +328,13 @@ valor de decisão, e a diretriz de UX da decisão 6 continua proposta.
   - a solicitação ou a aprovação pelo gestor (`DP-FLX-02`);
   - as alçadas de aprovação (`DP-FLX-03`);
   - documentos (`DP-FLX-14`);
-  - dados sensíveis ou restritos: saúde ocupacional (`DP-FLX-15`), dados
-    bancários, sindicais e de dependentes (`DP-FLX-16`) e as demais categorias
-    pessoais (`DP-FLX-06`), que seguem sem ficha (ADR 0016, decisão 5.4);
+  - dados sensíveis ou restritos: saúde ocupacional (`DP-FLX-15`) e dados
+    bancários, sindicais e de dependentes (`DP-FLX-16`). O eventual
+    enquadramento legal de um dado como sensível cabe a RH + Jurídico (ADR
+    0016, decisão 5);
+  - as categorias pessoais do `DP-FLX-06` — data de nascimento, endereço e
+    contato de emergência —, classe **A2 — Pessoal** na ADR 0016, que
+    continuam sem ficha de tratamento aprovada (ADR 0016, decisão 5.4);
   - a diretriz de UX da decisão 6 (`DP-FLX-21`). A direção visual da T142
     continua valendo até esse gate.
 
