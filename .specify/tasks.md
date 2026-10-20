@@ -2207,9 +2207,9 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       demonstração no navegador com dados sintéticos. Os Contatos reutilizam o
       modelo já aprovado na T169, sem segunda fonte para e-mail, celular e
       telefone. A empresa ativa continua contexto não editável, e RH e DP
-      continuam os operadores.
-    - **Ficha de tratamento:** os dados pessoais e o endereço são categorias A2
-      "Complementar" na ADR 0016, que exige ficha aprovada (decisão 5.4) e emenda
+      continuam os operadores da admissão.
+    - **Ficha de tratamento:** os dados pessoais e o endereço estão na matriz da
+      ADR 0016 como "Complementar" (a classificação A2 é proposta da ficha), que exige ficha aprovada (decisão 5.4) e emenda
       à ADR 0007, como foi feito com os Contatos na T169. Por decisão da
       proprietária, a ficha é redigida **nesta mesma PR** e o merge depende da
       aprovação dela.
@@ -2230,7 +2230,16 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       opcionais, expressos campo a campo na ficha, no contrato e na tela; (3) a
       matriz não marca fuso horário como descartado. Com a obrigatoriedade no
       servidor, o formulário transitório em modal da tela de Colaboradores foi
-      aposentado: "Novo colaborador" leva à página de Nova admissão.
+      aposentado, também por decisão da proprietária (2026-10-20): "Novo
+      colaborador" leva à página de Nova admissão. A ADR 0016 recebeu nota de
+      convergência da T177.
+    - **Pendências próprias da T177:** a aprovação da ficha e da Emenda 5 da ADR
+      0007 (condição do merge); o **alcance** do "acessa tudo" do
+      `master_tecnico` nos demais recursos (admissão, vínculo, movimentação,
+      ponto, documentos, folha, exportação), que a Emenda 2 da ADR 0012 deixa
+      para registro próprio; a edição de dados pessoais e endereço existe só na
+      API (`PUT`), sem tela nesta entrega; e o endereço gravado só com o país
+      sugerido quando o RH não toca no bloco (registrado na ficha).
     - **Entregue:** Dados pessoais básicos (data de nascimento, sexo, saudação, estado
       civil, nacionalidade, naturalidade, escolaridade, curso, nome do pai e nome
       da mãe, além do nome completo já existente), endereço (país, sugerido como

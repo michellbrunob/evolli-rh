@@ -2148,6 +2148,11 @@ merge depende da aprovação da proprietária.
   `master_tecnico`, troca de empresa e negação aos demais perfis.
 - **Pendente de aprovação da proprietária:** a ficha de tratamento e a Emenda 5
   da ADR 0007; o merge depende dela.
+- **Pendências próprias:** o alcance do "acessa tudo" do `master_tecnico` nos
+  demais recursos (Emenda 2 da ADR 0012, registro próprio); edição de dados
+  pessoais e endereço só pela API, sem tela; endereço gravado só com o país
+  sugerido quando o bloco não é tocado. A ADR 0016 recebeu nota de
+  convergência da T177.
 - **Recorte:** nome social, gênero e os demais grupos dos prints estão na matriz
   de cobertura da PR, cada um com destino; fuso horário, como decisão pendente.
 

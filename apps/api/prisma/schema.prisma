@@ -2190,9 +2190,10 @@ model ContatoColaboradorEvento {
 // Agregados PROPRIOS, fora de `Colaborador` (ADR 0016, decisao 3), por
 // colaborador E empresa, como os contatos da T169: o colaborador nao tem
 // `empresa_id`, e o RH de uma empresa nunca le o que o RH de outra gravou.
-// Todos os campos sao opcionais e em texto controlado pelo servidor: nao ha
-// catalogo canonico no sistema para sexo, genero, estado civil, escolaridade,
-// pais, UF ou municipio, e esta fatia nao inventa taxonomia.
+// Data de nascimento e OBRIGATORIA (NOT NULL); os demais campos sao
+// opcionais e em texto controlado pelo servidor: nao ha catalogo canonico no
+// sistema para sexo, estado civil, escolaridade, pais, UF ou municipio, e esta
+// fatia nao inventa taxonomia.
 // ---------------------------------------------------------------------------
 
 /// Categoria do dado pessoal tratada por um evento.

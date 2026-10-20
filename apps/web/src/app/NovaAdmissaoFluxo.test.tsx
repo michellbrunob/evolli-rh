@@ -3,7 +3,7 @@
  *
  * O teste da página (`NovaAdmissaoScreen.test.tsx`) prende o formulário. Este
  * prende o que só existe com o shell montado: o destino na navegação para `rh`
- * e `dp` (e não para `master_tecnico`, que só lê), a URL própria
+ * e `dp` (e não para `master_tecnico`, que não admite), a URL própria
  * (`#/pessoas/nova-admissao`), o "voltar" do navegador e a passagem da página
  * para a ficha do admitido — inclusive direto nos contatos aprovados.
  */
