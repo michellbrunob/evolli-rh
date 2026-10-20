@@ -38,7 +38,10 @@ export class DataNascimentoNoIntervalo implements ValidatorConstraintInterface {
 }
 
 /**
- * Dados pessoais básicos (T177, Módulo 1). Todos opcionais, em texto
+ * Dados pessoais básicos (T177, Módulo 1).
+ *
+ * OBRIGATÓRIO: `dataNascimento` — todo registro de perfil a tem, na admissão
+ * e na edição (o banco a exige por NOT NULL). OPCIONAIS: os demais, em texto
  * controlado: não há catálogo canônico no sistema para sexo, saudação, estado
  * civil, nacionalidade, naturalidade ou escolaridade, e esta fatia não inventa
  * taxonomia. O servidor apara, colapsa espaços e grava vazio como `null`.
@@ -47,12 +50,11 @@ export class DataNascimentoNoIntervalo implements ValidatorConstraintInterface {
  * `Colaborador`. Nome social e gênero ficaram fora do Módulo 1 (matriz da PR).
  */
 export class PerfilPessoalDto {
-  @Transform(({ value }) => (value === "" ? null : value))
-  @IsOptional()
+  @IsString()
   @IsDateString({ strict: true })
   @Matches(/^\d{4}-\d{2}-\d{2}$/)
   @Validate(DataNascimentoNoIntervalo)
-  dataNascimento?: string | null;
+  dataNascimento!: string;
 
   @Transform(({ value }) => normalizarTextoPessoal(value))
   @IsOptional()

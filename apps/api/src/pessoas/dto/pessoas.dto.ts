@@ -6,9 +6,11 @@ import {
 import { RegistrarContatosColaboradorDto } from "../contatos/contato-colaborador.dto";
 import {
   IsDateString,
+  IsDefined,
   IsIn,
   IsInt,
   IsNotEmpty,
+  IsObject,
   IsOptional,
   IsString,
   IsUUID,
@@ -171,14 +173,16 @@ export class AdmitirColaboradorDto extends DestinoOrganizacionalDto {
 
   /**
    * T177 — Módulo 1 do cadastro, gravado na MESMA transação da admissão.
-   * Os três blocos são opcionais no contrato: a página de Nova admissão os
-   * envia (e exige os contatos), e o formulário transitório em modal da tela
-   * de Colaboradores continua admitindo só com o mínimo.
+   *
+   * OBRIGATÓRIOS: `perfilPessoal` (com `dataNascimento`) e `contatos` (os
+   * três campos da ficha da T169). OPCIONAL: `endereco`, e todos os campos
+   * dele. Admissão sem eles é 400, antes de qualquer gravação.
    */
-  @IsOptional()
+  @IsDefined()
+  @IsObject()
   @ValidateNested()
   @Type(() => PerfilPessoalDto)
-  perfilPessoal?: PerfilPessoalDto;
+  perfilPessoal!: PerfilPessoalDto;
 
   @IsOptional()
   @ValidateNested()
@@ -186,10 +190,11 @@ export class AdmitirColaboradorDto extends DestinoOrganizacionalDto {
   endereco?: EnderecoDto;
 
   /** Os três contatos da ficha da T169, juntos — o mesmo DTO da rota própria. */
-  @IsOptional()
+  @IsDefined()
+  @IsObject()
   @ValidateNested()
   @Type(() => RegistrarContatosColaboradorDto)
-  contatos?: RegistrarContatosColaboradorDto;
+  contatos!: RegistrarContatosColaboradorDto;
 }
 
 /**

@@ -20,6 +20,14 @@
  *   da ficha da T169: obrigatórios, juntos, e lidos depois pela rota própria.
  * - **Servidor como fonte.** A confirmação mostra o que o servidor gravou.
  *
+ * ## Obrigatoriedade, campo a campo
+ *
+ * OBRIGATÓRIOS (asterisco e "obrigatório" para leitor de tela): nome
+ * completo, data de nascimento, e-mail pessoal, celular e telefone — e, do
+ * vínculo, matrícula, tipo, data de admissão e lotação inicial. OPCIONAIS
+ * (rótulo com "opcional"): os demais dados pessoais e todo o endereço. É o
+ * mesmo contrato que o servidor exige.
+ *
  * ## O que ela não faz
  *
  * Não coleta nome social, gênero, raça/etnia, foto, deficiência, contato de
@@ -28,10 +36,11 @@
  * Não consulta CEP em serviço externo, e não inventa lista de opções: sexo,
  * estado civil, escolaridade, país, cidade e estado são texto validado.
  *
- * ## Transição
+ * ## Única porta da admissão
  *
- * O formulário em modal da tela de Colaboradores continua existindo, de
- * propósito, e admite só com o mínimo. Ele é transitório.
+ * O formulário transitório em modal da tela de Colaboradores (T176) foi
+ * aposentado na T177: não coletava os campos obrigatórios. "Novo colaborador"
+ * traz para esta página.
  */
 import { useEffect, useRef, useState } from "react";
 import {
@@ -128,6 +137,11 @@ const OPCOES_TIPO_DESTINO: {
   { valor: "cargo", rotulo: "Cargo" },
   { valor: "centroCusto", rotulo: "Centro de custo" },
 ];
+
+/** Rótulo de campo opcional: o "opcional" é parte do nome acessível. */
+function rotuloOpcional(rotulo: string): string {
+  return `${rotulo} (opcional)`;
+}
 
 function rotuloTipoDestino(tipo: TipoDestino): string {
   return (
@@ -639,6 +653,10 @@ export function NovaAdmissaoScreen({
         noValidate
         onSubmit={(e) => void enviar(e)}
       >
+        <p className="nova-admissao__texto nova-admissao__legenda">
+          Campos com * são obrigatórios. Os marcados como opcionais podem ficar
+          em branco.
+        </p>
         <section
           className="nova-admissao__grupo"
           aria-labelledby="nova-admissao-grupo-empresa"
@@ -698,6 +716,7 @@ export function NovaAdmissaoScreen({
           <FormField
             id={ID_DO_CAMPO.dataNascimento}
             label={ROTULO_DATA_NASCIMENTO}
+            required
             {...(erros.dataNascimento ? { error: erros.dataNascimento } : {})}
           >
             {(control) => (
@@ -715,7 +734,7 @@ export function NovaAdmissaoScreen({
             <FormField
               key={campo.chave}
               id={ID_DO_CAMPO[campo.chave]}
-              label={campo.rotulo}
+              label={rotuloOpcional(campo.rotulo)}
               {...(campo.ajuda ? { help: campo.ajuda } : {})}
               {...(erros[campo.chave] ? { error: erros[campo.chave]! } : {})}
             >
@@ -747,7 +766,7 @@ export function NovaAdmissaoScreen({
             <FormField
               key={campo.chave}
               id={ID_DO_CAMPO[campo.chave]}
-              label={campo.rotulo}
+              label={rotuloOpcional(campo.rotulo)}
               {...(campo.chave === "pais"
                 ? { help: "Sugerido como Brasil; pode ser alterado." }
                 : campo.ajuda
@@ -1201,22 +1220,15 @@ function ConfirmacaoDaAdmissao({
         <ResumoGravado
           titulo="Dados pessoais"
           id="nova-admissao-sucesso-dados-pessoais"
-          linhas={
-            admissao.perfilPessoal
-              ? [
-                  [
-                    ROTULO_DATA_NASCIMENTO,
-                    admissao.perfilPessoal.dataNascimento
-                      ? formatarDiaCivil(admissao.perfilPessoal.dataNascimento)
-                      : null,
-                  ],
-                  ...CAMPOS_TEXTO_PERFIL.map(
-                    (c) =>
-                      [c.rotulo, admissao.perfilPessoal![c.chave]] as const,
-                  ),
-                ]
-              : null
-          }
+          linhas={[
+            [
+              ROTULO_DATA_NASCIMENTO,
+              formatarDiaCivil(admissao.perfilPessoal.dataNascimento),
+            ],
+            ...CAMPOS_TEXTO_PERFIL.map(
+              (c) => [c.rotulo, admissao.perfilPessoal[c.chave]] as const,
+            ),
+          ]}
         />
         <ResumoGravado
           titulo="Endereço"
@@ -1232,15 +1244,11 @@ function ConfirmacaoDaAdmissao({
         <ResumoGravado
           titulo="Contatos"
           id="nova-admissao-sucesso-contatos"
-          linhas={
-            admissao.contatos
-              ? [
-                  ["E-mail pessoal", admissao.contatos.emailPessoal],
-                  ["Celular", admissao.contatos.celular],
-                  ["Telefone", admissao.contatos.telefone],
-                ]
-              : null
-          }
+          linhas={[
+            ["E-mail pessoal", admissao.contatos.emailPessoal],
+            ["Celular", admissao.contatos.celular],
+            ["Telefone", admissao.contatos.telefone],
+          ]}
         />
         <FormActions>
           <Button

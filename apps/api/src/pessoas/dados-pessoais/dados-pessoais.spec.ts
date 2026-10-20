@@ -29,13 +29,15 @@ import {
 /**
  * T177 — Cadastro de colaborador, Módulo 1: dados pessoais e endereço.
  *
- * Prende, sem banco, o que o servidor decide: normalização e limites de cada
- * campo, a matriz de autorização (só `rh` e `dp`, sem a exceção do
- * `master_tecnico`), a gravação na admissão e a regra de que nenhum valor
- * pessoal entra na trilha. A atomicidade e os CHECKs do banco ficam no E2E.
+ * Prende, sem banco, o que o servidor decide: obrigatoriedade, normalização e
+ * limites de cada campo, a matriz de autorização (`rh` e `dp` na empresa
+ * ativa; `master_tecnico` em qualquer empresa, como nos contatos), a gravação
+ * na admissão e a regra de que nenhum valor pessoal entra na trilha. A
+ * atomicidade e os CHECKs do banco ficam no E2E.
  */
 
 const EMPRESA_A = "11111111-1111-4111-8111-111111111111";
+const EMPRESA_B = "22222222-2222-4222-8222-222222222222";
 const OPCOES = { whitelist: true, forbidNonWhitelisted: true };
 
 function ator(role: AccessRole, companyId: string | null): AccessUser {
@@ -88,8 +90,17 @@ describe("Módulo 1 — PerfilPessoalDto", () => {
     expect(dto.naturalidade).toBe("Belo Horizonte");
   });
 
-  it("todos os campos são opcionais", async () => {
-    expect(await erros(PerfilPessoalDto, {})).toEqual([]);
+  it("data de nascimento é obrigatória; os demais campos são opcionais", async () => {
+    expect(await erros(PerfilPessoalDto, {})).toEqual(["dataNascimento"]);
+    expect(await erros(PerfilPessoalDto, { dataNascimento: "" })).toEqual([
+      "dataNascimento",
+    ]);
+    expect(await erros(PerfilPessoalDto, { dataNascimento: null })).toEqual([
+      "dataNascimento",
+    ]);
+    expect(
+      await erros(PerfilPessoalDto, { dataNascimento: "1990-05-20" }),
+    ).toEqual([]);
   });
 
   it.each([
@@ -111,20 +122,26 @@ describe("Módulo 1 — PerfilPessoalDto", () => {
   });
 
   it("recusa texto acima do limite e caractere de controle", async () => {
+    const data = { dataNascimento: "1990-05-20" };
     expect(
-      await erros(PerfilPessoalDto, { saudacao: "x".repeat(41) }),
+      await erros(PerfilPessoalDto, { ...data, saudacao: "x".repeat(41) }),
     ).toContain("saudacao");
-    expect(await erros(PerfilPessoalDto, { curso: "a\u0007b" })).toContain(
-      "curso",
-    );
     expect(
-      await erros(PerfilPessoalDto, { nomeMae: "linha\nquebrada" }),
+      await erros(PerfilPessoalDto, { ...data, curso: "a\u0007b" }),
+    ).toContain("curso");
+    expect(
+      await erros(PerfilPessoalDto, { ...data, nomeMae: "linha\nquebrada" }),
     ).toContain("nomeMae");
   });
 
   it("recusa campo que não é do Módulo 1 (nome social, gênero, CPF)", async () => {
     for (const campo of ["nomeSocial", "genero", "cpf", "racaEtnia"]) {
-      expect(await erros(PerfilPessoalDto, { [campo]: "x" })).toContain(campo);
+      expect(
+        await erros(PerfilPessoalDto, {
+          dataNascimento: "1990-05-20",
+          [campo]: "x",
+        }),
+      ).toContain(campo);
     }
   });
 });
@@ -170,21 +187,59 @@ describe("Módulo 1 — AdmitirColaboradorDto com os blocos", () => {
     motivoCodigo: "admissao_inicial",
     departamentoId: "33333333-3333-4333-8333-333333333333",
   };
+  const obrigatorios = {
+    perfilPessoal: { dataNascimento: "1990-05-20" },
+    contatos: {
+      emailPessoal: "pessoa@exemplo.test",
+      celular: "+5511999990000",
+      telefone: "1133330000",
+    },
+  };
 
-  it("os três blocos são opcionais no contrato (modal transitório)", async () => {
-    expect(await erros(AdmitirColaboradorDto, base)).toEqual([]);
+  it("perfil (com data de nascimento) e contatos são obrigatórios; endereço é opcional", async () => {
+    expect(
+      await erros(AdmitirColaboradorDto, { ...base, ...obrigatorios }),
+    ).toEqual([]);
+    expect(await erros(AdmitirColaboradorDto, base)).toEqual(
+      expect.arrayContaining(["perfilPessoal", "contatos"]),
+    );
+    expect(
+      await erros(AdmitirColaboradorDto, {
+        ...base,
+        ...obrigatorios,
+        perfilPessoal: { sexo: "Feminino" },
+      }),
+    ).toEqual(["perfilPessoal"]);
+    expect(
+      await erros(AdmitirColaboradorDto, {
+        ...base,
+        perfilPessoal: obrigatorios.perfilPessoal,
+      }),
+    ).toEqual(["contatos"]);
+  });
+
+  it("nome completo continua obrigatório", async () => {
+    expect(
+      await erros(AdmitirColaboradorDto, {
+        ...base,
+        ...obrigatorios,
+        nome: undefined,
+      }),
+    ).toContain("nome");
   });
 
   it("valida cada bloco aninhado", async () => {
     expect(
       await erros(AdmitirColaboradorDto, {
         ...base,
+        ...obrigatorios,
         perfilPessoal: { dataNascimento: "2999-01-01" },
       }),
     ).toContain("perfilPessoal");
     expect(
       await erros(AdmitirColaboradorDto, {
         ...base,
+        ...obrigatorios,
         endereco: { cep: "?" },
       }),
     ).toContain("endereco");
@@ -194,12 +249,14 @@ describe("Módulo 1 — AdmitirColaboradorDto com os blocos", () => {
     expect(
       await erros(AdmitirColaboradorDto, {
         ...base,
+        ...obrigatorios,
         contatos: { emailPessoal: "a@b.test", celular: "11999990000" },
       }),
     ).toContain("contatos");
 
     const dto = plainToInstance(AdmitirColaboradorDto, {
       ...base,
+      ...obrigatorios,
       contatos: {
         emailPessoal: " Pessoa@Exemplo.TEST ",
         celular: "+55 (11) 99999-0000",
@@ -218,6 +275,7 @@ describe("Módulo 1 — AdmitirColaboradorDto com os blocos", () => {
     expect(
       await erros(AdmitirColaboradorDto, {
         ...base,
+        ...obrigatorios,
         endereco: { empresaId: EMPRESA_A },
       }),
     ).toContain("endereco");
@@ -228,9 +286,22 @@ describe("Módulo 1 — RegistrarDadosPessoaisDto", () => {
   it("cada bloco é validado", async () => {
     expect(
       await erros(RegistrarDadosPessoaisDto, {
-        perfilPessoal: { sexo: "x".repeat(61) },
+        perfilPessoal: { dataNascimento: "1990-05-20", sexo: "x".repeat(61) },
       }),
     ).toContain("perfilPessoal");
+  });
+
+  it("o bloco do perfil exige a data de nascimento também na edição", async () => {
+    expect(
+      await erros(RegistrarDadosPessoaisDto, {
+        perfilPessoal: { sexo: "Feminino" },
+      }),
+    ).toContain("perfilPessoal");
+    expect(
+      await erros(RegistrarDadosPessoaisDto, {
+        endereco: { cidade: "Recife" },
+      }),
+    ).toEqual([]);
   });
 });
 
@@ -276,24 +347,40 @@ describe("Módulo 1 — matriz de autorização (dados_pessoais_colaborador)", (
     expect(pode("rh", "manage", EMPRESA_A)).toBe(false);
   });
 
+  it("master_tecnico sem empresa ativa lê e edita em qualquer empresa", () => {
+    expect(pode("master_tecnico", "read", null)).toBe(true);
+    expect(pode("master_tecnico", "alter", null)).toBe(true);
+    expect(pode("master_tecnico", "read", null, EMPRESA_A)).toBe(true);
+    expect(pode("master_tecnico", "alter", null, EMPRESA_B)).toBe(true);
+  });
+
+  it("master_tecnico com empresa ativa atua só nela", () => {
+    expect(pode("master_tecnico", "read", EMPRESA_A)).toBe(true);
+    expect(pode("master_tecnico", "read", EMPRESA_A, EMPRESA_A)).toBe(true);
+    expect(pode("master_tecnico", "alter", EMPRESA_A, EMPRESA_A)).toBe(true);
+    expect(pode("master_tecnico", "read", EMPRESA_A, EMPRESA_B)).toBe(false);
+    expect(pode("master_tecnico", "alter", EMPRESA_A, EMPRESA_B)).toBe(false);
+  });
+
+  it("master_tecnico: alvo sem empresa resolvida é negado; create e manage não existem", () => {
+    expect(pode("master_tecnico", "read", null, null)).toBe(false);
+    expect(pode("master_tecnico", "create", null)).toBe(false);
+    expect(pode("master_tecnico", "manage", null)).toBe(false);
+  });
+
   it.each([
-    ["master_tecnico", null],
-    ["master_tecnico", EMPRESA_A],
     ["gestor", EMPRESA_A],
     ["colaborador", EMPRESA_A],
     ["financeiro", EMPRESA_A],
     ["admin_tecnico", null],
     ["auditor", EMPRESA_A],
     ["dpo", EMPRESA_A],
-  ] as const)(
-    "%s (empresa %s) não lê nem edita — a exceção do master_tecnico é só de contatos",
-    (role, companyId) => {
-      expect(pode(role, "read", companyId)).toBe(false);
-      expect(pode(role, "alter", companyId)).toBe(false);
-    },
-  );
+  ] as const)("%s (empresa %s) não lê nem edita", (role, companyId) => {
+    expect(pode(role, "read", companyId)).toBe(false);
+    expect(pode(role, "alter", companyId)).toBe(false);
+  });
 
-  it("a exceção do master_tecnico em contatos continua como estava", () => {
+  it("o acesso do master_tecnico em contatos continua como estava", () => {
     expect(
       evaluatePermission(
         { userId: "u-m", role: "master_tecnico", companyId: null },
@@ -545,20 +632,29 @@ describe("Módulo 1 — admissão com perfil, endereço e contatos", () => {
     );
   });
 
-  it("bloco sem nenhum valor não cria registro nem evento", async () => {
+  it("só o obrigatório: perfil com a data, contatos, e nenhum endereço", async () => {
     const { servico, tx, eventosDados } = montar();
     const resposta = await servico.admitir(
       plainToInstance(AdmitirColaboradorDto, {
         ...corpo,
-        perfilPessoal: { sexo: "   " },
+        perfilPessoal: { dataNascimento: "1990-05-20", sexo: "   " },
         endereco: {},
       }),
       ctx,
     );
-    expect(tx.perfilPessoalColaborador.create).not.toHaveBeenCalled();
+    expect(tx.perfilPessoalColaborador.create).toHaveBeenCalledTimes(1);
     expect(tx.enderecoColaborador.create).not.toHaveBeenCalled();
-    expect(eventosDados).toEqual([]);
-    expect(resposta.perfilPessoal).toBeNull();
+    expect(tx.contatoColaborador.create).toHaveBeenCalledTimes(1);
+    expect(eventosDados).toEqual([
+      expect.objectContaining({
+        categoria: "perfil_pessoal",
+        campos: ["data_nascimento"],
+      }),
+    ]);
+    expect(resposta.perfilPessoal).toMatchObject({
+      dataNascimento: "1990-05-20",
+      sexo: null,
+    });
     expect(resposta.endereco).toBeNull();
   });
 
@@ -573,5 +669,141 @@ describe("Módulo 1 — admissão com perfil, endereço e contatos", () => {
     // O cliente em memória não desfaz nada — quem desfaz é o banco, provado no
     // E2E. Aqui fica provado que o erro sobe de DENTRO da transação.
     expect(tx.contatoColaborador.create).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Escopo do `master_tecnico` na leitura e na edição, sobre um cliente em
+ * memória: com empresa ativa, só ela; sem empresa ativa, a empresa REAL do
+ * vínculo; com vínculo em mais de uma empresa, nada lido nem gravado.
+ */
+describe("Módulo 1 — escopo de leitura e edição do master_tecnico", () => {
+  function montar(vinculos: { empresaId: string; situacao: string }[]) {
+    const eventos: Record<string, unknown>[] = [];
+    const auditorias: Record<string, unknown>[] = [];
+    const filtros: Record<string, unknown>[] = [];
+    const tx = {
+      perfilPessoalColaborador: {
+        findUnique: jest.fn().mockResolvedValue(null),
+      },
+      enderecoColaborador: { findUnique: jest.fn().mockResolvedValue(null) },
+      dadosPessoaisColaboradorEvento: {
+        create: jest.fn(({ data }: { data: Record<string, unknown> }) => {
+          eventos.push(data);
+          return data;
+        }),
+      },
+    };
+    const prisma = {
+      vinculoFuncional: {
+        findMany: jest.fn(({ where }: { where: Record<string, unknown> }) => {
+          filtros.push(where);
+          const empresa = where.empresaId as string | undefined;
+          return Promise.resolve(
+            vinculos.filter((v) => !empresa || v.empresaId === empresa),
+          );
+        }),
+      },
+      $transaction: jest.fn((fn: (t: typeof tx) => unknown) => fn(tx)),
+    } as unknown as PrismaService;
+    const auditoria = {
+      registrarNaTransacao: jest.fn(
+        (_tx: unknown, _ctx: unknown, evento: Record<string, unknown>) => {
+          auditorias.push(evento);
+          return Promise.resolve();
+        },
+      ),
+      negarAcesso: jest.fn(() => Promise.reject(new Error("404"))),
+    } as unknown as PessoasAuditoriaService;
+    const servico = new DadosPessoaisColaboradorService(prisma, auditoria);
+    return { servico, eventos, auditorias, filtros, auditoria };
+  }
+
+  const contexto = (companyId: string | null) => ({
+    actor: ator("master_tecnico", companyId),
+    metadata: { ip: null, userAgent: null, requestId: "req-m" },
+  });
+
+  it("sem empresa ativa: lê na empresa REAL do vínculo e audita com ela", async () => {
+    const { servico, eventos, auditorias, filtros } = montar([
+      { empresaId: EMPRESA_B, situacao: "ativo" },
+    ]);
+    const r = await servico.consultar("col-1", contexto(null));
+    expect(filtros).toEqual([{ colaboradorId: "col-1" }]);
+    expect(r).toMatchObject({ empresaId: EMPRESA_B, situacao: "sem_registro" });
+    expect(eventos.map((e) => e.empresaId)).toEqual([EMPRESA_B, EMPRESA_B]);
+    expect(auditorias.map((a) => a.empresaId)).toEqual([EMPRESA_B, EMPRESA_B]);
+  });
+
+  it("com empresa ativa: procura só nela; fora dela, 404 de negação", async () => {
+    const { servico, filtros, auditoria } = montar([
+      { empresaId: EMPRESA_B, situacao: "ativo" },
+    ]);
+    await expect(
+      servico.consultar("col-1", contexto(EMPRESA_A)),
+    ).rejects.toThrow("404");
+    expect(filtros).toEqual([{ colaboradorId: "col-1", empresaId: EMPRESA_A }]);
+    expect(auditoria.negarAcesso).toHaveBeenCalledWith(
+      expect.anything(),
+      "dados_pessoais_colaborador",
+      "col-1",
+      EMPRESA_A,
+    );
+  });
+
+  it("sem empresa ativa e vínculo em duas empresas: 409, trilha sem empresa e sem valor", async () => {
+    const { servico, eventos, auditorias } = montar([
+      { empresaId: EMPRESA_A, situacao: "ativo" },
+      { empresaId: EMPRESA_B, situacao: "ativo" },
+    ]);
+    await expect(servico.consultar("col-1", contexto(null))).rejects.toThrow(
+      "Conflict",
+    );
+    expect(eventos).toEqual([
+      expect.objectContaining({
+        categoria: "perfil_pessoal",
+        empresaId: null,
+        perfilId: null,
+        enderecoId: null,
+        acao: "leitura",
+        resultado: "empresa_ambigua",
+        campos: [],
+      }),
+      expect.objectContaining({
+        categoria: "endereco",
+        empresaId: null,
+        resultado: "empresa_ambigua",
+      }),
+    ]);
+    expect(auditorias).toEqual([
+      expect.objectContaining({
+        action: "pessoas_dados_pessoais_consultados",
+        empresaId: null,
+        result: "failure",
+      }),
+    ]);
+  });
+
+  it("edição ambígua registra só a categoria enviada e não grava nada", async () => {
+    const { servico, eventos } = montar([
+      { empresaId: EMPRESA_A, situacao: "ativo" },
+      { empresaId: EMPRESA_B, situacao: "ativo" },
+    ]);
+    await expect(
+      servico.registrar(
+        "col-1",
+        plainToInstance(RegistrarDadosPessoaisDto, {
+          endereco: { cidade: "Recife" },
+        }),
+        contexto(null),
+      ),
+    ).rejects.toThrow("Conflict");
+    expect(eventos).toEqual([
+      expect.objectContaining({
+        categoria: "endereco",
+        acao: "edicao",
+        resultado: "empresa_ambigua",
+      }),
+    ]);
   });
 });

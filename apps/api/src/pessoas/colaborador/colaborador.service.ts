@@ -85,10 +85,13 @@ export interface AdmissaoRegistrada extends Pick<
       centroCustoId: string | null;
     };
   };
-  /** T177 — o que o servidor gravou do Módulo 1; `null` quando não enviado. */
-  perfilPessoal: ValoresPerfil | null;
+  /**
+   * T177 — o que o servidor gravou do Módulo 1. Perfil e contatos são
+   * obrigatórios na admissão; endereço é `null` quando nenhum campo veio.
+   */
+  perfilPessoal: ValoresPerfil;
   endereco: ValoresEndereco | null;
-  contatos: ValoresContatos | null;
+  contatos: ValoresContatos;
 }
 
 /**
@@ -152,7 +155,6 @@ export class ColaboradorService {
     // para que o dia em que as matrizes divergirem não abra um atalho pela
     // admissão.
     if (
-      (dto.perfilPessoal || dto.endereco) &&
       !podeAcessarPessoas(
         ctx.actor,
         "dados_pessoais_colaborador",
@@ -168,7 +170,6 @@ export class ColaboradorService {
       );
     }
     if (
-      dto.contatos &&
       !podeAcessarPessoas(
         ctx.actor,
         "contato_colaborador",
@@ -268,14 +269,12 @@ export class ColaboradorService {
           alvoModulo1,
           { perfilPessoal: dto.perfilPessoal, endereco: dto.endereco },
         );
-        const contatosGravados = dto.contatos
-          ? await this.contatos.criarNaAdmissao(
-              tx,
-              ctx,
-              alvoModulo1,
-              dto.contatos,
-            )
-          : null;
+        const contatosGravados = await this.contatos.criarNaAdmissao(
+          tx,
+          ctx,
+          alvoModulo1,
+          dto.contatos,
+        );
 
         return {
           id: colaborador.id,

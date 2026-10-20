@@ -7,11 +7,12 @@ const BASE = "/v1";
  * Dados pessoais e endereço do colaborador (T177, Módulo 1). Espelha a
  * resposta de `GET /v1/colaboradores/:colaboradorId/dados-pessoais`.
  *
- * A data de nascimento vem como dia civil `AAAA-MM-DD`. Toda leitura é
+ * A data de nascimento vem como dia civil `AAAA-MM-DD` e é obrigatória: todo
+ * perfil gravado a tem. Os demais campos são opcionais. Toda leitura é
  * auditada no servidor; `no-store` impede cache do navegador.
  */
 export interface PerfilPessoalApi {
-  dataNascimento: string | null;
+  dataNascimento: string;
   sexo: string | null;
   saudacao: string | null;
   estadoCivil: string | null;

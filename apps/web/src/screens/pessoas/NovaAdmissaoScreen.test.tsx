@@ -152,6 +152,7 @@ async function aguardarEmpresa() {
 }
 
 const nome = () => screen.getByLabelText(/Nome completo/);
+const dataNascimento = () => screen.getByLabelText(/^Data de nascimento/);
 const matricula = () => screen.getByLabelText(/^Matrícula/);
 const tipo = () => screen.getByLabelText(/Tipo de vínculo/);
 const data = () => screen.getByLabelText(/Data de admissão/);
@@ -179,6 +180,7 @@ function preencherContatos() {
 function preencherValido() {
   preencherContatos();
   fireEvent.change(nome(), { target: { value: "  Pessoa Sintética Nova " } });
+  fireEvent.change(dataNascimento(), { target: { value: "1990-05-20" } });
   fireEvent.change(matricula(), { target: { value: "mat-0900" } });
   fireEvent.change(tipo(), { target: { value: "clt" } });
   fireEvent.change(data(), { target: { value: "2026-11-03" } });
@@ -221,6 +223,7 @@ describe("Nova admissão — página própria", () => {
     await aguardarEmpresa();
     for (const campo of [
       nome,
+      dataNascimento,
       emailPessoal,
       celular,
       telefone,
@@ -235,7 +238,7 @@ describe("Nova admissão — página própria", () => {
       name: "Formulário de nova admissão",
     });
     const rotulos = [...form.querySelectorAll("label")].map((l) =>
-      (l.textContent ?? "").replace(/\*|obrigatório/g, "").trim(),
+      (l.textContent ?? "").replace(/\*|obrigatório|opcional/g, "").trim(),
     );
     for (const esperado of [
       "Nome completo",
@@ -284,6 +287,47 @@ describe("Nova admissão — página própria", () => {
     }
   });
 
+  it("obrigatoriedade campo a campo: os opcionais dizem que são opcionais", async () => {
+    montar();
+    await aguardarEmpresa();
+    expect(
+      screen.getByText(/Campos com \* são obrigatórios/),
+    ).toBeInTheDocument();
+    for (const rotulo of [
+      "Sexo",
+      "Saudação",
+      "Estado civil",
+      "Nacionalidade",
+      "Naturalidade",
+      "Escolaridade",
+      "Curso",
+      "Nome do pai",
+      "Nome da mãe",
+      "País",
+      "CEP",
+      "Logradouro",
+      "Número",
+      "Complemento",
+      "Bairro",
+      "Cidade",
+      "Estado",
+    ]) {
+      const campo = screen.getByLabelText(`${rotulo} (opcional)`);
+      expect(campo).not.toHaveAttribute("aria-required");
+    }
+    for (const campo of [
+      nome,
+      dataNascimento,
+      emailPessoal,
+      celular,
+      telefone,
+    ]) {
+      expect(campo()).toHaveAttribute("aria-required", "true");
+      expect(campo()).toHaveAccessibleName(/obrigatório/);
+      expect(campo()).not.toHaveAccessibleName(/opcional/);
+    }
+  });
+
   it("os blocos aparecem na ordem dos prints: dados pessoais, endereço, contatos", async () => {
     montar();
     await aguardarEmpresa();
@@ -316,7 +360,7 @@ describe("Nova admissão — página própria", () => {
       /^Estado civil/,
       /^Escolaridade/,
       /^Cidade/,
-      /^Estado$/,
+      /^Estado \(opcional\)$/,
       /^País/,
     ]) {
       expect(screen.getByLabelText(rotulo).tagName).toBe("INPUT");
@@ -338,6 +382,23 @@ describe("Nova admissão — página própria", () => {
     expect(tipoDestino()).toHaveAccessibleDescription(
       /Escolha o tipo de referência/,
     );
+    expect(dataNascimento()).toHaveAccessibleDescription(
+      /Informe a data de nascimento/,
+    );
+    expect(admitirColaborador).not.toHaveBeenCalled();
+  });
+
+  it("data de nascimento é obrigatória: sem ela, nada é enviado", async () => {
+    montar();
+    await aguardarEmpresa();
+    preencherValido();
+    fireEvent.change(dataNascimento(), { target: { value: "" } });
+    fireEvent.click(admitir());
+    await waitFor(() => expect(dataNascimento()).toHaveFocus());
+    expect(dataNascimento()).toHaveAttribute("aria-invalid", "true");
+    expect(dataNascimento()).toHaveAccessibleDescription(
+      /Informe a data de nascimento/,
+    );
     expect(admitirColaborador).not.toHaveBeenCalled();
   });
 
@@ -346,7 +407,11 @@ describe("Nova admissão — página própria", () => {
     await aguardarEmpresa();
     fireEvent.change(nome(), { target: { value: "Pessoa Sintética" } });
     fireEvent.click(admitir());
-    // Depois do nome, o primeiro obrigatório vazio é o e-mail pessoal.
+    // Depois do nome, o primeiro obrigatório vazio é a data de nascimento.
+    await waitFor(() => expect(dataNascimento()).toHaveFocus());
+    fireEvent.change(dataNascimento(), { target: { value: "1990-05-20" } });
+    fireEvent.click(admitir());
+    // Depois dela, o e-mail pessoal.
     await waitFor(() => expect(emailPessoal()).toHaveFocus());
     preencherContatos();
     fireEvent.click(admitir());
@@ -410,7 +475,7 @@ describe("Nova admissão — página própria", () => {
       motivoCodigo: "admissao_inicial",
       departamentoId: departamento.id,
       perfilPessoal: {
-        dataNascimento: null,
+        dataNascimento: "1990-05-20",
         sexo: null,
         saudacao: null,
         estadoCivil: null,
@@ -458,7 +523,7 @@ describe("Nova admissão — página própria", () => {
     fireEvent.change(screen.getByLabelText(/^CEP/), {
       target: { value: "30140-071" },
     });
-    fireEvent.change(screen.getByLabelText(/^Estado$/), {
+    fireEvent.change(screen.getByLabelText(/^Estado \(opcional\)$/), {
       target: { value: "MG" },
     });
     fireEvent.click(admitir());

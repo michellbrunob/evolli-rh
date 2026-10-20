@@ -75,14 +75,18 @@ export interface AdmitirColaboradorDto extends DestinoOrganizacionalDto {
   motivoCodigo: "admissao_inicial";
   /**
    * T177 — Módulo 1, gravado na MESMA transação da admissão. Vazio vai como
-   * `null`. Os contatos são os três da ficha da T169, juntos.
+   * `null`.
+   *
+   * OBRIGATÓRIOS: `perfilPessoal` com `dataNascimento`, e `contatos` (os três
+   * da ficha da T169, juntos). OPCIONAIS: os demais campos do perfil e o
+   * `endereco` inteiro.
    */
-  perfilPessoal?: Record<
-    Exclude<keyof PerfilPessoalApi, "atualizadoEm">,
+  perfilPessoal: Record<
+    Exclude<keyof PerfilPessoalApi, "atualizadoEm" | "dataNascimento">,
     string | null
-  >;
+  > & { dataNascimento: string };
   endereco?: Record<Exclude<keyof EnderecoApi, "atualizadoEm">, string | null>;
-  contatos?: { emailPessoal: string; celular: string; telefone: string };
+  contatos: { emailPessoal: string; celular: string; telefone: string };
 }
 
 /**
@@ -108,15 +112,18 @@ export interface AdmissaoRegistradaApi extends ColaboradorApi {
       [K in keyof DestinoOrganizacionalDto]: string | null;
     }>;
   };
-  /** T177 — o que o servidor gravou do Módulo 1; `null` quando não enviado. */
-  perfilPessoal: PerfilPessoalApi | null;
+  /**
+   * T177 — o que o servidor gravou do Módulo 1. Perfil e contatos são
+   * obrigatórios e sempre vêm; endereço é `null` quando nenhum campo veio.
+   */
+  perfilPessoal: PerfilPessoalApi;
   endereco: EnderecoApi | null;
   contatos: {
     emailPessoal: string;
     celular: string;
     telefone: string;
     atualizadoEm: string;
-  } | null;
+  };
 }
 
 export interface RetificarColaboradorDto {

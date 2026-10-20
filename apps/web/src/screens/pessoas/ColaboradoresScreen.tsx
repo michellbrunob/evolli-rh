@@ -3,51 +3,28 @@ import {
   Button,
   DataTable,
   EmptyState,
-  FormActions,
   FormField,
   Modal,
   PageHeader,
   StatusBadge,
   Surface,
-  usePedirFechamentoModal,
 } from "../../components";
 import type { DataTableColumn, StatusVariant } from "../../components";
 import {
-  ApiError,
-  type AdmissaoRegistradaApi,
-  type AdmitirColaboradorDto,
   type ColaboradorApi,
   type RetificarColaboradorDto,
   type TipoVinculo,
   type VinculoApi,
-  admitirColaborador,
   listarColaboradores,
   listarVinculosDoColaborador,
   retificarColaborador,
 } from "../../api/colaboradoresClient";
 import { formatarDiaCivil, formatarInstante } from "../../format/data";
-import {
-  type AreaApi,
-  type CentroCustoApi,
-  type DepartamentoApi,
-  type EmpresaApi,
-  type EquipeApi,
-  type UnidadeOrganizacionalApi,
-  listarAreas,
-  listarCentrosCusto,
-  listarDepartamentos,
-  listarEmpresasMulti,
-  listarEquipes,
-  listarUnidades,
-} from "../../api/organizacaoClient";
-import { type CargoApi, listarCargos } from "../../api/cargoClient";
 import { ContatosColaboradorSecao } from "./ContatosColaboradorSecao";
 import { DadosPessoaisColaboradorSecao } from "./DadosPessoaisColaboradorSecao";
 import "./ColaboradoresScreen.css";
 
 export const COLABORADORES_TITULO_ID = "colaboradores-titulo";
-
-const MATRICULA_PATTERN = /^[A-Z0-9_-]{2,32}$/;
 
 type FiltroSituacao = "todos" | "ativo" | "inativo";
 type FiltroSituacaoVinculo = "todos" | "previsto" | "ativo" | "encerrado";
@@ -77,54 +54,6 @@ const ROTULO_SITUACAO_VINCULO: Record<string, string> = {
   encerrado: "Encerrado",
 };
 
-type TipoDestino =
-  "" | "unidade" | "departamento" | "area" | "equipe" | "cargo" | "centroCusto";
-
-const OPCOES_TIPO_DESTINO: { valor: TipoDestino; rotulo: string }[] = [
-  { valor: "unidade", rotulo: "Unidade organizacional" },
-  { valor: "departamento", rotulo: "Departamento" },
-  { valor: "area", rotulo: "Área" },
-  { valor: "equipe", rotulo: "Equipe" },
-  { valor: "cargo", rotulo: "Cargo" },
-  { valor: "centroCusto", rotulo: "Centro de custo" },
-];
-
-interface FormularioErros {
-  nome?: string;
-  matricula?: string;
-  tipo?: string;
-  dataAdmissao?: string;
-  /** Falta escolher o TIPO de referência (categoria). */
-  tipoDestino?: string;
-  /** Falta o departamento que qualifica a área escolhida. */
-  departamentoArea?: string;
-  /** Falta escolher o REGISTRO da referência. */
-  destino?: string;
-  geral?: string;
-}
-
-interface FormularioState {
-  nome: string;
-  empresas: EmpresaApi[];
-  empresaId: string;
-  matricula: string;
-  tipo: TipoVinculo | "";
-  dataAdmissao: string;
-  tipoDestino: TipoDestino;
-  destinoId: string;
-  departamentoIdArea: string;
-  departamentos: DepartamentoApi[];
-  unidades: UnidadeOrganizacionalApi[];
-  equipes: EquipeApi[];
-  cargos: CargoApi[];
-  centrosCusto: CentroCustoApi[];
-  areasDoDepartamento: AreaApi[];
-  carregandoAreas: boolean;
-  carregandoOpcoes: boolean;
-  erros: FormularioErros;
-  salvando: boolean;
-}
-
 interface DetalheState {
   colaborador: ColaboradorApi;
   statusVinculos: "carregando" | "erro" | "dados";
@@ -132,157 +61,6 @@ interface DetalheState {
   nomeEdicao: string;
   salvandoNome: boolean;
   erroNome: string | null;
-}
-
-/** Rótulo do TIPO de referência organizacional (categoria), nunca do registro. */
-/**
- * Limpa o erro do campo que está sendo corrigido e PRESERVA `geral`.
- *
- * Antes, todo `onChange` fazia `erros: {}`. Como a mensagem devolvida pelo
- * servidor (matrícula duplicada, por exemplo) vive em `geral`, começar a
- * corrigir apagava a explicação do que havia dado errado — justamente no
- * momento em que ela é necessária. `geral` só é limpo no próximo envio.
- */
-function limparErroDoCampo(
-  erros: FormularioErros,
-  campo: keyof FormularioErros,
-): FormularioErros {
-  const restante: FormularioErros = { ...erros };
-  delete restante[campo];
-  return restante;
-}
-
-/**
- * T167 — a empresa da admissão vem SÓ da sessão. Se o servidor não devolver
- * exatamente uma empresa para ela, o formulário não tem como saber onde
- * admitir, e não oferece escolha: recusa enviar e diz por quê.
- */
-const MENSAGEM_EMPRESA_INDEFINIDA =
-  "Não foi possível confirmar a empresa ativa em que você está trabalhando. Nada será enviado. Feche a janela e tente novamente.";
-
-/** `id` da mensagem geral do formulário — alvo de foco quando é o único erro. */
-const ERRO_GERAL_ID = "colaboradores-form-erro-geral";
-
-/**
- * T167 — ordem VISUAL dos campos do formulário. Depois de um envio com erro, o
- * foco vai ao primeiro desta lista que tiver mensagem: quem usa teclado ou
- * leitor de tela chega direto ao que precisa corrigir, em vez de procurar a
- * marca vermelha numa janela longa.
- */
-const ORDEM_DOS_ERROS: readonly (keyof FormularioErros)[] = [
-  "nome",
-  "matricula",
-  "tipo",
-  "dataAdmissao",
-  "tipoDestino",
-  "departamentoArea",
-  "destino",
-  "geral",
-];
-
-const ID_DO_ERRO: Record<keyof FormularioErros, string> = {
-  nome: "colaboradores-nome",
-  matricula: "colaboradores-matricula",
-  tipo: "colaboradores-tipo-vinculo",
-  dataAdmissao: "colaboradores-data-admissao",
-  tipoDestino: "colaboradores-tipo-destino",
-  departamentoArea: "colaboradores-departamento-area",
-  destino: "colaboradores-destino",
-  geral: ERRO_GERAL_ID,
-};
-
-/**
- * T167 — traduz a recusa do servidor para o campo que a causou.
- *
- * O servidor responde com mensagem FIXA por status (`AllExceptionsFilter`),
- * sem dizer o campo; antes, a tela mostrava essa mensagem crua — "Conflito ao
- * processar a requisição." — no rodapé, sem apontar o que corrigir. O
- * mapeamento abaixo vale SÓ para `POST /v1/colaboradores` e se apoia no que o
- * código do servidor pode produzir nessa rota, não em suposição:
- *
- *  - 409 — a admissão cria um colaborador NOVO, então a única unicidade que ela
- *    pode violar é a da matrícula dentro da empresa (`traduzirErroPessoas`,
- *    P2002). Nenhum período de alocação é gravado na admissão, então a
- *    exclusão de sobreposição (23P01) não ocorre nela.
- *  - 422 — destino incoerente, inexistente, de outra empresa ou inativo
- *    (`assertDestinoCoerente`, `assertDestinoValidoEAtivo`, FK composta).
- *  - 404 — a empresa enviada não é a empresa ativa da sessão: o contexto mudou
- *    depois que a janela abriu (em outra aba, por exemplo).
- *
- * Em todos os casos os dados digitados ficam no formulário.
- */
-function errosDaAdmissaoRecusada(
-  erro: unknown,
-  temDestino: boolean,
-): FormularioErros {
-  const status = erro instanceof ApiError ? erro.status : null;
-  switch (status) {
-    case 409:
-      return {
-        matricula:
-          "Esta matrícula já está em uso nesta empresa. Informe outra.",
-      };
-    case 422:
-      return temDestino
-        ? {
-            destino:
-              "A referência organizacional escolhida não foi aceita: ela pode ter sido inativada ou não pertencer à empresa ativa. Escolha outra.",
-          }
-        : {
-            geral:
-              "O servidor recusou a referência organizacional. Revise a lotação e tente de novo.",
-          };
-    case 404:
-      return {
-        geral:
-          "A empresa ativa mudou desde que esta janela foi aberta. Nada foi salvo. Feche a janela e abra de novo para admitir na empresa atual.",
-      };
-    case 403:
-      return {
-        geral:
-          "Seu perfil não tem permissão para admitir colaboradores. Nada foi salvo.",
-      };
-    case 401:
-      return {
-        geral:
-          "Seu acesso expirou. Nada foi salvo. Entre novamente para concluir a admissão.",
-      };
-    case 400:
-      return {
-        geral:
-          "O servidor recusou algum dos dados informados. Revise os campos e tente de novo.",
-      };
-    default:
-      return {
-        geral:
-          "Não foi possível admitir o colaborador agora. Os dados digitados foram mantidos; tente de novo.",
-      };
-  }
-}
-
-/**
- * "Cancelar" do formulário, ligado ao pedido de fechamento do `Modal` (T167).
- * Chamava o fechamento da tela direto e descartava, sem perguntar, o que já
- * estava digitado — só "Fechar" e Escape pediam confirmação.
- */
-function CancelarFormulario({ desabilitado }: { desabilitado: boolean }) {
-  const pedirFechamento = usePedirFechamentoModal();
-  return (
-    <Button
-      type="button"
-      variant="secondary"
-      onClick={pedirFechamento}
-      disabled={desabilitado}
-    >
-      Cancelar
-    </Button>
-  );
-}
-
-function rotuloTipoDestino(tipo: TipoDestino): string {
-  return (
-    OPCOES_TIPO_DESTINO.find((o) => o.valor === tipo)?.rotulo ?? "Registro"
-  );
 }
 
 /**
@@ -343,12 +121,21 @@ export interface ColaboradoresScreenProps {
   } | null;
   /** Avisa que `aberturaInicial` foi atendida, para o shell não repeti-la. */
   readonly onAberturaAtendida?: () => void;
+  /**
+   * T177 — a admissão acontece só na página de Nova admissão. O modal
+   * transitório da T176 foi aposentado porque não coletava os campos que a
+   * admissão passou a exigir (data de nascimento e os três contatos).
+   * "Novo colaborador" leva até a página; sem esta prop — perfil que não pode
+   * admitir —, o botão não aparece.
+   */
+  readonly onNovaAdmissao?: () => void;
 }
 
 export function ColaboradoresScreen({
   empresaAtiva = null,
   aberturaInicial = null,
   onAberturaAtendida,
+  onNovaAdmissao,
 }: ColaboradoresScreenProps = {}) {
   const [statusCarregamento, setStatusCarregamento] = useState<
     "carregando" | "erro" | "dados"
@@ -385,7 +172,6 @@ export function ColaboradoresScreen({
    */
   const [tamanhoPaginaEfetivo, setTamanhoPaginaEfetivo] =
     useState(TAMANHO_PAGINA);
-  const [formulario, setFormulario] = useState<FormularioState | null>(null);
   const [detalhe, setDetalhe] = useState<DetalheState | null>(null);
   // T169 — a seção de contatos do detalhe edita por conta própria e avisa
   // aqui quando há edição não salva e quando está gravando, para que o
@@ -394,29 +180,7 @@ export function ColaboradoresScreen({
   const [salvandoContatos, setSalvandoContatos] = useState(false);
   // T176 — "Completar contatos" vindo da página de Nova admissão.
   const [focarContatos, setFocarContatos] = useState(false);
-  // T142 — confirmação de escrita. Antes, admitir fechava o formulário em
-  // silêncio: a pessoa ficava olhando a lista sem saber se salvou.
-  const [mensagemSucesso, setMensagemSucesso] = useState<string | null>(null);
-  // T167 — o colaborador recém-admitido, para a confirmação oferecer o
-  // caminho até a ficha dele. Vem da RESPOSTA da admissão, não de nova busca.
-  const [admitidoRecente, setAdmitidoRecente] = useState<ColaboradorApi | null>(
-    null,
-  );
-  /**
-   * Pedido de foco no primeiro erro, atendido depois que o React desenha as
-   * mensagens. Um ref, e não estado: é um gatilho de uma vez só, e não deve
-   * causar outro desenho.
-   */
-  const focarPrimeiroErroRef = useRef(false);
-  // T142 (piloto) — o painel de trabalho precisa ser encontrável: quando abre,
-  // entra no campo de visão e recebe o foco; quando fecha, devolve o foco a
-  // quem o abriu. Sem isto o botão "Novo colaborador" parecia não fazer nada,
-  // porque o formulário nascia centenas de pixels abaixo da dobra.
-  // O foco inicial, o foco preso, o Escape e a devolução do foco ao acionador
-  // são responsabilidade do `Modal` (UI-F04) — a tela só diz o que abre.
-  /** Envio em curso — trava síncrona, ver `handleSubmit`. */
-  const enviandoRef = useRef(false);
-  /** Salvamento do nome em curso — mesma trava síncrona, ver `handleSalvarNome`. */
+  /** Salvamento do nome em curso — trava síncrona, ver `handleSalvarNome`. */
   const salvandoNomeRef = useRef(false);
   /**
    * Sequência do pedido de lista em voo.
@@ -427,24 +191,6 @@ export function ColaboradoresScreen({
    * `AbortController`: a resposta só é aplicada se ainda for a mais recente.
    */
   const pedidoListaRef = useRef(0);
-
-  // T167 — foco no primeiro campo com erro, depois que as mensagens existem.
-  useEffect(() => {
-    if (!focarPrimeiroErroRef.current || !formulario) return;
-    focarPrimeiroErroRef.current = false;
-    const campo = ORDEM_DOS_ERROS.find((c) => formulario.erros[c]);
-    if (!campo) return;
-    document.getElementById(ID_DO_ERRO[campo])?.focus();
-  }, [formulario]);
-
-  const formularioAlterado =
-    formulario !== null &&
-    (formulario.nome !== "" ||
-      formulario.matricula !== "" ||
-      formulario.tipo !== "" ||
-      formulario.dataAdmissao !== "" ||
-      formulario.tipoDestino !== "" ||
-      formulario.destinoId !== "");
 
   // T144 (R1) — o detalhe também edita, e portanto também tem o que perder: o
   // nome. Um só derivado governa a confirmação de descarte do `Modal` e o
@@ -516,151 +262,6 @@ export function ColaboradoresScreen({
     void carregarDados(filtroSituacao, filtroSituacaoVinculo, destino);
   }
 
-  async function abrirFormulario() {
-    setMensagemSucesso(null);
-    setAdmitidoRecente(null);
-    setDetalhe(null);
-    setFormulario({
-      nome: "",
-      empresas: [],
-      empresaId: "",
-      matricula: "",
-      tipo: "",
-      dataAdmissao: "",
-      tipoDestino: "",
-      destinoId: "",
-      departamentoIdArea: "",
-      departamentos: [],
-      unidades: [],
-      equipes: [],
-      cargos: [],
-      centrosCusto: [],
-      areasDoDepartamento: [],
-      carregandoAreas: false,
-      carregandoOpcoes: true,
-      erros: {},
-      salvando: false,
-    });
-
-    try {
-      const [
-        empresasResp,
-        departamentosResp,
-        unidadesResp,
-        equipesResp,
-        cargosResp,
-        centrosResp,
-      ] = await Promise.all([
-        listarEmpresasMulti(),
-        listarDepartamentos({ status: "ativo", tamanhoPagina: 100 }),
-        listarUnidades({ status: "ativo", tamanhoPagina: 100 }),
-        listarEquipes({ status: "ativo", tamanhoPagina: 100 }),
-        listarCargos({ status: "ativo", tamanhoPagina: 100 }),
-        listarCentrosCusto({ status: "ativo", tamanhoPagina: 100 }),
-      ]);
-      setFormulario((prev) =>
-        prev
-          ? {
-              ...prev,
-              empresas: empresasResp.itens,
-              // T167 — a empresa da admissão é a ÚNICA que o servidor devolve
-              // para a sessão (`GET /v1/empresas` já vem escopado pela empresa
-              // ativa). Nenhuma, ou mais de uma, não é escolha a oferecer: é
-              // estado que o formulário não sabe resolver, e ele não envia.
-              empresaId:
-                empresasResp.itens.length === 1
-                  ? (empresasResp.itens[0]?.id ?? "")
-                  : "",
-              ...(empresasResp.itens.length === 1
-                ? {}
-                : { erros: { geral: MENSAGEM_EMPRESA_INDEFINIDA } }),
-              departamentos: departamentosResp.itens,
-              unidades: unidadesResp.itens,
-              equipes: equipesResp.itens,
-              cargos: cargosResp.itens,
-              centrosCusto: centrosResp.itens,
-              carregandoOpcoes: false,
-            }
-          : prev,
-      );
-    } catch {
-      setFormulario((prev) =>
-        prev
-          ? {
-              ...prev,
-              carregandoOpcoes: false,
-              erros: {
-                geral:
-                  "Não foi possível carregar as opções de lotação. Feche e tente novamente.",
-              },
-            }
-          : prev,
-      );
-    } finally {
-      enviandoRef.current = false;
-    }
-  }
-
-  function fecharFormulario() {
-    setFormulario(null);
-  }
-
-  async function selecionarDepartamentoArea(departamentoId: string) {
-    setFormulario((prev) =>
-      prev
-        ? {
-            ...prev,
-            departamentoIdArea: departamentoId,
-            destinoId: "",
-            areasDoDepartamento: [],
-            carregandoAreas: departamentoId !== "",
-            erros: limparErroDoCampo(
-              limparErroDoCampo(prev.erros, "departamentoArea"),
-              "destino",
-            ),
-          }
-        : prev,
-    );
-    if (!departamentoId) return;
-    try {
-      const resp = await listarAreas({
-        departamentoId,
-        status: "ativo",
-        tamanhoPagina: 100,
-      });
-      setFormulario((prev) =>
-        prev
-          ? { ...prev, areasDoDepartamento: resp.itens, carregandoAreas: false }
-          : prev,
-      );
-    } catch {
-      setFormulario((prev) =>
-        prev ? { ...prev, carregandoAreas: false } : prev,
-      );
-    }
-  }
-
-  function selecionarTipoDestino(tipoDestino: TipoDestino) {
-    setFormulario((prev) =>
-      prev
-        ? {
-            ...prev,
-            tipoDestino,
-            destinoId: "",
-            departamentoIdArea: "",
-            areasDoDepartamento: [],
-            erros: limparErroDoCampo(
-              limparErroDoCampo(
-                limparErroDoCampo(prev.erros, "tipoDestino"),
-                "departamentoArea",
-              ),
-              "destino",
-            ),
-          }
-        : prev,
-    );
-  }
-
   // T176 — atende a abertura pedida pela página de Nova admissão, uma vez.
   const aberturaAtendidaRef = useRef(false);
   useEffect(() => {
@@ -674,9 +275,6 @@ export function ColaboradoresScreen({
   }, [aberturaInicial, onAberturaAtendida]);
 
   function abrirDetalhe(colaborador: ColaboradorApi) {
-    setMensagemSucesso(null);
-    setAdmitidoRecente(null);
-    setFormulario(null);
     setDetalhe({
       colaborador,
       statusVinculos: "carregando",
@@ -719,8 +317,9 @@ export function ColaboradoresScreen({
 
   async function handleSalvarNome() {
     if (!detalhe) return;
-    // Mesma trava síncrona da admissão: `disabled` depende de um `setState`,
-    // que só chega no próximo render, e cliques no mesmo quadro escapam dele.
+    // Trava síncrona contra envio duplicado: `disabled` depende de um
+    // `setState`, que só chega no próximo render, e cliques no mesmo quadro
+    // escapam dele.
     if (salvandoNomeRef.current) return;
     const nome = detalhe.nomeEdicao.trim();
     if (!nome) {
@@ -775,188 +374,6 @@ export function ColaboradoresScreen({
       salvandoNomeRef.current = false;
     }
   }
-
-  async function handleSubmit(evento: React.FormEvent) {
-    evento.preventDefault();
-    if (!formulario) return;
-    // Trava SÍNCRONA contra envio duplicado. `disabled` no botão depende de um
-    // `setState`, que só chega no próximo render: cliques repetidos no mesmo
-    // quadro escapariam dele — e escapavam, medido no navegador (três cliques,
-    // três requisições). O ref fecha a porta no mesmo instante.
-    if (enviandoRef.current) return;
-
-    const erros: FormularioErros = {};
-    const nome = formulario.nome.trim();
-    if (!nome) {
-      erros.nome = "Nome é obrigatório.";
-    } else if (nome.length < 2 || nome.length > 160) {
-      erros.nome = "Nome deve ter entre 2 e 160 caracteres.";
-    }
-    if (!formulario.empresaId) {
-      erros.geral = MENSAGEM_EMPRESA_INDEFINIDA;
-    }
-    const matricula = formulario.matricula.trim().toUpperCase();
-    if (!MATRICULA_PATTERN.test(matricula)) {
-      erros.matricula =
-        "Use apenas letras maiúsculas, números, - e _ (2 a 32 caracteres).";
-    }
-    if (!formulario.tipo) {
-      erros.tipo = "Selecione o tipo de vínculo.";
-    }
-    if (!formulario.dataAdmissao) {
-      erros.dataAdmissao = "Informe a data de admissão.";
-    }
-    // T142 — cada erro fica no campo que precisa ser preenchido. Antes, faltar
-    // o REGISTRO marcava o seletor de TIPO, que já estava preenchido: a tela
-    // apontava para o campo errado e deixava o campo vazio sem marcação.
-    if (!formulario.tipoDestino) {
-      erros.tipoDestino = "Escolha o tipo de referência organizacional.";
-    } else if (
-      formulario.tipoDestino === "area" &&
-      !formulario.departamentoIdArea
-    ) {
-      erros.departamentoArea = "Selecione o departamento da área.";
-    } else if (!formulario.destinoId) {
-      erros.destino = `Selecione o registro de ${rotuloTipoDestino(
-        formulario.tipoDestino,
-      ).toLowerCase()}.`;
-    }
-
-    if (
-      erros.nome ??
-      erros.geral ??
-      erros.matricula ??
-      erros.tipo ??
-      erros.dataAdmissao ??
-      erros.tipoDestino ??
-      erros.departamentoArea ??
-      erros.destino
-    ) {
-      focarPrimeiroErroRef.current = true;
-      setFormulario((prev) => (prev ? { ...prev, erros } : prev));
-      return;
-    }
-
-    enviandoRef.current = true;
-    setFormulario((prev) =>
-      prev ? { ...prev, salvando: true, erros: {} } : prev,
-    );
-
-    try {
-      // Só a empresa que o servidor devolveu para a sessão — nunca escolha.
-      const empresaId = formulario.empresaId;
-
-      const dto: AdmitirColaboradorDto = {
-        nome,
-        empresaId,
-        matricula,
-        tipo: formulario.tipo as TipoVinculo,
-        dataAdmissao: formulario.dataAdmissao,
-        motivoCodigo: "admissao_inicial",
-        ...(formulario.tipoDestino === "unidade"
-          ? { unidadeOrganizacionalId: formulario.destinoId }
-          : {}),
-        ...(formulario.tipoDestino === "departamento"
-          ? { departamentoId: formulario.destinoId }
-          : {}),
-        ...(formulario.tipoDestino === "area"
-          ? {
-              areaId: formulario.destinoId,
-              departamentoId: formulario.departamentoIdArea,
-            }
-          : {}),
-        ...(formulario.tipoDestino === "equipe"
-          ? { equipeId: formulario.destinoId }
-          : {}),
-        ...(formulario.tipoDestino === "cargo"
-          ? { cargoId: formulario.destinoId }
-          : {}),
-        ...(formulario.tipoDestino === "centroCusto"
-          ? { centroCustoId: formulario.destinoId }
-          : {}),
-      };
-      const admitido: AdmissaoRegistradaApi = await admitirColaborador(dto);
-      const nomeAdmitido = admitido.nome;
-      fecharFormulario();
-      // A confirmação sai assim que o SERVIDOR confirma — não depende do
-      // refetch —, mas não pode mais afirmar que o registro está visível.
-      // A admissão nasce com colaborador `inativo` e vínculo `previsto`
-      // (contrato: só a efetivação ativa); com o filtro em "Ativo", o
-      // recém-admitido não volta na lista, e o texto antigo garantia que sim.
-      const ocultoPorSituacao =
-        filtroSituacao !== "todos" && filtroSituacao !== admitido.situacao;
-      const ocultoPorVinculo =
-        filtroSituacaoVinculo !== "todos" &&
-        filtroSituacaoVinculo !== "previsto";
-      // T167 — a confirmação usa o que o SERVIDOR gravou (matrícula e
-      // situação do vínculo vêm da resposta), não o que estava digitado.
-      const confirmacao = `Colaborador ${nomeAdmitido} admitido com a matrícula ${admitido.vinculo.matricula}. O vínculo começa ${ROTULO_SITUACAO_VINCULO[admitido.vinculo.situacao] ?? admitido.vinculo.situacao} e o colaborador ${admitido.situacao === "ativo" ? "Ativo" : "Inativo"} até a efetivação da admissão.`;
-      setMensagemSucesso(
-        ocultoPorSituacao || ocultoPorVinculo
-          ? `${confirmacao} Ele não aparece na lista porque os filtros atuais o excluem.`
-          : `${confirmacao} Ele já aparece na lista abaixo.`,
-      );
-      setAdmitidoRecente({
-        id: admitido.id,
-        nome: admitido.nome,
-        situacao: admitido.situacao,
-        criadoEm: admitido.criadoEm,
-        atualizadoEm: admitido.atualizadoEm,
-      });
-      await carregarDados(filtroSituacao, filtroSituacaoVinculo, pagina);
-    } catch (err: unknown) {
-      // Os dados digitados ficam: só o estado de envio e as mensagens mudam.
-      const erros = errosDaAdmissaoRecusada(err, formulario.tipoDestino !== "");
-      focarPrimeiroErroRef.current = true;
-      setFormulario((prev) =>
-        prev ? { ...prev, salvando: false, erros } : prev,
-      );
-    } finally {
-      // Libera a trava só aqui: depois que a tentativa termina de verdade
-      // (sucesso ou falha), nunca antes. Sem isto, uma falha deixava
-      // `enviandoRef.current` travado para sempre — o botão reaparecia
-      // habilitado, mas o próximo clique retornava em silêncio em `:416`,
-      // e não havia como corrigir o campo e reenviar sem fechar o modal.
-      enviandoRef.current = false;
-    }
-  }
-
-  const opcoesDestinoAtuais: { id: string; rotulo: string }[] =
-    formulario?.tipoDestino === "unidade"
-      ? (formulario.unidades.map((u) => ({
-          id: u.id,
-          rotulo: `${u.codigo} — ${u.nome}`,
-        })) ?? [])
-      : formulario?.tipoDestino === "departamento"
-        ? formulario.departamentos.map((d) => ({
-            id: d.id,
-            rotulo: `${d.codigo} — ${d.nome}`,
-          }))
-        : formulario?.tipoDestino === "area"
-          ? formulario.areasDoDepartamento.map((a) => ({
-              id: a.id,
-              rotulo: `${a.codigo} — ${a.nome}`,
-            }))
-          : formulario?.tipoDestino === "equipe"
-            ? (formulario.equipes.map((e) => ({
-                id: e.id,
-                rotulo: `${e.codigo} — ${e.nome}`,
-              })) ?? [])
-            : formulario?.tipoDestino === "cargo"
-              ? (formulario.cargos.map((c) => ({
-                  id: c.id,
-                  rotulo: `${c.codigo} — ${c.nome}`,
-                })) ?? [])
-              : formulario?.tipoDestino === "centroCusto"
-                ? (formulario.centrosCusto.map((c) => ({
-                    id: c.id,
-                    rotulo: `${c.codigo} — ${c.nome}`,
-                  })) ?? [])
-                : [];
-
-  const tipoDestinoEscolhido = formulario?.tipoDestino
-    ? rotuloTipoDestino(formulario.tipoDestino)
-    : null;
 
   const colunasColaboradores: DataTableColumn<ColaboradorApi>[] = [
     { key: "nome", header: "Nome", cell: (c) => c.nome },
@@ -1039,52 +456,14 @@ export function ColaboradoresScreen({
         titleId={COLABORADORES_TITULO_ID}
         title="Colaboradores"
         description="Administre a admissão e o cadastro de colaboradores da sua empresa. Situação, vínculo e lotação seguem sempre a fonte de verdade do backend."
-        actions={
-          <Button
-            onClick={(evento) => {
-              evento.currentTarget.focus();
-              void abrirFormulario();
-            }}
-            aria-haspopup="dialog"
-            aria-expanded={formulario !== null}
-          >
-            Novo colaborador
-          </Button>
-        }
+        {...(onNovaAdmissao
+          ? {
+              actions: (
+                <Button onClick={onNovaAdmissao}>Novo colaborador</Button>
+              ),
+            }
+          : {})}
       />
-
-      {mensagemSucesso ? (
-        <Surface
-          as="section"
-          padding="md"
-          className="colaboradores-screen__sucesso"
-        >
-          {/* `role="status"` anuncia sem roubar o foco de quem está digitando. */}
-          <p className="colaboradores-screen__sucesso-texto" role="status">
-            {mensagemSucesso}
-          </p>
-          {admitidoRecente ? (
-            <Button
-              type="button"
-              variant="primary"
-              aria-haspopup="dialog"
-              onClick={() => abrirDetalhe(admitidoRecente)}
-            >
-              Abrir ficha de {admitidoRecente.nome}
-            </Button>
-          ) : null}
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={() => {
-              setMensagemSucesso(null);
-              setAdmitidoRecente(null);
-            }}
-          >
-            Dispensar
-          </Button>
-        </Surface>
-      ) : null}
 
       <Surface
         as="section"
@@ -1098,8 +477,8 @@ export function ColaboradoresScreen({
           className="colaboradores-screen__aviso-texto"
         >
           Este cadastro é operado exclusivamente pelo RH e DP da própria
-          empresa. Admissão, consulta e alteração de nome aqui geram trilha de
-          auditoria automática.
+          empresa. Consulta e alteração de nome aqui geram trilha de auditoria
+          automática; a admissão é registrada na página de Nova admissão.
         </p>
       </Surface>
 
@@ -1246,19 +625,18 @@ export function ColaboradoresScreen({
               headingLevel={3}
               icon="—"
               title="Nenhum colaborador cadastrado"
-              description="Registre a admissão do primeiro colaborador desta empresa."
-              action={
-                <Button
-                  onClick={(evento) => {
-                    evento.currentTarget.focus();
-                    void abrirFormulario();
-                  }}
-                  aria-haspopup="dialog"
-                  aria-expanded={formulario !== null}
-                >
-                  Novo colaborador
-                </Button>
+              description={
+                onNovaAdmissao
+                  ? "Registre a admissão do primeiro colaborador desta empresa."
+                  : "Ainda não há colaboradores admitidos nesta empresa."
               }
+              {...(onNovaAdmissao
+                ? {
+                    action: (
+                      <Button onClick={onNovaAdmissao}>Novo colaborador</Button>
+                    ),
+                  }
+                : {})}
             />
           ) : (
             <DataTable
@@ -1426,284 +804,6 @@ export function ColaboradoresScreen({
               )}
             </div>
           </>
-        ) : null}
-      </Modal>
-
-      <Modal
-        aberto={formulario !== null}
-        titulo="Novo colaborador"
-        descricao="A admissão cria o colaborador e o primeiro vínculo em conjunto. Matrícula, tipo de vínculo, data de admissão e referência inicial são imutáveis nesta tela — corrija apenas o nome depois, se necessário."
-        onFechar={fecharFormulario}
-        bloqueado={formulario?.salvando ?? false}
-        alterado={formularioAlterado}
-        largura="larga"
-      >
-        {formulario ? (
-          <form
-            className="colaboradores-screen__form"
-            aria-label="Formulário de novo colaborador"
-            onSubmit={(e) => void handleSubmit(e)}
-          >
-            <FormField
-              id="colaboradores-nome"
-              label="Nome completo"
-              required
-              help="2 a 160 caracteres."
-              {...(formulario.erros.nome
-                ? { error: formulario.erros.nome }
-                : {})}
-            >
-              {(control) => (
-                <input
-                  type="text"
-                  maxLength={160}
-                  value={formulario.nome}
-                  onChange={(e) =>
-                    setFormulario((prev) =>
-                      prev
-                        ? {
-                            ...prev,
-                            nome: e.target.value,
-                            erros: limparErroDoCampo(prev.erros, "nome"),
-                          }
-                        : prev,
-                    )
-                  }
-                  {...control}
-                />
-              )}
-            </FormField>
-
-            {formulario.empresas.length === 1 && formulario.empresas[0] ? (
-              <p
-                className="colaboradores-screen__aviso-texto"
-                id="colaboradores-empresa-contexto"
-              >
-                Empresa da admissão:{" "}
-                <strong>{formulario.empresas[0].nome}</strong> (
-                {formulario.empresas[0].codigo}) — a empresa ativa em que você
-                está trabalhando. Não é editável aqui.
-              </p>
-            ) : null}
-
-            <FormField
-              id="colaboradores-matricula"
-              label="Matrícula"
-              required
-              help="Letras maiúsculas, números, - e _ (2 a 32 caracteres)."
-              {...(formulario.erros.matricula
-                ? { error: formulario.erros.matricula }
-                : {})}
-            >
-              {(control) => (
-                <input
-                  type="text"
-                  maxLength={32}
-                  value={formulario.matricula}
-                  onChange={(e) =>
-                    setFormulario((prev) =>
-                      prev
-                        ? {
-                            ...prev,
-                            matricula: e.target.value.toUpperCase(),
-                            erros: limparErroDoCampo(prev.erros, "matricula"),
-                          }
-                        : prev,
-                    )
-                  }
-                  {...control}
-                />
-              )}
-            </FormField>
-
-            <FormField
-              id="colaboradores-tipo-vinculo"
-              label="Tipo de vínculo"
-              required
-              {...(formulario.erros.tipo
-                ? { error: formulario.erros.tipo }
-                : {})}
-            >
-              {(control) => (
-                <select
-                  value={formulario.tipo}
-                  onChange={(e) =>
-                    setFormulario((prev) =>
-                      prev
-                        ? {
-                            ...prev,
-                            tipo: e.target.value as TipoVinculo,
-                            erros: limparErroDoCampo(prev.erros, "tipo"),
-                          }
-                        : prev,
-                    )
-                  }
-                  {...control}
-                >
-                  <option value="">Selecione…</option>
-                  {(Object.keys(ROTULO_TIPO_VINCULO) as TipoVinculo[]).map(
-                    (tipo) => (
-                      <option key={tipo} value={tipo}>
-                        {ROTULO_TIPO_VINCULO[tipo]}
-                      </option>
-                    ),
-                  )}
-                </select>
-              )}
-            </FormField>
-
-            <FormField
-              id="colaboradores-data-admissao"
-              label="Data de admissão"
-              required
-              {...(formulario.erros.dataAdmissao
-                ? { error: formulario.erros.dataAdmissao }
-                : {})}
-            >
-              {(control) => (
-                <input
-                  type="date"
-                  value={formulario.dataAdmissao}
-                  onChange={(e) =>
-                    setFormulario((prev) =>
-                      prev
-                        ? {
-                            ...prev,
-                            dataAdmissao: e.target.value,
-                            erros: limparErroDoCampo(
-                              prev.erros,
-                              "dataAdmissao",
-                            ),
-                          }
-                        : prev,
-                    )
-                  }
-                  {...control}
-                />
-              )}
-            </FormField>
-
-            <FormField
-              id="colaboradores-tipo-destino"
-              label="Tipo de referência organizacional"
-              required
-              help="Primeiro escolha o tipo; o registro é escolhido no campo seguinte."
-              {...(formulario.erros.tipoDestino
-                ? { error: formulario.erros.tipoDestino }
-                : {})}
-            >
-              {(control) => (
-                <select
-                  value={formulario.tipoDestino}
-                  onChange={(e) =>
-                    selecionarTipoDestino(e.target.value as TipoDestino)
-                  }
-                  disabled={formulario.carregandoOpcoes}
-                  {...control}
-                >
-                  <option value="">Selecione…</option>
-                  {OPCOES_TIPO_DESTINO.map((opcao) => (
-                    <option key={opcao.valor} value={opcao.valor}>
-                      {opcao.rotulo}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </FormField>
-
-            {formulario.tipoDestino === "area" ? (
-              <FormField
-                id="colaboradores-departamento-area"
-                label="Departamento da área"
-                required
-                help="A área só identifica a lotação junto com o departamento a que pertence."
-                {...(formulario.erros.departamentoArea
-                  ? { error: formulario.erros.departamentoArea }
-                  : {})}
-              >
-                {(control) => (
-                  <select
-                    value={formulario.departamentoIdArea}
-                    onChange={(e) =>
-                      void selecionarDepartamentoArea(e.target.value)
-                    }
-                    {...control}
-                  >
-                    <option value="">Selecione…</option>
-                    {formulario.departamentos.map((dep) => (
-                      <option key={dep.id} value={dep.id}>
-                        {dep.codigo} — {dep.nome}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </FormField>
-            ) : null}
-
-            {formulario.tipoDestino ? (
-              <FormField
-                id="colaboradores-destino"
-                label="Registro da referência organizacional"
-                required
-                help={`Tipo escolhido: ${tipoDestinoEscolhido}. Uma referência é suficiente para efetivar a admissão.`}
-                {...(formulario.erros.destino
-                  ? { error: formulario.erros.destino }
-                  : {})}
-              >
-                {(control) => (
-                  <select
-                    value={formulario.destinoId}
-                    onChange={(e) =>
-                      setFormulario((prev) =>
-                        prev
-                          ? {
-                              ...prev,
-                              destinoId: e.target.value,
-                              erros: limparErroDoCampo(prev.erros, "destino"),
-                            }
-                          : prev,
-                      )
-                    }
-                    disabled={
-                      formulario.tipoDestino === "area" &&
-                      (!formulario.departamentoIdArea ||
-                        formulario.carregandoAreas)
-                    }
-                    {...control}
-                  >
-                    <option value="">Selecione…</option>
-                    {opcoesDestinoAtuais.map((opcao) => (
-                      <option key={opcao.id} value={opcao.id}>
-                        {opcao.rotulo}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </FormField>
-            ) : null}
-
-            {formulario.erros.geral ? (
-              <p
-                className="colaboradores-screen__form-erro"
-                role="alert"
-                id={ERRO_GERAL_ID}
-                tabIndex={-1}
-              >
-                {formulario.erros.geral}
-              </p>
-            ) : null}
-
-            <FormActions>
-              <CancelarFormulario desabilitado={formulario.salvando} />
-              <Button
-                type="submit"
-                variant="primary"
-                disabled={formulario.salvando || formulario.carregandoOpcoes}
-              >
-                {formulario.salvando ? "Admitindo…" : "Admitir colaborador"}
-              </Button>
-            </FormActions>
-          </form>
         ) : null}
       </Modal>
     </div>

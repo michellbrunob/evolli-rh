@@ -4,10 +4,12 @@
  *
  * Espelha `normalizacao-dados-pessoais.util.ts` e `dados-pessoais.dto.ts` da
  * API: o servidor é a regra e o banco a rede de segurança; aqui a validação só
- * antecipa a recusa, com a mensagem no campo certo. Todos os campos são
- * opcionais e em texto: não há catálogo canônico no sistema para sexo,
- * saudação, estado civil, escolaridade, país, UF ou município, e a tela não
- * inventa lista de opções.
+ * antecipa a recusa, com a mensagem no campo certo.
+ *
+ * OBRIGATÓRIO: data de nascimento. OPCIONAIS: todos os demais campos do perfil
+ * e todos os do endereço, em texto: não há catálogo canônico no sistema para
+ * sexo, saudação, estado civil, escolaridade, país, UF ou município, e a tela
+ * não inventa lista de opções.
  */
 
 export type ChavePerfil =
@@ -43,7 +45,10 @@ export interface DefinicaoCampo<K extends string> {
   readonly ajuda?: string;
 }
 
-/** Campos de texto do perfil, na ordem da tela. A data é tratada à parte. */
+/**
+ * Campos de texto do perfil, na ordem da tela — todos OPCIONAIS. A data de
+ * nascimento, obrigatória, é tratada à parte.
+ */
 export const CAMPOS_TEXTO_PERFIL: readonly DefinicaoCampo<
   Exclude<ChavePerfil, "dataNascimento">
 >[] = [
@@ -68,6 +73,7 @@ export const CAMPOS_TEXTO_PERFIL: readonly DefinicaoCampo<
   { chave: "nomeMae", rotulo: "Nome da mãe", limite: 160 },
 ];
 
+/** Campos do endereço, na ordem da tela — todos OPCIONAIS. */
 export const CAMPOS_ENDERECO: readonly DefinicaoCampo<ChaveEndereco>[] = [
   { chave: "pais", rotulo: "País", limite: 80 },
   {
@@ -149,7 +155,9 @@ export type ErrosEndereco = Partial<Record<ChaveEndereco, string>>;
 export function validarPerfil(valores: ValoresPerfil): ErrosPerfil {
   const erros: ErrosPerfil = {};
   const data = valores.dataNascimento;
-  if (data !== "") {
+  if (data === "") {
+    erros.dataNascimento = "Informe a data de nascimento.";
+  } else {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(data) || Number.isNaN(Date.parse(data))) {
       erros.dataNascimento = "Informe uma data de nascimento válida.";
     } else if (data < DATA_MINIMA) {
@@ -187,16 +195,22 @@ export function validarEndereco(valores: ValoresEndereco): ErrosEndereco {
   return erros;
 }
 
-/** Corpo do bloco: texto normalizado, vazio como `null`. */
-export function blocoPerfil(
-  valores: ValoresPerfil,
-): Record<ChavePerfil, string | null> {
+/**
+ * Corpo do bloco: texto normalizado, vazio como `null`. A data de nascimento
+ * vai como digitada — só se monta o bloco depois de `validarPerfil` aceitá-la.
+ */
+export function blocoPerfil(valores: ValoresPerfil): Record<
+  Exclude<ChavePerfil, "dataNascimento">,
+  string | null
+> & {
+  dataNascimento: string;
+} {
   const bloco = {} as Record<ChavePerfil, string | null>;
   for (const chave of Object.keys(valores) as ChavePerfil[]) {
     const limpo = normalizarTexto(valores[chave]);
     bloco[chave] = limpo === "" ? null : limpo;
   }
-  return bloco;
+  return { ...bloco, dataNascimento: valores.dataNascimento };
 }
 
 export function blocoEndereco(

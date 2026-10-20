@@ -14,10 +14,8 @@ import {
 } from "@prisma/client";
 import { PrismaService } from "../../database/prisma.service";
 import { PessoasAuditoriaService } from "../pessoas-auditoria.service";
-import {
-  podeAcessarPessoas,
-  resolverEscopoPessoas,
-} from "../escopo-pessoas.util";
+import { podeAcessarPessoas } from "../escopo-pessoas.util";
+import { resolverEscopoContatos } from "../contatos/escopo-contatos.util";
 import { PessoasAuditContext } from "../pessoas.types";
 import {
   EnderecoDto,
@@ -31,8 +29,14 @@ import {
   ChavePerfil,
 } from "./normalizacao-dados-pessoais.util";
 
-/** Valores do perfil como a API devolve. Data em dia civil `AAAA-MM-DD`. */
-export type ValoresPerfil = { [K in ChavePerfil]: string | null } & {
+/**
+ * Valores do perfil como a API devolve. Data em dia civil `AAAA-MM-DD`,
+ * obrigatória; os demais campos, opcionais, podem vir `null`.
+ */
+export type ValoresPerfil = {
+  [K in Exclude<ChavePerfil, "dataNascimento">]: string | null;
+} & {
+  dataNascimento: string;
   atualizadoEm: Date;
 };
 
@@ -62,6 +66,19 @@ export interface AlvoDadosPessoais {
   colaboradorId: string;
   empresaId: string;
 }
+
+/**
+ * Resultado da resolução do alvo:
+ *
+ * - `resolvido` — a empresa REAL do colaborador está decidida.
+ * - `ambiguo` — `master_tecnico` sem empresa ativa diante de colaborador com
+ *   vínculo em mais de uma empresa. NENHUMA empresa foi resolvida, então nada
+ *   é lido nem gravado: a tentativa fica na trilha, sem empresa, e a resposta é
+ *   409 — a empresa se escolhe pelo contexto ativo (T163), como nos contatos.
+ */
+type AlvoResolucao =
+  | { tipo: "resolvido"; alvo: AlvoDadosPessoais; operacional: boolean }
+  | { tipo: "ambiguo"; colaboradorId: string };
 
 interface Evento {
   categoria: CategoriaDadosPessoais;
@@ -115,9 +132,14 @@ const TODOS_ENDERECO: readonly CampoDadosPessoais[] = CAMPOS_ENDERECO.map(
   ([, campo]) => campo,
 );
 
+const AS_DUAS_CATEGORIAS: readonly CategoriaDadosPessoais[] = [
+  "perfil_pessoal",
+  "endereco",
+];
+
 /** Dia civil `AAAA-MM-DD` de uma coluna `@db.Date`, sem fuso no caminho. */
-function diaCivil(data: Date | null): string | null {
-  return data === null ? null : data.toISOString().slice(0, 10);
+function diaCivil(data: Date): string {
+  return data.toISOString().slice(0, 10);
 }
 
 /** O perfil como a API devolve, sem o id do registro. */
@@ -151,12 +173,15 @@ function valoresEndereco(e: EnderecoProjetado): ValoresEndereco {
   };
 }
 
-/** Bloco do perfil completo, com ausente como `null` (o PUT substitui). */
+/**
+ * Bloco do perfil completo, com ausente como `null` (o PUT substitui). A data
+ * de nascimento é obrigatória no DTO, então nunca sai `null` daqui.
+ */
 export function perfilCompleto(dto: PerfilPessoalDto): {
-  [K in ChavePerfil]: string | null;
-} {
+  [K in Exclude<ChavePerfil, "dataNascimento">]: string | null;
+} & { dataNascimento: string } {
   return {
-    dataNascimento: dto.dataNascimento ?? null,
+    dataNascimento: dto.dataNascimento,
     sexo: dto.sexo ?? null,
     saudacao: dto.saudacao ?? null,
     estadoCivil: dto.estadoCivil ?? null,
@@ -203,13 +228,14 @@ export function camposAlterados<K extends string>(
     .map(([, c]) => c);
 }
 
-function dadosDoPerfil(valores: { [K in ChavePerfil]: string | null }) {
+function dadosDoPerfil(
+  valores: { [K in Exclude<ChavePerfil, "dataNascimento">]: string | null } & {
+    dataNascimento: string;
+  },
+) {
   return {
     ...valores,
-    dataNascimento:
-      valores.dataNascimento === null
-        ? null
-        : new Date(`${valores.dataNascimento}T00:00:00.000Z`),
+    dataNascimento: new Date(`${valores.dataNascimento}T00:00:00.000Z`),
   };
 }
 
@@ -225,8 +251,10 @@ function eUnicidadeVioladaNoBanco(erro: unknown): boolean {
  * agregados próprios, fora de `Colaborador`, por colaborador e empresa.
  *
  * Toda operação resolve no servidor a empresa REAL do colaborador pelo
- * vínculo, dentro da empresa ativa da sessão (só `rh` e `dp`). Nenhum id de
- * empresa vem do navegador.
+ * vínculo. `rh` e `dp` atuam na empresa ativa da sessão; `master_tecnico`
+ * (Emenda 2 da ADR 0012) também, quando tem empresa ativa, e em qualquer
+ * empresa quando não tem — sempre a do vínculo, auditada com ela. Nenhum id
+ * de empresa vem do navegador.
  *
  * TRILHA DE TODA OPERAÇÃO, uma por categoria, na MESMA transação do dado:
  * `audit_event` (ação, ator, empresa, id do colaborador) e
@@ -244,11 +272,17 @@ export class DadosPessoaisColaboradorService {
     colaboradorId: string,
     ctx: PessoasAuditContext,
   ): Promise<DadosPessoaisDoColaborador> {
-    const { alvo, operacional } = await this.resolverAlvo(
-      colaboradorId,
-      ctx,
-      "read",
-    );
+    const resolucao = await this.resolverAlvo(colaboradorId, ctx, "read");
+    if (resolucao.tipo === "ambiguo") {
+      await this.registrarAmbiguidade(
+        ctx,
+        resolucao.colaboradorId,
+        "leitura",
+        AS_DUAS_CATEGORIAS,
+      );
+      throw new ConflictException();
+    }
+    const { alvo, operacional } = resolucao;
 
     return this.prisma.$transaction(async (tx) => {
       if (!operacional) {
@@ -319,11 +353,19 @@ export class DadosPessoaisColaboradorService {
     if (!dto.perfilPessoal && !dto.endereco) {
       throw new BadRequestException();
     }
-    const { alvo, operacional } = await this.resolverAlvo(
-      colaboradorId,
-      ctx,
-      "alter",
-    );
+    const resolucao = await this.resolverAlvo(colaboradorId, ctx, "alter");
+    if (resolucao.tipo === "ambiguo") {
+      await this.registrarAmbiguidade(
+        ctx,
+        resolucao.colaboradorId,
+        "edicao",
+        AS_DUAS_CATEGORIAS.filter((c) =>
+          c === "perfil_pessoal" ? dto.perfilPessoal : dto.endereco,
+        ),
+      );
+      throw new ConflictException();
+    }
+    const { alvo, operacional } = resolucao;
 
     if (!operacional) {
       // Tentativa registrada ANTES da recusa, como nos contatos.
@@ -389,48 +431,44 @@ export class DadosPessoaisColaboradorService {
   /**
    * Gravação na ADMISSÃO, dentro da transação dela: o colaborador e o vínculo
    * acabaram de nascer na mesma transação, então não há registro anterior.
-   * Categoria sem nenhum valor não cria registro nem evento. Se qualquer
-   * gravação falhar, a admissão inteira falha (ADR 0004 §2).
+   * O perfil é obrigatório (tem ao menos a data de nascimento) e é sempre
+   * criado; o endereço, opcional, só é criado quando algum campo tem valor. Se
+   * qualquer gravação falhar, a admissão inteira falha (ADR 0004 §2).
    */
   async gravarNaAdmissao(
     tx: Prisma.TransactionClient,
     ctx: PessoasAuditContext,
     alvo: AlvoDadosPessoais,
     dto: {
-      perfilPessoal?: PerfilPessoalDto | undefined;
+      perfilPessoal: PerfilPessoalDto;
       endereco?: EnderecoDto | undefined;
     },
   ): Promise<{
-    perfilPessoal: ValoresPerfil | null;
+    perfilPessoal: ValoresPerfil;
     endereco: ValoresEndereco | null;
   }> {
-    let perfil: ValoresPerfil | null = null;
+    const valoresDoPerfil = perfilCompleto(dto.perfilPessoal);
+    const perfilCriado = await tx.perfilPessoalColaborador.create({
+      data: {
+        ...alvo,
+        ...dadosDoPerfil(valoresDoPerfil),
+        criadoPorUserId: ctx.actor.id,
+        atualizadoPorUserId: ctx.actor.id,
+      },
+      select: PROJECAO_PERFIL,
+    });
+    await this.registrarEvento(tx, ctx, alvo, {
+      categoria: "perfil_pessoal",
+      registroId: perfilCriado.id,
+      acao: "criacao",
+      resultado: "gravado",
+      campos: camposPreenchidos(valoresDoPerfil, CAMPOS_PERFIL),
+      auditAction: "pessoas_dados_pessoais_criados",
+      auditResult: "success",
+    });
+    const perfil = valoresPerfil(perfilCriado);
+
     let endereco: ValoresEndereco | null = null;
-    if (dto.perfilPessoal) {
-      const valores = perfilCompleto(dto.perfilPessoal);
-      const campos = camposPreenchidos(valores, CAMPOS_PERFIL);
-      if (campos.length > 0) {
-        const criado = await tx.perfilPessoalColaborador.create({
-          data: {
-            ...alvo,
-            ...dadosDoPerfil(valores),
-            criadoPorUserId: ctx.actor.id,
-            atualizadoPorUserId: ctx.actor.id,
-          },
-          select: PROJECAO_PERFIL,
-        });
-        await this.registrarEvento(tx, ctx, alvo, {
-          categoria: "perfil_pessoal",
-          registroId: criado.id,
-          acao: "criacao",
-          resultado: "gravado",
-          campos,
-          auditAction: "pessoas_dados_pessoais_criados",
-          auditResult: "success",
-        });
-        perfil = valoresPerfil(criado);
-      }
-    }
     if (dto.endereco) {
       const valores = enderecoCompleto(dto.endereco);
       const campos = camposPreenchidos(valores, CAMPOS_ENDERECO);
@@ -471,19 +509,9 @@ export class DadosPessoaisColaboradorService {
       select: PROJECAO_PERFIL,
     });
     if (!atual) {
+      // A data de nascimento é obrigatória: o bloco sempre tem ao menos um
+      // campo, e criar é sempre gravar.
       const campos = camposPreenchidos(novo, CAMPOS_PERFIL);
-      if (campos.length === 0) {
-        await this.registrarEvento(tx, ctx, alvo, {
-          categoria: "perfil_pessoal",
-          registroId: null,
-          acao: "leitura",
-          resultado: "sem_registro",
-          campos: [],
-          auditAction: "pessoas_dados_pessoais_consultados",
-          auditResult: "success",
-        });
-        return;
-      }
       const criado = await tx.perfilPessoalColaborador.create({
         data: {
           ...alvo,
@@ -610,48 +638,107 @@ export class DadosPessoaisColaboradorService {
   }
 
   /**
-   * Resolve o colaborador na empresa ativa da sessão. Inexistente e fora do
-   * escopo respondem igual (404, `negarAcesso`): a distinção vazaria a
-   * existência de uma pessoa em outra empresa. A reavaliação com a empresa do
-   * vínculo é defesa em profundidade, como nos contatos.
+   * Resolve o colaborador no escopo e a empresa REAL em que a operação vale —
+   * o mesmo escopo dos contatos (`resolverEscopoContatos`):
+   *
+   * - Escopado (`rh`, `dp`, `master_tecnico` com empresa ativa): só vínculos
+   *   da empresa da sessão.
+   * - Global (`master_tecnico` sem empresa ativa): os vínculos do colaborador
+   *   em qualquer empresa. Com mais de uma empresa, a operação é ambígua e
+   *   nada é lido nem gravado.
+   *
+   * Inexistente e fora do escopo respondem igual (404, `negarAcesso`): a
+   * distinção vazaria a existência de uma pessoa em outra empresa. A
+   * reavaliação com a empresa do vínculo é defesa em profundidade.
    */
   private async resolverAlvo(
     colaboradorId: string,
     ctx: PessoasAuditContext,
     action: "read" | "alter",
-  ): Promise<{ alvo: AlvoDadosPessoais; operacional: boolean }> {
-    const escopo = resolverEscopoPessoas(ctx.actor);
+  ): Promise<AlvoResolucao> {
+    const escopo = resolverEscopoContatos(ctx.actor);
     const vinculos = await this.prisma.vinculoFuncional.findMany({
-      where: { colaboradorId, empresaId: escopo.empresaId },
-      select: { situacao: true },
+      where: {
+        colaboradorId,
+        ...(escopo.global ? {} : { empresaId: escopo.empresaId }),
+      },
+      select: { empresaId: true, situacao: true },
     });
-    if (vinculos.length === 0) {
+    const [empresaId, ...outras] = [
+      ...new Set(vinculos.map((v) => v.empresaId)),
+    ];
+    if (empresaId === undefined) {
       return this.auditoria.negarAcesso(
         ctx,
         "dados_pessoais_colaborador",
         colaboradorId,
-        escopo.empresaId,
+        escopo.global ? null : escopo.empresaId,
       );
+    }
+    if (outras.length > 0) {
+      return { tipo: "ambiguo", colaboradorId };
     }
     if (
       !podeAcessarPessoas(
         ctx.actor,
         "dados_pessoais_colaborador",
         action,
-        escopo.empresaId,
+        empresaId,
       )
     ) {
       return this.auditoria.negarAcesso(
         ctx,
         "dados_pessoais_colaborador",
         colaboradorId,
-        escopo.empresaId,
+        empresaId,
       );
     }
     return {
-      alvo: { colaboradorId, empresaId: escopo.empresaId },
+      tipo: "resolvido",
+      alvo: { colaboradorId, empresaId },
       operacional: vinculos.some((v) => v.situacao !== "encerrado"),
     };
+  }
+
+  /**
+   * Tentativa sem empresa resolvida (`ambiguo`): uma linha por categoria
+   * alcançada, SEM empresa, SEM registro e sem campo — e `audit_event` com
+   * `failure`. Confirmada ANTES da recusa, como nos contatos.
+   */
+  private async registrarAmbiguidade(
+    ctx: PessoasAuditContext,
+    colaboradorId: string,
+    acao: "leitura" | "edicao",
+    categorias: readonly CategoriaDadosPessoais[],
+  ): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      await this.auditoria.registrarNaTransacao(tx, ctx, {
+        action:
+          acao === "leitura"
+            ? "pessoas_dados_pessoais_consultados"
+            : "pessoas_dados_pessoais_atualizados",
+        resource: "dados_pessoais_colaborador",
+        resourceId: colaboradorId,
+        empresaId: null,
+        result: "failure",
+      });
+      for (const categoria of categorias) {
+        await tx.dadosPessoaisColaboradorEvento.create({
+          data: {
+            colaboradorId,
+            empresaId: null,
+            categoria,
+            perfilId: null,
+            enderecoId: null,
+            acao,
+            resultado: "empresa_ambigua",
+            campos: [],
+            atorUserId: ctx.actor.id,
+            requestId: ctx.metadata.requestId,
+          },
+        });
+      }
+    });
   }
 
   private async idsDosRegistros(

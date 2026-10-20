@@ -13,9 +13,15 @@
 -- acao, resultado e NOMES dos campos, nunca os valores), porque `audit_event`
 -- nao tem coluna de detalhe (ADR 0004 §5).
 --
--- TODOS OS CAMPOS SAO OPCIONAIS E EM TEXTO CONTROLADO. Nao ha catalogo
+-- OBRIGATORIEDADE: `data_nascimento` e NOT NULL (todo perfil a tem); os
+-- demais campos sao OPCIONAIS e em texto controlado. Nao ha catalogo
 -- canonico no sistema para sexo, saudacao, estado civil,
 -- escolaridade, pais, UF ou municipio; esta migration nao inventa taxonomia.
+--
+-- ESCOPO: `rh` e `dp` na empresa ativa; `master_tecnico` em qualquer empresa
+-- (Emenda 2 da ADR 0012), como nos contatos. O evento fica SEM empresa so
+-- quando o `master_tecnico` sem empresa ativa alcanca colaborador com vinculo
+-- em mais de uma empresa (`empresa_ambigua`).
 -- O servidor apara, colapsa espacos e grava vazio como NULL; os CHECKs abaixo
 -- sao a rede de seguranca contra qualquer outro caminho.
 --
@@ -37,7 +43,7 @@ CREATE TYPE "CategoriaDadosPessoais" AS ENUM ('perfil_pessoal', 'endereco');
 CREATE TYPE "AcaoDadosPessoais" AS ENUM ('criacao', 'leitura', 'edicao');
 
 -- CreateEnum
-CREATE TYPE "ResultadoEventoDadosPessoais" AS ENUM ('gravado', 'valores_devolvidos', 'sem_alteracao', 'sem_registro', 'bloqueado');
+CREATE TYPE "ResultadoEventoDadosPessoais" AS ENUM ('gravado', 'valores_devolvidos', 'sem_alteracao', 'sem_registro', 'bloqueado', 'empresa_ambigua');
 
 -- CreateEnum
 CREATE TYPE "CampoDadosPessoais" AS ENUM ('data_nascimento', 'sexo', 'saudacao', 'estado_civil', 'nacionalidade', 'naturalidade', 'escolaridade', 'curso', 'nome_pai', 'nome_mae', 'pais', 'cep', 'logradouro', 'numero', 'complemento', 'bairro', 'cidade', 'estado');
@@ -53,7 +59,7 @@ CREATE TABLE "perfil_pessoal_colaborador" (
     "id" TEXT NOT NULL,
     "empresa_id" TEXT NOT NULL,
     "colaborador_id" TEXT NOT NULL,
-    "data_nascimento" DATE,
+    "data_nascimento" DATE NOT NULL,
     "sexo" TEXT,
     "saudacao" TEXT,
     "estado_civil" TEXT,
@@ -96,7 +102,7 @@ CREATE TABLE "endereco_colaborador" (
 CREATE TABLE "dados_pessoais_colaborador_evento" (
     "id" TEXT NOT NULL,
     "colaborador_id" TEXT NOT NULL,
-    "empresa_id" TEXT NOT NULL,
+    "empresa_id" TEXT,
     "categoria" "CategoriaDadosPessoais" NOT NULL,
     "perfil_id" TEXT,
     "endereco_id" TEXT,
@@ -268,7 +274,7 @@ ALTER TABLE "perfil_pessoal_colaborador"
 
 ALTER TABLE "perfil_pessoal_colaborador"
   ADD CONSTRAINT "perfil_pessoal_colaborador_data_nascimento_check"
-  CHECK ("data_nascimento" IS NULL OR "data_nascimento" >= DATE '1900-01-01');
+  CHECK ("data_nascimento" >= DATE '1900-01-01');
 
 ALTER TABLE "endereco_colaborador"
   ADD CONSTRAINT "endereco_colaborador_pais_texto_check"
@@ -354,13 +360,21 @@ ALTER TABLE "dados_pessoais_colaborador_evento"
     "campos" IS NOT NULL
     AND (
       ("resultado" IN ('gravado', 'valores_devolvidos', 'sem_alteracao')
+        AND "empresa_id" IS NOT NULL
         AND cardinality("campos") >= 1
         AND num_nonnulls("perfil_id", "endereco_id") = 1)
       OR ("resultado" = 'sem_registro'
+        AND "empresa_id" IS NOT NULL
         AND cardinality("campos") = 0
         AND num_nonnulls("perfil_id", "endereco_id") = 0)
       OR ("resultado" = 'bloqueado'
+        AND "empresa_id" IS NOT NULL
         AND cardinality("campos") = 0)
+      OR ("resultado" = 'empresa_ambigua'
+        AND "acao" IN ('leitura', 'edicao')
+        AND "empresa_id" IS NULL
+        AND cardinality("campos") = 0
+        AND num_nonnulls("perfil_id", "endereco_id") = 0)
     )
   );
 

@@ -192,12 +192,31 @@ describe("Admissão — a resposta é projeção explícita, campo a campo", () 
           colunaFutura: "NAO_PODE_VAZAR",
         }),
       },
+      perfilPessoalColaborador: {
+        create: jest.fn(({ data }: { data: Record<string, unknown> }) => ({
+          id: "per-1",
+          ...data,
+          atualizadoEm: AGORA,
+          colunaFutura: "NAO_PODE_VAZAR",
+        })),
+      },
+      contatoColaborador: {
+        create: jest.fn(({ data }: { data: Record<string, unknown> }) => ({
+          id: "con-1",
+          ...data,
+          atualizadoEm: AGORA,
+          colunaFutura: "NAO_PODE_VAZAR",
+        })),
+      },
+      dadosPessoaisColaboradorEvento: { create: jest.fn() },
+      contatoColaboradorEvento: { create: jest.fn() },
     };
     const prisma = {
       $transaction: jest.fn((fn: (t: typeof tx) => unknown) => fn(tx)),
     } as unknown as PrismaService;
     const auditoria = {
       registrarMutacao: jest.fn().mockResolvedValue(undefined),
+      registrarNaTransacao: jest.fn().mockResolvedValue(undefined),
     } as unknown as PessoasAuditoriaService;
     return new ColaboradorService(
       prisma,
@@ -217,6 +236,12 @@ describe("Admissão — a resposta é projeção explícita, campo a campo", () 
         dataAdmissao: "2026-10-01",
         motivoCodigo: "admissao_inicial",
         departamentoId: DEPARTAMENTO,
+        perfilPessoal: { dataNascimento: "1990-05-20" },
+        contatos: {
+          emailPessoal: "pessoa@exemplo.test",
+          celular: "+5511999990000",
+          telefone: "1133330000",
+        },
       }),
       {
         actor: ator("rh", EMPRESA_A),
@@ -258,10 +283,26 @@ describe("Admissão — a resposta é projeção explícita, campo a campo", () 
       situacao: "inativo",
       vinculo: { id: "vin-1", matricula: "MAT-T167", situacao: "previsto" },
       movimentacao: { id: "mov-1", tipo: "admissao" },
-      // T177 — sem os blocos do Módulo 1, nada é gravado e nada é inventado.
-      perfilPessoal: null,
+      // T177 — perfil e contatos são obrigatórios; sem endereço, nada é
+      // gravado nem inventado.
+      perfilPessoal: { dataNascimento: "1990-05-20", sexo: null },
       endereco: null,
-      contatos: null,
+      contatos: { emailPessoal: "pessoa@exemplo.test" },
     });
+    expect(Object.keys(resposta.perfilPessoal).sort()).toEqual(
+      [
+        "atualizadoEm",
+        "curso",
+        "dataNascimento",
+        "escolaridade",
+        "estadoCivil",
+        "nacionalidade",
+        "naturalidade",
+        "nomeMae",
+        "nomePai",
+        "saudacao",
+        "sexo",
+      ].sort(),
+    );
   });
 });

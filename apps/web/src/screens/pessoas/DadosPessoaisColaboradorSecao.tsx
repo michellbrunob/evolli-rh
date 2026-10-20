@@ -19,20 +19,36 @@ import {
  * Fica na ficha porque a ficha é consulta e edição delimitada (decisão do
  * `DP-FLX-21`). O cadastro destes dados é feito na página de Nova admissão.
  *
- * Perfil sem acesso (o `master_tecnico`, por exemplo, lê a ficha mas não estas
- * categorias) recebe a recusa do servidor e vê um aviso, nunca um valor.
+ * Leem: `rh` e `dp` na empresa ativa, e o `master_tecnico` em qualquer
+ * empresa (com empresa ativa, só nela) — Emenda 2 da ADR 0012. Perfil sem
+ * acesso recebe a recusa do servidor e vê um aviso, nunca um valor.
  */
 type Carga =
   | { status: "carregando" }
   | { status: "erro"; mensagem: string }
   | { status: "dados"; dados: DadosPessoaisDoColaboradorApi };
 
+/**
+ * Recusa da leitura, pelo que a rota produz — a mesma tradução dos contatos:
+ *  - 403 — perfil sem acesso a estas categorias;
+ *  - 404 — colaborador inexistente ou fora da empresa ativa (indistinguíveis);
+ *  - 409 — `master_tecnico` sem empresa ativa e colaborador com vínculo em
+ *    mais de uma empresa: a leitura seria ambígua, e nada foi lido.
+ */
 function mensagemDaRecusa(erro: unknown): string {
   const status = erro instanceof ApiError ? erro.status : null;
-  if (status === 403 || status === 404) {
-    return "Seu perfil não tem acesso aos dados pessoais e ao endereço deste colaborador.";
+  switch (status) {
+    case 403:
+      return "Seu perfil não tem acesso aos dados pessoais e ao endereço deste colaborador.";
+    case 404:
+      return "Colaborador não encontrado na empresa ativa.";
+    case 409:
+      return "Este colaborador tem vínculo em mais de uma empresa. Selecione a empresa ativa para ver os dados pessoais e o endereço.";
+    case 401:
+      return "Seu acesso expirou. Entre novamente para ver os dados pessoais.";
+    default:
+      return "Não foi possível carregar os dados pessoais e o endereço agora.";
   }
-  return "Não foi possível carregar os dados pessoais e o endereço agora.";
 }
 
 export function DadosPessoaisColaboradorSecao({

@@ -93,7 +93,20 @@ const resposta: AdmissaoRegistradaApi = {
       centroCustoId: null,
     },
   },
-  perfilPessoal: null,
+  // T177 — perfil e contatos passaram a ser obrigatórios na admissão.
+  perfilPessoal: {
+    dataNascimento: "1990-05-20T00:00:00.000Z",
+    sexo: null,
+    saudacao: null,
+    estadoCivil: null,
+    nacionalidade: null,
+    naturalidade: null,
+    escolaridade: null,
+    curso: null,
+    nomePai: null,
+    nomeMae: null,
+    atualizadoEm: "2026-10-20T12:00:00.000Z",
+  },
   endereco: null,
   contatos: {
     emailPessoal: "pessoa.fluxo@exemplo.test",
@@ -137,6 +150,10 @@ async function admitirPelaPagina() {
   });
   fireEvent.change(screen.getByLabelText(/^Matrícula/), {
     target: { value: "MAT-FLX1" },
+  });
+  // T177 — a data de nascimento passou a ser obrigatória na admissão.
+  fireEvent.change(screen.getByLabelText(/Data de nascimento/), {
+    target: { value: "1990-05-20" },
   });
   fireEvent.change(screen.getByLabelText(/E-mail pessoal/), {
     target: { value: "pessoa.fluxo@exemplo.test" },
@@ -254,6 +271,42 @@ describe("T176 — Nova admissão na navegação", () => {
     expect(
       await screen.findByRole("heading", { level: 1, name: "Colaboradores" }),
     ).toBeInTheDocument();
+  });
+});
+
+describe("T177 — 'Novo colaborador' em Pessoas leva à página de Nova admissão", () => {
+  it.each(["rh", "dp"])(
+    "%s aciona 'Novo colaborador' e chega à página, com a URL própria",
+    async (papel) => {
+      render(<App papelDoAtor={papel} />);
+      await screen.findByRole("heading", { level: 1, name: "Colaboradores" });
+      // A lista vazia mostra o botão no cabeçalho e no estado vazio; os dois
+      // levam ao mesmo lugar. O do cabeçalho vem primeiro.
+      const [doCabecalho] = await screen.findAllByRole("button", {
+        name: "Novo colaborador",
+      });
+      fireEvent.click(doCabecalho!);
+      expect(
+        await screen.findByRole("heading", { level: 1, name: "Nova admissão" }),
+      ).toBeInTheDocument();
+      expect(window.location.hash).toBe(ROTA);
+      // Navegou: nenhuma janela de admissão abriu sobre a lista.
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("heading", { level: 1, name: "Colaboradores" }),
+      ).not.toBeInTheDocument();
+    },
+  );
+
+  it("master_tecnico vê Colaboradores, mas sem 'Novo colaborador'", async () => {
+    render(<App papelDoAtor="master_tecnico" />);
+    await screen.findByRole("heading", { level: 1, name: "Colaboradores" });
+    await screen.findByRole("heading", {
+      name: "Nenhum colaborador cadastrado",
+    });
+    expect(
+      screen.queryByRole("button", { name: "Novo colaborador" }),
+    ).not.toBeInTheDocument();
   });
 });
 

@@ -3,8 +3,9 @@
  *
  * Prende o que a ficha mostra para cada resposta do servidor: os valores
  * gravados (com a data em dia civil, sem ISO cru), "Não informado" para campo
- * vazio, sem registro, bloqueado e a recusa para perfil sem acesso — que nunca
- * vê valor.
+ * vazio, sem registro, bloqueado e cada recusa do servidor (sem acesso, fora
+ * da empresa ativa, empresa ambígua do `master_tecnico`) — que nunca mostra
+ * valor.
  */
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -113,16 +114,19 @@ describe("Ficha — dados pessoais e endereço (T177)", () => {
     ).toBeInTheDocument();
   });
 
-  it.each([403, 404])(
-    "%i: perfil sem acesso vê o aviso, nunca um valor",
-    async (status) => {
+  it.each([
+    [403, /não tem acesso aos dados pessoais/],
+    [404, /não encontrado na empresa ativa/],
+    [409, /vínculo em mais de uma empresa. Selecione a empresa ativa/],
+    [401, /Seu acesso expirou/],
+  ] as const)(
+    "%i: a recusa vira aviso, nunca um valor",
+    async (status, mensagem) => {
       vi.mocked(consultarDadosPessoaisDoColaborador).mockRejectedValue(
         recusa(status),
       );
       render(<DadosPessoaisColaboradorSecao colaboradorId={ID} />);
-      expect(
-        await screen.findByText(/não tem acesso aos dados pessoais/),
-      ).toBeInTheDocument();
+      expect(await screen.findByText(mensagem)).toBeInTheDocument();
       expect(screen.queryByText("Feminino")).not.toBeInTheDocument();
     },
   );

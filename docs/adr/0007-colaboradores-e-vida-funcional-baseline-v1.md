@@ -685,9 +685,28 @@ garantia no banco de que o colaborador tem vínculo naquela empresa (ADR 0016,
 decisão 3), como os contatos da Emenda 4. `Colaborador` continua com `nome` e
 `situacao`. Os três contatos seguem na Emenda 4, sem segunda fonte.
 
+**Obrigatoriedade na admissão (decisão da proprietária, 2026-10-20):** nome
+completo, data de nascimento, e-mail pessoal, celular e telefone são
+**obrigatórios**; os demais campos desta emenda são **opcionais**. O contrato
+da API, a tela de Nova admissão e o banco (`data_nascimento` NOT NULL)
+expressam a regra campo a campo — tabela na §2 da ficha. Com isso, a admissão
+passa a ter **uma** porta: a página de Nova admissão. O formulário transitório
+em modal da tela de Colaboradores (T176) é aposentado, porque não coletava os
+campos obrigatórios. Colaboradores admitidos antes desta emenda não têm esses
+dados gravados e são lidos como `sem_registro`.
+
+**Quem acessa:** `rh` e `dp` na empresa ativa; `master_tecnico` em qualquer
+empresa, com empresa ativa só nela ([ADR 0012, Emenda 2](0012-convergencia-governanca-privacidade-e-perfis-globais.md)).
+Demais perfis, sem acesso.
+
+**Sujeito à aprovação (não é decisão tomada):** finalidade, base legal
+(proposta: execução do contrato), classificação (proposta: A2 — Pessoal),
+retenção (proposta: a mesma dos contatos) e dispensa de RIPD, como estão na
+ficha.
+
 **O que continua fora:** documento, CPF, dado bancário, salário, dado médico,
 dependente, benefício, nome social, identidade de gênero, raça/etnia,
-deficiência, foto e contato de emergência.
+deficiência, foto, contato de emergência e fuso horário.
 
 **Para o revisor:** a exceção ao bloqueio de "dado pessoal além dos aprovados"
 passa a valer também para estes campos e agregados, e só para eles.

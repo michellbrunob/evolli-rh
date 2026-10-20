@@ -2214,6 +2214,9 @@ enum ResultadoEventoDadosPessoais {
   sem_alteracao
   sem_registro
   bloqueado
+  /// `master_tecnico` sem empresa ativa e colaborador em mais de uma empresa:
+  /// nenhuma empresa resolvida, nada lido nem gravado.
+  empresa_ambigua
 }
 
 /// Campo alcancado por um evento. E o NOME do campo, nunca o valor.
@@ -2245,16 +2248,17 @@ model PerfilPessoalColaborador {
   empresaId     String @map("empresa_id")
   colaboradorId String @map("colaborador_id")
 
-  dataNascimento DateTime? @map("data_nascimento") @db.Date
+  /// Obrigatoria: todo perfil a tem (T177).
+  dataNascimento DateTime @map("data_nascimento") @db.Date
   sexo           String?
   saudacao       String?
-  estadoCivil    String?   @map("estado_civil")
+  estadoCivil    String?  @map("estado_civil")
   nacionalidade  String?
   naturalidade   String?
   escolaridade   String?
   curso          String?
-  nomePai        String?   @map("nome_pai")
-  nomeMae        String?   @map("nome_mae")
+  nomePai        String?  @map("nome_pai")
+  nomeMae        String?  @map("nome_mae")
 
   criadoPorUserId     String @map("criado_por_user_id")
   atualizadoPorUserId String @map("atualizado_por_user_id")
@@ -2318,9 +2322,10 @@ model EnderecoColaborador {
 /// alcancados — nunca os valores. APPEND-ONLY pelo banco (a migration revoga
 /// `UPDATE` e `DELETE` de `evolli_app`).
 model DadosPessoaisColaboradorEvento {
-  id            String @id @default(uuid())
-  colaboradorId String @map("colaborador_id")
-  empresaId     String @map("empresa_id")
+  id            String  @id @default(uuid())
+  colaboradorId String  @map("colaborador_id")
+  /// Ausente so em `empresa_ambigua`.
+  empresaId     String? @map("empresa_id")
 
   categoria  CategoriaDadosPessoais
   /// Registro da categoria, quando existe; no maximo um dos dois.
@@ -2336,7 +2341,7 @@ model DadosPessoaisColaboradorEvento {
   ocorridoEm DateTime @default(now()) @map("ocorrido_em")
 
   colaborador Colaborador               @relation(fields: [colaboradorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  empresa     Empresa                   @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  empresa     Empresa?                  @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   perfil      PerfilPessoalColaborador? @relation(fields: [perfilId, empresaId, colaboradorId], references: [id, empresaId, colaboradorId], onDelete: Restrict, onUpdate: Cascade)
   endereco    EnderecoColaborador?      @relation(fields: [enderecoId, empresaId, colaboradorId], references: [id, empresaId, colaboradorId], onDelete: Restrict, onUpdate: Cascade)
   ator        AccessUser                @relation("DadosPessoaisEventoAtor", fields: [atorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)

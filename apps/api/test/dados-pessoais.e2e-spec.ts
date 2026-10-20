@@ -22,7 +22,10 @@ import { requestIdMiddleware } from "../src/common/request-id";
  * Prova o que só o banco prova: a admissão com os três blocos é UMA transação
  * (falhou uma parte, nada fica), os contatos têm uma única fonte, a trilha não
  * guarda valor pessoal, o isolamento por empresa ativa vale também depois de
- * trocar de empresa, e só `rh` e `dp` alcançam estas categorias.
+ * trocar de empresa, `rh` e `dp` alcançam estas categorias na empresa ativa,
+ * o `master_tecnico` em qualquer empresa (com empresa ativa, só nela), e os
+ * demais perfis são negados. Nome completo, data de nascimento e os três
+ * contatos são obrigatórios na admissão.
  *
  * **Todos os dados são sintéticos.** Domínio reservado `example.test`.
  */
@@ -486,7 +489,6 @@ describe("Cadastro de colaborador — Módulo 1 (e2e)", () => {
       ["gestor", () => gestorA],
       ["colaborador", () => colaboradorA],
       ["financeiro", () => financeiroA],
-      ["master_tecnico", () => master],
     ])("%s não lê nem edita dados pessoais", async (_papel, cred) => {
       const leitura = await get(
         `/v1/colaboradores/${colaboradorId}/dados-pessoais`,
@@ -502,7 +504,216 @@ describe("Cadastro de colaborador — Módulo 1 (e2e)", () => {
     });
   });
 
-  describe("perfis sem acesso não admitem com os blocos", () => {
+  describe("master_tecnico lê e edita dados pessoais", () => {
+    let colaboradorId: string;
+    let masterEscopadoB: Credencial;
+    let masterEscopadoA: Credencial;
+
+    /** As duas trilhas da última operação: evento e `audit_event`. */
+    async function ultimaTrilha(id: string) {
+      const evento =
+        await prisma.dadosPessoaisColaboradorEvento.findFirstOrThrow({
+          where: { colaboradorId: id },
+          orderBy: { ocorridoEm: "desc" },
+        });
+      const formal = await prisma.auditEvent.findFirstOrThrow({
+        where: {
+          requestId: evento.requestId,
+          resource: "dados_pessoais_colaborador",
+        },
+      });
+      return { evento, formal };
+    }
+
+    beforeAll(async () => {
+      colaboradorId = (
+        await post("/v1/colaboradores", rhA)
+          .send(admissao("MAT-M1-MASTER"))
+          .expect(201)
+      ).body.id;
+      // Contas próprias: trocar o contexto do `master` compartilhado mudaria o
+      // escopo dos outros testes.
+      masterEscopadoB = await seedMaster("master.m1b@example.test");
+      await post("/v1/auth/contexto/empresa", masterEscopadoB)
+        .send({ empresaId: empresaB })
+        .expect(200);
+      masterEscopadoA = await seedMaster("master.m1a@example.test");
+      await post("/v1/auth/contexto/empresa", masterEscopadoA)
+        .send({ empresaId: empresaA })
+        .expect(200);
+    });
+
+    it("sem empresa ativa: lê na empresa REAL do vínculo, auditado com ela", async () => {
+      const r = await get(
+        `/v1/colaboradores/${colaboradorId}/dados-pessoais`,
+        master,
+      ).expect(200);
+      expect(r.headers["cache-control"]).toBe("no-store");
+      expect(r.body).toMatchObject({
+        empresaId: empresaA,
+        situacao: "registrado",
+        perfilPessoal: { dataNascimento: "1991-07-14", sexo: "Feminino" },
+        endereco: { cidade: "Cidade Sintetica" },
+      });
+      const { evento, formal } = await ultimaTrilha(colaboradorId);
+      expect(evento).toMatchObject({
+        empresaId: empresaA,
+        acao: "leitura",
+        resultado: "valores_devolvidos",
+      });
+      expect(formal).toMatchObject({
+        action: "pessoas_dados_pessoais_consultados",
+        companyId: empresaA,
+        actorRole: "master_tecnico",
+        result: "success",
+      });
+    });
+
+    it("sem empresa ativa: edita na empresa do vínculo, só o campo alterado", async () => {
+      const r = await put(
+        `/v1/colaboradores/${colaboradorId}/dados-pessoais`,
+        master,
+      )
+        .send({
+          perfilPessoal: { ...PERFIL, curso: "Curso Editado Pelo Master" },
+        })
+        .expect(200);
+      expect(r.body).toMatchObject({
+        empresaId: empresaA,
+        perfilPessoal: { curso: "Curso Editado Pelo Master" },
+      });
+      const { evento, formal } = await ultimaTrilha(colaboradorId);
+      expect(evento).toMatchObject({
+        empresaId: empresaA,
+        categoria: "perfil_pessoal",
+        acao: "edicao",
+        resultado: "gravado",
+        campos: ["curso"],
+      });
+      expect(formal).toMatchObject({
+        action: "pessoas_dados_pessoais_atualizados",
+        companyId: empresaA,
+        actorRole: "master_tecnico",
+      });
+      expect(JSON.stringify([evento, formal])).not.toContain(
+        "Curso Editado Pelo Master",
+      );
+    });
+
+    it("com empresa ativa B: colaborador da A responde 404, sem valor", async () => {
+      const leitura = await get(
+        `/v1/colaboradores/${colaboradorId}/dados-pessoais`,
+        masterEscopadoB,
+      ).expect(404);
+      expect(JSON.stringify(leitura.body)).not.toContain("Feminino");
+      await put(
+        `/v1/colaboradores/${colaboradorId}/dados-pessoais`,
+        masterEscopadoB,
+      )
+        .send({ endereco: ENDERECO })
+        .expect(404);
+    });
+
+    it("com empresa ativa A: lê e edita na A", async () => {
+      await get(
+        `/v1/colaboradores/${colaboradorId}/dados-pessoais`,
+        masterEscopadoA,
+      ).expect(200);
+      const r = await put(
+        `/v1/colaboradores/${colaboradorId}/dados-pessoais`,
+        masterEscopadoA,
+      )
+        .send({ endereco: { ...ENDERECO, bairro: "Bairro Do Master" } })
+        .expect(200);
+      expect(r.body.endereco.bairro).toBe("Bairro Do Master");
+    });
+
+    it("sem empresa ativa e vínculo em duas empresas: 409, nada lido nem gravado", async () => {
+      // A API não cria vínculo em outra empresa para quem não está nela: o
+      // segundo vínculo entra direto no banco, como nos E2E de contatos.
+      const linhas = await prisma.$queryRawUnsafe<{ id: string }[]>(
+        `INSERT INTO app.vinculo_funcional
+           (id, colaborador_id, empresa_id, matricula, tipo, situacao,
+            data_admissao, criado_em, atualizado_em)
+         VALUES (gen_random_uuid()::text, $1, $2, 'MAT-M1-AMB-B', 'clt',
+                 'previsto', DATE '2026-01-05', now(), now())
+         RETURNING id`,
+        colaboradorId,
+        empresaB,
+      );
+      const segundoVinculo = linhas[0]!.id;
+      try {
+        const antes = await prisma.perfilPessoalColaborador.findFirstOrThrow({
+          where: { colaboradorId },
+        });
+        const leitura = await get(
+          `/v1/colaboradores/${colaboradorId}/dados-pessoais`,
+          master,
+        ).expect(409);
+        expect(JSON.stringify(leitura.body)).not.toContain("Feminino");
+        const consulta = await prisma.dadosPessoaisColaboradorEvento.findMany({
+          where: {
+            colaboradorId,
+            resultado: "empresa_ambigua",
+            acao: "leitura",
+          },
+        });
+        expect(consulta.map((e) => e.categoria).sort()).toEqual([
+          "endereco",
+          "perfil_pessoal",
+        ]);
+        for (const e of consulta) {
+          expect(e).toMatchObject({
+            empresaId: null,
+            perfilId: null,
+            enderecoId: null,
+            campos: [],
+          });
+        }
+        const formal = await prisma.auditEvent.findFirstOrThrow({
+          where: {
+            requestId: consulta[0]!.requestId,
+            resource: "dados_pessoais_colaborador",
+          },
+        });
+        expect(formal).toMatchObject({
+          action: "pessoas_dados_pessoais_consultados",
+          companyId: null,
+          actorRole: "master_tecnico",
+          result: "failure",
+        });
+
+        await put(`/v1/colaboradores/${colaboradorId}/dados-pessoais`, master)
+          .send({ perfilPessoal: { ...PERFIL, curso: "Nao Pode Gravar" } })
+          .expect(409);
+        const tentativa = await ultimaTrilha(colaboradorId);
+        expect(tentativa.evento).toMatchObject({
+          empresaId: null,
+          categoria: "perfil_pessoal",
+          acao: "edicao",
+          resultado: "empresa_ambigua",
+        });
+        expect(tentativa.formal).toMatchObject({
+          action: "pessoas_dados_pessoais_atualizados",
+          companyId: null,
+          result: "failure",
+        });
+        expect(
+          await prisma.perfilPessoalColaborador.findFirstOrThrow({
+            where: { colaboradorId },
+          }),
+        ).toEqual(antes);
+      } finally {
+        // O vínculo extra não pode vazar para os testes seguintes.
+        await prisma.$executeRawUnsafe(
+          "DELETE FROM app.vinculo_funcional WHERE id = $1",
+          segundoVinculo,
+        );
+      }
+    });
+  });
+
+  describe("a admissão continua só de rh e dp", () => {
     it.each([
       ["gestor", () => gestorA],
       ["colaborador", () => colaboradorA],
@@ -528,6 +739,19 @@ describe("Cadastro de colaborador — Módulo 1 (e2e)", () => {
       ],
       ["CEP fora do padrão", { endereco: { cep: "30140/071" } }],
       ["contatos incompletos", { contatos: { emailPessoal: "a@b.test" } }],
+      ["sem data de nascimento", { perfilPessoal: { sexo: "Feminino" } }],
+      ["data de nascimento vazia", { perfilPessoal: { dataNascimento: "" } }],
+      ["sem o bloco do perfil", { perfilPessoal: undefined }],
+      ["sem os contatos", { contatos: undefined }],
+      [
+        "sem celular",
+        { contatos: { emailPessoal: "a@b.test", telefone: "1133330000" } },
+      ],
+      [
+        "sem telefone",
+        { contatos: { emailPessoal: "a@b.test", celular: "11999990000" } },
+      ],
+      ["sem nome completo", { nome: undefined }],
       ["campo fora do Módulo 1", { perfilPessoal: { nomeSocial: "X" } }],
       ["empresa no bloco", { endereco: { empresaId: "x" } }],
     ])("%s: 400 e nada persiste", async (_caso, extra) => {
@@ -542,6 +766,41 @@ describe("Cadastro de colaborador — Módulo 1 (e2e)", () => {
       expect(
         await prisma.vinculoFuncional.count({ where: { matricula } }),
       ).toBe(0);
+    });
+  });
+
+  describe("só o obrigatório", () => {
+    it("admite com nome, data de nascimento e contatos, sem endereço", async () => {
+      const r = await post("/v1/colaboradores", rhA)
+        .send(
+          admissao("MAT-M1-MIN", {
+            perfilPessoal: { dataNascimento: "1988-03-09" },
+            endereco: undefined,
+          }),
+        )
+        .expect(201);
+      expect(r.body.perfilPessoal).toMatchObject({
+        dataNascimento: "1988-03-09",
+        sexo: null,
+        nomeMae: null,
+      });
+      expect(r.body.endereco).toBeNull();
+      expect(r.body.contatos).toMatchObject({
+        emailPessoal: "pessoa.modulo1@example.test",
+      });
+      expect(
+        await prisma.enderecoColaborador.count({
+          where: { colaboradorId: r.body.id },
+        }),
+      ).toBe(0);
+      const leitura = await get(
+        `/v1/colaboradores/${r.body.id}/dados-pessoais`,
+        rhA,
+      ).expect(200);
+      expect(leitura.body).toMatchObject({
+        situacao: "registrado",
+        endereco: null,
+      });
     });
   });
 
@@ -660,6 +919,47 @@ describe("Cadastro de colaborador — Módulo 1 (e2e)", () => {
   });
 
   describe("o banco é a rede de segurança", () => {
+    it("recusa perfil sem data de nascimento e evento sem empresa fora da ambiguidade", async () => {
+      const qualquer = await prisma.perfilPessoalColaborador.findFirstOrThrow();
+      await expect(
+        prisma.$executeRawUnsafe(
+          "UPDATE app.perfil_pessoal_colaborador SET data_nascimento = NULL WHERE id = $1",
+          qualquer.id,
+        ),
+      ).rejects.toThrow();
+      const ator = await prisma.accessUser.findFirstOrThrow({
+        where: { email: "rh.m1a@example.test" },
+      });
+      await expect(
+        prisma.dadosPessoaisColaboradorEvento.create({
+          data: {
+            colaboradorId: qualquer.colaboradorId,
+            empresaId: null,
+            categoria: "perfil_pessoal",
+            acao: "leitura",
+            resultado: "sem_registro",
+            campos: [],
+            atorUserId: ator.id,
+            requestId: "req-incoerente",
+          },
+        }),
+      ).rejects.toThrow();
+      await expect(
+        prisma.dadosPessoaisColaboradorEvento.create({
+          data: {
+            colaboradorId: qualquer.colaboradorId,
+            empresaId: qualquer.empresaId,
+            categoria: "perfil_pessoal",
+            acao: "leitura",
+            resultado: "empresa_ambigua",
+            campos: [],
+            atorUserId: ator.id,
+            requestId: "req-incoerente-2",
+          },
+        }),
+      ).rejects.toThrow();
+    });
+
     it("recusa texto não aparado e data antes de 1900, mesmo por SQL direto", async () => {
       const qualquer = await prisma.perfilPessoalColaborador.findFirstOrThrow();
       await expect(

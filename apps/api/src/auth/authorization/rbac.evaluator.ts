@@ -685,9 +685,11 @@ function evaluateContatos(
  * Dados pessoais e endereco do colaborador (T177, Modulo 1 do cadastro).
  *
  * - `rh` e `dp` leem e editam na **empresa ativa**.
- * - `master_tecnico`: **sem acesso**. A excecao aprovada para ele vale so para
- *   contatos (Emenda 1 da ADR 0012); estender a outra categoria pediria
- *   decisao propria.
+ * - `master_tecnico` le e edita em **qualquer empresa** (Emenda 2 da ADR
+ *   0012: decisao da proprietaria de que o cargo de confianca acessa tudo),
+ *   no mesmo desenho dos contatos: com empresa ativa, atua **dentro dela**
+ *   (T163); sem selecao, atua na empresa do vinculo do colaborador, que o
+ *   service resolve e audita.
  * - `gestor`, `colaborador` e os demais: sem acesso.
  *
  * So `read` e `alter`, como nos contatos. A criacao na admissao passa pela
@@ -703,16 +705,27 @@ function evaluateDadosPessoais(
     return false;
   }
 
+  const escopoResolvido = target.targetCompanyId !== undefined;
+
   switch (subject.role) {
+    case "master_tecnico":
+      if (!escopoResolvido) {
+        return true;
+      }
+      if (target.targetCompanyId === null) {
+        return false;
+      }
+      // Sem empresa ativa, global; com empresa ativa, so ela.
+      return subject.companyId === null || isSameCompany(subject, target);
+
     case "rh":
     case "dp":
-      return target.targetCompanyId !== undefined
+      return escopoResolvido
         ? isSameCompany(subject, target)
         : subject.companyId !== null;
 
     default:
-      // master_tecnico, gestor, colaborador, financeiro, admin_tecnico,
-      // auditor, dpo.
+      // gestor, colaborador, financeiro, admin_tecnico, auditor, dpo.
       return false;
   }
 }
