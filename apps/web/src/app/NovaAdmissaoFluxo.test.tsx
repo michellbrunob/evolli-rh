@@ -1,11 +1,13 @@
 /**
- * T176 — Nova admissão no shell: rota, papéis e o caminho até a ficha.
+ * T176/T178 — Gestão de Pessoas no shell: Colaboradores e Nova admissão.
  *
  * O teste da página (`NovaAdmissaoScreen.test.tsx`) prende o formulário. Este
- * prende o que só existe com o shell montado: o destino na navegação para `rh`
- * e `dp` (e não para `master_tecnico`, que não admite), a URL própria
- * (`#/pessoas/nova-admissao`), o "voltar" do navegador e a passagem da página
- * para a ficha do admitido — inclusive direto nos contatos aprovados.
+ * prende o que só existe com o shell montado: "Colaboradores" como entrada do
+ * grupo "Gestão de Pessoas" (e a Nova admissão como sub-página dela, aberta
+ * pela listagem só para `rh` e `dp`), as duas URLs próprias
+ * (`#/pessoas/colaboradores` e `#/pessoas/nova-admissao`), a trilha de
+ * navegação, o "voltar" do navegador, o cancelar e a passagem da página para
+ * a listagem relida e para a ficha do admitido.
  */
 import {
   act,
@@ -119,7 +121,10 @@ const resposta: AdmissaoRegistradaApi = {
 beforeEach(() => {
   vi.clearAllMocks();
   window.history.replaceState(null, "", "/");
-  vi.mocked(listarColaboradores).mockResolvedValue(paginado([]));
+  vi.mocked(listarColaboradores).mockResolvedValue({
+    ...paginado([]),
+    contadores: { ativos: 0, inativos: 0 },
+  });
   vi.mocked(listarVinculosDoColaborador).mockResolvedValue([]);
   vi.mocked(admitirColaborador).mockResolvedValue(resposta);
   vi.mocked(listarEmpresasMulti).mockResolvedValue(paginado([empresa]));
@@ -139,8 +144,35 @@ beforeEach(() => {
   );
 });
 
-function itemNovaAdmissao() {
-  return screen.queryByRole("button", { name: /^Nova admissão/ });
+const ROTA_COLABORADORES = "#/pessoas/colaboradores";
+
+/** T178 — a barra não tem mais item próprio de Nova admissão. */
+function itemNovaAdmissaoNaBarra() {
+  return within(
+    screen.getByRole("navigation", { name: "Navegação do painel" }),
+  ).queryByRole("button", { name: /Nova admissão/ });
+}
+
+function itemColaboradoresNaBarra() {
+  return within(
+    screen.getByRole("navigation", { name: "Navegação do painel" }),
+  ).getByRole("button", { name: /^Colaboradores/ });
+}
+
+function trilha() {
+  return screen.getByRole("navigation", { name: "Trilha de navegação" });
+}
+
+/** T178 — o caminho até a Nova admissão: a ação da listagem de Colaboradores. */
+async function abrirNovaAdmissaoPelaListagem() {
+  await screen.findByRole("heading", { level: 1, name: "Colaboradores" });
+  // Com a lista vazia há dois botões (barra de ações e estado vazio); o da
+  // barra vem primeiro, e os dois levam ao mesmo lugar.
+  const [daBarra] = await screen.findAllByRole("button", {
+    name: "Nova admissão",
+  });
+  fireEvent.click(daBarra!);
+  await screen.findByRole("heading", { level: 1, name: "Nova admissão" });
 }
 
 async function admitirPelaPagina() {
@@ -181,34 +213,305 @@ async function admitirPelaPagina() {
   await screen.findByText("Admissão registrada");
 }
 
-describe("T176 — Nova admissão na navegação", () => {
-  it.each(["rh", "dp"])(
-    "%s abre a página pela navegação, com URL própria e h1 no <main>",
+describe("T178 — Gestão de Pessoas › Colaboradores na barra lateral", () => {
+  it.each(["rh", "dp", "master_tecnico"])(
+    "%s vê o grupo 'Gestão de Pessoas' com 'Colaboradores', sem item próprio de Nova admissão",
     async (papel) => {
       render(<App papelDoAtor={papel} />);
-      fireEvent.click(itemNovaAdmissao()!);
+      await screen.findByRole("heading", { level: 1, name: "Colaboradores" });
       expect(
-        await screen.findByRole("heading", { level: 1, name: "Nova admissão" }),
-      ).toBeInTheDocument();
+        screen.getByRole("button", { name: "Gestão de Pessoas" }),
+      ).toHaveAttribute("aria-expanded", "true");
+      expect(itemColaboradoresNaBarra()).toHaveAttribute(
+        "aria-current",
+        "page",
+      );
+      expect(itemNovaAdmissaoNaBarra()).toBeNull();
+    },
+  );
+
+  it.each(["rh", "dp"])(
+    "%s abre a Nova admissão pela listagem: URL própria, h1 no <main> e Colaboradores marcado",
+    async (papel) => {
+      render(<App papelDoAtor={papel} />);
+      await abrirNovaAdmissaoPelaListagem();
       expect(window.location.hash).toBe(ROTA);
       expect(screen.getByRole("main")).toHaveAttribute(
         "aria-labelledby",
         NOVA_ADMISSAO_TITULO_ID,
       );
-      expect(itemNovaAdmissao()).toHaveAttribute("aria-current", "page");
-      // A tela de Colaboradores não fica montada por baixo.
+      // Sub-página de Colaboradores: a barra marca a área, não some a marca.
+      expect(itemColaboradoresNaBarra()).toHaveAttribute(
+        "aria-current",
+        "page",
+      );
+      // Navegou: nenhuma janela abriu, e a listagem não fica montada por baixo.
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
       expect(
         screen.queryByRole("heading", { level: 1, name: "Colaboradores" }),
       ).not.toBeInTheDocument();
     },
   );
 
-  it("master_tecnico não vê o destino: o servidor recusaria a admissão", () => {
+  it("master_tecnico vê Colaboradores, mas sem 'Nova admissão' em lugar nenhum", async () => {
     render(<App papelDoAtor="master_tecnico" />);
-    expect(itemNovaAdmissao()).not.toBeInTheDocument();
+    await screen.findByRole("heading", { level: 1, name: "Colaboradores" });
+    await screen.findByRole("heading", {
+      name: "Nenhum colaborador cadastrado nesta empresa",
+    });
+    expect(
+      screen.queryByRole("button", { name: "Nova admissão" }),
+    ).not.toBeInTheDocument();
+    expect(itemNovaAdmissaoNaBarra()).toBeNull();
+  });
+});
+
+describe("T178 — trilha de navegação", () => {
+  it("na listagem: Gestão de Pessoas › Colaboradores, com Colaboradores como atual", async () => {
+    render(<App papelDoAtor="rh" />);
+    await screen.findByRole("heading", { level: 1, name: "Colaboradores" });
+
+    const itens = within(trilha()).getAllByRole("listitem");
+    expect(itens.map((i) => i.textContent?.replace("›", "").trim())).toEqual([
+      "Gestão de Pessoas",
+      "Colaboradores",
+    ]);
+    expect(within(trilha()).getByText("Colaboradores")).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    // O separador é desenho: fica fora da árvore de acessibilidade.
+    for (const separador of trilha().querySelectorAll(
+      ".evolli-trilha__separador",
+    )) {
+      expect(separador).toHaveAttribute("aria-hidden", "true");
+    }
   });
 
-  it("master_tecnico com a URL da rota cai no destino inicial, sem a página", async () => {
+  it("numa aba interna, a trilha ganha o terceiro nível e 'Colaboradores' volta à aba", async () => {
+    render(<App papelDoAtor="rh" />);
+    await screen.findByRole("heading", { level: 1, name: "Colaboradores" });
+    fireEvent.click(screen.getByRole("tab", { name: "Horário de trabalho" }));
+
+    expect(within(trilha()).getByText("Horário de trabalho")).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    fireEvent.click(
+      within(trilha()).getByRole("button", { name: "Colaboradores" }),
+    );
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "Colaboradores" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Colaboradores" })).toHaveFocus();
+  });
+
+  it("na Nova admissão: Gestão de Pessoas › Colaboradores › Nova admissão", async () => {
+    render(<App papelDoAtor="rh" />);
+    await abrirNovaAdmissaoPelaListagem();
+
+    const itens = within(trilha()).getAllByRole("listitem");
+    expect(itens.map((i) => i.textContent?.replace("›", "").trim())).toEqual([
+      "Gestão de Pessoas",
+      "Colaboradores",
+      "Nova admissão",
+    ]);
+    expect(within(trilha()).getByText("Nova admissão")).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    // O módulo não é página: só texto. Colaboradores é acionável.
+    expect(
+      within(trilha()).queryByRole("button", { name: "Gestão de Pessoas" }),
+    ).toBeNull();
+    expect(
+      within(trilha()).getByRole("button", { name: "Colaboradores" }),
+    ).toBeInTheDocument();
+  });
+
+  it("'Colaboradores' da trilha, sem nada digitado, volta direto à listagem", async () => {
+    render(<App papelDoAtor="rh" />);
+    await abrirNovaAdmissaoPelaListagem();
+    await screen.findByText("Empresa Sintética (teste)");
+
+    fireEvent.click(
+      within(trilha()).getByRole("button", { name: "Colaboradores" }),
+    );
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "Colaboradores" }),
+    ).toBeInTheDocument();
+    expect(window.location.hash).toBe(ROTA_COLABORADORES);
+  });
+
+  it("'Colaboradores' da trilha, com dados digitados, pede a confirmação de descarte", async () => {
+    render(<App papelDoAtor="rh" />);
+    await abrirNovaAdmissaoPelaListagem();
+    await screen.findByText("Empresa Sintética (teste)");
+    fireEvent.change(screen.getByLabelText(/Nome completo/), {
+      target: { value: "Pessoa Em Edição" },
+    });
+
+    fireEvent.click(
+      within(trilha()).getByRole("button", { name: "Colaboradores" }),
+    );
+    const confirmacao = await screen.findByRole("dialog", {
+      name: "Descartar esta admissão?",
+    });
+    // "Continuar preenchendo" fica na página, com o que foi digitado.
+    fireEvent.click(
+      within(confirmacao).getByRole("button", {
+        name: "Continuar preenchendo",
+      }),
+    );
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "Descartar esta admissão?" }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(screen.getByLabelText(/Nome completo/)).toHaveValue(
+      "Pessoa Em Edição",
+    );
+    expect(window.location.hash).toBe(ROTA);
+
+    // Pedir de novo e descartar: aí sim volta à listagem.
+    fireEvent.click(
+      within(trilha()).getByRole("button", { name: "Colaboradores" }),
+    );
+    fireEvent.click(
+      within(
+        await screen.findByRole("dialog", { name: "Descartar esta admissão?" }),
+      ).getByRole("button", { name: "Descartar e sair" }),
+    );
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "Colaboradores" }),
+    ).toBeInTheDocument();
+    expect(window.location.hash).toBe(ROTA_COLABORADORES);
+    expect(admitirColaborador).not.toHaveBeenCalled();
+  });
+});
+
+describe("T178 — rota própria da listagem (#/pessoas/colaboradores)", () => {
+  it.each(["rh", "dp", "master_tecnico"])(
+    "%s abrindo a URL da listagem monta Colaboradores, mesmo com outra escolha no Hub",
+    async (papel) => {
+      window.history.replaceState(null, "", `/${ROTA_COLABORADORES}`);
+      render(<App papelDoAtor={papel} destinoInicial="ponto" />);
+      expect(
+        await screen.findByRole("heading", { level: 1, name: "Colaboradores" }),
+      ).toBeInTheDocument();
+      expect(window.location.hash).toBe(ROTA_COLABORADORES);
+      expect(listarColaboradores).toHaveBeenCalled();
+    },
+  );
+
+  it("recarregar na listagem volta à listagem (nova montagem, nova leitura)", async () => {
+    const { unmount } = render(<App papelDoAtor="rh" />);
+    await screen.findByRole("heading", { level: 1, name: "Colaboradores" });
+    expect(window.location.hash).toBe(ROTA_COLABORADORES);
+    // "Recarregar": a URL fica e o shell remonta do zero. O desmonte limpa a
+    // rota (saída do shell); recarregar não desmonta — reponho a URL.
+    unmount();
+    window.history.replaceState(null, "", `/${ROTA_COLABORADORES}`);
+    const chamadasAntes = vi.mocked(listarColaboradores).mock.calls.length;
+
+    render(<App papelDoAtor="rh" destinoInicial="cadastros" />);
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "Colaboradores" }),
+    ).toBeInTheDocument();
+    expect(vi.mocked(listarColaboradores).mock.calls.length).toBeGreaterThan(
+      chamadasAntes,
+    );
+  });
+
+  it("a aterrissagem comum escreve a rota no lugar, sem entrada nova no histórico", async () => {
+    const entradasAntes = window.history.length;
+    render(<App papelDoAtor="rh" />);
+    await screen.findByRole("heading", { level: 1, name: "Colaboradores" });
+    expect(window.location.hash).toBe(ROTA_COLABORADORES);
+    expect(window.history.length).toBe(entradasAntes);
+  });
+
+  it.each([
+    ["gestor", /^Minha equipe/],
+    ["colaborador", /^Visão geral/],
+    ["financeiro", /^Visão geral/],
+  ] as const)(
+    "%s com a URL da listagem não monta Colaboradores, e a URL é corrigida",
+    async (papel, telaInicial) => {
+      window.history.replaceState(null, "", `/${ROTA_COLABORADORES}`);
+      const entradasAntes = window.history.length;
+      render(<App papelDoAtor={papel} />);
+      expect(
+        await screen.findByRole("button", { name: telaInicial }),
+      ).toHaveAttribute("aria-current", "page");
+      expect(
+        screen.queryByRole("heading", { level: 1, name: "Colaboradores" }),
+      ).not.toBeInTheDocument();
+      expect(listarColaboradores).not.toHaveBeenCalled();
+      expect(window.location.hash).toBe("");
+      expect(window.history.length).toBe(entradasAntes);
+    },
+  );
+
+  it("gestor digitando a rota com o painel aberto fica na tela atual", async () => {
+    render(<App papelDoAtor="gestor" />);
+    const atual = await screen.findByRole("button", { name: /^Minha equipe/ });
+    expect(atual).toHaveAttribute("aria-current", "page");
+    act(() => {
+      window.history.pushState(null, "", `/${ROTA_COLABORADORES}`);
+      window.dispatchEvent(new HashChangeEvent("hashchange"));
+    });
+    await waitFor(() => expect(window.location.hash).toBe(""));
+    expect(
+      screen.getByRole("button", { name: /^Minha equipe/ }),
+    ).toHaveAttribute("aria-current", "page");
+    expect(listarColaboradores).not.toHaveBeenCalled();
+  });
+
+  it("de outro destino, a URL da listagem digitada leva à listagem", async () => {
+    render(<App papelDoAtor="rh" destinoInicial="ponto" />);
+    await screen.findByRole("button", { name: /^Jornada/ });
+    act(() => {
+      window.history.pushState(null, "", `/${ROTA_COLABORADORES}`);
+      window.dispatchEvent(new HashChangeEvent("hashchange"));
+    });
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "Colaboradores" }),
+    ).toBeInTheDocument();
+  });
+
+  it("o link 'Pular para o conteúdo' é âncora: não tira a pessoa da listagem", async () => {
+    render(<App papelDoAtor="rh" />);
+    await screen.findByRole("heading", { level: 1, name: "Colaboradores" });
+    act(() => {
+      window.history.pushState(null, "", "/#conteudo-principal");
+      window.dispatchEvent(new HashChangeEvent("hashchange"));
+    });
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Colaboradores" }),
+    ).toBeInTheDocument();
+    expect(itemColaboradoresNaBarra()).toHaveAttribute("aria-current", "page");
+  });
+
+  it("ir para um destino sem rota tira a rota da URL, e 'voltar' retorna à listagem", async () => {
+    render(<App papelDoAtor="rh" />);
+    await screen.findByRole("heading", { level: 1, name: "Colaboradores" });
+    fireEvent.click(screen.getByRole("button", { name: /^Estrutura/ }));
+    await screen.findByRole("heading", { level: 1, name: "Horários" });
+    expect(window.location.hash).toBe("");
+
+    act(() => {
+      window.history.replaceState(null, "", `/${ROTA_COLABORADORES}`);
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "Colaboradores" }),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("T176/T178 — Nova admissão: rota, voltar e cancelar", () => {
+  it("master_tecnico com a URL da Nova admissão cai na listagem, com a URL dela", async () => {
     window.history.replaceState(null, "", `/${ROTA}`);
     render(<App papelDoAtor="master_tecnico" />);
     expect(
@@ -217,7 +520,7 @@ describe("T176 — Nova admissão na navegação", () => {
     expect(
       screen.queryByRole("heading", { level: 1, name: "Nova admissão" }),
     ).not.toBeInTheDocument();
-    expect(window.location.hash).toBe("");
+    expect(window.location.hash).toBe(ROTA_COLABORADORES);
   });
 
   it("rota que o papel não abre não sequestra a escolha do Hub", async () => {
@@ -229,31 +532,43 @@ describe("T176 — Nova admissão na navegação", () => {
     expect(window.location.hash).toBe("");
   });
 
-  it("a URL da rota abre a página direto para rh", async () => {
+  it("a URL da Nova admissão abre a página direto para rh", async () => {
     window.history.replaceState(null, "", `/${ROTA}`);
     render(<App papelDoAtor="rh" />);
     expect(
       await screen.findByRole("heading", { level: 1, name: "Nova admissão" }),
     ).toBeInTheDocument();
+    expect(itemColaboradoresNaBarra()).toHaveAttribute("aria-current", "page");
   });
 
-  it("sair para outro destino tira a rota da URL", async () => {
+  it("'Colaboradores' na barra, a partir da Nova admissão, volta à listagem e à rota dela", async () => {
     render(<App papelDoAtor="rh" />);
-    fireEvent.click(itemNovaAdmissao()!);
-    await screen.findByRole("heading", { level: 1, name: "Nova admissão" });
-    fireEvent.click(
-      screen.getByRole("button", { name: "Pessoas Colaboradores" }),
-    );
+    await abrirNovaAdmissaoPelaListagem();
+    fireEvent.click(itemColaboradoresNaBarra());
     expect(
       await screen.findByRole("heading", { level: 1, name: "Colaboradores" }),
     ).toBeInTheDocument();
-    expect(window.location.hash).toBe("");
+    expect(window.location.hash).toBe(ROTA_COLABORADORES);
   });
 
-  it("o 'voltar' do navegador sai da página para onde a pessoa estava", async () => {
+  it("o 'voltar' do navegador sai da Nova admissão para a listagem", async () => {
     render(<App papelDoAtor="rh" />);
-    fireEvent.click(itemNovaAdmissao()!);
-    await screen.findByRole("heading", { level: 1, name: "Nova admissão" });
+    await abrirNovaAdmissaoPelaListagem();
+    expect(window.location.hash).toBe(ROTA);
+    act(() => {
+      // O que o navegador faz no "voltar": a URL anterior, e `popstate`.
+      window.history.replaceState(null, "", `/${ROTA_COLABORADORES}`);
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "Colaboradores" }),
+    ).toBeInTheDocument();
+    expect(window.location.hash).toBe(ROTA_COLABORADORES);
+  });
+
+  it("o 'voltar' até a URL sem rota mostra a listagem e corrige a URL no lugar", async () => {
+    render(<App papelDoAtor="rh" />);
+    await abrirNovaAdmissaoPelaListagem();
     act(() => {
       window.history.replaceState(null, "", "/");
       window.dispatchEvent(new PopStateEvent("popstate"));
@@ -261,66 +576,32 @@ describe("T176 — Nova admissão na navegação", () => {
     expect(
       await screen.findByRole("heading", { level: 1, name: "Colaboradores" }),
     ).toBeInTheDocument();
+    expect(window.location.hash).toBe(ROTA_COLABORADORES);
   });
 
-  it("Cancelar sem dados volta para Colaboradores", async () => {
+  it("Cancelar sem dados volta para a listagem, na rota dela", async () => {
     render(<App papelDoAtor="rh" />);
-    fireEvent.click(itemNovaAdmissao()!);
+    await abrirNovaAdmissaoPelaListagem();
     await screen.findByText("Empresa Sintética (teste)");
     fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
     expect(
       await screen.findByRole("heading", { level: 1, name: "Colaboradores" }),
     ).toBeInTheDocument();
-  });
-});
-
-describe("T177 — 'Novo colaborador' em Pessoas leva à página de Nova admissão", () => {
-  it.each(["rh", "dp"])(
-    "%s aciona 'Novo colaborador' e chega à página, com a URL própria",
-    async (papel) => {
-      render(<App papelDoAtor={papel} />);
-      await screen.findByRole("heading", { level: 1, name: "Colaboradores" });
-      // A lista vazia mostra o botão no cabeçalho e no estado vazio; os dois
-      // levam ao mesmo lugar. O do cabeçalho vem primeiro.
-      const [doCabecalho] = await screen.findAllByRole("button", {
-        name: "Novo colaborador",
-      });
-      fireEvent.click(doCabecalho!);
-      expect(
-        await screen.findByRole("heading", { level: 1, name: "Nova admissão" }),
-      ).toBeInTheDocument();
-      expect(window.location.hash).toBe(ROTA);
-      // Navegou: nenhuma janela de admissão abriu sobre a lista.
-      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-      expect(
-        screen.queryByRole("heading", { level: 1, name: "Colaboradores" }),
-      ).not.toBeInTheDocument();
-    },
-  );
-
-  it("master_tecnico vê Colaboradores, mas sem 'Novo colaborador'", async () => {
-    render(<App papelDoAtor="master_tecnico" />);
-    await screen.findByRole("heading", { level: 1, name: "Colaboradores" });
-    await screen.findByRole("heading", {
-      name: "Nenhum colaborador cadastrado",
-    });
-    expect(
-      screen.queryByRole("button", { name: "Novo colaborador" }),
-    ).not.toBeInTheDocument();
+    expect(window.location.hash).toBe(ROTA_COLABORADORES);
   });
 });
 
 describe("T176 — rota recusada para quem não admite", () => {
   /** Quem não recebe `colaborador`/`create` no servidor, e a tela em que aterrissa. */
   const SEM_ACESSO = [
-    ["master_tecnico", /^Pessoas/],
-    ["gestor", /^Minha equipe/],
-    ["colaborador", /^Visão geral/],
+    ["master_tecnico", /^Colaboradores/, ROTA_COLABORADORES],
+    ["gestor", /^Minha equipe/, ""],
+    ["colaborador", /^Visão geral/, ""],
   ] as const;
 
   it.each(SEM_ACESSO)(
     "%s com a URL direta não monta a página, e a URL não fica pendurada",
-    async (papel, telaInicial) => {
+    async (papel, telaInicial, urlFinal) => {
       window.history.replaceState(null, "", `/${ROTA}`);
       const entradasAntes = window.history.length;
       render(<App papelDoAtor={papel} />);
@@ -333,7 +614,7 @@ describe("T176 — rota recusada para quem não admite", () => {
       expect(
         screen.queryByRole("form", { name: "Formulário de nova admissão" }),
       ).not.toBeInTheDocument();
-      expect(window.location.hash).toBe("");
+      expect(window.location.hash).toBe(urlFinal);
       // Corrigida no lugar: a rota nunca exibida não vira entrada no histórico.
       expect(window.history.length).toBe(entradasAntes);
       expect(admitirColaborador).not.toHaveBeenCalled();
@@ -379,10 +660,71 @@ describe("T176 — rota recusada para quem não admite", () => {
   });
 });
 
-describe("T176 — da página à ficha do admitido", () => {
+describe("T176/T178 — da página à listagem e à ficha do admitido", () => {
+  it("'Voltar para Colaboradores' mostra a listagem RELIDA do servidor", async () => {
+    render(<App papelDoAtor="rh" />);
+    await abrirNovaAdmissaoPelaListagem();
+    await admitirPelaPagina();
+    const chamadasAntes = vi.mocked(listarColaboradores).mock.calls.length;
+    // O servidor já conhece o admitido.
+    vi.mocked(listarColaboradores).mockResolvedValue({
+      ...paginado([
+        {
+          id: resposta.id,
+          nome: resposta.nome,
+          situacao: "inativo" as const,
+          criadoEm: resposta.criadoEm,
+          atualizadoEm: resposta.atualizadoEm,
+          vinculos: [
+            {
+              id: resposta.vinculo.id,
+              empresaId: empresa.id,
+              matricula: "MAT-FLX1",
+              situacao: "previsto" as const,
+              dataAdmissao: "2026-10-20T00:00:00.000Z",
+              dataDesligamento: null,
+            },
+          ],
+        },
+      ]),
+      contadores: { ativos: 0, inativos: 1 },
+    });
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Voltar para Colaboradores" }),
+    );
+
+    const tabela = await screen.findByRole("table", {
+      name: "Colaboradores desta empresa",
+    });
+    expect(
+      within(tabela).getByText("Pessoa Sintética Fluxo"),
+    ).toBeInTheDocument();
+    expect(within(tabela).getByText("MAT-FLX1")).toBeInTheDocument();
+    expect(vi.mocked(listarColaboradores).mock.calls.length).toBeGreaterThan(
+      chamadasAntes,
+    );
+    expect(window.location.hash).toBe(ROTA_COLABORADORES);
+  });
+
+  it("'Colaboradores' da trilha, depois da admissão, sai sem pedir confirmação", async () => {
+    render(<App papelDoAtor="rh" />);
+    await abrirNovaAdmissaoPelaListagem();
+    await admitirPelaPagina();
+    fireEvent.click(
+      within(trilha()).getByRole("button", { name: "Colaboradores" }),
+    );
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "Colaboradores" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("dialog", { name: "Descartar esta admissão?" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("'Abrir ficha' leva a Colaboradores com a ficha do admitido aberta", async () => {
     render(<App papelDoAtor="rh" />);
-    fireEvent.click(itemNovaAdmissao()!);
+    await abrirNovaAdmissaoPelaListagem();
     await admitirPelaPagina();
     fireEvent.click(
       screen.getByRole("button", {
@@ -395,7 +737,7 @@ describe("T176 — da página à ficha do admitido", () => {
     expect(
       screen.getByRole("heading", { level: 1, name: "Colaboradores" }),
     ).toBeInTheDocument();
-    expect(window.location.hash).toBe("");
+    expect(window.location.hash).toBe(ROTA_COLABORADORES);
     expect(listarVinculosDoColaborador).toHaveBeenCalledWith(resposta.id);
     expect(within(ficha).getByLabelText("Nome")).toHaveValue(
       "Pessoa Sintética Fluxo",
@@ -404,7 +746,7 @@ describe("T176 — da página à ficha do admitido", () => {
 
   it("'Revisar contatos na ficha' abre a ficha com o foco no primeiro contato", async () => {
     render(<App papelDoAtor="dp" />);
-    fireEvent.click(itemNovaAdmissao()!);
+    await abrirNovaAdmissaoPelaListagem();
     await admitirPelaPagina();
     fireEvent.click(
       screen.getByRole("button", { name: "Revisar contatos na ficha" }),
@@ -416,9 +758,9 @@ describe("T176 — da página à ficha do admitido", () => {
     expect(consultarContatosDoColaborador).toHaveBeenCalledWith(resposta.id);
   });
 
-  it("a abertura vale uma vez: voltar a Pessoas não reabre a ficha", async () => {
+  it("a abertura vale uma vez: voltar a Colaboradores não reabre a ficha", async () => {
     render(<App papelDoAtor="rh" />);
-    fireEvent.click(itemNovaAdmissao()!);
+    await abrirNovaAdmissaoPelaListagem();
     await admitirPelaPagina();
     fireEvent.click(
       screen.getByRole("button", {
@@ -430,9 +772,7 @@ describe("T176 — da página à ficha do admitido", () => {
     });
     fireEvent.click(within(ficha).getByRole("button", { name: /Fechar/ }));
     fireEvent.click(screen.getByRole("button", { name: /^Estrutura/ }));
-    fireEvent.click(
-      screen.getByRole("button", { name: "Pessoas Colaboradores" }),
-    );
+    fireEvent.click(itemColaboradoresNaBarra());
     await screen.findByRole("heading", { level: 1, name: "Colaboradores" });
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });

@@ -192,7 +192,7 @@ async function abrirProduto(rotulo: RegExp | string) {
 /** Caminho completo do ator padrão (`rh`): login, Hub e produto aberto. */
 async function entrar() {
   await entrarNoHub();
-  await abrirProduto(/^Pessoas/);
+  await abrirProduto(/^Colaboradores/);
 }
 
 describe("AutenticacaoApp (T116) — portão de sessão", () => {
@@ -248,9 +248,35 @@ describe("AutenticacaoApp (T116) — portão de sessão", () => {
       screen.queryByRole("heading", { level: 1, name: "Entrar" }),
     ).not.toBeInTheDocument();
     // E dali o shell continua a um clique de distância.
-    await abrirProduto(/^Pessoas/);
+    await abrirProduto(/^Colaboradores/);
     expect(
       screen.getByRole("navigation", { name: "Navegação do painel" }),
+    ).toBeInTheDocument();
+  });
+
+  it("T178: recarregar numa rota do shell abre direto nela, sem passar pelo Hub", async () => {
+    window.history.replaceState(null, "", "#/pessoas/colaboradores");
+    try {
+      vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token-restaurado");
+      render(<AutenticacaoApp />);
+      expect(
+        await screen.findByRole("heading", { level: 1, name: "Colaboradores" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole("heading", { level: 1, name: TITULO_DO_HUB }),
+      ).not.toBeInTheDocument();
+      expect(window.location.hash).toBe("#/pessoas/colaboradores");
+    } finally {
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+  });
+
+  it("T178: sem rota na URL, recarregar continua abrindo o Hub", async () => {
+    window.history.replaceState(null, "", window.location.pathname);
+    vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token-restaurado");
+    render(<AutenticacaoApp />);
+    expect(
+      await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB }),
     ).toBeInTheDocument();
   });
 
@@ -284,7 +310,7 @@ describe("AutenticacaoApp (T116) — portão de sessão", () => {
     expect(vi.mocked(listarTabelasHorario)).not.toHaveBeenCalled();
     expect(vi.mocked(listarEquipe)).not.toHaveBeenCalled();
 
-    await abrirProduto(/^Pessoas/);
+    await abrirProduto(/^Colaboradores/);
     expect(
       screen.getByRole("navigation", { name: "Navegação do painel" }),
     ).toBeInTheDocument();
@@ -295,7 +321,7 @@ describe("AutenticacaoApp (T116) — portão de sessão", () => {
 
     render(<AutenticacaoApp />);
     await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
-    await abrirProduto(/^Pessoas/);
+    await abrirProduto(/^Colaboradores/);
 
     fireEvent.click(screen.getByRole("button", { name: "Hub" }));
 
@@ -313,7 +339,7 @@ describe("AutenticacaoApp (T116) — portão de sessão", () => {
 
     render(<AutenticacaoApp />);
     await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
-    await abrirProduto(/^Pessoas/);
+    await abrirProduto(/^Colaboradores/);
 
     fireEvent.click(screen.getByRole("button", { name: "Sair" }));
 
@@ -332,7 +358,7 @@ describe("AutenticacaoApp (T116) — portão de sessão", () => {
 
     render(<AutenticacaoApp />);
     await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
-    await abrirProduto(/^Pessoas/);
+    await abrirProduto(/^Colaboradores/);
 
     fireEvent.click(screen.getByRole("button", { name: "Sair" }));
 
@@ -375,7 +401,7 @@ describe("AutenticacaoApp (T116) — portão de sessão", () => {
 
     render(<AutenticacaoApp />);
     await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
-    await abrirProduto(/^Pessoas/);
+    await abrirProduto(/^Colaboradores/);
 
     fireEvent.click(screen.getByRole("button", { name: "Sessões ativas" }));
     await screen.findByRole("heading", { name: "Sessões ativas" });
@@ -464,8 +490,10 @@ describe("T153 — aterrissagem segura por papel", () => {
       await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB }),
     ).toBeInTheDocument();
     expect(screen.queryByRole("navigation")).toBeNull();
-    await abrirProduto(/^Pessoas/);
-    expect(screen.getByRole("navigation")).toBeInTheDocument();
+    await abrirProduto(/^Colaboradores/);
+    expect(
+      screen.getByRole("navigation", { name: "Navegação do painel" }),
+    ).toBeInTheDocument();
   });
 
   it("B1.2 nenhum cliente funcional é chamado antes de o ator ser conhecido", async () => {
@@ -586,9 +614,11 @@ describe("T153 — aterrissagem segura por papel", () => {
       screen.getByRole("button", { name: /Minha equipe/ }),
     ).toBeInTheDocument();
 
-    await abrirProduto(/^Pessoas/);
+    await abrirProduto(/^Colaboradores/);
 
-    expect(destinosAtivos()).toEqual(["Pessoas Colaboradores"]);
+    expect(destinosAtivos()).toEqual([
+      "Colaboradores Consulta, ficha e vida funcional",
+    ]);
     // E continua vendo "Minha equipe", porque o contrato lhe concede.
     expect(
       screen.getByRole("button", { name: /Minha equipe/ }),
@@ -604,8 +634,12 @@ describe("T153 — aterrissagem segura por papel", () => {
    * tomavam 403 na primeira chamada, que era a primeira impressão do produto.
    */
   it.each([
-    ["dp", "Pessoas Colaboradores", /^Pessoas/],
-    ["master_tecnico", "Pessoas Colaboradores", /^Pessoas/],
+    ["dp", "Colaboradores Consulta, ficha e vida funcional", /^Colaboradores/],
+    [
+      "master_tecnico",
+      "Colaboradores Consulta, ficha e vida funcional",
+      /^Colaboradores/,
+    ],
     ["colaborador", "Visão geral", /Visão geral/],
     ["financeiro", "Visão geral", /Visão geral/],
   ])(
@@ -687,10 +721,12 @@ describe("T153 — aterrissagem segura por papel", () => {
     // T162 — a sessão nova começa no Hub, nunca dentro do produto em que a
     // anterior estava. Era "Minha equipe", e o gestor saiu.
     await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
-    await abrirProduto(/^Pessoas/);
+    await abrirProduto(/^Colaboradores/);
 
     // Recalculado para o ator NOVO, não herdado do gestor anterior.
-    expect(destinosAtivos()).toEqual(["Pessoas Colaboradores"]);
+    expect(destinosAtivos()).toEqual([
+      "Colaboradores Consulta, ficha e vida funcional",
+    ]);
   });
 
   it("B1.13 quem já navegou não é redirecionado de novo", async () => {
@@ -846,7 +882,7 @@ describe("T163 — contexto empresarial ativo", () => {
 
     render(<AutenticacaoApp />);
     await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
-    await abrirProduto(/^Pessoas/);
+    await abrirProduto(/^Colaboradores/);
 
     // De volta ao Hub só para trocar — e a troca não deixa ninguém dentro de
     // um módulo cujo universo de dados acabou de mudar sem aviso.

@@ -1,8 +1,8 @@
 /**
  * Pessoas > Nova admissão (T176) — página própria, só com tokens existentes
  * (`tokens.css`): sem hexadecimal novo, sem sombra, sem gradiente. Os grupos
- * empilham em uma coluna; os campos de cada grupo vão a duas colunas quando há
- * largura, e a uma só em tela estreita.
+ * empilham em uma coluna; dentro de cada grupo, os campos vão em linhas de
+ * duas ou três colunas quando há largura (T178), e a uma só em tela estreita.
  */
 
 .nova-admissao {
@@ -47,18 +47,80 @@
   gap: var(--space-lg);
 }
 
+/* T178 — o grupo empilha LINHAS (`__linha`); cada linha decide as próprias
+   colunas. Antes a grade era do grupo inteiro, de duas em duas, e a ordem de
+   leitura empurrava campos de assuntos diferentes para a mesma linha. */
 .nova-admissao__grupo {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-md);
   padding-top: var(--space-md);
   border-top: 1px solid var(--status-info-border);
 }
 
-.nova-admissao__grupo > .nova-admissao__grupo-titulo,
-.nova-admissao__grupo > .nova-admissao__leitura,
-.nova-admissao__grupo > .nova-admissao__texto {
-  grid-column: 1 / -1;
+/* Linha da grade: uma coluna por padrão (celular); as colunas entram só com
+   largura. `start` para que um campo com ajuda mais longa não estique o
+   vizinho. */
+.nova-admissao__linha {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-md);
+  align-items: start;
+  min-width: 0;
+}
+
+/* T178 — numa linha da grade, o texto de ajuda e o erro vão para DEPOIS do
+   campo. Antes deles, um campo com ajuda ("2 a 160 caracteres.") começava
+   mais abaixo que o vizinho sem ajuda, e a linha ficava desalinhada. O campo
+   é coluna flex (FormField), então `order` basta, sem tocar no componente: a
+   ordem no DOM, e com ela a do leitor de tela e o `aria-describedby`, não
+   muda. */
+.nova-admissao__linha .evolli-field__help {
+  order: 1;
+}
+
+.nova-admissao__linha .evolli-field__error {
+  order: 2;
+}
+
+@media (min-width: 641px) {
+  .nova-admissao__linha--2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .nova-admissao__linha--3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  /* Logradouro (≈2/3) e número (≈1/3). */
+  .nova-admissao__linha--larga-estreita {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  }
+}
+
+/* T178 — CEP com consulta assistida: o campo e, logo abaixo, o botão "Buscar
+   CEP" com a mensagem da consulta ao lado. Grade, e não coluna flex, para que
+   nenhum `flex-basis` vire altura (o vão da T172). */
+.nova-admissao__cep {
+  display: grid;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+.nova-admissao__cep-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs) var(--space-sm);
+  min-width: 0;
+}
+
+/* Vazia, a região fica montada e sem altura: esconder com `display: none`
+   faria alguns leitores de tela não anunciarem a primeira mensagem. */
+.nova-admissao__cep-status {
+  flex: 1 1 12rem;
+  min-width: 0;
+  color: var(--color-ink-muted);
 }
 
 .nova-admissao__grupo-titulo {
@@ -121,10 +183,6 @@
 }
 
 @media (max-width: 640px) {
-  .nova-admissao__grupo {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
   .nova-admissao__resumo {
     grid-template-columns: minmax(0, 1fr);
   }

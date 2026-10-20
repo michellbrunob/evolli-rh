@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { VisaoPeriodoScreen } from "./VisaoPeriodoScreen";
 import {
   type ColaboradorApi,
+  type ListagemColaboradoresApi,
   type VinculoApi,
   listarColaboradores,
   listarVinculosDoColaborador,
@@ -45,6 +46,18 @@ interface Paginado<T> {
 
 function paginado<T>(itens: T[]): Paginado<T> {
   return { itens, pagina: 1, tamanhoPagina: 100, total: itens.length };
+}
+
+/**
+ * T178 — `GET /v1/colaboradores` passou a trazer os vínculos de cada item e os
+ * `contadores` do escopo. Esta tela não usa nenhum dos dois; o envelope só
+ * precisa ter a forma do contrato.
+ */
+function listagem(itens: ColaboradorApi[]): ListagemColaboradoresApi {
+  return {
+    ...paginado(itens.map((c) => ({ ...c, vinculos: [] }))),
+    contadores: { ativos: 0, inativos: 0 },
+  };
 }
 
 const colaborador1: ColaboradorApi = {
@@ -206,7 +219,7 @@ const vinculoHorarioDepoisDaTroca: VinculoHorarioApi = {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(listarColaboradores).mockResolvedValue(
-    paginado([colaborador1, colaborador2]),
+    listagem([colaborador1, colaborador2]),
   );
   vi.mocked(listarVinculosDoColaborador).mockImplementation(async (id) =>
     id === colaborador1.id ? [vinculo1] : [vinculo2],
@@ -404,7 +417,7 @@ describe("VisaoPeriodoScreen (T113 — funcional)", () => {
   });
 
   it("bloqueia registro quando não há vínculo ativo", async () => {
-    vi.mocked(listarColaboradores).mockResolvedValue(paginado([]));
+    vi.mocked(listarColaboradores).mockResolvedValue(listagem([]));
 
     render(<VisaoPeriodoScreen />);
     await aguardarLista();
@@ -420,7 +433,7 @@ describe("VisaoPeriodoScreen (T113 — funcional)", () => {
   });
 
   it("resolve automaticamente o vínculo quando há só um ativo", async () => {
-    vi.mocked(listarColaboradores).mockResolvedValue(paginado([colaborador1]));
+    vi.mocked(listarColaboradores).mockResolvedValue(listagem([colaborador1]));
 
     render(<VisaoPeriodoScreen />);
     await aguardarLista();

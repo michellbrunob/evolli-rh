@@ -106,8 +106,10 @@ import {
  * nenhuma promete recurso inexistente, e nenhuma diz "em breve".
  */
 const DESCRICAO_DO_DESTINO: Readonly<Record<string, string>> = {
+  // T178 — porta principal de Gestão de Pessoas: só o que a listagem entrega
+  // hoje (busca, contadores e ficha), sem cargo nem departamento na linha.
   pessoas:
-    "Cadastro de colaboradores, vida funcional e vínculo com horário de trabalho.",
+    "Consulta de colaboradores por nome ou matrícula, ficha, vida funcional e vínculo com horário de trabalho.",
   "nova-admissao":
     "Admissão em página própria: cria o colaborador, o vínculo previsto e o ato de admissão na empresa ativa.",
   cadastros:

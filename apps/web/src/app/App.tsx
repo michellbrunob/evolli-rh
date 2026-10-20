@@ -95,7 +95,11 @@ import {
   destinoPorId,
   capacidadeFuncionalDe,
 } from "./mapaNavegacao";
-import { destinoDaRota, rotaDoDestino } from "./rotasDoShell";
+import {
+  destinoDaRota,
+  ehFragmentoDeRota,
+  rotaDoDestino,
+} from "./rotasDoShell";
 
 /** `titleId` do `h1` de cada destino, para `aria-labelledby` do `<main>`.
  * "cadastros", "pessoas", "ponto", "documentos", "portal-colaborador" e
@@ -472,8 +476,9 @@ export function App({
   // escolha seria um redirecionamento surpresa. Trocar de ator remonta o
   // componente (ver a `key` em `AutenticacaoApp`), e aí o inicializador roda
   // de novo com o papel novo.
-  // T176 — uma URL com rota conhecida (`#/pessoas/nova-admissao`) tem
-  // precedência sobre o destino do Hub: é o endereço que a pessoa abriu. Mas
+  // T176 — uma URL com rota conhecida (`#/pessoas/nova-admissao` e, desde a
+  // T178, `#/pessoas/colaboradores`) tem precedência sobre o destino do Hub:
+  // é o endereço que a pessoa abriu — ou recarregou. Mas
   // só quando o papel PODE abri-la — a mesma validação de capacidade de
   // qualquer pedido. Rota que o papel não abre é ignorada, e vale a escolha do
   // Hub, como se a URL não tivesse rota.
@@ -489,7 +494,12 @@ export function App({
   });
   const [aberturaDoAdmitido, setAberturaDoAdmitido] =
     useState<AberturaDoAdmitido | null>(null);
-  /** Último destino SEM rota, para onde o "voltar" do navegador devolve. */
+  /**
+   * Para onde a URL SEM rota devolve (o "voltar" até ela): o último destino
+   * sem rota exibido ou, antes de haver um, o destino inicial do papel — que,
+   * desde a T178, pode ter rota própria (`pessoas`); aí a URL é corrigida para
+   * a dela, no lugar (ver `aoMudarUrl`).
+   */
   const destinoSemRotaRef = useRef(
     rotaDoDestino(destinoAtivoId) === null
       ? destinoAtivoId
@@ -560,7 +570,8 @@ export function App({
     setDestinoAtivoId("pessoas");
   }, []);
   const aberturaAtendida = useCallback(() => setAberturaDoAdmitido(null), []);
-  // T177 — "Novo colaborador" leva à página de Nova admissão e só aparece para
+  // T177 — "Nova admissão" (T178; era "Novo colaborador"), na listagem, leva
+  // à página de Nova admissão e só aparece para
   // quem pode abri-la: a mesma validação de capacidade da entrada e da rota.
   // Perfil que só consulta não ganha um botão que o levaria a um 403.
   const podeAdmitir =
@@ -570,30 +581,52 @@ export function App({
   const destinoAtivoRef = useRef(destinoAtivoId);
   /** A rota do último destino EXIBIDO, ou `null` se ele não tinha rota. */
   const rotaExibidaRef = useRef<string | null>(null);
+  /**
+   * T178 — `true` até a primeira exibição escrever a URL.
+   *
+   * Desde que `pessoas` tem rota, a aterrissagem comum (Hub → Colaboradores)
+   * já escreve uma URL. Escrevê-la com `pushState` criaria uma entrada que a
+   * pessoa nunca percorreu: o primeiro "voltar" não sairia de lugar nenhum. A
+   * primeira exibição corrige a URL no lugar; só a navegação feita DENTRO do
+   * shell empilha. Volta a `true` ao sair do shell (ver o efeito de limpeza),
+   * o que também mantém o `StrictMode` de desenvolvimento — que desmonta e
+   * remonta os efeitos — sem entrada duplicada.
+   */
+  const primeiraExibicaoRef = useRef(true);
 
   // T176 — a URL acompanha o destino. Destino com rota a escreve; destino sem
   // rota a retira, se ela estava lá. Sair de uma página com rota usa
   // `pushState`, para que o "voltar" do navegador volte a ela. Uma rota que
   // foi PEDIDA mas nunca exibida (papel sem acesso, na entrada) só é corrigida,
   // com `replaceState`: não vira entrada no histórico.
+  //
+  // T178 — com duas rotas, sair de uma página com rota pode ser ENTRAR em
+  // outra (Nova admissão → Colaboradores): é o ramo de baixo, com `pushState`
+  // — o "voltar" retorna à página de onde se saiu.
   useEffect(() => {
     const rota = rotaDoDestino(destinoAtivoId);
     const atual = window.location.hash;
     const vinhaDeRota = rotaExibidaRef.current !== null;
+    const primeiraExibicao = primeiraExibicaoRef.current;
+    primeiraExibicaoRef.current = false;
     destinoAtivoRef.current = destinoAtivoId;
     rotaExibidaRef.current = rota;
     if (rota === null) {
       destinoSemRotaRef.current = destinoAtivoId;
       if (destinoDaRota(atual) !== null) {
         const semRota = window.location.pathname + window.location.search;
-        if (vinhaDeRota) {
+        if (vinhaDeRota && !primeiraExibicao) {
           window.history.pushState(null, "", semRota);
         } else {
           window.history.replaceState(null, "", semRota);
         }
       }
     } else if (atual !== rota) {
-      window.history.pushState(null, "", rota);
+      if (primeiraExibicao) {
+        window.history.replaceState(null, "", rota);
+      } else {
+        window.history.pushState(null, "", rota);
+      }
     }
   }, [destinoAtivoId]);
 
@@ -601,29 +634,43 @@ export function App({
   // A rota passa pela mesma validação de capacidade da entrada.
   useEffect(() => {
     function aoMudarUrl() {
-      const pedido = destinoDaRota(window.location.hash);
+      const fragmento = window.location.hash;
+      // T178 — âncora da própria página (o link "Pular para o conteúdo" põe
+      // `#conteudo-principal` na URL e dispara `hashchange`): ninguém pediu
+      // outro destino, e a tela fica onde está.
+      if (!ehFragmentoDeRota(fragmento)) return;
+      const pedido = destinoDaRota(fragmento);
+      let exibido: string;
       if (pedido === null) {
-        setDestinoAtivoId(destinoSemRotaRef.current);
-        return;
+        exibido = destinoSemRotaRef.current;
+      } else if (resolverEntrada(pedido, papelDoAtor) === pedido) {
+        exibido = pedido;
+      } else {
+        // Rota recusada: a tela atual fica, se o papel pode estar nela; só sem
+        // tela válida cai no destino inicial do papel.
+        const atual = destinoAtivoRef.current;
+        exibido =
+          resolverEntrada(atual, papelDoAtor) === atual
+            ? atual
+            : destinoInicialPara(papelDoAtor);
       }
-      if (resolverEntrada(pedido, papelDoAtor) === pedido) {
-        setDestinoAtivoId(pedido);
-        return;
-      }
-      // Rota recusada: a tela atual fica, se o papel pode estar nela; só sem
-      // tela válida cai no destino inicial do papel. A URL volta a dizer o
-      // que está na tela — nunca fica pendurada na rota recusada.
-      const atual = destinoAtivoRef.current;
-      const exibido =
-        resolverEntrada(atual, papelDoAtor) === atual
-          ? atual
-          : destinoInicialPara(papelDoAtor);
-      window.history.replaceState(
-        null,
-        "",
-        rotaDoDestino(exibido) ??
+      // A URL volta a dizer o que está na tela — nunca fica pendurada numa
+      // rota recusada ou desconhecida. Correção no lugar (`replaceState`):
+      // quem mudou a URL foi o navegador, e empilhar aqui criaria um histórico
+      // que a pessoa não percorreu. T178: vale também para o "voltar" até a
+      // URL sem rota quando o destino dela tem rota (`pessoas`).
+      const rotaExibida = rotaDoDestino(exibido);
+      if (rotaExibida !== null) {
+        if (fragmento !== rotaExibida) {
+          window.history.replaceState(null, "", rotaExibida);
+        }
+      } else if (fragmento.startsWith("#/")) {
+        window.history.replaceState(
+          null,
+          "",
           window.location.pathname + window.location.search,
-      );
+        );
+      }
       setDestinoAtivoId(exibido);
     }
     window.addEventListener("popstate", aoMudarUrl);
@@ -631,8 +678,16 @@ export function App({
     return () => {
       window.removeEventListener("popstate", aoMudarUrl);
       window.removeEventListener("hashchange", aoMudarUrl);
-      // Sair do shell (Hub, logout) não deixa a rota pendurada na URL: a
-      // próxima entrada pelo Hub não deve ser sequestrada por ela.
+    };
+  }, [papelDoAtor]);
+
+  // Sair do shell (Hub, logout) não deixa a rota pendurada na URL: a próxima
+  // entrada pelo Hub não deve ser sequestrada por ela. T178: efeito próprio,
+  // sem dependências, para que só a DESMONTAGEM limpe — antes a limpeza vivia
+  // no efeito dos ouvintes e rodaria também a cada troca de papel.
+  useEffect(
+    () => () => {
+      primeiraExibicaoRef.current = true;
       if (destinoDaRota(window.location.hash) !== null) {
         window.history.replaceState(
           null,
@@ -640,8 +695,9 @@ export function App({
           window.location.pathname + window.location.search,
         );
       }
-    };
-  }, [papelDoAtor]);
+    },
+    [],
+  );
 
   // Foco preso, `Escape` e devolução de foco — mesma disciplina do `Modal`
   // (UI-F04). Enquanto a gaveta está aberta ela é a única região alcançável:

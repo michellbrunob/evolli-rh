@@ -1,0 +1,47 @@
+/**
+ * TrilhaNavegacao (T178) — só tokens; sem sombra e sem gradiente. Foco
+ * visível vem de `:focus-visible` global (tokens.css). O item acionável tem
+ * sublinhado, além da cor: nunca só cor para dizer "isto é clicável".
+ */
+
+.evolli-trilha {
+  font-size: var(--text-caption);
+  color: var(--color-ink-subtle);
+}
+
+.evolli-trilha__lista {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.evolli-trilha__item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+.evolli-trilha__link {
+  padding: 0;
+  font: inherit;
+  color: var(--color-action);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.evolli-trilha__link:hover {
+  color: var(--color-action-hover);
+}
+
+.evolli-trilha__atual {
+  font-weight: var(--weight-strong);
+  color: var(--color-ink);
+}

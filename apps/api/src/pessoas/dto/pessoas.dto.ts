@@ -1,4 +1,4 @@
-import { Type } from "class-transformer";
+import { Transform, Type } from "class-transformer";
 import {
   EnderecoDto,
   PerfilPessoalDto,
@@ -282,6 +282,16 @@ export class ListarPaginadoQueryDto {
   tamanhoPagina: number = TAMANHO_PAGINA_PADRAO;
 }
 
+/** Limite da busca de colaboradores — o tamanho máximo do nome. */
+export const LIMITE_BUSCA = 160;
+
+/** Busca normalizada: aparada, espaços colapsados; vazia vira ausente. */
+export function normalizarBusca(valor: unknown): unknown {
+  if (typeof valor !== "string") return valor;
+  const limpo = valor.trim().replace(/\s{2,}/g, " ");
+  return limpo === "" ? undefined : limpo;
+}
+
 export class ListarColaboradoresQueryDto extends ListarPaginadoQueryDto {
   /** Filtro, nunca concessão de escopo: é interseccionado com o da sessão. */
   @IsOptional()
@@ -295,6 +305,20 @@ export class ListarColaboradoresQueryDto extends ListarPaginadoQueryDto {
   @IsOptional()
   @IsIn(SITUACOES_VINCULO)
   situacaoVinculo?: SituacaoVinculo;
+
+  /**
+   * T178 — busca por **nome** ou **matrícula**, no escopo da sessão. Aparada,
+   * com espaços repetidos colapsados; vazia vale como ausente. A matrícula só
+   * é procurada em vínculos da empresa ativa — procurar em outra empresa
+   * revelaria a quem pertence uma matrícula de lá.
+   */
+  @Transform(({ value }) => normalizarBusca(value))
+  @IsOptional()
+  @IsString()
+  @MaxLength(LIMITE_BUSCA)
+  // eslint-disable-next-line no-control-regex
+  @Matches(/^[^\u0000-\u001F\u007F]*$/)
+  busca?: string;
 }
 
 export class ListarMovimentacoesQueryDto extends ListarPaginadoQueryDto {
