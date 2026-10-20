@@ -133,9 +133,12 @@ export type ContatosResource = (typeof CONTATOS_RESOURCES)[number];
 
 /**
  * Recurso dos dados pessoais e do endereco do colaborador (T177, Modulo 1 do
- * cadastro). Separado de `CONTATOS_RESOURCES` porque a matriz e OUTRA: a
- * excecao do `master_tecnico` aprovada para contatos (Emenda 1 da ADR 0012)
- * NAO se estende a estas categorias. Aqui so `rh` e `dp`, na empresa ativa.
+ * cadastro). `rh` e `dp` leem e editam na empresa ativa; o `master_tecnico`
+ * le e edita em qualquer empresa — com empresa ativa, so nela; sem empresa
+ * ativa, na empresa real do vinculo —, a mesma regra dos contatos (Emenda 2
+ * da ADR 0012). Recurso proprio, e nao do ramo de pessoas, pelo mesmo motivo
+ * dos contatos: em `colaborador`/`vinculo_funcional` o `master_tecnico`
+ * continua so lendo, e a heranca estenderia a edicao a todo o dominio.
  */
 export const DADOS_PESSOAIS_RESOURCES = ["dados_pessoais_colaborador"] as const;
 

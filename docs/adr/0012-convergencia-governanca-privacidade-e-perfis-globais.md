@@ -281,7 +281,7 @@ não admite pessoas" — continua valendo para tudo, **exceto** os contatos.
 confiança, pode acessar tudo. Esta emenda aplica a decisão ao recorte da T177:
 **dados pessoais básicos e endereço do colaborador**
 ([ficha de tratamento](../decisions/ficha-tratamento-dados-pessoais-endereco-colaborador.md),
-em aprovação). Nessas categorias, o `master_tecnico` tem **leitura e edição em
+aprovada pela proprietária em 2026-10-20). Nessas categorias, o `master_tecnico` tem **leitura e edição em
 qualquer empresa**, como já tinha nos contatos (Emenda 1).
 
 **Condições — as mesmas da Emenda 1:**

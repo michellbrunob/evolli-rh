@@ -918,6 +918,182 @@ describe("Cadastro de colaborador — Módulo 1 (e2e)", () => {
     });
   });
 
+  describe("após o desligamento: uso operacional bloqueado (retenção aprovada)", () => {
+    const DESLIGAMENTO = "2026-05-04";
+    let colaboradorId: string;
+    let perfilAntes: Record<string, unknown>;
+    let enderecoAntes: Record<string, unknown>;
+
+    beforeAll(async () => {
+      colaboradorId = (
+        await post("/v1/colaboradores", rhA)
+          .send(admissao("MAT-M1-DESL"))
+          .expect(201)
+      ).body.id;
+      const vinculos = await get(
+        `/v1/colaboradores/${colaboradorId}/vinculos`,
+        rhA,
+      ).expect(200);
+      const vinculoId: string = vinculos.body[0].id;
+      const linha = await get(
+        `/v1/vinculos/${vinculoId}/linha-do-tempo`,
+        rhA,
+      ).expect(200);
+      await post(`/v1/movimentacoes/${linha.body[0].id}/efetivar`, rhA)
+        .send()
+        .expect(201);
+      const desligamento = await post("/v1/movimentacoes", rhA)
+        .send({
+          vinculoId,
+          tipo: "desligamento",
+          motivoCodigo: "encerramento_de_vinculo",
+          vigenciaInicio: DESLIGAMENTO,
+        })
+        .expect(201);
+      await post(`/v1/movimentacoes/${desligamento.body.id}/efetivar`, rhA)
+        .send()
+        .expect(201);
+      expect(
+        (
+          await prisma.vinculoFuncional.findFirstOrThrow({
+            where: { id: vinculoId },
+          })
+        ).situacao,
+      ).toBe("encerrado");
+      perfilAntes = await prisma.perfilPessoalColaborador.findFirstOrThrow({
+        where: { colaboradorId },
+      });
+      enderecoAntes = await prisma.enderecoColaborador.findFirstOrThrow({
+        where: { colaboradorId },
+      });
+    });
+
+    /** Os eventos da última requisição do colaborador, e a trilha formal. */
+    async function ultimaRequisicao(id: string) {
+      const ultimo =
+        await prisma.dadosPessoaisColaboradorEvento.findFirstOrThrow({
+          where: { colaboradorId: id },
+          orderBy: { ocorridoEm: "desc" },
+        });
+      const eventos = await prisma.dadosPessoaisColaboradorEvento.findMany({
+        where: { colaboradorId: id, requestId: ultimo.requestId },
+      });
+      const formal = await prisma.auditEvent.findMany({
+        where: {
+          requestId: ultimo.requestId,
+          resource: "dados_pessoais_colaborador",
+        },
+      });
+      return { eventos, formal };
+    }
+
+    it.each([
+      ["rh", () => rhA],
+      ["dp", () => dpA],
+      ["master_tecnico", () => master],
+    ])(
+      "%s lê: 200 bloqueado, sem nenhum valor, com trilha por categoria",
+      async (_papel, cred) => {
+        const r = await get(
+          `/v1/colaboradores/${colaboradorId}/dados-pessoais`,
+          cred(),
+        ).expect(200);
+        expect(r.body).toEqual({
+          colaboradorId,
+          empresaId: empresaA,
+          situacao: "bloqueado",
+          perfilPessoal: null,
+          endereco: null,
+        });
+        expect(r.headers["cache-control"]).toBe("no-store");
+        const texto = JSON.stringify(r.body);
+        for (const valor of VALORES_PESSOAIS) {
+          expect(texto).not.toContain(valor);
+        }
+        const { eventos, formal } = await ultimaRequisicao(colaboradorId);
+        expect(
+          eventos
+            .map((e) => ({
+              categoria: e.categoria,
+              acao: e.acao,
+              resultado: e.resultado,
+              campos: e.campos,
+              registro: e.perfilId ?? e.enderecoId,
+              empresaId: e.empresaId,
+            }))
+            .sort((x, y) => x.categoria.localeCompare(y.categoria)),
+        ).toEqual([
+          {
+            categoria: "endereco",
+            acao: "leitura",
+            resultado: "bloqueado",
+            campos: [],
+            registro: enderecoAntes.id,
+            empresaId: empresaA,
+          },
+          {
+            categoria: "perfil_pessoal",
+            acao: "leitura",
+            resultado: "bloqueado",
+            campos: [],
+            registro: perfilAntes.id,
+            empresaId: empresaA,
+          },
+        ]);
+        expect(formal.map((f) => [f.action, f.result])).toEqual([
+          ["pessoas_dados_pessoais_consultados", "success"],
+          ["pessoas_dados_pessoais_consultados", "success"],
+        ]);
+      },
+    );
+
+    it.each([
+      ["rh", () => rhA],
+      ["dp", () => dpA],
+      ["master_tecnico", () => master],
+    ])(
+      "%s edita: 409, nada gravado, tentativa na trilha como falha",
+      async (_papel, cred) => {
+        await put(`/v1/colaboradores/${colaboradorId}/dados-pessoais`, cred())
+          .send({
+            perfilPessoal: { ...PERFIL, curso: "Nao Pode Gravar" },
+            endereco: { ...ENDERECO, cidade: "Nao Pode Gravar" },
+          })
+          .expect(409);
+        const { eventos, formal } = await ultimaRequisicao(colaboradorId);
+        expect(
+          eventos.map((e) => [e.categoria, e.acao, e.resultado, e.campos]),
+        ).toEqual(
+          expect.arrayContaining([
+            ["perfil_pessoal", "edicao", "bloqueado", []],
+            ["endereco", "edicao", "bloqueado", []],
+          ]),
+        );
+        expect(eventos).toHaveLength(2);
+        expect(formal.map((f) => [f.action, f.result])).toEqual([
+          ["pessoas_dados_pessoais_atualizados", "failure"],
+          ["pessoas_dados_pessoais_atualizados", "failure"],
+        ]);
+      },
+    );
+
+    it("os registros vigentes ficam preservados: nada apagado, nada alterado", async () => {
+      expect(
+        await prisma.perfilPessoalColaborador.findFirstOrThrow({
+          where: { colaboradorId },
+        }),
+      ).toEqual(perfilAntes);
+      expect(
+        await prisma.enderecoColaborador.findFirstOrThrow({
+          where: { colaboradorId },
+        }),
+      ).toEqual(enderecoAntes);
+      expect(
+        await prisma.contatoColaborador.count({ where: { colaboradorId } }),
+      ).toBe(1);
+    });
+  });
+
   describe("o banco é a rede de segurança", () => {
     it("recusa perfil sem data de nascimento e evento sem empresa fora da ambiguidade", async () => {
       const qualquer = await prisma.perfilPessoalColaborador.findFirstOrThrow();

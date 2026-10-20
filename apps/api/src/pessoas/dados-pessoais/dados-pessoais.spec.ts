@@ -807,3 +807,128 @@ describe("Módulo 1 — escopo de leitura e edição do master_tecnico", () => {
     ]);
   });
 });
+
+/**
+ * Após o desligamento (todo vínculo na empresa encerrado), o uso operacional é
+ * bloqueado — a retenção aprovada: nada é excluído nem anonimizado, os
+ * registros vigentes ficam, e nenhum valor é lido nem gravado.
+ */
+describe("Módulo 1 — vínculo encerrado: uso operacional bloqueado", () => {
+  function montar() {
+    const eventos: Record<string, unknown>[] = [];
+    const auditorias: Record<string, unknown>[] = [];
+    const selects: unknown[] = [];
+    const tx = {
+      perfilPessoalColaborador: {
+        findUnique: jest.fn(({ select }: { select: unknown }) => {
+          selects.push(select);
+          return Promise.resolve({ id: "per-1" });
+        }),
+        create: jest.fn(),
+        update: jest.fn(),
+      },
+      enderecoColaborador: {
+        findUnique: jest.fn(({ select }: { select: unknown }) => {
+          selects.push(select);
+          return Promise.resolve({ id: "end-1" });
+        }),
+        create: jest.fn(),
+        update: jest.fn(),
+      },
+      dadosPessoaisColaboradorEvento: {
+        create: jest.fn(({ data }: { data: Record<string, unknown> }) => {
+          eventos.push(data);
+          return data;
+        }),
+      },
+    };
+    const prisma = {
+      vinculoFuncional: {
+        findMany: jest
+          .fn()
+          .mockResolvedValue([{ empresaId: EMPRESA_A, situacao: "encerrado" }]),
+      },
+      $transaction: jest.fn((fn: (t: typeof tx) => unknown) => fn(tx)),
+    } as unknown as PrismaService;
+    const auditoria = {
+      registrarNaTransacao: jest.fn(
+        (_tx: unknown, _ctx: unknown, evento: Record<string, unknown>) => {
+          auditorias.push(evento);
+          return Promise.resolve();
+        },
+      ),
+      negarAcesso: jest.fn(() => Promise.reject(new Error("404"))),
+    } as unknown as PessoasAuditoriaService;
+    return {
+      servico: new DadosPessoaisColaboradorService(prisma, auditoria),
+      tx,
+      eventos,
+      auditorias,
+      selects,
+    };
+  }
+
+  const ctx = {
+    actor: ator("rh", EMPRESA_A),
+    metadata: { ip: null, userAgent: null, requestId: "req-b" },
+  };
+
+  it("leitura: bloqueado, sem valor, e só o id dos registros é consultado", async () => {
+    const { servico, eventos, auditorias, selects } = montar();
+    const r = await servico.consultar("col-1", ctx);
+    expect(r).toEqual({
+      colaboradorId: "col-1",
+      empresaId: EMPRESA_A,
+      situacao: "bloqueado",
+      perfilPessoal: null,
+      endereco: null,
+    });
+    expect(selects).toEqual([{ id: true }, { id: true }]);
+    expect(eventos).toEqual([
+      expect.objectContaining({
+        categoria: "perfil_pessoal",
+        perfilId: "per-1",
+        acao: "leitura",
+        resultado: "bloqueado",
+        campos: [],
+      }),
+      expect.objectContaining({
+        categoria: "endereco",
+        enderecoId: "end-1",
+        acao: "leitura",
+        resultado: "bloqueado",
+        campos: [],
+      }),
+    ]);
+    expect(auditorias.map((a) => a.result)).toEqual(["success", "success"]);
+  });
+
+  it("edição: 409, nada criado nem alterado, tentativa na trilha como falha", async () => {
+    const { servico, tx, eventos, auditorias } = montar();
+    await expect(
+      servico.registrar(
+        "col-1",
+        plainToInstance(RegistrarDadosPessoaisDto, {
+          perfilPessoal: { dataNascimento: "1990-05-20", curso: "X" },
+          endereco: { cidade: "Recife" },
+        }),
+        ctx,
+      ),
+    ).rejects.toThrow("Conflict");
+    for (const tabela of [
+      tx.perfilPessoalColaborador,
+      tx.enderecoColaborador,
+    ]) {
+      expect(tabela.create).not.toHaveBeenCalled();
+      expect(tabela.update).not.toHaveBeenCalled();
+    }
+    expect(eventos.map((e) => [e.categoria, e.acao, e.resultado])).toEqual([
+      ["perfil_pessoal", "edicao", "bloqueado"],
+      ["endereco", "edicao", "bloqueado"],
+    ]);
+    expect(auditorias.map((a) => [a.action, a.result])).toEqual([
+      ["pessoas_dados_pessoais_atualizados", "failure"],
+      ["pessoas_dados_pessoais_atualizados", "failure"],
+    ]);
+  });
+});

@@ -751,6 +751,11 @@ aos campos do Módulo 1 do cadastro
   automática após o desligamento, com bloqueio do uso operacional e histórico e
   auditoria preservados (decisão substitutiva). Continuam abertas para as
   outras categorias.
+- **Contatos:** a retenção de `DP-ADM-03` para Contatos (2 anos e eliminação,
+  na nota da T169 acima) foi **alinhada** pela proprietária em 2026-10-20 à
+  mesma regra — sem eliminação nem anonimização automática; uso operacional
+  bloqueado após o desligamento; registros vigentes e trilha preservados (§7 da
+  ficha de Contatos).
 - **Admissão:** a decisão da T165 (§5.2, citada no Contexto acima) — o
   `master_tecnico` não admite — não muda nesta nota. A admissão continua de
   `rh` e `dp`; levar o "acessa tudo" a ela é registro próprio, quando a
