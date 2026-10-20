@@ -330,10 +330,24 @@ export interface ColaboradoresScreenProps {
     readonly codigo: string;
   } | null;
   readonly onTituloIdChange?: (tituloId: string) => void;
+  /**
+   * T176 — colaborador a abrir assim que a tela montar: é o destino das ações
+   * "Abrir ficha" e "Completar contatos" da página de Nova admissão. Vem da
+   * RESPOSTA da admissão, não de nova busca. `foco: "contatos"` leva o foco ao
+   * primeiro campo de contatos quando eles carregam.
+   */
+  readonly aberturaInicial?: {
+    readonly colaborador: ColaboradorApi;
+    readonly foco: "ficha" | "contatos";
+  } | null;
+  /** Avisa que `aberturaInicial` foi atendida, para o shell não repeti-la. */
+  readonly onAberturaAtendida?: () => void;
 }
 
 export function ColaboradoresScreen({
   empresaAtiva = null,
+  aberturaInicial = null,
+  onAberturaAtendida,
 }: ColaboradoresScreenProps = {}) {
   const [statusCarregamento, setStatusCarregamento] = useState<
     "carregando" | "erro" | "dados"
@@ -377,6 +391,8 @@ export function ColaboradoresScreen({
   // `Modal` peça confirmação de descarte e não feche no meio da gravação.
   const [contatosAlterados, setContatosAlterados] = useState(false);
   const [salvandoContatos, setSalvandoContatos] = useState(false);
+  // T176 — "Completar contatos" vindo da página de Nova admissão.
+  const [focarContatos, setFocarContatos] = useState(false);
   // T142 — confirmação de escrita. Antes, admitir fechava o formulário em
   // silêncio: a pessoa ficava olhando a lista sem saber se salvou.
   const [mensagemSucesso, setMensagemSucesso] = useState<string | null>(null);
@@ -644,6 +660,18 @@ export function ColaboradoresScreen({
     );
   }
 
+  // T176 — atende a abertura pedida pela página de Nova admissão, uma vez.
+  const aberturaAtendidaRef = useRef(false);
+  useEffect(() => {
+    if (!aberturaInicial || aberturaAtendidaRef.current) return;
+    aberturaAtendidaRef.current = true;
+    abrirDetalhe(aberturaInicial.colaborador);
+    setFocarContatos(aberturaInicial.foco === "contatos");
+    onAberturaAtendida?.();
+    // `abrirDetalhe` é recriada a cada desenho; a abertura vale só na montagem.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aberturaInicial, onAberturaAtendida]);
+
   function abrirDetalhe(colaborador: ColaboradorApi) {
     setMensagemSucesso(null);
     setAdmitidoRecente(null);
@@ -685,6 +713,7 @@ export function ColaboradoresScreen({
 
   function fecharDetalhe() {
     setDetalhe(null);
+    setFocarContatos(false);
   }
 
   async function handleSalvarNome() {
@@ -1357,6 +1386,7 @@ export function ColaboradoresScreen({
               colaboradorId={detalhe.colaborador.id}
               onAlteradoChange={setContatosAlterados}
               onSalvandoChange={setSalvandoContatos}
+              focarAoCarregar={focarContatos}
             />
 
             <div className="colaboradores-screen__vinculos">

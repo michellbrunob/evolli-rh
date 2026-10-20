@@ -6,6 +6,15 @@ o protótipo que a demonstra e a decisão do proprietário sobre ele, no fim.
 **Aprovar a fundação visual não aprova tela alguma e não autoriza
 implementação, merge, produção nem dado real.**
 
+> **Nota histórica — 20/10/2026 (`DP-FLX-21`).** Esta fundação continua
+> **não integrada**. A regra de modal que ela repete ("cadastro, detalhe e
+> ações operacionais usam modal") foi substituída **apenas** para cadastro
+> longo e estruturado de admissão e módulos equivalentes, pela decisão da
+> proprietária sobre o `DP-FLX-21` (ver a nota ao final da
+> [ADR 0017](../adr/0017-fluxo-admissao-vinculo-desligamento-rh-dp.md)): esse
+> cadastro usa página própria. Para consulta, confirmação, seleção curta e
+> edição delimitada, o modal continua. O texto abaixo fica preservado.
+
 > **Aprovar o mapa modular não aprova nenhuma tela.** O protótipo mostra como o
 > ecossistema se organiza, não o que ele já faz. O que cada tela faz hoje está
 > no inventário real, mais abaixo, e aparece marcado dentro do próprio

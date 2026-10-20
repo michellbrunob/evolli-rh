@@ -114,6 +114,7 @@ describe("T162 — o Hub oferece só o que o servidor autoriza", () => {
       "rh",
       [
         "Pessoas",
+        "Nova admissão",
         "Estrutura",
         "Jornada",
         "Minha equipe",
@@ -121,7 +122,7 @@ describe("T162 — o Hub oferece só o que o servidor autoriza", () => {
         "Contas de acesso",
       ],
     ],
-    ["dp", ["Pessoas", "Jornada", "Contas de acesso"]],
+    ["dp", ["Pessoas", "Nova admissão", "Jornada", "Contas de acesso"]],
     ["master_tecnico", ["Pessoas", "Estrutura", "Jornada", "Contas de acesso"]],
     ["gestor", ["Minha equipe"]],
     ["financeiro", []],
@@ -391,11 +392,31 @@ describe("T162 — acessibilidade e estrutura", () => {
 
   it("cada cartão tem nome acessível com o rótulo do produto", async () => {
     montar({ papel: "rh" });
-    await waitFor(() => expect(cartoesVisiveis().length).toBe(6));
+    await waitFor(() => expect(cartoesVisiveis().length).toBe(7));
     for (const destino of capacidadeFuncionalDe("rh")) {
       expect(
         screen.getByRole("button", { name: new RegExp(destino.label) }),
       ).toBeInTheDocument();
+    }
+  });
+
+  it("T176 — o cartão Nova admissão diz o que faz, sem prometer dado novo", async () => {
+    for (const papel of ["rh", "dp"]) {
+      const { unmount } = montar({ papel });
+      await waitFor(() => expect(cartoesVisiveis()).toContain("Nova admissão"));
+      const cartao = screen
+        .getAllByRole("button")
+        .find(
+          (b) =>
+            b.querySelector(".hub__cartao-titulo")?.textContent ===
+            "Nova admissão",
+        )!;
+      const descricao = cartao.querySelector(".hub__cartao-descricao");
+      expect(descricao).not.toBeNull();
+      expect(descricao).toHaveTextContent(
+        "Admissão em página própria: cria o colaborador, o vínculo previsto e o ato de admissão na empresa ativa.",
+      );
+      unmount();
     }
   });
 

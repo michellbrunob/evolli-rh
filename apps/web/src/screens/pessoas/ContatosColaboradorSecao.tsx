@@ -125,12 +125,19 @@ export interface ContatosColaboradorSecaoProps {
   readonly colaboradorId: string;
   readonly onAlteradoChange: (alterado: boolean) => void;
   readonly onSalvandoChange: (salvando: boolean) => void;
+  /**
+   * T176 — levar o foco ao primeiro campo assim que os contatos carregarem.
+   * É o "Completar contatos" da página de Nova admissão: quem acabou de
+   * admitir chega direto ao que vai preencher. Só vale uma vez por montagem.
+   */
+  readonly focarAoCarregar?: boolean;
 }
 
 export function ContatosColaboradorSecao({
   colaboradorId,
   onAlteradoChange,
   onSalvandoChange,
+  focarAoCarregar = false,
 }: ContatosColaboradorSecaoProps) {
   const [carga, setCarga] = useState<Carga>({ status: "carregando" });
   const [edicao, setEdicao] = useState<ValoresContatos>(VAZIO);
@@ -143,6 +150,8 @@ export function ContatosColaboradorSecao({
   const focarPrimeiroErroRef = useRef(false);
   /** Só a resposta mais recente é aplicada (troca rápida de colaborador). */
   const pedidoRef = useRef(0);
+  /** T176 — o foco pedido por `focarAoCarregar` é atendido uma vez só. */
+  const focoInicialAtendidoRef = useRef(false);
 
   const carregar = useCallback(async () => {
     const pedido = ++pedidoRef.current;
@@ -199,6 +208,13 @@ export function ContatosColaboradorSecao({
     },
     [onAlteradoChange, onSalvandoChange],
   );
+
+  useEffect(() => {
+    if (!focarAoCarregar || focoInicialAtendidoRef.current) return;
+    if (carga.status !== "dados") return;
+    focoInicialAtendidoRef.current = true;
+    document.getElementById(ID_DO_CAMPO.emailPessoal)?.focus();
+  }, [carga.status, focarAoCarregar]);
 
   useEffect(() => {
     if (!focarPrimeiroErroRef.current) return;

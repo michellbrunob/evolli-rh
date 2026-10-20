@@ -28,8 +28,9 @@
  * em §3.6. Quem decide continua sendo o RBAC, a cada requisição. Esconder um
  * item não protege nada; mostrar um item que sempre dá 403 é que atrapalha.
  *
- * **Não é roteador.** Continua não havendo URL nem `history`: destino é estado
- * do shell, como desde a T044.
+ * **Não é roteador.** Destino continua sendo estado do shell, como desde a
+ * T044. A única exceção é a tabela fechada de `rotasDoShell.ts` (T176), que dá
+ * URL própria a "Nova admissão".
  */
 
 import type { IconeModuloId } from "./IconeModulo";
@@ -83,6 +84,13 @@ export const PAPEIS_MINHA_EQUIPE: readonly string[] = ["gestor", "rh"];
 export const PAPEIS_ADMINISTRACAO_LIDERANCA: readonly string[] = ["rh"];
 
 /**
+ * T176 — papéis a que o RBAC concede `colaborador`/`create`, a ação de
+ * `POST /v1/colaboradores`: só `rh` e `dp`, na própria empresa. Espelha
+ * `evaluatePessoas` em `rbac.evaluator.ts`, em que `master_tecnico` só lê.
+ */
+export const PAPEIS_NOVA_ADMISSAO: readonly string[] = ["rh", "dp"];
+
+/**
  * Os cinco módulos da navegação primária, mais Demonstração.
  *
  * A ordem é de uso: quem se opera no dia a dia vem antes do que se administra,
@@ -98,6 +106,15 @@ export const GRUPOS: readonly GrupoNavegacao[] = [
         label: "Pessoas",
         subRotulo: "Colaboradores",
         estado: "funcional",
+      },
+      {
+        // T176 — página própria da admissão (decisão da proprietária sobre o
+        // `DP-FLX-21`). Usa só o contrato atual de `POST /v1/colaboradores`.
+        id: "nova-admissao",
+        label: "Nova admissão",
+        subRotulo: "Página própria",
+        estado: "funcional",
+        papeis: PAPEIS_NOVA_ADMISSAO,
       },
     ],
   },
@@ -312,6 +329,7 @@ export function destinoInicialPara(papel: string | null): string {
  * | Destino                   | Recurso da aba padrão   | Papéis concedidos                |
  * | ------------------------- | ----------------------- | -------------------------------- |
  * | `pessoas`                 | `colaborador` read      | `rh`, `dp`, `master_tecnico`     |
+ * | `nova-admissao`           | `colaborador` create    | `rh`, `dp`                       |
  * | `cadastros`               | `tabela_horario` read   | `rh`, `master_tecnico`           |
  * | `ponto`                   | `evento_ponto` read     | `rh`, `dp`, `master_tecnico`     |
  * | `equipe`                  | `gestor_equipe` read    | `gestor`, `rh`                   |
@@ -345,13 +363,14 @@ const CAPACIDADE_FUNCIONAL_POR_PAPEL: Readonly<
 > = {
   rh: [
     "pessoas",
+    "nova-admissao",
     "cadastros",
     "ponto",
     "equipe",
     "administracao-lideranca",
     "contas-acesso",
   ],
-  dp: ["pessoas", "ponto", "contas-acesso"],
+  dp: ["pessoas", "nova-admissao", "ponto", "contas-acesso"],
   master_tecnico: ["pessoas", "cadastros", "ponto", "contas-acesso"],
   gestor: ["equipe"],
 };

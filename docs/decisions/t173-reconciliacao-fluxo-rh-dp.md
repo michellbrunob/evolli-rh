@@ -605,8 +605,18 @@ por inteiro; o que existe é só o que já foi aprovado antes.
 proprietário aprovou a [ADR 0017](../adr/0017-fluxo-admissao-vinculo-desligamento-rh-dp.md).
 A linha dele continua na tabela, para preservar o histórico de decisões. Os
 demais 21 gates (`DP-FLX-02` a `DP-FLX-22`) e os 13 conflitos da seção 5
-continuam **abertos**, e esta atualização não autoriza implementação. O texto
+continuavam **abertos** nessa data (a atualização seguinte, da T176, traz as
+contagens atuais), e esta atualização não autoriza implementação. O texto
 a seguir é o original de 2026-10-19.
+
+**Atualização (T176, 2026-10-20).** O `DP-FLX-21` também foi **resolvido**,
+por autorização explícita da proprietária: cadastro longo e estruturado de
+admissão em página própria; modal só para consulta, confirmação, seleção curta
+e edição delimitada; sem campo, regra, dado ou processo novo. A linha dele
+continua na tabela. Contagens atuais: 22 gates no total, com o `DP-FLX-01` e o
+`DP-FLX-21` resolvidos e **20 abertos** — `DP-FLX-02` a `DP-FLX-20` e
+`DP-FLX-22`, inclusive o `DP-FLX-04`; e 13 conflitos na seção 5, com **12
+abertos** e o conflito 13 resolvido por decisão posterior.
 
 Nenhum gate abaixo está resolvido. A coluna **Responsável** separa três origens,
 e só elas:
@@ -654,21 +664,28 @@ Lista consolidada, para que nenhum fique escondido em uma seção. Os itens
 marcados **condicional** só são conflito numa das leituras possíveis da resposta;
 a leitura cabe ao responsável do gate, não a este diagnóstico.
 
-| #   | Resposta                                                                                                    | Decisão que contraria                                                                                        | Tipo        | Seção    | Gate                     |
-| --- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ----------- | -------- | ------------------------ |
-| 1   | CPF como identificação da pessoa (R37)                                                                      | `A7:67-70`: documento "não é chave [...] de unicidade [...] em nenhuma hipótese"                             | firme       | 3.1      | `DP-FLX-05`              |
-| 2   | Matrícula só na efetivação (R10)                                                                            | `BV1` decisão 15 (admissão atômica) e matrícula obrigatória do vínculo (`dto:143-155`; `A7:352-353`)         | firme       | 3.2      | `DP-FLX-04`, `DP-FLX-10` |
-| 3   | Mais de um vínculo ativo na **mesma** empresa, se vier a ser decidido — a R4 não o afirma                   | `BV1` decisão 3, `A7:74-78` e o índice `vinculo_funcional_ativo_unico`                                       | condicional | 3.3      | `DP-FLX-09`              |
-| 4   | Gestor **registrar** solicitação (R7, R17, R21) e **aprovar** (R8)                                          | `A15:197-198`, `PD-SOL-01` e `rbac:583-586`                                                                  | firme       | 3.4, 3.9 | `DP-FLX-02`              |
-| 5   | Aprovação por alçada (R8, R17, R22)                                                                         | `BV1` decisão 7 e `A7:115-118`                                                                               | firme       | 3.4, 3.9 | `DP-FLX-03`              |
-| 6   | Tipo de vínculo que determina campos e documentos (R3)                                                      | `A7:82-86`, conforme a leitura de "comportamento"                                                            | condicional | 3.5      | `DP-FLX-07`              |
-| 7   | Gestor como atributo do vínculo, se for essa a leitura de R5                                                | `A15:52-57`                                                                                                  | condicional | 3.7      | `DP-FLX-08`              |
-| 8   | Justificativa em texto livre, se for essa a leitura de R12, R19, R21 e R28                                  | `BV1` decisão 11                                                                                             | condicional | 3.8      | `DP-FLX-11`              |
-| 9   | Valores antes/depois **na trilha formal**, se a R19 o exigir                                                | ADR 0004, decisão 5                                                                                          | condicional | 3.8      | `DP-FLX-11`              |
-| 10  | Motivos de desligamento com classificação trabalhista (R23)                                                 | `schema:956-962` e `A7:388-390`                                                                              | firme       | 3.9      | `DP-FLX-12`              |
-| 11  | Projeção do desligamento ao gestor (R29)                                                                    | `A15:104-107`                                                                                                | firme       | 3.9      | `DP-FLX-19`              |
-| 12  | Documento por vínculo e período (R30)                                                                       | `DP-2E-07`                                                                                                   | firme       | 3.10     | `DP-FLX-14`              |
-| 13  | Cadastro completo e admissão em tela própria, sem modal (diretriz de UX do proprietário, não das respostas) | T142, item 5: cadastro, edição e detalhe em modal, implementada; a T146, ainda não integrada, repete a regra | firme       | 3.13     | `DP-FLX-21`              |
+| #   | Resposta                                                                                                    | Decisão que contraria                                                                                        | Tipo                                                                    | Seção    | Gate                     |
+| --- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- | -------- | ------------------------ |
+| 1   | CPF como identificação da pessoa (R37)                                                                      | `A7:67-70`: documento "não é chave [...] de unicidade [...] em nenhuma hipótese"                             | firme                                                                   | 3.1      | `DP-FLX-05`              |
+| 2   | Matrícula só na efetivação (R10)                                                                            | `BV1` decisão 15 (admissão atômica) e matrícula obrigatória do vínculo (`dto:143-155`; `A7:352-353`)         | firme                                                                   | 3.2      | `DP-FLX-04`, `DP-FLX-10` |
+| 3   | Mais de um vínculo ativo na **mesma** empresa, se vier a ser decidido — a R4 não o afirma                   | `BV1` decisão 3, `A7:74-78` e o índice `vinculo_funcional_ativo_unico`                                       | condicional                                                             | 3.3      | `DP-FLX-09`              |
+| 4   | Gestor **registrar** solicitação (R7, R17, R21) e **aprovar** (R8)                                          | `A15:197-198`, `PD-SOL-01` e `rbac:583-586`                                                                  | firme                                                                   | 3.4, 3.9 | `DP-FLX-02`              |
+| 5   | Aprovação por alçada (R8, R17, R22)                                                                         | `BV1` decisão 7 e `A7:115-118`                                                                               | firme                                                                   | 3.4, 3.9 | `DP-FLX-03`              |
+| 6   | Tipo de vínculo que determina campos e documentos (R3)                                                      | `A7:82-86`, conforme a leitura de "comportamento"                                                            | condicional                                                             | 3.5      | `DP-FLX-07`              |
+| 7   | Gestor como atributo do vínculo, se for essa a leitura de R5                                                | `A15:52-57`                                                                                                  | condicional                                                             | 3.7      | `DP-FLX-08`              |
+| 8   | Justificativa em texto livre, se for essa a leitura de R12, R19, R21 e R28                                  | `BV1` decisão 11                                                                                             | condicional                                                             | 3.8      | `DP-FLX-11`              |
+| 9   | Valores antes/depois **na trilha formal**, se a R19 o exigir                                                | ADR 0004, decisão 5                                                                                          | condicional                                                             | 3.8      | `DP-FLX-11`              |
+| 10  | Motivos de desligamento com classificação trabalhista (R23)                                                 | `schema:956-962` e `A7:388-390`                                                                              | firme                                                                   | 3.9      | `DP-FLX-12`              |
+| 11  | Projeção do desligamento ao gestor (R29)                                                                    | `A15:104-107`                                                                                                | firme                                                                   | 3.9      | `DP-FLX-19`              |
+| 12  | Documento por vínculo e período (R30)                                                                       | `DP-2E-07`                                                                                                   | firme                                                                   | 3.10     | `DP-FLX-14`              |
+| 13  | Cadastro completo e admissão em tela própria, sem modal (diretriz de UX do proprietário, não das respostas) | T142, item 5: cadastro, edição e detalhe em modal, implementada; a T146, ainda não integrada, repete a regra | firme — **resolvido por decisão posterior: `DP-FLX-21`, em 2026-10-20** | 3.13     | `DP-FLX-21`              |
+
+**Nota (T176, 2026-10-20).** O conflito 13 está **resolvido por decisão posterior: `DP-FLX-21`, em 2026-10-20**: a
+proprietária decidiu o gate dele (seção 4), e a direção de modal da T142 foi
+substituída para cadastro longo e estruturado de admissão e módulos
+equivalentes. A linha fica na tabela, sem ser retirada nem renumerada, para
+preservar o histórico. Dos 13 conflitos, **12 continuam abertos** e 1 está
+resolvido.
 
 **Fora da lista, por não serem conflito com decisão fechada:**
 
@@ -695,7 +712,8 @@ externa.
 **Remissão (T175, 2026-10-20).** O aceite da ADR 0017 (`DP-FLX-01`), listado na
 fatia 0 abaixo, foi resolvido pela T175. A tabela é o registro original de
 2026-10-19; as demais decisões da fatia 0 e os outros gates continuam
-pendentes.
+pendentes. Atualização (T176, 2026-10-20): o conflito 13 também saiu da fatia 0,
+resolvido pelo `DP-FLX-21`.
 
 | Ordem | Fatia                                                                                                                                                                                                                                                                | Gates prévios                                                                                                                    |
 | ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |

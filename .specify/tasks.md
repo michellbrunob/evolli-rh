@@ -2074,9 +2074,12 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       da T171: o aviso `[DEP0190]` do Node 24 no orquestrador da demonstração, no Windows (`shell: true` com argumentos), só aviso; e as observações O-1 (a CLI fina do `prisma generate` não tem teste próprio), O-2 (caminho inválido sem teste explícito) e O-3 (efeitos leves nos testes). Pendências da T172: as observações não bloqueantes O-1 (descarte protegido sem exercício no navegador), O-2 (contrato de CSS lido por regex), O-3 (banco sintético local alterado na validação), O-4 (outros quatro usos de `colaboradores-screen__aviso-texto` na mesma tela, não medidos) e O-5 (`openDeliveries.pullRequest` nulo com PR aberta), e as de redação O-a a O-c. Pendências da T173: os 13 conflitos com decisões fechadas (8 firmes e 5 condicionais) e os 22 gates `DP-FLX-01` a `DP-FLX-22`, **todos abertos**; a ADR 0017, que continua **Proposta**; e as observações não bloqueantes O-1 (a linha 9 do corpo da PR diz "mesmo hash", exato só até `fca0fe7`), O-2 (a célula "Reabre ou depende de" do `DP-FLX-21` cita a T146 sem o qualificador "ainda não integrada"), O-3 (quebra de linha curta na ADR) e O-4 ("proposta aprovada" × "fundação visual aprovada" para a T146).
 
 72. **T175 - Aceite da ADR 0017 e resolução do `DP-FLX-01`**
-    - **Estado:** **implementada em Draft**. Branch
+    - **Estado:** **integrada** em `main` pela PR #167, squash
+      `3a9ed3b21bbb4254f33750a705edbad89a8a642b`, com a CI de push 3/3 verde em Node 24. Branch
       `codex/t175-aceite-adr-0017`, a partir do squash
-      `34b95cfde73f33dfc1200f1c846f6b8d7d14a1b8` (T174, PR #166).
+      `34b95cfde73f33dfc1200f1c846f6b8d7d14a1b8` (T174, PR #166). A integração
+      resolveu só o `DP-FLX-01`; na data dela, seguiam abertos os 13 conflitos e
+      os 21 gates `DP-FLX-02` a `DP-FLX-22`.
     - **Natureza:** entrega **exclusivamente documental**. Registra a decisão do
       proprietário, entregue na conversa da tarefa em 2026-10-20: aprovar a ADR
       0017 e resolver o gate `DP-FLX-01`.
@@ -2110,6 +2113,82 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       conflito; e autorizar implementação.
     - **Dívida preservada:** R-3 (T162), R-3 da revisão da T164, S2 (T161), R1 a R3 (T160), L3, S-1 a S-4 (T158), R-A a R-C (T157), o registro `teste michell`, a decisão `DP-29` (se `outro_controlado` vale para admissão) e a limitação de validação em navegador da T167. Pendências da T169: o processo de eliminação ou anonimização após 2 anos; as rotas de exportação e exclusão de contatos; a origem e a evidência da coleta; a validação visual em navegador; as observações N-2 (criação concorrente de contato que perde na unicidade responde 409 sem trilha), N-3 (`ON UPDATE CASCADE` nas FKs do evento de contato permite reescrita indireta) e N-4 (CHECK do evento mais frouxo que o serviço); e a docstring do serviço de contatos sobre `resourceId`. Pendências
       da T171: o aviso `[DEP0190]` do Node 24 no orquestrador da demonstração, no Windows (`shell: true` com argumentos), só aviso; e as observações O-1 (a CLI fina do `prisma generate` não tem teste próprio), O-2 (caminho inválido sem teste explícito) e O-3 (efeitos leves nos testes). Pendências da T172: as observações não bloqueantes O-1 (descarte protegido sem exercício no navegador), O-2 (contrato de CSS lido por regex), O-3 (banco sintético local alterado na validação), O-4 (outros quatro usos de `colaboradores-screen__aviso-texto` na mesma tela, não medidos) e O-5 (`openDeliveries.pullRequest` nulo com PR aberta), e as de redação O-a a O-c. Pendências da T173: os 13 conflitos com decisões fechadas (8 firmes e 5 condicionais), **todos abertos**; dos 22 gates, o `DP-FLX-01` foi **resolvido** na T175, e os 21 restantes (`DP-FLX-02` a `DP-FLX-22`) seguem **abertos**; a ADR 0017, **aceita** na T175 sem autorizar implementação; e as observações não bloqueantes O-1 (a linha 9 do corpo da PR diz "mesmo hash", exato só até `fca0fe7`), O-2 (a célula "Reabre ou depende de" do `DP-FLX-21` cita a T146 sem o qualificador "ainda não integrada"), O-3 (quebra de linha curta na ADR) e O-4 ("proposta aprovada" × "fundação visual aprovada" para a T146). Pendências da T174: as observações não bloqueantes da revisão final O-1 (a justificativa da faixa 6 diz que `-18` vem antes de `-22` pela consideração 3, quando a ordem se sustenta pela consideração 5), O-2 (o parágrafo de portões externos lista `-14` entre as fichas de RH + Jurídico, quando o insumo da tabela é o Nível 2 da Etapa 2) e O-3 (a lista de fontes diz "que as fichas citam" e inclui a ADR 0004, citada só na tabela da seção 3); e o erro de redação "aliquotas de aprovacao" na mensagem do commit `54143b4`, preservado no squash.
+
+73. **T176 - Preparação da decisão do `DP-FLX-04` e Nova admissão em página própria (trilha acelerada)**
+    - **Estado:** **implementada em Draft**. Branch
+      `codex/t176-estados-processo-admissional`, a partir do squash
+      `3a9ed3b21bbb4254f33750a705edbad89a8a642b` (T175, PR #167).
+    - **Natureza na abertura:** entrega **exclusivamente documental**. Fontes permitidas: a
+      ADR 0017 aceita; o dossiê da T174; o diagnóstico e as respostas R1 a R40 da
+      T173; e as ADRs, os contratos, o código e os testes atuais, só como
+      evidência. Sem fonte externa, Notion, dado real ou referência de terceiros.
+    - **Mudança de direção (2026-10-20):** a proprietária autorizou a **trilha
+      acelerada** de admissão e a evolução dos demais módulos, com entrega
+      funcional visível sem liberar dados, regras ou gates pendentes, e pediu que
+      a T176 fosse a primeira entrega dessa trilha. Os dois commits documentais
+      já feitos foram mantidos, sem reescrever histórico. Na mesma data, ela
+      **resolveu o `DP-FLX-21`**: cadastro longo e estruturado de admissão em
+      página própria; modal só para consulta, confirmação, seleção curta e edição
+      delimitada; a decisão substitui a direção anterior de modal somente para
+      esse tipo de cadastro e módulos equivalentes; e não autoriza campo, regra,
+      dado ou processo novo. O `DP-FLX-04` continua aberto, com os outros 19
+      gates abertos; dos 13 conflitos, 12 seguem abertos e o conflito 13 está
+      resolvido por decisão posterior: `DP-FLX-21`, em 2026-10-20.
+    - **Entrega prevista:** um documento de decisão do `DP-FLX-04` que separa o
+      processo admissional do vínculo efetivado; propõe alternativas reais de
+      máquina de estados, sem escolher nenhuma; mapeia, para cada uma, estados,
+      transições, cancelamento, devolução para correção, responsabilidades,
+      auditoria e efeitos sobre matrícula, vínculo, lotação e movimentação; mostra
+      a compatibilidade de cada uma com a admissão atômica de hoje; declara o que
+      fica proibido até a decisão; e termina com uma pergunta decisória objetiva e
+      uma recomendação técnica identificada como análise.
+    - **Entregue:** o [documento de decisão](../docs/decisions/t176-decisao-dp-flx-04-estados-processo-admissional.md) do `DP-FLX-04`, com a separação entre processo
+      admissional, admissão efetivada, vínculo efetivado e vínculo ativo; a linha
+      de base da admissão atômica de hoje; três alternativas de onde o processo
+      vive (A, estender a movimentação de admissão; B, processo próprio com tudo
+      nascendo na efetivação; C, processo próprio sobre vínculo `previsto` criado
+      cedo), cada uma com estados, transições, cancelamento, devolução,
+      responsabilidades, auditoria, efeitos sobre matrícula, vínculo, lotação e
+      movimentação e compatibilidade com a admissão atômica; as subalternativas de
+      ativação (2.i a 2.iii), de quem opera (3.i e 3.ii) e de correção
+      pós-efetivação (4.i e 4.ii); o que fica proibido até a decisão; e a pergunta
+      decisória. 72 citações `caminho:linha` e 51 conferências de conteúdo
+      verificadas por script.
+    - **Recomendação, não decisão:** `B; 2.ii; 3.i; 4.i`, identificada como
+      análise do documento. **O `DP-FLX-04` continua aberto** e P1 a P4 seguem
+      sem resposta.
+    - **Entregue na trilha acelerada:** o registro do `DP-FLX-21` como resolvido
+      (nota na ADR 0017, atualização datada nas seções 4 e 5 do diagnóstico da
+      T173, atualização na decisão visual da T142 e nota no documento do
+      `DP-FLX-04`) e a [página de Nova admissão](../apps/web/src/screens/pessoas/NovaAdmissaoScreen.tsx), fora de modal, para `rh` e `dp`, com destino
+      próprio na navegação e no Hub e a primeira rota de URL do painel
+      (`#/pessoas/nova-admissao`). A página usa só o contrato atual de
+      `POST /v1/colaboradores` (admissão atômica: colaborador, vínculo `previsto`
+      e movimentação), mostra a empresa ativa só para leitura, ancora os erros nos
+      campos e foca o primeiro, preserva os dados na falha, pede confirmação ao
+      cancelar com dados, confirma com o que o servidor gravou e oferece abrir a
+      ficha do admitido e completar os contatos já aprovados (T169).
+    - **Transição:** o formulário de admissão em modal da tela de Colaboradores
+      continua existindo nesta entrega, por instrução da proprietária, até a
+      página nova ser validada. É transitório, não a solução definitiva.
+    - **Correção pós-revisão (2026-10-20):** a revisão adversarial no head `e33bf6e`
+      apontou que o Spec Kit mantinha os 13 conflitos como todos abertos, embora a
+      decisão do `DP-FLX-21` já tivesse substituído a direção de modal que o conflito
+      13 contesta. O conflito 13 passou a resolvido por decisão posterior: `DP-FLX-21`, em 2026-10-20, preservado no histórico;
+      as contagens são 13 conflitos no total, 12 abertos e 1 resolvido (o conflito 13, resolvido por decisão posterior: `DP-FLX-21`, em 2026-10-20); 22 gates no total, com o `DP-FLX-01` e o `DP-FLX-21` resolvidos e 20 abertos. A T146 ganhou nota histórica, sem ser
+      apresentada como integrada. Também: a rota recusada mantém a tela atual e devolve
+      a URL a ela, com regressão para `master_tecnico`, `gestor` e `colaborador`; e
+      ganharam teste a descrição do cartão no Hub, o texto "Nada foi salvo" do
+      descarte e o contrato de CSS que impede o vão da confirmação.
+    - **Fora de escopo:** resolver o `DP-FLX-04`, o `DP-FLX-10`, o `DP-FLX-02`, o
+      `DP-FLX-03` ou qualquer outro gate além do `DP-FLX-21`; entidade de processo
+      admissional, matrícula na efetivação, CPF, nascimento, endereço,
+      documentos, dados bancários, dependentes, saúde, dado sindical, múltiplos
+      vínculos, solicitação ou aprovação pelo gestor, alçadas, ativação
+      automática e qualquer dado pessoal novo; API, schema, migration, contrato
+      de admissão, RBAC, auditoria, Docker, banco, seed, dependência e lockfile.
+    - **Dívida preservada:** R-3 (T162), R-3 da revisão da T164, S2 (T161), R1 a R3 (T160), L3, S-1 a S-4 (T158), R-A a R-C (T157), o registro `teste michell`, a decisão `DP-29` (se `outro_controlado` vale para admissão) e a limitação de validação em navegador da T167. Pendências da T169: o processo de eliminação ou anonimização após 2 anos; as rotas de exportação e exclusão de contatos; a origem e a evidência da coleta; a validação visual em navegador; as observações N-2 (criação concorrente de contato que perde na unicidade responde 409 sem trilha), N-3 (`ON UPDATE CASCADE` nas FKs do evento de contato permite reescrita indireta) e N-4 (CHECK do evento mais frouxo que o serviço); e a docstring do serviço de contatos sobre `resourceId`. Pendências
+      da T171: o aviso `[DEP0190]` do Node 24 no orquestrador da demonstração, no Windows (`shell: true` com argumentos), só aviso; e as observações O-1 (a CLI fina do `prisma generate` não tem teste próprio), O-2 (caminho inválido sem teste explícito) e O-3 (efeitos leves nos testes). Pendências da T172: as observações não bloqueantes O-1 (descarte protegido sem exercício no navegador), O-2 (contrato de CSS lido por regex), O-3 (banco sintético local alterado na validação), O-4 (outros quatro usos de `colaboradores-screen__aviso-texto` na mesma tela, não medidos) e O-5 (`openDeliveries.pullRequest` nulo com PR aberta), e as de redação O-a a O-c. Pendências da T173: dos 13 conflitos com decisões fechadas (8 firmes e 5 condicionais), **12 seguem abertos** e o conflito 13 está resolvido por decisão posterior: `DP-FLX-21`, em 2026-10-20; dos 22 gates, o `DP-FLX-01` foi **resolvido** na T175 e o `DP-FLX-21` na T176, e os 20 restantes (`DP-FLX-02` a `DP-FLX-20` e `DP-FLX-22`) seguem **abertos**; a ADR 0017, **aceita** na T175 sem autorizar implementação; e as observações não bloqueantes O-1 (a linha 9 do corpo da PR diz "mesmo hash", exato só até `fca0fe7`), O-2 (a célula "Reabre ou depende de" do `DP-FLX-21` cita a T146 sem o qualificador "ainda não integrada"), O-3 (quebra de linha curta na ADR) e O-4 ("proposta aprovada" × "fundação visual aprovada" para a T146). Pendências da T174: as observações não bloqueantes da revisão final O-1 (a justificativa da faixa 6 diz que `-18` vem antes de `-22` pela consideração 3, quando a ordem se sustenta pela consideração 5), O-2 (o parágrafo de portões externos lista `-14` entre as fichas de RH + Jurídico, quando o insumo da tabela é o Nível 2 da Etapa 2) e O-3 (a lista de fontes diz "que as fichas citam" e inclui a ADR 0004, citada só na tabela da seção 3); e o erro de redação "aliquotas de aprovacao" na mensagem do commit `54143b4`, preservado no squash. Pendências da T175: as observações não bloqueantes da revisão final O-1 (o item do `DP-FLX-06` na nota de aceite não cita a questão do contato "telefone ou e-mail" frente aos três campos da T169), O-2 (dado sindical sem classe própria na ADR 0016, agrupado com os sensíveis ou restritos só pela ressalva de RH + Jurídico) e O-3 (a CI rodou Node 24 em dois patches, `v24.21.0` e `v24.22.0`, porque o `.nvmrc` fixa só a versão principal).
 
 ## Regra obrigatória para as próximas tarefas
 
