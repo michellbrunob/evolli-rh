@@ -4,6 +4,7 @@ import {
   AuthorizationSubject,
   AuthorizationTarget,
   isContatosResource,
+  isDadosPessoaisResource,
   isDocumentosResource,
   isHorariosResource,
   isSolicitacoesPessoasResource,
@@ -61,6 +62,9 @@ export function evaluatePermission(
       }
       if (isContatosResource(target.resource)) {
         return evaluateContatos(subject, target);
+      }
+      if (isDadosPessoaisResource(target.resource)) {
+        return evaluateDadosPessoais(subject, target);
       }
       return false;
   }
@@ -663,6 +667,55 @@ function evaluateContatos(
         return false;
       }
       // Sem empresa ativa, global; com empresa ativa, só ela.
+      return subject.companyId === null || isSameCompany(subject, target);
+
+    case "rh":
+    case "dp":
+      return escopoResolvido
+        ? isSameCompany(subject, target)
+        : subject.companyId !== null;
+
+    default:
+      // gestor, colaborador, financeiro, admin_tecnico, auditor, dpo.
+      return false;
+  }
+}
+
+/**
+ * Dados pessoais e endereco do colaborador (T177, Modulo 1 do cadastro).
+ *
+ * - `rh` e `dp` leem e editam na **empresa ativa**.
+ * - `master_tecnico` le e edita em **qualquer empresa** (Emenda 2 da ADR
+ *   0012: decisao da proprietaria de que o cargo de confianca acessa tudo),
+ *   no mesmo desenho dos contatos: com empresa ativa, atua **dentro dela**
+ *   (T163); sem selecao, atua na empresa do vinculo do colaborador, que o
+ *   service resolve e audita.
+ * - `gestor`, `colaborador` e os demais: sem acesso.
+ *
+ * So `read` e `alter`, como nos contatos. A criacao na admissao passa pela
+ * capacidade de admitir (`colaborador`/`create`) e e reavaliada aqui com a
+ * empresa ativa. Duas fases: sem empresa-alvo decide a CAPACIDADE; com ela, a
+ * FRONTEIRA.
+ */
+function evaluateDadosPessoais(
+  subject: AuthorizationSubject,
+  target: AuthorizationTarget,
+): boolean {
+  if (target.action !== "read" && target.action !== "alter") {
+    return false;
+  }
+
+  const escopoResolvido = target.targetCompanyId !== undefined;
+
+  switch (subject.role) {
+    case "master_tecnico":
+      if (!escopoResolvido) {
+        return true;
+      }
+      if (target.targetCompanyId === null) {
+        return false;
+      }
+      // Sem empresa ativa, global; com empresa ativa, so ela.
       return subject.companyId === null || isSameCompany(subject, target);
 
     case "rh":

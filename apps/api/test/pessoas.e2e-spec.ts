@@ -13,6 +13,10 @@ import { GenericContainer, StartedTestContainer, Wait } from "testcontainers";
 import { AppModule } from "../src/app.module";
 import { AllExceptionsFilter } from "../src/common/filters/http-exception.filter";
 import { requestIdMiddleware } from "../src/common/request-id";
+import {
+  CAMPOS_OBRIGATORIOS_ADMISSAO,
+  comoAdmitidoAntesDaT177,
+} from "./admissao-obrigatoria";
 
 /**
  * Etapa 1 — Fatia 2: Colaboradores e Vida Funcional (ADR 0007, Baseline V1).
@@ -253,6 +257,7 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
   ): Promise<{ colaboradorId: string; vinculoId: string }> {
     const colaborador = await post("/v1/colaboradores", cred)
       .send({
+        ...CAMPOS_OBRIGATORIOS_ADMISSAO,
         nome: dados.nome,
         empresaId: dados.empresaId,
         matricula: dados.matricula,
@@ -426,6 +431,7 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
     it("admite: cria colaborador, vínculo `previsto` e movimentação de admissão", async () => {
       const resposta = await post("/v1/colaboradores", rhA)
         .send({
+          ...CAMPOS_OBRIGATORIOS_ADMISSAO,
           nome: "Pessoa Sintetica Um",
           empresaId: empresaA,
           matricula: "MAT-0001",
@@ -643,6 +649,7 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
     it("admite via web (nome + matrícula + destino), confirma por GET individual e por vínculos", async () => {
       const admissao = await post("/v1/colaboradores", rhA)
         .send({
+          ...CAMPOS_OBRIGATORIOS_ADMISSAO,
           nome: "Pessoa Sintetica T111",
           empresaId: empresaA,
           matricula: "MAT-T111",
@@ -676,6 +683,7 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
     it("retifica o nome pela tela e o valor é refletido no GET individual", async () => {
       const admissao = await post("/v1/colaboradores", rhA)
         .send({
+          ...CAMPOS_OBRIGATORIOS_ADMISSAO,
           nome: "Nome Original T111",
           empresaId: empresaA,
           matricula: "MAT-T111-B",
@@ -702,6 +710,7 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
     it("IDOR: rhB não acessa colaborador nem vínculos de rhA (404 anti-enumeração)", async () => {
       const admissao = await post("/v1/colaboradores", rhA)
         .send({
+          ...CAMPOS_OBRIGATORIOS_ADMISSAO,
           nome: "Pessoa Sintetica T111 IDOR",
           empresaId: empresaA,
           matricula: "MAT-T111-C",
@@ -904,6 +913,7 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
     it("recusa matrícula duplicada dentro da empresa", async () => {
       await post("/v1/colaboradores", rhA)
         .send({
+          ...CAMPOS_OBRIGATORIOS_ADMISSAO,
           nome: "Pessoa Sintetica Dois",
           empresaId: empresaA,
           matricula: "MAT-0001",
@@ -918,6 +928,7 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
     it("a mesma matrícula é aceita em outra empresa", async () => {
       await post("/v1/colaboradores", rhB)
         .send({
+          ...CAMPOS_OBRIGATORIOS_ADMISSAO,
           nome: "Pessoa Sintetica Tres",
           empresaId: empresaB,
           matricula: "MAT-0001",
@@ -1046,6 +1057,7 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
     it("recusa alocação em nó organizacional de outra empresa (via API)", async () => {
       await post("/v1/colaboradores", rhA)
         .send({
+          ...CAMPOS_OBRIGATORIOS_ADMISSAO,
           nome: "Pessoa Sintetica Cinco",
           empresaId: empresaA,
           matricula: "MAT-0005",
@@ -1062,6 +1074,7 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
       // "libera" as demais.
       await post("/v1/colaboradores", rhA)
         .send({
+          ...CAMPOS_OBRIGATORIOS_ADMISSAO,
           nome: "Pessoa Sintetica Cargo Cruzado",
           empresaId: empresaA,
           matricula: "MAT-0005B",
@@ -1077,6 +1090,7 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
     it("aceita alocação com equipe da mesma empresa", async () => {
       const resposta = await post("/v1/colaboradores", rhA)
         .send({
+          ...CAMPOS_OBRIGATORIOS_ADMISSAO,
           nome: "Pessoa Sintetica Equipe",
           empresaId: empresaA,
           matricula: "MAT-0005C",
@@ -1120,6 +1134,7 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
 
       await post("/v1/colaboradores", rhA)
         .send({
+          ...CAMPOS_OBRIGATORIOS_ADMISSAO,
           nome: "Pessoa Sintetica Seis",
           empresaId: empresaA,
           matricula: "MAT-0006",
@@ -1134,6 +1149,7 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
     it("recusa alocação sem nenhuma referência organizacional", async () => {
       await post("/v1/colaboradores", rhA)
         .send({
+          ...CAMPOS_OBRIGATORIOS_ADMISSAO,
           nome: "Pessoa Sintetica Sete",
           empresaId: empresaA,
           matricula: "MAT-0007",
@@ -1147,6 +1163,7 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
     it("recusa motivo fora do catálogo controlado e texto livre", async () => {
       await post("/v1/colaboradores", rhA)
         .send({
+          ...CAMPOS_OBRIGATORIOS_ADMISSAO,
           nome: "Pessoa Sintetica Oito",
           empresaId: empresaA,
           matricula: "MAT-0008",
@@ -1161,6 +1178,7 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
     it("recusa tipo de vínculo fora do catálogo", async () => {
       await post("/v1/colaboradores", rhA)
         .send({
+          ...CAMPOS_OBRIGATORIOS_ADMISSAO,
           nome: "Pessoa Sintetica Nove",
           empresaId: empresaA,
           matricula: "MAT-0009",
@@ -1213,6 +1231,7 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
       // outros casos nem com a invariante "vinculo ativo exige alocacao".
       const colaborador = await post("/v1/colaboradores", rhA)
         .send({
+          ...CAMPOS_OBRIGATORIOS_ADMISSAO,
           nome: "Pessoa Sintetica Intervalo",
           empresaId: empresaA,
           matricula: "MAT-INTV",
@@ -1417,7 +1436,7 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
       // A unica rota de criacao e a admissao, e ela exige empresa, matricula,
       // tipo, data e destino organizacional.
       await post("/v1/colaboradores", rhA)
-        .send({ nome: "So Nome" })
+        .send({ ...CAMPOS_OBRIGATORIOS_ADMISSAO, nome: "So Nome" })
         .expect(400);
 
       const prisma = new PrismaClient({ datasources: { db: { url: appUrl } } });
@@ -1603,6 +1622,7 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
         // recusariam. Se o teste passar, foi a checagem da ORIGEM que agiu.
         const destinoColaborador = await post("/v1/colaboradores", rhA)
           .send({
+            ...CAMPOS_OBRIGATORIOS_ADMISSAO,
             nome: "Pessoa Sintetica Destino",
             empresaId: empresaA,
             matricula: "MAT-DEST",
@@ -1666,6 +1686,7 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
         // checagem da ORIGEM que agiu, nao a unicidade.
         const destinoColaborador = await post("/v1/colaboradores", rhA)
           .send({
+            ...CAMPOS_OBRIGATORIOS_ADMISSAO,
             nome: "Pessoa Sintetica Reaponte Destino",
             empresaId: empresaA,
             matricula: "MAT-REAP2",
@@ -1796,6 +1817,7 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
     it("admissao cria colaborador, vinculo e movimentacao na MESMA transacao", async () => {
       const resposta = await post("/v1/colaboradores", rhA)
         .send({
+          ...CAMPOS_OBRIGATORIOS_ADMISSAO,
           nome: "Pessoa Sintetica Atomica",
           empresaId: empresaA,
           matricula: "MAT-ATOM",
@@ -1856,6 +1878,7 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
         );
         await post("/v1/colaboradores", rhA)
           .send({
+            ...CAMPOS_OBRIGATORIOS_ADMISSAO,
             nome: "Pessoa Sintetica Atomica Falha",
             empresaId: empresaA,
             matricula: "MAT-ATOMF",
@@ -2083,6 +2106,7 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
     /** Corpo válido de admissão; só a matrícula muda entre os casos. */
     function admissao(matricula: string, extra: Record<string, unknown> = {}) {
       return {
+        ...CAMPOS_OBRIGATORIOS_ADMISSAO,
         nome: `Pessoa Sintetica ${matricula}`,
         empresaId: empresaA,
         matricula,
@@ -2115,17 +2139,30 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
       expect(resposta.body.nome).toBe("Pessoa Sintetica T167-001");
       expect(resposta.body.situacao).toBe("inativo");
 
-      // Projeção FECHADA: nenhuma chave além das aprovadas.
+      // Projeção FECHADA: nenhuma chave além das aprovadas. T177 — os três
+      // blocos do Módulo 1 sempre vêm: perfil e contatos, obrigatórios,
+      // gravados; endereço, `null` quando não enviado.
       expect(Object.keys(resposta.body).sort()).toEqual(
         [
           "atualizadoEm",
+          "contatos",
           "criadoEm",
+          "endereco",
           "id",
           "movimentacao",
           "nome",
+          "perfilPessoal",
           "situacao",
           "vinculo",
         ].sort(),
+      );
+      expect(resposta.body.perfilPessoal).toMatchObject({
+        dataNascimento:
+          CAMPOS_OBRIGATORIOS_ADMISSAO.perfilPessoal.dataNascimento,
+      });
+      expect(resposta.body.endereco).toBeNull();
+      expect(resposta.body.contatos).toMatchObject(
+        CAMPOS_OBRIGATORIOS_ADMISSAO.contatos,
       );
       expect(Object.keys(resposta.body.vinculo).sort()).toEqual(
         [
@@ -2331,6 +2368,11 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
           departamentoId: departamentoB,
         })
       ).colaboradorId;
+      // T177 — a admissão passou a gravar os contatos. Este bloco prova o
+      // caminho de quem foi admitido ANTES, sem contato: é o estado de todo o
+      // cadastro existente.
+      await comoAdmitidoAntesDaT177(migratorUrl, pessoaA);
+      await comoAdmitidoAntesDaT177(migratorUrl, pessoaB);
 
       // Conta própria: trocar o contexto do `master` compartilhado mudaria o
       // escopo dos testes seguintes.
@@ -2838,6 +2880,8 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
         matricula: "T169-D",
         departamentoId: departamentoA,
       });
+      // Sem contato, como quem foi admitido antes da T177.
+      await comoAdmitidoAntesDaT177(migratorUrl, pessoaD);
       await comPrisma(async (p) => {
         const ator = await p.accessUser.findFirstOrThrow({
           where: { email: "rh.pa@example.test" },
@@ -2952,6 +2996,8 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
         matricula: "T169-C",
         departamentoId: departamentoA,
       });
+      // Sem contato, como quem foi admitido antes da T177.
+      await comoAdmitidoAntesDaT177(migratorUrl, pessoaC);
       await comPrisma(async (p) => {
         const autor = await p.accessUser.findFirstOrThrow({
           where: { email: "rh.pa@example.test" },
@@ -3000,6 +3046,7 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
     it("nega admin_tecnico ao admitir", async () => {
       await post("/v1/colaboradores", admin)
         .send({
+          ...CAMPOS_OBRIGATORIOS_ADMISSAO,
           nome: "Pessoa Sintetica Admin",
           empresaId: empresaA,
           matricula: "MAT-ADM",
@@ -3050,6 +3097,7 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
       await get("/v1/movimentacoes", cred()).expect(403);
       await post("/v1/colaboradores", cred())
         .send({
+          ...CAMPOS_OBRIGATORIOS_ADMISSAO,
           nome: "Pessoa Sintetica Negada",
           empresaId: empresaA,
           matricula: "MAT-NEG",
@@ -3069,6 +3117,7 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
       await get("/v1/colaboradores", dpA).expect(200);
       const resposta = await post("/v1/colaboradores", dpA)
         .send({
+          ...CAMPOS_OBRIGATORIOS_ADMISSAO,
           nome: "Pessoa Sintetica Dp",
           empresaId: empresaA,
           matricula: "MAT-DP01",
@@ -3086,6 +3135,7 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
         .post("/v1/colaboradores")
         .set("Cookie", rhA.cookie)
         .send({
+          ...CAMPOS_OBRIGATORIOS_ADMISSAO,
           nome: "Pessoa Sintetica Sem Csrf",
           empresaId: empresaA,
           matricula: "MAT-CSRF",
@@ -3197,6 +3247,7 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
     it("admitir informando empresa de terceiro responde 404", async () => {
       await post("/v1/colaboradores", rhB)
         .send({
+          ...CAMPOS_OBRIGATORIOS_ADMISSAO,
           nome: "Pessoa Sintetica Escopo",
           empresaId: empresaA,
           matricula: "MAT-ESC",
@@ -3266,6 +3317,7 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
 
       const colaborador = await post("/v1/colaboradores", rhA)
         .send({
+          ...CAMPOS_OBRIGATORIOS_ADMISSAO,
           nome: "Pessoa Sintetica Ocupa",
           empresaId: empresaA,
           matricula: "MAT-OCUP",
@@ -3521,6 +3573,7 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
         );
         await post("/v1/colaboradores", rhA)
           .send({
+            ...CAMPOS_OBRIGATORIOS_ADMISSAO,
             nome: "Pessoa Sintetica Rollback",
             empresaId: empresaA,
             matricula: "MAT-ROLL",
@@ -3720,6 +3773,7 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
     it("duas efetivações simultâneas: exatamente uma vence", async () => {
       const colaborador = await post("/v1/colaboradores", rhA)
         .send({
+          ...CAMPOS_OBRIGATORIOS_ADMISSAO,
           nome: "Pessoa Sintetica Corrida",
           empresaId: empresaA,
           matricula: "MAT-CORR",

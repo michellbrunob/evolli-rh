@@ -1,0 +1,225 @@
+/**
+ * Dados pessoais e endereço do colaborador (T177, Módulo 1) — campos, limites,
+ * normalização e validação no cliente.
+ *
+ * Espelha `normalizacao-dados-pessoais.util.ts` e `dados-pessoais.dto.ts` da
+ * API: o servidor é a regra e o banco a rede de segurança; aqui a validação só
+ * antecipa a recusa, com a mensagem no campo certo.
+ *
+ * OBRIGATÓRIO: data de nascimento. OPCIONAIS: todos os demais campos do perfil
+ * e todos os do endereço, em texto: não há catálogo canônico no sistema para
+ * sexo, saudação, estado civil, escolaridade, país, UF ou município, e a tela
+ * não inventa lista de opções.
+ */
+
+export type ChavePerfil =
+  | "dataNascimento"
+  | "sexo"
+  | "saudacao"
+  | "estadoCivil"
+  | "nacionalidade"
+  | "naturalidade"
+  | "escolaridade"
+  | "curso"
+  | "nomePai"
+  | "nomeMae";
+
+export type ChaveEndereco =
+  | "pais"
+  | "cep"
+  | "logradouro"
+  | "numero"
+  | "complemento"
+  | "bairro"
+  | "cidade"
+  | "estado";
+
+export type ValoresPerfil = Record<ChavePerfil, string>;
+export type ValoresEndereco = Record<ChaveEndereco, string>;
+
+export interface DefinicaoCampo<K extends string> {
+  readonly chave: K;
+  readonly rotulo: string;
+  /** Limite de caracteres, o mesmo do servidor. Ausente na data. */
+  readonly limite?: number;
+  readonly ajuda?: string;
+}
+
+/**
+ * Campos de texto do perfil, na ordem da tela — todos OPCIONAIS. A data de
+ * nascimento, obrigatória, é tratada à parte.
+ */
+export const CAMPOS_TEXTO_PERFIL: readonly DefinicaoCampo<
+  Exclude<ChavePerfil, "dataNascimento">
+>[] = [
+  { chave: "sexo", rotulo: "Sexo", limite: 60 },
+  {
+    chave: "saudacao",
+    rotulo: "Saudação",
+    limite: 40,
+    ajuda: "Por exemplo, Sr. ou Sra.",
+  },
+  { chave: "estadoCivil", rotulo: "Estado civil", limite: 60 },
+  { chave: "nacionalidade", rotulo: "Nacionalidade", limite: 80 },
+  {
+    chave: "naturalidade",
+    rotulo: "Naturalidade",
+    limite: 120,
+    ajuda: "Cidade e estado de nascimento.",
+  },
+  { chave: "escolaridade", rotulo: "Escolaridade", limite: 80 },
+  { chave: "curso", rotulo: "Curso", limite: 160 },
+  { chave: "nomePai", rotulo: "Nome do pai", limite: 160 },
+  { chave: "nomeMae", rotulo: "Nome da mãe", limite: 160 },
+];
+
+/** Campos do endereço, na ordem da tela — todos OPCIONAIS. */
+export const CAMPOS_ENDERECO: readonly DefinicaoCampo<ChaveEndereco>[] = [
+  { chave: "pais", rotulo: "País", limite: 80 },
+  {
+    chave: "cep",
+    rotulo: "CEP",
+    limite: 12,
+    ajuda: "Letras, números, espaço e hífen, de 3 a 12 caracteres.",
+  },
+  { chave: "logradouro", rotulo: "Logradouro", limite: 200 },
+  { chave: "numero", rotulo: "Número", limite: 20 },
+  { chave: "complemento", rotulo: "Complemento", limite: 120 },
+  { chave: "bairro", rotulo: "Bairro", limite: 120 },
+  { chave: "cidade", rotulo: "Cidade", limite: 120 },
+  { chave: "estado", rotulo: "Estado", limite: 80 },
+];
+
+export const ROTULO_DATA_NASCIMENTO = "Data de nascimento";
+
+/** País sugerido no início da admissão. Editável: é só o valor inicial. */
+export const PAIS_SUGERIDO = "Brasil";
+
+export const PERFIL_VAZIO: ValoresPerfil = {
+  dataNascimento: "",
+  sexo: "",
+  saudacao: "",
+  estadoCivil: "",
+  nacionalidade: "",
+  naturalidade: "",
+  escolaridade: "",
+  curso: "",
+  nomePai: "",
+  nomeMae: "",
+};
+
+export const ENDERECO_INICIAL: ValoresEndereco = {
+  pais: PAIS_SUGERIDO,
+  cep: "",
+  logradouro: "",
+  numero: "",
+  complemento: "",
+  bairro: "",
+  cidade: "",
+  estado: "",
+};
+
+const DATA_MINIMA = "1900-01-01";
+// eslint-disable-next-line no-control-regex
+const SEM_CONTROLE = /^[^\u0000-\u001F\u007F]*$/;
+const CEP_FORMA = /^[A-Za-z0-9 -]{3,12}$/;
+
+/** Apara e colapsa espaços repetidos — a mesma normalização do servidor. */
+export function normalizarTexto(valor: string): string {
+  return valor.trim().replace(/ {2,}/g, " ");
+}
+
+function hojeUtc(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function erroDeTexto(
+  valor: string,
+  rotulo: string,
+  limite: number,
+): string | undefined {
+  const limpo = normalizarTexto(valor);
+  if (limpo === "") return undefined;
+  if (!SEM_CONTROLE.test(limpo)) {
+    return `${rotulo} não pode conter quebra de linha nem caractere de controle.`;
+  }
+  if (limpo.length > limite) {
+    return `${rotulo} deve ter no máximo ${limite} caracteres.`;
+  }
+  return undefined;
+}
+
+export type ErrosPerfil = Partial<Record<ChavePerfil, string>>;
+export type ErrosEndereco = Partial<Record<ChaveEndereco, string>>;
+
+export function validarPerfil(valores: ValoresPerfil): ErrosPerfil {
+  const erros: ErrosPerfil = {};
+  const data = valores.dataNascimento;
+  if (data === "") {
+    erros.dataNascimento = "Informe a data de nascimento.";
+  } else {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(data) || Number.isNaN(Date.parse(data))) {
+      erros.dataNascimento = "Informe uma data de nascimento válida.";
+    } else if (data < DATA_MINIMA) {
+      erros.dataNascimento =
+        "A data de nascimento não pode ser anterior a 01/01/1900.";
+    } else if (data > hojeUtc()) {
+      erros.dataNascimento = "A data de nascimento não pode estar no futuro.";
+    }
+  }
+  for (const campo of CAMPOS_TEXTO_PERFIL) {
+    const erro = erroDeTexto(
+      valores[campo.chave],
+      campo.rotulo,
+      campo.limite ?? 0,
+    );
+    if (erro) erros[campo.chave] = erro;
+  }
+  return erros;
+}
+
+export function validarEndereco(valores: ValoresEndereco): ErrosEndereco {
+  const erros: ErrosEndereco = {};
+  for (const campo of CAMPOS_ENDERECO) {
+    const erro = erroDeTexto(
+      valores[campo.chave],
+      campo.rotulo,
+      campo.limite ?? 0,
+    );
+    if (erro) erros[campo.chave] = erro;
+  }
+  const cep = normalizarTexto(valores.cep);
+  if (!erros.cep && cep !== "" && !CEP_FORMA.test(cep)) {
+    erros.cep = "Use letras, números, espaço e hífen, de 3 a 12 caracteres.";
+  }
+  return erros;
+}
+
+/**
+ * Corpo do bloco: texto normalizado, vazio como `null`. A data de nascimento
+ * vai como digitada — só se monta o bloco depois de `validarPerfil` aceitá-la.
+ */
+export function blocoPerfil(valores: ValoresPerfil): Record<
+  Exclude<ChavePerfil, "dataNascimento">,
+  string | null
+> & {
+  dataNascimento: string;
+} {
+  const bloco = {} as Record<ChavePerfil, string | null>;
+  for (const chave of Object.keys(valores) as ChavePerfil[]) {
+    const limpo = normalizarTexto(valores[chave]);
+    bloco[chave] = limpo === "" ? null : limpo;
+  }
+  return { ...bloco, dataNascimento: valores.dataNascimento };
+}
+
+export function blocoEndereco(
+  valores: ValoresEndereco,
+): Record<ChaveEndereco, string | null> {
+  const bloco = {} as Record<ChaveEndereco, string | null>;
+  for (const chave of Object.keys(valores) as ChaveEndereco[]) {
+    const limpo = normalizarTexto(valores[chave]);
+    bloco[chave] = limpo === "" ? null : limpo;
+  }
+  return bloco;
+}

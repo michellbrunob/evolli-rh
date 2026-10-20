@@ -496,6 +496,20 @@ const MATRICULA_NA_EQUIPE = "DEMO-A-0201";
  */
 const MATRICULA_FORA_DA_EQUIPE = "DEMO-A-0202";
 
+/**
+ * T177 — o que a admissão exige além do nome: data de nascimento e os três
+ * contatos. Valores SINTÉTICOS e iguais para toda pessoa da demonstração; o
+ * domínio é reservado (`example.test`). Endereço é opcional e fica de fora.
+ */
+const CAMPOS_OBRIGATORIOS_DA_ADMISSAO = {
+  perfilPessoal: { dataNascimento: "1990-01-15" },
+  contatos: {
+    emailPessoal: "pessoa.demo@example.test",
+    celular: "+5511900000000",
+    telefone: "1130000000",
+  },
+} as const;
+
 async function garantirColaborador(
   ctx: Contexto,
   rh: Sessao,
@@ -512,7 +526,11 @@ async function garantirColaborador(
         rh,
         (c) => c.nome === nome,
       ),
-    () => pedir(ctx, "POST", "/v1/colaboradores", rh, corpo),
+    () =>
+      pedir(ctx, "POST", "/v1/colaboradores", rh, {
+        ...CAMPOS_OBRIGATORIOS_DA_ADMISSAO,
+        ...corpo,
+      }),
   );
 }
 

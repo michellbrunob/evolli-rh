@@ -129,3 +129,26 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* T177 — blocos gravados do Módulo 1 na confirmação. Cada linha é um par
+   rótulo/valor; o `div` some do layout (`display: contents`) para que a grade
+   do resumo continue alinhando rótulo e valor em duas colunas. */
+.nova-admissao__bloco-gravado {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  width: 100%;
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--status-success-border);
+}
+
+.nova-admissao__subtitulo {
+  margin: 0;
+  font-size: var(--text-body);
+  font-weight: var(--weight-strong);
+  color: var(--color-ink);
+}
+
+.nova-admissao__resumo-linha {
+  display: contents;
+}

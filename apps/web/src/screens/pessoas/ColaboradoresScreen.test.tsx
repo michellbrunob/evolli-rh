@@ -11,30 +11,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ColaboradoresScreen } from "./ColaboradoresScreen";
 import {
   ApiError,
-  type AdmissaoRegistradaApi,
   type ColaboradorApi,
   type VinculoApi,
-  admitirColaborador,
   buscarColaborador,
   listarColaboradores,
   listarVinculosDoColaborador,
   retificarColaborador,
 } from "../../api/colaboradoresClient";
-import {
-  type AreaApi,
-  type CentroCustoApi,
-  type DepartamentoApi,
-  type EmpresaApi,
-  type EquipeApi,
-  type UnidadeOrganizacionalApi,
-  listarAreas,
-  listarCentrosCusto,
-  listarDepartamentos,
-  listarEmpresasMulti,
-  listarEquipes,
-  listarUnidades,
-} from "../../api/organizacaoClient";
-import { type CargoApi, listarCargos } from "../../api/cargoClient";
 import {
   type ContatosDoColaboradorApi,
   type ContatosRegistradosApi,
@@ -44,8 +27,6 @@ import {
 import { expectSemIsoVisivel } from "../../test/semIsoVisivel";
 
 vi.mock("../../api/colaboradoresClient");
-vi.mock("../../api/organizacaoClient");
-vi.mock("../../api/cargoClient");
 vi.mock("../../api/contatosColaboradorClient");
 
 interface ResultadoPaginadoTeste<T> {
@@ -89,38 +70,6 @@ const vinculo1: VinculoApi = {
 };
 
 /**
- * Resposta da admissão (T167): o colaborador no topo, mais a confirmação do
- * vínculo e do ato de admissão, como o servidor devolve.
- */
-function admissaoDe(colaborador: ColaboradorApi): AdmissaoRegistradaApi {
-  return {
-    ...colaborador,
-    vinculo: {
-      id: "abababab-abab-4bab-8bab-abababababab",
-      empresaId: "44444444-4444-4444-4444-444444444444",
-      matricula: "MAT-SRV1",
-      tipo: "clt",
-      situacao: "previsto",
-      dataAdmissao: "2026-01-05T00:00:00.000Z",
-    },
-    movimentacao: {
-      id: "cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd",
-      tipo: "admissao",
-      status: "solicitada",
-      vigenciaInicio: "2026-01-05T00:00:00.000Z",
-      destino: {
-        unidadeOrganizacionalId: null,
-        departamentoId: "55555555-5555-5555-5555-555555555555",
-        areaId: null,
-        equipeId: null,
-        cargoId: null,
-        centroCustoId: null,
-      },
-    },
-  };
-}
-
-/**
  * Recusa do servidor com o status real. O módulo do cliente é automockado: o
  * construtor de `ApiError` não roda, então `status` e `message` são postos
  * aqui — a tela decide pelo `status`, como faria com o erro verdadeiro.
@@ -131,91 +80,13 @@ function recusa(status: number, message: string): ApiError {
   return erro;
 }
 
-const empresa1: EmpresaApi = {
-  id: "44444444-4444-4444-4444-444444444444",
-  codigo: "EMP1",
-  nome: "Empresa Um (teste)",
-  status: "ativo",
-};
-
-const departamento1: DepartamentoApi = {
-  id: "55555555-5555-5555-5555-555555555555",
-  codigo: "DEP1",
-  nome: "Departamento Um (teste)",
-  empresaId: empresa1.id,
-  status: "ativo",
-  criadoEm: "2025-01-01T12:00:00.000Z",
-  atualizadoEm: "2025-01-01T12:00:00.000Z",
-};
-
-const area1: AreaApi = {
-  id: "66666666-6666-6666-6666-666666666666",
-  departamentoId: departamento1.id,
-  codigo: "ARE1",
-  nome: "Área Um (teste)",
-  status: "ativo",
-  criadoEm: "2025-01-01T12:00:00.000Z",
-  atualizadoEm: "2025-01-01T12:00:00.000Z",
-};
-
-const unidade1: UnidadeOrganizacionalApi = {
-  id: "77777777-7777-7777-7777-777777777777",
-  codigo: "UNI1",
-  nome: "Unidade Um (teste)",
-  empresaId: empresa1.id,
-  status: "ativo",
-  criadoEm: "2025-01-01T12:00:00.000Z",
-  atualizadoEm: "2025-01-01T12:00:00.000Z",
-};
-
-const equipe1: EquipeApi = {
-  id: "88888888-8888-8888-8888-888888888888",
-  empresaId: empresa1.id,
-  departamentoId: departamento1.id,
-  unidadeOrganizacionalId: null,
-  codigo: "EQU1",
-  nome: "Equipe Um (teste)",
-  status: "ativo",
-  criadoEm: "2025-01-01T12:00:00.000Z",
-  atualizadoEm: "2025-01-01T12:00:00.000Z",
-};
-
-const cargo1: CargoApi = {
-  id: "99999999-9999-9999-9999-999999999999",
-  codigo: "CAR1",
-  nome: "Cargo Um (teste)",
-  empresaId: empresa1.id,
-  status: "ativo",
-  criadoEm: "2025-01-01T12:00:00.000Z",
-  atualizadoEm: "2025-01-01T12:00:00.000Z",
-};
-
-const centroCusto1: CentroCustoApi = {
-  id: "10101010-1010-1010-1010-101010101010",
-  codigo: "CC1",
-  nome: "Centro de Custo Um (teste)",
-  empresaId: empresa1.id,
-  status: "ativo",
-  criadoEm: "2025-01-01T12:00:00.000Z",
-  atualizadoEm: "2025-01-01T12:00:00.000Z",
-};
-
 beforeEach(() => {
   vi.mocked(listarColaboradores).mockResolvedValue(
     paginado([colaborador1, colaborador2]),
   );
   vi.mocked(buscarColaborador).mockResolvedValue(colaborador1);
   vi.mocked(listarVinculosDoColaborador).mockResolvedValue([vinculo1]);
-  vi.mocked(admitirColaborador).mockResolvedValue(admissaoDe(colaborador1));
   vi.mocked(retificarColaborador).mockResolvedValue(colaborador1);
-
-  vi.mocked(listarEmpresasMulti).mockResolvedValue(paginado([empresa1]));
-  vi.mocked(listarDepartamentos).mockResolvedValue(paginado([departamento1]));
-  vi.mocked(listarUnidades).mockResolvedValue(paginado([unidade1]));
-  vi.mocked(listarEquipes).mockResolvedValue(paginado([equipe1]));
-  vi.mocked(listarCentrosCusto).mockResolvedValue(paginado([centroCusto1]));
-  vi.mocked(listarAreas).mockResolvedValue(paginado([area1]));
-  vi.mocked(listarCargos).mockResolvedValue(paginado([cargo1]));
 
   // T169 — por padrão, o colaborador aberto não tem contato registrado.
   vi.mocked(consultarContatosDoColaborador).mockImplementation(
@@ -230,14 +101,6 @@ function semContatos(colaboradorId: string): ContatosDoColaboradorApi {
     situacao: "sem_registro",
     contatos: null,
   };
-}
-
-async function abrirFormularioEAguardarOpcoes() {
-  fireEvent.click(screen.getByRole("button", { name: "Novo colaborador" }));
-  await waitFor(() => expect(listarEmpresasMulti).toHaveBeenCalled());
-  await waitFor(() =>
-    expect(screen.getByLabelText(/Tipo de vínculo/i)).not.toBeDisabled(),
-  );
 }
 
 describe("ColaboradoresScreen (T111 — funcional)", () => {
@@ -341,251 +204,6 @@ describe("ColaboradoresScreen (T111 — funcional)", () => {
         tamanhoPagina: 20,
       }),
     );
-  });
-
-  it("abre e fecha o formulário de novo colaborador", async () => {
-    render(<ColaboradoresScreen />);
-    await abrirFormularioEAguardarOpcoes();
-
-    expect(
-      screen.getByRole("form", { name: "Formulário de novo colaborador" }),
-    ).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
-    expect(
-      screen.queryByRole("form", { name: "Formulário de novo colaborador" }),
-    ).not.toBeInTheDocument();
-  });
-
-  it("valida nome obrigatório", async () => {
-    render(<ColaboradoresScreen />);
-    await abrirFormularioEAguardarOpcoes();
-
-    fireEvent.click(
-      screen.getByRole("button", { name: "Admitir colaborador" }),
-    );
-
-    expect(await screen.findByText("Nome é obrigatório.")).toBeInTheDocument();
-    expect(admitirColaborador).not.toHaveBeenCalled();
-  });
-
-  it("valida o padrão da matrícula", async () => {
-    render(<ColaboradoresScreen />);
-    await abrirFormularioEAguardarOpcoes();
-
-    fireEvent.change(screen.getByLabelText(/Nome completo/i), {
-      target: { value: "Colaborador Teste" },
-    });
-    fireEvent.change(screen.getByLabelText(/Matrícula/i), {
-      target: { value: "!!" },
-    });
-    fireEvent.click(
-      screen.getByRole("button", { name: "Admitir colaborador" }),
-    );
-
-    expect(
-      await screen.findByText(
-        "Use apenas letras maiúsculas, números, - e _ (2 a 32 caracteres).",
-      ),
-    ).toBeInTheDocument();
-    expect(admitirColaborador).not.toHaveBeenCalled();
-  });
-
-  it("exige tipo de vínculo, data de admissão e lotação inicial", async () => {
-    render(<ColaboradoresScreen />);
-    await abrirFormularioEAguardarOpcoes();
-
-    fireEvent.change(screen.getByLabelText(/Nome completo/i), {
-      target: { value: "Colaborador Teste" },
-    });
-    fireEvent.change(screen.getByLabelText(/Matrícula/i), {
-      target: { value: "MAT-0099" },
-    });
-    fireEvent.click(
-      screen.getByRole("button", { name: "Admitir colaborador" }),
-    );
-
-    expect(
-      await screen.findByText("Selecione o tipo de vínculo."),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Informe a data de admissão.")).toBeInTheDocument();
-    expect(
-      screen.getByText("Escolha o tipo de referência organizacional."),
-    ).toBeInTheDocument();
-    expect(admitirColaborador).not.toHaveBeenCalled();
-  });
-
-  it("admite um colaborador com sucesso (lotação por departamento) e recarrega a lista", async () => {
-    render(<ColaboradoresScreen />);
-    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
-    const chamadasAntes = vi.mocked(listarColaboradores).mock.calls.length;
-    await abrirFormularioEAguardarOpcoes();
-
-    fireEvent.change(screen.getByLabelText(/Nome completo/i), {
-      target: { value: "Colaborador Novo" },
-    });
-    fireEvent.change(screen.getByLabelText(/Matrícula/i), {
-      target: { value: "mat-0099" },
-    });
-    fireEvent.change(screen.getByLabelText(/Tipo de vínculo/i), {
-      target: { value: "clt" },
-    });
-    fireEvent.change(screen.getByLabelText(/Data de admissão/i), {
-      target: { value: "2026-01-05" },
-    });
-    fireEvent.change(
-      screen.getByLabelText(/Tipo de referência organizacional/i),
-      {
-        target: { value: "departamento" },
-      },
-    );
-    fireEvent.change(
-      screen.getByLabelText(/Registro da referência organizacional/i),
-      {
-        target: { value: departamento1.id },
-      },
-    );
-
-    fireEvent.click(
-      screen.getByRole("button", { name: "Admitir colaborador" }),
-    );
-
-    await waitFor(() =>
-      expect(admitirColaborador).toHaveBeenCalledWith({
-        nome: "Colaborador Novo",
-        empresaId: empresa1.id,
-        matricula: "MAT-0099",
-        tipo: "clt",
-        dataAdmissao: "2026-01-05",
-        motivoCodigo: "admissao_inicial",
-        departamentoId: departamento1.id,
-      }),
-    );
-
-    await waitFor(() =>
-      expect(
-        screen.queryByRole("form", { name: "Formulário de novo colaborador" }),
-      ).not.toBeInTheDocument(),
-    );
-    expect(vi.mocked(listarColaboradores).mock.calls.length).toBe(
-      chamadasAntes + 1,
-    );
-    expect(listarColaboradores).toHaveBeenLastCalledWith({
-      pagina: 1,
-      tamanhoPagina: 20,
-    });
-  });
-
-  it("exige departamento antes de liberar a seleção de área, e envia ambos ao admitir", async () => {
-    render(<ColaboradoresScreen />);
-    await abrirFormularioEAguardarOpcoes();
-
-    fireEvent.change(screen.getByLabelText(/Nome completo/i), {
-      target: { value: "Colaborador Área" },
-    });
-    fireEvent.change(screen.getByLabelText(/Matrícula/i), {
-      target: { value: "MAT-0100" },
-    });
-    fireEvent.change(screen.getByLabelText(/Tipo de vínculo/i), {
-      target: { value: "clt" },
-    });
-    fireEvent.change(screen.getByLabelText(/Data de admissão/i), {
-      target: { value: "2026-01-05" },
-    });
-    fireEvent.change(
-      screen.getByLabelText(/Tipo de referência organizacional/i),
-      {
-        target: { value: "area" },
-      },
-    );
-
-    // O registro (a área) só libera depois do departamento que a qualifica —
-    // e cada um tem rótulo permanente e próprio.
-    expect(
-      screen.getByLabelText(/Registro da referência organizacional/i),
-    ).toBeDisabled();
-
-    fireEvent.change(screen.getByLabelText(/Departamento da área/i), {
-      target: { value: departamento1.id },
-    });
-
-    await waitFor(() =>
-      expect(listarAreas).toHaveBeenCalledWith({
-        departamentoId: departamento1.id,
-        status: "ativo",
-        tamanhoPagina: 100,
-      }),
-    );
-    await waitFor(() =>
-      expect(
-        screen.getByLabelText(/Registro da referência organizacional/i),
-      ).not.toBeDisabled(),
-    );
-
-    fireEvent.change(
-      screen.getByLabelText(/Registro da referência organizacional/i),
-      {
-        target: { value: area1.id },
-      },
-    );
-    fireEvent.click(
-      screen.getByRole("button", { name: "Admitir colaborador" }),
-    );
-
-    await waitFor(() =>
-      expect(admitirColaborador).toHaveBeenCalledWith(
-        expect.objectContaining({
-          areaId: area1.id,
-          departamentoId: departamento1.id,
-        }),
-      ),
-    );
-  });
-
-  it("mostra o erro retornado pela API ao admitir", async () => {
-    vi.mocked(admitirColaborador).mockRejectedValueOnce(
-      recusa(409, "Conflito ao processar a requisição."),
-    );
-
-    render(<ColaboradoresScreen />);
-    await abrirFormularioEAguardarOpcoes();
-
-    fireEvent.change(screen.getByLabelText(/Nome completo/i), {
-      target: { value: "Colaborador Novo" },
-    });
-    fireEvent.change(screen.getByLabelText(/Matrícula/i), {
-      target: { value: "MAT-0099" },
-    });
-    fireEvent.change(screen.getByLabelText(/Tipo de vínculo/i), {
-      target: { value: "clt" },
-    });
-    fireEvent.change(screen.getByLabelText(/Data de admissão/i), {
-      target: { value: "2026-01-05" },
-    });
-    fireEvent.change(
-      screen.getByLabelText(/Tipo de referência organizacional/i),
-      {
-        target: { value: "departamento" },
-      },
-    );
-    fireEvent.change(
-      screen.getByLabelText(/Registro da referência organizacional/i),
-      {
-        target: { value: departamento1.id },
-      },
-    );
-    fireEvent.click(
-      screen.getByRole("button", { name: "Admitir colaborador" }),
-    );
-
-    expect(
-      await screen.findByText(
-        "Esta matrícula já está em uso nesta empresa. Informe outra.",
-      ),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("form", { name: "Formulário de novo colaborador" }),
-    ).toBeInTheDocument();
   });
 
   it("abre o detalhe de um colaborador e carrega seus vínculos", async () => {
@@ -919,29 +537,9 @@ describe("ColaboradoresScreen (T111 — funcional)", () => {
     expect(screen.queryByText(/alterações não salvas/i)).toBeNull();
   });
 
-  it("abrir o formulário fecha um detalhe que estava aberto", async () => {
-    render(<ColaboradoresScreen />);
-    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
-
-    const linha = screen.getByText("Ana Colaboradora (teste)").closest("tr")!;
-    fireEvent.click(
-      within(linha).getByRole("button", { name: /Ver detalhes/ }),
-    );
-    await screen.findByRole("table", {
-      name: `Vínculos — ${colaborador1.nome}`,
-    });
-
-    await abrirFormularioEAguardarOpcoes();
-
-    expect(
-      screen.queryByRole("table", { name: `Vínculos — ${colaborador1.nome}` }),
-    ).not.toBeInTheDocument();
-  });
-
   it("não contém CPF, senha, sessão ou outro dado sensível na tela", async () => {
     render(<ColaboradoresScreen />);
     await screen.findByRole("table", { name: "Colaboradores desta empresa" });
-    await abrirFormularioEAguardarOpcoes();
 
     const texto = document.body.innerHTML.toLowerCase();
     for (const termoProibido of [
@@ -953,47 +551,6 @@ describe("ColaboradoresScreen (T111 — funcional)", () => {
     ]) {
       expect(texto).not.toContain(termoProibido);
     }
-  });
-  // ---- T142 (piloto): o painel de trabalho precisa ser encontrável ---------
-
-  it("ao abrir o formulário, o foco vai para o título do painel", async () => {
-    render(<ColaboradoresScreen />);
-    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
-
-    const abrir = screen.getByRole("button", { name: "Novo colaborador" });
-    expect(abrir).toHaveAttribute("aria-expanded", "false");
-
-    fireEvent.click(abrir);
-
-    const titulo = await screen.findByRole("heading", {
-      name: "Novo colaborador",
-      level: 2,
-    });
-    await waitFor(() => expect(document.activeElement).toBe(titulo));
-    expect(abrir).toHaveAttribute("aria-expanded", "true");
-    expect(abrir).toHaveAttribute("aria-haspopup", "dialog");
-    // A janela é modal e é nomeada pelo título que recebeu o foco.
-    const dialogo = screen.getByRole("dialog");
-    expect(dialogo).toHaveAttribute("aria-modal", "true");
-    expect(dialogo).toHaveAttribute("aria-labelledby", titulo.id);
-  });
-
-  it("Escape fecha a janela vazia e devolve o foco a quem a abriu", async () => {
-    render(<ColaboradoresScreen />);
-    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
-
-    const abrir = screen.getByRole("button", { name: "Novo colaborador" });
-    fireEvent.click(abrir);
-    await screen.findByRole("heading", { name: "Novo colaborador", level: 2 });
-
-    fireEvent.keyDown(document, { key: "Escape" });
-
-    await waitFor(() =>
-      expect(
-        screen.queryByRole("heading", { name: "Novo colaborador", level: 2 }),
-      ).toBeNull(),
-    );
-    await waitFor(() => expect(document.activeElement).toBe(abrir));
   });
 
   it("o detalhe recebe o foco e fecha com Escape, devolvendo o foco", async () => {
@@ -1026,355 +583,76 @@ describe("ColaboradoresScreen (T111 — funcional)", () => {
     const repetidos = titulos.filter((t) => t === "Colaboradores");
     expect(repetidos).toHaveLength(1);
   });
-  it("admitir confirma o resultado e devolve o foco a quem abriu", async () => {
-    vi.mocked(admitirColaborador).mockResolvedValue(admissaoDe(colaborador1));
+});
+
+// ---- T177: a admissão mora só na página de Nova admissão -----------------
+
+describe("ColaboradoresScreen (T177 — Novo colaborador leva à página de Nova admissão)", () => {
+  it("'Novo colaborador' chama onNovaAdmissao e não abre janela nenhuma", async () => {
+    const onNovaAdmissao = vi.fn();
+    render(<ColaboradoresScreen onNovaAdmissao={onNovaAdmissao} />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+
+    const botao = screen.getByRole("button", { name: "Novo colaborador" });
+    // Navega, não abre janela: nada de semântica de diálogo.
+    expect(botao).not.toHaveAttribute("aria-haspopup");
+    expect(botao).not.toHaveAttribute("aria-expanded");
+
+    fireEvent.click(botao);
+
+    expect(onNovaAdmissao).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(
+      screen.queryByRole("form", { name: "Formulário de novo colaborador" }),
+    ).toBeNull();
+  });
+
+  it("sem onNovaAdmissao, não há botão 'Novo colaborador' no cabeçalho", async () => {
     render(<ColaboradoresScreen />);
     await screen.findByRole("table", { name: "Colaboradores desta empresa" });
 
-    const abrir = screen.getByRole("button", { name: "Novo colaborador" });
-    await abrirFormularioEAguardarOpcoes();
-
-    fireEvent.change(screen.getByLabelText(/Nome completo/i), {
-      target: { value: "Colaborador Novo" },
-    });
-    fireEvent.change(screen.getByLabelText(/Matrícula/i), {
-      target: { value: "mat-0099" },
-    });
-    fireEvent.change(screen.getByLabelText(/Tipo de vínculo/i), {
-      target: { value: "clt" },
-    });
-    fireEvent.change(screen.getByLabelText(/Data de admissão/i), {
-      target: { value: "2026-01-05" },
-    });
-    fireEvent.change(
-      screen.getByLabelText(/Tipo de referência organizacional/i),
-      {
-        target: { value: "departamento" },
-      },
-    );
-    fireEvent.change(
-      screen.getByLabelText(/Registro da referência organizacional/i),
-      {
-        target: { value: departamento1.id },
-      },
-    );
-
-    fireEvent.click(
-      screen.getByRole("button", { name: "Admitir colaborador" }),
-    );
-
-    const confirmacao = await screen.findByRole("status");
-    expect(confirmacao.textContent).toMatch(/admitido/i);
-    await waitFor(() => expect(document.activeElement).toBe(abrir));
-
-    // A confirmação sai de cena assim que outra tarefa começa.
-    fireEvent.click(screen.getByRole("button", { name: "Dispensar" }));
-    await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
-  });
-  // ---- T142: o erro fica no campo que precisa ser preenchido --------------
-
-  it("com o tipo escolhido e o registro vazio, o erro marca o REGISTRO, não o tipo", async () => {
-    render(<ColaboradoresScreen />);
-    await abrirFormularioEAguardarOpcoes();
-
-    // Só o tipo (a categoria) é escolhido; o registro fica vazio.
-    fireEvent.change(
-      screen.getByLabelText(/Tipo de referência organizacional/i),
-      { target: { value: "cargo" } },
-    );
-    fireEvent.click(
-      screen.getByRole("button", { name: "Admitir colaborador" }),
-    );
-
-    const tipo = screen.getByLabelText(/Tipo de referência organizacional/i);
-    const registro = screen.getByLabelText(
-      /Registro da referência organizacional/i,
-    );
-
-    await waitFor(() =>
-      expect(registro).toHaveAttribute("aria-invalid", "true"),
-    );
-    // O campo JÁ preenchido não pode ser acusado.
-    expect(tipo).not.toHaveAttribute("aria-invalid", "true");
-    expect(screen.getByText(/Selecione o registro de cargo\./i)).toBeTruthy();
-  });
-
-  it("sem tipo escolhido, o erro marca o TIPO", async () => {
-    render(<ColaboradoresScreen />);
-    await abrirFormularioEAguardarOpcoes();
-
-    fireEvent.click(
-      screen.getByRole("button", { name: "Admitir colaborador" }),
-    );
-
-    const tipo = screen.getByLabelText(/Tipo de referência organizacional/i);
-    await waitFor(() => expect(tipo).toHaveAttribute("aria-invalid", "true"));
     expect(
-      screen.getByText("Escolha o tipo de referência organizacional."),
-    ).toBeTruthy();
+      screen.queryByRole("button", { name: "Novo colaborador" }),
+    ).toBeNull();
   });
 
-  it("cargo sozinho é referência suficiente e vai no DTO como cargoId", async () => {
-    vi.mocked(admitirColaborador).mockResolvedValue(admissaoDe(colaborador1));
+  it("sem onNovaAdmissao, o estado vazio também não oferece o botão", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue(paginado([]));
     render(<ColaboradoresScreen />);
-    await abrirFormularioEAguardarOpcoes();
 
-    fireEvent.change(screen.getByLabelText(/Nome completo/i), {
-      target: { value: "Colaborador Cargo" },
+    await screen.findByRole("heading", {
+      name: "Nenhum colaborador cadastrado",
     });
-    fireEvent.change(screen.getByLabelText(/Matrícula/i), {
-      target: { value: "mat-0101" },
-    });
-    fireEvent.change(screen.getByLabelText(/Tipo de vínculo/i), {
-      target: { value: "clt" },
-    });
-    fireEvent.change(screen.getByLabelText(/Data de admissão/i), {
-      target: { value: "2026-01-05" },
-    });
-    fireEvent.change(
-      screen.getByLabelText(/Tipo de referência organizacional/i),
-      { target: { value: "cargo" } },
-    );
-    fireEvent.change(
-      screen.getByLabelText(/Registro da referência organizacional/i),
-      { target: { value: cargo1.id } },
-    );
-
-    fireEvent.click(
-      screen.getByRole("button", { name: "Admitir colaborador" }),
-    );
-
-    await waitFor(() =>
-      expect(admitirColaborador).toHaveBeenCalledWith({
-        nome: "Colaborador Cargo",
-        empresaId: empresa1.id,
-        matricula: "MAT-0101",
-        tipo: "clt",
-        dataAdmissao: "2026-01-05",
-        motivoCodigo: "admissao_inicial",
-        cargoId: cargo1.id,
-      }),
-    );
+    expect(
+      screen.queryByRole("button", { name: "Novo colaborador" }),
+    ).toBeNull();
+    expect(
+      screen.queryByText(/Registre a admissão do primeiro colaborador/i),
+    ).toBeNull();
   });
 
-  // ---- B2: a validação da referência organizacional precisa BLOQUEAR o
-  // envio sozinha, sem depender de nenhum outro campo obrigatório estar
-  // faltando — testes isolados, com todo o resto do formulário válido.
-  it("com todos os demais campos válidos, sem tipo de referência escolhido, bloqueia o envio e marca o campo do TIPO", async () => {
-    // Mocks não são limpos entre testes neste arquivo: a contagem de
-    // chamadas é sempre relativa ao que já havia antes deste teste.
-    const antes = vi.mocked(admitirColaborador).mock.calls.length;
-    render(<ColaboradoresScreen />);
-    await abrirFormularioEAguardarOpcoes();
+  it("o botão do estado vazio também chama onNovaAdmissao", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue(paginado([]));
+    const onNovaAdmissao = vi.fn();
+    render(<ColaboradoresScreen onNovaAdmissao={onNovaAdmissao} />);
 
-    fireEvent.change(screen.getByLabelText(/Nome completo/i), {
-      target: { value: "Colaborador Sem Tipo" },
+    const vazio = (
+      await screen.findByRole("heading", {
+        name: "Nenhum colaborador cadastrado",
+      })
+    ).closest(".evolli-empty-state");
+    expect(vazio).not.toBeNull();
+    // Um no cabeçalho e outro no estado vazio — os dois levam à página.
+    const botoes = screen.getAllByRole("button", { name: "Novo colaborador" });
+    expect(botoes).toHaveLength(2);
+    const doVazio = within(vazio as HTMLElement).getByRole("button", {
+      name: "Novo colaborador",
     });
-    fireEvent.change(screen.getByLabelText(/Matrícula/i), {
-      target: { value: "mat-0303" },
-    });
-    fireEvent.change(screen.getByLabelText(/Tipo de vínculo/i), {
-      target: { value: "clt" },
-    });
-    fireEvent.change(screen.getByLabelText(/Data de admissão/i), {
-      target: { value: "2026-01-05" },
-    });
-    // Tipo de referência organizacional deliberadamente NÃO escolhido.
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "Admitir colaborador" }),
-    );
+    fireEvent.click(doVazio);
 
-    const tipo = screen.getByLabelText(/Tipo de referência organizacional/i);
-    await waitFor(() => expect(tipo).toHaveAttribute("aria-invalid", "true"));
-    expect(
-      screen.getByText("Escolha o tipo de referência organizacional."),
-    ).toBeTruthy();
-    expect(vi.mocked(admitirColaborador).mock.calls.length).toBe(antes);
-  });
-
-  it("com todos os demais campos válidos, tipo Área sem departamento escolhido, bloqueia o envio e marca o campo do DEPARTAMENTO", async () => {
-    const antes = vi.mocked(admitirColaborador).mock.calls.length;
-    render(<ColaboradoresScreen />);
-    await abrirFormularioEAguardarOpcoes();
-
-    fireEvent.change(screen.getByLabelText(/Nome completo/i), {
-      target: { value: "Colaborador Área Sem Departamento" },
-    });
-    fireEvent.change(screen.getByLabelText(/Matrícula/i), {
-      target: { value: "mat-0304" },
-    });
-    fireEvent.change(screen.getByLabelText(/Tipo de vínculo/i), {
-      target: { value: "clt" },
-    });
-    fireEvent.change(screen.getByLabelText(/Data de admissão/i), {
-      target: { value: "2026-01-05" },
-    });
-    fireEvent.change(
-      screen.getByLabelText(/Tipo de referência organizacional/i),
-      { target: { value: "area" } },
-    );
-    // O registro (a área) só libera depois do departamento: continua vazio
-    // e desabilitado — não há como escolhê-lo sem o departamento primeiro.
-    expect(
-      screen.getByLabelText(/Registro da referência organizacional/i),
-    ).toBeDisabled();
-
-    fireEvent.click(
-      screen.getByRole("button", { name: "Admitir colaborador" }),
-    );
-
-    const departamentoArea = screen.getByLabelText(/Departamento da área/i);
-    await waitFor(() =>
-      expect(departamentoArea).toHaveAttribute("aria-invalid", "true"),
-    );
-    expect(screen.getByText("Selecione o departamento da área.")).toBeTruthy();
-    expect(vi.mocked(admitirColaborador).mock.calls.length).toBe(antes);
-  });
-
-  it("cliques repetidos no envio não duplicam a admissão", async () => {
-    // Objeto mutável, não `let`: o TypeScript não acompanha a atribuição de
-    // `resolver` feita dentro do executor da Promise (closure separada) e, na
-    // leitura abaixo, estreita a variável para `null` só por análise de fluxo
-    // — dar `resolver?.()` nela vira `never` ("not callable"). Guardando em
-    // `.current` o problema não existe: acesso a propriedade não sofre esse
-    // estreitamento.
-    const resolverRef: {
-      current: ((v: AdmissaoRegistradaApi) => void) | null;
-    } = {
-      current: null,
-    };
-    vi.mocked(admitirColaborador).mockImplementation(
-      () =>
-        new Promise<AdmissaoRegistradaApi>((res) => {
-          resolverRef.current = res;
-        }),
-    );
-    render(<ColaboradoresScreen />);
-    await abrirFormularioEAguardarOpcoes();
-
-    fireEvent.change(screen.getByLabelText(/Nome completo/i), {
-      target: { value: "Colaborador Duplo" },
-    });
-    fireEvent.change(screen.getByLabelText(/Matrícula/i), {
-      target: { value: "mat-0202" },
-    });
-    fireEvent.change(screen.getByLabelText(/Tipo de vínculo/i), {
-      target: { value: "clt" },
-    });
-    fireEvent.change(screen.getByLabelText(/Data de admissão/i), {
-      target: { value: "2026-01-05" },
-    });
-    fireEvent.change(
-      screen.getByLabelText(/Tipo de referência organizacional/i),
-      { target: { value: "cargo" } },
-    );
-    fireEvent.change(
-      screen.getByLabelText(/Registro da referência organizacional/i),
-      { target: { value: cargo1.id } },
-    );
-
-    const antes = vi.mocked(admitirColaborador).mock.calls.length;
-    const enviar = screen.getByRole("button", { name: "Admitir colaborador" });
-    // Três cliques no mesmo quadro: o `disabled` só chega no próximo render,
-    // então a trava tem de ser síncrona.
-    fireEvent.click(enviar);
-    fireEvent.click(enviar);
-    fireEvent.click(enviar);
-
-    await waitFor(() =>
-      expect(vi.mocked(admitirColaborador).mock.calls.length - antes).toBe(1),
-    );
-    resolverRef.current?.(admissaoDe(colaborador1));
-  });
-
-  // ---- B1: depois de uma falha, a trava síncrona de envio precisa ser
-  // liberada — senão o formulário fica preso: o botão volta a aparecer
-  // habilitado, mas o próximo clique não faz nada.
-  it("depois de uma falha, preserva os dados, libera o reenvio e admite com sucesso ao corrigir o campo", async () => {
-    // Mocks não são limpos entre testes neste arquivo (mesma convenção de
-    // "cliques repetidos..." e "admite um colaborador..."): a contagem é
-    // sempre relativa ao que já havia antes deste teste, nunca absoluta.
-    const antes = vi.mocked(admitirColaborador).mock.calls.length;
-    vi.mocked(admitirColaborador).mockRejectedValueOnce(
-      recusa(409, "Conflito ao processar a requisição."),
-    );
-
-    render(<ColaboradoresScreen />);
-    await abrirFormularioEAguardarOpcoes();
-
-    fireEvent.change(screen.getByLabelText(/Nome completo/i), {
-      target: { value: "Colaborador Reenvio" },
-    });
-    fireEvent.change(screen.getByLabelText(/Matrícula/i), {
-      target: { value: "mat-0400" },
-    });
-    fireEvent.change(screen.getByLabelText(/Tipo de vínculo/i), {
-      target: { value: "clt" },
-    });
-    fireEvent.change(screen.getByLabelText(/Data de admissão/i), {
-      target: { value: "2026-01-05" },
-    });
-    fireEvent.change(
-      screen.getByLabelText(/Tipo de referência organizacional/i),
-      { target: { value: "departamento" } },
-    );
-    fireEvent.change(
-      screen.getByLabelText(/Registro da referência organizacional/i),
-      { target: { value: departamento1.id } },
-    );
-
-    // Primeira tentativa: a API recusa.
-    fireEvent.click(
-      screen.getByRole("button", { name: "Admitir colaborador" }),
-    );
-    expect(
-      await screen.findByText(
-        "Esta matrícula já está em uso nesta empresa. Informe outra.",
-      ),
-    ).toBeInTheDocument();
-    expect(vi.mocked(admitirColaborador).mock.calls.length - antes).toBe(1);
-
-    // Os dados continuam no formulário — nada foi perdido na falha.
-    expect(screen.getByLabelText(/Nome completo/i)).toHaveValue(
-      "Colaborador Reenvio",
-    );
-    expect(screen.getByLabelText(/Matrícula/i)).toHaveValue("MAT-0400");
-    expect(
-      screen.getByRole("form", { name: "Formulário de novo colaborador" }),
-    ).toBeInTheDocument();
-    // O botão voltou ao estado normal — não ficou preso em "Admitindo…".
-    expect(
-      screen.getByRole("button", { name: "Admitir colaborador" }),
-    ).not.toBeDisabled();
-
-    // Corrige só a matrícula, sem fechar o modal, e reenvia.
-    fireEvent.change(screen.getByLabelText(/Matrícula/i), {
-      target: { value: "mat-0401" },
-    });
-    fireEvent.click(
-      screen.getByRole("button", { name: "Admitir colaborador" }),
-    );
-
-    // Segunda tentativa: sucesso (mock volta ao `mockResolvedValue` padrão).
-    await waitFor(() =>
-      expect(
-        screen.queryByRole("form", { name: "Formulário de novo colaborador" }),
-      ).not.toBeInTheDocument(),
-    );
-    expect(await screen.findByRole("status")).toHaveTextContent(/admitido/i);
-
-    // Uma chamada por tentativa: a primeira (recusada) e a segunda (aceita)
-    // com o campo já corrigido — nunca uma terceira, nem a duplicação do
-    // envio duplicado travado para sempre.
-    const chamadas = vi.mocked(admitirColaborador).mock.calls.slice(antes);
-    expect(chamadas).toHaveLength(2);
-    expect(chamadas[0]?.[0]).toEqual(
-      expect.objectContaining({ matricula: "MAT-0400" }),
-    );
-    expect(chamadas[1]?.[0]).toEqual(
-      expect.objectContaining({ matricula: "MAT-0401" }),
-    );
+    expect(onNovaAdmissao).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 });
 
@@ -1539,133 +817,6 @@ describe("ColaboradoresScreen (T147 — homologação da admissão)", () => {
       vi.mocked(retificarColaborador).mock.calls.slice(antes),
     ).toHaveLength(1);
     patch.resolver({ ...colaborador1, nome: "Ana Corrigida (teste)" });
-  });
-
-  /**
-   * D5. A admissão nasce com colaborador `inativo` e vínculo `previsto`. Com o
-   * filtro em "Ativo", o recém-admitido NÃO volta no refetch — e a confirmação
-   * antiga afirmava, incondicionalmente, que ele já aparecia na lista.
-   *
-   * Falha na implementação anterior: a frase "já aparece na lista abaixo" era
-   * exibida mesmo quando o filtro o escondia.
-   */
-  it("a confirmação não afirma visibilidade quando o filtro esconde o admitido", async () => {
-    vi.mocked(admitirColaborador).mockResolvedValue(
-      admissaoDe({
-        ...colaborador1,
-        id: "cccccccc-cccc-cccc-cccc-cccccccccccc",
-        nome: "Recem Admitido (teste)",
-        situacao: "inativo",
-      }),
-    );
-
-    render(<ColaboradoresScreen />);
-    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
-
-    fireEvent.change(screen.getByLabelText("Situação"), {
-      target: { value: "ativo" },
-    });
-    await waitFor(() =>
-      expect(vi.mocked(listarColaboradores).mock.calls.length).toBeGreaterThan(
-        1,
-      ),
-    );
-
-    await abrirFormularioEAguardarOpcoes();
-    fireEvent.change(screen.getByLabelText(/Nome completo/i), {
-      target: { value: "Recem Admitido (teste)" },
-    });
-    fireEvent.change(screen.getByLabelText(/Matrícula/i), {
-      target: { value: "MAT-0777" },
-    });
-    fireEvent.change(screen.getByLabelText(/Tipo de vínculo/i), {
-      target: { value: "clt" },
-    });
-    fireEvent.change(screen.getByLabelText(/Data de admissão/i), {
-      target: { value: "2026-01-05" },
-    });
-    fireEvent.change(
-      screen.getByLabelText(/Tipo de referência organizacional/i),
-      { target: { value: "departamento" } },
-    );
-    fireEvent.change(
-      screen.getByLabelText(/Registro da referência organizacional/i),
-      { target: { value: departamento1.id } },
-    );
-    fireEvent.click(
-      screen.getByRole("button", { name: "Admitir colaborador" }),
-    );
-
-    await waitFor(() => expect(admitirColaborador).toHaveBeenCalled());
-    const confirmacao = await screen.findByRole("status");
-    expect(confirmacao.textContent).toMatch(/admitido/i);
-    expect(confirmacao.textContent).toMatch(/não aparece na lista/i);
-    expect(confirmacao.textContent).not.toMatch(/já aparece na lista/i);
-  });
-
-  /**
-   * D6. Todo `onChange` fazia `erros: {}`. Como a mensagem do servidor vive em
-   * `geral`, começar a corrigir apagava a explicação do que deu errado — no
-   * momento exato em que ela é necessária.
-   *
-   * Falha na implementação anterior: um caractere digitado sumia com o texto.
-   */
-  it("corrigir OUTRO campo preserva o motivo da recusa; corrigir o campo apontado o resolve", async () => {
-    // T167: a recusa do servidor deixou de ser texto cru no rodapé — o 409 da
-    // admissão aponta a matrícula. A regra da D6 continua: começar a corrigir
-    // não apaga o motivo; só o campo que ele aponta, quando corrigido, o leva.
-    vi.mocked(admitirColaborador).mockRejectedValueOnce(
-      recusa(409, "Conflito ao processar a requisição."),
-    );
-
-    render(<ColaboradoresScreen />);
-    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
-    await abrirFormularioEAguardarOpcoes();
-
-    fireEvent.change(screen.getByLabelText(/Nome completo/i), {
-      target: { value: "Nome Teste (teste)" },
-    });
-    fireEvent.change(screen.getByLabelText(/Matrícula/i), {
-      target: { value: "MAT-0500" },
-    });
-    fireEvent.change(screen.getByLabelText(/Tipo de vínculo/i), {
-      target: { value: "clt" },
-    });
-    fireEvent.change(screen.getByLabelText(/Data de admissão/i), {
-      target: { value: "2026-01-05" },
-    });
-    fireEvent.change(
-      screen.getByLabelText(/Tipo de referência organizacional/i),
-      { target: { value: "departamento" } },
-    );
-    fireEvent.change(
-      screen.getByLabelText(/Registro da referência organizacional/i),
-      { target: { value: departamento1.id } },
-    );
-    fireEvent.click(
-      screen.getByRole("button", { name: "Admitir colaborador" }),
-    );
-
-    const erro = await screen.findByText(/matrícula já está em uso/i);
-    expect(erro).toBeInTheDocument();
-    // A mensagem crua do servidor não aparece mais.
-    expect(
-      screen.queryByText(/Conflito ao processar a requisição/i),
-    ).not.toBeInTheDocument();
-
-    // Corrige outro campo — o motivo da recusa continua legível.
-    fireEvent.change(screen.getByLabelText(/Nome completo/i), {
-      target: { value: "Nome Corrigido (teste)" },
-    });
-    expect(screen.getByText(/matrícula já está em uso/i)).toBeInTheDocument();
-
-    // Corrige a matrícula — o erro que ela causou sai com ela.
-    fireEvent.change(screen.getByLabelText(/Matrícula/i), {
-      target: { value: "MAT-0501" },
-    });
-    expect(
-      screen.queryByText(/matrícula já está em uso/i),
-    ).not.toBeInTheDocument();
   });
 
   /**
@@ -2192,338 +1343,6 @@ describe("R-2 — trocar de página não derruba o foco", () => {
         screen.getByRole("navigation", { name: "Paginação de colaboradores" }),
       ).toHaveTextContent("Página 2 de 3"),
     );
-  });
-});
-
-/**
- * T167 — admissão mínima segura, dentro do contrato atual.
- */
-describe("ColaboradoresScreen (T167 — admissão mínima segura)", () => {
-  async function preencherFormularioValido(matricula = "mat-0900") {
-    await abrirFormularioEAguardarOpcoes();
-    fireEvent.change(screen.getByLabelText(/Nome completo/i), {
-      target: { value: "Pessoa T167 (teste)" },
-    });
-    fireEvent.change(screen.getByLabelText(/Matrícula/i), {
-      target: { value: matricula },
-    });
-    fireEvent.change(screen.getByLabelText(/Tipo de vínculo/i), {
-      target: { value: "clt" },
-    });
-    fireEvent.change(screen.getByLabelText(/Data de admissão/i), {
-      target: { value: "2026-01-05" },
-    });
-    fireEvent.change(
-      screen.getByLabelText(/Tipo de referência organizacional/i),
-      { target: { value: "departamento" } },
-    );
-    fireEvent.change(
-      screen.getByLabelText(/Registro da referência organizacional/i),
-      { target: { value: departamento1.id } },
-    );
-  }
-
-  function enviar() {
-    fireEvent.click(
-      screen.getByRole("button", { name: "Admitir colaborador" }),
-    );
-  }
-
-  function formulario() {
-    return screen.queryByRole("form", {
-      name: "Formulário de novo colaborador",
-    });
-  }
-
-  it("Cancelar com dados digitados pede confirmação e não descarta sozinho", async () => {
-    render(<ColaboradoresScreen />);
-    await abrirFormularioEAguardarOpcoes();
-    fireEvent.change(screen.getByLabelText(/Nome completo/i), {
-      target: { value: "Digitado (teste)" },
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
-    expect(
-      screen.getByRole("alertdialog", {
-        name: "Há alterações não salvas nesta janela. Descartar?",
-      }),
-    ).toBeInTheDocument();
-    expect(formulario()).toBeInTheDocument();
-
-    // Continuar editando: nada se perde.
-    fireEvent.click(screen.getByRole("button", { name: "Continuar editando" }));
-    expect(screen.getByLabelText(/Nome completo/i)).toHaveValue(
-      "Digitado (teste)",
-    );
-
-    // Descartar: só agora a janela fecha.
-    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
-    fireEvent.click(
-      screen.getByRole("button", { name: "Descartar alterações" }),
-    );
-    expect(formulario()).not.toBeInTheDocument();
-  });
-
-  it("validação local leva o foco ao primeiro campo com erro, na ordem da tela", async () => {
-    const antes = vi.mocked(admitirColaborador).mock.calls.length;
-    render(<ColaboradoresScreen />);
-    await abrirFormularioEAguardarOpcoes();
-
-    enviar();
-    await waitFor(() =>
-      expect(document.activeElement).toBe(
-        screen.getByLabelText(/Nome completo/i),
-      ),
-    );
-
-    // Corrigido o nome, o próximo erro na ordem é a matrícula.
-    fireEvent.change(screen.getByLabelText(/Nome completo/i), {
-      target: { value: "Pessoa T167 (teste)" },
-    });
-    fireEvent.change(screen.getByLabelText(/Matrícula/i), {
-      target: { value: "x" },
-    });
-    enviar();
-    await waitFor(() =>
-      expect(document.activeElement).toBe(screen.getByLabelText(/Matrícula/i)),
-    );
-    expect(vi.mocked(admitirColaborador).mock.calls.length).toBe(antes);
-  });
-
-  it("409 aponta a matrícula: erro associado ao campo, foco nele e dados mantidos", async () => {
-    vi.mocked(admitirColaborador).mockRejectedValueOnce(
-      recusa(409, "Conflito ao processar a requisição."),
-    );
-    render(<ColaboradoresScreen />);
-    await preencherFormularioValido("mat-0901");
-    enviar();
-
-    const campo = screen.getByLabelText(/Matrícula/i);
-    await waitFor(() => expect(campo).toHaveAttribute("aria-invalid", "true"));
-    const descritores = campo.getAttribute("aria-describedby") ?? "";
-    const idErro = descritores.split(" ").find((id) => id.endsWith("-error"));
-    expect(idErro).toBeDefined();
-    expect(document.getElementById(idErro ?? "")).toHaveTextContent(
-      "Esta matrícula já está em uso nesta empresa. Informe outra.",
-    );
-    await waitFor(() => expect(document.activeElement).toBe(campo));
-
-    expect(formulario()).toBeInTheDocument();
-    expect(screen.getByLabelText(/Nome completo/i)).toHaveValue(
-      "Pessoa T167 (teste)",
-    );
-    expect(campo).toHaveValue("MAT-0901");
-    expect(
-      screen.getByLabelText(/Registro da referência organizacional/i),
-    ).toHaveValue(departamento1.id);
-  });
-
-  it("422 aponta a referência organizacional, com foco nela", async () => {
-    vi.mocked(admitirColaborador).mockRejectedValueOnce(
-      recusa(422, "Dados inválidos."),
-    );
-    render(<ColaboradoresScreen />);
-    await preencherFormularioValido("mat-0902");
-    enviar();
-
-    const campo = screen.getByLabelText(
-      /Registro da referência organizacional/i,
-    );
-    await waitFor(() => expect(campo).toHaveAttribute("aria-invalid", "true"));
-    expect(
-      screen.getByText(/referência organizacional escolhida não foi aceita/i),
-    ).toBeInTheDocument();
-    await waitFor(() => expect(document.activeElement).toBe(campo));
-    expect(screen.getByLabelText(/Matrícula/i)).toHaveValue("MAT-0902");
-  });
-
-  it("404 (empresa ativa mudou) explica, foca a mensagem e não perde os dados", async () => {
-    vi.mocked(admitirColaborador).mockRejectedValueOnce(
-      recusa(404, "Recurso não encontrado."),
-    );
-    render(<ColaboradoresScreen />);
-    await preencherFormularioValido("mat-0903");
-    enviar();
-
-    const mensagem = await screen.findByText(/empresa ativa mudou/i);
-    await waitFor(() => expect(document.activeElement).toBe(mensagem));
-    expect(
-      screen.queryByText(/Recurso não encontrado/i),
-    ).not.toBeInTheDocument();
-    expect(screen.getByLabelText(/Matrícula/i)).toHaveValue("MAT-0903");
-  });
-
-  it("falha de rede mantém os dados e permite tentar de novo", async () => {
-    vi.mocked(admitirColaborador).mockRejectedValueOnce(
-      new TypeError("Failed to fetch"),
-    );
-    render(<ColaboradoresScreen />);
-    await preencherFormularioValido("mat-0904");
-    enviar();
-
-    expect(
-      await screen.findByText(/Os dados digitados foram mantidos/i),
-    ).toBeInTheDocument();
-    expect(screen.getByLabelText(/Matrícula/i)).toHaveValue("MAT-0904");
-    expect(
-      screen.getByRole("button", { name: "Admitir colaborador" }),
-    ).not.toBeDisabled();
-  });
-
-  it("sucesso confirma com o que o SERVIDOR gravou e leva à ficha do admitido", async () => {
-    vi.mocked(admitirColaborador).mockResolvedValueOnce(
-      admissaoDe(colaborador1),
-    );
-    render(<ColaboradoresScreen />);
-    await preencherFormularioValido("mat-0905");
-    enviar();
-
-    const confirmacao = await screen.findByRole("status");
-    // A matrícula exibida é a da resposta, não a digitada.
-    expect(confirmacao).toHaveTextContent(/matrícula MAT-SRV1/);
-    expect(confirmacao).toHaveTextContent(/vínculo começa Previsto/);
-    expect(formulario()).not.toBeInTheDocument();
-
-    const antes = vi.mocked(listarVinculosDoColaborador).mock.calls.length;
-    fireEvent.click(
-      screen.getByRole("button", {
-        name: `Abrir ficha de ${colaborador1.nome}`,
-      }),
-    );
-    expect(
-      await screen.findByRole("dialog", { name: colaborador1.nome }),
-    ).toBeInTheDocument();
-    // Uma única busca: os vínculos da ficha aberta, nunca uma por linha.
-    await waitFor(() =>
-      expect(
-        vi.mocked(listarVinculosDoColaborador).mock.calls.slice(antes),
-      ).toEqual([[colaborador1.id]]),
-    );
-  });
-
-  it("o envio continua fixando o motivo admissao_inicial — nunca o de outra movimentação", async () => {
-    vi.mocked(admitirColaborador).mockResolvedValueOnce(
-      admissaoDe(colaborador1),
-    );
-    render(<ColaboradoresScreen />);
-    await preencherFormularioValido("mat-0906");
-    enviar();
-    await waitFor(() =>
-      expect(admitirColaborador).toHaveBeenCalledWith(
-        expect.objectContaining({
-          matricula: "MAT-0906",
-          motivoCodigo: "admissao_inicial",
-        }),
-      ),
-    );
-  });
-});
-
-/**
- * T167 — a empresa da admissão vem só da sessão, nunca de campo manipulável.
- */
-describe("ColaboradoresScreen (T167 — empresa só da sessão)", () => {
-  it("mostra a empresa da admissão em leitura, sem campo para trocá-la, e envia exatamente ela", async () => {
-    const antes = vi.mocked(admitirColaborador).mock.calls.length;
-    render(<ColaboradoresScreen />);
-    await abrirFormularioEAguardarOpcoes();
-
-    const formulario = screen.getByRole("form", {
-      name: "Formulário de novo colaborador",
-    });
-    expect(
-      within(formulario).getByText(/Empresa da admissão:/i),
-    ).toHaveTextContent(empresa1.nome);
-    expect(
-      within(formulario).queryByRole("combobox", { name: /Empresa/i }),
-    ).not.toBeInTheDocument();
-
-    fireEvent.change(screen.getByLabelText(/Nome completo/i), {
-      target: { value: "Pessoa Empresa (teste)" },
-    });
-    fireEvent.change(screen.getByLabelText(/Matrícula/i), {
-      target: { value: "mat-0910" },
-    });
-    fireEvent.change(screen.getByLabelText(/Tipo de vínculo/i), {
-      target: { value: "clt" },
-    });
-    fireEvent.change(screen.getByLabelText(/Data de admissão/i), {
-      target: { value: "2026-01-05" },
-    });
-    fireEvent.change(
-      screen.getByLabelText(/Tipo de referência organizacional/i),
-      { target: { value: "departamento" } },
-    );
-    fireEvent.change(
-      screen.getByLabelText(/Registro da referência organizacional/i),
-      { target: { value: departamento1.id } },
-    );
-    fireEvent.click(
-      screen.getByRole("button", { name: "Admitir colaborador" }),
-    );
-
-    await waitFor(() =>
-      expect(vi.mocked(admitirColaborador).mock.calls.length - antes).toBe(1),
-    );
-    expect(vi.mocked(admitirColaborador).mock.calls.at(-1)?.[0]).toEqual(
-      expect.objectContaining({ empresaId: empresa1.id }),
-    );
-  });
-
-  it("se o servidor não devolver exatamente uma empresa, não oferece escolha e não envia", async () => {
-    vi.mocked(listarEmpresasMulti).mockResolvedValueOnce(
-      paginado([
-        empresa1,
-        {
-          ...empresa1,
-          id: "45454545-4545-4545-8545-454545454545",
-          codigo: "EMP2",
-          nome: "Empresa Dois (teste)",
-        },
-      ]),
-    );
-    const antes = vi.mocked(admitirColaborador).mock.calls.length;
-    render(<ColaboradoresScreen />);
-    await abrirFormularioEAguardarOpcoes();
-
-    expect(
-      await screen.findByText(/Não foi possível confirmar a empresa ativa/i),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("combobox", { name: /Empresa/i }),
-    ).not.toBeInTheDocument();
-    expect(screen.queryByText(/Empresa da admissão:/i)).not.toBeInTheDocument();
-
-    fireEvent.change(screen.getByLabelText(/Nome completo/i), {
-      target: { value: "Pessoa Sem Empresa (teste)" },
-    });
-    fireEvent.change(screen.getByLabelText(/Matrícula/i), {
-      target: { value: "mat-0911" },
-    });
-    fireEvent.change(screen.getByLabelText(/Tipo de vínculo/i), {
-      target: { value: "clt" },
-    });
-    fireEvent.change(screen.getByLabelText(/Data de admissão/i), {
-      target: { value: "2026-01-05" },
-    });
-    fireEvent.change(
-      screen.getByLabelText(/Tipo de referência organizacional/i),
-      { target: { value: "departamento" } },
-    );
-    fireEvent.change(
-      screen.getByLabelText(/Registro da referência organizacional/i),
-      { target: { value: departamento1.id } },
-    );
-    fireEvent.click(
-      screen.getByRole("button", { name: "Admitir colaborador" }),
-    );
-
-    await waitFor(() =>
-      expect(document.activeElement).toBe(
-        screen.getByText(/Não foi possível confirmar a empresa ativa/i),
-      ),
-    );
-    expect(vi.mocked(admitirColaborador).mock.calls.length).toBe(antes);
   });
 });
 

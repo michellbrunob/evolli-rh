@@ -184,6 +184,14 @@ export const AUDIT_ACTIONS = [
   "pessoas_contato_criado",
   "pessoas_contato_atualizado",
   "pessoas_contato_consultado",
+
+  // T177 — Dados pessoais e endereco do colaborador (Modulo 1 do cadastro).
+  // Toda consulta, criacao e edicao deixa evento. Nenhum carrega valor
+  // pessoal: categoria, resultado e NOMES dos campos vivem em
+  // `dados_pessoais_colaborador_evento`, correlacionados por `request_id`.
+  "pessoas_dados_pessoais_criados",
+  "pessoas_dados_pessoais_atualizados",
+  "pessoas_dados_pessoais_consultados",
 ] as const satisfies readonly AuditAction[];
 
 /**
@@ -251,7 +259,10 @@ export type AuditResource =
   // negacoes genericas do `AuthorizationGuard` seguem o padrao transversal
   // existente e podem registrar `resourceId: null`. Nunca o valor de e-mail,
   // celular ou telefone.
-  | "contato_colaborador";
+  | "contato_colaborador"
+  // T177 — Dados pessoais e endereco do colaborador: rotulo tecnico. O
+  // `resourceId` e o id do COLABORADOR. Nunca um valor pessoal.
+  | "dados_pessoais_colaborador";
 
 export type RecordAuditEventInput =
   | {

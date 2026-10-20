@@ -274,3 +274,29 @@ administrador global confiável, com **leitura e edição em qualquer empresa**.
 vínculo, movimentação, ponto, documentos, folha, exportação e qualquer outro
 recurso. A decisão da T165 (§5.2) — "o `master_tecnico` não cria, não edita e
 não admite pessoas" — continua valendo para tudo, **exceto** os contatos.
+
+## Emenda 2 (2026-10-20) — `master_tecnico` em dados pessoais e endereço do colaborador
+
+**Aditivo.** A proprietária decidiu que o `master_tecnico`, por ser cargo de
+confiança, pode acessar tudo. Esta emenda aplica a decisão ao recorte da T177:
+**dados pessoais básicos e endereço do colaborador**
+([ficha de tratamento](../decisions/ficha-tratamento-dados-pessoais-endereco-colaborador.md),
+aprovada pela proprietária em 2026-10-20). Nessas categorias, o `master_tecnico` tem **leitura e edição em
+qualquer empresa**, como já tinha nos contatos (Emenda 1).
+
+**Condições — as mesmas da Emenda 1:**
+
+- toda leitura e toda edição identificam a **empresa real do colaborador** e
+  são **auditadas** com ela, sem registrar valor pessoal;
+- com empresa ativa selecionada, o `master_tecnico` atua **dentro dela**, como
+  em todo o resto (T163);
+- sem seleção, atua na empresa do vínculo do colaborador; se houver vínculo em
+  mais de uma empresa, nada é lido nem gravado (409), e a tentativa fica na
+  trilha sem empresa.
+
+**Alcance desta emenda:** os recursos de dados pessoais e endereço. A T177 não
+muda, por esta emenda, o acesso do `master_tecnico` a outros recursos —
+admissão, vínculo, movimentação, ponto, documentos, folha e exportação seguem
+como a Emenda 1 os descreve. Levar a decisão "acessa tudo" a cada um desses
+recursos é registro próprio, a ser feito quando a proprietária confirmar o
+alcance.

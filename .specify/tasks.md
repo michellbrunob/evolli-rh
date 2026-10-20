@@ -2115,9 +2115,12 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       da T171: o aviso `[DEP0190]` do Node 24 no orquestrador da demonstração, no Windows (`shell: true` com argumentos), só aviso; e as observações O-1 (a CLI fina do `prisma generate` não tem teste próprio), O-2 (caminho inválido sem teste explícito) e O-3 (efeitos leves nos testes). Pendências da T172: as observações não bloqueantes O-1 (descarte protegido sem exercício no navegador), O-2 (contrato de CSS lido por regex), O-3 (banco sintético local alterado na validação), O-4 (outros quatro usos de `colaboradores-screen__aviso-texto` na mesma tela, não medidos) e O-5 (`openDeliveries.pullRequest` nulo com PR aberta), e as de redação O-a a O-c. Pendências da T173: os 13 conflitos com decisões fechadas (8 firmes e 5 condicionais), **todos abertos**; dos 22 gates, o `DP-FLX-01` foi **resolvido** na T175, e os 21 restantes (`DP-FLX-02` a `DP-FLX-22`) seguem **abertos**; a ADR 0017, **aceita** na T175 sem autorizar implementação; e as observações não bloqueantes O-1 (a linha 9 do corpo da PR diz "mesmo hash", exato só até `fca0fe7`), O-2 (a célula "Reabre ou depende de" do `DP-FLX-21` cita a T146 sem o qualificador "ainda não integrada"), O-3 (quebra de linha curta na ADR) e O-4 ("proposta aprovada" × "fundação visual aprovada" para a T146). Pendências da T174: as observações não bloqueantes da revisão final O-1 (a justificativa da faixa 6 diz que `-18` vem antes de `-22` pela consideração 3, quando a ordem se sustenta pela consideração 5), O-2 (o parágrafo de portões externos lista `-14` entre as fichas de RH + Jurídico, quando o insumo da tabela é o Nível 2 da Etapa 2) e O-3 (a lista de fontes diz "que as fichas citam" e inclui a ADR 0004, citada só na tabela da seção 3); e o erro de redação "aliquotas de aprovacao" na mensagem do commit `54143b4`, preservado no squash.
 
 73. **T176 - Preparação da decisão do `DP-FLX-04` e Nova admissão em página própria (trilha acelerada)**
-    - **Estado:** **implementada em Draft**. Branch
+    - **Estado:** **integrada** em `main` pela PR #168, squash
+      `58fd37ccc72d12cf21c9739ed6395c6a302bb1ef`, com a CI de push 3/3 verde em Node 24. Branch
       `codex/t176-estados-processo-admissional`, a partir do squash
-      `3a9ed3b21bbb4254f33750a705edbad89a8a642b` (T175, PR #167).
+      `3a9ed3b21bbb4254f33750a705edbad89a8a642b` (T175, PR #167). Na data da
+      integração: 13 conflitos, 12 abertos e 1 resolvido; 22 gates, `DP-FLX-01` e
+      `DP-FLX-21` resolvidos e 20 abertos.
     - **Natureza na abertura:** entrega **exclusivamente documental**. Fontes permitidas: a
       ADR 0017 aceita; o dossiê da T174; o diagnóstico e as respostas R1 a R40 da
       T173; e as ADRs, os contratos, o código e os testes atuais, só como
@@ -2189,6 +2192,97 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       de admissão, RBAC, auditoria, Docker, banco, seed, dependência e lockfile.
     - **Dívida preservada:** R-3 (T162), R-3 da revisão da T164, S2 (T161), R1 a R3 (T160), L3, S-1 a S-4 (T158), R-A a R-C (T157), o registro `teste michell`, a decisão `DP-29` (se `outro_controlado` vale para admissão) e a limitação de validação em navegador da T167. Pendências da T169: o processo de eliminação ou anonimização após 2 anos; as rotas de exportação e exclusão de contatos; a origem e a evidência da coleta; a validação visual em navegador; as observações N-2 (criação concorrente de contato que perde na unicidade responde 409 sem trilha), N-3 (`ON UPDATE CASCADE` nas FKs do evento de contato permite reescrita indireta) e N-4 (CHECK do evento mais frouxo que o serviço); e a docstring do serviço de contatos sobre `resourceId`. Pendências
       da T171: o aviso `[DEP0190]` do Node 24 no orquestrador da demonstração, no Windows (`shell: true` com argumentos), só aviso; e as observações O-1 (a CLI fina do `prisma generate` não tem teste próprio), O-2 (caminho inválido sem teste explícito) e O-3 (efeitos leves nos testes). Pendências da T172: as observações não bloqueantes O-1 (descarte protegido sem exercício no navegador), O-2 (contrato de CSS lido por regex), O-3 (banco sintético local alterado na validação), O-4 (outros quatro usos de `colaboradores-screen__aviso-texto` na mesma tela, não medidos) e O-5 (`openDeliveries.pullRequest` nulo com PR aberta), e as de redação O-a a O-c. Pendências da T173: dos 13 conflitos com decisões fechadas (8 firmes e 5 condicionais), **12 seguem abertos** e o conflito 13 está resolvido por decisão posterior: `DP-FLX-21`, em 2026-10-20; dos 22 gates, o `DP-FLX-01` foi **resolvido** na T175 e o `DP-FLX-21` na T176, e os 20 restantes (`DP-FLX-02` a `DP-FLX-20` e `DP-FLX-22`) seguem **abertos**; a ADR 0017, **aceita** na T175 sem autorizar implementação; e as observações não bloqueantes O-1 (a linha 9 do corpo da PR diz "mesmo hash", exato só até `fca0fe7`), O-2 (a célula "Reabre ou depende de" do `DP-FLX-21` cita a T146 sem o qualificador "ainda não integrada"), O-3 (quebra de linha curta na ADR) e O-4 ("proposta aprovada" × "fundação visual aprovada" para a T146). Pendências da T174: as observações não bloqueantes da revisão final O-1 (a justificativa da faixa 6 diz que `-18` vem antes de `-22` pela consideração 3, quando a ordem se sustenta pela consideração 5), O-2 (o parágrafo de portões externos lista `-14` entre as fichas de RH + Jurídico, quando o insumo da tabela é o Nível 2 da Etapa 2) e O-3 (a lista de fontes diz "que as fichas citam" e inclui a ADR 0004, citada só na tabela da seção 3); e o erro de redação "aliquotas de aprovacao" na mensagem do commit `54143b4`, preservado no squash. Pendências da T175: as observações não bloqueantes da revisão final O-1 (o item do `DP-FLX-06` na nota de aceite não cita a questão do contato "telefone ou e-mail" frente aos três campos da T169), O-2 (dado sindical sem classe própria na ADR 0016, agrupado com os sensíveis ou restritos só pela ressalva de RH + Jurídico) e O-3 (a CI rodou Node 24 em dois patches, `v24.21.0` e `v24.22.0`, porque o `.nvmrc` fixa só a versão principal).
+
+74. **T177 - Cadastro de colaborador, Módulo 1: Dados pessoais, Endereço e Contatos na Nova admissão**
+    - **Estado:** **implementada em Draft**. Branch `codex/t177-cadastro-modulo-1`, a
+      partir do squash `58fd37ccc72d12cf21c9739ed6395c6a302bb1ef` (T176, PR #168).
+    - **Mudança de direção da proprietária (2026-10-20):** o cadastro de
+      colaborador passa a ser implementado **módulo por módulo, com entregas
+      funcionais**. Todo campo ou grupo das referências visuais e das instruções
+      da proprietária deve ser rastreado e atendido, nunca omitido em silêncio.
+    - **Entrega prevista:** implementação real do Módulo 1 na página própria de
+      Nova admissão, em três blocos — Dados pessoais, Endereço e Contatos —, com
+      migration e modelo quando necessário, contrato de API, validação no servidor
+      e no cliente, autorização e auditoria, testes unitários, E2E e web, e
+      demonstração no navegador com dados sintéticos. Os Contatos reutilizam o
+      modelo já aprovado na T169, sem segunda fonte para e-mail, celular e
+      telefone. A empresa ativa continua contexto não editável, e RH e DP
+      continuam os operadores da admissão.
+    - **Ficha de tratamento:** os dados pessoais e o endereço estão na matriz da
+      ADR 0016 como "Complementar" (a classificação A2 foi aprovada com a ficha), que exige ficha aprovada (decisão 5.4) e emenda
+      à ADR 0007, como foi feito com os Contatos na T169. Por decisão da
+      proprietária, a ficha foi redigida **nesta mesma PR**, e o merge dependia
+      da aprovação dela — dada em 2026-10-20.
+    - **Matriz de cobertura:** cada campo e grupo dos prints que a proprietária
+      anexar entra numa matriz no corpo da PR, como implementado, "próximo módulo"
+      ou "decisão necessária", com motivo objetivo e módulo previsto.
+    - **Recorte confirmado pela proprietária (2026-10-20):** nome social e gênero
+      saíram do Módulo 1 e foram para a matriz; país, cidade e estado são texto
+      validado nesta primeira entrega, sem consulta externa de CEP. Fuso horário
+      **não** foi decidido: fica na matriz como decisão pendente, sem descarte.
+    - **Correção da revisão da PR #169 (2026-10-20), por decisão da proprietária:**
+      (1) `master_tecnico` é cargo de confiança e acessa dados pessoais e
+      endereço em qualquer empresa — com empresa ativa, só nela; sem empresa
+      ativa, na empresa real do vínculo; com vínculo em mais de uma empresa, 409
+      e trilha sem empresa —, no desenho já aprovado para contatos (Emenda 2 da
+      ADR 0012); (2) nome completo, data de nascimento, e-mail pessoal, celular e
+      telefone são **obrigatórios** na admissão, e os demais campos do Módulo 1,
+      opcionais, expressos campo a campo na ficha, no contrato e na tela; (3) a
+      matriz não marca fuso horário como descartado. Com a obrigatoriedade no
+      servidor, o formulário transitório em modal da tela de Colaboradores foi
+      aposentado, também por decisão da proprietária (2026-10-20): "Novo
+      colaborador" leva à página de Nova admissão. A ADR 0016 recebeu nota de
+      convergência da T177.
+    - **Pendências próprias da T177:** o **alcance** do "acessa tudo" do
+      `master_tecnico` nos demais recursos (admissão, vínculo, movimentação,
+      ponto, documentos, folha, exportação), que a Emenda 2 da ADR 0012 deixa
+      para registro próprio; a edição de dados pessoais e endereço existe só na
+      API (`PUT`), sem tela nesta entrega; e o endereço gravado só com o país
+      sugerido quando o RH não toca no bloco (registrado na ficha).
+    - **Entregue:** Dados pessoais básicos (data de nascimento, sexo, saudação, estado
+      civil, nacionalidade, naturalidade, escolaridade, curso, nome do pai e nome
+      da mãe, além do nome completo já existente), endereço (país, sugerido como
+      Brasil e editável, CEP, logradouro, número, complemento, bairro, cidade e
+      estado) e os três contatos da T169 (obrigatórios na página), gravados na
+      MESMA transação da admissão. Inclui migration
+      `20261020120000_dados_pessoais_endereco_colaborador` (dois agregados
+      próprios por colaborador e empresa, trilha append-only, CHECKs e gatilhos
+      de vínculo), recurso de autorização `dados_pessoais_colaborador` (`rh` e
+      `dp` na empresa ativa; `master_tecnico` em qualquer empresa, como nos
+      contatos), rotas `GET` e `PUT /v1/colaboradores/:colaboradorId/dados-pessoais`,
+      auditoria de criação, leitura e edição sem valor pessoal, a página de Nova
+      admissão nos blocos dos prints, a leitura na ficha do colaborador e testes
+      unitários, E2E e web. Validado no navegador com dados sintéticos: criação
+      completa, obrigatoriedade, erros, rollback atômico real, leitura posterior,
+      RH, DP, `master_tecnico` (com e sem empresa ativa), troca de empresa e
+      negação a gestor e colaborador.
+    - **Contrato:** em `POST /v1/colaboradores`, `perfilPessoal` (com
+      `dataNascimento`) e `contatos` (os três campos) são **obrigatórios**, e
+      `endereco` é opcional; no `PUT` dos dados pessoais, o bloco do perfil exige
+      a data de nascimento. Os demais campos são opcionais. O banco guarda
+      `data_nascimento` como NOT NULL. Quem foi admitido antes da T177 segue sem
+      esses dados, lido como `sem_registro`.
+    - **Ficha e emenda:** a
+      [ficha de tratamento](../docs/decisions/ficha-tratamento-dados-pessoais-endereco-colaborador.md)
+      e a Emenda 5 da ADR 0007 foram **aprovadas pela proprietária em
+      2026-10-20**: finalidade — admissão e administração da relação de
+      trabalho; base legal — execução do contrato e procedimentos preliminares
+      necessários; classificação — A2, dado pessoal comum; RIPD — não
+      necessário nesta etapa, a reavaliar com documentos, dados bancários, saúde
+      ou demais dados sensíveis ou restritos. **Retenção, por decisão
+      substitutiva:** sem exclusão nem anonimização automática após o
+      desligamento; uso operacional bloqueado, com histórico e auditoria
+      preservados; mudança futura só com decisão explícita da proprietária e
+      avaliação de RH/Jurídico. A ficha de Contatos da T169 foi **alinhada** à
+      mesma regra (§7 dela): a eliminação ou anonimização após 2 anos deixou de
+      existir. O sistema mantém só o valor vigente e os metadados de auditoria,
+      sem versões históricas dos valores. O bloqueio após o desligamento ganhou
+      teste de API (unitário e E2E).
+    - **Fora de escopo:** CPF, documentos, dados bancários, dependentes, saúde,
+      múltiplos vínculos, alçadas e fluxo de aprovação; campo decorativo,
+      desabilitado ou que aparente estar salvo sem persistência real.
+    - **Dívida preservada:** R-3 (T162), R-3 da revisão da T164, S2 (T161), R1 a R3 (T160), L3, S-1 a S-4 (T158), R-A a R-C (T157), o registro `teste michell`, a decisão `DP-29` (se `outro_controlado` vale para admissão) e a limitação de validação em navegador da T167. Pendências da T169: o processo de eliminação ou anonimização após 2 anos — **superado** em 2026-10-20, retenção alinhada sem eliminação automática; as rotas de exportação e exclusão de contatos; a origem e a evidência da coleta; a validação visual em navegador; as observações N-2 (criação concorrente de contato que perde na unicidade responde 409 sem trilha), N-3 (`ON UPDATE CASCADE` nas FKs do evento de contato permite reescrita indireta) e N-4 (CHECK do evento mais frouxo que o serviço); e a docstring do serviço de contatos sobre `resourceId`. Pendências
+      da T171: o aviso `[DEP0190]` do Node 24 no orquestrador da demonstração, no Windows (`shell: true` com argumentos), só aviso; e as observações O-1 (a CLI fina do `prisma generate` não tem teste próprio), O-2 (caminho inválido sem teste explícito) e O-3 (efeitos leves nos testes). Pendências da T172: as observações não bloqueantes O-1 (descarte protegido sem exercício no navegador), O-2 (contrato de CSS lido por regex), O-3 (banco sintético local alterado na validação), O-4 (outros quatro usos de `colaboradores-screen__aviso-texto` na mesma tela, não medidos) e O-5 (`openDeliveries.pullRequest` nulo com PR aberta), e as de redação O-a a O-c. Pendências da T173: dos 13 conflitos com decisões fechadas (8 firmes e 5 condicionais), **12 seguem abertos** e o conflito 13 está resolvido por decisão posterior: `DP-FLX-21`, em 2026-10-20; dos 22 gates, o `DP-FLX-01` foi **resolvido** na T175 e o `DP-FLX-21` na T176, e os 20 restantes (`DP-FLX-02` a `DP-FLX-20` e `DP-FLX-22`) seguem **abertos**; a ADR 0017, **aceita** na T175 sem autorizar implementação; e as observações não bloqueantes O-1 (a linha 9 do corpo da PR diz "mesmo hash", exato só até `fca0fe7`), O-2 (a célula "Reabre ou depende de" do `DP-FLX-21` cita a T146 sem o qualificador "ainda não integrada"), O-3 (quebra de linha curta na ADR) e O-4 ("proposta aprovada" × "fundação visual aprovada" para a T146). Pendências da T174: as observações não bloqueantes da revisão final O-1 (a justificativa da faixa 6 diz que `-18` vem antes de `-22` pela consideração 3, quando a ordem se sustenta pela consideração 5), O-2 (o parágrafo de portões externos lista `-14` entre as fichas de RH + Jurídico, quando o insumo da tabela é o Nível 2 da Etapa 2) e O-3 (a lista de fontes diz "que as fichas citam" e inclui a ADR 0004, citada só na tabela da seção 3); e o erro de redação "aliquotas de aprovacao" na mensagem do commit `54143b4`, preservado no squash. Pendências da T175: as observações não bloqueantes da revisão final O-1 (o item do `DP-FLX-06` na nota de aceite não cita a questão do contato "telefone ou e-mail" frente aos três campos da T169), O-2 (dado sindical sem classe própria na ADR 0016, agrupado com os sensíveis ou restritos só pela ressalva de RH + Jurídico) e O-3 (a CI rodou Node 24 em dois patches, `v24.21.0` e `v24.22.0`, porque o `.nvmrc` fixa só a versão principal). Pendências da T176: o formulário de admissão em modal da tela de Colaboradores, mantido como **transitório** até a página própria ser validada — **aposentado na T177**, quando a admissão passou a exigir data de nascimento e contatos; as observações não bloqueantes da revisão final O-1 (na seção 4 do diagnóstico da T173, a frase "O texto a seguir é o original" da nota da T175 ficou antes da nota da T176) e O-2 (o Status da ADR 0017 não cita a nota de decisão do `DP-FLX-21`); e as documentadas N-4 (em desenvolvimento, abrir a página direto pela URL pode acrescentar uma entrada ao histórico) e N-6 (o efeito de abertura da ficha em `ColaboradoresScreen` suprime `react-hooks/exhaustive-deps`).
 
 ## Regra obrigatória para as próximas tarefas
 

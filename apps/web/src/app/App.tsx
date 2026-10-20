@@ -234,6 +234,8 @@ function conteudoDoDestino(
     readonly abertura: AberturaDoAdmitido | null;
     readonly onAbrirAdmitido: (abertura: AberturaDoAdmitido) => void;
     readonly onAberturaAtendida: () => void;
+    /** T177 — o papel abre a página de Nova admissão (ver `resolverEntrada`). */
+    readonly podeAdmitir: boolean;
   },
 ) {
   if (destinoId === "inicio") {
@@ -257,6 +259,9 @@ function conteudoDoDestino(
         empresaAtiva={empresaAtiva}
         aberturaInicial={admissao.abertura}
         onAberturaAtendida={admissao.onAberturaAtendida}
+        {...(admissao.podeAdmitir
+          ? { onNovaAdmissao: () => onNavegar("nova-admissao") }
+          : {})}
       />
     );
   }
@@ -555,6 +560,11 @@ export function App({
     setDestinoAtivoId("pessoas");
   }, []);
   const aberturaAtendida = useCallback(() => setAberturaDoAdmitido(null), []);
+  // T177 — "Novo colaborador" leva à página de Nova admissão e só aparece para
+  // quem pode abri-la: a mesma validação de capacidade da entrada e da rota.
+  // Perfil que só consulta não ganha um botão que o levaria a um 403.
+  const podeAdmitir =
+    resolverEntrada("nova-admissao", papelDoAtor) === "nova-admissao";
 
   /** O destino exibido agora — lido pelo manipulador de URL, fora do React. */
   const destinoAtivoRef = useRef(destinoAtivoId);
@@ -893,6 +903,7 @@ export function App({
               abertura: aberturaDoAdmitido,
               onAbrirAdmitido: abrirAdmitido,
               onAberturaAtendida: aberturaAtendida,
+              podeAdmitir,
             },
           )}
         </main>

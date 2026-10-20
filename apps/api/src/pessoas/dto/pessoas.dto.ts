@@ -1,9 +1,16 @@
 import { Type } from "class-transformer";
 import {
+  EnderecoDto,
+  PerfilPessoalDto,
+} from "../dados-pessoais/dados-pessoais.dto";
+import { RegistrarContatosColaboradorDto } from "../contatos/contato-colaborador.dto";
+import {
   IsDateString,
+  IsDefined,
   IsIn,
   IsInt,
   IsNotEmpty,
+  IsObject,
   IsOptional,
   IsString,
   IsUUID,
@@ -12,6 +19,7 @@ import {
   MaxLength,
   Min,
   MinLength,
+  ValidateNested,
 } from "class-validator";
 import {
   MotivoMovimentacao,
@@ -162,6 +170,31 @@ export class AdmitirColaboradorDto extends DestinoOrganizacionalDto {
   /** Só motivos compatíveis com uma primeira admissão (`MOTIVOS_ADMISSAO`). */
   @IsIn(MOTIVOS_ADMISSAO)
   motivoCodigo!: MotivoAdmissao;
+
+  /**
+   * T177 — Módulo 1 do cadastro, gravado na MESMA transação da admissão.
+   *
+   * OBRIGATÓRIOS: `perfilPessoal` (com `dataNascimento`) e `contatos` (os
+   * três campos da ficha da T169). OPCIONAL: `endereco`, e todos os campos
+   * dele. Admissão sem eles é 400, antes de qualquer gravação.
+   */
+  @IsDefined()
+  @IsObject()
+  @ValidateNested()
+  @Type(() => PerfilPessoalDto)
+  perfilPessoal!: PerfilPessoalDto;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => EnderecoDto)
+  endereco?: EnderecoDto;
+
+  /** Os três contatos da ficha da T169, juntos — o mesmo DTO da rota própria. */
+  @IsDefined()
+  @IsObject()
+  @ValidateNested()
+  @Type(() => RegistrarContatosColaboradorDto)
+  contatos!: RegistrarContatosColaboradorDto;
 }
 
 /**

@@ -13,6 +13,7 @@ import { GenericContainer, StartedTestContainer, Wait } from "testcontainers";
 import { AppModule } from "../src/app.module";
 import { AllExceptionsFilter } from "../src/common/filters/http-exception.filter";
 import { requestIdMiddleware } from "../src/common/request-id";
+import { CAMPOS_OBRIGATORIOS_ADMISSAO } from "./admissao-obrigatoria";
 
 /**
  * T139 — Central de Solicitações de Pessoas (fundação backend).
@@ -260,6 +261,7 @@ describe("Central de Solicitações de Pessoas — fundação backend (e2e)", ()
   ): Promise<string> {
     const colaborador = await post("/v1/colaboradores", cred)
       .send({
+        ...CAMPOS_OBRIGATORIOS_ADMISSAO,
         nome: "Pessoa Sintetica Solicitacoes",
         empresaId,
         matricula,

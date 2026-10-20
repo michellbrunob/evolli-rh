@@ -23,8 +23,9 @@ import { resolverEscopoContatos } from "./escopo-contatos.util";
  * - `registrado` — contato gravado e em uso operacional.
  * - `bloqueado` — nenhum vínculo do colaborador na empresa segue previsto ou
  *   ativo. A ficha manda **bloquear o uso operacional** após o desligamento:
- *   o valor não é respondido e não pode ser editado. A guarda por 2 anos e a
- *   eliminação seguem a ficha, por processo que esta fatia não implementa.
+ *   o valor não é respondido e não pode ser editado. Não há exclusão nem
+ *   anonimização automática (retenção alinhada em 2026-10-20, §7 da ficha):
+ *   o valor vigente e a trilha de auditoria ficam preservados.
  */
 export type SituacaoContatos = "sem_registro" | "registrado" | "bloqueado";
 
@@ -346,6 +347,46 @@ export class ContatoColaboradorService {
       }
       throw erro;
     }
+  }
+
+  /**
+   * T177 — contatos gravados na ADMISSÃO, dentro da transação dela. O
+   * colaborador e o vínculo acabaram de nascer na mesma transação: não há
+   * contato anterior. Mesmo registro, mesmo evento e mesma trilha da rota
+   * própria — uma só fonte para e-mail pessoal, celular e telefone.
+   */
+  async criarNaAdmissao(
+    tx: Prisma.TransactionClient,
+    ctx: PessoasAuditContext,
+    alvo: { colaboradorId: string; empresaId: string },
+    dto: RegistrarContatosColaboradorDto,
+  ): Promise<ValoresContatos> {
+    const criado = await tx.contatoColaborador.create({
+      data: {
+        empresaId: alvo.empresaId,
+        colaboradorId: alvo.colaboradorId,
+        emailPessoal: dto.emailPessoal,
+        celular: dto.celular,
+        telefone: dto.telefone,
+        criadoPorUserId: ctx.actor.id,
+        atualizadoPorUserId: ctx.actor.id,
+      },
+      select: PROJECAO_CONTATO,
+    });
+    await this.registrarEvento(
+      tx,
+      ctx,
+      { tipo: "resolvido", ...alvo, operacional: true },
+      criado.id,
+      {
+        acao: "criacao",
+        resultado: "gravado",
+        campos: TODOS_OS_CAMPOS,
+        auditAction: "pessoas_contato_criado",
+        auditResult: "success",
+      },
+    );
+    return valores(criado);
   }
 
   /**

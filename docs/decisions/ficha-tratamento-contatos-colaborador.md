@@ -1,6 +1,7 @@
 # Ficha de tratamento — Contatos do colaborador
 
-Status: **aprovada pelo proprietário em 2026-10-16.**
+Status: **aprovada pelo proprietário em 2026-10-16**; retenção alterada pela
+proprietária em 2026-10-20 (§7).
 Categoria: **Contatos do colaborador** (agregado "Contatos e endereço" da
 ADR 0016, recortado aos três campos abaixo; endereço e contato de emergência
 **não** fazem parte desta ficha).
@@ -21,24 +22,24 @@ Cada linha diz **de onde** veio a resposta. "Proprietário" é a aprovação dad
 em 2026-10-16; "derivado" é consequência direta de outra linha ou de decisão já
 aprovada; "avaliado na T169" é verificação técnica registrada na §2.
 
-| Item                                     | Resposta                                                                                                                                                                                                        | Origem                                          |
-| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
-| Campos                                   | **e-mail pessoal**, **celular** e **telefone**. E-mail corporativo **não** entra: segue derivado de `access_user.email`                                                                                         | proprietário                                    |
-| Formato e normalização                   | regra explícita da §3, sem presumir país                                                                                                                                                                        | avaliado na T169                                |
-| Finalidade                               | **cadastro e comunicação operacional durante a relação de trabalho**                                                                                                                                            | proprietário                                    |
-| Base legal principal                     | **execução do contrato**                                                                                                                                                                                        | proprietário                                    |
-| Classificação                            | **A2 restrita**                                                                                                                                                                                                 | proprietário                                    |
-| Titulares                                | o próprio colaborador                                                                                                                                                                                           | derivado: "contatos **do próprio** colaborador" |
-| Destinatários e compartilhamento externo | **inexistente** — nenhuma integração, exportação ou envio a terceiro                                                                                                                                            | proprietário                                    |
-| Módulo consumidor                        | Pessoas — o cadastro do colaborador                                                                                                                                                                             | derivado da finalidade                          |
-| Perfis que leem e alteram                | `rh` e `dp`: leitura e edição **na empresa ativa**. `master_tecnico`: administrador global confiável, com leitura e edição em **qualquer empresa**, auditadas. `gestor`, `colaborador` e demais: **sem acesso** | proprietário                                    |
-| Retenção                                 | **enquanto o vínculo estiver ativo**. Após o desligamento, **bloquear o uso operacional**, **reter por 2 anos** e então **eliminar ou anonimizar**, salvo litígio, ordem judicial ou obrigação formal           | proprietário                                    |
-| Histórico de valores                     | **não guardado**: só o valor vigente. A auditoria nunca registra valores                                                                                                                                        | derivado da regra de auditoria                  |
-| Auditoria                                | **criação, leitura, edição, exportação e exclusão**, com metadados e **campos afetados**, **nunca** valores de contato                                                                                          | proprietário                                    |
-| Necessidade de RIPD                      | **não exigido nesta fase**                                                                                                                                                                                      | proprietário                                    |
-| Autenticação reforçada (MFA adicional)   | **não exigida nesta fase**                                                                                                                                                                                      | proprietário                                    |
-| Proteção em repouso                      | adequada ao padrão atual do projeto para dado pessoal A2 — §2                                                                                                                                                   | avaliado na T169                                |
-| Origem e evidência da coleta             | **não especificadas** pela ficha. O sistema registra **quem** gravou e **quando**, não a evidência documental da coleta                                                                                         | lacuna registrada                               |
+| Item                                     | Resposta                                                                                                                                                                                                                                                                                                          | Origem                                                             |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| Campos                                   | **e-mail pessoal**, **celular** e **telefone**. E-mail corporativo **não** entra: segue derivado de `access_user.email`                                                                                                                                                                                           | proprietário                                                       |
+| Formato e normalização                   | regra explícita da §3, sem presumir país                                                                                                                                                                                                                                                                          | avaliado na T169                                                   |
+| Finalidade                               | **cadastro e comunicação operacional durante a relação de trabalho**                                                                                                                                                                                                                                              | proprietário                                                       |
+| Base legal principal                     | **execução do contrato**                                                                                                                                                                                                                                                                                          | proprietário                                                       |
+| Classificação                            | **A2 restrita**                                                                                                                                                                                                                                                                                                   | proprietário                                                       |
+| Titulares                                | o próprio colaborador                                                                                                                                                                                                                                                                                             | derivado: "contatos **do próprio** colaborador"                    |
+| Destinatários e compartilhamento externo | **inexistente** — nenhuma integração, exportação ou envio a terceiro                                                                                                                                                                                                                                              | proprietário                                                       |
+| Módulo consumidor                        | Pessoas — o cadastro do colaborador                                                                                                                                                                                                                                                                               | derivado da finalidade                                             |
+| Perfis que leem e alteram                | `rh` e `dp`: leitura e edição **na empresa ativa**. `master_tecnico`: administrador global confiável, com leitura e edição em **qualquer empresa**, auditadas. `gestor`, `colaborador` e demais: **sem acesso**                                                                                                   | proprietário                                                       |
+| Retenção                                 | **sem exclusão nem anonimização automática** de dados de funcionários. Após o desligamento, **bloquear o uso operacional**, com os **registros vigentes e a trilha de auditoria preservados**. Qualquer mudança futura desta política exige **decisão explícita da proprietária** e avaliação de RH/Jurídico (§7) | proprietária (alteração de 2026-10-20; antes, 2 anos e eliminação) |
+| Histórico de valores                     | **não guardado**: o sistema mantém só o **valor vigente** de cada contato e os **metadados de auditoria** (quem, quando, ação e nomes dos campos), nunca versões anteriores dos valores. A auditoria nunca registra valores                                                                                       | derivado da regra de auditoria                                     |
+| Auditoria                                | **criação, leitura, edição, exportação e exclusão**, com metadados e **campos afetados**, **nunca** valores de contato                                                                                                                                                                                            | proprietário                                                       |
+| Necessidade de RIPD                      | **não exigido nesta fase**                                                                                                                                                                                                                                                                                        | proprietário                                                       |
+| Autenticação reforçada (MFA adicional)   | **não exigida nesta fase**                                                                                                                                                                                                                                                                                        | proprietário                                                       |
+| Proteção em repouso                      | adequada ao padrão atual do projeto para dado pessoal A2 — §2                                                                                                                                                                                                                                                     | avaliado na T169                                                   |
+| Origem e evidência da coleta             | **não especificadas** pela ficha. O sistema registra **quem** gravou e **quando**, não a evidência documental da coleta                                                                                                                                                                                           | lacuna registrada                                                  |
 
 ## 2. Proteção em repouso — avaliação
 
@@ -87,8 +88,10 @@ formalizada na Emenda 1 da ADR 0012.
 
 ## 5. O que fica pendente
 
-- **Eliminação ou anonimização após 2 anos do desligamento:** a regra está
-  aprovada, mas o processo que a executa **não** existe nesta fatia.
+- ~~**Eliminação ou anonimização após 2 anos do desligamento**~~ —
+  **superada** pela decisão de 2026-10-20 (§7): não há eliminação nem
+  anonimização automática, e nenhum processo será construído para isso sem
+  nova decisão.
 - **Exportação e exclusão:** não há rota de nenhuma das duas nesta fatia, então
   não há evento a auditar. A auditoria delas é obrigatória quando existirem.
 - **Origem e evidência da coleta:** lacuna da ficha, registrada na §1.
@@ -143,7 +146,28 @@ onde a ficha é literal, a implementação a segue ao pé da letra.
   da infraestrutura de auditoria, não conteúdo dos contatos nem cabeçalho bruto.
   **Nunca** entram valores de contato, corpo da requisição ou cabeçalhos brutos.
 - **Exclusão.** `evolli_app` não tem `DELETE` no contato nem `UPDATE`/`DELETE`
-  no evento. O processo de eliminação dos 2 anos, quando existir, recebe o
-  privilégio junto com a sua própria auditoria (§5).
+  no evento. Pela decisão de 2026-10-20 (§7), não há processo de eliminação
+  previsto; uma mudança futura da política, se decidida, traria o privilégio
+  junto com a sua própria auditoria.
 
 Migrations: `20261016120000_contatos_colaborador` e `20261016130000_contatos_auditoria_toda_consulta`, criadas e não aplicadas localmente.
+
+## 7. Retenção — alteração de 2026-10-20
+
+A retenção aprovada em 2026-10-16 (reter por 2 anos após o desligamento e
+então eliminar ou anonimizar) foi **substituída pela proprietária em
+2026-10-20**, na mesma decisão que fixou a retenção dos dados pessoais e do
+endereço ([ficha da T177](ficha-tratamento-dados-pessoais-endereco-colaborador.md), §5):
+
+- **não** excluir nem anonimizar automaticamente dados de funcionários;
+- após o desligamento, **bloquear o uso operacional** — o que o sistema já faz:
+  com todo vínculo na empresa encerrado, a leitura responde `bloqueado`, sem
+  valor, e a edição é recusada, com a tentativa na trilha;
+- **preservar** os registros vigentes e a trilha de auditoria;
+- o sistema **não** mantém versões históricas dos valores de perfil nem de
+  contato: só o valor vigente e os metadados de auditoria;
+- qualquer mudança futura desta política exige **decisão explícita da
+  proprietária** e avaliação de RH/Jurídico.
+
+Nenhum código muda com esta alteração: o processo de eliminação dos 2 anos
+nunca foi implementado.

@@ -132,6 +132,19 @@ export const CONTATOS_RESOURCES = ["contato_colaborador"] as const;
 export type ContatosResource = (typeof CONTATOS_RESOURCES)[number];
 
 /**
+ * Recurso dos dados pessoais e do endereco do colaborador (T177, Modulo 1 do
+ * cadastro). `rh` e `dp` leem e editam na empresa ativa; o `master_tecnico`
+ * le e edita em qualquer empresa — com empresa ativa, so nela; sem empresa
+ * ativa, na empresa real do vinculo — (Emenda 2 da ADR 0012), a mesma regra
+ * ja aprovada para os contatos (Emenda 1 da ADR 0012). Recurso proprio, e nao do ramo de pessoas, pelo mesmo motivo
+ * dos contatos: em `colaborador`/`vinculo_funcional` o `master_tecnico`
+ * continua so lendo, e a heranca estenderia a edicao a todo o dominio.
+ */
+export const DADOS_PESSOAIS_RESOURCES = ["dados_pessoais_colaborador"] as const;
+
+export type DadosPessoaisResource = (typeof DADOS_PESSOAIS_RESOURCES)[number];
+
+/**
  * Recursos/ações desta fatia (matriz §3 da spec). Módulos futuros (Etapa 1+)
  * estendem este union — nunca reduzem o que já está aqui.
  */
@@ -152,7 +165,8 @@ export type AuthorizationResource =
   | HorariosResource
   | SolicitacoesPessoasResource
   | GestorResource
-  | ContatosResource;
+  | ContatosResource
+  | DadosPessoaisResource;
 
 export type AuthorizationAction =
   | "read"
@@ -231,4 +245,10 @@ export function isContatosResource(
   resource: AuthorizationResource,
 ): resource is ContatosResource {
   return (CONTATOS_RESOURCES as readonly string[]).includes(resource);
+}
+
+export function isDadosPessoaisResource(
+  resource: AuthorizationResource,
+): resource is DadosPessoaisResource {
+  return (DADOS_PESSOAIS_RESOURCES as readonly string[]).includes(resource);
 }

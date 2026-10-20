@@ -88,6 +88,36 @@ const resposta: AdmissaoRegistradaApi = {
       centroCustoId: null,
     },
   },
+  perfilPessoal: {
+    dataNascimento: "1990-05-20",
+    sexo: "Feminino",
+    saudacao: null,
+    estadoCivil: "Solteira",
+    nacionalidade: "Brasileira",
+    naturalidade: null,
+    escolaridade: null,
+    curso: null,
+    nomePai: null,
+    nomeMae: "Mãe Sintética Servidor",
+    atualizadoEm: "2026-10-20T12:00:00.000Z",
+  },
+  endereco: {
+    pais: "Brasil",
+    cep: "30140-071",
+    logradouro: null,
+    numero: null,
+    complemento: null,
+    bairro: null,
+    cidade: "Cidade Sintética",
+    estado: "MG",
+    atualizadoEm: "2026-10-20T12:00:00.000Z",
+  },
+  contatos: {
+    emailPessoal: "pessoa.servidor@exemplo.test",
+    celular: "+5531999990000",
+    telefone: "3133330000",
+    atualizadoEm: "2026-10-20T12:00:00.000Z",
+  },
 };
 
 function recusa(status: number): ApiError {
@@ -122,6 +152,7 @@ async function aguardarEmpresa() {
 }
 
 const nome = () => screen.getByLabelText(/Nome completo/);
+const dataNascimento = () => screen.getByLabelText(/^Data de nascimento/);
 const matricula = () => screen.getByLabelText(/^Matrícula/);
 const tipo = () => screen.getByLabelText(/Tipo de vínculo/);
 const data = () => screen.getByLabelText(/Data de admissão/);
@@ -132,8 +163,24 @@ const destino = () =>
 const admitir = () =>
   screen.getByRole("button", { name: "Admitir colaborador" });
 
+const emailPessoal = () => screen.getByLabelText(/E-mail pessoal/);
+const celular = () => screen.getByLabelText(/^Celular/);
+const telefone = () => screen.getByLabelText(/^Telefone/);
+const pais = () => screen.getByLabelText(/^País/);
+
+/** Os três contatos da ficha da T169 — obrigatórios na página. */
+function preencherContatos() {
+  fireEvent.change(emailPessoal(), {
+    target: { value: " Pessoa.Nova@Exemplo.TEST " },
+  });
+  fireEvent.change(celular(), { target: { value: "+55 (31) 99999-0000" } });
+  fireEvent.change(telefone(), { target: { value: "31 3333-0000" } });
+}
+
 function preencherValido() {
+  preencherContatos();
   fireEvent.change(nome(), { target: { value: "  Pessoa Sintética Nova " } });
+  fireEvent.change(dataNascimento(), { target: { value: "1990-05-20" } });
   fireEvent.change(matricula(), { target: { value: "mat-0900" } });
   fireEvent.change(tipo(), { target: { value: "clt" } });
   fireEvent.change(data(), { target: { value: "2026-11-03" } });
@@ -171,29 +218,152 @@ describe("Nova admissão — página própria", () => {
     expect(within(empresaBloco).queryByRole("combobox")).toBeNull();
   });
 
-  it("pede só os campos do contrato atual, e nenhum dado pessoal novo", async () => {
+  it("pede os campos do Módulo 1, e nenhum campo de módulo futuro", async () => {
     montar();
     await aguardarEmpresa();
-    for (const campo of [nome, matricula, tipo, data, tipoDestino]) {
+    for (const campo of [
+      nome,
+      dataNascimento,
+      emailPessoal,
+      celular,
+      telefone,
+      matricula,
+      tipo,
+      data,
+      tipoDestino,
+    ]) {
       expect(campo()).toHaveAttribute("aria-required", "true");
     }
     const form = screen.getByRole("form", {
       name: "Formulário de nova admissão",
     });
-    const rotulos = [...form.querySelectorAll("label")].map(
-      (l) => l.textContent ?? "",
+    const rotulos = [...form.querySelectorAll("label")].map((l) =>
+      (l.textContent ?? "").replace(/\*|obrigatório|opcional/g, "").trim(),
     );
+    for (const esperado of [
+      "Nome completo",
+      "Data de nascimento",
+      "Sexo",
+      "Saudação",
+      "Estado civil",
+      "Nacionalidade",
+      "Naturalidade",
+      "Escolaridade",
+      "Curso",
+      "Nome do pai",
+      "Nome da mãe",
+      "País",
+      "CEP",
+      "Logradouro",
+      "Número",
+      "Complemento",
+      "Bairro",
+      "Cidade",
+      "Estado",
+      "E-mail pessoal",
+      "Celular",
+      "Telefone",
+    ]) {
+      expect(rotulos.some((r) => r.startsWith(esperado))).toBe(true);
+    }
     for (const proibido of [
       /CPF/i,
-      /nascimento/i,
-      /endereço/i,
-      /banc/i,
+      /nome social/i,
+      /gênero/i,
+      /raça|etnia/i,
+      /foto/i,
+      /deficiência/i,
+      /emergência/i,
+      /corporativo/i,
+      /banc|agência|conta corrente/i,
       /dependente/i,
       /saúde/i,
       /sindic/i,
-      /documento/i,
+      /documento|\bRG\b|CNH|CTPS|\bPIS\b|eleitor|reservista/i,
+      /fuso/i,
+      /filhos|camisa/i,
     ]) {
-      expect(rotulos.some((r) => proibido.test(r))).toBe(false);
+      expect(rotulos.filter((r) => proibido.test(r))).toEqual([]);
+    }
+  });
+
+  it("obrigatoriedade campo a campo: os opcionais dizem que são opcionais", async () => {
+    montar();
+    await aguardarEmpresa();
+    expect(
+      screen.getByText(/Campos com \* são obrigatórios/),
+    ).toBeInTheDocument();
+    for (const rotulo of [
+      "Sexo",
+      "Saudação",
+      "Estado civil",
+      "Nacionalidade",
+      "Naturalidade",
+      "Escolaridade",
+      "Curso",
+      "Nome do pai",
+      "Nome da mãe",
+      "País",
+      "CEP",
+      "Logradouro",
+      "Número",
+      "Complemento",
+      "Bairro",
+      "Cidade",
+      "Estado",
+    ]) {
+      const campo = screen.getByLabelText(`${rotulo} (opcional)`);
+      expect(campo).not.toHaveAttribute("aria-required");
+    }
+    for (const campo of [
+      nome,
+      dataNascimento,
+      emailPessoal,
+      celular,
+      telefone,
+    ]) {
+      expect(campo()).toHaveAttribute("aria-required", "true");
+      expect(campo()).toHaveAccessibleName(/obrigatório/);
+      expect(campo()).not.toHaveAccessibleName(/opcional/);
+    }
+  });
+
+  it("os blocos aparecem na ordem dos prints: dados pessoais, endereço, contatos", async () => {
+    montar();
+    await aguardarEmpresa();
+    const titulos = screen
+      .getAllByRole("heading", { level: 2 })
+      .map((h) => h.textContent);
+    expect(titulos).toEqual([
+      "Empresa",
+      "Dados pessoais",
+      "Endereço",
+      "Contatos",
+      "Vínculo",
+      "Lotação inicial",
+    ]);
+  });
+
+  it("país começa sugerido como Brasil e pode ser editado", async () => {
+    montar();
+    await aguardarEmpresa();
+    expect(pais()).toHaveValue("Brasil");
+    fireEvent.change(pais(), { target: { value: "Portugal" } });
+    expect(pais()).toHaveValue("Portugal");
+  });
+
+  it("sem nenhum select inventado: sexo, estado civil, escolaridade, cidade e estado são texto", async () => {
+    montar();
+    await aguardarEmpresa();
+    for (const rotulo of [
+      /^Sexo/,
+      /^Estado civil/,
+      /^Escolaridade/,
+      /^Cidade/,
+      /^Estado \(opcional\)$/,
+      /^País/,
+    ]) {
+      expect(screen.getByLabelText(rotulo).tagName).toBe("INPUT");
     }
   });
 
@@ -212,6 +382,23 @@ describe("Nova admissão — página própria", () => {
     expect(tipoDestino()).toHaveAccessibleDescription(
       /Escolha o tipo de referência/,
     );
+    expect(dataNascimento()).toHaveAccessibleDescription(
+      /Informe a data de nascimento/,
+    );
+    expect(admitirColaborador).not.toHaveBeenCalled();
+  });
+
+  it("data de nascimento é obrigatória: sem ela, nada é enviado", async () => {
+    montar();
+    await aguardarEmpresa();
+    preencherValido();
+    fireEvent.change(dataNascimento(), { target: { value: "" } });
+    fireEvent.click(admitir());
+    await waitFor(() => expect(dataNascimento()).toHaveFocus());
+    expect(dataNascimento()).toHaveAttribute("aria-invalid", "true");
+    expect(dataNascimento()).toHaveAccessibleDescription(
+      /Informe a data de nascimento/,
+    );
     expect(admitirColaborador).not.toHaveBeenCalled();
   });
 
@@ -220,8 +407,48 @@ describe("Nova admissão — página própria", () => {
     await aguardarEmpresa();
     fireEvent.change(nome(), { target: { value: "Pessoa Sintética" } });
     fireEvent.click(admitir());
+    // Depois do nome, o primeiro obrigatório vazio é a data de nascimento.
+    await waitFor(() => expect(dataNascimento()).toHaveFocus());
+    fireEvent.change(dataNascimento(), { target: { value: "1990-05-20" } });
+    fireEvent.click(admitir());
+    // Depois dela, o e-mail pessoal.
+    await waitFor(() => expect(emailPessoal()).toHaveFocus());
+    preencherContatos();
+    fireEvent.click(admitir());
     await waitFor(() => expect(matricula()).toHaveFocus());
   });
+
+  it("contatos seguem a ficha da T169: os três obrigatórios, com mensagem no campo", async () => {
+    montar();
+    await aguardarEmpresa();
+    fireEvent.click(admitir());
+    await waitFor(() => expect(nome()).toHaveFocus());
+    expect(emailPessoal()).toHaveAccessibleDescription(
+      /E-mail pessoal é obrigatório/,
+    );
+    expect(celular()).toHaveAccessibleDescription(/Celular é obrigatório/);
+    expect(telefone()).toHaveAccessibleDescription(/Telefone é obrigatório/);
+  });
+
+  it.each([
+    [/Data de nascimento/, "2999-01-01", /não pode estar no futuro/],
+    [/Data de nascimento/, "1899-12-31", /anterior a 01\/01\/1900/],
+    [/^CEP/, "30140/071", /letras, números, espaço e hífen/],
+    [/^Saudação/, "x".repeat(41), /no máximo 40 caracteres/],
+  ])(
+    "valida %s no cliente, antes de enviar",
+    async (rotulo, valor, mensagem) => {
+      montar();
+      await aguardarEmpresa();
+      preencherValido();
+      const campo = screen.getByLabelText(rotulo);
+      fireEvent.change(campo, { target: { value: valor } });
+      fireEvent.click(admitir());
+      await waitFor(() => expect(campo).toHaveFocus());
+      expect(campo).toHaveAccessibleDescription(mensagem);
+      expect(admitirColaborador).not.toHaveBeenCalled();
+    },
+  );
 
   it("corrigir um campo limpa só o erro dele", async () => {
     montar();
@@ -247,7 +474,77 @@ describe("Nova admissão — página própria", () => {
       dataAdmissao: "2026-11-03",
       motivoCodigo: "admissao_inicial",
       departamentoId: departamento.id,
+      perfilPessoal: {
+        dataNascimento: "1990-05-20",
+        sexo: null,
+        saudacao: null,
+        estadoCivil: null,
+        nacionalidade: null,
+        naturalidade: null,
+        escolaridade: null,
+        curso: null,
+        nomePai: null,
+        nomeMae: null,
+      },
+      endereco: {
+        pais: "Brasil",
+        cep: null,
+        logradouro: null,
+        numero: null,
+        complemento: null,
+        bairro: null,
+        cidade: null,
+        estado: null,
+      },
+      contatos: {
+        emailPessoal: "pessoa.nova@exemplo.test",
+        celular: "+5531999990000",
+        telefone: "3133330000",
+      },
     });
+  });
+
+  it("envia os dados pessoais e o endereço normalizados, vazio como null", async () => {
+    montar();
+    await aguardarEmpresa();
+    preencherValido();
+    fireEvent.change(screen.getByLabelText(/Data de nascimento/), {
+      target: { value: "1990-05-20" },
+    });
+    fireEvent.change(screen.getByLabelText(/^Sexo/), {
+      target: { value: "  Feminino " },
+    });
+    fireEvent.change(screen.getByLabelText(/^Naturalidade/), {
+      target: { value: "Belo   Horizonte" },
+    });
+    fireEvent.change(screen.getByLabelText(/^Nome da mãe/), {
+      target: { value: "Mãe Sintética" },
+    });
+    fireEvent.change(screen.getByLabelText(/^CEP/), {
+      target: { value: "30140-071" },
+    });
+    fireEvent.change(screen.getByLabelText(/^Estado \(opcional\)$/), {
+      target: { value: "MG" },
+    });
+    fireEvent.click(admitir());
+    await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
+    expect(admitirColaborador).toHaveBeenCalledWith(
+      expect.objectContaining({
+        perfilPessoal: expect.objectContaining({
+          dataNascimento: "1990-05-20",
+          sexo: "Feminino",
+          naturalidade: "Belo Horizonte",
+          nomeMae: "Mãe Sintética",
+          curso: null,
+        }),
+        endereco: expect.objectContaining({
+          pais: "Brasil",
+          cep: "30140-071",
+          estado: "MG",
+          bairro: null,
+        }),
+      }),
+    );
   });
 
   it("área exige o departamento e envia os dois", async () => {
@@ -325,6 +622,9 @@ describe("Nova admissão — recusa do servidor preserva os dados", () => {
     expect(tipo()).toHaveValue("clt");
     expect(data()).toHaveValue("2026-11-03");
     expect(destino()).toHaveValue(departamento.id);
+    // `type="email"` apara as pontas no próprio campo; o resto fica como digitado.
+    expect(emailPessoal()).toHaveValue("Pessoa.Nova@Exemplo.TEST");
+    expect(pais()).toHaveValue("Brasil");
     expect(admitir()).toBeEnabled();
   });
 
@@ -390,6 +690,25 @@ describe("Nova admissão — empresa indefinida não envia", () => {
 });
 
 describe("Nova admissão — cancelar", () => {
+  it("o país sugerido, sozinho, não conta como dado digitado", async () => {
+    const { onSair } = montar();
+    await aguardarEmpresa();
+    expect(pais()).toHaveValue("Brasil");
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    expect(onSair).toHaveBeenCalledTimes(1);
+  });
+
+  it("editar só o país já conta como alteração e pede confirmação", async () => {
+    const { onSair } = montar();
+    await aguardarEmpresa();
+    fireEvent.change(pais(), { target: { value: "Argentina" } });
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    expect(
+      screen.getByRole("dialog", { name: "Descartar esta admissão?" }),
+    ).toBeInTheDocument();
+    expect(onSair).not.toHaveBeenCalled();
+  });
+
   it("sem nada digitado, sai direto", async () => {
     const { onSair } = montar();
     await aguardarEmpresa();
@@ -474,6 +793,19 @@ describe("Nova admissão — sucesso", () => {
     expect(
       screen.getByText("Departamento: DEP1 — Departamento Sintético (teste)"),
     ).toBeInTheDocument();
+    // Módulo 1: o que o SERVIDOR gravou, bloco a bloco.
+    const dadosPessoais = screen.getByRole("region", {
+      name: "Dados pessoais",
+    });
+    expect(dadosPessoais).toHaveTextContent("20/05/1990");
+    expect(dadosPessoais).toHaveTextContent("Mãe Sintética Servidor");
+    expect(dadosPessoais).toHaveTextContent("Não informado");
+    const enderecoGravado = screen.getByRole("region", { name: "Endereço" });
+    expect(enderecoGravado).toHaveTextContent("Cidade Sintética");
+    expect(enderecoGravado).toHaveTextContent("30140-071");
+    const contatosGravados = screen.getByRole("region", { name: "Contatos" });
+    expect(contatosGravados).toHaveTextContent("pessoa.servidor@exemplo.test");
+    expect(contatosGravados).toHaveTextContent("+5531999990000");
     expectSemIsoVisivel(document.body);
   });
 
@@ -496,9 +828,11 @@ describe("Nova admissão — sucesso", () => {
     );
   });
 
-  it("completar contatos é uma ação separada", async () => {
+  it("revisar contatos na ficha é uma ação separada", async () => {
     const { onAbrirAdmitido } = await admitirComSucesso();
-    fireEvent.click(screen.getByRole("button", { name: "Completar contatos" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Revisar contatos na ficha" }),
+    );
     expect(onAbrirAdmitido).toHaveBeenCalledWith(
       expect.objectContaining({ id: resposta.id }),
       "contatos",
@@ -512,6 +846,8 @@ describe("Nova admissão — sucesso", () => {
     );
     expect(nome()).toHaveValue("");
     expect(matricula()).toHaveValue("");
+    expect(emailPessoal()).toHaveValue("");
+    expect(pais()).toHaveValue("Brasil");
   });
 });
 

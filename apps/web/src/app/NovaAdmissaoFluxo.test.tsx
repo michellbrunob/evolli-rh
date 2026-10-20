@@ -3,7 +3,7 @@
  *
  * O teste da página (`NovaAdmissaoScreen.test.tsx`) prende o formulário. Este
  * prende o que só existe com o shell montado: o destino na navegação para `rh`
- * e `dp` (e não para `master_tecnico`, que só lê), a URL própria
+ * e `dp` (e não para `master_tecnico`, que não admite), a URL própria
  * (`#/pessoas/nova-admissao`), o "voltar" do navegador e a passagem da página
  * para a ficha do admitido — inclusive direto nos contatos aprovados.
  */
@@ -93,6 +93,27 @@ const resposta: AdmissaoRegistradaApi = {
       centroCustoId: null,
     },
   },
+  // T177 — perfil e contatos passaram a ser obrigatórios na admissão.
+  perfilPessoal: {
+    dataNascimento: "1990-05-20T00:00:00.000Z",
+    sexo: null,
+    saudacao: null,
+    estadoCivil: null,
+    nacionalidade: null,
+    naturalidade: null,
+    escolaridade: null,
+    curso: null,
+    nomePai: null,
+    nomeMae: null,
+    atualizadoEm: "2026-10-20T12:00:00.000Z",
+  },
+  endereco: null,
+  contatos: {
+    emailPessoal: "pessoa.fluxo@exemplo.test",
+    celular: "+5531999990001",
+    telefone: "3133330001",
+    atualizadoEm: "2026-10-20T12:00:00.000Z",
+  },
 };
 
 beforeEach(() => {
@@ -129,6 +150,19 @@ async function admitirPelaPagina() {
   });
   fireEvent.change(screen.getByLabelText(/^Matrícula/), {
     target: { value: "MAT-FLX1" },
+  });
+  // T177 — a data de nascimento passou a ser obrigatória na admissão.
+  fireEvent.change(screen.getByLabelText(/Data de nascimento/), {
+    target: { value: "1990-05-20" },
+  });
+  fireEvent.change(screen.getByLabelText(/E-mail pessoal/), {
+    target: { value: "pessoa.fluxo@exemplo.test" },
+  });
+  fireEvent.change(screen.getByLabelText(/^Celular/), {
+    target: { value: "+5531999990001" },
+  });
+  fireEvent.change(screen.getByLabelText(/^Telefone/), {
+    target: { value: "3133330001" },
   });
   fireEvent.change(screen.getByLabelText(/Tipo de vínculo/), {
     target: { value: "clt" },
@@ -240,6 +274,42 @@ describe("T176 — Nova admissão na navegação", () => {
   });
 });
 
+describe("T177 — 'Novo colaborador' em Pessoas leva à página de Nova admissão", () => {
+  it.each(["rh", "dp"])(
+    "%s aciona 'Novo colaborador' e chega à página, com a URL própria",
+    async (papel) => {
+      render(<App papelDoAtor={papel} />);
+      await screen.findByRole("heading", { level: 1, name: "Colaboradores" });
+      // A lista vazia mostra o botão no cabeçalho e no estado vazio; os dois
+      // levam ao mesmo lugar. O do cabeçalho vem primeiro.
+      const [doCabecalho] = await screen.findAllByRole("button", {
+        name: "Novo colaborador",
+      });
+      fireEvent.click(doCabecalho!);
+      expect(
+        await screen.findByRole("heading", { level: 1, name: "Nova admissão" }),
+      ).toBeInTheDocument();
+      expect(window.location.hash).toBe(ROTA);
+      // Navegou: nenhuma janela de admissão abriu sobre a lista.
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("heading", { level: 1, name: "Colaboradores" }),
+      ).not.toBeInTheDocument();
+    },
+  );
+
+  it("master_tecnico vê Colaboradores, mas sem 'Novo colaborador'", async () => {
+    render(<App papelDoAtor="master_tecnico" />);
+    await screen.findByRole("heading", { level: 1, name: "Colaboradores" });
+    await screen.findByRole("heading", {
+      name: "Nenhum colaborador cadastrado",
+    });
+    expect(
+      screen.queryByRole("button", { name: "Novo colaborador" }),
+    ).not.toBeInTheDocument();
+  });
+});
+
 describe("T176 — rota recusada para quem não admite", () => {
   /** Quem não recebe `colaborador`/`create` no servidor, e a tela em que aterrissa. */
   const SEM_ACESSO = [
@@ -332,11 +402,13 @@ describe("T176 — da página à ficha do admitido", () => {
     );
   });
 
-  it("'Completar contatos' abre a ficha com o foco no primeiro contato", async () => {
+  it("'Revisar contatos na ficha' abre a ficha com o foco no primeiro contato", async () => {
     render(<App papelDoAtor="dp" />);
     fireEvent.click(itemNovaAdmissao()!);
     await admitirPelaPagina();
-    fireEvent.click(screen.getByRole("button", { name: "Completar contatos" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Revisar contatos na ficha" }),
+    );
     await screen.findByRole("dialog", { name: "Pessoa Sintética Fluxo" });
     await waitFor(() =>
       expect(screen.getByLabelText(/E-mail pessoal/)).toHaveFocus(),

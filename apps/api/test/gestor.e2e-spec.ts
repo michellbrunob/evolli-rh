@@ -14,6 +14,7 @@ import { AppModule } from "../src/app.module";
 import { AllExceptionsFilter } from "../src/common/filters/http-exception.filter";
 import { requestIdMiddleware } from "../src/common/request-id";
 import { dataLocalDe } from "../src/ponto/competencia.util";
+import { CAMPOS_OBRIGATORIOS_ADMISSAO } from "./admissao-obrigatoria";
 
 /**
  * T151 — Gestor consultivo: escopo por equipe, exceção individual e DP-23.
@@ -343,6 +344,7 @@ describe("Gestor consultivo: escopo por equipe e administracao pelo RH (e2e)", (
   ): Promise<Pessoa> {
     const colaborador = await post("/v1/colaboradores", cred)
       .send({
+        ...CAMPOS_OBRIGATORIOS_ADMISSAO,
         nome: dados.nome,
         empresaId: dados.empresaId,
         matricula: dados.matricula,

@@ -10,6 +10,8 @@ import { MovimentacaoController } from "./movimentacao/movimentacao.controller";
 import { MovimentacaoService } from "./movimentacao/movimentacao.service";
 import { ContatoColaboradorController } from "./contatos/contato-colaborador.controller";
 import { ContatoColaboradorService } from "./contatos/contato-colaborador.service";
+import { DadosPessoaisColaboradorController } from "./dados-pessoais/dados-pessoais.controller";
+import { DadosPessoaisColaboradorService } from "./dados-pessoais/dados-pessoais.service";
 
 /**
  * Etapa 1 — Fatia 2: Colaboradores e Vida Funcional (ADR 0007, Baseline V1).
@@ -30,6 +32,8 @@ import { ContatoColaboradorService } from "./contatos/contato-colaborador.servic
     MovimentacaoController,
     // T169 — contatos do colaborador, agregado e rotas próprios.
     ContatoColaboradorController,
+    // T177 — dados pessoais e endereço, agregados e rotas próprios.
+    DadosPessoaisColaboradorController,
   ],
   providers: [
     PessoasAuditoriaService,
@@ -37,6 +41,7 @@ import { ContatoColaboradorService } from "./contatos/contato-colaborador.servic
     VinculoService,
     MovimentacaoService,
     ContatoColaboradorService,
+    DadosPessoaisColaboradorService,
   ],
 })
 export class PessoasModule {}

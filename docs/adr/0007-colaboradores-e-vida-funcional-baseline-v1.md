@@ -667,3 +667,56 @@ ficha.
 **Para o revisor:** o bloqueio de "campo de dado pessoal além dos quatro
 aprovados" passa a ter **uma** exceção, nestes três campos e neste agregado.
 Qualquer outro campo continua bloqueado sem ficha e emenda próprias.
+
+## Emenda 5 (2026-10-20) — dados pessoais básicos e endereço
+
+**Aprovada pela proprietária em 2026-10-20**, com a
+[ficha de tratamento](../decisions/ficha-tratamento-dados-pessoais-endereco-colaborador.md).
+**Aditivo**: nenhuma decisão anterior é revogada nem reescrita.
+
+**O que passa a ser permitido:** os dados pessoais básicos (data
+de nascimento, sexo, saudação, estado civil, nacionalidade, naturalidade,
+escolaridade, curso, nome do pai e nome da mãe) e o endereço (país, CEP,
+logradouro, número, complemento, bairro, cidade e estado), nos termos da
+[ficha de tratamento](../decisions/ficha-tratamento-dados-pessoais-endereco-colaborador.md).
+
+**Como:** em dois agregados próprios, `perfil_pessoal_colaborador` e
+`endereco_colaborador`, **fora** de `Colaborador`, com `empresa_id` próprio e
+garantia no banco de que o colaborador tem vínculo naquela empresa (ADR 0016,
+decisão 3), como os contatos da Emenda 4. `Colaborador` continua com `nome` e
+`situacao`. Os três contatos seguem na Emenda 4, sem segunda fonte.
+
+**Obrigatoriedade na admissão (decisão da proprietária, 2026-10-20):** nome
+completo, data de nascimento, e-mail pessoal, celular e telefone são
+**obrigatórios**; os demais campos desta emenda são **opcionais**. O contrato
+da API, a tela de Nova admissão e o banco (`data_nascimento` NOT NULL)
+expressam a regra campo a campo — tabela na §2 da ficha. Com isso, a admissão
+passa a ter **uma** porta: a página de Nova admissão. O formulário transitório
+em modal da tela de Colaboradores (T176) é aposentado, porque não coletava os
+campos obrigatórios. Colaboradores admitidos antes desta emenda não têm esses
+dados gravados e são lidos como `sem_registro`.
+
+**Quem acessa:** `rh` e `dp` na empresa ativa; `master_tecnico` em qualquer
+empresa, com empresa ativa só nela ([ADR 0012, Emenda 2](0012-convergencia-governanca-privacidade-e-perfis-globais.md)).
+Demais perfis, sem acesso.
+
+**Aprovado com a ficha (2026-10-20):** finalidade — admissão e
+administração da relação de trabalho; base legal — execução do contrato e
+procedimentos preliminares necessários; classificação — A2, dado pessoal
+comum; RIPD — não necessário nesta etapa, a reavaliar quando entrarem
+documentos, dados bancários, saúde ou demais dados sensíveis ou restritos.
+
+**Retenção (decisão substitutiva, 2026-10-20):** sem exclusão nem
+anonimização automática após o desligamento; os dados ficam bloqueados para uso
+operacional, com histórico e auditoria preservados — isto é, o **valor
+vigente** e os **metadados de auditoria** (quem, quando, ação e nomes dos
+campos); o sistema **não** guarda versões históricas dos valores; qualquer
+alteração futura exige decisão explícita da proprietária e avaliação de
+RH/Jurídico.
+
+**O que continua fora:** documento, CPF, dado bancário, salário, dado médico,
+dependente, benefício, nome social, identidade de gênero, raça/etnia,
+deficiência, foto, contato de emergência e fuso horário.
+
+**Para o revisor:** a exceção ao bloqueio de "dado pessoal além dos aprovados"
+passa a valer também para estes campos e agregados, e só para eles.
