@@ -49,6 +49,7 @@ import {
   PESSOAS_HORARIO_TITULO_ID,
   PessoasHorarioScreen,
 } from "./PessoasHorarioScreen";
+import type { ColaboradoresScreenProps } from "./ColaboradoresScreen";
 import "./PessoasScreen.css";
 import {
   SOLICITACOES_TITULO_ID,
@@ -162,12 +163,17 @@ export interface PessoasScreenProps {
    * `<main>` (`aria-labelledby`) mesmo quando a aba muda sem trocar de
    * destino. Não é navegação real — só sincroniza o rótulo de acessibilidade. */
   onTituloIdChange?: (tituloId: string) => void;
+  /** T176 — repassados à aba Colaboradores (ver `ColaboradoresScreenProps`). */
+  aberturaInicial?: ColaboradoresScreenProps["aberturaInicial"];
+  onAberturaAtendida?: () => void;
 }
 
 export function PessoasScreen({
   onTituloIdChange,
   modo = "funcional",
   empresaAtiva = null,
+  aberturaInicial = null,
+  onAberturaAtendida,
 }: PessoasScreenProps) {
   // Só as abas do modo. `ABAS` continua sendo a fonte única; o filtro é
   // de apresentação, e a primeira aba do conjunto vira o padrão — assim
@@ -218,7 +224,11 @@ export function PessoasScreen({
         className="pessoas-screen__panel"
       >
         {abaAtiva === "colaboradores" ? (
-          <ColaboradoresScreen empresaAtiva={empresaAtiva} />
+          <ColaboradoresScreen
+            empresaAtiva={empresaAtiva}
+            aberturaInicial={aberturaInicial}
+            {...(onAberturaAtendida ? { onAberturaAtendida } : {})}
+          />
         ) : abaAtiva === "horario" ? (
           <PessoasHorarioScreen />
         ) : abaAtiva === "historico_funcional" ? (

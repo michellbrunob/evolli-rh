@@ -21,6 +21,11 @@ export {
   PessoasDocumentosScreen,
 } from "./PessoasDocumentosScreen";
 export { PessoasHorarioScreen } from "./PessoasHorarioScreen";
+export {
+  NOVA_ADMISSAO_TITULO_ID,
+  NovaAdmissaoScreen,
+} from "./NovaAdmissaoScreen";
+export type { FocoDoAdmitido } from "./NovaAdmissaoScreen";
 export { PESSOAS_HORARIO_TITULO_ID, PessoasScreen } from "./PessoasScreen";
 export {
   SOLICITACOES_TITULO_ID,

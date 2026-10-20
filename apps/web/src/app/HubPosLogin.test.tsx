@@ -114,6 +114,7 @@ describe("T162 — o Hub oferece só o que o servidor autoriza", () => {
       "rh",
       [
         "Pessoas",
+        "Nova admissão",
         "Estrutura",
         "Jornada",
         "Minha equipe",
@@ -121,7 +122,7 @@ describe("T162 — o Hub oferece só o que o servidor autoriza", () => {
         "Contas de acesso",
       ],
     ],
-    ["dp", ["Pessoas", "Jornada", "Contas de acesso"]],
+    ["dp", ["Pessoas", "Nova admissão", "Jornada", "Contas de acesso"]],
     ["master_tecnico", ["Pessoas", "Estrutura", "Jornada", "Contas de acesso"]],
     ["gestor", ["Minha equipe"]],
     ["financeiro", []],
@@ -391,7 +392,7 @@ describe("T162 — acessibilidade e estrutura", () => {
 
   it("cada cartão tem nome acessível com o rótulo do produto", async () => {
     montar({ papel: "rh" });
-    await waitFor(() => expect(cartoesVisiveis().length).toBe(6));
+    await waitFor(() => expect(cartoesVisiveis().length).toBe(7));
     for (const destino of capacidadeFuncionalDe("rh")) {
       expect(
         screen.getByRole("button", { name: new RegExp(destino.label) }),

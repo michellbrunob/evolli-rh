@@ -212,6 +212,9 @@ São fatos recebidos. Cada um só vira regra do sistema pelo gate correspondente
 
 ### 6. Diretriz de UX proposta pelo proprietário
 
+> **Decidida em 2026-10-20 (`DP-FLX-21`).** Ver a nota de decisão do
+> `DP-FLX-21` ao final. O texto abaixo é o da proposta, preservado.
+
 **Proposta de UX do proprietário, registrada em 2026-10-19. Não autoriza
 implementação.** Ela não vem das respostas de RH/DP: é uma diretriz de
 experiência entregue pelo proprietário na mesma tarefa, e entra aqui com
@@ -342,3 +345,22 @@ valor de decisão, e a diretriz de UX da decisão 6 continua proposta.
 transições do processo admissional), como recomenda a seção 6 do
 [dossiê de decisões da T174](../decisions/t174-dossie-decisoes-fatia-0.md).
 **Não está resolvido**: é recomendação, não decisão.
+
+## Nota de decisão do `DP-FLX-21` (2026-10-20)
+
+A proprietária resolveu o gate `DP-FLX-21` por autorização explícita em
+2026-10-20, na T176: cadastro longo e estruturado de admissão usa **página própria**, não modal; modal fica restrito a consulta, confirmação, seleção curta e edição delimitada; a decisão substitui a direção anterior de modal **somente** para esse tipo de cadastro e módulos equivalentes; e **não autoriza** campo, regra, dado ou processo novo.
+
+**O que isto muda nesta ADR.** A diretriz de UX da decisão 6, nos itens 1 a 3,
+deixa de ser só proposta para o cadastro longo e estruturado de admissão e para
+os módulos equivalentes. Os itens 4 a 6 continuam como estão: os grupos da
+futura tela de admissão seguem sendo **referência funcional** que não autoriza
+campo, e cada grupo só se materializa depois dos seus gates.
+
+**O que não muda.** O `DP-FLX-04` (estados do processo admissional) continua
+aberto, com os outros 19 gates; os 13 conflitos continuam registrados; e esta
+decisão não autoriza CPF, nascimento, endereço, documentos, dados bancários,
+dependentes, saúde, dado sindical, múltiplos vínculos, matrícula na efetivação,
+solicitação ou aprovação pelo gestor, alçadas nem ativação automática. A
+primeira página que a aplica, a de Nova admissão (T176), usa só o contrato atual
+de `POST /v1/colaboradores`.

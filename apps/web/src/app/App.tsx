@@ -71,7 +71,14 @@ import {
 import { EQUIPE_TITULO_ID, EquipeScreen } from "../screens/equipe";
 import { CadastrosScreen, HORARIOS_TITULO_ID } from "../screens/horarios";
 import { InicioVisaoGeralScreen } from "../screens/inicio";
-import { COLABORADORES_TITULO_ID, PessoasScreen } from "../screens/pessoas";
+import {
+  COLABORADORES_TITULO_ID,
+  type FocoDoAdmitido,
+  NOVA_ADMISSAO_TITULO_ID,
+  NovaAdmissaoScreen,
+  PessoasScreen,
+} from "../screens/pessoas";
+import type { ColaboradorApi } from "../api/colaboradoresClient";
 import { PontoScreen } from "../screens/ponto/PontoScreen";
 import { VISAO_PERIODO_TITULO_ID } from "../screens/ponto/VisaoPeriodoScreen";
 import { PortalColaboradorScreen } from "../screens/portal-colaborador/PortalColaboradorScreen";
@@ -88,6 +95,7 @@ import {
   destinoPorId,
   capacidadeFuncionalDe,
 } from "./mapaNavegacao";
+import { destinoDaRota, rotaDoDestino } from "./rotasDoShell";
 
 /** `titleId` do `h1` de cada destino, para `aria-labelledby` do `<main>`.
  * "cadastros", "pessoas", "ponto", "documentos", "portal-colaborador" e
@@ -101,7 +109,18 @@ const TITULO_ID_POR_DESTINO: Record<string, string> = {
   "contas-acesso": CONTAS_ACESSO_TITULO_ID,
   equipe: EQUIPE_TITULO_ID,
   "administracao-lideranca": ADMINISTRACAO_LIDERANCA_TITULO_ID,
+  "nova-admissao": NOVA_ADMISSAO_TITULO_ID,
 };
+
+/**
+ * T176 — o colaborador que a página de Nova admissão pediu para abrir na aba
+ * Colaboradores, e onde pôr o foco. Vive no shell porque atravessa destinos:
+ * a página sai de cena e a tela de Colaboradores monta com o pedido.
+ */
+interface AberturaDoAdmitido {
+  readonly colaborador: ColaboradorApi;
+  readonly foco: FocoDoAdmitido;
+}
 
 /**
  * Seletor de elemento focável, para prender o foco dentro da gaveta no
@@ -210,6 +229,12 @@ function conteudoDoDestino(
   // T164 — ultimo parametro de proposito: acrescentar no fim preserva todas as
   // posicoes existentes, entao nenhuma chamada muda de significado por engano.
   empresaAtiva: { readonly nome: string; readonly codigo: string } | null,
+  // T176 — também no fim, pelo mesmo motivo.
+  admissao: {
+    readonly abertura: AberturaDoAdmitido | null;
+    readonly onAbrirAdmitido: (abertura: AberturaDoAdmitido) => void;
+    readonly onAberturaAtendida: () => void;
+  },
 ) {
   if (destinoId === "inicio") {
     return <InicioVisaoGeralScreen onNavegar={onNavegar} />;
@@ -230,6 +255,18 @@ function conteudoDoDestino(
       <PessoasScreen
         onTituloIdChange={onPessoasTituloIdChange}
         empresaAtiva={empresaAtiva}
+        aberturaInicial={admissao.abertura}
+        onAberturaAtendida={admissao.onAberturaAtendida}
+      />
+    );
+  }
+  if (destinoId === "nova-admissao") {
+    return (
+      <NovaAdmissaoScreen
+        onSair={() => onNavegar("pessoas")}
+        onAbrirAdmitido={(colaborador, foco) =>
+          admissao.onAbrirAdmitido({ colaborador, foco })
+        }
       />
     );
   }
@@ -430,8 +467,28 @@ export function App({
   // escolha seria um redirecionamento surpresa. Trocar de ator remonta o
   // componente (ver a `key` em `AutenticacaoApp`), e aí o inicializador roda
   // de novo com o papel novo.
-  const [destinoAtivoId, setDestinoAtivoId] = useState(() =>
-    resolverEntrada(destinoInicial, papelDoAtor),
+  // T176 — uma URL com rota conhecida (`#/pessoas/nova-admissao`) tem
+  // precedência sobre o destino do Hub: é o endereço que a pessoa abriu. Mas
+  // só quando o papel PODE abri-la — a mesma validação de capacidade de
+  // qualquer pedido. Rota que o papel não abre é ignorada, e vale a escolha do
+  // Hub, como se a URL não tivesse rota.
+  const [destinoAtivoId, setDestinoAtivoId] = useState(() => {
+    const pedidoDaRota = destinoDaRota(window.location.hash);
+    if (
+      pedidoDaRota !== null &&
+      resolverEntrada(pedidoDaRota, papelDoAtor) === pedidoDaRota
+    ) {
+      return pedidoDaRota;
+    }
+    return resolverEntrada(destinoInicial, papelDoAtor);
+  });
+  const [aberturaDoAdmitido, setAberturaDoAdmitido] =
+    useState<AberturaDoAdmitido | null>(null);
+  /** Último destino SEM rota, para onde o "voltar" do navegador devolve. */
+  const destinoSemRotaRef = useRef(
+    rotaDoDestino(destinoAtivoId) === null
+      ? destinoAtivoId
+      : destinoInicialPara(papelDoAtor),
   );
   const [sessoesAtivasAberto, setSessoesAtivasAberto] = useState(false);
   const [segurancaAberto, setSegurancaAberto] = useState(false);
@@ -492,6 +549,60 @@ export function App({
     setDestinoAtivoId(destinoId);
     setGavetaAberta(false);
   }, []);
+
+  const abrirAdmitido = useCallback((abertura: AberturaDoAdmitido) => {
+    setAberturaDoAdmitido(abertura);
+    setDestinoAtivoId("pessoas");
+  }, []);
+  const aberturaAtendida = useCallback(() => setAberturaDoAdmitido(null), []);
+
+  // T176 — a URL acompanha o destino. Destino com rota a escreve; destino sem
+  // rota a retira, se ela estava lá. `pushState`, e não `replaceState`, para
+  // que o "voltar" do navegador saia da página como quem clica em "Pessoas".
+  useEffect(() => {
+    const rota = rotaDoDestino(destinoAtivoId);
+    const atual = window.location.hash;
+    if (rota === null) {
+      destinoSemRotaRef.current = destinoAtivoId;
+      if (destinoDaRota(atual) !== null) {
+        window.history.pushState(
+          null,
+          "",
+          window.location.pathname + window.location.search,
+        );
+      }
+    } else if (atual !== rota) {
+      window.history.pushState(null, "", rota);
+    }
+  }, [destinoAtivoId]);
+
+  // "Voltar" e "avançar" do navegador, e a URL digitada com o painel aberto.
+  // A rota passa pela mesma validação de capacidade da entrada.
+  useEffect(() => {
+    function aoMudarUrl() {
+      const pedido = destinoDaRota(window.location.hash);
+      setDestinoAtivoId(
+        pedido === null
+          ? destinoSemRotaRef.current
+          : resolverEntrada(pedido, papelDoAtor),
+      );
+    }
+    window.addEventListener("popstate", aoMudarUrl);
+    window.addEventListener("hashchange", aoMudarUrl);
+    return () => {
+      window.removeEventListener("popstate", aoMudarUrl);
+      window.removeEventListener("hashchange", aoMudarUrl);
+      // Sair do shell (Hub, logout) não deixa a rota pendurada na URL: a
+      // próxima entrada pelo Hub não deve ser sequestrada por ela.
+      if (destinoDaRota(window.location.hash) !== null) {
+        window.history.replaceState(
+          null,
+          "",
+          window.location.pathname + window.location.search,
+        );
+      }
+    };
+  }, [papelDoAtor]);
 
   // Foco preso, `Escape` e devolução de foco — mesma disciplina do `Modal`
   // (UI-F04). Enquanto a gaveta está aberta ela é a única região alcançável:
@@ -749,6 +860,11 @@ export function App({
             setRelatoriosTituloId,
             () => onSessaoAtualEncerrada?.(),
             empresaAtiva,
+            {
+              abertura: aberturaDoAdmitido,
+              onAbrirAdmitido: abrirAdmitido,
+              onAberturaAtendida: aberturaAtendida,
+            },
           )}
         </main>
       </div>

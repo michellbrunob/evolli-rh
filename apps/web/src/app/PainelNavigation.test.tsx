@@ -95,6 +95,7 @@ describe("o estado declarado bate com o código", () => {
   /** Tela que cada destino abre por padrão. */
   const TELA_PADRAO: Readonly<Record<string, string>> = {
     pessoas: "src/screens/pessoas/ColaboradoresScreen.tsx",
+    "nova-admissao": "src/screens/pessoas/NovaAdmissaoScreen.tsx",
     cadastros: "src/screens/horarios/CadastroHorariosScreen.tsx",
     ponto: "src/screens/ponto/VisaoPeriodoScreen.tsx",
     equipe: "src/screens/equipe/EquipeScreen.tsx",
@@ -342,16 +343,54 @@ describe("aterrissagem por papel", () => {
 
 describe("módulo, submenu e destino ativo (T159 — evolução visual)", () => {
   it("módulo de um destino só É o destino: nenhum clique sem informação", () => {
+    // T176 — para `rh`, Pessoas passou a ter dois destinos (Nova admissão);
+    // Estrutura continua com um só, e é ele que prende a regra.
     render(
       <PainelNavigation
-        destinoAtivoId="pessoas"
+        destinoAtivoId="cadastros"
         onSelecionar={() => {}}
         papel="rh"
       />,
     );
-    const pessoas = screen.getByRole("button", { name: /^Pessoas/ });
-    expect(pessoas).not.toHaveAttribute("aria-expanded");
-    expect(pessoas).toHaveAttribute("aria-current", "page");
+    const estrutura = screen.getByRole("button", { name: /^Estrutura/ });
+    expect(estrutura).not.toHaveAttribute("aria-expanded");
+    expect(estrutura).toHaveAttribute("aria-current", "page");
+  });
+
+  it("T176 — Pessoas é disclosure com Nova admissão só para quem admite", () => {
+    const { unmount } = render(
+      <PainelNavigation
+        destinoAtivoId="pessoas"
+        onSelecionar={() => {}}
+        papel="dp"
+      />,
+    );
+    const pessoas = screen.getByRole("button", { name: "Pessoas" });
+    expect(pessoas).toHaveAttribute("aria-expanded", "true");
+    const regiao = document.getElementById(
+      pessoas.getAttribute("aria-controls")!,
+    )!;
+    expect(
+      within(regiao as HTMLElement)
+        .getAllByRole("button")
+        .map((b) => b.textContent),
+    ).toEqual(["Pessoas Colaboradores", "Nova admissão Página própria"]);
+    unmount();
+
+    // `master_tecnico` só lê Pessoas: o servidor recusaria a admissão.
+    render(
+      <PainelNavigation
+        destinoAtivoId="pessoas"
+        onSelecionar={() => {}}
+        papel="master_tecnico"
+      />,
+    );
+    expect(
+      screen.queryByRole("button", { name: /Nova admissão/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /^Pessoas/ }),
+    ).not.toHaveAttribute("aria-expanded");
   });
 
   it("módulo com mais de um destino é um disclosure que controla o seu submenu", () => {
@@ -424,7 +463,9 @@ describe("módulo, submenu e destino ativo (T159 — evolução visual)", () => 
         papel="rh"
       />,
     );
-    const pessoas = screen.getByRole("button", { name: /^Pessoas/ });
+    const pessoas = screen.getByRole("button", {
+      name: "Pessoas Colaboradores",
+    });
     // `aria-current` (semântica) + a classe que soma superfície, peso de
     // fonte e barra indicadora (ver PainelNavigation.css).
     expect(pessoas).toHaveAttribute("aria-current", "page");

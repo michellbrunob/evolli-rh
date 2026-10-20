@@ -17,6 +17,15 @@ muda é só o efeito dela: a expansão deixa de estar condicionada e passa a ser
 **liberada de forma gradual, tela por tela, com validação visual antes de
 ampliar**.
 
+**Atualização — 20/10/2026 (`DP-FLX-21`).** Para **cadastro longo e
+estruturado de admissão e módulos equivalentes**, a direção de modal desta
+decisão foi **substituída** pela decisão da proprietária sobre o `DP-FLX-21`
+(ver a nota ao final da
+[ADR 0017](../adr/0017-fluxo-admissao-vinculo-desligamento-rh-dp.md)): esse
+cadastro usa página própria. Modal continua valendo para consulta,
+confirmação, seleção curta e edição delimitada, com as regras abaixo. O texto
+original da T142 fica preservado.
+
 Esta aprovação é **visual**. Não autoriza merge, produção nem migração. A
 expansão é liberada, não concluída: cada tela recebe identificador próprio e
 validação própria.

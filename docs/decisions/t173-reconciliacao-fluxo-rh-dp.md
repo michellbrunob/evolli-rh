@@ -608,6 +608,13 @@ demais 21 gates (`DP-FLX-02` a `DP-FLX-22`) e os 13 conflitos da seção 5
 continuam **abertos**, e esta atualização não autoriza implementação. O texto
 a seguir é o original de 2026-10-19.
 
+**Atualização (T176, 2026-10-20).** O `DP-FLX-21` também foi **resolvido**,
+por autorização explícita da proprietária: cadastro longo e estruturado de
+admissão em página própria; modal só para consulta, confirmação, seleção curta
+e edição delimitada; sem campo, regra, dado ou processo novo. A linha dele
+continua na tabela. Seguem **abertos** 20 gates — `DP-FLX-02` a `DP-FLX-20` e
+`DP-FLX-22`, inclusive o `DP-FLX-04` — e os 13 conflitos da seção 5.
+
 Nenhum gate abaixo está resolvido. A coluna **Responsável** separa três origens,
 e só elas:
 
@@ -669,6 +676,11 @@ a leitura cabe ao responsável do gate, não a este diagnóstico.
 | 11  | Projeção do desligamento ao gestor (R29)                                                                    | `A15:104-107`                                                                                                | firme       | 3.9      | `DP-FLX-19`              |
 | 12  | Documento por vínculo e período (R30)                                                                       | `DP-2E-07`                                                                                                   | firme       | 3.10     | `DP-FLX-14`              |
 | 13  | Cadastro completo e admissão em tela própria, sem modal (diretriz de UX do proprietário, não das respostas) | T142, item 5: cadastro, edição e detalhe em modal, implementada; a T146, ainda não integrada, repete a regra | firme       | 3.13     | `DP-FLX-21`              |
+
+**Nota (T176, 2026-10-20).** O gate do conflito 13, o `DP-FLX-21`, foi
+decidido pela proprietária (seção 4). Por instrução dela, os 13 conflitos
+continuam registrados nesta lista; o conflito 13 não foi retirado nem
+renumerado.
 
 **Fora da lista, por não serem conflito com decisão fechada:**
 
