@@ -919,30 +919,39 @@ describe("Cadastro de colaborador — Módulo 1 (e2e)", () => {
   });
 
   describe("após o desligamento: uso operacional bloqueado (retenção aprovada)", () => {
+    // Cada caso monta o PRÓPRIO cenário: contas novas (rh que admite e desliga,
+    // e o papel que consulta), colaborador próprio e `x-request-id` próprio por
+    // requisição. Nenhum caso depende de outro, da ordem, nem do contexto de
+    // empresa que outro teste deixou numa conta compartilhada.
     const DESLIGAMENTO = "2026-05-04";
-    let colaboradorId: string;
-    let perfilAntes: Record<string, unknown>;
-    let enderecoAntes: Record<string, unknown>;
+    let sequencia = 0;
 
-    beforeAll(async () => {
-      colaboradorId = (
-        await post("/v1/colaboradores", rhA)
-          .send(admissao("MAT-M1-DESL"))
+    async function contaNova(papel: "rh" | "dp" | "master_tecnico") {
+      sequencia += 1;
+      const email = `${papel.replace("_", ".")}.desl${sequencia}@example.test`;
+      return papel === "master_tecnico"
+        ? seedMaster(email)
+        : criarUsuario(email, papel, empresaA);
+    }
+
+    /** Admite, efetiva e desliga um colaborador próprio, na empresa A. */
+    async function colaboradorDesligado(matricula: string) {
+      const rh = await contaNova("rh");
+      const id: string = (
+        await post("/v1/colaboradores", rh)
+          .send(admissao(matricula))
           .expect(201)
       ).body.id;
-      const vinculos = await get(
-        `/v1/colaboradores/${colaboradorId}/vinculos`,
-        rhA,
-      ).expect(200);
-      const vinculoId: string = vinculos.body[0].id;
-      const linha = await get(
-        `/v1/vinculos/${vinculoId}/linha-do-tempo`,
-        rhA,
-      ).expect(200);
-      await post(`/v1/movimentacoes/${linha.body[0].id}/efetivar`, rhA)
+      const vinculoId: string = (
+        await get(`/v1/colaboradores/${id}/vinculos`, rh).expect(200)
+      ).body[0].id;
+      const admissaoId: string = (
+        await get(`/v1/vinculos/${vinculoId}/linha-do-tempo`, rh).expect(200)
+      ).body[0].id;
+      await post(`/v1/movimentacoes/${admissaoId}/efetivar`, rh)
         .send()
         .expect(201);
-      const desligamento = await post("/v1/movimentacoes", rhA)
+      const desligamento = await post("/v1/movimentacoes", rh)
         .send({
           vinculoId,
           tipo: "desligamento",
@@ -950,56 +959,46 @@ describe("Cadastro de colaborador — Módulo 1 (e2e)", () => {
           vigenciaInicio: DESLIGAMENTO,
         })
         .expect(201);
-      await post(`/v1/movimentacoes/${desligamento.body.id}/efetivar`, rhA)
+      await post(`/v1/movimentacoes/${desligamento.body.id}/efetivar`, rh)
         .send()
         .expect(201);
-      expect(
-        (
-          await prisma.vinculoFuncional.findFirstOrThrow({
-            where: { id: vinculoId },
-          })
-        ).situacao,
-      ).toBe("encerrado");
-      perfilAntes = await prisma.perfilPessoalColaborador.findFirstOrThrow({
-        where: { colaboradorId },
+      const vinculo = await prisma.vinculoFuncional.findUniqueOrThrow({
+        where: { id: vinculoId },
       });
-      enderecoAntes = await prisma.enderecoColaborador.findFirstOrThrow({
-        where: { colaboradorId },
+      expect(vinculo.situacao).toBe("encerrado");
+      const perfil = await prisma.perfilPessoalColaborador.findFirstOrThrow({
+        where: { colaboradorId: id },
       });
-    });
+      const endereco = await prisma.enderecoColaborador.findFirstOrThrow({
+        where: { colaboradorId: id },
+      });
+      return { id, perfil, endereco };
+    }
 
-    /** Os eventos da última requisição do colaborador, e a trilha formal. */
-    async function ultimaRequisicao(id: string) {
-      const ultimo =
-        await prisma.dadosPessoaisColaboradorEvento.findFirstOrThrow({
-          where: { colaboradorId: id },
-          orderBy: { ocorridoEm: "desc" },
-        });
+    /** Eventos e trilha formal de UMA requisição, pelo `x-request-id` dela. */
+    async function trilhaDa(requestId: string) {
       const eventos = await prisma.dadosPessoaisColaboradorEvento.findMany({
-        where: { colaboradorId: id, requestId: ultimo.requestId },
+        where: { requestId },
       });
       const formal = await prisma.auditEvent.findMany({
-        where: {
-          requestId: ultimo.requestId,
-          resource: "dados_pessoais_colaborador",
-        },
+        where: { requestId, resource: "dados_pessoais_colaborador" },
       });
       return { eventos, formal };
     }
 
-    it.each([
-      ["rh", () => rhA],
-      ["dp", () => dpA],
-      ["master_tecnico", () => master],
-    ])(
+    it.each(["rh", "dp", "master_tecnico"] as const)(
       "%s lê: 200 bloqueado, sem nenhum valor, com trilha por categoria",
-      async (_papel, cred) => {
-        const r = await get(
-          `/v1/colaboradores/${colaboradorId}/dados-pessoais`,
-          cred(),
-        ).expect(200);
+      async (papel) => {
+        const alvo = await colaboradorDesligado(
+          `MAT-M1-DL-${papel.slice(0, 2).toUpperCase()}`,
+        );
+        const cred = await contaNova(papel);
+        const requestId = `t177-desl-leitura-${papel}`;
+        const r = await get(`/v1/colaboradores/${alvo.id}/dados-pessoais`, cred)
+          .set("x-request-id", requestId)
+          .expect(200);
         expect(r.body).toEqual({
-          colaboradorId,
+          colaboradorId: alvo.id,
           empresaId: empresaA,
           situacao: "bloqueado",
           perfilPessoal: null,
@@ -1010,10 +1009,12 @@ describe("Cadastro de colaborador — Módulo 1 (e2e)", () => {
         for (const valor of VALORES_PESSOAIS) {
           expect(texto).not.toContain(valor);
         }
-        const { eventos, formal } = await ultimaRequisicao(colaboradorId);
+
+        const { eventos, formal } = await trilhaDa(requestId);
         expect(
           eventos
             .map((e) => ({
+              colaboradorId: e.colaboradorId,
               categoria: e.categoria,
               acao: e.acao,
               resultado: e.resultado,
@@ -1024,74 +1025,79 @@ describe("Cadastro de colaborador — Módulo 1 (e2e)", () => {
             .sort((x, y) => x.categoria.localeCompare(y.categoria)),
         ).toEqual([
           {
+            colaboradorId: alvo.id,
             categoria: "endereco",
             acao: "leitura",
             resultado: "bloqueado",
             campos: [],
-            registro: enderecoAntes.id,
+            registro: alvo.endereco.id,
             empresaId: empresaA,
           },
           {
+            colaboradorId: alvo.id,
             categoria: "perfil_pessoal",
             acao: "leitura",
             resultado: "bloqueado",
             campos: [],
-            registro: perfilAntes.id,
+            registro: alvo.perfil.id,
             empresaId: empresaA,
           },
         ]);
-        expect(formal.map((f) => [f.action, f.result])).toEqual([
-          ["pessoas_dados_pessoais_consultados", "success"],
-          ["pessoas_dados_pessoais_consultados", "success"],
+        expect(formal.map((f) => [f.action, f.result, f.actorRole])).toEqual([
+          ["pessoas_dados_pessoais_consultados", "success", papel],
+          ["pessoas_dados_pessoais_consultados", "success", papel],
         ]);
       },
     );
 
-    it.each([
-      ["rh", () => rhA],
-      ["dp", () => dpA],
-      ["master_tecnico", () => master],
-    ])(
-      "%s edita: 409, nada gravado, tentativa na trilha como falha",
-      async (_papel, cred) => {
-        await put(`/v1/colaboradores/${colaboradorId}/dados-pessoais`, cred())
+    it.each(["rh", "dp", "master_tecnico"] as const)(
+      "%s edita: 409, nada gravado, trilha de falha e registros preservados",
+      async (papel) => {
+        const alvo = await colaboradorDesligado(
+          `MAT-M1-DE-${papel.slice(0, 2).toUpperCase()}`,
+        );
+        const cred = await contaNova(papel);
+        const requestId = `t177-desl-edicao-${papel}`;
+        await put(`/v1/colaboradores/${alvo.id}/dados-pessoais`, cred)
+          .set("x-request-id", requestId)
           .send({
             perfilPessoal: { ...PERFIL, curso: "Nao Pode Gravar" },
             endereco: { ...ENDERECO, cidade: "Nao Pode Gravar" },
           })
           .expect(409);
-        const { eventos, formal } = await ultimaRequisicao(colaboradorId);
+
+        const { eventos, formal } = await trilhaDa(requestId);
         expect(
-          eventos.map((e) => [e.categoria, e.acao, e.resultado, e.campos]),
-        ).toEqual(
-          expect.arrayContaining([
-            ["perfil_pessoal", "edicao", "bloqueado", []],
-            ["endereco", "edicao", "bloqueado", []],
-          ]),
-        );
-        expect(eventos).toHaveLength(2);
-        expect(formal.map((f) => [f.action, f.result])).toEqual([
-          ["pessoas_dados_pessoais_atualizados", "failure"],
-          ["pessoas_dados_pessoais_atualizados", "failure"],
+          eventos
+            .map((e) => [e.categoria, e.acao, e.resultado, e.campos])
+            .sort((x, y) => String(x[0]).localeCompare(String(y[0]))),
+        ).toEqual([
+          ["endereco", "edicao", "bloqueado", []],
+          ["perfil_pessoal", "edicao", "bloqueado", []],
         ]);
+        expect(formal.map((f) => [f.action, f.result, f.actorRole])).toEqual([
+          ["pessoas_dados_pessoais_atualizados", "failure", papel],
+          ["pessoas_dados_pessoais_atualizados", "failure", papel],
+        ]);
+
+        // Retenção aprovada: nada apagado, nada alterado, o contato continua.
+        expect(
+          await prisma.perfilPessoalColaborador.findUniqueOrThrow({
+            where: { id: alvo.perfil.id },
+          }),
+        ).toEqual(alvo.perfil);
+        expect(
+          await prisma.enderecoColaborador.findUniqueOrThrow({
+            where: { id: alvo.endereco.id },
+          }),
+        ).toEqual(alvo.endereco);
+        expect(
+          await prisma.contatoColaborador.count({
+            where: { colaboradorId: alvo.id },
+          }),
+        ).toBe(1);
       },
     );
-
-    it("os registros vigentes ficam preservados: nada apagado, nada alterado", async () => {
-      expect(
-        await prisma.perfilPessoalColaborador.findFirstOrThrow({
-          where: { colaboradorId },
-        }),
-      ).toEqual(perfilAntes);
-      expect(
-        await prisma.enderecoColaborador.findFirstOrThrow({
-          where: { colaboradorId },
-        }),
-      ).toEqual(enderecoAntes);
-      expect(
-        await prisma.contatoColaborador.count({ where: { colaboradorId } }),
-      ).toBe(1);
-    });
   });
 
   describe("o banco é a rede de segurança", () => {

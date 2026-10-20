@@ -708,8 +708,11 @@ documentos, dados bancários, saúde ou demais dados sensíveis ou restritos.
 
 **Retenção (decisão substitutiva, 2026-10-20):** sem exclusão nem
 anonimização automática após o desligamento; os dados ficam bloqueados para uso
-operacional, com histórico e auditoria preservados; qualquer alteração futura
-exige decisão explícita da proprietária e avaliação de RH/Jurídico.
+operacional, com histórico e auditoria preservados — isto é, o **valor
+vigente** e os **metadados de auditoria** (quem, quando, ação e nomes dos
+campos); o sistema **não** guarda versões históricas dos valores; qualquer
+alteração futura exige decisão explícita da proprietária e avaliação de
+RH/Jurídico.
 
 **O que continua fora:** documento, CPF, dado bancário, salário, dado médico,
 dependente, benefício, nome social, identidade de gênero, raça/etnia,

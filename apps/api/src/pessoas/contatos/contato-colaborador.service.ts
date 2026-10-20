@@ -23,8 +23,9 @@ import { resolverEscopoContatos } from "./escopo-contatos.util";
  * - `registrado` — contato gravado e em uso operacional.
  * - `bloqueado` — nenhum vínculo do colaborador na empresa segue previsto ou
  *   ativo. A ficha manda **bloquear o uso operacional** após o desligamento:
- *   o valor não é respondido e não pode ser editado. A guarda por 2 anos e a
- *   eliminação seguem a ficha, por processo que esta fatia não implementa.
+ *   o valor não é respondido e não pode ser editado. Não há exclusão nem
+ *   anonimização automática (retenção alinhada em 2026-10-20, §7 da ficha):
+ *   o valor vigente e a trilha de auditoria ficam preservados.
  */
 export type SituacaoContatos = "sem_registro" | "registrado" | "bloqueado";
 

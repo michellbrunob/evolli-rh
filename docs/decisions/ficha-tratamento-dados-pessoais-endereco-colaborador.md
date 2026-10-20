@@ -137,8 +137,10 @@ anos após o desligamento e então eliminar ou anonimizar. A proprietária a
   desligamento;
 - após o desligamento, os dados ficam **bloqueados para uso operacional**, com
   histórico e auditoria **preservados** — o que o sistema já faz: com todo
-  vínculo na empresa encerrado, leitura e edição respondem `bloqueado`, sem
-  valor, e a tentativa fica na trilha;
+  vínculo na empresa encerrado, a **leitura** responde HTTP 200 com situação
+  `bloqueado` e nenhum valor; a **edição** responde **HTTP 409** e não grava
+  nada. Nos dois casos, `bloqueado` é o resultado registrado na trilha de
+  auditoria;
 - qualquer alteração futura desta política exige **decisão explícita da
   proprietária** e avaliação de RH/Jurídico.
 

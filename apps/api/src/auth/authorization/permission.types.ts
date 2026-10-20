@@ -135,8 +135,8 @@ export type ContatosResource = (typeof CONTATOS_RESOURCES)[number];
  * Recurso dos dados pessoais e do endereco do colaborador (T177, Modulo 1 do
  * cadastro). `rh` e `dp` leem e editam na empresa ativa; o `master_tecnico`
  * le e edita em qualquer empresa — com empresa ativa, so nela; sem empresa
- * ativa, na empresa real do vinculo —, a mesma regra dos contatos (Emenda 2
- * da ADR 0012). Recurso proprio, e nao do ramo de pessoas, pelo mesmo motivo
+ * ativa, na empresa real do vinculo — (Emenda 2 da ADR 0012), a mesma regra
+ * ja aprovada para os contatos (Emenda 1 da ADR 0012). Recurso proprio, e nao do ramo de pessoas, pelo mesmo motivo
  * dos contatos: em `colaborador`/`vinculo_funcional` o `master_tecnico`
  * continua so lendo, e a heranca estenderia a edicao a todo o dominio.
  */
