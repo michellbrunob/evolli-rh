@@ -117,6 +117,9 @@ function admissaoDe(colaborador: ColaboradorApi): AdmissaoRegistradaApi {
         centroCustoId: null,
       },
     },
+    perfilPessoal: null,
+    endereco: null,
+    contatos: null,
   };
 }
 

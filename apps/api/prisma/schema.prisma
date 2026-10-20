@@ -136,6 +136,14 @@ model AccessUser {
   contatosColaboradorAtualizados ContatoColaborador[]       @relation("ContatoColaboradorAtualizadoPor")
   contatoColaboradorEventos      ContatoColaboradorEvento[] @relation("ContatoColaboradorEventoAtor")
 
+  // T177 — dados pessoais e endereco do colaborador que esta conta gravou, e
+  // os eventos de tratamento que ela praticou.
+  perfisPessoaisCriados     PerfilPessoalColaborador[]       @relation("PerfilPessoalCriadoPor")
+  perfisPessoaisAtualizados PerfilPessoalColaborador[]       @relation("PerfilPessoalAtualizadoPor")
+  enderecosCriados          EnderecoColaborador[]            @relation("EnderecoCriadoPor")
+  enderecosAtualizados      EnderecoColaborador[]            @relation("EnderecoAtualizadoPor")
+  dadosPessoaisEventos      DadosPessoaisColaboradorEvento[] @relation("DadosPessoaisEventoAtor")
+
   @@index([companyId])
   @@map("access_user")
 }
@@ -562,6 +570,14 @@ enum AuditAction {
   pessoas_contato_criado     @map("pessoas.contato.criado")
   pessoas_contato_atualizado @map("pessoas.contato.atualizado")
   pessoas_contato_consultado @map("pessoas.contato.consultado")
+
+  // T177 — dados pessoais e endereco do colaborador (Modulo 1 do cadastro).
+  // Toda consulta, criacao e edicao deixa evento, sem nenhum valor pessoal:
+  // categoria, resultado e NOMES dos campos vivem em
+  // `dados_pessoais_colaborador_evento`, correlacionados por `request_id`.
+  pessoas_dados_pessoais_criados     @map("pessoas.dados_pessoais.criados")
+  pessoas_dados_pessoais_atualizados @map("pessoas.dados_pessoais.atualizados")
+  pessoas_dados_pessoais_consultados @map("pessoas.dados_pessoais.consultados")
 }
 
 enum AuditResult {
@@ -700,6 +716,12 @@ model Empresa {
   // autorizacao e a empresa, nunca a pessoa (ADR 0016, decisao 3).
   contatosColaborador       ContatoColaborador[]
   eventosContatoColaborador ContatoColaboradorEvento[]
+
+  // T177 — dados pessoais e endereco do colaborador, com `empresa_id` proprio
+  // pelo mesmo motivo dos contatos.
+  perfisPessoaisColaborador PerfilPessoalColaborador[]
+  enderecosColaborador      EnderecoColaborador[]
+  eventosDadosPessoais      DadosPessoaisColaboradorEvento[]
 
   @@index([status])
   @@map("empresa")
@@ -1020,6 +1042,12 @@ model Colaborador {
   // existe mesmo quando o colaborador nao tem contato gravado.
   contatos       ContatoColaborador[]
   eventosContato ContatoColaboradorEvento[]
+
+  // T177 — dados pessoais e endereco, tambem em agregados PROPRIOS, por
+  // empresa. `colaborador` continua so com `nome` e `situacao`.
+  perfisPessoais       PerfilPessoalColaborador[]
+  enderecos            EnderecoColaborador[]
+  eventosDadosPessoais DadosPessoaisColaboradorEvento[]
 
   @@index([situacao])
   @@map("colaborador")
@@ -2154,4 +2182,167 @@ model ContatoColaboradorEvento {
   @@index([empresaId, ocorridoEm])
   @@index([atorUserId])
   @@map("contato_colaborador_evento")
+}
+
+// ---------------------------------------------------------------------------
+// T177 — Cadastro de colaborador, Modulo 1: dados pessoais e endereco.
+//
+// Agregados PROPRIOS, fora de `Colaborador` (ADR 0016, decisao 3), por
+// colaborador E empresa, como os contatos da T169: o colaborador nao tem
+// `empresa_id`, e o RH de uma empresa nunca le o que o RH de outra gravou.
+// Todos os campos sao opcionais e em texto controlado pelo servidor: nao ha
+// catalogo canonico no sistema para sexo, genero, estado civil, escolaridade,
+// pais, UF ou municipio, e esta fatia nao inventa taxonomia.
+// ---------------------------------------------------------------------------
+
+/// Categoria do dado pessoal tratada por um evento.
+enum CategoriaDadosPessoais {
+  perfil_pessoal
+  endereco
+}
+
+enum AcaoDadosPessoais {
+  criacao
+  leitura
+  edicao
+}
+
+/// Resultado do tratamento, com o mesmo vocabulario dos contatos.
+enum ResultadoEventoDadosPessoais {
+  gravado
+  valores_devolvidos
+  sem_alteracao
+  sem_registro
+  bloqueado
+}
+
+/// Campo alcancado por um evento. E o NOME do campo, nunca o valor.
+enum CampoDadosPessoais {
+  data_nascimento
+  sexo
+  saudacao
+  estado_civil
+  nacionalidade
+  naturalidade
+  escolaridade
+  curso
+  nome_pai
+  nome_mae
+  pais
+  cep
+  logradouro
+  numero
+  complemento
+  bairro
+  cidade
+  estado
+}
+
+/// Dados pessoais do colaborador DENTRO de uma empresa. Valores ja aparados e
+/// com espacos internos colapsados pelo servidor; vazio e `NULL`.
+model PerfilPessoalColaborador {
+  id            String @id @default(uuid())
+  empresaId     String @map("empresa_id")
+  colaboradorId String @map("colaborador_id")
+
+  dataNascimento DateTime? @map("data_nascimento") @db.Date
+  sexo           String?
+  saudacao       String?
+  estadoCivil    String?   @map("estado_civil")
+  nacionalidade  String?
+  naturalidade   String?
+  escolaridade   String?
+  curso          String?
+  nomePai        String?   @map("nome_pai")
+  nomeMae        String?   @map("nome_mae")
+
+  criadoPorUserId     String @map("criado_por_user_id")
+  atualizadoPorUserId String @map("atualizado_por_user_id")
+
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  empresa       Empresa     @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  colaborador   Colaborador @relation(fields: [colaboradorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  criadoPor     AccessUser  @relation("PerfilPessoalCriadoPor", fields: [criadoPorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  atualizadoPor AccessUser  @relation("PerfilPessoalAtualizadoPor", fields: [atualizadoPorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  eventos DadosPessoaisColaboradorEvento[]
+
+  @@unique([colaboradorId, empresaId])
+  @@unique([id, empresaId, colaboradorId])
+  @@index([empresaId])
+  @@index([criadoPorUserId])
+  @@index([atualizadoPorUserId])
+  @@map("perfil_pessoal_colaborador")
+}
+
+/// Endereco do colaborador DENTRO de uma empresa. Mesmas regras do perfil.
+model EnderecoColaborador {
+  id            String @id @default(uuid())
+  empresaId     String @map("empresa_id")
+  colaboradorId String @map("colaborador_id")
+
+  pais        String?
+  cep         String?
+  logradouro  String?
+  numero      String?
+  complemento String?
+  bairro      String?
+  cidade      String?
+  estado      String?
+
+  criadoPorUserId     String @map("criado_por_user_id")
+  atualizadoPorUserId String @map("atualizado_por_user_id")
+
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  empresa       Empresa     @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  colaborador   Colaborador @relation(fields: [colaboradorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  criadoPor     AccessUser  @relation("EnderecoCriadoPor", fields: [criadoPorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  atualizadoPor AccessUser  @relation("EnderecoAtualizadoPor", fields: [atualizadoPorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  eventos DadosPessoaisColaboradorEvento[]
+
+  @@unique([colaboradorId, empresaId])
+  @@unique([id, empresaId, colaboradorId])
+  @@index([empresaId])
+  @@index([criadoPorUserId])
+  @@index([atualizadoPorUserId])
+  @@map("endereco_colaborador")
+}
+
+/// Evento de tratamento dos dados pessoais e do endereco: TODA consulta,
+/// criacao e edicao, com a categoria, o resultado e os NOMES dos campos
+/// alcancados — nunca os valores. APPEND-ONLY pelo banco (a migration revoga
+/// `UPDATE` e `DELETE` de `evolli_app`).
+model DadosPessoaisColaboradorEvento {
+  id            String @id @default(uuid())
+  colaboradorId String @map("colaborador_id")
+  empresaId     String @map("empresa_id")
+
+  categoria  CategoriaDadosPessoais
+  /// Registro da categoria, quando existe; no maximo um dos dois.
+  perfilId   String?                @map("perfil_id")
+  enderecoId String?                @map("endereco_id")
+
+  acao      AcaoDadosPessoais
+  resultado ResultadoEventoDadosPessoais
+  campos    CampoDadosPessoais[]
+
+  atorUserId String   @map("ator_user_id")
+  requestId  String   @map("request_id")
+  ocorridoEm DateTime @default(now()) @map("ocorrido_em")
+
+  colaborador Colaborador               @relation(fields: [colaboradorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  empresa     Empresa                   @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  perfil      PerfilPessoalColaborador? @relation(fields: [perfilId, empresaId, colaboradorId], references: [id, empresaId, colaboradorId], onDelete: Restrict, onUpdate: Cascade)
+  endereco    EnderecoColaborador?      @relation(fields: [enderecoId, empresaId, colaboradorId], references: [id, empresaId, colaboradorId], onDelete: Restrict, onUpdate: Cascade)
+  ator        AccessUser                @relation("DadosPessoaisEventoAtor", fields: [atorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([colaboradorId, ocorridoEm])
+  @@index([empresaId, ocorridoEm])
+  @@index([atorUserId])
+  @@map("dados_pessoais_colaborador_evento")
 }

@@ -1,40 +1,37 @@
 /**
- * Nova admissão (T176) — a admissão em página própria, fora de modal.
+ * Nova admissão (T176; Módulo 1 do cadastro na T177) — a admissão em página
+ * própria, fora de modal.
  *
- * ## De onde vem
+ * ## Blocos
  *
- * A proprietária resolveu o `DP-FLX-21` em 2026-10-20: cadastro longo e
- * estruturado de admissão usa página própria, e modal fica para consulta,
- * confirmação, seleção curta e edição delimitada. Esta é a primeira página
- * dessa decisão. Ela **não cria campo, regra, dado nem processo**: usa só o
- * contrato atual de `POST /v1/colaboradores` (T167), com os mesmos campos e as
- * mesmas validações do formulário que até aqui abria em modal na tela de
- * Colaboradores.
+ * Empresa (só leitura) · Dados pessoais · Endereço · Contatos · Vínculo ·
+ * Lotação inicial. Dados pessoais, endereço e contatos são o **Módulo 1** do
+ * cadastro modular (T177), gravados de verdade na MESMA transação da admissão:
+ * falhou qualquer parte, nada fica.
  *
  * ## O que a página preserva do contrato
  *
- * - **Admissão atômica.** Uma chamada cria, numa transação do servidor, o
- *   colaborador, o vínculo `previsto` e o ato de admissão (Baseline V1,
- *   decisão 15). A página não divide a operação em etapas.
+ * - **Admissão atômica.** Uma chamada cria colaborador, vínculo `previsto`,
+ *   ato de admissão, perfil, endereço e contatos (Baseline V1, decisão 15).
  * - **Empresa só da sessão.** A empresa é a única que `GET /v1/empresas`
- *   devolve para a sessão. A página a mostra só para leitura e não oferece
- *   escolha; nenhuma, ou mais de uma, é estado que ela não sabe resolver, e
- *   então ela não envia.
- * - **Servidor como fonte.** A confirmação mostra o que o servidor gravou, não
- *   o que foi digitado.
+ *   devolve para a sessão. Nenhuma, ou mais de uma, é estado que a página não
+ *   sabe resolver, e então ela não envia.
+ * - **Contatos com uma só fonte.** E-mail pessoal, celular e telefone são os
+ *   da ficha da T169: obrigatórios, juntos, e lidos depois pela rota própria.
+ * - **Servidor como fonte.** A confirmação mostra o que o servidor gravou.
  *
  * ## O que ela não faz
  *
- * Não coleta CPF, nascimento, endereço, documentos, dados bancários,
- * dependentes, saúde nem dado sindical; não tem etapas, devolução ou
- * aprovação; não gera matrícula. Tudo isso depende de gates ainda abertos
- * (`DP-FLX-04`, `-02`, `-03`, `-05`, `-06`, `-09`, `-10` e outros).
+ * Não coleta nome social, gênero, raça/etnia, foto, deficiência, contato de
+ * emergência, documentos, CPF, dados bancários, dependentes nem dados
+ * contratuais avançados — cada um tem destino na matriz de cobertura da T177.
+ * Não consulta CEP em serviço externo, e não inventa lista de opções: sexo,
+ * estado civil, escolaridade, país, cidade e estado são texto validado.
  *
  * ## Transição
  *
- * O formulário em modal da tela de Colaboradores continua existindo nesta
- * entrega, de propósito: a proprietária pediu que ele só saia depois que esta
- * página estiver validada. Ele é transitório, não a solução definitiva.
+ * O formulário em modal da tela de Colaboradores continua existindo, de
+ * propósito, e admite só com o mínimo. Ele é transitório.
  */
 import { useEffect, useRef, useState } from "react";
 import {
@@ -70,6 +67,27 @@ import {
 } from "../../api/organizacaoClient";
 import { type CargoApi, listarCargos } from "../../api/cargoClient";
 import { formatarDiaCivil } from "../../format/data";
+import {
+  CAMPOS_ENDERECO,
+  CAMPOS_TEXTO_PERFIL,
+  type ChaveEndereco,
+  type ChavePerfil,
+  ENDERECO_INICIAL,
+  PERFIL_VAZIO,
+  ROTULO_DATA_NASCIMENTO,
+  type ValoresEndereco,
+  type ValoresPerfil,
+  blocoEndereco,
+  blocoPerfil,
+  validarEndereco,
+  validarPerfil,
+} from "./dadosPessoais";
+import {
+  type CampoContato,
+  type ValoresContatos,
+  normalizarContatos,
+  validarContatos,
+} from "./contatosColaborador";
 import "./NovaAdmissaoScreen.css";
 
 export const NOVA_ADMISSAO_TITULO_ID = "nova-admissao-titulo";
@@ -117,20 +135,30 @@ function rotuloTipoDestino(tipo: TipoDestino): string {
   );
 }
 
-interface Erros {
-  nome?: string;
-  matricula?: string;
-  tipo?: string;
-  dataAdmissao?: string;
-  tipoDestino?: string;
-  departamentoArea?: string;
-  destino?: string;
-  geral?: string;
-}
+type CampoErro =
+  | "nome"
+  | ChavePerfil
+  | ChaveEndereco
+  | CampoContato
+  | "matricula"
+  | "tipo"
+  | "dataAdmissao"
+  | "tipoDestino"
+  | "departamentoArea"
+  | "destino"
+  | "geral";
+
+type Erros = Partial<Record<CampoErro, string>>;
 
 /** Ordem visual dos campos: o foco vai ao primeiro desta lista com erro. */
-const ORDEM_DOS_ERROS: readonly (keyof Erros)[] = [
+const ORDEM_DOS_ERROS: readonly CampoErro[] = [
   "nome",
+  "dataNascimento",
+  ...CAMPOS_TEXTO_PERFIL.map((c) => c.chave),
+  ...CAMPOS_ENDERECO.map((c) => c.chave),
+  "emailPessoal",
+  "celular",
+  "telefone",
   "matricula",
   "tipo",
   "dataAdmissao",
@@ -142,22 +170,27 @@ const ORDEM_DOS_ERROS: readonly (keyof Erros)[] = [
 
 const ERRO_GERAL_ID = "nova-admissao-erro-geral";
 
-const ID_DO_CAMPO: Record<keyof Erros, string> = {
-  nome: "nova-admissao-nome",
-  matricula: "nova-admissao-matricula",
-  tipo: "nova-admissao-tipo-vinculo",
-  dataAdmissao: "nova-admissao-data-admissao",
-  tipoDestino: "nova-admissao-tipo-destino",
-  departamentoArea: "nova-admissao-departamento-area",
-  destino: "nova-admissao-destino",
-  geral: ERRO_GERAL_ID,
-};
+/** `nomeMae` -> `nova-admissao-nome-mae`. */
+function idDoCampo(campo: CampoErro): string {
+  const especiais: Partial<Record<CampoErro, string>> = {
+    tipo: "nova-admissao-tipo-vinculo",
+    geral: ERRO_GERAL_ID,
+  };
+  return (
+    especiais[campo] ??
+    `nova-admissao-${campo.replace(/[A-Z]/g, (l) => `-${l.toLowerCase()}`)}`
+  );
+}
+
+const ID_DO_CAMPO = Object.fromEntries(
+  ORDEM_DOS_ERROS.map((campo) => [campo, idDoCampo(campo)]),
+) as Record<CampoErro, string>;
 
 const MENSAGEM_EMPRESA_INDEFINIDA =
   "Não foi possível confirmar a empresa ativa em que você está trabalhando. Nada será enviado. Volte para Colaboradores e abra esta página de novo.";
 
 /** Limpa o erro do campo em correção e preserva os demais, inclusive `geral`. */
-function semErroDe(erros: Erros, ...campos: (keyof Erros)[]): Erros {
+function semErroDe(erros: Erros, ...campos: CampoErro[]): Erros {
   const restante: Erros = { ...erros };
   for (const campo of campos) delete restante[campo];
   return restante;
@@ -249,6 +282,12 @@ interface Campos {
   departamentoIdArea: string;
 }
 
+const CONTATOS_VAZIOS: ValoresContatos = {
+  emailPessoal: "",
+  celular: "",
+  telefone: "",
+};
+
 const CAMPOS_VAZIOS: Campos = {
   nome: "",
   matricula: "",
@@ -284,6 +323,10 @@ export function NovaAdmissaoScreen({
   const [areas, setAreas] = useState<AreaApi[]>([]);
   const [carregandoAreas, setCarregandoAreas] = useState(false);
   const [campos, setCampos] = useState<Campos>(CAMPOS_VAZIOS);
+  // T177 — Módulo 1. País começa sugerido como Brasil, e é editável.
+  const [perfil, setPerfil] = useState<ValoresPerfil>(PERFIL_VAZIO);
+  const [endereco, setEndereco] = useState<ValoresEndereco>(ENDERECO_INICIAL);
+  const [contatos, setContatos] = useState<ValoresContatos>(CONTATOS_VAZIOS);
   const [erros, setErros] = useState<Erros>({});
   const [salvando, setSalvando] = useState(false);
   const [admissao, setAdmissao] = useState<AdmissaoRegistradaApi | null>(null);
@@ -353,12 +396,34 @@ export function NovaAdmissaoScreen({
     campos.tipo !== "" ||
     campos.dataAdmissao !== "" ||
     campos.tipoDestino !== "" ||
-    campos.destinoId !== "";
+    campos.destinoId !== "" ||
+    (Object.keys(perfil) as ChavePerfil[]).some(
+      (c) => perfil[c] !== PERFIL_VAZIO[c],
+    ) ||
+    (Object.keys(endereco) as ChaveEndereco[]).some(
+      (c) => endereco[c] !== ENDERECO_INICIAL[c],
+    ) ||
+    (Object.keys(contatos) as CampoContato[]).some((c) => contatos[c] !== "");
+
+  function atualizarPerfil(campo: ChavePerfil, valor: string) {
+    setPerfil((prev) => ({ ...prev, [campo]: valor }));
+    setErros((prev) => semErroDe(prev, campo));
+  }
+
+  function atualizarEndereco(campo: ChaveEndereco, valor: string) {
+    setEndereco((prev) => ({ ...prev, [campo]: valor }));
+    setErros((prev) => semErroDe(prev, campo));
+  }
+
+  function atualizarContato(campo: CampoContato, valor: string) {
+    setContatos((prev) => ({ ...prev, [campo]: valor }));
+    setErros((prev) => semErroDe(prev, campo));
+  }
 
   function atualizar<K extends keyof Campos>(
     campo: K,
     valor: Campos[K],
-    ...errosLimpos: (keyof Erros)[]
+    ...errosLimpos: CampoErro[]
   ) {
     setCampos((prev) => ({ ...prev, [campo]: valor }));
     setErros((prev) => semErroDe(prev, ...errosLimpos));
@@ -426,6 +491,12 @@ export function NovaAdmissaoScreen({
         campos.tipoDestino,
       ).toLowerCase()}.`;
     }
+    Object.assign(
+      novos,
+      validarPerfil(perfil),
+      validarEndereco(endereco),
+      validarContatos(contatos),
+    );
     if (!empresa) novos.geral = MENSAGEM_EMPRESA_INDEFINIDA;
     return novos;
   }
@@ -449,6 +520,9 @@ export function NovaAdmissaoScreen({
       ...(tipoDestino === "equipe" ? { equipeId: destinoId } : {}),
       ...(tipoDestino === "cargo" ? { cargoId: destinoId } : {}),
       ...(tipoDestino === "centroCusto" ? { centroCustoId: destinoId } : {}),
+      perfilPessoal: blocoPerfil(perfil),
+      endereco: blocoEndereco(endereco),
+      contatos: normalizarContatos(contatos),
     };
   }
 
@@ -490,6 +564,9 @@ export function NovaAdmissaoScreen({
 
   function recomecar() {
     setCampos(CAMPOS_VAZIOS);
+    setPerfil(PERFIL_VAZIO);
+    setEndereco(ENDERECO_INICIAL);
+    setContatos(CONTATOS_VAZIOS);
     setAreas([]);
     setErros({});
     setAdmissao(null);
@@ -547,12 +624,12 @@ export function NovaAdmissaoScreen({
         className="nova-admissao__aviso"
         aria-labelledby="nova-admissao-aviso-titulo"
       >
-        <StatusBadge variant="info">Somente o aprovado</StatusBadge>
+        <StatusBadge variant="info">Módulo 1 do cadastro</StatusBadge>
         <p id="nova-admissao-aviso-titulo" className="nova-admissao__texto">
-          Esta página pede só os dados que a admissão já aceita hoje. CPF,
-          nascimento, endereço, documentos, dados bancários, dependentes e
-          outros dados pessoais ainda não são coletados: dependem de decisões
-          pendentes.
+          Dados pessoais, endereço e contatos são gravados junto com a admissão.
+          Nome social, gênero, documentos, CPF, dados bancários, dependentes e
+          dados contratuais avançados ainda não são coletados: entram nos
+          próximos módulos.
         </p>
       </Surface>
 
@@ -592,13 +669,13 @@ export function NovaAdmissaoScreen({
 
         <section
           className="nova-admissao__grupo"
-          aria-labelledby="nova-admissao-grupo-identificacao"
+          aria-labelledby="nova-admissao-grupo-dados-pessoais"
         >
           <h2
-            id="nova-admissao-grupo-identificacao"
+            id="nova-admissao-grupo-dados-pessoais"
             className="nova-admissao__grupo-titulo"
           >
-            Identificação
+            Dados pessoais
           </h2>
           <FormField
             id={ID_DO_CAMPO.nome}
@@ -618,6 +695,157 @@ export function NovaAdmissaoScreen({
               />
             )}
           </FormField>
+          <FormField
+            id={ID_DO_CAMPO.dataNascimento}
+            label={ROTULO_DATA_NASCIMENTO}
+            {...(erros.dataNascimento ? { error: erros.dataNascimento } : {})}
+          >
+            {(control) => (
+              <input
+                type="date"
+                value={perfil.dataNascimento}
+                onChange={(e) =>
+                  atualizarPerfil("dataNascimento", e.target.value)
+                }
+                {...control}
+              />
+            )}
+          </FormField>
+          {CAMPOS_TEXTO_PERFIL.map((campo) => (
+            <FormField
+              key={campo.chave}
+              id={ID_DO_CAMPO[campo.chave]}
+              label={campo.rotulo}
+              {...(campo.ajuda ? { help: campo.ajuda } : {})}
+              {...(erros[campo.chave] ? { error: erros[campo.chave]! } : {})}
+            >
+              {(control) => (
+                <input
+                  type="text"
+                  maxLength={campo.limite}
+                  autoComplete="off"
+                  value={perfil[campo.chave]}
+                  onChange={(e) => atualizarPerfil(campo.chave, e.target.value)}
+                  {...control}
+                />
+              )}
+            </FormField>
+          ))}
+        </section>
+
+        <section
+          className="nova-admissao__grupo"
+          aria-labelledby="nova-admissao-grupo-endereco"
+        >
+          <h2
+            id="nova-admissao-grupo-endereco"
+            className="nova-admissao__grupo-titulo"
+          >
+            Endereço
+          </h2>
+          {CAMPOS_ENDERECO.map((campo) => (
+            <FormField
+              key={campo.chave}
+              id={ID_DO_CAMPO[campo.chave]}
+              label={campo.rotulo}
+              {...(campo.chave === "pais"
+                ? { help: "Sugerido como Brasil; pode ser alterado." }
+                : campo.ajuda
+                  ? { help: campo.ajuda }
+                  : {})}
+              {...(erros[campo.chave] ? { error: erros[campo.chave]! } : {})}
+            >
+              {(control) => (
+                <input
+                  type="text"
+                  maxLength={campo.limite}
+                  autoComplete="off"
+                  value={endereco[campo.chave]}
+                  onChange={(e) =>
+                    atualizarEndereco(campo.chave, e.target.value)
+                  }
+                  {...control}
+                />
+              )}
+            </FormField>
+          ))}
+        </section>
+
+        <section
+          className="nova-admissao__grupo"
+          aria-labelledby="nova-admissao-grupo-contatos"
+        >
+          <h2
+            id="nova-admissao-grupo-contatos"
+            className="nova-admissao__grupo-titulo"
+          >
+            Contatos
+          </h2>
+          <FormField
+            id={ID_DO_CAMPO.emailPessoal}
+            label="E-mail pessoal"
+            required
+            {...(erros.emailPessoal ? { error: erros.emailPessoal } : {})}
+          >
+            {(control) => (
+              <input
+                type="email"
+                maxLength={254}
+                autoComplete="off"
+                value={contatos.emailPessoal}
+                onChange={(e) =>
+                  atualizarContato("emailPessoal", e.target.value)
+                }
+                {...control}
+              />
+            )}
+          </FormField>
+          <FormField
+            id={ID_DO_CAMPO.celular}
+            label="Celular"
+            required
+            help="Só dígitos, com + opcional no início. Espaço, parênteses, hífen e ponto são aceitos e removidos ao salvar."
+            {...(erros.celular ? { error: erros.celular } : {})}
+          >
+            {(control) => (
+              <input
+                type="tel"
+                autoComplete="off"
+                value={contatos.celular}
+                onChange={(e) => atualizarContato("celular", e.target.value)}
+                {...control}
+              />
+            )}
+          </FormField>
+          <FormField
+            id={ID_DO_CAMPO.telefone}
+            label="Telefone"
+            required
+            help="Só dígitos, com + opcional no início. Espaço, parênteses, hífen e ponto são aceitos e removidos ao salvar."
+            {...(erros.telefone ? { error: erros.telefone } : {})}
+          >
+            {(control) => (
+              <input
+                type="tel"
+                autoComplete="off"
+                value={contatos.telefone}
+                onChange={(e) => atualizarContato("telefone", e.target.value)}
+                {...control}
+              />
+            )}
+          </FormField>
+        </section>
+
+        <section
+          className="nova-admissao__grupo"
+          aria-labelledby="nova-admissao-grupo-vinculo"
+        >
+          <h2
+            id="nova-admissao-grupo-vinculo"
+            className="nova-admissao__grupo-titulo"
+          >
+            Vínculo
+          </h2>
           <FormField
             id={ID_DO_CAMPO.matricula}
             label="Matrícula"
@@ -642,18 +870,6 @@ export function NovaAdmissaoScreen({
               />
             )}
           </FormField>
-        </section>
-
-        <section
-          className="nova-admissao__grupo"
-          aria-labelledby="nova-admissao-grupo-vinculo"
-        >
-          <h2
-            id="nova-admissao-grupo-vinculo"
-            className="nova-admissao__grupo-titulo"
-          >
-            Vínculo
-          </h2>
           <FormField
             id={ID_DO_CAMPO.tipo}
             label="Tipo de vínculo"
@@ -982,6 +1198,50 @@ function ConfirmacaoDaAdmissao({
             {lotacaoGravada(admissao.movimentacao.destino, opcoes, areas)}
           </dd>
         </dl>
+        <ResumoGravado
+          titulo="Dados pessoais"
+          id="nova-admissao-sucesso-dados-pessoais"
+          linhas={
+            admissao.perfilPessoal
+              ? [
+                  [
+                    ROTULO_DATA_NASCIMENTO,
+                    admissao.perfilPessoal.dataNascimento
+                      ? formatarDiaCivil(admissao.perfilPessoal.dataNascimento)
+                      : null,
+                  ],
+                  ...CAMPOS_TEXTO_PERFIL.map(
+                    (c) =>
+                      [c.rotulo, admissao.perfilPessoal![c.chave]] as const,
+                  ),
+                ]
+              : null
+          }
+        />
+        <ResumoGravado
+          titulo="Endereço"
+          id="nova-admissao-sucesso-endereco"
+          linhas={
+            admissao.endereco
+              ? CAMPOS_ENDERECO.map(
+                  (c) => [c.rotulo, admissao.endereco![c.chave]] as const,
+                )
+              : null
+          }
+        />
+        <ResumoGravado
+          titulo="Contatos"
+          id="nova-admissao-sucesso-contatos"
+          linhas={
+            admissao.contatos
+              ? [
+                  ["E-mail pessoal", admissao.contatos.emailPessoal],
+                  ["Celular", admissao.contatos.celular],
+                  ["Telefone", admissao.contatos.telefone],
+                ]
+              : null
+          }
+        />
         <FormActions>
           <Button
             type="button"
@@ -995,7 +1255,7 @@ function ConfirmacaoDaAdmissao({
             variant="secondary"
             onClick={() => onAbrirAdmitido(colaborador, "contatos")}
           >
-            Completar contatos
+            Revisar contatos na ficha
           </Button>
           <Button type="button" variant="secondary" onClick={onRecomecar}>
             Registrar outra admissão
@@ -1006,5 +1266,39 @@ function ConfirmacaoDaAdmissao({
         </FormActions>
       </Surface>
     </div>
+  );
+}
+
+/**
+ * Um bloco da confirmação, com o que o SERVIDOR gravou. Campo sem valor
+ * aparece como "Não informado" — é o estado gravado, não um campo falso.
+ */
+function ResumoGravado({
+  titulo,
+  id,
+  linhas,
+}: {
+  titulo: string;
+  id: string;
+  linhas: readonly (readonly [string, string | null])[] | null;
+}) {
+  return (
+    <section className="nova-admissao__bloco-gravado" aria-labelledby={id}>
+      <h3 id={id} className="nova-admissao__subtitulo">
+        {titulo}
+      </h3>
+      {linhas ? (
+        <dl className="nova-admissao__resumo">
+          {linhas.map(([rotulo, valor]) => (
+            <div key={rotulo} className="nova-admissao__resumo-linha">
+              <dt>{rotulo}</dt>
+              <dd>{valor ?? "Não informado"}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : (
+        <p className="nova-admissao__texto">Nada informado neste bloco.</p>
+      )}
+    </section>
   );
 }

@@ -132,6 +132,16 @@ export const CONTATOS_RESOURCES = ["contato_colaborador"] as const;
 export type ContatosResource = (typeof CONTATOS_RESOURCES)[number];
 
 /**
+ * Recurso dos dados pessoais e do endereco do colaborador (T177, Modulo 1 do
+ * cadastro). Separado de `CONTATOS_RESOURCES` porque a matriz e OUTRA: a
+ * excecao do `master_tecnico` aprovada para contatos (Emenda 1 da ADR 0012)
+ * NAO se estende a estas categorias. Aqui so `rh` e `dp`, na empresa ativa.
+ */
+export const DADOS_PESSOAIS_RESOURCES = ["dados_pessoais_colaborador"] as const;
+
+export type DadosPessoaisResource = (typeof DADOS_PESSOAIS_RESOURCES)[number];
+
+/**
  * Recursos/ações desta fatia (matriz §3 da spec). Módulos futuros (Etapa 1+)
  * estendem este union — nunca reduzem o que já está aqui.
  */
@@ -152,7 +162,8 @@ export type AuthorizationResource =
   | HorariosResource
   | SolicitacoesPessoasResource
   | GestorResource
-  | ContatosResource;
+  | ContatosResource
+  | DadosPessoaisResource;
 
 export type AuthorizationAction =
   | "read"
@@ -231,4 +242,10 @@ export function isContatosResource(
   resource: AuthorizationResource,
 ): resource is ContatosResource {
   return (CONTATOS_RESOURCES as readonly string[]).includes(resource);
+}
+
+export function isDadosPessoaisResource(
+  resource: AuthorizationResource,
+): resource is DadosPessoaisResource {
+  return (DADOS_PESSOAIS_RESOURCES as readonly string[]).includes(resource);
 }

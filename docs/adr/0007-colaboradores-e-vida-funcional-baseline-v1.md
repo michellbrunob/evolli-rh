@@ -667,3 +667,27 @@ ficha.
 **Para o revisor:** o bloqueio de "campo de dado pessoal além dos quatro
 aprovados" passa a ter **uma** exceção, nestes três campos e neste agregado.
 Qualquer outro campo continua bloqueado sem ficha e emenda próprias.
+
+## Emenda 5 (2026-10-20, proposta) — dados pessoais básicos e endereço
+
+**Proposta, aguardando aprovação da proprietária.** O merge da T177 depende
+dela. **Aditivo**: nenhuma decisão anterior é revogada nem reescrita.
+
+**O que passa a ser permitido, se aprovada:** os dados pessoais básicos (data
+de nascimento, sexo, saudação, estado civil, nacionalidade, naturalidade,
+escolaridade, curso, nome do pai e nome da mãe) e o endereço (país, CEP,
+logradouro, número, complemento, bairro, cidade e estado), nos termos da
+[ficha de tratamento](../decisions/ficha-tratamento-dados-pessoais-endereco-colaborador.md).
+
+**Como:** em dois agregados próprios, `perfil_pessoal_colaborador` e
+`endereco_colaborador`, **fora** de `Colaborador`, com `empresa_id` próprio e
+garantia no banco de que o colaborador tem vínculo naquela empresa (ADR 0016,
+decisão 3), como os contatos da Emenda 4. `Colaborador` continua com `nome` e
+`situacao`. Os três contatos seguem na Emenda 4, sem segunda fonte.
+
+**O que continua fora:** documento, CPF, dado bancário, salário, dado médico,
+dependente, benefício, nome social, identidade de gênero, raça/etnia,
+deficiência, foto e contato de emergência.
+
+**Para o revisor:** a exceção ao bloqueio de "dado pessoal além dos aprovados"
+passa a valer também para estes campos e agregados, e só para eles.

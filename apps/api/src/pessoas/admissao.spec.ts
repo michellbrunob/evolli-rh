@@ -8,6 +8,8 @@ import { resolverEscopoPessoas } from "./escopo-pessoas.util";
 import { PrismaService } from "../database/prisma.service";
 import { PessoasAuditoriaService } from "./pessoas-auditoria.service";
 import { ColaboradorService } from "./colaborador/colaborador.service";
+import { DadosPessoaisColaboradorService } from "./dados-pessoais/dados-pessoais.service";
+import { ContatoColaboradorService } from "./contatos/contato-colaborador.service";
 
 /**
  * T167 — admissão mínima segura.
@@ -197,7 +199,12 @@ describe("Admissão — a resposta é projeção explícita, campo a campo", () 
     const auditoria = {
       registrarMutacao: jest.fn().mockResolvedValue(undefined),
     } as unknown as PessoasAuditoriaService;
-    return new ColaboradorService(prisma, auditoria);
+    return new ColaboradorService(
+      prisma,
+      auditoria,
+      new DadosPessoaisColaboradorService(prisma, auditoria),
+      new ContatoColaboradorService(prisma, auditoria),
+    );
   }
 
   it("devolve exatamente os campos escolhidos, e nenhuma coluna futura", async () => {
@@ -220,10 +227,13 @@ describe("Admissão — a resposta é projeção explícita, campo a campo", () 
     expect(Object.keys(resposta).sort()).toEqual(
       [
         "atualizadoEm",
+        "contatos",
         "criadoEm",
+        "endereco",
         "id",
         "movimentacao",
         "nome",
+        "perfilPessoal",
         "situacao",
         "vinculo",
       ].sort(),
@@ -248,6 +258,10 @@ describe("Admissão — a resposta é projeção explícita, campo a campo", () 
       situacao: "inativo",
       vinculo: { id: "vin-1", matricula: "MAT-T167", situacao: "previsto" },
       movimentacao: { id: "mov-1", tipo: "admissao" },
+      // T177 — sem os blocos do Módulo 1, nada é gravado e nada é inventado.
+      perfilPessoal: null,
+      endereco: null,
+      contatos: null,
     });
   });
 });

@@ -93,6 +93,14 @@ const resposta: AdmissaoRegistradaApi = {
       centroCustoId: null,
     },
   },
+  perfilPessoal: null,
+  endereco: null,
+  contatos: {
+    emailPessoal: "pessoa.fluxo@exemplo.test",
+    celular: "+5531999990001",
+    telefone: "3133330001",
+    atualizadoEm: "2026-10-20T12:00:00.000Z",
+  },
 };
 
 beforeEach(() => {
@@ -129,6 +137,15 @@ async function admitirPelaPagina() {
   });
   fireEvent.change(screen.getByLabelText(/^Matrícula/), {
     target: { value: "MAT-FLX1" },
+  });
+  fireEvent.change(screen.getByLabelText(/E-mail pessoal/), {
+    target: { value: "pessoa.fluxo@exemplo.test" },
+  });
+  fireEvent.change(screen.getByLabelText(/^Celular/), {
+    target: { value: "+5531999990001" },
+  });
+  fireEvent.change(screen.getByLabelText(/^Telefone/), {
+    target: { value: "3133330001" },
   });
   fireEvent.change(screen.getByLabelText(/Tipo de vínculo/), {
     target: { value: "clt" },
@@ -332,11 +349,13 @@ describe("T176 — da página à ficha do admitido", () => {
     );
   });
 
-  it("'Completar contatos' abre a ficha com o foco no primeiro contato", async () => {
+  it("'Revisar contatos na ficha' abre a ficha com o foco no primeiro contato", async () => {
     render(<App papelDoAtor="dp" />);
     fireEvent.click(itemNovaAdmissao()!);
     await admitirPelaPagina();
-    fireEvent.click(screen.getByRole("button", { name: "Completar contatos" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Revisar contatos na ficha" }),
+    );
     await screen.findByRole("dialog", { name: "Pessoa Sintética Fluxo" });
     await waitFor(() =>
       expect(screen.getByLabelText(/E-mail pessoal/)).toHaveFocus(),

@@ -349,6 +349,46 @@ export class ContatoColaboradorService {
   }
 
   /**
+   * T177 — contatos gravados na ADMISSÃO, dentro da transação dela. O
+   * colaborador e o vínculo acabaram de nascer na mesma transação: não há
+   * contato anterior. Mesmo registro, mesmo evento e mesma trilha da rota
+   * própria — uma só fonte para e-mail pessoal, celular e telefone.
+   */
+  async criarNaAdmissao(
+    tx: Prisma.TransactionClient,
+    ctx: PessoasAuditContext,
+    alvo: { colaboradorId: string; empresaId: string },
+    dto: RegistrarContatosColaboradorDto,
+  ): Promise<ValoresContatos> {
+    const criado = await tx.contatoColaborador.create({
+      data: {
+        empresaId: alvo.empresaId,
+        colaboradorId: alvo.colaboradorId,
+        emailPessoal: dto.emailPessoal,
+        celular: dto.celular,
+        telefone: dto.telefone,
+        criadoPorUserId: ctx.actor.id,
+        atualizadoPorUserId: ctx.actor.id,
+      },
+      select: PROJECAO_CONTATO,
+    });
+    await this.registrarEvento(
+      tx,
+      ctx,
+      { tipo: "resolvido", ...alvo, operacional: true },
+      criado.id,
+      {
+        acao: "criacao",
+        resultado: "gravado",
+        campos: TODOS_OS_CAMPOS,
+        auditAction: "pessoas_contato_criado",
+        auditResult: "success",
+      },
+    );
+    return valores(criado);
+  }
+
+  /**
    * Resolve o colaborador no escopo e a empresa REAL em que a operação vale.
    *
    * - Escopado (`rh`, `dp`, `master_tecnico` com empresa ativa): só vínculos

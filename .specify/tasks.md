@@ -2194,7 +2194,7 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       da T171: o aviso `[DEP0190]` do Node 24 no orquestrador da demonstração, no Windows (`shell: true` com argumentos), só aviso; e as observações O-1 (a CLI fina do `prisma generate` não tem teste próprio), O-2 (caminho inválido sem teste explícito) e O-3 (efeitos leves nos testes). Pendências da T172: as observações não bloqueantes O-1 (descarte protegido sem exercício no navegador), O-2 (contrato de CSS lido por regex), O-3 (banco sintético local alterado na validação), O-4 (outros quatro usos de `colaboradores-screen__aviso-texto` na mesma tela, não medidos) e O-5 (`openDeliveries.pullRequest` nulo com PR aberta), e as de redação O-a a O-c. Pendências da T173: dos 13 conflitos com decisões fechadas (8 firmes e 5 condicionais), **12 seguem abertos** e o conflito 13 está resolvido por decisão posterior: `DP-FLX-21`, em 2026-10-20; dos 22 gates, o `DP-FLX-01` foi **resolvido** na T175 e o `DP-FLX-21` na T176, e os 20 restantes (`DP-FLX-02` a `DP-FLX-20` e `DP-FLX-22`) seguem **abertos**; a ADR 0017, **aceita** na T175 sem autorizar implementação; e as observações não bloqueantes O-1 (a linha 9 do corpo da PR diz "mesmo hash", exato só até `fca0fe7`), O-2 (a célula "Reabre ou depende de" do `DP-FLX-21` cita a T146 sem o qualificador "ainda não integrada"), O-3 (quebra de linha curta na ADR) e O-4 ("proposta aprovada" × "fundação visual aprovada" para a T146). Pendências da T174: as observações não bloqueantes da revisão final O-1 (a justificativa da faixa 6 diz que `-18` vem antes de `-22` pela consideração 3, quando a ordem se sustenta pela consideração 5), O-2 (o parágrafo de portões externos lista `-14` entre as fichas de RH + Jurídico, quando o insumo da tabela é o Nível 2 da Etapa 2) e O-3 (a lista de fontes diz "que as fichas citam" e inclui a ADR 0004, citada só na tabela da seção 3); e o erro de redação "aliquotas de aprovacao" na mensagem do commit `54143b4`, preservado no squash. Pendências da T175: as observações não bloqueantes da revisão final O-1 (o item do `DP-FLX-06` na nota de aceite não cita a questão do contato "telefone ou e-mail" frente aos três campos da T169), O-2 (dado sindical sem classe própria na ADR 0016, agrupado com os sensíveis ou restritos só pela ressalva de RH + Jurídico) e O-3 (a CI rodou Node 24 em dois patches, `v24.21.0` e `v24.22.0`, porque o `.nvmrc` fixa só a versão principal).
 
 74. **T177 - Cadastro de colaborador, Módulo 1: Dados pessoais, Endereço e Contatos na Nova admissão**
-    - **Estado:** em implementação. Branch `codex/t177-cadastro-modulo-1`, a
+    - **Estado:** **implementada em Draft**. Branch `codex/t177-cadastro-modulo-1`, a
       partir do squash `58fd37ccc72d12cf21c9739ed6395c6a302bb1ef` (T176, PR #168).
     - **Mudança de direção da proprietária (2026-10-20):** o cadastro de
       colaborador passa a ser implementado **módulo por módulo, com entregas
@@ -2216,6 +2216,35 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
     - **Matriz de cobertura:** cada campo e grupo dos prints que a proprietária
       anexar entra numa matriz no corpo da PR, como implementado, "próximo módulo"
       ou "decisão necessária", com motivo objetivo e módulo previsto.
+    - **Recorte confirmado pela proprietária (2026-10-20):** nome social e gênero
+      saíram do Módulo 1 e foram para a matriz; fuso horário é desnecessário para o
+      projeto; país, cidade e estado são texto validado nesta primeira entrega, sem
+      consulta externa de CEP.
+    - **Entregue:** Dados pessoais básicos (data de nascimento, sexo, saudação, estado
+      civil, nacionalidade, naturalidade, escolaridade, curso, nome do pai e nome
+      da mãe, além do nome completo já existente), endereço (país, sugerido como
+      Brasil e editável, CEP, logradouro, número, complemento, bairro, cidade e
+      estado) e os três contatos da T169 (obrigatórios na página), gravados na
+      MESMA transação da admissão. Inclui migration
+      `20261020120000_dados_pessoais_endereco_colaborador` (dois agregados
+      próprios por colaborador e empresa, trilha append-only, CHECKs e gatilhos
+      de vínculo), recurso de autorização `dados_pessoais_colaborador` (só `rh`
+      e `dp`, sem a exceção do `master_tecnico`, que segue só nos contatos),
+      rotas `GET` e `PUT /v1/colaboradores/:colaboradorId/dados-pessoais`,
+      auditoria de criação, leitura e edição sem valor pessoal, a página de Nova
+      admissão nos blocos dos prints, a leitura na ficha do colaborador e testes
+      unitários, E2E e web. Validado no navegador com dados sintéticos: criação
+      completa, erros, rollback atômico real, leitura posterior, RH, DP, troca de
+      empresa e negação a gestor, colaborador e `master_tecnico`.
+    - **Contrato:** os blocos `perfilPessoal`, `endereco` e `contatos` são
+      opcionais em `POST /v1/colaboradores`, porque o formulário transitório em
+      modal de Colaboradores e o seed admitem só com o mínimo; a página de Nova
+      admissão os envia e exige os contatos. Tornar os contatos obrigatórios no
+      servidor acompanha a retirada do modal transitório.
+    - **Ficha e emenda:** a
+      [ficha de tratamento](../docs/decisions/ficha-tratamento-dados-pessoais-endereco-colaborador.md)
+      e a Emenda 5 da ADR 0007 estão **propostas**; o merge depende da aprovação
+      da proprietária.
     - **Fora de escopo:** CPF, documentos, dados bancários, dependentes, saúde,
       múltiplos vínculos, alçadas e fluxo de aprovação; campo decorativo,
       desabilitado ou que aparente estar salvo sem persistência real.

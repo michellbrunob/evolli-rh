@@ -4,6 +4,7 @@ import {
   AuthorizationSubject,
   AuthorizationTarget,
   isContatosResource,
+  isDadosPessoaisResource,
   isDocumentosResource,
   isHorariosResource,
   isSolicitacoesPessoasResource,
@@ -61,6 +62,9 @@ export function evaluatePermission(
       }
       if (isContatosResource(target.resource)) {
         return evaluateContatos(subject, target);
+      }
+      if (isDadosPessoaisResource(target.resource)) {
+        return evaluateDadosPessoais(subject, target);
       }
       return false;
   }
@@ -673,6 +677,42 @@ function evaluateContatos(
 
     default:
       // gestor, colaborador, financeiro, admin_tecnico, auditor, dpo.
+      return false;
+  }
+}
+
+/**
+ * Dados pessoais e endereco do colaborador (T177, Modulo 1 do cadastro).
+ *
+ * - `rh` e `dp` leem e editam na **empresa ativa**.
+ * - `master_tecnico`: **sem acesso**. A excecao aprovada para ele vale so para
+ *   contatos (Emenda 1 da ADR 0012); estender a outra categoria pediria
+ *   decisao propria.
+ * - `gestor`, `colaborador` e os demais: sem acesso.
+ *
+ * So `read` e `alter`, como nos contatos. A criacao na admissao passa pela
+ * capacidade de admitir (`colaborador`/`create`) e e reavaliada aqui com a
+ * empresa ativa. Duas fases: sem empresa-alvo decide a CAPACIDADE; com ela, a
+ * FRONTEIRA.
+ */
+function evaluateDadosPessoais(
+  subject: AuthorizationSubject,
+  target: AuthorizationTarget,
+): boolean {
+  if (target.action !== "read" && target.action !== "alter") {
+    return false;
+  }
+
+  switch (subject.role) {
+    case "rh":
+    case "dp":
+      return target.targetCompanyId !== undefined
+        ? isSameCompany(subject, target)
+        : subject.companyId !== null;
+
+    default:
+      // master_tecnico, gestor, colaborador, financeiro, admin_tecnico,
+      // auditor, dpo.
       return false;
   }
 }

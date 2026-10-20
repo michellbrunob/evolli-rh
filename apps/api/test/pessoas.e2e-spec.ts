@@ -2115,18 +2115,25 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
       expect(resposta.body.nome).toBe("Pessoa Sintetica T167-001");
       expect(resposta.body.situacao).toBe("inativo");
 
-      // Projeção FECHADA: nenhuma chave além das aprovadas.
+      // Projeção FECHADA: nenhuma chave além das aprovadas. T177 — os três
+      // blocos do Módulo 1 sempre vêm, como `null` quando não enviados.
       expect(Object.keys(resposta.body).sort()).toEqual(
         [
           "atualizadoEm",
+          "contatos",
           "criadoEm",
+          "endereco",
           "id",
           "movimentacao",
           "nome",
+          "perfilPessoal",
           "situacao",
           "vinculo",
         ].sort(),
       );
+      expect(resposta.body.perfilPessoal).toBeNull();
+      expect(resposta.body.endereco).toBeNull();
+      expect(resposta.body.contatos).toBeNull();
       expect(Object.keys(resposta.body.vinculo).sort()).toEqual(
         [
           "dataAdmissao",

@@ -32,6 +32,15 @@ import {
   ListarColaboradoresQueryDto,
   RetificarColaboradorDto,
 } from "../dto/pessoas.dto";
+import {
+  DadosPessoaisColaboradorService,
+  ValoresEndereco,
+  ValoresPerfil,
+} from "../dados-pessoais/dados-pessoais.service";
+import {
+  ContatoColaboradorService,
+  ValoresContatos,
+} from "../contatos/contato-colaborador.service";
 
 /**
  * Resposta da admissão (T167).
@@ -76,6 +85,10 @@ export interface AdmissaoRegistrada extends Pick<
       centroCustoId: string | null;
     };
   };
+  /** T177 — o que o servidor gravou do Módulo 1; `null` quando não enviado. */
+  perfilPessoal: ValoresPerfil | null;
+  endereco: ValoresEndereco | null;
+  contatos: ValoresContatos | null;
 }
 
 /**
@@ -92,6 +105,9 @@ export class ColaboradorService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditoria: PessoasAuditoriaService,
+    // T177 — Módulo 1 do cadastro, gravado na transação da admissão.
+    private readonly dadosPessoais: DadosPessoaisColaboradorService,
+    private readonly contatos: ContatoColaboradorService,
   ) {}
 
   /**
@@ -127,6 +143,42 @@ export class ColaboradorService {
       return this.auditoria.negarAcesso(
         ctx,
         "colaborador",
+        null,
+        escopo.empresaId,
+      );
+    }
+    // T177 — cada bloco do Módulo 1 tem a sua própria permissão, reavaliada
+    // com a empresa ativa. Hoje `rh` e `dp` têm as duas; a verificação existe
+    // para que o dia em que as matrizes divergirem não abra um atalho pela
+    // admissão.
+    if (
+      (dto.perfilPessoal || dto.endereco) &&
+      !podeAcessarPessoas(
+        ctx.actor,
+        "dados_pessoais_colaborador",
+        "alter",
+        escopo.empresaId,
+      )
+    ) {
+      return this.auditoria.negarAcesso(
+        ctx,
+        "dados_pessoais_colaborador",
+        null,
+        escopo.empresaId,
+      );
+    }
+    if (
+      dto.contatos &&
+      !podeAcessarPessoas(
+        ctx.actor,
+        "contato_colaborador",
+        "alter",
+        escopo.empresaId,
+      )
+    ) {
+      return this.auditoria.negarAcesso(
+        ctx,
+        "contato_colaborador",
         null,
         escopo.empresaId,
       );
@@ -203,6 +255,28 @@ export class ColaboradorService {
           escopo.empresaId,
         );
 
+        // T177 — Módulo 1: perfil, endereço e contatos iniciais, na MESMA
+        // transação. Qualquer falha desfaz a admissão inteira: não existe
+        // colaborador sem os dados enviados, nem dado sem colaborador.
+        const alvoModulo1 = {
+          colaboradorId: colaborador.id,
+          empresaId: escopo.empresaId,
+        };
+        const modulo1 = await this.dadosPessoais.gravarNaAdmissao(
+          tx,
+          ctx,
+          alvoModulo1,
+          { perfilPessoal: dto.perfilPessoal, endereco: dto.endereco },
+        );
+        const contatosGravados = dto.contatos
+          ? await this.contatos.criarNaAdmissao(
+              tx,
+              ctx,
+              alvoModulo1,
+              dto.contatos,
+            )
+          : null;
+
         return {
           id: colaborador.id,
           nome: colaborador.nome,
@@ -232,6 +306,9 @@ export class ColaboradorService {
               centroCustoId: movimentacao.destinoCentroCustoId,
             },
           },
+          perfilPessoal: modulo1.perfilPessoal,
+          endereco: modulo1.endereco,
+          contatos: contatosGravados,
         };
       });
     } catch (error) {

@@ -42,6 +42,7 @@ import {
 } from "../../api/organizacaoClient";
 import { type CargoApi, listarCargos } from "../../api/cargoClient";
 import { ContatosColaboradorSecao } from "./ContatosColaboradorSecao";
+import { DadosPessoaisColaboradorSecao } from "./DadosPessoaisColaboradorSecao";
 import "./ColaboradoresScreen.css";
 
 export const COLABORADORES_TITULO_ID = "colaboradores-titulo";
@@ -1380,6 +1381,12 @@ export function ColaboradoresScreen({
                 {detalhe.salvandoNome ? "Salvando…" : "Salvar nome"}
               </Button>
             </div>
+
+            {/* T177 — Módulo 1: dados pessoais e endereço, só leitura. */}
+            <DadosPessoaisColaboradorSecao
+              key={`dados-${detalhe.colaborador.id}`}
+              colaboradorId={detalhe.colaborador.id}
+            />
 
             <ContatosColaboradorSecao
               key={detalhe.colaborador.id}

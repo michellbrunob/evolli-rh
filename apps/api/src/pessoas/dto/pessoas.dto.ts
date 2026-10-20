@@ -1,5 +1,10 @@
 import { Type } from "class-transformer";
 import {
+  EnderecoDto,
+  PerfilPessoalDto,
+} from "../dados-pessoais/dados-pessoais.dto";
+import { RegistrarContatosColaboradorDto } from "../contatos/contato-colaborador.dto";
+import {
   IsDateString,
   IsIn,
   IsInt,
@@ -12,6 +17,7 @@ import {
   MaxLength,
   Min,
   MinLength,
+  ValidateNested,
 } from "class-validator";
 import {
   MotivoMovimentacao,
@@ -162,6 +168,28 @@ export class AdmitirColaboradorDto extends DestinoOrganizacionalDto {
   /** Só motivos compatíveis com uma primeira admissão (`MOTIVOS_ADMISSAO`). */
   @IsIn(MOTIVOS_ADMISSAO)
   motivoCodigo!: MotivoAdmissao;
+
+  /**
+   * T177 — Módulo 1 do cadastro, gravado na MESMA transação da admissão.
+   * Os três blocos são opcionais no contrato: a página de Nova admissão os
+   * envia (e exige os contatos), e o formulário transitório em modal da tela
+   * de Colaboradores continua admitindo só com o mínimo.
+   */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => PerfilPessoalDto)
+  perfilPessoal?: PerfilPessoalDto;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => EnderecoDto)
+  endereco?: EnderecoDto;
+
+  /** Os três contatos da ficha da T169, juntos — o mesmo DTO da rota própria. */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => RegistrarContatosColaboradorDto)
+  contatos?: RegistrarContatosColaboradorDto;
 }
 
 /**

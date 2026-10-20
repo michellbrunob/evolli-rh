@@ -1,4 +1,5 @@
 import { clearCsrfToken, getCsrfToken, refreshCsrfToken } from "./csrfClient";
+import type { EnderecoApi, PerfilPessoalApi } from "./dadosPessoaisClient";
 
 const BASE = "/v1";
 
@@ -72,6 +73,16 @@ export interface AdmitirColaboradorDto extends DestinoOrganizacionalDto {
   tipo: TipoVinculo;
   dataAdmissao: string;
   motivoCodigo: "admissao_inicial";
+  /**
+   * T177 — Módulo 1, gravado na MESMA transação da admissão. Vazio vai como
+   * `null`. Os contatos são os três da ficha da T169, juntos.
+   */
+  perfilPessoal?: Record<
+    Exclude<keyof PerfilPessoalApi, "atualizadoEm">,
+    string | null
+  >;
+  endereco?: Record<Exclude<keyof EnderecoApi, "atualizadoEm">, string | null>;
+  contatos?: { emailPessoal: string; celular: string; telefone: string };
 }
 
 /**
@@ -97,6 +108,15 @@ export interface AdmissaoRegistradaApi extends ColaboradorApi {
       [K in keyof DestinoOrganizacionalDto]: string | null;
     }>;
   };
+  /** T177 — o que o servidor gravou do Módulo 1; `null` quando não enviado. */
+  perfilPessoal: PerfilPessoalApi | null;
+  endereco: EnderecoApi | null;
+  contatos: {
+    emailPessoal: string;
+    celular: string;
+    telefone: string;
+    atualizadoEm: string;
+  } | null;
 }
 
 export interface RetificarColaboradorDto {
