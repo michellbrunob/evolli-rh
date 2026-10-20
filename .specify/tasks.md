@@ -2115,7 +2115,7 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       da T171: o aviso `[DEP0190]` do Node 24 no orquestrador da demonstração, no Windows (`shell: true` com argumentos), só aviso; e as observações O-1 (a CLI fina do `prisma generate` não tem teste próprio), O-2 (caminho inválido sem teste explícito) e O-3 (efeitos leves nos testes). Pendências da T172: as observações não bloqueantes O-1 (descarte protegido sem exercício no navegador), O-2 (contrato de CSS lido por regex), O-3 (banco sintético local alterado na validação), O-4 (outros quatro usos de `colaboradores-screen__aviso-texto` na mesma tela, não medidos) e O-5 (`openDeliveries.pullRequest` nulo com PR aberta), e as de redação O-a a O-c. Pendências da T173: os 13 conflitos com decisões fechadas (8 firmes e 5 condicionais), **todos abertos**; dos 22 gates, o `DP-FLX-01` foi **resolvido** na T175, e os 21 restantes (`DP-FLX-02` a `DP-FLX-22`) seguem **abertos**; a ADR 0017, **aceita** na T175 sem autorizar implementação; e as observações não bloqueantes O-1 (a linha 9 do corpo da PR diz "mesmo hash", exato só até `fca0fe7`), O-2 (a célula "Reabre ou depende de" do `DP-FLX-21` cita a T146 sem o qualificador "ainda não integrada"), O-3 (quebra de linha curta na ADR) e O-4 ("proposta aprovada" × "fundação visual aprovada" para a T146). Pendências da T174: as observações não bloqueantes da revisão final O-1 (a justificativa da faixa 6 diz que `-18` vem antes de `-22` pela consideração 3, quando a ordem se sustenta pela consideração 5), O-2 (o parágrafo de portões externos lista `-14` entre as fichas de RH + Jurídico, quando o insumo da tabela é o Nível 2 da Etapa 2) e O-3 (a lista de fontes diz "que as fichas citam" e inclui a ADR 0004, citada só na tabela da seção 3); e o erro de redação "aliquotas de aprovacao" na mensagem do commit `54143b4`, preservado no squash.
 
 73. **T176 - Preparação da decisão do `DP-FLX-04`: estados e transições do processo admissional**
-    - **Estado:** em implementação. Branch
+    - **Estado:** **implementada em Draft**. Branch
       `codex/t176-estados-processo-admissional`, a partir do squash
       `3a9ed3b21bbb4254f33750a705edbad89a8a642b` (T175, PR #167).
     - **Natureza:** entrega **exclusivamente documental**. Fontes permitidas: a
@@ -2130,6 +2130,21 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       a compatibilidade de cada uma com a admissão atômica de hoje; declara o que
       fica proibido até a decisão; e termina com uma pergunta decisória objetiva e
       uma recomendação técnica identificada como análise.
+    - **Entregue:** o [documento de decisão](../docs/decisions/t176-decisao-dp-flx-04-estados-processo-admissional.md) do `DP-FLX-04`, com a separação entre processo
+      admissional, admissão efetivada, vínculo efetivado e vínculo ativo; a linha
+      de base da admissão atômica de hoje; três alternativas de onde o processo
+      vive (A, estender a movimentação de admissão; B, processo próprio com tudo
+      nascendo na efetivação; C, processo próprio sobre vínculo `previsto` criado
+      cedo), cada uma com estados, transições, cancelamento, devolução,
+      responsabilidades, auditoria, efeitos sobre matrícula, vínculo, lotação e
+      movimentação e compatibilidade com a admissão atômica; as subalternativas de
+      ativação (2.i a 2.iii), de quem opera (3.i e 3.ii) e de correção
+      pós-efetivação (4.i e 4.ii); o que fica proibido até a decisão; e a pergunta
+      decisória. 72 citações `caminho:linha` e 51 conferências de conteúdo
+      verificadas por script.
+    - **Recomendação, não decisão:** `B; 2.ii; 3.i; 4.i`, identificada como
+      análise do documento. **O `DP-FLX-04` continua aberto**, como os demais 20
+      gates e os 13 conflitos.
     - **Fora de escopo:** resolver o `DP-FLX-04`, o `DP-FLX-10`, o `DP-FLX-02`, o
       `DP-FLX-03` ou qualquer outro gate; código, API, schema, migration, RBAC,
       teste de produto, Docker, banco, seed, dependência e lockfile.
