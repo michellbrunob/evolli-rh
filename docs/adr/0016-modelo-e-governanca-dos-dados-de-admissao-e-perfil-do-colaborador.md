@@ -728,14 +728,14 @@ O texto original desta ADR foi preservado.
 
 ## Nota de convergência (T177, 2026-10-20) — dados pessoais básicos e endereço
 
-A segunda ficha de tratamento está **proposta**, aguardando aprovação da
-proprietária: a das categorias **Perfil pessoal** e **Endereço**, recortadas
+A segunda ficha de tratamento foi **aprovada pela proprietária em
+2026-10-20**: a das categorias **Perfil pessoal** e **Endereço**, recortadas
 aos campos do Módulo 1 do cadastro
-([ficha](../decisions/ficha-tratamento-dados-pessoais-endereco-colaborador.md); Emenda 5 da ADR 0007, também proposta).
+([ficha](../decisions/ficha-tratamento-dados-pessoais-endereco-colaborador.md); Emenda 5 da ADR 0007).
 
-- **Classe de acesso:** a ficha propõe **A2 — Pessoal**, com a **mesma
-  diferença da decisão 4** já registrada para Contatos, e esta parte é decisão
-  da proprietária (2026-10-20): o `master_tecnico`, cargo de confiança, **lê e
+- **Classe de acesso:** **A2 — dado pessoal comum**, com a **mesma
+  diferença da decisão 4** já registrada para Contatos, decidida pela
+  proprietária (2026-10-20): o `master_tecnico`, cargo de confiança, **lê e
   edita**, auditado, em qualquer empresa — com empresa ativa, só nela; sem
   empresa ativa, na empresa real do vínculo (Emenda 2 da ADR 0012). `rh` e
   `dp` leem e editam na empresa ativa; `gestor`, `colaborador` e os demais não
@@ -744,9 +744,13 @@ aos campos do Módulo 1 do cadastro
 - **`DP-ADM-06`** fica **resolvida para Perfil pessoal e Endereço quanto ao
   acesso**, pela decisão da proprietária e pela Emenda 2 da ADR 0012; continua
   aberta para as outras categorias.
-- **`DP-ADM-02` e `DP-ADM-03`** (finalidade, base legal, retenção e descarte)
-  **seguem abertas** para estas categorias até a aprovação da ficha: os
-  valores dela são proposta.
+- **`DP-ADM-02` e `DP-ADM-03`** ficam **resolvidas para Perfil pessoal e
+  Endereço** pela ficha aprovada: finalidade — admissão e administração da
+  relação de trabalho; base legal — execução do contrato e procedimentos
+  preliminares necessários; retenção — sem exclusão nem anonimização
+  automática após o desligamento, com bloqueio do uso operacional e histórico e
+  auditoria preservados (decisão substitutiva). Continuam abertas para as
+  outras categorias.
 - **Admissão:** a decisão da T165 (§5.2, citada no Contexto acima) — o
   `master_tecnico` não admite — não muda nesta nota. A admissão continua de
   `rh` e `dp`; levar o "acessa tudo" a ela é registro próprio, quando a

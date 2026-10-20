@@ -668,12 +668,13 @@ ficha.
 aprovados" passa a ter **uma** exceção, nestes três campos e neste agregado.
 Qualquer outro campo continua bloqueado sem ficha e emenda próprias.
 
-## Emenda 5 (2026-10-20, proposta) — dados pessoais básicos e endereço
+## Emenda 5 (2026-10-20) — dados pessoais básicos e endereço
 
-**Proposta, aguardando aprovação da proprietária.** O merge da T177 depende
-dela. **Aditivo**: nenhuma decisão anterior é revogada nem reescrita.
+**Aprovada pela proprietária em 2026-10-20**, com a
+[ficha de tratamento](../decisions/ficha-tratamento-dados-pessoais-endereco-colaborador.md).
+**Aditivo**: nenhuma decisão anterior é revogada nem reescrita.
 
-**O que passa a ser permitido, se aprovada:** os dados pessoais básicos (data
+**O que passa a ser permitido:** os dados pessoais básicos (data
 de nascimento, sexo, saudação, estado civil, nacionalidade, naturalidade,
 escolaridade, curso, nome do pai e nome da mãe) e o endereço (país, CEP,
 logradouro, número, complemento, bairro, cidade e estado), nos termos da
@@ -699,10 +700,16 @@ dados gravados e são lidos como `sem_registro`.
 empresa, com empresa ativa só nela ([ADR 0012, Emenda 2](0012-convergencia-governanca-privacidade-e-perfis-globais.md)).
 Demais perfis, sem acesso.
 
-**Sujeito à aprovação (não é decisão tomada):** finalidade, base legal
-(proposta: execução do contrato), classificação (proposta: A2 — Pessoal),
-retenção (proposta: a mesma dos contatos) e dispensa de RIPD, como estão na
-ficha.
+**Aprovado com a ficha (2026-10-20):** finalidade — admissão e
+administração da relação de trabalho; base legal — execução do contrato e
+procedimentos preliminares necessários; classificação — A2, dado pessoal
+comum; RIPD — não necessário nesta etapa, a reavaliar quando entrarem
+documentos, dados bancários, saúde ou demais dados sensíveis ou restritos.
+
+**Retenção (decisão substitutiva, 2026-10-20):** sem exclusão nem
+anonimização automática após o desligamento; os dados ficam bloqueados para uso
+operacional, com histórico e auditoria preservados; qualquer alteração futura
+exige decisão explícita da proprietária e avaliação de RH/Jurídico.
 
 **O que continua fora:** documento, CPF, dado bancário, salário, dado médico,
 dependente, benefício, nome social, identidade de gênero, raça/etnia,

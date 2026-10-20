@@ -2209,7 +2209,7 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       telefone. A empresa ativa continua contexto não editável, e RH e DP
       continuam os operadores da admissão.
     - **Ficha de tratamento:** os dados pessoais e o endereço estão na matriz da
-      ADR 0016 como "Complementar" (a classificação A2 é proposta da ficha), que exige ficha aprovada (decisão 5.4) e emenda
+      ADR 0016 como "Complementar" (a classificação A2 foi aprovada com a ficha), que exige ficha aprovada (decisão 5.4) e emenda
       à ADR 0007, como foi feito com os Contatos na T169. Por decisão da
       proprietária, a ficha é redigida **nesta mesma PR** e o merge depende da
       aprovação dela.
@@ -2233,8 +2233,7 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       aposentado, também por decisão da proprietária (2026-10-20): "Novo
       colaborador" leva à página de Nova admissão. A ADR 0016 recebeu nota de
       convergência da T177.
-    - **Pendências próprias da T177:** a aprovação da ficha e da Emenda 5 da ADR
-      0007 (condição do merge); o **alcance** do "acessa tudo" do
+    - **Pendências próprias da T177:** o **alcance** do "acessa tudo" do
       `master_tecnico` nos demais recursos (admissão, vínculo, movimentação,
       ponto, documentos, folha, exportação), que a Emenda 2 da ADR 0012 deixa
       para registro próprio; a edição de dados pessoais e endereço existe só na
@@ -2265,8 +2264,16 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       esses dados, lido como `sem_registro`.
     - **Ficha e emenda:** a
       [ficha de tratamento](../docs/decisions/ficha-tratamento-dados-pessoais-endereco-colaborador.md)
-      e a Emenda 5 da ADR 0007 estão **propostas**; o merge depende da aprovação
-      da proprietária.
+      e a Emenda 5 da ADR 0007 foram **aprovadas pela proprietária em
+      2026-10-20**: finalidade — admissão e administração da relação de
+      trabalho; base legal — execução do contrato e procedimentos preliminares
+      necessários; classificação — A2, dado pessoal comum; RIPD — não
+      necessário nesta etapa, a reavaliar com documentos, dados bancários, saúde
+      ou demais dados sensíveis ou restritos. **Retenção, por decisão
+      substitutiva:** sem exclusão nem anonimização automática após o
+      desligamento; uso operacional bloqueado, com histórico e auditoria
+      preservados; mudança futura só com decisão explícita da proprietária e
+      avaliação de RH/Jurídico.
     - **Fora de escopo:** CPF, documentos, dados bancários, dependentes, saúde,
       múltiplos vínculos, alçadas e fluxo de aprovação; campo decorativo,
       desabilitado ou que aparente estar salvo sem persistência real.

@@ -2146,8 +2146,10 @@ merge depende da aprovação da proprietária.
 - **Validação no navegador** com dados sintéticos: criação completa,
   obrigatoriedade, erros, rollback atômico real, leitura posterior, RH, DP,
   `master_tecnico`, troca de empresa e negação aos demais perfis.
-- **Pendente de aprovação da proprietária:** a ficha de tratamento e a Emenda 5
-  da ADR 0007; o merge depende dela.
+- **Ficha e Emenda 5 da ADR 0007 aprovadas** pela proprietária em
+  2026-10-20, com decisão substitutiva de retenção: sem exclusão nem
+  anonimização automática após o desligamento; uso operacional bloqueado, com
+  histórico e auditoria preservados.
 - **Pendências próprias:** o alcance do "acessa tudo" do `master_tecnico` nos
   demais recursos (Emenda 2 da ADR 0012, registro próprio); edição de dados
   pessoais e endereço só pela API, sem tela; endereço gravado só com o país
