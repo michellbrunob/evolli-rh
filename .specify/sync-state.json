@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "constitutionVersion": "1.4.0",
   "lastConvergedAt": "2026-10-20",
-  "lastIntegratedTask": 174,
-  "lastRecordedTask": 175,
+  "lastIntegratedTask": 175,
+  "lastRecordedTask": 176,
   "platformDecision": {
     "adr": "docs/adr/0014-evolli-plataforma-base-e-encerramento-do-frappe.md",
     "decidedAt": "2026-10-01",
@@ -11,15 +11,15 @@
     "frappe": "encerrado_como_candidato_referencia_apenas"
   },
   "nextTask": {
-    "id": "T175",
-    "status": "aceite_adr_0017_implementada",
-    "reason": "T174 integrada em main pela PR #166 (squash 34b95cfde73f33dfc1200f1c846f6b8d7d14a1b8), com a CI de push 3/3 verde em Node 24. A integracao nao aceitou a ADR 0017 nem fechou gate: seguiam abertos os 13 conflitos com decisoes fechadas (8 firmes e 5 condicionais) e os 22 gates DP-FLX-01 a DP-FLX-22. A T175 e entrega exclusivamente documental: registra a decisao do proprietario, de 2026-10-20, de aprovar a ADR 0017 e resolver o gate DP-FLX-01, e deixa explicito, na ADR, no Spec Kit e na descricao da PR, que o aceite nao fecha os demais 21 gates, nao resolve nenhum dos 13 conflitos, nao autoriza implementacao e nao aprova CPF, multiplos vinculos, matricula na efetivacao, solicitacao ou aprovacao pelo gestor, alcadas, documentos, dados sensiveis nem a diretriz de UX. O DP-FLX-04 continua como a proxima decisao de conteudo recomendada, sem ser resolvido. Fora de escopo: codigo, API, schema, migration, RBAC, teste de produto, Docker, banco, seed, dependencia e lockfile. Seguem abertas e intocadas: R-3 da T162, a R-3 da revisao da T164, S2 da T161, R1 a R3 da T160, a divida L3 de paginacao, S-1 a S-4 da T158, R-A a R-C da T157, o registro teste michell, a decisao DP-29 e a limitacao de validacao em navegador da T167. Pendencias da T169: eliminacao apos 2 anos, exportacao e exclusao, origem e evidencia da coleta, validacao visual, N-2, N-3, N-4 e a docstring sobre resourceId. Pendencias da T171: aviso DEP0190 do Node 24 e as observacoes O-1, O-2 e O-3 do prisma generate. Pendencias da T172: as observacoes nao bloqueantes O-1 a O-5 e as de redacao O-a a O-c. Pendencias da T173: as observacoes nao bloqueantes O-1 a O-4 da ultima revisao (mesmo hash na linha 9 do corpo da PR, T146 sem qualificador na celula do DP-FLX-21, quebra de linha na ADR e proposta aprovada x fundacao visual aprovada). Pendencias da T174: as observacoes nao bloqueantes O-1 a O-3 da revisao final (justificativa da faixa 6, -14 entre as fichas de RH + Juridico, ADR 0004 na lista de fontes) e o erro de redacao no commit 54143b4. ENTREGUE em Draft: a ADR 0017 passou a Aceito em 2026-10-20, por aprovacao do proprietario, com o texto proposto preservado e uma nota de aceite ao final; o DP-FLX-01 ficou registrado como resolvido no Status e na nota da ADR e numa atualizacao datada na secao 4 do diagnostico da T173, que mantem a linha do gate na tabela. Continuam abertos os 13 conflitos e os 21 gates DP-FLX-02 a DP-FLX-22. O aceite nao autoriza implementacao, e o DP-FLX-04 continua como a proxima decisao de conteudo recomendada, sem ser resolvido. Correcao pos-revisao (2026-10-20), sem reescrever commits: a revisao adversarial no head 0c06781 apontou que a nota de aceite punha as categorias do DP-FLX-06 entre os dados sensiveis ou restritos. Agora esse item cita so o DP-FLX-15 e o DP-FLX-16, com o enquadramento legal como sensivel a cargo de RH + Juridico, e o DP-FLX-06 tem item proprio: data de nascimento, endereco e contato de emergencia, classe A2 na ADR 0016, ainda sem ficha de tratamento aprovada. Tambem: remissao historica na secao 6 do diagnostico da T173 e o squash completo da T174 na tabela do execution-status."
+    "id": "T176",
+    "status": "estados_processo_admissional_em_implementacao",
+    "reason": "T175 integrada em main pela PR #167 (squash 3a9ed3b21bbb4254f33750a705edbad89a8a642b), com a CI de push 3/3 verde em Node 24: a ADR 0017 esta aceita e o DP-FLX-01 resolvido; seguem abertos os 13 conflitos com decisoes fechadas (8 firmes e 5 condicionais) e os 21 gates DP-FLX-02 a DP-FLX-22, e o aceite nao autoriza implementacao. A T176 e entrega exclusivamente documental: prepara a decisao do DP-FLX-04 (estados e transicoes do processo admissional) com um documento que separa o processo admissional do vinculo efetivado, propoe alternativas reais de maquina de estados sem escolher nenhuma, mapeia estados, transicoes, cancelamento, devolucao, responsabilidades, auditoria e efeitos sobre matricula, vinculo, lotacao e movimentacao, mostra a compatibilidade com a admissao atomica de hoje, declara o que fica proibido ate a decisao e termina com uma pergunta decisoria e uma recomendacao tecnica identificada como analise. Nao resolve DP-FLX-04, DP-FLX-10, DP-FLX-02, DP-FLX-03 nem outro gate. Fontes: ADR 0017 aceita, dossie da T174, diagnostico e respostas R1 a R40 da T173, e ADRs, contratos, codigo e testes so como evidencia; sem fonte externa, Notion, dado real ou referencia de terceiros. Fora de escopo: codigo, API, schema, migration, RBAC, teste de produto, Docker, banco, seed, dependencia e lockfile. Seguem abertas e intocadas: R-3 da T162, a R-3 da revisao da T164, S2 da T161, R1 a R3 da T160, a divida L3 de paginacao, S-1 a S-4 da T158, R-A a R-C da T157, o registro teste michell, a decisao DP-29 e a limitacao de validacao em navegador da T167. Pendencias da T169: eliminacao apos 2 anos, exportacao e exclusao, origem e evidencia da coleta, validacao visual, N-2, N-3, N-4 e a docstring sobre resourceId. Pendencias da T171: aviso DEP0190 do Node 24 e as observacoes O-1, O-2 e O-3 do prisma generate. Pendencias da T172: as observacoes nao bloqueantes O-1 a O-5 e as de redacao O-a a O-c. Pendencias da T173: as observacoes nao bloqueantes O-1 a O-4 da ultima revisao. Pendencias da T174: as observacoes nao bloqueantes O-1 a O-3 da revisao final e o erro de redacao no commit 54143b4. Pendencias da T175: as observacoes nao bloqueantes O-1 a O-3 da revisao final (item do DP-FLX-06 sem a questao do contato telefone ou e-mail, dado sindical sem classe propria na ADR 0016 e Node 24 em dois patches na CI)."
   },
   "openDeliveries": [
     {
-      "id": "T175",
+      "id": "T176",
       "pullRequest": null,
-      "status": "aceite_adr_0017_implementada"
+      "status": "estados_processo_admissional_em_implementacao"
     }
   ],
   "requiredArtifacts": [
