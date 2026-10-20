@@ -556,20 +556,31 @@ export function App({
   }, []);
   const aberturaAtendida = useCallback(() => setAberturaDoAdmitido(null), []);
 
+  /** O destino exibido agora — lido pelo manipulador de URL, fora do React. */
+  const destinoAtivoRef = useRef(destinoAtivoId);
+  /** A rota do último destino EXIBIDO, ou `null` se ele não tinha rota. */
+  const rotaExibidaRef = useRef<string | null>(null);
+
   // T176 — a URL acompanha o destino. Destino com rota a escreve; destino sem
-  // rota a retira, se ela estava lá. `pushState`, e não `replaceState`, para
-  // que o "voltar" do navegador saia da página como quem clica em "Pessoas".
+  // rota a retira, se ela estava lá. Sair de uma página com rota usa
+  // `pushState`, para que o "voltar" do navegador volte a ela. Uma rota que
+  // foi PEDIDA mas nunca exibida (papel sem acesso, na entrada) só é corrigida,
+  // com `replaceState`: não vira entrada no histórico.
   useEffect(() => {
     const rota = rotaDoDestino(destinoAtivoId);
     const atual = window.location.hash;
+    const vinhaDeRota = rotaExibidaRef.current !== null;
+    destinoAtivoRef.current = destinoAtivoId;
+    rotaExibidaRef.current = rota;
     if (rota === null) {
       destinoSemRotaRef.current = destinoAtivoId;
       if (destinoDaRota(atual) !== null) {
-        window.history.pushState(
-          null,
-          "",
-          window.location.pathname + window.location.search,
-        );
+        const semRota = window.location.pathname + window.location.search;
+        if (vinhaDeRota) {
+          window.history.pushState(null, "", semRota);
+        } else {
+          window.history.replaceState(null, "", semRota);
+        }
       }
     } else if (atual !== rota) {
       window.history.pushState(null, "", rota);
@@ -581,11 +592,29 @@ export function App({
   useEffect(() => {
     function aoMudarUrl() {
       const pedido = destinoDaRota(window.location.hash);
-      setDestinoAtivoId(
-        pedido === null
-          ? destinoSemRotaRef.current
-          : resolverEntrada(pedido, papelDoAtor),
+      if (pedido === null) {
+        setDestinoAtivoId(destinoSemRotaRef.current);
+        return;
+      }
+      if (resolverEntrada(pedido, papelDoAtor) === pedido) {
+        setDestinoAtivoId(pedido);
+        return;
+      }
+      // Rota recusada: a tela atual fica, se o papel pode estar nela; só sem
+      // tela válida cai no destino inicial do papel. A URL volta a dizer o
+      // que está na tela — nunca fica pendurada na rota recusada.
+      const atual = destinoAtivoRef.current;
+      const exibido =
+        resolverEntrada(atual, papelDoAtor) === atual
+          ? atual
+          : destinoInicialPara(papelDoAtor);
+      window.history.replaceState(
+        null,
+        "",
+        rotaDoDestino(exibido) ??
+          window.location.pathname + window.location.search,
       );
+      setDestinoAtivoId(exibido);
     }
     window.addEventListener("popstate", aoMudarUrl);
     window.addEventListener("hashchange", aoMudarUrl);

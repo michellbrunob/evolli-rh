@@ -400,6 +400,26 @@ describe("T162 — acessibilidade e estrutura", () => {
     }
   });
 
+  it("T176 — o cartão Nova admissão diz o que faz, sem prometer dado novo", async () => {
+    for (const papel of ["rh", "dp"]) {
+      const { unmount } = montar({ papel });
+      await waitFor(() => expect(cartoesVisiveis()).toContain("Nova admissão"));
+      const cartao = screen
+        .getAllByRole("button")
+        .find(
+          (b) =>
+            b.querySelector(".hub__cartao-titulo")?.textContent ===
+            "Nova admissão",
+        )!;
+      const descricao = cartao.querySelector(".hub__cartao-descricao");
+      expect(descricao).not.toBeNull();
+      expect(descricao).toHaveTextContent(
+        "Admissão em página própria: cria o colaborador, o vínculo previsto e o ato de admissão na empresa ativa.",
+      );
+      unmount();
+    }
+  });
+
   it("o estado de carregamento das opções é anunciado", () => {
     vi.mocked(listarEmpresasDoContexto).mockReturnValue(
       new Promise(() => undefined),

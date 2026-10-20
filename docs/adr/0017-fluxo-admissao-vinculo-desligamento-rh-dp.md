@@ -316,11 +316,13 @@ valor de decisão, e a diretriz de UX da decisão 6 continua proposta.
 
 **O que o aceite não faz.**
 
-- **Não fecha os demais 21 gates** (`DP-FLX-02` a `DP-FLX-22`), que continuam
-  abertos e inalterados.
+- **Não fecha os demais 21 gates** (`DP-FLX-02` a `DP-FLX-22`), que o aceite
+  deixou abertos e inalterados. Depois, o `DP-FLX-21` foi resolvido por decisão
+  própria (ver a nota de decisão do `DP-FLX-21`, abaixo).
 - **Não resolve nenhum dos 13 conflitos** com decisões fechadas (8 firmes e 5
   condicionais). As decisões fechadas que eles citam continuam valendo até
-  decisão própria.
+  decisão própria. Depois, o conflito 13 foi resolvido pela decisão do
+  `DP-FLX-21`.
 - **Não autoriza implementação.** Nenhuma interface, API, endpoint, schema,
   migration, banco, seed, RBAC, Docker ou teste de produto nasce deste aceite,
   e nenhuma fatia da sequência proposta no diagnóstico começa por ele.
@@ -358,7 +360,7 @@ futura tela de admissão seguem sendo **referência funcional** que não autoriz
 campo, e cada grupo só se materializa depois dos seus gates.
 
 **O que não muda.** O `DP-FLX-04` (estados do processo admissional) continua
-aberto, com os outros 19 gates; os 13 conflitos continuam registrados; e esta
+aberto. Contagens depois desta decisão: 13 conflitos no total, 12 abertos e 1 resolvido (o conflito 13, resolvido por decisão posterior: `DP-FLX-21`, em 2026-10-20); 22 gates no total, com o `DP-FLX-01` e o `DP-FLX-21` resolvidos e 20 abertos. E esta
 decisão não autoriza CPF, nascimento, endereço, documentos, dados bancários,
 dependentes, saúde, dado sindical, múltiplos vínculos, matrícula na efetivação,
 solicitação ou aprovação pelo gestor, alçadas nem ativação automática. A

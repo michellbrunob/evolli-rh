@@ -240,6 +240,75 @@ describe("T176 — Nova admissão na navegação", () => {
   });
 });
 
+describe("T176 — rota recusada para quem não admite", () => {
+  /** Quem não recebe `colaborador`/`create` no servidor, e a tela em que aterrissa. */
+  const SEM_ACESSO = [
+    ["master_tecnico", /^Pessoas/],
+    ["gestor", /^Minha equipe/],
+    ["colaborador", /^Visão geral/],
+  ] as const;
+
+  it.each(SEM_ACESSO)(
+    "%s com a URL direta não monta a página, e a URL não fica pendurada",
+    async (papel, telaInicial) => {
+      window.history.replaceState(null, "", `/${ROTA}`);
+      const entradasAntes = window.history.length;
+      render(<App papelDoAtor={papel} />);
+      expect(
+        await screen.findByRole("button", { name: telaInicial }),
+      ).toHaveAttribute("aria-current", "page");
+      expect(
+        screen.queryByRole("heading", { level: 1, name: "Nova admissão" }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("form", { name: "Formulário de nova admissão" }),
+      ).not.toBeInTheDocument();
+      expect(window.location.hash).toBe("");
+      // Corrigida no lugar: a rota nunca exibida não vira entrada no histórico.
+      expect(window.history.length).toBe(entradasAntes);
+      expect(admitirColaborador).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    ["master_tecnico", "ponto", /^Jornada/],
+    ["gestor", "equipe", /^Minha equipe/],
+    ["colaborador", "relatorios", /^Relatórios/],
+  ] as const)(
+    "%s digitando a rota com o painel aberto fica na tela atual (%s)",
+    async (papel, destino, rotulo) => {
+      render(<App papelDoAtor={papel} destinoInicial={destino} />);
+      const atual = await screen.findByRole("button", { name: rotulo });
+      expect(atual).toHaveAttribute("aria-current", "page");
+      act(() => {
+        window.history.pushState(null, "", `/${ROTA}`);
+        window.dispatchEvent(new HashChangeEvent("hashchange"));
+      });
+      await waitFor(() => expect(window.location.hash).toBe(""));
+      expect(screen.getByRole("button", { name: rotulo })).toHaveAttribute(
+        "aria-current",
+        "page",
+      );
+      expect(
+        screen.queryByRole("heading", { level: 1, name: "Nova admissão" }),
+      ).not.toBeInTheDocument();
+    },
+  );
+
+  it("rh digitando a rota com o painel aberto vai à página", async () => {
+    render(<App papelDoAtor="rh" destinoInicial="ponto" />);
+    await screen.findByRole("button", { name: /^Jornada/ });
+    act(() => {
+      window.history.pushState(null, "", `/${ROTA}`);
+      window.dispatchEvent(new HashChangeEvent("hashchange"));
+    });
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "Nova admissão" }),
+    ).toBeInTheDocument();
+    expect(window.location.hash).toBe(ROTA);
+  });
+});
+
 describe("T176 — da página à ficha do admitido", () => {
   it("'Abrir ficha' leva a Colaboradores com a ficha do admitido aberta", async () => {
     render(<App papelDoAtor="rh" />);

@@ -9,7 +9,7 @@
 - **Atualização da mesma data.** Depois de escrito este documento, a
   proprietária resolveu o `DP-FLX-21`: cadastro longo de admissão em página
   própria, modal só para o que é curto. As menções ao `DP-FLX-21` como gate
-  aberto, nas seções 1, 6, 9, 11 e 12, ficam superadas por essa decisão; a
+  aberto, nas seções 1, 6, 9 e 11, ficam superadas por essa decisão; a
   tela própria deixa de ser pendência e passa a ser a direção. **P1 a P4
   continuam sem resposta** e o `DP-FLX-04` continua aberto.
 - Fontes, e só elas: a [ADR 0017](../adr/0017-fluxo-admissao-vinculo-desligamento-rh-dp.md),
@@ -21,12 +21,12 @@
 
 ## 1. O que está em decisão
 
-O gate, como o diagnóstico o registra (`DIAG:637`): "Estados e transições do
+O gate, como o diagnóstico o registra (`DIAG:640`): "Estados e transições do
 processo admissional: oito etapas, devolução, cancelamento, 'efetivada
 aguardando início', correção pós-efetivação (inclui T166 D8); quem opera cada
 transição, inclusive as etapas 3, 6 e 7". A decisão contraria hoje a decisão 15
-da Baseline V1 e a recusa de efetivar antes da vigência (`DIAG:637`), e é um
-dos dois gates do conflito 2, o da matrícula (`DIAG:667`).
+da Baseline V1 e a recusa de efetivar antes da vigência (`DIAG:640`), e é um
+dos dois gates do conflito 2, o da matrícula (`DIAG:670`).
 
 A decisão tem quatro partes, que este documento separa:
 
@@ -45,7 +45,7 @@ A decisão tem quatro partes, que este documento separa:
 - os dados de cada etapa (`DP-FLX-05`, `-06`, `-08`) e os documentos
   (`DP-FLX-14`);
 - a forma do motivo de devolução e de cancelamento, se texto livre (conflito 8,
-  `DP-FLX-11`; `DIAG:673`);
+  `DP-FLX-11`; `DIAG:676`);
 - a tela do processo (`DP-FLX-21`).
 
 ## 2. Como ler
@@ -180,7 +180,7 @@ como a admissão começa hoje.
 motivo" (`RESP:97-102`). Proposta do documento: a devolução é uma transição
 para um estado de espera, com motivo obrigatório, que volta a uma etapa
 anterior ou à mesma. Pela regra atual, motivo é **catálogo controlado**, nunca
-texto livre (`DIAG:673`, conflito 8, que é do `DP-FLX-11`); o catálogo de
+texto livre (`DIAG:676`, conflito 8, que é do `DP-FLX-11`); o catálogo de
 motivos de devolução seria novo.
 
 ### 5.3 Cancelamento
@@ -207,7 +207,7 @@ gestor continua sem mutação nenhuma (`A17:117-169`).
 
 Proposta do documento: cada transição do processo é um evento de auditoria
 próprio, com ator e alvo, na trilha atual, que não guarda valores antes e
-depois (`DIAG:674`, conflito 9). O status por etapa da R9 vem da sequência
+depois (`DIAG:677`, conflito 9). O status por etapa da R9 vem da sequência
 desses eventos, ou de uma linha do tempo do processo. Cada alternativa diz que
 eventos novos exige.
 
@@ -227,7 +227,7 @@ início, pelo `POST /v1/colaboradores` atômico de hoje.
 | **Devolução**         | Transição nova da movimentação (seção 5.2).                                                                                                                                                                                                                                                                 |
 | **Responsabilidades** | Como hoje: recurso `movimentacao_funcional`, `rh` e `dp` (`rbac:363-367`), com 3.i ou 3.ii.                                                                                                                                                                                                                 |
 | **Auditoria**         | Reaproveita `pessoas_movimentacao_*` (`audit:70-81`) e acrescenta ações para avançar etapa, devolver e retomar.                                                                                                                                                                                             |
-| **Matrícula**         | Informada no início, como hoje. **Mantém o conflito 2** (`DIAG:667`): matrícula só na efetivação exige identificador provisório ou matrícula opcional no vínculo, o que é do `DP-FLX-10`.                                                                                                                   |
+| **Matrícula**         | Informada no início, como hoje. **Mantém o conflito 2** (`DIAG:670`): matrícula só na efetivação exige identificador provisório ou matrícula opcional no vínculo, o que é do `DP-FLX-10`.                                                                                                                   |
 | **Vínculo**           | Existe desde o início, `previsto`. A pessoa em processo já é um Colaborador `inativo`.                                                                                                                                                                                                                      |
 | **Lotação**           | Inalterada: o destino fica na movimentação e a alocação nasce na efetivação (`mov.service.ts:301-311`).                                                                                                                                                                                                     |
 | **Movimentação**      | A movimentação de admissão **é** o processo.                                                                                                                                                                                                                                                                |
@@ -380,9 +380,9 @@ admissional) e **não autoriza código** por si só.
 
 Nenhum gate é resolvido por este documento. Seguem **abertos** 20 gates —
 `DP-FLX-02` a `DP-FLX-20` e `DP-FLX-22`, inclusive o próprio `DP-FLX-04`, o
-`DP-FLX-10`, o `DP-FLX-02` e o `DP-FLX-03` — e os 13 conflitos com decisões
-fechadas. O `DP-FLX-21` foi resolvido pela proprietária na mesma data, fora
-deste documento. Mesmo
+`DP-FLX-10`, o `DP-FLX-02` e o `DP-FLX-03` —, e 12 dos 13 conflitos com
+decisões fechadas. O `DP-FLX-21` foi resolvido pela proprietária na mesma
+data, fora deste documento, e com ele o conflito 13, por decisão posterior. Mesmo
 decidido, o `DP-FLX-04` não decide a regra da matrícula (`DP-FLX-10`), o papel do
 gestor (`DP-FLX-02`), as alçadas (`DP-FLX-03`), os dados de cada etapa
 (`DP-FLX-05`, `-06`, `-08`), os documentos (`DP-FLX-14`), a forma dos motivos

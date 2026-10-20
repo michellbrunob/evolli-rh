@@ -13,6 +13,7 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
+import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NovaAdmissaoScreen } from "./NovaAdmissaoScreen";
 import {
@@ -405,6 +406,12 @@ describe("Nova admissão — cancelar", () => {
     const confirmacao = screen.getByRole("dialog", {
       name: "Descartar esta admissão?",
     });
+    // T176 — "Nada foi salvo", e não "Nada foi enviado": depois de uma
+    // tentativa recusada, algo FOI enviado; o que não houve foi gravação.
+    expect(confirmacao).toHaveAccessibleDescription(
+      "Os dados digitados nesta página serão perdidos. Nada foi salvo.",
+    );
+    expect(confirmacao).not.toHaveTextContent(/Nada foi enviado/);
     fireEvent.click(
       within(confirmacao).getByRole("button", {
         name: "Continuar preenchendo",
@@ -413,6 +420,19 @@ describe("Nova admissão — cancelar", () => {
     expect(onSair).not.toHaveBeenCalled();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(nome()).toHaveValue("Pessoa Sintética");
+  });
+
+  it("depois de uma recusa do servidor, o descarte continua dizendo só que nada foi salvo", async () => {
+    vi.mocked(admitirColaborador).mockRejectedValue(recusa(409));
+    montar();
+    await aguardarEmpresa();
+    preencherValido();
+    fireEvent.click(admitir());
+    await waitFor(() => expect(matricula()).toHaveFocus());
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    expect(
+      screen.getByRole("dialog", { name: "Descartar esta admissão?" }),
+    ).toHaveAccessibleDescription(/Nada foi salvo\.$/);
   });
 
   it("com dados, descartar sai sem enviar nada", async () => {
@@ -492,5 +512,53 @@ describe("Nova admissão — sucesso", () => {
     );
     expect(nome()).toHaveValue("");
     expect(matricula()).toHaveValue("");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T176 — contrato de CSS da confirmação de sucesso.
+//
+// O ambiente de teste não carrega CSS (`css: false`), então o vão vertical que
+// a validação no navegador achou é preso aqui pela FONTE: `flex: 1 1 16rem` no
+// texto genérico virava ALTURA de 16rem na confirmação, que é coluna flex. A
+// base flexível só pode existir na faixa de aviso, que é linha.
+// ---------------------------------------------------------------------------
+describe("Nova admissão — contrato de CSS da confirmação", () => {
+  const css = readFileSync(
+    "src/screens/pessoas/NovaAdmissaoScreen.css",
+    "utf8",
+  );
+
+  /** Corpo da regra cujo seletor é exatamente `seletor`, ou `null`. */
+  function corpoDaRegra(seletor: string): string | null {
+    const escapado = seletor.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const m = new RegExp(
+      String.raw`(?:^|\})\s*${escapado}\s*\{([^}]*)\}`,
+      "m",
+    ).exec(css);
+    return m ? (m[1] ?? "") : null;
+  }
+
+  it("o texto genérico não tem nenhuma propriedade flex", () => {
+    const corpo = corpoDaRegra(".nova-admissao__texto");
+    expect(corpo).not.toBeNull();
+    expect(corpo).not.toMatch(/(?:^|[;\s])flex(?:-grow|-basis|-shrink)?\s*:/);
+    expect(corpo).not.toMatch(/(?:^|[;\s])(?:min-)?height\s*:/);
+  });
+
+  it("a base flexível existe só na faixa de aviso, que é linha", () => {
+    expect(corpoDaRegra(".nova-admissao__aviso .nova-admissao__texto")).toMatch(
+      /flex:\s*1\s+1\s+16rem\s*;/,
+    );
+    expect(css.match(/flex:\s*1\s+1\s+16rem/g)).toHaveLength(1);
+    expect(corpoDaRegra(".nova-admissao__aviso")).not.toMatch(
+      /flex-direction:\s*column/,
+    );
+  });
+
+  it("a confirmação é coluna flex — a premissa que fazia a base virar altura", () => {
+    const corpo = corpoDaRegra(".nova-admissao__sucesso");
+    expect(corpo).toMatch(/display:\s*flex/);
+    expect(corpo).toMatch(/flex-direction:\s*column/);
   });
 });
