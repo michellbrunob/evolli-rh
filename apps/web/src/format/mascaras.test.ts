@@ -230,3 +230,55 @@ describe("T179 — máscara de telefone", () => {
     expect(posicaoAposDigitos("(11) 98765-4321", 99)).toBe(15);
   });
 });
+
+describe("T179 (B1) — telefone digitado tecla a tecla com o código do país", () => {
+  it.each([
+    ["+55 11 98765-4321", "(11) 98765-4321"],
+    ["+55 91 98765-4321", "(91) 98765-4321"],
+    ["+55 (91) 98765-4321", "(91) 98765-4321"],
+    ["+5511987654321", "(11) 98765-4321"],
+    ["+55 21 3333-4444", "(21) 3333-4444"],
+  ])("digitar %p dá o mesmo que colar: %p", (texto, esperado) => {
+    expect(digitar("telefone", texto)).toBe(esperado);
+    expect(colarNaMascara("telefone", "", 0, 0, texto).valor).toBe(esperado);
+  });
+
+  it("sem o +, 13 dígitos começando por 55 são lidos como país, não como DDD", () => {
+    expect(digitar("telefone", "5511987654321")).toBe("(11) 98765-4321");
+    expect(digitar("telefone", "5591987654321")).toBe("(91) 98765-4321");
+  });
+
+  it("número nacional com DDD 55 continua com DDD 55", () => {
+    expect(digitar("telefone", "55999998888")).toBe("(55) 99999-8888");
+    expect(digitar("telefone", "5532221111")).toBe("(55) 3222-1111");
+  });
+
+  it("enquanto só há +, +5 ou +55, o campo mostra o que foi digitado", () => {
+    expect(digitar("telefone", "+")).toBe("+");
+    expect(digitar("telefone", "+5")).toBe("+5");
+    expect(digitar("telefone", "+55")).toBe("+55");
+    expect(digitar("telefone", "+55 ")).toBe("+55");
+    expect(digitar("telefone", "+551")).toBe("(1");
+  });
+
+  it("+ de outro país fica como veio, sem máscara: nada de DDD inventado", () => {
+    expect(digitar("telefone", "+1 202 555 0100")).toBe("+12025550100");
+    expect(digitar("telefone", "+51")).toBe("+51");
+  });
+
+  it("nenhum dígito se perde e o 12º dígito de um número nacional continua recusado", () => {
+    expect(digitar("telefone", "1", "(11) 98765-4321")).toBe("(11) 98765-4321");
+    expect(digitar("telefone", "+55 91 98765-4321").replace(/[^0-9]/g, "")).toBe(
+      "91987654321",
+    );
+  });
+
+  it("Backspace e Delete com o + no campo seguem o normal", () => {
+    expect(apagarComSeparador("telefone", "+", 1, 1, "Backspace")).toBeNull();
+    expect(apagarComSeparador("telefone", "+55", 0, 0, "Delete")).toBeNull();
+    expect(aplicarMascara("telefone", "+", "", 0)).toEqual({
+      valor: "",
+      cursor: 0,
+    });
+  });
+});

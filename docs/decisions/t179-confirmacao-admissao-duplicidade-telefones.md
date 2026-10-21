@@ -45,7 +45,52 @@ Colaboradores, em 2026-10-21:
 | Lotação                 | Na Nova admissão, Departamento, Cargo e Unidade passam a ser obrigatórios na API e na tela, em seletores próprios com `CÓDIGO — Nome`. Área, Equipe e Centro de custo seguem opcionais. Novo vínculo de colaborador existente (`POST /v1/vinculos`) não muda.                                                                                                     |
 | Empresa sem referências | Sem Departamento, Cargo ou Unidade ativos, a página explica o que falta e não envia. O RH é orientado a cadastrá-los em Estrutura; o DP, a pedir ao RH.                                                                                                                                                                                                           |
 
-## 3. O que esta decisão não autoriza
+## 3. Se a migration parar por e-mail pessoal repetido
+
+A migration `20261021120000_confirmacao_admissao_normalizacao` começa
+conferindo se já existe e-mail pessoal repetido na mesma empresa. Se existir,
+ela para **antes de qualquer mudança** e informa só a quantidade de grupos
+repetidos. Essa conferência é o primeiro comando do arquivo, então nada fica
+aplicado — o E2E da T179 prova que nem as tabelas novas, nem o índice, nem os
+telefones convertidos sobram. O Prisma registra a migration como falha no seu
+histórico.
+
+Procedimento seguro, sem expor nenhum valor:
+
+1. **Localizar os grupos só por identificador.** Como o papel de migração, a
+   consulta abaixo devolve a empresa e os colaboradores de cada grupo — nunca
+   o e-mail:
+
+   ```sql
+   SELECT empresa_id,
+          array_agg(colaborador_id ORDER BY colaborador_id) AS colaboradores
+     FROM app.contato_colaborador
+    GROUP BY empresa_id, email_pessoal
+   HAVING count(*) > 1;
+   ```
+
+2. **Corrigir pelo RH da empresa, na versão em uso.** Qual e-mail vale para
+   cada colaborador é decisão do RH, não da migration: ele ajusta o e-mail
+   pessoal pela ficha (Contatos), que nessa versão ainda não exige unicidade.
+   A comunicação entre quem opera e o RH usa só os identificadores do passo 1;
+   nenhum e-mail vai para chamado, log, PR ou documentação.
+3. **Repetir a consulta** até ela não devolver nenhuma linha.
+4. **Marcar a tentativa como desfeita e aplicar de novo:**
+
+   ```bash
+   pnpm --filter @evolli/api exec prisma migrate resolve --rolled-back 20261021120000_confirmacao_admissao_normalizacao
+   pnpm --filter @evolli/api exec prisma migrate deploy
+   ```
+
+5. **Conferir:** `prisma migrate status` sem pendência, e a relação técnica
+   `revisao_normalizacao_cadastro` consultada por contagem (registro e nome do
+   campo, sem valores) para tratar os telefones e CEPs que não tinham forma
+   inequívoca.
+
+Nunca apague um dos contatos repetidos para destravar a migration: o contato
+é dado do colaborador, retido pela ficha de Contatos, e a escolha seria chute.
+
+## 4. O que esta decisão não autoriza
 
 CPF, documentos, dados bancários, dependentes, salário, ponto, adicionais
 trabalhistas, horário na admissão, fuso horário, cargo completo, os modais

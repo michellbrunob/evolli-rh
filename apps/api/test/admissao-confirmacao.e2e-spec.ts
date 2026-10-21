@@ -901,6 +901,10 @@ describe("Confirmação da Nova admissão (T179, e2e)", () => {
       ],
       ["5531988887777", "553132221111", "+5531988887777", "+553132221111"],
       ["+5511987654321", "+551155556666", "+5511987654321", "+551155556666"],
+      // T179 (B1) — o que a tela envia depois de digitar +55 tecla a tecla:
+      // DDD iniciado por 9 e DDD comum, e o país digitado sem o +.
+      ["(91) 98765-4321", "(11) 3222-1111", "+5591987654321", "+551132221111"],
+      ["+55 91 98765-4320", "5591988887777", "+5591987654320", "+5591988887777"],
     ])(
       "celular %p e telefone %p são gravados %p e %p",
       async (celular, telefone, celularGravado, telefoneGravado) => {

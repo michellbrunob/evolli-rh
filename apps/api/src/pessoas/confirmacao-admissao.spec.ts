@@ -150,6 +150,31 @@ describe("T179 — telefone só brasileiro, em +55 + DDD + número", () => {
 // CEP coerente com o país
 // ---------------------------------------------------------------------------
 
+describe("T179 (B1) — o que a tela envia depois de digitar +55 tecla a tecla", () => {
+  // A tela mostra `+`, `+5` e `+55` enquanto o país é digitado e, com o
+  // primeiro dígito nacional, segue como número nacional. Cada passo abaixo é
+  // um valor que o campo pode ter ao enviar; o servidor nunca lê o 55 do país
+  // como DDD, e nunca aceita o país pela metade.
+  it.each([
+    ["(11) 98765-4321", "+5511987654321", "DDD comum, depois de +55 digitado"],
+    ["(91) 98765-4321", "+5591987654321", "DDD iniciado por 9, depois de +55"],
+    ["(21) 3333-4444", "+552133334444", "fixo, depois de +55 digitado"],
+    ["+55 91 98765-4321", "+5591987654321", "+55 e DDD 9x digitados inteiros"],
+    ["5591987654321", "+5591987654321", "55 + DDD 9x sem +: país, não DDD"],
+    ["(55) 99999-8888", "+5555999998888", "DDD 55 nacional continua DDD 55"],
+  ])("%p vira %p (%s)", (entrada, saida) => {
+    expect(normalizarTelefone(entrada)).toBe(saida);
+    expect(TELEFONE_NORMALIZADO.test(saida)).toBe(true);
+  });
+
+  it.each([["+"], ["+5"], ["+55"], ["(9"], ["(91) 9876"]])(
+    "país ou número pela metade (%p) é recusado",
+    (entrada) => {
+      expect(telefoneAceito(entrada)).toBe(false);
+    },
+  );
+});
+
 describe("T179 — CEP brasileiro em 8 dígitos; outro país em texto livre", () => {
   async function endereco(corpo: Record<string, unknown>) {
     const dto = plainToInstance(EnderecoDto, corpo);

@@ -648,6 +648,13 @@ export function NovaAdmissaoScreen({
   const [salvando, setSalvando] = useState(false);
   const [admissao, setAdmissao] = useState<AdmissaoRegistradaApi | null>(null);
   const [confirmandoDescarte, setConfirmandoDescarte] = useState(false);
+  /**
+   * T179 — o servidor disse que a chave deste envio já registrou uma admissão
+   * com OUTRO conteúdo (422 `idempotencia_conteudo_divergente`). Toda nova
+   * confirmação com a mesma chave repetiria a recusa: a tela oferece
+   * recomeçar com uma chave nova, ou conferir a listagem.
+   */
+  const [envioDivergente, setEnvioDivergente] = useState(false);
   /** Trava síncrona contra envio duplicado (cliques no mesmo quadro). */
   const enviandoRef = useRef(false);
   /**
@@ -1069,6 +1076,10 @@ export function NovaAdmissaoScreen({
       focarPrimeiroErroRef.current = true;
       setConfirmando(false);
       setErros(errosDaRecusa(erro));
+      setEnvioDivergente(
+        statusDe(erro) === 422 &&
+          detalhesDe(erro).codigo === "idempotencia_conteudo_divergente",
+      );
     } finally {
       setSalvando(false);
       enviandoRef.current = false;
@@ -1096,7 +1107,19 @@ export function NovaAdmissaoScreen({
     ultimoCepConsultadoRef.current = null;
     // T179 — página recomeçada: a próxima confirmação é um envio novo.
     chaveIdempotenciaRef.current = null;
+    setEnvioDivergente(false);
     setAdmissao(null);
+  }
+
+  /**
+   * T179 — "Recomeçar a admissão" depois do 422 divergente: página vazia,
+   * chave nova e o foco no primeiro campo (o botão some ao recomeçar).
+   */
+  function recomecarComNovaChave() {
+    recomecar();
+    requestAnimationFrame(() =>
+      document.getElementById(ID_DO_CAMPO.nome)?.focus(),
+    );
   }
 
   /** Referência escolhida, pelo id, para o resumo da confirmação. */
@@ -1760,6 +1783,33 @@ export function NovaAdmissaoScreen({
           >
             {erros.geral}
           </p>
+        ) : null}
+        {erros.geral && envioDivergente ? (
+          // T179 — saída clara do 422 divergente: recomeçar gera uma chave
+          // nova (o formulário volta vazio, porque a admissão anterior pode
+          // já existir), e conferir leva à listagem pelo caminho de sempre,
+          // com a confirmação de descarte se houver dados digitados.
+          <div className="nova-admissao__acoes-recusa">
+            <p className="nova-admissao__texto">
+              Recomeçar limpa o formulário e prepara um envio novo.
+            </p>
+            <FormActions>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={pedirCancelamento}
+              >
+                Conferir em Colaboradores
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
+                onClick={recomecarComNovaChave}
+              >
+                Recomeçar a admissão
+              </Button>
+            </FormActions>
+          </div>
         ) : null}
 
         <FormActions>

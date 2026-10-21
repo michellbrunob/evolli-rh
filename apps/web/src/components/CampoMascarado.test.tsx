@@ -125,3 +125,32 @@ describe("T179 — CampoMascarado", () => {
     expect(input.selectionStart).toBe(3);
   });
 });
+
+/** Digita caractere a caractere: cada tecla é um `change` com o valor atual + a tecla. */
+function teclar(texto: string) {
+  for (const tecla of texto) {
+    fireEvent.change(campo(), { target: { value: campo().value + tecla } });
+  }
+}
+
+describe("T179 (B1) — CampoMascarado com +55 digitado tecla a tecla", () => {
+  it.each([
+    ["+55 11 98765-4321", "(11) 98765-4321"],
+    ["+55 91 98765-4321", "(91) 98765-4321"],
+  ])("%p vira %p, como na colagem", (texto, esperado) => {
+    const aoMudar = vi.fn();
+    render(<Campo mascara="telefone" aoMudar={aoMudar} />);
+    teclar(texto);
+    expect(campo()).toHaveValue(esperado);
+    expect(aoMudar).toHaveBeenLastCalledWith(esperado);
+  });
+
+  it("o + aparece enquanto o código do país é digitado, e a dica continua ligada", () => {
+    render(<Campo mascara="telefone" />);
+    teclar("+55");
+    expect(campo()).toHaveValue("+55");
+    teclar("9");
+    expect(campo()).toHaveValue("(9");
+    expect(campo()).toHaveAccessibleDescription(DICA_DE_FORMATO.telefone);
+  });
+});

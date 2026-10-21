@@ -49,6 +49,9 @@ export const DICA_DE_FORMATO: Readonly<Record<TipoMascara, string>> = {
 
 const DIGITO = /[0-9]/;
 
+/** Limite da numeração internacional (E.164): `+` de outro país fica até aqui. */
+const LIMITE_INTERNACIONAL = 15;
+
 export function somenteDigitos(valor: string): string {
   return valor.replace(/[^0-9]/g, "");
 }
@@ -103,6 +106,18 @@ function temCodigoDoPais(entrada: string): boolean {
   );
 }
 
+/**
+ * T179 (B1 da revisão) — código do país ainda sendo DIGITADO: `+`, `+5` ou
+ * `+55`, sem nenhum dígito nacional depois. O campo mostra o que foi digitado,
+ * em vez de jogar fora o `+` e fazer do `55` o DDD na tecla seguinte.
+ */
+const PAIS_EM_DIGITACAO = /^\s*\+\s*(?:5\s*){0,2}$/;
+
+/** O texto começa com `+` (o usuário está informando o código do país)? */
+function comecaComMais(entrada: string): boolean {
+  return /^\s*\+/.test(entrada);
+}
+
 /** Posição logo depois do `n`-ésimo dígito do texto (0 = início). */
 export function posicaoAposDigitos(valor: string, n: number): number {
   if (n <= 0) return 0;
@@ -140,8 +155,30 @@ export function aplicarMascara(
   let digitos = somenteDigitos(entrada);
   let antes = digitosAntesDe(entrada, cursor);
 
+  // T179 (B1) — o `+` inicial é o código do país sendo digitado, tecla a
+  // tecla. Enquanto só há `+`, `+5` ou `+55`, o campo mostra isso mesmo; com o
+  // primeiro dígito nacional, o `55` sai e o número segue como nacional — o
+  // mesmo resultado da colagem. `+` de outro país fica como veio, sem máscara
+  // (que inventaria um DDD), e a validação o recusa: só número brasileiro.
+  if (tipo === "telefone" && comecaComMais(entrada)) {
+    if (PAIS_EM_DIGITACAO.test(entrada)) {
+      const valor = `+${digitos}`;
+      return { valor, cursor: valor.length };
+    }
+    if (!digitos.startsWith("55")) {
+      const valor = `+${digitos.slice(0, LIMITE_INTERNACIONAL)}`;
+      return { valor, cursor: valor.length };
+    }
+  }
+
+  // Sem o `+`, uma sequência que começa por `55` pode crescer até 13 dígitos:
+  // com 12 ou 13 ela só pode ser `55` + DDD + número (um número nacional tem
+  // no máximo 11), e é lida assim — igual à colagem. Recusar o 12º dígito
+  // deixaria o `55` como DDD e perderia os dois últimos.
+  const limiteDaEntrada =
+    tipo === "telefone" && digitos.startsWith("55") ? limite + 2 : limite;
   const digitacaoAlemDoLimite =
-    digitos.length > limite &&
+    digitos.length > limiteDaEntrada &&
     digitos.length - digitosAnteriores.length === 1 &&
     digitosAnteriores.length >= limite;
   if (digitacaoAlemDoLimite) {
@@ -207,6 +244,9 @@ export function apagarComSeparador(
   tecla: "Backspace" | "Delete",
 ): EstadoDoCampo | null {
   if (inicio !== fim) return null;
+  // T179 (B1) — com o `+` do país ainda no campo, a tecla segue o normal: o
+  // `+` não é separador da máscara, é o que foi digitado.
+  if (tipo === "telefone" && comecaComMais(valor)) return null;
   const digitos = somenteDigitos(valor);
   const antes = digitosAntesDe(valor, inicio);
   if (tecla === "Backspace") {

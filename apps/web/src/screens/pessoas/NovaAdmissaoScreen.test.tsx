@@ -1222,6 +1222,49 @@ describe("Nova admissão — recusa do servidor preserva os dados", () => {
     expect(matricula()).toHaveValue("MAT-0900");
   });
 
+  it("422 idempotência divergente: oferece recomeçar com chave nova e conferir a listagem", async () => {
+    vi.mocked(admitirColaborador).mockRejectedValueOnce(
+      recusa(422, { codigo: "idempotencia_conteudo_divergente" }),
+    );
+    montar();
+    await aguardarEmpresa();
+    preencherValido();
+    await salvarEConfirmar();
+    await screen.findByText(/Este envio já foi registrado antes/);
+    const chaveRecusada = chaveDaChamada(0);
+    expect(
+      screen.getByRole("button", { name: "Conferir em Colaboradores" }),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Recomeçar a admissão" }),
+    );
+    // Formulário vazio, foco no primeiro campo e nenhuma recusa na tela.
+    expect(matricula()).toHaveValue("");
+    await waitFor(() => expect(nome()).toHaveFocus());
+    expect(screen.queryByText(/Este envio já foi registrado antes/)).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Recomeçar a admissão" }),
+    ).toBeNull();
+    // O próximo envio é OUTRO: chave nova.
+    preencherValido();
+    await salvarEConfirmar();
+    await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(2));
+    expect(chaveDaChamada(1)).toMatch(/^[0-9a-f-]{36}$/);
+    expect(chaveDaChamada(1)).not.toBe(chaveRecusada);
+  });
+
+  it("outras recusas não oferecem recomeçar", async () => {
+    vi.mocked(admitirColaborador).mockRejectedValue(recusa(500));
+    montar();
+    await aguardarEmpresa();
+    preencherValido();
+    await salvarEConfirmar();
+    await screen.findByText(/Os dados digitados foram mantidos/);
+    expect(
+      screen.queryByRole("button", { name: "Recomeçar a admissão" }),
+    ).toBeNull();
+  });
+
   it.each([
     [400, /O servidor recusou algum dos dados/],
     [404, /A empresa ativa mudou/],
@@ -1387,6 +1430,28 @@ describe("T179 — máscaras na Nova admissão", () => {
     expect(celular()).toHaveValue("(31) 99999-0000");
     fireEvent.change(telefone(), { target: { value: "553133330000" } });
     expect(telefone()).toHaveValue("(31) 3333-0000");
+  });
+
+  it("T179 (B1): +55 digitado tecla a tecla, com DDD comum e com DDD iniciado por 9, chega certo ao servidor", async () => {
+    montar();
+    await aguardarEmpresa();
+    preencherValido();
+    const teclar = (campo: HTMLElement, texto: string) => {
+      fireEvent.change(campo, { target: { value: "" } });
+      for (const tecla of texto) {
+        const atual = (campo as HTMLInputElement).value;
+        fireEvent.change(campo, { target: { value: atual + tecla } });
+      }
+    };
+    teclar(celular(), "+55 91 98765-4321");
+    teclar(telefone(), "+55 11 3333-0000");
+    expect(celular()).toHaveValue("(91) 98765-4321");
+    expect(telefone()).toHaveValue("(11) 3333-0000");
+    await salvarEConfirmar();
+    await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
+    const dto = vi.mocked(admitirColaborador).mock.calls[0]![0];
+    expect(dto.contatos.celular).toBe("+5591987654321");
+    expect(dto.contatos.telefone).toBe("+551133330000");
   });
 
   it("CEP: máscara 00000-000 só com país Brasil", async () => {

@@ -146,6 +146,12 @@
   color: var(--color-ink);
 }
 
+/* T179 — saída do 422 de conteúdo divergente: recomeçar ou conferir. */
+.nova-admissao__acoes-recusa {
+  display: grid;
+  gap: var(--space-xs);
+}
+
 .nova-admissao__erro-geral {
   margin: 0;
   padding: var(--space-sm) var(--space-md);
