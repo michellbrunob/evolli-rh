@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { HistoricoFuncionalScreen } from "./HistoricoFuncionalScreen";
 import {
   type ColaboradorApi,
+  type ListagemColaboradoresApi,
   type VinculoApi,
   listarColaboradores,
   listarVinculosDoColaborador,
@@ -51,6 +52,18 @@ interface ResultadoPaginadoTeste<T> {
 
 function paginado<T>(itens: T[]): ResultadoPaginadoTeste<T> {
   return { itens, pagina: 1, tamanhoPagina: 100, total: itens.length };
+}
+
+/**
+ * T178 — `GET /v1/colaboradores` passou a trazer os vínculos de cada item e os
+ * `contadores` do escopo. Esta tela não usa nenhum dos dois; o envelope só
+ * precisa ter a forma do contrato.
+ */
+function listagem(itens: ColaboradorApi[]): ListagemColaboradoresApi {
+  return {
+    ...paginado(itens.map((c) => ({ ...c, vinculos: [] }))),
+    contadores: { ativos: 0, inativos: 0 },
+  };
 }
 
 const EMPRESA_ID = "99999999-9999-9999-9999-999999999999";
@@ -242,7 +255,7 @@ const movCorrecao: MovimentacaoApi = {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(listarColaboradores).mockResolvedValue(
-    paginado([colaborador1, colaborador2]),
+    listagem([colaborador1, colaborador2]),
   );
   vi.mocked(listarDepartamentos).mockResolvedValue(paginado([departamento1]));
   vi.mocked(listarUnidades).mockResolvedValue(paginado([unidade1]));
@@ -403,7 +416,7 @@ describe("HistoricoFuncionalScreen (T115 — funcional)", () => {
 
   it("colaborador sem nenhum vínculo bloqueia o registro e avisa", async () => {
     vi.mocked(listarColaboradores).mockResolvedValue(
-      paginado([
+      listagem([
         colaborador1,
         colaborador2,
         {

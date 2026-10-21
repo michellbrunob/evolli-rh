@@ -140,7 +140,9 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     ).toBeInTheDocument();
 
     fireEvent.click(
-      screen.getByRole("button", { name: "Pessoas Colaboradores" }),
+      screen.getByRole("button", {
+        name: "Colaboradores Consulta, ficha e vida funcional",
+      }),
     );
     fireEvent.click(screen.getByRole("button", { name: /^Estrutura/ }));
 
@@ -180,7 +182,9 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
       screen.getByRole("button", { name: /^Visão geral/ }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Pessoas Colaboradores" }),
+      screen.getByRole("button", {
+        name: "Colaboradores Consulta, ficha e vida funcional",
+      }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /^Jornada/ }),
@@ -209,7 +213,7 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
 
     // Pessoas é a aterrissagem funcional de `rh` desde a T159.
     const pessoas = screen.getByRole("button", {
-      name: "Pessoas Colaboradores",
+      name: "Colaboradores Consulta, ficha e vida funcional",
     });
     expect(pessoas).toHaveAttribute("aria-current", "page");
     expect(
@@ -243,7 +247,7 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     // Todos os destinos do mapa da T159, mais Nova admissão (T176) —
     // operacionais e de demonstração. Nenhum pode cair no placeholder.
     for (const rotulo of [
-      /^Pessoas Colaboradores/,
+      /^Colaboradores Consulta/,
       /^Nova admissão/,
       /^Estrutura/,
       /^Jornada/,
@@ -351,7 +355,9 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     ).toBeInTheDocument();
 
     fireEvent.click(
-      screen.getByRole("button", { name: "Pessoas Colaboradores" }),
+      screen.getByRole("button", {
+        name: "Colaboradores Consulta, ficha e vida funcional",
+      }),
     );
     fireEvent.click(screen.getByRole("button", { name: /^Jornada/ }));
 
@@ -365,7 +371,9 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     render(<App papelDoAtor="rh" />);
 
     fireEvent.click(
-      screen.getByRole("button", { name: "Pessoas Colaboradores" }),
+      screen.getByRole("button", {
+        name: "Colaboradores Consulta, ficha e vida funcional",
+      }),
     );
 
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
@@ -386,7 +394,9 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     render(<App papelDoAtor="rh" />);
 
     fireEvent.click(
-      screen.getByRole("button", { name: "Pessoas Colaboradores" }),
+      screen.getByRole("button", {
+        name: "Colaboradores Consulta, ficha e vida funcional",
+      }),
     );
     fireEvent.click(screen.getByRole("tab", { name: "Horário de trabalho" }));
 
@@ -407,7 +417,9 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     render(<App papelDoAtor="rh" />);
 
     fireEvent.click(
-      screen.getByRole("button", { name: "Pessoas Colaboradores" }),
+      screen.getByRole("button", {
+        name: "Colaboradores Consulta, ficha e vida funcional",
+      }),
     );
     fireEvent.click(screen.getByRole("tab", { name: "Horário de trabalho" }));
     expect(
@@ -416,7 +428,9 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /^Estrutura/ }));
     fireEvent.click(
-      screen.getByRole("button", { name: "Pessoas Colaboradores" }),
+      screen.getByRole("button", {
+        name: "Colaboradores Consulta, ficha e vida funcional",
+      }),
     );
 
     expect(
@@ -727,15 +741,16 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
       name: "Navegação do painel",
     });
     const botoes = Array.from(nav.querySelectorAll("button"));
-    // Quinze destinos (`rh` enxerga o mapa inteiro, inclusive Nova admissão,
-    // T176) mais os três cabeçalhos de módulo expansível — Pessoas, Liderança
-    // e Demonstração, os únicos com mais de um destino.
-    expect(botoes).toHaveLength(18);
+    // Catorze destinos (`rh` enxerga o mapa inteiro; Nova admissão, T176,
+    // saiu da barra na T178 — é sub-página de Colaboradores) mais os três
+    // cabeçalhos de módulo expansível: Gestão de Pessoas (`sempreComoModulo`),
+    // Liderança e Demonstração.
+    expect(botoes).toHaveLength(17);
     expect(
       botoes
         .filter((b) => b.hasAttribute("aria-expanded"))
         .map((b) => b.textContent),
-    ).toEqual(["Pessoas", "Liderança", "Demonstração"]);
+    ).toEqual(["Gestão de Pessoas", "Liderança", "Demonstração"]);
     for (const botao of botoes) {
       expect(botao.tagName).toBe("BUTTON");
       expect(botao).toHaveAttribute("type", "button");

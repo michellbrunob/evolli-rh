@@ -14,6 +14,7 @@ import { HorariosModule } from "./horarios/horarios.module";
 import { GestorModule } from "./gestor/gestor.module";
 import { SolicitacoesPessoasModule } from "./solicitacoes-pessoas/solicitacoes-pessoas.module";
 import { validateEnv } from "./config/env.validation";
+import { CepModule } from "./cep/cep.module";
 
 @Module({
   imports: [
@@ -34,6 +35,8 @@ import { validateEnv } from "./config/env.validation";
     HorariosModule,
     SolicitacoesPessoasModule,
     GestorModule,
+    // T178 — consulta de CEP para o preenchimento assistido de endereço.
+    CepModule,
   ],
 })
 export class AppModule {}

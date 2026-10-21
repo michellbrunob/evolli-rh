@@ -113,7 +113,7 @@ describe("T162 — o Hub oferece só o que o servidor autoriza", () => {
     [
       "rh",
       [
-        "Pessoas",
+        "Colaboradores",
         "Nova admissão",
         "Estrutura",
         "Jornada",
@@ -122,8 +122,11 @@ describe("T162 — o Hub oferece só o que o servidor autoriza", () => {
         "Contas de acesso",
       ],
     ],
-    ["dp", ["Pessoas", "Nova admissão", "Jornada", "Contas de acesso"]],
-    ["master_tecnico", ["Pessoas", "Estrutura", "Jornada", "Contas de acesso"]],
+    ["dp", ["Colaboradores", "Nova admissão", "Jornada", "Contas de acesso"]],
+    [
+      "master_tecnico",
+      ["Colaboradores", "Estrutura", "Jornada", "Contas de acesso"],
+    ],
     ["gestor", ["Minha equipe"]],
     ["financeiro", []],
     ["colaborador", []],

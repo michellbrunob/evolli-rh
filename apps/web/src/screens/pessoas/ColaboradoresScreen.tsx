@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { FormEvent } from "react";
 import {
   Button,
   DataTable,
@@ -11,7 +12,11 @@ import {
 } from "../../components";
 import type { DataTableColumn, StatusVariant } from "../../components";
 import {
+  BUSCA_COLABORADORES_MAXIMO,
   type ColaboradorApi,
+  type ColaboradorListadoApi,
+  type ContadoresColaboradoresApi,
+  type ListarColaboradoresQuery,
   type RetificarColaboradorDto,
   type TipoVinculo,
   type VinculoApi,
@@ -19,7 +24,7 @@ import {
   listarVinculosDoColaborador,
   retificarColaborador,
 } from "../../api/colaboradoresClient";
-import { formatarDiaCivil, formatarInstante } from "../../format/data";
+import { formatarDiaCivil } from "../../format/data";
 import { ContatosColaboradorSecao } from "./ContatosColaboradorSecao";
 import { DadosPessoaisColaboradorSecao } from "./DadosPessoaisColaboradorSecao";
 import "./ColaboradoresScreen.css";
@@ -94,6 +99,23 @@ function tamanhoDePaginaValido(valor: unknown): number {
     : TAMANHO_PAGINA;
 }
 
+/**
+ * T178 — o termo como o servidor o aceita: aparado e no teto de 160; `""` é
+ * "sem busca". É também o termo exibido no estado vazio ("Nenhum colaborador
+ * encontrado para …"), para que a tela mostre exatamente o que pediu.
+ *
+ * Mora aqui, e não no cliente, porque os testes automockam o cliente inteiro:
+ * uma função de lá viraria `vi.fn` e a normalização sumiria justo neles.
+ */
+function normalizarBusca(termo: string): string {
+  return termo.trim().slice(0, BUSCA_COLABORADORES_MAXIMO).trim();
+}
+
+/** Concordância de "N vínculo(s)", para o texto lido por leitor de tela. */
+function vinculosAMais(quantidade: number): string {
+  return quantidade === 1 ? "1 vínculo" : `${quantidade} vínculos`;
+}
+
 export interface ColaboradoresScreenProps {
   /**
    * T164 — a empresa de trabalho ATIVA, resolvida pelo servidor e repassada
@@ -125,8 +147,8 @@ export interface ColaboradoresScreenProps {
    * T177 — a admissão acontece só na página de Nova admissão. O modal
    * transitório da T176 foi aposentado porque não coletava os campos que a
    * admissão passou a exigir (data de nascimento e os três contatos).
-   * "Novo colaborador" leva até a página; sem esta prop — perfil que não pode
-   * admitir —, o botão não aparece.
+   * "Nova admissão" (T178; era "Novo colaborador") leva até a página; sem esta
+   * prop — perfil que não pode admitir —, o botão não aparece.
    */
   readonly onNovaAdmissao?: () => void;
 }
@@ -140,10 +162,34 @@ export function ColaboradoresScreen({
   const [statusCarregamento, setStatusCarregamento] = useState<
     "carregando" | "erro" | "dados"
   >("carregando");
-  const [colaboradores, setColaboradores] = useState<ColaboradorApi[]>([]);
+  // T178 — a lista vive só nesta montagem, de propósito: sem cache entre
+  // montagens, voltar da Nova admissão relê o servidor e o admitido aparece.
+  const [colaboradores, setColaboradores] = useState<ColaboradorListadoApi[]>(
+    [],
+  );
   const [filtroSituacao, setFiltroSituacao] = useState<FiltroSituacao>("todos");
   const [filtroSituacaoVinculo, setFiltroSituacaoVinculo] =
     useState<FiltroSituacaoVinculo>("todos");
+  /**
+   * T178 — busca por nome ou matrícula, em dois tempos: o que está no campo
+   * (`buscaDigitada`) e o que foi PEDIDO ao servidor (`buscaAplicada`, já
+   * normalizada). Separados porque a busca vai ao servidor só quando a pessoa
+   * envia — consultar a cada tecla dispararia uma requisição por caractere e
+   * deixaria a lista mudando por baixo de quem ainda digita.
+   *
+   * Nunca se filtra no cliente: a página tem 20 linhas de um conjunto maior, e
+   * filtrar só o que chegou esconderia quem está nas outras páginas.
+   */
+  const [buscaDigitada, setBuscaDigitada] = useState("");
+  const [buscaAplicada, setBuscaAplicada] = useState("");
+  const campoBuscaRef = useRef<HTMLInputElement | null>(null);
+  /**
+   * T178 — contagem do escopo inteiro, vinda do servidor (`contadores`), SEM
+   * filtros nem busca. `null` até a primeira resposta. Não é somada no
+   * cliente: a página só tem parte do conjunto, e a soma dela mentiria.
+   */
+  const [contadores, setContadores] =
+    useState<ContadoresColaboradoresApi | null>(null);
   /**
    * T164 — paginação real.
    *
@@ -205,23 +251,26 @@ export function ColaboradoresScreen({
     async (
       situacao: FiltroSituacao,
       situacaoVinculo: FiltroSituacaoVinculo,
+      busca: string,
       paginaPedida: number,
     ) => {
       const pedido = ++pedidoListaRef.current;
       setStatusCarregamento("carregando");
       try {
-        const query: {
-          situacao?: "ativo" | "inativo";
-          situacaoVinculo?: "previsto" | "ativo" | "encerrado";
-          pagina: number;
-          tamanhoPagina: number;
-        } = { pagina: paginaPedida, tamanhoPagina: TAMANHO_PAGINA };
+        // A empresa nunca entra na query: é a da sessão, resolvida no servidor.
+        const query: ListarColaboradoresQuery = {
+          pagina: paginaPedida,
+          tamanhoPagina: TAMANHO_PAGINA,
+        };
         if (situacao !== "todos") query.situacao = situacao;
         if (situacaoVinculo !== "todos")
           query.situacaoVinculo = situacaoVinculo;
+        // T178 — vazio é "sem busca": a chave nem vai.
+        if (busca) query.busca = busca;
         const resp = await listarColaboradores(query);
-        // Resposta obsoleta: outro filtro já pediu a lista depois desta.
-        // Aplicá-la mostraria dados que não correspondem ao filtro na tela.
+        // Resposta obsoleta: outro filtro (ou outra busca) já pediu a lista
+        // depois desta. Aplicá-la mostraria dados que não correspondem ao que
+        // está na tela — inclusive os contadores, que vêm na mesma resposta.
         if (pedido !== pedidoListaRef.current) return null;
         setColaboradores(resp.itens);
         // Página e total saem da RESPOSTA. Se a tela guardasse o que pediu, um
@@ -230,6 +279,7 @@ export function ColaboradoresScreen({
         setPagina(resp.pagina);
         setTotal(resp.total);
         setTamanhoPaginaEfetivo(tamanhoDePaginaValido(resp.tamanhoPagina));
+        setContadores(resp.contadores);
         setStatusCarregamento("dados");
         return resp.itens;
       } catch {
@@ -250,16 +300,60 @@ export function ColaboradoresScreen({
    * na página 1. O filtro muda o conjunto; a posição dentro dele não
    * sobrevive à mudança.
    */
+  //
+  // T178 — a busca entra na mesma regra: um termo novo é um conjunto novo.
   useEffect(() => {
-    void carregarDados(filtroSituacao, filtroSituacaoVinculo, 1);
-  }, [filtroSituacao, filtroSituacaoVinculo, carregarDados]);
+    void carregarDados(filtroSituacao, filtroSituacaoVinculo, buscaAplicada, 1);
+  }, [filtroSituacao, filtroSituacaoVinculo, buscaAplicada, carregarDados]);
 
   const totalPaginas = Math.max(1, Math.ceil(total / tamanhoPaginaEfetivo));
   const carregando = statusCarregamento === "carregando";
+  const temFiltro =
+    filtroSituacao !== "todos" || filtroSituacaoVinculo !== "todos";
+  const filtrando = temFiltro || buscaAplicada !== "";
 
   function irParaPagina(destino: number) {
     if (destino < 1 || destino > totalPaginas || carregando) return;
-    void carregarDados(filtroSituacao, filtroSituacaoVinculo, destino);
+    void carregarDados(
+      filtroSituacao,
+      filtroSituacaoVinculo,
+      buscaAplicada,
+      destino,
+    );
+  }
+
+  /**
+   * T178 — enviar a busca. Um termo novo dispara a releitura pelo efeito; o
+   * MESMO termo reenviado também relê (página 1), porque reenviar é pedir de
+   * novo — e o efeito não rodaria, já que o estado não mudou.
+   */
+  function handleBuscar(evento: FormEvent<HTMLFormElement>) {
+    evento.preventDefault();
+    const termo = normalizarBusca(buscaDigitada);
+    setBuscaDigitada(termo);
+    if (termo === buscaAplicada) {
+      void carregarDados(filtroSituacao, filtroSituacaoVinculo, termo, 1);
+      return;
+    }
+    setBuscaAplicada(termo);
+  }
+
+  /**
+   * T178 — "Limpar busca": volta ao conjunto sem termo. O foco vai ao campo,
+   * porque o botão acionado some junto com o termo — sem isto o foco cairia
+   * no `<body>`.
+   */
+  function limparBusca() {
+    setBuscaDigitada("");
+    setBuscaAplicada("");
+    campoBuscaRef.current?.focus();
+  }
+
+  /** T178 — do estado vazio por busca/filtro: tudo volta ao conjunto inteiro. */
+  function limparBuscaEFiltros() {
+    setFiltroSituacao("todos");
+    setFiltroSituacaoVinculo("todos");
+    limparBusca();
   }
 
   // T176 — atende a abertura pedida pela página de Nova admissão, uma vez.
@@ -347,18 +441,25 @@ export function ColaboradoresScreen({
         detalhe.colaborador.id,
         dto,
       );
+      // T178 — só o NOME vem da resposta. O `PATCH` devolve a situação
+      // GLOBAL do colaborador, e a linha (e a ficha aberta a partir dela)
+      // mostra a situação NA EMPRESA ATIVA: copiar o objeto inteiro trocaria
+      // "Inativo nesta empresa" por "Ativo" só porque o nome foi corrigido — e
+      // apagaria os vínculos que a listagem projetou.
       setDetalhe((prev) =>
         prev
           ? {
               ...prev,
-              colaborador: atualizado,
+              colaborador: { ...prev.colaborador, nome: atualizado.nome },
               nomeEdicao: atualizado.nome,
               salvandoNome: false,
             }
           : prev,
       );
       setColaboradores((prev) =>
-        prev.map((c) => (c.id === atualizado.id ? atualizado : c)),
+        prev.map((c) =>
+          c.id === atualizado.id ? { ...c, nome: atualizado.nome } : c,
+        ),
       );
     } catch (err: unknown) {
       const mensagem =
@@ -375,9 +476,52 @@ export function ColaboradoresScreen({
     }
   }
 
-  const colunasColaboradores: DataTableColumn<ColaboradorApi>[] = [
+  /**
+   * T178 — colunas da porta principal.
+   *
+   * Matrícula e admissão saem do VÍNCULO PRINCIPAL: o primeiro de `vinculos`,
+   * que o servidor já ordena (ativo, previsto, encerrado; admissão mais
+   * recente primeiro). Vêm na mesma resposta da lista — nenhuma leitura por
+   * pessoa. A coluna "Cadastrado em" (T164) saiu: ela existia porque a
+   * admissão não vinha na listagem, e `criadoEm` não é admissão.
+   *
+   * Cargo, departamento e Banco de Horas NÃO entram nesta entrega: a lotação
+   * ainda não é resolvida pela listagem e o Banco de Horas não tem operação,
+   * e uma coluna vazia ou montada por N+1 seria promessa falsa.
+   */
+  const colunasColaboradores: DataTableColumn<ColaboradorListadoApi>[] = [
     { key: "nome", header: "Nome", cell: (c) => c.nome },
     {
+      key: "matricula",
+      header: "Matrícula",
+      cell: (c) => {
+        const principal = c.vinculos[0];
+        if (!principal) return "—";
+        const aMais = c.vinculos.length - 1;
+        return (
+          <>
+            {principal.matricula}
+            {aMais > 0 ? (
+              <>
+                {/* "+N" é o atalho visual; quem usa leitor de tela ouve a
+                    frase inteira, em vez de "mais um" solto. */}
+                <span
+                  className="colaboradores-screen__vinculos-a-mais"
+                  aria-hidden="true"
+                >
+                  {" "}
+                  +{aMais}
+                </span>
+                <span className="sr-only"> e mais {vinculosAMais(aMais)}</span>
+              </>
+            ) : null}
+          </>
+        );
+      },
+    },
+    {
+      // Situação do ITEM: para `rh`/`dp`, na empresa ativa (tem vínculo ativo
+      // nela) — decidida pelo servidor, não derivada dos vínculos aqui.
       key: "situacao",
       header: "Situação",
       cell: (c) => (
@@ -389,12 +533,11 @@ export function ColaboradoresScreen({
       ),
     },
     {
-      // T164 — `criadoEm` é quando o CADASTRO nasceu, e o rótulo diz isso.
-      // Não é data de admissão: admissão vive no vínculo, que esta rota não
-      // projeta. Chamar de "Admissão" seria barato e errado.
-      key: "criadoEm",
-      header: "Cadastrado em",
-      cell: (c) => formatarInstante(c.criadoEm),
+      // Dia civil (`@db.Date`): `formatarDiaCivil` corta a string, sem `Date`,
+      // e devolve "—" quando não há vínculo — nunca uma data inventada.
+      key: "admissao",
+      header: "Admissão",
+      cell: (c) => formatarDiaCivil(c.vinculos[0]?.dataAdmissao),
     },
     {
       key: "acoes",
@@ -409,8 +552,8 @@ export function ColaboradoresScreen({
           aria-haspopup="dialog"
           aria-expanded={detalhe?.colaborador.id === c.id}
         >
-          Ver detalhes
-          <span className="sr-only"> — {c.nome}</span>
+          Abrir ficha
+          <span className="sr-only"> de {c.nome}</span>
         </Button>
       ),
     },
@@ -455,15 +598,87 @@ export function ColaboradoresScreen({
         headingLevel={1}
         titleId={COLABORADORES_TITULO_ID}
         title="Colaboradores"
-        description="Administre a admissão e o cadastro de colaboradores da sua empresa. Situação, vínculo e lotação seguem sempre a fonte de verdade do backend."
-        {...(onNovaAdmissao
-          ? {
-              actions: (
-                <Button onClick={onNovaAdmissao}>Novo colaborador</Button>
-              ),
-            }
-          : {})}
+        description="Consulte os colaboradores da empresa ativa, abra a ficha de cada um e inicie uma nova admissão. Situação e vínculo seguem sempre a fonte de verdade do backend."
+        actions={
+          /* T178 — contadores do escopo inteiro, como o servidor os contou,
+             no cabeçalho: são o tamanho da área, não um detalhe da lista.
+
+             Rotulados "sem filtros" porque NÃO acompanham a busca nem os
+             filtros: dizem quantos ativos e inativos há, enquanto o total da
+             lista diz quantos a consulta atual achou. Sem o rótulo, "Ativos
+             40" ao lado de uma busca com três resultados pareceria erro.
+
+             Antes da primeira resposta, reticências; depois, o último valor
+             do servidor fica à vista durante as releituras — ele não depende
+             do filtro, e trocá-lo por reticências a cada consulta só
+             piscaria. Sem `role="status"`, pelo mesmo motivo do total da
+             lista: regiões vivas a mais atropelam as que já existem. */
+          <div
+            className="colaboradores-screen__contadores"
+            role="group"
+            aria-labelledby="colaboradores-contadores-rotulo"
+          >
+            <p
+              id="colaboradores-contadores-rotulo"
+              className="colaboradores-screen__contadores-rotulo"
+            >
+              {empresaAtiva ? "Na empresa ativa" : "No seu escopo"}, sem filtros
+            </p>
+            <dl className="colaboradores-screen__contadores-lista">
+              <div className="colaboradores-screen__contador">
+                <dt>Ativos</dt>
+                <dd>{contadores ? contadores.ativos : "…"}</dd>
+              </div>
+              <div className="colaboradores-screen__contador">
+                <dt>Inativos</dt>
+                <dd>{contadores ? contadores.inativos : "…"}</dd>
+              </div>
+            </dl>
+          </div>
+        }
       />
+
+      {/* T178 — barra de ações: "Nova admissão" é a ação principal da área e
+          a busca fica ao lado. Só o que existe: nada de importar, exportar ou
+          pedir preenchimento — botão sem operação por trás é promessa falsa. */}
+      <div className="colaboradores-screen__barra-acoes">
+        {onNovaAdmissao ? (
+          <Button onClick={onNovaAdmissao}>Nova admissão</Button>
+        ) : null}
+        <form
+          role="search"
+          aria-label="Buscar colaboradores"
+          className="colaboradores-screen__busca"
+          onSubmit={handleBuscar}
+        >
+          <FormField
+            id="colaboradores-busca"
+            label="Buscar por nome ou matrícula"
+          >
+            {(control) => (
+              <input
+                ref={campoBuscaRef}
+                type="search"
+                maxLength={BUSCA_COLABORADORES_MAXIMO}
+                autoComplete="off"
+                value={buscaDigitada}
+                onChange={(e) => setBuscaDigitada(e.target.value)}
+                {...control}
+              />
+            )}
+          </FormField>
+          <div className="colaboradores-screen__busca-acoes">
+            <Button type="submit" variant="secondary">
+              Buscar
+            </Button>
+            {buscaDigitada !== "" || buscaAplicada !== "" ? (
+              <Button type="button" variant="subtle" onClick={limparBusca}>
+                Limpar busca
+              </Button>
+            ) : null}
+          </div>
+        </form>
+      </div>
 
       <Surface
         as="section"
@@ -472,13 +687,17 @@ export function ColaboradoresScreen({
         aria-labelledby="colaboradores-aviso-rh-titulo"
       >
         <StatusBadge variant="info">RH e DP</StatusBadge>
+        {/* T178 — o texto antigo dizia "operado exclusivamente pelo RH e DP",
+            e o suporte técnico (`master_tecnico`) também abre esta tela, só
+            para consultar. Operar continua sendo do RH e do DP; ler, não. */}
         <p
           id="colaboradores-aviso-rh-titulo"
           className="colaboradores-screen__aviso-texto"
         >
-          Este cadastro é operado exclusivamente pelo RH e DP da própria
-          empresa. Consulta e alteração de nome aqui geram trilha de auditoria
-          automática; a admissão é registrada na página de Nova admissão.
+          Admissão e correções deste cadastro são feitas pelo RH e pelo DP da
+          própria empresa; o suporte técnico apenas consulta. Consulta e
+          alteração de nome geram trilha de auditoria automática; a admissão é
+          registrada na página de Nova admissão.
         </p>
       </Surface>
 
@@ -520,7 +739,12 @@ export function ColaboradoresScreen({
           <Button
             variant="secondary"
             onClick={() =>
-              void carregarDados(filtroSituacao, filtroSituacaoVinculo, pagina)
+              void carregarDados(
+                filtroSituacao,
+                filtroSituacaoVinculo,
+                buscaAplicada,
+                pagina,
+              )
             }
           >
             Tentar novamente
@@ -549,9 +773,8 @@ export function ColaboradoresScreen({
               exibi-lo como total faria "20" significar "vinte pessoas" numa
               empresa com duzentas.
 
-              Não há contagem por situação porque a API não a oferece — só o
-              total do conjunto já filtrado. Desenhar contadores por faixa
-              exigiria somá-los no cliente, o que obrigaria a baixar tudo. */}
+              T178 — a contagem por situação passou a existir NO SERVIDOR
+              (`contadores`) e fica no cabeçalho da página. */}
           <p className="colaboradores-screen__contexto">
             {empresaAtiva ? (
               <span className="colaboradores-screen__empresa">
@@ -621,23 +844,76 @@ export function ColaboradoresScreen({
               Carregando colaboradores…
             </p>
           ) : colaboradores.length === 0 ? (
-            <EmptyState
-              headingLevel={3}
-              icon="—"
-              title="Nenhum colaborador cadastrado"
-              description={
-                onNovaAdmissao
-                  ? "Registre a admissão do primeiro colaborador desta empresa."
-                  : "Ainda não há colaboradores admitidos nesta empresa."
-              }
-              {...(onNovaAdmissao
-                ? {
-                    action: (
-                      <Button onClick={onNovaAdmissao}>Novo colaborador</Button>
-                    ),
-                  }
-                : {})}
-            />
+            /* T178 — três vazios diferentes, porque pedem ações diferentes.
+
+               (b) Busca ou filtro sem resultado: o conjunto existe, a consulta
+               é que não achou — oferecer "Nova admissão" aqui sugeriria
+               cadastrar de novo quem talvez só tenha sido digitado errado.
+               (a) Sem busca nem filtro e o servidor contando zero: a empresa
+               ainda não tem colaborador, e a ação é admitir.
+               Fora dos dois — sem filtro, contadores acima de zero e página
+               vazia —, o conjunto provavelmente mudou entre uma leitura e
+               outra; a saída é voltar à primeira página, não admitir. */
+            filtrando ? (
+              <EmptyState
+                headingLevel={3}
+                icon="—"
+                title="Nenhum colaborador encontrado"
+                description={
+                  buscaAplicada
+                    ? temFiltro
+                      ? `Nenhum colaborador corresponde a “${buscaAplicada}” com os filtros selecionados.`
+                      : `Nenhum colaborador corresponde a “${buscaAplicada}” por nome ou matrícula.`
+                    : "Nenhum colaborador corresponde aos filtros selecionados."
+                }
+                action={
+                  <Button variant="secondary" onClick={limparBuscaEFiltros}>
+                    Limpar busca e filtros
+                  </Button>
+                }
+              />
+            ) : contadores !== null &&
+              contadores.ativos + contadores.inativos > 0 ? (
+              <EmptyState
+                headingLevel={3}
+                icon="—"
+                title="Nenhum colaborador nesta página"
+                description="Esta página voltou vazia, embora a empresa tenha colaboradores: o conjunto pode ter mudado desde a última leitura."
+                action={
+                  <Button
+                    variant="secondary"
+                    onClick={() =>
+                      void carregarDados(
+                        filtroSituacao,
+                        filtroSituacaoVinculo,
+                        buscaAplicada,
+                        1,
+                      )
+                    }
+                  >
+                    Ir para a primeira página
+                  </Button>
+                }
+              />
+            ) : (
+              <EmptyState
+                headingLevel={3}
+                icon="—"
+                title="Nenhum colaborador cadastrado nesta empresa"
+                description={
+                  onNovaAdmissao
+                    ? "Registre a admissão do primeiro colaborador desta empresa."
+                    : "Ainda não há colaboradores admitidos nesta empresa."
+                }
+                {...(onNovaAdmissao
+                  ? {
+                      action: (
+                        <Button onClick={onNovaAdmissao}>Nova admissão</Button>
+                      ),
+                    }
+                  : {})}
+              />
+            )
           ) : (
             <DataTable
               caption="Colaboradores desta empresa"

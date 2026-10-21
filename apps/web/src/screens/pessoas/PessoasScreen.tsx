@@ -21,8 +21,13 @@
  * depende só de cor: soma `aria-selected`, peso de fonte e uma barra inferior
  * sólida (mesmo princípio do `PainelNavigation`/`StatusBadge`).
  */
-import { useEffect, useState } from "react";
-import type { EstadoDestino } from "../../app/mapaNavegacao";
+import { useEffect, useRef, useState } from "react";
+import {
+  type EstadoDestino,
+  destinoPorId,
+  tituloDoGrupoDe,
+} from "../../app/mapaNavegacao";
+import { TrilhaNavegacao } from "../../components";
 import {
   AFASTAMENTOS_TITULO_ID,
   AfastamentosScreen,
@@ -190,8 +195,41 @@ export function PessoasScreen({
     onTituloIdChange?.(definicaoAtiva.tituloId);
   }, [definicaoAtiva.tituloId, onTituloIdChange]);
 
+  /**
+   * T178 — voltar a Colaboradores pela trilha. O botão acionado vira texto (a
+   * página atual não é clicável), e o foco cairia no `<body>`: vai para a aba
+   * Colaboradores, que é onde a pessoa chegou.
+   */
+  const focarAbaColaboradoresRef = useRef(false);
+  useEffect(() => {
+    if (!focarAbaColaboradoresRef.current) return;
+    focarAbaColaboradoresRef.current = false;
+    document.getElementById("pessoas-tab-colaboradores")?.focus();
+  }, [abaAtiva]);
+
+  // T178 — trilha só no modo funcional, que é o destino "Colaboradores" da
+  // barra. Os nomes saem do mapa de navegação: barra e trilha não divergem.
+  // A aba ativa, quando não é Colaboradores, entra como terceiro nível.
+  const trilha =
+    modo === "funcional"
+      ? [
+          { rotulo: tituloDoGrupoDe("pessoas") ?? "Gestão de Pessoas" },
+          {
+            rotulo: destinoPorId("pessoas")?.label ?? "Colaboradores",
+            onSelecionar: () => {
+              focarAbaColaboradoresRef.current = true;
+              setAbaAtiva("colaboradores");
+            },
+          },
+          ...(definicaoAtiva.id === "colaboradores"
+            ? []
+            : [{ rotulo: definicaoAtiva.rotulo }]),
+        ]
+      : null;
+
   return (
     <div className="pessoas-screen">
+      {trilha ? <TrilhaNavegacao itens={trilha} /> : null}
       <div
         role="tablist"
         aria-label="Seções de Pessoas"

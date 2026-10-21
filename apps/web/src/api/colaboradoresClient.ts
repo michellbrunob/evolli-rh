@@ -38,9 +38,66 @@ export interface ResultadoPaginado<T> {
   total: number;
 }
 
+/**
+ * T178 — vínculo como a LISTAGEM o projeta: só o que a linha da tabela usa.
+ *
+ * Só vínculos da empresa ativa (escopo global para `master_tecnico` sem
+ * empresa ativa), já ordenados pelo servidor — ativo, previsto, encerrado e,
+ * dentro de cada um, admissão mais recente primeiro. O primeiro é o "vínculo
+ * principal" da linha; o cliente não reordena, para não ter duas regras.
+ */
+export interface VinculoListadoApi {
+  id: string;
+  empresaId: string;
+  matricula: string;
+  situacao: SituacaoVinculo;
+  /** Dia civil (`@db.Date`); exibir só com `formatarDiaCivil`. */
+  dataAdmissao: string;
+  dataDesligamento: string | null;
+}
+
+/**
+ * T178 — item de `GET /v1/colaboradores`.
+ *
+ * `situacao`, para `rh`/`dp`, é a situação NA EMPRESA ATIVA (tem vínculo
+ * ativo nela); só para `master_tecnico` sem empresa ativa é a global. Por isso
+ * não deve ser sobrescrita pela resposta de `PATCH /v1/colaboradores/:id`,
+ * que traz a situação global.
+ */
+export interface ColaboradorListadoApi extends ColaboradorApi {
+  vinculos: VinculoListadoApi[];
+}
+
+/**
+ * T178 — contagem do escopo inteiro (empresa ativa), calculada no servidor
+ * SEM filtros nem busca. Não muda com a página nem com o filtro na tela.
+ */
+export interface ContadoresColaboradoresApi {
+  ativos: number;
+  inativos: number;
+}
+
+export interface ListagemColaboradoresApi extends ResultadoPaginado<ColaboradorListadoApi> {
+  contadores: ContadoresColaboradoresApi;
+}
+
+/**
+ * T178 — teto de `busca`, o mesmo do validador do servidor. Constante, e não
+ * função, de propósito: os testes automockam este módulo, e um valor
+ * primitivo sobrevive ao automock — uma função normalizadora viraria `vi.fn`
+ * e a tela deixaria de normalizar justo nos testes.
+ */
+export const BUSCA_COLABORADORES_MAXIMO = 160;
+
 export interface ListarColaboradoresQuery {
   situacao?: SituacaoColaborador;
   situacaoVinculo?: SituacaoVinculo;
+  /**
+   * T178 — nome (contém, sem diferenciar maiúsculas) ou matrícula (contém, só
+   * de vínculos da empresa ativa). Aparada aqui; vazia não é enviada. A
+   * empresa nunca vai na query: é a da sessão.
+   */
+  busca?: string;
   pagina?: number;
   tamanhoPagina?: number;
 }
@@ -178,11 +235,18 @@ async function jsonOrThrow<T>(res: Response): Promise<T> {
 
 export async function listarColaboradores(
   query: ListarColaboradoresQuery = {},
-): Promise<ResultadoPaginado<ColaboradorApi>> {
+): Promise<ListagemColaboradoresApi> {
   const params = new URLSearchParams();
   if (query.situacao) params.set("situacao", query.situacao);
   if (query.situacaoVinculo)
     params.set("situacaoVinculo", query.situacaoVinculo);
+  // T178 — normaliza também aqui (a tela já normaliza): só espaços não viram
+  // busca, e o servidor recusaria um termo vazio ou acima do teto.
+  const busca = (query.busca ?? "")
+    .trim()
+    .slice(0, BUSCA_COLABORADORES_MAXIMO)
+    .trim();
+  if (busca) params.set("busca", busca);
   if (query.pagina !== undefined) params.set("pagina", String(query.pagina));
   if (query.tamanhoPagina !== undefined)
     params.set("tamanhoPagina", String(query.tamanhoPagina));

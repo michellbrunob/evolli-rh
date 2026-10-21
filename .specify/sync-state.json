@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "constitutionVersion": "1.4.0",
   "lastConvergedAt": "2026-10-20",
-  "lastIntegratedTask": 176,
-  "lastRecordedTask": 177,
+  "lastIntegratedTask": 177,
+  "lastRecordedTask": 178,
   "platformDecision": {
     "adr": "docs/adr/0014-evolli-plataforma-base-e-encerramento-do-frappe.md",
     "decidedAt": "2026-10-01",
@@ -11,15 +11,15 @@
     "frappe": "encerrado_como_candidato_referencia_apenas"
   },
   "nextTask": {
-    "id": "T177",
-    "status": "cadastro_modulo_1_implementada",
-    "reason": "T176 integrada em main pela PR #168 (squash 58fd37ccc72d12cf21c9739ed6395c6a302bb1ef), com a CI de push 3/3 verde em Node 24: pagina propria de Nova admissao e decisao do DP-FLX-21. Na data da integracao: 13 conflitos, 12 abertos e 1 resolvido; 22 gates, DP-FLX-01 e DP-FLX-21 resolvidos e 20 abertos. Mudanca de direcao da proprietaria (2026-10-20): o cadastro de colaborador passa a ser implementado modulo por modulo, com entregas funcionais, e todo campo ou grupo das referencias visuais deve ser rastreado e atendido. A T177 implementa o Modulo 1 na pagina de Nova admissao: Dados pessoais, Endereco e integracao dos Contatos ja aprovados (T169), com persistencia, API, permissoes, auditoria, validacao, testes e demonstracao. A ficha de tratamento dos dados pessoais e do endereco (ADR 0016, decisao 5.4) e a emenda a ADR 0007 foram redigidas nesta PR, e o merge dependia da aprovacao da proprietaria, dada em 2026-10-20. Fora de escopo: CPF, documentos, dados bancarios, dependentes, saude, multiplos vinculos, alcadas e fluxo de aprovacao. Seguem as dividas e pendencias anteriores, e as da T176: observacoes de redacao O-1 e O-2 da revisao final e as documentadas N-4 e N-6; o modal transitorio de admissao em Colaboradores foi aposentado na T177. Recorte confirmado pela proprietaria: nome social e genero sairam do Modulo 1 para a matriz; pais, cidade e estado em texto validado, sem consulta externa de CEP; fuso horario nao foi decidido e fica como decisao pendente (DP-FLX-22), sem descarte. ENTREGUE em Draft: dados pessoais basicos (data de nascimento, sexo, saudacao, estado civil, nacionalidade, naturalidade, escolaridade, curso, nome do pai e nome da mae), endereco (pais sugerido como Brasil, CEP, logradouro, numero, complemento, bairro, cidade e estado) e os tres contatos da T169, gravados na mesma transacao da admissao; migration 20261020120000_dados_pessoais_endereco_colaborador; recurso dados_pessoais_colaborador para rh e dp na empresa ativa e para o master_tecnico em qualquer empresa, com empresa ativa so nela (Emenda 2 da ADR 0012); obrigatorios na admissao nome completo, data de nascimento, e-mail pessoal, celular e telefone, os demais opcionais; rotas GET e PUT de dados pessoais; auditoria sem valores; pagina de Nova admissao e leitura na ficha; testes unitarios, E2E e web; validacao no navegador com dados sinteticos. Ficha de tratamento e Emenda 5 da ADR 0007 aprovadas pela proprietaria em 2026-10-20 (finalidade, base legal, classificacao A2 e dispensa de RIPD nesta etapa), com decisao substitutiva de retencao: sem exclusao nem anonimizacao automatica apos o desligamento, uso operacional bloqueado, historico e auditoria preservados; a ficha de Contatos da T169 foi alinhada a mesma regra (sem eliminacao automatica). O bloqueio apos o desligamento ganhou teste de API."
+    "id": "T178",
+    "status": "colaboradores_porta_principal_implementada",
+    "reason": "T177 integrada em main pela PR #169 (squash 0f573765463b7b6af3ee40a41c4f32636b0151fa), com a CI de push 3/3 verde em Node 24 (602 E2E e 1022 unitarios): Modulo 1 do cadastro (dados pessoais, endereco e contatos na admissao), ficha de tratamento e Emenda 5 da ADR 0007 aprovadas, retencao sem eliminacao automatica com a ficha de Contatos alinhada, master_tecnico em dados pessoais e endereco (Emenda 2 da ADR 0012). Contagens: 13 conflitos, 12 abertos e 1 resolvido; 22 gates, DP-FLX-01 e DP-FLX-21 resolvidos e 20 abertos. A T178 faz de Gestao de Pessoas -> Colaboradores a porta principal: rota propria da listagem, navegavel por URL; listagem so da empresa ativa com dados reais, estado vazio, busca por nome e matricula, contadores de ativos e inativos, nome, matricula, situacao e data de admissao; abertura da ficha e da Nova admissao em pagina propria, com retorno consistente. RBAC preservado; empresa so da sessao; cargo e departamento so se resolvidos pelos dados existentes. Fora de escopo: documentos, CPF, salario, dependentes, saude, dados bancarios, integracoes externas, promocao, merge e T179. Seguem as dividas e pendencias anteriores e as da T177: alcance do acessa tudo do master_tecnico nos demais recursos, edicao de dados pessoais so pela API, endereco so com o pais sugerido, e as observacoes O-1 a O-4 da revisao final. ENTREGUE em Draft: rota propria #/pessoas/colaboradores (abre direto ao recarregar), Nova admissao como subpagina com trilha, listagem real com busca, contadores, situacao na empresa ativa, matricula e admissao; ViaCEP autorizado pela proprietaria em 2026-10-20 (rota interna GET /v1/cep/:cep, so o CEP sai, nada persistido, limite e timeout); pagina de Nova admissao em grade. A pedido da proprietaria, a previa 5173 mostra a branch ao vivo, nao a main. Correcao do bloqueio B1 da revisao adversarial: o log geral de requisicoes nao grava mais a URL (so metodo, padrao da rota, status, duracao e requestId); nem CEP nem busca entram no log; prova E2E com log ligado."
   },
   "openDeliveries": [
     {
-      "id": "T177",
+      "id": "T178",
       "pullRequest": null,
-      "status": "cadastro_modulo_1_implementada"
+      "status": "colaboradores_porta_principal_implementada"
     }
   ],
   "requiredArtifacts": [

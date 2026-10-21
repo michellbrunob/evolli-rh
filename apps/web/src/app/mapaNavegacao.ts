@@ -29,8 +29,9 @@
  * item não protege nada; mostrar um item que sempre dá 403 é que atrapalha.
  *
  * **Não é roteador.** Destino continua sendo estado do shell, como desde a
- * T044. A única exceção é a tabela fechada de `rotasDoShell.ts` (T176), que dá
- * URL própria a "Nova admissão".
+ * T044. As únicas exceções estão na tabela fechada de `rotasDoShell.ts`: a URL
+ * própria de "Nova admissão" (T176) e a de "Colaboradores" (T178), a porta
+ * principal de Gestão de Pessoas.
  */
 
 import type { IconeModuloId } from "./IconeModulo";
@@ -49,6 +50,14 @@ export interface DestinoNavegacao {
    * incondicional na interface (o servidor segue decidindo cada requisição).
    */
   readonly papeis?: readonly string[];
+  /**
+   * T178 — o destino é SUB-PÁGINA de outro (o id do pai). Continua no mapa —
+   * com rota, capacidade, validação de entrada e cartão no Hub —, mas não
+   * vira item da barra lateral: chega-se a ele pela ação na página do pai.
+   * Enquanto ele está aberto, a barra marca o PAI como atual, para que quem
+   * navega saiba em que área está.
+   */
+  readonly agrupadoEm?: string;
 }
 
 export interface GrupoNavegacao {
@@ -67,6 +76,16 @@ export interface GrupoNavegacao {
    * estética: é a tradução visual de "isto não é capacidade disponível".
    */
   readonly secundario?: boolean;
+  /**
+   * T178 — mostra o cabeçalho do módulo mesmo com um único item na barra.
+   *
+   * A regra geral (`PainelNavigation`) funde módulo e destino quando há um só
+   * item, porque ali os dois têm o mesmo nome ("Estrutura", "Jornada"). Em
+   * Gestão de Pessoas não têm: o módulo é "Gestão de Pessoas" e a entrada é
+   * "Colaboradores" — fundir apagaria o nome do módulo, que é o mesmo que a
+   * trilha de navegação da página exibe.
+   */
+  readonly sempreComoModulo?: boolean;
   readonly destinos: readonly DestinoNavegacao[];
 }
 
@@ -98,23 +117,32 @@ export const PAPEIS_NOVA_ADMISSAO: readonly string[] = ["rh", "dp"];
  */
 export const GRUPOS: readonly GrupoNavegacao[] = [
   {
-    titulo: "Pessoas",
+    // T178 — "Gestão de Pessoas", com "Colaboradores" como porta principal:
+    // é dali que se consulta quem já está na empresa e se inicia uma admissão.
+    titulo: "Gestão de Pessoas",
     icone: "pessoas",
+    sempreComoModulo: true,
     destinos: [
       {
+        // O id continua `pessoas`: a aterrissagem por papel, o Hub, a
+        // capacidade e a abertura da ficha do admitido dependem dele. Só o
+        // rótulo mudou — o contêiner é o mesmo, aberto na aba Colaboradores.
         id: "pessoas",
-        label: "Pessoas",
-        subRotulo: "Colaboradores",
+        label: "Colaboradores",
+        subRotulo: "Consulta, ficha e vida funcional",
         estado: "funcional",
       },
       {
         // T176 — página própria da admissão (decisão da proprietária sobre o
         // `DP-FLX-21`). Usa só o contrato atual de `POST /v1/colaboradores`.
+        // T178 — sub-página de Colaboradores: sai da barra lateral (abre pela
+        // ação "Nova admissão" da listagem) e, aberta, marca Colaboradores.
         id: "nova-admissao",
         label: "Nova admissão",
         subRotulo: "Página própria",
         estado: "funcional",
         papeis: PAPEIS_NOVA_ADMISSAO,
+        agrupadoEm: "pessoas",
       },
     ],
   },
@@ -251,6 +279,24 @@ export function destinoVisivelPara(
 ): boolean {
   if (!destino.papeis) return true;
   return papel !== null && destino.papeis.includes(papel);
+}
+
+/**
+ * T178 — o item da barra que representa o destino aberto: o próprio destino
+ * ou, se ele é sub-página (`agrupadoEm`), o pai. É o que a barra marca como
+ * atual — com Nova admissão aberta, "Colaboradores".
+ */
+export function itemDaBarraPara(destinoId: string): string {
+  return destinoPorId(destinoId)?.agrupadoEm ?? destinoId;
+}
+
+/**
+ * T178 — o título do módulo a que o destino pertence ("Gestão de Pessoas"),
+ * para a trilha de navegação. Sai daqui, e não de um texto repetido na tela,
+ * para que barra e trilha nunca digam nomes diferentes do mesmo módulo.
+ */
+export function tituloDoGrupoDe(destinoId: string): string | undefined {
+  return GRUPOS.find((g) => g.destinos.some((d) => d.id === destinoId))?.titulo;
 }
 
 /**

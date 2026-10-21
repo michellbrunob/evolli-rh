@@ -31,3 +31,6 @@ export type { FormActionsProps } from "./FormActions";
 
 export { Modal, usePedirFechamentoModal } from "./Modal";
 export type { ModalProps } from "./Modal";
+
+export { TrilhaNavegacao } from "./TrilhaNavegacao";
+export type { ItemTrilha, TrilhaNavegacaoProps } from "./TrilhaNavegacao";

@@ -71,6 +71,7 @@ import "./AutenticacaoApp.css";
 import { App } from "./App";
 import { HubPosLogin } from "./HubPosLogin";
 import { LoginScreen } from "./LoginScreen";
+import { destinoDaRota } from "./rotasDoShell";
 import { logout } from "../api/authClient";
 import { clearCsrfToken, refreshCsrfToken } from "../api/csrfClient";
 import { obterUsuarioAtual, type SafeAccessUserApi } from "../api/usersClient";
@@ -98,10 +99,18 @@ export function AutenticacaoApp() {
   const [ator, setAtor] = useState<SafeAccessUserApi | null>(null);
   /**
    * Produto aberto a partir do Hub. `null` é o Hub — o estado em que a sessão
-   * nasce e ao qual ela volta. Não é rota: continua não havendo URL nem
-   * `history`, como desde a T044.
+   * nasce e ao qual ela volta.
+   *
+   * T178 — exceção única: a URL já traz uma rota conhecida do shell
+   * (`rotasDoShell.ts`), como ao recarregar `#/pessoas/colaboradores`. Aí a
+   * sessão abre direto nesse destino, sem passar pelo Hub: a rota sobrevive ao
+   * recarregamento. Não é atalho de permissão — o `App` passa o pedido pela
+   * mesma `resolverEntrada` de sempre, e papel que não abre o destino cai no
+   * seu destino permitido. Logout e troca de empresa continuam voltando ao Hub.
    */
-  const [destinoAberto, setDestinoAberto] = useState<string | null>(null);
+  const [destinoAberto, setDestinoAberto] = useState<string | null>(() =>
+    destinoDaRota(window.location.hash),
+  );
 
   useEffect(() => {
     let cancelado = false;

@@ -21,10 +21,12 @@
  *
  * ## O que continua não sendo
  *
- * Não é rota: não há URL, `history` nem `<a href>` — destino é estado do
- * shell, como desde a T044. E não é autorização: `papeis` evita oferecer uma
- * porta que o servidor recusaria (spec §3.6), mas quem decide é o RBAC, a
- * cada requisição.
+ * Não é rota: não há `history` nem `<a href>` aqui — destino é estado do
+ * shell, como desde a T044. As poucas URLs próprias (Colaboradores e Nova
+ * admissão, `rotasDoShell.ts`) são escritas pelo `App` a partir do destino
+ * selecionado, nunca por esta barra. E não é autorização: `papeis` evita
+ * oferecer uma porta que o servidor recusaria (spec §3.6), mas quem decide é
+ * o RBAC, a cada requisição.
  */
 import { useState } from "react";
 import "./PainelNavigation.css";
@@ -34,6 +36,7 @@ import {
   DESTINOS,
   GRUPOS,
   destinoVisivelPara,
+  itemDaBarraPara,
   type DestinoNavegacao,
   type GrupoNavegacao,
 } from "./mapaNavegacao";
@@ -140,7 +143,10 @@ function Modulo({
   onAlternar,
   onSelecionar,
 }: ModuloProps) {
-  const tituloId = `nav-grupo-${grupo.titulo}`;
+  // T178 — espaços viram hífen: "Gestão de Pessoas" foi o primeiro título com
+  // espaço, e `aria-labelledby`/`aria-controls` leem espaço como SEPARADOR de
+  // ids — o submenu passaria a apontar para três ids inexistentes.
+  const tituloId = `nav-grupo-${grupo.titulo.replace(/\s+/g, "-")}`;
   // O que o cabeçalho controla é a REGIÃO inteira — aviso e lista —, não só a
   // lista. Com o módulo fechado não pode sobrar um parágrafo anunciando um
   // grupo que não está à vista (R4).
@@ -150,8 +156,10 @@ function Modulo({
 
   // Módulo de um destino só: o item É o destino. Um cabeçalho que expandisse
   // para revelar exatamente um filho seria um clique sem informação — e dois
-  // nomes acessíveis quase iguais para a mesma coisa.
-  if (visiveis.length === 1) {
+  // nomes acessíveis quase iguais para a mesma coisa. T178: a exceção é o
+  // módulo cujo nome difere do destino (`sempreComoModulo`, Gestão de Pessoas
+  // → Colaboradores) — fundir os dois apagaria o nome do módulo.
+  if (visiveis.length === 1 && !grupo.sempreComoModulo) {
     const unico = visiveis[0]!;
     return (
       <li className="painel-nav__modulo">
@@ -229,9 +237,17 @@ export function PainelNavigation({
     {},
   );
 
+  // T178 — com uma sub-página aberta (Nova admissão), o item marcado é o do
+  // pai (Colaboradores): `aria-current` e destaque visual seguem a área.
+  const itemAtivo = itemDaBarraPara(destinoAtivoId);
+
   const grupos = GRUPOS.map((grupo) => ({
     grupo,
-    visiveis: grupo.destinos.filter((d) => destinoVisivelPara(d, papel)),
+    // T178 — sub-página (`agrupadoEm`) não é item da barra: chega-se a ela
+    // pela página do pai, e o pai fica marcado enquanto ela está aberta.
+    visiveis: grupo.destinos.filter(
+      (d) => !d.agrupadoEm && destinoVisivelPara(d, papel),
+    ),
   })).filter(({ visiveis }) => visiveis.length > 0);
 
   const renderizar = ({
@@ -245,7 +261,7 @@ export function PainelNavigation({
       key={grupo.titulo}
       grupo={grupo}
       visiveis={visiveis}
-      destinoAtivoId={destinoAtivoId}
+      destinoAtivoId={itemAtivo}
       aberto={!fechados[grupo.titulo]}
       onAlternar={() =>
         setFechados((atual) => ({

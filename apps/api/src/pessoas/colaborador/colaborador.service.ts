@@ -10,7 +10,11 @@ import {
 } from "@prisma/client";
 import { PrismaService } from "../../database/prisma.service";
 import { PessoasAuditoriaService } from "../pessoas-auditoria.service";
-import { PessoasAuditContext, ResultadoPaginado } from "../pessoas.types";
+import {
+  ContadoresColaboradores,
+  PessoasAuditContext,
+  ResultadoPaginado,
+} from "../pessoas.types";
 import {
   EscopoLeituraPessoas,
   deslocamento,
@@ -92,6 +96,67 @@ export interface AdmissaoRegistrada extends Pick<
   perfilPessoal: ValoresPerfil;
   endereco: ValoresEndereco | null;
   contatos: ValoresContatos;
+}
+
+/**
+ * T178 — vínculo resumido na listagem: o que a porta principal de
+ * Colaboradores mostra (matrícula, situação e admissão), sem tipo, lotação nem
+ * nada além. Só vínculos do escopo da sessão.
+ */
+export interface VinculoListado {
+  id: string;
+  empresaId: string;
+  matricula: string;
+  situacao: SituacaoVinculo;
+  dataAdmissao: Date;
+  dataDesligamento: Date | null;
+}
+
+/**
+ * T178 — item da listagem: projeção FECHADA. `situacao` é a situação **na
+ * empresa ativa** para quem está escopado (tem vínculo ativo nela), e a
+ * materializada (global) só para o `master_tecnico` sem empresa ativa. A
+ * global, para o RH de uma empresa, mostraria "ativo" um colaborador desligado
+ * ali e ativo em outra — resíduo de uma empresa na tela da outra.
+ */
+export interface ColaboradorListado {
+  id: string;
+  nome: string;
+  situacao: SituacaoColaborador;
+  criadoEm: Date;
+  atualizadoEm: Date;
+  /** Ordenados: ativo, previsto, encerrado; depois admissão mais recente. */
+  vinculos: VinculoListado[];
+}
+
+export interface ListagemColaboradores extends ResultadoPaginado<ColaboradorListado> {
+  contadores: ContadoresColaboradores;
+}
+
+/**
+ * O `contains` do Prisma vira `LIKE '%termo%'` sem escapar os curingas: uma
+ * busca por "%" ou "_" casaria com todo mundo. Escapados, valem literalmente.
+ */
+export function escaparCuringas(termo: string): string {
+  return termo.replace(/[\\%_]/g, (c) => `\\${c}`);
+}
+
+const ORDEM_SITUACAO_VINCULO: Record<SituacaoVinculo, number> = {
+  ativo: 0,
+  previsto: 1,
+  encerrado: 2,
+};
+
+/** Vínculo principal primeiro: o ativo, depois o previsto, depois o mais novo. */
+export function ordenarVinculosListados(
+  vinculos: readonly VinculoListado[],
+): VinculoListado[] {
+  return [...vinculos].sort(
+    (a, b) =>
+      ORDEM_SITUACAO_VINCULO[a.situacao] - ORDEM_SITUACAO_VINCULO[b.situacao] ||
+      b.dataAdmissao.getTime() - a.dataAdmissao.getTime() ||
+      a.matricula.localeCompare(b.matricula),
+  );
 }
 
 /**
@@ -315,10 +380,23 @@ export class ColaboradorService {
     }
   }
 
+  /**
+   * Listagem da porta principal de Colaboradores (T164; T178).
+   *
+   * - **Escopo estrutural:** para `rh`/`dp` (e `master_tecnico` com empresa
+   *   ativa), só colaborador com vínculo na empresa da sessão; para o
+   *   `master_tecnico` sem empresa ativa, toda a base, auditada.
+   * - **Situação na empresa:** escopado, "ativo" é ter vínculo ativo NA
+   *   empresa ativa — no filtro, na coluna e nos contadores. Global, vale a
+   *   situação materializada.
+   * - **Busca** (T178): nome contém, sem diferenciar maiúsculas; ou matrícula
+   *   contém, só em vínculos do escopo.
+   * - **Contadores** (T178): o escopo inteiro, sem filtros nem busca.
+   */
   async listar(
     query: ListarColaboradoresQueryDto,
     ctx: PessoasAuditContext,
-  ): Promise<ResultadoPaginado<Colaborador>> {
+  ): Promise<ListagemColaboradores> {
     const escopo = resolverEscopoLeituraPessoas(ctx.actor);
     const filtro = intersectarLeitura(escopo, query.empresaId);
 
@@ -329,40 +407,86 @@ export class ColaboradorService {
         pagina: query.pagina,
         tamanhoPagina: query.tamanhoPagina,
         total: 0,
+        contadores: { ativos: 0, inativos: 0 },
       };
     }
 
-    // O escopo é estrutural: para rh/dp a consulta só encontra colaborador com
-    // vínculo na empresa do ator. Para o `master_tecnico` (global), sem filtro
-    // de empresa (`filtro.empresaId` indefinido) — toda a base, auditada.
-    const filtroVinculo =
-      filtro.empresaId !== undefined
-        ? {
-            some: {
-              empresaId: filtro.empresaId,
-              ...(query.situacaoVinculo
-                ? { situacao: query.situacaoVinculo }
-                : {}),
+    const empresaId = filtro.empresaId;
+    const noEscopo: Prisma.VinculoFuncionalWhereInput =
+      empresaId !== undefined ? { empresaId } : {};
+
+    // Escopo: colaborador com vínculo na empresa (escopado) ou qualquer um
+    // (global). É a base de tudo — lista, total e contadores.
+    const base: Prisma.ColaboradorWhereInput =
+      empresaId !== undefined ? { vinculos: { some: { empresaId } } } : {};
+
+    const ativoNoEscopo: Prisma.ColaboradorWhereInput =
+      empresaId !== undefined
+        ? { vinculos: { some: { empresaId, situacao: "ativo" } } }
+        : { situacao: "ativo" };
+    const inativoNoEscopo: Prisma.ColaboradorWhereInput =
+      empresaId !== undefined
+        ? { vinculos: { none: { empresaId, situacao: "ativo" } } }
+        : { situacao: "inativo" };
+
+    const filtros: Prisma.ColaboradorWhereInput[] = [base];
+    if (query.situacaoVinculo) {
+      filtros.push({
+        vinculos: { some: { ...noEscopo, situacao: query.situacaoVinculo } },
+      });
+    }
+    if (query.situacao) {
+      filtros.push(
+        query.situacao === "ativo" ? ativoNoEscopo : inativoNoEscopo,
+      );
+    }
+    if (query.busca) {
+      const termo = escaparCuringas(query.busca);
+      filtros.push({
+        OR: [
+          { nome: { contains: termo, mode: "insensitive" } },
+          {
+            vinculos: {
+              some: {
+                ...noEscopo,
+                matricula: { contains: termo, mode: "insensitive" },
+              },
             },
-          }
-        : query.situacaoVinculo
-          ? { some: { situacao: query.situacaoVinculo } }
-          : undefined;
+          },
+        ],
+      });
+    }
+    const where: Prisma.ColaboradorWhereInput = { AND: filtros };
 
-    const where: Prisma.ColaboradorWhereInput = {
-      ...(filtroVinculo ? { vinculos: filtroVinculo } : {}),
-      ...(query.situacao ? { situacao: query.situacao } : {}),
-    };
-
-    const [itens, total] = await Promise.all([
+    const [linhas, total, ativos, totalNoEscopo] = await Promise.all([
       this.prisma.colaborador.findMany({
         where,
         // Ordenação fixa no servidor — nunca vinda do cliente.
         orderBy: [{ nome: "asc" }, { id: "asc" }],
         skip: deslocamento(query.pagina, query.tamanhoPagina),
         take: query.tamanhoPagina,
+        select: {
+          id: true,
+          nome: true,
+          situacao: true,
+          criadoEm: true,
+          atualizadoEm: true,
+          vinculos: {
+            where: noEscopo,
+            select: {
+              id: true,
+              empresaId: true,
+              matricula: true,
+              situacao: true,
+              dataAdmissao: true,
+              dataDesligamento: true,
+            },
+          },
+        },
       }),
       this.prisma.colaborador.count({ where }),
+      this.prisma.colaborador.count({ where: { AND: [base, ativoNoEscopo] } }),
+      this.prisma.colaborador.count({ where: base }),
     ]);
 
     if (escopo.global) {
@@ -370,11 +494,26 @@ export class ColaboradorService {
       await this.auditoria.registrarConsultaGlobal(ctx, "colaborador", null);
     }
 
+    const itens: ColaboradorListado[] = linhas.map((c) => ({
+      id: c.id,
+      nome: c.nome,
+      situacao:
+        empresaId !== undefined
+          ? c.vinculos.some((v) => v.situacao === "ativo")
+            ? "ativo"
+            : "inativo"
+          : c.situacao,
+      criadoEm: c.criadoEm,
+      atualizadoEm: c.atualizadoEm,
+      vinculos: ordenarVinculosListados(c.vinculos),
+    }));
+
     return {
       itens,
       pagina: query.pagina,
       tamanhoPagina: query.tamanhoPagina,
       total,
+      contadores: { ativos, inativos: totalNoEscopo - ativos },
     };
   }
 

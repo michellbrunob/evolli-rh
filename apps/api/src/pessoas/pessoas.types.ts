@@ -15,6 +15,16 @@ export interface ResultadoPaginado<T> {
   total: number;
 }
 
+/**
+ * T178 — contadores da listagem de colaboradores: o escopo inteiro da sessão
+ * (a empresa ativa), sem filtros nem busca. Somá-los no cliente obrigaria a
+ * baixar todas as páginas.
+ */
+export interface ContadoresColaboradores {
+  ativos: number;
+  inativos: number;
+}
+
 export const TAMANHO_PAGINA_PADRAO = 20;
 export const TAMANHO_PAGINA_MAXIMO = 100;
 

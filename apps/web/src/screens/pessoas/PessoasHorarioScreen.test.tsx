@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PessoasHorarioScreen } from "./PessoasHorarioScreen";
 import {
   type ColaboradorApi,
+  type ListagemColaboradoresApi,
   listarColaboradores,
 } from "../../api/colaboradoresClient";
 import {
@@ -36,6 +37,18 @@ interface ResultadoPaginadoTeste<T> {
 
 function paginado<T>(itens: T[]): ResultadoPaginadoTeste<T> {
   return { itens, pagina: 1, tamanhoPagina: 100, total: itens.length };
+}
+
+/**
+ * T178 — `GET /v1/colaboradores` passou a trazer os vínculos de cada item e os
+ * `contadores` do escopo. Esta tela não usa nenhum dos dois; o envelope só
+ * precisa ter a forma do contrato.
+ */
+function listagem(itens: ColaboradorApi[]): ListagemColaboradoresApi {
+  return {
+    ...paginado(itens.map((c) => ({ ...c, vinculos: [] }))),
+    contadores: { ativos: 0, inativos: 0 },
+  };
 }
 
 const colaborador1: ColaboradorApi = {
@@ -118,7 +131,7 @@ beforeEach(() => {
     paginado([vinculoVigente, vinculoEncerrado]),
   );
   vi.mocked(listarColaboradores).mockResolvedValue(
-    paginado([colaborador1, colaborador2, colaboradorInativo]),
+    listagem([colaborador1, colaborador2, colaboradorInativo]),
   );
   vi.mocked(listarTabelasHorario).mockResolvedValue(
     paginado([tabelaAtiva, tabelaInativa]),
@@ -332,7 +345,7 @@ describe("PessoasHorarioScreen (T112 — funcional)", () => {
 
   it("bloqueia a criação quando não há colaborador ativo disponível", async () => {
     vi.mocked(listarColaboradores).mockResolvedValue(
-      paginado([colaboradorInativo]),
+      listagem([colaboradorInativo]),
     );
 
     render(<PessoasHorarioScreen />);
@@ -397,7 +410,7 @@ describe("PessoasHorarioScreen (T112 — funcional)", () => {
   });
 
   it("resolve automaticamente o colaborador quando há só um ativo", async () => {
-    vi.mocked(listarColaboradores).mockResolvedValue(paginado([colaborador1]));
+    vi.mocked(listarColaboradores).mockResolvedValue(listagem([colaborador1]));
 
     render(<PessoasHorarioScreen />);
     await screen.findByRole("table", {

@@ -26,6 +26,8 @@ import {
   destinoInicialPara,
   destinoPorId,
   destinoVisivelPara,
+  itemDaBarraPara,
+  tituloDoGrupoDe,
 } from "./mapaNavegacao";
 
 function navegacao() {
@@ -45,7 +47,7 @@ function botoesDeDestino(): HTMLElement[] {
 describe("estrutura dos grupos", () => {
   it("os cinco módulos operacionais vêm antes de Demonstração", () => {
     expect(GRUPOS.map((g) => g.titulo)).toEqual([
-      "Pessoas",
+      "Gestão de Pessoas",
       "Estrutura",
       "Jornada",
       "Liderança",
@@ -209,7 +211,7 @@ describe("destinos preservados", () => {
       />,
     );
     for (const rotulo of [
-      "Pessoas",
+      "Colaboradores",
       "Estrutura",
       "Jornada",
       "Minha equipe",
@@ -243,7 +245,10 @@ describe("destinos preservados", () => {
     // Conta DESTINOS, não `<li>`: desde a evolução visual da T159 o módulo
     // com submenu tem um `<li>` próprio além do de cada destino, e contar
     // marcação faria o teste falhar por motivo errado.
-    expect(botoesDeDestino()).toHaveLength(DESTINOS.length);
+    // T178 — sub-página (`agrupadoEm`, Nova admissão) não é item da barra.
+    expect(botoesDeDestino()).toHaveLength(
+      DESTINOS.filter((d) => !d.agrupadoEm).length,
+    );
   });
 });
 
@@ -252,10 +257,9 @@ describe("semântica de item ativo, seleção e teclado", () => {
     render(
       <PainelNavigation destinoAtivoId="pessoas" onSelecionar={() => {}} />,
     );
-    expect(screen.getByRole("button", { name: /^Pessoas/ })).toHaveAttribute(
-      "aria-current",
-      "page",
-    );
+    expect(
+      screen.getByRole("button", { name: /^Colaboradores/ }),
+    ).toHaveAttribute("aria-current", "page");
     expect(
       screen.getByRole("button", { name: /^Relatórios/ }),
     ).not.toHaveAttribute("aria-current");
@@ -275,7 +279,9 @@ describe("semântica de item ativo, seleção e teclado", () => {
       <PainelNavigation destinoAtivoId="pessoas" onSelecionar={() => {}} />,
     );
     expect(
-      screen.getByRole("button", { name: /Pessoas.*Colaboradores/ }),
+      screen.getByRole("button", {
+        name: /Colaboradores.*Consulta, ficha e vida funcional/,
+      }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /Jornada.*Visão do período/ }),
@@ -357,40 +363,65 @@ describe("módulo, submenu e destino ativo (T159 — evolução visual)", () => 
     expect(estrutura).toHaveAttribute("aria-current", "page");
   });
 
-  it("T176 — Pessoas é disclosure com Nova admissão só para quem admite", () => {
-    const { unmount } = render(
-      <PainelNavigation
-        destinoAtivoId="pessoas"
-        onSelecionar={() => {}}
-        papel="dp"
-      />,
-    );
-    const pessoas = screen.getByRole("button", { name: "Pessoas" });
-    expect(pessoas).toHaveAttribute("aria-expanded", "true");
-    const regiao = document.getElementById(
-      pessoas.getAttribute("aria-controls")!,
-    )!;
-    expect(
-      within(regiao as HTMLElement)
-        .getAllByRole("button")
-        .map((b) => b.textContent),
-    ).toEqual(["Pessoas Colaboradores", "Nova admissão Página própria"]);
-    unmount();
+  it.each(["rh", "dp", "master_tecnico"])(
+    "T178 — %s vê 'Gestão de Pessoas' com 'Colaboradores' e sem item próprio de Nova admissão",
+    (papel) => {
+      render(
+        <PainelNavigation
+          destinoAtivoId="pessoas"
+          onSelecionar={() => {}}
+          papel={papel}
+        />,
+      );
+      // Módulo com um só item, mas com cabeçalho (`sempreComoModulo`): o nome
+      // do módulo não some, e é o mesmo da trilha de navegação.
+      const modulo = screen.getByRole("button", { name: "Gestão de Pessoas" });
+      expect(modulo).toHaveAttribute("aria-expanded", "true");
+      const regiao = document.getElementById(
+        modulo.getAttribute("aria-controls")!,
+      )!;
+      // `aria-labelledby` aponta para UM id: o título com espaços virou hífens.
+      expect(regiao.querySelector("ul")!.getAttribute("aria-labelledby")).toBe(
+        modulo.id,
+      );
+      expect(modulo.id).not.toMatch(/\s/);
+      expect(
+        within(regiao as HTMLElement)
+          .getAllByRole("button")
+          .map((b) => b.textContent),
+      ).toEqual(["Colaboradores Consulta, ficha e vida funcional"]);
+      // Nova admissão é sub-página de Colaboradores: abre pela listagem.
+      expect(
+        screen.queryByRole("button", { name: /Nova admissão/ }),
+      ).not.toBeInTheDocument();
+    },
+  );
 
-    // `master_tecnico` só lê Pessoas: o servidor recusaria a admissão.
+  it("T178 — com a Nova admissão aberta, a barra marca 'Colaboradores' como atual", () => {
     render(
       <PainelNavigation
-        destinoAtivoId="pessoas"
+        destinoAtivoId="nova-admissao"
         onSelecionar={() => {}}
-        papel="master_tecnico"
+        papel="rh"
       />,
     );
-    expect(
-      screen.queryByRole("button", { name: /Nova admissão/ }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /^Pessoas/ }),
-    ).not.toHaveAttribute("aria-expanded");
+    const colaboradores = screen.getByRole("button", {
+      name: "Colaboradores Consulta, ficha e vida funcional",
+    });
+    expect(colaboradores).toHaveAttribute("aria-current", "page");
+    expect(colaboradores).toHaveClass("painel-nav__destino--ativo");
+    for (const outro of botoesDeDestino().filter((b) => b !== colaboradores)) {
+      expect(outro).not.toHaveAttribute("aria-current");
+    }
+  });
+
+  it("T178 — `nova-admissao` continua no mapa, como sub-página de `pessoas`", () => {
+    const novaAdmissao = destinoPorId("nova-admissao")!;
+    expect(novaAdmissao.agrupadoEm).toBe("pessoas");
+    expect(novaAdmissao.papeis).toEqual(["rh", "dp"]);
+    expect(itemDaBarraPara("nova-admissao")).toBe("pessoas");
+    expect(itemDaBarraPara("cadastros")).toBe("cadastros");
+    expect(tituloDoGrupoDe("nova-admissao")).toBe("Gestão de Pessoas");
   });
 
   it("módulo com mais de um destino é um disclosure que controla o seu submenu", () => {
@@ -464,7 +495,7 @@ describe("módulo, submenu e destino ativo (T159 — evolução visual)", () => 
       />,
     );
     const pessoas = screen.getByRole("button", {
-      name: "Pessoas Colaboradores",
+      name: "Colaboradores Consulta, ficha e vida funcional",
     });
     // `aria-current` (semântica) + a classe que soma superfície, peso de
     // fonte e barra indicadora (ver PainelNavigation.css).
