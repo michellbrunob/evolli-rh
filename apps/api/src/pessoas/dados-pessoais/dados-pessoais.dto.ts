@@ -7,17 +7,36 @@ import {
   MaxLength,
   Validate,
   ValidateNested,
+  ValidationArguments,
   ValidatorConstraint,
   ValidatorConstraintInterface,
 } from "class-validator";
 import {
+  CEP_BRASILEIRO,
   CEP_FORMA,
   DATA_NASCIMENTO_MINIMA,
   LIMITES_ENDERECO,
   LIMITES_PERFIL,
   SEM_CONTROLE,
+  ehPaisBrasil,
+  normalizarCep,
   normalizarTextoPessoal,
 } from "./normalizacao-dados-pessoais.util";
+
+/**
+ * T179 — com país Brasil, o CEP é obrigatoriamente os 8 dígitos já
+ * normalizados (`normalizarCep`); com outro país, vale só `CEP_FORMA`.
+ */
+@ValidatorConstraint({ name: "cepCoerenteComPais", async: false })
+export class CepCoerenteComPais implements ValidatorConstraintInterface {
+  validate(valor: unknown, args: ValidationArguments): boolean {
+    const pais = (args.object as { pais?: unknown }).pais;
+    return (
+      !ehPaisBrasil(pais) ||
+      (typeof valor === "string" && CEP_BRASILEIRO.test(valor))
+    );
+  }
+}
 
 /**
  * Data de nascimento no intervalo aceito: de 1900-01-01 até hoje (UTC). O
@@ -134,10 +153,13 @@ export class EnderecoDto {
   @Matches(SEM_CONTROLE)
   pais?: string | null;
 
-  @Transform(({ value }) => normalizarTextoPessoal(value))
+  @Transform(({ value, obj }) =>
+    normalizarCep(value, (obj as { pais?: unknown }).pais),
+  )
   @IsOptional()
   @IsString()
   @Matches(CEP_FORMA)
+  @Validate(CepCoerenteComPais)
   cep?: string | null;
 
   @Transform(({ value }) => normalizarTextoPessoal(value))

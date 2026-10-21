@@ -147,8 +147,36 @@ export class DestinoOrganizacionalDto {
  * `empresa_id` (a empresa é do vínculo), então um cadastro sem vínculo ficaria
  * fora de qualquer escopo de autorização — invisível a todos, inclusive a
  * quem o criou.
+ *
+ * T179 — a lotação da Nova admissão **exige** Departamento, Cargo e Unidade
+ * (decisão da proprietária de 2026-10-21; `DP-28` só para a admissão). Área,
+ * Equipe e Centro de custo seguem opcionais. Por isso esta classe não herda
+ * `DestinoOrganizacionalDto`: o `@IsOptional` herdado valeria também aqui, e
+ * a obrigatoriedade sumiria. O novo vínculo de colaborador existente
+ * (`CriarVinculoDto`) continua com o destino todo opcional.
  */
-export class AdmitirColaboradorDto extends DestinoOrganizacionalDto {
+export class AdmitirColaboradorDto {
+  @IsUUID()
+  departamentoId!: string;
+
+  @IsUUID()
+  cargoId!: string;
+
+  @IsUUID()
+  unidadeOrganizacionalId!: string;
+
+  @IsOptional()
+  @IsUUID()
+  areaId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  equipeId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  centroCustoId?: string;
+
   @IsString()
   @IsNotEmpty()
   @MinLength(2)

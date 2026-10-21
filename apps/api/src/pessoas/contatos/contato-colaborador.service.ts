@@ -1,3 +1,4 @@
+import { ConflitoDeCamposException } from "../../common/erros/recusa-por-campo";
 import { ConflictException, Injectable } from "@nestjs/common";
 import {
   AcaoContatoColaborador,
@@ -134,6 +135,14 @@ function valores(contato: ContatoProjetado): ValoresContatos {
   };
 }
 
+/** T179 — a unicidade violada é a do e-mail pessoal na empresa? */
+function eUnicidadeDoEmail(erro: unknown): boolean {
+  if (!eUnicidadeVioladaNoBanco(erro)) return false;
+  const alvo = (erro as Prisma.PrismaClientKnownRequestError).meta?.["target"];
+  const texto = Array.isArray(alvo) ? alvo.join(",") : String(alvo ?? "");
+  return /email_pessoal|emailPessoal/.test(texto);
+}
+
 function eUnicidadeVioladaNoBanco(erro: unknown): boolean {
   return (
     erro instanceof Prisma.PrismaClientKnownRequestError &&
@@ -264,6 +273,24 @@ export class ContatoColaboradorService {
 
     try {
       return await this.prisma.$transaction(async (tx) => {
+        // T179 — e-mail pessoal único na MESMA empresa: outro colaborador da
+        // empresa já o usa? A restrição do banco é a garantia (corrida chega
+        // como P2002, abaixo); a consulta só diz qual campo conflita. Só a
+        // empresa do vínculo: "em uso" nunca revela alguém de outra.
+        const emailEmUso = await tx.contatoColaborador.findFirst({
+          where: {
+            empresaId: alvo.empresaId,
+            emailPessoal: dto.emailPessoal,
+            NOT: { colaboradorId: alvo.colaboradorId },
+          },
+          select: { id: true },
+        });
+        if (emailEmUso) {
+          throw new ConflitoDeCamposException([
+            { campo: "emailPessoal", motivo: "em_uso" },
+          ]);
+        }
+
         const atual = await tx.contatoColaborador.findUnique({
           where: {
             colaboradorId_empresaId: {
@@ -340,6 +367,14 @@ export class ContatoColaboradorService {
         };
       });
     } catch (erro) {
+      // T179 — e-mail que outro colaborador da empresa gravou ao mesmo tempo:
+      // a unicidade (empresa, e-mail) do banco barra, e o campo volta na
+      // resposta, sem o valor.
+      if (eUnicidadeDoEmail(erro)) {
+        throw new ConflitoDeCamposException([
+          { campo: "emailPessoal", motivo: "em_uso" },
+        ]);
+      }
       // Duas criações simultâneas do mesmo par: a segunda perde na unicidade
       // do banco. Conflito, não erro interno.
       if (eUnicidadeVioladaNoBanco(erro)) {

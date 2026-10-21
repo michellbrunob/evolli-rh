@@ -1,0 +1,49 @@
+import {
+  ConflictException,
+  UnprocessableEntityException,
+} from "@nestjs/common";
+
+/**
+ * T179 — erro por campo no contrato HTTP, **sem refletir o valor** enviado
+ * (ADR 0016, `DP-ADM-15`, resolvido para a admissão e a edição de contatos).
+ *
+ * A resposta continua com a mensagem pública fixa do status; o que se soma é
+ * a lista `erros`, com o caminho do campo no corpo da requisição e o motivo.
+ * Nunca o valor, nunca dado de outra pessoa: a checagem que gera o erro é só
+ * na empresa ativa, então "em uso" não confirma ninguém fora do escopo.
+ */
+
+/** Motivos públicos de recusa por campo. */
+export type MotivoDoCampo = "em_uso";
+
+/**
+ * Caminhos públicos de campo. Lista fechada: só estes saem na resposta, e o
+ * tipo impede que um nome montado a partir de entrada do usuário vaze.
+ */
+export type CampoPublico =
+  "matricula" | "contatos.emailPessoal" | "emailPessoal";
+
+export interface ErroDeCampo {
+  campo: CampoPublico;
+  motivo: MotivoDoCampo;
+}
+
+/** 409 com a lista dos campos que conflitam com dado já gravado na empresa. */
+export class ConflitoDeCamposException extends ConflictException {
+  constructor(readonly erros: readonly ErroDeCampo[]) {
+    super();
+  }
+}
+
+/** Códigos públicos de recusa de negócio sem campo próprio. */
+export type CodigoDeRecusa = "idempotencia_conteudo_divergente";
+
+/**
+ * 422 com um código estável. Hoje só um caso: a mesma chave de idempotência
+ * reenviada com conteúdo diferente do que ela já registrou.
+ */
+export class RecusaDeNegocioException extends UnprocessableEntityException {
+  constructor(readonly codigo: CodigoDeRecusa) {
+    super();
+  }
+}

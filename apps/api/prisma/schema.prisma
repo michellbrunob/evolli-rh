@@ -144,6 +144,9 @@ model AccessUser {
   enderecosAtualizados      EnderecoColaborador[]            @relation("EnderecoAtualizadoPor")
   dadosPessoaisEventos      DadosPessoaisColaboradorEvento[] @relation("DadosPessoaisEventoAtor")
 
+  // T179 — admissões que esta conta enviou com chave de idempotência.
+  idempotenciasAdmissao IdempotenciaAdmissao[] @relation("IdempotenciaAdmissaoAtor")
+
   @@index([companyId])
   @@map("access_user")
 }
@@ -723,6 +726,10 @@ model Empresa {
   enderecosColaborador      EnderecoColaborador[]
   eventosDadosPessoais      DadosPessoaisColaboradorEvento[]
 
+  // T179 — idempotência da admissão e relação técnica de revisão.
+  idempotenciasAdmissao IdempotenciaAdmissao[]
+  revisoesNormalizacao  RevisaoNormalizacaoCadastro[]
+
   @@index([status])
   @@map("empresa")
 }
@@ -1049,6 +1056,10 @@ model Colaborador {
   enderecos            EnderecoColaborador[]
   eventosDadosPessoais DadosPessoaisColaboradorEvento[]
 
+  // T179 — admissão idempotente que o criou e revisões de normalização.
+  idempotenciasAdmissao IdempotenciaAdmissao[]
+  revisoesNormalizacao  RevisaoNormalizacaoCadastro[]
+
   @@index([situacao])
   @@map("colaborador")
 }
@@ -1089,6 +1100,9 @@ model VinculoFuncional {
 
   // T151 — excecoes de acesso de gestor que tem ESTE vinculo como sujeito.
   excecoesAcessoGestor ExcecaoAcessoGestor[]
+
+  // T179 — admissão idempotente que o criou.
+  idempotenciasAdmissao IdempotenciaAdmissao[]
 
   @@unique([empresaId, matricula])
   /// Alvo das FKs compostas de alocacao e movimentacao: o banco garante que
@@ -1237,6 +1251,10 @@ model MovimentacaoFuncional {
   /// Uma movimentacao efetivada so pode ser retificada UMA vez — a correcao da
   /// correcao e uma nova retificacao encadeada, nunca duas concorrentes sobre
   /// o mesmo original.
+
+  // T179 — admissão idempotente que a criou.
+  idempotenciasAdmissao IdempotenciaAdmissao[]
+
   @@unique([retificaId])
   @@index([vinculoId, vigenciaInicio])
   @@index([empresaId, status])
@@ -2127,6 +2145,10 @@ model ContatoColaborador {
 
   /// Um registro de contato por colaborador e empresa.
   @@unique([colaboradorId, empresaId])
+  /// T179 — e-mail pessoal único na MESMA empresa (decisão da proprietária de
+  /// 2026-10-21); pode repetir em empresa diferente. Restrição do banco: a
+  /// garantia não depende de consulta prévia, então não há condição de corrida.
+  @@unique([empresaId, emailPessoal])
   /// Alvo da FK composta do evento: o banco garante que um evento que aponta
   /// um contato pertence a ele, a empresa dele E ao colaborador dele.
   @@unique([id, empresaId, colaboradorId])
@@ -2351,4 +2373,84 @@ model DadosPessoaisColaboradorEvento {
   @@index([empresaId, ocorridoEm])
   @@index([atorUserId])
   @@map("dados_pessoais_colaborador_evento")
+}
+
+/// T179 — idempotência do envio da Nova admissão (decisão da proprietária de
+/// 2026-10-21). A chave é gerada pela tela por envio e é única POR ATOR E
+/// EMPRESA. O registro guarda só a chave, quem enviou, a empresa e os ids do
+/// que a admissão criou: **nenhum dado pessoal** e nenhum resumo do conteúdo.
+/// O reenvio com a mesma chave é comparado com a própria admissão gravada.
+///
+/// Append-only para `evolli_app`: a migration retira UPDATE e DELETE.
+model IdempotenciaAdmissao {
+  id             String @id @default(uuid())
+  chave          String @db.Uuid
+  atorUserId     String @map("ator_user_id")
+  empresaId      String @map("empresa_id")
+  colaboradorId  String @map("colaborador_id")
+  vinculoId      String @map("vinculo_id")
+  movimentacaoId String @map("movimentacao_id")
+
+  criadoEm DateTime @default(now()) @map("criado_em")
+
+  ator         AccessUser            @relation("IdempotenciaAdmissaoAtor", fields: [atorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  empresa      Empresa               @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  colaborador  Colaborador           @relation(fields: [colaboradorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  vinculo      VinculoFuncional      @relation(fields: [vinculoId, empresaId], references: [id, empresaId], onDelete: Restrict, onUpdate: Cascade)
+  movimentacao MovimentacaoFuncional @relation(fields: [movimentacaoId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([atorUserId, empresaId, chave])
+  @@index([empresaId])
+  @@index([colaboradorId])
+  @@index([vinculoId, empresaId])
+  @@index([movimentacaoId])
+  @@map("idempotencia_admissao")
+}
+
+/// T179 — onde a normalização da migration
+/// `20261021120000_confirmacao_admissao_normalizacao` não converteu um valor
+/// já gravado com segurança.
+enum EntidadeRevisaoNormalizacao {
+  contato_colaborador
+  endereco_colaborador
+}
+
+/// T179 — qual campo não foi convertido. Só o NOME do campo, nunca o valor.
+enum CampoRevisaoNormalizacao {
+  celular
+  telefone
+  cep
+}
+
+/// T179 — por que não foi convertido.
+enum MotivoRevisaoNormalizacao {
+  forma_nao_inequivoca
+}
+
+/// T179 — relação técnica de revisão (decisão da proprietária de
+/// 2026-10-21): o valor já gravado que não tem forma inequívoca de telefone
+/// brasileiro ou de CEP brasileiro **não recebe chute**; fica como está, e o
+/// registro e o nome do campo entram aqui. **Nenhum valor** nesta tabela, em
+/// log, auditoria, PR ou documentação.
+///
+/// Só a migration escreve; `evolli_app` só lê (a migration retira INSERT,
+/// UPDATE e DELETE).
+model RevisaoNormalizacaoCadastro {
+  id            String                      @id @default(uuid())
+  empresaId     String                      @map("empresa_id")
+  colaboradorId String                      @map("colaborador_id")
+  entidade      EntidadeRevisaoNormalizacao
+  registroId    String                      @map("registro_id")
+  campo         CampoRevisaoNormalizacao
+  motivo        MotivoRevisaoNormalizacao
+
+  criadoEm DateTime @default(now()) @map("criado_em")
+
+  empresa     Empresa     @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  colaborador Colaborador @relation(fields: [colaboradorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([entidade, registroId, campo])
+  @@index([empresaId])
+  @@index([colaboradorId])
+  @@map("revisao_normalizacao_cadastro")
 }

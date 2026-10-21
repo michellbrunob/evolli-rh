@@ -19,6 +19,45 @@ export const SEM_CONTROLE = /^[^\u0000-\u001F\u007F]*$/;
 /** CEP ou código postal: letras, dígitos, espaço e hífen, de 3 a 12. */
 export const CEP_FORMA = /^[A-Za-z0-9 -]{3,12}$/;
 
+/**
+ * T179 — CEP brasileiro normalizado: os 8 dígitos (decisão da proprietária de
+ * 2026-10-21). A entrada aceita `00000-000` ou `00000000`; a tela mostra
+ * `00000-000`. Com outro país, o CEP segue em texto livre (`CEP_FORMA`).
+ */
+export const CEP_BRASILEIRO = /^[0-9]{8}$/;
+const CEP_BRASILEIRO_ENTRADA = /^[0-9]{5}-?[0-9]{3}$/;
+
+/**
+ * O país é o Brasil? Comparação sem caixa, sem acento e sem espaço nas pontas
+ * — a mesma da tela. Não há catálogo de país (`DP-ADM-12`): só o nome.
+ */
+export function ehPaisBrasil(pais: unknown): boolean {
+  return (
+    typeof pais === "string" &&
+    pais
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .trim()
+      .toLowerCase() === "brasil"
+  );
+}
+
+/**
+ * CEP do endereço: texto pessoal normalizado e, com país Brasil, só os 8
+ * dígitos quando a forma é `00000-000` ou `00000000`. Fora dessa forma volta
+ * como veio, para a validação recusar — normalizar nunca "conserta".
+ */
+export function normalizarCep(valor: unknown, pais: unknown): unknown {
+  const texto = normalizarTextoPessoal(valor);
+  if (
+    typeof texto !== "string" ||
+    !ehPaisBrasil(normalizarTextoPessoal(pais))
+  ) {
+    return texto;
+  }
+  return CEP_BRASILEIRO_ENTRADA.test(texto) ? texto.replace("-", "") : texto;
+}
+
 /** Borda inferior da data de nascimento, igual ao CHECK do banco. */
 export const DATA_NASCIMENTO_MINIMA = "1900-01-01";
 
