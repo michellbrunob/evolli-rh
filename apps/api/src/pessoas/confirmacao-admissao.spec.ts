@@ -175,6 +175,37 @@ describe("T179 (B1) — o que a tela envia depois de digitar +55 tecla a tecla",
   );
 });
 
+describe("T179 (B2) — DDD 55 nacional, colagem depois de +55 e excedente", () => {
+  // A tela junta `+55` digitado e o resto colado numa entrada só; o servidor
+  // recebe o número já na forma nacional (ou o texto inteiro, se outro
+  // cliente o mandar assim). Um número de DDD 55 completo continua nacional:
+  // dígitos a mais não o transformam em outro número válido.
+  it.each([
+    [
+      "+5591 98765-4321",
+      "+5591987654321",
+      "+55 digitado + resto colado, sem espaço",
+    ],
+    ["+55 91 98765-4321", "+5591987654321", "+55 digitado + resto colado"],
+    ["55999998888", "+5555999998888", "DDD 55 celular, 11 dígitos: nacional"],
+    ["(55) 99999-8888", "+5555999998888", "DDD 55 celular mascarado: nacional"],
+    ["5532221111", "+555532221111", "DDD 55 fixo, 10 dígitos: nacional"],
+  ])("%p vira %p (%s)", (entrada, saida) => {
+    expect(normalizarTelefone(entrada)).toBe(saida);
+    expect(TELEFONE_NORMALIZADO.test(saida)).toBe(true);
+  });
+
+  it.each([
+    ["559999988881", "DDD 55 + 1 dígito: 12 dígitos não formam número válido"],
+    ["55999998888123", "14 dígitos: excede qualquer forma"],
+    ["(55) 99999-88881", "mascarado com dígito a mais"],
+    ["+91987654321", "+ sem o 55: outro país"],
+    ["+499111234567", "estrangeiro que parece brasileiro"],
+  ])("%p (%s) é recusado", (entrada) => {
+    expect(telefoneAceito(entrada)).toBe(false);
+  });
+});
+
 describe("T179 — CEP brasileiro em 8 dígitos; outro país em texto livre", () => {
   async function endereco(corpo: Record<string, unknown>) {
     const dto = plainToInstance(EnderecoDto, corpo);

@@ -8,7 +8,7 @@ import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { CampoMascarado } from "./CampoMascarado";
 import { FormField } from "./FormField";
-import { DICA_DE_FORMATO } from "../format/mascaras";
+import { AVISO_DE_EXCEDENTE, DICA_DE_FORMATO } from "../format/mascaras";
 
 function Campo({
   mascara,
@@ -65,9 +65,16 @@ describe("T179 — CampoMascarado", () => {
     render(<Campo mascara="telefone" aoMudar={aoMudar} />);
     fireEvent.change(campo(), { target: { value: "119" } });
     expect(campo()).toHaveValue("(11) 9");
-    fireEvent.change(campo(), { target: { value: "(11) 98765-43210" } });
+    fireEvent.change(campo(), { target: { value: "(11) 98765-4321" } });
     expect(campo()).toHaveValue("(11) 98765-4321");
     expect(aoMudar).toHaveBeenLastCalledWith("(11) 98765-4321");
+    // T179 (B2) — entrada que passa de 11 dígitos é recusada inteira, com
+    // aviso: o valor certo fica, nenhum dígito some calado.
+    fireEvent.change(campo(), { target: { value: "(11) 98765-43210" } });
+    expect(campo()).toHaveValue("(11) 98765-4321");
+    expect(screen.getByRole("status")).toHaveTextContent(
+      AVISO_DE_EXCEDENTE.telefone,
+    );
   });
 
   it("colar com +55 entra sem o código do país, no lugar da seleção", () => {
@@ -152,5 +159,51 @@ describe("T179 (B1) — CampoMascarado com +55 digitado tecla a tecla", () => {
     teclar("9");
     expect(campo()).toHaveValue("(9");
     expect(campo()).toHaveAccessibleDescription(DICA_DE_FORMATO.telefone);
+  });
+});
+
+describe("T179 (B2) — CampoMascarado: colar depois de +, +5 ou +55, e DDD 55 completo", () => {
+  function colar(texto: string) {
+    const input = campo();
+    input.setSelectionRange(input.value.length, input.value.length);
+    fireEvent.paste(input, { clipboardData: { getData: () => texto } });
+  }
+
+  it.each([
+    ["+", "55 91 98765-4321"],
+    ["+5", "5 91 98765-4321"],
+    ["+55", "91 98765-4321"],
+  ])("digitar %p e colar %p dá (91) 98765-4321, sem aviso", (texto, colado) => {
+    const aoMudar = vi.fn();
+    render(<Campo mascara="telefone" aoMudar={aoMudar} />);
+    teclar(texto);
+    expect(campo()).toHaveValue(texto);
+    colar(colado);
+    expect(campo()).toHaveValue("(91) 98765-4321");
+    expect(aoMudar).toHaveBeenLastCalledWith("(91) 98765-4321");
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
+  });
+
+  it("DDD 55 completo recusa dígitos a mais, com aviso ligado ao campo, e o número fica", () => {
+    render(<Campo mascara="telefone" />);
+    teclar("55999998888");
+    expect(campo()).toHaveValue("(55) 99999-8888");
+    teclar("12");
+    expect(campo()).toHaveValue("(55) 99999-8888");
+    const aviso = screen.getByRole("status");
+    expect(aviso).toHaveTextContent(AVISO_DE_EXCEDENTE.telefone);
+    expect(campo()).toHaveAccessibleDescription(
+      new RegExp(AVISO_DE_EXCEDENTE.telefone.slice(0, 30)),
+    );
+    // A próxima mudança aceita tira o aviso.
+    fireEvent.change(campo(), { target: { value: "(55) 99999-888" } });
+    expect(campo()).toHaveValue("(55) 9999-9888");
+    expect(aviso).toBeEmptyDOMElement();
+  });
+
+  it("colar estrangeiro com + fica sem máscara", () => {
+    render(<Campo mascara="telefone" />);
+    colar("+49 911 1234567");
+    expect(campo()).toHaveValue("+499111234567");
   });
 });

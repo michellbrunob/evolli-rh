@@ -23,7 +23,7 @@
  * RH ou o DP, cadastrando OUTRA pessoa — sugerir o telefone ou o CEP de quem
  * está operando seria preencher o dado errado. Quem precisar pode sobrescrever.
  */
-import { useLayoutEffect, useRef } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import type {
   ClipboardEvent,
   ChangeEvent,
@@ -31,12 +31,14 @@ import type {
   KeyboardEvent,
 } from "react";
 import {
+  AVISO_DE_EXCEDENTE,
   type EstadoDoCampo,
   type TipoMascara,
   aplicarMascara,
   apagarComSeparador,
   colarNaMascara,
 } from "../format/mascaras";
+import "./CampoMascarado.css";
 
 export interface CampoMascaradoProps extends Omit<
   InputHTMLAttributes<HTMLInputElement>,
@@ -62,6 +64,11 @@ export function CampoMascarado({
   const ref = useRef<HTMLInputElement | null>(null);
   /** Cursor a aplicar depois que o valor novo chegar ao DOM. */
   const cursorPendenteRef = useRef<number | null>(null);
+  /**
+   * T179 (B2) — o que passou do limite foi recusado: o valor fica como
+   * estava, e o aviso diz por quê. Some na próxima mudança aceita.
+   */
+  const [aviso, setAviso] = useState<string | null>(null);
 
   useLayoutEffect(() => {
     const cursor = cursorPendenteRef.current;
@@ -76,6 +83,7 @@ export function CampoMascarado({
   });
 
   function aplicar(campo: HTMLInputElement, estado: EstadoDoCampo) {
+    setAviso(estado.recusado ? AVISO_DE_EXCEDENTE[mascara] : null);
     if (estado.valor === value) {
       // O estado não muda, então não há novo desenho: o DOM volta ao valor
       // atual aqui mesmo, sem o cursor saltar para o fim.
@@ -132,17 +140,30 @@ export function CampoMascarado({
     );
   }
 
+  const idDoAviso = resto.id ? `${resto.id}-aviso` : undefined;
+  const descritoPor =
+    [resto["aria-describedby"], aviso ? idDoAviso : undefined]
+      .filter(Boolean)
+      .join(" ") || undefined;
   return (
-    <input
-      {...resto}
-      ref={ref}
-      type={mascara === "telefone" ? "tel" : "text"}
-      inputMode={mascara === "telefone" ? "tel" : "numeric"}
-      autoComplete={autoComplete}
-      value={value}
-      onChange={aoMudar}
-      onKeyDown={aoTeclar}
-      onPaste={aoColar}
-    />
+    <>
+      <input
+        {...resto}
+        aria-describedby={descritoPor}
+        ref={ref}
+        type={mascara === "telefone" ? "tel" : "text"}
+        inputMode={mascara === "telefone" ? "tel" : "numeric"}
+        autoComplete={autoComplete}
+        value={value}
+        onChange={aoMudar}
+        onKeyDown={aoTeclar}
+        onPaste={aoColar}
+      />
+      {/* Região viva SEMPRE montada (vazia sem aviso): é o que faz o leitor de
+          tela anunciar a recusa no momento em que ela acontece. */}
+      <span id={idDoAviso} className="campo-mascarado__aviso" role="status">
+        {aviso ?? ""}
+      </span>
+    </>
   );
 }

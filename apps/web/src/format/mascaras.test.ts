@@ -42,7 +42,8 @@ describe("T179 — máscara de CEP", () => {
 
   it("não aceita o 9º dígito digitado: o valor fica como estava", () => {
     const r = aplicarMascara("cep", "30140-071", "30140-0712", 10);
-    expect(r).toEqual({ valor: "30140-071", cursor: 9 });
+    // T179 (B2) — recusado com sinal, para o campo avisar.
+    expect(r).toEqual({ valor: "30140-071", cursor: 9, recusado: true });
   });
 
   it("letras e pontuação colada somem; o excesso do fim é descartado", () => {
@@ -105,7 +106,7 @@ describe("T179 — máscara de telefone", () => {
       "(11) 98765-43219",
       16,
     );
-    expect(r).toEqual({ valor: "(11) 98765-4321", cursor: 15 });
+    expect(r).toEqual({ valor: "(11) 98765-4321", cursor: 15, recusado: true });
   });
 
   it.each([
@@ -243,9 +244,32 @@ describe("T179 (B1) — telefone digitado tecla a tecla com o código do país",
     expect(colarNaMascara("telefone", "", 0, 0, texto).valor).toBe(esperado);
   });
 
-  it("sem o +, 13 dígitos começando por 55 são lidos como país, não como DDD", () => {
-    expect(digitar("telefone", "5511987654321")).toBe("(11) 98765-4321");
-    expect(digitar("telefone", "5591987654321")).toBe("(91) 98765-4321");
+  it("sem o +, 13 dígitos começando por 55 que chegam INTEIROS (colagem, preenchimento) são o país", () => {
+    expect(colarNaMascara("telefone", "", 0, 0, "5511987654321").valor).toBe(
+      "(11) 98765-4321",
+    );
+    expect(colarNaMascara("telefone", "", 0, 0, "5591987654321").valor).toBe(
+      "(91) 98765-4321",
+    );
+    expect(aplicarMascara("telefone", "", "5591987654321", 13).valor).toBe(
+      "(91) 98765-4321",
+    );
+  });
+
+  it("T179 (B2): sem o +, tecla a tecla, o país não entra — o número completo de DDD 55 recusa o excedente", () => {
+    // Tecla a tecla, `55` + 9 dígitos JÁ é um número completo de DDD 55: o
+    // 12º dígito é recusado (com aviso), em vez de reinterpretar o 55 como
+    // país. O país, por teclado, se informa com `+`.
+    let valor = "";
+    let recusado = false;
+    for (const tecla of "5591987654321") {
+      const entrada = valor + tecla;
+      const r = aplicarMascara("telefone", valor, entrada, entrada.length);
+      valor = r.valor;
+      recusado = recusado || r.recusado === true;
+    }
+    expect(valor).toBe("(55) 91987-6543");
+    expect(recusado).toBe(true);
   });
 
   it("número nacional com DDD 55 continua com DDD 55", () => {
@@ -280,5 +304,105 @@ describe("T179 (B1) — telefone digitado tecla a tecla com o código do país",
       valor: "",
       cursor: 0,
     });
+  });
+});
+
+describe("T179 (B2) — colar depois de +, +5 ou +55, e DDD 55 completo", () => {
+  /** Digita `texto` e, no fim, cola `colado`, como o navegador faria. */
+  function digitarEColar(texto: string, colado: string) {
+    const valor = digitar("telefone", texto);
+    return colarNaMascara(
+      "telefone",
+      valor,
+      valor.length,
+      valor.length,
+      colado,
+    );
+  }
+
+  it.each([
+    ["+", "55 91 98765-4321"],
+    ["+5", "5 91 98765-4321"],
+    ["+55", "91 98765-4321"],
+    ["+55", " 91 98765-4321"],
+    ["+55", "+55 91 98765-4321"],
+    ["+55", "5591987654321"],
+  ])("digitar %p e colar %p dá (91) 98765-4321", (texto, colado) => {
+    const r = digitarEColar(texto, colado);
+    expect(r.valor).toBe("(91) 98765-4321");
+    expect(r.recusado).toBeUndefined();
+  });
+
+  it("colar em campo vazio, com ou sem o país, dá o mesmo número", () => {
+    for (const colado of [
+      "+55 91 98765-4321",
+      "5591987654321",
+      "91 98765-4321",
+      "(91) 98765-4321",
+    ]) {
+      expect(colarNaMascara("telefone", "", 0, 0, colado).valor).toBe(
+        "(91) 98765-4321",
+      );
+    }
+  });
+
+  it("com DDD comum também: +55 e colar 11 98765-4321", () => {
+    expect(digitarEColar("+55", "11 98765-4321").valor).toBe("(11) 98765-4321");
+  });
+
+  it("+55 e colar um número de DDD 55 mantém o DDD 55", () => {
+    expect(digitarEColar("+55", "55 99999-8888").valor).toBe("(55) 99999-8888");
+  });
+
+  it("+ e colar um número sem o 55 não inventa o Brasil: fica como veio e é recusado na validação", () => {
+    expect(digitarEColar("+", "91 98765-4321").valor).toBe("+91987654321");
+  });
+
+  it("colar número estrangeiro com + fica sem máscara, mesmo que pareça brasileiro", () => {
+    expect(colarNaMascara("telefone", "", 0, 0, "+49 911 1234567").valor).toBe(
+      "+499111234567",
+    );
+    expect(
+      colarNaMascara("telefone", "(11) 9", 6, 6, "+49 911 1234567").valor,
+    ).toBe("+499111234567");
+  });
+
+  it("colagem que passa de 11 dígitos é recusada com sinal, e o valor fica", () => {
+    expect(digitarEColar("+55", "91 98765-43210")).toEqual({
+      valor: "+55",
+      cursor: 3,
+      recusado: true,
+    });
+    const cheio = "(11) 98765-4321";
+    expect(colarNaMascara("telefone", cheio, 15, 15, "12")).toEqual({
+      valor: cheio,
+      cursor: 15,
+      recusado: true,
+    });
+  });
+
+  it("DDD 55 completo: dígito a mais no fim ou no meio é recusado e o número fica", () => {
+    const completo = digitar("telefone", "55999998888");
+    expect(completo).toBe("(55) 99999-8888");
+    for (const extra of ["1", "12"]) {
+      let valor = completo;
+      let recusado = false;
+      for (const tecla of extra) {
+        const entrada = valor + tecla;
+        const r = aplicarMascara("telefone", valor, entrada, entrada.length);
+        valor = r.valor;
+        recusado = recusado || r.recusado === true;
+      }
+      expect(valor).toBe(completo);
+      expect(recusado).toBe(true);
+    }
+    const meio = aplicarMascara("telefone", completo, "(55) 999919-8888", 10);
+    expect(meio.valor).toBe(completo);
+    expect(meio.recusado).toBe(true);
+  });
+
+  it("DDD 55 fixo completo ainda pode virar celular com o 11º dígito, como qualquer DDD", () => {
+    expect(digitar("telefone", "5532221111")).toBe("(55) 3222-1111");
+    expect(digitar("telefone", "5532221111" + "1")).toBe("(55) 32221-1111");
   });
 });

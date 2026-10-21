@@ -17,6 +17,10 @@
  *   o dígito anterior; Delete, o seguinte (`apagarComSeparador`).
  * - **Colagem tolerante:** telefone colado com `+55`, `55` + DDD + número, ou
  *   já mascarado, vira o número nacional; o `55` do país sai.
+ * - **País por teclado só com `+`** (T179, B1 e B2): `+`, `+5` e `+55` ficam no
+ *   campo até o primeiro dígito nacional; colar depois deles junta tudo numa
+ *   entrada só. Número nacional completo (inclusive de DDD 55) RECUSA dígito a
+ *   mais, com aviso, em vez de virar outro número.
  *
  * ## O que ela não faz
  *
@@ -32,6 +36,11 @@ export type TipoMascara = "cep" | "telefone";
 export interface EstadoDoCampo {
   readonly valor: string;
   readonly cursor: number;
+  /**
+   * T179 (B2) — a entrada passou do limite e foi RECUSADA: o valor é o que
+   * estava. O campo avisa (`AVISO_DE_EXCEDENTE`), em vez de calar.
+   */
+  readonly recusado?: true;
 }
 
 /** Quantos dígitos cada máscara comporta: CEP 8; telefone DDD + 9. */
@@ -45,6 +54,13 @@ export const DICA_DE_FORMATO: Readonly<Record<TipoMascara, string>> = {
   cep: "Formato 00000-000. Digite só os números: o hífen entra sozinho.",
   telefone:
     "Número brasileiro com DDD, no formato (00) 00000-0000 para celular ou (00) 0000-0000 para fixo. Digite só os números; pode colar com +55.",
+};
+
+/** T179 (B2) — aviso quando o que foi digitado ou colado passa do limite. */
+export const AVISO_DE_EXCEDENTE: Readonly<Record<TipoMascara, string>> = {
+  cep: "O CEP tem 8 dígitos: o que passou disso não entrou.",
+  telefone:
+    "O número já está completo: o que passou de 11 dígitos não entrou. Para informar o código do país, comece com +55.",
 };
 
 const DIGITO = /[0-9]/;
@@ -136,13 +152,65 @@ function digitosAntesDe(valor: string, posicao: number): number {
 }
 
 /**
+ * T179 (B2 da revisão) — leitura de um telefone INTEIRO: o que o campo terá
+ * depois da mudança, seja ela uma tecla, uma colagem ou um preenchimento.
+ *
+ * - `+`, `+5` ou `+55` sozinhos: o código do país ainda sendo digitado.
+ * - `+` de outro país: estrangeiro, mostrado como veio — nada de DDD
+ *   inventado; a validação o recusa (só número brasileiro).
+ * - `+55` + dígitos: o `55` é o país; o resto, o número nacional.
+ * - sem `+`: dígitos nacionais. Com 12 ou 13 dígitos começando por `55`, o
+ *   texto só pode ser `55` + DDD + número — mas só uma ENTRADA INTEIRA chega
+ *   assim (colagem, preenchimento); tecla a tecla, um número completo recusa o
+ *   dígito seguinte antes de chegar aqui (ver `aplicarMascara`).
+ *
+ * O número nacional pode passar de 11 dígitos: quem chama decide recusar.
+ */
+type TelefoneLido =
+  | { readonly tipo: "pais" | "estrangeiro"; readonly valor: string }
+  | { readonly tipo: "nacional"; readonly digitos: string };
+
+function lerTelefone(entrada: string): TelefoneLido {
+  const digitos = somenteDigitos(entrada);
+  if (comecaComMais(entrada)) {
+    if (PAIS_EM_DIGITACAO.test(entrada)) {
+      return { tipo: "pais", valor: `+${digitos}` };
+    }
+    if (!digitos.startsWith("55")) {
+      return {
+        tipo: "estrangeiro",
+        valor: `+${digitos.slice(0, LIMITE_INTERNACIONAL)}`,
+      };
+    }
+    return { tipo: "nacional", digitos: digitos.slice(2) };
+  }
+  if (
+    (digitos.length === 12 || digitos.length === 13) &&
+    digitos.startsWith("55")
+  ) {
+    return { tipo: "nacional", digitos: digitos.slice(2) };
+  }
+  return { tipo: "nacional", digitos };
+}
+
+/** O valor fica como estava: entrada excedente, recusada com aviso. */
+function recusar(anterior: string, cursor: number): EstadoDoCampo {
+  return { valor: anterior, cursor, recusado: true };
+}
+
+/**
  * Aplica a máscara a uma mudança do campo (`onChange`): digitação, apagar,
  * colagem que o navegador já inseriu, preenchimento automático.
  *
  * `anterior` é o valor antes da mudança; `entrada` e `cursor`, o que o
- * navegador tem agora. Um dígito a mais num campo já cheio é RECUSADO — o
- * valor fica como estava, com o cursor onde estava — em vez de empurrar o
- * último dígito para fora sem aviso.
+ * navegador tem agora. Entrada que passa do limite é RECUSADA — o valor fica
+ * como estava e o estado volta com `recusado`, para o campo avisar — em vez
+ * de empurrar dígitos para fora sem aviso.
+ *
+ * T179 (B2) — telefone completo é NACIONAL: com 11 dígitos, o dígito seguinte
+ * é recusado, inclusive com DDD 55. Um número de DDD 55 não vira `55` do país
+ * por causa de dígitos a mais. O código do país, por teclado, se informa com
+ * `+`; sem `+`, só uma entrada inteira (colagem, preenchimento) o traz.
  */
 export function aplicarMascara(
   tipo: TipoMascara,
@@ -152,59 +220,71 @@ export function aplicarMascara(
 ): EstadoDoCampo {
   const limite = LIMITE_DE_DIGITOS[tipo];
   const digitosAnteriores = somenteDigitos(anterior);
-  let digitos = somenteDigitos(entrada);
-  let antes = digitosAntesDe(entrada, cursor);
+  const digitos = somenteDigitos(entrada);
+  const antes = digitosAntesDe(entrada, cursor);
 
-  // T179 (B1) — o `+` inicial é o código do país sendo digitado, tecla a
-  // tecla. Enquanto só há `+`, `+5` ou `+55`, o campo mostra isso mesmo; com o
-  // primeiro dígito nacional, o `55` sai e o número segue como nacional — o
-  // mesmo resultado da colagem. `+` de outro país fica como veio, sem máscara
-  // (que inventaria um DDD), e a validação o recusa: só número brasileiro.
-  if (tipo === "telefone" && comecaComMais(entrada)) {
-    if (PAIS_EM_DIGITACAO.test(entrada)) {
-      const valor = `+${digitos}`;
-      return { valor, cursor: valor.length };
-    }
-    if (!digitos.startsWith("55")) {
-      const valor = `+${digitos.slice(0, LIMITE_INTERNACIONAL)}`;
-      return { valor, cursor: valor.length };
-    }
-  }
-
-  // Sem o `+`, uma sequência que começa por `55` pode crescer até 13 dígitos:
-  // com 12 ou 13 ela só pode ser `55` + DDD + número (um número nacional tem
-  // no máximo 11), e é lida assim — igual à colagem. Recusar o 12º dígito
-  // deixaria o `55` como DDD e perderia os dois últimos.
-  const limiteDaEntrada =
-    tipo === "telefone" && digitos.startsWith("55") ? limite + 2 : limite;
-  const digitacaoAlemDoLimite =
-    digitos.length > limiteDaEntrada &&
+  const teclaAlemDoLimite =
+    !(tipo === "telefone" && comecaComMais(entrada)) &&
+    digitos.length > limite &&
     digitos.length - digitosAnteriores.length === 1 &&
     digitosAnteriores.length >= limite;
-  if (digitacaoAlemDoLimite) {
+  if (teclaAlemDoLimite) {
     const valor = mascarar(tipo, digitosAnteriores);
-    return { valor, cursor: posicaoAposDigitos(valor, antes - 1) };
+    return {
+      valor,
+      cursor: posicaoAposDigitos(valor, antes - 1),
+      recusado: true,
+    };
   }
 
-  if (tipo === "telefone") {
-    // O `55` do país sai do começo: o cursor anda dois dígitos para trás.
-    if (temCodigoDoPais(entrada)) antes = Math.max(0, antes - 2);
-    digitos = digitosNacionaisDoTelefone(entrada);
+  if (tipo === "cep") {
+    const cep = digitos.slice(0, limite);
+    const valor = mascararCep(cep);
+    return {
+      valor,
+      cursor: posicaoAposDigitos(valor, Math.min(antes, cep.length)),
+    };
   }
 
-  digitos = digitos.slice(0, limite);
-  const valor = mascarar(tipo, digitos);
+  const lido = lerTelefone(entrada);
+  if (lido.tipo !== "nacional") {
+    return { valor: lido.valor, cursor: lido.valor.length };
+  }
+  if (lido.digitos.length > limite) {
+    return recusar(anterior, anterior.length);
+  }
+  // O `55` do país sai do começo: o cursor anda dois dígitos para trás.
+  const antesNacional = Math.max(
+    0,
+    antes - (digitos.length - lido.digitos.length),
+  );
+  const valor = mascararTelefone(lido.digitos);
   return {
     valor,
-    cursor: posicaoAposDigitos(valor, Math.min(antes, digitos.length)),
+    cursor: posicaoAposDigitos(
+      valor,
+      Math.min(antesNacional, lido.digitos.length),
+    ),
   };
 }
 
 /**
  * Colagem (`onPaste`): o texto colado substitui a seleção `[inicio, fim)` do
- * valor atual. O que veio colado é limpo SOZINHO antes de entrar — assim um
- * `+55 11 98765-4321` colado no meio de um campo vazio ou não perde o `55` do
- * país do jeito certo. Passou do limite, o excesso do fim é descartado.
+ * valor atual.
+ *
+ * - CEP: o colado é limpo e entra no lugar da seleção; passou de 8 dígitos, o
+ *   excesso do fim é descartado.
+ * - Telefone (T179, B2):
+ *   - colado que começa com `+` é um número INTEIRO, com o próprio país: ele
+ *     substitui o campo (`+` de outro país fica como veio e é recusado);
+ *   - com o campo só no código do país (`+`, `+5` ou `+55`), campo e colado
+ *     viram UMA entrada antes de formatar — `+55` + `91 98765-4321` dá
+ *     `(91) 98765-4321`. Se o colado já traz o próprio `55` do país, ele vale
+ *     sozinho, para o `55` não entrar duas vezes;
+ *   - nos demais casos, o colado é limpo sozinho (o `55` do país sai) e entra
+ *     no lugar da seleção.
+ *   Passou de 11 dígitos nacionais, a colagem é RECUSADA com aviso e o valor
+ *   fica como estava — nenhum dígito some sem aviso.
  */
 export function colarNaMascara(
   tipo: TipoMascara,
@@ -214,16 +294,62 @@ export function colarNaMascara(
   colado: string,
 ): EstadoDoCampo {
   const limite = LIMITE_DE_DIGITOS[tipo];
-  const limpo =
-    tipo === "telefone"
-      ? digitosNacionaisDoTelefone(colado)
-      : somenteDigitos(colado);
+  if (tipo === "cep") {
+    const limpo = somenteDigitos(colado);
+    const antes = somenteDigitos(atual.slice(0, inicio));
+    const depois = somenteDigitos(atual.slice(fim));
+    const digitos = `${antes}${limpo}${depois}`.slice(0, limite);
+    const valor = mascararCep(digitos);
+    const cursorEmDigitos = Math.min(
+      antes.length + limpo.length,
+      digitos.length,
+    );
+    return { valor, cursor: posicaoAposDigitos(valor, cursorEmDigitos) };
+  }
+
+  const foraDaSelecao = atual.slice(0, inicio) + atual.slice(fim);
+  if (
+    comecaComMais(colado) ||
+    (PAIS_EM_DIGITACAO.test(foraDaSelecao) && temCodigoDoPais(colado))
+  ) {
+    return telefoneInteiro(atual, colado);
+  }
+  if (PAIS_EM_DIGITACAO.test(foraDaSelecao)) {
+    return telefoneInteiro(
+      atual,
+      atual.slice(0, inicio) + colado + atual.slice(fim),
+    );
+  }
+
+  const limpo = digitosNacionaisDeColagem(colado);
   const antes = somenteDigitos(atual.slice(0, inicio));
   const depois = somenteDigitos(atual.slice(fim));
-  const digitos = `${antes}${limpo}${depois}`.slice(0, limite);
-  const valor = mascarar(tipo, digitos);
-  const cursorEmDigitos = Math.min(antes.length + limpo.length, digitos.length);
-  return { valor, cursor: posicaoAposDigitos(valor, cursorEmDigitos) };
+  const digitos = `${antes}${limpo}${depois}`;
+  if (digitos.length > limite) return recusar(atual, inicio);
+  const valor = mascararTelefone(digitos);
+  return {
+    valor,
+    cursor: posicaoAposDigitos(valor, antes.length + limpo.length),
+  };
+}
+
+/** Um telefone inteiro no lugar do campo (ver `lerTelefone`). */
+function telefoneInteiro(atual: string, entrada: string): EstadoDoCampo {
+  const lido = lerTelefone(entrada);
+  if (lido.tipo !== "nacional") {
+    return { valor: lido.valor, cursor: lido.valor.length };
+  }
+  if (lido.digitos.length > LIMITE_DE_DIGITOS.telefone) {
+    return recusar(atual, atual.length);
+  }
+  const valor = mascararTelefone(lido.digitos);
+  return { valor, cursor: valor.length };
+}
+
+/** Dígitos nacionais de um trecho colado, SEM cortar no limite. */
+function digitosNacionaisDeColagem(colado: string): string {
+  const digitos = somenteDigitos(colado);
+  return temCodigoDoPais(colado) ? digitos.slice(2) : digitos;
 }
 
 /**

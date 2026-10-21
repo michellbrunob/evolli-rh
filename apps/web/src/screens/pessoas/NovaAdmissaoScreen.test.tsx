@@ -1454,6 +1454,39 @@ describe("T179 — máscaras na Nova admissão", () => {
     expect(dto.contatos.telefone).toBe("+551133330000");
   });
 
+  it("T179 (B2): +55 digitado e o resto colado, e DDD 55 completo com dígitos a mais, chegam certos ao servidor", async () => {
+    montar();
+    await aguardarEmpresa();
+    preencherValido();
+    const teclar = (campo: HTMLElement, texto: string) => {
+      for (const tecla of texto) {
+        const atual = (campo as HTMLInputElement).value;
+        fireEvent.change(campo, { target: { value: atual + tecla } });
+      }
+    };
+    // Celular: `+55` tecla a tecla e, depois, o resto colado.
+    fireEvent.change(celular(), { target: { value: "" } });
+    teclar(celular(), "+55");
+    expect(celular()).toHaveValue("+55");
+    const c = celular() as HTMLInputElement;
+    c.setSelectionRange(c.value.length, c.value.length);
+    fireEvent.paste(celular(), {
+      clipboardData: { getData: () => "91 98765-4321" },
+    });
+    expect(celular()).toHaveValue("(91) 98765-4321");
+    // Telefone: DDD 55 completo e dois dígitos a mais — recusados, com aviso.
+    fireEvent.change(telefone(), { target: { value: "" } });
+    teclar(telefone(), "55999998888");
+    teclar(telefone(), "12");
+    expect(telefone()).toHaveValue("(55) 99999-8888");
+    expect(telefone()).toHaveAccessibleDescription(/O número já está completo/);
+    await salvarEConfirmar();
+    await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
+    const dto = vi.mocked(admitirColaborador).mock.calls[0]![0];
+    expect(dto.contatos.celular).toBe("+5591987654321");
+    expect(dto.contatos.telefone).toBe("+5555999998888");
+  });
+
   it("CEP: máscara 00000-000 só com país Brasil", async () => {
     montar();
     await aguardarEmpresa();
