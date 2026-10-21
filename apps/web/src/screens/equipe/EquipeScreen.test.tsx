@@ -230,6 +230,51 @@ describe("lista da equipe", () => {
     expect(vi.mocked(listarEquipe).mock.calls.length).toBe(chamadasAntes);
   });
 
+  it("T179 — matrícula nula: 'Sem matrícula' na lista e no detalhe, e a busca não quebra", async () => {
+    vi.mocked(obterUsuarioAtual).mockResolvedValue(ator("gestor") as never);
+    vi.mocked(listarEquipe).mockResolvedValue({
+      dataReferencia: "2026-10-08",
+      itens: [
+        membro({ matricula: null }),
+        membro({
+          vinculoId: "v-2",
+          nome: "Zulmira Souza",
+          matricula: "DEMO-A-0203",
+        }),
+      ],
+    } as never);
+    vi.mocked(detalharVinculo).mockResolvedValue(detalhe({ matricula: null }));
+
+    render(<EquipeScreen />);
+    const linha = (await screen.findByText("Pessoa Demo Alfa Turno A")).closest(
+      "tr",
+    )!;
+    expect(linha).toHaveTextContent("Sem matrícula");
+    expect(linha).not.toHaveTextContent("null");
+
+    fireEvent.change(screen.getByLabelText("Buscar na lista"), {
+      target: { value: "0203" },
+    });
+    expect(screen.getByText("Zulmira Souza")).toBeInTheDocument();
+    expect(
+      screen.queryByText("Pessoa Demo Alfa Turno A"),
+    ).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Buscar na lista"), {
+      target: { value: "" },
+    });
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Ver detalhe de Pessoa Demo Alfa Turno A",
+      }),
+    );
+    const dialogo = await screen.findByRole("dialog");
+    expect(
+      await within(dialogo).findByText("Sem matrícula"),
+    ).toBeInTheDocument();
+    expect(dialogo).not.toHaveTextContent("null");
+  });
+
   it("T153.5 exibe a data de referência do servidor e não oferece como mudá-la", async () => {
     vi.mocked(obterUsuarioAtual).mockResolvedValue(ator("gestor") as never);
     vi.mocked(listarEquipe).mockResolvedValue({

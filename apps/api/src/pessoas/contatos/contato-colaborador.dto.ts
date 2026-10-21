@@ -2,6 +2,7 @@ import { Transform } from "class-transformer";
 import {
   IsEmail,
   IsNotEmpty,
+  IsOptional,
   IsString,
   Matches,
   MaxLength,
@@ -17,8 +18,9 @@ import {
 /**
  * Corpo de `PUT /colaboradores/:colaboradorId/contatos`.
  *
- * Os TRÊS campos são obrigatórios — a ficha os aprovou juntos, e o formulário
- * os exige juntos. Não existe `empresaId` aqui, nem em query: a empresa vem da
+ * T179 — os TRÊS campos são OPCIONAIS (decisão da proprietária de 2026-10-21):
+ * ausente, vazio ou `null` vale como não informado e grava `null`. Quando
+ * informado, o formato continua conferido. Não existe `empresaId` aqui, nem em query: a empresa vem da
  * sessão e do vínculo do colaborador, nunca do navegador. Com
  * `forbidNonWhitelisted`, um corpo que tente informá-la é recusado (400).
  *
@@ -27,20 +29,23 @@ import {
  */
 export class RegistrarContatosColaboradorDto {
   @Transform(({ value }) => normalizarEmailPessoal(value))
+  @IsOptional()
   @IsString()
   @IsNotEmpty()
   @MaxLength(LIMITE_EMAIL_PESSOAL)
   @Matches(EMAIL_PESSOAL_FORMA)
   @IsEmail()
-  emailPessoal!: string;
+  emailPessoal?: string | null;
 
   @Transform(({ value }) => normalizarTelefone(value))
+  @IsOptional()
   @IsString()
   @Matches(TELEFONE_NORMALIZADO)
-  celular!: string;
+  celular?: string | null;
 
   @Transform(({ value }) => normalizarTelefone(value))
+  @IsOptional()
   @IsString()
   @Matches(TELEFONE_NORMALIZADO)
-  telefone!: string;
+  telefone?: string | null;
 }

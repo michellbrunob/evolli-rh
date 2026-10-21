@@ -156,3 +156,15 @@ convertido pela migration da T179; o resto fica como está e entra na relação
 técnica de revisão, com o registro e o nome do campo, nunca o valor. Com outro
 país, o CEP segue em texto livre. Finalidade, base legal, classificação,
 retenção e escopo de acesso não mudam.
+
+## 7. Alteração de 2026-10-21 (T179) — obrigatoriedade e Sexo em lista fechada
+
+Pela [decisão de obrigatoriedade](t179-obrigatoriedade-cadastro-colaborador.md): obrigatórios só o nome
+completo e a data de nascimento; o e-mail pessoal passa a opcional; todo o
+endereço, inclusive o CEP, é opcional (§2 desta ficha fica assim
+atualizado). **Sexo** passa a opções fechadas — Feminino, Masculino,
+Intersexo, Não informar (gravados `feminino`, `masculino`, `intersexo`,
+`nao_informar`) —, opcional; sem seleção, a ficha mostra "Não informado". O
+texto livre gravado antes aparece como foi gravado, sem conversão. Gênero
+continua fora desta ficha, obrigatório quando a sua for aprovada.
+Finalidade, base legal, classificação, retenção e escopo de acesso não mudam.

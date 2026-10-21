@@ -16,10 +16,14 @@ const BASE = "/v1";
 
 export type SituacaoContatosApi = "sem_registro" | "registrado" | "bloqueado";
 
+/**
+ * T179 — os três contatos são OPCIONAIS (decisão da proprietária de
+ * 2026-10-21): cada um pode vir `null`, que é "não informado".
+ */
 export interface ContatosApi {
-  emailPessoal: string;
-  celular: string;
-  telefone: string;
+  emailPessoal: string | null;
+  celular: string | null;
+  telefone: string | null;
   atualizadoEm: string;
 }
 
@@ -34,10 +38,14 @@ export interface ContatosRegistradosApi extends ContatosDoColaboradorApi {
   resultado: "criado" | "atualizado" | "sem_alteracao";
 }
 
+/**
+ * T179 — cada campo é opcional; `null` grava "não informado" (é assim que a
+ * ficha apaga um contato). A tela envia os três, vazio como `null`.
+ */
 export interface RegistrarContatosDto {
-  emailPessoal: string;
-  celular: string;
-  telefone: string;
+  emailPessoal?: string | null;
+  celular?: string | null;
+  telefone?: string | null;
 }
 
 async function getCsrf(): Promise<string> {

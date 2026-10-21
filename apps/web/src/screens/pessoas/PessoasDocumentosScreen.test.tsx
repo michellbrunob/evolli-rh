@@ -405,6 +405,30 @@ describe("PessoasDocumentosScreen (T133 — funcional)", () => {
     expect(within(vinculos).getByText(/matrícula M-001/)).toBeInTheDocument();
   });
 
+  it("T179 — vínculo sem matrícula diz 'sem matrícula', nunca 'null'", async () => {
+    vi.mocked(listarVinculosDoColaborador).mockResolvedValue([
+      {
+        id: "v1",
+        colaboradorId: "colab-1",
+        empresaId: "emp-1",
+        matricula: null,
+        tipo: "clt",
+        situacao: "ativo",
+        dataAdmissao: "2026-01-01",
+        dataDesligamento: null,
+        criadoEm: "2026-01-01T10:00:00.000Z",
+        atualizadoEm: "2026-01-01T10:00:00.000Z",
+      },
+    ] as never);
+    render(<PessoasDocumentosScreen />);
+    fireEvent.change(await screen.findByLabelText("Selecione o colaborador"), {
+      target: { value: "colab-1" },
+    });
+    const item = await screen.findByText(/sem matrícula/);
+    expect(item).toHaveTextContent("clt · ativo · sem matrícula");
+    expect(item).not.toHaveTextContent("null");
+  });
+
   it("erro ao carregar documentos mostra nova tentativa", async () => {
     vi.mocked(listarDocumentos)
       .mockRejectedValueOnce(new ApiError(500, "x"))

@@ -72,6 +72,7 @@ import {
   type StatusVariant,
 } from "../../components";
 import { formatarDiaCivil } from "../../format/data";
+import { exibirMatricula } from "../../format/matricula";
 import "./EquipeScreen.css";
 
 export const EQUIPE_TITULO_ID = "equipe-titulo";
@@ -140,7 +141,8 @@ function rotuloTipo(valor: string): string {
 function textoDeBusca(m: MembroEquipeApi): string {
   return [
     m.nome,
-    m.matricula,
+    // T179 — matrícula opcional: sem ela, nada entra na busca.
+    m.matricula ?? "",
     m.cargoVigente?.nome ?? "",
     m.lotacaoVigente?.equipe?.nome ?? "",
   ]
@@ -346,7 +348,11 @@ export function EquipeScreen({
           </Button>
         ),
       },
-      { key: "matricula", header: "Matrícula", cell: (m) => m.matricula },
+      {
+        key: "matricula",
+        header: "Matrícula",
+        cell: (m) => exibirMatricula(m.matricula),
+      },
       {
         key: "situacao",
         header: "Situação",
@@ -515,7 +521,7 @@ export function EquipeScreen({
           <dl className="equipe-screen__detalhe">
             <div>
               <dt>Matrícula</dt>
-              <dd>{detalhe.matricula}</dd>
+              <dd>{exibirMatricula(detalhe.matricula)}</dd>
             </div>
             <div>
               <dt>Situação do vínculo</dt>

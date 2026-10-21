@@ -80,6 +80,7 @@ import {
   type TipoSolicitacaoPessoa,
 } from "../../api/solicitacoesPessoasClient";
 import { formatarDiaCivil, formatarInstante } from "../../format/data";
+import { trechoDeMatricula } from "../../format/matricula";
 import "./SolicitacoesScreen.css";
 
 export const SOLICITACOES_TITULO_ID = "solicitacoes-titulo";
@@ -878,7 +879,8 @@ export function SolicitacoesScreen() {
                       <option value="">Selecione…</option>
                       {vinculos.map((v) => (
                         <option key={v.id} value={v.id}>
-                          matrícula {v.matricula} · {v.tipo} · {v.situacao}
+                          {trechoDeMatricula(v.matricula)} · {v.tipo} ·{" "}
+                          {v.situacao}
                         </option>
                       ))}
                     </select>

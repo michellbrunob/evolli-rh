@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  contatosDaAdmissao,
+  contatosParaEdicao,
+  contatosParaRegistro,
+  contatosVazios,
   normalizarContatos,
   normalizarTelefone,
   validarContatos,
@@ -50,12 +54,34 @@ describe("contatos do colaborador — regra no cliente", () => {
     expect(normalizarTelefone("119876543210")).toBe("119876543210");
   });
 
-  it("os três são obrigatórios", () => {
+  it("T179 — os três são opcionais: vazios não têm erro", () => {
+    expect(
+      validarContatos({ emailPessoal: " ", celular: "", telefone: "" }),
+    ).toEqual({});
+  });
+
+  it("T179 — um só preenchido é válido, e o formato dele ainda é conferido", () => {
+    expect(
+      validarContatos({
+        emailPessoal: "",
+        celular: "",
+        telefone: "1133330001",
+      }),
+    ).toEqual({});
     expect(
       Object.keys(
-        validarContatos({ emailPessoal: " ", celular: "", telefone: "" }),
-      ).sort(),
-    ).toEqual(["celular", "emailPessoal", "telefone"]);
+        validarContatos({
+          emailPessoal: "sem-arroba",
+          celular: "",
+          telefone: "",
+        }),
+      ),
+    ).toEqual(["emailPessoal"]);
+    expect(
+      Object.keys(
+        validarContatos({ emailPessoal: "", celular: "11 9876", telefone: "" }),
+      ),
+    ).toEqual(["celular"]);
   });
 
   it.each(["sem-arroba", "a@b", "a b@c.test", "a@b@c.test"])(
@@ -98,5 +124,64 @@ describe("contatos do colaborador — regra no cliente", () => {
         telefone: "+55 21 2222-0000",
       }),
     ).toEqual({});
+  });
+});
+
+/** T179 — contatos opcionais: o que vai no corpo de cada rota. */
+describe("contatos do colaborador — corpo enviado (T179)", () => {
+  it("admissão: bloco some quando os três estão vazios", () => {
+    expect(
+      contatosDaAdmissao({ emailPessoal: " ", celular: "", telefone: "" }),
+    ).toBeUndefined();
+  });
+
+  it("admissão: só os preenchidos, normalizados", () => {
+    expect(
+      contatosDaAdmissao({
+        emailPessoal: "",
+        celular: "(11) 98765-0001",
+        telefone: "",
+      }),
+    ).toEqual({ celular: "+5511987650001" });
+    expect(
+      contatosDaAdmissao({
+        emailPessoal: " Ana@EXAMPLE.test ",
+        celular: "",
+        telefone: "(11) 3333-0001",
+      }),
+    ).toEqual({ emailPessoal: "ana@example.test", telefone: "+551133330001" });
+  });
+
+  it("ficha: os três sempre, vazio como null", () => {
+    expect(
+      contatosParaRegistro({
+        emailPessoal: "",
+        celular: "(11) 98765-0001",
+        telefone: " ",
+      }),
+    ).toEqual({
+      emailPessoal: null,
+      celular: "+5511987650001",
+      telefone: null,
+    });
+  });
+
+  it("gravado nulo vira campo vazio na edição", () => {
+    expect(
+      contatosParaEdicao({
+        emailPessoal: null,
+        celular: "+5511987650001",
+        telefone: null,
+      }),
+    ).toEqual({ emailPessoal: "", celular: "(11) 98765-0001", telefone: "" });
+  });
+
+  it("contatosVazios só com os três em branco", () => {
+    expect(
+      contatosVazios({ emailPessoal: " ", celular: "", telefone: "" }),
+    ).toBe(true);
+    expect(
+      contatosVazios({ emailPessoal: "", celular: "", telefone: "1133330001" }),
+    ).toBe(false);
   });
 });

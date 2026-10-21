@@ -8,6 +8,11 @@
  *
  * T179 — "Salvar" só valida; quem grava é "Confirmar cadastro", no modal de
  * confirmação. Os testes que esperam um envio passam pelos dois.
+ *
+ * T179 — obrigatoriedade da decisão da proprietária de 2026-10-21: só nome,
+ * data de nascimento, tipo de vínculo, data de admissão, Departamento e Cargo
+ * são obrigatórios. Matrícula, Unidade, e-mail pessoal, celular e telefone
+ * passaram a opcionais, e o sexo é lista fechada.
  */
 import {
   act,
@@ -118,7 +123,8 @@ const resposta: AdmissaoRegistradaApi = {
   },
   perfilPessoal: {
     dataNascimento: "1990-05-20",
-    sexo: "Feminino",
+    // T179 — gravado como código; a confirmação mostra o rótulo.
+    sexo: "feminino",
     saudacao: null,
     estadoCivil: "Solteira",
     nacionalidade: "Brasileira",
@@ -290,20 +296,25 @@ describe("Nova admissão — página própria", () => {
   it("pede os campos do Módulo 1, e nenhum campo de módulo futuro", async () => {
     montar();
     await aguardarEmpresa();
+    // T179 — só estes seis são obrigatórios.
     for (const campo of [
       nome,
       dataNascimento,
-      emailPessoal,
-      celular,
-      telefone,
-      matricula,
       tipo,
       data,
       departamentoSel,
       cargoSel,
-      unidadeSel,
     ]) {
       expect(campo()).toHaveAttribute("aria-required", "true");
+    }
+    for (const campo of [
+      emailPessoal,
+      celular,
+      telefone,
+      matricula,
+      unidadeSel,
+    ]) {
+      expect(campo()).not.toHaveAttribute("aria-required");
     }
     const form = screen.getByRole("form", {
       name: "Formulário de nova admissão",
@@ -382,6 +393,12 @@ describe("Nova admissão — página própria", () => {
       "Bairro",
       "Cidade",
       "Estado",
+      // T179 — opcionais desde a decisão de 2026-10-21.
+      "E-mail pessoal",
+      "Celular",
+      "Telefone",
+      "Matrícula",
+      "Unidade",
       "Área",
       "Equipe",
       "Centro de custo",
@@ -392,12 +409,10 @@ describe("Nova admissão — página própria", () => {
     for (const campo of [
       nome,
       dataNascimento,
-      emailPessoal,
-      celular,
-      telefone,
+      tipo,
+      data,
       departamentoSel,
       cargoSel,
-      unidadeSel,
     ]) {
       expect(campo()).toHaveAttribute("aria-required", "true");
       expect(campo()).toHaveAccessibleName(/obrigatório/);
@@ -429,11 +444,30 @@ describe("Nova admissão — página própria", () => {
     expect(pais()).toHaveValue("Portugal");
   });
 
-  it("sem nenhum select inventado: sexo, estado civil, escolaridade, cidade e estado são texto", async () => {
+  it("T179 — sexo é seletor de lista fechada: vazio + as quatro opções, sem texto livre", async () => {
+    montar();
+    await aguardarEmpresa();
+    const sexo = screen.getByLabelText("Sexo (opcional)");
+    expect(sexo.tagName).toBe("SELECT");
+    expect(sexo).not.toHaveAttribute("aria-required");
+    expect(sexo).toHaveValue("");
+    expect(
+      within(sexo)
+        .getAllByRole("option")
+        .map((o) => [(o as HTMLOptionElement).value, o.textContent]),
+    ).toEqual([
+      ["", "Selecione…"],
+      ["feminino", "Feminino"],
+      ["masculino", "Masculino"],
+      ["intersexo", "Intersexo"],
+      ["nao_informar", "Não informar"],
+    ]);
+  });
+
+  it("sem outro select inventado: estado civil, escolaridade, cidade e estado são texto", async () => {
     montar();
     await aguardarEmpresa();
     for (const rotulo of [
-      /^Sexo/,
       /^Estado civil/,
       /^Escolaridade/,
       /^Cidade/,
@@ -451,19 +485,25 @@ describe("Nova admissão — página própria", () => {
     await waitFor(() => expect(nome()).toHaveFocus());
     expect(nome()).toHaveAttribute("aria-invalid", "true");
     expect(nome()).toHaveAccessibleDescription(/Nome é obrigatório/);
-    expect(matricula()).toHaveAccessibleDescription(
-      /Use apenas letras maiúsculas/,
-    );
     expect(tipo()).toHaveAccessibleDescription(/Selecione o tipo de vínculo/);
     expect(data()).toHaveAccessibleDescription(/Informe a data de admissão/);
     expect(departamentoSel()).toHaveAccessibleDescription(
       /Selecione o departamento/,
     );
     expect(cargoSel()).toHaveAccessibleDescription(/Selecione o cargo/);
-    expect(unidadeSel()).toHaveAccessibleDescription(/Selecione a unidade/);
     expect(dataNascimento()).toHaveAccessibleDescription(
       /Informe a data de nascimento/,
     );
+    // T179 — os opcionais vazios não acusam erro.
+    for (const campo of [
+      matricula,
+      unidadeSel,
+      emailPessoal,
+      celular,
+      telefone,
+    ]) {
+      expect(campo()).not.toHaveAttribute("aria-invalid");
+    }
     expect(dialogoConfirmacao()).toBeNull();
     expect(admitirColaborador).not.toHaveBeenCalled();
   });
@@ -488,34 +528,30 @@ describe("Nova admissão — página própria", () => {
     await aguardarEmpresa();
     fireEvent.change(nome(), { target: { value: "Pessoa Sintética" } });
     fireEvent.click(salvar());
-    // T178 — o e-mail pessoal fica ao lado do nome, em Dados pessoais: é o
-    // primeiro obrigatório vazio depois dele.
-    await waitFor(() => expect(emailPessoal()).toHaveFocus());
-    fireEvent.change(emailPessoal(), {
-      target: { value: "pessoa@exemplo.test" },
-    });
-    fireEvent.click(salvar());
-    // Depois dele, a data de nascimento.
+    // T179 — o e-mail pessoal, ao lado do nome, é opcional: o primeiro
+    // obrigatório vazio depois do nome é a data de nascimento.
     await waitFor(() => expect(dataNascimento()).toHaveFocus());
     fireEvent.change(dataNascimento(), { target: { value: "1990-05-20" } });
     fireEvent.click(salvar());
-    // Depois dela, o celular (o primeiro dos contatos que ficaram no bloco).
-    await waitFor(() => expect(celular()).toHaveFocus());
-    preencherContatos();
-    fireEvent.click(salvar());
-    await waitFor(() => expect(matricula()).toHaveFocus());
-    fireEvent.change(matricula(), { target: { value: "MAT-1" } });
+    // Contatos e matrícula são opcionais: depois vem o tipo de vínculo.
+    await waitFor(() => expect(tipo()).toHaveFocus());
     fireEvent.change(tipo(), { target: { value: "clt" } });
+    fireEvent.click(salvar());
+    await waitFor(() => expect(data()).toHaveFocus());
     fireEvent.change(data(), { target: { value: "2026-11-03" } });
     fireEvent.click(salvar());
-    // T179 — e, por fim, os três seletores obrigatórios da lotação.
+    // T179 — e, por fim, os dois seletores obrigatórios da lotação.
     await waitFor(() => expect(departamentoSel()).toHaveFocus());
     fireEvent.change(departamentoSel(), { target: { value: departamento.id } });
     fireEvent.click(salvar());
     await waitFor(() => expect(cargoSel()).toHaveFocus());
     fireEvent.change(cargoSel(), { target: { value: cargo.id } });
     fireEvent.click(salvar());
-    await waitFor(() => expect(unidadeSel()).toHaveFocus());
+    // Sem Unidade, o formulário está completo: abre a confirmação.
+    await screen.findByRole("dialog", {
+      name: "Confirmar cadastro de colaborador?",
+    });
+    expect(admitirColaborador).not.toHaveBeenCalled();
   });
 
   it("T178/T179 — os campos aparecem na disposição pedida, linha a linha", async () => {
@@ -612,16 +648,16 @@ describe("Nova admissão — página própria", () => {
     expect(dto.perfilPessoal).not.toHaveProperty("emailPessoal");
   });
 
-  it("contatos seguem a ficha da T169: os três obrigatórios, com mensagem no campo", async () => {
+  it("T179 — contatos opcionais: vazios não acusam erro nem dizem 'obrigatório'", async () => {
     montar();
     await aguardarEmpresa();
     fireEvent.click(salvar());
     await waitFor(() => expect(nome()).toHaveFocus());
-    expect(emailPessoal()).toHaveAccessibleDescription(
-      /E-mail pessoal é obrigatório/,
-    );
-    expect(celular()).toHaveAccessibleDescription(/Celular é obrigatório/);
-    expect(telefone()).toHaveAccessibleDescription(/Telefone é obrigatório/);
+    for (const campo of [emailPessoal, celular, telefone]) {
+      expect(campo()).not.toHaveAttribute("aria-invalid");
+      expect(campo()).not.toHaveAccessibleDescription(/obrigatório/);
+      expect(campo()).not.toHaveAccessibleName(/obrigatório/);
+    }
   });
 
   it.each([
@@ -632,6 +668,10 @@ describe("Nova admissão — página própria", () => {
     [/^Saudação/, "x".repeat(41), /no máximo 40 caracteres/],
     [/^Celular/, "11 9876-5", /precisa do DDD e do número/],
     [/^Telefone/, "(11) 1000-0000", /não é um número brasileiro válido/],
+    // T179 — opcionais, mas o formato ainda vale quando preenchidos.
+    [/^Matrícula/, "M", /Use apenas letras maiúsculas/],
+    [/^Matrícula/, "MAT 01", /Use apenas letras maiúsculas/],
+    [/E-mail pessoal/, "sem-arroba", /Informe um e-mail válido/],
   ])(
     "valida %s no cliente, antes de enviar",
     async (rotulo, valor, mensagem) => {
@@ -674,7 +714,7 @@ describe("Nova admissão — página própria", () => {
     await waitFor(() => expect(nome()).toHaveFocus());
     fireEvent.change(nome(), { target: { value: "Pessoa" } });
     expect(nome()).not.toHaveAttribute("aria-invalid");
-    expect(matricula()).toHaveAttribute("aria-invalid", "true");
+    expect(tipo()).toHaveAttribute("aria-invalid", "true");
   });
 
   it("envia exatamente o contrato: empresa da sessão, matrícula normalizada, Departamento, Cargo e Unidade, e a chave do envio", async () => {
@@ -726,6 +766,120 @@ describe("Nova admissão — página própria", () => {
     );
   });
 
+  it("T179 — só os obrigatórios: sem matrícula, unidade, contatos nem e-mail, o corpo os omite", async () => {
+    montar();
+    await aguardarEmpresa();
+    fireEvent.change(nome(), { target: { value: " Pessoa Mínima " } });
+    fireEvent.change(dataNascimento(), { target: { value: "1991-02-03" } });
+    fireEvent.change(tipo(), { target: { value: "estagio" } });
+    fireEvent.change(data(), { target: { value: "2026-11-04" } });
+    fireEvent.change(departamentoSel(), { target: { value: departamento.id } });
+    fireEvent.change(cargoSel(), { target: { value: cargo.id } });
+    await salvarEConfirmar();
+    await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
+    const [dto, opcoes] = vi.mocked(admitirColaborador).mock.calls[0]!;
+    expect(dto).toEqual({
+      nome: "Pessoa Mínima",
+      empresaId: empresa.id,
+      tipo: "estagio",
+      dataAdmissao: "2026-11-04",
+      motivoCodigo: "admissao_inicial",
+      departamentoId: departamento.id,
+      cargoId: cargo.id,
+      perfilPessoal: {
+        dataNascimento: "1991-02-03",
+        sexo: null,
+        saudacao: null,
+        estadoCivil: null,
+        nacionalidade: null,
+        naturalidade: null,
+        escolaridade: null,
+        curso: null,
+        nomePai: null,
+        nomeMae: null,
+      },
+      endereco: {
+        pais: "Brasil",
+        cep: null,
+        logradouro: null,
+        numero: null,
+        complemento: null,
+        bairro: null,
+        cidade: null,
+        estado: null,
+      },
+    });
+    // Ausentes de verdade — nem `undefined`, nem string vazia.
+    for (const chave of [
+      "matricula",
+      "unidadeOrganizacionalId",
+      "areaId",
+      "equipeId",
+      "centroCustoId",
+      "contatos",
+    ]) {
+      expect(Object.keys(dto)).not.toContain(chave);
+    }
+    expect(opcoes).toEqual({
+      chaveIdempotencia: expect.stringMatching(/^[0-9a-f-]{36}$/),
+    });
+  });
+
+  it("T179 — um contato só: o bloco leva só ele", async () => {
+    montar();
+    await aguardarEmpresa();
+    preencherValido();
+    fireEvent.change(emailPessoal(), { target: { value: "" } });
+    fireEvent.change(telefone(), { target: { value: "" } });
+    await salvarEConfirmar();
+    await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(admitirColaborador).mock.calls[0]![0].contatos).toEqual({
+      celular: "+5531999990000",
+    });
+  });
+
+  it.each([
+    ["feminino", "Feminino"],
+    ["masculino", "Masculino"],
+    ["intersexo", "Intersexo"],
+    ["nao_informar", "Não informar"],
+  ])("T179 — sexo %s (%s) vai como código no corpo", async (codigo, rotulo) => {
+    montar();
+    await aguardarEmpresa();
+    preencherValido();
+    const sexo = screen.getByLabelText("Sexo (opcional)");
+    fireEvent.change(sexo, { target: { value: codigo } });
+    expect(sexo).toHaveDisplayValue(rotulo);
+    await salvarEConfirmar();
+    await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
+    expect(
+      vi.mocked(admitirColaborador).mock.calls[0]![0].perfilPessoal.sexo,
+    ).toBe(codigo);
+  });
+
+  it("T179 — sexo sem seleção vai null, e voltar a 'Selecione…' desfaz a escolha", async () => {
+    montar();
+    await aguardarEmpresa();
+    preencherValido();
+    const sexo = screen.getByLabelText("Sexo (opcional)");
+    fireEvent.change(sexo, { target: { value: "masculino" } });
+    fireEvent.change(sexo, { target: { value: "" } });
+    await salvarEConfirmar();
+    await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
+    expect(
+      vi.mocked(admitirColaborador).mock.calls[0]![0].perfilPessoal.sexo,
+    ).toBeNull();
+  });
+
+  it("T179 — valor de sexo fora da lista não é aceito pelo seletor", async () => {
+    montar();
+    await aguardarEmpresa();
+    const sexo = screen.getByLabelText("Sexo (opcional)");
+    fireEvent.change(sexo, { target: { value: "Feminino" } });
+    // Sem opção com esse valor, o seletor fica sem seleção — nunca texto livre.
+    expect(sexo).toHaveValue("");
+  });
+
   it("envia os dados pessoais e o endereço normalizados, vazio como null", async () => {
     montar();
     await aguardarEmpresa();
@@ -733,8 +887,9 @@ describe("Nova admissão — página própria", () => {
     fireEvent.change(screen.getByLabelText(/Data de nascimento/), {
       target: { value: "1990-05-20" },
     });
+    // T179 — sexo de lista fechada: vai o código.
     fireEvent.change(screen.getByLabelText(/^Sexo/), {
-      target: { value: "  Feminino " },
+      target: { value: "feminino" },
     });
     fireEvent.change(screen.getByLabelText(/^Naturalidade/), {
       target: { value: "Belo   Horizonte" },
@@ -754,7 +909,7 @@ describe("Nova admissão — página própria", () => {
       expect.objectContaining({
         perfilPessoal: expect.objectContaining({
           dataNascimento: "1990-05-20",
-          sexo: "Feminino",
+          sexo: "feminino",
           naturalidade: "Belo Horizonte",
           nomeMae: "Mãe Sintética",
           curso: null,
@@ -979,6 +1134,26 @@ describe("T179 — confirmação antes de gravar", () => {
     }
   });
 
+  it("T179 — sem matrícula e sem unidade, o resumo diz 'Não informada'", async () => {
+    montar();
+    await aguardarEmpresa();
+    preencherValido();
+    fireEvent.change(matricula(), { target: { value: "" } });
+    fireEvent.change(unidadeSel(), { target: { value: "" } });
+    fireEvent.click(salvar());
+    const dialogo = await screen.findByRole("dialog", {
+      name: "Confirmar cadastro de colaborador?",
+    });
+    const matriculaNoResumo = within(dialogo).getByText("Matrícula", {
+      selector: "dt",
+    }).nextElementSibling;
+    expect(matriculaNoResumo).toHaveTextContent("Não informada");
+    expect(dialogo).toHaveTextContent("Unidade: Não informada");
+    expect(dialogo).toHaveTextContent("Área: Não informada");
+    expect(dialogo).toHaveTextContent("Centro de custo: Não informado");
+    expect(dialogo).not.toHaveTextContent("null");
+  });
+
   it("'Voltar e revisar' fecha sem enviar, preserva tudo e devolve o foco a 'Salvar'", async () => {
     vi.mocked(consultarCep).mockResolvedValue({
       cep: "30140071",
@@ -1102,7 +1277,7 @@ describe("Nova admissão — recusa do servidor preserva os dados", () => {
     await waitFor(() => expect(matricula()).toHaveFocus());
     expect(dialogoConfirmacao()).toBeNull();
     expect(matricula()).toHaveAccessibleDescription(
-      "Letras maiúsculas, números, - e _ (2 a 32 caracteres). Esta matrícula já está em uso nesta empresa.",
+      "Letras maiúsculas, números, - e _ (2 a 32 caracteres). Pode ficar em branco. Esta matrícula já está em uso nesta empresa.",
     );
     expect(emailPessoal()).not.toHaveAttribute("aria-invalid");
     expect(nome()).toHaveValue("  Pessoa Sintética Nova ");
@@ -1361,7 +1536,7 @@ describe("Nova admissão — empresa indefinida não envia", () => {
   );
 });
 
-describe("T179 — empresa sem Departamento, Cargo ou Unidade ativos", () => {
+describe("T179 — empresa sem Departamento ou Cargo ativos", () => {
   beforeEach(() => {
     vi.mocked(listarCargos).mockResolvedValue(paginado([]));
     vi.mocked(listarUnidades).mockResolvedValue(paginado([]));
@@ -1371,12 +1546,13 @@ describe("T179 — empresa sem Departamento, Cargo ou Unidade ativos", () => {
     montar("rh");
     await aguardarEmpresa();
     const aviso = screen.getByText(/ainda não tem cadastro ativo de/);
+    // T179 — a Unidade é opcional: faltar unidade não entra no aviso.
     expect(aviso).toHaveTextContent(
-      "Esta empresa ainda não tem cadastro ativo de Cargo e Unidade",
+      "Esta empresa ainda não tem cadastro ativo de Cargo, e a admissão exige Departamento e Cargo.",
     );
     expect(aviso).toHaveTextContent(/Cadastre o que falta em Estrutura/);
-    expect(aviso).toHaveTextContent(/Unidade em Estrutura organizacional/);
     expect(aviso).toHaveTextContent(/Cargo em Funções e cargos/);
+    expect(aviso).not.toHaveTextContent(/Unidade/);
     expect(aviso).not.toHaveTextContent(/O RH precisa/);
     expect(
       within(cargoSel()).getByRole("option", { name: "Nenhum cargo ativo" }),
@@ -1393,13 +1569,26 @@ describe("T179 — empresa sem Departamento, Cargo ou Unidade ativos", () => {
     expect(admitirColaborador).not.toHaveBeenCalled();
   });
 
-  it("DP: diz que o RH precisa cadastrar Departamento, Cargo e Unidade", async () => {
+  it("RH: sem departamento e sem cargo, aponta cada um ao seu lugar", async () => {
+    vi.mocked(listarDepartamentos).mockResolvedValue(paginado([]));
+    montar("rh");
+    await aguardarEmpresa();
+    const aviso = screen.getByText(/ainda não tem cadastro ativo de/);
+    expect(aviso).toHaveTextContent(
+      "Esta empresa ainda não tem cadastro ativo de Departamento e Cargo",
+    );
+    expect(aviso).toHaveTextContent(/Departamento em Estrutura organizacional/);
+    expect(aviso).toHaveTextContent(/Cargo em Funções e cargos/);
+  });
+
+  it("DP: diz que o RH precisa cadastrar o que falta", async () => {
     montar("dp");
     await aguardarEmpresa();
     const aviso = screen.getByText(/ainda não tem cadastro ativo de/);
     expect(aviso).toHaveTextContent(
-      /O RH precisa cadastrar Departamento, Cargo e Unidade/,
+      /O RH precisa cadastrar Cargo nesta empresa/,
     );
+    expect(aviso).not.toHaveTextContent(/Unidade/);
     expect(aviso).not.toHaveTextContent(/Cadastre o que falta/);
     fireEvent.click(salvar());
     await waitFor(() => expect(aviso).toHaveFocus());
@@ -1412,6 +1601,30 @@ describe("T179 — empresa sem Departamento, Cargo ou Unidade ativos", () => {
     montar("dp");
     await aguardarEmpresa();
     expect(screen.queryByText(/ainda não tem cadastro ativo de/)).toBeNull();
+  });
+
+  it("T179 — sem unidade ativa: não há aviso, o seletor diz isso e a admissão segue sem unidade", async () => {
+    vi.mocked(listarCargos).mockResolvedValue(paginado([cargo]));
+    montar("rh");
+    await aguardarEmpresa();
+    expect(screen.queryByText(/ainda não tem cadastro ativo de/)).toBeNull();
+    expect(
+      within(unidadeSel()).getByRole("option", {
+        name: "Nenhuma unidade ativa",
+      }),
+    ).toBeInTheDocument();
+    preencherContatos();
+    fireEvent.change(nome(), { target: { value: "Pessoa Sintética" } });
+    fireEvent.change(dataNascimento(), { target: { value: "1990-05-20" } });
+    fireEvent.change(tipo(), { target: { value: "clt" } });
+    fireEvent.change(data(), { target: { value: "2026-11-03" } });
+    fireEvent.change(departamentoSel(), { target: { value: departamento.id } });
+    fireEvent.change(cargoSel(), { target: { value: cargo.id } });
+    await salvarEConfirmar();
+    await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
+    expect(
+      Object.keys(vi.mocked(admitirColaborador).mock.calls[0]![0]),
+    ).not.toContain("unidadeOrganizacionalId");
   });
 });
 
@@ -1450,8 +1663,8 @@ describe("T179 — máscaras na Nova admissão", () => {
     await salvarEConfirmar();
     await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
     const dto = vi.mocked(admitirColaborador).mock.calls[0]![0];
-    expect(dto.contatos.celular).toBe("+5591987654321");
-    expect(dto.contatos.telefone).toBe("+551133330000");
+    expect(dto.contatos?.celular).toBe("+5591987654321");
+    expect(dto.contatos?.telefone).toBe("+551133330000");
   });
 
   it("T179 (B2): +55 digitado e o resto colado, e DDD 55 completo com dígitos a mais, chegam certos ao servidor", async () => {
@@ -1483,8 +1696,8 @@ describe("T179 — máscaras na Nova admissão", () => {
     await salvarEConfirmar();
     await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
     const dto = vi.mocked(admitirColaborador).mock.calls[0]![0];
-    expect(dto.contatos.celular).toBe("+5591987654321");
-    expect(dto.contatos.telefone).toBe("+5555999998888");
+    expect(dto.contatos?.celular).toBe("+5591987654321");
+    expect(dto.contatos?.telefone).toBe("+5555999998888");
   });
 
   it("CEP: máscara 00000-000 só com país Brasil", async () => {
@@ -1630,6 +1843,8 @@ describe("Nova admissão — sucesso", () => {
       name: "Dados pessoais",
     });
     expect(dadosPessoais).toHaveTextContent("20/05/1990");
+    expect(dadosPessoais).toHaveTextContent("Feminino");
+    expect(dadosPessoais).not.toHaveTextContent("feminino");
     expect(dadosPessoais).toHaveTextContent("Mãe Sintética Servidor");
     expect(dadosPessoais).toHaveTextContent("Não informado");
     const enderecoGravado = screen.getByRole("region", { name: "Endereço" });
@@ -1643,6 +1858,47 @@ describe("Nova admissão — sucesso", () => {
     expect(contatosGravados).toHaveTextContent("(31) 3333-0000");
     expect(contatosGravados).not.toHaveTextContent("+55");
     expectSemIsoVisivel(document.body);
+  });
+
+  it("T179 — sem matrícula, unidade nem contatos gravados: a confirmação diz isso, sem 'null'", async () => {
+    vi.mocked(admitirColaborador).mockResolvedValue({
+      ...resposta,
+      vinculo: { ...resposta.vinculo, matricula: null },
+      movimentacao: {
+        ...resposta.movimentacao,
+        destino: {
+          ...resposta.movimentacao.destino,
+          unidadeOrganizacionalId: null,
+        },
+      },
+      perfilPessoal: { ...resposta.perfilPessoal, sexo: null },
+      contatos: null,
+    });
+    await admitirComSucesso();
+    const matriculaGravada = screen.getByText("Matrícula", {
+      selector: "dt",
+    }).nextElementSibling;
+    expect(matriculaGravada).toHaveTextContent("Não informada");
+    expect(screen.getByText("Unidade: Não informada")).toBeInTheDocument();
+    const sexoGravado = within(
+      screen.getByRole("region", { name: "Dados pessoais" }),
+    ).getByText("Sexo", { selector: "dt" }).nextElementSibling;
+    expect(sexoGravado).toHaveTextContent("Não informado");
+    expect(screen.getByRole("region", { name: "Contatos" })).toHaveTextContent(
+      "Nada informado neste bloco.",
+    );
+    expect(document.body).not.toHaveTextContent("null");
+  });
+
+  it("T179 — contato gravado nulo aparece como 'Não informado'", async () => {
+    vi.mocked(admitirColaborador).mockResolvedValue({
+      ...resposta,
+      contatos: { ...resposta.contatos!, emailPessoal: null, telefone: null },
+    });
+    await admitirComSucesso();
+    const contatos = screen.getByRole("region", { name: "Contatos" });
+    expect(contatos).toHaveTextContent("(31) 99999-0000");
+    expect(within(contatos).getAllByText("Não informado")).toHaveLength(2);
   });
 
   it("abre a ficha do admitido com os dados da resposta", async () => {

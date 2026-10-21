@@ -12,6 +12,10 @@
  * mostra e edita na máscara `(00) 00000-0000` / `(00) 0000-0000`
  * (`format/mascaras.ts`); aqui o valor, mascarado ou colado, vira a forma do
  * servidor.
+ *
+ * T179 — os três contatos passaram a ser OPCIONAIS (decisão da proprietária
+ * de 2026-10-21): vazio é "não informado", e o formato só é conferido quando
+ * o campo está preenchido.
  */
 import {
   digitosNacionaisDoTelefone,
@@ -64,10 +68,17 @@ export function normalizarTelefone(valor: string): string {
   return `+55${nacionais}`;
 }
 
-/** Valores gravados como a tela os edita: telefones na máscara brasileira. */
-export function contatosParaEdicao(valores: ValoresContatos): ValoresContatos {
+/**
+ * Valores gravados como a tela os edita: telefones na máscara brasileira.
+ * T179 — o não informado (`null`) vira campo vazio.
+ */
+export function contatosParaEdicao(valores: {
+  readonly emailPessoal: string | null;
+  readonly celular: string | null;
+  readonly telefone: string | null;
+}): ValoresContatos {
   return {
-    emailPessoal: valores.emailPessoal,
+    emailPessoal: valores.emailPessoal ?? "",
     celular: exibirTelefone(valores.celular),
     telefone: exibirTelefone(valores.telefone),
   };
@@ -81,10 +92,48 @@ export function normalizarContatos(valores: ValoresContatos): ValoresContatos {
   };
 }
 
+/**
+ * T179 — corpo do bloco `contatos` da ADMISSÃO: só os campos preenchidos,
+ * normalizados; `undefined` quando os três estão vazios, para o bloco nem ir.
+ */
+export function contatosDaAdmissao(
+  valores: ValoresContatos,
+): Partial<ValoresContatos> | undefined {
+  const normalizados = normalizarContatos(valores);
+  const bloco: Partial<ValoresContatos> = {};
+  for (const campo of Object.keys(normalizados) as CampoContato[]) {
+    if (normalizados[campo] !== "") bloco[campo] = normalizados[campo];
+  }
+  return Object.keys(bloco).length > 0 ? bloco : undefined;
+}
+
+/**
+ * T179 — corpo do `PUT` da ficha: os três campos sempre, normalizados, e o
+ * vazio como `null` — é assim que um contato gravado é apagado.
+ */
+export function contatosParaRegistro(
+  valores: ValoresContatos,
+): Record<CampoContato, string | null> {
+  const normalizados = normalizarContatos(valores);
+  return {
+    emailPessoal: normalizados.emailPessoal || null,
+    celular: normalizados.celular || null,
+    telefone: normalizados.telefone || null,
+  };
+}
+
+/** T179 — nenhum dos três foi preenchido? */
+export function contatosVazios(valores: ValoresContatos): boolean {
+  return (Object.keys(valores) as CampoContato[]).every(
+    (campo) => valores[campo].trim() === "",
+  );
+}
+
 function erroDeTelefone(valor: string, rotulo: string): string | undefined {
   const aparado = valor.trim();
+  // T179 — opcional: vazio não tem formato a conferir.
   if (aparado === "") {
-    return `${rotulo} é obrigatório.`;
+    return undefined;
   }
   if (!TELEFONE_ENTRADA.test(aparado)) {
     return `${rotulo} aceita só dígitos e, como separadores, espaço, parênteses, hífen e ponto, com + apenas no início.`;
@@ -108,12 +157,15 @@ function erroDeTelefone(valor: string, rotulo: string): string | undefined {
   return `${rotulo} não é um número brasileiro válido: confira o DDD; celular tem 9 dígitos começando por 9, e fixo tem 8 começando de 2 a 5.`;
 }
 
-/** Erros por campo; vazio quando os três estão válidos. */
+/**
+ * Erros por campo; vazio quando os três estão válidos. T179 — campo vazio é
+ * válido: só o preenchido tem o formato conferido.
+ */
 export function validarContatos(valores: ValoresContatos): ErrosContatos {
   const erros: ErrosContatos = {};
   const email = normalizarEmailPessoal(valores.emailPessoal);
   if (email === "") {
-    erros.emailPessoal = "E-mail pessoal é obrigatório.";
+    // Opcional: nada a conferir.
   } else if (email.length > LIMITE_EMAIL_PESSOAL) {
     erros.emailPessoal = `E-mail pessoal deve ter no máximo ${LIMITE_EMAIL_PESSOAL} caracteres.`;
   } else if (!EMAIL_FORMA.test(email)) {

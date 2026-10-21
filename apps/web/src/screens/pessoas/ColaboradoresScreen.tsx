@@ -25,6 +25,7 @@ import {
   retificarColaborador,
 } from "../../api/colaboradoresClient";
 import { formatarDiaCivil } from "../../format/data";
+import { exibirMatricula } from "../../format/matricula";
 import { ContatosColaboradorSecao } from "./ContatosColaboradorSecao";
 import { DadosPessoaisColaboradorSecao } from "./DadosPessoaisColaboradorSecao";
 import "./ColaboradoresScreen.css";
@@ -500,7 +501,8 @@ export function ColaboradoresScreen({
         const aMais = c.vinculos.length - 1;
         return (
           <>
-            {principal.matricula}
+            {/* T179 — matrícula opcional: sem ela, "Sem matrícula". */}
+            {exibirMatricula(principal.matricula)}
             {aMais > 0 ? (
               <>
                 {/* "+N" é o atalho visual; quem usa leitor de tela ouve a
@@ -560,7 +562,11 @@ export function ColaboradoresScreen({
   ];
 
   const colunasVinculos: DataTableColumn<VinculoApi>[] = [
-    { key: "matricula", header: "Matrícula", cell: (v) => v.matricula },
+    {
+      key: "matricula",
+      header: "Matrícula",
+      cell: (v) => exibirMatricula(v.matricula),
+    },
     {
       key: "tipo",
       header: "Tipo",

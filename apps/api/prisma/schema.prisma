@@ -1078,7 +1078,9 @@ model VinculoFuncional {
   id            String          @id @default(uuid())
   colaboradorId String          @map("colaborador_id")
   empresaId     String          @map("empresa_id")
-  matricula     String
+  /// T179 — opcional na Nova admissão (decisão da proprietária de
+  /// 2026-10-21); quando informada, continua única na empresa.
+  matricula     String?
   tipo          TipoVinculo
   situacao      SituacaoVinculo @default(previsto)
 
@@ -2126,9 +2128,12 @@ model ContatoColaborador {
   empresaId     String @map("empresa_id")
   colaboradorId String @map("colaborador_id")
 
-  emailPessoal String @map("email_pessoal")
-  celular      String
-  telefone     String
+  /// T179 — os três contatos são opcionais (decisão da proprietária de
+  /// 2026-10-21); o formato continua conferido quando o valor existe, e o
+  /// e-mail pessoal informado continua único na empresa.
+  emailPessoal String? @map("email_pessoal")
+  celular      String?
+  telefone     String?
 
   criadoPorUserId     String @map("criado_por_user_id")
   atualizadoPorUserId String @map("atualizado_por_user_id")

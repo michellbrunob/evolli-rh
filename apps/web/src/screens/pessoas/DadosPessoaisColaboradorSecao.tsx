@@ -9,8 +9,10 @@ import { exibirCep } from "../../format/mascaras";
 import {
   CAMPOS_ENDERECO,
   CAMPOS_TEXTO_PERFIL,
+  CAMPO_SEXO,
   ROTULO_DATA_NASCIMENTO,
   ehPaisBrasil,
+  rotuloDoSexo,
 } from "./dadosPessoais";
 
 /**
@@ -24,6 +26,10 @@ import {
  * Leem: `rh` e `dp` na empresa ativa, e o `master_tecnico` em qualquer
  * empresa (com empresa ativa, só nela) — Emenda 2 da ADR 0012. Perfil sem
  * acesso recebe a recusa do servidor e vê um aviso, nunca um valor.
+ *
+ * T179 — o sexo é gravado como código da lista fechada e aparece pelo
+ * rótulo; sem valor, "Não informado" (nada é inferido); texto livre de um
+ * cadastro anterior à lista aparece como veio.
  */
 type Carga =
   | { status: "carregando" }
@@ -112,6 +118,12 @@ export function DadosPessoaisColaboradorSecao({
               {carga.dados.perfilPessoal?.dataNascimento
                 ? formatarDiaCivil(carga.dados.perfilPessoal.dataNascimento)
                 : "Não informado"}
+            </dd>
+          </div>
+          <div className="colaboradores-screen__par">
+            <dt>{CAMPO_SEXO.rotulo}</dt>
+            <dd>
+              {rotuloDoSexo(carga.dados.perfilPessoal?.sexo) ?? "Não informado"}
             </dd>
           </div>
           {CAMPOS_TEXTO_PERFIL.map((c) => (

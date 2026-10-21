@@ -83,7 +83,8 @@ export interface MembroEquipeApi {
   vinculoId: string;
   colaboradorId: string;
   nome: string;
-  matricula: string;
+  /** T179 — `null` quando a admissão não informou matrícula. */
+  matricula: string | null;
   situacaoVinculo: string;
   tipoVinculo: string;
   /** `YYYY-MM-DD`. */

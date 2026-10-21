@@ -131,15 +131,22 @@ describe("Contatos — validação do corpo", () => {
     });
   });
 
-  it("os três campos são obrigatórios", async () => {
-    expect((await errosDe({})).campos).toEqual([
-      "celular",
-      "emailPessoal",
-      "telefone",
-    ]);
+  it("T179: os três campos são opcionais — ausentes, vazios ou nulos valem como não informados", async () => {
+    expect((await errosDe({})).campos).toEqual([]);
+    const { dto, campos } = await errosDe({
+      emailPessoal: "   ",
+      celular: "",
+      telefone: null,
+    });
+    expect(campos).toEqual([]);
+    expect(dto).toMatchObject({
+      emailPessoal: null,
+      celular: null,
+      telefone: null,
+    });
   });
 
-  it.each(["", "   ", "sem-arroba", "a@b@c.test", "duas palavras@x.test"])(
+  it.each(["sem-arroba", "a@b@c.test", "duas palavras@x.test"])(
     "e-mail inválido %p é recusado",
     async (emailPessoal) => {
       expect((await errosDe({ ...CORPO_VALIDO, emailPessoal })).campos).toEqual(
@@ -181,7 +188,6 @@ describe("Contatos — validação do corpo", () => {
     ["1234567", "7 dígitos"],
     ["+1234567890123456", "16 dígitos"],
     ["11 9876-ABCD", "letra"],
-    ["", "vazio"],
     ["() - .", "só separadores"],
     // T179 — fora da forma brasileira.
     ["12345678", "8 dígitos, sem DDD"],

@@ -12,7 +12,8 @@ import {
   type ValoresContatos,
   LIMITE_EMAIL_PESSOAL,
   contatosParaEdicao,
-  normalizarContatos,
+  contatosParaRegistro,
+  contatosVazios,
   validarContatos,
 } from "./contatosColaborador";
 import { DICA_DE_FORMATO } from "../../format/mascaras";
@@ -23,7 +24,11 @@ import { DICA_DE_FORMATO } from "../../format/mascaras";
  * Lê e grava pelas rotas próprias de contatos; nada daqui passa pela
  * listagem. A empresa nunca é enviada: o servidor a resolve pelo vínculo.
  *
- * Os três campos são obrigatórios juntos, como na ficha de tratamento. A
+ * T179 — os três campos são OPCIONAIS (decisão da proprietária de
+ * 2026-10-21): o formato só é conferido no que está preenchido, e o vazio vai
+ * `null` no `PUT` — é assim que um contato gravado é apagado. Sem registro,
+ * salvar os três vazios não cria nada: pede ao menos um. O não informado
+ * aparece como "Não informado" no próprio campo vazio. A
  * confirmação de descarte é a do `Modal`: a seção avisa o detalhe quando há
  * edição não salva (`onAlteradoChange`) e quando está gravando
  * (`onSalvandoChange`), e o detalhe soma isso ao que ele próprio edita.
@@ -58,14 +63,21 @@ type Carga =
   | { status: "bloqueado" }
   | { status: "dados"; gravado: ContatosApi | null };
 
-/** O que foi gravado, como a tela edita: telefones já mascarados (T179). */
+/**
+ * O que foi gravado, como a tela edita: telefones já mascarados (T179). O
+ * não informado (`null`) vira campo vazio.
+ */
 function valoresDe(contatos: ContatosApi): ValoresContatos {
-  return contatosParaEdicao({
-    emailPessoal: contatos.emailPessoal,
-    celular: contatos.celular,
-    telefone: contatos.telefone,
-  });
+  return contatosParaEdicao(contatos);
 }
+
+/** T179 — rótulo de campo opcional: o "opcional" é parte do nome acessível. */
+function rotuloOpcional(rotulo: string): string {
+  return `${rotulo} (opcional)`;
+}
+
+/** T179 — o que o campo vazio mostra: o estado gravado, não um valor. */
+const NAO_INFORMADO = "Não informado";
 
 /** T179 — o campo apontado pelo 409 de e-mail em uso, lido por forma. */
 function emailEmUso(erro: unknown): boolean {
@@ -269,7 +281,12 @@ export function ContatosColaboradorSecao({
     if (salvandoRef.current || carga.status !== "dados") return;
     setSucesso(null);
 
-    const errosLocais = validarContatos(edicao);
+    const errosLocais: ErrosContatos = validarContatos(edicao);
+    // T179 — sem registro, os três vazios não criam nada: não há o que gravar.
+    if (gravado === null && contatosVazios(edicao)) {
+      errosLocais.geral =
+        "Nenhum contato preenchido: informe ao menos um para salvar.";
+    }
     if (Object.keys(errosLocais).length > 0) {
       focarPrimeiroErroRef.current = true;
       setErros(errosLocais);
@@ -282,7 +299,7 @@ export function ContatosColaboradorSecao({
     try {
       const resposta = await registrarContatosDoColaborador(
         colaboradorId,
-        normalizarContatos(edicao),
+        contatosParaRegistro(edicao),
       );
       if (!resposta?.contatos) {
         throw new Error("resposta inesperada");
@@ -340,14 +357,14 @@ export function ContatosColaboradorSecao({
         >
           {gravado === null ? (
             <p className="colaboradores-screen__contatos-aviso">
-              Nenhum contato registrado. Informe os três campos para salvar.
+              Nenhum contato registrado. Os três campos são opcionais: informe
+              os que tiver.
             </p>
           ) : null}
 
           <FormField
             id={ID_DO_CAMPO.emailPessoal}
-            label="E-mail pessoal"
-            required
+            label={rotuloOpcional("E-mail pessoal")}
             disabled={salvando}
             {...(erros.emailPessoal ? { error: erros.emailPessoal } : {})}
           >
@@ -356,6 +373,7 @@ export function ContatosColaboradorSecao({
                 type="email"
                 autoComplete="off"
                 maxLength={LIMITE_EMAIL_PESSOAL + 10}
+                placeholder={NAO_INFORMADO}
                 value={edicao.emailPessoal}
                 onChange={(e) => alterarCampo("emailPessoal", e.target.value)}
                 {...control}
@@ -365,15 +383,15 @@ export function ContatosColaboradorSecao({
 
           <FormField
             id={ID_DO_CAMPO.celular}
-            label="Celular"
+            label={rotuloOpcional("Celular")}
             help={DICA_DE_FORMATO.telefone}
-            required
             disabled={salvando}
             {...(erros.celular ? { error: erros.celular } : {})}
           >
             {(control) => (
               <CampoMascarado
                 mascara="telefone"
+                placeholder={NAO_INFORMADO}
                 value={edicao.celular}
                 onValorChange={(valor) => alterarCampo("celular", valor)}
                 {...control}
@@ -383,15 +401,15 @@ export function ContatosColaboradorSecao({
 
           <FormField
             id={ID_DO_CAMPO.telefone}
-            label="Telefone"
+            label={rotuloOpcional("Telefone")}
             help={DICA_DE_FORMATO.telefone}
-            required
             disabled={salvando}
             {...(erros.telefone ? { error: erros.telefone } : {})}
           >
             {(control) => (
               <CampoMascarado
                 mascara="telefone"
+                placeholder={NAO_INFORMADO}
                 value={edicao.telefone}
                 onValorChange={(valor) => alterarCampo("telefone", valor)}
                 {...control}

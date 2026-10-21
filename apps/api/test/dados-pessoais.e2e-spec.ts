@@ -55,7 +55,7 @@ const ADMISSAO = "2026-01-05";
 /** Valores sintéticos que NÃO podem aparecer em trilha nenhuma. */
 const PERFIL = {
   dataNascimento: "1991-07-14",
-  sexo: "  Feminino ",
+  sexo: "  feminino ",
   saudacao: "Sra.",
   estadoCivil: "Casada",
   nacionalidade: "Brasileira",
@@ -367,7 +367,7 @@ describe("Cadastro de colaborador — Módulo 1 (e2e)", () => {
     it("devolve o que o servidor gravou, já normalizado", () => {
       expect(resposta.perfilPessoal).toMatchObject({
         dataNascimento: "1991-07-14",
-        sexo: "Feminino",
+        sexo: "feminino",
         naturalidade: "Ouro Preto",
         nomeMae: "Mae Sintetica Modulo",
       });
@@ -393,7 +393,7 @@ describe("Cadastro de colaborador — Módulo 1 (e2e)", () => {
       expect(r.body.situacao).toBe("registrado");
       expect(r.body.empresaId).toBe(empresaA);
       expect(r.body.perfilPessoal).toMatchObject({
-        sexo: "Feminino",
+        sexo: "feminino",
         escolaridade: "Superior completo",
       });
       expect(r.body.endereco).toMatchObject({ cidade: "Cidade Sintetica" });
@@ -576,7 +576,7 @@ describe("Cadastro de colaborador — Módulo 1 (e2e)", () => {
       expect(r.body).toMatchObject({
         empresaId: empresaA,
         situacao: "registrado",
-        perfilPessoal: { dataNascimento: "1991-07-14", sexo: "Feminino" },
+        perfilPessoal: { dataNascimento: "1991-07-14", sexo: "feminino" },
         endereco: { cidade: "Cidade Sintetica" },
       });
       const { evento, formal } = await ultimaTrilha(colaboradorId);
@@ -762,18 +762,14 @@ describe("Cadastro de colaborador — Módulo 1 (e2e)", () => {
         { perfilPessoal: { dataNascimento: "2999-01-01" } },
       ],
       ["CEP fora do padrão", { endereco: { cep: "30140/071" } }],
-      ["contatos incompletos", { contatos: { emailPessoal: "a@b.test" } }],
-      ["sem data de nascimento", { perfilPessoal: { sexo: "Feminino" } }],
+      ["sem data de nascimento", { perfilPessoal: { sexo: "feminino" } }],
       ["data de nascimento vazia", { perfilPessoal: { dataNascimento: "" } }],
       ["sem o bloco do perfil", { perfilPessoal: undefined }],
-      ["sem os contatos", { contatos: undefined }],
+      // T179 — contatos (inteiros ou em parte) são opcionais desde a decisão
+      // de 2026-10-21: os casos de contato ausente saíram desta lista.
       [
-        "sem celular",
-        { contatos: { emailPessoal: "a@b.test", telefone: "1133330000" } },
-      ],
-      [
-        "sem telefone",
-        { contatos: { emailPessoal: "a@b.test", celular: "11999990000" } },
+        "sexo fora da lista fechada",
+        { perfilPessoal: { ...PERFIL, sexo: "Feminino" } },
       ],
       ["sem nome completo", { nome: undefined }],
       ["campo fora do Módulo 1", { perfilPessoal: { nomeSocial: "X" } }],

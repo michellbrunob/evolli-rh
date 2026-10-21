@@ -30,10 +30,15 @@ import { resolverEscopoContatos } from "./escopo-contatos.util";
  */
 export type SituacaoContatos = "sem_registro" | "registrado" | "bloqueado";
 
+/**
+ * T179 — os três contatos são opcionais (decisão da proprietária de
+ * 2026-10-21): cada um pode vir `null`. O formato continua conferido quando o
+ * valor existe.
+ */
 export interface ValoresContatos {
-  emailPessoal: string;
-  celular: string;
-  telefone: string;
+  emailPessoal: string | null;
+  celular: string | null;
+  telefone: string | null;
   atualizadoEm: Date;
 }
 
@@ -105,13 +110,44 @@ interface EventoContato {
   auditResult: AuditResult;
 }
 
+/** T179 — os três contatos como valores: o que não veio vale `null`. */
+export type ContatosInformados = Pick<
+  ValoresContatos,
+  "emailPessoal" | "celular" | "telefone"
+>;
+
+/**
+ * T179 — contatos opcionais (decisão da proprietária de 2026-10-21): o que não
+ * veio, ou veio vazio, vale `null`. O PUT substitui os três.
+ */
+export function contatosInformados(
+  dto: RegistrarContatosColaboradorDto | undefined | null,
+): ContatosInformados {
+  return {
+    emailPessoal: dto?.emailPessoal ?? null,
+    celular: dto?.celular ?? null,
+    telefone: dto?.telefone ?? null,
+  };
+}
+
+/** T179 — NOMES dos campos com valor, para o evento de criação. */
+export function camposPreenchidos(
+  valores: ContatosInformados,
+): CampoContatoColaborador[] {
+  const campos: CampoContatoColaborador[] = [];
+  if (valores.emailPessoal !== null) campos.push("email_pessoal");
+  if (valores.celular !== null) campos.push("celular");
+  if (valores.telefone !== null) campos.push("telefone");
+  return campos;
+}
+
 /**
  * Campos cujo valor normalizado mudou. Só os NOMES saem daqui — é o que o
  * evento de edição registra.
  */
 export function camposAlterados(
-  atual: Pick<ValoresContatos, "emailPessoal" | "celular" | "telefone">,
-  novo: RegistrarContatosColaboradorDto,
+  atual: ContatosInformados,
+  novo: ContatosInformados,
 ): CampoContatoColaborador[] {
   const campos: CampoContatoColaborador[] = [];
   if (atual.emailPessoal !== novo.emailPessoal) {
@@ -277,14 +313,18 @@ export class ContatoColaboradorService {
         // empresa já o usa? A restrição do banco é a garantia (corrida chega
         // como P2002, abaixo); a consulta só diz qual campo conflita. Só a
         // empresa do vínculo: "em uso" nunca revela alguém de outra.
-        const emailEmUso = await tx.contatoColaborador.findFirst({
-          where: {
-            empresaId: alvo.empresaId,
-            emailPessoal: dto.emailPessoal,
-            NOT: { colaboradorId: alvo.colaboradorId },
-          },
-          select: { id: true },
-        });
+        const novos = contatosInformados(dto);
+        const emailEmUso =
+          novos.emailPessoal === null
+            ? null
+            : await tx.contatoColaborador.findFirst({
+                where: {
+                  empresaId: alvo.empresaId,
+                  emailPessoal: novos.emailPessoal,
+                  NOT: { colaboradorId: alvo.colaboradorId },
+                },
+                select: { id: true },
+              });
         if (emailEmUso) {
           throw new ConflitoDeCamposException([
             { campo: "emailPessoal", motivo: "em_uso" },
@@ -302,13 +342,27 @@ export class ContatoColaboradorService {
         });
 
         if (!atual) {
+          const preenchidos = camposPreenchidos(novos);
+          if (preenchidos.length === 0) {
+            // T179 — nada gravado antes e nada informado agora: não há o que
+            // criar. Responde como a leitura de quem não tem contato.
+            await this.registrarEvento(tx, ctx, alvo, null, {
+              acao: "leitura",
+              resultado: "sem_registro",
+              campos: NENHUM_CAMPO,
+              auditAction: "pessoas_contato_consultado",
+              auditResult: "success",
+            });
+            return {
+              ...this.resposta(alvo, "sem_registro", null),
+              resultado: "sem_alteracao" as const,
+            };
+          }
           const criado = await tx.contatoColaborador.create({
             data: {
               empresaId: alvo.empresaId,
               colaboradorId: alvo.colaboradorId,
-              emailPessoal: dto.emailPessoal,
-              celular: dto.celular,
-              telefone: dto.telefone,
+              ...novos,
               criadoPorUserId: ctx.actor.id,
               atualizadoPorUserId: ctx.actor.id,
             },
@@ -317,7 +371,7 @@ export class ContatoColaboradorService {
           await this.registrarEvento(tx, ctx, alvo, criado.id, {
             acao: "criacao",
             resultado: "gravado",
-            campos: TODOS_OS_CAMPOS,
+            campos: preenchidos,
             auditAction: "pessoas_contato_criado",
             auditResult: "success",
           });
@@ -327,7 +381,7 @@ export class ContatoColaboradorService {
           };
         }
 
-        const campos = camposAlterados(atual, dto);
+        const campos = camposAlterados(atual, novos);
         if (campos.length === 0) {
           // Nada a gravar, mas os valores gravados voltam na resposta: é uma
           // LEITURA, e fica na trilha como tal.
@@ -347,9 +401,7 @@ export class ContatoColaboradorService {
         const atualizado = await tx.contatoColaborador.update({
           where: { id: atual.id },
           data: {
-            emailPessoal: dto.emailPessoal,
-            celular: dto.celular,
-            telefone: dto.telefone,
+            ...novos,
             atualizadoPorUserId: ctx.actor.id,
           },
           select: PROJECAO_CONTATO,
@@ -394,15 +446,17 @@ export class ContatoColaboradorService {
     tx: Prisma.TransactionClient,
     ctx: PessoasAuditContext,
     alvo: { colaboradorId: string; empresaId: string },
-    dto: RegistrarContatosColaboradorDto,
-  ): Promise<ValoresContatos> {
+    dto: RegistrarContatosColaboradorDto | undefined,
+  ): Promise<ValoresContatos | null> {
+    // T179 — contatos opcionais: sem nenhum valor, nenhum registro nasce.
+    const novos = contatosInformados(dto);
+    const preenchidos = camposPreenchidos(novos);
+    if (preenchidos.length === 0) return null;
     const criado = await tx.contatoColaborador.create({
       data: {
         empresaId: alvo.empresaId,
         colaboradorId: alvo.colaboradorId,
-        emailPessoal: dto.emailPessoal,
-        celular: dto.celular,
-        telefone: dto.telefone,
+        ...novos,
         criadoPorUserId: ctx.actor.id,
         atualizadoPorUserId: ctx.actor.id,
       },
@@ -416,7 +470,7 @@ export class ContatoColaboradorService {
       {
         acao: "criacao",
         resultado: "gravado",
-        campos: TODOS_OS_CAMPOS,
+        campos: preenchidos,
         auditAction: "pessoas_contato_criado",
         auditResult: "success",
       },

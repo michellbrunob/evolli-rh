@@ -803,3 +803,17 @@ Decisões da proprietária de 2026-10-21 ([decisão](../decisions/t179-confirmac
   (`DP-28`, ver a nota da T179 na ADR 0017).
 
 O texto original desta ADR foi preservado.
+
+## Nota de convergência (T179, 2026-10-21) — obrigatoriedade do cadastro
+
+A proprietária fixou a obrigatoriedade do cadastro por seção
+([decisão](../decisions/t179-obrigatoriedade-cadastro-colaborador.md)): obrigatórios nome completo, data de
+nascimento, Departamento, Cargo, data de admissão e tipo de vínculo (este,
+até tarefa própria); opcionais e-mail pessoal, Sexo, matrícula, Unidade,
+endereço (inclusive CEP) e contatos. **Sexo** passa a opções fechadas
+(Feminino, Masculino, Intersexo, Não informar), opcional. Obrigatoriedade
+futura registrada sem implementar: **gênero** obrigatório quando o
+`DP-ADM-09` liberar; **CPF** obrigatório quando, e só quando, o módulo de
+documentos e a sua ficha forem autorizados (`DP-ADM-04`). Nas matrizes da
+seção 6, onde a coluna de obrigatoriedade divergir, vale esta nota. O texto
+original desta ADR foi preservado.

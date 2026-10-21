@@ -17,17 +17,20 @@
  *   devolve para a sessão. Nenhuma, ou mais de uma, é estado que a página não
  *   sabe resolver, e então ela não envia.
  * - **Contatos com uma só fonte.** E-mail pessoal, celular e telefone são os
- *   da ficha da T169: obrigatórios, juntos, e lidos depois pela rota própria.
+ *   da ficha da T169, lidos depois pela rota própria. T179 — opcionais: cada
+ *   vazio fica fora do corpo, e o bloco some quando os três estão vazios.
  * - **Servidor como fonte.** A confirmação mostra o que o servidor gravou.
  *
  * ## Obrigatoriedade, campo a campo
  *
- * OBRIGATÓRIOS (asterisco e "obrigatório" para leitor de tela): nome
- * completo, data de nascimento, e-mail pessoal, celular e telefone — e, do
- * vínculo, matrícula, tipo e data de admissão; da lotação, Departamento, Cargo
- * e Unidade (T179). OPCIONAIS (rótulo com "opcional"): os demais dados
- * pessoais, todo o endereço, e Área, Equipe e Centro de custo. É o mesmo
- * contrato que o servidor exige.
+ * T179 — decisão da proprietária de 2026-10-21. OBRIGATÓRIOS (asterisco e
+ * "obrigatório" para leitor de tela): nome completo e data de nascimento; do
+ * vínculo, tipo e data de admissão; da lotação, Departamento e Cargo.
+ * OPCIONAIS (rótulo com "opcional"): e-mail pessoal, celular e telefone; os
+ * demais dados pessoais (sexo em lista fechada); todo o endereço; a
+ * matrícula (formato conferido só quando preenchida); e Unidade, Área,
+ * Equipe e Centro de custo. Opcional vazio não vai no corpo (ou vai `null`
+ * nos blocos de perfil e endereço). É o mesmo contrato que o servidor exige.
  *
  * ## T179 — confirmar antes de gravar
  *
@@ -51,9 +54,10 @@
  * Não coleta nome social, gênero, raça/etnia, foto, deficiência, contato de
  * emergência, documentos, CPF, dados bancários, dependentes nem dados
  * contratuais avançados — cada um tem destino na matriz de cobertura da T177.
- * Não inventa lista de opções: sexo, estado civil, escolaridade, país, cidade
- * e estado são texto validado. Não cadastra Departamento, Cargo nem Unidade:
- * isso é do RH, em Estrutura (T179, decisão 7).
+ * Não inventa lista de opções: estado civil, escolaridade, país, cidade e
+ * estado são texto validado. A única lista é a de sexo, FECHADA por decisão
+ * da proprietária (T179, `OPCOES_SEXO`). Não cadastra Departamento, Cargo nem
+ * Unidade: isso é do RH, em Estrutura (T179, decisão 7).
  *
  * T178 — o CEP brasileiro pode SUGERIR logradouro, bairro, cidade e estado
  * (consulta autorizada pela proprietária, feita pelo servidor em
@@ -112,6 +116,8 @@ import {
 import {
   CAMPOS_ENDERECO,
   CAMPOS_TEXTO_PERFIL,
+  CAMPO_SEXO,
+  OPCOES_SEXO,
   type ChaveEndereco,
   type ChavePerfil,
   ENDERECO_INICIAL,
@@ -122,13 +128,14 @@ import {
   blocoEndereco,
   blocoPerfil,
   ehPaisBrasil,
+  rotuloDoSexo,
   validarEndereco,
   validarPerfil,
 } from "./dadosPessoais";
 import {
   type CampoContato,
   type ValoresContatos,
-  normalizarContatos,
+  contatosDaAdmissao,
   validarContatos,
 } from "./contatosColaborador";
 import "./NovaAdmissaoScreen.css";
@@ -283,7 +290,10 @@ type EstadoCep =
 // Erros, campo a campo.
 // ---------------------------------------------------------------------------
 
-/** T179 — os seis seletores da lotação: três obrigatórios, três opcionais. */
+/**
+ * T179 — os seis seletores da lotação: Departamento e Cargo obrigatórios;
+ * Unidade, Área, Equipe e Centro de custo opcionais.
+ */
 type CampoLotacao =
   "departamento" | "cargo" | "unidade" | "area" | "equipe" | "centroCusto";
 
@@ -310,15 +320,17 @@ type Erros = Partial<Record<CampoErro, string>>;
  * T169 — mesmo estado, mesma validação, e vai em `contatos.emailPessoal` no
  * corpo —, por isso só a posição nesta lista mudou: ela acompanha a tela.
  *
- * T179 — `referencias` é o aviso de empresa sem Departamento, Cargo ou
- * Unidade ativos, no topo do formulário: com ele, nada é enviado, e é para lá
- * que o foco vai primeiro.
+ * T179 — `referencias` é o aviso de empresa sem Departamento ou Cargo
+ * ativos, no topo do formulário: com ele, nada é enviado, e é para lá que o
+ * foco vai primeiro. A Unidade, opcional, não entra no aviso.
  */
 const ORDEM_DOS_ERROS: readonly CampoErro[] = [
   "referencias",
   "nome",
   "emailPessoal",
   "dataNascimento",
+  // T179 — o sexo é seletor, logo depois da data de nascimento na tela.
+  CAMPO_SEXO.chave,
   ...CAMPOS_TEXTO_PERFIL.map((c) => c.chave),
   ...CAMPOS_ENDERECO.map((c) => c.chave),
   "celular",
@@ -344,6 +356,7 @@ const ROTULO_DO_CAMPO = {
   nome: "Nome completo",
   emailPessoal: "E-mail pessoal",
   dataNascimento: ROTULO_DATA_NASCIMENTO,
+  sexo: CAMPO_SEXO.rotulo,
   ...Object.fromEntries(CAMPOS_TEXTO_PERFIL.map((c) => [c.chave, c.rotulo])),
   ...Object.fromEntries(CAMPOS_ENDERECO.map((c) => [c.chave, c.rotulo])),
   celular: "Celular",
@@ -485,7 +498,7 @@ function errosDaRecusa(erro: unknown): Erros {
           }
         : {
             lotacao:
-              "A lotação escolhida não foi aceita: alguma referência pode ter sido inativada ou não pertencer à empresa ativa. Revise Departamento, Cargo, Unidade e os campos opcionais da lotação.",
+              "A lotação escolhida não foi aceita: alguma referência pode ter sido inativada ou não pertencer à empresa ativa. Revise Departamento, Cargo e os campos opcionais da lotação (Unidade, Área, Equipe e Centro de custo).",
           };
     case 404:
       return {
@@ -530,9 +543,10 @@ function gerarChaveIdempotencia(): string {
 }
 
 /**
- * T179 — o aviso de empresa sem referências obrigatórias. O RH é quem
- * cadastra (em Estrutura); o DP, e qualquer outro papel, só lê — para ele, a
- * orientação é pedir ao RH (decisões 6 e 7).
+ * T179 — o aviso de empresa sem referências obrigatórias (Departamento e
+ * Cargo; a Unidade é opcional desde 2026-10-21). O RH é quem cadastra (em
+ * Estrutura); o DP, e qualquer outro papel, só lê — para ele, a orientação é
+ * pedir ao RH (decisões 6 e 7).
  */
 function mensagemSemReferencias(
   faltando: readonly string[],
@@ -540,7 +554,7 @@ function mensagemSemReferencias(
 ): string {
   const base = `Esta empresa ainda não tem cadastro ativo de ${listaComE(
     faltando,
-  )}, e a admissão exige Departamento, Cargo e Unidade. Nada será enviado até isso ser resolvido.`;
+  )}, e a admissão exige Departamento e Cargo. Nada será enviado até isso ser resolvido.`;
   if (papelDoAtor === "rh") {
     const onde: string[] = [];
     const naEstrutura = faltando.filter((f) => f !== "Cargo");
@@ -550,7 +564,9 @@ function mensagemSemReferencias(
     if (faltando.includes("Cargo")) onde.push("Cargo em Funções e cargos");
     return `${base} Cadastre o que falta em Estrutura (${onde.join("; ")}) e depois abra esta página de novo.`;
   }
-  return `${base} O RH precisa cadastrar Departamento, Cargo e Unidade nesta empresa; depois disso, abra esta página de novo.`;
+  return `${base} O RH precisa cadastrar ${listaComE(
+    faltando,
+  )} nesta empresa; depois disso, abra esta página de novo.`;
 }
 
 interface Opcoes {
@@ -734,9 +750,10 @@ export function NovaAdmissaoScreen({
   }, [admissao]);
 
   /**
-   * T179 — o que falta para admitir nesta empresa: Departamento, Cargo e
-   * Unidade são obrigatórios, e o DP não pode cadastrá-los. Só se calcula com
-   * a empresa resolvida: sem ela, o aviso de empresa indefinida já basta.
+   * T179 — o que falta para admitir nesta empresa: Departamento e Cargo são
+   * obrigatórios, e o DP não pode cadastrá-los. A Unidade é opcional: empresa
+   * sem unidade ativa admite sem ela. Só se calcula com a empresa resolvida:
+   * sem ela, o aviso de empresa indefinida já basta.
    */
   const referenciasFaltando: string[] =
     carregandoOpcoes || !empresa
@@ -744,7 +761,6 @@ export function NovaAdmissaoScreen({
       : [
           ...(opcoes.departamentos.length === 0 ? ["Departamento"] : []),
           ...(opcoes.cargos.length === 0 ? ["Cargo"] : []),
-          ...(opcoes.unidades.length === 0 ? ["Unidade"] : []),
         ];
 
   const alterado =
@@ -973,7 +989,9 @@ export function NovaAdmissaoScreen({
     } else if (nome.length < 2 || nome.length > 160) {
       novos.nome = "Nome deve ter entre 2 e 160 caracteres.";
     }
-    if (!MATRICULA_PATTERN.test(campos.matricula.trim().toUpperCase())) {
+    // T179 — matrícula opcional: o formato só é conferido quando preenchida.
+    const matricula = campos.matricula.trim().toUpperCase();
+    if (matricula !== "" && !MATRICULA_PATTERN.test(matricula)) {
       novos.matricula =
         "Use apenas letras maiúsculas, números, - e _ (2 a 32 caracteres).";
     }
@@ -993,12 +1011,6 @@ export function NovaAdmissaoScreen({
           ? "Selecione o cargo."
           : "Não há cargo ativo nesta empresa.";
     }
-    if (!campos.unidadeId) {
-      novos.unidade =
-        opcoes.unidades.length > 0
-          ? "Selecione a unidade."
-          : "Não há unidade ativa nesta empresa.";
-    }
     Object.assign(
       novos,
       validarPerfil(perfil),
@@ -1009,24 +1021,32 @@ export function NovaAdmissaoScreen({
     return novos;
   }
 
+  /**
+   * Corpo da admissão. T179 — opcional vazio fica FORA do corpo: matrícula,
+   * Unidade, Área, Equipe, Centro de custo e cada contato (o bloco `contatos`
+   * inteiro some quando os três estão vazios). Perfil e endereço seguem com
+   * o vazio como `null` — inclusive o sexo sem seleção.
+   */
   function montarDto(empresaId: string): AdmitirColaboradorDto {
-    const { areaId, equipeId, centroCustoId } = campos;
+    const { unidadeId, areaId, equipeId, centroCustoId } = campos;
+    const matricula = campos.matricula.trim().toUpperCase();
+    const blocoContatos = contatosDaAdmissao(contatos);
     return {
       nome: campos.nome.trim(),
       empresaId,
-      matricula: campos.matricula.trim().toUpperCase(),
+      ...(matricula ? { matricula } : {}),
       tipo: campos.tipo as TipoVinculo,
       dataAdmissao: campos.dataAdmissao,
       motivoCodigo: "admissao_inicial",
       departamentoId: campos.departamentoId,
       cargoId: campos.cargoId,
-      unidadeOrganizacionalId: campos.unidadeId,
+      ...(unidadeId ? { unidadeOrganizacionalId: unidadeId } : {}),
       ...(areaId ? { areaId } : {}),
       ...(equipeId ? { equipeId } : {}),
       ...(centroCustoId ? { centroCustoId } : {}),
       perfilPessoal: blocoPerfil(perfil),
       endereco: blocoEndereco(endereco),
-      contatos: normalizarContatos(contatos),
+      ...(blocoContatos ? { contatos: blocoContatos } : {}),
     };
   }
 
@@ -1134,7 +1154,7 @@ export function NovaAdmissaoScreen({
    * ajuda e validação continuam vindo de `CAMPOS_TEXTO_PERFIL`; o JSX só
    * decide em que linha da grade ele aparece.
    */
-  function campoPerfil(chave: Exclude<ChavePerfil, "dataNascimento">) {
+  function campoPerfil(chave: Exclude<ChavePerfil, "dataNascimento" | "sexo">) {
     const campo = CAMPOS_TEXTO_PERFIL.find((c) => c.chave === chave)!;
     return (
       <FormField
@@ -1152,6 +1172,36 @@ export function NovaAdmissaoScreen({
             onChange={(e) => atualizarPerfil(campo.chave, e.target.value)}
             {...control}
           />
+        )}
+      </FormField>
+    );
+  }
+
+  /**
+   * T179 — o sexo: seletor de lista FECHADA (`OPCOES_SEXO`), opcional. A
+   * opção vazia "Selecione…" é o "não informado" — vai `null`. O valor é o
+   * código; o que se lê é o rótulo.
+   */
+  function campoSexo() {
+    return (
+      <FormField
+        id={ID_DO_CAMPO.sexo}
+        label={rotuloOpcional(CAMPO_SEXO.rotulo)}
+        {...(erros.sexo ? { error: erros.sexo } : {})}
+      >
+        {(control) => (
+          <select
+            value={perfil.sexo}
+            onChange={(e) => atualizarPerfil("sexo", e.target.value)}
+            {...control}
+          >
+            <option value="">Selecione…</option>
+            {OPCOES_SEXO.map((opcao) => (
+              <option key={opcao.codigo} value={opcao.codigo}>
+                {opcao.rotulo}
+              </option>
+            ))}
+          </select>
         )}
       </FormField>
     );
@@ -1202,8 +1252,8 @@ export function NovaAdmissaoScreen({
   }
 
   /**
-   * T179 — um seletor da lotação. Obrigatório (Departamento, Cargo, Unidade)
-   * ou opcional (Área, Equipe, Centro de custo); opções `CÓDIGO — Nome`, só
+   * T179 — um seletor da lotação. Obrigatório (Departamento, Cargo) ou
+   * opcional (Unidade, Área, Equipe, Centro de custo); opções `CÓDIGO — Nome`, só
    * ativas. Sem opções, o seletor diz isso no lugar de "Selecione…".
    */
   function seletorDeLotacao(definicao: {
@@ -1370,7 +1420,7 @@ export function NovaAdmissaoScreen({
               </dd>
             </dl>
           ) : null}
-          {/* T179 — empresa sem Departamento, Cargo ou Unidade ativos: o aviso
+          {/* T179 — empresa sem Departamento ou Cargo ativos: o aviso
               fica visível desde o carregamento e recebe o foco ao tentar
               salvar. */}
           {referenciasFaltando.length > 0 ? (
@@ -1420,11 +1470,10 @@ export function NovaAdmissaoScreen({
             </FormField>
             {/* O e-mail pessoal é o MESMO campo dos contatos (T169): mesmo
                 estado e validação, e segue em `contatos.emailPessoal`. Só a
-                posição na tela é de Dados pessoais. */}
+                posição na tela é de Dados pessoais. T179 — opcional. */}
             <FormField
               id={ID_DO_CAMPO.emailPessoal}
-              label="E-mail pessoal"
-              required
+              label={rotuloOpcional("E-mail pessoal")}
               {...(erros.emailPessoal ? { error: erros.emailPessoal } : {})}
             >
               {(control) => (
@@ -1459,7 +1508,7 @@ export function NovaAdmissaoScreen({
                 />
               )}
             </FormField>
-            {campoPerfil("sexo")}
+            {campoSexo()}
             {campoPerfil("saudacao")}
           </div>
           <div className="nova-admissao__linha nova-admissao__linha--3">
@@ -1569,8 +1618,7 @@ export function NovaAdmissaoScreen({
           <div className="nova-admissao__linha nova-admissao__linha--2">
             <FormField
               id={ID_DO_CAMPO.celular}
-              label="Celular"
-              required
+              label={rotuloOpcional("Celular")}
               help={DICA_DE_FORMATO.telefone}
               {...(erros.celular ? { error: erros.celular } : {})}
             >
@@ -1585,8 +1633,7 @@ export function NovaAdmissaoScreen({
             </FormField>
             <FormField
               id={ID_DO_CAMPO.telefone}
-              label="Telefone"
-              required
+              label={rotuloOpcional("Telefone")}
               help={DICA_DE_FORMATO.telefone}
               {...(erros.telefone ? { error: erros.telefone } : {})}
             >
@@ -1615,9 +1662,8 @@ export function NovaAdmissaoScreen({
           <div className="nova-admissao__linha nova-admissao__linha--3">
             <FormField
               id={ID_DO_CAMPO.matricula}
-              label="Matrícula"
-              required
-              help="Letras maiúsculas, números, - e _ (2 a 32 caracteres)."
+              label={rotuloOpcional("Matrícula")}
+              help="Letras maiúsculas, números, - e _ (2 a 32 caracteres). Pode ficar em branco."
               {...(erros.matricula ? { error: erros.matricula } : {})}
             >
               {(control) => (
@@ -1693,9 +1739,10 @@ export function NovaAdmissaoScreen({
           >
             Lotação inicial
           </h2>
-          {/* T179 — um seletor por referência: os três obrigatórios na
-              primeira linha; os três opcionais na segunda, com a Área logo
-              abaixo do Departamento que a filtra. */}
+          {/* T179 — um seletor por referência: Departamento e Cargo
+              (obrigatórios) e a Unidade (opcional) na primeira linha; os
+              demais opcionais na segunda, com a Área logo abaixo do
+              Departamento que a filtra. */}
           <div className="nova-admissao__linha nova-admissao__linha--3">
             {seletorDeLotacao({
               campo: "departamento",
@@ -1718,7 +1765,7 @@ export function NovaAdmissaoScreen({
             {seletorDeLotacao({
               campo: "unidade",
               rotulo: "Unidade",
-              obrigatorio: true,
+              obrigatorio: false,
               valor: campos.unidadeId,
               lista: opcoes.unidades,
               aoMudar: (id) => atualizar("unidadeId", id, "unidade", "lotacao"),
@@ -1873,7 +1920,7 @@ export function NovaAdmissaoScreen({
             <dt>Nome</dt>
             <dd>{campos.nome.trim()}</dd>
             <dt>Matrícula</dt>
-            <dd>{campos.matricula.trim().toUpperCase()}</dd>
+            <dd>{campos.matricula.trim().toUpperCase() || "Não informada"}</dd>
             <dt>Tipo de vínculo</dt>
             <dd>{campos.tipo ? ROTULO_TIPO_VINCULO[campos.tipo] : ""}</dd>
             <dt>Data de admissão</dt>
@@ -1881,24 +1928,40 @@ export function NovaAdmissaoScreen({
             <dt>Lotação inicial</dt>
             <dd>
               <ul className="nova-admissao__lista-lotacao">
+                {/* T179 — o opcional vazio diz "Não informada/o", no
+                    gênero do campo. */}
                 {(
                   [
                     [
                       "Departamento",
                       escolhida(opcoes.departamentos, campos.departamentoId),
+                      "Não informado",
                     ],
-                    ["Cargo", escolhida(opcoes.cargos, campos.cargoId)],
-                    ["Unidade", escolhida(opcoes.unidades, campos.unidadeId)],
-                    ["Área", escolhida(areas, campos.areaId)],
-                    ["Equipe", escolhida(opcoes.equipes, campos.equipeId)],
+                    [
+                      "Cargo",
+                      escolhida(opcoes.cargos, campos.cargoId),
+                      "Não informado",
+                    ],
+                    [
+                      "Unidade",
+                      escolhida(opcoes.unidades, campos.unidadeId),
+                      "Não informada",
+                    ],
+                    ["Área", escolhida(areas, campos.areaId), "Não informada"],
+                    [
+                      "Equipe",
+                      escolhida(opcoes.equipes, campos.equipeId),
+                      "Não informada",
+                    ],
                     [
                       "Centro de custo",
                       escolhida(opcoes.centrosCusto, campos.centroCustoId),
+                      "Não informado",
                     ],
                   ] as const
-                ).map(([rotulo, valor]) => (
+                ).map(([rotulo, valor, vazio]) => (
                   <li key={rotulo}>
-                    {rotulo}: {valor ?? "Não informado"}
+                    {rotulo}: {valor ?? vazio}
                   </li>
                 ))}
               </ul>
@@ -2006,12 +2069,15 @@ function lotacaoGravada(
       "Departamento registrado",
     ),
     ...nomear(opcoes.cargos, destino.cargoId, "Cargo", "Cargo registrado"),
-    ...nomear(
-      opcoes.unidades,
-      destino.unidadeOrganizacionalId,
-      "Unidade",
-      "Unidade registrada",
-    ),
+    // T179 — a Unidade é opcional: sem ela, a confirmação diz isso.
+    ...(destino.unidadeOrganizacionalId
+      ? nomear(
+          opcoes.unidades,
+          destino.unidadeOrganizacionalId,
+          "Unidade",
+          "Unidade registrada",
+        )
+      : ["Unidade: Não informada"]),
     ...nomear(areas, destino.areaId, "Área", "Área registrada"),
     ...nomear(opcoes.equipes, destino.equipeId, "Equipe", "Equipe registrada"),
     ...nomear(
@@ -2041,6 +2107,7 @@ function ConfirmacaoDaAdmissao({
     atualizadoEm: admissao.atualizadoEm,
   };
   const enderecoGravado = admissao.endereco;
+  const contatosGravados = admissao.contatos;
   const cepBrasileiro = ehPaisBrasil(enderecoGravado?.pais);
   return (
     <div className="nova-admissao">
@@ -2079,7 +2146,8 @@ function ConfirmacaoDaAdmissao({
           <dt>Colaborador</dt>
           <dd>{admissao.nome}</dd>
           <dt>Matrícula</dt>
-          <dd>{admissao.vinculo.matricula}</dd>
+          {/* T179 — matrícula opcional: o servidor devolve `null`. */}
+          <dd>{admissao.vinculo.matricula ?? "Não informada"}</dd>
           <dt>Tipo de vínculo</dt>
           <dd>
             {ROTULO_TIPO_VINCULO[admissao.vinculo.tipo] ??
@@ -2116,6 +2184,8 @@ function ConfirmacaoDaAdmissao({
               ROTULO_DATA_NASCIMENTO,
               formatarDiaCivil(admissao.perfilPessoal.dataNascimento),
             ],
+            // T179 — o sexo gravado é código: aparece pelo rótulo.
+            [CAMPO_SEXO.rotulo, rotuloDoSexo(admissao.perfilPessoal.sexo)],
             ...CAMPOS_TEXTO_PERFIL.map(
               (c) => [c.rotulo, admissao.perfilPessoal[c.chave]] as const,
             ),
@@ -2143,13 +2213,29 @@ function ConfirmacaoDaAdmissao({
         <ResumoGravado
           titulo="Contatos"
           id="nova-admissao-sucesso-contatos"
-          linhas={[
-            ["E-mail pessoal", admissao.contatos.emailPessoal],
-            // T179 — gravados em `+55` + DDD + número; exibidos na forma
-            // brasileira.
-            ["Celular", exibirTelefone(admissao.contatos.celular)],
-            ["Telefone", exibirTelefone(admissao.contatos.telefone)],
-          ]}
+          linhas={
+            // T179 — contatos opcionais: sem nenhum, o bloco diz isso; cada
+            // ausente aparece como "Não informado".
+            contatosGravados
+              ? [
+                  ["E-mail pessoal", contatosGravados.emailPessoal],
+                  // T179 — gravados em `+55` + DDD + número; exibidos na
+                  // forma brasileira.
+                  [
+                    "Celular",
+                    contatosGravados.celular === null
+                      ? null
+                      : exibirTelefone(contatosGravados.celular),
+                  ],
+                  [
+                    "Telefone",
+                    contatosGravados.telefone === null
+                      ? null
+                      : exibirTelefone(contatosGravados.telefone),
+                  ],
+                ]
+              : null
+          }
         />
         <FormActions>
           <Button

@@ -190,3 +190,13 @@ Por decisão da proprietária ([decisão da T179](t179-confirmacao-admissao-dupl
   e sem o valor, e só na empresa ativa.
 
 Finalidade, base legal, classificação, retenção e escopo de acesso não mudam.
+
+## 9. Alteração de 2026-10-21 (T179) — contatos opcionais
+
+Pela [decisão de obrigatoriedade](t179-obrigatoriedade-cadastro-colaborador.md), **e-mail pessoal, celular e
+telefone passam a opcionais**, na admissão e na edição. Admissão sem nenhum
+contato não cria registro; campo vazio grava `null`. Quando informados, o
+formato continua conferido (§3 e §8) e o e-mail pessoal continua único na
+empresa (§8). Contato de emergência continua sem campo, opcional quando for
+liberado. Finalidade, base legal, classificação, retenção e escopo de acesso
+não mudam.

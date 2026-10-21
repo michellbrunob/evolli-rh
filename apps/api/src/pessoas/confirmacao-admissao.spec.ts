@@ -464,6 +464,26 @@ describe("T179 — conflitosDaAdmissao (só a empresa ativa, sem valor)", () => 
 // Reenvio idempotente: o conteúdo confere com a admissão gravada?
 // ---------------------------------------------------------------------------
 
+describe("T179 — conflitosDaAdmissao com matrícula e e-mail opcionais", () => {
+  it("sem matrícula e sem e-mail: nada é consultado e nada conflita", async () => {
+    const t = {
+      vinculoFuncional: { findFirst: jest.fn() },
+      contatoColaborador: { findFirst: jest.fn() },
+    };
+    const erros = await conflitosDaAdmissao(
+      t as unknown as Prisma.TransactionClient,
+      EMPRESA_A,
+      { contatos: { celular: "+5511987654321" } } as Pick<
+        AdmitirColaboradorDto,
+        "matricula" | "contatos"
+      >,
+    );
+    expect(erros).toEqual([]);
+    expect(t.vinculoFuncional.findFirst).not.toHaveBeenCalled();
+    expect(t.contatoColaborador.findFirst).not.toHaveBeenCalled();
+  });
+});
+
 describe("T179 — admissaoConfere", () => {
   const CORPO = {
     nome: "Pessoa Sintetica T179",
@@ -475,7 +495,7 @@ describe("T179 — admissaoConfere", () => {
     departamentoId: DEPARTAMENTO,
     cargoId: CARGO,
     unidadeOrganizacionalId: UNIDADE,
-    perfilPessoal: { dataNascimento: "1990-05-20", sexo: "Feminino" },
+    perfilPessoal: { dataNascimento: "1990-05-20", sexo: "feminino" },
     endereco: { pais: "Brasil", cep: "01001-000", cidade: "Sao Paulo" },
     contatos: {
       emailPessoal: "Pessoa.T179@Example.TEST",
@@ -509,7 +529,7 @@ describe("T179 — admissaoConfere", () => {
       },
       perfil: {
         dataNascimento: new Date("1990-05-20T00:00:00.000Z"),
-        sexo: "Feminino",
+        sexo: "feminino",
         saudacao: null,
         estadoCivil: null,
         nacionalidade: null,
@@ -539,6 +559,39 @@ describe("T179 — admissaoConfere", () => {
 
   it("o mesmo conteúdo, já normalizado, confere", () => {
     expect(admissaoConfere(dto(), gravada())).toBe(true);
+  });
+
+  it("T179: sem matrícula e sem contatos, confere com a admissão gravada sem eles", () => {
+    const semOpcionais = {
+      ...CORPO,
+      matricula: undefined,
+      contatos: undefined,
+    };
+    const g = gravada();
+    g.vinculo.matricula = null;
+    g.contato = null;
+    expect(admissaoConfere(dto(semOpcionais), g)).toBe(true);
+    // Contatos vazios valem como não informados.
+    expect(
+      admissaoConfere(
+        dto({ ...semOpcionais, contatos: { emailPessoal: " ", celular: "" } }),
+        g,
+      ),
+    ).toBe(true);
+  });
+
+  it("T179: reenvio sem contatos não confere com admissão gravada com contato, e vice-versa", () => {
+    const semContatos = { ...CORPO, contatos: undefined };
+    expect(admissaoConfere(dto(semContatos), gravada())).toBe(false);
+    const g = gravada();
+    g.contato = null;
+    expect(admissaoConfere(dto(), g)).toBe(false);
+  });
+
+  it("T179: reenvio sem matrícula não confere com admissão gravada com matrícula", () => {
+    expect(
+      admissaoConfere(dto({ ...CORPO, matricula: undefined }), gravada()),
+    ).toBe(false);
   });
 
   type Mutacao = (g: AdmissaoGravada) => void;
@@ -639,7 +692,7 @@ describe("T179 — admissaoConfere", () => {
 // Lotação obrigatória só na Nova admissão
 // ---------------------------------------------------------------------------
 
-describe("T179 — AdmitirColaboradorDto exige Departamento, Cargo e Unidade", () => {
+describe("T179 — AdmitirColaboradorDto: obrigatoriedade da Nova admissão", () => {
   const CORPO = {
     nome: "Pessoa Sintetica T179",
     empresaId: EMPRESA_A,
@@ -670,7 +723,7 @@ describe("T179 — AdmitirColaboradorDto exige Departamento, Cargo e Unidade", (
     expect(await campos(CORPO)).toEqual([]);
   });
 
-  it.each(["departamentoId", "cargoId", "unidadeOrganizacionalId"])(
+  it.each(["departamentoId", "cargoId"])(
     "sem %s: recusado só nesse campo",
     async (campo) => {
       expect(await campos({ ...CORPO, [campo]: undefined })).toEqual([campo]);
@@ -682,16 +735,58 @@ describe("T179 — AdmitirColaboradorDto exige Departamento, Cargo e Unidade", (
     },
   );
 
-  it("sem nenhum dos três: os três recusados", async () => {
+  it("sem nenhum da lotação: Departamento e Cargo recusados; Unidade é opcional", async () => {
     const semLotacao = {
       ...CORPO,
       departamentoId: undefined,
       cargoId: undefined,
       unidadeOrganizacionalId: undefined,
     };
-    expect(await campos(semLotacao)).toEqual(
-      ["cargoId", "departamentoId", "unidadeOrganizacionalId"].sort(),
-    );
+    expect(await campos(semLotacao)).toEqual(["cargoId", "departamentoId"]);
+  });
+
+  it("Unidade é opcional, mas, quando vem, é UUID", async () => {
+    expect(
+      await campos({ ...CORPO, unidadeOrganizacionalId: undefined }),
+    ).toEqual([]);
+    expect(await campos({ ...CORPO, unidadeOrganizacionalId: "x" })).toEqual([
+      "unidadeOrganizacionalId",
+    ]);
+  });
+
+  it("só os obrigatórios — nome, empresa, tipo, data de admissão, motivo, Departamento, Cargo e data de nascimento — bastam", async () => {
+    expect(
+      await campos({
+        nome: CORPO.nome,
+        empresaId: CORPO.empresaId,
+        tipo: CORPO.tipo,
+        dataAdmissao: CORPO.dataAdmissao,
+        motivoCodigo: CORPO.motivoCodigo,
+        departamentoId: CORPO.departamentoId,
+        cargoId: CORPO.cargoId,
+        perfilPessoal: CORPO.perfilPessoal,
+      }),
+    ).toEqual([]);
+  });
+
+  it.each(["dataAdmissao", "tipo", "nome"])(
+    "%s continua obrigatório",
+    async (campo) => {
+      expect(await campos({ ...CORPO, [campo]: undefined })).toEqual([campo]);
+    },
+  );
+
+  it("matrícula é opcional; vazia vale como não informada; informada, segue o padrão", async () => {
+    expect(await campos({ ...CORPO, matricula: undefined })).toEqual([]);
+    const vazia = plainToInstance(AdmitirColaboradorDto, {
+      ...CORPO,
+      matricula: "   ",
+    });
+    expect(await validate(vazia, OPCOES)).toEqual([]);
+    expect(vazia.matricula).toBeUndefined();
+    expect(await campos({ ...CORPO, matricula: "minúscula" })).toEqual([
+      "matricula",
+    ]);
   });
 
   it.each(["areaId", "equipeId", "centroCustoId"])(

@@ -57,6 +57,8 @@ import {
 import {
   ContatoColaboradorService,
   ValoresContatos,
+  camposPreenchidos,
+  contatosInformados,
 } from "../contatos/contato-colaborador.service";
 
 /**
@@ -83,7 +85,8 @@ export interface AdmissaoRegistrada extends Pick<
   vinculo: {
     id: string;
     empresaId: string;
-    matricula: string;
+    /** T179 — opcional na Nova admissão. */
+    matricula: string | null;
     tipo: TipoVinculo;
     situacao: SituacaoVinculo;
     dataAdmissao: Date;
@@ -108,7 +111,8 @@ export interface AdmissaoRegistrada extends Pick<
    */
   perfilPessoal: ValoresPerfil;
   endereco: ValoresEndereco | null;
-  contatos: ValoresContatos;
+  /** T179 — `null` quando nenhum contato foi informado na admissão. */
+  contatos: ValoresContatos | null;
 }
 
 /**
@@ -119,7 +123,8 @@ export interface AdmissaoRegistrada extends Pick<
 export interface VinculoListado {
   id: string;
   empresaId: string;
-  matricula: string;
+  /** T179 — opcional na Nova admissão: pode vir `null`. */
+  matricula: string | null;
   situacao: SituacaoVinculo;
   dataAdmissao: Date;
   dataDesligamento: Date | null;
@@ -160,6 +165,14 @@ const ORDEM_SITUACAO_VINCULO: Record<SituacaoVinculo, number> = {
   encerrado: 2,
 };
 
+/** T179 — matrícula opcional: quem não tem vai depois de quem tem. */
+function compararMatriculas(a: string | null, b: string | null): number {
+  if (a === b) return 0;
+  if (a === null) return 1;
+  if (b === null) return -1;
+  return a.localeCompare(b);
+}
+
 /** Vínculo principal primeiro: o ativo, depois o previsto, depois o mais novo. */
 export function ordenarVinculosListados(
   vinculos: readonly VinculoListado[],
@@ -168,7 +181,8 @@ export function ordenarVinculosListados(
     (a, b) =>
       ORDEM_SITUACAO_VINCULO[a.situacao] - ORDEM_SITUACAO_VINCULO[b.situacao] ||
       b.dataAdmissao.getTime() - a.dataAdmissao.getTime() ||
-      a.matricula.localeCompare(b.matricula),
+      // T179 — matrícula opcional: quem não tem vai depois de quem tem.
+      compararMatriculas(a.matricula, b.matricula),
   );
 }
 
@@ -182,14 +196,22 @@ export async function conflitosDaAdmissao(
   empresaId: string,
   dto: Pick<AdmitirColaboradorDto, "matricula" | "contatos">,
 ): Promise<ErroDeCampo[]> {
-  const matricula = await tx.vinculoFuncional.findFirst({
-    where: { empresaId, matricula: dto.matricula },
-    select: { id: true },
-  });
-  const email = await tx.contatoColaborador.findFirst({
-    where: { empresaId, emailPessoal: dto.contatos.emailPessoal },
-    select: { id: true },
-  });
+  // T179 — matrícula e e-mail são opcionais: só o que veio é conferido.
+  const emailPessoal = contatosInformados(dto.contatos).emailPessoal;
+  const matricula =
+    dto.matricula === undefined
+      ? null
+      : await tx.vinculoFuncional.findFirst({
+          where: { empresaId, matricula: dto.matricula },
+          select: { id: true },
+        });
+  const email =
+    emailPessoal === null
+      ? null
+      : await tx.contatoColaborador.findFirst({
+          where: { empresaId, emailPessoal },
+          select: { id: true },
+        });
   const erros: ErroDeCampo[] = [];
   if (matricula) erros.push({ campo: "matricula", motivo: "em_uso" });
   if (email) erros.push({ campo: "contatos.emailPessoal", motivo: "em_uso" });
@@ -282,7 +304,7 @@ export function admissaoConfere(
   if (
     !iguais(colaborador.nome, dto.nome) ||
     !iguais(vinculo.empresaId, dto.empresaId) ||
-    !iguais(vinculo.matricula, dto.matricula) ||
+    !iguais(vinculo.matricula, dto.matricula ?? null) ||
     !iguais(vinculo.tipo, dto.tipo) ||
     vinculo.dataAdmissao.getTime() !==
       dataUtc(new Date(dto.dataAdmissao)).getTime() ||
@@ -325,11 +347,14 @@ export function admissaoConfere(
     }
   }
 
+  // T179 — contatos opcionais: sem nenhum enviado, nenhum registro nasceu.
+  const enviados = contatosInformados(dto.contatos);
+  if (camposPreenchidos(enviados).length === 0) return contato === null;
   return (
     contato !== null &&
-    iguais(contato.emailPessoal, dto.contatos.emailPessoal) &&
-    iguais(contato.celular, dto.contatos.celular) &&
-    iguais(contato.telefone, dto.contatos.telefone)
+    iguais(contato.emailPessoal, enviados.emailPessoal) &&
+    iguais(contato.celular, enviados.celular) &&
+    iguais(contato.telefone, enviados.telefone)
   );
 }
 
@@ -506,7 +531,7 @@ export class ColaboradorService {
           data: {
             colaboradorId: colaborador.id,
             empresaId: escopo.empresaId,
-            matricula: dto.matricula,
+            matricula: dto.matricula ?? null,
             tipo: dto.tipo,
             situacao: "previsto",
             dataAdmissao,
@@ -735,7 +760,11 @@ export class ColaboradorService {
       ctx,
     );
     const contatos = await this.contatos.consultar(registro.colaboradorId, ctx);
-    if (!dados.perfilPessoal || !contatos.contatos) {
+    if (
+      !dados.perfilPessoal ||
+      dados.situacao === "bloqueado" ||
+      contatos.situacao === "bloqueado"
+    ) {
       // A admissão confere, mas o uso operacional foi bloqueado depois dela
       // (desligamento): não há o que devolver como admissão registrada.
       throw new ConflictException();

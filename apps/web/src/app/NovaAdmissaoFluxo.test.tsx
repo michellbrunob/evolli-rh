@@ -67,7 +67,8 @@ const departamento: DepartamentoApi = {
   atualizadoEm: "2025-01-01T12:00:00.000Z",
 };
 
-// T179 — Departamento, Cargo e Unidade são obrigatórios na Nova admissão.
+// T179 — Departamento e Cargo são obrigatórios na Nova admissão; a Unidade,
+// opcional desde 2026-10-21, segue escolhida aqui.
 const cargo = {
   id: "77777777-7777-4777-8777-777777777777",
   codigo: "CAR1",
@@ -116,7 +117,7 @@ const resposta: AdmissaoRegistradaApi = {
       centroCustoId: null,
     },
   },
-  // T177 — perfil e contatos passaram a ser obrigatórios na admissão.
+  // T177 — perfil obrigatório na admissão; T179 — contatos opcionais.
   perfilPessoal: {
     dataNascimento: "1990-05-20T00:00:00.000Z",
     sexo: null,
@@ -816,7 +817,8 @@ describe("T176/T178 — da página à listagem e à ficha do admitido", () => {
 describe("T179 — empresa sem referências, pelo papel que o shell conhece", () => {
   it.each([
     ["rh", /Cadastre o que falta em Estrutura/],
-    ["dp", /O RH precisa cadastrar Departamento, Cargo e Unidade/],
+    // T179 — só o que falta, e só Departamento e Cargo contam.
+    ["dp", /O RH precisa cadastrar Cargo nesta empresa/],
   ])("%s vê a orientação certa e não consegue enviar", async (papel, texto) => {
     vi.mocked(listarCargos).mockResolvedValue(paginado([]));
     render(<App papelDoAtor={papel} />);

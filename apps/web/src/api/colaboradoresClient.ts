@@ -22,7 +22,8 @@ export interface VinculoApi {
   id: string;
   colaboradorId: string;
   empresaId: string;
-  matricula: string;
+  /** T179 — opcional desde 2026-10-21: `null` quando não foi informada. */
+  matricula: string | null;
   tipo: TipoVinculo;
   situacao: SituacaoVinculo;
   dataAdmissao: string;
@@ -49,7 +50,8 @@ export interface ResultadoPaginado<T> {
 export interface VinculoListadoApi {
   id: string;
   empresaId: string;
-  matricula: string;
+  /** T179 — `null` quando a admissão não informou matrícula. */
+  matricula: string | null;
   situacao: SituacaoVinculo;
   /** Dia civil (`@db.Date`); exibir só com `formatarDiaCivil`. */
   dataAdmissao: string;
@@ -123,18 +125,19 @@ export interface DestinoOrganizacionalDto {
  * (obtida via `/v1/empresas`, nunca inventada no cliente) e é conferida contra
  * a sessão no servidor; divergência responde 404, nunca 403.
  *
- * T179 — na Nova admissão, Departamento, Cargo e Unidade passaram a ser
- * OBRIGATÓRIOS (decisão da proprietária de 2026-10-21); Área (com o
- * departamento), Equipe e Centro de custo seguem opcionais. Novo vínculo de
- * colaborador existente não muda.
+ * T179 — na Nova admissão, Departamento e Cargo são OBRIGATÓRIOS; Unidade,
+ * Área (com o departamento), Equipe e Centro de custo são opcionais
+ * (decisões da proprietária de 2026-10-21). A matrícula também é opcional:
+ * vazia, o campo nem vai no corpo. Novo vínculo de colaborador existente não
+ * muda.
  */
 export interface AdmitirColaboradorDto extends DestinoOrganizacionalDto {
   departamentoId: string;
   cargoId: string;
-  unidadeOrganizacionalId: string;
   nome: string;
   empresaId: string;
-  matricula: string;
+  /** T179 — opcional; omitida quando vazia. */
+  matricula?: string;
   tipo: TipoVinculo;
   dataAdmissao: string;
   motivoCodigo: "admissao_inicial";
@@ -142,16 +145,17 @@ export interface AdmitirColaboradorDto extends DestinoOrganizacionalDto {
    * T177 — Módulo 1, gravado na MESMA transação da admissão. Vazio vai como
    * `null`.
    *
-   * OBRIGATÓRIOS: `perfilPessoal` com `dataNascimento`, e `contatos` (os três
-   * da ficha da T169, juntos). OPCIONAIS: os demais campos do perfil e o
-   * `endereco` inteiro.
+   * OBRIGATÓRIO: `perfilPessoal` com `dataNascimento`. OPCIONAIS: os demais
+   * campos do perfil (`sexo` só com um código de `OPCOES_SEXO`), o `endereco`
+   * inteiro e os `contatos` — T179: cada contato vazio é omitido, e o bloco
+   * inteiro some quando os três estão vazios.
    */
   perfilPessoal: Record<
     Exclude<keyof PerfilPessoalApi, "atualizadoEm" | "dataNascimento">,
     string | null
   > & { dataNascimento: string };
   endereco?: Record<Exclude<keyof EnderecoApi, "atualizadoEm">, string | null>;
-  contatos: { emailPessoal: string; celular: string; telefone: string };
+  contatos?: { emailPessoal?: string; celular?: string; telefone?: string };
 }
 
 /**
@@ -163,7 +167,8 @@ export interface AdmissaoRegistradaApi extends ColaboradorApi {
   vinculo: {
     id: string;
     empresaId: string;
-    matricula: string;
+    /** T179 — `null` quando a admissão não informou matrícula. */
+    matricula: string | null;
     tipo: TipoVinculo;
     situacao: SituacaoVinculo;
     dataAdmissao: string;
@@ -178,17 +183,18 @@ export interface AdmissaoRegistradaApi extends ColaboradorApi {
     }>;
   };
   /**
-   * T177 — o que o servidor gravou do Módulo 1. Perfil e contatos são
-   * obrigatórios e sempre vêm; endereço é `null` quando nenhum campo veio.
+   * T177 — o que o servidor gravou do Módulo 1. O perfil sempre vem;
+   * endereço é `null` quando nenhum campo veio. T179 — contatos também são
+   * `null` quando nenhum veio, e cada um pode ser `null` sozinho.
    */
   perfilPessoal: PerfilPessoalApi;
   endereco: EnderecoApi | null;
   contatos: {
-    emailPessoal: string;
-    celular: string;
-    telefone: string;
+    emailPessoal: string | null;
+    celular: string | null;
+    telefone: string | null;
     atualizadoEm: string;
-  };
+  } | null;
 }
 
 export interface RetificarColaboradorDto {

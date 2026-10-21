@@ -75,7 +75,7 @@ describe("Módulo 1 — PerfilPessoalDto", () => {
   it("aceita o perfil completo e normaliza o texto", async () => {
     const dto = plainToInstance(PerfilPessoalDto, {
       dataNascimento: "1990-05-20",
-      sexo: " Feminino ",
+      sexo: " feminino ",
       saudacao: "Sra.",
       estadoCivil: "Casada",
       nacionalidade: "Brasileira",
@@ -86,9 +86,41 @@ describe("Módulo 1 — PerfilPessoalDto", () => {
       nomeMae: "Mãe Sintética",
     });
     expect(await validate(dto, OPCOES)).toEqual([]);
-    expect(dto.sexo).toBe("Feminino");
+    expect(dto.sexo).toBe("feminino");
     expect(dto.naturalidade).toBe("Belo Horizonte");
   });
+
+  it.each(["feminino", "masculino", "intersexo", "nao_informar"])(
+    "T179: sexo %p é uma das opções fechadas e é aceito",
+    async (sexo) => {
+      const dto = plainToInstance(PerfilPessoalDto, {
+        dataNascimento: "1990-05-20",
+        sexo,
+      });
+      expect(await validate(dto, OPCOES)).toEqual([]);
+      expect(dto.sexo).toBe(sexo);
+    },
+  );
+
+  it("T179: sem seleção de sexo (ausente, vazio ou null) é aceito e vira null", async () => {
+    for (const sexo of [undefined, "", "   ", null]) {
+      const dto = plainToInstance(PerfilPessoalDto, {
+        dataNascimento: "1990-05-20",
+        ...(sexo === undefined ? {} : { sexo }),
+      });
+      expect(await validate(dto, OPCOES)).toEqual([]);
+      expect(dto.sexo ?? null).toBeNull();
+    }
+  });
+
+  it.each(["Feminino", "F", "outro", "não informar", "mulher", "<b>x</b>"])(
+    "T179: sexo fora da lista fechada (%p) é recusado — sem texto livre",
+    async (sexo) => {
+      expect(
+        await erros(PerfilPessoalDto, { dataNascimento: "1990-05-20", sexo }),
+      ).toEqual(["sexo"]);
+    },
+  );
 
   it("data de nascimento é obrigatória; os demais campos são opcionais", async () => {
     expect(await erros(PerfilPessoalDto, {})).toEqual(["dataNascimento"]);
@@ -199,18 +231,16 @@ describe("Módulo 1 — AdmitirColaboradorDto com os blocos", () => {
     },
   };
 
-  it("perfil (com data de nascimento) e contatos são obrigatórios; endereço é opcional", async () => {
+  it("perfil (com data de nascimento) é obrigatório; T179: contatos e endereço são opcionais", async () => {
     expect(
       await erros(AdmitirColaboradorDto, { ...base, ...obrigatorios }),
     ).toEqual([]);
-    expect(await erros(AdmitirColaboradorDto, base)).toEqual(
-      expect.arrayContaining(["perfilPessoal", "contatos"]),
-    );
+    expect(await erros(AdmitirColaboradorDto, base)).toEqual(["perfilPessoal"]);
     expect(
       await erros(AdmitirColaboradorDto, {
         ...base,
         ...obrigatorios,
-        perfilPessoal: { sexo: "Feminino" },
+        perfilPessoal: { sexo: "feminino" },
       }),
     ).toEqual(["perfilPessoal"]);
     expect(
@@ -218,7 +248,7 @@ describe("Módulo 1 — AdmitirColaboradorDto com os blocos", () => {
         ...base,
         perfilPessoal: obrigatorios.perfilPessoal,
       }),
-    ).toEqual(["contatos"]);
+    ).toEqual([]);
   });
 
   it("nome completo continua obrigatório", async () => {
@@ -248,12 +278,19 @@ describe("Módulo 1 — AdmitirColaboradorDto com os blocos", () => {
     ).toContain("endereco");
   });
 
-  it("contatos seguem a ficha da T169: os três juntos e normalizados", async () => {
+  it("contatos seguem a ficha da T169, normalizados; T179: cada um é opcional, e o informado tem formato conferido", async () => {
     expect(
       await erros(AdmitirColaboradorDto, {
         ...base,
         ...obrigatorios,
         contatos: { emailPessoal: "a@b.test", celular: "11999990000" },
+      }),
+    ).toEqual([]);
+    expect(
+      await erros(AdmitirColaboradorDto, {
+        ...base,
+        ...obrigatorios,
+        contatos: { celular: "12345" },
       }),
     ).toContain("contatos");
 

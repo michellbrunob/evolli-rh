@@ -13,6 +13,11 @@ const BASE = "/v1";
  */
 export interface PerfilPessoalApi {
   dataNascimento: string;
+  /**
+   * T179 — código de `OPCOES_SEXO` (`feminino`, `masculino`, `intersexo`,
+   * `nao_informar`), `null` quando não informado, ou o texto livre de um
+   * cadastro anterior à lista fechada, que a ficha mostra como veio.
+   */
   sexo: string | null;
   saudacao: string | null;
   estadoCivil: string | null;

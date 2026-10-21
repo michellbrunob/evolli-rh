@@ -148,9 +148,11 @@ export class DestinoOrganizacionalDto {
  * fora de qualquer escopo de autorização — invisível a todos, inclusive a
  * quem o criou.
  *
- * T179 — a lotação da Nova admissão **exige** Departamento, Cargo e Unidade
- * (decisão da proprietária de 2026-10-21; `DP-28` só para a admissão). Área,
- * Equipe e Centro de custo seguem opcionais. Por isso esta classe não herda
+ * T179 — obrigatoriedade da Nova admissão (decisões da proprietária de
+ * 2026-10-21): a lotação **exige** Departamento e Cargo (`DP-28` só para a
+ * admissão); Unidade, Área, Equipe e Centro de custo são opcionais. A
+ * matrícula é opcional (quando informada, continua única na empresa) e o bloco
+ * de contatos também. Por isso esta classe não herda
  * `DestinoOrganizacionalDto`: o `@IsOptional` herdado valeria também aqui, e
  * a obrigatoriedade sumiria. O novo vínculo de colaborador existente
  * (`CriarVinculoDto`) continua com o destino todo opcional.
@@ -162,8 +164,9 @@ export class AdmitirColaboradorDto {
   @IsUUID()
   cargoId!: string;
 
+  @IsOptional()
   @IsUUID()
-  unidadeOrganizacionalId!: string;
+  unidadeOrganizacionalId?: string;
 
   @IsOptional()
   @IsUUID()
@@ -186,8 +189,16 @@ export class AdmitirColaboradorDto {
   @IsUUID()
   empresaId!: string;
 
+  /**
+   * T179 — opcional na Nova admissão; vazio vale como não informada. Quando
+   * vem, segue o padrão e é única na empresa.
+   */
+  @Transform(({ value }) =>
+    typeof value === "string" && value.trim() === "" ? undefined : value,
+  )
+  @IsOptional()
   @Matches(MATRICULA_PATTERN)
-  matricula!: string;
+  matricula?: string;
 
   @IsIn(TIPOS_VINCULO)
   tipo!: TipoVinculo;
@@ -217,12 +228,15 @@ export class AdmitirColaboradorDto {
   @Type(() => EnderecoDto)
   endereco?: EnderecoDto;
 
-  /** Os três contatos da ficha da T169, juntos — o mesmo DTO da rota própria. */
-  @IsDefined()
+  /**
+   * Os contatos da ficha da T169 — o mesmo DTO da rota própria. T179: o bloco
+   * e cada campo são opcionais; sem nenhum valor, nenhum contato é gravado.
+   */
+  @IsOptional()
   @IsObject()
   @ValidateNested()
   @Type(() => RegistrarContatosColaboradorDto)
-  contatos!: RegistrarContatosColaboradorDto;
+  contatos?: RegistrarContatosColaboradorDto;
 }
 
 /**

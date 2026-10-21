@@ -493,3 +493,13 @@ exige Departamento, Cargo e Unidade. É a resposta ao `DP-28` **só para a
 admissão**: as demais movimentações e o novo vínculo de colaborador existente
 continuam com a regra desta Baseline (ao menos uma referência). O texto
 original foi preservado.
+
+## Nota de convergência (T179, 2026-10-21) — matrícula e lotação na Nova admissão
+
+Pela [decisão de obrigatoriedade](t179-obrigatoriedade-cadastro-colaborador.md), a Nova admissão exige
+**Departamento e Cargo** (a Unidade, citada na nota anterior, passa a
+opcional) e a **matrícula passa a opcional** na admissão. Quando informada, a
+matrícula continua sendo o identificador funcional do item 2, única dentro da
+empresa; colaborador admitido sem ela fica sem matrícula até que uma seja
+registrada. O novo vínculo de colaborador existente continua exigindo
+matrícula. O texto original foi preservado.

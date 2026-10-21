@@ -49,6 +49,7 @@ import {
   formatarInstante,
   formatarMesReferencia,
 } from "../../format/data";
+import { exibirMatricula } from "../../format/matricula";
 import "./VisaoPeriodoScreen.css";
 
 export const VISAO_PERIODO_TITULO_ID = "visao-periodo-titulo";
@@ -259,7 +260,8 @@ export function VisaoPeriodoScreen() {
   );
 
   function rotuloVinculo(v: VinculoComColaborador): string {
-    return `${v.nomeColaborador} — ${v.matricula}`;
+    // T179 — matrícula opcional: sem ela, "Sem matrícula", nunca "null".
+    return `${v.nomeColaborador} — ${exibirMatricula(v.matricula)}`;
   }
   function nomePorVinculoId(id: string): string {
     const v = vinculosPorId.get(id);

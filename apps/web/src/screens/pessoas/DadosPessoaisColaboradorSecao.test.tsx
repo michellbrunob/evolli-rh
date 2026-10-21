@@ -7,7 +7,7 @@
  * da empresa ativa, empresa ambígua do `master_tecnico`) — que nunca mostra
  * valor.
  */
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DadosPessoaisColaboradorSecao } from "./DadosPessoaisColaboradorSecao";
 import {
@@ -34,7 +34,8 @@ const registrado: DadosPessoaisDoColaboradorApi = {
   situacao: "registrado",
   perfilPessoal: {
     dataNascimento: "1990-05-20",
-    sexo: "Feminino",
+    // T179 — gravado como código da lista fechada; a ficha mostra o rótulo.
+    sexo: "feminino",
     saudacao: null,
     estadoCivil: "Casada",
     nacionalidade: "Brasileira",
@@ -147,4 +148,50 @@ describe("Ficha — dados pessoais e endereço (T177)", () => {
       expect(screen.queryByText("Feminino")).not.toBeInTheDocument();
     },
   );
+});
+
+// ---------------------------------------------------------------------------
+// T179 — sexo de lista fechada: código pelo rótulo, ausente como "Não
+// informado", texto livre de cadastro anterior como veio.
+// ---------------------------------------------------------------------------
+describe("Ficha — sexo (T179)", () => {
+  /** O valor exibido na linha "Sexo" da ficha. */
+  async function valorDoSexo(): Promise<string> {
+    const rotulo = await screen.findByText("Sexo", { selector: "dt" });
+    const par = rotulo.closest(".colaboradores-screen__par") as HTMLElement;
+    return within(par).getByRole("definition").textContent ?? "";
+  }
+
+  it.each([
+    ["feminino", "Feminino"],
+    ["masculino", "Masculino"],
+    ["intersexo", "Intersexo"],
+    ["nao_informar", "Não informar"],
+  ])("código %s aparece como %s", async (codigo, rotulo) => {
+    vi.mocked(consultarDadosPessoaisDoColaborador).mockResolvedValue({
+      ...registrado,
+      perfilPessoal: { ...registrado.perfilPessoal!, sexo: codigo },
+    });
+    render(<DadosPessoaisColaboradorSecao colaboradorId={ID} />);
+    expect(await valorDoSexo()).toBe(rotulo);
+    expect(screen.queryByText(codigo)).not.toBeInTheDocument();
+  });
+
+  it("sem sexo gravado: 'Não informado', sem inferir", async () => {
+    vi.mocked(consultarDadosPessoaisDoColaborador).mockResolvedValue({
+      ...registrado,
+      perfilPessoal: { ...registrado.perfilPessoal!, sexo: null },
+    });
+    render(<DadosPessoaisColaboradorSecao colaboradorId={ID} />);
+    expect(await valorDoSexo()).toBe("Não informado");
+  });
+
+  it("texto livre de cadastro anterior aparece como veio", async () => {
+    vi.mocked(consultarDadosPessoaisDoColaborador).mockResolvedValue({
+      ...registrado,
+      perfilPessoal: { ...registrado.perfilPessoal!, sexo: "Fem. (legado)" },
+    });
+    render(<DadosPessoaisColaboradorSecao colaboradorId={ID} />);
+    expect(await valorDoSexo()).toBe("Fem. (legado)");
+  });
 });

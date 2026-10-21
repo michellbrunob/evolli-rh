@@ -58,6 +58,21 @@ export function normalizarCep(valor: unknown, pais: unknown): unknown {
   return CEP_BRASILEIRO_ENTRADA.test(texto) ? texto.replace("-", "") : texto;
 }
 
+/**
+ * T179 — Sexo em opções FECHADAS (decisão da proprietária de 2026-10-21),
+ * sem texto livre: o servidor recusa qualquer outro valor. Opcional — sem
+ * seleção, o campo fica `null`, e a ficha mostra "Não informado". "Não
+ * informar" é uma escolha explícita, diferente de não ter escolhido. Gênero é
+ * outro dado, bloqueado até a sua ficha (`DP-ADM-09`).
+ */
+export const SEXOS = [
+  "feminino",
+  "masculino",
+  "intersexo",
+  "nao_informar",
+] as const;
+export type Sexo = (typeof SEXOS)[number];
+
 /** Borda inferior da data de nascimento, igual ao CHECK do banco. */
 export const DATA_NASCIMENTO_MINIMA = "1900-01-01";
 

@@ -96,3 +96,13 @@ CPF, documentos, dados bancários, dependentes, salário, ponto, adicionais
 trabalhistas, horário na admissão, fuso horário, cargo completo, os modais
 rápidos de Departamento, Cargo e Unidade, telefone estrangeiro e qualquer
 capacidade nova para o DP.
+
+## 5. Alteração de 2026-10-21 — obrigatoriedade do cadastro
+
+A [decisão de obrigatoriedade](t179-obrigatoriedade-cadastro-colaborador.md) substitui a **decisão 5** quanto
+à Unidade: na Nova admissão, **Departamento e Cargo** são obrigatórios e a
+**Unidade é opcional**. Na mesma decisão, a matrícula e os três contatos
+(e-mail pessoal, celular e telefone) passam a opcionais; quando informados,
+matrícula e e-mail pessoal continuam únicos na empresa, e o formato de
+telefone e CEP continua conferido. A decisão 6 passa a valer para Departamento
+e Cargo. O texto acima foi preservado como registro de quando foi decidido.

@@ -324,8 +324,8 @@ describe("Confirmação da Nova admissão (T179, e2e)", () => {
 
   // -------------------------------------------------------------------------
 
-  describe("lotação obrigatória: Departamento, Cargo e Unidade", () => {
-    it.each(["departamentoId", "cargoId", "unidadeOrganizacionalId"])(
+  describe("lotação obrigatória: Departamento e Cargo (Unidade opcional)", () => {
+    it.each(["departamentoId", "cargoId"])(
       "sem %s: 400 e nada é gravado",
       async (campo) => {
         const corpo: Record<string, unknown> = admissao();
@@ -1036,6 +1036,150 @@ describe("Confirmação da Nova admissão (T179, e2e)", () => {
   });
 
   // -------------------------------------------------------------------------
+
+  describe("obrigatoriedade da Nova admissão (decisão de 2026-10-21)", () => {
+    /** Corpo só com os obrigatórios: sem matrícula, Unidade nem contatos. */
+    function soObrigatorios(extra: Record<string, unknown> = {}) {
+      const corpo: Record<string, unknown> = admissao();
+      delete corpo["matricula"];
+      delete corpo["unidadeOrganizacionalId"];
+      delete corpo["contatos"];
+      return { ...corpo, ...extra };
+    }
+
+    it("só com os obrigatórios: 201, sem matrícula, Unidade, contatos nem sexo", async () => {
+      const r = await admitir(rhA).send(soObrigatorios()).expect(201);
+      expect(r.body.vinculo.matricula).toBeNull();
+      expect(r.body.contatos).toBeNull();
+      expect(r.body.movimentacao.destino.unidadeOrganizacionalId).toBeNull();
+      expect(r.body.perfilPessoal.sexo).toBeNull();
+      expect(
+        await prisma.contatoColaborador.count({
+          where: { colaboradorId: r.body.id },
+        }),
+      ).toBe(0);
+      const dados = await get(
+        `/v1/colaboradores/${r.body.id}/dados-pessoais`,
+        rhA,
+      ).expect(200);
+      expect(dados.body.perfilPessoal.sexo).toBeNull();
+      const contatos = await get(
+        `/v1/colaboradores/${r.body.id}/contatos`,
+        rhA,
+      ).expect(200);
+      expect(contatos.body).toMatchObject({
+        situacao: "sem_registro",
+        contatos: null,
+      });
+    });
+
+    it("duas admissões sem matrícula e sem e-mail na mesma empresa: as duas 201", async () => {
+      await admitir(rhA).send(soObrigatorios()).expect(201);
+      await admitir(rhA).send(soObrigatorios()).expect(201);
+    });
+
+    it("contatos parciais: só o celular é gravado, e-mail e telefone ficam nulos", async () => {
+      const corpo = soObrigatorios({
+        contatos: { celular: "(91) 98765-4321" },
+      });
+      const r = await admitir(rhA).send(corpo).expect(201);
+      expect(r.body.contatos).toMatchObject({
+        emailPessoal: null,
+        celular: "+5591987654321",
+        telefone: null,
+      });
+    });
+
+    it("contatos vazios valem como não informados", async () => {
+      const corpo = soObrigatorios({
+        contatos: { emailPessoal: "  ", celular: "", telefone: null },
+      });
+      const r = await admitir(rhA).send(corpo).expect(201);
+      expect(r.body.contatos).toBeNull();
+    });
+
+    it("telefone informado fora da forma continua recusado", async () => {
+      const corpo = soObrigatorios({ contatos: { celular: "12345" } });
+      await admitir(rhA).send(corpo).expect(400);
+    });
+
+    it.each(["feminino", "masculino", "intersexo", "nao_informar"])(
+      "sexo %p: gravado e lido como veio",
+      async (sexo) => {
+        const corpo = soObrigatorios({
+          perfilPessoal: { dataNascimento: "1990-01-15", sexo },
+        });
+        const r = await admitir(rhA).send(corpo).expect(201);
+        expect(r.body.perfilPessoal.sexo).toBe(sexo);
+        const lido = await get(
+          `/v1/colaboradores/${r.body.id}/dados-pessoais`,
+          rhA,
+        ).expect(200);
+        expect(lido.body.perfilPessoal.sexo).toBe(sexo);
+        expect(
+          (
+            await prisma.perfilPessoalColaborador.findFirstOrThrow({
+              where: { colaboradorId: r.body.id },
+            })
+          ).sexo,
+        ).toBe(sexo);
+      },
+    );
+
+    it.each(["Feminino", "outro", "não informar", "F"])(
+      "sexo fora da lista fechada (%p) enviado direto à API: 400 e nada gravado",
+      async (sexo) => {
+        const corpo = soObrigatorios({
+          perfilPessoal: { dataNascimento: "1990-01-15", sexo },
+        });
+        const antes = await prisma.colaborador.count();
+        await admitir(rhA).send(corpo).expect(400);
+        expect(await prisma.colaborador.count()).toBe(antes);
+      },
+    );
+
+    it("Departamento, Cargo e data de admissão continuam obrigatórios", async () => {
+      for (const campo of ["departamentoId", "cargoId", "dataAdmissao"]) {
+        const corpo = soObrigatorios();
+        delete corpo[campo];
+        await admitir(rhA).send(corpo).expect(400);
+      }
+    });
+
+    it("PUT de contatos: todos opcionais — nada informado não cria registro; um só cria com os outros nulos", async () => {
+      const r = await admitir(rhA).send(soObrigatorios()).expect(201);
+      const rota = `/v1/colaboradores/${r.body.id}/contatos`;
+      const vazio = await put(rota, rhA).send({}).expect(200);
+      expect(vazio.body).toMatchObject({
+        situacao: "sem_registro",
+        contatos: null,
+      });
+      expect(
+        await prisma.contatoColaborador.count({
+          where: { colaboradorId: r.body.id },
+        }),
+      ).toBe(0);
+      const um = await put(rota, rhA)
+        .send({ telefone: "(55) 3222-1111" })
+        .expect(200);
+      expect(um.body.contatos).toMatchObject({
+        emailPessoal: null,
+        celular: null,
+        telefone: "+555532221111",
+      });
+      // Como a ficha envia: os três campos, vazio como `null` — apaga o
+      // telefone gravado, sem recusar.
+      const apagado = await put(rota, rhA)
+        .send({ emailPessoal: null, celular: null, telefone: null })
+        .expect(200);
+      expect(apagado.body.resultado).toBe("atualizado");
+      expect(apagado.body.contatos).toMatchObject({
+        emailPessoal: null,
+        celular: null,
+        telefone: null,
+      });
+    });
+  });
 
   describe("trilhas sem valores", () => {
     it("`audit_event` e as trilhas de tratamento não contêm e-mail, telefone, CEP nem matrícula enviados", async () => {

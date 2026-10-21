@@ -8,8 +8,12 @@
  *
  * OBRIGATÓRIO: data de nascimento. OPCIONAIS: todos os demais campos do perfil
  * e todos os do endereço, em texto: não há catálogo canônico no sistema para
- * sexo, saudação, estado civil, escolaridade, país, UF ou município, e a tela
- * não inventa lista de opções.
+ * saudação, estado civil, escolaridade, país, UF ou município, e a tela não
+ * inventa lista de opções.
+ *
+ * T179 — a exceção é o SEXO: lista FECHADA decidida pela proprietária em
+ * 2026-10-21 (`OPCOES_SEXO`), opcional, sem texto livre. Vai o código; a tela
+ * mostra o rótulo.
  */
 
 export type ChavePerfil =
@@ -46,13 +50,48 @@ export interface DefinicaoCampo<K extends string> {
 }
 
 /**
+ * T179 — opções FECHADAS de sexo (decisão da proprietária de 2026-10-21), na
+ * ordem do seletor. O código é o que vai ao servidor e fica gravado; o rótulo
+ * é só da tela. Sem seleção, o campo vai `null` — "não informado".
+ */
+export const OPCOES_SEXO = [
+  { codigo: "feminino", rotulo: "Feminino" },
+  { codigo: "masculino", rotulo: "Masculino" },
+  { codigo: "intersexo", rotulo: "Intersexo" },
+  { codigo: "nao_informar", rotulo: "Não informar" },
+] as const;
+
+export type CodigoSexo = (typeof OPCOES_SEXO)[number]["codigo"];
+
+/** O valor é um dos códigos da lista fechada? */
+export function ehCodigoSexo(valor: string): valor is CodigoSexo {
+  return OPCOES_SEXO.some((o) => o.codigo === valor);
+}
+
+/**
+ * T179 — sexo gravado, como a tela o mostra: código conhecido pelo rótulo;
+ * texto livre de um cadastro anterior à lista, como veio (sem inferir); e
+ * ausente como `null`, para quem chama escrever "Não informado".
+ */
+export function rotuloDoSexo(valor: string | null | undefined): string | null {
+  if (typeof valor !== "string" || valor.trim() === "") return null;
+  return OPCOES_SEXO.find((o) => o.codigo === valor)?.rotulo ?? valor;
+}
+
+/** T179 — o sexo é seletor, não texto: definição à parte, na ordem da tela. */
+export const CAMPO_SEXO: DefinicaoCampo<"sexo"> = {
+  chave: "sexo",
+  rotulo: "Sexo",
+};
+
+/**
  * Campos de texto do perfil, na ordem da tela — todos OPCIONAIS. A data de
- * nascimento, obrigatória, é tratada à parte.
+ * nascimento, obrigatória, é tratada à parte; o sexo (T179), também, porque
+ * é seletor de lista fechada (`CAMPO_SEXO`).
  */
 export const CAMPOS_TEXTO_PERFIL: readonly DefinicaoCampo<
-  Exclude<ChavePerfil, "dataNascimento">
+  Exclude<ChavePerfil, "dataNascimento" | "sexo">
 >[] = [
-  { chave: "sexo", rotulo: "Sexo", limite: 60 },
   {
     chave: "saudacao",
     rotulo: "Saudação",
@@ -181,6 +220,10 @@ export function validarPerfil(valores: ValoresPerfil): ErrosPerfil {
     } else if (data > hojeUtc()) {
       erros.dataNascimento = "A data de nascimento não pode estar no futuro.";
     }
+  }
+  // T179 — sexo só da lista fechada; sem seleção é válido (opcional).
+  if (valores.sexo !== "" && !ehCodigoSexo(valores.sexo)) {
+    erros.sexo = "Selecione uma das opções de sexo, ou deixe sem seleção.";
   }
   for (const campo of CAMPOS_TEXTO_PERFIL) {
     const erro = erroDeTexto(

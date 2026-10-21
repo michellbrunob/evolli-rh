@@ -385,3 +385,12 @@ Por decisão da proprietária ([decisão da T179](../decisions/t179-confirmacao-
 Contagens depois desta nota: 13 conflitos, 12 abertos e 1 resolvido; 22 gates,
 com o `DP-FLX-01`, o `DP-FLX-21` e o `DP-FLX-22` resolvidos e 19 abertos.
 Nenhuma outra decisão desta ADR muda.
+
+## Nota de convergência (T179, 2026-10-21) — obrigatoriedade do cadastro
+
+Pela [decisão de obrigatoriedade](../decisions/t179-obrigatoriedade-cadastro-colaborador.md), a lotação da
+Nova admissão exige **Departamento e Cargo**; a **Unidade passa a opcional**
+(o item correspondente da nota anterior fica substituído). A **matrícula**
+também passa a opcional na Nova admissão — quando informada, continua única
+na empresa — e o tipo de vínculo continua obrigatório. Novo vínculo de
+colaborador existente não muda. Contagens de gates e conflitos inalteradas.

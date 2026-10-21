@@ -36,7 +36,10 @@ const TELEFONE_ENTRADA = /^\+?[0-9 ().-]+$/;
 
 /** E-mail pessoal: o mesmo tratamento do e-mail de conta (pontas e caixa). */
 export function normalizarEmailPessoal(valor: unknown): unknown {
-  return typeof valor === "string" ? normalizeEmail(valor) : valor;
+  if (typeof valor !== "string") return valor;
+  // T179 — contato opcional: vazio (ou só espaço) vale como não informado.
+  const normalizado = normalizeEmail(valor);
+  return normalizado === "" ? null : normalizado;
 }
 
 /**
@@ -51,6 +54,8 @@ export function normalizarTelefone(valor: unknown): unknown {
     return valor;
   }
   const aparado = valor.trim();
+  // T179 — contato opcional: vazio (ou só espaço) vale como não informado.
+  if (aparado === "") return null;
   if (!TELEFONE_ENTRADA.test(aparado)) {
     return valor;
   }

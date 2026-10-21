@@ -38,6 +38,7 @@ import {
   listarVinculosDoColaborador,
 } from "../../api/colaboradoresClient";
 import { formatarDiaCivil, formatarInstante } from "../../format/data";
+import { exibirMatricula } from "../../format/matricula";
 import {
   type AreaApi,
   type CentroCustoApi,
@@ -357,7 +358,7 @@ export function HistoricoFuncionalScreen() {
     const colaborador = colaboradoresPorId.get(vinculo.colaboradorId);
     const nomeColaborador =
       colaborador?.nome ?? `Colaborador ${vinculo.colaboradorId.slice(0, 8)}`;
-    return `${vinculo.matricula} (${ROTULO_TIPO_VINCULO[vinculo.tipo]}) — ${nomeColaborador}`;
+    return `${exibirMatricula(vinculo.matricula)} (${ROTULO_TIPO_VINCULO[vinculo.tipo]}) — ${nomeColaborador}`;
   }
 
   function resolverDestino(m: MovimentacaoApi): string {
@@ -1022,7 +1023,8 @@ export function HistoricoFuncionalScreen() {
                     </option>
                     {vinculosDoColaborador.map((v) => (
                       <option key={v.id} value={v.id}>
-                        {v.matricula} — {ROTULO_TIPO_VINCULO[v.tipo]}
+                        {exibirMatricula(v.matricula)} —{" "}
+                        {ROTULO_TIPO_VINCULO[v.tipo]}
                       </option>
                     ))}
                   </select>

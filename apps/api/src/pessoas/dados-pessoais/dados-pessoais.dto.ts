@@ -1,6 +1,7 @@
 import { Transform, Type } from "class-transformer";
 import {
   IsDateString,
+  IsIn,
   IsOptional,
   IsString,
   Matches,
@@ -18,6 +19,8 @@ import {
   LIMITES_ENDERECO,
   LIMITES_PERFIL,
   SEM_CONTROLE,
+  SEXOS,
+  type Sexo,
   ehPaisBrasil,
   normalizarCep,
   normalizarTextoPessoal,
@@ -60,10 +63,11 @@ export class DataNascimentoNoIntervalo implements ValidatorConstraintInterface {
  * Dados pessoais básicos (T177, Módulo 1).
  *
  * OBRIGATÓRIO: `dataNascimento` — todo registro de perfil a tem, na admissão
- * e na edição (o banco a exige por NOT NULL). OPCIONAIS: os demais, em texto
- * controlado: não há catálogo canônico no sistema para sexo, saudação, estado
- * civil, nacionalidade, naturalidade ou escolaridade, e esta fatia não inventa
- * taxonomia. O servidor apara, colapsa espaços e grava vazio como `null`.
+ * e na edição (o banco a exige por NOT NULL). OPCIONAIS: os demais. Sexo, em
+ * opções fechadas (`SEXOS`, T179); saudação, estado civil, nacionalidade,
+ * naturalidade e escolaridade, em texto controlado — não há catálogo canônico
+ * para eles, e esta fatia não inventa taxonomia. O servidor apara, colapsa
+ * espaços e grava vazio como `null`.
  *
  * Nome completo NÃO está aqui: continua sendo `nome` da admissão, no
  * `Colaborador`. Nome social e gênero ficaram fora do Módulo 1 (matriz da PR).
@@ -75,12 +79,11 @@ export class PerfilPessoalDto {
   @Validate(DataNascimentoNoIntervalo)
   dataNascimento!: string;
 
+  /** T179 — opções fechadas (`SEXOS`); sem seleção, `null`. */
   @Transform(({ value }) => normalizarTextoPessoal(value))
   @IsOptional()
-  @IsString()
-  @MaxLength(LIMITES_PERFIL.sexo)
-  @Matches(SEM_CONTROLE)
-  sexo?: string | null;
+  @IsIn(SEXOS)
+  sexo?: Sexo | null;
 
   @Transform(({ value }) => normalizarTextoPessoal(value))
   @IsOptional()
