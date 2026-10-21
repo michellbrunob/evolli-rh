@@ -1096,6 +1096,71 @@ describe("Confirmação da Nova admissão (T179, e2e)", () => {
       });
       const r = await admitir(rhA).send(corpo).expect(201);
       expect(r.body.contatos).toBeNull();
+      expect(
+        await prisma.contatoColaborador.count({
+          where: { colaboradorId: r.body.id },
+        }),
+      ).toBe(0);
+    });
+
+    it("sem nenhum contato: nenhum registro nem evento de contato, e a leitura posterior diz sem registro", async () => {
+      const contatoCriado = () =>
+        prisma.auditEvent.count({
+          where: { action: "pessoas_contato_criado" },
+        });
+      const criadosAntes = await contatoCriado();
+      const r = await admitir(rhA).send(soObrigatorios()).expect(201);
+      const colaboradorId: string = r.body.id;
+      expect(r.body.contatos).toBeNull();
+      expect(
+        await prisma.contatoColaborador.count({ where: { colaboradorId } }),
+      ).toBe(0);
+      // Nenhum evento de criação de contato: só a admissão foi registrada.
+      expect(
+        await prisma.contatoColaboradorEvento.count({
+          where: { colaboradorId, acao: "criacao" },
+        }),
+      ).toBe(0);
+      expect(await contatoCriado()).toBe(criadosAntes);
+
+      const lido = await get(
+        `/v1/colaboradores/${colaboradorId}/contatos`,
+        rhA,
+      ).expect(200);
+      expect(lido.body).toMatchObject({
+        colaboradorId,
+        situacao: "sem_registro",
+        contatos: null,
+      });
+      // A leitura não cria registro.
+      expect(
+        await prisma.contatoColaborador.count({ where: { colaboradorId } }),
+      ).toBe(0);
+      // Isolamento: outra empresa não sabe que a pessoa existe.
+      await get(`/v1/colaboradores/${colaboradorId}/contatos`, rhB).expect(404);
+    });
+
+    it("sem nenhum contato: o reenvio com a mesma chave é reconhecido e não cria nada", async () => {
+      const chave = randomUUID();
+      const corpo = soObrigatorios({
+        contatos: { emailPessoal: "", celular: "", telefone: "" },
+      });
+      const primeiro = await admitir(rhA, chave).send(corpo).expect(201);
+      const reenvio = await admitir(rhA, chave).send(corpo).expect(201);
+      expect(reenvio.headers["idempotent-replayed"]).toBe("true");
+      expect(reenvio.body.id).toBe(primeiro.body.id);
+      expect(reenvio.body.contatos).toBeNull();
+      expect(
+        await prisma.contatoColaborador.count({
+          where: { colaboradorId: primeiro.body.id },
+        }),
+      ).toBe(0);
+      // Sem os contatos, o mesmo corpo continua sendo o mesmo envio; com um
+      // contato a mais, é conteúdo divergente.
+      const divergente = await admitir(rhA, chave)
+        .send(soObrigatorios({ contatos: { celular: "(91) 98765-4321" } }))
+        .expect(422);
+      expect(divergente.body.codigo).toBe("idempotencia_conteudo_divergente");
     });
 
     it("telefone informado fora da forma continua recusado", async () => {

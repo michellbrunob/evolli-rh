@@ -1552,11 +1552,31 @@ describe("ColaboradoresScreen (T169 — contatos do colaborador)", () => {
     expect(
       secao.querySelector(".colaboradores-screen__aviso-texto"),
     ).toBeNull();
-    // T179 — o texto diz que os três são opcionais.
+    // T179 — o texto diz que não há contato cadastrado e que os três são
+    // opcionais.
     expect(aviso).toHaveTextContent(
-      "Nenhum contato registrado. Os três campos são opcionais: informe os que tiver.",
+      "Nenhum contato registrado. Este colaborador não tem e-mail pessoal, celular nem telefone cadastrados. Os três campos são opcionais: informe os que tiver.",
     );
     expect(email()).not.toHaveAttribute("aria-required");
+  });
+
+  it("T179 — 'Nenhum contato registrado' é estado acessível: status, descrição da seção e nenhum erro", async () => {
+    const secao = await abrirDetalheDeAna();
+    const estado = await within(secao).findByText(/Nenhum contato registrado/);
+    expect(estado).toHaveAttribute("role", "status");
+    expect(estado).toHaveTextContent(/^Nenhum contato registrado\./);
+    expect(estado).toHaveTextContent(
+      "não tem e-mail pessoal, celular nem telefone cadastrados",
+    );
+    // A seção aponta para o estado: o leitor de tela o ouve com o título.
+    expect(secao).toHaveAccessibleDescription(
+      "Nenhum contato registrado. Este colaborador não tem e-mail pessoal, celular nem telefone cadastrados. Os três campos são opcionais: informe os que tiver.",
+    );
+    // Estado, não erro: nada de alerta nem campo inválido.
+    expect(within(secao).queryByRole("alert")).toBeNull();
+    for (const campo of [email(), celular(), telefone()]) {
+      expect(campo).not.toHaveAttribute("aria-invalid", "true");
+    }
   });
 
   it("T172 — bloqueado: o aviso usa a classe própria, mantém o status e não usa a da T111", async () => {

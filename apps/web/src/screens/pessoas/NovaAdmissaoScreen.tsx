@@ -2213,6 +2213,9 @@ function ConfirmacaoDaAdmissao({
         <ResumoGravado
           titulo="Contatos"
           id="nova-admissao-sucesso-contatos"
+          // T179 — admissão sem contatos não cria registro: o bloco diz isso
+          // com o mesmo texto que a ficha mostra depois.
+          vazio="Nenhum contato registrado."
           linhas={
             // T179 — contatos opcionais: sem nenhum, o bloco diz isso; cada
             // ausente aparece como "Não informado".
@@ -2272,10 +2275,13 @@ function ResumoGravado({
   titulo,
   id,
   linhas,
+  vazio = "Nada informado neste bloco.",
 }: {
   titulo: string;
   id: string;
   linhas: readonly (readonly [string, string | null])[] | null;
+  /** Texto do bloco sem nenhum registro gravado. */
+  vazio?: string;
 }) {
   return (
     <section className="nova-admissao__bloco-gravado" aria-labelledby={id}>
@@ -2292,7 +2298,7 @@ function ResumoGravado({
           ))}
         </dl>
       ) : (
-        <p className="nova-admissao__texto">Nada informado neste bloco.</p>
+        <p className="nova-admissao__texto">{vazio}</p>
       )}
     </section>
   );

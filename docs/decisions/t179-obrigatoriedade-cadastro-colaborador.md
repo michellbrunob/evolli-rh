@@ -66,8 +66,13 @@ novo vínculo de colaborador existente (`POST /v1/vinculos`) não muda.
   indispensável. Os CHECKs de formato e os índices únicos (matrícula e e-mail
   na empresa) seguem valendo para o valor informado; nenhum dado é alterado.
 - Sexo não precisou de migration: a lista fechada é regra do servidor.
-- Admissão sem nenhum contato não cria registro de contato. A edição de
-  contatos aceita cada campo vazio.
+- Admissão sem nenhum contato não cria registro de contato e não mostra
+  aviso, erro nem bloqueio por isso; o reenvio com a mesma chave continua
+  reconhecido. Depois, a tela de sucesso e a ficha mostram o estado
+  **"Nenhum contato registrado"**, anunciado como status e ligado à seção de
+  Contatos, sem campo marcado como inválido. A edição de contatos aceita cada
+  campo vazio; com ao menos um preenchido, valem as validações e a
+  normalização de sempre.
 
 ## 4. O que esta decisão não autoriza
 

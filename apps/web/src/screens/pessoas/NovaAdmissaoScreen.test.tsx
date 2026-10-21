@@ -1884,8 +1884,9 @@ describe("Nova admissão — sucesso", () => {
       screen.getByRole("region", { name: "Dados pessoais" }),
     ).getByText("Sexo", { selector: "dt" }).nextElementSibling;
     expect(sexoGravado).toHaveTextContent("Não informado");
+    // T179 — sem contatos, o bloco usa o mesmo texto da ficha.
     expect(screen.getByRole("region", { name: "Contatos" })).toHaveTextContent(
-      "Nada informado neste bloco.",
+      "Nenhum contato registrado.",
     );
     expect(document.body).not.toHaveTextContent("null");
   });

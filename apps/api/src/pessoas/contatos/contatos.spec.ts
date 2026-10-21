@@ -1086,6 +1086,60 @@ describe("Contatos — serviço", () => {
     });
   });
 
+  describe("criarNaAdmissao — contatos vazios (T179)", () => {
+    const ALVO = { colaboradorId: COLABORADOR, empresaId: EMPRESA_A };
+
+    it.each([
+      ["sem o bloco", undefined],
+      ["bloco vazio", {}],
+      ["os três nulos", { emailPessoal: null, celular: null, telefone: null }],
+    ])(
+      "%s: nenhum registro nasce, nenhum evento é gravado",
+      async (_caso, dto) => {
+        const m = montar({ vinculos: ATIVO_A, contato: null });
+        const gravado = await m.service.criarNaAdmissao(
+          m.prisma as never,
+          ctx(ator("rh", EMPRESA_A)),
+          ALVO,
+          dto as RegistrarContatosColaboradorDto | undefined,
+        );
+        expect(gravado).toBeNull();
+        expect(m.prisma.contatoColaborador.create).not.toHaveBeenCalled();
+        expect(m.prisma.contatoColaboradorEvento.create).not.toHaveBeenCalled();
+        expect(m.auditService.record).not.toHaveBeenCalled();
+      },
+    );
+
+    it("um contato só: grava ele, os outros nulos, e o evento nomeia só ele", async () => {
+      const m = montar({ vinculos: ATIVO_A, contato: null });
+      const gravado = await m.service.criarNaAdmissao(
+        m.prisma as never,
+        ctx(ator("rh", EMPRESA_A)),
+        ALVO,
+        { celular: CELULAR } as RegistrarContatosColaboradorDto,
+      );
+      expect(gravado).toMatchObject({
+        emailPessoal: null,
+        celular: CELULAR,
+        telefone: null,
+      });
+      expect(m.prisma.contatoColaborador.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            empresaId: EMPRESA_A,
+            emailPessoal: null,
+            celular: CELULAR,
+            telefone: null,
+          }),
+        }),
+      );
+      expect(eventoDeTratamento(m)).toEqual(
+        expect.objectContaining({ acao: "criacao", campos: ["celular"] }),
+      );
+      semValores(trilha(m));
+    });
+  });
+
   describe("camposAlterados", () => {
     it("compara valores normalizados, campo a campo", () => {
       const atual = {

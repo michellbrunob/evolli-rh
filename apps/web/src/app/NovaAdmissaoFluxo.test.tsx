@@ -197,7 +197,7 @@ async function abrirNovaAdmissaoPelaListagem() {
   await screen.findByRole("heading", { level: 1, name: "Nova admissão" });
 }
 
-async function admitirPelaPagina() {
+async function admitirPelaPagina({ semContatos = false } = {}) {
   await screen.findByText("Empresa Sintética (teste)");
   fireEvent.change(screen.getByLabelText(/Nome completo/), {
     target: { value: "Pessoa Sintética Fluxo" },
@@ -209,15 +209,17 @@ async function admitirPelaPagina() {
   fireEvent.change(screen.getByLabelText(/Data de nascimento/), {
     target: { value: "1990-05-20" },
   });
-  fireEvent.change(screen.getByLabelText(/E-mail pessoal/), {
-    target: { value: "pessoa.fluxo@exemplo.test" },
-  });
-  fireEvent.change(screen.getByLabelText(/^Celular/), {
-    target: { value: "+5531999990001" },
-  });
-  fireEvent.change(screen.getByLabelText(/^Telefone/), {
-    target: { value: "3133330001" },
-  });
+  if (!semContatos) {
+    fireEvent.change(screen.getByLabelText(/E-mail pessoal/), {
+      target: { value: "pessoa.fluxo@exemplo.test" },
+    });
+    fireEvent.change(screen.getByLabelText(/^Celular/), {
+      target: { value: "+5531999990001" },
+    });
+    fireEvent.change(screen.getByLabelText(/^Telefone/), {
+      target: { value: "3133330001" },
+    });
+  }
   fireEvent.change(screen.getByLabelText(/Tipo de vínculo/), {
     target: { value: "clt" },
   });
@@ -787,6 +789,44 @@ describe("T176/T178 — da página à listagem e à ficha do admitido", () => {
     await waitFor(() =>
       expect(screen.getByLabelText(/E-mail pessoal/)).toHaveFocus(),
     );
+    expect(consultarContatosDoColaborador).toHaveBeenCalledWith(resposta.id);
+  });
+
+  it("T179 — sem nenhum contato: salva sem aviso, não envia o bloco e a ficha mostra 'Nenhum contato registrado'", async () => {
+    vi.mocked(admitirColaborador).mockResolvedValue({
+      ...resposta,
+      contatos: null,
+    });
+    render(<App papelDoAtor="rh" />);
+    await abrirNovaAdmissaoPelaListagem();
+    await admitirPelaPagina({ semContatos: true });
+
+    // Nenhum aviso, erro ou bloqueio pela ausência de contatos.
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    const [corpo] = vi.mocked(admitirColaborador).mock.calls[0]!;
+    expect(corpo).not.toHaveProperty("contatos");
+    expect(screen.getByRole("region", { name: "Contatos" })).toHaveTextContent(
+      "Nenhum contato registrado.",
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Abrir ficha de Pessoa Sintética Fluxo",
+      }),
+    );
+    const ficha = await screen.findByRole("dialog", {
+      name: "Pessoa Sintética Fluxo",
+    });
+    const contatos = await within(ficha).findByRole("region", {
+      name: "Contatos",
+    });
+    const estado = await within(contatos).findByText(
+      /Nenhum contato registrado/,
+    );
+    expect(estado).toHaveAttribute("role", "status");
+    expect(estado).toHaveTextContent(/^Nenhum contato registrado\./);
+    expect(contatos).toHaveAccessibleDescription(/Nenhum contato registrado/);
+    expect(within(contatos).queryByRole("alert")).not.toBeInTheDocument();
     expect(consultarContatosDoColaborador).toHaveBeenCalledWith(resposta.id);
   });
 

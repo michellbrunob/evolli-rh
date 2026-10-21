@@ -50,6 +50,15 @@ const ORDEM_DOS_ERROS: readonly (CampoContato | "geral")[] = [
 
 const ERRO_GERAL_ID = "contatos-colaborador-erro-geral";
 
+/**
+ * T179 — estado "Nenhum contato registrado" (colaborador admitido sem
+ * contatos). Tem id próprio para a seção apontar para ele: quem chega por
+ * leitor de tela ouve, junto do título, que não há contato cadastrado.
+ */
+const SEM_CONTATOS_ID = "contatos-colaborador-sem-registro";
+const TEXTO_SEM_CONTATOS =
+  "Nenhum contato registrado. Este colaborador não tem e-mail pessoal, celular nem telefone cadastrados. Os três campos são opcionais: informe os que tiver.";
+
 const ID_DO_CAMPO: Record<CampoContato | "geral", string> = {
   emailPessoal: "contatos-colaborador-email-pessoal",
   celular: "contatos-colaborador-celular",
@@ -324,6 +333,9 @@ export function ContatosColaboradorSecao({
     <section
       className="colaboradores-screen__contatos"
       aria-labelledby="contatos-colaborador-titulo"
+      {...(carga.status === "dados" && gravado === null
+        ? { "aria-describedby": SEM_CONTATOS_ID }
+        : {})}
     >
       <h3
         id="contatos-colaborador-titulo"
@@ -356,9 +368,13 @@ export function ContatosColaboradorSecao({
           onSubmit={(e) => void salvar(e)}
         >
           {gravado === null ? (
-            <p className="colaboradores-screen__contatos-aviso">
-              Nenhum contato registrado. Os três campos são opcionais: informe
-              os que tiver.
+            // T179 — estado, não erro: `status` anuncia sem interromper.
+            <p
+              id={SEM_CONTATOS_ID}
+              className="colaboradores-screen__contatos-aviso"
+              role="status"
+            >
+              {TEXTO_SEM_CONTATOS}
             </p>
           ) : null}
 
