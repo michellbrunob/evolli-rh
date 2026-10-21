@@ -2206,11 +2206,11 @@ da T171: o aviso `[DEP0190]` do Node 24 no orquestrador da demonstração, no Wi
 
 **Integração:** A T178 foi integrada em `main` pela PR #170, squash `27b4415696560c937a0f22df15d1a882ed5f5c46`, com a CI da `main` 3/3 verde em Node 24 (647 E2E e 1049 unitários; run 39610634615, disparada manualmente porque o GitHub não criou a run de push do merge): "Gestão de Pessoas → Colaboradores" como porta principal, ViaCEP para preenchimento assistido e log geral de requisições sem valores. Branch `codex/t178-colaboradores-porta-principal` preservada.
 
-## Confirmação da Nova admissão e duplicidade — T179 (em implementação)
+## Confirmação da Nova admissão e duplicidade — T179 (implementada em Draft)
 
-| Tarefa | Estado               | Resultado principal                                                                                    |
-| ------ | -------------------- | ------------------------------------------------------------------------------------------------------ |
-| T179   | **Em implementação** | Confirmação antes de gravar, idempotência, erros por campo, e-mail único na empresa e telefones `+55`. |
+| Tarefa | Estado                    | Resultado principal                                                                                    |
+| ------ | ------------------------- | ------------------------------------------------------------------------------------------------------ |
+| T179   | **Implementada em Draft** | Confirmação antes de gravar, idempotência, erros por campo, e-mail único na empresa e telefones `+55`. |
 
 **Escopo da T179:** validação local e modal acessível de confirmação na Nova
 admissão; idempotência do envio; conflitos por campo sem valores (matrícula e
@@ -2227,6 +2227,12 @@ reconciliação RH/DP (`DP-FLX-22` não aplicável só quanto ao fuso) e na Base
 V1 da Fatia 2 (`DP-28` só na admissão). Contagens: 13 conflitos, 12 abertos e 1
 resolvido; 22 gates, com o `DP-FLX-01`, o `DP-FLX-21` e o `DP-FLX-22`
 resolvidos e 19 abertos.
+
+### O que a T179 entregou
+
+Confirmação segura da Nova admissão: validação local antes de abrir a confirmação, com foco no primeiro campo inválido; modal acessível "Confirmar cadastro de colaborador?" com resumo de empresa ativa, nome, matrícula, tipo de vínculo, data de admissão e lotação (nunca contatos, endereço ou nascimento); "Voltar e revisar" preserva tudo; só "Confirmar cadastro" envia, sem duplo envio, com "Cadastrando…". Idempotência do envio (`Idempotency-Key`, tabela `idempotencia_admissao` sem dado pessoal; reenvio devolve a mesma admissão com `Idempotent-Replayed: true`; mesma chave com conteúdo diferente é 422 `idempotencia_conteudo_divergente`; envios simultâneos resolvidos no banco). Conflitos por campo sem valor (409 com `erros`: matrícula e e-mail pessoal na admissão, e-mail pessoal na edição de contatos), com resumo seguro, campos marcados e foco no primeiro. E-mail pessoal único na mesma empresa por índice do banco. Departamento, Cargo e Unidade obrigatórios só na Nova admissão, em seletores `CÓDIGO — Nome`; empresa sem essas referências não envia, com orientação ao RH (Estrutura) ou ao DP (pedir ao RH). Telefone só brasileiro, gravado em `+55` + DDD + número; CEP brasileiro em 8 dígitos; máscaras acessíveis e progressivas de CEP e telefone na Nova admissão e na edição de contatos. Migration `20261021120000_confirmacao_admissao_normalizacao`: para com e-mail já repetido na empresa (só a contagem), converte telefones e CEPs só quando inequívocos e lista o resto em `revisao_normalizacao_cadastro`, sem valores. Testes: API unitários, E2E (suíte nova da confirmação e prova da migration sobre dados já gravados; log ligado sem valores) e web.
+
+Pendências próprias da T179: a chave de idempotência é opcional na API (a tela sempre a envia); os registros de idempotência não têm expiração nem limpeza (retenção dos registros técnicos a decidir); a relação técnica de revisão não tem tela, só consulta técnica; o reenvio de uma admissão já editada depois (nome, contato) é recusado como conteúdo divergente, de propósito; telefone estrangeiro e os modais rápidos de Departamento, Cargo e Unidade ficam para módulos próprios; na prévia, a API roda de build único, sem watch.
 
 **Fora de escopo:** CPF, documentos, dados bancários, dependentes, salário,
 ponto, adicionais trabalhistas, horário, fuso, cargo completo, modais rápidos de
