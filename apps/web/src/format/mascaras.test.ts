@@ -268,9 +268,9 @@ describe("T179 (B1) — telefone digitado tecla a tecla com o código do país",
 
   it("nenhum dígito se perde e o 12º dígito de um número nacional continua recusado", () => {
     expect(digitar("telefone", "1", "(11) 98765-4321")).toBe("(11) 98765-4321");
-    expect(digitar("telefone", "+55 91 98765-4321").replace(/[^0-9]/g, "")).toBe(
-      "91987654321",
-    );
+    expect(
+      digitar("telefone", "+55 91 98765-4321").replace(/[^0-9]/g, ""),
+    ).toBe("91987654321");
   });
 
   it("Backspace e Delete com o + no campo seguem o normal", () => {
