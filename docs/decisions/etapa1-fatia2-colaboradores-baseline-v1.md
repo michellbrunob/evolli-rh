@@ -485,3 +485,11 @@ própria empresa), e não move nenhum dos gates da §2.
 | --------------------------------------------- | ---------- | ---------------- |
 | 14. `btree_gist` como pré-condição gerenciada | Decisão 14 | §14.1, §14.7     |
 | 15. Admissão atômica                          | Decisão 15 | §4.1, §10, §14.2 |
+
+## Nota de convergência (T179, 2026-10-21) — `DP-28` na Nova admissão
+
+Por decisão da proprietária ([decisão da T179](t179-confirmacao-admissao-duplicidade-telefones.md)), a **Nova admissão**
+exige Departamento, Cargo e Unidade. É a resposta ao `DP-28` **só para a
+admissão**: as demais movimentações e o novo vínculo de colaborador existente
+continuam com a regra desta Baseline (ao menos uma referência). O texto
+original foi preservado.

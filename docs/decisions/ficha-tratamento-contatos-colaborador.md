@@ -171,3 +171,22 @@ endereço ([ficha da T177](ficha-tratamento-dados-pessoais-endereco-colaborador.
 
 Nenhum código muda com esta alteração: o processo de eliminação dos 2 anos
 nunca foi implementado.
+
+## 8. Alteração de 2026-10-21 (T179) — telefone brasileiro e e-mail único na empresa
+
+Por decisão da proprietária ([decisão da T179](t179-confirmacao-admissao-duplicidade-telefones.md)), a regra da §3 muda:
+
+- **Celular e telefone:** só números **brasileiros**, gravados em `+55` + DDD +
+  número — DDD de dois dígitos de 1 a 9; celular com 9 dígitos iniciado por 9;
+  fixo com 8 dígitos iniciado por 2 a 5. A entrada aceita `+55`, `55`,
+  parênteses, espaço, hífen e ponto. A tela mostra `(00) 0000-0000` ou
+  `(00) 00000-0000`. Número estrangeiro não é aceito nesta etapa.
+- **Telefones já gravados:** a migration da T179 converte só o que tem forma
+  inequívoca; o que não puder ser convertido com segurança fica como está e
+  entra na relação técnica de revisão (`revisao_normalizacao_cadastro`), com o
+  registro e o nome do campo, **nunca o valor**.
+- **E-mail pessoal:** passa a ser **único na mesma empresa**, por restrição do
+  banco; pode repetir em empresa diferente. O conflito responde 409 com o campo
+  e sem o valor, e só na empresa ativa.
+
+Finalidade, base legal, classificação, retenção e escopo de acesso não mudam.
