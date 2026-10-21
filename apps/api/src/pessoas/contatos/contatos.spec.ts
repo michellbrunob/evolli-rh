@@ -11,6 +11,7 @@ import { AuditService } from "../../audit/audit.service";
 import { PrismaService } from "../../database/prisma.service";
 import { PessoasAuditoriaService } from "../pessoas-auditoria.service";
 import { PessoasAuditContext } from "../pessoas.types";
+import { ConflitoDeCamposException } from "../../common/erros/recusa-por-campo";
 import { RegistrarContatosColaboradorDto } from "./contato-colaborador.dto";
 import {
   ContatoColaboradorService,
@@ -38,7 +39,8 @@ const CONTATO_ID = "44444444-4444-4444-8444-444444444444";
 
 const EMAIL = "pessoa.sintetica@example.test";
 const CELULAR = "+5511987654321";
-const TELEFONE = "1133334444";
+// T179 — telefone só brasileiro, gravado na forma `+55` + DDD + número.
+const TELEFONE = "+551133334444";
 
 function ator(role: AccessRole, companyId: string | null): AccessUser {
   return { id: `ator-${role}`, role, companyId } as unknown as AccessUser;
@@ -84,15 +86,22 @@ describe("Contatos — normalização (ficha, §3)", () => {
     );
   });
 
+  // T179 — a forma gravada passou a ser `+55` + DDD + número (ficha, §8).
   it.each([
-    ["(11) 98765-4321", "11987654321"],
+    ["(11) 98765-4321", "+5511987654321"],
     ["+55 (11) 98765-4321", "+5511987654321"],
-    ["+44 20.7946.0958", "+442079460958"],
-    ["  1133334444  ", "1133334444"],
-    ["1234-5678", "12345678"],
-  ])("telefone %p vira %p — só dígitos, + preservado", (entrada, saida) => {
+    ["  1133334444  ", "+551133334444"],
+    ["55 11 3333-4444", "+551133334444"],
+  ])("telefone %p vira %p — só dígitos, em +55", (entrada, saida) => {
     expect(normalizarTelefone(entrada)).toBe(saida);
   });
+
+  it.each(["+44 20.7946.0958", "1234-5678"])(
+    "telefone sem forma brasileira %p volta intacto (a validação recusa)",
+    (entrada) => {
+      expect(normalizarTelefone(entrada)).toBe(entrada);
+    },
+  );
 
   it.each(["11 9876-ABCD", "55+11987654321", "+", "ramal 123", "11/98765"])(
     "telefone com caractere fora do permitido %p volta intacto (a validação recusa)",
@@ -174,6 +183,12 @@ describe("Contatos — validação do corpo", () => {
     ["11 9876-ABCD", "letra"],
     ["", "vazio"],
     ["() - .", "só separadores"],
+    // T179 — fora da forma brasileira.
+    ["12345678", "8 dígitos, sem DDD"],
+    ["+44 20 7946 0958", "estrangeiro"],
+    ["0198765432", "DDD iniciado por 0"],
+    ["11887654321", "celular sem o 9"],
+    ["1163334444", "fixo iniciado por 6"],
   ])("telefone %p (%s) é recusado nos dois campos", async (valor) => {
     expect(
       (await errosDe({ ...CORPO_VALIDO, celular: valor, telefone: valor }))
@@ -181,16 +196,15 @@ describe("Contatos — validação do corpo", () => {
     ).toEqual(["celular", "telefone"]);
   });
 
-  it("8 e 15 dígitos são os limites aceitos", async () => {
-    expect(
-      (
-        await errosDe({
-          ...CORPO_VALIDO,
-          celular: "12345678",
-          telefone: "+123456789012345",
-        })
-      ).campos,
-    ).toEqual([]);
+  it("T179: celular de 9 dígitos iniciado por 9 e fixo de 8 iniciado por 2 a 5 são as formas aceitas", async () => {
+    const { dto, campos } = await errosDe({
+      ...CORPO_VALIDO,
+      celular: "21987654321",
+      telefone: "5122223333",
+    });
+    expect(campos).toEqual([]);
+    expect(dto.celular).toBe("+5521987654321");
+    expect(dto.telefone).toBe("+555122223333");
   });
 
   it("empresa vinda do navegador é recusada — o corpo não a aceita", async () => {
@@ -348,6 +362,8 @@ function montar(opcoes: {
    * a camada que nega.
    */
   ignorarFiltroDeEmpresa?: boolean;
+  /** T179 — outro colaborador da empresa já usa o e-mail enviado. */
+  emailDeOutro?: boolean;
 }) {
   const contatoGravado =
     opcoes.contato === undefined || opcoes.contato === null
@@ -370,6 +386,10 @@ function montar(opcoes: {
       ),
     },
     contatoColaborador: {
+      // T179 — e-mail pessoal de OUTRO colaborador da mesma empresa.
+      findFirst: jest.fn(async (): Promise<{ id: string } | null> =>
+        opcoes.emailDeOutro ? { id: "outro-contato" } : null,
+      ),
       findUnique: jest.fn(async () => contatoGravado),
       create: jest.fn(async (args: { data: Record<string, unknown> }) => ({
         id: CONTATO_ID,
@@ -419,7 +439,14 @@ function trilha(m: ReturnType<typeof montar>): string {
 }
 
 function semValores(texto: string) {
-  for (const valor of [EMAIL, CELULAR, TELEFONE, "5511987654321", "@"]) {
+  for (const valor of [
+    EMAIL,
+    CELULAR,
+    TELEFONE,
+    "5511987654321",
+    "551133334444",
+    "@",
+  ]) {
     expect(texto).not.toContain(valor);
   }
 }
@@ -863,7 +890,7 @@ describe("Contatos — serviço", () => {
       const m = montar({ vinculos: ATIVO_A, contato: COM_VALOR });
       const resposta = await m.service.registrar(
         COLABORADOR,
-        { ...CORPO_VALIDO, telefone: "1144445555" },
+        { ...CORPO_VALIDO, telefone: "+551144445555" },
         ctx(ator("dp", EMPRESA_A)),
       );
       expect(resposta.resultado).toBe("atualizado");
@@ -885,6 +912,7 @@ describe("Contatos — serviço", () => {
       );
       semValores(trilha(m));
       expect(trilha(m)).not.toContain("1144445555");
+      expect(trilha(m)).not.toContain("551144445555");
     });
 
     it("PUT sem alteração: nada gravado, mas a devolução dos valores fica na trilha como leitura", async () => {
@@ -979,6 +1007,62 @@ describe("Contatos — serviço", () => {
       ).rejects.toBeInstanceOf(ConflictException);
     });
 
+    it("T179: e-mail de OUTRO colaborador da mesma empresa é 409 com o campo, sem o valor, e nada é gravado", async () => {
+      const m = montar({
+        vinculos: ATIVO_A,
+        contato: null,
+        emailDeOutro: true,
+      });
+      const erro = await m.service
+        .registrar(
+          COLABORADOR,
+          CORPO_VALIDO as RegistrarContatosColaboradorDto,
+          ctx(ator("rh", EMPRESA_A)),
+        )
+        .catch((e: unknown) => e);
+      expect(erro).toBeInstanceOf(ConflitoDeCamposException);
+      expect((erro as ConflitoDeCamposException).erros).toEqual([
+        { campo: "emailPessoal", motivo: "em_uso" },
+      ]);
+      expect(
+        JSON.stringify((erro as ConflitoDeCamposException).erros),
+      ).not.toContain(EMAIL);
+      // A consulta é só na empresa do vínculo e exclui o próprio colaborador.
+      expect(m.prisma.contatoColaborador.findFirst).toHaveBeenCalledWith({
+        where: {
+          empresaId: EMPRESA_A,
+          emailPessoal: EMAIL,
+          NOT: { colaboradorId: COLABORADOR },
+        },
+        select: { id: true },
+      });
+      expect(m.prisma.contatoColaborador.create).not.toHaveBeenCalled();
+      expect(m.prisma.contatoColaborador.update).not.toHaveBeenCalled();
+      expect(m.prisma.contatoColaboradorEvento.create).not.toHaveBeenCalled();
+    });
+
+    it("T179: corrida perdida na unicidade (empresa, e-mail) do banco vira 409 com o campo", async () => {
+      const m = montar({ vinculos: ATIVO_A, contato: null });
+      m.prisma.contatoColaborador.create.mockRejectedValueOnce(
+        new Prisma.PrismaClientKnownRequestError("unique", {
+          code: "P2002",
+          clientVersion: "5.22.0",
+          meta: { target: ["empresa_id", "email_pessoal"] },
+        }),
+      );
+      const erro = await m.service
+        .registrar(
+          COLABORADOR,
+          CORPO_VALIDO as RegistrarContatosColaboradorDto,
+          ctx(ator("rh", EMPRESA_A)),
+        )
+        .catch((e: unknown) => e);
+      expect(erro).toBeInstanceOf(ConflitoDeCamposException);
+      expect((erro as ConflitoDeCamposException).erros).toEqual([
+        { campo: "emailPessoal", motivo: "em_uso" },
+      ]);
+    });
+
     it("falha na trilha desfaz a gravação (mesma transação)", async () => {
       const m = montar({
         vinculos: ATIVO_A,
@@ -1007,7 +1091,7 @@ describe("Contatos — serviço", () => {
       expect(
         camposAlterados(atual, {
           emailPessoal: "outra@example.test",
-          celular: "11900000000",
+          celular: "+5511900000000",
           telefone: TELEFONE,
         }),
       ).toEqual(["email_pessoal", "celular"]);

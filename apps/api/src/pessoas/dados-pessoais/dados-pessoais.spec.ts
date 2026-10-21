@@ -185,14 +185,17 @@ describe("Módulo 1 — AdmitirColaboradorDto com os blocos", () => {
     tipo: "clt",
     dataAdmissao: "2026-10-20",
     motivoCodigo: "admissao_inicial",
+    // T179 — a lotação da Nova admissão exige Departamento, Cargo e Unidade.
     departamentoId: "33333333-3333-4333-8333-333333333333",
+    cargoId: "55555555-5555-4555-8555-555555555555",
+    unidadeOrganizacionalId: "66666666-6666-4666-8666-666666666666",
   };
   const obrigatorios = {
     perfilPessoal: { dataNascimento: "1990-05-20" },
     contatos: {
       emailPessoal: "pessoa@exemplo.test",
       celular: "+5511999990000",
-      telefone: "1133330000",
+      telefone: "+551133330000",
     },
   };
 
@@ -264,10 +267,11 @@ describe("Módulo 1 — AdmitirColaboradorDto com os blocos", () => {
       },
     });
     expect(await validate(dto, OPCOES)).toEqual([]);
+    // T179 — telefone gravado em `+55` + DDD + número.
     expect(dto.contatos).toEqual({
       emailPessoal: "pessoa@exemplo.test",
       celular: "+5511999990000",
-      telefone: "1133330000",
+      telefone: "+551133330000",
     });
   });
 
@@ -426,6 +430,8 @@ describe("Módulo 1 — campos alcançados (só nomes)", () => {
 describe("Módulo 1 — admissão com perfil, endereço e contatos", () => {
   const AGORA = new Date("2026-10-20T12:00:00.000Z");
   const DEPARTAMENTO = "33333333-3333-4333-8333-333333333333";
+  const CARGO = "55555555-5555-4555-8555-555555555555";
+  const UNIDADE = "66666666-6666-4666-8666-666666666666";
 
   function montar() {
     const eventosDados: Record<string, unknown>[] = [];
@@ -433,6 +439,8 @@ describe("Módulo 1 — admissão com perfil, endereço e contatos", () => {
     const auditorias: Record<string, unknown>[] = [];
     const tx = {
       departamento: { count: jest.fn().mockResolvedValue(1) },
+      cargo: { count: jest.fn().mockResolvedValue(1) },
+      unidadeOrganizacional: { count: jest.fn().mockResolvedValue(1) },
       colaborador: {
         create: jest.fn().mockResolvedValue({
           id: "col-1",
@@ -443,6 +451,8 @@ describe("Módulo 1 — admissão com perfil, endereço e contatos", () => {
         }),
       },
       vinculoFuncional: {
+        // T179 — matrícula livre na empresa.
+        findFirst: jest.fn().mockResolvedValue(null),
         create: jest.fn().mockResolvedValue({
           id: "vin-1",
           empresaId: EMPRESA_A,
@@ -458,11 +468,11 @@ describe("Módulo 1 — admissão com perfil, endereço e contatos", () => {
           tipo: "admissao",
           status: "solicitada",
           vigenciaInicio: AGORA,
-          destinoUnidadeOrganizacionalId: null,
+          destinoUnidadeOrganizacionalId: UNIDADE,
           destinoDepartamentoId: DEPARTAMENTO,
           destinoAreaId: null,
           destinoEquipeId: null,
-          destinoCargoId: null,
+          destinoCargoId: CARGO,
           destinoCentroCustoId: null,
         }),
       },
@@ -481,6 +491,8 @@ describe("Módulo 1 — admissão com perfil, endereço e contatos", () => {
         })),
       },
       contatoColaborador: {
+        // T179 — e-mail pessoal livre na empresa.
+        findFirst: jest.fn().mockResolvedValue(null),
         create: jest.fn(({ data }: { data: Record<string, unknown> }) => ({
           id: "con-1",
           ...data,
@@ -540,6 +552,8 @@ describe("Módulo 1 — admissão com perfil, endereço e contatos", () => {
     dataAdmissao: "2026-10-01",
     motivoCodigo: "admissao_inicial",
     departamentoId: DEPARTAMENTO,
+    cargoId: CARGO,
+    unidadeOrganizacionalId: UNIDADE,
     perfilPessoal: {
       dataNascimento: "1990-05-20",
       sexo: "Feminino",
@@ -556,7 +570,7 @@ describe("Módulo 1 — admissão com perfil, endereço e contatos", () => {
     contatos: {
       emailPessoal: "pessoa.sintetica@exemplo.test",
       celular: "+5531999990000",
-      telefone: "3133330000",
+      telefone: "+553133330000",
     },
   };
 
@@ -576,9 +590,10 @@ describe("Módulo 1 — admissão com perfil, endereço e contatos", () => {
       saudacao: null,
       nomeMae: "Mãe Sintética",
     });
+    // T179 — com país Brasil, o CEP é gravado nos 8 dígitos.
     expect(resposta.endereco).toMatchObject({
       pais: "Brasil",
-      cep: "30140-071",
+      cep: "30140071",
       logradouro: null,
     });
     expect(resposta.contatos).toMatchObject({
@@ -618,9 +633,11 @@ describe("Módulo 1 — admissão com perfil, endereço e contatos", () => {
       "Feminino",
       "Mãe Sintética",
       "30140-071",
+      "30140071",
       "Belo Horizonte",
       "pessoa.sintetica@exemplo.test",
       "+5531999990000",
+      "553133330000",
     ]) {
       expect(trilha).not.toContain(valor);
     }

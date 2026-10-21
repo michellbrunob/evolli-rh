@@ -17,7 +17,7 @@ describe("contatos do colaborador — regra no cliente", () => {
     expect(validarContatos(validos)).toEqual({});
   });
 
-  it("normaliza como o servidor: e-mail aparado e minúsculo, telefone só com dígitos", () => {
+  it("normaliza como o servidor: e-mail aparado e minúsculo, telefone em +55 + DDD + número", () => {
     expect(
       normalizarContatos({
         emailPessoal: "  Ana@EXAMPLE.test ",
@@ -27,8 +27,27 @@ describe("contatos do colaborador — regra no cliente", () => {
     ).toEqual({
       emailPessoal: "ana@example.test",
       celular: "+5511987650001",
-      telefone: "1133330001",
+      telefone: "+551133330001",
     });
+  });
+
+  it.each([
+    ["(11) 98765-4321", "+5511987654321"],
+    ["11987654321", "+5511987654321"],
+    ["5511987654321", "+5511987654321"],
+    ["+55 11 98765-4321", "+5511987654321"],
+    ["(11) 3000-0000", "+551130000000"],
+    ["551130000000", "+551130000000"],
+    // Com 10 ou 11 dígitos, o 55 do começo é DDD (Rio Grande do Sul).
+    ["5598765432", "+555598765432"],
+  ])("T179 — telefone %p vira %p", (entrada, esperado) => {
+    expect(normalizarTelefone(entrada)).toBe(esperado);
+  });
+
+  it("T179 — o que não tem forma brasileira volta aparado, sem chute", () => {
+    expect(normalizarTelefone(" +44 20 7946 0958 ")).toBe("+44 20 7946 0958");
+    expect(normalizarTelefone("1234567")).toBe("1234567");
+    expect(normalizarTelefone("119876543210")).toBe("119876543210");
   });
 
   it("os três são obrigatórios", () => {
@@ -58,22 +77,26 @@ describe("contatos do colaborador — regra no cliente", () => {
   });
 
   it.each([
-    ["1234567", /8 a 15 dígitos/],
-    ["+1234567890123456", /8 a 15 dígitos/],
+    ["1234567", /precisa do DDD e do número/],
+    ["(11) 9876-543", /precisa do DDD e do número/],
+    ["+1 212 555 0123", /só número brasileiro/],
     ["11 9876-ABCD", /só dígitos/],
     ["55+11987654321", /só dígitos/],
+    // DDD com zero, celular sem o 9, fixo começando por 1.
+    ["(10) 98765-4321", /não é um número brasileiro válido/],
+    ["(11) 88765-4321", /não é um número brasileiro válido/],
+    ["(11) 1000-0000", /não é um número brasileiro válido/],
   ])("telefone %p é recusado com a explicação certa", (telefone, motivo) => {
     expect(validarContatos({ ...validos, telefone }).telefone).toMatch(motivo);
   });
 
-  it("8 e 15 dígitos são os limites aceitos, sem presumir país", () => {
+  it("T179 — celular de 11 dígitos e fixo de 10, com ou sem +55, são aceitos", () => {
     expect(
       validarContatos({
         ...validos,
-        celular: "12345678",
-        telefone: "+123456789012345",
+        celular: "(21) 99999-0000",
+        telefone: "+55 21 2222-0000",
       }),
     ).toEqual({});
-    expect(normalizarTelefone("+44 20.7946.0958")).toBe("+442079460958");
   });
 });

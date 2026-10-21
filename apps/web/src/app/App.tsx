@@ -240,6 +240,11 @@ function conteudoDoDestino(
     readonly onAberturaAtendida: () => void;
     /** T177 — o papel abre a página de Nova admissão (ver `resolverEntrada`). */
     readonly podeAdmitir: boolean;
+    /**
+     * T179 — o papel do ator, só para a página orientar quem cadastra as
+     * referências que faltam (RH) ou a quem pedir (DP). Não concede nada.
+     */
+    readonly papelDoAtor: string | null;
   },
 ) {
   if (destinoId === "inicio") {
@@ -272,6 +277,7 @@ function conteudoDoDestino(
   if (destinoId === "nova-admissao") {
     return (
       <NovaAdmissaoScreen
+        papelDoAtor={admissao.papelDoAtor}
         onSair={() => onNavegar("pessoas")}
         onAbrirAdmitido={(colaborador, foco) =>
           admissao.onAbrirAdmitido({ colaborador, foco })
@@ -960,6 +966,7 @@ export function App({
               onAbrirAdmitido: abrirAdmitido,
               onAberturaAtendida: aberturaAtendida,
               podeAdmitir,
+              papelDoAtor,
             },
           )}
         </main>

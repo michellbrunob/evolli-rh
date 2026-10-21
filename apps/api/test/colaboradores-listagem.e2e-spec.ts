@@ -13,7 +13,10 @@ import { GenericContainer, StartedTestContainer, Wait } from "testcontainers";
 import { AppModule } from "../src/app.module";
 import { AllExceptionsFilter } from "../src/common/filters/http-exception.filter";
 import { requestIdMiddleware } from "../src/common/request-id";
-import { CAMPOS_OBRIGATORIOS_ADMISSAO } from "./admissao-obrigatoria";
+import {
+  camposObrigatoriosAdmissao,
+  lotacaoMinima,
+} from "./admissao-obrigatoria";
 
 /**
  * T178 — "Gestão de Pessoas → Colaboradores" como porta principal: a
@@ -210,7 +213,8 @@ describe("Colaboradores — listagem da porta principal (T178, e2e)", () => {
   ): Promise<{ colaboradorId: string; vinculoId: string }> {
     const r = await post("/v1/colaboradores", cred)
       .send({
-        ...CAMPOS_OBRIGATORIOS_ADMISSAO,
+        ...camposObrigatoriosAdmissao(),
+        ...(await lotacaoMinima(appUrl, dados.empresaId)),
         nome: dados.nome,
         empresaId: dados.empresaId,
         matricula: dados.matricula,
@@ -642,7 +646,8 @@ describe("Colaboradores — listagem da porta principal (T178, e2e)", () => {
     it("desligado na Alfa conta como inativo nela", async () => {
       const r = await post("/v1/colaboradores", rhA)
         .send({
-          ...CAMPOS_OBRIGATORIOS_ADMISSAO,
+          ...camposObrigatoriosAdmissao(),
+          ...(await lotacaoMinima(appUrl, empresaA)),
           nome: "Fabio Sintetico Desligado",
           empresaId: empresaA,
           matricula: "MAT-L-FAB",

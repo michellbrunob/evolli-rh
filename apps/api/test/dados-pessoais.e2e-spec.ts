@@ -13,6 +13,7 @@ import { GenericContainer, StartedTestContainer, Wait } from "testcontainers";
 import { AppModule } from "../src/app.module";
 import { AllExceptionsFilter } from "../src/common/filters/http-exception.filter";
 import { requestIdMiddleware } from "../src/common/request-id";
+import { LotacaoMinima, lotacaoMinima } from "./admissao-obrigatoria";
 
 /**
  * T177 — Cadastro de colaborador, Módulo 1: dados pessoais, endereço e
@@ -79,6 +80,15 @@ const CONTATOS = {
   celular: "+55 (31) 98888-1771",
   telefone: "31 3333-1771",
 };
+/**
+ * T179 — o e-mail pessoal é único na mesma empresa: cada admissão usa o seu,
+ * derivado da matrícula (`Pessoa.<matrícula>@Example.TEST`, gravado em caixa
+ * baixa). A mesma matrícula repete o mesmo e-mail.
+ */
+const emailDaAdmissao = (matricula: string) =>
+  `Pessoa.${matricula}@Example.TEST`;
+const emailGravado = (matricula: string) =>
+  emailDaAdmissao(matricula).toLowerCase();
 const VALORES_PESSOAIS = [
   "1991-07-14",
   "Feminino",
@@ -89,11 +99,18 @@ const VALORES_PESSOAIS = [
   "Pai Sintetico Modulo",
   "Mae Sintetica Modulo",
   "30140-071",
+  // T179 — com país Brasil, o CEP é gravado nos 8 dígitos.
+  "30140071",
   "Avenida Sintetica Modulo",
   "Bairro Sintetico",
   "Cidade Sintetica",
   "pessoa.modulo1@example.test",
+  // T179 — todo e-mail pessoal derivado da matrícula (`emailDaAdmissao`).
+  "pessoa.mat-m1-",
+  "Pessoa.MAT-M1-",
   "+5531988881771",
+  // T179 — telefone gravado em `+55` + DDD + número.
+  "553133331771",
   "3133331771",
 ];
 
@@ -172,6 +189,9 @@ describe("Cadastro de colaborador — Módulo 1 (e2e)", () => {
   let empresaB: string;
   let departamentoA: string;
   let departamentoB: string;
+  // T179 — a Nova admissão exige Departamento, Cargo e Unidade da empresa.
+  let lotacaoA: LotacaoMinima;
+  let lotacaoB: LotacaoMinima;
 
   const agent = () => request(app.getHttpServer());
 
@@ -226,6 +246,7 @@ describe("Cadastro de colaborador — Módulo 1 (e2e)", () => {
 
   function admissao(matricula: string, extra: Record<string, unknown> = {}) {
     return {
+      ...lotacaoA,
       nome: `Pessoa Sintetica ${matricula}`,
       empresaId: empresaA,
       matricula,
@@ -235,7 +256,7 @@ describe("Cadastro de colaborador — Módulo 1 (e2e)", () => {
       departamentoId: departamentoA,
       perfilPessoal: PERFIL,
       endereco: ENDERECO,
-      contatos: CONTATOS,
+      contatos: { ...CONTATOS, emailPessoal: emailDaAdmissao(matricula) },
       ...extra,
     };
   }
@@ -306,6 +327,8 @@ describe("Cadastro de colaborador — Módulo 1 (e2e)", () => {
         .send({ empresaId: empresaB, codigo: "DEPM1B", nome: "Depto B" })
         .expect(201)
     ).body.id;
+    lotacaoA = await lotacaoMinima(appUrl, empresaA);
+    lotacaoB = await lotacaoMinima(appUrl, empresaB);
 
     rhA = await criarUsuario("rh.m1a@example.test", "rh", empresaA);
     rhB = await criarUsuario("rh.m1b@example.test", "rh", empresaB);
@@ -348,15 +371,16 @@ describe("Cadastro de colaborador — Módulo 1 (e2e)", () => {
         naturalidade: "Ouro Preto",
         nomeMae: "Mae Sintetica Modulo",
       });
+      // T179 — CEP brasileiro em 8 dígitos; telefones em `+55`.
       expect(resposta.endereco).toMatchObject({
         pais: "Brasil",
-        cep: "30140-071",
+        cep: "30140071",
         estado: "MG",
       });
       expect(resposta.contatos).toMatchObject({
-        emailPessoal: "pessoa.modulo1@example.test",
+        emailPessoal: emailGravado("MAT-M1-001"),
         celular: "+5531988881771",
-        telefone: "3133331771",
+        telefone: "+553133331771",
       });
     });
 
@@ -382,7 +406,7 @@ describe("Cadastro de colaborador — Módulo 1 (e2e)", () => {
       ).expect(200);
       expect(r.body.situacao).toBe("registrado");
       expect(r.body.contatos).toMatchObject({
-        emailPessoal: "pessoa.modulo1@example.test",
+        emailPessoal: emailGravado("MAT-M1-001"),
       });
       expect(
         await prisma.contatoColaborador.count({ where: { colaboradorId } }),
@@ -786,7 +810,7 @@ describe("Cadastro de colaborador — Módulo 1 (e2e)", () => {
       });
       expect(r.body.endereco).toBeNull();
       expect(r.body.contatos).toMatchObject({
-        emailPessoal: "pessoa.modulo1@example.test",
+        emailPessoal: emailGravado("MAT-M1-MIN"),
       });
       expect(
         await prisma.enderecoColaborador.count({
@@ -898,6 +922,7 @@ describe("Cadastro de colaborador — Módulo 1 (e2e)", () => {
       const naB = await post("/v1/colaboradores", rhA)
         .send(
           admissao("MAT-M1-B", {
+            ...lotacaoB,
             empresaId: empresaB,
             departamentoId: departamentoB,
           }),

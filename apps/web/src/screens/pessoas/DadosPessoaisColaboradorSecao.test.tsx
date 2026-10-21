@@ -78,6 +78,23 @@ describe("Ficha — dados pessoais e endereço (T177)", () => {
     expectSemIsoVisivel(document.body);
   });
 
+  it.each([
+    ["Brasil", "30140071", "30140-071"],
+    ["brasil", "30140071", "30140-071"],
+    ["Portugal", "1000-001", "1000-001"],
+    ["Portugal", "30140071", "30140071"],
+  ])(
+    "T179 — com país %s, o CEP gravado %s aparece como %s",
+    async (pais, cep, exibido) => {
+      vi.mocked(consultarDadosPessoaisDoColaborador).mockResolvedValue({
+        ...registrado,
+        endereco: { ...registrado.endereco!, pais, cep },
+      });
+      render(<DadosPessoaisColaboradorSecao colaboradorId={ID} />);
+      expect(await screen.findByText(exibido)).toBeInTheDocument();
+    },
+  );
+
   it("é só leitura: nenhum campo editável", async () => {
     vi.mocked(consultarDadosPessoaisDoColaborador).mockResolvedValue(
       registrado,

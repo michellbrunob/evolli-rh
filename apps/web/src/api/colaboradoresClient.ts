@@ -122,8 +122,16 @@ export interface DestinoOrganizacionalDto {
  * `AdmitirColaboradorDto` do backend — `empresaId` é a empresa do próprio ator
  * (obtida via `/v1/empresas`, nunca inventada no cliente) e é conferida contra
  * a sessão no servidor; divergência responde 404, nunca 403.
+ *
+ * T179 — na Nova admissão, Departamento, Cargo e Unidade passaram a ser
+ * OBRIGATÓRIOS (decisão da proprietária de 2026-10-21); Área (com o
+ * departamento), Equipe e Centro de custo seguem opcionais. Novo vínculo de
+ * colaborador existente não muda.
  */
 export interface AdmitirColaboradorDto extends DestinoOrganizacionalDto {
+  departamentoId: string;
+  cargoId: string;
+  unidadeOrganizacionalId: string;
   nome: string;
   empresaId: string;
   matricula: string;
@@ -187,14 +195,76 @@ export interface RetificarColaboradorDto {
   nome: string;
 }
 
+/**
+ * T179 — um campo recusado pelo servidor, SEM o valor enviado: só o caminho
+ * do campo no corpo (`matricula`, `contatos.emailPessoal`, `emailPessoal`) e o
+ * motivo (`em_uso`).
+ */
+export interface ErroDeCampoApi {
+  readonly campo: string;
+  readonly motivo: string;
+}
+
+/**
+ * T179 — o que o corpo do erro pode trazer além da mensagem: `erros` (409 por
+ * campo) e `codigo` (por exemplo `idempotencia_conteudo_divergente`, no 422).
+ */
+export interface DetalhesDaRecusaApi {
+  readonly erros?: readonly ErroDeCampoApi[];
+  readonly codigo?: string;
+}
+
+function ehErroDeCampo(item: unknown): item is ErroDeCampoApi {
+  return (
+    typeof item === "object" &&
+    item !== null &&
+    typeof (item as { campo?: unknown }).campo === "string" &&
+    typeof (item as { motivo?: unknown }).motivo === "string"
+  );
+}
+
 export class ApiError extends Error {
+  /** T179 — campos recusados, quando o servidor os informa. */
+  readonly erros?: readonly ErroDeCampoApi[];
+  /** T179 — código estável da recusa, quando o servidor o informa. */
+  readonly codigo?: string;
+
+  /**
+   * `corpo` é o corpo JSON do erro, ou nada. Só `erros` (lista de
+   * `{campo, motivo}` em texto) e `codigo` (texto) são lidos; qualquer outra
+   * coisa do corpo é ignorada, e forma inesperada simplesmente não vira
+   * detalhe — quem já usava `status` e `message` não muda.
+   */
   constructor(
     readonly status: number,
     message: string,
+    corpo?: unknown,
   ) {
     super(message);
     this.name = "ApiError";
+    if (typeof corpo === "object" && corpo !== null) {
+      const { erros, codigo } = corpo as {
+        erros?: unknown;
+        codigo?: unknown;
+      };
+      if (Array.isArray(erros)) {
+        this.erros = erros
+          .filter(ehErroDeCampo)
+          .map(({ campo, motivo }) => ({ campo, motivo }));
+      }
+      if (typeof codigo === "string") this.codigo = codigo;
+    }
   }
+}
+
+/** T179 — opções do envio da admissão. */
+export interface OpcoesDaAdmissao {
+  /**
+   * Chave de idempotência (UUID) do envio, no cabeçalho `Idempotency-Key`.
+   * A MESMA chave em nova tentativa nunca cria uma segunda admissão: o
+   * servidor devolve a já gravada, ou recusa com 422 se o conteúdo mudou.
+   */
+  readonly chaveIdempotencia?: string;
 }
 
 async function getCsrf(): Promise<string> {
@@ -228,7 +298,7 @@ async function jsonOrThrow<T>(res: Response): Promise<T> {
     const msg = Array.isArray(body.message)
       ? (body.message[0] ?? "Erro na requisição.")
       : (body.message ?? "Erro na requisição.");
-    throw new ApiError(res.status, msg);
+    throw new ApiError(res.status, msg, body);
   }
   return res.json() as Promise<T>;
 }
@@ -267,13 +337,24 @@ export async function listarVinculosDoColaborador(
   return jsonOrThrow(res);
 }
 
+/**
+ * Registra a admissão. T179 — com `chaveIdempotencia`, o envio é idempotente:
+ * reenviar a mesma chave (depois de uma falha de rede, por exemplo) devolve a
+ * admissão já gravada com o mesmo 201, e o cabeçalho `Idempotent-Replayed`.
+ */
 export async function admitirColaborador(
   dto: AdmitirColaboradorDto,
+  opcoes: OpcoesDaAdmissao = {},
 ): Promise<AdmissaoRegistradaApi> {
   const token = await getCsrf();
   const res = await apiFetch("/colaboradores", {
     method: "POST",
-    headers: { "x-csrf-token": token },
+    headers: {
+      "x-csrf-token": token,
+      ...(opcoes.chaveIdempotencia
+        ? { "Idempotency-Key": opcoes.chaveIdempotencia }
+        : {}),
+    },
     body: JSON.stringify(dto),
   });
   return jsonOrThrow(res);

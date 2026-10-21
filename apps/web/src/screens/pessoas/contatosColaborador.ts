@@ -6,8 +6,17 @@
  * por status, sem apontar o campo. **Quem decide é o servidor** — ele valida e
  * normaliza de novo, qualquer que seja o cliente.
  *
- * Nenhum país é presumido: sem DDD, DDI ou máscara nacional.
+ * T179 — telefone SÓ BRASILEIRO (decisão da proprietária de 2026-10-21): o
+ * servidor grava `+55` + DDD + número, com DDD de dois dígitos de 1 a 9,
+ * celular de 9 dígitos começando por 9 e fixo de 8 começando de 2 a 5. A tela
+ * mostra e edita na máscara `(00) 00000-0000` / `(00) 0000-0000`
+ * (`format/mascaras.ts`); aqui o valor, mascarado ou colado, vira a forma do
+ * servidor.
  */
+import {
+  digitosNacionaisDoTelefone,
+  exibirTelefone,
+} from "../../format/mascaras";
 
 export interface ValoresContatos {
   emailPessoal: string;
@@ -23,20 +32,45 @@ export const LIMITE_EMAIL_PESSOAL = 254;
 
 const EMAIL_FORMA = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const TELEFONE_ENTRADA = /^\+?[0-9 ().-]+$/;
-const TELEFONE_NORMALIZADO = /^\+?[0-9]{8,15}$/;
+/** O mesmo `TELEFONE_NORMALIZADO` do servidor (T179). */
+const TELEFONE_NORMALIZADO = /^\+55[1-9]{2}(?:9[0-9]{8}|[2-5][0-9]{7})$/;
 
 export function normalizarEmailPessoal(valor: string): string {
   return valor.trim().toLowerCase();
 }
 
-/** Só dígitos, precedidos de `+` quando informado; inválido volta aparado. */
+/**
+ * `+55` + DDD + número, como o servidor grava. Aceita o número nacional (10
+ * ou 11 dígitos, com ou sem máscara) e o internacional brasileiro (`+55` ou
+ * `55` + 10 ou 11 dígitos). Fora dessas formas volta aparado, para a
+ * validação recusar — normalizar nunca "conserta".
+ */
 export function normalizarTelefone(valor: string): string {
   const aparado = valor.trim();
   if (!TELEFONE_ENTRADA.test(aparado)) {
     return aparado;
   }
   const digitos = aparado.replace(/[^0-9]/g, "");
-  return aparado.startsWith("+") ? `+${digitos}` : digitos;
+  if (aparado.startsWith("+") && !digitos.startsWith("55")) {
+    return aparado;
+  }
+  const nacionais = digitosNacionaisDoTelefone(aparado);
+  const sobra = digitos.length - nacionais.length;
+  // Só 10 ou 11 dígitos nacionais, e nada além do `55` do país.
+  const semSobra = sobra === 0 || (sobra === 2 && digitos.startsWith("55"));
+  if ((nacionais.length !== 10 && nacionais.length !== 11) || !semSobra) {
+    return aparado;
+  }
+  return `+55${nacionais}`;
+}
+
+/** Valores gravados como a tela os edita: telefones na máscara brasileira. */
+export function contatosParaEdicao(valores: ValoresContatos): ValoresContatos {
+  return {
+    emailPessoal: valores.emailPessoal,
+    celular: exibirTelefone(valores.celular),
+    telefone: exibirTelefone(valores.telefone),
+  };
 }
 
 export function normalizarContatos(valores: ValoresContatos): ValoresContatos {
@@ -48,16 +82,30 @@ export function normalizarContatos(valores: ValoresContatos): ValoresContatos {
 }
 
 function erroDeTelefone(valor: string, rotulo: string): string | undefined {
-  if (valor.trim() === "") {
+  const aparado = valor.trim();
+  if (aparado === "") {
     return `${rotulo} é obrigatório.`;
   }
-  if (!TELEFONE_ENTRADA.test(valor.trim())) {
+  if (!TELEFONE_ENTRADA.test(aparado)) {
     return `${rotulo} aceita só dígitos e, como separadores, espaço, parênteses, hífen e ponto, com + apenas no início.`;
   }
-  if (!TELEFONE_NORMALIZADO.test(normalizarTelefone(valor))) {
-    return `${rotulo} deve ter de 8 a 15 dígitos.`;
+  const normalizado = normalizarTelefone(aparado);
+  if (TELEFONE_NORMALIZADO.test(normalizado)) {
+    return undefined;
   }
-  return undefined;
+  const digitos = aparado.replace(/[^0-9]/g, "");
+  if (aparado.startsWith("+") && !digitos.startsWith("55")) {
+    return `${rotulo} aceita só número brasileiro (+55).`;
+  }
+  const comPais =
+    aparado.startsWith("+") ||
+    ((digitos.length === 12 || digitos.length === 13) &&
+      digitos.startsWith("55"));
+  const nacionais = comPais ? digitos.slice(2) : digitos;
+  if (nacionais.length !== 10 && nacionais.length !== 11) {
+    return `${rotulo} precisa do DDD e do número: 10 dígitos para fixo ou 11 para celular.`;
+  }
+  return `${rotulo} não é um número brasileiro válido: confira o DDD; celular tem 9 dígitos começando por 9, e fixo tem 8 começando de 2 a 5.`;
 }
 
 /** Erros por campo; vazio quando os três estão válidos. */

@@ -210,3 +210,49 @@
 .nova-admissao__resumo-linha {
   display: contents;
 }
+
+/* T179 — empresa sem Departamento, Cargo ou Unidade ativos: aviso que impede
+   o envio. Cor de alerta (não de erro): não há nada a corrigir no formulário,
+   e sim um cadastro a fazer antes. */
+.nova-admissao__sem-referencias {
+  margin: 0;
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--status-warning-border);
+  border-radius: var(--radius-md);
+  background: var(--status-warning-surface);
+  color: var(--status-warning-ink);
+}
+
+/* T179 — resumo dos campos a revisar, no topo do formulário. Só NOMES de
+   campos, nunca valores; cada nome leva o foco ao campo. */
+.nova-admissao__revisar {
+  display: grid;
+  gap: var(--space-xs);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--status-danger-border);
+  border-radius: var(--radius-md);
+  background: var(--status-danger-surface);
+}
+
+.nova-admissao__revisar-titulo {
+  margin: 0;
+  font-weight: var(--weight-strong);
+  color: var(--status-danger-ink);
+}
+
+.nova-admissao__revisar-lista {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* T179 — lotação no resumo da confirmação e na tela de sucesso: uma
+   referência por linha. */
+.nova-admissao__lista-lotacao {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}

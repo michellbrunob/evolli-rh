@@ -72,7 +72,8 @@ async function jsonOrThrow<T>(res: Response): Promise<T> {
     const msg = Array.isArray(body.message)
       ? (body.message[0] ?? "Erro na requisição.")
       : (body.message ?? "Erro na requisição.");
-    throw new ApiError(res.status, msg);
+    // T179 — o corpo segue junto: o 409 de e-mail em uso traz `erros`.
+    throw new ApiError(res.status, msg, body);
   }
   return res.json() as Promise<T>;
 }

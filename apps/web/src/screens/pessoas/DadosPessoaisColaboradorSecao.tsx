@@ -5,10 +5,12 @@ import {
   consultarDadosPessoaisDoColaborador,
 } from "../../api/dadosPessoaisClient";
 import { formatarDiaCivil } from "../../format/data";
+import { exibirCep } from "../../format/mascaras";
 import {
   CAMPOS_ENDERECO,
   CAMPOS_TEXTO_PERFIL,
   ROTULO_DATA_NASCIMENTO,
+  ehPaisBrasil,
 } from "./dadosPessoais";
 
 /**
@@ -118,12 +120,26 @@ export function DadosPessoaisColaboradorSecao({
               <dd>{carga.dados.perfilPessoal?.[c.chave] ?? "Não informado"}</dd>
             </div>
           ))}
-          {CAMPOS_ENDERECO.map((c) => (
-            <div key={c.chave} className="colaboradores-screen__par">
-              <dt>{c.rotulo}</dt>
-              <dd>{carga.dados.endereco?.[c.chave] ?? "Não informado"}</dd>
-            </div>
-          ))}
+          {CAMPOS_ENDERECO.map((c) => {
+            const valor = carga.dados.endereco?.[c.chave] ?? null;
+            return (
+              <div key={c.chave} className="colaboradores-screen__par">
+                <dt>{c.rotulo}</dt>
+                <dd>
+                  {valor === null
+                    ? "Não informado"
+                    : c.chave === "cep"
+                      ? // T179 — CEP brasileiro gravado em 8 dígitos e
+                        // exibido `00000-000`; outro país, como veio.
+                        exibirCep(
+                          valor,
+                          ehPaisBrasil(carga.dados.endereco?.pais),
+                        )
+                      : valor}
+                </dd>
+              </div>
+            );
+          })}
         </dl>
       )}
     </section>

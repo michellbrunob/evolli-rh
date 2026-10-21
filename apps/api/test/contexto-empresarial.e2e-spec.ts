@@ -32,7 +32,10 @@ import { GenericContainer, StartedTestContainer, Wait } from "testcontainers";
 import { AppModule } from "../src/app.module";
 import { AllExceptionsFilter } from "../src/common/filters/http-exception.filter";
 import { requestIdMiddleware } from "../src/common/request-id";
-import { CAMPOS_OBRIGATORIOS_ADMISSAO } from "./admissao-obrigatoria";
+import {
+  camposObrigatoriosAdmissao,
+  lotacaoMinima,
+} from "./admissao-obrigatoria";
 
 jest.setTimeout(600_000);
 
@@ -265,7 +268,8 @@ describe("Contexto empresarial ativo (e2e)", () => {
     const departamentoId = departamentoDe[empresaId]!;
     const resposta = await post("/v1/colaboradores", cred)
       .send({
-        ...CAMPOS_OBRIGATORIOS_ADMISSAO,
+        ...camposObrigatoriosAdmissao(),
+        ...(await lotacaoMinima(appUrl, empresaId)),
         nome,
         empresaId,
         matricula,
@@ -469,7 +473,8 @@ describe("Contexto empresarial ativo (e2e)", () => {
       // amplia escopo: quem decide é o contexto ativo, não o cliente.
       await post("/v1/colaboradores", rhB)
         .send({
-          ...CAMPOS_OBRIGATORIOS_ADMISSAO,
+          ...camposObrigatoriosAdmissao(),
+          ...(await lotacaoMinima(appUrl, empresaB)),
           nome: "Nao Deve Nascer",
           empresaId: empresaB,
           matricula: "FUNC-X-0001",

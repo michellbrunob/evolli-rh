@@ -67,6 +67,27 @@ const departamento: DepartamentoApi = {
   atualizadoEm: "2025-01-01T12:00:00.000Z",
 };
 
+// T179 — Departamento, Cargo e Unidade são obrigatórios na Nova admissão.
+const cargo = {
+  id: "77777777-7777-4777-8777-777777777777",
+  codigo: "CAR1",
+  nome: "Cargo Sintético (teste)",
+  empresaId: empresa.id,
+  status: "ativo",
+  criadoEm: "2025-01-01T12:00:00.000Z",
+  atualizadoEm: "2025-01-01T12:00:00.000Z",
+};
+
+const unidade = {
+  id: "88888888-8888-4888-8888-888888888888",
+  codigo: "UNI1",
+  nome: "Unidade Sintética (teste)",
+  empresaId: empresa.id,
+  status: "ativo",
+  criadoEm: "2025-01-01T12:00:00.000Z",
+  atualizadoEm: "2025-01-01T12:00:00.000Z",
+};
+
 const resposta: AdmissaoRegistradaApi = {
   id: "11111111-1111-4111-8111-111111111111",
   nome: "Pessoa Sintética Fluxo",
@@ -129,9 +150,9 @@ beforeEach(() => {
   vi.mocked(admitirColaborador).mockResolvedValue(resposta);
   vi.mocked(listarEmpresasMulti).mockResolvedValue(paginado([empresa]));
   vi.mocked(listarDepartamentos).mockResolvedValue(paginado([departamento]));
-  vi.mocked(listarUnidades).mockResolvedValue(paginado([]));
+  vi.mocked(listarUnidades).mockResolvedValue(paginado([unidade]));
   vi.mocked(listarEquipes).mockResolvedValue(paginado([]));
-  vi.mocked(listarCargos).mockResolvedValue(paginado([]));
+  vi.mocked(listarCargos).mockResolvedValue(paginado([cargo]));
   vi.mocked(listarCentrosCusto).mockResolvedValue(paginado([]));
   vi.mocked(listarAreas).mockResolvedValue(paginado([]));
   vi.mocked(consultarContatosDoColaborador).mockImplementation(
@@ -202,14 +223,24 @@ async function admitirPelaPagina() {
   fireEvent.change(screen.getByLabelText(/Data de admissão/), {
     target: { value: "2026-10-20" },
   });
-  fireEvent.change(screen.getByLabelText(/Tipo de referência organizacional/), {
-    target: { value: "departamento" },
+  fireEvent.change(screen.getByLabelText(/^Departamento/), {
+    target: { value: departamento.id },
   });
-  fireEvent.change(
-    screen.getByLabelText(/Registro da referência organizacional/),
-    { target: { value: departamento.id } },
+  fireEvent.change(screen.getByLabelText(/^Cargo/), {
+    target: { value: cargo.id },
+  });
+  fireEvent.change(screen.getByLabelText(/^Unidade/), {
+    target: { value: unidade.id },
+  });
+  // T179 — "Salvar" só valida e abre a confirmação; quem grava é
+  // "Confirmar cadastro".
+  fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
+  const confirmacao = await screen.findByRole("dialog", {
+    name: "Confirmar cadastro de colaborador?",
+  });
+  fireEvent.click(
+    within(confirmacao).getByRole("button", { name: "Confirmar cadastro" }),
   );
-  fireEvent.click(screen.getByRole("button", { name: "Admitir colaborador" }));
   await screen.findByText("Admissão registrada");
 }
 
@@ -775,5 +806,26 @@ describe("T176/T178 — da página à listagem e à ficha do admitido", () => {
     fireEvent.click(itemColaboradoresNaBarra());
     await screen.findByRole("heading", { level: 1, name: "Colaboradores" });
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T179 — o shell repassa o papel à página: só a ORIENTAÇÃO do aviso de
+// empresa sem referências muda (o RH cadastra em Estrutura; o DP pede ao RH).
+// ---------------------------------------------------------------------------
+describe("T179 — empresa sem referências, pelo papel que o shell conhece", () => {
+  it.each([
+    ["rh", /Cadastre o que falta em Estrutura/],
+    ["dp", /O RH precisa cadastrar Departamento, Cargo e Unidade/],
+  ])("%s vê a orientação certa e não consegue enviar", async (papel, texto) => {
+    vi.mocked(listarCargos).mockResolvedValue(paginado([]));
+    render(<App papelDoAtor={papel} />);
+    await abrirNovaAdmissaoPelaListagem();
+    const aviso = await screen.findByText(texto);
+    expect(aviso).toHaveTextContent(/cadastro ativo de Cargo/);
+    fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
+    await waitFor(() => expect(aviso).toHaveFocus());
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(admitirColaborador).not.toHaveBeenCalled();
   });
 });

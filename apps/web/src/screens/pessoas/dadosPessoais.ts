@@ -123,6 +123,21 @@ const DATA_MINIMA = "1900-01-01";
 // eslint-disable-next-line no-control-regex
 const SEM_CONTROLE = /^[^\u0000-\u001F\u007F]*$/;
 const CEP_FORMA = /^[A-Za-z0-9 -]{3,12}$/;
+/** T179 — CEP brasileiro: 8 dígitos, com ou sem o hífen da máscara. */
+const CEP_BRASILEIRO_ENTRADA = /^[0-9]{5}-?[0-9]{3}$/;
+
+/**
+ * T179 — o país é o Brasil? Sem diferenciar caixa e acento, e sem os espaços
+ * das pontas: a MESMA comparação de `ehPaisBrasil` no servidor. Não há
+ * catálogo de país (`DP-ADM-12`), só o nome.
+ */
+export function ehPaisBrasil(pais: string | null | undefined): boolean {
+  return (
+    typeof pais === "string" &&
+    pais.normalize("NFD").replace(/\p{M}/gu, "").trim().toLowerCase() ===
+      "brasil"
+  );
+}
 
 /** Apara e colapsa espaços repetidos — a mesma normalização do servidor. */
 export function normalizarTexto(valor: string): string {
@@ -189,8 +204,16 @@ export function validarEndereco(valores: ValoresEndereco): ErrosEndereco {
     if (erro) erros[campo.chave] = erro;
   }
   const cep = normalizarTexto(valores.cep);
-  if (!erros.cep && cep !== "" && !CEP_FORMA.test(cep)) {
-    erros.cep = "Use letras, números, espaço e hífen, de 3 a 12 caracteres.";
+  if (!erros.cep && cep !== "") {
+    // T179 — com país Brasil, o servidor exige os 8 dígitos; com outro país,
+    // o CEP segue em texto livre, com a forma de antes.
+    if (ehPaisBrasil(valores.pais)) {
+      if (!CEP_BRASILEIRO_ENTRADA.test(cep)) {
+        erros.cep = "Informe os 8 dígitos do CEP, no formato 00000-000.";
+      }
+    } else if (!CEP_FORMA.test(cep)) {
+      erros.cep = "Use letras, números, espaço e hífen, de 3 a 12 caracteres.";
+    }
   }
   return erros;
 }
@@ -220,6 +243,15 @@ export function blocoEndereco(
   for (const chave of Object.keys(valores) as ChaveEndereco[]) {
     const limpo = normalizarTexto(valores[chave]);
     bloco[chave] = limpo === "" ? null : limpo;
+  }
+  // T179 — CEP brasileiro vai só com os 8 dígitos, a forma que o servidor
+  // grava; a máscara `00000-000` é só da tela.
+  if (
+    bloco.cep !== null &&
+    ehPaisBrasil(bloco.pais) &&
+    CEP_BRASILEIRO_ENTRADA.test(bloco.cep)
+  ) {
+    bloco.cep = bloco.cep.replace("-", "");
   }
   return bloco;
 }

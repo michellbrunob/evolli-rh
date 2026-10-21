@@ -1376,7 +1376,7 @@ describe("ColaboradoresScreen (T169 — contatos do colaborador)", () => {
     contatos: {
       emailPessoal: "ana.contato@example.test",
       celular: "+5511987650001",
-      telefone: "1133330001",
+      telefone: "+551133330001",
       atualizadoEm: "2026-10-16T12:00:00.000Z",
     },
   };
@@ -1429,14 +1429,15 @@ describe("ColaboradoresScreen (T169 — contatos do colaborador)", () => {
     expect(within(secao).queryByRole("alert")).toBeNull();
   });
 
-  it("registrado: os campos chegam preenchidos com o valor gravado", async () => {
+  it("registrado: os campos chegam preenchidos com o valor gravado, telefones na máscara brasileira", async () => {
     vi.mocked(consultarContatosDoColaborador).mockResolvedValueOnce(registrado);
     await abrirDetalheDeAna();
     await waitFor(() =>
       expect(email()).toHaveValue("ana.contato@example.test"),
     );
-    expect(celular()).toHaveValue("+5511987650001");
-    expect(telefone()).toHaveValue("1133330001");
+    // T179 — gravados em `+55` + DDD + número; exibidos formatados.
+    expect(celular()).toHaveValue("(11) 98765-0001");
+    expect(telefone()).toHaveValue("(11) 3333-0001");
     // Nada a salvar enquanto nada mudou.
     expect(
       screen.getByRole("button", { name: "Salvar contatos" }),
@@ -1562,13 +1563,15 @@ describe("ColaboradoresScreen (T169 — contatos do colaborador)", () => {
     await abrirDetalheDeAna();
     await screen.findByText(/Nenhum contato registrado/);
     fireEvent.change(email(), { target: { value: "ana@example.test" } });
+    // T179 — a máscara só deixa entrar dígitos: o número fica incompleto.
     fireEvent.change(celular(), { target: { value: "11 9876-ABCD" } });
+    expect(celular()).toHaveValue("(11) 9876");
     fireEvent.change(telefone(), { target: { value: "(11) 3333-0001" } });
 
     fireEvent.click(screen.getByRole("button", { name: "Salvar contatos" }));
 
     expect(
-      await screen.findByText(/Celular aceita só dígitos/),
+      await screen.findByText(/Celular precisa do DDD e do número/),
     ).toBeInTheDocument();
     expect(email()).not.toHaveAttribute("aria-invalid");
     expect(telefone()).not.toHaveAttribute("aria-invalid");
@@ -1581,7 +1584,7 @@ describe("ColaboradoresScreen (T169 — contatos do colaborador)", () => {
       gravacao("criado", {
         emailPessoal: "ana@example.test",
         celular: "+5511987650001",
-        telefone: "1133330001",
+        telefone: "+551133330001",
         atualizadoEm: "2026-10-16T12:00:00.000Z",
       }),
     );
@@ -1604,10 +1607,11 @@ describe("ColaboradoresScreen (T169 — contatos do colaborador)", () => {
       {
         emailPessoal: "ana@example.test",
         celular: "+5511987650001",
-        telefone: "1133330001",
+        telefone: "+551133330001",
       },
     ]);
-    expect(celular()).toHaveValue("+5511987650001");
+    expect(celular()).toHaveValue("(11) 98765-0001");
+    expect(telefone()).toHaveValue("(11) 3333-0001");
 
     // Salvo: fechar não pede confirmação.
     fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
@@ -1630,8 +1634,53 @@ describe("ColaboradoresScreen (T169 — contatos do colaborador)", () => {
     expect(alerta).toHaveTextContent(/Os contatos não foram salvos/);
     await waitFor(() => expect(document.activeElement).toBe(alerta));
     expect(email()).toHaveValue("ana@example.test");
-    expect(celular()).toHaveValue("11987650001");
-    expect(telefone()).toHaveValue("1133330001");
+    expect(celular()).toHaveValue("(11) 98765-0001");
+    expect(telefone()).toHaveValue("(11) 3333-0001");
+    expect(email()).not.toHaveAttribute("aria-invalid");
+  });
+
+  it("T179 — 409 de e-mail em uso: a mensagem vai para o campo, com foco, e nada se perde", async () => {
+    vi.mocked(registrarContatosDoColaborador).mockRejectedValueOnce(
+      Object.assign(recusa(409, "Conflito."), {
+        erros: [{ campo: "emailPessoal", motivo: "em_uso" }],
+      }),
+    );
+    const secao = await abrirDetalheDeAna();
+    await within(secao).findByText(/Nenhum contato registrado/);
+    fireEvent.change(email(), { target: { value: "repetido@example.test" } });
+    fireEvent.change(celular(), { target: { value: "11987650001" } });
+    fireEvent.change(telefone(), { target: { value: "1133330001" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Salvar contatos" }));
+
+    await waitFor(() => expect(email()).toHaveFocus());
+    expect(email()).toHaveAttribute("aria-invalid", "true");
+    expect(email()).toHaveAccessibleDescription(
+      "Este e-mail pessoal já está em uso nesta empresa.",
+    );
+    // A mensagem não repete o valor, e não há mensagem geral de bloqueio.
+    expect(within(secao).queryByText(/não foram salvos/)).toBeNull();
+    expect(email()).toHaveValue("repetido@example.test");
+    expect(celular()).toHaveValue("(11) 98765-0001");
+  });
+
+  it("T179 — celular e telefone com máscara brasileira, dica de formato e colagem com +55", async () => {
+    const secao = await abrirDetalheDeAna();
+    await within(secao).findByText(/Nenhum contato registrado/);
+    expect(celular()).toHaveAttribute("type", "tel");
+    expect(celular()).toHaveAttribute("inputmode", "tel");
+    expect(celular()).toHaveAccessibleDescription(/\(00\) 00000-0000/);
+    expect(telefone()).toHaveAccessibleDescription(/\(00\) 0000-0000/);
+
+    fireEvent.change(celular(), { target: { value: "1198765" } });
+    expect(celular()).toHaveValue("(11) 9876-5");
+    fireEvent.change(celular(), { target: { value: "" } });
+    fireEvent.paste(celular(), {
+      clipboardData: { getData: () => "+55 11 98765-0001" },
+    });
+    expect(celular()).toHaveValue("(11) 98765-0001");
+    fireEvent.change(telefone(), { target: { value: "551133330001" } });
+    expect(telefone()).toHaveValue("(11) 3333-0001");
   });
 
   it("contato editado e não salvo: fechar pede confirmação; descartar fecha sem gravar", async () => {
@@ -1647,7 +1696,7 @@ describe("ColaboradoresScreen (T169 — contatos do colaborador)", () => {
 
     expect(screen.getByText(/alterações não salvas/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Continuar editando" }));
-    expect(telefone()).toHaveValue("1133330002");
+    expect(telefone()).toHaveValue("(11) 3333-0002");
 
     fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
     fireEvent.click(

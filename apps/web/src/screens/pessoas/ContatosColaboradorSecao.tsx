@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Button, FormField } from "../../components";
+import { Button, CampoMascarado, FormField } from "../../components";
 import { ApiError } from "../../api/colaboradoresClient";
 import {
   type ContatosApi,
@@ -11,9 +11,11 @@ import {
   type ErrosContatos,
   type ValoresContatos,
   LIMITE_EMAIL_PESSOAL,
+  contatosParaEdicao,
   normalizarContatos,
   validarContatos,
 } from "./contatosColaborador";
+import { DICA_DE_FORMATO } from "../../format/mascaras";
 
 /**
  * T169 — seção "Contatos" do detalhe do colaborador.
@@ -25,6 +27,11 @@ import {
  * confirmação de descarte é a do `Modal`: a seção avisa o detalhe quando há
  * edição não salva (`onAlteradoChange`) e quando está gravando
  * (`onSalvandoChange`), e o detalhe soma isso ao que ele próprio edita.
+ *
+ * T179 — celular e telefone são só brasileiros: gravados em `+55` + DDD +
+ * número e editados na máscara `(00) 00000-0000` / `(00) 0000-0000`. O e-mail
+ * pessoal é único na empresa: o 409 com `emailPessoal` em uso vai para o
+ * campo, sem repetir o valor.
  */
 
 const VAZIO: ValoresContatos = { emailPessoal: "", celular: "", telefone: "" };
@@ -45,21 +52,37 @@ const ID_DO_CAMPO: Record<CampoContato | "geral", string> = {
   geral: ERRO_GERAL_ID,
 };
 
-const AJUDA_TELEFONE =
-  "Só dígitos, com + opcional no início. Espaço, parênteses, hífen e ponto são aceitos e removidos ao salvar.";
-
 type Carga =
   | { status: "carregando" }
   | { status: "erro"; mensagem: string }
   | { status: "bloqueado" }
   | { status: "dados"; gravado: ContatosApi | null };
 
+/** O que foi gravado, como a tela edita: telefones já mascarados (T179). */
 function valoresDe(contatos: ContatosApi): ValoresContatos {
-  return {
+  return contatosParaEdicao({
     emailPessoal: contatos.emailPessoal,
     celular: contatos.celular,
     telefone: contatos.telefone,
-  };
+  });
+}
+
+/** T179 — o campo apontado pelo 409 de e-mail em uso, lido por forma. */
+function emailEmUso(erro: unknown): boolean {
+  const erros =
+    typeof erro === "object" && erro !== null
+      ? (erro as { erros?: unknown }).erros
+      : undefined;
+  return (
+    Array.isArray(erros) &&
+    erros.some(
+      (e) =>
+        typeof e === "object" &&
+        e !== null &&
+        (e as { campo?: unknown }).campo === "emailPessoal" &&
+        (e as { motivo?: unknown }).motivo === "em_uso",
+    )
+  );
 }
 
 /**
@@ -95,6 +118,13 @@ function errosDaGravacaoRecusada(erro: unknown): ErrosContatos {
           "O servidor recusou algum dos contatos informados. Revise os campos e tente de novo.",
       };
     case 409:
+      // T179 — com a lista de campos, é o e-mail de outro colaborador desta
+      // empresa; sem ela, o bloqueio de antes (vínculo encerrado).
+      if (emailEmUso(erro)) {
+        return {
+          emailPessoal: "Este e-mail pessoal já está em uso nesta empresa.",
+        };
+      }
       return {
         geral:
           "Os contatos não foram salvos: o colaborador deixou de ter vínculo em uso nesta empresa, ou outra pessoa os gravou ao mesmo tempo. Feche e abra a ficha de novo.",
@@ -182,15 +212,14 @@ export function ContatosColaboradorSecao({
   }, [carregar]);
 
   const gravado = carga.status === "dados" ? carga.gravado : null;
+  // T179 — comparado com o gravado JÁ MASCARADO, a mesma forma da edição:
+  // abrir a ficha não conta como alteração.
+  const inicial = gravado ? valoresDe(gravado) : VAZIO;
   const alterado =
     carga.status === "dados" &&
-    (gravado
-      ? edicao.emailPessoal !== gravado.emailPessoal ||
-        edicao.celular !== gravado.celular ||
-        edicao.telefone !== gravado.telefone
-      : edicao.emailPessoal !== "" ||
-        edicao.celular !== "" ||
-        edicao.telefone !== "");
+    (edicao.emailPessoal !== inicial.emailPessoal ||
+      edicao.celular !== inicial.celular ||
+      edicao.telefone !== inicial.telefone);
 
   useEffect(() => {
     onAlteradoChange(alterado);
@@ -337,19 +366,16 @@ export function ContatosColaboradorSecao({
           <FormField
             id={ID_DO_CAMPO.celular}
             label="Celular"
-            help={AJUDA_TELEFONE}
+            help={DICA_DE_FORMATO.telefone}
             required
             disabled={salvando}
             {...(erros.celular ? { error: erros.celular } : {})}
           >
             {(control) => (
-              <input
-                type="tel"
-                inputMode="tel"
-                autoComplete="off"
-                maxLength={32}
+              <CampoMascarado
+                mascara="telefone"
                 value={edicao.celular}
-                onChange={(e) => alterarCampo("celular", e.target.value)}
+                onValorChange={(valor) => alterarCampo("celular", valor)}
                 {...control}
               />
             )}
@@ -358,19 +384,16 @@ export function ContatosColaboradorSecao({
           <FormField
             id={ID_DO_CAMPO.telefone}
             label="Telefone"
-            help={AJUDA_TELEFONE}
+            help={DICA_DE_FORMATO.telefone}
             required
             disabled={salvando}
             {...(erros.telefone ? { error: erros.telefone } : {})}
           >
             {(control) => (
-              <input
-                type="tel"
-                inputMode="tel"
-                autoComplete="off"
-                maxLength={32}
+              <CampoMascarado
+                mascara="telefone"
                 value={edicao.telefone}
-                onChange={(e) => alterarCampo("telefone", e.target.value)}
+                onValorChange={(valor) => alterarCampo("telefone", valor)}
                 {...control}
               />
             )}

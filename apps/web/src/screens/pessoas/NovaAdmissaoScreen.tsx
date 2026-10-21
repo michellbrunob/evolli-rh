@@ -24,9 +24,27 @@
  *
  * OBRIGATÓRIOS (asterisco e "obrigatório" para leitor de tela): nome
  * completo, data de nascimento, e-mail pessoal, celular e telefone — e, do
- * vínculo, matrícula, tipo, data de admissão e lotação inicial. OPCIONAIS
- * (rótulo com "opcional"): os demais dados pessoais e todo o endereço. É o
- * mesmo contrato que o servidor exige.
+ * vínculo, matrícula, tipo e data de admissão; da lotação, Departamento, Cargo
+ * e Unidade (T179). OPCIONAIS (rótulo com "opcional"): os demais dados
+ * pessoais, todo o endereço, e Área, Equipe e Centro de custo. É o mesmo
+ * contrato que o servidor exige.
+ *
+ * ## T179 — confirmar antes de gravar
+ *
+ * "Salvar" só VALIDA no navegador: com falha, a página fica e o foco vai ao
+ * primeiro campo inválido; sem falha, abre o modal "Confirmar cadastro de
+ * colaborador?" com o resumo do que identifica a admissão (empresa, nome,
+ * matrícula, vínculo, data e lotação) — nunca contatos, endereço ou
+ * nascimento. O modal não grava; só "Confirmar cadastro" envia.
+ *
+ * O envio leva uma chave de idempotência (`Idempotency-Key`), gerada na
+ * primeira confirmação e REPETIDA em toda nova tentativa até um sucesso ou até
+ * a página recomeçar. Assim, depois de uma falha de rede em que o servidor
+ * pode ter gravado, confirmar de novo nunca cria um segundo cadastro.
+ *
+ * Recusa do servidor fecha o modal, preserva o formulário inteiro e diz, no
+ * topo, QUAIS campos revisar — só os nomes, nunca os valores —, com a
+ * mensagem em cada campo e o foco no primeiro.
  *
  * ## O que ela não faz
  *
@@ -34,7 +52,8 @@
  * emergência, documentos, CPF, dados bancários, dependentes nem dados
  * contratuais avançados — cada um tem destino na matriz de cobertura da T177.
  * Não inventa lista de opções: sexo, estado civil, escolaridade, país, cidade
- * e estado são texto validado.
+ * e estado são texto validado. Não cadastra Departamento, Cargo nem Unidade:
+ * isso é do RH, em Estrutura (T179, decisão 7).
  *
  * T178 — o CEP brasileiro pode SUGERIR logradouro, bairro, cidade e estado
  * (consulta autorizada pela proprietária, feita pelo servidor em
@@ -51,6 +70,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   Button,
+  CampoMascarado,
   FormActions,
   FormField,
   Modal,
@@ -61,7 +81,6 @@ import {
 } from "../../components";
 import { destinoPorId, tituloDoGrupoDe } from "../../app/mapaNavegacao";
 import {
-  ApiError,
   type AdmissaoRegistradaApi,
   type AdmitirColaboradorDto,
   type ColaboradorApi,
@@ -86,6 +105,11 @@ import { type CargoApi, listarCargos } from "../../api/cargoClient";
 import { type EnderecoDoCepApi, consultarCep } from "../../api/cepClient";
 import { formatarDiaCivil } from "../../format/data";
 import {
+  DICA_DE_FORMATO,
+  exibirCep,
+  exibirTelefone,
+} from "../../format/mascaras";
+import {
   CAMPOS_ENDERECO,
   CAMPOS_TEXTO_PERFIL,
   type ChaveEndereco,
@@ -97,6 +121,7 @@ import {
   type ValoresPerfil,
   blocoEndereco,
   blocoPerfil,
+  ehPaisBrasil,
   validarEndereco,
   validarPerfil,
 } from "./dadosPessoais";
@@ -132,24 +157,33 @@ const ROTULO_STATUS_ADMISSAO: Record<string, string> = {
   programada: "Programada para a data de admissão",
 };
 
-type TipoDestino =
-  "" | "unidade" | "departamento" | "area" | "equipe" | "cargo" | "centroCusto";
-
-const OPCOES_TIPO_DESTINO: {
-  valor: Exclude<TipoDestino, "">;
-  rotulo: string;
-}[] = [
-  { valor: "unidade", rotulo: "Unidade organizacional" },
-  { valor: "departamento", rotulo: "Departamento" },
-  { valor: "area", rotulo: "Área" },
-  { valor: "equipe", rotulo: "Equipe" },
-  { valor: "cargo", rotulo: "Cargo" },
-  { valor: "centroCusto", rotulo: "Centro de custo" },
-];
-
 /** Rótulo de campo opcional: o "opcional" é parte do nome acessível. */
 function rotuloOpcional(rotulo: string): string {
   return `${rotulo} (opcional)`;
+}
+
+/** Referência organizacional como aparece em seletor e resumo. */
+interface Referencia {
+  readonly id: string;
+  readonly codigo: string;
+  readonly nome: string;
+}
+
+/** `CÓDIGO — Nome`: nomes repetidos são permitidos, o código distingue. */
+function rotuloDaReferencia(referencia: Referencia): string {
+  return `${referencia.codigo} — ${referencia.nome}`;
+}
+
+/** Só o que está ativo vira opção (o servidor já filtra; aqui, por garantia). */
+function soAtivos<T extends { status: string }>(lista: readonly T[]): T[] {
+  return lista.filter((item) => item.status === "ativo");
+}
+
+/** "A", "A e B", "A, B e C". */
+function listaComE(itens: readonly string[]): string {
+  return itens.length <= 1
+    ? (itens[0] ?? "")
+    : `${itens.slice(0, -1).join(", ")} e ${itens[itens.length - 1]}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -165,7 +199,7 @@ const ID_BOTAO_BUSCAR_CEP = "nova-admissao-buscar-cep";
 const CAMPOS_DO_CEP = ["logradouro", "bairro", "cidade", "estado"] as const;
 type CampoDoCep = (typeof CAMPOS_DO_CEP)[number];
 
-/** Só dígitos do CEP: sem hífen, espaço nem ponto. O campo não é reescrito. */
+/** Só dígitos do CEP: sem hífen, espaço nem ponto. */
 function digitosDoCep(cep: string): string {
   return cep.trim().replace(/[\s.-]/g, "");
 }
@@ -174,15 +208,10 @@ function digitosDoCep(cep: string): string {
 function textoComparavel(valor: string): string {
   return valor
     .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/\p{M}/gu, "")
     .replace(/\s+/g, " ")
     .trim()
     .toLowerCase();
-}
-
-/** O país é o Brasil? A consulta só existe para CEP brasileiro. */
-function ehBrasil(pais: string): boolean {
-  return textoComparavel(pais).replace(/ /g, "") === "brasil";
 }
 
 /**
@@ -191,13 +220,7 @@ function ehBrasil(pais: string): boolean {
  * também com o cliente automockado nos testes.
  */
 function mensagemDoErroDeCep(erro: unknown): string {
-  const status =
-    typeof erro === "object" &&
-    erro !== null &&
-    typeof (erro as { status?: unknown }).status === "number"
-      ? (erro as { status: number }).status
-      : null;
-  switch (status) {
+  switch (statusDe(erro)) {
     case 404:
       return "CEP não encontrado. Preencha o endereço manualmente.";
     case 503:
@@ -213,12 +236,9 @@ function mensagemDoErroDeCep(erro: unknown): string {
 
 /** "Logradouro, Bairro e Cidade" — os rótulos da tela, na ordem da tela. */
 function listaDeRotulos(chaves: readonly CampoDoCep[]): string {
-  const rotulos = chaves.map(
-    (c) => CAMPOS_ENDERECO.find((d) => d.chave === c)?.rotulo ?? c,
+  return listaComE(
+    chaves.map((c) => CAMPOS_ENDERECO.find((d) => d.chave === c)?.rotulo ?? c),
   );
-  return rotulos.length <= 1
-    ? (rotulos[0] ?? "")
-    : `${rotulos.slice(0, -1).join(", ")} e ${rotulos[rotulos.length - 1]}`;
 }
 
 /**
@@ -259,13 +279,16 @@ type EstadoCep =
       }[];
     };
 
-function rotuloTipoDestino(tipo: TipoDestino): string {
-  return (
-    OPCOES_TIPO_DESTINO.find((o) => o.valor === tipo)?.rotulo ?? "Registro"
-  );
-}
+// ---------------------------------------------------------------------------
+// Erros, campo a campo.
+// ---------------------------------------------------------------------------
+
+/** T179 — os seis seletores da lotação: três obrigatórios, três opcionais. */
+type CampoLotacao =
+  "departamento" | "cargo" | "unidade" | "area" | "equipe" | "centroCusto";
 
 type CampoErro =
+  | "referencias"
   | "nome"
   | ChavePerfil
   | ChaveEndereco
@@ -273,9 +296,8 @@ type CampoErro =
   | "matricula"
   | "tipo"
   | "dataAdmissao"
-  | "tipoDestino"
-  | "departamentoArea"
-  | "destino"
+  | CampoLotacao
+  | "lotacao"
   | "geral";
 
 type Erros = Partial<Record<CampoErro, string>>;
@@ -287,8 +309,13 @@ type Erros = Partial<Record<CampoErro, string>>;
  * nome (disposição pedida pela proprietária). É o MESMO campo dos contatos da
  * T169 — mesmo estado, mesma validação, e vai em `contatos.emailPessoal` no
  * corpo —, por isso só a posição nesta lista mudou: ela acompanha a tela.
+ *
+ * T179 — `referencias` é o aviso de empresa sem Departamento, Cargo ou
+ * Unidade ativos, no topo do formulário: com ele, nada é enviado, e é para lá
+ * que o foco vai primeiro.
  */
 const ORDEM_DOS_ERROS: readonly CampoErro[] = [
+  "referencias",
   "nome",
   "emailPessoal",
   "dataNascimento",
@@ -299,13 +326,42 @@ const ORDEM_DOS_ERROS: readonly CampoErro[] = [
   "matricula",
   "tipo",
   "dataAdmissao",
-  "tipoDestino",
-  "departamentoArea",
-  "destino",
+  "departamento",
+  "cargo",
+  "unidade",
+  "area",
+  "equipe",
+  "centroCusto",
+  "lotacao",
   "geral",
 ];
 
+/**
+ * T179 — nome de cada campo no resumo "Revise N campos". São os rótulos da
+ * tela: o resumo diz ONDE corrigir, nunca o valor digitado.
+ */
+const ROTULO_DO_CAMPO = {
+  nome: "Nome completo",
+  emailPessoal: "E-mail pessoal",
+  dataNascimento: ROTULO_DATA_NASCIMENTO,
+  ...Object.fromEntries(CAMPOS_TEXTO_PERFIL.map((c) => [c.chave, c.rotulo])),
+  ...Object.fromEntries(CAMPOS_ENDERECO.map((c) => [c.chave, c.rotulo])),
+  celular: "Celular",
+  telefone: "Telefone",
+  matricula: "Matrícula",
+  tipo: "Tipo de vínculo",
+  dataAdmissao: "Data de admissão",
+  departamento: "Departamento",
+  cargo: "Cargo",
+  unidade: "Unidade",
+  area: "Área",
+  equipe: "Equipe",
+  centroCusto: "Centro de custo",
+  lotacao: "Lotação inicial",
+} as Record<Exclude<CampoErro, "referencias" | "geral">, string>;
+
 const ERRO_GERAL_ID = "nova-admissao-erro-geral";
+const ID_BOTAO_SALVAR = "nova-admissao-salvar";
 
 /** `nomeMae` -> `nova-admissao-nome-mae`. */
 function idDoCampo(campo: CampoErro): string {
@@ -326,6 +382,10 @@ const ID_DO_CAMPO = Object.fromEntries(
 const MENSAGEM_EMPRESA_INDEFINIDA =
   "Não foi possível confirmar a empresa ativa em que você está trabalhando. Nada será enviado. Volte para Colaboradores e abra esta página de novo.";
 
+/** T179 — falha sem resposta: o servidor pode ou não ter gravado. */
+const MENSAGEM_ENVIO_INCERTO =
+  "Não foi possível confirmar se o cadastro foi gravado. Tente confirmar de novo: o mesmo envio não cria um segundo cadastro.";
+
 /** Limpa o erro do campo em correção e preserva os demais, inclusive `geral`. */
 function semErroDe(erros: Erros, ...campos: CampoErro[]): Erros {
   const restante: Erros = { ...erros };
@@ -333,35 +393,99 @@ function semErroDe(erros: Erros, ...campos: CampoErro[]): Erros {
   return restante;
 }
 
+/** `status` numérico do erro, lido por forma; `null` quando não há resposta. */
+function statusDe(erro: unknown): number | null {
+  return typeof erro === "object" &&
+    erro !== null &&
+    typeof (erro as { status?: unknown }).status === "number"
+    ? (erro as { status: number }).status
+    : null;
+}
+
 /**
- * Traduz a recusa do servidor para o campo que a causou. O servidor responde
- * com mensagem fixa por status, sem dizer o campo; o mapeamento vale só para
- * `POST /v1/colaboradores` e é o mesmo do formulário da T167:
+ * T179 — detalhes da recusa (`erros` por campo e `codigo`), lidos por forma,
+ * como o status: valem com o `ApiError` real e com o automockado dos testes.
+ */
+function detalhesDe(erro: unknown): {
+  erros: readonly { campo: string; motivo: string }[];
+  codigo: string | null;
+} {
+  if (typeof erro !== "object" || erro === null) {
+    return { erros: [], codigo: null };
+  }
+  const { erros, codigo } = erro as { erros?: unknown; codigo?: unknown };
+  return {
+    erros: Array.isArray(erros)
+      ? erros.filter(
+          (e): e is { campo: string; motivo: string } =>
+            typeof e === "object" &&
+            e !== null &&
+            typeof (e as { campo?: unknown }).campo === "string" &&
+            typeof (e as { motivo?: unknown }).motivo === "string",
+        )
+      : [],
+    codigo: typeof codigo === "string" ? codigo : null,
+  };
+}
+
+/** T179 — caminho do campo no corpo da admissão → campo da tela. */
+const CAMPO_DO_CONFLITO: Readonly<
+  Record<string, { campo: CampoErro; mensagem: string }>
+> = {
+  matricula: {
+    campo: "matricula",
+    mensagem: "Esta matrícula já está em uso nesta empresa.",
+  },
+  "contatos.emailPessoal": {
+    campo: "emailPessoal",
+    mensagem: "Este e-mail pessoal já está em uso nesta empresa.",
+  },
+};
+
+/**
+ * Traduz a recusa do servidor para o campo que a causou. Vale só para
+ * `POST /v1/colaboradores`:
  *
- *  - 409 — a única unicidade que a admissão pode violar é a da matrícula
- *    dentro da empresa;
- *  - 422 — referência organizacional incoerente, de outra empresa ou inativa;
- *  - 404 — a empresa enviada deixou de ser a empresa ativa da sessão.
+ *  - 409 — T179: o servidor diz QUAIS campos já estão em uso na empresa ativa
+ *    (`erros: [{campo, motivo: "em_uso"}]`, sem o valor). Sem a lista, é outro
+ *    conflito, e a mensagem é geral — não se presume mais que seja a
+ *    matrícula;
+ *  - 422 — com `codigo: "idempotencia_conteudo_divergente"`, a mesma chave de
+ *    envio já registrou uma admissão com outro conteúdo; sem código,
+ *    referência organizacional incoerente, de outra empresa ou inativa;
+ *  - 404 — a empresa enviada deixou de ser a empresa ativa da sessão;
+ *  - sem resposta (rede) — não se sabe se gravou; confirmar de novo é seguro.
  *
  * Em todos os casos os dados digitados ficam na página.
  */
-function errosDaRecusa(erro: unknown, temDestino: boolean): Erros {
-  const status = erro instanceof ApiError ? erro.status : null;
+function errosDaRecusa(erro: unknown): Erros {
+  const status = statusDe(erro);
+  const { erros: porCampo, codigo } = detalhesDe(erro);
   switch (status) {
-    case 409:
-      return {
-        matricula:
-          "Esta matrícula já está em uso nesta empresa. Informe outra.",
-      };
-    case 422:
-      return temDestino
-        ? {
-            destino:
-              "A referência organizacional escolhida não foi aceita: ela pode ter sido inativada ou não pertencer à empresa ativa. Escolha outra.",
-          }
+    case null:
+      return { geral: MENSAGEM_ENVIO_INCERTO };
+    case 409: {
+      const novos: Erros = {};
+      for (const { campo, motivo } of porCampo) {
+        const alvo = CAMPO_DO_CONFLITO[campo];
+        if (alvo && motivo === "em_uso") novos[alvo.campo] = alvo.mensagem;
+      }
+      return Object.keys(novos).length > 0
+        ? novos
         : {
             geral:
-              "O servidor recusou a referência organizacional. Revise a lotação inicial e tente de novo.",
+              "O cadastro não foi gravado: ele conflita com um registro que já existe nesta empresa. Revise os dados e confirme de novo.",
+          };
+    }
+    case 422:
+      return codigo === "idempotencia_conteudo_divergente"
+        ? {
+            geral:
+              "Este envio já foi registrado antes, com outros dados, e nada novo foi gravado agora. Confira em Colaboradores se a admissão já existe antes de cadastrar de novo.",
+          }
+        : {
+            lotacao:
+              "A lotação escolhida não foi aceita: alguma referência pode ter sido inativada ou não pertencer à empresa ativa. Revise Departamento, Cargo, Unidade e os campos opcionais da lotação.",
           };
     case 404:
       return {
@@ -391,6 +515,44 @@ function errosDaRecusa(erro: unknown, temDestino: boolean): Erros {
   }
 }
 
+/**
+ * T179 — chave de idempotência do envio. `crypto.randomUUID` existe em todo
+ * contexto seguro (HTTPS e `localhost`); fora dele, um UUID v4 montado com
+ * `getRandomValues`, a mesma fonte aleatória.
+ */
+function gerarChaveIdempotencia(): string {
+  if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  bytes[6] = (bytes[6]! & 0x0f) | 0x40;
+  bytes[8] = (bytes[8]! & 0x3f) | 0x80;
+  const hex = [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+/**
+ * T179 — o aviso de empresa sem referências obrigatórias. O RH é quem
+ * cadastra (em Estrutura); o DP, e qualquer outro papel, só lê — para ele, a
+ * orientação é pedir ao RH (decisões 6 e 7).
+ */
+function mensagemSemReferencias(
+  faltando: readonly string[],
+  papelDoAtor: string | null,
+): string {
+  const base = `Esta empresa ainda não tem cadastro ativo de ${listaComE(
+    faltando,
+  )}, e a admissão exige Departamento, Cargo e Unidade. Nada será enviado até isso ser resolvido.`;
+  if (papelDoAtor === "rh") {
+    const onde: string[] = [];
+    const naEstrutura = faltando.filter((f) => f !== "Cargo");
+    if (naEstrutura.length > 0) {
+      onde.push(`${listaComE(naEstrutura)} em Estrutura organizacional`);
+    }
+    if (faltando.includes("Cargo")) onde.push("Cargo em Funções e cargos");
+    return `${base} Cadastre o que falta em Estrutura (${onde.join("; ")}) e depois abra esta página de novo.`;
+  }
+  return `${base} O RH precisa cadastrar Departamento, Cargo e Unidade nesta empresa; depois disso, abra esta página de novo.`;
+}
+
 interface Opcoes {
   empresas: EmpresaApi[];
   departamentos: DepartamentoApi[];
@@ -414,9 +576,13 @@ interface Campos {
   matricula: string;
   tipo: TipoVinculo | "";
   dataAdmissao: string;
-  tipoDestino: TipoDestino;
-  destinoId: string;
-  departamentoIdArea: string;
+  /** T179 — lotação: um seletor por referência, cada um com o id escolhido. */
+  departamentoId: string;
+  cargoId: string;
+  unidadeId: string;
+  areaId: string;
+  equipeId: string;
+  centroCustoId: string;
 }
 
 const CONTATOS_VAZIOS: ValoresContatos = {
@@ -430,9 +596,12 @@ const CAMPOS_VAZIOS: Campos = {
   matricula: "",
   tipo: "",
   dataAdmissao: "",
-  tipoDestino: "",
-  destinoId: "",
-  departamentoIdArea: "",
+  departamentoId: "",
+  cargoId: "",
+  unidadeId: "",
+  areaId: "",
+  equipeId: "",
+  centroCustoId: "",
 };
 
 /** Para onde levar quem acabou de admitir. */
@@ -449,11 +618,18 @@ export interface NovaAdmissaoScreenProps {
     colaborador: ColaboradorApi,
     foco: FocoDoAdmitido,
   ) => void;
+  /**
+   * T179 — papel do ator, decidido pelo servidor (o mesmo que o shell usa).
+   * Só muda a ORIENTAÇÃO do aviso de empresa sem referências: o RH cadastra
+   * em Estrutura; o DP pede ao RH. Nunca concede nada.
+   */
+  readonly papelDoAtor?: string | null;
 }
 
 export function NovaAdmissaoScreen({
   onSair,
   onAbrirAdmitido,
+  papelDoAtor = null,
 }: NovaAdmissaoScreenProps) {
   const [opcoes, setOpcoes] = useState<Opcoes>(OPCOES_VAZIAS);
   const [carregandoOpcoes, setCarregandoOpcoes] = useState(true);
@@ -465,13 +641,27 @@ export function NovaAdmissaoScreen({
   const [endereco, setEndereco] = useState<ValoresEndereco>(ENDERECO_INICIAL);
   const [contatos, setContatos] = useState<ValoresContatos>(CONTATOS_VAZIOS);
   const [erros, setErros] = useState<Erros>({});
+  /** T179 — o resumo "Revise N campos" só aparece depois de uma tentativa. */
+  const [tentouSalvar, setTentouSalvar] = useState(false);
+  /** T179 — o modal "Confirmar cadastro de colaborador?" está aberto. */
+  const [confirmando, setConfirmando] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [admissao, setAdmissao] = useState<AdmissaoRegistradaApi | null>(null);
   const [confirmandoDescarte, setConfirmandoDescarte] = useState(false);
   /** Trava síncrona contra envio duplicado (cliques no mesmo quadro). */
   const enviandoRef = useRef(false);
+  /**
+   * T179 — chave de idempotência do envio em curso. Nasce na primeira
+   * confirmação e é REPETIDA em cada nova tentativa; só um sucesso ou o
+   * recomeço da página a descartam.
+   */
+  const chaveIdempotenciaRef = useRef<string | null>(null);
   /** Gatilho de uma vez só: focar o primeiro erro depois que ele existe. */
   const focarPrimeiroErroRef = useRef(false);
+  /** T179 — gatilho de uma vez só: devolver o foco a "Salvar". */
+  const focarSalvarRef = useRef(false);
+  /** Só a resposta mais recente de áreas vale (troca rápida de departamento). */
+  const pedidoAreasRef = useRef(0);
   const sucessoTituloRef = useRef<HTMLHeadingElement | null>(null);
 
   const empresa = opcoes.empresas.length === 1 ? opcoes.empresas[0] : undefined;
@@ -492,11 +682,11 @@ export function NovaAdmissaoScreen({
         if (!vigente) return;
         setOpcoes({
           empresas: empresas.itens,
-          departamentos: departamentos.itens,
-          unidades: unidades.itens,
-          equipes: equipes.itens,
-          cargos: cargos.itens,
-          centrosCusto: centros.itens,
+          departamentos: soAtivos(departamentos.itens),
+          unidades: soAtivos(unidades.itens),
+          equipes: soAtivos(equipes.itens),
+          cargos: soAtivos(cargos.itens),
+          centrosCusto: soAtivos(centros.itens),
         });
         if (empresas.itens.length !== 1) {
           setErros({ geral: MENSAGEM_EMPRESA_INDEFINIDA });
@@ -523,17 +713,37 @@ export function NovaAdmissaoScreen({
     if (campo) document.getElementById(ID_DO_CAMPO[campo])?.focus();
   }, [erros]);
 
+  // T179 — "Voltar e revisar" (ou Escape) devolve o foco a "Salvar". Pelo id:
+  // o `Button` do Evolli não repassa `ref`, e o `Modal` só devolve o foco a
+  // quem o tinha quando ele abriu — que pode não ser o botão.
+  useEffect(() => {
+    if (confirmando || !focarSalvarRef.current) return;
+    focarSalvarRef.current = false;
+    document.getElementById(ID_BOTAO_SALVAR)?.focus();
+  }, [confirmando]);
+
   useEffect(() => {
     if (admissao) sucessoTituloRef.current?.focus();
   }, [admissao]);
 
+  /**
+   * T179 — o que falta para admitir nesta empresa: Departamento, Cargo e
+   * Unidade são obrigatórios, e o DP não pode cadastrá-los. Só se calcula com
+   * a empresa resolvida: sem ela, o aviso de empresa indefinida já basta.
+   */
+  const referenciasFaltando: string[] =
+    carregandoOpcoes || !empresa
+      ? []
+      : [
+          ...(opcoes.departamentos.length === 0 ? ["Departamento"] : []),
+          ...(opcoes.cargos.length === 0 ? ["Cargo"] : []),
+          ...(opcoes.unidades.length === 0 ? ["Unidade"] : []),
+        ];
+
   const alterado =
-    campos.nome !== "" ||
-    campos.matricula !== "" ||
-    campos.tipo !== "" ||
-    campos.dataAdmissao !== "" ||
-    campos.tipoDestino !== "" ||
-    campos.destinoId !== "" ||
+    (Object.keys(campos) as (keyof Campos)[]).some(
+      (c) => campos[c] !== CAMPOS_VAZIOS[c],
+    ) ||
     (Object.keys(perfil) as ChavePerfil[]).some(
       (c) => perfil[c] !== PERFIL_VAZIO[c],
     ) ||
@@ -549,7 +759,13 @@ export function NovaAdmissaoScreen({
 
   function atualizarEndereco(campo: ChaveEndereco, valor: string) {
     setEndereco((prev) => ({ ...prev, [campo]: valor }));
-    setErros((prev) => semErroDe(prev, campo));
+    // T179 — trocar o país muda a regra do CEP (8 dígitos só no Brasil): a
+    // mensagem do CEP deixa de valer junto.
+    setErros((prev) =>
+      campo === "pais"
+        ? semErroDe(prev, "pais", "cep")
+        : semErroDe(prev, campo),
+    );
     // T178 — mudar o CEP ou o país tira de cena o que a consulta anterior
     // disse: a mensagem falava de OUTRO CEP. Uma resposta ainda em voo é
     // descartada ao chegar (ver `respostaVigente`).
@@ -567,7 +783,7 @@ export function NovaAdmissaoScreen({
   const cepEmVooRef = useRef<string | null>(null);
   /** Sequência do pedido, contra resposta obsoleta. */
   const pedidoCepRef = useRef(0);
-  const cepAssistido = ehBrasil(endereco.pais);
+  const cepAssistido = ehPaisBrasil(endereco.pais);
 
   /** A resposta ainda vale: é a do último pedido, para o CEP e país atuais. */
   function respostaVigente(pedido: number, digitos: string): boolean {
@@ -575,7 +791,7 @@ export function NovaAdmissaoScreen({
     return (
       pedido === pedidoCepRef.current &&
       digitosDoCep(atual.cep) === digitos &&
-      ehBrasil(atual.pais)
+      ehPaisBrasil(atual.pais)
     );
   }
 
@@ -586,7 +802,7 @@ export function NovaAdmissaoScreen({
    */
   async function buscarCep(origem: "botao" | "saida") {
     const atual = enderecoRef.current;
-    if (!ehBrasil(atual.pais)) return;
+    if (!ehPaisBrasil(atual.pais)) return;
     const digitos = digitosDoCep(atual.cep);
     if (!/^\d{8}$/.test(digitos)) {
       // Na saída do campo, CEP incompleto é só um CEP ainda sendo digitado.
@@ -702,31 +918,23 @@ export function NovaAdmissaoScreen({
     ...errosLimpos: CampoErro[]
   ) {
     setCampos((prev) => ({ ...prev, [campo]: valor }));
+    // Mudar qualquer referência da lotação tira de cena a recusa do conjunto.
     setErros((prev) => semErroDe(prev, ...errosLimpos));
   }
 
-  function selecionarTipoDestino(tipoDestino: TipoDestino) {
-    setCampos((prev) => ({
-      ...prev,
-      tipoDestino,
-      destinoId: "",
-      departamentoIdArea: "",
-    }));
+  /**
+   * T179 — o departamento filtra a área: trocá-lo limpa a área escolhida e
+   * recarrega só as áreas dele. A área continua opcional.
+   */
+  async function selecionarDepartamento(departamentoId: string) {
+    setCampos((prev) => ({ ...prev, departamentoId, areaId: "" }));
     setAreas([]);
-    setErros((prev) =>
-      semErroDe(prev, "tipoDestino", "departamentoArea", "destino"),
-    );
-  }
-
-  async function selecionarDepartamentoArea(departamentoId: string) {
-    setCampos((prev) => ({
-      ...prev,
-      departamentoIdArea: departamentoId,
-      destinoId: "",
-    }));
-    setAreas([]);
-    setErros((prev) => semErroDe(prev, "departamentoArea", "destino"));
-    if (!departamentoId) return;
+    setErros((prev) => semErroDe(prev, "departamento", "area", "lotacao"));
+    const pedido = ++pedidoAreasRef.current;
+    if (!departamentoId) {
+      setCarregandoAreas(false);
+      return;
+    }
     setCarregandoAreas(true);
     try {
       const resp = await listarAreas({
@@ -734,16 +942,24 @@ export function NovaAdmissaoScreen({
         status: "ativo",
         tamanhoPagina: 100,
       });
-      setAreas(resp.itens);
+      if (pedido !== pedidoAreasRef.current) return;
+      setAreas(soAtivos(resp.itens));
     } catch {
+      if (pedido !== pedidoAreasRef.current) return;
       setAreas([]);
     } finally {
-      setCarregandoAreas(false);
+      if (pedido === pedidoAreasRef.current) setCarregandoAreas(false);
     }
   }
 
   function validar(): Erros {
     const novos: Erros = {};
+    if (referenciasFaltando.length > 0) {
+      novos.referencias = mensagemSemReferencias(
+        referenciasFaltando,
+        papelDoAtor,
+      );
+    }
     const nome = campos.nome.trim();
     if (!nome) {
       novos.nome = "Nome é obrigatório.";
@@ -758,14 +974,23 @@ export function NovaAdmissaoScreen({
     if (!campos.dataAdmissao) {
       novos.dataAdmissao = "Informe a data de admissão.";
     }
-    if (!campos.tipoDestino) {
-      novos.tipoDestino = "Escolha o tipo de referência organizacional.";
-    } else if (campos.tipoDestino === "area" && !campos.departamentoIdArea) {
-      novos.departamentoArea = "Selecione o departamento da área.";
-    } else if (!campos.destinoId) {
-      novos.destino = `Selecione o registro de ${rotuloTipoDestino(
-        campos.tipoDestino,
-      ).toLowerCase()}.`;
+    if (!campos.departamentoId) {
+      novos.departamento =
+        opcoes.departamentos.length > 0
+          ? "Selecione o departamento."
+          : "Não há departamento ativo nesta empresa.";
+    }
+    if (!campos.cargoId) {
+      novos.cargo =
+        opcoes.cargos.length > 0
+          ? "Selecione o cargo."
+          : "Não há cargo ativo nesta empresa.";
+    }
+    if (!campos.unidadeId) {
+      novos.unidade =
+        opcoes.unidades.length > 0
+          ? "Selecione a unidade."
+          : "Não há unidade ativa nesta empresa.";
     }
     Object.assign(
       novos,
@@ -778,7 +1003,7 @@ export function NovaAdmissaoScreen({
   }
 
   function montarDto(empresaId: string): AdmitirColaboradorDto {
-    const { tipoDestino, destinoId, departamentoIdArea } = campos;
+    const { areaId, equipeId, centroCustoId } = campos;
     return {
       nome: campos.nome.trim(),
       empresaId,
@@ -786,43 +1011,64 @@ export function NovaAdmissaoScreen({
       tipo: campos.tipo as TipoVinculo,
       dataAdmissao: campos.dataAdmissao,
       motivoCodigo: "admissao_inicial",
-      ...(tipoDestino === "unidade"
-        ? { unidadeOrganizacionalId: destinoId }
-        : {}),
-      ...(tipoDestino === "departamento" ? { departamentoId: destinoId } : {}),
-      ...(tipoDestino === "area"
-        ? { areaId: destinoId, departamentoId: departamentoIdArea }
-        : {}),
-      ...(tipoDestino === "equipe" ? { equipeId: destinoId } : {}),
-      ...(tipoDestino === "cargo" ? { cargoId: destinoId } : {}),
-      ...(tipoDestino === "centroCusto" ? { centroCustoId: destinoId } : {}),
+      departamentoId: campos.departamentoId,
+      cargoId: campos.cargoId,
+      unidadeOrganizacionalId: campos.unidadeId,
+      ...(areaId ? { areaId } : {}),
+      ...(equipeId ? { equipeId } : {}),
+      ...(centroCustoId ? { centroCustoId } : {}),
       perfilPessoal: blocoPerfil(perfil),
       endereco: blocoEndereco(endereco),
       contatos: normalizarContatos(contatos),
     };
   }
 
-  async function enviar(evento: React.FormEvent) {
+  /**
+   * T179 — "Salvar": só valida. Com falha, a página fica e o foco vai ao
+   * primeiro campo inválido; sem falha, abre a confirmação. Nada é enviado
+   * aqui.
+   */
+  function pedirConfirmacao(evento: React.FormEvent) {
     evento.preventDefault();
-    if (enviandoRef.current) return;
-
+    if (enviandoRef.current || confirmando) return;
+    setTentouSalvar(true);
     const novos = validar();
     if (Object.keys(novos).length > 0 || !empresa) {
       focarPrimeiroErroRef.current = true;
       setErros(novos);
       return;
     }
-
-    enviandoRef.current = true;
-    setSalvando(true);
     setErros({});
+    setConfirmando(true);
+  }
+
+  /** T179 — fecha a confirmação sem tocar em nada; o foco volta a "Salvar". */
+  function voltarERevisar() {
+    if (enviandoRef.current) return;
+    focarSalvarRef.current = true;
+    setConfirmando(false);
+  }
+
+  /** T179 — "Confirmar cadastro": o ÚNICO caminho que grava. */
+  async function confirmarCadastro() {
+    if (enviandoRef.current || !empresa) return;
+    enviandoRef.current = true;
+    const chave = (chaveIdempotenciaRef.current ??= gerarChaveIdempotencia());
+    setSalvando(true);
     try {
-      const resposta = await admitirColaborador(montarDto(empresa.id));
+      const resposta = await admitirColaborador(montarDto(empresa.id), {
+        chaveIdempotencia: chave,
+      });
+      // Sucesso: a próxima admissão desta página será OUTRO envio.
+      chaveIdempotenciaRef.current = null;
+      setConfirmando(false);
       setAdmissao(resposta);
     } catch (erro: unknown) {
       // Os dados digitados ficam: só as mensagens e o estado de envio mudam.
+      // A chave também fica — a próxima confirmação é o MESMO envio.
       focarPrimeiroErroRef.current = true;
-      setErros(errosDaRecusa(erro, campos.tipoDestino !== ""));
+      setConfirmando(false);
+      setErros(errosDaRecusa(erro));
     } finally {
       setSalvando(false);
       enviandoRef.current = false;
@@ -845,31 +1091,20 @@ export function NovaAdmissaoScreen({
     setContatos(CONTATOS_VAZIOS);
     setAreas([]);
     setErros({});
+    setTentouSalvar(false);
+    setCep({ tipo: "ocioso" });
+    ultimoCepConsultadoRef.current = null;
+    // T179 — página recomeçada: a próxima confirmação é um envio novo.
+    chaveIdempotenciaRef.current = null;
     setAdmissao(null);
   }
 
-  const opcoesDestino: { id: string; rotulo: string }[] = (() => {
-    const rotular = (r: { id: string; codigo: string; nome: string }) => ({
-      id: r.id,
-      rotulo: `${r.codigo} — ${r.nome}`,
-    });
-    switch (campos.tipoDestino) {
-      case "unidade":
-        return opcoes.unidades.map(rotular);
-      case "departamento":
-        return opcoes.departamentos.map(rotular);
-      case "area":
-        return areas.map(rotular);
-      case "equipe":
-        return opcoes.equipes.map(rotular);
-      case "cargo":
-        return opcoes.cargos.map(rotular);
-      case "centroCusto":
-        return opcoes.centrosCusto.map(rotular);
-      default:
-        return [];
-    }
-  })();
+  /** Referência escolhida, pelo id, para o resumo da confirmação. */
+  function escolhida(lista: readonly Referencia[], id: string): string | null {
+    if (!id) return null;
+    const achada = lista.find((r) => r.id === id);
+    return achada ? rotuloDaReferencia(achada) : null;
+  }
 
   /**
    * T178 — um campo de texto opcional do perfil, pela chave. Rótulo, limite,
@@ -902,27 +1137,90 @@ export function NovaAdmissaoScreen({
   /** T178 — idem para o endereço (`CAMPOS_ENDERECO`). */
   function campoEndereco(chave: ChaveEndereco, aoSair?: () => void) {
     const campo = CAMPOS_ENDERECO.find((c) => c.chave === chave)!;
+    // T179 — CEP brasileiro tem máscara `00000-000`; com outro país, texto
+    // livre como antes.
+    const cepComMascara = chave === "cep" && cepAssistido;
+    const ajuda =
+      campo.chave === "pais"
+        ? "Sugerido como Brasil; pode ser alterado."
+        : cepComMascara
+          ? DICA_DE_FORMATO.cep
+          : campo.ajuda;
     return (
       <FormField
         id={ID_DO_CAMPO[campo.chave]}
         label={rotuloOpcional(campo.rotulo)}
-        {...(campo.chave === "pais"
-          ? { help: "Sugerido como Brasil; pode ser alterado." }
-          : campo.ajuda
-            ? { help: campo.ajuda }
-            : {})}
+        {...(ajuda ? { help: ajuda } : {})}
         {...(erros[campo.chave] ? { error: erros[campo.chave]! } : {})}
       >
+        {(control) =>
+          cepComMascara ? (
+            <CampoMascarado
+              mascara="cep"
+              value={endereco.cep}
+              onValorChange={(valor) => atualizarEndereco("cep", valor)}
+              onBlur={aoSair}
+              {...control}
+            />
+          ) : (
+            <input
+              type="text"
+              maxLength={campo.limite}
+              autoComplete="off"
+              value={endereco[campo.chave]}
+              onChange={(e) => atualizarEndereco(campo.chave, e.target.value)}
+              onBlur={aoSair}
+              {...control}
+            />
+          )
+        }
+      </FormField>
+    );
+  }
+
+  /**
+   * T179 — um seletor da lotação. Obrigatório (Departamento, Cargo, Unidade)
+   * ou opcional (Área, Equipe, Centro de custo); opções `CÓDIGO — Nome`, só
+   * ativas. Sem opções, o seletor diz isso no lugar de "Selecione…".
+   */
+  function seletorDeLotacao(definicao: {
+    campo: CampoLotacao;
+    rotulo: string;
+    obrigatorio: boolean;
+    valor: string;
+    lista: readonly Referencia[];
+    aoMudar: (id: string) => void;
+    ajuda?: string;
+    vazio: string;
+    desabilitado?: boolean;
+  }) {
+    const { campo, rotulo, obrigatorio, valor, lista, aoMudar } = definicao;
+    return (
+      <FormField
+        id={ID_DO_CAMPO[campo]}
+        label={obrigatorio ? rotulo : rotuloOpcional(rotulo)}
+        required={obrigatorio}
+        {...(definicao.ajuda ? { help: definicao.ajuda } : {})}
+        {...(erros[campo] ? { error: erros[campo]! } : {})}
+      >
         {(control) => (
-          <input
-            type="text"
-            maxLength={campo.limite}
-            autoComplete="off"
-            value={endereco[campo.chave]}
-            onChange={(e) => atualizarEndereco(campo.chave, e.target.value)}
-            onBlur={aoSair}
+          <select
+            value={valor}
+            onChange={(e) => aoMudar(e.target.value)}
+            disabled={carregandoOpcoes || definicao.desabilitado === true}
             {...control}
-          />
+          >
+            <option value="">
+              {lista.length > 0 || carregandoOpcoes
+                ? "Selecione…"
+                : definicao.vazio}
+            </option>
+            {lista.map((ref) => (
+              <option key={ref.id} value={ref.id}>
+                {rotuloDaReferencia(ref)}
+              </option>
+            ))}
+          </select>
         )}
       </FormField>
     );
@@ -941,6 +1239,15 @@ export function NovaAdmissaoScreen({
       />
     );
   }
+
+  // T179 — campos a revisar, na ordem da tela. Só depois de uma tentativa, e
+  // sem o aviso de referências (que tem bloco próprio) nem o erro geral.
+  const camposARevisar = tentouSalvar
+    ? ORDEM_DOS_ERROS.filter(
+        (c): c is Exclude<CampoErro, "referencias" | "geral"> =>
+          c !== "referencias" && c !== "geral" && Boolean(erros[c]),
+      )
+    : [];
 
   return (
     <div className="nova-admissao">
@@ -973,8 +1280,43 @@ export function NovaAdmissaoScreen({
         className="nova-admissao__form"
         aria-label="Formulário de nova admissão"
         noValidate
-        onSubmit={(e) => void enviar(e)}
+        onSubmit={pedirConfirmacao}
       >
+        {/* T179 — resumo do que revisar: só NOMES de campos, nunca valores.
+            Cada nome é um botão que leva o foco ao campo. Não é região viva:
+            quem anuncia é o foco, que já vai ao primeiro campo. */}
+        {camposARevisar.length > 0 ? (
+          <div
+            className="nova-admissao__revisar"
+            role="group"
+            aria-labelledby="nova-admissao-revisar-titulo"
+          >
+            <p
+              id="nova-admissao-revisar-titulo"
+              className="nova-admissao__revisar-titulo"
+            >
+              Revise {camposARevisar.length}{" "}
+              {camposARevisar.length === 1 ? "campo" : "campos"} antes de
+              confirmar
+            </p>
+            <ul className="nova-admissao__revisar-lista">
+              {camposARevisar.map((campo) => (
+                <li key={campo}>
+                  <Button
+                    type="button"
+                    variant="subtle"
+                    onClick={() =>
+                      document.getElementById(ID_DO_CAMPO[campo])?.focus()
+                    }
+                  >
+                    {ROTULO_DO_CAMPO[campo]}
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
         <p className="nova-admissao__texto nova-admissao__legenda">
           Campos com * são obrigatórios. Os marcados como opcionais podem ficar
           em branco.
@@ -1004,6 +1346,19 @@ export function NovaAdmissaoScreen({
                 </span>
               </dd>
             </dl>
+          ) : null}
+          {/* T179 — empresa sem Departamento, Cargo ou Unidade ativos: o aviso
+              fica visível desde o carregamento e recebe o foco ao tentar
+              salvar. */}
+          {referenciasFaltando.length > 0 ? (
+            <p
+              id={ID_DO_CAMPO.referencias}
+              className="nova-admissao__sem-referencias"
+              role="alert"
+              tabIndex={-1}
+            >
+              {mensagemSemReferencias(referenciasFaltando, papelDoAtor)}
+            </p>
           ) : null}
         </section>
 
@@ -1193,15 +1548,14 @@ export function NovaAdmissaoScreen({
               id={ID_DO_CAMPO.celular}
               label="Celular"
               required
-              help="Só dígitos, com + opcional no início. Espaço, parênteses, hífen e ponto são aceitos e removidos ao salvar."
+              help={DICA_DE_FORMATO.telefone}
               {...(erros.celular ? { error: erros.celular } : {})}
             >
               {(control) => (
-                <input
-                  type="tel"
-                  autoComplete="off"
+                <CampoMascarado
+                  mascara="telefone"
                   value={contatos.celular}
-                  onChange={(e) => atualizarContato("celular", e.target.value)}
+                  onValorChange={(valor) => atualizarContato("celular", valor)}
                   {...control}
                 />
               )}
@@ -1210,15 +1564,14 @@ export function NovaAdmissaoScreen({
               id={ID_DO_CAMPO.telefone}
               label="Telefone"
               required
-              help="Só dígitos, com + opcional no início. Espaço, parênteses, hífen e ponto são aceitos e removidos ao salvar."
+              help={DICA_DE_FORMATO.telefone}
               {...(erros.telefone ? { error: erros.telefone } : {})}
             >
               {(control) => (
-                <input
-                  type="tel"
-                  autoComplete="off"
+                <CampoMascarado
+                  mascara="telefone"
                   value={contatos.telefone}
-                  onChange={(e) => atualizarContato("telefone", e.target.value)}
+                  onValorChange={(valor) => atualizarContato("telefone", valor)}
                   {...control}
                 />
               )}
@@ -1317,101 +1670,85 @@ export function NovaAdmissaoScreen({
           >
             Lotação inicial
           </h2>
-          {/* T178 — tipo e registro lado a lado; com "Área", o departamento
-              entra ENTRE os dois, na ordem em que precisa ser escolhido. */}
-          <div
-            className={`nova-admissao__linha ${
-              campos.tipoDestino === "area"
-                ? "nova-admissao__linha--3"
-                : "nova-admissao__linha--2"
-            }`}
-          >
-            <FormField
-              id={ID_DO_CAMPO.tipoDestino}
-              label="Tipo de referência organizacional"
-              required
-              help="Primeiro escolha o tipo; o registro é escolhido no campo seguinte."
-              {...(erros.tipoDestino ? { error: erros.tipoDestino } : {})}
-            >
-              {(control) => (
-                <select
-                  value={campos.tipoDestino}
-                  onChange={(e) =>
-                    selecionarTipoDestino(e.target.value as TipoDestino)
-                  }
-                  disabled={carregandoOpcoes}
-                  {...control}
-                >
-                  <option value="">Selecione…</option>
-                  {OPCOES_TIPO_DESTINO.map((opcao) => (
-                    <option key={opcao.valor} value={opcao.valor}>
-                      {opcao.rotulo}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </FormField>
-
-            {campos.tipoDestino === "area" ? (
-              <FormField
-                id={ID_DO_CAMPO.departamentoArea}
-                label="Departamento da área"
-                required
-                help="A área só identifica a lotação junto com o departamento a que pertence."
-                {...(erros.departamentoArea
-                  ? { error: erros.departamentoArea }
-                  : {})}
-              >
-                {(control) => (
-                  <select
-                    value={campos.departamentoIdArea}
-                    onChange={(e) =>
-                      void selecionarDepartamentoArea(e.target.value)
-                    }
-                    {...control}
-                  >
-                    <option value="">Selecione…</option>
-                    {opcoes.departamentos.map((dep) => (
-                      <option key={dep.id} value={dep.id}>
-                        {dep.codigo} — {dep.nome}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </FormField>
-            ) : null}
-
-            {campos.tipoDestino ? (
-              <FormField
-                id={ID_DO_CAMPO.destino}
-                label="Registro da referência organizacional"
-                required
-                help={`Tipo escolhido: ${rotuloTipoDestino(campos.tipoDestino)}. Uma referência é suficiente para efetivar a admissão.`}
-                {...(erros.destino ? { error: erros.destino } : {})}
-              >
-                {(control) => (
-                  <select
-                    value={campos.destinoId}
-                    onChange={(e) =>
-                      atualizar("destinoId", e.target.value, "destino")
-                    }
-                    disabled={
-                      campos.tipoDestino === "area" &&
-                      (!campos.departamentoIdArea || carregandoAreas)
-                    }
-                    {...control}
-                  >
-                    <option value="">Selecione…</option>
-                    {opcoesDestino.map((opcao) => (
-                      <option key={opcao.id} value={opcao.id}>
-                        {opcao.rotulo}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </FormField>
-            ) : null}
+          {/* T179 — um seletor por referência: os três obrigatórios na
+              primeira linha; os três opcionais na segunda, com a Área logo
+              abaixo do Departamento que a filtra. */}
+          <div className="nova-admissao__linha nova-admissao__linha--3">
+            {seletorDeLotacao({
+              campo: "departamento",
+              rotulo: "Departamento",
+              obrigatorio: true,
+              valor: campos.departamentoId,
+              lista: opcoes.departamentos,
+              aoMudar: (id) => void selecionarDepartamento(id),
+              vazio: "Nenhum departamento ativo",
+            })}
+            {seletorDeLotacao({
+              campo: "cargo",
+              rotulo: "Cargo",
+              obrigatorio: true,
+              valor: campos.cargoId,
+              lista: opcoes.cargos,
+              aoMudar: (id) => atualizar("cargoId", id, "cargo", "lotacao"),
+              vazio: "Nenhum cargo ativo",
+            })}
+            {seletorDeLotacao({
+              campo: "unidade",
+              rotulo: "Unidade",
+              obrigatorio: true,
+              valor: campos.unidadeId,
+              lista: opcoes.unidades,
+              aoMudar: (id) => atualizar("unidadeId", id, "unidade", "lotacao"),
+              vazio: "Nenhuma unidade ativa",
+            })}
           </div>
+          <div className="nova-admissao__linha nova-admissao__linha--3">
+            {seletorDeLotacao({
+              campo: "area",
+              rotulo: "Área",
+              obrigatorio: false,
+              valor: campos.areaId,
+              lista: areas,
+              aoMudar: (id) => atualizar("areaId", id, "area", "lotacao"),
+              ajuda:
+                "Escolha antes o departamento: a lista mostra só as áreas dele.",
+              vazio: campos.departamentoId
+                ? carregandoAreas
+                  ? "Carregando áreas…"
+                  : "Nenhuma área ativa neste departamento"
+                : "Escolha antes o departamento",
+              desabilitado: !campos.departamentoId || carregandoAreas,
+            })}
+            {seletorDeLotacao({
+              campo: "equipe",
+              rotulo: "Equipe",
+              obrigatorio: false,
+              valor: campos.equipeId,
+              lista: opcoes.equipes,
+              aoMudar: (id) => atualizar("equipeId", id, "equipe", "lotacao"),
+              vazio: "Nenhuma equipe ativa",
+            })}
+            {seletorDeLotacao({
+              campo: "centroCusto",
+              rotulo: "Centro de custo",
+              obrigatorio: false,
+              valor: campos.centroCustoId,
+              lista: opcoes.centrosCusto,
+              aoMudar: (id) =>
+                atualizar("centroCustoId", id, "centroCusto", "lotacao"),
+              vazio: "Nenhum centro de custo ativo",
+            })}
+          </div>
+          {erros.lotacao ? (
+            <p
+              className="nova-admissao__erro-geral"
+              role="alert"
+              id={ID_DO_CAMPO.lotacao}
+              tabIndex={-1}
+            >
+              {erros.lotacao}
+            </p>
+          ) : null}
         </section>
 
         {erros.geral ? (
@@ -1437,12 +1774,93 @@ export function NovaAdmissaoScreen({
           <Button
             type="submit"
             variant="primary"
+            id={ID_BOTAO_SALVAR}
             disabled={salvando || carregandoOpcoes}
           >
-            {salvando ? "Admitindo…" : "Admitir colaborador"}
+            Salvar
           </Button>
         </FormActions>
       </form>
+
+      {/* T179 — confirmação antes de gravar: confirmação curta, o uso de
+          modal que a decisão do `DP-FLX-21` mantém. O resumo traz só o que
+          identifica a admissão — nunca contatos, endereço ou nascimento. O
+          modal não grava: só "Confirmar cadastro" envia, e enquanto envia ele
+          não fecha (`bloqueado`). */}
+      <Modal
+        aberto={confirmando && empresa !== undefined}
+        titulo="Confirmar cadastro de colaborador?"
+        descricao="Confira os dados abaixo. Nada é gravado até você escolher Confirmar cadastro."
+        onFechar={voltarERevisar}
+        bloqueado={salvando}
+        rodape={
+          <FormActions>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={voltarERevisar}
+              disabled={salvando}
+            >
+              Voltar e revisar
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              aria-disabled={salvando}
+              onClick={() => void confirmarCadastro()}
+            >
+              {salvando ? "Cadastrando…" : "Confirmar cadastro"}
+            </Button>
+          </FormActions>
+        }
+      >
+        {empresa ? (
+          <dl className="nova-admissao__resumo">
+            <dt>Empresa ativa</dt>
+            <dd>
+              {empresa.nome} ({empresa.codigo})
+            </dd>
+            <dt>Nome</dt>
+            <dd>{campos.nome.trim()}</dd>
+            <dt>Matrícula</dt>
+            <dd>{campos.matricula.trim().toUpperCase()}</dd>
+            <dt>Tipo de vínculo</dt>
+            <dd>{campos.tipo ? ROTULO_TIPO_VINCULO[campos.tipo] : ""}</dd>
+            <dt>Data de admissão</dt>
+            <dd>{formatarDiaCivil(campos.dataAdmissao)}</dd>
+            <dt>Lotação inicial</dt>
+            <dd>
+              <ul className="nova-admissao__lista-lotacao">
+                {(
+                  [
+                    [
+                      "Departamento",
+                      escolhida(opcoes.departamentos, campos.departamentoId),
+                    ],
+                    ["Cargo", escolhida(opcoes.cargos, campos.cargoId)],
+                    ["Unidade", escolhida(opcoes.unidades, campos.unidadeId)],
+                    ["Área", escolhida(areas, campos.areaId)],
+                    ["Equipe", escolhida(opcoes.equipes, campos.equipeId)],
+                    [
+                      "Centro de custo",
+                      escolhida(opcoes.centrosCusto, campos.centroCustoId),
+                    ],
+                  ] as const
+                ).map(([rotulo, valor]) => (
+                  <li key={rotulo}>
+                    {rotulo}: {valor ?? "Não informado"}
+                  </li>
+                ))}
+              </ul>
+            </dd>
+          </dl>
+        ) : null}
+        {salvando ? (
+          <p className="nova-admissao__texto" role="status">
+            Cadastrando… Aguarde a confirmação do servidor.
+          </p>
+        ) : null}
+      </Modal>
 
       {/* Confirmação de descarte: é confirmação curta, o uso de modal que a
           decisão do `DP-FLX-21` mantém. O cadastro em si nunca abre em modal. */}
@@ -1511,7 +1929,7 @@ interface ConfirmacaoProps {
 }
 
 /**
- * Lotação inicial como o SERVIDOR a gravou: a referência devolvida na
+ * Lotação inicial como o SERVIDOR a gravou: cada referência devolvida na
  * resposta, nomeada pelas opções que a própria página carregou do servidor.
  * Se o registro não estiver entre elas, diz só o tipo — nunca um id cru.
  */
@@ -1519,36 +1937,41 @@ function lotacaoGravada(
   destino: AdmissaoRegistradaApi["movimentacao"]["destino"],
   opcoes: Opcoes,
   areas: AreaApi[],
-): string {
+): string[] {
   const nomear = (
-    lista: { id: string; codigo: string; nome: string }[],
-    id: string,
+    lista: readonly Referencia[],
+    id: string | null,
     rotulo: string,
-  ) => {
+    registrada: string,
+  ): string[] => {
+    if (!id) return [];
     const achado = lista.find((r) => r.id === id);
-    return achado
-      ? `${rotulo}: ${achado.codigo} — ${achado.nome}`
-      : `${rotulo} registrada`;
+    return [achado ? `${rotulo}: ${rotuloDaReferencia(achado)}` : registrada];
   };
-  if (destino.areaId) return nomear(areas, destino.areaId, "Área");
-  if (destino.departamentoId)
-    return nomear(opcoes.departamentos, destino.departamentoId, "Departamento");
-  if (destino.unidadeOrganizacionalId)
-    return nomear(
+  const linhas = [
+    ...nomear(
+      opcoes.departamentos,
+      destino.departamentoId,
+      "Departamento",
+      "Departamento registrado",
+    ),
+    ...nomear(opcoes.cargos, destino.cargoId, "Cargo", "Cargo registrado"),
+    ...nomear(
       opcoes.unidades,
       destino.unidadeOrganizacionalId,
-      "Unidade organizacional",
-    );
-  if (destino.equipeId)
-    return nomear(opcoes.equipes, destino.equipeId, "Equipe");
-  if (destino.cargoId) return nomear(opcoes.cargos, destino.cargoId, "Cargo");
-  if (destino.centroCustoId)
-    return nomear(
+      "Unidade",
+      "Unidade registrada",
+    ),
+    ...nomear(areas, destino.areaId, "Área", "Área registrada"),
+    ...nomear(opcoes.equipes, destino.equipeId, "Equipe", "Equipe registrada"),
+    ...nomear(
       opcoes.centrosCusto,
       destino.centroCustoId,
       "Centro de custo",
-    );
-  return "Sem referência registrada";
+      "Centro de custo registrado",
+    ),
+  ];
+  return linhas.length > 0 ? linhas : ["Sem referência registrada"];
 }
 
 function ConfirmacaoDaAdmissao({
@@ -1567,6 +1990,8 @@ function ConfirmacaoDaAdmissao({
     criadoEm: admissao.criadoEm,
     atualizadoEm: admissao.atualizadoEm,
   };
+  const enderecoGravado = admissao.endereco;
+  const cepBrasileiro = ehPaisBrasil(enderecoGravado?.pais);
   return (
     <div className="nova-admissao">
       {/* Depois da admissão não há o que descartar: a trilha sai direto, como
@@ -1624,7 +2049,13 @@ function ConfirmacaoDaAdmissao({
           </dd>
           <dt>Lotação inicial</dt>
           <dd>
-            {lotacaoGravada(admissao.movimentacao.destino, opcoes, areas)}
+            <ul className="nova-admissao__lista-lotacao">
+              {lotacaoGravada(admissao.movimentacao.destino, opcoes, areas).map(
+                (linha) => (
+                  <li key={linha}>{linha}</li>
+                ),
+              )}
+            </ul>
           </dd>
         </dl>
         <ResumoGravado
@@ -1644,10 +2075,18 @@ function ConfirmacaoDaAdmissao({
           titulo="Endereço"
           id="nova-admissao-sucesso-endereco"
           linhas={
-            admissao.endereco
-              ? CAMPOS_ENDERECO.map(
-                  (c) => [c.rotulo, admissao.endereco![c.chave]] as const,
-                )
+            enderecoGravado
+              ? CAMPOS_ENDERECO.map((c) => {
+                  const valor = enderecoGravado[c.chave];
+                  // T179 — CEP brasileiro gravado em 8 dígitos; exibido
+                  // `00000-000`.
+                  return [
+                    c.rotulo,
+                    c.chave === "cep" && valor !== null
+                      ? exibirCep(valor, cepBrasileiro)
+                      : valor,
+                  ] as const;
+                })
               : null
           }
         />
@@ -1656,8 +2095,10 @@ function ConfirmacaoDaAdmissao({
           id="nova-admissao-sucesso-contatos"
           linhas={[
             ["E-mail pessoal", admissao.contatos.emailPessoal],
-            ["Celular", admissao.contatos.celular],
-            ["Telefone", admissao.contatos.telefone],
+            // T179 — gravados em `+55` + DDD + número; exibidos na forma
+            // brasileira.
+            ["Celular", exibirTelefone(admissao.contatos.celular)],
+            ["Telefone", exibirTelefone(admissao.contatos.telefone)],
           ]}
         />
         <FormActions>

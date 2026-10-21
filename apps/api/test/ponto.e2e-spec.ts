@@ -13,7 +13,10 @@ import { GenericContainer, StartedTestContainer, Wait } from "testcontainers";
 import { AppModule } from "../src/app.module";
 import { AllExceptionsFilter } from "../src/common/filters/http-exception.filter";
 import { requestIdMiddleware } from "../src/common/request-id";
-import { CAMPOS_OBRIGATORIOS_ADMISSAO } from "./admissao-obrigatoria";
+import {
+  camposObrigatoriosAdmissao,
+  lotacaoMinima,
+} from "./admissao-obrigatoria";
 
 /**
  * Etapa 3 — Jornada e Ponto Rastreável V1 (ADR 0008, Baseline Jornada V1).
@@ -254,7 +257,8 @@ describe("Jornada e Ponto Rastreavel (e2e)", () => {
   ): Promise<string> {
     const colaborador = await post("/v1/colaboradores", cred)
       .send({
-        ...CAMPOS_OBRIGATORIOS_ADMISSAO,
+        ...camposObrigatoriosAdmissao(),
+        ...(await lotacaoMinima(appUrl, dados.empresaId)),
         nome: dados.nome,
         empresaId: dados.empresaId,
         matricula: dados.matricula,
@@ -531,7 +535,8 @@ describe("Jornada e Ponto Rastreavel (e2e)", () => {
     it("recusa vinculo PREVISTO — ainda nao admitido", async () => {
       const colaborador = await post("/v1/colaboradores", rhA)
         .send({
-          ...CAMPOS_OBRIGATORIOS_ADMISSAO,
+          ...camposObrigatoriosAdmissao(),
+          ...(await lotacaoMinima(appUrl, empresaA)),
           nome: "Pessoa Sintetica Previsto",
           empresaId: empresaA,
           matricula: "MAT-PREV",
