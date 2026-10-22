@@ -1577,6 +1577,49 @@ describe("Confirmação da Nova admissão (T179, e2e)", () => {
       expect(tokenErrado.body.codigo).toBe("csrf_invalido");
       expect(await prisma.colaborador.count()).toBe(antes);
     });
+
+    it("duas abas: a outra renova o token da mesma sessão; o envio com o token velho recebe 403 csrf_invalido sem gravar; com o token novo e a MESMA chave conclui uma vez só", async () => {
+      const chave = randomUUID();
+      const corpo = soObrigatorios();
+      const antes = await prisma.colaborador.count();
+      // "Outra aba": renova o token CSRF da MESMA sessão.
+      const renovado = await agent()
+        .get("/v1/auth/csrf")
+        .set("Cookie", rhA.cookie)
+        .expect(200);
+      const tokenNovo: string = renovado.body.csrfToken;
+      expect(tokenNovo).not.toBe(rhA.csrfToken);
+
+      const velho = await agent()
+        .post("/v1/colaboradores")
+        .set("Cookie", rhA.cookie)
+        .set("x-csrf-token", rhA.csrfToken)
+        .set("Idempotency-Key", chave)
+        .send(corpo)
+        .expect(403);
+      expect(velho.body.codigo).toBe("csrf_invalido");
+      expect(await prisma.colaborador.count()).toBe(antes);
+
+      const novo = await agent()
+        .post("/v1/colaboradores")
+        .set("Cookie", rhA.cookie)
+        .set("x-csrf-token", tokenNovo)
+        .set("Idempotency-Key", chave)
+        .send(corpo)
+        .expect(201);
+      const reenvio = await agent()
+        .post("/v1/colaboradores")
+        .set("Cookie", rhA.cookie)
+        .set("x-csrf-token", tokenNovo)
+        .set("Idempotency-Key", chave)
+        .send(corpo)
+        .expect(201);
+      expect(reenvio.headers["idempotent-replayed"]).toBe("true");
+      expect(reenvio.body.id).toBe(novo.body.id);
+      expect(await prisma.colaborador.count()).toBe(antes + 1);
+      // As credenciais de rhA seguem válidas para os testes seguintes.
+      rhA.csrfToken = tokenNovo;
+    });
   });
 
   describe("trilhas sem valores", () => {

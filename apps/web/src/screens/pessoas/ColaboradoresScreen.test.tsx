@@ -1754,7 +1754,9 @@ describe("ColaboradoresScreen (T169 — contatos do colaborador)", () => {
         Object.assign(recusa(403, "Token CSRF inválido."), {
           codigo: "csrf_invalido",
         }),
-      "Sua sessão expirou e os contatos não foram salvos. Entre de novo para continuar; os dados digitados foram mantidos nesta ficha.",
+      // T179 (revisão definitiva) — sessão válida, token desta aba renovado
+      // por outra: página desatualizada, não sessão expirada.
+      "Esta página ficou desatualizada. Salve novamente; seus dados foram mantidos.",
     ],
     [
       "403 sem código",
@@ -1784,6 +1786,41 @@ describe("ColaboradoresScreen (T169 — contatos do colaborador)", () => {
       expect(celular()).toHaveValue("(11) 98765-0001");
     },
   );
+
+  it("T179 (revisão definitiva) — 403 csrf_invalido (outra aba renovou o token): página desatualizada; salvar de novo conclui com os mesmos dados", async () => {
+    vi.mocked(registrarContatosDoColaborador)
+      .mockRejectedValueOnce(
+        Object.assign(recusa(403, "Token CSRF inválido."), {
+          codigo: "csrf_invalido",
+        }),
+      )
+      .mockResolvedValueOnce(
+        gravacao("criado", {
+          emailPessoal: null,
+          celular: "+5511987650001",
+          telefone: null,
+          atualizadoEm: "2026-10-16T12:00:00.000Z",
+        }),
+      );
+    const secao = await abrirDetalheDeAna();
+    await within(secao).findByText(/Nenhum contato registrado/);
+    fireEvent.change(celular(), { target: { value: "11987650001" } });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar contatos" }));
+    const alerta = await within(secao).findByRole("alert");
+    expect(alerta).toHaveTextContent(
+      "Esta página ficou desatualizada. Salve novamente; seus dados foram mantidos.",
+    );
+    expect(alerta).not.toHaveTextContent(/sessão expirou/);
+    expect(celular()).toHaveValue("(11) 98765-0001");
+    fireEvent.click(screen.getByRole("button", { name: "Salvar contatos" }));
+    await within(secao).findByText("Contatos salvos.");
+    // As duas últimas chamadas (a recusada e a que concluiu) levam o mesmo
+    // corpo: nada se perdeu entre elas.
+    const [recusada, concluida] = vi
+      .mocked(registrarContatosDoColaborador)
+      .mock.calls.slice(-2);
+    expect(concluida).toEqual(recusada);
+  });
 
   it("T179 — 409 de e-mail em uso: a mensagem vai para o campo, com foco, e nada se perde", async () => {
     vi.mocked(registrarContatosDoColaborador).mockRejectedValueOnce(

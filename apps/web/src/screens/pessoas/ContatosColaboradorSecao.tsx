@@ -9,6 +9,7 @@ import {
 import {
   falhaAoPrepararEnvio,
   falhaPorSessaoExpirada,
+  falhaPorTokenDesatualizado,
 } from "../../api/csrfClient";
 import {
   type CampoContato,
@@ -155,14 +156,21 @@ function mensagemDaLeituraRecusada(erro: unknown): string {
 /**
  * Recusa da GRAVAÇÃO — os dados digitados ficam no formulário em todos os casos.
  *
- * T179 (revisão final) — sessão expirada (401, `CsrfSessionExpiredError` na
- * renovação do token ou 403 com `codigo: "csrf_invalido"`) tem mensagem
- * própria, em vez de cair na genérica ou na de permissão; o 403 sem código
- * continua sendo de permissão. `CsrfRequestError` (token não renovado por rede
+ * T179 (revisão final) — sessão expirada (401 ou `CsrfSessionExpiredError` na
+ * renovação do token) tem mensagem própria; T179 (revisão definitiva) — 403
+ * com `codigo: "csrf_invalido"` é página desatualizada (sessão válida, token
+ * desta aba renovado por outra): o cliente já descartou o token, e salvar de
+ * novo funciona. O 403 sem código continua sendo de permissão. `CsrfRequestError` (token não renovado por rede
  * ou 5xx) diz que o pedido nem saiu. Aqui não há envio incerto: os contatos
  * não têm chave de idempotência.
  */
 function errosDaGravacaoRecusada(erro: unknown): ErrosContatos {
+  if (falhaPorTokenDesatualizado(erro)) {
+    return {
+      geral:
+        "Esta página ficou desatualizada. Salve novamente; seus dados foram mantidos.",
+    };
+  }
   if (falhaPorSessaoExpirada(erro)) {
     return {
       geral:

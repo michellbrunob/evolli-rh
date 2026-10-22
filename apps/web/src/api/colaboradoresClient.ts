@@ -1,4 +1,8 @@
-import { clearCsrfToken, tokenCsrfParaGravacao } from "./csrfClient";
+import {
+  clearCsrfToken,
+  descartarTokenSeDesatualizado,
+  tokenCsrfParaGravacao,
+} from "./csrfClient";
 import type { EnderecoApi, PerfilPessoalApi } from "./dadosPessoaisClient";
 
 const BASE = "/v1";
@@ -297,6 +301,9 @@ async function apiFetch(
   if (res.status === 401) {
     clearCsrfToken();
   }
+  // T179 (revisão definitiva) — 403 `csrf_invalido`: o token desta aba ficou
+  // desatualizado; descartado, a próxima gravação pede um novo.
+  await descartarTokenSeDesatualizado(res);
   return res;
 }
 

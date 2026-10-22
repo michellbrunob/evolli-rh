@@ -1,5 +1,9 @@
 import { ApiError } from "./colaboradoresClient";
-import { clearCsrfToken, tokenCsrfParaGravacao } from "./csrfClient";
+import {
+  clearCsrfToken,
+  descartarTokenSeDesatualizado,
+  tokenCsrfParaGravacao,
+} from "./csrfClient";
 
 /**
  * T169 — contatos do colaborador: e-mail pessoal, celular e telefone.
@@ -81,6 +85,9 @@ async function apiFetch(
   if (res.status === 401) {
     clearCsrfToken();
   }
+  // T179 (revisão definitiva) — 403 `csrf_invalido`: o token desta aba ficou
+  // desatualizado; descartado, a próxima gravação pede um novo.
+  await descartarTokenSeDesatualizado(res);
   return res;
 }
 

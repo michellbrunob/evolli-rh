@@ -4,8 +4,10 @@ import {
   CsrfRequestError,
   CsrfSessionExpiredError,
   clearCsrfToken,
+  descartarTokenSeDesatualizado,
   falhaAoPrepararEnvio,
   falhaPorSessaoExpirada,
+  falhaPorTokenDesatualizado,
   getCsrfToken,
   refreshCsrfToken,
   setCsrfToken,
@@ -170,11 +172,19 @@ describe("T179 — token para gravação e classificação da falha", () => {
     expect(falhaPorSessaoExpirada(erro401)).toBe(true);
   });
 
-  it("sessão expirada: 401 e 403 csrf_invalido; o 403 de permissão e o 5xx, não", () => {
+  it("sessão expirada: só o 401; o 403 csrf_invalido é página desatualizada; o 403 de permissão e o 5xx, nenhum dos dois", () => {
     expect(falhaPorSessaoExpirada({ status: 401 })).toBe(true);
+    // T179 (revisão definitiva) — a sessão vencida responde 401 antes do
+    // CSRF: o 403 csrf_invalido vem com a sessão válida e o token desta aba
+    // desatualizado.
     expect(
       falhaPorSessaoExpirada({ status: 403, codigo: CODIGO_CSRF_INVALIDO }),
+    ).toBe(false);
+    expect(
+      falhaPorTokenDesatualizado({ status: 403, codigo: CODIGO_CSRF_INVALIDO }),
     ).toBe(true);
+    expect(falhaPorTokenDesatualizado({ status: 403 })).toBe(false);
+    expect(falhaPorTokenDesatualizado({ status: 401 })).toBe(false);
     expect(falhaPorSessaoExpirada({ status: 403 })).toBe(false);
     expect(falhaPorSessaoExpirada({ status: 403, codigo: "outro" })).toBe(
       false,
@@ -184,5 +194,33 @@ describe("T179 — token para gravação e classificação da falha", () => {
       false,
     );
     expect(falhaAoPrepararEnvio(new TypeError("Failed to fetch"))).toBe(false);
+  });
+});
+
+describe("T179 (revisão definitiva) — descarte do token desatualizado", () => {
+  const resposta = (status: number, corpo: unknown) =>
+    new Response(JSON.stringify(corpo), {
+      status,
+      headers: { "Content-Type": "application/json" },
+    });
+
+  it("403 csrf_invalido: descarta SÓ o token em memória, e o corpo segue legível", async () => {
+    setCsrfToken("token-sintetico-velho");
+    const res = resposta(403, { codigo: CODIGO_CSRF_INVALIDO });
+    await descartarTokenSeDesatualizado(res);
+    expect(getCsrfToken()).toBeNull();
+    // A resposta original continua intacta para quem chama.
+    await expect(res.json()).resolves.toEqual({ codigo: CODIGO_CSRF_INVALIDO });
+  });
+
+  it.each([
+    ["403 de permissão (sem código)", resposta(403, {})],
+    ["403 com outro código", resposta(403, { codigo: "outro" })],
+    ["409", resposta(409, { codigo: CODIGO_CSRF_INVALIDO })],
+    ["403 com corpo ilegível", new Response("x", { status: 403 })],
+  ])("%s: o token fica", async (_caso, res) => {
+    setCsrfToken("token-sintetico-valido");
+    await descartarTokenSeDesatualizado(res);
+    expect(getCsrfToken()).toBe("token-sintetico-valido");
   });
 });

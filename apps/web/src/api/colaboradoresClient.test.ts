@@ -95,6 +95,8 @@ vi.mock("./csrfClient", () => ({
   refreshCsrfToken: vi.fn(async () => "token-sintetico"),
   // T179 — o token das gravações vem por aqui.
   tokenCsrfParaGravacao: vi.fn(async () => "token-sintetico"),
+  // T179 (revisão definitiva) — descarte do token num 403 csrf_invalido.
+  descartarTokenSeDesatualizado: vi.fn(async () => undefined),
 }));
 
 const DTO: AdmitirColaboradorDto = {

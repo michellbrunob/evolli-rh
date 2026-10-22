@@ -110,6 +110,7 @@ import { type EnderecoDoCepApi, consultarCep } from "../../api/cepClient";
 import {
   falhaAoPrepararEnvio,
   falhaPorSessaoExpirada,
+  falhaPorTokenDesatualizado,
 } from "../../api/csrfClient";
 import { formatarDiaCivil } from "../../format/data";
 import {
@@ -411,10 +412,9 @@ const MENSAGEM_ENVIO_INCERTO =
   "Não foi possível confirmar se o cadastro foi gravado. Antes de tentar de novo, confira em Colaboradores; se ele não estiver lá, confirme de novo: o mesmo envio não cria um segundo cadastro.";
 
 /**
- * T179 (revisão final) — sessão expirada: 401 da admissão, 401 na renovação
- * do token (`CsrfSessionExpiredError`) ou 403 `csrf_invalido`. O servidor não
- * aceitou o cadastro (ou ele nem saiu): não é envio incerto, e a mensagem não
- * manda reconfirmar com a mesma chave.
+ * T179 (revisão final) — sessão expirada: 401 da admissão ou 401 na renovação
+ * do token (`CsrfSessionExpiredError`). O servidor não aceitou ESTE pedido (ou
+ * ele nem saiu): não é envio incerto.
  */
 const MENSAGEM_SESSAO_EXPIRADA =
   "Sua sessão expirou e o cadastro não foi gravado. Entre de novo para continuar; os dados digitados foram mantidos nesta página.";
@@ -425,6 +425,26 @@ const MENSAGEM_SESSAO_EXPIRADA =
  */
 const MENSAGEM_FALHA_AO_PREPARAR =
   "Não foi possível preparar o envio e o cadastro não foi enviado. Confira a conexão e confirme de novo.";
+
+/**
+ * T179 (revisão definitiva) — 403 `csrf_invalido`: a sessão vale, mas o token
+ * desta página ficou desatualizado (outra aba o renovou). O cliente já o
+ * descartou; confirmar de novo renova o token e reenvia o MESMO pedido, com a
+ * mesma chave. Não afirma nem nega gravação de um envio anterior.
+ */
+const MENSAGEM_PAGINA_DESATUALIZADA =
+  "Esta página ficou desatualizada. Confirme novamente; seus dados foram mantidos.";
+
+/**
+ * T179 (revisão definitiva) — depois de um envio incerto, a falha de sessão ou
+ * de preparo de um pedido SEGUINTE nada diz sobre o anterior: as mensagens não
+ * podem negar a gravação e mantêm a orientação de conferir Colaboradores. A
+ * chave segue a mesma, então reconfirmar não duplica.
+ */
+const MENSAGEM_SESSAO_EXPIRADA_APOS_INCERTO =
+  "Sua sessão expirou. Um envio anterior pode ter sido registrado: depois de entrar de novo, confira em Colaboradores; se ele não estiver lá, confirme de novo nesta página — o mesmo envio não cria um segundo cadastro. Os dados digitados foram mantidos.";
+const MENSAGEM_FALHA_AO_PREPARAR_APOS_INCERTO =
+  "Não foi possível preparar o envio agora. Um envio anterior pode ter sido registrado: confira em Colaboradores antes de tentar de novo; o mesmo envio não cria um segundo cadastro.";
 
 /**
  * T179 — a confirmação de descarte. "Nada foi salvo." só é verdade quando
@@ -461,7 +481,13 @@ function statusDe(erro: unknown): number | null {
  * aceitou o cadastro, ou ele nem saiu.
  */
 function envioSemConfirmacao(erro: unknown): boolean {
-  if (falhaPorSessaoExpirada(erro) || falhaAoPrepararEnvio(erro)) return false;
+  if (
+    falhaPorSessaoExpirada(erro) ||
+    falhaAoPrepararEnvio(erro) ||
+    falhaPorTokenDesatualizado(erro)
+  ) {
+    return false;
+  }
   const status = statusDe(erro);
   return status === null || status >= 500;
 }
@@ -520,17 +546,34 @@ const CAMPO_DO_CONFLITO: Readonly<
  *  - 404 — a empresa enviada deixou de ser a empresa ativa da sessão;
  *  - sem resposta (rede) ou 5xx (T179, revisão final) — não se sabe se
  *    gravou; confirmar de novo, com a mesma chave, é seguro;
- *  - T179 (revisão final) — 401, `CsrfSessionExpiredError` ou 403 com
- *    `codigo: "csrf_invalido"`: sessão expirada, nada gravado; o 403 sem
- *    código continua sendo de permissão;
+ *  - T179 (revisão final) — 401 ou `CsrfSessionExpiredError`: sessão
+ *    expirada; T179 (revisão definitiva) — 403 com `codigo: "csrf_invalido"`:
+ *    página desatualizada (sessão válida), confirmar de novo reenvia o mesmo
+ *    pedido; o 403 sem código continua sendo de permissão. Depois de um envio
+ *    incerto, nenhuma dessas mensagens nega a gravação do anterior;
  *  - T179 (revisão final) — `CsrfRequestError`: o token não foi renovado e o
  *    pedido nem saiu.
  *
  * Em todos os casos os dados digitados ficam na página.
  */
-function errosDaRecusa(erro: unknown): Erros {
-  if (falhaPorSessaoExpirada(erro)) return { geral: MENSAGEM_SESSAO_EXPIRADA };
-  if (falhaAoPrepararEnvio(erro)) return { geral: MENSAGEM_FALHA_AO_PREPARAR };
+function errosDaRecusa(erro: unknown, envioJaIncerto: boolean): Erros {
+  if (falhaPorTokenDesatualizado(erro)) {
+    return { geral: MENSAGEM_PAGINA_DESATUALIZADA };
+  }
+  if (falhaPorSessaoExpirada(erro)) {
+    return {
+      geral: envioJaIncerto
+        ? MENSAGEM_SESSAO_EXPIRADA_APOS_INCERTO
+        : MENSAGEM_SESSAO_EXPIRADA,
+    };
+  }
+  if (falhaAoPrepararEnvio(erro)) {
+    return {
+      geral: envioJaIncerto
+        ? MENSAGEM_FALHA_AO_PREPARAR_APOS_INCERTO
+        : MENSAGEM_FALHA_AO_PREPARAR,
+    };
+  }
   if (envioSemConfirmacao(erro)) return { geral: MENSAGEM_ENVIO_INCERTO };
   const status = statusDe(erro);
   const { erros: porCampo, codigo } = detalhesDe(erro);
@@ -1165,7 +1208,7 @@ export function NovaAdmissaoScreen({
       // A chave também fica — a próxima confirmação é o MESMO envio.
       focarPrimeiroErroRef.current = true;
       setConfirmando(false);
-      setErros(errosDaRecusa(erro));
+      setErros(errosDaRecusa(erro, envioIncerto));
       const divergente =
         statusDe(erro) === 422 &&
         detalhesDe(erro).codigo === "idempotencia_conteudo_divergente";

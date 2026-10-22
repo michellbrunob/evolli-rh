@@ -2589,6 +2589,12 @@ const MENSAGEM_PERMISSAO =
   "Seu perfil não tem permissão para admitir colaboradores. Nada foi salvo.";
 const MENSAGEM_INCERTO =
   "Não foi possível confirmar se o cadastro foi gravado. Antes de tentar de novo, confira em Colaboradores; se ele não estiver lá, confirme de novo: o mesmo envio não cria um segundo cadastro.";
+const MENSAGEM_PAGINA_DESATUALIZADA =
+  "Esta página ficou desatualizada. Confirme novamente; seus dados foram mantidos.";
+const MENSAGEM_SESSAO_APOS_INCERTO =
+  "Sua sessão expirou. Um envio anterior pode ter sido registrado: depois de entrar de novo, confira em Colaboradores; se ele não estiver lá, confirme de novo nesta página — o mesmo envio não cria um segundo cadastro. Os dados digitados foram mantidos.";
+const MENSAGEM_PREPARO_APOS_INCERTO =
+  "Não foi possível preparar o envio agora. Um envio anterior pode ter sido registrado: confira em Colaboradores antes de tentar de novo; o mesmo envio não cria um segundo cadastro.";
 
 describe("T179 (revisão final) — sessão expirada separada de envio incerto", () => {
   const dialogoDescarte = () =>
@@ -2615,10 +2621,6 @@ describe("T179 (revisão final) — sessão expirada separada de envio incerto",
       "CsrfSessionExpiredError na renovação do token",
       () => new CsrfSessionExpiredError(),
     ],
-    [
-      "403 com codigo csrf_invalido",
-      () => recusa(403, { codigo: "csrf_invalido" }),
-    ],
   ])(
     "%s: sessão expirada, foco na mensagem, formulário preservado e descarte sem envio incerto",
     async (_, erro) => {
@@ -2638,6 +2640,35 @@ describe("T179 (revisão final) — sessão expirada separada de envio incerto",
       expect(descricaoDoDescarte()).toHaveAccessibleDescription(DESCARTE_COMUM);
     },
   );
+
+  // T179 (revisão definitiva) — duas abas: a outra renovou o token CSRF da
+  // mesma sessão (válida); esta recebe 403 csrf_invalido. O cliente descarta o
+  // token, e confirmar de novo renova e reenvia o MESMO pedido.
+  it("403 csrf_invalido (outra aba renovou o token): página desatualizada, dados e chave mantidos; confirmar de novo conclui sem duplicar", async () => {
+    vi.mocked(admitirColaborador)
+      .mockRejectedValueOnce(recusa(403, { codigo: "csrf_invalido" }))
+      .mockResolvedValueOnce(resposta);
+    montar();
+    await aguardarEmpresa();
+    preencherValido();
+    await salvarEConfirmar();
+    const alerta = await screen.findByText(MENSAGEM_PAGINA_DESATUALIZADA);
+    await waitFor(() => expect(alerta).toHaveFocus());
+    expect(screen.queryByText(MENSAGEM_SESSAO_EXPIRADA)).toBeNull();
+    expect(screen.queryByText(MENSAGEM_INCERTO)).toBeNull();
+    expect(alerta).not.toHaveTextContent(/sessão expirou|não foi gravado/);
+    esperarFormularioPreservado();
+    expect(descricaoDoDescarte()).toHaveAccessibleDescription(DESCARTE_COMUM);
+    fireEvent.click(
+      within(dialogoDescarte()).getByRole("button", {
+        name: "Continuar preenchendo",
+      }),
+    );
+    await salvarEConfirmar();
+    await screen.findByText("Admissão registrada");
+    expect(admitirColaborador).toHaveBeenCalledTimes(2);
+    expect(chaveDaChamada(1)).toBe(chaveDaChamada(0));
+  });
 
   it("403 de permissão (sem código): mensagem de permissão, não de sessão", async () => {
     vi.mocked(admitirColaborador).mockRejectedValueOnce(recusa(403));
@@ -2690,29 +2721,69 @@ describe("T179 (revisão final) — sessão expirada separada de envio incerto",
     },
   );
 
-  it.each([
-    ["401", () => recusa(401)],
-    ["CsrfSessionExpiredError", () => new CsrfSessionExpiredError()],
-    ["403 csrf_invalido", () => recusa(403, { codigo: "csrf_invalido" })],
-  ])(
-    "sessão expirada (%s) depois de um envio incerto: a mensagem é de sessão, mas o descarte continua incerto",
-    async (_, erro) => {
+  // T179 (revisão definitiva) — depois de um envio incerto, a falha de um
+  // pedido SEGUINTE nada diz sobre o anterior: nenhuma mensagem nega a
+  // gravação, todas mantêm a orientação de conferir Colaboradores (ou a de
+  // confirmar de novo, que é seguro com a mesma chave), e a chave fica.
+  const INCERTOS = [
+    ["rede", () => new TypeError("Failed to fetch")],
+    ["500", () => recusa(500)],
+  ] as const;
+  const FALHAS_SEGUINTES = [
+    ["401", () => recusa(401), MENSAGEM_SESSAO_APOS_INCERTO],
+    [
+      "CsrfSessionExpiredError",
+      () => new CsrfSessionExpiredError(),
+      MENSAGEM_SESSAO_APOS_INCERTO,
+    ],
+    [
+      "403 csrf_invalido",
+      () => recusa(403, { codigo: "csrf_invalido" }),
+      MENSAGEM_PAGINA_DESATUALIZADA,
+    ],
+    [
+      "CsrfRequestError",
+      () => new CsrfRequestError("Não foi possível obter o token CSRF."),
+      MENSAGEM_PREPARO_APOS_INCERTO,
+    ],
+  ] as const;
+
+  it.each(
+    INCERTOS.flatMap(([incerto, criarIncerto]) =>
+      FALHAS_SEGUINTES.map(
+        ([falha, criarFalha, texto]) =>
+          [incerto, falha, criarIncerto, criarFalha, texto] as const,
+      ),
+    ),
+  )(
+    "envio incerto (%s) seguido de %s: nenhuma mensagem nega a gravação; dados e chave mantidos",
+    async (_incerto, _falha, criarIncerto, criarFalha, texto) => {
       vi.mocked(admitirColaborador)
-        .mockRejectedValueOnce(new TypeError("Failed to fetch"))
-        .mockRejectedValueOnce(erro());
+        .mockRejectedValueOnce(criarIncerto())
+        .mockRejectedValueOnce(criarFalha())
+        .mockResolvedValueOnce(resposta);
       montar();
       await aguardarEmpresa();
       preencherValido();
       await salvarEConfirmar();
       await screen.findByText(MENSAGEM_INCERTO);
       await salvarEConfirmar();
-      const alerta = await screen.findByText(MENSAGEM_SESSAO_EXPIRADA);
+      const alerta = await screen.findByText(texto);
       await waitFor(() => expect(alerta).toHaveFocus());
-      expect(screen.queryByText(MENSAGEM_INCERTO)).toBeNull();
+      expect(document.body).not.toHaveTextContent(
+        /não foi gravado|não foi enviado|Nada foi salvo/,
+      );
       esperarFormularioPreservado();
       const dialogo = descricaoDoDescarte();
       expect(dialogo).toHaveAccessibleDescription(DESCARTE_INCERTO);
-      expect(dialogo).not.toHaveTextContent(/Nada foi salvo/);
+      fireEvent.click(
+        within(dialogo).getByRole("button", { name: "Continuar preenchendo" }),
+      );
+      // A chave é a mesma em todas as tentativas: reconfirmar não duplica.
+      await salvarEConfirmar();
+      await screen.findByText("Admissão registrada");
+      expect(chaveDaChamada(1)).toBe(chaveDaChamada(0));
+      expect(chaveDaChamada(2)).toBe(chaveDaChamada(0));
     },
   );
 });

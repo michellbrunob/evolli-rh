@@ -104,12 +104,23 @@ novo vínculo de colaborador existente (`POST /v1/vinculos`) não muda.
   Colaboradores antes de tentar de novo e, na nova confirmação, reusa a mesma
   chave de idempotência: se o primeiro envio foi gravado, o servidor devolve
   a mesma admissão, sem segundo cadastro.
-- **Sessão expirada não é envio incerto** (decisão de 2026-10-22): 401, falha
-  ao renovar o token da página e 403 do CSRF (`codigo: "csrf_invalido"`)
-  significam que o cadastro não foi enviado ou não foi aceito. A tela mantém o
-  formulário e orienta a entrar de novo, sem orientar confirmação idempotente.
-  Falha ao preparar o envio (renovação do token sem resposta) também não é
-  envio incerto. Só falta de resposta do envio e 5xx são.
+- **Sessão expirada não é envio incerto** (decisão de 2026-10-22): 401 e
+  falha ao renovar o token da página por sessão vencida significam que o
+  pedido não foi aceito ou nem saiu. A tela mantém o formulário e orienta a
+  entrar de novo. Falha ao preparar o envio (renovação do token sem resposta)
+  também não é envio incerto. Só falta de resposta do envio e 5xx são.
+- **Página desatualizada** (revisão definitiva, 2026-10-22): o 403 do CSRF
+  (`codigo: "csrf_invalido"`) chega com a sessão **válida** — a sessão vencida
+  responde 401 antes — e o token desta aba desatualizado, por exemplo porque
+  outra aba o renovou. A tela descarta só o token local e mostra "Esta página
+  ficou desatualizada. Confirme novamente; seus dados foram mantidos." (na ficha
+  de contatos, "Salve novamente"); confirmar de novo renova o token e reenvia o
+  mesmo pedido, com a mesma chave. Não é sessão expirada nem envio incerto.
+- **Depois de um envio incerto**, uma falha de sessão, de token desatualizado
+  ou de preparo num pedido seguinte não afirma que o cadastro não foi gravado:
+  a mensagem mantém a orientação de conferir Colaboradores, a chave continua a
+  mesma e o descarte segue dizendo que um envio anterior pode ter sido
+  registrado. A ficha de contatos não tem envio incerto (sem idempotência).
 - **`+` sobre número nacional:** com dígitos já no campo e sem `+` inicial,
   inserir `+` — inclusive substituindo uma seleção parcial — é recusado,
   mantendo valor e cursor; um número nacional de DDD 55 nunca vira código de
