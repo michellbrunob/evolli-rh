@@ -98,6 +98,12 @@ novo vínculo de colaborador existente (`POST /v1/vinculos`) não muda.
   nem reinterpretar. Salvar outro campo não o reenvia nem o regrava; editá-lo
   exige a forma brasileira atual. Para isso, no `PUT` de contatos, **campo
   ausente mantém o valor gravado**, e `null` ou vazio apaga.
+- **Resposta 5xx na Nova admissão** (decisão de 2026-10-22): qualquer 5xx,
+  inclusive 500, e a falta de resposta (rede) são **envio incerto**. A tela
+  não afirma que nada foi salvo, preserva o formulário, orienta a conferir
+  Colaboradores antes de tentar de novo e, na nova confirmação, reusa a mesma
+  chave de idempotência: se o primeiro envio foi gravado, o servidor devolve
+  a mesma admissão, sem segundo cadastro.
 
 ## 4. O que esta decisão não autoriza
 

@@ -1477,7 +1477,7 @@ describe("Nova admissão — recusa do servidor preserva os dados", () => {
     preencherValido();
     await salvarEConfirmar();
     const alerta = await screen.findByText(
-      "Não foi possível confirmar se o cadastro foi gravado. Tente confirmar de novo: o mesmo envio não cria um segundo cadastro.",
+      "Não foi possível confirmar se o cadastro foi gravado. Antes de tentar de novo, confira em Colaboradores; se ele não estiver lá, confirme de novo: o mesmo envio não cria um segundo cadastro.",
     );
     await waitFor(() => expect(alerta).toHaveFocus());
     expect(dialogoConfirmacao()).toBeNull();
@@ -2374,17 +2374,25 @@ describe("T179 (revisão final) — descarte depois de envio incerto", () => {
     expect(dialogoDescarte()).toHaveAccessibleDescription(DESCARTE_INCERTO);
   });
 
-  it.each([502, 504])(
-    "depois de %i: o descarte usa o texto incerto, nunca 'Nada foi salvo.'",
+  // T179 — decisão da proprietária (2026-10-22): qualquer 5xx, inclusive 500,
+  // é envio incerto.
+  it.each([500, 502, 504])(
+    "depois de %i: não afirma que nada foi salvo, manda conferir Colaboradores e preserva o formulário",
     async (status) => {
       vi.mocked(admitirColaborador).mockRejectedValueOnce(recusa(status));
       montar();
       await aguardarEmpresa();
       preencherValido();
       await salvarEConfirmar();
-      await screen.findByText(
-        "Não foi possível confirmar se o cadastro foi gravado. Tente confirmar de novo: o mesmo envio não cria um segundo cadastro.",
+      const alerta = await screen.findByText(
+        "Não foi possível confirmar se o cadastro foi gravado. Antes de tentar de novo, confira em Colaboradores; se ele não estiver lá, confirme de novo: o mesmo envio não cria um segundo cadastro.",
       );
+      expect(alerta).toHaveTextContent(/confira em Colaboradores/);
+      expect(alerta).not.toHaveTextContent(/Nada foi salvo|não foi gravad/i);
+      // O formulário fica como estava, pronto para reconfirmar.
+      expect(nome()).not.toHaveValue("");
+      expect(matricula()).toHaveValue("MAT-0900");
+      expect(unidadeSel()).toHaveValue(unidade.id);
       fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
       const dialogo = dialogoDescarte();
       expect(dialogo).toHaveAccessibleDescription(DESCARTE_INCERTO);
@@ -2392,19 +2400,22 @@ describe("T179 (revisão final) — descarte depois de envio incerto", () => {
     },
   );
 
-  it("depois de 504, reconfirmar usa a MESMA chave", async () => {
-    vi.mocked(admitirColaborador)
-      .mockRejectedValueOnce(recusa(504))
-      .mockResolvedValueOnce(resposta);
-    montar();
-    await aguardarEmpresa();
-    preencherValido();
-    await salvarEConfirmar();
-    await screen.findByText(/Não foi possível confirmar se o cadastro/);
-    await salvarEConfirmar();
-    await screen.findByText("Admissão registrada");
-    expect(chaveDaChamada(1)).toBe(chaveDaChamada(0));
-  });
+  it.each([500, 502, 504])(
+    "depois de %i, reconfirmar usa a MESMA chave (o servidor reconhece o reenvio)",
+    async (status) => {
+      vi.mocked(admitirColaborador)
+        .mockRejectedValueOnce(recusa(status))
+        .mockResolvedValueOnce(resposta);
+      montar();
+      await aguardarEmpresa();
+      preencherValido();
+      await salvarEConfirmar();
+      await screen.findByText(/Não foi possível confirmar se o cadastro/);
+      await salvarEConfirmar();
+      await screen.findByText("Admissão registrada");
+      expect(chaveDaChamada(1)).toBe(chaveDaChamada(0));
+    },
+  );
 
   it("recomeçar a página com chave nova volta ao texto comum", async () => {
     vi.mocked(admitirColaborador).mockRejectedValueOnce(

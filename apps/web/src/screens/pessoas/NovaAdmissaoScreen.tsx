@@ -400,8 +400,11 @@ const MENSAGEM_EMPRESA_INDEFINIDA =
  * (revisão final) — vale também para 5xx: o servidor pode ter gravado antes
  * de o proxy responder.
  */
+// T179 — decisão da proprietária (2026-10-22): rede sem resposta e QUALQUER
+// 5xx, inclusive 500, são envio incerto. A mensagem não afirma nem nega a
+// gravação e manda conferir Colaboradores antes de tentar de novo.
 const MENSAGEM_ENVIO_INCERTO =
-  "Não foi possível confirmar se o cadastro foi gravado. Tente confirmar de novo: o mesmo envio não cria um segundo cadastro.";
+  "Não foi possível confirmar se o cadastro foi gravado. Antes de tentar de novo, confira em Colaboradores; se ele não estiver lá, confirme de novo: o mesmo envio não cria um segundo cadastro.";
 
 /**
  * T179 — a confirmação de descarte. "Nada foi salvo." só é verdade quando
