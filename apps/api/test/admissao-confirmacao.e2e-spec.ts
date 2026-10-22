@@ -1441,6 +1441,67 @@ describe("Confirmação da Nova admissão (T179, e2e)", () => {
         enviados.add("3133331776");
       },
     );
+
+    // ---------------------------------------------------------------------
+    // Revisão final (commit 13) — salvamentos simultâneos de contatos.
+
+    it.each([
+      [
+        "como a tela envia (os três campos)",
+        (_email: string) => ({
+          emailPessoal: null,
+          celular: "(31) 98888-1777",
+          telefone: null,
+        }),
+        (email: string) => ({
+          emailPessoal: email,
+          celular: null,
+          telefone: null,
+        }),
+      ],
+      [
+        "só o campo que cada um limpa (os outros ausentes)",
+        () => ({ emailPessoal: null }),
+        () => ({ celular: null }),
+      ],
+    ])(
+      "dois PUTs simultâneos limpando contatos distintos (%s): nenhum 500, um registro, ativo coerente, trilha sem valores",
+      async (_caso, corpoA, corpoB) => {
+        for (let rodada = 0; rodada < 6; rodada++) {
+          const r = await admitir(rhA).send(soObrigatorios()).expect(201);
+          const colaboradorId: string = r.body.id;
+          const rota = `/v1/colaboradores/${colaboradorId}/contatos`;
+          const email = `concorrencia.${colaboradorId.slice(0, 8)}@example.test`;
+          await put(rota, rhA)
+            .send({ emailPessoal: email, celular: "(31) 98888-1777" })
+            .expect(200);
+
+          const [ra, rb] = await Promise.all([
+            put(rota, rhA).send(corpoA(email)),
+            put(rota, rhA).send(corpoB(email)),
+          ]);
+          expect([ra.status, rb.status]).toEqual([200, 200]);
+
+          const linhas = await prisma.contatoColaborador.findMany({
+            where: { colaboradorId },
+          });
+          expect(linhas).toHaveLength(1);
+          const [linha] = linhas;
+          const temValor =
+            linha!.emailPessoal !== null ||
+            linha!.celular !== null ||
+            linha!.telefone !== null;
+          expect(linha!.ativo).toBe(temValor);
+          // A leitura bate com o banco: um único estado.
+          const lido = await get(rota, rhA).expect(200);
+          expect(lido.body.situacao).toBe(
+            temValor ? "registrado" : "sem_registro",
+          );
+          enviados.add(email);
+        }
+        enviados.add("31988881777");
+      },
+    );
   });
 
   describe("trilhas sem valores", () => {

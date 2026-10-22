@@ -63,7 +63,7 @@ export class ContatoColaboradorController {
   @Header("Cache-Control", "no-store")
   @ApiOperation({
     summary:
-      "Grava os tres contatos do colaborador (cria ou edita); auditado com os campos afetados, nunca valores",
+      "Grava os contatos do colaborador (cria, edita ou remove): campo ausente mantem o valor gravado; vazio ou null apaga; sem nenhum contato o registro fica inativo. Auditado com os campos afetados, nunca valores",
   })
   async registrar(
     @Param("colaboradorId", ParseUUIDPipe) colaboradorId: string,

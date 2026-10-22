@@ -430,6 +430,8 @@ function montar(opcoes: {
       })),
     },
     contatoColaboradorEvento: { create: jest.fn(async () => ({})) },
+    // T179 — trava `FOR UPDATE` da linha do contato no PUT.
+    $queryRaw: jest.fn(async () => []),
     $transaction: jest.fn(),
   };
   prisma.$transaction.mockImplementation(
@@ -1216,6 +1218,23 @@ describe("Contatos — serviço", () => {
       );
       semValores(trilha(m));
     });
+  });
+
+  it("T179: o PUT trava a linha do contato (FOR UPDATE) antes de ler o atual", async () => {
+    const m = montar({ vinculos: ATIVO_A, contato: COM_VALOR });
+    await m.service.registrar(
+      COLABORADOR,
+      { telefone: null } as unknown as RegistrarContatosColaboradorDto,
+      ctx(ator("rh", EMPRESA_A)),
+    );
+    expect(m.prisma.$queryRaw).toHaveBeenCalledTimes(1);
+    const [partes] = m.prisma.$queryRaw.mock.calls[0] as unknown as [
+      TemplateStringsArray,
+    ];
+    expect(partes.join("?")).toMatch(/FOR UPDATE/);
+    expect(m.prisma.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      m.prisma.contatoColaborador.findUnique.mock.invocationCallOrder[0]!,
+    );
   });
 
   describe("campo ausente mantém o gravado; telefone legado intocado (T179)", () => {

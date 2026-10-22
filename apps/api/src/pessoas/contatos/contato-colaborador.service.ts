@@ -124,7 +124,8 @@ export type ContatosInformados = Pick<
 
 /**
  * T179 — contatos opcionais (decisão da proprietária de 2026-10-21): o que não
- * veio, ou veio vazio, vale `null`. O PUT substitui os três.
+ * veio, ou veio vazio, vale `null`. Usado na ADMISSÃO, em que não há valor
+ * anterior; o PUT usa `contatosDoPut`, em que campo ausente mantém o gravado.
  */
 export function contatosInformados(
   dto: RegistrarContatosColaboradorDto | undefined | null,
@@ -369,6 +370,12 @@ export class ContatoColaboradorService {
           ]);
         }
 
+        // T179 — trava a linha do par ANTES de ler o atual (`FOR UPDATE`):
+        // salvamentos simultâneos se serializam e cada um lê o que o anterior
+        // gravou. Sem isso, dois PUTs que limpam campos diferentes calculavam
+        // `ativo` sobre a mesma leitura e podiam deixar a linha vazia e ativa
+        // (a CHECK do banco recusava, e a resposta era 500).
+        await tx.$queryRaw`SELECT id FROM contato_colaborador WHERE colaborador_id = ${alvo.colaboradorId}::text AND empresa_id = ${alvo.empresaId}::text FOR UPDATE`;
         const atual = await tx.contatoColaborador.findUnique({
           where: {
             colaboradorId_empresaId: {
