@@ -11,6 +11,7 @@ import { AuditService } from "../../audit/audit.service";
 import { PrismaService } from "../../database/prisma.service";
 import { PessoasAuditoriaService } from "../pessoas-auditoria.service";
 import { PessoasAuditContext } from "../pessoas.types";
+import { ConflitoDeCamposException } from "../../common/erros/recusa-por-campo";
 import { RegistrarContatosColaboradorDto } from "./contato-colaborador.dto";
 import {
   ContatoColaboradorService,
@@ -38,7 +39,8 @@ const CONTATO_ID = "44444444-4444-4444-8444-444444444444";
 
 const EMAIL = "pessoa.sintetica@example.test";
 const CELULAR = "+5511987654321";
-const TELEFONE = "1133334444";
+// T179 — telefone só brasileiro, gravado na forma `+55` + DDD + número.
+const TELEFONE = "+551133334444";
 
 function ator(role: AccessRole, companyId: string | null): AccessUser {
   return { id: `ator-${role}`, role, companyId } as unknown as AccessUser;
@@ -84,15 +86,22 @@ describe("Contatos — normalização (ficha, §3)", () => {
     );
   });
 
+  // T179 — a forma gravada passou a ser `+55` + DDD + número (ficha, §8).
   it.each([
-    ["(11) 98765-4321", "11987654321"],
+    ["(11) 98765-4321", "+5511987654321"],
     ["+55 (11) 98765-4321", "+5511987654321"],
-    ["+44 20.7946.0958", "+442079460958"],
-    ["  1133334444  ", "1133334444"],
-    ["1234-5678", "12345678"],
-  ])("telefone %p vira %p — só dígitos, + preservado", (entrada, saida) => {
+    ["  1133334444  ", "+551133334444"],
+    ["55 11 3333-4444", "+551133334444"],
+  ])("telefone %p vira %p — só dígitos, em +55", (entrada, saida) => {
     expect(normalizarTelefone(entrada)).toBe(saida);
   });
+
+  it.each(["+44 20.7946.0958", "1234-5678"])(
+    "telefone sem forma brasileira %p volta intacto (a validação recusa)",
+    (entrada) => {
+      expect(normalizarTelefone(entrada)).toBe(entrada);
+    },
+  );
 
   it.each(["11 9876-ABCD", "55+11987654321", "+", "ramal 123", "11/98765"])(
     "telefone com caractere fora do permitido %p volta intacto (a validação recusa)",
@@ -108,6 +117,20 @@ describe("Contatos — normalização (ficha, §3)", () => {
 });
 
 describe("Contatos — validação do corpo", () => {
+  // T179 (revisão final) — o servidor nunca descarta letras para "achar" um
+  // número: ramal, extensão e rótulos são recusados no formato.
+  it.each([
+    "3333-4444 ramal 25",
+    "Tel 3333-4444 / ramal 21",
+    "2345-6789 ramal 12",
+    "11 98765-4321 x12",
+    "Cel: 11 98765-4321",
+    "11 98765-4321 (WhatsApp)",
+  ])("telefone com texto (%p) é recusado", async (valor) => {
+    expect((await errosDe({ celular: valor })).campos).toEqual(["celular"]);
+    expect((await errosDe({ telefone: valor })).campos).toEqual(["telefone"]);
+  });
+
   it("corpo válido passa e chega NORMALIZADO ao serviço", async () => {
     const { dto, campos } = await errosDe({
       emailPessoal: "  Pessoa.Sintetica@EXAMPLE.test",
@@ -122,15 +145,22 @@ describe("Contatos — validação do corpo", () => {
     });
   });
 
-  it("os três campos são obrigatórios", async () => {
-    expect((await errosDe({})).campos).toEqual([
-      "celular",
-      "emailPessoal",
-      "telefone",
-    ]);
+  it("T179: os três campos são opcionais — ausentes, vazios ou nulos valem como não informados", async () => {
+    expect((await errosDe({})).campos).toEqual([]);
+    const { dto, campos } = await errosDe({
+      emailPessoal: "   ",
+      celular: "",
+      telefone: null,
+    });
+    expect(campos).toEqual([]);
+    expect(dto).toMatchObject({
+      emailPessoal: null,
+      celular: null,
+      telefone: null,
+    });
   });
 
-  it.each(["", "   ", "sem-arroba", "a@b@c.test", "duas palavras@x.test"])(
+  it.each(["sem-arroba", "a@b@c.test", "duas palavras@x.test"])(
     "e-mail inválido %p é recusado",
     async (emailPessoal) => {
       expect((await errosDe({ ...CORPO_VALIDO, emailPessoal })).campos).toEqual(
@@ -172,8 +202,13 @@ describe("Contatos — validação do corpo", () => {
     ["1234567", "7 dígitos"],
     ["+1234567890123456", "16 dígitos"],
     ["11 9876-ABCD", "letra"],
-    ["", "vazio"],
     ["() - .", "só separadores"],
+    // T179 — fora da forma brasileira.
+    ["12345678", "8 dígitos, sem DDD"],
+    ["+44 20 7946 0958", "estrangeiro"],
+    ["0198765432", "DDD iniciado por 0"],
+    ["11887654321", "celular sem o 9"],
+    ["1163334444", "fixo iniciado por 6"],
   ])("telefone %p (%s) é recusado nos dois campos", async (valor) => {
     expect(
       (await errosDe({ ...CORPO_VALIDO, celular: valor, telefone: valor }))
@@ -181,16 +216,15 @@ describe("Contatos — validação do corpo", () => {
     ).toEqual(["celular", "telefone"]);
   });
 
-  it("8 e 15 dígitos são os limites aceitos", async () => {
-    expect(
-      (
-        await errosDe({
-          ...CORPO_VALIDO,
-          celular: "12345678",
-          telefone: "+123456789012345",
-        })
-      ).campos,
-    ).toEqual([]);
+  it("T179: celular de 9 dígitos iniciado por 9 e fixo de 8 iniciado por 2 a 5 são as formas aceitas", async () => {
+    const { dto, campos } = await errosDe({
+      ...CORPO_VALIDO,
+      celular: "21987654321",
+      telefone: "5122223333",
+    });
+    expect(campos).toEqual([]);
+    expect(dto.celular).toBe("+5521987654321");
+    expect(dto.telefone).toBe("+555122223333");
   });
 
   it("empresa vinda do navegador é recusada — o corpo não a aceita", async () => {
@@ -348,6 +382,8 @@ function montar(opcoes: {
    * a camada que nega.
    */
   ignorarFiltroDeEmpresa?: boolean;
+  /** T179 — outro colaborador da empresa já usa o e-mail enviado. */
+  emailDeOutro?: boolean;
 }) {
   const contatoGravado =
     opcoes.contato === undefined || opcoes.contato === null
@@ -355,6 +391,10 @@ function montar(opcoes: {
       : {
           id: CONTATO_ID,
           atualizadoEm: new Date("2026-10-16T12:00:00Z"),
+          // T179 — ativo com algum contato; o teste pode forçar o inativo.
+          ativo: Object.values(opcoes.contato).some(
+            (v) => typeof v === "string",
+          ),
           ...opcoes.contato,
         };
 
@@ -370,6 +410,10 @@ function montar(opcoes: {
       ),
     },
     contatoColaborador: {
+      // T179 — e-mail pessoal de OUTRO colaborador da mesma empresa.
+      findFirst: jest.fn(async (): Promise<{ id: string } | null> =>
+        opcoes.emailDeOutro ? { id: "outro-contato" } : null,
+      ),
       findUnique: jest.fn(async () => contatoGravado),
       create: jest.fn(async (args: { data: Record<string, unknown> }) => ({
         id: CONTATO_ID,
@@ -386,6 +430,8 @@ function montar(opcoes: {
       })),
     },
     contatoColaboradorEvento: { create: jest.fn(async () => ({})) },
+    // T179 — trava `FOR UPDATE` da linha do contato no PUT.
+    $queryRaw: jest.fn(async () => []),
     $transaction: jest.fn(),
   };
   prisma.$transaction.mockImplementation(
@@ -419,7 +465,14 @@ function trilha(m: ReturnType<typeof montar>): string {
 }
 
 function semValores(texto: string) {
-  for (const valor of [EMAIL, CELULAR, TELEFONE, "5511987654321", "@"]) {
+  for (const valor of [
+    EMAIL,
+    CELULAR,
+    TELEFONE,
+    "5511987654321",
+    "551133334444",
+    "@",
+  ]) {
     expect(texto).not.toContain(valor);
   }
 }
@@ -863,7 +916,7 @@ describe("Contatos — serviço", () => {
       const m = montar({ vinculos: ATIVO_A, contato: COM_VALOR });
       const resposta = await m.service.registrar(
         COLABORADOR,
-        { ...CORPO_VALIDO, telefone: "1144445555" },
+        { ...CORPO_VALIDO, telefone: "+551144445555" },
         ctx(ator("dp", EMPRESA_A)),
       );
       expect(resposta.resultado).toBe("atualizado");
@@ -885,6 +938,7 @@ describe("Contatos — serviço", () => {
       );
       semValores(trilha(m));
       expect(trilha(m)).not.toContain("1144445555");
+      expect(trilha(m)).not.toContain("551144445555");
     });
 
     it("PUT sem alteração: nada gravado, mas a devolução dos valores fica na trilha como leitura", async () => {
@@ -979,6 +1033,62 @@ describe("Contatos — serviço", () => {
       ).rejects.toBeInstanceOf(ConflictException);
     });
 
+    it("T179: e-mail de OUTRO colaborador da mesma empresa é 409 com o campo, sem o valor, e nada é gravado", async () => {
+      const m = montar({
+        vinculos: ATIVO_A,
+        contato: null,
+        emailDeOutro: true,
+      });
+      const erro = await m.service
+        .registrar(
+          COLABORADOR,
+          CORPO_VALIDO as RegistrarContatosColaboradorDto,
+          ctx(ator("rh", EMPRESA_A)),
+        )
+        .catch((e: unknown) => e);
+      expect(erro).toBeInstanceOf(ConflitoDeCamposException);
+      expect((erro as ConflitoDeCamposException).erros).toEqual([
+        { campo: "emailPessoal", motivo: "em_uso" },
+      ]);
+      expect(
+        JSON.stringify((erro as ConflitoDeCamposException).erros),
+      ).not.toContain(EMAIL);
+      // A consulta é só na empresa do vínculo e exclui o próprio colaborador.
+      expect(m.prisma.contatoColaborador.findFirst).toHaveBeenCalledWith({
+        where: {
+          empresaId: EMPRESA_A,
+          emailPessoal: EMAIL,
+          NOT: { colaboradorId: COLABORADOR },
+        },
+        select: { id: true },
+      });
+      expect(m.prisma.contatoColaborador.create).not.toHaveBeenCalled();
+      expect(m.prisma.contatoColaborador.update).not.toHaveBeenCalled();
+      expect(m.prisma.contatoColaboradorEvento.create).not.toHaveBeenCalled();
+    });
+
+    it("T179: corrida perdida na unicidade (empresa, e-mail) do banco vira 409 com o campo", async () => {
+      const m = montar({ vinculos: ATIVO_A, contato: null });
+      m.prisma.contatoColaborador.create.mockRejectedValueOnce(
+        new Prisma.PrismaClientKnownRequestError("unique", {
+          code: "P2002",
+          clientVersion: "5.22.0",
+          meta: { target: ["empresa_id", "email_pessoal"] },
+        }),
+      );
+      const erro = await m.service
+        .registrar(
+          COLABORADOR,
+          CORPO_VALIDO as RegistrarContatosColaboradorDto,
+          ctx(ator("rh", EMPRESA_A)),
+        )
+        .catch((e: unknown) => e);
+      expect(erro).toBeInstanceOf(ConflitoDeCamposException);
+      expect((erro as ConflitoDeCamposException).erros).toEqual([
+        { campo: "emailPessoal", motivo: "em_uso" },
+      ]);
+    });
+
     it("falha na trilha desfaz a gravação (mesma transação)", async () => {
       const m = montar({
         vinculos: ATIVO_A,
@@ -996,6 +1106,273 @@ describe("Contatos — serviço", () => {
     });
   });
 
+  describe("remoção de todos os contatos — registro inativo (T179)", () => {
+    const NULOS = { emailPessoal: null, celular: null, telefone: null };
+    const INATIVO = { ...NULOS, ativo: false };
+
+    it("limpar os três: registro fica INATIVO, sem valor; resposta sem_registro/removido; evento de edição só com nomes", async () => {
+      const m = montar({ vinculos: ATIVO_A, contato: COM_VALOR });
+      const resposta = await m.service.registrar(
+        COLABORADOR,
+        NULOS as unknown as RegistrarContatosColaboradorDto,
+        ctx(ator("rh", EMPRESA_A)),
+      );
+      expect(resposta).toEqual({
+        colaboradorId: COLABORADOR,
+        empresaId: EMPRESA_A,
+        situacao: "sem_registro",
+        contatos: null,
+        resultado: "removido",
+      });
+      expect(m.prisma.contatoColaborador.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: {
+            emailPessoal: null,
+            celular: null,
+            telefone: null,
+            ativo: false,
+            atualizadoPorUserId: "ator-rh",
+          },
+        }),
+      );
+      expect(eventoFormal(m)).toEqual(
+        expect.objectContaining({
+          action: "pessoas_contato_atualizado",
+          result: "success",
+        }),
+      );
+      expect(eventoDeTratamento(m)).toEqual(
+        expect.objectContaining({
+          contatoId: CONTATO_ID,
+          acao: "edicao",
+          resultado: "gravado",
+          campos: ["email_pessoal", "celular", "telefone"],
+        }),
+      );
+      semValores(trilha(m));
+    });
+
+    it("leitura de registro inativo: sem_registro, sem valor, evento aponta para o registro sem campos", async () => {
+      const m = montar({ vinculos: ATIVO_A, contato: INATIVO });
+      const resposta = await m.service.consultar(
+        COLABORADOR,
+        ctx(ator("dp", EMPRESA_A)),
+      );
+      expect(resposta).toEqual({
+        colaboradorId: COLABORADOR,
+        empresaId: EMPRESA_A,
+        situacao: "sem_registro",
+        contatos: null,
+      });
+      expect(eventoDeTratamento(m)).toEqual(
+        expect.objectContaining({
+          contatoId: CONTATO_ID,
+          acao: "leitura",
+          resultado: "sem_registro",
+          campos: [],
+        }),
+      );
+    });
+
+    it("inativo e nada informado: nada é gravado; sem_registro/sem_alteracao", async () => {
+      const m = montar({ vinculos: ATIVO_A, contato: INATIVO });
+      const resposta = await m.service.registrar(
+        COLABORADOR,
+        {} as RegistrarContatosColaboradorDto,
+        ctx(ator("rh", EMPRESA_A)),
+      );
+      expect(resposta).toMatchObject({
+        situacao: "sem_registro",
+        contatos: null,
+        resultado: "sem_alteracao",
+      });
+      expect(m.prisma.contatoColaborador.update).not.toHaveBeenCalled();
+      expect(m.prisma.contatoColaborador.create).not.toHaveBeenCalled();
+      expect(eventoDeTratamento(m)).toEqual(
+        expect.objectContaining({
+          contatoId: CONTATO_ID,
+          resultado: "sem_registro",
+        }),
+      );
+    });
+
+    it("inativo e um contato informado: o registro volta a ativo, evento nomeia só ele", async () => {
+      const m = montar({ vinculos: ATIVO_A, contato: INATIVO });
+      const resposta = await m.service.registrar(
+        COLABORADOR,
+        { celular: CELULAR } as RegistrarContatosColaboradorDto,
+        ctx(ator("rh", EMPRESA_A)),
+      );
+      expect(resposta).toMatchObject({
+        situacao: "registrado",
+        resultado: "atualizado",
+        contatos: { emailPessoal: null, celular: CELULAR, telefone: null },
+      });
+      expect(m.prisma.contatoColaborador.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ celular: CELULAR, ativo: true }),
+        }),
+      );
+      expect(eventoDeTratamento(m)).toEqual(
+        expect.objectContaining({ acao: "edicao", campos: ["celular"] }),
+      );
+      semValores(trilha(m));
+    });
+  });
+
+  it("T179: o PUT trava a linha do contato (FOR NO KEY UPDATE) antes de ler o atual", async () => {
+    const m = montar({ vinculos: ATIVO_A, contato: COM_VALOR });
+    await m.service.registrar(
+      COLABORADOR,
+      { telefone: null } as unknown as RegistrarContatosColaboradorDto,
+      ctx(ator("rh", EMPRESA_A)),
+    );
+    expect(m.prisma.$queryRaw).toHaveBeenCalledTimes(1);
+    const [partes] = m.prisma.$queryRaw.mock.calls[0] as unknown as [
+      TemplateStringsArray,
+    ];
+    // `NO KEY UPDATE`: serializa salvamentos sem bloquear a checagem de
+    // chave estrangeira da trilha de uma leitura.
+    expect(partes.join("?")).toMatch(/FOR NO KEY UPDATE/);
+    expect(m.prisma.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      m.prisma.contatoColaborador.findUnique.mock.invocationCallOrder[0]!,
+    );
+  });
+
+  it("T179: a leitura se ordena com um salvamento em andamento (FOR SHARE) antes de ler", async () => {
+    const m = montar({ vinculos: ATIVO_A, contato: COM_VALOR });
+    await m.service.consultar(COLABORADOR, ctx(ator("rh", EMPRESA_A)));
+    expect(m.prisma.$queryRaw).toHaveBeenCalledTimes(1);
+    const [partes] = m.prisma.$queryRaw.mock.calls[0] as unknown as [
+      TemplateStringsArray,
+    ];
+    expect(partes.join("?")).toMatch(/FOR SHARE/);
+    expect(m.prisma.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      m.prisma.contatoColaborador.findUnique.mock.invocationCallOrder[0]!,
+    );
+  });
+
+  describe("campo ausente mantém o gravado; telefone legado intocado (T179)", () => {
+    // Formatos que o banco aceitava antes da forma `+55` atual (sintéticos).
+    const LEGADOS = ["+55119876543210", "55919876543210", "119876543210"];
+
+    it.each(LEGADOS)(
+      "legado %p: salvar só o e-mail não reenvia, não transforma nem regrava o telefone",
+      async (legado) => {
+        const m = montar({
+          vinculos: ATIVO_A,
+          contato: { emailPessoal: EMAIL, celular: legado, telefone: null },
+        });
+        const resposta = await m.service.registrar(
+          COLABORADOR,
+          {
+            emailPessoal: "outro.sintetico@example.test",
+          } as RegistrarContatosColaboradorDto,
+          ctx(ator("rh", EMPRESA_A)),
+        );
+        expect(resposta.contatos).toMatchObject({ celular: legado });
+        // Só o e-mail é escrito: o celular legado nem entra no `update`.
+        expect(m.prisma.contatoColaborador.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: {
+              emailPessoal: "outro.sintetico@example.test",
+              ativo: true,
+              atualizadoPorUserId: "ator-rh",
+            },
+          }),
+        );
+        expect(eventoDeTratamento(m)).toEqual(
+          expect.objectContaining({
+            acao: "edicao",
+            campos: ["email_pessoal"],
+          }),
+        );
+      },
+    );
+
+    it("nada enviado sobre registro com valores: nada muda (todos ausentes = manter)", async () => {
+      const m = montar({ vinculos: ATIVO_A, contato: COM_VALOR });
+      const resposta = await m.service.registrar(
+        COLABORADOR,
+        {} as RegistrarContatosColaboradorDto,
+        ctx(ator("rh", EMPRESA_A)),
+      );
+      expect(resposta).toMatchObject({
+        situacao: "registrado",
+        resultado: "sem_alteracao",
+      });
+      expect(m.prisma.contatoColaborador.update).not.toHaveBeenCalled();
+    });
+
+    it("null explícito apaga só aquele campo; os ausentes ficam", async () => {
+      const m = montar({ vinculos: ATIVO_A, contato: COM_VALOR });
+      await m.service.registrar(
+        COLABORADOR,
+        { telefone: null } as unknown as RegistrarContatosColaboradorDto,
+        ctx(ator("rh", EMPRESA_A)),
+      );
+      expect(m.prisma.contatoColaborador.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: { telefone: null, ativo: true, atualizadoPorUserId: "ator-rh" },
+        }),
+      );
+    });
+  });
+
+  describe("criarNaAdmissao — contatos vazios (T179)", () => {
+    const ALVO = { colaboradorId: COLABORADOR, empresaId: EMPRESA_A };
+
+    it.each([
+      ["sem o bloco", undefined],
+      ["bloco vazio", {}],
+      ["os três nulos", { emailPessoal: null, celular: null, telefone: null }],
+    ])(
+      "%s: nenhum registro nasce, nenhum evento é gravado",
+      async (_caso, dto) => {
+        const m = montar({ vinculos: ATIVO_A, contato: null });
+        const gravado = await m.service.criarNaAdmissao(
+          m.prisma as never,
+          ctx(ator("rh", EMPRESA_A)),
+          ALVO,
+          dto as RegistrarContatosColaboradorDto | undefined,
+        );
+        expect(gravado).toBeNull();
+        expect(m.prisma.contatoColaborador.create).not.toHaveBeenCalled();
+        expect(m.prisma.contatoColaboradorEvento.create).not.toHaveBeenCalled();
+        expect(m.auditService.record).not.toHaveBeenCalled();
+      },
+    );
+
+    it("um contato só: grava ele, os outros nulos, e o evento nomeia só ele", async () => {
+      const m = montar({ vinculos: ATIVO_A, contato: null });
+      const gravado = await m.service.criarNaAdmissao(
+        m.prisma as never,
+        ctx(ator("rh", EMPRESA_A)),
+        ALVO,
+        { celular: CELULAR } as RegistrarContatosColaboradorDto,
+      );
+      expect(gravado).toMatchObject({
+        emailPessoal: null,
+        celular: CELULAR,
+        telefone: null,
+      });
+      expect(m.prisma.contatoColaborador.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            empresaId: EMPRESA_A,
+            emailPessoal: null,
+            celular: CELULAR,
+            telefone: null,
+          }),
+        }),
+      );
+      expect(eventoDeTratamento(m)).toEqual(
+        expect.objectContaining({ acao: "criacao", campos: ["celular"] }),
+      );
+      semValores(trilha(m));
+    });
+  });
+
   describe("camposAlterados", () => {
     it("compara valores normalizados, campo a campo", () => {
       const atual = {
@@ -1007,7 +1384,7 @@ describe("Contatos — serviço", () => {
       expect(
         camposAlterados(atual, {
           emailPessoal: "outra@example.test",
-          celular: "11900000000",
+          celular: "+5511900000000",
           telefone: TELEFONE,
         }),
       ).toEqual(["email_pessoal", "celular"]);

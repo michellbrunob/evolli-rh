@@ -402,6 +402,26 @@ describe("HistoricoFuncionalScreen (T115 — funcional)", () => {
     ).not.toBeDisabled();
   });
 
+  it("T179 — vínculo sem matrícula aparece como 'Sem matrícula' no seletor", async () => {
+    vi.mocked(listarVinculosDoColaborador).mockImplementation(async (id) =>
+      id === colaborador2.id
+        ? [{ ...vinculo2a, matricula: null }, vinculo2b]
+        : [vinculo1],
+    );
+    render(<HistoricoFuncionalScreen />);
+    await screen.findByRole("table", { name: "Movimentações funcionais" });
+
+    await selecionarColaborador(colaborador2.id);
+
+    const seletor = screen.getByLabelText(/^Vínculo\b/i);
+    await waitFor(() =>
+      expect(
+        within(seletor).getByRole("option", { name: "Sem matrícula — CLT" }),
+      ).toBeInTheDocument(),
+    );
+    expect(seletor).not.toHaveTextContent("null");
+  });
+
   it("seleciona colaborador com múltiplos vínculos: exige seleção explícita, sem escolha silenciosa", async () => {
     render(<HistoricoFuncionalScreen />);
     await screen.findByRole("table", { name: "Movimentações funcionais" });

@@ -498,17 +498,26 @@ const MATRICULA_FORA_DA_EQUIPE = "DEMO-A-0202";
 
 /**
  * T177 — o que a admissão exige além do nome: data de nascimento e os três
- * contatos. Valores SINTÉTICOS e iguais para toda pessoa da demonstração; o
- * domínio é reservado (`example.test`). Endereço é opcional e fica de fora.
+ * contatos. Valores SINTÉTICOS; o domínio é reservado (`example.test`).
+ * Endereço é opcional e fica de fora.
+ *
+ * T179 — o e-mail pessoal é único na mesma empresa: cada pessoa da
+ * demonstração ganha o seu, derivado da matrícula. Os telefones já estão na
+ * forma brasileira que o servidor normaliza para `+55`.
  */
-const CAMPOS_OBRIGATORIOS_DA_ADMISSAO = {
-  perfilPessoal: { dataNascimento: "1990-01-15" },
-  contatos: {
-    emailPessoal: "pessoa.demo@example.test",
-    celular: "+5511900000000",
-    telefone: "1130000000",
-  },
-} as const;
+function camposObrigatoriosDaAdmissao(matricula: unknown) {
+  const sufixo = String(matricula)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ".");
+  return {
+    perfilPessoal: { dataNascimento: "1990-01-15" },
+    contatos: {
+      emailPessoal: `pessoa.demo.${sufixo}@example.test`,
+      celular: "+5511900000000",
+      telefone: "1130000000",
+    },
+  };
+}
 
 async function garantirColaborador(
   ctx: Contexto,
@@ -528,7 +537,7 @@ async function garantirColaborador(
       ),
     () =>
       pedir(ctx, "POST", "/v1/colaboradores", rh, {
-        ...CAMPOS_OBRIGATORIOS_DA_ADMISSAO,
+        ...camposObrigatoriosDaAdmissao(corpo["matricula"]),
         ...corpo,
       }),
   );
@@ -937,7 +946,7 @@ export async function semearDemonstracao(
     const rhBeta = await entrar(ctx, `rh.beta@${DOMINIO}`);
 
     // --- Estrutura organizacional da Alfa ---------------------------------
-    await garantirCatalogo(
+    const matriz = await garantirCatalogo(
       ctx,
       rhAlfa,
       "/v1/unidades-organizacionais",
@@ -1045,6 +1054,7 @@ export async function semearDemonstracao(
       motivoCodigo: "admissao_inicial",
       cargoId: analista.id,
       departamentoId: operacoes.id,
+      unidadeOrganizacionalId: matriz.id,
     });
 
     const colabDois = await garantirColaborador(ctx, rhAlfa, doisVinculos, {
@@ -1054,7 +1064,11 @@ export async function semearDemonstracao(
       tipo: "clt",
       dataAdmissao: "2026-01-05",
       motivoCodigo: "admissao_inicial",
+      // T179 — a Nova admissão exige Departamento e Cargo; a Unidade é
+      // opcional e vai aqui só para a demonstração ter lotação completa.
+      cargoId: analista.id,
       departamentoId: operacoes.id,
+      unidadeOrganizacionalId: matriz.id,
     });
 
     await garantir<VinculoApi>(
@@ -1099,6 +1113,7 @@ export async function semearDemonstracao(
       cargoId: analista.id,
       departamentoId: operacoes.id,
       equipeId: turnoA.id,
+      unidadeOrganizacionalId: matriz.id,
     });
 
     const foraDaEquipe = `Pessoa ${MARCA_DEMO} Alfa Turno B`;
@@ -1116,6 +1131,7 @@ export async function semearDemonstracao(
         cargoId: analista.id,
         departamentoId: operacoes.id,
         equipeId: turnoB.id,
+        unidadeOrganizacionalId: matriz.id,
       },
     );
 
@@ -1159,6 +1175,30 @@ export async function semearDemonstracao(
         nome: `Operacoes ${MARCA_DEMO} Beta`,
       },
     );
+    // T179 — a Nova admissão exige Departamento e Cargo; a Unidade é opcional
+    // e entra só para a demonstração da Beta ter lotação completa.
+    const unidadeBeta = await garantirCatalogo(
+      ctx,
+      rhBeta,
+      "/v1/unidades-organizacionais",
+      "BETAMTZ",
+      {
+        empresaId: beta.id,
+        codigo: "BETAMTZ",
+        nome: `Matriz ${MARCA_DEMO} Beta`,
+      },
+    );
+    const cargoBeta = await garantirCatalogo(
+      ctx,
+      rhBeta,
+      "/v1/cargos",
+      "BETAANL",
+      {
+        empresaId: beta.id,
+        codigo: "BETAANL",
+        nome: `Analista ${MARCA_DEMO} Beta`,
+      },
+    );
     const colabBeta = `Pessoa ${MARCA_DEMO} Beta Um`;
     const registroBeta = await garantirColaborador(ctx, rhBeta, colabBeta, {
       nome: colabBeta,
@@ -1168,6 +1208,8 @@ export async function semearDemonstracao(
       dataAdmissao: "2026-02-10",
       motivoCodigo: "admissao_inicial",
       departamentoId: departamentoBeta.id,
+      cargoId: cargoBeta.id,
+      unidadeOrganizacionalId: unidadeBeta.id,
     });
     await garantirAdmissaoEfetivada(
       ctx,

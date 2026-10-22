@@ -13,7 +13,10 @@ import { GenericContainer, StartedTestContainer, Wait } from "testcontainers";
 import { AppModule } from "../src/app.module";
 import { AllExceptionsFilter } from "../src/common/filters/http-exception.filter";
 import { requestIdMiddleware } from "../src/common/request-id";
-import { CAMPOS_OBRIGATORIOS_ADMISSAO } from "./admissao-obrigatoria";
+import {
+  camposObrigatoriosAdmissao,
+  lotacaoMinima,
+} from "./admissao-obrigatoria";
 
 /**
  * T038 — Cadastros: Tabelas de Horario e vinculo historico ao colaborador.
@@ -249,7 +252,8 @@ describe("Cadastros: Horarios e vinculo ao colaborador (e2e)", () => {
   ): Promise<string> {
     const colaborador = await post("/v1/colaboradores", cred)
       .send({
-        ...CAMPOS_OBRIGATORIOS_ADMISSAO,
+        ...camposObrigatoriosAdmissao(),
+        ...(await lotacaoMinima(appUrl, dados.empresaId)),
         nome: dados.nome,
         empresaId: dados.empresaId,
         matricula: dados.matricula,

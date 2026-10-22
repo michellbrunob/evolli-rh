@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DadosContratuaisScreen } from "./DadosContratuaisScreen";
 import {
@@ -263,6 +269,30 @@ describe("DadosContratuaisScreen (T134 — funcional, somente leitura)", () => {
     expect(
       await screen.findByRole("heading", { name: "Vínculo — M-002" }),
     ).toBeInTheDocument();
+  });
+
+  it("T179 — vínculo sem matrícula: 'Sem matrícula' na opção, no título e no detalhe", async () => {
+    configurarPadrao({
+      colaboradores: [COLAB_1],
+      vinculos: [
+        vinculo({ matricula: null }),
+        vinculo({ id: "vinc-2", matricula: "M-002" }),
+      ],
+    });
+    render(<DadosContratuaisScreen />);
+    const selVinc = (await screen.findByLabelText(
+      "Vínculo",
+    )) as HTMLSelectElement;
+    expect(
+      within(selVinc).getByRole("option", { name: /^Sem matrícula · CLT/ }),
+    ).toBeInTheDocument();
+    fireEvent.change(selVinc, { target: { value: "vinc-1" } });
+    expect(
+      await screen.findByRole("heading", { name: "Vínculo — Sem matrícula" }),
+    ).toBeInTheDocument();
+    const matricula = screen.getByText("Matrícula", { selector: "dt" });
+    expect(matricula.nextElementSibling).toHaveTextContent("Sem matrícula");
+    expect(document.body).not.toHaveTextContent(/\bnull\b/);
   });
 
   it("detalhe exibe matrícula, tipo, situação, admissão e desligamento", async () => {

@@ -147,8 +147,39 @@ export class DestinoOrganizacionalDto {
  * `empresa_id` (a empresa é do vínculo), então um cadastro sem vínculo ficaria
  * fora de qualquer escopo de autorização — invisível a todos, inclusive a
  * quem o criou.
+ *
+ * T179 — obrigatoriedade da Nova admissão (decisões da proprietária de
+ * 2026-10-21): a lotação **exige** Departamento e Cargo (`DP-28` só para a
+ * admissão); Unidade, Área, Equipe e Centro de custo são opcionais. A
+ * matrícula é opcional (quando informada, continua única na empresa) e o bloco
+ * de contatos também. Por isso esta classe não herda
+ * `DestinoOrganizacionalDto`: o `@IsOptional` herdado valeria também aqui, e
+ * a obrigatoriedade sumiria. O novo vínculo de colaborador existente
+ * (`CriarVinculoDto`) continua com o destino todo opcional.
  */
-export class AdmitirColaboradorDto extends DestinoOrganizacionalDto {
+export class AdmitirColaboradorDto {
+  @IsUUID()
+  departamentoId!: string;
+
+  @IsUUID()
+  cargoId!: string;
+
+  @IsOptional()
+  @IsUUID()
+  unidadeOrganizacionalId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  areaId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  equipeId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  centroCustoId?: string;
+
   @IsString()
   @IsNotEmpty()
   @MinLength(2)
@@ -158,8 +189,19 @@ export class AdmitirColaboradorDto extends DestinoOrganizacionalDto {
   @IsUUID()
   empresaId!: string;
 
+  /**
+   * T179 — opcional na Nova admissão; ausente, `null`, vazia ou só espaços vale
+   * como não informada (e não é conferida contra as outras). Quando vem,
+   * segue o padrão e é única na empresa.
+   */
+  @Transform(({ value }) =>
+    value === null || (typeof value === "string" && value.trim() === "")
+      ? undefined
+      : value,
+  )
+  @IsOptional()
   @Matches(MATRICULA_PATTERN)
-  matricula!: string;
+  matricula?: string;
 
   @IsIn(TIPOS_VINCULO)
   tipo!: TipoVinculo;
@@ -174,9 +216,9 @@ export class AdmitirColaboradorDto extends DestinoOrganizacionalDto {
   /**
    * T177 — Módulo 1 do cadastro, gravado na MESMA transação da admissão.
    *
-   * OBRIGATÓRIOS: `perfilPessoal` (com `dataNascimento`) e `contatos` (os
-   * três campos da ficha da T169). OPCIONAL: `endereco`, e todos os campos
-   * dele. Admissão sem eles é 400, antes de qualquer gravação.
+   * OBRIGATÓRIO: `perfilPessoal` (com `dataNascimento`); sem ele, 400 antes de
+   * qualquer gravação. OPCIONAIS: `endereco`, com todos os campos dele, e —
+   * desde a obrigatoriedade da T179 (2026-10-21) — `contatos`, com cada campo.
    */
   @IsDefined()
   @IsObject()
@@ -189,12 +231,15 @@ export class AdmitirColaboradorDto extends DestinoOrganizacionalDto {
   @Type(() => EnderecoDto)
   endereco?: EnderecoDto;
 
-  /** Os três contatos da ficha da T169, juntos — o mesmo DTO da rota própria. */
-  @IsDefined()
+  /**
+   * Os contatos da ficha da T169 — o mesmo DTO da rota própria. T179: o bloco
+   * e cada campo são opcionais; sem nenhum valor, nenhum contato é gravado.
+   */
+  @IsOptional()
   @IsObject()
   @ValidateNested()
   @Type(() => RegistrarContatosColaboradorDto)
-  contatos!: RegistrarContatosColaboradorDto;
+  contatos?: RegistrarContatosColaboradorDto;
 }
 
 /**

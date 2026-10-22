@@ -96,7 +96,10 @@ describe("Admissão — motivoCodigo só aceita motivo de primeira admissão", (
       tipo: "clt",
       dataAdmissao: "2026-10-01",
       motivoCodigo,
+      // T179 — a lotação da Nova admissão exige os três.
       departamentoId: "33333333-3333-4333-8333-333333333333",
+      cargoId: "55555555-5555-4555-8555-555555555555",
+      unidadeOrganizacionalId: "66666666-6666-4666-8666-666666666666",
     });
   }
 
@@ -141,6 +144,8 @@ describe("Admissão — motivoCodigo só aceita motivo de primeira admissão", (
 
 describe("Admissão — a resposta é projeção explícita, campo a campo", () => {
   const DEPARTAMENTO = "33333333-3333-4333-8333-333333333333";
+  const CARGO = "55555555-5555-4555-8555-555555555555";
+  const UNIDADE = "66666666-6666-4666-8666-666666666666";
   const AGORA = new Date("2026-10-01T12:00:00.000Z");
 
   /**
@@ -151,6 +156,8 @@ describe("Admissão — a resposta é projeção explícita, campo a campo", () 
   function servico() {
     const tx = {
       departamento: { count: jest.fn().mockResolvedValue(1) },
+      cargo: { count: jest.fn().mockResolvedValue(1) },
+      unidadeOrganizacional: { count: jest.fn().mockResolvedValue(1) },
       colaborador: {
         create: jest.fn().mockResolvedValue({
           id: "col-1",
@@ -162,6 +169,8 @@ describe("Admissão — a resposta é projeção explícita, campo a campo", () 
         }),
       },
       vinculoFuncional: {
+        // T179 — matrícula livre na empresa.
+        findFirst: jest.fn().mockResolvedValue(null),
         create: jest.fn().mockResolvedValue({
           id: "vin-1",
           colaboradorId: "col-1",
@@ -183,11 +192,11 @@ describe("Admissão — a resposta é projeção explícita, campo a campo", () 
           status: "solicitada",
           vigenciaInicio: AGORA,
           solicitanteUserId: "ator-rh",
-          destinoUnidadeOrganizacionalId: null,
+          destinoUnidadeOrganizacionalId: UNIDADE,
           destinoDepartamentoId: DEPARTAMENTO,
           destinoAreaId: null,
           destinoEquipeId: null,
-          destinoCargoId: null,
+          destinoCargoId: CARGO,
           destinoCentroCustoId: null,
           colunaFutura: "NAO_PODE_VAZAR",
         }),
@@ -201,6 +210,8 @@ describe("Admissão — a resposta é projeção explícita, campo a campo", () 
         })),
       },
       contatoColaborador: {
+        // T179 — e-mail pessoal livre na empresa.
+        findFirst: jest.fn().mockResolvedValue(null),
         create: jest.fn(({ data }: { data: Record<string, unknown> }) => ({
           id: "con-1",
           ...data,
@@ -236,11 +247,13 @@ describe("Admissão — a resposta é projeção explícita, campo a campo", () 
         dataAdmissao: "2026-10-01",
         motivoCodigo: "admissao_inicial",
         departamentoId: DEPARTAMENTO,
+        cargoId: CARGO,
+        unidadeOrganizacionalId: UNIDADE,
         perfilPessoal: { dataNascimento: "1990-05-20" },
         contatos: {
           emailPessoal: "pessoa@exemplo.test",
           celular: "+5511999990000",
-          telefone: "1133330000",
+          telefone: "+551133330000",
         },
       }),
       {

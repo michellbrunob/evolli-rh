@@ -24,7 +24,10 @@ import {
   FornecedorCep,
   ResultadoFornecedorCep,
 } from "../src/cep/cep.types";
-import { CAMPOS_OBRIGATORIOS_ADMISSAO } from "./admissao-obrigatoria";
+import {
+  camposObrigatoriosAdmissao,
+  lotacaoMinima,
+} from "./admissao-obrigatoria";
 
 /**
  * T178 — log geral de requisições COM O LOG LIGADO (nível `info`, as mesmas
@@ -34,6 +37,10 @@ import { CAMPOS_OBRIGATORIOS_ADMISSAO } from "./admissao-obrigatoria";
  * matrícula, nem outro valor de rota ou query entram no log; os metadados
  * técnicos (método, padrão da rota, status, duração e `requestId`) continuam
  * lá; e a consulta de CEP e a listagem respondem como antes.
+ *
+ * T179 — também com o log ligado: a admissão recusada por duplicidade (409)
+ * e a edição de contatos não deixam e-mail, telefone, CEP, matrícula nem a
+ * chave de idempotência em linha nenhuma, e o 409 traz só o nome do campo.
  *
  * As demais suítes rodam com `LOG_LEVEL=silent` — por isso esta existe.
  *
@@ -63,6 +70,9 @@ const SENHA_PADRAO = "Log!SemValores#2026";
 const CEP = "01001000";
 const NOME = "Lucia Rastreavel Sintetica";
 const MATRICULA = "MAT-LOGX-77";
+// T179 — chaves de idempotência rastreáveis no log.
+const CHAVE_CONFLITO = "3f2b6c1e-9a7d-4e5f-8b6a-1c2d3e4f5a6b";
+const CHAVE_ADMISSAO = "7c8d9e0f-1a2b-4c3d-9e4f-5a6b7c8d9e0f";
 
 async function runInfraScript(
   container: StartedTestContainer,
@@ -134,6 +144,10 @@ describe("Log geral de requisições sem valores (T178, e2e)", () => {
   const destino = new DestinoDoLog();
 
   let rh: Credencial;
+  // T179 — o que a primeira admissão enviou, e o corpo comum às admissões.
+  let primeiraAdmissao: ReturnType<typeof camposObrigatoriosAdmissao>;
+  let colaboradorId: string;
+  let corpoBase: Record<string, unknown>;
 
   const agent = () => request(app.getHttpServer());
 
@@ -157,6 +171,12 @@ describe("Log geral de requisições sem valores (T178, e2e)", () => {
   }
   const get = (rota: string, cred: Credencial) =>
     agent().get(rota).set("Cookie", cred.cookie);
+  function put(rota: string, cred: Credencial) {
+    return agent()
+      .put(rota)
+      .set("Cookie", cred.cookie)
+      .set("x-csrf-token", cred.csrfToken);
+  }
 
   /** Linhas JSON do log de uma requisição, pelo `requestId` da resposta. */
   function linhasDa(requestId: string): Linha[] {
@@ -279,18 +299,25 @@ describe("Log geral de requisições sem valores (T178, e2e)", () => {
       })
       .expect(201);
     rh = await login("rh.log@example.test");
-    await post("/v1/colaboradores", rh)
-      .send({
-        ...CAMPOS_OBRIGATORIOS_ADMISSAO,
-        nome: NOME,
-        empresaId,
-        matricula: MATRICULA,
-        tipo: "clt",
-        dataAdmissao: "2026-02-02",
-        motivoCodigo: "admissao_inicial",
-        departamentoId,
-      })
-      .expect(201);
+    primeiraAdmissao = camposObrigatoriosAdmissao();
+    corpoBase = {
+      ...(await lotacaoMinima(appUrl, empresaId)),
+      empresaId,
+      tipo: "clt",
+      dataAdmissao: "2026-02-02",
+      motivoCodigo: "admissao_inicial",
+      departamentoId,
+    };
+    colaboradorId = (
+      await post("/v1/colaboradores", rh)
+        .send({
+          ...primeiraAdmissao,
+          ...corpoBase,
+          nome: NOME,
+          matricula: MATRICULA,
+        })
+        .expect(201)
+    ).body.id as string;
   });
 
   afterAll(async () => {
@@ -432,6 +459,158 @@ describe("Log geral de requisições sem valores (T178, e2e)", () => {
       rota: "/*",
     });
     ausenteDoLog("caminho-inexistente", "87654321", "Valor Secreto");
+  });
+
+  describe("T179 — admissão e contatos com o log ligado", () => {
+    // Valores SINTÉTICOS que não aparecem em nenhum outro lugar da suíte:
+    // se surgirem no log, vieram destas requisições.
+    const EMAIL_NOVO = "pessoa.rastreavel.log@example.test";
+    const CELULAR_ENTRADA = "(11) 98765-1212";
+    const CELULAR_GRAVADO = "+5511987651212";
+    const TELEFONE_ENTRADA = "(11) 3232-1212";
+    const TELEFONE_GRAVADO = "+551132321212";
+    const CEP_ENTRADA = "04538-133";
+    const CEP_GRAVADO = "04538133";
+    const MATRICULA_NOVA = "MAT-LOGX-88";
+
+    const valoresDaT179 = () => [
+      MATRICULA,
+      MATRICULA_NOVA,
+      primeiraAdmissao.contatos.emailPessoal,
+      EMAIL_NOVO,
+      CELULAR_ENTRADA,
+      CELULAR_GRAVADO,
+      "5511987651212",
+      "11987651212",
+      TELEFONE_ENTRADA,
+      TELEFONE_GRAVADO,
+      "551132321212",
+      "1132321212",
+      CEP_ENTRADA,
+      CEP_GRAVADO,
+      CHAVE_CONFLITO,
+      CHAVE_ADMISSAO,
+    ];
+
+    it("409 de duplicidade: só os nomes dos campos na resposta, e nenhum valor nem a chave no log", async () => {
+      const r = await post("/v1/colaboradores", rh)
+        .set("Idempotency-Key", CHAVE_CONFLITO)
+        .send({
+          ...corpoBase,
+          nome: "Outra Pessoa Rastreavel",
+          matricula: MATRICULA,
+          perfilPessoal: { dataNascimento: "1991-03-04" },
+          endereco: { pais: "Brasil", cep: CEP_ENTRADA },
+          contatos: {
+            emailPessoal: primeiraAdmissao.contatos.emailPessoal,
+            celular: CELULAR_ENTRADA,
+            telefone: TELEFONE_ENTRADA,
+          },
+        })
+        .expect(409);
+      expect(r.body.erros).toEqual([
+        { campo: "matricula", motivo: "em_uso" },
+        { campo: "contatos.emailPessoal", motivo: "em_uso" },
+      ]);
+      expect(Object.keys(r.body).sort()).toEqual(
+        ["erros", "message", "request_id", "status_code", "timestamp"].sort(),
+      );
+      const corpo = JSON.stringify(r.body).toLowerCase();
+      for (const valor of valoresDaT179()) {
+        expect(corpo).not.toContain(valor.toLowerCase());
+      }
+
+      expect(conclusao(r.headers[REQUEST_ID_HEADER] as string)).toMatchObject({
+        req: { method: "POST" },
+        res: { statusCode: 409 },
+        rota: "/v1/colaboradores",
+      });
+      ausenteDoLog(...valoresDaT179());
+    });
+
+    it("admissão com chave e o reenvio dela: a chave e os valores ficam fora do log", async () => {
+      const corpo = {
+        ...corpoBase,
+        nome: "Pessoa Rastreavel Nova",
+        matricula: MATRICULA_NOVA,
+        perfilPessoal: { dataNascimento: "1991-03-04" },
+        endereco: { pais: "Brasil", cep: CEP_ENTRADA },
+        contatos: {
+          emailPessoal: EMAIL_NOVO,
+          celular: CELULAR_ENTRADA,
+          telefone: TELEFONE_ENTRADA,
+        },
+      };
+      const primeira = await post("/v1/colaboradores", rh)
+        .set("Idempotency-Key", CHAVE_ADMISSAO)
+        .send(corpo)
+        .expect(201);
+      expect(primeira.body.contatos).toMatchObject({
+        celular: CELULAR_GRAVADO,
+        telefone: TELEFONE_GRAVADO,
+      });
+      expect(primeira.body.endereco).toMatchObject({ cep: CEP_GRAVADO });
+      const reenvio = await post("/v1/colaboradores", rh)
+        .set("Idempotency-Key", CHAVE_ADMISSAO)
+        .send(corpo)
+        .expect(201);
+      expect(reenvio.headers["idempotent-replayed"]).toBe("true");
+      expect(reenvio.body.id).toBe(primeira.body.id);
+      for (const r of [primeira, reenvio]) {
+        expect(conclusao(r.headers[REQUEST_ID_HEADER] as string)).toMatchObject(
+          {
+            req: { method: "POST" },
+            res: { statusCode: 201 },
+            rota: "/v1/colaboradores",
+          },
+        );
+      }
+      ausenteDoLog(...valoresDaT179());
+    });
+
+    it("PUT de contatos — gravado e em conflito: nenhum valor no log, e o 409 só com o campo", async () => {
+      const ok = await put(`/v1/colaboradores/${colaboradorId}/contatos`, rh)
+        .send({
+          emailPessoal: primeiraAdmissao.contatos.emailPessoal,
+          celular: CELULAR_ENTRADA,
+          telefone: TELEFONE_ENTRADA,
+        })
+        .expect(200);
+      expect(ok.body.contatos).toMatchObject({
+        celular: CELULAR_GRAVADO,
+        telefone: TELEFONE_GRAVADO,
+      });
+      expect(conclusao(ok.headers[REQUEST_ID_HEADER] as string)).toMatchObject({
+        req: { method: "PUT" },
+        res: { statusCode: 200 },
+        rota: "/v1/colaboradores/:colaboradorId/contatos",
+      });
+
+      const conflito = await put(
+        `/v1/colaboradores/${colaboradorId}/contatos`,
+        rh,
+      )
+        .send({
+          emailPessoal: EMAIL_NOVO,
+          celular: CELULAR_ENTRADA,
+          telefone: TELEFONE_ENTRADA,
+        })
+        .expect(409);
+      expect(conflito.body.erros).toEqual([
+        { campo: "emailPessoal", motivo: "em_uso" },
+      ]);
+      expect(JSON.stringify(conflito.body).toLowerCase()).not.toContain(
+        EMAIL_NOVO,
+      );
+      expect(
+        conclusao(conflito.headers[REQUEST_ID_HEADER] as string),
+      ).toMatchObject({
+        req: { method: "PUT" },
+        res: { statusCode: 409 },
+        rota: "/v1/colaboradores/:colaboradorId/contatos",
+      });
+      ausenteDoLog(...valoresDaT179(), primeiraAdmissao.contatos.celular);
+    });
   });
 
   it("nenhuma linha traz URL, query ou parâmetros", () => {

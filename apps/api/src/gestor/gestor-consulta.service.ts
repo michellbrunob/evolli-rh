@@ -435,7 +435,8 @@ export class GestorConsultaService {
   /** Projeção fechada da decisão 7. Acrescentar campo aqui é decisão, não detalhe. */
   private comoItem(v: {
     id: string;
-    matricula: string;
+    /** T179 — opcional na Nova admissão: pode vir `null`. */
+    matricula: string | null;
     tipo: string;
     situacao: string;
     dataAdmissao: Date;

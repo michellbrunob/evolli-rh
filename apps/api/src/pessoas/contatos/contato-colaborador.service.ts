@@ -1,3 +1,4 @@
+import { ConflitoDeCamposException } from "../../common/erros/recusa-por-campo";
 import { ConflictException, Injectable } from "@nestjs/common";
 import {
   AcaoContatoColaborador,
@@ -19,7 +20,8 @@ import { resolverEscopoContatos } from "./escopo-contatos.util";
  *
  * - `sem_registro` — o colaborador existe no escopo e não tem contato gravado.
  *   É o estado de todo colaborador admitido antes desta fatia: a ausência de
- *   registro nunca é erro.
+ *   registro nunca é erro. T179 — também o de quem teve todos os contatos
+ *   removidos: o registro fica INATIVO, sem valor, e é lido assim.
  * - `registrado` — contato gravado e em uso operacional.
  * - `bloqueado` — nenhum vínculo do colaborador na empresa segue previsto ou
  *   ativo. A ficha manda **bloquear o uso operacional** após o desligamento:
@@ -29,10 +31,15 @@ import { resolverEscopoContatos } from "./escopo-contatos.util";
  */
 export type SituacaoContatos = "sem_registro" | "registrado" | "bloqueado";
 
+/**
+ * T179 — os três contatos são opcionais (decisão da proprietária de
+ * 2026-10-21): cada um pode vir `null`. O formato continua conferido quando o
+ * valor existe.
+ */
 export interface ValoresContatos {
-  emailPessoal: string;
-  celular: string;
-  telefone: string;
+  emailPessoal: string | null;
+  celular: string | null;
+  telefone: string | null;
   atualizadoEm: Date;
 }
 
@@ -45,8 +52,12 @@ export interface ContatosDoColaborador {
   contatos: ValoresContatos | null;
 }
 
+/**
+ * T179 — `removido`: os três contatos foram limpos; o registro ficou inativo e
+ * a resposta é `sem_registro`.
+ */
 export type ResultadoRegistroContatos =
-  "criado" | "atualizado" | "sem_alteracao";
+  "criado" | "atualizado" | "removido" | "sem_alteracao";
 
 export interface ContatosRegistrados extends ContatosDoColaborador {
   resultado: ResultadoRegistroContatos;
@@ -67,6 +78,7 @@ const PROJECAO_CONTATO = {
   emailPessoal: true,
   celular: true,
   telefone: true,
+  ativo: true,
   atualizadoEm: true,
 } as const satisfies Prisma.ContatoColaboradorSelect;
 
@@ -104,13 +116,74 @@ interface EventoContato {
   auditResult: AuditResult;
 }
 
+/** T179 — os três contatos como valores: o que não veio vale `null`. */
+export type ContatosInformados = Pick<
+  ValoresContatos,
+  "emailPessoal" | "celular" | "telefone"
+>;
+
+/**
+ * T179 — contatos opcionais (decisão da proprietária de 2026-10-21): o que não
+ * veio, ou veio vazio, vale `null`. Usado na ADMISSÃO, em que não há valor
+ * anterior; o PUT usa `contatosDoPut`, em que campo ausente mantém o gravado.
+ */
+export function contatosInformados(
+  dto: RegistrarContatosColaboradorDto | undefined | null,
+): ContatosInformados {
+  return {
+    emailPessoal: dto?.emailPessoal ?? null,
+    celular: dto?.celular ?? null,
+    telefone: dto?.telefone ?? null,
+  };
+}
+
+/**
+ * T179 — valores do PUT: campo AUSENTE mantém o valor gravado; `null` ou vazio
+ * (já `null` pelo DTO) apaga. Assim um telefone legado — gravado antes da
+ * forma `+55` atual — não é reenviado, truncado nem regravado quando a ficha
+ * salva outro campo.
+ */
+export function contatosDoPut(
+  dto: RegistrarContatosColaboradorDto,
+  atual: ContatosInformados | null,
+): ContatosInformados {
+  const manter = <K extends keyof ContatosInformados>(campo: K) =>
+    dto[campo] === undefined ? (atual?.[campo] ?? null) : (dto[campo] ?? null);
+  return {
+    emailPessoal: manter("emailPessoal"),
+    celular: manter("celular"),
+    telefone: manter("telefone"),
+  };
+}
+
+/** Nome do campo no evento → chave do registro. */
+const CHAVE_DO_CAMPO: Record<
+  CampoContatoColaborador,
+  keyof ContatosInformados
+> = {
+  email_pessoal: "emailPessoal",
+  celular: "celular",
+  telefone: "telefone",
+};
+
+/** T179 — NOMES dos campos com valor, para o evento de criação. */
+export function camposPreenchidos(
+  valores: ContatosInformados,
+): CampoContatoColaborador[] {
+  const campos: CampoContatoColaborador[] = [];
+  if (valores.emailPessoal !== null) campos.push("email_pessoal");
+  if (valores.celular !== null) campos.push("celular");
+  if (valores.telefone !== null) campos.push("telefone");
+  return campos;
+}
+
 /**
  * Campos cujo valor normalizado mudou. Só os NOMES saem daqui — é o que o
  * evento de edição registra.
  */
 export function camposAlterados(
-  atual: Pick<ValoresContatos, "emailPessoal" | "celular" | "telefone">,
-  novo: RegistrarContatosColaboradorDto,
+  atual: ContatosInformados,
+  novo: ContatosInformados,
 ): CampoContatoColaborador[] {
   const campos: CampoContatoColaborador[] = [];
   if (atual.emailPessoal !== novo.emailPessoal) {
@@ -132,6 +205,14 @@ function valores(contato: ContatoProjetado): ValoresContatos {
     telefone: contato.telefone,
     atualizadoEm: contato.atualizadoEm,
   };
+}
+
+/** T179 — a unicidade violada é a do e-mail pessoal na empresa? */
+function eUnicidadeDoEmail(erro: unknown): boolean {
+  if (!eUnicidadeVioladaNoBanco(erro)) return false;
+  const alvo = (erro as Prisma.PrismaClientKnownRequestError).meta?.["target"];
+  const texto = Array.isArray(alvo) ? alvo.join(",") : String(alvo ?? "");
+  return /email_pessoal|emailPessoal/.test(texto);
 }
 
 function eUnicidadeVioladaNoBanco(erro: unknown): boolean {
@@ -204,6 +285,12 @@ export class ContatoColaboradorService {
         return this.resposta(alvo, "bloqueado", null);
       }
 
+      // T179 — leitura ordenada com um salvamento em andamento (`FOR SHARE`,
+      // que conflita com o `NO KEY UPDATE` do PUT e não com outra leitura):
+      // espera ele terminar e lê o que ele gravou. Sem isso, a trilha da
+      // leitura podia afirmar um estado (ativo ou inativo) que o salvamento
+      // concorrente acabara de mudar, e o trigger de coerência recusava (500).
+      await tx.$queryRaw`SELECT id FROM contato_colaborador WHERE colaborador_id = ${alvo.colaboradorId}::text AND empresa_id = ${alvo.empresaId}::text FOR SHARE`;
       const contato = await tx.contatoColaborador.findUnique({
         where: {
           colaboradorId_empresaId: {
@@ -213,8 +300,10 @@ export class ContatoColaboradorService {
         },
         select: PROJECAO_CONTATO,
       });
-      if (!contato) {
-        await this.registrarEvento(tx, ctx, alvo, null, {
+      // T179 — registro inativo (todos os contatos removidos) é lido como
+      // "sem registro"; o evento aponta para ele, sem nenhum campo.
+      if (!contato || !contato.ativo) {
+        await this.registrarEvento(tx, ctx, alvo, contato?.id ?? null, {
           acao: "leitura",
           resultado: "sem_registro",
           campos: NENHUM_CAMPO,
@@ -264,6 +353,37 @@ export class ContatoColaboradorService {
 
     try {
       return await this.prisma.$transaction(async (tx) => {
+        // T179 — e-mail pessoal único na MESMA empresa: outro colaborador da
+        // empresa já o usa? A restrição do banco é a garantia (corrida chega
+        // como P2002, abaixo); a consulta só diz qual campo conflita. Só a
+        // empresa do vínculo: "em uso" nunca revela alguém de outra.
+        // Só o e-mail ENVIADO é conferido: o ausente fica como estava.
+        const emailEnviado = dto.emailPessoal ?? null;
+        const emailEmUso =
+          emailEnviado === null
+            ? null
+            : await tx.contatoColaborador.findFirst({
+                where: {
+                  empresaId: alvo.empresaId,
+                  emailPessoal: emailEnviado,
+                  NOT: { colaboradorId: alvo.colaboradorId },
+                },
+                select: { id: true },
+              });
+        if (emailEmUso) {
+          throw new ConflitoDeCamposException([
+            { campo: "emailPessoal", motivo: "em_uso" },
+          ]);
+        }
+
+        // T179 — trava a linha do par ANTES de ler o atual: salvamentos
+        // simultâneos se serializam e cada um lê o que o anterior gravou (sem
+        // isso, dois PUTs que limpam campos diferentes podiam deixar a linha
+        // vazia e ativa, e a CHECK do banco recusava com 500). `NO KEY UPDATE`,
+        // e não `UPDATE`: não bloqueia a checagem de chave estrangeira
+        // (`KEY SHARE`) que a trilha de uma leitura faz; a leitura se ordena
+        // com o salvamento pelo `FOR SHARE` de `consultar`.
+        await tx.$queryRaw`SELECT id FROM contato_colaborador WHERE colaborador_id = ${alvo.colaboradorId}::text AND empresa_id = ${alvo.empresaId}::text FOR NO KEY UPDATE`;
         const atual = await tx.contatoColaborador.findUnique({
           where: {
             colaboradorId_empresaId: {
@@ -274,14 +394,31 @@ export class ContatoColaboradorService {
           select: PROJECAO_CONTATO,
         });
 
+        const novos = contatosDoPut(dto, atual);
+        const preenchidos = camposPreenchidos(novos);
+        if ((!atual || !atual.ativo) && preenchidos.length === 0) {
+          // T179 — nenhum contato antes (nunca gravado, ou removido) e nenhum
+          // agora: não há o que gravar. Responde como a leitura de quem não
+          // tem contato.
+          await this.registrarEvento(tx, ctx, alvo, atual?.id ?? null, {
+            acao: "leitura",
+            resultado: "sem_registro",
+            campos: NENHUM_CAMPO,
+            auditAction: "pessoas_contato_consultado",
+            auditResult: "success",
+          });
+          return {
+            ...this.resposta(alvo, "sem_registro", null),
+            resultado: "sem_alteracao" as const,
+          };
+        }
+
         if (!atual) {
           const criado = await tx.contatoColaborador.create({
             data: {
               empresaId: alvo.empresaId,
               colaboradorId: alvo.colaboradorId,
-              emailPessoal: dto.emailPessoal,
-              celular: dto.celular,
-              telefone: dto.telefone,
+              ...novos,
               criadoPorUserId: ctx.actor.id,
               atualizadoPorUserId: ctx.actor.id,
             },
@@ -290,7 +427,7 @@ export class ContatoColaboradorService {
           await this.registrarEvento(tx, ctx, alvo, criado.id, {
             acao: "criacao",
             resultado: "gravado",
-            campos: TODOS_OS_CAMPOS,
+            campos: preenchidos,
             auditAction: "pessoas_contato_criado",
             auditResult: "success",
           });
@@ -300,7 +437,7 @@ export class ContatoColaboradorService {
           };
         }
 
-        const campos = camposAlterados(atual, dto);
+        const campos = camposAlterados(atual, novos);
         if (campos.length === 0) {
           // Nada a gravar, mas os valores gravados voltam na resposta: é uma
           // LEITURA, e fica na trilha como tal.
@@ -317,12 +454,22 @@ export class ContatoColaboradorService {
           };
         }
 
+        // T179 — sem nenhum contato, o registro fica INATIVO (não há exclusão
+        // física: a trilha aponta para ele); com algum, volta a ativo. O
+        // evento é de EDIÇÃO, com os nomes dos campos alterados ou removidos.
+        // Só os campos que mudaram são escritos: o que ficou como estava —
+        // inclusive um telefone legado — não é regravado.
+        const removidos = preenchidos.length === 0;
+        const mudancas: Partial<ContatosInformados> = {};
+        for (const campo of campos) {
+          const chave = CHAVE_DO_CAMPO[campo];
+          mudancas[chave] = novos[chave];
+        }
         const atualizado = await tx.contatoColaborador.update({
           where: { id: atual.id },
           data: {
-            emailPessoal: dto.emailPessoal,
-            celular: dto.celular,
-            telefone: dto.telefone,
+            ...mudancas,
+            ativo: !removidos,
             atualizadoPorUserId: ctx.actor.id,
           },
           select: PROJECAO_CONTATO,
@@ -334,12 +481,26 @@ export class ContatoColaboradorService {
           auditAction: "pessoas_contato_atualizado",
           auditResult: "success",
         });
+        if (removidos) {
+          return {
+            ...this.resposta(alvo, "sem_registro", null),
+            resultado: "removido" as const,
+          };
+        }
         return {
           ...this.resposta(alvo, "registrado", valores(atualizado)),
           resultado: "atualizado" as const,
         };
       });
     } catch (erro) {
+      // T179 — e-mail que outro colaborador da empresa gravou ao mesmo tempo:
+      // a unicidade (empresa, e-mail) do banco barra, e o campo volta na
+      // resposta, sem o valor.
+      if (eUnicidadeDoEmail(erro)) {
+        throw new ConflitoDeCamposException([
+          { campo: "emailPessoal", motivo: "em_uso" },
+        ]);
+      }
       // Duas criações simultâneas do mesmo par: a segunda perde na unicidade
       // do banco. Conflito, não erro interno.
       if (eUnicidadeVioladaNoBanco(erro)) {
@@ -359,15 +520,17 @@ export class ContatoColaboradorService {
     tx: Prisma.TransactionClient,
     ctx: PessoasAuditContext,
     alvo: { colaboradorId: string; empresaId: string },
-    dto: RegistrarContatosColaboradorDto,
-  ): Promise<ValoresContatos> {
+    dto: RegistrarContatosColaboradorDto | undefined,
+  ): Promise<ValoresContatos | null> {
+    // T179 — contatos opcionais: sem nenhum valor, nenhum registro nasce.
+    const novos = contatosInformados(dto);
+    const preenchidos = camposPreenchidos(novos);
+    if (preenchidos.length === 0) return null;
     const criado = await tx.contatoColaborador.create({
       data: {
         empresaId: alvo.empresaId,
         colaboradorId: alvo.colaboradorId,
-        emailPessoal: dto.emailPessoal,
-        celular: dto.celular,
-        telefone: dto.telefone,
+        ...novos,
         criadoPorUserId: ctx.actor.id,
         atualizadoPorUserId: ctx.actor.id,
       },
@@ -381,7 +544,7 @@ export class ContatoColaboradorService {
       {
         acao: "criacao",
         resultado: "gravado",
-        campos: TODOS_OS_CAMPOS,
+        campos: preenchidos,
         auditAction: "pessoas_contato_criado",
         auditResult: "success",
       },

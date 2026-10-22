@@ -352,6 +352,30 @@ describe("SolicitacoesScreen (T140) — listagem, filtros e paginação", () => 
     );
   });
 
+  it("T179 — vínculo sem matrícula aparece como 'sem matrícula' no seletor", async () => {
+    prepararBase();
+    vi.mocked(listarVinculosDoColaborador).mockResolvedValue([
+      vinculo({ id: "v1", matricula: null }),
+      vinculo({ id: "v2", matricula: "M2" }),
+    ] as never);
+    render(<SolicitacoesScreen />);
+    fireEvent.change(await screen.findByLabelText("Colaborador"), {
+      target: { value: "colab-A" },
+    });
+    const selVinculo = await screen.findByLabelText("Vínculo");
+    expect(
+      within(selVinculo).getByRole("option", {
+        name: "sem matrícula · clt · ativo",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(selVinculo).getByRole("option", {
+        name: "matrícula M2 · clt · ativo",
+      }),
+    ).toBeInTheDocument();
+    expect(selVinculo).not.toHaveTextContent("null");
+  });
+
   it("os filtros oferecem só os seis tipos aprovados, sem `documento`", async () => {
     prepararBase();
     render(<SolicitacoesScreen />);

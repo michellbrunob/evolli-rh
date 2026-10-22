@@ -44,6 +44,12 @@ vi.mock("../api/organizacaoClient");
 vi.mock("../api/cargoClient");
 vi.mock("../api/contatosColaboradorClient");
 
+// T179 — fluxo integrado (App inteiro, admissão com confirmação, ficha): cada
+// teste passa de 0,3 s isolado, mas na suíte completa, com a máquina carregada,
+// alguns estouravam os 5 s padrão. O limite maior vale só para este arquivo;
+// as asserções não mudam.
+vi.setConfig({ testTimeout: 20_000 });
+
 const ROTA = "#/pessoas/nova-admissao";
 
 function paginado<T>(itens: T[]) {
@@ -61,6 +67,28 @@ const departamento: DepartamentoApi = {
   id: "55555555-5555-5555-5555-555555555555",
   codigo: "DEP1",
   nome: "Departamento Sintético (teste)",
+  empresaId: empresa.id,
+  status: "ativo",
+  criadoEm: "2025-01-01T12:00:00.000Z",
+  atualizadoEm: "2025-01-01T12:00:00.000Z",
+};
+
+// T179 — Departamento e Cargo são obrigatórios na Nova admissão; a Unidade,
+// opcional desde 2026-10-21, segue escolhida aqui.
+const cargo = {
+  id: "77777777-7777-4777-8777-777777777777",
+  codigo: "CAR1",
+  nome: "Cargo Sintético (teste)",
+  empresaId: empresa.id,
+  status: "ativo",
+  criadoEm: "2025-01-01T12:00:00.000Z",
+  atualizadoEm: "2025-01-01T12:00:00.000Z",
+};
+
+const unidade = {
+  id: "88888888-8888-4888-8888-888888888888",
+  codigo: "UNI1",
+  nome: "Unidade Sintética (teste)",
   empresaId: empresa.id,
   status: "ativo",
   criadoEm: "2025-01-01T12:00:00.000Z",
@@ -95,7 +123,7 @@ const resposta: AdmissaoRegistradaApi = {
       centroCustoId: null,
     },
   },
-  // T177 — perfil e contatos passaram a ser obrigatórios na admissão.
+  // T177 — perfil obrigatório na admissão; T179 — contatos opcionais.
   perfilPessoal: {
     dataNascimento: "1990-05-20T00:00:00.000Z",
     sexo: null,
@@ -129,9 +157,9 @@ beforeEach(() => {
   vi.mocked(admitirColaborador).mockResolvedValue(resposta);
   vi.mocked(listarEmpresasMulti).mockResolvedValue(paginado([empresa]));
   vi.mocked(listarDepartamentos).mockResolvedValue(paginado([departamento]));
-  vi.mocked(listarUnidades).mockResolvedValue(paginado([]));
+  vi.mocked(listarUnidades).mockResolvedValue(paginado([unidade]));
   vi.mocked(listarEquipes).mockResolvedValue(paginado([]));
-  vi.mocked(listarCargos).mockResolvedValue(paginado([]));
+  vi.mocked(listarCargos).mockResolvedValue(paginado([cargo]));
   vi.mocked(listarCentrosCusto).mockResolvedValue(paginado([]));
   vi.mocked(listarAreas).mockResolvedValue(paginado([]));
   vi.mocked(consultarContatosDoColaborador).mockImplementation(
@@ -175,7 +203,7 @@ async function abrirNovaAdmissaoPelaListagem() {
   await screen.findByRole("heading", { level: 1, name: "Nova admissão" });
 }
 
-async function admitirPelaPagina() {
+async function admitirPelaPagina({ semContatos = false } = {}) {
   await screen.findByText("Empresa Sintética (teste)");
   fireEvent.change(screen.getByLabelText(/Nome completo/), {
     target: { value: "Pessoa Sintética Fluxo" },
@@ -187,29 +215,41 @@ async function admitirPelaPagina() {
   fireEvent.change(screen.getByLabelText(/Data de nascimento/), {
     target: { value: "1990-05-20" },
   });
-  fireEvent.change(screen.getByLabelText(/E-mail pessoal/), {
-    target: { value: "pessoa.fluxo@exemplo.test" },
-  });
-  fireEvent.change(screen.getByLabelText(/^Celular/), {
-    target: { value: "+5531999990001" },
-  });
-  fireEvent.change(screen.getByLabelText(/^Telefone/), {
-    target: { value: "3133330001" },
-  });
+  if (!semContatos) {
+    fireEvent.change(screen.getByLabelText(/E-mail pessoal/), {
+      target: { value: "pessoa.fluxo@exemplo.test" },
+    });
+    fireEvent.change(screen.getByLabelText(/^Celular/), {
+      target: { value: "+5531999990001" },
+    });
+    fireEvent.change(screen.getByLabelText(/^Telefone/), {
+      target: { value: "3133330001" },
+    });
+  }
   fireEvent.change(screen.getByLabelText(/Tipo de vínculo/), {
     target: { value: "clt" },
   });
   fireEvent.change(screen.getByLabelText(/Data de admissão/), {
     target: { value: "2026-10-20" },
   });
-  fireEvent.change(screen.getByLabelText(/Tipo de referência organizacional/), {
-    target: { value: "departamento" },
+  fireEvent.change(screen.getByLabelText(/^Departamento/), {
+    target: { value: departamento.id },
   });
-  fireEvent.change(
-    screen.getByLabelText(/Registro da referência organizacional/),
-    { target: { value: departamento.id } },
+  fireEvent.change(screen.getByLabelText(/^Cargo/), {
+    target: { value: cargo.id },
+  });
+  fireEvent.change(screen.getByLabelText(/^Unidade/), {
+    target: { value: unidade.id },
+  });
+  // T179 — "Salvar" só valida e abre a confirmação; quem grava é
+  // "Confirmar cadastro".
+  fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
+  const confirmacao = await screen.findByRole("dialog", {
+    name: "Confirmar cadastro de colaborador?",
+  });
+  fireEvent.click(
+    within(confirmacao).getByRole("button", { name: "Confirmar cadastro" }),
   );
-  fireEvent.click(screen.getByRole("button", { name: "Admitir colaborador" }));
   await screen.findByText("Admissão registrada");
 }
 
@@ -755,6 +795,49 @@ describe("T176/T178 — da página à listagem e à ficha do admitido", () => {
     await waitFor(() =>
       expect(screen.getByLabelText(/E-mail pessoal/)).toHaveFocus(),
     );
+    // T179 (revisão final) — o foco pula o título da seção: o estado "Nenhum
+    // contato registrado" chega pela descrição do próprio campo focado.
+    expect(screen.getByLabelText(/E-mail pessoal/)).toHaveAccessibleDescription(
+      /Nenhum contato registrado/,
+    );
+    expect(consultarContatosDoColaborador).toHaveBeenCalledWith(resposta.id);
+  });
+
+  it("T179 — sem nenhum contato: salva sem aviso, não envia o bloco e a ficha mostra 'Nenhum contato registrado'", async () => {
+    vi.mocked(admitirColaborador).mockResolvedValue({
+      ...resposta,
+      contatos: null,
+    });
+    render(<App papelDoAtor="rh" />);
+    await abrirNovaAdmissaoPelaListagem();
+    await admitirPelaPagina({ semContatos: true });
+
+    // Nenhum aviso, erro ou bloqueio pela ausência de contatos.
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    const [corpo] = vi.mocked(admitirColaborador).mock.calls[0]!;
+    expect(corpo).not.toHaveProperty("contatos");
+    expect(screen.getByRole("region", { name: "Contatos" })).toHaveTextContent(
+      "Nenhum contato registrado.",
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Abrir ficha de Pessoa Sintética Fluxo",
+      }),
+    );
+    const ficha = await screen.findByRole("dialog", {
+      name: "Pessoa Sintética Fluxo",
+    });
+    const contatos = await within(ficha).findByRole("region", {
+      name: "Contatos",
+    });
+    const estado = await within(contatos).findByText(
+      /Nenhum contato registrado/,
+    );
+    expect(estado).toHaveAttribute("role", "status");
+    expect(estado).toHaveTextContent(/^Nenhum contato registrado\./);
+    expect(contatos).toHaveAccessibleDescription(/Nenhum contato registrado/);
+    expect(within(contatos).queryByRole("alert")).not.toBeInTheDocument();
     expect(consultarContatosDoColaborador).toHaveBeenCalledWith(resposta.id);
   });
 
@@ -775,5 +858,27 @@ describe("T176/T178 — da página à listagem e à ficha do admitido", () => {
     fireEvent.click(itemColaboradoresNaBarra());
     await screen.findByRole("heading", { level: 1, name: "Colaboradores" });
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T179 — o shell repassa o papel à página: só a ORIENTAÇÃO do aviso de
+// empresa sem referências muda (o RH cadastra em Estrutura; o DP pede ao RH).
+// ---------------------------------------------------------------------------
+describe("T179 — empresa sem referências, pelo papel que o shell conhece", () => {
+  it.each([
+    ["rh", /Cadastre o que falta em Estrutura/],
+    // T179 — só o que falta, e só Departamento e Cargo contam.
+    ["dp", /O RH precisa cadastrar Cargo nesta empresa/],
+  ])("%s vê a orientação certa e não consegue enviar", async (papel, texto) => {
+    vi.mocked(listarCargos).mockResolvedValue(paginado([]));
+    render(<App papelDoAtor={papel} />);
+    await abrirNovaAdmissaoPelaListagem();
+    const aviso = await screen.findByText(texto);
+    expect(aviso).toHaveTextContent(/cadastro ativo de Cargo/);
+    fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
+    await waitFor(() => expect(aviso).toHaveFocus());
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(admitirColaborador).not.toHaveBeenCalled();
   });
 });

@@ -146,3 +146,25 @@ anos após o desligamento e então eliminar ou anonimizar. A proprietária a
 
 Esta decisão vale para as categorias desta ficha (perfil pessoal e endereço).
 A ficha de Contatos (T169) foi alinhada a ela em 2026-10-20 (§7 daquela ficha).
+
+## 6. Alteração de 2026-10-21 (T179) — CEP brasileiro normalizado
+
+Por decisão da proprietária ([decisão da T179](t179-confirmacao-admissao-duplicidade-telefones.md)), com país Brasil o
+servidor grava o CEP com **8 dígitos** (aceita `00000-000` na entrada) e a tela
+o mostra como `00000-000`. CEP brasileiro já gravado com forma inequívoca é
+convertido pela migration da T179; o resto fica como está e entra na relação
+técnica de revisão, com o registro e o nome do campo, nunca o valor. Com outro
+país, o CEP segue em texto livre. Finalidade, base legal, classificação,
+retenção e escopo de acesso não mudam.
+
+## 7. Alteração de 2026-10-21 (T179) — obrigatoriedade e Sexo em lista fechada
+
+Pela [decisão de obrigatoriedade](t179-obrigatoriedade-cadastro-colaborador.md): obrigatórios só o nome
+completo e a data de nascimento; o e-mail pessoal passa a opcional; todo o
+endereço, inclusive o CEP, é opcional (§2 desta ficha fica assim
+atualizado). **Sexo** passa a opções fechadas — Feminino, Masculino,
+Intersexo, Não informar (gravados `feminino`, `masculino`, `intersexo`,
+`nao_informar`) —, opcional; sem seleção, a ficha mostra "Não informado". O
+texto livre gravado antes aparece como foi gravado, sem conversão. Gênero
+continua fora desta ficha, obrigatório quando a sua for aprovada.
+Finalidade, base legal, classificação, retenção e escopo de acesso não mudam.

@@ -8,12 +8,23 @@ import {
 } from "@nestjs/common";
 import { Request, Response } from "express";
 import { descreverErroDeBanco } from "../diagnostico-banco";
+import {
+  CodigoDeRecusa,
+  ConflitoDeCamposException,
+  ErroDeCampo,
+  RecusaCsrfException,
+  RecusaDeNegocioException,
+} from "../erros/recusa-por-campo";
 
 interface ErrorBody {
   status_code: number;
   message: string;
   request_id: string;
   timestamp: string;
+  /** T179 — campos recusados e o motivo, sem o valor (`DP-ADM-15`). */
+  erros?: readonly ErroDeCampo[];
+  /** T179 — código estável de recusa de negócio sem campo próprio. */
+  codigo?: CodigoDeRecusa;
 }
 
 const DEFAULT_CLIENT_MESSAGE = "Não foi possível processar a requisição.";
@@ -78,6 +89,21 @@ export class AllExceptionsFilter implements ExceptionFilter {
       message,
       request_id: requestId,
       timestamp: new Date().toISOString(),
+      // T179 — só os detalhes tipados que a própria aplicação monta: caminho
+      // do campo e motivo de uma lista fechada, ou um código fixo. Nada da
+      // mensagem da exceção nem do valor enviado.
+      ...(exception instanceof ConflitoDeCamposException
+        ? {
+            erros: exception.erros.map(({ campo, motivo }) => ({
+              campo,
+              motivo,
+            })),
+          }
+        : {}),
+      ...(exception instanceof RecusaDeNegocioException ||
+      exception instanceof RecusaCsrfException
+        ? { codigo: exception.codigo }
+        : {}),
     };
 
     response.status(statusCode).json(body);

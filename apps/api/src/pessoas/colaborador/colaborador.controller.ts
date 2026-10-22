@@ -1,18 +1,21 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
+  Headers,
   Param,
   ParseUUIDPipe,
   Patch,
   Post,
   Query,
   Req,
+  Res,
   UseGuards,
 } from "@nestjs/common";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import { AccessUser } from "@prisma/client";
-import { Request } from "express";
+import { Request, Response } from "express";
 import { SessionGuard } from "../../auth/session/session.guard";
 import { CsrfGuard } from "../../auth/csrf/csrf.guard";
 import { AuthorizationGuard } from "../../auth/authorization/authorization.guard";
@@ -26,6 +29,26 @@ import {
   ListarColaboradoresQueryDto,
   RetificarColaboradorDto,
 } from "../dto/pessoas.dto";
+
+/**
+ * T179 — chave de idempotência do envio da admissão. Opcional na API (a tela
+ * sempre a envia); quando vem, é um UUID, e a mesma chave do mesmo ator na
+ * mesma empresa nunca cria duas admissões. O reenvio responde como a admissão
+ * original, com `Idempotent-Replayed: true`.
+ */
+export const CABECALHO_IDEMPOTENCIA = "idempotency-key";
+export const CABECALHO_REENVIO = "Idempotent-Replayed";
+const UUID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/** Chave ausente vale como envio sem idempotência; fora da forma, 400. */
+export function chaveDeIdempotencia(valor: unknown): string | undefined {
+  if (valor === undefined) return undefined;
+  if (typeof valor !== "string" || !UUID.test(valor)) {
+    throw new BadRequestException();
+  }
+  return valor.toLowerCase();
+}
 
 /**
  * Sem rota `DELETE` (RI-H1): colaborador nunca é excluído, nem no
@@ -87,11 +110,18 @@ export class ColaboradorController {
     @Body() dto: AdmitirColaboradorDto,
     @CurrentUser() actor: AccessUser,
     @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+    @Headers(CABECALHO_IDEMPOTENCIA) chaveRecebida?: string,
   ) {
-    return this.service.admitir(dto, {
-      actor,
-      metadata: extractRequestMetadata(req),
-    });
+    const { admissao, reenvio } = await this.service.admitirIdempotente(
+      dto,
+      { actor, metadata: extractRequestMetadata(req) },
+      chaveDeIdempotencia(chaveRecebida),
+    );
+    if (reenvio) {
+      res.setHeader(CABECALHO_REENVIO, "true");
+    }
+    return admissao;
   }
 
   @Patch(":colaboradorId")

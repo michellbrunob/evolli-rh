@@ -8,8 +8,12 @@
  *
  * OBRIGATÓRIO: data de nascimento. OPCIONAIS: todos os demais campos do perfil
  * e todos os do endereço, em texto: não há catálogo canônico no sistema para
- * sexo, saudação, estado civil, escolaridade, país, UF ou município, e a tela
- * não inventa lista de opções.
+ * saudação, estado civil, escolaridade, país, UF ou município, e a tela não
+ * inventa lista de opções.
+ *
+ * T179 — a exceção é o SEXO: lista FECHADA decidida pela proprietária em
+ * 2026-10-21 (`OPCOES_SEXO`), opcional, sem texto livre. Vai o código; a tela
+ * mostra o rótulo.
  */
 
 export type ChavePerfil =
@@ -46,13 +50,48 @@ export interface DefinicaoCampo<K extends string> {
 }
 
 /**
+ * T179 — opções FECHADAS de sexo (decisão da proprietária de 2026-10-21), na
+ * ordem do seletor. O código é o que vai ao servidor e fica gravado; o rótulo
+ * é só da tela. Sem seleção, o campo vai `null` — "não informado".
+ */
+export const OPCOES_SEXO = [
+  { codigo: "feminino", rotulo: "Feminino" },
+  { codigo: "masculino", rotulo: "Masculino" },
+  { codigo: "intersexo", rotulo: "Intersexo" },
+  { codigo: "nao_informar", rotulo: "Não informar" },
+] as const;
+
+export type CodigoSexo = (typeof OPCOES_SEXO)[number]["codigo"];
+
+/** O valor é um dos códigos da lista fechada? */
+export function ehCodigoSexo(valor: string): valor is CodigoSexo {
+  return OPCOES_SEXO.some((o) => o.codigo === valor);
+}
+
+/**
+ * T179 — sexo gravado, como a tela o mostra: código conhecido pelo rótulo;
+ * texto livre de um cadastro anterior à lista, como veio (sem inferir); e
+ * ausente como `null`, para quem chama escrever "Não informado".
+ */
+export function rotuloDoSexo(valor: string | null | undefined): string | null {
+  if (typeof valor !== "string" || valor.trim() === "") return null;
+  return OPCOES_SEXO.find((o) => o.codigo === valor)?.rotulo ?? valor;
+}
+
+/** T179 — o sexo é seletor, não texto: definição à parte, na ordem da tela. */
+export const CAMPO_SEXO: DefinicaoCampo<"sexo"> = {
+  chave: "sexo",
+  rotulo: "Sexo",
+};
+
+/**
  * Campos de texto do perfil, na ordem da tela — todos OPCIONAIS. A data de
- * nascimento, obrigatória, é tratada à parte.
+ * nascimento, obrigatória, é tratada à parte; o sexo (T179), também, porque
+ * é seletor de lista fechada (`CAMPO_SEXO`).
  */
 export const CAMPOS_TEXTO_PERFIL: readonly DefinicaoCampo<
-  Exclude<ChavePerfil, "dataNascimento">
+  Exclude<ChavePerfil, "dataNascimento" | "sexo">
 >[] = [
-  { chave: "sexo", rotulo: "Sexo", limite: 60 },
   {
     chave: "saudacao",
     rotulo: "Saudação",
@@ -123,6 +162,21 @@ const DATA_MINIMA = "1900-01-01";
 // eslint-disable-next-line no-control-regex
 const SEM_CONTROLE = /^[^\u0000-\u001F\u007F]*$/;
 const CEP_FORMA = /^[A-Za-z0-9 -]{3,12}$/;
+/** T179 — CEP brasileiro: 8 dígitos, com ou sem o hífen da máscara. */
+const CEP_BRASILEIRO_ENTRADA = /^[0-9]{5}-?[0-9]{3}$/;
+
+/**
+ * T179 — o país é o Brasil? Sem diferenciar caixa e acento, e sem os espaços
+ * das pontas: a MESMA comparação de `ehPaisBrasil` no servidor. Não há
+ * catálogo de país (`DP-ADM-12`), só o nome.
+ */
+export function ehPaisBrasil(pais: string | null | undefined): boolean {
+  return (
+    typeof pais === "string" &&
+    pais.normalize("NFD").replace(/\p{M}/gu, "").trim().toLowerCase() ===
+      "brasil"
+  );
+}
 
 /** Apara e colapsa espaços repetidos — a mesma normalização do servidor. */
 export function normalizarTexto(valor: string): string {
@@ -167,6 +221,10 @@ export function validarPerfil(valores: ValoresPerfil): ErrosPerfil {
       erros.dataNascimento = "A data de nascimento não pode estar no futuro.";
     }
   }
+  // T179 — sexo só da lista fechada; sem seleção é válido (opcional).
+  if (valores.sexo !== "" && !ehCodigoSexo(valores.sexo)) {
+    erros.sexo = "Selecione uma das opções de sexo, ou deixe sem seleção.";
+  }
   for (const campo of CAMPOS_TEXTO_PERFIL) {
     const erro = erroDeTexto(
       valores[campo.chave],
@@ -189,8 +247,16 @@ export function validarEndereco(valores: ValoresEndereco): ErrosEndereco {
     if (erro) erros[campo.chave] = erro;
   }
   const cep = normalizarTexto(valores.cep);
-  if (!erros.cep && cep !== "" && !CEP_FORMA.test(cep)) {
-    erros.cep = "Use letras, números, espaço e hífen, de 3 a 12 caracteres.";
+  if (!erros.cep && cep !== "") {
+    // T179 — com país Brasil, o servidor exige os 8 dígitos; com outro país,
+    // o CEP segue em texto livre, com a forma de antes.
+    if (ehPaisBrasil(valores.pais)) {
+      if (!CEP_BRASILEIRO_ENTRADA.test(cep)) {
+        erros.cep = "Informe os 8 dígitos do CEP, no formato 00000-000.";
+      }
+    } else if (!CEP_FORMA.test(cep)) {
+      erros.cep = "Use letras, números, espaço e hífen, de 3 a 12 caracteres.";
+    }
   }
   return erros;
 }
@@ -220,6 +286,15 @@ export function blocoEndereco(
   for (const chave of Object.keys(valores) as ChaveEndereco[]) {
     const limpo = normalizarTexto(valores[chave]);
     bloco[chave] = limpo === "" ? null : limpo;
+  }
+  // T179 — CEP brasileiro vai só com os 8 dígitos, a forma que o servidor
+  // grava; a máscara `00000-000` é só da tela.
+  if (
+    bloco.cep !== null &&
+    ehPaisBrasil(bloco.pais) &&
+    CEP_BRASILEIRO_ENTRADA.test(bloco.cep)
+  ) {
+    bloco.cep = bloco.cep.replace("-", "");
   }
   return bloco;
 }

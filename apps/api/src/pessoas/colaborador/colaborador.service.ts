@@ -1,13 +1,24 @@
-import { Injectable } from "@nestjs/common";
+import { ConflictException, Injectable } from "@nestjs/common";
 import {
   Colaborador,
+  ContatoColaborador,
+  EnderecoColaborador,
+  IdempotenciaAdmissao,
+  MovimentacaoFuncional,
+  PerfilPessoalColaborador,
   Prisma,
   SituacaoColaborador,
   SituacaoVinculo,
   StatusMovimentacao,
   TipoMovimentacao,
   TipoVinculo,
+  VinculoFuncional,
 } from "@prisma/client";
+import {
+  ConflitoDeCamposException,
+  ErroDeCampo,
+  RecusaDeNegocioException,
+} from "../../common/erros/recusa-por-campo";
 import { PrismaService } from "../../database/prisma.service";
 import { PessoasAuditoriaService } from "../pessoas-auditoria.service";
 import {
@@ -40,10 +51,14 @@ import {
   DadosPessoaisColaboradorService,
   ValoresEndereco,
   ValoresPerfil,
+  enderecoCompleto,
+  perfilCompleto,
 } from "../dados-pessoais/dados-pessoais.service";
 import {
   ContatoColaboradorService,
   ValoresContatos,
+  camposPreenchidos,
+  contatosInformados,
 } from "../contatos/contato-colaborador.service";
 
 /**
@@ -70,7 +85,8 @@ export interface AdmissaoRegistrada extends Pick<
   vinculo: {
     id: string;
     empresaId: string;
-    matricula: string;
+    /** T179 — opcional na Nova admissão. */
+    matricula: string | null;
     tipo: TipoVinculo;
     situacao: SituacaoVinculo;
     dataAdmissao: Date;
@@ -95,7 +111,8 @@ export interface AdmissaoRegistrada extends Pick<
    */
   perfilPessoal: ValoresPerfil;
   endereco: ValoresEndereco | null;
-  contatos: ValoresContatos;
+  /** T179 — `null` quando nenhum contato foi informado na admissão. */
+  contatos: ValoresContatos | null;
 }
 
 /**
@@ -106,7 +123,8 @@ export interface AdmissaoRegistrada extends Pick<
 export interface VinculoListado {
   id: string;
   empresaId: string;
-  matricula: string;
+  /** T179 — opcional na Nova admissão: pode vir `null`. */
+  matricula: string | null;
   situacao: SituacaoVinculo;
   dataAdmissao: Date;
   dataDesligamento: Date | null;
@@ -147,6 +165,14 @@ const ORDEM_SITUACAO_VINCULO: Record<SituacaoVinculo, number> = {
   encerrado: 2,
 };
 
+/** T179 — matrícula opcional: quem não tem vai depois de quem tem. */
+function compararMatriculas(a: string | null, b: string | null): number {
+  if (a === b) return 0;
+  if (a === null) return 1;
+  if (b === null) return -1;
+  return a.localeCompare(b);
+}
+
 /** Vínculo principal primeiro: o ativo, depois o previsto, depois o mais novo. */
 export function ordenarVinculosListados(
   vinculos: readonly VinculoListado[],
@@ -155,9 +181,208 @@ export function ordenarVinculosListados(
     (a, b) =>
       ORDEM_SITUACAO_VINCULO[a.situacao] - ORDEM_SITUACAO_VINCULO[b.situacao] ||
       b.dataAdmissao.getTime() - a.dataAdmissao.getTime() ||
-      a.matricula.localeCompare(b.matricula),
+      // T179 — matrícula opcional: quem não tem vai depois de quem tem.
+      compararMatriculas(a.matricula, b.matricula),
   );
 }
+
+/**
+ * T179 — campos da admissão já usados na empresa ativa: matrícula e e-mail
+ * pessoal (único na mesma empresa, decisão da proprietária de 2026-10-21).
+ * Só a empresa ativa é consultada: "em uso" nunca revela alguém de outra.
+ */
+export async function conflitosDaAdmissao(
+  tx: Prisma.TransactionClient,
+  empresaId: string,
+  dto: Pick<AdmitirColaboradorDto, "matricula" | "contatos">,
+): Promise<ErroDeCampo[]> {
+  // T179 — matrícula e e-mail são opcionais: só o que veio é conferido.
+  const emailPessoal = contatosInformados(dto.contatos).emailPessoal;
+  const matricula =
+    dto.matricula == null
+      ? null
+      : await tx.vinculoFuncional.findFirst({
+          where: { empresaId, matricula: dto.matricula },
+          select: { id: true },
+        });
+  const email =
+    emailPessoal === null
+      ? null
+      : await tx.contatoColaborador.findFirst({
+          where: { empresaId, emailPessoal },
+          select: { id: true },
+        });
+  const erros: ErroDeCampo[] = [];
+  if (matricula) erros.push({ campo: "matricula", motivo: "em_uso" });
+  if (email) erros.push({ campo: "contatos.emailPessoal", motivo: "em_uso" });
+  return erros;
+}
+
+/**
+ * T179 — qual campo da admissão uma unicidade do banco protegeu. Só a
+ * matrícula na empresa e o e-mail pessoal na empresa têm campo público; a
+ * unicidade da chave de idempotência e as demais voltam `null`.
+ */
+export function camposDaUnicidadeViolada(erro: unknown): ErroDeCampo[] | null {
+  if (
+    !(erro instanceof Prisma.PrismaClientKnownRequestError) ||
+    erro.code !== "P2002"
+  ) {
+    return null;
+  }
+  const alvo = erro.meta?.["target"];
+  const texto = Array.isArray(alvo) ? alvo.join(",") : String(alvo ?? "");
+  if (/chave/.test(texto)) return null;
+  if (/matricula/.test(texto)) {
+    return [{ campo: "matricula", motivo: "em_uso" }];
+  }
+  if (/email_pessoal|emailPessoal/.test(texto)) {
+    return [{ campo: "contatos.emailPessoal", motivo: "em_uso" }];
+  }
+  return null;
+}
+
+/** O que o reenvio idempotente compara com a admissão gravada. */
+export interface AdmissaoGravada {
+  colaborador: Pick<Colaborador, "nome">;
+  vinculo: Pick<
+    VinculoFuncional,
+    "empresaId" | "matricula" | "tipo" | "dataAdmissao"
+  >;
+  movimentacao: Pick<
+    MovimentacaoFuncional,
+    | "motivoCodigo"
+    | "destinoUnidadeOrganizacionalId"
+    | "destinoDepartamentoId"
+    | "destinoAreaId"
+    | "destinoEquipeId"
+    | "destinoCargoId"
+    | "destinoCentroCustoId"
+  >;
+  perfil: Omit<
+    PerfilPessoalColaborador,
+    | "id"
+    | "empresaId"
+    | "colaboradorId"
+    | "criadoPorUserId"
+    | "atualizadoPorUserId"
+    | "criadoEm"
+    | "atualizadoEm"
+  > | null;
+  endereco: Omit<
+    EnderecoColaborador,
+    | "id"
+    | "empresaId"
+    | "colaboradorId"
+    | "criadoPorUserId"
+    | "atualizadoPorUserId"
+    | "criadoEm"
+    | "atualizadoEm"
+  > | null;
+  contato: Pick<
+    ContatoColaborador,
+    "emailPessoal" | "celular" | "telefone" | "ativo"
+  > | null;
+}
+
+/**
+ * T179 — o reenvio traz o MESMO conteúdo da admissão gravada? Compara cada
+ * campo já normalizado (o DTO passa pelos mesmos `@Transform` da gravação).
+ * Uma admissão editada depois (nome retificado, contato alterado) deixa de
+ * conferir — e o reenvio é recusado, em vez de devolver um estado que não é
+ * mais o do envio.
+ */
+export function admissaoConfere(
+  dto: AdmitirColaboradorDto,
+  gravada: AdmissaoGravada,
+): boolean {
+  const { colaborador, vinculo, movimentacao, perfil, endereco, contato } =
+    gravada;
+  const destino = extrairDestino(dto);
+  const iguais = (a: unknown, b: unknown) => a === b;
+
+  if (
+    !iguais(colaborador.nome, dto.nome) ||
+    !iguais(vinculo.empresaId, dto.empresaId) ||
+    !iguais(vinculo.matricula, dto.matricula ?? null) ||
+    !iguais(vinculo.tipo, dto.tipo) ||
+    vinculo.dataAdmissao.getTime() !==
+      dataUtc(new Date(dto.dataAdmissao)).getTime() ||
+    !iguais(movimentacao.motivoCodigo, dto.motivoCodigo) ||
+    !iguais(
+      movimentacao.destinoUnidadeOrganizacionalId,
+      destino.unidadeOrganizacionalId,
+    ) ||
+    !iguais(movimentacao.destinoDepartamentoId, destino.departamentoId) ||
+    !iguais(movimentacao.destinoAreaId, destino.areaId) ||
+    !iguais(movimentacao.destinoEquipeId, destino.equipeId) ||
+    !iguais(movimentacao.destinoCargoId, destino.cargoId) ||
+    !iguais(movimentacao.destinoCentroCustoId, destino.centroCustoId)
+  ) {
+    return false;
+  }
+
+  if (!perfil) return false;
+  const perfilEnviado = perfilCompleto(dto.perfilPessoal);
+  if (
+    perfil.dataNascimento.toISOString().slice(0, 10) !==
+    perfilEnviado.dataNascimento
+  ) {
+    return false;
+  }
+  for (const chave of CHAVES_PERFIL_SEM_DATA) {
+    if (!iguais(perfil[chave], perfilEnviado[chave])) return false;
+  }
+
+  const enderecoEnviado = dto.endereco ? enderecoCompleto(dto.endereco) : null;
+  const enderecoTemValor =
+    enderecoEnviado !== null &&
+    Object.values(enderecoEnviado).some((v) => v !== null);
+  if (!enderecoTemValor) {
+    if (endereco !== null) return false;
+  } else {
+    if (!endereco) return false;
+    for (const chave of CHAVES_ENDERECO) {
+      if (!iguais(endereco[chave], enderecoEnviado![chave])) return false;
+    }
+  }
+
+  // T179 — contatos opcionais: sem nenhum enviado, nenhum registro nasceu.
+  const enviados = contatosInformados(dto.contatos);
+  // Registro inativo (contatos removidos depois) é o mesmo "sem contato".
+  if (camposPreenchidos(enviados).length === 0) {
+    return contato === null || !contato.ativo;
+  }
+  return (
+    contato !== null &&
+    iguais(contato.emailPessoal, enviados.emailPessoal) &&
+    iguais(contato.celular, enviados.celular) &&
+    iguais(contato.telefone, enviados.telefone)
+  );
+}
+
+const CHAVES_PERFIL_SEM_DATA = [
+  "sexo",
+  "saudacao",
+  "estadoCivil",
+  "nacionalidade",
+  "naturalidade",
+  "escolaridade",
+  "curso",
+  "nomePai",
+  "nomeMae",
+] as const;
+
+const CHAVES_ENDERECO = [
+  "pais",
+  "cep",
+  "logradouro",
+  "numero",
+  "complemento",
+  "bairro",
+  "cidade",
+  "estado",
+] as const;
 
 /**
  * Colaborador — a pessoa. Carrega **apenas** os dados aprovados na Baseline V1
@@ -193,6 +418,28 @@ export class ColaboradorService {
     dto: AdmitirColaboradorDto,
     ctx: PessoasAuditContext,
   ): Promise<AdmissaoRegistrada> {
+    return (await this.admitirIdempotente(dto, ctx, undefined)).admissao;
+  }
+
+  /**
+   * T179 — admissão com idempotência do envio (decisão da proprietária de
+   * 2026-10-21).
+   *
+   * Com `chave`, a mesma chave do MESMO ator na MESMA empresa nunca cria duas
+   * admissões: o reenvio devolve a admissão já gravada (`reenvio: true`); a
+   * mesma chave com conteúdo diferente é recusada (422,
+   * `idempotencia_conteudo_divergente`). Envios simultâneos com a mesma chave
+   * se resolvem no banco: o segundo esbarra numa unicidade, e o `catch`
+   * encontra o registro do primeiro e responde como reenvio.
+   *
+   * Duplicidade de dado (matrícula, e-mail pessoal na empresa) responde 409
+   * com o campo e sem o valor (`ConflitoDeCamposException`).
+   */
+  async admitirIdempotente(
+    dto: AdmitirColaboradorDto,
+    ctx: PessoasAuditContext,
+    chave: string | undefined,
+  ): Promise<{ admissao: AdmissaoRegistrada; reenvio: boolean }> {
     const escopo = resolverEscopoPessoas(ctx.actor);
 
     if (dto.empresaId !== escopo.empresaId) {
@@ -257,9 +504,27 @@ export class ColaboradorService {
     const status: StatusMovimentacao =
       dataAdmissao > dataUtc(new Date()) ? "programada" : "solicitada";
 
+    // Reenvio de uma chave já registrada: nada é gravado de novo.
+    const registroAnterior = await this.registroDaChave(
+      ctx.actor.id,
+      escopo.empresaId,
+      chave,
+    );
+    if (registroAnterior) {
+      return this.reenviarAdmissao(registroAnterior, dto, ctx);
+    }
+
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      const admissao = await this.prisma.$transaction(async (tx) => {
         await assertDestinoValidoEAtivo(tx, escopo.empresaId, destino);
+
+        // T179 — duplicidade de dado, toda de uma vez e só na empresa ativa.
+        // A restrição do banco é a garantia (corrida chega como P2002, abaixo);
+        // esta consulta só existe para dizer QUAIS campos conflitam.
+        const conflitos = await conflitosDaAdmissao(tx, escopo.empresaId, dto);
+        if (conflitos.length > 0) {
+          throw new ConflitoDeCamposException(conflitos);
+        }
 
         const colaborador = await tx.colaborador.create({
           data: { nome: dto.nome, situacao: SituacaoColaborador.inativo },
@@ -269,7 +534,7 @@ export class ColaboradorService {
           data: {
             colaboradorId: colaborador.id,
             empresaId: escopo.empresaId,
-            matricula: dto.matricula,
+            matricula: dto.matricula ?? null,
             tipo: dto.tipo,
             situacao: "previsto",
             dataAdmissao,
@@ -341,6 +606,22 @@ export class ColaboradorService {
           dto.contatos,
         );
 
+        // T179 — registro de idempotência na MESMA transação: existe se, e só
+        // se, a admissão existe. Só chave, ator, empresa e ids — nenhum dado
+        // pessoal.
+        if (chave !== undefined) {
+          await tx.idempotenciaAdmissao.create({
+            data: {
+              chave,
+              atorUserId: ctx.actor.id,
+              empresaId: escopo.empresaId,
+              colaboradorId: colaborador.id,
+              vinculoId: vinculo.id,
+              movimentacaoId: movimentacao.id,
+            },
+          });
+        }
+
         return {
           id: colaborador.id,
           nome: colaborador.nome,
@@ -375,9 +656,160 @@ export class ColaboradorService {
           contatos: contatosGravados,
         };
       });
+      return { admissao, reenvio: false };
     } catch (error) {
+      const conflito =
+        error instanceof ConflitoDeCamposException ||
+        (error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === "P2002");
+      if (conflito) {
+        // Envio simultâneo com a mesma chave: o outro já gravou. A unicidade
+        // que barrou este (matrícula, e-mail ou a própria chave) é a do
+        // registro dele — é reenvio, não conflito.
+        const registro = await this.registroDaChave(
+          ctx.actor.id,
+          escopo.empresaId,
+          chave,
+        );
+        if (registro) {
+          return this.reenviarAdmissao(registro, dto, ctx);
+        }
+      }
+      if (error instanceof ConflitoDeCamposException) {
+        throw error;
+      }
+      const campos = camposDaUnicidadeViolada(error);
+      if (campos) {
+        throw new ConflitoDeCamposException(campos);
+      }
       traduzirErroPessoas(error);
     }
+  }
+
+  /** O registro de idempotência desta chave, deste ator, nesta empresa. */
+  private async registroDaChave(
+    atorUserId: string,
+    empresaId: string,
+    chave: string | undefined,
+  ): Promise<IdempotenciaAdmissao | null> {
+    if (chave === undefined) return null;
+    return this.prisma.idempotenciaAdmissao.findUnique({
+      where: {
+        atorUserId_empresaId_chave: { atorUserId, empresaId, chave },
+      },
+    });
+  }
+
+  /**
+   * T179 — reenvio de uma chave já registrada.
+   *
+   * O conteúdo do reenvio é comparado com a PRÓPRIA admissão gravada — por
+   * isso o registro de idempotência não precisa guardar nem um resumo dele.
+   * A comparação lê no servidor e nada devolve; só quando confere a resposta
+   * é montada, pelas consultas de dados pessoais e de contatos, que deixam a
+   * trilha de leitura de sempre.
+   */
+  private async reenviarAdmissao(
+    registro: IdempotenciaAdmissao,
+    dto: AdmitirColaboradorDto,
+    ctx: PessoasAuditContext,
+  ): Promise<{ admissao: AdmissaoRegistrada; reenvio: boolean }> {
+    const gravada = await this.prisma.$transaction(async (tx) => {
+      const [colaborador, vinculo, movimentacao, perfil, endereco, contato] =
+        await Promise.all([
+          tx.colaborador.findUniqueOrThrow({
+            where: { id: registro.colaboradorId },
+          }),
+          tx.vinculoFuncional.findUniqueOrThrow({
+            where: { id: registro.vinculoId },
+          }),
+          tx.movimentacaoFuncional.findUniqueOrThrow({
+            where: { id: registro.movimentacaoId },
+          }),
+          tx.perfilPessoalColaborador.findUnique({
+            where: {
+              colaboradorId_empresaId: {
+                colaboradorId: registro.colaboradorId,
+                empresaId: registro.empresaId,
+              },
+            },
+          }),
+          tx.enderecoColaborador.findUnique({
+            where: {
+              colaboradorId_empresaId: {
+                colaboradorId: registro.colaboradorId,
+                empresaId: registro.empresaId,
+              },
+            },
+          }),
+          tx.contatoColaborador.findUnique({
+            where: {
+              colaboradorId_empresaId: {
+                colaboradorId: registro.colaboradorId,
+                empresaId: registro.empresaId,
+              },
+            },
+          }),
+        ]);
+      return { colaborador, vinculo, movimentacao, perfil, endereco, contato };
+    });
+
+    if (!admissaoConfere(dto, gravada)) {
+      throw new RecusaDeNegocioException("idempotencia_conteudo_divergente");
+    }
+
+    const dados = await this.dadosPessoais.consultar(
+      registro.colaboradorId,
+      ctx,
+    );
+    const contatos = await this.contatos.consultar(registro.colaboradorId, ctx);
+    if (
+      !dados.perfilPessoal ||
+      dados.situacao === "bloqueado" ||
+      contatos.situacao === "bloqueado"
+    ) {
+      // A admissão confere, mas o uso operacional foi bloqueado depois dela
+      // (desligamento): não há o que devolver como admissão registrada.
+      throw new ConflictException();
+    }
+
+    const { colaborador, vinculo, movimentacao } = gravada;
+    return {
+      reenvio: true,
+      admissao: {
+        id: colaborador.id,
+        nome: colaborador.nome,
+        situacao: colaborador.situacao,
+        criadoEm: colaborador.criadoEm,
+        atualizadoEm: colaborador.atualizadoEm,
+        vinculo: {
+          id: vinculo.id,
+          empresaId: vinculo.empresaId,
+          matricula: vinculo.matricula,
+          tipo: vinculo.tipo,
+          situacao: vinculo.situacao,
+          dataAdmissao: vinculo.dataAdmissao,
+        },
+        movimentacao: {
+          id: movimentacao.id,
+          tipo: movimentacao.tipo,
+          status: movimentacao.status,
+          vigenciaInicio: movimentacao.vigenciaInicio,
+          destino: {
+            unidadeOrganizacionalId:
+              movimentacao.destinoUnidadeOrganizacionalId,
+            departamentoId: movimentacao.destinoDepartamentoId,
+            areaId: movimentacao.destinoAreaId,
+            equipeId: movimentacao.destinoEquipeId,
+            cargoId: movimentacao.destinoCargoId,
+            centroCustoId: movimentacao.destinoCentroCustoId,
+          },
+        },
+        perfilPessoal: dados.perfilPessoal,
+        endereco: dados.endereco,
+        contatos: contatos.contatos,
+      },
+    };
   }
 
   /**

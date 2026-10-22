@@ -366,3 +366,31 @@ dependentes, saúde, dado sindical, múltiplos vínculos, matrícula na efetiva�
 solicitação ou aprovação pelo gestor, alçadas nem ativação automática. A
 primeira página que a aplica, a de Nova admissão (T176), usa só o contrato atual
 de `POST /v1/colaboradores`.
+
+## Nota de convergência (T179, 2026-10-21) — lotação obrigatória e fuso
+
+Por decisão da proprietária ([decisão da T179](../decisions/t179-confirmacao-admissao-duplicidade-telefones.md)):
+
+- **Na Nova admissão**, Departamento, Cargo e Unidade passam a ser
+  **obrigatórios** (resolve o `DP-28` só para a admissão). Novo vínculo de
+  colaborador existente continua como está. Empresa sem essas referências não
+  admite: a tela explica que o RH precisa cadastrá-las, e o DP continua só com
+  leitura da estrutura.
+- O **fuso horário** fica fora do produto: o `DP-FLX-22` foi resolvido como não
+  aplicável só quanto ao fuso; "Dados adicionais" seguem pendentes no
+  `DP-ADM-19` da ADR 0016.
+- A admissão ganha **confirmação antes de gravar**, **idempotência** do envio e
+  **erro por campo** nos conflitos, sem valores.
+
+Contagens depois desta nota: 13 conflitos, 12 abertos e 1 resolvido; 22 gates,
+com o `DP-FLX-01`, o `DP-FLX-21` e o `DP-FLX-22` resolvidos e 19 abertos.
+Nenhuma outra decisão desta ADR muda.
+
+## Nota de convergência (T179, 2026-10-21) — obrigatoriedade do cadastro
+
+Pela [decisão de obrigatoriedade](../decisions/t179-obrigatoriedade-cadastro-colaborador.md), a lotação da
+Nova admissão exige **Departamento e Cargo**; a **Unidade passa a opcional**
+(o item correspondente da nota anterior fica substituído). A **matrícula**
+também passa a opcional na Nova admissão — quando informada, continua única
+na empresa — e o tipo de vínculo continua obrigatório. Novo vínculo de
+colaborador existente não muda. Contagens de gates e conflitos inalteradas.

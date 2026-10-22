@@ -34,3 +34,6 @@ export type { ModalProps } from "./Modal";
 
 export { TrilhaNavegacao } from "./TrilhaNavegacao";
 export type { ItemTrilha, TrilhaNavegacaoProps } from "./TrilhaNavegacao";
+
+export { CampoMascarado } from "./CampoMascarado";
+export type { CampoMascaradoProps } from "./CampoMascarado";

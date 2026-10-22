@@ -1,0 +1,8 @@
+/* T179 (B2) — aviso de entrada excedente do campo mascarado: o que passou do
+   limite não entrou, e o valor ficou como estava. Vazio, não ocupa espaço. */
+.campo-mascarado__aviso {
+  display: block;
+  margin: 0;
+  font-size: var(--text-caption);
+  color: var(--status-warning-ink);
+}

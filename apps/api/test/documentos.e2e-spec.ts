@@ -13,7 +13,10 @@ import { GenericContainer, StartedTestContainer, Wait } from "testcontainers";
 import { AppModule } from "../src/app.module";
 import { AllExceptionsFilter } from "../src/common/filters/http-exception.filter";
 import { requestIdMiddleware } from "../src/common/request-id";
-import { CAMPOS_OBRIGATORIOS_ADMISSAO } from "./admissao-obrigatoria";
+import {
+  camposObrigatoriosAdmissao,
+  lotacaoMinima,
+} from "./admissao-obrigatoria";
 
 /**
  * Etapa 2 — Documentos e Admissão Digital: V1 de METADADOS (ADR 0011, T008).
@@ -274,7 +277,8 @@ describe("Documentos — metadados V1 (e2e)", () => {
   ): Promise<string> {
     const colaborador = await post("/v1/colaboradores", cred)
       .send({
-        ...CAMPOS_OBRIGATORIOS_ADMISSAO,
+        ...camposObrigatoriosAdmissao(),
+        ...(await lotacaoMinima(appUrl, empresaId)),
         nome: "Pessoa Sintetica Documentos",
         empresaId,
         matricula,
@@ -1024,7 +1028,8 @@ describe("Documentos — metadados V1 (e2e)", () => {
     it("NÃO admite colaborador (mutação sensível negada)", async () => {
       await post("/v1/colaboradores", master)
         .send({
-          ...CAMPOS_OBRIGATORIOS_ADMISSAO,
+          ...camposObrigatoriosAdmissao(),
+          ...(await lotacaoMinima(appUrl, empresaA)),
           nome: "Nao Deve Ser Criado",
           empresaId: empresaA,
           matricula: "MST-X-0001",

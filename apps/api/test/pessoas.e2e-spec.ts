@@ -14,8 +14,11 @@ import { AppModule } from "../src/app.module";
 import { AllExceptionsFilter } from "../src/common/filters/http-exception.filter";
 import { requestIdMiddleware } from "../src/common/request-id";
 import {
-  CAMPOS_OBRIGATORIOS_ADMISSAO,
+  LotacaoMinima,
+  TELEFONE_GRAVADO_ADMISSAO,
+  camposObrigatoriosAdmissao,
   comoAdmitidoAntesDaT177,
+  lotacaoMinima,
 } from "./admissao-obrigatoria";
 
 /**
@@ -156,6 +159,9 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
   let equipeA: string;
   let departamentoB: string;
   let cargoB: string;
+  // T179 — a Nova admissão exige Departamento, Cargo e Unidade da empresa.
+  let lotacaoA: LotacaoMinima;
+  let lotacaoB: LotacaoMinima;
 
   const agent = () => request(app.getHttpServer());
 
@@ -257,7 +263,8 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
   ): Promise<{ colaboradorId: string; vinculoId: string }> {
     const colaborador = await post("/v1/colaboradores", cred)
       .send({
-        ...CAMPOS_OBRIGATORIOS_ADMISSAO,
+        ...camposObrigatoriosAdmissao(),
+        ...(await lotacaoMinima(appUrl, dados.empresaId)),
         nome: dados.nome,
         empresaId: dados.empresaId,
         matricula: dados.matricula,
@@ -393,6 +400,8 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
         .send({ empresaId: empresaB, codigo: "CARGOB1", nome: "Cargo B1" })
         .expect(201)
     ).body.id;
+    lotacaoA = await lotacaoMinima(appUrl, empresaA);
+    lotacaoB = await lotacaoMinima(appUrl, empresaB);
 
     rhA = await criarUsuario("rh.pa@example.test", "rh", empresaA);
     rhB = await criarUsuario("rh.pb@example.test", "rh", empresaB);
@@ -431,7 +440,8 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
     it("admite: cria colaborador, vínculo `previsto` e movimentação de admissão", async () => {
       const resposta = await post("/v1/colaboradores", rhA)
         .send({
-          ...CAMPOS_OBRIGATORIOS_ADMISSAO,
+          ...camposObrigatoriosAdmissao(),
+          ...lotacaoA,
           nome: "Pessoa Sintetica Um",
           empresaId: empresaA,
           matricula: "MAT-0001",
@@ -649,7 +659,8 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
     it("admite via web (nome + matrícula + destino), confirma por GET individual e por vínculos", async () => {
       const admissao = await post("/v1/colaboradores", rhA)
         .send({
-          ...CAMPOS_OBRIGATORIOS_ADMISSAO,
+          ...camposObrigatoriosAdmissao(),
+          ...lotacaoA,
           nome: "Pessoa Sintetica T111",
           empresaId: empresaA,
           matricula: "MAT-T111",
@@ -683,7 +694,8 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
     it("retifica o nome pela tela e o valor é refletido no GET individual", async () => {
       const admissao = await post("/v1/colaboradores", rhA)
         .send({
-          ...CAMPOS_OBRIGATORIOS_ADMISSAO,
+          ...camposObrigatoriosAdmissao(),
+          ...lotacaoA,
           nome: "Nome Original T111",
           empresaId: empresaA,
           matricula: "MAT-T111-B",
@@ -710,7 +722,8 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
     it("IDOR: rhB não acessa colaborador nem vínculos de rhA (404 anti-enumeração)", async () => {
       const admissao = await post("/v1/colaboradores", rhA)
         .send({
-          ...CAMPOS_OBRIGATORIOS_ADMISSAO,
+          ...camposObrigatoriosAdmissao(),
+          ...lotacaoA,
           nome: "Pessoa Sintetica T111 IDOR",
           empresaId: empresaA,
           matricula: "MAT-T111-C",
@@ -913,7 +926,8 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
     it("recusa matrícula duplicada dentro da empresa", async () => {
       await post("/v1/colaboradores", rhA)
         .send({
-          ...CAMPOS_OBRIGATORIOS_ADMISSAO,
+          ...camposObrigatoriosAdmissao(),
+          ...lotacaoA,
           nome: "Pessoa Sintetica Dois",
           empresaId: empresaA,
           matricula: "MAT-0001",
@@ -928,7 +942,8 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
     it("a mesma matrícula é aceita em outra empresa", async () => {
       await post("/v1/colaboradores", rhB)
         .send({
-          ...CAMPOS_OBRIGATORIOS_ADMISSAO,
+          ...camposObrigatoriosAdmissao(),
+          ...lotacaoB,
           nome: "Pessoa Sintetica Tres",
           empresaId: empresaB,
           matricula: "MAT-0001",
@@ -1057,7 +1072,8 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
     it("recusa alocação em nó organizacional de outra empresa (via API)", async () => {
       await post("/v1/colaboradores", rhA)
         .send({
-          ...CAMPOS_OBRIGATORIOS_ADMISSAO,
+          ...camposObrigatoriosAdmissao(),
+          ...lotacaoA,
           nome: "Pessoa Sintetica Cinco",
           empresaId: empresaA,
           matricula: "MAT-0005",
@@ -1074,7 +1090,8 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
       // "libera" as demais.
       await post("/v1/colaboradores", rhA)
         .send({
-          ...CAMPOS_OBRIGATORIOS_ADMISSAO,
+          ...camposObrigatoriosAdmissao(),
+          ...lotacaoA,
           nome: "Pessoa Sintetica Cargo Cruzado",
           empresaId: empresaA,
           matricula: "MAT-0005B",
@@ -1090,7 +1107,8 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
     it("aceita alocação com equipe da mesma empresa", async () => {
       const resposta = await post("/v1/colaboradores", rhA)
         .send({
-          ...CAMPOS_OBRIGATORIOS_ADMISSAO,
+          ...camposObrigatoriosAdmissao(),
+          ...lotacaoA,
           nome: "Pessoa Sintetica Equipe",
           empresaId: empresaA,
           matricula: "MAT-0005C",
@@ -1134,7 +1152,8 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
 
       await post("/v1/colaboradores", rhA)
         .send({
-          ...CAMPOS_OBRIGATORIOS_ADMISSAO,
+          ...camposObrigatoriosAdmissao(),
+          ...lotacaoA,
           nome: "Pessoa Sintetica Seis",
           empresaId: empresaA,
           matricula: "MAT-0006",
@@ -1147,9 +1166,12 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
     });
 
     it("recusa alocação sem nenhuma referência organizacional", async () => {
+      // T179 — a Nova admissão exige Departamento, Cargo e Unidade: sem
+      // nenhuma referência, a recusa chega já na validação do corpo (400),
+      // antes de qualquer gravação.
       await post("/v1/colaboradores", rhA)
         .send({
-          ...CAMPOS_OBRIGATORIOS_ADMISSAO,
+          ...camposObrigatoriosAdmissao(),
           nome: "Pessoa Sintetica Sete",
           empresaId: empresaA,
           matricula: "MAT-0007",
@@ -1157,13 +1179,24 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
           dataAdmissao: ADMISSAO,
           motivoCodigo: "admissao_inicial",
         })
-        .expect(422);
+        .expect(400);
+      const prisma = new PrismaClient({ datasources: { db: { url: appUrl } } });
+      try {
+        expect(
+          await prisma.vinculoFuncional.count({
+            where: { matricula: "MAT-0007" },
+          }),
+        ).toBe(0);
+      } finally {
+        await prisma.$disconnect();
+      }
     });
 
     it("recusa motivo fora do catálogo controlado e texto livre", async () => {
       await post("/v1/colaboradores", rhA)
         .send({
-          ...CAMPOS_OBRIGATORIOS_ADMISSAO,
+          ...camposObrigatoriosAdmissao(),
+          ...lotacaoA,
           nome: "Pessoa Sintetica Oito",
           empresaId: empresaA,
           matricula: "MAT-0008",
@@ -1178,7 +1211,8 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
     it("recusa tipo de vínculo fora do catálogo", async () => {
       await post("/v1/colaboradores", rhA)
         .send({
-          ...CAMPOS_OBRIGATORIOS_ADMISSAO,
+          ...camposObrigatoriosAdmissao(),
+          ...lotacaoA,
           nome: "Pessoa Sintetica Nove",
           empresaId: empresaA,
           matricula: "MAT-0009",
@@ -1231,7 +1265,8 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
       // outros casos nem com a invariante "vinculo ativo exige alocacao".
       const colaborador = await post("/v1/colaboradores", rhA)
         .send({
-          ...CAMPOS_OBRIGATORIOS_ADMISSAO,
+          ...camposObrigatoriosAdmissao(),
+          ...lotacaoA,
           nome: "Pessoa Sintetica Intervalo",
           empresaId: empresaA,
           matricula: "MAT-INTV",
@@ -1436,7 +1471,7 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
       // A unica rota de criacao e a admissao, e ela exige empresa, matricula,
       // tipo, data e destino organizacional.
       await post("/v1/colaboradores", rhA)
-        .send({ ...CAMPOS_OBRIGATORIOS_ADMISSAO, nome: "So Nome" })
+        .send({ ...camposObrigatoriosAdmissao(), nome: "So Nome" })
         .expect(400);
 
       const prisma = new PrismaClient({ datasources: { db: { url: appUrl } } });
@@ -1622,7 +1657,8 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
         // recusariam. Se o teste passar, foi a checagem da ORIGEM que agiu.
         const destinoColaborador = await post("/v1/colaboradores", rhA)
           .send({
-            ...CAMPOS_OBRIGATORIOS_ADMISSAO,
+            ...camposObrigatoriosAdmissao(),
+            ...lotacaoA,
             nome: "Pessoa Sintetica Destino",
             empresaId: empresaA,
             matricula: "MAT-DEST",
@@ -1686,7 +1722,8 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
         // checagem da ORIGEM que agiu, nao a unicidade.
         const destinoColaborador = await post("/v1/colaboradores", rhA)
           .send({
-            ...CAMPOS_OBRIGATORIOS_ADMISSAO,
+            ...camposObrigatoriosAdmissao(),
+            ...lotacaoA,
             nome: "Pessoa Sintetica Reaponte Destino",
             empresaId: empresaA,
             matricula: "MAT-REAP2",
@@ -1817,7 +1854,8 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
     it("admissao cria colaborador, vinculo e movimentacao na MESMA transacao", async () => {
       const resposta = await post("/v1/colaboradores", rhA)
         .send({
-          ...CAMPOS_OBRIGATORIOS_ADMISSAO,
+          ...camposObrigatoriosAdmissao(),
+          ...lotacaoA,
           nome: "Pessoa Sintetica Atomica",
           empresaId: empresaA,
           matricula: "MAT-ATOM",
@@ -1878,7 +1916,8 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
         );
         await post("/v1/colaboradores", rhA)
           .send({
-            ...CAMPOS_OBRIGATORIOS_ADMISSAO,
+            ...camposObrigatoriosAdmissao(),
+            ...lotacaoA,
             nome: "Pessoa Sintetica Atomica Falha",
             empresaId: empresaA,
             matricula: "MAT-ATOMF",
@@ -2106,7 +2145,8 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
     /** Corpo válido de admissão; só a matrícula muda entre os casos. */
     function admissao(matricula: string, extra: Record<string, unknown> = {}) {
       return {
-        ...CAMPOS_OBRIGATORIOS_ADMISSAO,
+        ...camposObrigatoriosAdmissao(),
+        ...lotacaoA,
         nome: `Pessoa Sintetica ${matricula}`,
         empresaId: empresaA,
         matricula,
@@ -2130,8 +2170,9 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
     }
 
     it("a resposta confirma colaborador, vínculo e ato de admissão — e nada além", async () => {
+      const corpo = admissao("T167-001");
       const resposta = await post("/v1/colaboradores", rhA)
-        .send(admissao("T167-001"))
+        .send(corpo)
         .expect(201);
 
       // Compatível com quem já lia o colaborador no topo.
@@ -2157,13 +2198,14 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
         ].sort(),
       );
       expect(resposta.body.perfilPessoal).toMatchObject({
-        dataNascimento:
-          CAMPOS_OBRIGATORIOS_ADMISSAO.perfilPessoal.dataNascimento,
+        dataNascimento: corpo.perfilPessoal.dataNascimento,
       });
       expect(resposta.body.endereco).toBeNull();
-      expect(resposta.body.contatos).toMatchObject(
-        CAMPOS_OBRIGATORIOS_ADMISSAO.contatos,
-      );
+      // T179 — telefones gravados em `+55` + DDD + número.
+      expect(resposta.body.contatos).toMatchObject({
+        emailPessoal: corpo.contatos.emailPessoal,
+        ...TELEFONE_GRAVADO_ADMISSAO,
+      });
       expect(Object.keys(resposta.body.vinculo).sort()).toEqual(
         [
           "dataAdmissao",
@@ -2190,7 +2232,7 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
       expect(resposta.body.movimentacao).toMatchObject({
         tipo: "admissao",
         destino: {
-          unidadeOrganizacionalId: null,
+          unidadeOrganizacionalId: lotacaoA.unidadeOrganizacionalId,
           departamentoId: departamentoA,
           areaId: null,
           equipeId: null,
@@ -2298,8 +2340,9 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
     const EMAIL_ENTRADA = "  Pessoa.Contato@EXAMPLE.test ";
     const EMAIL = "pessoa.contato@example.test";
     const CELULAR = "+5511987650001";
-    const TELEFONE = "1133330001";
-    const TELEFONE_NOVO = "1133330002";
+    // T179 — telefone gravado em `+55` + DDD + número.
+    const TELEFONE = "+551133330001";
+    const TELEFONE_NOVO = "+551133330002";
 
     let pessoaA: string;
     let pessoaB: string;
@@ -2460,7 +2503,7 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
       expect(JSON.stringify(foraDoEscopo.body)).not.toContain(EMAIL);
 
       await put(rota(pessoaA), rhB)
-        .send(corpo({ telefone: "1199999999" }))
+        .send(corpo({ telefone: "1144449999" }))
         .expect(404);
       const linha = await comPrisma((p) =>
         p.contatoColaborador.findFirstOrThrow({
@@ -2498,9 +2541,9 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
     // lido na montagem do `it.each` seria `undefined` — o JSON o descartaria e
     // o caso deixaria de enviar empresa nenhuma.
     it.each([
-      ["sem e-mail", () => ({ emailPessoal: undefined })],
-      ["sem celular", () => ({ celular: undefined })],
-      ["sem telefone", () => ({ telefone: undefined })],
+      // T179 — e-mail, celular e telefone ausentes deixaram de ser erro
+      // (decisão de 2026-10-21); ficam só os casos de formato e de campo
+      // proibido.
       ["e-mail inválido", () => ({ emailPessoal: "sem-arroba" })],
       ["celular curto", () => ({ celular: "1234567" })],
       ["telefone com letra", () => ({ telefone: "11 3333-ABCD" })],
@@ -2634,8 +2677,14 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
         departamentoId: departamentoA,
       });
       pessoaDesligada = colaboradorId;
+      // T179 — e-mail pessoal único na empresa: e-mail próprio desta pessoa.
+      const corpoDesligada = (extra: Record<string, unknown> = {}) =>
+        corpo({
+          emailPessoal: "pessoa.contato.desligada@example.test",
+          ...extra,
+        });
       await put(rota(pessoaDesligada), rhA)
-        .send(corpo({ celular: "11987650009" }))
+        .send(corpoDesligada({ celular: "11987650009" }))
         .expect(200);
 
       const desligamento = await post("/v1/movimentacoes", rhA)
@@ -2676,7 +2725,7 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
         result: "success",
       });
 
-      await put(rota(pessoaDesligada), rhA).send(corpo()).expect(409);
+      await put(rota(pessoaDesligada), rhA).send(corpoDesligada()).expect(409);
       const tentativa = await ultimaTrilha(pessoaDesligada);
       expect(tentativa.evento).toMatchObject({
         acao: "edicao",
@@ -2695,7 +2744,7 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
           where: { colaboradorId: pessoaDesligada },
         }),
       );
-      expect(linha.celular).toBe("11987650009");
+      expect(linha.celular).toBe("+5511987650009");
     });
 
     it("listagem e detalhe do colaborador NÃO expõem contatos", async () => {
@@ -2786,7 +2835,10 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
           TELEFONE,
           TELEFONE_NOVO,
           "11987650009",
+          "5511987650009",
           "5511987650001",
+          "pessoa.contato.desligada@example.test",
+          "pessoa.contato.ambigua@example.test",
         ]) {
           expect(tudo).not.toContain(valor);
         }
@@ -2800,7 +2852,13 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
         matricula: "T169-AMB",
         departamentoId: departamentoA,
       });
-      await put(rota(pessoaAmbigua), rhA).send(corpo()).expect(200);
+      // T179 — e-mail pessoal único na empresa: e-mail próprio desta pessoa.
+      const corpoAmbigua = (extra: Record<string, unknown> = {}) =>
+        corpo({
+          emailPessoal: "pessoa.contato.ambigua@example.test",
+          ...extra,
+        });
+      await put(rota(pessoaAmbigua), rhA).send(corpoAmbigua()).expect(200);
       // A API não cria vínculo em outra empresa para quem não está nela: o
       // segundo vínculo entra direto no banco, como nos E2E de documentos.
       const segundoVinculo = await comPrisma(async (p) => {
@@ -2825,6 +2883,9 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
 
         const leitura = await get(rota(pessoaAmbigua), master).expect(409);
         expect(JSON.stringify(leitura.body)).not.toContain(EMAIL);
+        expect(JSON.stringify(leitura.body)).not.toContain(
+          "pessoa.contato.ambigua@example.test",
+        );
         const consulta = await ultimaTrilha(pessoaAmbigua);
         expect(consulta.evento).toMatchObject({
           empresaId: null,
@@ -2842,7 +2903,7 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
         });
 
         await put(rota(pessoaAmbigua), master)
-          .send(corpo({ telefone: "1199990000" }))
+          .send(corpoAmbigua({ telefone: "1144440000" }))
           .expect(409);
         const tentativa = await ultimaTrilha(pessoaAmbigua);
         expect(tentativa.evento).toMatchObject({
@@ -3046,7 +3107,8 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
     it("nega admin_tecnico ao admitir", async () => {
       await post("/v1/colaboradores", admin)
         .send({
-          ...CAMPOS_OBRIGATORIOS_ADMISSAO,
+          ...camposObrigatoriosAdmissao(),
+          ...lotacaoA,
           nome: "Pessoa Sintetica Admin",
           empresaId: empresaA,
           matricula: "MAT-ADM",
@@ -3097,7 +3159,8 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
       await get("/v1/movimentacoes", cred()).expect(403);
       await post("/v1/colaboradores", cred())
         .send({
-          ...CAMPOS_OBRIGATORIOS_ADMISSAO,
+          ...camposObrigatoriosAdmissao(),
+          ...lotacaoA,
           nome: "Pessoa Sintetica Negada",
           empresaId: empresaA,
           matricula: "MAT-NEG",
@@ -3117,7 +3180,8 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
       await get("/v1/colaboradores", dpA).expect(200);
       const resposta = await post("/v1/colaboradores", dpA)
         .send({
-          ...CAMPOS_OBRIGATORIOS_ADMISSAO,
+          ...camposObrigatoriosAdmissao(),
+          ...lotacaoA,
           nome: "Pessoa Sintetica Dp",
           empresaId: empresaA,
           matricula: "MAT-DP01",
@@ -3135,7 +3199,8 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
         .post("/v1/colaboradores")
         .set("Cookie", rhA.cookie)
         .send({
-          ...CAMPOS_OBRIGATORIOS_ADMISSAO,
+          ...camposObrigatoriosAdmissao(),
+          ...lotacaoA,
           nome: "Pessoa Sintetica Sem Csrf",
           empresaId: empresaA,
           matricula: "MAT-CSRF",
@@ -3247,7 +3312,8 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
     it("admitir informando empresa de terceiro responde 404", async () => {
       await post("/v1/colaboradores", rhB)
         .send({
-          ...CAMPOS_OBRIGATORIOS_ADMISSAO,
+          ...camposObrigatoriosAdmissao(),
+          ...lotacaoA,
           nome: "Pessoa Sintetica Escopo",
           empresaId: empresaA,
           matricula: "MAT-ESC",
@@ -3317,7 +3383,8 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
 
       const colaborador = await post("/v1/colaboradores", rhA)
         .send({
-          ...CAMPOS_OBRIGATORIOS_ADMISSAO,
+          ...camposObrigatoriosAdmissao(),
+          ...lotacaoA,
           nome: "Pessoa Sintetica Ocupa",
           empresaId: empresaA,
           matricula: "MAT-OCUP",
@@ -3573,7 +3640,8 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
         );
         await post("/v1/colaboradores", rhA)
           .send({
-            ...CAMPOS_OBRIGATORIOS_ADMISSAO,
+            ...camposObrigatoriosAdmissao(),
+            ...lotacaoA,
             nome: "Pessoa Sintetica Rollback",
             empresaId: empresaA,
             matricula: "MAT-ROLL",
@@ -3773,7 +3841,8 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
     it("duas efetivações simultâneas: exatamente uma vence", async () => {
       const colaborador = await post("/v1/colaboradores", rhA)
         .send({
-          ...CAMPOS_OBRIGATORIOS_ADMISSAO,
+          ...camposObrigatoriosAdmissao(),
+          ...lotacaoA,
           nome: "Pessoa Sintetica Corrida",
           empresaId: empresaA,
           matricula: "MAT-CORR",

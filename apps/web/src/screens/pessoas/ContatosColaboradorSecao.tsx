@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Button, FormField } from "../../components";
+import { Button, CampoMascarado, FormField } from "../../components";
 import { ApiError } from "../../api/colaboradoresClient";
 import {
   type ContatosApi,
@@ -7,13 +7,24 @@ import {
   registrarContatosDoColaborador,
 } from "../../api/contatosColaboradorClient";
 import {
+  falhaAoPrepararEnvio,
+  falhaPorSessaoExpirada,
+  falhaPorTokenDesatualizado,
+} from "../../api/csrfClient";
+import {
   type CampoContato,
+  type CampoTelefone,
   type ErrosContatos,
   type ValoresContatos,
   LIMITE_EMAIL_PESSOAL,
-  normalizarContatos,
+  contatosParaEdicao,
+  contatosParaRegistro,
+  contatosVazios,
+  legadoIntacto,
+  telefonesLegados,
   validarContatos,
 } from "./contatosColaborador";
+import { DICA_DE_FORMATO } from "../../format/mascaras";
 
 /**
  * T169 — seção "Contatos" do detalhe do colaborador.
@@ -21,10 +32,28 @@ import {
  * Lê e grava pelas rotas próprias de contatos; nada daqui passa pela
  * listagem. A empresa nunca é enviada: o servidor a resolve pelo vínculo.
  *
- * Os três campos são obrigatórios juntos, como na ficha de tratamento. A
+ * T179 — os três campos são OPCIONAIS (decisão da proprietária de
+ * 2026-10-21): o formato só é conferido no que está preenchido, e o vazio vai
+ * `null` no `PUT` — é assim que um contato gravado é apagado. Sem registro,
+ * salvar os três vazios não cria nada: pede ao menos um. Com registro, limpar
+ * os três e salvar REMOVE os contatos: o servidor responde `sem_registro`
+ * (`removido`) e a seção volta ao estado "Nenhum contato registrado", o mesmo
+ * de quem nunca teve contato. O não informado
+ * aparece como "Não informado" no próprio campo vazio. A
  * confirmação de descarte é a do `Modal`: a seção avisa o detalhe quando há
  * edição não salva (`onAlteradoChange`) e quando está gravando
  * (`onSalvandoChange`), e o detalhe soma isso ao que ele próprio edita.
+ *
+ * T179 — celular e telefone são só brasileiros: gravados em `+55` + DDD +
+ * número e editados na máscara `(00) 00000-0000` / `(00) 0000-0000`. O e-mail
+ * pessoal é único na empresa: o 409 com `emailPessoal` em uso vai para o
+ * campo, sem repetir o valor.
+ *
+ * T179 (revisão final) — telefone gravado fora da forma atual é LEGADO: o
+ * campo o mostra exatamente como gravado, com a dica `DICA_LEGADO`. Intacto,
+ * não é validado nem enviado (a chave sai do `PUT`, e o servidor mantém o
+ * gravado); alterado, só um número brasileiro válido é aceito, e apagar tudo
+ * envia `null`. Os avisos da máscara somem ao salvar, remover ou recarregar.
  */
 
 const VAZIO: ValoresContatos = { emailPessoal: "", celular: "", telefone: "" };
@@ -38,6 +67,15 @@ const ORDEM_DOS_ERROS: readonly (CampoContato | "geral")[] = [
 
 const ERRO_GERAL_ID = "contatos-colaborador-erro-geral";
 
+/**
+ * T179 — estado "Nenhum contato registrado" (colaborador admitido sem
+ * contatos). Tem id próprio para a seção apontar para ele: quem chega por
+ * leitor de tela ouve, junto do título, que não há contato cadastrado.
+ */
+const SEM_CONTATOS_ID = "contatos-colaborador-sem-registro";
+const TEXTO_SEM_CONTATOS =
+  "Nenhum contato registrado. Este colaborador não tem e-mail pessoal, celular nem telefone cadastrados. Os três campos são opcionais: informe os que tiver.";
+
 const ID_DO_CAMPO: Record<CampoContato | "geral", string> = {
   emailPessoal: "contatos-colaborador-email-pessoal",
   celular: "contatos-colaborador-celular",
@@ -45,21 +83,51 @@ const ID_DO_CAMPO: Record<CampoContato | "geral", string> = {
   geral: ERRO_GERAL_ID,
 };
 
-const AJUDA_TELEFONE =
-  "Só dígitos, com + opcional no início. Espaço, parênteses, hífen e ponto são aceitos e removidos ao salvar.";
-
 type Carga =
   | { status: "carregando" }
   | { status: "erro"; mensagem: string }
   | { status: "bloqueado" }
   | { status: "dados"; gravado: ContatosApi | null };
 
+/**
+ * O que foi gravado, como a tela edita: telefones já mascarados (T179). O
+ * não informado (`null`) vira campo vazio.
+ */
 function valoresDe(contatos: ContatosApi): ValoresContatos {
-  return {
-    emailPessoal: contatos.emailPessoal,
-    celular: contatos.celular,
-    telefone: contatos.telefone,
-  };
+  return contatosParaEdicao(contatos);
+}
+
+/** T179 — rótulo de campo opcional: o "opcional" é parte do nome acessível. */
+function rotuloOpcional(rotulo: string): string {
+  return `${rotulo} (opcional)`;
+}
+
+/** T179 — o que o campo vazio mostra: o estado gravado, não um valor. */
+const NAO_INFORMADO = "Não informado";
+
+/**
+ * T179 (revisão final) — a marca do telefone LEGADO, ligada ao campo por
+ * `aria-describedby` enquanto ele ainda tem o valor gravado.
+ */
+const DICA_LEGADO =
+  "Formato antigo, mantido exatamente como gravado. Para trocar, apague e digite um número brasileiro.";
+
+/** T179 — o campo apontado pelo 409 de e-mail em uso, lido por forma. */
+function emailEmUso(erro: unknown): boolean {
+  const erros =
+    typeof erro === "object" && erro !== null
+      ? (erro as { erros?: unknown }).erros
+      : undefined;
+  return (
+    Array.isArray(erros) &&
+    erros.some(
+      (e) =>
+        typeof e === "object" &&
+        e !== null &&
+        (e as { campo?: unknown }).campo === "emailPessoal" &&
+        (e as { motivo?: unknown }).motivo === "em_uso",
+    )
+  );
 }
 
 /**
@@ -85,8 +153,36 @@ function mensagemDaLeituraRecusada(erro: unknown): string {
   }
 }
 
-/** Recusa da GRAVAÇÃO — os dados digitados ficam no formulário em todos os casos. */
+/**
+ * Recusa da GRAVAÇÃO — os dados digitados ficam no formulário em todos os casos.
+ *
+ * T179 (revisão final) — sessão expirada (401 ou `CsrfSessionExpiredError` na
+ * renovação do token) tem mensagem própria; T179 (revisão definitiva) — 403
+ * com `codigo: "csrf_invalido"` é página desatualizada (sessão válida, token
+ * desta aba renovado por outra): o cliente já descartou o token, e salvar de
+ * novo funciona. O 403 sem código continua sendo de permissão. `CsrfRequestError` (token não renovado por rede
+ * ou 5xx) diz que o pedido nem saiu. Aqui não há envio incerto: os contatos
+ * não têm chave de idempotência.
+ */
 function errosDaGravacaoRecusada(erro: unknown): ErrosContatos {
+  if (falhaPorTokenDesatualizado(erro)) {
+    return {
+      geral:
+        "Esta página ficou desatualizada. Salve novamente; seus dados foram mantidos.",
+    };
+  }
+  if (falhaPorSessaoExpirada(erro)) {
+    return {
+      geral:
+        "Sua sessão expirou e os contatos não foram salvos. Entre de novo para continuar; os dados digitados foram mantidos nesta ficha.",
+    };
+  }
+  if (falhaAoPrepararEnvio(erro)) {
+    return {
+      geral:
+        "Não foi possível preparar o envio e os contatos não foram salvos. Confira a conexão e salve de novo.",
+    };
+  }
   const status = erro instanceof ApiError ? erro.status : null;
   switch (status) {
     case 400:
@@ -95,6 +191,13 @@ function errosDaGravacaoRecusada(erro: unknown): ErrosContatos {
           "O servidor recusou algum dos contatos informados. Revise os campos e tente de novo.",
       };
     case 409:
+      // T179 — com a lista de campos, é o e-mail de outro colaborador desta
+      // empresa; sem ela, o bloqueio de antes (vínculo encerrado).
+      if (emailEmUso(erro)) {
+        return {
+          emailPessoal: "Este e-mail pessoal já está em uso nesta empresa.",
+        };
+      }
       return {
         geral:
           "Os contatos não foram salvos: o colaborador deixou de ter vínculo em uso nesta empresa, ou outra pessoa os gravou ao mesmo tempo. Feche e abra a ficha de novo.",
@@ -107,11 +210,6 @@ function errosDaGravacaoRecusada(erro: unknown): ErrosContatos {
       return {
         geral:
           "Seu perfil não tem permissão para alterar contatos. Nada foi salvo.",
-      };
-    case 401:
-      return {
-        geral:
-          "Seu acesso expirou. Nada foi salvo. Entre novamente para concluir.",
       };
     default:
       return {
@@ -152,9 +250,15 @@ export function ContatosColaboradorSecao({
   const pedidoRef = useRef(0);
   /** T176 — o foco pedido por `focarAoCarregar` é atendido uma vez só. */
   const focoInicialAtendidoRef = useRef(false);
+  /**
+   * T179 (revisão final) — contador que limpa os avisos da máscara
+   * (`limparAvisos`): muda ao recarregar, salvar ou remover.
+   */
+  const [limpezaDosAvisos, setLimpezaDosAvisos] = useState(0);
 
   const carregar = useCallback(async () => {
     const pedido = ++pedidoRef.current;
+    setLimpezaDosAvisos((n) => n + 1);
     setCarga({ status: "carregando" });
     try {
       const resposta = await consultarContatosDoColaborador(colaboradorId);
@@ -182,15 +286,16 @@ export function ContatosColaboradorSecao({
   }, [carregar]);
 
   const gravado = carga.status === "dados" ? carga.gravado : null;
+  // T179 (revisão final) — telefones gravados fora da forma atual, brutos.
+  const legados = telefonesLegados(gravado);
+  // T179 — comparado com o gravado como a tela o exibe (mascarado na forma
+  // atual; o legado, bruto): abrir a ficha não conta como alteração.
+  const inicial = gravado ? valoresDe(gravado) : VAZIO;
   const alterado =
     carga.status === "dados" &&
-    (gravado
-      ? edicao.emailPessoal !== gravado.emailPessoal ||
-        edicao.celular !== gravado.celular ||
-        edicao.telefone !== gravado.telefone
-      : edicao.emailPessoal !== "" ||
-        edicao.celular !== "" ||
-        edicao.telefone !== "");
+    (edicao.emailPessoal !== inicial.emailPessoal ||
+      edicao.celular !== inicial.celular ||
+      edicao.telefone !== inicial.telefone);
 
   useEffect(() => {
     onAlteradoChange(alterado);
@@ -240,7 +345,12 @@ export function ContatosColaboradorSecao({
     if (salvandoRef.current || carga.status !== "dados") return;
     setSucesso(null);
 
-    const errosLocais = validarContatos(edicao);
+    const errosLocais: ErrosContatos = validarContatos(edicao, legados);
+    // T179 — sem registro, os três vazios não criam nada: não há o que gravar.
+    if (gravado === null && contatosVazios(edicao)) {
+      errosLocais.geral =
+        "Nenhum contato preenchido: informe ao menos um para salvar.";
+    }
     if (Object.keys(errosLocais).length > 0) {
       focarPrimeiroErroRef.current = true;
       setErros(errosLocais);
@@ -253,11 +363,25 @@ export function ContatosColaboradorSecao({
     try {
       const resposta = await registrarContatosDoColaborador(
         colaboradorId,
-        normalizarContatos(edicao),
+        contatosParaRegistro(edicao, legados),
       );
+      // T179 — os três vazios removem o registro (`removido`) ou confirmam
+      // que não havia nenhum (`sem_alteracao`): a seção fica sem registro.
+      if (resposta?.situacao === "sem_registro") {
+        setLimpezaDosAvisos((n) => n + 1);
+        setCarga({ status: "dados", gravado: null });
+        setEdicao(VAZIO);
+        setSucesso(
+          resposta.resultado === "removido"
+            ? "Contatos removidos."
+            : "Nada mudou: este colaborador já não tinha contatos.",
+        );
+        return;
+      }
       if (!resposta?.contatos) {
         throw new Error("resposta inesperada");
       }
+      setLimpezaDosAvisos((n) => n + 1);
       setCarga({ status: "dados", gravado: resposta.contatos });
       setEdicao(valoresDe(resposta.contatos));
       setSucesso(
@@ -274,10 +398,61 @@ export function ContatosColaboradorSecao({
     }
   }
 
+  /**
+   * T179 — um campo de telefone. T179 (revisão final) — com o legado intacto,
+   * a dica `DICA_LEGADO` aparece e entra na descrição do campo.
+   */
+  function campoTelefone(campo: CampoTelefone, rotulo: string) {
+    const id = ID_DO_CAMPO[campo];
+    const legado = legadoIntacto(edicao, legados, campo);
+    const idDoLegado = `${id}-legado`;
+    const erro = erros[campo];
+    return (
+      <FormField
+        id={id}
+        label={rotuloOpcional(rotulo)}
+        help={DICA_DE_FORMATO.telefone}
+        disabled={salvando}
+        {...(erro ? { error: erro } : {})}
+      >
+        {(control) => (
+          <>
+            <CampoMascarado
+              mascara="telefone"
+              placeholder={NAO_INFORMADO}
+              value={edicao[campo]}
+              onValorChange={(valor) => alterarCampo(campo, valor)}
+              limparAvisos={limpezaDosAvisos}
+              {...control}
+              {...(legado
+                ? {
+                    "aria-describedby": [
+                      control["aria-describedby"],
+                      idDoLegado,
+                    ]
+                      .filter(Boolean)
+                      .join(" "),
+                  }
+                : {})}
+            />
+            {legado ? (
+              <p id={idDoLegado} className="evolli-field__help">
+                {DICA_LEGADO}
+              </p>
+            ) : null}
+          </>
+        )}
+      </FormField>
+    );
+  }
+
   return (
     <section
       className="colaboradores-screen__contatos"
       aria-labelledby="contatos-colaborador-titulo"
+      {...(carga.status === "dados" && gravado === null
+        ? { "aria-describedby": SEM_CONTATOS_ID }
+        : {})}
     >
       <h3
         id="contatos-colaborador-titulo"
@@ -310,15 +485,19 @@ export function ContatosColaboradorSecao({
           onSubmit={(e) => void salvar(e)}
         >
           {gravado === null ? (
-            <p className="colaboradores-screen__contatos-aviso">
-              Nenhum contato registrado. Informe os três campos para salvar.
+            // T179 — estado, não erro: `status` anuncia sem interromper.
+            <p
+              id={SEM_CONTATOS_ID}
+              className="colaboradores-screen__contatos-aviso"
+              role="status"
+            >
+              {TEXTO_SEM_CONTATOS}
             </p>
           ) : null}
 
           <FormField
             id={ID_DO_CAMPO.emailPessoal}
-            label="E-mail pessoal"
-            required
+            label={rotuloOpcional("E-mail pessoal")}
             disabled={salvando}
             {...(erros.emailPessoal ? { error: erros.emailPessoal } : {})}
           >
@@ -327,54 +506,31 @@ export function ContatosColaboradorSecao({
                 type="email"
                 autoComplete="off"
                 maxLength={LIMITE_EMAIL_PESSOAL + 10}
+                placeholder={NAO_INFORMADO}
                 value={edicao.emailPessoal}
                 onChange={(e) => alterarCampo("emailPessoal", e.target.value)}
                 {...control}
+                // T179 — o foco de "Revisar contatos na ficha" cai direto
+                // aqui, sem passar pelo título da seção: o estado "Nenhum
+                // contato registrado" entra na descrição do primeiro campo,
+                // junto da ajuda e do erro que o `FormField` já liga.
+                {...(gravado === null
+                  ? {
+                      "aria-describedby": [
+                        control["aria-describedby"],
+                        SEM_CONTATOS_ID,
+                      ]
+                        .filter(Boolean)
+                        .join(" "),
+                    }
+                  : {})}
               />
             )}
           </FormField>
 
-          <FormField
-            id={ID_DO_CAMPO.celular}
-            label="Celular"
-            help={AJUDA_TELEFONE}
-            required
-            disabled={salvando}
-            {...(erros.celular ? { error: erros.celular } : {})}
-          >
-            {(control) => (
-              <input
-                type="tel"
-                inputMode="tel"
-                autoComplete="off"
-                maxLength={32}
-                value={edicao.celular}
-                onChange={(e) => alterarCampo("celular", e.target.value)}
-                {...control}
-              />
-            )}
-          </FormField>
+          {campoTelefone("celular", "Celular")}
 
-          <FormField
-            id={ID_DO_CAMPO.telefone}
-            label="Telefone"
-            help={AJUDA_TELEFONE}
-            required
-            disabled={salvando}
-            {...(erros.telefone ? { error: erros.telefone } : {})}
-          >
-            {(control) => (
-              <input
-                type="tel"
-                inputMode="tel"
-                autoComplete="off"
-                maxLength={32}
-                value={edicao.telefone}
-                onChange={(e) => alterarCampo("telefone", e.target.value)}
-                {...control}
-              />
-            )}
-          </FormField>
+          {campoTelefone("telefone", "Telefone")}
 
           {erros.geral ? (
             <p

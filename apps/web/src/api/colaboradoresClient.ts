@@ -1,4 +1,8 @@
-import { clearCsrfToken, getCsrfToken, refreshCsrfToken } from "./csrfClient";
+import {
+  clearCsrfToken,
+  descartarTokenSeDesatualizado,
+  tokenCsrfParaGravacao,
+} from "./csrfClient";
 import type { EnderecoApi, PerfilPessoalApi } from "./dadosPessoaisClient";
 
 const BASE = "/v1";
@@ -22,7 +26,8 @@ export interface VinculoApi {
   id: string;
   colaboradorId: string;
   empresaId: string;
-  matricula: string;
+  /** T179 — opcional desde 2026-10-21: `null` quando não foi informada. */
+  matricula: string | null;
   tipo: TipoVinculo;
   situacao: SituacaoVinculo;
   dataAdmissao: string;
@@ -49,7 +54,8 @@ export interface ResultadoPaginado<T> {
 export interface VinculoListadoApi {
   id: string;
   empresaId: string;
-  matricula: string;
+  /** T179 — `null` quando a admissão não informou matrícula. */
+  matricula: string | null;
   situacao: SituacaoVinculo;
   /** Dia civil (`@db.Date`); exibir só com `formatarDiaCivil`. */
   dataAdmissao: string;
@@ -122,11 +128,20 @@ export interface DestinoOrganizacionalDto {
  * `AdmitirColaboradorDto` do backend — `empresaId` é a empresa do próprio ator
  * (obtida via `/v1/empresas`, nunca inventada no cliente) e é conferida contra
  * a sessão no servidor; divergência responde 404, nunca 403.
+ *
+ * T179 — na Nova admissão, Departamento e Cargo são OBRIGATÓRIOS; Unidade,
+ * Área (com o departamento), Equipe e Centro de custo são opcionais
+ * (decisões da proprietária de 2026-10-21). A matrícula também é opcional:
+ * vazia, o campo nem vai no corpo. Novo vínculo de colaborador existente não
+ * muda.
  */
 export interface AdmitirColaboradorDto extends DestinoOrganizacionalDto {
+  departamentoId: string;
+  cargoId: string;
   nome: string;
   empresaId: string;
-  matricula: string;
+  /** T179 — opcional; omitida quando vazia. */
+  matricula?: string;
   tipo: TipoVinculo;
   dataAdmissao: string;
   motivoCodigo: "admissao_inicial";
@@ -134,16 +149,17 @@ export interface AdmitirColaboradorDto extends DestinoOrganizacionalDto {
    * T177 — Módulo 1, gravado na MESMA transação da admissão. Vazio vai como
    * `null`.
    *
-   * OBRIGATÓRIOS: `perfilPessoal` com `dataNascimento`, e `contatos` (os três
-   * da ficha da T169, juntos). OPCIONAIS: os demais campos do perfil e o
-   * `endereco` inteiro.
+   * OBRIGATÓRIO: `perfilPessoal` com `dataNascimento`. OPCIONAIS: os demais
+   * campos do perfil (`sexo` só com um código de `OPCOES_SEXO`), o `endereco`
+   * inteiro e os `contatos` — T179: cada contato vazio é omitido, e o bloco
+   * inteiro some quando os três estão vazios.
    */
   perfilPessoal: Record<
     Exclude<keyof PerfilPessoalApi, "atualizadoEm" | "dataNascimento">,
     string | null
   > & { dataNascimento: string };
   endereco?: Record<Exclude<keyof EnderecoApi, "atualizadoEm">, string | null>;
-  contatos: { emailPessoal: string; celular: string; telefone: string };
+  contatos?: { emailPessoal?: string; celular?: string; telefone?: string };
 }
 
 /**
@@ -155,7 +171,8 @@ export interface AdmissaoRegistradaApi extends ColaboradorApi {
   vinculo: {
     id: string;
     empresaId: string;
-    matricula: string;
+    /** T179 — `null` quando a admissão não informou matrícula. */
+    matricula: string | null;
     tipo: TipoVinculo;
     situacao: SituacaoVinculo;
     dataAdmissao: string;
@@ -170,35 +187,102 @@ export interface AdmissaoRegistradaApi extends ColaboradorApi {
     }>;
   };
   /**
-   * T177 — o que o servidor gravou do Módulo 1. Perfil e contatos são
-   * obrigatórios e sempre vêm; endereço é `null` quando nenhum campo veio.
+   * T177 — o que o servidor gravou do Módulo 1. O perfil sempre vem;
+   * endereço é `null` quando nenhum campo veio. T179 — contatos também são
+   * `null` quando nenhum veio, e cada um pode ser `null` sozinho.
    */
   perfilPessoal: PerfilPessoalApi;
   endereco: EnderecoApi | null;
   contatos: {
-    emailPessoal: string;
-    celular: string;
-    telefone: string;
+    emailPessoal: string | null;
+    celular: string | null;
+    telefone: string | null;
     atualizadoEm: string;
-  };
+  } | null;
 }
 
 export interface RetificarColaboradorDto {
   nome: string;
 }
 
+/**
+ * T179 — um campo recusado pelo servidor, SEM o valor enviado: só o caminho
+ * do campo no corpo (`matricula`, `contatos.emailPessoal`, `emailPessoal`) e o
+ * motivo (`em_uso`).
+ */
+export interface ErroDeCampoApi {
+  readonly campo: string;
+  readonly motivo: string;
+}
+
+/**
+ * T179 — o que o corpo do erro pode trazer além da mensagem: `erros` (409 por
+ * campo) e `codigo` (por exemplo `idempotencia_conteudo_divergente`, no 422).
+ */
+export interface DetalhesDaRecusaApi {
+  readonly erros?: readonly ErroDeCampoApi[];
+  readonly codigo?: string;
+}
+
+function ehErroDeCampo(item: unknown): item is ErroDeCampoApi {
+  return (
+    typeof item === "object" &&
+    item !== null &&
+    typeof (item as { campo?: unknown }).campo === "string" &&
+    typeof (item as { motivo?: unknown }).motivo === "string"
+  );
+}
+
 export class ApiError extends Error {
+  /** T179 — campos recusados, quando o servidor os informa. */
+  readonly erros?: readonly ErroDeCampoApi[];
+  /** T179 — código estável da recusa, quando o servidor o informa. */
+  readonly codigo?: string;
+
+  /**
+   * `corpo` é o corpo JSON do erro, ou nada. Só `erros` (lista de
+   * `{campo, motivo}` em texto) e `codigo` (texto) são lidos; qualquer outra
+   * coisa do corpo é ignorada, e forma inesperada simplesmente não vira
+   * detalhe — quem já usava `status` e `message` não muda.
+   */
   constructor(
     readonly status: number,
     message: string,
+    corpo?: unknown,
   ) {
     super(message);
     this.name = "ApiError";
+    if (typeof corpo === "object" && corpo !== null) {
+      const { erros, codigo } = corpo as {
+        erros?: unknown;
+        codigo?: unknown;
+      };
+      if (Array.isArray(erros)) {
+        this.erros = erros
+          .filter(ehErroDeCampo)
+          .map(({ campo, motivo }) => ({ campo, motivo }));
+      }
+      if (typeof codigo === "string") this.codigo = codigo;
+    }
   }
 }
 
+/** T179 — opções do envio da admissão. */
+export interface OpcoesDaAdmissao {
+  /**
+   * Chave de idempotência (UUID) do envio, no cabeçalho `Idempotency-Key`.
+   * A MESMA chave em nova tentativa nunca cria uma segunda admissão: o
+   * servidor devolve a já gravada, ou recusa com 422 se o conteúdo mudou.
+   */
+  readonly chaveIdempotencia?: string;
+}
+
+/**
+ * T179 — rede caída ao renovar o token vira `CsrfRequestError`: a gravação nem
+ * saiu, e a tela não a confunde com envio incerto.
+ */
 async function getCsrf(): Promise<string> {
-  return getCsrfToken() ?? refreshCsrfToken();
+  return tokenCsrfParaGravacao();
 }
 
 async function apiFetch(
@@ -217,6 +301,9 @@ async function apiFetch(
   if (res.status === 401) {
     clearCsrfToken();
   }
+  // T179 (revisão definitiva) — 403 `csrf_invalido`: o token desta aba ficou
+  // desatualizado; descartado, a próxima gravação pede um novo.
+  await descartarTokenSeDesatualizado(res);
   return res;
 }
 
@@ -228,7 +315,7 @@ async function jsonOrThrow<T>(res: Response): Promise<T> {
     const msg = Array.isArray(body.message)
       ? (body.message[0] ?? "Erro na requisição.")
       : (body.message ?? "Erro na requisição.");
-    throw new ApiError(res.status, msg);
+    throw new ApiError(res.status, msg, body);
   }
   return res.json() as Promise<T>;
 }
@@ -267,13 +354,24 @@ export async function listarVinculosDoColaborador(
   return jsonOrThrow(res);
 }
 
+/**
+ * Registra a admissão. T179 — com `chaveIdempotencia`, o envio é idempotente:
+ * reenviar a mesma chave (depois de uma falha de rede, por exemplo) devolve a
+ * admissão já gravada com o mesmo 201, e o cabeçalho `Idempotent-Replayed`.
+ */
 export async function admitirColaborador(
   dto: AdmitirColaboradorDto,
+  opcoes: OpcoesDaAdmissao = {},
 ): Promise<AdmissaoRegistradaApi> {
   const token = await getCsrf();
   const res = await apiFetch("/colaboradores", {
     method: "POST",
-    headers: { "x-csrf-token": token },
+    headers: {
+      "x-csrf-token": token,
+      ...(opcoes.chaveIdempotencia
+        ? { "Idempotency-Key": opcoes.chaveIdempotencia }
+        : {}),
+    },
     body: JSON.stringify(dto),
   });
   return jsonOrThrow(res);

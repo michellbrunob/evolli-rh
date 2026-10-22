@@ -1,23 +1,45 @@
 import { Transform, Type } from "class-transformer";
 import {
   IsDateString,
+  IsIn,
   IsOptional,
   IsString,
   Matches,
   MaxLength,
   Validate,
   ValidateNested,
+  ValidationArguments,
   ValidatorConstraint,
   ValidatorConstraintInterface,
 } from "class-validator";
 import {
+  CEP_BRASILEIRO,
   CEP_FORMA,
   DATA_NASCIMENTO_MINIMA,
   LIMITES_ENDERECO,
   LIMITES_PERFIL,
   SEM_CONTROLE,
+  SEXOS,
+  type Sexo,
+  ehPaisBrasil,
+  normalizarCep,
   normalizarTextoPessoal,
 } from "./normalizacao-dados-pessoais.util";
+
+/**
+ * T179 — com país Brasil, o CEP é obrigatoriamente os 8 dígitos já
+ * normalizados (`normalizarCep`); com outro país, vale só `CEP_FORMA`.
+ */
+@ValidatorConstraint({ name: "cepCoerenteComPais", async: false })
+export class CepCoerenteComPais implements ValidatorConstraintInterface {
+  validate(valor: unknown, args: ValidationArguments): boolean {
+    const pais = (args.object as { pais?: unknown }).pais;
+    return (
+      !ehPaisBrasil(pais) ||
+      (typeof valor === "string" && CEP_BRASILEIRO.test(valor))
+    );
+  }
+}
 
 /**
  * Data de nascimento no intervalo aceito: de 1900-01-01 até hoje (UTC). O
@@ -41,10 +63,11 @@ export class DataNascimentoNoIntervalo implements ValidatorConstraintInterface {
  * Dados pessoais básicos (T177, Módulo 1).
  *
  * OBRIGATÓRIO: `dataNascimento` — todo registro de perfil a tem, na admissão
- * e na edição (o banco a exige por NOT NULL). OPCIONAIS: os demais, em texto
- * controlado: não há catálogo canônico no sistema para sexo, saudação, estado
- * civil, nacionalidade, naturalidade ou escolaridade, e esta fatia não inventa
- * taxonomia. O servidor apara, colapsa espaços e grava vazio como `null`.
+ * e na edição (o banco a exige por NOT NULL). OPCIONAIS: os demais. Sexo, em
+ * opções fechadas (`SEXOS`, T179); saudação, estado civil, nacionalidade,
+ * naturalidade e escolaridade, em texto controlado — não há catálogo canônico
+ * para eles, e esta fatia não inventa taxonomia. O servidor apara, colapsa
+ * espaços e grava vazio como `null`.
  *
  * Nome completo NÃO está aqui: continua sendo `nome` da admissão, no
  * `Colaborador`. Nome social e gênero ficaram fora do Módulo 1 (matriz da PR).
@@ -56,12 +79,11 @@ export class PerfilPessoalDto {
   @Validate(DataNascimentoNoIntervalo)
   dataNascimento!: string;
 
+  /** T179 — opções fechadas (`SEXOS`); sem seleção, `null`. */
   @Transform(({ value }) => normalizarTextoPessoal(value))
   @IsOptional()
-  @IsString()
-  @MaxLength(LIMITES_PERFIL.sexo)
-  @Matches(SEM_CONTROLE)
-  sexo?: string | null;
+  @IsIn(SEXOS)
+  sexo?: Sexo | null;
 
   @Transform(({ value }) => normalizarTextoPessoal(value))
   @IsOptional()
@@ -134,10 +156,13 @@ export class EnderecoDto {
   @Matches(SEM_CONTROLE)
   pais?: string | null;
 
-  @Transform(({ value }) => normalizarTextoPessoal(value))
+  @Transform(({ value, obj }) =>
+    normalizarCep(value, (obj as { pais?: unknown }).pais),
+  )
   @IsOptional()
   @IsString()
   @Matches(CEP_FORMA)
+  @Validate(CepCoerenteComPais)
   cep?: string | null;
 
   @Transform(({ value }) => normalizarTextoPessoal(value))

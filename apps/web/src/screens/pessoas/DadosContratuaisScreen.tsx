@@ -37,6 +37,7 @@ import {
   type VinculoApi,
 } from "../../api/colaboradoresClient";
 import { formatarDiaCivil, formatarInstante } from "../../format/data";
+import { exibirMatricula } from "../../format/matricula";
 import {
   listarAlocacoesVinculo,
   type AlocacaoOrganizacionalApi,
@@ -575,7 +576,8 @@ export function DadosContratuaisScreen() {
                       <option value="">Selecione…</option>
                       {vinculos.map((v) => (
                         <option key={v.id} value={v.id}>
-                          {v.matricula} · {ROTULO_TIPO_VINCULO[v.tipo]} ·{" "}
+                          {exibirMatricula(v.matricula)} ·{" "}
+                          {ROTULO_TIPO_VINCULO[v.tipo]} ·{" "}
                           {ROTULO_SITUACAO_VINCULO[v.situacao]}
                         </option>
                       ))}
@@ -606,12 +608,12 @@ export function DadosContratuaisScreen() {
               id="dados-contratuais-detalhe-titulo"
               className="dados-contratuais-screen__section-title"
             >
-              Vínculo — {vinculoSelecionado.matricula}
+              Vínculo — {exibirMatricula(vinculoSelecionado.matricula)}
             </h2>
             <dl className="dados-contratuais-screen__lista">
               <div>
                 <dt>Matrícula</dt>
-                <dd>{vinculoSelecionado.matricula}</dd>
+                <dd>{exibirMatricula(vinculoSelecionado.matricula)}</dd>
               </div>
               <div>
                 <dt>Tipo</dt>

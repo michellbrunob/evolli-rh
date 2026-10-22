@@ -5,10 +5,14 @@ import {
   consultarDadosPessoaisDoColaborador,
 } from "../../api/dadosPessoaisClient";
 import { formatarDiaCivil } from "../../format/data";
+import { exibirCep } from "../../format/mascaras";
 import {
   CAMPOS_ENDERECO,
   CAMPOS_TEXTO_PERFIL,
+  CAMPO_SEXO,
   ROTULO_DATA_NASCIMENTO,
+  ehPaisBrasil,
+  rotuloDoSexo,
 } from "./dadosPessoais";
 
 /**
@@ -22,6 +26,10 @@ import {
  * Leem: `rh` e `dp` na empresa ativa, e o `master_tecnico` em qualquer
  * empresa (com empresa ativa, só nela) — Emenda 2 da ADR 0012. Perfil sem
  * acesso recebe a recusa do servidor e vê um aviso, nunca um valor.
+ *
+ * T179 — o sexo é gravado como código da lista fechada e aparece pelo
+ * rótulo; sem valor, "Não informado" (nada é inferido); texto livre de um
+ * cadastro anterior à lista aparece como veio.
  */
 type Carga =
   | { status: "carregando" }
@@ -112,18 +120,38 @@ export function DadosPessoaisColaboradorSecao({
                 : "Não informado"}
             </dd>
           </div>
+          <div className="colaboradores-screen__par">
+            <dt>{CAMPO_SEXO.rotulo}</dt>
+            <dd>
+              {rotuloDoSexo(carga.dados.perfilPessoal?.sexo) ?? "Não informado"}
+            </dd>
+          </div>
           {CAMPOS_TEXTO_PERFIL.map((c) => (
             <div key={c.chave} className="colaboradores-screen__par">
               <dt>{c.rotulo}</dt>
               <dd>{carga.dados.perfilPessoal?.[c.chave] ?? "Não informado"}</dd>
             </div>
           ))}
-          {CAMPOS_ENDERECO.map((c) => (
-            <div key={c.chave} className="colaboradores-screen__par">
-              <dt>{c.rotulo}</dt>
-              <dd>{carga.dados.endereco?.[c.chave] ?? "Não informado"}</dd>
-            </div>
-          ))}
+          {CAMPOS_ENDERECO.map((c) => {
+            const valor = carga.dados.endereco?.[c.chave] ?? null;
+            return (
+              <div key={c.chave} className="colaboradores-screen__par">
+                <dt>{c.rotulo}</dt>
+                <dd>
+                  {valor === null
+                    ? "Não informado"
+                    : c.chave === "cep"
+                      ? // T179 — CEP brasileiro gravado em 8 dígitos e
+                        // exibido `00000-000`; outro país, como veio.
+                        exibirCep(
+                          valor,
+                          ehPaisBrasil(carga.dados.endereco?.pais),
+                        )
+                      : valor}
+                </dd>
+              </div>
+            );
+          })}
         </dl>
       )}
     </section>

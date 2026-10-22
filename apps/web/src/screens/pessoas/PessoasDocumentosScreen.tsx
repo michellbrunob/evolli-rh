@@ -61,6 +61,7 @@ import {
   type TipoDocumentoApi,
 } from "../../api/documentosClient";
 import { formatarInstante } from "../../format/data";
+import { trechoDeMatricula } from "../../format/matricula";
 import "./PessoasDocumentosScreen.css";
 
 export const PESSOAS_DOCUMENTOS_TITULO_ID = "pessoas-documentos-titulo";
@@ -606,7 +607,7 @@ export function PessoasDocumentosScreen() {
               <ul className="pessoas-documentos-screen__vinculos-lista">
                 {vinculos.map((v) => (
                   <li key={v.id}>
-                    {v.tipo} · {v.situacao} · matrícula {v.matricula}
+                    {v.tipo} · {v.situacao} · {trechoDeMatricula(v.matricula)}
                   </li>
                 ))}
               </ul>

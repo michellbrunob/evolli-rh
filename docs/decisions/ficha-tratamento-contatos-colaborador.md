@@ -171,3 +171,71 @@ endereço ([ficha da T177](ficha-tratamento-dados-pessoais-endereco-colaborador.
 
 Nenhum código muda com esta alteração: o processo de eliminação dos 2 anos
 nunca foi implementado.
+
+## 8. Alteração de 2026-10-21 (T179) — telefone brasileiro e e-mail único na empresa
+
+Por decisão da proprietária ([decisão da T179](t179-confirmacao-admissao-duplicidade-telefones.md)), a regra da §3 muda:
+
+- **Celular e telefone:** só números **brasileiros**, gravados em `+55` + DDD +
+  número — DDD de dois dígitos de 1 a 9; celular com 9 dígitos iniciado por 9;
+  fixo com 8 dígitos iniciado por 2 a 5. A entrada aceita `+55`, `55`,
+  parênteses, espaço, hífen e ponto. A tela mostra `(00) 0000-0000` ou
+  `(00) 00000-0000`. Número estrangeiro não é aceito nesta etapa.
+- **Telefones já gravados:** a migration da T179 converte só o que tem forma
+  inequívoca; o que não puder ser convertido com segurança fica como está e
+  entra na relação técnica de revisão (`revisao_normalizacao_cadastro`), com o
+  registro e o nome do campo, **nunca o valor**.
+- **E-mail pessoal:** passa a ser **único na mesma empresa**, por restrição do
+  banco; pode repetir em empresa diferente. O conflito responde 409 com o campo
+  e sem o valor, e só na empresa ativa.
+
+Finalidade, base legal, classificação, retenção e escopo de acesso não mudam.
+
+## 9. Alteração de 2026-10-21 (T179) — contatos opcionais
+
+Pela [decisão de obrigatoriedade](t179-obrigatoriedade-cadastro-colaborador.md), **e-mail pessoal, celular e
+telefone passam a opcionais**, na admissão e na edição. Admissão sem nenhum
+contato não cria registro; campo vazio grava `null`. Quando informados, o
+formato continua conferido (§3 e §8) e o e-mail pessoal continua único na
+empresa (§8). Contato de emergência continua sem campo, opcional quando for
+liberado. Finalidade, base legal, classificação, retenção e escopo de acesso
+não mudam.
+
+## 10. Alteração de 2026-10-22 (T179) — remoção de todos os contatos
+
+Quando quem já tem contatos limpa e salva os três campos, o registro passa a
+**inativo** (`ativo = false`): sem nenhum valor, preservado só para a trilha
+de auditoria, e lido como "sem registro" — o mesmo estado de quem nunca teve
+contato. **Não há exclusão física**: a rota de exclusão continua inexistente
+(§5), `evolli_app` continua sem `DELETE` e os eventos apontam para o registro.
+A remoção fica na trilha como **edição**, com os nomes dos campos removidos e
+nunca os valores; a leitura posterior registra `sem_registro` apontando para o
+registro inativo. Informar um contato depois reativa o mesmo registro. O banco
+garante a coerência: registro ativo tem ao menos um contato, e inativo, nenhum
+(migration `20261022120000_contato_colaborador_inativo`). Finalidade, base
+legal, classificação, retenção e escopo de acesso não mudam.
+
+## 11. Alteração de 2026-10-22 (T179) — telefone legado e texto com ramal
+
+- **Edição parcial:** no `PUT` de contatos, campo **ausente mantém** o valor
+  gravado; `null` ou vazio apaga aquele campo. O registro só escreve os campos
+  que mudaram, e o evento de edição nomeia só esses.
+- **Telefone legado:** um telefone gravado antes da forma `+55` atual, que não
+  se enquadre nela com segurança, aparece exatamente como gravado. Salvar outro
+  campo não o reenvia, não o transforma e não o regrava; editá-lo exige a forma
+  brasileira atual, e só o valor novo é normalizado. Os legados já estão
+  listados na relação técnica de revisão da migration `20261021120000`, sem
+  valores.
+- **Texto com ramal ou palavras:** recusado como formato inválido (§3), na tela
+  e no servidor; nenhuma letra é descartada para formar um número.
+
+## 12. Alteração de 2026-10-22 (T179) — salvamentos e leituras simultâneos
+
+Salvar contatos trava a linha do contato (`FOR NO KEY UPDATE`) antes de ler o
+registro atual: salvamentos simultâneos se serializam, e cada um parte do que
+o anterior gravou. A leitura pega `FOR SHARE` na mesma linha antes de ler:
+leituras não se bloqueiam entre si, e uma leitura só espera um salvamento em
+andamento terminar, lendo o que ele gravou. Assim, nenhum salvamento deixa o
+registro vazio e ativo, e a trilha de uma leitura nunca afirma um estado que um
+salvamento concorrente acabou de mudar. Nada muda em finalidade, retenção,
+escopo de acesso ou conteúdo da trilha (só nomes de campos).

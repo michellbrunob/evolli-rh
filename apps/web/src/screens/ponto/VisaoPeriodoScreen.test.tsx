@@ -272,6 +272,22 @@ describe("VisaoPeriodoScreen (T113 — funcional)", () => {
     expect(dentro.getByText("Ajustada")).toBeInTheDocument();
   });
 
+  it("T179 — vínculo sem matrícula: 'Sem matrícula' junto do nome, nunca 'null'", async () => {
+    vi.mocked(listarVinculosDoColaborador).mockImplementation(async (id) =>
+      id === colaborador1.id ? [{ ...vinculo1, matricula: null }] : [vinculo2],
+    );
+    render(<VisaoPeriodoScreen />);
+
+    const tabela = await aguardarLista();
+    await waitFor(() =>
+      expect(
+        within(tabela).getAllByText("Ana Colaboradora (teste) — Sem matrícula")
+          .length,
+      ).toBeGreaterThan(0),
+    );
+    expect(tabela).not.toHaveTextContent("null");
+  });
+
   it("mostra o estado de carregamento antes dos dados", async () => {
     let resolver: (v: Paginado<EventoPontoApi>) => void;
     vi.mocked(listarPontos).mockReturnValueOnce(
