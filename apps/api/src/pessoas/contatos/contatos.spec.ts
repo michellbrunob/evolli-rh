@@ -377,6 +377,10 @@ function montar(opcoes: {
       : {
           id: CONTATO_ID,
           atualizadoEm: new Date("2026-10-16T12:00:00Z"),
+          // T179 — ativo com algum contato; o teste pode forçar o inativo.
+          ativo: Object.values(opcoes.contato).some(
+            (v) => typeof v === "string",
+          ),
           ...opcoes.contato,
         };
 
@@ -1083,6 +1087,120 @@ describe("Contatos — serviço", () => {
         ),
       ).rejects.toThrow("trilha indisponível");
       expect(m.prisma.contatoColaboradorEvento.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("remoção de todos os contatos — registro inativo (T179)", () => {
+    const NULOS = { emailPessoal: null, celular: null, telefone: null };
+    const INATIVO = { ...NULOS, ativo: false };
+
+    it("limpar os três: registro fica INATIVO, sem valor; resposta sem_registro/removido; evento de edição só com nomes", async () => {
+      const m = montar({ vinculos: ATIVO_A, contato: COM_VALOR });
+      const resposta = await m.service.registrar(
+        COLABORADOR,
+        NULOS as unknown as RegistrarContatosColaboradorDto,
+        ctx(ator("rh", EMPRESA_A)),
+      );
+      expect(resposta).toEqual({
+        colaboradorId: COLABORADOR,
+        empresaId: EMPRESA_A,
+        situacao: "sem_registro",
+        contatos: null,
+        resultado: "removido",
+      });
+      expect(m.prisma.contatoColaborador.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: {
+            emailPessoal: null,
+            celular: null,
+            telefone: null,
+            ativo: false,
+            atualizadoPorUserId: "ator-rh",
+          },
+        }),
+      );
+      expect(eventoFormal(m)).toEqual(
+        expect.objectContaining({
+          action: "pessoas_contato_atualizado",
+          result: "success",
+        }),
+      );
+      expect(eventoDeTratamento(m)).toEqual(
+        expect.objectContaining({
+          contatoId: CONTATO_ID,
+          acao: "edicao",
+          resultado: "gravado",
+          campos: ["email_pessoal", "celular", "telefone"],
+        }),
+      );
+      semValores(trilha(m));
+    });
+
+    it("leitura de registro inativo: sem_registro, sem valor, evento aponta para o registro sem campos", async () => {
+      const m = montar({ vinculos: ATIVO_A, contato: INATIVO });
+      const resposta = await m.service.consultar(
+        COLABORADOR,
+        ctx(ator("dp", EMPRESA_A)),
+      );
+      expect(resposta).toEqual({
+        colaboradorId: COLABORADOR,
+        empresaId: EMPRESA_A,
+        situacao: "sem_registro",
+        contatos: null,
+      });
+      expect(eventoDeTratamento(m)).toEqual(
+        expect.objectContaining({
+          contatoId: CONTATO_ID,
+          acao: "leitura",
+          resultado: "sem_registro",
+          campos: [],
+        }),
+      );
+    });
+
+    it("inativo e nada informado: nada é gravado; sem_registro/sem_alteracao", async () => {
+      const m = montar({ vinculos: ATIVO_A, contato: INATIVO });
+      const resposta = await m.service.registrar(
+        COLABORADOR,
+        {} as RegistrarContatosColaboradorDto,
+        ctx(ator("rh", EMPRESA_A)),
+      );
+      expect(resposta).toMatchObject({
+        situacao: "sem_registro",
+        contatos: null,
+        resultado: "sem_alteracao",
+      });
+      expect(m.prisma.contatoColaborador.update).not.toHaveBeenCalled();
+      expect(m.prisma.contatoColaborador.create).not.toHaveBeenCalled();
+      expect(eventoDeTratamento(m)).toEqual(
+        expect.objectContaining({
+          contatoId: CONTATO_ID,
+          resultado: "sem_registro",
+        }),
+      );
+    });
+
+    it("inativo e um contato informado: o registro volta a ativo, evento nomeia só ele", async () => {
+      const m = montar({ vinculos: ATIVO_A, contato: INATIVO });
+      const resposta = await m.service.registrar(
+        COLABORADOR,
+        { celular: CELULAR } as RegistrarContatosColaboradorDto,
+        ctx(ator("rh", EMPRESA_A)),
+      );
+      expect(resposta).toMatchObject({
+        situacao: "registrado",
+        resultado: "atualizado",
+        contatos: { emailPessoal: null, celular: CELULAR, telefone: null },
+      });
+      expect(m.prisma.contatoColaborador.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ celular: CELULAR, ativo: true }),
+        }),
+      );
+      expect(eventoDeTratamento(m)).toEqual(
+        expect.objectContaining({ acao: "edicao", campos: ["celular"] }),
+      );
+      semValores(trilha(m));
     });
   });
 

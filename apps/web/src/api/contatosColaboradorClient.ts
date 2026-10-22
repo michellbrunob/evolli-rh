@@ -34,8 +34,14 @@ export interface ContatosDoColaboradorApi {
   contatos: ContatosApi | null;
 }
 
+/**
+ * T179 — `removido`: o `PUT` com os três vazios (ou `null`) para quem TINHA
+ * contatos inativa o registro; a resposta volta `sem_registro`, com
+ * `contatos: null`, como a de quem nunca teve contato. Os três vazios para
+ * quem já não tem registro voltam `sem_registro` e `sem_alteracao`.
+ */
 export interface ContatosRegistradosApi extends ContatosDoColaboradorApi {
-  resultado: "criado" | "atualizado" | "sem_alteracao";
+  resultado: "criado" | "atualizado" | "sem_alteracao" | "removido";
 }
 
 /**

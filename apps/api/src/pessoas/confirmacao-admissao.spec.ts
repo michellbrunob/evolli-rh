@@ -482,6 +482,25 @@ describe("T179 — conflitosDaAdmissao com matrícula e e-mail opcionais", () =>
     expect(t.vinculoFuncional.findFirst).not.toHaveBeenCalled();
     expect(t.contatoColaborador.findFirst).not.toHaveBeenCalled();
   });
+
+  // Revisão final: `null` explícito virava "matrícula IS NULL" e achava
+  // qualquer vínculo sem matrícula — 409 falso.
+  it("matrícula null (cliente que envia null): nada é consultado e nada conflita", async () => {
+    const t = {
+      vinculoFuncional: { findFirst: jest.fn(async () => ({ id: "outro" })) },
+      contatoColaborador: { findFirst: jest.fn() },
+    };
+    const erros = await conflitosDaAdmissao(
+      t as unknown as Prisma.TransactionClient,
+      EMPRESA_A,
+      { matricula: null } as unknown as Pick<
+        AdmitirColaboradorDto,
+        "matricula" | "contatos"
+      >,
+    );
+    expect(erros).toEqual([]);
+    expect(t.vinculoFuncional.findFirst).not.toHaveBeenCalled();
+  });
 });
 
 describe("T179 — admissaoConfere", () => {
@@ -553,6 +572,7 @@ describe("T179 — admissaoConfere", () => {
         emailPessoal: "pessoa.t179@example.test",
         celular: "+5511987654321",
         telefone: "+551133334444",
+        ativo: true,
       },
     } as AdmissaoGravada;
   }
@@ -571,6 +591,22 @@ describe("T179 — admissaoConfere", () => {
     g.vinculo.matricula = null;
     g.contato = null;
     expect(admissaoConfere(dto(semOpcionais), g)).toBe(true);
+    // Matrícula `null` explícita é a mesma ausência.
+    expect(admissaoConfere(dto({ ...semOpcionais, matricula: null }), g)).toBe(
+      true,
+    );
+    // Contatos removidos depois (registro inativo) continuam "sem contato".
+    g.contato = {
+      emailPessoal: null,
+      celular: null,
+      telefone: null,
+      ativo: false,
+    };
+    expect(admissaoConfere(dto(semOpcionais), g)).toBe(true);
+    expect(
+      admissaoConfere(dto({ ...semOpcionais, contatos: CORPO.contatos }), g),
+    ).toBe(false);
+    g.contato = null;
     // Contatos vazios valem como não informados.
     expect(
       admissaoConfere(
@@ -778,6 +814,13 @@ describe("T179 — AdmitirColaboradorDto: obrigatoriedade da Nova admissão", ()
 
   it("matrícula é opcional; vazia vale como não informada; informada, segue o padrão", async () => {
     expect(await campos({ ...CORPO, matricula: undefined })).toEqual([]);
+    // T179 (revisão final) — `null` explícito é a mesma ausência.
+    const nula = plainToInstance(AdmitirColaboradorDto, {
+      ...CORPO,
+      matricula: null,
+    });
+    expect(await validate(nula, OPCOES)).toEqual([]);
+    expect(nula.matricula).toBeUndefined();
     const vazia = plainToInstance(AdmitirColaboradorDto, {
       ...CORPO,
       matricula: "   ",
@@ -908,6 +951,7 @@ describe("T179 — admitirIdempotente (serviço, sem banco)", () => {
         emailPessoal: "pessoa.t179@example.test",
         celular: "+5511987654321",
         telefone: "+551133334444",
+        ativo: true,
       },
     };
   }

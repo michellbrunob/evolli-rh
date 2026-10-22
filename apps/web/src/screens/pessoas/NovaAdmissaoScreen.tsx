@@ -399,6 +399,17 @@ const MENSAGEM_EMPRESA_INDEFINIDA =
 const MENSAGEM_ENVIO_INCERTO =
   "Não foi possível confirmar se o cadastro foi gravado. Tente confirmar de novo: o mesmo envio não cria um segundo cadastro.";
 
+/**
+ * T179 — a confirmação de descarte. "Nada foi salvo." só é verdade quando
+ * nenhum envio ficou incerto; depois de falha de rede ou de 422
+ * `idempotencia_conteudo_divergente`, um envio anterior pode ter sido
+ * registrado, e o texto não afirma nem nega gravação.
+ */
+const DESCARTE_SEM_ENVIO_INCERTO =
+  "Os dados digitados nesta página serão perdidos. Nada foi salvo.";
+const DESCARTE_COM_ENVIO_INCERTO =
+  "Os dados digitados nesta página serão descartados. Um envio anterior pode ter sido registrado: confira em Colaboradores.";
+
 /** Limpa o erro do campo em correção e preserva os demais, inclusive `geral`. */
 function semErroDe(erros: Erros, ...campos: CampoErro[]): Erros {
   const restante: Erros = { ...erros };
@@ -671,6 +682,13 @@ export function NovaAdmissaoScreen({
    * recomeçar com uma chave nova, ou conferir a listagem.
    */
   const [envioDivergente, setEnvioDivergente] = useState(false);
+  /**
+   * T179 — algum envio com a chave em curso ficou sem resposta (rede) ou foi
+   * dado como divergente (422): ele pode ter sido registrado. Fica até um
+   * sucesso ou o recomeço da página — uma recusa posterior (409, validação)
+   * não desfaz a dúvida sobre o envio anterior.
+   */
+  const [envioIncerto, setEnvioIncerto] = useState(false);
   /** Trava síncrona contra envio duplicado (cliques no mesmo quadro). */
   const enviandoRef = useRef(false);
   /**
@@ -1088,6 +1106,7 @@ export function NovaAdmissaoScreen({
       });
       // Sucesso: a próxima admissão desta página será OUTRO envio.
       chaveIdempotenciaRef.current = null;
+      setEnvioIncerto(false);
       setConfirmando(false);
       setAdmissao(resposta);
     } catch (erro: unknown) {
@@ -1096,10 +1115,11 @@ export function NovaAdmissaoScreen({
       focarPrimeiroErroRef.current = true;
       setConfirmando(false);
       setErros(errosDaRecusa(erro));
-      setEnvioDivergente(
+      const divergente =
         statusDe(erro) === 422 &&
-          detalhesDe(erro).codigo === "idempotencia_conteudo_divergente",
-      );
+        detalhesDe(erro).codigo === "idempotencia_conteudo_divergente";
+      setEnvioDivergente(divergente);
+      if (divergente || statusDe(erro) === null) setEnvioIncerto(true);
     } finally {
       setSalvando(false);
       enviandoRef.current = false;
@@ -1128,6 +1148,7 @@ export function NovaAdmissaoScreen({
     // T179 — página recomeçada: a próxima confirmação é um envio novo.
     chaveIdempotenciaRef.current = null;
     setEnvioDivergente(false);
+    setEnvioIncerto(false);
     setAdmissao(null);
   }
 
@@ -1980,7 +2001,9 @@ export function NovaAdmissaoScreen({
       <Modal
         aberto={confirmandoDescarte}
         titulo="Descartar esta admissão?"
-        descricao="Os dados digitados nesta página serão perdidos. Nada foi salvo."
+        descricao={
+          envioIncerto ? DESCARTE_COM_ENVIO_INCERTO : DESCARTE_SEM_ENVIO_INCERTO
+        }
         onFechar={() => setConfirmandoDescarte(false)}
       >
         <FormActions>

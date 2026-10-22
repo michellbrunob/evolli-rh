@@ -1745,8 +1745,10 @@ describe("ColaboradoresScreen (T169 — contatos do colaborador)", () => {
 
     await waitFor(() => expect(email()).toHaveFocus());
     expect(email()).toHaveAttribute("aria-invalid", "true");
+    // T179 (revisão final) — o erro vem primeiro; sem registro, o estado
+    // "Nenhum contato registrado" segue junto na descrição do primeiro campo.
     expect(email()).toHaveAccessibleDescription(
-      "Este e-mail pessoal já está em uso nesta empresa.",
+      /^Este e-mail pessoal já está em uso nesta empresa\. Nenhum contato registrado\./,
     );
     // A mensagem não repete o valor, e não há mensagem geral de bloqueio.
     expect(within(secao).queryByText(/não foram salvos/)).toBeNull();
@@ -1842,6 +1844,155 @@ describe("ColaboradoresScreen (T169 — contatos do colaborador)", () => {
     expect(
       await within(secao).findByText("Contatos salvos."),
     ).toBeInTheDocument();
+  });
+
+  // -------------------------------------------------------------------------
+  // T179 (revisão final) — remover todos os contatos e o estado único
+  // "Nenhum contato registrado", também na descrição do primeiro campo.
+  // -------------------------------------------------------------------------
+
+  function removido(): ContatosRegistradosApi {
+    return {
+      colaboradorId: colaborador1.id,
+      empresaId: "44444444-4444-4444-4444-444444444444",
+      situacao: "sem_registro",
+      contatos: null,
+      resultado: "removido",
+    };
+  }
+
+  it("T179 — com registro, limpar os três e salvar REMOVE: 'Contatos removidos.' e o estado sem registro", async () => {
+    vi.mocked(consultarContatosDoColaborador).mockResolvedValueOnce(registrado);
+    vi.mocked(registrarContatosDoColaborador).mockResolvedValueOnce(removido());
+    const secao = await abrirDetalheDeAna();
+    await waitFor(() => expect(celular()).toHaveValue("(11) 98765-0001"));
+    expect(within(secao).queryByText(/Nenhum contato registrado/)).toBeNull();
+
+    fireEvent.change(email(), { target: { value: "" } });
+    fireEvent.change(celular(), { target: { value: "" } });
+    fireEvent.change(telefone(), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar contatos" }));
+
+    expect(
+      await within(secao).findByText("Contatos removidos."),
+    ).toHaveAttribute("role", "status");
+    // Nenhuma validação local barrou a remoção: os três foram como null.
+    const chamadas = vi.mocked(registrarContatosDoColaborador).mock.calls;
+    expect(chamadas[chamadas.length - 1]).toEqual([
+      colaborador1.id,
+      { emailPessoal: null, celular: null, telefone: null },
+    ]);
+
+    const estado = within(secao).getByText(/Nenhum contato registrado/);
+    expect(estado).toHaveAttribute("role", "status");
+    expect(estado).toHaveAttribute("id", "contatos-colaborador-sem-registro");
+    expect(secao).toHaveAccessibleDescription(/^Nenhum contato registrado\./);
+    expect(email()).toHaveAccessibleDescription(/Nenhum contato registrado/);
+    // Estado, não erro: nada de alerta nem campo inválido depois da remoção.
+    expect(within(secao).queryByRole("alert")).toBeNull();
+    for (const campo of [email(), celular(), telefone()]) {
+      expect(campo).toHaveValue("");
+      expect(campo).not.toHaveAttribute("aria-invalid");
+    }
+    expect(
+      screen.getByRole("button", { name: "Salvar contatos" }),
+    ).toBeEnabled();
+  });
+
+  it("T179 — depois da remoção, salvar os três vazios de novo não envia: pede ao menos um", async () => {
+    vi.mocked(consultarContatosDoColaborador).mockResolvedValueOnce(registrado);
+    vi.mocked(registrarContatosDoColaborador).mockResolvedValueOnce(removido());
+    const secao = await abrirDetalheDeAna();
+    await waitFor(() =>
+      expect(email()).toHaveValue("ana.contato@example.test"),
+    );
+    fireEvent.change(email(), { target: { value: "" } });
+    fireEvent.change(celular(), { target: { value: "" } });
+    fireEvent.change(telefone(), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar contatos" }));
+    await within(secao).findByText("Contatos removidos.");
+    const antes = vi.mocked(registrarContatosDoColaborador).mock.calls.length;
+
+    fireEvent.click(screen.getByRole("button", { name: "Salvar contatos" }));
+    expect(
+      await within(secao).findByText(
+        "Nenhum contato preenchido: informe ao menos um para salvar.",
+      ),
+    ).toBeInTheDocument();
+    expect(vi.mocked(registrarContatosDoColaborador).mock.calls.length).toBe(
+      antes,
+    );
+  });
+
+  it("T179 — 'sem_alteracao' com sem_registro não quebra a ficha", async () => {
+    vi.mocked(consultarContatosDoColaborador).mockResolvedValueOnce(registrado);
+    vi.mocked(registrarContatosDoColaborador).mockResolvedValueOnce({
+      ...removido(),
+      resultado: "sem_alteracao",
+    });
+    const secao = await abrirDetalheDeAna();
+    await waitFor(() =>
+      expect(email()).toHaveValue("ana.contato@example.test"),
+    );
+    fireEvent.change(email(), { target: { value: "" } });
+    fireEvent.change(celular(), { target: { value: "" } });
+    fireEvent.change(telefone(), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar contatos" }));
+    expect(
+      await within(secao).findByText(
+        "Nada mudou: este colaborador já não tinha contatos.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(secao).getByText(/Nenhum contato registrado/),
+    ).toHaveAttribute("role", "status");
+    expect(within(secao).queryByRole("alert")).toBeNull();
+  });
+
+  it("T179 — sem registro: o e-mail pessoal descreve o estado 'Nenhum contato registrado'", async () => {
+    await abrirDetalheDeAna();
+    await screen.findByText(/Nenhum contato registrado/);
+    expect(email()).toHaveAccessibleDescription(/Nenhum contato registrado/);
+    expect(email().getAttribute("aria-describedby")?.split(" ")).toContain(
+      "contatos-colaborador-sem-registro",
+    );
+  });
+
+  it("T179 — sem registro e com erro no e-mail: a descrição tem o erro E o estado", async () => {
+    const secao = await abrirDetalheDeAna();
+    await within(secao).findByText(/Nenhum contato registrado/);
+    fireEvent.change(email(), { target: { value: "sem-arroba" } });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar contatos" }));
+    await waitFor(() =>
+      expect(email()).toHaveAttribute("aria-invalid", "true"),
+    );
+    const ids = email().getAttribute("aria-describedby")!.split(" ");
+    expect(ids).toContain("contatos-colaborador-email-pessoal-error");
+    expect(ids).toContain("contatos-colaborador-sem-registro");
+  });
+
+  it("T179 — com contatos registrados, o id do estado não entra na descrição do e-mail", async () => {
+    vi.mocked(consultarContatosDoColaborador).mockResolvedValueOnce(registrado);
+    await abrirDetalheDeAna();
+    await waitFor(() =>
+      expect(email()).toHaveValue("ana.contato@example.test"),
+    );
+    expect(email().getAttribute("aria-describedby") ?? "").not.toContain(
+      "contatos-colaborador-sem-registro",
+    );
+    expect(email()).not.toHaveAccessibleDescription(
+      /Nenhum contato registrado/,
+    );
+  });
+
+  it("T179 — 'Revisar contatos na ficha': o foco cai no e-mail, e o estado vem na descrição dele", async () => {
+    render(
+      <ColaboradoresScreen
+        aberturaInicial={{ colaborador: colaborador1, foco: "contatos" }}
+      />,
+    );
+    await waitFor(() => expect(email()).toHaveFocus());
+    expect(email()).toHaveAccessibleDescription(/Nenhum contato registrado/);
   });
 });
 

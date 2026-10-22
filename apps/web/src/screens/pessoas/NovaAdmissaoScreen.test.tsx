@@ -1692,7 +1692,12 @@ describe("T179 — máscaras na Nova admissão", () => {
     teclar(telefone(), "55999998888");
     teclar(telefone(), "12");
     expect(telefone()).toHaveValue("(55) 99999-8888");
-    expect(telefone()).toHaveAccessibleDescription(/O número já está completo/);
+    // T179 — a 2ª recusa igual é reanunciada: o texto volta logo depois.
+    await waitFor(() =>
+      expect(telefone()).toHaveAccessibleDescription(
+        /O número não pode passar de 11 dígitos/,
+      ),
+    );
     await salvarEConfirmar();
     await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
     const dto = vi.mocked(admitirColaborador).mock.calls[0]![0];
@@ -2286,4 +2291,183 @@ describe("T178 — CEP: o que faz com a resposta", () => {
       });
     },
   );
+});
+
+// ---------------------------------------------------------------------------
+// T179 (revisão final) — descarte sem afirmar o que não se sabe, CEP e
+// telefone sem excedente, matrícula só de espaços fora do corpo.
+// ---------------------------------------------------------------------------
+
+const DESCARTE_COMUM =
+  "Os dados digitados nesta página serão perdidos. Nada foi salvo.";
+const DESCARTE_INCERTO =
+  "Os dados digitados nesta página serão descartados. Um envio anterior pode ter sido registrado: confira em Colaboradores.";
+
+describe("T179 (revisão final) — descarte depois de envio incerto", () => {
+  const dialogoDescarte = () =>
+    screen.getByRole("dialog", { name: "Descartar esta admissão?" });
+
+  it("cancelamento comum: 'Nada foi salvo.'", async () => {
+    montar();
+    await aguardarEmpresa();
+    fireEvent.change(nome(), { target: { value: "Pessoa Sintética" } });
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    expect(dialogoDescarte()).toHaveAccessibleDescription(DESCARTE_COMUM);
+  });
+
+  it("depois de erro de rede: não afirma nem nega gravação", async () => {
+    vi.mocked(admitirColaborador).mockRejectedValueOnce(
+      new TypeError("Failed to fetch"),
+    );
+    const { onSair } = montar();
+    await aguardarEmpresa();
+    preencherValido();
+    await salvarEConfirmar();
+    await screen.findByText(/Não foi possível confirmar se o cadastro/);
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    const dialogo = dialogoDescarte();
+    expect(dialogo).toHaveAccessibleDescription(DESCARTE_INCERTO);
+    expect(dialogo).not.toHaveTextContent(/Nada foi salvo/);
+    fireEvent.click(
+      within(dialogo).getByRole("button", { name: "Descartar e sair" }),
+    );
+    expect(onSair).toHaveBeenCalledTimes(1);
+  });
+
+  it("depois de 422 divergente, 'Conferir em Colaboradores' também não diz 'Nada foi salvo.'", async () => {
+    vi.mocked(admitirColaborador).mockRejectedValueOnce(
+      recusa(422, { codigo: "idempotencia_conteudo_divergente" }),
+    );
+    montar();
+    await aguardarEmpresa();
+    preencherValido();
+    await salvarEConfirmar();
+    await screen.findByText(/Este envio já foi registrado antes/);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Conferir em Colaboradores" }),
+    );
+    const dialogo = dialogoDescarte();
+    expect(dialogo).toHaveAccessibleDescription(DESCARTE_INCERTO);
+    expect(dialogo).not.toHaveTextContent(/Nada foi salvo/);
+  });
+
+  it("a dúvida fica mesmo se a tentativa seguinte for recusada por 409", async () => {
+    vi.mocked(admitirColaborador)
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+      .mockRejectedValueOnce(
+        recusa(409, { erros: [{ campo: "matricula", motivo: "em_uso" }] }),
+      );
+    montar();
+    await aguardarEmpresa();
+    preencherValido();
+    await salvarEConfirmar();
+    await screen.findByText(/Não foi possível confirmar se o cadastro/);
+    await salvarEConfirmar();
+    await waitFor(() => expect(matricula()).toHaveFocus());
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    expect(dialogoDescarte()).toHaveAccessibleDescription(DESCARTE_INCERTO);
+  });
+
+  it("recomeçar a página com chave nova volta ao texto comum", async () => {
+    vi.mocked(admitirColaborador).mockRejectedValueOnce(
+      recusa(422, { codigo: "idempotencia_conteudo_divergente" }),
+    );
+    montar();
+    await aguardarEmpresa();
+    preencherValido();
+    await salvarEConfirmar();
+    await screen.findByText(/Este envio já foi registrado antes/);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Recomeçar a admissão" }),
+    );
+    fireEvent.change(nome(), { target: { value: "Outra Pessoa Sintética" } });
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    expect(dialogoDescarte()).toHaveAccessibleDescription(DESCARTE_COMUM);
+  });
+});
+
+describe("T179 (revisão final) — CEP e telefone sem excedente na página", () => {
+  beforeEach(() => {
+    vi.mocked(consultarCep).mockReset();
+    vi.mocked(consultarCep).mockResolvedValue(RESPOSTA_CEP);
+  });
+
+  function colarNoCep(posicao: number, texto: string) {
+    const campo = campoCep() as HTMLInputElement;
+    campo.focus();
+    campo.setSelectionRange(posicao, posicao);
+    fireEvent.paste(campo, { clipboardData: { getData: () => texto } });
+  }
+
+  it("'0131' + colar '04567-000': recusado com aviso, e o ViaCEP não é consultado", async () => {
+    montar();
+    await aguardarEmpresa();
+    digitarCep("0131");
+    colarNoCep(4, "04567-000");
+    expect(campoCep()).toHaveValue("0131");
+    expect(campoCep()).toHaveAccessibleDescription(/O CEP tem 8 dígitos/);
+    fireEvent.blur(campoCep());
+    fireEvent.click(botaoBuscarCep()!);
+    await waitFor(() =>
+      expect(campoCep()).toHaveAccessibleDescription(
+        /Informe os 8 dígitos do CEP/,
+      ),
+    );
+    expect(consultarCep).not.toHaveBeenCalled();
+    expect(logradouro()).toHaveValue("");
+  });
+
+  it("'01310-100' + colar '9' na posição 2: recusado; só o CEP válido do campo é consultado", async () => {
+    montar();
+    await aguardarEmpresa();
+    digitarCep("01310-100");
+    colarNoCep(2, "9");
+    expect(campoCep()).toHaveValue("01310-100");
+    expect((campoCep() as HTMLInputElement).selectionStart).toBe(2);
+    expect(campoCep()).toHaveAccessibleDescription(/O CEP tem 8 dígitos/);
+    fireEvent.blur(campoCep());
+    await waitFor(() => expect(consultarCep).toHaveBeenCalledTimes(1));
+    expect(consultarCep).toHaveBeenCalledWith("01310100");
+    expect(consultarCep).not.toHaveBeenCalledWith("01931010");
+  });
+
+  it("CEP inteiro colado no campo vazio entra, sem aviso", async () => {
+    montar();
+    await aguardarEmpresa();
+    colarNoCep(0, "01310-100");
+    expect(campoCep()).toHaveValue("01310-100");
+    expect(campoCep()).not.toHaveAccessibleDescription(/O CEP tem 8 dígitos/);
+  });
+
+  it("telefone de DDD 55 completo com dígitos soltos de uma vez: recusado e chega intacto ao servidor", async () => {
+    montar();
+    await aguardarEmpresa();
+    preencherValido();
+    fireEvent.change(telefone(), { target: { value: "(55) 99999-8888" } });
+    fireEvent.change(telefone(), { target: { value: "(55) 99999-888877" } });
+    expect(telefone()).toHaveValue("(55) 99999-8888");
+    expect(telefone()).toHaveAccessibleDescription(
+      /O número não pode passar de 11 dígitos/,
+    );
+    await salvarEConfirmar();
+    await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
+    const dto = vi.mocked(admitirColaborador).mock.calls[0]![0];
+    expect(dto.contatos?.telefone).toBe("+5555999998888");
+  });
+});
+
+describe("T179 (revisão final) — matrícula", () => {
+  it.each([
+    ["vazia", ""],
+    ["só com espaços", "   "],
+  ])("matrícula %s fica fora do corpo da admissão", async (_, valor) => {
+    montar();
+    await aguardarEmpresa();
+    preencherValido();
+    fireEvent.change(matricula(), { target: { value: valor } });
+    await salvarEConfirmar();
+    await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
+    const [dto] = vi.mocked(admitirColaborador).mock.calls[0]!;
+    expect(dto).not.toHaveProperty("matricula");
+  });
 });

@@ -13,6 +13,8 @@ import {
   mascararCep,
   mascararTelefone,
   posicaoAposDigitos,
+  AVISO_DE_RECUSA,
+  avisoDaRecusa,
 } from "./mascaras";
 
 /** Digita `texto` caractere a caractere no fim do campo, como o teclado. */
@@ -43,17 +45,24 @@ describe("T179 — máscara de CEP", () => {
   it("não aceita o 9º dígito digitado: o valor fica como estava", () => {
     const r = aplicarMascara("cep", "30140-071", "30140-0712", 10);
     // T179 (B2) — recusado com sinal, para o campo avisar.
-    expect(r).toEqual({ valor: "30140-071", cursor: 9, recusado: true });
+    expect(r).toEqual({
+      valor: "30140-071",
+      cursor: 9,
+      recusado: "excedente",
+    });
   });
 
-  it("letras e pontuação colada somem; o excesso do fim é descartado", () => {
+  it("letras e pontuação colada somem; o que passa de 8 dígitos é recusado", () => {
     expect(colarNaMascara("cep", "", 0, 0, " 30.140-071 ")).toEqual({
       valor: "30140-071",
       cursor: 9,
     });
-    expect(colarNaMascara("cep", "", 0, 0, "301400719999").valor).toBe(
-      "30140-071",
-    );
+    // T179 (revisão final) — o excesso não é mais cortado em silêncio.
+    expect(colarNaMascara("cep", "", 0, 0, "301400719999")).toEqual({
+      valor: "",
+      cursor: 0,
+      recusado: "excedente",
+    });
   });
 
   it("Backspace logo depois do hífen apaga o dígito anterior", () => {
@@ -106,7 +115,11 @@ describe("T179 — máscara de telefone", () => {
       "(11) 98765-43219",
       16,
     );
-    expect(r).toEqual({ valor: "(11) 98765-4321", cursor: 15, recusado: true });
+    expect(r).toEqual({
+      valor: "(11) 98765-4321",
+      cursor: 15,
+      recusado: "excedente",
+    });
   });
 
   it.each([
@@ -266,7 +279,7 @@ describe("T179 (B1) — telefone digitado tecla a tecla com o código do país",
       const entrada = valor + tecla;
       const r = aplicarMascara("telefone", valor, entrada, entrada.length);
       valor = r.valor;
-      recusado = recusado || r.recusado === true;
+      recusado = recusado || r.recusado === "excedente";
     }
     expect(valor).toBe("(55) 91987-6543");
     expect(recusado).toBe(true);
@@ -362,22 +375,25 @@ describe("T179 (B2) — colar depois de +, +5 ou +55, e DDD 55 completo", () => 
     expect(colarNaMascara("telefone", "", 0, 0, "+49 911 1234567").valor).toBe(
       "+499111234567",
     );
+    // T179 (revisão final) — colado depois de dígitos que ficam no campo é
+    // inserção: passa de 11 dígitos e é recusado, sem apagar o "(11) 9".
     expect(
-      colarNaMascara("telefone", "(11) 9", 6, 6, "+49 911 1234567").valor,
-    ).toBe("+499111234567");
+      colarNaMascara("telefone", "(11) 9", 6, 6, "+49 911 1234567"),
+    ).toEqual({ valor: "(11) 9", cursor: 6, recusado: "excedente" });
   });
 
   it("colagem que passa de 11 dígitos é recusada com sinal, e o valor fica", () => {
+    // Depois do `+55` é entrada única: longa demais, é de formato.
     expect(digitarEColar("+55", "91 98765-43210")).toEqual({
       valor: "+55",
       cursor: 3,
-      recusado: true,
+      recusado: "formato",
     });
     const cheio = "(11) 98765-4321";
     expect(colarNaMascara("telefone", cheio, 15, 15, "12")).toEqual({
       valor: cheio,
       cursor: 15,
-      recusado: true,
+      recusado: "excedente",
     });
   });
 
@@ -391,18 +407,232 @@ describe("T179 (B2) — colar depois de +, +5 ou +55, e DDD 55 completo", () => 
         const entrada = valor + tecla;
         const r = aplicarMascara("telefone", valor, entrada, entrada.length);
         valor = r.valor;
-        recusado = recusado || r.recusado === true;
+        recusado = recusado || r.recusado === "excedente";
       }
       expect(valor).toBe(completo);
       expect(recusado).toBe(true);
     }
     const meio = aplicarMascara("telefone", completo, "(55) 999919-8888", 10);
     expect(meio.valor).toBe(completo);
-    expect(meio.recusado).toBe(true);
+    expect(meio.recusado).toBe("excedente");
   });
 
   it("DDD 55 fixo completo ainda pode virar celular com o 11º dígito, como qualquer DDD", () => {
     expect(digitar("telefone", "5532221111")).toBe("(55) 3222-1111");
     expect(digitar("telefone", "5532221111" + "1")).toBe("(55) 32221-1111");
+  });
+});
+
+describe("T179 (revisão final) — telefone: inserção excedente de vários dígitos de uma vez", () => {
+  /** Insere `extra` na posição `pos` de `base`, como arrastar, IME ou ditado. */
+  function inserir(base: string, pos: number, extra: string) {
+    const entrada = base.slice(0, pos) + extra + base.slice(pos);
+    return aplicarMascara("telefone", base, entrada, pos + extra.length);
+  }
+
+  const completos = [
+    ["DDD 55 celular", "(55) 99999-8888"],
+    ["DDD 55 fixo", "(55) 3333-4444"],
+    ["outro DDD celular", "(11) 98765-4321"],
+    ["outro DDD fixo", "(11) 3333-4444"],
+  ] as const;
+  const posicoes = [
+    ["no fim", (v: string) => v.length],
+    ["no meio", () => 8],
+    ["no início", () => 1],
+  ] as const;
+
+  for (const [rotulo, base] of completos) {
+    for (const [onde, pos] of posicoes) {
+      it.each(["77", "555", "12345"])(
+        `${rotulo}: %p ${onde} é recusado, com valor, cursor e aviso de excedente`,
+        (extra) => {
+          const p = pos(base);
+          expect(inserir(base, p, extra)).toEqual({
+            valor: base,
+            cursor: p,
+            recusado: "excedente",
+          });
+        },
+      );
+    }
+  }
+
+  it("os exemplos da revisão: DDD 55 não vira outro número válido", () => {
+    // Antes: "(99) 99988-8877" e "(33) 3344-4455".
+    expect(inserir("(55) 99999-8888", 15, "77").valor).toBe("(55) 99999-8888");
+    expect(inserir("(55) 3333-4444", 14, "55").valor).toBe("(55) 3333-4444");
+  });
+
+  it("dígitos antes do parêntese também conservam o número: recusado", () => {
+    expect(inserir("(55) 99999-8888", 0, "55")).toEqual({
+      valor: "(55) 99999-8888",
+      cursor: 0,
+      recusado: "excedente",
+    });
+  });
+
+  it("número pela metade + colagem longa demais: excedente, sem ler o 55 como país", () => {
+    // "(1" + "5511987654321": 14 dígitos com o "1" conservado.
+    expect(colarNaMascara("telefone", "(1", 2, 2, "5511987654321")).toEqual({
+      valor: "(1",
+      cursor: 2,
+      recusado: "excedente",
+    });
+  });
+
+  it("+ posto na frente de um número nacional é recusado: o DDD não vira país", () => {
+    expect(
+      aplicarMascara("telefone", "(55) 99999-8888", "+(55) 99999-8888", 1),
+    ).toEqual({ valor: "(55) 99999-8888", cursor: 0, recusado: "formato" });
+    expect(
+      aplicarMascara("telefone", "(51) 98765-4321", "+(51) 98765-4321", 1),
+    ).toEqual({ valor: "(51) 98765-4321", cursor: 0, recusado: "formato" });
+  });
+
+  it("preenchimento com +55 trocando o valor todo entra, mesmo com o último dígito igual", () => {
+    expect(
+      aplicarMascara("telefone", "(21) 91234-5671", "+5511987654321", 14),
+    ).toEqual({ valor: "(11) 98765-4321", cursor: 15 });
+  });
+});
+
+describe("T179 (revisão final) — telefone: colagem num número completo", () => {
+  it.each([
+    ["no fim", 15, 15, "12"],
+    ["no meio", 6, 6, "123"],
+    ["no início", 1, 1, "55"],
+    ["no meio, com 5 dígitos", 8, 8, "12345"],
+  ])("%s: recusada com aviso de excedente", (_onde, inicio, fim, colado) => {
+    const completo = "(55) 99999-8888";
+    expect(colarNaMascara("telefone", completo, inicio, fim, colado)).toEqual({
+      valor: completo,
+      cursor: inicio,
+      recusado: "excedente",
+    });
+  });
+
+  it("trocando uma parte selecionada sem passar de 11 dígitos, entra", () => {
+    expect(
+      colarNaMascara("telefone", "(11) 3333-4444", 5, 9, "9876").valor,
+    ).toBe("(11) 9876-4444");
+  });
+
+  it("com o número todo selecionado, o colado é entrada inteira e entra", () => {
+    expect(
+      colarNaMascara("telefone", "(55) 99999-8888", 0, 15, "+55 11 98765-4321"),
+    ).toEqual({ valor: "(11) 98765-4321", cursor: 15 });
+    expect(
+      colarNaMascara("telefone", "(55) 99999-8888", 0, 15, "5511987654321")
+        .valor,
+    ).toBe("(11) 98765-4321");
+  });
+
+  it.each([
+    ["+", "55 91 98765-4321"],
+    ["+5", "5 91 98765-4321"],
+    ["+55", "91 98765-4321"],
+  ])("depois de %p continua sendo entrada única: %p entra", (pais, colado) => {
+    expect(
+      colarNaMascara("telefone", pais, pais.length, pais.length, colado),
+    ).toEqual({ valor: "(91) 98765-4321", cursor: 15 });
+  });
+});
+
+describe("T179 (revisão final) — telefone: entrada inteira inválida", () => {
+  it.each([
+    ["zero de tronco", "(011) 98765-4321"],
+    ["0055 na frente", "0055 11 98765 4321"],
+    ["texto com ramal", "Tel: 11 98765-4321 ramal 2"],
+    ["14 dígitos", "55119876543210"],
+    ["+55 com 12 dígitos nacionais", "+55 11 98765-43210"],
+  ])(
+    "%s: recusada com o aviso de formato, nunca o de excedente",
+    (_, texto) => {
+      for (const r of [
+        colarNaMascara("telefone", "", 0, 0, texto),
+        aplicarMascara("telefone", "", texto, texto.length),
+      ]) {
+        expect(r).toEqual({ valor: "", cursor: 0, recusado: "formato" });
+        expect(avisoDaRecusa("telefone", r.recusado!)).toBe(
+          AVISO_DE_RECUSA.telefoneFormato,
+        );
+      }
+    },
+  );
+
+  it("estrangeiro com + acima de 15 dígitos é recusado (formato)", () => {
+    expect(
+      colarNaMascara("telefone", "", 0, 0, "+49 911 1234567 8901"),
+    ).toEqual({ valor: "", cursor: 0, recusado: "formato" });
+  });
+
+  it("os avisos dizem o que é verdade em cada caso", () => {
+    expect(avisoDaRecusa("telefone", "excedente")).toBe(
+      "O número não pode passar de 11 dígitos: o que foi digitado ou colado não entrou. Para trocar o número, apague antes ou selecione o número inteiro.",
+    );
+    expect(avisoDaRecusa("telefone", "formato")).toBe(
+      "Use um telefone brasileiro: DDD e número, como (00) 00000-0000 ou (00) 0000-0000; pode começar com +55.",
+    );
+    expect(AVISO_DE_RECUSA.telefoneFormato).not.toMatch(/completo|11 dígitos/);
+  });
+});
+
+describe("T179 (revisão final) — CEP: o excedente é recusado, não cortado", () => {
+  it("'0131' + colar '04567-000' é recusado (antes virava 01310-456)", () => {
+    expect(colarNaMascara("cep", "0131", 4, 4, "04567-000")).toEqual({
+      valor: "0131",
+      cursor: 4,
+      recusado: "excedente",
+    });
+  });
+
+  it("'01310-100' com o cursor na posição 2 + colar '9' é recusado (antes virava 01931-010)", () => {
+    expect(colarNaMascara("cep", "01310-100", 2, 2, "9")).toEqual({
+      valor: "01310-100",
+      cursor: 2,
+      recusado: "excedente",
+    });
+    // O mesmo dígito chegando por `onChange` (arrastar, tecla no meio).
+    expect(aplicarMascara("cep", "01310-100", "019310-100", 3)).toEqual({
+      valor: "01310-100",
+      cursor: 2,
+      recusado: "excedente",
+    });
+  });
+
+  it("vários dígitos de uma vez no meio também são recusados", () => {
+    expect(aplicarMascara("cep", "01310-100", "01234310-100", 5)).toEqual({
+      valor: "01310-100",
+      cursor: 2,
+      recusado: "excedente",
+    });
+  });
+
+  it("CEP inteiro colado em campo vazio, ou sobre o CEP todo selecionado, entra", () => {
+    expect(colarNaMascara("cep", "", 0, 0, "01310-100")).toEqual({
+      valor: "01310-100",
+      cursor: 9,
+    });
+    expect(colarNaMascara("cep", "01310-100", 0, 9, "04567000")).toEqual({
+      valor: "04567-000",
+      cursor: 9,
+    });
+  });
+
+  it("o aviso do CEP diz que não coube e como trocar", () => {
+    expect(avisoDaRecusa("cep", "excedente")).toBe(
+      "O CEP tem 8 dígitos: o que foi digitado ou colado não coube. Apague antes ou selecione o CEP inteiro para trocar.",
+    );
+  });
+
+  it("CEP que já passava de 8 dígitos (outro país) pode ser apagado aos poucos", () => {
+    expect(aplicarMascara("cep", "1234567890", "123456789", 9)).toEqual({
+      valor: "123456789",
+      cursor: 9,
+    });
+    expect(aplicarMascara("cep", "123456789", "12345678", 8).valor).toBe(
+      "12345-678",
+    );
   });
 });

@@ -16,6 +16,12 @@
  *  - `onPaste` — o texto colado é limpo sozinho (tira o `+55` do telefone)
  *    antes de entrar na posição da seleção.
  *
+ * T179 (revisão final) — a recusa é avisada numa região viva (`role=status`)
+ * com o texto do motivo (`avisoDaRecusa`). A MESMA recusa repetida também é
+ * anunciada: a região é esvaziada e o texto volta logo depois
+ * (`ATRASO_DO_REANUNCIO_MS`) — texto igual, sem a troca, o leitor de tela não
+ * repetiria.
+ *
  * O teclado é o de números (`inputMode`), e nada impede a navegação comum:
  * setas, Home/End, seleção e Tab seguem do navegador.
  *
@@ -23,7 +29,7 @@
  * RH ou o DP, cadastrando OUTRA pessoa — sugerir o telefone ou o CEP de quem
  * está operando seria preencher o dado errado. Quem precisar pode sobrescrever.
  */
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type {
   ClipboardEvent,
   ChangeEvent,
@@ -31,14 +37,21 @@ import type {
   KeyboardEvent,
 } from "react";
 import {
-  AVISO_DE_EXCEDENTE,
   type EstadoDoCampo,
   type TipoMascara,
   aplicarMascara,
   apagarComSeparador,
+  avisoDaRecusa,
   colarNaMascara,
 } from "../format/mascaras";
 import "./CampoMascarado.css";
+
+/**
+ * T179 — quanto a região viva fica vazia antes de receber de novo o MESMO
+ * aviso. Curto para quem vê, longo o bastante para a árvore de
+ * acessibilidade registrar a troca (no mesmo quadro, ela se perderia).
+ */
+export const ATRASO_DO_REANUNCIO_MS = 100;
 
 export interface CampoMascaradoProps extends Omit<
   InputHTMLAttributes<HTMLInputElement>,
@@ -65,10 +78,30 @@ export function CampoMascarado({
   /** Cursor a aplicar depois que o valor novo chegar ao DOM. */
   const cursorPendenteRef = useRef<number | null>(null);
   /**
-   * T179 (B2) — o que passou do limite foi recusado: o valor fica como
-   * estava, e o aviso diz por quê. Some na próxima mudança aceita.
+   * T179 (B2) — a entrada foi recusada: o valor fica como estava, e o aviso
+   * diz por quê. Some na próxima mudança aceita.
    */
   const [aviso, setAviso] = useState<string | null>(null);
+  /**
+   * T179 — a região viva está vazia de propósito, à espera de receber de
+   * novo o mesmo aviso (nova tentativa recusada).
+   */
+  const [reanunciando, setReanunciando] = useState(false);
+  const reanuncioRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function cancelarReanuncio() {
+    if (reanuncioRef.current === null) return;
+    clearTimeout(reanuncioRef.current);
+    reanuncioRef.current = null;
+  }
+
+  // Desmontado o campo, nenhum reanúncio fica pendurado.
+  useEffect(() => {
+    const pendente = reanuncioRef;
+    return () => {
+      if (pendente.current !== null) clearTimeout(pendente.current);
+    };
+  }, []);
 
   useLayoutEffect(() => {
     const cursor = cursorPendenteRef.current;
@@ -82,8 +115,27 @@ export function CampoMascarado({
     }
   });
 
+  /**
+   * T179 — mostra o aviso da recusa ou o tira. O mesmo aviso de novo (outra
+   * tentativa recusada) esvazia a região agora e o devolve logo depois, para
+   * ser anunciado outra vez.
+   */
+  function avisar(novo: string | null) {
+    cancelarReanuncio();
+    if (novo !== null && novo === aviso) {
+      setReanunciando(true);
+      reanuncioRef.current = setTimeout(() => {
+        reanuncioRef.current = null;
+        setReanunciando(false);
+      }, ATRASO_DO_REANUNCIO_MS);
+      return;
+    }
+    setReanunciando(false);
+    setAviso(novo);
+  }
+
   function aplicar(campo: HTMLInputElement, estado: EstadoDoCampo) {
-    setAviso(estado.recusado ? AVISO_DE_EXCEDENTE[mascara] : null);
+    avisar(estado.recusado ? avisoDaRecusa(mascara, estado.recusado) : null);
     if (estado.valor === value) {
       // O estado não muda, então não há novo desenho: o DOM volta ao valor
       // atual aqui mesmo, sem o cursor saltar para o fim.
@@ -162,7 +214,7 @@ export function CampoMascarado({
       {/* Região viva SEMPRE montada (vazia sem aviso): é o que faz o leitor de
           tela anunciar a recusa no momento em que ela acontece. */}
       <span id={idDoAviso} className="campo-mascarado__aviso" role="status">
-        {aviso ?? ""}
+        {reanunciando ? "" : (aviso ?? "")}
       </span>
     </>
   );

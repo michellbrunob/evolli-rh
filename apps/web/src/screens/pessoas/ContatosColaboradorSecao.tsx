@@ -27,7 +27,10 @@ import { DICA_DE_FORMATO } from "../../format/mascaras";
  * T179 — os três campos são OPCIONAIS (decisão da proprietária de
  * 2026-10-21): o formato só é conferido no que está preenchido, e o vazio vai
  * `null` no `PUT` — é assim que um contato gravado é apagado. Sem registro,
- * salvar os três vazios não cria nada: pede ao menos um. O não informado
+ * salvar os três vazios não cria nada: pede ao menos um. Com registro, limpar
+ * os três e salvar REMOVE os contatos: o servidor responde `sem_registro`
+ * (`removido`) e a seção volta ao estado "Nenhum contato registrado", o mesmo
+ * de quem nunca teve contato. O não informado
  * aparece como "Não informado" no próprio campo vazio. A
  * confirmação de descarte é a do `Modal`: a seção avisa o detalhe quando há
  * edição não salva (`onAlteradoChange`) e quando está gravando
@@ -310,6 +313,18 @@ export function ContatosColaboradorSecao({
         colaboradorId,
         contatosParaRegistro(edicao),
       );
+      // T179 — os três vazios removem o registro (`removido`) ou confirmam
+      // que não havia nenhum (`sem_alteracao`): a seção fica sem registro.
+      if (resposta?.situacao === "sem_registro") {
+        setCarga({ status: "dados", gravado: null });
+        setEdicao(VAZIO);
+        setSucesso(
+          resposta.resultado === "removido"
+            ? "Contatos removidos."
+            : "Nada mudou: este colaborador já não tinha contatos.",
+        );
+        return;
+      }
       if (!resposta?.contatos) {
         throw new Error("resposta inesperada");
       }
@@ -393,6 +408,20 @@ export function ContatosColaboradorSecao({
                 value={edicao.emailPessoal}
                 onChange={(e) => alterarCampo("emailPessoal", e.target.value)}
                 {...control}
+                // T179 — o foco de "Revisar contatos na ficha" cai direto
+                // aqui, sem passar pelo título da seção: o estado "Nenhum
+                // contato registrado" entra na descrição do primeiro campo,
+                // junto da ajuda e do erro que o `FormField` já liga.
+                {...(gravado === null
+                  ? {
+                      "aria-describedby": [
+                        control["aria-describedby"],
+                        SEM_CONTATOS_ID,
+                      ]
+                        .filter(Boolean)
+                        .join(" "),
+                    }
+                  : {})}
               />
             )}
           </FormField>

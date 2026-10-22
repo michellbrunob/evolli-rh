@@ -73,6 +73,22 @@ novo vínculo de colaborador existente (`POST /v1/vinculos`) não muda.
   Contatos, sem campo marcado como inválido. A edição de contatos aceita cada
   campo vazio; com ao menos um preenchido, valem as validações e a
   normalização de sempre.
+- **Remover todos os contatos** (decisão de 2026-10-22): quem já tinha
+  contatos e salva os três vazios não fica com registro vazio em uso. Sem
+  exclusão física (a ficha de contatos não a prevê e a trilha aponta para o
+  registro), o registro passa a **inativo**: sem nenhum valor, preservado só
+  para a trilha e lido como "sem registro". A ficha volta ao mesmo estado
+  "Nenhum contato registrado" de quem nunca teve contato. A remoção é um
+  evento de edição com os nomes dos campos removidos, nunca os valores.
+  Informar um contato depois reativa o mesmo registro. Migration
+  `20261022120000_contato_colaborador_inativo`: coluna `ativo` com CHECK
+  (ativo se, e somente se, há ao menos um contato) e coerência dos eventos.
+- **Matrícula ausente, `null`, vazia ou só com espaços** é a mesma ausência:
+  não é conferida contra outras matrículas e nunca gera conflito.
+- **Máscaras:** inserção excedente de telefone ou CEP — tecla, colagem,
+  arrastar e soltar, sugestão de teclado, ditado ou IME — é recusada com
+  aviso acessível, mantendo valor e cursor; um telefone nacional com DDD 55
+  nunca é lido como código de país, e nenhum dígito é cortado em silêncio.
 
 ## 4. O que esta decisão não autoriza
 

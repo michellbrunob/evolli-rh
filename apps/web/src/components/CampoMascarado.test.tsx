@@ -3,12 +3,18 @@
  * formato por `aria-describedby`, digitação, colagem, edição no meio com o
  * cursor preservado e Backspace/Delete sobre separador.
  */
-import { fireEvent, render, screen } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { useState } from "react";
-import { describe, expect, it, vi } from "vitest";
-import { CampoMascarado } from "./CampoMascarado";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { ATRASO_DO_REANUNCIO_MS, CampoMascarado } from "./CampoMascarado";
 import { FormField } from "./FormField";
-import { AVISO_DE_EXCEDENTE, DICA_DE_FORMATO } from "../format/mascaras";
+import { AVISO_DE_RECUSA, DICA_DE_FORMATO } from "../format/mascaras";
 
 function Campo({
   mascara,
@@ -73,7 +79,7 @@ describe("T179 — CampoMascarado", () => {
     fireEvent.change(campo(), { target: { value: "(11) 98765-43210" } });
     expect(campo()).toHaveValue("(11) 98765-4321");
     expect(screen.getByRole("status")).toHaveTextContent(
-      AVISO_DE_EXCEDENTE.telefone,
+      AVISO_DE_RECUSA.telefoneExcedente,
     );
   });
 
@@ -184,16 +190,19 @@ describe("T179 (B2) — CampoMascarado: colar depois de +, +5 ou +55, e DDD 55 c
     expect(screen.getByRole("status")).toBeEmptyDOMElement();
   });
 
-  it("DDD 55 completo recusa dígitos a mais, com aviso ligado ao campo, e o número fica", () => {
+  it("DDD 55 completo recusa dígitos a mais, com aviso ligado ao campo, e o número fica", async () => {
     render(<Campo mascara="telefone" />);
     teclar("55999998888");
     expect(campo()).toHaveValue("(55) 99999-8888");
     teclar("12");
     expect(campo()).toHaveValue("(55) 99999-8888");
     const aviso = screen.getByRole("status");
-    expect(aviso).toHaveTextContent(AVISO_DE_EXCEDENTE.telefone);
+    // T179 — a 2ª recusa igual esvazia a região e devolve o texto logo depois.
+    await waitFor(() =>
+      expect(aviso).toHaveTextContent(AVISO_DE_RECUSA.telefoneExcedente),
+    );
     expect(campo()).toHaveAccessibleDescription(
-      new RegExp(AVISO_DE_EXCEDENTE.telefone.slice(0, 30)),
+      new RegExp(AVISO_DE_RECUSA.telefoneExcedente.slice(0, 30)),
     );
     // A próxima mudança aceita tira o aviso.
     fireEvent.change(campo(), { target: { value: "(55) 99999-888" } });
@@ -205,5 +214,134 @@ describe("T179 (B2) — CampoMascarado: colar depois de +, +5 ou +55, e DDD 55 c
     render(<Campo mascara="telefone" />);
     colar("+49 911 1234567");
     expect(campo()).toHaveValue("+499111234567");
+  });
+});
+
+describe("T179 (revisão final) — CampoMascarado: inserção múltipla, motivo do aviso e reanúncio", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** Simula arrastar/soltar, IME ou ditado: vários caracteres num `change`. */
+  function inserirDeUmaVez(pos: number, extra: string) {
+    const input = campo();
+    const valor = input.value.slice(0, pos) + extra + input.value.slice(pos);
+    const cursor = pos + extra.length;
+    fireEvent.change(input, {
+      target: { value: valor, selectionStart: cursor, selectionEnd: cursor },
+    });
+  }
+
+  it.each([
+    ["(55) 99999-8888", 15, "77"],
+    ["(55) 3333-4444", 14, "55"],
+    ["(11) 98765-4321", 8, "123"],
+    ["(11) 3333-4444", 1, "12345"],
+  ])(
+    "%p com %p + %p de uma vez: recusado, valor e cursor preservados, aviso de excedente",
+    (inicial, pos, extra) => {
+      render(<Campo mascara="telefone" inicial={inicial} />);
+      const input = campo();
+      input.focus();
+      inserirDeUmaVez(pos, extra);
+      expect(input).toHaveValue(inicial);
+      expect(input.selectionStart).toBe(pos);
+      expect(screen.getByRole("status")).toHaveTextContent(
+        AVISO_DE_RECUSA.telefoneExcedente,
+      );
+    },
+  );
+
+  it("colar num número completo é recusado, com o cursor onde estava", () => {
+    render(<Campo mascara="telefone" inicial="(55) 99999-8888" />);
+    const input = campo();
+    input.focus();
+    input.setSelectionRange(6, 6);
+    fireEvent.paste(input, { clipboardData: { getData: () => "123" } });
+    expect(input).toHaveValue("(55) 99999-8888");
+    expect(input.selectionStart).toBe(6);
+    expect(screen.getByRole("status")).toHaveTextContent(
+      AVISO_DE_RECUSA.telefoneExcedente,
+    );
+  });
+
+  it.each(["(011) 98765-4321", "Tel: 11 98765-4321 ramal 2", "55119876543210"])(
+    "colar %p em campo vazio dá o aviso de formato, nunca o de excedente",
+    (texto) => {
+      render(<Campo mascara="telefone" />);
+      fireEvent.paste(campo(), { clipboardData: { getData: () => texto } });
+      expect(campo()).toHaveValue("");
+      const aviso = screen.getByRole("status");
+      expect(aviso).toHaveTextContent(AVISO_DE_RECUSA.telefoneFormato);
+      expect(aviso).not.toHaveTextContent(/não pode passar|completo/);
+      expect(campo()).toHaveAccessibleDescription(/Use um telefone brasileiro/);
+    },
+  );
+
+  it("colar em campo vazio, com +55 ou 55, continua aceito e sem aviso", () => {
+    render(<Campo mascara="telefone" />);
+    fireEvent.paste(campo(), {
+      clipboardData: { getData: () => "5591987654321" },
+    });
+    expect(campo()).toHaveValue("(91) 98765-4321");
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
+  });
+
+  it("a mesma recusa repetida é anunciada de novo: a região esvazia e o texto volta", () => {
+    vi.useFakeTimers();
+    render(<Campo mascara="telefone" inicial="(55) 99999-8888" />);
+    const aviso = screen.getByRole("status");
+    teclar("1");
+    expect(aviso).toHaveTextContent(AVISO_DE_RECUSA.telefoneExcedente);
+
+    // 2ª tentativa idêntica: limpa agora…
+    teclar("1");
+    expect(aviso).toBeEmptyDOMElement();
+    // …e o texto volta no próximo tique, para o leitor de tela repetir.
+    act(() => {
+      vi.advanceTimersByTime(ATRASO_DO_REANUNCIO_MS);
+    });
+    expect(aviso).toHaveTextContent(AVISO_DE_RECUSA.telefoneExcedente);
+
+    // 3ª tentativa: o mesmo ciclo.
+    teclar("2");
+    expect(aviso).toBeEmptyDOMElement();
+    act(() => {
+      vi.advanceTimersByTime(ATRASO_DO_REANUNCIO_MS);
+    });
+    expect(aviso).toHaveTextContent(AVISO_DE_RECUSA.telefoneExcedente);
+    expect(campo()).toHaveValue("(55) 99999-8888");
+  });
+
+  it("aviso de outro motivo troca na hora; mudança aceita cancela o reanúncio pendente", () => {
+    vi.useFakeTimers();
+    render(<Campo mascara="telefone" />);
+    const aviso = screen.getByRole("status");
+    fireEvent.paste(campo(), {
+      clipboardData: { getData: () => "(011) 98765-4321" },
+    });
+    expect(aviso).toHaveTextContent(AVISO_DE_RECUSA.telefoneFormato);
+    fireEvent.paste(campo(), {
+      clipboardData: { getData: () => "(011) 98765-4321" },
+    });
+    expect(aviso).toBeEmptyDOMElement();
+    teclar("1");
+    act(() => {
+      vi.advanceTimersByTime(ATRASO_DO_REANUNCIO_MS);
+    });
+    expect(campo()).toHaveValue("(1");
+    expect(aviso).toBeEmptyDOMElement();
+  });
+
+  it("CEP: colar além de 8 dígitos é recusado com o aviso do CEP", () => {
+    render(<Campo mascara="cep" inicial="0131" />);
+    const input = campo();
+    input.focus();
+    input.setSelectionRange(4, 4);
+    fireEvent.paste(input, { clipboardData: { getData: () => "04567-000" } });
+    expect(input).toHaveValue("0131");
+    expect(input.selectionStart).toBe(4);
+    expect(screen.getByRole("status")).toHaveTextContent(AVISO_DE_RECUSA.cep);
+    expect(input).toHaveAccessibleDescription(/O CEP tem 8 dígitos/);
   });
 });

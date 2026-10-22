@@ -190,11 +190,14 @@ export class AdmitirColaboradorDto {
   empresaId!: string;
 
   /**
-   * T179 — opcional na Nova admissão; vazio vale como não informada. Quando
-   * vem, segue o padrão e é única na empresa.
+   * T179 — opcional na Nova admissão; ausente, `null`, vazia ou só espaços vale
+   * como não informada (e não é conferida contra as outras). Quando vem,
+   * segue o padrão e é única na empresa.
    */
   @Transform(({ value }) =>
-    typeof value === "string" && value.trim() === "" ? undefined : value,
+    value === null || (typeof value === "string" && value.trim() === "")
+      ? undefined
+      : value,
   )
   @IsOptional()
   @Matches(MATRICULA_PATTERN)

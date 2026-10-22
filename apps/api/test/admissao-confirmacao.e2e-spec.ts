@@ -1232,17 +1232,146 @@ describe("Confirmação da Nova admissão (T179, e2e)", () => {
         celular: null,
         telefone: "+555532221111",
       });
-      // Como a ficha envia: os três campos, vazio como `null` — apaga o
-      // telefone gravado, sem recusar.
+      // Como a ficha envia: os três campos, vazio como `null`. Era o único
+      // contato: o registro fica INATIVO e a resposta é "sem registro".
       const apagado = await put(rota, rhA)
         .send({ emailPessoal: null, celular: null, telefone: null })
         .expect(200);
-      expect(apagado.body.resultado).toBe("atualizado");
-      expect(apagado.body.contatos).toMatchObject({
+      expect(apagado.body).toMatchObject({
+        situacao: "sem_registro",
+        contatos: null,
+        resultado: "removido",
+      });
+    });
+
+    // ---------------------------------------------------------------------
+    // Revisão final — matrícula `null` e remoção de todos os contatos.
+
+    it("sem matrícula por clientes diferentes (omitida, null, vazia, só espaços): todas 201, nenhuma conflita", async () => {
+      const ids: string[] = [];
+      for (const matricula of [undefined, null, "", "   ", null]) {
+        const corpo = soObrigatorios(
+          matricula === undefined ? {} : { matricula },
+        );
+        const r = await admitir(rhA, randomUUID()).send(corpo).expect(201);
+        expect(r.body.vinculo.matricula).toBeNull();
+        ids.push(r.body.id);
+      }
+      expect(new Set(ids).size).toBe(5);
+      // O reenvio com `null` e a mesma chave é reconhecido, sem 409.
+      const chave = randomUUID();
+      const corpo = soObrigatorios({ matricula: null });
+      const primeiro = await admitir(rhA, chave).send(corpo).expect(201);
+      const reenvio = await admitir(rhA, chave).send(corpo).expect(201);
+      expect(reenvio.headers["idempotent-replayed"]).toBe("true");
+      expect(reenvio.body.id).toBe(primeiro.body.id);
+    });
+
+    it("remover todos os contatos: registro inativo e sem valor, evento de edição só com nomes, leitura sem registro; um contato depois o reativa", async () => {
+      const r = await admitir(rhA)
+        .send(
+          soObrigatorios({
+            contatos: { celular: "(31) 98888-1771", telefone: "3133331771" },
+          }),
+        )
+        .expect(201);
+      const colaboradorId: string = r.body.id;
+      const rota = `/v1/colaboradores/${colaboradorId}/contatos`;
+      const registro = () =>
+        prisma.contatoColaborador.findFirstOrThrow({
+          where: { colaboradorId },
+        });
+      const ultimoEvento = () =>
+        prisma.contatoColaboradorEvento.findFirstOrThrow({
+          where: { colaboradorId },
+          orderBy: { ocorridoEm: "desc" },
+        });
+
+      const removido = await put(rota, rhA)
+        .send({ emailPessoal: "", celular: "", telefone: "" })
+        .expect(200);
+      expect(removido.body).toMatchObject({
+        situacao: "sem_registro",
+        contatos: null,
+        resultado: "removido",
+      });
+      const inativo = await registro();
+      expect(inativo).toMatchObject({
+        ativo: false,
         emailPessoal: null,
         celular: null,
         telefone: null,
       });
+      expect(await ultimoEvento()).toMatchObject({
+        contatoId: inativo.id,
+        acao: "edicao",
+        resultado: "gravado",
+        campos: ["celular", "telefone"],
+      });
+
+      const lido = await get(rota, rhA).expect(200);
+      expect(lido.body).toMatchObject({
+        situacao: "sem_registro",
+        contatos: null,
+      });
+      expect(await ultimoEvento()).toMatchObject({
+        contatoId: inativo.id,
+        acao: "leitura",
+        resultado: "sem_registro",
+        campos: [],
+      });
+      // Isolamento: outra empresa não sabe que a pessoa existe.
+      await get(rota, rhB).expect(404);
+
+      const nada = await put(rota, rhA).send({}).expect(200);
+      expect(nada.body).toMatchObject({
+        situacao: "sem_registro",
+        resultado: "sem_alteracao",
+      });
+      expect(await registro()).toMatchObject({ ativo: false });
+
+      const reativado = await put(rota, rhA)
+        .send({ celular: "(31) 98888-1772" })
+        .expect(200);
+      expect(reativado.body).toMatchObject({
+        situacao: "registrado",
+        resultado: "atualizado",
+        contatos: {
+          emailPessoal: null,
+          celular: "+5531988881772",
+          telefone: null,
+        },
+      });
+      expect(await registro()).toMatchObject({ ativo: true });
+      // Um só registro do par o tempo todo: nada foi apagado.
+      expect(
+        await prisma.contatoColaborador.count({ where: { colaboradorId } }),
+      ).toBe(1);
+      for (const valor of ["31988881771", "3133331771", "31988881772"]) {
+        enviados.add(valor);
+      }
+    });
+
+    it("o banco recusa registro ativo vazio e registro inativo com valor", async () => {
+      const r = await admitir(rhA)
+        .send(soObrigatorios({ contatos: { telefone: "3133331773" } }))
+        .expect(201);
+      const contato = await prisma.contatoColaborador.findFirstOrThrow({
+        where: { colaboradorId: r.body.id },
+      });
+      await expect(
+        prisma.contatoColaborador.update({
+          where: { id: contato.id },
+          data: { telefone: null },
+        }),
+      ).rejects.toThrow();
+      await expect(
+        prisma.contatoColaborador.update({
+          where: { id: contato.id },
+          data: { ativo: false },
+        }),
+      ).rejects.toThrow();
+      enviados.add("3133331773");
     });
   });
 

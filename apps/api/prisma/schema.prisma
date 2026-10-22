@@ -2135,6 +2135,12 @@ model ContatoColaborador {
   celular      String?
   telefone     String?
 
+  /// T179 — falso quando todos os contatos foram removidos (decisão de
+  /// 2026-10-22): o registro fica sem valor, preservado só para a trilha, e é
+  /// lido como "sem registro". CHECK no banco: ativo se, e somente se, há ao
+  /// menos um contato.
+  ativo Boolean @default(true)
+
   criadoPorUserId     String @map("criado_por_user_id")
   atualizadoPorUserId String @map("atualizado_por_user_id")
 

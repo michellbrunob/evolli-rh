@@ -199,7 +199,7 @@ export async function conflitosDaAdmissao(
   // T179 — matrícula e e-mail são opcionais: só o que veio é conferido.
   const emailPessoal = contatosInformados(dto.contatos).emailPessoal;
   const matricula =
-    dto.matricula === undefined
+    dto.matricula == null
       ? null
       : await tx.vinculoFuncional.findFirst({
           where: { empresaId, matricula: dto.matricula },
@@ -281,7 +281,7 @@ export interface AdmissaoGravada {
   > | null;
   contato: Pick<
     ContatoColaborador,
-    "emailPessoal" | "celular" | "telefone"
+    "emailPessoal" | "celular" | "telefone" | "ativo"
   > | null;
 }
 
@@ -349,7 +349,10 @@ export function admissaoConfere(
 
   // T179 — contatos opcionais: sem nenhum enviado, nenhum registro nasceu.
   const enviados = contatosInformados(dto.contatos);
-  if (camposPreenchidos(enviados).length === 0) return contato === null;
+  // Registro inativo (contatos removidos depois) é o mesmo "sem contato".
+  if (camposPreenchidos(enviados).length === 0) {
+    return contato === null || !contato.ativo;
+  }
   return (
     contato !== null &&
     iguais(contato.emailPessoal, enviados.emailPessoal) &&

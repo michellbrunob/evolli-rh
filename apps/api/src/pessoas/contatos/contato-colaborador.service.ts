@@ -20,7 +20,8 @@ import { resolverEscopoContatos } from "./escopo-contatos.util";
  *
  * - `sem_registro` — o colaborador existe no escopo e não tem contato gravado.
  *   É o estado de todo colaborador admitido antes desta fatia: a ausência de
- *   registro nunca é erro.
+ *   registro nunca é erro. T179 — também o de quem teve todos os contatos
+ *   removidos: o registro fica INATIVO, sem valor, e é lido assim.
  * - `registrado` — contato gravado e em uso operacional.
  * - `bloqueado` — nenhum vínculo do colaborador na empresa segue previsto ou
  *   ativo. A ficha manda **bloquear o uso operacional** após o desligamento:
@@ -51,8 +52,12 @@ export interface ContatosDoColaborador {
   contatos: ValoresContatos | null;
 }
 
+/**
+ * T179 — `removido`: os três contatos foram limpos; o registro ficou inativo e
+ * a resposta é `sem_registro`.
+ */
 export type ResultadoRegistroContatos =
-  "criado" | "atualizado" | "sem_alteracao";
+  "criado" | "atualizado" | "removido" | "sem_alteracao";
 
 export interface ContatosRegistrados extends ContatosDoColaborador {
   resultado: ResultadoRegistroContatos;
@@ -73,6 +78,7 @@ const PROJECAO_CONTATO = {
   emailPessoal: true,
   celular: true,
   telefone: true,
+  ativo: true,
   atualizadoEm: true,
 } as const satisfies Prisma.ContatoColaboradorSelect;
 
@@ -258,8 +264,10 @@ export class ContatoColaboradorService {
         },
         select: PROJECAO_CONTATO,
       });
-      if (!contato) {
-        await this.registrarEvento(tx, ctx, alvo, null, {
+      // T179 — registro inativo (todos os contatos removidos) é lido como
+      // "sem registro"; o evento aponta para ele, sem nenhum campo.
+      if (!contato || !contato.ativo) {
+        await this.registrarEvento(tx, ctx, alvo, contato?.id ?? null, {
           acao: "leitura",
           resultado: "sem_registro",
           campos: NENHUM_CAMPO,
@@ -341,23 +349,25 @@ export class ContatoColaboradorService {
           select: PROJECAO_CONTATO,
         });
 
+        const preenchidos = camposPreenchidos(novos);
+        if ((!atual || !atual.ativo) && preenchidos.length === 0) {
+          // T179 — nenhum contato antes (nunca gravado, ou removido) e nenhum
+          // agora: não há o que gravar. Responde como a leitura de quem não
+          // tem contato.
+          await this.registrarEvento(tx, ctx, alvo, atual?.id ?? null, {
+            acao: "leitura",
+            resultado: "sem_registro",
+            campos: NENHUM_CAMPO,
+            auditAction: "pessoas_contato_consultado",
+            auditResult: "success",
+          });
+          return {
+            ...this.resposta(alvo, "sem_registro", null),
+            resultado: "sem_alteracao" as const,
+          };
+        }
+
         if (!atual) {
-          const preenchidos = camposPreenchidos(novos);
-          if (preenchidos.length === 0) {
-            // T179 — nada gravado antes e nada informado agora: não há o que
-            // criar. Responde como a leitura de quem não tem contato.
-            await this.registrarEvento(tx, ctx, alvo, null, {
-              acao: "leitura",
-              resultado: "sem_registro",
-              campos: NENHUM_CAMPO,
-              auditAction: "pessoas_contato_consultado",
-              auditResult: "success",
-            });
-            return {
-              ...this.resposta(alvo, "sem_registro", null),
-              resultado: "sem_alteracao" as const,
-            };
-          }
           const criado = await tx.contatoColaborador.create({
             data: {
               empresaId: alvo.empresaId,
@@ -398,10 +408,15 @@ export class ContatoColaboradorService {
           };
         }
 
+        // T179 — sem nenhum contato, o registro fica INATIVO (não há exclusão
+        // física: a trilha aponta para ele); com algum, volta a ativo. O
+        // evento é de EDIÇÃO, com os nomes dos campos alterados ou removidos.
+        const removidos = preenchidos.length === 0;
         const atualizado = await tx.contatoColaborador.update({
           where: { id: atual.id },
           data: {
             ...novos,
+            ativo: !removidos,
             atualizadoPorUserId: ctx.actor.id,
           },
           select: PROJECAO_CONTATO,
@@ -413,6 +428,12 @@ export class ContatoColaboradorService {
           auditAction: "pessoas_contato_atualizado",
           auditResult: "success",
         });
+        if (removidos) {
+          return {
+            ...this.resposta(alvo, "sem_registro", null),
+            resultado: "removido" as const,
+          };
+        }
         return {
           ...this.resposta(alvo, "registrado", valores(atualizado)),
           resultado: "atualizado" as const,

@@ -200,3 +200,17 @@ formato continua conferido (§3 e §8) e o e-mail pessoal continua único na
 empresa (§8). Contato de emergência continua sem campo, opcional quando for
 liberado. Finalidade, base legal, classificação, retenção e escopo de acesso
 não mudam.
+
+## 10. Alteração de 2026-10-22 (T179) — remoção de todos os contatos
+
+Quando quem já tem contatos limpa e salva os três campos, o registro passa a
+**inativo** (`ativo = false`): sem nenhum valor, preservado só para a trilha
+de auditoria, e lido como "sem registro" — o mesmo estado de quem nunca teve
+contato. **Não há exclusão física**: a rota de exclusão continua inexistente
+(§5), `evolli_app` continua sem `DELETE` e os eventos apontam para o registro.
+A remoção fica na trilha como **edição**, com os nomes dos campos removidos e
+nunca os valores; a leitura posterior registra `sem_registro` apontando para o
+registro inativo. Informar um contato depois reativa o mesmo registro. O banco
+garante a coerência: registro ativo tem ao menos um contato, e inativo, nenhum
+(migration `20261022120000_contato_colaborador_inativo`). Finalidade, base
+legal, classificação, retenção e escopo de acesso não mudam.

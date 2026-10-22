@@ -44,6 +44,12 @@ vi.mock("../api/organizacaoClient");
 vi.mock("../api/cargoClient");
 vi.mock("../api/contatosColaboradorClient");
 
+// T179 — fluxo integrado (App inteiro, admissão com confirmação, ficha): cada
+// teste passa de 0,3 s isolado, mas na suíte completa, com a máquina carregada,
+// alguns estouravam os 5 s padrão. O limite maior vale só para este arquivo;
+// as asserções não mudam.
+vi.setConfig({ testTimeout: 20_000 });
+
 const ROTA = "#/pessoas/nova-admissao";
 
 function paginado<T>(itens: T[]) {
@@ -788,6 +794,11 @@ describe("T176/T178 — da página à listagem e à ficha do admitido", () => {
     await screen.findByRole("dialog", { name: "Pessoa Sintética Fluxo" });
     await waitFor(() =>
       expect(screen.getByLabelText(/E-mail pessoal/)).toHaveFocus(),
+    );
+    // T179 (revisão final) — o foco pula o título da seção: o estado "Nenhum
+    // contato registrado" chega pela descrição do próprio campo focado.
+    expect(screen.getByLabelText(/E-mail pessoal/)).toHaveAccessibleDescription(
+      /Nenhum contato registrado/,
     );
     expect(consultarContatosDoColaborador).toHaveBeenCalledWith(resposta.id);
   });
