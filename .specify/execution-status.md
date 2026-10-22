@@ -2210,8 +2210,8 @@ da T171: o aviso `[DEP0190]` do Node 24 no orquestrador da demonstração, no Wi
 
 ## Confirmação da Nova admissão e duplicidade — T179 (integrada)
 
-| Tarefa | Estado                    | Resultado principal                                                                                    |
-| ------ | ------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Tarefa | Estado                                                                     | Resultado principal                                                                                    |
+| ------ | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
 | T179   | **Integrada (PR #171, squash `60ce990bc6a04bee542b93d494d00d6f48bf8c19`)** | Confirmação antes de gravar, idempotência, erros por campo, e-mail único na empresa e telefones `+55`. |
 
 **Escopo da T179:** validação local e modal acessível de confirmação na Nova
