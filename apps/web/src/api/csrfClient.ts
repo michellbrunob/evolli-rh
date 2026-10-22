@@ -27,6 +27,34 @@ export class CsrfRequestError extends Error {
   }
 }
 
+/**
+ * T179 — `codigo` que o `CsrfGuard` põe no corpo do 403 quando o token CSRF
+ * falta ou não vale mais (sessão expirada). O 403 de permissão vem sem ele.
+ */
+export const CODIGO_CSRF_INVALIDO = "csrf_invalido";
+
+/**
+ * T179 — a gravação falhou porque a sessão expirou, e o servidor NÃO a
+ * aceitou: 401 da própria chamada, `CsrfSessionExpiredError` na renovação do
+ * token (o pedido nem saiu) ou 403 com `codigo: "csrf_invalido"`. Não é envio
+ * incerto. `status` e `codigo` são lidos por forma: valem com o `ApiError` de
+ * qualquer cliente e com os automockados dos testes.
+ */
+export function falhaPorSessaoExpirada(erro: unknown): boolean {
+  if (erro instanceof CsrfSessionExpiredError) return true;
+  if (typeof erro !== "object" || erro === null) return false;
+  const { status, codigo } = erro as { status?: unknown; codigo?: unknown };
+  return status === 401 || (status === 403 && codigo === CODIGO_CSRF_INVALIDO);
+}
+
+/**
+ * T179 — a gravação nem saiu: a renovação do token CSRF falhou por rede ou
+ * 5xx (`CsrfRequestError`), antes do pedido de gravação. Não é envio incerto.
+ */
+export function falhaAoPrepararEnvio(erro: unknown): boolean {
+  return erro instanceof CsrfRequestError;
+}
+
 let csrfTokenInMemory: string | null = null;
 
 /** Token CSRF corrente, se algum já foi obtido nesta aba. Nunca lido de storage. */
@@ -86,6 +114,30 @@ export async function refreshCsrfToken(
 
   csrfTokenInMemory = body.csrfToken;
   return csrfTokenInMemory;
+}
+
+/**
+ * T179 — o token para uma GRAVAÇÃO: o da memória ou um novo. A falha de rede
+ * na renovação vira `CsrfRequestError`, como o 5xx: o pedido de gravação nem
+ * saiu, e quem chama não pode confundi-la com a rede caindo no meio da
+ * gravação (envio incerto). O 401 segue como `CsrfSessionExpiredError`.
+ */
+export async function tokenCsrfParaGravacao(
+  fetchImpl: typeof fetch = fetch,
+): Promise<string> {
+  const atual = getCsrfToken();
+  if (atual) return atual;
+  try {
+    return await refreshCsrfToken(fetchImpl);
+  } catch (erro) {
+    if (
+      erro instanceof CsrfSessionExpiredError ||
+      erro instanceof CsrfRequestError
+    ) {
+      throw erro;
+    }
+    throw new CsrfRequestError("Não foi possível obter o token CSRF.");
+  }
 }
 
 async function readRequestId(response: Response): Promise<string | undefined> {

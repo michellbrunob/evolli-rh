@@ -519,3 +519,157 @@ describe("T179 (revisão final) — CampoMascarado: avisos velhos", () => {
     expect(screen.getByRole("status")).toBeEmptyDOMElement();
   });
 });
+
+// ---------------------------------------------------------------------------
+// T179 (revisão final) — `+` trocando uma seleção parcial e CEP com texto
+// misturado: recusados com o aviso de formato, na região viva.
+// ---------------------------------------------------------------------------
+
+describe("T179 (revisão final) — CampoMascarado: + sobre seleção parcial", () => {
+  /** Troca a seleção `[inicio, fim)` por `texto` num `change` só (tecla ou arrastar). */
+  function trocarSelecao(inicio: number, fim: number, texto: string) {
+    const input = campo();
+    input.focus();
+    input.setSelectionRange(inicio, fim);
+    const valor = input.value.slice(0, inicio) + texto + input.value.slice(fim);
+    const cursor = inicio + texto.length;
+    fireEvent.change(input, {
+      target: { value: valor, selectionStart: cursor, selectionEnd: cursor },
+    });
+  }
+
+  it.each([
+    ["(55) 98765-4321", 0, 1],
+    ["(55) 98765-4321", 0, 2],
+    ["(55) 98765-4321", 0, 3],
+    ["(55) 3234-5678", 0, 1],
+    ["(55) 3234-5678", 0, 8],
+    ["(11) 98765-4321", 0, 1],
+    ["(11) 98765-4321", 5, 8],
+  ])(
+    "%p com [%i,%i) trocado por + digitado: recusado, valor e cursor preservados, aviso de formato",
+    (inicial, inicio, fim) => {
+      render(<Campo mascara="telefone" inicial={inicial} />);
+      trocarSelecao(inicio, fim, "+");
+      expect(campo()).toHaveValue(inicial);
+      expect(campo().selectionStart).toBe(fim);
+      expect(screen.getByRole("status")).toHaveTextContent(
+        AVISO_DE_RECUSA.telefoneFormato,
+      );
+      expect(campo()).toHaveAccessibleDescription(/Use um telefone brasileiro/);
+    },
+  );
+
+  it.each([
+    ["+", 0, 1],
+    ["+", 0, 2],
+    ["+55", 0, 1],
+    ["+55", 0, 3],
+    ["+55 ", 0, 8],
+  ])(
+    "colar %p sobre [%i,%i) de (55) 98765-4321: recusado, cursor no início da seleção",
+    (colado, inicio, fim) => {
+      render(<Campo mascara="telefone" inicial="(55) 98765-4321" />);
+      const input = campo();
+      input.focus();
+      input.setSelectionRange(inicio, fim);
+      fireEvent.paste(input, { clipboardData: { getData: () => colado } });
+      expect(input).toHaveValue("(55) 98765-4321");
+      expect(input.selectionStart).toBe(inicio);
+      expect(screen.getByRole("status")).toHaveTextContent(
+        AVISO_DE_RECUSA.telefoneFormato,
+      );
+    },
+  );
+
+  it("digitar depois da recusa não leva a outro número", () => {
+    render(<Campo mascara="telefone" inicial="(55) 3234-5678" />);
+    trocarSelecao(0, 1, "+");
+    expect(campo()).toHaveValue("(55) 3234-5678");
+    // No fim: o 9 vira o 11º dígito e o 0 é excedente; o DDD segue 55.
+    teclar("90");
+    expect(campo()).toHaveValue("(55) 32345-6789");
+    expect(screen.getByRole("status")).toHaveTextContent(
+      AVISO_DE_RECUSA.telefoneExcedente,
+    );
+  });
+
+  it("colar +55… com o número inteiro selecionado continua aceito, sem aviso", () => {
+    render(<Campo mascara="telefone" inicial="(55) 98765-4321" />);
+    const input = campo();
+    input.focus();
+    input.setSelectionRange(0, 15);
+    fireEvent.paste(input, {
+      clipboardData: { getData: () => "+55 11 3333-4444" },
+    });
+    expect(input).toHaveValue("(11) 3333-4444");
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
+  });
+});
+
+describe("T179 (revisão final) — CampoMascarado: CEP com texto misturado", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it.each([
+    "Nº 5, 0131010",
+    "CEP: 01310-100",
+    "01310-1OO",
+    "01310 100",
+    "０１３１０１００",
+    "01310/100",
+  ])(
+    "colar %p é recusado com o aviso de formato do CEP, e o campo fica vazio",
+    (texto) => {
+      render(<Campo mascara="cep" />);
+      fireEvent.paste(campo(), { clipboardData: { getData: () => texto } });
+      expect(campo()).toHaveValue("");
+      expect(screen.getByRole("status")).toHaveTextContent(
+        AVISO_DE_RECUSA.cepFormato,
+      );
+      expect(campo()).toHaveAccessibleDescription(/Use um CEP brasileiro/);
+    },
+  );
+
+  it("letra digitada no meio: recusada, cursor onde estava", () => {
+    render(<Campo mascara="cep" inicial="01310-100" />);
+    const input = campo();
+    input.focus();
+    fireEvent.change(input, {
+      target: { value: "01310O-100", selectionStart: 6, selectionEnd: 6 },
+    });
+    expect(input).toHaveValue("01310-100");
+    expect(input.selectionStart).toBe(5);
+    expect(screen.getByRole("status")).toHaveTextContent(
+      AVISO_DE_RECUSA.cepFormato,
+    );
+  });
+
+  it("formato e excedente têm avisos próprios, e a mesma recusa é reanunciada", () => {
+    vi.useFakeTimers();
+    render(<Campo mascara="cep" inicial="01310-100" />);
+    const aviso = screen.getByRole("status");
+    teclar("1");
+    expect(aviso).toHaveTextContent(AVISO_DE_RECUSA.cep);
+    teclar("a");
+    expect(aviso).toHaveTextContent(AVISO_DE_RECUSA.cepFormato);
+    teclar("a");
+    expect(aviso).toBeEmptyDOMElement();
+    act(() => {
+      vi.advanceTimersByTime(ATRASO_DO_REANUNCIO_MS);
+    });
+    expect(aviso).toHaveTextContent(AVISO_DE_RECUSA.cepFormato);
+    expect(campo()).toHaveValue("01310-100");
+  });
+
+  it.each(["01310-100", "01310100", "01310 100", "01.310-100"])(
+    "%p continua aceito, sem aviso",
+    (texto) => {
+      render(<Campo mascara="cep" />);
+      fireEvent.paste(campo(), { clipboardData: { getData: () => texto } });
+      expect(campo()).toHaveValue("01310-100");
+      expect(screen.getByRole("status")).toBeEmptyDOMElement();
+    },
+  );
+});

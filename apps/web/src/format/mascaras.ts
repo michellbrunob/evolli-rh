@@ -32,6 +32,14 @@
  *   com qualquer caractere fora de `TELEFONE_ENTRADA` (letras, `ramal`, `x`,
  *   `/`, `:`…) é RECUSADA (`formato`), por tecla, colagem ou preenchimento —
  *   nunca vira outro número com as letras jogadas fora.
+ * - **`+` nunca vira país sobre um número** (T179, revisão final): `+` posto
+ *   num número nacional que já estava no campo, conservando algum dígito dele
+ *   — inserido ou TROCANDO uma seleção parcial —, é RECUSADO (`formato`). Um
+ *   DDD 55 nunca é relido como código do país.
+ * - **CEP só com caracteres de CEP** (T179, revisão final): entrada com
+ *   qualquer caractere fora de `CEP_ENTRADA` (letras, `Nº`, vírgula, `/`,
+ *   espaço invisível, dígitos de outra escrita) é RECUSADA (`formato`) — nunca
+ *   vira um CEP com os números tirados do texto.
  * - **Legado intocado** (T179, revisão final): telefone gravado fora da forma
  *   atual aparece exatamente como veio (`exibirTelefone`) e, enquanto ainda
  *   tem o texto antigo, apagar não o reformata: a mudança fica como veio até
@@ -52,8 +60,9 @@ export type TipoMascara = "cep" | "telefone";
  * (`avisoDaRecusa`):
  *  - `excedente` — a inserção conserva dígitos do valor e passaria do limite;
  *  - `formato` — a entrada não é um telefone brasileiro (inteira longa demais
- *    sem ser `55` + DDD + número, zero de tronco, `+` inserido num número
+ *    sem ser `55` + DDD + número, zero de tronco, `+` posto num número
  *    nacional) ou traz caractere fora de `TELEFONE_ENTRADA` (letras, ramal).
+ *    T179 (revisão final) — no CEP, caractere fora de `CEP_ENTRADA`.
  */
 export type MotivoDaRecusa = "excedente" | "formato";
 
@@ -89,6 +98,7 @@ export const DICA_DE_FORMATO: Readonly<Record<TipoMascara, string>> = {
  */
 export const AVISO_DE_RECUSA = {
   cep: "O CEP tem 8 dígitos: o que foi digitado ou colado não coube. Apague antes ou selecione o CEP inteiro para trocar.",
+  cepFormato: "Use um CEP brasileiro: 8 dígitos, como 00000-000.",
   telefoneExcedente:
     "O número não pode passar de 11 dígitos: o que foi digitado ou colado não entrou. Para trocar o número, apague antes ou selecione o número inteiro.",
   telefoneFormato:
@@ -100,7 +110,11 @@ export function avisoDaRecusa(
   tipo: TipoMascara,
   motivo: MotivoDaRecusa,
 ): string {
-  if (tipo === "cep") return AVISO_DE_RECUSA.cep;
+  if (tipo === "cep") {
+    return motivo === "excedente"
+      ? AVISO_DE_RECUSA.cep
+      : AVISO_DE_RECUSA.cepFormato;
+  }
   return motivo === "excedente"
     ? AVISO_DE_RECUSA.telefoneExcedente
     : AVISO_DE_RECUSA.telefoneFormato;
@@ -136,6 +150,24 @@ export function telefoneNaFormaAtual(
 function soCaracteresDeTelefone(entrada: string): boolean {
   const aparado = entrada.trim();
   return aparado === "" || aparado === "+" || TELEFONE_ENTRADA.test(aparado);
+}
+
+/**
+ * T179 (revisão final) — o que o CEP aceita: dígitos ASCII `0-9` e, como
+ * separadores, espaço, hífen e ponto (`01310-100`, `01310 100`,
+ * `01.310-100`). Letras, vírgula, `/`, `:`, espaço invisível (NBSP, largura
+ * zero, tab) e dígitos de outra escrita (largura total, arábicos) ficam de
+ * fora: o CEP nunca sai de números tirados de um texto misturado.
+ */
+export const CEP_ENTRADA = /^[0-9 .-]+$/;
+
+/**
+ * T179 (revisão final) — a entrada só tem caracteres de CEP? O vazio serve
+ * (é apagar). Nada é aparado aqui: NBSP ou tab digitado é recusado mesmo no
+ * fim; só a colagem apara as pontas do colado (`colarNaMascara`).
+ */
+function soCaracteresDeCep(entrada: string): boolean {
+  return entrada === "" || CEP_ENTRADA.test(entrada);
 }
 
 /** Limite da numeração internacional (E.164): `+` de outro país fica até aqui. */
@@ -296,11 +328,18 @@ function recusar(
  * sufixo comuns, sem se sobreporem. O que fica fora deles é o trecho
  * trocado. Diz se algum DÍGITO do anterior sobreviveu (no prefixo ou no
  * sufixo) e se a mudança foi só inserção (o anterior inteiro sobreviveu).
+ * T179 (revisão final) — devolve também o texto conservado e o inserido.
  */
-function comparar(
-  anterior: string,
-  entrada: string,
-): { readonly digito: boolean; readonly soInsercao: boolean } {
+interface Mudanca {
+  readonly digito: boolean;
+  readonly soInsercao: boolean;
+  /** O que ficou do anterior: prefixo e sufixo comuns, juntos. */
+  readonly conservado: string;
+  /** O que entrou no lugar do trecho trocado (vazio: só se apagou). */
+  readonly inserido: string;
+}
+
+function comparar(anterior: string, entrada: string): Mudanca {
   const maximo = Math.min(anterior.length, entrada.length);
   let prefixo = 0;
   while (prefixo < maximo && anterior[prefixo] === entrada[prefixo]) {
@@ -319,19 +358,51 @@ function comparar(
   return {
     digito: DIGITO.test(conservado),
     soInsercao: prefixo + sufixo === anterior.length,
+    conservado,
+    inserido: entrada.slice(prefixo, entrada.length - sufixo),
   };
+}
+
+/**
+ * T179 (revisão final) — preenchimento que troca o valor INTEIRO por `+55` +
+ * número completo e, por acaso, termina com os mesmos dígitos do anterior:
+ * `(21) 91234-5671` → `+5511987654321`. Sem a seleção (o `onChange` não a
+ * tem), só o texto diz que foi troca inteira: o que "sobrou" do anterior são
+ * só dígitos (nenhum parêntese, espaço ou hífen da máscara), o `55` do país
+ * veio inteiro no texto novo e o resto é um número nacional completo (10 ou
+ * 11 dígitos). Um `+` trocando parte do número sempre conserva separador da
+ * máscara, ou usa o `55` do DDD como país — e é recusado.
+ */
+function trocaInteiraPorMais55(entrada: string, mudanca: Mudanca): boolean {
+  if (!comecaComMais(entrada) || mudanca.soInsercao) return false;
+  if (!/^[0-9]+$/.test(mudanca.conservado)) return false;
+  if (!somenteDigitos(mudanca.inserido).startsWith("55")) return false;
+  const nacionais = somenteDigitos(entrada).length - 2;
+  return nacionais === 10 || nacionais === 11;
+}
+
+/**
+ * T179 (revisão final) — `+` posto num número nacional que já estava no campo
+ * (o anterior não começava com `+`), conservando algum dígito dele: por
+ * inserção ou trocando uma seleção parcial. Ler o resto como `+55…` faria do
+ * DDD 55 o código do país e daria outro número.
+ */
+function maisSobreNumeroNacional(
+  anterior: string,
+  entrada: string,
+  conservaDigito: boolean,
+): boolean {
+  return comecaComMais(entrada) && !comecaComMais(anterior) && conservaDigito;
 }
 
 /** T179 — o que uma mudança do telefone conserva do valor anterior. */
 interface Conservado {
   /** Algum dígito NACIONAL do anterior ficou: é inserção num número. */
   readonly digito: boolean;
-  /** O anterior inteiro ficou: só houve inserção, nada foi trocado. */
-  readonly soInsercao: boolean;
 }
 
 /** Nada do anterior ficou: a entrada é INTEIRA. */
-const ENTRADA_INTEIRA: Conservado = { digito: false, soInsercao: false };
+const ENTRADA_INTEIRA: Conservado = { digito: false };
 
 /**
  * T179 (revisão final) — o telefone que uma mudança produz, ou a recusa.
@@ -346,8 +417,10 @@ const ENTRADA_INTEIRA: Conservado = { digito: false, soInsercao: false };
  * - Entrada inteira com mais de 11 dígitos: só `55` + 10 ou 11 dígitos (sem
  *   `+`) ou `+55` + até 11 dígitos servem; o resto é RECUSADO (`formato`) —
  *   zero de tronco, `0055…`, texto com ramal, 14 dígitos.
- * - `+` posto na frente de um número nacional que já estava no campo:
- *   RECUSADO, para o DDD (55 inclusive) não virar código de país.
+ * - `+` posto num número nacional que já estava no campo, conservando algum
+ *   dígito dele — inserido na frente OU trocando uma seleção parcial (T179,
+ *   revisão final): RECUSADO (`formato`), para o DDD (55 inclusive) não virar
+ *   código de país.
  * - `+` de outro país: fica como veio (a validação o recusa); passar de 15
  *   dígitos, o limite internacional, é recusado (`formato`).
  */
@@ -367,17 +440,11 @@ function telefoneDaEntrada(
     return recusar(anterior, cursorDaRecusa, "formato");
   }
 
-  if (
-    comecaComMais(entrada) &&
-    !comecaComMais(anterior) &&
-    conservado.digito &&
-    conservado.soInsercao
-  ) {
-    return recusar(
-      anterior,
-      cursorDaRecusa,
-      digitos.length > limite ? "excedente" : "formato",
-    );
+  // T179 (revisão final) — vale também quando o `+` TROCA uma seleção
+  // parcial: `(55) 98765-4321` com o `(` trocado por `+` virava
+  // `(98) 7654-321`.
+  if (maisSobreNumeroNacional(anterior, entrada, conservado.digito)) {
+    return recusar(anterior, cursorDaRecusa, "formato");
   }
 
   const lido = lerTelefone(entrada, !conservado.digito);
@@ -434,6 +501,10 @@ function telefoneDaEntrada(
  * é reformatado enquanto é apagado: mudança que conserva dígitos dele sem
  * aumentá-los fica como veio, qualquer que seja a quantidade. Esvaziado, ou
  * trocado por inteiro, o campo volta à máscara.
+ *
+ * T179 (revisão final) — CEP: caractere fora de `CEP_ENTRADA` é recusado
+ * (`formato`) antes de tudo, por tecla, preenchimento, arrastar ou edição no
+ * meio.
  */
 export function aplicarMascara(
   tipo: TipoMascara,
@@ -446,18 +517,42 @@ export function aplicarMascara(
   const digitos = somenteDigitos(entrada);
   // Onde o cursor estava antes: a inserção termina no cursor de agora.
   const cursorDaRecusa = cursor - (entrada.length - anterior.length);
+  const mudanca = comparar(anterior, entrada);
+  // T179 (revisão final) — `+`, `+5` ou `+55` em digitação não são dígitos do
+  // número; nem o fim que coincide numa troca inteira por `+55…`.
+  const conservaDigito =
+    mudanca.digito &&
+    !PAIS_EM_DIGITACAO.test(anterior) &&
+    !trocaInteiraPorMais55(entrada, mudanca);
 
   if (tipo === "telefone") {
     if (!soCaracteresDeTelefone(entrada)) {
       return recusar(anterior, cursorDaRecusa, "formato");
     }
+    // T179 (revisão final) — antes do legado: nem o número gravado fora da
+    // máscara aceita o `+` que faria dele outro número.
+    if (maisSobreNumeroNacional(anterior, entrada, conservaDigito)) {
+      return recusar(anterior, cursorDaRecusa, "formato");
+    }
     if (
       telefoneForaDaMascara(anterior) &&
       digitos.length <= digitosAnteriores.length &&
-      comparar(anterior, entrada).digito
+      mudanca.digito
     ) {
       return { valor: entrada, cursor };
     }
+  }
+
+  // T179 (revisão final) — CEP com letra, `Nº`, vírgula, `/`, espaço
+  // invisível ou dígito de outra escrita: recusado inteiro, nunca "limpo"
+  // para virar outro CEP. Antes do excedente, que deixaria passar texto.
+  // Exceção: o valor que JÁ tinha esses caracteres (CEP de outro país, antes
+  // de o país voltar a ser Brasil) pode ser apagado aos poucos, como veio.
+  if (tipo === "cep" && !soCaracteresDeCep(entrada)) {
+    if (!soCaracteresDeCep(anterior) && mudanca.inserido === "") {
+      return { valor: entrada, cursor };
+    }
+    return recusar(anterior, cursorDaRecusa, "formato");
   }
 
   if (
@@ -480,11 +575,8 @@ export function aplicarMascara(
     };
   }
 
-  const { digito, soInsercao } = comparar(anterior, entrada);
   return telefoneDaEntrada(anterior, entrada, cursor, cursorDaRecusa, {
-    // `+`, `+5` ou `+55` em digitação não são dígitos do número.
-    digito: digito && !PAIS_EM_DIGITACAO.test(anterior),
-    soInsercao,
+    digito: conservaDigito,
   });
 }
 
@@ -494,7 +586,10 @@ export function aplicarMascara(
  *
  * - CEP: o colado é limpo e entra no lugar da seleção; se o resultado passar
  *   de 8 dígitos, a colagem é RECUSADA com aviso e o valor fica. CEP inteiro
- *   colado em campo vazio, ou sobre o CEP todo selecionado, entra.
+ *   colado em campo vazio, ou sobre o CEP todo selecionado, entra. T179
+ *   (revisão final) — colado com caractere fora de `CEP_ENTRADA` (`Nº 5,`,
+ *   `CEP:`, letra O no lugar do zero, NBSP, largura total) é RECUSADO
+ *   (`formato`); só os espaços das pontas são aparados.
  * - Telefone (T179, B2 e revisão final) — a mesma regra do `onChange`:
  *   - com o campo só no código do país (`+`, `+5` ou `+55`), campo e colado
  *     viram UMA entrada antes de formatar — `+55` + `91 98765-4321` dá
@@ -506,6 +601,9 @@ export function aplicarMascara(
  *     validação;
  *   - colado num número existente (fim, meio ou início) é INSERÇÃO: passou de
  *     11 dígitos, RECUSADO, sem ler `55` nenhum como país;
+ *   - T179 (revisão final) — `+` ou `+55` colado sobre uma seleção PARCIAL de
+ *     um número nacional (algum dígito fica fora da seleção): RECUSADO
+ *     (`formato`), como o `+` digitado;
  *   - T179 (revisão final) — colado com letra, ramal, `/` ou `:` é RECUSADO
  *     (`formato`), em qualquer posição.
  *   Nenhum dígito some sem aviso.
@@ -519,7 +617,15 @@ export function colarNaMascara(
 ): EstadoDoCampo {
   const limite = LIMITE_DE_DIGITOS[tipo];
   if (tipo === "cep") {
-    const limpo = somenteDigitos(colado);
+    // T179 (revisão final) — o que o campo teria depois da colagem, com as
+    // pontas do colado aparadas: caractere fora do CEP, recusado inteiro.
+    const aparado = colado.trim();
+    if (
+      !soCaracteresDeCep(atual.slice(0, inicio) + aparado + atual.slice(fim))
+    ) {
+      return recusar(atual, inicio, "formato");
+    }
+    const limpo = somenteDigitos(aparado);
     const antes = somenteDigitos(atual.slice(0, inicio));
     const depois = somenteDigitos(atual.slice(fim));
     const digitos = `${antes}${limpo}${depois}`;
@@ -556,7 +662,6 @@ export function colarNaMascara(
   }
   return telefoneDaEntrada(atual, combinado, cursorNoCombinado, inicio, {
     digito: true,
-    soInsercao: inicio === fim,
   });
 }
 

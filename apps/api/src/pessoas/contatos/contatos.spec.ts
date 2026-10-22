@@ -1220,7 +1220,7 @@ describe("Contatos — serviço", () => {
     });
   });
 
-  it("T179: o PUT trava a linha do contato (FOR UPDATE) antes de ler o atual", async () => {
+  it("T179: o PUT trava a linha do contato (FOR NO KEY UPDATE) antes de ler o atual", async () => {
     const m = montar({ vinculos: ATIVO_A, contato: COM_VALOR });
     await m.service.registrar(
       COLABORADOR,
@@ -1231,7 +1231,22 @@ describe("Contatos — serviço", () => {
     const [partes] = m.prisma.$queryRaw.mock.calls[0] as unknown as [
       TemplateStringsArray,
     ];
-    expect(partes.join("?")).toMatch(/FOR UPDATE/);
+    // `NO KEY UPDATE`: serializa salvamentos sem bloquear a checagem de
+    // chave estrangeira da trilha de uma leitura.
+    expect(partes.join("?")).toMatch(/FOR NO KEY UPDATE/);
+    expect(m.prisma.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      m.prisma.contatoColaborador.findUnique.mock.invocationCallOrder[0]!,
+    );
+  });
+
+  it("T179: a leitura se ordena com um salvamento em andamento (FOR SHARE) antes de ler", async () => {
+    const m = montar({ vinculos: ATIVO_A, contato: COM_VALOR });
+    await m.service.consultar(COLABORADOR, ctx(ator("rh", EMPRESA_A)));
+    expect(m.prisma.$queryRaw).toHaveBeenCalledTimes(1);
+    const [partes] = m.prisma.$queryRaw.mock.calls[0] as unknown as [
+      TemplateStringsArray,
+    ];
+    expect(partes.join("?")).toMatch(/FOR SHARE/);
     expect(m.prisma.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
       m.prisma.contatoColaborador.findUnique.mock.invocationCallOrder[0]!,
     );

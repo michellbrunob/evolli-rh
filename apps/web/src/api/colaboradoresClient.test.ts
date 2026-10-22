@@ -93,6 +93,8 @@ vi.mock("./csrfClient", () => ({
   clearCsrfToken: vi.fn(),
   getCsrfToken: () => "token-sintetico",
   refreshCsrfToken: vi.fn(async () => "token-sintetico"),
+  // T179 — o token das gravações vem por aqui.
+  tokenCsrfParaGravacao: vi.fn(async () => "token-sintetico"),
 }));
 
 const DTO: AdmitirColaboradorDto = {

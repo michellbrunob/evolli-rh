@@ -43,6 +43,10 @@ import {
 } from "../../api/organizacaoClient";
 import { type CargoApi, listarCargos } from "../../api/cargoClient";
 import { type EnderecoDoCepApi, consultarCep } from "../../api/cepClient";
+import {
+  CsrfRequestError,
+  CsrfSessionExpiredError,
+} from "../../api/csrfClient";
 import { expectSemIsoVisivel } from "../../test/semIsoVisivel";
 
 vi.mock("../../api/colaboradoresClient");
@@ -1445,7 +1449,8 @@ describe("Nova admissão — recusa do servidor preserva os dados", () => {
     [400, /O servidor recusou algum dos dados/],
     [404, /A empresa ativa mudou/],
     [403, /não tem permissão para admitir/],
-    [401, /Seu acesso expirou/],
+    // T179 (revisão final) — 401 é sessão expirada, com a mensagem única.
+    [401, /Sua sessão expirou e o cadastro não foi gravado/],
     // T179 (revisão final) — 5xx: o servidor pode ter gravado; a mensagem é
     // a do envio incerto, que manda reconfirmar com a mesma chave.
     [500, /Não foi possível confirmar se o cadastro foi gravado/],
@@ -2568,5 +2573,245 @@ describe("T179 (revisão final) — matrícula", () => {
     await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
     const [dto] = vi.mocked(admitirColaborador).mock.calls[0]!;
     expect(dto).not.toHaveProperty("matricula");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T179 (revisão final) — sessão expirada e falha ao preparar o envio NÃO são
+// envio incerto; rede no POST e 5xx continuam sendo.
+// ---------------------------------------------------------------------------
+
+const MENSAGEM_SESSAO_EXPIRADA =
+  "Sua sessão expirou e o cadastro não foi gravado. Entre de novo para continuar; os dados digitados foram mantidos nesta página.";
+const MENSAGEM_FALHA_AO_PREPARAR =
+  "Não foi possível preparar o envio e o cadastro não foi enviado. Confira a conexão e confirme de novo.";
+const MENSAGEM_PERMISSAO =
+  "Seu perfil não tem permissão para admitir colaboradores. Nada foi salvo.";
+const MENSAGEM_INCERTO =
+  "Não foi possível confirmar se o cadastro foi gravado. Antes de tentar de novo, confira em Colaboradores; se ele não estiver lá, confirme de novo: o mesmo envio não cria um segundo cadastro.";
+
+describe("T179 (revisão final) — sessão expirada separada de envio incerto", () => {
+  const dialogoDescarte = () =>
+    screen.getByRole("dialog", { name: "Descartar esta admissão?" });
+
+  /** O formulário segue como foi preenchido por `preencherValido`. */
+  function esperarFormularioPreservado() {
+    expect(dialogoConfirmacao()).toBeNull();
+    expect(nome()).toHaveValue("  Pessoa Sintética Nova ");
+    expect(matricula()).toHaveValue("MAT-0900");
+    expect(unidadeSel()).toHaveValue(unidade.id);
+    expect(celular()).toHaveValue("(31) 99999-0000");
+  }
+
+  /** Abre o descarte e devolve a descrição dele (diz se há envio incerto). */
+  function descricaoDoDescarte(): HTMLElement {
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    return dialogoDescarte();
+  }
+
+  it.each([
+    ["401 do POST da admissão", () => recusa(401)],
+    [
+      "CsrfSessionExpiredError na renovação do token",
+      () => new CsrfSessionExpiredError(),
+    ],
+    [
+      "403 com codigo csrf_invalido",
+      () => recusa(403, { codigo: "csrf_invalido" }),
+    ],
+  ])(
+    "%s: sessão expirada, foco na mensagem, formulário preservado e descarte sem envio incerto",
+    async (_, erro) => {
+      vi.mocked(admitirColaborador).mockRejectedValueOnce(erro());
+      montar();
+      await aguardarEmpresa();
+      preencherValido();
+      await salvarEConfirmar();
+      const alerta = await screen.findByText(MENSAGEM_SESSAO_EXPIRADA);
+      await waitFor(() => expect(alerta).toHaveFocus());
+      expect(screen.queryByText(MENSAGEM_INCERTO)).toBeNull();
+      expect(alerta).not.toHaveTextContent(
+        /mesmo envio|confira em Colaboradores/,
+      );
+      expect(screen.queryByText(/Seu acesso expirou/)).toBeNull();
+      esperarFormularioPreservado();
+      expect(descricaoDoDescarte()).toHaveAccessibleDescription(DESCARTE_COMUM);
+    },
+  );
+
+  it("403 de permissão (sem código): mensagem de permissão, não de sessão", async () => {
+    vi.mocked(admitirColaborador).mockRejectedValueOnce(recusa(403));
+    montar();
+    await aguardarEmpresa();
+    preencherValido();
+    await salvarEConfirmar();
+    const alerta = await screen.findByText(MENSAGEM_PERMISSAO);
+    await waitFor(() => expect(alerta).toHaveFocus());
+    expect(screen.queryByText(MENSAGEM_SESSAO_EXPIRADA)).toBeNull();
+    esperarFormularioPreservado();
+    expect(descricaoDoDescarte()).toHaveAccessibleDescription(DESCARTE_COMUM);
+  });
+
+  it("CsrfRequestError: o envio nem saiu — mensagem própria, sem envio incerto", async () => {
+    vi.mocked(admitirColaborador).mockRejectedValueOnce(
+      new CsrfRequestError("Não foi possível obter o token CSRF."),
+    );
+    montar();
+    await aguardarEmpresa();
+    preencherValido();
+    await salvarEConfirmar();
+    const alerta = await screen.findByText(MENSAGEM_FALHA_AO_PREPARAR);
+    await waitFor(() => expect(alerta).toHaveFocus());
+    expect(screen.queryByText(MENSAGEM_INCERTO)).toBeNull();
+    esperarFormularioPreservado();
+    expect(descricaoDoDescarte()).toHaveAccessibleDescription(DESCARTE_COMUM);
+  });
+
+  it.each([
+    ["rede no POST", () => new TypeError("Failed to fetch")],
+    ["500", () => recusa(500)],
+    ["502", () => recusa(502)],
+    ["504", () => recusa(504)],
+  ])(
+    "%s: continua envio incerto, com foco, formulário preservado e descarte incerto",
+    async (_, erro) => {
+      vi.mocked(admitirColaborador).mockRejectedValueOnce(erro());
+      montar();
+      await aguardarEmpresa();
+      preencherValido();
+      await salvarEConfirmar();
+      const alerta = await screen.findByText(MENSAGEM_INCERTO);
+      await waitFor(() => expect(alerta).toHaveFocus());
+      expect(screen.queryByText(MENSAGEM_SESSAO_EXPIRADA)).toBeNull();
+      esperarFormularioPreservado();
+      expect(descricaoDoDescarte()).toHaveAccessibleDescription(
+        DESCARTE_INCERTO,
+      );
+    },
+  );
+
+  it.each([
+    ["401", () => recusa(401)],
+    ["CsrfSessionExpiredError", () => new CsrfSessionExpiredError()],
+    ["403 csrf_invalido", () => recusa(403, { codigo: "csrf_invalido" })],
+  ])(
+    "sessão expirada (%s) depois de um envio incerto: a mensagem é de sessão, mas o descarte continua incerto",
+    async (_, erro) => {
+      vi.mocked(admitirColaborador)
+        .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+        .mockRejectedValueOnce(erro());
+      montar();
+      await aguardarEmpresa();
+      preencherValido();
+      await salvarEConfirmar();
+      await screen.findByText(MENSAGEM_INCERTO);
+      await salvarEConfirmar();
+      const alerta = await screen.findByText(MENSAGEM_SESSAO_EXPIRADA);
+      await waitFor(() => expect(alerta).toHaveFocus());
+      expect(screen.queryByText(MENSAGEM_INCERTO)).toBeNull();
+      esperarFormularioPreservado();
+      const dialogo = descricaoDoDescarte();
+      expect(dialogo).toHaveAccessibleDescription(DESCARTE_INCERTO);
+      expect(dialogo).not.toHaveTextContent(/Nada foi salvo/);
+    },
+  );
+});
+
+// ---------------------------------------------------------------------------
+// T179 (revisão final) — CEP com texto misturado: recusado, e o ViaCEP nunca
+// consulta um CEP tirado do texto. CEPs sintéticos.
+// ---------------------------------------------------------------------------
+
+const CEP_MISTURADO_NA_PAGINA = [
+  "Nº 5, 0131010",
+  "CEP: 01310-100",
+  "01310-1OO",
+  "01310 100",
+  "０１３１０１００",
+  "01310/100",
+];
+
+/** Os CEPs que um texto misturado daria se os números fossem tirados dele. */
+const CEPS_DERIVADOS = ["50131010", "01310100", "013101", "0131010"];
+
+describe("T179 (revisão final) — CEP com texto misturado na página", () => {
+  beforeEach(() => {
+    vi.mocked(consultarCep).mockReset();
+    vi.mocked(consultarCep).mockResolvedValue(RESPOSTA_CEP);
+  });
+
+  function colarNoCep(inicio: number, fim: number, texto: string) {
+    const campo = campoCep() as HTMLInputElement;
+    campo.focus();
+    campo.setSelectionRange(inicio, fim);
+    fireEvent.paste(campo, { clipboardData: { getData: () => texto } });
+  }
+
+  it.each(CEP_MISTURADO_NA_PAGINA)(
+    "colar %p no CEP vazio: recusado com aviso, e sair do campo não consulta nada",
+    async (texto) => {
+      montar();
+      await aguardarEmpresa();
+      colarNoCep(0, 0, texto);
+      expect(campoCep()).toHaveValue("");
+      expect(campoCep()).toHaveAccessibleDescription(/Use um CEP brasileiro/);
+      fireEvent.blur(campoCep());
+      // Dá tempo a uma consulta que, errada, sairia no blur.
+      await act(async () => {});
+      expect(consultarCep).not.toHaveBeenCalled();
+      expect(logradouro()).toHaveValue("");
+    },
+  );
+
+  it.each(CEP_MISTURADO_NA_PAGINA)(
+    "preencher %p no CEP vazio: recusado, e nada é consultado",
+    async (texto) => {
+      montar();
+      await aguardarEmpresa();
+      digitarCep(texto);
+      expect(campoCep()).toHaveValue("");
+      expect(campoCep()).toHaveAccessibleDescription(/Use um CEP brasileiro/);
+      fireEvent.blur(campoCep());
+      await act(async () => {});
+      expect(consultarCep).not.toHaveBeenCalled();
+    },
+  );
+
+  it("colado sobre um CEP válido: o válido fica, e só ele pode ser consultado", async () => {
+    montar();
+    await aguardarEmpresa();
+    digitarCep("04567-000");
+    colarNoCep(0, 9, "Nº 5, 0131010");
+    expect(campoCep()).toHaveValue("04567-000");
+    expect(campoCep()).toHaveAccessibleDescription(/Use um CEP brasileiro/);
+    fireEvent.blur(campoCep());
+    await waitFor(() => expect(consultarCep).toHaveBeenCalledTimes(1));
+    expect(consultarCep).toHaveBeenCalledWith("04567000");
+    for (const derivado of CEPS_DERIVADOS) {
+      expect(consultarCep).not.toHaveBeenCalledWith(derivado);
+    }
+  });
+
+  it("letra no meio de um CEP (tecla ou arrastar): recusada, e nenhum CEP derivado é consultado", async () => {
+    montar();
+    await aguardarEmpresa();
+    digitarCep("0131");
+    // "0131" + "0-1OO" de uma vez: o texto misturado não entra.
+    fireEvent.change(campoCep(), { target: { value: "01310-1OO" } });
+    expect(campoCep()).toHaveValue("0131");
+    expect(campoCep()).toHaveAccessibleDescription(/Use um CEP brasileiro/);
+    fireEvent.blur(campoCep());
+    await act(async () => {});
+    expect(consultarCep).not.toHaveBeenCalled();
+  });
+
+  it("CEPs legítimos continuam aceitos e consultados", async () => {
+    montar();
+    await aguardarEmpresa();
+    colarNoCep(0, 0, "01.310-100");
+    expect(campoCep()).toHaveValue("01310-100");
+    expect(campoCep()).not.toHaveAccessibleDescription(/Use um CEP brasileiro/);
+    fireEvent.blur(campoCep());
+    await waitFor(() => expect(consultarCep).toHaveBeenCalledWith("01310100"));
   });
 });

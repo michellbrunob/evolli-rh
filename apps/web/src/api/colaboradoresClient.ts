@@ -1,4 +1,4 @@
-import { clearCsrfToken, getCsrfToken, refreshCsrfToken } from "./csrfClient";
+import { clearCsrfToken, tokenCsrfParaGravacao } from "./csrfClient";
 import type { EnderecoApi, PerfilPessoalApi } from "./dadosPessoaisClient";
 
 const BASE = "/v1";
@@ -273,8 +273,12 @@ export interface OpcoesDaAdmissao {
   readonly chaveIdempotencia?: string;
 }
 
+/**
+ * T179 — rede caída ao renovar o token vira `CsrfRequestError`: a gravação nem
+ * saiu, e a tela não a confunde com envio incerto.
+ */
 async function getCsrf(): Promise<string> {
-  return getCsrfToken() ?? refreshCsrfToken();
+  return tokenCsrfParaGravacao();
 }
 
 async function apiFetch(

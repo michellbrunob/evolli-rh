@@ -1,11 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  CODIGO_CSRF_INVALIDO,
   CsrfRequestError,
   CsrfSessionExpiredError,
   clearCsrfToken,
+  falhaAoPrepararEnvio,
+  falhaPorSessaoExpirada,
   getCsrfToken,
   refreshCsrfToken,
   setCsrfToken,
+  tokenCsrfParaGravacao,
 } from "./csrfClient";
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -121,5 +125,64 @@ describe("csrfClient", () => {
     setCsrfToken("token-novo");
 
     expect(getCsrfToken()).toBe("token-novo");
+  });
+});
+
+describe("T179 — token para gravação e classificação da falha", () => {
+  beforeEach(() => {
+    clearCsrfToken();
+  });
+
+  afterEach(() => {
+    clearCsrfToken();
+  });
+
+  it("usa o token da memória sem ir ao servidor", async () => {
+    setCsrfToken("token-em-memoria");
+    const fetchMock = vi.fn();
+    await expect(tokenCsrfParaGravacao(fetchMock)).resolves.toBe(
+      "token-em-memoria",
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("rede caída na renovação vira CsrfRequestError (o pedido nem saiu)", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValue(new TypeError("Failed to fetch"));
+    const erro: unknown = await tokenCsrfParaGravacao(fetchMock).catch(
+      (e: unknown) => e,
+    );
+    expect(erro).toBeInstanceOf(CsrfRequestError);
+    expect(falhaAoPrepararEnvio(erro)).toBe(true);
+    expect(falhaPorSessaoExpirada(erro)).toBe(false);
+  });
+
+  it("5xx na renovação é CsrfRequestError; 401, sessão expirada", async () => {
+    const erro5xx: unknown = await tokenCsrfParaGravacao(
+      vi.fn().mockResolvedValue(jsonResponse(503, {})),
+    ).catch((e: unknown) => e);
+    expect(erro5xx).toBeInstanceOf(CsrfRequestError);
+    const erro401: unknown = await tokenCsrfParaGravacao(
+      vi.fn().mockResolvedValue(jsonResponse(401, {})),
+    ).catch((e: unknown) => e);
+    expect(erro401).toBeInstanceOf(CsrfSessionExpiredError);
+    expect(falhaPorSessaoExpirada(erro401)).toBe(true);
+  });
+
+  it("sessão expirada: 401 e 403 csrf_invalido; o 403 de permissão e o 5xx, não", () => {
+    expect(falhaPorSessaoExpirada({ status: 401 })).toBe(true);
+    expect(
+      falhaPorSessaoExpirada({ status: 403, codigo: CODIGO_CSRF_INVALIDO }),
+    ).toBe(true);
+    expect(falhaPorSessaoExpirada({ status: 403 })).toBe(false);
+    expect(falhaPorSessaoExpirada({ status: 403, codigo: "outro" })).toBe(
+      false,
+    );
+    expect(falhaPorSessaoExpirada({ status: 500 })).toBe(false);
+    expect(falhaPorSessaoExpirada(new TypeError("Failed to fetch"))).toBe(
+      false,
+    );
+    expect(falhaAoPrepararEnvio(new TypeError("Failed to fetch"))).toBe(false);
   });
 });

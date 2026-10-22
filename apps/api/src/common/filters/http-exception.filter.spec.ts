@@ -2,6 +2,7 @@ import {
   ArgumentsHost,
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   HttpStatus,
   Logger,
   UnprocessableEntityException,
@@ -10,6 +11,7 @@ import { Prisma } from "@prisma/client";
 import {
   ConflitoDeCamposException,
   ErroDeCampo,
+  RecusaCsrfException,
   RecusaDeNegocioException,
 } from "../erros/recusa-por-campo";
 import { AllExceptionsFilter } from "./http-exception.filter";
@@ -220,6 +222,20 @@ describe("AllExceptionsFilter", () => {
         codigo: "idempotencia_conteudo_divergente",
       });
       expect(corpo).not.toHaveProperty("erros");
+    });
+
+    it("403 do CSRF: código csrf_invalido; 403 de permissão segue sem código", () => {
+      const csrf = corpoDe(new RecusaCsrfException());
+      expect(csrf.status).toBe(HttpStatus.FORBIDDEN);
+      expect(csrf.corpo).toMatchObject({
+        status_code: HttpStatus.FORBIDDEN,
+        codigo: "csrf_invalido",
+      });
+      expect(csrf.corpo).not.toHaveProperty("erros");
+      const permissao = corpoDe(new ForbiddenException("motivo interno"));
+      expect(permissao.status).toBe(HttpStatus.FORBIDDEN);
+      expect(permissao.corpo).not.toHaveProperty("codigo");
+      expect(JSON.stringify(permissao.corpo)).not.toContain("motivo interno");
     });
 
     it.each([

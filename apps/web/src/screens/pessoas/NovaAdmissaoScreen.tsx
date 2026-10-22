@@ -107,6 +107,10 @@ import {
 } from "../../api/organizacaoClient";
 import { type CargoApi, listarCargos } from "../../api/cargoClient";
 import { type EnderecoDoCepApi, consultarCep } from "../../api/cepClient";
+import {
+  falhaAoPrepararEnvio,
+  falhaPorSessaoExpirada,
+} from "../../api/csrfClient";
 import { formatarDiaCivil } from "../../format/data";
 import {
   DICA_DE_FORMATO,
@@ -407,6 +411,22 @@ const MENSAGEM_ENVIO_INCERTO =
   "Não foi possível confirmar se o cadastro foi gravado. Antes de tentar de novo, confira em Colaboradores; se ele não estiver lá, confirme de novo: o mesmo envio não cria um segundo cadastro.";
 
 /**
+ * T179 (revisão final) — sessão expirada: 401 da admissão, 401 na renovação
+ * do token (`CsrfSessionExpiredError`) ou 403 `csrf_invalido`. O servidor não
+ * aceitou o cadastro (ou ele nem saiu): não é envio incerto, e a mensagem não
+ * manda reconfirmar com a mesma chave.
+ */
+const MENSAGEM_SESSAO_EXPIRADA =
+  "Sua sessão expirou e o cadastro não foi gravado. Entre de novo para continuar; os dados digitados foram mantidos nesta página.";
+
+/**
+ * T179 (revisão final) — a renovação do token falhou por rede ou 5xx
+ * (`CsrfRequestError`): o pedido de admissão nem saiu.
+ */
+const MENSAGEM_FALHA_AO_PREPARAR =
+  "Não foi possível preparar o envio e o cadastro não foi enviado. Confira a conexão e confirme de novo.";
+
+/**
  * T179 — a confirmação de descarte. "Nada foi salvo." só é verdade quando
  * nenhum envio ficou incerto; depois de falha de rede, de 5xx (T179, revisão
  * final) ou de 422 `idempotencia_conteudo_divergente`, um envio anterior pode
@@ -436,9 +456,12 @@ function statusDe(erro: unknown): number | null {
 /**
  * T179 (revisão final) — o envio pode ter sido gravado: sem resposta (rede)
  * ou com 5xx (500, 502, 503, 504…), em que o servidor pode ter gravado antes
- * de o proxy responder.
+ * de o proxy responder. T179 (revisão final) — sessão expirada e falha ao
+ * renovar o token não têm `status`, mas não são envio incerto: o servidor não
+ * aceitou o cadastro, ou ele nem saiu.
  */
 function envioSemConfirmacao(erro: unknown): boolean {
+  if (falhaPorSessaoExpirada(erro) || falhaAoPrepararEnvio(erro)) return false;
   const status = statusDe(erro);
   return status === null || status >= 500;
 }
@@ -496,11 +519,18 @@ const CAMPO_DO_CONFLITO: Readonly<
  *    referência organizacional incoerente, de outra empresa ou inativa;
  *  - 404 — a empresa enviada deixou de ser a empresa ativa da sessão;
  *  - sem resposta (rede) ou 5xx (T179, revisão final) — não se sabe se
- *    gravou; confirmar de novo, com a mesma chave, é seguro.
+ *    gravou; confirmar de novo, com a mesma chave, é seguro;
+ *  - T179 (revisão final) — 401, `CsrfSessionExpiredError` ou 403 com
+ *    `codigo: "csrf_invalido"`: sessão expirada, nada gravado; o 403 sem
+ *    código continua sendo de permissão;
+ *  - T179 (revisão final) — `CsrfRequestError`: o token não foi renovado e o
+ *    pedido nem saiu.
  *
  * Em todos os casos os dados digitados ficam na página.
  */
 function errosDaRecusa(erro: unknown): Erros {
+  if (falhaPorSessaoExpirada(erro)) return { geral: MENSAGEM_SESSAO_EXPIRADA };
+  if (falhaAoPrepararEnvio(erro)) return { geral: MENSAGEM_FALHA_AO_PREPARAR };
   if (envioSemConfirmacao(erro)) return { geral: MENSAGEM_ENVIO_INCERTO };
   const status = statusDe(erro);
   const { erros: porCampo, codigo } = detalhesDe(erro);
@@ -538,11 +568,8 @@ function errosDaRecusa(erro: unknown): Erros {
         geral:
           "Seu perfil não tem permissão para admitir colaboradores. Nada foi salvo.",
       };
-    case 401:
-      return {
-        geral:
-          "Seu acesso expirou. Nada foi salvo. Entre novamente para concluir a admissão.",
-      };
+    // T179 (revisão final) — o 401 é sessão expirada, tratado acima com o 403
+    // `csrf_invalido` e a renovação recusada: uma mensagem só.
     case 400:
       return {
         geral:
@@ -1143,6 +1170,8 @@ export function NovaAdmissaoScreen({
         statusDe(erro) === 422 &&
         detalhesDe(erro).codigo === "idempotencia_conteudo_divergente";
       setEnvioDivergente(divergente);
+      // T179 (revisão final) — só liga, nunca desliga: a sessão expirada
+      // depois de um envio incerto não apaga a dúvida sobre o anterior.
       if (divergente || envioSemConfirmacao(erro)) setEnvioIncerto(true);
     } finally {
       setSalvando(false);

@@ -285,6 +285,12 @@ export class ContatoColaboradorService {
         return this.resposta(alvo, "bloqueado", null);
       }
 
+      // T179 — leitura ordenada com um salvamento em andamento (`FOR SHARE`,
+      // que conflita com o `NO KEY UPDATE` do PUT e não com outra leitura):
+      // espera ele terminar e lê o que ele gravou. Sem isso, a trilha da
+      // leitura podia afirmar um estado (ativo ou inativo) que o salvamento
+      // concorrente acabara de mudar, e o trigger de coerência recusava (500).
+      await tx.$queryRaw`SELECT id FROM contato_colaborador WHERE colaborador_id = ${alvo.colaboradorId}::text AND empresa_id = ${alvo.empresaId}::text FOR SHARE`;
       const contato = await tx.contatoColaborador.findUnique({
         where: {
           colaboradorId_empresaId: {
@@ -370,12 +376,14 @@ export class ContatoColaboradorService {
           ]);
         }
 
-        // T179 — trava a linha do par ANTES de ler o atual (`FOR UPDATE`):
-        // salvamentos simultâneos se serializam e cada um lê o que o anterior
-        // gravou. Sem isso, dois PUTs que limpam campos diferentes calculavam
-        // `ativo` sobre a mesma leitura e podiam deixar a linha vazia e ativa
-        // (a CHECK do banco recusava, e a resposta era 500).
-        await tx.$queryRaw`SELECT id FROM contato_colaborador WHERE colaborador_id = ${alvo.colaboradorId}::text AND empresa_id = ${alvo.empresaId}::text FOR UPDATE`;
+        // T179 — trava a linha do par ANTES de ler o atual: salvamentos
+        // simultâneos se serializam e cada um lê o que o anterior gravou (sem
+        // isso, dois PUTs que limpam campos diferentes podiam deixar a linha
+        // vazia e ativa, e a CHECK do banco recusava com 500). `NO KEY UPDATE`,
+        // e não `UPDATE`: não bloqueia a checagem de chave estrangeira
+        // (`KEY SHARE`) que a trilha de uma leitura faz; a leitura se ordena
+        // com o salvamento pelo `FOR SHARE` de `consultar`.
+        await tx.$queryRaw`SELECT id FROM contato_colaborador WHERE colaborador_id = ${alvo.colaboradorId}::text AND empresa_id = ${alvo.empresaId}::text FOR NO KEY UPDATE`;
         const atual = await tx.contatoColaborador.findUnique({
           where: {
             colaboradorId_empresaId: {

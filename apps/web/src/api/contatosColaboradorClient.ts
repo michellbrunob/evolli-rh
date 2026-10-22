@@ -1,5 +1,5 @@
 import { ApiError } from "./colaboradoresClient";
-import { clearCsrfToken, getCsrfToken, refreshCsrfToken } from "./csrfClient";
+import { clearCsrfToken, tokenCsrfParaGravacao } from "./csrfClient";
 
 /**
  * T169 — contatos do colaborador: e-mail pessoal, celular e telefone.
@@ -56,8 +56,12 @@ export interface RegistrarContatosDto {
   telefone?: string | null;
 }
 
+/**
+ * T179 — rede caída ao renovar o token vira `CsrfRequestError`: a gravação nem
+ * saiu (ver `tokenCsrfParaGravacao`).
+ */
 async function getCsrf(): Promise<string> {
-  return getCsrfToken() ?? refreshCsrfToken();
+  return tokenCsrfParaGravacao();
 }
 
 async function apiFetch(

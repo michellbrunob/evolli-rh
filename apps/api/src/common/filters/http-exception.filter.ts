@@ -12,6 +12,7 @@ import {
   CodigoDeRecusa,
   ConflitoDeCamposException,
   ErroDeCampo,
+  RecusaCsrfException,
   RecusaDeNegocioException,
 } from "../erros/recusa-por-campo";
 
@@ -99,7 +100,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
             })),
           }
         : {}),
-      ...(exception instanceof RecusaDeNegocioException
+      ...(exception instanceof RecusaDeNegocioException ||
+      exception instanceof RecusaCsrfException
         ? { codigo: exception.codigo }
         : {}),
     };

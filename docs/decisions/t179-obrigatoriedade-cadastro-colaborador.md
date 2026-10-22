@@ -104,6 +104,19 @@ novo vínculo de colaborador existente (`POST /v1/vinculos`) não muda.
   Colaboradores antes de tentar de novo e, na nova confirmação, reusa a mesma
   chave de idempotência: se o primeiro envio foi gravado, o servidor devolve
   a mesma admissão, sem segundo cadastro.
+- **Sessão expirada não é envio incerto** (decisão de 2026-10-22): 401, falha
+  ao renovar o token da página e 403 do CSRF (`codigo: "csrf_invalido"`)
+  significam que o cadastro não foi enviado ou não foi aceito. A tela mantém o
+  formulário e orienta a entrar de novo, sem orientar confirmação idempotente.
+  Falha ao preparar o envio (renovação do token sem resposta) também não é
+  envio incerto. Só falta de resposta do envio e 5xx são.
+- **`+` sobre número nacional:** com dígitos já no campo e sem `+` inicial,
+  inserir `+` — inclusive substituindo uma seleção parcial — é recusado,
+  mantendo valor e cursor; um número nacional de DDD 55 nunca vira código de
+  país. Substituir o valor inteiro por `+55…` continua aceito.
+- **CEP com letras ou caracteres estranhos** (palavras, vírgula, `/`,
+  invisíveis, dígitos de outros sistemas de escrita) é recusado como formato:
+  nenhum número é extraído de texto misturado e nada é consultado no ViaCEP.
 
 ## 4. O que esta decisão não autoriza
 

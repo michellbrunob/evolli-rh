@@ -26,6 +26,10 @@ import {
   consultarContatosDoColaborador,
   registrarContatosDoColaborador,
 } from "../../api/contatosColaboradorClient";
+import {
+  CsrfRequestError,
+  CsrfSessionExpiredError,
+} from "../../api/csrfClient";
 import { expectSemIsoVisivel } from "../../test/semIsoVisivel";
 import { AVISO_DE_RECUSA } from "../../format/mascaras";
 
@@ -1730,6 +1734,56 @@ describe("ColaboradoresScreen (T169 — contatos do colaborador)", () => {
     expect(telefone()).toHaveValue("(11) 3333-0001");
     expect(email()).not.toHaveAttribute("aria-invalid");
   });
+
+  // T179 (revisão final) — sessão expirada e falha ao preparar o envio têm
+  // mensagem própria; o 403 sem código continua sendo de permissão.
+  it.each([
+    [
+      "401",
+      () => recusa(401, "Não autenticado."),
+      "Sua sessão expirou e os contatos não foram salvos. Entre de novo para continuar; os dados digitados foram mantidos nesta ficha.",
+    ],
+    [
+      "CsrfSessionExpiredError",
+      () => new CsrfSessionExpiredError(),
+      "Sua sessão expirou e os contatos não foram salvos. Entre de novo para continuar; os dados digitados foram mantidos nesta ficha.",
+    ],
+    [
+      "403 csrf_invalido",
+      () =>
+        Object.assign(recusa(403, "Token CSRF inválido."), {
+          codigo: "csrf_invalido",
+        }),
+      "Sua sessão expirou e os contatos não foram salvos. Entre de novo para continuar; os dados digitados foram mantidos nesta ficha.",
+    ],
+    [
+      "403 sem código",
+      () => recusa(403, "Proibido."),
+      "Seu perfil não tem permissão para alterar contatos. Nada foi salvo.",
+    ],
+    [
+      "CsrfRequestError",
+      () => new CsrfRequestError("Não foi possível obter o token CSRF."),
+      "Não foi possível preparar o envio e os contatos não foram salvos. Confira a conexão e salve de novo.",
+    ],
+  ])(
+    "T179 — gravação recusada por %s: mensagem certa, foco nela e os dados ficam",
+    async (_, erro, mensagem) => {
+      vi.mocked(registrarContatosDoColaborador).mockRejectedValueOnce(erro());
+      const secao = await abrirDetalheDeAna();
+      await within(secao).findByText(/Nenhum contato registrado/);
+      fireEvent.change(email(), { target: { value: "ana@example.test" } });
+      fireEvent.change(celular(), { target: { value: "11987650001" } });
+
+      fireEvent.click(screen.getByRole("button", { name: "Salvar contatos" }));
+
+      const alerta = await within(secao).findByRole("alert");
+      expect(alerta).toHaveTextContent(mensagem);
+      await waitFor(() => expect(document.activeElement).toBe(alerta));
+      expect(email()).toHaveValue("ana@example.test");
+      expect(celular()).toHaveValue("(11) 98765-0001");
+    },
+  );
 
   it("T179 — 409 de e-mail em uso: a mensagem vai para o campo, com foco, e nada se perde", async () => {
     vi.mocked(registrarContatosDoColaborador).mockRejectedValueOnce(

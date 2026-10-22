@@ -1502,6 +1502,81 @@ describe("Confirmação da Nova admissão (T179, e2e)", () => {
         enviados.add("31988881777");
       },
     );
+
+    // ---------------------------------------------------------------------
+    // Revisão definitiva (commit 14) — leitura simultânea a remoção e
+    // reativação; 403 do CSRF com código.
+
+    it.each([
+      ["celular", { celular: "(31) 98888-1778" }, { celular: null }],
+      // E-mail é coluna de índice único: a remoção dele troca a "chave" da
+      // linha — o caso que ainda dava 500 com `NO KEY UPDATE` sozinho.
+      ["e-mail", { emailPessoal: "__EMAIL__" }, { emailPessoal: null }],
+    ])(
+      "leituras simultâneas a remoção e reativação (%s): nenhum 500, um registro, estado coerente, trilha sem valores",
+      async (_caso, preencher, limpar) => {
+        for (let rodada = 0; rodada < 5; rodada++) {
+          const r = await admitir(rhA).send(soObrigatorios()).expect(201);
+          const colaboradorId: string = r.body.id;
+          const rota = `/v1/colaboradores/${colaboradorId}/contatos`;
+          const email = `leitura.${colaboradorId.slice(0, 8)}@example.test`;
+          const comValor = JSON.parse(
+            JSON.stringify(preencher).replace("__EMAIL__", email),
+          ) as Record<string, unknown>;
+          await put(rota, rhA).send(comValor).expect(200);
+
+          for (const corpo of [limpar, comValor]) {
+            const respostas = await Promise.all([
+              get(rota, rhA),
+              put(rota, rhA).send(corpo),
+              get(rota, rhA),
+              get(rota, rhA),
+            ]);
+            expect(respostas.map((x) => x.status)).toEqual([
+              200, 200, 200, 200,
+            ]);
+            for (const leitura of [respostas[0], respostas[2], respostas[3]]) {
+              expect(["registrado", "sem_registro"]).toContain(
+                leitura!.body.situacao,
+              );
+            }
+            const linhas = await prisma.contatoColaborador.findMany({
+              where: { colaboradorId },
+            });
+            expect(linhas).toHaveLength(1);
+            const linha = linhas[0]!;
+            expect(linha.ativo).toBe(
+              linha.emailPessoal !== null ||
+                linha.celular !== null ||
+                linha.telefone !== null,
+            );
+          }
+          // Terminou reativado: o valor voltou, nada se perdeu.
+          const final = await get(rota, rhA).expect(200);
+          expect(final.body.situacao).toBe("registrado");
+          enviados.add(email);
+        }
+        enviados.add("31988881778");
+      },
+    );
+
+    it("403 do CSRF traz codigo csrf_invalido e nada é gravado; 403 de permissão segue sem código", async () => {
+      const antes = await prisma.colaborador.count();
+      const semToken = await agent()
+        .post("/v1/colaboradores")
+        .set("Cookie", rhA.cookie)
+        .send(soObrigatorios())
+        .expect(403);
+      expect(semToken.body.codigo).toBe("csrf_invalido");
+      const tokenErrado = await agent()
+        .post("/v1/colaboradores")
+        .set("Cookie", rhA.cookie)
+        .set("x-csrf-token", "token-sintetico-invalido")
+        .send(soObrigatorios())
+        .expect(403);
+      expect(tokenErrado.body.codigo).toBe("csrf_invalido");
+      expect(await prisma.colaborador.count()).toBe(antes);
+    });
   });
 
   describe("trilhas sem valores", () => {

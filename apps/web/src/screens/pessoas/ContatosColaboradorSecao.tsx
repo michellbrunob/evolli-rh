@@ -7,6 +7,10 @@ import {
   registrarContatosDoColaborador,
 } from "../../api/contatosColaboradorClient";
 import {
+  falhaAoPrepararEnvio,
+  falhaPorSessaoExpirada,
+} from "../../api/csrfClient";
+import {
   type CampoContato,
   type CampoTelefone,
   type ErrosContatos,
@@ -148,8 +152,29 @@ function mensagemDaLeituraRecusada(erro: unknown): string {
   }
 }
 
-/** Recusa da GRAVAÇÃO — os dados digitados ficam no formulário em todos os casos. */
+/**
+ * Recusa da GRAVAÇÃO — os dados digitados ficam no formulário em todos os casos.
+ *
+ * T179 (revisão final) — sessão expirada (401, `CsrfSessionExpiredError` na
+ * renovação do token ou 403 com `codigo: "csrf_invalido"`) tem mensagem
+ * própria, em vez de cair na genérica ou na de permissão; o 403 sem código
+ * continua sendo de permissão. `CsrfRequestError` (token não renovado por rede
+ * ou 5xx) diz que o pedido nem saiu. Aqui não há envio incerto: os contatos
+ * não têm chave de idempotência.
+ */
 function errosDaGravacaoRecusada(erro: unknown): ErrosContatos {
+  if (falhaPorSessaoExpirada(erro)) {
+    return {
+      geral:
+        "Sua sessão expirou e os contatos não foram salvos. Entre de novo para continuar; os dados digitados foram mantidos nesta ficha.",
+    };
+  }
+  if (falhaAoPrepararEnvio(erro)) {
+    return {
+      geral:
+        "Não foi possível preparar o envio e os contatos não foram salvos. Confira a conexão e salve de novo.",
+    };
+  }
   const status = erro instanceof ApiError ? erro.status : null;
   switch (status) {
     case 400:
@@ -177,11 +202,6 @@ function errosDaGravacaoRecusada(erro: unknown): ErrosContatos {
       return {
         geral:
           "Seu perfil não tem permissão para alterar contatos. Nada foi salvo.",
-      };
-    case 401:
-      return {
-        geral:
-          "Seu acesso expirou. Nada foi salvo. Entre novamente para concluir.",
       };
     default:
       return {

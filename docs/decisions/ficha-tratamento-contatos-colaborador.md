@@ -228,3 +228,14 @@ legal, classificação, retenção e escopo de acesso não mudam.
   valores.
 - **Texto com ramal ou palavras:** recusado como formato inválido (§3), na tela
   e no servidor; nenhuma letra é descartada para formar um número.
+
+## 12. Alteração de 2026-10-22 (T179) — salvamentos e leituras simultâneos
+
+Salvar contatos trava a linha do contato (`FOR NO KEY UPDATE`) antes de ler o
+registro atual: salvamentos simultâneos se serializam, e cada um parte do que
+o anterior gravou. A leitura pega `FOR SHARE` na mesma linha antes de ler:
+leituras não se bloqueiam entre si, e uma leitura só espera um salvamento em
+andamento terminar, lendo o que ele gravou. Assim, nenhum salvamento deixa o
+registro vazio e ativo, e a trilha de uma leitura nunca afirma um estado que um
+salvamento concorrente acabou de mudar. Nada muda em finalidade, retenção,
+escopo de acesso ou conteúdo da trilha (só nomes de campos).
