@@ -2208,11 +2208,11 @@ da T171: o aviso `[DEP0190]` do Node 24 no orquestrador da demonstração, no Wi
 
 **Integração:** A T178 foi integrada em `main` pela PR #170, squash `27b4415696560c937a0f22df15d1a882ed5f5c46`, com a CI da `main` 3/3 verde em Node 24 (647 E2E e 1049 unitários; run 39610634615, disparada manualmente porque o GitHub não criou a run de push do merge): "Gestão de Pessoas → Colaboradores" como porta principal, ViaCEP para preenchimento assistido e log geral de requisições sem valores. Branch `codex/t178-colaboradores-porta-principal` preservada.
 
-## Confirmação da Nova admissão e duplicidade — T179 (implementada em Draft)
+## Confirmação da Nova admissão e duplicidade — T179 (integrada)
 
 | Tarefa | Estado                    | Resultado principal                                                                                    |
 | ------ | ------------------------- | ------------------------------------------------------------------------------------------------------ |
-| T179   | **Implementada em Draft** | Confirmação antes de gravar, idempotência, erros por campo, e-mail único na empresa e telefones `+55`. |
+| T179   | **Integrada (PR #171, squash `60ce990bc6a04bee542b93d494d00d6f48bf8c19`)** | Confirmação antes de gravar, idempotência, erros por campo, e-mail único na empresa e telefones `+55`. |
 
 **Escopo da T179:** validação local e modal acessível de confirmação na Nova
 admissão; idempotência do envio; conflitos por campo sem valores (matrícula e

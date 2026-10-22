@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "constitutionVersion": "1.4.0",
-  "lastConvergedAt": "2026-10-21",
-  "lastIntegratedTask": 178,
+  "lastConvergedAt": "2026-10-22",
+  "lastIntegratedTask": 179,
   "lastRecordedTask": 179,
   "platformDecision": {
     "adr": "docs/adr/0014-evolli-plataforma-base-e-encerramento-do-frappe.md",
@@ -12,16 +12,10 @@
   },
   "nextTask": {
     "id": "T179",
-    "status": "confirmacao_admissao_implementada",
-    "reason": "T178 integrada em main pela PR #170 (squash 27b4415696560c937a0f22df15d1a882ed5f5c46), com a CI da main 3/3 verde em Node 24 (647 E2E e 1049 unitarios; run 39610634615 disparada manualmente porque o GitHub nao criou a run de push do merge): Gestao de Pessoas -> Colaboradores como porta principal, ViaCEP assistido e log geral de requisicoes sem valores. A T179 implementa a confirmacao segura da Nova admissao (validacao local, modal acessivel, so Confirmar cadastro envia), idempotencia do envio com migration propria e sem dado pessoal, conflitos por campo sem valores (matricula e e-mail pessoal unico na mesma empresa), Departamento e Cargo obrigatorios so na Nova admissao (a Unidade, obrigatoria na primeira entrega, passou a opcional: regra substituida em 2026-10-21), mascaras acessiveis de CEP e telefone e normalizacao no servidor (CEP brasileiro em 8 digitos, telefone so brasileiro em +55 + DDD + numero), com migration que converte o ja gravado so quando inequivoco e relacao tecnica de revisao sem valores. Decisoes da proprietaria de 2026-10-21 registradas na decisao da T179, nas ADRs 0016 e 0017, nas fichas e na reconciliacao RH/DP. Contagens: 13 conflitos, 12 abertos e 1 resolvido; 22 gates, DP-FLX-01, DP-FLX-21 e DP-FLX-22 (nao aplicavel so quanto ao fuso) resolvidos e 19 abertos; Dados adicionais no DP-ADM-19. Fora de escopo: CPF, documentos, banco, dependentes, salario, ponto, adicionais trabalhistas, horario, fuso, cargo completo, modais rapidos de referencias, telefone estrangeiro, capacidade nova para o DP, promocao, merge e a proxima tarefa. ENTREGUE em Draft: modal de confirmacao acessivel, idempotencia com reenvio e conteudo divergente, conflitos por campo sem valores, e-mail unico na empresa, Departamento e Cargo obrigatorios na Nova admissao, telefones +55 e CEP em 8 digitos com mascaras acessiveis, migration com conversao inequivoca e relacao tecnica de revisao sem valores; previa em 5173 com banco proprio da T179 (porta 5435). Obrigatoriedade do cadastro (decisao da proprietaria de 2026-10-21): obrigatorios nome, data de nascimento, Departamento, Cargo, data de admissao e tipo de vinculo; opcionais e-mail pessoal, Sexo em opcoes fechadas, matricula, Unidade, endereco e contatos; genero e CPF obrigatorios so quando os seus gates/fichas liberarem; migration so retira o NOT NULL da matricula e dos contatos. Estado atual: obrigatorios nome, data de nascimento, Departamento, Cargo, data de admissao e tipo de vinculo; opcionais matricula (ausente, null, vazia ou com espacos nao gera conflito), Unidade, e-mail pessoal, contatos e endereco. Admissao sem contatos nao cria registro; remover todos os contatos deixa o registro inativo, sem valor e sem exclusao fisica (migration 20261022120000_contato_colaborador_inativo); a ficha mostra o estado unico Nenhum contato registrado. Mascaras recusam qualquer excedente de telefone ou CEP com aviso acessivel. Telefone com texto (ramal, rotulos) e recusado; telefone legado aparece como gravado e nao e regravado ao salvar outro campo (PUT de contatos: campo ausente mantem o valor). Resposta 5xx (inclusive 500) e falta de resposta sao envio incerto (decisao de 2026-10-22): sem afirmar que nada foi salvo, formulario preservado, orientacao para conferir Colaboradores e reconfirmacao com a mesma chave. Sessao expirada (401 ou renovacao do token por sessao vencida) nao e envio incerto; 403 do CSRF (csrf_invalido) e pagina desatualizada com sessao valida: a tela descarta o token local e confirmar de novo reenvia o mesmo pedido; depois de envio incerto, nenhuma falha seguinte afirma que o cadastro nao foi gravado. + sobre numero nacional recusado; CEP com letras recusado. Contatos: salvamentos serializados (FOR NO KEY UPDATE) e leituras ordenadas (FOR SHARE)."
+    "status": "integrada_em_main",
+    "reason": "T179 integrada em main pela PR #171, squash 60ce990bc6a04bee542b93d494d00d6f48bf8c19. A primeira CI de push falhou somente porque o trailer Spec-Kit-Entrega do squash anterior foi enviado com quebras de linha literais e nao foi reconhecido; esta convergencia registra a integracao com trailer valido. Nenhuma nova tarefa foi iniciada."
   },
-  "openDeliveries": [
-    {
-      "id": "T179",
-      "pullRequest": null,
-      "status": "confirmacao_admissao_implementada"
-    }
-  ],
+  "openDeliveries": [],
   "requiredArtifacts": [
     ".specify/memory/constitution.md",
     ".specify/spec.md",
