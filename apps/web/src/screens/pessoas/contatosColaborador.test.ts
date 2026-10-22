@@ -6,6 +6,7 @@ import {
   contatosVazios,
   normalizarContatos,
   normalizarTelefone,
+  telefonesLegados,
   validarContatos,
 } from "./contatosColaborador";
 
@@ -183,5 +184,61 @@ describe("contatos do colaborador — corpo enviado (T179)", () => {
     expect(
       contatosVazios({ emailPessoal: "", celular: "", telefone: "1133330001" }),
     ).toBe(false);
+  });
+});
+
+/** T179 (revisão final) — telefone legado: intacto, nem validado nem enviado. */
+describe("contatos do colaborador — telefone legado", () => {
+  const gravado = {
+    emailPessoal: "ana@example.test",
+    celular: "55919876543210",
+    telefone: "+551133330001",
+  };
+  const legados = telefonesLegados(gravado);
+  const edicao = contatosParaEdicao(gravado);
+
+  it("só o gravado fora da forma atual é legado, e aparece como veio", () => {
+    expect(legados).toEqual({ celular: "55919876543210" });
+    expect(telefonesLegados(null)).toEqual({});
+    expect(
+      telefonesLegados({ ...gravado, celular: null, telefone: "119876543210" }),
+    ).toEqual({ telefone: "119876543210" });
+    expect(edicao.celular).toBe("55919876543210");
+    expect(edicao.telefone).toBe("(11) 3333-0001");
+  });
+
+  it("intacto: sem erro e FORA do corpo do PUT", () => {
+    expect(validarContatos(edicao, legados)).toEqual({});
+    expect(contatosParaRegistro(edicao, legados)).toEqual({
+      emailPessoal: "ana@example.test",
+      telefone: "+551133330001",
+    });
+  });
+
+  it("alterado: validado e enviado como os demais", () => {
+    expect(
+      validarContatos({ ...edicao, celular: "5919876543210" }, legados).celular,
+    ).toMatch(/precisa do DDD e do número/);
+    expect(
+      contatosParaRegistro({ ...edicao, celular: "(11) 98765-0002" }, legados),
+    ).toEqual({
+      emailPessoal: "ana@example.test",
+      celular: "+5511987650002",
+      telefone: "+551133330001",
+    });
+    expect(contatosParaRegistro({ ...edicao, celular: "" }, legados)).toEqual({
+      emailPessoal: "ana@example.test",
+      celular: null,
+      telefone: "+551133330001",
+    });
+  });
+
+  it("normalizar nunca corta um legado para 11 dígitos", () => {
+    for (const bruto of ["+55119876543210", "55919876543210", "119876543210"]) {
+      expect(normalizarTelefone(bruto)).toBe(bruto);
+      expect(
+        validarContatos({ ...edicao, celular: bruto }).celular,
+      ).toBeTruthy();
+    }
   });
 });

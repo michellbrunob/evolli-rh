@@ -9,6 +9,7 @@ import {
   colarNaMascara,
   digitosNacionaisDoTelefone,
   exibirCep,
+  telefoneNaFormaAtual,
   exibirTelefone,
   mascararCep,
   mascararTelefone,
@@ -231,7 +232,8 @@ describe("T179 — máscara de telefone", () => {
   it("exibe o gravado (+55) na forma brasileira; o resto, como veio", () => {
     expect(exibirTelefone("+5511987654321")).toBe("(11) 98765-4321");
     expect(exibirTelefone("+551130000000")).toBe("(11) 3000-0000");
-    expect(exibirTelefone("1133330001")).toBe("(11) 3333-0001");
+    // T179 (revisão final) — fora da forma atual (sem `+55`), como gravado.
+    expect(exibirTelefone("1133330001")).toBe("1133330001");
     expect(exibirTelefone("+442079460958")).toBe("+442079460958");
     expect(exibirTelefone("12345")).toBe("12345");
     expect(exibirTelefone(null)).toBe("");
@@ -375,11 +377,11 @@ describe("T179 (B2) — colar depois de +, +5 ou +55, e DDD 55 completo", () => 
     expect(colarNaMascara("telefone", "", 0, 0, "+49 911 1234567").valor).toBe(
       "+499111234567",
     );
-    // T179 (revisão final) — colado depois de dígitos que ficam no campo é
-    // inserção: passa de 11 dígitos e é recusado, sem apagar o "(11) 9".
+    // T179 (revisão final) — colado depois de dígitos que ficam no campo, o
+    // `+` fica fora do início: recusado (formato), sem apagar o "(11) 9".
     expect(
       colarNaMascara("telefone", "(11) 9", 6, 6, "+49 911 1234567"),
-    ).toEqual({ valor: "(11) 9", cursor: 6, recusado: "excedente" });
+    ).toEqual({ valor: "(11) 9", cursor: 6, recusado: "formato" });
   });
 
   it("colagem que passa de 11 dígitos é recusada com sinal, e o valor fica", () => {
@@ -633,6 +635,161 @@ describe("T179 (revisão final) — CEP: o excedente é recusado, não cortado",
     });
     expect(aplicarMascara("cep", "123456789", "12345678", 8).valor).toBe(
       "12345-678",
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T179 (revisão final) — telefone legado: exibido e editado sem reinterpretar.
+// Números sintéticos, no formato antigo `^\+?[0-9]{8,15}$`.
+// ---------------------------------------------------------------------------
+
+const LEGADOS = ["+55119876543210", "55919876543210", "119876543210"] as const;
+
+describe("T179 (revisão final) — telefone legado", () => {
+  it.each(LEGADOS)("%p aparece EXATAMENTE como gravado", (bruto) => {
+    expect(telefoneNaFormaAtual(bruto)).toBe(false);
+    expect(exibirTelefone(bruto)).toBe(bruto);
+  });
+
+  it("só a forma atual (+55 + DDD + número) ganha a máscara", () => {
+    expect(telefoneNaFormaAtual("+5511987654321")).toBe(true);
+    expect(exibirTelefone("+5511987654321")).toBe("(11) 98765-4321");
+    expect(exibirTelefone("+551133334444")).toBe("(11) 3333-4444");
+    // Com a forma de `+55`, mas DDD ou número inválido: como gravado.
+    expect(exibirTelefone("+5501987654321")).toBe("+5501987654321");
+    expect(exibirTelefone("+551113334444")).toBe("+551113334444");
+  });
+
+  it("os dígitos nacionais não são mais cortados em 11", () => {
+    expect(digitosNacionaisDoTelefone("55919876543210")).toBe("55919876543210");
+    expect(digitosNacionaisDoTelefone("+55119876543210")).toBe("119876543210");
+  });
+
+  it.each(LEGADOS)(
+    "%p apagado aos poucos, do fim, fica como veio até esvaziar",
+    (bruto) => {
+      let valor: string = bruto;
+      while (valor !== "") {
+        const entrada = valor.slice(0, -1);
+        const r = aplicarMascara("telefone", valor, entrada, entrada.length);
+        expect(r.recusado).toBeUndefined();
+        expect(r.valor).toBe(entrada);
+        valor = r.valor;
+      }
+      // Vazio, o campo volta à máscara normal.
+      expect(digitar("telefone", "11987654321", valor)).toBe("(11) 98765-4321");
+    },
+  );
+
+  it("apagar no meio do legado não reformata e mantém o cursor", () => {
+    expect(
+      aplicarMascara("telefone", "55919876543210", "5591876543210", 4),
+    ).toEqual({ valor: "5591876543210", cursor: 4 });
+    expect(
+      apagarComSeparador("telefone", "55919876543210", 4, 4, "Backspace"),
+    ).toBeNull();
+  });
+
+  it("dígito a mais no legado é recusado (excedente); letra, por formato", () => {
+    expect(
+      aplicarMascara("telefone", "55919876543210", "559198765432101", 15),
+    ).toEqual({ valor: "55919876543210", cursor: 14, recusado: "excedente" });
+    expect(
+      aplicarMascara("telefone", "55919876543210", "55919876543210a", 15),
+    ).toEqual({ valor: "55919876543210", cursor: 14, recusado: "formato" });
+  });
+
+  it("legado todo selecionado e trocado por colagem ou preenchimento: máscara normal", () => {
+    expect(
+      colarNaMascara("telefone", "55919876543210", 0, 14, "11 98765-4321"),
+    ).toEqual({ valor: "(11) 98765-4321", cursor: 15 });
+    expect(
+      aplicarMascara("telefone", "+55119876543210", "21987654321", 11).valor,
+    ).toBe("(21) 98765-4321");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T179 (revisão final) — telefone com ramal, rótulo ou letra: recusado inteiro.
+// ---------------------------------------------------------------------------
+
+const COM_TEXTO = [
+  "3333-4444 ramal 25",
+  "Tel 3333-4444 / ramal 21",
+  "2345-6789 ramal 12",
+  "ramal 25",
+  "11 98765-4321 x12",
+  "Cel: 11 98765-4321",
+  "11 98765-4321 (WhatsApp)",
+] as const;
+
+describe("T179 (revisão final) — telefone: só caracteres de telefone", () => {
+  it.each(COM_TEXTO)("colar %p em campo vazio: recusado (formato)", (texto) => {
+    expect(colarNaMascara("telefone", "", 0, 0, texto)).toEqual({
+      valor: "",
+      cursor: 0,
+      recusado: "formato",
+    });
+  });
+
+  it.each(COM_TEXTO)(
+    "%p sobre um número correto (colado no fim, sobre tudo ou por preenchimento): o número fica",
+    (texto) => {
+      const certo = "(11) 98765-4321";
+      expect(colarNaMascara("telefone", certo, 15, 15, texto)).toEqual({
+        valor: certo,
+        cursor: 15,
+        recusado: "formato",
+      });
+      expect(colarNaMascara("telefone", certo, 0, 15, texto)).toEqual({
+        valor: certo,
+        cursor: 0,
+        recusado: "formato",
+      });
+      const r = aplicarMascara("telefone", certo, texto, texto.length);
+      expect(r.valor).toBe(certo);
+      expect(r.recusado).toBe("formato");
+    },
+  );
+
+  it("letra digitada tecla a tecla, no fim ou no meio: recusada, cursor onde estava", () => {
+    expect(aplicarMascara("telefone", "(11) 9876", "(11) 9876a", 10)).toEqual({
+      valor: "(11) 9876",
+      cursor: 9,
+      recusado: "formato",
+    });
+    expect(
+      aplicarMascara("telefone", "(11) 98765-4321", "(11) 98x765-4321", 8),
+    ).toEqual({ valor: "(11) 98765-4321", cursor: 7, recusado: "formato" });
+    expect(aplicarMascara("telefone", "", "x", 1)).toEqual({
+      valor: "",
+      cursor: 0,
+      recusado: "formato",
+    });
+  });
+
+  it.each(["/", ":", "#", "*"])("%p no meio do número: recusado", (sinal) => {
+    expect(colarNaMascara("telefone", "(11) 9876", 9, 9, sinal).recusado).toBe(
+      "formato",
+    );
+  });
+
+  it.each([
+    "11 98765 4321",
+    "(11) 98765-4321",
+    "11.98765.4321",
+    "11-98765-4321",
+    "+55 (11) 98765-4321",
+    "+55 11 98765-4321",
+    " +5511987654321\n",
+  ])("%p continua aceito", (texto) => {
+    expect(colarNaMascara("telefone", "", 0, 0, texto)).toEqual({
+      valor: "(11) 98765-4321",
+      cursor: 15,
+    });
+    expect(aplicarMascara("telefone", "", texto, texto.length).valor).toBe(
+      "(11) 98765-4321",
     );
   });
 });

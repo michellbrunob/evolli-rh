@@ -117,6 +117,20 @@ describe("Contatos — normalização (ficha, §3)", () => {
 });
 
 describe("Contatos — validação do corpo", () => {
+  // T179 (revisão final) — o servidor nunca descarta letras para "achar" um
+  // número: ramal, extensão e rótulos são recusados no formato.
+  it.each([
+    "3333-4444 ramal 25",
+    "Tel 3333-4444 / ramal 21",
+    "2345-6789 ramal 12",
+    "11 98765-4321 x12",
+    "Cel: 11 98765-4321",
+    "11 98765-4321 (WhatsApp)",
+  ])("telefone com texto (%p) é recusado", async (valor) => {
+    expect((await errosDe({ celular: valor })).campos).toEqual(["celular"]);
+    expect((await errosDe({ telefone: valor })).campos).toEqual(["telefone"]);
+  });
+
   it("corpo válido passa e chega NORMALIZADO ao serviço", async () => {
     const { dto, campos } = await errosDe({
       emailPessoal: "  Pessoa.Sintetica@EXAMPLE.test",
@@ -1201,6 +1215,73 @@ describe("Contatos — serviço", () => {
         expect.objectContaining({ acao: "edicao", campos: ["celular"] }),
       );
       semValores(trilha(m));
+    });
+  });
+
+  describe("campo ausente mantém o gravado; telefone legado intocado (T179)", () => {
+    // Formatos que o banco aceitava antes da forma `+55` atual (sintéticos).
+    const LEGADOS = ["+55119876543210", "55919876543210", "119876543210"];
+
+    it.each(LEGADOS)(
+      "legado %p: salvar só o e-mail não reenvia, não transforma nem regrava o telefone",
+      async (legado) => {
+        const m = montar({
+          vinculos: ATIVO_A,
+          contato: { emailPessoal: EMAIL, celular: legado, telefone: null },
+        });
+        const resposta = await m.service.registrar(
+          COLABORADOR,
+          {
+            emailPessoal: "outro.sintetico@example.test",
+          } as RegistrarContatosColaboradorDto,
+          ctx(ator("rh", EMPRESA_A)),
+        );
+        expect(resposta.contatos).toMatchObject({ celular: legado });
+        // Só o e-mail é escrito: o celular legado nem entra no `update`.
+        expect(m.prisma.contatoColaborador.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: {
+              emailPessoal: "outro.sintetico@example.test",
+              ativo: true,
+              atualizadoPorUserId: "ator-rh",
+            },
+          }),
+        );
+        expect(eventoDeTratamento(m)).toEqual(
+          expect.objectContaining({
+            acao: "edicao",
+            campos: ["email_pessoal"],
+          }),
+        );
+      },
+    );
+
+    it("nada enviado sobre registro com valores: nada muda (todos ausentes = manter)", async () => {
+      const m = montar({ vinculos: ATIVO_A, contato: COM_VALOR });
+      const resposta = await m.service.registrar(
+        COLABORADOR,
+        {} as RegistrarContatosColaboradorDto,
+        ctx(ator("rh", EMPRESA_A)),
+      );
+      expect(resposta).toMatchObject({
+        situacao: "registrado",
+        resultado: "sem_alteracao",
+      });
+      expect(m.prisma.contatoColaborador.update).not.toHaveBeenCalled();
+    });
+
+    it("null explícito apaga só aquele campo; os ausentes ficam", async () => {
+      const m = montar({ vinculos: ATIVO_A, contato: COM_VALOR });
+      await m.service.registrar(
+        COLABORADOR,
+        { telefone: null } as unknown as RegistrarContatosColaboradorDto,
+        ctx(ator("rh", EMPRESA_A)),
+      );
+      expect(m.prisma.contatoColaborador.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: { telefone: null, ativo: true, atualizadoPorUserId: "ator-rh" },
+        }),
+      );
     });
   });
 

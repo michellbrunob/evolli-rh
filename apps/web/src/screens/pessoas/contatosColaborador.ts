@@ -16,10 +16,18 @@
  * T179 — os três contatos passaram a ser OPCIONAIS (decisão da proprietária
  * de 2026-10-21): vazio é "não informado", e o formato só é conferido quando
  * o campo está preenchido.
+ *
+ * T179 (revisão final) — telefone LEGADO: o banco ainda guarda números de
+ * antes da forma atual (`^\+?[0-9]{8,15}$`). A ficha os mostra exatamente como
+ * gravados e, enquanto o campo não é alterado, nem os valida nem os envia: a
+ * chave fica FORA do `PUT`, e campo ausente é "manter o gravado" no servidor.
  */
 import {
+  TELEFONE_ENTRADA,
+  TELEFONE_NORMALIZADO,
   digitosNacionaisDoTelefone,
   exibirTelefone,
+  telefoneNaFormaAtual,
 } from "../../format/mascaras";
 
 export interface ValoresContatos {
@@ -35,9 +43,48 @@ export type ErrosContatos = Partial<Record<CampoContato | "geral", string>>;
 export const LIMITE_EMAIL_PESSOAL = 254;
 
 const EMAIL_FORMA = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
-const TELEFONE_ENTRADA = /^\+?[0-9 ().-]+$/;
-/** O mesmo `TELEFONE_NORMALIZADO` do servidor (T179). */
-const TELEFONE_NORMALIZADO = /^\+55[1-9]{2}(?:9[0-9]{8}|[2-5][0-9]{7})$/;
+
+/** T179 — os dois campos de telefone. */
+export type CampoTelefone = "celular" | "telefone";
+
+const CAMPOS_TELEFONE: readonly CampoTelefone[] = ["celular", "telefone"];
+
+/**
+ * T179 (revisão final) — telefones gravados FORA da forma atual
+ * (`TELEFONE_NORMALIZADO`), exatamente como vieram do servidor. Só os
+ * presentes aqui são legados; `null` (não informado) nunca é.
+ */
+export type TelefonesLegados = Partial<Record<CampoTelefone, string>>;
+
+/** T179 (revisão final) — os telefones legados do que foi gravado. */
+export function telefonesLegados(
+  gravado: {
+    readonly celular: string | null;
+    readonly telefone: string | null;
+  } | null,
+): TelefonesLegados {
+  const legados: TelefonesLegados = {};
+  if (!gravado) return legados;
+  for (const campo of CAMPOS_TELEFONE) {
+    const bruto = gravado[campo];
+    if (bruto !== null && !telefoneNaFormaAtual(bruto)) legados[campo] = bruto;
+  }
+  return legados;
+}
+
+/**
+ * T179 (revisão final) — o campo ainda tem o legado intacto: valor IDÊNTICO
+ * ao bruto carregado (a comparação é com o texto exibido, nunca com uma
+ * versão mascarada). Intacto, ele não é validado nem enviado.
+ */
+export function legadoIntacto(
+  valores: ValoresContatos,
+  legados: TelefonesLegados,
+  campo: CampoTelefone,
+): boolean {
+  const bruto = legados[campo];
+  return bruto !== undefined && valores[campo] === bruto;
+}
 
 export function normalizarEmailPessoal(valor: string): string {
   return valor.trim().toLowerCase();
@@ -58,11 +105,10 @@ export function normalizarTelefone(valor: string): string {
   if (aparado.startsWith("+") && !digitos.startsWith("55")) {
     return aparado;
   }
+  // T179 (revisão final) — os dígitos nacionais vêm inteiros, sem corte: só
+  // 10 ou 11 servem.
   const nacionais = digitosNacionaisDoTelefone(aparado);
-  const sobra = digitos.length - nacionais.length;
-  // Só 10 ou 11 dígitos nacionais, e nada além do `55` do país.
-  const semSobra = sobra === 0 || (sobra === 2 && digitos.startsWith("55"));
-  if ((nacionais.length !== 10 && nacionais.length !== 11) || !semSobra) {
+  if (nacionais.length !== 10 && nacionais.length !== 11) {
     return aparado;
   }
   return `+55${nacionais}`;
@@ -70,7 +116,8 @@ export function normalizarTelefone(valor: string): string {
 
 /**
  * Valores gravados como a tela os edita: telefones na máscara brasileira.
- * T179 — o não informado (`null`) vira campo vazio.
+ * T179 — o não informado (`null`) vira campo vazio; o legado, o texto
+ * gravado, sem máscara (`exibirTelefone`).
  */
 export function contatosParaEdicao(valores: {
   readonly emailPessoal: string | null;
@@ -108,18 +155,28 @@ export function contatosDaAdmissao(
 }
 
 /**
- * T179 — corpo do `PUT` da ficha: os três campos sempre, normalizados, e o
- * vazio como `null` — é assim que um contato gravado é apagado.
+ * T179 — corpo do `PUT` da ficha: os campos normalizados, e o vazio como
+ * `null` — é assim que um contato gravado é apagado.
+ *
+ * T179 (revisão final) — telefone legado INTACTO fica fora do corpo: a chave
+ * ausente mantém o gravado no servidor. Alterado, vai como os demais.
  */
 export function contatosParaRegistro(
   valores: ValoresContatos,
-): Record<CampoContato, string | null> {
+  legados: TelefonesLegados = {},
+): { emailPessoal: string | null } & Partial<
+  Record<CampoTelefone, string | null>
+> {
   const normalizados = normalizarContatos(valores);
-  return {
-    emailPessoal: normalizados.emailPessoal || null,
-    celular: normalizados.celular || null,
-    telefone: normalizados.telefone || null,
-  };
+  const corpo: { emailPessoal: string | null } & Partial<
+    Record<CampoTelefone, string | null>
+  > = { emailPessoal: normalizados.emailPessoal || null };
+  for (const campo of CAMPOS_TELEFONE) {
+    if (!legadoIntacto(valores, legados, campo)) {
+      corpo[campo] = normalizados[campo] || null;
+    }
+  }
+  return corpo;
 }
 
 /** T179 — nenhum dos três foi preenchido? */
@@ -159,9 +216,14 @@ function erroDeTelefone(valor: string, rotulo: string): string | undefined {
 
 /**
  * Erros por campo; vazio quando os três estão válidos. T179 — campo vazio é
- * válido: só o preenchido tem o formato conferido.
+ * válido: só o preenchido tem o formato conferido. T179 (revisão final) — o
+ * telefone legado intacto também não é conferido (não será enviado); alterado,
+ * só passa um número brasileiro na forma atual.
  */
-export function validarContatos(valores: ValoresContatos): ErrosContatos {
+export function validarContatos(
+  valores: ValoresContatos,
+  legados: TelefonesLegados = {},
+): ErrosContatos {
   const erros: ErrosContatos = {};
   const email = normalizarEmailPessoal(valores.emailPessoal);
   if (email === "") {
@@ -171,11 +233,15 @@ export function validarContatos(valores: ValoresContatos): ErrosContatos {
   } else if (!EMAIL_FORMA.test(email)) {
     erros.emailPessoal = "Informe um e-mail válido, como nome@exemplo.com.";
   }
-  const celular = erroDeTelefone(valores.celular, "Celular");
+  const celular = legadoIntacto(valores, legados, "celular")
+    ? undefined
+    : erroDeTelefone(valores.celular, "Celular");
   if (celular) {
     erros.celular = celular;
   }
-  const telefone = erroDeTelefone(valores.telefone, "Telefone");
+  const telefone = legadoIntacto(valores, legados, "telefone")
+    ? undefined
+    : erroDeTelefone(valores.telefone, "Telefone");
   if (telefone) {
     erros.telefone = telefone;
   }

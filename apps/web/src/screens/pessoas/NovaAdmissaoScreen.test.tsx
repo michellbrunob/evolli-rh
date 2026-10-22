@@ -1434,7 +1434,8 @@ describe("Nova admissão — recusa do servidor preserva os dados", () => {
     await aguardarEmpresa();
     preencherValido();
     await salvarEConfirmar();
-    await screen.findByText(/Os dados digitados foram mantidos/);
+    // T179 (revisão final) — 5xx é envio incerto: reconfirmar, não recomeçar.
+    await screen.findByText(/Não foi possível confirmar se o cadastro/);
     expect(
       screen.queryByRole("button", { name: "Recomeçar a admissão" }),
     ).toBeNull();
@@ -1445,7 +1446,12 @@ describe("Nova admissão — recusa do servidor preserva os dados", () => {
     [404, /A empresa ativa mudou/],
     [403, /não tem permissão para admitir/],
     [401, /Seu acesso expirou/],
-    [500, /Os dados digitados foram mantidos/],
+    // T179 (revisão final) — 5xx: o servidor pode ter gravado; a mensagem é
+    // a do envio incerto, que manda reconfirmar com a mesma chave.
+    [500, /Não foi possível confirmar se o cadastro foi gravado/],
+    [502, /Não foi possível confirmar se o cadastro foi gravado/],
+    [503, /Não foi possível confirmar se o cadastro foi gravado/],
+    [504, /Não foi possível confirmar se o cadastro foi gravado/],
   ])(
     "%i: modal fecha, mensagem geral com foco nela e dados intactos",
     async (status, texto) => {
@@ -2368,6 +2374,38 @@ describe("T179 (revisão final) — descarte depois de envio incerto", () => {
     expect(dialogoDescarte()).toHaveAccessibleDescription(DESCARTE_INCERTO);
   });
 
+  it.each([502, 504])(
+    "depois de %i: o descarte usa o texto incerto, nunca 'Nada foi salvo.'",
+    async (status) => {
+      vi.mocked(admitirColaborador).mockRejectedValueOnce(recusa(status));
+      montar();
+      await aguardarEmpresa();
+      preencherValido();
+      await salvarEConfirmar();
+      await screen.findByText(
+        "Não foi possível confirmar se o cadastro foi gravado. Tente confirmar de novo: o mesmo envio não cria um segundo cadastro.",
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+      const dialogo = dialogoDescarte();
+      expect(dialogo).toHaveAccessibleDescription(DESCARTE_INCERTO);
+      expect(dialogo).not.toHaveTextContent(/Nada foi salvo/);
+    },
+  );
+
+  it("depois de 504, reconfirmar usa a MESMA chave", async () => {
+    vi.mocked(admitirColaborador)
+      .mockRejectedValueOnce(recusa(504))
+      .mockResolvedValueOnce(resposta);
+    montar();
+    await aguardarEmpresa();
+    preencherValido();
+    await salvarEConfirmar();
+    await screen.findByText(/Não foi possível confirmar se o cadastro/);
+    await salvarEConfirmar();
+    await screen.findByText("Admissão registrada");
+    expect(chaveDaChamada(1)).toBe(chaveDaChamada(0));
+  });
+
   it("recomeçar a página com chave nova volta ao texto comum", async () => {
     vi.mocked(admitirColaborador).mockRejectedValueOnce(
       recusa(422, { codigo: "idempotencia_conteudo_divergente" }),
@@ -2453,6 +2491,56 @@ describe("T179 (revisão final) — CEP e telefone sem excedente na página", ()
     await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
     const dto = vi.mocked(admitirColaborador).mock.calls[0]![0];
     expect(dto.contatos?.telefone).toBe("+5555999998888");
+  });
+
+  it("T179 (revisão final): telefone com ramal ou rótulo é recusado com aviso de formato, e o servidor recebe só os números certos", async () => {
+    montar();
+    await aguardarEmpresa();
+    preencherValido();
+    expect(celular()).toHaveValue("(31) 99999-0000");
+    fireEvent.change(telefone(), { target: { value: "" } });
+    fireEvent.paste(telefone(), {
+      clipboardData: { getData: () => "3333-4444 ramal 25" },
+    });
+    expect(telefone()).toHaveValue("");
+    expect(telefone()).toHaveAccessibleDescription(
+      /Use um telefone brasileiro/,
+    );
+    // Preenchimento automático com rótulo sobre o celular certo: fica o certo.
+    fireEvent.change(celular(), { target: { value: "Cel: 11 98765-4321" } });
+    expect(celular()).toHaveValue("(31) 99999-0000");
+    expect(celular()).toHaveAccessibleDescription(/Use um telefone brasileiro/);
+    await salvarEConfirmar();
+    await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
+    const dto = vi.mocked(admitirColaborador).mock.calls[0]![0];
+    expect(dto.contatos?.celular).toBe("+5531999990000");
+    expect(dto.contatos).not.toHaveProperty("telefone");
+  });
+
+  it("T179 (revisão final): recomeçar a página tira os avisos da máscara", async () => {
+    vi.mocked(admitirColaborador).mockRejectedValueOnce(
+      recusa(422, { codigo: "idempotencia_conteudo_divergente" }),
+    );
+    montar();
+    await aguardarEmpresa();
+    preencherValido();
+    await salvarEConfirmar();
+    await screen.findByText(/Este envio já foi registrado antes/);
+    // Telefone vazio + colagem recusada: o valor segue vazio, com aviso.
+    fireEvent.change(telefone(), { target: { value: "" } });
+    fireEvent.paste(telefone(), {
+      clipboardData: { getData: () => "ramal 25" },
+    });
+    expect(telefone()).toHaveAccessibleDescription(
+      /Use um telefone brasileiro/,
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Recomeçar a admissão" }),
+    );
+    expect(telefone()).toHaveValue("");
+    expect(telefone()).not.toHaveAccessibleDescription(
+      /Use um telefone brasileiro/,
+    );
   });
 });
 

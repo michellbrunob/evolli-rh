@@ -395,15 +395,19 @@ const ID_DO_CAMPO = Object.fromEntries(
 const MENSAGEM_EMPRESA_INDEFINIDA =
   "Não foi possível confirmar a empresa ativa em que você está trabalhando. Nada será enviado. Volte para Colaboradores e abra esta página de novo.";
 
-/** T179 — falha sem resposta: o servidor pode ou não ter gravado. */
+/**
+ * T179 — falha sem resposta: o servidor pode ou não ter gravado. T179
+ * (revisão final) — vale também para 5xx: o servidor pode ter gravado antes
+ * de o proxy responder.
+ */
 const MENSAGEM_ENVIO_INCERTO =
   "Não foi possível confirmar se o cadastro foi gravado. Tente confirmar de novo: o mesmo envio não cria um segundo cadastro.";
 
 /**
  * T179 — a confirmação de descarte. "Nada foi salvo." só é verdade quando
- * nenhum envio ficou incerto; depois de falha de rede ou de 422
- * `idempotencia_conteudo_divergente`, um envio anterior pode ter sido
- * registrado, e o texto não afirma nem nega gravação.
+ * nenhum envio ficou incerto; depois de falha de rede, de 5xx (T179, revisão
+ * final) ou de 422 `idempotencia_conteudo_divergente`, um envio anterior pode
+ * ter sido registrado, e o texto não afirma nem nega gravação.
  */
 const DESCARTE_SEM_ENVIO_INCERTO =
   "Os dados digitados nesta página serão perdidos. Nada foi salvo.";
@@ -424,6 +428,16 @@ function statusDe(erro: unknown): number | null {
     typeof (erro as { status?: unknown }).status === "number"
     ? (erro as { status: number }).status
     : null;
+}
+
+/**
+ * T179 (revisão final) — o envio pode ter sido gravado: sem resposta (rede)
+ * ou com 5xx (500, 502, 503, 504…), em que o servidor pode ter gravado antes
+ * de o proxy responder.
+ */
+function envioSemConfirmacao(erro: unknown): boolean {
+  const status = statusDe(erro);
+  return status === null || status >= 500;
 }
 
 /**
@@ -478,16 +492,16 @@ const CAMPO_DO_CONFLITO: Readonly<
  *    envio já registrou uma admissão com outro conteúdo; sem código,
  *    referência organizacional incoerente, de outra empresa ou inativa;
  *  - 404 — a empresa enviada deixou de ser a empresa ativa da sessão;
- *  - sem resposta (rede) — não se sabe se gravou; confirmar de novo é seguro.
+ *  - sem resposta (rede) ou 5xx (T179, revisão final) — não se sabe se
+ *    gravou; confirmar de novo, com a mesma chave, é seguro.
  *
  * Em todos os casos os dados digitados ficam na página.
  */
 function errosDaRecusa(erro: unknown): Erros {
+  if (envioSemConfirmacao(erro)) return { geral: MENSAGEM_ENVIO_INCERTO };
   const status = statusDe(erro);
   const { erros: porCampo, codigo } = detalhesDe(erro);
   switch (status) {
-    case null:
-      return { geral: MENSAGEM_ENVIO_INCERTO };
     case 409: {
       const novos: Erros = {};
       for (const { campo, motivo } of porCampo) {
@@ -683,12 +697,18 @@ export function NovaAdmissaoScreen({
    */
   const [envioDivergente, setEnvioDivergente] = useState(false);
   /**
-   * T179 — algum envio com a chave em curso ficou sem resposta (rede) ou foi
-   * dado como divergente (422): ele pode ter sido registrado. Fica até um
+   * T179 — algum envio com a chave em curso ficou sem resposta (rede), voltou
+   * 5xx (revisão final) ou foi dado como divergente (422): ele pode ter sido
+   * registrado. Fica até um
    * sucesso ou o recomeço da página — uma recusa posterior (409, validação)
    * não desfaz a dúvida sobre o envio anterior.
    */
   const [envioIncerto, setEnvioIncerto] = useState(false);
+  /**
+   * T179 (revisão final) — contador que limpa os avisos da máscara
+   * (`limparAvisos`): muda ao recomeçar e depois do sucesso.
+   */
+  const [limpezaDosAvisos, setLimpezaDosAvisos] = useState(0);
   /** Trava síncrona contra envio duplicado (cliques no mesmo quadro). */
   const enviandoRef = useRef(false);
   /**
@@ -1107,6 +1127,7 @@ export function NovaAdmissaoScreen({
       // Sucesso: a próxima admissão desta página será OUTRO envio.
       chaveIdempotenciaRef.current = null;
       setEnvioIncerto(false);
+      setLimpezaDosAvisos((n) => n + 1);
       setConfirmando(false);
       setAdmissao(resposta);
     } catch (erro: unknown) {
@@ -1119,7 +1140,7 @@ export function NovaAdmissaoScreen({
         statusDe(erro) === 422 &&
         detalhesDe(erro).codigo === "idempotencia_conteudo_divergente";
       setEnvioDivergente(divergente);
-      if (divergente || statusDe(erro) === null) setEnvioIncerto(true);
+      if (divergente || envioSemConfirmacao(erro)) setEnvioIncerto(true);
     } finally {
       setSalvando(false);
       enviandoRef.current = false;
@@ -1149,6 +1170,7 @@ export function NovaAdmissaoScreen({
     chaveIdempotenciaRef.current = null;
     setEnvioDivergente(false);
     setEnvioIncerto(false);
+    setLimpezaDosAvisos((n) => n + 1);
     setAdmissao(null);
   }
 
@@ -1253,6 +1275,7 @@ export function NovaAdmissaoScreen({
               mascara="cep"
               value={endereco.cep}
               onValorChange={(valor) => atualizarEndereco("cep", valor)}
+              limparAvisos={limpezaDosAvisos}
               onBlur={aoSair}
               {...control}
             />
@@ -1648,6 +1671,7 @@ export function NovaAdmissaoScreen({
                   mascara="telefone"
                   value={contatos.celular}
                   onValorChange={(valor) => atualizarContato("celular", valor)}
+                  limparAvisos={limpezaDosAvisos}
                   {...control}
                 />
               )}
@@ -1663,6 +1687,7 @@ export function NovaAdmissaoScreen({
                   mascara="telefone"
                   value={contatos.telefone}
                   onValorChange={(valor) => atualizarContato("telefone", valor)}
+                  limparAvisos={limpezaDosAvisos}
                   {...control}
                 />
               )}

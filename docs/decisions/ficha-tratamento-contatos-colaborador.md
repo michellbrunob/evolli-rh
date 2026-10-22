@@ -214,3 +214,17 @@ registro inativo. Informar um contato depois reativa o mesmo registro. O banco
 garante a coerência: registro ativo tem ao menos um contato, e inativo, nenhum
 (migration `20261022120000_contato_colaborador_inativo`). Finalidade, base
 legal, classificação, retenção e escopo de acesso não mudam.
+
+## 11. Alteração de 2026-10-22 (T179) — telefone legado e texto com ramal
+
+- **Edição parcial:** no `PUT` de contatos, campo **ausente mantém** o valor
+  gravado; `null` ou vazio apaga aquele campo. O registro só escreve os campos
+  que mudaram, e o evento de edição nomeia só esses.
+- **Telefone legado:** um telefone gravado antes da forma `+55` atual, que não
+  se enquadre nela com segurança, aparece exatamente como gravado. Salvar outro
+  campo não o reenvia, não o transforma e não o regrava; editá-lo exige a forma
+  brasileira atual, e só o valor novo é normalizado. Os legados já estão
+  listados na relação técnica de revisão da migration `20261021120000`, sem
+  valores.
+- **Texto com ramal ou palavras:** recusado como formato inválido (§3), na tela
+  e no servidor; nenhuma letra é descartada para formar um número.

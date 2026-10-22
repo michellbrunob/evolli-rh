@@ -216,9 +216,9 @@ export class AdmitirColaboradorDto {
   /**
    * T177 — Módulo 1 do cadastro, gravado na MESMA transação da admissão.
    *
-   * OBRIGATÓRIOS: `perfilPessoal` (com `dataNascimento`) e `contatos` (os
-   * três campos da ficha da T169). OPCIONAL: `endereco`, e todos os campos
-   * dele. Admissão sem eles é 400, antes de qualquer gravação.
+   * OBRIGATÓRIO: `perfilPessoal` (com `dataNascimento`); sem ele, 400 antes de
+   * qualquer gravação. OPCIONAIS: `endereco`, com todos os campos dele, e —
+   * desde a obrigatoriedade da T179 (2026-10-21) — `contatos`, com cada campo.
    */
   @IsDefined()
   @IsObject()

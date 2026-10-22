@@ -27,6 +27,7 @@ import {
   registrarContatosDoColaborador,
 } from "../../api/contatosColaboradorClient";
 import { expectSemIsoVisivel } from "../../test/semIsoVisivel";
+import { AVISO_DE_RECUSA } from "../../format/mascaras";
 
 vi.mock("../../api/colaboradoresClient");
 vi.mock("../../api/contatosColaboradorClient");
@@ -1653,8 +1654,9 @@ describe("ColaboradoresScreen (T169 — contatos do colaborador)", () => {
     await abrirDetalheDeAna();
     await screen.findByText(/Nenhum contato registrado/);
     fireEvent.change(email(), { target: { value: "ana@example.test" } });
-    // T179 — a máscara só deixa entrar dígitos: o número fica incompleto.
-    fireEvent.change(celular(), { target: { value: "11 9876-ABCD" } });
+    // T179 — o número fica incompleto. (Letras nem entram: a máscara as
+    // recusa — ver "T179 (revisão final)".)
+    fireEvent.change(celular(), { target: { value: "11 9876" } });
     expect(celular()).toHaveValue("(11) 9876");
     fireEvent.change(telefone(), { target: { value: "(11) 3333-0001" } });
 
@@ -1993,6 +1995,246 @@ describe("ColaboradoresScreen (T169 — contatos do colaborador)", () => {
     );
     await waitFor(() => expect(email()).toHaveFocus());
     expect(email()).toHaveAccessibleDescription(/Nenhum contato registrado/);
+  });
+
+  // -------------------------------------------------------------------------
+  // T179 (revisão final) — telefone LEGADO (gravado fora da forma atual):
+  // exibido como gravado, marcado, e fora do `PUT` enquanto intacto.
+  // Números sintéticos.
+  // -------------------------------------------------------------------------
+
+  const DICA_LEGADO =
+    /Formato antigo, mantido exatamente como gravado\. Para trocar, apague e digite um número brasileiro\./;
+
+  /** Registro com o celular no formato antigo e o telefone na forma atual. */
+  function comCelularLegado(bruto: string): ContatosDoColaboradorApi {
+    return {
+      ...registrado,
+      contatos: { ...registrado.contatos!, celular: bruto },
+    };
+  }
+
+  it.each(["+55119876543210", "55919876543210", "119876543210"])(
+    "T179 — legado %p aparece exatamente como gravado, marcado como formato antigo",
+    async (bruto) => {
+      vi.mocked(consultarContatosDoColaborador).mockResolvedValueOnce(
+        comCelularLegado(bruto),
+      );
+      const secao = await abrirDetalheDeAna();
+      await waitFor(() => expect(celular()).toHaveValue(bruto));
+      expect(celular()).toHaveAccessibleDescription(DICA_LEGADO);
+      expect(celular().getAttribute("aria-describedby")?.split(" ")).toContain(
+        "contatos-colaborador-celular-legado",
+      );
+      // O da forma atual continua mascarado e sem a marca.
+      expect(telefone()).toHaveValue("(11) 3333-0001");
+      expect(telefone()).not.toHaveAccessibleDescription(DICA_LEGADO);
+      // Abrir não é alterar.
+      expect(
+        screen.getByRole("button", { name: "Salvar contatos" }),
+      ).toBeDisabled();
+      expect(within(secao).queryByRole("alert")).toBeNull();
+    },
+  );
+
+  it("T179 — salvar só o e-mail NÃO envia a chave do telefone legado", async () => {
+    vi.mocked(consultarContatosDoColaborador).mockResolvedValueOnce(
+      comCelularLegado("55919876543210"),
+    );
+    vi.mocked(registrarContatosDoColaborador).mockResolvedValueOnce(
+      gravacao("atualizado", {
+        emailPessoal: "ana.nova@example.test",
+        celular: "55919876543210",
+        telefone: "+551133330001",
+        atualizadoEm: "2026-10-16T12:00:00.000Z",
+      }),
+    );
+    const secao = await abrirDetalheDeAna();
+    await waitFor(() => expect(celular()).toHaveValue("55919876543210"));
+    fireEvent.change(email(), { target: { value: "ana.nova@example.test" } });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar contatos" }));
+    expect(
+      await within(secao).findByText("Contatos salvos."),
+    ).toBeInTheDocument();
+    const chamadas = vi.mocked(registrarContatosDoColaborador).mock.calls;
+    const [id, corpo] = chamadas[chamadas.length - 1]!;
+    expect(id).toBe(colaborador1.id);
+    expect(corpo).toEqual({
+      emailPessoal: "ana.nova@example.test",
+      telefone: "+551133330001",
+    });
+    expect(corpo).not.toHaveProperty("celular");
+    // Gravado de novo como estava: continua legado, exibido como veio.
+    expect(celular()).toHaveValue("55919876543210");
+    expect(celular()).toHaveAccessibleDescription(DICA_LEGADO);
+  });
+
+  it("T179 — legado editado para um número válido: vai normalizado, e a marca sai", async () => {
+    vi.mocked(consultarContatosDoColaborador).mockResolvedValueOnce(
+      comCelularLegado("+55119876543210"),
+    );
+    vi.mocked(registrarContatosDoColaborador).mockResolvedValueOnce(
+      gravacao("atualizado", {
+        ...registrado.contatos!,
+        celular: "+5511987650002",
+      }),
+    );
+    const secao = await abrirDetalheDeAna();
+    await waitFor(() => expect(celular()).toHaveValue("+55119876543210"));
+    fireEvent.change(celular(), { target: { value: "" } });
+    fireEvent.change(celular(), { target: { value: "11987650002" } });
+    expect(celular()).toHaveValue("(11) 98765-0002");
+    expect(celular()).not.toHaveAccessibleDescription(DICA_LEGADO);
+    fireEvent.click(screen.getByRole("button", { name: "Salvar contatos" }));
+    expect(
+      await within(secao).findByText("Contatos salvos."),
+    ).toBeInTheDocument();
+    const chamadas = vi.mocked(registrarContatosDoColaborador).mock.calls;
+    expect(chamadas[chamadas.length - 1]).toEqual([
+      colaborador1.id,
+      {
+        emailPessoal: "ana.contato@example.test",
+        celular: "+5511987650002",
+        telefone: "+551133330001",
+      },
+    ]);
+  });
+
+  it("T179 — legado editado para um valor inválido: recusado aqui, nada é enviado", async () => {
+    vi.mocked(consultarContatosDoColaborador).mockResolvedValueOnce(
+      comCelularLegado("55919876543210"),
+    );
+    await abrirDetalheDeAna();
+    await waitFor(() => expect(celular()).toHaveValue("55919876543210"));
+    const antes = vi.mocked(registrarContatosDoColaborador).mock.calls.length;
+    // Backspace no primeiro dígito: o resto fica como veio, sem máscara.
+    fireEvent.change(celular(), { target: { value: "5919876543210" } });
+    expect(celular()).toHaveValue("5919876543210");
+    expect(
+      screen.getByRole("button", { name: "Salvar contatos" }),
+    ).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "Salvar contatos" }));
+    expect(
+      await screen.findByText(/Celular precisa do DDD e do número/),
+    ).toBeInTheDocument();
+    await waitFor(() => expect(celular()).toHaveFocus());
+    expect(vi.mocked(registrarContatosDoColaborador).mock.calls.length).toBe(
+      antes,
+    );
+  });
+
+  it("T179 — apagar o legado envia null nele", async () => {
+    vi.mocked(consultarContatosDoColaborador).mockResolvedValueOnce(
+      comCelularLegado("119876543210"),
+    );
+    vi.mocked(registrarContatosDoColaborador).mockResolvedValueOnce(
+      gravacao("atualizado", { ...registrado.contatos!, celular: null }),
+    );
+    const secao = await abrirDetalheDeAna();
+    await waitFor(() => expect(celular()).toHaveValue("119876543210"));
+    fireEvent.change(celular(), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar contatos" }));
+    expect(
+      await within(secao).findByText("Contatos salvos."),
+    ).toBeInTheDocument();
+    const chamadas = vi.mocked(registrarContatosDoColaborador).mock.calls;
+    expect(chamadas[chamadas.length - 1]).toEqual([
+      colaborador1.id,
+      {
+        emailPessoal: "ana.contato@example.test",
+        celular: null,
+        telefone: "+551133330001",
+      },
+    ]);
+  });
+
+  it("T179 — telefones na forma atual seguem mascarados e vão no PUT como antes", async () => {
+    vi.mocked(consultarContatosDoColaborador).mockResolvedValueOnce(registrado);
+    vi.mocked(registrarContatosDoColaborador).mockResolvedValueOnce(
+      gravacao("atualizado", {
+        ...registrado.contatos!,
+        emailPessoal: "ana.nova@example.test",
+      }),
+    );
+    const secao = await abrirDetalheDeAna();
+    await waitFor(() => expect(celular()).toHaveValue("(11) 98765-0001"));
+    expect(celular()).not.toHaveAccessibleDescription(DICA_LEGADO);
+    fireEvent.change(email(), { target: { value: "ana.nova@example.test" } });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar contatos" }));
+    expect(
+      await within(secao).findByText("Contatos salvos."),
+    ).toBeInTheDocument();
+    const chamadas = vi.mocked(registrarContatosDoColaborador).mock.calls;
+    expect(chamadas[chamadas.length - 1]).toEqual([
+      colaborador1.id,
+      {
+        emailPessoal: "ana.nova@example.test",
+        celular: "+5511987650001",
+        telefone: "+551133330001",
+      },
+    ]);
+  });
+
+  // -------------------------------------------------------------------------
+  // T179 (revisão final) — aviso da máscara não sobrevive a salvar ou remover.
+  // -------------------------------------------------------------------------
+
+  it("T179 — aviso de excedente no celular some depois de salvar o e-mail", async () => {
+    vi.mocked(consultarContatosDoColaborador).mockResolvedValueOnce(registrado);
+    vi.mocked(registrarContatosDoColaborador).mockResolvedValueOnce(
+      gravacao("atualizado", {
+        ...registrado.contatos!,
+        emailPessoal: "ana.nova@example.test",
+      }),
+    );
+    const secao = await abrirDetalheDeAna();
+    await waitFor(() => expect(celular()).toHaveValue("(11) 98765-0001"));
+    fireEvent.change(celular(), { target: { value: "(11) 98765-00019" } });
+    expect(celular()).toHaveValue("(11) 98765-0001");
+    expect(celular()).toHaveAccessibleDescription(
+      /O número não pode passar de 11 dígitos/,
+    );
+    fireEvent.change(email(), { target: { value: "ana.nova@example.test" } });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar contatos" }));
+    expect(
+      await within(secao).findByText("Contatos salvos."),
+    ).toBeInTheDocument();
+    expect(celular()).toHaveValue("(11) 98765-0001");
+    expect(celular()).not.toHaveAccessibleDescription(
+      /O número não pode passar de 11 dígitos/,
+    );
+    expect(
+      within(secao).queryByText(AVISO_DE_RECUSA.telefoneExcedente),
+    ).toBeNull();
+  });
+
+  it("T179 — depois de 'Contatos removidos.', nenhum aviso da máscara fica", async () => {
+    vi.mocked(consultarContatosDoColaborador).mockResolvedValueOnce(registrado);
+    vi.mocked(registrarContatosDoColaborador).mockResolvedValueOnce(removido());
+    const secao = await abrirDetalheDeAna();
+    await waitFor(() => expect(celular()).toHaveValue("(11) 98765-0001"));
+    fireEvent.change(email(), { target: { value: "" } });
+    fireEvent.change(telefone(), { target: { value: "" } });
+    fireEvent.change(celular(), { target: { value: "" } });
+    fireEvent.paste(celular(), {
+      clipboardData: { getData: () => "ramal 25" },
+    });
+    expect(celular()).toHaveValue("");
+    expect(
+      within(secao).getByText(AVISO_DE_RECUSA.telefoneFormato),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Salvar contatos" }));
+    expect(
+      await within(secao).findByText("Contatos removidos."),
+    ).toBeInTheDocument();
+    expect(
+      within(secao).queryByText(AVISO_DE_RECUSA.telefoneFormato),
+    ).toBeNull();
+    for (const campo of [celular(), telefone()]) {
+      expect(campo).not.toHaveAccessibleDescription(
+        /Use um telefone brasileiro|não pode passar/,
+      );
+    }
   });
 });
 

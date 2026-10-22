@@ -28,6 +28,14 @@
  *   como estavam, com o motivo (`recusado`) para o campo avisar. Só uma
  *   entrada INTEIRA (campo vazio, ou todo o valor trocado) pode trazer o `55`
  *   do país sem `+`.
+ * - **Só caracteres de telefone** (T179, revisão final): no telefone, entrada
+ *   com qualquer caractere fora de `TELEFONE_ENTRADA` (letras, `ramal`, `x`,
+ *   `/`, `:`…) é RECUSADA (`formato`), por tecla, colagem ou preenchimento —
+ *   nunca vira outro número com as letras jogadas fora.
+ * - **Legado intocado** (T179, revisão final): telefone gravado fora da forma
+ *   atual aparece exatamente como veio (`exibirTelefone`) e, enquanto ainda
+ *   tem o texto antigo, apagar não o reformata: a mudança fica como veio até
+ *   o campo ser esvaziado ou trocado por inteiro.
  *
  * ## O que ela não faz
  *
@@ -44,8 +52,8 @@ export type TipoMascara = "cep" | "telefone";
  * (`avisoDaRecusa`):
  *  - `excedente` — a inserção conserva dígitos do valor e passaria do limite;
  *  - `formato` — a entrada não é um telefone brasileiro (inteira longa demais
- *    sem ser `55` + DDD + número, zero de tronco, texto com ramal, `+`
- *    inserido num número nacional).
+ *    sem ser `55` + DDD + número, zero de tronco, `+` inserido num número
+ *    nacional) ou traz caractere fora de `TELEFONE_ENTRADA` (letras, ramal).
  */
 export type MotivoDaRecusa = "excedente" | "formato";
 
@@ -100,6 +108,36 @@ export function avisoDaRecusa(
 
 const DIGITO = /[0-9]/;
 
+/**
+ * T179 — o mesmo `TELEFONE_ENTRADA` do servidor e da validação local: só
+ * dígitos e, como separadores, espaço, parênteses, ponto e hífen, com `+`
+ * apenas no início. Letras, `/` e `:` ficam de fora — não há rótulo aprovado.
+ */
+export const TELEFONE_ENTRADA = /^\+?[0-9 ().-]+$/;
+
+/**
+ * T179 — o mesmo `TELEFONE_NORMALIZADO` do servidor: a forma ATUAL do
+ * telefone gravado, `+55` + DDD + celular (9 + 8 dígitos) ou fixo (2 a 5 + 7).
+ */
+export const TELEFONE_NORMALIZADO = /^\+55[1-9]{2}(?:9[0-9]{8}|[2-5][0-9]{7})$/;
+
+/** T179 — o telefone gravado está na forma atual (`TELEFONE_NORMALIZADO`)? */
+export function telefoneNaFormaAtual(
+  valor: string | null | undefined,
+): boolean {
+  return typeof valor === "string" && TELEFONE_NORMALIZADO.test(valor);
+}
+
+/**
+ * T179 (revisão final) — a entrada só tem caracteres de telefone? O vazio
+ * serve (é apagar), e o `+` sozinho também (o país sendo digitado); espaços
+ * nas pontas também (colagem com quebra de linha).
+ */
+function soCaracteresDeTelefone(entrada: string): boolean {
+  const aparado = entrada.trim();
+  return aparado === "" || aparado === "+" || TELEFONE_ENTRADA.test(aparado);
+}
+
 /** Limite da numeração internacional (E.164): `+` de outro país fica até aqui. */
 const LIMITE_INTERNACIONAL = 15;
 
@@ -137,14 +175,13 @@ function mascarar(tipo: TipoMascara, digitos: string): string {
  * Dígitos NACIONAIS de um telefone digitado, colado ou gravado: tira o `55`
  * do país quando ele está explícito (`+55…`) ou quando o número tem 12 ou 13
  * dígitos começando por `55` (o `55` + DDD + número). Com 10 ou 11 dígitos o
- * `55` inicial é DDD, e fica. O resultado não passa de 11 dígitos.
+ * `55` inicial é DDD, e fica. T179 (revisão final) — nada é cortado: com mais
+ * de 11 dígitos o resultado vem inteiro, e quem chama o recusa (cortar
+ * inventaria outro número).
  */
 export function digitosNacionaisDoTelefone(entrada: string): string {
   const digitos = somenteDigitos(entrada);
-  return (temCodigoDoPais(entrada) ? digitos.slice(2) : digitos).slice(
-    0,
-    LIMITE_DE_DIGITOS.telefone,
-  );
+  return temCodigoDoPais(entrada) ? digitos.slice(2) : digitos;
 }
 
 /** O texto traz o `55` do Brasil na frente (ver `digitosNacionaisDoTelefone`)? */
@@ -184,6 +221,19 @@ export function posicaoAposDigitos(valor: string, n: number): number {
 
 function digitosAntesDe(valor: string, posicao: number): number {
   return somenteDigitos(valor.slice(0, Math.max(0, posicao))).length;
+}
+
+/**
+ * T179 (revisão final) — o telefone do campo está FORA da forma que a máscara
+ * produz: é o legado exibido como foi gravado (ou o que sobrou dele enquanto
+ * é apagado). Vazio e `+`, `+5` ou `+55` em digitação não contam.
+ */
+function telefoneForaDaMascara(valor: string): boolean {
+  return (
+    valor !== "" &&
+    !PAIS_EM_DIGITACAO.test(valor) &&
+    valor !== mascararTelefone(somenteDigitos(valor))
+  );
 }
 
 /**
@@ -311,6 +361,12 @@ function telefoneDaEntrada(
   const limite = LIMITE_DE_DIGITOS.telefone;
   const digitos = somenteDigitos(entrada);
 
+  // T179 (revisão final) — letra, ramal, `/`, `:` ou `+` fora do início:
+  // recusado inteiro, nunca "limpo" para virar outro número.
+  if (!soCaracteresDeTelefone(entrada)) {
+    return recusar(anterior, cursorDaRecusa, "formato");
+  }
+
   if (
     comecaComMais(entrada) &&
     !comecaComMais(anterior) &&
@@ -372,6 +428,12 @@ function telefoneDaEntrada(
  * Valor que JÁ passava do limite (CEP de outro país antes de o país voltar a
  * ser Brasil) pode ser apagado aos poucos: mudança que não aumenta os dígitos
  * fica como veio, sem cortar nada, até caber na máscara.
+ *
+ * T179 (revisão final) — telefone: caractere fora de `TELEFONE_ENTRADA` é
+ * recusado (`formato`) antes de tudo. E o legado (valor fora da máscara) não
+ * é reformatado enquanto é apagado: mudança que conserva dígitos dele sem
+ * aumentá-los fica como veio, qualquer que seja a quantidade. Esvaziado, ou
+ * trocado por inteiro, o campo volta à máscara.
  */
 export function aplicarMascara(
   tipo: TipoMascara,
@@ -384,6 +446,19 @@ export function aplicarMascara(
   const digitos = somenteDigitos(entrada);
   // Onde o cursor estava antes: a inserção termina no cursor de agora.
   const cursorDaRecusa = cursor - (entrada.length - anterior.length);
+
+  if (tipo === "telefone") {
+    if (!soCaracteresDeTelefone(entrada)) {
+      return recusar(anterior, cursorDaRecusa, "formato");
+    }
+    if (
+      telefoneForaDaMascara(anterior) &&
+      digitos.length <= digitosAnteriores.length &&
+      comparar(anterior, entrada).digito
+    ) {
+      return { valor: entrada, cursor };
+    }
+  }
 
   if (
     digitos.length > limite &&
@@ -430,7 +505,9 @@ export function aplicarMascara(
  *     trazem o país; `+` de outro país fica como veio e é recusado na
  *     validação;
  *   - colado num número existente (fim, meio ou início) é INSERÇÃO: passou de
- *     11 dígitos, RECUSADO, sem ler `55` nenhum como país.
+ *     11 dígitos, RECUSADO, sem ler `55` nenhum como país;
+ *   - T179 (revisão final) — colado com letra, ramal, `/` ou `:` é RECUSADO
+ *     (`formato`), em qualquer posição.
  *   Nenhum dígito some sem aviso.
  */
 export function colarNaMascara(
@@ -502,8 +579,14 @@ export function apagarComSeparador(
 ): EstadoDoCampo | null {
   if (inicio !== fim) return null;
   // T179 (B1) — com o `+` do país ainda no campo, a tecla segue o normal: o
-  // `+` não é separador da máscara, é o que foi digitado.
-  if (tipo === "telefone" && comecaComMais(valor)) return null;
+  // `+` não é separador da máscara, é o que foi digitado. T179 (revisão
+  // final) — o legado fora da máscara também: a tecla não o reformata.
+  if (
+    tipo === "telefone" &&
+    (comecaComMais(valor) || telefoneForaDaMascara(valor))
+  ) {
+    return null;
+  }
   const digitos = somenteDigitos(valor);
   const antes = digitosAntesDe(valor, inicio);
   if (tecla === "Backspace") {
@@ -525,23 +608,15 @@ export function apagarComSeparador(
 // ---------------------------------------------------------------------------
 
 /**
- * Telefone gravado (`+55` + DDD + número) na forma brasileira:
- * `+5511987654321` → `(11) 98765-4321`. Valor que não tem a forma de um
- * número brasileiro completo (registro antigo, ainda em revisão) aparece como
- * veio — mascarar pela metade inventaria um número.
+ * Telefone gravado na forma ATUAL (`TELEFONE_NORMALIZADO`) na máscara
+ * brasileira: `+5511987654321` → `(11) 98765-4321`. T179 (revisão final) —
+ * qualquer outro valor (legado `^\+?[0-9]{8,15}$`, estrangeiro) aparece
+ * EXATAMENTE como gravado: sem cortar, sem reinterpretar o `55` e sem
+ * máscara — mascarar inventaria outro número, e salvar o regravaria.
  */
 export function exibirTelefone(valor: string | null | undefined): string {
   if (typeof valor !== "string") return "";
-  const nacionais = digitosNacionaisDoTelefone(valor);
-  const forma = /^\+?[0-9 ().-]+$/.test(valor.trim());
-  if (!forma || (nacionais.length !== 10 && nacionais.length !== 11)) {
-    return valor;
-  }
-  // `+` de outro país não é número brasileiro: fica como veio.
-  if (/^\s*\+/.test(valor) && !somenteDigitos(valor).startsWith("55")) {
-    return valor;
-  }
-  return mascararTelefone(nacionais);
+  return telefoneNaFormaAtual(valor) ? mascararTelefone(valor.slice(3)) : valor;
 }
 
 /**

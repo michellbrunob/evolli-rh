@@ -1064,7 +1064,8 @@ export async function semearDemonstracao(
       tipo: "clt",
       dataAdmissao: "2026-01-05",
       motivoCodigo: "admissao_inicial",
-      // T179 — a Nova admissão exige Departamento, Cargo e Unidade.
+      // T179 — a Nova admissão exige Departamento e Cargo; a Unidade é
+      // opcional e vai aqui só para a demonstração ter lotação completa.
       cargoId: analista.id,
       departamentoId: operacoes.id,
       unidadeOrganizacionalId: matriz.id,
@@ -1174,7 +1175,8 @@ export async function semearDemonstracao(
         nome: `Operacoes ${MARCA_DEMO} Beta`,
       },
     );
-    // T179 — a Nova admissão exige Departamento, Cargo e Unidade.
+    // T179 — a Nova admissão exige Departamento e Cargo; a Unidade é opcional
+    // e entra só para a demonstração da Beta ter lotação completa.
     const unidadeBeta = await garantirCatalogo(
       ctx,
       rhBeta,

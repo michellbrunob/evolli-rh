@@ -22,6 +22,11 @@
  * (`ATRASO_DO_REANUNCIO_MS`) — texto igual, sem a troca, o leitor de tela não
  * repetiria.
  *
+ * T179 (revisão final) — o aviso vale para o valor em que a recusa aconteceu:
+ * some quando o valor muda por fora (a tela recarregou ou trocou o campo) e
+ * quando a tela pede (`limparAvisos`), mesmo com o valor igual — depois de
+ * salvar, por exemplo. O reanúncio pendente é cancelado junto.
+ *
  * O teclado é o de números (`inputMode`), e nada impede a navegação comum:
  * setas, Home/End, seleção e Tab seguem do navegador.
  *
@@ -63,12 +68,18 @@ export interface CampoMascaradoProps extends Omit<
   readonly value: string;
   /** Recebe o valor novo, já mascarado. */
   readonly onValorChange: (valor: string) => void;
+  /**
+   * T179 (revisão final) — a tela limpa o aviso da recusa mudando este número
+   * (um contador): depois de salvar, remover ou recomeçar.
+   */
+  readonly limparAvisos?: number;
 }
 
 export function CampoMascarado({
   mascara,
   value,
   onValorChange,
+  limparAvisos = 0,
   onKeyDown,
   onPaste,
   autoComplete = "off",
@@ -79,9 +90,19 @@ export function CampoMascarado({
   const cursorPendenteRef = useRef<number | null>(null);
   /**
    * T179 (B2) — a entrada foi recusada: o valor fica como estava, e o aviso
-   * diz por quê. Some na próxima mudança aceita.
+   * diz por quê. Some na próxima mudança aceita. T179 (revisão final) —
+   * guarda também o valor e a limpeza em que nasceu: só aparece enquanto os
+   * dois forem os de agora.
    */
-  const [aviso, setAviso] = useState<string | null>(null);
+  const [recusa, setRecusa] = useState<{
+    readonly texto: string;
+    readonly valor: string;
+    readonly limpeza: number;
+  } | null>(null);
+  const aviso =
+    recusa && recusa.valor === value && recusa.limpeza === limparAvisos
+      ? recusa.texto
+      : null;
   /**
    * T179 — a região viva está vazia de propósito, à espera de receber de
    * novo o mesmo aviso (nova tentativa recusada).
@@ -95,13 +116,15 @@ export function CampoMascarado({
     reanuncioRef.current = null;
   }
 
-  // Desmontado o campo, nenhum reanúncio fica pendurado.
+  // Desmontado o campo, nenhum reanúncio fica pendurado. T179 (revisão
+  // final) — nem quando o valor muda por fora ou a tela limpa os avisos.
   useEffect(() => {
     const pendente = reanuncioRef;
     return () => {
       if (pendente.current !== null) clearTimeout(pendente.current);
+      pendente.current = null;
     };
-  }, []);
+  }, [value, limparAvisos]);
 
   useLayoutEffect(() => {
     const cursor = cursorPendenteRef.current;
@@ -131,7 +154,11 @@ export function CampoMascarado({
       return;
     }
     setReanunciando(false);
-    setAviso(novo);
+    setRecusa(
+      novo === null
+        ? null
+        : { texto: novo, valor: value, limpeza: limparAvisos },
+    );
   }
 
   function aplicar(campo: HTMLInputElement, estado: EstadoDoCampo) {

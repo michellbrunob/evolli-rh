@@ -136,6 +136,35 @@ export function contatosInformados(
   };
 }
 
+/**
+ * T179 — valores do PUT: campo AUSENTE mantém o valor gravado; `null` ou vazio
+ * (já `null` pelo DTO) apaga. Assim um telefone legado — gravado antes da
+ * forma `+55` atual — não é reenviado, truncado nem regravado quando a ficha
+ * salva outro campo.
+ */
+export function contatosDoPut(
+  dto: RegistrarContatosColaboradorDto,
+  atual: ContatosInformados | null,
+): ContatosInformados {
+  const manter = <K extends keyof ContatosInformados>(campo: K) =>
+    dto[campo] === undefined ? (atual?.[campo] ?? null) : (dto[campo] ?? null);
+  return {
+    emailPessoal: manter("emailPessoal"),
+    celular: manter("celular"),
+    telefone: manter("telefone"),
+  };
+}
+
+/** Nome do campo no evento → chave do registro. */
+const CHAVE_DO_CAMPO: Record<
+  CampoContatoColaborador,
+  keyof ContatosInformados
+> = {
+  email_pessoal: "emailPessoal",
+  celular: "celular",
+  telefone: "telefone",
+};
+
 /** T179 — NOMES dos campos com valor, para o evento de criação. */
 export function camposPreenchidos(
   valores: ContatosInformados,
@@ -321,14 +350,15 @@ export class ContatoColaboradorService {
         // empresa já o usa? A restrição do banco é a garantia (corrida chega
         // como P2002, abaixo); a consulta só diz qual campo conflita. Só a
         // empresa do vínculo: "em uso" nunca revela alguém de outra.
-        const novos = contatosInformados(dto);
+        // Só o e-mail ENVIADO é conferido: o ausente fica como estava.
+        const emailEnviado = dto.emailPessoal ?? null;
         const emailEmUso =
-          novos.emailPessoal === null
+          emailEnviado === null
             ? null
             : await tx.contatoColaborador.findFirst({
                 where: {
                   empresaId: alvo.empresaId,
-                  emailPessoal: novos.emailPessoal,
+                  emailPessoal: emailEnviado,
                   NOT: { colaboradorId: alvo.colaboradorId },
                 },
                 select: { id: true },
@@ -349,6 +379,7 @@ export class ContatoColaboradorService {
           select: PROJECAO_CONTATO,
         });
 
+        const novos = contatosDoPut(dto, atual);
         const preenchidos = camposPreenchidos(novos);
         if ((!atual || !atual.ativo) && preenchidos.length === 0) {
           // T179 — nenhum contato antes (nunca gravado, ou removido) e nenhum
@@ -411,11 +442,18 @@ export class ContatoColaboradorService {
         // T179 — sem nenhum contato, o registro fica INATIVO (não há exclusão
         // física: a trilha aponta para ele); com algum, volta a ativo. O
         // evento é de EDIÇÃO, com os nomes dos campos alterados ou removidos.
+        // Só os campos que mudaram são escritos: o que ficou como estava —
+        // inclusive um telefone legado — não é regravado.
         const removidos = preenchidos.length === 0;
+        const mudancas: Partial<ContatosInformados> = {};
+        for (const campo of campos) {
+          const chave = CHAVE_DO_CAMPO[campo];
+          mudancas[chave] = novos[chave];
+        }
         const atualizado = await tx.contatoColaborador.update({
           where: { id: atual.id },
           data: {
-            ...novos,
+            ...mudancas,
             ativo: !removidos,
             atualizadoPorUserId: ctx.actor.id,
           },

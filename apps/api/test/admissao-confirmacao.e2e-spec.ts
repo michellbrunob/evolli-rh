@@ -1373,6 +1373,74 @@ describe("Confirmação da Nova admissão (T179, e2e)", () => {
       ).rejects.toThrow();
       enviados.add("3133331773");
     });
+
+    // ---------------------------------------------------------------------
+    // Revisão final (commit 11) — telefone legado e texto com ramal.
+
+    it.each(["+55119876543210", "55919876543210", "119876543210"])(
+      "telefone legado %p: salvar só o e-mail não reenvia nem regrava o telefone; editá-lo exige a forma atual",
+      async (legado) => {
+        const r = await admitir(rhA)
+          .send(soObrigatorios({ contatos: { telefone: "3133331774" } }))
+          .expect(201);
+        const colaboradorId: string = r.body.id;
+        const rota = `/v1/colaboradores/${colaboradorId}/contatos`;
+        // Valor gravado antes da forma `+55` atual: o banco ainda o aceita.
+        await prisma.contatoColaborador.updateMany({
+          where: { colaboradorId },
+          data: { celular: legado },
+        });
+
+        const outro = await put(rota, rhA)
+          .send({
+            emailPessoal: `legado.${colaboradorId.slice(0, 8)}@example.test`,
+            telefone: "3133331774",
+          })
+          .expect(200);
+        expect(outro.body.contatos.celular).toBe(legado);
+        const gravado = await prisma.contatoColaborador.findFirstOrThrow({
+          where: { colaboradorId },
+        });
+        expect(gravado.celular).toBe(legado);
+        const evento = await prisma.contatoColaboradorEvento.findFirstOrThrow({
+          where: { colaboradorId },
+          orderBy: { ocorridoEm: "desc" },
+        });
+        expect(evento.campos).toEqual(["email_pessoal"]);
+
+        // Reenviar o legado como valor é recusado: editar exige a forma atual.
+        await put(rota, rhA).send({ celular: legado }).expect(400);
+        const novo = await put(rota, rhA)
+          .send({ celular: "(31) 98888-1775" })
+          .expect(200);
+        expect(novo.body.contatos.celular).toBe("+5531988881775");
+        for (const valor of [legado, "3133331774", "31988881775"]) {
+          enviados.add(valor);
+        }
+      },
+    );
+
+    it.each(["3333-4444 ramal 25", "11 98765-4321 x12", "Cel: 11 98765-4321"])(
+      "telefone com texto (%p): admissão e edição recusam (400) e nada muda",
+      async (valor) => {
+        const antes = await prisma.colaborador.count();
+        await admitir(rhA)
+          .send(soObrigatorios({ contatos: { celular: valor } }))
+          .expect(400);
+        expect(await prisma.colaborador.count()).toBe(antes);
+
+        const r = await admitir(rhA)
+          .send(soObrigatorios({ contatos: { telefone: "3133331776" } }))
+          .expect(201);
+        const rota = `/v1/colaboradores/${r.body.id}/contatos`;
+        await put(rota, rhA).send({ telefone: valor }).expect(400);
+        const gravado = await prisma.contatoColaborador.findFirstOrThrow({
+          where: { colaboradorId: r.body.id },
+        });
+        expect(gravado.telefone).toBe("+553133331776");
+        enviados.add("3133331776");
+      },
+    );
   });
 
   describe("trilhas sem valores", () => {

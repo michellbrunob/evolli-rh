@@ -345,3 +345,177 @@ describe("T179 (revisão final) — CampoMascarado: inserção múltipla, motivo
     expect(input).toHaveAccessibleDescription(/O CEP tem 8 dígitos/);
   });
 });
+
+// ---------------------------------------------------------------------------
+// T179 (revisão final) — telefone com ramal, rótulo ou letra: recusado com o
+// aviso de formato, por qualquer caminho de entrada.
+// ---------------------------------------------------------------------------
+
+const COM_TEXTO = [
+  "3333-4444 ramal 25",
+  "Tel 3333-4444 / ramal 21",
+  "2345-6789 ramal 12",
+  "ramal 25",
+  "11 98765-4321 x12",
+  "Cel: 11 98765-4321",
+  "11 98765-4321 (WhatsApp)",
+];
+
+describe("T179 (revisão final) — CampoMascarado: telefone só com caracteres de telefone", () => {
+  function esperarAvisoDeFormato() {
+    expect(screen.getByRole("status")).toHaveTextContent(
+      AVISO_DE_RECUSA.telefoneFormato,
+    );
+    expect(campo()).toHaveAccessibleDescription(/Use um telefone brasileiro/);
+  }
+
+  it.each(COM_TEXTO)(
+    "colar %p sobre o número correto: recusado, o número fica",
+    (texto) => {
+      const aoMudar = vi.fn();
+      render(
+        <Campo
+          mascara="telefone"
+          inicial="(11) 98765-4321"
+          aoMudar={aoMudar}
+        />,
+      );
+      const input = campo();
+      input.focus();
+      input.setSelectionRange(15, 15);
+      fireEvent.paste(input, { clipboardData: { getData: () => texto } });
+      expect(input).toHaveValue("(11) 98765-4321");
+      expect(input.selectionStart).toBe(15);
+      expect(aoMudar).not.toHaveBeenCalled();
+      esperarAvisoDeFormato();
+    },
+  );
+
+  it.each(COM_TEXTO)("colar %p no campo vazio: recusado", (texto) => {
+    render(<Campo mascara="telefone" />);
+    fireEvent.paste(campo(), { clipboardData: { getData: () => texto } });
+    expect(campo()).toHaveValue("");
+    esperarAvisoDeFormato();
+  });
+
+  it.each(COM_TEXTO)(
+    "preenchimento automático com %p (troca do valor inteiro): recusado",
+    (texto) => {
+      render(<Campo mascara="telefone" inicial="(11) 98765-4321" />);
+      fireEvent.change(campo(), { target: { value: texto } });
+      expect(campo()).toHaveValue("(11) 98765-4321");
+      esperarAvisoDeFormato();
+    },
+  );
+
+  it("letra digitada tecla a tecla: recusada com o mesmo aviso", () => {
+    render(<Campo mascara="telefone" />);
+    teclar("119876");
+    teclar("x");
+    expect(campo()).toHaveValue("(11) 9876");
+    esperarAvisoDeFormato();
+  });
+
+  it("letra no meio do número: recusada, cursor onde estava", () => {
+    render(<Campo mascara="telefone" inicial="(11) 98765-4321" />);
+    const input = campo();
+    input.focus();
+    fireEvent.change(input, {
+      target: { value: "(11) 98r765-4321", selectionStart: 8, selectionEnd: 8 },
+    });
+    expect(input).toHaveValue("(11) 98765-4321");
+    expect(input.selectionStart).toBe(7);
+    esperarAvisoDeFormato();
+  });
+
+  it.each([
+    "11 98765 4321",
+    "(11) 98765-4321",
+    "11.98765.4321",
+    "+55 (11) 98765-4321",
+  ])("%p continua aceito, sem aviso", (texto) => {
+    render(<Campo mascara="telefone" />);
+    fireEvent.paste(campo(), { clipboardData: { getData: () => texto } });
+    expect(campo()).toHaveValue("(11) 98765-4321");
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T179 (revisão final) — avisos velhos: somem quando o valor muda por fora e
+// quando a tela pede (`limparAvisos`).
+// ---------------------------------------------------------------------------
+
+/** Campo com os controles da tela: trocar o valor por fora e limpar avisos. */
+function CampoNaTela({ inicial }: { inicial: string }) {
+  const [valor, setValor] = useState(inicial);
+  const [limpeza, setLimpeza] = useState(0);
+  return (
+    <>
+      <FormField id="campo" label="Celular" help={DICA_DE_FORMATO.telefone}>
+        {(control) => (
+          <CampoMascarado
+            mascara="telefone"
+            value={valor}
+            onValorChange={setValor}
+            limparAvisos={limpeza}
+            {...control}
+          />
+        )}
+      </FormField>
+      <button type="button" onClick={() => setValor("(21) 3333-4444")}>
+        Trocar por fora
+      </button>
+      <button type="button" onClick={() => setLimpeza((n) => n + 1)}>
+        Limpar avisos
+      </button>
+    </>
+  );
+}
+
+describe("T179 (revisão final) — CampoMascarado: avisos velhos", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("a tela limpa o aviso com limparAvisos, mesmo com o valor igual", () => {
+    render(<CampoNaTela inicial="(11) 98765-4321" />);
+    teclar("1");
+    expect(screen.getByRole("status")).toHaveTextContent(
+      AVISO_DE_RECUSA.telefoneExcedente,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Limpar avisos" }));
+    expect(campo()).toHaveValue("(11) 98765-4321");
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
+    expect(campo()).toHaveAccessibleDescription(DICA_DE_FORMATO.telefone);
+    // Nova recusa depois da limpeza volta a avisar na hora.
+    teclar("1");
+    expect(screen.getByRole("status")).toHaveTextContent(
+      AVISO_DE_RECUSA.telefoneExcedente,
+    );
+  });
+
+  it("o valor trocado por fora tira o aviso", () => {
+    render(<CampoNaTela inicial="(11) 98765-4321" />);
+    teclar("1");
+    expect(screen.getByRole("status")).not.toBeEmptyDOMElement();
+    fireEvent.click(screen.getByRole("button", { name: "Trocar por fora" }));
+    expect(campo()).toHaveValue("(21) 3333-4444");
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
+    expect(campo()).toHaveAccessibleDescription(DICA_DE_FORMATO.telefone);
+  });
+
+  it("limpar cancela o reanúncio pendente: o aviso não volta depois", () => {
+    vi.useFakeTimers();
+    render(<CampoNaTela inicial="(11) 98765-4321" />);
+    teclar("1");
+    teclar("1");
+    // Reanúncio pendente: a região está vazia à espera do texto.
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
+    fireEvent.click(screen.getByRole("button", { name: "Limpar avisos" }));
+    act(() => {
+      vi.advanceTimersByTime(ATRASO_DO_REANUNCIO_MS * 2);
+    });
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
+  });
+});

@@ -8,12 +8,15 @@ import {
 } from "../../api/contatosColaboradorClient";
 import {
   type CampoContato,
+  type CampoTelefone,
   type ErrosContatos,
   type ValoresContatos,
   LIMITE_EMAIL_PESSOAL,
   contatosParaEdicao,
   contatosParaRegistro,
   contatosVazios,
+  legadoIntacto,
+  telefonesLegados,
   validarContatos,
 } from "./contatosColaborador";
 import { DICA_DE_FORMATO } from "../../format/mascaras";
@@ -40,6 +43,12 @@ import { DICA_DE_FORMATO } from "../../format/mascaras";
  * número e editados na máscara `(00) 00000-0000` / `(00) 0000-0000`. O e-mail
  * pessoal é único na empresa: o 409 com `emailPessoal` em uso vai para o
  * campo, sem repetir o valor.
+ *
+ * T179 (revisão final) — telefone gravado fora da forma atual é LEGADO: o
+ * campo o mostra exatamente como gravado, com a dica `DICA_LEGADO`. Intacto,
+ * não é validado nem enviado (a chave sai do `PUT`, e o servidor mantém o
+ * gravado); alterado, só um número brasileiro válido é aceito, e apagar tudo
+ * envia `null`. Os avisos da máscara somem ao salvar, remover ou recarregar.
  */
 
 const VAZIO: ValoresContatos = { emailPessoal: "", celular: "", telefone: "" };
@@ -90,6 +99,13 @@ function rotuloOpcional(rotulo: string): string {
 
 /** T179 — o que o campo vazio mostra: o estado gravado, não um valor. */
 const NAO_INFORMADO = "Não informado";
+
+/**
+ * T179 (revisão final) — a marca do telefone LEGADO, ligada ao campo por
+ * `aria-describedby` enquanto ele ainda tem o valor gravado.
+ */
+const DICA_LEGADO =
+  "Formato antigo, mantido exatamente como gravado. Para trocar, apague e digite um número brasileiro.";
 
 /** T179 — o campo apontado pelo 409 de e-mail em uso, lido por forma. */
 function emailEmUso(erro: unknown): boolean {
@@ -206,9 +222,15 @@ export function ContatosColaboradorSecao({
   const pedidoRef = useRef(0);
   /** T176 — o foco pedido por `focarAoCarregar` é atendido uma vez só. */
   const focoInicialAtendidoRef = useRef(false);
+  /**
+   * T179 (revisão final) — contador que limpa os avisos da máscara
+   * (`limparAvisos`): muda ao recarregar, salvar ou remover.
+   */
+  const [limpezaDosAvisos, setLimpezaDosAvisos] = useState(0);
 
   const carregar = useCallback(async () => {
     const pedido = ++pedidoRef.current;
+    setLimpezaDosAvisos((n) => n + 1);
     setCarga({ status: "carregando" });
     try {
       const resposta = await consultarContatosDoColaborador(colaboradorId);
@@ -236,8 +258,10 @@ export function ContatosColaboradorSecao({
   }, [carregar]);
 
   const gravado = carga.status === "dados" ? carga.gravado : null;
-  // T179 — comparado com o gravado JÁ MASCARADO, a mesma forma da edição:
-  // abrir a ficha não conta como alteração.
+  // T179 (revisão final) — telefones gravados fora da forma atual, brutos.
+  const legados = telefonesLegados(gravado);
+  // T179 — comparado com o gravado como a tela o exibe (mascarado na forma
+  // atual; o legado, bruto): abrir a ficha não conta como alteração.
   const inicial = gravado ? valoresDe(gravado) : VAZIO;
   const alterado =
     carga.status === "dados" &&
@@ -293,7 +317,7 @@ export function ContatosColaboradorSecao({
     if (salvandoRef.current || carga.status !== "dados") return;
     setSucesso(null);
 
-    const errosLocais: ErrosContatos = validarContatos(edicao);
+    const errosLocais: ErrosContatos = validarContatos(edicao, legados);
     // T179 — sem registro, os três vazios não criam nada: não há o que gravar.
     if (gravado === null && contatosVazios(edicao)) {
       errosLocais.geral =
@@ -311,11 +335,12 @@ export function ContatosColaboradorSecao({
     try {
       const resposta = await registrarContatosDoColaborador(
         colaboradorId,
-        contatosParaRegistro(edicao),
+        contatosParaRegistro(edicao, legados),
       );
       // T179 — os três vazios removem o registro (`removido`) ou confirmam
       // que não havia nenhum (`sem_alteracao`): a seção fica sem registro.
       if (resposta?.situacao === "sem_registro") {
+        setLimpezaDosAvisos((n) => n + 1);
         setCarga({ status: "dados", gravado: null });
         setEdicao(VAZIO);
         setSucesso(
@@ -328,6 +353,7 @@ export function ContatosColaboradorSecao({
       if (!resposta?.contatos) {
         throw new Error("resposta inesperada");
       }
+      setLimpezaDosAvisos((n) => n + 1);
       setCarga({ status: "dados", gravado: resposta.contatos });
       setEdicao(valoresDe(resposta.contatos));
       setSucesso(
@@ -342,6 +368,54 @@ export function ContatosColaboradorSecao({
       salvandoRef.current = false;
       setSalvando(false);
     }
+  }
+
+  /**
+   * T179 — um campo de telefone. T179 (revisão final) — com o legado intacto,
+   * a dica `DICA_LEGADO` aparece e entra na descrição do campo.
+   */
+  function campoTelefone(campo: CampoTelefone, rotulo: string) {
+    const id = ID_DO_CAMPO[campo];
+    const legado = legadoIntacto(edicao, legados, campo);
+    const idDoLegado = `${id}-legado`;
+    const erro = erros[campo];
+    return (
+      <FormField
+        id={id}
+        label={rotuloOpcional(rotulo)}
+        help={DICA_DE_FORMATO.telefone}
+        disabled={salvando}
+        {...(erro ? { error: erro } : {})}
+      >
+        {(control) => (
+          <>
+            <CampoMascarado
+              mascara="telefone"
+              placeholder={NAO_INFORMADO}
+              value={edicao[campo]}
+              onValorChange={(valor) => alterarCampo(campo, valor)}
+              limparAvisos={limpezaDosAvisos}
+              {...control}
+              {...(legado
+                ? {
+                    "aria-describedby": [
+                      control["aria-describedby"],
+                      idDoLegado,
+                    ]
+                      .filter(Boolean)
+                      .join(" "),
+                  }
+                : {})}
+            />
+            {legado ? (
+              <p id={idDoLegado} className="evolli-field__help">
+                {DICA_LEGADO}
+              </p>
+            ) : null}
+          </>
+        )}
+      </FormField>
+    );
   }
 
   return (
@@ -426,41 +500,9 @@ export function ContatosColaboradorSecao({
             )}
           </FormField>
 
-          <FormField
-            id={ID_DO_CAMPO.celular}
-            label={rotuloOpcional("Celular")}
-            help={DICA_DE_FORMATO.telefone}
-            disabled={salvando}
-            {...(erros.celular ? { error: erros.celular } : {})}
-          >
-            {(control) => (
-              <CampoMascarado
-                mascara="telefone"
-                placeholder={NAO_INFORMADO}
-                value={edicao.celular}
-                onValorChange={(valor) => alterarCampo("celular", valor)}
-                {...control}
-              />
-            )}
-          </FormField>
+          {campoTelefone("celular", "Celular")}
 
-          <FormField
-            id={ID_DO_CAMPO.telefone}
-            label={rotuloOpcional("Telefone")}
-            help={DICA_DE_FORMATO.telefone}
-            disabled={salvando}
-            {...(erros.telefone ? { error: erros.telefone } : {})}
-          >
-            {(control) => (
-              <CampoMascarado
-                mascara="telefone"
-                placeholder={NAO_INFORMADO}
-                value={edicao.telefone}
-                onValorChange={(valor) => alterarCampo("telefone", valor)}
-                {...control}
-              />
-            )}
-          </FormField>
+          {campoTelefone("telefone", "Telefone")}
 
           {erros.geral ? (
             <p

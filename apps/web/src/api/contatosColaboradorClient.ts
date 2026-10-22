@@ -46,7 +46,9 @@ export interface ContatosRegistradosApi extends ContatosDoColaboradorApi {
 
 /**
  * T179 — cada campo é opcional; `null` grava "não informado" (é assim que a
- * ficha apaga um contato). A tela envia os três, vazio como `null`.
+ * ficha apaga um contato). A tela envia os três, vazio como `null`. T179
+ * (revisão final) — exceto o telefone legado intacto: a chave ausente mantém
+ * o valor gravado.
  */
 export interface RegistrarContatosDto {
   emailPessoal?: string | null;

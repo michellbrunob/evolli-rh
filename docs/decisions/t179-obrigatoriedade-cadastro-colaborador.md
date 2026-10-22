@@ -89,6 +89,15 @@ novo vínculo de colaborador existente (`POST /v1/vinculos`) não muda.
   arrastar e soltar, sugestão de teclado, ditado ou IME — é recusada com
   aviso acessível, mantendo valor e cursor; um telefone nacional com DDD 55
   nunca é lido como código de país, e nenhum dígito é cortado em silêncio.
+- **Telefone com texto** (ramal, extensão, `x`, rótulos como "Cel" ou
+  "WhatsApp", palavras): recusado como formato inválido na tela e no
+  servidor. Nenhuma letra é descartada para "achar" um número; o valor que já
+  estava no campo fica.
+- **Telefone legado** — gravado antes da forma `+55` atual e que não se
+  enquadra nela com segurança: aparece exatamente como gravado, sem truncar
+  nem reinterpretar. Salvar outro campo não o reenvia nem o regrava; editá-lo
+  exige a forma brasileira atual. Para isso, no `PUT` de contatos, **campo
+  ausente mantém o valor gravado**, e `null` ou vazio apaga.
 
 ## 4. O que esta decisão não autoriza
 
