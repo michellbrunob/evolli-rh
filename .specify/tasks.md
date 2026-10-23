@@ -2385,3 +2385,27 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
 5. Revisão e CI verdes não substituem decisão humana pendente nem autorizam merge ou produção.
 6. Citar uma tarefa antiga em prosa **não** exige mais registrá-la: desde a T149 o verificador
    fiscaliza a janela de entrega declarada em `sync-state.json`, não todo `T###` do texto.
+
+7. **T180 - Cadastro rápido de Departamento, Cargo e Unidade na Nova admissão**
+   - **Estado:** **em implementação**. Branch `codex/t180-referencias-rapidas-admissao`, a partir
+     do squash `584a5c0b0c8faf2979a5b1a1838764b31674291d` (convergência da T179, PR #172). A T179
+     está integrada (PR #171, squash `60ce990bc6a04bee542b93d494d00d6f48bf8c19`) e convergida.
+   - **Objetivo:** na Nova admissão, o RH cadastra Departamento, Cargo e Unidade em modais curtos,
+     sem sair do formulário e sem perder nada do que já digitou; a referência criada entra no
+     seletor e fica selecionada.
+   - **Decisão da proprietária (2026-10-23):** [decisão](../docs/decisions/t180-referencias-rapidas-nova-admissao.md). Botão "+" só
+     para RH (o DP seleciona, mas não cria); obrigatoriedade inalterada (Departamento e Cargo
+     obrigatórios, Unidade opcional); modais só com os campos mínimos do contrato atual (código e
+     nome); empresa sempre da sessão, conferida pelo servidor; cancelar preserva a admissão;
+     erro de validação ou de código repetido no campo, sem fechar o modal; permissões e
+     auditoria pelo padrão existente da estrutura; sem migration e sem mudança de contrato.
+   - **Entrega prevista:** modais acessíveis (foco inicial, Escape, Cancelar, retorno do foco ao
+     seletor, sem rolagem horizontal em tela pequena); atualização e seleção automáticas do
+     seletor; testes de API, web e E2E com PostgreSQL real (RH cria nas três, código repetido,
+     outra empresa, DP e demais papéis recusados); validação no navegador como RH e DP.
+   - **Fora de escopo:** documentos, CPF, dados bancários, dependentes, saúde, gênero, foto,
+     raça/etnia, dados trabalhistas detalhados, horário e fuso, telefone estrangeiro, importação
+     em massa, cadastro rápido de Área, Equipe e Centro de custo, mudança de permissões não
+     relacionadas, promoção e merge.
+   - **Prévia:** `http://127.0.0.1:5173` passa a mostrar a branch da T180 ao vivo, identificada
+     como `[T180 dev]`, não a `main`.
