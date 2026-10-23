@@ -2377,7 +2377,9 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       como desenvolvimento da T179, não a `main`.
 
 77. **T180 - Cadastro rápido de Departamento, Cargo e Unidade na Nova admissão**
-    - **Estado:** **em implementação**. Branch `codex/t180-referencias-rapidas-admissao`, a partir
+    - **Estado:** **integrada** em `main` pela PR #173, squash
+      `cf04afcce8bd6a1e3c03f32f668ed7d88d73b6b0`, com a CI de push 3/3 verde (run 39972657182);
+      branch preservada. Implementada na branch `codex/t180-referencias-rapidas-admissao`, a partir
       do squash `584a5c0b0c8faf2979a5b1a1838764b31674291d` (convergência da T179, PR #172). A T179
       está integrada (PR #171, squash `60ce990bc6a04bee542b93d494d00d6f48bf8c19`) e convergida.
     - **Objetivo:** na Nova admissão, o RH cadastra Departamento, Cargo e Unidade em modais curtos,
@@ -2406,6 +2408,31 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       nunca sai do seletor. A mensagem do envio incerto só diz que a lista foi atualizada
       depois que isso acontece, e diz quando a recarga falha. O E2E passou a conferir a trilha
       `authorization_denied` das recusas 403 e 404 e que o 409 não devolve o código.
+
+78. **T181 - Edição da ficha do colaborador por RH e DP**
+    - **Estado:** **em implementação**. Branch `codex/t181-ficha-edicao-colaborador`, a partir do
+      squash `cf04afcce8bd6a1e3c03f32f668ed7d88d73b6b0` (T180 integrada, PR #173).
+    - **Objetivo:** em Gestão de Pessoas › Colaboradores, RH e DP completam e atualizam, pela ficha
+      do colaborador, os dados já aprovados e já gravados: dados pessoais complementares, endereço
+      e contatos.
+    - **Decisão da proprietária (2026-10-23):** [decisão](../docs/decisions/t181-edicao-ficha-colaborador.md).
+      Edição só na empresa ativa; leitura segura para os perfis sem permissão, sem botão que o
+      servidor recusaria; contatos com o estado "Nenhum contato registrado" e as regras da T179
+      para adicionar e remover; CEP assistido só pelo servidor, com alternativa manual; máscaras,
+      `+55`, validações e mensagens acessíveis já aprovadas; auditoria existente, só com nomes de
+      campos; falhas sem perder o digitado e sem afirmar gravação incerta; edição por seção, com
+      Salvar e Cancelar.
+    - **Entrega prevista:** seções editáveis de dados pessoais e endereço na ficha, Cancelar nos
+      contatos, testes de API, web e E2E com PostgreSQL real, validação no navegador como RH e DP,
+      recusa dos demais papéis, troca de empresa e 375 px. Sem schema, migration, seed, Docker,
+      dependência ou lockfile novos.
+    - **Fora de escopo:** CPF, RG, CNH, CTPS, PIS, documentos, dados bancários, dependentes,
+      filhos, camisa, saúde, dados sindicais, foto, raça/etnia, gênero, deficiência, dados
+      contratuais detalhados, fuso, telefone estrangeiro, importação; nome (fora a correção já
+      existente), matrícula, tipo de vínculo, lotação, situação e datas da admissão; promoção e
+      merge.
+    - **Prévia:** `http://127.0.0.1:5173` passa a mostrar a branch da T181 ao vivo, identificada
+      como `[T181 dev]`, não a `main`.
 
 ## Regra obrigatória para as próximas tarefas
 
