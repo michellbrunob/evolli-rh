@@ -281,6 +281,9 @@
   margin: 0;
   color: var(--color-ink);
   min-width: 0;
+  /* T181 — valor longo sem espaço (e-mail, logradouro) quebra em vez de
+     empurrar a largura do modal. */
+  overflow-wrap: anywhere;
 }
 
 .colaboradores-screen__par {
@@ -290,5 +293,45 @@
 @media (max-width: 640px) {
   .colaboradores-screen__dados-pessoais-lista {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* T181 — ações de cada seção editável da ficha (Editar; Salvar e Cancelar):
+   lado a lado quando cabem, e quebrando de linha quando não. */
+.colaboradores-screen__bloco-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+/* T181 — CEP com consulta assistida na edição do endereço: o campo e, abaixo,
+   o botão, o resultado da consulta e "Usar endereço do CEP". */
+.colaboradores-screen__cep {
+  display: grid;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+.colaboradores-screen__cep-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs) var(--space-sm);
+  min-width: 0;
+}
+
+/* Vazia, a região fica montada e sem altura: o anúncio precisa dela no DOM. */
+.colaboradores-screen__cep-status {
+  flex: 1 1 12rem;
+  min-width: 0;
+  margin: 0;
+  color: var(--color-ink-muted);
+}
+
+/* Celular: as ações ocupam a largura, para alvos de toque confortáveis. */
+@media (max-width: 640px) {
+  .colaboradores-screen__bloco-acoes > .evolli-button,
+  .colaboradores-screen__cep-acoes > .evolli-button {
+    flex: 1 1 auto;
   }
 }

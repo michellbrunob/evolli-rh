@@ -212,9 +212,12 @@ function errosDaGravacaoRecusada(erro: unknown): ErrosContatos {
           "Seu perfil não tem permissão para alterar contatos. Nada foi salvo.",
       };
     default:
+      // T181 — rede ou 5xx: o servidor pode ter gravado. A mensagem não
+      // afirma nem nega; salvar de novo é seguro, porque o `PUT` com os mesmos
+      // valores não muda nada.
       return {
         geral:
-          "Não foi possível salvar os contatos agora. Os dados digitados foram mantidos; tente de novo.",
+          "Não foi possível confirmar se os contatos foram salvos. O que você digitou foi mantido; salvar de novo é seguro.",
       };
   }
 }
@@ -338,6 +341,20 @@ export function ContatosColaboradorSecao({
       delete restante[campo];
       return restante;
     });
+  }
+
+  /**
+   * T181 — Cancelar: descarta o que foi digitado e volta ao gravado (ou ao
+   * vazio, sem registro). O foco vai ao primeiro campo, porque o botão fica
+   * inativo depois de cancelar.
+   */
+  function cancelar() {
+    if (salvandoRef.current) return;
+    setEdicao(gravado ? valoresDe(gravado) : VAZIO);
+    setErros({});
+    setSucesso(null);
+    setLimpezaDosAvisos((n) => n + 1);
+    document.getElementById(ID_DO_CAMPO.emailPessoal)?.focus();
   }
 
   async function salvar(evento: React.FormEvent) {
@@ -549,16 +566,26 @@ export function ContatosColaboradorSecao({
             </p>
           ) : null}
 
-          <div>
+          <div className="colaboradores-screen__bloco-acoes">
             <Button
               type="submit"
-              variant="secondary"
+              variant="primary"
               // Sem registro, o botão fica disponível mesmo vazio: é clicando
               // que a pessoa descobre o que falta. Com registro, só quando há
               // o que salvar.
               disabled={salvando || (gravado !== null && !alterado)}
             >
               {salvando ? "Salvando…" : "Salvar contatos"}
+            </Button>
+            {/* T181 — Cancelar restaura o gravado; sem nada digitado, não há
+                o que descartar. */}
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={cancelar}
+              disabled={salvando || !alterado}
+            >
+              Cancelar
             </Button>
           </div>
         </form>

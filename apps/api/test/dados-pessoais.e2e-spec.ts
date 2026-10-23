@@ -824,6 +824,237 @@ describe("Cadastro de colaborador — Módulo 1 (e2e)", () => {
     });
   });
 
+  // T181 — a ficha do colaborador edita os dados já aprovados, um bloco por
+  // vez, pela rota própria: o que a tela envia, com PostgreSQL real.
+  describe("T181 — edição pela ficha do colaborador", () => {
+    /** Valores sintéticos da T181 que NÃO podem aparecer em trilha nenhuma. */
+    const VALORES_T181 = [
+      "Curso Ficha T181",
+      "Rua Ficha Sintetica",
+      "1000-001",
+      "Lisboa Sintetica",
+      "Numero 321",
+    ];
+
+    async function admitir(
+      matricula: string,
+      extra: Record<string, unknown> = {},
+    ): Promise<string> {
+      const r = await post("/v1/colaboradores", rhA)
+        .send(admissao(matricula, extra))
+        .expect(201);
+      return r.body.id as string;
+    }
+
+    const rota = (id: string) => `/v1/colaboradores/${id}/dados-pessoais`;
+    const perfilDe = (colaboradorId: string) =>
+      prisma.perfilPessoalColaborador.findFirstOrThrow({
+        where: { colaboradorId },
+      });
+    const enderecoDe = (colaboradorId: string) =>
+      prisma.enderecoColaborador.findFirst({ where: { colaboradorId } });
+
+    async function trilhaSemValores(colaboradorId: string) {
+      const eventos = await prisma.dadosPessoaisColaboradorEvento.findMany({
+        where: { colaboradorId },
+      });
+      const contatos = await prisma.contatoColaboradorEvento.findMany({
+        where: { colaboradorId },
+      });
+      const auditoria = await prisma.auditEvent.findMany({
+        where: { resourceId: colaboradorId },
+      });
+      const trilha = JSON.stringify([eventos, contatos, auditoria]);
+      for (const valor of VALORES_T181) {
+        expect(trilha).not.toContain(valor);
+      }
+    }
+
+    it("salvar o endereço não toca nos dados pessoais, e vice-versa", async () => {
+      const id = await admitir("MAT-T181-001");
+      const perfilAntes = await perfilDe(id);
+      await put(rota(id), rhA)
+        .send({ endereco: { ...ENDERECO, logradouro: "Rua Ficha Sintetica" } })
+        .expect(200);
+      expect(await perfilDe(id)).toEqual(perfilAntes);
+
+      const enderecoAntes = await enderecoDe(id);
+      const r = await put(rota(id), rhA)
+        .send({ perfilPessoal: { ...PERFIL, curso: "Curso Ficha T181" } })
+        .expect(200);
+      expect(r.body.perfilPessoal.curso).toBe("Curso Ficha T181");
+      expect(r.body.endereco.logradouro).toBe("Rua Ficha Sintetica");
+      expect(await enderecoDe(id)).toEqual(enderecoAntes);
+
+      const edicoes = await prisma.dadosPessoaisColaboradorEvento.findMany({
+        where: { colaboradorId: id, acao: "edicao", resultado: "gravado" },
+        orderBy: { ocorridoEm: "asc" },
+      });
+      expect(edicoes.map((e) => [e.categoria, e.campos])).toEqual([
+        ["endereco", ["logradouro"]],
+        ["perfil_pessoal", ["curso"]],
+      ]);
+      await trilhaSemValores(id);
+    });
+
+    it("limpar um campo opcional grava null, e a trilha leva só o nome do campo", async () => {
+      const id = await admitir("MAT-T181-002");
+      expect((await enderecoDe(id))?.bairro).not.toBeNull();
+      const r = await put(rota(id), rhA)
+        .send({ endereco: { ...ENDERECO, bairro: null, numero: "Numero 321" } })
+        .expect(200);
+      expect(r.body.endereco).toMatchObject({
+        bairro: null,
+        numero: "Numero 321",
+      });
+      expect(await enderecoDe(id)).toMatchObject({
+        bairro: null,
+        numero: "Numero 321",
+      });
+      const ultimo = await prisma.dadosPessoaisColaboradorEvento.findFirst({
+        where: { colaboradorId: id, acao: "edicao" },
+        orderBy: { ocorridoEm: "desc" },
+      });
+      expect(ultimo?.campos).toEqual(
+        expect.arrayContaining(["bairro", "numero"]),
+      );
+      expect(ultimo?.campos).toHaveLength(2);
+      await trilhaSemValores(id);
+    });
+
+    it("sem endereço, a ficha o cria; com outro país, o CEP fica como veio", async () => {
+      const id = await admitir("MAT-T181-003", { endereco: undefined });
+      expect(await enderecoDe(id)).toBeNull();
+      const r = await put(rota(id), dpA)
+        .send({
+          endereco: {
+            pais: "Portugal",
+            cep: "1000-001",
+            logradouro: null,
+            numero: null,
+            complemento: null,
+            bairro: null,
+            cidade: "Lisboa Sintetica",
+            estado: null,
+          },
+        })
+        .expect(200);
+      expect(r.body.endereco).toMatchObject({
+        pais: "Portugal",
+        cep: "1000-001",
+        cidade: "Lisboa Sintetica",
+      });
+      const criacao =
+        await prisma.dadosPessoaisColaboradorEvento.findFirstOrThrow({
+          where: { colaboradorId: id, categoria: "endereco", acao: "criacao" },
+        });
+      expect(criacao.campos).toEqual(
+        expect.arrayContaining(["pais", "cep", "cidade"]),
+      );
+      expect(criacao.campos).toHaveLength(3);
+      await trilhaSemValores(id);
+    });
+
+    it("CEP brasileiro digitado na máscara é gravado nos 8 dígitos", async () => {
+      const id = await admitir("MAT-T181-004", { endereco: undefined });
+      const r = await put(rota(id), rhA)
+        .send({ endereco: { ...ENDERECO, cep: "01310-100" } })
+        .expect(200);
+      expect(r.body.endereco.cep).toBe("01310100");
+    });
+
+    it("RH de outra empresa recebe 404 nos dois blocos, e nada muda", async () => {
+      const id = await admitir("MAT-T181-005");
+      const perfilAntes = await perfilDe(id);
+      const enderecoAntes = await enderecoDe(id);
+      const r1 = await put(rota(id), rhB)
+        .send({ perfilPessoal: { ...PERFIL, curso: "Curso Ficha T181" } })
+        .expect(404);
+      const r2 = await put(rota(id), rhB)
+        .send({ endereco: { ...ENDERECO, cidade: "Lisboa Sintetica" } })
+        .expect(404);
+      for (const corpo of [r1.body, r2.body]) {
+        expect(JSON.stringify(corpo)).not.toContain("Curso Ficha T181");
+        expect(JSON.stringify(corpo)).not.toContain("Lisboa Sintetica");
+      }
+      expect(await perfilDe(id)).toEqual(perfilAntes);
+      expect(await enderecoDe(id)).toEqual(enderecoAntes);
+    });
+
+    it.each([
+      ["gestor", "G", () => gestorA],
+      ["colaborador", "C", () => colaboradorA],
+      ["financeiro", "F", () => financeiroA],
+    ])(
+      "%s não edita nenhum bloco, e nada muda",
+      async (_papel, sufixo, cred) => {
+        const id = await admitir(`MAT-T181-N${sufixo}`);
+        const perfilAntes = await perfilDe(id);
+        const enderecoAntes = await enderecoDe(id);
+        const r = await put(rota(id), cred()).send({
+          perfilPessoal: { ...PERFIL, curso: "Curso Ficha T181" },
+          endereco: { ...ENDERECO, cidade: "Lisboa Sintetica" },
+        });
+        expect([403, 404]).toContain(r.status);
+        expect(await perfilDe(id)).toEqual(perfilAntes);
+        expect(await enderecoDe(id)).toEqual(enderecoAntes);
+      },
+    );
+
+    it("contatos pela ficha: adicionar, remover todos e adicionar de novo", async () => {
+      const id = await admitir("MAT-T181-006", { contatos: undefined });
+      const rotaContatos = `/v1/colaboradores/${id}/contatos`;
+      const vazio = await get(rotaContatos, rhA).expect(200);
+      expect(vazio.body).toMatchObject({
+        situacao: "sem_registro",
+        contatos: null,
+      });
+
+      const criado = await put(rotaContatos, dpA)
+        .send({ celular: "(31) 98888-0181" })
+        .expect(200);
+      expect(criado.body).toMatchObject({
+        resultado: "criado",
+        contatos: { celular: "+5531988880181" },
+      });
+
+      const removido = await put(rotaContatos, rhA)
+        .send({ emailPessoal: null, celular: null, telefone: null })
+        .expect(200);
+      expect(removido.body).toMatchObject({
+        resultado: "removido",
+        situacao: "sem_registro",
+        contatos: null,
+      });
+      expect(
+        await prisma.contatoColaborador.findFirstOrThrow({
+          where: { colaboradorId: id },
+        }),
+      ).toMatchObject({ ativo: false, celular: null });
+
+      const deNovo = await put(rotaContatos, rhA)
+        .send({ telefone: "(31) 3333-0181" })
+        .expect(200);
+      expect(deNovo.body).toMatchObject({
+        situacao: "registrado",
+        contatos: { telefone: "+553133330181", celular: null },
+      });
+      const eventos = await prisma.contatoColaboradorEvento.findMany({
+        where: { colaboradorId: id, resultado: "gravado" },
+        orderBy: { ocorridoEm: "asc" },
+      });
+      expect(eventos.map((e) => [e.acao, e.campos])).toEqual([
+        ["criacao", ["celular"]],
+        ["edicao", ["celular"]],
+        ["edicao", ["telefone"]],
+      ]);
+      const trilha = JSON.stringify(eventos);
+      for (const valor of ["98888-0181", "988880181", "33330181"]) {
+        expect(trilha).not.toContain(valor);
+      }
+    });
+  });
+
   describe("atomicidade: falhou uma parte, nada fica", () => {
     it("sem permissão de gravar o endereço, a admissão INTEIRA é desfeita", async () => {
       const migrator = new PrismaClient({

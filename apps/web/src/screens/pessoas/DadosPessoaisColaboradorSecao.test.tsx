@@ -7,18 +7,33 @@
  * da empresa ativa, empresa ambígua do `master_tecnico`) — que nunca mostra
  * valor.
  */
-import { render, screen, within } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DadosPessoaisColaboradorSecao } from "./DadosPessoaisColaboradorSecao";
 import {
   type DadosPessoaisDoColaboradorApi,
   consultarDadosPessoaisDoColaborador,
+  registrarDadosPessoaisDoColaborador,
 } from "../../api/dadosPessoaisClient";
 import { ApiError } from "../../api/colaboradoresClient";
+import { consultarCep } from "../../api/cepClient";
+import {
+  CsrfRequestError,
+  CsrfSessionExpiredError,
+} from "../../api/csrfClient";
 import { expectSemIsoVisivel } from "../../test/semIsoVisivel";
 
 vi.mock("../../api/dadosPessoaisClient");
 vi.mock("../../api/colaboradoresClient");
+// T181 — a consulta de CEP nunca sai da ficha nos testes.
+vi.mock("../../api/cepClient");
 
 const ID = "11111111-1111-4111-8111-111111111111";
 
@@ -96,14 +111,18 @@ describe("Ficha — dados pessoais e endereço (T177)", () => {
     },
   );
 
-  it("é só leitura: nenhum campo editável", async () => {
+  it("T181 — abre em leitura: nenhum campo editável até 'Editar'", async () => {
     vi.mocked(consultarDadosPessoaisDoColaborador).mockResolvedValue(
       registrado,
     );
     render(<DadosPessoaisColaboradorSecao colaboradorId={ID} />);
     await screen.findByText("Feminino");
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual([
+      "Editar dados pessoais",
+      "Editar endereço",
+    ]);
   });
 
   it("sem registro diz isso, sem campo falso", async () => {
@@ -115,7 +134,16 @@ describe("Ficha — dados pessoais e endereço (T177)", () => {
     });
     render(<DadosPessoaisColaboradorSecao colaboradorId={ID} />);
     expect(
-      await screen.findByText("Nenhum dado pessoal ou endereço registrado."),
+      await screen.findByText("Nenhum dado pessoal registrado."),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Nenhum endereço registrado.")).toBeInTheDocument();
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    // T181 — sem registro, o bloco se preenche pela própria ficha.
+    expect(
+      screen.getByRole("button", { name: "Preencher dados pessoais" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Preencher endereço" }),
     ).toBeInTheDocument();
   });
 
@@ -130,6 +158,8 @@ describe("Ficha — dados pessoais e endereço (T177)", () => {
     expect(
       await screen.findByText(/uso dos dados pessoais/),
     ).toBeInTheDocument();
+    // T181 — vínculo encerrado não tem edição: o servidor recusaria.
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 
   it.each([
@@ -146,6 +176,8 @@ describe("Ficha — dados pessoais e endereço (T177)", () => {
       render(<DadosPessoaisColaboradorSecao colaboradorId={ID} />);
       expect(await screen.findByText(mensagem)).toBeInTheDocument();
       expect(screen.queryByText("Feminino")).not.toBeInTheDocument();
+      // T181 — sem leitura aceita, nenhum botão de edição.
+      expect(screen.queryByRole("button")).not.toBeInTheDocument();
     },
   );
 });
@@ -193,5 +225,514 @@ describe("Ficha — sexo (T179)", () => {
     });
     render(<DadosPessoaisColaboradorSecao colaboradorId={ID} />);
     expect(await valorDoSexo()).toBe("Fem. (legado)");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T181 — edição na ficha (decisão da proprietária de 2026-10-23): cada bloco
+// com "Editar", Salvar e Cancelar; Cancelar volta ao gravado; Salvar envia só
+// o bloco; erro no campo com foco no primeiro; nenhuma recusa apaga o
+// digitado, e nenhuma mensagem afirma uma gravação incerta.
+// ---------------------------------------------------------------------------
+
+type Perfil = NonNullable<DadosPessoaisDoColaboradorApi["perfilPessoal"]>;
+type Endereco = NonNullable<DadosPessoaisDoColaboradorApi["endereco"]>;
+
+/** O que o servidor devolve depois de gravar (dados sintéticos). */
+function gravado(
+  mudancas: {
+    perfilPessoal?: Partial<Perfil>;
+    endereco?: Partial<Endereco>;
+  } = {},
+): DadosPessoaisDoColaboradorApi {
+  return {
+    ...registrado,
+    perfilPessoal: {
+      ...registrado.perfilPessoal!,
+      atualizadoEm: "2026-10-23T12:00:00.000Z",
+      ...mudancas.perfilPessoal,
+    },
+    endereco: {
+      ...registrado.endereco!,
+      atualizadoEm: "2026-10-23T12:00:00.000Z",
+      ...mudancas.endereco,
+    },
+  };
+}
+
+const regiao = (nome: string) => screen.getByRole("region", { name: nome });
+const campo = (rotulo: RegExp) => screen.getByLabelText(rotulo);
+const botao = (nome: string | RegExp) =>
+  screen.getByRole("button", { name: nome });
+
+function montarEdicao(
+  props: { consultaCepDisponivel?: boolean } = {},
+  dados: DadosPessoaisDoColaboradorApi = registrado,
+) {
+  vi.mocked(consultarDadosPessoaisDoColaborador).mockResolvedValue(dados);
+  const onAlteradoChange = vi.fn();
+  const onSalvandoChange = vi.fn();
+  render(
+    <DadosPessoaisColaboradorSecao
+      colaboradorId={ID}
+      onAlteradoChange={onAlteradoChange}
+      onSalvandoChange={onSalvandoChange}
+      {...props}
+    />,
+  );
+  return { onAlteradoChange, onSalvandoChange };
+}
+
+async function editar(nome: string) {
+  fireEvent.click(await screen.findByRole("button", { name: nome }));
+}
+
+describe("T181 — edição dos dados pessoais na ficha", () => {
+  it("Editar abre o formulário com o gravado e foco na data de nascimento", async () => {
+    montarEdicao();
+    await editar("Editar dados pessoais");
+    const data = campo(/^Data de nascimento/);
+    expect(data).toHaveFocus();
+    expect(data).toHaveValue("1990-05-20");
+    expect(data).toHaveAttribute("aria-required", "true");
+    expect(campo(/^Sexo/)).toHaveValue("feminino");
+    expect(campo(/^Estado civil/)).toHaveValue("Casada");
+    expect(campo(/^Nome da mãe/)).toHaveValue("Mãe Sintética");
+    expect(campo(/^Curso/)).toHaveValue("");
+    // Só o bloco em edição vira formulário; o endereço segue em leitura.
+    expect(within(regiao("Endereço")).queryByRole("textbox")).toBeNull();
+    expect(botao("Salvar dados pessoais")).toBeInTheDocument();
+    expect(botao("Cancelar")).toBeInTheDocument();
+  });
+
+  it("Cancelar descarta o digitado, volta ao gravado e devolve o foco a 'Editar'", async () => {
+    const { onAlteradoChange } = montarEdicao();
+    await editar("Editar dados pessoais");
+    fireEvent.change(campo(/^Nome da mãe/), {
+      target: { value: "Outra Mãe" },
+    });
+    await waitFor(() =>
+      expect(onAlteradoChange).toHaveBeenLastCalledWith(true),
+    );
+    fireEvent.click(botao("Cancelar"));
+    expect(botao("Editar dados pessoais")).toHaveFocus();
+    expect(screen.getByText("Mãe Sintética")).toBeInTheDocument();
+    expect(screen.queryByText("Outra Mãe")).toBeNull();
+    await waitFor(() =>
+      expect(onAlteradoChange).toHaveBeenLastCalledWith(false),
+    );
+    // Reabrir começa do gravado, não do que foi descartado.
+    fireEvent.click(botao("Editar dados pessoais"));
+    expect(campo(/^Nome da mãe/)).toHaveValue("Mãe Sintética");
+    expect(registrarDadosPessoaisDoColaborador).not.toHaveBeenCalled();
+  });
+
+  it("Salvar envia só o bloco de dados pessoais, normalizado, e volta à leitura com o gravado", async () => {
+    vi.mocked(registrarDadosPessoaisDoColaborador).mockResolvedValue(
+      gravado({
+        perfilPessoal: {
+          curso: "Administração",
+          sexo: "masculino",
+          estadoCivil: null,
+        },
+      }),
+    );
+    const { onSalvandoChange } = montarEdicao();
+    await editar("Editar dados pessoais");
+    fireEvent.change(campo(/^Curso/), {
+      target: { value: "  Administração " },
+    });
+    fireEvent.change(campo(/^Sexo/), { target: { value: "masculino" } });
+    fireEvent.change(campo(/^Estado civil/), { target: { value: "   " } });
+    fireEvent.click(botao("Salvar dados pessoais"));
+    expect(
+      await screen.findByText("Dados pessoais salvos."),
+    ).toBeInTheDocument();
+    expect(registrarDadosPessoaisDoColaborador).toHaveBeenCalledTimes(1);
+    const [id, corpo] = vi.mocked(registrarDadosPessoaisDoColaborador).mock
+      .calls[0]!;
+    expect(id).toBe(ID);
+    expect(corpo).toEqual({
+      perfilPessoal: {
+        dataNascimento: "1990-05-20",
+        sexo: "masculino",
+        saudacao: null,
+        estadoCivil: null,
+        nacionalidade: "Brasileira",
+        naturalidade: "Ouro Preto",
+        escolaridade: null,
+        curso: "Administração",
+        nomePai: null,
+        nomeMae: "Mãe Sintética",
+      },
+    });
+    // Nada de empresa nem de endereço no corpo: a empresa é da sessão.
+    expect(corpo).not.toHaveProperty("endereco");
+    expect(JSON.stringify(corpo)).not.toContain("empresa");
+    expect(screen.getByText("Administração")).toBeInTheDocument();
+    expect(screen.getByText("Masculino")).toBeInTheDocument();
+    expect(botao("Editar dados pessoais")).toHaveFocus();
+    expect(onSalvandoChange).toHaveBeenCalledWith(true);
+    await waitFor(() =>
+      expect(onSalvandoChange).toHaveBeenLastCalledWith(false),
+    );
+  });
+
+  it("salvar sem mudar nada diz que nada mudou", async () => {
+    vi.mocked(registrarDadosPessoaisDoColaborador).mockResolvedValue(
+      registrado,
+    );
+    montarEdicao();
+    await editar("Editar dados pessoais");
+    fireEvent.click(botao("Salvar dados pessoais"));
+    expect(
+      await screen.findByText(
+        "Nada mudou: os dados pessoais já estavam com estes valores.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it.each([
+    ["", "Informe a data de nascimento."],
+    ["2999-01-01", "A data de nascimento não pode estar no futuro."],
+  ])(
+    "data de nascimento %j: erro no campo, foco nele e nada enviado",
+    async (valor, mensagem) => {
+      montarEdicao();
+      await editar("Editar dados pessoais");
+      fireEvent.change(campo(/^Nome da mãe/), {
+        target: { value: "Mãe Nova" },
+      });
+      fireEvent.change(campo(/^Data de nascimento/), {
+        target: { value: valor },
+      });
+      fireEvent.click(botao("Salvar dados pessoais"));
+      const data = campo(/^Data de nascimento/);
+      await waitFor(() => expect(data).toHaveFocus());
+      expect(data).toHaveAttribute("aria-invalid", "true");
+      expect(data).toHaveAccessibleDescription(new RegExp(mensagem));
+      expect(registrarDadosPessoaisDoColaborador).not.toHaveBeenCalled();
+      // O resto do formulário fica como estava.
+      expect(campo(/^Nome da mãe/)).toHaveValue("Mãe Nova");
+    },
+  );
+
+  it("sexo gravado fora da lista: o seletor começa vazio e a ficha diz o que estava gravado", async () => {
+    vi.mocked(registrarDadosPessoaisDoColaborador).mockResolvedValue(
+      gravado({ perfilPessoal: { sexo: "intersexo" } }),
+    );
+    montarEdicao(
+      {},
+      {
+        ...registrado,
+        perfilPessoal: { ...registrado.perfilPessoal!, sexo: "Fem. (legado)" },
+      },
+    );
+    await editar("Editar dados pessoais");
+    const sexo = campo(/^Sexo/);
+    expect(sexo).toHaveValue("");
+    expect(sexo).toHaveAccessibleDescription(/Fem\. \(legado\)/);
+    fireEvent.change(sexo, { target: { value: "intersexo" } });
+    fireEvent.click(botao("Salvar dados pessoais"));
+    await screen.findByText("Dados pessoais salvos.");
+    expect(
+      vi.mocked(registrarDadosPessoaisDoColaborador).mock.calls[0]![1]
+        .perfilPessoal?.sexo,
+    ).toBe("intersexo");
+  });
+
+  it("sem dados pessoais gravados: 'Preencher' abre o formulário vazio e a data é obrigatória", async () => {
+    montarEdicao(
+      {},
+      {
+        ...registrado,
+        situacao: "sem_registro",
+        perfilPessoal: null,
+        endereco: null,
+      },
+    );
+    await editar("Preencher dados pessoais");
+    expect(campo(/^Data de nascimento/)).toHaveValue("");
+    fireEvent.click(botao("Salvar dados pessoais"));
+    await waitFor(() =>
+      expect(campo(/^Data de nascimento/)).toHaveAttribute(
+        "aria-invalid",
+        "true",
+      ),
+    );
+    expect(registrarDadosPessoaisDoColaborador).not.toHaveBeenCalled();
+  });
+});
+
+describe("T181 — edição do endereço na ficha", () => {
+  it("Editar mostra o CEP brasileiro na máscara e Salvar envia só o endereço, com os 8 dígitos", async () => {
+    vi.mocked(registrarDadosPessoaisDoColaborador).mockResolvedValue(
+      gravado({ endereco: { numero: "200", complemento: "Sala 3" } }),
+    );
+    montarEdicao(
+      {},
+      { ...registrado, endereco: { ...registrado.endereco!, cep: "30140071" } },
+    );
+    await editar("Editar endereço");
+    expect(campo(/^País/)).toHaveFocus();
+    expect(campo(/^CEP/)).toHaveValue("30140-071");
+    fireEvent.change(campo(/^Número/), { target: { value: "200" } });
+    fireEvent.change(campo(/^Complemento/), { target: { value: "Sala 3" } });
+    fireEvent.click(botao("Salvar endereço"));
+    expect(await screen.findByText("Endereço salvo.")).toBeInTheDocument();
+    const corpo = vi.mocked(registrarDadosPessoaisDoColaborador).mock
+      .calls[0]![1];
+    expect(corpo).toEqual({
+      endereco: {
+        pais: "Brasil",
+        cep: "30140071",
+        logradouro: "Rua Sintética",
+        numero: "200",
+        complemento: "Sala 3",
+        bairro: "Centro",
+        cidade: "Cidade Sintética",
+        estado: "MG",
+      },
+    });
+    expect(corpo).not.toHaveProperty("perfilPessoal");
+    expect(botao("Editar endereço")).toHaveFocus();
+  });
+
+  it("limpar um campo opcional envia null; outro país deixa o CEP em texto livre", async () => {
+    vi.mocked(registrarDadosPessoaisDoColaborador).mockResolvedValue(
+      registrado,
+    );
+    montarEdicao({ consultaCepDisponivel: true });
+    await editar("Editar endereço");
+    fireEvent.change(campo(/^País/), { target: { value: "Portugal" } });
+    fireEvent.change(campo(/^CEP/), { target: { value: "1000-001" } });
+    fireEvent.change(campo(/^Bairro/), { target: { value: "" } });
+    // Com outro país não há consulta, nem para quem pode consultar.
+    expect(screen.queryByRole("button", { name: "Buscar CEP" })).toBeNull();
+    fireEvent.click(botao("Salvar endereço"));
+    await waitFor(() =>
+      expect(registrarDadosPessoaisDoColaborador).toHaveBeenCalled(),
+    );
+    expect(
+      vi.mocked(registrarDadosPessoaisDoColaborador).mock.calls[0]![1].endereco,
+    ).toMatchObject({ pais: "Portugal", cep: "1000-001", bairro: null });
+  });
+
+  it("CEP brasileiro incompleto: erro no campo CEP, foco nele e nada enviado", async () => {
+    montarEdicao();
+    await editar("Editar endereço");
+    fireEvent.change(campo(/^CEP/), { target: { value: "3014" } });
+    fireEvent.click(botao("Salvar endereço"));
+    await waitFor(() => expect(campo(/^CEP/)).toHaveFocus());
+    expect(campo(/^CEP/)).toHaveAccessibleDescription(/8 dígitos do CEP/);
+    expect(registrarDadosPessoaisDoColaborador).not.toHaveBeenCalled();
+  });
+
+  it("Cancelar volta ao endereço gravado", async () => {
+    montarEdicao();
+    await editar("Editar endereço");
+    fireEvent.change(campo(/^Cidade/), { target: { value: "Outra Cidade" } });
+    fireEvent.click(botao("Cancelar"));
+    expect(botao("Editar endereço")).toHaveFocus();
+    expect(screen.getByText("Cidade Sintética")).toBeInTheDocument();
+    expect(registrarDadosPessoaisDoColaborador).not.toHaveBeenCalled();
+  });
+
+  it("sem endereço: começa com o país sugerido e não cria endereço só com o país", async () => {
+    montarEdicao({}, { ...registrado, endereco: null });
+    await editar("Preencher endereço");
+    expect(campo(/^País/)).toHaveValue("Brasil");
+    fireEvent.click(botao("Salvar endereço"));
+    const aviso = await screen.findByText(
+      /Nenhum endereço preenchido: informe ao menos um campo além do país/,
+    );
+    await waitFor(() => expect(aviso).toHaveFocus());
+    expect(registrarDadosPessoaisDoColaborador).not.toHaveBeenCalled();
+  });
+
+  it("com a consulta disponível, 'Buscar CEP' preenche só o vazio e os campos seguem editáveis", async () => {
+    vi.mocked(consultarCep).mockResolvedValue({
+      cep: "01310100",
+      logradouro: "Avenida Sintética",
+      bairro: "Bairro Sintético",
+      cidade: "Cidade Sintética",
+      uf: "SP",
+      estado: "São Paulo",
+    });
+    montarEdicao(
+      { consultaCepDisponivel: true },
+      { ...registrado, endereco: null },
+    );
+    await editar("Preencher endereço");
+    fireEvent.change(campo(/^Logradouro/), {
+      target: { value: "Rua Digitada" },
+    });
+    fireEvent.change(campo(/^CEP/), { target: { value: "01310100" } });
+    fireEvent.click(botao("Buscar CEP"));
+    await waitFor(() =>
+      expect(campo(/^Bairro/)).toHaveValue("Bairro Sintético"),
+    );
+    expect(consultarCep).toHaveBeenCalledWith("01310100");
+    expect(campo(/^Logradouro/)).toHaveValue("Rua Digitada");
+    expect(campo(/^Estado/)).toHaveValue("SP");
+    expect(
+      screen.getByText(/O que já estava digitado foi mantido em Logradouro/),
+    ).toBeInTheDocument();
+    // "Usar endereço do CEP" substitui só por ação explícita.
+    fireEvent.click(botao("Usar endereço do CEP"));
+    expect(campo(/^Logradouro/)).toHaveValue("Avenida Sintética");
+    expect(botao("Buscar CEP")).toHaveFocus();
+    fireEvent.change(campo(/^Bairro/), {
+      target: { value: "Bairro Ajustado" },
+    });
+    expect(campo(/^Bairro/)).toHaveValue("Bairro Ajustado");
+  });
+
+  it("sem a consulta disponível, não há 'Buscar CEP' e sair do campo não consulta", async () => {
+    montarEdicao({ consultaCepDisponivel: false });
+    await editar("Editar endereço");
+    expect(screen.queryByRole("button", { name: "Buscar CEP" })).toBeNull();
+    fireEvent.change(campo(/^CEP/), { target: { value: "01310100" } });
+    fireEvent.blur(campo(/^CEP/));
+    expect(consultarCep).not.toHaveBeenCalled();
+  });
+});
+
+describe("T181 — recusa da gravação: o digitado fica e nada é afirmado sem certeza", () => {
+  const INCERTO =
+    "Não foi possível confirmar se os dados pessoais foram salvos. O que você digitou foi mantido; salvar de novo é seguro.";
+  it.each([
+    [
+      "403 csrf_invalido",
+      () => Object.assign(recusa(403), { codigo: "csrf_invalido" }),
+      "Esta página ficou desatualizada. Salve novamente; seus dados foram mantidos.",
+    ],
+    [
+      "sessão expirada na renovação do token",
+      () => new CsrfSessionExpiredError(),
+      "Sua sessão expirou, e os dados pessoais não foram salvos.",
+    ],
+    [
+      "401",
+      () => recusa(401),
+      "Sua sessão expirou, e os dados pessoais não foram salvos.",
+    ],
+    [
+      "token não renovado (rede)",
+      () => new CsrfRequestError("falhou"),
+      "Não foi possível preparar o envio, e os dados pessoais não foram salvos.",
+    ],
+    [
+      "403 de permissão",
+      () => recusa(403),
+      "Seu perfil não tem permissão para alterar os dados pessoais deste colaborador. Nada foi salvo.",
+    ],
+    [
+      "404 (fora da empresa ativa)",
+      () => recusa(404),
+      "Colaborador não encontrado na empresa ativa. Nada foi salvo.",
+    ],
+    [
+      "409",
+      () => recusa(409),
+      "Os dados pessoais não foram salvos: o colaborador deixou de ter vínculo em uso nesta empresa",
+    ],
+    [
+      "400",
+      () => recusa(400),
+      "O servidor recusou algum dos dados informados.",
+    ],
+    ["rede", () => new TypeError("Failed to fetch"), INCERTO],
+    ["500", () => recusa(500), INCERTO],
+    ["503", () => recusa(503), INCERTO],
+  ])(
+    "%s: mensagem certa, formulário aberto com o digitado e foco no aviso",
+    async (_caso, erro, mensagem) => {
+      vi.mocked(registrarDadosPessoaisDoColaborador).mockRejectedValue(erro());
+      montarEdicao();
+      await editar("Editar dados pessoais");
+      fireEvent.change(campo(/^Nome do pai/), {
+        target: { value: "Pai Sintético" },
+      });
+      fireEvent.click(botao("Salvar dados pessoais"));
+      const aviso = await screen.findByRole("alert");
+      expect(aviso).toHaveTextContent(mensagem);
+      await waitFor(() => expect(aviso).toHaveFocus());
+      expect(campo(/^Nome do pai/)).toHaveValue("Pai Sintético");
+      expect(botao("Salvar dados pessoais")).toBeInTheDocument();
+      expect(screen.queryByText("Dados pessoais salvos.")).toBeNull();
+    },
+  );
+
+  it("o aviso incerto do endereço também não afirma nada", async () => {
+    vi.mocked(registrarDadosPessoaisDoColaborador).mockRejectedValue(
+      recusa(502),
+    );
+    montarEdicao();
+    await editar("Editar endereço");
+    fireEvent.change(campo(/^Número/), { target: { value: "99" } });
+    fireEvent.click(botao("Salvar endereço"));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Não foi possível confirmar se o endereço foi salvo. O que você digitou foi mantido; salvar de novo é seguro.",
+    );
+    expect(campo(/^Número/)).toHaveValue("99");
+  });
+
+  it("depois de uma recusa incerta, salvar de novo envia o mesmo conteúdo", async () => {
+    vi.mocked(registrarDadosPessoaisDoColaborador)
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+      .mockResolvedValueOnce(
+        gravado({ perfilPessoal: { nomePai: "Pai Sintético" } }),
+      );
+    montarEdicao();
+    await editar("Editar dados pessoais");
+    fireEvent.change(campo(/^Nome do pai/), {
+      target: { value: "Pai Sintético" },
+    });
+    fireEvent.click(botao("Salvar dados pessoais"));
+    await screen.findByRole("alert");
+    fireEvent.click(botao("Salvar dados pessoais"));
+    expect(
+      await screen.findByText("Dados pessoais salvos."),
+    ).toBeInTheDocument();
+    const chamadas = vi.mocked(registrarDadosPessoaisDoColaborador).mock.calls;
+    expect(chamadas).toHaveLength(2);
+    expect(chamadas[1]![1]).toEqual(chamadas[0]![1]);
+  });
+
+  it("duplo clique em Salvar envia uma vez só, e Cancelar fica travado durante o envio", async () => {
+    let liberar: (v: DadosPessoaisDoColaboradorApi) => void = () => undefined;
+    vi.mocked(registrarDadosPessoaisDoColaborador).mockReturnValue(
+      new Promise((r) => {
+        liberar = r;
+      }),
+    );
+    montarEdicao();
+    await editar("Editar endereço");
+    fireEvent.click(botao("Salvar endereço"));
+    fireEvent.click(botao("Salvando…"));
+    expect(registrarDadosPessoaisDoColaborador).toHaveBeenCalledTimes(1);
+    expect(botao("Cancelar")).toBeDisabled();
+    await act(async () => liberar(registrado));
+    expect(
+      await screen.findByText(/Nada mudou: o endereço/),
+    ).toBeInTheDocument();
+  });
+
+  it("salvar um bloco não descarta o que está sendo editado no outro", async () => {
+    vi.mocked(registrarDadosPessoaisDoColaborador).mockResolvedValue(
+      gravado({ endereco: { numero: "77" } }),
+    );
+    montarEdicao();
+    await editar("Editar dados pessoais");
+    fireEvent.change(campo(/^Nome do pai/), {
+      target: { value: "Pai em edição" },
+    });
+    fireEvent.click(botao("Editar endereço"));
+    fireEvent.change(campo(/^Número/), { target: { value: "77" } });
+    fireEvent.click(botao("Salvar endereço"));
+    expect(await screen.findByText("Endereço salvo.")).toBeInTheDocument();
+    expect(campo(/^Nome do pai/)).toHaveValue("Pai em edição");
+    expect(within(regiao("Endereço")).getByText("77")).toBeInTheDocument();
   });
 });

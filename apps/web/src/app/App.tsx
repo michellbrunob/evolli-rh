@@ -271,6 +271,8 @@ function conteudoDoDestino(
         {...(admissao.podeAdmitir
           ? { onNovaAdmissao: () => onNavegar("nova-admissao") }
           : {})}
+        // T181 — a consulta de CEP exige a mesma capacidade de admitir.
+        consultaCepDisponivel={admissao.podeAdmitir}
       />
     );
   }

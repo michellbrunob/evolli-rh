@@ -1,3 +1,9 @@
+import type {
+  EnderecoApi,
+  PerfilPessoalApi,
+} from "../../api/dadosPessoaisClient";
+import { exibirCep } from "../../format/mascaras";
+
 /**
  * Dados pessoais e endereço do colaborador (T177, Módulo 1) — campos, limites,
  * normalização e validação no cliente.
@@ -297,4 +303,54 @@ export function blocoEndereco(
     bloco.cep = bloco.cep.replace("-", "");
   }
   return bloco;
+}
+
+// ---- T181 — edição na ficha do colaborador ---------------------------------
+
+/**
+ * T181 — o perfil gravado, como a ficha o edita: `null` vira campo vazio. Sexo
+ * gravado fora da lista fechada (cadastro anterior à T179) não cabe no
+ * seletor: o campo começa sem seleção e o valor volta em `sexoAnterior`, para
+ * a ficha dizer o que estava gravado — o servidor só aceita a lista.
+ */
+export function perfilParaEdicao(perfil: PerfilPessoalApi | null): {
+  readonly valores: ValoresPerfil;
+  readonly sexoAnterior: string | null;
+} {
+  if (!perfil) return { valores: PERFIL_VAZIO, sexoAnterior: null };
+  const valores = { ...PERFIL_VAZIO };
+  for (const chave of Object.keys(PERFIL_VAZIO) as ChavePerfil[]) {
+    valores[chave] = perfil[chave] ?? "";
+  }
+  const sexo = perfil.sexo ?? "";
+  const legado = sexo !== "" && !ehCodigoSexo(sexo);
+  return {
+    valores: { ...valores, sexo: legado ? "" : sexo },
+    sexoAnterior: legado ? sexo : null,
+  };
+}
+
+/**
+ * T181 — o endereço gravado, como a ficha o edita: `null` vira campo vazio e
+ * o CEP brasileiro aparece na máscara `00000-000`. Sem endereço gravado, o
+ * formulário começa como o da admissão, com o país sugerido.
+ */
+export function enderecoParaEdicao(
+  endereco: EnderecoApi | null,
+): ValoresEndereco {
+  if (!endereco) return ENDERECO_INICIAL;
+  const valores = { ...ENDERECO_INICIAL };
+  for (const chave of Object.keys(ENDERECO_INICIAL) as ChaveEndereco[]) {
+    valores[chave] = endereco[chave] ?? "";
+  }
+  valores.cep = exibirCep(endereco.cep, ehPaisBrasil(endereco.pais));
+  return valores;
+}
+
+/** T181 — os dois conjuntos de valores são iguais, campo a campo. */
+export function mesmosValores<K extends string>(
+  a: Readonly<Record<K, string>>,
+  b: Readonly<Record<K, string>>,
+): boolean {
+  return (Object.keys(a) as K[]).every((chave) => a[chave] === b[chave]);
 }
