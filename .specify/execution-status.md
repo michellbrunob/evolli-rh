@@ -2274,11 +2274,11 @@ envia. A mensagem do envio incerto só diz que a lista foi atualizada depois
 que isso acontece. O E2E confere a trilha `authorization_denied` das recusas
 403 e 404 e que o 409 não devolve o código.
 
-## Edição da ficha do colaborador — T181 (em implementação)
+## Edição da ficha do colaborador — T181 (integrada)
 
-| Tarefa | Estado               | Resultado principal                                                                          |
-| ------ | -------------------- | -------------------------------------------------------------------------------------------- |
-| T181   | **Em implementação** | RH e DP completam e atualizam, pela ficha, dados pessoais, endereço e contatos já aprovados. |
+| Tarefa | Estado                                    | Resultado principal                                                                          |
+| ------ | ----------------------------------------- | -------------------------------------------------------------------------------------------- |
+| T181   | **Integrada** (PR #174, squash `b6442f3`) | RH e DP completam e atualizam, pela ficha, dados pessoais, endereço e contatos já aprovados. |
 
 **Escopo da T181:** na ficha de Gestão de Pessoas › Colaboradores, edição por
 seção, com Salvar e Cancelar, dos dados pessoais complementares já existentes,
@@ -2300,6 +2300,26 @@ dependentes, filhos, camisa, saúde, dados sindicais, foto, raça/etnia, gênero
 deficiência, dados contratuais detalhados, fuso, telefone estrangeiro,
 importação; nome (fora a correção já existente), matrícula, tipo de vínculo,
 lotação, situação e datas da admissão; promoção e merge.
+
+## Catálogo de Jornadas de trabalho — T182 (em implementação)
+
+| Tarefa | Estado               | Resultado principal                                                     |
+| ------ | -------------------- | ----------------------------------------------------------------------- |
+| T182   | **Em implementação** | RH e DP mantêm, em Estrutura, as jornadas de trabalho da empresa ativa. |
+
+**Escopo da T182:** tela própria em Estrutura › Jornadas de trabalho, com
+lista da empresa ativa, busca, estado vazio e status; RH cria, edita e inativa;
+DP só consulta; código (único na empresa, por migration aditiva), nome e os
+dias e horários que o contrato já tem; dias e horários editáveis só sem vínculo
+com colaborador; inativação lógica; empresa da sessão; auditoria existente.
+
+**Decisão da proprietária (2026-10-23):** [decisão](../docs/decisions/t182-jornadas-trabalho.md).
+Fuso horário não faz parte do produto.
+
+**Fora de escopo:** associação da jornada ao colaborador, banco de horas,
+escala, adicional noturno, folha, compensação, feriado, ponto, geolocalização,
+fuso horário, salário, contrato, CPF, documentos, dados bancários,
+dependentes, saúde, promoção e merge.
 
 ## Próxima ação autorizável
 
