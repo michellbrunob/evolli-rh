@@ -217,6 +217,24 @@ function comReferenciaNova<T extends Referencia>(
     : [...sem.slice(0, posicao), nova, ...sem.slice(posicao)];
 }
 
+/**
+ * T180 (revisão) — a lista recarregada substitui a atual, mas nunca tira dela
+ * a referência ESCOLHIDA: seletor, confirmação e envio falam sempre da mesma.
+ * Se ela não veio na recarga (inativada nesse meio-tempo, por exemplo), quem
+ * decide é o servidor, ao gravar a admissão.
+ */
+function mantendoEscolhida<T extends Referencia>(
+  recarregada: T[],
+  atual: readonly T[],
+  idEscolhido: string,
+): T[] {
+  if (!idEscolhido || recarregada.some((r) => r.id === idEscolhido)) {
+    return recarregada;
+  }
+  const escolhida = atual.find((r) => r.id === idEscolhido);
+  return escolhida ? comReferenciaNova(recarregada, escolhida) : recarregada;
+}
+
 /** T180 — nome acessível do "+" de cada seletor. */
 const ROTULO_DO_BOTAO_REFERENCIA: Record<TipoReferenciaRapida, string> = {
   departamento: "Cadastrar novo departamento",
@@ -834,6 +852,31 @@ export function NovaAdmissaoScreen({
     useState<TipoReferenciaRapida | null>(null);
   /** T180 — gatilho de uma vez só: devolver o foco ao seletor da referência. */
   const focarSeletorRef = useRef<TipoReferenciaRapida | null>(null);
+  /**
+   * T180 (revisão) — versão da lista de cada referência do cadastro rápido. A
+   * criação e cada recarga a avançam, e a resposta de uma recarga só vale se
+   * ainda for a mais recente. Sem isso, uma recarga lenta, lida ANTES de uma
+   * criação, chegava depois dela e tirava a referência nova do seletor: a
+   * confirmação dizia "Não informado" enquanto a admissão enviava o id.
+   */
+  const versaoDaListaRef = useRef<Record<TipoReferenciaRapida, number>>({
+    departamento: 0,
+    cargo: 0,
+    unidade: 0,
+  });
+  /** T180 (revisão) — as referências escolhidas agora, lidas pela recarga. */
+  const escolhidasRef = useRef<Record<TipoReferenciaRapida, string>>({
+    departamento: "",
+    cargo: "",
+    unidade: "",
+  });
+  useEffect(() => {
+    escolhidasRef.current = {
+      departamento: campos.departamentoId,
+      cargo: campos.cargoId,
+      unidade: campos.unidadeId,
+    };
+  }, [campos.departamentoId, campos.cargoId, campos.unidadeId]);
 
   const empresa = opcoes.empresas.length === 1 ? opcoes.empresas[0] : undefined;
 
@@ -1150,6 +1193,8 @@ export function NovaAdmissaoScreen({
     tipo: TipoReferenciaRapida,
     criada: ReferenciaCriada,
   ) {
+    // Uma recarga ainda em curso foi lida antes desta criação: fica obsoleta.
+    versaoDaListaRef.current[tipo] += 1;
     switch (tipo) {
       case "departamento":
         setOpcoes((prev) => ({
@@ -1179,34 +1224,63 @@ export function NovaAdmissaoScreen({
 
   /**
    * Rede ou 5xx no cadastro rápido: o servidor pode ter gravado. A lista
-   * daquela referência é lida de novo, como no carregamento inicial; se a
-   * leitura falhar, a lista atual fica.
+   * daquela referência é lida de novo, como no carregamento inicial.
+   * Responde se a lista foi de fato atualizada: `false` quando a leitura
+   * falhou (a lista atual fica) ou quando a resposta chegou obsoleta, depois
+   * de uma criação ou de outra recarga (é descartada). A referência
+   * escolhida nunca sai do seletor (`mantendoEscolhida`).
    */
-  async function recarregarReferencia(tipo: TipoReferenciaRapida) {
+  async function recarregarReferencia(
+    tipo: TipoReferenciaRapida,
+  ): Promise<boolean> {
+    const versao = ++versaoDaListaRef.current[tipo];
+    const vigente = () => versao === versaoDaListaRef.current[tipo];
     const filtro = { status: "ativo", tamanhoPagina: 100 };
     try {
       switch (tipo) {
         case "departamento": {
-          const resp = await listarDepartamentos(filtro);
+          const itens = soAtivos((await listarDepartamentos(filtro)).itens);
+          if (!vigente()) return false;
           setOpcoes((prev) => ({
             ...prev,
-            departamentos: soAtivos(resp.itens),
+            departamentos: mantendoEscolhida(
+              itens,
+              prev.departamentos,
+              escolhidasRef.current.departamento,
+            ),
           }));
-          break;
+          return true;
         }
         case "cargo": {
-          const resp = await listarCargos(filtro);
-          setOpcoes((prev) => ({ ...prev, cargos: soAtivos(resp.itens) }));
-          break;
+          const itens = soAtivos((await listarCargos(filtro)).itens);
+          if (!vigente()) return false;
+          setOpcoes((prev) => ({
+            ...prev,
+            cargos: mantendoEscolhida(
+              itens,
+              prev.cargos,
+              escolhidasRef.current.cargo,
+            ),
+          }));
+          return true;
         }
         case "unidade": {
-          const resp = await listarUnidades(filtro);
-          setOpcoes((prev) => ({ ...prev, unidades: soAtivos(resp.itens) }));
-          break;
+          const itens = soAtivos((await listarUnidades(filtro)).itens);
+          if (!vigente()) return false;
+          setOpcoes((prev) => ({
+            ...prev,
+            unidades: mantendoEscolhida(
+              itens,
+              prev.unidades,
+              escolhidasRef.current.unidade,
+            ),
+          }));
+          return true;
         }
       }
     } catch {
-      // A lista atual fica; a mensagem do modal já manda conferir.
+      // A lista atual fica; o modal diz que ela não pôde ser atualizada.
+      return false;
     }
   }
 
@@ -2264,7 +2338,7 @@ export function NovaAdmissaoScreen({
           empresaId={empresa.id}
           onFechar={fecharCadastroRapido}
           onCriada={referenciaCriada}
-          onRecarregar={(tipo) => void recarregarReferencia(tipo)}
+          onRecarregar={recarregarReferencia}
         />
       ) : null}
 

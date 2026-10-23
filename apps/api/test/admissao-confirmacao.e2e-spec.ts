@@ -1635,34 +1635,65 @@ describe("Confirmação da Nova admissão (T179, e2e)", () => {
         rota: "/v1/departamentos",
         campo: "departamentoId",
         acao: "organizacao_departamento_criado",
+        recurso: "departamento",
       },
       {
         nome: "cargo",
         rota: "/v1/cargos",
         campo: "cargoId",
         acao: "organizacao_cargo_criado",
+        recurso: "cargo",
       },
       {
         nome: "unidade",
         rota: "/v1/unidades-organizacionais",
         campo: "unidadeOrganizacionalId",
         acao: "organizacao_unidade_organizacional_criada",
+        recurso: "unidade_organizacional",
       },
     ] as const;
     type Referencia = (typeof REFERENCIAS)[number];
 
     let dpA: Credencial;
     const outrosPapeis: [string, Credencial][] = [];
+    /** Quem tenta criar sem poder, com o id do usuário para achar a trilha. */
+    const recusados: { cred: Credencial; usuarioId: string }[] = [];
+    let rhAId: string;
+
+    const idDoUsuario = async (email: string) =>
+      (await prisma.accessUser.findUniqueOrThrow({ where: { email } })).id;
 
     beforeAll(async () => {
       dpA = await criarUsuario("dp.t180a@example.test", "dp", empresaA);
+      recusados.push({
+        cred: dpA,
+        usuarioId: await idDoUsuario("dp.t180a@example.test"),
+      });
       for (const papel of ["gestor", "financeiro", "colaborador"]) {
-        outrosPapeis.push([
-          papel,
-          await criarUsuario(`${papel}.t180a@example.test`, papel, empresaA),
-        ]);
+        const email = `${papel}.t180a@example.test`;
+        const cred = await criarUsuario(email, papel, empresaA);
+        outrosPapeis.push([papel, cred]);
+        recusados.push({ cred, usuarioId: await idDoUsuario(email) });
       }
+      rhAId = await idDoUsuario("rh.t179a@example.test");
     });
+
+    /** Negações `authorization_denied` daquele ator, recurso e empresa. */
+    const negacoes = (
+      ref: Referencia,
+      actorUserId: string,
+      companyId: string,
+    ) =>
+      prisma.auditEvent.findMany({
+        where: {
+          action: "authorization_denied",
+          resource: ref.recurso,
+          actorUserId,
+          companyId,
+          result: "denied",
+        },
+        orderBy: { occurredAt: "asc" },
+      });
 
     const quantos = (ref: Referencia, empresaId: string, codigo: string) =>
       ref.nome === "departamento"
@@ -1709,13 +1740,18 @@ describe("Confirmação da Nova admissão (T179, e2e)", () => {
         await post(ref.rota, rhA)
           .send({ codigo, nome: "Primeira", empresaId: empresaA })
           .expect(201);
-        await post(ref.rota, rhA)
+        const repetido = await post(ref.rota, rhA)
           .send({
             codigo,
             nome: "Segunda com o mesmo codigo",
             empresaId: empresaA,
           })
           .expect(409);
+        // A recusa não devolve o código (nem o nome) que foi enviado.
+        expect(JSON.stringify(repetido.body)).not.toContain(codigo);
+        expect(JSON.stringify(repetido.body)).not.toContain(
+          "Segunda com o mesmo codigo",
+        );
         expect(await quantos(ref, empresaA, codigo)).toBe(1);
         await post(ref.rota, rhB)
           .send({ codigo, nome: "Outra empresa", empresaId: empresaB })
@@ -1725,25 +1761,43 @@ describe("Confirmação da Nova admissão (T179, e2e)", () => {
     );
 
     it.each(REFERENCIAS)(
-      "$nome com a empresa do navegador diferente da sessão: 404 e nada é criado",
+      "$nome com a empresa do navegador diferente da sessão: 404, nada é criado e a negação fica na trilha",
       async (ref) => {
         const codigo = `T180_CRUZ_${ref.nome.toUpperCase()}`;
-        await post(ref.rota, rhA)
+        const antes = await negacoes(ref, rhAId, empresaB);
+        const r = await post(ref.rota, rhA)
           .send({ codigo, nome: "Tentativa cruzada", empresaId: empresaB })
           .expect(404);
+        expect(JSON.stringify(r.body)).not.toContain(codigo);
         expect(await quantos(ref, empresaB, codigo)).toBe(0);
         expect(await quantos(ref, empresaA, codigo)).toBe(0);
+        // Uma negação a mais, na empresa TENTADA, sem id de recurso e sem os
+        // valores enviados.
+        const depois = await negacoes(ref, rhAId, empresaB);
+        expect(depois).toHaveLength(antes.length + 1);
+        const evento = depois[depois.length - 1]!;
+        expect(evento).toMatchObject({ actorRole: "rh", resourceId: null });
+        expect(JSON.stringify(evento)).not.toContain(codigo);
+        expect(JSON.stringify(evento)).not.toContain("Tentativa cruzada");
       },
     );
 
     it.each(REFERENCIAS)(
-      "$nome: DP, gestor, financeiro e colaborador não criam (403) e nada é gravado; o DP continua lendo",
+      "$nome: DP, gestor, financeiro e colaborador não criam (403), cada negação fica na trilha e nada é gravado; o DP continua lendo",
       async (ref) => {
         const codigo = `T180_NEG_${ref.nome.toUpperCase()}`;
-        for (const cred of [dpA, ...outrosPapeis.map(([, c]) => c)]) {
+        expect(recusados).toHaveLength(1 + outrosPapeis.length);
+        for (const { cred, usuarioId } of recusados) {
+          const antes = await negacoes(ref, usuarioId, empresaA);
           await post(ref.rota, cred)
             .send({ codigo, nome: "Sem permissao", empresaId: empresaA })
             .expect(403);
+          const depois = await negacoes(ref, usuarioId, empresaA);
+          expect(depois).toHaveLength(antes.length + 1);
+          const evento = depois[depois.length - 1]!;
+          expect(evento.resourceId).toBeNull();
+          expect(JSON.stringify(evento)).not.toContain(codigo);
+          expect(JSON.stringify(evento)).not.toContain("Sem permissao");
         }
         expect(await quantos(ref, empresaA, codigo)).toBe(0);
         await get(`${ref.rota}?status=ativo&tamanhoPagina=100`, dpA).expect(

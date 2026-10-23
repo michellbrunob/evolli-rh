@@ -83,8 +83,14 @@ export const MENSAGENS_REFERENCIA = {
     "Sua sessão expirou. Entre de novo para continuar; os dados digitados foram mantidos nesta página.",
   empresaNaoConfirmada:
     "A empresa ativa não pôde ser confirmada. Feche este cadastro e abra a página de novo.",
+  // T180 (revisão) — rede ou 5xx: a mensagem acompanha a recarga da lista e
+  // só diz que ela foi atualizada depois que isso de fato aconteceu.
   incerto:
+    "Não foi possível confirmar se o cadastro foi feito. Atualizando a lista para você conferir…",
+  incertoListaAtualizada:
     "Não foi possível confirmar se o cadastro foi feito. A lista foi atualizada: confira se a referência já aparece antes de tentar de novo.",
+  incertoListaNaoAtualizada:
+    "Não foi possível confirmar se o cadastro foi feito, e a lista não pôde ser atualizada. Confira o seletor antes de tentar de novo: se o código já estiver em uso, o aviso aparece no campo.",
 } as const;
 
 /** T180 — 403 sem `codigo`: o perfil não escreve na estrutura (o DP só lê). */
@@ -190,8 +196,11 @@ export interface ModalReferenciaRapidaProps {
     tipo: TipoReferenciaRapida,
     criada: ReferenciaCriada,
   ) => void;
-  /** Rede ou 5xx: a página recarrega a lista daquela referência. */
-  readonly onRecarregar: (tipo: TipoReferenciaRapida) => void;
+  /**
+   * Rede ou 5xx: a página recarrega a lista daquela referência e responde se
+   * a lista foi de fato atualizada.
+   */
+  readonly onRecarregar: (tipo: TipoReferenciaRapida) => Promise<boolean>;
 }
 
 export function ModalReferenciaRapida({
@@ -207,6 +216,12 @@ export function ModalReferenciaRapida({
   const [enviando, setEnviando] = useState(false);
   /** Trava síncrona contra envio duplicado (cliques no mesmo quadro). */
   const enviandoRef = useRef(false);
+  /**
+   * T180 (revisão) — tentativa em curso. O resultado de uma recarga só muda a
+   * mensagem se ainda for da tentativa atual: nem um novo envio nem um novo
+   * cadastro (fechar e abrir de novo) herdam o aviso da tentativa anterior.
+   */
+  const tentativaRef = useRef(0);
 
   // T180 — foco inicial no Código. Este efeito roda DEPOIS do efeito do
   // `Modal` (filho), que leva o foco ao título ao abrir.
@@ -216,6 +231,7 @@ export function ModalReferenciaRapida({
 
   /** Volta ao estado vazio: o próximo cadastro começa do zero. */
   function limpar() {
+    tentativaRef.current += 1;
     setCodigo("");
     setNome("");
     setErros({});
@@ -243,6 +259,7 @@ export function ModalReferenciaRapida({
       return;
     }
     enviandoRef.current = true;
+    const tentativa = ++tentativaRef.current;
     setEnviando(true);
     setErros({});
     try {
@@ -260,7 +277,19 @@ export function ModalReferenciaRapida({
       if (recusa.erros.codigo) {
         document.getElementById(ID_CODIGO_REFERENCIA)?.focus();
       }
-      if (recusa.incerto) onRecarregar(tipo);
+      if (recusa.incerto) {
+        void onRecarregar(tipo)
+          .catch(() => false)
+          .then((atualizada) => {
+            if (tentativa !== tentativaRef.current) return;
+            setErros((prev) => ({
+              ...prev,
+              geral: atualizada
+                ? MENSAGENS_REFERENCIA.incertoListaAtualizada
+                : MENSAGENS_REFERENCIA.incertoListaNaoAtualizada,
+            }));
+          });
+      }
     } finally {
       enviandoRef.current = false;
       setEnviando(false);

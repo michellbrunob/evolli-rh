@@ -8,7 +8,14 @@
  * (seletor, foco de volta, dados preservados) está em
  * `NovaAdmissaoScreen.test.tsx`.
  */
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ModalReferenciaRapida,
@@ -63,10 +70,13 @@ beforeEach(() => {
   );
 });
 
-function montar(tipo: TipoReferenciaRapida | null = "departamento") {
+function montar(
+  tipo: TipoReferenciaRapida | null = "departamento",
+  recarga: () => Promise<boolean> = () => Promise.resolve(true),
+) {
   const onFechar = vi.fn();
   const onCriada = vi.fn();
-  const onRecarregar = vi.fn();
+  const onRecarregar = vi.fn(recarga);
   const resultado = render(
     <ModalReferenciaRapida
       tipo={tipo}
@@ -322,13 +332,125 @@ describe("T180 — modal de cadastro rápido", () => {
       const { onFechar, onRecarregar } = montar("cargo");
       preencher("CAR_NOVO", "Cargo Sintético");
       fireEvent.click(cadastrar());
-      expect(await within(dialogo()).findByRole("alert")).toHaveTextContent(
-        "Não foi possível confirmar se o cadastro foi feito. A lista foi atualizada: confira se a referência já aparece antes de tentar de novo.",
+      await waitFor(() =>
+        expect(within(dialogo()).getByRole("alert")).toHaveTextContent(
+          "Não foi possível confirmar se o cadastro foi feito. A lista foi atualizada: confira se a referência já aparece antes de tentar de novo.",
+        ),
       );
       expect(onRecarregar).toHaveBeenCalledWith("cargo");
       expect(onFechar).not.toHaveBeenCalled();
+      // O que foi digitado fica.
+      expect(codigo()).toHaveValue("CAR_NOVO");
+      expect(nome()).toHaveValue("Cargo Sintético");
     },
   );
+
+  // T180 (revisão) — a mensagem só diz que a lista foi atualizada depois que
+  // a recarga terminou, e nunca quando ela falhou.
+  it("rede: enquanto a recarga não termina, não diz que a lista foi atualizada", async () => {
+    vi.mocked(criarCargo).mockRejectedValue(new TypeError("Failed to fetch"));
+    let concluir: (atualizada: boolean) => void = () => undefined;
+    montar(
+      "cargo",
+      () =>
+        new Promise<boolean>((r) => {
+          concluir = r;
+        }),
+    );
+    preencher("CAR_NOVO", "Cargo Sintético");
+    fireEvent.click(cadastrar());
+    const alerta = await within(dialogo()).findByRole("alert");
+    expect(alerta).toHaveTextContent(
+      "Não foi possível confirmar se o cadastro foi feito. Atualizando a lista para você conferir…",
+    );
+    expect(alerta).not.toHaveTextContent(/foi atualizada/);
+    await act(async () => concluir(true));
+    expect(within(dialogo()).getByRole("alert")).toHaveTextContent(
+      "A lista foi atualizada: confira se a referência já aparece antes de tentar de novo.",
+    );
+  });
+
+  it.each([
+    ["a leitura falhou", () => Promise.resolve(false)],
+    ["a recarga rejeitou", () => Promise.reject(new Error("falhou"))],
+  ])(
+    "rede e %s: diz que a lista não pôde ser atualizada, sem fechar",
+    async (_caso, recarga) => {
+      vi.mocked(criarUnidade).mockRejectedValue(recusa(503));
+      const { onFechar } = montar("unidade", recarga);
+      preencher("UNI_NOVA", "Unidade Sintética");
+      fireEvent.click(cadastrar());
+      await waitFor(() =>
+        expect(within(dialogo()).getByRole("alert")).toHaveTextContent(
+          "Não foi possível confirmar se o cadastro foi feito, e a lista não pôde ser atualizada. Confira o seletor antes de tentar de novo: se o código já estiver em uso, o aviso aparece no campo.",
+        ),
+      );
+      expect(within(dialogo()).getByRole("alert")).not.toHaveTextContent(
+        /foi atualizada/,
+      );
+      expect(onFechar).not.toHaveBeenCalled();
+      expect(codigo()).toHaveValue("UNI_NOVA");
+    },
+  );
+
+  it("o resultado de uma recarga antiga não muda a mensagem de uma tentativa nova", async () => {
+    vi.mocked(criarDepartamento)
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+      .mockRejectedValueOnce(recusa(409));
+    let concluir: (atualizada: boolean) => void = () => undefined;
+    montar(
+      "departamento",
+      () =>
+        new Promise<boolean>((r) => {
+          concluir = r;
+        }),
+    );
+    preencher("DEP_NOVO", "Departamento Sintético");
+    fireEvent.click(cadastrar());
+    await within(dialogo()).findByRole("alert");
+    // Nova tentativa: o servidor já tinha gravado e responde 409.
+    fireEvent.click(cadastrar());
+    await waitFor(() =>
+      expect(codigo()).toHaveAccessibleDescription(
+        /Este código já está em uso nesta empresa\./,
+      ),
+    );
+    await act(async () => concluir(false));
+    // Só o erro do campo (que também é alerta); nada sobre a lista.
+    expect(dialogo()).not.toHaveTextContent(/lista/);
+    expect(codigo()).toHaveAccessibleDescription(
+      /Este código já está em uso nesta empresa\./,
+    );
+  });
+
+  it("fechar e abrir de novo não herda o aviso de uma recarga anterior", async () => {
+    vi.mocked(criarCargo).mockRejectedValue(new TypeError("Failed to fetch"));
+    let concluir: (atualizada: boolean) => void = () => undefined;
+    const recarga = () =>
+      new Promise<boolean>((r) => {
+        concluir = r;
+      });
+    const { rerender, onFechar, onCriada } = montar("cargo", recarga);
+    preencher("CAR_NOVO", "Cargo Sintético");
+    fireEvent.click(cadastrar());
+    await within(dialogo()).findByRole("alert");
+    fireEvent.click(
+      within(dialogo()).getByRole("button", { name: "Cancelar" }),
+    );
+    expect(onFechar).toHaveBeenCalledTimes(1);
+    const props = {
+      empresaId: EMPRESA_ID,
+      onFechar,
+      onCriada,
+      onRecarregar: vi.fn(recarga),
+    };
+    rerender(<ModalReferenciaRapida tipo={null} {...props} />);
+    rerender(<ModalReferenciaRapida tipo="cargo" {...props} />);
+    await act(async () => concluir(true));
+    expect(within(dialogo()).queryByRole("alert")).toBeNull();
+    expect(dialogo()).not.toHaveTextContent(/lista/);
+    expect(codigo()).toHaveValue("");
+  });
 
   it("depois de uma recusa, corrigir o código limpa o erro do campo", async () => {
     vi.mocked(criarDepartamento).mockRejectedValueOnce(recusa(409));

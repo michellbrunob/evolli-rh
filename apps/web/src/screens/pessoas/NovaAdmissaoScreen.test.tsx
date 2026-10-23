@@ -3294,8 +3294,10 @@ describe("T180 — cadastro rápido de referências na Nova admissão", () => {
       cargoNovo.codigo,
       cargoNovo.nome,
     );
-    expect(await within(dialogo).findByRole("alert")).toHaveTextContent(
-      "Não foi possível confirmar se o cadastro foi feito. A lista foi atualizada: confira se a referência já aparece antes de tentar de novo.",
+    await waitFor(() =>
+      expect(within(dialogo).getByRole("alert")).toHaveTextContent(
+        "Não foi possível confirmar se o cadastro foi feito. A lista foi atualizada: confira se a referência já aparece antes de tentar de novo.",
+      ),
     );
     await waitFor(() => expect(listarCargos).toHaveBeenCalledTimes(2));
     expect(listarCargos).toHaveBeenLastCalledWith({
@@ -3315,6 +3317,209 @@ describe("T180 — cadastro rápido de referências na Nova admissão", () => {
     // Nada foi escolhido por conta própria.
     expect(cargoSel()).toHaveValue("");
   });
+
+  it("rede e recarga falha: diz que a lista não pôde ser atualizada, e a lista e a admissão ficam", async () => {
+    vi.mocked(criarCargo).mockRejectedValue(new TypeError("Failed to fetch"));
+    montar("rh");
+    await aguardarEmpresa();
+    preencherParteDaAdmissao();
+    vi.mocked(listarCargos).mockRejectedValue(new TypeError("Failed to fetch"));
+    const dialogo = await cadastrarPeloMais(
+      "Cadastrar novo cargo",
+      cargoNovo.codigo,
+      cargoNovo.nome,
+    );
+    await waitFor(() =>
+      expect(within(dialogo).getByRole("alert")).toHaveTextContent(
+        "Não foi possível confirmar se o cadastro foi feito, e a lista não pôde ser atualizada.",
+      ),
+    );
+    expect(within(dialogo).getByRole("alert")).not.toHaveTextContent(
+      /foi atualizada/,
+    );
+    expect(listarCargos).toHaveBeenCalledTimes(2);
+    expect(dialogoReferencia()).toBeInTheDocument();
+    expect(
+      within(cargoSel())
+        .getAllByRole("option")
+        .map((o) => o.textContent),
+    ).toEqual(["Selecione…", "CAR1 — Cargo Sintético (teste)"]);
+    admissaoPreservada();
+  });
+
+  // T180 (revisão, B1) — a recarga pedida depois de um envio incerto pode
+  // chegar DEPOIS de uma nova tentativa que criou a referência. Essa resposta
+  // é antiga: não pode tirar a referência nova do seletor, e a confirmação
+  // mostra exatamente o que a admissão envia.
+  const CASOS_DA_RECARGA = [
+    {
+      rotulo: "Cadastrar novo departamento",
+      criar: criarDepartamento,
+      listar: listarDepartamentos,
+      existente: departamento,
+      nova: departamentoNovo,
+      seletor: departamentoSel,
+      linha: "Departamento",
+      chave: "departamentoId",
+    },
+    {
+      rotulo: "Cadastrar novo cargo",
+      criar: criarCargo,
+      listar: listarCargos,
+      existente: cargo,
+      nova: cargoNovo,
+      seletor: cargoSel,
+      linha: "Cargo",
+      chave: "cargoId",
+    },
+    {
+      rotulo: "Cadastrar nova unidade",
+      criar: criarUnidade,
+      listar: listarUnidades,
+      existente: unidade,
+      nova: unidadeNova,
+      seletor: unidadeSel,
+      linha: "Unidade",
+      chave: "unidadeOrganizacionalId",
+    },
+  ] as const;
+
+  it.each(CASOS_DA_RECARGA)(
+    "$linha: recarga atrasada, que chega depois da criação, é descartada; confirmação e envio falam da referência nova",
+    async ({
+      rotulo,
+      criar,
+      listar,
+      existente,
+      nova,
+      seletor,
+      linha,
+      chave,
+    }) => {
+      // 1ª tentativa sem resposta (rede); a 2ª cria.
+      vi.mocked(criar as typeof criarCargo)
+        .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+        .mockResolvedValueOnce(nova as CargoApi);
+      montar("rh");
+      await aguardarEmpresa();
+      preencherValido();
+      // A recarga do envio incerto fica pendente, lida ANTES da criação.
+      let liberarRecarga: () => void = () => undefined;
+      const obsoleto = {
+        ...existente,
+        id: "d4d4d4d4-d4d4-4d4d-8d4d-d4d4d4d4d4d4",
+        codigo: "ZZ_OBSOLETO",
+        nome: "Lido antes da criação (teste)",
+      };
+      vi.mocked(listar as typeof listarCargos).mockReturnValueOnce(
+        new Promise((r) => {
+          liberarRecarga = () => r(paginado([existente, obsoleto]) as never);
+        }),
+      );
+      const dialogo = await cadastrarPeloMais(rotulo, nova.codigo, nova.nome);
+      expect(await within(dialogo).findByRole("alert")).toHaveTextContent(
+        "Atualizando a lista para você conferir…",
+      );
+      // Nova tentativa, com os dados mantidos: 201.
+      fireEvent.click(
+        within(dialogo).getByRole("button", { name: "Cadastrar" }),
+      );
+      await waitFor(() => expect(dialogoReferencia()).toBeNull());
+      expect(seletor()).toHaveValue(nova.id);
+
+      // Só agora chega a recarga antiga.
+      await act(async () => liberarRecarga());
+
+      expect(seletor()).toHaveValue(nova.id);
+      expect(
+        within(seletor())
+          .getAllByRole("option")
+          .map((o) => o.textContent),
+      ).toEqual([
+        "Selecione…",
+        `${existente.codigo} — ${existente.nome}`,
+        `${nova.codigo} — ${nova.nome}`,
+      ]);
+
+      fireEvent.click(salvar());
+      const confirmacao = await screen.findByRole("dialog", {
+        name: "Confirmar cadastro de colaborador?",
+      });
+      expect(confirmacao).toHaveTextContent(
+        `${linha}: ${nova.codigo} — ${nova.nome}`,
+      );
+      expect(confirmacao.textContent ?? "").not.toMatch(
+        new RegExp(`${linha}: Não informad`),
+      );
+      fireEvent.click(botaoConfirmar());
+      await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
+      const dto = vi.mocked(admitirColaborador).mock
+        .calls[0]![0] as unknown as Record<string, unknown>;
+      expect(dto[chave]).toBe(nova.id);
+    },
+  );
+
+  it.each(CASOS_DA_RECARGA)(
+    "$linha: uma recarga que não traz a referência escolhida não a tira do seletor nem da confirmação",
+    async ({
+      rotulo,
+      criar,
+      listar,
+      existente,
+      nova,
+      seletor,
+      linha,
+      chave,
+    }) => {
+      // 1º "+": cria e seleciona. 2º "+": rede, e a recarga (a mais recente)
+      // volta sem a referência escolhida.
+      vi.mocked(criar as typeof criarCargo)
+        .mockResolvedValueOnce(nova as CargoApi)
+        .mockRejectedValueOnce(new TypeError("Failed to fetch"));
+      montar("rh");
+      await aguardarEmpresa();
+      preencherValido();
+      await cadastrarPeloMais(rotulo, nova.codigo, nova.nome);
+      await waitFor(() => expect(dialogoReferencia()).toBeNull());
+      expect(seletor()).toHaveValue(nova.id);
+
+      vi.mocked(listar as typeof listarCargos).mockResolvedValueOnce(
+        paginado([existente]) as never,
+      );
+      const dialogo = await cadastrarPeloMais(
+        rotulo,
+        "OUTRA_REF",
+        "Outra referência (teste)",
+      );
+      await waitFor(() =>
+        expect(within(dialogo).getByRole("alert")).toHaveTextContent(
+          "A lista foi atualizada",
+        ),
+      );
+      fireEvent.click(
+        within(dialogo).getByRole("button", { name: "Cancelar" }),
+      );
+
+      expect(seletor()).toHaveValue(nova.id);
+      expect(
+        within(seletor()).getByRole("option", {
+          name: `${nova.codigo} — ${nova.nome}`,
+        }),
+      ).toBeInTheDocument();
+      fireEvent.click(salvar());
+      const confirmacao = await screen.findByRole("dialog", {
+        name: "Confirmar cadastro de colaborador?",
+      });
+      expect(confirmacao).toHaveTextContent(
+        `${linha}: ${nova.codigo} — ${nova.nome}`,
+      );
+      fireEvent.click(botaoConfirmar());
+      await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
+      const dto = vi.mocked(admitirColaborador).mock
+        .calls[0]![0] as unknown as Record<string, unknown>;
+      expect(dto[chave]).toBe(nova.id);
+    },
+  );
 
   it('empresa sem Departamento e Cargo: o aviso orienta o "+", some depois de criar os dois e a admissão segue', async () => {
     vi.mocked(listarDepartamentos).mockResolvedValue(paginado([]));

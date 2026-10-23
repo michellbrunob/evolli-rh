@@ -2266,6 +2266,14 @@ gênero, foto, raça/etnia, dados trabalhistas detalhados, horário e fuso,
 telefone estrangeiro, importação em massa, cadastro rápido de Área, Equipe e
 Centro de custo, promoção e merge.
 
+**Revisão adversarial (2026-10-23):** corrigida a corrida em que uma recarga
+lenta do seletor, lida antes de uma criação, chegava depois dela e tirava a
+referência nova da lista: a resposta obsoleta é descartada e a referência
+escolhida nunca sai do seletor, então a confirmação mostra o que a admissão
+envia. A mensagem do envio incerto só diz que a lista foi atualizada depois
+que isso acontece. O E2E confere a trilha `authorization_denied` das recusas
+403 e 404 e que o 409 não devolve o código.
+
 ## Próxima ação autorizável
 
 1. ~~**Decidir o pacote da T150**~~ — **cumprido pela T151.** O proprietário aprovou o recorte em
