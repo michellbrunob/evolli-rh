@@ -19,7 +19,9 @@ import {
   ROTULO_DATA_NASCIMENTO,
   type ValoresEndereco,
   blocoEndereco,
-  blocoPerfil,
+  blocoPerfilDaFicha,
+  ehSexoLegado,
+  SEXO_LEGADO_MANTIDO,
   ehPaisBrasil,
   enderecoParaEdicao,
   normalizarTexto,
@@ -48,12 +50,17 @@ import {
  * cadastro anterior à lista aparece como veio.
  *
  * T181 — os dois blocos passam a ser EDITÁVEIS na ficha, cada um com o seu
- * "Editar", Salvar e Cancelar (decisão da proprietária de 2026-10-23). A
- * edição só aparece depois de uma leitura aceita: no servidor, quem lê estas
- * categorias também as edita, na mesma empresa, então a ficha nunca oferece
- * um botão que ele recusaria. Vínculo encerrado (`bloqueado`) não tem edição.
- * Cada bloco envia só ele mesmo (`PUT .../dados-pessoais`); o outro fica como
- * está. A empresa nunca é enviada: o servidor a resolve pela sessão.
+ * "Editar", Salvar e Cancelar, só para RH e DP, na empresa ativa (decisões da
+ * proprietária de 2026-10-23). O `master_tecnico` continua lendo e NÃO edita:
+ * sem `podeEditar`, a ficha não mostra Preencher, Editar, Salvar nem Cancelar,
+ * e o servidor recusa a edição de qualquer forma. A edição também só aparece
+ * depois de uma leitura aceita, e vínculo encerrado (`bloqueado`) não tem
+ * edição. Cada bloco envia só ele mesmo (`PUT .../dados-pessoais`); o outro
+ * fica como está. A empresa nunca é enviada: o servidor a resolve pela sessão.
+ *
+ * T181 — sexo LEGADO (texto de antes da lista fechada) aparece marcado como
+ * tal, só para leitura, e nunca é limpo nem convertido sem pedido: sem escolha
+ * no seletor, o campo sai do envio e o servidor mantém o gravado.
  */
 type Carga =
   | { status: "carregando" }
@@ -93,11 +100,11 @@ const NAO_INFORMADO = "Não informado";
 export interface DadosPessoaisColaboradorSecaoProps {
   readonly colaboradorId: string;
   /**
-   * T181 — o perfil pode consultar o CEP. A consulta é do servidor e exige a
-   * mesma capacidade de admitir (RH e DP); sem ela, não há botão nem consulta
-   * ao sair do campo, e o endereço é preenchido à mão.
+   * T181 — o perfil edita a ficha: só RH e DP (`PAPEIS_EDICAO_FICHA`). Sem
+   * isso, os blocos ficam só em leitura, sem nenhum botão. A consulta de CEP
+   * na edição do endereço exige a capacidade de admitir, dos mesmos RH e DP.
    */
-  readonly consultaCepDisponivel?: boolean;
+  readonly podeEditar?: boolean;
   /** T181 — há edição não salva em algum dos blocos. */
   readonly onAlteradoChange?: (alterado: boolean) => void;
   /** T181 — algum dos blocos está gravando. */
@@ -106,7 +113,7 @@ export interface DadosPessoaisColaboradorSecaoProps {
 
 export function DadosPessoaisColaboradorSecao({
   colaboradorId,
-  consultaCepDisponivel = false,
+  podeEditar = false,
   onAlteradoChange,
   onSalvandoChange,
 }: DadosPessoaisColaboradorSecaoProps) {
@@ -209,6 +216,7 @@ export function DadosPessoaisColaboradorSecao({
       <BlocoPerfilPessoal
         colaboradorId={colaboradorId}
         perfil={dados.perfilPessoal}
+        podeEditar={podeEditar}
         onGravado={aoGravar}
         onAlteradoChange={aoAlterarPerfil}
         onSalvandoChange={aoSalvarPerfil}
@@ -216,7 +224,7 @@ export function DadosPessoaisColaboradorSecao({
       <BlocoEndereco
         colaboradorId={colaboradorId}
         endereco={dados.endereco}
-        consultaCepDisponivel={consultaCepDisponivel}
+        podeEditar={podeEditar}
         onGravado={aoGravar}
         onAlteradoChange={aoAlterarEndereco}
         onSalvandoChange={aoSalvarEndereco}
@@ -227,6 +235,8 @@ export function DadosPessoaisColaboradorSecao({
 
 interface BlocoProps {
   readonly colaboradorId: string;
+  /** T181 — só RH e DP: sem isso, o bloco fica só em leitura, sem botões. */
+  readonly podeEditar: boolean;
   readonly onGravado: (dados: DadosPessoaisDoColaboradorApi) => void;
   readonly onAlteradoChange: (alterado: boolean) => void;
   readonly onSalvandoChange: (salvando: boolean) => void;
@@ -364,14 +374,14 @@ const NOME_PERFIL: NomeDoBloco = {
 function BlocoPerfilPessoal(
   props: BlocoProps & { readonly perfil: PerfilPessoalApi | null },
 ) {
-  const { colaboradorId, perfil, onGravado } = props;
+  const { colaboradorId, perfil, podeEditar, onGravado } = props;
   const { valores: inicial, sexoAnterior } = perfilParaEdicao(perfil);
   const edicao = useEdicaoDoBloco<ChavePerfil>({
     colaboradorId,
     inicial,
     atualizadoEm: perfil?.atualizadoEm ?? null,
     validar: validarPerfil,
-    corpo: (valores) => ({ perfilPessoal: blocoPerfil(valores) }),
+    corpo: (valores) => ({ perfilPessoal: blocoPerfilDaFicha(valores) }),
     atualizadoEmDa: (r) => r.perfilPessoal?.atualizadoEm ?? null,
     ordem: ORDEM_PERFIL,
     idDoCampo: (campo) => ID_PERFIL[campo],
@@ -407,7 +417,11 @@ function BlocoPerfilPessoal(
               </div>
               <div className="colaboradores-screen__par">
                 <dt>{CAMPO_SEXO.rotulo}</dt>
-                <dd>{rotuloDoSexo(perfil.sexo) ?? NAO_INFORMADO}</dd>
+                <dd>
+                  {ehSexoLegado(perfil.sexo)
+                    ? `${perfil.sexo} (valor legado)`
+                    : (rotuloDoSexo(perfil.sexo) ?? NAO_INFORMADO)}
+                </dd>
               </div>
               {CAMPOS_TEXTO_PERFIL.map((c) => (
                 <div key={c.chave} className="colaboradores-screen__par">
@@ -417,16 +431,18 @@ function BlocoPerfilPessoal(
               ))}
             </dl>
           )}
-          <RodapeDaLeitura
-            sucesso={edicao.sucesso}
-            idBotao={ID_EDITAR_PERFIL}
-            rotuloBotao={
-              perfil === null
-                ? "Preencher dados pessoais"
-                : "Editar dados pessoais"
-            }
-            onEditar={edicao.editar}
-          />
+          {podeEditar ? (
+            <RodapeDaLeitura
+              sucesso={edicao.sucesso}
+              idBotao={ID_EDITAR_PERFIL}
+              rotuloBotao={
+                perfil === null
+                  ? "Preencher dados pessoais"
+                  : "Editar dados pessoais"
+              }
+              onEditar={edicao.editar}
+            />
+          ) : null}
         </>
       ) : (
         <form
@@ -476,7 +492,17 @@ function BlocoPerfilPessoal(
                       }
                     : {})}
                 >
-                  <option value="">Selecione…</option>
+                  {sexoAnterior !== null ? (
+                    // T181 — legado: a primeira opção mantém o gravado (o
+                    // campo sai do envio); mudar exige uma opção da lista
+                    // atual. Não há opção vazia: o legado nunca vira "não
+                    // informado" sem que alguém escolha "Não informar".
+                    <option value={SEXO_LEGADO_MANTIDO}>
+                      Manter o valor legado
+                    </option>
+                  ) : (
+                    <option value="">Selecione…</option>
+                  )}
                   {OPCOES_SEXO.map((opcao) => (
                     <option key={opcao.codigo} value={opcao.codigo}>
                       {opcao.rotulo}
@@ -484,10 +510,8 @@ function BlocoPerfilPessoal(
                   ))}
                 </select>
                 {sexoAnterior !== null ? (
-                  // T181 — cadastro anterior à lista fechada: o servidor só
-                  // aceita a lista, então salvar substitui o valor anterior.
                   <p id={ID_SEXO_ANTERIOR} className="evolli-field__help">
-                    {`Valor gravado anteriormente, fora da lista: "${sexoAnterior}". Escolha uma opção ou deixe sem seleção; ao salvar, ele é substituído.`}
+                    {`Valor legado, gravado antes da lista atual: "${sexoAnterior}". Ele fica exatamente como está enquanto "Manter o valor legado" estiver escolhido; uma nova escolha segue a lista atual.`}
                   </p>
                 ) : null}
               </>
@@ -579,10 +603,9 @@ function validarEnderecoDaFicha(
 function BlocoEndereco(
   props: BlocoProps & {
     readonly endereco: EnderecoApi | null;
-    readonly consultaCepDisponivel: boolean;
   },
 ) {
-  const { colaboradorId, endereco, consultaCepDisponivel, onGravado } = props;
+  const { colaboradorId, endereco, podeEditar, onGravado } = props;
   /** T179 — contador que limpa os avisos da máscara do CEP. */
   const [limpezaDosAvisos, setLimpezaDosAvisos] = useState(0);
   /** O recomeço da consulta de CEP, ligado depois que ela existe. */
@@ -619,8 +642,9 @@ function BlocoEndereco(
   });
   reiniciarCepRef.current = consultaCep.reiniciar;
   useAvisarPai(edicao.alterado, edicao.salvando, props);
-  // Consulta só para quem o servidor a aceita, e só com país Brasil.
-  const cepAssistido = consultaCepDisponivel && consultaCep.assistido;
+  // Consulta só para quem edita (RH e DP, os mesmos que o servidor aceita na
+  // consulta de CEP), e só com país Brasil.
+  const cepAssistido = podeEditar && consultaCep.assistido;
   const cep = consultaCep.estado;
 
   function alterar(campo: ChaveEndereco, valor: string) {
@@ -716,14 +740,16 @@ function BlocoEndereco(
               })}
             </dl>
           )}
-          <RodapeDaLeitura
-            sucesso={edicao.sucesso}
-            idBotao={ID_EDITAR_ENDERECO}
-            rotuloBotao={
-              endereco === null ? "Preencher endereço" : "Editar endereço"
-            }
-            onEditar={edicao.editar}
-          />
+          {podeEditar ? (
+            <RodapeDaLeitura
+              sucesso={edicao.sucesso}
+              idBotao={ID_EDITAR_ENDERECO}
+              rotuloBotao={
+                endereco === null ? "Preencher endereço" : "Editar endereço"
+              }
+              onEditar={edicao.editar}
+            />
+          ) : null}
         </>
       ) : (
         <form

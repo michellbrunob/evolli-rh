@@ -174,7 +174,7 @@ export interface PessoasScreenProps {
   /** T177 — leva "Novo colaborador" à página de Nova admissão. */
   onNovaAdmissao?: ColaboradoresScreenProps["onNovaAdmissao"];
   /** T181 — repassado à aba Colaboradores (ver `ColaboradoresScreenProps`). */
-  consultaCepDisponivel?: boolean;
+  podeEditarFicha?: boolean;
 }
 
 export function PessoasScreen({
@@ -184,7 +184,7 @@ export function PessoasScreen({
   aberturaInicial = null,
   onAberturaAtendida,
   onNovaAdmissao,
-  consultaCepDisponivel = false,
+  podeEditarFicha = false,
 }: PessoasScreenProps) {
   // Só as abas do modo. `ABAS` continua sendo a fonte única; o filtro é
   // de apresentação, e a primeira aba do conjunto vira o padrão — assim
@@ -273,7 +273,7 @@ export function PessoasScreen({
             aberturaInicial={aberturaInicial}
             {...(onAberturaAtendida ? { onAberturaAtendida } : {})}
             {...(onNovaAdmissao ? { onNovaAdmissao } : {})}
-            consultaCepDisponivel={consultaCepDisponivel}
+            podeEditarFicha={podeEditarFicha}
           />
         ) : abaAtiva === "horario" ? (
           <PessoasHorarioScreen />

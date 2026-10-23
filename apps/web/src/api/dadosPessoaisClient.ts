@@ -81,7 +81,14 @@ export async function consultarDadosPessoaisDoColaborador(
  * ausente fica como está. A ficha salva um bloco por vez.
  */
 export interface RegistrarDadosPessoaisDto {
-  perfilPessoal?: Omit<PerfilPessoalApi, "atualizadoEm">;
+  /**
+   * T181 — `sexo` AUSENTE mantém o gravado (inclusive um valor legado, de
+   * antes da lista fechada); só um código da lista o substitui, e `null`
+   * explícito o apaga.
+   */
+  perfilPessoal?: Omit<PerfilPessoalApi, "atualizadoEm" | "sexo"> & {
+    sexo?: string | null;
+  };
   endereco?: Omit<EnderecoApi, "atualizadoEm">;
 }
 

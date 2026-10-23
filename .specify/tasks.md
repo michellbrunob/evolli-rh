@@ -2433,6 +2433,11 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       merge.
     - **Prévia:** `http://127.0.0.1:5173` passa a mostrar a branch da T181 ao vivo, identificada
       como `[T181 dev]`, não a `main`.
+    - **Decisões complementares (2026-10-23):** a edição de dados pessoais, endereço e contatos é
+      só de RH e DP, na empresa ativa; o `master_tecnico` mantém a leitura e deixa de editar,
+      recusado pelo servidor e sem botões na ficha. Sexo legado (fora da lista fechada) fica
+      exatamente como está ao salvar outro campo — sexo ausente do corpo mantém o gravado —,
+      aparece como valor legado só para leitura, e mudá-lo exige uma opção da lista atual.
 
 ## Regra obrigatória para as próximas tarefas
 

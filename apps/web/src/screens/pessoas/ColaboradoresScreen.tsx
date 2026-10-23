@@ -153,11 +153,12 @@ export interface ColaboradoresScreenProps {
    */
   readonly onNovaAdmissao?: () => void;
   /**
-   * T181 — o perfil pode consultar o CEP na edição do endereço da ficha. A
-   * consulta é do servidor e exige a capacidade de admitir (RH e DP): sem
-   * ela, a ficha não oferece o botão, e o endereço é preenchido à mão.
+   * T181 — o perfil edita, na ficha, dados pessoais, endereço e contatos: só
+   * RH e DP (`PAPEIS_EDICAO_FICHA`). Sem isso, os blocos ficam só em leitura,
+   * sem Preencher, Editar, Salvar nem Cancelar. Os mesmos papéis consultam o
+   * CEP. Só orienta a tela: quem recusa é o servidor.
    */
-  readonly consultaCepDisponivel?: boolean;
+  readonly podeEditarFicha?: boolean;
 }
 
 export function ColaboradoresScreen({
@@ -165,7 +166,7 @@ export function ColaboradoresScreen({
   aberturaInicial = null,
   onAberturaAtendida,
   onNovaAdmissao,
-  consultaCepDisponivel = false,
+  podeEditarFicha = false,
 }: ColaboradoresScreenProps = {}) {
   const [statusCarregamento, setStatusCarregamento] = useState<
     "carregando" | "erro" | "dados"
@@ -1064,7 +1065,7 @@ export function ColaboradoresScreen({
             <DadosPessoaisColaboradorSecao
               key={`dados-${detalhe.colaborador.id}`}
               colaboradorId={detalhe.colaborador.id}
-              consultaCepDisponivel={consultaCepDisponivel}
+              podeEditar={podeEditarFicha}
               onAlteradoChange={setDadosPessoaisAlterados}
               onSalvandoChange={setSalvandoDadosPessoais}
             />
@@ -1075,6 +1076,7 @@ export function ColaboradoresScreen({
               onAlteradoChange={setContatosAlterados}
               onSalvandoChange={setSalvandoContatos}
               focarAoCarregar={focarContatos}
+              podeEditar={podeEditarFicha}
             />
 
             <div className="colaboradores-screen__vinculos">

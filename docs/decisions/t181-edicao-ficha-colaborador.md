@@ -17,7 +17,7 @@ gravados, sem nenhum campo novo.
 | Ponto                   | Regra                                                                                                                                                                                                  |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Blocos editáveis        | **Dados pessoais** complementares já existentes, **Endereço** e **Contatos**                                                                                                                           |
-| Quem edita              | RH e DP, somente na **empresa ativa** da sessão                                                                                                                                                        |
+| Quem edita              | Só RH e DP, somente na **empresa ativa** da sessão. O `master_tecnico` **não edita** (só lê, como antes); a recusa é do servidor, e a ficha não lhe mostra Preencher, Editar, Salvar nem Cancelar      |
 | Sem permissão           | Leitura segura: perfil que o servidor recusa não vê valor nem botão de edição                                                                                                                          |
 | Contatos                | Mantém o estado "Nenhum contato registrado" e as regras da T179 para adicionar e remover; concorrência continua protegida                                                                              |
 | CEP                     | Preenchimento assistido pelo ViaCEP somente pelo servidor, campos editáveis e alternativa manual                                                                                                       |
@@ -27,6 +27,7 @@ gravados, sem nenhum campo novo.
 | Falhas                  | Sessão expirada, CSRF desatualizado, 403, 404, 409, rede e 5xx não perdem o que foi digitado, e nenhuma mensagem afirma gravação incerta                                                               |
 | Interface               | Identidade do Evolli; edição por seção, com Salvar e Cancelar; Cancelar restaura o gravado; erro no campo, foco no primeiro erro; em 375 px sem rolagem horizontal e com controles de toque acessíveis |
 | Imutáveis nesta tarefa  | Nome (fora a correção já existente na ficha), matrícula, tipo de vínculo, lotação, situação e datas da admissão                                                                                        |
+| Sexo legado             | Valor fora da lista fechada (cadastro anterior à T179) fica exatamente como está: aparece como "valor legado", só para leitura; mudar exige escolher Feminino, Masculino, Intersexo ou Não informar    |
 | Contrato, banco e build | Sem schema, migration, seed, Docker, dependência ou lockfile novos                                                                                                                                     |
 
 A referência funcional de mercado serve só para o comportamento; marca,
@@ -45,19 +46,42 @@ Leitura do código em `main` (`cf04afc`), sem mudança de contrato:
   (`FOR NO KEY UPDATE`) e o e-mail pessoal é único na empresa.
 - `GET /v1/cep/:cep` consulta o ViaCEP pelo servidor, com a capacidade de
   admitir (`colaborador:create`: RH e DP na própria empresa).
-- As permissões de leitura e de edição de dados pessoais e de contatos são as
-  **mesmas** para cada papel: quem lê, edita. A ficha mostra a edição só
-  depois de uma leitura aceita pelo servidor.
+- Até a T181, as permissões de leitura e de edição de dados pessoais e de
+  contatos eram as mesmas para cada papel, inclusive o `master_tecnico`
+  (Emendas 1 e 2 da ADR 0012).
 
-## 3. Pontos de leitura técnica, sem mudança de regra
+## 3. Decisões complementares da proprietária (2026-10-23)
 
-- **`master_tecnico`:** a regra existente (Emenda 2 da ADR 0012) já o deixa
-  ler e editar dados pessoais e contatos, na empresa ativa quando há uma. A
-  T181 não muda permissão: a ficha segue o que o servidor aceita. A consulta
-  de CEP não é oferecida a ele, porque o servidor a recusaria; o endereço
-  segue manual.
+Tomadas depois da primeira versão da PR, ainda na T181.
+
+1. **Edição da ficha só por RH e DP.** RH e DP leem e editam dados pessoais,
+   endereço e contatos, só na empresa ativa. O `master_tecnico` **deixa de
+   editar** essas categorias e mantém só a leitura que já tinha (sem empresa
+   ativa, na empresa do vínculo; com empresa ativa, só nela). Isto restringe,
+   para a edição, o que as Emendas 1 e 2 da ADR 0012 concediam; nenhuma
+   permissão de nenhum perfil é ampliada. A recusa é do servidor
+   (`evaluateContatos` e `evaluateDadosPessoais`, com a negação na trilha pelo
+   recurso certo e sem valores); a tela só deixa de oferecer o que ele
+   recusaria.
+2. **Sexo legado preservado.** Um valor fora da lista fechada (cadastro
+   anterior à T179) nunca é limpo, alterado, descartado nem convertido sem
+   pedido:
+   - aparece na ficha como "valor legado", só para leitura, com aviso de que
+     novas escolhas seguem a lista atual;
+   - salvar outro campo dos dados pessoais, ou o endereço, não o toca: na
+     edição dos dados pessoais, sexo **ausente** do corpo mantém o gravado;
+   - mudá-lo exige escolher uma opção da lista atual — Feminino, Masculino,
+     Intersexo ou Não informar —; não há texto livre novo, e o seletor não
+     oferece "vazio" para o legado;
+   - valor fora da lista enviado direto à API é recusado com 400, sem eco do
+     valor, e o gravado fica.
+
+## 4. Pontos de leitura técnica
+
 - **Data de nascimento:** é o campo obrigatório do bloco de dados pessoais e
   vai sempre junto quando o bloco é salvo. Não é data da admissão.
-- **Sexo gravado fora da lista fechada** (cadastro anterior à T179): o
-  servidor só aceita a lista; a ficha mostra o valor anterior e pede uma
-  opção da lista, ou nenhuma, ao salvar o bloco.
+- **CEP:** a consulta exige a capacidade de admitir (`colaborador:create`):
+  RH e DP, os mesmos que editam a ficha.
+- **`null` explícito em sexo**, enviado direto à API, continua apagando o
+  valor ("não informado"), como antes da T181; a ficha não o envia para um
+  valor legado.

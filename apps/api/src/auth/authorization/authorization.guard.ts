@@ -18,6 +18,7 @@ import {
   isOrganizationalResource,
   isSolicitacoesPessoasResource,
   isContatosResource,
+  isDadosPessoaisResource,
 } from "./permission.types";
 import { AuditResource } from "../../audit/audit.types";
 import {
@@ -64,6 +65,12 @@ function toAuditResource(resource: AuthorizationResource): AuditResource {
   // T169 — mesma razão: a negação de capacidade em contatos não pode virar
   // `access_user` na trilha.
   if (isContatosResource(resource)) {
+    return resource;
+  }
+  // T181 — mesma razão para dados pessoais e endereço: a recusa da edição
+  // (master técnico, gestor, colaborador…) aparece na trilha pelo recurso
+  // certo, nunca como `access_user`.
+  if (isDadosPessoaisResource(resource)) {
     return resource;
   }
   return "access_user";

@@ -634,10 +634,11 @@ function evaluateSolicitacoesPessoas(
  * 2026-10-16 (A2 restrita).
  *
  * - `rh` e `dp` leem e editam na **empresa ativa**.
- * - `master_tecnico` lê e edita em **qualquer empresa** (Emenda 1 da ADR
- *   0012). Com empresa ativa, atua **dentro dela**, como em todo o resto
- *   (T163); sem seleção, atua na empresa do vínculo do colaborador, que o
- *   service resolve e audita.
+ * - `master_tecnico` LÊ em **qualquer empresa** (Emenda 1 da ADR 0012). Com
+ *   empresa ativa, lê **dentro dela**, como em todo o resto (T163); sem
+ *   seleção, lê na empresa do vínculo do colaborador, que o service resolve e
+ *   audita. T181 — NÃO edita (decisão da proprietária de 2026-10-23: a edição
+ *   da ficha é só de RH e DP).
  * - `gestor`, `colaborador` e os demais: sem acesso.
  *
  * Só `read` e `alter`. `create` não é ação própria — gravar contato pela
@@ -660,6 +661,10 @@ function evaluateContatos(
 
   switch (subject.role) {
     case "master_tecnico":
+      // T181 — só leitura: a edição da ficha é de RH e DP.
+      if (target.action !== "read") {
+        return false;
+      }
       if (!escopoResolvido) {
         return true;
       }
@@ -685,11 +690,11 @@ function evaluateContatos(
  * Dados pessoais e endereco do colaborador (T177, Modulo 1 do cadastro).
  *
  * - `rh` e `dp` leem e editam na **empresa ativa**.
- * - `master_tecnico` le e edita em **qualquer empresa** (Emenda 2 da ADR
- *   0012: decisao da proprietaria de que o cargo de confianca acessa tudo),
- *   no mesmo desenho dos contatos: com empresa ativa, atua **dentro dela**
- *   (T163); sem selecao, atua na empresa do vinculo do colaborador, que o
- *   service resolve e audita.
+ * - `master_tecnico` LE em **qualquer empresa** (Emenda 2 da ADR 0012), no
+ *   mesmo desenho dos contatos: com empresa ativa, le **dentro dela** (T163);
+ *   sem selecao, le na empresa do vinculo do colaborador, que o service
+ *   resolve e audita. T181 — NAO edita (decisao da proprietaria de
+ *   2026-10-23: a edicao da ficha e so de RH e DP).
  * - `gestor`, `colaborador` e os demais: sem acesso.
  *
  * So `read` e `alter`, como nos contatos. A criacao na admissao passa pela
@@ -709,6 +714,10 @@ function evaluateDadosPessoais(
 
   switch (subject.role) {
     case "master_tecnico":
+      // T181 — so leitura: a edicao da ficha e de RH e DP.
+      if (target.action !== "read") {
+        return false;
+      }
       if (!escopoResolvido) {
         return true;
       }

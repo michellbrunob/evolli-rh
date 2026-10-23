@@ -232,6 +232,48 @@ export interface ContatosColaboradorSecaoProps {
    * admitir chega direto ao que vai preencher. Só vale uma vez por montagem.
    */
   readonly focarAoCarregar?: boolean;
+  /**
+   * T181 — o perfil edita os contatos: só RH e DP, na empresa ativa (decisão
+   * da proprietária de 2026-10-23). Sem isso, a seção mostra os contatos só
+   * para leitura, sem Salvar nem Cancelar — o `master_tecnico` lê, mas o
+   * servidor recusa a edição.
+   */
+  readonly podeEditar?: boolean;
+}
+
+/** T181 — contatos só para leitura: o gravado, como a ficha o mostra. */
+function ContatosSoLeitura({
+  gravado,
+}: {
+  readonly gravado: ContatosApi | null;
+}) {
+  if (gravado === null) {
+    return (
+      <p
+        id={SEM_CONTATOS_ID}
+        className="colaboradores-screen__contatos-aviso"
+        role="status"
+      >
+        Nenhum contato registrado.
+      </p>
+    );
+  }
+  const valores = valoresDe(gravado);
+  const linhas: readonly [string, string][] = [
+    ["E-mail pessoal", valores.emailPessoal],
+    ["Celular", valores.celular],
+    ["Telefone", valores.telefone],
+  ];
+  return (
+    <dl className="colaboradores-screen__dados-pessoais-lista">
+      {linhas.map(([rotulo, valor]) => (
+        <div key={rotulo} className="colaboradores-screen__par">
+          <dt>{rotulo}</dt>
+          <dd>{valor === "" ? NAO_INFORMADO : valor}</dd>
+        </div>
+      ))}
+    </dl>
+  );
 }
 
 export function ContatosColaboradorSecao({
@@ -239,6 +281,7 @@ export function ContatosColaboradorSecao({
   onAlteradoChange,
   onSalvandoChange,
   focarAoCarregar = false,
+  podeEditar = false,
 }: ContatosColaboradorSecaoProps) {
   const [carga, setCarga] = useState<Carga>({ status: "carregando" });
   const [edicao, setEdicao] = useState<ValoresContatos>(VAZIO);
@@ -318,11 +361,13 @@ export function ContatosColaboradorSecao({
   );
 
   useEffect(() => {
-    if (!focarAoCarregar || focoInicialAtendidoRef.current) return;
+    if (!podeEditar || !focarAoCarregar || focoInicialAtendidoRef.current) {
+      return;
+    }
     if (carga.status !== "dados") return;
     focoInicialAtendidoRef.current = true;
     document.getElementById(ID_DO_CAMPO.emailPessoal)?.focus();
-  }, [carga.status, focarAoCarregar]);
+  }, [carga.status, focarAoCarregar, podeEditar]);
 
   useEffect(() => {
     if (!focarPrimeiroErroRef.current) return;
@@ -495,6 +540,8 @@ export function ContatosColaboradorSecao({
           previsto ou ativo nesta empresa. Depois do desligamento, os contatos
           ficam guardados, mas não são exibidos nem alterados.
         </p>
+      ) : !podeEditar ? (
+        <ContatosSoLeitura gravado={gravado} />
       ) : (
         <form
           className="colaboradores-screen__contatos-form"

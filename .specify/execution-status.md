@@ -2290,6 +2290,11 @@ Docker, dependência ou lockfile novos.
 
 **Decisão da proprietária (2026-10-23):** [decisão](../docs/decisions/t181-edicao-ficha-colaborador.md).
 
+**Decisões complementares (2026-10-23):** edição da ficha só por RH e DP (o
+`master_tecnico` lê e não edita, recusado pelo servidor); sexo legado
+preservado ao salvar outro campo e alterado só por escolha deliberada de uma
+opção da lista atual.
+
 **Fora de escopo:** CPF, RG, CNH, CTPS, PIS, documentos, dados bancários,
 dependentes, filhos, camisa, saúde, dados sindicais, foto, raça/etnia, gênero,
 deficiência, dados contratuais detalhados, fuso, telefone estrangeiro,

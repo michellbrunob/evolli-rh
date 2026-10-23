@@ -94,6 +94,7 @@ import {
   destinoInicialPara,
   destinoPorId,
   capacidadeFuncionalDe,
+  podeEditarFicha,
 } from "./mapaNavegacao";
 import {
   destinoDaRota,
@@ -271,8 +272,8 @@ function conteudoDoDestino(
         {...(admissao.podeAdmitir
           ? { onNovaAdmissao: () => onNavegar("nova-admissao") }
           : {})}
-        // T181 — a consulta de CEP exige a mesma capacidade de admitir.
-        consultaCepDisponivel={admissao.podeAdmitir}
+        // T181 — a edição da ficha é só de RH e DP.
+        podeEditarFicha={podeEditarFicha(admissao.papelDoAtor)}
       />
     );
   }

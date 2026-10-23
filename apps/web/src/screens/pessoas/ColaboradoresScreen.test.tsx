@@ -1437,7 +1437,7 @@ describe("ColaboradoresScreen (T169 — contatos do colaborador)", () => {
   }
 
   async function abrirDetalheDeAna() {
-    render(<ColaboradoresScreen />);
+    render(<ColaboradoresScreen podeEditarFicha />);
     await screen.findByRole("table", { name: "Colaboradores desta empresa" });
     const linha = screen.getByText("Ana Colaboradora (teste)").closest("tr")!;
     fireEvent.click(within(linha).getByRole("button", { name: /Abrir ficha/ }));
@@ -1450,7 +1450,7 @@ describe("ColaboradoresScreen (T169 — contatos do colaborador)", () => {
 
   it("a lista não pede contatos: só o detalhe, pela rota própria e sem empresa", async () => {
     const antes = vi.mocked(consultarContatosDoColaborador).mock.calls.length;
-    render(<ColaboradoresScreen />);
+    render(<ColaboradoresScreen podeEditarFicha />);
     await screen.findByRole("table", { name: "Colaboradores desta empresa" });
     expect(vi.mocked(consultarContatosDoColaborador).mock.calls.length).toBe(
       antes,
@@ -2180,6 +2180,7 @@ describe("ColaboradoresScreen (T169 — contatos do colaborador)", () => {
     render(
       <ColaboradoresScreen
         aberturaInicial={{ colaborador: colaborador1, foco: "contatos" }}
+        podeEditarFicha
       />,
     );
     await waitFor(() => expect(email()).toHaveFocus());
@@ -3104,8 +3105,8 @@ describe("T178 — 'Nova admissão' e a ficha a partir da linha", () => {
 // servidor a aceita.
 // ---------------------------------------------------------------------------
 describe("T181 — ficha: dados pessoais e endereço editáveis no detalhe", () => {
-  async function abrirFicha(props: { consultaCepDisponivel?: boolean } = {}) {
-    render(<ColaboradoresScreen {...props} />);
+  async function abrirFicha(props: { podeEditarFicha?: boolean } = {}) {
+    render(<ColaboradoresScreen podeEditarFicha {...props} />);
     await screen.findByRole("table", { name: "Colaboradores desta empresa" });
     const linha = screen.getByText("Ana Colaboradora (teste)").closest("tr")!;
     fireEvent.click(within(linha).getByRole("button", { name: /Abrir ficha/ }));
@@ -3165,19 +3166,52 @@ describe("T181 — ficha: dados pessoais e endereço editáveis no detalhe", () 
     );
   });
 
-  it.each([
-    [true, 1],
-    [false, 0],
-  ])(
-    "consulta de CEP disponível = %s: %i botão 'Buscar CEP' na edição do endereço",
-    async (disponivel, quantos) => {
-      const endereco = await abrirFicha({ consultaCepDisponivel: disponivel });
-      fireEvent.click(
-        within(endereco).getByRole("button", { name: "Editar endereço" }),
-      );
-      expect(
-        within(endereco).queryAllByRole("button", { name: "Buscar CEP" }),
-      ).toHaveLength(quantos);
-    },
-  );
+  it("quem edita a ficha (RH ou DP) tem 'Buscar CEP' na edição do endereço", async () => {
+    const endereco = await abrirFicha();
+    fireEvent.click(
+      within(endereco).getByRole("button", { name: "Editar endereço" }),
+    );
+    expect(
+      within(endereco).getAllByRole("button", { name: "Buscar CEP" }),
+    ).toHaveLength(1);
+  });
+
+  // T181 — a edição da ficha é só de RH e DP (decisão de 2026-10-23): quem
+  // só lê (o master_tecnico) vê os três blocos sem nenhum botão de edição.
+  it("sem permissão de editar: dados pessoais, endereço e contatos só para leitura", async () => {
+    vi.mocked(consultarContatosDoColaborador).mockResolvedValueOnce({
+      colaboradorId: colaborador1.id,
+      empresaId: "44444444-4444-4444-4444-444444444444",
+      situacao: "registrado",
+      contatos: {
+        emailPessoal: "ana.leitura@example.test",
+        celular: "+5511987650001",
+        telefone: null,
+        atualizadoEm: "2026-10-16T12:00:00.000Z",
+      },
+    });
+    await abrirFicha({ podeEditarFicha: false });
+    const contatos = await screen.findByRole("region", { name: "Contatos" });
+    await within(contatos).findByText("ana.leitura@example.test");
+    expect(within(contatos).getByText("(11) 98765-0001")).toBeInTheDocument();
+    for (const nome of ["Dados pessoais", "Endereço", "Contatos"]) {
+      const regiao = screen.getByRole("region", { name: nome });
+      expect(within(regiao).queryByRole("button")).toBeNull();
+      expect(within(regiao).queryByRole("textbox")).toBeNull();
+    }
+    expect(
+      screen.queryByRole("button", {
+        name: /^(Preencher|Editar) (dados pessoais|endereço)$|^Salvar contatos$|^Cancelar$/,
+      }),
+    ).toBeNull();
+  });
+
+  it("sem permissão de editar e sem contatos: 'Nenhum contato registrado', sem campos", async () => {
+    await abrirFicha({ podeEditarFicha: false });
+    const contatos = await screen.findByRole("region", { name: "Contatos" });
+    expect(
+      await within(contatos).findByText("Nenhum contato registrado."),
+    ).toBeInTheDocument();
+    expect(within(contatos).queryByRole("textbox")).toBeNull();
+  });
 });

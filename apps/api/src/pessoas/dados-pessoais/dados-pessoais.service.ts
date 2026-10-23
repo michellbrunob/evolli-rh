@@ -508,6 +508,14 @@ export class DadosPessoaisColaboradorService {
       where: { colaboradorId_empresaId: alvo },
       select: PROJECAO_PERFIL,
     });
+    // T181 — sexo AUSENTE do corpo mantém o gravado, exatamente como está:
+    // inclusive um valor legado, de antes da lista fechada da T179, que nunca
+    // é limpo nem convertido sem pedido (decisão da proprietária de
+    // 2026-10-23). Alterá-lo exige enviar um código da lista (`SEXOS`); `null`
+    // explícito apaga.
+    if (atual && dto.sexo === undefined) {
+      novo.sexo = atual.sexo;
+    }
     if (!atual) {
       // A data de nascimento é obrigatória: o bloco sempre tem ao menos um
       // campo, e criar é sempre gravar.

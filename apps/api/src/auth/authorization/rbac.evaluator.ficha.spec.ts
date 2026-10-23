@@ -3,16 +3,16 @@ import { evaluatePermission } from "./rbac.evaluator";
 import { AuthorizationResource } from "./permission.types";
 
 /**
- * T181 — a ficha do colaborador mostra a edição de dados pessoais, endereço e
- * contatos só depois de uma leitura ACEITA pelo servidor. Isso só é seguro
- * porque, nestas categorias, quem lê também edita, no mesmo escopo: se um dia
- * a leitura for concedida a quem não edita, a ficha passaria a oferecer um
- * botão que o servidor recusa. Este teste prende a equivalência em todos os
- * papéis e situações de empresa, nas duas fases da avaliação (capacidade, sem
- * empresa resolvida, e escopo, com ela).
+ * T181 — a edição de dados pessoais, endereço e contatos na ficha é só de RH
+ * e DP, na empresa ativa (decisão da proprietária de 2026-10-23). O
+ * `master_tecnico` mantém a leitura que já tinha e NÃO edita. A ficha mostra a
+ * edição só a RH e DP (`PAPEIS_EDICAO_FICHA`, na web) e depois de uma leitura
+ * aceita; este teste prende, no servidor, a regra que sustenta isso, em todos
+ * os papéis e situações de empresa, nas duas fases da avaliação (capacidade,
+ * sem empresa resolvida, e escopo, com ela).
  *
- * A consulta de CEP exige a capacidade de admitir (`colaborador:create`): a
- * ficha a oferece só a RH e DP, os mesmos que a podem admitir.
+ * A consulta de CEP exige a capacidade de admitir (`colaborador:create`): RH e
+ * DP, os mesmos que editam a ficha.
  */
 
 const EMPRESA_A = "11111111-1111-4111-8111-111111111111";
@@ -60,9 +60,9 @@ function pode(
   );
 }
 
-describe("T181 — ficha: quem lê dados pessoais e contatos também os edita", () => {
+describe("T181 — ficha: fora o master_tecnico, quem lê dados pessoais e contatos também os edita", () => {
   for (const resource of CATEGORIAS_DA_FICHA) {
-    for (const role of TODOS_OS_PAPEIS) {
+    for (const role of TODOS_OS_PAPEIS.filter((p) => p !== "master_tecnico")) {
       for (const empresaDoSujeito of [EMPRESA_A, null]) {
         it.each(ALVOS)(
           `${resource} · ${role} · sujeito ${empresaDoSujeito ? "com" : "sem"} empresa · alvo %s: ler ⇔ editar`,
@@ -75,6 +75,37 @@ describe("T181 — ficha: quem lê dados pessoais e contatos também os edita", 
       }
     }
   }
+
+  it("master_tecnico nunca edita, em nenhuma fase nem empresa", () => {
+    for (const resource of CATEGORIAS_DA_FICHA) {
+      for (const empresaDoSujeito of [EMPRESA_A, null]) {
+        for (const alvo of ALVOS) {
+          expect(
+            pode("master_tecnico", empresaDoSujeito, resource, "alter", alvo),
+          ).toBe(false);
+        }
+      }
+    }
+  });
+
+  it("master_tecnico mantém só a leitura que já tinha", () => {
+    for (const resource of CATEGORIAS_DA_FICHA) {
+      // Sem empresa ativa, lê em qualquer empresa; com ela, só nela.
+      expect(pode("master_tecnico", null, resource, "read", undefined)).toBe(
+        true,
+      );
+      expect(pode("master_tecnico", null, resource, "read", EMPRESA_B)).toBe(
+        true,
+      );
+      expect(
+        pode("master_tecnico", EMPRESA_A, resource, "read", EMPRESA_A),
+      ).toBe(true);
+      expect(
+        pode("master_tecnico", EMPRESA_A, resource, "read", EMPRESA_B),
+      ).toBe(false);
+      expect(pode("master_tecnico", null, resource, "read", null)).toBe(false);
+    }
+  });
 
   it.each(["rh", "dp"] as const)(
     "%s edita só na própria empresa ativa",

@@ -528,7 +528,7 @@ describe("Cadastro de colaborador — Módulo 1 (e2e)", () => {
     });
   });
 
-  describe("master_tecnico lê e edita dados pessoais", () => {
+  describe("master_tecnico lê dados pessoais e, desde a T181, não os edita", () => {
     let colaboradorId: string;
     let masterEscopadoB: Credencial;
     let masterEscopadoA: Credencial;
@@ -593,7 +593,11 @@ describe("Cadastro de colaborador — Módulo 1 (e2e)", () => {
       });
     });
 
-    it("sem empresa ativa: edita na empresa do vínculo, só o campo alterado", async () => {
+    // T181 — a edição da ficha é só de RH e DP (decisão de 2026-10-23).
+    it("sem empresa ativa: não edita — 403, nada gravado, negação sem valor", async () => {
+      const antes = await prisma.perfilPessoalColaborador.findFirstOrThrow({
+        where: { colaboradorId },
+      });
       const r = await put(
         `/v1/colaboradores/${colaboradorId}/dados-pessoais`,
         master,
@@ -601,25 +605,23 @@ describe("Cadastro de colaborador — Módulo 1 (e2e)", () => {
         .send({
           perfilPessoal: { ...PERFIL, curso: "Curso Editado Pelo Master" },
         })
-        .expect(200);
-      expect(r.body).toMatchObject({
-        empresaId: empresaA,
-        perfilPessoal: { curso: "Curso Editado Pelo Master" },
+        .expect(403);
+      expect(JSON.stringify(r.body)).not.toContain("Curso Editado Pelo Master");
+      expect(
+        await prisma.perfilPessoalColaborador.findFirstOrThrow({
+          where: { colaboradorId },
+        }),
+      ).toEqual(antes);
+      const negacao = await prisma.auditEvent.findFirstOrThrow({
+        where: {
+          action: "authorization_denied",
+          resource: "dados_pessoais_colaborador",
+          actorRole: "master_tecnico",
+        },
+        orderBy: { occurredAt: "desc" },
       });
-      const { evento, formal } = await ultimaTrilha(colaboradorId);
-      expect(evento).toMatchObject({
-        empresaId: empresaA,
-        categoria: "perfil_pessoal",
-        acao: "edicao",
-        resultado: "gravado",
-        campos: ["curso"],
-      });
-      expect(formal).toMatchObject({
-        action: "pessoas_dados_pessoais_atualizados",
-        companyId: empresaA,
-        actorRole: "master_tecnico",
-      });
-      expect(JSON.stringify([evento, formal])).not.toContain(
+      expect(negacao.result).toBe("denied");
+      expect(JSON.stringify(negacao)).not.toContain(
         "Curso Editado Pelo Master",
       );
     });
@@ -635,21 +637,28 @@ describe("Cadastro de colaborador — Módulo 1 (e2e)", () => {
         masterEscopadoB,
       )
         .send({ endereco: ENDERECO })
-        .expect(404);
+        .expect(403);
     });
 
-    it("com empresa ativa A: lê e edita na A", async () => {
+    it("com empresa ativa A: lê na A; T181 — não edita", async () => {
       await get(
         `/v1/colaboradores/${colaboradorId}/dados-pessoais`,
         masterEscopadoA,
       ).expect(200);
-      const r = await put(
+      const antes = await prisma.enderecoColaborador.findFirst({
+        where: { colaboradorId },
+      });
+      await put(
         `/v1/colaboradores/${colaboradorId}/dados-pessoais`,
         masterEscopadoA,
       )
         .send({ endereco: { ...ENDERECO, bairro: "Bairro Do Master" } })
-        .expect(200);
-      expect(r.body.endereco.bairro).toBe("Bairro Do Master");
+        .expect(403);
+      expect(
+        await prisma.enderecoColaborador.findFirst({
+          where: { colaboradorId },
+        }),
+      ).toEqual(antes);
     });
 
     it("sem empresa ativa e vínculo em duas empresas: 409, nada lido nem gravado", async () => {
@@ -707,21 +716,11 @@ describe("Cadastro de colaborador — Módulo 1 (e2e)", () => {
           result: "failure",
         });
 
+        // T181 — o master não edita: o guard recusa antes de o serviço
+        // olhar a empresa.
         await put(`/v1/colaboradores/${colaboradorId}/dados-pessoais`, master)
           .send({ perfilPessoal: { ...PERFIL, curso: "Nao Pode Gravar" } })
-          .expect(409);
-        const tentativa = await ultimaTrilha(colaboradorId);
-        expect(tentativa.evento).toMatchObject({
-          empresaId: null,
-          categoria: "perfil_pessoal",
-          acao: "edicao",
-          resultado: "empresa_ambigua",
-        });
-        expect(tentativa.formal).toMatchObject({
-          action: "pessoas_dados_pessoais_atualizados",
-          companyId: null,
-          result: "failure",
-        });
+          .expect(403);
         expect(
           await prisma.perfilPessoalColaborador.findFirstOrThrow({
             where: { colaboradorId },
@@ -1053,6 +1052,134 @@ describe("Cadastro de colaborador — Módulo 1 (e2e)", () => {
         expect(trilha).not.toContain(valor);
       }
     });
+
+    // T181 — sexo gravado fora da lista fechada (cadastro anterior à T179):
+    // nunca é limpo, alterado nem convertido sem pedido explícito.
+    describe("sexo legado", () => {
+      const LEGADO = "Fem. legado T181";
+      const PERFIL_SEM_SEXO = Object.fromEntries(
+        Object.entries(PERFIL).filter(([chave]) => chave !== "sexo"),
+      );
+
+      async function comSexoLegado(matricula: string): Promise<string> {
+        const id = await admitir(matricula);
+        // O valor legado entra direto no banco, como um cadastro antigo.
+        await prisma.perfilPessoalColaborador.updateMany({
+          where: { colaboradorId: id },
+          data: { sexo: LEGADO },
+        });
+        return id;
+      }
+
+      async function trilhaSemLegado(colaboradorId: string) {
+        const eventos = await prisma.dadosPessoaisColaboradorEvento.findMany({
+          where: { colaboradorId },
+        });
+        const auditoria = await prisma.auditEvent.findMany({
+          where: { resourceId: colaboradorId },
+        });
+        expect(JSON.stringify([eventos, auditoria])).not.toContain(LEGADO);
+      }
+
+      it("salvar os dados pessoais sem o campo sexo mantém o legado exatamente", async () => {
+        const id = await comSexoLegado("MAT-T181-L01");
+        const r = await put(rota(id), rhA)
+          .send({
+            perfilPessoal: { ...PERFIL_SEM_SEXO, curso: "Curso Ficha T181" },
+          })
+          .expect(200);
+        expect(r.body.perfilPessoal).toMatchObject({
+          sexo: LEGADO,
+          curso: "Curso Ficha T181",
+        });
+        expect((await perfilDe(id)).sexo).toBe(LEGADO);
+        const leitura = await get(rota(id), dpA).expect(200);
+        expect(leitura.body.perfilPessoal.sexo).toBe(LEGADO);
+        const edicao =
+          await prisma.dadosPessoaisColaboradorEvento.findFirstOrThrow({
+            where: { colaboradorId: id, acao: "edicao", resultado: "gravado" },
+          });
+        expect(edicao.campos).toEqual(["curso"]);
+        await trilhaSemLegado(id);
+      });
+
+      it("salvar o endereço não toca no sexo legado", async () => {
+        const id = await comSexoLegado("MAT-T181-L02");
+        await put(rota(id), dpA)
+          .send({ endereco: { ...ENDERECO, numero: "Numero 321" } })
+          .expect(200);
+        expect((await perfilDe(id)).sexo).toBe(LEGADO);
+        await trilhaSemLegado(id);
+      });
+
+      it.each(["feminino", "masculino", "intersexo", "nao_informar"])(
+        "trocar deliberadamente para %s grava a opção da lista",
+        async (codigo) => {
+          const id = await comSexoLegado(`MAT-T181-L-${codigo.toUpperCase()}`);
+          const r = await put(rota(id), rhA)
+            .send({ perfilPessoal: { ...PERFIL_SEM_SEXO, sexo: codigo } })
+            .expect(200);
+          expect(r.body.perfilPessoal.sexo).toBe(codigo);
+          expect((await perfilDe(id)).sexo).toBe(codigo);
+          const edicao =
+            await prisma.dadosPessoaisColaboradorEvento.findFirstOrThrow({
+              where: {
+                colaboradorId: id,
+                acao: "edicao",
+                resultado: "gravado",
+              },
+            });
+          expect(edicao.campos).toEqual(["sexo"]);
+          await trilhaSemLegado(id);
+        },
+      );
+
+      it.each([
+        ["MAT-T181-LX1", "Texto Livre Novo T181"],
+        ["MAT-T181-LX2", "Feminino"],
+        ["MAT-T181-LX3", LEGADO],
+      ])(
+        "%s: valor fora da lista (%j) é recusado com 400, sem eco, e o legado fica",
+        async (matricula, valor) => {
+          const id = await comSexoLegado(matricula);
+          const r = await put(rota(id), rhA)
+            .send({ perfilPessoal: { ...PERFIL_SEM_SEXO, sexo: valor } })
+            .expect(400);
+          expect(JSON.stringify(r.body)).not.toContain(valor);
+          expect((await perfilDe(id)).sexo).toBe(LEGADO);
+          await trilhaSemLegado(id);
+        },
+      );
+    });
+
+    // T181 — a edição da ficha é só de RH e DP: o master_tecnico continua
+    // lendo, e o servidor recusa a edição nos dois recursos, sem valores.
+    it("master_tecnico lê, mas não edita dados pessoais nem contatos", async () => {
+      const id = await admitir("MAT-T181-M01");
+      const perfilAntes = await perfilDe(id);
+      const contatoAntes = await prisma.contatoColaborador.findFirst({
+        where: { colaboradorId: id },
+      });
+      await get(rota(id), master).expect(200);
+      await get(`/v1/colaboradores/${id}/contatos`, master).expect(200);
+      const dados = await put(rota(id), master)
+        .send({ perfilPessoal: { ...PERFIL, curso: "Curso Ficha T181" } })
+        .expect(403);
+      const contatos = await put(`/v1/colaboradores/${id}/contatos`, master)
+        .send({ telefone: "(31) 3333-0181" })
+        .expect(403);
+      for (const corpo of [dados.body, contatos.body]) {
+        expect(JSON.stringify(corpo)).not.toContain("Curso Ficha T181");
+        expect(JSON.stringify(corpo)).not.toContain("3333");
+      }
+      expect(await perfilDe(id)).toEqual(perfilAntes);
+      expect(
+        await prisma.contatoColaborador.findFirst({
+          where: { colaboradorId: id },
+        }),
+      ).toEqual(contatoAntes);
+      await trilhaSemValores(id);
+    });
   });
 
   describe("atomicidade: falhou uma parte, nada fica", () => {
@@ -1302,7 +1429,9 @@ describe("Cadastro de colaborador — Módulo 1 (e2e)", () => {
       },
     );
 
-    it.each(["rh", "dp", "master_tecnico"] as const)(
+    // T181 — o master_tecnico não edita dados pessoais (403 no guard, no
+    // bloco "master_tecnico lê dados pessoais"); o bloqueio vale para RH e DP.
+    it.each(["rh", "dp"] as const)(
       "%s edita: 409, nada gravado, trilha de falha e registros preservados",
       async (papel) => {
         const alvo = await colaboradorDesligado(

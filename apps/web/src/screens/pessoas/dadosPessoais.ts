@@ -228,7 +228,13 @@ export function validarPerfil(valores: ValoresPerfil): ErrosPerfil {
     }
   }
   // T179 — sexo só da lista fechada; sem seleção é válido (opcional).
-  if (valores.sexo !== "" && !ehCodigoSexo(valores.sexo)) {
+  // T181 — na ficha, o legado mantido (`SEXO_LEGADO_MANTIDO`) também é válido:
+  // é a ausência de pedido de mudança, e o campo sai do envio.
+  if (
+    valores.sexo !== "" &&
+    valores.sexo !== SEXO_LEGADO_MANTIDO &&
+    !ehCodigoSexo(valores.sexo)
+  ) {
     erros.sexo = "Selecione uma das opções de sexo, ou deixe sem seleção.";
   }
   for (const campo of CAMPOS_TEXTO_PERFIL) {
@@ -308,10 +314,26 @@ export function blocoEndereco(
 // ---- T181 — edição na ficha do colaborador ---------------------------------
 
 /**
+ * T181 — valor do seletor de sexo quando o gravado é LEGADO (texto de um
+ * cadastro anterior à lista fechada da T179) e ninguém pediu para mudá-lo.
+ * Não é um código: com ele, o campo sai do envio, e o servidor mantém o
+ * gravado exatamente como está (decisão da proprietária de 2026-10-23).
+ */
+export const SEXO_LEGADO_MANTIDO = "__sexo_legado_mantido__";
+
+/** T181 — o sexo gravado é legado: tem valor, mas fora da lista fechada. */
+export function ehSexoLegado(valor: string | null | undefined): boolean {
+  return (
+    typeof valor === "string" && valor.trim() !== "" && !ehCodigoSexo(valor)
+  );
+}
+
+/**
  * T181 — o perfil gravado, como a ficha o edita: `null` vira campo vazio. Sexo
- * gravado fora da lista fechada (cadastro anterior à T179) não cabe no
- * seletor: o campo começa sem seleção e o valor volta em `sexoAnterior`, para
- * a ficha dizer o que estava gravado — o servidor só aceita a lista.
+ * LEGADO não cabe no seletor como código: o campo começa em
+ * `SEXO_LEGADO_MANTIDO` ("manter o valor legado") e o valor volta em
+ * `sexoAnterior`, para a ficha mostrá-lo só para leitura. Nunca vira vazio
+ * nem outra opção sem pedido.
  */
 export function perfilParaEdicao(perfil: PerfilPessoalApi | null): {
   readonly valores: ValoresPerfil;
@@ -322,12 +344,26 @@ export function perfilParaEdicao(perfil: PerfilPessoalApi | null): {
   for (const chave of Object.keys(PERFIL_VAZIO) as ChavePerfil[]) {
     valores[chave] = perfil[chave] ?? "";
   }
-  const sexo = perfil.sexo ?? "";
-  const legado = sexo !== "" && !ehCodigoSexo(sexo);
+  const legado = ehSexoLegado(perfil.sexo);
   return {
-    valores: { ...valores, sexo: legado ? "" : sexo },
-    sexoAnterior: legado ? sexo : null,
+    valores: {
+      ...valores,
+      sexo: legado ? SEXO_LEGADO_MANTIDO : (perfil.sexo ?? ""),
+    },
+    sexoAnterior: legado ? perfil.sexo : null,
   };
+}
+
+/**
+ * T181 — corpo do bloco de dados pessoais na ficha: o de `blocoPerfil`, mas
+ * SEM o sexo quando o legado foi mantido. Campo ausente, o servidor mantém o
+ * gravado; só uma opção escolhida da lista o substitui.
+ */
+export function blocoPerfilDaFicha(
+  valores: ValoresPerfil,
+): Omit<ReturnType<typeof blocoPerfil>, "sexo"> & { sexo?: string | null } {
+  const { sexo, ...resto } = blocoPerfil(valores);
+  return valores.sexo === SEXO_LEGADO_MANTIDO ? resto : { ...resto, sexo };
 }
 
 /**

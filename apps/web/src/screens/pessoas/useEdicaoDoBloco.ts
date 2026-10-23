@@ -142,16 +142,26 @@ export function useEdicaoDoBloco<K extends string>(
 
   const alterado = emEdicao && !mesmosValores(edicao, inicial);
 
+  // O pedido só é atendido quando o alvo já está na tela. O efeito de uma
+  // renderização ANTERIOR pode rodar depois do clique (o React adia efeitos);
+  // ele ainda vê o modo antigo, e consumir o pedido ali perderia o foco.
   useEffect(() => {
     const pedido = focoPendenteRef.current;
     if (pedido === null) return;
+    const campo =
+      pedido === "primeiro-erro"
+        ? [...ordem, "geral" as const].find((c) => erros[c])
+        : undefined;
+    const id =
+      pedido === "primeiro-erro"
+        ? campo === undefined
+          ? null
+          : idDoCampo(campo)
+        : pedido;
+    const alvo = id === null ? null : document.getElementById(id);
+    if (!alvo) return;
     focoPendenteRef.current = null;
-    if (pedido === "primeiro-erro") {
-      const campo = [...ordem, "geral" as const].find((c) => erros[c]);
-      if (campo) document.getElementById(idDoCampo(campo))?.focus();
-      return;
-    }
-    document.getElementById(pedido)?.focus();
+    alvo.focus();
   });
 
   function editar() {

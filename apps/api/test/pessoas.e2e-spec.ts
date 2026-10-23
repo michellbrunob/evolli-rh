@@ -2621,7 +2621,7 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
       });
     });
 
-    it("master sem empresa ativa lê e grava em outra empresa, auditado com a empresa REAL", async () => {
+    it("master sem empresa ativa lê em outra empresa, auditado com a empresa REAL; T181 — não grava", async () => {
       const leitura = await get(rota(pessoaB), master).expect(200);
       expect(leitura.body).toMatchObject({
         empresaId: empresaB,
@@ -2639,34 +2639,38 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
         result: "success",
       });
 
+      // T181 — a edição da ficha é só de RH e DP (decisão de 2026-10-23): o
+      // guard recusa antes do serviço, e nada é gravado.
       const gravacao = await put(rota(pessoaB), master)
         .send(corpo())
-        .expect(200);
-      expect(gravacao.body).toMatchObject({
-        empresaId: empresaB,
-        resultado: "criado",
-      });
-
-      const evento = await comPrisma((p) =>
+        .expect(403);
+      expect(JSON.stringify(gravacao.body)).not.toContain("example.test");
+      expect(
+        await comPrisma((p) =>
+          p.contatoColaborador.count({ where: { colaboradorId: pessoaB } }),
+        ),
+      ).toBe(0);
+      const negacao = await comPrisma((p) =>
         p.auditEvent.findFirstOrThrow({
           where: {
-            action: "pessoas_contato_criado",
+            action: "authorization_denied",
+            resource: "contato_colaborador",
             actorRole: "master_tecnico",
           },
+          orderBy: { occurredAt: "desc" },
         }),
       );
-      expect(evento.companyId).toBe(empresaB);
-      expect(evento.resource).toBe("contato_colaborador");
-
-      // E o rh da empresa B lê o que o master gravou — a mesma empresa.
+      expect(negacao.result).toBe("denied");
+      expect(JSON.stringify(negacao)).not.toContain("example.test");
       await get(rota(pessoaB), rhB).expect(200);
     });
 
-    it("master com empresa ativa atua só dentro dela", async () => {
+    it("master com empresa ativa lê só dentro dela; T181 — não grava em nenhuma", async () => {
       await get(rota(pessoaB), masterEscopado).expect(404);
-      await put(rota(pessoaB), masterEscopado).send(corpo()).expect(404);
+      await put(rota(pessoaB), masterEscopado).send(corpo()).expect(403);
       const r = await get(rota(pessoaA), masterEscopado).expect(200);
       expect(r.body.empresaId).toBe(empresaA);
+      await put(rota(pessoaA), masterEscopado).send(corpo()).expect(403);
     });
 
     it("desligado: uso operacional bloqueado — sem valor na leitura, edição recusada", async () => {
@@ -2902,20 +2906,11 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
           result: "failure",
         });
 
+        // T181 — o master não edita contatos: o guard recusa antes de o
+        // serviço olhar a empresa.
         await put(rota(pessoaAmbigua), master)
           .send(corpoAmbigua({ telefone: "1144440000" }))
-          .expect(409);
-        const tentativa = await ultimaTrilha(pessoaAmbigua);
-        expect(tentativa.evento).toMatchObject({
-          empresaId: null,
-          acao: "edicao",
-          resultado: "empresa_ambigua",
-        });
-        expect(tentativa.formal).toMatchObject({
-          action: "pessoas_contato_atualizado",
-          companyId: null,
-          result: "failure",
-        });
+          .expect(403);
 
         const depois = await comPrisma((p) =>
           p.contatoColaborador.findFirstOrThrow({

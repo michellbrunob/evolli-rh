@@ -115,7 +115,7 @@ describe("Ficha — dados pessoais e endereço (T177)", () => {
     vi.mocked(consultarDadosPessoaisDoColaborador).mockResolvedValue(
       registrado,
     );
-    render(<DadosPessoaisColaboradorSecao colaboradorId={ID} />);
+    render(<DadosPessoaisColaboradorSecao colaboradorId={ID} podeEditar />);
     await screen.findByText("Feminino");
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
     expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
@@ -132,7 +132,7 @@ describe("Ficha — dados pessoais e endereço (T177)", () => {
       perfilPessoal: null,
       endereco: null,
     });
-    render(<DadosPessoaisColaboradorSecao colaboradorId={ID} />);
+    render(<DadosPessoaisColaboradorSecao colaboradorId={ID} podeEditar />);
     expect(
       await screen.findByText("Nenhum dado pessoal registrado."),
     ).toBeInTheDocument();
@@ -218,13 +218,13 @@ describe("Ficha — sexo (T179)", () => {
     expect(await valorDoSexo()).toBe("Não informado");
   });
 
-  it("texto livre de cadastro anterior aparece como veio", async () => {
+  it("texto livre de cadastro anterior aparece como veio, marcado como valor legado (T181)", async () => {
     vi.mocked(consultarDadosPessoaisDoColaborador).mockResolvedValue({
       ...registrado,
       perfilPessoal: { ...registrado.perfilPessoal!, sexo: "Fem. (legado)" },
     });
     render(<DadosPessoaisColaboradorSecao colaboradorId={ID} />);
-    expect(await valorDoSexo()).toBe("Fem. (legado)");
+    expect(await valorDoSexo()).toBe("Fem. (legado) (valor legado)");
   });
 });
 
@@ -266,7 +266,7 @@ const botao = (nome: string | RegExp) =>
   screen.getByRole("button", { name: nome });
 
 function montarEdicao(
-  props: { consultaCepDisponivel?: boolean } = {},
+  props: { podeEditar?: boolean } = {},
   dados: DadosPessoaisDoColaboradorApi = registrado,
 ) {
   vi.mocked(consultarDadosPessoaisDoColaborador).mockResolvedValue(dados);
@@ -277,10 +277,18 @@ function montarEdicao(
       colaboradorId={ID}
       onAlteradoChange={onAlteradoChange}
       onSalvandoChange={onSalvandoChange}
+      podeEditar
       {...props}
     />,
   );
   return { onAlteradoChange, onSalvandoChange };
+}
+
+/** O valor exibido na linha "Sexo" da leitura. */
+async function valorDoSexoNaFicha(): Promise<string> {
+  const rotulo = await screen.findByText("Sexo", { selector: "dt" });
+  const par = rotulo.closest(".colaboradores-screen__par") as HTMLElement;
+  return within(par).getByRole("definition").textContent ?? "";
 }
 
 async function editar(nome: string) {
@@ -292,7 +300,7 @@ describe("T181 — edição dos dados pessoais na ficha", () => {
     montarEdicao();
     await editar("Editar dados pessoais");
     const data = campo(/^Data de nascimento/);
-    expect(data).toHaveFocus();
+    await waitFor(() => expect(data).toHaveFocus());
     expect(data).toHaveValue("1990-05-20");
     expect(data).toHaveAttribute("aria-required", "true");
     expect(campo(/^Sexo/)).toHaveValue("feminino");
@@ -417,28 +425,124 @@ describe("T181 — edição dos dados pessoais na ficha", () => {
     },
   );
 
-  it("sexo gravado fora da lista: o seletor começa vazio e a ficha diz o que estava gravado", async () => {
-    vi.mocked(registrarDadosPessoaisDoColaborador).mockResolvedValue(
-      gravado({ perfilPessoal: { sexo: "intersexo" } }),
-    );
-    montarEdicao(
-      {},
-      {
-        ...registrado,
-        perfilPessoal: { ...registrado.perfilPessoal!, sexo: "Fem. (legado)" },
-      },
-    );
+  // T181 — sexo LEGADO (decisão da proprietária de 2026-10-23): fica como
+  // está até alguém escolher, deliberadamente, uma opção da lista atual.
+  const comLegado: DadosPessoaisDoColaboradorApi = {
+    ...registrado,
+    perfilPessoal: { ...registrado.perfilPessoal!, sexo: "Fem. (legado)" },
+  };
+
+  it("sexo legado: o seletor começa em 'Manter o valor legado', mostra o valor e não oferece vazio", async () => {
+    montarEdicao({}, comLegado);
     await editar("Editar dados pessoais");
-    const sexo = campo(/^Sexo/);
-    expect(sexo).toHaveValue("");
-    expect(sexo).toHaveAccessibleDescription(/Fem\. \(legado\)/);
-    fireEvent.change(sexo, { target: { value: "intersexo" } });
+    const sexo = campo(/^Sexo/) as HTMLSelectElement;
+    expect(
+      within(sexo).getByRole("option", { selected: true }),
+    ).toHaveTextContent("Manter o valor legado");
+    expect(sexo).toHaveAccessibleDescription(
+      /Valor legado, gravado antes da lista atual: "Fem\. \(legado\)"\..*segue a lista atual/,
+    );
+    expect(
+      within(sexo)
+        .getAllByRole("option")
+        .map((o) => o.textContent),
+    ).toEqual([
+      "Manter o valor legado",
+      "Feminino",
+      "Masculino",
+      "Intersexo",
+      "Não informar",
+    ]);
+    // Abrir não conta como alteração.
+    expect(botao("Cancelar")).toBeEnabled();
+  });
+
+  it("sexo legado: salvar outro campo omite o sexo do envio, e o legado fica", async () => {
+    vi.mocked(registrarDadosPessoaisDoColaborador).mockResolvedValue({
+      ...comLegado,
+      perfilPessoal: {
+        ...comLegado.perfilPessoal!,
+        curso: "Curso Sintético",
+        atualizadoEm: "2026-10-23T12:00:00.000Z",
+      },
+    });
+    montarEdicao({}, comLegado);
+    await editar("Editar dados pessoais");
+    fireEvent.change(campo(/^Curso/), { target: { value: "Curso Sintético" } });
     fireEvent.click(botao("Salvar dados pessoais"));
     await screen.findByText("Dados pessoais salvos.");
+    const corpo = vi.mocked(registrarDadosPessoaisDoColaborador).mock
+      .calls[0]![1];
+    expect(corpo.perfilPessoal).not.toHaveProperty("sexo");
+    expect(corpo.perfilPessoal).toMatchObject({ curso: "Curso Sintético" });
+    expect(await valorDoSexoNaFicha()).toBe("Fem. (legado) (valor legado)");
+  });
+
+  it.each([
+    ["feminino", "Feminino"],
+    ["masculino", "Masculino"],
+    ["intersexo", "Intersexo"],
+    ["nao_informar", "Não informar"],
+  ])(
+    "sexo legado: escolher %s envia o código da lista",
+    async (codigo, rotulo) => {
+      vi.mocked(registrarDadosPessoaisDoColaborador).mockResolvedValue({
+        ...comLegado,
+        perfilPessoal: {
+          ...comLegado.perfilPessoal!,
+          sexo: codigo,
+          atualizadoEm: "2026-10-23T12:00:00.000Z",
+        },
+      });
+      montarEdicao({}, comLegado);
+      await editar("Editar dados pessoais");
+      fireEvent.change(campo(/^Sexo/), { target: { value: codigo } });
+      fireEvent.click(botao("Salvar dados pessoais"));
+      await screen.findByText("Dados pessoais salvos.");
+      expect(
+        vi.mocked(registrarDadosPessoaisDoColaborador).mock.calls[0]![1]
+          .perfilPessoal?.sexo,
+      ).toBe(codigo);
+      expect(await valorDoSexoNaFicha()).toBe(rotulo);
+    },
+  );
+
+  it("sexo legado: voltar a 'Manter o valor legado' depois de escolher outra opção omite o sexo de novo", async () => {
+    vi.mocked(registrarDadosPessoaisDoColaborador).mockResolvedValue(comLegado);
+    montarEdicao({}, comLegado);
+    await editar("Editar dados pessoais");
+    const sexo = campo(/^Sexo/);
+    fireEvent.change(sexo, { target: { value: "masculino" } });
+    fireEvent.change(sexo, { target: { value: "__sexo_legado_mantido__" } });
+    fireEvent.click(botao("Salvar dados pessoais"));
+    await waitFor(() =>
+      expect(registrarDadosPessoaisDoColaborador).toHaveBeenCalled(),
+    );
+    expect(
+      vi.mocked(registrarDadosPessoaisDoColaborador).mock.calls[0]![1]
+        .perfilPessoal,
+    ).not.toHaveProperty("sexo");
+  });
+
+  it("sem sexo legado, o seletor segue como antes: 'Selecione…' e o sexo vai no envio", async () => {
+    vi.mocked(registrarDadosPessoaisDoColaborador).mockResolvedValue(
+      registrado,
+    );
+    montarEdicao();
+    await editar("Editar dados pessoais");
+    expect(
+      within(campo(/^Sexo/))
+        .getAllByRole("option")
+        .map((o) => o.textContent)[0],
+    ).toBe("Selecione…");
+    fireEvent.click(botao("Salvar dados pessoais"));
+    await waitFor(() =>
+      expect(registrarDadosPessoaisDoColaborador).toHaveBeenCalled(),
+    );
     expect(
       vi.mocked(registrarDadosPessoaisDoColaborador).mock.calls[0]![1]
         .perfilPessoal?.sexo,
-    ).toBe("intersexo");
+    ).toBe("feminino");
   });
 
   it("sem dados pessoais gravados: 'Preencher' abre o formulário vazio e a data é obrigatória", async () => {
@@ -502,7 +606,7 @@ describe("T181 — edição do endereço na ficha", () => {
     vi.mocked(registrarDadosPessoaisDoColaborador).mockResolvedValue(
       registrado,
     );
-    montarEdicao({ consultaCepDisponivel: true });
+    montarEdicao();
     await editar("Editar endereço");
     fireEvent.change(campo(/^País/), { target: { value: "Portugal" } });
     fireEvent.change(campo(/^CEP/), { target: { value: "1000-001" } });
@@ -559,10 +663,7 @@ describe("T181 — edição do endereço na ficha", () => {
       uf: "SP",
       estado: "São Paulo",
     });
-    montarEdicao(
-      { consultaCepDisponivel: true },
-      { ...registrado, endereco: null },
-    );
+    montarEdicao({}, { ...registrado, endereco: null });
     await editar("Preencher endereço");
     fireEvent.change(campo(/^Logradouro/), {
       target: { value: "Rua Digitada" },
@@ -588,14 +689,30 @@ describe("T181 — edição do endereço na ficha", () => {
     expect(campo(/^Bairro/)).toHaveValue("Bairro Ajustado");
   });
 
-  it("sem a consulta disponível, não há 'Buscar CEP' e sair do campo não consulta", async () => {
-    montarEdicao({ consultaCepDisponivel: false });
-    await editar("Editar endereço");
-    expect(screen.queryByRole("button", { name: "Buscar CEP" })).toBeNull();
-    fireEvent.change(campo(/^CEP/), { target: { value: "01310100" } });
-    fireEvent.blur(campo(/^CEP/));
-    expect(consultarCep).not.toHaveBeenCalled();
-  });
+  // T181 — a edição da ficha é só de RH e DP: sem `podeEditar` (o
+  // master_tecnico, por exemplo), os blocos ficam só em leitura.
+  it.each([
+    ["com registro", registrado],
+    [
+      "sem registro",
+      {
+        ...registrado,
+        situacao: "sem_registro" as const,
+        perfilPessoal: null,
+        endereco: null,
+      },
+    ],
+  ])(
+    "sem permissão de editar (%s): só leitura, sem Preencher, Editar, Salvar nem Cancelar",
+    async (_caso, dados) => {
+      montarEdicao({ podeEditar: false }, dados);
+      await screen.findByRole("region", { name: "Dados pessoais" });
+      expect(screen.queryByRole("button")).toBeNull();
+      expect(screen.queryByRole("textbox")).toBeNull();
+      expect(screen.queryByRole("combobox")).toBeNull();
+      expect(consultarCep).not.toHaveBeenCalled();
+    },
+  );
 });
 
 describe("T181 — recusa da gravação: o digitado fica e nada é afirmado sem certeza", () => {

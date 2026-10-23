@@ -110,6 +110,20 @@ export const PAPEIS_ADMINISTRACAO_LIDERANCA: readonly string[] = ["rh"];
 export const PAPEIS_NOVA_ADMISSAO: readonly string[] = ["rh", "dp"];
 
 /**
+ * T181 — papéis que EDITAM, na ficha do colaborador, dados pessoais, endereço
+ * e contatos: só `rh` e `dp`, na empresa ativa (decisão da proprietária de
+ * 2026-10-23). Espelha `evaluateDadosPessoais` e `evaluateContatos` em
+ * `rbac.evaluator.ts`, em que o `master_tecnico` só lê. Os mesmos papéis
+ * consultam o CEP (`colaborador`/`create`). Só ORIENTA a tela: quem recusa é
+ * o servidor.
+ */
+export const PAPEIS_EDICAO_FICHA: readonly string[] = ["rh", "dp"];
+
+export function podeEditarFicha(papel: string | null): boolean {
+  return papel !== null && PAPEIS_EDICAO_FICHA.includes(papel);
+}
+
+/**
  * Os cinco módulos da navegação primária, mais Demonstração.
  *
  * A ordem é de uso: quem se opera no dia a dia vem antes do que se administra,

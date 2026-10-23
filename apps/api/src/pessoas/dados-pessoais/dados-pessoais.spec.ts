@@ -388,17 +388,20 @@ describe("Módulo 1 — matriz de autorização (dados_pessoais_colaborador)", (
     expect(pode("rh", "manage", EMPRESA_A)).toBe(false);
   });
 
-  it("master_tecnico sem empresa ativa lê e edita em qualquer empresa", () => {
+  // T181 — a edição da ficha é só de RH e DP (decisão de 2026-10-23): o
+  // master_tecnico mantém a leitura e perde a edição.
+  it("master_tecnico sem empresa ativa lê em qualquer empresa e não edita", () => {
     expect(pode("master_tecnico", "read", null)).toBe(true);
-    expect(pode("master_tecnico", "alter", null)).toBe(true);
+    expect(pode("master_tecnico", "alter", null)).toBe(false);
     expect(pode("master_tecnico", "read", null, EMPRESA_A)).toBe(true);
-    expect(pode("master_tecnico", "alter", null, EMPRESA_B)).toBe(true);
+    expect(pode("master_tecnico", "alter", null, EMPRESA_B)).toBe(false);
   });
 
-  it("master_tecnico com empresa ativa atua só nela", () => {
+  it("master_tecnico com empresa ativa lê só nela e não edita", () => {
     expect(pode("master_tecnico", "read", EMPRESA_A)).toBe(true);
     expect(pode("master_tecnico", "read", EMPRESA_A, EMPRESA_A)).toBe(true);
-    expect(pode("master_tecnico", "alter", EMPRESA_A, EMPRESA_A)).toBe(true);
+    expect(pode("master_tecnico", "alter", EMPRESA_A)).toBe(false);
+    expect(pode("master_tecnico", "alter", EMPRESA_A, EMPRESA_A)).toBe(false);
     expect(pode("master_tecnico", "read", EMPRESA_A, EMPRESA_B)).toBe(false);
     expect(pode("master_tecnico", "alter", EMPRESA_A, EMPRESA_B)).toBe(false);
   });
