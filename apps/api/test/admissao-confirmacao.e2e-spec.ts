@@ -1622,6 +1622,156 @@ describe("Confirmação da Nova admissão (T179, e2e)", () => {
     });
   });
 
+  // -------------------------------------------------------------------------
+  // T180 — cadastro rápido de Departamento, Cargo e Unidade pela Nova admissão.
+  // O modal da tela usa os endpoints que já existiam, com a empresa ativa da
+  // sessão no corpo; o servidor a confere. Nada de contrato novo: estes testes
+  // provam o contrato do jeito que a tela o usa.
+
+  describe("T180 — cadastro rápido de referências pela Nova admissão", () => {
+    const REFERENCIAS = [
+      {
+        nome: "departamento",
+        rota: "/v1/departamentos",
+        campo: "departamentoId",
+        acao: "organizacao_departamento_criado",
+      },
+      {
+        nome: "cargo",
+        rota: "/v1/cargos",
+        campo: "cargoId",
+        acao: "organizacao_cargo_criado",
+      },
+      {
+        nome: "unidade",
+        rota: "/v1/unidades-organizacionais",
+        campo: "unidadeOrganizacionalId",
+        acao: "organizacao_unidade_organizacional_criada",
+      },
+    ] as const;
+    type Referencia = (typeof REFERENCIAS)[number];
+
+    let dpA: Credencial;
+    const outrosPapeis: [string, Credencial][] = [];
+
+    beforeAll(async () => {
+      dpA = await criarUsuario("dp.t180a@example.test", "dp", empresaA);
+      for (const papel of ["gestor", "financeiro", "colaborador"]) {
+        outrosPapeis.push([
+          papel,
+          await criarUsuario(`${papel}.t180a@example.test`, papel, empresaA),
+        ]);
+      }
+    });
+
+    const quantos = (ref: Referencia, empresaId: string, codigo: string) =>
+      ref.nome === "departamento"
+        ? prisma.departamento.count({ where: { empresaId, codigo } })
+        : ref.nome === "cargo"
+          ? prisma.cargo.count({ where: { empresaId, codigo } })
+          : prisma.unidadeOrganizacional.count({
+              where: { empresaId, codigo },
+            });
+
+    it("RH cria as três na empresa da sessão; ficam ativas na listagem que a tela usa, e a admissão as aceita", async () => {
+      const ids: Record<string, string> = {};
+      for (const ref of REFERENCIAS) {
+        const codigo = `T180_${ref.nome.toUpperCase()}_A`;
+        const criado = await post(ref.rota, rhA)
+          .send({
+            codigo,
+            nome: `Referencia rapida ${ref.nome}`,
+            empresaId: empresaA,
+          })
+          .expect(201);
+        expect(criado.body).toMatchObject({
+          codigo,
+          empresaId: empresaA,
+          status: "ativo",
+        });
+        const lista = await get(
+          `${ref.rota}?status=ativo&tamanhoPagina=100`,
+          rhA,
+        ).expect(200);
+        expect(lista.body.itens.map((i: { id: string }) => i.id)).toContain(
+          criado.body.id,
+        );
+        ids[ref.campo] = criado.body.id;
+      }
+      const r = await admitir(rhA).send(admissao(ids)).expect(201);
+      expect(r.body.movimentacao.destino).toMatchObject(ids);
+    });
+
+    it.each(REFERENCIAS)(
+      "$nome com código repetido na mesma empresa: 409 e nada novo; outra empresa aceita o mesmo código",
+      async (ref) => {
+        const codigo = `T180_REP_${ref.nome.toUpperCase()}`;
+        await post(ref.rota, rhA)
+          .send({ codigo, nome: "Primeira", empresaId: empresaA })
+          .expect(201);
+        await post(ref.rota, rhA)
+          .send({
+            codigo,
+            nome: "Segunda com o mesmo codigo",
+            empresaId: empresaA,
+          })
+          .expect(409);
+        expect(await quantos(ref, empresaA, codigo)).toBe(1);
+        await post(ref.rota, rhB)
+          .send({ codigo, nome: "Outra empresa", empresaId: empresaB })
+          .expect(201);
+        expect(await quantos(ref, empresaB, codigo)).toBe(1);
+      },
+    );
+
+    it.each(REFERENCIAS)(
+      "$nome com a empresa do navegador diferente da sessão: 404 e nada é criado",
+      async (ref) => {
+        const codigo = `T180_CRUZ_${ref.nome.toUpperCase()}`;
+        await post(ref.rota, rhA)
+          .send({ codigo, nome: "Tentativa cruzada", empresaId: empresaB })
+          .expect(404);
+        expect(await quantos(ref, empresaB, codigo)).toBe(0);
+        expect(await quantos(ref, empresaA, codigo)).toBe(0);
+      },
+    );
+
+    it.each(REFERENCIAS)(
+      "$nome: DP, gestor, financeiro e colaborador não criam (403) e nada é gravado; o DP continua lendo",
+      async (ref) => {
+        const codigo = `T180_NEG_${ref.nome.toUpperCase()}`;
+        for (const cred of [dpA, ...outrosPapeis.map(([, c]) => c)]) {
+          await post(ref.rota, cred)
+            .send({ codigo, nome: "Sem permissao", empresaId: empresaA })
+            .expect(403);
+        }
+        expect(await quantos(ref, empresaA, codigo)).toBe(0);
+        await get(`${ref.rota}?status=ativo&tamanhoPagina=100`, dpA).expect(
+          200,
+        );
+      },
+    );
+
+    it("a criação fica na trilha pelo padrão da estrutura, só com ids", async () => {
+      for (const ref of REFERENCIAS) {
+        const codigo = `T180_TRILHA_${ref.nome.toUpperCase()}`;
+        const nome = `Nome sintetico trilha ${ref.nome}`;
+        const criado = await post(ref.rota, rhA)
+          .send({ codigo, nome, empresaId: empresaA })
+          .expect(201);
+        const eventos = await prisma.auditEvent.findMany({
+          where: { action: ref.acao, resourceId: criado.body.id },
+        });
+        expect(eventos).toHaveLength(1);
+        expect(eventos[0]).toMatchObject({
+          companyId: empresaA,
+          result: "success",
+        });
+        expect(JSON.stringify(eventos[0])).not.toContain(nome);
+      }
+    });
+  });
+
   describe("trilhas sem valores", () => {
     it("`audit_event` e as trilhas de tratamento não contêm e-mail, telefone, CEP nem matrícula enviados", async () => {
       expect(enviados.size).toBeGreaterThan(50);

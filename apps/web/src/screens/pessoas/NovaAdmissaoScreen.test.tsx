@@ -34,6 +34,8 @@ import {
   type DepartamentoApi,
   type EmpresaApi,
   type UnidadeOrganizacionalApi,
+  criarDepartamento,
+  criarUnidade,
   listarAreas,
   listarCentrosCusto,
   listarDepartamentos,
@@ -41,7 +43,7 @@ import {
   listarEquipes,
   listarUnidades,
 } from "../../api/organizacaoClient";
-import { type CargoApi, listarCargos } from "../../api/cargoClient";
+import { type CargoApi, criarCargo, listarCargos } from "../../api/cargoClient";
 import { type EnderecoDoCepApi, consultarCep } from "../../api/cepClient";
 import {
   CsrfRequestError,
@@ -1553,7 +1555,7 @@ describe("T179 — empresa sem Departamento ou Cargo ativos", () => {
     vi.mocked(listarUnidades).mockResolvedValue(paginado([]));
   });
 
-  it("RH: diz o que falta e orienta a cadastrar em Estrutura; nada é enviado", async () => {
+  it('RH: diz o que falta e orienta o "+" desta página; nada é enviado', async () => {
     montar("rh");
     await aguardarEmpresa();
     const aviso = screen.getByText(/ainda não tem cadastro ativo de/);
@@ -1561,8 +1563,12 @@ describe("T179 — empresa sem Departamento ou Cargo ativos", () => {
     expect(aviso).toHaveTextContent(
       "Esta empresa ainda não tem cadastro ativo de Cargo, e a admissão exige Departamento e Cargo.",
     );
-    expect(aviso).toHaveTextContent(/Cadastre o que falta em Estrutura/);
-    expect(aviso).toHaveTextContent(/Cargo em Funções e cargos/);
+    // T180 — o RH cadastra aqui mesmo, sem ir a Estrutura.
+    expect(aviso).toHaveTextContent(
+      'Use o botão "+" ao lado de Cargo, em Lotação inicial, para cadastrar sem sair desta página.',
+    );
+    expect(aviso).not.toHaveTextContent(/Estrutura/);
+    expect(aviso).not.toHaveTextContent(/abra esta página de novo/);
     expect(aviso).not.toHaveTextContent(/Unidade/);
     expect(aviso).not.toHaveTextContent(/O RH precisa/);
     expect(
@@ -1580,7 +1586,7 @@ describe("T179 — empresa sem Departamento ou Cargo ativos", () => {
     expect(admitirColaborador).not.toHaveBeenCalled();
   });
 
-  it("RH: sem departamento e sem cargo, aponta cada um ao seu lugar", async () => {
+  it('RH: sem departamento e sem cargo, aponta o "+" de cada um', async () => {
     vi.mocked(listarDepartamentos).mockResolvedValue(paginado([]));
     montar("rh");
     await aguardarEmpresa();
@@ -1588,8 +1594,10 @@ describe("T179 — empresa sem Departamento ou Cargo ativos", () => {
     expect(aviso).toHaveTextContent(
       "Esta empresa ainda não tem cadastro ativo de Departamento e Cargo",
     );
-    expect(aviso).toHaveTextContent(/Departamento em Estrutura organizacional/);
-    expect(aviso).toHaveTextContent(/Cargo em Funções e cargos/);
+    // T180 — sem sair da página.
+    expect(aviso).toHaveTextContent(
+      'Use o botão "+" ao lado de Departamento e Cargo, em Lotação inicial, para cadastrar sem sair desta página.',
+    );
   });
 
   it("DP: diz que o RH precisa cadastrar o que falta", async () => {
@@ -1600,7 +1608,7 @@ describe("T179 — empresa sem Departamento ou Cargo ativos", () => {
       /O RH precisa cadastrar Cargo nesta empresa/,
     );
     expect(aviso).not.toHaveTextContent(/Unidade/);
-    expect(aviso).not.toHaveTextContent(/Cadastre o que falta/);
+    expect(aviso).not.toHaveTextContent(/Use o botão/);
     fireEvent.click(salvar());
     await waitFor(() => expect(aviso).toHaveFocus());
     expect(admitirColaborador).not.toHaveBeenCalled();
@@ -2884,5 +2892,466 @@ describe("T179 (revisão final) — CEP com texto misturado na página", () => {
     expect(campoCep()).not.toHaveAccessibleDescription(/Use um CEP brasileiro/);
     fireEvent.blur(campoCep());
     await waitFor(() => expect(consultarCep).toHaveBeenCalledWith("01310100"));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T180 — cadastro rápido de Departamento, Cargo e Unidade, sem sair da página
+// (decisão da proprietária de 2026-10-23). Só o RH vê o "+"; o modal fecha
+// sem tocar na admissão, o foco volta ao SELETOR, e a referência criada entra
+// no seletor já escolhida — e é ela que a admissão envia.
+// ---------------------------------------------------------------------------
+
+/** Referências que o servidor "cria" nos testes (dados sintéticos). */
+const departamentoNovo: DepartamentoApi = {
+  ...departamento,
+  id: "a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1",
+  codigo: "DEP_RAPIDO",
+  nome: "Departamento Rápido (teste)",
+};
+const cargoNovo: CargoApi = {
+  ...cargo,
+  id: "b2b2b2b2-b2b2-4b2b-8b2b-b2b2b2b2b2b2",
+  codigo: "CAR_RAPIDO",
+  nome: "Cargo Rápido (teste)",
+};
+const unidadeNova: UnidadeOrganizacionalApi = {
+  ...unidade,
+  id: "c3c3c3c3-c3c3-4c3c-8c3c-c3c3c3c3c3c3",
+  codigo: "UNI_RAPIDA",
+  nome: "Unidade Rápida (teste)",
+};
+
+const botaoMais = (nomeAcessivel: string) =>
+  screen.getByRole("button", { name: nomeAcessivel });
+const dialogoReferencia = () =>
+  screen.queryByRole("dialog", {
+    name: /^Cadastrar (departamento|cargo|unidade)$/,
+  });
+
+/** Abre o "+" e preenche código e nome no modal; não envia. */
+async function abrirEPreencher(
+  nomeAcessivel: string,
+  codigoDigitado: string,
+  nomeDigitado: string,
+) {
+  fireEvent.click(botaoMais(nomeAcessivel));
+  const dialogo = await screen.findByRole("dialog", {
+    name: /^Cadastrar (departamento|cargo|unidade)$/,
+  });
+  fireEvent.change(within(dialogo).getByLabelText(/^Código/), {
+    target: { value: codigoDigitado },
+  });
+  fireEvent.change(within(dialogo).getByLabelText(/^Nome/), {
+    target: { value: nomeDigitado },
+  });
+  return dialogo;
+}
+
+/** Abre, preenche e clica "Cadastrar". */
+async function cadastrarPeloMais(
+  nomeAcessivel: string,
+  codigoDigitado: string,
+  nomeDigitado: string,
+) {
+  const dialogo = await abrirEPreencher(
+    nomeAcessivel,
+    codigoDigitado,
+    nomeDigitado,
+  );
+  fireEvent.click(within(dialogo).getByRole("button", { name: "Cadastrar" }));
+  return dialogo;
+}
+
+/** Parte da admissão digitada ANTES do modal, para conferir que fica. */
+function preencherParteDaAdmissao() {
+  fireEvent.change(nome(), { target: { value: "Pessoa Sintética Rápida" } });
+  fireEvent.change(dataNascimento(), { target: { value: "1991-02-03" } });
+  fireEvent.change(tipo(), { target: { value: "clt" } });
+  fireEvent.change(data(), { target: { value: "2026-11-10" } });
+  fireEvent.change(emailPessoal(), {
+    target: { value: "pessoa.rapida@exemplo.test" },
+  });
+}
+
+function admissaoPreservada() {
+  expect(nome()).toHaveValue("Pessoa Sintética Rápida");
+  expect(dataNascimento()).toHaveValue("1991-02-03");
+  expect(tipo()).toHaveValue("clt");
+  expect(data()).toHaveValue("2026-11-10");
+  expect(emailPessoal()).toHaveValue("pessoa.rapida@exemplo.test");
+}
+
+function recusaDeReferencia(status: number, codigo?: string) {
+  return Object.assign(new Error("recusado"), {
+    status,
+    ...(codigo ? { codigo } : {}),
+  });
+}
+
+describe("T180 — cadastro rápido de referências na Nova admissão", () => {
+  beforeEach(() => {
+    vi.mocked(criarDepartamento).mockResolvedValue(departamentoNovo);
+    vi.mocked(criarCargo).mockResolvedValue(cargoNovo);
+    vi.mocked(criarUnidade).mockResolvedValue(unidadeNova);
+  });
+
+  it('o RH vê os três "+", ao lado de Departamento, Cargo e Unidade', async () => {
+    montar("rh");
+    await aguardarEmpresa();
+    for (const [rotulo, seletor] of [
+      ["Cadastrar novo departamento", departamentoSel],
+      ["Cadastrar novo cargo", cargoSel],
+      ["Cadastrar nova unidade", unidadeSel],
+    ] as const) {
+      const botao = botaoMais(rotulo);
+      expect(botao).toBeEnabled();
+      // Na mesma linha do seletor, dentro do mesmo campo.
+      expect(botao.parentElement).toContainElement(seletor());
+    }
+    // A obrigatoriedade não muda.
+    expect(departamentoSel()).toHaveAttribute("aria-required", "true");
+    expect(cargoSel()).toHaveAttribute("aria-required", "true");
+    expect(unidadeSel()).not.toHaveAttribute("aria-required");
+  });
+
+  it.each(["dp", null])('%s não vê nenhum "+"', async (papel) => {
+    montar(papel);
+    await aguardarEmpresa();
+    expect(
+      screen.queryByRole("button", { name: /^Cadastrar nov[oa] / }),
+    ).toBeNull();
+  });
+
+  it('enquanto as opções carregam, o "+" fica desabilitado', async () => {
+    let liberar: () => void = () => undefined;
+    vi.mocked(listarEmpresasMulti).mockReturnValue(
+      new Promise((r) => {
+        liberar = () => r(paginado([empresa]));
+      }),
+    );
+    montar("rh");
+    expect(botaoMais("Cadastrar novo departamento")).toBeDisabled();
+    await act(async () => liberar());
+    await aguardarEmpresa();
+    expect(botaoMais("Cadastrar novo departamento")).toBeEnabled();
+  });
+
+  it('sem empresa resolvida, o "+" fica desabilitado', async () => {
+    vi.mocked(listarEmpresasMulti).mockResolvedValue(paginado([]));
+    montar("rh");
+    await screen.findByText(/Não foi possível confirmar a empresa ativa/);
+    expect(botaoMais("Cadastrar novo cargo")).toBeDisabled();
+  });
+
+  it("abre com o foco em Código; Escape fecha, o foco volta ao seletor e a admissão fica igual", async () => {
+    montar("rh");
+    await aguardarEmpresa();
+    preencherParteDaAdmissao();
+    fireEvent.click(botaoMais("Cadastrar novo departamento"));
+    const dialogo = await screen.findByRole("dialog", {
+      name: "Cadastrar departamento",
+    });
+    expect(within(dialogo).getByLabelText(/^Código/)).toHaveFocus();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(dialogoReferencia()).toBeNull();
+    expect(departamentoSel()).toHaveFocus();
+    admissaoPreservada();
+    expect(criarDepartamento).not.toHaveBeenCalled();
+  });
+
+  it('"Cancelar" faz o mesmo: fecha, foco no seletor, admissão e erros iguais', async () => {
+    montar("rh");
+    await aguardarEmpresa();
+    preencherParteDaAdmissao();
+    // Um erro já na tela (matrícula inválida) também tem de ficar.
+    fireEvent.change(matricula(), { target: { value: "x" } });
+    fireEvent.click(salvar());
+    await waitFor(() =>
+      expect(matricula()).toHaveAttribute("aria-invalid", "true"),
+    );
+    const dialogo = await abrirEPreencher(
+      "Cadastrar novo cargo",
+      "CAR_X",
+      "Cargo descartado",
+    );
+    fireEvent.click(within(dialogo).getByRole("button", { name: "Cancelar" }));
+    expect(dialogoReferencia()).toBeNull();
+    expect(cargoSel()).toHaveFocus();
+    admissaoPreservada();
+    expect(matricula()).toHaveValue("X");
+    expect(matricula()).toHaveAttribute("aria-invalid", "true");
+    expect(criarCargo).not.toHaveBeenCalled();
+    // Reabrir começa vazio.
+    fireEvent.click(botaoMais("Cadastrar novo cargo"));
+    const reaberto = await screen.findByRole("dialog", {
+      name: "Cadastrar cargo",
+    });
+    expect(within(reaberto).getByLabelText(/^Código/)).toHaveValue("");
+    expect(within(reaberto).getByLabelText(/^Nome/)).toHaveValue("");
+  });
+
+  it.each([
+    {
+      rotulo: "Cadastrar novo departamento",
+      criar: criarDepartamento,
+      nova: departamentoNovo,
+      seletor: departamentoSel,
+      chave: "departamentoId",
+    },
+    {
+      rotulo: "Cadastrar novo cargo",
+      criar: criarCargo,
+      nova: cargoNovo,
+      seletor: cargoSel,
+      chave: "cargoId",
+    },
+    {
+      rotulo: "Cadastrar nova unidade",
+      criar: criarUnidade,
+      nova: unidadeNova,
+      seletor: unidadeSel,
+      chave: "unidadeOrganizacionalId",
+    },
+  ] as const)(
+    "$rotulo: cria na empresa ativa, seleciona a nova opção e a admissão a envia",
+    async ({ rotulo, criar, nova, seletor, chave }) => {
+      montar("rh");
+      await aguardarEmpresa();
+      preencherValido();
+      await cadastrarPeloMais(rotulo, nova.codigo.toLowerCase(), nova.nome);
+      await waitFor(() => expect(dialogoReferencia()).toBeNull());
+      expect(criar).toHaveBeenCalledWith({
+        codigo: nova.codigo,
+        nome: nova.nome,
+        empresaId: empresa.id,
+      });
+      // A nova opção está no seletor, escolhida, e o foco voltou a ele.
+      expect(seletor()).toHaveValue(nova.id);
+      expect(
+        within(seletor()).getByRole("option", {
+          name: `${nova.codigo} — ${nova.nome}`,
+        }),
+      ).toBeInTheDocument();
+      expect(seletor()).toHaveFocus();
+      // O resto da admissão continua como estava.
+      expect(nome()).toHaveValue("  Pessoa Sintética Nova ");
+      expect(data()).toHaveValue("2026-11-03");
+      expect(tipo()).toHaveValue("clt");
+
+      await salvarEConfirmar();
+      await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
+      const dto = vi.mocked(admitirColaborador).mock
+        .calls[0]![0] as unknown as Record<string, unknown>;
+      expect(dto[chave]).toBe(nova.id);
+    },
+  );
+
+  it("o departamento criado passa pelo caminho da troca: limpa a Área e recarrega as áreas dele", async () => {
+    montar("rh");
+    await aguardarEmpresa();
+    fireEvent.change(departamentoSel(), { target: { value: departamento.id } });
+    await waitFor(() =>
+      expect(listarAreas).toHaveBeenCalledWith(
+        expect.objectContaining({ departamentoId: departamento.id }),
+      ),
+    );
+    await cadastrarPeloMais(
+      "Cadastrar novo departamento",
+      departamentoNovo.codigo,
+      departamentoNovo.nome,
+    );
+    await waitFor(() =>
+      expect(listarAreas).toHaveBeenLastCalledWith(
+        expect.objectContaining({ departamentoId: departamentoNovo.id }),
+      ),
+    );
+    expect(areaSel()).toHaveValue("");
+  });
+
+  it("a nova opção entra na ordem por código", async () => {
+    vi.mocked(listarCargos).mockResolvedValue(
+      paginado([
+        { ...cargo, id: "c-a", codigo: "AAA", nome: "Primeiro" },
+        { ...cargo, id: "c-z", codigo: "ZZZ", nome: "Último" },
+      ]),
+    );
+    montar("rh");
+    await aguardarEmpresa();
+    await cadastrarPeloMais(
+      "Cadastrar novo cargo",
+      cargoNovo.codigo,
+      cargoNovo.nome,
+    );
+    await waitFor(() => expect(dialogoReferencia()).toBeNull());
+    const rotulos = within(cargoSel())
+      .getAllByRole("option")
+      .map((o) => o.textContent);
+    expect(rotulos).toEqual([
+      "Selecione…",
+      "AAA — Primeiro",
+      "CAR_RAPIDO — Cargo Rápido (teste)",
+      "ZZZ — Último",
+    ]);
+  });
+
+  it("código inválido: nenhuma chamada e o erro no campo do modal", async () => {
+    montar("rh");
+    await aguardarEmpresa();
+    const dialogo = await cadastrarPeloMais(
+      "Cadastrar novo departamento",
+      "x",
+      "Departamento Sintético",
+    );
+    const codigoDoModal = within(dialogo).getByLabelText(/^Código/);
+    expect(codigoDoModal).toHaveAttribute("aria-invalid", "true");
+    expect(codigoDoModal).toHaveAccessibleDescription(
+      /Código deve conter apenas letras maiúsculas, dígitos e _ \(2 a 32 caracteres\)\./,
+    );
+    expect(codigoDoModal).toHaveFocus();
+    expect(criarDepartamento).not.toHaveBeenCalled();
+    expect(dialogoReferencia()).toBeInTheDocument();
+  });
+
+  it("409: erro no Código, modal aberto e admissão preservada", async () => {
+    vi.mocked(criarDepartamento).mockRejectedValue(recusaDeReferencia(409));
+    montar("rh");
+    await aguardarEmpresa();
+    preencherParteDaAdmissao();
+    const dialogo = await cadastrarPeloMais(
+      "Cadastrar novo departamento",
+      "DEP1",
+      "Departamento repetido",
+    );
+    const codigoDoModal = within(dialogo).getByLabelText(/^Código/);
+    await waitFor(() =>
+      expect(codigoDoModal).toHaveAccessibleDescription(
+        /Este código já está em uso nesta empresa\./,
+      ),
+    );
+    expect(codigoDoModal).toHaveFocus();
+    expect(dialogoReferencia()).toBeInTheDocument();
+    expect(departamentoSel()).toHaveValue("");
+    admissaoPreservada();
+  });
+
+  it.each([
+    [
+      "400",
+      () => recusaDeReferencia(400),
+      "O servidor recusou os dados. Revise código e nome.",
+    ],
+    [
+      "403 csrf_invalido",
+      () => recusaDeReferencia(403, "csrf_invalido"),
+      "Esta página ficou desatualizada. Cadastre novamente; seus dados foram mantidos.",
+    ],
+    [
+      "403 de permissão",
+      () => recusaDeReferencia(403),
+      "Seu perfil não tem permissão para cadastrar unidades.",
+    ],
+    [
+      "401",
+      () => recusaDeReferencia(401),
+      "Sua sessão expirou. Entre de novo para continuar; os dados digitados foram mantidos nesta página.",
+    ],
+    [
+      "404",
+      () => recusaDeReferencia(404),
+      "A empresa ativa não pôde ser confirmada. Feche este cadastro e abra a página de novo.",
+    ],
+  ])(
+    "%s: mensagem certa, modal aberto, admissão preservada",
+    async (_caso, erro, mensagem) => {
+      vi.mocked(criarUnidade).mockRejectedValue(erro());
+      montar("rh");
+      await aguardarEmpresa();
+      preencherParteDaAdmissao();
+      const dialogo = await cadastrarPeloMais(
+        "Cadastrar nova unidade",
+        "UNI_X",
+        "Unidade Sintética",
+      );
+      expect(await within(dialogo).findByRole("alert")).toHaveTextContent(
+        mensagem,
+      );
+      expect(dialogoReferencia()).toBeInTheDocument();
+      expect(listarUnidades).toHaveBeenCalledTimes(1);
+      admissaoPreservada();
+    },
+  );
+
+  it("rede: não afirma o cadastro e recarrega a lista daquela referência", async () => {
+    vi.mocked(criarCargo).mockRejectedValue(new TypeError("Failed to fetch"));
+    montar("rh");
+    await aguardarEmpresa();
+    expect(listarCargos).toHaveBeenCalledTimes(1);
+    // O servidor gravou antes de a resposta se perder: a recarga já o traz.
+    vi.mocked(listarCargos).mockResolvedValue(paginado([cargo, cargoNovo]));
+    const dialogo = await cadastrarPeloMais(
+      "Cadastrar novo cargo",
+      cargoNovo.codigo,
+      cargoNovo.nome,
+    );
+    expect(await within(dialogo).findByRole("alert")).toHaveTextContent(
+      "Não foi possível confirmar se o cadastro foi feito. A lista foi atualizada: confira se a referência já aparece antes de tentar de novo.",
+    );
+    await waitFor(() => expect(listarCargos).toHaveBeenCalledTimes(2));
+    expect(listarCargos).toHaveBeenLastCalledWith({
+      status: "ativo",
+      tamanhoPagina: 100,
+    });
+    expect(listarDepartamentos).toHaveBeenCalledTimes(1);
+    expect(listarUnidades).toHaveBeenCalledTimes(1);
+    expect(dialogoReferencia()).toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        within(cargoSel()).getByRole("option", {
+          name: `${cargoNovo.codigo} — ${cargoNovo.nome}`,
+        }),
+      ).toBeInTheDocument(),
+    );
+    // Nada foi escolhido por conta própria.
+    expect(cargoSel()).toHaveValue("");
+  });
+
+  it('empresa sem Departamento e Cargo: o aviso orienta o "+", some depois de criar os dois e a admissão segue', async () => {
+    vi.mocked(listarDepartamentos).mockResolvedValue(paginado([]));
+    vi.mocked(listarCargos).mockResolvedValue(paginado([]));
+    montar("rh");
+    await aguardarEmpresa();
+    expect(
+      screen.getByText(/ainda não tem cadastro ativo de/),
+    ).toHaveTextContent(/Use o botão "\+" ao lado de Departamento e Cargo/);
+
+    await cadastrarPeloMais(
+      "Cadastrar novo departamento",
+      departamentoNovo.codigo,
+      departamentoNovo.nome,
+    );
+    await waitFor(() => expect(dialogoReferencia()).toBeNull());
+    expect(
+      screen.getByText(/ainda não tem cadastro ativo de/),
+    ).toHaveTextContent(/Use o botão "\+" ao lado de Cargo,/);
+
+    await cadastrarPeloMais(
+      "Cadastrar novo cargo",
+      cargoNovo.codigo,
+      cargoNovo.nome,
+    );
+    await waitFor(() => expect(dialogoReferencia()).toBeNull());
+    expect(screen.queryByText(/ainda não tem cadastro ativo de/)).toBeNull();
+
+    fireEvent.change(nome(), { target: { value: "Pessoa Sintética" } });
+    fireEvent.change(dataNascimento(), { target: { value: "1990-05-20" } });
+    fireEvent.change(tipo(), { target: { value: "clt" } });
+    fireEvent.change(data(), { target: { value: "2026-11-03" } });
+    await salvarEConfirmar();
+    await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(admitirColaborador).mock.calls[0]![0]).toMatchObject({
+      departamentoId: departamentoNovo.id,
+      cargoId: cargoNovo.id,
+    });
   });
 });

@@ -1,4 +1,9 @@
-import { clearCsrfToken, getCsrfToken, refreshCsrfToken } from "./csrfClient";
+import {
+  clearCsrfToken,
+  descartarTokenSeDesatualizado,
+  getCsrfToken,
+  refreshCsrfToken,
+} from "./csrfClient";
 
 const BASE = "/v1";
 
@@ -43,12 +48,21 @@ export interface AtualizarUnidadeDto {
 }
 
 export class ApiError extends Error {
+  /** T180 — código estável da recusa (ex.: `csrf_invalido`), quando vem. */
+  readonly codigo?: string;
+
   constructor(
     readonly status: number,
     message: string,
+    corpo?: unknown,
   ) {
     super(message);
     this.name = "ApiError";
+    // T180 — só `codigo` (texto) é lido do corpo, como em `colaboradoresClient`.
+    if (typeof corpo === "object" && corpo !== null) {
+      const { codigo } = corpo as { codigo?: unknown };
+      if (typeof codigo === "string") this.codigo = codigo;
+    }
   }
 }
 
@@ -72,13 +86,16 @@ async function apiFetch(
   if (res.status === 401) {
     clearCsrfToken();
   }
+  // T180 — 403 `csrf_invalido`: o token desta aba ficou desatualizado;
+  // descartado, a próxima gravação pede um novo (como na T179).
+  await descartarTokenSeDesatualizado(res);
   return res;
 }
 
 async function jsonOrThrow<T>(res: Response): Promise<T> {
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { message?: string };
-    throw new ApiError(res.status, body.message ?? "Erro na requisição.");
+    throw new ApiError(res.status, body.message ?? "Erro na requisição.", body);
   }
   return res.json() as Promise<T>;
 }

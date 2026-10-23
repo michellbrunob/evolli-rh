@@ -35,7 +35,7 @@ import {
 import { inativarCargo, reativarCargo } from "./cargoClient";
 import * as organizacaoClient from "./organizacaoClient";
 import * as cargoClient from "./cargoClient";
-import { clearCsrfToken, setCsrfToken } from "./csrfClient";
+import { clearCsrfToken, getCsrfToken, setCsrfToken } from "./csrfClient";
 
 const fetchMock = vi.fn();
 
@@ -59,11 +59,19 @@ function respostaOk(body: unknown = { id: "x", status: "inativo" }): Response {
   } as unknown as Response;
 }
 
-function respostaErro(status: number): Response {
+/**
+ * T180 — com `clone`, como a `Response` real: no 403 os clientes leem uma
+ * cópia do corpo para decidir se descartam o token (`csrf_invalido`).
+ */
+function respostaErro(
+  status: number,
+  corpo: unknown = { message: "recusado" },
+): Response {
   return {
     ok: false,
     status,
-    json: async () => ({ message: "recusado" }),
+    json: async () => corpo,
+    clone: () => respostaErro(status, corpo),
   } as unknown as Response;
 }
 
@@ -202,4 +210,86 @@ describe("o status da recusa chega a quem chamou", () => {
     );
     expect(erro.status).toBeUndefined();
   });
+});
+
+// ---------------------------------------------------------------------------
+// T180 — o cadastro rápido da Nova admissão grava por `criarDepartamento`,
+// `criarUnidade` e `criarCargo`. Como `colaboradoresClient` desde a T179, os
+// dois clientes guardam o `codigo` da recusa e, no 403 `csrf_invalido`,
+// descartam o token em memória; o 403 de permissão não o toca.
+// ---------------------------------------------------------------------------
+describe("T180 — criação guarda o codigo e descarta o token desatualizado", () => {
+  const DTO = {
+    codigo: "DEP_NOVO",
+    nome: "Departamento Sintético",
+    empresaId: "44444444-4444-4444-4444-444444444444",
+  };
+  const CRIACOES: ReadonlyArray<{
+    nome: string;
+    criar: (dto: typeof DTO) => Promise<unknown>;
+    caminho: string;
+  }> = [
+    {
+      nome: "criarDepartamento",
+      criar: organizacaoClient.criarDepartamento,
+      caminho: "/v1/departamentos",
+    },
+    {
+      nome: "criarUnidade",
+      criar: organizacaoClient.criarUnidade,
+      caminho: "/v1/unidades-organizacionais",
+    },
+    {
+      nome: "criarCargo",
+      criar: cargoClient.criarCargo,
+      caminho: "/v1/cargos",
+    },
+  ];
+
+  /** A recusa de uma criação, lida por forma, como a tela a lê. */
+  async function recusaDe(
+    promessa: Promise<unknown>,
+  ): Promise<{ status?: number; codigo?: string }> {
+    return promessa.then(
+      () => ({}),
+      (e: unknown) => e as { status?: number; codigo?: string },
+    );
+  }
+
+  for (const caso of CRIACOES) {
+    it(`${caso.nome}: POST ${caso.caminho} com o corpo e o CSRF`, async () => {
+      fetchMock.mockResolvedValueOnce(respostaOk({ id: "n-1" }));
+      await caso.criar(DTO);
+      const { url, init, headers } = ultimaChamada();
+      expect(url).toBe(caso.caminho);
+      expect(init.method).toBe("POST");
+      expect(headers?.["x-csrf-token"]).toBe("csrf-em-memoria");
+      expect(JSON.parse(init.body as string)).toEqual(DTO);
+    });
+
+    it(`${caso.nome}: 403 csrf_invalido guarda o codigo e descarta o token`, async () => {
+      fetchMock.mockResolvedValueOnce(
+        respostaErro(403, { message: "recusado", codigo: "csrf_invalido" }),
+      );
+      const erro = await recusaDe(caso.criar(DTO));
+      expect(erro.status).toBe(403);
+      expect(erro.codigo).toBe("csrf_invalido");
+      expect(getCsrfToken()).toBeNull();
+    });
+
+    it(`${caso.nome}: 403 de permissão, sem codigo, mantém o token`, async () => {
+      fetchMock.mockResolvedValueOnce(respostaErro(403));
+      const erro = await recusaDe(caso.criar(DTO));
+      expect(erro.status).toBe(403);
+      expect(erro.codigo).toBeUndefined();
+      expect(getCsrfToken()).toBe("csrf-em-memoria");
+    });
+
+    it(`${caso.nome}: 409 chega com o status para a mensagem do campo`, async () => {
+      fetchMock.mockResolvedValueOnce(respostaErro(409));
+      const erro = await recusaDe(caso.criar(DTO));
+      expect(erro.status).toBe(409);
+      expect(getCsrfToken()).toBe("csrf-em-memoria");
+    });
+  }
 });

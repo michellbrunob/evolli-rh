@@ -862,23 +862,31 @@ describe("T176/T178 — da página à listagem e à ficha do admitido", () => {
 });
 
 // ---------------------------------------------------------------------------
-// T179 — o shell repassa o papel à página: só a ORIENTAÇÃO do aviso de
-// empresa sem referências muda (o RH cadastra em Estrutura; o DP pede ao RH).
+// T179 — o shell repassa o papel à página: a ORIENTAÇÃO do aviso de empresa
+// sem referências muda (T180 — o RH usa o "+" sem sair da página; o DP pede
+// ao RH), e só o RH vê o "+" do cadastro rápido.
 // ---------------------------------------------------------------------------
 describe("T179 — empresa sem referências, pelo papel que o shell conhece", () => {
   it.each([
-    ["rh", /Cadastre o que falta em Estrutura/],
+    ["rh", /Use o botão "\+" ao lado de Cargo/, true],
     // T179 — só o que falta, e só Departamento e Cargo contam.
-    ["dp", /O RH precisa cadastrar Cargo nesta empresa/],
-  ])("%s vê a orientação certa e não consegue enviar", async (papel, texto) => {
-    vi.mocked(listarCargos).mockResolvedValue(paginado([]));
-    render(<App papelDoAtor={papel} />);
-    await abrirNovaAdmissaoPelaListagem();
-    const aviso = await screen.findByText(texto);
-    expect(aviso).toHaveTextContent(/cadastro ativo de Cargo/);
-    fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
-    await waitFor(() => expect(aviso).toHaveFocus());
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    expect(admitirColaborador).not.toHaveBeenCalled();
-  });
+    ["dp", /O RH precisa cadastrar Cargo nesta empresa/, false],
+  ])(
+    "%s vê a orientação certa e não consegue enviar",
+    async (papel, texto, comMais) => {
+      vi.mocked(listarCargos).mockResolvedValue(paginado([]));
+      render(<App papelDoAtor={papel} />);
+      await abrirNovaAdmissaoPelaListagem();
+      const aviso = await screen.findByText(texto);
+      expect(aviso).toHaveTextContent(/cadastro ativo de Cargo/);
+      // T180 — o "+" do cadastro rápido é só do RH.
+      expect(
+        screen.queryByRole("button", { name: "Cadastrar novo cargo" }) !== null,
+      ).toBe(comMais);
+      fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
+      await waitFor(() => expect(aviso).toHaveFocus());
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(admitirColaborador).not.toHaveBeenCalled();
+    },
+  );
 });
