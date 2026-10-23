@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "constitutionVersion": "1.4.0",
-  "lastConvergedAt": "2026-10-22",
+  "lastConvergedAt": "2026-10-23",
   "lastIntegratedTask": 179,
-  "lastRecordedTask": 179,
+  "lastRecordedTask": 180,
   "platformDecision": {
     "adr": "docs/adr/0014-evolli-plataforma-base-e-encerramento-do-frappe.md",
     "decidedAt": "2026-10-01",
@@ -11,11 +11,17 @@
     "frappe": "encerrado_como_candidato_referencia_apenas"
   },
   "nextTask": {
-    "id": "T179",
-    "status": "integrada_em_main",
-    "reason": "T179 integrada em main pela PR #171, squash 60ce990bc6a04bee542b93d494d00d6f48bf8c19. A primeira CI de push falhou somente porque o trailer Spec-Kit-Entrega do squash anterior foi enviado com quebras de linha literais e nao foi reconhecido; esta convergencia registra a integracao com trailer valido. Nenhuma nova tarefa foi iniciada."
+    "id": "T180",
+    "status": "referencias_rapidas_em_implementacao",
+    "reason": "T179 integrada em main pela PR #171 (squash 60ce990bc6a04bee542b93d494d00d6f48bf8c19) e convergida pela PR #172 (squash 584a5c0b0c8faf2979a5b1a1838764b31674291d). A T180 permite ao RH cadastrar Departamento, Cargo e Unidade em modais na Nova admissao, sem sair do formulario e sem perder o que digitou: botao + so para RH (DP seleciona, nao cria); modais so com codigo e nome, os campos minimos do contrato atual; empresa sempre da sessao, conferida pelo servidor; erro no campo sem fechar o modal; seletor atualizado e referencia nova selecionada sem recarregar. Obrigatoriedade, permissoes, auditoria e contrato inalterados; sem migration. Decisao da proprietaria de 2026-10-23 em docs/decisions/t180-referencias-rapidas-nova-admissao.md. Fora de escopo: documentos, CPF, banco, dependentes, saude, genero, foto, raca/etnia, dados trabalhistas detalhados, horario, fuso, telefone estrangeiro, importacao em massa, cadastro rapido de Area, Equipe e Centro de custo, promocao e merge."
   },
-  "openDeliveries": [],
+  "openDeliveries": [
+    {
+      "id": "T180",
+      "pullRequest": null,
+      "status": "referencias_rapidas_em_implementacao"
+    }
+  ],
   "requiredArtifacts": [
     ".specify/memory/constitution.md",
     ".specify/spec.md",

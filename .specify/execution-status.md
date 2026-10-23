@@ -2246,6 +2246,34 @@ a T180.
 **Prévia:** `http://127.0.0.1:5173` mostra a branch da T179 ao vivo, identificada
 como desenvolvimento da T179, não a `main`.
 
+## Cadastro rápido de referências na Nova admissão — T180 (em implementação)
+
+| Tarefa | Estado               | Resultado principal                                                                             |
+| ------ | -------------------- | ----------------------------------------------------------------------------------------------- |
+| T180   | **Em implementação** | RH cadastra Departamento, Cargo e Unidade em modais na Nova admissão, sem perder o que digitou. |
+
+**Escopo da T180:** botão "+" ao lado dos seletores de Departamento, Cargo e
+Unidade, só para RH; modal curto e acessível para cada referência, só com
+código e nome (os campos mínimos do contrato atual); empresa sempre da sessão,
+conferida pelo servidor; erro no campo sem fechar o modal; seletor atualizado e
+referência nova selecionada sem recarregar a página. Obrigatoriedade,
+permissões, auditoria e contrato inalterados; sem migration.
+
+**Decisão da proprietária (2026-10-23):** [decisão](../docs/decisions/t180-referencias-rapidas-nova-admissao.md).
+
+**Fora de escopo:** documentos, CPF, dados bancários, dependentes, saúde,
+gênero, foto, raça/etnia, dados trabalhistas detalhados, horário e fuso,
+telefone estrangeiro, importação em massa, cadastro rápido de Área, Equipe e
+Centro de custo, promoção e merge.
+
+**Revisão adversarial (2026-10-23):** corrigida a corrida em que uma recarga
+lenta do seletor, lida antes de uma criação, chegava depois dela e tirava a
+referência nova da lista: a resposta obsoleta é descartada e a referência
+escolhida nunca sai do seletor, então a confirmação mostra o que a admissão
+envia. A mensagem do envio incerto só diz que a lista foi atualizada depois
+que isso acontece. O E2E confere a trilha `authorization_denied` das recusas
+403 e 404 e que o 409 não devolve o código.
+
 ## Próxima ação autorizável
 
 1. ~~**Decidir o pacote da T150**~~ — **cumprido pela T151.** O proprietário aprovou o recorte em

@@ -56,8 +56,13 @@
  * contratuais avançados — cada um tem destino na matriz de cobertura da T177.
  * Não inventa lista de opções: estado civil, escolaridade, país, cidade e
  * estado são texto validado. A única lista é a de sexo, FECHADA por decisão
- * da proprietária (T179, `OPCOES_SEXO`). Não cadastra Departamento, Cargo nem
- * Unidade: isso é do RH, em Estrutura (T179, decisão 7).
+ * da proprietária (T179, `OPCOES_SEXO`).
+ *
+ * T180 — o RH cadastra Departamento, Cargo e Unidade sem sair da página, pelo
+ * botão "+" ao lado de cada seletor (`ModalReferenciaRapida`: só código e
+ * nome). A referência criada entra no seletor já escolhida, e cancelar não
+ * toca na admissão. O DP não vê o botão; o servidor continua decidindo quem
+ * grava. Área, Equipe e Centro de custo seguem sem cadastro rápido.
  *
  * T178 — o CEP brasileiro pode SUGERIR logradouro, bairro, cidade e estado
  * (consulta autorizada pela proprietária, feita pelo servidor em
@@ -71,7 +76,7 @@
  * aposentado na T177: não coletava os campos obrigatórios. "Novo colaborador"
  * traz para esta página.
  */
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import {
   Button,
   CampoMascarado,
@@ -143,6 +148,11 @@ import {
   contatosDaAdmissao,
   validarContatos,
 } from "./contatosColaborador";
+import {
+  ModalReferenciaRapida,
+  type ReferenciaCriada,
+  type TipoReferenciaRapida,
+} from "./ModalReferenciaRapida";
 import "./NovaAdmissaoScreen.css";
 
 export const NOVA_ADMISSAO_TITULO_ID = "nova-admissao-titulo";
@@ -190,6 +200,47 @@ function rotuloDaReferencia(referencia: Referencia): string {
 function soAtivos<T extends { status: string }>(lista: readonly T[]): T[] {
   return lista.filter((item) => item.status === "ativo");
 }
+
+/**
+ * T180 — a referência criada entra na lista na posição do código, a ordem em
+ * que o servidor já devolve (`codigo` crescente); o resto da lista fica como
+ * veio. Se o id já estiver lá (recarga anterior), não duplica.
+ */
+function comReferenciaNova<T extends Referencia>(
+  lista: readonly T[],
+  nova: T,
+): T[] {
+  const sem = lista.filter((r) => r.id !== nova.id);
+  const posicao = sem.findIndex((r) => r.codigo > nova.codigo);
+  return posicao === -1
+    ? [...sem, nova]
+    : [...sem.slice(0, posicao), nova, ...sem.slice(posicao)];
+}
+
+/**
+ * T180 (revisão) — a lista recarregada substitui a atual, mas nunca tira dela
+ * a referência ESCOLHIDA: seletor, confirmação e envio falam sempre da mesma.
+ * Se ela não veio na recarga (inativada nesse meio-tempo, por exemplo), quem
+ * decide é o servidor, ao gravar a admissão.
+ */
+function mantendoEscolhida<T extends Referencia>(
+  recarregada: T[],
+  atual: readonly T[],
+  idEscolhido: string,
+): T[] {
+  if (!idEscolhido || recarregada.some((r) => r.id === idEscolhido)) {
+    return recarregada;
+  }
+  const escolhida = atual.find((r) => r.id === idEscolhido);
+  return escolhida ? comReferenciaNova(recarregada, escolhida) : recarregada;
+}
+
+/** T180 — nome acessível do "+" de cada seletor. */
+const ROTULO_DO_BOTAO_REFERENCIA: Record<TipoReferenciaRapida, string> = {
+  departamento: "Cadastrar novo departamento",
+  cargo: "Cadastrar novo cargo",
+  unidade: "Cadastrar nova unidade",
+};
 
 /** "A", "A e B", "A, B e C". */
 function listaComE(itens: readonly string[]): string {
@@ -642,9 +693,11 @@ function gerarChaveIdempotencia(): string {
 
 /**
  * T179 — o aviso de empresa sem referências obrigatórias (Departamento e
- * Cargo; a Unidade é opcional desde 2026-10-21). O RH é quem cadastra (em
- * Estrutura); o DP, e qualquer outro papel, só lê — para ele, a orientação é
- * pedir ao RH (decisões 6 e 7).
+ * Cargo; a Unidade é opcional desde 2026-10-21). O DP, e qualquer outro
+ * papel, só lê — para ele, a orientação é pedir ao RH (decisões 6 e 7).
+ *
+ * T180 — o RH cadastra aqui mesmo, pelo "+" ao lado do seletor, sem sair da
+ * página. O aviso é calculado das opções: some quando elas passam a existir.
  */
 function mensagemSemReferencias(
   faltando: readonly string[],
@@ -654,13 +707,9 @@ function mensagemSemReferencias(
     faltando,
   )}, e a admissão exige Departamento e Cargo. Nada será enviado até isso ser resolvido.`;
   if (papelDoAtor === "rh") {
-    const onde: string[] = [];
-    const naEstrutura = faltando.filter((f) => f !== "Cargo");
-    if (naEstrutura.length > 0) {
-      onde.push(`${listaComE(naEstrutura)} em Estrutura organizacional`);
-    }
-    if (faltando.includes("Cargo")) onde.push("Cargo em Funções e cargos");
-    return `${base} Cadastre o que falta em Estrutura (${onde.join("; ")}) e depois abra esta página de novo.`;
+    return `${base} Use o botão "+" ao lado de ${listaComE(
+      faltando,
+    )}, em Lotação inicial, para cadastrar sem sair desta página.`;
   }
   return `${base} O RH precisa cadastrar ${listaComE(
     faltando,
@@ -734,8 +783,9 @@ export interface NovaAdmissaoScreenProps {
   ) => void;
   /**
    * T179 — papel do ator, decidido pelo servidor (o mesmo que o shell usa).
-   * Só muda a ORIENTAÇÃO do aviso de empresa sem referências: o RH cadastra
-   * em Estrutura; o DP pede ao RH. Nunca concede nada.
+   * Muda a ORIENTAÇÃO do aviso de empresa sem referências: o RH cadastra; o
+   * DP pede ao RH. T180 — e mostra o "+" do cadastro rápido só ao RH. Nunca
+   * concede nada: quem grava ou recusa é o servidor.
    */
   readonly papelDoAtor?: string | null;
 }
@@ -797,6 +847,36 @@ export function NovaAdmissaoScreen({
   /** Só a resposta mais recente de áreas vale (troca rápida de departamento). */
   const pedidoAreasRef = useRef(0);
   const sucessoTituloRef = useRef<HTMLHeadingElement | null>(null);
+  /** T180 — a referência em cadastro rápido; `null` com o modal fechado. */
+  const [referenciaEmCadastro, setReferenciaEmCadastro] =
+    useState<TipoReferenciaRapida | null>(null);
+  /** T180 — gatilho de uma vez só: devolver o foco ao seletor da referência. */
+  const focarSeletorRef = useRef<TipoReferenciaRapida | null>(null);
+  /**
+   * T180 (revisão) — versão da lista de cada referência do cadastro rápido. A
+   * criação e cada recarga a avançam, e a resposta de uma recarga só vale se
+   * ainda for a mais recente. Sem isso, uma recarga lenta, lida ANTES de uma
+   * criação, chegava depois dela e tirava a referência nova do seletor: a
+   * confirmação dizia "Não informado" enquanto a admissão enviava o id.
+   */
+  const versaoDaListaRef = useRef<Record<TipoReferenciaRapida, number>>({
+    departamento: 0,
+    cargo: 0,
+    unidade: 0,
+  });
+  /** T180 (revisão) — as referências escolhidas agora, lidas pela recarga. */
+  const escolhidasRef = useRef<Record<TipoReferenciaRapida, string>>({
+    departamento: "",
+    cargo: "",
+    unidade: "",
+  });
+  useEffect(() => {
+    escolhidasRef.current = {
+      departamento: campos.departamentoId,
+      cargo: campos.cargoId,
+      unidade: campos.unidadeId,
+    };
+  }, [campos.departamentoId, campos.cargoId, campos.unidadeId]);
 
   const empresa = opcoes.empresas.length === 1 ? opcoes.empresas[0] : undefined;
 
@@ -859,6 +939,16 @@ export function NovaAdmissaoScreen({
   useEffect(() => {
     if (admissao) sucessoTituloRef.current?.focus();
   }, [admissao]);
+
+  // T180 — ao fechar o cadastro rápido por qualquer caminho, o foco vai ao
+  // SELETOR, não ao "+". Este efeito roda depois da limpeza do `Modal`, que
+  // devolve o foco a quem o abriu (o botão), e assim prevalece.
+  useEffect(() => {
+    if (referenciaEmCadastro || !focarSeletorRef.current) return;
+    const campo = focarSeletorRef.current;
+    focarSeletorRef.current = null;
+    document.getElementById(ID_DO_CAMPO[campo])?.focus();
+  }, [referenciaEmCadastro]);
 
   /**
    * T179 — o que falta para admitir nesta empresa: Departamento e Cargo são
@@ -1084,6 +1174,135 @@ export function NovaAdmissaoScreen({
     } finally {
       if (pedido === pedidoAreasRef.current) setCarregandoAreas(false);
     }
+  }
+
+  // ---- T180 — cadastro rápido de Departamento, Cargo e Unidade ------------
+
+  /** Fecha o modal sem tocar na admissão; o foco volta ao seletor. */
+  function fecharCadastroRapido() {
+    focarSeletorRef.current = referenciaEmCadastro;
+    setReferenciaEmCadastro(null);
+  }
+
+  /**
+   * 201: a referência entra nas opções e fica escolhida pelo MESMO caminho
+   * da troca manual do seletor — no Departamento, o que limpa e recarrega as
+   * Áreas. O erro do campo sai junto, e o foco volta ao seletor.
+   */
+  function referenciaCriada(
+    tipo: TipoReferenciaRapida,
+    criada: ReferenciaCriada,
+  ) {
+    // Uma recarga ainda em curso foi lida antes desta criação: fica obsoleta.
+    versaoDaListaRef.current[tipo] += 1;
+    switch (tipo) {
+      case "departamento":
+        setOpcoes((prev) => ({
+          ...prev,
+          departamentos: comReferenciaNova(prev.departamentos, criada),
+        }));
+        void selecionarDepartamento(criada.id);
+        break;
+      case "cargo":
+        setOpcoes((prev) => ({
+          ...prev,
+          cargos: comReferenciaNova(prev.cargos, criada),
+        }));
+        atualizar("cargoId", criada.id, "cargo", "lotacao");
+        break;
+      case "unidade":
+        setOpcoes((prev) => ({
+          ...prev,
+          unidades: comReferenciaNova(prev.unidades, criada),
+        }));
+        atualizar("unidadeId", criada.id, "unidade", "lotacao");
+        break;
+    }
+    focarSeletorRef.current = tipo;
+    setReferenciaEmCadastro(null);
+  }
+
+  /**
+   * Rede ou 5xx no cadastro rápido: o servidor pode ter gravado. A lista
+   * daquela referência é lida de novo, como no carregamento inicial.
+   * Responde se a lista foi de fato atualizada: `false` quando a leitura
+   * falhou (a lista atual fica) ou quando a resposta chegou obsoleta, depois
+   * de uma criação ou de outra recarga (é descartada). A referência
+   * escolhida nunca sai do seletor (`mantendoEscolhida`).
+   */
+  async function recarregarReferencia(
+    tipo: TipoReferenciaRapida,
+  ): Promise<boolean> {
+    const versao = ++versaoDaListaRef.current[tipo];
+    const vigente = () => versao === versaoDaListaRef.current[tipo];
+    const filtro = { status: "ativo", tamanhoPagina: 100 };
+    try {
+      switch (tipo) {
+        case "departamento": {
+          const itens = soAtivos((await listarDepartamentos(filtro)).itens);
+          if (!vigente()) return false;
+          setOpcoes((prev) => ({
+            ...prev,
+            departamentos: mantendoEscolhida(
+              itens,
+              prev.departamentos,
+              escolhidasRef.current.departamento,
+            ),
+          }));
+          return true;
+        }
+        case "cargo": {
+          const itens = soAtivos((await listarCargos(filtro)).itens);
+          if (!vigente()) return false;
+          setOpcoes((prev) => ({
+            ...prev,
+            cargos: mantendoEscolhida(
+              itens,
+              prev.cargos,
+              escolhidasRef.current.cargo,
+            ),
+          }));
+          return true;
+        }
+        case "unidade": {
+          const itens = soAtivos((await listarUnidades(filtro)).itens);
+          if (!vigente()) return false;
+          setOpcoes((prev) => ({
+            ...prev,
+            unidades: mantendoEscolhida(
+              itens,
+              prev.unidades,
+              escolhidasRef.current.unidade,
+            ),
+          }));
+          return true;
+        }
+      }
+    } catch {
+      // A lista atual fica; o modal diz que ela não pôde ser atualizada.
+      return false;
+    }
+  }
+
+  /**
+   * O "+" ao lado do seletor: só para o RH. Desabilitado enquanto as opções
+   * carregam, sem empresa resolvida e durante o envio da admissão; na tela
+   * de sucesso o formulário nem existe.
+   */
+  function botaoNovaReferencia(tipo: TipoReferenciaRapida): ReactNode {
+    if (papelDoAtor !== "rh") return null;
+    return (
+      <Button
+        type="button"
+        variant="secondary"
+        className="nova-admissao__botao-referencia"
+        aria-label={ROTULO_DO_BOTAO_REFERENCIA[tipo]}
+        disabled={carregandoOpcoes || !empresa || salvando}
+        onClick={() => setReferenciaEmCadastro(tipo)}
+      >
+        <span aria-hidden="true">+</span>
+      </Button>
+    );
   }
 
   function validar(): Erros {
@@ -1385,6 +1604,8 @@ export function NovaAdmissaoScreen({
     ajuda?: string;
     vazio: string;
     desabilitado?: boolean;
+    /** T180 — o "+" do cadastro rápido, na mesma linha do seletor. */
+    acao?: ReactNode;
   }) {
     const { campo, rotulo, obrigatorio, valor, lista, aoMudar } = definicao;
     return (
@@ -1395,25 +1616,35 @@ export function NovaAdmissaoScreen({
         {...(definicao.ajuda ? { help: definicao.ajuda } : {})}
         {...(erros[campo] ? { error: erros[campo]! } : {})}
       >
-        {(control) => (
-          <select
-            value={valor}
-            onChange={(e) => aoMudar(e.target.value)}
-            disabled={carregandoOpcoes || definicao.desabilitado === true}
-            {...control}
-          >
-            <option value="">
-              {lista.length > 0 || carregandoOpcoes
-                ? "Selecione…"
-                : definicao.vazio}
-            </option>
-            {lista.map((ref) => (
-              <option key={ref.id} value={ref.id}>
-                {rotuloDaReferencia(ref)}
+        {(control) => {
+          const seletor = (
+            <select
+              value={valor}
+              onChange={(e) => aoMudar(e.target.value)}
+              disabled={carregandoOpcoes || definicao.desabilitado === true}
+              {...control}
+            >
+              <option value="">
+                {lista.length > 0 || carregandoOpcoes
+                  ? "Selecione…"
+                  : definicao.vazio}
               </option>
-            ))}
-          </select>
-        )}
+              {lista.map((ref) => (
+                <option key={ref.id} value={ref.id}>
+                  {rotuloDaReferencia(ref)}
+                </option>
+              ))}
+            </select>
+          );
+          return definicao.acao ? (
+            <div className="nova-admissao__seletor-com-acao">
+              {seletor}
+              {definicao.acao}
+            </div>
+          ) : (
+            seletor
+          );
+        }}
       </FormField>
     );
   }
@@ -1873,6 +2104,7 @@ export function NovaAdmissaoScreen({
               lista: opcoes.departamentos,
               aoMudar: (id) => void selecionarDepartamento(id),
               vazio: "Nenhum departamento ativo",
+              acao: botaoNovaReferencia("departamento"),
             })}
             {seletorDeLotacao({
               campo: "cargo",
@@ -1882,6 +2114,7 @@ export function NovaAdmissaoScreen({
               lista: opcoes.cargos,
               aoMudar: (id) => atualizar("cargoId", id, "cargo", "lotacao"),
               vazio: "Nenhum cargo ativo",
+              acao: botaoNovaReferencia("cargo"),
             })}
             {seletorDeLotacao({
               campo: "unidade",
@@ -1891,6 +2124,7 @@ export function NovaAdmissaoScreen({
               lista: opcoes.unidades,
               aoMudar: (id) => atualizar("unidadeId", id, "unidade", "lotacao"),
               vazio: "Nenhuma unidade ativa",
+              acao: botaoNovaReferencia("unidade"),
             })}
           </div>
           <div className="nova-admissao__linha nova-admissao__linha--3">
@@ -2095,6 +2329,18 @@ export function NovaAdmissaoScreen({
           </p>
         ) : null}
       </Modal>
+
+      {/* T180 — cadastro rápido de Departamento, Cargo ou Unidade: modal
+          curto, fora do formulário da admissão, que nada perde ao fechar. */}
+      {empresa ? (
+        <ModalReferenciaRapida
+          tipo={referenciaEmCadastro}
+          empresaId={empresa.id}
+          onFechar={fecharCadastroRapido}
+          onCriada={referenciaCriada}
+          onRecarregar={recarregarReferencia}
+        />
+      ) : null}
 
       {/* Confirmação de descarte: é confirmação curta, o uso de modal que a
           decisão do `DP-FLX-21` mantém. O cadastro em si nunca abre em modal. */}

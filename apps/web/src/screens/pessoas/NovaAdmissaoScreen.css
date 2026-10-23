@@ -255,6 +255,34 @@
   list-style: none;
 }
 
+/* T180 — seletor e "+" do cadastro rápido na mesma linha: o seletor ocupa o
+   resto (`min-width: 0` para encolher em 375 px sem rolagem horizontal) e o
+   botão fica compacto, no alvo de toque mínimo. */
+.nova-admissao__seletor-com-acao {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+.nova-admissao__seletor-com-acao > select {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.nova-admissao__botao-referencia {
+  flex: 0 0 auto;
+  padding: 0;
+  font-size: var(--text-lead);
+}
+
+/* T180 — os dois campos do modal de cadastro rápido, em coluna. */
+.nova-admissao__referencia-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-md);
+}
+
 /* T179 — lotação no resumo da confirmação e na tela de sucesso: uma
    referência por linha. */
 .nova-admissao__lista-lotacao {
