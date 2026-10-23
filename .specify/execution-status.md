@@ -2246,11 +2246,11 @@ a T180.
 **Prévia:** `http://127.0.0.1:5173` mostra a branch da T179 ao vivo, identificada
 como desenvolvimento da T179, não a `main`.
 
-## Cadastro rápido de referências na Nova admissão — T180 (em implementação)
+## Cadastro rápido de referências na Nova admissão — T180 (integrada)
 
-| Tarefa | Estado               | Resultado principal                                                                             |
-| ------ | -------------------- | ----------------------------------------------------------------------------------------------- |
-| T180   | **Em implementação** | RH cadastra Departamento, Cargo e Unidade em modais na Nova admissão, sem perder o que digitou. |
+| Tarefa | Estado                                    | Resultado principal                                                                             |
+| ------ | ----------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| T180   | **Integrada** (PR #173, squash `cf04afc`) | RH cadastra Departamento, Cargo e Unidade em modais na Nova admissão, sem perder o que digitou. |
 
 **Escopo da T180:** botão "+" ao lado dos seletores de Departamento, Cargo e
 Unidade, só para RH; modal curto e acessível para cada referência, só com
@@ -2273,6 +2273,33 @@ escolhida nunca sai do seletor, então a confirmação mostra o que a admissão
 envia. A mensagem do envio incerto só diz que a lista foi atualizada depois
 que isso acontece. O E2E confere a trilha `authorization_denied` das recusas
 403 e 404 e que o 409 não devolve o código.
+
+## Edição da ficha do colaborador — T181 (em implementação)
+
+| Tarefa | Estado               | Resultado principal                                                                          |
+| ------ | -------------------- | -------------------------------------------------------------------------------------------- |
+| T181   | **Em implementação** | RH e DP completam e atualizam, pela ficha, dados pessoais, endereço e contatos já aprovados. |
+
+**Escopo da T181:** na ficha de Gestão de Pessoas › Colaboradores, edição por
+seção, com Salvar e Cancelar, dos dados pessoais complementares já existentes,
+do endereço (CEP assistido só pelo servidor, com alternativa manual) e dos
+contatos (regras da T179); só na empresa ativa; leitura segura para quem não
+tem permissão; auditoria existente, só com nomes de campos; falhas sem perder
+o digitado e sem afirmar gravação incerta. Sem schema, migration, seed,
+Docker, dependência ou lockfile novos.
+
+**Decisão da proprietária (2026-10-23):** [decisão](../docs/decisions/t181-edicao-ficha-colaborador.md).
+
+**Decisões complementares (2026-10-23):** edição da ficha só por RH e DP (o
+`master_tecnico` lê e não edita, recusado pelo servidor); sexo legado
+preservado ao salvar outro campo e alterado só por escolha deliberada de uma
+opção da lista atual.
+
+**Fora de escopo:** CPF, RG, CNH, CTPS, PIS, documentos, dados bancários,
+dependentes, filhos, camisa, saúde, dados sindicais, foto, raça/etnia, gênero,
+deficiência, dados contratuais detalhados, fuso, telefone estrangeiro,
+importação; nome (fora a correção já existente), matrícula, tipo de vínculo,
+lotação, situação e datas da admissão; promoção e merge.
 
 ## Próxima ação autorizável
 

@@ -1,3 +1,9 @@
+import type {
+  EnderecoApi,
+  PerfilPessoalApi,
+} from "../../api/dadosPessoaisClient";
+import { exibirCep } from "../../format/mascaras";
+
 /**
  * Dados pessoais e endereço do colaborador (T177, Módulo 1) — campos, limites,
  * normalização e validação no cliente.
@@ -222,7 +228,13 @@ export function validarPerfil(valores: ValoresPerfil): ErrosPerfil {
     }
   }
   // T179 — sexo só da lista fechada; sem seleção é válido (opcional).
-  if (valores.sexo !== "" && !ehCodigoSexo(valores.sexo)) {
+  // T181 — na ficha, o legado mantido (`SEXO_LEGADO_MANTIDO`) também é válido:
+  // é a ausência de pedido de mudança, e o campo sai do envio.
+  if (
+    valores.sexo !== "" &&
+    valores.sexo !== SEXO_LEGADO_MANTIDO &&
+    !ehCodigoSexo(valores.sexo)
+  ) {
     erros.sexo = "Selecione uma das opções de sexo, ou deixe sem seleção.";
   }
   for (const campo of CAMPOS_TEXTO_PERFIL) {
@@ -297,4 +309,84 @@ export function blocoEndereco(
     bloco.cep = bloco.cep.replace("-", "");
   }
   return bloco;
+}
+
+// ---- T181 — edição na ficha do colaborador ---------------------------------
+
+/**
+ * T181 — valor do seletor de sexo quando o gravado é LEGADO (texto de um
+ * cadastro anterior à lista fechada da T179) e ninguém pediu para mudá-lo.
+ * Não é um código: com ele, o campo sai do envio, e o servidor mantém o
+ * gravado exatamente como está (decisão da proprietária de 2026-10-23).
+ */
+export const SEXO_LEGADO_MANTIDO = "__sexo_legado_mantido__";
+
+/** T181 — o sexo gravado é legado: tem valor, mas fora da lista fechada. */
+export function ehSexoLegado(valor: string | null | undefined): boolean {
+  return (
+    typeof valor === "string" && valor.trim() !== "" && !ehCodigoSexo(valor)
+  );
+}
+
+/**
+ * T181 — o perfil gravado, como a ficha o edita: `null` vira campo vazio. Sexo
+ * LEGADO não cabe no seletor como código: o campo começa em
+ * `SEXO_LEGADO_MANTIDO` ("manter o valor legado") e o valor volta em
+ * `sexoAnterior`, para a ficha mostrá-lo só para leitura. Nunca vira vazio
+ * nem outra opção sem pedido.
+ */
+export function perfilParaEdicao(perfil: PerfilPessoalApi | null): {
+  readonly valores: ValoresPerfil;
+  readonly sexoAnterior: string | null;
+} {
+  if (!perfil) return { valores: PERFIL_VAZIO, sexoAnterior: null };
+  const valores = { ...PERFIL_VAZIO };
+  for (const chave of Object.keys(PERFIL_VAZIO) as ChavePerfil[]) {
+    valores[chave] = perfil[chave] ?? "";
+  }
+  const legado = ehSexoLegado(perfil.sexo);
+  return {
+    valores: {
+      ...valores,
+      sexo: legado ? SEXO_LEGADO_MANTIDO : (perfil.sexo ?? ""),
+    },
+    sexoAnterior: legado ? perfil.sexo : null,
+  };
+}
+
+/**
+ * T181 — corpo do bloco de dados pessoais na ficha: o de `blocoPerfil`, mas
+ * SEM o sexo quando o legado foi mantido. Campo ausente, o servidor mantém o
+ * gravado; só uma opção escolhida da lista o substitui.
+ */
+export function blocoPerfilDaFicha(
+  valores: ValoresPerfil,
+): Omit<ReturnType<typeof blocoPerfil>, "sexo"> & { sexo?: string | null } {
+  const { sexo, ...resto } = blocoPerfil(valores);
+  return valores.sexo === SEXO_LEGADO_MANTIDO ? resto : { ...resto, sexo };
+}
+
+/**
+ * T181 — o endereço gravado, como a ficha o edita: `null` vira campo vazio e
+ * o CEP brasileiro aparece na máscara `00000-000`. Sem endereço gravado, o
+ * formulário começa como o da admissão, com o país sugerido.
+ */
+export function enderecoParaEdicao(
+  endereco: EnderecoApi | null,
+): ValoresEndereco {
+  if (!endereco) return ENDERECO_INICIAL;
+  const valores = { ...ENDERECO_INICIAL };
+  for (const chave of Object.keys(ENDERECO_INICIAL) as ChaveEndereco[]) {
+    valores[chave] = endereco[chave] ?? "";
+  }
+  valores.cep = exibirCep(endereco.cep, ehPaisBrasil(endereco.pais));
+  return valores;
+}
+
+/** T181 — os dois conjuntos de valores são iguais, campo a campo. */
+export function mesmosValores<K extends string>(
+  a: Readonly<Record<K, string>>,
+  b: Readonly<Record<K, string>>,
+): boolean {
+  return (Object.keys(a) as K[]).every((chave) => a[chave] === b[chave]);
 }

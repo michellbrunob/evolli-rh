@@ -111,7 +111,6 @@ import {
   listarUnidades,
 } from "../../api/organizacaoClient";
 import { type CargoApi, listarCargos } from "../../api/cargoClient";
-import { type EnderecoDoCepApi, consultarCep } from "../../api/cepClient";
 import {
   falhaAoPrepararEnvio,
   falhaPorSessaoExpirada,
@@ -153,6 +152,7 @@ import {
   type ReferenciaCriada,
   type TipoReferenciaRapida,
 } from "./ModalReferenciaRapida";
+import { listaComE, useCepAssistido } from "./cepAssistido";
 import "./NovaAdmissaoScreen.css";
 
 export const NOVA_ADMISSAO_TITULO_ID = "nova-admissao-titulo";
@@ -242,105 +242,10 @@ const ROTULO_DO_BOTAO_REFERENCIA: Record<TipoReferenciaRapida, string> = {
   unidade: "Cadastrar nova unidade",
 };
 
-/** "A", "A e B", "A, B e C". */
-function listaComE(itens: readonly string[]): string {
-  return itens.length <= 1
-    ? (itens[0] ?? "")
-    : `${itens.slice(0, -1).join(", ")} e ${itens[itens.length - 1]}`;
-}
-
-// ---------------------------------------------------------------------------
-// T178 — preenchimento ASSISTIDO do endereço pelo CEP (autorizado pela
-// proprietária: só CEP brasileiro, campos editáveis, cadastro manual como
-// alternativa). A consulta é do servidor (`GET /v1/cep/:cep`); aqui só se
-// decide QUANDO perguntar e o que fazer com a resposta.
-// ---------------------------------------------------------------------------
-
+// T178 — preenchimento ASSISTIDO do endereço pelo CEP: a consulta e o que
+// fazer com a resposta ficam em `cepAssistido.ts` (T181), compartilhados com
+// a edição do endereço na ficha do colaborador.
 const ID_BOTAO_BUSCAR_CEP = "nova-admissao-buscar-cep";
-
-/** Campos que a consulta sugere. Número e complemento nunca são tocados. */
-const CAMPOS_DO_CEP = ["logradouro", "bairro", "cidade", "estado"] as const;
-type CampoDoCep = (typeof CAMPOS_DO_CEP)[number];
-
-/** Só dígitos do CEP: sem hífen, espaço nem ponto. */
-function digitosDoCep(cep: string): string {
-  return cep.trim().replace(/[\s.-]/g, "");
-}
-
-/** Texto comparável: sem acento, sem diferença de caixa e sem espaços extras. */
-function textoComparavel(valor: string): string {
-  return valor
-    .normalize("NFD")
-    .replace(/\p{M}/gu, "")
-    .replace(/\s+/g, " ")
-    .trim()
-    .toLowerCase();
-}
-
-/**
- * Mensagem da recusa. Nenhuma bloqueia: o cadastro manual segue. O status é
- * lido por forma (`status` numérico), e não por `instanceof`, para valer
- * também com o cliente automockado nos testes.
- */
-function mensagemDoErroDeCep(erro: unknown): string {
-  switch (statusDe(erro)) {
-    case 404:
-      return "CEP não encontrado. Preencha o endereço manualmente.";
-    case 503:
-      return "Não foi possível consultar o CEP agora. Preencha o endereço manualmente ou tente de novo.";
-    case 429:
-      return "Muitas consultas de CEP em pouco tempo. Aguarde alguns minutos ou preencha manualmente.";
-    case 400:
-      return "CEP inválido. Use os 8 dígitos.";
-    default:
-      return "A consulta de CEP está indisponível agora. Preencha o endereço manualmente.";
-  }
-}
-
-/** "Logradouro, Bairro e Cidade" — os rótulos da tela, na ordem da tela. */
-function listaDeRotulos(chaves: readonly CampoDoCep[]): string {
-  return listaComE(
-    chaves.map((c) => CAMPOS_ENDERECO.find((d) => d.chave === c)?.rotulo ?? c),
-  );
-}
-
-/**
- * A sugestão da resposta, campo a campo, já aparada e no limite do campo.
- * Estado usa a SIGLA (`uf`, "MG"), como os dados existentes; sem sigla, o
- * nome por extenso.
- */
-function sugestaoDoCep(
-  resposta: EnderecoDoCepApi,
-): Partial<Record<CampoDoCep, string>> {
-  const bruto: Record<CampoDoCep, string | null> = {
-    logradouro: resposta.logradouro,
-    bairro: resposta.bairro,
-    cidade: resposta.cidade,
-    estado: resposta.uf?.trim() ? resposta.uf : resposta.estado,
-  };
-  const sugestao: Partial<Record<CampoDoCep, string>> = {};
-  for (const chave of CAMPOS_DO_CEP) {
-    const limite = CAMPOS_ENDERECO.find((c) => c.chave === chave)?.limite;
-    const valor = (bruto[chave] ?? "").trim().slice(0, limite);
-    if (valor) sugestao[chave] = valor;
-  }
-  return sugestao;
-}
-
-/** Estado da consulta de CEP — a única região viva própria do bloco. */
-type EstadoCep =
-  | { readonly tipo: "ocioso" }
-  | { readonly tipo: "buscando" }
-  | { readonly tipo: "aviso"; readonly mensagem: string }
-  | {
-      readonly tipo: "sugerido";
-      readonly mensagem: string;
-      /** Campos que já tinham outro valor: mantidos até a ação explícita. */
-      readonly mantidos: readonly {
-        readonly chave: CampoDoCep;
-        readonly sugerido: string;
-      }[];
-    };
 
 // ---------------------------------------------------------------------------
 // Erros, campo a campo.
@@ -993,143 +898,22 @@ export function NovaAdmissaoScreen({
     // T178 — mudar o CEP ou o país tira de cena o que a consulta anterior
     // disse: a mensagem falava de OUTRO CEP. Uma resposta ainda em voo é
     // descartada ao chegar (ver `respostaVigente`).
-    if (campo === "cep" || campo === "pais") setCep({ tipo: "ocioso" });
+    if (campo === "cep" || campo === "pais") consultaCep.descartarResultado();
   }
 
-  // ---- T178 — consulta assistida de CEP -----------------------------------
-  const [cep, setCep] = useState<EstadoCep>({ tipo: "ocioso" });
-  /** O endereço mais recente, para decidir fora do ciclo de render. */
-  const enderecoRef = useRef(endereco);
-  enderecoRef.current = endereco;
-  /** Último CEP (8 dígitos) já perguntado: sair do campo não repergunta. */
-  const ultimoCepConsultadoRef = useRef<string | null>(null);
-  /** CEP em voo: trava síncrona contra duplo clique e saída + clique. */
-  const cepEmVooRef = useRef<string | null>(null);
-  /** Sequência do pedido, contra resposta obsoleta. */
-  const pedidoCepRef = useRef(0);
-  const cepAssistido = ehPaisBrasil(endereco.pais);
-
-  /** A resposta ainda vale: é a do último pedido, para o CEP e país atuais. */
-  function respostaVigente(pedido: number, digitos: string): boolean {
-    const atual = enderecoRef.current;
-    return (
-      pedido === pedidoCepRef.current &&
-      digitosDoCep(atual.cep) === digitos &&
-      ehPaisBrasil(atual.pais)
-    );
-  }
-
-  /**
-   * Consulta o CEP. Só por ação: o botão, ou SAIR do campo com o CEP completo
-   * e diferente do último perguntado — nunca a cada tecla, porque a consulta
-   * é limitada no servidor e cada tecla gastaria uma.
-   */
-  async function buscarCep(origem: "botao" | "saida") {
-    const atual = enderecoRef.current;
-    if (!ehPaisBrasil(atual.pais)) return;
-    const digitos = digitosDoCep(atual.cep);
-    if (!/^\d{8}$/.test(digitos)) {
-      // Na saída do campo, CEP incompleto é só um CEP ainda sendo digitado.
-      if (origem === "botao") {
-        setErros((prev) => ({ ...prev, cep: "Informe os 8 dígitos do CEP." }));
-      }
-      return;
-    }
-    if (cepEmVooRef.current === digitos) return;
-    if (origem === "saida" && digitos === ultimoCepConsultadoRef.current) {
-      return;
-    }
-    cepEmVooRef.current = digitos;
-    ultimoCepConsultadoRef.current = digitos;
-    const pedido = ++pedidoCepRef.current;
-    setCep({ tipo: "buscando" });
-    try {
-      const resposta = await consultarCep(digitos);
-      if (!respostaVigente(pedido, digitos)) return;
-      aplicarSugestaoDoCep(resposta);
-    } catch (erro: unknown) {
-      if (!respostaVigente(pedido, digitos)) return;
-      setCep({ tipo: "aviso", mensagem: mensagemDoErroDeCep(erro) });
-    } finally {
-      if (cepEmVooRef.current === digitos) cepEmVooRef.current = null;
-    }
-  }
-
-  /**
-   * Preenche só o que está VAZIO. Campo já digitado com outro valor fica como
-   * está e vai para a lista de "mantidos", que só a ação explícita "Usar
-   * endereço do CEP" substitui — nada é sobrescrito em silêncio.
-   */
-  function aplicarSugestaoDoCep(resposta: EnderecoDoCepApi) {
-    const sugestao = sugestaoDoCep(resposta);
-    const atual = enderecoRef.current;
-    const preenchidos: CampoDoCep[] = [];
-    const mantidos: { chave: CampoDoCep; sugerido: string }[] = [];
-    for (const chave of CAMPOS_DO_CEP) {
-      const sugerido = sugestao[chave];
-      if (!sugerido) continue;
-      const valor = atual[chave];
-      if (valor.trim() === "") preenchidos.push(chave);
-      else if (textoComparavel(valor) !== textoComparavel(sugerido)) {
-        mantidos.push({ chave, sugerido });
-      }
-    }
-    if (Object.keys(sugestao).length === 0) {
-      setCep({
-        tipo: "aviso",
-        mensagem:
-          "O CEP foi encontrado, mas sem endereço detalhado. Preencha o endereço manualmente.",
-      });
-      return;
-    }
-    if (preenchidos.length > 0) {
-      setEndereco((prev) => {
-        const proximo = { ...prev };
-        for (const chave of preenchidos) {
-          if (prev[chave].trim() === "") proximo[chave] = sugestao[chave]!;
-        }
-        return proximo;
-      });
-      setErros((prev) => semErroDe(prev, "cep", ...preenchidos));
-    }
-    const partes: string[] = [];
-    if (preenchidos.length > 0) {
-      partes.push(
-        `Endereço sugerido pelo CEP em ${listaDeRotulos(preenchidos)}. Confira e ajuste se precisar.`,
-      );
-    }
-    if (mantidos.length > 0) {
-      partes.push(
-        `O que já estava digitado foi mantido em ${listaDeRotulos(
-          mantidos.map((m) => m.chave),
-        )}.`,
-      );
-    }
-    if (partes.length === 0) partes.push("O endereço já confere com o CEP.");
-    setCep({ tipo: "sugerido", mensagem: partes.join(" "), mantidos });
-  }
-
-  /** Ação explícita: substitui os campos mantidos pelo que o CEP sugeriu. */
-  function usarEnderecoDoCep() {
-    if (cep.tipo !== "sugerido" || cep.mantidos.length === 0) return;
-    const { mantidos } = cep;
-    setEndereco((prev) => {
-      const proximo = { ...prev };
-      for (const { chave, sugerido } of mantidos) proximo[chave] = sugerido;
-      return proximo;
-    });
-    setErros((prev) => semErroDe(prev, ...mantidos.map((m) => m.chave)));
-    setCep({
-      tipo: "sugerido",
-      mensagem: `Endereço do CEP aplicado em ${listaDeRotulos(
-        mantidos.map((m) => m.chave),
-      )}. Os campos continuam editáveis.`,
-      mantidos: [],
-    });
-    // O botão acionado some: o foco volta para "Buscar CEP", ao lado. Por id:
-    // o `Button` do Evolli não repassa `ref`.
-    document.getElementById(ID_BOTAO_BUSCAR_CEP)?.focus();
-  }
+  // ---- T178 — consulta assistida de CEP (T181: `useCepAssistido`) ---------
+  const consultaCep = useCepAssistido({
+    endereco,
+    setEndereco,
+    onErroNoCep: (mensagem) => setErros((prev) => ({ ...prev, cep: mensagem })),
+    onCamposAjustados: (campos) =>
+      setErros((prev) => semErroDe(prev, ...campos)),
+    idBotaoBuscar: ID_BOTAO_BUSCAR_CEP,
+  });
+  const cep = consultaCep.estado;
+  const cepAssistido = consultaCep.assistido;
+  const buscarCep = consultaCep.buscar;
+  const usarEnderecoDoCep = consultaCep.usarEnderecoDoCep;
 
   function atualizarContato(campo: CampoContato, valor: string) {
     setContatos((prev) => ({ ...prev, [campo]: valor }));
@@ -1458,8 +1242,7 @@ export function NovaAdmissaoScreen({
     setAreas([]);
     setErros({});
     setTentouSalvar(false);
-    setCep({ tipo: "ocioso" });
-    ultimoCepConsultadoRef.current = null;
+    consultaCep.reiniciar();
     // T179 — página recomeçada: a próxima confirmação é um envio novo.
     chaveIdempotenciaRef.current = null;
     setEnvioDivergente(false);

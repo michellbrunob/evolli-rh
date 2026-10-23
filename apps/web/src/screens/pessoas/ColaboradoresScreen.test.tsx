@@ -30,11 +30,18 @@ import {
   CsrfRequestError,
   CsrfSessionExpiredError,
 } from "../../api/csrfClient";
+import {
+  type DadosPessoaisDoColaboradorApi,
+  consultarDadosPessoaisDoColaborador,
+  registrarDadosPessoaisDoColaborador,
+} from "../../api/dadosPessoaisClient";
 import { expectSemIsoVisivel } from "../../test/semIsoVisivel";
 import { AVISO_DE_RECUSA } from "../../format/mascaras";
 
 vi.mock("../../api/colaboradoresClient");
 vi.mock("../../api/contatosColaboradorClient");
+// T181 — a ficha edita dados pessoais e endereço pela rota própria.
+vi.mock("../../api/dadosPessoaisClient");
 
 /**
  * T178 — o envelope de `GET /v1/colaboradores` traz `contadores` do escopo
@@ -134,7 +141,43 @@ beforeEach(() => {
   vi.mocked(consultarContatosDoColaborador).mockImplementation(
     async (colaboradorId) => semContatos(colaboradorId),
   );
+  // T181 — por padrão, dados pessoais e endereço gravados (sintéticos).
+  vi.mocked(consultarDadosPessoaisDoColaborador).mockImplementation(
+    async (colaboradorId) => dadosPessoaisDe(colaboradorId),
+  );
 });
+
+function dadosPessoaisDe(colaboradorId: string): DadosPessoaisDoColaboradorApi {
+  return {
+    colaboradorId,
+    empresaId: "44444444-4444-4444-4444-444444444444",
+    situacao: "registrado",
+    perfilPessoal: {
+      dataNascimento: "1990-05-20",
+      sexo: null,
+      saudacao: null,
+      estadoCivil: null,
+      nacionalidade: null,
+      naturalidade: null,
+      escolaridade: null,
+      curso: null,
+      nomePai: null,
+      nomeMae: null,
+      atualizadoEm: "2026-10-20T12:00:00.000Z",
+    },
+    endereco: {
+      pais: "Brasil",
+      cep: "30140071",
+      logradouro: "Rua Sintética",
+      numero: "10",
+      complemento: null,
+      bairro: "Centro",
+      cidade: "Cidade Sintética",
+      estado: "MG",
+      atualizadoEm: "2026-10-20T12:00:00.000Z",
+    },
+  };
+}
 
 function semContatos(colaboradorId: string): ContatosDoColaboradorApi {
   return {
@@ -1394,7 +1437,7 @@ describe("ColaboradoresScreen (T169 — contatos do colaborador)", () => {
   }
 
   async function abrirDetalheDeAna() {
-    render(<ColaboradoresScreen />);
+    render(<ColaboradoresScreen podeEditarFicha />);
     await screen.findByRole("table", { name: "Colaboradores desta empresa" });
     const linha = screen.getByText("Ana Colaboradora (teste)").closest("tr")!;
     fireEvent.click(within(linha).getByRole("button", { name: /Abrir ficha/ }));
@@ -1407,7 +1450,7 @@ describe("ColaboradoresScreen (T169 — contatos do colaborador)", () => {
 
   it("a lista não pede contatos: só o detalhe, pela rota própria e sem empresa", async () => {
     const antes = vi.mocked(consultarContatosDoColaborador).mock.calls.length;
-    render(<ColaboradoresScreen />);
+    render(<ColaboradoresScreen podeEditarFicha />);
     await screen.findByRole("table", { name: "Colaboradores desta empresa" });
     expect(vi.mocked(consultarContatosDoColaborador).mock.calls.length).toBe(
       antes,
@@ -1787,6 +1830,61 @@ describe("ColaboradoresScreen (T169 — contatos do colaborador)", () => {
     },
   );
 
+  // T181 — rede ou 5xx: o servidor pode ter gravado. A mensagem não afirma
+  // nem nega, e o que foi digitado fica.
+  it.each([
+    ["rede", () => new TypeError("Failed to fetch")],
+    ["500", () => recusa(500, "Erro interno.")],
+    ["503", () => recusa(503, "Indisponível.")],
+  ])(
+    "T181 — gravação sem resposta certa (%s): não afirma nem nega, e os dados ficam",
+    async (_, erro) => {
+      vi.mocked(registrarContatosDoColaborador).mockRejectedValueOnce(erro());
+      const secao = await abrirDetalheDeAna();
+      await within(secao).findByText(/Nenhum contato registrado/);
+      fireEvent.change(email(), { target: { value: "ana@example.test" } });
+      fireEvent.click(screen.getByRole("button", { name: "Salvar contatos" }));
+      const alerta = await within(secao).findByRole("alert");
+      expect(alerta).toHaveTextContent(
+        "Não foi possível confirmar se os contatos foram salvos. O que você digitou foi mantido; salvar de novo é seguro.",
+      );
+      expect(alerta).not.toHaveTextContent(/não foram salvos/);
+      expect(email()).toHaveValue("ana@example.test");
+    },
+  );
+
+  it("T181 — Cancelar volta aos contatos gravados, sem enviar nada", async () => {
+    vi.mocked(consultarContatosDoColaborador).mockResolvedValueOnce(registrado);
+    const antes = vi.mocked(registrarContatosDoColaborador).mock.calls.length;
+    const secao = await abrirDetalheDeAna();
+    await waitFor(() => expect(celular()).toHaveValue("(11) 98765-0001"));
+    const cancelar = within(secao).getByRole("button", { name: "Cancelar" });
+    // Nada digitado: nada a descartar.
+    expect(cancelar).toBeDisabled();
+    fireEvent.change(email(), { target: { value: "outro@example.test" } });
+    fireEvent.change(celular(), { target: { value: "" } });
+    expect(cancelar).toBeEnabled();
+    fireEvent.click(cancelar);
+    expect(email()).toHaveValue("ana.contato@example.test");
+    expect(celular()).toHaveValue("(11) 98765-0001");
+    expect(email()).toHaveFocus();
+    expect(cancelar).toBeDisabled();
+    expect(vi.mocked(registrarContatosDoColaborador).mock.calls.length).toBe(
+      antes,
+    );
+  });
+
+  it("T181 — sem registro, Cancelar limpa o digitado e o estado 'Nenhum contato registrado' continua", async () => {
+    const secao = await abrirDetalheDeAna();
+    await within(secao).findByText(/Nenhum contato registrado/);
+    fireEvent.change(celular(), { target: { value: "11987650001" } });
+    fireEvent.click(within(secao).getByRole("button", { name: "Cancelar" }));
+    expect(celular()).toHaveValue("");
+    expect(
+      within(secao).getByText(/Nenhum contato registrado/),
+    ).toBeInTheDocument();
+  });
+
   it("T179 (revisão definitiva) — 403 csrf_invalido (outra aba renovou o token): página desatualizada; salvar de novo conclui com os mesmos dados", async () => {
     vi.mocked(registrarContatosDoColaborador)
       .mockRejectedValueOnce(
@@ -2082,6 +2180,7 @@ describe("ColaboradoresScreen (T169 — contatos do colaborador)", () => {
     render(
       <ColaboradoresScreen
         aberturaInicial={{ colaborador: colaborador1, foco: "contatos" }}
+        podeEditarFicha
       />,
     );
     await waitFor(() => expect(email()).toHaveFocus());
@@ -2996,5 +3095,123 @@ describe("T178 — 'Nova admissão' e a ficha a partir da linha", () => {
     render(<ColaboradoresScreen />);
     await screen.findByRole("table", { name: "Colaboradores desta empresa" });
     expect(vi.mocked(listarColaboradores).mock.calls.length - antes).toBe(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T181 — a ficha com dados pessoais e endereço editáveis: o modal pede
+// confirmação antes de descartar o que está sendo editado nesses blocos, não
+// fecha no meio da gravação, e a consulta de CEP só aparece para quem o
+// servidor a aceita.
+// ---------------------------------------------------------------------------
+describe("T181 — ficha: dados pessoais e endereço editáveis no detalhe", () => {
+  async function abrirFicha(props: { podeEditarFicha?: boolean } = {}) {
+    render(<ColaboradoresScreen podeEditarFicha {...props} />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+    const linha = screen.getByText("Ana Colaboradora (teste)").closest("tr")!;
+    fireEvent.click(within(linha).getByRole("button", { name: /Abrir ficha/ }));
+    return screen.findByRole("region", { name: "Endereço" });
+  }
+
+  it("o aviso do detalhe diz o que pode ser corrigido", async () => {
+    await abrirFicha();
+    expect(
+      screen.getByText(
+        /O nome, os dados pessoais, o endereço e os contatos podem ser\s+corrigidos abaixo\./,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("endereço em edição com alteração: fechar pede confirmação, e descartar não grava", async () => {
+    const endereco = await abrirFicha();
+    fireEvent.click(
+      within(endereco).getByRole("button", { name: "Editar endereço" }),
+    );
+    fireEvent.change(screen.getByLabelText(/^Número/), {
+      target: { value: "999" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
+    expect(screen.getByText(/alterações não salvas/i)).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Descartar alterações" }),
+    );
+    expect(registrarDadosPessoaisDoColaborador).not.toHaveBeenCalled();
+  });
+
+  it("dados pessoais só abertos, sem alteração: fecha direto", async () => {
+    await abrirFicha();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Editar dados pessoais" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
+    expect(screen.queryByText(/alterações não salvas/i)).toBeNull();
+  });
+
+  it("durante a gravação de um bloco, o detalhe não fecha", async () => {
+    vi.mocked(registrarDadosPessoaisDoColaborador).mockReturnValueOnce(
+      new Promise(() => undefined),
+    );
+    await abrirFicha();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Editar dados pessoais" }),
+    );
+    fireEvent.change(screen.getByLabelText(/^Curso/), {
+      target: { value: "Curso Sintético" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Salvar dados pessoais" }),
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Fechar" })).toBeDisabled(),
+    );
+  });
+
+  it("quem edita a ficha (RH ou DP) tem 'Buscar CEP' na edição do endereço", async () => {
+    const endereco = await abrirFicha();
+    fireEvent.click(
+      within(endereco).getByRole("button", { name: "Editar endereço" }),
+    );
+    expect(
+      within(endereco).getAllByRole("button", { name: "Buscar CEP" }),
+    ).toHaveLength(1);
+  });
+
+  // T181 — a edição da ficha é só de RH e DP (decisão de 2026-10-23): quem
+  // só lê (o master_tecnico) vê os três blocos sem nenhum botão de edição.
+  it("sem permissão de editar: dados pessoais, endereço e contatos só para leitura", async () => {
+    vi.mocked(consultarContatosDoColaborador).mockResolvedValueOnce({
+      colaboradorId: colaborador1.id,
+      empresaId: "44444444-4444-4444-4444-444444444444",
+      situacao: "registrado",
+      contatos: {
+        emailPessoal: "ana.leitura@example.test",
+        celular: "+5511987650001",
+        telefone: null,
+        atualizadoEm: "2026-10-16T12:00:00.000Z",
+      },
+    });
+    await abrirFicha({ podeEditarFicha: false });
+    const contatos = await screen.findByRole("region", { name: "Contatos" });
+    await within(contatos).findByText("ana.leitura@example.test");
+    expect(within(contatos).getByText("(11) 98765-0001")).toBeInTheDocument();
+    for (const nome of ["Dados pessoais", "Endereço", "Contatos"]) {
+      const regiao = screen.getByRole("region", { name: nome });
+      expect(within(regiao).queryByRole("button")).toBeNull();
+      expect(within(regiao).queryByRole("textbox")).toBeNull();
+    }
+    expect(
+      screen.queryByRole("button", {
+        name: /^(Preencher|Editar) (dados pessoais|endereço)$|^Salvar contatos$|^Cancelar$/,
+      }),
+    ).toBeNull();
+  });
+
+  it("sem permissão de editar e sem contatos: 'Nenhum contato registrado', sem campos", async () => {
+    await abrirFicha({ podeEditarFicha: false });
+    const contatos = await screen.findByRole("region", { name: "Contatos" });
+    expect(
+      await within(contatos).findByText("Nenhum contato registrado."),
+    ).toBeInTheDocument();
+    expect(within(contatos).queryByRole("textbox")).toBeNull();
   });
 });

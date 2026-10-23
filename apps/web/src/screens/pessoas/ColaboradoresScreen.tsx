@@ -152,6 +152,13 @@ export interface ColaboradoresScreenProps {
    * prop — perfil que não pode admitir —, o botão não aparece.
    */
   readonly onNovaAdmissao?: () => void;
+  /**
+   * T181 — o perfil edita, na ficha, dados pessoais, endereço e contatos: só
+   * RH e DP (`PAPEIS_EDICAO_FICHA`). Sem isso, os blocos ficam só em leitura,
+   * sem Preencher, Editar, Salvar nem Cancelar. Os mesmos papéis consultam o
+   * CEP. Só orienta a tela: quem recusa é o servidor.
+   */
+  readonly podeEditarFicha?: boolean;
 }
 
 export function ColaboradoresScreen({
@@ -159,6 +166,7 @@ export function ColaboradoresScreen({
   aberturaInicial = null,
   onAberturaAtendida,
   onNovaAdmissao,
+  podeEditarFicha = false,
 }: ColaboradoresScreenProps = {}) {
   const [statusCarregamento, setStatusCarregamento] = useState<
     "carregando" | "erro" | "dados"
@@ -225,6 +233,9 @@ export function ColaboradoresScreen({
   // `Modal` peça confirmação de descarte e não feche no meio da gravação.
   const [contatosAlterados, setContatosAlterados] = useState(false);
   const [salvandoContatos, setSalvandoContatos] = useState(false);
+  // T181 — idem para os dados pessoais e o endereço, agora editáveis.
+  const [dadosPessoaisAlterados, setDadosPessoaisAlterados] = useState(false);
+  const [salvandoDadosPessoais, setSalvandoDadosPessoais] = useState(false);
   // T176 — "Completar contatos" vindo da página de Nova admissão.
   const [focarContatos, setFocarContatos] = useState(false);
   /** Salvamento do nome em curso — trava síncrona, ver `handleSalvarNome`. */
@@ -985,8 +996,14 @@ export function ColaboradoresScreen({
         aberto={detalhe !== null}
         titulo={detalhe?.colaborador.nome ?? ""}
         onFechar={fecharDetalhe}
-        bloqueado={(detalhe?.salvandoNome ?? false) || salvandoContatos}
-        alterado={detalheNomeAlterado || contatosAlterados}
+        bloqueado={
+          (detalhe?.salvandoNome ?? false) ||
+          salvandoContatos ||
+          salvandoDadosPessoais
+        }
+        alterado={
+          detalheNomeAlterado || contatosAlterados || dadosPessoaisAlterados
+        }
         largura="media"
       >
         {detalhe ? (
@@ -1003,7 +1020,8 @@ export function ColaboradoresScreen({
             </p>
             <p className="colaboradores-screen__aviso-texto">
               Matrícula, tipo de vínculo e data de admissão são imutáveis nesta
-              tela. Apenas o nome e os contatos podem ser corrigidos abaixo.
+              tela. O nome, os dados pessoais, o endereço e os contatos podem
+              ser corrigidos abaixo.
             </p>
 
             <div className="colaboradores-screen__edicao-nome">
@@ -1042,10 +1060,14 @@ export function ColaboradoresScreen({
               </Button>
             </div>
 
-            {/* T177 — Módulo 1: dados pessoais e endereço, só leitura. */}
+            {/* T177 — Módulo 1: dados pessoais e endereço. T181 — editáveis,
+                cada bloco com Salvar e Cancelar. */}
             <DadosPessoaisColaboradorSecao
               key={`dados-${detalhe.colaborador.id}`}
               colaboradorId={detalhe.colaborador.id}
+              podeEditar={podeEditarFicha}
+              onAlteradoChange={setDadosPessoaisAlterados}
+              onSalvandoChange={setSalvandoDadosPessoais}
             />
 
             <ContatosColaboradorSecao
@@ -1054,6 +1076,7 @@ export function ColaboradoresScreen({
               onAlteradoChange={setContatosAlterados}
               onSalvandoChange={setSalvandoContatos}
               focarAoCarregar={focarContatos}
+              podeEditar={podeEditarFicha}
             />
 
             <div className="colaboradores-screen__vinculos">

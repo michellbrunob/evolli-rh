@@ -266,12 +266,19 @@ describe("Contatos — matriz de acesso da ficha", () => {
     it.each([
       ["rh", EMPRESA_A],
       ["dp", EMPRESA_A],
-      ["master_tecnico", null],
-      ["master_tecnico", EMPRESA_A],
     ] as const)("%s (empresa %s) lê e edita", (role, companyId) => {
       expect(pode(role, companyId, "read")).toBe(true);
       expect(pode(role, companyId, "alter")).toBe(true);
     });
+
+    // T181 — a edição da ficha é só de RH e DP (decisão de 2026-10-23).
+    it.each([null, EMPRESA_A] as const)(
+      "master_tecnico (empresa %s) lê, mas não edita",
+      (companyId) => {
+        expect(pode("master_tecnico", companyId, "read")).toBe(true);
+        expect(pode("master_tecnico", companyId, "alter")).toBe(false);
+      },
+    );
 
     it.each([
       ["gestor", EMPRESA_A],
@@ -303,13 +310,17 @@ describe("Contatos — matriz de acesso da ficha", () => {
       expect(pode(role, EMPRESA_A, "read", EMPRESA_B)).toBe(false);
     });
 
-    it("master sem empresa ativa: qualquer empresa", () => {
-      expect(pode("master_tecnico", null, "alter", EMPRESA_B)).toBe(true);
+    it("master sem empresa ativa: lê em qualquer empresa, não edita em nenhuma", () => {
       expect(pode("master_tecnico", null, "read", EMPRESA_A)).toBe(true);
+      expect(pode("master_tecnico", null, "read", EMPRESA_B)).toBe(true);
+      expect(pode("master_tecnico", null, "alter", EMPRESA_A)).toBe(false);
+      expect(pode("master_tecnico", null, "alter", EMPRESA_B)).toBe(false);
     });
 
-    it("master com empresa ativa: só ela", () => {
-      expect(pode("master_tecnico", EMPRESA_A, "alter", EMPRESA_A)).toBe(true);
+    it("master com empresa ativa: lê só nela e não edita", () => {
+      expect(pode("master_tecnico", EMPRESA_A, "read", EMPRESA_A)).toBe(true);
+      expect(pode("master_tecnico", EMPRESA_A, "read", EMPRESA_B)).toBe(false);
+      expect(pode("master_tecnico", EMPRESA_A, "alter", EMPRESA_A)).toBe(false);
       expect(pode("master_tecnico", EMPRESA_A, "alter", EMPRESA_B)).toBe(false);
     });
 
@@ -835,30 +846,26 @@ describe("Contatos — serviço", () => {
       ).rejects.toBeInstanceOf(NotFoundException);
     });
 
-    it("edita em qualquer empresa, auditado com a empresa real", async () => {
-      const m = montar({
-        vinculos: [{ empresaId: EMPRESA_B, situacao: "ativo" }],
-        contato: null,
-      });
-      const resposta = await m.service.registrar(
-        COLABORADOR,
-        CORPO_VALIDO as RegistrarContatosColaboradorDto,
-        ctx(ator("master_tecnico", null)),
-      );
-      expect(resposta.resultado).toBe("criado");
-      expect(m.prisma.contatoColaborador.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({ empresaId: EMPRESA_B }),
-        }),
-      );
-      expect(eventoFormal(m)).toEqual(
-        expect.objectContaining({
-          action: "pessoas_contato_criado",
-          companyId: EMPRESA_B,
-          actorRole: "master_tecnico",
-        }),
-      );
-    });
+    // T181 — a edição da ficha é só de RH e DP: o serviço também recusa,
+    // mesmo que o guard fosse contornado.
+    it.each([null, EMPRESA_B] as const)(
+      "não edita (empresa ativa %s): recusado e nada gravado",
+      async (empresaAtiva) => {
+        const m = montar({
+          vinculos: [{ empresaId: EMPRESA_B, situacao: "ativo" }],
+          contato: null,
+        });
+        await expect(
+          m.service.registrar(
+            COLABORADOR,
+            CORPO_VALIDO as RegistrarContatosColaboradorDto,
+            ctx(ator("master_tecnico", empresaAtiva)),
+          ),
+        ).rejects.toThrow();
+        expect(m.prisma.contatoColaborador.create).not.toHaveBeenCalled();
+        expect(m.prisma.contatoColaborador.update).not.toHaveBeenCalled();
+      },
+    );
   });
 
   describe("gravação", () => {
