@@ -163,6 +163,32 @@ export interface VinculoListado {
   dataDesligamento: Date | null;
   /** T184 — `null` sem lotação vigente. */
   lotacaoVigente: LotacaoListada | null;
+  /**
+   * T185 — as vigências de jornada (T183) do colaborador na empresa deste
+   * vínculo que tocam `[hoje UTC − 1, hoje UTC + 1]`: no máximo três. A tela
+   * escolhe a que contém o dia civil do navegador, como a ficha. Vazio para
+   * vínculo que não está ativo (decisão da proprietária de 2026-10-26).
+   */
+  vigenciasDeJornada: VigenciaDeJornadaListada[];
+}
+
+/** T185 — uma vigência de jornada na listagem: datas e a jornada resumida. */
+export interface VigenciaDeJornadaListada {
+  /** Primeiro dia (`YYYY-MM-DD`). */
+  vigenciaInicio: string;
+  /** Primeiro dia SEM a jornada (`YYYY-MM-DD`), ou `null`. */
+  vigenciaFim: string | null;
+  jornada: { id: string; codigo: string | null; nome: string; ativo: boolean };
+}
+
+/** T185 — `Date` (coluna DATE, meia-noite UTC) -> `"YYYY-MM-DD"`. */
+function diaIso(data: Date): string {
+  return data.toISOString().slice(0, 10);
+}
+
+/** T185 — chave do par colaborador e empresa. */
+function chaveDoPar(colaboradorId: string, empresaId: string): string {
+  return `${colaboradorId}|${empresaId}`;
 }
 
 /**
@@ -819,6 +845,52 @@ export class ColaboradorService {
     };
   }
 
+  /**
+   * T185 — vigências de jornada que tocam `[hoje UTC − 1, hoje UTC + 1]` para
+   * cada par colaborador e empresa: as vigências não se cruzam, então são no
+   * máximo três por par — o bastante para a tela decidir pelo dia civil do
+   * navegador em qualquer fuso, sem o histórico inteiro.
+   */
+  private async jornadasPertoDeHoje(
+    pares: readonly { colaboradorId: string; empresaId: string }[],
+  ): Promise<Map<string, VigenciaDeJornadaListada[]>> {
+    const porPar = new Map<string, VigenciaDeJornadaListada[]>();
+    if (pares.length === 0) return porPar;
+    const hoje = dataUtc(new Date());
+    const umDia = 24 * 60 * 60 * 1000;
+    const ontem = new Date(hoje.getTime() - umDia);
+    const amanha = new Date(hoje.getTime() + umDia);
+    const vigencias = await this.prisma.vinculoHorario.findMany({
+      where: {
+        OR: pares.map(({ colaboradorId, empresaId }) => ({
+          colaboradorId,
+          empresaId,
+        })),
+        vigenciaInicio: { lte: amanha },
+        AND: [{ OR: [{ vigenciaFim: null }, { vigenciaFim: { gt: ontem } }] }],
+      },
+      orderBy: [{ vigenciaInicio: "asc" }, { id: "asc" }],
+      select: {
+        colaboradorId: true,
+        empresaId: true,
+        vigenciaInicio: true,
+        vigenciaFim: true,
+        tabela: { select: { id: true, codigo: true, nome: true, ativo: true } },
+      },
+    });
+    for (const v of vigencias) {
+      const chave = chaveDoPar(v.colaboradorId, v.empresaId);
+      const lista = porPar.get(chave) ?? [];
+      lista.push({
+        vigenciaInicio: diaIso(v.vigenciaInicio),
+        vigenciaFim: v.vigenciaFim !== null ? diaIso(v.vigenciaFim) : null,
+        jornada: v.tabela,
+      });
+      porPar.set(chave, lista);
+    }
+    return porPar;
+  }
+
   /** O registro de idempotência desta chave, deste ator, nesta empresa. */
   private async registroDaChave(
     atorUserId: string,
@@ -1094,6 +1166,17 @@ export class ColaboradorService {
       await this.auditoria.registrarConsultaGlobal(ctx, "colaborador", null);
     }
 
+    // T185 — jornadas perto de hoje dos vínculos ATIVOS desta página, numa
+    // consulta só. O vínculo de jornada é do colaborador na empresa (T183),
+    // e os vínculos já vêm do escopo da sessão: nenhum par sai dele.
+    const jornadasPorPar = await this.jornadasPertoDeHoje(
+      linhas.flatMap((c) =>
+        c.vinculos
+          .filter((v) => v.situacao === "ativo")
+          .map((v) => ({ colaboradorId: c.id, empresaId: v.empresaId })),
+      ),
+    );
+
     const itens: ColaboradorListado[] = linhas.map((c) => ({
       id: c.id,
       nome: c.nome,
@@ -1114,6 +1197,10 @@ export class ColaboradorService {
                 departamento: alocacoes[0].departamento,
               }
             : null,
+          vigenciasDeJornada:
+            vinculo.situacao === "ativo"
+              ? (jornadasPorPar.get(chaveDoPar(c.id, vinculo.empresaId)) ?? [])
+              : [],
         })),
       ),
     }));

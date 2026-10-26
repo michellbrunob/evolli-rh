@@ -81,6 +81,21 @@ export interface VinculoListadoApi {
    * efetivada) ou encerrado (decisão da proprietária de 2026-10-26).
    */
   lotacaoVigente: LotacaoListadaApi | null;
+  /**
+   * T185 — vigências de jornada (T183) perto de hoje, do colaborador na
+   * empresa deste vínculo; a tela escolhe a que contém o dia civil do
+   * navegador. Vazio para vínculo que não está ativo.
+   */
+  vigenciasDeJornada: VigenciaDeJornadaListadaApi[];
+}
+
+/** T185 — uma vigência de jornada na listagem. */
+export interface VigenciaDeJornadaListadaApi {
+  /** Primeiro dia (`YYYY-MM-DD`). */
+  vigenciaInicio: string;
+  /** Primeiro dia SEM a jornada (`YYYY-MM-DD`), ou `null`. */
+  vigenciaFim: string | null;
+  jornada: { id: string; codigo: string | null; nome: string; ativo: boolean };
 }
 
 /**

@@ -30,6 +30,11 @@ import { formatarDiaCivil } from "../../format/data";
 import { exibirMatricula } from "../../format/matricula";
 import { ContatosColaboradorSecao } from "./ContatosColaboradorSecao";
 import { JornadaColaboradorSecao } from "./JornadaColaboradorSecao";
+import {
+  diaDeHoje,
+  rotuloDaJornada,
+  situacaoDaVigencia,
+} from "./jornadaColaborador";
 import { DadosPessoaisColaboradorSecao } from "./DadosPessoaisColaboradorSecao";
 import "./ColaboradoresScreen.css";
 
@@ -193,6 +198,41 @@ function celulaDaLotacao(
     referencia.nome
   ) : (
     <span className="colaboradores-screen__sem-lotacao">Não informado</span>
+  );
+}
+
+/**
+ * T185 — jornada vigente HOJE (dia civil do navegador) do vínculo principal
+ * ativo. Sem vínculo, o mesmo "—" das outras colunas.
+ */
+function celulaDaJornada(
+  principal: VinculoListadoApi | undefined,
+  hoje: string,
+): React.ReactNode {
+  if (!principal) return "—";
+  const vigente =
+    principal.situacao === "ativo"
+      ? principal.vigenciasDeJornada.find(
+          (v) => situacaoDaVigencia(v, hoje) === "vigente",
+        )
+      : undefined;
+  if (!vigente) {
+    return (
+      <span className="colaboradores-screen__sem-lotacao">
+        Sem jornada vigente
+      </span>
+    );
+  }
+  return (
+    <>
+      {rotuloDaJornada(vigente.jornada)}
+      {vigente.jornada.ativo ? null : (
+        <>
+          {" "}
+          <StatusBadge variant="warning">Jornada inativa</StatusBadge>
+        </>
+      )}
+    </>
   );
 }
 
@@ -542,7 +582,14 @@ export function ColaboradoresScreen({
    * não tem lotação vigente e mostra "Sem lotação vigente" — nunca o destino
    * planejado nem a última lotação (decisão da proprietária de 2026-10-26).
    * O Banco de Horas segue fora: não tem operação.
+   *
+   * T185 — Jornada de trabalho: a vigência (T183) que contém o dia civil do
+   * navegador — a mesma regra da ficha —, do colaborador na empresa do
+   * vínculo principal ATIVO. Previsto, encerrado, sem jornada ou com
+   * vigência futura: "Sem jornada vigente". Jornada inativada aparece com a
+   * indicação (decisões da proprietária de 2026-10-26).
    */
+  const hoje = diaDeHoje();
   const colunasColaboradores: DataTableColumn<ColaboradorListadoApi>[] = [
     { key: "nome", header: "Nome", cell: (c) => c.nome },
     {
@@ -583,6 +630,11 @@ export function ColaboradoresScreen({
       key: "departamento",
       header: "Departamento",
       cell: (c) => celulaDaLotacao(c.vinculos[0], "departamento"),
+    },
+    {
+      key: "jornada",
+      header: "Jornada de trabalho",
+      cell: (c) => celulaDaJornada(c.vinculos[0], hoje),
     },
     {
       // Situação do ITEM: para `rh`/`dp`, na empresa ativa (tem vínculo ativo

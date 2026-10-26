@@ -9,6 +9,7 @@ import {
 import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ColaboradoresScreen } from "./ColaboradoresScreen";
+import { diaDeHoje, proximoDiaCivil } from "./jornadaColaborador";
 import { listarVinculosHorario } from "../../api/vinculoHorarioClient";
 import { listarTabelasHorario } from "../../api/horariosClient";
 import {
@@ -88,6 +89,18 @@ const LOTACAO_ATIVA = {
   departamento: { id: "d-1", codigo: "ADM", nome: "Administrativo (teste)" },
 };
 
+/** T185 — jornada vigente desde sempre, sem término. */
+const JORNADA_VIGENTE = {
+  vigenciaInicio: "2020-01-01",
+  vigenciaFim: null,
+  jornada: {
+    id: "j-1",
+    codigo: "COMERCIAL_44H",
+    nome: "Comercial 44 horas (teste)",
+    ativo: true,
+  },
+};
+
 const colaborador1: ColaboradorListadoApi = {
   id: "11111111-1111-1111-1111-111111111111",
   nome: "Ana Colaboradora (teste)",
@@ -103,6 +116,7 @@ const colaborador1: ColaboradorListadoApi = {
       dataAdmissao: "2025-01-10T00:00:00.000Z",
       dataDesligamento: null,
       lotacaoVigente: LOTACAO_ATIVA,
+      vigenciasDeJornada: [JORNADA_VIGENTE],
     },
   ],
 };
@@ -1176,7 +1190,7 @@ describe("T164/T178 — o que a tabela promete, e a que custo", () => {
    * e Banco de Horas continuam fora: a lotação não é resolvida pela listagem,
    * e coluna vazia ou montada por N+1 é promessa falsa.
    */
-  it("colunas: Nome, Matrícula, Cargo, Departamento, Situação, Admissão e Ações (T184)", async () => {
+  it("colunas: Nome, Matrícula, Cargo, Departamento, Jornada de trabalho, Situação, Admissão e Ações (T185)", async () => {
     render(<ColaboradoresScreen />);
     await screen.findByRole("table", { name: "Colaboradores desta empresa" });
 
@@ -1188,6 +1202,7 @@ describe("T164/T178 — o que a tabela promete, e a que custo", () => {
       "Matrícula",
       "Cargo",
       "Departamento",
+      "Jornada de trabalho",
       "Situação",
       "Admissão",
       "Ações",
@@ -2550,6 +2565,8 @@ function vinculoListado(
     dataDesligamento: situacao === "encerrado" ? "2025-12-31" : null,
     // T184 — só o vínculo ativo tem lotação vigente.
     lotacaoVigente: situacao === "ativo" ? LOTACAO_ATIVA : null,
+    // T185 — a API só projeta jornada para o vínculo ativo.
+    vigenciasDeJornada: situacao === "ativo" ? [JORNADA_VIGENTE] : [],
   };
 }
 
@@ -2606,8 +2623,12 @@ describe("T178 — colunas e vínculo principal", () => {
     // T184 — cargo e departamento da lotação vigente.
     expect(celulasAna[2]).toHaveTextContent("Analista (teste)");
     expect(celulasAna[3]).toHaveTextContent("Administrativo (teste)");
-    expect(celulasAna[4]).toHaveTextContent("Ativo");
-    expect(celulasAna[5]).toHaveTextContent("10/01/2025");
+    // T185 — jornada vigente: código e nome.
+    expect(celulasAna[4]).toHaveTextContent(
+      "COMERCIAL_44H — Comercial 44 horas (teste)",
+    );
+    expect(celulasAna[5]).toHaveTextContent("Ativo");
+    expect(celulasAna[6]).toHaveTextContent("10/01/2025");
 
     // Sem vínculo na empresa ativa: traço, nunca dado inventado.
     const bruno = within(tabela).getByText(colaborador2.nome).closest("tr")!;
@@ -2615,8 +2636,9 @@ describe("T178 — colunas e vínculo principal", () => {
     expect(celulasBruno[1]).toHaveTextContent("—");
     expect(celulasBruno[2]).toHaveTextContent("—");
     expect(celulasBruno[3]).toHaveTextContent("—");
-    expect(celulasBruno[4]).toHaveTextContent("Inativo");
-    expect(celulasBruno[5]).toHaveTextContent("—");
+    expect(celulasBruno[4]).toHaveTextContent("—");
+    expect(celulasBruno[5]).toHaveTextContent("Inativo");
+    expect(celulasBruno[6]).toHaveTextContent("—");
   });
 
   it("T184 — sem lotação vigente (previsto ou encerrado): texto neutro nas duas colunas", async () => {
@@ -2702,6 +2724,168 @@ describe("T178 — colunas e vínculo principal", () => {
     ).getAllByRole("cell");
     expect(celulas[2]).toHaveTextContent("Analista (teste)");
     expect(celulas[3]).toHaveTextContent("Administrativo (teste)");
+  });
+
+  /**
+   * T185 — a coluna "Jornada de trabalho": a vigência que contém o dia civil
+   * do navegador, do vínculo principal ativo. As datas da troca são
+   * calculadas a partir do mesmo `diaDeHoje` que a tela usa.
+   */
+  function comJornada(
+    nome: string,
+    sufixo: string,
+    vigencias: ColaboradorListadoApi["vinculos"][number]["vigenciasDeJornada"],
+    situacao: "previsto" | "ativo" | "encerrado" = "ativo",
+  ): ColaboradorListadoApi {
+    return listado(
+      { id: `66666666-6666-4666-8666-6666666667${sufixo}`, nome },
+      [
+        {
+          ...vinculoListado(
+            `v-j${sufixo}`,
+            `DEMO-J-00${sufixo}`,
+            situacao,
+            "2025-01-01",
+          ),
+          vigenciasDeJornada: vigencias,
+        },
+      ],
+    );
+  }
+
+  async function celulaDaJornadaDe(nome: string): Promise<HTMLElement> {
+    const tabela = await screen.findByRole("table", {
+      name: "Colaboradores desta empresa",
+    });
+    return within(within(tabela).getByText(nome).closest("tr")!).getAllByRole(
+      "cell",
+    )[4]!;
+  }
+
+  it("T185 — troca hoje: mostra a jornada que começa hoje, não a que terminou ontem", async () => {
+    const hoje = diaDeHoje();
+    const antiga = {
+      ...JORNADA_VIGENTE,
+      vigenciaFim: hoje,
+      jornada: { ...JORNADA_VIGENTE.jornada, id: "j-a", codigo: "ANTIGA" },
+    };
+    const nova = {
+      vigenciaInicio: hoje,
+      vigenciaFim: null,
+      jornada: { id: "j-n", codigo: "NOVA", nome: "Nova (teste)", ativo: true },
+    };
+    vi.mocked(listarColaboradores).mockResolvedValue(
+      paginado([comJornada("Pessoa Troca (teste)", "01", [antiga, nova])]),
+    );
+    render(<ColaboradoresScreen />);
+    const celula = await celulaDaJornadaDe("Pessoa Troca (teste)");
+    expect(celula).toHaveTextContent("NOVA — Nova (teste)");
+    expect(celula).not.toHaveTextContent("ANTIGA");
+  });
+
+  it("T185 — sem jornada, só futura (começa amanhã) ou encerrada: 'Sem jornada vigente'", async () => {
+    const amanha = proximoDiaCivil(diaDeHoje());
+    vi.mocked(listarColaboradores).mockResolvedValue(
+      paginado([
+        comJornada("Pessoa Sem Jornada (teste)", "02", []),
+        comJornada("Pessoa Futura (teste)", "03", [
+          { ...JORNADA_VIGENTE, vigenciaInicio: amanha },
+        ]),
+        comJornada("Pessoa Encerrada (teste)", "04", [
+          { ...JORNADA_VIGENTE, vigenciaFim: diaDeHoje() },
+        ]),
+      ]),
+    );
+    render(<ColaboradoresScreen />);
+    for (const nome of [
+      "Pessoa Sem Jornada (teste)",
+      "Pessoa Futura (teste)",
+      "Pessoa Encerrada (teste)",
+    ]) {
+      const celula = await celulaDaJornadaDe(nome);
+      expect(celula).toHaveTextContent("Sem jornada vigente");
+      expect(celula).not.toHaveTextContent("COMERCIAL_44H");
+    }
+  });
+
+  it("T185 — vínculo principal previsto ou encerrado: 'Sem jornada vigente', mesmo com vigência", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue(
+      paginado([
+        comJornada(
+          "Pessoa Prevista J (teste)",
+          "05",
+          [JORNADA_VIGENTE],
+          "previsto",
+        ),
+        comJornada(
+          "Pessoa Desligada J (teste)",
+          "06",
+          [JORNADA_VIGENTE],
+          "encerrado",
+        ),
+      ]),
+    );
+    render(<ColaboradoresScreen />);
+    for (const nome of [
+      "Pessoa Prevista J (teste)",
+      "Pessoa Desligada J (teste)",
+    ]) {
+      const celula = await celulaDaJornadaDe(nome);
+      expect(celula).toHaveTextContent("Sem jornada vigente");
+      expect(celula).not.toHaveTextContent("COMERCIAL_44H");
+    }
+  });
+
+  it("T185 — jornada inativada: nome com a indicação 'Jornada inativa'", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue(
+      paginado([
+        comJornada("Pessoa Jornada Inativa (teste)", "07", [
+          {
+            ...JORNADA_VIGENTE,
+            jornada: { ...JORNADA_VIGENTE.jornada, ativo: false },
+          },
+        ]),
+      ]),
+    );
+    render(<ColaboradoresScreen />);
+    const celula = await celulaDaJornadaDe("Pessoa Jornada Inativa (teste)");
+    expect(celula).toHaveTextContent(
+      "COMERCIAL_44H — Comercial 44 horas (teste)",
+    );
+    expect(within(celula).getByText("Jornada inativa")).toBeInTheDocument();
+  });
+
+  it("T185 — jornada sem código: só o nome", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue(
+      paginado([
+        comJornada("Pessoa Sem Codigo (teste)", "08", [
+          {
+            ...JORNADA_VIGENTE,
+            jornada: { ...JORNADA_VIGENTE.jornada, codigo: null },
+          },
+        ]),
+      ]),
+    );
+    render(<ColaboradoresScreen />);
+    const celula = await celulaDaJornadaDe("Pessoa Sem Codigo (teste)");
+    expect(celula.textContent?.trim()).toBe("Comercial 44 horas (teste)");
+  });
+
+  it("T185 — com mais de um vínculo, a jornada é a do vínculo principal", async () => {
+    const dois = listado(
+      {
+        id: "66666666-6666-4666-8666-666666666709",
+        nome: "Pessoa Principal Previsto (teste)",
+      },
+      [
+        vinculoListado("v-p9", "DEMO-P-0009", "previsto", "2026-03-01"),
+        vinculoListado("v-e9", "DEMO-E-0009", "encerrado", "2024-01-01"),
+      ],
+    );
+    vi.mocked(listarColaboradores).mockResolvedValue(paginado([dois]));
+    render(<ColaboradoresScreen />);
+    const celula = await celulaDaJornadaDe("Pessoa Principal Previsto (teste)");
+    expect(celula).toHaveTextContent("Sem jornada vigente");
   });
 
   it("com mais de um vínculo, mostra o principal e '+N' com frase acessível", async () => {
@@ -3197,7 +3381,7 @@ describe("T178 — 'Nova admissão' e a ficha a partir da linha", () => {
       .closest("tr")!;
     const celulas = within(linha).getAllByRole("cell");
     expect(celulas[1]).toHaveTextContent("MAT-0009");
-    expect(celulas[4]).toHaveTextContent("Inativo");
+    expect(celulas[5]).toHaveTextContent("Inativo");
     // A ficha aberta também segue com a situação da linha.
     expect(
       within(screen.getByRole("dialog")).getByText("Inativo"),

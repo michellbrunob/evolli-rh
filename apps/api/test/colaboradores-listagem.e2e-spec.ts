@@ -518,6 +518,9 @@ describe("Colaboradores — listagem da porta principal (T178, e2e)", () => {
           "lotacaoVigente",
           "matricula",
           "situacao",
+          // T185 — vigências de jornada perto de hoje; vazias aqui: o Bruno
+          // só tem vínculo previsto.
+          "vigenciasDeJornada",
         ].sort(),
       );
       expect(Object.keys(r).sort()).toEqual(
@@ -856,6 +859,209 @@ describe("Colaboradores — listagem da porta principal (T178, e2e)", () => {
         const negada = await get("/v1/colaboradores", cred);
         expect([403, 404]).toContain(negada.status);
         expect(JSON.stringify(negada.body)).not.toContain("DEPLA");
+      }
+    });
+  });
+
+  // T185 — jornada de trabalho (T183) na listagem: as vigências perto de hoje
+  // do colaborador na empresa do vínculo principal ATIVO; a tela escolhe a de
+  // hoje pelo dia civil do navegador (decisões da proprietária de
+  // 2026-10-26). Fica no fim: depende dos colaboradores criados acima.
+  describe("T185 — jornada de trabalho na listagem", () => {
+    interface VigenciaListada {
+      vigenciaInicio: string;
+      vigenciaFim: string | null;
+      jornada: {
+        id: string;
+        codigo: string | null;
+        nome: string;
+        ativo: boolean;
+      };
+    }
+    interface VinculoComJornada {
+      empresaId: string;
+      situacao: string;
+      vigenciasDeJornada: VigenciaListada[];
+    }
+
+    const UM_DIA = 24 * 60 * 60 * 1000;
+    const hojeUtc = new Date(
+      new Date().toISOString().slice(0, 10) + "T00:00:00.000Z",
+    );
+    const dia = (deslocamento: number) =>
+      new Date(hojeUtc.getTime() + deslocamento * UM_DIA)
+        .toISOString()
+        .slice(0, 10);
+
+    let sequencia = 0;
+    async function jornada(cred: Credencial, nome: string) {
+      const codigo = `T185_${++sequencia}`;
+      const r = await post("/v1/horarios", cred)
+        .send({ codigo, nome, periodos: [] })
+        .expect(201);
+      return { id: r.body.id as string, codigo, nome };
+    }
+
+    async function atribuir(
+      cred: Credencial,
+      colaboradorId: string,
+      tabelaHorarioId: string,
+      vigenciaInicio: string,
+    ) {
+      const r = await post("/v1/horarios/vinculos/atribuicoes", cred)
+        .send({ colaboradorId, tabelaHorarioId, vigenciaInicio })
+        .expect(201);
+      return r.body.id as string;
+    }
+
+    async function vinculosDe(
+      cred: Credencial,
+      busca: string,
+    ): Promise<VinculoComJornada[]> {
+      const r = await get(
+        `/v1/colaboradores?busca=${encodeURIComponent(busca)}`,
+        cred,
+      ).expect(200);
+      expect(r.body.itens).toHaveLength(1);
+      return r.body.itens[0].vinculos;
+    }
+
+    async function idDe(busca: string): Promise<string> {
+      const r = await get(
+        `/v1/colaboradores?busca=${encodeURIComponent(busca)}`,
+        rhA,
+      ).expect(200);
+      return r.body.itens[0].id;
+    }
+
+    it("ativo: a vigência de hoje vem com código, nome e situação da jornada, e só ela", async () => {
+      const j = await jornada(rhA, "Jornada Eva T185");
+      const eva = await idDe("Eva Sintetica");
+      await atribuir(rhA, eva, j.id, dia(-10));
+      const [principal] = await vinculosDe(rhA, "Eva Sintetica");
+      expect(principal!.situacao).toBe("ativo");
+      expect(principal!.vigenciasDeJornada).toEqual([
+        {
+          vigenciaInicio: dia(-10),
+          vigenciaFim: null,
+          jornada: { id: j.id, codigo: j.codigo, nome: j.nome, ativo: true },
+        },
+      ]);
+    });
+
+    it("previsto: nada de jornada, mesmo com vigência atribuída", async () => {
+      const j = await jornada(rhA, "Jornada Bruno T185");
+      await atribuir(rhA, bruno, j.id, dia(-5));
+      const vinculos = await vinculosDe(rhA, "Bruno Sintetico");
+      expect(vinculos[0]).toMatchObject({
+        situacao: "previsto",
+        vigenciasDeJornada: [],
+      });
+    });
+
+    it("vínculo ativo e previsto na mesma empresa: só o ativo projeta a jornada (a mesma do colaborador)", async () => {
+      const j = await jornada(rhA, "Jornada Ana T185");
+      await atribuir(rhA, ana, j.id, dia(-3));
+      const vinculos = await vinculosDe(rhA, "Ana Sintetica");
+      expect(vinculos[0]!.situacao).toBe("ativo");
+      expect(vinculos[0]!.vigenciasDeJornada.map((v) => v.jornada.id)).toEqual([
+        j.id,
+      ]);
+      expect(vinculos[1]).toMatchObject({
+        situacao: "previsto",
+        vigenciasDeJornada: [],
+      });
+    });
+
+    it("vigência futura não vem; troca perto de hoje traz as duas para a tela decidir", async () => {
+      const futura = await jornada(rhA, "Jornada Futura T185");
+      await atribuir(rhA, carla, futura.id, dia(30));
+      expect(
+        (await vinculosDe(rhA, "Carla Sintetica"))[0]!.vigenciasDeJornada,
+      ).toEqual([]);
+
+      // A Ana já tem jornada desde hoje − 3: trocar AMANHÃ deixa a anterior
+      // terminando amanhã e a nova começando amanhã — as duas tocam a janela.
+      const nova = await jornada(rhA, "Jornada Ana Nova T185");
+      await atribuir(rhA, ana, nova.id, dia(1));
+      const vigencias = (await vinculosDe(rhA, "Ana Sintetica"))[0]!
+        .vigenciasDeJornada;
+      expect(vigencias.map((v) => [v.vigenciaInicio, v.vigenciaFim])).toEqual([
+        [dia(-3), dia(1)],
+        [dia(1), null],
+      ]);
+    });
+
+    it("jornada inativada continua visível, com ativo falso", async () => {
+      const eva = (await vinculosDe(rhA, "Eva Sintetica"))[0]!;
+      const jornadaId = eva.vigenciasDeJornada[0]!.jornada.id;
+      await post(`/v1/horarios/${jornadaId}/desativar`, rhA).expect(201);
+      const depois = (await vinculosDe(rhA, "Eva Sintetica"))[0]!;
+      expect(depois.vigenciasDeJornada[0]!.jornada).toMatchObject({
+        id: jornadaId,
+        ativo: false,
+      });
+    });
+
+    it("encerrado (desligamento efetivado): nada de jornada, mesmo com vigência atribuída", async () => {
+      const j = await jornada(rhA, "Jornada Desligado T185");
+      const fabio = await idDe("Fabio Sintetico Desligado");
+      await atribuir(rhA, fabio, j.id, dia(-2));
+      const vinculos = await vinculosDe(rhA, "Fabio Sintetico Desligado");
+      expect(vinculos[0]).toMatchObject({
+        situacao: "encerrado",
+        vigenciasDeJornada: [],
+      });
+    });
+
+    it("encerrada no passado não vem", async () => {
+      const j = await jornada(rhA, "Jornada Passada T185");
+      const { colaboradorId } = await admitir(
+        rhA,
+        {
+          nome: "Gil Sintetico Jornada",
+          matricula: "MAT-L-GIL",
+          empresaId: empresaA,
+          departamentoId: departamentoA,
+        },
+        true,
+      );
+      const v = await atribuir(rhA, colaboradorId, j.id, dia(-60));
+      await post(`/v1/horarios/vinculos/${v}/encerrar`, rhA)
+        .send({ vigenciaFim: dia(-30) })
+        .expect(201);
+      expect(
+        (await vinculosDe(rhA, "Gil Sintetico"))[0]!.vigenciasDeJornada,
+      ).toEqual([]);
+    });
+
+    it("isolamento: na Beta, a Carla não traz jornada da Alfa; DP vê o mesmo que o RH", async () => {
+      const daAlfa = (await vinculosDe(rhA, "Eva Sintetica"))[0]!
+        .vigenciasDeJornada[0]!.jornada.id;
+      for (const cred of [rhB, masterEscopadoB]) {
+        const r = await get(
+          `/v1/colaboradores?busca=${encodeURIComponent("Carla Sintetica")}`,
+          cred,
+        ).expect(200);
+        expect(r.body.itens[0].vinculos).toHaveLength(1);
+        expect(r.body.itens[0].vinculos[0]).toMatchObject({
+          empresaId: empresaB,
+          vigenciasDeJornada: [],
+        });
+        expect(JSON.stringify(r.body)).not.toContain("T185_");
+        expect(JSON.stringify(r.body)).not.toContain(daAlfa);
+      }
+      const doRh = await get("/v1/colaboradores?busca=Sintetic", rhA).expect(
+        200,
+      );
+      const doDp = await get("/v1/colaboradores?busca=Sintetic", dpA).expect(
+        200,
+      );
+      expect(doDp.body.itens).toEqual(doRh.body.itens);
+      for (const cred of [gestorA, colaboradorA]) {
+        const negada = await get("/v1/colaboradores", cred);
+        expect([403, 404]).toContain(negada.status);
+        expect(JSON.stringify(negada.body)).not.toContain("T185_");
       }
     });
   });

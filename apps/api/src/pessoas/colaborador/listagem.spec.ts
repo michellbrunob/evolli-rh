@@ -38,6 +38,7 @@ function vinculo(
     dataAdmissao: new Date(`${dataAdmissao}T00:00:00.000Z`),
     dataDesligamento: null,
     lotacaoVigente: null,
+    vigenciasDeJornada: [],
   };
 }
 
