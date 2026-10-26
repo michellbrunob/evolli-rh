@@ -1,18 +1,22 @@
 /**
- * Cadastros (T073) — wrapper de navegação local entre "Horários" (padrão,
- * T043), "Estrutura organizacional" (T073), "Calendário de feriados" (T076),
+ * Cadastros (T073) — wrapper de navegação local entre "Estrutura
+ * organizacional" (padrão, T073), "Calendário de feriados" (T076),
  * "Políticas de Banco de Horas" (T078), "Funções e cargos" (T080),
  * "Motivos de ausência e justificativas" (T081), "Centros de custo" (T083),
  * "Tipos de documento" (T084), "Motivos de desligamento" (T085),
  * "Escolaridade" (T086) e "Cidades e localidades" (T087).
  *
+ * T182 — a aba "Horários" (T043/T110) saiu daqui: virou a tela própria
+ * Estrutura › Jornadas de trabalho (`JornadasTrabalhoScreen`, destino
+ * `jornadas-trabalho`).
+ *
  * A troca de aba é feita só por estado React local (`useState`) — sem React
  * Router, sem rota real, sem API/fetch. A cada vez que o destino "Cadastros"
- * é selecionado no shell, este componente remonta e volta ao padrão
- * "Horários" (mesmo princípio do "Ponto" — T063 — do "Documentos" — T070 —
+ * é selecionado no shell, este componente remonta e volta à primeira aba do
+ * modo (mesmo princípio do "Ponto" — T063 — do "Documentos" — T070 —
  * e do "Pessoas" — T072). Como só a aba ativa é renderizada por vez, existe
- * sempre exatamente um `h1` na página — cada tela (`CadastroHorariosScreen`,
- * `EstruturaOrganizacionalScreen`, `CalendarioFeriadosScreen`,
+ * sempre exatamente um `h1` na página — cada tela
+ * (`EstruturaOrganizacionalScreen`, `CalendarioFeriadosScreen`,
  * `PoliticasBancoHorasScreen`, `FuncoesCargosScreen`,
  * `MotivosAusenciaJustificativasScreen`, `CentrosCustoScreen`,
  * `TiposDocumentoScreen`, `MotivosDesligamentoScreen`, `EscolaridadeScreen`,
@@ -26,10 +30,6 @@
  */
 import { useEffect, useState } from "react";
 import type { EstadoDestino } from "../../app/mapaNavegacao";
-import {
-  CadastroHorariosScreen,
-  HORARIOS_TITULO_ID,
-} from "./CadastroHorariosScreen";
 import {
   CALENDARIO_FERIADOS_TITULO_ID,
   CalendarioFeriadosScreen,
@@ -72,10 +72,7 @@ import {
 } from "./TiposDocumentoScreen";
 import "./CadastrosScreen.css";
 
-export { HORARIOS_TITULO_ID };
-
 type AbaCadastros =
-  | "horarios"
   | "estrutura"
   | "feriados"
   | "politicas_bh"
@@ -96,12 +93,6 @@ interface AbaDefinicao {
 }
 
 const ABAS: readonly AbaDefinicao[] = [
-  {
-    id: "horarios",
-    rotulo: "Horários",
-    tituloId: HORARIOS_TITULO_ID,
-    estado: "funcional",
-  },
   {
     id: "estrutura",
     rotulo: "Estrutura organizacional",
@@ -181,11 +172,18 @@ export interface CadastrosScreenProps {
    * `<main>` (`aria-labelledby`) mesmo quando a aba muda sem trocar de
    * destino. Não é navegação real — só sincroniza o rótulo de acessibilidade. */
   onTituloIdChange?: (tituloId: string) => void;
+  /**
+   * T182 — o perfil opera as abas funcionais (Estrutura organizacional,
+   * Funções e cargos, Centros de custo). Sem isso elas são só consulta.
+   * Padrão `false`: quem não diz o papel não recebe controle de escrita.
+   */
+  podeOperar?: boolean;
 }
 
 export function CadastrosScreen({
   onTituloIdChange,
   modo = "funcional",
+  podeOperar = false,
 }: CadastrosScreenProps) {
   // Só as abas do modo. `ABAS` continua sendo a fonte única; o filtro é
   // de apresentação, e a primeira aba do conjunto vira o padrão — assim
@@ -235,20 +233,18 @@ export function CadastrosScreen({
         aria-labelledby={`cadastros-tab-${definicaoAtiva.id}`}
         className="cadastros-screen__panel"
       >
-        {abaAtiva === "horarios" ? (
-          <CadastroHorariosScreen />
-        ) : abaAtiva === "estrutura" ? (
-          <EstruturaOrganizacionalScreen />
+        {abaAtiva === "estrutura" ? (
+          <EstruturaOrganizacionalScreen podeOperar={podeOperar} />
         ) : abaAtiva === "feriados" ? (
           <CalendarioFeriadosScreen />
         ) : abaAtiva === "politicas_bh" ? (
           <PoliticasBancoHorasScreen />
         ) : abaAtiva === "funcoes_cargos" ? (
-          <FuncoesCargosScreen />
+          <FuncoesCargosScreen podeOperar={podeOperar} />
         ) : abaAtiva === "motivos_ausencia_justificativas" ? (
           <MotivosAusenciaJustificativasScreen />
         ) : abaAtiva === "centros_custo" ? (
-          <CentrosCustoScreen />
+          <CentrosCustoScreen podeOperar={podeOperar} />
         ) : abaAtiva === "tipos_documento" ? (
           <TiposDocumentoScreen />
         ) : abaAtiva === "motivos_desligamento" ? (

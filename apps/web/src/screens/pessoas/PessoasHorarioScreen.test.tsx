@@ -78,6 +78,7 @@ const colaboradorInativo: ColaboradorApi = {
 const tabelaAtiva: TabelaHorarioApi = {
   id: "44444444-4444-4444-4444-444444444444",
   empresaId: "77777777-7777-7777-7777-777777777777",
+  codigo: null,
   nome: "Tabela Comercial (teste)",
   ativo: true,
   criadoPorUserId: "88888888-8888-8888-8888-888888888888",
@@ -89,6 +90,7 @@ const tabelaAtiva: TabelaHorarioApi = {
 const tabelaInativa: TabelaHorarioApi = {
   id: "55555555-5555-5555-5555-555555555555",
   empresaId: "77777777-7777-7777-7777-777777777777",
+  codigo: null,
   nome: "Tabela Descontinuada (teste)",
   ativo: false,
   criadoPorUserId: "88888888-8888-8888-8888-888888888888",

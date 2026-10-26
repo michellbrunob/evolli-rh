@@ -844,10 +844,22 @@ function evaluateHorarios(
         ? isSameCompany(subject, target)
         : subject.companyId !== null;
 
+    // T182 — o DP CONSULTA as jornadas (tabelas de horário) da própria
+    // empresa, por decisão da proprietária de 2026-10-23. Criar, editar,
+    // inativar e reativar seguem só do RH (T037), e o vínculo de horário com
+    // o colaborador segue negado ao DP.
+    case "dp":
+      if (target.resource !== "tabela_horario" || target.action !== "read") {
+        return false;
+      }
+      return escopoResolvido
+        ? isSameCompany(subject, target)
+        : subject.companyId !== null;
+
     // Negados, cada um por decisão registrada:
     //
-    // `dp`            — a alçada de ponto/horário no V1 é exclusiva de RH
-    //                   (T037). DP não opera horários, ao contrário de ponto.
+    // `dp`            — fora a consulta de jornadas (T182), a alçada de
+    //                   horário no V1 é exclusiva de RH (T037).
     // `admin_tecnico` — mesmo raciocínio de pessoas/ponto: sem exceção global.
     // `gestor`        — a ADR 0015 resolveu DP-8, mas a leitura de HORÁRIO
     //                   pelo gestor tem rota própria em `gestor_equipe`, com

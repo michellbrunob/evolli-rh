@@ -2410,7 +2410,9 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       `authorization_denied` das recusas 403 e 404 e que o 409 não devolve o código.
 
 78. **T181 - Edição da ficha do colaborador por RH e DP**
-    - **Estado:** **em implementação**. Branch `codex/t181-ficha-edicao-colaborador`, a partir do
+    - **Estado:** **integrada** em `main` pela PR #174, squash
+      `b6442f3dcbe7107b1044b10ecd5e13bb3d7e0859`, com a CI de push 3/3 verde (run 40012309132);
+      branch preservada. Implementada na branch `codex/t181-ficha-edicao-colaborador`, a partir do
       squash `cf04afcce8bd6a1e3c03f32f668ed7d88d73b6b0` (T180 integrada, PR #173).
     - **Objetivo:** em Gestão de Pessoas › Colaboradores, RH e DP completam e atualizam, pela ficha
       do colaborador, os dados já aprovados e já gravados: dados pessoais complementares, endereço
@@ -2438,6 +2440,27 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       recusado pelo servidor e sem botões na ficha. Sexo legado (fora da lista fechada) fica
       exatamente como está ao salvar outro campo — sexo ausente do corpo mantém o gravado —,
       aparece como valor legado só para leitura, e mudá-lo exige uma opção da lista atual.
+
+79. **T182 - Catálogo de Jornadas de trabalho em Estrutura**
+    - **Estado:** **em implementação**. Branch `codex/t182-jornadas-trabalho`, a partir do squash
+      `b6442f3dcbe7107b1044b10ecd5e13bb3d7e0859` (T181 integrada, PR #174).
+    - **Objetivo:** em Estrutura › Jornadas de trabalho, RH e DP mantêm o catálogo de jornadas da
+      empresa ativa — turnos reutilizáveis, futuramente associados aos colaboradores.
+    - **Decisão da proprietária (2026-10-23):** [decisão](../docs/decisions/t182-jornadas-trabalho.md).
+      Tela própria com lista, busca, estado vazio e status; RH cria, edita e inativa; DP só
+      consulta; código, nome e os dias e horários que o contrato já tem; código único na empresa,
+      por migration aditiva; nome e código editáveis, dias e horários imutáveis (T038) — para
+      mudar, nova jornada a partir da existente e inativação da antiga; inativação
+      lógica; empresa da sessão; auditoria existente, só com ids e nomes de campos. **Fuso horário
+      não faz parte do produto.**
+    - **Entrega prevista:** migration aditiva do código, edição e busca na API, leitura pelo DP,
+      tela própria na web, testes de API, web e E2E com PostgreSQL real e validação no navegador.
+    - **Fora de escopo:** associação da jornada ao colaborador (o vínculo de horário existente não
+      muda), banco de horas, escala, adicional noturno, folha, compensação, feriado, ponto,
+      geolocalização, fuso horário, salário, contrato, CPF, documentos, dados bancários,
+      dependentes, saúde, promoção e merge.
+    - **Prévia:** `http://127.0.0.1:5173` passa a mostrar a branch da T182 ao vivo, identificada
+      como `[T182 dev]`, não a `main`.
 
 ## Regra obrigatória para as próximas tarefas
 

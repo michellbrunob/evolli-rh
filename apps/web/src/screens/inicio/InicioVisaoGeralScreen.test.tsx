@@ -35,14 +35,19 @@ describe("InicioVisaoGeralScreen (T048 — tela visual estática)", () => {
   it("lista um card de resumo por módulo com métrica rotulada como exemplo", () => {
     render(<InicioVisaoGeralScreen onNavegar={() => {}} />);
 
-    for (const titulo of ["Cadastros", "Pessoas", "Ponto", "Documentos"]) {
+    for (const titulo of [
+      "Jornadas de trabalho",
+      "Pessoas",
+      "Ponto",
+      "Documentos",
+    ]) {
       expect(
         screen.getByRole("heading", { level: 3, name: titulo }),
       ).toBeInTheDocument();
     }
     expect(screen.getAllByText("Exemplo").length).toBe(4);
     expect(
-      screen.getByText("3 tabelas de horário cadastradas (exemplo)"),
+      screen.getByText("3 jornadas de trabalho cadastradas (exemplo)"),
     ).toBeInTheDocument();
     expect(
       screen.getByText("12 colaboradores com horário atribuído (exemplo)"),
@@ -56,8 +61,11 @@ describe("InicioVisaoGeralScreen (T048 — tela visual estática)", () => {
     const onNavegar = vi.fn();
     render(<InicioVisaoGeralScreen onNavegar={onNavegar} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Ir para Cadastros" }));
-    expect(onNavegar).toHaveBeenCalledWith("cadastros");
+    // T182 — o atalho das jornadas leva à tela própria delas.
+    fireEvent.click(
+      screen.getByRole("button", { name: "Ir para Jornadas de trabalho" }),
+    );
+    expect(onNavegar).toHaveBeenCalledWith("jornadas-trabalho");
 
     fireEvent.click(screen.getByRole("button", { name: "Ir para Pessoas" }));
     expect(onNavegar).toHaveBeenCalledWith("pessoas");

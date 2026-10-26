@@ -22,7 +22,11 @@ export type MotivoDoCampo = "em_uso";
  * tipo impede que um nome montado a partir de entrada do usuário vaze.
  */
 export type CampoPublico =
-  "matricula" | "contatos.emailPessoal" | "emailPessoal";
+  | "matricula"
+  | "contatos.emailPessoal"
+  | "emailPessoal"
+  // T182 — código de jornada repetido na empresa.
+  | "codigo";
 
 export interface ErroDeCampo {
   campo: CampoPublico;

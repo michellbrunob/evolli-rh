@@ -1032,6 +1032,10 @@ export async function semearDemonstracao(
         ),
       () =>
         pedir(ctx, "POST", "/v1/horarios", rhAlfa, {
+          // T182 — o código da jornada é obrigatório ao criar e único na
+          // empresa. A busca acima segue pelo nome: bancos já semeados mantêm
+          // a jornada anterior, sem código.
+          codigo: "COMERCIAL_44H",
           nome: nomeHorario,
           periodos: ["segunda", "terca", "quarta", "quinta", "sexta"].map(
             (dia) => ({ dia, inicio: "08:00", fim: "17:00" }),

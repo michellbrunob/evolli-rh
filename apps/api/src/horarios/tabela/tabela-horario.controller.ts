@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Param,
+  Patch,
   ParseUUIDPipe,
   Post,
   Query,
@@ -21,6 +22,7 @@ import { extractRequestMetadata } from "../../auth/request-metadata.util";
 import { TabelaHorarioService } from "./tabela-horario.service";
 import {
   CriarTabelaHorarioDto,
+  EditarTabelaHorarioDto,
   ListarTabelasHorarioQueryDto,
 } from "../dto/horarios.dto";
 
@@ -82,6 +84,25 @@ export class TabelaHorarioController {
     @Req() req: Request,
   ) {
     return this.service.detalhar(tabelaId, {
+      actor,
+      metadata: extractRequestMetadata(req),
+    });
+  }
+
+  @Patch(":tabelaId")
+  @UseGuards(CsrfGuard, AuthorizationGuard)
+  @RequirePermission("tabela_horario", "alter")
+  @ApiOperation({
+    summary:
+      "Edita nome e/ou codigo de uma tabela de horario (jornada) da propria empresa (RH); os periodos sao imutaveis",
+  })
+  async editar(
+    @Param("tabelaId", ParseUUIDPipe) tabelaId: string,
+    @Body() dto: EditarTabelaHorarioDto,
+    @CurrentUser() actor: AccessUser,
+    @Req() req: Request,
+  ) {
+    return this.service.editar(tabelaId, dto, {
       actor,
       metadata: extractRequestMetadata(req),
     });

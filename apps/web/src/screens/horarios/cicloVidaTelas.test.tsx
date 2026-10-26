@@ -107,7 +107,7 @@ describe("Estrutura organizacional — quatro entidades, quatro funções", () =
   const org = () => vi.mocked(organizacaoClient);
 
   async function abrirAba(aba: string) {
-    render(<EstruturaOrganizacionalScreen />);
+    render(<EstruturaOrganizacionalScreen podeOperar />);
     if (aba !== "Unidades") {
       fireEvent.click(await screen.findByRole("tab", { name: aba }));
     }
@@ -204,7 +204,7 @@ describe("Funções e cargos", () => {
     vi.mocked(cargoClient).inativarCargo.mockResolvedValue(
       registro({ status: "inativo" }) as never,
     );
-    render(<FuncoesCargosScreen />);
+    render(<FuncoesCargosScreen podeOperar />);
     await inativarPrimeiraLinha();
     await waitFor(() =>
       expect(vi.mocked(cargoClient).inativarCargo).toHaveBeenCalledWith(
@@ -223,7 +223,7 @@ describe("Funções e cargos", () => {
     vi.mocked(cargoClient).inativarCargo.mockRejectedValue(
       new TypeError("Failed to fetch"),
     );
-    render(<FuncoesCargosScreen />);
+    render(<FuncoesCargosScreen podeOperar />);
     await inativarPrimeiraLinha();
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Verifique a conexão",
@@ -239,7 +239,7 @@ describe("Centros de custo", () => {
     vi.mocked(organizacaoClient).inativarCentroCusto.mockResolvedValue(
       registro({ status: "inativo" }) as never,
     );
-    render(<CentrosCustoScreen />);
+    render(<CentrosCustoScreen podeOperar />);
     await inativarPrimeiraLinha();
     await waitFor(() =>
       expect(
@@ -255,7 +255,7 @@ describe("Centros de custo", () => {
     vi.mocked(organizacaoClient).reativarCentroCusto.mockRejectedValue(
       Object.assign(new Error("pai inativo"), { status: 422 }),
     );
-    render(<CentrosCustoScreen />);
+    render(<CentrosCustoScreen podeOperar />);
     await inativarPrimeiraLinha("Reativar");
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "nível superior",
@@ -268,7 +268,7 @@ describe("exclusão não aparece em nenhuma das três telas", () => {
     vi.mocked(organizacaoClient).listarCentrosCusto.mockResolvedValue(
       pagina([registro()]) as never,
     );
-    render(<CentrosCustoScreen />);
+    render(<CentrosCustoScreen podeOperar />);
     await screen.findByRole("button", { name: /^Inativar / });
     expect(
       screen.queryByRole("button", { name: /excluir|remover|apagar|deletar/i }),

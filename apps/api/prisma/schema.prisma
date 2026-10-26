@@ -494,6 +494,8 @@ enum AuditAction {
   horarios_tabela_criada     @map("horarios.tabela.criada")
   horarios_tabela_desativada @map("horarios.tabela.desativada")
   horarios_tabela_reativada  @map("horarios.tabela.reativada")
+  // T182 — edição do nome e do código de uma jornada (tabela de horário).
+  horarios_tabela_editada    @map("horarios.tabela.editada")
   horarios_vinculo_criado    @map("horarios.vinculo.criado")
   horarios_vinculo_encerrado @map("horarios.vinculo.encerrado")
   horarios_consultado        @map("horarios.consultado")
@@ -1575,6 +1577,10 @@ model SolicitacaoDocumento {
 model TabelaHorario {
   id              String  @id @default(uuid())
   empresaId       String  @map("empresa_id")
+  /// T182 — código da jornada, único na empresa. Anulável: tabelas criadas
+  /// antes da T182 ficam sem código até alguém editá-las (migration aditiva,
+  /// sem valor inventado). Forma `^[A-Z0-9_]{2,32}$` (CHECK na migration).
+  codigo          String?
   nome            String
   ativo           Boolean @default(true)
   criadoPorUserId String  @map("criado_por_user_id")
@@ -1590,6 +1596,8 @@ model TabelaHorario {
   /// Alvo da FK COMPOSTA de `vinculo_horario` — garante, no banco, que um
   /// vinculo so referencie tabela da MESMA empresa.
   @@unique([id, empresaId])
+  /// T182 — código único na empresa; NULLs distintos (tabelas antigas).
+  @@unique([empresaId, codigo])
   @@index([empresaId, ativo])
   @@map("tabela_horario")
 }

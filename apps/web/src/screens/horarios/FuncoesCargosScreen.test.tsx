@@ -98,7 +98,7 @@ describe("FuncoesCargosScreen (T105 — funcional)", () => {
 
   it("tem um único h1", async () => {
     mockSucesso();
-    render(<FuncoesCargosScreen />);
+    render(<FuncoesCargosScreen podeOperar />);
 
     await waitFor(() =>
       expect(
@@ -110,7 +110,7 @@ describe("FuncoesCargosScreen (T105 — funcional)", () => {
 
   it("exibe os avisos de escopo, auditoria e referências organizacionais", async () => {
     mockSucesso();
-    render(<FuncoesCargosScreen />);
+    render(<FuncoesCargosScreen podeOperar />);
 
     await waitFor(() =>
       expect(screen.getByText("Somente RH")).toBeInTheDocument(),
@@ -134,7 +134,7 @@ describe("FuncoesCargosScreen (T105 — funcional)", () => {
 
   it("exibe a seção de Funções como referência não operacional sem formulário", async () => {
     mockSucesso();
-    render(<FuncoesCargosScreen />);
+    render(<FuncoesCargosScreen podeOperar />);
 
     await waitFor(() =>
       expect(
@@ -153,7 +153,7 @@ describe("FuncoesCargosScreen (T105 — funcional)", () => {
 
   it("lista cargos com código, nome, situação e botão Editar", async () => {
     mockSucesso();
-    render(<FuncoesCargosScreen />);
+    render(<FuncoesCargosScreen podeOperar />);
 
     const tabela = await screen.findByRole("table", { name: "Cargos" });
     expect(within(tabela).getByText("ANALISTA")).toBeInTheDocument();
@@ -169,7 +169,7 @@ describe("FuncoesCargosScreen (T105 — funcional)", () => {
 
   it("status 'ativo' exibe rótulo 'Ativa' e 'inativo' exibe 'Inativa'", async () => {
     mockSucesso([cargo1, cargo2]);
-    render(<FuncoesCargosScreen />);
+    render(<FuncoesCargosScreen podeOperar />);
 
     const tabela = await screen.findByRole("table", { name: "Cargos" });
     const linhaAtivo = within(tabela).getByText("ANALISTA").closest("tr")!;
@@ -180,7 +180,7 @@ describe("FuncoesCargosScreen (T105 — funcional)", () => {
 
   it("mostra EmptyState quando não há cargos", async () => {
     mockSucesso([]);
-    render(<FuncoesCargosScreen />);
+    render(<FuncoesCargosScreen podeOperar />);
 
     await waitFor(() =>
       expect(
@@ -195,7 +195,7 @@ describe("FuncoesCargosScreen (T105 — funcional)", () => {
   it("mostra erro e permite tentar novamente", async () => {
     mockListarEmpresas.mockRejectedValue(new Error("falha de rede"));
     mockListarCargos.mockRejectedValue(new Error("falha de rede"));
-    render(<FuncoesCargosScreen />);
+    render(<FuncoesCargosScreen podeOperar />);
 
     await waitFor(() =>
       expect(
@@ -213,7 +213,7 @@ describe("FuncoesCargosScreen (T105 — funcional)", () => {
 
   it("filtra por situação chamando a API com o parâmetro status correto", async () => {
     mockSucesso();
-    render(<FuncoesCargosScreen />);
+    render(<FuncoesCargosScreen podeOperar />);
     await screen.findByRole("table", { name: "Cargos" });
 
     mockListarCargos.mockResolvedValue({
@@ -236,7 +236,7 @@ describe("FuncoesCargosScreen (T105 — funcional)", () => {
 
   it("o filtro envia 'inativo' (não 'inativa') para a API", async () => {
     mockSucesso();
-    render(<FuncoesCargosScreen />);
+    render(<FuncoesCargosScreen podeOperar />);
     await screen.findByRole("table", { name: "Cargos" });
 
     mockListarCargos.mockResolvedValue({
@@ -265,7 +265,7 @@ describe("FuncoesCargosScreen (T105 — funcional)", () => {
       codigo: "COORD",
       nome: "Coordenador (teste)",
     });
-    render(<FuncoesCargosScreen />);
+    render(<FuncoesCargosScreen podeOperar />);
     await screen.findByRole("table", { name: "Cargos" });
 
     fireEvent.click(screen.getByRole("button", { name: "Novo cargo" }));
@@ -305,7 +305,7 @@ describe("FuncoesCargosScreen (T105 — funcional)", () => {
 
   it("código inválido exibe mensagem de erro", async () => {
     mockSucesso();
-    render(<FuncoesCargosScreen />);
+    render(<FuncoesCargosScreen podeOperar />);
     await screen.findByRole("table", { name: "Cargos" });
 
     fireEvent.click(screen.getByRole("button", { name: "Novo cargo" }));
@@ -326,7 +326,7 @@ describe("FuncoesCargosScreen (T105 — funcional)", () => {
 
   it("exige seleção explícita de empresa quando há mais de uma no escopo", async () => {
     mockMultiEmpresa();
-    render(<FuncoesCargosScreen />);
+    render(<FuncoesCargosScreen podeOperar />);
     await screen.findByRole("table", { name: "Cargos" });
 
     fireEvent.click(screen.getByRole("button", { name: "Novo cargo" }));
@@ -358,7 +358,7 @@ describe("FuncoesCargosScreen (T105 — funcional)", () => {
       codigo: "COORD",
       nome: "Coordenador (teste)",
     });
-    render(<FuncoesCargosScreen />);
+    render(<FuncoesCargosScreen podeOperar />);
     await screen.findByRole("table", { name: "Cargos" });
 
     fireEvent.click(screen.getByRole("button", { name: "Novo cargo" }));
@@ -398,7 +398,7 @@ describe("FuncoesCargosScreen (T105 — funcional)", () => {
       total: 2,
     } satisfies ResultadoPaginado<CargoApi>);
 
-    render(<FuncoesCargosScreen />);
+    render(<FuncoesCargosScreen podeOperar />);
     const tabela = await screen.findByRole("table", { name: "Cargos" });
 
     const linhaAnalista = within(tabela).getByText("ANALISTA").closest("tr")!;
@@ -429,7 +429,7 @@ describe("FuncoesCargosScreen (T105 — funcional)", () => {
 
   it("cancelar fecha o formulário sem chamar a API", async () => {
     mockSucesso();
-    render(<FuncoesCargosScreen />);
+    render(<FuncoesCargosScreen podeOperar />);
     await screen.findByRole("table", { name: "Cargos" });
 
     fireEvent.click(screen.getByRole("button", { name: "Novo cargo" }));
@@ -463,7 +463,7 @@ describe("FuncoesCargosScreen (T105 — funcional)", () => {
         total: 2,
       } satisfies ResultadoPaginado<CargoApi>);
 
-    render(<FuncoesCargosScreen />);
+    render(<FuncoesCargosScreen podeOperar />);
     await screen.findByRole("table", { name: "Cargos" });
 
     fireEvent.click(screen.getByRole("button", { name: "Novo cargo" }));
@@ -484,7 +484,7 @@ describe("FuncoesCargosScreen (T105 — funcional)", () => {
 
   it("não contém dados sensíveis, marca de terceiro ou valor financeiro", async () => {
     mockSucesso();
-    render(<FuncoesCargosScreen />);
+    render(<FuncoesCargosScreen podeOperar />);
     await screen.findByRole("table", { name: "Cargos" });
 
     const texto = document.body.innerHTML.toLowerCase();
@@ -505,7 +505,7 @@ describe("FuncoesCargosScreen (T105 — funcional)", () => {
 
   it("não declara conformidade com CLT, CCT/ACT, Portaria 671, LGPD ou eSocial", async () => {
     mockSucesso();
-    render(<FuncoesCargosScreen />);
+    render(<FuncoesCargosScreen podeOperar />);
     await screen.findByRole("table", { name: "Cargos" });
 
     const texto = document.body.innerHTML.toLowerCase();
@@ -518,5 +518,59 @@ describe("FuncoesCargosScreen (T105 — funcional)", () => {
     ]) {
       expect(texto).not.toContain(termoProibido);
     }
+  });
+});
+
+/**
+ * T182 — controles de escrita visíveis: criar ("Nova…"/"Novo…"), editar,
+ * inativar e reativar. Para um perfil leitor, como o DP, a lista é vazia.
+ */
+function botoesDeEscrita(): HTMLElement[] {
+  return screen
+    .queryAllByRole("button")
+    .filter((b) =>
+      /^(Nova|Novo|Editar|Inativar|Reativar)\b/.test(
+        b.textContent?.trim() ?? "",
+      ),
+    );
+}
+
+describe("FuncoesCargosScreen — perfil leitor, como o DP (T182)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockSucesso();
+  });
+
+  it("diz 'Somente consulta' e lista sem nenhum controle de escrita", async () => {
+    render(<FuncoesCargosScreen />);
+
+    expect(screen.getByText("Somente consulta")).toBeInTheDocument();
+    expect(screen.queryByText("Somente RH")).toBeNull();
+    expect(
+      await screen.findAllByRole("cell", { name: cargo1.nome }),
+    ).not.toHaveLength(0);
+    expect(botoesDeEscrita()).toEqual([]);
+    expect(screen.queryByRole("columnheader", { name: "Ações" })).toBeNull();
+    expect(mockCriarCargo).not.toHaveBeenCalled();
+  });
+
+  it("estado vazio para o leitor não oferece criar", async () => {
+    mockSucesso([]);
+    render(<FuncoesCargosScreen />);
+    await screen.findByText("Nenhum cargo cadastrado");
+    expect(botoesDeEscrita()).toEqual([]);
+  });
+
+  it("o RH (quem opera) mantém criar, editar e inativar", async () => {
+    render(<FuncoesCargosScreen podeOperar />);
+    expect(
+      await screen.findAllByRole("cell", { name: cargo1.nome }),
+    ).not.toHaveLength(0);
+    const rotulos = botoesDeEscrita().map((b) => b.textContent?.trim());
+    expect(rotulos).toContain("Novo cargo");
+    expect(rotulos).toContain("Editar");
+    expect(rotulos.some((r) => /^(Inativar|Reativar)/.test(r ?? ""))).toBe(
+      true,
+    );
   });
 });

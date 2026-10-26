@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "constitutionVersion": "1.4.0",
   "lastConvergedAt": "2026-10-23",
-  "lastIntegratedTask": 180,
-  "lastRecordedTask": 181,
+  "lastIntegratedTask": 181,
+  "lastRecordedTask": 182,
   "platformDecision": {
     "adr": "docs/adr/0014-evolli-plataforma-base-e-encerramento-do-frappe.md",
     "decidedAt": "2026-10-01",
@@ -11,15 +11,15 @@
     "frappe": "encerrado_como_candidato_referencia_apenas"
   },
   "nextTask": {
-    "id": "T181",
-    "status": "ficha_edicao_em_implementacao",
-    "reason": "T180 integrada em main pela PR #173 (squash cf04afcce8bd6a1e3c03f32f668ed7d88d73b6b0), com a CI de push 3/3 verde (run 39972657182). A T181 permite que RH e DP completem e atualizem, pela ficha do colaborador em Gestao de Pessoas > Colaboradores, os dados ja aprovados e gravados: dados pessoais complementares, endereco e contatos. Edicao so na empresa ativa; leitura segura para os perfis sem permissao, sem botao que o servidor recusaria; contatos com o estado Nenhum contato registrado e as regras da T179; CEP assistido so pelo servidor, com alternativa manual; mascaras, +55, validacoes e mensagens acessiveis ja aprovadas; auditoria existente, so com nomes de campos; falhas sem perder o digitado e sem afirmar gravacao incerta; edicao por secao, com Salvar e Cancelar. Sem schema, migration, seed, Docker, dependencia ou lockfile novos. Decisao da proprietaria de 2026-10-23 em docs/decisions/t181-edicao-ficha-colaborador.md. Fora de escopo: CPF, RG, CNH, CTPS, PIS, documentos, banco, dependentes, filhos, camisa, saude, dados sindicais, foto, raca/etnia, genero, deficiencia, dados contratuais detalhados, fuso, telefone estrangeiro, importacao; nome (fora a correcao ja existente), matricula, tipo de vinculo, lotacao, situacao e datas da admissao; promocao e merge."
+    "id": "T182",
+    "status": "jornadas_trabalho_em_implementacao",
+    "reason": "T181 integrada em main pela PR #174 (squash b6442f3dcbe7107b1044b10ecd5e13bb3d7e0859), com a CI de push 3/3 verde (run 40012309132). A T182 cria, em Estrutura > Jornadas de trabalho, o catalogo de jornadas da empresa ativa: tela propria com lista, busca, estado vazio e status; RH cria, edita e inativa; DP so consulta; codigo (unico na empresa, por migration aditiva aprovada pela proprietaria), nome e os dias e horarios que o contrato ja tem (tabela_horario e periodo_horario); nome e codigo editaveis, dias e horarios imutaveis (T038), mudanca por nova jornada a partir da existente e inativacao da antiga; inativacao logica; empresa da sessao; auditoria existente, so com ids e nomes de campos. Fuso horario nao faz parte do produto. Decisao da proprietaria de 2026-10-23 em docs/decisions/t182-jornadas-trabalho.md. Fora de escopo: associacao da jornada ao colaborador, banco de horas, escala, adicional noturno, folha, compensacao, feriado, ponto, geolocalizacao, fuso horario, salario, contrato, CPF, documentos, banco, dependentes, saude, promocao e merge."
   },
   "openDeliveries": [
     {
-      "id": "T181",
+      "id": "T182",
       "pullRequest": null,
-      "status": "ficha_edicao_em_implementacao"
+      "status": "jornadas_trabalho_em_implementacao"
     }
   ],
   "requiredArtifacts": [

@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { BadRequestException, Injectable } from "@nestjs/common";
 import { PeriodoHorario, Prisma, TabelaHorario } from "@prisma/client";
 import { PrismaService } from "../../database/prisma.service";
 import { HorariosAuditoriaService } from "../horarios-auditoria.service";
@@ -12,8 +12,10 @@ import {
   filtroEmpresaLeituraHorarios,
   podeConsultarHorarios,
   resolverEscopoHorarios,
-  resolverEscopoLeituraHorarios,
+  resolverEscopoLeituraTabelas,
 } from "../escopo-horarios.util";
+import { ConflitoDeCamposException } from "../../common/erros/recusa-por-campo";
+import { escaparCuringas } from "../../pessoas/colaborador/colaborador.service";
 import {
   formatarHora,
   normalizarPeriodos,
@@ -22,6 +24,7 @@ import {
 } from "../validacao-horarios.util";
 import {
   CriarTabelaHorarioDto,
+  EditarTabelaHorarioDto,
   ListarTabelasHorarioQueryDto,
 } from "../dto/horarios.dto";
 
@@ -36,12 +39,32 @@ interface PeriodoProjetado {
 interface TabelaProjetada {
   id: string;
   empresaId: string;
+  /** T182 — `null` nas tabelas criadas antes do código existir. */
+  codigo: string | null;
   nome: string;
   ativo: boolean;
   criadoPorUserId: string;
   criadoEm: Date;
   atualizadoEm: Date;
   periodos: PeriodoProjetado[];
+}
+
+/**
+ * T182 — código repetido na empresa: o campo vai na resposta, sem o valor.
+ * Usado pela consulta prévia e pela unicidade do banco (corrida).
+ */
+const CODIGO_EM_USO = [{ campo: "codigo", motivo: "em_uso" }] as const;
+
+/**
+ * T182 — nas escritas de `tabela_horario`, a única unicidade alcançável é a do
+ * código na empresa (`@@unique([empresaId, codigo])`): um P2002 ali é o código
+ * gravado ao mesmo tempo por outra pessoa.
+ */
+function eCodigoRepetidoNoBanco(error: unknown): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2002"
+  );
 }
 
 const ORDEM_PERIODOS = [
@@ -58,6 +81,10 @@ const ORDEM_PERIODOS = [
  * código para isso, e `periodo_horario` é imutável no banco (`evolli_app` sem
  * `UPDATE`/`DELETE`, migration T038). "Alterar" um horário é criar uma tabela
  * nova (revisão). Não apaga nada fisicamente: desativação é lógica (`ativo`).
+ *
+ * T182 — a tabela de horário é a JORNADA DE TRABALHO do catálogo de Estrutura:
+ * ganha código (único na empresa) e edição de nome e código; os períodos
+ * continuam imutáveis. O DP consulta, só na própria empresa.
  *
  * Não calcula jornada, tolerância, banco de horas nem DSR — fora de escopo.
  *
@@ -84,9 +111,11 @@ export class TabelaHorarioService {
 
     try {
       const criada = await this.prisma.$transaction(async (tx) => {
+        await this.recusarCodigoEmUso(tx, escopo.empresaId, dto.codigo, null);
         const tabela = await tx.tabelaHorario.create({
           data: {
             empresaId: escopo.empresaId,
+            codigo: dto.codigo,
             nome: dto.nome,
             criadoPorUserId: ctx.actor.id,
             periodos: {
@@ -114,6 +143,84 @@ export class TabelaHorarioService {
 
       return this.projetar(criada, criada.periodos);
     } catch (error) {
+      if (eCodigoRepetidoNoBanco(error)) {
+        throw new ConflitoDeCamposException(CODIGO_EM_USO);
+      }
+      traduzirErroHorario(error);
+    }
+  }
+
+  /**
+   * T182 — edita NOME e/ou CÓDIGO de uma jornada da própria empresa (só RH).
+   * Os períodos não têm caminho de edição (T038). Código repetido na empresa
+   * responde 409 com o campo, sem o valor. Sem nenhum campo, 400. Sem
+   * mudança real, devolve o gravado e não grava nada.
+   */
+  async editar(
+    tabelaId: string,
+    dto: EditarTabelaHorarioDto,
+    ctx: HorariosAuditContext,
+  ): Promise<TabelaProjetada> {
+    if (dto.codigo === undefined && dto.nome === undefined) {
+      throw new BadRequestException();
+    }
+    const escopo = resolverEscopoHorarios(ctx.actor);
+
+    // Busca já escopada: tabela de outra empresa não é encontrada aqui.
+    const tabela = await this.prisma.tabelaHorario.findFirst({
+      where: { id: tabelaId, empresaId: escopo.empresaId },
+      include: { periodos: { orderBy: ORDEM_PERIODOS } },
+    });
+    if (tabela === null) {
+      return this.auditoria.negarAcesso(
+        ctx,
+        "tabela_horario",
+        tabelaId,
+        escopo.empresaId,
+      );
+    }
+
+    const mudancas: { codigo?: string; nome?: string } = {};
+    if (dto.codigo !== undefined && dto.codigo !== tabela.codigo) {
+      mudancas.codigo = dto.codigo;
+    }
+    if (dto.nome !== undefined && dto.nome !== tabela.nome) {
+      mudancas.nome = dto.nome;
+    }
+    if (Object.keys(mudancas).length === 0) {
+      return this.projetar(tabela, tabela.periodos);
+    }
+
+    try {
+      const atualizada = await this.prisma.$transaction(async (tx) => {
+        if (mudancas.codigo !== undefined) {
+          await this.recusarCodigoEmUso(
+            tx,
+            tabela.empresaId,
+            mudancas.codigo,
+            tabela.id,
+          );
+        }
+        const tabelaAtualizada = await tx.tabelaHorario.update({
+          where: { id: tabela.id },
+          data: mudancas,
+          include: { periodos: { orderBy: ORDEM_PERIODOS } },
+        });
+        await this.auditoria.registrarMutacao(
+          tx,
+          ctx,
+          "horarios_tabela_editada",
+          "tabela_horario",
+          tabela.id,
+          tabela.empresaId,
+        );
+        return tabelaAtualizada;
+      });
+      return this.projetar(atualizada, atualizada.periodos);
+    } catch (error) {
+      if (eCodigoRepetidoNoBanco(error)) {
+        throw new ConflitoDeCamposException(CODIGO_EM_USO);
+      }
       traduzirErroHorario(error);
     }
   }
@@ -122,11 +229,19 @@ export class TabelaHorarioService {
     query: ListarTabelasHorarioQueryDto,
     ctx: HorariosAuditContext,
   ): Promise<ResultadoPaginado<TabelaProjetada>> {
-    const escopo = resolverEscopoLeituraHorarios(ctx.actor);
+    const escopo = resolverEscopoLeituraTabelas(ctx.actor);
 
+    // T182 — busca por nome ou código, com os curingas do LIKE escapados.
+    const termo = query.busca ? escaparCuringas(query.busca) : null;
     const where: Prisma.TabelaHorarioWhereInput = {
       ...filtroEmpresaLeituraHorarios(escopo),
       ...(query.ativo !== undefined && { ativo: query.ativo }),
+      ...(termo !== null && {
+        OR: [
+          { nome: { contains: termo, mode: "insensitive" } },
+          { codigo: { contains: termo, mode: "insensitive" } },
+        ],
+      }),
     };
 
     const pagina = query.pagina ?? 1;
@@ -162,7 +277,7 @@ export class TabelaHorarioService {
     tabelaId: string,
     ctx: HorariosAuditContext,
   ): Promise<TabelaProjetada> {
-    const escopo = resolverEscopoLeituraHorarios(ctx.actor);
+    const escopo = resolverEscopoLeituraTabelas(ctx.actor);
 
     const tabela = await this.prisma.tabelaHorario.findFirst({
       where: { id: tabelaId, ...filtroEmpresaLeituraHorarios(escopo) },
@@ -268,6 +383,30 @@ export class TabelaHorarioService {
     }
   }
 
+  /**
+   * T182 — o código já é de outra tabela da mesma empresa? Só a empresa da
+   * sessão é consultada: "em uso" nunca revela outra empresa. A unicidade do
+   * banco cobre a corrida entre a consulta e a gravação.
+   */
+  private async recusarCodigoEmUso(
+    tx: Prisma.TransactionClient,
+    empresaId: string,
+    codigo: string,
+    tabelaId: string | null,
+  ): Promise<void> {
+    const outra = await tx.tabelaHorario.findFirst({
+      where: {
+        empresaId,
+        codigo,
+        ...(tabelaId !== null && { NOT: { id: tabelaId } }),
+      },
+      select: { id: true },
+    });
+    if (outra) {
+      throw new ConflitoDeCamposException(CODIGO_EM_USO);
+    }
+  }
+
   private projetar(
     tabela: TabelaHorario,
     periodos: PeriodoHorario[],
@@ -275,6 +414,7 @@ export class TabelaHorarioService {
     return {
       id: tabela.id,
       empresaId: tabela.empresaId,
+      codigo: tabela.codigo,
       nome: tabela.nome,
       ativo: tabela.ativo,
       criadoPorUserId: tabela.criadoPorUserId,

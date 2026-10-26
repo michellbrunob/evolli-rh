@@ -2,7 +2,7 @@
  * Dados sintéticos da tela "Início > Visão geral" (T048).
  *
  * Painel de resumo puramente ilustrativo: um card por módulo já disponível
- * (Cadastros, Pessoas, Ponto, Documentos), cada um com uma métrica de
+ * (Jornadas de trabalho, Pessoas, Ponto, Documentos), cada um com uma métrica de
  * exemplo e um atalho local (troca de destino via o estado já existente em
  * `App`, nunca rota real). Nenhum número aqui reflete indicador operacional
  * de nenhuma empresa — todos são explicitamente rotulados "(exemplo)".
@@ -19,12 +19,14 @@ export interface ResumoModuloExemplo {
 
 export const RESUMOS_MODULO_EXEMPLO: readonly ResumoModuloExemplo[] = [
   {
-    id: "resumo-cadastros",
-    destinoId: "cadastros",
-    titulo: "Cadastros",
-    metrica: "3 tabelas de horário cadastradas (exemplo)",
-    descricao: "Tabelas de horário disponíveis para atribuição às equipes.",
-    rotuloAtalho: "Ir para Cadastros",
+    // T182 — as tabelas de horário são as Jornadas de trabalho, em tela
+    // própria; o atalho leva até elas, e não à Estrutura organizacional.
+    id: "resumo-jornadas",
+    destinoId: "jornadas-trabalho",
+    titulo: "Jornadas de trabalho",
+    metrica: "3 jornadas de trabalho cadastradas (exemplo)",
+    descricao: "Turnos reutilizáveis da empresa, com código, nome e horários.",
+    rotuloAtalho: "Ir para Jornadas de trabalho",
   },
   {
     id: "resumo-pessoas",

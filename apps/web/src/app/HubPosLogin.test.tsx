@@ -115,17 +115,36 @@ describe("T162 — o Hub oferece só o que o servidor autoriza", () => {
       [
         "Colaboradores",
         "Nova admissão",
-        "Estrutura",
+        "Estrutura organizacional",
+        "Jornadas de trabalho",
         "Jornada",
         "Minha equipe",
         "Administração da liderança",
         "Contas de acesso",
       ],
     ],
-    ["dp", ["Colaboradores", "Nova admissão", "Jornada", "Contas de acesso"]],
+    // T182 — o DP consulta as jornadas e, sem a aba Horários, a aba padrão
+    // de Estrutura passou a ser a organizacional, que ele lê.
+    [
+      "dp",
+      [
+        "Colaboradores",
+        "Nova admissão",
+        "Estrutura organizacional",
+        "Jornadas de trabalho",
+        "Jornada",
+        "Contas de acesso",
+      ],
+    ],
     [
       "master_tecnico",
-      ["Colaboradores", "Estrutura", "Jornada", "Contas de acesso"],
+      [
+        "Colaboradores",
+        "Estrutura organizacional",
+        "Jornadas de trabalho",
+        "Jornada",
+        "Contas de acesso",
+      ],
     ],
     ["gestor", ["Minha equipe"]],
     ["financeiro", []],
@@ -395,11 +414,13 @@ describe("T162 — acessibilidade e estrutura", () => {
 
   it("cada cartão tem nome acessível com o rótulo do produto", async () => {
     montar({ papel: "rh" });
-    await waitFor(() => expect(cartoesVisiveis().length).toBe(7));
+    await waitFor(() => expect(cartoesVisiveis().length).toBe(8));
     for (const destino of capacidadeFuncionalDe("rh")) {
+      // T182 — "Jornada" também casa com "Jornadas de trabalho".
       expect(
-        screen.getByRole("button", { name: new RegExp(destino.label) }),
-      ).toBeInTheDocument();
+        screen.getAllByRole("button", { name: new RegExp(destino.label) })
+          .length,
+      ).toBeGreaterThan(0);
     }
   });
 

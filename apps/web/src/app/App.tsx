@@ -6,8 +6,9 @@
  * navegação (`PainelNavigation`) troca apenas um estado local de "destino
  * selecionado" — sem React Router, sem rota real, sem API/fetch. Os oito
  * destinos já têm tela própria: "Início" (Visão geral, T048), "Cadastros"
- * (Horários por padrão + "Estrutura organizacional" por aba local,
- * T043/T073), "Pessoas" (Colaboradores por padrão + "Horário de trabalho"
+ * ("Estrutura organizacional" por padrão + Funções e cargos e Centros de custo
+ * por aba local, T073/T182; os Horários viraram o destino próprio "Jornadas
+ * de trabalho", T182), "Pessoas" (Colaboradores por padrão + "Horário de trabalho"
  * por aba local, T046/T072), "Ponto" (Visão do período por padrão +
  * Verificar folhas por aba local, T045/T063), "Documentos" (Metadados por
  * padrão + "Repositório documental" por aba local, T047/T070), "Portal do
@@ -69,7 +70,12 @@ import {
   DocumentosScreen,
 } from "../screens/documentos";
 import { EQUIPE_TITULO_ID, EquipeScreen } from "../screens/equipe";
-import { CadastrosScreen, HORARIOS_TITULO_ID } from "../screens/horarios";
+import {
+  CadastrosScreen,
+  ESTRUTURA_ORGANIZACIONAL_TITULO_ID,
+  JORNADAS_TRABALHO_TITULO_ID,
+  JornadasTrabalhoScreen,
+} from "../screens/horarios";
 import { InicioVisaoGeralScreen } from "../screens/inicio";
 import {
   COLABORADORES_TITULO_ID,
@@ -95,6 +101,8 @@ import {
   destinoPorId,
   capacidadeFuncionalDe,
   podeEditarFicha,
+  podeOperarEstrutura,
+  podeOperarJornadas,
 } from "./mapaNavegacao";
 import {
   destinoDaRota,
@@ -115,6 +123,7 @@ const TITULO_ID_POR_DESTINO: Record<string, string> = {
   equipe: EQUIPE_TITULO_ID,
   "administracao-lideranca": ADMINISTRACAO_LIDERANCA_TITULO_ID,
   "nova-admissao": NOVA_ADMISSAO_TITULO_ID,
+  "jornadas-trabalho": JORNADAS_TRABALHO_TITULO_ID,
 };
 
 /**
@@ -252,7 +261,21 @@ function conteudoDoDestino(
     return <InicioVisaoGeralScreen onNavegar={onNavegar} />;
   }
   if (destinoId === "cadastros") {
-    return <CadastrosScreen onTituloIdChange={onCadastrosTituloIdChange} />;
+    // T182 — DP (e quem só lê) vê a Estrutura sem controle de escrita.
+    return (
+      <CadastrosScreen
+        onTituloIdChange={onCadastrosTituloIdChange}
+        podeOperar={podeOperarEstrutura(admissao.papelDoAtor)}
+      />
+    );
+  }
+  if (destinoId === "jornadas-trabalho") {
+    // T182 — só o RH opera; DP e `master_tecnico` consultam.
+    return (
+      <JornadasTrabalhoScreen
+        podeOperar={podeOperarJornadas(admissao.papelDoAtor)}
+      />
+    );
   }
   if (destinoId === "cadastros-demonstracao") {
     return (
@@ -520,8 +543,9 @@ export function App({
   // "Relatórios" sempre voltam à aba padrão ao serem selecionados (o wrapper
   // de cada um remonta e reseta sua aba interna) — por isso o valor inicial
   // já é o `titleId` dessa aba padrão.
-  const [cadastrosTituloId, setCadastrosTituloId] =
-    useState(HORARIOS_TITULO_ID);
+  const [cadastrosTituloId, setCadastrosTituloId] = useState(
+    ESTRUTURA_ORGANIZACIONAL_TITULO_ID,
+  );
   const [pessoasTituloId, setPessoasTituloId] = useState(
     COLABORADORES_TITULO_ID,
   );

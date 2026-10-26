@@ -1,9 +1,10 @@
 /**
  * CadastrosScreen → módulo Estrutura (T073…T087, separado por modo na T159).
  *
- * A T159 dividiu as abas por ESTADO: quatro falam com o servidor — Horários,
- * Estrutura organizacional, Funções e cargos e Centros de custo — e sete são
- * catálogos de apoio que só desenham exemplos.
+ * A T159 dividiu as abas por ESTADO: as que falam com o servidor — hoje
+ * Estrutura organizacional, Funções e cargos e Centros de custo — e sete
+ * catálogos de apoio que só desenham exemplos. A T182 tirou daqui a aba
+ * Horários: ela virou a tela própria Estrutura › Jornadas de trabalho.
  *
  * ## Por que os onze testes de "sem regressão" viraram dois
  *
@@ -36,7 +37,6 @@ function abasDoContainer() {
 }
 
 const FUNCIONAIS = [
-  { aba: "Horários", titulo: "Horários", id: "horarios-titulo" },
   {
     aba: "Estrutura organizacional",
     titulo: "Estrutura organizacional",
@@ -88,17 +88,25 @@ const DEMONSTRATIVAS = [
   },
 ] as const;
 
-describe("CadastrosScreen — modo funcional (T073/T080/T083/T110)", () => {
-  it("mostra 'Horários' por padrão, com h1 único", () => {
+describe("CadastrosScreen — modo funcional (T073/T080/T083/T182)", () => {
+  it("mostra 'Estrutura organizacional' por padrão, com h1 único", () => {
     render(<CadastrosScreen />);
 
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     expect(
-      screen.getByRole("heading", { level: 1, name: "Horários" }),
+      screen.getByRole("heading", {
+        level: 1,
+        name: "Estrutura organizacional",
+      }),
     ).toBeInTheDocument();
   });
 
-  it("expõe as quatro abas funcionais, na ordem, com aria-selected correto", () => {
+  it("T182 — não tem mais a aba Horários (virou Jornadas de trabalho)", () => {
+    render(<CadastrosScreen />);
+    expect(screen.queryByRole("tab", { name: "Horários" })).toBeNull();
+  });
+
+  it("expõe as três abas funcionais, na ordem, com aria-selected correto", () => {
     render(<CadastrosScreen />);
 
     expect(
@@ -112,7 +120,7 @@ describe("CadastrosScreen — modo funcional (T073/T080/T083/T110)", () => {
       expect(aba.tagName).toBe("BUTTON");
       expect(aba).toHaveAttribute(
         "aria-selected",
-        aba.textContent === "Horários" ? "true" : "false",
+        aba.textContent === "Estrutura organizacional" ? "true" : "false",
       );
     }
   });
@@ -165,15 +173,22 @@ describe("CadastrosScreen — modo funcional (T073/T080/T083/T110)", () => {
       expect(titulos).toHaveLength(1);
       expect(titulos[0]!.textContent).toBe(titulo);
     }
-    fireEvent.click(screen.getByRole("tab", { name: "Horários" }));
+    fireEvent.click(
+      screen.getByRole("tab", { name: "Estrutura organizacional" }),
+    );
     expect(
-      screen.getByRole("heading", { level: 1, name: "Horários" }),
+      screen.getByRole("heading", {
+        level: 1,
+        name: "Estrutura organizacional",
+      }),
     ).toBeInTheDocument();
   });
 
   it("clicar de novo na aba ativa não duplica o h1", () => {
     render(<CadastrosScreen />);
-    fireEvent.click(screen.getByRole("tab", { name: "Horários" }));
+    fireEvent.click(
+      screen.getByRole("tab", { name: "Estrutura organizacional" }),
+    );
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
   });
 

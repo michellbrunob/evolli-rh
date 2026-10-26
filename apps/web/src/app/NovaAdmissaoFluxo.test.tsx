@@ -510,7 +510,7 @@ describe("T178 — rota própria da listagem (#/pessoas/colaboradores)", () => {
 
   it("de outro destino, a URL da listagem digitada leva à listagem", async () => {
     render(<App papelDoAtor="rh" destinoInicial="ponto" />);
-    await screen.findByRole("button", { name: /^Jornada/ });
+    await screen.findByRole("button", { name: /^Jornada Visão/ });
     act(() => {
       window.history.pushState(null, "", `/${ROTA_COLABORADORES}`);
       window.dispatchEvent(new HashChangeEvent("hashchange"));
@@ -536,8 +536,13 @@ describe("T178 — rota própria da listagem (#/pessoas/colaboradores)", () => {
   it("ir para um destino sem rota tira a rota da URL, e 'voltar' retorna à listagem", async () => {
     render(<App papelDoAtor="rh" />);
     await screen.findByRole("heading", { level: 1, name: "Colaboradores" });
-    fireEvent.click(screen.getByRole("button", { name: /^Estrutura/ }));
-    await screen.findByRole("heading", { level: 1, name: "Horários" });
+    fireEvent.click(
+      screen.getByRole("button", { name: /^Estrutura organizacional/ }),
+    );
+    await screen.findByRole("heading", {
+      level: 1,
+      name: "Estrutura organizacional",
+    });
     expect(window.location.hash).toBe("");
 
     act(() => {
@@ -567,7 +572,7 @@ describe("T176/T178 — Nova admissão: rota, voltar e cancelar", () => {
     window.history.replaceState(null, "", `/${ROTA}`);
     render(<App papelDoAtor="master_tecnico" destinoInicial="ponto" />);
     expect(
-      await screen.findByRole("button", { name: /^Jornada/ }),
+      await screen.findByRole("button", { name: /^Jornada Visão/ }),
     ).toHaveAttribute("aria-current", "page");
     expect(window.location.hash).toBe("");
   });
@@ -662,7 +667,7 @@ describe("T176 — rota recusada para quem não admite", () => {
   );
 
   it.each([
-    ["master_tecnico", "ponto", /^Jornada/],
+    ["master_tecnico", "ponto", /^Jornada Visão/],
     ["gestor", "equipe", /^Minha equipe/],
     ["colaborador", "relatorios", /^Relatórios/],
   ] as const)(
@@ -688,7 +693,7 @@ describe("T176 — rota recusada para quem não admite", () => {
 
   it("rh digitando a rota com o painel aberto vai à página", async () => {
     render(<App papelDoAtor="rh" destinoInicial="ponto" />);
-    await screen.findByRole("button", { name: /^Jornada/ });
+    await screen.findByRole("button", { name: /^Jornada Visão/ });
     act(() => {
       window.history.pushState(null, "", `/${ROTA}`);
       window.dispatchEvent(new HashChangeEvent("hashchange"));
@@ -854,7 +859,9 @@ describe("T176/T178 — da página à listagem e à ficha do admitido", () => {
       name: "Pessoa Sintética Fluxo",
     });
     fireEvent.click(within(ficha).getByRole("button", { name: /Fechar/ }));
-    fireEvent.click(screen.getByRole("button", { name: /^Estrutura/ }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /^Estrutura organizacional/ }),
+    );
     fireEvent.click(itemColaboradoresNaBarra());
     await screen.findByRole("heading", { level: 1, name: "Colaboradores" });
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
