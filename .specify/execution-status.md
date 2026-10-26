@@ -2344,11 +2344,11 @@ geolocalização, fuso horário, salário, contrato detalhado, CPF, documentos,
 dados bancários, dependentes, saúde, dados pessoais novos, permissões além de
 RH editar e DP consultar, promoção e merge.
 
-## Cargo e Departamento na listagem de Colaboradores — T184 (em implementação)
+## Cargo e Departamento na listagem de Colaboradores — T184 (integrada)
 
-| Tarefa | Estado               | Resultado principal                                                                          |
-| ------ | -------------------- | -------------------------------------------------------------------------------------------- |
-| T184   | **Em implementação** | A listagem de Colaboradores mostra Cargo e Departamento da lotação vigente na empresa ativa. |
+| Tarefa | Estado                                    | Resultado principal                                                                          |
+| ------ | ----------------------------------------- | -------------------------------------------------------------------------------------------- |
+| T184   | **Integrada** (PR #177, squash `398c70a`) | A listagem de Colaboradores mostra Cargo e Departamento da lotação vigente na empresa ativa. |
 
 **Escopo da T184:** colunas Cargo e Departamento na listagem de Pessoas ›
 Colaboradores, da lotação vigente (alocação organizacional aberta) do vínculo
@@ -2363,6 +2363,26 @@ compensação, fuso horário, campos novos de cadastro, salário, contrato
 detalhado, documentos, CPF, dados bancários, dependentes, saúde, edição pela
 listagem, importação, exportação, envio de links, integrações externas,
 promoção e merge.
+
+## Jornada de trabalho na listagem de Colaboradores — T185 (em implementação)
+
+| Tarefa | Estado               | Resultado principal                                                              |
+| ------ | -------------------- | -------------------------------------------------------------------------------- |
+| T185   | **Em implementação** | A listagem de Colaboradores mostra a jornada vigente do vínculo principal ativo. |
+
+**Escopo da T185:** coluna "Jornada de trabalho" na listagem de Pessoas ›
+Colaboradores, com código e nome da jornada vigente (T183) do colaborador na
+empresa do vínculo principal ativo, pelo dia civil do navegador; previsto,
+encerrado, sem jornada ou com vigência futura mostram "Sem jornada vigente";
+jornada inativada com a indicação. Sem permissão nova, sem migration.
+
+**Decisão da proprietária (2026-10-26):** [decisão](../docs/decisions/t185-colaboradores-jornada.md).
+
+**Fora de escopo:** banco de horas, saldo, batidas, ponto, cálculo de horas,
+escala, folha, adicional noturno, compensação, feriado, geolocalização, fuso
+horário, campos novos de cadastro, salário, contrato detalhado, documentos,
+CPF, dados bancários, dependentes, saúde, edição de jornada pela listagem,
+importação, exportação, integrações externas, promoção e merge.
 
 ## Próxima ação autorizável
 

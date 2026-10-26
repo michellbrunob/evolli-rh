@@ -730,6 +730,7 @@ describe("T176/T178 — da página à listagem e à ficha do admitido", () => {
               dataDesligamento: null,
               // T184 — admissão ainda não efetivada: sem lotação vigente.
               lotacaoVigente: null,
+              vigenciasDeJornada: [],
             },
           ],
         },
