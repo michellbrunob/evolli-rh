@@ -177,6 +177,12 @@
   color: var(--status-danger-ink);
 }
 
+/* T184 — sem lotação vigente (vínculo previsto ou encerrado) ou referência
+   não informada: secundário e neutro; o texto diz o que é. */
+.colaboradores-screen__sem-lotacao {
+  color: var(--color-ink-subtle);
+}
+
 /* Subseção "Vínculos" dentro do painel de detalhe. */
 .colaboradores-screen__vinculos {
   display: flex;

@@ -19,7 +19,9 @@ import {
   type ListarColaboradoresQuery,
   type RetificarColaboradorDto,
   type TipoVinculo,
+  type LotacaoListadaApi,
   type VinculoApi,
+  type VinculoListadoApi,
   listarColaboradores,
   listarVinculosDoColaborador,
   retificarColaborador,
@@ -166,6 +168,32 @@ export interface ColaboradoresScreenProps {
    * de trabalho" é só consulta. Só orienta a tela: quem recusa é o servidor.
    */
   readonly podeOperarJornada?: boolean;
+}
+
+/**
+ * T184 — cargo ou departamento da lotação vigente do vínculo principal. Sem
+ * lotação vigente, o texto neutro diz isso; lotação vigente sem a referência
+ * diz "Não informado". Sem vínculo, o mesmo "—" das outras colunas.
+ */
+function celulaDaLotacao(
+  principal: VinculoListadoApi | undefined,
+  campo: keyof LotacaoListadaApi,
+): React.ReactNode {
+  if (!principal) return "—";
+  const lotacao = principal.lotacaoVigente;
+  if (!lotacao) {
+    return (
+      <span className="colaboradores-screen__sem-lotacao">
+        Sem lotação vigente
+      </span>
+    );
+  }
+  const referencia = lotacao[campo];
+  return referencia ? (
+    referencia.nome
+  ) : (
+    <span className="colaboradores-screen__sem-lotacao">Não informado</span>
+  );
 }
 
 export function ColaboradoresScreen({
@@ -508,9 +536,12 @@ export function ColaboradoresScreen({
    * pessoa. A coluna "Cadastrado em" (T164) saiu: ela existia porque a
    * admissão não vinha na listagem, e `criadoEm` não é admissão.
    *
-   * Cargo, departamento e Banco de Horas NÃO entram nesta entrega: a lotação
-   * ainda não é resolvida pela listagem e o Banco de Horas não tem operação,
-   * e uma coluna vazia ou montada por N+1 seria promessa falsa.
+   * T184 — Cargo e Departamento são os da LOTAÇÃO VIGENTE do vínculo
+   * principal (a alocação organizacional aberta), que o servidor já devolve
+   * na mesma resposta. Vínculo previsto (admissão não efetivada) ou encerrado
+   * não tem lotação vigente e mostra "Sem lotação vigente" — nunca o destino
+   * planejado nem a última lotação (decisão da proprietária de 2026-10-26).
+   * O Banco de Horas segue fora: não tem operação.
    */
   const colunasColaboradores: DataTableColumn<ColaboradorListadoApi>[] = [
     { key: "nome", header: "Nome", cell: (c) => c.nome },
@@ -542,6 +573,16 @@ export function ColaboradoresScreen({
           </>
         );
       },
+    },
+    {
+      key: "cargo",
+      header: "Cargo",
+      cell: (c) => celulaDaLotacao(c.vinculos[0], "cargo"),
+    },
+    {
+      key: "departamento",
+      header: "Departamento",
+      cell: (c) => celulaDaLotacao(c.vinculos[0], "departamento"),
     },
     {
       // Situação do ITEM: para `rh`/`dp`, na empresa ativa (tem vínculo ativo
