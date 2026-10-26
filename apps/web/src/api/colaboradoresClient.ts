@@ -51,6 +51,22 @@ export interface ResultadoPaginado<T> {
  * dentro de cada um, admissão mais recente primeiro. O primeiro é o "vínculo
  * principal" da linha; o cliente não reordena, para não ter duas regras.
  */
+/** T184 — cargo ou departamento resumido: só id, código e nome. */
+export interface ReferenciaListadaApi {
+  id: string;
+  codigo: string;
+  nome: string;
+}
+
+/**
+ * T184 — lotação VIGENTE do vínculo (a alocação organizacional aberta), com
+ * cada referência `null` quando ela não a tem.
+ */
+export interface LotacaoListadaApi {
+  cargo: ReferenciaListadaApi | null;
+  departamento: ReferenciaListadaApi | null;
+}
+
 export interface VinculoListadoApi {
   id: string;
   empresaId: string;
@@ -60,6 +76,11 @@ export interface VinculoListadoApi {
   /** Dia civil (`@db.Date`); exibir só com `formatarDiaCivil`. */
   dataAdmissao: string;
   dataDesligamento: string | null;
+  /**
+   * T184 — `null` sem lotação vigente: vínculo previsto (admissão não
+   * efetivada) ou encerrado (decisão da proprietária de 2026-10-26).
+   */
+  lotacaoVigente: LotacaoListadaApi | null;
 }
 
 /**

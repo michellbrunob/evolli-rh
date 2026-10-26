@@ -728,6 +728,8 @@ describe("T176/T178 — da página à listagem e à ficha do admitido", () => {
               situacao: "previsto" as const,
               dataAdmissao: "2026-10-20T00:00:00.000Z",
               dataDesligamento: null,
+              // T184 — admissão ainda não efetivada: sem lotação vigente.
+              lotacaoVigente: null,
             },
           ],
         },

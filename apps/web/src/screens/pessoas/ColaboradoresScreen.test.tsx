@@ -82,6 +82,12 @@ function paginado<T extends { situacao: string }>(
   };
 }
 
+/** T184 — lotação vigente de um vínculo ativo (cargo e departamento). */
+const LOTACAO_ATIVA = {
+  cargo: { id: "c-1", codigo: "ANALISTA", nome: "Analista (teste)" },
+  departamento: { id: "d-1", codigo: "ADM", nome: "Administrativo (teste)" },
+};
+
 const colaborador1: ColaboradorListadoApi = {
   id: "11111111-1111-1111-1111-111111111111",
   nome: "Ana Colaboradora (teste)",
@@ -96,6 +102,7 @@ const colaborador1: ColaboradorListadoApi = {
       situacao: "ativo",
       dataAdmissao: "2025-01-10T00:00:00.000Z",
       dataDesligamento: null,
+      lotacaoVigente: LOTACAO_ATIVA,
     },
   ],
 };
@@ -1169,7 +1176,7 @@ describe("T164/T178 — o que a tabela promete, e a que custo", () => {
    * e Banco de Horas continuam fora: a lotação não é resolvida pela listagem,
    * e coluna vazia ou montada por N+1 é promessa falsa.
    */
-  it("colunas: Nome, Matrícula, Situação, Admissão e Ações — sem cargo nem departamento", async () => {
+  it("colunas: Nome, Matrícula, Cargo, Departamento, Situação, Admissão e Ações (T184)", async () => {
     render(<ColaboradoresScreen />);
     await screen.findByRole("table", { name: "Colaboradores desta empresa" });
 
@@ -1179,6 +1186,8 @@ describe("T164/T178 — o que a tabela promete, e a que custo", () => {
     expect(cabecalhos).toEqual([
       "Nome",
       "Matrícula",
+      "Cargo",
+      "Departamento",
       "Situação",
       "Admissão",
       "Ações",
@@ -2539,6 +2548,8 @@ function vinculoListado(
     situacao,
     dataAdmissao,
     dataDesligamento: situacao === "encerrado" ? "2025-12-31" : null,
+    // T184 — só o vínculo ativo tem lotação vigente.
+    lotacaoVigente: situacao === "ativo" ? LOTACAO_ATIVA : null,
   };
 }
 
@@ -2592,15 +2603,105 @@ describe("T178 — colunas e vínculo principal", () => {
     const celulasAna = within(ana).getAllByRole("cell");
     expect(celulasAna[0]).toHaveTextContent(colaborador1.nome);
     expect(celulasAna[1]).toHaveTextContent("MAT-0001");
-    expect(celulasAna[2]).toHaveTextContent("Ativo");
-    expect(celulasAna[3]).toHaveTextContent("10/01/2025");
+    // T184 — cargo e departamento da lotação vigente.
+    expect(celulasAna[2]).toHaveTextContent("Analista (teste)");
+    expect(celulasAna[3]).toHaveTextContent("Administrativo (teste)");
+    expect(celulasAna[4]).toHaveTextContent("Ativo");
+    expect(celulasAna[5]).toHaveTextContent("10/01/2025");
 
     // Sem vínculo na empresa ativa: traço, nunca dado inventado.
     const bruno = within(tabela).getByText(colaborador2.nome).closest("tr")!;
     const celulasBruno = within(bruno).getAllByRole("cell");
     expect(celulasBruno[1]).toHaveTextContent("—");
-    expect(celulasBruno[2]).toHaveTextContent("Inativo");
+    expect(celulasBruno[2]).toHaveTextContent("—");
     expect(celulasBruno[3]).toHaveTextContent("—");
+    expect(celulasBruno[4]).toHaveTextContent("Inativo");
+    expect(celulasBruno[5]).toHaveTextContent("—");
+  });
+
+  it("T184 — sem lotação vigente (previsto ou encerrado): texto neutro nas duas colunas", async () => {
+    const previsto = listado(
+      {
+        id: "66666666-6666-4666-8666-666666666661",
+        nome: "Pessoa Prevista (teste)",
+      },
+      [vinculoListado("v-p", "DEMO-P-0001", "previsto", "2026-11-03")],
+    );
+    const encerrado = listado(
+      {
+        id: "66666666-6666-4666-8666-666666666662",
+        nome: "Pessoa Desligada (teste)",
+      },
+      [vinculoListado("v-e", "DEMO-E-0001", "encerrado", "2024-01-02")],
+    );
+    vi.mocked(listarColaboradores).mockResolvedValue(
+      paginado([previsto, encerrado]),
+    );
+    render(<ColaboradoresScreen />);
+    const tabela = await screen.findByRole("table", {
+      name: "Colaboradores desta empresa",
+    });
+    for (const nome of [
+      "Pessoa Prevista (teste)",
+      "Pessoa Desligada (teste)",
+    ]) {
+      const celulas = within(
+        within(tabela).getByText(nome).closest("tr")!,
+      ).getAllByRole("cell");
+      expect(celulas[2]).toHaveTextContent("Sem lotação vigente");
+      expect(celulas[3]).toHaveTextContent("Sem lotação vigente");
+    }
+  });
+
+  it("T184 — lotação vigente sem cargo: 'Não informado' só no cargo", async () => {
+    const semCargo = listado(
+      {
+        id: "66666666-6666-4666-8666-666666666663",
+        nome: "Pessoa Sem Cargo (teste)",
+      },
+      [
+        {
+          ...vinculoListado("v-s", "DEMO-S-0001", "ativo", "2025-02-03"),
+          lotacaoVigente: {
+            cargo: null,
+            departamento: LOTACAO_ATIVA.departamento,
+          },
+        },
+      ],
+    );
+    vi.mocked(listarColaboradores).mockResolvedValue(paginado([semCargo]));
+    render(<ColaboradoresScreen />);
+    const tabela = await screen.findByRole("table", {
+      name: "Colaboradores desta empresa",
+    });
+    const celulas = within(
+      within(tabela).getByText("Pessoa Sem Cargo (teste)").closest("tr")!,
+    ).getAllByRole("cell");
+    expect(celulas[2]).toHaveTextContent("Não informado");
+    expect(celulas[3]).toHaveTextContent("Administrativo (teste)");
+  });
+
+  it("T184 — com mais de um vínculo, a lotação é a do vínculo principal", async () => {
+    const dois = listado(
+      {
+        id: "66666666-6666-4666-8666-666666666664",
+        nome: "Pessoa Dois Vínculos (teste)",
+      },
+      [
+        vinculoListado("v-a", "DEMO-A-0009", "ativo", "2025-01-01"),
+        vinculoListado("v-b", "DEMO-B-0009", "previsto", "2026-03-01"),
+      ],
+    );
+    vi.mocked(listarColaboradores).mockResolvedValue(paginado([dois]));
+    render(<ColaboradoresScreen />);
+    const tabela = await screen.findByRole("table", {
+      name: "Colaboradores desta empresa",
+    });
+    const celulas = within(
+      within(tabela).getByText("Pessoa Dois Vínculos (teste)").closest("tr")!,
+    ).getAllByRole("cell");
+    expect(celulas[2]).toHaveTextContent("Analista (teste)");
+    expect(celulas[3]).toHaveTextContent("Administrativo (teste)");
   });
 
   it("com mais de um vínculo, mostra o principal e '+N' com frase acessível", async () => {
@@ -3096,7 +3197,7 @@ describe("T178 — 'Nova admissão' e a ficha a partir da linha", () => {
       .closest("tr")!;
     const celulas = within(linha).getAllByRole("cell");
     expect(celulas[1]).toHaveTextContent("MAT-0009");
-    expect(celulas[2]).toHaveTextContent("Inativo");
+    expect(celulas[4]).toHaveTextContent("Inativo");
     // A ficha aberta também segue com a situação da linha.
     expect(
       within(screen.getByRole("dialog")).getByText("Inativo"),

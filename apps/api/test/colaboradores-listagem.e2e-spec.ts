@@ -513,6 +513,9 @@ describe("Colaboradores — listagem da porta principal (T178, e2e)", () => {
           "dataDesligamento",
           "empresaId",
           "id",
+          // T184 — a lotação vigente (cargo e departamento), `null` aqui:
+          // o Bruno só tem vínculo previsto.
+          "lotacaoVigente",
           "matricula",
           "situacao",
         ].sort(),
@@ -687,5 +690,173 @@ describe("Colaboradores — listagem da porta principal (T178, e2e)", () => {
     ).not.toContain(diego);
     expect((await listar(rhA)).itens.map((i) => i.id)).not.toContain(diego);
     expect((await listar(rhA)).itens.map((i) => i.id)).toContain(bruno);
+  });
+
+  // T184 — Cargo e Departamento da lotação VIGENTE (a alocação organizacional
+  // aberta do vínculo), decisão da proprietária de 2026-10-26: vínculo
+  // previsto ou encerrado não tem lotação vigente. Fica no fim de propósito:
+  // cria colaborador e não pode mudar as contagens dos blocos de cima.
+  describe("T184 — lotação vigente na listagem", () => {
+    interface Referencia {
+      id: string;
+      codigo: string;
+      nome: string;
+    }
+    interface VinculoComLotacao {
+      id: string;
+      empresaId: string;
+      matricula: string | null;
+      situacao: string;
+      lotacaoVigente: {
+        cargo: Referencia | null;
+        departamento: Referencia | null;
+      } | null;
+    }
+
+    async function listarComLotacao(
+      cred: Credencial,
+      busca: string,
+    ): Promise<{ nome: string; vinculos: VinculoComLotacao[] }[]> {
+      const r = await get(
+        `/v1/colaboradores?busca=${encodeURIComponent(busca)}`,
+        cred,
+      ).expect(200);
+      return r.body.itens;
+    }
+
+    async function lotacaoDaAdmissao(empresaId: string) {
+      const l = await lotacaoMinima(appUrl, empresaId);
+      const cargo = await prisma.cargo.findUniqueOrThrow({
+        where: { id: l.cargoId },
+        select: { id: true, codigo: true, nome: true },
+      });
+      return cargo;
+    }
+
+    it("ativo: cargo e departamento da alocação aberta, só com id, código e nome", async () => {
+      const cargo = await lotacaoDaAdmissao(empresaA);
+      const [anaListada] = await listarComLotacao(rhA, "Ana Sintetica");
+      const principal = anaListada!.vinculos[0]!;
+      expect(principal.situacao).toBe("ativo");
+      expect(principal.lotacaoVigente).toEqual({
+        cargo,
+        departamento: {
+          id: departamentoA,
+          codigo: "DEPLA",
+          nome: "Depto DEPLA",
+        },
+      });
+      expect(Object.keys(principal.lotacaoVigente!).sort()).toEqual([
+        "cargo",
+        "departamento",
+      ]);
+      // O segundo vínculo dela, previsto, não tem lotação vigente.
+      expect(anaListada!.vinculos[1]).toMatchObject({
+        situacao: "previsto",
+        lotacaoVigente: null,
+      });
+    });
+
+    it("previsto (admissão não efetivada): sem lotação vigente, mesmo com destino escolhido", async () => {
+      const [brunoListado] = await listarComLotacao(rhA, "Bruno Sintetico");
+      expect(brunoListado!.vinculos).toHaveLength(1);
+      expect(brunoListado!.vinculos[0]).toMatchObject({
+        situacao: "previsto",
+        lotacaoVigente: null,
+      });
+    });
+
+    it("só a empresa ativa: na Beta, a Carla não traz a lotação da Alfa", async () => {
+      const cargoA = await lotacaoDaAdmissao(empresaA);
+      for (const cred of [rhB, masterEscopadoB]) {
+        const itens = await listarComLotacao(cred, "Carla Sintetica");
+        expect(itens).toHaveLength(1);
+        expect(itens[0]!.vinculos).toHaveLength(1);
+        expect(itens[0]!.vinculos[0]).toMatchObject({
+          empresaId: empresaB,
+          lotacaoVigente: null,
+        });
+        const texto = JSON.stringify(itens);
+        expect(texto).not.toContain(departamentoA);
+        expect(texto).not.toContain(cargoA.id);
+      }
+      // E na Alfa, a lotação dela é a da Alfa.
+      const [naAlfa] = await listarComLotacao(rhA, "Carla Sintetica");
+      expect(naAlfa!.vinculos[0]!.lotacaoVigente!.departamento!.id).toBe(
+        departamentoA,
+      );
+    });
+
+    it("dp lê o mesmo que o rh; master sem empresa vê cada vínculo com a lotação da própria empresa", async () => {
+      const doRh = await listarComLotacao(rhA, "Sintetic");
+      const doDp = await listarComLotacao(dpA, "Sintetic");
+      expect(doDp).toEqual(doRh);
+      const global = await listarComLotacao(master, "Carla Sintetica");
+      const vinculos = global[0]!.vinculos;
+      expect(vinculos).toHaveLength(2);
+      const alfa = vinculos.find((v) => v.empresaId === empresaA)!;
+      const beta = vinculos.find((v) => v.empresaId === empresaB)!;
+      expect(alfa.lotacaoVigente!.departamento!.id).toBe(departamentoA);
+      expect(beta.lotacaoVigente).toBeNull();
+    });
+
+    it("troca de lotação: só a aberta aparece; sem cargo na vigente, cargo nulo", async () => {
+      const { vinculoId } = await admitir(
+        rhA,
+        {
+          nome: "Eva Sintetica Lotacao",
+          matricula: "MAT-L-EVA",
+          empresaId: empresaA,
+          departamentoId: departamentoA,
+        },
+        true,
+      );
+      const outro = (
+        await post("/v1/departamentos", master)
+          .send({ empresaId: empresaA, codigo: "DEPLA2", nome: "Depto DEPLA2" })
+          .expect(201)
+      ).body.id as string;
+      const vigente = await prisma.alocacaoOrganizacional.findFirstOrThrow({
+        where: { vinculoId, vigenteAte: null },
+      });
+      // Sucessão no banco, numa transação (o vínculo ativo nunca fica sem
+      // alocação aberta): a anterior fecha, a nova abre só com departamento.
+      await prisma.$transaction([
+        prisma.alocacaoOrganizacional.update({
+          where: { id: vigente.id },
+          data: { vigenteAte: new Date("2026-02-01T00:00:00.000Z") },
+        }),
+        prisma.alocacaoOrganizacional.create({
+          data: {
+            vinculoId,
+            empresaId: empresaA,
+            departamentoId: outro,
+            vigenteDe: new Date("2026-02-01T00:00:00.000Z"),
+            movimentacaoOrigemId: vigente.movimentacaoOrigemId,
+          },
+        }),
+      ]);
+      const [eva] = await listarComLotacao(rhA, "Eva Sintetica");
+      expect(eva!.vinculos[0]!.lotacaoVigente).toEqual({
+        cargo: null,
+        departamento: { id: outro, codigo: "DEPLA2", nome: "Depto DEPLA2" },
+      });
+    });
+
+    it("busca, contadores e negações seguem iguais com a lotação na projeção", async () => {
+      const r = await get("/v1/colaboradores?busca=MAT-L-EVA", rhA).expect(200);
+      expect(r.body.itens.map((i: { nome: string }) => i.nome)).toEqual([
+        "Eva Sintetica Lotacao",
+      ]);
+      expect(Object.keys(r.body.contadores).sort()).toEqual([
+        "ativos",
+        "inativos",
+      ]);
+      for (const cred of [gestorA, colaboradorA]) {
+        const negada = await get("/v1/colaboradores", cred);
+        expect([403, 404]).toContain(negada.status);
+        expect(JSON.stringify(negada.body)).not.toContain("DEPLA");
+      }
+    });
   });
 });

@@ -129,10 +129,29 @@ export interface JornadaDaAdmissao {
   vigenciaInicio: Date;
 }
 
+/** T184 — referência organizacional resumida: só id, código e nome. */
+export interface ReferenciaListada {
+  id: string;
+  codigo: string;
+  nome: string;
+}
+
+/**
+ * T184 — lotação VIGENTE do vínculo (a alocação organizacional aberta,
+ * `vigente_ate` nulo): só o cargo e o departamento, cada um `null` quando a
+ * lotação não o tem. Vínculo previsto (admissão não efetivada) e encerrado não
+ * têm lotação vigente: `null` (decisão da proprietária de 2026-10-26).
+ */
+export interface LotacaoListada {
+  cargo: ReferenciaListada | null;
+  departamento: ReferenciaListada | null;
+}
+
 /**
  * T178 — vínculo resumido na listagem: o que a porta principal de
- * Colaboradores mostra (matrícula, situação e admissão), sem tipo, lotação nem
- * nada além. Só vínculos do escopo da sessão.
+ * Colaboradores mostra (matrícula, situação e admissão), sem tipo nem nada
+ * além. Só vínculos do escopo da sessão. T184 — mais a lotação vigente
+ * (cargo e departamento).
  */
 export interface VinculoListado {
   id: string;
@@ -142,6 +161,8 @@ export interface VinculoListado {
   situacao: SituacaoVinculo;
   dataAdmissao: Date;
   dataDesligamento: Date | null;
+  /** T184 — `null` sem lotação vigente. */
+  lotacaoVigente: LotacaoListada | null;
 }
 
 /**
@@ -1045,6 +1066,20 @@ export class ColaboradorService {
               situacao: true,
               dataAdmissao: true,
               dataDesligamento: true,
+              // T184 — a lotação vigente: a alocação ABERTA do vínculo (no
+              // máximo uma; o banco garante). Cargo e departamento são da
+              // mesma empresa do vínculo pela FK composta, e o vínculo já está
+              // no escopo da sessão.
+              alocacoes: {
+                where: { vigenteAte: null },
+                take: 1,
+                select: {
+                  cargo: { select: { id: true, codigo: true, nome: true } },
+                  departamento: {
+                    select: { id: true, codigo: true, nome: true },
+                  },
+                },
+              },
             },
           },
         },
@@ -1070,7 +1105,17 @@ export class ColaboradorService {
           : c.situacao,
       criadoEm: c.criadoEm,
       atualizadoEm: c.atualizadoEm,
-      vinculos: ordenarVinculosListados(c.vinculos),
+      vinculos: ordenarVinculosListados(
+        c.vinculos.map(({ alocacoes, ...vinculo }) => ({
+          ...vinculo,
+          lotacaoVigente: alocacoes[0]
+            ? {
+                cargo: alocacoes[0].cargo,
+                departamento: alocacoes[0].departamento,
+              }
+            : null,
+        })),
+      ),
     }));
 
     return {
