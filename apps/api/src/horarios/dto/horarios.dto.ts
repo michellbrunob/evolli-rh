@@ -3,6 +3,7 @@ import {
   ArrayMaxSize,
   IsArray,
   IsBoolean,
+  IsDateString,
   IsIn,
   IsInt,
   IsOptional,
@@ -122,6 +123,27 @@ export class CriarVinculoHorarioDto {
     message: "vigenciaFim deve estar no formato YYYY-MM-DD.",
   })
   vigenciaFim?: string;
+}
+
+/**
+ * T183 — atribui ou troca a jornada de um colaborador da empresa ativa, com
+ * início de vigência. Sem jornada vigente, cria a vigência; com jornada
+ * vigente, encerra a vigente no novo início e cria a nova, na mesma
+ * transação. A empresa vem da sessão.
+ */
+export class AtribuirJornadaDto {
+  @IsUUID()
+  colaboradorId!: string;
+
+  @IsUUID()
+  tabelaHorarioId!: string;
+
+  /** Data (YYYY-MM-DD) do primeiro dia da nova jornada. */
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, {
+    message: "vigenciaInicio deve estar no formato YYYY-MM-DD.",
+  })
+  @IsDateString({ strict: true })
+  vigenciaInicio!: string;
 }
 
 /** Encerra a vigência de um vínculo aberto (mecanismo de troca de horário). */

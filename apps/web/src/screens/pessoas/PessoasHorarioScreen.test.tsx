@@ -104,6 +104,12 @@ const vinculoVigente: VinculoHorarioApi = {
   colaboradorId: colaborador1.id,
   empresaId: tabelaAtiva.empresaId,
   tabelaHorarioId: tabelaAtiva.id,
+  tabela: {
+    id: tabelaAtiva.id,
+    codigo: tabelaAtiva.codigo,
+    nome: tabelaAtiva.nome,
+    ativo: tabelaAtiva.ativo,
+  },
   vigenciaInicio: "2025-01-10",
   vigenciaFim: null,
   criadoPorUserId: "88888888-8888-8888-8888-888888888888",
@@ -116,6 +122,12 @@ const vinculoEncerrado: VinculoHorarioApi = {
   colaboradorId: colaboradorInativo.id,
   empresaId: tabelaAtiva.empresaId,
   tabelaHorarioId: tabelaAtiva.id,
+  tabela: {
+    id: tabelaAtiva.id,
+    codigo: tabelaAtiva.codigo,
+    nome: tabelaAtiva.nome,
+    ativo: tabelaAtiva.ativo,
+  },
   // Forma REAL do fio: `vigenciaInicio`/`vigenciaFim` são `@db.Date`, e o
   // Prisma as entrega como `Date` — chegam ao navegador em ISO completo.
   // A fixture antiga usava "2024-01-01" puro e por isso não pegava o ISO cru
@@ -144,7 +156,7 @@ beforeEach(() => {
 
 describe("PessoasHorarioScreen (T112 — funcional)", () => {
   it("tem um único h1 e exibe o aviso Somente RH", async () => {
-    render(<PessoasHorarioScreen />);
+    render(<PessoasHorarioScreen podeOperar />);
 
     expect(
       screen.getAllByRole("heading", { level: 1, name: "Horário de trabalho" }),
@@ -155,7 +167,7 @@ describe("PessoasHorarioScreen (T112 — funcional)", () => {
   });
 
   it("lista vínculos reais com nome do colaborador, tabela, vigência e situação", async () => {
-    render(<PessoasHorarioScreen />);
+    render(<PessoasHorarioScreen podeOperar />);
 
     const tabela = await screen.findByRole("table", {
       name: "Colaboradores com tabela de horário vinculada",
@@ -183,7 +195,7 @@ describe("PessoasHorarioScreen (T112 — funcional)", () => {
       }) as ReturnType<typeof listarVinculosHorario>,
     );
 
-    render(<PessoasHorarioScreen />);
+    render(<PessoasHorarioScreen podeOperar />);
 
     expect(
       screen.getByText("Carregando vínculos de horário…"),
@@ -198,7 +210,7 @@ describe("PessoasHorarioScreen (T112 — funcional)", () => {
   it("mostra erro de carregamento e permite tentar novamente", async () => {
     vi.mocked(listarVinculosHorario).mockRejectedValueOnce(new Error("falha"));
 
-    render(<PessoasHorarioScreen />);
+    render(<PessoasHorarioScreen podeOperar />);
 
     await screen.findByRole("heading", {
       name: "Não foi possível carregar os vínculos de horário",
@@ -214,7 +226,7 @@ describe("PessoasHorarioScreen (T112 — funcional)", () => {
   it("mostra EmptyState quando não há vínculos", async () => {
     vi.mocked(listarVinculosHorario).mockResolvedValue(paginado([]));
 
-    render(<PessoasHorarioScreen />);
+    render(<PessoasHorarioScreen podeOperar />);
 
     expect(
       await screen.findByRole("heading", {
@@ -224,7 +236,7 @@ describe("PessoasHorarioScreen (T112 — funcional)", () => {
   });
 
   it("abre o formulário: múltiplos colaboradores ativos exigem seleção explícita; tabela única fica oculta/resolvida", async () => {
-    render(<PessoasHorarioScreen />);
+    render(<PessoasHorarioScreen podeOperar />);
     await screen.findByRole("table", {
       name: "Colaboradores com tabela de horário vinculada",
     });
@@ -243,7 +255,7 @@ describe("PessoasHorarioScreen (T112 — funcional)", () => {
   });
 
   it("valida vigência de início obrigatória", async () => {
-    render(<PessoasHorarioScreen />);
+    render(<PessoasHorarioScreen podeOperar />);
     await screen.findByRole("table", {
       name: "Colaboradores com tabela de horário vinculada",
     });
@@ -261,7 +273,7 @@ describe("PessoasHorarioScreen (T112 — funcional)", () => {
   });
 
   it("valida que o fim da vigência deve ser posterior ao início", async () => {
-    render(<PessoasHorarioScreen />);
+    render(<PessoasHorarioScreen podeOperar />);
     await screen.findByRole("table", {
       name: "Colaboradores com tabela de horário vinculada",
     });
@@ -287,7 +299,7 @@ describe("PessoasHorarioScreen (T112 — funcional)", () => {
   });
 
   it("cria vínculo com sucesso (tabela única resolvida automaticamente) e recarrega a lista", async () => {
-    render(<PessoasHorarioScreen />);
+    render(<PessoasHorarioScreen podeOperar />);
     await screen.findByRole("table", {
       name: "Colaboradores com tabela de horário vinculada",
     });
@@ -327,7 +339,7 @@ describe("PessoasHorarioScreen (T112 — funcional)", () => {
       Object.assign(new Error("Conflict"), { status: 409 }),
     );
 
-    render(<PessoasHorarioScreen />);
+    render(<PessoasHorarioScreen podeOperar />);
     await screen.findByRole("table", {
       name: "Colaboradores com tabela de horário vinculada",
     });
@@ -350,7 +362,7 @@ describe("PessoasHorarioScreen (T112 — funcional)", () => {
       listagem([colaboradorInativo]),
     );
 
-    render(<PessoasHorarioScreen />);
+    render(<PessoasHorarioScreen podeOperar />);
     await screen.findByRole("table", {
       name: "Colaboradores com tabela de horário vinculada",
     });
@@ -366,7 +378,7 @@ describe("PessoasHorarioScreen (T112 — funcional)", () => {
       paginado([tabelaInativa]),
     );
 
-    render(<PessoasHorarioScreen />);
+    render(<PessoasHorarioScreen podeOperar />);
     await screen.findByRole("table", {
       name: "Colaboradores com tabela de horário vinculada",
     });
@@ -389,7 +401,7 @@ describe("PessoasHorarioScreen (T112 — funcional)", () => {
       paginado([tabelaAtiva, tabelaAtiva2]),
     );
 
-    render(<PessoasHorarioScreen />);
+    render(<PessoasHorarioScreen podeOperar />);
     await screen.findByRole("table", {
       name: "Colaboradores com tabela de horário vinculada",
     });
@@ -414,7 +426,7 @@ describe("PessoasHorarioScreen (T112 — funcional)", () => {
   it("resolve automaticamente o colaborador quando há só um ativo", async () => {
     vi.mocked(listarColaboradores).mockResolvedValue(listagem([colaborador1]));
 
-    render(<PessoasHorarioScreen />);
+    render(<PessoasHorarioScreen podeOperar />);
     await screen.findByRole("table", {
       name: "Colaboradores com tabela de horário vinculada",
     });
@@ -435,7 +447,7 @@ describe("PessoasHorarioScreen (T112 — funcional)", () => {
   });
 
   it("abre o detalhe e mostra colaborador, tabela e vigência, sem campos editáveis além do encerramento", async () => {
-    render(<PessoasHorarioScreen />);
+    render(<PessoasHorarioScreen podeOperar />);
     await screen.findByRole("table", {
       name: "Colaboradores com tabela de horário vinculada",
     });
@@ -469,7 +481,7 @@ describe("PessoasHorarioScreen (T112 — funcional)", () => {
     };
     vi.mocked(encerrarVinculoHorario).mockResolvedValueOnce(encerrado);
 
-    render(<PessoasHorarioScreen />);
+    render(<PessoasHorarioScreen podeOperar />);
     await screen.findByRole("table", {
       name: "Colaboradores com tabela de horário vinculada",
     });
@@ -501,7 +513,7 @@ describe("PessoasHorarioScreen (T112 — funcional)", () => {
   });
 
   it("valida a data de encerramento obrigatória e posterior ao início", async () => {
-    render(<PessoasHorarioScreen />);
+    render(<PessoasHorarioScreen podeOperar />);
     await screen.findByRole("table", {
       name: "Colaboradores com tabela de horário vinculada",
     });
@@ -528,7 +540,7 @@ describe("PessoasHorarioScreen (T112 — funcional)", () => {
   });
 
   it("não mostra formulário de encerramento para vínculo já encerrado", async () => {
-    render(<PessoasHorarioScreen />);
+    render(<PessoasHorarioScreen podeOperar />);
     await screen.findByRole("table", {
       name: "Colaboradores com tabela de horário vinculada",
     });
@@ -544,7 +556,7 @@ describe("PessoasHorarioScreen (T112 — funcional)", () => {
   });
 
   it("fecha o painel de detalhe", async () => {
-    render(<PessoasHorarioScreen />);
+    render(<PessoasHorarioScreen podeOperar />);
     await screen.findByRole("table", {
       name: "Colaboradores com tabela de horário vinculada",
     });
@@ -561,7 +573,7 @@ describe("PessoasHorarioScreen (T112 — funcional)", () => {
   });
 
   it("abrir o formulário fecha um detalhe que estava aberto", async () => {
-    render(<PessoasHorarioScreen />);
+    render(<PessoasHorarioScreen podeOperar />);
     await screen.findByRole("table", {
       name: "Colaboradores com tabela de horário vinculada",
     });
@@ -578,7 +590,7 @@ describe("PessoasHorarioScreen (T112 — funcional)", () => {
   });
 
   it("não referencia cálculo de jornada, Banco de Horas, DSR, AFD, Folha, CPF, senha ou sessão", async () => {
-    render(<PessoasHorarioScreen />);
+    render(<PessoasHorarioScreen podeOperar />);
     await screen.findByRole("table", {
       name: "Colaboradores com tabela de horário vinculada",
     });
@@ -601,5 +613,29 @@ describe("PessoasHorarioScreen (T112 — funcional)", () => {
     ]) {
       expect(texto).not.toContain(termoProibido);
     }
+  });
+});
+
+describe("PessoasHorarioScreen — perfil leitor, como o DP (T183)", () => {
+  it("diz 'Somente consulta', lista as vigências e não oferece vincular nem encerrar", async () => {
+    render(<PessoasHorarioScreen />);
+    await screen.findByRole("table", {
+      name: "Colaboradores com tabela de horário vinculada",
+    });
+    expect(screen.getByText("Somente consulta")).toBeInTheDocument();
+    expect(screen.queryByText("Somente RH")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Novo vínculo" })).toBeNull();
+
+    const linha = screen.getByText("Ana Colaboradora (teste)").closest("tr")!;
+    fireEvent.click(
+      within(linha).getByRole("button", { name: /Ver detalhes/ }),
+    );
+    expect(
+      screen.getByRole("heading", { name: "Ana Colaboradora (teste)" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Encerrar vigência/ }),
+    ).toBeNull();
+    expect(screen.queryByLabelText(/Encerrar vigência em/)).toBeNull();
   });
 });

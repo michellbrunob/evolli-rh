@@ -92,7 +92,9 @@ interface VinculoComColaborador extends VinculoApi {
   nomeColaborador: string;
 }
 
-interface VinculoHorarioComTabela extends VinculoHorarioApi {
+// T183 — o vínculo agora traz a jornada resumida (`tabela`); aqui ela é
+// trocada pela tabela COMPLETA (com os períodos), buscada à parte.
+interface VinculoHorarioComTabela extends Omit<VinculoHorarioApi, "tabela"> {
   tabela: TabelaHorarioApi | null;
 }
 

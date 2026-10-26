@@ -9,6 +9,7 @@ import {
 import { Request, Response } from "express";
 import { descreverErroDeBanco } from "../diagnostico-banco";
 import {
+  CamposRecusadosException,
   CodigoDeRecusa,
   ConflitoDeCamposException,
   ErroDeCampo,
@@ -92,7 +93,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
       // T179 — só os detalhes tipados que a própria aplicação monta: caminho
       // do campo e motivo de uma lista fechada, ou um código fixo. Nada da
       // mensagem da exceção nem do valor enviado.
-      ...(exception instanceof ConflitoDeCamposException
+      ...(exception instanceof ConflitoDeCamposException ||
+      exception instanceof CamposRecusadosException
         ? {
             erros: exception.erros.map(({ campo, motivo }) => ({
               campo,

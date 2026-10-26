@@ -13,8 +13,10 @@ import {
   TipoMovimentacao,
   TipoVinculo,
   VinculoFuncional,
+  VinculoHorario,
 } from "@prisma/client";
 import {
+  CamposRecusadosException,
   ConflitoDeCamposException,
   ErroDeCampo,
   RecusaDeNegocioException,
@@ -113,6 +115,18 @@ export interface AdmissaoRegistrada extends Pick<
   endereco: ValoresEndereco | null;
   /** T179 — `null` quando nenhum contato foi informado na admissão. */
   contatos: ValoresContatos | null;
+  /**
+   * T183 — a vigência da jornada criada com a admissão, ou `null` quando
+   * nenhuma jornada foi escolhida (é opcional).
+   */
+  jornada: JornadaDaAdmissao | null;
+}
+
+/** T183 — a jornada da admissão: só ids e a data de início. */
+export interface JornadaDaAdmissao {
+  id: string;
+  tabelaHorarioId: string;
+  vigenciaInicio: Date;
 }
 
 /**
@@ -283,6 +297,8 @@ export interface AdmissaoGravada {
     ContatoColaborador,
     "emailPessoal" | "celular" | "telefone" | "ativo"
   > | null;
+  /** T183 — a jornada criada com a admissão; ausente ou `null` é nenhuma. */
+  jornada?: Pick<VinculoHorario, "tabelaHorarioId"> | null;
 }
 
 /**
@@ -300,6 +316,16 @@ export function admissaoConfere(
     gravada;
   const destino = extrairDestino(dto);
   const iguais = (a: unknown, b: unknown) => a === b;
+
+  // T183 — a jornada opcional também precisa ser a mesma do envio.
+  if (
+    !iguais(
+      gravada.jornada?.tabelaHorarioId ?? null,
+      dto.tabelaHorarioId ?? null,
+    )
+  ) {
+    return false;
+  }
 
   if (
     !iguais(colaborador.nome, dto.nome) ||
@@ -497,6 +523,26 @@ export class ColaboradorService {
       );
     }
 
+    // T183 — a jornada opcional é um vínculo de horário: só quem ATRIBUI
+    // jornada (o RH) pode enviá-la. O DP admite, mas não altera jornada;
+    // vinda dele, a admissão inteira é negada, sem gravar nada.
+    if (
+      dto.tabelaHorarioId !== undefined &&
+      !podeAcessarPessoas(
+        ctx.actor,
+        "vinculo_horario",
+        "create",
+        escopo.empresaId,
+      )
+    ) {
+      return this.auditoria.negarAcesso(
+        ctx,
+        "vinculo_horario",
+        null,
+        escopo.empresaId,
+      );
+    }
+
     const destino = extrairDestino(dto);
     assertDestinoCoerente("admissao", destino);
 
@@ -606,6 +652,18 @@ export class ColaboradorService {
           dto.contatos,
         );
 
+        // T183 — jornada opcional: a vigência começa na data de admissão,
+        // na MESMA transação. Qualquer recusa desfaz a admissão inteira.
+        const jornada =
+          dto.tabelaHorarioId === undefined
+            ? null
+            : await this.atribuirJornadaNaAdmissao(tx, ctx, {
+                colaboradorId: colaborador.id,
+                empresaId: escopo.empresaId,
+                tabelaHorarioId: dto.tabelaHorarioId,
+                dataAdmissao,
+              });
+
         // T179 — registro de idempotência na MESMA transação: existe se, e só
         // se, a admissão existe. Só chave, ator, empresa e ids — nenhum dado
         // pessoal.
@@ -654,6 +712,7 @@ export class ColaboradorService {
           perfilPessoal: modulo1.perfilPessoal,
           endereco: modulo1.endereco,
           contatos: contatosGravados,
+          jornada,
         };
       });
       return { admissao, reenvio: false };
@@ -684,6 +743,59 @@ export class ColaboradorService {
       }
       traduzirErroPessoas(error);
     }
+  }
+
+  /**
+   * T183 — cria a vigência da jornada escolhida na admissão. Só jornada
+   * ATIVA da empresa ativa: inexistente nela e inativa respondem igual
+   * (`indisponivel`), sem revelar outra empresa. Na trilha, só o id.
+   */
+  private async atribuirJornadaNaAdmissao(
+    tx: Prisma.TransactionClient,
+    ctx: PessoasAuditContext,
+    alvo: {
+      colaboradorId: string;
+      empresaId: string;
+      tabelaHorarioId: string;
+      dataAdmissao: Date;
+    },
+  ): Promise<JornadaDaAdmissao> {
+    const tabela = await tx.tabelaHorario.findFirst({
+      where: {
+        id: alvo.tabelaHorarioId,
+        empresaId: alvo.empresaId,
+        ativo: true,
+      },
+      select: { id: true },
+    });
+    if (tabela === null) {
+      throw new CamposRecusadosException([
+        { campo: "tabelaHorarioId", motivo: "indisponivel" },
+      ]);
+    }
+    const vinculo = await tx.vinculoHorario.create({
+      data: {
+        colaboradorId: alvo.colaboradorId,
+        empresaId: alvo.empresaId,
+        tabelaHorarioId: tabela.id,
+        vigenciaInicio: alvo.dataAdmissao,
+        vigenciaFim: null,
+        criadoPorUserId: ctx.actor.id,
+      },
+    });
+    await this.auditoria.registrarMutacao(
+      tx,
+      ctx,
+      "horarios_vinculo_criado",
+      "vinculo_horario",
+      vinculo.id,
+      alvo.empresaId,
+    );
+    return {
+      id: vinculo.id,
+      tabelaHorarioId: vinculo.tabelaHorarioId,
+      vigenciaInicio: vinculo.vigenciaInicio,
+    };
   }
 
   /** O registro de idempotência desta chave, deste ator, nesta empresa. */
@@ -751,7 +863,27 @@ export class ColaboradorService {
             },
           }),
         ]);
-      return { colaborador, vinculo, movimentacao, perfil, endereco, contato };
+      // T183 — a jornada criada com a admissão: a vigência que começa na data
+      // de admissão, a primeira gravada. Uma troca posterior encerra esta e
+      // cria outra; esta continua no histórico.
+      const jornada = await tx.vinculoHorario.findFirst({
+        where: {
+          colaboradorId: registro.colaboradorId,
+          empresaId: registro.empresaId,
+          vigenciaInicio: vinculo.dataAdmissao,
+        },
+        orderBy: { criadoEm: "asc" },
+        select: { id: true, tabelaHorarioId: true, vigenciaInicio: true },
+      });
+      return {
+        colaborador,
+        vinculo,
+        movimentacao,
+        perfil,
+        endereco,
+        contato,
+        jornada,
+      };
     });
 
     if (!admissaoConfere(dto, gravada)) {
@@ -808,6 +940,7 @@ export class ColaboradorService {
         perfilPessoal: dados.perfilPessoal,
         endereco: dados.endereco,
         contatos: contatos.contatos,
+        jornada: gravada.jornada,
       },
     };
   }

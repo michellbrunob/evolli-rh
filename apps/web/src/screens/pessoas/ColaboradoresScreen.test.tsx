@@ -9,6 +9,8 @@ import {
 import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ColaboradoresScreen } from "./ColaboradoresScreen";
+import { listarVinculosHorario } from "../../api/vinculoHorarioClient";
+import { listarTabelasHorario } from "../../api/horariosClient";
 import {
   ApiError,
   type ColaboradorApi,
@@ -39,6 +41,9 @@ import { expectSemIsoVisivel } from "../../test/semIsoVisivel";
 import { AVISO_DE_RECUSA } from "../../format/mascaras";
 
 vi.mock("../../api/colaboradoresClient");
+// T183 — a seção "Jornada de trabalho" da ficha lê os vínculos de horário.
+vi.mock("../../api/vinculoHorarioClient");
+vi.mock("../../api/horariosClient");
 vi.mock("../../api/contatosColaboradorClient");
 // T181 — a ficha edita dados pessoais e endereço pela rota própria.
 vi.mock("../../api/dadosPessoaisClient");
@@ -130,6 +135,18 @@ function recusa(status: number, message: string): ApiError {
 }
 
 beforeEach(() => {
+  vi.mocked(listarVinculosHorario).mockResolvedValue({
+    itens: [],
+    pagina: 1,
+    tamanhoPagina: 100,
+    total: 0,
+  });
+  vi.mocked(listarTabelasHorario).mockResolvedValue({
+    itens: [],
+    pagina: 1,
+    tamanhoPagina: 100,
+    total: 0,
+  });
   vi.mocked(listarColaboradores).mockResolvedValue(
     paginado([colaborador1, colaborador2]),
   );

@@ -2301,11 +2301,11 @@ deficiência, dados contratuais detalhados, fuso, telefone estrangeiro,
 importação; nome (fora a correção já existente), matrícula, tipo de vínculo,
 lotação, situação e datas da admissão; promoção e merge.
 
-## Catálogo de Jornadas de trabalho — T182 (em implementação)
+## Catálogo de Jornadas de trabalho — T182 (integrada)
 
-| Tarefa | Estado               | Resultado principal                                                     |
-| ------ | -------------------- | ----------------------------------------------------------------------- |
-| T182   | **Em implementação** | RH e DP mantêm, em Estrutura, as jornadas de trabalho da empresa ativa. |
+| Tarefa | Estado                                    | Resultado principal                                                     |
+| ------ | ----------------------------------------- | ----------------------------------------------------------------------- |
+| T182   | **Integrada** (PR #175, squash `3879656`) | RH e DP mantêm, em Estrutura, as jornadas de trabalho da empresa ativa. |
 
 **Escopo da T182:** tela própria em Estrutura › Jornadas de trabalho, com
 lista da empresa ativa, busca, estado vazio e status; RH cria, edita e inativa;
@@ -2322,6 +2322,27 @@ Fuso horário não faz parte do produto.
 escala, adicional noturno, folha, compensação, feriado, ponto, geolocalização,
 fuso horário, salário, contrato, CPF, documentos, dados bancários,
 dependentes, saúde, promoção e merge.
+
+## Jornada de trabalho do colaborador — T183 (em implementação)
+
+| Tarefa | Estado               | Resultado principal                                                                 |
+| ------ | -------------------- | ----------------------------------------------------------------------------------- |
+| T183   | **Em implementação** | O RH associa uma jornada ao colaborador, com vigência e histórico; o DP a consulta. |
+
+**Escopo da T183:** RH atribui, troca e encerra a jornada vigente do
+colaborador na empresa ativa; DP consulta a jornada e o histórico; a ficha
+mostra a jornada atual e as vigências; a Nova admissão aceita uma jornada
+existente, opcional; só jornadas ativas para vínculo novo. Sem migration: o
+`vinculo_horario` (T037/T038) já guarda a vigência e impede sobreposição no
+banco.
+
+**Decisão:** [decisão](../docs/decisions/t183-jornada-colaborador.md).
+
+**Fora de escopo:** ponto, batida, banco de horas, cálculo de jornada,
+escala, folga, feriado, adicional noturno, compensação, folha,
+geolocalização, fuso horário, salário, contrato detalhado, CPF, documentos,
+dados bancários, dependentes, saúde, dados pessoais novos, permissões além de
+RH editar e DP consultar, promoção e merge.
 
 ## Próxima ação autorizável
 

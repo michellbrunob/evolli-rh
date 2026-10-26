@@ -112,6 +112,11 @@ import {
 } from "../../api/organizacaoClient";
 import { type CargoApi, listarCargos } from "../../api/cargoClient";
 import {
+  type TabelaHorarioApi,
+  listarTabelasHorario,
+} from "../../api/horariosClient";
+import { rotuloDaJornada } from "./jornadaColaborador";
+import {
   falhaAoPrepararEnvio,
   falhaPorSessaoExpirada,
   falhaPorTokenDesatualizado,
@@ -269,6 +274,8 @@ type CampoErro =
   | "dataAdmissao"
   | CampoLotacao
   | "lotacao"
+  // T183 — jornada de trabalho opcional (só o RH a vê).
+  | "jornada"
   | "geral";
 
 type Erros = Partial<Record<CampoErro, string>>;
@@ -306,6 +313,7 @@ const ORDEM_DOS_ERROS: readonly CampoErro[] = [
   "equipe",
   "centroCusto",
   "lotacao",
+  "jornada",
   "geral",
 ];
 
@@ -332,6 +340,7 @@ const ROTULO_DO_CAMPO = {
   equipe: "Equipe",
   centroCusto: "Centro de custo",
   lotacao: "Lotação inicial",
+  jornada: "Jornada de trabalho",
 } as Record<Exclude<CampoErro, "referencias" | "geral">, string>;
 
 const ERRO_GERAL_ID = "nova-admissao-erro-geral";
@@ -548,6 +557,14 @@ function errosDaRecusa(erro: unknown, envioJaIncerto: boolean): Erros {
           };
     }
     case 422:
+      // T183 — a jornada escolhida deixou de estar disponível (inativada, ou
+      // não é da empresa ativa): o erro vai ao campo, sem o valor.
+      if (porCampo.some(({ campo }) => campo === "tabelaHorarioId")) {
+        return {
+          jornada:
+            "A jornada escolhida não está mais disponível. Escolha outra jornada ativa ou siga sem jornada.",
+        };
+      }
       return codigo === "idempotencia_conteudo_divergente"
         ? {
             geral:
@@ -628,6 +645,8 @@ interface Opcoes {
   equipes: EquipeApi[];
   cargos: CargoApi[];
   centrosCusto: CentroCustoApi[];
+  /** T183 — só as jornadas ATIVAS, e só para o RH. */
+  jornadas: TabelaHorarioApi[];
 }
 
 const OPCOES_VAZIAS: Opcoes = {
@@ -637,6 +656,7 @@ const OPCOES_VAZIAS: Opcoes = {
   equipes: [],
   cargos: [],
   centrosCusto: [],
+  jornadas: [],
 };
 
 interface Campos {
@@ -651,6 +671,8 @@ interface Campos {
   areaId: string;
   equipeId: string;
   centroCustoId: string;
+  /** T183 — jornada de trabalho opcional; vazio é "sem jornada". */
+  tabelaHorarioId: string;
 }
 
 const CONTATOS_VAZIOS: ValoresContatos = {
@@ -670,6 +692,7 @@ const CAMPOS_VAZIOS: Campos = {
   areaId: "",
   equipeId: "",
   centroCustoId: "",
+  tabelaHorarioId: "",
 };
 
 /** Para onde levar quem acabou de admitir. */
@@ -785,6 +808,40 @@ export function NovaAdmissaoScreen({
 
   const empresa = opcoes.empresas.length === 1 ? opcoes.empresas[0] : undefined;
 
+  // T183 — as jornadas ATIVAS, só para o RH (o DP admite sem jornada). Uma
+  // falha aqui não impede a admissão: a jornada é opcional.
+  const [carregandoJornadas, setCarregandoJornadas] = useState(
+    papelDoAtor === "rh",
+  );
+  const [jornadasIndisponiveis, setJornadasIndisponiveis] = useState(false);
+  useEffect(() => {
+    if (papelDoAtor !== "rh") return;
+    let vigente = true;
+    void (async () => {
+      try {
+        const resp = await listarTabelasHorario({
+          ativo: true,
+          tamanhoPagina: 100,
+        });
+        if (!vigente) return;
+        setOpcoes((prev) => ({
+          ...prev,
+          jornadas: resp.itens.filter((j) => j.ativo),
+        }));
+      } catch {
+        if (vigente) setJornadasIndisponiveis(true);
+      } finally {
+        if (vigente) setCarregandoJornadas(false);
+      }
+    })();
+    return () => {
+      vigente = false;
+    };
+  }, [papelDoAtor]);
+  const jornadaEscolhida = opcoes.jornadas.find(
+    (j) => j.id === campos.tabelaHorarioId,
+  );
+
   useEffect(() => {
     let vigente = true;
     void (async () => {
@@ -799,14 +856,16 @@ export function NovaAdmissaoScreen({
             listarCentrosCusto({ status: "ativo", tamanhoPagina: 100 }),
           ]);
         if (!vigente) return;
-        setOpcoes({
+        setOpcoes((prev) => ({
+          // T183 — as jornadas chegam por conta própria (ver abaixo).
+          jornadas: prev.jornadas,
           empresas: empresas.itens,
           departamentos: soAtivos(departamentos.itens),
           unidades: soAtivos(unidades.itens),
           equipes: soAtivos(equipes.itens),
           cargos: soAtivos(cargos.itens),
           centrosCusto: soAtivos(centros.itens),
-        });
+        }));
         if (empresas.itens.length !== 1) {
           setErros({ geral: MENSAGEM_EMPRESA_INDEFINIDA });
         }
@@ -1161,6 +1220,10 @@ export function NovaAdmissaoScreen({
       perfilPessoal: blocoPerfil(perfil),
       endereco: blocoEndereco(endereco),
       ...(blocoContatos ? { contatos: blocoContatos } : {}),
+      // T183 — jornada opcional: só vai quando escolhida (e só o RH a vê).
+      ...(campos.tabelaHorarioId
+        ? { tabelaHorarioId: campos.tabelaHorarioId }
+        : {}),
     };
   }
 
@@ -1959,6 +2022,59 @@ export function NovaAdmissaoScreen({
           ) : null}
         </section>
 
+        {/* T183 — jornada de trabalho OPCIONAL, só para o RH: o DP admite,
+            mas não atribui jornada. A vigência começa na data de admissão. */}
+        {papelDoAtor === "rh" ? (
+          <section
+            className="nova-admissao__grupo"
+            aria-labelledby="nova-admissao-grupo-jornada"
+          >
+            <h2
+              id="nova-admissao-grupo-jornada"
+              className="nova-admissao__grupo-titulo"
+            >
+              Jornada de trabalho
+            </h2>
+            <div className="nova-admissao__linha nova-admissao__linha--3">
+              <FormField
+                id={ID_DO_CAMPO.jornada}
+                label={rotuloOpcional("Jornada de trabalho")}
+                help="Só jornadas ativas. A vigência começa na data de admissão."
+                {...(erros.jornada ? { error: erros.jornada } : {})}
+              >
+                {(control) => (
+                  <select
+                    value={campos.tabelaHorarioId}
+                    onChange={(e) =>
+                      atualizar("tabelaHorarioId", e.target.value, "jornada")
+                    }
+                    disabled={carregandoOpcoes}
+                    {...control}
+                  >
+                    <option value="">Sem jornada por enquanto</option>
+                    {opcoes.jornadas.map((j) => (
+                      <option key={j.id} value={j.id}>
+                        {rotuloDaJornada(j)}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </FormField>
+            </div>
+            {jornadasIndisponiveis ? (
+              <p className="nova-admissao__texto">
+                Não foi possível carregar as jornadas. A admissão pode seguir
+                sem jornada; atribua depois, na ficha do colaborador.
+              </p>
+            ) : !carregandoJornadas && opcoes.jornadas.length === 0 ? (
+              <p className="nova-admissao__texto">
+                Nenhuma jornada ativa nesta empresa. A admissão segue sem
+                jornada.
+              </p>
+            ) : null}
+          </section>
+        ) : null}
+
         {erros.geral ? (
           <p
             className="nova-admissao__erro-geral"
@@ -2104,6 +2220,16 @@ export function NovaAdmissaoScreen({
                 ))}
               </ul>
             </dd>
+            {papelDoAtor === "rh" ? (
+              <>
+                <dt>Jornada de trabalho</dt>
+                <dd>
+                  {campos.tabelaHorarioId
+                    ? `${jornadaEscolhida ? rotuloDaJornada(jornadaEscolhida) : "Jornada escolhida"}, a partir de ${formatarDiaCivil(campos.dataAdmissao)}`
+                    : "Sem jornada"}
+                </dd>
+              </>
+            ) : null}
           </dl>
         ) : null}
         {salvando ? (
@@ -2242,6 +2368,12 @@ function lotacaoGravada(
   return linhas.length > 0 ? linhas : ["Sem referência registrada"];
 }
 
+/** T183 — a jornada gravada, nomeada pelas opções da página, nunca por id. */
+function jornadaGravada(tabelaHorarioId: string, opcoes: Opcoes): string {
+  const jornada = opcoes.jornadas.find((j) => j.id === tabelaHorarioId);
+  return jornada ? rotuloDaJornada(jornada) : "Jornada registrada";
+}
+
 function ConfirmacaoDaAdmissao({
   admissao,
   opcoes,
@@ -2327,6 +2459,15 @@ function ConfirmacaoDaAdmissao({
               )}
             </ul>
           </dd>
+          {/* T183 — a jornada que o SERVIDOR gravou com a admissão. */}
+          {admissao.jornada ? (
+            <>
+              <dt>Jornada de trabalho</dt>
+              <dd>
+                {`${jornadaGravada(admissao.jornada.tabelaHorarioId, opcoes)}, a partir de ${formatarDiaCivil(admissao.jornada.vigenciaInicio)}`}
+              </dd>
+            </>
+          ) : null}
         </dl>
         <ResumoGravado
           titulo="Dados pessoais"

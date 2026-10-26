@@ -25,6 +25,7 @@ import {
 import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NovaAdmissaoScreen } from "./NovaAdmissaoScreen";
+import { listarTabelasHorario } from "../../api/horariosClient";
 import {
   ApiError,
   type AdmissaoRegistradaApi,
@@ -54,6 +55,8 @@ import { expectSemIsoVisivel } from "../../test/semIsoVisivel";
 vi.mock("../../api/colaboradoresClient");
 vi.mock("../../api/organizacaoClient");
 vi.mock("../../api/cargoClient");
+// T183 — a jornada opcional lê as jornadas ativas (só para o RH).
+vi.mock("../../api/horariosClient");
 // T178 — a consulta de CEP nunca sai da página nos testes.
 vi.mock("../../api/cepClient");
 
@@ -181,6 +184,12 @@ function chaveDaChamada(n: number): string | undefined {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(listarTabelasHorario).mockResolvedValue({
+    itens: [],
+    pagina: 1,
+    tamanhoPagina: 100,
+    total: 0,
+  });
   vi.mocked(listarEmpresasMulti).mockResolvedValue(paginado([empresa]));
   vi.mocked(listarDepartamentos).mockResolvedValue(paginado([departamento]));
   vi.mocked(listarUnidades).mockResolvedValue(paginado([unidade]));
@@ -439,6 +448,8 @@ describe("Nova admissão — página própria", () => {
       "Contatos",
       "Vínculo",
       "Lotação inicial",
+      // T183 — opcional, só para o RH.
+      "Jornada de trabalho",
     ]);
   });
 
@@ -3558,5 +3569,139 @@ describe("T180 — cadastro rápido de referências na Nova admissão", () => {
       departamentoId: departamentoNovo.id,
       cargoId: cargoNovo.id,
     });
+  });
+});
+
+describe("Nova admissão — jornada de trabalho opcional (T183)", () => {
+  const JORNADA = {
+    id: "jjjjjjjj-0000-4000-8000-000000000001",
+    empresaId: "e",
+    codigo: "COM_44H",
+    nome: "Comercial 44h (teste)",
+    ativo: true,
+    criadoPorUserId: "u",
+    criadoEm: "2026-01-01T00:00:00.000Z",
+    atualizadoEm: "2026-01-01T00:00:00.000Z",
+    periodos: [],
+  };
+
+  it("o RH vê o campo opcional, com só as jornadas ativas e 'Sem jornada por enquanto'", async () => {
+    vi.mocked(listarTabelasHorario).mockResolvedValue({
+      itens: [JORNADA],
+      pagina: 1,
+      tamanhoPagina: 100,
+      total: 1,
+    });
+    montar("rh");
+    await aguardarEmpresa();
+    const seletor = await screen.findByRole("combobox", {
+      name: /Jornada de trabalho/,
+    });
+    await waitFor(() =>
+      expect(
+        within(seletor)
+          .getAllByRole("option")
+          .map((o) => o.textContent),
+      ).toEqual([
+        "Sem jornada por enquanto",
+        "COM_44H — Comercial 44h (teste)",
+      ]),
+    );
+    expect(listarTabelasHorario).toHaveBeenCalledWith({
+      ativo: true,
+      tamanhoPagina: 100,
+    });
+  });
+
+  it("o DP admite sem o campo de jornada, e o catálogo de jornadas nem é lido", async () => {
+    montar("dp");
+    await aguardarEmpresa();
+    expect(
+      screen.queryByRole("combobox", { name: /Jornada de trabalho/ }),
+    ).toBeNull();
+    expect(listarTabelasHorario).not.toHaveBeenCalled();
+  });
+
+  function comJornada() {
+    vi.mocked(listarTabelasHorario).mockResolvedValue({
+      itens: [JORNADA],
+      pagina: 1,
+      tamanhoPagina: 100,
+      total: 1,
+    });
+  }
+
+  it("escolhida, a jornada vai no envio; sem escolha, o campo nem vai", async () => {
+    comJornada();
+    montar("rh");
+    await aguardarEmpresa();
+    preencherValido();
+    await salvarEConfirmar();
+    await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(admitirColaborador).mock.calls[0]![0]).not.toHaveProperty(
+      "tabelaHorarioId",
+    );
+  });
+
+  it("com jornada escolhida, envia o id e a confirmação mostra a jornada", async () => {
+    comJornada();
+    montar("rh");
+    await aguardarEmpresa();
+    preencherValido();
+    const seletor = await screen.findByRole("combobox", {
+      name: /Jornada de trabalho/,
+    });
+    await waitFor(() =>
+      expect(within(seletor).getAllByRole("option")).toHaveLength(2),
+    );
+    fireEvent.change(seletor, { target: { value: JORNADA.id } });
+    fireEvent.click(salvar());
+    const dialogo = await screen.findByRole("dialog", {
+      name: "Confirmar cadastro de colaborador?",
+    });
+    expect(
+      within(dialogo).getByText(
+        /COM_44H — Comercial 44h \(teste\), a partir de 03\/11\/2026/,
+      ),
+    ).toBeInTheDocument();
+    fireEvent.click(botaoConfirmar());
+    await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(admitirColaborador).mock.calls[0]![0]).toMatchObject({
+      tabelaHorarioId: JORNADA.id,
+    });
+  });
+
+  it("jornada recusada pelo servidor (422 no campo): erro na jornada, digitado preservado", async () => {
+    comJornada();
+    vi.mocked(admitirColaborador).mockRejectedValue(
+      recusa(422, {
+        erros: [{ campo: "tabelaHorarioId", motivo: "indisponivel" }],
+      }),
+    );
+    montar("rh");
+    await aguardarEmpresa();
+    preencherValido();
+    const seletor = await screen.findByRole("combobox", {
+      name: /Jornada de trabalho/,
+    });
+    await waitFor(() =>
+      expect(within(seletor).getAllByRole("option")).toHaveLength(2),
+    );
+    fireEvent.change(seletor, { target: { value: JORNADA.id } });
+    await salvarEConfirmar();
+    expect(
+      await screen.findByText(/A jornada escolhida não está mais disponível/),
+    ).toBeInTheDocument();
+    expect(seletor).toHaveValue(JORNADA.id);
+    expect(nome()).toHaveValue("  Pessoa Sintética Nova ");
+  });
+
+  it("falha ao ler as jornadas não impede a admissão: avisa e segue sem jornada", async () => {
+    vi.mocked(listarTabelasHorario).mockRejectedValue(new Error("rede"));
+    montar("rh");
+    await aguardarEmpresa();
+    expect(
+      await screen.findByText(/Não foi possível carregar as jornadas/),
+    ).toBeInTheDocument();
   });
 });

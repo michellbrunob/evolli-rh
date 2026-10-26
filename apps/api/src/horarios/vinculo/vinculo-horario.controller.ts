@@ -20,6 +20,7 @@ import { CurrentUser } from "../../auth/session/current-user.decorator";
 import { extractRequestMetadata } from "../../auth/request-metadata.util";
 import { VinculoHorarioService } from "./vinculo-horario.service";
 import {
+  AtribuirJornadaDto,
   CriarVinculoHorarioDto,
   EncerrarVinculoHorarioDto,
   ListarVinculosHorarioQueryDto,
@@ -53,6 +54,29 @@ export class VinculoHorarioController {
     @Req() req: Request,
   ) {
     return this.service.criar(dto, {
+      actor,
+      metadata: extractRequestMetadata(req),
+    });
+  }
+
+  /**
+   * T183 — atribui ou troca a jornada vigente do colaborador numa operação
+   * só (encerra a vigente no novo início e cria a nova). Só RH, empresa da
+   * sessão.
+   */
+  @Post("atribuicoes")
+  @UseGuards(CsrfGuard, AuthorizationGuard)
+  @RequirePermission("vinculo_horario", "create")
+  @ApiOperation({
+    summary:
+      "Atribui ou troca a jornada vigente de um colaborador da propria empresa, a partir de uma data (RH)",
+  })
+  async atribuir(
+    @Body() dto: AtribuirJornadaDto,
+    @CurrentUser() actor: AccessUser,
+    @Req() req: Request,
+  ) {
+    return this.service.atribuir(dto, {
       actor,
       metadata: extractRequestMetadata(req),
     });

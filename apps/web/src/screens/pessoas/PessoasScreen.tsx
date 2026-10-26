@@ -175,6 +175,12 @@ export interface PessoasScreenProps {
   onNovaAdmissao?: ColaboradoresScreenProps["onNovaAdmissao"];
   /** T181 — repassado à aba Colaboradores (ver `ColaboradoresScreenProps`). */
   podeEditarFicha?: boolean;
+  /**
+   * T183 — o perfil atribui, troca e encerra jornadas: na ficha (aba
+   * Colaboradores) e na aba Horário de trabalho. Sem isso, as duas são só
+   * consulta.
+   */
+  podeOperarJornada?: boolean;
 }
 
 export function PessoasScreen({
@@ -185,6 +191,7 @@ export function PessoasScreen({
   onAberturaAtendida,
   onNovaAdmissao,
   podeEditarFicha = false,
+  podeOperarJornada = false,
 }: PessoasScreenProps) {
   // Só as abas do modo. `ABAS` continua sendo a fonte única; o filtro é
   // de apresentação, e a primeira aba do conjunto vira o padrão — assim
@@ -274,9 +281,10 @@ export function PessoasScreen({
             {...(onAberturaAtendida ? { onAberturaAtendida } : {})}
             {...(onNovaAdmissao ? { onNovaAdmissao } : {})}
             podeEditarFicha={podeEditarFicha}
+            podeOperarJornada={podeOperarJornada}
           />
         ) : abaAtiva === "horario" ? (
-          <PessoasHorarioScreen />
+          <PessoasHorarioScreen podeOperar={podeOperarJornada} />
         ) : abaAtiva === "historico_funcional" ? (
           <HistoricoFuncionalScreen />
         ) : abaAtiva === "dados_contratuais" ? (

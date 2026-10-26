@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "constitutionVersion": "1.4.0",
-  "lastConvergedAt": "2026-10-23",
-  "lastIntegratedTask": 181,
-  "lastRecordedTask": 182,
+  "lastConvergedAt": "2026-10-26",
+  "lastIntegratedTask": 182,
+  "lastRecordedTask": 183,
   "platformDecision": {
     "adr": "docs/adr/0014-evolli-plataforma-base-e-encerramento-do-frappe.md",
     "decidedAt": "2026-10-01",
@@ -11,15 +11,15 @@
     "frappe": "encerrado_como_candidato_referencia_apenas"
   },
   "nextTask": {
-    "id": "T182",
-    "status": "jornadas_trabalho_em_implementacao",
-    "reason": "T181 integrada em main pela PR #174 (squash b6442f3dcbe7107b1044b10ecd5e13bb3d7e0859), com a CI de push 3/3 verde (run 40012309132). A T182 cria, em Estrutura > Jornadas de trabalho, o catalogo de jornadas da empresa ativa: tela propria com lista, busca, estado vazio e status; RH cria, edita e inativa; DP so consulta; codigo (unico na empresa, por migration aditiva aprovada pela proprietaria), nome e os dias e horarios que o contrato ja tem (tabela_horario e periodo_horario); nome e codigo editaveis, dias e horarios imutaveis (T038), mudanca por nova jornada a partir da existente e inativacao da antiga; inativacao logica; empresa da sessao; auditoria existente, so com ids e nomes de campos. Fuso horario nao faz parte do produto. Decisao da proprietaria de 2026-10-23 em docs/decisions/t182-jornadas-trabalho.md. Fora de escopo: associacao da jornada ao colaborador, banco de horas, escala, adicional noturno, folha, compensacao, feriado, ponto, geolocalizacao, fuso horario, salario, contrato, CPF, documentos, banco, dependentes, saude, promocao e merge."
+    "id": "T183",
+    "status": "jornada_colaborador_em_implementacao",
+    "reason": "T182 integrada em main pela PR #175 (squash 38796565c3eb491e8e838d270d56d3647644e08d), com a CI de push 3/3 verde (run 40323308350). A T183 associa uma Jornada de trabalho existente ao colaborador, na empresa ativa, com data de inicio de vigencia e historico consultavel: RH atribui, troca e encerra; DP consulta jornada e historico; a ficha mostra a jornada atual e o historico; a Nova admissao aceita uma jornada existente, opcional; so jornadas ativas para vinculo novo; historico mostra jornadas inativadas com a indicacao. Sem migration: o vinculo_horario (T037/T038) ja representa a vigencia [inicio, fim) e impede sobreposicao no banco. Troca atomica, erros por campo sem valor, isolamento por empresa, auditoria so com ids. Decisao em docs/decisions/t183-jornada-colaborador.md. Fora de escopo: ponto, batida, banco de horas, calculo de jornada, escala, folga, feriado, adicional noturno, compensacao, folha, geolocalizacao, fuso horario, salario, contrato detalhado, CPF, documentos, banco, dependentes, saude, dados pessoais novos, permissoes alem de RH editar e DP consultar, promocao e merge."
   },
   "openDeliveries": [
     {
-      "id": "T182",
+      "id": "T183",
       "pullRequest": null,
-      "status": "jornadas_trabalho_em_implementacao"
+      "status": "jornada_colaborador_em_implementacao"
     }
   ],
   "requiredArtifacts": [

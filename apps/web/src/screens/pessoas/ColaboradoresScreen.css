@@ -184,6 +184,19 @@
   gap: var(--space-sm);
 }
 
+/* T183 — subseção "Jornada de trabalho" da ficha: jornada atual, histórico
+   de vigências e, para o RH, atribuir, trocar e encerrar. */
+.colaboradores-screen__jornada {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+
+.colaboradores-screen__jornada-nome {
+  overflow-wrap: anywhere;
+}
+
 /* T169 — subseção "Contatos" dentro do painel de detalhe. */
 .colaboradores-screen__contatos,
 .colaboradores-screen__contatos-form {
