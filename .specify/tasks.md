@@ -2465,7 +2465,9 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       como `[T182 dev]`, não a `main`.
 
 80. **T183 - Jornada de trabalho do colaborador, com vigência**
-    - **Estado:** **em implementação**. Branch `codex/t183-jornada-colaborador`, a partir do squash
+    - **Estado:** **integrada** em `main` pela PR #176, squash
+      `077315604c4ea7f27237bfebbaf3a94c2652f38e`, com a CI de push 3/3 verde (run 40337489015);
+      branch preservada. Implementada na branch `codex/t183-jornada-colaborador`, a partir do squash
       `38796565c3eb491e8e838d270d56d3647644e08d` (T182 integrada, PR #175).
     - **Objetivo:** associar uma Jornada de trabalho existente ao colaborador, na empresa ativa,
       com data de início de vigência e histórico consultável.
@@ -2484,6 +2486,26 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       pessoais novos, qualquer permissão além de RH editar e DP consultar, promoção e merge.
     - **Prévia:** `http://127.0.0.1:5173` passa a mostrar a branch da T183 ao vivo, identificada
       como `[T183 dev]`, não a `main`.
+
+81. **T184 - Cargo e Departamento na listagem de Colaboradores**
+    - **Estado:** **em implementação**. Branch `codex/t184-colaboradores-cargo-departamento`, a
+      partir do squash `077315604c4ea7f27237bfebbaf3a94c2652f38e` (T183 integrada, PR #176).
+    - **Objetivo:** completar Pessoas › Colaboradores com as colunas reais Cargo e Departamento,
+      da lotação vigente do colaborador na empresa ativa.
+    - **Decisão da proprietária (2026-10-26):**
+      [decisão](../docs/decisions/t184-colaboradores-cargo-departamento.md). Só a lotação vigente
+      (a alocação organizacional aberta do vínculo principal); vínculo previsto (admissão não
+      efetivada) e vínculo encerrado mostram "Sem lotação vigente". Sem permissão nova, sem
+      migration e sem dado de negócio novo.
+    - **Entrega prevista:** lotação vigente (id, código e nome de cargo e departamento) na
+      projeção da listagem, colunas na web, testes de API, web e E2E com PostgreSQL real e
+      validação no navegador em 375 px.
+    - **Fora de escopo:** banco de horas, ponto, batidas, cálculos, escala, folha, compensação,
+      fuso horário, campos novos de cadastro, salário, contrato detalhado, documentos, CPF, dados
+      bancários, dependentes, saúde, edição de cargo ou departamento pela listagem, importação,
+      exportação, envio de links, integrações externas, promoção e merge.
+    - **Prévia:** `http://127.0.0.1:5173` passa a mostrar a branch da T184 ao vivo, identificada
+      como `[T184 dev]`, não a `main`.
 
 ## Regra obrigatória para as próximas tarefas
 

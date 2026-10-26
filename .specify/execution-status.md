@@ -2323,11 +2323,11 @@ escala, adicional noturno, folha, compensação, feriado, ponto, geolocalizaçã
 fuso horário, salário, contrato, CPF, documentos, dados bancários,
 dependentes, saúde, promoção e merge.
 
-## Jornada de trabalho do colaborador — T183 (em implementação)
+## Jornada de trabalho do colaborador — T183 (integrada)
 
-| Tarefa | Estado               | Resultado principal                                                                 |
-| ------ | -------------------- | ----------------------------------------------------------------------------------- |
-| T183   | **Em implementação** | O RH associa uma jornada ao colaborador, com vigência e histórico; o DP a consulta. |
+| Tarefa | Estado                                    | Resultado principal                                                                 |
+| ------ | ----------------------------------------- | ----------------------------------------------------------------------------------- |
+| T183   | **Integrada** (PR #176, squash `0773156`) | O RH associa uma jornada ao colaborador, com vigência e histórico; o DP a consulta. |
 
 **Escopo da T183:** RH atribui, troca e encerra a jornada vigente do
 colaborador na empresa ativa; DP consulta a jornada e o histórico; a ficha
@@ -2343,6 +2343,26 @@ escala, folga, feriado, adicional noturno, compensação, folha,
 geolocalização, fuso horário, salário, contrato detalhado, CPF, documentos,
 dados bancários, dependentes, saúde, dados pessoais novos, permissões além de
 RH editar e DP consultar, promoção e merge.
+
+## Cargo e Departamento na listagem de Colaboradores — T184 (em implementação)
+
+| Tarefa | Estado               | Resultado principal                                                                          |
+| ------ | -------------------- | -------------------------------------------------------------------------------------------- |
+| T184   | **Em implementação** | A listagem de Colaboradores mostra Cargo e Departamento da lotação vigente na empresa ativa. |
+
+**Escopo da T184:** colunas Cargo e Departamento na listagem de Pessoas ›
+Colaboradores, da lotação vigente (alocação organizacional aberta) do vínculo
+principal na empresa ativa; vínculo previsto ou encerrado mostra "Sem lotação
+vigente". Busca, contadores, estados vazios, ficha, troca de empresa e rota
+direta seguem funcionando. Sem permissão nova, sem migration.
+
+**Decisão da proprietária (2026-10-26):** [decisão](../docs/decisions/t184-colaboradores-cargo-departamento.md).
+
+**Fora de escopo:** banco de horas, ponto, batidas, cálculos, escala, folha,
+compensação, fuso horário, campos novos de cadastro, salário, contrato
+detalhado, documentos, CPF, dados bancários, dependentes, saúde, edição pela
+listagem, importação, exportação, envio de links, integrações externas,
+promoção e merge.
 
 ## Próxima ação autorizável
 
