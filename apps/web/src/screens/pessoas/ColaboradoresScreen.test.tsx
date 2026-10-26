@@ -297,9 +297,7 @@ describe("ColaboradoresScreen (T111 — funcional)", () => {
     render(<ColaboradoresScreen />);
     await screen.findByRole("table", { name: "Colaboradores desta empresa" });
 
-    fireEvent.change(screen.getByLabelText("Situação"), {
-      target: { value: "ativo" },
-    });
+    filtrarSituacao("Ativos");
 
     await waitFor(() =>
       expect(listarColaboradores).toHaveBeenLastCalledWith({
@@ -800,9 +798,8 @@ describe("ColaboradoresScreen (T147 — homologação da admissão)", () => {
     render(<ColaboradoresScreen />);
     await screen.findByRole("table", { name: "Colaboradores desta empresa" });
 
-    const filtro = screen.getByLabelText("Situação");
-    fireEvent.change(filtro, { target: { value: "ativo" } });
-    fireEvent.change(filtro, { target: { value: "inativo" } });
+    filtrarSituacao("Ativos");
+    filtrarSituacao("Inativos");
 
     // A terceira chamada já respondeu: só Bruno está na tela.
     await waitFor(() =>
@@ -1097,9 +1094,7 @@ describe("T164 — paginação real", () => {
     render(<ColaboradoresScreen />);
     await screen.findByRole("table", { name: "Colaboradores desta empresa" });
 
-    fireEvent.change(screen.getByLabelText("Situação"), {
-      target: { value: "ativo" },
-    });
+    filtrarSituacao("Ativos");
 
     // Sem isto, filtrar na página 3 pediria a página 3 de um conjunto que
     // talvez tenha uma só — e a lista vazia pareceria "nenhum ativo".
@@ -2570,6 +2565,24 @@ function vinculoListado(
   };
 }
 
+/** T186 — o grupo dos contadores, que também filtra por situação. */
+const grupoSituacao = () => screen.getByRole("group", { name: /sem filtros/ });
+
+/** T186 — aciona o filtro "Todos", "Ativos" ou "Inativos" dos contadores. */
+function filtrarSituacao(rotulo: "Todos" | "Ativos" | "Inativos") {
+  fireEvent.click(
+    within(grupoSituacao()).getByRole("button", {
+      name: new RegExp(`^${rotulo}\\b`),
+    }),
+  );
+}
+
+/** T186 — o texto de cada botão do grupo, na ordem da tela. */
+const botoesDeSituacao = () =>
+  within(grupoSituacao())
+    .getAllByRole("button")
+    .map((b) => b.textContent);
+
 const campoBusca = () =>
   screen.getByRole("searchbox", { name: "Buscar por nome ou matrícula" });
 
@@ -3023,9 +3036,7 @@ describe("T178 — busca por nome ou matrícula, no servidor", () => {
     render(<ColaboradoresScreen />);
     await screen.findByRole("table", { name: "Colaboradores desta empresa" });
 
-    fireEvent.change(screen.getByLabelText("Situação"), {
-      target: { value: "ativo" },
-    });
+    filtrarSituacao("Ativos");
     await waitFor(() =>
       expect(listarColaboradores).toHaveBeenLastCalledWith({
         situacao: "ativo",
@@ -3191,19 +3202,19 @@ describe("T178 — estados vazios distintos", () => {
       ...paginado([]),
       contadores: { ativos: 3, inativos: 1 },
     });
-    fireEvent.change(screen.getByLabelText("Situação"), {
-      target: { value: "inativo" },
-    });
+    filtrarSituacao("Inativos");
     await screen.findByRole("heading", {
-      name: "Nenhum colaborador encontrado",
+      name: "Nenhum colaborador inativo no seu escopo",
+    });
+    buscar("ana");
+    await screen.findByRole("heading", {
+      name: "Nenhum colaborador encontrado com estes filtros",
     });
     expect(
       screen.getByText(
-        "Nenhum colaborador corresponde aos filtros selecionados.",
+        "Nenhum colaborador inativo corresponde a “ana” por nome ou matrícula.",
       ),
     ).toBeInTheDocument();
-    buscar("ana");
-    await screen.findByText(/corresponde a “ana” com os filtros selecionados/);
 
     vi.mocked(listarColaboradores).mockResolvedValue(
       paginado([colaborador1, colaborador2]),
@@ -3219,7 +3230,9 @@ describe("T178 — estados vazios distintos", () => {
       }),
     );
     await screen.findByRole("table", { name: "Colaboradores desta empresa" });
-    expect(screen.getByLabelText("Situação")).toHaveValue("todos");
+    expect(
+      within(grupoSituacao()).getByRole("button", { name: /^Todos\b/ }),
+    ).toHaveAttribute("aria-pressed", "true");
     expect(campoBusca()).toHaveValue("");
   });
 });
@@ -3233,17 +3246,17 @@ describe("T178 — contadores do escopo, do servidor", () => {
     render(<ColaboradoresScreen />);
     await screen.findByRole("table", { name: "Colaboradores desta empresa" });
 
-    const grupo = screen.getByRole("group", {
-      name: "No seu escopo, sem filtros",
-    });
-    const termos = within(grupo)
-      .getAllByRole("term")
-      .map((t) => t.textContent);
-    const valores = within(grupo)
-      .getAllByRole("definition")
-      .map((d) => d.textContent);
-    expect(termos).toEqual(["Ativos", "Inativos"]);
-    expect(valores).toEqual(["30", "15"]);
+    expect(
+      screen.getByRole("group", {
+        name: "Situação no seu escopo, totais sem filtros",
+      }),
+    ).toBeInTheDocument();
+    // T186 — "Todos" é a soma dos dois totais do servidor.
+    expect(botoesDeSituacao()).toEqual([
+      "Todos 45",
+      "Ativos 30",
+      "Inativos 15",
+    ]);
   });
 
   it("com empresa ativa, o rótulo diz que é da empresa ativa", async () => {
@@ -3254,7 +3267,9 @@ describe("T178 — contadores do escopo, do servidor", () => {
     );
     await screen.findByRole("table", { name: "Colaboradores desta empresa" });
     expect(
-      screen.getByRole("group", { name: "Na empresa ativa, sem filtros" }),
+      screen.getByRole("group", {
+        name: "Situação na empresa ativa, totais sem filtros",
+      }),
     ).toBeInTheDocument();
   });
 
@@ -3265,22 +3280,13 @@ describe("T178 — contadores do escopo, do servidor", () => {
     );
     render(<ColaboradoresScreen />);
 
-    const grupo = screen.getByRole("group", { name: /sem filtros/ });
-    expect(
-      within(grupo)
-        .getAllByRole("definition")
-        .map((d) => d.textContent),
-    ).toEqual(["…", "…"]);
-    expect(within(grupo).queryByText("0")).toBeNull();
+    expect(botoesDeSituacao()).toEqual(["Todos …", "Ativos …", "Inativos …"]);
+    expect(within(grupoSituacao()).queryByText("0")).toBeNull();
 
     await act(async () => {
       pendente.resolver(paginado([colaborador1]));
     });
-    expect(
-      within(screen.getByRole("group", { name: /sem filtros/ }))
-        .getAllByRole("definition")
-        .map((d) => d.textContent),
-    ).toEqual(["1", "0"]);
+    expect(botoesDeSituacao()).toEqual(["Todos 1", "Ativos 1", "Inativos 0"]);
   });
 
   it("ficam no cabeçalho da página, sem região viva própria", async () => {
@@ -3515,5 +3521,228 @@ describe("T181 — ficha: dados pessoais e endereço editáveis no detalhe", () 
       await within(contatos).findByText("Nenhum contato registrado."),
     ).toBeInTheDocument();
     expect(within(contatos).queryByRole("textbox")).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T186 — os contadores viram os filtros de situação da listagem.
+// ---------------------------------------------------------------------------
+
+describe("T186 — filtros de situação nos contadores", () => {
+  it("o select 'Situação' saiu; o de situação do vínculo continua", async () => {
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+    expect(screen.queryByLabelText("Situação")).toBeNull();
+    expect(screen.getByLabelText("Situação do vínculo")).toBeInTheDocument();
+  });
+
+  it("três botões com aria-pressed; 'Todos' começa pressionado", async () => {
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+    const botoes = within(grupoSituacao()).getAllByRole("button");
+    expect(botoes.map((b) => b.getAttribute("aria-pressed"))).toEqual([
+      "true",
+      "false",
+      "false",
+    ]);
+    for (const botao of botoes) expect(botao).toHaveAttribute("type", "button");
+  });
+
+  it("acionar 'Inativos' filtra no servidor, na página 1, e pressiona só ele", async () => {
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+
+    filtrarSituacao("Inativos");
+    await waitFor(() =>
+      expect(listarColaboradores).toHaveBeenLastCalledWith({
+        situacao: "inativo",
+        pagina: 1,
+        tamanhoPagina: 20,
+      }),
+    );
+    const botoes = within(grupoSituacao()).getAllByRole("button");
+    expect(botoes.map((b) => b.getAttribute("aria-pressed"))).toEqual([
+      "false",
+      "false",
+      "true",
+    ]);
+
+    // "Todos" tira o parâmetro: a consulta volta ao conjunto inteiro.
+    filtrarSituacao("Todos");
+    await waitFor(() =>
+      expect(listarColaboradores).toHaveBeenLastCalledWith({
+        pagina: 1,
+        tamanhoPagina: 20,
+      }),
+    );
+  });
+
+  it("os totais seguem os do servidor, sem filtro; o total da lista é o do recorte", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue({
+      ...paginado([colaborador1, colaborador2]),
+      total: 45,
+      contadores: { ativos: 30, inativos: 15 },
+    });
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+
+    vi.mocked(listarColaboradores).mockResolvedValue({
+      ...paginado([colaborador2]),
+      total: 15,
+      contadores: { ativos: 30, inativos: 15 },
+    });
+    filtrarSituacao("Inativos");
+    await screen.findByText("15 colaboradores no filtro atual");
+    expect(botoesDeSituacao()).toEqual([
+      "Todos 45",
+      "Ativos 30",
+      "Inativos 15",
+    ]);
+    expect(screen.queryByText(colaborador1.nome)).toBeNull();
+  });
+
+  it("combina com a busca, nos dois sentidos", async () => {
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+
+    buscar("ana");
+    await waitFor(() =>
+      expect(listarColaboradores).toHaveBeenLastCalledWith({
+        busca: "ana",
+        pagina: 1,
+        tamanhoPagina: 20,
+      }),
+    );
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+    filtrarSituacao("Ativos");
+    await waitFor(() =>
+      expect(listarColaboradores).toHaveBeenLastCalledWith({
+        situacao: "ativo",
+        busca: "ana",
+        pagina: 1,
+        tamanhoPagina: 20,
+      }),
+    );
+  });
+});
+
+describe("T186 — estados vazios distintos", () => {
+  const COM_GENTE = { ativos: 3, inativos: 1 };
+
+  async function montarEVaziar(
+    props: Parameters<typeof ColaboradoresScreen>[0] = {},
+  ) {
+    render(<ColaboradoresScreen {...props} />);
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+    vi.mocked(listarColaboradores).mockResolvedValue({
+      ...paginado([]),
+      contadores: COM_GENTE,
+    });
+  }
+
+  it("empresa sem colaboradores: o vazio de cadastro, sem filtro nem busca", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue(paginado([]));
+    render(<ColaboradoresScreen />);
+    expect(
+      await screen.findByRole("heading", {
+        name: "Nenhum colaborador cadastrado nesta empresa",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("busca sem resultado: 'Limpar busca' tira só a busca", async () => {
+    await montarEVaziar();
+    buscar("zzz");
+    const titulo = await screen.findByRole("heading", {
+      name: "Nenhum colaborador encontrado",
+    });
+    const vazio = titulo.closest(".evolli-empty-state") as HTMLElement;
+    expect(vazio).toHaveTextContent(
+      "Nenhum colaborador corresponde a “zzz” por nome ou matrícula.",
+    );
+    fireEvent.click(
+      within(vazio).getByRole("button", { name: "Limpar busca" }),
+    );
+    await waitFor(() =>
+      expect(listarColaboradores).toHaveBeenLastCalledWith({
+        pagina: 1,
+        tamanhoPagina: 20,
+      }),
+    );
+  });
+
+  it("filtro sem resultado, na empresa ativa: diz a situação e 'Ver todos' volta a Todos", async () => {
+    await montarEVaziar({
+      empresaAtiva: { nome: "Empresa Teste", codigo: "TESTE" },
+    });
+    filtrarSituacao("Inativos");
+    const titulo = await screen.findByRole("heading", {
+      name: "Nenhum colaborador inativo nesta empresa",
+    });
+    const vazio = titulo.closest(".evolli-empty-state") as HTMLElement;
+    // Os totais seguem à vista: o vazio é do recorte, não da empresa.
+    expect(botoesDeSituacao()).toEqual(["Todos 4", "Ativos 3", "Inativos 1"]);
+    expect(
+      within(vazio).queryByRole("button", { name: "Nova admissão" }),
+    ).toBeNull();
+    fireEvent.click(within(vazio).getByRole("button", { name: "Ver todos" }));
+    await waitFor(() =>
+      expect(listarColaboradores).toHaveBeenLastCalledWith({
+        pagina: 1,
+        tamanhoPagina: 20,
+      }),
+    );
+    expect(
+      within(grupoSituacao()).getByRole("button", { name: /^Todos\b/ }),
+    ).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("filtro de situação com o de vínculo sem resultado: vazio dos filtros", async () => {
+    await montarEVaziar();
+    filtrarSituacao("Ativos");
+    await screen.findByRole("heading", {
+      name: "Nenhum colaborador ativo no seu escopo",
+    });
+    fireEvent.change(screen.getByLabelText("Situação do vínculo"), {
+      target: { value: "encerrado" },
+    });
+    const titulo = await screen.findByRole("heading", {
+      name: "Nenhum colaborador com estes filtros",
+    });
+    const vazio = titulo.closest(".evolli-empty-state") as HTMLElement;
+    fireEvent.click(
+      within(vazio).getByRole("button", { name: "Limpar filtros" }),
+    );
+    await waitFor(() =>
+      expect(listarColaboradores).toHaveBeenLastCalledWith({
+        pagina: 1,
+        tamanhoPagina: 20,
+      }),
+    );
+    expect(screen.getByLabelText("Situação do vínculo")).toHaveValue("todos");
+  });
+
+  it("busca com filtro sem resultado: título próprio e 'Limpar busca e filtros'", async () => {
+    await montarEVaziar();
+    filtrarSituacao("Ativos");
+    await screen.findByRole("heading", {
+      name: "Nenhum colaborador ativo no seu escopo",
+    });
+    buscar("zzz");
+    const titulo = await screen.findByRole("heading", {
+      name: "Nenhum colaborador encontrado com estes filtros",
+    });
+    const vazio = titulo.closest(".evolli-empty-state") as HTMLElement;
+    expect(vazio).toHaveTextContent(
+      "Nenhum colaborador ativo corresponde a “zzz” por nome ou matrícula.",
+    );
+    // Os quatro vazios não se confundem.
+    for (const outro of [
+      "Nenhum colaborador encontrado",
+      "Nenhum colaborador ativo no seu escopo",
+      "Nenhum colaborador cadastrado nesta empresa",
+    ]) {
+      expect(screen.queryByRole("heading", { name: outro })).toBeNull();
+    }
   });
 });

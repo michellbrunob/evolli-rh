@@ -43,6 +43,22 @@ export const COLABORADORES_TITULO_ID = "colaboradores-titulo";
 type FiltroSituacao = "todos" | "ativo" | "inativo";
 type FiltroSituacaoVinculo = "todos" | "previsto" | "ativo" | "encerrado";
 
+/**
+ * T186 — os contadores viram os filtros de situação: cada opção mostra o
+ * total do escopo (sem filtro nem busca) e, acionada, filtra a lista no
+ * servidor. "Todos" soma os dois totais do servidor — o escopo é a soma de
+ * ativos e inativos.
+ */
+const OPCOES_SITUACAO: readonly {
+  valor: FiltroSituacao;
+  rotulo: string;
+  total: (c: ContadoresColaboradoresApi) => number;
+}[] = [
+  { valor: "todos", rotulo: "Todos", total: (c) => c.ativos + c.inativos },
+  { valor: "ativo", rotulo: "Ativos", total: (c) => c.ativos },
+  { valor: "inativo", rotulo: "Inativos", total: (c) => c.inativos },
+];
+
 const ROTULO_TIPO_VINCULO: Record<TipoVinculo, string> = {
   clt: "CLT",
   estagio: "Estágio",
@@ -440,11 +456,65 @@ export function ColaboradoresScreen({
     campoBuscaRef.current?.focus();
   }
 
-  /** T178 — do estado vazio por busca/filtro: tudo volta ao conjunto inteiro. */
-  function limparBuscaEFiltros() {
+  /** T186 — do estado vazio por filtro: volta a "Todos", busca intacta. */
+  function limparFiltros() {
     setFiltroSituacao("todos");
     setFiltroSituacaoVinculo("todos");
+  }
+
+  /** T178 — do estado vazio por busca/filtro: tudo volta ao conjunto inteiro. */
+  function limparBuscaEFiltros() {
+    limparFiltros();
     limparBusca();
+  }
+
+  /**
+   * T186 — o estado vazio de uma consulta filtrada, distinto para busca,
+   * filtro e os dois juntos: cada um diz o que não foi achado e oferece
+   * desfazer exatamente o que o produziu. "Ativo" e "inativo" seguem a regra
+   * da T178 (na empresa ativa; sem empresa, no escopo do master).
+   */
+  function vazioDaConsulta(): {
+    titulo: string;
+    descricao: string;
+    acao: { rotulo: string; executar: () => void };
+  } {
+    const onde = empresaAtiva ? "nesta empresa" : "no seu escopo";
+    const situacao =
+      filtroSituacao === "todos"
+        ? null
+        : filtroSituacao === "ativo"
+          ? "ativo"
+          : "inativo";
+    const soSituacao = situacao !== null && filtroSituacaoVinculo === "todos";
+    if (buscaAplicada && !temFiltro) {
+      return {
+        titulo: "Nenhum colaborador encontrado",
+        descricao: `Nenhum colaborador corresponde a “${buscaAplicada}” por nome ou matrícula.`,
+        acao: { rotulo: "Limpar busca", executar: limparBusca },
+      };
+    }
+    if (!buscaAplicada) {
+      return soSituacao
+        ? {
+            titulo: `Nenhum colaborador ${situacao} ${onde}`,
+            descricao: `Não há colaborador ${situacao} ${onde}. Os totais acima não dependem do filtro.`,
+            acao: { rotulo: "Ver todos", executar: limparFiltros },
+          }
+        : {
+            titulo: "Nenhum colaborador com estes filtros",
+            descricao:
+              "Nenhum colaborador corresponde aos filtros selecionados.",
+            acao: { rotulo: "Limpar filtros", executar: limparFiltros },
+          };
+    }
+    return {
+      titulo: "Nenhum colaborador encontrado com estes filtros",
+      descricao: soSituacao
+        ? `Nenhum colaborador ${situacao} corresponde a “${buscaAplicada}” por nome ou matrícula.`
+        : `Nenhum colaborador corresponde a “${buscaAplicada}” com os filtros selecionados.`,
+      acao: { rotulo: "Limpar busca e filtros", executar: limparBuscaEFiltros },
+    };
   }
 
   // T176 — atende a abertura pedida pela página de Nova admissão, uma vez.
@@ -733,7 +803,15 @@ export function ColaboradoresScreen({
              do servidor fica à vista durante as releituras — ele não depende
              do filtro, e trocá-lo por reticências a cada consulta só
              piscaria. Sem `role="status"`, pelo mesmo motivo do total da
-             lista: regiões vivas a mais atropelam as que já existem. */
+             lista: regiões vivas a mais atropelam as que já existem.
+
+             T186 — os contadores SÃO o filtro de situação (o select
+             "Situação" saiu, por decisão da proprietária de 2026-10-26).
+             Botões com `aria-pressed`, como os demais seletores do produto:
+             o número segue sendo o total sem filtros, e o botão pressionado
+             diz qual recorte a lista mostra. O filtro vai ao servidor, antes
+             da paginação; nada é escondido no navegador. Não fica na URL:
+             recarregar volta a "Todos". */
           <div
             className="colaboradores-screen__contadores"
             role="group"
@@ -743,18 +821,29 @@ export function ColaboradoresScreen({
               id="colaboradores-contadores-rotulo"
               className="colaboradores-screen__contadores-rotulo"
             >
-              {empresaAtiva ? "Na empresa ativa" : "No seu escopo"}, sem filtros
+              Situação {empresaAtiva ? "na empresa ativa" : "no seu escopo"},
+              totais sem filtros
             </p>
-            <dl className="colaboradores-screen__contadores-lista">
-              <div className="colaboradores-screen__contador">
-                <dt>Ativos</dt>
-                <dd>{contadores ? contadores.ativos : "…"}</dd>
-              </div>
-              <div className="colaboradores-screen__contador">
-                <dt>Inativos</dt>
-                <dd>{contadores ? contadores.inativos : "…"}</dd>
-              </div>
-            </dl>
+            <div className="colaboradores-screen__contadores-lista">
+              {OPCOES_SITUACAO.map((opcao) => (
+                <Button
+                  key={opcao.valor}
+                  variant={
+                    filtroSituacao === opcao.valor ? "primary" : "secondary"
+                  }
+                  aria-pressed={filtroSituacao === opcao.valor}
+                  className="colaboradores-screen__contador"
+                  onClick={() => setFiltroSituacao(opcao.valor)}
+                >
+                  <span className="colaboradores-screen__contador-rotulo">
+                    {opcao.rotulo}
+                  </span>{" "}
+                  <span className="colaboradores-screen__contador-valor">
+                    {contadores ? opcao.total(contadores) : "…"}
+                  </span>
+                </Button>
+              ))}
+            </div>
           </div>
         }
       />
@@ -919,23 +1008,6 @@ export function ColaboradoresScreen({
           </p>
 
           <div className="colaboradores-screen__filtros">
-            <FormField id="colaboradores-filtro-situacao" label="Situação">
-              {(control) => (
-                <select
-                  value={filtroSituacao}
-                  onChange={(e) =>
-                    setFiltroSituacao(e.target.value as FiltroSituacao)
-                  }
-                  disabled={statusCarregamento === "carregando"}
-                  {...control}
-                >
-                  <option value="todos">Todas as situações</option>
-                  <option value="ativo">Ativo</option>
-                  <option value="inativo">Inativo</option>
-                </select>
-              )}
-            </FormField>
-
             <FormField
               id="colaboradores-filtro-situacao-vinculo"
               label="Situação do vínculo"
@@ -976,23 +1048,23 @@ export function ColaboradoresScreen({
                vazia —, o conjunto provavelmente mudou entre uma leitura e
                outra; a saída é voltar à primeira página, não admitir. */
             filtrando ? (
-              <EmptyState
-                headingLevel={3}
-                icon="—"
-                title="Nenhum colaborador encontrado"
-                description={
-                  buscaAplicada
-                    ? temFiltro
-                      ? `Nenhum colaborador corresponde a “${buscaAplicada}” com os filtros selecionados.`
-                      : `Nenhum colaborador corresponde a “${buscaAplicada}” por nome ou matrícula.`
-                    : "Nenhum colaborador corresponde aos filtros selecionados."
-                }
-                action={
-                  <Button variant="secondary" onClick={limparBuscaEFiltros}>
-                    Limpar busca e filtros
-                  </Button>
-                }
-              />
+              (() => {
+                // T186 — busca, filtro e os dois juntos: vazios distintos.
+                const vazio = vazioDaConsulta();
+                return (
+                  <EmptyState
+                    headingLevel={3}
+                    icon="—"
+                    title={vazio.titulo}
+                    description={vazio.descricao}
+                    action={
+                      <Button variant="secondary" onClick={vazio.acao.executar}>
+                        {vazio.acao.rotulo}
+                      </Button>
+                    }
+                  />
+                );
+              })()
             ) : contadores !== null &&
               contadores.ativos + contadores.inativos > 0 ? (
               <EmptyState
