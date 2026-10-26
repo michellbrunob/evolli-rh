@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "constitutionVersion": "1.4.0",
   "lastConvergedAt": "2026-10-26",
-  "lastIntegratedTask": 183,
-  "lastRecordedTask": 184,
+  "lastIntegratedTask": 184,
+  "lastRecordedTask": 185,
   "platformDecision": {
     "adr": "docs/adr/0014-evolli-plataforma-base-e-encerramento-do-frappe.md",
     "decidedAt": "2026-10-01",
@@ -11,15 +11,15 @@
     "frappe": "encerrado_como_candidato_referencia_apenas"
   },
   "nextTask": {
-    "id": "T184",
-    "status": "colaboradores_cargo_departamento_em_implementacao",
-    "reason": "T183 integrada em main pela PR #176 (squash 077315604c4ea7f27237bfebbaf3a94c2652f38e), com a CI de push 3/3 verde (run 40337489015). A T184 completa Pessoas > Colaboradores com as colunas reais Cargo e Departamento, da lotacao vigente (alocacao organizacional aberta) do vinculo principal na empresa ativa; vinculo previsto ou encerrado mostra Sem lotacao vigente (decisao da proprietaria de 2026-10-26). Busca, contadores, estados vazios, ficha, troca de empresa e rota direta seguem funcionando; sem permissao nova, sem migration e sem dado de negocio novo. Decisao em docs/decisions/t184-colaboradores-cargo-departamento.md. Fora de escopo: banco de horas, ponto, batidas, calculos, escala, folha, compensacao, fuso horario, campos novos de cadastro, salario, contrato detalhado, documentos, CPF, banco, dependentes, saude, edicao pela listagem, importacao, exportacao, envio de links, integracoes externas, promocao e merge."
+    "id": "T185",
+    "status": "colaboradores_jornada_em_implementacao",
+    "reason": "T184 integrada em main pela PR #177 (squash 398c70ab51e004e89c35181f1a5d2cf68dde603d), com a CI de push 3/3 verde (run 40369382783). A T185 adiciona a coluna Jornada de trabalho em Pessoas > Colaboradores, so com o vinculo de jornada da T183: codigo e nome da jornada vigente do colaborador na empresa do vinculo principal ativo, pelo dia civil do navegador (igual a ficha); previsto, encerrado, sem jornada ou com vigencia futura mostram Sem jornada vigente; jornada inativada com a indicacao (decisoes da proprietaria de 2026-10-26). Sem permissao nova e sem migration. Decisao em docs/decisions/t185-colaboradores-jornada.md. Fora de escopo: banco de horas, saldo, batidas, ponto, calculo de horas, escala, folha, adicional noturno, compensacao, feriado, geolocalizacao, fuso horario, campos novos de cadastro, salario, contrato detalhado, documentos, CPF, banco, dependentes, saude, edicao de jornada pela listagem, importacao, exportacao, integracoes externas, promocao e merge."
   },
   "openDeliveries": [
     {
-      "id": "T184",
+      "id": "T185",
       "pullRequest": null,
-      "status": "colaboradores_cargo_departamento_em_implementacao"
+      "status": "colaboradores_jornada_em_implementacao"
     }
   ],
   "requiredArtifacts": [
