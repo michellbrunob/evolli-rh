@@ -470,6 +470,41 @@ describe("JornadasTrabalhoScreen (T182) — operação do RH", () => {
     ).toBeInTheDocument();
   });
 
+  it("com o filtro Ativas, a jornada inativada sai da lista na hora", async () => {
+    mockListar.mockResolvedValue(paginado([tabela1]));
+    render(<JornadasTrabalhoScreen podeOperar />);
+    await screen.findByRole("table", LISTA);
+    preencher("Situação", "ativo");
+    await waitFor(() =>
+      expect(mockListar).toHaveBeenLastCalledWith({
+        ativo: true,
+        tamanhoPagina: 100,
+      }),
+    );
+    await abrirDetalhe(0);
+    fireEvent.click(screen.getByRole("button", { name: "Inativar" }));
+    await waitFor(() => expect(mockDesativar).toHaveBeenCalledWith(tabela1.id));
+    expect(
+      await screen.findByRole("heading", {
+        level: 3,
+        name: "Nenhuma jornada encontrada",
+      }),
+    ).toBeInTheDocument();
+    // O detalhe segue aberto, já como inativa, para poder reativar.
+    expect(
+      screen.getByRole("button", { name: "Reativar" }),
+    ).toBeInTheDocument();
+    expect(mockListar).toHaveBeenCalledTimes(2);
+  });
+
+  it("sem filtro, a jornada inativada continua na lista, como inativa", async () => {
+    render(<JornadasTrabalhoScreen podeOperar />);
+    await abrirDetalhe(0);
+    fireEvent.click(screen.getByRole("button", { name: "Inativar" }));
+    await waitFor(() => expect(mockDesativar).toHaveBeenCalledWith(tabela1.id));
+    await waitFor(() => expect(screen.getAllByText("Inativa")).toHaveLength(3));
+  });
+
   it("falha ao inativar fica no detalhe, sem mudar a situação", async () => {
     mockDesativar.mockRejectedValue({ status: 403 });
     render(<JornadasTrabalhoScreen podeOperar />);

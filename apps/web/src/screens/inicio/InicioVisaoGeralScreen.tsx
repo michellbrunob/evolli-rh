@@ -2,7 +2,7 @@
  * Início > Visão geral (T048) — tela visual estática.
  *
  * Painel de resumo do administrativo: um card de exemplo por módulo já
- * disponível (Cadastros, Pessoas, Ponto, Documentos) e um destaque para as
+ * disponível (Jornadas de trabalho, Pessoas, Ponto, Documentos) e um destaque para as
  * pendências de ponto a conferir. Cada atalho apenas troca o estado local de
  * "destino selecionado" já existente em `App` (`onNavegar`) — sem React
  * Router, sem URL real, sem API/fetch, sem persistência.

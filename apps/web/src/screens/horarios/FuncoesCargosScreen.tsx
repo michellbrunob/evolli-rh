@@ -60,7 +60,19 @@ interface FormularioState {
   salvando: boolean;
 }
 
-export function FuncoesCargosScreen() {
+export interface FuncoesCargosScreenProps {
+  /**
+   * T182 — o perfil OPERA o catálogo de cargos (criar, editar, inativar e reativar):
+   * `rh` e `master_tecnico` (ver `podeOperarEstrutura`). Sem isso a tela é só
+   * consulta: nenhum controle de escrita aparece. Só orienta a tela — quem
+   * recusa é o servidor.
+   */
+  readonly podeOperar?: boolean;
+}
+
+export function FuncoesCargosScreen({
+  podeOperar = false,
+}: FuncoesCargosScreenProps) {
   const [statusCarregamento, setStatusCarregamento] = useState<
     "carregando" | "erro" | "dados"
   >("carregando");
@@ -237,17 +249,31 @@ export function FuncoesCargosScreen() {
 
   const podeCriar = statusCarregamento === "dados" && empresas.length > 0;
 
+  /** T182 — sem `podeOperar`, a coluna de ações (editar, inativar e
+   * reativar) não aparece. */
+  function colunasVisiveis<T>(
+    colunas: DataTableColumn<T>[],
+  ): DataTableColumn<T>[] {
+    return podeOperar ? colunas : colunas.filter((c) => c.key !== "acoes");
+  }
+
   return (
     <div className="funcoes-cargos-screen">
       <PageHeader
         headingLevel={1}
         titleId={FUNCOES_CARGOS_TITULO_ID}
         title="Funções e cargos"
-        description="Gerencie o catálogo de cargos da sua empresa: cadastre, consulte e edite dentro do seu escopo autorizado. Funções aguardam decisão formal de modelo de domínio."
+        description={
+          podeOperar
+            ? "Gerencie o catálogo de cargos da sua empresa: cadastre, consulte e edite dentro do seu escopo autorizado. Funções aguardam decisão formal de modelo de domínio."
+            : "Consulte o catálogo de cargos da sua empresa. Funções aguardam decisão formal de modelo de domínio."
+        }
         actions={
-          <Button onClick={abrirCriar} disabled={!podeCriar}>
-            Novo cargo
-          </Button>
+          podeOperar ? (
+            <Button onClick={abrirCriar} disabled={!podeCriar}>
+              Novo cargo
+            </Button>
+          ) : undefined
         }
       />
 
@@ -257,15 +283,16 @@ export function FuncoesCargosScreen() {
         className="funcoes-cargos-screen__aviso"
         aria-labelledby="funcoes-cargos-aviso-rh-titulo"
       >
-        <StatusBadge variant="info">Somente RH</StatusBadge>
+        <StatusBadge variant="info">
+          {podeOperar ? "Somente RH" : "Somente consulta"}
+        </StatusBadge>
         <p
           id="funcoes-cargos-aviso-rh-titulo"
           className="funcoes-cargos-screen__aviso-texto"
         >
-          Somente o RH da própria empresa administra o catálogo de cargos. Todas
-          as operações são restritas ao escopo autorizado e não concedem
-          permissão de acesso, alteram vínculo, remuneração, jornada, escala ou
-          Banco de Horas.
+          {podeOperar
+            ? "Somente o RH da própria empresa administra o catálogo de cargos. Todas as operações são restritas ao escopo autorizado e não concedem permissão de acesso, alteram vínculo, remuneração, jornada, escala ou Banco de Horas."
+            : "Você consulta o catálogo de cargos da empresa ativa. Só o RH cria, edita e inativa cargos."}
         </p>
       </Surface>
 
@@ -371,7 +398,7 @@ export function FuncoesCargosScreen() {
               title="Nenhum cargo cadastrado"
               description="Cadastre o primeiro cargo para esta empresa."
               action={
-                podeCriar ? (
+                podeOperar && podeCriar ? (
                   <Button onClick={abrirCriar}>Novo cargo</Button>
                 ) : undefined
               }
@@ -379,7 +406,7 @@ export function FuncoesCargosScreen() {
           ) : (
             <DataTable
               caption="Cargos"
-              columns={colunas}
+              columns={colunasVisiveis(colunas)}
               rows={cargos}
               rowKey={(linha) => linha.id}
             />

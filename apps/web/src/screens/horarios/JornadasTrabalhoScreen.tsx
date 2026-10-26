@@ -448,9 +448,17 @@ export function JornadasTrabalhoScreen({
         ? await desativarTabelaHorario(tabela.id)
         : await reativarTabelaHorario(tabela.id);
       setDetalhe({ tabela: atualizada, alterando: false, erro: null });
+      // Com o filtro de situação, a jornada que deixa de corresponder a ele
+      // sai da lista na hora (o detalhe continua aberto, com Reativar).
+      const saiDoFiltro =
+        (filtroAtivo === "ativo" && !atualizada.ativo) ||
+        (filtroAtivo === "inativo" && atualizada.ativo);
       setTabelas((prev) =>
-        prev.map((t) => (t.id === atualizada.id ? atualizada : t)),
+        saiDoFiltro
+          ? prev.filter((t) => t.id !== atualizada.id)
+          : prev.map((t) => (t.id === atualizada.id ? atualizada : t)),
       );
+      if (saiDoFiltro) setTotal((anterior) => Math.max(0, anterior - 1));
       setAviso(
         atualizada.ativo
           ? `Jornada ${rotuloDe(atualizada)} reativada.`

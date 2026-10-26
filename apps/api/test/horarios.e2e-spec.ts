@@ -1283,6 +1283,74 @@ describe("Cadastros: Horarios e vinculo ao colaborador (e2e)", () => {
       },
     );
 
+    // `null` não é "não alterar": é recusado antes do serviço. Sem isso, o
+    // código seria apagado (ou daria 409 falso contra jornadas antigas sem
+    // código) e o nome nulo viraria 500 no Prisma.
+    it.each([
+      ["codigo: null", { codigo: null }],
+      ["nome: null", { nome: null }],
+      ["os dois nulos", { codigo: null, nome: null }],
+      ["nome válido e codigo: null", { nome: "Outro nome T182", codigo: null }],
+    ])(
+      "edição com %s: 400, nada muda e nenhuma trilha de edição",
+      async (_caso, corpo) => {
+        // Uma jornada antiga sem código na mesma empresa: o 409 falso viria
+        // dela, se o `null` chegasse à consulta de código em uso.
+        await comPrisma(async (p) => {
+          const usuario = await p.accessUser.findFirstOrThrow({
+            where: { role: "rh", companyId: empresaA },
+          });
+          await p.tabelaHorario.create({
+            data: {
+              empresaId: empresaA,
+              nome: `Antiga sem codigo nulo ${_caso}`,
+              criadoPorUserId: usuario.id,
+            },
+          });
+        });
+        const { id, body } = await criarTabela(rhA, `Nulo ${_caso} T182`);
+        const r = await patch(`/v1/horarios/${id}`, rhA)
+          .send(corpo)
+          .expect(400);
+        expect(r.body.erros).toBeUndefined();
+        const atual = await get(`/v1/horarios/${id}`, rhA).expect(200);
+        expect(atual.body).toMatchObject({
+          codigo: body.codigo,
+          nome: `Nulo ${_caso} T182`,
+          periodos: body.periodos,
+        });
+        expect(
+          await comPrisma((p) =>
+            p.auditEvent.count({
+              where: { action: "horarios_tabela_editada", resourceId: id },
+            }),
+          ),
+        ).toBe(0);
+      },
+    );
+
+    it("criar com codigo: null continua recusado (400), e nada é criado", async () => {
+      const nome = "Criacao codigo nulo T182";
+      await post("/v1/horarios", rhA)
+        .send({ codigo: null, nome, periodos: [] })
+        .expect(400);
+      expect(
+        await comPrisma((p) => p.tabelaHorario.count({ where: { nome } })),
+      ).toBe(0);
+    });
+
+    it("campo ausente segue sendo 'não alterar': só o nome muda", async () => {
+      const { id, body } = await criarTabela(rhA, "Ausente T182", GRADE_44H);
+      const r = await patch(`/v1/horarios/${id}`, rhA)
+        .send({ nome: "Ausente Renomeada T182" })
+        .expect(200);
+      expect(r.body).toMatchObject({
+        codigo: body.codigo,
+        nome: "Ausente Renomeada T182",
+        periodos: body.periodos,
+      });
+    });
+
     it("tabela criada antes do código aparece sem código e ganha um pela edição", async () => {
       const antiga = await comPrisma(async (p) => {
         const usuario = await p.accessUser.findFirstOrThrow({

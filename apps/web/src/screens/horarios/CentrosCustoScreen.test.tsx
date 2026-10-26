@@ -98,7 +98,7 @@ describe("CentrosCustoScreen (T109 — funcional)", () => {
 
   it("tem um único h1", async () => {
     mockSucesso();
-    render(<CentrosCustoScreen />);
+    render(<CentrosCustoScreen podeOperar />);
 
     await waitFor(() =>
       expect(
@@ -110,7 +110,7 @@ describe("CentrosCustoScreen (T109 — funcional)", () => {
 
   it("exibe os avisos de escopo, auditoria e referências organizacionais", async () => {
     mockSucesso();
-    render(<CentrosCustoScreen />);
+    render(<CentrosCustoScreen podeOperar />);
 
     await waitFor(() =>
       expect(screen.getByText("Somente RH")).toBeInTheDocument(),
@@ -132,7 +132,7 @@ describe("CentrosCustoScreen (T109 — funcional)", () => {
 
   it("lista centros de custo com código, nome, situação e botão Editar", async () => {
     mockSucesso();
-    render(<CentrosCustoScreen />);
+    render(<CentrosCustoScreen podeOperar />);
 
     const tabela = await screen.findByRole("table", {
       name: "Centros de custo",
@@ -154,7 +154,7 @@ describe("CentrosCustoScreen (T109 — funcional)", () => {
 
   it("status 'ativo' exibe rótulo 'Ativo' e 'inativo' exibe 'Inativo'", async () => {
     mockSucesso([cc1, cc2]);
-    render(<CentrosCustoScreen />);
+    render(<CentrosCustoScreen podeOperar />);
 
     const tabela = await screen.findByRole("table", {
       name: "Centros de custo",
@@ -167,7 +167,7 @@ describe("CentrosCustoScreen (T109 — funcional)", () => {
 
   it("mostra EmptyState quando não há centros de custo", async () => {
     mockSucesso([]);
-    render(<CentrosCustoScreen />);
+    render(<CentrosCustoScreen podeOperar />);
 
     await waitFor(() =>
       expect(
@@ -184,7 +184,7 @@ describe("CentrosCustoScreen (T109 — funcional)", () => {
   it("mostra erro e permite tentar novamente", async () => {
     mockListarEmpresas.mockRejectedValue(new Error("falha de rede"));
     mockListarCentrosCusto.mockRejectedValue(new Error("falha de rede"));
-    render(<CentrosCustoScreen />);
+    render(<CentrosCustoScreen podeOperar />);
 
     await waitFor(() =>
       expect(
@@ -202,7 +202,7 @@ describe("CentrosCustoScreen (T109 — funcional)", () => {
 
   it("filtra por situação chamando a API com o parâmetro status correto", async () => {
     mockSucesso();
-    render(<CentrosCustoScreen />);
+    render(<CentrosCustoScreen podeOperar />);
     await screen.findByRole("table", { name: "Centros de custo" });
 
     mockListarCentrosCusto.mockResolvedValue({
@@ -225,7 +225,7 @@ describe("CentrosCustoScreen (T109 — funcional)", () => {
 
   it("o filtro envia 'inativo' (não 'inativa') para a API", async () => {
     mockSucesso();
-    render(<CentrosCustoScreen />);
+    render(<CentrosCustoScreen podeOperar />);
     await screen.findByRole("table", { name: "Centros de custo" });
 
     mockListarCentrosCusto.mockResolvedValue({
@@ -260,7 +260,7 @@ describe("CentrosCustoScreen (T109 — funcional)", () => {
       total: 1,
     } satisfies ResultadoPaginado<CentroCustoApi>);
 
-    render(<CentrosCustoScreen />);
+    render(<CentrosCustoScreen podeOperar />);
     await screen.findByRole("table", { name: "Centros de custo" });
 
     expect(
@@ -276,7 +276,7 @@ describe("CentrosCustoScreen (T109 — funcional)", () => {
       codigo: "CC_FIN",
       nome: "Centro Financeiro (teste)",
     });
-    render(<CentrosCustoScreen />);
+    render(<CentrosCustoScreen podeOperar />);
     await screen.findByRole("table", { name: "Centros de custo" });
 
     fireEvent.click(
@@ -318,7 +318,7 @@ describe("CentrosCustoScreen (T109 — funcional)", () => {
 
   it("código inválido exibe mensagem de erro", async () => {
     mockSucesso();
-    render(<CentrosCustoScreen />);
+    render(<CentrosCustoScreen podeOperar />);
     await screen.findByRole("table", { name: "Centros de custo" });
 
     fireEvent.click(
@@ -343,7 +343,7 @@ describe("CentrosCustoScreen (T109 — funcional)", () => {
 
   it("exige seleção explícita de empresa quando há mais de uma no escopo", async () => {
     mockMultiEmpresa();
-    render(<CentrosCustoScreen />);
+    render(<CentrosCustoScreen podeOperar />);
     await screen.findByRole("table", { name: "Centros de custo" });
 
     fireEvent.click(
@@ -379,7 +379,7 @@ describe("CentrosCustoScreen (T109 — funcional)", () => {
       codigo: "CC_FIN",
       nome: "Centro Financeiro (teste)",
     });
-    render(<CentrosCustoScreen />);
+    render(<CentrosCustoScreen podeOperar />);
     await screen.findByRole("table", { name: "Centros de custo" });
 
     fireEvent.click(
@@ -423,7 +423,7 @@ describe("CentrosCustoScreen (T109 — funcional)", () => {
       total: 2,
     } satisfies ResultadoPaginado<CentroCustoApi>);
 
-    render(<CentrosCustoScreen />);
+    render(<CentrosCustoScreen podeOperar />);
     const tabela = await screen.findByRole("table", {
       name: "Centros de custo",
     });
@@ -454,7 +454,7 @@ describe("CentrosCustoScreen (T109 — funcional)", () => {
 
   it("cancelar fecha o formulário sem chamar a API", async () => {
     mockSucesso();
-    render(<CentrosCustoScreen />);
+    render(<CentrosCustoScreen podeOperar />);
     await screen.findByRole("table", { name: "Centros de custo" });
 
     fireEvent.click(
@@ -491,7 +491,7 @@ describe("CentrosCustoScreen (T109 — funcional)", () => {
         total: 2,
       } satisfies ResultadoPaginado<CentroCustoApi>);
 
-    render(<CentrosCustoScreen />);
+    render(<CentrosCustoScreen podeOperar />);
     await screen.findByRole("table", { name: "Centros de custo" });
 
     fireEvent.click(
@@ -516,7 +516,7 @@ describe("CentrosCustoScreen (T109 — funcional)", () => {
 
   it("não contém dados sensíveis, marca de terceiro ou valor financeiro", async () => {
     mockSucesso();
-    render(<CentrosCustoScreen />);
+    render(<CentrosCustoScreen podeOperar />);
     await screen.findByRole("table", { name: "Centros de custo" });
 
     const texto = document.body.innerHTML.toLowerCase();
@@ -537,7 +537,7 @@ describe("CentrosCustoScreen (T109 — funcional)", () => {
 
   it("não declara conformidade com CLT, CCT/ACT, Portaria 671, LGPD ou eSocial", async () => {
     mockSucesso();
-    render(<CentrosCustoScreen />);
+    render(<CentrosCustoScreen podeOperar />);
     await screen.findByRole("table", { name: "Centros de custo" });
 
     const texto = document.body.innerHTML.toLowerCase();
@@ -550,5 +550,59 @@ describe("CentrosCustoScreen (T109 — funcional)", () => {
     ]) {
       expect(texto).not.toContain(termoProibido);
     }
+  });
+});
+
+/**
+ * T182 — controles de escrita visíveis: criar ("Nova…"/"Novo…"), editar,
+ * inativar e reativar. Para um perfil leitor, como o DP, a lista é vazia.
+ */
+function botoesDeEscrita(): HTMLElement[] {
+  return screen
+    .queryAllByRole("button")
+    .filter((b) =>
+      /^(Nova|Novo|Editar|Inativar|Reativar)\b/.test(
+        b.textContent?.trim() ?? "",
+      ),
+    );
+}
+
+describe("CentrosCustoScreen — perfil leitor, como o DP (T182)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockSucesso();
+  });
+
+  it("diz 'Somente consulta' e lista sem nenhum controle de escrita", async () => {
+    render(<CentrosCustoScreen />);
+
+    expect(screen.getByText("Somente consulta")).toBeInTheDocument();
+    expect(screen.queryByText("Somente RH")).toBeNull();
+    expect(
+      await screen.findAllByRole("cell", { name: cc1.nome }),
+    ).not.toHaveLength(0);
+    expect(botoesDeEscrita()).toEqual([]);
+    expect(screen.queryByRole("columnheader", { name: "Ações" })).toBeNull();
+    expect(mockCriarCentroCusto).not.toHaveBeenCalled();
+  });
+
+  it("estado vazio para o leitor não oferece criar", async () => {
+    mockSucesso([]);
+    render(<CentrosCustoScreen />);
+    await screen.findByText("Nenhum centro de custo cadastrado");
+    expect(botoesDeEscrita()).toEqual([]);
+  });
+
+  it("o RH (quem opera) mantém criar, editar e inativar", async () => {
+    render(<CentrosCustoScreen podeOperar />);
+    expect(
+      await screen.findAllByRole("cell", { name: cc1.nome }),
+    ).not.toHaveLength(0);
+    const rotulos = botoesDeEscrita().map((b) => b.textContent?.trim());
+    expect(rotulos).toContain("Novo centro de custo");
+    expect(rotulos).toContain("Editar");
+    expect(rotulos.some((r) => /^(Inativar|Reativar)/.test(r ?? ""))).toBe(
+      true,
+    );
   });
 });

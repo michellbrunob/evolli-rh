@@ -58,6 +58,13 @@ Leitura do código em `main` (`b6442f3`):
   ela, o destino Estrutura passa a abrir na Estrutura organizacional, que o DP
   já lia: o DP passa a ter o cartão de Estrutura no Hub. Nenhuma permissão do
   servidor muda por isso.
+- Aprovado pela proprietária **só para consulta**: Estrutura organizacional,
+  Funções e cargos e Centros de custo passam a esconder criar, editar,
+  inativar e reativar de quem não opera e mostram "Somente consulta". Operam
+  `rh` e `master_tecnico`, como no servidor (`evaluateOrganizacao`), que
+  segue recusando escrita do DP.
+- A edição de uma jornada recusa `null` em código ou nome (400): campo
+  ausente é "não alterar", e nada apaga o código nem o nome por envio direto.
 
 ## 4. Dias e horários continuam imutáveis
 

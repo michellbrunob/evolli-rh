@@ -60,7 +60,19 @@ interface FormularioState {
   salvando: boolean;
 }
 
-export function CentrosCustoScreen() {
+export interface CentrosCustoScreenProps {
+  /**
+   * T182 — o perfil OPERA os centros de custo (criar, editar, inativar e reativar):
+   * `rh` e `master_tecnico` (ver `podeOperarEstrutura`). Sem isso a tela é só
+   * consulta: nenhum controle de escrita aparece. Só orienta a tela — quem
+   * recusa é o servidor.
+   */
+  readonly podeOperar?: boolean;
+}
+
+export function CentrosCustoScreen({
+  podeOperar = false,
+}: CentrosCustoScreenProps) {
   const [statusCarregamento, setStatusCarregamento] = useState<
     "carregando" | "erro" | "dados"
   >("carregando");
@@ -239,17 +251,31 @@ export function CentrosCustoScreen() {
 
   const podeCriar = statusCarregamento === "dados" && empresas.length > 0;
 
+  /** T182 — sem `podeOperar`, a coluna de ações (editar, inativar e
+   * reativar) não aparece. */
+  function colunasVisiveis<T>(
+    colunas: DataTableColumn<T>[],
+  ): DataTableColumn<T>[] {
+    return podeOperar ? colunas : colunas.filter((c) => c.key !== "acoes");
+  }
+
   return (
     <div className="centros-custo-screen">
       <PageHeader
         headingLevel={1}
         titleId={CENTROS_CUSTO_TITULO_ID}
         title="Centros de custo"
-        description="Gerencie os centros de custo da sua empresa: cadastre, consulte e edite dentro do seu escopo autorizado. Centro de custo é referência organizacional e não cria rateio, orçamento ou lançamento contábil."
+        description={
+          podeOperar
+            ? "Gerencie os centros de custo da sua empresa: cadastre, consulte e edite dentro do seu escopo autorizado. Centro de custo é referência organizacional e não cria rateio, orçamento ou lançamento contábil."
+            : "Consulte os centros de custo da sua empresa. Centro de custo é referência organizacional e não cria rateio, orçamento ou lançamento contábil."
+        }
         actions={
-          <Button onClick={abrirCriar} disabled={!podeCriar}>
-            Novo centro de custo
-          </Button>
+          podeOperar ? (
+            <Button onClick={abrirCriar} disabled={!podeCriar}>
+              Novo centro de custo
+            </Button>
+          ) : undefined
         }
       />
 
@@ -259,15 +285,16 @@ export function CentrosCustoScreen() {
         className="centros-custo-screen__aviso"
         aria-labelledby="centros-custo-aviso-rh-titulo"
       >
-        <StatusBadge variant="info">Somente RH</StatusBadge>
+        <StatusBadge variant="info">
+          {podeOperar ? "Somente RH" : "Somente consulta"}
+        </StatusBadge>
         <p
           id="centros-custo-aviso-rh-titulo"
           className="centros-custo-screen__aviso-texto"
         >
-          Somente o RH da própria empresa administra centros de custo. Todas as
-          operações são restritas ao escopo autorizado e não concedem permissão
-          de acesso, alteram vínculo, remuneração, jornada, escala ou Banco de
-          Horas.
+          {podeOperar
+            ? "Somente o RH da própria empresa administra centros de custo. Todas as operações são restritas ao escopo autorizado e não concedem permissão de acesso, alteram vínculo, remuneração, jornada, escala ou Banco de Horas."
+            : "Você consulta os centros de custo da empresa ativa. Só o RH cria, edita e inativa centros de custo."}
         </p>
       </Surface>
 
@@ -374,7 +401,7 @@ export function CentrosCustoScreen() {
               title="Nenhum centro de custo cadastrado"
               description="Cadastre o primeiro centro de custo para esta empresa."
               action={
-                podeCriar ? (
+                podeOperar && podeCriar ? (
                   <Button onClick={abrirCriar}>Novo centro de custo</Button>
                 ) : undefined
               }
@@ -382,7 +409,7 @@ export function CentrosCustoScreen() {
           ) : (
             <DataTable
               caption="Centros de custo"
-              columns={colunas}
+              columns={colunasVisiveis(colunas)}
               rows={centrosCusto}
               rowKey={(linha) => linha.id}
             />

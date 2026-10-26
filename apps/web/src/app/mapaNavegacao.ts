@@ -147,6 +147,23 @@ export function podeOperarJornadas(papel: string | null): boolean {
 }
 
 /**
+ * T182 — papéis que OPERAM a Estrutura organizacional, os cargos e os centros
+ * de custo (criar, editar, inativar e reativar): `rh` na própria empresa e
+ * `master_tecnico`. Espelha `evaluateOrganizacao` em `rbac.evaluator.ts`, em
+ * que o `dp` só lê. Com o cartão de Estrutura oferecido ao DP, a tela precisa
+ * saber disso para ser, de fato, só consulta. Só ORIENTA a tela: quem recusa
+ * é o servidor.
+ */
+export const PAPEIS_OPERACAO_ESTRUTURA: readonly string[] = [
+  "rh",
+  "master_tecnico",
+];
+
+export function podeOperarEstrutura(papel: string | null): boolean {
+  return papel !== null && PAPEIS_OPERACAO_ESTRUTURA.includes(papel);
+}
+
+/**
  * Os cinco módulos da navegação primária, mais Demonstração.
  *
  * A ordem é de uso: quem se opera no dia a dia vem antes do que se administra,

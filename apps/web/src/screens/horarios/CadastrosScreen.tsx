@@ -172,11 +172,18 @@ export interface CadastrosScreenProps {
    * `<main>` (`aria-labelledby`) mesmo quando a aba muda sem trocar de
    * destino. Não é navegação real — só sincroniza o rótulo de acessibilidade. */
   onTituloIdChange?: (tituloId: string) => void;
+  /**
+   * T182 — o perfil opera as abas funcionais (Estrutura organizacional,
+   * Funções e cargos, Centros de custo). Sem isso elas são só consulta.
+   * Padrão `false`: quem não diz o papel não recebe controle de escrita.
+   */
+  podeOperar?: boolean;
 }
 
 export function CadastrosScreen({
   onTituloIdChange,
   modo = "funcional",
+  podeOperar = false,
 }: CadastrosScreenProps) {
   // Só as abas do modo. `ABAS` continua sendo a fonte única; o filtro é
   // de apresentação, e a primeira aba do conjunto vira o padrão — assim
@@ -227,17 +234,17 @@ export function CadastrosScreen({
         className="cadastros-screen__panel"
       >
         {abaAtiva === "estrutura" ? (
-          <EstruturaOrganizacionalScreen />
+          <EstruturaOrganizacionalScreen podeOperar={podeOperar} />
         ) : abaAtiva === "feriados" ? (
           <CalendarioFeriadosScreen />
         ) : abaAtiva === "politicas_bh" ? (
           <PoliticasBancoHorasScreen />
         ) : abaAtiva === "funcoes_cargos" ? (
-          <FuncoesCargosScreen />
+          <FuncoesCargosScreen podeOperar={podeOperar} />
         ) : abaAtiva === "motivos_ausencia_justificativas" ? (
           <MotivosAusenciaJustificativasScreen />
         ) : abaAtiva === "centros_custo" ? (
-          <CentrosCustoScreen />
+          <CentrosCustoScreen podeOperar={podeOperar} />
         ) : abaAtiva === "tipos_documento" ? (
           <TiposDocumentoScreen />
         ) : abaAtiva === "motivos_desligamento" ? (

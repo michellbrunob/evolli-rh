@@ -13,6 +13,7 @@ import {
   MaxLength,
   Min,
   MinLength,
+  ValidateIf,
   ValidateNested,
 } from "class-validator";
 import { DIAS_SEMANA } from "../horarios.types";
@@ -75,21 +76,25 @@ export class CriarTabelaHorarioDto {
   periodos!: PeriodoHorarioInputDto[];
 }
 
-/** Vincula uma tabela a um colaborador com vigência (início e fim opcional). */
 /**
  * T182 — edição de uma jornada: só NOME e CÓDIGO. Os períodos (dias e
  * horários) são imutáveis desde a T038 — no banco, inclusive —, e um corpo com
  * `periodos` é recusado pelo `forbidNonWhitelisted`. Ao menos um dos dois.
+ *
+ * Campo AUSENTE (`undefined`) é "não alterar". `null` NÃO é ausência: o
+ * `@IsOptional()` pularia a validação de `null`, e a edição apagaria o código
+ * (ou quebraria no banco com o nome). Por isso `@ValidateIf` só pula o
+ * `undefined`, e `null` é recusado com 400.
  */
 export class EditarTabelaHorarioDto {
-  @IsOptional()
+  @ValidateIf((_, valor) => valor !== undefined)
   @IsString()
   @Matches(CODIGO_JORNADA, {
     message: "codigo deve ter de 2 a 32 letras maiusculas, digitos ou _.",
   })
   codigo?: string;
 
-  @IsOptional()
+  @ValidateIf((_, valor) => valor !== undefined)
   @Transform(({ value }) => aparar(value))
   @IsString()
   @MinLength(1)
@@ -97,6 +102,7 @@ export class EditarTabelaHorarioDto {
   nome?: string;
 }
 
+/** Vincula uma tabela a um colaborador com vigência (início e fim opcional). */
 export class CriarVinculoHorarioDto {
   @IsUUID()
   colaboradorId!: string;

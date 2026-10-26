@@ -263,7 +263,7 @@ describe("EstruturaOrganizacionalScreen (T104 — funcional)", () => {
 
   it("tem um único h1", async () => {
     mockSucesso();
-    render(<EstruturaOrganizacionalScreen />);
+    render(<EstruturaOrganizacionalScreen podeOperar />);
 
     await waitFor(() =>
       expect(
@@ -278,7 +278,7 @@ describe("EstruturaOrganizacionalScreen (T104 — funcional)", () => {
 
   it("exibe o aviso 'Somente RH' com texto de escopo e o aviso 'Auditado' com trilha de auditoria", async () => {
     mockSucesso();
-    render(<EstruturaOrganizacionalScreen />);
+    render(<EstruturaOrganizacionalScreen podeOperar />);
 
     await waitFor(() =>
       expect(screen.getByText("Somente RH")).toBeInTheDocument(),
@@ -294,7 +294,7 @@ describe("EstruturaOrganizacionalScreen (T104 — funcional)", () => {
 
   it("lista unidades com código, nome, situação e botão Editar", async () => {
     mockSucesso();
-    render(<EstruturaOrganizacionalScreen />);
+    render(<EstruturaOrganizacionalScreen podeOperar />);
 
     const tabela = await screen.findByRole("table", {
       name: "Unidades organizacionais",
@@ -316,7 +316,7 @@ describe("EstruturaOrganizacionalScreen (T104 — funcional)", () => {
 
   it("mostra EmptyState quando não há unidades cadastradas", async () => {
     mockSucesso([]);
-    render(<EstruturaOrganizacionalScreen />);
+    render(<EstruturaOrganizacionalScreen podeOperar />);
 
     await waitFor(() =>
       expect(
@@ -333,7 +333,7 @@ describe("EstruturaOrganizacionalScreen (T104 — funcional)", () => {
   it("mostra erro e permite tentar novamente", async () => {
     mockListarEmpresas.mockRejectedValue(new Error("falha de rede"));
     mockListarUnidades.mockRejectedValue(new Error("falha de rede"));
-    render(<EstruturaOrganizacionalScreen />);
+    render(<EstruturaOrganizacionalScreen podeOperar />);
 
     await waitFor(() =>
       expect(
@@ -351,7 +351,7 @@ describe("EstruturaOrganizacionalScreen (T104 — funcional)", () => {
 
   it("filtra por situação chamando a API com o parâmetro status", async () => {
     mockSucesso();
-    render(<EstruturaOrganizacionalScreen />);
+    render(<EstruturaOrganizacionalScreen podeOperar />);
     await screen.findByRole("table", { name: "Unidades organizacionais" });
 
     mockListarUnidades.mockResolvedValue({
@@ -380,7 +380,7 @@ describe("EstruturaOrganizacionalScreen (T104 — funcional)", () => {
       codigo: "UNID_TESTE",
       nome: "Unidade Teste",
     });
-    render(<EstruturaOrganizacionalScreen />);
+    render(<EstruturaOrganizacionalScreen podeOperar />);
     await screen.findByRole("table", { name: "Unidades organizacionais" });
 
     fireEvent.click(screen.getByRole("button", { name: "Nova unidade" }));
@@ -415,7 +415,7 @@ describe("EstruturaOrganizacionalScreen (T104 — funcional)", () => {
 
   it("código inválido no formulário de criação exibe mensagem de erro", async () => {
     mockSucesso();
-    render(<EstruturaOrganizacionalScreen />);
+    render(<EstruturaOrganizacionalScreen podeOperar />);
     await screen.findByRole("table", { name: "Unidades organizacionais" });
 
     fireEvent.click(screen.getByRole("button", { name: "Nova unidade" }));
@@ -449,7 +449,7 @@ describe("EstruturaOrganizacionalScreen (T104 — funcional)", () => {
       total: 2,
     } satisfies ResultadoPaginado<UnidadeOrganizacionalApi>);
 
-    render(<EstruturaOrganizacionalScreen />);
+    render(<EstruturaOrganizacionalScreen podeOperar />);
     const tabela = await screen.findByRole("table", {
       name: "Unidades organizacionais",
     });
@@ -480,7 +480,7 @@ describe("EstruturaOrganizacionalScreen (T104 — funcional)", () => {
 
   it("cancelar fecha o formulário sem chamar a API", async () => {
     mockSucesso();
-    render(<EstruturaOrganizacionalScreen />);
+    render(<EstruturaOrganizacionalScreen podeOperar />);
     await screen.findByRole("table", { name: "Unidades organizacionais" });
 
     fireEvent.click(screen.getByRole("button", { name: "Nova unidade" }));
@@ -497,7 +497,7 @@ describe("EstruturaOrganizacionalScreen (T104 — funcional)", () => {
 
   it("não contém razão social, CNPJ, nome de pessoa, endereço, documento ou valor financeiro", async () => {
     mockSucesso();
-    render(<EstruturaOrganizacionalScreen />);
+    render(<EstruturaOrganizacionalScreen podeOperar />);
     await screen.findByRole("table", { name: "Unidades organizacionais" });
 
     const texto = document.body.innerHTML.toLowerCase();
@@ -518,7 +518,7 @@ describe("EstruturaOrganizacionalScreen (T104 — funcional)", () => {
 
   it("não declara conformidade com CLT, CCT/ACT, Portaria 671, LGPD ou eSocial", async () => {
     mockSucesso();
-    render(<EstruturaOrganizacionalScreen />);
+    render(<EstruturaOrganizacionalScreen podeOperar />);
     await screen.findByRole("table", { name: "Unidades organizacionais" });
 
     const texto = document.body.innerHTML.toLowerCase();
@@ -535,7 +535,7 @@ describe("EstruturaOrganizacionalScreen (T104 — funcional)", () => {
 
   it("estrutura de abas é acessível: tablist com quatro tabs, aba ativa marcada", async () => {
     mockSucesso();
-    render(<EstruturaOrganizacionalScreen />);
+    render(<EstruturaOrganizacionalScreen podeOperar />);
     await screen.findByRole("table", { name: "Unidades organizacionais" });
 
     const tablist = screen.getByRole("tablist");
@@ -566,7 +566,7 @@ describe("EstruturaOrganizacionalScreen — Departamentos (T106)", () => {
   it("seleciona a aba Departamentos e exibe a lista", async () => {
     mockSucesso();
     mockSucessoDep();
-    render(<EstruturaOrganizacionalScreen />);
+    render(<EstruturaOrganizacionalScreen podeOperar />);
     await screen.findByRole("table", { name: "Unidades organizacionais" });
 
     await ativarAbaDepartamentos();
@@ -586,7 +586,7 @@ describe("EstruturaOrganizacionalScreen — Departamentos (T106)", () => {
   it("aba Departamentos marcada como ativa após seleção", async () => {
     mockSucesso();
     mockSucessoDep();
-    render(<EstruturaOrganizacionalScreen />);
+    render(<EstruturaOrganizacionalScreen podeOperar />);
     await screen.findByRole("table", { name: "Unidades organizacionais" });
 
     await ativarAbaDepartamentos();
@@ -604,7 +604,7 @@ describe("EstruturaOrganizacionalScreen — Departamentos (T106)", () => {
   it("exibe EmptyState quando não há departamentos cadastrados", async () => {
     mockSucesso();
     mockSucessoDep([]);
-    render(<EstruturaOrganizacionalScreen />);
+    render(<EstruturaOrganizacionalScreen podeOperar />);
     await screen.findByRole("table", { name: "Unidades organizacionais" });
 
     await ativarAbaDepartamentos();
@@ -625,7 +625,7 @@ describe("EstruturaOrganizacionalScreen — Departamentos (T106)", () => {
     mockSucesso();
     mockListarEmpresasMulti.mockRejectedValue(new Error("falha"));
     mockListarDepartamentos.mockRejectedValue(new Error("falha"));
-    render(<EstruturaOrganizacionalScreen />);
+    render(<EstruturaOrganizacionalScreen podeOperar />);
     await screen.findByRole("table", { name: "Unidades organizacionais" });
 
     await ativarAbaDepartamentos();
@@ -653,7 +653,7 @@ describe("EstruturaOrganizacionalScreen — Departamentos (T106)", () => {
       codigo: "MKT",
       nome: "Marketing",
     });
-    render(<EstruturaOrganizacionalScreen />);
+    render(<EstruturaOrganizacionalScreen podeOperar />);
     await screen.findByRole("table", { name: "Unidades organizacionais" });
 
     await ativarAbaDepartamentos();
@@ -691,7 +691,7 @@ describe("EstruturaOrganizacionalScreen — Departamentos (T106)", () => {
   it("código inválido no formulário de departamento exibe mensagem de erro", async () => {
     mockSucesso();
     mockSucessoDep([dep1]);
-    render(<EstruturaOrganizacionalScreen />);
+    render(<EstruturaOrganizacionalScreen podeOperar />);
     await screen.findByRole("table", { name: "Unidades organizacionais" });
 
     await ativarAbaDepartamentos();
@@ -717,7 +717,7 @@ describe("EstruturaOrganizacionalScreen — Departamentos (T106)", () => {
   it("sem empresa selector quando há empresa única no criar", async () => {
     mockSucesso();
     mockSucessoDep([dep1], [empresaFixture]);
-    render(<EstruturaOrganizacionalScreen />);
+    render(<EstruturaOrganizacionalScreen podeOperar />);
     await screen.findByRole("table", { name: "Unidades organizacionais" });
 
     await ativarAbaDepartamentos();
@@ -736,7 +736,7 @@ describe("EstruturaOrganizacionalScreen — Departamentos (T106)", () => {
   it("mostra selector de empresa quando há múltiplas empresas no criar", async () => {
     mockSucesso();
     mockSucessoDep([dep1], [empresaFixture, empresa2Fixture]);
-    render(<EstruturaOrganizacionalScreen />);
+    render(<EstruturaOrganizacionalScreen podeOperar />);
     await screen.findByRole("table", { name: "Unidades organizacionais" });
 
     await ativarAbaDepartamentos();
@@ -766,7 +766,7 @@ describe("EstruturaOrganizacionalScreen — Departamentos (T106)", () => {
       total: 2,
     } satisfies ResultadoPaginado<DepartamentoApi>);
 
-    render(<EstruturaOrganizacionalScreen />);
+    render(<EstruturaOrganizacionalScreen podeOperar />);
     await screen.findByRole("table", { name: "Unidades organizacionais" });
 
     await ativarAbaDepartamentos();
@@ -812,7 +812,7 @@ describe("EstruturaOrganizacionalScreen — Departamentos (T106)", () => {
       atualizadoEm: "2026-01-01T00:00:00.000Z",
     };
     mockCriarDepartamento.mockResolvedValue(novoDep);
-    render(<EstruturaOrganizacionalScreen />);
+    render(<EstruturaOrganizacionalScreen podeOperar />);
     await screen.findByRole("table", { name: "Unidades organizacionais" });
 
     await ativarAbaDepartamentos();
@@ -846,7 +846,7 @@ describe("EstruturaOrganizacionalScreen — Departamentos (T106)", () => {
   it("cancelar formulário de departamento fecha sem chamar a API", async () => {
     mockSucesso();
     mockSucessoDep([dep1]);
-    render(<EstruturaOrganizacionalScreen />);
+    render(<EstruturaOrganizacionalScreen podeOperar />);
     await screen.findByRole("table", { name: "Unidades organizacionais" });
 
     await ativarAbaDepartamentos();
@@ -865,7 +865,7 @@ describe("EstruturaOrganizacionalScreen — Departamentos (T106)", () => {
   it("não regressão — aba Unidades funciona após ativar e retornar da aba Departamentos", async () => {
     mockSucesso();
     mockSucessoDep();
-    render(<EstruturaOrganizacionalScreen />);
+    render(<EstruturaOrganizacionalScreen podeOperar />);
     await screen.findByRole("table", { name: "Unidades organizacionais" });
 
     await ativarAbaDepartamentos();
@@ -882,7 +882,7 @@ describe("EstruturaOrganizacionalScreen — Departamentos (T106)", () => {
   it("não contém razão social, CNPJ, nome de pessoa, endereço ou valor financeiro (departamentos)", async () => {
     mockSucesso();
     mockSucessoDep();
-    render(<EstruturaOrganizacionalScreen />);
+    render(<EstruturaOrganizacionalScreen podeOperar />);
     await screen.findByRole("table", { name: "Unidades organizacionais" });
 
     await ativarAbaDepartamentos();
@@ -913,7 +913,7 @@ describe("EstruturaOrganizacionalScreen — Áreas (T107)", () => {
   it("seleciona a aba Áreas e exibe a lista com referência de departamento", async () => {
     mockSucesso();
     mockSucessoArea();
-    render(<EstruturaOrganizacionalScreen />);
+    render(<EstruturaOrganizacionalScreen podeOperar />);
     await screen.findByRole("table", { name: "Unidades organizacionais" });
 
     await ativarAbaAreas();
@@ -937,7 +937,7 @@ describe("EstruturaOrganizacionalScreen — Áreas (T107)", () => {
   it("aba Áreas marcada como ativa após seleção", async () => {
     mockSucesso();
     mockSucessoArea();
-    render(<EstruturaOrganizacionalScreen />);
+    render(<EstruturaOrganizacionalScreen podeOperar />);
     await screen.findByRole("table", { name: "Unidades organizacionais" });
 
     await ativarAbaAreas();
@@ -959,7 +959,7 @@ describe("EstruturaOrganizacionalScreen — Áreas (T107)", () => {
   it("exibe EmptyState quando não há áreas cadastradas", async () => {
     mockSucesso();
     mockSucessoArea([]);
-    render(<EstruturaOrganizacionalScreen />);
+    render(<EstruturaOrganizacionalScreen podeOperar />);
     await screen.findByRole("table", { name: "Unidades organizacionais" });
 
     await ativarAbaAreas();
@@ -978,7 +978,7 @@ describe("EstruturaOrganizacionalScreen — Áreas (T107)", () => {
     mockSucesso();
     mockListarDepartamentosParaArea.mockRejectedValue(new Error("falha"));
     mockListarAreas.mockRejectedValue(new Error("falha"));
-    render(<EstruturaOrganizacionalScreen />);
+    render(<EstruturaOrganizacionalScreen podeOperar />);
     await screen.findByRole("table", { name: "Unidades organizacionais" });
 
     await ativarAbaAreas();
@@ -1006,7 +1006,7 @@ describe("EstruturaOrganizacionalScreen — Áreas (T107)", () => {
       codigo: "FISCAL",
       nome: "Fiscal (teste)",
     });
-    render(<EstruturaOrganizacionalScreen />);
+    render(<EstruturaOrganizacionalScreen podeOperar />);
     await screen.findByRole("table", { name: "Unidades organizacionais" });
 
     await ativarAbaAreas();
@@ -1045,7 +1045,7 @@ describe("EstruturaOrganizacionalScreen — Áreas (T107)", () => {
   it("código inválido no formulário de área exibe mensagem de erro", async () => {
     mockSucesso();
     mockSucessoArea([area1]);
-    render(<EstruturaOrganizacionalScreen />);
+    render(<EstruturaOrganizacionalScreen podeOperar />);
     await screen.findByRole("table", { name: "Unidades organizacionais" });
 
     await ativarAbaAreas();
@@ -1069,7 +1069,7 @@ describe("EstruturaOrganizacionalScreen — Áreas (T107)", () => {
   it("sem departamento selector quando há departamento único no criar", async () => {
     mockSucesso();
     mockSucessoArea([area1], [dep1]);
-    render(<EstruturaOrganizacionalScreen />);
+    render(<EstruturaOrganizacionalScreen podeOperar />);
     await screen.findByRole("table", { name: "Unidades organizacionais" });
 
     await ativarAbaAreas();
@@ -1088,7 +1088,7 @@ describe("EstruturaOrganizacionalScreen — Áreas (T107)", () => {
   it("mostra selector de departamento quando há múltiplos departamentos no criar", async () => {
     mockSucesso();
     mockSucessoArea([area1], [dep1, dep3]);
-    render(<EstruturaOrganizacionalScreen />);
+    render(<EstruturaOrganizacionalScreen podeOperar />);
     await screen.findByRole("table", { name: "Unidades organizacionais" });
 
     await ativarAbaAreas();
@@ -1107,7 +1107,7 @@ describe("EstruturaOrganizacionalScreen — Áreas (T107)", () => {
   it("nenhuma criação silenciosa no primeiro departamento quando há múltiplos", async () => {
     mockSucesso();
     mockSucessoArea([area1], [dep1, dep3]);
-    render(<EstruturaOrganizacionalScreen />);
+    render(<EstruturaOrganizacionalScreen podeOperar />);
     await screen.findByRole("table", { name: "Unidades organizacionais" });
 
     await ativarAbaAreas();
@@ -1147,7 +1147,7 @@ describe("EstruturaOrganizacionalScreen — Áreas (T107)", () => {
       total: 1,
     } satisfies ResultadoPaginado<AreaApi>);
 
-    render(<EstruturaOrganizacionalScreen />);
+    render(<EstruturaOrganizacionalScreen podeOperar />);
     await screen.findByRole("table", { name: "Unidades organizacionais" });
 
     await ativarAbaAreas();
@@ -1194,7 +1194,7 @@ describe("EstruturaOrganizacionalScreen — Áreas (T107)", () => {
       atualizadoEm: "2026-01-01T00:00:00.000Z",
     };
     mockCriarArea.mockResolvedValue(novaArea);
-    render(<EstruturaOrganizacionalScreen />);
+    render(<EstruturaOrganizacionalScreen podeOperar />);
     await screen.findByRole("table", { name: "Unidades organizacionais" });
 
     await ativarAbaAreas();
@@ -1226,7 +1226,7 @@ describe("EstruturaOrganizacionalScreen — Áreas (T107)", () => {
   it("cancelar formulário de área fecha sem chamar a API", async () => {
     mockSucesso();
     mockSucessoArea([area1]);
-    render(<EstruturaOrganizacionalScreen />);
+    render(<EstruturaOrganizacionalScreen podeOperar />);
     await screen.findByRole("table", { name: "Unidades organizacionais" });
 
     await ativarAbaAreas();
@@ -1246,7 +1246,7 @@ describe("EstruturaOrganizacionalScreen — Áreas (T107)", () => {
     mockSucesso();
     mockSucessoDep();
     mockSucessoArea();
-    render(<EstruturaOrganizacionalScreen />);
+    render(<EstruturaOrganizacionalScreen podeOperar />);
     await screen.findByRole("table", { name: "Unidades organizacionais" });
 
     await ativarAbaAreas();
@@ -1270,7 +1270,7 @@ describe("EstruturaOrganizacionalScreen — Áreas (T107)", () => {
   it("não contém razão social, CNPJ, nome de pessoa, endereço ou valor financeiro (áreas)", async () => {
     mockSucesso();
     mockSucessoArea();
-    render(<EstruturaOrganizacionalScreen />);
+    render(<EstruturaOrganizacionalScreen podeOperar />);
     await screen.findByRole("table", { name: "Unidades organizacionais" });
 
     await ativarAbaAreas();
@@ -1301,7 +1301,7 @@ describe("EstruturaOrganizacionalScreen — Equipes (T108)", () => {
   it("ativa aba Equipes e exibe lista com colunas Departamento e Unidade", async () => {
     mockSucesso();
     mockSucessoEquipe();
-    render(<EstruturaOrganizacionalScreen />);
+    render(<EstruturaOrganizacionalScreen podeOperar />);
     await screen.findByRole("table", { name: "Unidades organizacionais" });
 
     await ativarAbaEquipes();
@@ -1319,7 +1319,7 @@ describe("EstruturaOrganizacionalScreen — Equipes (T108)", () => {
 
   it("equipes não são carregadas enquanto a aba estiver inativa", async () => {
     mockSucesso();
-    render(<EstruturaOrganizacionalScreen />);
+    render(<EstruturaOrganizacionalScreen podeOperar />);
     await screen.findByRole("table", { name: "Unidades organizacionais" });
 
     expect(mockListarDepartamentosParaEquipe).not.toHaveBeenCalled();
@@ -1330,7 +1330,7 @@ describe("EstruturaOrganizacionalScreen — Equipes (T108)", () => {
   it("exibe EmptyState quando não há equipes cadastradas", async () => {
     mockSucesso();
     mockSucessoEquipe([]);
-    render(<EstruturaOrganizacionalScreen />);
+    render(<EstruturaOrganizacionalScreen podeOperar />);
     await screen.findByRole("table", { name: "Unidades organizacionais" });
 
     await ativarAbaEquipes();
@@ -1352,7 +1352,7 @@ describe("EstruturaOrganizacionalScreen — Equipes (T108)", () => {
     mockListarDepartamentosParaEquipe.mockRejectedValue(new Error("falha"));
     mockListarUnidadesParaEquipe.mockRejectedValue(new Error("falha"));
     mockListarEquipes.mockRejectedValue(new Error("falha"));
-    render(<EstruturaOrganizacionalScreen />);
+    render(<EstruturaOrganizacionalScreen podeOperar />);
     await screen.findByRole("table", { name: "Unidades organizacionais" });
 
     await ativarAbaEquipes();
@@ -1372,7 +1372,7 @@ describe("EstruturaOrganizacionalScreen — Equipes (T108)", () => {
   it("botão Nova equipe desabilitado quando não há departamentos ativos", async () => {
     mockSucesso();
     mockSucessoEquipe([], [dep2], []);
-    render(<EstruturaOrganizacionalScreen />);
+    render(<EstruturaOrganizacionalScreen podeOperar />);
     await screen.findByRole("table", { name: "Unidades organizacionais" });
 
     await ativarAbaEquipes();
@@ -1387,7 +1387,7 @@ describe("EstruturaOrganizacionalScreen — Equipes (T108)", () => {
   it("com único departamento ativo: abre formulário sem seletor de departamento", async () => {
     mockSucesso();
     mockSucessoEquipe([], [dep1]);
-    render(<EstruturaOrganizacionalScreen />);
+    render(<EstruturaOrganizacionalScreen podeOperar />);
     await screen.findByRole("table", { name: "Unidades organizacionais" });
 
     await ativarAbaEquipes();
@@ -1408,7 +1408,7 @@ describe("EstruturaOrganizacionalScreen — Equipes (T108)", () => {
   it("com múltiplos departamentos ativos: seletor obrigatório sem seleção silenciosa", async () => {
     mockSucesso();
     mockSucessoEquipe([], [dep1, dep3]);
-    render(<EstruturaOrganizacionalScreen />);
+    render(<EstruturaOrganizacionalScreen podeOperar />);
     await screen.findByRole("table", { name: "Unidades organizacionais" });
 
     await ativarAbaEquipes();
@@ -1446,7 +1446,7 @@ describe("EstruturaOrganizacionalScreen — Equipes (T108)", () => {
       ...equipe2,
       id: "00000000-0000-0000-0000-000000000099",
     });
-    render(<EstruturaOrganizacionalScreen />);
+    render(<EstruturaOrganizacionalScreen podeOperar />);
     await screen.findByRole("table", { name: "Unidades organizacionais" });
 
     await ativarAbaEquipes();
@@ -1484,7 +1484,7 @@ describe("EstruturaOrganizacionalScreen — Equipes (T108)", () => {
     mockSucesso();
     mockSucessoEquipe([], [dep1], [unidade1]);
     mockCriarEquipe.mockResolvedValue(equipe1);
-    render(<EstruturaOrganizacionalScreen />);
+    render(<EstruturaOrganizacionalScreen podeOperar />);
     await screen.findByRole("table", { name: "Unidades organizacionais" });
 
     await ativarAbaEquipes();
@@ -1526,7 +1526,7 @@ describe("EstruturaOrganizacionalScreen — Equipes (T108)", () => {
   it("valida código vazio na criação", async () => {
     mockSucesso();
     mockSucessoEquipe([], [dep1]);
-    render(<EstruturaOrganizacionalScreen />);
+    render(<EstruturaOrganizacionalScreen podeOperar />);
     await screen.findByRole("table", { name: "Unidades organizacionais" });
 
     await ativarAbaEquipes();
@@ -1554,7 +1554,7 @@ describe("EstruturaOrganizacionalScreen — Equipes (T108)", () => {
   it("valida nome vazio na criação", async () => {
     mockSucesso();
     mockSucessoEquipe([], [dep1]);
-    render(<EstruturaOrganizacionalScreen />);
+    render(<EstruturaOrganizacionalScreen podeOperar />);
     await screen.findByRole("table", { name: "Unidades organizacionais" });
 
     await ativarAbaEquipes();
@@ -1582,7 +1582,7 @@ describe("EstruturaOrganizacionalScreen — Equipes (T108)", () => {
   it("abre formulário de edição com código somente leitura e departamento/unidade imutáveis", async () => {
     mockSucesso();
     mockSucessoEquipe([equipe1], [dep1], [unidade1]);
-    render(<EstruturaOrganizacionalScreen />);
+    render(<EstruturaOrganizacionalScreen podeOperar />);
     await screen.findByRole("table", { name: "Unidades organizacionais" });
 
     await ativarAbaEquipes();
@@ -1616,7 +1616,7 @@ describe("EstruturaOrganizacionalScreen — Equipes (T108)", () => {
       ...equipe1,
       nome: "Equipe Financeira Editada (teste)",
     });
-    render(<EstruturaOrganizacionalScreen />);
+    render(<EstruturaOrganizacionalScreen podeOperar />);
     await screen.findByRole("table", { name: "Unidades organizacionais" });
 
     await ativarAbaEquipes();
@@ -1652,7 +1652,7 @@ describe("EstruturaOrganizacionalScreen — Equipes (T108)", () => {
   it("cancelar formulário de equipe fecha sem chamar a API", async () => {
     mockSucesso();
     mockSucessoEquipe([equipe1]);
-    render(<EstruturaOrganizacionalScreen />);
+    render(<EstruturaOrganizacionalScreen podeOperar />);
     await screen.findByRole("table", { name: "Unidades organizacionais" });
 
     await ativarAbaEquipes();
@@ -1673,7 +1673,7 @@ describe("EstruturaOrganizacionalScreen — Equipes (T108)", () => {
     mockSucessoDep();
     mockSucessoArea();
     mockSucessoEquipe();
-    render(<EstruturaOrganizacionalScreen />);
+    render(<EstruturaOrganizacionalScreen podeOperar />);
     await screen.findByRole("table", { name: "Unidades organizacionais" });
 
     await ativarAbaEquipes();
@@ -1698,7 +1698,7 @@ describe("EstruturaOrganizacionalScreen — Equipes (T108)", () => {
   it("não contém razão social, CNPJ, nome de pessoa, endereço ou valor financeiro (equipes)", async () => {
     mockSucesso();
     mockSucessoEquipe();
-    render(<EstruturaOrganizacionalScreen />);
+    render(<EstruturaOrganizacionalScreen podeOperar />);
     await screen.findByRole("table", { name: "Unidades organizacionais" });
 
     await ativarAbaEquipes();
@@ -1718,5 +1718,84 @@ describe("EstruturaOrganizacionalScreen — Equipes (T108)", () => {
     ]) {
       expect(texto).not.toContain(termoProibido);
     }
+  });
+});
+
+/**
+ * T182 — controles de escrita visíveis: criar ("Nova…"/"Novo…"), editar,
+ * inativar e reativar. Para um perfil leitor, como o DP, a lista é vazia.
+ */
+function botoesDeEscrita(): HTMLElement[] {
+  return screen
+    .queryAllByRole("button")
+    .filter((b) =>
+      /^(Nova|Novo|Editar|Inativar|Reativar)\b/.test(
+        b.textContent?.trim() ?? "",
+      ),
+    );
+}
+
+describe("EstruturaOrganizacionalScreen — perfil leitor, como o DP (T182)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockSucesso();
+    mockSucessoDep();
+    mockSucessoArea();
+    mockSucessoEquipe();
+  });
+
+  it("diz 'Somente consulta' e lê as quatro abas sem nenhum controle de escrita", async () => {
+    render(<EstruturaOrganizacionalScreen />);
+
+    expect(screen.getByText("Somente consulta")).toBeInTheDocument();
+    expect(screen.queryByText("Somente RH")).toBeNull();
+    expect(
+      await screen.findAllByRole("cell", { name: unidade1.nome }),
+    ).not.toHaveLength(0);
+    expect(botoesDeEscrita()).toEqual([]);
+    expect(screen.queryByRole("columnheader", { name: "Ações" })).toBeNull();
+
+    await ativarAbaDepartamentos();
+    expect(
+      await screen.findAllByRole("cell", { name: dep1.nome }),
+    ).not.toHaveLength(0);
+    expect(botoesDeEscrita()).toEqual([]);
+
+    await ativarAbaAreas();
+    expect(
+      await screen.findAllByRole("cell", { name: area1.nome }),
+    ).not.toHaveLength(0);
+    expect(botoesDeEscrita()).toEqual([]);
+
+    await ativarAbaEquipes();
+    expect(
+      await screen.findAllByRole("cell", { name: equipe1.nome }),
+    ).not.toHaveLength(0);
+    expect(botoesDeEscrita()).toEqual([]);
+
+    expect(mockCriarUnidade).not.toHaveBeenCalled();
+    expect(mockCriarDepartamento).not.toHaveBeenCalled();
+    expect(mockCriarArea).not.toHaveBeenCalled();
+    expect(mockCriarEquipe).not.toHaveBeenCalled();
+  });
+
+  it("estado vazio para o leitor não oferece criar", async () => {
+    mockSucesso([]);
+    render(<EstruturaOrganizacionalScreen />);
+    await screen.findByText("Nenhuma unidade organizacional cadastrada");
+    expect(botoesDeEscrita()).toEqual([]);
+  });
+
+  it("o RH (quem opera) mantém criar, editar e inativar", async () => {
+    render(<EstruturaOrganizacionalScreen podeOperar />);
+    expect(
+      await screen.findAllByRole("cell", { name: unidade1.nome }),
+    ).not.toHaveLength(0);
+    const rotulos = botoesDeEscrita().map((b) => b.textContent?.trim());
+    expect(rotulos).toContain("Nova unidade");
+    expect(rotulos).toContain("Editar");
+    expect(rotulos.some((r) => /^(Inativar|Reativar)/.test(r ?? ""))).toBe(
+      true,
+    );
   });
 });

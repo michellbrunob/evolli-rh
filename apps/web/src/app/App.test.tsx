@@ -1362,6 +1362,36 @@ describe("T162 — entrada vinda do Hub é validada no shell", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("T182 — dp entra em Estrutura só para consultar: nenhum controle de escrita", () => {
+    render(<App papelDoAtor="dp" destinoInicial="cadastros" />);
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+      "Estrutura organizacional",
+    );
+    expect(screen.getByText("Somente consulta")).toBeInTheDocument();
+    const main = screen.getByRole("main");
+    for (const aba of ["Funções e cargos", "Centros de custo"]) {
+      fireEvent.click(screen.getByRole("tab", { name: aba }));
+      expect(within(main).getByText("Somente consulta")).toBeInTheDocument();
+    }
+    expect(
+      within(main)
+        .queryAllByRole("button")
+        .filter((b) =>
+          /^(Nova|Novo|Editar|Inativar|Reativar)\b/.test(
+            b.textContent?.trim() ?? "",
+          ),
+        ),
+    ).toEqual([]);
+  });
+
+  it("T182 — rh segue com a criação em Estrutura", () => {
+    render(<App papelDoAtor="rh" destinoInicial="cadastros" />);
+    expect(
+      screen.getByRole("button", { name: "Nova unidade" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Somente consulta")).toBeNull();
+  });
+
   it("destino funcional NÃO concedido ao papel cai na aterrissagem do papel", () => {
     // `financeiro` não lê `tabela_horario` (T182: só RH, DP e
     // `master_tecnico`). Montar ali seria 403.

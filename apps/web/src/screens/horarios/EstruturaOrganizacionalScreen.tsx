@@ -146,7 +146,19 @@ interface FormularioEquipeState {
   salvando: boolean;
 }
 
-export function EstruturaOrganizacionalScreen() {
+export interface EstruturaOrganizacionalScreenProps {
+  /**
+   * T182 — o perfil OPERA a estrutura organizacional (criar, editar, inativar e reativar):
+   * `rh` e `master_tecnico` (ver `podeOperarEstrutura`). Sem isso a tela é só
+   * consulta: nenhum controle de escrita aparece. Só orienta a tela — quem
+   * recusa é o servidor.
+   */
+  readonly podeOperar?: boolean;
+}
+
+export function EstruturaOrganizacionalScreen({
+  podeOperar = false,
+}: EstruturaOrganizacionalScreenProps) {
   const [statusCarregamento, setStatusCarregamento] = useState<
     "carregando" | "erro" | "dados"
   >("carregando");
@@ -875,15 +887,27 @@ export function EstruturaOrganizacionalScreen() {
     },
   ];
 
+  /** T182 — sem `podeOperar`, a coluna de ações (editar, inativar e
+   * reativar) não aparece. */
+  function colunasVisiveis<T>(
+    colunas: DataTableColumn<T>[],
+  ): DataTableColumn<T>[] {
+    return podeOperar ? colunas : colunas.filter((c) => c.key !== "acoes");
+  }
+
   return (
     <div className="estrutura-organizacional-screen">
       <PageHeader
         headingLevel={1}
         titleId={ESTRUTURA_ORGANIZACIONAL_TITULO_ID}
         title="Estrutura organizacional"
-        description="Gerencie as unidades, departamentos, áreas e equipes organizacionais da sua empresa: cadastre, consulte e edite as referências de estrutura dentro do seu escopo."
+        description={
+          podeOperar
+            ? "Gerencie as unidades, departamentos, áreas e equipes organizacionais da sua empresa: cadastre, consulte e edite as referências de estrutura dentro do seu escopo."
+            : "Consulte as unidades, departamentos, áreas e equipes organizacionais da sua empresa."
+        }
         actions={
-          abaAtiva === "unidades" ? (
+          !podeOperar ? undefined : abaAtiva === "unidades" ? (
             <Button
               onClick={abrirCriar}
               disabled={statusCarregamento !== "dados" || !empresa}
@@ -912,14 +936,16 @@ export function EstruturaOrganizacionalScreen() {
         className="estrutura-organizacional-screen__aviso"
         aria-labelledby="estrutura-organizacional-aviso-rh-titulo"
       >
-        <StatusBadge variant="info">Somente RH</StatusBadge>
+        <StatusBadge variant="info">
+          {podeOperar ? "Somente RH" : "Somente consulta"}
+        </StatusBadge>
         <p
           id="estrutura-organizacional-aviso-rh-titulo"
           className="estrutura-organizacional-screen__aviso-texto"
         >
-          Somente o RH da própria empresa administra a estrutura organizacional.
-          Todas as operações são restritas ao escopo da sua empresa e unidades
-          autorizadas.
+          {podeOperar
+            ? "Somente o RH da própria empresa administra a estrutura organizacional. Todas as operações são restritas ao escopo da sua empresa e unidades autorizadas."
+            : "Você consulta a estrutura organizacional da empresa ativa. Só o RH cria, edita e inativa unidades, departamentos, áreas e equipes."}
         </p>
       </Surface>
 
@@ -1060,7 +1086,7 @@ export function EstruturaOrganizacionalScreen() {
                 title="Nenhuma unidade organizacional cadastrada"
                 description="Cadastre a primeira unidade organizacional para esta empresa."
                 action={
-                  empresa ? (
+                  podeOperar && empresa ? (
                     <Button onClick={abrirCriar}>Nova unidade</Button>
                   ) : undefined
                 }
@@ -1068,7 +1094,7 @@ export function EstruturaOrganizacionalScreen() {
             ) : (
               <DataTable
                 caption="Unidades organizacionais"
-                columns={colunas}
+                columns={colunasVisiveis(colunas)}
                 rows={unidades}
                 rowKey={(linha) => linha.id}
               />
@@ -1143,7 +1169,7 @@ export function EstruturaOrganizacionalScreen() {
                 title="Nenhum departamento cadastrado"
                 description="Cadastre o primeiro departamento para esta empresa."
                 action={
-                  podeCriarDep ? (
+                  podeOperar && podeCriarDep ? (
                     <Button onClick={abrirCriarDep}>Novo departamento</Button>
                   ) : undefined
                 }
@@ -1151,7 +1177,7 @@ export function EstruturaOrganizacionalScreen() {
             ) : (
               <DataTable
                 caption="Departamentos"
-                columns={colunasDep}
+                columns={colunasVisiveis(colunasDep)}
                 rows={departamentos}
                 rowKey={(linha) => linha.id}
               />
@@ -1226,7 +1252,7 @@ export function EstruturaOrganizacionalScreen() {
                 title="Nenhuma área cadastrada"
                 description="Cadastre a primeira área para um departamento desta empresa."
                 action={
-                  podeCriarArea ? (
+                  podeOperar && podeCriarArea ? (
                     <Button onClick={abrirCriarArea}>Nova área</Button>
                   ) : undefined
                 }
@@ -1234,7 +1260,7 @@ export function EstruturaOrganizacionalScreen() {
             ) : (
               <DataTable
                 caption="Áreas"
-                columns={colunasArea}
+                columns={colunasVisiveis(colunasArea)}
                 rows={areas}
                 rowKey={(linha) => linha.id}
               />
@@ -1308,7 +1334,7 @@ export function EstruturaOrganizacionalScreen() {
               title="Nenhuma equipe cadastrada"
               description="Cadastre a primeira equipe para um departamento desta empresa."
               action={
-                podeCriarEquipe ? (
+                podeOperar && podeCriarEquipe ? (
                   <Button onClick={abrirCriarEquipe}>Nova equipe</Button>
                 ) : undefined
               }
@@ -1316,7 +1342,7 @@ export function EstruturaOrganizacionalScreen() {
           ) : (
             <DataTable
               caption="Equipes"
-              columns={colunasEquipe}
+              columns={colunasVisiveis(colunasEquipe)}
               rows={equipes}
               rowKey={(linha) => linha.id}
             />
