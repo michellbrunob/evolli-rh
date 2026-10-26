@@ -2190,6 +2190,8 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
           "criadoEm",
           "endereco",
           "id",
+          // T183 — a jornada opcional: `null` quando não escolhida.
+          "jornada",
           "movimentacao",
           "nome",
           "perfilPessoal",
@@ -2197,6 +2199,7 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
           "vinculo",
         ].sort(),
       );
+      expect(resposta.body.jornada).toBeNull();
       expect(resposta.body.perfilPessoal).toMatchObject({
         dataNascimento: corpo.perfilPessoal.dataNascimento,
       });

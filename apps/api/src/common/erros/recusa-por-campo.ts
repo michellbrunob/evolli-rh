@@ -14,8 +14,23 @@ import {
  * na empresa ativa, então "em uso" não confirma ninguém fora do escopo.
  */
 
-/** Motivos públicos de recusa por campo. */
-export type MotivoDoCampo = "em_uso";
+/**
+ * Motivos públicos de recusa por campo.
+ *
+ * T183 — jornada do colaborador: `indisponivel` (jornada inativa ou fora da
+ * empresa ativa — os dois respondem igual, para não revelar outra empresa),
+ * `igual_a_vigente` (trocar para a jornada que já vale), `fora_de_ordem`
+ * (data que não vem depois da que precisa vir), `ja_encerrada` (encerrar uma
+ * vigência que já terminou) e `sobreposta` (a vigência cruza outra do mesmo
+ * colaborador).
+ */
+export type MotivoDoCampo =
+  | "em_uso"
+  | "indisponivel"
+  | "igual_a_vigente"
+  | "fora_de_ordem"
+  | "ja_encerrada"
+  | "sobreposta";
 
 /**
  * Caminhos públicos de campo. Lista fechada: só estes saem na resposta, e o
@@ -26,7 +41,11 @@ export type CampoPublico =
   | "contatos.emailPessoal"
   | "emailPessoal"
   // T182 — código de jornada repetido na empresa.
-  | "codigo";
+  | "codigo"
+  // T183 — jornada do colaborador e a sua vigência.
+  | "tabelaHorarioId"
+  | "vigenciaInicio"
+  | "vigenciaFim";
 
 export interface ErroDeCampo {
   campo: CampoPublico;
@@ -35,6 +54,17 @@ export interface ErroDeCampo {
 
 /** 409 com a lista dos campos que conflitam com dado já gravado na empresa. */
 export class ConflitoDeCamposException extends ConflictException {
+  constructor(readonly erros: readonly ErroDeCampo[]) {
+    super();
+  }
+}
+
+/**
+ * T183 — 422 com a lista dos campos recusados por regra de negócio (não por
+ * conflito com dado gravado, que é o 409 acima). Mesmo formato: campo e
+ * motivo, nunca o valor.
+ */
+export class CamposRecusadosException extends UnprocessableEntityException {
   constructor(readonly erros: readonly ErroDeCampo[]) {
     super();
   }

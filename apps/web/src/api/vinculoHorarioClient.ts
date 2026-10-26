@@ -1,13 +1,36 @@
-import { clearCsrfToken, getCsrfToken, refreshCsrfToken } from "./csrfClient";
+import {
+  clearCsrfToken,
+  descartarTokenSeDesatualizado,
+  tokenCsrfParaGravacao,
+} from "./csrfClient";
+import { ApiError, type ResultadoPaginado } from "./horariosClient";
+
+export { ApiError };
+export type { ResultadoPaginado };
 
 const BASE = "/v1";
+
+/**
+ * T183 — a jornada do vínculo, como o servidor a projeta: o histórico mostra
+ * qual era e se ela foi inativada depois.
+ */
+export interface JornadaDoVinculoApi {
+  id: string;
+  codigo: string | null;
+  nome: string;
+  ativo: boolean;
+}
 
 export interface VinculoHorarioApi {
   id: string;
   colaboradorId: string;
   empresaId: string;
   tabelaHorarioId: string;
+  /** T183 — a jornada vinculada. */
+  tabela: JornadaDoVinculoApi;
+  /** Primeiro dia da vigência (`YYYY-MM-DD`). */
   vigenciaInicio: string;
+  /** Primeiro dia SEM a jornada (`YYYY-MM-DD`; o fim não conta), ou `null`. */
   vigenciaFim: string | null;
   criadoPorUserId: string;
   criadoEm: string;
@@ -27,7 +50,20 @@ export interface CriarVinculoHorarioDto {
   vigenciaFim?: string;
 }
 
-/** `vigenciaFim` é obrigatório no encerramento — não existe encerramento "imediato". */
+/**
+ * T183 — atribui ou TROCA a jornada do colaborador numa operação só: com
+ * jornada vigente, o servidor a encerra em `vigenciaInicio` e cria a nova.
+ */
+export interface AtribuirJornadaDto {
+  colaboradorId: string;
+  tabelaHorarioId: string;
+  vigenciaInicio: string;
+}
+
+/**
+ * `vigenciaFim` é obrigatório no encerramento — não existe encerramento
+ * "imediato". É o primeiro dia SEM a jornada.
+ */
 export interface EncerrarVinculoHorarioDto {
   vigenciaFim: string;
 }
@@ -37,27 +73,6 @@ export interface ListarVinculosHorarioQuery {
   tabelaHorarioId?: string;
   pagina?: number;
   tamanhoPagina?: number;
-}
-
-export interface ResultadoPaginado<T> {
-  itens: T[];
-  pagina: number;
-  tamanhoPagina: number;
-  total: number;
-}
-
-export class ApiError extends Error {
-  constructor(
-    readonly status: number,
-    message: string,
-  ) {
-    super(message);
-    this.name = "ApiError";
-  }
-}
-
-async function getCsrf(): Promise<string> {
-  return getCsrfToken() ?? refreshCsrfToken();
 }
 
 async function apiFetch(
@@ -76,6 +91,9 @@ async function apiFetch(
   if (res.status === 401) {
     clearCsrfToken();
   }
+  // T183 — 403 `csrf_invalido`: o token desta aba ficou desatualizado;
+  // descartado, a próxima gravação pede um novo.
+  await descartarTokenSeDesatualizado(res);
   return res;
 }
 
@@ -87,9 +105,21 @@ async function jsonOrThrow<T>(res: Response): Promise<T> {
     const msg = Array.isArray(body.message)
       ? (body.message[0] ?? "Erro na requisição.")
       : (body.message ?? "Erro na requisição.");
-    throw new ApiError(res.status, msg);
+    // T183 — o corpo segue junto: as recusas por campo trazem `erros`.
+    throw new ApiError(res.status, msg, body);
   }
   return res.json() as Promise<T>;
+}
+
+/** T183 — gravação: token renovado pela regra comum (rede caída não envia). */
+async function gravar<T>(path: string, corpo: unknown): Promise<T> {
+  const token = await tokenCsrfParaGravacao();
+  const res = await apiFetch(path, {
+    method: "POST",
+    headers: { "x-csrf-token": token },
+    body: JSON.stringify(corpo),
+  });
+  return jsonOrThrow(res);
 }
 
 export async function listarVinculosHorario(
@@ -117,24 +147,19 @@ export async function buscarVinculoHorario(
 export async function criarVinculoHorario(
   dto: CriarVinculoHorarioDto,
 ): Promise<VinculoHorarioApi> {
-  const token = await getCsrf();
-  const res = await apiFetch("/horarios/vinculos", {
-    method: "POST",
-    headers: { "x-csrf-token": token },
-    body: JSON.stringify(dto),
-  });
-  return jsonOrThrow(res);
+  return gravar("/horarios/vinculos", dto);
+}
+
+/** T183 — atribui ou troca a jornada vigente do colaborador. */
+export async function atribuirJornada(
+  dto: AtribuirJornadaDto,
+): Promise<VinculoHorarioApi> {
+  return gravar("/horarios/vinculos/atribuicoes", dto);
 }
 
 export async function encerrarVinculoHorario(
   id: string,
   dto: EncerrarVinculoHorarioDto,
 ): Promise<VinculoHorarioApi> {
-  const token = await getCsrf();
-  const res = await apiFetch(`/horarios/vinculos/${id}/encerrar`, {
-    method: "POST",
-    headers: { "x-csrf-token": token },
-    body: JSON.stringify(dto),
-  });
-  return jsonOrThrow(res);
+  return gravar(`/horarios/vinculos/${id}/encerrar`, dto);
 }

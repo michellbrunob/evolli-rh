@@ -92,3 +92,15 @@ vigência e impede sobreposição. O que falta é contrato e interface.
   encerramento só para o RH.
 - **Nova admissão:** "Jornada de trabalho (opcional)", só para o RH, com as
   jornadas ativas da empresa.
+
+## 5. Pendências registradas
+
+- A aba Pessoas › Horário de trabalho (T112) continua pedindo, no
+  encerramento, o primeiro dia **sem** a jornada ("Encerrar vigência em");
+  a ficha pergunta o **último dia** com ela. As duas gravam a mesma coisa;
+  alinhar o texto da aba antiga fica para decisão.
+- O início da jornada não é comparado à data de admissão: o banco só exige
+  vínculo funcional na empresa. Se a jornada deve começar na admissão ou
+  depois, é regra a decidir.
+- Não há usuário de demonstração do perfil financeiro; a recusa a ele é
+  provada nos testes de API.

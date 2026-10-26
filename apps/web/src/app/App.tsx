@@ -297,6 +297,8 @@ function conteudoDoDestino(
           : {})}
         // T181 — a edição da ficha é só de RH e DP.
         podeEditarFicha={podeEditarFicha(admissao.papelDoAtor)}
+        // T183 — atribuir, trocar e encerrar jornada é só do RH.
+        podeOperarJornada={podeOperarJornadas(admissao.papelDoAtor)}
       />
     );
   }

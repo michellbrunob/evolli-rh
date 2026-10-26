@@ -77,8 +77,8 @@ export function resolverEscopoLeituraHorarios(
 /**
  * T182 — escopo de LEITURA do catálogo de jornadas (tabelas de horário): o de
  * `resolverEscopoLeituraHorarios` e, além dele, o DP, sempre na própria
- * empresa. Só para `tabela_horario`: o vínculo de horário com o colaborador
- * continua com o escopo de antes.
+ * empresa. T183 — vale também para os vínculos de horário (a jornada de cada
+ * colaborador e o histórico), que o DP passa a consultar.
  */
 export function resolverEscopoLeituraTabelas(
   actor: AccessUser,

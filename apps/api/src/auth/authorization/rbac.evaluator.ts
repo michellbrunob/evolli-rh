@@ -845,11 +845,17 @@ function evaluateHorarios(
         : subject.companyId !== null;
 
     // T182 — o DP CONSULTA as jornadas (tabelas de horário) da própria
-    // empresa, por decisão da proprietária de 2026-10-23. Criar, editar,
-    // inativar e reativar seguem só do RH (T037), e o vínculo de horário com
-    // o colaborador segue negado ao DP.
+    // empresa, por decisão da proprietária de 2026-10-23. T183 — e também a
+    // jornada de cada colaborador e o histórico de vigências
+    // (`vinculo_horario`), por decisão da proprietária de 2026-10-26. Criar,
+    // editar, inativar, reativar, atribuir, trocar e encerrar seguem só do
+    // RH (T037).
     case "dp":
-      if (target.resource !== "tabela_horario" || target.action !== "read") {
+      if (
+        (target.resource !== "tabela_horario" &&
+          target.resource !== "vinculo_horario") ||
+        target.action !== "read"
+      ) {
         return false;
       }
       return escopoResolvido
@@ -858,8 +864,8 @@ function evaluateHorarios(
 
     // Negados, cada um por decisão registrada:
     //
-    // `dp`            — fora a consulta de jornadas (T182), a alçada de
-    //                   horário no V1 é exclusiva de RH (T037).
+    // `dp`            — fora a consulta de jornadas (T182) e de vínculos
+    //                   (T183), a alçada de horário é exclusiva de RH (T037).
     // `admin_tecnico` — mesmo raciocínio de pessoas/ponto: sem exceção global.
     // `gestor`        — a ADR 0015 resolveu DP-8, mas a leitura de HORÁRIO
     //                   pelo gestor tem rota própria em `gestor_equipe`, com

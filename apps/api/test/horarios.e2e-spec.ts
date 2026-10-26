@@ -1424,9 +1424,9 @@ describe("Cadastros: Horarios e vinculo ao colaborador (e2e)", () => {
         .expect(403);
       await post(`/v1/horarios/${id}/desativar`, dpA).expect(403);
       await post(`/v1/horarios/${id}/reativar`, dpA).expect(403);
-      // O vínculo de horário com o colaborador segue negado ao DP.
-      const vinculos = await get("/v1/horarios/vinculos", dpA);
-      expect([403, 404]).toContain(vinculos.status);
+      // T183 — o DP passou a CONSULTAR os vínculos de horário da própria
+      // empresa (escrita segue negada; ver o bloco da T183).
+      await get("/v1/horarios/vinculos", dpA).expect(200);
       const atual = await get(`/v1/horarios/${id}`, rhA).expect(200);
       expect(atual.body).toMatchObject({
         nome: "Consulta do DP T182",
@@ -1504,6 +1504,532 @@ describe("Cadastros: Horarios e vinculo ao colaborador (e2e)", () => {
       await get(`/v1/colaboradores/${colaboradorAId}/vinculos`, rhA).expect(
         200,
       );
+    });
+  });
+  // T183 — jornada de trabalho do colaborador, com vigência (decisão de
+  // 2026-10-26): o RH atribui, troca e encerra; o DP consulta; a admissão
+  // aceita uma jornada opcional; erros por campo sem valor.
+  describe("T183 — jornada do colaborador: atribuir, trocar, encerrar e consultar", () => {
+    let sequencia = 0;
+    const matricula = () => `MAT-T183-${++sequencia}`;
+
+    async function comPrisma<T>(f: (p: PrismaClient) => Promise<T>) {
+      const prisma = new PrismaClient({ datasources: { db: { url: appUrl } } });
+      try {
+        return await f(prisma);
+      } finally {
+        await prisma.$disconnect();
+      }
+    }
+
+    async function colaboradorDaA(nome: string): Promise<string> {
+      return admitir(rhA, {
+        nome,
+        empresaId: empresaA,
+        matricula: matricula(),
+        departamentoId: departamentoA,
+      });
+    }
+
+    function atribuir(cred: Credencial, corpo: Record<string, unknown>) {
+      return post("/v1/horarios/vinculos/atribuicoes", cred).send(corpo);
+    }
+
+    async function historico(colaboradorId: string, cred: Credencial = rhA) {
+      const r = await get(
+        `/v1/horarios/vinculos?colaboradorId=${colaboradorId}`,
+        cred,
+      ).expect(200);
+      return r.body.itens as {
+        id: string;
+        tabelaHorarioId: string;
+        tabela: {
+          id: string;
+          codigo: string | null;
+          nome: string;
+          ativo: boolean;
+        };
+        vigenciaInicio: string;
+        vigenciaFim: string | null;
+      }[];
+    }
+
+    async function trilha(resourceId: string) {
+      return comPrisma((p) =>
+        p.auditEvent.findMany({
+          where: { resourceId },
+          orderBy: { occurredAt: "asc" },
+        }),
+      );
+    }
+
+    it("atribui sem jornada vigente: cria a vigência aberta, com a jornada na projeção e só o id na trilha", async () => {
+      const { id: jornada } = await criarTabela(
+        rhA,
+        "Jornada Atribuir T183",
+        GRADE_44H,
+        "ATR_T183",
+      );
+      const colab = await colaboradorDaA("Pessoa Sintetica Atribuir");
+      const r = await atribuir(rhA, {
+        colaboradorId: colab,
+        tabelaHorarioId: jornada,
+        vigenciaInicio: "2026-02-02",
+      }).expect(201);
+      expect(r.body).toMatchObject({
+        colaboradorId: colab,
+        tabelaHorarioId: jornada,
+        tabela: {
+          id: jornada,
+          codigo: "ATR_T183",
+          nome: "Jornada Atribuir T183",
+          ativo: true,
+        },
+        vigenciaInicio: "2026-02-02",
+        vigenciaFim: null,
+      });
+      const eventos = await trilha(r.body.id);
+      expect(eventos.map((e) => e.action)).toContain("horarios_vinculo_criado");
+      const texto = JSON.stringify(eventos);
+      expect(texto).not.toContain("ATR_T183");
+      expect(texto).not.toContain("Jornada Atribuir");
+      expect(texto).not.toContain("Pessoa Sintetica");
+    });
+
+    it("troca: encerra a vigente no novo início e cria a nova, adjacentes, numa operação só", async () => {
+      const { id: j1 } = await criarTabela(rhA, "Troca A T183");
+      const { id: j2 } = await criarTabela(rhA, "Troca B T183");
+      const colab = await colaboradorDaA("Pessoa Sintetica Troca");
+      const primeira = await atribuir(rhA, {
+        colaboradorId: colab,
+        tabelaHorarioId: j1,
+        vigenciaInicio: "2026-02-01",
+      }).expect(201);
+      const segunda = await atribuir(rhA, {
+        colaboradorId: colab,
+        tabelaHorarioId: j2,
+        vigenciaInicio: "2026-04-01",
+      }).expect(201);
+      expect(segunda.body).toMatchObject({
+        tabelaHorarioId: j2,
+        vigenciaFim: null,
+      });
+
+      const itens = await historico(colab);
+      expect(itens).toHaveLength(2);
+      expect(itens[0]).toMatchObject({
+        tabelaHorarioId: j2,
+        vigenciaInicio: "2026-04-01",
+        vigenciaFim: null,
+      });
+      expect(itens[1]).toMatchObject({
+        id: primeira.body.id,
+        tabelaHorarioId: j1,
+        vigenciaInicio: "2026-02-01",
+        vigenciaFim: "2026-04-01",
+      });
+      const acoes = (await trilha(primeira.body.id)).map((e) => e.action);
+      expect(acoes).toEqual([
+        "horarios_vinculo_criado",
+        "horarios_vinculo_encerrado",
+      ]);
+    });
+
+    it("trocar para a mesma jornada vigente: 422 no campo, sem eco, e nada muda", async () => {
+      const { id: jornada } = await criarTabela(
+        rhA,
+        "Mesma T183",
+        GRADE_44H,
+        "MESMA_T183",
+      );
+      const colab = await colaboradorDaA("Pessoa Sintetica Mesma");
+      await atribuir(rhA, {
+        colaboradorId: colab,
+        tabelaHorarioId: jornada,
+        vigenciaInicio: "2026-02-01",
+      }).expect(201);
+      const r = await atribuir(rhA, {
+        colaboradorId: colab,
+        tabelaHorarioId: jornada,
+        vigenciaInicio: "2026-05-01",
+      }).expect(422);
+      expect(r.body.erros).toEqual([
+        { campo: "tabelaHorarioId", motivo: "igual_a_vigente" },
+      ]);
+      expect(JSON.stringify(r.body)).not.toContain("MESMA_T183");
+      const itens = await historico(colab);
+      expect(itens).toHaveLength(1);
+      expect(itens[0]!.vigenciaFim).toBeNull();
+    });
+
+    it("novo início que não vem depois do início da vigente: 422 em vigenciaInicio, e nada muda", async () => {
+      const { id: j1 } = await criarTabela(rhA, "Ordem A T183");
+      const { id: j2 } = await criarTabela(rhA, "Ordem B T183");
+      const colab = await colaboradorDaA("Pessoa Sintetica Ordem");
+      await atribuir(rhA, {
+        colaboradorId: colab,
+        tabelaHorarioId: j1,
+        vigenciaInicio: "2026-03-01",
+      }).expect(201);
+      for (const inicio of ["2026-03-01", "2026-02-15"]) {
+        const r = await atribuir(rhA, {
+          colaboradorId: colab,
+          tabelaHorarioId: j2,
+          vigenciaInicio: inicio,
+        }).expect(422);
+        expect(r.body.erros).toEqual([
+          { campo: "vigenciaInicio", motivo: "fora_de_ordem" },
+        ]);
+      }
+      const itens = await historico(colab);
+      expect(itens).toHaveLength(1);
+      expect(itens[0]).toMatchObject({
+        tabelaHorarioId: j1,
+        vigenciaFim: null,
+      });
+    });
+
+    it("jornada inativa ou de outra empresa: o mesmo 422 'indisponivel', sem eco, e nada criado", async () => {
+      const { id: inativa } = await criarTabela(
+        rhA,
+        "Inativa T183",
+        GRADE_44H,
+        "INAT_T183",
+      );
+      await post(`/v1/horarios/${inativa}/desativar`, rhA).expect(201);
+      const { id: daB } = await criarTabela(
+        rhB,
+        "Da B T183",
+        GRADE_44H,
+        "DAB_T183",
+      );
+      const colab = await colaboradorDaA("Pessoa Sintetica Indisponivel");
+      for (const tabelaHorarioId of [inativa, daB]) {
+        const r = await atribuir(rhA, {
+          colaboradorId: colab,
+          tabelaHorarioId,
+          vigenciaInicio: "2026-02-01",
+        }).expect(422);
+        expect(r.body.erros).toEqual([
+          { campo: "tabelaHorarioId", motivo: "indisponivel" },
+        ]);
+        const corpo = JSON.stringify(r.body);
+        expect(corpo).not.toContain("INAT_T183");
+        expect(corpo).not.toContain("DAB_T183");
+      }
+      expect(await historico(colab)).toEqual([]);
+    });
+
+    it("vigência que cruza outra do mesmo colaborador: 409 em vigenciaInicio, e nada criado", async () => {
+      const { id: j1 } = await criarTabela(rhA, "Cruza A T183");
+      const { id: j2 } = await criarTabela(rhA, "Cruza B T183");
+      const colab = await colaboradorDaA("Pessoa Sintetica Cruza");
+      await post("/v1/horarios/vinculos", rhA)
+        .send({
+          colaboradorId: colab,
+          tabelaHorarioId: j1,
+          vigenciaInicio: "2026-01-10",
+          vigenciaFim: "2026-06-01",
+        })
+        .expect(201);
+      const r = await atribuir(rhA, {
+        colaboradorId: colab,
+        tabelaHorarioId: j2,
+        vigenciaInicio: "2026-03-01",
+      }).expect(409);
+      expect(r.body.erros).toEqual([
+        { campo: "vigenciaInicio", motivo: "sobreposta" },
+      ]);
+      expect(await historico(colab)).toHaveLength(1);
+      // Depois do fim da encerrada, a nova cabe.
+      await atribuir(rhA, {
+        colaboradorId: colab,
+        tabelaHorarioId: j2,
+        vigenciaInicio: "2026-06-01",
+      }).expect(201);
+    });
+
+    it("encerrar: o primeiro dia sem a jornada; já encerrada e fim fora de ordem dão 422 no campo", async () => {
+      const { id: jornada } = await criarTabela(rhA, "Encerrar T183");
+      const colab = await colaboradorDaA("Pessoa Sintetica Encerrar");
+      const v = await atribuir(rhA, {
+        colaboradorId: colab,
+        tabelaHorarioId: jornada,
+        vigenciaInicio: "2026-02-01",
+      }).expect(201);
+      const fora = await post(
+        `/v1/horarios/vinculos/${v.body.id}/encerrar`,
+        rhA,
+      )
+        .send({ vigenciaFim: "2026-02-01" })
+        .expect(422);
+      expect(fora.body.erros).toEqual([
+        { campo: "vigenciaFim", motivo: "fora_de_ordem" },
+      ]);
+      const ok = await post(`/v1/horarios/vinculos/${v.body.id}/encerrar`, rhA)
+        .send({ vigenciaFim: "2026-07-01" })
+        .expect(201);
+      expect(ok.body).toMatchObject({
+        vigenciaFim: "2026-07-01",
+        tabela: { id: jornada },
+      });
+      const deNovo = await post(
+        `/v1/horarios/vinculos/${v.body.id}/encerrar`,
+        rhA,
+      )
+        .send({ vigenciaFim: "2026-08-01" })
+        .expect(422);
+      expect(deNovo.body.erros).toEqual([
+        { campo: "vigenciaFim", motivo: "ja_encerrada" },
+      ]);
+    });
+
+    it("o histórico mostra a jornada inativada depois, com a indicação", async () => {
+      const { id: jornada } = await criarTabela(rhA, "Inativada Depois T183");
+      const colab = await colaboradorDaA("Pessoa Sintetica Historico");
+      await atribuir(rhA, {
+        colaboradorId: colab,
+        tabelaHorarioId: jornada,
+        vigenciaInicio: "2026-02-01",
+      }).expect(201);
+      await post(`/v1/horarios/${jornada}/desativar`, rhA).expect(201);
+      const itens = await historico(colab);
+      expect(itens[0]!.tabela).toMatchObject({ id: jornada, ativo: false });
+    });
+
+    it("DP consulta jornada e histórico da própria empresa, e não atribui, troca nem encerra", async () => {
+      const { id: j1 } = await criarTabela(rhA, "DP A T183");
+      const { id: j2 } = await criarTabela(rhA, "DP B T183");
+      const colab = await colaboradorDaA("Pessoa Sintetica DP");
+      const v = await atribuir(rhA, {
+        colaboradorId: colab,
+        tabelaHorarioId: j1,
+        vigenciaInicio: "2026-02-01",
+      }).expect(201);
+      const itens = await historico(colab, dpA);
+      expect(itens.map((i) => i.id)).toEqual([v.body.id]);
+      await get(`/v1/horarios/vinculos/${v.body.id}`, dpA).expect(200);
+      await atribuir(dpA, {
+        colaboradorId: colab,
+        tabelaHorarioId: j2,
+        vigenciaInicio: "2026-05-01",
+      }).expect(403);
+      await post(`/v1/horarios/vinculos/${v.body.id}/encerrar`, dpA)
+        .send({ vigenciaFim: "2026-05-01" })
+        .expect(403);
+      await post("/v1/horarios/vinculos", dpA)
+        .send({
+          colaboradorId: colab,
+          tabelaHorarioId: j2,
+          vigenciaInicio: "2026-05-01",
+        })
+        .expect(403);
+      const depois = await historico(colab);
+      expect(depois).toHaveLength(1);
+      expect(depois[0]!.vigenciaFim).toBeNull();
+    });
+
+    it("outra empresa: RH da B recebe 404 ao atribuir para colaborador da A, não vê o histórico, e a negação não traz valores", async () => {
+      const { id: daB } = await criarTabela(rhB, "Invasao B T183");
+      const { id: daA } = await criarTabela(rhA, "Alvo A T183");
+      const colab = await colaboradorDaA("Pessoa Sintetica Alvo");
+      const v = await atribuir(rhA, {
+        colaboradorId: colab,
+        tabelaHorarioId: daA,
+        vigenciaInicio: "2026-02-01",
+      }).expect(201);
+      const r = await atribuir(rhB, {
+        colaboradorId: colab,
+        tabelaHorarioId: daB,
+        vigenciaInicio: "2026-05-01",
+      }).expect(404);
+      expect(JSON.stringify(r.body)).not.toContain("Pessoa Sintetica");
+      expect(await historico(colab, rhB)).toEqual([]);
+      await get(`/v1/horarios/vinculos/${v.body.id}`, rhB).expect(404);
+      await get(`/v1/horarios/vinculos/${v.body.id}`, dpA).expect(200);
+      const negacoes = await comPrisma((p) =>
+        p.auditEvent.findMany({
+          where: { action: "authorization_denied", resourceId: colab },
+        }),
+      );
+      expect(negacoes.length).toBeGreaterThanOrEqual(1);
+      expect(JSON.stringify(negacoes)).not.toContain("Pessoa Sintetica");
+      expect(await historico(colab)).toHaveLength(1);
+    });
+
+    it.each([
+      ["gestor", () => gestorA],
+      ["financeiro", () => financeiroA],
+      ["colaborador", () => colaboradorA],
+      ["master_tecnico", () => master],
+    ])("%s não atribui jornada (403)", async (_papel, cred) => {
+      const { id: jornada } = await criarTabela(rhA, `Papel ${_papel} T183`);
+      const colab = await colaboradorDaA(`Pessoa Sintetica Papel ${_papel}`);
+      await atribuir(cred(), {
+        colaboradorId: colab,
+        tabelaHorarioId: jornada,
+        vigenciaInicio: "2026-02-01",
+      }).expect(403);
+      expect(await historico(colab)).toEqual([]);
+    });
+
+    it("sem CSRF 403; empresa no corpo, data inválida ou campo nulo 400; nada criado", async () => {
+      const { id: jornada } = await criarTabela(rhA, "Contrato T183");
+      const colab = await colaboradorDaA("Pessoa Sintetica Contrato");
+      await agent()
+        .post("/v1/horarios/vinculos/atribuicoes")
+        .set("Cookie", rhA.cookie)
+        .send({
+          colaboradorId: colab,
+          tabelaHorarioId: jornada,
+          vigenciaInicio: "2026-02-01",
+        })
+        .expect(403);
+      for (const corpo of [
+        {
+          colaboradorId: colab,
+          tabelaHorarioId: jornada,
+          vigenciaInicio: "2026-02-01",
+          empresaId: empresaB,
+        },
+        {
+          colaboradorId: colab,
+          tabelaHorarioId: jornada,
+          vigenciaInicio: "2026-02-30",
+        },
+        {
+          colaboradorId: colab,
+          tabelaHorarioId: null,
+          vigenciaInicio: "2026-02-01",
+        },
+        { colaboradorId: colab, tabelaHorarioId: jornada },
+      ]) {
+        await atribuir(rhA, corpo).expect(400);
+      }
+      expect(await historico(colab)).toEqual([]);
+    });
+
+    describe("Nova admissão com jornada opcional", () => {
+      function corpoDaAdmissao(
+        extra: Record<string, unknown>,
+        lotacao: object,
+      ) {
+        return {
+          ...camposObrigatoriosAdmissao(),
+          ...lotacao,
+          empresaId: empresaA,
+          matricula: matricula(),
+          tipo: "clt",
+          dataAdmissao: ADMISSAO,
+          motivoCodigo: "admissao_inicial",
+          departamentoId: departamentoA,
+          ...extra,
+        };
+      }
+
+      it("RH admite com jornada: a vigência começa na data de admissão, na mesma transação", async () => {
+        const { id: jornada } = await criarTabela(rhA, "Admissao T183");
+        const lotacao = await lotacaoMinima(appUrl, empresaA);
+        const r = await post("/v1/colaboradores", rhA)
+          .send(
+            corpoDaAdmissao(
+              {
+                nome: "Pessoa Sintetica Admitida Jornada",
+                tabelaHorarioId: jornada,
+              },
+              lotacao,
+            ),
+          )
+          .expect(201);
+        expect(r.body.jornada).toMatchObject({ tabelaHorarioId: jornada });
+        const itens = await historico(r.body.id);
+        expect(itens).toHaveLength(1);
+        expect(itens[0]).toMatchObject({
+          tabelaHorarioId: jornada,
+          vigenciaInicio: ADMISSAO,
+          vigenciaFim: null,
+        });
+        const acoes = (await trilha(itens[0]!.id)).map((e) => e.action);
+        expect(acoes).toEqual(["horarios_vinculo_criado"]);
+      });
+
+      it("sem jornada, a admissão segue igual: jornada nula e nenhuma vigência", async () => {
+        const lotacao = await lotacaoMinima(appUrl, empresaA);
+        const r = await post("/v1/colaboradores", rhA)
+          .send(
+            corpoDaAdmissao({ nome: "Pessoa Sintetica Sem Jornada" }, lotacao),
+          )
+          .expect(201);
+        expect(r.body.jornada).toBeNull();
+        expect(await historico(r.body.id)).toEqual([]);
+      });
+
+      it("jornada inativa ou de outra empresa: 422 no campo, e nada da admissão é gravado", async () => {
+        const { id: inativa } = await criarTabela(rhA, "Admissao Inativa T183");
+        await post(`/v1/horarios/${inativa}/desativar`, rhA).expect(201);
+        const { id: daB } = await criarTabela(rhB, "Admissao Da B T183");
+        const lotacao = await lotacaoMinima(appUrl, empresaA);
+        for (const [i, tabelaHorarioId] of [inativa, daB].entries()) {
+          const nome = `Pessoa Sintetica Recusada ${i}`;
+          const r = await post("/v1/colaboradores", rhA)
+            .send(corpoDaAdmissao({ nome, tabelaHorarioId }, lotacao))
+            .expect(422);
+          expect(r.body.erros).toEqual([
+            { campo: "tabelaHorarioId", motivo: "indisponivel" },
+          ]);
+          expect(
+            await comPrisma((p) => p.colaborador.count({ where: { nome } })),
+          ).toBe(0);
+        }
+      });
+
+      it("DP admite, mas não envia jornada: com ela, a admissão inteira é negada e nada é gravado", async () => {
+        const { id: jornada } = await criarTabela(rhA, "Admissao DP T183");
+        const lotacao = await lotacaoMinima(appUrl, empresaA);
+        const nome = "Pessoa Sintetica Admissao DP";
+        await post("/v1/colaboradores", dpA)
+          .send(corpoDaAdmissao({ nome, tabelaHorarioId: jornada }, lotacao))
+          .expect(404);
+        expect(
+          await comPrisma((p) => p.colaborador.count({ where: { nome } })),
+        ).toBe(0);
+        // Sem jornada, o DP admite normalmente.
+        await post("/v1/colaboradores", dpA)
+          .send(
+            corpoDaAdmissao(
+              { nome: "Pessoa Sintetica Admissao DP Sem" },
+              lotacao,
+            ),
+          )
+          .expect(201);
+      });
+
+      it("idempotência confere também a jornada: mesmo envio é reenvio; outra jornada com a mesma chave é recusada", async () => {
+        const { id: j1 } = await criarTabela(rhA, "Idem A T183");
+        const { id: j2 } = await criarTabela(rhA, "Idem B T183");
+        const lotacao = await lotacaoMinima(appUrl, empresaA);
+        const corpo = corpoDaAdmissao(
+          { nome: "Pessoa Sintetica Idempotente", tabelaHorarioId: j1 },
+          lotacao,
+        );
+        const chave = "6f3c2a1e-8b7d-4c5e-9f0a-1b2c3d4e5f60";
+        const primeira = await post("/v1/colaboradores", rhA)
+          .set("idempotency-key", chave)
+          .send(corpo)
+          .expect(201);
+        const reenvio = await post("/v1/colaboradores", rhA)
+          .set("idempotency-key", chave)
+          .send(corpo);
+        expect([200, 201]).toContain(reenvio.status);
+        expect(reenvio.body.id).toBe(primeira.body.id);
+        expect(reenvio.body.jornada).toMatchObject({ tabelaHorarioId: j1 });
+        const outra = await post("/v1/colaboradores", rhA)
+          .set("idempotency-key", chave)
+          .send({ ...corpo, tabelaHorarioId: j2 })
+          .expect(422);
+        expect(outra.body.codigo).toBe("idempotencia_conteudo_divergente");
+        expect(await historico(primeira.body.id)).toHaveLength(1);
+      });
     });
   });
 });

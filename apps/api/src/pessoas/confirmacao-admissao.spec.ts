@@ -980,6 +980,8 @@ describe("T179 — admitirIdempotente (serviço, sem banco)", () => {
       },
       enderecoColaborador: { findUnique: jest.fn(async () => null) },
       contatoColaborador: { findUnique: jest.fn(async () => gravada.contato) },
+      // T183 — admissão sem jornada: nenhuma vigência nasceu com ela.
+      vinculoHorario: { findFirst: jest.fn(async () => null) },
     };
     const gravacao = jest.fn(async () => {
       throw opcoes.falhaNaGravacao ?? new Error("não devia gravar");

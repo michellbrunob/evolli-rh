@@ -160,6 +160,11 @@ export interface AdmitirColaboradorDto extends DestinoOrganizacionalDto {
   > & { dataNascimento: string };
   endereco?: Record<Exclude<keyof EnderecoApi, "atualizadoEm">, string | null>;
   contatos?: { emailPessoal?: string; celular?: string; telefone?: string };
+  /**
+   * T183 — jornada de trabalho opcional (só o RH a envia): a vigência começa
+   * na data de admissão. Ausente é "sem jornada".
+   */
+  tabelaHorarioId?: string;
 }
 
 /**
@@ -198,6 +203,15 @@ export interface AdmissaoRegistradaApi extends ColaboradorApi {
     celular: string | null;
     telefone: string | null;
     atualizadoEm: string;
+  } | null;
+  /**
+   * T183 — a vigência da jornada criada com a admissão, ou `null` sem
+   * jornada. Ausente em respostas de antes da T183.
+   */
+  jornada?: {
+    id: string;
+    tabelaHorarioId: string;
+    vigenciaInicio: string;
   } | null;
 }
 

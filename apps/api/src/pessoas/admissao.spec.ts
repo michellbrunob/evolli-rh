@@ -269,6 +269,7 @@ describe("Admissão — a resposta é projeção explícita, campo a campo", () 
         "criadoEm",
         "endereco",
         "id",
+        "jornada",
         "movimentacao",
         "nome",
         "perfilPessoal",

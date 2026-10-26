@@ -187,8 +187,43 @@ describe("evaluateHorarios — matriz de Cadastros/Horarios (T038)", () => {
       }
     });
 
+    // T183 — o DP também CONSULTA os vínculos de horário (a jornada de cada
+    // colaborador e o histórico) da própria empresa; não atribui, não troca,
+    // não encerra.
+    it("consulta vinculo_horario so na propria empresa, e nao o altera", () => {
+      expect(
+        evaluatePermission(sujeito("dp"), {
+          resource: "vinculo_horario",
+          action: "read",
+        }),
+      ).toBe(true);
+      expect(
+        evaluatePermission(sujeito("dp"), {
+          resource: "vinculo_horario",
+          action: "read",
+          targetCompanyId: EMPRESA_A,
+        }),
+      ).toBe(true);
+      expect(
+        evaluatePermission(sujeito("dp"), {
+          resource: "vinculo_horario",
+          action: "read",
+          targetCompanyId: "99999999-9999-4999-8999-999999999999",
+        }),
+      ).toBe(false);
+      for (const acao of ACOES.filter((a) => a !== "read")) {
+        expect(
+          evaluatePermission(sujeito("dp"), {
+            resource: "vinculo_horario",
+            action: acao,
+            targetCompanyId: EMPRESA_A,
+          }),
+        ).toBe(false);
+      }
+    });
+
     for (const recurso of HORARIOS_RESOURCES.filter(
-      (r) => r !== "tabela_horario",
+      (r) => r !== "tabela_horario" && r !== "vinculo_horario",
     )) {
       it(`dp segue negado em ${recurso}, em toda acao e nas duas fases`, () => {
         for (const acao of ACOES) {

@@ -20,6 +20,7 @@ import {
   Min,
   MinLength,
   ValidateNested,
+  ValidateIf,
 } from "class-validator";
 import {
   MotivoMovimentacao,
@@ -240,6 +241,16 @@ export class AdmitirColaboradorDto {
   @ValidateNested()
   @Type(() => RegistrarContatosColaboradorDto)
   contatos?: RegistrarContatosColaboradorDto;
+
+  /**
+   * T183 — jornada de trabalho opcional (decisão de 2026-10-26). Informada,
+   * a admissão cria, na MESMA transação, a vigência da jornada a partir da
+   * data de admissão. Só jornada ATIVA da empresa ativa, e só quem atribui
+   * jornada (o RH) pode enviá-la. Ausente é "sem jornada"; `null` é recusado.
+   */
+  @ValidateIf((_, valor) => valor !== undefined)
+  @IsUUID()
+  tabelaHorarioId?: string;
 }
 
 /**

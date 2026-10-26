@@ -27,6 +27,7 @@ import {
 import { formatarDiaCivil } from "../../format/data";
 import { exibirMatricula } from "../../format/matricula";
 import { ContatosColaboradorSecao } from "./ContatosColaboradorSecao";
+import { JornadaColaboradorSecao } from "./JornadaColaboradorSecao";
 import { DadosPessoaisColaboradorSecao } from "./DadosPessoaisColaboradorSecao";
 import "./ColaboradoresScreen.css";
 
@@ -159,6 +160,12 @@ export interface ColaboradoresScreenProps {
    * CEP. Só orienta a tela: quem recusa é o servidor.
    */
   readonly podeEditarFicha?: boolean;
+  /**
+   * T183 — o perfil atribui, troca e encerra a jornada do colaborador na
+   * ficha: só o RH (`PAPEIS_OPERACAO_JORNADAS`). Sem isso, a seção "Jornada
+   * de trabalho" é só consulta. Só orienta a tela: quem recusa é o servidor.
+   */
+  readonly podeOperarJornada?: boolean;
 }
 
 export function ColaboradoresScreen({
@@ -167,6 +174,7 @@ export function ColaboradoresScreen({
   onAberturaAtendida,
   onNovaAdmissao,
   podeEditarFicha = false,
+  podeOperarJornada = false,
 }: ColaboradoresScreenProps = {}) {
   const [statusCarregamento, setStatusCarregamento] = useState<
     "carregando" | "erro" | "dados"
@@ -236,6 +244,9 @@ export function ColaboradoresScreen({
   // T181 — idem para os dados pessoais e o endereço, agora editáveis.
   const [dadosPessoaisAlterados, setDadosPessoaisAlterados] = useState(false);
   const [salvandoDadosPessoais, setSalvandoDadosPessoais] = useState(false);
+  // T183 — idem para a jornada de trabalho (atribuir, trocar e encerrar).
+  const [jornadaAlterada, setJornadaAlterada] = useState(false);
+  const [salvandoJornada, setSalvandoJornada] = useState(false);
   // T176 — "Completar contatos" vindo da página de Nova admissão.
   const [focarContatos, setFocarContatos] = useState(false);
   /** Salvamento do nome em curso — trava síncrona, ver `handleSalvarNome`. */
@@ -999,10 +1010,14 @@ export function ColaboradoresScreen({
         bloqueado={
           (detalhe?.salvandoNome ?? false) ||
           salvandoContatos ||
-          salvandoDadosPessoais
+          salvandoDadosPessoais ||
+          salvandoJornada
         }
         alterado={
-          detalheNomeAlterado || contatosAlterados || dadosPessoaisAlterados
+          detalheNomeAlterado ||
+          contatosAlterados ||
+          dadosPessoaisAlterados ||
+          jornadaAlterada
         }
         largura="media"
       >
@@ -1077,6 +1092,16 @@ export function ColaboradoresScreen({
               onSalvandoChange={setSalvandoContatos}
               focarAoCarregar={focarContatos}
               podeEditar={podeEditarFicha}
+            />
+
+            {/* T183 — a jornada atual e o histórico de vigências; o RH
+                atribui, troca e encerra. */}
+            <JornadaColaboradorSecao
+              key={`jornada-${detalhe.colaborador.id}`}
+              colaboradorId={detalhe.colaborador.id}
+              podeOperar={podeOperarJornada}
+              onAlteradoChange={setJornadaAlterada}
+              onSalvandoChange={setSalvandoJornada}
             />
 
             <div className="colaboradores-screen__vinculos">

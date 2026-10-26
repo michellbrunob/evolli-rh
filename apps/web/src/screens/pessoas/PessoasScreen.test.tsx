@@ -60,7 +60,9 @@ describe("PessoasScreen — modo funcional (T072/T088/T089/T090/T091)", () => {
 
   it("troca para 'Horário de trabalho' ao clicar na aba — preservado sem regressão (T112)", () => {
     const onTituloIdChange = vi.fn();
-    render(<PessoasScreen onTituloIdChange={onTituloIdChange} />);
+    render(
+      <PessoasScreen onTituloIdChange={onTituloIdChange} podeOperarJornada />,
+    );
 
     fireEvent.click(screen.getByRole("tab", { name: "Horário de trabalho" }));
 
@@ -281,7 +283,7 @@ describe("PessoasScreen — modo funcional (T072/T088/T089/T090/T091)", () => {
   });
 
   it("passa por 'Histórico funcional' e volta para 'Colaboradores', preservando 'Horário de trabalho' sem regressão", () => {
-    render(<PessoasScreen />);
+    render(<PessoasScreen podeOperarJornada />);
 
     fireEvent.click(screen.getByRole("tab", { name: "Histórico funcional" }));
     expect(

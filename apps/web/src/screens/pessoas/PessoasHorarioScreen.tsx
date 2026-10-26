@@ -60,7 +60,18 @@ interface DetalheState {
   erroEncerramento: string | null;
 }
 
-export function PessoasHorarioScreen() {
+export interface PessoasHorarioScreenProps {
+  /**
+   * T183 — o perfil vincula e encerra jornadas: só o RH. Sem isso (DP,
+   * `master_tecnico`), a tela é só consulta, sem nenhum controle de escrita.
+   * Só orienta a tela: quem recusa é o servidor.
+   */
+  readonly podeOperar?: boolean;
+}
+
+export function PessoasHorarioScreen({
+  podeOperar = false,
+}: PessoasHorarioScreenProps = {}) {
   const [statusCarregamento, setStatusCarregamento] = useState<
     "carregando" | "erro" | "dados"
   >("carregando");
@@ -325,12 +336,14 @@ export function PessoasHorarioScreen() {
         title="Horário de trabalho"
         description="O RH vincula uma tabela de horário ao colaborador, com vigência — a mesma tabela pode ser reaproveitada por vários colaboradores, e uma nova vigência substitui a anterior somente dali em diante."
         actions={
-          <Button
-            onClick={abrirFormulario}
-            disabled={statusCarregamento !== "dados" || semOpcoesValidas}
-          >
-            Novo vínculo
-          </Button>
+          podeOperar ? (
+            <Button
+              onClick={abrirFormulario}
+              disabled={statusCarregamento !== "dados" || semOpcoesValidas}
+            >
+              Novo vínculo
+            </Button>
+          ) : undefined
         }
       />
 
@@ -340,15 +353,16 @@ export function PessoasHorarioScreen() {
         className="pessoas-horario-screen__aviso"
         aria-labelledby="pessoas-horario-aviso-titulo"
       >
-        <StatusBadge variant="info">Somente RH</StatusBadge>
+        <StatusBadge variant="info">
+          {podeOperar ? "Somente RH" : "Somente consulta"}
+        </StatusBadge>
         <p
           id="pessoas-horario-aviso-titulo"
           className="pessoas-horario-screen__aviso-texto"
         >
-          Somente o RH da própria empresa vincula ou encerra a tabela de horário
-          de um colaborador. Uma nova vigência vale apenas a partir da data de
-          início escolhida — ela nunca altera cálculo, apuração ou saldo já
-          existentes.
+          {podeOperar
+            ? "Somente o RH da própria empresa vincula ou encerra a tabela de horário de um colaborador. Uma nova vigência vale apenas a partir da data de início escolhida — ela nunca altera cálculo, apuração ou saldo já existentes."
+            : "Você consulta as jornadas dos colaboradores da empresa ativa e as suas vigências. Só o RH vincula, troca e encerra."}
         </p>
       </Surface>
 
@@ -393,11 +407,18 @@ export function PessoasHorarioScreen() {
               icon="—"
               title="Nenhum vínculo de horário cadastrado"
               description="Vincule uma tabela de horário a um colaborador desta empresa para que ela apareça aqui."
-              action={
-                <Button onClick={abrirFormulario} disabled={semOpcoesValidas}>
-                  Novo vínculo
-                </Button>
-              }
+              {...(podeOperar
+                ? {
+                    action: (
+                      <Button
+                        onClick={abrirFormulario}
+                        disabled={semOpcoesValidas}
+                      >
+                        Novo vínculo
+                      </Button>
+                    ),
+                  }
+                : {})}
             />
           ) : (
             <DataTable
@@ -408,7 +429,7 @@ export function PessoasHorarioScreen() {
             />
           )}
 
-          {statusCarregamento === "dados" && semOpcoesValidas ? (
+          {podeOperar && statusCarregamento === "dados" && semOpcoesValidas ? (
             <p className="pessoas-horario-screen__form-erro" role="status">
               {colaboradoresAtivos.length === 0
                 ? "Nenhum colaborador ativo disponível para vincular. "
@@ -460,7 +481,7 @@ export function PessoasHorarioScreen() {
             DSR, saldo, Banco de Horas ou Folha.
           </p>
 
-          {!detalhe.vinculo.vigenciaFim ? (
+          {podeOperar && !detalhe.vinculo.vigenciaFim ? (
             <div className="pessoas-horario-screen__encerrar">
               <FormField
                 id="pessoas-horario-encerrar-data"
