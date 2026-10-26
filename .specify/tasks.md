@@ -2449,7 +2449,8 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
     - **Decisão da proprietária (2026-10-23):** [decisão](../docs/decisions/t182-jornadas-trabalho.md).
       Tela própria com lista, busca, estado vazio e status; RH cria, edita e inativa; DP só
       consulta; código, nome e os dias e horários que o contrato já tem; código único na empresa,
-      por migration aditiva; dias e horários editáveis só sem vínculo com colaborador; inativação
+      por migration aditiva; nome e código editáveis, dias e horários imutáveis (T038) — para
+      mudar, nova jornada a partir da existente e inativação da antiga; inativação
       lógica; empresa da sessão; auditoria existente, só com ids e nomes de campos. **Fuso horário
       não faz parte do produto.**
     - **Entrega prevista:** migration aditiva do código, edição e busca na API, leitura pelo DP,

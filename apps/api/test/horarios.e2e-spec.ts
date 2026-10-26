@@ -280,13 +280,18 @@ describe("Cadastros: Horarios e vinculo ao colaborador (e2e)", () => {
     return colaborador.body.id;
   }
 
+  /** T182 — o código é obrigatório ao criar e único na empresa. */
+  let sequenciaDeCodigo = 0;
+  const novoCodigo = () => `JOR_${++sequenciaDeCodigo}`;
+
   async function criarTabela(
     cred: Credencial,
     nome: string,
     periodos: { dia: string; inicio: string; fim: string }[] = GRADE_44H,
+    codigo: string = novoCodigo(),
   ): Promise<{ id: string; body: Record<string, unknown> }> {
     const resposta = await post("/v1/horarios", cred)
-      .send({ nome, periodos })
+      .send({ codigo, nome, periodos })
       .expect(201);
     return { id: resposta.body.id, body: resposta.body };
   }
@@ -456,6 +461,7 @@ describe("Cadastros: Horarios e vinculo ao colaborador (e2e)", () => {
     it("rejeita periodos sobrepostos no mesmo dia (422)", async () => {
       await post("/v1/horarios", rhA)
         .send({
+          codigo: novoCodigo(),
           nome: "Invalida",
           periodos: [
             { dia: "segunda", inicio: "08:00", fim: "12:00" },
@@ -468,6 +474,7 @@ describe("Cadastros: Horarios e vinculo ao colaborador (e2e)", () => {
     it("rejeita hora fora do formato HH:MM (400)", async () => {
       await post("/v1/horarios", rhA)
         .send({
+          codigo: novoCodigo(),
           nome: "X",
           periodos: [{ dia: "segunda", inicio: "8h", fim: "12:00" }],
         })
@@ -476,7 +483,12 @@ describe("Cadastros: Horarios e vinculo ao colaborador (e2e)", () => {
 
     it("rejeita campo nao declarado no corpo (400)", async () => {
       await post("/v1/horarios", rhA)
-        .send({ nome: "X", periodos: [], empresaId: empresaB })
+        .send({
+          codigo: novoCodigo(),
+          nome: "X",
+          periodos: [],
+          empresaId: empresaB,
+        })
         .expect(400);
     });
 
@@ -831,24 +843,30 @@ describe("Cadastros: Horarios e vinculo ao colaborador (e2e)", () => {
       await agent()
         .post("/v1/horarios")
         .set("Cookie", rhA.cookie)
-        .send({ nome: "X", periodos: [] })
+        .send({ codigo: novoCodigo(), nome: "X", periodos: [] })
         .expect(403);
     });
 
-    it("DP e NEGADO (a alcada de horario e exclusiva de RH)", async () => {
+    // T182 — o DP CONSULTA as jornadas da propria empresa; criar segue so
+    // do RH (T037).
+    it("DP nao cria tabela, mas consulta a lista da propria empresa (T182)", async () => {
       const criar = await post("/v1/horarios", dpA).send({
+        codigo: novoCodigo(),
         nome: "X",
         periodos: [],
       });
       expect([403, 404]).toContain(criar.status);
       expect(criar.status).not.toBe(201);
-      const ler = await get("/v1/horarios", dpA);
-      expect([403, 404]).toContain(ler.status);
+      const ler = await get("/v1/horarios", dpA).expect(200);
+      for (const item of ler.body.itens as { empresaId: string }[]) {
+        expect(item.empresaId).toBe(empresaA);
+      }
     });
 
     it("gestor, financeiro, colaborador, auditor e dpo sao negados", async () => {
       for (const cred of [gestorA, financeiroA, colaboradorA, auditorA, dpoA]) {
         const criar = await post("/v1/horarios", cred).send({
+          codigo: novoCodigo(),
           nome: "X",
           periodos: [],
         });
@@ -860,6 +878,7 @@ describe("Cadastros: Horarios e vinculo ao colaborador (e2e)", () => {
 
     it("admin_tecnico e negado", async () => {
       const criar = await post("/v1/horarios", admin).send({
+        codigo: novoCodigo(),
         nome: "X",
         periodos: [],
       });
@@ -884,7 +903,7 @@ describe("Cadastros: Horarios e vinculo ao colaborador (e2e)", () => {
       expect(empresas.has(empresaB)).toBe(true);
       // Nao muta.
       await post("/v1/horarios", master)
-        .send({ nome: "X", periodos: [] })
+        .send({ codigo: novoCodigo(), nome: "X", periodos: [] })
         .expect(403);
       await post(`/v1/horarios/${tabelaA}/desativar`, master)
         .send()
@@ -1130,6 +1149,282 @@ describe("Cadastros: Horarios e vinculo ao colaborador (e2e)", () => {
   });
 
   // -------------------------------------------------------------------------
+  // T182 — catálogo de Jornadas de trabalho em Estrutura (decisão da
+  // proprietária de 2026-10-23): a tabela de horário ganha código único na
+  // empresa e edição de nome e código; os períodos seguem imutáveis; o DP
+  // consulta; a empresa é sempre a da sessão.
+  describe("T182 — jornadas de trabalho: código, edição, busca e consulta do DP", () => {
+    function patch(rota: string, cred: Credencial) {
+      return agent()
+        .patch(rota)
+        .set("Cookie", cred.cookie)
+        .set("x-csrf-token", cred.csrfToken);
+    }
+
+    async function comPrisma<T>(f: (p: PrismaClient) => Promise<T>) {
+      const prisma = new PrismaClient({ datasources: { db: { url: appUrl } } });
+      try {
+        return await f(prisma);
+      } finally {
+        await prisma.$disconnect();
+      }
+    }
+
+    const CODIGO_EM_USO = [{ campo: "codigo", motivo: "em_uso" }];
+
+    it("RH cria com código, e a jornada volta com ele na lista e no detalhe", async () => {
+      const { id, body } = await criarTabela(
+        rhA,
+        "Jornada Comercial T182",
+        GRADE_44H,
+        "COM_T182",
+      );
+      expect(body).toMatchObject({ codigo: "COM_T182", ativo: true });
+      const detalhe = await get(`/v1/horarios/${id}`, rhA).expect(200);
+      expect(detalhe.body.codigo).toBe("COM_T182");
+      const lista = await get("/v1/horarios?busca=COM_T182", rhA).expect(200);
+      expect(lista.body.itens.map((t: { id: string }) => t.id)).toEqual([id]);
+    });
+
+    it.each([
+      ["sem código", {}],
+      ["minúsculas", { codigo: "com_t182" }],
+      ["curto", { codigo: "A" }],
+      ["com espaço", { codigo: "COM T182" }],
+    ])("código inválido (%s): 400 e nada criado", async (_caso, extra) => {
+      const nome = `Jornada Invalida ${_caso}`;
+      await post("/v1/horarios", rhA)
+        .send({ nome, periodos: [], ...extra })
+        .expect(400);
+      expect(
+        await comPrisma((p) => p.tabelaHorario.count({ where: { nome } })),
+      ).toBe(0);
+    });
+
+    it("código repetido na mesma empresa: 409 no campo, sem eco, e nada criado; outra empresa aceita", async () => {
+      await criarTabela(rhA, "Primeira com codigo", [], "DUP_T182");
+      const repetido = await post("/v1/horarios", rhA)
+        .send({ codigo: "DUP_T182", nome: "Segunda com codigo", periodos: [] })
+        .expect(409);
+      expect(repetido.body.erros).toEqual(CODIGO_EM_USO);
+      expect(JSON.stringify(repetido.body)).not.toContain("DUP_T182");
+      expect(JSON.stringify(repetido.body)).not.toContain("Segunda com codigo");
+      expect(
+        await comPrisma((p) =>
+          p.tabelaHorario.count({
+            where: { empresaId: empresaA, codigo: "DUP_T182" },
+          }),
+        ),
+      ).toBe(1);
+      await criarTabela(rhB, "Mesmo codigo na B", [], "DUP_T182");
+    });
+
+    it("RH edita nome e código; os períodos ficam; a trilha tem só o id", async () => {
+      const { id, body } = await criarTabela(rhA, "Antes T182", GRADE_44H);
+      const r = await patch(`/v1/horarios/${id}`, rhA)
+        .send({ codigo: "EDT_T182", nome: "Depois Edicao T182" })
+        .expect(200);
+      expect(r.body).toMatchObject({
+        codigo: "EDT_T182",
+        nome: "Depois Edicao T182",
+        periodos: body.periodos,
+      });
+      const eventos = await comPrisma((p) =>
+        p.auditEvent.findMany({
+          where: { action: "horarios_tabela_editada", resourceId: id },
+        }),
+      );
+      expect(eventos).toHaveLength(1);
+      expect(eventos[0]).toMatchObject({
+        companyId: empresaA,
+        actorRole: "rh",
+        result: "success",
+      });
+      const trilha = JSON.stringify(eventos);
+      expect(trilha).not.toContain("EDT_T182");
+      expect(trilha).not.toContain("Depois Edicao");
+      // Sem mudança real: devolve o gravado e não grava outra trilha.
+      await patch(`/v1/horarios/${id}`, rhA)
+        .send({ nome: "Depois Edicao T182" })
+        .expect(200);
+      expect(
+        await comPrisma((p) =>
+          p.auditEvent.count({
+            where: { action: "horarios_tabela_editada", resourceId: id },
+          }),
+        ),
+      ).toBe(1);
+    });
+
+    it("editar para um código de outra jornada da empresa: 409 no campo, e nada muda", async () => {
+      await criarTabela(rhA, "Dona do codigo", [], "DONA_T182");
+      const { id } = await criarTabela(rhA, "Quer o codigo", [], "QUER_T182");
+      const r = await patch(`/v1/horarios/${id}`, rhA)
+        .send({ codigo: "DONA_T182" })
+        .expect(409);
+      expect(r.body.erros).toEqual(CODIGO_EM_USO);
+      const atual = await get(`/v1/horarios/${id}`, rhA).expect(200);
+      expect(atual.body.codigo).toBe("QUER_T182");
+    });
+
+    it.each([
+      ["períodos", { periodos: [] }],
+      ["empresa", { empresaId: "11111111-1111-4111-8111-111111111111" }],
+      ["corpo vazio", {}],
+      ["nome só com espaços", { nome: "   " }],
+    ])(
+      "edição com %s: 400, e os períodos seguem imutáveis",
+      async (_caso, corpo) => {
+        const { id, body } = await criarTabela(rhA, `Imutavel ${_caso}`);
+        await patch(`/v1/horarios/${id}`, rhA).send(corpo).expect(400);
+        const atual = await get(`/v1/horarios/${id}`, rhA).expect(200);
+        expect(atual.body.periodos).toEqual(body.periodos);
+        expect(atual.body.nome).toBe(`Imutavel ${_caso}`);
+      },
+    );
+
+    it("tabela criada antes do código aparece sem código e ganha um pela edição", async () => {
+      const antiga = await comPrisma(async (p) => {
+        const usuario = await p.accessUser.findFirstOrThrow({
+          where: { role: "rh", companyId: empresaA },
+        });
+        return p.tabelaHorario.create({
+          data: {
+            empresaId: empresaA,
+            nome: "Antiga sem codigo T182",
+            criadoPorUserId: usuario.id,
+          },
+        });
+      });
+      const lista = await get(
+        "/v1/horarios?busca=Antiga sem codigo T182",
+        rhA,
+      ).expect(200);
+      expect(lista.body.itens[0]).toMatchObject({
+        id: antiga.id,
+        codigo: null,
+      });
+      const r = await patch(`/v1/horarios/${antiga.id}`, rhA)
+        .send({ codigo: "ANTIGA_T182" })
+        .expect(200);
+      expect(r.body.codigo).toBe("ANTIGA_T182");
+    });
+
+    it("busca por nome (sem diferenciar caixa) e por código; curinga vale literalmente", async () => {
+      const { id: a } = await criarTabela(
+        rhA,
+        "Turno Matutino Busca",
+        [],
+        "MAT_BUSCA",
+      );
+      const { id: b } = await criarTabela(
+        rhA,
+        "Turno Noturno Busca",
+        [],
+        "NOT_BUSCA",
+      );
+      const porNome = await get(
+        "/v1/horarios?busca=matutino busca",
+        rhA,
+      ).expect(200);
+      expect(porNome.body.itens.map((t: { id: string }) => t.id)).toEqual([a]);
+      const porCodigo = await get("/v1/horarios?busca=not_busca", rhA).expect(
+        200,
+      );
+      expect(porCodigo.body.itens.map((t: { id: string }) => t.id)).toEqual([
+        b,
+      ]);
+      const curinga = await get("/v1/horarios?busca=%25", rhA).expect(200);
+      expect(curinga.body.itens).toEqual([]);
+      // Só a empresa da sessão: a B não vê as jornadas da A.
+      const daB = await get("/v1/horarios?busca=Busca", rhB).expect(200);
+      expect(daB.body.itens).toEqual([]);
+    });
+
+    it("DP consulta lista e detalhe da própria empresa, e não cria, edita, inativa nem reativa", async () => {
+      const { id } = await criarTabela(
+        rhA,
+        "Consulta do DP T182",
+        [],
+        "DP_T182",
+      );
+      const lista = await get("/v1/horarios?busca=DP_T182", dpA).expect(200);
+      expect(lista.body.itens.map((t: { id: string }) => t.id)).toEqual([id]);
+      await get(`/v1/horarios/${id}`, dpA).expect(200);
+      await patch(`/v1/horarios/${id}`, dpA)
+        .send({ nome: "Nao pode" })
+        .expect(403);
+      await post(`/v1/horarios/${id}/desativar`, dpA).expect(403);
+      await post(`/v1/horarios/${id}/reativar`, dpA).expect(403);
+      // O vínculo de horário com o colaborador segue negado ao DP.
+      const vinculos = await get("/v1/horarios/vinculos", dpA);
+      expect([403, 404]).toContain(vinculos.status);
+      const atual = await get(`/v1/horarios/${id}`, rhA).expect(200);
+      expect(atual.body).toMatchObject({
+        nome: "Consulta do DP T182",
+        ativo: true,
+      });
+    });
+
+    it("jornada de outra empresa: 404 para o RH e para o DP, com a negação na trilha e nada mudado", async () => {
+      const { id } = await criarTabela(rhB, "So da B T182", [], "SOB_T182");
+      await get(`/v1/horarios/${id}`, dpA).expect(404);
+      const r = await patch(`/v1/horarios/${id}`, rhA)
+        .send({ nome: "Invasao T182" })
+        .expect(404);
+      expect(JSON.stringify(r.body)).not.toContain("So da B");
+      const negacoes = await comPrisma((p) =>
+        p.auditEvent.findMany({
+          where: {
+            action: "authorization_denied",
+            resource: "tabela_horario",
+            resourceId: id,
+          },
+        }),
+      );
+      expect(negacoes.length).toBeGreaterThanOrEqual(2);
+      expect(JSON.stringify(negacoes)).not.toContain("Invasao T182");
+      const atual = await get(`/v1/horarios/${id}`, rhB).expect(200);
+      expect(atual.body.nome).toBe("So da B T182");
+    });
+
+    it.each([
+      ["gestor", () => gestorA],
+      ["financeiro", () => financeiroA],
+      ["colaborador", () => colaboradorA],
+      ["master_tecnico", () => master],
+    ])("%s não edita jornada (403), e nada muda", async (_papel, cred) => {
+      const { id } = await criarTabela(rhA, `Alvo ${_papel} T182`);
+      await patch(`/v1/horarios/${id}`, cred())
+        .send({ nome: "Nao pode" })
+        .expect(403);
+      const atual = await get(`/v1/horarios/${id}`, rhA).expect(200);
+      expect(atual.body.nome).toBe(`Alvo ${_papel} T182`);
+    });
+
+    it("inativar é lógico: a jornada continua listada como inativa, com os mesmos períodos", async () => {
+      const { id, body } = await criarTabela(
+        rhA,
+        "Para inativar T182",
+        GRADE_44H,
+        "INA_T182",
+      );
+      await post(`/v1/horarios/${id}/desativar`, rhA).expect(201);
+      const inativas = await get(
+        "/v1/horarios?ativo=false&busca=INA_T182",
+        rhA,
+      ).expect(200);
+      expect(inativas.body.itens[0]).toMatchObject({
+        id,
+        ativo: false,
+        periodos: body.periodos,
+      });
+      expect(
+        await comPrisma((p) => p.tabelaHorario.count({ where: { id } })),
+      ).toBe(1);
+    });
+  });
+
   describe("regressao: fatias anteriores intactas", () => {
     it("master ainda le estrutura organizacional; admin_tecnico segue negado", async () => {
       await get("/v1/empresas", master).expect(200);

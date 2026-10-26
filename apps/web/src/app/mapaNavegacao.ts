@@ -30,8 +30,8 @@
  *
  * **Não é roteador.** Destino continua sendo estado do shell, como desde a
  * T044. As únicas exceções estão na tabela fechada de `rotasDoShell.ts`: a URL
- * própria de "Nova admissão" (T176) e a de "Colaboradores" (T178), a porta
- * principal de Gestão de Pessoas.
+ * própria de "Nova admissão" (T176), a de "Colaboradores" (T178), a porta
+ * principal de Gestão de Pessoas, e a de "Jornadas de trabalho" (T182).
  */
 
 import type { IconeModuloId } from "./IconeModulo";
@@ -124,6 +124,29 @@ export function podeEditarFicha(papel: string | null): boolean {
 }
 
 /**
+ * T182 — papéis que CONSULTAM o catálogo de Jornadas de trabalho
+ * (`tabela_horario`/`read`): `rh` e `dp` na própria empresa (o DP por decisão
+ * da proprietária de 2026-10-23) e `master_tecnico`, que já lia. Espelha
+ * `evaluateHorarios` em `rbac.evaluator.ts`.
+ */
+export const PAPEIS_CONSULTA_JORNADAS: readonly string[] = [
+  "rh",
+  "dp",
+  "master_tecnico",
+];
+
+/**
+ * T182 — papéis que OPERAM o catálogo (criar, editar nome e código, inativar
+ * e reativar): só `rh`, na própria empresa (T037). Só ORIENTA a tela: quem
+ * recusa é o servidor.
+ */
+export const PAPEIS_OPERACAO_JORNADAS: readonly string[] = ["rh"];
+
+export function podeOperarJornadas(papel: string | null): boolean {
+  return papel !== null && PAPEIS_OPERACAO_JORNADAS.includes(papel);
+}
+
+/**
  * Os cinco módulos da navegação primária, mais Demonstração.
  *
  * A ordem é de uso: quem se opera no dia a dia vem antes do que se administra,
@@ -165,10 +188,21 @@ export const GRUPOS: readonly GrupoNavegacao[] = [
     icone: "estrutura",
     destinos: [
       {
+        // T182 — sem a aba Horários, o contêiner abre na Estrutura
+        // organizacional; o rótulo diz isso, e não repete o nome do módulo.
         id: "cadastros",
-        label: "Estrutura",
-        subRotulo: "Horários",
+        label: "Estrutura organizacional",
+        subRotulo: "Unidades, cargos e centros de custo",
         estado: "funcional",
+      },
+      {
+        // T182 — tela própria do catálogo de jornadas (antes a aba Horários
+        // de Cadastros), sobre o mesmo contrato de `/v1/horarios`.
+        id: "jornadas-trabalho",
+        label: "Jornadas de trabalho",
+        subRotulo: "Turnos da empresa",
+        estado: "funcional",
+        papeis: PAPEIS_CONSULTA_JORNADAS,
       },
     ],
   },
@@ -334,8 +368,8 @@ export function tituloDoGrupoDe(destinoId: string): string | undefined {
  * | demais           | `inicio`     | nenhuma capacidade funcional — e `inicio` não chama nada |
  *
  * **Isto corrige um defeito antigo sem inventar capacidade.** O padrão era
- * `cadastros` para todo mundo, cuja aba inicial consulta `tabela_horario` —
- * concedida só a `rh` e `master_tecnico`. Seis papéis abriam o produto numa
+ * `cadastros` para todo mundo, cuja aba inicial consultava `tabela_horario` —
+ * concedida, até a T182, só a `rh` e `master_tecnico`. Seis papéis abriam o produto numa
  * tela que respondia 403 na primeira requisição: a primeira impressão do
  * sistema era uma negação. `financeiro` é o caso menos óbvio e por isso vale
  * dizer: ele lê `centro_custo`, que é uma aba de Estrutura, mas **não** a aba
@@ -390,7 +424,8 @@ export function destinoInicialPara(papel: string | null): string {
  * | ------------------------- | ----------------------- | -------------------------------- |
  * | `pessoas`                 | `colaborador` read      | `rh`, `dp`, `master_tecnico`     |
  * | `nova-admissao`           | `colaborador` create    | `rh`, `dp`                       |
- * | `cadastros`               | `tabela_horario` read   | `rh`, `master_tecnico`           |
+ * | `cadastros`               | `unidade_organizacional`| `rh`, `dp`, `master_tecnico`     |
+ * | `jornadas-trabalho`       | `tabela_horario` read   | `rh`, `dp`, `master_tecnico`     |
  * | `ponto`                   | `evento_ponto` read     | `rh`, `dp`, `master_tecnico`     |
  * | `equipe`                  | `gestor_equipe` read    | `gestor`, `rh`                   |
  * | `administracao-lideranca` | `gestor_atribuicao`     | `rh`                             |
@@ -398,12 +433,14 @@ export function destinoInicialPara(papel: string | null): string {
  *
  * Os dois casos que surpreendem, e por isso valem dito:
  *
- * - **`dp` não recebe `cadastros`.** `evaluateHorarios` concede `tabela_horario`
- *   só a `rh` e `master_tecnico` — a alçada de horários é exclusiva do RH desde
- *   a T037. `dp` lê a estrutura organizacional, que é **outra aba** do mesmo
- *   destino; como o cartão abre na aba padrão, oferecê-lo produziria 403 na
- *   primeira requisição. É a mesma razão pela qual `destinoInicialPara` não
- *   manda `financeiro` para lá.
+ * - **`dp` recebe `cadastros` desde a T182.** Até ali a aba padrão era
+ *   Horários (`tabela_horario`), negada ao DP; com as jornadas em destino
+ *   próprio, a aba padrão é a Estrutura organizacional, que o DP lê
+ *   (`evaluateOrganizacao`). `financeiro` continua fora: lê só
+ *   `centro_custo`, que não é a aba padrão.
+ * - **`dp` consulta `jornadas-trabalho`, sem operar** (T182, decisão da
+ *   proprietária de 2026-10-23): `evaluateHorarios` lhe concede só
+ *   `tabela_horario`/`read`.
  * - **`master_tecnico` não recebe `equipe` nem `administracao-lideranca`.**
  *   Ambos partem da empresa do ator, e `master_tecnico` não tem empresa. Já
  *   está registrado em `PAPEIS_MINHA_EQUIPE` e
@@ -425,13 +462,27 @@ const CAPACIDADE_FUNCIONAL_POR_PAPEL: Readonly<
     "pessoas",
     "nova-admissao",
     "cadastros",
+    "jornadas-trabalho",
     "ponto",
     "equipe",
     "administracao-lideranca",
     "contas-acesso",
   ],
-  dp: ["pessoas", "nova-admissao", "ponto", "contas-acesso"],
-  master_tecnico: ["pessoas", "cadastros", "ponto", "contas-acesso"],
+  dp: [
+    "pessoas",
+    "nova-admissao",
+    "cadastros",
+    "jornadas-trabalho",
+    "ponto",
+    "contas-acesso",
+  ],
+  master_tecnico: [
+    "pessoas",
+    "cadastros",
+    "jornadas-trabalho",
+    "ponto",
+    "contas-acesso",
+  ],
   gestor: ["equipe"],
 };
 

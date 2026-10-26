@@ -2310,8 +2310,10 @@ lotação, situação e datas da admissão; promoção e merge.
 **Escopo da T182:** tela própria em Estrutura › Jornadas de trabalho, com
 lista da empresa ativa, busca, estado vazio e status; RH cria, edita e inativa;
 DP só consulta; código (único na empresa, por migration aditiva), nome e os
-dias e horários que o contrato já tem; dias e horários editáveis só sem vínculo
-com colaborador; inativação lógica; empresa da sessão; auditoria existente.
+dias e horários que o contrato já tem; nome e código editáveis, dias e
+horários imutáveis (T038) — para mudar, nova jornada a partir da existente e
+inativação da antiga; inativação lógica; empresa da sessão; auditoria
+existente.
 
 **Decisão da proprietária (2026-10-23):** [decisão](../docs/decisions/t182-jornadas-trabalho.md).
 Fuso horário não faz parte do produto.

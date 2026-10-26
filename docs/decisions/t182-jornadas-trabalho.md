@@ -20,7 +20,7 @@ associados aos colaboradores.
 | DP                 | **Consulta** as jornadas da própria empresa; não cria, não edita, não inativa                                                                                |
 | Campos             | Código, nome e a configuração de dias e horários que o contrato já tem (períodos por dia da semana, com início e fim). Nada além disso                       |
 | Código             | Obrigatório ao criar e ao editar; letras maiúsculas, dígitos e `_`, de 2 a 32 caracteres; único na empresa. Repetido: erro no campo Código, sem eco do valor |
-| Edição de horários | Nome e código sempre editáveis. Dias e horários só enquanto a jornada não tiver **nenhum** vínculo com colaborador; com vínculo, cria-se nova jornada        |
+| Edição de horários | Nome e código editáveis. **Dias e horários imutáveis** depois de criados (T038); para mudar, nova jornada a partir de uma existente e inativação da antiga   |
 | Inativação         | Lógica, preserva o histórico; nada é excluído fisicamente                                                                                                    |
 | Empresa            | Sempre a da sessão; nenhuma jornada vaza entre empresas                                                                                                      |
 | Auditoria          | A existente, só com ids e nomes de campos                                                                                                                    |
@@ -46,9 +46,48 @@ Leitura do código em `main` (`b6442f3`):
 - **Código** não existia. Decisão da proprietária: **migration aditiva**, com
   coluna `codigo` anulável (as tabelas já gravadas não são tocadas), restrição
   de forma e unicidade por empresa; a tela o exige ao criar e ao editar.
-- **Edição** não existia. A T182 cria a edição de nome, código e — só sem
-  vínculo — dias e horários.
+- **Edição** não existia. A T182 cria a edição de **nome e código** (ver §4):
+  dias e horários continuam imutáveis.
 - **DP** era negado inclusive na leitura de horários (T037). Decisão da
   proprietária: o DP **consulta** as jornadas da própria empresa; criar,
   editar, inativar e reativar continuam só do RH. O `master_tecnico` mantém a
-  leitura que já tinha, sem operar.
+  leitura que já tinha, sem operar. Isto substitui a T037 **só na leitura**
+  das jornadas; o vínculo de horário com o colaborador segue negado ao DP.
+- A aba **Horários** de Estrutura vira a tela própria **Jornadas de trabalho**
+  (destino `jornadas-trabalho`, rota `#/estrutura/jornadas-trabalho`). Sem
+  ela, o destino Estrutura passa a abrir na Estrutura organizacional, que o DP
+  já lia: o DP passa a ter o cartão de Estrutura no Hub. Nenhuma permissão do
+  servidor muda por isso.
+
+## 4. Dias e horários continuam imutáveis
+
+A primeira resposta da proprietária liberava dias e horários enquanto a jornada
+não tivesse vínculo. A leitura do código mostrou que isso exigiria mudar
+privilégios do banco: desde a T038, `periodo_horario` é imutável para o papel
+da aplicação (sem `UPDATE` nem `DELETE`). Consultada de novo, a proprietária
+decidiu **manter a imutabilidade**:
+
+- nome e código são editáveis;
+- dias e horários nunca mudam depois de criados;
+- para mudar, o RH cria uma **nova jornada a partir da existente** (a tela
+  copia os dias e horários, com código e nome em branco) e **inativa** a
+  antiga;
+- nenhum privilégio do banco muda.
+
+## 5. Seed de demonstração
+
+Com o código obrigatório ao criar, o seed de demonstração (que criava a jornada
+"Comercial 44h" sem código) passou a ser recusado. Decisão da proprietária de
+2026-10-26: **ajustar o seed**, que agora envia o código `COMERCIAL_44H`. A
+procura idempotente continua pelo nome; um banco já semeado mantém a jornada
+anterior, sem código.
+
+## 6. Pendências registradas
+
+- As tabelas gravadas antes da T182 ficam **sem código** (a coluna é
+  anulável, sem preenchimento automático); a tela as mostra como "Sem código"
+  e exige um código na primeira edição.
+- Associar a jornada ao colaborador fica para tarefa própria; o vínculo de
+  horário existente (Pessoas › Horário) não muda.
+- Não há usuário de demonstração do perfil financeiro; a negação a ele é
+  provada nos testes de API.

@@ -1,8 +1,8 @@
 /**
- * Cadastros > Horários (T110) — só tokens já existentes (tokens.css); sem
- * novo hexadecimal, sem sombra, sem gradiente. Layout responsivo: pilha
- * vertical de seções, com o formulário e os períodos se ajustando a partir
- * de telas largas.
+ * Estrutura > Jornadas de trabalho (T182; antes Cadastros > Horários, T110) —
+ * só tokens já existentes (tokens.css); sem novo hexadecimal, sem sombra, sem
+ * gradiente. Layout responsivo: pilha vertical de seções, com o formulário e
+ * os períodos se ajustando a partir de telas largas.
  */
 
 .horarios-screen {
@@ -14,7 +14,7 @@
 
 /* Cada seção é um item flex (coluna): sem `min-width: 0` ela recusaria
    encolher abaixo do min-content de seus descendentes — em particular a
-   tabela de horários, que é mais larga que o viewport em telas estreitas e já
+   tabela de jornadas, que é mais larga que o viewport em telas estreitas e já
    trata a própria rolagem horizontal (`DataTable`/`.evolli-datatable`). Sem
    isso aqui, essa rolagem vazaria para a página inteira. */
 .horarios-screen > * {
@@ -30,7 +30,7 @@
   color: var(--color-ink);
 }
 
-/* Aviso "Somente RH" — reaproveita os tokens semânticos de "info". */
+/* Aviso de alçada — reaproveita os tokens semânticos de "info". */
 .horarios-screen__aviso {
   display: flex;
   flex-wrap: wrap;
@@ -46,6 +46,18 @@
   flex: 1 1 16rem;
 }
 
+/* T182 — confirmação de escrita: tokens de sucesso, nunca só cor (o texto
+   diz o que aconteceu). */
+.horarios-screen__sucesso {
+  margin: 0;
+  padding: var(--space-xs) var(--space-sm);
+  border: 1px solid var(--status-success-border);
+  border-radius: var(--radius-sm);
+  background: var(--status-success-surface);
+  color: var(--status-success-ink);
+  font-weight: var(--weight-strong);
+}
+
 /* Bloco de erro — tokens semânticos de "danger". */
 .horarios-screen__erro {
   display: flex;
@@ -56,12 +68,39 @@
   border-color: var(--status-danger-border);
 }
 
-/* Filtros de listagem. */
+/* Filtros de listagem: busca e situação. */
 .horarios-screen__filtros {
   display: flex;
   flex-wrap: wrap;
+  align-items: flex-end;
   gap: var(--space-md);
   margin-bottom: var(--space-md);
+}
+
+/* T182 — busca por nome ou código. */
+.horarios-screen__busca {
+  display: flex;
+  flex: 1 1 24rem;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-sm) var(--space-md);
+  min-width: 0;
+}
+
+.horarios-screen__busca > .evolli-field {
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+
+.horarios-screen__busca-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+/* T182 — jornada anterior ao código: secundário, e o texto diz o que é. */
+.horarios-screen__sem-codigo {
+  color: var(--color-ink-subtle);
 }
 
 /* Indicador de carregamento. */
@@ -70,7 +109,7 @@
   color: var(--color-ink-subtle);
 }
 
-/* Painel do formulário de cadastro e do painel de detalhe. */
+/* Painel do formulário e do detalhe. */
 .horarios-screen__formulario {
   display: flex;
   flex-direction: column;
@@ -82,6 +121,25 @@
   flex-direction: column;
   gap: var(--space-lg);
   max-width: 40rem;
+  min-width: 0;
+}
+
+/* T182 — código e situação no detalhe. */
+.horarios-screen__dados {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm) var(--space-lg);
+  margin: 0;
+}
+
+.horarios-screen__dados dt {
+  color: var(--color-ink-subtle);
+}
+
+.horarios-screen__dados dd {
+  margin: 0;
+  font-weight: var(--weight-strong);
+  overflow-wrap: anywhere;
 }
 
 /* Erro inline no formulário (validação ou retorno da API). */
@@ -90,11 +148,19 @@
   color: var(--status-danger-ink);
 }
 
-/* Área do editor de períodos. */
+/* Área dos dias e horários (um `fieldset`, sem a moldura do navegador). */
 .horarios-screen__periodos {
   display: flex;
   flex-direction: column;
   gap: var(--space-sm);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.horarios-screen__periodos > legend {
+  padding: 0;
 }
 
 /* Uma linha de período (dia + entrada + saída + remover). */

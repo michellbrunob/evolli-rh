@@ -1,9 +1,12 @@
-export { CadastroHorariosScreen } from "./CadastroHorariosScreen";
+export {
+  JORNADAS_TRABALHO_TITULO_ID,
+  JornadasTrabalhoScreen,
+} from "./JornadasTrabalhoScreen";
 export {
   CALENDARIO_FERIADOS_TITULO_ID,
   CalendarioFeriadosScreen,
 } from "./CalendarioFeriadosScreen";
-export { HORARIOS_TITULO_ID, CadastrosScreen } from "./CadastrosScreen";
+export { CadastrosScreen } from "./CadastrosScreen";
 export {
   CENTROS_CUSTO_TITULO_ID,
   CentrosCustoScreen,

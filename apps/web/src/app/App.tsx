@@ -69,7 +69,12 @@ import {
   DocumentosScreen,
 } from "../screens/documentos";
 import { EQUIPE_TITULO_ID, EquipeScreen } from "../screens/equipe";
-import { CadastrosScreen, HORARIOS_TITULO_ID } from "../screens/horarios";
+import {
+  CadastrosScreen,
+  ESTRUTURA_ORGANIZACIONAL_TITULO_ID,
+  JORNADAS_TRABALHO_TITULO_ID,
+  JornadasTrabalhoScreen,
+} from "../screens/horarios";
 import { InicioVisaoGeralScreen } from "../screens/inicio";
 import {
   COLABORADORES_TITULO_ID,
@@ -95,6 +100,7 @@ import {
   destinoPorId,
   capacidadeFuncionalDe,
   podeEditarFicha,
+  podeOperarJornadas,
 } from "./mapaNavegacao";
 import {
   destinoDaRota,
@@ -115,6 +121,7 @@ const TITULO_ID_POR_DESTINO: Record<string, string> = {
   equipe: EQUIPE_TITULO_ID,
   "administracao-lideranca": ADMINISTRACAO_LIDERANCA_TITULO_ID,
   "nova-admissao": NOVA_ADMISSAO_TITULO_ID,
+  "jornadas-trabalho": JORNADAS_TRABALHO_TITULO_ID,
 };
 
 /**
@@ -253,6 +260,14 @@ function conteudoDoDestino(
   }
   if (destinoId === "cadastros") {
     return <CadastrosScreen onTituloIdChange={onCadastrosTituloIdChange} />;
+  }
+  if (destinoId === "jornadas-trabalho") {
+    // T182 — só o RH opera; DP e `master_tecnico` consultam.
+    return (
+      <JornadasTrabalhoScreen
+        podeOperar={podeOperarJornadas(admissao.papelDoAtor)}
+      />
+    );
   }
   if (destinoId === "cadastros-demonstracao") {
     return (
@@ -520,8 +535,9 @@ export function App({
   // "Relatórios" sempre voltam à aba padrão ao serem selecionados (o wrapper
   // de cada um remonta e reseta sua aba interna) — por isso o valor inicial
   // já é o `titleId` dessa aba padrão.
-  const [cadastrosTituloId, setCadastrosTituloId] =
-    useState(HORARIOS_TITULO_ID);
+  const [cadastrosTituloId, setCadastrosTituloId] = useState(
+    ESTRUTURA_ORGANIZACIONAL_TITULO_ID,
+  );
   const [pessoasTituloId, setPessoasTituloId] = useState(
     COLABORADORES_TITULO_ID,
   );

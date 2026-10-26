@@ -40,6 +40,8 @@ const ROTA_POR_DESTINO: Readonly<Record<string, string>> = {
   // T178 — o id segue `pessoas` (o contêiner, aberto na aba Colaboradores).
   pessoas: "#/pessoas/colaboradores",
   "nova-admissao": "#/pessoas/nova-admissao",
+  // T182 — tela própria do catálogo de jornadas: recarregar volta a ela.
+  "jornadas-trabalho": "#/estrutura/jornadas-trabalho",
 };
 
 /** O fragmento da URL do destino, ou `null` se ele não tem rota própria. */

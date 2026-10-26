@@ -159,6 +159,7 @@ const detalheAjustado: EventoPontoDetalhadoApi = {
 const tabelaComercial: TabelaHorarioApi = {
   id: "th111111-1111-1111-1111-111111111111",
   empresaId: vinculo1.empresaId,
+  codigo: null,
   nome: "Tabela Comercial (teste)",
   ativo: true,
   criadoPorUserId: "u0000000-0000-0000-0000-000000000000",
@@ -170,6 +171,7 @@ const tabelaComercial: TabelaHorarioApi = {
 const tabelaMeioPeriodo: TabelaHorarioApi = {
   id: "th222222-2222-2222-2222-222222222222",
   empresaId: vinculo1.empresaId,
+  codigo: null,
   nome: "Tabela Meio Período (teste)",
   ativo: true,
   criadoPorUserId: "u0000000-0000-0000-0000-000000000000",

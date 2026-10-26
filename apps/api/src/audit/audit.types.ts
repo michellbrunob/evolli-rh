@@ -120,6 +120,8 @@ export const AUDIT_ACTIONS = [
   "horarios_tabela_criada",
   "horarios_tabela_desativada",
   "horarios_tabela_reativada",
+  // T182 — edição do nome e do código de uma jornada; só o id na trilha.
+  "horarios_tabela_editada",
   "horarios_vinculo_criado",
   "horarios_vinculo_encerrado",
   "horarios_consultado",

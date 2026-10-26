@@ -136,9 +136,61 @@ describe("evaluateHorarios — matriz de Cadastros/Horarios (T038)", () => {
     }
   });
 
-  describe("DP: NEGADO (a alcada de horario e exclusiva de RH, T037)", () => {
-    for (const recurso of HORARIOS_RESOURCES) {
-      it(`dp e negado em ${recurso}, em toda acao e nas duas fases`, () => {
+  // T182 — o DP CONSULTA as jornadas (tabelas de horario) da propria empresa
+  // (decisao da proprietaria de 2026-10-23). Criar, editar, inativar e
+  // reativar seguem so do RH (T037), e o vinculo de horario segue negado.
+  describe("DP: so CONSULTA tabela_horario da propria empresa (T182)", () => {
+    it("le tabela_horario nas duas fases, so na propria empresa", () => {
+      expect(
+        evaluatePermission(sujeito("dp"), {
+          resource: "tabela_horario",
+          action: "read",
+        }),
+      ).toBe(true);
+      expect(
+        evaluatePermission(sujeito("dp"), {
+          resource: "tabela_horario",
+          action: "read",
+          targetCompanyId: EMPRESA_A,
+        }),
+      ).toBe(true);
+      expect(
+        evaluatePermission(sujeito("dp"), {
+          resource: "tabela_horario",
+          action: "read",
+          targetCompanyId: "99999999-9999-4999-8999-999999999999",
+        }),
+      ).toBe(false);
+      expect(
+        evaluatePermission(
+          { userId: "u-dp", role: "dp", companyId: null },
+          { resource: "tabela_horario", action: "read" },
+        ),
+      ).toBe(false);
+    });
+
+    it("nao cria, nao altera nem gerencia tabela_horario", () => {
+      for (const acao of ACOES.filter((a) => a !== "read")) {
+        expect(
+          evaluatePermission(sujeito("dp"), {
+            resource: "tabela_horario",
+            action: acao,
+          }),
+        ).toBe(false);
+        expect(
+          evaluatePermission(sujeito("dp"), {
+            resource: "tabela_horario",
+            action: acao,
+            targetCompanyId: EMPRESA_A,
+          }),
+        ).toBe(false);
+      }
+    });
+
+    for (const recurso of HORARIOS_RESOURCES.filter(
+      (r) => r !== "tabela_horario",
+    )) {
+      it(`dp segue negado em ${recurso}, em toda acao e nas duas fases`, () => {
         for (const acao of ACOES) {
           expect(
             evaluatePermission(sujeito("dp"), {

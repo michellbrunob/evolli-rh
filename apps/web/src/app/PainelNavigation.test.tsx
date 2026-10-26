@@ -98,7 +98,8 @@ describe("o estado declarado bate com o código", () => {
   const TELA_PADRAO: Readonly<Record<string, string>> = {
     pessoas: "src/screens/pessoas/ColaboradoresScreen.tsx",
     "nova-admissao": "src/screens/pessoas/NovaAdmissaoScreen.tsx",
-    cadastros: "src/screens/horarios/CadastroHorariosScreen.tsx",
+    cadastros: "src/screens/horarios/EstruturaOrganizacionalScreen.tsx",
+    "jornadas-trabalho": "src/screens/horarios/JornadasTrabalhoScreen.tsx",
     ponto: "src/screens/ponto/VisaoPeriodoScreen.tsx",
     equipe: "src/screens/equipe/EquipeScreen.tsx",
     "administracao-lideranca":
@@ -270,7 +271,7 @@ describe("semântica de item ativo, seleção e teclado", () => {
     render(
       <PainelNavigation destinoAtivoId="pessoas" onSelecionar={onSelecionar} />,
     );
-    fireEvent.click(screen.getByRole("button", { name: /^Jornada/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^Jornada Visão/ }));
     expect(onSelecionar).toHaveBeenCalledWith("ponto");
   });
 
@@ -350,18 +351,56 @@ describe("aterrissagem por papel", () => {
 describe("módulo, submenu e destino ativo (T159 — evolução visual)", () => {
   it("módulo de um destino só É o destino: nenhum clique sem informação", () => {
     // T176 — para `rh`, Pessoas passou a ter dois destinos (Nova admissão);
-    // Estrutura continua com um só, e é ele que prende a regra.
+    // T182 — Estrutura também (Jornadas de trabalho). Jornada continua com
+    // um só, e é ela que prende a regra.
     render(
       <PainelNavigation
-        destinoAtivoId="cadastros"
+        destinoAtivoId="ponto"
         onSelecionar={() => {}}
         papel="rh"
       />,
     );
-    const estrutura = screen.getByRole("button", { name: /^Estrutura/ });
-    expect(estrutura).not.toHaveAttribute("aria-expanded");
-    expect(estrutura).toHaveAttribute("aria-current", "page");
+    const jornada = screen.getByRole("button", { name: /^Jornada Visão/ });
+    expect(jornada).not.toHaveAttribute("aria-expanded");
+    expect(jornada).toHaveAttribute("aria-current", "page");
   });
+
+  it.each(["rh", "dp", "master_tecnico"])(
+    "T182 — %s vê Estrutura com 'Estrutura organizacional' e 'Jornadas de trabalho'",
+    (papel) => {
+      render(
+        <PainelNavigation
+          destinoAtivoId="jornadas-trabalho"
+          onSelecionar={() => {}}
+          papel={papel}
+        />,
+      );
+      const modulo = screen.getByRole("button", { name: "Estrutura" });
+      expect(modulo).toHaveAttribute("aria-expanded", "true");
+      expect(
+        screen.getByRole("button", { name: /^Estrutura organizacional/ }),
+      ).not.toHaveAttribute("aria-current");
+      expect(
+        screen.getByRole("button", { name: /^Jornadas de trabalho/ }),
+      ).toHaveAttribute("aria-current", "page");
+    },
+  );
+
+  it.each(["gestor", "financeiro", "colaborador", null])(
+    "T182 — %s não vê Jornadas de trabalho",
+    (papel) => {
+      render(
+        <PainelNavigation
+          destinoAtivoId="inicio"
+          onSelecionar={() => {}}
+          papel={papel}
+        />,
+      );
+      expect(
+        screen.queryByRole("button", { name: /^Jornadas de trabalho/ }),
+      ).toBeNull();
+    },
+  );
 
   it.each(["rh", "dp", "master_tecnico"])(
     "T178 — %s vê 'Gestão de Pessoas' com 'Colaboradores' e sem item próprio de Nova admissão",

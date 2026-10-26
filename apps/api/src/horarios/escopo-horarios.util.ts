@@ -74,6 +74,24 @@ export function resolverEscopoLeituraHorarios(
 }
 
 /** Filtro por `empresa_id` para leitura. Global (Master): sem filtro. */
+/**
+ * T182 — escopo de LEITURA do catálogo de jornadas (tabelas de horário): o de
+ * `resolverEscopoLeituraHorarios` e, além dele, o DP, sempre na própria
+ * empresa. Só para `tabela_horario`: o vínculo de horário com o colaborador
+ * continua com o escopo de antes.
+ */
+export function resolverEscopoLeituraTabelas(
+  actor: AccessUser,
+): EscopoLeituraHorarios {
+  if (actor.role === "dp") {
+    if (actor.companyId === null) {
+      throw new ForbiddenException();
+    }
+    return { global: false, empresaId: actor.companyId };
+  }
+  return resolverEscopoLeituraHorarios(actor);
+}
+
 export function filtroEmpresaLeituraHorarios(escopo: EscopoLeituraHorarios): {
   empresaId?: string;
 } {

@@ -113,7 +113,10 @@ const DESCRICAO_DO_DESTINO: Readonly<Record<string, string>> = {
   "nova-admissao":
     "Admissão em página própria: cria o colaborador, o vínculo previsto e o ato de admissão na empresa ativa.",
   cadastros:
-    "Tabelas de horário e a estrutura organizacional da empresa: unidades, departamentos, áreas, equipes, cargos e centros de custo.",
+    "Estrutura organizacional da empresa: unidades, departamentos, áreas, equipes, cargos e centros de custo.",
+  // T182 — tela própria do catálogo de jornadas (antes a aba Horários).
+  "jornadas-trabalho":
+    "Jornadas de trabalho da empresa: código, nome e os dias e horários de cada turno.",
   ponto: "Registros de ponto do período e conferência das folhas apuradas.",
   equipe:
     "Consulta da sua equipe: quem responde a você hoje, pela atribuição vigente.",
