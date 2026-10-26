@@ -1035,9 +1035,7 @@ describe("Colaboradores — listagem da porta principal (T178, e2e)", () => {
       ).toEqual([]);
     });
 
-    it("isolamento: na Beta, a Carla não traz jornada da Alfa; DP vê o mesmo que o RH", async () => {
-      const daAlfa = (await vinculosDe(rhA, "Eva Sintetica"))[0]!
-        .vigenciasDeJornada[0]!.jornada.id;
+    it("vínculo previsto na Beta não projeta jornada; DP vê o mesmo que o RH; gestor e colaborador negados", async () => {
       for (const cred of [rhB, masterEscopadoB]) {
         const r = await get(
           `/v1/colaboradores?busca=${encodeURIComponent("Carla Sintetica")}`,
@@ -1046,10 +1044,9 @@ describe("Colaboradores — listagem da porta principal (T178, e2e)", () => {
         expect(r.body.itens[0].vinculos).toHaveLength(1);
         expect(r.body.itens[0].vinculos[0]).toMatchObject({
           empresaId: empresaB,
+          situacao: "previsto",
           vigenciasDeJornada: [],
         });
-        expect(JSON.stringify(r.body)).not.toContain("T185_");
-        expect(JSON.stringify(r.body)).not.toContain(daAlfa);
       }
       const doRh = await get("/v1/colaboradores?busca=Sintetic", rhA).expect(
         200,
@@ -1063,6 +1060,123 @@ describe("Colaboradores — listagem da porta principal (T178, e2e)", () => {
         expect([403, 404]).toContain(negada.status);
         expect(JSON.stringify(negada.body)).not.toContain("T185_");
       }
+    });
+
+    // Isolamento com dado que APARECERIA se vazasse: a mesma pessoa ATIVA na
+    // Alfa e na Beta, cada empresa com uma jornada vigente distinta. Se a
+    // consulta ou o agrupamento ignorassem a empresa, a jornada de uma
+    // empresa surgiria no vínculo da outra.
+    it("isolamento: ativa na Alfa e na Beta, cada vínculo só com a jornada da própria empresa", async () => {
+      const { colaboradorId: pessoa } = await admitir(
+        rhA,
+        {
+          nome: "Helena Sintetica Duas Empresas",
+          matricula: "MAT-L-HEL",
+          empresaId: empresaA,
+          departamentoId: departamentoA,
+        },
+        true,
+      );
+
+      // A API não admite quem já existe em outra empresa: o vínculo da Beta
+      // entra previsto no banco, com uma admissão pendente igual à do Diego
+      // (mesma empresa e destinos), e é EFETIVADO pela API — a efetivação
+      // cria a lotação, como em qualquer admissão.
+      const [inserido] = await prisma.$queryRawUnsafe<{ id: string }[]>(
+        `INSERT INTO app.vinculo_funcional
+           (id, colaborador_id, empresa_id, matricula, tipo, situacao,
+            data_admissao, criado_em, atualizado_em)
+         VALUES (gen_random_uuid()::text, $1, $2, 'BETA-HEL-01', 'clt',
+                 'previsto', $3::date, now(), now())
+         RETURNING id`,
+        pessoa,
+        empresaB,
+        ADMISSAO,
+      );
+      const vinculoBeta = inserido!.id;
+      const modelo = await prisma.movimentacaoFuncional.findFirstOrThrow({
+        where: { vinculo: { colaboradorId: diego }, tipo: "admissao" },
+      });
+      const admissaoBeta = await prisma.movimentacaoFuncional.create({
+        data: {
+          vinculoId: vinculoBeta,
+          empresaId: empresaB,
+          tipo: modelo.tipo,
+          status: modelo.status,
+          motivoCodigo: modelo.motivoCodigo,
+          solicitanteUserId: modelo.solicitanteUserId,
+          vigenciaInicio: modelo.vigenciaInicio,
+          destinoUnidadeOrganizacionalId: modelo.destinoUnidadeOrganizacionalId,
+          destinoDepartamentoId: modelo.destinoDepartamentoId,
+          destinoAreaId: modelo.destinoAreaId,
+          destinoEquipeId: modelo.destinoEquipeId,
+          destinoCargoId: modelo.destinoCargoId,
+          destinoCentroCustoId: modelo.destinoCentroCustoId,
+        },
+      });
+      await post(`/v1/movimentacoes/${admissaoBeta.id}/efetivar`, rhB)
+        .send()
+        .expect(201);
+
+      const naAlfa = await jornada(rhA, "Jornada Isolamento Alfa T185");
+      const naBeta = await jornada(rhB, "Jornada Isolamento Beta T185");
+      await atribuir(rhA, pessoa, naAlfa.id, dia(-5));
+      await atribuir(rhB, pessoa, naBeta.id, dia(-5));
+
+      const vazou = (corpo: unknown, de: typeof naAlfa) => {
+        const texto = JSON.stringify(corpo);
+        return (
+          texto.includes(de.id) ||
+          texto.includes(de.codigo) ||
+          texto.includes(de.nome)
+        );
+      };
+      const daPessoa = async (cred: Credencial) => {
+        const r = await get(
+          `/v1/colaboradores?busca=${encodeURIComponent("Helena Sintetica")}`,
+          cred,
+        ).expect(200);
+        expect(r.body.itens).toHaveLength(1);
+        return r.body as { itens: { vinculos: VinculoComJornada[] }[] };
+      };
+      const idsDasJornadas = (v: VinculoComJornada) =>
+        v.vigenciasDeJornada.map((x) => x.jornada.id);
+
+      // RH com a Alfa ativa: só o vínculo e a jornada da Alfa.
+      const doRhA = await daPessoa(rhA);
+      expect(doRhA.itens[0]!.vinculos).toHaveLength(1);
+      expect(doRhA.itens[0]!.vinculos[0]).toMatchObject({
+        empresaId: empresaA,
+        situacao: "ativo",
+      });
+      expect(idsDasJornadas(doRhA.itens[0]!.vinculos[0]!)).toEqual([naAlfa.id]);
+      expect(vazou(doRhA, naBeta)).toBe(false);
+
+      // RH e master com a Beta ativa: só o vínculo e a jornada da Beta.
+      for (const cred of [rhB, masterEscopadoB]) {
+        const corpo = await daPessoa(cred);
+        expect(corpo.itens[0]!.vinculos).toHaveLength(1);
+        expect(corpo.itens[0]!.vinculos[0]).toMatchObject({
+          empresaId: empresaB,
+          situacao: "ativo",
+        });
+        expect(idsDasJornadas(corpo.itens[0]!.vinculos[0]!)).toEqual([
+          naBeta.id,
+        ]);
+        expect(vazou(corpo, naAlfa)).toBe(false);
+      }
+
+      // Master sem empresa ativa: os dois vínculos, cada um com a jornada da
+      // própria empresa — nunca as duas no mesmo vínculo.
+      const global = await daPessoa(master);
+      const porEmpresa = new Map(
+        global.itens[0]!.vinculos.map((v) => [v.empresaId, v]),
+      );
+      expect(global.itens[0]!.vinculos).toHaveLength(2);
+      expect(idsDasJornadas(porEmpresa.get(empresaA)!)).toEqual([naAlfa.id]);
+      expect(idsDasJornadas(porEmpresa.get(empresaB)!)).toEqual([naBeta.id]);
+      expect(vazou(porEmpresa.get(empresaA), naBeta)).toBe(false);
+      expect(vazou(porEmpresa.get(empresaB), naAlfa)).toBe(false);
     });
   });
 });
