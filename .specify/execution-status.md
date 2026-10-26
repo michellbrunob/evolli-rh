@@ -2364,11 +2364,11 @@ detalhado, documentos, CPF, dados bancários, dependentes, saúde, edição pela
 listagem, importação, exportação, envio de links, integrações externas,
 promoção e merge.
 
-## Jornada de trabalho na listagem de Colaboradores — T185 (em implementação)
+## Jornada de trabalho na listagem de Colaboradores — T185 (integrada)
 
-| Tarefa | Estado               | Resultado principal                                                              |
-| ------ | -------------------- | -------------------------------------------------------------------------------- |
-| T185   | **Em implementação** | A listagem de Colaboradores mostra a jornada vigente do vínculo principal ativo. |
+| Tarefa | Estado                                    | Resultado principal                                                              |
+| ------ | ----------------------------------------- | -------------------------------------------------------------------------------- |
+| T185   | **Integrada** (PR #178, squash `2f5b1cc`) | A listagem de Colaboradores mostra a jornada vigente do vínculo principal ativo. |
 
 **Escopo da T185:** coluna "Jornada de trabalho" na listagem de Pessoas ›
 Colaboradores, com código e nome da jornada vigente (T183) do colaborador na
@@ -2383,6 +2383,27 @@ escala, folha, adicional noturno, compensação, feriado, geolocalização, fuso
 horário, campos novos de cadastro, salário, contrato detalhado, documentos,
 CPF, dados bancários, dependentes, saúde, edição de jornada pela listagem,
 importação, exportação, integrações externas, promoção e merge.
+
+## Filtros de situação nos contadores de Colaboradores — T186 (em implementação)
+
+| Tarefa | Estado               | Resultado principal                                                                |
+| ------ | -------------------- | ---------------------------------------------------------------------------------- |
+| T186   | **Em implementação** | Os contadores de Colaboradores viram filtros Todos, Ativos e Inativos da listagem. |
+
+**Escopo da T186:** filtros "Todos", "Ativos" e "Inativos" junto aos contadores
+de Pessoas › Colaboradores, com a regra de situação por empresa da T178,
+aplicados no servidor antes da paginação e combináveis com a busca; os
+contadores seguem mostrando os totais da empresa ativa; estados vazios
+distintos para empresa sem colaboradores, busca, filtro e busca com filtro.
+Sem mudança de servidor, schema, migration nem RBAC.
+
+**Decisão da proprietária (2026-10-26):** [decisão](../docs/decisions/t186-colaboradores-filtro-situacao.md).
+
+**Fora de escopo:** banco de horas, ponto, jornadas, escala, folha,
+compensação, fuso horário, admissão, desligamento, edição de situação, mudança
+de vínculo, campos pessoais novos, salário, contrato detalhado, documentos,
+CPF, dados bancários, dependentes, saúde, importação, exportação, integrações
+externas, promoção e merge.
 
 ## Próxima ação autorizável
 
