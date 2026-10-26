@@ -67,28 +67,18 @@
   color: var(--color-ink-subtle);
 }
 
+/* T186 — os contadores são botões de filtro: quebram linha no celular em
+   vez de empurrar a página para o lado. */
 .colaboradores-screen__contadores-lista {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-xs) var(--space-lg);
-  margin: 0;
-}
-
-.colaboradores-screen__contador {
-  display: flex;
-  align-items: baseline;
   gap: var(--space-xs);
-}
-
-.colaboradores-screen__contador dt {
-  color: var(--color-ink-subtle);
-}
-
-.colaboradores-screen__contador dd {
   margin: 0;
-  font-size: var(--text-lead);
+  max-width: 100%;
+}
+
+.colaboradores-screen__contador-valor {
   font-weight: var(--weight-strong);
-  color: var(--color-ink);
 }
 
 /* T178 — barra de ações: "Nova admissão" e a busca ao lado, alinhadas à base

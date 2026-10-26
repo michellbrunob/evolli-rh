@@ -2510,7 +2510,9 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       como `[T184 dev]`, não a `main`.
 
 82. **T185 - Jornada de trabalho na listagem de Colaboradores**
-    - **Estado:** **em implementação**. Branch `codex/t185-colaboradores-jornada`, a partir do
+    - **Estado:** **integrada** em `main` pela PR #178, squash
+      `2f5b1cccedb4bf31ae181ca4af7b64b57da80a2a`, com a CI de push 3/3 verde (run 40385160298);
+      branch preservada. Implementada na branch `codex/t185-colaboradores-jornada`, a partir do
       squash `398c70ab51e004e89c35181f1a5d2cf68dde603d` (T184 integrada, PR #177).
     - **Objetivo:** coluna "Jornada de trabalho" em Pessoas › Colaboradores, só com o vínculo de
       jornada da T183: a jornada vigente do vínculo principal na empresa ativa.
@@ -2529,6 +2531,28 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       promoção e merge.
     - **Prévia:** `http://127.0.0.1:5173` passa a mostrar a branch da T185 ao vivo, identificada
       como `[T185 dev]`, não a `main`.
+
+83. **T186 - Filtros de situação nos contadores de Colaboradores**
+    - **Estado:** **em implementação**. Branch `codex/t186-colaboradores-filtro-situacao`, a
+      partir do squash `2f5b1cccedb4bf31ae181ca4af7b64b57da80a2a` (T185 integrada, PR #178).
+    - **Objetivo:** em Pessoas › Colaboradores, transformar os contadores Ativos e Inativos em
+      filtros reais e acessíveis ("Todos", "Ativos", "Inativos"), com a mesma regra de situação
+      por empresa da T178.
+    - **Decisão da proprietária (2026-10-26):**
+      [decisão](../docs/decisions/t186-colaboradores-filtro-situacao.md). O select "Situação"
+      sai e os filtros nos contadores passam a ser o único controle de situação; o filtro não vai
+      para a URL (a rota segue a mesma e recarregar volta a "Todos"); o master sem empresa ativa
+      segue a regra da T178. A API já filtra no servidor, antes da paginação: sem mudança de
+      servidor, schema, migration nem RBAC.
+    - **Entrega prevista:** filtros nos contadores, estados vazios distintos (empresa sem
+      colaboradores, busca, filtro, busca com filtro), testes de web e E2E com PostgreSQL real e
+      validação no navegador em 375 px.
+    - **Fora de escopo:** banco de horas, ponto, jornadas, escala, folha, compensação, fuso
+      horário, admissão, desligamento, edição de situação, mudança de vínculo, campos pessoais
+      novos, salário, contrato detalhado, documentos, CPF, dados bancários, dependentes, saúde,
+      importação, exportação, integrações externas, promoção e merge.
+    - **Prévia:** `http://127.0.0.1:5173` passa a mostrar a branch da T186 ao vivo, identificada
+      como `[T186 dev]`, não a `main`.
 
 ## Regra obrigatória para as próximas tarefas
 

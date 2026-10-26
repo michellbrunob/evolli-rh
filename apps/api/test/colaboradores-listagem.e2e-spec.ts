@@ -1179,4 +1179,148 @@ describe("Colaboradores — listagem da porta principal (T178, e2e)", () => {
       expect(vazou(porEmpresa.get(empresaB), naAlfa)).toBe(false);
     });
   });
+
+  // T186 — os contadores viram filtros na tela; o servidor não muda. Estes
+  // testes provam, com PostgreSQL real, o que a tela passa a usar: o filtro
+  // de situação por empresa (regra da T178) acontece ANTES da paginação,
+  // combina com a busca, não mexe nos contadores e respeita as negações.
+  describe("T186 — filtro de situação por empresa", () => {
+    const TUDO = { tamanhoPagina: "100" };
+    const ids = (itens: ItemListado[]) => itens.map((i) => i.id).sort();
+    const temVinculoAtivo = (i: ItemListado) =>
+      i.vinculos.some((v) => v.situacao === "ativo");
+
+    it("ativos e inativos somam o escopo e batem com os contadores", async () => {
+      const todos = await listar(rhA, TUDO);
+      const ativos = await listar(rhA, { ...TUDO, situacao: "ativo" });
+      const inativos = await listar(rhA, { ...TUDO, situacao: "inativo" });
+
+      expect(ativos.total).toBe(todos.contadores.ativos);
+      expect(inativos.total).toBe(todos.contadores.inativos);
+      expect(ativos.total + inativos.total).toBe(todos.total);
+      expect(ativos.total).toBeGreaterThan(0);
+      expect(inativos.total).toBeGreaterThan(0);
+
+      // A regra da T178 na empresa ativa: ativo é ter vínculo ativo NELA.
+      expect(ativos.itens.every((i) => i.situacao === "ativo")).toBe(true);
+      expect(ativos.itens.every(temVinculoAtivo)).toBe(true);
+      expect(inativos.itens.every((i) => i.situacao === "inativo")).toBe(true);
+      expect(inativos.itens.some(temVinculoAtivo)).toBe(false);
+
+      // Os contadores nunca acompanham o filtro.
+      for (const r of [ativos, inativos]) {
+        expect(r.contadores).toEqual(todos.contadores);
+      }
+    });
+
+    it("filtra antes de paginar: página a página, só inativos, sem perder ninguém", async () => {
+      const inativos = await listar(rhA, { ...TUDO, situacao: "inativo" });
+      const vistos: string[] = [];
+      for (let pagina = 1; pagina <= inativos.total; pagina++) {
+        const r = await listar(rhA, {
+          situacao: "inativo",
+          tamanhoPagina: "1",
+          pagina: String(pagina),
+        });
+        // Se o filtro viesse depois da paginação, alguma página de tamanho 1
+        // traria um ativo ou viria vazia — e o total seria o do escopo.
+        expect(r.total).toBe(inativos.total);
+        expect(r.itens).toHaveLength(1);
+        expect(r.itens[0]!.situacao).toBe("inativo");
+        vistos.push(r.itens[0]!.id);
+      }
+      expect(vistos.sort()).toEqual(ids(inativos.itens));
+      const alem = await listar(rhA, {
+        situacao: "inativo",
+        tamanhoPagina: "1",
+        pagina: String(inativos.total + 1),
+      });
+      expect(alem.itens).toEqual([]);
+    });
+
+    it("combina com a busca: o recorte é a interseção, e os contadores não mudam", async () => {
+      const todos = await listar(rhA, TUDO);
+      const busca = await listar(rhA, { ...TUDO, busca: "Sintetic" });
+      for (const situacao of ["ativo", "inativo"] as const) {
+        const r = await listar(rhA, { ...TUDO, busca: "Sintetic", situacao });
+        expect(ids(r.itens)).toEqual(
+          ids(busca.itens.filter((i) => i.situacao === situacao)),
+        );
+        expect(r.itens.length).toBeGreaterThan(0);
+        expect(r.contadores).toEqual(todos.contadores);
+      }
+      // Busca por matrícula também combina.
+      const porMatricula = await listar(rhA, {
+        busca: "MAT-L-BRU",
+        situacao: "ativo",
+      });
+      expect(porMatricula.itens).toEqual([]);
+      expect(
+        nomes(
+          (await listar(rhA, { busca: "MAT-L-BRU", situacao: "inativo" }))
+            .itens,
+        ),
+      ).toEqual(["Bruno Sintetico Alfa"]);
+    });
+
+    it("situação é por empresa: a Carla é ativa na Alfa e inativa na Beta", async () => {
+      const busca = { ...TUDO, busca: "Carla Sintetica" };
+      expect(
+        ids((await listar(rhA, { ...busca, situacao: "ativo" })).itens),
+      ).toEqual([carla]);
+      expect(
+        (await listar(rhA, { ...busca, situacao: "inativo" })).itens,
+      ).toEqual([]);
+      for (const cred of [rhB, masterEscopadoB]) {
+        expect(
+          ids((await listar(cred, { ...busca, situacao: "inativo" })).itens),
+        ).toEqual([carla]);
+        expect(
+          (await listar(cred, { ...busca, situacao: "ativo" })).itens,
+        ).toEqual([]);
+      }
+      // Master sem empresa ativa: a regra global da T178 (situação
+      // materializada) — a Carla está ativa em alguma empresa.
+      expect(
+        ids((await listar(master, { ...busca, situacao: "ativo" })).itens),
+      ).toEqual([carla]);
+      expect(
+        (await listar(master, { ...busca, situacao: "inativo" })).itens,
+      ).toEqual([]);
+    });
+
+    it("DP vê o mesmo recorte que o RH; master por empresa, o mesmo que o RH da empresa", async () => {
+      for (const situacao of ["ativo", "inativo"] as const) {
+        expect(await listar(dpA, { ...TUDO, situacao })).toEqual(
+          await listar(rhA, { ...TUDO, situacao }),
+        );
+        expect(await listar(masterEscopadoB, { ...TUDO, situacao })).toEqual(
+          await listar(rhB, { ...TUDO, situacao }),
+        );
+      }
+    });
+
+    it("gestor, colaborador e financeiro seguem negados, com ou sem filtro", async () => {
+      const financeiroA = await criarUsuario(
+        "fin.la@example.test",
+        "financeiro",
+        empresaA,
+      );
+      for (const cred of [gestorA, colaboradorA, financeiroA]) {
+        for (const situacao of ["ativo", "inativo"]) {
+          const negada = await get(
+            `/v1/colaboradores?situacao=${situacao}`,
+            cred,
+          );
+          expect([403, 404]).toContain(negada.status);
+          expect(JSON.stringify(negada.body)).not.toContain("Sintetic");
+        }
+      }
+    });
+
+    it("situação fora do contrato é recusada, nunca ignorada", async () => {
+      await get("/v1/colaboradores?situacao=previsto", rhA).expect(400);
+      await get("/v1/colaboradores?situacao=todos", rhA).expect(400);
+    });
+  });
 });
