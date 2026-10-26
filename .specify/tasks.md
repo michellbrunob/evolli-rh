@@ -2442,7 +2442,9 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       aparece como valor legado só para leitura, e mudá-lo exige uma opção da lista atual.
 
 79. **T182 - Catálogo de Jornadas de trabalho em Estrutura**
-    - **Estado:** **em implementação**. Branch `codex/t182-jornadas-trabalho`, a partir do squash
+    - **Estado:** **integrada** em `main` pela PR #175, squash
+      `38796565c3eb491e8e838d270d56d3647644e08d`, com a CI de push 3/3 verde (run 40323308350);
+      branch preservada. Implementada na branch `codex/t182-jornadas-trabalho`, a partir do squash
       `b6442f3dcbe7107b1044b10ecd5e13bb3d7e0859` (T181 integrada, PR #174).
     - **Objetivo:** em Estrutura › Jornadas de trabalho, RH e DP mantêm o catálogo de jornadas da
       empresa ativa — turnos reutilizáveis, futuramente associados aos colaboradores.
@@ -2461,6 +2463,27 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       dependentes, saúde, promoção e merge.
     - **Prévia:** `http://127.0.0.1:5173` passa a mostrar a branch da T182 ao vivo, identificada
       como `[T182 dev]`, não a `main`.
+
+80. **T183 - Jornada de trabalho do colaborador, com vigência**
+    - **Estado:** **em implementação**. Branch `codex/t183-jornada-colaborador`, a partir do squash
+      `38796565c3eb491e8e838d270d56d3647644e08d` (T182 integrada, PR #175).
+    - **Objetivo:** associar uma Jornada de trabalho existente ao colaborador, na empresa ativa,
+      com data de início de vigência e histórico consultável.
+    - **Decisão:** [decisão](../docs/decisions/t183-jornada-colaborador.md). RH atribui, troca e
+      encerra; DP consulta jornada e histórico; a ficha mostra a jornada atual e o histórico; a
+      Nova admissão permite escolher uma jornada, opcional; só jornadas ativas para vínculo novo.
+      O modelo `vinculo_horario` (T037/T038) já representa a vigência `[início, fim)` e impede
+      sobreposição no banco: **sem migration**. Troca atômica (encerra a vigente no novo início e
+      cria a nova), erros por campo sem valor, isolamento por empresa e auditoria só com ids.
+    - **Entrega prevista:** atribuição e troca na API, leitura pelo DP, jornada na projeção do
+      vínculo, jornada opcional na admissão, seção na ficha, testes de API, web e E2E com
+      PostgreSQL real e validação no navegador em 375 px.
+    - **Fora de escopo:** ponto, batida, banco de horas, cálculo de jornada, escala, folga,
+      feriado, adicional noturno, compensação, folha, geolocalização, fuso horário, salário,
+      contrato trabalhista detalhado, CPF, documentos, dados bancários, dependentes, saúde, dados
+      pessoais novos, qualquer permissão além de RH editar e DP consultar, promoção e merge.
+    - **Prévia:** `http://127.0.0.1:5173` passa a mostrar a branch da T183 ao vivo, identificada
+      como `[T183 dev]`, não a `main`.
 
 ## Regra obrigatória para as próximas tarefas
 
