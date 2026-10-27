@@ -2533,8 +2533,12 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       como `[T185 dev]`, não a `main`.
 
 83. **T186 - Filtros de situação nos contadores de Colaboradores**
-    - **Estado:** **em implementação**. Branch `codex/t186-colaboradores-filtro-situacao`, a
+    - **Estado:** **integrada** em `main` pela PR #179, squash
+      `d7ab1721c19732f19d00bf8d26eaa01d1eb47f1d`, com a CI de push 3/3 verde (run 40396676554);
+      branch preservada. Implementada na branch `codex/t186-colaboradores-filtro-situacao`, a
       partir do squash `2f5b1cccedb4bf31ae181ca4af7b64b57da80a2a` (T185 integrada, PR #178).
+    - **Observação histórica (O1 da revisão):** o E2E da listagem ainda não cobre
+      especificamente `situacaoVinculo` (lacuna anterior à T186, sem correção nela).
     - **Objetivo:** em Pessoas › Colaboradores, transformar os contadores Ativos e Inativos em
       filtros reais e acessíveis ("Todos", "Ativos", "Inativos"), com a mesma regra de situação
       por empresa da T178.
@@ -2553,6 +2557,20 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       importação, exportação, integrações externas, promoção e merge.
     - **Prévia:** `http://127.0.0.1:5173` passa a mostrar a branch da T186 ao vivo, identificada
       como `[T186 dev]`, não a `main`.
+
+84. **T187 - Próxima fatia de Colaboradores (preparação de decisão)**
+    - **Estado:** **em preparação de decisão**. Branch `codex/t187-proxima-fatia-colaboradores`,
+      a partir do squash `d7ab1721c19732f19d00bf8d26eaa01d1eb47f1d` (T186 integrada, PR #179).
+    - **Objetivo desta etapa:** convergir a T186 e propor a próxima fatia independente de maior
+      valor em Gestão de Pessoas › Colaboradores, sem implementar produto antes de uma decisão
+      explícita da proprietária.
+    - **Entrega desta etapa:** dossiê
+      (`docs/decisions/t187-dossie-proxima-fatia-colaboradores.md`) com três opções e uma recomendação. Só documentação: sem código, API, schema, migration,
+      RBAC, seed, dependência, CI ou PR.
+    - **Fora de escopo:** implementação de qualquer opção antes da decisão, banco de horas,
+      ponto, escala, folha, fuso horário, dados pessoais novos, salário, documentos, CPF, dados
+      bancários, dependentes, saúde, importação, exportação, integrações externas, promoção e
+      merge.
 
 ## Regra obrigatória para as próximas tarefas
 

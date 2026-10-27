@@ -2384,11 +2384,15 @@ horário, campos novos de cadastro, salário, contrato detalhado, documentos,
 CPF, dados bancários, dependentes, saúde, edição de jornada pela listagem,
 importação, exportação, integrações externas, promoção e merge.
 
-## Filtros de situação nos contadores de Colaboradores — T186 (em implementação)
+## Filtros de situação nos contadores de Colaboradores — T186 (integrada)
 
-| Tarefa | Estado               | Resultado principal                                                                |
-| ------ | -------------------- | ---------------------------------------------------------------------------------- |
-| T186   | **Em implementação** | Os contadores de Colaboradores viram filtros Todos, Ativos e Inativos da listagem. |
+| Tarefa | Estado                                    | Resultado principal                                                                |
+| ------ | ----------------------------------------- | ---------------------------------------------------------------------------------- |
+| T186   | **Integrada** (PR #179, squash `d7ab172`) | Os contadores de Colaboradores viram filtros Todos, Ativos e Inativos da listagem. |
+
+**Observação histórica (O1 da revisão da T186):** o E2E da listagem ainda não
+cobre especificamente o filtro `situacaoVinculo`. A lacuna é anterior à T186 e
+não foi corrigida nela.
 
 **Escopo da T186:** filtros "Todos", "Ativos" e "Inativos" junto aos contadores
 de Pessoas › Colaboradores, com a regra de situação por empresa da T178,
@@ -2404,6 +2408,20 @@ compensação, fuso horário, admissão, desligamento, edição de situação, m
 de vínculo, campos pessoais novos, salário, contrato detalhado, documentos,
 CPF, dados bancários, dependentes, saúde, importação, exportação, integrações
 externas, promoção e merge.
+
+## Próxima fatia de Colaboradores — T187 (em preparação de decisão)
+
+| Tarefa | Estado                       | Resultado principal                                                          |
+| ------ | ---------------------------- | ---------------------------------------------------------------------------- |
+| T187   | **Em preparação de decisão** | Dossiê com três opções para a próxima fatia de Colaboradores e recomendação. |
+
+**Escopo desta etapa:** convergência da T186 e o dossiê
+(`docs/decisions/t187-dossie-proxima-fatia-colaboradores.md`) da
+próxima fatia de Gestão de Pessoas › Colaboradores. Nenhuma implementação de
+produto antes da decisão da proprietária.
+
+**Fora de escopo:** código, API, schema, migration, RBAC, banco, seed, Docker,
+dependências, CI, PR, promoção e merge.
 
 ## Próxima ação autorizável
 
