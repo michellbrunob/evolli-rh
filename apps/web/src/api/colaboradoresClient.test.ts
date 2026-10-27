@@ -216,3 +216,24 @@ describe("T179 — admitirColaborador", () => {
     expect(erro.message).toBe("Erro na requisição.");
   });
 });
+
+describe("T190 — listarColaboradores com filtros de lotação", () => {
+  it("envia departamento e cargo quando vêm, e nada quando vazios", async () => {
+    await listarColaboradores({
+      departamentoId: "55555555-5555-4555-8555-555555555555",
+      cargoId: "66666666-6666-4666-8666-666666666666",
+      situacao: "ativo",
+    });
+    let q = queryEnviada();
+    expect(q.get("departamentoId")).toBe(
+      "55555555-5555-4555-8555-555555555555",
+    );
+    expect(q.get("cargoId")).toBe("66666666-6666-4666-8666-666666666666");
+    expect(q.get("situacao")).toBe("ativo");
+
+    await listarColaboradores({ departamentoId: "", cargoId: "" });
+    q = queryEnviada();
+    expect(q.has("departamentoId")).toBe(false);
+    expect(q.has("cargoId")).toBe(false);
+  });
+});

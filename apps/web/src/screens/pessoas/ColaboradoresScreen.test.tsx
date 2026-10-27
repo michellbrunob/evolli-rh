@@ -48,6 +48,8 @@ import {
   type AlocacaoOrganizacionalApi,
 } from "../../api/vinculoContratualClient";
 import { AVISO_DE_RECUSA } from "../../format/mascaras";
+import { listarDepartamentos } from "../../api/organizacaoClient";
+import { listarCargos } from "../../api/cargoClient";
 
 vi.mock("../../api/colaboradoresClient");
 // T183 — a seção "Jornada de trabalho" da ficha lê os vínculos de horário.
@@ -59,6 +61,9 @@ vi.mock("../../api/dadosPessoaisClient");
 // T187 — a "Vida funcional" da ficha lê linha do tempo e alocações.
 vi.mock("../../api/movimentacaoClient");
 vi.mock("../../api/vinculoContratualClient");
+// T190 — os filtros de lotação leem os catálogos de departamentos e cargos.
+vi.mock("../../api/organizacaoClient");
+vi.mock("../../api/cargoClient");
 
 /**
  * T178 — o envelope de `GET /v1/colaboradores` traz `contadores` do escopo
@@ -188,6 +193,19 @@ beforeEach(() => {
   vi.mocked(buscarColaborador).mockResolvedValue(colaborador1);
   vi.mocked(listarVinculosDoColaborador).mockResolvedValue([vinculo1]);
   vi.mocked(retificarColaborador).mockResolvedValue(colaborador1);
+  // T190 — por padrão, catálogos vazios: os filtros ficam só com "Todos".
+  vi.mocked(listarDepartamentos).mockResolvedValue({
+    itens: [],
+    pagina: 1,
+    tamanhoPagina: 100,
+    total: 0,
+  });
+  vi.mocked(listarCargos).mockResolvedValue({
+    itens: [],
+    pagina: 1,
+    tamanhoPagina: 100,
+    total: 0,
+  });
 
   // T169 — por padrão, o colaborador aberto não tem contato registrado.
   vi.mocked(consultarContatosDoColaborador).mockImplementation(
@@ -4071,5 +4089,303 @@ describe("T187 — contrato de CSS da Vida funcional (375 px)", () => {
       name: `Linha do tempo — ${colaborador1.nome}`,
     });
     expect(linhaDoTempo.closest(".evolli-datatable")).not.toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T190 — filtros por Departamento e Cargo, pela lotação vigente.
+// ---------------------------------------------------------------------------
+
+describe("T190 — filtros por Departamento e Cargo", () => {
+  const EMPRESA = "44444444-4444-4444-4444-444444444444";
+  function referencia(
+    id: string,
+    codigo: string,
+    nome: string,
+    status = "ativo",
+  ) {
+    return {
+      id,
+      codigo,
+      nome,
+      empresaId: EMPRESA,
+      status,
+      criadoEm: "2025-01-01T12:00:00.000Z",
+      atualizadoEm: "2025-01-01T12:00:00.000Z",
+    };
+  }
+  const DEP_ADM = referencia("d-1", "ADM", "Administrativo (teste)");
+  const DEP_OPS = referencia("d-2", "OPS", "Operações (teste)");
+  const DEP_INATIVO = referencia("d-9", "OLD", "Antigo (teste)", "inativo");
+  const CAR_ANA = referencia("c-1", "ANALISTA", "Analista (teste)");
+  const CAR_TEC = referencia("c-2", "TECNICO", "Técnico (teste)");
+
+  function pagina<T>(itens: T[]) {
+    return { itens, pagina: 1, tamanhoPagina: 100, total: itens.length };
+  }
+
+  beforeEach(() => {
+    vi.mocked(listarDepartamentos).mockResolvedValue(
+      pagina([DEP_ADM, DEP_OPS, DEP_INATIVO]) as never,
+    );
+    vi.mocked(listarCargos).mockResolvedValue(
+      pagina([CAR_ANA, CAR_TEC]) as never,
+    );
+  });
+
+  const seletorDepartamento = () =>
+    screen.getByLabelText("Departamento") as HTMLSelectElement;
+  const seletorCargo = () =>
+    screen.getByLabelText("Cargo") as HTMLSelectElement;
+
+  async function montarPronto() {
+    render(<ColaboradoresScreen />);
+    await screen.findByText(colaborador1.nome);
+    await waitFor(() => expect(seletorDepartamento()).toBeEnabled());
+  }
+
+  function ultimaConsulta() {
+    return vi.mocked(listarColaboradores).mock.lastCall![0]!;
+  }
+
+  it("lê só referências ATIVAS, uma página de 100, e oferece “Todos”", async () => {
+    await montarPronto();
+    expect(listarDepartamentos).toHaveBeenCalledWith({
+      status: "ativo",
+      tamanhoPagina: 100,
+    });
+    expect(listarCargos).toHaveBeenCalledWith({
+      status: "ativo",
+      tamanhoPagina: 100,
+    });
+    const deps = [...seletorDepartamento().options].map((o) => o.textContent);
+    expect(deps).toEqual([
+      "Todos os departamentos",
+      "Administrativo (teste) (ADM)",
+      "Operações (teste) (OPS)",
+    ]);
+    expect(deps.join()).not.toContain("Antigo");
+    expect([...seletorCargo().options].map((o) => o.textContent)).toEqual([
+      "Todos os cargos",
+      "Analista (teste) (ANALISTA)",
+      "Técnico (teste) (TECNICO)",
+    ]);
+  });
+
+  it("departamento vai ao servidor, na página 1, e o filtro fica à vista", async () => {
+    await montarPronto();
+    fireEvent.change(seletorDepartamento(), { target: { value: DEP_OPS.id } });
+    await waitFor(() =>
+      expect(ultimaConsulta()).toEqual({
+        pagina: 1,
+        tamanhoPagina: 20,
+        departamentoId: DEP_OPS.id,
+      }),
+    );
+    const ativos = await screen.findByRole("group", {
+      name: "Filtros de lotação ativos",
+    });
+    expect(
+      within(ativos).getByRole("button", {
+        name: "Remover filtro de departamento: Operações (teste) (OPS)",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("combina com busca, situação e situação do vínculo, numa só consulta", async () => {
+    await montarPronto();
+    fireEvent.change(screen.getByLabelText("Buscar por nome ou matrícula"), {
+      target: { value: "Ana" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Buscar" }));
+    await waitFor(() => expect(ultimaConsulta().busca).toBe("Ana"));
+    fireEvent.click(screen.getByRole("button", { name: /^Ativos/ }));
+    await waitFor(() => expect(ultimaConsulta().situacao).toBe("ativo"));
+    await waitFor(() => expect(seletorDepartamento()).toBeEnabled());
+    fireEvent.change(screen.getByLabelText("Situação do vínculo"), {
+      target: { value: "ativo" },
+    });
+    await waitFor(() => expect(seletorDepartamento()).toBeEnabled());
+    fireEvent.change(seletorDepartamento(), { target: { value: DEP_ADM.id } });
+    await waitFor(() => expect(seletorCargo()).toBeEnabled());
+    fireEvent.change(seletorCargo(), { target: { value: CAR_TEC.id } });
+    await waitFor(() =>
+      expect(ultimaConsulta()).toEqual({
+        pagina: 1,
+        tamanhoPagina: 20,
+        busca: "Ana",
+        situacao: "ativo",
+        situacaoVinculo: "ativo",
+        departamentoId: DEP_ADM.id,
+        cargoId: CAR_TEC.id,
+      }),
+    );
+  });
+
+  it("remover um filtro de lotação mantém o outro, a busca e a situação", async () => {
+    await montarPronto();
+    fireEvent.click(screen.getByRole("button", { name: /^Ativos/ }));
+    await waitFor(() => expect(seletorDepartamento()).toBeEnabled());
+    fireEvent.change(seletorDepartamento(), { target: { value: DEP_ADM.id } });
+    await waitFor(() => expect(seletorCargo()).toBeEnabled());
+    fireEvent.change(seletorCargo(), { target: { value: CAR_ANA.id } });
+    await waitFor(() => expect(ultimaConsulta().cargoId).toBe(CAR_ANA.id));
+
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "Remover filtro de departamento: Administrativo (teste) (ADM)",
+      }),
+    );
+    await waitFor(() =>
+      expect(ultimaConsulta()).toEqual({
+        pagina: 1,
+        tamanhoPagina: 20,
+        situacao: "ativo",
+        cargoId: CAR_ANA.id,
+      }),
+    );
+    expect(seletorDepartamento().value).toBe("");
+    expect(seletorCargo().value).toBe(CAR_ANA.id);
+
+    // "Todos os cargos" desfaz só o cargo: o resumo some.
+    await waitFor(() => expect(seletorCargo()).toBeEnabled());
+    fireEvent.change(seletorCargo(), { target: { value: "" } });
+    await waitFor(() =>
+      expect(ultimaConsulta()).toEqual({
+        pagina: 1,
+        tamanhoPagina: 20,
+        situacao: "ativo",
+      }),
+    );
+    expect(
+      screen.queryByRole("group", { name: "Filtros de lotação ativos" }),
+    ).toBeNull();
+  });
+
+  it("os contadores seguem os do servidor, sem filtro: não mudam com a lotação", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue({
+      ...paginado([colaborador1]),
+      contadores: { ativos: 40, inativos: 7 },
+    });
+    await montarPronto();
+    fireEvent.change(seletorDepartamento(), { target: { value: DEP_OPS.id } });
+    await waitFor(() =>
+      expect(ultimaConsulta().departamentoId).toBe(DEP_OPS.id),
+    );
+    expect(
+      await screen.findByRole("button", { name: /^Ativos\s*40/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /^Inativos\s*7/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("paginar mantém os filtros de lotação", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue({
+      itens: [colaborador1],
+      pagina: 1,
+      tamanhoPagina: 20,
+      total: 45,
+      contadores: { ativos: 45, inativos: 0 },
+    });
+    await montarPronto();
+    fireEvent.change(seletorDepartamento(), { target: { value: DEP_ADM.id } });
+    await waitFor(() =>
+      expect(ultimaConsulta().departamentoId).toBe(DEP_ADM.id),
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Próxima página" }),
+    );
+    await waitFor(() =>
+      expect(ultimaConsulta()).toEqual({
+        pagina: 2,
+        tamanhoPagina: 20,
+        departamentoId: DEP_ADM.id,
+      }),
+    );
+  });
+
+  it("vazio com filtro de lotação: “Limpar filtros” tira lotação e situação, mantém a busca", async () => {
+    await montarPronto();
+    fireEvent.change(screen.getByLabelText("Buscar por nome ou matrícula"), {
+      target: { value: "Bruno" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Buscar" }));
+    await waitFor(() => expect(ultimaConsulta().busca).toBe("Bruno"));
+    vi.mocked(listarColaboradores).mockResolvedValue(paginado([]));
+    await waitFor(() => expect(seletorDepartamento()).toBeEnabled());
+    fireEvent.change(seletorDepartamento(), { target: { value: DEP_OPS.id } });
+    expect(
+      await screen.findByText(
+        "Nenhum colaborador encontrado com estes filtros",
+      ),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Limpar busca e filtros" }),
+    );
+    await waitFor(() =>
+      expect(ultimaConsulta()).toEqual({ pagina: 1, tamanhoPagina: 20 }),
+    );
+  });
+
+  it("vazio só por lotação (sem busca): mensagem de filtros e “Limpar filtros”", async () => {
+    await montarPronto();
+    vi.mocked(listarColaboradores).mockResolvedValue(paginado([]));
+    fireEvent.click(screen.getByRole("button", { name: /^Ativos/ }));
+    await waitFor(() => expect(seletorDepartamento()).toBeEnabled());
+    fireEvent.change(seletorDepartamento(), { target: { value: DEP_OPS.id } });
+    expect(
+      await screen.findByText("Nenhum colaborador com estes filtros"),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Limpar filtros" }));
+    await waitFor(() =>
+      expect(ultimaConsulta()).toEqual({ pagina: 1, tamanhoPagina: 20 }),
+    );
+    expect(seletorDepartamento().value).toBe("");
+  });
+
+  it("catálogos indisponíveis: filtros desabilitados, aviso e nova tentativa", async () => {
+    vi.mocked(listarDepartamentos).mockRejectedValueOnce(new Error("rede"));
+    render(<ColaboradoresScreen />);
+    await screen.findByText(colaborador1.nome);
+    expect(
+      await screen.findByText(
+        "Não foi possível carregar departamentos e cargos.",
+      ),
+    ).toBeInTheDocument();
+    expect(seletorDepartamento()).toBeDisabled();
+    expect(seletorCargo()).toBeDisabled();
+    // A lista continua funcionando sem os filtros de lotação.
+    expect(screen.getByText(colaborador1.nome)).toBeInTheDocument();
+
+    const leituras = vi.mocked(listarDepartamentos).mock.calls.length;
+    fireEvent.click(
+      screen.getByRole("button", { name: "Recarregar departamentos e cargos" }),
+    );
+    await waitFor(() => expect(seletorDepartamento()).toBeEnabled());
+    expect(vi.mocked(listarDepartamentos).mock.calls.length).toBe(leituras + 1);
+  });
+
+  it("375 px: o resumo dos filtros quebra linha, sem alargar a página", () => {
+    const css = readFileSync(
+      "src/screens/pessoas/ColaboradoresScreen.css",
+      "utf8",
+    );
+    const bloco = (seletor: string) =>
+      new RegExp(`${seletor.replace(/[.]/g, "\\.")} \\{([^}]*)\\}`).exec(
+        css,
+      )?.[1] ?? "";
+    expect(bloco(".colaboradores-screen__filtros-ativos")).toMatch(
+      /flex-wrap: wrap/,
+    );
+    expect(bloco(".colaboradores-screen__filtros-ativos")).toMatch(
+      /min-width: 0/,
+    );
+    expect(bloco(".colaboradores-screen__filtro-ativo")).toMatch(
+      /overflow-wrap: anywhere/,
+    );
+    expect(bloco(".colaboradores-screen__filtro-ativo")).toMatch(
+      /white-space: normal/,
+    );
   });
 });

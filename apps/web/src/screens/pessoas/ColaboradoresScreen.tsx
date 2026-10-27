@@ -26,6 +26,11 @@ import {
   listarVinculosDoColaborador,
   retificarColaborador,
 } from "../../api/colaboradoresClient";
+import {
+  type DepartamentoApi,
+  listarDepartamentos,
+} from "../../api/organizacaoClient";
+import { type CargoApi, listarCargos } from "../../api/cargoClient";
 import { formatarDiaCivil } from "../../format/data";
 import { exibirMatricula } from "../../format/matricula";
 import { ContatosColaboradorSecao } from "./ContatosColaboradorSecao";
@@ -47,6 +52,38 @@ export const COLABORADORES_TITULO_ID = "colaboradores-titulo";
 
 type FiltroSituacao = "todos" | "ativo" | "inativo";
 type FiltroSituacaoVinculo = "todos" | "previsto" | "ativo" | "encerrado";
+
+/**
+ * T190 — a consulta da listagem inteira: situação, situação do vínculo,
+ * busca e, desde a T190, departamento e cargo da lotação vigente. Um objeto
+ * só, para que nenhum caminho (efeito, página, busca, tentar de novo) esqueça
+ * um dos filtros. Vazio (`""`) é "todos".
+ */
+interface ConsultaColaboradores {
+  readonly situacao: FiltroSituacao;
+  readonly situacaoVinculo: FiltroSituacaoVinculo;
+  readonly busca: string;
+  readonly departamentoId: string;
+  readonly cargoId: string;
+}
+
+/**
+ * T190 — catálogos dos filtros de lotação: só departamentos e cargos ATIVOS
+ * da empresa ativa (o servidor escopa pela sessão). Uma página de 100, o
+ * limite já registrado para os catálogos organizacionais.
+ */
+type CatalogosDeLotacao =
+  | { readonly status: "carregando" }
+  | { readonly status: "erro" }
+  | {
+      readonly status: "dados";
+      readonly departamentos: readonly DepartamentoApi[];
+      readonly cargos: readonly CargoApi[];
+    };
+
+function rotuloDaReferencia(ref: { nome: string; codigo: string }): string {
+  return `${ref.nome} (${ref.codigo})`;
+}
 
 /**
  * T186 — os contadores viram os filtros de situação: cada opção mostra o
@@ -303,6 +340,17 @@ export function ColaboradoresScreen({
    */
   const [buscaDigitada, setBuscaDigitada] = useState("");
   const [buscaAplicada, setBuscaAplicada] = useState("");
+  /**
+   * T190 — filtros pela lotação vigente. Vazio é "todos". Vão ao servidor,
+   * antes da paginação; os contadores não dependem deles. Não ficam na URL e
+   * somem na troca de empresa, que recria a tela (T189), como a busca.
+   */
+  const [filtroDepartamentoId, setFiltroDepartamentoId] = useState("");
+  const [filtroCargoId, setFiltroCargoId] = useState("");
+  const [catalogos, setCatalogos] = useState<CatalogosDeLotacao>({
+    status: "carregando",
+  });
+  const [tentativaCatalogos, setTentativaCatalogos] = useState(0);
   const campoBuscaRef = useRef<HTMLInputElement | null>(null);
   /**
    * T178 — contagem do escopo inteiro, vinda do servidor (`contadores`), SEM
@@ -375,12 +423,7 @@ export function ColaboradoresScreen({
     detalhe !== null && detalhe.nomeEdicao.trim() !== detalhe.colaborador.nome;
 
   const carregarDados = useCallback(
-    async (
-      situacao: FiltroSituacao,
-      situacaoVinculo: FiltroSituacaoVinculo,
-      busca: string,
-      paginaPedida: number,
-    ) => {
+    async (consulta: ConsultaColaboradores, paginaPedida: number) => {
       const pedido = ++pedidoListaRef.current;
       setStatusCarregamento("carregando");
       try {
@@ -389,11 +432,15 @@ export function ColaboradoresScreen({
           pagina: paginaPedida,
           tamanhoPagina: TAMANHO_PAGINA,
         };
-        if (situacao !== "todos") query.situacao = situacao;
-        if (situacaoVinculo !== "todos")
-          query.situacaoVinculo = situacaoVinculo;
+        if (consulta.situacao !== "todos") query.situacao = consulta.situacao;
+        if (consulta.situacaoVinculo !== "todos")
+          query.situacaoVinculo = consulta.situacaoVinculo;
         // T178 — vazio é "sem busca": a chave nem vai.
-        if (busca) query.busca = busca;
+        if (consulta.busca) query.busca = consulta.busca;
+        // T190 — idem para departamento e cargo.
+        if (consulta.departamentoId)
+          query.departamentoId = consulta.departamentoId;
+        if (consulta.cargoId) query.cargoId = consulta.cargoId;
         const resp = await listarColaboradores(query);
         // Resposta obsoleta: outro filtro (ou outra busca) já pediu a lista
         // depois desta. Aplicá-la mostraria dados que não correspondem ao que
@@ -429,24 +476,86 @@ export function ColaboradoresScreen({
    */
   //
   // T178 — a busca entra na mesma regra: um termo novo é um conjunto novo.
+  // T190 — departamento e cargo também.
+  const consulta: ConsultaColaboradores = {
+    situacao: filtroSituacao,
+    situacaoVinculo: filtroSituacaoVinculo,
+    busca: buscaAplicada,
+    departamentoId: filtroDepartamentoId,
+    cargoId: filtroCargoId,
+  };
   useEffect(() => {
-    void carregarDados(filtroSituacao, filtroSituacaoVinculo, buscaAplicada, 1);
-  }, [filtroSituacao, filtroSituacaoVinculo, buscaAplicada, carregarDados]);
+    void carregarDados(
+      {
+        situacao: filtroSituacao,
+        situacaoVinculo: filtroSituacaoVinculo,
+        busca: buscaAplicada,
+        departamentoId: filtroDepartamentoId,
+        cargoId: filtroCargoId,
+      },
+      1,
+    );
+  }, [
+    filtroSituacao,
+    filtroSituacaoVinculo,
+    buscaAplicada,
+    filtroDepartamentoId,
+    filtroCargoId,
+    carregarDados,
+  ]);
+
+  // T190 — catálogos dos filtros de lotação: uma leitura por montagem (e a
+  // cada "Tentar novamente"), só ativos. A troca de empresa recria a tela e
+  // relê os da empresa nova.
+  useEffect(() => {
+    let vigente = true;
+    setCatalogos({ status: "carregando" });
+    Promise.all([
+      listarDepartamentos({ status: "ativo", tamanhoPagina: 100 }),
+      listarCargos({ status: "ativo", tamanhoPagina: 100 }),
+    ])
+      .then(([departamentos, cargos]) => {
+        if (!vigente) return;
+        // Só ativos, mesmo que o servidor devolva outro status: o filtro
+        // oferece o que a lotação vigente pode ter.
+        setCatalogos({
+          status: "dados",
+          departamentos: departamentos.itens.filter(
+            (d) => d.status === "ativo",
+          ),
+          cargos: cargos.itens.filter((c) => c.status === "ativo"),
+        });
+      })
+      .catch(() => {
+        if (vigente) setCatalogos({ status: "erro" });
+      });
+    return () => {
+      vigente = false;
+    };
+  }, [tentativaCatalogos]);
 
   const totalPaginas = Math.max(1, Math.ceil(total / tamanhoPaginaEfetivo));
   const carregando = statusCarregamento === "carregando";
+  const temFiltroDeLotacao =
+    filtroDepartamentoId !== "" || filtroCargoId !== "";
   const temFiltro =
-    filtroSituacao !== "todos" || filtroSituacaoVinculo !== "todos";
+    filtroSituacao !== "todos" ||
+    filtroSituacaoVinculo !== "todos" ||
+    temFiltroDeLotacao;
   const filtrando = temFiltro || buscaAplicada !== "";
+
+  const departamentoFiltrado =
+    catalogos.status === "dados"
+      ? catalogos.departamentos.find((d) => d.id === filtroDepartamentoId)
+      : undefined;
+  const cargoFiltrado =
+    catalogos.status === "dados"
+      ? catalogos.cargos.find((c) => c.id === filtroCargoId)
+      : undefined;
 
   function irParaPagina(destino: number) {
     if (destino < 1 || destino > totalPaginas || carregando) return;
-    void carregarDados(
-      filtroSituacao,
-      filtroSituacaoVinculo,
-      buscaAplicada,
-      destino,
-    );
+    void carregarDados(consulta, destino);
   }
 
   /**
@@ -459,7 +568,7 @@ export function ColaboradoresScreen({
     const termo = normalizarBusca(buscaDigitada);
     setBuscaDigitada(termo);
     if (termo === buscaAplicada) {
-      void carregarDados(filtroSituacao, filtroSituacaoVinculo, termo, 1);
+      void carregarDados({ ...consulta, busca: termo }, 1);
       return;
     }
     setBuscaAplicada(termo);
@@ -476,10 +585,15 @@ export function ColaboradoresScreen({
     campoBuscaRef.current?.focus();
   }
 
-  /** T186 — do estado vazio por filtro: volta a "Todos", busca intacta. */
+  /**
+   * T186 — do estado vazio por filtro: volta a "Todos", busca intacta.
+   * T190 — departamento e cargo também saem.
+   */
   function limparFiltros() {
     setFiltroSituacao("todos");
     setFiltroSituacaoVinculo("todos");
+    setFiltroDepartamentoId("");
+    setFiltroCargoId("");
   }
 
   /** T178 — do estado vazio por busca/filtro: tudo volta ao conjunto inteiro. */
@@ -506,7 +620,10 @@ export function ColaboradoresScreen({
         : filtroSituacao === "ativo"
           ? "ativo"
           : "inativo";
-    const soSituacao = situacao !== null && filtroSituacaoVinculo === "todos";
+    const soSituacao =
+      situacao !== null &&
+      filtroSituacaoVinculo === "todos" &&
+      !temFiltroDeLotacao;
     if (buscaAplicada && !temFiltro) {
       return {
         titulo: "Nenhum colaborador encontrado",
@@ -980,14 +1097,7 @@ export function ColaboradoresScreen({
           </p>
           <Button
             variant="secondary"
-            onClick={() =>
-              void carregarDados(
-                filtroSituacao,
-                filtroSituacaoVinculo,
-                buscaAplicada,
-                pagina,
-              )
-            }
+            onClick={() => void carregarDados(consulta, pagina)}
           >
             Tentar novamente
           </Button>
@@ -1062,7 +1172,131 @@ export function ColaboradoresScreen({
                 </select>
               )}
             </FormField>
+
+            {/* T190 — lotação vigente. Seletor simples, só com referências
+                ATIVAS da empresa ativa; "Todos" desfaz só este filtro. */}
+            <FormField
+              id="colaboradores-filtro-departamento"
+              label="Departamento"
+              {...(catalogos.status === "erro"
+                ? {
+                    help: "Não foi possível carregar departamentos e cargos.",
+                  }
+                : {})}
+            >
+              {(control) => (
+                <select
+                  value={filtroDepartamentoId}
+                  onChange={(e) => setFiltroDepartamentoId(e.target.value)}
+                  disabled={
+                    statusCarregamento === "carregando" ||
+                    catalogos.status !== "dados"
+                  }
+                  {...control}
+                >
+                  <option value="">
+                    {catalogos.status === "carregando"
+                      ? "Carregando…"
+                      : "Todos os departamentos"}
+                  </option>
+                  {catalogos.status === "dados"
+                    ? catalogos.departamentos.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {rotuloDaReferencia(d)}
+                        </option>
+                      ))
+                    : null}
+                </select>
+              )}
+            </FormField>
+
+            <FormField id="colaboradores-filtro-cargo" label="Cargo">
+              {(control) => (
+                <select
+                  value={filtroCargoId}
+                  onChange={(e) => setFiltroCargoId(e.target.value)}
+                  disabled={
+                    statusCarregamento === "carregando" ||
+                    catalogos.status !== "dados"
+                  }
+                  {...control}
+                >
+                  <option value="">
+                    {catalogos.status === "carregando"
+                      ? "Carregando…"
+                      : "Todos os cargos"}
+                  </option>
+                  {catalogos.status === "dados"
+                    ? catalogos.cargos.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {rotuloDaReferencia(c)}
+                        </option>
+                      ))
+                    : null}
+                </select>
+              )}
+            </FormField>
+
+            {catalogos.status === "erro" ? (
+              <Button
+                variant="subtle"
+                className="colaboradores-screen__filtros-retry"
+                onClick={() => setTentativaCatalogos((n) => n + 1)}
+              >
+                Recarregar departamentos e cargos
+              </Button>
+            ) : null}
           </div>
+
+          {/* T190 — o que a lotação está filtrando, à vista, e como desfazer
+              cada um sem perder os demais (busca, situação e o outro). */}
+          {temFiltroDeLotacao ? (
+            <div
+              className="colaboradores-screen__filtros-ativos"
+              role="group"
+              aria-label="Filtros de lotação ativos"
+            >
+              <span className="colaboradores-screen__filtros-ativos-rotulo">
+                Lotação vigente:
+              </span>
+              {filtroDepartamentoId ? (
+                <Button
+                  variant="secondary"
+                  className="colaboradores-screen__filtro-ativo"
+                  aria-label={`Remover filtro de departamento: ${
+                    departamentoFiltrado
+                      ? rotuloDaReferencia(departamentoFiltrado)
+                      : "selecionado"
+                  }`}
+                  onClick={() => setFiltroDepartamentoId("")}
+                >
+                  Departamento:{" "}
+                  {departamentoFiltrado
+                    ? rotuloDaReferencia(departamentoFiltrado)
+                    : "selecionado"}{" "}
+                  <span aria-hidden="true">×</span>
+                </Button>
+              ) : null}
+              {filtroCargoId ? (
+                <Button
+                  variant="secondary"
+                  className="colaboradores-screen__filtro-ativo"
+                  aria-label={`Remover filtro de cargo: ${
+                    cargoFiltrado
+                      ? rotuloDaReferencia(cargoFiltrado)
+                      : "selecionado"
+                  }`}
+                  onClick={() => setFiltroCargoId("")}
+                >
+                  Cargo:{" "}
+                  {cargoFiltrado
+                    ? rotuloDaReferencia(cargoFiltrado)
+                    : "selecionado"}{" "}
+                  <span aria-hidden="true">×</span>
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
 
           {statusCarregamento === "carregando" ? (
             <p className="colaboradores-screen__carregando" role="status">
@@ -1107,14 +1341,7 @@ export function ColaboradoresScreen({
                 action={
                   <Button
                     variant="secondary"
-                    onClick={() =>
-                      void carregarDados(
-                        filtroSituacao,
-                        filtroSituacaoVinculo,
-                        buscaAplicada,
-                        1,
-                      )
-                    }
+                    onClick={() => void carregarDados(consulta, 1)}
                   >
                     Ir para a primeira página
                   </Button>
