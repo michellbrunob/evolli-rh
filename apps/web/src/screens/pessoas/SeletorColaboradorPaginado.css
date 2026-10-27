@@ -1,0 +1,84 @@
+/**
+ * T188 — seletor de colaborador por busca e paginação simples. Só tokens
+ * existentes. Tudo quebra linha em telas estreitas: nada aqui empurra a
+ * página para o lado (`min-width: 0`, `flex-wrap`, `overflow-wrap`).
+ */
+
+.pessoas-seletor-colaborador {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+.pessoas-seletor-colaborador__rotulo {
+  font-weight: var(--weight-strong);
+  color: var(--color-ink);
+}
+
+.pessoas-seletor-colaborador__busca {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs) var(--space-sm);
+  align-items: center;
+  min-width: 0;
+}
+
+.pessoas-seletor-colaborador__busca input {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.pessoas-seletor-colaborador__selecionado,
+.pessoas-seletor-colaborador__nota {
+  margin: 0;
+  color: var(--color-ink-subtle);
+  overflow-wrap: anywhere;
+}
+
+.pessoas-seletor-colaborador__erro {
+  margin: 0;
+  color: var(--status-danger-ink);
+}
+
+.pessoas-seletor-colaborador__resultados {
+  min-width: 0;
+}
+
+.pessoas-seletor-colaborador__lista {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  min-width: 0;
+}
+
+.pessoas-seletor-colaborador__lista .evolli-button {
+  /* Bloco, não flex: nome e matrícula correm na mesma linha e quebram
+     juntos em telas estreitas, em vez de virar duas colunas. */
+  display: block;
+  width: 100%;
+  justify-content: flex-start;
+  max-width: 100%;
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.pessoas-seletor-colaborador__matricula {
+  color: var(--color-ink-subtle);
+}
+
+.pessoas-paginacao {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs) var(--space-sm);
+  margin-top: var(--space-xs);
+}
+
+.pessoas-paginacao__posicao {
+  color: var(--color-ink-subtle);
+}

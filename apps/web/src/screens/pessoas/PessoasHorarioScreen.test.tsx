@@ -51,6 +51,26 @@ function listagem(itens: ColaboradorApi[]): ListagemColaboradoresApi {
   };
 }
 
+/**
+ * T188 — o servidor filtra por `situacao` (a tela conta e busca só ativos);
+ * o dublê faz o mesmo, em vez de devolver a lista inteira a qualquer pedido.
+ */
+function responderColaboradores(lista: ColaboradorApi[]) {
+  vi.mocked(listarColaboradores).mockImplementation(async (q = {}) =>
+    listagem(
+      q.situacao ? lista.filter((c) => c.situacao === q.situacao) : lista,
+    ),
+  );
+}
+
+/** T188 — escolhe o colaborador na busca paginada do formulário. */
+async function escolherColaborador(nome: string) {
+  const lista = await screen.findByRole("list", {
+    name: "Colaboradores encontrados",
+  });
+  fireEvent.click(within(lista).getByRole("button", { name: nome }));
+}
+
 const colaborador1: ColaboradorApi = {
   id: "11111111-1111-1111-1111-111111111111",
   nome: "Ana Colaboradora (teste)",
@@ -144,9 +164,7 @@ beforeEach(() => {
   vi.mocked(listarVinculosHorario).mockResolvedValue(
     paginado([vinculoVigente, vinculoEncerrado]),
   );
-  vi.mocked(listarColaboradores).mockResolvedValue(
-    listagem([colaborador1, colaborador2, colaboradorInativo]),
-  );
+  responderColaboradores([colaborador1, colaborador2, colaboradorInativo]);
   vi.mocked(listarTabelasHorario).mockResolvedValue(
     paginado([tabelaAtiva, tabelaInativa]),
   );
@@ -261,9 +279,7 @@ describe("PessoasHorarioScreen (T112 — funcional)", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Novo vínculo" }));
 
-    fireEvent.change(screen.getByLabelText(/^Colaborador\b/i), {
-      target: { value: colaborador1.id },
-    });
+    await escolherColaborador(colaborador1.nome);
     fireEvent.click(screen.getByRole("button", { name: "Criar vínculo" }));
 
     expect(
@@ -279,9 +295,7 @@ describe("PessoasHorarioScreen (T112 — funcional)", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Novo vínculo" }));
 
-    fireEvent.change(screen.getByLabelText(/^Colaborador\b/i), {
-      target: { value: colaborador1.id },
-    });
+    await escolherColaborador(colaborador1.nome);
     fireEvent.change(screen.getByLabelText(/Vigência — início/i), {
       target: { value: "2026-05-01" },
     });
@@ -306,9 +320,7 @@ describe("PessoasHorarioScreen (T112 — funcional)", () => {
     const chamadasAntes = vi.mocked(listarVinculosHorario).mock.calls.length;
 
     fireEvent.click(screen.getByRole("button", { name: "Novo vínculo" }));
-    fireEvent.change(screen.getByLabelText(/^Colaborador\b/i), {
-      target: { value: colaborador2.id },
-    });
+    await escolherColaborador(colaborador2.nome);
     fireEvent.change(screen.getByLabelText(/Vigência — início/i), {
       target: { value: "2026-01-05" },
     });
@@ -344,9 +356,7 @@ describe("PessoasHorarioScreen (T112 — funcional)", () => {
       name: "Colaboradores com tabela de horário vinculada",
     });
     fireEvent.click(screen.getByRole("button", { name: "Novo vínculo" }));
-    fireEvent.change(screen.getByLabelText(/^Colaborador\b/i), {
-      target: { value: colaborador1.id },
-    });
+    await escolherColaborador(colaborador1.nome);
     fireEvent.change(screen.getByLabelText(/Vigência — início/i), {
       target: { value: "2026-01-05" },
     });
@@ -358,9 +368,7 @@ describe("PessoasHorarioScreen (T112 — funcional)", () => {
   });
 
   it("bloqueia a criação quando não há colaborador ativo disponível", async () => {
-    vi.mocked(listarColaboradores).mockResolvedValue(
-      listagem([colaboradorInativo]),
-    );
+    responderColaboradores([colaboradorInativo]);
 
     render(<PessoasHorarioScreen podeOperar />);
     await screen.findByRole("table", {
@@ -409,9 +417,7 @@ describe("PessoasHorarioScreen (T112 — funcional)", () => {
 
     expect(screen.getByLabelText(/^Tabela de horário/i)).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText(/^Colaborador\b/i), {
-      target: { value: colaborador1.id },
-    });
+    await escolherColaborador(colaborador1.nome);
     fireEvent.change(screen.getByLabelText(/Vigência — início/i), {
       target: { value: "2026-01-05" },
     });
@@ -424,7 +430,7 @@ describe("PessoasHorarioScreen (T112 — funcional)", () => {
   });
 
   it("resolve automaticamente o colaborador quando há só um ativo", async () => {
-    vi.mocked(listarColaboradores).mockResolvedValue(listagem([colaborador1]));
+    responderColaboradores([colaborador1]);
 
     render(<PessoasHorarioScreen podeOperar />);
     await screen.findByRole("table", {
@@ -637,5 +643,120 @@ describe("PessoasHorarioScreen — perfil leitor, como o DP (T183)", () => {
       screen.queryByRole("button", { name: /Encerrar vigência/ }),
     ).toBeNull();
     expect(screen.queryByLabelText(/Encerrar vigência em/)).toBeNull();
+  });
+});
+
+/**
+ * T188 — dublê de `GET /v1/colaboradores` com 150 pessoas: pagina, busca por
+ * nome ou matrícula e filtra por situação, como o servidor (T178).
+ */
+function servidorComCentoECinquenta() {
+  const lista = Array.from({ length: 150 }, (_, i) => {
+    const n = String(i + 1).padStart(3, "0");
+    return {
+      id: `c-${n}`,
+      nome: `Pessoa Teste ${n}`,
+      situacao: "ativo" as const,
+      criadoEm: "2026-01-01T12:00:00.000Z",
+      atualizadoEm: "2026-01-01T12:00:00.000Z",
+      vinculos: [
+        {
+          id: `vf-${n}`,
+          empresaId: "e-1",
+          matricula: `MAT-${n}`,
+          situacao: "ativo" as const,
+          dataAdmissao: "2025-01-01",
+          dataDesligamento: null,
+          lotacaoVigente: null,
+          vigenciasDeJornada: [],
+        },
+      ],
+    };
+  });
+  vi.mocked(listarColaboradores).mockImplementation((async (
+    q: {
+      busca?: string;
+      pagina?: number;
+      tamanhoPagina?: number;
+      situacao?: string;
+    } = {},
+  ) => {
+    const termo = (q.busca ?? "").toLowerCase();
+    const filtrada = lista.filter(
+      (c) =>
+        (!q.situacao || c.situacao === q.situacao) &&
+        (!termo ||
+          c.nome.toLowerCase().includes(termo) ||
+          c.vinculos[0]!.matricula.toLowerCase().includes(termo)),
+    );
+    const pagina = q.pagina ?? 1;
+    const tamanho = q.tamanhoPagina ?? 20;
+    return {
+      itens: filtrada.slice((pagina - 1) * tamanho, pagina * tamanho),
+      pagina,
+      tamanhoPagina: tamanho,
+      total: filtrada.length,
+      contadores: { ativos: filtrada.length, inativos: 0 },
+    };
+  }) as never);
+}
+
+async function buscarEEscolher(termo: string, nome: RegExp) {
+  const campo = await screen.findByLabelText(
+    "Colaborador (buscar por nome ou matrícula)",
+  );
+  fireEvent.change(campo, { target: { value: termo } });
+  fireEvent.keyDown(campo, { key: "Enter" });
+  const botao = await screen.findByRole("button", { name: nome });
+  fireEvent.click(botao);
+}
+
+describe("T188 — Horário de trabalho sem o teto de 100", () => {
+  it("vincula jornada à 140ª pessoa ativa, escolhida pela busca", async () => {
+    servidorComCentoECinquenta();
+    render(<PessoasHorarioScreen podeOperar />);
+    await screen.findByRole("table", {
+      name: "Colaboradores com tabela de horário vinculada",
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Novo vínculo" }));
+    await buscarEEscolher("Pessoa Teste 140", /^Pessoa Teste 140/);
+    fireEvent.change(screen.getByLabelText(/Vigência — início/i), {
+      target: { value: "2026-01-05" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Criar vínculo" }));
+    await waitFor(() =>
+      expect(criarVinculoHorario).toHaveBeenCalledWith(
+        expect.objectContaining({ colaboradorId: "c-140" }),
+      ),
+    );
+    // A busca do formulário pede só ativos ao servidor.
+    expect(listarColaboradores).toHaveBeenCalledWith(
+      expect.objectContaining({ situacao: "ativo", busca: "Pessoa Teste 140" }),
+    );
+  });
+
+  it("a contagem de ativos vem do servidor, não de uma página de 100", async () => {
+    servidorComCentoECinquenta();
+    render(<PessoasHorarioScreen podeOperar />);
+    await screen.findByRole("table", {
+      name: "Colaboradores com tabela de horário vinculada",
+    });
+    expect(listarColaboradores).toHaveBeenCalledWith({
+      situacao: "ativo",
+      tamanhoPagina: 1,
+    });
+    expect(screen.getByRole("button", { name: "Novo vínculo" })).toBeEnabled();
+  });
+
+  it("perfil só de consulta: sem formulário e sem busca de colaborador", async () => {
+    servidorComCentoECinquenta();
+    render(<PessoasHorarioScreen />);
+    await screen.findByRole("table", {
+      name: "Colaboradores com tabela de horário vinculada",
+    });
+    expect(screen.queryByRole("button", { name: "Novo vínculo" })).toBeNull();
+    expect(
+      screen.queryByLabelText("Colaborador (buscar por nome ou matrícula)"),
+    ).toBeNull();
   });
 });

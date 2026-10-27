@@ -29,9 +29,7 @@ import {
 } from "../../components";
 import type { DataTableColumn, StatusVariant } from "../../components";
 import {
-  listarColaboradores,
   listarVinculosDoColaborador,
-  type ColaboradorApi,
   type SituacaoVinculo,
   type TipoVinculo,
   type VinculoApi,
@@ -65,6 +63,10 @@ import {
   listarTabelasHorario,
   type TabelaHorarioApi,
 } from "../../api/horariosClient";
+import {
+  SeletorColaboradorPaginado,
+  type ColaboradorEscolhido,
+} from "./SeletorColaboradorPaginado";
 import "./DadosContratuaisScreen.css";
 
 export const DADOS_CONTRATUAIS_TITULO_ID = "dados-contratuais-titulo";
@@ -122,10 +124,10 @@ const VARIANTE_STATUS_MOV: Record<StatusMovimentacao, StatusVariant> = {
 // célula, que é exatamente a distinção que esta tela precisa deixar visível.
 
 export function DadosContratuaisScreen() {
-  const [colaboradores, setColaboradores] = useState<ColaboradorApi[]>([]);
-  const [statusColaboradores, setStatusColaboradores] =
-    useState<StatusCarregamento>("carregando");
-  const [colaboradorId, setColaboradorId] = useState("");
+  // T188 — escolhido pela busca paginada no servidor, sem o teto de 100.
+  const [colaboradorEscolhido, setColaboradorEscolhido] =
+    useState<ColaboradorEscolhido | null>(null);
+  const colaboradorId = colaboradorEscolhido?.id ?? "";
 
   const [vinculos, setVinculos] = useState<VinculoApi[]>([]);
   const [statusVinculos, setStatusVinculos] =
@@ -208,25 +210,9 @@ export function DadosContratuaisScreen() {
     }
   }, []);
 
-  const carregarColaboradores = useCallback(async () => {
-    setStatusColaboradores("carregando");
-    try {
-      const res = await listarColaboradores({ tamanhoPagina: 100 });
-      setColaboradores(res.itens);
-      setColaboradorId((atual) => {
-        if (atual) return atual;
-        return res.itens.length === 1 ? res.itens[0]!.id : "";
-      });
-      setStatusColaboradores("pronto");
-    } catch {
-      setStatusColaboradores("erro");
-    }
-  }, []);
-
   useEffect(() => {
     void carregarCatalogos();
-    void carregarColaboradores();
-  }, [carregarCatalogos, carregarColaboradores]);
+  }, [carregarCatalogos]);
 
   // ---- Vínculos do colaborador -------------------------------------------
   const carregarVinculos = useCallback(async (id: string) => {
@@ -328,7 +314,7 @@ export function DadosContratuaisScreen() {
   // antes de os efeitos re-dispararem) e limpa vínculos, vínculo selecionado,
   // alocações, horários e linha do tempo — nada do colaborador anterior
   // sobrevive à troca. Os efeitos acima recarregam a partir do novo estado.
-  function selecionarColaborador(id: string) {
+  function selecionarColaborador(colaborador: ColaboradorEscolhido | null) {
     seqVinculos.current++;
     seqAlocacoes.current++;
     seqHorarios.current++;
@@ -338,7 +324,7 @@ export function DadosContratuaisScreen() {
     setAlocacoes([]);
     setHorarios([]);
     setLinhaTempo([]);
-    setColaboradorId(id);
+    setColaboradorEscolhido(colaborador);
   }
 
   // Troca de vínculo: invalida alocações/linha do tempo em voo e limpa-as, para
@@ -503,91 +489,60 @@ export function DadosContratuaisScreen() {
           Colaborador e vínculo
         </h2>
 
-        {statusColaboradores === "carregando" ? (
-          <p role="status">Carregando colaboradores…</p>
-        ) : statusColaboradores === "erro" ? (
-          <Surface
-            as="div"
-            padding="md"
-            className="dados-contratuais-screen__erro"
-          >
-            <p role="alert">Não foi possível carregar os colaboradores.</p>
-            <Button
-              variant="secondary"
-              onClick={() => void carregarColaboradores()}
-            >
-              Tentar novamente
-            </Button>
-          </Surface>
-        ) : colaboradores.length === 0 ? (
-          <EmptyState
-            headingLevel={3}
-            icon="—"
-            title="Nenhum colaborador no seu escopo"
-            description="Quando houver um colaborador com vínculo na sua empresa, ele aparece aqui."
+        <div className="dados-contratuais-screen__selecao">
+          {/* T188 — qualquer colaborador da empresa ativa, por busca
+              paginada no servidor; sem o teto de 100. Com um só no escopo,
+              ele é escolhido sozinho, como antes. */}
+          <SeletorColaboradorPaginado
+            id="dados-contratuais-colaborador"
+            rotulo="Colaborador (buscar por nome ou matrícula)"
+            selecionado={colaboradorEscolhido}
+            onSelecionar={selecionarColaborador}
+            autoSelecionarUnico
           />
-        ) : (
-          <div className="dados-contratuais-screen__selecao">
-            <FormField id="dados-contratuais-colaborador" label="Colaborador">
-              {(control) => (
-                <select
-                  value={colaboradorId}
-                  onChange={(e) => selecionarColaborador(e.target.value)}
-                  {...control}
-                >
-                  <option value="">Selecione…</option>
-                  {colaboradores.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.nome}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </FormField>
 
-            {colaboradorId ? (
-              statusVinculos === "carregando" ? (
-                <p role="status">Carregando vínculos…</p>
-              ) : statusVinculos === "erro" ? (
-                <div className="dados-contratuais-screen__erro">
-                  <p role="alert">Não foi possível carregar os vínculos.</p>
-                  <Button
-                    variant="secondary"
-                    onClick={() => void carregarVinculos(colaboradorId)}
+          {colaboradorId ? (
+            statusVinculos === "carregando" ? (
+              <p role="status">Carregando vínculos…</p>
+            ) : statusVinculos === "erro" ? (
+              <div className="dados-contratuais-screen__erro">
+                <p role="alert">Não foi possível carregar os vínculos.</p>
+                <Button
+                  variant="secondary"
+                  onClick={() => void carregarVinculos(colaboradorId)}
+                >
+                  Tentar novamente
+                </Button>
+              </div>
+            ) : vinculos.length === 0 ? (
+              <EmptyState
+                headingLevel={3}
+                icon="—"
+                title="Este colaborador não tem vínculo no seu escopo"
+                description="Nenhum vínculo funcional disponível para consulta."
+              />
+            ) : (
+              <FormField id="dados-contratuais-vinculo" label="Vínculo">
+                {(control) => (
+                  <select
+                    value={vinculoId}
+                    onChange={(e) => selecionarVinculo(e.target.value)}
+                    {...control}
                   >
-                    Tentar novamente
-                  </Button>
-                </div>
-              ) : vinculos.length === 0 ? (
-                <EmptyState
-                  headingLevel={3}
-                  icon="—"
-                  title="Este colaborador não tem vínculo no seu escopo"
-                  description="Nenhum vínculo funcional disponível para consulta."
-                />
-              ) : (
-                <FormField id="dados-contratuais-vinculo" label="Vínculo">
-                  {(control) => (
-                    <select
-                      value={vinculoId}
-                      onChange={(e) => selecionarVinculo(e.target.value)}
-                      {...control}
-                    >
-                      <option value="">Selecione…</option>
-                      {vinculos.map((v) => (
-                        <option key={v.id} value={v.id}>
-                          {exibirMatricula(v.matricula)} ·{" "}
-                          {ROTULO_TIPO_VINCULO[v.tipo]} ·{" "}
-                          {ROTULO_SITUACAO_VINCULO[v.situacao]}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </FormField>
-              )
-            ) : null}
-          </div>
-        )}
+                    <option value="">Selecione…</option>
+                    {vinculos.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {exibirMatricula(v.matricula)} ·{" "}
+                        {ROTULO_TIPO_VINCULO[v.tipo]} ·{" "}
+                        {ROTULO_SITUACAO_VINCULO[v.situacao]}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </FormField>
+            )
+          ) : null}
+        </div>
       </section>
 
       {/* Detalhe do vínculo -------------------------------------------- */}

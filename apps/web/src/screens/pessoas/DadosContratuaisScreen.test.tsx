@@ -90,8 +90,20 @@ const COLAB_1 = {
   situacao: "ativo" as const,
   criadoEm: "2026-01-01T10:00:00.000Z",
   atualizadoEm: "2026-01-01T10:00:00.000Z",
+  vinculos: [],
 };
 const COLAB_2 = { ...COLAB_1, id: "colab-2", nome: "Colaborador Dois" };
+
+/** T188 — o colaborador é escolhido pela busca paginada, não por `<select>`. */
+const campoColaborador = () =>
+  screen.findByLabelText("Colaborador (buscar por nome ou matrícula)");
+
+async function escolherColaborador(nome: string) {
+  const lista = await screen.findByRole("list", {
+    name: "Colaboradores encontrados",
+  });
+  fireEvent.click(within(lista).getByRole("button", { name: nome }));
+}
 
 function vinculo(over: Record<string, unknown> = {}) {
   return {
@@ -208,15 +220,15 @@ describe("DadosContratuaisScreen (T134 — funcional, somente leitura)", () => {
     expect(
       screen.getAllByRole("heading", { level: 1, name: "Dados contratuais" }),
     ).toHaveLength(1);
-    await screen.findByLabelText("Colaborador");
+    await campoColaborador();
   });
 
   it("múltiplos colaboradores: não seleciona em silêncio", async () => {
     render(<DadosContratuaisScreen />);
-    const sel = (await screen.findByLabelText(
-      "Colaborador",
-    )) as HTMLSelectElement;
-    expect(sel.value).toBe("");
+    await screen.findByRole("list", { name: "Colaboradores encontrados" });
+    expect(
+      screen.getByText("Nenhum colaborador selecionado."),
+    ).toBeInTheDocument();
     expect(listarVinculosDoColaborador).not.toHaveBeenCalled();
   });
 
@@ -237,7 +249,7 @@ describe("DadosContratuaisScreen (T134 — funcional, somente leitura)", () => {
     configurarPadrao({ colaboradores: [] });
     render(<DadosContratuaisScreen />);
     expect(
-      await screen.findByText("Nenhum colaborador no seu escopo"),
+      await screen.findByText("Nenhum colaborador no seu escopo."),
     ).toBeInTheDocument();
   });
 
@@ -249,7 +261,9 @@ describe("DadosContratuaisScreen (T134 — funcional, somente leitura)", () => {
     fireEvent.click(
       await screen.findByRole("button", { name: "Tentar novamente" }),
     );
-    expect(await screen.findByLabelText("Colaborador")).toBeInTheDocument();
+    expect(
+      await screen.findByRole("list", { name: "Colaboradores encontrados" }),
+    ).toBeInTheDocument();
   });
 
   it("múltiplos vínculos exigem seleção explícita, sem escolher o primeiro", async () => {
@@ -443,9 +457,8 @@ describe("DadosContratuaisScreen (T134) — corridas assíncronas", () => {
       q.colaboradorId === "colab-A" ? dHorA.promise : dHorB.promise) as never);
 
     render(<DadosContratuaisScreen />);
-    const selColab = await screen.findByLabelText("Colaborador");
-    fireEvent.change(selColab, { target: { value: "colab-A" } });
-    fireEvent.change(selColab, { target: { value: "colab-B" } });
+    await escolherColaborador("Alice");
+    await escolherColaborador("Bob");
 
     // Resolve B primeiro (mais recente), depois A (obsoleta).
     dVincB.resolve([
@@ -532,10 +545,9 @@ describe("DadosContratuaisScreen (T134) — corridas assíncronas", () => {
     }) as never);
 
     render(<DadosContratuaisScreen />);
-    const selColab = await screen.findByLabelText("Colaborador");
-    fireEvent.change(selColab, { target: { value: "colab-A" } }); // carga A #1 (dA1)
-    fireEvent.change(selColab, { target: { value: "colab-B" } });
-    fireEvent.change(selColab, { target: { value: "colab-A" } }); // carga A #2 (dA2)
+    await escolherColaborador("Alice"); // carga A #1 (dA1)
+    await escolherColaborador("Bob");
+    await escolherColaborador("Alice"); // carga A #2 (dA2)
 
     // Resolve a SEGUNDA carga de A primeiro, depois a primeira (obsoleta).
     dA2.resolve([
@@ -553,5 +565,100 @@ describe("DadosContratuaisScreen (T134) — corridas assíncronas", () => {
       screen.getByRole("heading", { name: "Vínculo — MA2" }),
     ).toBeInTheDocument();
     expect(screen.queryByText(/MA1/)).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * T188 — dublê de `GET /v1/colaboradores` com 150 pessoas: pagina, busca por
+ * nome ou matrícula e filtra por situação, como o servidor (T178).
+ */
+function servidorComCentoECinquenta() {
+  const lista = Array.from({ length: 150 }, (_, i) => {
+    const n = String(i + 1).padStart(3, "0");
+    return {
+      id: `c-${n}`,
+      nome: `Pessoa Teste ${n}`,
+      situacao: "ativo" as const,
+      criadoEm: "2026-01-01T12:00:00.000Z",
+      atualizadoEm: "2026-01-01T12:00:00.000Z",
+      vinculos: [
+        {
+          id: `vf-${n}`,
+          empresaId: "e-1",
+          matricula: `MAT-${n}`,
+          situacao: "ativo" as const,
+          dataAdmissao: "2025-01-01",
+          dataDesligamento: null,
+          lotacaoVigente: null,
+          vigenciasDeJornada: [],
+        },
+      ],
+    };
+  });
+  vi.mocked(listarColaboradores).mockImplementation((async (
+    q: {
+      busca?: string;
+      pagina?: number;
+      tamanhoPagina?: number;
+      situacao?: string;
+    } = {},
+  ) => {
+    const termo = (q.busca ?? "").toLowerCase();
+    const filtrada = lista.filter(
+      (c) =>
+        (!q.situacao || c.situacao === q.situacao) &&
+        (!termo ||
+          c.nome.toLowerCase().includes(termo) ||
+          c.vinculos[0]!.matricula.toLowerCase().includes(termo)),
+    );
+    const pagina = q.pagina ?? 1;
+    const tamanho = q.tamanhoPagina ?? 20;
+    return {
+      itens: filtrada.slice((pagina - 1) * tamanho, pagina * tamanho),
+      pagina,
+      tamanhoPagina: tamanho,
+      total: filtrada.length,
+      contadores: { ativos: filtrada.length, inativos: 0 },
+    };
+  }) as never);
+}
+
+async function buscarEEscolher(termo: string, nome: RegExp) {
+  const campo = await screen.findByLabelText(
+    "Colaborador (buscar por nome ou matrícula)",
+  );
+  fireEvent.change(campo, { target: { value: termo } });
+  fireEvent.keyDown(campo, { key: "Enter" });
+  const botao = await screen.findByRole("button", { name: nome });
+  fireEvent.click(botao);
+}
+
+describe("T188 — Dados contratuais sem o teto de 100", () => {
+  it("escolhe a 120ª pessoa pela matrícula e consulta os vínculos dela", async () => {
+    servidorComCentoECinquenta();
+    render(<DadosContratuaisScreen />);
+    await buscarEEscolher("MAT-120", /^Pessoa Teste 120/);
+    await waitFor(() =>
+      expect(listarVinculosDoColaborador).toHaveBeenCalledWith("c-120"),
+    );
+  });
+
+  it("com mais de um no escopo, nada é escolhido sozinho", async () => {
+    servidorComCentoECinquenta();
+    render(<DadosContratuaisScreen />);
+    await screen.findByRole("list", { name: "Colaboradores encontrados" });
+    expect(
+      screen.getByText("Nenhum colaborador selecionado."),
+    ).toBeInTheDocument();
+    expect(listarVinculosDoColaborador).not.toHaveBeenCalled();
+  });
+
+  it("somente leitura: a tela não oferece edição", async () => {
+    configurarPadrao({ colaboradores: [COLAB_1], vinculos: [vinculo()] });
+    render(<DadosContratuaisScreen />);
+    await screen.findByRole("heading", { name: "Vínculo — M-001" });
+    for (const acao of [/Salvar/, /Editar/, /Registrar/, /Efetivar/]) {
+      expect(screen.queryByRole("button", { name: acao })).toBeNull();
+    }
   });
 });
