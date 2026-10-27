@@ -84,7 +84,10 @@ import type { ReactNode } from "react";
 import "./tokens.css";
 import "./AutenticacaoApp.css";
 import { App } from "./App";
-import { AvisoContextoAlterado } from "./AvisoContextoAlterado";
+import {
+  AvisoContextoAlterado,
+  type ResultadoDaConferencia,
+} from "./AvisoContextoAlterado";
 import { HubPosLogin } from "./HubPosLogin";
 import { LoginScreen } from "./LoginScreen";
 import { ProvedorDeEdicoes, useRegistroDeEdicoes } from "./edicoesPendentes";
@@ -424,6 +427,45 @@ export function AutenticacaoApp() {
     );
   }, []);
 
+  /**
+   * T189 (N1) — "continuar na empresa nova": relê o contexto no servidor e
+   * aplica só o mais recente. A leitura que abriu o aviso pode ter ficado
+   * velha — outra aba pode ter trocado de novo enquanto ele estava na tela.
+   *
+   * Qualquer falha devolve um resultado, e o aviso continua bloqueando: nada
+   * é aplicado a partir de uma leitura que não veio, e nada é presumido.
+   */
+  const continuarNoContextoAtual =
+    useCallback(async (): Promise<ResultadoDaConferencia> => {
+      let eu: SafeAccessUserApi;
+      try {
+        eu = await obterUsuarioAtual();
+      } catch (erro) {
+        return erro instanceof ApiError && erro.status === 401
+          ? "sessao-encerrada"
+          : "falha";
+      }
+      if (typeof eu?.role !== "string" || eu.role.trim() === "") {
+        return "falha";
+      }
+      const atual = atorRef.current;
+      if (
+        atual !== null &&
+        eu.id === atual.id &&
+        (eu.companyId ?? null) === (atual.companyId ?? null)
+      ) {
+        // A sessão voltou, por outra aba, à empresa desta: a tela já
+        // descreve o servidor, e não há o que descartar.
+        setContextoAlterado(null);
+        setAnuncio(
+          "A empresa ativa voltou a ser a desta aba. As alterações não salvas foram mantidas.",
+        );
+        return "aplicado";
+      }
+      aplicarContextoAlterado(eu);
+      return "aplicado";
+    }, [aplicarContextoAlterado]);
+
   const handleLogout = useCallback(async () => {
     try {
       await logout();
@@ -568,7 +610,8 @@ export function AutenticacaoApp() {
             contextoAlterado.id === ator.id && ator.companyId !== null
           }
           onVoltar={voltarAoContextoAnterior}
-          onContinuar={() => aplicarContextoAlterado(contextoAlterado)}
+          onContinuar={continuarNoContextoAtual}
+          onSair={() => void handleLogout()}
         />
       ) : null}
     </>,

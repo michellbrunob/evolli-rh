@@ -22,6 +22,7 @@ import {
   criarUnidade,
 } from "../../api/organizacaoClient";
 import { type CargoApi, criarCargo } from "../../api/cargoClient";
+import { useEdicaoEmAndamento } from "../../app/edicoesPendentes";
 import {
   falhaPorSessaoExpirada,
   falhaPorTokenDesatualizado,
@@ -216,6 +217,16 @@ export function ModalReferenciaRapida({
   const [enviando, setEnviando] = useState(false);
   /** Trava síncrona contra envio duplicado (cliques no mesmo quadro). */
   const enviandoRef = useRef(false);
+
+  // T189 (B1) — código ou nome digitados são edição pendente. Sem isto, uma
+  // troca de empresa feita em outra aba recriava a tela e descartava o que
+  // foi digitado aqui sem perguntar: a Nova admissão vazia não conta como
+  // alterada, e o `Modal` não recebe `alterado` deste formulário (o fechar
+  // dele continua como sempre foi). Modal aberto e vazio não é pendência.
+  useEdicaoEmAndamento(tipo ? REFERENCIAS[tipo].titulo : "Cadastro rápido", {
+    pendente: tipo !== null && (codigo !== "" || nome !== ""),
+    salvando: tipo !== null && enviando,
+  });
   /**
    * T180 (revisão) — tentativa em curso. O resultado de uma recarga só muda a
    * mensagem se ainda for da tentativa atual: nem um novo envio nem um novo

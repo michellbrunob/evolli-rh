@@ -4,6 +4,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -17,6 +18,15 @@ import {
 } from "../api/usersClient";
 import { listarTabelasHorario } from "../api/horariosClient";
 import { listarEquipe } from "../api/gestorClient";
+import {
+  listarAreas,
+  listarCentrosCusto,
+  listarDepartamentos,
+  listarEmpresasMulti,
+  listarEquipes,
+  listarUnidades,
+} from "../api/organizacaoClient";
+import { listarCargos } from "../api/cargoClient";
 import {
   listarEmpresasDoContexto,
   trocarEmpresaDoContexto,
@@ -122,6 +132,32 @@ vi.mock("../api/contextoEmpresarialClient", async () => {
   };
 });
 
+// T189 (B1) — a Nova admissão só oferece o cadastro rápido de referência
+// com a empresa carregada. Por padrão estas leituras FALHAM, como falhavam
+// antes (fetch sem servidor); os testes do B1 as resolvem.
+vi.mock("../api/organizacaoClient", async () => {
+  const actual = await vi.importActual<
+    typeof import("../api/organizacaoClient")
+  >("../api/organizacaoClient");
+  return {
+    ...actual,
+    listarEmpresasMulti: vi.fn(),
+    listarDepartamentos: vi.fn(),
+    listarUnidades: vi.fn(),
+    listarEquipes: vi.fn(),
+    listarCentrosCusto: vi.fn(),
+    listarAreas: vi.fn(),
+  };
+});
+
+vi.mock("../api/cargoClient", async () => {
+  const actual =
+    await vi.importActual<typeof import("../api/cargoClient")>(
+      "../api/cargoClient",
+    );
+  return { ...actual, listarCargos: vi.fn() };
+});
+
 vi.mock("../api/horariosClient", async () => {
   const actual = await vi.importActual<typeof import("../api/horariosClient")>(
     "../api/horariosClient",
@@ -157,6 +193,17 @@ beforeEach(() => {
     EMPRESA_BETA,
   ]);
   vi.mocked(trocarEmpresaDoContexto).mockResolvedValue(EMPRESA_BETA);
+  for (const leitura of [
+    listarEmpresasMulti,
+    listarDepartamentos,
+    listarUnidades,
+    listarEquipes,
+    listarCentrosCusto,
+    listarAreas,
+    listarCargos,
+  ]) {
+    vi.mocked(leitura).mockRejectedValue(new Error("rede") as never);
+  }
 });
 
 /**
@@ -1261,5 +1308,268 @@ describe("T163/T189 — contexto empresarial ativo", () => {
     act(() => window.dispatchEvent(new Event("focus")));
 
     expect(gravou).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T189 (B1/N1) — referência rápida digitada conta como edição pendente; e
+// "continuar na empresa nova" relê o servidor antes de aplicar.
+// ---------------------------------------------------------------------------
+
+describe("T189 (B1/N1) — referência rápida pendente e conferência antes de continuar", () => {
+  const EMPRESA_GAMA = {
+    id: "empresa-sintetica-gama",
+    codigo: "GAMA",
+    nome: "Empresa Gama",
+  };
+  const ATOR_EM_GAMA = {
+    ...ATOR_PADRAO,
+    companyId: EMPRESA_GAMA.id,
+    empresaAtiva: EMPRESA_GAMA,
+  };
+
+  function pagina<T>(itens: T[]) {
+    return { itens, pagina: 1, tamanhoPagina: 100, total: itens.length };
+  }
+
+  beforeEach(() => {
+    CanalFalso.abertos.clear();
+    vi.stubGlobal("BroadcastChannel", CanalFalso);
+    window.history.replaceState(null, "", window.location.pathname);
+    // A empresa ALFA carregada e nenhuma referência: o "+" fica disponível.
+    vi.mocked(listarEmpresasMulti).mockResolvedValue(
+      pagina([{ ...EMPRESA_ALFA, status: "ativo" }]) as never,
+    );
+    for (const leitura of [
+      listarDepartamentos,
+      listarUnidades,
+      listarEquipes,
+      listarCentrosCusto,
+      listarAreas,
+      listarCargos,
+    ]) {
+      vi.mocked(leitura).mockResolvedValue(pagina([]) as never);
+    }
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    window.history.replaceState(null, "", window.location.pathname);
+  });
+
+  /** Nova admissão vazia, com o cadastro rápido de departamento aberto. */
+  async function abrirReferenciaRapida() {
+    await abrirNovaAdmissaoPorRota();
+    const mais = await screen.findByRole("button", {
+      name: "Cadastrar novo departamento",
+    });
+    await waitFor(() => expect(mais).toBeEnabled());
+    fireEvent.click(mais);
+    await screen.findByRole("dialog", { name: "Cadastrar departamento" });
+  }
+  const campoDaReferencia = (rotulo: RegExp) =>
+    within(
+      document.querySelector(".evolli-modal__caixa") as HTMLElement,
+    ).getByLabelText(rotulo) as HTMLInputElement;
+
+  function trocaEmOutraAba(ator: unknown) {
+    vi.mocked(obterUsuarioAtual).mockResolvedValue(ator as never);
+    act(() =>
+      new CanalFalso(NOME_DO_CANAL).postMessage({
+        tipo: "contexto-empresarial-alterado",
+      }),
+    );
+  }
+
+  const aviso = () =>
+    screen.findByRole("alertdialog", { name: "A empresa ativa mudou" });
+
+  it("B1: código digitado + troca em outra aba → aviso; voltar preserva empresa, modal e código", async () => {
+    vi.mocked(trocarEmpresaDoContexto).mockResolvedValue(EMPRESA_ALFA);
+    await abrirReferenciaRapida();
+    fireEvent.change(campoDaReferencia(/^Código/), {
+      target: { value: "DEP_RASCUNHO" },
+    });
+
+    trocaEmOutraAba(ATOR_EM_BETA);
+    await aviso();
+    // Nada recriado enquanto a pessoa não escolhe.
+    expect(campoDaReferencia(/^Código/).value).toBe("DEP_RASCUNHO");
+    expect(document.querySelector(".autenticacao-app__arvore")).toHaveAttribute(
+      "inert",
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Voltar à empresa anterior e continuar editando",
+      }),
+    );
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    expect(trocarEmpresaDoContexto).toHaveBeenCalledWith(EMPRESA_ALFA.id);
+    expect(
+      screen.getByRole("dialog", { name: "Cadastrar departamento" }),
+    ).toBeInTheDocument();
+    expect(campoDaReferencia(/^Código/).value).toBe("DEP_RASCUNHO");
+    expect(seletorDoMenu()).toHaveTextContent("Empresa Alfa");
+  });
+
+  it("B1: nome digitado → descarte só depois de “continuar”, no contexto atual", async () => {
+    await abrirReferenciaRapida();
+    fireEvent.change(campoDaReferencia(/^Nome/), {
+      target: { value: "Departamento Rascunho" },
+    });
+
+    trocaEmOutraAba(ATOR_EM_BETA);
+    await aviso();
+    expect(campoDaReferencia(/^Nome/).value).toBe("Departamento Rascunho");
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Continuar na empresa nova e descartar alterações",
+      }),
+    );
+    await waitFor(() =>
+      expect(seletorDoMenu()).toHaveTextContent("Empresa Beta"),
+    );
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(
+      screen.queryByRole("dialog", { name: "Cadastrar departamento" }),
+    ).toBeNull();
+    expect(document.body.textContent).not.toContain("Departamento Rascunho");
+    expect(window.location.hash).toBe("#/pessoas/colaboradores");
+  });
+
+  it("B1: código e nome digitados também bloqueiam", async () => {
+    await abrirReferenciaRapida();
+    fireEvent.change(campoDaReferencia(/^Código/), {
+      target: { value: "DEP_AMBOS" },
+    });
+    fireEvent.change(campoDaReferencia(/^Nome/), {
+      target: { value: "Departamento Ambos" },
+    });
+    trocaEmOutraAba(ATOR_EM_BETA);
+    await aviso();
+    expect(campoDaReferencia(/^Nome/).value).toBe("Departamento Ambos");
+  });
+
+  it("B1: modal aberto e vazio não é pendência — a troca vinda de outra aba aplica direto", async () => {
+    await abrirReferenciaRapida();
+    trocaEmOutraAba(ATOR_EM_BETA);
+    await waitFor(() =>
+      expect(seletorDoMenu()).toHaveTextContent("Empresa Beta"),
+    );
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+  });
+
+  it("N1: duas trocas seguidas em outra aba — “continuar” relê e aplica a mais recente", async () => {
+    const nome = await abrirNovaAdmissaoPorRota();
+    fireEvent.change(nome, { target: { value: "Pessoa Sintetica N1" } });
+
+    trocaEmOutraAba(ATOR_EM_BETA);
+    await aviso();
+    // Segunda troca, com o aviso aberto: o servidor agora está em GAMA.
+    trocaEmOutraAba(ATOR_EM_GAMA);
+    const leituras = vi.mocked(obterUsuarioAtual).mock.calls.length;
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Continuar na empresa nova e descartar alterações",
+      }),
+    );
+    await waitFor(() =>
+      expect(seletorDoMenu()).toHaveTextContent("Empresa Gama"),
+    );
+    expect(vi.mocked(obterUsuarioAtual).mock.calls.length).toBe(leituras + 1);
+    expect(seletorDoMenu()).not.toHaveTextContent("Empresa Beta");
+    expect(anuncio()).toHaveTextContent("Empresa Gama (código GAMA)");
+  });
+
+  it.each([
+    ["falha de rede", () => new TypeError("Failed to fetch")],
+    ["403", () => new ApiErrorDeUsuarios(403, "negado")],
+    ["404", () => new ApiErrorDeUsuarios(404, "não encontrado")],
+  ])(
+    "N1: %s na conferência não libera a tela nem troca de contexto",
+    async (_caso, erro) => {
+      const nome = await abrirNovaAdmissaoPorRota();
+      fireEvent.change(nome, { target: { value: "Pessoa Sintetica Incerta" } });
+      trocaEmOutraAba(ATOR_EM_BETA);
+      await aviso();
+
+      vi.mocked(obterUsuarioAtual).mockRejectedValue(erro());
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: "Continuar na empresa nova e descartar alterações",
+        }),
+      );
+
+      expect(
+        await screen.findByText(
+          /Não foi possível conferir a empresa ativa agora/,
+        ),
+      ).toBeInTheDocument();
+      expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+      expect(
+        document.querySelector(".autenticacao-app__arvore"),
+      ).toHaveAttribute("inert");
+      expect(seletorDoMenu()).toHaveTextContent("Empresa Alfa");
+      expect(
+        (
+          screen.getByLabelText(/^Nome completo/, {
+            hidden: true,
+          } as never) as HTMLInputElement
+        ).value,
+      ).toBe("Pessoa Sintetica Incerta");
+      expect(trocarEmpresaDoContexto).not.toHaveBeenCalled();
+    },
+  );
+
+  it("N1: 401 na conferência — sessão encerrada, nada aplicado, só a saída", async () => {
+    const nome = await abrirNovaAdmissaoPorRota();
+    fireEvent.change(nome, { target: { value: "Pessoa Sintetica Sessao" } });
+    trocaEmOutraAba(ATOR_EM_BETA);
+    await aviso();
+
+    vi.mocked(obterUsuarioAtual).mockRejectedValue(
+      new ApiErrorDeUsuarios(401, "sessão expirada"),
+    );
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Continuar na empresa nova e descartar alterações",
+      }),
+    );
+    expect(await screen.findByText(/Sua sessão terminou/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sair" })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", {
+        name: "Continuar na empresa nova e descartar alterações",
+      }),
+    ).toBeNull();
+    expect(document.querySelector(".autenticacao-app__arvore")).toHaveAttribute(
+      "inert",
+    );
+    expect(seletorDoMenu()).toHaveTextContent("Empresa Alfa");
+  });
+
+  it("N1: se a sessão voltou à empresa desta aba, “continuar” não descarta nada", async () => {
+    const nome = await abrirNovaAdmissaoPorRota();
+    fireEvent.change(nome, { target: { value: "Pessoa Sintetica Volta" } });
+    trocaEmOutraAba(ATOR_EM_BETA);
+    await aviso();
+    // A outra aba voltou para ALFA antes do clique.
+    vi.mocked(obterUsuarioAtual).mockResolvedValue({ ...ATOR_PADRAO } as never);
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Continuar na empresa nova e descartar alterações",
+      }),
+    );
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    expect(
+      (screen.getByLabelText(/^Nome completo/) as HTMLInputElement).value,
+    ).toBe("Pessoa Sintetica Volta");
+    expect(seletorDoMenu()).toHaveTextContent("Empresa Alfa");
+    expect(
+      document.querySelector(".autenticacao-app__arvore"),
+    ).not.toHaveAttribute("inert");
   });
 });

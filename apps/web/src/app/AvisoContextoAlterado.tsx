@@ -20,6 +20,13 @@
  *
  * Com salvamento em andamento, as duas escolhas esperam ele terminar.
  *
+ * T189 (N1) — "continuar" não confia na leitura que abriu este aviso: a
+ * empresa pode ter mudado DE NOVO enquanto ele estava na tela (as outras
+ * abas seguem trocando). Quem monta o aviso relê o contexto no servidor e só
+ * aplica o mais recente. Enquanto confere, e se a conferência falhar, o aviso
+ * continua na tela e a árvore antiga continua inerte: nada é liberado nem
+ * trocado para um contexto incerto.
+ *
  * O nome da empresa anterior não é escrito aqui: pode ser justamente a que
  * deixou de estar autorizada.
  *
@@ -34,12 +41,24 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "../components/Button";
 import { useResumoDasEdicoes } from "./edicoesPendentes";
 
+/** Resultado de reler o contexto antes de seguir na empresa nova. */
+export type ResultadoDaConferencia =
+  /** O contexto mais recente do servidor foi aplicado. */
+  | "aplicado"
+  /** 401: a sessão acabou. Nada foi aplicado. */
+  | "sessao-encerrada"
+  /** Rede, 403, 404, 5xx ou resposta sem papel. Nada foi aplicado. */
+  | "falha";
+
 export interface AvisoContextoAlteradoProps {
   /** A empresa em que a sessão está agora, já descrita ("Empresa X (código X)"). */
   readonly empresaNova: string;
   readonly podeVoltar: boolean;
   readonly onVoltar: () => Promise<void>;
-  readonly onContinuar: () => void;
+  /** Relê o contexto no servidor e aplica o mais recente. */
+  readonly onContinuar: () => Promise<ResultadoDaConferencia>;
+  /** Saída quando a sessão acabou durante a conferência. */
+  readonly onSair: () => void;
 }
 
 const FOCAVEIS = "button:not([disabled])";
@@ -49,13 +68,19 @@ export function AvisoContextoAlterado({
   podeVoltar,
   onVoltar,
   onContinuar,
+  onSair,
 }: AvisoContextoAlteradoProps) {
   const resumo = useResumoDasEdicoes();
   const caixaRef = useRef<HTMLDivElement | null>(null);
   const [voltando, setVoltando] = useState(false);
   const [falhaAoVoltar, setFalhaAoVoltar] = useState(false);
+  const [conferindo, setConferindo] = useState(false);
+  const [falhaAoConferir, setFalhaAoConferir] = useState<
+    "sessao-encerrada" | "falha" | null
+  >(null);
   const salvando = resumo.salvando.length > 0;
-  const ocupado = salvando || voltando;
+  const sessaoEncerrada = falhaAoConferir === "sessao-encerrada";
+  const ocupado = salvando || voltando || conferindo || sessaoEncerrada;
 
   useEffect(() => {
     const caixa = caixaRef.current;
@@ -100,6 +125,21 @@ export function AvisoContextoAlterado({
     }
   }
 
+  async function continuar() {
+    setConferindo(true);
+    setFalhaAoConferir(null);
+    setFalhaAoVoltar(false);
+    try {
+      const resultado = await onContinuar();
+      // "aplicado": quem monta este aviso já o tirou da tela.
+      if (resultado !== "aplicado") setFalhaAoConferir(resultado);
+    } catch {
+      setFalhaAoConferir("falha");
+    } finally {
+      setConferindo(false);
+    }
+  }
+
   return (
     <div className="aviso-contexto" role="presentation">
       <div className="aviso-contexto__fundo" aria-hidden="true" />
@@ -136,6 +176,23 @@ export function AvisoContextoAlterado({
             Voltando à empresa anterior…
           </p>
         ) : null}
+        {conferindo ? (
+          <p className="aviso-contexto__status" role="status">
+            Conferindo a empresa ativa com o servidor…
+          </p>
+        ) : null}
+        {falhaAoConferir === "falha" ? (
+          <p className="aviso-contexto__erro" role="alert">
+            Não foi possível conferir a empresa ativa agora. Nada foi trocado
+            nem descartado nesta aba; tente de novo.
+          </p>
+        ) : null}
+        {sessaoEncerrada ? (
+          <p className="aviso-contexto__erro" role="alert">
+            Sua sessão terminou. As alterações desta aba não podem mais ser
+            gravadas; saia e entre de novo.
+          </p>
+        ) : null}
         {falhaAoVoltar ? (
           <p className="aviso-contexto__erro" role="alert">
             Não foi possível voltar à empresa anterior. Ela pode não estar mais
@@ -154,9 +211,19 @@ export function AvisoContextoAlterado({
               Voltar à empresa anterior e continuar editando
             </Button>
           ) : null}
-          <Button type="button" disabled={ocupado} onClick={onContinuar}>
-            Continuar na empresa nova e descartar alterações
-          </Button>
+          {sessaoEncerrada ? (
+            <Button type="button" onClick={onSair}>
+              Sair
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              disabled={ocupado}
+              onClick={() => void continuar()}
+            >
+              Continuar na empresa nova e descartar alterações
+            </Button>
+          )}
         </div>
       </div>
     </div>
