@@ -349,10 +349,20 @@ export function HistoricoFuncionalScreen({
     void carregarListagem();
   }, [carregarListagem]);
 
+  /**
+   * T188 (O3) — sequência do pedido de vínculos, no padrão de Dados
+   * contratuais: toda escolha (inclusive limpar) invalida as leituras em voo,
+   * e uma resposta que já não pertence ao colaborador da tela é descartada.
+   * Sem isto, escolher A e logo B podia deixar B selecionado com os vínculos
+   * de A — e o registro de movimentação no vínculo de outra pessoa.
+   */
+  const pedidoVinculosRef = useRef(0);
+
   async function selecionarColaborador(
     colaborador: ColaboradorEscolhido | null,
     vinculoPreferido?: string,
   ) {
+    const pedido = ++pedidoVinculosRef.current;
     const colaboradorId = colaborador?.id ?? "";
     setColaboradorEscolhido(colaborador);
     setFormulario(null);
@@ -364,7 +374,12 @@ export function HistoricoFuncionalScreen({
     }
     setStatusVinculos("carregando");
     try {
-      const vinculos = await listarVinculosDoColaborador(colaboradorId);
+      const resposta = await listarVinculosDoColaborador(colaboradorId);
+      if (pedido !== pedidoVinculosRef.current) return; // superada: descarta
+      // Defesa extra: só vínculos do colaborador pedido entram na tela.
+      const vinculos = resposta.filter(
+        (v) => v.colaboradorId === colaboradorId,
+      );
       setVinculosDoColaborador(vinculos);
       setStatusVinculos("dados");
       // T187 — o vínculo pedido pela ficha só vale se veio nesta resposta.
@@ -374,6 +389,7 @@ export function HistoricoFuncionalScreen({
         setFiltroVinculoId(vinculos[0]!.id);
       }
     } catch {
+      if (pedido !== pedidoVinculosRef.current) return;
       setStatusVinculos("erro");
     }
   }
@@ -385,10 +401,20 @@ export function HistoricoFuncionalScreen({
     selecaoAplicadaRef.current = true;
     const { colaboradorId, vinculoId } = selecaoInicial;
     // T188 — o nome vem do servidor, no escopo da sessão. Se ele recusar
-    // (outra empresa, sem acesso), nada fica selecionado.
+    // (outra empresa, sem acesso), nada fica selecionado. (O3) Se a pessoa
+    // escolher alguém antes de o nome chegar, a escolha dela prevalece: a
+    // resposta da ficha, aceita ou recusada, é descartada.
+    const pedidoNaAbertura = pedidoVinculosRef.current;
+    const aindaValida = () => pedidoVinculosRef.current === pedidoNaAbertura;
     void buscarColaborador(colaboradorId)
-      .then((c) => selecionarColaborador({ id: c.id, nome: c.nome }, vinculoId))
-      .catch(() => selecionarColaborador(null));
+      .then((c) => {
+        if (aindaValida()) {
+          void selecionarColaborador({ id: c.id, nome: c.nome }, vinculoId);
+        }
+      })
+      .catch(() => {
+        if (aindaValida()) void selecionarColaborador(null);
+      });
     // `selecionarColaborador` é recriada a cada desenho; vale só na montagem.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selecaoInicial]);

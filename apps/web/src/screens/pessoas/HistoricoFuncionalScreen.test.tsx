@@ -1,4 +1,5 @@
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -1168,5 +1169,193 @@ describe("T188 — Histórico funcional sem o teto de 100", () => {
     expect(
       await screen.findByRole("table", { name: "Movimentações funcionais" }),
     ).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T188 (O3) — corridas ao carregar os vínculos do colaborador escolhido. Uma
+// resposta que já não pertence ao colaborador da tela é descartada: B nunca
+// fica com os vínculos de A, e "Registrar movimentação" nunca usa vínculo de
+// outra pessoa.
+// ---------------------------------------------------------------------------
+
+function adiado<T>() {
+  let resolver!: (valor: T) => void;
+  let rejeitar!: (erro: unknown) => void;
+  const promessa = new Promise<T>((res, rej) => {
+    resolver = res;
+    rejeitar = rej;
+  });
+  return { promessa, resolver, rejeitar };
+}
+
+/** Os vínculos de cada colaborador chegam quando o teste mandar. */
+function vinculosControlados() {
+  const pendentes = new Map<string, ReturnType<typeof adiado<VinculoApi[]>>>();
+  vi.mocked(listarVinculosDoColaborador).mockImplementation((id) => {
+    const d = adiado<VinculoApi[]>();
+    pendentes.set(id, d);
+    return d.promessa;
+  });
+  return {
+    responder: async (id: string, vinculos: VinculoApi[]) => {
+      await act(async () => {
+        pendentes.get(id)!.resolver(vinculos);
+      });
+    },
+  };
+}
+
+const seletorVinculo = () =>
+  screen.getByLabelText(/^Vínculo\b/i) as HTMLSelectElement;
+const opcoesDeVinculo = () =>
+  [...seletorVinculo().options].map((o) => o.value).filter(Boolean);
+const botaoRegistrar = () =>
+  screen.getByRole("button", { name: "Registrar movimentação" });
+
+describe("T188 (O3) — resposta atrasada de vínculos é descartada", () => {
+  it("escolhe A e logo B; os vínculos de A chegam por último e não valem", async () => {
+    const controle = vinculosControlados();
+    render(<HistoricoFuncionalScreen />);
+    await screen.findByRole("table", { name: "Movimentações funcionais" });
+
+    await selecionarColaborador(colaborador2.id); // A — pendente
+    await selecionarColaborador(colaborador1.id); // B — pendente
+
+    await controle.responder(colaborador1.id, [vinculo1]); // B chega antes
+    await waitFor(() => expect(seletorVinculo()).toHaveValue(vinculo1.id));
+
+    await controle.responder(colaborador2.id, [vinculo2a]); // A, atrasada
+
+    expect(seletorVinculo()).toHaveValue(vinculo1.id);
+    expect(opcoesDeVinculo()).toEqual([vinculo1.id]);
+    expect(
+      screen.getByText(colaborador1.nome, { selector: "strong" }),
+    ).toBeInTheDocument();
+    // O registro, se aberto, é do vínculo de B.
+    expect(botaoRegistrar()).toBeEnabled();
+    expect(listarMovimentacoes).toHaveBeenLastCalledWith(
+      expect.objectContaining({ vinculoId: vinculo1.id }),
+    );
+    expect(listarMovimentacoes).not.toHaveBeenCalledWith(
+      expect.objectContaining({ vinculoId: vinculo2a.id }),
+    );
+  });
+
+  it("seleção da ficha ainda carregando e escolha manual depois: vale a manual", async () => {
+    const controle = vinculosControlados();
+    const ficha = adiado<typeof colaborador2>();
+    vi.mocked(buscarColaborador).mockReturnValue(ficha.promessa);
+    render(
+      <HistoricoFuncionalScreen
+        selecaoInicial={{
+          colaboradorId: colaborador2.id,
+          vinculoId: vinculo2b.id,
+        }}
+      />,
+    );
+    await screen.findByRole("table", { name: "Movimentações funcionais" });
+
+    await selecionarColaborador(colaborador1.id);
+    await controle.responder(colaborador1.id, [vinculo1]);
+    await waitFor(() => expect(seletorVinculo()).toHaveValue(vinculo1.id));
+
+    // O nome da ficha chega depois da escolha manual.
+    await act(async () => {
+      ficha.resolver(colaborador2);
+    });
+
+    expect(listarVinculosDoColaborador).not.toHaveBeenCalledWith(
+      colaborador2.id,
+    );
+    expect(seletorVinculo()).toHaveValue(vinculo1.id);
+    expect(
+      screen.getByText(colaborador1.nome, { selector: "strong" }),
+    ).toBeInTheDocument();
+  });
+
+  it("seleção da ficha recusada depois da escolha manual não desfaz a escolha", async () => {
+    const controle = vinculosControlados();
+    const ficha = adiado<typeof colaborador2>();
+    vi.mocked(buscarColaborador).mockReturnValue(ficha.promessa);
+    render(
+      <HistoricoFuncionalScreen
+        selecaoInicial={{ colaboradorId: "c-outra", vinculoId: "v-outra" }}
+      />,
+    );
+    await screen.findByRole("table", { name: "Movimentações funcionais" });
+
+    await selecionarColaborador(colaborador1.id);
+    await controle.responder(colaborador1.id, [vinculo1]);
+    await waitFor(() => expect(seletorVinculo()).toHaveValue(vinculo1.id));
+
+    await act(async () => {
+      ficha.rejeitar(new Error("404"));
+    });
+
+    expect(seletorVinculo()).toHaveValue(vinculo1.id);
+    expect(
+      screen.getByText(colaborador1.nome, { selector: "strong" }),
+    ).toBeInTheDocument();
+  });
+
+  it("limpar a seleção com a leitura pendente: a resposta não repovoa nada", async () => {
+    const controle = vinculosControlados();
+    render(<HistoricoFuncionalScreen />);
+    await screen.findByRole("table", { name: "Movimentações funcionais" });
+
+    await selecionarColaborador(colaborador1.id);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Ver todos os colaboradores" }),
+    );
+    await controle.responder(colaborador1.id, [vinculo1]);
+
+    expect(
+      screen.getByText("Nenhum colaborador selecionado."),
+    ).toBeInTheDocument();
+    expect(seletorVinculo()).toBeDisabled();
+    expect(seletorVinculo()).toHaveValue("");
+    expect(opcoesDeVinculo()).toEqual([]);
+    expect(botaoRegistrar()).toBeDisabled();
+  });
+
+  it("troca de empresa com a leitura pendente: a tela nova não recebe nada da antiga", async () => {
+    const controle = vinculosControlados();
+    const { unmount } = render(<HistoricoFuncionalScreen />);
+    await screen.findByRole("table", { name: "Movimentações funcionais" });
+    await selecionarColaborador(colaborador1.id);
+
+    // O shell remonta a árvore na troca de empresa.
+    unmount();
+    render(<HistoricoFuncionalScreen />);
+    await screen.findByRole("table", { name: "Movimentações funcionais" });
+
+    await controle.responder(colaborador1.id, [vinculo1]);
+
+    expect(
+      screen.getByText("Nenhum colaborador selecionado."),
+    ).toBeInTheDocument();
+    expect(seletorVinculo()).toHaveValue("");
+    expect(opcoesDeVinculo()).toEqual([]);
+    expect(botaoRegistrar()).toBeDisabled();
+  });
+
+  it("clicar de novo no mesmo colaborador continua limpando o vínculo escolhido", async () => {
+    const controle = vinculosControlados();
+    render(<HistoricoFuncionalScreen />);
+    await screen.findByRole("table", { name: "Movimentações funcionais" });
+
+    await selecionarColaborador(colaborador2.id);
+    await controle.responder(colaborador2.id, [vinculo2a, vinculo2b]);
+    await waitFor(() => expect(opcoesDeVinculo()).toHaveLength(2));
+    fireEvent.change(seletorVinculo(), { target: { value: vinculo2b.id } });
+    expect(seletorVinculo()).toHaveValue(vinculo2b.id);
+
+    await selecionarColaborador(colaborador2.id);
+    expect(seletorVinculo()).toHaveValue("");
+    await controle.responder(colaborador2.id, [vinculo2a, vinculo2b]);
+    await waitFor(() => expect(opcoesDeVinculo()).toHaveLength(2));
+    expect(seletorVinculo()).toHaveValue("");
+    expect(botaoRegistrar()).toBeDisabled();
   });
 });
