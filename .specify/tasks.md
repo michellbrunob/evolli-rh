@@ -2558,19 +2558,28 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
     - **Prévia:** `http://127.0.0.1:5173` passa a mostrar a branch da T186 ao vivo, identificada
       como `[T186 dev]`, não a `main`.
 
-84. **T187 - Próxima fatia de Colaboradores (preparação de decisão)**
-    - **Estado:** **em preparação de decisão**. Branch `codex/t187-proxima-fatia-colaboradores`,
-      a partir do squash `d7ab1721c19732f19d00bf8d26eaa01d1eb47f1d` (T186 integrada, PR #179).
-    - **Objetivo desta etapa:** convergir a T186 e propor a próxima fatia independente de maior
-      valor em Gestão de Pessoas › Colaboradores, sem implementar produto antes de uma decisão
-      explícita da proprietária.
-    - **Entrega desta etapa:** dossiê
-      (`docs/decisions/t187-dossie-proxima-fatia-colaboradores.md`) com três opções e uma recomendação. Só documentação: sem código, API, schema, migration,
-      RBAC, seed, dependência, CI ou PR.
-    - **Fora de escopo:** implementação de qualquer opção antes da decisão, banco de horas,
-      ponto, escala, folha, fuso horário, dados pessoais novos, salário, documentos, CPF, dados
-      bancários, dependentes, saúde, importação, exportação, integrações externas, promoção e
-      merge.
+84. **T187 - Vida funcional na ficha do colaborador**
+    - **Estado:** **em implementação**. Branch `codex/t187-proxima-fatia-colaboradores`, a
+      partir do squash `d7ab1721c19732f19d00bf8d26eaa01d1eb47f1d` (T186 integrada, PR #179).
+    - **Preparação:** [dossiê](../docs/decisions/t187-dossie-proxima-fatia-colaboradores.md) com três opções; a proprietária aprovou a opção A em
+      2026-10-27.
+    - **Objetivo:** seção "Vida funcional" na ficha, **somente leitura**: lotação vigente e linha
+      do tempo de movimentações do vínculo principal, com todos os status (programada,
+      efetivada, cancelada e retificada), e atalho para o Histórico funcional já no colaborador e
+      no vínculo.
+    - **Contratos:** só `GET /v1/vinculos/:id/alocacoes` e `GET /v1/vinculos/:id/linha-do-tempo`,
+      com as permissões existentes (RH, DP e `master_tecnico` leem). Sem mudança de API, schema,
+      migration, RBAC, auditoria, seed ou dependência.
+    - **Entrega prevista:** seção na ficha, atalho com seleção inicial no Histórico funcional,
+      testes web e validação no navegador em 375 px; E2E existentes como prova de isolamento e
+      permissão dos contratos reutilizados.
+    - **Fora de escopo:** registrar, efetivar, cancelar ou retificar movimentação pela ficha,
+      transferência, mudança de cargo, desligamento (opções B e C do dossiê), O1 da T186, banco
+      de horas, ponto, escala, folha, fuso horário, dados pessoais novos, salário, documentos,
+      CPF, dados bancários, dependentes, saúde, importação, exportação, integrações externas,
+      promoção e merge.
+    - **Prévia:** `http://127.0.0.1:5173` passa a mostrar a branch da T187 ao vivo, identificada
+      como `[T187 dev]`, não a `main`.
 
 ## Regra obrigatória para as próximas tarefas
 

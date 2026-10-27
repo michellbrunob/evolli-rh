@@ -12,14 +12,14 @@
   },
   "nextTask": {
     "id": "T187",
-    "status": "colaboradores_proxima_fatia_em_decisao",
-    "reason": "T186 integrada em main pela PR #179 (squash d7ab1721c19732f19d00bf8d26eaa01d1eb47f1d), com a CI de push 3/3 verde (run 40396676554); observacao historica O1: o E2E da listagem ainda nao cobre situacaoVinculo. A T187 abre em preparacao de decisao: dossie com tres opcoes para a proxima fatia de Pessoas > Colaboradores e uma recomendacao, em docs/decisions/t187-dossie-proxima-fatia-colaboradores.md. Nenhuma implementacao de produto antes da decisao da proprietaria. Fora de escopo: codigo, API, schema, migration, RBAC, banco, seed, Docker, dependencias, CI, PR, promocao e merge."
+    "status": "colaboradores_vida_funcional_em_implementacao",
+    "reason": "T186 integrada em main pela PR #179 (squash d7ab1721c19732f19d00bf8d26eaa01d1eb47f1d), com a CI de push 3/3 verde (run 40396676554); observacao historica O1: o E2E da listagem ainda nao cobre situacaoVinculo. A T187 implementa a opcao A do dossie, aprovada pela proprietaria em 2026-10-27: secao Vida funcional na ficha, somente leitura, com a lotacao vigente e todos os status da linha do tempo do vinculo principal, e atalho para o Historico funcional ja no colaborador e no vinculo. So os contratos de alocacoes e linha do tempo, com as permissoes existentes; sem mudanca de API, schema, migration, RBAC, auditoria, seed ou dependencia. Decisao em docs/decisions/t187-dossie-proxima-fatia-colaboradores.md. Fora de escopo: escrita pela ficha, opcoes B e C, O1, banco de horas, ponto, escala, folha, fuso horario, dados pessoais novos, importacao, exportacao, integracoes externas, promocao e merge."
   },
   "openDeliveries": [
     {
       "id": "T187",
       "pullRequest": null,
-      "status": "colaboradores_proxima_fatia_em_decisao"
+      "status": "colaboradores_vida_funcional_em_implementacao"
     }
   ],
   "requiredArtifacts": [

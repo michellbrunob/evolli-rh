@@ -2409,19 +2409,23 @@ de vínculo, campos pessoais novos, salário, contrato detalhado, documentos,
 CPF, dados bancários, dependentes, saúde, importação, exportação, integrações
 externas, promoção e merge.
 
-## Próxima fatia de Colaboradores — T187 (em preparação de decisão)
+## Vida funcional na ficha do colaborador — T187 (em implementação)
 
-| Tarefa | Estado                       | Resultado principal                                                          |
-| ------ | ---------------------------- | ---------------------------------------------------------------------------- |
-| T187   | **Em preparação de decisão** | Dossiê com três opções para a próxima fatia de Colaboradores e recomendação. |
+| Tarefa | Estado               | Resultado principal                                                                         |
+| ------ | -------------------- | ------------------------------------------------------------------------------------------- |
+| T187   | **Em implementação** | A ficha mostra, só para leitura, a lotação vigente e a linha do tempo do vínculo principal. |
 
-**Escopo desta etapa:** convergência da T186 e o dossiê
-(`docs/decisions/t187-dossie-proxima-fatia-colaboradores.md`) da
-próxima fatia de Gestão de Pessoas › Colaboradores. Nenhuma implementação de
-produto antes da decisão da proprietária.
+**Escopo da T187:** opção A do [dossiê](../docs/decisions/t187-dossie-proxima-fatia-colaboradores.md), aprovada pela proprietária
+em 2026-10-27: seção "Vida funcional" na ficha, somente leitura, com a lotação
+vigente e todos os status da linha do tempo do vínculo principal, e atalho
+para o Histórico funcional já no colaborador e no vínculo. Só os contratos de
+alocações e linha do tempo, com as permissões existentes; sem mudança de API,
+schema, migration, RBAC, auditoria, seed ou dependência.
 
-**Fora de escopo:** código, API, schema, migration, RBAC, banco, seed, Docker,
-dependências, CI, PR, promoção e merge.
+**Fora de escopo:** qualquer escrita pela ficha (registrar, efetivar, cancelar,
+retificar, transferir, mudar cargo, desligar), as opções B e C do dossiê, O1 da
+T186, banco de horas, ponto, escala, folha, fuso horário, dados pessoais novos,
+importação, exportação, integrações externas, promoção e merge.
 
 ## Próxima ação autorizável
 

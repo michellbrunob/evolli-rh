@@ -1,7 +1,7 @@
 # T187 — Dossiê: próxima fatia de Gestão de Pessoas › Colaboradores
 
-Status: **dossiê de preparação de decisão.** Nada aqui decide, aprova ou
-autoriza implementação: a escolha é da proprietária.
+Status: **decidido pela proprietária em 2026-10-27: opção A** (seção 5). As
+seções 1 a 4 registram o dossiê como foi apresentado.
 Data: 2026-10-27. Tarefa: T187.
 Fontes, e só elas: `.specify`, as decisões em `docs/decisions` (em especial
 [T174](t174-dossie-decisoes-fatia-0.md), [T176](t176-decisao-dp-flx-04-estados-processo-admissional.md),
@@ -108,3 +108,34 @@ Para seguir com A, a proprietária precisa decidir:
 2. **O que a linha do tempo mostra:** todos os status, inclusive cancelada e
    retificada, como no Histórico funcional (recomendado, histórico append-only), ou
    só efetivadas e programadas.
+
+## 5. Decisão da proprietária (2026-10-27)
+
+**Opção A aprovada**, com as duas respostas recomendadas:
+
+1. **Somente leitura na ficha.** A seção "Vida funcional" não registra, efetiva,
+   cancela, retifica, transfere, muda cargo nem desliga. Para operar, um atalho
+   abre o Histórico funcional já no colaborador e no vínculo da ficha.
+2. **Todos os status na linha do tempo**, inclusive programada, efetivada,
+   cancelada e retificada, com a indicação de que são históricos; nada é
+   ocultado.
+
+Também decidido:
+
+- A seção mostra a **lotação vigente** do vínculo principal (a alocação com
+  `vigenteAte` nulo) e respeita a empresa ativa e o **mesmo vínculo principal**
+  das demais informações da ficha (ordem da listagem: ativo, previsto,
+  encerrado; admissão mais recente).
+- **Só os contratos aprovados** de alocações e linha do tempo, com as
+  permissões existentes: RH, DP e `master_tecnico` leem; os demais perfis
+  seguem como o servidor determina. Nenhuma API, schema, migration, RBAC,
+  auditoria, seed ou dependência muda.
+- Como esses contratos devolvem só identificadores organizacionais, os nomes
+  de departamento e cargo vêm da própria linha da listagem (T184), que já
+  traz a mesma alocação aberta; nenhum catálogo é lido pela ficha. Os destinos
+  de cada movimentação e os demais níveis da lotação ficam no Histórico
+  funcional, para onde o atalho leva.
+- Estados vazios claros para vínculo sem movimentação e sem lotação vigente;
+  em 375 px a página não rola na horizontal, só o quadro da tabela.
+- O1 da T186 continua como observação, sem correção nesta tarefa. As opções B
+  e C não são implementadas.
