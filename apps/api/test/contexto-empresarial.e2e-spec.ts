@@ -755,4 +755,222 @@ describe("Contexto empresarial ativo (e2e)", () => {
       ).rejects.toThrow();
     });
   });
+
+  // -------------------------------------------------------------------------
+  // T189 — o seletor de empresa do menu lateral e do Hub consome SÓ estes
+  // contratos. A API não muda: estes testes provam, com PostgreSQL real, o que
+  // a interface pressupõe — quem troca, quem só lê, o que cada resposta traz
+  // (sem identificador fiscal), empresa única, empresa indisponível, a sessão
+  // compartilhada entre abas e o isolamento depois da troca.
+  // -------------------------------------------------------------------------
+  describe("T189 — contratos do seletor de empresa ativa", () => {
+    const CAMPOS_DA_EMPRESA = ["codigo", "id", "nome"];
+    let rhMulti: Credencial;
+    let rhUnica: Credencial;
+    let empresaE: string;
+    /**
+     * Sessão nova do master, no acesso global: a de cima pode ter trocado de
+     * empresa nas seções anteriores, e criar contas fora dela seria recusado.
+     */
+    let masterGlobal: Credencial;
+
+    async function criar(
+      email: string,
+      role: string,
+      companyId: string,
+    ): Promise<Credencial> {
+      await post("/v1/users", masterGlobal)
+        .send({ email, password: SENHA_PADRAO, role, companyId })
+        .expect(201);
+      return login(email, SENHA_PADRAO);
+    }
+
+    /** Papéis que nenhuma rota comum cria: direto no banco, como o master. */
+    async function criarDireto(
+      email: string,
+      role: "auditor" | "dpo",
+      companyId: string,
+    ): Promise<Credencial> {
+      const { PasswordHashService } =
+        await import("../src/auth/password/password-hash.service");
+      const passwordHash = await new PasswordHashService().hash(SENHA_PADRAO);
+      await prisma.accessUser.create({
+        data: { email, passwordHash, role, companyId, status: "active" },
+      });
+      return login(email, SENHA_PADRAO);
+    }
+
+    beforeAll(async () => {
+      masterGlobal = await login("master.ctx@example.test", SENHA_PADRAO);
+      rhMulti = await criar("rh.multi.t189@example.test", "rh", empresaB);
+      await autorizarEmpresa("rh.multi.t189@example.test", empresaD);
+      rhUnica = await criar("rh.unica.t189@example.test", "rh", empresaD);
+    });
+
+    it("rh: /users/me diz que troca, e a empresa ativa traz só id, código e nome", async () => {
+      const eu = await get("/v1/users/me", rhMulti).expect(200);
+      expect(eu.body.podeTrocarEmpresa).toBe(true);
+      expect(Object.keys(eu.body.empresaAtiva).sort()).toEqual(
+        CAMPOS_DA_EMPRESA,
+      );
+      expect(eu.body.empresaAtiva.id).toBe(empresaB);
+      expect(JSON.stringify(eu.body)).not.toMatch(/cnpj|cpf/i);
+    });
+
+    it("rh com várias empresas: a lista traz as autorizadas, só com id, código e nome", async () => {
+      const r = await get("/v1/auth/contexto/empresas", rhMulti).expect(200);
+      expect(r.body.itens.map((e: { id: string }) => e.id)).toEqual([
+        empresaB,
+        empresaD,
+      ]);
+      for (const item of r.body.itens) {
+        expect(Object.keys(item).sort()).toEqual(CAMPOS_DA_EMPRESA);
+      }
+      expect(JSON.stringify(r.body)).not.toMatch(/cnpj|cpf/i);
+    });
+
+    it("empresa única: a lista tem só a ativa — a interface mostra só leitura", async () => {
+      const eu = await get("/v1/users/me", rhUnica).expect(200);
+      const r = await get("/v1/auth/contexto/empresas", rhUnica).expect(200);
+      expect(r.body.itens).toHaveLength(1);
+      expect(r.body.itens[0].id).toBe(eu.body.empresaAtiva.id);
+    });
+
+    it.each([
+      ["dp", () => criar("dp.t189@example.test", "dp", empresaB)],
+      ["gestor", () => criar("gestor.t189@example.test", "gestor", empresaB)],
+      [
+        "colaborador",
+        () => criar("colab.t189@example.test", "colaborador", empresaB),
+      ],
+      [
+        "financeiro",
+        () => criar("fin.t189@example.test", "financeiro", empresaB),
+      ],
+      [
+        "auditor",
+        () => criarDireto("auditor.t189@example.test", "auditor", empresaB),
+      ],
+      ["dpo", () => criarDireto("dpo.t189@example.test", "dpo", empresaB)],
+    ])(
+      "%s: só leitura — /users/me sem troca, lista 403, troca 403, contexto intacto",
+      async (_papel, credencial) => {
+        const cred = await credencial();
+        const antes = await get("/v1/users/me", cred).expect(200);
+        expect(antes.body.podeTrocarEmpresa).toBe(false);
+        expect(Object.keys(antes.body.empresaAtiva).sort()).toEqual(
+          CAMPOS_DA_EMPRESA,
+        );
+        expect(antes.body.empresaAtiva.id).toBe(empresaB);
+
+        const lista = await get("/v1/auth/contexto/empresas", cred).expect(403);
+        expect(JSON.stringify(lista.body)).not.toContain("EMP");
+        await post("/v1/auth/contexto/empresa", cred)
+          .send({ empresaId: empresaD })
+          .expect(403);
+
+        const depois = await get("/v1/users/me", cred).expect(200);
+        expect(depois.body.empresaAtiva.id).toBe(empresaB);
+      },
+    );
+
+    it("a troca vale para TODAS as abas da mesma sessão (o motivo do aviso entre abas)", async () => {
+      // "Duas abas" = o mesmo cookie de sessão.
+      const abaUm = rhMulti;
+      const abaDois: Credencial = { ...rhMulti };
+      await post("/v1/auth/contexto/empresa", abaUm)
+        .send({ empresaId: empresaD })
+        .expect(200);
+      const naOutraAba = await get("/v1/users/me", abaDois).expect(200);
+      expect(naOutraAba.body.empresaAtiva.id).toBe(empresaD);
+      // Outra SESSÃO (outro login) não muda.
+      const outraSessao = await login(
+        "rh.multi.t189@example.test",
+        SENHA_PADRAO,
+      );
+      const deOutraSessao = await get("/v1/users/me", outraSessao).expect(200);
+      expect(deOutraSessao.body.empresaAtiva.id).toBe(empresaB);
+    });
+
+    it("depois da troca, só a empresa nova: colaboradores, /users/me e nada da anterior", async () => {
+      // `rhMulti` está em D desde o teste anterior.
+      const eu = await get("/v1/users/me", rhMulti).expect(200);
+      expect(eu.body.empresaAtiva).toEqual({
+        id: empresaD,
+        codigo: "EMPD",
+        nome: "Empresa D",
+      });
+      const r = await get(
+        "/v1/colaboradores?tamanhoPagina=100",
+        rhMulti,
+      ).expect(200);
+      const corpo = JSON.stringify(r.body);
+      expect(corpo).toContain(NOME_D);
+      expect(corpo).not.toContain(NOME_B);
+      expect(corpo).not.toContain(empresaB);
+      // E de volta: o universo volta a ser o da B.
+      await post("/v1/auth/contexto/empresa", rhMulti)
+        .send({ empresaId: empresaB })
+        .expect(200);
+      const deVolta = JSON.stringify(
+        (await get("/v1/colaboradores?tamanhoPagina=100", rhMulti).expect(200))
+          .body,
+      );
+      expect(deVolta).toContain(NOME_B);
+      expect(deVolta).not.toContain(NOME_D);
+    });
+
+    it("empresa que fica indisponível some da lista, e a troca para ela é 404 — o mesmo da inexistente", async () => {
+      empresaE = (
+        await post("/v1/empresas", masterGlobal)
+          .send({ codigo: "EMPE", nome: "Empresa E" })
+          .expect(201)
+      ).body.id;
+      await autorizarEmpresa("rh.multi.t189@example.test", empresaE);
+      const com = await get("/v1/auth/contexto/empresas", rhMulti).expect(200);
+      expect(com.body.itens.map((e: { id: string }) => e.id)).toContain(
+        empresaE,
+      );
+
+      await post(`/v1/empresas/${empresaE}/inativar`, masterGlobal).expect(201);
+
+      const sem = await get("/v1/auth/contexto/empresas", rhMulti).expect(200);
+      expect(sem.body.itens.map((e: { id: string }) => e.id)).not.toContain(
+        empresaE,
+      );
+      const indisponivel = await post("/v1/auth/contexto/empresa", rhMulti)
+        .send({ empresaId: empresaE })
+        .expect(404);
+      const inexistente = await post("/v1/auth/contexto/empresa", rhMulti)
+        .send({ empresaId: "00000000-0000-4000-8000-000000000189" })
+        .expect(404);
+      expect(indisponivel.body.message).toBe(inexistente.body.message);
+      expect(JSON.stringify(indisponivel.body)).not.toContain("EMPE");
+      // O contexto não mudou com a recusa.
+      const eu = await get("/v1/users/me", rhMulti).expect(200);
+      expect(eu.body.empresaAtiva.id).toBe(empresaB);
+    });
+
+    it("master_tecnico: começa no acesso global e não tem rota para voltar a ele sem novo login", async () => {
+      const masterNovo = await login("master.ctx@example.test", SENHA_PADRAO);
+      const inicio = await get("/v1/users/me", masterNovo).expect(200);
+      expect(inicio.body.podeTrocarEmpresa).toBe(true);
+      expect(inicio.body.empresaAtiva).toBeNull();
+
+      await post("/v1/auth/contexto/empresa", masterNovo)
+        .send({ empresaId: empresaD })
+        .expect(200);
+      await post("/v1/auth/contexto/empresa", masterNovo)
+        .send({ empresaId: null })
+        .expect(400);
+      const depois = await get("/v1/users/me", masterNovo).expect(200);
+      expect(depois.body.empresaAtiva.id).toBe(empresaD);
+
+      // Novo login: de volta ao padrão do papel (global).
+      const deNovo = await login("master.ctx@example.test", SENHA_PADRAO);
+      expect(
+        (await get("/v1/users/me", deNovo).expect(200)).body.empresaAtiva,
+      ).toBeNull();
+    });
+  });
 });

@@ -6,12 +6,15 @@ import {
   waitFor,
 } from "@testing-library/react";
 import { StrictMode } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AutenticacaoApp } from "./AutenticacaoApp";
 import { login, logout } from "../api/authClient";
 import { refreshCsrfToken } from "../api/csrfClient";
 import { ApiError, listarSessoesAtivas } from "../api/sessoesClient";
-import { obterUsuarioAtual } from "../api/usersClient";
+import {
+  ApiError as ApiErrorDeUsuarios,
+  obterUsuarioAtual,
+} from "../api/usersClient";
 import { listarTabelasHorario } from "../api/horariosClient";
 import { listarEquipe } from "../api/gestorClient";
 import {
@@ -808,113 +811,420 @@ describe("T153 — aterrissagem segura por papel", () => {
 });
 
 // ---------------------------------------------------------------------------
-// T163 — a troca de empresa remonta a árvore inteira.
+// T163/T189 — a troca de empresa remonta a árvore inteira; desde a T189, no
+// mesmo módulo, pelo seletor do menu lateral ou do Hub, com aviso às outras
+// abas e reconferência ao foco.
 // ---------------------------------------------------------------------------
 
-describe("T163 — contexto empresarial ativo", () => {
-  /**
-   * Faz o "servidor" passar a responder com a empresa Beta ativa a partir da
-   * confirmação da troca — e não antes. É o que permite afirmar que a tela
-   * mudou porque o servidor mudou, e não porque ela se adiantou.
-   */
-  function trocarParaBetaNoServidor() {
-    vi.mocked(obterUsuarioAtual).mockResolvedValue({ ...ATOR_PADRAO } as never);
-    vi.mocked(trocarEmpresaDoContexto).mockImplementation(async () => {
-      vi.mocked(obterUsuarioAtual).mockResolvedValue({
-        ...ATOR_PADRAO,
-        companyId: EMPRESA_BETA.id,
-        empresaAtiva: EMPRESA_BETA,
-      } as never);
-      return EMPRESA_BETA;
-    });
+/**
+ * `BroadcastChannel` de mentira, no mesmo processo: o que uma instância
+ * publica chega às OUTRAS com o mesmo nome — como entre abas. A "outra aba"
+ * dos testes é uma instância criada pelo próprio teste.
+ */
+class CanalFalso {
+  static abertos = new Set<CanalFalso>();
+  private readonly ouvintes = new Set<(e: { data: unknown }) => void>();
+  constructor(readonly name: string) {
+    CanalFalso.abertos.add(this);
   }
+  postMessage(dado: unknown) {
+    for (const canal of CanalFalso.abertos) {
+      if (canal === this || canal.name !== this.name) continue;
+      for (const ouvinte of canal.ouvintes) ouvinte({ data: dado });
+    }
+  }
+  addEventListener(_tipo: string, ouvinte: (e: { data: unknown }) => void) {
+    this.ouvintes.add(ouvinte);
+  }
+  removeEventListener(_tipo: string, ouvinte: (e: { data: unknown }) => void) {
+    this.ouvintes.delete(ouvinte);
+  }
+  close() {
+    CanalFalso.abertos.delete(this);
+  }
+}
 
-  it("o Hub mostra a empresa ATIVA que o servidor resolveu", async () => {
-    vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
+const NOME_DO_CANAL = "evolli-contexto-empresarial";
+const ATOR_EM_BETA = {
+  ...ATOR_PADRAO,
+  companyId: EMPRESA_BETA.id,
+  empresaAtiva: EMPRESA_BETA,
+};
 
-    render(<AutenticacaoApp />);
-    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
+/**
+ * Faz o "servidor" passar a responder com a empresa Beta ativa a partir da
+ * confirmação da troca — e não antes. É o que permite afirmar que a tela
+ * mudou porque o servidor mudou, e não porque ela se adiantou.
+ */
+function trocarParaBetaNoServidor() {
+  vi.mocked(obterUsuarioAtual).mockResolvedValue({ ...ATOR_PADRAO } as never);
+  vi.mocked(trocarEmpresaDoContexto).mockImplementation(async (id) => {
+    const empresa = id === EMPRESA_BETA.id ? EMPRESA_BETA : EMPRESA_ALFA;
+    vi.mocked(obterUsuarioAtual).mockResolvedValue({
+      ...ATOR_PADRAO,
+      companyId: empresa.id,
+      empresaAtiva: empresa,
+    } as never);
+    return empresa;
+  });
+}
 
-    const seletor = await screen.findByLabelText("Empresa");
-    expect((seletor as HTMLSelectElement).value).toBe(EMPRESA_ALFA.id);
+/** O servidor mudou de empresa por fora desta aba (outra aba, revogação). */
+function servidorPassaParaBeta() {
+  vi.mocked(obterUsuarioAtual).mockResolvedValue(ATOR_EM_BETA as never);
+}
+
+const anuncio = () =>
+  document.querySelector(".autenticacao-app__anuncio") as HTMLElement;
+const seletorDoMenu = () =>
+  document.getElementById("menu-empresa-ativa-botao") as HTMLButtonElement;
+
+async function trocarPeloMenuPara(nome: string) {
+  await waitFor(() => expect(seletorDoMenu()).not.toBeNull());
+  fireEvent.click(seletorDoMenu());
+  fireEvent.click(
+    await screen.findByRole("button", { name: new RegExp(`^${nome}`) }),
+  );
+}
+
+async function abrirNovaAdmissaoPorRota() {
+  window.history.replaceState(null, "", "#/pessoas/nova-admissao");
+  vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
+  render(<AutenticacaoApp />);
+  return screen.findByLabelText(/^Nome completo/);
+}
+
+describe("T163/T189 — contexto empresarial ativo", () => {
+  beforeEach(() => {
+    CanalFalso.abertos.clear();
+    vi.stubGlobal("BroadcastChannel", CanalFalso);
+    window.history.replaceState(null, "", window.location.pathname);
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    window.history.replaceState(null, "", window.location.pathname);
   });
 
-  it("trocar de empresa reresolve o ator e remonta no contexto novo", async () => {
+  it("o Hub mostra a empresa ATIVA que o servidor resolveu, no seletor", async () => {
     vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
-    // A segunda leitura do ator traz a empresa nova — é o servidor que diz
-    // onde a sessão passou a operar, não a tela.
-    // O servidor é quem muda: a troca altera o contexto, e QUALQUER leitura
-    // seguinte do ator já vê a empresa nova. Encadear `mockResolvedValueOnce`
-    // suporia um número exato de leituras — suposição frágil, e que esconde
-    // uma releitura a mais em vez de tolerá-la.
+    render(<AutenticacaoApp />);
+    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
+    const botao = await screen.findByRole("button", { name: /Empresa ativa/ });
+    expect(botao).toHaveTextContent("Empresa Alfa");
+    expect(botao).toHaveTextContent("Código ALFA");
+  });
+
+  it("troca no Hub: reresolve o ator, fica no Hub, anuncia e foca o título", async () => {
+    vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
     trocarParaBetaNoServidor();
+    const outraAba = new CanalFalso(NOME_DO_CANAL);
+    const avisoNaOutraAba = vi.fn();
+    outraAba.addEventListener("message", avisoNaOutraAba);
 
     render(<AutenticacaoApp />);
     await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
-    const seletor = await screen.findByLabelText("Empresa");
-    await waitFor(() =>
-      expect((seletor as HTMLSelectElement).options.length).toBe(2),
+    fireEvent.click(
+      await screen.findByRole("button", { name: /Empresa ativa/ }),
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: /^Empresa Beta/ }),
     );
 
-    fireEvent.change(seletor, { target: { value: EMPRESA_BETA.id } });
-
-    await waitFor(() =>
-      expect(trocarEmpresaDoContexto).toHaveBeenCalledWith(EMPRESA_BETA.id),
-    );
-    // O ator foi lido de NOVO depois da troca — é daí que vem a empresa
-    // nova, e não de estado local da tela.
     await waitFor(() =>
       expect(
-        vi.mocked(obterUsuarioAtual).mock.calls.length,
-      ).toBeGreaterThanOrEqual(2),
+        screen.getByRole("button", { name: /Empresa ativa/ }),
+      ).toHaveTextContent("Empresa Beta"),
     );
-    const depois = await screen.findByLabelText("Empresa");
-    expect((depois as HTMLSelectElement).value).toBe(EMPRESA_BETA.id);
+    expect(trocarEmpresaDoContexto).toHaveBeenCalledWith(EMPRESA_BETA.id);
+    // O ator foi lido de NOVO depois da troca — é daí que vem a empresa nova.
+    expect(
+      vi.mocked(obterUsuarioAtual).mock.calls.length,
+    ).toBeGreaterThanOrEqual(2);
+    expect(anuncio()).toHaveTextContent(
+      "Empresa ativa alterada para Empresa Beta (código BETA).",
+    );
+    expect(document.activeElement).toBe(
+      screen.getByRole("heading", { level: 1, name: TITULO_DO_HUB }),
+    );
+    // A outra aba foi avisada — sem id, nome ou código no aviso.
+    expect(avisoNaOutraAba).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(avisoNaOutraAba.mock.calls[0]![0].data)).not.toMatch(
+      /BETA|Beta|ALFA|Alfa|empresa-sintetica/,
+    );
   });
 
-  it("trocar de empresa DENTRO de um módulo devolve ao Hub", async () => {
+  it("troca pelo menu lateral DENTRO de Colaboradores: fica no módulo, limpo, com o título em foco", async () => {
     vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
-    // O servidor é quem muda: a troca altera o contexto, e QUALQUER leitura
-    // seguinte do ator já vê a empresa nova. Encadear `mockResolvedValueOnce`
-    // suporia um número exato de leituras — suposição frágil, e que esconde
-    // uma releitura a mais em vez de tolerá-la.
     trocarParaBetaNoServidor();
-
     render(<AutenticacaoApp />);
     await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
     await abrirProduto(/^Colaboradores/);
+    expect(window.location.hash).toBe("#/pessoas/colaboradores");
 
-    // De volta ao Hub só para trocar — e a troca não deixa ninguém dentro de
-    // um módulo cujo universo de dados acabou de mudar sem aviso.
-    fireEvent.click(screen.getByRole("button", { name: "Hub" }));
-    const seletor = await screen.findByLabelText("Empresa");
+    // Busca antiga digitada na empresa Alfa.
+    const busca = (await screen.findByLabelText(
+      /Buscar por nome ou matrícula/,
+    )) as HTMLInputElement;
+    fireEvent.change(busca, { target: { value: "busca da empresa anterior" } });
+
+    await trocarPeloMenuPara("Empresa Beta");
+
     await waitFor(() =>
-      expect((seletor as HTMLSelectElement).options.length).toBe(2),
+      expect(seletorDoMenu()).toHaveTextContent("Empresa Beta"),
     );
-    fireEvent.change(seletor, { target: { value: EMPRESA_BETA.id } });
-    await waitFor(() => expect(trocarEmpresaDoContexto).toHaveBeenCalled());
-
+    // Mesmo módulo, não o Hub.
     expect(
-      await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB }),
+      screen.getByRole("navigation", { name: "Navegação do painel" }),
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole("navigation", { name: "Navegação do painel" }),
-    ).not.toBeInTheDocument();
+      screen.queryByRole("heading", { level: 1, name: TITULO_DO_HUB }),
+    ).toBeNull();
+    expect(window.location.hash).toBe("#/pessoas/colaboradores");
+    // Recriado: a busca da empresa anterior não sobrou.
+    const buscaNova = (await screen.findByLabelText(
+      /Buscar por nome ou matrícula/,
+    )) as HTMLInputElement;
+    expect(buscaNova.value).toBe("");
+    // Foco no título da tela de destino; anúncio da troca.
+    await waitFor(() =>
+      expect(document.activeElement?.id).toBe("colaboradores-titulo"),
+    );
+    expect(anuncio()).toHaveTextContent("Empresa Beta (código BETA)");
+    // Nada da empresa anterior no conteúdo nem no anúncio.
+    const main = document.getElementById("conteudo-principal")!;
+    expect(main.textContent).not.toMatch(/Empresa Alfa|ALFA/);
+    expect(anuncio().textContent).not.toMatch(/Alfa|ALFA/);
   });
 
-  it("papel que não troca não recebe seletor nem pede a lista", async () => {
+  it("rota direta da Nova admissão: a troca reduz ao nível do módulo (Colaboradores)", async () => {
+    trocarParaBetaNoServidor();
+    await abrirNovaAdmissaoPorRota();
+    expect(window.location.hash).toBe("#/pessoas/nova-admissao");
+
+    await trocarPeloMenuPara("Empresa Beta");
+
+    await waitFor(() =>
+      expect(window.location.hash).toBe("#/pessoas/colaboradores"),
+    );
+    expect(screen.queryByLabelText(/^Nome completo/)).toBeNull();
+    await waitFor(() =>
+      expect(seletorDoMenu()).toHaveTextContent("Empresa Beta"),
+    );
+  });
+
+  it("edição pendente: cancelar a confirmação mantém a empresa e o que foi digitado", async () => {
+    trocarParaBetaNoServidor();
+    const nome = await abrirNovaAdmissaoPorRota();
+    fireEvent.change(nome, { target: { value: "Pessoa Sintetica Rascunho" } });
+
+    await trocarPeloMenuPara("Empresa Beta");
+    expect(
+      await screen.findByText(/Há edição em andamento em: Nova admissão\./),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Continuar editando" }));
+
+    expect(trocarEmpresaDoContexto).not.toHaveBeenCalled();
+    expect(seletorDoMenu()).toHaveTextContent("Empresa Alfa");
+    expect(
+      (screen.getByLabelText(/^Nome completo/) as HTMLInputElement).value,
+    ).toBe("Pessoa Sintetica Rascunho");
+  });
+
+  it("edição pendente: confirmar troca, descarta e vai para Colaboradores na empresa nova", async () => {
+    trocarParaBetaNoServidor();
+    const nome = await abrirNovaAdmissaoPorRota();
+    fireEvent.change(nome, { target: { value: "Pessoa Sintetica Rascunho" } });
+
+    await trocarPeloMenuPara("Empresa Beta");
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Trocar e descartar" }),
+    );
+
+    await waitFor(() =>
+      expect(seletorDoMenu()).toHaveTextContent("Empresa Beta"),
+    );
+    expect(trocarEmpresaDoContexto).toHaveBeenCalledWith(EMPRESA_BETA.id);
+    expect(window.location.hash).toBe("#/pessoas/colaboradores");
+    expect(document.body.textContent).not.toContain(
+      "Pessoa Sintetica Rascunho",
+    );
+  });
+
+  it("papel que não troca não recebe seletor nem pede a lista — no Hub e no menu", async () => {
     vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
-    vi.mocked(obterUsuarioAtual).mockResolvedValueOnce({
+    vi.mocked(obterUsuarioAtual).mockResolvedValue({
       ...ATOR_PADRAO,
-      role: "gestor",
+      role: "dp",
       podeTrocarEmpresa: false,
     } as never);
 
     render(<AutenticacaoApp />);
     await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
-
-    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Empresa ativa/ })).toBeNull();
+    await abrirProduto(/^Colaboradores/);
+    expect(
+      document.querySelector(".app-shell__sidebar .seletor-empresa__leitura"),
+    ).toHaveTextContent("Empresa Alfa");
+    expect(screen.queryByRole("button", { name: /Empresa ativa/ })).toBeNull();
     expect(listarEmpresasDoContexto).not.toHaveBeenCalled();
+  });
+
+  it("a lista de empresas é lida uma vez por login, não a cada tela", async () => {
+    vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
+    render(<AutenticacaoApp />);
+    await screen.findByRole("button", { name: /Empresa ativa/ });
+    await abrirProduto(/^Colaboradores/);
+    await waitFor(() => expect(seletorDoMenu()).not.toBeNull());
+    fireEvent.click(screen.getByRole("button", { name: "Hub" }));
+    await screen.findByRole("button", { name: /Empresa ativa/ });
+    expect(listarEmpresasDoContexto).toHaveBeenCalledTimes(1);
+  });
+
+  it("aviso de outra aba: reconfere o servidor e recria no mesmo módulo", async () => {
+    vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
+    render(<AutenticacaoApp />);
+    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
+    await abrirProduto(/^Colaboradores/);
+    const leiturasAntes = vi.mocked(obterUsuarioAtual).mock.calls.length;
+
+    servidorPassaParaBeta();
+    const outraAba = new CanalFalso(NOME_DO_CANAL);
+    act(() => outraAba.postMessage({ tipo: "contexto-empresarial-alterado" }));
+
+    await waitFor(() =>
+      expect(seletorDoMenu()).toHaveTextContent("Empresa Beta"),
+    );
+    expect(vi.mocked(obterUsuarioAtual).mock.calls.length).toBeGreaterThan(
+      leiturasAntes,
+    );
+    expect(window.location.hash).toBe("#/pessoas/colaboradores");
+    expect(anuncio()).toHaveTextContent(
+      "A empresa ativa desta sessão mudou. Empresa ativa: Empresa Beta (código BETA).",
+    );
+  });
+
+  it("mensagem estranha no canal é ignorada (não reconfere)", async () => {
+    vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
+    render(<AutenticacaoApp />);
+    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
+    const leituras = vi.mocked(obterUsuarioAtual).mock.calls.length;
+    act(() =>
+      new CanalFalso(NOME_DO_CANAL).postMessage({ tipo: "outra-coisa" }),
+    );
+    await new Promise((r) => setTimeout(r, 0));
+    expect(vi.mocked(obterUsuarioAtual).mock.calls.length).toBe(leituras);
+  });
+
+  it("ao recuperar o foco, reconfere; mesma empresa não mexe em nada", async () => {
+    const nome = await abrirNovaAdmissaoPorRota();
+    fireEvent.change(nome, { target: { value: "Pessoa Sintetica Foco" } });
+    const leituras = vi.mocked(obterUsuarioAtual).mock.calls.length;
+
+    act(() => window.dispatchEvent(new Event("focus")));
+
+    await waitFor(() =>
+      expect(vi.mocked(obterUsuarioAtual).mock.calls.length).toBe(leituras + 1),
+    );
+    expect(
+      (screen.getByLabelText(/^Nome completo/) as HTMLInputElement).value,
+    ).toBe("Pessoa Sintetica Foco");
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+  });
+
+  it("ao recuperar o foco com a empresa trocada por fora (sem edição), recria no contexto novo", async () => {
+    vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
+    render(<AutenticacaoApp />);
+    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
+    await abrirProduto(/^Colaboradores/);
+
+    servidorPassaParaBeta();
+    act(() => window.dispatchEvent(new Event("focus")));
+
+    await waitFor(() =>
+      expect(seletorDoMenu()).toHaveTextContent("Empresa Beta"),
+    );
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+  });
+
+  it("com edição pendente, a mudança por fora vira aviso bloqueante — continuar descarta, com aviso", async () => {
+    const nome = await abrirNovaAdmissaoPorRota();
+    fireEvent.change(nome, { target: { value: "Pessoa Sintetica Aba" } });
+
+    servidorPassaParaBeta();
+    act(() => window.dispatchEvent(new Event("focus")));
+
+    const aviso = await screen.findByRole("alertdialog", {
+      name: "A empresa ativa mudou",
+    });
+    expect(aviso).toHaveTextContent("Empresa Beta (código BETA)");
+    // A árvore antiga fica visível, mas inerte; o aviso não nomeia a anterior.
+    expect(document.querySelector(".autenticacao-app__arvore")).toHaveAttribute(
+      "inert",
+    );
+    expect(aviso.textContent).not.toMatch(/Alfa|ALFA/);
+    expect(
+      (
+        screen.getByLabelText(/^Nome completo/, {
+          hidden: true,
+        } as never) as HTMLInputElement
+      ).value,
+    ).toBe("Pessoa Sintetica Aba");
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Continuar na empresa nova e descartar alterações",
+      }),
+    );
+    await waitFor(() =>
+      expect(seletorDoMenu()).toHaveTextContent("Empresa Beta"),
+    );
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(window.location.hash).toBe("#/pessoas/colaboradores");
+    expect(document.body.textContent).not.toContain("Pessoa Sintetica Aba");
+  });
+
+  it("com edição pendente, “voltar à empresa anterior” troca de volta e mantém o que foi digitado", async () => {
+    vi.mocked(trocarEmpresaDoContexto).mockResolvedValue(EMPRESA_ALFA);
+    const nome = await abrirNovaAdmissaoPorRota();
+    fireEvent.change(nome, { target: { value: "Pessoa Sintetica Volta" } });
+    const outraAba = new CanalFalso(NOME_DO_CANAL);
+    const avisoNaOutraAba = vi.fn();
+    outraAba.addEventListener("message", avisoNaOutraAba);
+
+    servidorPassaParaBeta();
+    act(() => outraAba.postMessage({ tipo: "contexto-empresarial-alterado" }));
+    await screen.findByRole("alertdialog", { name: "A empresa ativa mudou" });
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Voltar à empresa anterior e continuar editando",
+      }),
+    );
+
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    expect(trocarEmpresaDoContexto).toHaveBeenCalledWith(EMPRESA_ALFA.id);
+    expect(
+      (screen.getByLabelText(/^Nome completo/) as HTMLInputElement).value,
+    ).toBe("Pessoa Sintetica Volta");
+    expect(seletorDoMenu()).toHaveTextContent("Empresa Alfa");
+    expect(
+      document.querySelector(".autenticacao-app__arvore"),
+    ).not.toHaveAttribute("inert");
+    // A outra aba fica sabendo da volta.
+    expect(avisoNaOutraAba).toHaveBeenCalledTimes(1);
+  });
+
+  it("reconferência que encontra a sessão encerrada (401) volta ao login", async () => {
+    vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
+    render(<AutenticacaoApp />);
+    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
+    vi.mocked(obterUsuarioAtual).mockRejectedValue(
+      new ApiErrorDeUsuarios(401, "sessão expirada"),
+    );
+    act(() => window.dispatchEvent(new Event("focus")));
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "Entrar" }),
+    ).toBeInTheDocument();
   });
 
   it("logout limpa o contexto junto com a sessão", async () => {
@@ -926,28 +1236,29 @@ describe("T163 — contexto empresarial ativo", () => {
     fireEvent.click(screen.getByRole("button", { name: "Sair" }));
 
     await screen.findByRole("heading", { level: 1, name: "Entrar" });
-    // Nenhum resquício de empresa na tela de login.
+    // Nenhum resquício de empresa na tela de login, nem no anúncio.
     expect(document.body.textContent ?? "").not.toContain(EMPRESA_ALFA.nome);
     expect(document.body.textContent ?? "").not.toContain(EMPRESA_BETA.nome);
   });
 
-  it("nada de storage do navegador em todo o ciclo com troca de empresa", async () => {
+  it("nada de storage do navegador em todo o ciclo com troca de empresa e aviso entre abas", async () => {
     const gravou = vi.spyOn(Storage.prototype, "setItem");
     vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
-    // O servidor é quem muda: a troca altera o contexto, e QUALQUER leitura
-    // seguinte do ator já vê a empresa nova. Encadear `mockResolvedValueOnce`
-    // suporia um número exato de leituras — suposição frágil, e que esconde
-    // uma releitura a mais em vez de tolerá-la.
     trocarParaBetaNoServidor();
 
     render(<AutenticacaoApp />);
     await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
-    const seletor = await screen.findByLabelText("Empresa");
+    await abrirProduto(/^Colaboradores/);
+    await trocarPeloMenuPara("Empresa Beta");
     await waitFor(() =>
-      expect((seletor as HTMLSelectElement).options.length).toBe(2),
+      expect(seletorDoMenu()).toHaveTextContent("Empresa Beta"),
     );
-    fireEvent.change(seletor, { target: { value: EMPRESA_BETA.id } });
-    await waitFor(() => expect(trocarEmpresaDoContexto).toHaveBeenCalled());
+    act(() =>
+      new CanalFalso(NOME_DO_CANAL).postMessage({
+        tipo: "contexto-empresarial-alterado",
+      }),
+    );
+    act(() => window.dispatchEvent(new Event("focus")));
 
     expect(gravou).not.toHaveBeenCalled();
   });

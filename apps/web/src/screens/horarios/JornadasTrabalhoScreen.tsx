@@ -26,6 +26,7 @@ import {
   falhaPorTokenDesatualizado,
 } from "../../api/csrfClient";
 import "./JornadasTrabalhoScreen.css";
+import { useEdicaoEmAndamento } from "../../app/edicoesPendentes";
 
 /**
  * T182 — Estrutura › Jornadas de trabalho (decisão da proprietária de
@@ -257,6 +258,13 @@ export function JornadasTrabalhoScreen({
   const [busca, setBusca] = useState("");
   const [buscaAplicada, setBuscaAplicada] = useState("");
   const [formulario, setFormulario] = useState<Formulario | null>(null);
+  // T189 — formulário aberto conta como edição em andamento, e envio como
+  // salvamento: a troca de empresa pergunta antes de descartar, e espera
+  // o envio terminar.
+  useEdicaoEmAndamento("Jornadas de trabalho", {
+    pendente: formulario !== null,
+    salvando: formulario?.salvando === true,
+  });
   const [detalhe, setDetalhe] = useState<Detalhe | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const formTituloId = useId();

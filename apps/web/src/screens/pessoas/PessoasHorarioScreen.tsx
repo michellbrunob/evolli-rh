@@ -32,6 +32,7 @@ import {
   type ColaboradorEscolhido,
 } from "./SeletorColaboradorPaginado";
 import "./PessoasHorarioScreen.css";
+import { useEdicaoEmAndamento } from "../../app/edicoesPendentes";
 
 export const PESSOAS_HORARIO_TITULO_ID = "pessoas-horario-titulo";
 
@@ -99,6 +100,13 @@ export function PessoasHorarioScreen({
     useState<ColaboradorEscolhido | null>(null);
   const [tabelas, setTabelas] = useState<TabelaHorarioApi[]>([]);
   const [formulario, setFormulario] = useState<FormularioState | null>(null);
+  // T189 — formulário aberto conta como edição em andamento, e envio como
+  // salvamento: a troca de empresa pergunta antes de descartar, e espera
+  // o envio terminar.
+  useEdicaoEmAndamento("Horário de trabalho", {
+    pendente: formulario !== null,
+    salvando: formulario?.salvando === true,
+  });
   const [detalhe, setDetalhe] = useState<DetalheState | null>(null);
   const formTituloId = useId();
   const detalheTituloId = useId();

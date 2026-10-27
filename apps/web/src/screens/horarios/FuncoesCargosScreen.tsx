@@ -25,6 +25,7 @@ import {
 } from "../../api/cargoClient";
 import { AcaoSituacao } from "./AcaoSituacao";
 import "./FuncoesCargosScreen.css";
+import { useEdicaoEmAndamento } from "../../app/edicoesPendentes";
 
 export const FUNCOES_CARGOS_TITULO_ID = "funcoes-cargos-titulo";
 
@@ -80,6 +81,13 @@ export function FuncoesCargosScreen({
   const [empresas, setEmpresas] = useState<EmpresaApi[]>([]);
   const [filtroStatus, setFiltroStatus] = useState<StatusFiltro>("todos");
   const [formulario, setFormulario] = useState<FormularioState | null>(null);
+  // T189 — formulário aberto conta como edição em andamento, e envio como
+  // salvamento: a troca de empresa pergunta antes de descartar, e espera
+  // o envio terminar.
+  useEdicaoEmAndamento("Cargos", {
+    pendente: formulario !== null,
+    salvando: formulario?.salvando === true,
+  });
   const [aviso, setAviso] = useState<string | null>(null);
   const formTituloId = useId();
 

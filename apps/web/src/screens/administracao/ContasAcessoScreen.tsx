@@ -84,6 +84,7 @@ import {
 } from "../../api/organizacaoClient";
 import { formatarInstante } from "../../format/data";
 import "./ContasAcessoScreen.css";
+import { useEdicaoEmAndamento } from "../../app/edicoesPendentes";
 
 export const CONTAS_ACESSO_TITULO_ID = "contas-acesso-titulo";
 
@@ -176,6 +177,13 @@ export function ContasAcessoScreen({
     null,
   );
   const [edicaoPapel, setEdicaoPapel] = useState<EdicaoPapelState | null>(null);
+  // T189 — formulário aberto conta como edição em andamento, e envio como
+  // salvamento: a troca de empresa pergunta antes de descartar, e espera
+  // o envio terminar.
+  useEdicaoEmAndamento("Contas de acesso", {
+    pendente: formulario !== null || edicaoPapel !== null,
+    salvando: formulario?.salvando === true || edicaoPapel?.salvando === true,
+  });
   const [confirmacaoDesativacao, setConfirmacaoDesativacao] =
     useState<ConfirmacaoDesativacaoState | null>(null);
   const [confirmacaoResetMfa, setConfirmacaoResetMfa] =

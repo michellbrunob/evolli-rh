@@ -64,7 +64,11 @@ interface Opcoes {
   readonly empresaAtiva?: { id: string; codigo: string; nome: string } | null;
   readonly podeTrocarEmpresa?: boolean;
   readonly onAbrirDestino?: (id: string) => void;
-  readonly onEmpresaTrocada?: () => void;
+  readonly onEmpresaTrocada?: (empresa: {
+    id: string;
+    codigo: string;
+    nome: string;
+  }) => void;
   readonly onLogout?: () => void;
 }
 
@@ -225,32 +229,56 @@ describe("T162 — o Hub oferece só o que o servidor autoriza", () => {
   });
 });
 
-describe("T163 — quem troca de empresa, e quem não troca", () => {
-  it("rh vê o seletor, rotulado como Empresa, com as autorizadas", async () => {
+/** T189 — o botão do `SeletorEmpresaAtiva` (o mesmo do menu lateral). */
+const botaoDaEmpresa = () =>
+  screen.findByRole("button", { name: /Empresa ativa/ });
+
+async function abrirListaDeEmpresas() {
+  fireEvent.click(await botaoDaEmpresa());
+  await screen.findByRole("list", { name: "Empresas autorizadas" });
+}
+
+describe("T163/T189 — quem troca de empresa, e quem não troca", () => {
+  it("rh vê a empresa ativa e, aberto, as autorizadas com a atual marcada", async () => {
     montar({ papel: "rh" });
-    const seletor = await screen.findByLabelText("Empresa");
-    expect(seletor.tagName).toBe("SELECT");
-    await waitFor(() =>
-      expect(
-        [...(seletor as HTMLSelectElement).options].map((o) => o.textContent),
-      ).toEqual(["Empresa B (EMPB)", "Empresa D (EMPD)"]),
+    const botao = await botaoDaEmpresa();
+    expect(botao).toHaveTextContent("Empresa B");
+    expect(botao).toHaveTextContent("Código EMPB");
+    await abrirListaDeEmpresas();
+    const lista = screen.getByRole("list", { name: "Empresas autorizadas" });
+    expect(
+      [...lista.querySelectorAll(".seletor-empresa__opcao-nome")].map(
+        (n) => n.textContent,
+      ),
+    ).toEqual(["Empresa B", "Empresa D"]);
+    expect(screen.getByRole("button", { name: /^Empresa B/ })).toHaveAttribute(
+      "aria-current",
+      "true",
     );
-    expect((seletor as HTMLSelectElement).value).toBe(EMPRESA_B.id);
   });
 
-  it.each(["dp", "gestor", "colaborador", "financeiro"])(
+  it("o Hub usa o MESMO componente do menu lateral — não há select próprio", async () => {
+    const { container } = montar({ papel: "rh" });
+    await botaoDaEmpresa();
+    expect(container.querySelector(".seletor-empresa--hub")).not.toBeNull();
+    expect(container.querySelector("select")).toBeNull();
+  });
+
+  it.each(["dp", "gestor", "colaborador", "financeiro", "auditor", "dpo"])(
     "%s NÃO vê seletor e NÃO pede a lista de empresas",
     async (papel) => {
       montar({ papel, podeTrocarEmpresa: false });
-      await screen.findByText(/Empresa B/);
-      expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+      await screen.findByText("Empresa B");
+      expect(
+        screen.queryByRole("button", { name: /Empresa ativa/ }),
+      ).not.toBeInTheDocument();
       expect(listarEmpresasDoContexto).not.toHaveBeenCalled();
     },
   );
 
   it("quem não troca vê a empresa como TEXTO, não como controle", async () => {
     montar({ papel: "dp", podeTrocarEmpresa: false });
-    const valor = await screen.findByText(/Empresa B/);
+    const valor = await screen.findByText("Empresa B");
     expect(valor.closest("button")).toBeNull();
     expect(valor.closest("select")).toBeNull();
     expect(valor.closest("a")).toBeNull();
@@ -264,34 +292,42 @@ describe("T163 — quem troca de empresa, e quem não troca", () => {
     expect(listarEmpresasDoContexto).not.toHaveBeenCalled();
   });
 
-  it("master_tecnico sem seleção mostra o escopo global como opção neutra", async () => {
+  it("master_tecnico sem seleção mostra o escopo global, sem empresa marcada", async () => {
     montar({ papel: "master_tecnico", empresaAtiva: null });
-    const seletor = await screen.findByLabelText("Empresa");
-    expect((seletor as HTMLSelectElement).value).toBe("");
+    expect(await botaoDaEmpresa()).toHaveTextContent(/Acesso global/);
+    await abrirListaDeEmpresas();
+    expect(
+      screen
+        .getAllByRole("button")
+        .some((b) => b.getAttribute("aria-current") === "true"),
+    ).toBe(false);
+  });
+
+  it("empresa única: só leitura, sem lista", async () => {
+    vi.mocked(listarEmpresasDoContexto).mockResolvedValue([EMPRESA_B]);
+    montar({ papel: "rh" });
+    await waitFor(() => expect(listarEmpresasDoContexto).toHaveBeenCalled());
     await waitFor(() =>
-      expect(
-        [...(seletor as HTMLSelectElement).options][0]!.textContent,
-      ).toMatch(/Acesso global/i),
+      expect(screen.queryByText("Carregando empresas…")).toBeNull(),
     );
+    expect(
+      screen.queryByRole("button", { name: /Empresa ativa/ }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("Empresa B")).toBeInTheDocument();
   });
 });
 
-describe("T163 — a troca passa pelo servidor, e nada nela é otimista", () => {
+describe("T163/T189 — a troca passa pelo servidor, e nada nela é otimista", () => {
   it("escolher outra empresa chama o servidor com o id certo", async () => {
     montar({ papel: "rh" });
-    const seletor = await screen.findByLabelText("Empresa");
-    await waitFor(() =>
-      expect((seletor as HTMLSelectElement).options.length).toBe(2),
-    );
-
-    fireEvent.change(seletor, { target: { value: EMPRESA_D.id } });
-
+    await abrirListaDeEmpresas();
+    fireEvent.click(screen.getByRole("button", { name: /^Empresa D/ }));
     await waitFor(() =>
       expect(trocarEmpresaDoContexto).toHaveBeenCalledWith(EMPRESA_D.id),
     );
   });
 
-  it("só avisa a troca DEPOIS de o servidor confirmar", async () => {
+  it("só avisa a troca DEPOIS de o servidor confirmar, e com a empresa confirmada", async () => {
     let confirmar!: (e: typeof EMPRESA_D) => void;
     vi.mocked(trocarEmpresaDoContexto).mockReturnValue(
       new Promise((r) => {
@@ -300,50 +336,39 @@ describe("T163 — a troca passa pelo servidor, e nada nela é otimista", () => 
     );
     const avisou = vi.fn();
     montar({ papel: "rh", onEmpresaTrocada: avisou });
-    const seletor = await screen.findByLabelText("Empresa");
-    await waitFor(() =>
-      expect((seletor as HTMLSelectElement).options.length).toBe(2),
-    );
-
-    fireEvent.change(seletor, { target: { value: EMPRESA_D.id } });
-    // Servidor ainda pensando: ninguém foi avisado, e o controle está inerte.
-    await screen.findByText(/Trocando/i);
+    await abrirListaDeEmpresas();
+    fireEvent.click(screen.getByRole("button", { name: /^Empresa D/ }));
+    // Servidor ainda pensando: ninguém foi avisado, e as opções estão inertes.
+    await screen.findByText(/Trocando para Empresa D/i);
     expect(avisou).not.toHaveBeenCalled();
-    expect(seletor).toBeDisabled();
+    expect(screen.getByRole("button", { name: /^Empresa D/ })).toBeDisabled();
 
     confirmar(EMPRESA_D);
-    await waitFor(() => expect(avisou).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(avisou).toHaveBeenCalledWith(EMPRESA_D));
   });
 
   it("escolher a empresa que já está ativa não chama o servidor", async () => {
     montar({ papel: "rh" });
-    const seletor = await screen.findByLabelText("Empresa");
-    await waitFor(() =>
-      expect((seletor as HTMLSelectElement).options.length).toBe(2),
-    );
-    fireEvent.change(seletor, { target: { value: EMPRESA_B.id } });
+    await abrirListaDeEmpresas();
+    fireEvent.click(screen.getByRole("button", { name: /^Empresa B/ }));
     expect(trocarEmpresaDoContexto).not.toHaveBeenCalled();
   });
 
   it("troca recusada pelo servidor avisa, e NÃO finge que trocou", async () => {
     vi.mocked(trocarEmpresaDoContexto).mockRejectedValue(
-      new Error("404 — empresa não autorizada"),
+      new Error("500 — detalhe interno"),
     );
     const avisou = vi.fn();
     montar({ papel: "rh", onEmpresaTrocada: avisou });
-    const seletor = await screen.findByLabelText("Empresa");
-    await waitFor(() =>
-      expect((seletor as HTMLSelectElement).options.length).toBe(2),
-    );
-
-    fireEvent.change(seletor, { target: { value: EMPRESA_D.id } });
+    await abrirListaDeEmpresas();
+    fireEvent.click(screen.getByRole("button", { name: /^Empresa D/ }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       /Não foi possível trocar de empresa/i,
     );
     expect(avisou).not.toHaveBeenCalled();
     // O corpo do erro do servidor nunca chega à tela.
-    expect(document.body.textContent ?? "").not.toMatch(/404|autorizada/);
+    expect(document.body.textContent ?? "").not.toMatch(/500|detalhe interno/);
   });
 
   it("falha ao CARREGAR as opções oferece retry, e os produtos continuam", async () => {
@@ -362,7 +387,15 @@ describe("T163 — a troca passa pelo servidor, e nada nela é otimista", () => 
       EMPRESA_D,
     ]);
     fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
-    expect(await screen.findByLabelText("Empresa")).toBeInTheDocument();
+    expect(await botaoDaEmpresa()).toBeInTheDocument();
+  });
+
+  it("montagem comum não mexe no foco (só depois de uma troca)", async () => {
+    montar({ papel: "rh" });
+    // Montagem comum: o foco não é mexido.
+    expect(document.activeElement).not.toBe(
+      screen.getByRole("heading", { level: 1 }),
+    );
   });
 });
 
@@ -408,7 +441,7 @@ describe("T163 — o navegador não é autoridade sobre a empresa", () => {
 describe("T162 — acessibilidade e estrutura", () => {
   it("há exatamente um h1", async () => {
     montar({ papel: "rh" });
-    await screen.findByLabelText("Empresa");
+    await botaoDaEmpresa();
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
   });
 
@@ -454,12 +487,32 @@ describe("T162 — acessibilidade e estrutura", () => {
 
   it("o seletor é alcançável por teclado e tem nome acessível", async () => {
     montar({ papel: "rh" });
-    const seletor = await screen.findByLabelText("Empresa");
-    // `<select>` nativo: foco, teclado e leitor de tela vêm do navegador.
+    const seletor = await botaoDaEmpresa();
+    // Um `<button>` com aria-expanded: Enter e Espaço vêm do navegador.
+    expect(seletor.tagName).toBe("BUTTON");
     expect(seletor).not.toHaveAttribute("tabindex", "-1");
-    expect(seletor).toBeEnabled();
-    (seletor as HTMLSelectElement).focus();
+    expect(seletor).toHaveAttribute("aria-expanded", "false");
+    expect(seletor).toHaveAccessibleName(/Empresa ativa.*Empresa B/);
+    seletor.focus();
     expect(document.activeElement).toBe(seletor);
+  });
+
+  it("T189 — com o pedido de foco, o título recebe o foco ao montar", async () => {
+    render(
+      <HubPosLogin
+        papelDoAtor="rh"
+        empresaAtiva={EMPRESA_D}
+        podeTrocarEmpresa
+        emailDoAtor={EMAIL_SINTETICO}
+        onAbrirDestino={() => undefined}
+        onEmpresaTrocada={() => undefined}
+        onLogout={() => undefined}
+        focarTituloAoAbrir
+      />,
+    );
+    expect(document.activeElement).toBe(
+      screen.getByRole("heading", { level: 1, name: "Seu acesso" }),
+    );
   });
 
   it("Sair chama o encerramento da sessão", async () => {

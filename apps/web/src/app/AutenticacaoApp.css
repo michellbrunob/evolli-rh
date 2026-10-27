@@ -63,3 +63,103 @@
   font: inherit;
   cursor: pointer;
 }
+
+/**
+ * T189 — região que anuncia a troca de empresa. Fica fora da árvore recriada
+ * na troca, para sobreviver à remontagem; visualmente oculta, porque o
+ * seletor já mostra a empresa nova.
+ */
+.autenticacao-app__anuncio {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/**
+ * T189 — aviso de que a empresa mudou por fora desta aba, com edição
+ * pendente. Mesma moldura do `Modal` (fundo, camada acima da gaveta), sem
+ * gradiente nem sombra.
+ */
+.aviso-contexto {
+  position: fixed;
+  inset: 0;
+  z-index: 110;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-lg);
+}
+
+.aviso-contexto__fundo {
+  position: absolute;
+  inset: 0;
+  background: rgb(29 29 31 / 45%);
+}
+
+.aviso-contexto__caixa {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  width: 100%;
+  max-width: 34rem;
+  max-height: calc(100dvh - 2 * var(--space-lg));
+  overflow-y: auto;
+  padding: var(--space-lg);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+  background: var(--surface-canvas);
+  color: var(--color-ink);
+  outline: none;
+}
+
+.aviso-contexto__titulo {
+  margin: 0;
+  font-size: var(--text-lead);
+  font-weight: var(--weight-bold);
+}
+
+.aviso-contexto__texto p {
+  margin: 0 0 var(--space-xs);
+  overflow-wrap: anywhere;
+}
+
+.aviso-contexto__status {
+  margin: 0;
+  color: var(--color-ink-muted);
+}
+
+.aviso-contexto__erro {
+  margin: 0;
+  color: var(--status-danger-ink);
+}
+
+.aviso-contexto__acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+/* Os rótulos das ações são longos: quebram linha em vez de alargar. */
+.aviso-contexto__acoes .evolli-button {
+  max-width: 100%;
+  white-space: normal;
+  line-height: var(--leading-tight);
+  padding-block: var(--space-xs);
+}
+
+@media (max-width: 640px) {
+  .aviso-contexto {
+    padding: var(--space-sm);
+  }
+
+  .aviso-contexto__acoes .evolli-button {
+    width: 100%;
+  }
+}

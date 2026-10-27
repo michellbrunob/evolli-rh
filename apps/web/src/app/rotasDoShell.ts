@@ -70,3 +70,28 @@ export function destinoDaRota(fragmento: string): string | null {
 export function ehFragmentoDeRota(fragmento: string): boolean {
   return fragmento === "" || fragmento === "#" || fragmento.startsWith("#/");
 }
+
+/**
+ * T189 — para onde o shell volta depois de uma troca de empresa: o MESMO
+ * módulo, na tela inicial segura dele.
+ *
+ * A troca recria a árvore inteira (T163), então a tela inicial do módulo já
+ * vem limpa — sem busca, filtro, seleção nem ficha. O que sobra decidir é o
+ * destino em si, e só uma página precisa ser reduzida: a Nova admissão é um
+ * formulário dentro de Pessoas, e reabri-lo na empresa nova seria começar
+ * um cadastro que ninguém pediu. Ela volta para a listagem de Colaboradores,
+ * o nível do módulo.
+ *
+ * Não é autorização: o `App` ainda passa o destino por `resolverEntrada`, e
+ * papel que não o abre cai no destino inicial dele.
+ */
+const DESTINO_SEGURO_APOS_TROCA: Readonly<Record<string, string>> = {
+  "nova-admissao": "pessoas",
+};
+
+export function destinoAposTrocaDeEmpresa(
+  destinoId: string | null,
+): string | null {
+  if (destinoId === null) return null;
+  return DESTINO_SEGURO_APOS_TROCA[destinoId] ?? destinoId;
+}

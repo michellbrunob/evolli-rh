@@ -82,6 +82,7 @@ import {
 import { formatarDiaCivil, formatarInstante } from "../../format/data";
 import { trechoDeMatricula } from "../../format/matricula";
 import "./SolicitacoesScreen.css";
+import { useEdicaoEmAndamento } from "../../app/edicoesPendentes";
 
 export const SOLICITACOES_TITULO_ID = "solicitacoes-titulo";
 
@@ -184,6 +185,14 @@ export function SolicitacoesScreen() {
   );
   const [formTransicao, setFormTransicao] =
     useState<FormularioTransicao | null>(null);
+  // T189 — formulário aberto conta como edição em andamento, e envio como
+  // salvamento: a troca de empresa pergunta antes de descartar, e espera
+  // o envio terminar.
+  useEdicaoEmAndamento("Solicitações", {
+    pendente: formRegistro !== null || formTransicao !== null,
+    salvando:
+      formRegistro?.salvando === true || formTransicao?.salvando === true,
+  });
   const [mensagemSucesso, setMensagemSucesso] = useState<string | null>(null);
   /**
    * Aviso de falha que pertence à TELA, não a um formulário.

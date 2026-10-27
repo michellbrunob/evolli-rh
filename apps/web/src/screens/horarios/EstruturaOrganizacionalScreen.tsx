@@ -56,6 +56,7 @@ import {
 } from "../../api/organizacaoClient";
 import { AcaoSituacao } from "./AcaoSituacao";
 import "./EstruturaOrganizacionalScreen.css";
+import { useEdicaoEmAndamento } from "../../app/edicoesPendentes";
 
 export const ESTRUTURA_ORGANIZACIONAL_TITULO_ID =
   "estrutura-organizacional-titulo";
@@ -209,6 +210,21 @@ export function EstruturaOrganizacionalScreen({
     useState<StatusFiltro>("todos");
   const [formularioEquipe, setFormularioEquipe] =
     useState<FormularioEquipeState | null>(null);
+  // T189 — formulário aberto conta como edição em andamento, e envio como
+  // salvamento: a troca de empresa pergunta antes de descartar, e espera
+  // o envio terminar.
+  useEdicaoEmAndamento("Estrutura organizacional", {
+    pendente:
+      formulario !== null ||
+      formularioDep !== null ||
+      formularioArea !== null ||
+      formularioEquipe !== null,
+    salvando:
+      formulario?.salvando === true ||
+      formularioDep?.salvando === true ||
+      formularioArea?.salvando === true ||
+      formularioEquipe?.salvando === true,
+  });
   const formEquipeTituloId = useId();
 
   const carregarDados = useCallback(async (status: StatusFiltro) => {

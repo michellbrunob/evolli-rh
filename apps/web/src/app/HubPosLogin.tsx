@@ -43,6 +43,11 @@
  * nem teria como: a rota recusa gestor e colaborador mesmo que esta tela
  * pedisse a lista.
  *
+ * **T189 — um componente só.** O `<select>` que morava aqui deu lugar ao
+ * `SeletorEmpresaAtiva`, o mesmo do topo do menu lateral do shell. A lista de
+ * empresas, o carregamento, a falha e a troca moram nele; o Hub só o põe na
+ * tela e repassa a confirmação do servidor.
+ *
  * **A troca remonta tudo.** Depois do `POST /v1/auth/contexto/empresa`, o
  * `AutenticacaoApp` reresolve o ator e troca a `key` da árvore — Hub e
  * módulos nascem de novo no contexto novo. É assim que nenhum dado da empresa
@@ -71,7 +76,7 @@
  * problema: o Hub continua na tela, informa e oferece nova tentativa. Os
  * produtos seguem listados — eles dependem do papel, não desta leitura.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useRef } from "react";
 import "./HubPosLogin.css";
 import { IconeModulo, MarcaEvolli } from "./IconeModulo";
 import type { IconeModuloId } from "./IconeModulo";
@@ -82,11 +87,8 @@ import {
   type DestinoNavegacao,
 } from "./mapaNavegacao";
 import { ROTULO_PAPEL } from "../api/usersClient";
-import {
-  listarEmpresasDoContexto,
-  trocarEmpresaDoContexto,
-  type EmpresaDoContextoApi,
-} from "../api/contextoEmpresarialClient";
+import type { EmpresaDoContextoApi } from "../api/contextoEmpresarialClient";
+import { SeletorEmpresaAtiva } from "./SeletorEmpresaAtiva";
 
 /*
  * T163 — as duas listas de papéis que existiam aqui foram REMOVIDAS, e isso é
@@ -133,26 +135,6 @@ const ICONE_DO_DESTINO: Readonly<Record<string, IconeModuloId>> =
     ),
   );
 
-/**
- * Estado das OPÇÕES de troca — não da empresa ativa.
- *
- * A empresa ativa não tem estado de carregamento aqui: ela chega pronta em
- * `/users/me`, antes de esta tela montar. O que carrega é a lista de para
- * onde se pode ir.
- */
-type EstadoOpcoes =
-  /** O papel não seleciona empresa: não há o que buscar, nem seletor. */
-  | { readonly tipo: "nao-aplicavel" }
-  | { readonly tipo: "carregando" }
-  | { readonly tipo: "carregadas"; readonly itens: EmpresaDoContextoApi[] }
-  | { readonly tipo: "falha" };
-
-/** A troca em si, que é uma mutação e pode falhar. */
-type EstadoTroca =
-  | { readonly tipo: "ocioso" }
-  | { readonly tipo: "trocando"; readonly empresaId: string }
-  | { readonly tipo: "falha" };
-
 export interface HubPosLoginProps {
   /** Papel decidido pelo SERVIDOR (`GET /v1/users/me`), já resolvido. */
   readonly papelDoAtor: string;
@@ -175,8 +157,13 @@ export interface HubPosLoginProps {
    * reresolve o ator e remonta a árvore — é isso que garante que nada da
    * empresa anterior siga na tela.
    */
-  readonly onEmpresaTrocada: () => void;
+  readonly onEmpresaTrocada: (empresa: EmpresaDoContextoApi) => void;
   readonly onLogout: () => void;
+  /**
+   * T189 — ao montar, levar o foco ao título. Usado depois de uma troca de
+   * empresa feita aqui: a tela foi recriada e o foco não pode ficar perdido.
+   */
+  readonly focarTituloAoAbrir?: boolean;
 }
 
 export function HubPosLogin({
@@ -187,63 +174,17 @@ export function HubPosLogin({
   onAbrirDestino,
   onEmpresaTrocada,
   onLogout,
+  focarTituloAoAbrir = false,
 }: HubPosLoginProps) {
   const produtos = capacidadeFuncionalDe(papelDoAtor);
 
-  const [opcoes, setOpcoes] = useState<EstadoOpcoes>(() =>
-    podeTrocarEmpresa ? { tipo: "carregando" } : { tipo: "nao-aplicavel" },
-  );
-  const [troca, setTroca] = useState<EstadoTroca>({ tipo: "ocioso" });
-  /** Incrementado pelo botão "Tentar novamente"; redispara o efeito. */
-  const [tentativa, setTentativa] = useState(0);
-
+  const tituloRef = useRef<HTMLHeadingElement | null>(null);
+  const focarTituloRef = useRef(focarTituloAoAbrir);
   useEffect(() => {
-    if (!podeTrocarEmpresa) return;
-    let cancelado = false;
-    setOpcoes({ tipo: "carregando" });
-
-    async function carregar() {
-      try {
-        const itens = await listarEmpresasDoContexto();
-        if (!cancelado) setOpcoes({ tipo: "carregadas", itens });
-      } catch {
-        // Nada do corpo da resposta é lido nem exibido: a mensagem é nossa.
-        if (!cancelado) setOpcoes({ tipo: "falha" });
-      }
-    }
-
-    void carregar();
-    return () => {
-      cancelado = true;
-    };
-  }, [podeTrocarEmpresa, tentativa]);
-
-  const tentarDeNovo = useCallback(() => {
-    setTentativa((n) => n + 1);
+    if (!focarTituloRef.current) return;
+    focarTituloRef.current = false;
+    tituloRef.current?.focus();
   }, []);
-
-  /**
-   * Troca de empresa.
-   *
-   * Só avisa quem monta esta tela **depois** de o servidor confirmar. Não há
-   * atualização otimista aqui de propósito: mostrar a empresa nova antes da
-   * confirmação seria o frontend afirmando um escopo que o servidor ainda não
-   * concedeu — e, se a troca falhasse, a tela estaria mentindo sobre onde a
-   * sessão opera.
-   */
-  const trocarEmpresa = useCallback(
-    async (empresaId: string) => {
-      if (empresaId === empresaAtiva?.id) return;
-      setTroca({ tipo: "trocando", empresaId });
-      try {
-        await trocarEmpresaDoContexto(empresaId);
-        onEmpresaTrocada();
-      } catch {
-        setTroca({ tipo: "falha" });
-      }
-    },
-    [empresaAtiva, onEmpresaTrocada],
-  );
 
   const rotuloDoPapel = ROTULO_PAPEL[papelDoAtor] ?? papelDoAtor;
 
@@ -270,7 +211,9 @@ export function HubPosLogin({
 
       <main className="hub__area" id="hub-conteudo">
         <div className="hub__area-inner">
-          <h1 className="hub__titulo">Seu acesso</h1>
+          <h1 className="hub__titulo" ref={tituloRef} tabIndex={-1}>
+            Seu acesso
+          </h1>
           <p className="hub__intro">
             Estes são os produtos que o seu acesso abre hoje. O que não aparece
             aqui não está liberado para o seu perfil.
@@ -281,10 +224,8 @@ export function HubPosLogin({
             rotuloDoPapel={rotuloDoPapel}
             empresaAtiva={empresaAtiva}
             podeTrocarEmpresa={podeTrocarEmpresa}
-            opcoes={opcoes}
-            troca={troca}
-            onTentarDeNovo={tentarDeNovo}
-            onTrocar={(id) => void trocarEmpresa(id)}
+            papelDoAtor={papelDoAtor}
+            onEmpresaTrocada={onEmpresaTrocada}
           />
 
           <section className="hub__secao" aria-labelledby="hub-produtos">
@@ -344,34 +285,26 @@ interface ContextoDaSessaoProps {
   readonly rotuloDoPapel: string;
   readonly empresaAtiva: EmpresaDoContextoApi | null;
   readonly podeTrocarEmpresa: boolean;
-  readonly opcoes: EstadoOpcoes;
-  readonly troca: EstadoTroca;
-  readonly onTentarDeNovo: () => void;
-  readonly onTrocar: (empresaId: string) => void;
+  readonly papelDoAtor: string;
+  readonly onEmpresaTrocada: (empresa: EmpresaDoContextoApi) => void;
 }
 
 /**
  * O contexto da sessão.
  *
- * `Conta` e `Perfil` continuam sendo texto, porque nada neles é editável.
- * `Empresa` passou a ser editável **para quem o servidor autoriza** — e só
- * nesse caso vira um `<select>` de verdade, com `<label>` associado, em vez
- * de um menu desenhado à mão. Um `<select>` nativo já traz teclado, leitor de
- * tela e comportamento em toque sem que precisemos reimplementar nada disso,
- * e reimplementar seria a forma mais provável de errar.
+ * `Conta` e `Perfil` são texto, porque nada neles é editável. `Empresa` é o
+ * `SeletorEmpresaAtiva` (T189) — o MESMO componente do topo do menu lateral:
+ * só leitura para quem não troca ou tem uma empresa só; lista das
+ * autorizadas, com a atual marcada, para quem o servidor deixa trocar.
  */
 function ContextoDaSessao({
   email,
   rotuloDoPapel,
   empresaAtiva,
   podeTrocarEmpresa,
-  opcoes,
-  troca,
-  onTentarDeNovo,
-  onTrocar,
+  papelDoAtor,
+  onEmpresaTrocada,
 }: ContextoDaSessaoProps) {
-  const trocando = troca.tipo === "trocando";
-
   return (
     <dl className="hub__contexto">
       <div className="hub__contexto-item">
@@ -383,85 +316,19 @@ function ContextoDaSessao({
         <dd>{rotuloDoPapel}</dd>
       </div>
       <div className="hub__contexto-item hub__contexto-item--empresa">
-        {podeTrocarEmpresa ? (
-          // `dt` vira `label` do próprio controle: o nome acessível do
-          // `<select>` é "Empresa", sem rótulo duplicado nem `aria-label`
-          // competindo com o texto visível.
-          <>
-            <dt>
-              <label htmlFor="hub-empresa-ativa">Empresa</label>
-            </dt>
-            <dd>
-              {opcoes.tipo === "carregando" ? (
-                <span role="status">Carregando empresas…</span>
-              ) : opcoes.tipo === "falha" ? (
-                <span className="hub__contexto-falha">
-                  <span role="alert">
-                    Não foi possível carregar as empresas.
-                  </span>{" "}
-                  <button
-                    type="button"
-                    className="hub__contexto-retry"
-                    onClick={onTentarDeNovo}
-                  >
-                    Tentar novamente
-                  </button>
-                </span>
-              ) : (
-                <select
-                  id="hub-empresa-ativa"
-                  className="hub__empresa-select"
-                  // Em escopo global não há empresa ativa, e a opção neutra
-                  // abaixo é o que o `select` mostra — nunca uma empresa
-                  // qualquer escolhida por nós.
-                  value={empresaAtiva?.id ?? ""}
-                  disabled={trocando}
-                  onChange={(e) => onTrocar(e.target.value)}
-                >
-                  {empresaAtiva === null ? (
-                    <option value="">Acesso global — todas as empresas</option>
-                  ) : null}
-                  {opcoes.tipo === "carregadas"
-                    ? opcoes.itens.map((e) => (
-                        <option key={e.id} value={e.id}>
-                          {e.nome} ({e.codigo})
-                        </option>
-                      ))
-                    : null}
-                </select>
-              )}
-              {trocando ? (
-                <span className="hub__empresa-status" role="status">
-                  Trocando…
-                </span>
-              ) : null}
-              {troca.tipo === "falha" ? (
-                <span className="hub__contexto-falha" role="alert">
-                  Não foi possível trocar de empresa.
-                </span>
-              ) : null}
-            </dd>
-          </>
-        ) : (
-          <>
-            <dt>Empresa</dt>
-            <dd>
-              {empresaAtiva === null ? (
-                // Sem empresa ativa e sem poder de seleção: o perfil opera
-                // num escopo que esta tela não tem como nomear, e dizer isso
-                // é mais honesto que inventar um nome.
-                "Não disponível para o seu perfil"
-              ) : (
-                <>
-                  {empresaAtiva.nome}{" "}
-                  <span className="hub__contexto-codigo">
-                    ({empresaAtiva.codigo})
-                  </span>
-                </>
-              )}
-            </dd>
-          </>
-        )}
+        {/* O componente já diz "Empresa ativa" à vista; o `dt` existe para a
+            estrutura da lista de definição, sem repetir o rótulo na tela. */}
+        <dt className="hub__contexto-oculto">Empresa</dt>
+        <dd>
+          <SeletorEmpresaAtiva
+            id="hub-empresa-ativa"
+            variante="hub"
+            empresaAtiva={empresaAtiva}
+            podeTrocarEmpresa={podeTrocarEmpresa}
+            papelDoAtor={papelDoAtor}
+            onEmpresaTrocada={onEmpresaTrocada}
+          />
+        </dd>
       </div>
     </dl>
   );

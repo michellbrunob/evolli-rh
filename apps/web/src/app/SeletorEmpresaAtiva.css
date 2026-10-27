@@ -1,0 +1,235 @@
+/**
+ * T189 — empresa ativa. Só tokens do Evolli (`tokens.css`): cor de ação
+ * única, superfícies claras, raio médio, alvo de toque de 44px. Nada aqui
+ * empurra a largura da página: nomes longos quebram linha (`overflow-wrap`)
+ * e todo contêiner flexível tem `min-width: 0`. O painel abre no fluxo — no
+ * mobile, dentro da própria gaveta, sem camada flutuante.
+ */
+
+.seletor-empresa {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+.seletor-empresa--hub {
+  max-width: 32rem;
+}
+
+.seletor-empresa__cartao {
+  /* Posicionado: o texto só para leitor de tela (absoluto) fica contido
+     aqui e não escapa para alargar a página (lição da T188). */
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  min-width: 0;
+  min-height: var(--touch-target);
+  padding: var(--space-sm);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  background: var(--surface-pearl);
+  color: var(--color-ink);
+  font: inherit;
+  text-align: left;
+}
+
+.seletor-empresa__botao {
+  cursor: pointer;
+}
+
+.seletor-empresa__botao:hover,
+.seletor-empresa__botao[aria-expanded="true"] {
+  border-color: var(--color-action);
+}
+
+.seletor-empresa__monograma {
+  flex: 0 0 auto;
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  background: var(--status-info-surface);
+  color: var(--color-action);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-bold);
+}
+
+.seletor-empresa__textos {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.seletor-empresa__rotulo,
+.seletor-empresa__codigo,
+.seletor-empresa__opcao-codigo,
+.seletor-empresa__titulo-lista {
+  font-size: var(--text-caption);
+  color: var(--color-ink-subtle);
+}
+
+.seletor-empresa__nome {
+  font-weight: var(--weight-strong);
+  line-height: var(--leading-tight);
+  overflow-wrap: anywhere;
+}
+
+.seletor-empresa__seta {
+  flex: 0 0 auto;
+  color: var(--color-ink-muted);
+}
+
+.seletor-empresa__botao[aria-expanded="true"] .seletor-empresa__seta {
+  transform: rotate(180deg);
+}
+
+.seletor-empresa__painel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  min-width: 0;
+  padding: var(--space-xs);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  background: var(--surface-canvas);
+}
+
+.seletor-empresa__painel[hidden] {
+  display: none;
+}
+
+.seletor-empresa__titulo-lista {
+  margin: 0;
+  padding: 0 var(--space-xs);
+}
+
+.seletor-empresa__lista {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.seletor-empresa__opcao {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  min-width: 0;
+  min-height: var(--touch-target);
+  padding: var(--space-xs) var(--space-sm);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.seletor-empresa__opcao:hover:not(:disabled) {
+  background: var(--surface-neutral);
+}
+
+.seletor-empresa__opcao[aria-current="true"] {
+  border-color: var(--status-info-border);
+  background: var(--status-info-surface);
+}
+
+.seletor-empresa__opcao:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.seletor-empresa__opcao-textos {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.seletor-empresa__opcao-nome {
+  overflow-wrap: anywhere;
+}
+
+.seletor-empresa__opcao[aria-current="true"] .seletor-empresa__opcao-nome {
+  font-weight: var(--weight-strong);
+}
+
+.seletor-empresa__atual {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+  padding: 0 var(--space-xs);
+  border-radius: var(--radius-pill);
+  background: var(--color-action);
+  color: var(--color-on-action);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-strong);
+}
+
+.seletor-empresa__confirmacao {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-sm);
+  border: 1px solid var(--status-warning-border);
+  border-radius: var(--radius-md);
+  background: var(--status-warning-surface);
+  color: var(--status-warning-ink);
+}
+
+.seletor-empresa__confirmacao p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.seletor-empresa__acoes,
+.seletor-empresa__falha {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.seletor-empresa__erro {
+  margin: 0;
+  color: var(--status-danger-ink);
+  overflow-wrap: anywhere;
+}
+
+.seletor-empresa__nota,
+.seletor-empresa__status {
+  margin: 0;
+  font-size: var(--text-caption);
+  color: var(--color-ink-muted);
+  overflow-wrap: anywhere;
+}
+
+/* Texto só para leitor de tela. Próprio do componente: as classes `sr-only`
+   do produto moram nas folhas das telas. */
+.seletor-empresa__oculto {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .seletor-empresa__seta {
+    transition: transform 120ms ease;
+  }
+}

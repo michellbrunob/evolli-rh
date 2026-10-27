@@ -87,6 +87,7 @@ import {
   type ColaboradorEscolhido,
 } from "./SeletorColaboradorPaginado";
 import "./HistoricoFuncionalScreen.css";
+import { useEdicaoEmAndamento } from "../../app/edicoesPendentes";
 
 export const HISTORICO_FUNCIONAL_TITULO_ID = "historico-funcional-titulo";
 
@@ -284,6 +285,17 @@ export function HistoricoFuncionalScreen({
   const [linhaDoTempo, setLinhaDoTempo] = useState<LinhaDoTempoState | null>(
     null,
   );
+  // T189 — formulário aberto conta como edição em andamento, e envio como
+  // salvamento: a troca de empresa pergunta antes de descartar, e espera
+  // o envio terminar.
+  useEdicaoEmAndamento("Registrar movimentação", {
+    pendente: formulario !== null,
+    salvando: formulario?.salvando === true,
+  });
+  useEdicaoEmAndamento("Retificar movimentação", {
+    pendente: linhaDoTempo?.retificar != null,
+    salvando: linhaDoTempo?.retificar?.salvando === true,
+  });
 
   const formTituloId = useId();
   const linhaTituloId = useId();
