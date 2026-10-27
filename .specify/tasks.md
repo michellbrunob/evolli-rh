@@ -2654,18 +2654,28 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
     - **Prévia:** `http://127.0.0.1:5173` passa a mostrar a branch da T189 ao vivo, identificada
       como `[T189 dev]`, não a `main`.
 
-87. **T190 - Próxima fatia de Gestão de Pessoas (preparação de decisão)**
-    - **Estado:** **em preparação de decisão**. Branch `codex/t190-proxima-fatia-pessoas`, a
-      partir do squash `bf9d87cafb7d6676207d5d38c28889a09276dd59` (T189 integrada, PR #182).
-    - **Objetivo desta etapa:** convergir a T189 e propor três próximas fatias de Gestão de
-      Pessoas que tornem o módulo Colaboradores mais utilizável no dia a dia com regras já
-      aprovadas, sem implementar produto antes de uma decisão explícita da proprietária.
-    - **Entrega desta etapa:** dossiê (`docs/decisions/t190-dossie-proxima-fatia-pessoas.md`) com as opções e uma recomendação. Só
-      documentação: sem código, API, schema, migration, RBAC, banco, seed, Docker,
-      dependência, CI, PR ou push.
-    - **Fora de escopo:** implementação de qualquer opção antes da decisão, dados pessoais
-      novos, documentos, folha, ponto, banco de horas, fuso horário, importação, exportação,
-      integrações externas, promoção e merge.
+87. **T190 - Filtros por Departamento e Cargo na listagem de Colaboradores**
+    - **Estado:** **em implementação**. Branch `codex/t190-proxima-fatia-pessoas`, a partir do
+      squash `bf9d87cafb7d6676207d5d38c28889a09276dd59` (T189 integrada, PR #182).
+    - **Preparação:** [dossiê](../docs/decisions/t190-dossie-proxima-fatia-pessoas.md) com três opções; a proprietária aprovou a opção B
+      com o complemento da O2 da T188 em 2026-10-27.
+    - **Objetivo:** filtrar a listagem de Colaboradores por Departamento e/ou Cargo pela
+      lotação vigente (regra da T184), combináveis com busca, situação e situação do vínculo;
+      fechar a O1 da T186 (E2E de `situacaoVinculo`); e a O2 da T188 (ordem estável das
+      movimentações paginadas, com `id` como desempate).
+    - **Contratos:** `GET /v1/colaboradores` ganha `departamentoId` e `cargoId` opcionais
+      (extensão aditiva); `GET /v1/movimentacoes` só ganha o desempate na ordem, sem mudar o
+      formato. Catálogos dos filtros pelos contratos existentes (`GET /v1/departamentos`,
+      `GET /v1/cargos`, só ativos). Sem schema, migration, RBAC, auditoria, seed, Docker ou
+      dependência.
+    - **Regras aprovadas:** contadores Todos/Ativos/Inativos sobre a empresa inteira, sem
+      filtros; seletor simples, só com referências ativas da empresa ativa; previsto,
+      encerrado e sem lotação vigente não aparecem com filtro de lotação.
+    - **Fora de escopo:** transferência e mudança de cargo pela ficha, dados pessoais novos,
+      documentos, folha, ponto, banco de horas, fuso horário, catálogos acima de 100 itens,
+      importação, exportação, integrações externas, promoção e merge.
+    - **Prévia:** `http://127.0.0.1:5173` passa a mostrar a branch da T190 ao vivo, identificada
+      como `[T190 dev]`, não a `main`.
 
 ## Regra obrigatória para as próximas tarefas
 

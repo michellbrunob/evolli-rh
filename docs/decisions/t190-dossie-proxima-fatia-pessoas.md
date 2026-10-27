@@ -1,7 +1,8 @@
 # T190 — Dossiê: próxima fatia de Gestão de Pessoas
 
-Status: **dossiê de preparação de decisão.** Nada aqui decide, aprova ou
-autoriza implementação: a escolha é da proprietária.
+Status: **decidido pela proprietária em 2026-10-27: opção B, com o
+complemento da O2 da T188** (seção 5). As seções 1 a 4 registram o dossiê como
+foi apresentado.
 Data: 2026-10-27. Tarefa: T190.
 Fontes, e só elas: `.specify`, as decisões em `docs/decisions` (em especial
 [T174](t174-dossie-decisoes-fatia-0.md), [T187](t187-dossie-proxima-fatia-colaboradores.md),
@@ -143,3 +144,43 @@ Para seguir com B, a proprietária precisa decidir:
    (recomendado) ou com busca.
 4. **Alcance:** só os filtros e o E2E de `situacaoVinculo` (recomendado), ou
    também a correção de ordenação das movimentações (O2 da opção A).
+
+## 5. Decisão da proprietária (2026-10-27)
+
+**Opção B aprovada, com o complemento da O2 da T188.** Respostas às decisões:
+
+1. **Contadores:** Todos, Ativos e Inativos continuam refletindo a empresa
+   inteira — sem busca, situação, departamento ou cargo (regra da T178).
+2. **Catálogos:** só departamentos e cargos **ativos** da empresa ativa.
+3. **Forma:** seletor simples, sem busca dentro do seletor.
+4. **Alcance:** os filtros, o E2E de `situacaoVinculo` (O1 da T186) **e** a
+   ordem estável das movimentações paginadas (O2 da T188).
+
+Fora: transferência e mudança de cargo pela ficha (opção C), dados pessoais
+novos, documentos, folha, ponto, banco de horas e fuso horário.
+
+## 6. O que foi entregue
+
+- **API — listagem de Colaboradores:** `departamentoId` e `cargoId`
+  opcionais (UUID). Casam só com colaborador que tenha vínculo **ativo** no
+  escopo da sessão cuja alocação **aberta** (`vigente_ate` nulo) está naquele
+  departamento e/ou cargo — os dois na mesma alocação, quando vêm juntos.
+  Previsto, encerrado e sem lotação vigente ficam fora. Aplicado no banco,
+  antes da paginação, junto com busca, situação e situação do vínculo; os
+  contadores não mudam. Referência de outra empresa não casa com ninguém do
+  escopo. Projeção, permissões e auditoria inalteradas; índices já existentes,
+  sem migration.
+- **API — movimentações (O2):** ordem `[vigência desc, registro desc, id
+desc]`. Com data e horário iguais, a paginação deixa de repetir ou pular
+  registro. Formato da resposta inalterado.
+- **Web — Colaboradores:** seletores "Departamento" e "Cargo" ao lado de
+  "Situação do vínculo", com "Todos" em cada um e só referências ativas;
+  resumo "Lotação vigente" com cada filtro removível sozinho, sem tocar busca,
+  situação ou o outro filtro; vazios e "Limpar filtros" consideram os novos
+  filtros; falha dos catálogos não derruba a lista e oferece nova tentativa.
+  Os filtros não ficam na URL e somem na troca de empresa (T189).
+- **Testes:** unidade da API (validação e formato do filtro, ordem), E2E com
+  PostgreSQL real (filtro isolado e combinado, combinação com busca,
+  situação e situação do vínculo, paginação, contadores, isolamento entre
+  empresas, DP igual a RH, master global, perfis negados, `situacaoVinculo`,
+  ordem estável com data e horário iguais), testes web da tela e do cliente.

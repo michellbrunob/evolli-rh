@@ -12,14 +12,14 @@
   },
   "nextTask": {
     "id": "T190",
-    "status": "pessoas_proxima_fatia_em_decisao",
-    "reason": "T189 integrada em main pela PR #182 (squash bf9d87cafb7d6676207d5d38c28889a09276dd59), com a CI de push 3/3 verde (run 40561605036); observacoes N2, N3, N4 e N5 seguem abertas, e a verificacao definitiva da empresa esperada no servidor continua como risco conhecido. A T190 abre em preparacao de decisao: dossie com tres opcoes para a proxima fatia de Gestao de Pessoas e uma recomendacao, em docs/decisions/t190-dossie-proxima-fatia-pessoas.md. Nenhuma implementacao de produto antes da decisao da proprietaria. Fora de escopo: codigo, API, schema, migration, RBAC, banco, seed, Docker, dependencias, CI, PR, push, promocao e merge."
+    "status": "colaboradores_filtros_lotacao_em_implementacao",
+    "reason": "T189 integrada em main pela PR #182 (squash bf9d87cafb7d6676207d5d38c28889a09276dd59), com a CI de push 3/3 verde (run 40561605036); N2, N3, N4 e N5 seguem como observacoes. A T190 implementa a opcao B do dossie com o complemento da O2 da T188, aprovada pela proprietaria em 2026-10-27: filtros de Departamento e Cargo na listagem de Colaboradores pela lotacao vigente (regra da T184), aplicados no banco antes da paginacao e combinaveis com busca, situacao e situacao do vinculo; contadores sobre a empresa inteira; seletor simples so com referencias ativas; E2E de situacaoVinculo (O1 da T186); id como desempate na ordem das movimentacoes paginadas (O2 da T188). Sem schema, migration, RBAC, auditoria, seed ou dependencia. Decisao em docs/decisions/t190-dossie-proxima-fatia-pessoas.md. Fora de escopo: transferencia e mudanca de cargo pela ficha, dados pessoais novos, documentos, folha, ponto, banco de horas, fuso horario, promocao e merge."
   },
   "openDeliveries": [
     {
       "id": "T190",
       "pullRequest": null,
-      "status": "pessoas_proxima_fatia_em_decisao"
+      "status": "colaboradores_filtros_lotacao_em_implementacao"
     }
   ],
   "requiredArtifacts": [
