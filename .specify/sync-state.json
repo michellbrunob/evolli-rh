@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "constitutionVersion": "1.4.0",
   "lastConvergedAt": "2026-10-27",
-  "lastIntegratedTask": 187,
-  "lastRecordedTask": 188,
+  "lastIntegratedTask": 188,
+  "lastRecordedTask": 189,
   "platformDecision": {
     "adr": "docs/adr/0014-evolli-plataforma-base-e-encerramento-do-frappe.md",
     "decidedAt": "2026-10-01",
@@ -11,15 +11,15 @@
     "frappe": "encerrado_como_candidato_referencia_apenas"
   },
   "nextTask": {
-    "id": "T188",
-    "status": "pessoas_abas_sem_teto_em_implementacao",
-    "reason": "T187 integrada em main pela PR #180 (squash 00a94df7c8e9dc25179b8e23bf9fbe9a1466e50f), com a CI de push 3/3 verde (run 40496328412). A T188 implementa a opcao A completa do dossie, aprovada pela proprietaria em 2026-10-27: Historico funcional, Dados contratuais e Horario de trabalho escolhem qualquer colaborador por busca (nome ou matricula) com resultados paginados pelo servidor, no lugar do seletor de uma pagina de 100; a lista de movimentacoes e paginada; a largura do Historico funcional e corrigida (pendencia T115). So contratos existentes, com as permissoes atuais; sem mudanca de API, schema, migration, RBAC, auditoria, seed ou dependencia. Decisao em docs/decisions/t188-dossie-proxima-fatia-pessoas.md. Fora de escopo: opcoes B e C, O1 da T186, catalogos acima de 100, tabela de vinculos de horario, escrita ou permissao nova, promocao e merge."
+    "id": "T189",
+    "status": "seletor_empresa_ativa_em_implementacao",
+    "reason": "T188 integrada em main pela PR #181 (squash 9f9a98627f5a5da75cb6c4cf8d1a80a4574c7402), com a CI de push 3/3 verde (run 40516941977); observacoes O1, O2, O4, O5 e O6 seguem abertas. A T189 implementa o seletor de empresa ativa no topo do menu lateral e no Hub, conforme decisao aprovada pela proprietaria em 2026-10-27: componente unico; empresa unica e perfis sem troca so para leitura; troca que mantem o modulo na tela inicial segura; confirmacao diante de edicao pendente e bloqueio durante salvamento; aviso as outras abas e reconferencia ao foco. So os contratos da T163, com as permissoes existentes; sem mudanca de API, schema, migration, RBAC, auditoria, seed ou dependencia. Decisao em docs/decisions/t189-seletor-empresa-ativa.md. Fora de escopo: CNPJ, Adicionar e Gerenciar empresas, concessao, retorno do master ao global, verificacao definitiva no servidor, promocao e merge."
   },
   "openDeliveries": [
     {
-      "id": "T188",
+      "id": "T189",
       "pullRequest": null,
-      "status": "pessoas_abas_sem_teto_em_implementacao"
+      "status": "seletor_empresa_ativa_em_implementacao"
     }
   ],
   "requiredArtifacts": [

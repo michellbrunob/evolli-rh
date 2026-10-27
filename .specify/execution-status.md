@@ -2431,11 +2431,16 @@ retificar, transferir, mudar cargo, desligar), as opções B e C do dossiê, O1 
 T186, banco de horas, ponto, escala, folha, fuso horário, dados pessoais novos,
 importação, exportação, integrações externas, promoção e merge.
 
-## Abas operacionais de Pessoas sem o teto de 100 — T188 (em implementação)
+## Abas operacionais de Pessoas sem o teto de 100 — T188 (integrada)
 
-| Tarefa | Estado               | Resultado principal                                                                                   |
-| ------ | -------------------- | ----------------------------------------------------------------------------------------------------- |
-| T188   | **Em implementação** | Histórico funcional, Dados contratuais e Horário de trabalho escolhem qualquer colaborador por busca. |
+| Tarefa | Estado                                    | Resultado principal                                                                                   |
+| ------ | ----------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| T188   | **Integrada** (PR #181, squash `9f9a986`) | Histórico funcional, Dados contratuais e Horário de trabalho escolhem qualquer colaborador por busca. |
+
+**Observação de relatório:** a integração funcional da T188 está concluída
+(CI de push 3/3 verde, run 40516941977); a única pendência administrativa era
+a sua convergência no Spec Kit, resolvida no primeiro commit da T189. Seguem
+abertas, como observações, O1, O2, O4, O5 e O6 da revisão.
 
 **Escopo da T188:** opção A do [dossiê](../docs/decisions/t188-dossie-proxima-fatia-pessoas.md), aprovada pela proprietária
 em 2026-10-27: busca por nome ou matrícula com resultados paginados pelo
@@ -2448,6 +2453,24 @@ schema, migration, RBAC, auditoria, seed ou dependência.
 tabela de vínculos de horário, formulários e regras dos módulos, escrita ou
 permissão nova, banco de horas, ponto, escala, folha, fuso horário, dados
 pessoais novos, importação, exportação, integrações externas, promoção e
+merge.
+
+## Seletor de empresa ativa — T189 (em implementação)
+
+| Tarefa | Estado               | Resultado principal                                                                             |
+| ------ | -------------------- | ----------------------------------------------------------------------------------------------- |
+| T189   | **Em implementação** | Empresa ativa no topo do menu lateral e no Hub, com troca segura para quem o servidor autoriza. |
+
+**Escopo da T189:** [decisão](../docs/decisions/t189-seletor-empresa-ativa.md) aprovada pela proprietária em
+2026-10-27: componente único de empresa ativa no menu lateral e no Hub; troca
+que mantém o módulo na tela inicial segura; confirmação diante de edição
+pendente e bloqueio durante salvamento; aviso às outras abas e reconferência ao
+foco. Só os contratos da T163, com as permissões atuais; sem mudança de API,
+schema, migration, RBAC, auditoria, seed ou dependência.
+
+**Fora de escopo:** CNPJ ou dado fiscal novo, "Adicionar empresa",
+"Gerenciar empresas", concessão de empresa, retorno do `master_tecnico` ao
+acesso global sem novo login, verificação definitiva no servidor, promoção e
 merge.
 
 ## Próxima ação autorizável

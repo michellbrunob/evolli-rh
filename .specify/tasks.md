@@ -2587,8 +2587,16 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       como `[T187 dev]`, não a `main`.
 
 85. **T188 - Abas operacionais de Pessoas sem o teto de 100 colaboradores**
-    - **Estado:** **em implementação**. Branch `codex/t188-proxima-fatia-pessoas`, a partir do
+    - **Estado:** **integrada** em `main` pela PR #181, squash
+      `9f9a98627f5a5da75cb6c4cf8d1a80a4574c7402`, com a CI de push 3/3 verde (run 40516941977);
+      branch preservada. Implementada na branch `codex/t188-proxima-fatia-pessoas`, a partir do
       squash `00a94df7c8e9dc25179b8e23bf9fbe9a1466e50f` (T187 integrada, PR #180).
+    - **Observação de relatório:** a integração funcional da T188 está concluída; a única
+      pendência administrativa era a sua convergência no Spec Kit, resolvida no primeiro commit
+      da T189. Observações da revisão que seguem abertas, sem correção: O1 (Horário resolve nomes
+      pela primeira página de 100), O2 (ordenação de movimentações sem desempate por id; exige
+      API), O4 (clicar de novo no mesmo colaborador limpa o vínculo), O5 (auditoria de consulta
+      global do `master_tecnico` no atalho) e O6 (prévia sem mais de 100 colaboradores).
     - **Preparação:** [dossiê](../docs/decisions/t188-dossie-proxima-fatia-pessoas.md) com três opções; a proprietária aprovou a opção A
       completa em 2026-10-27.
     - **Objetivo:** em Histórico funcional, Dados contratuais e Horário de trabalho, escolher
@@ -2610,6 +2618,30 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       externas, promoção e merge.
     - **Prévia:** `http://127.0.0.1:5173` passa a mostrar a branch da T188 ao vivo, identificada
       como `[T188 dev]`, não a `main`.
+
+86. **T189 - Seletor de empresa ativa no menu lateral e no Hub**
+    - **Estado:** **em implementação**. Branch `codex/t189-seletor-empresa-ativa`, a partir do
+      squash `9f9a98627f5a5da75cb6c4cf8d1a80a4574c7402` (T188 integrada, PR #181).
+    - **Decisão:** [documento de decisão](../docs/decisions/t189-seletor-empresa-ativa.md), com as decisões aprovadas pela
+      proprietária em 2026-10-27.
+    - **Objetivo:** um componente único de empresa ativa, no topo do menu lateral e no Hub (no
+      lugar do select atual): nome e código interno da empresa ativa; lista das empresas
+      autorizadas para quem pode trocar; empresa única e perfis sem troca só para leitura;
+      troca que mantém o módulo, na tela inicial segura dele; confirmação diante de edição
+      pendente e bloqueio durante salvamento; aviso às outras abas e reconferência ao recuperar
+      o foco.
+    - **Contratos:** só os da T163 — `GET /v1/users/me`, `GET /v1/auth/contexto/empresas` e
+      `POST /v1/auth/contexto/empresa` — com as permissões existentes (trocam só `rh` e
+      `master_tecnico`). Sem mudança de API, schema, migration, RBAC, auditoria, seed, Docker
+      ou dependência.
+    - **Entrega prevista:** componente, registro global de edição pendente e salvamento em
+      andamento, sincronização entre abas por `BroadcastChannel`, testes web e E2E com
+      PostgreSQL real dos contratos reutilizados, validação no navegador em 375 px.
+    - **Fora de escopo:** CNPJ ou outro dado fiscal, "Adicionar empresa", "Gerenciar empresas",
+      concessão de empresa à conta, retorno do `master_tecnico` ao acesso global sem novo login,
+      verificação definitiva da empresa esperada no servidor, `localStorage`, promoção e merge.
+    - **Prévia:** `http://127.0.0.1:5173` passa a mostrar a branch da T189 ao vivo, identificada
+      como `[T189 dev]`, não a `main`.
 
 ## Regra obrigatória para as próximas tarefas
 
