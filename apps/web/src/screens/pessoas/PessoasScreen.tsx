@@ -198,6 +198,30 @@ export function PessoasScreen({
   // o contêiner nunca abre numa aba que ele mesmo não lista.
   const abas = ABAS.filter((aba) => aba.estado === modo);
   const [abaAtiva, setAbaAtiva] = useState<AbaPessoas>(abas[0]!.id);
+  /**
+   * T187 — o atalho da "Vida funcional" da ficha: abre o Histórico funcional
+   * já no colaborador e no vínculo. Vale só para essa abertura; trocar de aba
+   * pela barra limpa a seleção.
+   */
+  const [selecaoHistorico, setSelecaoHistorico] = useState<{
+    colaboradorId: string;
+    vinculoId: string;
+  } | null>(null);
+  const focarAbaHistoricoRef = useRef(false);
+  useEffect(() => {
+    if (!focarAbaHistoricoRef.current) return;
+    focarAbaHistoricoRef.current = false;
+    document.getElementById("pessoas-tab-historico_funcional")?.focus();
+  }, [abaAtiva]);
+
+  function abrirHistoricoFuncional(alvo: {
+    colaboradorId: string;
+    vinculoId: string;
+  }) {
+    setSelecaoHistorico(alvo);
+    focarAbaHistoricoRef.current = true;
+    setAbaAtiva("historico_funcional");
+  }
 
   const definicaoAtiva = abas.find((aba) => aba.id === abaAtiva) ?? abas[0]!;
 
@@ -260,7 +284,10 @@ export function PessoasScreen({
                   ? "pessoas-screen__tab pessoas-screen__tab--ativa"
                   : "pessoas-screen__tab"
               }
-              onClick={() => setAbaAtiva(aba.id)}
+              onClick={() => {
+                setSelecaoHistorico(null);
+                setAbaAtiva(aba.id);
+              }}
             >
               {aba.rotulo}
             </button>
@@ -282,11 +309,12 @@ export function PessoasScreen({
             {...(onNovaAdmissao ? { onNovaAdmissao } : {})}
             podeEditarFicha={podeEditarFicha}
             podeOperarJornada={podeOperarJornada}
+            onAbrirHistoricoFuncional={abrirHistoricoFuncional}
           />
         ) : abaAtiva === "horario" ? (
           <PessoasHorarioScreen podeOperar={podeOperarJornada} />
         ) : abaAtiva === "historico_funcional" ? (
-          <HistoricoFuncionalScreen />
+          <HistoricoFuncionalScreen selecaoInicial={selecaoHistorico} />
         ) : abaAtiva === "dados_contratuais" ? (
           <DadosContratuaisScreen />
         ) : abaAtiva === "documentos" ? (

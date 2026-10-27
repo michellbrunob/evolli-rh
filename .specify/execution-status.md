@@ -2384,11 +2384,15 @@ horário, campos novos de cadastro, salário, contrato detalhado, documentos,
 CPF, dados bancários, dependentes, saúde, edição de jornada pela listagem,
 importação, exportação, integrações externas, promoção e merge.
 
-## Filtros de situação nos contadores de Colaboradores — T186 (em implementação)
+## Filtros de situação nos contadores de Colaboradores — T186 (integrada)
 
-| Tarefa | Estado               | Resultado principal                                                                |
-| ------ | -------------------- | ---------------------------------------------------------------------------------- |
-| T186   | **Em implementação** | Os contadores de Colaboradores viram filtros Todos, Ativos e Inativos da listagem. |
+| Tarefa | Estado                                    | Resultado principal                                                                |
+| ------ | ----------------------------------------- | ---------------------------------------------------------------------------------- |
+| T186   | **Integrada** (PR #179, squash `d7ab172`) | Os contadores de Colaboradores viram filtros Todos, Ativos e Inativos da listagem. |
+
+**Observação histórica (O1 da revisão da T186):** o E2E da listagem ainda não
+cobre especificamente o filtro `situacaoVinculo`. A lacuna é anterior à T186 e
+não foi corrigida nela.
 
 **Escopo da T186:** filtros "Todos", "Ativos" e "Inativos" junto aos contadores
 de Pessoas › Colaboradores, com a regra de situação por empresa da T178,
@@ -2404,6 +2408,24 @@ compensação, fuso horário, admissão, desligamento, edição de situação, m
 de vínculo, campos pessoais novos, salário, contrato detalhado, documentos,
 CPF, dados bancários, dependentes, saúde, importação, exportação, integrações
 externas, promoção e merge.
+
+## Vida funcional na ficha do colaborador — T187 (em implementação)
+
+| Tarefa | Estado               | Resultado principal                                                                         |
+| ------ | -------------------- | ------------------------------------------------------------------------------------------- |
+| T187   | **Em implementação** | A ficha mostra, só para leitura, a lotação vigente e a linha do tempo do vínculo principal. |
+
+**Escopo da T187:** opção A do [dossiê](../docs/decisions/t187-dossie-proxima-fatia-colaboradores.md), aprovada pela proprietária
+em 2026-10-27: seção "Vida funcional" na ficha, somente leitura, com a lotação
+vigente e todos os status da linha do tempo do vínculo principal, e atalho
+para o Histórico funcional já no colaborador e no vínculo. Só os contratos de
+alocações e linha do tempo, com as permissões existentes; sem mudança de API,
+schema, migration, RBAC, auditoria, seed ou dependência.
+
+**Fora de escopo:** qualquer escrita pela ficha (registrar, efetivar, cancelar,
+retificar, transferir, mudar cargo, desligar), as opções B e C do dossiê, O1 da
+T186, banco de horas, ponto, escala, folha, fuso horário, dados pessoais novos,
+importação, exportação, integrações externas, promoção e merge.
 
 ## Próxima ação autorizável
 

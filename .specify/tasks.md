@@ -2533,8 +2533,12 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       como `[T185 dev]`, não a `main`.
 
 83. **T186 - Filtros de situação nos contadores de Colaboradores**
-    - **Estado:** **em implementação**. Branch `codex/t186-colaboradores-filtro-situacao`, a
+    - **Estado:** **integrada** em `main` pela PR #179, squash
+      `d7ab1721c19732f19d00bf8d26eaa01d1eb47f1d`, com a CI de push 3/3 verde (run 40396676554);
+      branch preservada. Implementada na branch `codex/t186-colaboradores-filtro-situacao`, a
       partir do squash `2f5b1cccedb4bf31ae181ca4af7b64b57da80a2a` (T185 integrada, PR #178).
+    - **Observação histórica (O1 da revisão):** o E2E da listagem ainda não cobre
+      especificamente `situacaoVinculo` (lacuna anterior à T186, sem correção nela).
     - **Objetivo:** em Pessoas › Colaboradores, transformar os contadores Ativos e Inativos em
       filtros reais e acessíveis ("Todos", "Ativos", "Inativos"), com a mesma regra de situação
       por empresa da T178.
@@ -2553,6 +2557,29 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       importação, exportação, integrações externas, promoção e merge.
     - **Prévia:** `http://127.0.0.1:5173` passa a mostrar a branch da T186 ao vivo, identificada
       como `[T186 dev]`, não a `main`.
+
+84. **T187 - Vida funcional na ficha do colaborador**
+    - **Estado:** **em implementação**. Branch `codex/t187-proxima-fatia-colaboradores`, a
+      partir do squash `d7ab1721c19732f19d00bf8d26eaa01d1eb47f1d` (T186 integrada, PR #179).
+    - **Preparação:** [dossiê](../docs/decisions/t187-dossie-proxima-fatia-colaboradores.md) com três opções; a proprietária aprovou a opção A em
+      2026-10-27.
+    - **Objetivo:** seção "Vida funcional" na ficha, **somente leitura**: lotação vigente e linha
+      do tempo de movimentações do vínculo principal, com todos os status (programada,
+      efetivada, cancelada e retificada), e atalho para o Histórico funcional já no colaborador e
+      no vínculo.
+    - **Contratos:** só `GET /v1/vinculos/:id/alocacoes` e `GET /v1/vinculos/:id/linha-do-tempo`,
+      com as permissões existentes (RH, DP e `master_tecnico` leem). Sem mudança de API, schema,
+      migration, RBAC, auditoria, seed ou dependência.
+    - **Entrega prevista:** seção na ficha, atalho com seleção inicial no Histórico funcional,
+      testes web e validação no navegador em 375 px; E2E existentes como prova de isolamento e
+      permissão dos contratos reutilizados.
+    - **Fora de escopo:** registrar, efetivar, cancelar ou retificar movimentação pela ficha,
+      transferência, mudança de cargo, desligamento (opções B e C do dossiê), O1 da T186, banco
+      de horas, ponto, escala, folha, fuso horário, dados pessoais novos, salário, documentos,
+      CPF, dados bancários, dependentes, saúde, importação, exportação, integrações externas,
+      promoção e merge.
+    - **Prévia:** `http://127.0.0.1:5173` passa a mostrar a branch da T187 ao vivo, identificada
+      como `[T187 dev]`, não a `main`.
 
 ## Regra obrigatória para as próximas tarefas
 

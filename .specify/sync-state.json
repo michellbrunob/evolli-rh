@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "constitutionVersion": "1.4.0",
-  "lastConvergedAt": "2026-10-26",
-  "lastIntegratedTask": 185,
-  "lastRecordedTask": 186,
+  "lastConvergedAt": "2026-10-27",
+  "lastIntegratedTask": 186,
+  "lastRecordedTask": 187,
   "platformDecision": {
     "adr": "docs/adr/0014-evolli-plataforma-base-e-encerramento-do-frappe.md",
     "decidedAt": "2026-10-01",
@@ -11,15 +11,15 @@
     "frappe": "encerrado_como_candidato_referencia_apenas"
   },
   "nextTask": {
-    "id": "T186",
-    "status": "colaboradores_filtro_situacao_em_implementacao",
-    "reason": "T185 integrada em main pela PR #178 (squash 2f5b1cccedb4bf31ae181ca4af7b64b57da80a2a), com a CI de push 3/3 verde (run 40385160298). A T186 transforma os contadores Ativos e Inativos de Pessoas > Colaboradores em filtros Todos, Ativos e Inativos, com a regra de situacao por empresa da T178, aplicados no servidor antes da paginacao e combinaveis com a busca; os contadores seguem com os totais da empresa ativa; estados vazios distintos para empresa sem colaboradores, busca, filtro e busca com filtro. Decisoes da proprietaria de 2026-10-26: o select Situacao sai, o filtro nao vai para a URL e o master sem empresa ativa segue a regra da T178. Sem mudanca de servidor, schema, migration nem RBAC. Decisao em docs/decisions/t186-colaboradores-filtro-situacao.md. Fora de escopo: banco de horas, ponto, jornadas, escala, folha, compensacao, fuso horario, admissao, desligamento, edicao de situacao, mudanca de vinculo, campos pessoais novos, salario, contrato detalhado, documentos, CPF, banco, dependentes, saude, importacao, exportacao, integracoes externas, promocao e merge."
+    "id": "T187",
+    "status": "colaboradores_vida_funcional_em_implementacao",
+    "reason": "T186 integrada em main pela PR #179 (squash d7ab1721c19732f19d00bf8d26eaa01d1eb47f1d), com a CI de push 3/3 verde (run 40396676554); observacao historica O1: o E2E da listagem ainda nao cobre situacaoVinculo. A T187 implementa a opcao A do dossie, aprovada pela proprietaria em 2026-10-27: secao Vida funcional na ficha, somente leitura, com a lotacao vigente e todos os status da linha do tempo do vinculo principal, e atalho para o Historico funcional ja no colaborador e no vinculo. So os contratos de alocacoes e linha do tempo, com as permissoes existentes; sem mudanca de API, schema, migration, RBAC, auditoria, seed ou dependencia. Decisao em docs/decisions/t187-dossie-proxima-fatia-colaboradores.md. Fora de escopo: escrita pela ficha, opcoes B e C, O1, banco de horas, ponto, escala, folha, fuso horario, dados pessoais novos, importacao, exportacao, integracoes externas, promocao e merge."
   },
   "openDeliveries": [
     {
-      "id": "T186",
+      "id": "T187",
       "pullRequest": null,
-      "status": "colaboradores_filtro_situacao_em_implementacao"
+      "status": "colaboradores_vida_funcional_em_implementacao"
     }
   ],
   "requiredArtifacts": [
