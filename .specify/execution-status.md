@@ -2510,18 +2510,22 @@ Departamento e Cargo dos filtros carregam no máximo 100 itens; acima desse
 limite, opções podem não aparecer no seletor. O limite não está resolvido e
 fica pendente de uma entrega própria.
 
-## Próxima fatia de Gestão de Pessoas — T191 (em preparação de decisão)
+## Horário de trabalho sem o teto de 100 — T191 (em implementação)
 
-| Tarefa | Estado                       | Resultado principal                                                        |
-| ------ | ---------------------------- | -------------------------------------------------------------------------- |
-| T191   | **Em preparação de decisão** | Dossiê com três opções para a próxima fatia de Pessoas e uma recomendação. |
+| Tarefa | Estado               | Resultado principal                                                                                  |
+| ------ | -------------------- | ---------------------------------------------------------------------------------------------------- |
+| T191   | **Em implementação** | Vínculos de jornada com o nome do próprio vínculo, paginados, com filtros por colaborador e jornada. |
 
-**Escopo desta etapa:** convergência da T190 e o dossiê (`docs/decisions/t191-dossie-proxima-fatia-pessoas.md`) da próxima
-fatia de Gestão de Pessoas, priorizando o Horário de trabalho (O1 da T188).
-Nenhuma implementação de produto antes da decisão da proprietária.
+**Escopo da T191:** opção B do [dossiê](../docs/decisions/t191-dossie-proxima-fatia-pessoas.md), aprovada pela proprietária
+em 2026-10-27: `colaborador: { id, nome }` na lista e no detalhe dos vínculos
+de horário; tabela de 20 em 20, com filtros por colaborador e por jornada;
+fim da dependência das listas de 100 colaboradores e de 100 jornadas para
+montar a tabela (O1 da T188). Sem schema, migration, RBAC, auditoria, seed ou
+dependência.
 
-**Fora de escopo:** código, API, schema, migration, RBAC, banco, seed, Docker,
-dependências, CI, PR, push, promoção e merge.
+**Fora de escopo:** desempate da linha do tempo do vínculo funcional, catálogo
+de jornadas acima de 100 itens, limite de 100 dos catálogos de Departamento e
+Cargo, regras de jornada, promoção e merge.
 
 ## Próxima ação autorizável
 

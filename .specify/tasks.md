@@ -2692,18 +2692,25 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
     - **Prévia:** `http://127.0.0.1:5173` passa a mostrar a branch da T190 ao vivo, identificada
       como `[T190 dev]`, não a `main`.
 
-88. **T191 - Próxima fatia de Gestão de Pessoas (preparação de decisão)**
-    - **Estado:** **em preparação de decisão**. Branch `codex/t191-proxima-fatia-pessoas`, a
-      partir do squash `e148a6117a8e1a84d93ee814c6811577fa5943e3` (T190 integrada, PR #183).
-    - **Objetivo desta etapa:** convergir a T190 e propor três próximas fatias de Gestão de
-      Pessoas, priorizando a pendência operacional do Horário de trabalho (O1 da T188), sem
-      implementar produto antes de uma decisão explícita da proprietária.
-    - **Entrega desta etapa:** dossiê (`docs/decisions/t191-dossie-proxima-fatia-pessoas.md`) com as opções e uma recomendação. Só
-      documentação: sem código, API, schema, migration, RBAC, banco, seed, Docker,
-      dependência, CI, PR ou push.
-    - **Fora de escopo:** implementação de qualquer opção antes da decisão, regras de jornada,
-      dados pessoais novos, documentos, folha, ponto, banco de horas, fuso horário, importação,
-      exportação, integrações externas, promoção e merge.
+88. **T191 - Horário de trabalho sem o teto de 100 vínculos e nomes**
+    - **Estado:** **em implementação**. Branch `codex/t191-proxima-fatia-pessoas`, a partir do
+      squash `e148a6117a8e1a84d93ee814c6811577fa5943e3` (T190 integrada, PR #183).
+    - **Preparação:** [dossiê](../docs/decisions/t191-dossie-proxima-fatia-pessoas.md) com três opções; a proprietária aprovou a opção B em
+      2026-10-27.
+    - **Objetivo:** a tabela de vínculos de jornada do Horário de trabalho deixa de limitar
+      vínculos e nomes aos primeiros 100: cada vínculo traz o próprio colaborador (`id` e
+      `nome`), em lista e detalhe; a tela pagina de 20 em 20, com filtros por colaborador e por
+      jornada. Fecha a O1 da T188.
+    - **Contratos:** `GET /v1/horarios/vinculos` e `GET /v1/horarios/vinculos/:vinculoId`
+      ganham `colaborador: { id, nome }` (extensão aditiva); filtros `colaboradorId` e
+      `tabelaHorarioId` já existentes e combináveis. Sem schema, migration, RBAC, auditoria,
+      seed, Docker ou dependência; leitura segue com RH, DP e `master_tecnico`.
+    - **Fora de escopo:** desempate por `id` na linha do tempo do vínculo funcional, catálogo de
+      jornadas acima de 100 itens (filtro e formulário seguem numa página de 100), limite de 100
+      dos catálogos de Departamento e Cargo (T190), regras de jornada, dados pessoais novos,
+      documentos, folha, ponto, banco de horas, fuso horário, promoção e merge.
+    - **Prévia:** `http://127.0.0.1:5173` passa a mostrar a branch da T191 ao vivo, identificada
+      como `[T191 dev]`, não a `main`.
 
 ## Regra obrigatória para as próximas tarefas
 

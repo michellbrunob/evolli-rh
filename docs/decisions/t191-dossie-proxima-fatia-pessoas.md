@@ -1,7 +1,7 @@
 # T191 — Dossiê: próxima fatia de Gestão de Pessoas
 
-Status: **dossiê de preparação de decisão.** Nada aqui decide, aprova ou
-autoriza implementação: a escolha é da proprietária.
+Status: **decidido pela proprietária em 2026-10-27: opção B** (seção 5).
+As seções 1 a 4 registram o dossiê como foi apresentado.
 Data: 2026-10-27. Tarefa: T191.
 Fontes, e só elas: `.specify`, as decisões em `docs/decisions` (em especial
 [T183](t183-jornada-colaborador.md),
@@ -140,3 +140,49 @@ Para seguir com B, a proprietária precisa decidir:
 3. **Detalhe do vínculo com o nome** também (recomendado: sim).
 4. **Incluir o desempate por `id` da linha do tempo** (pendência da T190) na
    mesma entrega (opcional).
+
+## 5. Decisão da proprietária (2026-10-27)
+
+**Opção B aprovada.** Respostas às decisões:
+
+1. **Filtros:** por colaborador **e** por jornada, combináveis.
+2. **Página:** 20 vínculos.
+3. **Detalhe:** também traz o nome do colaborador.
+4. **Linha do tempo:** o desempate por `id` **não** entra nesta entrega.
+
+A T191 fica focada no Horário de trabalho: a tabela de vínculos de jornada não
+limita mais nomes nem vínculos aos primeiros 100.
+
+## 6. O que foi entregue
+
+- **API:** `GET /v1/horarios/vinculos` e `GET /v1/horarios/vinculos/:vinculoId`
+  trazem `colaborador: { id, nome }` — só esses dois campos —, pela relação do
+  próprio vínculo, na mesma consulta e no mesmo escopo. Os campos atuais não
+  mudaram. Os filtros `colaboradorId` e `tabelaHorarioId`, já existentes,
+  continuam combináveis. Leitura com RH, DP e `master_tecnico`, como antes;
+  demais negados. Auditoria inalterada (uma consulta por página). Sem schema
+  nem migration.
+- **Web — Horário de trabalho:** a tabela pede 20 vínculos por vez, com
+  paginação e o total do filtro atual; nome e jornada vêm do próprio vínculo
+  (sem nome na resposta, rótulo neutro — nunca o identificador técnico).
+  Filtro por jornada (com as inativas, marcadas) e filtro por colaborador
+  (busca da T188, aberta sob pedido, com o filtro ativo removível); trocar de
+  filtro volta à página 1; resposta atrasada de filtro anterior é descartada;
+  vazio com filtros tem mensagem própria e "Limpar filtros". DP e master
+  seguem só consultando. Em 375 px os filtros empilham.
+- **Testes:** E2E com PostgreSQL real — 105 vínculos criados pelo caminho da
+  API, mais de 100 colaboradores na empresa, todos os nomes depois do
+  centésimo, paginação de 20 sem repetição nem lacuna, filtros isolados e
+  combinados, nome no detalhe, isolamento entre empresas (inclusive master
+  global), DP igual a RH e perfis negados — e testes web da tela.
+
+## 7. Fora do escopo desta entrega e limites conhecidos
+
+- **Desempate da linha do tempo do vínculo funcional:** continua sem `id` como
+  último critério (`vinculo/vinculo.service.ts`), por decisão (item 4).
+- **Catálogo de jornadas:** o filtro por jornada e o formulário de novo
+  vínculo seguem com uma página de 100 jornadas. A **tabela** não depende mais
+  dela; numa empresa com mais de 100 jornadas, algumas não apareceriam como
+  opção de filtro ou de vínculo. Limite pendente de entrega própria.
+- **Catálogos de Departamento e Cargo** dos filtros de Colaboradores (T190):
+  limite de 100 itens, inalterado.

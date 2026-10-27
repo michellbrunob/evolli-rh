@@ -12,14 +12,14 @@
   },
   "nextTask": {
     "id": "T191",
-    "status": "pessoas_proxima_fatia_em_decisao",
-    "reason": "T190 integrada em main pela PR #183 (squash e148a6117a8e1a84d93ee814c6811577fa5943e3), com a CI de push 3/3 verde (run 40579253102); seguem abertos o limite de 100 itens dos catalogos dos filtros, a O1 da T188, a linha do tempo sem desempate, a falha de catalogo sem regiao viva e os rotulos repetidos do master sem empresa ativa. A T191 abre em preparacao de decisao: dossie com tres opcoes para a proxima fatia de Gestao de Pessoas, priorizando o Horario de trabalho, em docs/decisions/t191-dossie-proxima-fatia-pessoas.md. Nenhuma implementacao de produto antes da decisao da proprietaria. Fora de escopo: codigo, API, schema, migration, RBAC, banco, seed, Docker, dependencias, CI, PR, push, promocao e merge."
+    "status": "horario_trabalho_sem_teto_em_implementacao",
+    "reason": "T190 integrada em main pela PR #183 (squash e148a6117a8e1a84d93ee814c6811577fa5943e3), com a CI de push 3/3 verde (run 40579253102). A T191 implementa a opcao B do dossie, aprovada pela proprietaria em 2026-10-27: colaborador {id, nome} na lista e no detalhe dos vinculos de horario; tabela do Horario de trabalho de 20 em 20, com filtros por colaborador e por jornada, sem as listas de 100 colaboradores e de 100 jornadas para montar a tabela (O1 da T188). Sem schema, migration, RBAC, auditoria, seed ou dependencia. Decisao em docs/decisions/t191-dossie-proxima-fatia-pessoas.md. Fora de escopo: desempate da linha do tempo, catalogo de jornadas acima de 100, limite de 100 dos catalogos de Departamento e Cargo, promocao e merge."
   },
   "openDeliveries": [
     {
       "id": "T191",
       "pullRequest": null,
-      "status": "pessoas_proxima_fatia_em_decisao"
+      "status": "horario_trabalho_sem_teto_em_implementacao"
     }
   ],
   "requiredArtifacts": [
