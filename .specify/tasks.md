@@ -2559,8 +2559,13 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       como `[T186 dev]`, não a `main`.
 
 84. **T187 - Vida funcional na ficha do colaborador**
-    - **Estado:** **em implementação**. Branch `codex/t187-proxima-fatia-colaboradores`, a
+    - **Estado:** **integrada** em `main` pela PR #180, squash
+      `00a94df7c8e9dc25179b8e23bf9fbe9a1466e50f`, com a CI de push 3/3 verde (run 40496328412);
+      branch preservada. Implementada na branch `codex/t187-proxima-fatia-colaboradores`, a
       partir do squash `d7ab1721c19732f19d00bf8d26eaa01d1eb47f1d` (T186 integrada, PR #179).
+    - **Observação de relatório:** a integração funcional da T187 está concluída; a única
+      pendência administrativa era a sua convergência no Spec Kit, resolvida no primeiro commit
+      da T188.
     - **Preparação:** [dossiê](../docs/decisions/t187-dossie-proxima-fatia-colaboradores.md) com três opções; a proprietária aprovou a opção A em
       2026-10-27.
     - **Objetivo:** seção "Vida funcional" na ficha, **somente leitura**: lotação vigente e linha
@@ -2580,6 +2585,21 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       promoção e merge.
     - **Prévia:** `http://127.0.0.1:5173` passa a mostrar a branch da T187 ao vivo, identificada
       como `[T187 dev]`, não a `main`.
+
+85. **T188 - Próxima fatia de Gestão de Pessoas (preparação de decisão)**
+    - **Estado:** **em preparação de decisão**. Branch `codex/t188-proxima-fatia-pessoas`, a
+      partir do squash `00a94df7c8e9dc25179b8e23bf9fbe9a1466e50f` (T187 integrada, PR #180).
+    - **Objetivo desta etapa:** convergir a T187 e propor até três próximas fatias
+      independentes de Gestão de Pessoas, priorizando valor operacional para RH e DP, sem
+      implementar produto antes de uma decisão explícita da proprietária.
+    - **Entrega desta etapa:** dossiê
+      (`docs/decisions/t188-dossie-proxima-fatia-pessoas.md`) com as opções e uma
+      recomendação. Só documentação: sem código, API, schema, migration, RBAC, banco, seed,
+      Docker, dependência, CI ou PR.
+    - **Fora de escopo:** implementação de qualquer opção antes da decisão, banco de horas,
+      ponto, escala, folha, fuso horário, dados pessoais novos, salário, documentos, CPF, dados
+      bancários, dependentes, saúde, importação, exportação, integrações externas, promoção e
+      merge.
 
 ## Regra obrigatória para as próximas tarefas
 

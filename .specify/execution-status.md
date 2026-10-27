@@ -2409,11 +2409,15 @@ de vínculo, campos pessoais novos, salário, contrato detalhado, documentos,
 CPF, dados bancários, dependentes, saúde, importação, exportação, integrações
 externas, promoção e merge.
 
-## Vida funcional na ficha do colaborador — T187 (em implementação)
+## Vida funcional na ficha do colaborador — T187 (integrada)
 
-| Tarefa | Estado               | Resultado principal                                                                         |
-| ------ | -------------------- | ------------------------------------------------------------------------------------------- |
-| T187   | **Em implementação** | A ficha mostra, só para leitura, a lotação vigente e a linha do tempo do vínculo principal. |
+| Tarefa | Estado                                    | Resultado principal                                                                         |
+| ------ | ----------------------------------------- | ------------------------------------------------------------------------------------------- |
+| T187   | **Integrada** (PR #180, squash `00a94df`) | A ficha mostra, só para leitura, a lotação vigente e a linha do tempo do vínculo principal. |
+
+**Observação de relatório:** a integração funcional da T187 está concluída
+(CI de push 3/3 verde, run 40496328412); a única pendência administrativa era
+a sua convergência no Spec Kit, resolvida no primeiro commit da T188.
 
 **Escopo da T187:** opção A do [dossiê](../docs/decisions/t187-dossie-proxima-fatia-colaboradores.md), aprovada pela proprietária
 em 2026-10-27: seção "Vida funcional" na ficha, somente leitura, com a lotação
@@ -2426,6 +2430,20 @@ schema, migration, RBAC, auditoria, seed ou dependência.
 retificar, transferir, mudar cargo, desligar), as opções B e C do dossiê, O1 da
 T186, banco de horas, ponto, escala, folha, fuso horário, dados pessoais novos,
 importação, exportação, integrações externas, promoção e merge.
+
+## Próxima fatia de Gestão de Pessoas — T188 (em preparação de decisão)
+
+| Tarefa | Estado                       | Resultado principal                                                        |
+| ------ | ---------------------------- | -------------------------------------------------------------------------- |
+| T188   | **Em preparação de decisão** | Dossiê com até três opções para a próxima fatia de Pessoas e recomendação. |
+
+**Escopo desta etapa:** convergência da T187 e o dossiê
+(`docs/decisions/t188-dossie-proxima-fatia-pessoas.md`) da próxima fatia de
+Gestão de Pessoas. Nenhuma implementação de produto antes da decisão da
+proprietária.
+
+**Fora de escopo:** código, API, schema, migration, RBAC, banco, seed, Docker,
+dependências, CI, PR, promoção e merge.
 
 ## Próxima ação autorizável
 
