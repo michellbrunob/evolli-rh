@@ -2655,8 +2655,17 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       como `[T189 dev]`, não a `main`.
 
 87. **T190 - Filtros por Departamento e Cargo na listagem de Colaboradores**
-    - **Estado:** **em implementação**. Branch `codex/t190-proxima-fatia-pessoas`, a partir do
+    - **Estado:** **integrada** em `main` pela PR #183, squash
+      `e148a6117a8e1a84d93ee814c6811577fa5943e3`, com a CI de push 3/3 verde (run 40579253102);
+      branch preservada. Implementada na branch `codex/t190-proxima-fatia-pessoas`, a partir do
       squash `bf9d87cafb7d6676207d5d38c28889a09276dd59` (T189 integrada, PR #182).
+    - **Observação de relatório:** a integração funcional da T190 está concluída; a única
+      pendência administrativa era a sua convergência no Spec Kit, resolvida no primeiro commit
+      da T191. Seguem abertas, sem correção: o limite de 100 itens dos catálogos de Departamento
+      e Cargo dos filtros; a O1 da T188 (nomes no Horário de trabalho acima de 100
+      colaboradores); a linha do tempo do vínculo sem desempate por `id`; a falha de carregamento
+      dos catálogos sem anúncio por região viva; e rótulos repetidos entre empresas para o
+      `master_tecnico` sem empresa ativa.
     - **Preparação:** [dossiê](../docs/decisions/t190-dossie-proxima-fatia-pessoas.md) com três opções; a proprietária aprovou a opção B
       com o complemento da O2 da T188 em 2026-10-27.
     - **Objetivo:** filtrar a listagem de Colaboradores por Departamento e/ou Cargo pela
@@ -2682,6 +2691,19 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       própria.
     - **Prévia:** `http://127.0.0.1:5173` passa a mostrar a branch da T190 ao vivo, identificada
       como `[T190 dev]`, não a `main`.
+
+88. **T191 - Próxima fatia de Gestão de Pessoas (preparação de decisão)**
+    - **Estado:** **em preparação de decisão**. Branch `codex/t191-proxima-fatia-pessoas`, a
+      partir do squash `e148a6117a8e1a84d93ee814c6811577fa5943e3` (T190 integrada, PR #183).
+    - **Objetivo desta etapa:** convergir a T190 e propor três próximas fatias de Gestão de
+      Pessoas, priorizando a pendência operacional do Horário de trabalho (O1 da T188), sem
+      implementar produto antes de uma decisão explícita da proprietária.
+    - **Entrega desta etapa:** dossiê (`docs/decisions/t191-dossie-proxima-fatia-pessoas.md`) com as opções e uma recomendação. Só
+      documentação: sem código, API, schema, migration, RBAC, banco, seed, Docker,
+      dependência, CI, PR ou push.
+    - **Fora de escopo:** implementação de qualquer opção antes da decisão, regras de jornada,
+      dados pessoais novos, documentos, folha, ponto, banco de horas, fuso horário, importação,
+      exportação, integrações externas, promoção e merge.
 
 ## Regra obrigatória para as próximas tarefas
 
