@@ -27,6 +27,10 @@ import {
   listarVinculosHorario,
 } from "../../api/vinculoHorarioClient";
 import { formatarDiaCivil } from "../../format/data";
+import {
+  SeletorColaboradorPaginado,
+  type ColaboradorEscolhido,
+} from "./SeletorColaboradorPaginado";
 import "./PessoasHorarioScreen.css";
 
 export const PESSOAS_HORARIO_TITULO_ID = "pessoas-horario-titulo";
@@ -76,7 +80,23 @@ export function PessoasHorarioScreen({
     "carregando" | "erro" | "dados"
   >("carregando");
   const [vinculos, setVinculos] = useState<VinculoHorarioApi[]>([]);
+  /**
+   * Primeira página de colaboradores, usada SÓ como dicionário de nomes da
+   * tabela de vínculos (que também é uma página de 100). A ESCOLHA do
+   * colaborador não depende mais dela (T188): é por busca paginada.
+   */
   const [colaboradores, setColaboradores] = useState<ColaboradorApi[]>([]);
+  /**
+   * T188 — quantos colaboradores ATIVOS o escopo tem, contados pelo servidor
+   * (`situacao=ativo`, a regra por empresa da T178), e qual é, quando há um
+   * só. Antes vinha da página de 100, e passava a errar acima dela.
+   */
+  const [ativos, setAtivos] = useState<{
+    total: number;
+    unico: ColaboradorEscolhido | null;
+  }>({ total: 0, unico: null });
+  const [colaboradorDoFormulario, setColaboradorDoFormulario] =
+    useState<ColaboradorEscolhido | null>(null);
   const [tabelas, setTabelas] = useState<TabelaHorarioApi[]>([]);
   const [formulario, setFormulario] = useState<FormularioState | null>(null);
   const [detalhe, setDetalhe] = useState<DetalheState | null>(null);
@@ -86,13 +106,23 @@ export function PessoasHorarioScreen({
   const carregarDados = useCallback(async () => {
     setStatusCarregamento("carregando");
     try {
-      const [vinculosResp, colaboradoresResp, tabelasResp] = await Promise.all([
-        listarVinculosHorario({ tamanhoPagina: 100 }),
-        listarColaboradores({ tamanhoPagina: 100 }),
-        listarTabelasHorario({ tamanhoPagina: 100 }),
-      ]);
+      const [vinculosResp, colaboradoresResp, ativosResp, tabelasResp] =
+        await Promise.all([
+          listarVinculosHorario({ tamanhoPagina: 100 }),
+          listarColaboradores({ tamanhoPagina: 100 }),
+          listarColaboradores({ situacao: "ativo", tamanhoPagina: 1 }),
+          listarTabelasHorario({ tamanhoPagina: 100 }),
+        ]);
       setVinculos(vinculosResp.itens);
       setColaboradores(colaboradoresResp.itens);
+      const primeiroAtivo = ativosResp.itens[0];
+      setAtivos({
+        total: ativosResp.total,
+        unico:
+          ativosResp.total === 1 && primeiroAtivo
+            ? { id: primeiroAtivo.id, nome: primeiroAtivo.nome }
+            : null,
+      });
       setTabelas(tabelasResp.itens);
       setStatusCarregamento("dados");
     } catch {
@@ -113,17 +143,18 @@ export function PessoasHorarioScreen({
     [tabelas],
   );
 
-  const colaboradoresAtivos = useMemo(
-    () => colaboradores.filter((c) => c.situacao === "ativo"),
-    [colaboradores],
-  );
   const tabelasAtivas = useMemo(
     () => tabelas.filter((t) => t.ativo),
     [tabelas],
   );
 
   function nomeColaborador(id: string): string {
-    return colaboradoresPorId.get(id)?.nome ?? `Colaborador ${id.slice(0, 8)}`;
+    return (
+      colaboradoresPorId.get(id)?.nome ??
+      (colaboradorDoFormulario?.id === id
+        ? colaboradorDoFormulario.nome
+        : `Colaborador ${id.slice(0, 8)}`)
+    );
   }
   function nomeTabela(id: string): string {
     return tabelasPorId.get(id)?.nome ?? `Tabela ${id.slice(0, 8)}`;
@@ -131,9 +162,9 @@ export function PessoasHorarioScreen({
 
   function abrirFormulario() {
     setDetalhe(null);
+    setColaboradorDoFormulario(ativos.unico);
     setFormulario({
-      colaboradorId:
-        colaboradoresAtivos.length === 1 ? colaboradoresAtivos[0]!.id : "",
+      colaboradorId: ativos.unico?.id ?? "",
       tabelaHorarioId: tabelasAtivas.length === 1 ? tabelasAtivas[0]!.id : "",
       vigenciaInicio: "",
       vigenciaFim: "",
@@ -165,7 +196,7 @@ export function PessoasHorarioScreen({
     if (!formulario) return;
 
     const erros: FormularioErros = {};
-    if (colaboradoresAtivos.length > 1 && !formulario.colaboradorId) {
+    if (ativos.total > 1 && !formulario.colaboradorId) {
       erros.colaboradorId = "Selecione o colaborador.";
     }
     if (tabelasAtivas.length > 1 && !formulario.tabelaHorarioId) {
@@ -283,8 +314,7 @@ export function PessoasHorarioScreen({
     }
   }
 
-  const semOpcoesValidas =
-    colaboradoresAtivos.length === 0 || tabelasAtivas.length === 0;
+  const semOpcoesValidas = ativos.total === 0 || tabelasAtivas.length === 0;
 
   const colunas: DataTableColumn<VinculoHorarioApi>[] = [
     {
@@ -431,7 +461,7 @@ export function PessoasHorarioScreen({
 
           {podeOperar && statusCarregamento === "dados" && semOpcoesValidas ? (
             <p className="pessoas-horario-screen__form-erro" role="status">
-              {colaboradoresAtivos.length === 0
+              {ativos.total === 0
                 ? "Nenhum colaborador ativo disponível para vincular. "
                 : ""}
               {tabelasAtivas.length === 0
@@ -557,40 +587,27 @@ export function PessoasHorarioScreen({
             aria-label="Formulário de novo vínculo de horário"
             onSubmit={(e) => void handleSubmit(e)}
           >
-            {colaboradoresAtivos.length > 1 ? (
-              <FormField
+            {/* T188 — qualquer colaborador ATIVO da empresa, por busca
+                paginada no servidor; sem o teto de 100. Com um só ativo,
+                ele já vem escolhido e o campo não aparece, como antes. */}
+            {ativos.total > 1 ? (
+              <SeletorColaboradorPaginado
                 id="pessoas-horario-colaborador"
-                label="Colaborador"
-                required
+                rotulo="Colaborador (buscar por nome ou matrícula)"
+                situacao="ativo"
+                selecionado={colaboradorDoFormulario}
+                onSelecionar={(c) => {
+                  setColaboradorDoFormulario(c);
+                  setFormulario((prev) =>
+                    prev
+                      ? { ...prev, colaboradorId: c?.id ?? "", erros: {} }
+                      : prev,
+                  );
+                }}
                 {...(formulario.erros.colaboradorId
-                  ? { error: formulario.erros.colaboradorId }
+                  ? { erro: formulario.erros.colaboradorId }
                   : {})}
-              >
-                {(control) => (
-                  <select
-                    value={formulario.colaboradorId}
-                    onChange={(e) =>
-                      setFormulario((prev) =>
-                        prev
-                          ? {
-                              ...prev,
-                              colaboradorId: e.target.value,
-                              erros: {},
-                            }
-                          : prev,
-                      )
-                    }
-                    {...control}
-                  >
-                    <option value="">Selecione…</option>
-                    {colaboradoresAtivos.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.nome}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </FormField>
+              />
             ) : null}
 
             {tabelasAtivas.length > 1 ? (

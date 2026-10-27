@@ -38,10 +38,9 @@ import {
 } from "../../components";
 import type { DataTableColumn } from "../../components";
 import {
-  type ColaboradorApi,
   type TipoVinculo,
   type VinculoApi,
-  listarColaboradores,
+  buscarColaborador,
   listarVinculosDoColaborador,
 } from "../../api/colaboradoresClient";
 import { formatarDiaCivil, formatarInstante } from "../../format/data";
@@ -82,6 +81,11 @@ import {
   ROTULO_TIPO_MOVIMENTACAO,
   VARIANTE_STATUS_MOVIMENTACAO,
 } from "./movimentacaoRotulos";
+import { PaginacaoSimples } from "./PaginacaoSimples";
+import {
+  SeletorColaboradorPaginado,
+  type ColaboradorEscolhido,
+} from "./SeletorColaboradorPaginado";
 import "./HistoricoFuncionalScreen.css";
 
 export const HISTORICO_FUNCIONAL_TITULO_ID = "historico-funcional-titulo";
@@ -103,6 +107,9 @@ const TIPOS_REGISTRAVEIS: readonly TipoMovimentacaoRegistravel[] = [
   "mudanca_cargo",
   "desligamento",
 ];
+
+/** T188 — movimentações por página (o servidor aceita até 100). */
+const TAMANHO_PAGINA_MOVIMENTACOES = 20;
 
 const MOTIVOS: readonly MotivoMovimentacao[] = Object.keys(
   ROTULO_MOTIVO,
@@ -225,7 +232,6 @@ export function HistoricoFuncionalScreen({
   const [statusCarregamento, setStatusCarregamento] = useState<
     "carregando" | "erro" | "dados"
   >("carregando");
-  const [colaboradores, setColaboradores] = useState<ColaboradorApi[]>([]);
   const [departamentosLista, setDepartamentosLista] = useState<
     DepartamentoApi[]
   >([]);
@@ -239,7 +245,9 @@ export function HistoricoFuncionalScreen({
     [],
   );
 
-  const [filtroColaboradorId, setFiltroColaboradorId] = useState("todos");
+  // T188 — o colaborador escolhido pela busca paginada (sem o teto de 100).
+  const [colaboradorEscolhido, setColaboradorEscolhido] =
+    useState<ColaboradorEscolhido | null>(null);
   const [vinculosDoColaborador, setVinculosDoColaborador] = useState<
     VinculoApi[]
   >([]);
@@ -254,6 +262,21 @@ export function HistoricoFuncionalScreen({
     "carregando" | "erro" | "dados"
   >("carregando");
   const [movimentacoes, setMovimentacoes] = useState<MovimentacaoApi[]>([]);
+  /**
+   * T188 — a lista de movimentações é paginada pelo servidor (antes: uma
+   * página de 100, sem navegação). A página vale para os filtros em que foi
+   * escolhida: filtro novo é conjunto novo, e volta à primeira página sem
+   * pedir a página antiga de novo.
+   */
+  const chaveFiltros = `${filtroVinculoId}|${filtroTipo}|${filtroStatus}`;
+  const [paginaMovimentacoes, setPaginaMovimentacoes] = useState({
+    chave: chaveFiltros,
+    pagina: 1,
+  });
+  const paginaAtual =
+    paginaMovimentacoes.chave === chaveFiltros ? paginaMovimentacoes.pagina : 1;
+  const [totalPaginasMovimentacoes, setTotalPaginasMovimentacoes] = useState(1);
+  const pedidoListagemRef = useRef(0);
 
   const [formulario, setFormulario] = useState<FormularioRegistroState | null>(
     null,
@@ -268,17 +291,14 @@ export function HistoricoFuncionalScreen({
   const carregarBase = useCallback(async () => {
     setStatusCarregamento("carregando");
     try {
-      const [colabResp, deps, unis, areas, equipes, cargos, centros] =
-        await Promise.all([
-          listarColaboradores({ tamanhoPagina: 100 }),
-          listarDepartamentos({ tamanhoPagina: 100 }),
-          listarUnidades({ tamanhoPagina: 100 }),
-          listarAreas({ tamanhoPagina: 100 }),
-          listarEquipes({ tamanhoPagina: 100 }),
-          listarCargos({ tamanhoPagina: 100 }),
-          listarCentrosCusto({ tamanhoPagina: 100 }),
-        ]);
-      setColaboradores(colabResp.itens);
+      const [deps, unis, areas, equipes, cargos, centros] = await Promise.all([
+        listarDepartamentos({ tamanhoPagina: 100 }),
+        listarUnidades({ tamanhoPagina: 100 }),
+        listarAreas({ tamanhoPagina: 100 }),
+        listarEquipes({ tamanhoPagina: 100 }),
+        listarCargos({ tamanhoPagina: 100 }),
+        listarCentrosCusto({ tamanhoPagina: 100 }),
+      ]);
       setDepartamentosLista(deps.itens);
       setUnidadesLista(unis.itens);
       setAreasLista(areas.itens);
@@ -296,45 +316,70 @@ export function HistoricoFuncionalScreen({
   }, [carregarBase]);
 
   const carregarListagem = useCallback(async () => {
+    const pedido = ++pedidoListagemRef.current;
     setStatusListagem("carregando");
     try {
-      const query: ListarMovimentacoesQuery = { tamanhoPagina: 100 };
+      const query: ListarMovimentacoesQuery = {
+        pagina: paginaAtual,
+        tamanhoPagina: TAMANHO_PAGINA_MOVIMENTACOES,
+      };
       if (filtroVinculoId) query.vinculoId = filtroVinculoId;
       if (filtroTipo !== "todos") query.tipo = filtroTipo as TipoMovimentacao;
       if (filtroStatus !== "todos")
         query.status = filtroStatus as StatusMovimentacao;
       const resp = await listarMovimentacoes(query);
+      if (pedido !== pedidoListagemRef.current) return;
       setMovimentacoes(resp.itens);
+      setTotalPaginasMovimentacoes(
+        Math.max(
+          1,
+          Math.ceil(
+            resp.total / (resp.tamanhoPagina || TAMANHO_PAGINA_MOVIMENTACOES),
+          ),
+        ),
+      );
       setStatusListagem("dados");
     } catch {
+      if (pedido !== pedidoListagemRef.current) return;
       setStatusListagem("erro");
     }
-  }, [filtroVinculoId, filtroTipo, filtroStatus]);
+  }, [filtroVinculoId, filtroTipo, filtroStatus, paginaAtual]);
 
   useEffect(() => {
     void carregarListagem();
   }, [carregarListagem]);
 
-  const colaboradoresPorId = useMemo(
-    () => new Map(colaboradores.map((c) => [c.id, c])),
-    [colaboradores],
-  );
+  /**
+   * T188 (O3) — sequência do pedido de vínculos, no padrão de Dados
+   * contratuais: toda escolha (inclusive limpar) invalida as leituras em voo,
+   * e uma resposta que já não pertence ao colaborador da tela é descartada.
+   * Sem isto, escolher A e logo B podia deixar B selecionado com os vínculos
+   * de A — e o registro de movimentação no vínculo de outra pessoa.
+   */
+  const pedidoVinculosRef = useRef(0);
 
   async function selecionarColaborador(
-    colaboradorId: string,
+    colaborador: ColaboradorEscolhido | null,
     vinculoPreferido?: string,
   ) {
-    setFiltroColaboradorId(colaboradorId);
+    const pedido = ++pedidoVinculosRef.current;
+    const colaboradorId = colaborador?.id ?? "";
+    setColaboradorEscolhido(colaborador);
     setFormulario(null);
     setFiltroVinculoId("");
     setVinculosDoColaborador([]);
-    if (!colaboradorId || colaboradorId === "todos") {
+    if (!colaboradorId) {
       setStatusVinculos("ocioso");
       return;
     }
     setStatusVinculos("carregando");
     try {
-      const vinculos = await listarVinculosDoColaborador(colaboradorId);
+      const resposta = await listarVinculosDoColaborador(colaboradorId);
+      if (pedido !== pedidoVinculosRef.current) return; // superada: descarta
+      // Defesa extra: só vínculos do colaborador pedido entram na tela.
+      const vinculos = resposta.filter(
+        (v) => v.colaboradorId === colaboradorId,
+      );
       setVinculosDoColaborador(vinculos);
       setStatusVinculos("dados");
       // T187 — o vínculo pedido pela ficha só vale se veio nesta resposta.
@@ -344,6 +389,7 @@ export function HistoricoFuncionalScreen({
         setFiltroVinculoId(vinculos[0]!.id);
       }
     } catch {
+      if (pedido !== pedidoVinculosRef.current) return;
       setStatusVinculos("erro");
     }
   }
@@ -353,10 +399,22 @@ export function HistoricoFuncionalScreen({
   useEffect(() => {
     if (!selecaoInicial || selecaoAplicadaRef.current) return;
     selecaoAplicadaRef.current = true;
-    void selecionarColaborador(
-      selecaoInicial.colaboradorId,
-      selecaoInicial.vinculoId,
-    );
+    const { colaboradorId, vinculoId } = selecaoInicial;
+    // T188 — o nome vem do servidor, no escopo da sessão. Se ele recusar
+    // (outra empresa, sem acesso), nada fica selecionado. (O3) Se a pessoa
+    // escolher alguém antes de o nome chegar, a escolha dela prevalece: a
+    // resposta da ficha, aceita ou recusada, é descartada.
+    const pedidoNaAbertura = pedidoVinculosRef.current;
+    const aindaValida = () => pedidoVinculosRef.current === pedidoNaAbertura;
+    void buscarColaborador(colaboradorId)
+      .then((c) => {
+        if (aindaValida()) {
+          void selecionarColaborador({ id: c.id, nome: c.nome }, vinculoId);
+        }
+      })
+      .catch(() => {
+        if (aindaValida()) void selecionarColaborador(null);
+      });
     // `selecionarColaborador` é recriada a cada desenho; vale só na montagem.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selecaoInicial]);
@@ -369,9 +427,10 @@ export function HistoricoFuncionalScreen({
   function resolverVinculo(vinculoId: string): string {
     const vinculo = vinculosDoColaborador.find((v) => v.id === vinculoId);
     if (!vinculo) return `Vínculo ${vinculoId.slice(0, 8)}`;
-    const colaborador = colaboradoresPorId.get(vinculo.colaboradorId);
     const nomeColaborador =
-      colaborador?.nome ?? `Colaborador ${vinculo.colaboradorId.slice(0, 8)}`;
+      colaboradorEscolhido?.id === vinculo.colaboradorId
+        ? colaboradorEscolhido.nome
+        : `Colaborador ${vinculo.colaboradorId.slice(0, 8)}`;
     return `${exibirMatricula(vinculo.matricula)} (${ROTULO_TIPO_VINCULO[vinculo.tipo]}) — ${nomeColaborador}`;
   }
 
@@ -977,15 +1036,8 @@ export function HistoricoFuncionalScreen({
         </Surface>
       ) : statusCarregamento === "carregando" ? (
         <p className="historico-funcional-screen__carregando" role="status">
-          Carregando colaboradores…
+          Carregando dados da tela…
         </p>
-      ) : colaboradores.length === 0 ? (
-        <EmptyState
-          headingLevel={2}
-          icon="—"
-          title="Nenhum colaborador cadastrado"
-          description="Cadastre um colaborador na aba Colaboradores para começar a registrar movimentações."
-        />
       ) : (
         <>
           <section aria-labelledby="historico-funcional-filtros-titulo">
@@ -996,25 +1048,17 @@ export function HistoricoFuncionalScreen({
               Filtros
             </h2>
             <div className="historico-funcional-screen__filtros">
-              <FormField
-                id="historico-funcional-filtro-colaborador"
-                label="Colaborador"
-              >
-                {(control) => (
-                  <select
-                    value={filtroColaboradorId}
-                    onChange={(e) => void selecionarColaborador(e.target.value)}
-                    {...control}
-                  >
-                    <option value="todos">Todos os colaboradores</option>
-                    {colaboradores.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.nome}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </FormField>
+              {/* T188 — qualquer colaborador da empresa ativa, por busca
+                  paginada no servidor; sem o teto de 100. */}
+              <div className="historico-funcional-screen__colaborador">
+                <SeletorColaboradorPaginado
+                  id="historico-funcional-colaborador"
+                  rotulo="Colaborador (buscar por nome ou matrícula)"
+                  selecionado={colaboradorEscolhido}
+                  onSelecionar={(c) => void selecionarColaborador(c)}
+                  rotuloLimpar="Ver todos os colaboradores"
+                />
+              </div>
 
               <FormField
                 id="historico-funcional-filtro-vinculo"
@@ -1025,13 +1069,13 @@ export function HistoricoFuncionalScreen({
                     value={filtroVinculoId}
                     onChange={(e) => selecionarVinculo(e.target.value)}
                     disabled={
-                      filtroColaboradorId === "todos" ||
+                      colaboradorEscolhido === null ||
                       statusVinculos !== "dados"
                     }
                     {...control}
                   >
                     <option value="">
-                      {filtroColaboradorId === "todos"
+                      {colaboradorEscolhido === null
                         ? "Selecione um colaborador primeiro"
                         : "Selecione…"}
                     </option>
@@ -1149,12 +1193,22 @@ export function HistoricoFuncionalScreen({
                 description="Ajuste os filtros ou registre uma nova movimentação para um vínculo selecionado."
               />
             ) : (
-              <DataTable
-                caption="Movimentações funcionais"
-                columns={colunasMovimentacoes}
-                rows={movimentacoes}
-                rowKey={(m) => m.id}
-              />
+              <>
+                <DataTable
+                  caption="Movimentações funcionais"
+                  columns={colunasMovimentacoes}
+                  rows={movimentacoes}
+                  rowKey={(m) => m.id}
+                />
+                <PaginacaoSimples
+                  rotulo="Páginas de movimentações"
+                  pagina={paginaAtual}
+                  totalPaginas={totalPaginasMovimentacoes}
+                  onIrPara={(p) =>
+                    setPaginaMovimentacoes({ chave: chaveFiltros, pagina: p })
+                  }
+                />
+              </>
             )}
           </section>
         </>

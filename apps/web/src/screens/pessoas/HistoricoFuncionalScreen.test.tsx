@@ -1,4 +1,5 @@
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -11,6 +12,7 @@ import {
   type ColaboradorApi,
   type ListagemColaboradoresApi,
   type VinculoApi,
+  buscarColaborador,
   listarColaboradores,
   listarVinculosDoColaborador,
 } from "../../api/colaboradoresClient";
@@ -287,12 +289,30 @@ beforeEach(() => {
     status: "cancelada",
   });
   vi.mocked(retificarMovimentacao).mockResolvedValue(movCorrecao);
+  // T188 — a seleção vinda da ficha busca o nome no servidor.
+  vi.mocked(buscarColaborador).mockImplementation(async (id) => {
+    const achado = [colaborador1, colaborador2].find((c) => c.id === id);
+    if (!achado) throw new Error("404");
+    return achado;
+  });
 });
 
+/** T188 — o colaborador é escolhido na busca paginada, pelo nome. */
+const NOME_POR_ID: Record<string, string> = {
+  [colaborador1.id]: colaborador1.nome,
+  [colaborador2.id]: colaborador2.nome,
+  "55555555-5555-5555-5555-555555555555": "Carla Sem Vínculo (teste)",
+};
+
 async function selecionarColaborador(colaboradorId: string) {
-  fireEvent.change(screen.getByLabelText(/^Colaborador\b/i), {
-    target: { value: colaboradorId },
+  const lista = await screen.findByRole("list", {
+    name: "Colaboradores encontrados",
   });
+  fireEvent.click(
+    within(lista).getByRole("button", {
+      name: NOME_POR_ID[colaboradorId] ?? colaboradorId,
+    }),
+  );
   await waitFor(() => expect(listarVinculosDoColaborador).toHaveBeenCalled());
 }
 
@@ -376,7 +396,7 @@ describe("HistoricoFuncionalScreen (T115 — funcional)", () => {
   });
 
   it("mostra erro base e permite tentar novamente quando falha ao carregar dados de referência", async () => {
-    vi.mocked(listarColaboradores).mockRejectedValueOnce(new Error("falha"));
+    vi.mocked(listarDepartamentos).mockRejectedValueOnce(new Error("falha"));
 
     render(<HistoricoFuncionalScreen />);
 
@@ -385,7 +405,9 @@ describe("HistoricoFuncionalScreen (T115 — funcional)", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
 
-    expect(await screen.findByLabelText(/^Colaborador\b/i)).toBeInTheDocument();
+    expect(
+      await screen.findByRole("list", { name: "Colaboradores encontrados" }),
+    ).toBeInTheDocument();
   });
 
   it("seleciona colaborador com um único vínculo: resolve automaticamente e habilita registrar", async () => {
@@ -934,9 +956,10 @@ describe("T187 — seleção inicial vinda da ficha", () => {
       ),
     );
     expect(listarVinculosDoColaborador).toHaveBeenCalledWith(colaborador2.id);
-    expect(screen.getByLabelText(/^Colaborador\b/i)).toHaveValue(
-      colaborador2.id,
-    );
+    expect(buscarColaborador).toHaveBeenCalledWith(colaborador2.id);
+    expect(
+      screen.getByText(colaborador2.nome, { selector: "strong" }),
+    ).toBeInTheDocument();
     expect(screen.getByLabelText(/^Vínculo\b/i)).toHaveValue(vinculo2b.id);
   });
 
@@ -966,5 +989,373 @@ describe("T187 — seleção inicial vinda da ficha", () => {
     render(<HistoricoFuncionalScreen />);
     await screen.findByRole("table", { name: "Movimentações funcionais" });
     expect(listarVinculosDoColaborador).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * T188 — dublê de `GET /v1/colaboradores` com 150 pessoas: pagina, busca por
+ * nome ou matrícula e filtra por situação, como o servidor (T178).
+ */
+function servidorComCentoECinquenta() {
+  const lista = Array.from({ length: 150 }, (_, i) => {
+    const n = String(i + 1).padStart(3, "0");
+    return {
+      id: `c-${n}`,
+      nome: `Pessoa Teste ${n}`,
+      situacao: "ativo" as const,
+      criadoEm: "2026-01-01T12:00:00.000Z",
+      atualizadoEm: "2026-01-01T12:00:00.000Z",
+      vinculos: [
+        {
+          id: `vf-${n}`,
+          empresaId: "e-1",
+          matricula: `MAT-${n}`,
+          situacao: "ativo" as const,
+          dataAdmissao: "2025-01-01",
+          dataDesligamento: null,
+          lotacaoVigente: null,
+          vigenciasDeJornada: [],
+        },
+      ],
+    };
+  });
+  vi.mocked(listarColaboradores).mockImplementation((async (
+    q: {
+      busca?: string;
+      pagina?: number;
+      tamanhoPagina?: number;
+      situacao?: string;
+    } = {},
+  ) => {
+    const termo = (q.busca ?? "").toLowerCase();
+    const filtrada = lista.filter(
+      (c) =>
+        (!q.situacao || c.situacao === q.situacao) &&
+        (!termo ||
+          c.nome.toLowerCase().includes(termo) ||
+          c.vinculos[0]!.matricula.toLowerCase().includes(termo)),
+    );
+    const pagina = q.pagina ?? 1;
+    const tamanho = q.tamanhoPagina ?? 20;
+    return {
+      itens: filtrada.slice((pagina - 1) * tamanho, pagina * tamanho),
+      pagina,
+      tamanhoPagina: tamanho,
+      total: filtrada.length,
+      contadores: { ativos: filtrada.length, inativos: 0 },
+    };
+  }) as never);
+}
+
+async function buscarEEscolher(termo: string, nome: RegExp) {
+  const campo = await screen.findByLabelText(
+    "Colaborador (buscar por nome ou matrícula)",
+  );
+  fireEvent.change(campo, { target: { value: termo } });
+  fireEvent.keyDown(campo, { key: "Enter" });
+  const botao = await screen.findByRole("button", { name: nome });
+  fireEvent.click(botao);
+}
+
+describe("T188 — Histórico funcional sem o teto de 100", () => {
+  it("escolhe a 130ª pessoa pela busca e filtra pelos vínculos dela", async () => {
+    servidorComCentoECinquenta();
+    vi.mocked(listarVinculosDoColaborador).mockImplementation(async (id) =>
+      id === "c-130"
+        ? [
+            {
+              ...vinculo1,
+              id: "vf-130",
+              colaboradorId: "c-130",
+              matricula: "MAT-130",
+            },
+          ]
+        : [],
+    );
+    render(<HistoricoFuncionalScreen />);
+    await screen.findByRole("table", { name: "Movimentações funcionais" });
+
+    await buscarEEscolher("Pessoa Teste 130", /^Pessoa Teste 130/);
+
+    await waitFor(() =>
+      expect(listarVinculosDoColaborador).toHaveBeenCalledWith("c-130"),
+    );
+    await waitFor(() =>
+      expect(listarMovimentacoes).toHaveBeenLastCalledWith(
+        expect.objectContaining({ vinculoId: "vf-130", pagina: 1 }),
+      ),
+    );
+    expect(
+      screen.getByText("Pessoa Teste 130", { selector: "strong" }),
+    ).toBeInTheDocument();
+  });
+
+  it("movimentações paginadas: navega, preserva os filtros e volta à página 1 ao filtrar", async () => {
+    vi.mocked(listarMovimentacoes).mockImplementation(async (q = {}) => ({
+      itens: [movSolicitada],
+      pagina: q.pagina ?? 1,
+      tamanhoPagina: q.tamanhoPagina ?? 20,
+      total: 45,
+    }));
+    render(<HistoricoFuncionalScreen />);
+    const nav = await screen.findByRole("navigation", {
+      name: "Páginas de movimentações",
+    });
+    expect(within(nav).getByText("Página 1 de 3")).toBeInTheDocument();
+    expect(listarMovimentacoes).toHaveBeenLastCalledWith({
+      pagina: 1,
+      tamanhoPagina: 20,
+    });
+
+    fireEvent.click(within(nav).getByRole("button", { name: "Próxima" }));
+    await waitFor(() =>
+      expect(listarMovimentacoes).toHaveBeenLastCalledWith({
+        pagina: 2,
+        tamanhoPagina: 20,
+      }),
+    );
+    await screen.findByText("Página 2 de 3");
+
+    fireEvent.change(screen.getByLabelText(/^Tipo\b/i), {
+      target: { value: "desligamento" },
+    });
+    await waitFor(() =>
+      expect(listarMovimentacoes).toHaveBeenLastCalledWith({
+        pagina: 1,
+        tamanhoPagina: 20,
+        tipo: "desligamento",
+      }),
+    );
+    // Nenhum pedido da página 2 com o filtro novo.
+    expect(listarMovimentacoes).not.toHaveBeenCalledWith(
+      expect.objectContaining({ pagina: 2, tipo: "desligamento" }),
+    );
+  });
+
+  it("estados históricos seguem visíveis na página (cancelada inclusive)", async () => {
+    render(<HistoricoFuncionalScreen />);
+    const tabela = await screen.findByRole("table", {
+      name: "Movimentações funcionais",
+    });
+    expect(within(tabela).getByText("Cancelada")).toBeInTheDocument();
+  });
+
+  it("seleção vinda da ficha de alguém fora da sessão: nada fica selecionado", async () => {
+    vi.mocked(buscarColaborador).mockRejectedValue(new Error("404"));
+    render(
+      <HistoricoFuncionalScreen
+        selecaoInicial={{ colaboradorId: "c-outra", vinculoId: "v-outra" }}
+      />,
+    );
+    await waitFor(() =>
+      expect(buscarColaborador).toHaveBeenCalledWith("c-outra"),
+    );
+    await screen.findByRole("list", { name: "Colaboradores encontrados" });
+    expect(
+      screen.getByText("Nenhum colaborador selecionado."),
+    ).toBeInTheDocument();
+    expect(listarVinculosDoColaborador).not.toHaveBeenCalled();
+  });
+
+  it("servidor recusa a busca de colaboradores: aviso, sem nomes, movimentações intactas", async () => {
+    vi.mocked(listarColaboradores).mockRejectedValue(
+      Object.assign(new Error("recusado"), { status: 403 }),
+    );
+    render(<HistoricoFuncionalScreen />);
+    expect(
+      await screen.findByText(/Não foi possível buscar os colaboradores/),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(colaborador1.nome)).toBeNull();
+    expect(
+      await screen.findByRole("table", { name: "Movimentações funcionais" }),
+    ).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T188 (O3) — corridas ao carregar os vínculos do colaborador escolhido. Uma
+// resposta que já não pertence ao colaborador da tela é descartada: B nunca
+// fica com os vínculos de A, e "Registrar movimentação" nunca usa vínculo de
+// outra pessoa.
+// ---------------------------------------------------------------------------
+
+function adiado<T>() {
+  let resolver!: (valor: T) => void;
+  let rejeitar!: (erro: unknown) => void;
+  const promessa = new Promise<T>((res, rej) => {
+    resolver = res;
+    rejeitar = rej;
+  });
+  return { promessa, resolver, rejeitar };
+}
+
+/** Os vínculos de cada colaborador chegam quando o teste mandar. */
+function vinculosControlados() {
+  const pendentes = new Map<string, ReturnType<typeof adiado<VinculoApi[]>>>();
+  vi.mocked(listarVinculosDoColaborador).mockImplementation((id) => {
+    const d = adiado<VinculoApi[]>();
+    pendentes.set(id, d);
+    return d.promessa;
+  });
+  return {
+    responder: async (id: string, vinculos: VinculoApi[]) => {
+      await act(async () => {
+        pendentes.get(id)!.resolver(vinculos);
+      });
+    },
+  };
+}
+
+const seletorVinculo = () =>
+  screen.getByLabelText(/^Vínculo\b/i) as HTMLSelectElement;
+const opcoesDeVinculo = () =>
+  [...seletorVinculo().options].map((o) => o.value).filter(Boolean);
+const botaoRegistrar = () =>
+  screen.getByRole("button", { name: "Registrar movimentação" });
+
+describe("T188 (O3) — resposta atrasada de vínculos é descartada", () => {
+  it("escolhe A e logo B; os vínculos de A chegam por último e não valem", async () => {
+    const controle = vinculosControlados();
+    render(<HistoricoFuncionalScreen />);
+    await screen.findByRole("table", { name: "Movimentações funcionais" });
+
+    await selecionarColaborador(colaborador2.id); // A — pendente
+    await selecionarColaborador(colaborador1.id); // B — pendente
+
+    await controle.responder(colaborador1.id, [vinculo1]); // B chega antes
+    await waitFor(() => expect(seletorVinculo()).toHaveValue(vinculo1.id));
+
+    await controle.responder(colaborador2.id, [vinculo2a]); // A, atrasada
+
+    expect(seletorVinculo()).toHaveValue(vinculo1.id);
+    expect(opcoesDeVinculo()).toEqual([vinculo1.id]);
+    expect(
+      screen.getByText(colaborador1.nome, { selector: "strong" }),
+    ).toBeInTheDocument();
+    // O registro, se aberto, é do vínculo de B.
+    expect(botaoRegistrar()).toBeEnabled();
+    expect(listarMovimentacoes).toHaveBeenLastCalledWith(
+      expect.objectContaining({ vinculoId: vinculo1.id }),
+    );
+    expect(listarMovimentacoes).not.toHaveBeenCalledWith(
+      expect.objectContaining({ vinculoId: vinculo2a.id }),
+    );
+  });
+
+  it("seleção da ficha ainda carregando e escolha manual depois: vale a manual", async () => {
+    const controle = vinculosControlados();
+    const ficha = adiado<typeof colaborador2>();
+    vi.mocked(buscarColaborador).mockReturnValue(ficha.promessa);
+    render(
+      <HistoricoFuncionalScreen
+        selecaoInicial={{
+          colaboradorId: colaborador2.id,
+          vinculoId: vinculo2b.id,
+        }}
+      />,
+    );
+    await screen.findByRole("table", { name: "Movimentações funcionais" });
+
+    await selecionarColaborador(colaborador1.id);
+    await controle.responder(colaborador1.id, [vinculo1]);
+    await waitFor(() => expect(seletorVinculo()).toHaveValue(vinculo1.id));
+
+    // O nome da ficha chega depois da escolha manual.
+    await act(async () => {
+      ficha.resolver(colaborador2);
+    });
+
+    expect(listarVinculosDoColaborador).not.toHaveBeenCalledWith(
+      colaborador2.id,
+    );
+    expect(seletorVinculo()).toHaveValue(vinculo1.id);
+    expect(
+      screen.getByText(colaborador1.nome, { selector: "strong" }),
+    ).toBeInTheDocument();
+  });
+
+  it("seleção da ficha recusada depois da escolha manual não desfaz a escolha", async () => {
+    const controle = vinculosControlados();
+    const ficha = adiado<typeof colaborador2>();
+    vi.mocked(buscarColaborador).mockReturnValue(ficha.promessa);
+    render(
+      <HistoricoFuncionalScreen
+        selecaoInicial={{ colaboradorId: "c-outra", vinculoId: "v-outra" }}
+      />,
+    );
+    await screen.findByRole("table", { name: "Movimentações funcionais" });
+
+    await selecionarColaborador(colaborador1.id);
+    await controle.responder(colaborador1.id, [vinculo1]);
+    await waitFor(() => expect(seletorVinculo()).toHaveValue(vinculo1.id));
+
+    await act(async () => {
+      ficha.rejeitar(new Error("404"));
+    });
+
+    expect(seletorVinculo()).toHaveValue(vinculo1.id);
+    expect(
+      screen.getByText(colaborador1.nome, { selector: "strong" }),
+    ).toBeInTheDocument();
+  });
+
+  it("limpar a seleção com a leitura pendente: a resposta não repovoa nada", async () => {
+    const controle = vinculosControlados();
+    render(<HistoricoFuncionalScreen />);
+    await screen.findByRole("table", { name: "Movimentações funcionais" });
+
+    await selecionarColaborador(colaborador1.id);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Ver todos os colaboradores" }),
+    );
+    await controle.responder(colaborador1.id, [vinculo1]);
+
+    expect(
+      screen.getByText("Nenhum colaborador selecionado."),
+    ).toBeInTheDocument();
+    expect(seletorVinculo()).toBeDisabled();
+    expect(seletorVinculo()).toHaveValue("");
+    expect(opcoesDeVinculo()).toEqual([]);
+    expect(botaoRegistrar()).toBeDisabled();
+  });
+
+  it("troca de empresa com a leitura pendente: a tela nova não recebe nada da antiga", async () => {
+    const controle = vinculosControlados();
+    const { unmount } = render(<HistoricoFuncionalScreen />);
+    await screen.findByRole("table", { name: "Movimentações funcionais" });
+    await selecionarColaborador(colaborador1.id);
+
+    // O shell remonta a árvore na troca de empresa.
+    unmount();
+    render(<HistoricoFuncionalScreen />);
+    await screen.findByRole("table", { name: "Movimentações funcionais" });
+
+    await controle.responder(colaborador1.id, [vinculo1]);
+
+    expect(
+      screen.getByText("Nenhum colaborador selecionado."),
+    ).toBeInTheDocument();
+    expect(seletorVinculo()).toHaveValue("");
+    expect(opcoesDeVinculo()).toEqual([]);
+    expect(botaoRegistrar()).toBeDisabled();
+  });
+
+  it("clicar de novo no mesmo colaborador continua limpando o vínculo escolhido", async () => {
+    const controle = vinculosControlados();
+    render(<HistoricoFuncionalScreen />);
+    await screen.findByRole("table", { name: "Movimentações funcionais" });
+
+    await selecionarColaborador(colaborador2.id);
+    await controle.responder(colaborador2.id, [vinculo2a, vinculo2b]);
+    await waitFor(() => expect(opcoesDeVinculo()).toHaveLength(2));
+    fireEvent.change(seletorVinculo(), { target: { value: vinculo2b.id } });
+    expect(seletorVinculo()).toHaveValue(vinculo2b.id);
+
+    await selecionarColaborador(colaborador2.id);
+    expect(seletorVinculo()).toHaveValue("");
+    await controle.responder(colaborador2.id, [vinculo2a, vinculo2b]);
+    await waitFor(() => expect(opcoesDeVinculo()).toHaveLength(2));
+    expect(seletorVinculo()).toHaveValue("");
+    expect(botaoRegistrar()).toBeDisabled();
   });
 });

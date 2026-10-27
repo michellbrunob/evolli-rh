@@ -2409,11 +2409,15 @@ de vínculo, campos pessoais novos, salário, contrato detalhado, documentos,
 CPF, dados bancários, dependentes, saúde, importação, exportação, integrações
 externas, promoção e merge.
 
-## Vida funcional na ficha do colaborador — T187 (em implementação)
+## Vida funcional na ficha do colaborador — T187 (integrada)
 
-| Tarefa | Estado               | Resultado principal                                                                         |
-| ------ | -------------------- | ------------------------------------------------------------------------------------------- |
-| T187   | **Em implementação** | A ficha mostra, só para leitura, a lotação vigente e a linha do tempo do vínculo principal. |
+| Tarefa | Estado                                    | Resultado principal                                                                         |
+| ------ | ----------------------------------------- | ------------------------------------------------------------------------------------------- |
+| T187   | **Integrada** (PR #180, squash `00a94df`) | A ficha mostra, só para leitura, a lotação vigente e a linha do tempo do vínculo principal. |
+
+**Observação de relatório:** a integração funcional da T187 está concluída
+(CI de push 3/3 verde, run 40496328412); a única pendência administrativa era
+a sua convergência no Spec Kit, resolvida no primeiro commit da T188.
 
 **Escopo da T187:** opção A do [dossiê](../docs/decisions/t187-dossie-proxima-fatia-colaboradores.md), aprovada pela proprietária
 em 2026-10-27: seção "Vida funcional" na ficha, somente leitura, com a lotação
@@ -2426,6 +2430,25 @@ schema, migration, RBAC, auditoria, seed ou dependência.
 retificar, transferir, mudar cargo, desligar), as opções B e C do dossiê, O1 da
 T186, banco de horas, ponto, escala, folha, fuso horário, dados pessoais novos,
 importação, exportação, integrações externas, promoção e merge.
+
+## Abas operacionais de Pessoas sem o teto de 100 — T188 (em implementação)
+
+| Tarefa | Estado               | Resultado principal                                                                                   |
+| ------ | -------------------- | ----------------------------------------------------------------------------------------------------- |
+| T188   | **Em implementação** | Histórico funcional, Dados contratuais e Horário de trabalho escolhem qualquer colaborador por busca. |
+
+**Escopo da T188:** opção A do [dossiê](../docs/decisions/t188-dossie-proxima-fatia-pessoas.md), aprovada pela proprietária
+em 2026-10-27: busca por nome ou matrícula com resultados paginados pelo
+servidor nas três abas, no lugar do seletor de uma página de 100; lista de
+movimentações paginada; largura do Histórico funcional corrigida (pendência
+T115). Só contratos existentes, com as permissões atuais; sem mudança de API,
+schema, migration, RBAC, auditoria, seed ou dependência.
+
+**Fora de escopo:** opções B e C, O1 da T186, catálogos acima de 100 itens, a
+tabela de vínculos de horário, formulários e regras dos módulos, escrita ou
+permissão nova, banco de horas, ponto, escala, folha, fuso horário, dados
+pessoais novos, importação, exportação, integrações externas, promoção e
+merge.
 
 ## Próxima ação autorizável
 

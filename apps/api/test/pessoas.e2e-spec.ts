@@ -3955,4 +3955,151 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
       }
     });
   });
+
+  // T188 — as abas operacionais (Histórico funcional, Dados contratuais,
+  // Horário de trabalho) deixam a página única de 100 e passam a paginar
+  // `GET /v1/movimentacoes` e a buscar em `GET /v1/colaboradores`. A API não
+  // muda: estes testes provam, com PostgreSQL real, que os contratos
+  // reutilizados paginam sem perder nem repetir ninguém, respeitam a empresa
+  // ativa e as negações.
+  describe("T188 — paginação e busca reutilizadas pelas abas operacionais", () => {
+    type Pagina = {
+      itens: { id: string; empresaId?: string }[];
+      total: number;
+    };
+
+    async function todasAsPaginas(
+      rota: string,
+      cred: Credencial,
+      tamanho: number,
+    ): Promise<{ ids: string[]; total: number; empresas: Set<string> }> {
+      const ids: string[] = [];
+      const empresas = new Set<string>();
+      let total = 0;
+      for (let pagina = 1; ; pagina++) {
+        const separador = rota.includes("?") ? "&" : "?";
+        const r = await get(
+          `${rota}${separador}pagina=${pagina}&tamanhoPagina=${tamanho}`,
+          cred,
+        ).expect(200);
+        const corpo = r.body as Pagina;
+        total = corpo.total;
+        for (const item of corpo.itens) {
+          ids.push(item.id);
+          if (item.empresaId) empresas.add(item.empresaId);
+        }
+        if (corpo.itens.length < tamanho) break;
+      }
+      return { ids, total, empresas };
+    }
+
+    it("movimentações: página a página, ninguém some nem se repete, e o total bate", async () => {
+      const inteira = await get(
+        "/v1/movimentacoes?tamanhoPagina=100",
+        rhA,
+      ).expect(200);
+      expect(inteira.body.total).toBeGreaterThan(2);
+      const paginado = await todasAsPaginas("/v1/movimentacoes", rhA, 2);
+      expect(paginado.total).toBe(inteira.body.total);
+      expect(new Set(paginado.ids).size).toBe(paginado.ids.length);
+      expect([...paginado.ids].sort()).toEqual(
+        (inteira.body.itens as { id: string }[]).map((m) => m.id).sort(),
+      );
+      expect([...paginado.empresas]).toEqual([empresaA]);
+    });
+
+    it("movimentações: o filtro por vínculo vale em todas as páginas", async () => {
+      const inteira = await get(
+        "/v1/movimentacoes?tamanhoPagina=100",
+        rhA,
+      ).expect(200);
+      const vinculoId = (inteira.body.itens as { vinculoId: string }[])[0]!
+        .vinculoId;
+      const r = await get(
+        `/v1/movimentacoes?vinculoId=${vinculoId}&pagina=1&tamanhoPagina=1`,
+        rhA,
+      ).expect(200);
+      expect(r.body.itens).toHaveLength(1);
+      expect(r.body.itens[0].vinculoId).toBe(vinculoId);
+      const paginado = await todasAsPaginas(
+        `/v1/movimentacoes?vinculoId=${vinculoId}`,
+        rhA,
+        1,
+      );
+      expect(paginado.ids).toHaveLength(r.body.total);
+    });
+
+    it("movimentações: cada empresa só pagina as suas; DP vê o mesmo que o RH", async () => {
+      const deB = await todasAsPaginas("/v1/movimentacoes", rhB, 2);
+      expect(deB.total).toBeGreaterThan(0);
+      expect([...deB.empresas]).toEqual([empresaB]);
+      const deA = await todasAsPaginas("/v1/movimentacoes", rhA, 2);
+      expect(deA.ids.some((id) => deB.ids.includes(id))).toBe(false);
+      const doDp = await todasAsPaginas("/v1/movimentacoes", dpA, 2);
+      expect([...doDp.ids].sort()).toEqual([...deA.ids].sort());
+      // Master sem empresa ativa: a leitura global já autorizada.
+      const global = await todasAsPaginas("/v1/movimentacoes", master, 5);
+      for (const id of [...deA.ids, ...deB.ids]) {
+        expect(global.ids).toContain(id);
+      }
+    });
+
+    it("colaboradores: busca paginada de 1 em 1 devolve os mesmos da busca inteira, só da empresa", async () => {
+      const inteira = await get(
+        "/v1/colaboradores?busca=Sintetic&tamanhoPagina=100",
+        rhA,
+      ).expect(200);
+      expect(inteira.body.total).toBeGreaterThan(1);
+      const paginado = await todasAsPaginas(
+        "/v1/colaboradores?busca=Sintetic",
+        rhA,
+        1,
+      );
+      expect(paginado.total).toBe(inteira.body.total);
+      expect(new Set(paginado.ids).size).toBe(paginado.ids.length);
+      expect([...paginado.ids].sort()).toEqual(
+        (inteira.body.itens as { id: string }[]).map((c) => c.id).sort(),
+      );
+      // Ninguém da empresa A na busca da empresa B.
+      const deB = await todasAsPaginas(
+        "/v1/colaboradores?busca=Sintetic",
+        rhB,
+        1,
+      );
+      for (const id of deB.ids) {
+        const doVinculo = await get(
+          `/v1/colaboradores/${id}/vinculos`,
+          rhB,
+        ).expect(200);
+        for (const v of doVinculo.body as { empresaId: string }[]) {
+          expect(v.empresaId).toBe(empresaB);
+        }
+      }
+    });
+
+    it("colaboradores ativos (contagem do Horário): total do servidor, sem página de 100", async () => {
+      const ativos = await get(
+        "/v1/colaboradores?situacao=ativo&tamanhoPagina=1",
+        rhA,
+      ).expect(200);
+      const todos = await get("/v1/colaboradores?tamanhoPagina=1", rhA).expect(
+        200,
+      );
+      expect(ativos.body.total).toBe(todos.body.contadores.ativos);
+      expect(ativos.body.itens.length).toBeLessThanOrEqual(1);
+    });
+
+    it("gestor, colaborador e financeiro seguem negados nas páginas e na busca", async () => {
+      for (const cred of [gestorA, colaboradorA, financeiroA]) {
+        for (const rota of [
+          "/v1/movimentacoes?pagina=2&tamanhoPagina=2",
+          "/v1/colaboradores?busca=Sintetic&pagina=2&tamanhoPagina=1",
+        ]) {
+          const negada = await get(rota, cred);
+          expect([403, 404]).toContain(negada.status);
+          expect(JSON.stringify(negada.body)).not.toContain("Sintetic");
+        }
+      }
+    });
+  });
 });
