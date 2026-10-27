@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "constitutionVersion": "1.4.0",
   "lastConvergedAt": "2026-10-27",
-  "lastIntegratedTask": 188,
-  "lastRecordedTask": 189,
+  "lastIntegratedTask": 189,
+  "lastRecordedTask": 190,
   "platformDecision": {
     "adr": "docs/adr/0014-evolli-plataforma-base-e-encerramento-do-frappe.md",
     "decidedAt": "2026-10-01",
@@ -11,15 +11,15 @@
     "frappe": "encerrado_como_candidato_referencia_apenas"
   },
   "nextTask": {
-    "id": "T189",
-    "status": "seletor_empresa_ativa_em_implementacao",
-    "reason": "T188 integrada em main pela PR #181 (squash 9f9a98627f5a5da75cb6c4cf8d1a80a4574c7402), com a CI de push 3/3 verde (run 40516941977); observacoes O1, O2, O4, O5 e O6 seguem abertas. A T189 implementa o seletor de empresa ativa no topo do menu lateral e no Hub, conforme decisao aprovada pela proprietaria em 2026-10-27: componente unico; empresa unica e perfis sem troca so para leitura; troca que mantem o modulo na tela inicial segura; confirmacao diante de edicao pendente e bloqueio durante salvamento; aviso as outras abas e reconferencia ao foco. So os contratos da T163, com as permissoes existentes; sem mudanca de API, schema, migration, RBAC, auditoria, seed ou dependencia. Decisao em docs/decisions/t189-seletor-empresa-ativa.md. Fora de escopo: CNPJ, Adicionar e Gerenciar empresas, concessao, retorno do master ao global, verificacao definitiva no servidor, promocao e merge."
+    "id": "T190",
+    "status": "pessoas_proxima_fatia_em_decisao",
+    "reason": "T189 integrada em main pela PR #182 (squash bf9d87cafb7d6676207d5d38c28889a09276dd59), com a CI de push 3/3 verde (run 40561605036); observacoes N2, N3, N4 e N5 seguem abertas, e a verificacao definitiva da empresa esperada no servidor continua como risco conhecido. A T190 abre em preparacao de decisao: dossie com tres opcoes para a proxima fatia de Gestao de Pessoas e uma recomendacao, em docs/decisions/t190-dossie-proxima-fatia-pessoas.md. Nenhuma implementacao de produto antes da decisao da proprietaria. Fora de escopo: codigo, API, schema, migration, RBAC, banco, seed, Docker, dependencias, CI, PR, push, promocao e merge."
   },
   "openDeliveries": [
     {
-      "id": "T189",
+      "id": "T190",
       "pullRequest": null,
-      "status": "seletor_empresa_ativa_em_implementacao"
+      "status": "pessoas_proxima_fatia_em_decisao"
     }
   ],
   "requiredArtifacts": [

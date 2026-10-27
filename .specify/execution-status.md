@@ -2455,11 +2455,17 @@ permissão nova, banco de horas, ponto, escala, folha, fuso horário, dados
 pessoais novos, importação, exportação, integrações externas, promoção e
 merge.
 
-## Seletor de empresa ativa — T189 (em implementação)
+## Seletor de empresa ativa — T189 (integrada)
 
-| Tarefa | Estado               | Resultado principal                                                                             |
-| ------ | -------------------- | ----------------------------------------------------------------------------------------------- |
-| T189   | **Em implementação** | Empresa ativa no topo do menu lateral e no Hub, com troca segura para quem o servidor autoriza. |
+| Tarefa | Estado                                    | Resultado principal                                                                             |
+| ------ | ----------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| T189   | **Integrada** (PR #182, squash `bf9d87c`) | Empresa ativa no topo do menu lateral e no Hub, com troca segura para quem o servidor autoriza. |
+
+**Observação de relatório:** a integração funcional da T189 está concluída
+(CI de push 3/3 verde, run 40561605036); a única pendência administrativa era
+a sua convergência no Spec Kit, resolvida no primeiro commit da T190. Seguem
+abertas, como observações, N2, N3, N4 e N5 da revisão; a verificação definitiva
+da empresa esperada no servidor continua como risco conhecido.
 
 **Escopo da T189:** [decisão](../docs/decisions/t189-seletor-empresa-ativa.md) aprovada pela proprietária em
 2026-10-27: componente único de empresa ativa no menu lateral e no Hub; troca
@@ -2472,6 +2478,19 @@ schema, migration, RBAC, auditoria, seed ou dependência.
 "Gerenciar empresas", concessão de empresa, retorno do `master_tecnico` ao
 acesso global sem novo login, verificação definitiva no servidor, promoção e
 merge.
+
+## Próxima fatia de Gestão de Pessoas — T190 (em preparação de decisão)
+
+| Tarefa | Estado                       | Resultado principal                                                        |
+| ------ | ---------------------------- | -------------------------------------------------------------------------- |
+| T190   | **Em preparação de decisão** | Dossiê com três opções para a próxima fatia de Pessoas e uma recomendação. |
+
+**Escopo desta etapa:** convergência da T189 e o dossiê (`docs/decisions/t190-dossie-proxima-fatia-pessoas.md`) da
+próxima fatia de Gestão de Pessoas. Nenhuma implementação de produto antes da
+decisão da proprietária.
+
+**Fora de escopo:** código, API, schema, migration, RBAC, banco, seed, Docker,
+dependências, CI, PR, push, promoção e merge.
 
 ## Próxima ação autorizável
 

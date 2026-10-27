@@ -2620,8 +2620,19 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       como `[T188 dev]`, não a `main`.
 
 86. **T189 - Seletor de empresa ativa no menu lateral e no Hub**
-    - **Estado:** **em implementação**. Branch `codex/t189-seletor-empresa-ativa`, a partir do
+    - **Estado:** **integrada** em `main` pela PR #182, squash
+      `bf9d87cafb7d6676207d5d38c28889a09276dd59`, com a CI de push 3/3 verde (run 40561605036);
+      branch preservada. Implementada na branch `codex/t189-seletor-empresa-ativa`, a partir do
       squash `9f9a98627f5a5da75cb6c4cf8d1a80a4574c7402` (T188 integrada, PR #181).
+    - **Observação de relatório:** a integração funcional da T189 está concluída; a única
+      pendência administrativa era a sua convergência no Spec Kit, resolvida no primeiro commit
+      da T190. Observações da revisão que seguem abertas, sem correção: N2 (401 durante a troca
+      no seletor aparece como falha genérica; a reconferência seguinte leva ao login), N3 (sem
+      teste para navegador sem `BroadcastChannel`, para o aviso entre abas com salvamento em
+      andamento e para cada tela ligada ao registro de edições), N4 (o corpo da PR #182 ficou
+      com a contagem de testes anterior às correções B1 e N1) e N5 (para RH, saber que a empresa
+      é única custa uma leitura da lista). Risco conhecido: a verificação definitiva, no
+      servidor, da empresa esperada por requisição segue fora de escopo.
     - **Decisão:** [documento de decisão](../docs/decisions/t189-seletor-empresa-ativa.md), com as decisões aprovadas pela
       proprietária em 2026-10-27.
     - **Objetivo:** um componente único de empresa ativa, no topo do menu lateral e no Hub (no
@@ -2642,6 +2653,19 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       verificação definitiva da empresa esperada no servidor, `localStorage`, promoção e merge.
     - **Prévia:** `http://127.0.0.1:5173` passa a mostrar a branch da T189 ao vivo, identificada
       como `[T189 dev]`, não a `main`.
+
+87. **T190 - Próxima fatia de Gestão de Pessoas (preparação de decisão)**
+    - **Estado:** **em preparação de decisão**. Branch `codex/t190-proxima-fatia-pessoas`, a
+      partir do squash `bf9d87cafb7d6676207d5d38c28889a09276dd59` (T189 integrada, PR #182).
+    - **Objetivo desta etapa:** convergir a T189 e propor três próximas fatias de Gestão de
+      Pessoas que tornem o módulo Colaboradores mais utilizável no dia a dia com regras já
+      aprovadas, sem implementar produto antes de uma decisão explícita da proprietária.
+    - **Entrega desta etapa:** dossiê (`docs/decisions/t190-dossie-proxima-fatia-pessoas.md`) com as opções e uma recomendação. Só
+      documentação: sem código, API, schema, migration, RBAC, banco, seed, Docker,
+      dependência, CI, PR ou push.
+    - **Fora de escopo:** implementação de qualquer opção antes da decisão, dados pessoais
+      novos, documentos, folha, ponto, banco de horas, fuso horário, importação, exportação,
+      integrações externas, promoção e merge.
 
 ## Regra obrigatória para as próximas tarefas
 
