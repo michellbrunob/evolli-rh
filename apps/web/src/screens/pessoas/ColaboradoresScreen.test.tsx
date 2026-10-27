@@ -39,6 +39,14 @@ import {
   registrarDadosPessoaisDoColaborador,
 } from "../../api/dadosPessoaisClient";
 import { expectSemIsoVisivel } from "../../test/semIsoVisivel";
+import {
+  buscarLinhaDoTempo,
+  type MovimentacaoApi,
+} from "../../api/movimentacaoClient";
+import {
+  listarAlocacoesVinculo,
+  type AlocacaoOrganizacionalApi,
+} from "../../api/vinculoContratualClient";
 import { AVISO_DE_RECUSA } from "../../format/mascaras";
 
 vi.mock("../../api/colaboradoresClient");
@@ -48,6 +56,9 @@ vi.mock("../../api/horariosClient");
 vi.mock("../../api/contatosColaboradorClient");
 // T181 — a ficha edita dados pessoais e endereço pela rota própria.
 vi.mock("../../api/dadosPessoaisClient");
+// T187 — a "Vida funcional" da ficha lê linha do tempo e alocações.
+vi.mock("../../api/movimentacaoClient");
+vi.mock("../../api/vinculoContratualClient");
 
 /**
  * T178 — o envelope de `GET /v1/colaboradores` traz `contadores` do escopo
@@ -156,6 +167,9 @@ function recusa(status: number, message: string): ApiError {
 }
 
 beforeEach(() => {
+  // T187 — por padrão, vínculo sem movimentação e sem lotação vigente.
+  vi.mocked(buscarLinhaDoTempo).mockResolvedValue([]);
+  vi.mocked(listarAlocacoesVinculo).mockResolvedValue([]);
   vi.mocked(listarVinculosHorario).mockResolvedValue({
     itens: [],
     pagina: 1,
@@ -3744,5 +3758,318 @@ describe("T186 — estados vazios distintos", () => {
     ]) {
       expect(screen.queryByRole("heading", { name: outro })).toBeNull();
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T187 — "Vida funcional" na ficha: só leitura, do vínculo principal.
+// ---------------------------------------------------------------------------
+
+describe("T187 — Vida funcional na ficha", () => {
+  /** A alocação aberta do vínculo da linha, com os ids de LOTACAO_ATIVA. */
+  const ALOCACAO_ABERTA: AlocacaoOrganizacionalApi = {
+    id: "a-1",
+    vinculoId: vinculo1.id,
+    empresaId: vinculo1.empresaId,
+    unidadeOrganizacionalId: null,
+    departamentoId: LOTACAO_ATIVA.departamento.id,
+    areaId: null,
+    equipeId: null,
+    cargoId: LOTACAO_ATIVA.cargo.id,
+    centroCustoId: null,
+    vigenteDe: "2025-01-10",
+    vigenteAte: null,
+    movimentacaoOrigemId: "m-1",
+    criadoEm: "2025-01-10T12:00:00.000Z",
+  };
+
+  const ADMISSAO_EFETIVADA: MovimentacaoApi = {
+    id: "m-1",
+    vinculoId: vinculo1.id,
+    empresaId: vinculo1.empresaId,
+    tipo: "admissao",
+    status: "efetivada",
+    motivoCodigo: "admissao_inicial",
+    registradaEm: "2025-01-10T12:00:00.000Z",
+    solicitanteUserId: "u-1",
+    vigenciaInicio: "2025-01-10",
+    efetivadaEm: "2025-01-10T12:00:00.000Z",
+    executorUserId: "u-1",
+    retificaId: null,
+    destinoUnidadeOrganizacionalId: null,
+    destinoDepartamentoId: LOTACAO_ATIVA.departamento.id,
+    destinoAreaId: null,
+    destinoEquipeId: null,
+    destinoCargoId: LOTACAO_ATIVA.cargo.id,
+    destinoCentroCustoId: null,
+    criadoEm: "2025-01-10T12:00:00.000Z",
+    atualizadoEm: "2025-01-10T12:00:00.000Z",
+  };
+
+  async function abrirFichaDaAna() {
+    const tabela = await screen.findByRole("table", {
+      name: "Colaboradores desta empresa",
+    });
+    const linha = within(tabela).getByText(colaborador1.nome).closest("tr")!;
+    fireEvent.click(within(linha).getByRole("button", { name: /Abrir ficha/ }));
+    const ficha = await screen.findByRole("dialog");
+    return within(ficha).findByRole("region", { name: "Vida funcional" });
+  }
+
+  it("mostra a vida funcional do vínculo principal, com a lotação da linha", async () => {
+    vi.mocked(listarAlocacoesVinculo).mockResolvedValue([ALOCACAO_ABERTA]);
+    vi.mocked(buscarLinhaDoTempo).mockResolvedValue([ADMISSAO_EFETIVADA]);
+    render(<ColaboradoresScreen />);
+    const secao = await abrirFichaDaAna();
+
+    await within(secao).findByRole("table", {
+      name: `Linha do tempo — ${colaborador1.nome}`,
+    });
+    expect(buscarLinhaDoTempo).toHaveBeenLastCalledWith(vinculo1.id);
+    expect(listarAlocacoesVinculo).toHaveBeenLastCalledWith(vinculo1.id);
+    expect(secao).toHaveTextContent("Vínculo principal: MAT-0001 · Ativo");
+    expect(secao).toHaveTextContent("Administrativo (teste)");
+    expect(secao).toHaveTextContent("Analista (teste)");
+    expect(secao).toHaveTextContent("Admissão");
+  });
+
+  it("o principal é o mesmo da linha: ativo antes de um previsto mais novo", async () => {
+    const previstoNovo: VinculoApi = {
+      ...vinculo1,
+      id: "77777777-7777-4777-8777-777777777777",
+      matricula: "MAT-NOVA",
+      situacao: "previsto",
+      dataAdmissao: "2026-12-01",
+    };
+    vi.mocked(listarVinculosDoColaborador).mockResolvedValue([
+      previstoNovo,
+      vinculo1,
+    ]);
+    render(<ColaboradoresScreen />);
+    const secao = await abrirFichaDaAna();
+    await within(secao).findByText(
+      "Nenhuma movimentação registrada para este vínculo.",
+    );
+    expect(buscarLinhaDoTempo).toHaveBeenLastCalledWith(vinculo1.id);
+    expect(buscarLinhaDoTempo).not.toHaveBeenCalledWith(previstoNovo.id);
+    expect(secao).toHaveTextContent("Vínculo principal: MAT-0001");
+  });
+
+  it("estados vazios: sem movimentação e sem lotação vigente", async () => {
+    render(<ColaboradoresScreen />);
+    const secao = await abrirFichaDaAna();
+    expect(
+      await within(secao).findByText(
+        "Nenhuma movimentação registrada para este vínculo.",
+      ),
+    ).toBeInTheDocument();
+    expect(secao).toHaveTextContent(/Sem lotação vigente/);
+  });
+
+  it("o atalho leva o colaborador e o vínculo da ficha", async () => {
+    const onAbrirHistoricoFuncional = vi.fn();
+    render(
+      <ColaboradoresScreen
+        onAbrirHistoricoFuncional={onAbrirHistoricoFuncional}
+      />,
+    );
+    const secao = await abrirFichaDaAna();
+    fireEvent.click(
+      within(secao).getByRole("button", {
+        name: "Abrir no Histórico funcional",
+      }),
+    );
+    expect(onAbrirHistoricoFuncional).toHaveBeenCalledWith({
+      colaboradorId: colaborador1.id,
+      vinculoId: vinculo1.id,
+    });
+  });
+
+  it("com o nome alterado e não salvo, o atalho espera", async () => {
+    const onAbrirHistoricoFuncional = vi.fn();
+    render(
+      <ColaboradoresScreen
+        onAbrirHistoricoFuncional={onAbrirHistoricoFuncional}
+        podeEditarFicha
+      />,
+    );
+    const secao = await abrirFichaDaAna();
+    fireEvent.change(
+      within(screen.getByRole("dialog")).getByLabelText("Nome"),
+      { target: { value: "Outro nome (teste)" } },
+    );
+    const atalho = within(secao).getByRole("button", {
+      name: "Abrir no Histórico funcional",
+    });
+    expect(atalho).toBeDisabled();
+    fireEvent.click(atalho);
+    expect(onAbrirHistoricoFuncional).not.toHaveBeenCalled();
+  });
+
+  it("só leitura mesmo para quem edita a ficha: nenhum botão de operar movimentação", async () => {
+    vi.mocked(buscarLinhaDoTempo).mockResolvedValue([ADMISSAO_EFETIVADA]);
+    render(
+      <ColaboradoresScreen
+        podeEditarFicha
+        podeOperarJornada
+        onAbrirHistoricoFuncional={() => {}}
+      />,
+    );
+    const secao = await abrirFichaDaAna();
+    await within(secao).findByRole("table", {
+      name: `Linha do tempo — ${colaborador1.nome}`,
+    });
+    expect(
+      within(secao)
+        .getAllByRole("button")
+        .map((b) => b.textContent),
+    ).toEqual(["Abrir no Histórico funcional"]);
+  });
+
+  it("servidor recusa a leitura: aviso de acesso, sem dado", async () => {
+    vi.mocked(buscarLinhaDoTempo).mockRejectedValue(
+      Object.assign(new Error("recusado"), { status: 403 }),
+    );
+    render(<ColaboradoresScreen onAbrirHistoricoFuncional={() => {}} />);
+    const secao = await abrirFichaDaAna();
+    expect(
+      await within(secao).findByText(
+        "Seu perfil não tem acesso à vida funcional deste vínculo.",
+      ),
+    ).toBeInTheDocument();
+    expect(within(secao).queryByRole("table")).toBeNull();
+    expect(within(secao).queryByRole("button")).toBeNull();
+  });
+
+  it("troca de empresa: a ficha remontada lê só o vínculo da empresa nova", async () => {
+    const { unmount } = render(
+      <ColaboradoresScreen
+        empresaAtiva={{ nome: "Empresa Teste A", codigo: "TA" }}
+      />,
+    );
+    await abrirFichaDaAna();
+    await waitFor(() =>
+      expect(buscarLinhaDoTempo).toHaveBeenLastCalledWith(vinculo1.id),
+    );
+    unmount();
+
+    // O shell remonta a árvore na troca (HubPosLogin); a empresa nova devolve
+    // outro vínculo da mesma pessoa.
+    const vinculoB: VinculoApi = {
+      ...vinculo1,
+      id: "88888888-8888-4888-8888-888888888888",
+      empresaId: "99999999-9999-4999-8999-999999999999",
+      matricula: "MAT-B-0001",
+    };
+    vi.mocked(listarColaboradores).mockResolvedValue(
+      paginado([
+        {
+          ...colaborador1,
+          vinculos: [
+            {
+              ...colaborador1.vinculos[0]!,
+              id: vinculoB.id,
+              empresaId: vinculoB.empresaId,
+              matricula: vinculoB.matricula,
+              lotacaoVigente: null,
+            },
+          ],
+        },
+      ]),
+    );
+    vi.mocked(listarVinculosDoColaborador).mockResolvedValue([vinculoB]);
+    vi.mocked(buscarLinhaDoTempo).mockClear();
+    vi.mocked(listarAlocacoesVinculo).mockClear();
+
+    render(
+      <ColaboradoresScreen
+        empresaAtiva={{ nome: "Empresa Teste B", codigo: "TB" }}
+      />,
+    );
+    const secao = await abrirFichaDaAna();
+    await within(secao).findByText(
+      "Nenhuma movimentação registrada para este vínculo.",
+    );
+    expect(vi.mocked(buscarLinhaDoTempo).mock.calls).toEqual([[vinculoB.id]]);
+    expect(vi.mocked(listarAlocacoesVinculo).mock.calls).toEqual([
+      [vinculoB.id],
+    ]);
+    expect(secao).toHaveTextContent("Vínculo principal: MAT-B-0001");
+    expect(secao).not.toHaveTextContent("MAT-0001");
+  });
+});
+
+describe("T187 — contrato de CSS da Vida funcional (375 px)", () => {
+  const css = readFileSync(
+    "src/screens/pessoas/ColaboradoresScreen.css",
+    "utf8",
+  );
+  const corpo = (seletor: string) => {
+    const escapado = seletor.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const m = new RegExp(
+      String.raw`(?:^|\})\s*${escapado}\s*\{([^}]*)\}`,
+      "m",
+    ).exec(css);
+    return m ? (m[1] ?? "") : null;
+  };
+
+  it("a seção não estica a página: encolhe abaixo do conteúdo", () => {
+    expect(corpo(".colaboradores-screen__vida-funcional")).toMatch(
+      /min-width:\s*0\s*;/,
+    );
+  });
+
+  it("lotação e atalho quebram linha; texto longo quebra dentro da caixa", () => {
+    expect(corpo(".colaboradores-screen__vida-funcional-lotacao")).toMatch(
+      /flex-wrap:\s*wrap\s*;/,
+    );
+    expect(corpo(".colaboradores-screen__vida-funcional-atalho")).toMatch(
+      /flex-wrap:\s*wrap\s*;/,
+    );
+    expect(corpo(".colaboradores-screen__vida-funcional-vinculo")).toMatch(
+      /overflow-wrap:\s*anywhere\s*;/,
+    );
+  });
+
+  it("a linha do tempo usa o DataTable, que rola só no próprio quadro", async () => {
+    const dataTableCss = readFileSync("src/components/DataTable.css", "utf8");
+    expect(dataTableCss).toMatch(/overflow-x:\s*auto;/);
+    vi.mocked(buscarLinhaDoTempo).mockResolvedValue([
+      {
+        id: "m-1",
+        vinculoId: vinculo1.id,
+        empresaId: vinculo1.empresaId,
+        tipo: "admissao",
+        status: "efetivada",
+        motivoCodigo: "admissao_inicial",
+        registradaEm: "2025-01-10T12:00:00.000Z",
+        solicitanteUserId: "u-1",
+        vigenciaInicio: "2025-01-10",
+        efetivadaEm: "2025-01-10T12:00:00.000Z",
+        executorUserId: "u-1",
+        retificaId: null,
+        destinoUnidadeOrganizacionalId: null,
+        destinoDepartamentoId: null,
+        destinoAreaId: null,
+        destinoEquipeId: null,
+        destinoCargoId: null,
+        destinoCentroCustoId: null,
+        criadoEm: "2025-01-10T12:00:00.000Z",
+        atualizadoEm: "2025-01-10T12:00:00.000Z",
+      },
+    ]);
+    render(<ColaboradoresScreen />);
+    const tabela = await screen.findByRole("table", {
+      name: "Colaboradores desta empresa",
+    });
+    fireEvent.click(
+      within(
+        within(tabela).getByText(colaborador1.nome).closest("tr")!,
+      ).getByRole("button", { name: /Abrir ficha/ }),
+    );
+    const linhaDoTempo = await screen.findByRole("table", {
+      name: `Linha do tempo — ${colaborador1.nome}`,
+    });
+    expect(linhaDoTempo.closest(".evolli-datatable")).not.toBeNull();
   });
 });

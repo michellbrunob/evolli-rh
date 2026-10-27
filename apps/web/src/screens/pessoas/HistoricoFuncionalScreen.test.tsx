@@ -913,3 +913,58 @@ describe("HistoricoFuncionalScreen (T115 — funcional)", () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// T187 — aberto pelo atalho da "Vida funcional" da ficha.
+// ---------------------------------------------------------------------------
+describe("T187 — seleção inicial vinda da ficha", () => {
+  it("chega com o colaborador e o vínculo pedidos já filtrados", async () => {
+    render(
+      <HistoricoFuncionalScreen
+        selecaoInicial={{
+          colaboradorId: colaborador2.id,
+          vinculoId: vinculo2b.id,
+        }}
+      />,
+    );
+    // Com dois vínculos, sem a seleção nada seria escolhido sozinho.
+    await waitFor(() =>
+      expect(listarMovimentacoes).toHaveBeenLastCalledWith(
+        expect.objectContaining({ vinculoId: vinculo2b.id }),
+      ),
+    );
+    expect(listarVinculosDoColaborador).toHaveBeenCalledWith(colaborador2.id);
+    expect(screen.getByLabelText(/^Colaborador\b/i)).toHaveValue(
+      colaborador2.id,
+    );
+    expect(screen.getByLabelText(/^Vínculo\b/i)).toHaveValue(vinculo2b.id);
+  });
+
+  it("vínculo que o servidor não devolve para a sessão não é selecionado", async () => {
+    render(
+      <HistoricoFuncionalScreen
+        selecaoInicial={{
+          colaboradorId: colaborador2.id,
+          vinculoId: "66666666-6666-4666-8666-666666666666",
+        }}
+      />,
+    );
+    await waitFor(() =>
+      expect(listarVinculosDoColaborador).toHaveBeenCalledWith(colaborador2.id),
+    );
+    await waitFor(() =>
+      expect(screen.getByLabelText(/^Vínculo\b/i)).toHaveValue(""),
+    );
+    for (const chamada of vi.mocked(listarMovimentacoes).mock.calls) {
+      expect(chamada[0]?.vinculoId).not.toBe(
+        "66666666-6666-4666-8666-666666666666",
+      );
+    }
+  });
+
+  it("sem seleção inicial, nada muda: nenhum colaborador escolhido", async () => {
+    render(<HistoricoFuncionalScreen />);
+    await screen.findByRole("table", { name: "Movimentações funcionais" });
+    expect(listarVinculosDoColaborador).not.toHaveBeenCalled();
+  });
+});

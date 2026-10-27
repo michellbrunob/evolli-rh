@@ -31,6 +31,11 @@ import { exibirMatricula } from "../../format/matricula";
 import { ContatosColaboradorSecao } from "./ContatosColaboradorSecao";
 import { JornadaColaboradorSecao } from "./JornadaColaboradorSecao";
 import {
+  VidaFuncionalColaboradorSecao,
+  type AlvoHistoricoFuncional,
+} from "./VidaFuncionalColaboradorSecao";
+import { vinculoPrincipal } from "./vinculoPrincipal";
+import {
   diaDeHoje,
   rotuloDaJornada,
   situacaoDaVigencia,
@@ -86,6 +91,15 @@ const ROTULO_SITUACAO_VINCULO: Record<string, string> = {
 
 interface DetalheState {
   colaborador: ColaboradorApi;
+  /**
+   * T187 — a lotação que a linha da listagem já trazia (T184), com o vínculo
+   * a que se refere. Dá nome a departamento e cargo na "Vida funcional" sem
+   * ler catálogo; `null` quando a ficha não veio de uma linha.
+   */
+  lotacaoDaLinha: {
+    vinculoId: string;
+    lotacao: LotacaoListadaApi | null;
+  } | null;
   statusVinculos: "carregando" | "erro" | "dados";
   vinculos: VinculoApi[];
   nomeEdicao: string;
@@ -168,6 +182,11 @@ export interface ColaboradoresScreenProps {
   } | null;
   /** Avisa que `aberturaInicial` foi atendida, para o shell não repeti-la. */
   readonly onAberturaAtendida?: () => void;
+  /**
+   * T187 — atalho da "Vida funcional": abre o Histórico funcional já no
+   * colaborador e no vínculo da ficha. Quem decide a aba é o contêiner.
+   */
+  readonly onAbrirHistoricoFuncional?: (alvo: AlvoHistoricoFuncional) => void;
   /**
    * T177 — a admissão acontece só na página de Nova admissão. O modal
    * transitório da T176 foi aposentado porque não coletava os campos que a
@@ -259,6 +278,7 @@ export function ColaboradoresScreen({
   onNovaAdmissao,
   podeEditarFicha = false,
   podeOperarJornada = false,
+  onAbrirHistoricoFuncional,
 }: ColaboradoresScreenProps = {}) {
   const [statusCarregamento, setStatusCarregamento] = useState<
     "carregando" | "erro" | "dados"
@@ -530,8 +550,20 @@ export function ColaboradoresScreen({
   }, [aberturaInicial, onAberturaAtendida]);
 
   function abrirDetalhe(colaborador: ColaboradorApi) {
+    // T187 — aberta de uma linha da listagem, a ficha herda a lotação do
+    // vínculo principal daquela linha; vinda da Nova admissão, não há.
+    const principalDaLinha =
+      "vinculos" in colaborador
+        ? (colaborador as ColaboradorListadoApi).vinculos[0]
+        : undefined;
     setDetalhe({
       colaborador,
+      lotacaoDaLinha: principalDaLinha
+        ? {
+            vinculoId: principalDaLinha.id,
+            lotacao: principalDaLinha.lotacaoVigente,
+          }
+        : null,
       statusVinculos: "carregando",
       vinculos: [],
       nomeEdicao: colaborador.nome,
@@ -1268,6 +1300,34 @@ export function ColaboradoresScreen({
               onAlteradoChange={setJornadaAlterada}
               onSalvandoChange={setSalvandoJornada}
             />
+
+            {/* T187 — vida funcional do vínculo principal, só leitura. Espera
+                os vínculos: é deles que sai o principal, pela mesma ordem da
+                listagem. */}
+            {detalhe.statusVinculos === "dados" ? (
+              <VidaFuncionalColaboradorSecao
+                key={`vida-${detalhe.colaborador.id}-${
+                  vinculoPrincipal(detalhe.vinculos)?.id ?? "sem-vinculo"
+                }`}
+                colaboradorId={detalhe.colaborador.id}
+                nomeColaborador={detalhe.colaborador.nome}
+                vinculo={vinculoPrincipal(detalhe.vinculos)}
+                lotacaoDaLinha={detalhe.lotacaoDaLinha}
+                {...(onAbrirHistoricoFuncional
+                  ? { onAbrirHistorico: onAbrirHistoricoFuncional }
+                  : {})}
+                atalhoBloqueado={
+                  detalheNomeAlterado ||
+                  contatosAlterados ||
+                  dadosPessoaisAlterados ||
+                  jornadaAlterada ||
+                  detalhe.salvandoNome ||
+                  salvandoContatos ||
+                  salvandoDadosPessoais ||
+                  salvandoJornada
+                }
+              />
+            ) : null}
 
             <div className="colaboradores-screen__vinculos">
               <h3 className="colaboradores-screen__section-title">Vínculos</h3>

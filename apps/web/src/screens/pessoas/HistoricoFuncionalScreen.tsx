@@ -18,7 +18,14 @@
  * ou Banco de Horas. Retificação sempre cria um registro novo e preserva o
  * original na linha do tempo — nada é apagado, editado ou ocultado.
  */
-import { useCallback, useEffect, useId, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Button,
   DataTable,
@@ -29,7 +36,7 @@ import {
   StatusBadge,
   Surface,
 } from "../../components";
-import type { DataTableColumn, StatusVariant } from "../../components";
+import type { DataTableColumn } from "../../components";
 import {
   type ColaboradorApi,
   type TipoVinculo,
@@ -69,6 +76,12 @@ import {
   registrarMovimentacao,
   retificarMovimentacao,
 } from "../../api/movimentacaoClient";
+import {
+  ROTULO_MOTIVO,
+  ROTULO_STATUS_MOVIMENTACAO,
+  ROTULO_TIPO_MOVIMENTACAO,
+  VARIANTE_STATUS_MOVIMENTACAO,
+} from "./movimentacaoRotulos";
 import "./HistoricoFuncionalScreen.css";
 
 export const HISTORICO_FUNCIONAL_TITULO_ID = "historico-funcional-titulo";
@@ -90,40 +103,6 @@ const TIPOS_REGISTRAVEIS: readonly TipoMovimentacaoRegistravel[] = [
   "mudanca_cargo",
   "desligamento",
 ];
-
-const ROTULO_TIPO_MOVIMENTACAO: Record<TipoMovimentacao, string> = {
-  admissao: "Admissão",
-  transferencia_organizacional: "Transferência organizacional",
-  mudanca_cargo: "Mudança de cargo",
-  desligamento: "Desligamento",
-};
-
-const ROTULO_STATUS_MOVIMENTACAO: Record<StatusMovimentacao, string> = {
-  solicitada: "Solicitada",
-  programada: "Programada",
-  efetivada: "Efetivada",
-  cancelada: "Cancelada",
-  retificada: "Retificada",
-};
-
-const VARIANTE_STATUS_MOVIMENTACAO: Record<StatusMovimentacao, StatusVariant> =
-  {
-    solicitada: "info",
-    programada: "info",
-    efetivada: "success",
-    cancelada: "neutral",
-    retificada: "neutral",
-  };
-
-const ROTULO_MOTIVO: Record<MotivoMovimentacao, string> = {
-  admissao_inicial: "Admissão inicial",
-  reestruturacao_organizacional: "Reestruturação organizacional",
-  realocacao_interna: "Realocação interna",
-  promocao: "Promoção",
-  correcao_cadastral: "Correção cadastral",
-  encerramento_de_vinculo: "Encerramento de vínculo",
-  outro_controlado: "Outro (controlado)",
-};
 
 const MOTIVOS: readonly MotivoMovimentacao[] = Object.keys(
   ROTULO_MOTIVO,
@@ -226,7 +205,23 @@ function montarDestinoDto(
   }
 }
 
-export function HistoricoFuncionalScreen() {
+export interface HistoricoFuncionalScreenProps {
+  /**
+   * T187 — aberto pelo atalho da "Vida funcional" da ficha: já chega com o
+   * colaborador e o vínculo filtrados. Só seleciona o que o servidor devolve
+   * para a sessão — os vínculos vêm de `GET /colaboradores/:id/vinculos`, já
+   * no escopo da empresa ativa; um vínculo que não esteja lá não é
+   * selecionado, e nada de outra empresa aparece.
+   */
+  readonly selecaoInicial?: {
+    readonly colaboradorId: string;
+    readonly vinculoId: string;
+  } | null;
+}
+
+export function HistoricoFuncionalScreen({
+  selecaoInicial = null,
+}: HistoricoFuncionalScreenProps = {}) {
   const [statusCarregamento, setStatusCarregamento] = useState<
     "carregando" | "erro" | "dados"
   >("carregando");
@@ -325,7 +320,10 @@ export function HistoricoFuncionalScreen() {
     [colaboradores],
   );
 
-  async function selecionarColaborador(colaboradorId: string) {
+  async function selecionarColaborador(
+    colaboradorId: string,
+    vinculoPreferido?: string,
+  ) {
     setFiltroColaboradorId(colaboradorId);
     setFormulario(null);
     setFiltroVinculoId("");
@@ -339,13 +337,29 @@ export function HistoricoFuncionalScreen() {
       const vinculos = await listarVinculosDoColaborador(colaboradorId);
       setVinculosDoColaborador(vinculos);
       setStatusVinculos("dados");
-      if (vinculos.length === 1) {
+      // T187 — o vínculo pedido pela ficha só vale se veio nesta resposta.
+      if (vinculoPreferido && vinculos.some((v) => v.id === vinculoPreferido)) {
+        setFiltroVinculoId(vinculoPreferido);
+      } else if (vinculos.length === 1) {
         setFiltroVinculoId(vinculos[0]!.id);
       }
     } catch {
       setStatusVinculos("erro");
     }
   }
+
+  // T187 — a seleção vinda da ficha é aplicada uma vez, na montagem.
+  const selecaoAplicadaRef = useRef(false);
+  useEffect(() => {
+    if (!selecaoInicial || selecaoAplicadaRef.current) return;
+    selecaoAplicadaRef.current = true;
+    void selecionarColaborador(
+      selecaoInicial.colaboradorId,
+      selecaoInicial.vinculoId,
+    );
+    // `selecionarColaborador` é recriada a cada desenho; vale só na montagem.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selecaoInicial]);
 
   function selecionarVinculo(vinculoId: string) {
     setFiltroVinculoId(vinculoId);
