@@ -8,6 +8,7 @@ import {
 import {
   VinculoListado,
   escaparCuringas,
+  filtroDeLotacaoVigente,
   ordenarVinculosListados,
 } from "./colaborador.service";
 
@@ -99,5 +100,62 @@ describe("T178 — vínculo principal da linha", () => {
     ];
     ordenarVinculosListados(original);
     expect(original.map((v) => v.matricula)).toEqual(["B", "A"]);
+  });
+});
+
+describe("T190 — filtros por Departamento e Cargo", () => {
+  const DEP = "11111111-1111-4111-8111-111111111111";
+  const CAR = "22222222-2222-4222-8222-222222222222";
+  const EMPRESA = "33333333-3333-4333-8333-333333333333";
+
+  it("aceita UUID e recusa o que não for UUID", async () => {
+    expect(await erros({ departamentoId: DEP, cargoId: CAR })).toEqual([]);
+    expect(await erros({ departamentoId: "abc" })).toEqual(["departamentoId"]);
+    expect(await erros({ cargoId: "1" })).toEqual(["cargoId"]);
+  });
+
+  it("sem departamento nem cargo, o filtro não entra na consulta", () => {
+    expect(
+      filtroDeLotacaoVigente({ empresaId: EMPRESA }, undefined, undefined),
+    ).toBeNull();
+  });
+
+  it("departamento: vínculo ATIVO do escopo com alocação ABERTA naquele departamento", () => {
+    expect(
+      filtroDeLotacaoVigente({ empresaId: EMPRESA }, DEP, undefined),
+    ).toEqual({
+      vinculos: {
+        some: {
+          empresaId: EMPRESA,
+          situacao: "ativo",
+          alocacoes: { some: { vigenteAte: null, departamentoId: DEP } },
+        },
+      },
+    });
+  });
+
+  it("os dois juntos valem na MESMA alocação aberta", () => {
+    expect(filtroDeLotacaoVigente({ empresaId: EMPRESA }, DEP, CAR)).toEqual({
+      vinculos: {
+        some: {
+          empresaId: EMPRESA,
+          situacao: "ativo",
+          alocacoes: {
+            some: { vigenteAte: null, departamentoId: DEP, cargoId: CAR },
+          },
+        },
+      },
+    });
+  });
+
+  it("escopo global (master sem empresa ativa): sem empresa no filtro", () => {
+    expect(filtroDeLotacaoVigente({}, undefined, CAR)).toEqual({
+      vinculos: {
+        some: {
+          situacao: "ativo",
+          alocacoes: { some: { vigenteAte: null, cargoId: CAR } },
+        },
+      },
+    });
   });
 });

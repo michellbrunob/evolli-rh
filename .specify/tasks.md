@@ -2620,8 +2620,19 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       como `[T188 dev]`, não a `main`.
 
 86. **T189 - Seletor de empresa ativa no menu lateral e no Hub**
-    - **Estado:** **em implementação**. Branch `codex/t189-seletor-empresa-ativa`, a partir do
+    - **Estado:** **integrada** em `main` pela PR #182, squash
+      `bf9d87cafb7d6676207d5d38c28889a09276dd59`, com a CI de push 3/3 verde (run 40561605036);
+      branch preservada. Implementada na branch `codex/t189-seletor-empresa-ativa`, a partir do
       squash `9f9a98627f5a5da75cb6c4cf8d1a80a4574c7402` (T188 integrada, PR #181).
+    - **Observação de relatório:** a integração funcional da T189 está concluída; a única
+      pendência administrativa era a sua convergência no Spec Kit, resolvida no primeiro commit
+      da T190. Observações da revisão que seguem abertas, sem correção: N2 (401 durante a troca
+      no seletor aparece como falha genérica; a reconferência seguinte leva ao login), N3 (sem
+      teste para navegador sem `BroadcastChannel`, para o aviso entre abas com salvamento em
+      andamento e para cada tela ligada ao registro de edições), N4 (o corpo da PR #182 ficou
+      com a contagem de testes anterior às correções B1 e N1) e N5 (para RH, saber que a empresa
+      é única custa uma leitura da lista). Risco conhecido: a verificação definitiva, no
+      servidor, da empresa esperada por requisição segue fora de escopo.
     - **Decisão:** [documento de decisão](../docs/decisions/t189-seletor-empresa-ativa.md), com as decisões aprovadas pela
       proprietária em 2026-10-27.
     - **Objetivo:** um componente único de empresa ativa, no topo do menu lateral e no Hub (no
@@ -2642,6 +2653,35 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       verificação definitiva da empresa esperada no servidor, `localStorage`, promoção e merge.
     - **Prévia:** `http://127.0.0.1:5173` passa a mostrar a branch da T189 ao vivo, identificada
       como `[T189 dev]`, não a `main`.
+
+87. **T190 - Filtros por Departamento e Cargo na listagem de Colaboradores**
+    - **Estado:** **em implementação**. Branch `codex/t190-proxima-fatia-pessoas`, a partir do
+      squash `bf9d87cafb7d6676207d5d38c28889a09276dd59` (T189 integrada, PR #182).
+    - **Preparação:** [dossiê](../docs/decisions/t190-dossie-proxima-fatia-pessoas.md) com três opções; a proprietária aprovou a opção B
+      com o complemento da O2 da T188 em 2026-10-27.
+    - **Objetivo:** filtrar a listagem de Colaboradores por Departamento e/ou Cargo pela
+      lotação vigente (regra da T184), combináveis com busca, situação e situação do vínculo;
+      fechar a O1 da T186 (E2E de `situacaoVinculo`); e a O2 da T188 (ordem estável das
+      movimentações paginadas, com `id` como desempate).
+    - **Contratos:** `GET /v1/colaboradores` ganha `departamentoId` e `cargoId` opcionais
+      (extensão aditiva); `GET /v1/movimentacoes` só ganha o desempate na ordem, sem mudar o
+      formato. Catálogos dos filtros pelos contratos existentes (`GET /v1/departamentos`,
+      `GET /v1/cargos`, só ativos). Sem schema, migration, RBAC, auditoria, seed, Docker ou
+      dependência.
+    - **Regras aprovadas:** contadores Todos/Ativos/Inativos sobre a empresa inteira, sem
+      filtros; seletor simples, só com referências ativas da empresa ativa; previsto,
+      encerrado e sem lotação vigente não aparecem com filtro de lotação.
+    - **Fora de escopo:** transferência e mudança de cargo pela ficha, dados pessoais novos,
+      documentos, folha, ponto, banco de horas, fuso horário, catálogos acima de 100 itens,
+      importação, exportação, integrações externas, promoção e merge.
+    - **Fora de escopo, explícito (pós-revisão da PR #183):** a O1 da T188 (nomes no Horário de
+      trabalho acima de 100 colaboradores) continua aberta; o desempate por `id` vale só para a
+      lista paginada de movimentações — a linha do tempo do vínculo não o recebeu e permanece
+      fora desta entrega; os catálogos de Departamento e Cargo carregam no máximo 100 itens
+      ativos e, acima disso, opções podem não aparecer no seletor — limite pendente de entrega
+      própria.
+    - **Prévia:** `http://127.0.0.1:5173` passa a mostrar a branch da T190 ao vivo, identificada
+      como `[T190 dev]`, não a `main`.
 
 ## Regra obrigatória para as próximas tarefas
 

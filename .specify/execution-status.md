@@ -2455,11 +2455,17 @@ permissão nova, banco de horas, ponto, escala, folha, fuso horário, dados
 pessoais novos, importação, exportação, integrações externas, promoção e
 merge.
 
-## Seletor de empresa ativa — T189 (em implementação)
+## Seletor de empresa ativa — T189 (integrada)
 
-| Tarefa | Estado               | Resultado principal                                                                             |
-| ------ | -------------------- | ----------------------------------------------------------------------------------------------- |
-| T189   | **Em implementação** | Empresa ativa no topo do menu lateral e no Hub, com troca segura para quem o servidor autoriza. |
+| Tarefa | Estado                                    | Resultado principal                                                                             |
+| ------ | ----------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| T189   | **Integrada** (PR #182, squash `bf9d87c`) | Empresa ativa no topo do menu lateral e no Hub, com troca segura para quem o servidor autoriza. |
+
+**Observação de relatório:** a integração funcional da T189 está concluída
+(CI de push 3/3 verde, run 40561605036); a única pendência administrativa era
+a sua convergência no Spec Kit, resolvida no primeiro commit da T190. Seguem
+abertas, como observações, N2, N3, N4 e N5 da revisão; a verificação definitiva
+da empresa esperada no servidor continua como risco conhecido.
 
 **Escopo da T189:** [decisão](../docs/decisions/t189-seletor-empresa-ativa.md) aprovada pela proprietária em
 2026-10-27: componente único de empresa ativa no menu lateral e no Hub; troca
@@ -2472,6 +2478,30 @@ schema, migration, RBAC, auditoria, seed ou dependência.
 "Gerenciar empresas", concessão de empresa, retorno do `master_tecnico` ao
 acesso global sem novo login, verificação definitiva no servidor, promoção e
 merge.
+
+## Filtros por Departamento e Cargo — T190 (em implementação)
+
+| Tarefa | Estado               | Resultado principal                                                                                   |
+| ------ | -------------------- | ----------------------------------------------------------------------------------------------------- |
+| T190   | **Em implementação** | Colaboradores filtrados por Departamento e Cargo da lotação vigente; ordem estável das movimentações. |
+
+**Escopo da T190:** opção B do [dossiê](../docs/decisions/t190-dossie-proxima-fatia-pessoas.md), com o complemento da O2 da
+T188, aprovada pela proprietária em 2026-10-27: filtros de Departamento e
+Cargo na listagem pela lotação vigente (regra da T184), aplicados no banco
+antes da paginação e combináveis com busca, situação e situação do vínculo;
+contadores sobre a empresa inteira; seletor simples só com referências ativas;
+E2E de `situacaoVinculo` (O1 da T186); `id` como desempate na ordem das
+movimentações paginadas (O2 da T188). Sem schema, migration, RBAC, auditoria,
+seed ou dependência.
+
+**Fora de escopo:** transferência e mudança de cargo pela ficha, dados pessoais
+novos, documentos, folha, ponto, banco de horas, fuso horário, promoção e
+merge.
+
+**Limite conhecido (pós-revisão da PR #183):** os catálogos ativos de
+Departamento e Cargo dos filtros carregam no máximo 100 itens; acima desse
+limite, opções podem não aparecer no seletor. O limite não está resolvido e
+fica pendente de uma entrega própria.
 
 ## Próxima ação autorizável
 

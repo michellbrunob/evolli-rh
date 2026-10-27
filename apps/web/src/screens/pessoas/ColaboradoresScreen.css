@@ -125,6 +125,33 @@
   margin-bottom: var(--space-md);
 }
 
+/* T190 — filtros de lotação vigente ativos: cada um à vista, removível
+   sozinho. Quebram linha em vez de alargar a página. */
+.colaboradores-screen__filtros-ativos {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+  margin: 0 0 var(--space-md);
+  min-width: 0;
+}
+
+.colaboradores-screen__filtros-ativos-rotulo {
+  color: var(--color-ink-subtle);
+  font-size: var(--text-caption);
+}
+
+.colaboradores-screen__filtro-ativo {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+
+.colaboradores-screen__filtros-retry {
+  align-self: flex-end;
+}
+
 /* Indicador de carregamento. */
 .colaboradores-screen__carregando {
   margin: 0;

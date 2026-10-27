@@ -140,6 +140,13 @@ export interface ListarColaboradoresQuery {
    * empresa nunca vai na query: é a da sessão.
    */
   busca?: string;
+  /**
+   * T190 — pela lotação VIGENTE (regra da T184): só colaborador com vínculo
+   * ativo cuja alocação aberta está neste departamento / cargo. Os dois
+   * juntos valem na mesma alocação. Os contadores não mudam.
+   */
+  departamentoId?: string;
+  cargoId?: string;
   pagina?: number;
   tamanhoPagina?: number;
 }
@@ -384,6 +391,8 @@ export async function listarColaboradores(
     .slice(0, BUSCA_COLABORADORES_MAXIMO)
     .trim();
   if (busca) params.set("busca", busca);
+  if (query.departamentoId) params.set("departamentoId", query.departamentoId);
+  if (query.cargoId) params.set("cargoId", query.cargoId);
   if (query.pagina !== undefined) params.set("pagina", String(query.pagina));
   if (query.tamanhoPagina !== undefined)
     params.set("tamanhoPagina", String(query.tamanhoPagina));

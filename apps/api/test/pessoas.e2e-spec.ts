@@ -4102,4 +4102,360 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
       }
     });
   });
+
+  // T190 — filtros por Departamento e Cargo na listagem de Colaboradores,
+  // pela lotação VIGENTE (regra da T184), aplicados no banco antes da
+  // paginação; o E2E de `situacaoVinculo` que faltava (O1 da T186); e a ordem
+  // estável das movimentações paginadas (O2 da T188).
+  describe("T190 — filtros de lotação vigente, situacaoVinculo e ordem estável", () => {
+    type Item = { id: string; nome: string };
+    const PREFIXO = "Sintetico Lotacao T190";
+    const nome = (sufixo: string) => `${PREFIXO} ${sufixo}`;
+
+    let depX: string;
+    let depY: string;
+    let carX: string;
+    let carY: string;
+    const ids: Record<string, string> = {};
+
+    async function admitirSemEfetivar(dados: {
+      nome: string;
+      matricula: string;
+      departamentoId: string;
+      cargoId: string;
+    }): Promise<string> {
+      const r = await post("/v1/colaboradores", rhA)
+        .send({
+          ...camposObrigatoriosAdmissao(),
+          ...lotacaoA,
+          nome: dados.nome,
+          empresaId: empresaA,
+          matricula: dados.matricula,
+          tipo: "clt",
+          dataAdmissao: ADMISSAO,
+          motivoCodigo: "admissao_inicial",
+          departamentoId: dados.departamentoId,
+          cargoId: dados.cargoId,
+        })
+        .expect(201);
+      return r.body.id as string;
+    }
+
+    async function listar(cred: Credencial, query: string) {
+      const r = await get(`/v1/colaboradores?${query}`, cred).expect(200);
+      return r.body as {
+        itens: Item[];
+        total: number;
+        contadores: { ativos: number; inativos: number };
+      };
+    }
+
+    const nomes = (itens: Item[]) => itens.map((i) => i.nome).sort();
+
+    beforeAll(async () => {
+      depX = (
+        await post("/v1/departamentos", master)
+          .send({
+            empresaId: empresaA,
+            codigo: "DEPT190X",
+            nome: "Departamento T190 X",
+          })
+          .expect(201)
+      ).body.id;
+      depY = (
+        await post("/v1/departamentos", master)
+          .send({
+            empresaId: empresaA,
+            codigo: "DEPT190Y",
+            nome: "Departamento T190 Y",
+          })
+          .expect(201)
+      ).body.id;
+      carX = (
+        await post("/v1/cargos", master)
+          .send({
+            empresaId: empresaA,
+            codigo: "CART190X",
+            nome: "Cargo T190 X",
+          })
+          .expect(201)
+      ).body.id;
+      carY = (
+        await post("/v1/cargos", master)
+          .send({
+            empresaId: empresaA,
+            codigo: "CART190Y",
+            nome: "Cargo T190 Y",
+          })
+          .expect(201)
+      ).body.id;
+
+      // Ativos, cada um com a sua lotação vigente.
+      for (const [sufixo, matricula, departamentoId, cargoId] of [
+        ["Ana", "T190-ANA", depX, carX],
+        ["Bia", "T190-BIA", depX, carY],
+        ["Caio", "T190-CAIO", depY, carX],
+        ["Fabio", "T190-FAB", depX, carY],
+      ] as const) {
+        const r = await admitirEEfetivar(rhA, {
+          nome: nome(sufixo),
+          empresaId: empresaA,
+          matricula,
+          departamentoId,
+          cargoId,
+        });
+        ids[sufixo] = r.colaboradorId;
+        ids[`vinculo${sufixo}`] = r.vinculoId;
+      }
+
+      // Previsto: lotação pedida, mas vínculo não ativo.
+      ids.Dora = await admitirSemEfetivar({
+        nome: nome("Dora"),
+        matricula: "T190-DORA",
+        departamentoId: depX,
+        cargoId: carX,
+      });
+
+      // Encerrado: foi ativo em depX/carX e foi desligado.
+      const eli = await admitirEEfetivar(rhA, {
+        nome: nome("Eli"),
+        empresaId: empresaA,
+        matricula: "T190-ELI",
+        departamentoId: depX,
+        cargoId: carX,
+      });
+      ids.Eli = eli.colaboradorId;
+      const desligamento = await post("/v1/movimentacoes", rhA)
+        .send({
+          vinculoId: eli.vinculoId,
+          tipo: "desligamento",
+          motivoCodigo: "encerramento_de_vinculo",
+          vigenciaInicio: DESLIGAMENTO,
+        })
+        .expect(201);
+      await post(`/v1/movimentacoes/${desligamento.body.id}/efetivar`, rhA)
+        .send()
+        .expect(201);
+
+      // Outra empresa, com a mesma forma de nome.
+      const gil = await admitirEEfetivar(rhB, {
+        nome: nome("Gil"),
+        empresaId: empresaB,
+        matricula: "T190-GIL",
+        departamentoId: departamentoB,
+        cargoId: cargoB,
+      });
+      ids.Gil = gil.colaboradorId;
+    });
+
+    it("departamento isolado: só ativos com lotação vigente nele (previsto e encerrado fora)", async () => {
+      const r = await listar(rhA, `departamentoId=${depX}&tamanhoPagina=100`);
+      expect(nomes(r.itens)).toEqual([nome("Ana"), nome("Bia"), nome("Fabio")]);
+      expect(r.total).toBe(3);
+    });
+
+    it("cargo isolado", async () => {
+      const r = await listar(rhA, `cargoId=${carX}&tamanhoPagina=100`);
+      expect(nomes(r.itens)).toEqual([nome("Ana"), nome("Caio")]);
+    });
+
+    it("departamento e cargo juntos valem na MESMA lotação", async () => {
+      expect(
+        nomes(
+          (await listar(rhA, `departamentoId=${depX}&cargoId=${carY}`)).itens,
+        ),
+      ).toEqual([nome("Bia"), nome("Fabio")]);
+      expect(
+        nomes(
+          (await listar(rhA, `departamentoId=${depX}&cargoId=${carX}`)).itens,
+        ),
+      ).toEqual([nome("Ana")]);
+      expect(
+        (await listar(rhA, `departamentoId=${depY}&cargoId=${carY}`)).total,
+      ).toBe(0);
+    });
+
+    it("combina com busca, situação e situação do vínculo", async () => {
+      expect(
+        nomes(
+          (
+            await listar(
+              rhA,
+              `departamentoId=${depX}&busca=${encodeURIComponent("T190 Bia")}`,
+            )
+          ).itens,
+        ),
+      ).toEqual([nome("Bia")]);
+      expect(
+        (await listar(rhA, `departamentoId=${depX}&situacao=ativo`)).total,
+      ).toBe(3);
+      expect(
+        (await listar(rhA, `departamentoId=${depX}&situacao=inativo`)).total,
+      ).toBe(0);
+      expect(
+        (await listar(rhA, `cargoId=${carY}&situacaoVinculo=ativo`)).total,
+      ).toBe(2);
+      expect(
+        (await listar(rhA, `cargoId=${carX}&situacaoVinculo=previsto`)).total,
+      ).toBe(0);
+    });
+
+    it("os contadores não mudam com os filtros (regra da T178)", async () => {
+      const sem = await listar(rhA, "tamanhoPagina=1");
+      const com = await listar(
+        rhA,
+        `departamentoId=${depX}&cargoId=${carY}&busca=${encodeURIComponent(PREFIXO)}&situacao=ativo&situacaoVinculo=ativo&tamanhoPagina=1`,
+      );
+      expect(com.contadores).toEqual(sem.contadores);
+    });
+
+    it("paginação depois do filtro: de 1 em 1, sem repetir nem pular", async () => {
+      const vistos: string[] = [];
+      let total = 0;
+      for (let pagina = 1; pagina <= 5; pagina++) {
+        const r = await listar(
+          rhA,
+          `departamentoId=${depX}&pagina=${pagina}&tamanhoPagina=1`,
+        );
+        total = r.total;
+        if (r.itens.length === 0) break;
+        vistos.push(...r.itens.map((i) => i.id));
+      }
+      expect(total).toBe(3);
+      expect(new Set(vistos).size).toBe(3);
+      expect(vistos.sort()).toEqual([ids.Ana, ids.Bia, ids.Fabio].sort());
+    });
+
+    it("isolamento: referência de outra empresa não casa com ninguém do escopo", async () => {
+      expect((await listar(rhA, `departamentoId=${departamentoB}`)).total).toBe(
+        0,
+      );
+      expect((await listar(rhA, `cargoId=${cargoB}`)).total).toBe(0);
+      expect((await listar(rhB, `departamentoId=${depX}`)).total).toBe(0);
+      const deB = await listar(
+        rhB,
+        `departamentoId=${departamentoB}&busca=${encodeURIComponent(PREFIXO)}`,
+      );
+      expect(deB.itens.map((i) => i.id)).toEqual([ids.Gil]);
+      expect(JSON.stringify(deB)).not.toContain(nome("Ana"));
+    });
+
+    it("DP vê o mesmo que o RH; o master global também acha os do filtro", async () => {
+      const doRh = await listar(rhA, `departamentoId=${depX}&cargoId=${carY}`);
+      const doDp = await listar(dpA, `departamentoId=${depX}&cargoId=${carY}`);
+      expect(nomes(doDp.itens)).toEqual(nomes(doRh.itens));
+      const global = await listar(
+        master,
+        `departamentoId=${depX}&tamanhoPagina=100`,
+      );
+      expect(nomes(global.itens)).toEqual([
+        nome("Ana"),
+        nome("Bia"),
+        nome("Fabio"),
+      ]);
+    });
+
+    it("gestor, colaborador, financeiro e auditor seguem negados, sem dado", async () => {
+      for (const cred of [gestorA, colaboradorA, financeiroA, auditorA]) {
+        const r = await get(
+          `/v1/colaboradores?departamentoId=${depX}&cargoId=${carX}`,
+          cred,
+        );
+        expect([403, 404]).toContain(r.status);
+        expect(JSON.stringify(r.body)).not.toContain(PREFIXO);
+      }
+    });
+
+    it("departamento ou cargo que não é UUID é recusado", async () => {
+      await get("/v1/colaboradores?departamentoId=abc", rhA).expect(400);
+      await get("/v1/colaboradores?cargoId=1", rhA).expect(400);
+    });
+
+    it("O1 da T186 — situacaoVinculo: previsto, ativo e encerrado, no escopo", async () => {
+      const busca = `busca=${encodeURIComponent(PREFIXO)}&tamanhoPagina=100`;
+      expect(
+        nomes((await listar(rhA, `situacaoVinculo=previsto&${busca}`)).itens),
+      ).toEqual([nome("Dora")]);
+      expect(
+        nomes((await listar(rhA, `situacaoVinculo=encerrado&${busca}`)).itens),
+      ).toEqual([nome("Eli")]);
+      expect(
+        nomes((await listar(rhA, `situacaoVinculo=ativo&${busca}`)).itens),
+      ).toEqual([nome("Ana"), nome("Bia"), nome("Caio"), nome("Fabio")]);
+      // A outra empresa não entra, em nenhuma situação.
+      expect(
+        JSON.stringify(
+          (await listar(rhA, `situacaoVinculo=ativo&${busca}`)).itens,
+        ),
+      ).not.toContain(nome("Gil"));
+      await get("/v1/colaboradores?situacaoVinculo=suspenso", rhA).expect(400);
+    });
+
+    it("O2 da T188 — movimentações com mesma vigência e mesmo registro: ordem total, sem repetição nem lacuna", async () => {
+      const vinculoId = ids.vinculoAna!;
+      const solicitante = await (async () => {
+        const prisma = new PrismaClient({
+          datasources: { db: { url: appUrl } },
+        });
+        try {
+          const rh = await prisma.accessUser.findUniqueOrThrow({
+            where: { email: "rh.pa@example.test" },
+          });
+          // Seis movimentações com a MESMA vigência e o MESMO instante de
+          // registro: sem desempate, a ordem entre elas não existe.
+          const instante = new Date("2026-03-02T12:00:00.000Z");
+          await prisma.movimentacaoFuncional.createMany({
+            data: Array.from({ length: 6 }, () => ({
+              vinculoId,
+              empresaId: empresaA,
+              tipo: "transferencia_organizacional" as const,
+              motivoCodigo: "realocacao_interna" as const,
+              solicitanteUserId: rh.id,
+              vigenciaInicio: new Date("2026-03-02T00:00:00.000Z"),
+              registradaEm: instante,
+              destinoDepartamentoId: depY,
+            })),
+          });
+          return rh.id;
+        } finally {
+          await prisma.$disconnect();
+        }
+      })();
+      expect(solicitante).toBeTruthy();
+
+      const inteira = await get(
+        `/v1/movimentacoes?vinculoId=${vinculoId}&tamanhoPagina=100`,
+        rhA,
+      ).expect(200);
+      type Mov = { id: string; vigenciaInicio: string; registradaEm: string };
+      const todas = inteira.body.itens as Mov[];
+      expect(todas.length).toBe(7);
+      // A ordem é a declarada: vigência, registro e id, todos decrescentes.
+      const esperada = [...todas].sort(
+        (a, b) =>
+          b.vigenciaInicio.localeCompare(a.vigenciaInicio) ||
+          b.registradaEm.localeCompare(a.registradaEm) ||
+          b.id.localeCompare(a.id),
+      );
+      expect(todas.map((m) => m.id)).toEqual(esperada.map((m) => m.id));
+
+      // Página a página, duas vezes: sempre a mesma sequência, sem repetir.
+      for (let passada = 0; passada < 2; passada++) {
+        const vistos: string[] = [];
+        for (let pagina = 1; pagina <= 4; pagina++) {
+          const r = await get(
+            `/v1/movimentacoes?vinculoId=${vinculoId}&pagina=${pagina}&tamanhoPagina=2`,
+            rhA,
+          ).expect(200);
+          vistos.push(...(r.body.itens as Mov[]).map((m) => m.id));
+        }
+        expect(vistos).toEqual(esperada.map((m) => m.id));
+        expect(new Set(vistos).size).toBe(7);
+      }
+      // O formato da resposta não mudou.
+      expect(Object.keys(inteira.body).sort()).toEqual(
+        ["itens", "pagina", "tamanhoPagina", "total"].sort(),
+      );
+    });
+  });
 });
