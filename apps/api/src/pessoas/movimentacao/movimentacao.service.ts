@@ -49,6 +49,19 @@ import {
  * cálculo de direito, saldo, período, rescisão ou enquadramento legal. O
  * sistema registra quem decidiu, quando e com qual efeito.
  */
+/**
+ * T190 (O2 da T188) — ordem da listagem paginada de movimentações: vigência e
+ * registro, do mais novo ao mais antigo, e o `id` como desempate final.
+ *
+ * Sem o desempate, duas movimentações com a mesma vigência e o mesmo instante
+ * de registro não têm ordem definida: o banco pode devolvê-las em ordens
+ * diferentes a cada página, e a paginação repete uma e pula a outra. O `id` é
+ * único, então a ordem fica total e estável entre leituras. O formato da
+ * resposta não muda.
+ */
+export const ORDEM_DAS_MOVIMENTACOES: Prisma.MovimentacaoFuncionalOrderByWithRelationInput[] =
+  [{ vigenciaInicio: "desc" }, { registradaEm: "desc" }, { id: "desc" }];
+
 @Injectable()
 export class MovimentacaoService {
   constructor(
@@ -156,7 +169,7 @@ export class MovimentacaoService {
     const [itens, total] = await Promise.all([
       this.prisma.movimentacaoFuncional.findMany({
         where,
-        orderBy: [{ vigenciaInicio: "desc" }, { registradaEm: "desc" }],
+        orderBy: ORDEM_DAS_MOVIMENTACOES,
         skip: deslocamento(query.pagina, query.tamanhoPagina),
         take: query.tamanhoPagina,
       }),

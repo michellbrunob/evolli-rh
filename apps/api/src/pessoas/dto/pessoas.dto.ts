@@ -375,6 +375,21 @@ export class ListarColaboradoresQueryDto extends ListarPaginadoQueryDto {
   // eslint-disable-next-line no-control-regex
   @Matches(/^[^\u0000-\u001F\u007F]*$/)
   busca?: string;
+
+  /**
+   * T190 — filtro pela lotação VIGENTE (a regra da T184): colaborador com
+   * vínculo ATIVO no escopo cuja alocação aberta (`vigente_ate` nulo) está
+   * neste departamento. Filtro, nunca concessão: o departamento de outra
+   * empresa simplesmente não casa com ninguém do escopo.
+   */
+  @IsOptional()
+  @IsUUID()
+  departamentoId?: string;
+
+  /** T190 — idem, pelo cargo da alocação aberta. */
+  @IsOptional()
+  @IsUUID()
+  cargoId?: string;
 }
 
 export class ListarMovimentacoesQueryDto extends ListarPaginadoQueryDto {

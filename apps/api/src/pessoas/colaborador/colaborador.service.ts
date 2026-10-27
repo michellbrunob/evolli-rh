@@ -234,6 +234,39 @@ function compararMatriculas(a: string | null, b: string | null): number {
   return a.localeCompare(b);
 }
 
+/**
+ * T190 — filtro por Departamento e/ou Cargo, pela lotação VIGENTE (T184): um
+ * vínculo ATIVO do escopo cuja alocação ABERTA (`vigenteAte` nulo) tem o
+ * departamento e o cargo pedidos — os dois na MESMA alocação, quando os dois
+ * vêm. Previsto, encerrado e vínculo sem lotação vigente não casam: não há
+ * lotação vigente ativa a mostrar, e aparecer filtrado seria afirmar uma
+ * lotação que a linha não tem.
+ *
+ * Sem nenhum dos dois, `null`: o filtro não entra na consulta.
+ */
+export function filtroDeLotacaoVigente(
+  noEscopo: Prisma.VinculoFuncionalWhereInput,
+  departamentoId: string | undefined,
+  cargoId: string | undefined,
+): Prisma.ColaboradorWhereInput | null {
+  if (!departamentoId && !cargoId) return null;
+  return {
+    vinculos: {
+      some: {
+        ...noEscopo,
+        situacao: "ativo",
+        alocacoes: {
+          some: {
+            vigenteAte: null,
+            ...(departamentoId ? { departamentoId } : {}),
+            ...(cargoId ? { cargoId } : {}),
+          },
+        },
+      },
+    },
+  };
+}
+
 /** Vínculo principal primeiro: o ativo, depois o previsto, depois o mais novo. */
 export function ordenarVinculosListados(
   vinculos: readonly VinculoListado[],
@@ -1050,6 +1083,8 @@ export class ColaboradorService {
    * - **Busca** (T178): nome contém, sem diferenciar maiúsculas; ou matrícula
    *   contém, só em vínculos do escopo.
    * - **Contadores** (T178): o escopo inteiro, sem filtros nem busca.
+   * - **Departamento e Cargo** (T190): pela lotação vigente, no banco, antes
+   *   da paginação (`filtroDeLotacaoVigente`). Os contadores não mudam.
    */
   async listar(
     query: ListarColaboradoresQueryDto,
@@ -1114,6 +1149,12 @@ export class ColaboradorService {
         ],
       });
     }
+    const porLotacao = filtroDeLotacaoVigente(
+      noEscopo,
+      query.departamentoId,
+      query.cargoId,
+    );
+    if (porLotacao) filtros.push(porLotacao);
     const where: Prisma.ColaboradorWhereInput = { AND: filtros };
 
     const [linhas, total, ativos, totalNoEscopo] = await Promise.all([
