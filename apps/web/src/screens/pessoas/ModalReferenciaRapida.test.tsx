@@ -24,6 +24,10 @@ import {
 import { criarDepartamento, criarUnidade } from "../../api/organizacaoClient";
 import { criarCargo } from "../../api/cargoClient";
 import { CsrfSessionExpiredError } from "../../api/csrfClient";
+import {
+  ProvedorDeEdicoes,
+  RegistroDeEdicoes,
+} from "../../app/edicoesPendentes";
 
 vi.mock("../../api/organizacaoClient");
 vi.mock("../../api/cargoClient");
@@ -462,5 +466,74 @@ describe("T180 — modal de cadastro rápido", () => {
     );
     fireEvent.change(codigo(), { target: { value: "DEP_OUTRO" } });
     expect(codigo()).not.toHaveAttribute("aria-invalid");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T189 (B1) — o que foi digitado aqui é edição pendente. Sem isto, uma troca
+// de empresa feita em outra aba descartava código e nome sem perguntar.
+// ---------------------------------------------------------------------------
+
+describe("T189 (B1) — código ou nome digitados são edição pendente", () => {
+  function montarComRegistro(
+    tipo: TipoReferenciaRapida | null = "departamento",
+  ) {
+    const registro = new RegistroDeEdicoes();
+    const props = {
+      empresaId: EMPRESA_ID,
+      onFechar: vi.fn(),
+      onCriada: vi.fn(),
+      onRecarregar: vi.fn(() => Promise.resolve(true)),
+    };
+    const resultado = render(
+      <ProvedorDeEdicoes registro={registro}>
+        <ModalReferenciaRapida tipo={tipo} {...props} />
+      </ProvedorDeEdicoes>,
+    );
+    return {
+      registro,
+      fechar: () =>
+        resultado.rerender(
+          <ProvedorDeEdicoes registro={registro}>
+            <ModalReferenciaRapida tipo={null} {...props} />
+          </ProvedorDeEdicoes>,
+        ),
+    };
+  }
+  const codigo = () => screen.getByLabelText(/^Código/);
+  const nome = () => screen.getByLabelText(/^Nome/);
+
+  it("aberto e vazio: nenhuma pendência", () => {
+    const { registro } = montarComRegistro();
+    expect(registro.obter().pendentes).toEqual([]);
+  });
+
+  it("só o código preenchido: pendente", () => {
+    const { registro } = montarComRegistro();
+    fireEvent.change(codigo(), { target: { value: "DEP_X" } });
+    expect(registro.obter().pendentes).toEqual(["Cadastrar departamento"]);
+  });
+
+  it("só o nome preenchido: pendente", () => {
+    const { registro } = montarComRegistro("cargo");
+    fireEvent.change(nome(), { target: { value: "Cargo Sintético" } });
+    expect(registro.obter().pendentes).toEqual(["Cadastrar cargo"]);
+  });
+
+  it("código e nome preenchidos: pendente; apagados, deixa de ser", () => {
+    const { registro } = montarComRegistro("unidade");
+    fireEvent.change(codigo(), { target: { value: "UNI_X" } });
+    fireEvent.change(nome(), { target: { value: "Unidade Sintética" } });
+    expect(registro.obter().pendentes).toEqual(["Cadastrar unidade"]);
+    fireEvent.change(codigo(), { target: { value: "" } });
+    fireEvent.change(nome(), { target: { value: "" } });
+    expect(registro.obter().pendentes).toEqual([]);
+  });
+
+  it("fechado, sai do registro", () => {
+    const { registro, fechar } = montarComRegistro();
+    fireEvent.change(codigo(), { target: { value: "DEP_X" } });
+    fechar();
+    expect(registro.obter().pendentes).toEqual([]);
   });
 });

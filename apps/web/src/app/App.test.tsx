@@ -6,6 +6,23 @@ import {
   definirLarguraDaJanela,
   redefinirLarguraDaJanela,
 } from "../test/viewport";
+import {
+  listarEmpresasDoContexto,
+  trocarEmpresaDoContexto,
+} from "../api/contextoEmpresarialClient";
+
+// T189 — o seletor de empresa do menu lateral só existe na sessão autenticada
+// (`onLogout`); os testes que montam o `App` sem ela não o veem nem o chamam.
+vi.mock("../api/contextoEmpresarialClient", async () => {
+  const actual = await vi.importActual<
+    typeof import("../api/contextoEmpresarialClient")
+  >("../api/contextoEmpresarialClient");
+  return {
+    ...actual,
+    listarEmpresasDoContexto: vi.fn(),
+    trocarEmpresaDoContexto: vi.fn(),
+  };
+});
 
 describe("App — shell administrativo + navegação visual (T044)", () => {
   it("usa marcos semânticos e um único banner (a barra do shell)", () => {
@@ -1443,5 +1460,163 @@ describe("T162 — entrada vinda do Hub é validada no shell", () => {
     render(<App papelDoAtor="rh" onVoltarAoHub={voltar} />);
     fireEvent.click(screen.getByRole("button", { name: "Hub" }));
     expect(voltar).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T189 — empresa ativa no topo do menu lateral.
+// ---------------------------------------------------------------------------
+
+describe("T189 — empresa ativa no topo do menu lateral", () => {
+  const ALFA = {
+    id: "empresa-sintetica-alfa",
+    codigo: "ALFA",
+    nome: "Empresa Alfa",
+  };
+  const BETA = {
+    id: "empresa-sintetica-beta",
+    codigo: "BETA",
+    nome: "Empresa Beta",
+  };
+
+  beforeEach(() => {
+    vi.mocked(listarEmpresasDoContexto).mockReset();
+    vi.mocked(trocarEmpresaDoContexto).mockReset();
+    vi.mocked(listarEmpresasDoContexto).mockResolvedValue([ALFA, BETA]);
+    vi.mocked(trocarEmpresaDoContexto).mockResolvedValue(BETA);
+  });
+
+  afterEach(() => {
+    redefinirLarguraDaJanela();
+  });
+
+  it("fica logo abaixo da marca Evolli, antes da navegação", async () => {
+    render(
+      <App
+        papelDoAtor="rh"
+        onLogout={() => undefined}
+        empresaAtiva={ALFA}
+        podeTrocarEmpresa
+      />,
+    );
+    await screen.findByRole("button", { name: /Empresa ativa/ });
+    const barra = document.getElementById("navegacao-lateral")!;
+    const filhos = [...barra.children].map((f) => f.className);
+    const marca = filhos.findIndex((c) => c.includes("app-shell__marca"));
+    const seletor = filhos.findIndex((c) => c.includes("seletor-empresa"));
+    const navegacao = [...barra.children].findIndex(
+      (f) => f.querySelector("nav") !== null || f.tagName === "NAV",
+    );
+    expect(marca).toBe(0);
+    expect(seletor).toBe(1);
+    expect(navegacao).toBeGreaterThan(seletor);
+  });
+
+  it("sem sessão (sem onLogout) não há seletor nem leitura de empresas", () => {
+    render(<App papelDoAtor="rh" empresaAtiva={ALFA} podeTrocarEmpresa />);
+    expect(document.querySelector(".seletor-empresa")).toBeNull();
+    expect(listarEmpresasDoContexto).not.toHaveBeenCalled();
+  });
+
+  it("perfil sem troca: só leitura no menu, sem pedir a lista", () => {
+    render(
+      <App papelDoAtor="dp" onLogout={() => undefined} empresaAtiva={ALFA} />,
+    );
+    const leitura = document.querySelector(
+      "#navegacao-lateral .seletor-empresa__leitura",
+    );
+    expect(leitura).toHaveTextContent("Empresa Alfa");
+    expect(leitura).toHaveTextContent("Código ALFA");
+    expect(screen.queryByRole("button", { name: /Empresa ativa/ })).toBeNull();
+    expect(listarEmpresasDoContexto).not.toHaveBeenCalled();
+  });
+
+  it("a troca confirmada sobe para quem monta o shell, com a empresa do servidor", async () => {
+    const onEmpresaTrocada = vi.fn();
+    render(
+      <App
+        papelDoAtor="rh"
+        onLogout={() => undefined}
+        empresaAtiva={ALFA}
+        podeTrocarEmpresa
+        onEmpresaTrocada={onEmpresaTrocada}
+      />,
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: /Empresa ativa/ }),
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: /^Empresa Beta/ }),
+    );
+    await vi.waitFor(() => expect(onEmpresaTrocada).toHaveBeenCalledWith(BETA));
+  });
+
+  it("informa o destino exibido, na montagem e a cada navegação", () => {
+    const onDestinoAlterado = vi.fn();
+    render(
+      <App
+        papelDoAtor="rh"
+        onLogout={() => undefined}
+        destinoInicial="pessoas"
+        onDestinoAlterado={onDestinoAlterado}
+      />,
+    );
+    expect(onDestinoAlterado).toHaveBeenLastCalledWith("pessoas");
+    fireEvent.click(screen.getByRole("button", { name: /^Visão geral/ }));
+    expect(onDestinoAlterado).toHaveBeenLastCalledWith("inicio");
+  });
+
+  it("com o pedido de foco, o título da tela de destino recebe o foco ao montar", () => {
+    render(
+      <App
+        papelDoAtor="rh"
+        onLogout={() => undefined}
+        destinoInicial="pessoas"
+        focarTituloAoAbrir
+      />,
+    );
+    expect(document.activeElement?.id).toBe("colaboradores-titulo");
+  });
+
+  it("sem o pedido de foco, a montagem não mexe no foco", () => {
+    render(
+      <App
+        papelDoAtor="rh"
+        onLogout={() => undefined}
+        destinoInicial="pessoas"
+      />,
+    );
+    expect(document.activeElement?.id).not.toBe("colaboradores-titulo");
+  });
+
+  it("375 px: o seletor está dentro da gaveta, a lista abre nela, e Esc fecha a lista sem fechar a gaveta", async () => {
+    act(() => definirLarguraDaJanela(375));
+    render(
+      <App
+        papelDoAtor="rh"
+        onLogout={() => undefined}
+        empresaAtiva={ALFA}
+        podeTrocarEmpresa
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Menu" }));
+    const gaveta = document.getElementById("navegacao-lateral")!;
+    const botao = await within(gaveta).findByRole("button", {
+      name: /Empresa ativa/,
+    });
+    fireEvent.click(botao);
+    const lista = await within(gaveta).findByRole("list", {
+      name: "Empresas autorizadas",
+    });
+    expect(gaveta.contains(lista)).toBe(true);
+    expect(gaveta.contains(document.activeElement)).toBe(true);
+
+    fireEvent.keyDown(document.activeElement!, { key: "Escape" });
+    expect(botao).toHaveAttribute("aria-expanded", "false");
+    expect(document.activeElement).toBe(botao);
+    // A gaveta continua aberta: o Esc era do painel.
+    expect(
+      screen.getByRole("button", { name: "Menu", hidden: true }),
+    ).toHaveAttribute("aria-expanded", "true");
   });
 });

@@ -18,7 +18,12 @@
  * O arquivo é autocontido — mesmo padrão dos dez outros clientes de `src/api`,
  * cada um com seu `apiFetch` local.
  */
-import { clearCsrfToken, getCsrfToken, refreshCsrfToken } from "./csrfClient";
+import {
+  clearCsrfToken,
+  descartarTokenSeDesatualizado,
+  getCsrfToken,
+  refreshCsrfToken,
+} from "./csrfClient";
 
 const BASE = "/v1";
 
@@ -97,12 +102,21 @@ export async function listarEmpresasDoContexto(): Promise<
 export async function trocarEmpresaDoContexto(
   empresaId: string,
 ): Promise<EmpresaDoContextoApi> {
-  const token = await getCsrf();
-  const res = await apiFetch("/auth/contexto/empresa", {
-    method: "POST",
-    headers: { "x-csrf-token": token },
-    body: JSON.stringify({ empresaId }),
-  });
+  const enviar = async () =>
+    apiFetch("/auth/contexto/empresa", {
+      method: "POST",
+      headers: { "x-csrf-token": await getCsrf() },
+      body: JSON.stringify({ empresaId }),
+    });
+  let res = await enviar();
+  // T189 — 403 `csrf_invalido`: a sessão vale, mas outra aba renovou o token
+  // desta sessão — justamente o cenário de várias abas que a troca de empresa
+  // envolve. A troca é idempotente (trocar duas vezes para a mesma empresa dá
+  // no mesmo), então descartar o token, renovar e repetir UMA vez é seguro.
+  await descartarTokenSeDesatualizado(res);
+  if (res.status === 403 && getCsrfToken() === null) {
+    res = await enviar();
+  }
   const corpo = await jsonOrThrow<{ empresaAtiva: EmpresaDoContextoApi }>(res);
   return corpo.empresaAtiva;
 }

@@ -47,6 +47,7 @@ import {
 import type { ReactNode } from "react";
 import { Button } from "./Button";
 import "./Modal.css";
+import { useEdicaoEmAndamento } from "../app/edicoesPendentes";
 
 export interface ModalProps {
   /** Quando `false`, nada é renderizado. */
@@ -125,6 +126,14 @@ export function Modal({
   // ao fluxo de edição quando a pessoa escolhe continuar editando.
   const focoAntesDaConfirmacaoRef = useRef<HTMLElement | null>(null);
   const [confirmandoDescarte, setConfirmandoDescarte] = useState(false);
+
+  // T189 — janela aberta com alteração não salva é edição pendente; envio
+  // em andamento (`bloqueado`), salvamento. A troca de empresa respeita os
+  // dois, como o próprio fechamento desta janela.
+  useEdicaoEmAndamento(titulo, {
+    pendente: aberto && alterado,
+    salvando: aberto && bloqueado,
+  });
 
   // Guarda quem abriu, para devolver o foco ao fechar.
   useEffect(() => {

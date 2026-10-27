@@ -97,6 +97,11 @@ import { CentralSolicitacoesRHScreen } from "../screens/solicitacoes-rh/CentralS
 import { ModuloEmPreparacao } from "./ModuloEmPreparacao";
 import { PainelNavigation } from "./PainelNavigation";
 import {
+  SeletorEmpresaAtiva,
+  type EmpresaAtivaExibida,
+} from "./SeletorEmpresaAtiva";
+import type { EmpresaDoContextoApi } from "../api/contextoEmpresarialClient";
+import {
   destinoInicialPara,
   destinoPorId,
   capacidadeFuncionalDe,
@@ -479,10 +484,28 @@ export interface AppProps {
    * qual empresa o que está na tela foi lido. Desce do `AutenticacaoApp`, que
    * já tem o ator; nenhuma tela faz leitura própria para obtê-la.
    *
-   * É contexto, nunca controle: a troca acontece no Hub, e só para os papéis
-   * que o servidor autoriza.
+   * T189 — também aparece no topo do menu lateral (`SeletorEmpresaAtiva`),
+   * e é dali que quem o servidor autoriza troca de empresa sem voltar ao Hub.
    */
-  empresaAtiva?: { readonly nome: string; readonly codigo: string } | null;
+  empresaAtiva?: EmpresaAtivaExibida | null;
+  /** T189 — decidido pelo servidor (`/users/me`): este papel troca de empresa? */
+  podeTrocarEmpresa?: boolean;
+  /**
+   * T189 — o servidor confirmou a troca feita no menu lateral. Quem monta o
+   * shell reresolve o ator e o remonta no mesmo módulo (ver `AutenticacaoApp`).
+   */
+  onEmpresaTrocada?: (empresa: EmpresaDoContextoApi) => void;
+  /**
+   * T189 — o destino exibido agora, para que uma troca de empresa (aqui ou em
+   * outra aba) devolva a pessoa ao mesmo módulo.
+   */
+  onDestinoAlterado?: (destinoId: string) => void;
+  /**
+   * T189 — ao montar, levar o foco ao título da tela. Usado depois de uma
+   * troca de empresa: a tela é outra, e quem usa teclado ou leitor de tela
+   * precisa saber onde está.
+   */
+  focarTituloAoAbrir?: boolean;
   destinoInicial?: string | null;
   /**
    * T162 — volta ao Hub. Ausente significa que não há Hub acima deste shell
@@ -497,6 +520,10 @@ export function App({
   mfaDisponivel = false,
   papelDoAtor = null,
   empresaAtiva = null,
+  podeTrocarEmpresa = false,
+  onEmpresaTrocada,
+  onDestinoAlterado,
+  focarTituloAoAbrir = false,
   destinoInicial = null,
   onVoltarAoHub,
 }: AppProps = {}) {
@@ -665,6 +692,15 @@ export function App({
     }
   }, [destinoAtivoId]);
 
+  // T189 — quem monta o shell sabe sempre o destino exibido: é para ele que
+  // uma troca de empresa devolve. Ref, para não refazer o efeito a cada
+  // desenho de quem passa a função.
+  const onDestinoAlteradoRef = useRef(onDestinoAlterado);
+  onDestinoAlteradoRef.current = onDestinoAlterado;
+  useEffect(() => {
+    onDestinoAlteradoRef.current?.(destinoAtivoId);
+  }, [destinoAtivoId]);
+
   // "Voltar" e "avançar" do navegador, e a URL digitada com o painel aberto.
   // A rota passa pela mesma validação de capacidade da entrada.
   useEffect(() => {
@@ -797,6 +833,39 @@ export function App({
   }, [gavetaModal]);
 
   const rotuloDoPapel = papelDoAtor ? ROTULO_PAPEL[papelDoAtor] : undefined;
+
+  const tituloDoDestinoId =
+    destinoAtivoId === "cadastros"
+      ? cadastrosTituloId
+      : destinoAtivoId === "pessoas"
+        ? pessoasTituloId
+        : destinoAtivoId === "ponto"
+          ? pontoTituloId
+          : destinoAtivoId === "documentos"
+            ? documentosTituloId
+            : destinoAtivoId === "portal-colaborador"
+              ? portalTituloId
+              : destinoAtivoId === "relatorios"
+                ? relatoriosTituloId
+                : (TITULO_ID_POR_DESTINO[destinoAtivoId] ?? "modulo-titulo");
+
+  // T189 — depois de uma troca de empresa, o foco vai para o título da tela
+  // de destino (ou, sem título no DOM, para a região principal, nomeada por
+  // ele). Só na montagem: é a tela nova que precisa ser anunciada.
+  const mainRef = useRef<HTMLElement | null>(null);
+  const tituloAoMontarRef = useRef(
+    focarTituloAoAbrir ? tituloDoDestinoId : null,
+  );
+  useEffect(() => {
+    const id = tituloAoMontarRef.current;
+    if (id === null) return;
+    tituloAoMontarRef.current = null;
+    const titulo = document.getElementById(id);
+    const alvo = titulo ?? mainRef.current;
+    if (!alvo) return;
+    if (!alvo.hasAttribute("tabindex")) alvo.setAttribute("tabindex", "-1");
+    alvo.focus();
+  }, []);
 
   return (
     <div
@@ -946,6 +1015,20 @@ export function App({
             </span>
           </span>
 
+          {/* T189 — a empresa ativa, logo abaixo da marca. Só na sessão
+              autenticada (mesmo critério de "Sair"): sem sessão não há
+              empresa a mostrar. */}
+          {onLogout ? (
+            <SeletorEmpresaAtiva
+              id="menu-empresa-ativa"
+              variante="menu"
+              empresaAtiva={empresaAtiva}
+              podeTrocarEmpresa={podeTrocarEmpresa}
+              papelDoAtor={papelDoAtor}
+              onEmpresaTrocada={(empresa) => onEmpresaTrocada?.(empresa)}
+            />
+          ) : null}
+
           {/* T159 — o shell passa o papel e a navegação decide sozinha quais
               destinos condicionados oferecer, lendo os papéis declarados no
               mapa. Antes a lista de capacidades era remontada aqui, longe dos
@@ -962,22 +1045,8 @@ export function App({
           className="app-shell__main"
           tabIndex={-1}
           {...(gavetaModal ? FUNDO_INERTE : {})}
-          aria-labelledby={
-            destinoAtivoId === "cadastros"
-              ? cadastrosTituloId
-              : destinoAtivoId === "pessoas"
-                ? pessoasTituloId
-                : destinoAtivoId === "ponto"
-                  ? pontoTituloId
-                  : destinoAtivoId === "documentos"
-                    ? documentosTituloId
-                    : destinoAtivoId === "portal-colaborador"
-                      ? portalTituloId
-                      : destinoAtivoId === "relatorios"
-                        ? relatoriosTituloId
-                        : (TITULO_ID_POR_DESTINO[destinoAtivoId] ??
-                          "modulo-titulo")
-          }
+          ref={mainRef}
+          aria-labelledby={tituloDoDestinoId}
         >
           {conteudoDoDestino(
             destinoAtivoId,

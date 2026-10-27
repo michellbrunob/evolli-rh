@@ -25,6 +25,7 @@ import {
   listarEmpresasParaCentroCusto,
 } from "../../api/organizacaoClient";
 import "./CentrosCustoScreen.css";
+import { useEdicaoEmAndamento } from "../../app/edicoesPendentes";
 
 export const CENTROS_CUSTO_TITULO_ID = "centros-custo-titulo";
 
@@ -80,6 +81,13 @@ export function CentrosCustoScreen({
   const [empresas, setEmpresas] = useState<EmpresaApi[]>([]);
   const [filtroStatus, setFiltroStatus] = useState<StatusFiltro>("todos");
   const [formulario, setFormulario] = useState<FormularioState | null>(null);
+  // T189 — formulário aberto conta como edição em andamento, e envio como
+  // salvamento: a troca de empresa pergunta antes de descartar, e espera
+  // o envio terminar.
+  useEdicaoEmAndamento("Centros de custo", {
+    pendente: formulario !== null,
+    salvando: formulario?.salvando === true,
+  });
   const [aviso, setAviso] = useState<string | null>(null);
   const formTituloId = useId();
 

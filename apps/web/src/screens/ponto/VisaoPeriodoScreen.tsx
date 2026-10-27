@@ -51,6 +51,7 @@ import {
 } from "../../format/data";
 import { exibirMatricula } from "../../format/matricula";
 import "./VisaoPeriodoScreen.css";
+import { useEdicaoEmAndamento } from "../../app/edicoesPendentes";
 
 export const VISAO_PERIODO_TITULO_ID = "visao-periodo-titulo";
 
@@ -190,6 +191,13 @@ export function VisaoPeriodoScreen() {
   const [filtroCompetencia, setFiltroCompetencia] = useState<string>("");
   const [filtroTipo, setFiltroTipo] = useState<FiltroTipo>("todos");
   const [formulario, setFormulario] = useState<FormularioState | null>(null);
+  // T189 — formulário aberto conta como edição em andamento, e envio como
+  // salvamento: a troca de empresa pergunta antes de descartar, e espera
+  // o envio terminar.
+  useEdicaoEmAndamento("Registro de ponto", {
+    pendente: formulario !== null,
+    salvando: formulario?.salvando === true,
+  });
   const [detalhe, setDetalhe] = useState<DetalheState | null>(null);
   const [referenciaHorario, setReferenciaHorario] =
     useState<ReferenciaHorarioState | null>(null);

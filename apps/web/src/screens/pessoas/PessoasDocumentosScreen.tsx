@@ -63,6 +63,7 @@ import {
 import { formatarInstante } from "../../format/data";
 import { trechoDeMatricula } from "../../format/matricula";
 import "./PessoasDocumentosScreen.css";
+import { useEdicaoEmAndamento } from "../../app/edicoesPendentes";
 
 export const PESSOAS_DOCUMENTOS_TITULO_ID = "pessoas-documentos-titulo";
 
@@ -138,6 +139,19 @@ export function PessoasDocumentosScreen() {
   >(null);
   const [formSolicitar, setFormSolicitar] =
     useState<FormularioTipoState | null>(null);
+  // T189 — formulário aberto conta como edição em andamento, e envio como
+  // salvamento: a troca de empresa pergunta antes de descartar, e espera
+  // o envio terminar.
+  useEdicaoEmAndamento("Documentos", {
+    pendente:
+      formCriarDoc !== null ||
+      formSubstituir !== null ||
+      formSolicitar !== null,
+    salvando:
+      formCriarDoc?.salvando === true ||
+      formSubstituir?.salvando === true ||
+      formSolicitar?.salvando === true,
+  });
   const [mensagemSucesso, setMensagemSucesso] = useState<string | null>(null);
 
   const tituloDetalheDocId = useId();

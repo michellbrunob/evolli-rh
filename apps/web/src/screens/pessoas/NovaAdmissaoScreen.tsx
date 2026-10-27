@@ -159,6 +159,7 @@ import {
 } from "./ModalReferenciaRapida";
 import { listaComE, useCepAssistido } from "./cepAssistido";
 import "./NovaAdmissaoScreen.css";
+import { useEdicaoEmAndamento } from "../../app/edicoesPendentes";
 
 export const NOVA_ADMISSAO_TITULO_ID = "nova-admissao-titulo";
 
@@ -939,6 +940,14 @@ export function NovaAdmissaoScreen({
       (c) => endereco[c] !== ENDERECO_INICIAL[c],
     ) ||
     (Object.keys(contatos) as CampoContato[]).some((c) => contatos[c] !== "");
+
+  // T189 — o cadastro com dados digitados e ainda não registrado é edição
+  // pendente; o envio, salvamento em andamento. A troca de empresa pergunta
+  // antes de descartar, e espera o envio terminar.
+  useEdicaoEmAndamento("Nova admissão", {
+    pendente: alterado && admissao === null,
+    salvando,
+  });
 
   function atualizarPerfil(campo: ChavePerfil, valor: string) {
     setPerfil((prev) => ({ ...prev, [campo]: valor }));
