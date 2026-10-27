@@ -2498,6 +2498,11 @@ seed ou dependência.
 novos, documentos, folha, ponto, banco de horas, fuso horário, promoção e
 merge.
 
+**Limite conhecido (pós-revisão da PR #183):** os catálogos ativos de
+Departamento e Cargo dos filtros carregam no máximo 100 itens; acima desse
+limite, opções podem não aparecer no seletor. O limite não está resolvido e
+fica pendente de uma entrega própria.
+
 ## Próxima ação autorizável
 
 1. ~~**Decidir o pacote da T150**~~ — **cumprido pela T151.** O proprietário aprovou o recorte em

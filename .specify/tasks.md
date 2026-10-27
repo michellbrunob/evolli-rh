@@ -2674,6 +2674,12 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
     - **Fora de escopo:** transferência e mudança de cargo pela ficha, dados pessoais novos,
       documentos, folha, ponto, banco de horas, fuso horário, catálogos acima de 100 itens,
       importação, exportação, integrações externas, promoção e merge.
+    - **Fora de escopo, explícito (pós-revisão da PR #183):** a O1 da T188 (nomes no Horário de
+      trabalho acima de 100 colaboradores) continua aberta; o desempate por `id` vale só para a
+      lista paginada de movimentações — a linha do tempo do vínculo não o recebeu e permanece
+      fora desta entrega; os catálogos de Departamento e Cargo carregam no máximo 100 itens
+      ativos e, acima disso, opções podem não aparecer no seletor — limite pendente de entrega
+      própria.
     - **Prévia:** `http://127.0.0.1:5173` passa a mostrar a branch da T190 ao vivo, identificada
       como `[T190 dev]`, não a `main`.
 

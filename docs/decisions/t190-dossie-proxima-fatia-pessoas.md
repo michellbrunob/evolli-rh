@@ -184,3 +184,23 @@ desc]`. Com data e horário iguais, a paginação deixa de repetir ou pular
   situação e situação do vínculo, paginação, contadores, isolamento entre
   empresas, DP igual a RH, master global, perfis negados, `situacaoVinculo`,
   ordem estável com data e horário iguais), testes web da tela e do cliente.
+
+## 7. Fora do escopo desta entrega e limites conhecidos
+
+Registrado depois da revisão final da PR #183, para não deixar implícito o
+que a entrega não cobre:
+
+- **O1 da T188 continua fora:** a tabela de vínculos de horário segue
+  resolvendo nomes pela primeira página de 100 colaboradores; acima disso, o
+  vínculo pode aparecer sem nome. Nada nesta entrega mexe no Horário de
+  trabalho.
+- **O desempate por `id` vale só para a lista paginada de movimentações**
+  (`GET /v1/movimentacoes`). A **linha do tempo do vínculo** não recebeu esse
+  desempate (`vinculo.service.ts`, ordem por vigência e registro) e permanece
+  fora do escopo desta entrega — a opção A da seção 2 a descrevia, mas a
+  decisão aprovada (seção 5) cobriu só a O2 da lista paginada.
+- **Catálogos dos filtros limitados a 100 itens:** os seletores de
+  Departamento e Cargo carregam no máximo 100 referências ativas (uma página de
+  100, o teto do servidor). Numa empresa com mais de 100 departamentos ou
+  cargos ativos, opções podem não aparecer no seletor, sem aviso na tela. Esse
+  limite **não está resolvido** e fica pendente de uma entrega própria.
