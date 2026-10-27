@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useId, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Button,
   DataTable,
@@ -10,10 +17,7 @@ import {
   Surface,
 } from "../../components";
 import type { DataTableColumn, StatusVariant } from "../../components";
-import {
-  type ColaboradorApi,
-  listarColaboradores,
-} from "../../api/colaboradoresClient";
+import { listarColaboradores } from "../../api/colaboradoresClient";
 import {
   type TabelaHorarioApi,
   listarTabelasHorario,
@@ -21,6 +25,7 @@ import {
 import {
   type CriarVinculoHorarioDto,
   type EncerrarVinculoHorarioDto,
+  type ListarVinculosHorarioQuery,
   type VinculoHorarioApi,
   criarVinculoHorario,
   encerrarVinculoHorario,
@@ -31,10 +36,27 @@ import {
   SeletorColaboradorPaginado,
   type ColaboradorEscolhido,
 } from "./SeletorColaboradorPaginado";
+import { PaginacaoSimples } from "./PaginacaoSimples";
 import "./PessoasHorarioScreen.css";
 import { useEdicaoEmAndamento } from "../../app/edicoesPendentes";
 
 export const PESSOAS_HORARIO_TITULO_ID = "pessoas-horario-titulo";
+
+/** T191 — vínculos por página, como as demais listas de Pessoas. */
+export const TAMANHO_PAGINA_VINCULOS = 20;
+
+/**
+ * T191 — o nome vem do próprio vínculo. Sem ele (falha de leitura, servidor
+ * anterior), um rótulo neutro: nunca o identificador técnico no lugar do nome.
+ */
+function nomeColaborador(v: VinculoHorarioApi): string {
+  return v.colaborador?.nome ?? "Colaborador não identificado";
+}
+
+/** T191 — a jornada também vem do próprio vínculo (T183). */
+function nomeJornada(v: VinculoHorarioApi): string {
+  return v.tabela?.nome ?? "Jornada não identificada";
+}
 
 const VARIANTE_SITUACAO: Record<"vigente" | "encerrada", StatusVariant> = {
   vigente: "success",
@@ -82,11 +104,26 @@ export function PessoasHorarioScreen({
   >("carregando");
   const [vinculos, setVinculos] = useState<VinculoHorarioApi[]>([]);
   /**
-   * Primeira página de colaboradores, usada SÓ como dicionário de nomes da
-   * tabela de vínculos (que também é uma página de 100). A ESCOLHA do
-   * colaborador não depende mais dela (T188): é por busca paginada.
+   * T191 — a tabela de vínculos pagina no servidor, de 20 em 20, com filtros
+   * por colaborador e por jornada. Antes era UMA página de 100, e os nomes
+   * vinham de um dicionário de 100 colaboradores: acima disso, vínculos
+   * sumiam e nomes viravam identificadores técnicos.
    */
-  const [colaboradores, setColaboradores] = useState<ColaboradorApi[]>([]);
+  const [pagina, setPagina] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [filtroColaborador, setFiltroColaborador] =
+    useState<ColaboradorEscolhido | null>(null);
+  const [filtroJornadaId, setFiltroJornadaId] = useState("");
+  /**
+   * T191 — a busca do filtro por colaborador abre sob pedido: aberta o tempo
+   * todo, ela poria uma lista de nomes acima da tabela antes de alguém
+   * querer filtrar.
+   */
+  const [buscandoColaborador, setBuscandoColaborador] = useState(false);
+  /** Só a resposta mais recente é aplicada (filtro trocado durante a leitura). */
+  const pedidoVinculosRef = useRef(0);
+  /** Ativos e jornadas (formulário e filtro) não carregaram. */
+  const [apoioFalhou, setApoioFalhou] = useState(false);
   /**
    * T188 — quantos colaboradores ATIVOS o escopo tem, contados pelo servidor
    * (`situacao=ativo`, a regra por empresa da T178), e qual é, quando há um
@@ -111,18 +148,52 @@ export function PessoasHorarioScreen({
   const formTituloId = useId();
   const detalheTituloId = useId();
 
-  const carregarDados = useCallback(async () => {
-    setStatusCarregamento("carregando");
+  const carregarVinculos = useCallback(
+    async (
+      colaboradorId: string,
+      tabelaHorarioId: string,
+      paginaPedida: number,
+    ) => {
+      const pedido = ++pedidoVinculosRef.current;
+      setStatusCarregamento("carregando");
+      try {
+        const query: ListarVinculosHorarioQuery = {
+          pagina: paginaPedida,
+          tamanhoPagina: TAMANHO_PAGINA_VINCULOS,
+        };
+        if (colaboradorId) query.colaboradorId = colaboradorId;
+        if (tabelaHorarioId) query.tabelaHorarioId = tabelaHorarioId;
+        const resp = await listarVinculosHorario(query);
+        if (pedido !== pedidoVinculosRef.current) return;
+        setVinculos(resp.itens);
+        setPagina(resp.pagina);
+        setTotal(resp.total);
+        setStatusCarregamento("dados");
+      } catch {
+        if (pedido !== pedidoVinculosRef.current) return;
+        setStatusCarregamento("erro");
+      }
+    },
+    [],
+  );
+
+  // Trocar de filtro volta para a primeira página: o conjunto é outro.
+  const filtroColaboradorId = filtroColaborador?.id ?? "";
+  useEffect(() => {
+    void carregarVinculos(filtroColaboradorId, filtroJornadaId, 1);
+  }, [filtroColaboradorId, filtroJornadaId, carregarVinculos]);
+
+  /**
+   * Apoio do formulário e do filtro: quantos ativos (T188) e as jornadas. As
+   * jornadas seguem numa página de 100 — catálogo da empresa, limite
+   * registrado; a TABELA não depende mais dela: cada vínculo traz a sua.
+   */
+  const carregarApoio = useCallback(async () => {
     try {
-      const [vinculosResp, colaboradoresResp, ativosResp, tabelasResp] =
-        await Promise.all([
-          listarVinculosHorario({ tamanhoPagina: 100 }),
-          listarColaboradores({ tamanhoPagina: 100 }),
-          listarColaboradores({ situacao: "ativo", tamanhoPagina: 1 }),
-          listarTabelasHorario({ tamanhoPagina: 100 }),
-        ]);
-      setVinculos(vinculosResp.itens);
-      setColaboradores(colaboradoresResp.itens);
+      const [ativosResp, tabelasResp] = await Promise.all([
+        listarColaboradores({ situacao: "ativo", tamanhoPagina: 1 }),
+        listarTabelasHorario({ tamanhoPagina: 100 }),
+      ]);
       const primeiroAtivo = ativosResp.itens[0];
       setAtivos({
         total: ativosResp.total,
@@ -132,40 +203,33 @@ export function PessoasHorarioScreen({
             : null,
       });
       setTabelas(tabelasResp.itens);
-      setStatusCarregamento("dados");
+      setApoioFalhou(false);
     } catch {
-      setStatusCarregamento("erro");
+      setApoioFalhou(true);
     }
   }, []);
 
   useEffect(() => {
-    void carregarDados();
-  }, [carregarDados]);
+    void carregarApoio();
+  }, [carregarApoio]);
 
-  const colaboradoresPorId = useMemo(
-    () => new Map(colaboradores.map((c) => [c.id, c])),
-    [colaboradores],
-  );
-  const tabelasPorId = useMemo(
-    () => new Map(tabelas.map((t) => [t.id, t])),
-    [tabelas],
-  );
+  function tentarDeNovo() {
+    void carregarApoio();
+    void carregarVinculos(filtroColaboradorId, filtroJornadaId, pagina);
+  }
 
   const tabelasAtivas = useMemo(
     () => tabelas.filter((t) => t.ativo),
     [tabelas],
   );
 
-  function nomeColaborador(id: string): string {
-    return (
-      colaboradoresPorId.get(id)?.nome ??
-      (colaboradorDoFormulario?.id === id
-        ? colaboradorDoFormulario.nome
-        : `Colaborador ${id.slice(0, 8)}`)
-    );
-  }
-  function nomeTabela(id: string): string {
-    return tabelasPorId.get(id)?.nome ?? `Tabela ${id.slice(0, 8)}`;
+  const totalPaginas = Math.max(1, Math.ceil(total / TAMANHO_PAGINA_VINCULOS));
+  const filtrando = filtroColaborador !== null || filtroJornadaId !== "";
+
+  function limparFiltros() {
+    setFiltroColaborador(null);
+    setBuscandoColaborador(false);
+    setFiltroJornadaId("");
   }
 
   function abrirFormulario() {
@@ -246,7 +310,7 @@ export function PessoasHorarioScreen({
       };
       await criarVinculoHorario(dto);
       setFormulario(null);
-      await carregarDados();
+      await carregarVinculos(filtroColaboradorId, filtroJornadaId, 1);
     } catch (err: unknown) {
       const status =
         typeof err === "object" && err !== null && "status" in err
@@ -328,12 +392,12 @@ export function PessoasHorarioScreen({
     {
       key: "colaborador",
       header: "Colaborador",
-      cell: (v) => nomeColaborador(v.colaboradorId),
+      cell: (v) => nomeColaborador(v),
     },
     {
       key: "tabela",
       header: "Tabela de horário",
-      cell: (v) => nomeTabela(v.tabelaHorarioId),
+      cell: (v) => nomeJornada(v),
     },
     {
       key: "vigencia",
@@ -360,7 +424,7 @@ export function PessoasHorarioScreen({
       cell: (v) => (
         <Button variant="secondary" onClick={() => abrirDetalhe(v)}>
           Ver detalhes
-          <span className="sr-only"> — {nomeColaborador(v.colaboradorId)}</span>
+          <span className="sr-only"> — {nomeColaborador(v)}</span>
         </Button>
       ),
     },
@@ -404,7 +468,7 @@ export function PessoasHorarioScreen({
         </p>
       </Surface>
 
-      {statusCarregamento === "erro" ? (
+      {statusCarregamento === "erro" || apoioFalhou ? (
         <Surface
           as="section"
           padding="lg"
@@ -422,7 +486,7 @@ export function PessoasHorarioScreen({
             Verifique sua conexão e tente novamente. Se o problema persistir,
             contate o suporte.
           </p>
-          <Button variant="secondary" onClick={() => void carregarDados()}>
+          <Button variant="secondary" onClick={tentarDeNovo}>
             Tentar novamente
           </Button>
         </Surface>
@@ -435,10 +499,109 @@ export function PessoasHorarioScreen({
             Colaboradores com tabela de horário vinculada
           </h2>
 
+          {/* T191 — filtros combináveis, no servidor e antes da paginação:
+              o colaborador por busca (o mesmo seletor da T188) e a jornada. */}
+          <div
+            className="pessoas-horario-screen__filtros"
+            role="group"
+            aria-label="Filtrar vínculos de horário"
+          >
+            <div className="pessoas-horario-screen__filtro-colaborador">
+              {filtroColaborador ? (
+                <p className="pessoas-horario-screen__filtro-ativo">
+                  <span>
+                    Colaborador: <strong>{filtroColaborador.nome}</strong>
+                  </span>
+                  <Button
+                    variant="secondary"
+                    aria-label={`Remover filtro de colaborador: ${filtroColaborador.nome}`}
+                    onClick={() => setFiltroColaborador(null)}
+                  >
+                    Remover <span aria-hidden="true">×</span>
+                  </Button>
+                </p>
+              ) : buscandoColaborador ? (
+                <>
+                  <SeletorColaboradorPaginado
+                    id="pessoas-horario-filtro-colaborador"
+                    rotulo="Filtrar por colaborador (nome ou matrícula)"
+                    selecionado={null}
+                    onSelecionar={(c) => {
+                      setFiltroColaborador(c);
+                      setBuscandoColaborador(false);
+                    }}
+                  />
+                  <Button
+                    variant="subtle"
+                    onClick={() => setBuscandoColaborador(false)}
+                  >
+                    Cancelar filtro por colaborador
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  variant="secondary"
+                  onClick={() => setBuscandoColaborador(true)}
+                >
+                  Filtrar por colaborador
+                </Button>
+              )}
+            </div>
+            <FormField id="pessoas-horario-filtro-jornada" label="Jornada">
+              {(control) => (
+                <select
+                  value={filtroJornadaId}
+                  onChange={(e) => setFiltroJornadaId(e.target.value)}
+                  {...control}
+                >
+                  <option value="">Todas as jornadas</option>
+                  {tabelas.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.ativo ? t.nome : `${t.nome} (inativa)`}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </FormField>
+          </div>
+
           {statusCarregamento === "carregando" ? (
             <p className="pessoas-horario-screen__carregando" role="status">
               Carregando vínculos de horário…
             </p>
+          ) : vinculos.length === 0 && filtrando ? (
+            <EmptyState
+              headingLevel={3}
+              icon="—"
+              title="Nenhum vínculo com estes filtros"
+              description="Nenhum vínculo de horário corresponde ao colaborador ou à jornada escolhidos."
+              action={
+                <Button variant="secondary" onClick={limparFiltros}>
+                  Limpar filtros
+                </Button>
+              }
+            />
+          ) : vinculos.length === 0 && total > 0 ? (
+            <EmptyState
+              headingLevel={3}
+              icon="—"
+              title="Nenhum vínculo nesta página"
+              description="Esta página voltou vazia: o conjunto pode ter mudado desde a última leitura."
+              action={
+                <Button
+                  variant="secondary"
+                  onClick={() =>
+                    void carregarVinculos(
+                      filtroColaboradorId,
+                      filtroJornadaId,
+                      1,
+                    )
+                  }
+                >
+                  Ir para a primeira página
+                </Button>
+              }
+            />
           ) : vinculos.length === 0 ? (
             <EmptyState
               headingLevel={3}
@@ -459,12 +622,31 @@ export function PessoasHorarioScreen({
                 : {})}
             />
           ) : (
-            <DataTable
-              caption="Colaboradores com tabela de horário vinculada"
-              columns={colunas}
-              rows={vinculos}
-              rowKey={(v) => v.id}
-            />
+            <>
+              <p className="pessoas-horario-screen__total">
+                {total === 1
+                  ? "1 vínculo no filtro atual"
+                  : `${total} vínculos no filtro atual`}
+              </p>
+              <DataTable
+                caption="Colaboradores com tabela de horário vinculada"
+                columns={colunas}
+                rows={vinculos}
+                rowKey={(v) => v.id}
+              />
+              <PaginacaoSimples
+                rotulo="Páginas de vínculos de horário"
+                pagina={pagina}
+                totalPaginas={totalPaginas}
+                onIrPara={(destino) =>
+                  void carregarVinculos(
+                    filtroColaboradorId,
+                    filtroJornadaId,
+                    destino,
+                  )
+                }
+              />
+            </>
           )}
 
           {podeOperar && statusCarregamento === "dados" && semOpcoesValidas ? (
@@ -491,7 +673,7 @@ export function PessoasHorarioScreen({
             id={detalheTituloId}
             className="pessoas-horario-screen__section-title"
           >
-            {nomeColaborador(detalhe.vinculo.colaboradorId)}
+            {nomeColaborador(detalhe.vinculo)}
           </h2>
           <p>
             <StatusBadge
@@ -505,7 +687,7 @@ export function PessoasHorarioScreen({
             </StatusBadge>
           </p>
           <p className="pessoas-horario-screen__aviso-texto">
-            Tabela de horário: {nomeTabela(detalhe.vinculo.tabelaHorarioId)}
+            Tabela de horário: {nomeJornada(detalhe.vinculo)}
             <br />
             Vigência: {formatarDiaCivil(detalhe.vinculo.vigenciaInicio)} –{" "}
             {detalhe.vinculo.vigenciaFim
