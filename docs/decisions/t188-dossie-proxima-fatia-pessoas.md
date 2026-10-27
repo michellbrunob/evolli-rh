@@ -1,7 +1,7 @@
 # T188 — Dossiê: próxima fatia de Gestão de Pessoas
 
-Status: **dossiê de preparação de decisão.** Nada aqui decide, aprova ou
-autoriza implementação: a escolha é da proprietária.
+Status: **decidido pela proprietária em 2026-10-27: opção A completa**
+(seção 5). As seções 1 a 4 registram o dossiê como foi apresentado.
 Data: 2026-10-27. Tarefa: T188.
 Fontes, e só elas: `.specify`, as decisões em `docs/decisions` (em especial
 [T174](t174-dossie-decisoes-fatia-0.md) e [T187](t187-dossie-proxima-fatia-colaboradores.md)),
@@ -130,3 +130,38 @@ Para seguir com A, a proprietária precisa decidir:
    contratuais e Horário de trabalho (recomendado) — ou só o Histórico
    funcional agora; e se a correção da largura da aba Histórico funcional
    (pendência T115) entra junto (recomendado).
+
+## 5. Decisão da proprietária (2026-10-27)
+
+**Opção A aprovada, completa**, com as respostas recomendadas:
+
+1. **Busca por nome ou matrícula com resultados paginados pelo servidor** no
+   lugar do seletor de uma página de 100.
+2. **As três abas** — Histórico funcional, Dados contratuais e Horário de
+   trabalho — na mesma entrega, **com a lista de movimentações paginada** e a
+   **correção da largura** do Histórico funcional.
+
+Escopo final:
+
+- **Contratos:** só os existentes — `GET /v1/colaboradores` (`busca`,
+  `pagina`, `tamanhoPagina` e, no Horário, `situacao=ativo`),
+  `GET /v1/colaboradores/:id` (nome da seleção vinda da ficha, T187) e
+  `GET /v1/movimentacoes` (`pagina`, `tamanhoPagina`). A empresa é sempre a
+  da sessão; ninguém de outra empresa aparece.
+- **Seleção:** a escolha continua à vista ("Selecionado") quando a busca muda;
+  desfazê-la é explícito. Seleção vinda da ficha que o servidor recusa não
+  seleciona ninguém. Troca de empresa remonta a tela, e nada fica.
+- **Regras preservadas:** com um só colaborador no escopo (Dados contratuais)
+  ou um só ativo (Horário), ele é escolhido sozinho, como antes; buscar nunca
+  escolhe por conta própria. O Horário passa a contar os ativos no servidor
+  (`situacao=ativo`, regra da T178) em vez de na página de 100.
+- **Largura:** a causa medida era o texto só para leitor de tela (`.sr-only`,
+  `position: absolute`) da coluna Ações escapar do quadro rolável da tabela;
+  o quadro passa a ser posicionado e só ele rola.
+- **Permissões:** inalteradas — RH e DP conforme os contratos; o
+  `master_tecnico` no alcance já autorizado; gestor, colaborador, financeiro e
+  demais negados pelo servidor.
+- **Fora:** opções B e C, O1 da T186, catálogos organizacionais acima de 100
+  itens e a tabela de vínculos de horário (que segue numa página de 100 e
+  resolve nomes pela primeira página), formulários e regras dos módulos,
+  qualquer escrita, papel ou permissão nova, dado pessoal novo.

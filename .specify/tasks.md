@@ -2586,20 +2586,30 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
     - **Prévia:** `http://127.0.0.1:5173` passa a mostrar a branch da T187 ao vivo, identificada
       como `[T187 dev]`, não a `main`.
 
-85. **T188 - Próxima fatia de Gestão de Pessoas (preparação de decisão)**
-    - **Estado:** **em preparação de decisão**. Branch `codex/t188-proxima-fatia-pessoas`, a
-      partir do squash `00a94df7c8e9dc25179b8e23bf9fbe9a1466e50f` (T187 integrada, PR #180).
-    - **Objetivo desta etapa:** convergir a T187 e propor até três próximas fatias
-      independentes de Gestão de Pessoas, priorizando valor operacional para RH e DP, sem
-      implementar produto antes de uma decisão explícita da proprietária.
-    - **Entrega desta etapa:** dossiê
-      (`docs/decisions/t188-dossie-proxima-fatia-pessoas.md`) com as opções e uma
-      recomendação. Só documentação: sem código, API, schema, migration, RBAC, banco, seed,
-      Docker, dependência, CI ou PR.
-    - **Fora de escopo:** implementação de qualquer opção antes da decisão, banco de horas,
-      ponto, escala, folha, fuso horário, dados pessoais novos, salário, documentos, CPF, dados
-      bancários, dependentes, saúde, importação, exportação, integrações externas, promoção e
-      merge.
+85. **T188 - Abas operacionais de Pessoas sem o teto de 100 colaboradores**
+    - **Estado:** **em implementação**. Branch `codex/t188-proxima-fatia-pessoas`, a partir do
+      squash `00a94df7c8e9dc25179b8e23bf9fbe9a1466e50f` (T187 integrada, PR #180).
+    - **Preparação:** [dossiê](../docs/decisions/t188-dossie-proxima-fatia-pessoas.md) com três opções; a proprietária aprovou a opção A
+      completa em 2026-10-27.
+    - **Objetivo:** em Histórico funcional, Dados contratuais e Horário de trabalho, escolher
+      qualquer colaborador da empresa ativa por busca (nome ou matrícula) com resultados
+      paginados pelo servidor, no lugar do seletor de uma página de 100; paginar a lista de
+      movimentações do Histórico funcional; corrigir o transbordamento de largura dessa aba
+      (pendência T115).
+    - **Contratos:** só `GET /v1/colaboradores` (`busca`, `pagina`, `tamanhoPagina`,
+      `situacao`), `GET /v1/colaboradores/:id` e `GET /v1/movimentacoes` (`pagina`,
+      `tamanhoPagina`), com as permissões existentes. Sem mudança de API, schema, migration,
+      RBAC, auditoria, seed ou dependência.
+    - **Entrega prevista:** seletor por busca paginada nas três abas, paginação de
+      movimentações, correção de largura, testes web e E2E com PostgreSQL real dos contratos
+      reutilizados, validação no navegador em 375 px.
+    - **Fora de escopo:** opções B e C do dossiê, O1 da T186, catálogos organizacionais acima
+      de 100 itens, a tabela de vínculos de horário (uma página de 100), formulários, dados e
+      regras dos módulos, qualquer escrita, papel ou permissão nova, banco de horas, ponto,
+      escala, folha, fuso horário, dados pessoais novos, importação, exportação, integrações
+      externas, promoção e merge.
+    - **Prévia:** `http://127.0.0.1:5173` passa a mostrar a branch da T188 ao vivo, identificada
+      como `[T188 dev]`, não a `main`.
 
 ## Regra obrigatória para as próximas tarefas
 

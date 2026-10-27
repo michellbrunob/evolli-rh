@@ -2431,19 +2431,24 @@ retificar, transferir, mudar cargo, desligar), as opções B e C do dossiê, O1 
 T186, banco de horas, ponto, escala, folha, fuso horário, dados pessoais novos,
 importação, exportação, integrações externas, promoção e merge.
 
-## Próxima fatia de Gestão de Pessoas — T188 (em preparação de decisão)
+## Abas operacionais de Pessoas sem o teto de 100 — T188 (em implementação)
 
-| Tarefa | Estado                       | Resultado principal                                                        |
-| ------ | ---------------------------- | -------------------------------------------------------------------------- |
-| T188   | **Em preparação de decisão** | Dossiê com até três opções para a próxima fatia de Pessoas e recomendação. |
+| Tarefa | Estado               | Resultado principal                                                                                   |
+| ------ | -------------------- | ----------------------------------------------------------------------------------------------------- |
+| T188   | **Em implementação** | Histórico funcional, Dados contratuais e Horário de trabalho escolhem qualquer colaborador por busca. |
 
-**Escopo desta etapa:** convergência da T187 e o dossiê
-(`docs/decisions/t188-dossie-proxima-fatia-pessoas.md`) da próxima fatia de
-Gestão de Pessoas. Nenhuma implementação de produto antes da decisão da
-proprietária.
+**Escopo da T188:** opção A do [dossiê](../docs/decisions/t188-dossie-proxima-fatia-pessoas.md), aprovada pela proprietária
+em 2026-10-27: busca por nome ou matrícula com resultados paginados pelo
+servidor nas três abas, no lugar do seletor de uma página de 100; lista de
+movimentações paginada; largura do Histórico funcional corrigida (pendência
+T115). Só contratos existentes, com as permissões atuais; sem mudança de API,
+schema, migration, RBAC, auditoria, seed ou dependência.
 
-**Fora de escopo:** código, API, schema, migration, RBAC, banco, seed, Docker,
-dependências, CI, PR, promoção e merge.
+**Fora de escopo:** opções B e C, O1 da T186, catálogos acima de 100 itens, a
+tabela de vínculos de horário, formulários e regras dos módulos, escrita ou
+permissão nova, banco de horas, ponto, escala, folha, fuso horário, dados
+pessoais novos, importação, exportação, integrações externas, promoção e
+merge.
 
 ## Próxima ação autorizável
 

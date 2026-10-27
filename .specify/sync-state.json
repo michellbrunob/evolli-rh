@@ -12,14 +12,14 @@
   },
   "nextTask": {
     "id": "T188",
-    "status": "pessoas_proxima_fatia_em_decisao",
-    "reason": "T187 integrada em main pela PR #180 (squash 00a94df7c8e9dc25179b8e23bf9fbe9a1466e50f), com a CI de push 3/3 verde (run 40496328412); a integracao funcional esta concluida e a convergencia no Spec Kit e feita aqui. A T188 abre em preparacao de decisao: dossie com ate tres opcoes para a proxima fatia de Gestao de Pessoas e uma recomendacao, em docs/decisions/t188-dossie-proxima-fatia-pessoas.md. Nenhuma implementacao de produto antes da decisao da proprietaria. Fora de escopo: codigo, API, schema, migration, RBAC, banco, seed, Docker, dependencias, CI, PR, promocao e merge."
+    "status": "pessoas_abas_sem_teto_em_implementacao",
+    "reason": "T187 integrada em main pela PR #180 (squash 00a94df7c8e9dc25179b8e23bf9fbe9a1466e50f), com a CI de push 3/3 verde (run 40496328412). A T188 implementa a opcao A completa do dossie, aprovada pela proprietaria em 2026-10-27: Historico funcional, Dados contratuais e Horario de trabalho escolhem qualquer colaborador por busca (nome ou matricula) com resultados paginados pelo servidor, no lugar do seletor de uma pagina de 100; a lista de movimentacoes e paginada; a largura do Historico funcional e corrigida (pendencia T115). So contratos existentes, com as permissoes atuais; sem mudanca de API, schema, migration, RBAC, auditoria, seed ou dependencia. Decisao em docs/decisions/t188-dossie-proxima-fatia-pessoas.md. Fora de escopo: opcoes B e C, O1 da T186, catalogos acima de 100, tabela de vinculos de horario, escrita ou permissao nova, promocao e merge."
   },
   "openDeliveries": [
     {
       "id": "T188",
       "pullRequest": null,
-      "status": "pessoas_proxima_fatia_em_decisao"
+      "status": "pessoas_abas_sem_teto_em_implementacao"
     }
   ],
   "requiredArtifacts": [
