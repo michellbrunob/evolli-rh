@@ -31,9 +31,17 @@ import {
 /**
  * T183 — a jornada vem junto com o vínculo: o histórico mostra qual era e se
  * ela foi inativada depois, sem a tela buscar o catálogo inteiro.
+ *
+ * T191 — e o colaborador também, só `id` e `nome`: a tabela de vínculos do
+ * Horário de trabalho resolvia o nome por uma página de 100 colaboradores, e
+ * quem passava do centésimo aparecia sem nome. O nome vem pela relação do
+ * próprio vínculo, na mesma consulta e no mesmo escopo: só acompanha um
+ * vínculo que o papel já pode ler (RH, DP e master — os mesmos que leem
+ * colaboradores). Nada além do nome: nenhum outro dado pessoal.
  */
 const COM_JORNADA = {
   tabela: { select: { id: true, codigo: true, nome: true, ativo: true } },
+  colaborador: { select: { id: true, nome: true } },
 } satisfies Prisma.VinculoHorarioInclude;
 
 type VinculoComJornada = Prisma.VinculoHorarioGetPayload<{
@@ -52,6 +60,11 @@ export interface VinculoProjetado {
     codigo: string | null;
     nome: string;
     ativo: boolean;
+  };
+  /** T191 — o colaborador do vínculo: só `id` e `nome`. */
+  colaborador: {
+    id: string;
+    nome: string;
   };
   vigenciaInicio: string;
   vigenciaFim: string | null;
@@ -490,6 +503,10 @@ export class VinculoHorarioService {
         codigo: vinculo.tabela.codigo,
         nome: vinculo.tabela.nome,
         ativo: vinculo.tabela.ativo,
+      },
+      colaborador: {
+        id: vinculo.colaborador.id,
+        nome: vinculo.colaborador.nome,
       },
       vigenciaInicio: dataIso(vinculo.vigenciaInicio),
       vigenciaFim:

@@ -2032,4 +2032,262 @@ describe("Cadastros: Horarios e vinculo ao colaborador (e2e)", () => {
       });
     });
   });
+
+  // T191 — a tabela de vínculos do Horário de trabalho deixa a página única
+  // de 100 e o dicionário de 100 colaboradores: cada vínculo traz o próprio
+  // colaborador (`id` e `nome`), e a tela pagina de 20 em 20 com filtros por
+  // colaborador e por jornada. Mais de 100 vínculos e nomes depois do
+  // centésimo, com PostgreSQL real.
+  describe("T191 — vínculos de horário com o nome do colaborador, paginados", () => {
+    type Item = {
+      id: string;
+      colaboradorId: string;
+      tabelaHorarioId: string;
+      colaborador: { id: string; nome: string };
+      [campo: string]: unknown;
+    };
+    const QUANTOS = 105;
+    const PREFIXO = "Zz Sintetico Horario T191";
+    const nomeDe = new Map<string, string>();
+    const idsA: string[] = [];
+    const idsB: string[] = [];
+    let jornadaUm: string;
+    let jornadaDois: string;
+    let jornadaB: string;
+
+    /**
+     * Colaboradores admitidos e efetivados (vínculo funcional ativo), cada um
+     * com uma jornada — pelo caminho real da API, que respeita as travas do
+     * banco (colaborador e vínculo nascem juntos).
+     */
+    async function semear(
+      cred: Credencial,
+      empresaId: string,
+      departamentoId: string,
+      quantos: number,
+      jornada: (i: number) => string,
+      sufixo: string,
+      destino: string[],
+    ) {
+      for (let i = 1; i <= quantos; i++) {
+        const nome = `${PREFIXO} ${sufixo} ${String(i).padStart(3, "0")}`;
+        const id = await admitir(cred, {
+          nome,
+          empresaId,
+          matricula: `T191-${sufixo}-${i}`,
+          departamentoId,
+        });
+        await post("/v1/horarios/vinculos", cred)
+          .send({
+            colaboradorId: id,
+            tabelaHorarioId: jornada(i),
+            vigenciaInicio: "2026-02-01",
+          })
+          .expect(201);
+        nomeDe.set(id, nome);
+        destino.push(id);
+      }
+    }
+
+    async function todasAsPaginas(rota: string, cred: Credencial) {
+      const vistos: Item[] = [];
+      let total = 0;
+      for (let pagina = 1; pagina <= 50; pagina++) {
+        const sep = rota.includes("?") ? "&" : "?";
+        const r = await get(
+          `${rota}${sep}pagina=${pagina}&tamanhoPagina=20`,
+          cred,
+        ).expect(200);
+        total = r.body.total;
+        vistos.push(...(r.body.itens as Item[]));
+        if ((r.body.itens as Item[]).length < 20) break;
+      }
+      return { vistos, total };
+    }
+
+    beforeAll(async () => {
+      jornadaUm = (await criarTabela(rhA, "Jornada T191 Um")).id;
+      jornadaDois = (await criarTabela(rhA, "Jornada T191 Dois")).id;
+      jornadaB = (await criarTabela(rhB, "Jornada T191 B")).id;
+      await semear(
+        rhA,
+        empresaA,
+        departamentoA,
+        QUANTOS,
+        (i) => (i % 2 === 1 ? jornadaUm : jornadaDois),
+        "A",
+        idsA,
+      );
+      await semear(rhB, empresaB, departamentoB, 3, () => jornadaB, "B", idsB);
+    });
+
+    it("a empresa tem mais de 100 colaboradores e mais de 100 vínculos de jornada", async () => {
+      const colaboradores = await get(
+        "/v1/colaboradores?tamanhoPagina=1",
+        rhA,
+      ).expect(200);
+      expect(colaboradores.body.total).toBeGreaterThan(100);
+      const vinculos = await get(
+        "/v1/horarios/vinculos?tamanhoPagina=1",
+        rhA,
+      ).expect(200);
+      expect(vinculos.body.total).toBeGreaterThan(100);
+    });
+
+    it("cada vínculo traz o colaborador só com id e nome, e os campos atuais seguem iguais", async () => {
+      const r = await get("/v1/horarios/vinculos?tamanhoPagina=20", rhA).expect(
+        200,
+      );
+      for (const item of r.body.itens as Item[]) {
+        expect(Object.keys(item.colaborador).sort()).toEqual(["id", "nome"]);
+        expect(item.colaborador.id).toBe(item.colaboradorId);
+        expect(Object.keys(item).sort()).toEqual(
+          [
+            "id",
+            "colaboradorId",
+            "empresaId",
+            "tabelaHorarioId",
+            "tabela",
+            "colaborador",
+            "vigenciaInicio",
+            "vigenciaFim",
+            "criadoPorUserId",
+            "criadoEm",
+            "atualizadoEm",
+          ].sort(),
+        );
+      }
+    });
+
+    it("de 20 em 20, sem repetir nem pular — e com o nome de todos, inclusive depois do centésimo", async () => {
+      const inteira = await get(
+        "/v1/horarios/vinculos?tamanhoPagina=100",
+        rhA,
+      ).expect(200);
+      const { vistos, total } = await todasAsPaginas(
+        "/v1/horarios/vinculos",
+        rhA,
+      );
+      expect(total).toBe(inteira.body.total);
+      expect(vistos).toHaveLength(total);
+      expect(new Set(vistos.map((v) => v.id)).size).toBe(total);
+      // Os 105 semeados — cujos nomes ficam depois do centésimo em ordem
+      // alfabética ("Zz…") — aparecem todos, cada um com o seu nome.
+      const porColaborador = new Map(vistos.map((v) => [v.colaboradorId, v]));
+      for (const id of idsA) {
+        expect(porColaborador.get(id)?.colaborador.nome).toBe(nomeDe.get(id));
+      }
+      // Nada da outra empresa.
+      for (const id of idsB) expect(porColaborador.has(id)).toBe(false);
+    });
+
+    it("filtro por jornada, isolado e paginado", async () => {
+      const { vistos, total } = await todasAsPaginas(
+        `/v1/horarios/vinculos?tabelaHorarioId=${jornadaUm}`,
+        rhA,
+      );
+      const esperados = idsA.filter((_, i) => (i + 1) % 2 === 1);
+      expect(total).toBe(esperados.length);
+      expect(vistos.map((v) => v.colaboradorId).sort()).toEqual(
+        [...esperados].sort(),
+      );
+      expect(vistos.every((v) => v.tabelaHorarioId === jornadaUm)).toBe(true);
+    });
+
+    it("filtros por colaborador e por jornada, combinados", async () => {
+      const umDaJornadaUm = idsA[0]!;
+      const umDaJornadaDois = idsA[1]!;
+      const so = await get(
+        `/v1/horarios/vinculos?colaboradorId=${umDaJornadaUm}`,
+        rhA,
+      ).expect(200);
+      expect(so.body.total).toBe(1);
+      expect(so.body.itens[0].colaborador.nome).toBe(nomeDe.get(umDaJornadaUm));
+      const casa = await get(
+        `/v1/horarios/vinculos?colaboradorId=${umDaJornadaUm}&tabelaHorarioId=${jornadaUm}`,
+        rhA,
+      ).expect(200);
+      expect(casa.body.total).toBe(1);
+      const naoCasa = await get(
+        `/v1/horarios/vinculos?colaboradorId=${umDaJornadaDois}&tabelaHorarioId=${jornadaUm}`,
+        rhA,
+      ).expect(200);
+      expect(naoCasa.body.total).toBe(0);
+    });
+
+    it("o detalhe do vínculo também traz o colaborador (id e nome)", async () => {
+      const lista = await get(
+        `/v1/horarios/vinculos?colaboradorId=${idsA[104]!}`,
+        rhA,
+      ).expect(200);
+      const vinculoId = lista.body.itens[0].id as string;
+      const detalhe = await get(
+        `/v1/horarios/vinculos/${vinculoId}`,
+        rhA,
+      ).expect(200);
+      expect(detalhe.body.colaborador).toEqual({
+        id: idsA[104],
+        nome: nomeDe.get(idsA[104]!),
+      });
+    });
+
+    it("isolamento: B não vê nomes de A; jornada ou vínculo de A não respondem para B", async () => {
+      const deB = await todasAsPaginas("/v1/horarios/vinculos", rhB);
+      const texto = JSON.stringify(deB.vistos);
+      expect(texto).not.toContain(`${PREFIXO} A`);
+      for (const id of idsB) {
+        expect(deB.vistos.some((v) => v.colaboradorId === id)).toBe(true);
+      }
+      const jornadaDeA = await get(
+        `/v1/horarios/vinculos?tabelaHorarioId=${jornadaUm}`,
+        rhB,
+      ).expect(200);
+      expect(jornadaDeA.body.total).toBe(0);
+      const colaboradorDeA = await get(
+        `/v1/horarios/vinculos?colaboradorId=${idsA[0]!}`,
+        rhB,
+      ).expect(200);
+      expect(colaboradorDeA.body.total).toBe(0);
+      const vinculoDeA = (
+        await get(
+          `/v1/horarios/vinculos?colaboradorId=${idsA[0]!}`,
+          rhA,
+        ).expect(200)
+      ).body.itens[0].id as string;
+      const r = await get(`/v1/horarios/vinculos/${vinculoDeA}`, rhB);
+      expect([403, 404]).toContain(r.status);
+      expect(JSON.stringify(r.body)).not.toContain(PREFIXO);
+    });
+
+    it("master global lê as duas empresas, cada vínculo com o nome certo", async () => {
+      const { vistos } = await todasAsPaginas("/v1/horarios/vinculos", master);
+      const porColaborador = new Map(vistos.map((v) => [v.colaboradorId, v]));
+      for (const id of [...idsA, ...idsB]) {
+        expect(porColaborador.get(id)?.colaborador.nome).toBe(nomeDe.get(id));
+      }
+    });
+
+    it("DP lê o mesmo que o RH", async () => {
+      const doRh = await get(
+        `/v1/horarios/vinculos?tabelaHorarioId=${jornadaDois}&tamanhoPagina=20`,
+        rhA,
+      ).expect(200);
+      const doDp = await get(
+        `/v1/horarios/vinculos?tabelaHorarioId=${jornadaDois}&tamanhoPagina=20`,
+        dpA,
+      ).expect(200);
+      expect(doDp.body).toEqual(doRh.body);
+    });
+
+    it("gestor, colaborador, financeiro, auditor e dpo seguem negados, sem nome", async () => {
+      for (const cred of [gestorA, colaboradorA, financeiroA, auditorA, dpoA]) {
+        const lista = await get(
+          `/v1/horarios/vinculos?tabelaHorarioId=${jornadaUm}`,
+          cred,
+        );
+        expect([403, 404]).toContain(lista.status);
+        expect(JSON.stringify(lista.body)).not.toContain(PREFIXO);
+      }
+    });
+  });
 });
