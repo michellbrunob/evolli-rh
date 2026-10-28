@@ -284,9 +284,11 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
 
     // Todos os destinos do mapa da T159, mais Nova admissão (T176) —
     // operacionais e de demonstração. Nenhum pode cair no placeholder.
+    // T194 — a Nova admissão abre pelo painel "Adicionar colaborador".
     for (const rotulo of [
       /^Colaboradores Consulta/,
-      /^Nova admissão/,
+      /^Adicionar colaborador/,
+      /^Iniciar cadastro individual/,
       /^Estrutura organizacional/,
       /^Jornadas de trabalho/,
       /^Jornada Visão/,
