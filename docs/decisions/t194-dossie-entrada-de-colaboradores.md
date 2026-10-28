@@ -744,3 +744,48 @@ referências, criação ou retirada de Área.
 Os mesmos papéis de hoje (RH e DP admitem; `master_tecnico` não). A empresa
 vem sempre da sessão. Sem API, schema, migration, RBAC, auditoria, seed,
 Docker, dependência ou lockfile novos.
+
+### 16.4 Revisão final e regra de qualidade
+
+**Regra de qualidade (proprietária, 2026-10-28; regra 8 do `tasks.md`):**
+“Antes de Ready for review, toda correção pequena e acionável identificada em revisão — de UX, acessibilidade, consistência ou teste — deve ser resolvida dentro da própria entrega. Só pode ficar pendente o que exigir decisão de negócio, expansão material de escopo ou arquitetura própria; nesses casos, documentar o motivo.”
+
+Observações da revisão final da PR da T195 e o que foi feito com cada uma:
+
+- **N1 — duplo clique em "Continuar" (corrigido).** O botão principal é o
+  mesmo nas quatro etapas e fica no mesmo lugar; na etapa 3, o 2º clique de um
+  duplo clique caía em "Confirmar admissão" e abria a confirmação sem a
+  revisão ter sido vista. Agora o clique repetido — `detail` maior que 1, a
+  contagem de cliques do próprio navegador — é ignorado: a pessoa sempre
+  chega à revisão visível, e só um clique novo abre a confirmação. Teclado
+  (Enter ou Espaço no botão) e o envio implícito por Enter num campo têm
+  `detail` 0 e seguem como antes. Nada é perdido, e a validação por etapa não
+  muda.
+- **N2 — Enter num seletor (decisão explícita, sem mudança).** O Enter num
+  `select` pertence ao próprio seletor: conforme o sistema e o navegador, ele
+  abre a lista ou confirma a opção. Interceptá-lo para avançar a etapa
+  entraria em conflito com esse uso e mudaria o comportamento nativo. Por
+  isso, **depois de escolher num seletor, o avanço é feito pelo botão
+  "Continuar"**: Tab leva, em ordem, a Cancelar, Voltar e Continuar, e Enter
+  ou Espaço no botão avança. Enter num campo de texto ou de data continua
+  avançando (envio implícito do navegador). Há teste da ordem do Tab e da
+  ativação pelo teclado.
+- **N3 — teste da troca de empresa com a referência rápida (corrigido).** O
+  teste preenchia a etapa 1, avançava e apagava os dados só para isolar a
+  pendência do modal — um estado que a interface não produz. Agora ele segue o
+  caminho real: etapa 1 preenchida, "Continuar", "+" e código digitado; a
+  troca em outra aba abre o aviso, e voltar preserva empresa, etapa, modal,
+  código e os dados da admissão. A regra de que o modal sozinho só conta como
+  pendência com código ou nome (e vazio não conta) continua provada no teste
+  do componente, com o registro de edições isolado. O antigo caso "modal
+  vazio, troca aplicada direto" deixou de ser alcançável: desde a T195 o "+"
+  só aparece na etapa 2, com a admissão já preenchida — e o teste passou a
+  provar esse estado real (aviso e preservação). Nada no produto mudou para
+  acomodar o teste.
+- **N4 — E2E de navegador (não é defeito desta entrega).** A cobertura segue
+  dividida: os testes de tela usam um cliente controlado e conferem o corpo
+  exato enviado (agora passando pelas quatro etapas), e o E2E com PostgreSQL
+  real cobre a gravação pela API. A T195 não criou lacuna: o corpo continua
+  montado pela mesma função de antes, sem mudança de contrato, e a API não
+  mudou. Um E2E de navegador seria infraestrutura nova, fora do escopo; fica
+  como decisão de arquitetura própria, se a proprietária quiser.

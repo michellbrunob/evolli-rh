@@ -2844,6 +2844,12 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       alcançada e, adiante, valida o caminho; foco no título da etapa; recusa do servidor abre a
       etapa do campo. Sem rascunho nem persistência nova: recarregar começa do zero, na etapa 1,
       como antes.
+    - **Revisão final (2026-10-28):** sob a regra 8, as observações acionáveis foram resolvidas
+      na própria entrega: N1 — clique repetido no botão principal (`detail` > 1) é ignorado, e
+      um duplo clique na etapa 3 não abre mais a confirmação sem a revisão; N3 — o teste da
+      troca de empresa com a referência rápida aberta segue o caminho real da interface; N2 —
+      decisão explícita: Enter num seletor fica com o seletor, e o avanço é por Tab + Enter em
+      "Continuar" (testado); N4 — sem lacuna introduzida pela T195 (seção 16.4 do dossiê).
     - **Contratos:** nenhum. Sem API, schema, migration, RBAC, auditoria, seed, Docker,
       dependência ou lockfile.
     - **Fora de escopo:** documentos e Cloudflare R2, importação, admissão digital, criação inline, busca de referências, criação ou retirada de Área, Aprendiz, salário, escala, gestor direto, conselho profissional, dependentes e pensão; promoção e merge.
@@ -2864,3 +2870,5 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
    no localhost com dados sintéticos, revisar, abrir a PR, validar a CI, integrar — e só então
    a seguinte começa. Entregas não se misturam, e a tarefa seguinte não é iniciada antes da
    integração da atual.
+8. **Correções de revisão dentro da entrega (regra de qualidade da proprietária, 2026-10-28,
+   registrada na T195):** “Antes de Ready for review, toda correção pequena e acionável identificada em revisão — de UX, acessibilidade, consistência ou teste — deve ser resolvida dentro da própria entrega. Só pode ficar pendente o que exigir decisão de negócio, expansão material de escopo ou arquitetura própria; nesses casos, documentar o motivo.”

@@ -2438,12 +2438,24 @@ export function NovaAdmissaoScreen({
               Voltar
             </Button>
           ) : null}
-          {/* T195 — Enter em qualquer campo faz o mesmo que este botão. */}
+          {/* T195 — Enter num campo de texto ou de data faz o mesmo que este
+              botão (envio implícito do navegador). Num seletor, Enter é do
+              próprio seletor: avança-se com Tab até aqui e Enter.
+
+              Revisão final — o botão é o mesmo nas quatro etapas e fica no
+              mesmo lugar: o 2º clique de um duplo clique em "Continuar" na
+              etapa 3 caía em "Confirmar admissão" e abria a confirmação sem a
+              revisão ter sido lida. Clique repetido (`detail` > 1, a contagem
+              do próprio navegador) é ignorado; teclado e envio implícito têm
+              `detail` 0 e seguem normais. */}
           <Button
             type="submit"
             variant="primary"
             id={etapa === ULTIMA_ETAPA ? ID_BOTAO_SALVAR : ID_BOTAO_CONTINUAR}
             disabled={salvando || (carregandoOpcoes && etapa > 0)}
+            onClick={(evento) => {
+              if (evento.detail > 1) evento.preventDefault();
+            }}
           >
             {etapa === ULTIMA_ETAPA ? "Confirmar admissão" : "Continuar"}
           </Button>

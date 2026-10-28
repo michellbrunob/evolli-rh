@@ -2663,6 +2663,11 @@ perde dado; "Continuar" valida só a etapa atual; o indicador não salta
 adiante sem validar; a recusa do servidor abre a etapa do campo. Sem rascunho
 nem persistência nova: recarregar começa do zero, na etapa 1, como antes.
 
+**Revisão final (2026-10-28):** nova regra de qualidade, a regra 8 do
+`tasks.md`: “Antes de Ready for review, toda correção pequena e acionável identificada em revisão — de UX, acessibilidade, consistência ou teste — deve ser resolvida dentro da própria entrega. Só pode ficar pendente o que exigir decisão de negócio, expansão material de escopo ou arquitetura própria; nesses casos, documentar o motivo.” Sob ela, N1 (duplo clique saltando a revisão) e N3
+(teste com estado inalcançável) foram corrigidos; N2 (Enter em seletor) e N4
+(E2E de navegador) têm decisão e motivo registrados na seção 16.4 do dossiê.
+
 **Fora de escopo:** documentos e Cloudflare R2, importação, admissão digital, criação inline, busca de referências, criação ou retirada de Área, Aprendiz, salário, escala, gestor direto, conselho profissional, dependentes e pensão; promoção e merge.
 
 ## Próxima ação autorizável

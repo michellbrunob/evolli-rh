@@ -4206,3 +4206,110 @@ describe("T195 — cancelar e recomeçar", () => {
     expect(within(indicador()).queryAllByRole("button")).toHaveLength(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// T195 (revisão final) — acionamento repetido e avanço pelo teclado.
+// ---------------------------------------------------------------------------
+
+/** Elementos alcançáveis por Tab, na ordem do documento. */
+function tabulaveis(): HTMLElement[] {
+  return [
+    ...document.querySelectorAll<HTMLElement>(
+      "a[href], button, input, select, textarea, [tabindex]",
+    ),
+  ].filter(
+    (e) =>
+      e.tabIndex >= 0 &&
+      !e.hasAttribute("disabled") &&
+      e.closest("[hidden]") === null,
+  );
+}
+
+describe("T195 (revisão final) — duplo clique não salta a revisão", () => {
+  it("duplo clique em Continuar na etapa 3: para na revisão, e a confirmação só abre num clique novo", async () => {
+    montar();
+    await aguardarEmpresa();
+    preencherValido();
+    irAteEtapa("Endereço");
+    const botao = botaoContinuar();
+    // O navegador conta os cliques: 1 e depois 2, no mesmo lugar.
+    fireEvent.click(botao, { detail: 1 });
+    // O mesmo botão já virou "Confirmar admissão" — é onde o 2º clique cai.
+    expect(botao).toHaveTextContent("Confirmar admissão");
+    fireEvent.click(botao, { detail: 2 });
+    expect(tituloDaEtapa()).toHaveTextContent(/Revisão e conclusão$/);
+    expect(dialogoConfirmacao()).toBeNull();
+    await waitFor(() => expect(tituloDaEtapa()).toHaveFocus());
+    // Um clique novo, deliberado, abre a confirmação de sempre.
+    fireEvent.click(botao, { detail: 1 });
+    await screen.findByRole("dialog", {
+      name: "Confirmar cadastro de colaborador?",
+    });
+    expect(admitirColaborador).not.toHaveBeenCalled();
+  });
+
+  it("duplo e triplo clique em Continuar avançam uma etapa só, sem perder nada", async () => {
+    montar();
+    await aguardarEmpresa();
+    preencherValido();
+    fireEvent.click(botaoContinuar(), { detail: 1 });
+    fireEvent.click(botaoContinuar(), { detail: 2 });
+    expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais e lotação$/);
+    fireEvent.click(botaoContinuar(), { detail: 1 });
+    fireEvent.click(botaoContinuar(), { detail: 2 });
+    fireEvent.click(botaoContinuar(), { detail: 3 });
+    expect(tituloDaEtapa()).toHaveTextContent(/Endereço$/);
+    expect(nome()).toHaveValue("  Pessoa Sintética Nova ");
+    expect(departamentoSel()).toHaveValue(departamento.id);
+  });
+
+  it("teclado e Enter num campo seguem normais (sem contagem de cliques)", async () => {
+    montar();
+    await aguardarEmpresa();
+    preencherValido();
+    // Enter num campo de texto: envio implícito do navegador.
+    fireEvent.submit(nome().closest("form")!);
+    expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais e lotação$/);
+    // Enter ou Espaço no botão: ativação pelo teclado, `detail` 0.
+    fireEvent.click(botaoContinuar(), { detail: 0 });
+    expect(tituloDaEtapa()).toHaveTextContent(/Endereço$/);
+    fireEvent.click(botaoContinuar(), { detail: 0 });
+    expect(tituloDaEtapa()).toHaveTextContent(/Revisão e conclusão$/);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Confirmar admissão" }),
+      {
+        detail: 0,
+      },
+    );
+    await screen.findByRole("dialog", {
+      name: "Confirmar cadastro de colaborador?",
+    });
+  });
+});
+
+describe("T195 (revisão final) — depois de um seletor, avança-se por Tab e Enter no botão", () => {
+  it("Enter no seletor não envia; Tab leva a Cancelar, Voltar e Continuar, e Enter em Continuar avança", async () => {
+    montar("dp");
+    await aguardarEmpresa();
+    abrirLotacao();
+    fireEvent.change(tipo(), { target: { value: "clt" } });
+    fireEvent.change(data(), { target: { value: "2026-11-03" } });
+    preencherLotacao();
+    // O seletor fica com o Enter: nada de envio a partir dele.
+    fireEvent.keyDown(centroSel(), { key: "Enter" });
+    expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais e lotação$/);
+    // O último seletor da etapa e, logo depois, as ações — nesta ordem.
+    const ordem = tabulaveis();
+    const depois = ordem.slice(ordem.indexOf(centroSel()) + 1);
+    expect(depois.map((e) => e.textContent)).toEqual([
+      "Cancelar",
+      "Voltar",
+      "Continuar",
+    ]);
+    const continuar = depois[2]!;
+    expect(continuar).toHaveAttribute("type", "submit");
+    continuar.focus();
+    fireEvent.click(continuar, { detail: 0 });
+    expect(tituloDaEtapa()).toHaveTextContent(/Endereço$/);
+  });
+});
