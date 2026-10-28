@@ -70,6 +70,12 @@ export interface ModalProps {
   alterado?: boolean;
   /** Largura máxima: `media` para leitura, `larga` para formulário em duas colunas. */
   largura?: "media" | "larga";
+  /**
+   * T194 — `lateral`: a mesma janela, presa à borda direita e na altura toda
+   * da tela (painel lateral), para escolhas curtas que acompanham a página de
+   * trás. Comportamento, foco e acessibilidade são os mesmos do `centro`.
+   */
+  posicao?: "centro" | "lateral";
   /** Ações fixas no rodapé (não rolam com o conteúdo). */
   rodape?: ReactNode;
   children: ReactNode;
@@ -112,6 +118,7 @@ export function Modal({
   bloqueado = false,
   alterado = false,
   largura = "media",
+  posicao = "centro",
   rodape,
   children,
 }: ModalProps) {
@@ -280,7 +287,14 @@ export function Modal({
   if (!aberto) return null;
 
   return (
-    <div className="evolli-modal" role="presentation">
+    <div
+      className={
+        posicao === "lateral"
+          ? "evolli-modal evolli-modal--lateral"
+          : "evolli-modal"
+      }
+      role="presentation"
+    >
       {/* O fundo não fecha ao clique: num formulário longo, um clique fora
           descartaria trabalho sem aviso. Fechar é sempre explícito. */}
       <div className="evolli-modal__fundo" aria-hidden="true" />

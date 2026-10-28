@@ -118,6 +118,23 @@
   border-top: 1px solid var(--divider-soft);
 }
 
+/* T194 — painel lateral: a mesma janela, presa à borda direita, na altura
+   toda da tela. Em 640 px ou menos vale a regra do celular abaixo (tela
+   inteira), igual à janela central. */
+.evolli-modal--lateral {
+  justify-content: flex-end;
+  align-items: stretch;
+  padding: 0;
+}
+
+.evolli-modal--lateral .evolli-modal__caixa {
+  max-width: 30rem;
+  max-height: none;
+  height: 100dvh;
+  border-width: 0 0 0 1px;
+  border-radius: 0;
+}
+
 /* Celular: a janela ocupa a tela inteira, respeitando a área visível real
    (`dvh` acompanha o teclado virtual) e as áreas seguras do aparelho. */
 @media (max-width: 640px) {
@@ -159,5 +176,11 @@
 
   .evolli-modal__rodape > * {
     width: 100%;
+  }
+
+  /* T194 — o painel lateral também vira tela inteira, sem borda. */
+  .evolli-modal--lateral .evolli-modal__caixa {
+    max-width: none;
+    border: 0;
   }
 }

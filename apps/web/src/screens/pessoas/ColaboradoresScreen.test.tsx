@@ -50,6 +50,10 @@ import {
 import { AVISO_DE_RECUSA } from "../../format/mascaras";
 import { listarDepartamentos } from "../../api/organizacaoClient";
 import { listarCargos } from "../../api/cargoClient";
+import {
+  ProvedorDeEdicoes,
+  RegistroDeEdicoes,
+} from "../../app/edicoesPendentes";
 
 vi.mock("../../api/colaboradoresClient");
 // T183 — a seção "Jornada de trabalho" da ficha lê os vínculos de horário.
@@ -727,17 +731,25 @@ describe("ColaboradoresScreen (T111 — funcional)", () => {
 // ---- T177: a admissão mora só na página de Nova admissão -----------------
 
 describe("ColaboradoresScreen (T177 — Nova admissão leva à página de Nova admissão)", () => {
-  it("'Nova admissão' chama onNovaAdmissao e não abre janela nenhuma", async () => {
+  it("T194 — 'Adicionar colaborador' abre o painel; o cadastro individual chama onNovaAdmissao", async () => {
     const onNovaAdmissao = vi.fn();
     render(<ColaboradoresScreen onNovaAdmissao={onNovaAdmissao} />);
     await screen.findByRole("table", { name: "Colaboradores desta empresa" });
 
-    const botao = screen.getByRole("button", { name: "Nova admissão" });
-    // Navega, não abre janela: nada de semântica de diálogo.
-    expect(botao).not.toHaveAttribute("aria-haspopup");
-    expect(botao).not.toHaveAttribute("aria-expanded");
-
+    const botao = screen.getByRole("button", { name: "Adicionar colaborador" });
+    // Abre uma janela (o painel), não navega.
+    expect(botao).toHaveAttribute("aria-haspopup", "dialog");
     fireEvent.click(botao);
+    expect(onNovaAdmissao).not.toHaveBeenCalled();
+    const painel = screen.getByRole("dialog", {
+      name: "Adicionar colaborador",
+    });
+
+    fireEvent.click(
+      within(painel).getByRole("button", {
+        name: "Iniciar cadastro individual",
+      }),
+    );
 
     expect(onNovaAdmissao).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole("dialog")).toBeNull();
@@ -750,7 +762,10 @@ describe("ColaboradoresScreen (T177 — Nova admissão leva à página de Nova a
     render(<ColaboradoresScreen />);
     await screen.findByRole("table", { name: "Colaboradores desta empresa" });
 
-    expect(screen.queryByRole("button", { name: "Nova admissão" })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Adicionar colaborador" }),
+    ).toBeNull();
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
   it("sem onNovaAdmissao, o estado vazio também não oferece o botão", async () => {
@@ -760,13 +775,16 @@ describe("ColaboradoresScreen (T177 — Nova admissão leva à página de Nova a
     await screen.findByRole("heading", {
       name: "Nenhum colaborador cadastrado nesta empresa",
     });
-    expect(screen.queryByRole("button", { name: "Nova admissão" })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Adicionar colaborador" }),
+    ).toBeNull();
+    expect(screen.queryByRole("dialog")).toBeNull();
     expect(
       screen.queryByText(/Registre a admissão do primeiro colaborador/i),
     ).toBeNull();
   });
 
-  it("o botão do estado vazio também chama onNovaAdmissao", async () => {
+  it("o botão do estado vazio também abre o painel, que leva à Nova admissão", async () => {
     vi.mocked(listarColaboradores).mockResolvedValue(paginado([]));
     const onNovaAdmissao = vi.fn();
     render(<ColaboradoresScreen onNovaAdmissao={onNovaAdmissao} />);
@@ -777,14 +795,22 @@ describe("ColaboradoresScreen (T177 — Nova admissão leva à página de Nova a
       })
     ).closest(".evolli-empty-state");
     expect(vazio).not.toBeNull();
-    // Um no cabeçalho e outro no estado vazio — os dois levam à página.
-    const botoes = screen.getAllByRole("button", { name: "Nova admissão" });
+    // Um no cabeçalho e outro no estado vazio — os dois abrem o painel.
+    const botoes = screen.getAllByRole("button", {
+      name: "Adicionar colaborador",
+    });
     expect(botoes).toHaveLength(2);
     const doVazio = within(vazio as HTMLElement).getByRole("button", {
-      name: "Nova admissão",
+      name: "Adicionar colaborador",
     });
 
     fireEvent.click(doVazio);
+    expect(onNovaAdmissao).not.toHaveBeenCalled();
+    fireEvent.click(
+      within(
+        screen.getByRole("dialog", { name: "Adicionar colaborador" }),
+      ).getByRole("button", { name: "Iniciar cadastro individual" }),
+    );
 
     expect(onNovaAdmissao).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole("dialog")).toBeNull();
@@ -3182,7 +3208,7 @@ describe("T178 — busca por nome ou matrícula, no servidor", () => {
 });
 
 describe("T178 — estados vazios distintos", () => {
-  it("empresa sem colaborador: título claro e 'Nova admissão' para quem pode", async () => {
+  it("empresa sem colaborador: título claro e 'Adicionar colaborador' para quem pode", async () => {
     vi.mocked(listarColaboradores).mockResolvedValue(paginado([]));
     const onNovaAdmissao = vi.fn();
     render(<ColaboradoresScreen onNovaAdmissao={onNovaAdmissao} />);
@@ -3192,7 +3218,10 @@ describe("T178 — estados vazios distintos", () => {
     });
     const vazio = titulo.closest(".evolli-empty-state") as HTMLElement;
     fireEvent.click(
-      within(vazio).getByRole("button", { name: "Nova admissão" }),
+      within(vazio).getByRole("button", { name: "Adicionar colaborador" }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Iniciar cadastro individual" }),
     );
     expect(onNovaAdmissao).toHaveBeenCalledTimes(1);
     expect(
@@ -3217,7 +3246,7 @@ describe("T178 — estados vazios distintos", () => {
     const vazio = titulo.closest(".evolli-empty-state") as HTMLElement;
     expect(vazio).toHaveTextContent("zzz-inexistente");
     expect(
-      within(vazio).queryByRole("button", { name: "Nova admissão" }),
+      within(vazio).queryByRole("button", { name: "Adicionar colaborador" }),
     ).toBeNull();
     expect(
       screen.queryByRole("heading", {
@@ -3333,12 +3362,12 @@ describe("T178 — contadores do escopo, do servidor", () => {
 });
 
 describe("T178 — 'Nova admissão' e a ficha a partir da linha", () => {
-  it("'Nova admissão' é a ação principal, ao lado da busca", async () => {
+  it("'Adicionar colaborador' (T194) é a ação principal, ao lado da busca", async () => {
     const onNovaAdmissao = vi.fn();
     render(<ColaboradoresScreen onNovaAdmissao={onNovaAdmissao} />);
     await screen.findByRole("table", { name: "Colaboradores desta empresa" });
 
-    const botao = screen.getByRole("button", { name: "Nova admissão" });
+    const botao = screen.getByRole("button", { name: "Adicionar colaborador" });
     const barra = botao.closest(".colaboradores-screen__barra-acoes");
     expect(barra).not.toBeNull();
     expect(
@@ -3346,6 +3375,9 @@ describe("T178 — 'Nova admissão' e a ficha a partir da linha", () => {
     ).toBeInTheDocument();
     expect(botao).toHaveClass("evolli-button--primary");
     fireEvent.click(botao);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Iniciar cadastro individual" }),
+    );
     expect(onNovaAdmissao).toHaveBeenCalledTimes(1);
   });
 
@@ -3715,7 +3747,7 @@ describe("T186 — estados vazios distintos", () => {
     // Os totais seguem à vista: o vazio é do recorte, não da empresa.
     expect(botoesDeSituacao()).toEqual(["Todos 4", "Ativos 3", "Inativos 1"]);
     expect(
-      within(vazio).queryByRole("button", { name: "Nova admissão" }),
+      within(vazio).queryByRole("button", { name: "Adicionar colaborador" }),
     ).toBeNull();
     fireEvent.click(within(vazio).getByRole("button", { name: "Ver todos" }));
     await waitFor(() =>
@@ -4387,5 +4419,161 @@ describe("T190 — filtros por Departamento e Cargo", () => {
     expect(bloco(".colaboradores-screen__filtro-ativo")).toMatch(
       /white-space: normal/,
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T194 — "Adicionar colaborador": o botão abre um painel lateral com as formas
+// de entrada; a tela de trás (busca, filtros, página, empresa) fica intacta, o
+// foco volta ao botão de origem e o painel nunca vira edição pendente.
+// ---------------------------------------------------------------------------
+
+describe("T194 — painel 'Adicionar colaborador' na listagem", () => {
+  const botaoAdicionar = () =>
+    screen.getByRole("button", { name: "Adicionar colaborador" });
+
+  async function montarComTabela(
+    props: Partial<Parameters<typeof ColaboradoresScreen>[0]> = {},
+  ) {
+    const onNovaAdmissao = vi.fn();
+    const utils = render(
+      <ColaboradoresScreen onNovaAdmissao={onNovaAdmissao} {...props} />,
+    );
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+    return { ...utils, onNovaAdmissao };
+  }
+
+  it.each([
+    ["Escape", () => fireEvent.keyDown(document, { key: "Escape" })],
+    [
+      "Fechar",
+      () =>
+        fireEvent.click(
+          within(screen.getByRole("dialog")).getByRole("button", {
+            name: "Fechar",
+          }),
+        ),
+    ],
+    [
+      "Cancelar",
+      () =>
+        fireEvent.click(
+          within(screen.getByRole("dialog")).getByRole("button", {
+            name: "Cancelar",
+          }),
+        ),
+    ],
+  ])(
+    "fechar por %s devolve o foco ao botão 'Adicionar colaborador'",
+    async (_, fechar) => {
+      const { onNovaAdmissao } = await montarComTabela();
+      botaoAdicionar().focus();
+      fireEvent.click(botaoAdicionar());
+      const painel = screen.getByRole("dialog", {
+        name: "Adicionar colaborador",
+      });
+      expect(document.activeElement).toBe(
+        within(painel).getByRole("heading", { level: 2 }),
+      );
+      fechar();
+      expect(screen.queryByRole("dialog")).toBeNull();
+      expect(document.activeElement).toBe(botaoAdicionar());
+      expect(onNovaAdmissao).not.toHaveBeenCalled();
+    },
+  );
+
+  it("abrir e fechar não mexe na busca, nos filtros nem na página, e não relê nada", async () => {
+    await montarComTabela();
+    buscar("Ana");
+    await waitFor(() =>
+      expect(listarColaboradores).toHaveBeenLastCalledWith(
+        expect.objectContaining({ busca: "Ana" }),
+      ),
+    );
+    filtrarSituacao("Ativos");
+    await waitFor(() =>
+      expect(listarColaboradores).toHaveBeenLastCalledWith(
+        expect.objectContaining({ busca: "Ana", situacao: "ativo" }),
+      ),
+    );
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+    const chamadas = vi.mocked(listarColaboradores).mock.calls.length;
+
+    fireEvent.click(botaoAdicionar());
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    expect(vi.mocked(listarColaboradores).mock.calls.length).toBe(chamadas);
+    expect(campoBusca()).toHaveValue("Ana");
+    expect(
+      within(grupoSituacao()).getByRole("button", { name: /^Ativos\b/ }),
+    ).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("abrir o painel não registra edição pendente (a troca de empresa segue livre)", async () => {
+    const registro = new RegistroDeEdicoes();
+    render(
+      <ProvedorDeEdicoes registro={registro}>
+        <ColaboradoresScreen onNovaAdmissao={vi.fn()} />
+      </ProvedorDeEdicoes>,
+    );
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+    fireEvent.click(botaoAdicionar());
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(registro.obter()).toEqual({ pendentes: [], salvando: [] });
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(registro.obter()).toEqual({ pendentes: [], salvando: [] });
+  });
+
+  it("empresa trocada (árvore remontada): o painel some e reabre só com a empresa nova", async () => {
+    const { rerender } = render(
+      <ColaboradoresScreen
+        key="empresa-a"
+        onNovaAdmissao={vi.fn()}
+        empresaAtiva={{ nome: "Empresa Alfa Sintética", codigo: "ALFA" }}
+      />,
+    );
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+    fireEvent.click(botaoAdicionar());
+    expect(screen.getByRole("dialog")).toHaveTextContent(
+      "Empresa Alfa Sintética",
+    );
+
+    rerender(
+      <ColaboradoresScreen
+        key="empresa-b"
+        onNovaAdmissao={vi.fn()}
+        empresaAtiva={{ nome: "Empresa Beta Sintética", codigo: "BETA" }}
+      />,
+    );
+    expect(screen.queryByRole("dialog")).toBeNull();
+    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+    fireEvent.click(botaoAdicionar());
+    const painel = screen.getByRole("dialog");
+    expect(painel).toHaveTextContent("Empresa Beta Sintética (BETA)");
+    expect(painel).not.toHaveTextContent("Alfa");
+  });
+
+  it("o cadastro individual fecha o painel e segue para a Nova admissão uma vez só", async () => {
+    const { onNovaAdmissao } = await montarComTabela();
+    fireEvent.click(botaoAdicionar());
+    fireEvent.click(
+      screen.getByRole("button", { name: "Iniciar cadastro individual" }),
+    );
+    expect(onNovaAdmissao).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("formas indisponíveis no painel não chamam nada", async () => {
+    const { onNovaAdmissao } = await montarComTabela();
+    const chamadas = vi.mocked(listarColaboradores).mock.calls.length;
+    fireEvent.click(botaoAdicionar());
+    const painel = screen.getByRole("dialog");
+    for (const titulo of ["Importar planilha", "Admissão digital"]) {
+      fireEvent.click(within(painel).getByRole("heading", { name: titulo }));
+    }
+    expect(onNovaAdmissao).not.toHaveBeenCalled();
+    expect(vi.mocked(listarColaboradores).mock.calls.length).toBe(chamadas);
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
 });

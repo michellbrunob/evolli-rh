@@ -195,11 +195,14 @@ function trilha() {
 async function abrirNovaAdmissaoPelaListagem() {
   await screen.findByRole("heading", { level: 1, name: "Colaboradores" });
   // Com a lista vazia há dois botões (barra de ações e estado vazio); o da
-  // barra vem primeiro, e os dois levam ao mesmo lugar.
+  // barra vem primeiro, e os dois abrem o mesmo painel (T194).
   const [daBarra] = await screen.findAllByRole("button", {
-    name: "Nova admissão",
+    name: "Adicionar colaborador",
   });
   fireEvent.click(daBarra!);
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Iniciar cadastro individual" }),
+  );
   await screen.findByRole("heading", { level: 1, name: "Nova admissão" });
 }
 
@@ -302,6 +305,11 @@ describe("T178 — Gestão de Pessoas › Colaboradores na barra lateral", () =>
     expect(
       screen.queryByRole("button", { name: "Nova admissão" }),
     ).not.toBeInTheDocument();
+    // T194 — nem o botão novo, nem o painel.
+    expect(
+      screen.queryByRole("button", { name: "Adicionar colaborador" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(itemNovaAdmissaoNaBarra()).toBeNull();
   });
 });

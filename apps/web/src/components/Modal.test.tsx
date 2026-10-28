@@ -502,3 +502,28 @@ describe("Modal — usePedirFechamentoModal (T167)", () => {
     erroConsole.mockRestore();
   });
 });
+
+describe("Modal — posição (T194)", () => {
+  it('por padrão é a janela central; `posicao="lateral"` só muda a camada', () => {
+    const { rerender } = render(
+      <Modal aberto titulo="Janela" onFechar={() => {}}>
+        <p>Conteúdo</p>
+      </Modal>,
+    );
+    const camada = () =>
+      screen.getByRole("dialog", { name: "Janela" }).closest(".evolli-modal");
+    expect(camada()).not.toHaveClass("evolli-modal--lateral");
+
+    rerender(
+      <Modal aberto titulo="Janela" posicao="lateral" onFechar={() => {}}>
+        <p>Conteúdo</p>
+      </Modal>,
+    );
+    expect(camada()).toHaveClass("evolli-modal--lateral");
+    // Mesma semântica de janela modal, com o foco no título.
+    expect(screen.getByRole("dialog", { name: "Janela" })).toHaveAttribute(
+      "aria-modal",
+      "true",
+    );
+  });
+});
