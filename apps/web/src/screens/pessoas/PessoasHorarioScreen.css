@@ -188,3 +188,20 @@
   opacity: 0.5;
   cursor: progress;
 }
+
+/* T193 — botões indisponíveis por `aria-disabled` durante uma nova tentativa
+   ("Tentar novamente", "Ir para a primeira página", avisos de carga de
+   apoio): continuam focáveis e se parecem com o desabilitado nativo. */
+.pessoas-horario-screen .evolli-button[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: progress;
+}
+
+.pessoas-horario-screen .evolli-button--secondary[aria-disabled="true"]:hover {
+  background: var(--surface-canvas);
+}
+
+/* T193 — o motivo de o formulário não salvar recebe o foco por programa. */
+#pessoas-horario-formulario-sem-opcoes:focus {
+  outline-offset: 2px;
+}

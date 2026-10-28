@@ -1482,3 +1482,546 @@ describe("T192 — foco, paginação e falhas no Horário de trabalho", () => {
     ).toMatch(/opacity: 0\.5/);
   });
 });
+
+// ---------------------------------------------------------------------------
+// T193 — recuperação, anúncios e formulário sem arestas: a nova tentativa
+// mantém o aviso e o foco, sem linhas antigas; cada evento é anunciado uma
+// vez; o formulário não envia sem jornada ou colaborador ativo; a contagem
+// de ativos tem aviso e nova tentativa próprios; depois de criar, o foco
+// volta a "Novo vínculo".
+// ---------------------------------------------------------------------------
+
+describe("T193 — recuperação, anúncios e formulário no Horário de trabalho", () => {
+  type Pagina = ResultadoPaginadoTeste<VinculoHorarioApi>;
+
+  function pagina(
+    itens: VinculoHorarioApi[],
+    total: number,
+    atual = 1,
+  ): Pagina {
+    return { itens, pagina: atual, tamanhoPagina: 20, total };
+  }
+
+  function pendente<T>() {
+    let soltar!: (v: T) => void;
+    let falhar!: (e: unknown) => void;
+    const promessa = new Promise<T>((resolve, reject) => {
+      soltar = resolve;
+      falhar = reject;
+    });
+    return { promessa, soltar, falhar };
+  }
+
+  function ultimaConsulta() {
+    return vi.mocked(listarVinculosHorario).mock.lastCall![0];
+  }
+
+  function anuncio() {
+    return document.querySelector("p.sr-only[role='status']")!.textContent;
+  }
+
+  /** Regiões vivas com texto agora (status, alert e `aria-live`). */
+  function regioesComTexto(trecho: RegExp) {
+    return [
+      ...document.querySelectorAll(
+        "[role='status'], [role='alert'], [aria-live]",
+      ),
+    ].filter((e) => trecho.test(e.textContent ?? ""));
+  }
+
+  function tituloDaLista() {
+    return screen.getByRole("heading", {
+      level: 2,
+      name: "Colaboradores com tabela de horário vinculada",
+    });
+  }
+
+  function paginacao() {
+    return screen.getByRole("navigation", {
+      name: "Páginas de vínculos de horário",
+    });
+  }
+
+  async function montarComTabela(podeOperar = true) {
+    render(<PessoasHorarioScreen podeOperar={podeOperar} />);
+    return screen.findByRole("table", {
+      name: "Colaboradores com tabela de horário vinculada",
+    });
+  }
+
+  /** Vai à página 2 e faz a página 3 falhar, com a jornada filtrada. */
+  async function falharNaPagina3() {
+    vi.mocked(listarVinculosHorario).mockResolvedValue(
+      pagina([vinculoVigente], 45),
+    );
+    await montarComTabela();
+    fireEvent.change(screen.getByLabelText("Jornada"), {
+      target: { value: tabelaAtiva.id },
+    });
+    await waitFor(() =>
+      expect(ultimaConsulta()).toEqual({
+        pagina: 1,
+        tamanhoPagina: 20,
+        tabelaHorarioId: tabelaAtiva.id,
+      }),
+    );
+    vi.mocked(listarVinculosHorario).mockResolvedValueOnce(
+      pagina([vinculoEncerrado], 45, 2),
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "Próxima" }));
+    await waitFor(() =>
+      expect(
+        within(paginacao()).getByText("Página 2 de 3"),
+      ).toBeInTheDocument(),
+    );
+    vi.mocked(listarVinculosHorario).mockRejectedValueOnce(new Error("rede"));
+    fireEvent.click(screen.getByRole("button", { name: "Próxima" }));
+    const tentar = await screen.findByRole("button", {
+      name: "Tentar novamente",
+    });
+    await waitFor(() => expect(document.activeElement).toBe(tentar));
+    return tentar;
+  }
+
+  // --- nova tentativa de página ----------------------------------------------
+
+  it("“Tentar novamente”: o aviso fica montado, o botão indisponível com o foco, e nenhuma linha antiga reaparece", async () => {
+    const tentar = await falharNaPagina3();
+    const aviso = screen.getByRole("alert");
+    const carga = pendente<Pagina>();
+    vi.mocked(listarVinculosHorario).mockReturnValueOnce(
+      carga.promessa as ReturnType<typeof listarVinculosHorario>,
+    );
+    fireEvent.click(tentar);
+
+    await waitFor(() =>
+      expect(tentar).toHaveAttribute("aria-disabled", "true"),
+    );
+    expect(screen.getByRole("alert")).toBe(aviso);
+    expect(aviso).toHaveTextContent("A página 3 não carregou.");
+    expect(document.activeElement).toBe(tentar);
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    expect(screen.queryByText(colaboradorInativo.nome)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Carregando vínculos de horário…"),
+    ).not.toBeInTheDocument();
+    expect(anuncio()).toBe("Carregando a página 3 dos vínculos de horário…");
+    expect(ultimaConsulta()).toEqual({
+      pagina: 3,
+      tamanhoPagina: 20,
+      tabelaHorarioId: tabelaAtiva.id,
+    });
+    // Clique repetido durante a carga não pede outra leitura.
+    const chamadas = vi.mocked(listarVinculosHorario).mock.calls.length;
+    fireEvent.click(tentar);
+    expect(vi.mocked(listarVinculosHorario).mock.calls.length).toBe(chamadas);
+
+    carga.soltar(pagina([vinculoVigente], 45, 3));
+    await waitFor(() => expect(document.activeElement).toBe(tituloDaLista()));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(within(paginacao()).getByText("Página 3 de 3")).toBeInTheDocument();
+    expect(anuncio()).toBe("Página 3 de 3 — 45 vínculos no filtro atual.");
+  });
+
+  it("nova falha na repetição: o mesmo aviso segue, o foco fica no botão, e a falha é anunciada uma vez", async () => {
+    const tentar = await falharNaPagina3();
+    const aviso = screen.getByRole("alert");
+    tentar.focus();
+    vi.mocked(listarVinculosHorario).mockRejectedValueOnce(new Error("rede"));
+    fireEvent.click(tentar);
+    await waitFor(() =>
+      expect(anuncio()).toBe(
+        "A nova tentativa falhou: a página 3 não carregou.",
+      ),
+    );
+    expect(screen.getByRole("alert")).toBe(aviso);
+    expect(tentar).toHaveAttribute("aria-disabled", "false");
+    expect(document.activeElement).toBe(tentar);
+    expect(regioesComTexto(/não carregou/)).toHaveLength(2);
+    // O aviso (montado antes, texto inalterado) e a região: só a região mudou.
+    expect(ultimaConsulta()).toEqual({
+      pagina: 3,
+      tamanhoPagina: 20,
+      tabelaHorarioId: tabelaAtiva.id,
+    });
+  });
+
+  it("depois de uma falha, trocar de filtro não reexibe as linhas da leitura anterior", async () => {
+    await falharNaPagina3();
+    const carga = pendente<Pagina>();
+    vi.mocked(listarVinculosHorario).mockReturnValueOnce(
+      carga.promessa as ReturnType<typeof listarVinculosHorario>,
+    );
+    fireEvent.change(screen.getByLabelText("Jornada"), {
+      target: { value: "" },
+    });
+    await waitFor(() =>
+      expect(
+        screen.getByText("Carregando vínculos de horário…"),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    carga.soltar(pagina([vinculoVigente], 1));
+    await screen.findByRole("table");
+  });
+
+  it("“Ir para a primeira página”: o estado vazio fica montado durante a carga e o foco vai ao título no fim", async () => {
+    vi.mocked(listarVinculosHorario).mockResolvedValueOnce(pagina([], 45, 3));
+    render(<PessoasHorarioScreen podeOperar />);
+    const ir = await screen.findByRole("button", {
+      name: "Ir para a primeira página",
+    });
+    ir.focus();
+    const carga = pendente<Pagina>();
+    vi.mocked(listarVinculosHorario).mockReturnValueOnce(
+      carga.promessa as ReturnType<typeof listarVinculosHorario>,
+    );
+    fireEvent.click(ir);
+    await waitFor(() => expect(ir).toHaveAttribute("aria-disabled", "true"));
+    expect(document.activeElement).toBe(ir);
+    expect(screen.getByText("Nenhum vínculo nesta página")).toBeInTheDocument();
+    carga.soltar(pagina([vinculoVigente], 45, 1));
+    await waitFor(() => expect(document.activeElement).toBe(tituloDaLista()));
+  });
+
+  // --- anúncios únicos --------------------------------------------------------
+
+  it("carga inicial: nenhuma região viva com texto", async () => {
+    const carga = pendente<Pagina>();
+    vi.mocked(listarVinculosHorario).mockReturnValueOnce(
+      carga.promessa as ReturnType<typeof listarVinculosHorario>,
+    );
+    render(<PessoasHorarioScreen podeOperar />);
+    expect(
+      screen.getByText("Carregando vínculos de horário…"),
+    ).toBeInTheDocument();
+    expect(regioesComTexto(/./)).toHaveLength(0);
+    carga.soltar(pagina([vinculoVigente], 1));
+    await screen.findByRole("table");
+    expect(regioesComTexto(/./)).toHaveLength(0);
+  });
+
+  it("carga a partir de um estado vazio: só a região estável anuncia (o texto visível não é região viva)", async () => {
+    vi.mocked(listarVinculosHorario).mockResolvedValueOnce(pagina([], 0));
+    render(<PessoasHorarioScreen podeOperar />);
+    await screen.findByText("Nenhum vínculo de horário cadastrado");
+    const carga = pendente<Pagina>();
+    vi.mocked(listarVinculosHorario).mockReturnValueOnce(
+      carga.promessa as ReturnType<typeof listarVinculosHorario>,
+    );
+    fireEvent.change(screen.getByLabelText("Jornada"), {
+      target: { value: tabelaAtiva.id },
+    });
+    await waitFor(() =>
+      expect(
+        screen.getByText("Carregando vínculos de horário…"),
+      ).toBeInTheDocument(),
+    );
+    expect(regioesComTexto(/Carregando/)).toHaveLength(1);
+    carga.soltar(pagina([], 0));
+    await screen.findByText("Nenhum vínculo com estes filtros");
+  });
+
+  it("catálogo falha de novo com o formulário aberto: um único aviso anunciado", async () => {
+    vi.mocked(listarTabelasHorario).mockRejectedValueOnce(new Error("rede"));
+    await montarComTabela();
+    await screen.findAllByText(/Não foi possível carregar as jornadas/);
+    fireEvent.click(screen.getByRole("button", { name: "Novo vínculo" }));
+    const form = screen.getByRole("form", {
+      name: "Formulário de novo vínculo de horário",
+    });
+    // Os dois avisos à vista, um só anunciado (o do formulário).
+    expect(
+      screen.getAllByText(/Não foi possível carregar as jornadas/),
+    ).toHaveLength(2);
+    expect(regioesComTexto(/carregar as jornadas/)).toHaveLength(1);
+    expect(within(form).getByRole("alert")).toBeInTheDocument();
+
+    vi.mocked(listarTabelasHorario).mockRejectedValueOnce(new Error("rede"));
+    fireEvent.click(
+      within(form).getByRole("button", { name: "Tentar carregar as jornadas" }),
+    );
+    await waitFor(() =>
+      expect(vi.mocked(listarTabelasHorario).mock.calls.length).toBe(2),
+    );
+    await waitFor(() =>
+      expect(regioesComTexto(/carregar as jornadas/)).toHaveLength(1),
+    );
+    expect(regioesComTexto(/jornadas/)).toHaveLength(1);
+  });
+
+  it("catálogo recuperado com o formulário aberto: um anúncio de recuperação e o foco no campo liberado", async () => {
+    vi.mocked(listarTabelasHorario).mockRejectedValueOnce(new Error("rede"));
+    await montarComTabela();
+    await screen.findAllByText(/Não foi possível carregar as jornadas/);
+    fireEvent.click(screen.getByRole("button", { name: "Novo vínculo" }));
+    const form = screen.getByRole("form", {
+      name: "Formulário de novo vínculo de horário",
+    });
+    const tentar = within(form).getByRole("button", {
+      name: "Tentar carregar as jornadas",
+    });
+    fireEvent.click(tentar);
+    await waitFor(() =>
+      expect(anuncio()).toBe("As jornadas foram carregadas."),
+    );
+    expect(regioesComTexto(/jornadas/)).toHaveLength(1);
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        within(form).getByLabelText(/Vigência — início/),
+      ),
+    );
+  });
+
+  // --- catálogo sem jornada ativa ---------------------------------------------
+
+  it("catálogo recuperado sem jornada ativa: o formulário diz o motivo, recebe o foco e não envia", async () => {
+    vi.mocked(listarTabelasHorario).mockRejectedValueOnce(new Error("rede"));
+    await montarComTabela();
+    await screen.findAllByText(/Não foi possível carregar as jornadas/);
+    fireEvent.click(screen.getByRole("button", { name: "Novo vínculo" }));
+    const form = screen.getByRole("form", {
+      name: "Formulário de novo vínculo de horário",
+    });
+    fireEvent.change(within(form).getByLabelText(/Vigência — início/), {
+      target: { value: "2026-03-01" },
+    });
+    vi.mocked(listarTabelasHorario).mockResolvedValueOnce(
+      paginado([tabelaInativa]),
+    );
+    fireEvent.click(
+      within(form).getByRole("button", { name: "Tentar carregar as jornadas" }),
+    );
+    const motivo = await within(form).findByText(
+      /Nenhuma tabela de horário ativa disponível para vincular/,
+    );
+    await waitFor(() => expect(document.activeElement).toBe(motivo));
+    const criar = within(form).getByRole("button", { name: "Criar vínculo" });
+    expect(criar).toBeDisabled();
+    // O formulário segue com o que já foi preenchido.
+    expect(
+      (within(form).getByLabelText(/Vigência — início/) as HTMLInputElement)
+        .value,
+    ).toBe("2026-03-01");
+    // Nem um envio forçado sai.
+    await escolherColaborador(colaborador1.nome);
+    fireEvent.submit(form);
+    await waitFor(() => expect(document.activeElement).toBe(motivo));
+    expect(criarVinculoHorario).not.toHaveBeenCalled();
+  });
+
+  it("catálogo que segue falhando preserva o formulário preenchido", async () => {
+    vi.mocked(listarTabelasHorario).mockRejectedValueOnce(new Error("rede"));
+    await montarComTabela();
+    await screen.findAllByText(/Não foi possível carregar as jornadas/);
+    fireEvent.click(screen.getByRole("button", { name: "Novo vínculo" }));
+    const form = screen.getByRole("form", {
+      name: "Formulário de novo vínculo de horário",
+    });
+    fireEvent.change(within(form).getByLabelText(/Vigência — início/), {
+      target: { value: "2026-04-01" },
+    });
+    const tentar = within(form).getByRole("button", {
+      name: "Tentar carregar as jornadas",
+    });
+    tentar.focus();
+    vi.mocked(listarTabelasHorario).mockRejectedValueOnce(new Error("rede"));
+    fireEvent.click(tentar);
+    await waitFor(() =>
+      expect(vi.mocked(listarTabelasHorario).mock.calls.length).toBe(2),
+    );
+    await waitFor(() =>
+      expect(tentar).toHaveAttribute("aria-disabled", "false"),
+    );
+    expect(document.activeElement).toBe(tentar);
+    expect(
+      (within(form).getByLabelText(/Vigência — início/) as HTMLInputElement)
+        .value,
+    ).toBe("2026-04-01");
+    expect(
+      within(form).getByRole("button", { name: "Criar vínculo" }),
+    ).toBeDisabled();
+  });
+
+  // --- contagem de colaboradores ativos ---------------------------------------
+
+  it("contagem de ativos falha: aviso próprio no formulário, busca disponível e nova tentativa só da contagem", async () => {
+    vi.mocked(listarColaboradores).mockRejectedValueOnce(new Error("rede"));
+    await montarComTabela();
+    const novo = screen.getByRole("button", { name: "Novo vínculo" });
+    await waitFor(() => expect(novo).toBeEnabled());
+    fireEvent.click(novo);
+    const form = screen.getByRole("form", {
+      name: "Formulário de novo vínculo de horário",
+    });
+    expect(within(form).getByRole("alert")).toHaveTextContent(
+      "Não foi possível conferir quantos colaboradores ativos há. A busca de colaborador continua disponível.",
+    );
+    expect(
+      within(form).getByLabelText("Colaborador (buscar por nome ou matrícula)"),
+    ).toBeInTheDocument();
+
+    const vinculosAntes = vi.mocked(listarVinculosHorario).mock.calls.length;
+    const jornadasAntes = vi.mocked(listarTabelasHorario).mock.calls.length;
+    const contagem = pendente<ListagemColaboradoresApi>();
+    vi.mocked(listarColaboradores).mockReturnValueOnce(
+      contagem.promessa as ReturnType<typeof listarColaboradores>,
+    );
+    const tentar = within(form).getByRole("button", {
+      name: "Tentar conferir os colaboradores ativos",
+    });
+    tentar.focus();
+    fireEvent.click(tentar);
+    await waitFor(() =>
+      expect(tentar).toHaveAttribute("aria-disabled", "true"),
+    );
+    expect(document.activeElement).toBe(tentar);
+    expect(anuncio()).toBe("Conferindo os colaboradores ativos…");
+    expect(vi.mocked(listarColaboradores).mock.lastCall![0]).toEqual({
+      situacao: "ativo",
+      tamanhoPagina: 1,
+    });
+
+    contagem.soltar({
+      ...listagem([colaborador1, colaborador2]),
+      total: 2,
+    });
+    await waitFor(() =>
+      expect(anuncio()).toBe("Colaboradores ativos conferidos."),
+    );
+    expect(within(form).queryByRole("alert")).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        within(form).getByLabelText(
+          "Colaborador (buscar por nome ou matrícula)",
+        ),
+      ),
+    );
+    expect(vi.mocked(listarVinculosHorario).mock.calls.length).toBe(
+      vinculosAntes,
+    );
+    expect(vi.mocked(listarTabelasHorario).mock.calls.length).toBe(
+      jornadasAntes,
+    );
+  });
+
+  it("contagem que falha de novo mantém o aviso, a busca e o foco no botão", async () => {
+    vi.mocked(listarColaboradores).mockRejectedValueOnce(new Error("rede"));
+    await montarComTabela();
+    const novo = screen.getByRole("button", { name: "Novo vínculo" });
+    await waitFor(() => expect(novo).toBeEnabled());
+    fireEvent.click(novo);
+    const form = screen.getByRole("form", {
+      name: "Formulário de novo vínculo de horário",
+    });
+    const tentar = within(form).getByRole("button", {
+      name: "Tentar conferir os colaboradores ativos",
+    });
+    tentar.focus();
+    vi.mocked(listarColaboradores).mockRejectedValueOnce(new Error("rede"));
+    fireEvent.click(tentar);
+    await waitFor(() =>
+      expect(tentar).toHaveAttribute("aria-disabled", "false"),
+    );
+    expect(within(form).getByRole("alert")).toBeInTheDocument();
+    expect(document.activeElement).toBe(tentar);
+    expect(
+      within(form).getByLabelText("Colaborador (buscar por nome ou matrícula)"),
+    ).toBeInTheDocument();
+  });
+
+  it("contagem recuperada com um só ativo: ele vem escolhido e o foco vai ao início da vigência", async () => {
+    vi.mocked(listarColaboradores).mockRejectedValueOnce(new Error("rede"));
+    await montarComTabela();
+    const novo = screen.getByRole("button", { name: "Novo vínculo" });
+    await waitFor(() => expect(novo).toBeEnabled());
+    fireEvent.click(novo);
+    const form = screen.getByRole("form", {
+      name: "Formulário de novo vínculo de horário",
+    });
+    vi.mocked(listarColaboradores).mockResolvedValueOnce({
+      ...listagem([colaborador1]),
+      total: 1,
+    });
+    fireEvent.click(
+      within(form).getByRole("button", {
+        name: "Tentar conferir os colaboradores ativos",
+      }),
+    );
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        within(form).getByLabelText(/Vigência — início/),
+      ),
+    );
+    expect(
+      within(form).queryByLabelText(
+        "Colaborador (buscar por nome ou matrícula)",
+      ),
+    ).not.toBeInTheDocument();
+    fireEvent.change(within(form).getByLabelText(/Vigência — início/), {
+      target: { value: "2026-06-01" },
+    });
+    fireEvent.click(
+      within(form).getByRole("button", { name: "Criar vínculo" }),
+    );
+    await waitFor(() =>
+      expect(criarVinculoHorario).toHaveBeenCalledWith({
+        colaboradorId: colaborador1.id,
+        tabelaHorarioId: tabelaAtiva.id,
+        vigenciaInicio: "2026-06-01",
+      }),
+    );
+  });
+
+  it("perfil leitor (DP): a falha da contagem não mostra aviso — não há formulário", async () => {
+    vi.mocked(listarColaboradores).mockRejectedValueOnce(new Error("rede"));
+    await montarComTabela(false);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Novo vínculo" })).toBeNull();
+  });
+
+  // --- criação ----------------------------------------------------------------
+
+  it("criar um vínculo: o formulário fecha e o foco volta a “Novo vínculo”, habilitado durante a releitura", async () => {
+    await montarComTabela();
+    fireEvent.click(screen.getByRole("button", { name: "Novo vínculo" }));
+    await escolherColaborador(colaborador2.nome);
+    fireEvent.change(screen.getByLabelText(/Vigência — início/i), {
+      target: { value: "2026-01-05" },
+    });
+    const releitura = pendente<Pagina>();
+    vi.mocked(listarVinculosHorario).mockReturnValueOnce(
+      releitura.promessa as ReturnType<typeof listarVinculosHorario>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Criar vínculo" }));
+
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("form", {
+          name: "Formulário de novo vínculo de horário",
+        }),
+      ).not.toBeInTheDocument(),
+    );
+    const novo = screen.getByRole("button", { name: "Novo vínculo" });
+    expect(novo).toBeEnabled();
+    await waitFor(() => expect(document.activeElement).toBe(novo));
+    expect(anuncio()).toBe(
+      "Vínculo criado. Carregando a página 1 dos vínculos de horário…",
+    );
+    releitura.soltar(pagina([vinculoVigente, vinculoEncerrado], 2));
+    await waitFor(() =>
+      expect(anuncio()).toBe("Página 1 de 1 — 2 vínculos no filtro atual."),
+    );
+    expect(document.activeElement).toBe(novo);
+  });
+
+  it("CSS: indisponível por `aria-disabled` parece desabilitado na tela", () => {
+    const css = readFileSync(
+      "src/screens/pessoas/PessoasHorarioScreen.css",
+      "utf8",
+    );
+    expect(css).toMatch(
+      /\.pessoas-horario-screen \.evolli-button\[aria-disabled="true"\] \{[^}]*opacity: 0\.5/,
+    );
+  });
+});
