@@ -2792,8 +2792,17 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       como `[T193 dev]`, não a `main`.
 
 91. **T194 - Entrada de colaboradores: painel "Adicionar colaborador" (fatia 1)**
-    - **Estado:** **em implementação** (fatia 1). Branch `codex/t194-entrada-de-colaboradores`,
-      a partir do squash `6366f066e8e5d5330deea9ac29a419c507963652` (T193 integrada, PR #186).
+    - **Estado:** **integrada** em `main` pela PR #187, squash
+      `dd79f4c4703f797498fcc72fc41f436e3eb44928`, com a CI de push 3/3 verde (run 40746014658);
+      branch preservada. Implementada na branch `codex/t194-entrada-de-colaboradores`, a partir
+      do squash `6366f066e8e5d5330deea9ac29a419c507963652` (T193 integrada, PR #186).
+    - **Observação de relatório:** a integração funcional da T194 está concluída; a única
+      pendência administrativa era a sua convergência no Spec Kit, resolvida no primeiro commit
+      da T195. Seguem abertas, sem correção, as observações da revisão final: fundo do `Modal`
+      sem `inert` (padrão da T142); rótulo da empresa no painel com atraso de instantes em
+      troca vinda de outra aba; teste que clica em rádio desabilitado; texto "inicie uma nova
+      admissão" no cabeçalho de Colaboradores; "Iniciar cadastro" sempre habilitado. As decisões
+      pendentes do dossiê seguem pendentes.
     - **Preparação:** [dossiê](../docs/decisions/t194-dossie-entrada-de-colaboradores.md) da
       entrada de colaboradores (painel com três formas, cadastro em quatro etapas, criação
       inline, importação, admissão digital), com a referência de mercado observada nas quatro
@@ -2812,6 +2821,24 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
     - **Fora de escopo:** fluxo de cadastro em quatro etapas; documentos e Cloudflare R2; importação CSV/XLSX; admissão digital; Área; busca de referências; criação inline; Aprendiz; demais decisões pendentes do dossiê; promoção e merge.
     - **Prévia:** `http://127.0.0.1:5173` passa a mostrar a branch da T194 ao vivo, identificada
       como `[T194 dev]`, não a `main`.
+
+92. **T195 - Cadastro individual em quatro etapas**
+    - **Estado:** **em implementação**. Branch `codex/t195-admissao-quatro-etapas`, a partir do
+      squash `dd79f4c4703f797498fcc72fc41f436e3eb44928` (T194 integrada, PR #187).
+    - **Origem:** fatia 2 do [dossiê](../docs/decisions/t194-dossie-entrada-de-colaboradores.md) da entrada de colaboradores.
+    - **Decisões aprovadas (2026-10-28):** A Etapa 4 terá revisão final e um bloco explicando que documentos serão liberados em entrega própria; nenhum upload nesta entrega. Área, Equipe e Centro de custo seguem na
+      lotação como hoje (opcionais, Área dependente do Departamento, sem criação inline).
+    - **Objetivo:** a Nova admissão vira um fluxo guiado em quatro etapas — Dados básicos (dados
+      pessoais e contatos), Dados profissionais e lotação, Endereço, Revisão e conclusão —, com
+      progresso de 25% a 100%, validação só da etapa atual ao avançar, etapas visitadas
+      revisitáveis, sem salto para etapa futura e "Voltar" preservando tudo. A conclusão
+      reutiliza a confirmação, a idempotência, a validação por campo e a gravação atômica
+      existentes.
+    - **Contratos:** nenhum. Sem API, schema, migration, RBAC, auditoria, seed, Docker,
+      dependência ou lockfile.
+    - **Fora de escopo:** documentos e Cloudflare R2, importação, admissão digital, criação inline, busca de referências, criação ou retirada de Área, Aprendiz, salário, escala, gestor direto, conselho profissional, dependentes e pensão; promoção e merge.
+    - **Prévia:** `http://127.0.0.1:5173` passa a mostrar a branch da T195 ao vivo, identificada
+      como `[T195 dev]`, não a `main`.
 
 ## Regra obrigatória para as próximas tarefas
 

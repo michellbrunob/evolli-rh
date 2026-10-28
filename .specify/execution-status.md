@@ -2607,11 +2607,22 @@ auditoria, seed ou dependência.
 **Fora de escopo:** rótulos do `master_tecnico` global, catálogos acima de 100
 itens, desempate da linha do tempo, outras abas, promoção e merge.
 
-## Entrada de colaboradores — T194 (em implementação: fatia 1)
+## Entrada de colaboradores — T194 (integrada)
 
-| Tarefa | Estado                         | Resultado principal                                                                                                                                       |
-| ------ | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| T194   | **Em implementação** (fatia 1) | Painel lateral "Adicionar colaborador" com três formas: cadastro individual disponível; importar planilha e admissão digital indisponíveis, com o motivo. |
+| Tarefa | Estado                                    | Resultado principal                                                                                                                                       |
+| ------ | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T194   | **Integrada** (PR #187, squash `dd79f4c`) | Painel lateral "Adicionar colaborador" com três formas: cadastro individual disponível; importar planilha e admissão digital indisponíveis, com o motivo. |
+
+**Observação de relatório:** a integração funcional da T194 está concluída
+(CI de push 3/3 verde, run 40746014658); a única pendência administrativa era
+a sua convergência no Spec Kit, resolvida no primeiro commit da T195. Seguem
+abertas, como observações da revisão final: o fundo do `Modal` sem o atributo
+`inert` (padrão herdado da T142); o rótulo da empresa no painel pode atrasar
+um instante quando a troca vem de outra aba (o servidor recusa empresa
+divergente); um teste clica em rádio desabilitado (cenário que o navegador não
+produz); o texto "inicie uma nova admissão" no cabeçalho de Colaboradores; e
+"Iniciar cadastro" sempre habilitado (coerente enquanto só há uma forma
+disponível). As decisões pendentes do dossiê seguem pendentes.
 
 **Escopo da T194:** convergência da T193, diretriz de execução incremental
 (regra 7 do `tasks.md`), o [dossiê](../docs/decisions/t194-dossie-entrada-de-colaboradores.md)
@@ -2628,6 +2639,25 @@ própria), D1, D2, D3, D7 e Área fora desta entrega; as demais seguem pendentes
 no dossiê.
 
 **Fora de escopo:** fluxo de cadastro em quatro etapas; documentos e Cloudflare R2; importação CSV/XLSX; admissão digital; Área; busca de referências; criação inline; Aprendiz; promoção e merge.
+
+## Cadastro individual em quatro etapas — T195 (em implementação)
+
+| Tarefa | Estado               | Resultado principal                                                                                                            |
+| ------ | -------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| T195   | **Em implementação** | Nova admissão como fluxo guiado em quatro etapas: dados básicos, dados profissionais e lotação, endereço, revisão e conclusão. |
+
+**Escopo da T195:** a página de Nova admissão vira um fluxo guiado em quatro
+etapas (fatia 2 do [dossiê](../docs/decisions/t194-dossie-entrada-de-colaboradores.md)), com os campos, regras e contratos já
+aprovados do Evolli: progresso de 25% a 100%, validação por etapa, etapas
+visitadas revisitáveis, sem salto para etapa futura, revisão final e a mesma
+confirmação, idempotência e gravação atômica de hoje. Sem API, schema,
+migration, RBAC, auditoria, seed, Docker ou dependência.
+
+**Decisões aprovadas (2026-10-28):** A Etapa 4 terá revisão final e um bloco explicando que documentos serão liberados em entrega própria; nenhum upload nesta entrega. Área, Equipe e Centro de custo
+seguem na lotação como hoje (opcionais, Área dependente do Departamento, sem
+criação inline).
+
+**Fora de escopo:** documentos e Cloudflare R2, importação, admissão digital, criação inline, busca de referências, criação ou retirada de Área, Aprendiz, salário, escala, gestor direto, conselho profissional, dependentes e pensão; promoção e merge.
 
 ## Próxima ação autorizável
 
