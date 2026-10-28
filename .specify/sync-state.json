@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "constitutionVersion": "1.4.0",
   "lastConvergedAt": "2026-10-27",
-  "lastIntegratedTask": 189,
-  "lastRecordedTask": 190,
+  "lastIntegratedTask": 190,
+  "lastRecordedTask": 191,
   "platformDecision": {
     "adr": "docs/adr/0014-evolli-plataforma-base-e-encerramento-do-frappe.md",
     "decidedAt": "2026-10-01",
@@ -11,15 +11,15 @@
     "frappe": "encerrado_como_candidato_referencia_apenas"
   },
   "nextTask": {
-    "id": "T190",
-    "status": "colaboradores_filtros_lotacao_em_implementacao",
-    "reason": "T189 integrada em main pela PR #182 (squash bf9d87cafb7d6676207d5d38c28889a09276dd59), com a CI de push 3/3 verde (run 40561605036); N2, N3, N4 e N5 seguem como observacoes. A T190 implementa a opcao B do dossie com o complemento da O2 da T188, aprovada pela proprietaria em 2026-10-27: filtros de Departamento e Cargo na listagem de Colaboradores pela lotacao vigente (regra da T184), aplicados no banco antes da paginacao e combinaveis com busca, situacao e situacao do vinculo; contadores sobre a empresa inteira; seletor simples so com referencias ativas; E2E de situacaoVinculo (O1 da T186); id como desempate na ordem das movimentacoes paginadas (O2 da T188). Sem schema, migration, RBAC, auditoria, seed ou dependencia. Decisao em docs/decisions/t190-dossie-proxima-fatia-pessoas.md. Fora de escopo: transferencia e mudanca de cargo pela ficha, dados pessoais novos, documentos, folha, ponto, banco de horas, fuso horario, promocao e merge."
+    "id": "T191",
+    "status": "horario_trabalho_sem_teto_em_implementacao",
+    "reason": "T190 integrada em main pela PR #183 (squash e148a6117a8e1a84d93ee814c6811577fa5943e3), com a CI de push 3/3 verde (run 40579253102). A T191 implementa a opcao B do dossie, aprovada pela proprietaria em 2026-10-27: colaborador {id, nome} na lista e no detalhe dos vinculos de horario; tabela do Horario de trabalho de 20 em 20, com filtros por colaborador e por jornada, sem as listas de 100 colaboradores e de 100 jornadas para montar a tabela (O1 da T188). Sem schema, migration, RBAC, auditoria, seed ou dependencia. Decisao em docs/decisions/t191-dossie-proxima-fatia-pessoas.md. Fora de escopo: desempate da linha do tempo, catalogo de jornadas acima de 100, limite de 100 dos catalogos de Departamento e Cargo, promocao e merge."
   },
   "openDeliveries": [
     {
-      "id": "T190",
+      "id": "T191",
       "pullRequest": null,
-      "status": "colaboradores_filtros_lotacao_em_implementacao"
+      "status": "horario_trabalho_sem_teto_em_implementacao"
     }
   ],
   "requiredArtifacts": [

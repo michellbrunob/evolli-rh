@@ -28,6 +28,13 @@ export interface VinculoHorarioApi {
   tabelaHorarioId: string;
   /** T183 — a jornada vinculada. */
   tabela: JornadaDoVinculoApi;
+  /**
+   * T191 — o colaborador do vínculo, só `id` e `nome`, na mesma resposta: a
+   * tabela do Horário de trabalho não depende mais de um dicionário de 100
+   * colaboradores. Opcional no tipo só para que uma resposta sem ele (servidor
+   * anterior) caia num rótulo neutro, nunca no identificador técnico.
+   */
+  colaborador?: { id: string; nome: string };
   /** Primeiro dia da vigência (`YYYY-MM-DD`). */
   vigenciaInicio: string;
   /** Primeiro dia SEM a jornada (`YYYY-MM-DD`; o fim não conta), ou `null`. */

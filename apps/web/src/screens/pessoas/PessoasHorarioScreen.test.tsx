@@ -5,6 +5,7 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
+import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PessoasHorarioScreen } from "./PessoasHorarioScreen";
 import {
@@ -122,6 +123,8 @@ const tabelaInativa: TabelaHorarioApi = {
 const vinculoVigente: VinculoHorarioApi = {
   id: "66666666-6666-6666-6666-666666666666",
   colaboradorId: colaborador1.id,
+  // T191 — o colaborador vem no próprio vínculo (id e nome).
+  colaborador: { id: colaborador1.id, nome: colaborador1.nome },
   empresaId: tabelaAtiva.empresaId,
   tabelaHorarioId: tabelaAtiva.id,
   tabela: {
@@ -140,6 +143,7 @@ const vinculoVigente: VinculoHorarioApi = {
 const vinculoEncerrado: VinculoHorarioApi = {
   id: "99999999-9999-9999-9999-999999999999",
   colaboradorId: colaboradorInativo.id,
+  colaborador: { id: colaboradorInativo.id, nome: colaboradorInativo.nome },
   empresaId: tabelaAtiva.empresaId,
   tabelaHorarioId: tabelaAtiva.id,
   tabela: {
@@ -758,5 +762,270 @@ describe("T188 — Horário de trabalho sem o teto de 100", () => {
     expect(
       screen.queryByLabelText("Colaborador (buscar por nome ou matrícula)"),
     ).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T191 — a tabela de vínculos deixa a página única de 100 e os dicionários de
+// 100: nome e jornada vêm do próprio vínculo, de 20 em 20, com filtros por
+// colaborador e por jornada.
+// ---------------------------------------------------------------------------
+
+describe("T191 — vínculos de horário paginados, com nome do próprio vínculo", () => {
+  function pagina(
+    itens: VinculoHorarioApi[],
+    total: number,
+    paginaAtual = 1,
+  ): ResultadoPaginadoTeste<VinculoHorarioApi> {
+    return { itens, pagina: paginaAtual, tamanhoPagina: 20, total };
+  }
+
+  function ultimaConsulta() {
+    return vi.mocked(listarVinculosHorario).mock.lastCall![0];
+  }
+
+  async function montarComTabela(podeOperar = true) {
+    render(<PessoasHorarioScreen podeOperar={podeOperar} />);
+    return screen.findByRole("table", {
+      name: "Colaboradores com tabela de horário vinculada",
+    });
+  }
+
+  it("pede a primeira página de 20 e não lê mais o dicionário de 100 colaboradores", async () => {
+    await montarComTabela();
+    expect(listarVinculosHorario).toHaveBeenCalledWith({
+      pagina: 1,
+      tamanhoPagina: 20,
+    });
+    // Só a contagem de ativos (T188); nada de página de 100.
+    for (const [consulta] of vi.mocked(listarColaboradores).mock.calls) {
+      expect(consulta?.tamanhoPagina).not.toBe(100);
+    }
+  });
+
+  it("nome e jornada vêm do próprio vínculo — mesmo fora de qualquer lista carregada", async () => {
+    const deFora: VinculoHorarioApi = {
+      ...vinculoVigente,
+      id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      colaboradorId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      colaborador: {
+        id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        nome: "Zz Pessoa Depois do Centésimo (teste)",
+      },
+      tabelaHorarioId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+      tabela: {
+        id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        codigo: "NOTURNA",
+        nome: "Jornada Fora do Catálogo (teste)",
+        ativo: true,
+      },
+    };
+    vi.mocked(listarVinculosHorario).mockResolvedValue(pagina([deFora], 1));
+    const tabela = await montarComTabela();
+    expect(
+      within(tabela).getByText("Zz Pessoa Depois do Centésimo (teste)"),
+    ).toBeInTheDocument();
+    expect(
+      within(tabela).getByText("Jornada Fora do Catálogo (teste)"),
+    ).toBeInTheDocument();
+  });
+
+  it("sem o nome na resposta, um rótulo neutro — nunca o identificador técnico", async () => {
+    const semNome = { ...vinculoVigente } as VinculoHorarioApi;
+    delete (semNome as { colaborador?: unknown }).colaborador;
+    vi.mocked(listarVinculosHorario).mockResolvedValue(pagina([semNome], 1));
+    const tabela = await montarComTabela();
+    expect(
+      within(tabela).getByText("Colaborador não identificado"),
+    ).toBeInTheDocument();
+    expect(tabela.textContent).not.toContain(semNome.colaboradorId.slice(0, 8));
+  });
+
+  it("paginação de 20 em 20, com o total do filtro atual", async () => {
+    vi.mocked(listarVinculosHorario).mockResolvedValue(
+      pagina([vinculoVigente, vinculoEncerrado], 45),
+    );
+    await montarComTabela();
+    expect(screen.getByText("45 vínculos no filtro atual")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Próxima" }));
+    await waitFor(() =>
+      expect(ultimaConsulta()).toEqual({ pagina: 2, tamanhoPagina: 20 }),
+    );
+  });
+
+  it("filtro por jornada: inclui as inativas, volta à página 1 e se mantém ao paginar", async () => {
+    vi.mocked(listarVinculosHorario).mockResolvedValue(
+      pagina([vinculoVigente], 45),
+    );
+    await montarComTabela();
+    const seletor = screen.getByLabelText("Jornada") as HTMLSelectElement;
+    expect([...seletor.options].map((o) => o.textContent)).toEqual([
+      "Todas as jornadas",
+      "Tabela Comercial (teste)",
+      "Tabela Descontinuada (teste) (inativa)",
+    ]);
+    fireEvent.change(seletor, { target: { value: tabelaInativa.id } });
+    await waitFor(() =>
+      expect(ultimaConsulta()).toEqual({
+        pagina: 1,
+        tamanhoPagina: 20,
+        tabelaHorarioId: tabelaInativa.id,
+      }),
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "Próxima" }));
+    await waitFor(() =>
+      expect(ultimaConsulta()).toEqual({
+        pagina: 2,
+        tamanhoPagina: 20,
+        tabelaHorarioId: tabelaInativa.id,
+      }),
+    );
+  });
+
+  it("filtro por colaborador: abre sob pedido, combina com a jornada e sai sozinho", async () => {
+    await montarComTabela();
+    expect(
+      screen.queryByRole("list", { name: "Colaboradores encontrados" }),
+    ).toBeNull();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Filtrar por colaborador" }),
+    );
+    const lista = await screen.findByRole("list", {
+      name: "Colaboradores encontrados",
+    });
+    fireEvent.click(
+      within(lista).getByRole("button", { name: colaborador2.nome }),
+    );
+    await waitFor(() =>
+      expect(ultimaConsulta()).toEqual({
+        pagina: 1,
+        tamanhoPagina: 20,
+        colaboradorId: colaborador2.id,
+      }),
+    );
+    fireEvent.change(screen.getByLabelText("Jornada"), {
+      target: { value: tabelaAtiva.id },
+    });
+    await waitFor(() =>
+      expect(ultimaConsulta()).toEqual({
+        pagina: 1,
+        tamanhoPagina: 20,
+        colaboradorId: colaborador2.id,
+        tabelaHorarioId: tabelaAtiva.id,
+      }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: `Remover filtro de colaborador: ${colaborador2.nome}`,
+      }),
+    );
+    await waitFor(() =>
+      expect(ultimaConsulta()).toEqual({
+        pagina: 1,
+        tamanhoPagina: 20,
+        tabelaHorarioId: tabelaAtiva.id,
+      }),
+    );
+  });
+
+  it("vazio com filtros: mensagem própria e “Limpar filtros” volta a tudo", async () => {
+    await montarComTabela();
+    vi.mocked(listarVinculosHorario).mockResolvedValue(pagina([], 0));
+    fireEvent.change(screen.getByLabelText("Jornada"), {
+      target: { value: tabelaInativa.id },
+    });
+    expect(
+      await screen.findByText("Nenhum vínculo com estes filtros"),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Limpar filtros" }));
+    await waitFor(() =>
+      expect(ultimaConsulta()).toEqual({ pagina: 1, tamanhoPagina: 20 }),
+    );
+  });
+
+  it("vazio sem filtros continua dizendo que não há vínculo cadastrado", async () => {
+    vi.mocked(listarVinculosHorario).mockResolvedValue(pagina([], 0));
+    render(<PessoasHorarioScreen podeOperar />);
+    expect(
+      await screen.findByText("Nenhum vínculo de horário cadastrado"),
+    ).toBeInTheDocument();
+  });
+
+  it("perfil leitor (DP): filtra e pagina, sem nenhum controle de escrita", async () => {
+    vi.mocked(listarVinculosHorario).mockResolvedValue(
+      pagina([vinculoVigente], 45),
+    );
+    await montarComTabela(false);
+    expect(screen.getByLabelText("Jornada")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Filtrar por colaborador" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Próxima" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Novo vínculo" })).toBeNull();
+  });
+
+  it("falha ao ler os vínculos: aviso e nova tentativa", async () => {
+    vi.mocked(listarVinculosHorario).mockRejectedValueOnce(new Error("rede"));
+    render(<PessoasHorarioScreen podeOperar />);
+    expect(
+      await screen.findByText(
+        "Não foi possível carregar os vínculos de horário",
+      ),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
+    await screen.findByRole("table", {
+      name: "Colaboradores com tabela de horário vinculada",
+    });
+  });
+
+  it("resposta atrasada de um filtro anterior não sobrescreve a do filtro atual", async () => {
+    await montarComTabela();
+    let soltarAntiga!: (v: ResultadoPaginadoTeste<VinculoHorarioApi>) => void;
+    vi.mocked(listarVinculosHorario)
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            soltarAntiga = resolve;
+          }),
+      )
+      .mockResolvedValueOnce(pagina([vinculoEncerrado], 1));
+    fireEvent.change(screen.getByLabelText("Jornada"), {
+      target: { value: tabelaInativa.id },
+    });
+    fireEvent.change(screen.getByLabelText("Jornada"), {
+      target: { value: tabelaAtiva.id },
+    });
+    const tabela = await screen.findByRole("table", {
+      name: "Colaboradores com tabela de horário vinculada",
+    });
+    await waitFor(() =>
+      expect(
+        within(tabela).getByText(colaboradorInativo.nome),
+      ).toBeInTheDocument(),
+    );
+    soltarAntiga(pagina([vinculoVigente], 1));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(within(tabela).queryByText(colaborador1.nome)).toBeNull();
+  });
+
+  it("375 px: filtros empilham e o filtro ativo quebra linha, sem alargar a página", () => {
+    const css = readFileSync(
+      "src/screens/pessoas/PessoasHorarioScreen.css",
+      "utf8",
+    );
+    expect(css).toMatch(
+      /@media \(max-width: 640px\) \{[\s\S]*\.pessoas-horario-screen__filtros \{[^}]*flex-direction: column/,
+    );
+    const bloco = (seletor: string) =>
+      new RegExp(`${seletor.replace(/[.]/g, "\\.")} \\{([^}]*)\\}`).exec(
+        css,
+      )?.[1] ?? "";
+    expect(bloco(".pessoas-horario-screen__filtro-ativo")).toMatch(
+      /overflow-wrap: anywhere/,
+    );
+    expect(bloco(".pessoas-horario-screen__filtros")).toMatch(
+      /flex-wrap: wrap/,
+    );
+    expect(bloco(".pessoas-horario-screen__filtros")).toMatch(/min-width: 0/);
   });
 });

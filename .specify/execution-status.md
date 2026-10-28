@@ -2479,11 +2479,18 @@ schema, migration, RBAC, auditoria, seed ou dependência.
 acesso global sem novo login, verificação definitiva no servidor, promoção e
 merge.
 
-## Filtros por Departamento e Cargo — T190 (em implementação)
+## Filtros por Departamento e Cargo — T190 (integrada)
 
-| Tarefa | Estado               | Resultado principal                                                                                   |
-| ------ | -------------------- | ----------------------------------------------------------------------------------------------------- |
-| T190   | **Em implementação** | Colaboradores filtrados por Departamento e Cargo da lotação vigente; ordem estável das movimentações. |
+| Tarefa | Estado                                    | Resultado principal                                                                                   |
+| ------ | ----------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| T190   | **Integrada** (PR #183, squash `e148a61`) | Colaboradores filtrados por Departamento e Cargo da lotação vigente; ordem estável das movimentações. |
+
+**Observação de relatório:** a integração funcional da T190 está concluída
+(CI de push 3/3 verde, run 40579253102); a única pendência administrativa era
+a sua convergência no Spec Kit, resolvida no primeiro commit da T191. Seguem
+abertos o limite de 100 itens dos catálogos dos filtros, a O1 da T188, a linha
+do tempo sem desempate, a falha de catálogo sem região viva e os rótulos
+repetidos do `master_tecnico` sem empresa ativa.
 
 **Escopo da T190:** opção B do [dossiê](../docs/decisions/t190-dossie-proxima-fatia-pessoas.md), com o complemento da O2 da
 T188, aprovada pela proprietária em 2026-10-27: filtros de Departamento e
@@ -2502,6 +2509,23 @@ merge.
 Departamento e Cargo dos filtros carregam no máximo 100 itens; acima desse
 limite, opções podem não aparecer no seletor. O limite não está resolvido e
 fica pendente de uma entrega própria.
+
+## Horário de trabalho sem o teto de 100 — T191 (em implementação)
+
+| Tarefa | Estado               | Resultado principal                                                                                  |
+| ------ | -------------------- | ---------------------------------------------------------------------------------------------------- |
+| T191   | **Em implementação** | Vínculos de jornada com o nome do próprio vínculo, paginados, com filtros por colaborador e jornada. |
+
+**Escopo da T191:** opção B do [dossiê](../docs/decisions/t191-dossie-proxima-fatia-pessoas.md), aprovada pela proprietária
+em 2026-10-27: `colaborador: { id, nome }` na lista e no detalhe dos vínculos
+de horário; tabela de 20 em 20, com filtros por colaborador e por jornada;
+fim da dependência das listas de 100 colaboradores e de 100 jornadas para
+montar a tabela (O1 da T188). Sem schema, migration, RBAC, auditoria, seed ou
+dependência.
+
+**Fora de escopo:** desempate da linha do tempo do vínculo funcional, catálogo
+de jornadas acima de 100 itens, limite de 100 dos catálogos de Departamento e
+Cargo, regras de jornada, promoção e merge.
 
 ## Próxima ação autorizável
 

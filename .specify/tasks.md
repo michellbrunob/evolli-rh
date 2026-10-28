@@ -2655,8 +2655,17 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       como `[T189 dev]`, não a `main`.
 
 87. **T190 - Filtros por Departamento e Cargo na listagem de Colaboradores**
-    - **Estado:** **em implementação**. Branch `codex/t190-proxima-fatia-pessoas`, a partir do
+    - **Estado:** **integrada** em `main` pela PR #183, squash
+      `e148a6117a8e1a84d93ee814c6811577fa5943e3`, com a CI de push 3/3 verde (run 40579253102);
+      branch preservada. Implementada na branch `codex/t190-proxima-fatia-pessoas`, a partir do
       squash `bf9d87cafb7d6676207d5d38c28889a09276dd59` (T189 integrada, PR #182).
+    - **Observação de relatório:** a integração funcional da T190 está concluída; a única
+      pendência administrativa era a sua convergência no Spec Kit, resolvida no primeiro commit
+      da T191. Seguem abertas, sem correção: o limite de 100 itens dos catálogos de Departamento
+      e Cargo dos filtros; a O1 da T188 (nomes no Horário de trabalho acima de 100
+      colaboradores); a linha do tempo do vínculo sem desempate por `id`; a falha de carregamento
+      dos catálogos sem anúncio por região viva; e rótulos repetidos entre empresas para o
+      `master_tecnico` sem empresa ativa.
     - **Preparação:** [dossiê](../docs/decisions/t190-dossie-proxima-fatia-pessoas.md) com três opções; a proprietária aprovou a opção B
       com o complemento da O2 da T188 em 2026-10-27.
     - **Objetivo:** filtrar a listagem de Colaboradores por Departamento e/ou Cargo pela
@@ -2682,6 +2691,26 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       própria.
     - **Prévia:** `http://127.0.0.1:5173` passa a mostrar a branch da T190 ao vivo, identificada
       como `[T190 dev]`, não a `main`.
+
+88. **T191 - Horário de trabalho sem o teto de 100 vínculos e nomes**
+    - **Estado:** **em implementação**. Branch `codex/t191-proxima-fatia-pessoas`, a partir do
+      squash `e148a6117a8e1a84d93ee814c6811577fa5943e3` (T190 integrada, PR #183).
+    - **Preparação:** [dossiê](../docs/decisions/t191-dossie-proxima-fatia-pessoas.md) com três opções; a proprietária aprovou a opção B em
+      2026-10-27.
+    - **Objetivo:** a tabela de vínculos de jornada do Horário de trabalho deixa de limitar
+      vínculos e nomes aos primeiros 100: cada vínculo traz o próprio colaborador (`id` e
+      `nome`), em lista e detalhe; a tela pagina de 20 em 20, com filtros por colaborador e por
+      jornada. Fecha a O1 da T188.
+    - **Contratos:** `GET /v1/horarios/vinculos` e `GET /v1/horarios/vinculos/:vinculoId`
+      ganham `colaborador: { id, nome }` (extensão aditiva); filtros `colaboradorId` e
+      `tabelaHorarioId` já existentes e combináveis. Sem schema, migration, RBAC, auditoria,
+      seed, Docker ou dependência; leitura segue com RH, DP e `master_tecnico`.
+    - **Fora de escopo:** desempate por `id` na linha do tempo do vínculo funcional, catálogo de
+      jornadas acima de 100 itens (filtro e formulário seguem numa página de 100), limite de 100
+      dos catálogos de Departamento e Cargo (T190), regras de jornada, dados pessoais novos,
+      documentos, folha, ponto, banco de horas, fuso horário, promoção e merge.
+    - **Prévia:** `http://127.0.0.1:5173` passa a mostrar a branch da T191 ao vivo, identificada
+      como `[T191 dev]`, não a `main`.
 
 ## Regra obrigatória para as próximas tarefas
 
