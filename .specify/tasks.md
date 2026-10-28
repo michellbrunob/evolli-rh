@@ -2759,21 +2759,25 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
     - **Prévia:** `http://127.0.0.1:5173` passa a mostrar a branch da T192 ao vivo, identificada
       como `[T192 dev]`, não a `main`.
 
-90. **T193 - Próxima fatia de Gestão de Pessoas (preparação de decisão)**
-    - **Estado:** **em preparação de decisão**. Branch `codex/t193-proxima-fatia-pessoas`, a
-      partir do squash `5908912c6f0e6a838419280dd75a0a8d2a9661aa` (T192 integrada, PR #185).
-    - **Objetivo desta etapa:** convergir a T192 e propor três próximas fatias de Gestão de
-      Pessoas, priorizando as observações da revisão final da T192 (foco durante a nova
-      tentativa, anúncios duplicados, formulário com catálogo recuperado sem jornada ativa, nova
-      tentativa da contagem de ativos, foco depois de criar um vínculo) e os rótulos do
-      `master_tecnico` global, sem implementar produto antes de uma decisão explícita da
-      proprietária.
-    - **Entrega desta etapa:** dossiê (`docs/decisions/t193-dossie-proxima-fatia-pessoas.md`) com as opções e uma recomendação. Só
-      documentação: sem código, API, schema, migration, RBAC, banco, seed, Docker,
-      dependência, CI, PR ou push.
-    - **Fora de escopo:** implementação de qualquer opção antes da decisão, regras de jornada,
-      dados pessoais novos, documentos, folha, ponto, banco de horas, fuso horário, importação,
-      exportação, integrações externas, promoção e merge.
+90. **T193 - Horário de trabalho: recuperação, anúncios e formulário sem arestas**
+    - **Estado:** **em implementação**. Branch `codex/t193-proxima-fatia-pessoas`, a partir do
+      squash `5908912c6f0e6a838419280dd75a0a8d2a9661aa` (T192 integrada, PR #185).
+    - **Preparação:** [dossiê](../docs/decisions/t193-dossie-proxima-fatia-pessoas.md) com três opções; a proprietária aprovou a opção A em
+      2026-10-28.
+    - **Objetivo:** na aba Horário de trabalho, a nova tentativa de página mantém o aviso e o
+      botão à vista (indisponível durante a carga), sem reexibir linhas antigas nem soltar o foco
+      no `<body>`; cada carga, falha ou recuperação é anunciada uma só vez; o formulário informa
+      e não envia sem jornada ativa; a contagem de colaboradores ativos tem aviso e nova
+      tentativa próprios; depois de criar um vínculo, o foco volta a "Novo vínculo". Mais o E2E
+      do `master_tecnico` com empresa ativa comparando o corpo inteiro com o do RH.
+    - **Contratos:** nenhum muda. Sem API, schema, migration, RBAC, auditoria, seed, Docker ou
+      dependência.
+    - **Fora de escopo:** rótulos sem ambiguidade do `master_tecnico` global, catálogos acima de
+      100 itens (jornadas, departamentos e cargos), desempate da linha do tempo do vínculo
+      funcional, outras abas de Pessoas, regras de jornada, dados pessoais novos, promoção e
+      merge.
+    - **Prévia:** `http://127.0.0.1:5173` passa a mostrar a branch da T193 ao vivo, identificada
+      como `[T193 dev]`, não a `main`.
 
 ## Regra obrigatória para as próximas tarefas
 

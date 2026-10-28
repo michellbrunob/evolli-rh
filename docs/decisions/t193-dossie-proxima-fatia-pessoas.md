@@ -1,7 +1,7 @@
 # T193 — Dossiê: próxima fatia de Gestão de Pessoas
 
-Status: **dossiê de preparação de decisão.** Nada aqui decide, aprova ou
-autoriza implementação: a escolha é da proprietária.
+Status: **decidido pela proprietária em 2026-10-28: opção A** (seção 5).
+As seções 1 a 4 registram o dossiê como foi apresentado.
 Data: 2026-10-28. Tarefa: T193.
 Fontes, e só elas: `.specify`, as decisões em `docs/decisions` (em especial
 [T190](t190-dossie-proxima-fatia-pessoas.md),
@@ -165,3 +165,35 @@ Para seguir com A, a proprietária precisa decidir:
    falha (recomendado), ou junto da nova tentativa do catálogo.
 3. **Incluir os rótulos do master global (opção B)** na mesma entrega
    (opcional; recomendado: não, para manter a fatia numa tela).
+
+## 5. Decisão da proprietária (2026-10-28)
+
+**Opção A aprovada**, só na aba Horário de trabalho. Respostas às decisões:
+
+1. **Foco depois de criar um vínculo:** volta ao botão "Novo vínculo".
+2. **Contagem de colaboradores ativos:** aviso e nova tentativa próprios.
+3. **Rótulos do `master_tecnico` global (opção B):** não entram.
+
+Também fica de fora o limite de 100 jornadas (opção C).
+
+Comportamento aprovado:
+
+- **Nova tentativa de página:** o aviso de falha fica montado e o botão de
+  nova tentativa à vista, indisponível enquanto carrega; nenhuma linha da
+  página anterior reaparece; o foco não passa pelo `<body>`. No sucesso, o
+  foco vai ao título da lista; numa nova falha, fica no aviso e no botão.
+  Página e filtros exatos.
+- **Anúncios:** cada carga, falha ou recuperação é anunciada uma só vez, sem
+  duplicar texto visível e região viva; com o formulário aberto, a falha ou a
+  recuperação do catálogo tem um único anúncio útil; a carga inicial segue
+  sem anúncio.
+- **Catálogo sem jornada ativa:** o formulário informa o motivo, e "Criar
+  vínculo" não envia sem jornada nem depende do 400 do servidor; o formulário
+  e o foco se preservam se a lista for recuperada ou continuar vazia.
+- **Contagem de ativos:** aviso e nova tentativa próprios, sem reiniciar
+  tabela, página, filtros ou catálogo; a busca de colaborador continua
+  enquanto a contagem estiver indisponível.
+- **Criação:** no sucesso, o formulário fecha e o foco volta a "Novo
+  vínculo"; RH opera, DP e `master_tecnico` só consultam.
+- **E2E:** `master_tecnico` com empresa ativa comparando o corpo inteiro com
+  o resultado do RH.

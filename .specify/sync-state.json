@@ -12,14 +12,14 @@
   },
   "nextTask": {
     "id": "T193",
-    "status": "pessoas_proxima_fatia_em_decisao",
-    "reason": "T192 integrada em main pela PR #185 (squash 5908912c6f0e6a838419280dd75a0a8d2a9661aa), com a CI de push 3/3 verde (run 40690118929); seguem abertas as observacoes da revisao final (foco e tabela anterior durante a nova tentativa, anuncios duplicados, formulario com catalogo recuperado sem jornada ativa, contagem de ativos sem nova tentativa, foco depois de criar um vinculo, E2E do master com empresa ativa comparando so o total), os rotulos do master sem empresa ativa, o catalogo de jornadas em 100, a linha do tempo sem desempate, o limite de 100 dos catalogos de Departamento e Cargo e a falha de catalogo de lotacao sem regiao viva. A T193 abre em preparacao de decisao: dossie com tres opcoes para a proxima fatia de Gestao de Pessoas, priorizando as observacoes da T192, em docs/decisions/t193-dossie-proxima-fatia-pessoas.md. Nenhuma implementacao de produto antes da decisao da proprietaria. Fora de escopo: codigo, API, schema, migration, RBAC, banco, seed, Docker, dependencias, CI, PR, push, promocao e merge."
+    "status": "horario_trabalho_recuperacao_em_implementacao",
+    "reason": "T192 integrada em main pela PR #185 (squash 5908912c6f0e6a838419280dd75a0a8d2a9661aa), com a CI de push 3/3 verde (run 40690118929). A T193 implementa a opcao A do dossie, aprovada pela proprietaria em 2026-10-28, so na aba Horario de trabalho: nova tentativa de pagina com aviso e botao a vista, sem linhas antigas e sem foco no body; um anuncio por carga, falha ou recuperacao; formulario sem jornada ativa avisando e sem enviar; aviso e nova tentativa proprios da contagem de ativos; foco em Novo vinculo depois de criar; E2E do master_tecnico com empresa ativa comparando o corpo inteiro com o do RH. Sem API, schema, migration, RBAC, auditoria, seed ou dependencia. Decisao em docs/decisions/t193-dossie-proxima-fatia-pessoas.md. Fora de escopo: rotulos do master global, catalogos acima de 100, desempate da linha do tempo, outras abas, promocao e merge."
   },
   "openDeliveries": [
     {
       "id": "T193",
       "pullRequest": null,
-      "status": "pessoas_proxima_fatia_em_decisao"
+      "status": "horario_trabalho_recuperacao_em_implementacao"
     }
   ],
   "requiredArtifacts": [

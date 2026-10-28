@@ -2575,22 +2575,23 @@ ativa. Sem API, schema, migration, RBAC, auditoria, seed ou dependência.
 **Fora de escopo:** rótulos do `master_tecnico` global, catálogos acima de 100
 itens, desempate da linha do tempo, outras abas, promoção e merge.
 
-## Próxima fatia de Gestão de Pessoas — T193 (em preparação de decisão)
+## Horário de trabalho: recuperação, anúncios e formulário — T193 (em implementação)
 
-| Tarefa | Estado                       | Resultado principal                                                        |
-| ------ | ---------------------------- | -------------------------------------------------------------------------- |
-| T193   | **Em preparação de decisão** | Dossiê com três opções para a próxima fatia de Pessoas e uma recomendação. |
+| Tarefa | Estado               | Resultado principal                                                                                               |
+| ------ | -------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| T193   | **Em implementação** | Horário de trabalho com nova tentativa sem perder o foco, anúncios únicos e formulário que não envia sem jornada. |
 
-**Escopo desta etapa:** convergência da T192 e o dossiê (`docs/decisions/t193-dossie-proxima-fatia-pessoas.md`) da próxima
-fatia de Gestão de Pessoas, priorizando as observações da revisão final da
-T192 no Horário de trabalho (foco durante a nova tentativa, anúncios
-duplicados, formulário com catálogo recuperado sem jornada ativa, nova
-tentativa da contagem de ativos, foco depois de criar um vínculo) e os
-rótulos do `master_tecnico` global. Nenhuma implementação de produto antes da
-decisão da proprietária.
+**Escopo da T193:** opção A do [dossiê](../docs/decisions/t193-dossie-proxima-fatia-pessoas.md), aprovada pela proprietária
+em 2026-10-28, só na aba Horário de trabalho: nova tentativa de página com o
+aviso e o botão à vista, sem linhas antigas e sem foco no `<body>`; um anúncio
+por carga, falha ou recuperação; formulário sem jornada ativa avisando e sem
+enviar; aviso e nova tentativa próprios da contagem de ativos; foco em "Novo
+vínculo" depois de criar; E2E do `master_tecnico` com empresa ativa
+comparando o corpo inteiro com o do RH. Sem API, schema, migration, RBAC,
+auditoria, seed ou dependência.
 
-**Fora de escopo:** código, API, schema, migration, RBAC, banco, seed, Docker,
-dependências, CI, PR, push, promoção e merge.
+**Fora de escopo:** rótulos do `master_tecnico` global, catálogos acima de 100
+itens, desempate da linha do tempo, outras abas, promoção e merge.
 
 ## Próxima ação autorizável
 
