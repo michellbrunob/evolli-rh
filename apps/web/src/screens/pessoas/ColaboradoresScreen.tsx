@@ -46,6 +46,10 @@ import {
   situacaoDaVigencia,
 } from "./jornadaColaborador";
 import { DadosPessoaisColaboradorSecao } from "./DadosPessoaisColaboradorSecao";
+import {
+  IconeAdicionarPessoa,
+  PainelAdicionarColaborador,
+} from "./PainelAdicionarColaborador";
 import "./ColaboradoresScreen.css";
 
 export const COLABORADORES_TITULO_ID = "colaboradores-titulo";
@@ -230,6 +234,9 @@ export interface ColaboradoresScreenProps {
    * admissão passou a exigir (data de nascimento e os três contatos).
    * "Nova admissão" (T178; era "Novo colaborador") leva até a página; sem esta
    * prop — perfil que não pode admitir —, o botão não aparece.
+   * T194 — o botão passou a ser "Adicionar colaborador" e abre um painel
+   * lateral com as formas de entrada; o "Cadastro individual" dele é que chama
+   * esta prop. Sem ela, nem botão nem painel existem.
    */
   readonly onNovaAdmissao?: () => void;
   /**
@@ -388,6 +395,11 @@ export function ColaboradoresScreen({
   const [tamanhoPaginaEfetivo, setTamanhoPaginaEfetivo] =
     useState(TAMANHO_PAGINA);
   const [detalhe, setDetalhe] = useState<DetalheState | null>(null);
+  /**
+   * T194 — painel "Adicionar colaborador". Só estado local: abrir e fechar não
+   * mexem em busca, filtros, página nem empresa, e não relêem nada.
+   */
+  const [painelAdicionarAberto, setPainelAdicionarAberto] = useState(false);
   // T169 — a seção de contatos do detalhe edita por conta própria e avisa
   // aqui quando há edição não salva e quando está gravando, para que o
   // `Modal` peça confirmação de descarte e não feche no meio da gravação.
@@ -997,12 +1009,19 @@ export function ColaboradoresScreen({
         }
       />
 
-      {/* T178 — barra de ações: "Nova admissão" é a ação principal da área e
-          a busca fica ao lado. Só o que existe: nada de importar, exportar ou
-          pedir preenchimento — botão sem operação por trás é promessa falsa. */}
+      {/* T178 — barra de ações: a entrada de colaboradores é a ação principal
+          da área e a busca fica ao lado. Só o que existe: nada de exportar.
+          T194 — "Adicionar colaborador" abre o painel das formas de entrada;
+          as que ainda não existem aparecem lá como indisponíveis, sem ação. */}
       <div className="colaboradores-screen__barra-acoes">
         {onNovaAdmissao ? (
-          <Button onClick={onNovaAdmissao}>Nova admissão</Button>
+          <Button
+            aria-haspopup="dialog"
+            onClick={() => setPainelAdicionarAberto(true)}
+          >
+            <IconeAdicionarPessoa />
+            Adicionar colaborador
+          </Button>
         ) : null}
         <form
           role="search"
@@ -1360,7 +1379,13 @@ export function ColaboradoresScreen({
                 {...(onNovaAdmissao
                   ? {
                       action: (
-                        <Button onClick={onNovaAdmissao}>Nova admissão</Button>
+                        <Button
+                          aria-haspopup="dialog"
+                          onClick={() => setPainelAdicionarAberto(true)}
+                        >
+                          <IconeAdicionarPessoa />
+                          Adicionar colaborador
+                        </Button>
                       ),
                     }
                   : {})}
@@ -1588,6 +1613,21 @@ export function ColaboradoresScreen({
           </>
         ) : null}
       </Modal>
+
+      {/* T194 — painel "Adicionar colaborador": só para quem pode admitir (a
+          mesma prop que mostra o botão). "Cadastro individual" fecha o painel
+          e segue para a Nova admissão de sempre. */}
+      {onNovaAdmissao ? (
+        <PainelAdicionarColaborador
+          aberto={painelAdicionarAberto}
+          empresaAtiva={empresaAtiva ?? null}
+          onFechar={() => setPainelAdicionarAberto(false)}
+          onCadastroIndividual={() => {
+            setPainelAdicionarAberto(false);
+            onNovaAdmissao();
+          }}
+        />
+      ) : null}
     </div>
   );
 }

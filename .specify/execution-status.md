@@ -2575,11 +2575,25 @@ ativa. Sem API, schema, migration, RBAC, auditoria, seed ou dependência.
 **Fora de escopo:** rótulos do `master_tecnico` global, catálogos acima de 100
 itens, desempate da linha do tempo, outras abas, promoção e merge.
 
-## Horário de trabalho: recuperação, anúncios e formulário — T193 (em implementação)
+## Horário de trabalho: recuperação, anúncios e formulário — T193 (integrada)
 
-| Tarefa | Estado               | Resultado principal                                                                                               |
-| ------ | -------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| T193   | **Em implementação** | Horário de trabalho com nova tentativa sem perder o foco, anúncios únicos e formulário que não envia sem jornada. |
+| Tarefa | Estado                                    | Resultado principal                                                                                               |
+| ------ | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| T193   | **Integrada** (PR #186, squash `6366f06`) | Horário de trabalho com nova tentativa sem perder o foco, anúncios únicos e formulário que não envia sem jornada. |
+
+**Observação de relatório:** a integração funcional da T193 está concluída
+(CI de push 3/3 verde, run 40708057214); a única pendência administrativa era
+a sua convergência no Spec Kit, resolvida no primeiro commit da T194. Seguem
+abertas, como observações da revisão final e limites registrados: uma só
+região viva para as cargas da tabela e as novas tentativas do catálogo e da
+contagem (eventos quase simultâneos podem se sobrepor); o teste de anúncio
+único da nova falha conta regiões com texto, não anúncios; ao abrir o
+formulário com o catálogo e a contagem em falha, os dois avisos são lidos; a
+contagem de ativos segue pedida também para DP e `master_tecnico`; rótulos
+repetidos entre empresas para o `master_tecnico` sem empresa ativa; o
+catálogo de jornadas numa página de 100; a linha do tempo do vínculo sem
+desempate por `id`; o limite de 100 itens dos catálogos de Departamento e
+Cargo; e a falha de catálogo de lotação sem região viva.
 
 **Escopo da T193:** opção A do [dossiê](../docs/decisions/t193-dossie-proxima-fatia-pessoas.md), aprovada pela proprietária
 em 2026-10-28, só na aba Horário de trabalho: nova tentativa de página com o
@@ -2592,6 +2606,28 @@ auditoria, seed ou dependência.
 
 **Fora de escopo:** rótulos do `master_tecnico` global, catálogos acima de 100
 itens, desempate da linha do tempo, outras abas, promoção e merge.
+
+## Entrada de colaboradores — T194 (em implementação: fatia 1)
+
+| Tarefa | Estado                         | Resultado principal                                                                                                                                       |
+| ------ | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T194   | **Em implementação** (fatia 1) | Painel lateral "Adicionar colaborador" com três formas: cadastro individual disponível; importar planilha e admissão digital indisponíveis, com o motivo. |
+
+**Escopo da T194:** convergência da T193, diretriz de execução incremental
+(regra 7 do `tasks.md`), o [dossiê](../docs/decisions/t194-dossie-entrada-de-colaboradores.md)
+da entrada de colaboradores e a **fatia 1**: na listagem de Colaboradores,
+"Adicionar colaborador" (barra de ações e estado vazio) abre um painel lateral
+acessível — o `Modal` existente em posição lateral — com Cadastro individual
+(leva à Nova admissão de sempre), Importar planilha e Admissão digital
+(indisponíveis, sem nenhuma ação). Permissões de Nova admissão inalteradas.
+Sem API, schema, migration, RBAC, auditoria, seed, Docker, dependência ou
+integração externa.
+
+**Decisões tomadas (2026-10-28):** D14, D15, D16 (Aprendiz em entrega futura
+própria), D1, D2, D3, D7 e Área fora desta entrega; as demais seguem pendentes
+no dossiê.
+
+**Fora de escopo:** fluxo de cadastro em quatro etapas; documentos e Cloudflare R2; importação CSV/XLSX; admissão digital; Área; busca de referências; criação inline; Aprendiz; promoção e merge.
 
 ## Próxima ação autorizável
 

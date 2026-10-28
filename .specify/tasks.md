@@ -2760,8 +2760,20 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       como `[T192 dev]`, não a `main`.
 
 90. **T193 - Horário de trabalho: recuperação, anúncios e formulário sem arestas**
-    - **Estado:** **em implementação**. Branch `codex/t193-proxima-fatia-pessoas`, a partir do
+    - **Estado:** **integrada** em `main` pela PR #186, squash
+      `6366f066e8e5d5330deea9ac29a419c507963652`, com a CI de push 3/3 verde (run 40708057214);
+      branch preservada. Implementada na branch `codex/t193-proxima-fatia-pessoas`, a partir do
       squash `5908912c6f0e6a838419280dd75a0a8d2a9661aa` (T192 integrada, PR #185).
+    - **Observação de relatório:** a integração funcional da T193 está concluída; a única
+      pendência administrativa era a sua convergência no Spec Kit, resolvida no primeiro commit
+      da T194. Seguem abertas, sem correção, as observações da revisão final: uma só região viva
+      para as cargas da tabela e as novas tentativas do catálogo e da contagem; o teste de
+      anúncio único da nova falha conta regiões com texto, não anúncios; dois avisos lidos ao
+      abrir o formulário com o catálogo e a contagem em falha; contagem de ativos pedida também
+      para DP e `master_tecnico`. Seguem também os rótulos repetidos do `master_tecnico` sem
+      empresa ativa, o catálogo de jornadas numa página de 100, a linha do tempo sem desempate
+      por `id`, o limite de 100 dos catálogos de Departamento e Cargo e a falha de catálogo de
+      lotação sem região viva.
     - **Preparação:** [dossiê](../docs/decisions/t193-dossie-proxima-fatia-pessoas.md) com três opções; a proprietária aprovou a opção A em
       2026-10-28.
     - **Objetivo:** na aba Horário de trabalho, a nova tentativa de página mantém o aviso e o
@@ -2779,6 +2791,28 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
     - **Prévia:** `http://127.0.0.1:5173` passa a mostrar a branch da T193 ao vivo, identificada
       como `[T193 dev]`, não a `main`.
 
+91. **T194 - Entrada de colaboradores: painel "Adicionar colaborador" (fatia 1)**
+    - **Estado:** **em implementação** (fatia 1). Branch `codex/t194-entrada-de-colaboradores`,
+      a partir do squash `6366f066e8e5d5330deea9ac29a419c507963652` (T193 integrada, PR #186).
+    - **Preparação:** [dossiê](../docs/decisions/t194-dossie-entrada-de-colaboradores.md) da
+      entrada de colaboradores (painel com três formas, cadastro em quatro etapas, criação
+      inline, importação, admissão digital), com a referência de mercado observada nas quatro
+      etapas, matrizes, riscos, gates e fatiamento em sete entregas.
+    - **Decisões tomadas (2026-10-28):** D14 (etapas 2 a 4 observadas com CPF sintético
+      autorizado, digitado pela proprietária), D15 (contatos na etapa 1), D16 (**Aprendiz** como
+      tipo de vínculo em entrega futura própria), D1 (começar pela fatia 1), D2 (botão "Adicionar
+      colaborador"), D3 (formas indisponíveis visíveis com o motivo), D7 (sem rascunho no
+      servidor) e Área fora desta entrega.
+    - **Objetivo (fatia 1):** na listagem de Colaboradores, "Adicionar colaborador" (barra de
+      ações e estado vazio) abre um painel lateral acessível com três formas: Cadastro individual
+      (disponível, leva à Nova admissão de sempre), Importar planilha e Admissão digital
+      (indisponíveis, com o motivo e sem nenhuma ação). Mesmas permissões de Nova admissão.
+    - **Contratos:** nenhum. Sem API, schema, migration, RBAC, auditoria, seed, Docker,
+      dependência ou integração externa; o painel é o `Modal` existente em posição lateral.
+    - **Fora de escopo:** fluxo de cadastro em quatro etapas; documentos e Cloudflare R2; importação CSV/XLSX; admissão digital; Área; busca de referências; criação inline; Aprendiz; demais decisões pendentes do dossiê; promoção e merge.
+    - **Prévia:** `http://127.0.0.1:5173` passa a mostrar a branch da T194 ao vivo, identificada
+      como `[T194 dev]`, não a `main`.
+
 ## Regra obrigatória para as próximas tarefas
 
 1. Criar ou atualizar a entrada da tarefa neste arquivo antes da implementação.
@@ -2788,3 +2822,8 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
 5. Revisão e CI verdes não substituem decisão humana pendente nem autorizam merge ou produção.
 6. Citar uma tarefa antiga em prosa **não** exige mais registrá-la: desde a T149 o verificador
    fiscaliza a janela de entrega declarada em `sync-state.json`, não todo `T###` do texto.
+7. **Execução incremental (diretriz da proprietária, 2026-10-28):** o Evolli é desenvolvido
+   funcionalidade por funcionalidade, em entregas pequenas e completas — implementar, validar
+   no localhost com dados sintéticos, revisar, abrir a PR, validar a CI, integrar — e só então
+   a seguinte começa. Entregas não se misturam, e a tarefa seguinte não é iniciada antes da
+   integração da atual.
