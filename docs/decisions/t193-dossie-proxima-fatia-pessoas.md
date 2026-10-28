@@ -197,3 +197,50 @@ Comportamento aprovado:
   vínculo"; RH opera, DP e `master_tecnico` só consultam.
 - **E2E:** `master_tecnico` com empresa ativa comparando o corpo inteiro com
   o resultado do RH.
+
+## 6. O que foi entregue
+
+- **Nova tentativa de página:** ao repetir uma página que falhou, o aviso de
+  falha segue montado, com o texto inalterado, e "Tentar novamente" à vista,
+  indisponível por `aria-disabled` durante a carga — o foco fica nele. Na
+  falha, as linhas da leitura anterior saem da tela e não reaparecem, nem na
+  repetição nem numa troca de filtro. No sucesso, o foco vai ao título da
+  lista; numa nova falha, fica no botão, e a região estável anuncia a nova
+  falha uma vez. "Ir para a primeira página" segue o mesmo padrão. Página e
+  filtros exatos.
+- **Anúncios únicos:** o texto visível de carga e o aviso de "sem opções" da
+  lista deixam de ser região viva — a carga inicial segue sem anúncio. Com o
+  formulário aberto, só o aviso do catálogo no formulário é anunciado (o do
+  filtro continua à vista). A nova tentativa do catálogo e da contagem
+  anuncia a carga e a recuperação uma vez cada; o botão não muda de nome.
+- **Sem jornada ativa (ou sem colaborador ativo) com o formulário aberto:**
+  o motivo fica à vista e recebe o foco quando a nova tentativa traz a lista
+  vazia; "Criar vínculo" fica indisponível, e o envio nunca sai sem jornada
+  ou colaborador (guarda dupla no envio). O formulário preserva o que já foi
+  preenchido.
+- **Contagem de colaboradores ativos:** aviso e nova tentativa próprios no
+  formulário; a busca de colaborador continua enquanto a contagem falha;
+  tabela, página, filtros e catálogo não reiniciam. Recuperada com mais de um
+  ativo, o foco vai à busca; com um só, ele vem escolhido e o foco vai ao
+  início da vigência. DP e `master_tecnico` não veem o aviso (não têm
+  formulário).
+- **Criação:** o formulário fecha e o foco volta a "Novo vínculo", que não
+  depende mais da carga da tabela (só da contagem e do catálogo); a criação é
+  anunciada junto da releitura.
+- **Testes:** web — 16 novos (nova tentativa com aviso e foco, nova falha,
+  linhas antigas, página vazia, carga inicial sem anúncio, anúncio único,
+  catálogo com o formulário aberto, catálogo vazio, catálogo que segue
+  falhando, contagem falha, de novo e recuperada, DP, criação, CSS). E2E com
+  PostgreSQL real — o `master_tecnico` com empresa ativa recebe exatamente o
+  corpo do RH em todas as páginas, num filtro, num filtro combinado e no
+  detalhe.
+
+## 7. Fora do escopo desta entrega e limites conhecidos
+
+- **Rótulos sem ambiguidade do `master_tecnico` global** (opção B): não
+  entram, por decisão.
+- **Catálogos acima de 100 itens** (opção C e T190): inalterados.
+- **Linha do tempo do vínculo funcional** sem desempate por `id`.
+- **Painel "Adicionar colaborador", importação em lote e admissão por
+  convite:** fora desta entrega; avaliados à parte, sem registro no Spec Kit
+  até a decisão da proprietária.
