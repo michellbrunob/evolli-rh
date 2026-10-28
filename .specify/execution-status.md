@@ -2607,29 +2607,27 @@ auditoria, seed ou dependência.
 **Fora de escopo:** rótulos do `master_tecnico` global, catálogos acima de 100
 itens, desempate da linha do tempo, outras abas, promoção e merge.
 
-## Entrada de colaboradores — T194 (em preparação de decisão)
+## Entrada de colaboradores — T194 (em implementação: fatia 1)
 
-| Tarefa | Estado                       | Resultado principal                                                                                            |
-| ------ | ---------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| T194   | **Em preparação de decisão** | Dossiê para modernizar a entrada de colaboradores: painel lateral, cadastro em quatro etapas e criação inline. |
+| Tarefa | Estado                         | Resultado principal                                                                                                                                       |
+| ------ | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T194   | **Em implementação** (fatia 1) | Painel lateral "Adicionar colaborador" com três formas: cadastro individual disponível; importar planilha e admissão digital indisponíveis, com o motivo. |
 
-**Escopo desta etapa:** convergência da T193, registro da diretriz de execução
-incremental e o dossiê (`docs/decisions/t194-dossie-entrada-de-colaboradores.md`) para modernizar a entrada de colaboradores:
-painel lateral "Adicionar colaborador" com três formas (cadastro individual,
-importar planilha, admissão digital), cadastro individual guiado em quatro
-etapas e criação rápida inline de Departamento, Cargo, Unidade e Centro de
-custo em seletores pesquisáveis. Referência funcional observada em produto de
-mercado, sem copiar marca, textos, layout ou código. Nenhuma implementação de
-produto antes da decisão da proprietária.
+**Escopo da T194:** convergência da T193, diretriz de execução incremental
+(regra 7 do `tasks.md`), o [dossiê](../docs/decisions/t194-dossie-entrada-de-colaboradores.md)
+da entrada de colaboradores e a **fatia 1**: na listagem de Colaboradores,
+"Adicionar colaborador" (barra de ações e estado vazio) abre um painel lateral
+acessível — o `Modal` existente em posição lateral — com Cadastro individual
+(leva à Nova admissão de sempre), Importar planilha e Admissão digital
+(indisponíveis, sem nenhuma ação). Permissões de Nova admissão inalteradas.
+Sem API, schema, migration, RBAC, auditoria, seed, Docker, dependência ou
+integração externa.
 
-**Decisões já tomadas (2026-10-28):** etapas 2 a 4 da referência observadas
-com CPF sintético autorizado (D14); contatos na etapa 1 (D15); **Aprendiz**
-aprovado como tipo de vínculo para entrega futura própria (D16). As demais
-decisões seguem pendentes no dossiê.
+**Decisões tomadas (2026-10-28):** D14, D15, D16 (Aprendiz em entrega futura
+própria), D1, D2, D3, D7 e Área fora desta entrega; as demais seguem pendentes
+no dossiê.
 
-**Fora de escopo:** código, API, schema, migration, RBAC, banco, seed, Docker,
-dependências, CI, PR, push, promoção e merge; Área como estrutura (não
-aprovada).
+**Fora de escopo:** fluxo de cadastro em quatro etapas; documentos e Cloudflare R2; importação CSV/XLSX; admissão digital; Área; busca de referências; criação inline; Aprendiz; promoção e merge.
 
 ## Próxima ação autorizável
 

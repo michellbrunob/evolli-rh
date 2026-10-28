@@ -2791,25 +2791,27 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
     - **Prévia:** `http://127.0.0.1:5173` passa a mostrar a branch da T193 ao vivo, identificada
       como `[T193 dev]`, não a `main`.
 
-91. **T194 - Entrada de colaboradores (preparação de decisão)**
-    - **Estado:** **em preparação de decisão**. Branch `codex/t194-entrada-de-colaboradores`, a
-      partir do squash `6366f066e8e5d5330deea9ac29a419c507963652` (T193 integrada, PR #186).
-    - **Objetivo desta etapa:** convergir a T193 e preparar o plano para modernizar a entrada de
-      colaboradores — painel lateral "Adicionar colaborador" com três formas (cadastro
-      individual, importar planilha, admissão digital), cadastro individual guiado em quatro
-      etapas e criação rápida inline de Departamento, Cargo, Unidade e Centro de custo em
-      seletores pesquisáveis —, sem implementar produto antes de uma decisão explícita da
-      proprietária.
-    - **Entrega desta etapa:** dossiê (`docs/decisions/t194-dossie-entrada-de-colaboradores.md`) com as matrizes, o plano da criação inline,
-      riscos, dependências, fatiamento e decisões. Só documentação: sem código, API, schema,
-      migration, RBAC, banco, seed, Docker, dependência, CI, PR ou push.
-    - **Decisões já tomadas (2026-10-28):** D14 — etapas 2 a 4 da referência observadas com CPF
-      sintético autorizado (digitado pela proprietária); D15 — e-mail pessoal, celular e telefone
-      na etapa 1; D16 — **Aprendiz** aprovado como tipo de vínculo para entrega futura própria,
-      com regras formais (dossiê, seção 5.1). As demais decisões seguem pendentes no dossiê.
-    - **Fora de escopo:** implementação de qualquer fatia antes da decisão; Área como estrutura;
-      importação e admissão digital funcionando sem os seus gates; documentos e dados sensíveis
-      sem ADR e ficha de tratamento; promoção e merge.
+91. **T194 - Entrada de colaboradores: painel "Adicionar colaborador" (fatia 1)**
+    - **Estado:** **em implementação** (fatia 1). Branch `codex/t194-entrada-de-colaboradores`,
+      a partir do squash `6366f066e8e5d5330deea9ac29a419c507963652` (T193 integrada, PR #186).
+    - **Preparação:** [dossiê](../docs/decisions/t194-dossie-entrada-de-colaboradores.md) da
+      entrada de colaboradores (painel com três formas, cadastro em quatro etapas, criação
+      inline, importação, admissão digital), com a referência de mercado observada nas quatro
+      etapas, matrizes, riscos, gates e fatiamento em sete entregas.
+    - **Decisões tomadas (2026-10-28):** D14 (etapas 2 a 4 observadas com CPF sintético
+      autorizado, digitado pela proprietária), D15 (contatos na etapa 1), D16 (**Aprendiz** como
+      tipo de vínculo em entrega futura própria), D1 (começar pela fatia 1), D2 (botão "Adicionar
+      colaborador"), D3 (formas indisponíveis visíveis com o motivo), D7 (sem rascunho no
+      servidor) e Área fora desta entrega.
+    - **Objetivo (fatia 1):** na listagem de Colaboradores, "Adicionar colaborador" (barra de
+      ações e estado vazio) abre um painel lateral acessível com três formas: Cadastro individual
+      (disponível, leva à Nova admissão de sempre), Importar planilha e Admissão digital
+      (indisponíveis, com o motivo e sem nenhuma ação). Mesmas permissões de Nova admissão.
+    - **Contratos:** nenhum. Sem API, schema, migration, RBAC, auditoria, seed, Docker,
+      dependência ou integração externa; o painel é o `Modal` existente em posição lateral.
+    - **Fora de escopo:** fluxo de cadastro em quatro etapas; documentos e Cloudflare R2; importação CSV/XLSX; admissão digital; Área; busca de referências; criação inline; Aprendiz; demais decisões pendentes do dossiê; promoção e merge.
+    - **Prévia:** `http://127.0.0.1:5173` passa a mostrar a branch da T194 ao vivo, identificada
+      como `[T194 dev]`, não a `main`.
 
 ## Regra obrigatória para as próximas tarefas
 

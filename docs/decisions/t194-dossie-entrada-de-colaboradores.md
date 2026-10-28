@@ -599,39 +599,80 @@ contrato, e juntas já dão a experiência de entrada guiada.
 - **D15** — e-mail pessoal, celular e telefone ficam na etapa 1.
 - **D16** — Aprendiz entra como tipo de vínculo, em entrega futura própria
   (seção 5.1).
+- **D1** — a primeira entrega é a fatia 1, o painel lateral.
+- **D2** — o botão passa a se chamar "Adicionar colaborador".
+- **D3** — Importar planilha e Admissão digital aparecem no painel como
+  indisponíveis, com o motivo.
+- **D4 (nesta fatia)** — Área não entra nesta entrega.
+- **D7** — sem rascunho no servidor.
 
 **Pendentes antes de qualquer código de produto:**
 
-1. **D1 — Primeira fatia:** começar pelo painel lateral (recomendado).
-2. **D2 — Nome do botão:** "Adicionar colaborador" (substitui "Nova
-   admissão" como ponto de entrada) ou manter "Nova admissão".
-3. **D3 — Formas indisponíveis no painel:** visíveis com o motivo
-   (recomendado) ou ocultas.
 4. **D4 — Área:** "não aprovada" significa só "sem criação inline" (Área
    continua como seleção opcional, recomendado) ou retirar Área da admissão.
 5. **D5 — Etapa 4 sem documentos:** mostrar o bloco "Documentos —
    indisponível" com a revisão final (recomendado) ou só a revisão.
 6. **D6 — Estado civil:** manter texto livre (recomendado agora) ou lista
    fechada (exige revisão da ficha da T177).
-7. **D7 — Rascunho:** nenhum nesta fase (recomendado) ou rascunho no servidor
-   (schema e ficha).
-8. **D8 — Busca nas referências:** aprovar `busca` aditiva nos quatro `GET`
+7. **D8 — Busca nas referências:** aprovar `busca` aditiva nos quatro `GET`
    (recomendado).
-9. **D9 — Código na criação inline:** G1 servidor deriva do nome
+8. **D9 — Código na criação inline:** G1 servidor deriva do nome
    (recomendado), G2, G3 ou G4; e se "Criar" pede confirmação inline
    (recomendado) ou cria direto, como na referência.
-10. **D10 — Formato da importação:** CSV apenas (recomendado) ou também .xlsx.
-11. **D11 — Gravação da importação:** uma admissão por linha com chave própria
+9. **D10 — Formato da importação:** CSV apenas (recomendado) ou também .xlsx.
+10. **D11 — Gravação da importação:** uma admissão por linha com chave própria
     (recomendado) ou lote no servidor.
-12. **D12 — Quem importa e o limite de linhas.**
-13. **D13 — Admissão digital:** confirmar que segue bloqueada até as decisões
+11. **D12 — Quem importa e o limite de linhas.**
+12. **D13 — Admissão digital:** confirmar que segue bloqueada até as decisões
     de 8.3 (recomendado), sem código antes disso.
-14. **D17 — Nível (senioridade):** módulo futuro próprio ou fora do produto.
-15. **D18 — Part-time, freelancer e trainee:** tipos de vínculo, atributos
+13. **D17 — Nível (senioridade):** módulo futuro próprio ou fora do produto.
+14. **D18 — Part-time, freelancer e trainee:** tipos de vínculo, atributos
     (jornada, programa) ou fora do produto.
-16. **D19 — Conselho e registro profissional:** módulo futuro com ficha de
+15. **D19 — Conselho e registro profissional:** módulo futuro com ficha de
     tratamento ou fora do produto.
-17. **D20 — Estado no endereço:** manter texto ou adotar lista de UF
+16. **D20 — Estado no endereço:** manter texto ou adotar lista de UF
     (o CEP já devolve a UF).
-18. **D21 — Regras do Aprendiz:** aprovar a lista da seção 5.1 como roteiro da
+17. **D21 — Regras do Aprendiz:** aprovar a lista da seção 5.1 como roteiro da
     entrega própria (prazo, idade, programa, jornada, término, cota).
+
+## 15. Fatia 1 entregue — painel "Adicionar colaborador"
+
+**Decisão aprovada (2026-10-28):** implementar só a fatia 1. O botão passa a
+ser "Adicionar colaborador" e abre um painel lateral acessível; Cadastro
+individual fica disponível e continua levando ao fluxo atual de Nova
+admissão; Importar planilha e Admissão digital aparecem indisponíveis, com o
+motivo, e não podem iniciar nada; sem rascunho no servidor; sem nova API,
+schema, migration, RBAC, seed, Docker, dependência ou integração externa.
+
+**O que foi entregue (web):**
+
+- Na listagem de Colaboradores, o botão da barra de ações e o do estado vazio
+  ("nenhum colaborador cadastrado") passam de "Nova admissão" a "Adicionar
+  colaborador" e abrem o painel, sem navegar e sem mexer em busca, filtros,
+  página ou empresa ativa (nada é relido).
+- O painel é o `Modal` existente numa posição nova e opcional, `lateral`
+  (presa à borda direita, altura toda; em 640 px ou menos, tela inteira). Ele
+  herda o comportamento já aprovado: `role="dialog"` com `aria-modal`, foco
+  inicial no título, foco preso, Escape, "Fechar" e "Cancelar" fecham, foco
+  devolvido ao botão que abriu, fundo sem rolagem e fora de alcance. A
+  direção visual da T142 ("janelas modais no lugar do painel lateral") fica
+  ajustada por esta decisão: o painel lateral existe só como posição do mesmo
+  componente, para escolhas curtas (`DP-FLX-21`).
+- Conteúdo: título, texto de apoio, a empresa ativa e três cartões numa lista
+  nomeada, cada um nomeado pelo próprio título:
+  - **Cadastro individual** — "Disponível"; a ação "Iniciar cadastro
+    individual" fecha o painel e abre a Nova admissão de sempre (autorização,
+    confirmação e idempotência da T179 intactas).
+  - **Importar planilha** e **Admissão digital** — "Indisponível", com a
+    finalidade e o motivo em texto; **sem nenhum controle** (nem botão, nem
+    link, nem foco): não iniciam, não chamam API, não criam rascunho, não
+    enviam e-mail, não abrem link e não gravam nada.
+- Sem formulário, o painel **nunca** vira edição pendente (T189): fechar não
+  pede confirmação e a troca de empresa segue livre; ela remonta a tela e o
+  painel some — reaberto, mostra só a empresa nova.
+- Permissões inalteradas: o botão e o painel só existem para quem já podia
+  admitir (RH e DP, a mesma regra da rota e da entrada); `master_tecnico` e
+  os demais perfis não ganham botão, painel, rota nem ação. A rota
+  `#/pessoas/nova-admissao` não muda.
+
+**Fora de escopo nesta fatia:** fluxo de cadastro em quatro etapas; documentos e Cloudflare R2; importação CSV/XLSX; admissão digital; Área; busca de referências; criação inline; Aprendiz.
