@@ -36,8 +36,11 @@ segurança e decisões próprias do Evolli, sem contornar gates existentes.
   ficha de tratamento, `DP-FLX-17`) e admissão digital (ADR 0016 §5.3, ADR
   0017 §5.1 e §5.3, `DP-FLX-04`, `DP-FLX-18`, Etapa 2, MFA, e-mail).
 - **Estrutura-alvo:** as quatro etapas da referência (dados básicos, dados
-  profissionais, endereço, documentos), com campos e regras do Evolli; o que
-  não foi observado está marcado como "pendente de evidência visual".
+  profissionais, endereço, documentos), agora **todas observadas**, com campos
+  e regras do Evolli (seção 3).
+- **Decididos em 2026-10-28:** D14 (observação com CPF sintético autorizado),
+  D15 (contatos na etapa 1) e D16 (**Aprendiz** como tipo de vínculo, em
+  entrega futura própria — seção 5.1).
 - **Primeira entrega recomendada:** o painel lateral (fatia 1, seção 12) —
   pequena, completa, só web, sem contrato novo.
 
@@ -51,32 +54,39 @@ próprias do Evolli. As quatro etapas da referência são a **estrutura-alvo**.
 
 ### 2.1 Como foi feita
 
-- Navegador da proprietária, já autenticado, no módulo Colaboradores.
+- Navegador da proprietária, já autenticado, no módulo Colaboradores, em duas
+  sessões de observação em 2026-10-28.
 - Antes de entrar no cadastro, uma trava no navegador bloqueou **toda**
   requisição de gravação (qualquer método além de GET/HEAD/OPTIONS) só naquela
-  aba. Só foram bloqueados envios de telemetria, um registro de auditoria do
-  próprio front e duas consultas do tipo RPC — nada chegou ao servidor.
-- Dados digitados: apenas valores claramente sintéticos e não pessoais (um
-  nome de duas letras, uma data impossível, um e-mail e um telefone
-  inválidos), para ver as validações.
-- Saída pelo cancelamento, escolhendo descartar. O rascunho que o produto
-  guarda na sessão da aba foi apagado; nenhum rascunho, colaborador ou
-  referência foi gravado pela observação.
+  aba. Só foram bloqueados envios de telemetria, registros de auditoria do
+  próprio front e consultas internas do tipo RPC — nada chegou ao servidor.
+- Dados digitados: apenas valores claramente sintéticos e não pessoais (nome
+  sintético, data impossível, e-mail e telefone inválidos, um valor de
+  salário sintético e um CEP público de logradouro, sem número).
+- **CPF sintético autorizado:** para avançar da etapa 1, a proprietária
+  digitou ela mesma um CPF fictício autorizado; o número não é registrado em
+  lugar nenhum.
+- A opção de **criar o termo pesquisado** foi vista em cada lista, mas **não
+  acionada** (gravaria na conta). Segundo a proprietária, ela cria a
+  referência na hora — é o comportamento desejado no Evolli.
+- A lista de gestor direto (pessoas da conta) não foi aberta, para não expor
+  dados.
+- Saída pelo botão de voltar à lista, escolhendo descartar. O rascunho que o
+  produto guarda na sessão da aba foi apagado; nenhum rascunho, colaborador ou
+  referência foi gravado pela observação. O botão final e o de salvar rascunho
+  **não** foram acionados.
 - **Registro existente na conta:** havia um único colaborador, cadastrado pela
   própria proprietária em sessão anterior para conhecer o fluxo. Ele **não**
   foi aberto, alterado nem lido, e nenhum dado dele entra neste dossiê; serve
-  só como evidência de que o fluxo completo existe e de que a conclusão gera um
-  registro real.
+  só como evidência de que a conclusão gera um registro real.
 
-### 2.2 Limitação
+### 2.2 Limitações que permanecem
 
-**A etapa 1 só avança com o CPF preenchido.** CPF é identificador
-governamental: não foi digitado, nem inventado. Por isso as etapas 2, 3 e 4
-**não foram observadas** — só os seus nomes e subtítulos, visíveis na lista de
-etapas. Tudo o que depende delas está marcado como **"pendente de evidência
-visual"**; nada foi presumido. Completar essa parte exige capturas fornecidas
-pela proprietária (com dados reais cobertos) ou que ela mesma digite um CPF
-fictício para a observação seguir.
+- O efeito exato de "criar o termo" (só nome? pede código? onde aparece
+  depois?) vem da informação da proprietária, não de observação.
+- O limite de tamanho dos arquivos da etapa 4 não aparece na tela.
+- Salvar rascunho, concluir o cadastro e as mensagens finais não foram
+  observados (gravariam).
 
 ### 2.3 O que foi observado
 
@@ -105,78 +115,98 @@ fictício para a observação seguir.
     aprova (vira ativa) ou reprova (fica no histórico).
 - **Página do cadastro individual** (comportamentos observados):
 
-| Elemento        | Comportamento                                                                                                                                                                                                         |
-| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Cabeçalho       | título, subtítulo, botão de voltar à lista e botão de salvar rascunho                                                                                                                                                 |
-| Lista de etapas | à esquerda; número, nome e subtítulo de cada etapa; a atual destacada; as seguintes **não** são navegáveis antes de concluir a atual                                                                                  |
-| Corpo da etapa  | título, subtítulo e "Etapa N de 4"; campos agrupados em seções com título e explicação curta; cada campo com rótulo e uma linha de ajuda à esquerda                                                                   |
-| Rodapé          | barra de progresso com porcentagem (25% na etapa 1), cancelar e próxima etapa                                                                                                                                         |
-| Validação       | ao pedir a próxima etapa: valida a etapa inteira, mostra a mensagem abaixo de cada campo inválido e não avança; o e-mail é conferido no formato; telefone incompleto e data impossível não foram acusados nessa etapa |
-| Cancelar        | pergunta se quer sair, com duas saídas: descartar ou salvar o rascunho e sair                                                                                                                                         |
-| Rascunho local  | o preenchimento fica guardado na sessão da aba enquanto ela existe                                                                                                                                                    |
-| Salvar rascunho | botão sempre visível; **não acionado** (gravaria) — comportamento pendente de evidência                                                                                                                               |
-| Conclusão       | **pendente de evidência visual**; pela existência do registro da proprietária, a conclusão grava um colaborador real                                                                                                  |
+| Elemento        | Comportamento                                                                                                                                                                                                                                              |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Cabeçalho       | título, subtítulo, botão de voltar à lista e botão de salvar rascunho (sempre visível)                                                                                                                                                                     |
+| Lista de etapas | à esquerda; número, nome e subtítulo; etapa concluída ganha marca de concluída; a atual destacada; etapas ainda não visitadas **não** são navegáveis; as já visitadas (inclusive à frente) ficam clicáveis                                                 |
+| Corpo da etapa  | título, subtítulo e "Etapa N de 4"; campos em seções com título e explicação curta; cada campo com rótulo e uma linha de ajuda; alguns com ícone de ajuda que explica o uso do dado                                                                        |
+| Rodapé          | barra de progresso por etapa (25%, 50%, 75%, 100%); na etapa 1, cancelar; nas demais, voltar; próxima etapa; na etapa 4, o botão final de cadastrar                                                                                                        |
+| Validação       | só ao pedir a próxima etapa; mensagem abaixo de cada campo inválido; não avança. Obrigatórios observados: nome (mínimo de 3 letras) e CPF na etapa 1; salário bruto na etapa 2; etapas 3 e 4 sem obrigatório                                               |
+| Sair            | o botão de voltar à lista (e o cancelar da etapa 1) pergunta se quer sair, com descartar ou salvar o rascunho e sair                                                                                                                                       |
+| Rascunho local  | o preenchimento fica guardado na sessão da aba enquanto ela existe                                                                                                                                                                                         |
+| Listas          | abrem um painel com campo de busca; as de estrutura dizem "buscar ou criar" e oferecem, por último, "+ Criar «termo»" quando o termo não existe; cada lista tem uma opção "sem …" no topo                                                                  |
+| Dependências    | o tipo de contratação **não** muda os campos (CLT, estágio e aprendiz mostram os mesmos); o salário líquido é calculado do bruto e não é editável; o CEP preenche logradouro, bairro, cidade e UF, deixa número e complemento vazios e tudo segue editável |
 
 ## 3. Matriz das etapas e equivalência campo a campo
 
 Destinos: **já existe** · **adaptar** · **módulo futuro** · **bloqueado por
-decisão** · **fora do produto** · **pendente de evidência visual**.
+decisão** · **fora do produto**.
 
-### 3.1 Etapa 1 — Dados básicos (observada)
+### 3.1 Etapa 1 — Dados básicos
 
-| Campo (referência)               | Finalidade            | Obrig. aparente | Controle                     | Máscara / validação observada | Dependências | Comportamento        | Equivalente e destino no Evolli                                                                                                                            |
-| -------------------------------- | --------------------- | --------------- | ---------------------------- | ----------------------------- | ------------ | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Foto                             | perfil e lista        | não             | arquivo PNG ou JPG, até 5 MB | —                             | upload       | enviar e remover     | **Bloqueado** — dado biométrico/imagem; `DP-ADM-11`, upload da Etapa 2 (ADR 0011)                                                                          |
-| Nome completo                    | identificação oficial | **sim**         | texto, até 150               | mínimo de 3 letras            | —            | erro abaixo do campo | **Já existe** — Nome completo, obrigatório, 2 a 160 após aparar                                                                                            |
-| CPF                              | folha e eSocial       | **sim**         | numérico, máscara de CPF     | obrigatório                   | —            | impede avançar       | **Bloqueado** — `DP-ADM-04`, `DP-FLX-05`; ausente por decisão                                                                                              |
-| RG                               | folha e eSocial       | não             | texto, até 20, máscara de RG | —                             | —            | —                    | **Bloqueado** — documento; ausente por decisão                                                                                                             |
-| Data de nascimento               | perfil                | não aparente    | numérico `dd/mm/aaaa`        | aceitou data impossível       | —            | —                    | **Já existe** — obrigatória, de 1900-01-01 até hoje                                                                                                        |
-| Gênero                           | perfil                | não             | lista de 4 opções            | —                             | —            | —                    | **Adaptar para Sexo** — lista aprovada do Evolli (feminino, masculino, intersexo, não informar); **gênero (identidade) é sensível e bloqueado** (ADR 0016) |
-| Estado civil                     | perfil                | não             | lista de 5 opções            | —                             | —            | —                    | **Já existe como texto livre opcional** (ficha da T177); lista fechada exige decisão (D6)                                                                  |
-| E-mail pessoal                   | contato               | não             | e-mail, até 254              | formato                       | —            | erro ao avançar      | **Já existe** — opcional, único por empresa                                                                                                                |
-| Telefone pessoal                 | contato               | não             | máscara de telefone com DDD  | incompleto não acusado        | —            | —                    | **Já existe** — celular e telefone opcionais, só `+55`                                                                                                     |
-| Contato de emergência — nome     | urgência              | não             | texto, até 150               | —                             | —            | —                    | **Bloqueado** — dado de terceiro; `DP-FLX-06` (sem ficha)                                                                                                  |
-| Contato de emergência — telefone | urgência              | não             | telefone com DDD             | —                             | —            | —                    | **Bloqueado** — `DP-FLX-06`                                                                                                                                |
+| Campo (referência)               | Finalidade            | Obrig.  | Controle                     | Máscara / validação observada | Dependências | Comportamento        | Equivalente e destino no Evolli                                                                                                                            |
+| -------------------------------- | --------------------- | ------- | ---------------------------- | ----------------------------- | ------------ | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Foto                             | perfil e lista        | não     | arquivo PNG ou JPG, até 5 MB | —                             | upload       | enviar e remover     | **Bloqueado** — imagem do titular; `DP-ADM-11`, upload da Etapa 2 (ADR 0011)                                                                               |
+| Nome completo                    | identificação oficial | **sim** | texto, até 150               | mínimo de 3 letras            | —            | erro abaixo do campo | **Já existe** — obrigatório, 2 a 160 após aparar                                                                                                           |
+| CPF                              | folha e eSocial       | **sim** | numérico, máscara de CPF     | obrigatório                   | —            | impede avançar       | **Bloqueado** — `DP-ADM-04`, `DP-FLX-05`; ausente por decisão                                                                                              |
+| RG                               | folha e eSocial       | não     | texto, até 20, máscara de RG | —                             | —            | —                    | **Bloqueado** — documento; ausente por decisão                                                                                                             |
+| Data de nascimento               | perfil                | não     | numérico `dd/mm/aaaa`        | aceitou data impossível       | —            | —                    | **Já existe** — obrigatória, de 1900-01-01 até hoje                                                                                                        |
+| Gênero                           | perfil                | não     | lista de 4 opções            | —                             | —            | —                    | **Adaptar para Sexo** — lista aprovada do Evolli (feminino, masculino, intersexo, não informar); **gênero (identidade) é sensível e bloqueado** (ADR 0016) |
+| Estado civil                     | perfil                | não     | lista de 5 opções            | —                             | —            | —                    | **Já existe como texto livre opcional** (ficha da T177); lista fechada exige decisão (D6)                                                                  |
+| E-mail pessoal                   | contato               | não     | e-mail, até 254              | formato                       | —            | erro ao avançar      | **Já existe** — opcional, único por empresa; **etapa 1** (D15)                                                                                             |
+| Telefone pessoal                 | contato               | não     | máscara de telefone com DDD  | incompleto não acusado        | —            | —                    | **Já existe** — celular e telefone opcionais, só `+55`; **etapa 1** (D15)                                                                                  |
+| Contato de emergência — nome     | urgência              | não     | texto, até 150               | —                             | —            | —                    | **Bloqueado** — dado de terceiro; `DP-FLX-06` (sem ficha)                                                                                                  |
+| Contato de emergência — telefone | urgência              | não     | telefone com DDD             | —                             | —            | —                    | **Bloqueado** — `DP-FLX-06`                                                                                                                                |
 
 Campos que o Evolli já tem e que **ficam na etapa 1** do Evolli, mesmo sem
 equivalente observado: saudação, nacionalidade, naturalidade, escolaridade,
 curso, nome do pai e nome da mãe (opcionais, ficha da T177).
 
-### 3.2 Etapa 2 — Dados profissionais (pendente de evidência visual)
+### 3.2 Etapa 2 — Dados profissionais (observada)
 
-| Campo esperado                     | Situação na referência                                                                | Equivalente e destino no Evolli                                                                                                  |
-| ---------------------------------- | ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| Cargo                              | pendente de evidência visual                                                          | **Já existe** — obrigatório; criação inline só RH (seção 6)                                                                      |
-| Departamento                       | pendente de evidência visual                                                          | **Já existe** — obrigatório; criação inline só RH                                                                                |
-| Área                               | pendente de evidência visual                                                          | **Já existe** como seleção opcional dependente do departamento; **sem criação inline** (D4)                                      |
-| Unidade                            | pendente de evidência visual                                                          | **Já existe** — opcional; criação inline só RH                                                                                   |
-| Centro de custo                    | pendente de evidência visual                                                          | **Já existe** — opcional; criação inline só RH                                                                                   |
-| Equipe                             | pendente de evidência visual                                                          | **Já existe** — opcional                                                                                                         |
-| Tipo de contrato / vínculo         | pendente de evidência visual (o resumo da lista mostra CLT, PJ, estágio, aprendiz)    | **Já existe** — tipo de vínculo obrigatório (`clt`, `estagio`, `pj`, `temporario`, `outro_controlado`); "aprendiz" exige decisão |
-| Data de admissão                   | pendente de evidência visual                                                          | **Já existe** — obrigatória                                                                                                      |
-| Matrícula                          | pendente de evidência visual                                                          | **Já existe** — opcional, única por empresa                                                                                      |
-| Jornada / escala                   | pendente de evidência visual                                                          | **Já existe** — opcional, só RH                                                                                                  |
-| Salário                            | pendente de evidência visual (a lista mostra coluna de salário; a importação o exige) | **Bloqueado** — remuneração ausente por decisão                                                                                  |
-| Gestor, e-mail corporativo, outros | pendente de evidência visual                                                          | a classificar quando houver evidência                                                                                            |
-| Oferta de criar o termo pesquisado | pendente de evidência visual                                                          | **Adaptar** — seção 6                                                                                                            |
+Seções: estrutura (onde a pessoa está na organização), contrato (vínculo,
+admissão, jornada, escala, matrícula), remuneração e informações adicionais.
 
-### 3.3 Etapa 3 — Endereço (pendente de evidência visual)
+| Campo (referência)  | Finalidade                                                  | Obrig.  | Controle                                                                                                                                                              | Máscara / validação | Dependências                               | Comportamento     | Equivalente e destino no Evolli                                                                                                                                                                                  |
+| ------------------- | ----------------------------------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- | ------------------------------------------ | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Cargo               | função                                                      | não     | **texto livre**, até 120                                                                                                                                              | —                   | —                                          | —                 | **Adaptar** — no Evolli, Cargo é **referência obrigatória** da empresa; vira lista com busca e criação inline (seção 6)                                                                                          |
+| Nível               | senioridade                                                 | não     | lista com busca: sem nível, primeiro emprego, júnior, pleno, sênior, líder técnico, coordenador, gerente, head, diretor, VP, C-level                                  | —                   | —                                          | —                 | **Módulo futuro** — não existe no Evolli (D17)                                                                                                                                                                   |
+| Departamento        | estrutura                                                   | não     | lista com busca e **criação inline**; opção "sem departamento"; a conta já traz uma lista genérica de departamentos                                                   | —                   | —                                          | "+ Criar «termo»" | **Já existe** — obrigatório; **criação inline só RH** (seção 6)                                                                                                                                                  |
+| Área                | estrutura                                                   | não     | lista com busca e **criação inline**; "sem área"                                                                                                                      | —                   | não ficou claro se depende do departamento | "+ Criar «termo»" | **Já existe** como seleção opcional dependente do departamento; **sem criação inline** (D4)                                                                                                                      |
+| Centro de custo     | estrutura                                                   | não     | lista com busca e **criação inline**; "sem centro de custo"                                                                                                           | —                   | —                                          | "+ Criar «termo»" | **Já existe** — opcional; **criação inline só RH**                                                                                                                                                               |
+| Unidade             | filial, loja ou local                                       | não     | lista com busca e **criação inline**; "sem unidade"                                                                                                                   | —                   | —                                          | "+ Criar «termo»" | **Já existe** — opcional; **criação inline só RH**                                                                                                                                                               |
+| Gestor direto       | recebe solicitações da pessoa                               | não     | lista de pessoas (não aberta)                                                                                                                                         | —                   | —                                          | —                 | **Bloqueado** — relação gestor/subordinado não antecipada (ADR 0006 d.8; ADR 0015)                                                                                                                               |
+| Tipo de contratação | vínculo                                                     | não     | lista: CLT, PJ, estágio, aprendiz, part-time, freelancer, trainee                                                                                                     | —                   | não altera campos                          | —                 | **Adaptar** — tipo de vínculo **obrigatório** (`clt`, `estagio`, `pj`, `temporario`, `outro_controlado`); **Aprendiz aprovado** para entrega futura (seção 5.1); part-time, freelancer e trainee a decidir (D18) |
+| Data de admissão    | início                                                      | não     | `dd/mm/aaaa`                                                                                                                                                          | —                   | —                                          | —                 | **Já existe** — **obrigatória**                                                                                                                                                                                  |
+| Jornada de trabalho | carga horária                                               | não     | número de horas por semana (exemplo 44)                                                                                                                               | numérico            | —                                          | —                 | **Adaptar** — no Evolli a jornada é uma **tabela de horário** (T182/T183), opcional e só RH; horas semanais derivam dela                                                                                         |
+| Escala de trabalho  | dias de trabalho e folga                                    | não     | lista com busca: não informada, 5x2, 6x1, semana espanhola, 4x3, fim de semana, 5x1, 6x2, 4x2, 2x2, 3x3, 4x4, 12x36, 12x60, 12x72… cada uma com a explicação dos dias | —                   | sem escala, benefícios usam dias úteis     | —                 | **Módulo futuro** — escalas e revezamento dependem de Ponto (Etapa 3) e de regra trabalhista não decidida                                                                                                        |
+| Matrícula           | localizar a pessoa na folha                                 | não     | texto, até 30, com ajuda explicando o uso                                                                                                                             | —                   | —                                          | —                 | **Já existe** — opcional, `^[A-Z0-9_-]{2,32}$`, única por empresa                                                                                                                                                |
+| Salário bruto       | folha                                                       | **sim** | moeda                                                                                                                                                                 | obrigatório         | —                                          | erro ao avançar   | **Bloqueado** — remuneração ausente por decisão (ADR 0015, ADR 0016)                                                                                                                                             |
+| Salário líquido     | folha                                                       | —       | calculado, só leitura                                                                                                                                                 | —                   | do bruto                                   | —                 | **Bloqueado** — idem                                                                                                                                                                                             |
+| Conselho e registro | registro profissional (obrigatório para algumas profissões) | não     | lista (nenhum, OAB, CRM, COREN, CRO, CRP, CREA, CAU, CRA, CRC, CRF, CRN, CREF, CREFITO, CRBM, CRTR) + número, até 40                                                  | —                   | —                                          | —                 | **Módulo futuro** — dado profissional novo; exige ficha de tratamento (D19)                                                                                                                                      |
+| Dependentes (IRRF)  | dedução fiscal                                              | não     | numérico                                                                                                                                                              | —                   | —                                          | —                 | **Bloqueado** — dependentes e dado fiscal (`DP-ADM-14`)                                                                                                                                                          |
+| Pensão alimentícia  | desconto em folha                                           | não     | percentual                                                                                                                                                            | —                   | —                                          | —                 | **Bloqueado** — dado judicial e financeiro                                                                                                                                                                       |
 
-| Campo esperado                                          | Situação na referência       | Equivalente e destino no Evolli                                                      |
-| ------------------------------------------------------- | ---------------------------- | ------------------------------------------------------------------------------------ |
-| CEP com preenchimento automático                        | pendente de evidência visual | **Já existe** — ViaCEP assistido pelo servidor, editável, nunca número e complemento |
-| Logradouro, número, complemento, bairro, cidade, estado | pendente de evidência visual | **Já existem** — opcionais                                                           |
-| País                                                    | pendente de evidência visual | **Já existe** — começa como Brasil                                                   |
-| Outros (tempo de residência, comprovante…)              | pendente de evidência visual | comprovante é **documento — bloqueado**                                              |
+### 3.3 Etapa 3 — Endereço (observada)
 
-### 3.4 Etapa 4 — Documentos (pendente de evidência visual)
+Toda a etapa é **opcional** na referência (avança vazia).
 
-| Item esperado                       | Situação na referência       | Equivalente e destino no Evolli                                             |
-| ----------------------------------- | ---------------------------- | --------------------------------------------------------------------------- |
-| Lista de documentos pedidos         | pendente de evidência visual | **Bloqueado** — `DP-FLX-14`, ADR 0011, Etapa 2 Nível 2                      |
-| Formatos e tamanho                  | pendente de evidência visual | **Bloqueado** — `DP-2E-05`                                                  |
-| Envio de arquivos                   | pendente de evidência visual | **Bloqueado** — upload desabilitado (ADR 0011 d.2)                          |
-| Botão de conclusão e mensagem final | pendente de evidência visual | **Adaptar** — no Evolli, revisão e confirmação (T179) com `Idempotency-Key` |
+| Campo (referência) | Controle                      | Máscara / validação | Comportamento                                                                 | Equivalente e destino no Evolli                                                          |
+| ------------------ | ----------------------------- | ------------------- | ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| CEP                | numérico, máscara `00000-000` | —                   | preenche logradouro, bairro, cidade e UF; não preenche número nem complemento | **Já existe** — ViaCEP assistido pelo servidor; preenche só campos vazios; tudo editável |
+| Logradouro         | texto, até 200                | —                   | preenchido pelo CEP, editável                                                 | **Já existe**                                                                            |
+| Número             | texto, até 20                 | —                   | nunca preenchido                                                              | **Já existe**                                                                            |
+| Complemento        | texto, até 120                | —                   | nunca preenchido                                                              | **Já existe**                                                                            |
+| Bairro             | texto, até 120                | —                   | preenchido pelo CEP, editável                                                 | **Já existe**                                                                            |
+| Cidade             | texto, até 120                | —                   | preenchida pelo CEP, editável                                                 | **Já existe**                                                                            |
+| UF                 | lista                         | —                   | preenchida pelo CEP                                                           | **Adaptar** — no Evolli é "Estado" em texto; lista de UF a decidir (D20)                 |
+| (País)             | não existe na referência      | —                   | —                                                                             | **Já existe** no Evolli (começa como Brasil); mantém                                     |
+
+### 3.4 Etapa 4 — Documentos (observada)
+
+Etapa **opcional** na referência; os arquivos seriam enviados ao concluir o
+cadastro.
+
+| Item (referência)                           | Controle                                                                     | Formatos                                                              | Comportamento | Equivalente e destino no Evolli                                             |
+| ------------------------------------------- | ---------------------------------------------------------------------------- | --------------------------------------------------------------------- | ------------- | --------------------------------------------------------------------------- |
+| Documentos obrigatórios (contador "0 de 5") | lista com estado "pendente" e enviar arquivo                                 | PDF, JPG, JPEG, PNG, WEBP, DOC, DOCX, HEIC, HEIF; tamanho não exibido | —             | **Bloqueado** — `DP-FLX-14`, ADR 0011, Etapa 2 Nível 2                      |
+| RG                                          | arquivo                                                                      | idem                                                                  | —             | **Bloqueado**                                                               |
+| CPF                                         | arquivo                                                                      | idem                                                                  | —             | **Bloqueado**                                                               |
+| Comprovante de endereço                     | arquivo                                                                      | idem                                                                  | —             | **Bloqueado**                                                               |
+| Carteira de Trabalho                        | arquivo                                                                      | idem                                                                  | —             | **Bloqueado**                                                               |
+| Certidões                                   | arquivo                                                                      | idem                                                                  | —             | **Bloqueado**                                                               |
+| Outros documentos                           | nome livre (o exemplo é um atestado médico) + arquivo; adicionar só com nome | idem                                                                  | —             | **Bloqueado** — atestado é dado de saúde (sensível)                         |
+| Botão final de cadastrar                    | botão                                                                        | —                                                                     | não acionado  | **Adaptar** — no Evolli, revisão e confirmação (T179) com `Idempotency-Key` |
 
 ### 3.5 Outros fluxos observados
 
@@ -251,9 +281,13 @@ envio no fim, com a confirmação da T179 e a mesma `Idempotency-Key`.
 | **3 — Endereço**                      | Endereço (residência)                   | país, CEP, logradouro, número, complemento, bairro, cidade, estado                                                                                                                                                   | ViaCEP assistido e editável; sem fuso horário                                                                             |
 | **4 — Documentos e conclusão**        | Documentos (envio de arquivos)          | bloco "Documentos" informando que o envio ainda não está disponível (sem campo); revisão de tudo; confirmar cadastro                                                                                                 | documentos só depois de `DP-FLX-14`, Etapa 2 e ficha; resumo segue a regra da T179 (sem contatos, endereço ou nascimento) |
 
-Os contatos ficam na etapa 1, como na referência. A alternativa — "Endereço e
-contatos" na etapa 3, como no primeiro rascunho deste dossiê — é a decisão
-D15.
+Os contatos ficam na etapa 1, como na referência (**D15 decidida**).
+
+Diferenças da referência que o Evolli **mantém** por decisão ou contrato:
+Cargo é referência obrigatória (não texto livre); Departamento, Cargo, data de
+admissão e tipo de vínculo são obrigatórios; data de nascimento é obrigatória;
+salário, CPF, documentos, gestor direto, escala, nível, conselho, dependentes e
+pensão não entram.
 
 Comportamento proposto (equivalente ao observado, com as regras do Evolli):
 
@@ -278,6 +312,38 @@ Comportamento proposto (equivalente ao observado, com as regras do Evolli):
   Departamento ou Cargo ativos, orientação de pedir ao RH (como hoje).
 - **Textos:** todos escritos pelo Evolli; nenhum texto da referência é
   reproduzido.
+
+### 5.1 Aprendiz como tipo de vínculo (D16 — aprovado para entrega futura)
+
+A proprietária aprovou incluir **Aprendiz** como tipo de vínculo previsto no
+Evolli, em **entrega futura própria**, com regras formais, validações e
+decisões documentadas. Nada é implementado nesta tarefa. A referência mostra
+"aprendiz" na lista de tipos, sem nenhum campo extra.
+
+Impacto previsto (para a entrega própria):
+
+- **Contrato e schema:** novo valor no tipo de vínculo (enum no banco, DTO,
+  migration aditiva), E2E com PostgreSQL real e revisão de onde o tipo é lido
+  (listagem, filtros, ficha, histórico funcional, importação futura).
+- **RBAC e auditoria:** sem mudança prevista — o tipo é atributo do vínculo,
+  que RH e DP já gravam; eventos seguem só com ids.
+
+Regras a decidir e documentar antes do código (todas a confirmar com RH/DP e
+jurídico — nada aqui é regra adotada):
+
+1. **Prazo determinado:** o contrato de aprendizagem tem data de término;
+   decidir se ela passa a ser obrigatória para Aprendiz e qual o prazo máximo
+   aceito.
+2. **Idade:** faixa etária na admissão, validada contra a data de nascimento
+   (e a exceção para pessoa com deficiência — dado sensível, que **não** existe
+   no Evolli e exigiria ADR e ficha).
+3. **Programa e entidade formadora:** se o Evolli registra o curso ou a
+   instituição de aprendizagem — dado novo, com ficha de tratamento.
+4. **Jornada:** limite de horas e relação com a jornada (tabela de horário) já
+   existente; validação ou só orientação.
+5. **Término e conversão:** o que acontece no fim do prazo (desligamento,
+   conversão para outro tipo) e como isso entra no histórico funcional.
+6. **Cota e relatórios:** se o Evolli calcula ou só informa.
 
 ## 6. Criação rápida inline em seletores
 
@@ -449,6 +515,11 @@ servidor recusa empresa divergente (404) e o RBAC continua a decisão final.
 | Dependentes                                   | dado de terceiro                                       | ADR 0016 (`DP-ADM-14`)                                                    |
 | Convite digital e preenchimento pelo titular  | acesso do papel `colaborador`, link, e-mail            | ADR 0016 §5.3, ADR 0017 §5.1 e §5.3, seção 8.3                            |
 | Fuso horário                                  | fora do produto                                        | `DP-FLX-22`                                                               |
+| Conselho e registro profissional              | dado profissional novo                                 | ficha nova (D19)                                                          |
+| Dependentes para IRRF e pensão alimentícia    | dado fiscal, judicial e de terceiro                    | ADR 0016 (`DP-ADM-14`), folha                                             |
+| Gestor direto                                 | relação gestor/subordinado não antecipada              | ADR 0006 d.8, ADR 0015                                                    |
+| Atestado médico e outros documentos livres    | dado de saúde (sensível)                               | ADR 0011, LGPD art. 11                                                    |
+| Faixa etária e deficiência para Aprendiz      | dado sensível (deficiência)                            | seção 5.1                                                                 |
 
 **Nunca usar dado real em teste, comparação, captura, log ou documentação** —
 inclusive o registro que a proprietária criou na referência de mercado.
@@ -462,34 +533,48 @@ redigido.
 
 ## 11. Riscos e dependências
 
-| Risco ou dependência                     | Impacto                                                      | Mitigação                                                       |
-| ---------------------------------------- | ------------------------------------------------------------ | --------------------------------------------------------------- |
-| Listas sem `busca`, presas em 100        | seletor pesquisável incompleto; "Criar" para termo existente | `busca` aditiva (6.2-B) antes da criação inline                 |
-| Código obrigatório e sem geração         | criação "só com o nome" impossível sem contrato              | G1 (6.3)                                                        |
-| 409 genérico nas referências             | não distingue colisão de código                              | 409 com campo `codigo`                                          |
-| Criação de referência sem idempotência   | duplicata após incerteza                                     | buscar pelo nome antes de reenviar                              |
-| Sem reenvio em 403 `csrf_invalido`       | erro desnecessário após outra aba renovar o token            | renovar e oferecer reenviar                                     |
-| Nome só com espaços aceito pelo servidor | referência sem nome legível                                  | normalizar no servidor                                          |
-| Área "não aprovada" × existente          | ambiguidade de escopo                                        | D4                                                              |
-| ADR 0016 §6.5 × T180                     | documentação contraditória                                   | nota de convergência na ADR                                     |
-| Estado civil texto × lista da referência | inconsistência futura                                        | D6                                                              |
-| Redação do logger incompleta para a T177 | risco latente de vazamento em log                            | incluir os caminhos antes de mexer na admissão                  |
-| Reorganizar a página de admissão         | regressão em fluxo crítico                                   | fatia própria, E2E existentes como rede de segurança, navegador |
-| Importação e admissão digital            | gates múltiplos                                              | decisões antes de qualquer código                               |
+| Risco ou dependência                                 | Impacto                                                      | Mitigação                                                       |
+| ---------------------------------------------------- | ------------------------------------------------------------ | --------------------------------------------------------------- |
+| Listas sem `busca`, presas em 100                    | seletor pesquisável incompleto; "Criar" para termo existente | `busca` aditiva (6.2-B) antes da criação inline                 |
+| Código obrigatório e sem geração                     | criação "só com o nome" impossível sem contrato              | G1 (6.3)                                                        |
+| 409 genérico nas referências                         | não distingue colisão de código                              | 409 com campo `codigo`                                          |
+| Criação de referência sem idempotência               | duplicata após incerteza                                     | buscar pelo nome antes de reenviar                              |
+| Sem reenvio em 403 `csrf_invalido`                   | erro desnecessário após outra aba renovar o token            | renovar e oferecer reenviar                                     |
+| Nome só com espaços aceito pelo servidor             | referência sem nome legível                                  | normalizar no servidor                                          |
+| Referência cria a estrutura na hora, sem confirmação | estrutura criada por engano                                  | confirmação inline e só RH (D9)                                 |
+| A referência trata Cargo como texto livre            | divergência de modelo                                        | o Evolli mantém Cargo como referência (seção 5)                 |
+| A referência exige salário e CPF e não exige lotação | expectativa de paridade total                                | equivalência explícita campo a campo (seção 3)                  |
+| Área "não aprovada" × existente                      | ambiguidade de escopo                                        | D4                                                              |
+| ADR 0016 §6.5 × T180                                 | documentação contraditória                                   | nota de convergência na ADR                                     |
+| Estado civil texto × lista da referência             | inconsistência futura                                        | D6                                                              |
+| Aprendiz exige enum, migration e regras legais       | regressão em listagens e filtros; regra mal definida         | entrega própria (fatia 5) com regras decididas antes            |
+| Tipos part-time, freelancer e trainee                | confusão entre vínculo, jornada e programa                   | D18                                                             |
+| "Outros documentos" com atestado médico              | dado de saúde                                                | bloqueado; documentos só após a Etapa 2                         |
+| Redação do logger incompleta para a T177             | risco latente de vazamento em log                            | incluir os caminhos antes de mexer na admissão                  |
+| Reorganizar a página de admissão                     | regressão em fluxo crítico                                   | fatia própria, E2E existentes como rede de segurança, navegador |
+| Importação e admissão digital                        | gates múltiplos                                              | decisões antes de qualquer código                               |
 
 ## 12. Fatiamento em entregas pequenas
 
-| Fatia                                           | Conteúdo                                                                                                                                     | Contrato                    | Depende de           |
-| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- | -------------------- |
-| **1 — Painel "Adicionar colaborador"**          | painel lateral, três cartões (individual leva à Nova admissão de hoje; importar e digital indisponíveis com motivo), acessibilidade e 375 px | nenhum                      | D1, D2, D3           |
-| 2 — Nova admissão em quatro etapas              | reorganização da página existente, sem campo novo; validação por etapa; progresso; confirmação da T179                                       | nenhum                      | D5, D6, D7, D14, D15 |
-| 3 — Busca nas referências e seletor pesquisável | `busca` nos quatro `GET`; seletor combobox em Departamento, Cargo, Unidade e Centro de custo na admissão                                     | aditivo + E2E               | D8                   |
-| 4 — Criação inline                              | "Criar «termo»" para RH, código conforme a opção escolhida, 409 com campo, normalização do nome                                              | aditivo (se G1) + E2E       | D8, D9               |
-| 5 — Importar planilha                           | conforme 8.2                                                                                                                                 | contrato + ficha            | D10, D11, D12, ficha |
-| 6 — Admissão digital                            | conforme 8.3                                                                                                                                 | schema + contratos + fichas | gates de 8.3         |
+Uma funcionalidade completa por entrega (regra 7 do `tasks.md`):
+implementar, validar no localhost com dados sintéticos, revisar, PR, CI,
+integrar — e só então a seguinte.
 
-**Recomendação:** começar pela **fatia 1** — pequena, completa, só web, sem
-contrato, e já entrega o ponto de entrada das três formas.
+| Fatia                                           | Funcionalidade completa                                                                                                                              | Contrato                    | Depende de           |
+| ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- | -------------------- |
+| **1 — Painel "Adicionar colaborador"**          | painel lateral, três cartões (individual leva à Nova admissão de hoje; importar e digital indisponíveis com motivo), acessibilidade e 375 px         | nenhum                      | D1, D2, D3           |
+| 2 — Cadastro em quatro etapas                   | a Nova admissão reorganizada nas quatro etapas (contatos na etapa 1), sem campo novo; validação por etapa; progresso; navegação; confirmação da T179 | nenhum                      | D5, D6, D7           |
+| 3 — Busca nas referências e seletor pesquisável | `busca` nos quatro `GET`; seletor com busca em Departamento, Cargo, Unidade e Centro de custo na admissão                                            | aditivo + E2E               | D8                   |
+| 4 — Criação inline                              | "+ Criar «termo»" para RH, com o código conforme a opção escolhida, 409 com campo e nome normalizado                                                 | aditivo + E2E               | D8, D9               |
+| 5 — Aprendiz                                    | novo tipo de vínculo com as regras da seção 5.1                                                                                                      | enum, migration, E2E        | D16 (aprovada), D21  |
+| 6 — Importar planilha                           | conforme 8.2                                                                                                                                         | contrato + ficha            | D10, D11, D12, ficha |
+| 7 — Admissão digital                            | conforme 8.3                                                                                                                                         | schema + contratos + fichas | gates de 8.3         |
+
+Fora do plano (módulos futuros, cada um com decisão própria): nível, escala de
+trabalho, conselho e registro, gestor direto, salário, documentos.
+
+**Recomendação:** começar pela **fatia 1**, depois a 2 — as duas só web, sem
+contrato, e juntas já dão a experiência de entrada guiada.
 
 ## 13. Estratégia de testes (por fatia)
 
@@ -505,7 +590,17 @@ contrato, e já entrega o ponto de entrada das três formas.
   direta; troca de empresa com o painel e com a admissão abertos; sessão
   expirada; CSRF; falha de rede simulada; 375 px; só dados sintéticos.
 
-## 14. Decisões necessárias antes de qualquer código
+## 14. Decisões
+
+**Decididas em 2026-10-28:**
+
+- **D14** — observação das etapas 2 a 4 com CPF sintético autorizado
+  (digitado pela proprietária); feita e registrada na seção 3.
+- **D15** — e-mail pessoal, celular e telefone ficam na etapa 1.
+- **D16** — Aprendiz entra como tipo de vínculo, em entrega futura própria
+  (seção 5.1).
+
+**Pendentes antes de qualquer código de produto:**
 
 1. **D1 — Primeira fatia:** começar pelo painel lateral (recomendado).
 2. **D2 — Nome do botão:** "Adicionar colaborador" (substitui "Nova
@@ -523,17 +618,20 @@ contrato, e já entrega o ponto de entrada das três formas.
 8. **D8 — Busca nas referências:** aprovar `busca` aditiva nos quatro `GET`
    (recomendado).
 9. **D9 — Código na criação inline:** G1 servidor deriva do nome
-   (recomendado), G2, G3 ou G4; e se o "Criar" exige confirmação inline.
+   (recomendado), G2, G3 ou G4; e se "Criar" pede confirmação inline
+   (recomendado) ou cria direto, como na referência.
 10. **D10 — Formato da importação:** CSV apenas (recomendado) ou também .xlsx.
 11. **D11 — Gravação da importação:** uma admissão por linha com chave própria
     (recomendado) ou lote no servidor.
 12. **D12 — Quem importa e o limite de linhas.**
 13. **D13 — Admissão digital:** confirmar que segue bloqueada até as decisões
     de 8.3 (recomendado), sem código antes disso.
-14. **D14 — Evidência das etapas 2 a 4:** fornecer capturas (com dados reais
-    cobertos) ou digitar um CPF fictício na referência para completar os
-    campos "pendente de evidência visual" antes da fatia 2.
-15. **D15 — Lugar dos contatos:** na etapa 1, como na referência
-    (recomendado), ou na etapa 3 junto do endereço.
-16. **D16 — "Aprendiz" como tipo de vínculo:** a referência o mostra; o
-    Evolli não o tem hoje.
+14. **D17 — Nível (senioridade):** módulo futuro próprio ou fora do produto.
+15. **D18 — Part-time, freelancer e trainee:** tipos de vínculo, atributos
+    (jornada, programa) ou fora do produto.
+16. **D19 — Conselho e registro profissional:** módulo futuro com ficha de
+    tratamento ou fora do produto.
+17. **D20 — Estado no endereço:** manter texto ou adotar lista de UF
+    (o CEP já devolve a UF).
+18. **D21 — Regras do Aprendiz:** aprovar a lista da seção 5.1 como roteiro da
+    entrega própria (prazo, idade, programa, jornada, término, cota).

@@ -2622,6 +2622,11 @@ custo em seletores pesquisáveis. Referência funcional observada em produto de
 mercado, sem copiar marca, textos, layout ou código. Nenhuma implementação de
 produto antes da decisão da proprietária.
 
+**Decisões já tomadas (2026-10-28):** etapas 2 a 4 da referência observadas
+com CPF sintético autorizado (D14); contatos na etapa 1 (D15); **Aprendiz**
+aprovado como tipo de vínculo para entrega futura própria (D16). As demais
+decisões seguem pendentes no dossiê.
+
 **Fora de escopo:** código, API, schema, migration, RBAC, banco, seed, Docker,
 dependências, CI, PR, push, promoção e merge; Área como estrutura (não
 aprovada).

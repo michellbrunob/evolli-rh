@@ -2803,6 +2803,10 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
     - **Entrega desta etapa:** dossiê (`docs/decisions/t194-dossie-entrada-de-colaboradores.md`) com as matrizes, o plano da criação inline,
       riscos, dependências, fatiamento e decisões. Só documentação: sem código, API, schema,
       migration, RBAC, banco, seed, Docker, dependência, CI, PR ou push.
+    - **Decisões já tomadas (2026-10-28):** D14 — etapas 2 a 4 da referência observadas com CPF
+      sintético autorizado (digitado pela proprietária); D15 — e-mail pessoal, celular e telefone
+      na etapa 1; D16 — **Aprendiz** aprovado como tipo de vínculo para entrega futura própria,
+      com regras formais (dossiê, seção 5.1). As demais decisões seguem pendentes no dossiê.
     - **Fora de escopo:** implementação de qualquer fatia antes da decisão; Área como estrutura;
       importação e admissão digital funcionando sem os seus gates; documentos e dados sensíveis
       sem ADR e ficha de tratamento; promoção e merge.
