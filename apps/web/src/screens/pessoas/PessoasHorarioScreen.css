@@ -124,8 +124,11 @@
   min-width: 0;
 }
 
-.pessoas-horario-screen__filtros > .evolli-field {
+.pessoas-horario-screen__filtro-jornada {
+  display: flex;
   flex: 0 1 16rem;
+  flex-direction: column;
+  gap: var(--space-xs);
   min-width: 0;
 }
 
@@ -152,8 +155,36 @@
   /* Em coluna, o `flex-basis` viraria ALTURA (o vão da T172). */
   .pessoas-horario-screen__filtros
     > .pessoas-horario-screen__filtro-colaborador,
-  .pessoas-horario-screen__filtros > .evolli-field {
+  .pessoas-horario-screen__filtros > .pessoas-horario-screen__filtro-jornada {
     flex: 0 0 auto;
     width: 100%;
   }
+}
+
+/* T192 — o resumo do filtro de colaborador e o título da lista recebem o
+   foco por programa (`tabindex="-1"`); o anel vem de `:focus-visible`. */
+.pessoas-horario-screen__filtro-ativo:focus,
+.pessoas-horario-screen__section-title:focus {
+  outline-offset: 2px;
+}
+
+/* T192 — durante a carga de outra página ou filtro, a tabela segue à vista,
+   esmaecida; a paginação fica indisponível (`aria-disabled`). */
+.pessoas-horario-screen__lista[aria-busy="true"] .evolli-datatable {
+  opacity: 0.6;
+}
+
+/* T192 — falha do catálogo de jornadas: aviso e nova tentativa, no filtro
+   e no formulário; quebra linha em vez de alargar a página. */
+.pessoas-horario-screen__aviso-catalogo {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-xs);
+  overflow-wrap: anywhere;
+}
+
+.pessoas-horario-screen__aviso-catalogo .evolli-button[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: progress;
 }

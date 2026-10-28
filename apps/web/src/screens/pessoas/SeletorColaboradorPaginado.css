@@ -82,3 +82,18 @@
 .pessoas-paginacao__posicao {
   color: var(--color-ink-subtle);
 }
+
+/* T192 — modo `focoEstavel`: o botão indisponível usa `aria-disabled`
+   (o foco fica nele) e se parece com o desabilitado nativo. */
+.pessoas-paginacao .evolli-button[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pessoas-paginacao .evolli-button--secondary[aria-disabled="true"]:hover {
+  background: var(--surface-canvas);
+}
+
+.pessoas-paginacao .evolli-button[aria-disabled="true"]:active {
+  transform: none;
+}
