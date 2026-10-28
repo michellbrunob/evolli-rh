@@ -1077,6 +1077,31 @@ describe("T163/T189 — contexto empresarial ativo", () => {
     ).toBe("Pessoa Sintetica Rascunho");
   });
 
+  it("T195 — edição pendente numa etapa adiantada: continuar editando mantém a etapa e os dados", async () => {
+    trocarParaBetaNoServidor();
+    const nome = await abrirNovaAdmissaoPorRota();
+    fireEvent.change(nome, { target: { value: "Pessoa Sintetica Rascunho" } });
+    fireEvent.change(screen.getByLabelText(/^Data de nascimento/), {
+      target: { value: "1990-05-20" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
+    const titulo = await screen.findByRole("heading", {
+      level: 2,
+      name: /Dados profissionais e lotação$/,
+    });
+
+    await trocarPeloMenuPara("Empresa Beta");
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Continuar editando" }),
+    );
+
+    expect(trocarEmpresaDoContexto).not.toHaveBeenCalled();
+    expect(titulo).toBeVisible();
+    expect(
+      (screen.getByLabelText(/^Nome completo/) as HTMLInputElement).value,
+    ).toBe("Pessoa Sintetica Rascunho");
+  });
+
   it("edição pendente: confirmar troca, descarta e vai para Colaboradores na empresa nova", async () => {
     trocarParaBetaNoServidor();
     const nome = await abrirNovaAdmissaoPorRota();
@@ -1356,9 +1381,21 @@ describe("T189 (B1/N1) — referência rápida pendente e conferência antes de 
     window.history.replaceState(null, "", window.location.pathname);
   });
 
-  /** Nova admissão vazia, com o cadastro rápido de departamento aberto. */
+  /**
+   * Nova admissão vazia, com o cadastro rápido de departamento aberto. T195 —
+   * o "+" fica na etapa 2: a etapa 1 é preenchida para avançar e esvaziada
+   * de novo (os painéis seguem montados), para que a única pendência em jogo
+   * seja a do modal.
+   */
   async function abrirReferenciaRapida() {
     await abrirNovaAdmissaoPorRota();
+    const nome = screen.getByLabelText(/Nome completo/);
+    const nascimento = screen.getByLabelText(/^Data de nascimento/);
+    fireEvent.change(nome, { target: { value: "Pessoa Sintética" } });
+    fireEvent.change(nascimento, { target: { value: "1990-05-20" } });
+    fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
+    fireEvent.change(nome, { target: { value: "" } });
+    fireEvent.change(nascimento, { target: { value: "" } });
     const mais = await screen.findByRole("button", {
       name: "Cadastrar novo departamento",
     });
