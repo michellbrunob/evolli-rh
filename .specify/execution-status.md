@@ -2541,11 +2541,27 @@ dependência.
 de jornadas acima de 100 itens, limite de 100 dos catálogos de Departamento e
 Cargo, regras de jornada, promoção e merge.
 
-## Horário de trabalho: foco, paginação e falhas — T192 (em implementação)
+## Horário de trabalho: foco, paginação e falhas — T192 (integrada)
 
-| Tarefa | Estado               | Resultado principal                                                                               |
-| ------ | -------------------- | ------------------------------------------------------------------------------------------------- |
-| T192   | **Em implementação** | Horário de trabalho sem perda de foco ao filtrar e paginar, com falhas que não escondem a tabela. |
+| Tarefa | Estado                                    | Resultado principal                                                                               |
+| ------ | ----------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| T192   | **Integrada** (PR #185, squash `5908912`) | Horário de trabalho sem perda de foco ao filtrar e paginar, com falhas que não escondem a tabela. |
+
+**Observação de relatório:** a integração funcional da T192 está concluída
+(CI de push 3/3 verde, run 40690118929); a única pendência administrativa era
+a sua convergência no Spec Kit, resolvida no primeiro commit da T193. Seguem
+abertos, como observações da revisão final e limites registrados: durante "Tentar novamente" o foco passa pelo `<body>` e a tabela da
+leitura anterior reaparece enquanto a página carrega; anúncios duplicados
+(carga a partir de um estado vazio; os dois avisos do catálogo com o
+formulário aberto); o formulário de novo vínculo aberto quando o catálogo
+volta sem jornada ativa permite enviar sem jornada (o servidor recusa); a
+falha da contagem de colaboradores ativos não tem nova tentativa; o foco
+depois de criar um vínculo não vai a um lugar definido; o E2E do master com
+empresa ativa compara com o RH só o total; rótulos repetidos entre empresas
+para o `master_tecnico` sem empresa ativa; o catálogo de jornadas numa
+página de 100; a linha do tempo do vínculo sem desempate por `id`; o limite
+de 100 itens dos catálogos de Departamento e Cargo; e a falha de catálogo
+de lotação sem região viva.
 
 **Escopo da T192:** opção A do [dossiê](../docs/decisions/t192-dossie-proxima-fatia-pessoas.md), aprovada pela proprietária
 em 2026-10-28, só na aba Horário de trabalho: foco no filtro de colaborador
@@ -2558,6 +2574,23 @@ ativa. Sem API, schema, migration, RBAC, auditoria, seed ou dependência.
 
 **Fora de escopo:** rótulos do `master_tecnico` global, catálogos acima de 100
 itens, desempate da linha do tempo, outras abas, promoção e merge.
+
+## Próxima fatia de Gestão de Pessoas — T193 (em preparação de decisão)
+
+| Tarefa | Estado                       | Resultado principal                                                        |
+| ------ | ---------------------------- | -------------------------------------------------------------------------- |
+| T193   | **Em preparação de decisão** | Dossiê com três opções para a próxima fatia de Pessoas e uma recomendação. |
+
+**Escopo desta etapa:** convergência da T192 e o dossiê (`docs/decisions/t193-dossie-proxima-fatia-pessoas.md`) da próxima
+fatia de Gestão de Pessoas, priorizando as observações da revisão final da
+T192 no Horário de trabalho (foco durante a nova tentativa, anúncios
+duplicados, formulário com catálogo recuperado sem jornada ativa, nova
+tentativa da contagem de ativos, foco depois de criar um vínculo) e os
+rótulos do `master_tecnico` global. Nenhuma implementação de produto antes da
+decisão da proprietária.
+
+**Fora de escopo:** código, API, schema, migration, RBAC, banco, seed, Docker,
+dependências, CI, PR, push, promoção e merge.
 
 ## Próxima ação autorizável
 

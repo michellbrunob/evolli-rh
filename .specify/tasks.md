@@ -2726,8 +2726,22 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       como `[T191 dev]`, não a `main`.
 
 89. **T192 - Horário de trabalho: foco, paginação e falhas sem perder o lugar**
-    - **Estado:** **em implementação**. Branch `codex/t192-proxima-fatia-pessoas`, a partir do
+    - **Estado:** **integrada** em `main` pela PR #185, squash
+      `5908912c6f0e6a838419280dd75a0a8d2a9661aa`, com a CI de push 3/3 verde (run 40690118929);
+      branch preservada. Implementada na branch `codex/t192-proxima-fatia-pessoas`, a partir do
       squash `1a7daf433564d3ce21a6413e0d2106bd6a7b7ddb` (T191 integrada, PR #184).
+    - **Observação de relatório:** a integração funcional da T192 está concluída; a única
+      pendência administrativa era a sua convergência no Spec Kit, resolvida no primeiro commit
+      da T193. Seguem abertas, sem correção, as observações da revisão final: foco passando pelo
+      `<body>` e tabela da leitura anterior durante "Tentar novamente"; anúncios duplicados (carga
+      a partir de um estado vazio; os dois avisos do catálogo com o formulário aberto);
+      formulário aberto com o catálogo recuperado sem jornada ativa permitindo envio sem jornada
+      (o servidor recusa); falha da contagem de ativos sem nova tentativa; foco depois de criar
+      um vínculo sem destino definido; E2E do master com empresa ativa comparando com o RH só o
+      total. Seguem também os rótulos repetidos do `master_tecnico` sem empresa ativa, o
+      catálogo de jornadas numa página de 100, a linha do tempo sem desempate por `id`, o limite
+      de 100 dos catálogos de Departamento e Cargo e a falha de catálogo de lotação sem região
+      viva.
     - **Preparação:** [dossiê](../docs/decisions/t192-dossie-proxima-fatia-pessoas.md) com três opções; a proprietária aprovou a opção A em
       2026-10-28.
     - **Objetivo:** na aba Horário de trabalho, o foco não se perde ao abrir, cancelar,
@@ -2744,6 +2758,22 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       merge.
     - **Prévia:** `http://127.0.0.1:5173` passa a mostrar a branch da T192 ao vivo, identificada
       como `[T192 dev]`, não a `main`.
+
+90. **T193 - Próxima fatia de Gestão de Pessoas (preparação de decisão)**
+    - **Estado:** **em preparação de decisão**. Branch `codex/t193-proxima-fatia-pessoas`, a
+      partir do squash `5908912c6f0e6a838419280dd75a0a8d2a9661aa` (T192 integrada, PR #185).
+    - **Objetivo desta etapa:** convergir a T192 e propor três próximas fatias de Gestão de
+      Pessoas, priorizando as observações da revisão final da T192 (foco durante a nova
+      tentativa, anúncios duplicados, formulário com catálogo recuperado sem jornada ativa, nova
+      tentativa da contagem de ativos, foco depois de criar um vínculo) e os rótulos do
+      `master_tecnico` global, sem implementar produto antes de uma decisão explícita da
+      proprietária.
+    - **Entrega desta etapa:** dossiê (`docs/decisions/t193-dossie-proxima-fatia-pessoas.md`) com as opções e uma recomendação. Só
+      documentação: sem código, API, schema, migration, RBAC, banco, seed, Docker,
+      dependência, CI, PR ou push.
+    - **Fora de escopo:** implementação de qualquer opção antes da decisão, regras de jornada,
+      dados pessoais novos, documentos, folha, ponto, banco de horas, fuso horário, importação,
+      exportação, integrações externas, promoção e merge.
 
 ## Regra obrigatória para as próximas tarefas
 
