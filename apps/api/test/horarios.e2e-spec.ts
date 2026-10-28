@@ -2353,6 +2353,32 @@ describe("Cadastros: Horarios e vinculo ao colaborador (e2e)", () => {
         expect(total).toBe(doRh.total);
       });
 
+      // T193 — o mesmo corpo do RH, não só o total: página a página (com
+      // envelope), filtrado e no detalhe.
+      it("master com empresa ativa recebe exatamente o corpo do RH — páginas, filtro e detalhe", async () => {
+        const rotas: string[] = [];
+        const primeira = await get(
+          "/v1/horarios/vinculos?pagina=1&tamanhoPagina=20",
+          rhA,
+        ).expect(200);
+        const paginas = Math.ceil(primeira.body.total / 20);
+        expect(paginas).toBeGreaterThan(5);
+        for (let p = 1; p <= paginas; p++) {
+          rotas.push(`/v1/horarios/vinculos?pagina=${p}&tamanhoPagina=20`);
+        }
+        rotas.push(
+          `/v1/horarios/vinculos?tabelaHorarioId=${jornadaDois}&pagina=2&tamanhoPagina=20`,
+          `/v1/horarios/vinculos?colaboradorId=${idsA[104]!}&tabelaHorarioId=${jornadaUm}`,
+        );
+        const vinculoA = await vinculoDe(idsA[57]!, rhA);
+        rotas.push(`/v1/horarios/vinculos/${vinculoA}`);
+        for (const rota of rotas) {
+          const doRh = await get(rota, rhA).expect(200);
+          const doMaster = await get(rota, masterEmA).expect(200);
+          expect(doMaster.body).toEqual(doRh.body);
+        }
+      });
+
       it("master com empresa ativa: filtros e detalhe de outra empresa não respondem", async () => {
         const daJornadaB = await get(
           `/v1/horarios/vinculos?tabelaHorarioId=${jornadaB}`,
