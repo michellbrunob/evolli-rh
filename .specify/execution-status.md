@@ -2657,6 +2657,12 @@ migration, RBAC, auditoria, seed, Docker ou dependência.
 seguem na lotação como hoje (opcionais, Área dependente do Departamento, sem
 criação inline).
 
+**Entrega:** campos por etapa e exclusões na seção 16 do [dossiê](../docs/decisions/t194-dossie-entrada-de-colaboradores.md).
+Os quatro painéis ficam montados (só o atual visível), então voltar nunca
+perde dado; "Continuar" valida só a etapa atual; o indicador não salta
+adiante sem validar; a recusa do servidor abre a etapa do campo. Sem rascunho
+nem persistência nova: recarregar começa do zero, na etapa 1, como antes.
+
 **Fora de escopo:** documentos e Cloudflare R2, importação, admissão digital, criação inline, busca de referências, criação ou retirada de Área, Aprendiz, salário, escala, gestor direto, conselho profissional, dependentes e pensão; promoção e merge.
 
 ## Próxima ação autorizável

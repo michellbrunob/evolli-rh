@@ -2834,6 +2834,16 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       revisitáveis, sem salto para etapa futura e "Voltar" preservando tudo. A conclusão
       reutiliza a confirmação, a idempotência, a validação por campo e a gravação atômica
       existentes.
+    - **Campos por etapa e exclusões:** matriz na seção 16 do [dossiê](../docs/decisions/t194-dossie-entrada-de-colaboradores.md).
+      Etapa 1: dados pessoais de hoje e contatos (e-mail pessoal, celular, telefone). Etapa 2:
+      matrícula, tipo, data de admissão, Departamento e Cargo (obrigatórios), Unidade, Área,
+      Equipe, Centro de custo e, para o RH, jornada. Etapa 3: endereço com CEP assistido. Etapa
+      4: revisão, "Editar" por bloco e o aviso de documentos em entrega própria.
+    - **Navegação:** os quatro painéis ficam montados (só o atual visível); "Continuar" (ou
+      Enter) valida só a etapa atual; "Voltar" não valida; o indicador volta a qualquer etapa
+      alcançada e, adiante, valida o caminho; foco no título da etapa; recusa do servidor abre a
+      etapa do campo. Sem rascunho nem persistência nova: recarregar começa do zero, na etapa 1,
+      como antes.
     - **Contratos:** nenhum. Sem API, schema, migration, RBAC, auditoria, seed, Docker,
       dependência ou lockfile.
     - **Fora de escopo:** documentos e Cloudflare R2, importação, admissão digital, criação inline, busca de referências, criação ou retirada de Área, Aprendiz, salário, escala, gestor direto, conselho profissional, dependentes e pensão; promoção e merge.
