@@ -3,13 +3,14 @@ import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   PainelAdicionarColaborador,
+  ROTULO_INICIAR_CADASTRO,
   TITULO_PAINEL_ADICIONAR,
 } from "./PainelAdicionarColaborador";
 
 /**
  * T194 — painel "Adicionar colaborador": só escolhe a forma de entrada. Uma
- * disponível (cadastro individual), duas indisponíveis com o motivo e sem
- * nenhum controle. Nunca chama API.
+ * disponível (cadastro individual, já marcada), duas indisponíveis com o
+ * motivo e o rádio desabilitado. Nunca chama API.
  */
 
 const EMPRESA = { nome: "Empresa Sintética (teste)", codigo: "SINT01" };
@@ -35,10 +36,14 @@ function painel() {
   return screen.getByRole("dialog", { name: TITULO_PAINEL_ADICIONAR });
 }
 
-function formas() {
-  return within(
-    within(painel()).getByRole("list", { name: "Formas de adicionar" }),
-  ).getAllByRole("listitem");
+function grupo() {
+  return within(painel()).getByRole("group", {
+    name: "Como você quer adicionar",
+  });
+}
+
+function radio(nome: string) {
+  return within(grupo()).getByRole("radio", { name: new RegExp(`^${nome}`) });
 }
 
 describe("PainelAdicionarColaborador (T194)", () => {
@@ -51,7 +56,7 @@ describe("PainelAdicionarColaborador (T194)", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it("é uma janela modal lateral, nomeada pelo título, com a empresa ativa", () => {
+  it("é uma janela modal lateral, nomeada pelo título, com ícone decorativo e a empresa ativa", () => {
     montar();
     const dialogo = painel();
     expect(dialogo).toHaveAttribute("aria-modal", "true");
@@ -59,10 +64,15 @@ describe("PainelAdicionarColaborador (T194)", () => {
       "evolli-modal--lateral",
     );
     expect(dialogo).toHaveAccessibleDescription(
-      /Escolha como iniciar a entrada de uma pessoa/,
+      "Escolha o caminho mais prático para trazer alguém para a equipe.",
     );
-    expect(within(dialogo).getByText(/Empresa ativa:/)).toHaveTextContent(
-      "Empresa ativa: Empresa Sintética (teste) (SINT01)",
+    // O ícone ao lado do título é só ilustração.
+    const icone = dialogo.querySelector(".evolli-modal__icone");
+    expect(icone).toHaveAttribute("aria-hidden", "true");
+    expect(
+      within(dialogo).getByText(/Você está adicionando em/),
+    ).toHaveTextContent(
+      "Você está adicionando em Empresa Sintética (teste) (SINT01).",
     );
   });
 
@@ -76,66 +86,62 @@ describe("PainelAdicionarColaborador (T194)", () => {
     );
   });
 
-  it("três formas, na ordem: cadastro individual, importar planilha, admissão digital", () => {
+  it("três formas num grupo de escolha única, na ordem, com o cadastro individual já marcado", () => {
     montar();
-    expect(
-      formas().map(
-        (f) => within(f).getByRole("heading", { level: 3 }).textContent,
-      ),
-    ).toEqual(["Cadastro individual", "Importar planilha", "Admissão digital"]);
-    // Cada cartão é nomeado pelo próprio título.
-    expect(formas()[0]).toHaveAccessibleName("Cadastro individual");
+    const radios = within(grupo()).getAllByRole("radio");
+    expect(radios).toHaveLength(3);
+    expect(radio("Cadastro individual")).toBeChecked();
+    expect(radio("Cadastro individual")).toBeEnabled();
+    expect(radio("Cadastro individual")).toHaveAccessibleDescription(
+      /confere tudo antes de salvar/,
+    );
+    // Todos no mesmo grupo de nome: escolher um desmarca os outros.
+    expect(new Set(radios.map((r) => r.getAttribute("name"))).size).toBe(1);
+    expect(grupo()).toHaveTextContent("Leva poucos minutos");
   });
 
-  it("cadastro individual: disponível, com uma ação que chama onCadastroIndividual", () => {
-    const { onCadastroIndividual, onFechar } = montar();
-    const [individual] = formas();
-    expect(within(individual!).getByText("Disponível")).toBeInTheDocument();
-    const acao = within(individual!).getByRole("button", {
-      name: "Iniciar cadastro individual",
-    });
-    expect(acao).toHaveAccessibleDescription(/página de Nova admissão/);
-    fireEvent.click(acao);
-    expect(onCadastroIndividual).toHaveBeenCalledTimes(1);
-    expect(onFechar).not.toHaveBeenCalled();
-  });
-
-  it("importar planilha e admissão digital: indisponíveis, com o motivo e sem nenhum controle", () => {
+  it("importar planilha e admissão digital: rádio desabilitado, motivo anunciado, nenhum outro controle", () => {
     montar();
-    const [, importar, digital] = formas();
-    for (const forma of [importar!, digital!]) {
-      expect(within(forma).getByText("Indisponível")).toBeInTheDocument();
-      expect(
-        within(forma).getByText("Por que está indisponível:"),
-      ).toBeInTheDocument();
-      // Nada clicável: nem botão, nem link, nem campo.
-      expect(within(forma).queryAllByRole("button")).toHaveLength(0);
-      expect(within(forma).queryAllByRole("link")).toHaveLength(0);
-      expect(
-        forma.querySelectorAll("button, a, input, [tabindex]"),
-      ).toHaveLength(0);
+    for (const [nome, motivo] of [
+      ["Importar planilha", /Ainda estamos preparando a importação/],
+      [
+        "Admissão digital",
+        /segurança, de proteção de dados \(LGPD\) e do convite/,
+      ],
+    ] as const) {
+      const r = radio(nome);
+      expect(r).toBeDisabled();
+      expect(r).not.toBeChecked();
+      expect(r).toHaveAccessibleDescription(motivo);
+      const cartao = r.closest("label") as HTMLElement;
+      expect(cartao).toHaveTextContent("Indisponível · em preparação");
+      expect(cartao.querySelectorAll("button, a, [tabindex]")).toHaveLength(0);
+      expect(cartao).toHaveClass("painel-adicionar__forma--indisponivel");
     }
-    expect(importar).toHaveTextContent(
-      /importação está em preparação e ainda não foi liberada/,
-    );
-    expect(digital).toHaveTextContent(
-      /segurança, de proteção de dados \(LGPD\) e do convite/,
-    );
   });
 
-  it("clicar nas formas indisponíveis não chama ação nem rede", () => {
+  it("clicar nas formas indisponíveis não muda a escolha nem chama ação ou rede", () => {
     const fetchEspiao = vi.fn();
     vi.stubGlobal("fetch", fetchEspiao);
     const { onCadastroIndividual, onFechar } = montar();
-    const [, importar, digital] = formas();
-    for (const forma of [importar!, digital!]) {
-      fireEvent.click(forma);
-      fireEvent.click(within(forma).getByRole("heading", { level: 3 }));
+    for (const nome of ["Importar planilha", "Admissão digital"]) {
+      fireEvent.click(radio(nome).closest("label") as HTMLElement);
+      fireEvent.click(radio(nome));
     }
+    expect(radio("Cadastro individual")).toBeChecked();
     expect(fetchEspiao).not.toHaveBeenCalled();
     expect(onCadastroIndividual).not.toHaveBeenCalled();
     expect(onFechar).not.toHaveBeenCalled();
     expect(painel()).toBeInTheDocument();
+  });
+
+  it("'Iniciar cadastro' inicia a forma escolhida: o cadastro individual", () => {
+    const { onCadastroIndividual, onFechar } = montar();
+    fireEvent.click(
+      within(painel()).getByRole("button", { name: ROTULO_INICIAR_CADASTRO }),
+    );
+    expect(onCadastroIndividual).toHaveBeenCalledTimes(1);
+    expect(onFechar).not.toHaveBeenCalled();
   });
 
   it("Fechar, Cancelar e Escape fecham o painel", () => {
@@ -148,26 +154,30 @@ describe("PainelAdicionarColaborador (T194)", () => {
     expect(onFechar).toHaveBeenCalledTimes(3);
   });
 
-  it("o foco fica preso no painel: Tab no último volta ao primeiro controle", () => {
+  it("o foco fica preso no painel e passa só pelos controles habilitados", () => {
     montar();
-    const botoes = within(painel()).getAllByRole("button");
-    const ultimo = botoes[botoes.length - 1]!;
+    const focaveis = [
+      ...painel().querySelectorAll<HTMLElement>(
+        "button:not([disabled]), input:not([disabled])",
+      ),
+    ];
+    expect(
+      focaveis.map((e) =>
+        e instanceof HTMLInputElement ? `radio:${e.value}` : e.textContent,
+      ),
+    ).toEqual(["Fechar", "radio:individual", "Cancelar", "Iniciar cadastro"]);
+    const ultimo = focaveis[focaveis.length - 1]!;
     ultimo.focus();
     fireEvent.keyDown(document, { key: "Tab" });
-    expect(document.activeElement).toBe(botoes[0]);
-    expect(botoes.map((b) => b.textContent)).toEqual([
-      "Fechar",
-      "Iniciar cadastro individual",
-      "Cancelar",
-    ]);
+    expect(document.activeElement).toBe(focaveis[0]);
   });
 
   it("sem empresa ativa informada, não mostra a linha da empresa", () => {
     montar({ empresaAtiva: null });
-    expect(within(painel()).queryByText(/Empresa ativa:/)).toBeNull();
+    expect(within(painel()).queryByText(/Você está adicionando em/)).toBeNull();
   });
 
-  it("375 px: o painel lateral ocupa a tela inteira e a ação disponível ocupa a largura", () => {
+  it("375 px e estados visuais: tela inteira, cartões que quebram linha, escolhida e indisponível distintas", () => {
     const cssModal = readFileSync("src/components/Modal.css", "utf8");
     expect(cssModal).toMatch(
       /\.evolli-modal--lateral \{[^}]*justify-content: flex-end/,
@@ -180,10 +190,13 @@ describe("PainelAdicionarColaborador (T194)", () => {
       "utf8",
     );
     expect(css).toMatch(
-      /@media \(max-width: 640px\) \{[\s\S]*\.painel-adicionar__acao \{[^}]*width: 100%/,
+      /\.painel-adicionar__forma \{[^}]*overflow-wrap: anywhere/,
     );
     expect(css).toMatch(
-      /\.painel-adicionar__forma \{[^}]*overflow-wrap: anywhere/,
+      /\.painel-adicionar__forma \{[^}]*grid-template-columns: auto minmax\(0, 1fr\) auto/,
+    );
+    expect(css).toMatch(
+      /\.painel-adicionar__forma--marcada \{[^}]*border-color: var\(--color-action\)/,
     );
     expect(css).toMatch(
       /\.painel-adicionar__forma--indisponivel \{[^}]*cursor: default/,

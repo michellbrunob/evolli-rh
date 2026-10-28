@@ -76,6 +76,11 @@ export interface ModalProps {
    * trás. Comportamento, foco e acessibilidade são os mesmos do `centro`.
    */
   posicao?: "centro" | "lateral";
+  /**
+   * T194 — ilustração decorativa ao lado do título (sempre `aria-hidden`): o
+   * nome da janela continua vindo só do título.
+   */
+  icone?: ReactNode;
   /** Ações fixas no rodapé (não rolam com o conteúdo). */
   rodape?: ReactNode;
   children: ReactNode;
@@ -119,6 +124,7 @@ export function Modal({
   alterado = false,
   largura = "media",
   posicao = "centro",
+  icone,
   rodape,
   children,
 }: ModalProps) {
@@ -307,14 +313,21 @@ export function Modal({
         ref={caixaRef}
       >
         <header className="evolli-modal__cabecalho">
-          <h2
-            className="evolli-modal__titulo"
-            id={tituloId}
-            ref={tituloRef}
-            tabIndex={-1}
-          >
-            {titulo}
-          </h2>
+          <div className="evolli-modal__titulo-grupo">
+            {icone ? (
+              <span className="evolli-modal__icone" aria-hidden="true">
+                {icone}
+              </span>
+            ) : null}
+            <h2
+              className="evolli-modal__titulo"
+              id={tituloId}
+              ref={tituloRef}
+              tabIndex={-1}
+            >
+              {titulo}
+            </h2>
+          </div>
           <Button
             type="button"
             variant="secondary"

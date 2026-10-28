@@ -201,7 +201,7 @@ async function abrirNovaAdmissaoPelaListagem() {
   });
   fireEvent.click(daBarra!);
   fireEvent.click(
-    await screen.findByRole("button", { name: "Iniciar cadastro individual" }),
+    await screen.findByRole("button", { name: "Iniciar cadastro" }),
   );
   await screen.findByRole("heading", { level: 1, name: "Nova admissão" });
 }

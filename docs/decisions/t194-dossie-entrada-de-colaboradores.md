@@ -658,15 +658,27 @@ schema, migration, RBAC, seed, Docker, dependência ou integração externa.
   direção visual da T142 ("janelas modais no lugar do painel lateral") fica
   ajustada por esta decisão: o painel lateral existe só como posição do mesmo
   componente, para escolhas curtas (`DP-FLX-21`).
-- Conteúdo: título, texto de apoio, a empresa ativa e três cartões numa lista
-  nomeada, cada um nomeado pelo próprio título:
-  - **Cadastro individual** — "Disponível"; a ação "Iniciar cadastro
-    individual" fecha o painel e abre a Nova admissão de sempre (autorização,
-    confirmação e idempotência da T179 intactas).
-  - **Importar planilha** e **Admissão digital** — "Indisponível", com a
-    finalidade e o motivo em texto; **sem nenhum controle** (nem botão, nem
-    link, nem foco): não iniciam, não chamam API, não criam rascunho, não
-    enviam e-mail, não abrem link e não gravam nada.
+- **Visual (pedido da proprietária, 2026-10-28):** ícone ao lado do título do
+  painel e no botão "Adicionar colaborador"; cada forma num cartão com
+  ícone, título, texto e uma etiqueta; a forma escolhida destacada; rodapé
+  com "Cancelar" e "Iniciar cadastro". Ícones desenhados no próprio Evolli,
+  com geometria simples e `aria-hidden` (regra da T159, sem biblioteca nem
+  conjunto de terceiros); cores e textos do Evolli, escritos em tom humano,
+  sem reproduzir a referência de mercado. O bloco de ajuda da referência
+  ficou de fora: o Evolli ainda não tem página de ajuda ou suporte para onde
+  ele levaria.
+- Conteúdo: título, texto de apoio, a empresa ativa ("Você está adicionando
+  em …") e as três formas num grupo de escolha única com rádios nativos (o
+  cartão inteiro é o rótulo; o nome de cada rádio é o título, e texto,
+  motivo e etiqueta são a descrição):
+  - **Cadastro individual** — já vem escolhido; etiqueta "Leva poucos
+    minutos"; "Iniciar cadastro" fecha o painel e abre a Nova admissão de
+    sempre (autorização, confirmação e idempotência da T179 intactas).
+  - **Importar planilha** e **Admissão digital** — rádio **desabilitado**
+    (fora do teclado, anunciado como indisponível), etiqueta "Indisponível ·
+    em preparação" e o motivo em texto; o clique no cartão é anulado. Não
+    iniciam, não chamam API, não criam rascunho, não enviam e-mail, não
+    abrem link e não gravam nada.
 - Sem formulário, o painel **nunca** vira edição pendente (T189): fechar não
   pede confirmação e a troca de empresa segue livre; ela remonta a tela e o
   painel some — reaberto, mostra só a empresa nova.

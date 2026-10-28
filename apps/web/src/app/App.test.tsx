@@ -288,7 +288,7 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     for (const rotulo of [
       /^Colaboradores Consulta/,
       /^Adicionar colaborador/,
-      /^Iniciar cadastro individual/,
+      /^Iniciar cadastro$/,
       /^Estrutura organizacional/,
       /^Jornadas de trabalho/,
       /^Jornada Visão/,

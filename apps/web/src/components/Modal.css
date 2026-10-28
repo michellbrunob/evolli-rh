@@ -53,6 +53,26 @@
   border-bottom: 1px solid var(--divider-soft);
 }
 
+.evolli-modal__titulo-grupo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+
+/* T194 — ilustração opcional ao lado do título, num ladrilho suave. */
+.evolli-modal__icone {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: var(--radius-md);
+  background: var(--status-info-surface);
+  color: var(--color-action);
+}
+
 .evolli-modal__titulo {
   margin: 0;
   min-width: 0;

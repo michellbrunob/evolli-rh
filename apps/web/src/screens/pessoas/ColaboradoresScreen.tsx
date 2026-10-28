@@ -46,7 +46,10 @@ import {
   situacaoDaVigencia,
 } from "./jornadaColaborador";
 import { DadosPessoaisColaboradorSecao } from "./DadosPessoaisColaboradorSecao";
-import { PainelAdicionarColaborador } from "./PainelAdicionarColaborador";
+import {
+  IconeAdicionarPessoa,
+  PainelAdicionarColaborador,
+} from "./PainelAdicionarColaborador";
 import "./ColaboradoresScreen.css";
 
 export const COLABORADORES_TITULO_ID = "colaboradores-titulo";
@@ -1016,6 +1019,7 @@ export function ColaboradoresScreen({
             aria-haspopup="dialog"
             onClick={() => setPainelAdicionarAberto(true)}
           >
+            <IconeAdicionarPessoa />
             Adicionar colaborador
           </Button>
         ) : null}
@@ -1379,6 +1383,7 @@ export function ColaboradoresScreen({
                           aria-haspopup="dialog"
                           onClick={() => setPainelAdicionarAberto(true)}
                         >
+                          <IconeAdicionarPessoa />
                           Adicionar colaborador
                         </Button>
                       ),

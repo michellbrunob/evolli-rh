@@ -747,7 +747,7 @@ describe("ColaboradoresScreen (T177 — Nova admissão leva à página de Nova a
 
     fireEvent.click(
       within(painel).getByRole("button", {
-        name: "Iniciar cadastro individual",
+        name: "Iniciar cadastro",
       }),
     );
 
@@ -809,7 +809,7 @@ describe("ColaboradoresScreen (T177 — Nova admissão leva à página de Nova a
     fireEvent.click(
       within(
         screen.getByRole("dialog", { name: "Adicionar colaborador" }),
-      ).getByRole("button", { name: "Iniciar cadastro individual" }),
+      ).getByRole("button", { name: "Iniciar cadastro" }),
     );
 
     expect(onNovaAdmissao).toHaveBeenCalledTimes(1);
@@ -3220,9 +3220,7 @@ describe("T178 — estados vazios distintos", () => {
     fireEvent.click(
       within(vazio).getByRole("button", { name: "Adicionar colaborador" }),
     );
-    fireEvent.click(
-      screen.getByRole("button", { name: "Iniciar cadastro individual" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Iniciar cadastro" }));
     expect(onNovaAdmissao).toHaveBeenCalledTimes(1);
     expect(
       screen.queryByRole("button", { name: "Limpar busca e filtros" }),
@@ -3375,9 +3373,7 @@ describe("T178 — 'Nova admissão' e a ficha a partir da linha", () => {
     ).toBeInTheDocument();
     expect(botao).toHaveClass("evolli-button--primary");
     fireEvent.click(botao);
-    fireEvent.click(
-      screen.getByRole("button", { name: "Iniciar cadastro individual" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Iniciar cadastro" }));
     expect(onNovaAdmissao).toHaveBeenCalledTimes(1);
   });
 
@@ -4557,9 +4553,7 @@ describe("T194 — painel 'Adicionar colaborador' na listagem", () => {
   it("o cadastro individual fecha o painel e segue para a Nova admissão uma vez só", async () => {
     const { onNovaAdmissao } = await montarComTabela();
     fireEvent.click(botaoAdicionar());
-    fireEvent.click(
-      screen.getByRole("button", { name: "Iniciar cadastro individual" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Iniciar cadastro" }));
     expect(onNovaAdmissao).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole("dialog")).toBeNull();
   });
@@ -4570,8 +4564,16 @@ describe("T194 — painel 'Adicionar colaborador' na listagem", () => {
     fireEvent.click(botaoAdicionar());
     const painel = screen.getByRole("dialog");
     for (const titulo of ["Importar planilha", "Admissão digital"]) {
-      fireEvent.click(within(painel).getByRole("heading", { name: titulo }));
+      const radio = within(painel).getByRole("radio", {
+        name: new RegExp(`^${titulo}`),
+      });
+      expect(radio).toBeDisabled();
+      fireEvent.click(within(painel).getByText(titulo));
     }
+    // A forma escolhida continua sendo o cadastro individual.
+    expect(
+      within(painel).getByRole("radio", { name: /^Cadastro individual/ }),
+    ).toBeChecked();
     expect(onNovaAdmissao).not.toHaveBeenCalled();
     expect(vi.mocked(listarColaboradores).mock.calls.length).toBe(chamadas);
     expect(screen.getByRole("dialog")).toBeInTheDocument();
