@@ -186,3 +186,51 @@ Comportamento aprovado:
   específico e anunciado no filtro de jornada e no formulário de novo vínculo;
   nova tentativa só do catálogo, sem reiniciar tabela, filtros ou página.
   Leitura de RH, DP e `master_tecnico` inalterada.
+
+## 6. O que foi entregue
+
+- **Filtro de colaborador:** abrir leva o foco ao campo de busca; cancelar e
+  remover devolvem o foco ao botão "Filtrar por colaborador"; escolher leva ao
+  resumo do filtro aplicado. "Limpar filtros", que some com o estado vazio,
+  também devolve o foco ao botão de filtrar.
+- **Paginação:** tabela e controles seguem à vista durante a carga, com a
+  tabela marcada como ocupada (`aria-busy`). Os botões "Anterior" e
+  "Próxima" ficam indisponíveis por `aria-disabled` — botão `disabled` de
+  verdade perde o foco no navegador —, e o foco permanece no botão acionado,
+  inclusive na última página. A carga ("Carregando a página N…") e o
+  resultado ("Página N de M — X vínculos no filtro atual.") são anunciados
+  numa região viva estável; a carga inicial não anuncia nada. O componente
+  `PaginacaoSimples` ganhou esse modo como opção (`focoEstavel`); o seletor de
+  colaborador e o Histórico funcional seguem como antes.
+- **Nova tentativa:** "Tentar novamente" repete exatamente a página que
+  falhou, com os mesmos filtros. Numa falha ao paginar, o foco vai a ele; no
+  sucesso da nova tentativa, ao título da lista. Os filtros ficam à vista
+  também durante a falha.
+- **Falha do catálogo de jornadas:** o catálogo carrega à parte da contagem
+  de ativos, e nenhuma das duas falhas esconde a tabela. O filtro de jornada e
+  o formulário de novo vínculo mostram um aviso próprio, anunciado, com a nova
+  tentativa só do catálogo — tabela, filtros e página não reiniciam. O
+  formulário abre, avisa e não salva sem as jornadas; quando elas chegam, a
+  regra de antes vale (uma só ativa vem escolhida) e o foco vai ao campo
+  liberado. Falha da contagem de ativos mostra a busca de colaborador no
+  formulário. RH, DP e `master_tecnico` leem como antes.
+- **Testes:** web — foco nos quatro comandos do filtro e em "Limpar
+  filtros", paginação com controles à vista e foco no botão (também na
+  última página), anúncio, clique ignorado durante a carga, falha e nova
+  tentativa da mesma página com os mesmos filtros, falha do catálogo no filtro
+  e no formulário, nova falha do catálogo, falha da contagem de ativos, DP e
+  375 px; o modo novo e o padrão de `PaginacaoSimples`. E2E com PostgreSQL
+  real — perfis negados também no detalhe e `master_tecnico` com empresa
+  ativa (só a empresa dela, nome certo, filtros e detalhe de outra empresa sem
+  resposta, só leitura).
+
+## 7. Fora do escopo desta entrega e limites conhecidos
+
+- **Rótulos sem ambiguidade do `master_tecnico` global** (opção B): não
+  entram, por decisão.
+- **Catálogos acima de 100 itens:** o catálogo de jornadas segue numa página
+  de 100 (filtro e formulário), e os de Departamento e Cargo (T190) também.
+- **Linha do tempo do vínculo funcional** sem desempate por `id`.
+- **Foco depois de criar um vínculo:** o formulário fecha e o foco não é
+  levado a um lugar definido — comportamento anterior, fora das observações
+  aprovadas.
