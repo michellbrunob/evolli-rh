@@ -46,7 +46,14 @@ export const PESSOAS_HORARIO_TITULO_ID = "pessoas-horario-titulo";
 export const TAMANHO_PAGINA_VINCULOS = 20;
 
 /** T192 — quem pediu a carga da tabela (ver `carregarVinculos`). */
-type OrigemDaCarga = "inicial" | "filtro" | "pagina" | "repeticao";
+type OrigemDaCarga = "inicial" | "filtro" | "pagina" | "repeticao" | "criacao";
+
+/**
+ * T193 — a nova tentativa em curso e o aviso que a pediu: ele segue montado,
+ * com o botão indisponível, até a resposta — sem linhas antigas no lugar e
+ * sem o foco passar pelo `<body>`.
+ */
+type Repeticao = "falha" | "paginaVazia" | null;
 
 /** T192 — alvos do foco quando o controle acionado some ou troca. */
 const ID_TITULO_LISTA = "pessoas-horario-lista-titulo";
@@ -59,6 +66,12 @@ const ID_RESUMO_FILTRO_COLABORADOR = "pessoas-horario-filtro-colaborador-ativo";
 const ID_FILTRO_JORNADA = "pessoas-horario-filtro-jornada";
 const ID_FORMULARIO_JORNADA = "pessoas-horario-tabela";
 const ID_FORMULARIO_INICIO = "pessoas-horario-vigencia-inicio";
+/** T193 — destino do foco depois de criar um vínculo. */
+const ID_NOVO_VINCULO = "pessoas-horario-novo-vinculo";
+/** T193 — o motivo de o formulário não salvar (sem jornada ou colaborador ativo). */
+const ID_FORMULARIO_SEM_OPCOES = "pessoas-horario-formulario-sem-opcoes";
+const ID_FORMULARIO_COLABORADOR = "pessoas-horario-colaborador";
+const ID_FORMULARIO_COLABORADOR_BUSCA = `${ID_FORMULARIO_COLABORADOR}-busca`;
 
 /** T192 — o que se anuncia ao fim de uma carga pedida. */
 function descreverResultado(pagina: number, total: number): string {
@@ -164,18 +177,29 @@ export function PessoasHorarioScreen({
   /** Filtros da última carga feita pelo efeito: distingue a inicial. */
   const chaveFiltrosRef = useRef<string | null>(null);
   /**
+   * T193 — a nova tentativa em curso (ver `Repeticao`). O ref é lido dentro da
+   * carga, que não muda de identidade; o estado decide o que fica na tela.
+   */
+  const [repeticao, setRepeticao] = useState<Repeticao>(null);
+  const repeticaoRef = useRef<Repeticao>(null);
+  /**
    * T188 — quantos colaboradores ATIVOS o escopo tem, contados pelo servidor
    * (`situacao=ativo`, a regra por empresa da T178), e qual é, quando há um
    * só. Antes vinha da página de 100, e passava a errar acima dela.
    * T192 — carregado à parte das jornadas: a falha de um não derruba o outro,
    * e nenhuma das duas esconde a tabela. Sem a contagem, o formulário mostra
    * a busca de colaborador, que tem a própria carga.
+   * T193 — a falha tem aviso e nova tentativa próprios, no formulário.
    */
   const [ativos, setAtivos] = useState<{
     total: number;
     unico: ColaboradorEscolhido | null;
   }>({ total: 0, unico: null });
+  const [contagemAtivos, setContagemAtivos] = useState<
+    "carregando" | "erro" | "dados"
+  >("carregando");
   const [ativosFalhou, setAtivosFalhou] = useState(false);
+  const [falhasDaContagem, setFalhasDaContagem] = useState(0);
   /**
    * T192 — o catálogo de jornadas (filtro e formulário). A falha tem aviso e
    * nova tentativa próprios; tabela, filtros e página não reiniciam.
@@ -210,6 +234,10 @@ export function PessoasHorarioScreen({
    *   novamente", porque a paginação some com a tabela;
    * - `repeticao`: "Tentar novamente" ou "Ir para a primeira página"; o botão
    *   some ao concluir, e o foco vai ao título da lista.
+   * - `criacao` (T193): vínculo criado; anuncia a criação junto da carga.
+   *
+   * T193 — numa repetição, o aviso que a pediu fica montado até a resposta
+   * (`repeticao`); numa falha, as linhas da leitura anterior saem da tela.
    */
   const carregarVinculos = useCallback(
     async (
@@ -219,11 +247,16 @@ export function PessoasHorarioScreen({
       origem: OrigemDaCarga,
     ) => {
       const pedido = ++pedidoVinculosRef.current;
+      // Outra carga (filtro, página) substitui uma repetição em curso.
+      if (origem !== "repeticao") {
+        repeticaoRef.current = null;
+        setRepeticao(null);
+      }
       setPaginaPedida(paginaAlvo);
       setStatusCarregamento("carregando");
       if (origem !== "inicial") {
         setAnuncio(
-          `Carregando a página ${paginaAlvo} dos vínculos de horário…`,
+          `${origem === "criacao" ? "Vínculo criado. " : ""}Carregando a página ${paginaAlvo} dos vínculos de horário…`,
         );
       }
       try {
@@ -235,6 +268,8 @@ export function PessoasHorarioScreen({
         if (tabelaHorarioId) query.tabelaHorarioId = tabelaHorarioId;
         const resp = await listarVinculosHorario(query);
         if (pedido !== pedidoVinculosRef.current) return;
+        repeticaoRef.current = null;
+        setRepeticao(null);
         setVinculos(resp.itens);
         setPagina(resp.pagina);
         setTotal(resp.total);
@@ -245,9 +280,20 @@ export function PessoasHorarioScreen({
         if (origem === "repeticao") setFocoPendente(ID_TITULO_LISTA);
       } catch {
         if (pedido !== pedidoVinculosRef.current) return;
+        // T193 — o aviso de falha já estava montado (nova falha da mesma
+        // repetição)? Então ele não é lido de novo: a região estável
+        // anuncia a nova falha, uma vez. Senão, o aviso que monta é o
+        // anúncio (`role="alert"`), e a região fica calada.
+        const avisoSeguiuMontado = repeticaoRef.current === "falha";
+        repeticaoRef.current = null;
+        setRepeticao(null);
+        setVinculos([]);
         setStatusCarregamento("erro");
-        // O aviso de erro tem a própria região (`role="alert"`).
-        setAnuncio("");
+        setAnuncio(
+          avisoSeguiuMontado
+            ? `A nova tentativa falhou: a página ${paginaAlvo} não carregou.`
+            : "",
+        );
         if (origem === "pagina" || origem === "repeticao") {
           setFocoPendente(ID_TENTAR_NOVAMENTE);
         }
@@ -276,24 +322,56 @@ export function PessoasHorarioScreen({
     setFocoPendente(null);
   }, [focoPendente]);
 
-  /** T188 — quantos ativos: decide se o formulário mostra a busca. */
-  const carregarAtivos = useCallback(async () => {
+  /**
+   * T188 — quantos ativos: decide se o formulário mostra a busca.
+   * T193 — `repeticao`: a nova tentativa do aviso próprio. Ela anuncia a carga
+   * e o fim, e o foco vai ao campo que a contagem libera — ou ao motivo de
+   * não salvar, quando não há ativo. A falha remonta o aviso (anúncio único).
+   */
+  const carregarAtivos = useCallback(async (repeticao: boolean) => {
+    setContagemAtivos("carregando");
+    if (repeticao) setAnuncio("Conferindo os colaboradores ativos…");
     try {
       const ativosResp = await listarColaboradores({
         situacao: "ativo",
         tamanhoPagina: 1,
       });
       const primeiroAtivo = ativosResp.itens[0];
-      setAtivos({
-        total: ativosResp.total,
-        unico:
-          ativosResp.total === 1 && primeiroAtivo
-            ? { id: primeiroAtivo.id, nome: primeiroAtivo.nome }
-            : null,
-      });
+      const unico =
+        ativosResp.total === 1 && primeiroAtivo
+          ? { id: primeiroAtivo.id, nome: primeiroAtivo.nome }
+          : null;
+      setAtivos({ total: ativosResp.total, unico });
+      setContagemAtivos("dados");
       setAtivosFalhou(false);
+      // Com um só ativo, o formulário aberto já o recebe — a regra de
+      // quando a contagem chega antes de abrir.
+      if (unico) {
+        setFormulario((prev) =>
+          prev && !prev.colaboradorId
+            ? { ...prev, colaboradorId: unico.id }
+            : prev,
+        );
+        setColaboradorDoFormulario((prev) => prev ?? unico);
+      }
+      if (repeticao) {
+        if (ativosResp.total === 0) {
+          setAnuncio("");
+          setFocoPendente(ID_FORMULARIO_SEM_OPCOES);
+        } else {
+          setAnuncio("Colaboradores ativos conferidos.");
+          setFocoPendente(
+            ativosResp.total > 1
+              ? ID_FORMULARIO_COLABORADOR_BUSCA
+              : ID_FORMULARIO_INICIO,
+          );
+        }
+      }
     } catch {
+      setContagemAtivos("erro");
       setAtivosFalhou(true);
+      setFalhasDaContagem((n) => n + 1);
+      if (repeticao) setAnuncio("");
     }
   }, []);
 
@@ -302,10 +380,14 @@ export function PessoasHorarioScreen({
    * empresa, limite registrado; a TABELA não depende dela: cada vínculo traz
    * a sua. `destinoDoFoco`: numa nova tentativa que dá certo, o botão
    * "Tentar carregar as jornadas" some, e o foco vai ao campo que ela libera.
+   * T193 — a nova tentativa anuncia a carga e a recuperação uma vez, na região
+   * estável; sem jornada ativa, o foco vai ao motivo de não salvar, que se
+   * explica sozinho. A falha remonta um único aviso anunciado.
    */
   const carregarJornadas = useCallback(
     async (destinoDoFoco: "filtro" | "formulario" | null) => {
       setCatalogoJornadas("carregando");
+      if (destinoDoFoco) setAnuncio("Carregando as jornadas…");
       try {
         const resp = await listarTabelasHorario({ tamanhoPagina: 100 });
         const ativas = resp.itens.filter((t) => t.ativo);
@@ -322,34 +404,62 @@ export function PessoasHorarioScreen({
               : prev,
           );
         }
-        if (destinoDoFoco === "filtro") setFocoPendente(ID_FILTRO_JORNADA);
-        if (destinoDoFoco === "formulario") {
+        if (destinoDoFoco === "formulario" && ativas.length === 0) {
+          setAnuncio("");
+          setFocoPendente(ID_FORMULARIO_SEM_OPCOES);
+        } else if (destinoDoFoco) {
+          setAnuncio("As jornadas foram carregadas.");
           setFocoPendente(
-            ativas.length > 1 ? ID_FORMULARIO_JORNADA : ID_FORMULARIO_INICIO,
+            destinoDoFoco === "filtro"
+              ? ID_FILTRO_JORNADA
+              : ativas.length > 1
+                ? ID_FORMULARIO_JORNADA
+                : ID_FORMULARIO_INICIO,
           );
         }
       } catch {
         setCatalogoJornadas("erro");
         setCatalogoFalhou(true);
         setFalhasDoCatalogo((n) => n + 1);
+        if (destinoDoFoco) setAnuncio("");
       }
     },
     [],
   );
 
   useEffect(() => {
-    void carregarAtivos();
+    void carregarAtivos(false);
     void carregarJornadas(null);
   }, [carregarAtivos, carregarJornadas]);
 
-  /** T192 — repete exatamente a página que falhou, com os mesmos filtros. */
+  /**
+   * T192 — repete exatamente a página que falhou, com os mesmos filtros.
+   * T193 — o aviso de falha segue montado, com o botão indisponível.
+   */
   function tentarDeNovo() {
+    if (statusCarregamento === "carregando") return;
+    repeticaoRef.current = "falha";
+    setRepeticao("falha");
     void carregarVinculos(
       filtroColaboradorId,
       filtroJornadaId,
       paginaPedida,
       "repeticao",
     );
+  }
+
+  /** T193 — da página que voltou vazia; o estado vazio segue montado. */
+  function irParaPrimeiraPagina() {
+    if (statusCarregamento === "carregando") return;
+    repeticaoRef.current = "paginaVazia";
+    setRepeticao("paginaVazia");
+    void carregarVinculos(filtroColaboradorId, filtroJornadaId, 1, "repeticao");
+  }
+
+  /** T193 — só a contagem: tabela, página, filtros e catálogo ficam. */
+  function tentarContagemAtivos() {
+    if (contagemAtivos === "carregando") return;
+    void carregarAtivos(true);
   }
 
   /** T192 — só o catálogo: tabela, filtros e página ficam como estão. */
@@ -447,10 +557,18 @@ export function PessoasHorarioScreen({
       );
       return;
     }
-    if (buscaNoFormulario && !formulario.colaboradorId) {
+    if (semJornadaAtiva || semColaboradorAtivo) {
+      // T193 — o botão de salvar já fica indisponível e o motivo, à vista;
+      // guarda dupla: nunca enviar sem jornada ou colaborador.
+      setFocoPendente(ID_FORMULARIO_SEM_OPCOES);
+      return;
+    }
+    // T193 — exigidos sempre: com um só ativo (ou uma só jornada ativa), o
+    // valor já vem escolhido e o campo nem aparece.
+    if (!formulario.colaboradorId) {
       erros.colaboradorId = "Selecione o colaborador.";
     }
-    if (tabelasAtivas.length > 1 && !formulario.tabelaHorarioId) {
+    if (!formulario.tabelaHorarioId) {
       erros.tabelaHorarioId = "Selecione a tabela de horário.";
     }
     if (!formulario.vigenciaInicio) {
@@ -489,7 +607,15 @@ export function PessoasHorarioScreen({
       };
       await criarVinculoHorario(dto);
       setFormulario(null);
-      await carregarVinculos(filtroColaboradorId, filtroJornadaId, 1, "filtro");
+      // T193 — o formulário some; o foco volta a "Novo vínculo", de onde a
+      // pessoa veio (fica habilitado durante a releitura da tabela).
+      setFocoPendente(ID_NOVO_VINCULO);
+      await carregarVinculos(
+        filtroColaboradorId,
+        filtroJornadaId,
+        1,
+        "criacao",
+      );
     } catch (err: unknown) {
       const status =
         typeof err === "object" && err !== null && "status" in err
@@ -570,11 +696,15 @@ export function PessoasHorarioScreen({
    * contagem de ativos mostra a busca no formulário; falha das jornadas
    * deixa abrir o formulário, que avisa e oferece a nova tentativa.
    */
-  const semOpcoesValidas =
-    (!ativosFalhou && ativos.total === 0) ||
-    (catalogoJornadas === "dados" && tabelasAtivas.length === 0);
+  const semColaboradorAtivo = contagemAtivos === "dados" && ativos.total === 0;
+  const semJornadaAtiva =
+    catalogoJornadas === "dados" && tabelasAtivas.length === 0;
+  const semOpcoesValidas = semColaboradorAtivo || semJornadaAtiva;
   const catalogoAindaNaoCarregou =
     catalogoJornadas === "carregando" && !catalogoFalhou;
+  /** T193 — a primeira contagem ainda não chegou (não é falha). */
+  const contagemAindaNaoChegou =
+    contagemAtivos === "carregando" && !ativosFalhou;
 
   const colunas: DataTableColumn<VinculoHorarioApi>[] = [
     {
@@ -628,11 +758,14 @@ export function PessoasHorarioScreen({
         actions={
           podeOperar ? (
             <Button
+              id={ID_NOVO_VINCULO}
               onClick={abrirFormulario}
+              // T193 — não depende da tabela: o formulário usa só a contagem
+              // de ativos e o catálogo. Assim segue focável depois de criar.
               disabled={
-                statusCarregamento !== "dados" ||
                 semOpcoesValidas ||
-                catalogoAindaNaoCarregou
+                catalogoAindaNaoCarregou ||
+                contagemAindaNaoChegou
               }
             >
               Novo vínculo
@@ -743,17 +876,22 @@ export function PessoasHorarioScreen({
               )}
             </FormField>
             {catalogoFalhou ? (
-              <AvisoCatalogoJornadas
+              <AvisoComNovaTentativa
                 chave={falhasDoCatalogo}
                 texto="Não foi possível carregar as jornadas. O filtro por jornada fica indisponível até carregar."
+                rotuloBotao="Tentar carregar as jornadas"
                 carregando={catalogoJornadas === "carregando"}
+                // T193 — com o formulário aberto, só o aviso dele é anunciado.
+                anunciar={formulario === null}
                 onTentar={() => tentarJornadas("filtro")}
               />
             ) : null}
           </div>
         </div>
 
-        {statusCarregamento === "erro" ? (
+        {statusCarregamento === "erro" || repeticao === "falha" ? (
+          // T193 — durante "Tentar novamente", o aviso segue montado e o
+          // texto não muda (não é lido de novo); só o botão fica indisponível.
           <Surface
             as="div"
             padding="lg"
@@ -774,13 +912,36 @@ export function PessoasHorarioScreen({
             <Button
               id={ID_TENTAR_NOVAMENTE}
               variant="secondary"
+              aria-disabled={statusCarregamento === "carregando"}
               onClick={tentarDeNovo}
             >
               Tentar novamente
             </Button>
           </Surface>
+        ) : repeticao === "paginaVazia" ||
+          (statusCarregamento === "dados" &&
+            vinculos.length === 0 &&
+            total > 0 &&
+            !filtrando) ? (
+          <EmptyState
+            headingLevel={3}
+            icon="—"
+            title="Nenhum vínculo nesta página"
+            description="Esta página voltou vazia: o conjunto pode ter mudado desde a última leitura."
+            action={
+              <Button
+                variant="secondary"
+                aria-disabled={statusCarregamento === "carregando"}
+                onClick={irParaPrimeiraPagina}
+              >
+                Ir para a primeira página
+              </Button>
+            }
+          />
         ) : statusCarregamento === "carregando" && vinculos.length === 0 ? (
-          <p className="pessoas-horario-screen__carregando" role="status">
+          // T193 — texto visível, sem região viva: quem anuncia a carga é a
+          // região estável (e a carga inicial não é anunciada).
+          <p className="pessoas-horario-screen__carregando">
             Carregando vínculos de horário…
           </p>
         ) : vinculos.length === 0 && filtrando ? (
@@ -795,28 +956,6 @@ export function PessoasHorarioScreen({
               </Button>
             }
           />
-        ) : vinculos.length === 0 && total > 0 ? (
-          <EmptyState
-            headingLevel={3}
-            icon="—"
-            title="Nenhum vínculo nesta página"
-            description="Esta página voltou vazia: o conjunto pode ter mudado desde a última leitura."
-            action={
-              <Button
-                variant="secondary"
-                onClick={() =>
-                  void carregarVinculos(
-                    filtroColaboradorId,
-                    filtroJornadaId,
-                    1,
-                    "repeticao",
-                  )
-                }
-              >
-                Ir para a primeira página
-              </Button>
-            }
-          />
         ) : vinculos.length === 0 ? (
           <EmptyState
             headingLevel={3}
@@ -828,7 +967,11 @@ export function PessoasHorarioScreen({
                   action: (
                     <Button
                       onClick={abrirFormulario}
-                      disabled={semOpcoesValidas || catalogoAindaNaoCarregou}
+                      disabled={
+                        semOpcoesValidas ||
+                        catalogoAindaNaoCarregou ||
+                        contagemAindaNaoChegou
+                      }
                     >
                       Novo vínculo
                     </Button>
@@ -873,12 +1016,13 @@ export function PessoasHorarioScreen({
           </div>
         )}
 
+        {/* T193 — texto à vista, sem região viva: não anuncia na carga. */}
         {podeOperar && statusCarregamento === "dados" && semOpcoesValidas ? (
-          <p className="pessoas-horario-screen__form-erro" role="status">
-            {!ativosFalhou && ativos.total === 0
+          <p className="pessoas-horario-screen__form-erro">
+            {semColaboradorAtivo
               ? "Nenhum colaborador ativo disponível para vincular. "
               : ""}
-            {catalogoJornadas === "dados" && tabelasAtivas.length === 0
+            {semJornadaAtiva
               ? "Nenhuma tabela de horário ativa disponível para vincular."
               : ""}
           </p>
@@ -1003,9 +1147,21 @@ export function PessoasHorarioScreen({
             {/* T188 — qualquer colaborador ATIVO da empresa, por busca
                 paginada no servidor; sem o teto de 100. Com um só ativo,
                 ele já vem escolhido e o campo não aparece, como antes. */}
+            {/* T193 — falha da contagem: aviso e nova tentativa próprios; a
+                busca abaixo continua enquanto ela não volta. */}
+            {ativosFalhou ? (
+              <AvisoComNovaTentativa
+                chave={falhasDaContagem}
+                texto="Não foi possível conferir quantos colaboradores ativos há. A busca de colaborador continua disponível."
+                rotuloBotao="Tentar conferir os colaboradores ativos"
+                carregando={contagemAtivos === "carregando"}
+                anunciar
+                onTentar={tentarContagemAtivos}
+              />
+            ) : null}
             {buscaNoFormulario ? (
               <SeletorColaboradorPaginado
-                id="pessoas-horario-colaborador"
+                id={ID_FORMULARIO_COLABORADOR}
                 rotulo="Colaborador (buscar por nome ou matrícula)"
                 situacao="ativo"
                 autoSelecionarUnico={ativosFalhou}
@@ -1027,10 +1183,12 @@ export function PessoasHorarioScreen({
             {/* T192 — sem o catálogo, o aviso fica no lugar do campo, com a
                 nova tentativa; salvar espera as jornadas. */}
             {catalogoFalhou ? (
-              <AvisoCatalogoJornadas
+              <AvisoComNovaTentativa
                 chave={falhasDoCatalogo}
                 texto="Não foi possível carregar as jornadas. Sem elas, não dá para criar o vínculo."
+                rotuloBotao="Tentar carregar as jornadas"
                 carregando={catalogoJornadas === "carregando"}
+                anunciar
                 onTentar={() => tentarJornadas("formulario")}
               />
             ) : tabelasAtivas.length > 1 ? (
@@ -1067,6 +1225,25 @@ export function PessoasHorarioScreen({
                   </select>
                 )}
               </FormField>
+            ) : null}
+
+            {/* T193 — sem jornada ou colaborador ativo (o catálogo ou a
+                contagem voltaram vazios com o formulário aberto): o motivo
+                fica à vista e "Criar vínculo", indisponível. Recebe o foco
+                quando a nova tentativa traz a lista vazia. */}
+            {semJornadaAtiva || semColaboradorAtivo ? (
+              <p
+                id={ID_FORMULARIO_SEM_OPCOES}
+                className="pessoas-horario-screen__form-erro"
+                tabIndex={-1}
+              >
+                {semJornadaAtiva
+                  ? "Nenhuma tabela de horário ativa disponível para vincular. Ative ou cadastre uma em Jornadas de trabalho para criar o vínculo. "
+                  : ""}
+                {semColaboradorAtivo
+                  ? "Nenhum colaborador ativo disponível para vincular."
+                  : ""}
+              </p>
             ) : null}
 
             <FormField
@@ -1140,7 +1317,12 @@ export function PessoasHorarioScreen({
               <Button
                 type="submit"
                 variant="primary"
-                disabled={formulario.salvando || catalogoJornadas !== "dados"}
+                disabled={
+                  formulario.salvando ||
+                  catalogoJornadas !== "dados" ||
+                  semJornadaAtiva ||
+                  semColaboradorAtivo
+                }
               >
                 {formulario.salvando ? "Criando…" : "Criar vínculo"}
               </Button>
@@ -1152,29 +1334,43 @@ export function PessoasHorarioScreen({
   );
 }
 
-interface AvisoCatalogoJornadasProps {
+interface AvisoComNovaTentativaProps {
   /** Muda a cada falha: remonta o aviso, que o leitor de tela lê de novo. */
   readonly chave: number;
   readonly texto: string;
+  readonly rotuloBotao: string;
   readonly carregando: boolean;
+  /**
+   * T193 — o aviso é anunciado (`role="alert"`). Quando a mesma falha aparece
+   * em dois lugares (filtro e formulário), só um anuncia.
+   */
+  readonly anunciar: boolean;
   readonly onTentar: () => void;
 }
 
 /**
- * T192 — falha do catálogo de jornadas, no filtro e no formulário: aviso
- * anunciado e nova tentativa só do catálogo. O botão não some nem fica
- * `disabled` durante a nova tentativa (perderia o foco): fica com
- * `aria-disabled` e ignora o clique até a resposta.
+ * T192 — falha de uma carga de apoio (catálogo de jornadas; T193: também a
+ * contagem de ativos): aviso e nova tentativa só dela. O botão não some nem
+ * fica `disabled` durante a nova tentativa (perderia o foco): fica com
+ * `aria-disabled` e ignora o clique até a resposta. T193 — o rótulo não muda
+ * durante a carga: a região estável já anuncia, e o nome do botão focado
+ * mudando seria um segundo anúncio.
  */
-function AvisoCatalogoJornadas({
+function AvisoComNovaTentativa({
   chave,
   texto,
+  rotuloBotao,
   carregando,
+  anunciar,
   onTentar,
-}: AvisoCatalogoJornadasProps) {
+}: AvisoComNovaTentativaProps) {
   return (
     <div className="pessoas-horario-screen__aviso-catalogo">
-      <p key={chave} className="pessoas-horario-screen__form-erro" role="alert">
+      <p
+        key={chave}
+        className="pessoas-horario-screen__form-erro"
+        {...(anunciar ? { role: "alert" } : {})}
+      >
         {texto}
       </p>
       <Button
@@ -1184,7 +1380,7 @@ function AvisoCatalogoJornadas({
           if (!carregando) onTentar();
         }}
       >
-        {carregando ? "Carregando as jornadas…" : "Tentar carregar as jornadas"}
+        {rotuloBotao}
       </Button>
     </div>
   );

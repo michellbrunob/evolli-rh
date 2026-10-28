@@ -2541,11 +2541,27 @@ dependência.
 de jornadas acima de 100 itens, limite de 100 dos catálogos de Departamento e
 Cargo, regras de jornada, promoção e merge.
 
-## Horário de trabalho: foco, paginação e falhas — T192 (em implementação)
+## Horário de trabalho: foco, paginação e falhas — T192 (integrada)
 
-| Tarefa | Estado               | Resultado principal                                                                               |
-| ------ | -------------------- | ------------------------------------------------------------------------------------------------- |
-| T192   | **Em implementação** | Horário de trabalho sem perda de foco ao filtrar e paginar, com falhas que não escondem a tabela. |
+| Tarefa | Estado                                    | Resultado principal                                                                               |
+| ------ | ----------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| T192   | **Integrada** (PR #185, squash `5908912`) | Horário de trabalho sem perda de foco ao filtrar e paginar, com falhas que não escondem a tabela. |
+
+**Observação de relatório:** a integração funcional da T192 está concluída
+(CI de push 3/3 verde, run 40690118929); a única pendência administrativa era
+a sua convergência no Spec Kit, resolvida no primeiro commit da T193. Seguem
+abertos, como observações da revisão final e limites registrados: durante "Tentar novamente" o foco passa pelo `<body>` e a tabela da
+leitura anterior reaparece enquanto a página carrega; anúncios duplicados
+(carga a partir de um estado vazio; os dois avisos do catálogo com o
+formulário aberto); o formulário de novo vínculo aberto quando o catálogo
+volta sem jornada ativa permite enviar sem jornada (o servidor recusa); a
+falha da contagem de colaboradores ativos não tem nova tentativa; o foco
+depois de criar um vínculo não vai a um lugar definido; o E2E do master com
+empresa ativa compara com o RH só o total; rótulos repetidos entre empresas
+para o `master_tecnico` sem empresa ativa; o catálogo de jornadas numa
+página de 100; a linha do tempo do vínculo sem desempate por `id`; o limite
+de 100 itens dos catálogos de Departamento e Cargo; e a falha de catálogo
+de lotação sem região viva.
 
 **Escopo da T192:** opção A do [dossiê](../docs/decisions/t192-dossie-proxima-fatia-pessoas.md), aprovada pela proprietária
 em 2026-10-28, só na aba Horário de trabalho: foco no filtro de colaborador
@@ -2555,6 +2571,24 @@ página; falha do catálogo de jornadas com aviso próprio e nova tentativa, sem
 esconder a tabela; "Tentar novamente" na página que falhou, com os mesmos
 filtros; E2E de perfis negados no detalhe e do `master_tecnico` com empresa
 ativa. Sem API, schema, migration, RBAC, auditoria, seed ou dependência.
+
+**Fora de escopo:** rótulos do `master_tecnico` global, catálogos acima de 100
+itens, desempate da linha do tempo, outras abas, promoção e merge.
+
+## Horário de trabalho: recuperação, anúncios e formulário — T193 (em implementação)
+
+| Tarefa | Estado               | Resultado principal                                                                                               |
+| ------ | -------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| T193   | **Em implementação** | Horário de trabalho com nova tentativa sem perder o foco, anúncios únicos e formulário que não envia sem jornada. |
+
+**Escopo da T193:** opção A do [dossiê](../docs/decisions/t193-dossie-proxima-fatia-pessoas.md), aprovada pela proprietária
+em 2026-10-28, só na aba Horário de trabalho: nova tentativa de página com o
+aviso e o botão à vista, sem linhas antigas e sem foco no `<body>`; um anúncio
+por carga, falha ou recuperação; formulário sem jornada ativa avisando e sem
+enviar; aviso e nova tentativa próprios da contagem de ativos; foco em "Novo
+vínculo" depois de criar; E2E do `master_tecnico` com empresa ativa
+comparando o corpo inteiro com o do RH. Sem API, schema, migration, RBAC,
+auditoria, seed ou dependência.
 
 **Fora de escopo:** rótulos do `master_tecnico` global, catálogos acima de 100
 itens, desempate da linha do tempo, outras abas, promoção e merge.

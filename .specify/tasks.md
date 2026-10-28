@@ -2726,8 +2726,22 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       como `[T191 dev]`, não a `main`.
 
 89. **T192 - Horário de trabalho: foco, paginação e falhas sem perder o lugar**
-    - **Estado:** **em implementação**. Branch `codex/t192-proxima-fatia-pessoas`, a partir do
+    - **Estado:** **integrada** em `main` pela PR #185, squash
+      `5908912c6f0e6a838419280dd75a0a8d2a9661aa`, com a CI de push 3/3 verde (run 40690118929);
+      branch preservada. Implementada na branch `codex/t192-proxima-fatia-pessoas`, a partir do
       squash `1a7daf433564d3ce21a6413e0d2106bd6a7b7ddb` (T191 integrada, PR #184).
+    - **Observação de relatório:** a integração funcional da T192 está concluída; a única
+      pendência administrativa era a sua convergência no Spec Kit, resolvida no primeiro commit
+      da T193. Seguem abertas, sem correção, as observações da revisão final: foco passando pelo
+      `<body>` e tabela da leitura anterior durante "Tentar novamente"; anúncios duplicados (carga
+      a partir de um estado vazio; os dois avisos do catálogo com o formulário aberto);
+      formulário aberto com o catálogo recuperado sem jornada ativa permitindo envio sem jornada
+      (o servidor recusa); falha da contagem de ativos sem nova tentativa; foco depois de criar
+      um vínculo sem destino definido; E2E do master com empresa ativa comparando com o RH só o
+      total. Seguem também os rótulos repetidos do `master_tecnico` sem empresa ativa, o
+      catálogo de jornadas numa página de 100, a linha do tempo sem desempate por `id`, o limite
+      de 100 dos catálogos de Departamento e Cargo e a falha de catálogo de lotação sem região
+      viva.
     - **Preparação:** [dossiê](../docs/decisions/t192-dossie-proxima-fatia-pessoas.md) com três opções; a proprietária aprovou a opção A em
       2026-10-28.
     - **Objetivo:** na aba Horário de trabalho, o foco não se perde ao abrir, cancelar,
@@ -2744,6 +2758,26 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       merge.
     - **Prévia:** `http://127.0.0.1:5173` passa a mostrar a branch da T192 ao vivo, identificada
       como `[T192 dev]`, não a `main`.
+
+90. **T193 - Horário de trabalho: recuperação, anúncios e formulário sem arestas**
+    - **Estado:** **em implementação**. Branch `codex/t193-proxima-fatia-pessoas`, a partir do
+      squash `5908912c6f0e6a838419280dd75a0a8d2a9661aa` (T192 integrada, PR #185).
+    - **Preparação:** [dossiê](../docs/decisions/t193-dossie-proxima-fatia-pessoas.md) com três opções; a proprietária aprovou a opção A em
+      2026-10-28.
+    - **Objetivo:** na aba Horário de trabalho, a nova tentativa de página mantém o aviso e o
+      botão à vista (indisponível durante a carga), sem reexibir linhas antigas nem soltar o foco
+      no `<body>`; cada carga, falha ou recuperação é anunciada uma só vez; o formulário informa
+      e não envia sem jornada ativa; a contagem de colaboradores ativos tem aviso e nova
+      tentativa próprios; depois de criar um vínculo, o foco volta a "Novo vínculo". Mais o E2E
+      do `master_tecnico` com empresa ativa comparando o corpo inteiro com o do RH.
+    - **Contratos:** nenhum muda. Sem API, schema, migration, RBAC, auditoria, seed, Docker ou
+      dependência.
+    - **Fora de escopo:** rótulos sem ambiguidade do `master_tecnico` global, catálogos acima de
+      100 itens (jornadas, departamentos e cargos), desempate da linha do tempo do vínculo
+      funcional, outras abas de Pessoas, regras de jornada, dados pessoais novos, promoção e
+      merge.
+    - **Prévia:** `http://127.0.0.1:5173` passa a mostrar a branch da T193 ao vivo, identificada
+      como `[T193 dev]`, não a `main`.
 
 ## Regra obrigatória para as próximas tarefas
 
