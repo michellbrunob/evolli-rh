@@ -2289,5 +2289,108 @@ describe("Cadastros: Horarios e vinculo ao colaborador (e2e)", () => {
         expect(JSON.stringify(lista.body)).not.toContain(PREFIXO);
       }
     });
+
+    // T192 — as duas lacunas de E2E apontadas na revisão final da T191:
+    // perfis negados também no DETALHE, e o `master_tecnico` com empresa
+    // ativa (não só o global). Mesmos dados semeados acima.
+    describe("T192 — detalhe negado e master com empresa ativa", () => {
+      let masterEmA: Credencial;
+
+      async function vinculoDe(colaboradorId: string, cred: Credencial) {
+        const r = await get(
+          `/v1/horarios/vinculos?colaboradorId=${colaboradorId}`,
+          cred,
+        ).expect(200);
+        expect(r.body.total).toBe(1);
+        return r.body.itens[0].id as string;
+      }
+
+      beforeAll(async () => {
+        masterEmA = await seedMaster("master.t192.a@example.test");
+        await post("/v1/auth/contexto/empresa", masterEmA)
+          .send({ empresaId: empresaA })
+          .expect(200);
+      });
+
+      it("gestor, colaborador, financeiro, auditor e dpo não leem o detalhe, nem o nome", async () => {
+        const vinculoId = await vinculoDe(idsA[0]!, rhA);
+        // O detalhe existe e traz o nome para quem pode ler.
+        const doRh = await get(
+          `/v1/horarios/vinculos/${vinculoId}`,
+          rhA,
+        ).expect(200);
+        expect(doRh.body.colaborador.nome).toBe(nomeDe.get(idsA[0]!));
+        for (const cred of [
+          gestorA,
+          colaboradorA,
+          financeiroA,
+          auditorA,
+          dpoA,
+        ]) {
+          const r = await get(`/v1/horarios/vinculos/${vinculoId}`, cred);
+          expect([403, 404]).toContain(r.status);
+          expect(JSON.stringify(r.body)).not.toContain(PREFIXO);
+          expect(JSON.stringify(r.body)).not.toContain(idsA[0]!);
+        }
+      });
+
+      it("master com empresa ativa lista só os vínculos dela, cada um com o nome certo", async () => {
+        const { vistos, total } = await todasAsPaginas(
+          "/v1/horarios/vinculos",
+          masterEmA,
+        );
+        expect(vistos).toHaveLength(total);
+        expect(new Set(vistos.map((v) => v.id)).size).toBe(total);
+        expect(vistos.every((v) => v.empresaId === empresaA)).toBe(true);
+        const porColaborador = new Map(vistos.map((v) => [v.colaboradorId, v]));
+        for (const id of idsA) {
+          expect(porColaborador.get(id)?.colaborador.nome).toBe(nomeDe.get(id));
+        }
+        for (const id of idsB) expect(porColaborador.has(id)).toBe(false);
+        expect(JSON.stringify(vistos)).not.toContain(`${PREFIXO} B`);
+        // O mesmo que o RH da empresa lê.
+        const doRh = await todasAsPaginas("/v1/horarios/vinculos", rhA);
+        expect(total).toBe(doRh.total);
+      });
+
+      it("master com empresa ativa: filtros e detalhe de outra empresa não respondem", async () => {
+        const daJornadaB = await get(
+          `/v1/horarios/vinculos?tabelaHorarioId=${jornadaB}`,
+          masterEmA,
+        ).expect(200);
+        expect(daJornadaB.body.total).toBe(0);
+        const doColaboradorB = await get(
+          `/v1/horarios/vinculos?colaboradorId=${idsB[0]!}`,
+          masterEmA,
+        ).expect(200);
+        expect(doColaboradorB.body.total).toBe(0);
+
+        const vinculoB = await vinculoDe(idsB[0]!, rhB);
+        const r = await get(`/v1/horarios/vinculos/${vinculoB}`, masterEmA);
+        expect([403, 404]).toContain(r.status);
+        expect(JSON.stringify(r.body)).not.toContain(PREFIXO);
+
+        const vinculoA = await vinculoDe(idsA[104]!, rhA);
+        const detalhe = await get(
+          `/v1/horarios/vinculos/${vinculoA}`,
+          masterEmA,
+        ).expect(200);
+        expect(detalhe.body.colaborador).toEqual({
+          id: idsA[104],
+          nome: nomeDe.get(idsA[104]!),
+        });
+      });
+
+      it("master com empresa ativa segue só leitura: não cria vínculo de horário", async () => {
+        const r = await post("/v1/horarios/vinculos", masterEmA).send({
+          colaboradorId: idsA[0]!,
+          tabelaHorarioId: jornadaUm,
+          vigenciaInicio: "2027-01-01",
+        });
+        // Recusa pelo papel (como o master global), não por CSRF.
+        expect(r.status).toBe(403);
+        expect(JSON.stringify(r.body)).not.toMatch(/csrf/i);
+      });
+    });
   });
 });
