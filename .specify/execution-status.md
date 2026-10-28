@@ -2510,11 +2510,25 @@ Departamento e Cargo dos filtros carregam no máximo 100 itens; acima desse
 limite, opções podem não aparecer no seletor. O limite não está resolvido e
 fica pendente de uma entrega própria.
 
-## Horário de trabalho sem o teto de 100 — T191 (em implementação)
+## Horário de trabalho sem o teto de 100 — T191 (integrada)
 
-| Tarefa | Estado               | Resultado principal                                                                                  |
-| ------ | -------------------- | ---------------------------------------------------------------------------------------------------- |
-| T191   | **Em implementação** | Vínculos de jornada com o nome do próprio vínculo, paginados, com filtros por colaborador e jornada. |
+| Tarefa | Estado                                    | Resultado principal                                                                                  |
+| ------ | ----------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| T191   | **Integrada** (PR #184, squash `1a7daf4`) | Vínculos de jornada com o nome do próprio vínculo, paginados, com filtros por colaborador e jornada. |
+
+**Observação de relatório:** a integração funcional da T191 está concluída
+(CI de push 3/3 verde, run 40675583894); a única pendência administrativa era
+a sua convergência no Spec Kit, resolvida no primeiro commit da T192. Seguem
+abertos, como observações da revisão final: o foco do teclado se perde ao abrir, cancelar, escolher ou remover o
+filtro de colaborador e ao paginar (com o anúncio da página recriado); a
+falha do apoio (ativos e jornadas) esconde a tabela de vínculos, que não
+depende dele; "Tentar novamente" repete a última página carregada, não a
+pedida; lacunas pequenas de E2E (perfis negados só na lista, master com
+empresa ativa fora do bloco); rótulos repetidos entre empresas para o
+`master_tecnico` sem empresa ativa; o catálogo de jornadas numa página de
+100 (filtro e formulário); a linha do tempo do vínculo sem desempate por
+`id`; o limite de 100 itens dos catálogos de Departamento e Cargo; e a falha
+de catálogo de lotação sem região viva.
 
 **Escopo da T191:** opção B do [dossiê](../docs/decisions/t191-dossie-proxima-fatia-pessoas.md), aprovada pela proprietária
 em 2026-10-27: `colaborador: { id, nome }` na lista e no detalhe dos vínculos
@@ -2526,6 +2540,24 @@ dependência.
 **Fora de escopo:** desempate da linha do tempo do vínculo funcional, catálogo
 de jornadas acima de 100 itens, limite de 100 dos catálogos de Departamento e
 Cargo, regras de jornada, promoção e merge.
+
+## Horário de trabalho: foco, paginação e falhas — T192 (em implementação)
+
+| Tarefa | Estado               | Resultado principal                                                                               |
+| ------ | -------------------- | ------------------------------------------------------------------------------------------------- |
+| T192   | **Em implementação** | Horário de trabalho sem perda de foco ao filtrar e paginar, com falhas que não escondem a tabela. |
+
+**Escopo da T192:** opção A do [dossiê](../docs/decisions/t192-dossie-proxima-fatia-pessoas.md), aprovada pela proprietária
+em 2026-10-28, só na aba Horário de trabalho: foco no filtro de colaborador
+(abrir, cancelar, escolher, remover); paginação com tabela e controles à
+vista durante a carga, foco no próprio botão acionado e anúncio da carga e da
+página; falha do catálogo de jornadas com aviso próprio e nova tentativa, sem
+esconder a tabela; "Tentar novamente" na página que falhou, com os mesmos
+filtros; E2E de perfis negados no detalhe e do `master_tecnico` com empresa
+ativa. Sem API, schema, migration, RBAC, auditoria, seed ou dependência.
+
+**Fora de escopo:** rótulos do `master_tecnico` global, catálogos acima de 100
+itens, desempate da linha do tempo, outras abas, promoção e merge.
 
 ## Próxima ação autorizável
 

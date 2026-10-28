@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "constitutionVersion": "1.4.0",
-  "lastConvergedAt": "2026-10-27",
-  "lastIntegratedTask": 190,
-  "lastRecordedTask": 191,
+  "lastConvergedAt": "2026-10-28",
+  "lastIntegratedTask": 191,
+  "lastRecordedTask": 192,
   "platformDecision": {
     "adr": "docs/adr/0014-evolli-plataforma-base-e-encerramento-do-frappe.md",
     "decidedAt": "2026-10-01",
@@ -11,15 +11,15 @@
     "frappe": "encerrado_como_candidato_referencia_apenas"
   },
   "nextTask": {
-    "id": "T191",
-    "status": "horario_trabalho_sem_teto_em_implementacao",
-    "reason": "T190 integrada em main pela PR #183 (squash e148a6117a8e1a84d93ee814c6811577fa5943e3), com a CI de push 3/3 verde (run 40579253102). A T191 implementa a opcao B do dossie, aprovada pela proprietaria em 2026-10-27: colaborador {id, nome} na lista e no detalhe dos vinculos de horario; tabela do Horario de trabalho de 20 em 20, com filtros por colaborador e por jornada, sem as listas de 100 colaboradores e de 100 jornadas para montar a tabela (O1 da T188). Sem schema, migration, RBAC, auditoria, seed ou dependencia. Decisao em docs/decisions/t191-dossie-proxima-fatia-pessoas.md. Fora de escopo: desempate da linha do tempo, catalogo de jornadas acima de 100, limite de 100 dos catalogos de Departamento e Cargo, promocao e merge."
+    "id": "T192",
+    "status": "horario_trabalho_foco_e_falhas_em_implementacao",
+    "reason": "T191 integrada em main pela PR #184 (squash 1a7daf433564d3ce21a6413e0d2106bd6a7b7ddb), com a CI de push 3/3 verde (run 40675583894). A T192 implementa a opcao A do dossie, aprovada pela proprietaria em 2026-10-28, so na aba Horario de trabalho: foco no filtro de colaborador e na paginacao (foco no proprio botao, controles visiveis e desabilitados durante a carga, carga e pagina anunciadas), falha do catalogo de jornadas sem esconder a tabela e com nova tentativa propria, nova tentativa na pagina que falhou com os mesmos filtros, e os E2E pendentes da T191 (perfis negados no detalhe, master_tecnico com empresa ativa). Sem API, schema, migration, RBAC, auditoria, seed ou dependencia. Decisao em docs/decisions/t192-dossie-proxima-fatia-pessoas.md. Fora de escopo: rotulos do master global, catalogos acima de 100, desempate da linha do tempo, outras abas, promocao e merge."
   },
   "openDeliveries": [
     {
-      "id": "T191",
+      "id": "T192",
       "pullRequest": null,
-      "status": "horario_trabalho_sem_teto_em_implementacao"
+      "status": "horario_trabalho_foco_e_falhas_em_implementacao"
     }
   ],
   "requiredArtifacts": [

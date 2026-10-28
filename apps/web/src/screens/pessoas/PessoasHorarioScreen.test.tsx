@@ -1029,3 +1029,456 @@ describe("T191 — vínculos de horário paginados, com nome do próprio víncul
     expect(bloco(".pessoas-horario-screen__filtros")).toMatch(/min-width: 0/);
   });
 });
+
+// ---------------------------------------------------------------------------
+// T192 — foco, paginação e falhas sem perder o lugar: o foco acompanha cada
+// comando do filtro de colaborador e fica no botão de página; a carga e a
+// página são anunciadas numa região viva estável; a falha do catálogo de
+// jornadas não esconde a tabela; "Tentar novamente" repete a página que
+// falhou, com os mesmos filtros.
+// ---------------------------------------------------------------------------
+
+describe("T192 — foco, paginação e falhas no Horário de trabalho", () => {
+  function pagina(
+    itens: VinculoHorarioApi[],
+    total: number,
+    paginaAtual = 1,
+  ): ResultadoPaginadoTeste<VinculoHorarioApi> {
+    return { itens, pagina: paginaAtual, tamanhoPagina: 20, total };
+  }
+
+  function pendente() {
+    let soltar!: (v: ResultadoPaginadoTeste<VinculoHorarioApi>) => void;
+    let falhar!: (e: unknown) => void;
+    const promessa = new Promise<ResultadoPaginadoTeste<VinculoHorarioApi>>(
+      (resolve, reject) => {
+        soltar = resolve;
+        falhar = reject;
+      },
+    );
+    return { promessa, soltar, falhar };
+  }
+
+  function ultimaConsulta() {
+    return vi.mocked(listarVinculosHorario).mock.lastCall![0];
+  }
+
+  function anuncio() {
+    return document.querySelector("p.sr-only[role='status']")!.textContent;
+  }
+
+  async function montarComTabela(podeOperar = true) {
+    render(<PessoasHorarioScreen podeOperar={podeOperar} />);
+    return screen.findByRole("table", {
+      name: "Colaboradores com tabela de horário vinculada",
+    });
+  }
+
+  function paginacao() {
+    return screen.getByRole("navigation", {
+      name: "Páginas de vínculos de horário",
+    });
+  }
+
+  // --- filtro de colaborador ------------------------------------------------
+
+  it("filtro de colaborador: abrir leva o foco ao campo de busca; cancelar devolve ao botão", async () => {
+    await montarComTabela();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Filtrar por colaborador" }),
+    );
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByLabelText("Filtrar por colaborador (nome ou matrícula)"),
+      ),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Cancelar filtro por colaborador" }),
+    );
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole("button", { name: "Filtrar por colaborador" }),
+      ),
+    );
+  });
+
+  it("filtro de colaborador: escolher leva o foco ao resumo; remover devolve ao botão de filtrar", async () => {
+    await montarComTabela();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Filtrar por colaborador" }),
+    );
+    const lista = await screen.findByRole("list", {
+      name: "Colaboradores encontrados",
+    });
+    fireEvent.click(
+      within(lista).getByRole("button", { name: colaborador2.nome }),
+    );
+    await waitFor(() => {
+      const ativo = document.activeElement as HTMLElement;
+      expect(ativo.tagName).toBe("P");
+      expect(ativo.textContent).toContain(`Colaborador: ${colaborador2.nome}`);
+    });
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: `Remover filtro de colaborador: ${colaborador2.nome}`,
+      }),
+    );
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole("button", { name: "Filtrar por colaborador" }),
+      ),
+    );
+  });
+
+  it("“Limpar filtros” leva o foco ao botão de filtrar, que substitui o estado vazio", async () => {
+    await montarComTabela();
+    vi.mocked(listarVinculosHorario).mockResolvedValue(pagina([], 0));
+    fireEvent.change(screen.getByLabelText("Jornada"), {
+      target: { value: tabelaAtiva.id },
+    });
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Limpar filtros" }),
+    );
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole("button", { name: "Filtrar por colaborador" }),
+      ),
+    );
+  });
+
+  // --- paginação -------------------------------------------------------------
+
+  it("paginar: tabela e paginação seguem à vista, indisponíveis, e o foco fica no botão acionado", async () => {
+    vi.mocked(listarVinculosHorario).mockResolvedValue(
+      pagina([vinculoVigente], 45),
+    );
+    const tabela = await montarComTabela();
+    const proxima = screen.getByRole("button", { name: "Próxima" });
+    proxima.focus();
+    const carga = pendente();
+    vi.mocked(listarVinculosHorario).mockReturnValueOnce(
+      carga.promessa as ReturnType<typeof listarVinculosHorario>,
+    );
+    fireEvent.click(proxima);
+
+    // Durante a carga: nada some, nada fica `disabled` (perderia o foco).
+    await waitFor(() =>
+      expect(proxima).toHaveAttribute("aria-disabled", "true"),
+    );
+    expect(tabela).toBeInTheDocument();
+    expect(
+      within(paginacao()).getByRole("button", { name: "Anterior" }),
+    ).toHaveAttribute("aria-disabled", "true");
+    expect(proxima).not.toBeDisabled();
+    expect(document.activeElement).toBe(proxima);
+    expect(anuncio()).toBe("Carregando a página 2 dos vínculos de horário…");
+    expect(
+      screen.queryByText("Carregando vínculos de horário…"),
+    ).not.toBeInTheDocument();
+
+    // Clique repetido durante a carga não pede outra página.
+    const chamadas = vi.mocked(listarVinculosHorario).mock.calls.length;
+    fireEvent.click(proxima);
+    expect(vi.mocked(listarVinculosHorario).mock.calls.length).toBe(chamadas);
+
+    carga.soltar(pagina([vinculoEncerrado], 45, 2));
+    await waitFor(() =>
+      expect(anuncio()).toBe("Página 2 de 3 — 45 vínculos no filtro atual."),
+    );
+    expect(screen.getByRole("button", { name: "Próxima" })).toBe(proxima);
+    expect(proxima).toHaveAttribute("aria-disabled", "false");
+    expect(document.activeElement).toBe(proxima);
+    expect(within(paginacao()).getByText("Página 2 de 3")).toBeInTheDocument();
+  });
+
+  it("na última página o foco segue no “Próxima”, agora indisponível, e o clique não pede nada", async () => {
+    vi.mocked(listarVinculosHorario).mockResolvedValue(
+      pagina([vinculoVigente], 25),
+    );
+    await montarComTabela();
+    const proxima = screen.getByRole("button", { name: "Próxima" });
+    proxima.focus();
+    vi.mocked(listarVinculosHorario).mockResolvedValueOnce(
+      pagina([vinculoEncerrado], 25, 2),
+    );
+    fireEvent.click(proxima);
+    await waitFor(() =>
+      expect(
+        within(paginacao()).getByText("Página 2 de 2"),
+      ).toBeInTheDocument(),
+    );
+    expect(proxima).toHaveAttribute("aria-disabled", "true");
+    expect(document.activeElement).toBe(proxima);
+    const chamadas = vi.mocked(listarVinculosHorario).mock.calls.length;
+    fireEvent.click(proxima);
+    expect(vi.mocked(listarVinculosHorario).mock.calls.length).toBe(chamadas);
+  });
+
+  it("a posição da paginação não é uma segunda região viva — o anúncio é um só", async () => {
+    vi.mocked(listarVinculosHorario).mockResolvedValue(
+      pagina([vinculoVigente], 45),
+    );
+    await montarComTabela();
+    expect(within(paginacao()).getByText("Página 1 de 3")).not.toHaveAttribute(
+      "aria-live",
+    );
+    // A carga inicial não anuncia nada.
+    expect(anuncio()).toBe("");
+  });
+
+  it("falha ao paginar: aviso, foco em “Tentar novamente”, que repete a MESMA página com os MESMOS filtros", async () => {
+    vi.mocked(listarVinculosHorario).mockResolvedValue(
+      pagina([vinculoVigente], 45),
+    );
+    await montarComTabela();
+    fireEvent.change(screen.getByLabelText("Jornada"), {
+      target: { value: tabelaAtiva.id },
+    });
+    await waitFor(() =>
+      expect(ultimaConsulta()).toEqual({
+        pagina: 1,
+        tamanhoPagina: 20,
+        tabelaHorarioId: tabelaAtiva.id,
+      }),
+    );
+    // Página 2 carrega; a 3 falha.
+    vi.mocked(listarVinculosHorario).mockResolvedValueOnce(
+      pagina([vinculoEncerrado], 45, 2),
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "Próxima" }));
+    await waitFor(() =>
+      expect(
+        within(paginacao()).getByText("Página 2 de 3"),
+      ).toBeInTheDocument(),
+    );
+    vi.mocked(listarVinculosHorario).mockRejectedValueOnce(new Error("rede"));
+    fireEvent.click(screen.getByRole("button", { name: "Próxima" }));
+
+    const alerta = await screen.findByRole("alert");
+    expect(alerta).toHaveTextContent(
+      "Não foi possível carregar os vínculos de horário",
+    );
+    expect(alerta).toHaveTextContent("A página 3 não carregou.");
+    const tentar = screen.getByRole("button", { name: "Tentar novamente" });
+    await waitFor(() => expect(document.activeElement).toBe(tentar));
+    // Filtros seguem à vista e intactos.
+    expect((screen.getByLabelText("Jornada") as HTMLSelectElement).value).toBe(
+      tabelaAtiva.id,
+    );
+
+    vi.mocked(listarVinculosHorario).mockResolvedValueOnce(
+      pagina([vinculoVigente], 45, 3),
+    );
+    fireEvent.click(tentar);
+    await waitFor(() =>
+      expect(ultimaConsulta()).toEqual({
+        pagina: 3,
+        tamanhoPagina: 20,
+        tabelaHorarioId: tabelaAtiva.id,
+      }),
+    );
+    await waitFor(() =>
+      expect(
+        within(paginacao()).getByText("Página 3 de 3"),
+      ).toBeInTheDocument(),
+    );
+    // O botão sumiu: o foco vai ao título da lista.
+    expect(document.activeElement).toBe(
+      screen.getByRole("heading", {
+        level: 2,
+        name: "Colaboradores com tabela de horário vinculada",
+      }),
+    );
+    expect(anuncio()).toBe("Página 3 de 3 — 45 vínculos no filtro atual.");
+  });
+
+  it("nova tentativa que falha de novo mantém o aviso e o foco em “Tentar novamente”", async () => {
+    vi.mocked(listarVinculosHorario).mockRejectedValueOnce(new Error("rede"));
+    render(<PessoasHorarioScreen podeOperar />);
+    await screen.findByRole("alert");
+    vi.mocked(listarVinculosHorario).mockRejectedValueOnce(new Error("rede"));
+    fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole("button", { name: "Tentar novamente" }),
+      ),
+    );
+    expect(ultimaConsulta()).toEqual({ pagina: 1, tamanhoPagina: 20 });
+  });
+
+  // --- falha do catálogo de jornadas ----------------------------------------
+
+  it("catálogo de jornadas falha: a tabela aparece, o filtro avisa e a nova tentativa é só do catálogo", async () => {
+    vi.mocked(listarTabelasHorario).mockRejectedValueOnce(new Error("rede"));
+    vi.mocked(listarVinculosHorario).mockResolvedValue(
+      pagina([vinculoVigente], 45),
+    );
+    const tabela = await montarComTabela();
+    expect(within(tabela).getByText(colaborador1.nome)).toBeInTheDocument();
+
+    const filtros = screen.getByRole("group", {
+      name: "Filtrar vínculos de horário",
+    });
+    expect(await within(filtros).findByRole("alert")).toHaveTextContent(
+      "Não foi possível carregar as jornadas. O filtro por jornada fica indisponível até carregar.",
+    );
+    expect(
+      screen.queryByText("Não foi possível carregar os vínculos de horário"),
+    ).not.toBeInTheDocument();
+
+    // Vai à página 2 antes de tentar de novo: a página não pode reiniciar.
+    vi.mocked(listarVinculosHorario).mockResolvedValueOnce(
+      pagina([vinculoEncerrado], 45, 2),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Próxima" }));
+    await waitFor(() =>
+      expect(
+        within(paginacao()).getByText("Página 2 de 3"),
+      ).toBeInTheDocument(),
+    );
+    const vinculosAntes = vi.mocked(listarVinculosHorario).mock.calls.length;
+    const jornadasAntes = vi.mocked(listarTabelasHorario).mock.calls.length;
+
+    fireEvent.click(
+      within(filtros).getByRole("button", {
+        name: "Tentar carregar as jornadas",
+      }),
+    );
+    await waitFor(() =>
+      expect(within(filtros).queryByRole("alert")).not.toBeInTheDocument(),
+    );
+    expect(vi.mocked(listarTabelasHorario).mock.calls.length).toBe(
+      jornadasAntes + 1,
+    );
+    expect(vi.mocked(listarVinculosHorario).mock.calls.length).toBe(
+      vinculosAntes,
+    );
+    expect(within(paginacao()).getByText("Página 2 de 3")).toBeInTheDocument();
+    const seletor = screen.getByLabelText("Jornada") as HTMLSelectElement;
+    expect([...seletor.options].map((o) => o.textContent)).toContain(
+      "Tabela Comercial (teste)",
+    );
+    // O botão sumiu: o foco vai ao filtro que ele liberou.
+    await waitFor(() => expect(document.activeElement).toBe(seletor));
+  });
+
+  it("catálogo falha de novo: o aviso continua e o botão fica indisponível durante a tentativa", async () => {
+    vi.mocked(listarTabelasHorario).mockRejectedValueOnce(new Error("rede"));
+    await montarComTabela();
+    const filtros = screen.getByRole("group", {
+      name: "Filtrar vínculos de horário",
+    });
+    await within(filtros).findByRole("alert");
+    let falhar!: (e: unknown) => void;
+    vi.mocked(listarTabelasHorario).mockReturnValueOnce(
+      new Promise((_, reject) => {
+        falhar = reject;
+      }) as ReturnType<typeof listarTabelasHorario>,
+    );
+    const tentar = within(filtros).getByRole("button", {
+      name: "Tentar carregar as jornadas",
+    });
+    tentar.focus();
+    fireEvent.click(tentar);
+    await waitFor(() =>
+      expect(tentar).toHaveAttribute("aria-disabled", "true"),
+    );
+    expect(document.activeElement).toBe(tentar);
+    falhar(new Error("rede"));
+    await waitFor(() =>
+      expect(tentar).toHaveAttribute("aria-disabled", "false"),
+    );
+    expect(within(filtros).getByRole("alert")).toBeInTheDocument();
+    expect(document.activeElement).toBe(tentar);
+  });
+
+  it("catálogo falha: o formulário abre, avisa, não salva e recebe as jornadas na nova tentativa", async () => {
+    vi.mocked(listarTabelasHorario).mockRejectedValueOnce(new Error("rede"));
+    await montarComTabela();
+    await screen.findAllByText(/Não foi possível carregar as jornadas/);
+    fireEvent.click(screen.getByRole("button", { name: "Novo vínculo" }));
+    const form = screen.getByRole("form", {
+      name: "Formulário de novo vínculo de horário",
+    });
+    expect(within(form).getByRole("alert")).toHaveTextContent(
+      "Não foi possível carregar as jornadas. Sem elas, não dá para criar o vínculo.",
+    );
+    expect(
+      within(form).getByRole("button", { name: "Criar vínculo" }),
+    ).toBeDisabled();
+
+    fireEvent.click(
+      within(form).getByRole("button", { name: "Tentar carregar as jornadas" }),
+    );
+    // Uma só jornada ativa: vem escolhida e o campo não aparece (regra de
+    // antes); o foco vai ao início da vigência.
+    await waitFor(() =>
+      expect(within(form).queryByRole("alert")).not.toBeInTheDocument(),
+    );
+    expect(
+      within(form).getByRole("button", { name: "Criar vínculo" }),
+    ).toBeEnabled();
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        within(form).getByLabelText(/Vigência — início/),
+      ),
+    );
+  });
+
+  it("contagem de ativos falha: a tabela aparece e o formulário mostra a busca de colaborador", async () => {
+    vi.mocked(listarColaboradores).mockRejectedValueOnce(new Error("rede"));
+    const tabela = await montarComTabela();
+    expect(within(tabela).getByText(colaborador1.nome)).toBeInTheDocument();
+    expect(
+      screen.queryByText(/Nenhum colaborador ativo disponível/),
+    ).not.toBeInTheDocument();
+    const novo = screen.getByRole("button", { name: "Novo vínculo" });
+    await waitFor(() => expect(novo).toBeEnabled());
+    fireEvent.click(novo);
+    expect(
+      await screen.findByLabelText(
+        "Colaborador (buscar por nome ou matrícula)",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("perfil leitor (DP): falha do catálogo avisa no filtro, sem nenhum controle de escrita", async () => {
+    vi.mocked(listarTabelasHorario).mockRejectedValueOnce(new Error("rede"));
+    const tabela = await montarComTabela(false);
+    expect(within(tabela).getByText(colaborador1.nome)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/O filtro por jornada fica indisponível/),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Novo vínculo" })).toBeNull();
+  });
+
+  it("375 px: o filtro de jornada e o aviso do catálogo empilham e quebram linha; indisponível parece desabilitado", () => {
+    const css = readFileSync(
+      "src/screens/pessoas/PessoasHorarioScreen.css",
+      "utf8",
+    );
+    expect(css).toMatch(
+      /@media \(max-width: 640px\) \{[\s\S]*\.pessoas-horario-screen__filtros > \.pessoas-horario-screen__filtro-jornada \{[^}]*width: 100%/,
+    );
+    const bloco = (fonte: string, seletor: string) =>
+      new RegExp(
+        `${seletor.replace(/[.[\]="]/g, (c) => `\\${c}`)} \\{([^}]*)\\}`,
+      ).exec(fonte)?.[1] ?? "";
+    expect(bloco(css, ".pessoas-horario-screen__aviso-catalogo")).toMatch(
+      /overflow-wrap: anywhere/,
+    );
+    expect(bloco(css, ".pessoas-horario-screen__filtro-jornada")).toMatch(
+      /min-width: 0/,
+    );
+    const cssPaginacao = readFileSync(
+      "src/screens/pessoas/SeletorColaboradorPaginado.css",
+      "utf8",
+    );
+    expect(
+      bloco(
+        cssPaginacao,
+        '.pessoas-paginacao .evolli-button[aria-disabled="true"]',
+      ),
+    ).toMatch(/opacity: 0\.5/);
+  });
+});
