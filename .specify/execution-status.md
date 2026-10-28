@@ -2541,20 +2541,23 @@ dependência.
 de jornadas acima de 100 itens, limite de 100 dos catálogos de Departamento e
 Cargo, regras de jornada, promoção e merge.
 
-## Próxima fatia de Gestão de Pessoas — T192 (em preparação de decisão)
+## Horário de trabalho: foco, paginação e falhas — T192 (em implementação)
 
-| Tarefa | Estado                       | Resultado principal                                                        |
-| ------ | ---------------------------- | -------------------------------------------------------------------------- |
-| T192   | **Em preparação de decisão** | Dossiê com três opções para a próxima fatia de Pessoas e uma recomendação. |
+| Tarefa | Estado               | Resultado principal                                                                               |
+| ------ | -------------------- | ------------------------------------------------------------------------------------------------- |
+| T192   | **Em implementação** | Horário de trabalho sem perda de foco ao filtrar e paginar, com falhas que não escondem a tabela. |
 
-**Escopo desta etapa:** convergência da T191 e o dossiê (`docs/decisions/t192-dossie-proxima-fatia-pessoas.md`) da próxima
-fatia de Gestão de Pessoas, priorizando as observações da revisão final da
-T191 no Horário de trabalho (foco, paginação, falha do apoio, nova tentativa)
-e os rótulos do `master_tecnico` global. Nenhuma implementação de produto
-antes da decisão da proprietária.
+**Escopo da T192:** opção A do [dossiê](../docs/decisions/t192-dossie-proxima-fatia-pessoas.md), aprovada pela proprietária
+em 2026-10-28, só na aba Horário de trabalho: foco no filtro de colaborador
+(abrir, cancelar, escolher, remover); paginação com tabela e controles à
+vista durante a carga, foco no próprio botão acionado e anúncio da carga e da
+página; falha do catálogo de jornadas com aviso próprio e nova tentativa, sem
+esconder a tabela; "Tentar novamente" na página que falhou, com os mesmos
+filtros; E2E de perfis negados no detalhe e do `master_tecnico` com empresa
+ativa. Sem API, schema, migration, RBAC, auditoria, seed ou dependência.
 
-**Fora de escopo:** código, API, schema, migration, RBAC, banco, seed, Docker,
-dependências, CI, PR, push, promoção e merge.
+**Fora de escopo:** rótulos do `master_tecnico` global, catálogos acima de 100
+itens, desempate da linha do tempo, outras abas, promoção e merge.
 
 ## Próxima ação autorizável
 

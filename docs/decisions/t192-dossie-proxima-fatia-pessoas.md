@@ -1,7 +1,7 @@
 # T192 — Dossiê: próxima fatia de Gestão de Pessoas
 
-Status: **dossiê de preparação de decisão.** Nada aqui decide, aprova ou
-autoriza implementação: a escolha é da proprietária.
+Status: **decidido pela proprietária em 2026-10-28: opção A** (seção 5).
+As seções 1 a 4 registram o dossiê como foi apresentado.
 Data: 2026-10-28. Tarefa: T192.
 Fontes, e só elas: `.specify`, as decisões em `docs/decisions` (em especial
 [T188](t188-dossie-proxima-fatia-pessoas.md),
@@ -159,3 +159,30 @@ Para seguir com A, a proprietária precisa decidir:
    perfis e master com empresa ativa (recomendado: sim; só testes).
 3. **Incluir os rótulos do master global (opção B)** na mesma entrega
    (opcional; recomendado: não, para manter a fatia numa tela).
+
+## 5. Decisão da proprietária (2026-10-28)
+
+**Opção A aprovada**, só na aba Horário de trabalho. Respostas às decisões:
+
+1. **Foco depois de paginar:** permanece no próprio botão "Próxima" ou
+   "Anterior", que continua à vista e desabilitado durante a carga.
+2. **E2E pendentes da T191:** entram — perfis negados também no detalhe e
+   `master_tecnico` com empresa ativa.
+3. **Rótulos do `master_tecnico` global (opção B):** não entram.
+
+Também ficam de fora: catálogos acima de 100 itens e qualquer outra aba.
+
+Comportamento aprovado:
+
+- **Filtro de colaborador:** ao abrir, o foco vai ao campo de busca; ao
+  cancelar, volta ao botão que abriu; ao escolher, vai ao resumo do filtro
+  aplicado; ao remover, volta ao botão de filtrar.
+- **Paginação:** tabela e controles não somem durante a carga; os controles
+  ficam visíveis e desabilitados enquanto a página pedida carrega; ao
+  concluir, o foco segue no botão acionado; a carga e a página atual são
+  anunciadas ao leitor de tela. "Tentar novamente" repete exatamente a página
+  que falhou, com os mesmos filtros.
+- **Falha do catálogo de jornadas:** não esconde a tabela de vínculos; aviso
+  específico e anunciado no filtro de jornada e no formulário de novo vínculo;
+  nova tentativa só do catálogo, sem reiniciar tabela, filtros ou página.
+  Leitura de RH, DP e `master_tecnico` inalterada.

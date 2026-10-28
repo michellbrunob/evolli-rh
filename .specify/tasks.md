@@ -2725,19 +2725,25 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
     - **Prévia:** `http://127.0.0.1:5173` passa a mostrar a branch da T191 ao vivo, identificada
       como `[T191 dev]`, não a `main`.
 
-89. **T192 - Próxima fatia de Gestão de Pessoas (preparação de decisão)**
-    - **Estado:** **em preparação de decisão**. Branch `codex/t192-proxima-fatia-pessoas`, a
-      partir do squash `1a7daf433564d3ce21a6413e0d2106bd6a7b7ddb` (T191 integrada, PR #184).
-    - **Objetivo desta etapa:** convergir a T191 e propor três próximas fatias de Gestão de
-      Pessoas, priorizando as observações da revisão final da T191 (foco, paginação, falha do
-      apoio, nova tentativa e rótulos do `master_tecnico` global), sem implementar produto antes
-      de uma decisão explícita da proprietária.
-    - **Entrega desta etapa:** dossiê (`docs/decisions/t192-dossie-proxima-fatia-pessoas.md`) com as opções e uma recomendação. Só
-      documentação: sem código, API, schema, migration, RBAC, banco, seed, Docker,
-      dependência, CI, PR ou push.
-    - **Fora de escopo:** implementação de qualquer opção antes da decisão, regras de jornada,
-      dados pessoais novos, documentos, folha, ponto, banco de horas, fuso horário, importação,
-      exportação, integrações externas, promoção e merge.
+89. **T192 - Horário de trabalho: foco, paginação e falhas sem perder o lugar**
+    - **Estado:** **em implementação**. Branch `codex/t192-proxima-fatia-pessoas`, a partir do
+      squash `1a7daf433564d3ce21a6413e0d2106bd6a7b7ddb` (T191 integrada, PR #184).
+    - **Preparação:** [dossiê](../docs/decisions/t192-dossie-proxima-fatia-pessoas.md) com três opções; a proprietária aprovou a opção A em
+      2026-10-28.
+    - **Objetivo:** na aba Horário de trabalho, o foco não se perde ao abrir, cancelar,
+      escolher ou remover o filtro de colaborador nem ao paginar; tabela e paginação seguem à
+      vista durante a carga, com o carregamento e a página anunciados; a falha do catálogo de
+      jornadas não esconde a tabela e tem nova tentativa própria; "Tentar novamente" repete a
+      página que falhou, com os mesmos filtros. Mais os dois E2E pendentes da T191: perfis
+      negados no detalhe e `master_tecnico` com empresa ativa.
+    - **Contratos:** nenhum muda. Sem API, schema, migration, RBAC, auditoria, seed, Docker ou
+      dependência.
+    - **Fora de escopo:** rótulos sem ambiguidade do `master_tecnico` global, catálogos acima de
+      100 itens (jornadas, departamentos e cargos), desempate da linha do tempo do vínculo
+      funcional, outras abas de Pessoas, regras de jornada, dados pessoais novos, promoção e
+      merge.
+    - **Prévia:** `http://127.0.0.1:5173` passa a mostrar a branch da T192 ao vivo, identificada
+      como `[T192 dev]`, não a `main`.
 
 ## Regra obrigatória para as próximas tarefas
 
