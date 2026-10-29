@@ -4846,6 +4846,8 @@ describe("T197 — criação inline de referências na Nova admissão", () => {
         `Escolha atual: ${novo.codigo} — Nova Referência Sintética`,
       );
       await waitFor(() => expect(campo()).toHaveFocus());
+      // A busca é limpa, como numa escolha feita na própria lista.
+      expect(campo()).toHaveValue("");
       expect(statusDo(campo())).toBe(
         `Criado e escolhido: ${novo.codigo} — Nova Referência Sintética.`,
       );
@@ -4917,6 +4919,18 @@ describe("T197 — criação inline de referências na Nova admissão", () => {
       expect(dialogoCriacao()).toBeNull();
     },
   );
+
+  it("vazio no feminino: «Nenhuma unidade encontrada», no anúncio e na lista", async () => {
+    vi.mocked(listarUnidades).mockResolvedValue(paginado([]));
+    montar("dp");
+    await aguardarEmpresa();
+    abrirLotacao();
+    await buscarNo(unidadeSel(), "Inexistente");
+    expect(statusDo(unidadeSel())).toBe("Nenhuma unidade encontrada.");
+    expect(listaDe(unidadeSel()).parentElement).toHaveTextContent(
+      "Nenhuma unidade ativa encontrada para a busca.",
+    );
+  });
 
   it('o "+" segue em Departamento, Cargo e Unidade; Centro de custo não tem "+"', async () => {
     montar("rh");

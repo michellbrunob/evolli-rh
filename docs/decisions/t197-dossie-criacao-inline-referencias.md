@@ -413,8 +413,8 @@ tipo **e nome normalizado** (seção 12).
   o diálogo não fecha. Cancelar, Escape e Fechar não criam nada e devolvem o
   foco ao campo, com o termo.
 - Sucesso: a referência fica escolhida pelo mesmo caminho da escolha manual
-  (no Departamento, limpa e relê as Áreas), a busca do seletor é relida, o
-  foco volta ao campo e a região de status anuncia "Criado e escolhido:
+  (no Departamento, limpa e relê as Áreas), a busca do seletor é relida e
+  limpa, o foco volta ao campo e a região de status anuncia "Criado e escolhido:
   CÓDIGO — Nome." uma vez. Nada da admissão se perde.
 - Recusas no diálogo: `nome_em_uso` oferece "Escolher CÓDIGO — Nome";
   `nome_inativo`, `codigo_indisponivel`, 400, 403 e 404 explicam e não
@@ -426,6 +426,11 @@ tipo **e nome normalizado** (seção 12).
   troca de empresa remonta a página e descarta respostas atrasadas.
 - O "+" da T180 segue para Departamento, Cargo e Unidade; Centro de custo
   ganhou só a criação inline. O DP não recebe a oferta.
+
+- Validação no localhost (banco isolado, dados sintéticos) trouxe dois
+  ajustes pequenos, feitos na entrega: a busca passa a ser limpa depois de
+  criar ou escolher pela confirmação, como numa escolha da própria lista; e o
+  vazio concorda no feminino ("Nenhuma unidade encontrada").
 
 ### 12.3 Limites conhecidos
 

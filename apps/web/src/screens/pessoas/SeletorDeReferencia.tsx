@@ -192,6 +192,8 @@ export function SeletorDeReferencia({
   const idEscolha = `${id}-escolha`;
   const idDaOpcao = (indice: number) => `${base}-opcao-${indice}`;
   const idDaCriacao = `${base}-criar`;
+  /** T197 — concordância do vazio ("Nenhuma unidade encontrada"). */
+  const encontrado = ativo === "ativa" ? "encontrada" : "encontrado";
 
   const [termo, setTermo] = useState("");
   const [estado, setEstado] = useState<Estado>({ tipo: "fechado" });
@@ -240,9 +242,13 @@ export function SeletorDeReferencia({
     setAnuncio(texto);
   }
 
-  // T197 — o aviso de fora é anunciado uma vez por `id`.
+  // T197 — o aviso de fora (referência criada ou escolhida pela confirmação)
+  // é anunciado uma vez por `id`, e a busca é limpa, como numa escolha feita
+  // na própria lista.
   useEffect(() => {
-    if (aviso) setAnuncio(aviso.texto);
+    if (!aviso) return;
+    setAnuncio(aviso.texto);
+    setTermo("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aviso?.id]);
 
@@ -262,7 +268,7 @@ export function SeletorDeReferencia({
   }
 
   function textoDaContagem(exibidos: number, total: number): string {
-    if (total === 0) return `${nenhum} ${rotulo.toLowerCase()} encontrado.`;
+    if (total === 0) return `${nenhum} ${rotulo.toLowerCase()} ${encontrado}.`;
     if (total === 1 && exibidos === 1) return "1 resultado.";
     return `${total} ${total === 1 ? "resultado" : "resultados"}; ${exibidos} ${
       exibidos === 1 ? "exibido" : "exibidos"
@@ -579,7 +585,7 @@ export function SeletorDeReferencia({
         !haMaisPaginas(estado) ? (
           <p className="seletor-referencia__texto">
             {termo.trim()
-              ? `${nenhum} ${rotulo.toLowerCase()} ${ativo} encontrado para a busca.`
+              ? `${nenhum} ${rotulo.toLowerCase()} ${ativo} ${encontrado} para a busca.`
               : `${nenhum} ${rotulo.toLowerCase()} ${ativo} nesta empresa.`}
           </p>
         ) : null}
