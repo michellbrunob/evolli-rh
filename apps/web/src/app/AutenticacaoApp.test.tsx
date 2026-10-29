@@ -1077,6 +1077,31 @@ describe("T163/T189 — contexto empresarial ativo", () => {
     ).toBe("Pessoa Sintetica Rascunho");
   });
 
+  it("T195 — edição pendente numa etapa adiantada: continuar editando mantém a etapa e os dados", async () => {
+    trocarParaBetaNoServidor();
+    const nome = await abrirNovaAdmissaoPorRota();
+    fireEvent.change(nome, { target: { value: "Pessoa Sintetica Rascunho" } });
+    fireEvent.change(screen.getByLabelText(/^Data de nascimento/), {
+      target: { value: "1990-05-20" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
+    const titulo = await screen.findByRole("heading", {
+      level: 2,
+      name: /Dados profissionais e lotação$/,
+    });
+
+    await trocarPeloMenuPara("Empresa Beta");
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Continuar editando" }),
+    );
+
+    expect(trocarEmpresaDoContexto).not.toHaveBeenCalled();
+    expect(titulo).toBeVisible();
+    expect(
+      (screen.getByLabelText(/^Nome completo/) as HTMLInputElement).value,
+    ).toBe("Pessoa Sintetica Rascunho");
+  });
+
   it("edição pendente: confirmar troca, descarta e vai para Colaboradores na empresa nova", async () => {
     trocarParaBetaNoServidor();
     const nome = await abrirNovaAdmissaoPorRota();
@@ -1356,9 +1381,28 @@ describe("T189 (B1/N1) — referência rápida pendente e conferência antes de 
     window.history.replaceState(null, "", window.location.pathname);
   });
 
-  /** Nova admissão vazia, com o cadastro rápido de departamento aberto. */
+  /**
+   * Nova admissão com o cadastro rápido de departamento aberto, pelo caminho
+   * que a interface oferece (T195): a etapa 1 é preenchida, "Continuar" leva
+   * à etapa 2 e o "+" abre o modal. Nesse estado a Nova admissão também é
+   * edição pendente — não há como abrir o "+" com ela vazia. Que o modal,
+   * sozinho, conte como pendência só com código ou nome digitados (e vazio
+   * não conte) é provado no teste do componente, com o registro isolado
+   * (`ModalReferenciaRapida.test.tsx`, T189 B1).
+   */
   async function abrirReferenciaRapida() {
     await abrirNovaAdmissaoPorRota();
+    fireEvent.change(screen.getByLabelText(/Nome completo/), {
+      target: { value: "Pessoa Sintetica Referencia" },
+    });
+    fireEvent.change(screen.getByLabelText(/^Data de nascimento/), {
+      target: { value: "1990-05-20" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
+    await screen.findByRole("heading", {
+      level: 2,
+      name: /Dados profissionais e lotação$/,
+    });
     const mais = await screen.findByRole("button", {
       name: "Cadastrar novo departamento",
     });
@@ -1382,6 +1426,24 @@ describe("T189 (B1/N1) — referência rápida pendente e conferência antes de 
 
   const aviso = () =>
     screen.findByRole("alertdialog", { name: "A empresa ativa mudou" });
+
+  /**
+   * T195 — a etapa ATIVA da Nova admissão: os quatro painéis ficam sempre
+   * montados, e só o da etapa atual está sem `hidden`. Confere que exatamente
+   * a Etapa 2 é a visível — nenhuma outra ao mesmo tempo — e que o indicador
+   * das etapas a marca como atual (`aria-current="step"`).
+   */
+  function esperarEtapa2Ativa() {
+    const visiveis = [
+      ...document.querySelectorAll<HTMLElement>("section.nova-admissao__etapa"),
+    ]
+      .filter((painel) => !painel.hasAttribute("hidden"))
+      .map((painel) => painel.querySelector("h2")?.textContent);
+    expect(visiveis).toEqual(["Etapa 2 de 4: Dados profissionais e lotação"]);
+    expect(
+      document.querySelector('.nova-admissao__etapas [aria-current="step"]'),
+    ).toHaveTextContent("Etapa 2: Dados profissionais e lotação, etapa atual");
+  }
 
   it("B1: código digitado + troca em outra aba → aviso; voltar preserva empresa, modal e código", async () => {
     vi.mocked(trocarEmpresaDoContexto).mockResolvedValue(EMPRESA_ALFA);
@@ -1410,6 +1472,11 @@ describe("T189 (B1/N1) — referência rápida pendente e conferência antes de 
     ).toBeInTheDocument();
     expect(campoDaReferencia(/^Código/).value).toBe("DEP_RASCUNHO");
     expect(seletorDoMenu()).toHaveTextContent("Empresa Alfa");
+    // A admissão por trás do modal também ficou, na mesma etapa.
+    expect(
+      (screen.getByLabelText(/Nome completo/) as HTMLInputElement).value,
+    ).toBe("Pessoa Sintetica Referencia");
+    esperarEtapa2Ativa();
   });
 
   it("B1: nome digitado → descarte só depois de “continuar”, no contexto atual", async () => {
@@ -1435,6 +1502,9 @@ describe("T189 (B1/N1) — referência rápida pendente e conferência antes de 
       screen.queryByRole("dialog", { name: "Cadastrar departamento" }),
     ).toBeNull();
     expect(document.body.textContent).not.toContain("Departamento Rascunho");
+    expect(document.body.textContent).not.toContain(
+      "Pessoa Sintetica Referencia",
+    );
     expect(window.location.hash).toBe("#/pessoas/colaboradores");
   });
 
@@ -1451,13 +1521,30 @@ describe("T189 (B1/N1) — referência rápida pendente e conferência antes de 
     expect(campoDaReferencia(/^Nome/).value).toBe("Departamento Ambos");
   });
 
-  it("B1: modal aberto e vazio não é pendência — a troca vinda de outra aba aplica direto", async () => {
+  // T195 — o "+" só existe na etapa 2, depois da etapa 1 preenchida: com o
+  // modal aberto, a admissão já é pendência. O antigo "modal vazio, troca
+  // aplicada direto" deixou de ser alcançável pela interface; a regra do
+  // modal vazio segue provada no teste do componente.
+  it("B1 (T195): modal aberto e vazio, admissão preenchida — avisa; voltar preserva etapa, modal e dados", async () => {
+    vi.mocked(trocarEmpresaDoContexto).mockResolvedValue(EMPRESA_ALFA);
     await abrirReferenciaRapida();
     trocaEmOutraAba(ATOR_EM_BETA);
-    await waitFor(() =>
-      expect(seletorDoMenu()).toHaveTextContent("Empresa Beta"),
+    await aviso();
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Voltar à empresa anterior e continuar editando",
+      }),
     );
-    expect(screen.queryByRole("alertdialog")).toBeNull();
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    expect(
+      screen.getByRole("dialog", { name: "Cadastrar departamento" }),
+    ).toBeInTheDocument();
+    expect(campoDaReferencia(/^Código/).value).toBe("");
+    expect(
+      (screen.getByLabelText(/Nome completo/) as HTMLInputElement).value,
+    ).toBe("Pessoa Sintetica Referencia");
+    expect(seletorDoMenu()).toHaveTextContent("Empresa Alfa");
+    esperarEtapa2Ativa();
   });
 
   it("N1: duas trocas seguidas em outra aba — “continuar” relê e aplica a mais recente", async () => {

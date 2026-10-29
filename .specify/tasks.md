@@ -2792,8 +2792,17 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       como `[T193 dev]`, não a `main`.
 
 91. **T194 - Entrada de colaboradores: painel "Adicionar colaborador" (fatia 1)**
-    - **Estado:** **em implementação** (fatia 1). Branch `codex/t194-entrada-de-colaboradores`,
-      a partir do squash `6366f066e8e5d5330deea9ac29a419c507963652` (T193 integrada, PR #186).
+    - **Estado:** **integrada** em `main` pela PR #187, squash
+      `dd79f4c4703f797498fcc72fc41f436e3eb44928`, com a CI de push 3/3 verde (run 40746014658);
+      branch preservada. Implementada na branch `codex/t194-entrada-de-colaboradores`, a partir
+      do squash `6366f066e8e5d5330deea9ac29a419c507963652` (T193 integrada, PR #186).
+    - **Observação de relatório:** a integração funcional da T194 está concluída; a única
+      pendência administrativa era a sua convergência no Spec Kit, resolvida no primeiro commit
+      da T195. Seguem abertas, sem correção, as observações da revisão final: fundo do `Modal`
+      sem `inert` (padrão da T142); rótulo da empresa no painel com atraso de instantes em
+      troca vinda de outra aba; teste que clica em rádio desabilitado; texto "inicie uma nova
+      admissão" no cabeçalho de Colaboradores; "Iniciar cadastro" sempre habilitado. As decisões
+      pendentes do dossiê seguem pendentes.
     - **Preparação:** [dossiê](../docs/decisions/t194-dossie-entrada-de-colaboradores.md) da
       entrada de colaboradores (painel com três formas, cadastro em quatro etapas, criação
       inline, importação, admissão digital), com a referência de mercado observada nas quatro
@@ -2813,6 +2822,40 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
     - **Prévia:** `http://127.0.0.1:5173` passa a mostrar a branch da T194 ao vivo, identificada
       como `[T194 dev]`, não a `main`.
 
+92. **T195 - Cadastro individual em quatro etapas**
+    - **Estado:** **em implementação**. Branch `codex/t195-admissao-quatro-etapas`, a partir do
+      squash `dd79f4c4703f797498fcc72fc41f436e3eb44928` (T194 integrada, PR #187).
+    - **Origem:** fatia 2 do [dossiê](../docs/decisions/t194-dossie-entrada-de-colaboradores.md) da entrada de colaboradores.
+    - **Decisões aprovadas (2026-10-28):** A Etapa 4 terá revisão final e um bloco explicando que documentos serão liberados em entrega própria; nenhum upload nesta entrega. Área, Equipe e Centro de custo seguem na
+      lotação como hoje (opcionais, Área dependente do Departamento, sem criação inline).
+    - **Objetivo:** a Nova admissão vira um fluxo guiado em quatro etapas — Dados básicos (dados
+      pessoais e contatos), Dados profissionais e lotação, Endereço, Revisão e conclusão —, com
+      progresso de 25% a 100%, validação só da etapa atual ao avançar, etapas visitadas
+      revisitáveis, sem salto para etapa futura e "Voltar" preservando tudo. A conclusão
+      reutiliza a confirmação, a idempotência, a validação por campo e a gravação atômica
+      existentes.
+    - **Campos por etapa e exclusões:** matriz na seção 16 do [dossiê](../docs/decisions/t194-dossie-entrada-de-colaboradores.md).
+      Etapa 1: dados pessoais de hoje e contatos (e-mail pessoal, celular, telefone). Etapa 2:
+      matrícula, tipo, data de admissão, Departamento e Cargo (obrigatórios), Unidade, Área,
+      Equipe, Centro de custo e, para o RH, jornada. Etapa 3: endereço com CEP assistido. Etapa
+      4: revisão, "Editar" por bloco e o aviso de documentos em entrega própria.
+    - **Navegação:** os quatro painéis ficam montados (só o atual visível); "Continuar" (ou
+      Enter) valida só a etapa atual; "Voltar" não valida; o indicador volta a qualquer etapa
+      alcançada e, adiante, valida o caminho; foco no título da etapa; recusa do servidor abre a
+      etapa do campo. Sem rascunho nem persistência nova: recarregar começa do zero, na etapa 1,
+      como antes.
+    - **Revisão final (2026-10-28):** sob a regra 8, as observações acionáveis foram resolvidas
+      na própria entrega: N1 — clique repetido no botão principal (`detail` > 1) é ignorado, e
+      um duplo clique na etapa 3 não abre mais a confirmação sem a revisão; N3 — o teste da
+      troca de empresa com a referência rápida aberta segue o caminho real da interface; N2 —
+      decisão explícita: Enter num seletor fica com o seletor, e o avanço é por Tab + Enter em
+      "Continuar" (testado); N4 — sem lacuna introduzida pela T195 (seção 16.4 do dossiê).
+    - **Contratos:** nenhum. Sem API, schema, migration, RBAC, auditoria, seed, Docker,
+      dependência ou lockfile.
+    - **Fora de escopo:** documentos e Cloudflare R2, importação, admissão digital, criação inline, busca de referências, criação ou retirada de Área, Aprendiz, salário, escala, gestor direto, conselho profissional, dependentes e pensão; promoção e merge.
+    - **Prévia:** `http://127.0.0.1:5173` passa a mostrar a branch da T195 ao vivo, identificada
+      como `[T195 dev]`, não a `main`.
+
 ## Regra obrigatória para as próximas tarefas
 
 1. Criar ou atualizar a entrada da tarefa neste arquivo antes da implementação.
@@ -2827,3 +2870,5 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
    no localhost com dados sintéticos, revisar, abrir a PR, validar a CI, integrar — e só então
    a seguinte começa. Entregas não se misturam, e a tarefa seguinte não é iniciada antes da
    integração da atual.
+8. **Correções de revisão dentro da entrega (regra de qualidade da proprietária, 2026-10-28,
+   registrada na T195):** “Antes de Ready for review, toda correção pequena e acionável identificada em revisão — de UX, acessibilidade, consistência ou teste — deve ser resolvida dentro da própria entrega. Só pode ficar pendente o que exigir decisão de negócio, expansão material de escopo ou arquitetura própria; nesses casos, documentar o motivo.”

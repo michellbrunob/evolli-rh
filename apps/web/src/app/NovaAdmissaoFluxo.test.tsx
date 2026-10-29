@@ -244,9 +244,16 @@ async function admitirPelaPagina({ semContatos = false } = {}) {
   fireEvent.change(screen.getByLabelText(/^Unidade/), {
     target: { value: unidade.id },
   });
-  // T179 — "Salvar" só valida e abre a confirmação; quem grava é
+  // T195 — quatro etapas: "Continuar" até a revisão. Nela, "Confirmar
+  // admissão" só valida e abre a confirmação (T179); quem grava é
   // "Confirmar cadastro".
-  fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
+  for (const etapa of ["Dados básicos", "Dados profissionais", "Endereço"]) {
+    expect(
+      screen.getByRole("heading", { level: 2, name: new RegExp(etapa) }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
+  }
+  fireEvent.click(screen.getByRole("button", { name: "Confirmar admissão" }));
   const confirmacao = await screen.findByRole("dialog", {
     name: "Confirmar cadastro de colaborador?",
   });
@@ -897,11 +904,19 @@ describe("T179 — empresa sem referências, pelo papel que o shell conhece", ()
       await abrirNovaAdmissaoPelaListagem();
       const aviso = await screen.findByText(texto);
       expect(aviso).toHaveTextContent(/cadastro ativo de Cargo/);
+      // T195 — a lotação é a etapa 2: a 1 é preenchida para chegar a ela.
+      fireEvent.change(screen.getByLabelText(/Nome completo/), {
+        target: { value: "Pessoa Sintética Fluxo" },
+      });
+      fireEvent.change(screen.getByLabelText(/Data de nascimento/), {
+        target: { value: "1990-05-20" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
       // T180 — o "+" do cadastro rápido é só do RH.
       expect(
         screen.queryByRole("button", { name: "Cadastrar novo cargo" }) !== null,
       ).toBe(comMais);
-      fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
+      fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
       await waitFor(() => expect(aviso).toHaveFocus());
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
       expect(admitirColaborador).not.toHaveBeenCalled();

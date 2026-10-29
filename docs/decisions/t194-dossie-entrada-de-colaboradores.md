@@ -606,33 +606,37 @@ contrato, e juntas já dão a experiência de entrada guiada.
 - **D4 (nesta fatia)** — Área não entra nesta entrega.
 - **D7** — sem rascunho no servidor.
 
+**Decididas em 2026-10-28, para a fatia 2 (T195):**
+
+- **D5** — a etapa 4 tem revisão final e um bloco explicando que documentos
+  serão liberados em entrega própria; nenhum upload nesta entrega.
+- **D4 (na fatia 2)** — Área segue como hoje: seleção opcional, dependente do
+  Departamento, sem criação inline. Equipe e Centro de custo também seguem
+  como hoje (opcionais, na lotação).
+
 **Pendentes antes de qualquer código de produto:**
 
-4. **D4 — Área:** "não aprovada" significa só "sem criação inline" (Área
-   continua como seleção opcional, recomendado) ou retirar Área da admissão.
-5. **D5 — Etapa 4 sem documentos:** mostrar o bloco "Documentos —
-   indisponível" com a revisão final (recomendado) ou só a revisão.
-6. **D6 — Estado civil:** manter texto livre (recomendado agora) ou lista
+4. **D6 — Estado civil:** manter texto livre (recomendado agora) ou lista
    fechada (exige revisão da ficha da T177).
-7. **D8 — Busca nas referências:** aprovar `busca` aditiva nos quatro `GET`
+5. **D8 — Busca nas referências:** aprovar `busca` aditiva nos quatro `GET`
    (recomendado).
-8. **D9 — Código na criação inline:** G1 servidor deriva do nome
+6. **D9 — Código na criação inline:** G1 servidor deriva do nome
    (recomendado), G2, G3 ou G4; e se "Criar" pede confirmação inline
    (recomendado) ou cria direto, como na referência.
-9. **D10 — Formato da importação:** CSV apenas (recomendado) ou também .xlsx.
-10. **D11 — Gravação da importação:** uma admissão por linha com chave própria
-    (recomendado) ou lote no servidor.
-11. **D12 — Quem importa e o limite de linhas.**
-12. **D13 — Admissão digital:** confirmar que segue bloqueada até as decisões
+7. **D10 — Formato da importação:** CSV apenas (recomendado) ou também .xlsx.
+8. **D11 — Gravação da importação:** uma admissão por linha com chave própria
+   (recomendado) ou lote no servidor.
+9. **D12 — Quem importa e o limite de linhas.**
+10. **D13 — Admissão digital:** confirmar que segue bloqueada até as decisões
     de 8.3 (recomendado), sem código antes disso.
-13. **D17 — Nível (senioridade):** módulo futuro próprio ou fora do produto.
-14. **D18 — Part-time, freelancer e trainee:** tipos de vínculo, atributos
+11. **D17 — Nível (senioridade):** módulo futuro próprio ou fora do produto.
+12. **D18 — Part-time, freelancer e trainee:** tipos de vínculo, atributos
     (jornada, programa) ou fora do produto.
-15. **D19 — Conselho e registro profissional:** módulo futuro com ficha de
+13. **D19 — Conselho e registro profissional:** módulo futuro com ficha de
     tratamento ou fora do produto.
-16. **D20 — Estado no endereço:** manter texto ou adotar lista de UF
+14. **D20 — Estado no endereço:** manter texto ou adotar lista de UF
     (o CEP já devolve a UF).
-17. **D21 — Regras do Aprendiz:** aprovar a lista da seção 5.1 como roteiro da
+15. **D21 — Regras do Aprendiz:** aprovar a lista da seção 5.1 como roteiro da
     entrega própria (prazo, idade, programa, jornada, término, cota).
 
 ## 15. Fatia 1 entregue — painel "Adicionar colaborador"
@@ -688,3 +692,100 @@ schema, migration, RBAC, seed, Docker, dependência ou integração externa.
   `#/pessoas/nova-admissao` não muda.
 
 **Fora de escopo nesta fatia:** fluxo de cadastro em quatro etapas; documentos e Cloudflare R2; importação CSV/XLSX; admissão digital; Área; busca de referências; criação inline; Aprendiz.
+
+## 16. Fatia 2 entregue — cadastro individual em quatro etapas (T195)
+
+**Decisões aprovadas (2026-10-28):** D5 e D4 na fatia 2 (seção 14). A Nova
+admissão vira um fluxo guiado em quatro etapas com os campos, as máscaras,
+as regras e o contrato que já existiam; nada novo é coletado.
+
+### 16.1 Campos por etapa
+
+| Etapa                            | Campos (obrigatório em **negrito**)                                                                                                                                                                                     | Regras                                                                                                                        |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| 1. Dados básicos                 | **Nome completo**, e-mail pessoal, **data de nascimento**, sexo (lista fechada), saudação, estado civil, nacionalidade, naturalidade, escolaridade, curso, nome do pai, nome da mãe; contatos: celular e telefone (D15) | mesmas máscaras e validações; e-mail único por empresa (decidido pelo servidor)                                               |
+| 2. Dados profissionais e lotação | matrícula, **tipo de vínculo**, **data de admissão**; **Departamento**, **Cargo**, Unidade, Área (dependente do Departamento), Equipe, Centro de custo; jornada de trabalho (só o RH, opcional)                         | "+" do cadastro rápido de Departamento, Cargo e Unidade só para o RH (T180); aviso de empresa sem Departamento ou Cargo ativo |
+| 3. Endereço                      | país (sugerido Brasil), CEP, logradouro, número, complemento, bairro, cidade, estado — todos opcionais                                                                                                                  | ViaCEP assistido só para CEP brasileiro, sem sobrescrever o digitado; edição manual preservada                                |
+| 4. Revisão e conclusão           | resumo do que foi digitado (opcional em branco não aparece), "Editar" por bloco e o bloco "Documentos serão liberados em uma próxima etapa do Evolli."                                                                  | "Confirmar admissão" valida tudo e abre a confirmação da T179; idempotência e gravação atômica intactas                       |
+
+**Fora desta entrega:** CPF, foto, raça/etnia, deficiência, gênero, nome
+social, documentos e contato de emergência (etapa 1); nível, salário,
+escala, gestor direto, dependentes, pensão, conselho profissional e Aprendiz
+(etapa 2); documentos, arquivos, upload, Cloudflare R2 e API de arquivos
+(etapa 4); importação, admissão digital, criação inline, busca de
+referências, criação ou retirada de Área.
+
+### 16.2 Navegação
+
+- Indicador das quatro etapas com progresso de 25%, 50%, 75% e 100%; cada
+  etapa diz o seu estado em texto (atual, concluída, visitada, não iniciada).
+- "Continuar" (ou Enter num campo) valida **só** a etapa atual; com erro, a
+  etapa fica, o foco vai ao primeiro campo inválido e o erro é anunciado uma
+  vez (pela descrição do campo). A etapa 1 avança mesmo enquanto as opções da
+  lotação carregam; da etapa 2 em diante, espera a carga.
+- "Voltar" não valida e não perde nada. As etapas já alcançadas são botões no
+  indicador; ir adiante por ele valida as etapas do caminho, uma a uma, e para
+  na primeira com erro — não há salto sem validar.
+- Ao mudar de etapa, o foco vai ao título dela ("Etapa N de 4: …").
+- Os quatro painéis ficam montados e só o atual aparece: dados, avisos das
+  máscaras e o resultado do CEP sobrevivem a qualquer ida e volta.
+- Recusa do servidor (ou validação final) num campo de outra etapa abre a
+  etapa dele, com o foco no campo; o resumo "Revise N campos" leva a cada
+  campo, na etapa dele. O erro geral (envio incerto, sessão expirada, CSRF,
+  empresa mudada, permissão) aparece em qualquer etapa, com as mensagens de
+  sempre, e a chave de idempotência é a mesma até um sucesso ou recomeço.
+- Sem rascunho no servidor (D7) nem persistência nova no navegador:
+  **recarregar a página começa do zero, na etapa 1**, como antes. A troca de
+  empresa e o Cancelar seguem a regra da T189 e da T179 (confirmação só com
+  dado digitado).
+
+### 16.3 Permissões e segurança
+
+Os mesmos papéis de hoje (RH e DP admitem; `master_tecnico` não). A empresa
+vem sempre da sessão. Sem API, schema, migration, RBAC, auditoria, seed,
+Docker, dependência ou lockfile novos.
+
+### 16.4 Revisão final e regra de qualidade
+
+**Regra de qualidade (proprietária, 2026-10-28; regra 8 do `tasks.md`):**
+“Antes de Ready for review, toda correção pequena e acionável identificada em revisão — de UX, acessibilidade, consistência ou teste — deve ser resolvida dentro da própria entrega. Só pode ficar pendente o que exigir decisão de negócio, expansão material de escopo ou arquitetura própria; nesses casos, documentar o motivo.”
+
+Observações da revisão final da PR da T195 e o que foi feito com cada uma:
+
+- **N1 — duplo clique em "Continuar" (corrigido).** O botão principal é o
+  mesmo nas quatro etapas e fica no mesmo lugar; na etapa 3, o 2º clique de um
+  duplo clique caía em "Confirmar admissão" e abria a confirmação sem a
+  revisão ter sido vista. Agora o clique repetido — `detail` maior que 1, a
+  contagem de cliques do próprio navegador — é ignorado: a pessoa sempre
+  chega à revisão visível, e só um clique novo abre a confirmação. Teclado
+  (Enter ou Espaço no botão) e o envio implícito por Enter num campo têm
+  `detail` 0 e seguem como antes. Nada é perdido, e a validação por etapa não
+  muda.
+- **N2 — Enter num seletor (decisão explícita, sem mudança).** O Enter num
+  `select` pertence ao próprio seletor: conforme o sistema e o navegador, ele
+  abre a lista ou confirma a opção. Interceptá-lo para avançar a etapa
+  entraria em conflito com esse uso e mudaria o comportamento nativo. Por
+  isso, **depois de escolher num seletor, o avanço é feito pelo botão
+  "Continuar"**: Tab leva, em ordem, a Cancelar, Voltar e Continuar, e Enter
+  ou Espaço no botão avança. Enter num campo de texto ou de data continua
+  avançando (envio implícito do navegador). Há teste da ordem do Tab e da
+  ativação pelo teclado.
+- **N3 — teste da troca de empresa com a referência rápida (corrigido).** O
+  teste preenchia a etapa 1, avançava e apagava os dados só para isolar a
+  pendência do modal — um estado que a interface não produz. Agora ele segue o
+  caminho real: etapa 1 preenchida, "Continuar", "+" e código digitado; a
+  troca em outra aba abre o aviso, e voltar preserva empresa, etapa, modal,
+  código e os dados da admissão. A regra de que o modal sozinho só conta como
+  pendência com código ou nome (e vazio não conta) continua provada no teste
+  do componente, com o registro de edições isolado. O antigo caso "modal
+  vazio, troca aplicada direto" deixou de ser alcançável: desde a T195 o "+"
+  só aparece na etapa 2, com a admissão já preenchida — e o teste passou a
+  provar esse estado real (aviso e preservação). Nada no produto mudou para
+  acomodar o teste.
+- **N4 — E2E de navegador (não é defeito desta entrega).** A cobertura segue
+  dividida: os testes de tela usam um cliente controlado e conferem o corpo
+  exato enviado (agora passando pelas quatro etapas), e o E2E com PostgreSQL
+  real cobre a gravação pela API. A T195 não criou lacuna: o corpo continua
+  montado pela mesma função de antes, sem mudança de contrato, e a API não
+  mudou. Um E2E de navegador seria infraestrutura nova, fora do escopo; fica
+  como decisão de arquitetura própria, se a proprietária quiser.

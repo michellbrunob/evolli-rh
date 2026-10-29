@@ -290,3 +290,231 @@
   padding: 0;
   list-style: none;
 }
+
+/* ---------------------------------------------------------------------------
+   T195 — as quatro etapas. Só tokens existentes; nada de cor, raio ou escala
+   nova.
+   ------------------------------------------------------------------------- */
+
+/* Texto só para leitor de tela. Próprio da página, como nas demais telas. */
+.nova-admissao__so-leitor {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Indicador: o progresso e, abaixo, as quatro etapas lado a lado. */
+.nova-admissao__etapas {
+  display: grid;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+
+.nova-admissao__progresso {
+  display: grid;
+  gap: var(--space-xxs);
+}
+
+.nova-admissao__progresso-texto {
+  margin: 0;
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+}
+
+.nova-admissao__progresso-barra {
+  appearance: none;
+  width: 100%;
+  height: 0.5rem;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--surface-neutral);
+  overflow: hidden;
+}
+
+.nova-admissao__progresso-barra::-webkit-progress-bar {
+  border-radius: var(--radius-pill);
+  background: var(--surface-neutral);
+}
+
+.nova-admissao__progresso-barra::-webkit-progress-value {
+  border-radius: var(--radius-pill);
+  background: var(--color-action);
+}
+
+.nova-admissao__progresso-barra::-moz-progress-bar {
+  border-radius: var(--radius-pill);
+  background: var(--color-action);
+}
+
+.nova-admissao__etapas-lista {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.nova-admissao__etapa-item {
+  min-width: 0;
+}
+
+/* Botão (etapa alcançada) ou texto (atual e não iniciada), com o mesmo
+   desenho: marcador e nome. Alvo de toque mínimo de 44 px. */
+.nova-admissao__etapa-passo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  width: 100%;
+  min-height: var(--touch-target);
+  padding: var(--space-xxs) var(--space-xs);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--color-ink-muted);
+  font: inherit;
+  font-size: var(--text-caption);
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+button.nova-admissao__etapa-passo {
+  cursor: pointer;
+}
+
+button.nova-admissao__etapa-passo:hover:not(:disabled) {
+  border-color: var(--hairline);
+  background: var(--surface-neutral);
+}
+
+button.nova-admissao__etapa-passo:focus-visible {
+  outline: var(--focus-width) solid var(--color-action);
+  outline-offset: var(--focus-offset);
+}
+
+.nova-admissao__etapa-marcador {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-pill);
+  background: var(--surface-canvas);
+  font-weight: var(--weight-strong);
+}
+
+.nova-admissao__etapa-nome {
+  min-width: 0;
+}
+
+/* Atual: marcador cheio e nome em destaque. Concluída: marcador com ✓. O
+   estado também é dito em texto, para leitor de tela. */
+.nova-admissao__etapa-item--atual .nova-admissao__etapa-passo {
+  color: var(--color-ink);
+  font-weight: var(--weight-strong);
+}
+
+.nova-admissao__etapa-item--atual .nova-admissao__etapa-marcador {
+  border-color: var(--color-action);
+  background: var(--color-action);
+  color: var(--color-on-action);
+}
+
+.nova-admissao__etapa-item--concluida .nova-admissao__etapa-marcador {
+  border-color: var(--color-action);
+  color: var(--color-action);
+}
+
+.nova-admissao__etapa-item--concluida .nova-admissao__etapa-passo,
+.nova-admissao__etapa-item--visitada .nova-admissao__etapa-passo {
+  color: var(--color-ink);
+}
+
+/* O painel de cada etapa: montado sempre, visível só o da atual. A regra do
+   `hidden` precisa vir explícita, porque `display: grid` a sobreporia. */
+.nova-admissao__etapa {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-lg);
+  min-width: 0;
+}
+
+.nova-admissao__etapa[hidden] {
+  display: none;
+}
+
+.nova-admissao__etapa-titulo {
+  display: grid;
+  gap: var(--space-xxs);
+  margin: 0;
+  font-size: var(--text-title);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  font-weight: var(--weight-strong);
+  color: var(--color-ink);
+}
+
+.nova-admissao__etapa-titulo:focus {
+  outline: none;
+}
+
+.nova-admissao__etapa-titulo:focus-visible {
+  outline: var(--focus-width) solid var(--color-action);
+  outline-offset: var(--focus-offset);
+}
+
+.nova-admissao__etapa-numero {
+  font-size: var(--text-caption);
+  font-weight: var(--weight-regular);
+  letter-spacing: normal;
+  color: var(--color-ink-muted);
+}
+
+/* Revisão: um bloco por etapa, com "Editar" ao lado do título. */
+.nova-admissao__revisao-bloco {
+  display: grid;
+  gap: var(--space-xs);
+  min-width: 0;
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--status-info-border);
+  overflow-wrap: anywhere;
+}
+
+.nova-admissao__revisao-cabecalho {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-xs) var(--space-sm);
+}
+
+/* Documentos: aviso informativo, sem ação. */
+.nova-admissao__documentos {
+  display: grid;
+  gap: var(--space-xxs);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--status-info-border);
+  border-radius: var(--radius-md);
+  background: var(--status-info-surface);
+}
+
+/* Em tela estreita, as quatro etapas viram só marcadores; o leitor de tela
+   segue com o nome completo de cada uma, e o título da etapa atual aparece
+   logo abaixo. */
+@media (max-width: 640px) {
+  .nova-admissao__etapa-passo {
+    justify-content: center;
+  }
+
+  .nova-admissao__etapa-nome {
+    display: none;
+  }
+}
