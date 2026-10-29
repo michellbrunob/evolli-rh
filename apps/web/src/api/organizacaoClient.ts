@@ -40,7 +40,11 @@ export interface ListarUnidadesQuery {
 }
 
 export interface CriarUnidadeDto {
-  codigo: string;
+  /**
+   * T197 — ausente: criação inline da Nova admissão, com o código gerado no
+   * servidor a partir do nome. Presente: o cadastro manual de sempre.
+   */
+  codigo?: string;
   nome: string;
   empresaId: string;
 }
@@ -49,9 +53,18 @@ export interface AtualizarUnidadeDto {
   nome: string;
 }
 
+/** T197 — a referência ativa que já tem o nome (409 `nome_em_uso`). */
+export interface ReferenciaExistenteApi {
+  id: string;
+  codigo: string;
+  nome: string;
+}
+
 export class ApiError extends Error {
   /** T180 — código estável da recusa (ex.: `csrf_invalido`), quando vem. */
   readonly codigo?: string;
+  /** T197 — no 409 `nome_em_uso`: id, código e nome da referência existente. */
+  readonly referencia?: ReferenciaExistenteApi;
 
   constructor(
     readonly status: number,
@@ -62,8 +75,22 @@ export class ApiError extends Error {
     this.name = "ApiError";
     // T180 — só `codigo` (texto) é lido do corpo, como em `colaboradoresClient`.
     if (typeof corpo === "object" && corpo !== null) {
-      const { codigo } = corpo as { codigo?: unknown };
+      const { codigo, referencia } = corpo as {
+        codigo?: unknown;
+        referencia?: unknown;
+      };
       if (typeof codigo === "string") this.codigo = codigo;
+      // T197 — só os três campos, e só se forem texto.
+      if (typeof referencia === "object" && referencia !== null) {
+        const { id, codigo: cod, nome } = referencia as Record<string, unknown>;
+        if (
+          typeof id === "string" &&
+          typeof cod === "string" &&
+          typeof nome === "string"
+        ) {
+          this.referencia = { id, codigo: cod, nome };
+        }
+      }
     }
   }
 }
@@ -121,7 +148,11 @@ export interface ListarDepartamentosQuery {
 }
 
 export interface CriarDepartamentoDto {
-  codigo: string;
+  /**
+   * T197 — ausente: criação inline da Nova admissão, com o código gerado no
+   * servidor a partir do nome. Presente: o cadastro manual de sempre.
+   */
+  codigo?: string;
   nome: string;
   empresaId: string;
 }
@@ -355,7 +386,11 @@ export interface ListarCentrosCustoQuery {
 }
 
 export interface CriarCentroCustoDto {
-  codigo: string;
+  /**
+   * T197 — ausente: criação inline da Nova admissão, com o código gerado no
+   * servidor a partir do nome. Presente: o cadastro manual de sempre.
+   */
+  codigo?: string;
   nome: string;
   empresaId: string;
 }

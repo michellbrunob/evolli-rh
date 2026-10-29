@@ -2677,11 +2677,17 @@ nem persistência nova: recarregar começa do zero, na etapa 1, como antes.
 
 **Fora de escopo:** documentos e Cloudflare R2, importação, admissão digital, criação inline, busca de referências, criação ou retirada de Área, Aprendiz, salário, escala, gestor direto, conselho profissional, dependentes e pensão; promoção e merge.
 
-## Busca nas referências organizacionais — T196 (em implementação)
+## Busca nas referências organizacionais — T196 (integrada)
 
-| Tarefa | Estado               | Resultado principal                                                                                                      |
-| ------ | -------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| T196   | **Em implementação** | Busca no servidor e seletor pesquisável para Departamento, Cargo, Unidade e Centro de custo na etapa 2 da Nova admissão. |
+| Tarefa | Estado                                    | Resultado principal                                                                                                      |
+| ------ | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| T196   | **Integrada** (PR #189, squash `513f39f`) | Busca no servidor e seletor pesquisável para Departamento, Cargo, Unidade e Centro de custo na etapa 2 da Nova admissão. |
+
+**Observação de relatório:** a integração funcional da T196 está concluída
+(CI de push 3/3 verde, run 40920945239); a única pendência administrativa era
+a sua convergência no Spec Kit, resolvida no primeiro commit da T197. As
+correções das revisões (B1 a B4, N1, O2) foram feitas dentro da entrega; O1
+não se reproduziu e ficou sem mudança de produto.
 
 **Escopo da T196:** a preparação de decisão veio primeiro (o
 [dossiê](../docs/decisions/t196-dossie-busca-referencias.md)); depois, a
@@ -2698,7 +2704,32 @@ Centro de custo entra na busca. Regra desta entrega: busca **sem remoção de
 acentos**. Criação inline, código automático e confirmação curta (D9) ficam
 para a fatia seguinte. Entrega e limites na seção 11 do dossiê.
 
+**Limites que continuam:** busca sem remoção de acentos; sem índice de texto
+(`ILIKE` dentro da empresa); o teto de 100 segue em Área, Equipe e nas telas
+fora da Nova admissão; itens e total saem de duas consultas separadas, e o
+seletor encerra a paginação pelo servidor e mostra, no fim, só o que foi
+carregado.
+
 **Fora de escopo:** criação inline, Área, Equipe, o teto de 100 fora da admissão, schema, migration, RBAC, seed, Docker, dependências, promoção e merge.
+
+## Criação inline de referências na Nova admissão — T197 (em implementação)
+
+| Tarefa | Estado               | Resultado principal                                                                                             |
+| ------ | -------------------- | --------------------------------------------------------------------------------------------------------------- |
+| T197   | **Em implementação** | Criação inline de Departamento, Cargo, Unidade e Centro de custo a partir da busca da etapa 2 da Nova admissão. |
+
+**Escopo da T197:** a preparação de decisão veio primeiro (o
+[dossiê](../docs/decisions/t197-dossie-criacao-inline-referencias.md)); depois,
+a implementação aprovada: `POST` das quatro referências sem `codigo`, com o
+código gerado no servidor, nome repetido recusado e pedidos iguais
+serializados; e "Criar «termo»" no seletor da etapa 2, só para o RH, com
+confirmação curta e a referência criada já escolhida. O DP só pesquisa e
+escolhe. Sem schema, migration, RBAC, seed ou dependência.
+
+**Decisões aprovadas (2026-10-29):** D10 a D16 (seção 11 do dossiê); entrega
+e limites na seção 12.
+
+**Fora de escopo:** Área, Equipe, importação, admissão digital, documentos, upload, R2, schema, migration, RBAC, seed, Docker, dependências, promoção e merge.
 
 ## Próxima ação autorizável
 

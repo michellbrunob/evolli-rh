@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "constitutionVersion": "1.4.0",
   "lastConvergedAt": "2026-10-29",
-  "lastIntegratedTask": 195,
-  "lastRecordedTask": 196,
+  "lastIntegratedTask": 196,
+  "lastRecordedTask": 197,
   "platformDecision": {
     "adr": "docs/adr/0014-evolli-plataforma-base-e-encerramento-do-frappe.md",
     "decidedAt": "2026-10-01",
@@ -11,15 +11,15 @@
     "frappe": "encerrado_como_candidato_referencia_apenas"
   },
   "nextTask": {
-    "id": "T196",
-    "status": "busca_referencias_em_implementacao",
-    "reason": "T195 integrada em main pela PR #188 (squash e473d47642cde02ed22fec3970fcfe293b9202cb), com a CI de push 3/3 verde (run 40859789278). A T196 implementa a busca aprovada (D8): busca opcional por codigo ou nome, sem diferenciar maiusculas e sem remover acentos, antes da paginacao, nas rotas de Departamento, Cargo, Unidade e Centro de custo, e o seletor pesquisavel acessivel na etapa 2 da Nova admissao (docs/decisions/t196-dossie-busca-referencias.md, secao 11). Sem schema, migration, indice, RBAC, seed ou dependencia. Criacao inline, codigo automatico e confirmacao curta (D9) ficam para a fatia seguinte. Diretriz: uma funcionalidade completa por entrega, com correcoes pequenas acionaveis resolvidas antes de Ready for review."
+    "id": "T197",
+    "status": "criacao_inline_referencias_em_implementacao",
+    "reason": "T196 integrada em main pela PR #189 (squash 513f39fd43dd0df1848d8a36041e3b8a530b5c16), com a CI de push 3/3 verde (run 40920945239). A T197 implementa a criacao inline aprovada (D10 a D16, docs/decisions/t197-dossie-criacao-inline-referencias.md, secao 12): POST de Departamento, Cargo, Unidade e Centro de custo sem codigo, com o codigo gerado no servidor a partir do nome (ASCII em maiusculas, prefixo do tipo para nome curto, sufixos _2 a _50), nome repetido recusado (nome_em_uso com a existente, nome_inativo sem reativar) e trava por empresa, tipo e nome normalizado; e Criar no seletor da etapa 2 da Nova admissao, so para o RH, com confirmacao curta e a referencia criada ja escolhida. O + da T180 fica; Centro de custo sem +. Sem schema, migration, RBAC, seed ou dependencia."
   },
   "openDeliveries": [
     {
-      "id": "T196",
+      "id": "T197",
       "pullRequest": null,
-      "status": "busca_referencias_em_implementacao"
+      "status": "criacao_inline_referencias_em_implementacao"
     }
   ],
   "requiredArtifacts": [

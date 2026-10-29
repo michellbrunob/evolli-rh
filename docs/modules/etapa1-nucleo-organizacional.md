@@ -544,7 +544,10 @@ acomodar multitenancy. A evolução comercial futura tem gates próprios
 - **R1 — Código obrigatório, estável e imutável.** Toda entidade tem `code`
   curto, obrigatório, imutável após a criação. Renomear é operação de
   `name`, nunca de `code` — código é o identificador estável para
-  integrações e referências futuras.
+  integrações e referências futuras. T197: na criação inline da Nova
+  admissão (Departamento, Cargo, Unidade e Centro de custo), o código pode
+  ser omitido na entrada e é **gerado pelo servidor** a partir do nome; a
+  entidade continua sempre com código, e ele não muda depois.
 - **R2 — Unicidade sempre no escopo correto.** `empresa.code` é único no
   deployment; `unidade_organizacional.code` e `departamento.code` são
   únicos **dentro da empresa**; `area.code` é único **dentro do
@@ -729,6 +732,14 @@ criado nesta fase. Rotas em português, conforme nomenclatura aprovada
   auditoria não mudam, e o termo não vai para log, auditoria nem mensagem
   de erro. É a única exceção à listagem sem texto livre; Empresa, Área e
   Equipe seguem sem busca.
+- **T197 — criação com código gerado.** `POST` de `/departamentos`,
+  `/cargos`, `/unidades-organizacionais` e `/centros-de-custo` aceita o corpo
+  sem `codigo`: o servidor normaliza o nome, gera o código (ASCII em
+  maiúsculas; `DEP`, `CAR`, `UNI` ou `CC` para nome curto; `_2` a `_50` em
+  colisão) e recusa nome repetido na empresa com 409 `nome_em_uso` (com a
+  referência ativa) ou `nome_inativo`; sem código livre, 409
+  `codigo_indisponivel`. Com `codigo`, nada muda. Escopo, RBAC e auditoria
+  são os de sempre.
 - **Escopo nunca vem do cliente** — a empresa acessível é sempre derivada
   da sessão autenticada e do escopo autorizado do ator. Aceitá-la do
   corpo/query seria vetor direto de acesso fora de escopo.

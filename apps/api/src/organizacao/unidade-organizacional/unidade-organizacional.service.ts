@@ -18,6 +18,7 @@ import {
 } from "../escopo.util";
 import { podeAcessar } from "../autorizacao.util";
 import { traduzirErroPrisma } from "../prisma-erro.util";
+import { criarComCodigoAutomatico } from "../criacao-automatica";
 import {
   assertAindaAtivo,
   assertAindaInativo,
@@ -71,10 +72,40 @@ export class UnidadeOrganizacionalService {
       );
     }
 
+    // T197 — sem código: criação inline da Nova admissão, com o código gerado
+    // aqui e nome repetido recusado (`criacao-automatica.ts`).
+    if (dto.codigo === undefined) {
+      return criarComCodigoAutomatico({
+        prisma: this.prisma,
+        tipo: "unidade_organizacional",
+        prefixo: "UNI",
+        empresaId: empresa.id,
+        nome: dto.nome,
+        porNome: (tx, filtro) =>
+          tx.unidadeOrganizacional.findMany({ where: filtro }),
+        codigosUsados: (tx, empresaId, codigos) =>
+          tx.unidadeOrganizacional.findMany({
+            where: { empresaId, codigo: { in: codigos } },
+            select: { codigo: true },
+          }),
+        criar: (tx, dados) => tx.unidadeOrganizacional.create({ data: dados }),
+        auditar: (tx, criada) =>
+          this.auditoria.registrarMutacao(
+            tx,
+            ctx,
+            "organizacao_unidade_organizacional_criada",
+            "unidade_organizacional",
+            criada.id,
+            criada.empresaId,
+          ),
+      });
+    }
+    const codigo = dto.codigo;
+
     try {
       return await this.prisma.$transaction(async (tx) => {
         const criada = await tx.unidadeOrganizacional.create({
-          data: { empresaId: empresa.id, codigo: dto.codigo, nome: dto.nome },
+          data: { empresaId: empresa.id, codigo, nome: dto.nome },
         });
 
         await this.auditoria.registrarMutacao(

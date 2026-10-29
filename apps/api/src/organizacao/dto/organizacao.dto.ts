@@ -11,6 +11,7 @@ import {
   MaxLength,
   Min,
   MinLength,
+  ValidateIf,
 } from "class-validator";
 import { StatusOrganizacional } from "@prisma/client";
 import {
@@ -61,12 +62,32 @@ export class AtualizarNoOrganizacionalDto {
 
 export class CriarEmpresaDto extends CodigoNomeDto {}
 
-export class CriarUnidadeOrganizacionalDto extends CodigoNomeDto {
+/**
+ * T197 — criação de Departamento, Unidade, Cargo ou Centro de custo. Com
+ * `codigo`, o caminho manual de sempre (Estrutura, Funções e cargos e o "+" da
+ * T180), com as mesmas regras. Sem `codigo`, a criação inline da Nova
+ * admissão: o SERVIDOR gera o código a partir do nome e recusa nome repetido
+ * na empresa (`criacao-automatica.ts`). `null` ou vazio não contam como
+ * ausente: são recusados pela regra do código.
+ */
+export class CodigoOpcionalNomeDto {
+  @ValidateIf((o: { codigo?: unknown }) => o.codigo !== undefined)
+  @Matches(CODIGO_PATTERN)
+  codigo?: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(1)
+  @MaxLength(160)
+  nome!: string;
+}
+
+export class CriarUnidadeOrganizacionalDto extends CodigoOpcionalNomeDto {
   @IsUUID()
   empresaId!: string;
 }
 
-export class CriarDepartamentoDto extends CodigoNomeDto {
+export class CriarDepartamentoDto extends CodigoOpcionalNomeDto {
   @IsUUID()
   empresaId!: string;
 }
@@ -87,12 +108,12 @@ export class CriarEquipeDto extends CodigoNomeDto {
   unidadeOrganizacionalId?: string;
 }
 
-export class CriarCargoDto extends CodigoNomeDto {
+export class CriarCargoDto extends CodigoOpcionalNomeDto {
   @IsUUID()
   empresaId!: string;
 }
 
-export class CriarCentroCustoDto extends CodigoNomeDto {
+export class CriarCentroCustoDto extends CodigoOpcionalNomeDto {
   @IsUUID()
   empresaId!: string;
 }

@@ -85,6 +85,34 @@ export class RecusaDeNegocioException extends UnprocessableEntityException {
 }
 
 /**
+ * T197 — motivos do 409 da criação de referência com código automático (nome
+ * já usado por referência ativa ou inativa da empresa, ou sem código livre).
+ */
+export type CodigoDeConflitoDeReferencia =
+  "nome_em_uso" | "nome_inativo" | "codigo_indisponivel";
+
+/**
+ * T197 — a referência ativa da própria empresa que já tem o nome pedido. Só
+ * sai no 409 `nome_em_uso`, para o RH escolhê-la em vez de criar outra; a
+ * consulta é sempre na empresa da sessão.
+ */
+export interface ReferenciaExistente {
+  id: string;
+  codigo: string;
+  nome: string;
+}
+
+/** T197 — 409 da criação com código automático, com código estável. */
+export class ConflitoDeReferenciaException extends ConflictException {
+  constructor(
+    readonly codigo: CodigoDeConflitoDeReferencia,
+    readonly referencia?: ReferenciaExistente,
+  ) {
+    super();
+  }
+}
+
+/**
  * T179 — 403 do `CsrfGuard`, com código estável (`csrf_invalido`) para a tela
  * distinguir sessão ou token de página vencido de falta de permissão (403 sem
  * código). Mesmo status e mesma negação de antes: nada é liberado.

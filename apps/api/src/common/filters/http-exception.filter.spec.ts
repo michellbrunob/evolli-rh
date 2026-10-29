@@ -12,6 +12,7 @@ import {
   ConflitoDeCamposException,
   ErroDeCampo,
   RecusaCsrfException,
+  ConflitoDeReferenciaException,
   RecusaDeNegocioException,
 } from "../erros/recusa-por-campo";
 import { AllExceptionsFilter } from "./http-exception.filter";
@@ -222,6 +223,32 @@ describe("AllExceptionsFilter", () => {
         codigo: "idempotencia_conteudo_divergente",
       });
       expect(corpo).not.toHaveProperty("erros");
+    });
+
+    it("T197 — 409 da criação automática: código e, no nome_em_uso, só id, código e nome", () => {
+      const emUso = corpoDe(
+        new ConflitoDeReferenciaException("nome_em_uso", {
+          id: "ref-1",
+          codigo: "COD_1",
+          nome: "Nome existente",
+          extra: "nao sai",
+        } as never),
+      );
+      expect(emUso.status).toBe(HttpStatus.CONFLICT);
+      expect(emUso.corpo).toEqual({
+        status_code: HttpStatus.CONFLICT,
+        message: "Conflito ao processar a requisição.",
+        request_id: "req-t179",
+        timestamp: expect.any(String),
+        codigo: "nome_em_uso",
+        referencia: { id: "ref-1", codigo: "COD_1", nome: "Nome existente" },
+      });
+      for (const codigo of ["nome_inativo", "codigo_indisponivel"] as const) {
+        const { corpo } = corpoDe(new ConflitoDeReferenciaException(codigo));
+        expect(corpo).toMatchObject({ codigo });
+        expect(corpo).not.toHaveProperty("referencia");
+        expect(corpo).not.toHaveProperty("erros");
+      }
     });
 
     it("403 do CSRF: código csrf_invalido; 403 de permissão segue sem código", () => {

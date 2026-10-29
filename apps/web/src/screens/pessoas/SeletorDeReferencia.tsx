@@ -26,6 +26,10 @@
  *   novo" e não toca na escolha. Contagens e escolhas são anunciadas UMA vez,
  *   numa região de status sempre montada.
  * - Busca sem remoção de acentos (regra desta entrega).
+ * - T197 — com `criacao` (só o RH), uma busca sem nome idêntico entre os
+ *   resultados oferece "Criar «termo»" como última opção, também no vazio.
+ *   Escolhê-la (Enter ou clique) só pede a confirmação a quem usa o seletor:
+ *   nada é criado aqui, e o termo fica no campo.
  */
 import {
   type KeyboardEvent,
@@ -36,6 +40,7 @@ import {
   useState,
 } from "react";
 import { FormField } from "../../components";
+import { chaveDoNome, normalizarNomeDeReferencia } from "./nomeDeReferencia";
 import type { ResultadoPaginado } from "../../api/organizacaoClient";
 import "./SeletorDeReferencia.css";
 
@@ -100,6 +105,16 @@ export interface SeletorDeReferenciaProps {
   readonly versao?: number;
   /** T180 — o "+" do cadastro rápido, ao lado do campo. */
   readonly acao?: ReactNode;
+  /**
+   * T197 — criação inline, só para o RH: `onCriar` recebe o nome já
+   * normalizado quando a pessoa escolhe "Criar «termo»".
+   */
+  readonly criacao?: { readonly onCriar: (nome: string) => void } | undefined;
+  /**
+   * T197 — anúncio de fora (a referência criada e escolhida), feito uma vez
+   * na região de status do seletor a cada `id` novo.
+   */
+  readonly aviso?: { readonly id: number; readonly texto: string } | undefined;
 }
 
 type Estado =
@@ -107,6 +122,8 @@ type Estado =
   | { tipo: "carregando" }
   | {
       tipo: "pronto";
+      /** T197 — o termo (aparado) a que estes resultados respondem. */
+      busca: string;
       itens: readonly ReferenciaEscolhida[];
       /** Do servidor: com `pagina` e `tamanhoPagina`, decide a próxima página. */
       totalDoServidor: number;
@@ -167,11 +184,16 @@ export function SeletorDeReferencia({
   desabilitado = false,
   versao = 0,
   acao,
+  criacao,
+  aviso,
 }: SeletorDeReferenciaProps) {
   const base = useId();
   const idLista = `${base}-lista`;
   const idEscolha = `${id}-escolha`;
   const idDaOpcao = (indice: number) => `${base}-opcao-${indice}`;
+  const idDaCriacao = `${base}-criar`;
+  /** T197 — concordância do vazio ("Nenhuma unidade encontrada"). */
+  const encontrado = ativo === "ativa" ? "encontrada" : "encontrado";
 
   const [termo, setTermo] = useState("");
   const [estado, setEstado] = useState<Estado>({ tipo: "fechado" });
@@ -220,8 +242,33 @@ export function SeletorDeReferencia({
     setAnuncio(texto);
   }
 
+  // T197 — o aviso de fora (referência criada ou escolhida pela confirmação)
+  // é anunciado uma vez por `id`, e a busca é limpa, como numa escolha feita
+  // na própria lista.
+  useEffect(() => {
+    if (!aviso) return;
+    setAnuncio(aviso.texto);
+    setTermo("");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aviso?.id]);
+
+  /**
+   * T197 — o nome a oferecer em "Criar «termo»": só com `criacao`, termo
+   * válido e nenhum resultado com o mesmo nome. `null` quando não há oferta.
+   */
+  function nomeParaCriar(
+    busca: string,
+    itens: readonly ReferenciaEscolhida[],
+  ): string | null {
+    if (!criacao) return null;
+    const nome = normalizarNomeDeReferencia(busca);
+    if (nome === null) return null;
+    const chave = chaveDoNome(nome);
+    return itens.some((item) => chaveDoNome(item.nome) === chave) ? null : nome;
+  }
+
   function textoDaContagem(exibidos: number, total: number): string {
-    if (total === 0) return `${nenhum} ${rotulo.toLowerCase()} encontrado.`;
+    if (total === 0) return `${nenhum} ${rotulo.toLowerCase()} ${encontrado}.`;
     if (total === 1 && exibidos === 1) return "1 resultado.";
     return `${total} ${total === 1 ? "resultado" : "resultados"}; ${exibidos} ${
       exibidos === 1 ? "exibido" : "exibidos"
@@ -250,6 +297,7 @@ export function SeletorDeReferencia({
       const anterior = pagina > 1 && atual.tipo === "pronto" ? atual : null;
       const proximo: Pronto = {
         tipo: "pronto",
+        busca,
         itens: [...(anterior?.itens ?? []), ...resposta.itens],
         totalDoServidor: resposta.total,
         pagina,
@@ -264,7 +312,12 @@ export function SeletorDeReferencia({
         focarCampoRef.current = true;
       }
       setEstado(proximo);
-      anunciar(textoDaContagem(proximo.itens.length, totalExibido(proximo)));
+      const oferta = nomeParaCriar(busca, proximo.itens);
+      anunciar(
+        `${textoDaContagem(proximo.itens.length, totalExibido(proximo))}${
+          oferta ? ` A opção de criar «${oferta}» está no fim da lista.` : ""
+        }`,
+      );
     } catch {
       if (pedido !== pedidoRef.current) return;
       if (pagina > 1) {
@@ -285,11 +338,16 @@ export function SeletorDeReferencia({
     void consultar(busca.trim(), 1);
   }
 
-  function fechar() {
+  /** Fecha a lista; o termo fica (T197: volta da confirmação de criação). */
+  function fecharLista() {
     if (esperaRef.current) clearTimeout(esperaRef.current);
     pedidoRef.current += 1;
     setEstado({ tipo: "fechado" });
     setAtiva(-1);
+  }
+
+  function fechar() {
+    fecharLista();
     setTermo("");
   }
 
@@ -315,6 +373,21 @@ export function SeletorDeReferencia({
   }
 
   const itens = estado.tipo === "pronto" ? estado.itens : [];
+  // T197 — só vale para o termo que os resultados respondem: enquanto a nova
+  // busca espera, a oferta some.
+  const oferta =
+    estado.tipo === "pronto" && estado.busca === termo.trim()
+      ? nomeParaCriar(termo, itens)
+      : null;
+  /** Opções navegáveis: os resultados e, se houver, "Criar" no fim. */
+  const totalDeOpcoes = itens.length + (oferta ? 1 : 0);
+
+  /** T197 — pede a confirmação; a lista fecha e o termo fica no campo. */
+  function pedirCriacao() {
+    if (!oferta || !criacao) return;
+    fecharLista();
+    criacao.onCriar(oferta);
+  }
 
   function aoTeclar(evento: KeyboardEvent<HTMLInputElement>) {
     switch (evento.key) {
@@ -324,19 +397,20 @@ export function SeletorDeReferencia({
           abrir();
           return;
         }
-        if (itens.length > 0)
-          setAtiva((a) => Math.min(a + 1, itens.length - 1));
+        if (totalDeOpcoes > 0)
+          setAtiva((a) => Math.min(a + 1, totalDeOpcoes - 1));
         return;
       case "ArrowUp":
         if (!aberto) return;
         evento.preventDefault();
-        if (itens.length > 0) setAtiva((a) => Math.max(a - 1, 0));
+        if (totalDeOpcoes > 0) setAtiva((a) => Math.max(a - 1, 0));
         return;
       case "Enter":
         // Lista aberta: Enter é da lista, nunca envia o formulário.
         if (!aberto) return;
         evento.preventDefault();
         if (ativa >= 0 && itens[ativa]) escolher(itens[ativa]!);
+        else if (oferta && ativa === itens.length) pedirCriacao();
         return;
       case "Escape":
         if (!aberto) return;
@@ -384,7 +458,9 @@ export function SeletorDeReferencia({
                 .join(" ")}
               {...(aberto && ativa >= 0 && itens[ativa]
                 ? { "aria-activedescendant": idDaOpcao(ativa) }
-                : {})}
+                : aberto && oferta && ativa === itens.length
+                  ? { "aria-activedescendant": idDaCriacao }
+                  : {})}
               value={termo}
               disabled={desabilitado}
               onChange={(e) => aoDigitar(e.target.value)}
@@ -480,6 +556,26 @@ export function SeletorDeReferencia({
               </li>
             );
           })}
+          {oferta ? (
+            <li
+              id={idDaCriacao}
+              role="option"
+              aria-selected={false}
+              className={[
+                "seletor-referencia__opcao",
+                "seletor-referencia__opcao--criar",
+                ativa === itens.length
+                  ? "seletor-referencia__opcao--ativa"
+                  : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={pedirCriacao}
+            >
+              Criar {rotulo.toLowerCase()} «{oferta}»
+            </li>
+          ) : null}
         </ul>
         {estado.tipo === "carregando" ? (
           <p className="seletor-referencia__texto">Buscando {plural}…</p>
@@ -489,7 +585,7 @@ export function SeletorDeReferencia({
         !haMaisPaginas(estado) ? (
           <p className="seletor-referencia__texto">
             {termo.trim()
-              ? `${nenhum} ${rotulo.toLowerCase()} ${ativo} encontrado para a busca.`
+              ? `${nenhum} ${rotulo.toLowerCase()} ${ativo} ${encontrado} para a busca.`
               : `${nenhum} ${rotulo.toLowerCase()} ${ativo} nesta empresa.`}
           </p>
         ) : null}

@@ -112,6 +112,14 @@
   background: var(--surface-neutral);
 }
 
+/* T197 — "Criar «termo»": separada dos resultados por um fio e em
+   negrito, e o texto já diz que cria (não depende só da aparência). */
+.seletor-referencia__opcao--criar {
+  border-top: 1px solid var(--hairline);
+  color: var(--color-action);
+  font-weight: 600;
+}
+
 /* A opção ativa pelo teclado tem contorno, não só cor; a escolhida diz
    "(escolha atual)" por texto. */
 .seletor-referencia__opcao--ativa {

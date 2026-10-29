@@ -35,6 +35,7 @@ import {
   type DepartamentoApi,
   type EmpresaApi,
   type UnidadeOrganizacionalApi,
+  criarCentroCusto,
   criarDepartamento,
   criarUnidade,
   listarAreas,
@@ -51,6 +52,10 @@ import {
   CsrfSessionExpiredError,
 } from "../../api/csrfClient";
 import { expectSemIsoVisivel } from "../../test/semIsoVisivel";
+import {
+  ProvedorDeEdicoes,
+  RegistroDeEdicoes,
+} from "../../app/edicoesPendentes";
 
 vi.mock("../../api/colaboradoresClient");
 vi.mock("../../api/organizacaoClient");
@@ -4716,5 +4721,556 @@ describe("T196 — busca nas referências da etapa 2", () => {
     );
     // Abrir só por foco, não: a lista segue fechada.
     expect(departamentoSel()).toHaveAttribute("aria-expanded", "false");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T197 — criação inline a partir da busca dos seletores da etapa 2: "Criar
+// «termo»" só para o RH, confirmação curta, código gerado no servidor e a
+// referência criada já escolhida. Dados sintéticos.
+// ---------------------------------------------------------------------------
+
+const centroNovo = {
+  ...departamento,
+  id: "d4d4d4d4-d4d4-4d4d-8d4d-d4d4d4d4d4d4",
+  codigo: "CENTRO_NOVO",
+  nome: "Centro Novo (teste)",
+};
+
+const TIPOS_INLINE = [
+  {
+    tipo: "departamento",
+    rotulo: "Departamento",
+    campo: () => departamentoSel(),
+    listar: listarDepartamentos,
+    criar: criarDepartamento,
+    novo: { ...departamentoNovo, nome: "Nova Referência Sintética" },
+  },
+  {
+    tipo: "cargo",
+    rotulo: "Cargo",
+    campo: () => cargoSel(),
+    listar: listarCargos,
+    criar: criarCargo,
+    novo: { ...cargoNovo, nome: "Nova Referência Sintética" },
+  },
+  {
+    tipo: "unidade",
+    rotulo: "Unidade",
+    campo: () => unidadeSel(),
+    listar: listarUnidades,
+    criar: criarUnidade,
+    novo: { ...unidadeNova, nome: "Nova Referência Sintética" },
+  },
+  {
+    tipo: "centro de custo",
+    rotulo: "Centro de custo",
+    campo: () => centroSel(),
+    listar: listarCentrosCusto,
+    criar: criarCentroCusto,
+    novo: { ...centroNovo, nome: "Nova Referência Sintética" },
+  },
+] as const;
+
+type CriarQualquer = (dto: {
+  nome: string;
+  empresaId: string;
+  codigo?: string;
+}) => Promise<unknown>;
+
+/** Digita no seletor e espera a resposta da busca (sem espera fixa). */
+async function buscarNo(campo: HTMLElement, termo: string) {
+  fireEvent.change(campo, { target: { value: termo } });
+  await waitFor(() =>
+    expect(
+      campo.closest(".seletor-referencia")!.querySelector('[role="status"]')
+        ?.textContent,
+    ).not.toBe(""),
+  );
+}
+
+const opcaoCriar = (campo: HTMLElement) =>
+  within(listaDe(campo)).queryByRole("option", { name: /^Criar / });
+const statusDo = (campo: HTMLElement) =>
+  campo.closest(".seletor-referencia")!.querySelector('[role="status"]')
+    ?.textContent;
+const dialogoCriacao = () => screen.queryByRole("dialog", { name: /^Criar / });
+
+describe("T197 — criação inline de referências na Nova admissão", () => {
+  beforeEach(() => {
+    vi.mocked(listarCentrosCusto).mockResolvedValue(paginado([]));
+  });
+
+  it.each(TIPOS_INLINE)(
+    "$rotulo: no vazio, o RH cria pelo «Criar», confirma e a referência fica escolhida sem perder a admissão",
+    async ({ tipo, campo, listar, criar, novo }) => {
+      vi.mocked(listar as typeof listarCargos).mockResolvedValue(
+        paginado([]) as never,
+      );
+      vi.mocked(criar as CriarQualquer).mockResolvedValue(novo);
+      montar("rh");
+      await aguardarEmpresa();
+      preencherParteDaAdmissao();
+      abrirLotacao();
+      await buscarNo(campo(), "  Nova   Referência Sintética ");
+      // No vazio, a mensagem de nenhum resultado e a oferta de criar.
+      expect(listaDe(campo()).parentElement).toHaveTextContent(
+        /encontrad[oa] para a busca/,
+      );
+      const criarOpcao = opcaoCriar(campo())!;
+      expect(criarOpcao).toHaveTextContent(
+        `Criar ${tipo} «Nova Referência Sintética»`,
+      );
+      expect(statusDo(campo())).toContain(
+        "A opção de criar «Nova Referência Sintética» está no fim da lista.",
+      );
+      fireEvent.click(criarOpcao);
+      const dialogo = await screen.findByRole("dialog", {
+        name: `Criar ${tipo}`,
+      });
+      expect(dialogo).toHaveTextContent("Nome: Nova Referência Sintética");
+      expect(dialogo).toHaveTextContent("O código é gerado automaticamente.");
+      expect(dialogo).not.toHaveTextContent(novo.codigo);
+      expect(criar).not.toHaveBeenCalled();
+      fireEvent.click(
+        within(dialogo).getByRole("button", { name: "Criar e escolher" }),
+      );
+      await waitFor(() => expect(dialogoCriacao()).toBeNull());
+      // Só o nome normalizado e a empresa ativa; nunca código.
+      expect(criar).toHaveBeenCalledTimes(1);
+      expect(criar).toHaveBeenCalledWith({
+        nome: "Nova Referência Sintética",
+        empresaId: empresa.id,
+      });
+      expect(escolhaDe(campo())).toHaveTextContent(
+        `Escolha atual: ${novo.codigo} — Nova Referência Sintética`,
+      );
+      await waitFor(() => expect(campo()).toHaveFocus());
+      // A busca é limpa, como numa escolha feita na própria lista.
+      expect(campo()).toHaveValue("");
+      expect(statusDo(campo())).toBe(
+        `Criado e escolhido: ${novo.codigo} — Nova Referência Sintética.`,
+      );
+      admissaoPreservada();
+      expect(admitirColaborador).not.toHaveBeenCalled();
+    },
+  );
+
+  it("no fim dos resultados: setas chegam ao «Criar», Enter abre a confirmação e não envia nem avança", async () => {
+    montar("rh");
+    await aguardarEmpresa();
+    abrirLotacao();
+    await buscarNo(cargoSel(), "Cargo");
+    const opcoes = within(listaDe(cargoSel())).getAllByRole("option");
+    expect(opcoes.map((o) => o.textContent)).toEqual([
+      "CAR1 — Cargo Sintético (teste)",
+      "Criar cargo «Cargo»",
+    ]);
+    fireEvent.keyDown(cargoSel(), { key: "ArrowDown" });
+    fireEvent.keyDown(cargoSel(), { key: "ArrowDown" });
+    expect(cargoSel()).toHaveAttribute(
+      "aria-activedescendant",
+      opcaoCriar(cargoSel())!.id,
+    );
+    fireEvent.keyDown(cargoSel(), { key: "Enter" });
+    expect(
+      await screen.findByRole("dialog", { name: "Criar cargo" }),
+    ).toBeInTheDocument();
+    expect(tituloDaEtapa()).toHaveTextContent("Dados profissionais e lotação");
+    expect(admitirColaborador).not.toHaveBeenCalled();
+    expect(criarCargo).not.toHaveBeenCalled();
+  });
+
+  it("nome idêntico entre os resultados (maiúsculas e espaços à parte): sem «Criar»", async () => {
+    montar("rh");
+    await aguardarEmpresa();
+    abrirLotacao();
+    await buscarNo(cargoSel(), "cargo   sintético (TESTE)");
+    expect(within(listaDe(cargoSel())).getAllByRole("option")).toHaveLength(1);
+    expect(opcaoCriar(cargoSel())).toBeNull();
+  });
+
+  it.each([
+    ["vazio", ""],
+    ["só espaços", "    "],
+    ["com caractere de controle", "Nome\u0007Sintetico"],
+    ["acima de 160", "x".repeat(161)],
+  ])("termo %s: sem «Criar»", async (_caso, termo) => {
+    vi.mocked(listarCargos).mockResolvedValue(paginado([]));
+    montar("rh");
+    await aguardarEmpresa();
+    abrirLotacao();
+    fireEvent.keyDown(cargoSel(), { key: "ArrowDown" });
+    await buscarNo(cargoSel(), termo);
+    expect(opcaoCriar(cargoSel())).toBeNull();
+  });
+
+  it.each(TIPOS_INLINE)(
+    "$rotulo: o DP pesquisa e escolhe, mas nunca vê «Criar» nem diálogo",
+    async ({ campo, listar }) => {
+      vi.mocked(listar as typeof listarCargos).mockResolvedValue(
+        paginado([]) as never,
+      );
+      montar("dp");
+      await aguardarEmpresa();
+      abrirLotacao();
+      await buscarNo(campo(), "Nova Referência Sintética");
+      expect(opcaoCriar(campo())).toBeNull();
+      expect(dialogoCriacao()).toBeNull();
+    },
+  );
+
+  it("vazio no feminino: «Nenhuma unidade encontrada», no anúncio e na lista", async () => {
+    vi.mocked(listarUnidades).mockResolvedValue(paginado([]));
+    montar("dp");
+    await aguardarEmpresa();
+    abrirLotacao();
+    await buscarNo(unidadeSel(), "Inexistente");
+    expect(statusDo(unidadeSel())).toBe("Nenhuma unidade encontrada.");
+    expect(listaDe(unidadeSel()).parentElement).toHaveTextContent(
+      "Nenhuma unidade ativa encontrada para a busca.",
+    );
+  });
+
+  it('o "+" segue em Departamento, Cargo e Unidade; Centro de custo não tem "+"', async () => {
+    montar("rh");
+    await aguardarEmpresa();
+    abrirLotacao();
+    for (const rotulo of [
+      "Cadastrar novo departamento",
+      "Cadastrar novo cargo",
+      "Cadastrar nova unidade",
+    ]) {
+      expect(screen.getByRole("button", { name: rotulo })).toBeEnabled();
+    }
+    expect(
+      screen.queryByRole("button", { name: /Cadastrar novo centro de custo/ }),
+    ).toBeNull();
+  });
+
+  it.each([
+    [
+      "Cancelar",
+      () => {
+        fireEvent.click(
+          within(dialogoCriacao()!).getByRole("button", { name: "Cancelar" }),
+        );
+      },
+    ],
+    [
+      "Escape",
+      () => {
+        fireEvent.keyDown(document, { key: "Escape" });
+      },
+    ],
+    [
+      "Fechar",
+      () => {
+        fireEvent.click(
+          within(dialogoCriacao()!).getByRole("button", { name: /^Fechar/ }),
+        );
+      },
+    ],
+  ])(
+    "%s: não cria, o foco volta ao seletor com o termo e a admissão fica igual",
+    async (_caso, fechar) => {
+      vi.mocked(listarCargos).mockResolvedValue(paginado([]));
+      montar("rh");
+      await aguardarEmpresa();
+      preencherParteDaAdmissao();
+      abrirLotacao();
+      await buscarNo(cargoSel(), "Nova Referência Sintética");
+      fireEvent.click(opcaoCriar(cargoSel())!);
+      await screen.findByRole("dialog", { name: "Criar cargo" });
+      fechar();
+      await waitFor(() => expect(dialogoCriacao()).toBeNull());
+      await waitFor(() => expect(cargoSel()).toHaveFocus());
+      expect(cargoSel()).toHaveValue("Nova Referência Sintética");
+      expect(escolhaDe(cargoSel())).toHaveTextContent("Nenhuma escolha.");
+      expect(criarCargo).not.toHaveBeenCalled();
+      admissaoPreservada();
+    },
+  );
+
+  /** Abre a confirmação de "Cargo" com um nome sem resultado. */
+  async function abrirConfirmacaoDeCargo() {
+    vi.mocked(listarCargos).mockResolvedValue(paginado([]));
+    montar("rh");
+    await aguardarEmpresa();
+    abrirLotacao();
+    await buscarNo(cargoSel(), "Nova Referência Sintética");
+    fireEvent.click(opcaoCriar(cargoSel())!);
+    return screen.findByRole("dialog", { name: "Criar cargo" });
+  }
+  /** Ativa "Criar e escolher" como no navegador: o botão recebe o foco. */
+  const confirmar = (dialogo: HTMLElement) => {
+    const botao = within(dialogo).getByRole("button", {
+      name: /^Criar e escolher|^Criando/,
+    });
+    botao.focus();
+    fireEvent.click(botao);
+  };
+
+  it("nome já em uso (ativo): oferece escolher a existente, sem criar outra", async () => {
+    vi.mocked(criarCargo).mockRejectedValue(
+      Object.assign(recusaDeReferencia(409, "nome_em_uso"), {
+        referencia: {
+          id: cargoNovo.id,
+          codigo: "CAR_EXISTENTE",
+          nome: "Nova Referência Sintética",
+        },
+      }),
+    );
+    const dialogo = await abrirConfirmacaoDeCargo();
+    confirmar(dialogo);
+    const alerta = await within(dialogo).findByRole("alert");
+    expect(alerta).toHaveTextContent("Já existe um cargo ativo com este nome");
+    expect(alerta).toHaveTextContent(
+      "CAR_EXISTENTE — Nova Referência Sintética",
+    );
+    expect(
+      within(dialogo).queryByRole("button", { name: "Criar e escolher" }),
+    ).toBeNull();
+    // A ação em foco virou "Escolher …" sem sair da tela: o foco fica nela.
+    const escolher = within(dialogo).getByRole("button", {
+      name: "Escolher CAR_EXISTENTE — Nova Referência Sintética",
+    });
+    expect(escolher).toHaveFocus();
+    fireEvent.click(escolher);
+    await waitFor(() => expect(dialogoCriacao()).toBeNull());
+    expect(escolhaDe(cargoSel())).toHaveTextContent(
+      "Escolha atual: CAR_EXISTENTE — Nova Referência Sintética",
+    );
+    expect(statusDo(cargoSel())).toBe(
+      "Escolhido: CAR_EXISTENTE — Nova Referência Sintética.",
+    );
+    expect(criarCargo).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    [
+      "nome_inativo",
+      recusaDeReferencia(409, "nome_inativo"),
+      "Já existe um cargo inativo com este nome, e nada foi criado.",
+    ],
+    [
+      "codigo_indisponivel",
+      recusaDeReferencia(409, "codigo_indisponivel"),
+      'Use outro nome ou o botão "+" para escolher o código.',
+    ],
+    [
+      "400",
+      recusaDeReferencia(400),
+      "O servidor recusou este nome, e nada foi criado.",
+    ],
+    [
+      "403",
+      recusaDeReferencia(403),
+      "Seu perfil não tem permissão para criar cargos.",
+    ],
+    [
+      "404",
+      recusaDeReferencia(404),
+      "A empresa ativa não pôde ser confirmada, e nada foi criado.",
+    ],
+  ])(
+    "%s: mensagem no diálogo, sem nova tentativa e sem escolher nada",
+    async (_caso, erro, mensagem) => {
+      vi.mocked(criarCargo).mockRejectedValue(erro);
+      const dialogo = await abrirConfirmacaoDeCargo();
+      confirmar(dialogo);
+      // A ação principal, que tinha o foco, sai; o foco vai à mensagem, dentro
+      // do diálogo, e não ao corpo da página.
+      await waitFor(() =>
+        expect(document.activeElement).toHaveTextContent(mensagem),
+      );
+      const foco = document.activeElement as HTMLElement;
+      expect(dialogo).toContainElement(foco);
+      expect(foco.tagName).toBe("P");
+      expect(foco).toHaveAttribute("tabindex", "-1");
+      expect(
+        within(dialogo).queryByRole("button", { name: "Criar e escolher" }),
+      ).toBeNull();
+      // Lida uma vez, pelo foco: sem `alert` repetindo a mesma mensagem.
+      expect(within(dialogo).queryByRole("alert")).toBeNull();
+      expect(escolhaDe(cargoSel())).toHaveTextContent("Nenhuma escolha.");
+    },
+  );
+
+  it("Centro de custo sem código livre: a mensagem não fala do «+», que ele não tem", async () => {
+    vi.mocked(listarCentrosCusto).mockResolvedValue(paginado([]));
+    vi.mocked(criarCentroCusto).mockRejectedValue(
+      recusaDeReferencia(409, "codigo_indisponivel"),
+    );
+    montar("rh");
+    await aguardarEmpresa();
+    abrirLotacao();
+    await buscarNo(centroSel(), "Nova Referência Sintética");
+    fireEvent.click(opcaoCriar(centroSel())!);
+    const dialogo = await screen.findByRole("dialog", {
+      name: "Criar centro de custo",
+    });
+    confirmar(dialogo);
+    await waitFor(() =>
+      expect(document.activeElement).toHaveTextContent("Use outro nome."),
+    );
+    expect(dialogo).toContainElement(document.activeElement as HTMLElement);
+    expect(document.activeElement).not.toHaveTextContent("+");
+  });
+
+  it.each([
+    [
+      "sessão expirada",
+      new CsrfSessionExpiredError(),
+      "Sua sessão expirou e nada foi criado.",
+    ],
+    ["401", recusaDeReferencia(401), "Sua sessão expirou e nada foi criado."],
+    [
+      "CSRF desatualizado",
+      recusaDeReferencia(403, "csrf_invalido"),
+      "Esta página ficou desatualizada e nada foi criado.",
+    ],
+  ])(
+    "%s: diz que nada foi criado e permite confirmar de novo, que então cria",
+    async (_caso, erro, mensagem) => {
+      vi.mocked(criarCargo)
+        .mockRejectedValueOnce(erro)
+        .mockResolvedValueOnce({
+          ...cargoNovo,
+          nome: "Nova Referência Sintética",
+        });
+      const dialogo = await abrirConfirmacaoDeCargo();
+      confirmar(dialogo);
+      expect(await within(dialogo).findByRole("alert")).toHaveTextContent(
+        mensagem,
+      );
+      // Pode repetir: o foco continua na ação de confirmar.
+      expect(
+        within(dialogo).getByRole("button", { name: "Criar e escolher" }),
+      ).toHaveFocus();
+      expect(escolhaDe(cargoSel())).toHaveTextContent("Nenhuma escolha.");
+      confirmar(dialogo);
+      await waitFor(() => expect(dialogoCriacao()).toBeNull());
+      expect(escolhaDe(cargoSel())).toHaveTextContent(
+        `Escolha atual: ${cargoNovo.codigo} — Nova Referência Sintética`,
+      );
+      expect(criarCargo).toHaveBeenCalledTimes(2);
+    },
+  );
+
+  it.each([
+    ["rede", new TypeError("Failed to fetch")],
+    ["5xx", recusaDeReferencia(503)],
+  ])(
+    "%s: não afirma que criou; confirmar de novo devolve a já criada para escolher",
+    async (_caso, erro) => {
+      vi.mocked(criarCargo)
+        .mockRejectedValueOnce(erro)
+        .mockRejectedValueOnce(
+          Object.assign(recusaDeReferencia(409, "nome_em_uso"), {
+            referencia: {
+              id: cargoNovo.id,
+              codigo: cargoNovo.codigo,
+              nome: "Nova Referência Sintética",
+            },
+          }),
+        );
+      const dialogo = await abrirConfirmacaoDeCargo();
+      confirmar(dialogo);
+      const alerta = await within(dialogo).findByRole("alert");
+      expect(alerta).toHaveTextContent(
+        "Não foi possível confirmar se o cargo foi criado.",
+      );
+      expect(alerta).not.toHaveTextContent(/criado e escolhido/i);
+      expect(
+        within(dialogo).getByRole("button", { name: "Criar e escolher" }),
+      ).toHaveFocus();
+      expect(escolhaDe(cargoSel())).toHaveTextContent("Nenhuma escolha.");
+      confirmar(dialogo);
+      fireEvent.click(
+        await within(dialogo).findByRole("button", {
+          name: `Escolher ${cargoNovo.codigo} — Nova Referência Sintética`,
+        }),
+      );
+      await waitFor(() => expect(dialogoCriacao()).toBeNull());
+      expect(escolhaDe(cargoSel())).toHaveTextContent(
+        `Escolha atual: ${cargoNovo.codigo} — Nova Referência Sintética`,
+      );
+    },
+  );
+
+  it("duplo clique cria uma vez; durante o envio o diálogo não fecha e a resposta atrasada escolhe", async () => {
+    let liberar: (v: CargoApi) => void = () => undefined;
+    vi.mocked(criarCargo).mockReturnValue(
+      new Promise((r) => {
+        liberar = r;
+      }),
+    );
+    const dialogo = await abrirConfirmacaoDeCargo();
+    confirmar(dialogo);
+    confirmar(dialogo);
+    expect(criarCargo).toHaveBeenCalledTimes(1);
+    expect(
+      within(dialogo).getByRole("button", { name: "Criando…" }),
+    ).toHaveAttribute("aria-disabled", "true");
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(dialogoCriacao()).not.toBeNull();
+    await act(async () =>
+      liberar({ ...cargoNovo, nome: "Nova Referência Sintética" }),
+    );
+    await waitFor(() => expect(dialogoCriacao()).toBeNull());
+    expect(escolhaDe(cargoSel())).toHaveTextContent(
+      `Escolha atual: ${cargoNovo.codigo} — Nova Referência Sintética`,
+    );
+  });
+
+  it("troca de empresa: a confirmação aberta e o envio contam como edição; a resposta depois da troca não escolhe nada", async () => {
+    const registro = new RegistroDeEdicoes();
+    let liberar: (v: CargoApi) => void = () => undefined;
+    vi.mocked(listarCargos).mockResolvedValue(paginado([]));
+    vi.mocked(criarCargo).mockReturnValue(
+      new Promise((r) => {
+        liberar = r;
+      }),
+    );
+    const { unmount } = render(
+      <ProvedorDeEdicoes registro={registro}>
+        <NovaAdmissaoScreen
+          onSair={vi.fn()}
+          onAbrirAdmitido={vi.fn()}
+          papelDoAtor="rh"
+        />
+      </ProvedorDeEdicoes>,
+    );
+    await aguardarEmpresa();
+    abrirLotacao();
+    await buscarNo(cargoSel(), "Nova Referência Sintética");
+    fireEvent.click(opcaoCriar(cargoSel())!);
+    const dialogo = await screen.findByRole("dialog", { name: "Criar cargo" });
+    expect(registro.obter().pendentes).toContain("Criar cargo");
+    confirmar(dialogo);
+    await waitFor(() =>
+      expect(registro.obter().salvando).toContain("Criar cargo"),
+    );
+    // A troca de empresa remonta a página (T189): a anterior sai de cena.
+    unmount();
+    await act(async () =>
+      liberar({ ...cargoNovo, nome: "Nova Referência Sintética" }),
+    );
+    expect(registro.obter()).toEqual({ pendentes: [], salvando: [] });
+  });
+
+  it("375 px: a opção de criar não tem largura própria e herda o alvo de 44 px", () => {
+    const css = readFileSync(
+      "src/screens/pessoas/SeletorDeReferencia.css",
+      "utf8",
+    );
+    const regra = css.match(
+      /\.seletor-referencia__opcao--criar\s*\{[^}]*\}/,
+    )![0];
+    expect(regra).not.toMatch(/(?:^|[\s;{])(?:min-)?width\s*:/);
+    expect(css).toMatch(
+      /\.seletor-referencia__opcao\s*\{[^}]*min-height:\s*var\(--touch-target\)/,
+    );
   });
 });

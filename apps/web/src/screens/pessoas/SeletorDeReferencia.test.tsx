@@ -364,3 +364,139 @@ describe("T196 — SeletorDeReferencia: contrato de CSS (375 px e 44 px)", () =>
     );
   });
 });
+
+describe("T197 — SeletorDeReferencia: criação inline", () => {
+  /** Seletor com a oferta de criação, dentro de um formulário espionado. */
+  function MontadoComCriacao({
+    listar,
+    onCriar,
+    aviso,
+  }: {
+    listar: ListarReferencias;
+    onCriar?: (nome: string) => void;
+    aviso?: { id: number; texto: string };
+  }) {
+    const [escolhida, setEscolhida] = useState<ReferenciaEscolhida | null>(
+      null,
+    );
+    return (
+      <form aria-label="Formulário" onSubmit={enviar}>
+        <SeletorDeReferencia
+          id="campo-departamento"
+          rotulo="Departamento"
+          rotuloVisivel="Departamento"
+          plural="departamentos"
+          nenhum="Nenhum"
+          ativo="ativo"
+          obrigatorio
+          escolhida={escolhida}
+          onEscolher={setEscolhida}
+          listar={listar}
+          criacao={onCriar ? { onCriar } : undefined}
+          aviso={aviso}
+        />
+      </form>
+    );
+  }
+  const enviar = vi.fn((e: { preventDefault: () => void }) =>
+    e.preventDefault(),
+  );
+  const criarOpcao = () =>
+    within(lista()).queryByRole("option", { hidden: true, name: /^Criar / });
+
+  async function digitar(termo: string) {
+    fireEvent.change(campo(), { target: { value: termo } });
+    await waitFor(() => expect(status().textContent).not.toBe(""));
+  }
+
+  it("sem `criacao`, nenhuma oferta (o DP não recebe a propriedade)", async () => {
+    render(<MontadoComCriacao listar={servidor()} />);
+    await digitar("Inexistente");
+    expect(criarOpcao()).toBeNull();
+    expect(status().textContent).not.toMatch(/criar/i);
+  });
+
+  it("no fim dos resultados: seta chega ao «Criar», Enter pede a criação com o nome normalizado, a lista fecha e o termo fica, sem enviar o formulário", async () => {
+    const onCriar = vi.fn();
+    render(<MontadoComCriacao listar={servidor()} onCriar={onCriar} />);
+    await digitar("  Referencia 04 ");
+    // Casa "Referencia 040" a "Referencia 045"; nenhum tem exatamente o nome.
+    expect(opcoes()).toHaveLength(7);
+    expect(opcoes().at(-1)).toBe("Criar departamento «Referencia 04»");
+    expect(status().textContent).toContain(
+      "A opção de criar «Referencia 04» está no fim da lista.",
+    );
+    for (let i = 0; i < opcoes().length; i += 1) {
+      fireEvent.keyDown(campo(), { key: "ArrowDown" });
+    }
+    expect(campo()).toHaveAttribute("aria-activedescendant", criarOpcao()!.id);
+    fireEvent.keyDown(campo(), { key: "Enter" });
+    expect(onCriar).toHaveBeenCalledWith("Referencia 04");
+    expect(enviar).not.toHaveBeenCalled();
+    expect(campo()).toHaveAttribute("aria-expanded", "false");
+    expect(campo()).toHaveValue("  Referencia 04 ");
+  });
+
+  it("nome idêntico entre os resultados, sem diferenciar maiúsculas: sem oferta", async () => {
+    render(<MontadoComCriacao listar={servidor()} onCriar={vi.fn()} />);
+    await digitar("REFERENCIA 007");
+    expect(opcoes()).toEqual(["R007 — Referencia 007"]);
+    expect(criarOpcao()).toBeNull();
+  });
+
+  it("no vazio, a oferta é a única opção; clique pede a criação", async () => {
+    const onCriar = vi.fn();
+    render(<MontadoComCriacao listar={servidor()} onCriar={onCriar} />);
+    await digitar("Inexistente");
+    expect(opcoes()).toEqual(["Criar departamento «Inexistente»"]);
+    fireEvent.click(criarOpcao()!);
+    expect(onCriar).toHaveBeenCalledWith("Inexistente");
+  });
+
+  it("enquanto a nova busca espera, a oferta do termo anterior some", async () => {
+    let liberar: () => void = () => undefined;
+    const servidorReal = servidor();
+    const listar = vi.fn<ListarReferencias>(async (consulta) => {
+      if (consulta.busca === "Inexistente mais") {
+        await new Promise<void>((r) => {
+          liberar = r;
+        });
+      }
+      return servidorReal(consulta);
+    });
+    render(<MontadoComCriacao listar={listar} onCriar={vi.fn()} />);
+    await digitar("Inexistente");
+    expect(criarOpcao()).not.toBeNull();
+    fireEvent.change(campo(), { target: { value: "Inexistente mais" } });
+    expect(criarOpcao()).toBeNull();
+    await waitFor(() =>
+      expect(listar).toHaveBeenLastCalledWith({
+        busca: "Inexistente mais",
+        pagina: 1,
+      }),
+    );
+    await act(async () => liberar());
+    await waitFor(() =>
+      expect(criarOpcao()).toHaveTextContent(
+        "Criar departamento «Inexistente mais»",
+      ),
+    );
+  });
+
+  it("o aviso de fora é anunciado uma vez por id", () => {
+    const { rerender } = render(
+      <MontadoComCriacao
+        listar={servidor()}
+        aviso={{ id: 1, texto: "Criado e escolhido: R099 — Nova." }}
+      />,
+    );
+    expect(status()).toHaveTextContent("Criado e escolhido: R099 — Nova.");
+    rerender(
+      <MontadoComCriacao
+        listar={servidor()}
+        aviso={{ id: 2, texto: "Escolhido: R100 — Outra." }}
+      />,
+    );
+    expect(status().textContent).toBe("Escolhido: R100 — Outra.");
+  });
+});

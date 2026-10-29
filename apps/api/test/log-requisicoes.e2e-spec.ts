@@ -478,6 +478,35 @@ describe("Log geral de requisições sem valores (T178, e2e)", () => {
     });
   });
 
+  describe("T197 — criação com código gerado no servidor", () => {
+    it("Departamento, Cargo, Unidade e Centro de custo: nem o nome nem o código gerado vão para o log", async () => {
+      const empresaId = (await get("/v1/empresas", rh).expect(200)).body
+        .itens[0].id as string;
+      for (const rota of [
+        "/v1/departamentos",
+        "/v1/cargos",
+        "/v1/unidades-organizacionais",
+        "/v1/centros-de-custo",
+      ]) {
+        const criada = await post(rota, rh)
+          .send({ empresaId, nome: "Inline Rastreavel Log" })
+          .expect(201);
+        expect(criada.body.codigo).toBe("INLINE_RASTREAVEL_LOG");
+        const repetida = await post(rota, rh)
+          .send({ empresaId, nome: "inline rastreavel log" })
+          .expect(409);
+        expect(
+          conclusao(repetida.headers[REQUEST_ID_HEADER] as string),
+        ).toMatchObject({
+          req: { method: "POST" },
+          res: { statusCode: 409 },
+          rota,
+        });
+      }
+      ausenteDoLog("inline rastreavel log", "INLINE_RASTREAVEL_LOG");
+    });
+  });
+
   it("caminho inexistente: só o padrão genérico do Nest, e nada do caminho pedido", async () => {
     const r = await get(
       "/v1/caminho-inexistente/87654321?busca=Valor%20Secreto",
