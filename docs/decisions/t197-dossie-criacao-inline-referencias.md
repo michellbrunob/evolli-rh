@@ -1,7 +1,8 @@
 # T197 — Dossiê: criação inline de referências na Nova admissão
 
-**Situação:** preparação de decisão. Nenhum produto, API, schema, migration,
-RBAC, seed, Docker ou dependência muda nesta tarefa.
+**Situação:** implementada (2026-10-29), depois da preparação de decisão; a
+entrega está na seção 12. Sem schema, migration, RBAC, seed, Docker ou
+dependência.
 **Escopo:** criar **Departamento**, **Cargo**, **Unidade** e **Centro de
 custo** a partir da busca dos seletores da **etapa 2** da Nova admissão (T195,
 T196).
@@ -342,7 +343,10 @@ Docker e dependências, e as telas fora da Nova admissão.
 - T196: o seletor, a busca e a normalização do termo são reusados; a criação
   não muda a paginação nem a contagem.
 
-## 11. Decisões pendentes
+## 11. Decisões (aprovadas em 2026-10-29)
+
+Todas aprovadas como recomendado abaixo; a trava de D12 ficou por empresa,
+tipo **e nome normalizado** (seção 12).
 
 1. **D10 — Forma do contrato:** `codigo` opcional no `POST` atual
    (recomendado) ou rota nova por referência.
@@ -362,3 +366,70 @@ Docker e dependências, e as telas fora da Nova admissão.
 7. **D16 — Normalização do nome criado:** aparar e colapsar espaços,
    recusar caracteres de controle, preservar maiúsculas e acentos
    (recomendado).
+
+## 12. Entrega (implementada em 2026-10-29)
+
+### 12.1 API
+
+- `codigo` passou a ser **opcional** só em `CriarDepartamentoDto`,
+  `CriarCargoDto`, `CriarUnidadeOrganizacionalDto` e `CriarCentroCustoDto`
+  (`CodigoOpcionalNomeDto`). Ausente, o serviço usa
+  `criarComCodigoAutomatico` (`apps/api/src/organizacao/criacao-automatica.ts`);
+  vazio ou nulo continuam recusados pela regra do código. Empresa, Área e
+  Equipe seguem exigindo código.
+- A empresa e a permissão são resolvidas antes, como sempre (sessão,
+  `resolverEmpresaPai`, `podeAcessar`): o cliente não decide empresa, código
+  final, unicidade nem permissão.
+- Nome: extremidades aparadas, espaços repetidos reduzidos a um, recusa de
+  caractere de controle e do que passar de 160 (400 sem repetir o valor).
+- Numa transação: trava consultiva (`pg_advisory_xact_lock`) por tipo,
+  empresa e nome normalizado; procura de nome igual na empresa (sem
+  diferenciar maiúsculas, acentos contam); 409 `nome_em_uso` com `id`,
+  `codigo` e `nome` da ativa, ou 409 `nome_inativo` sem reativar; primeiro
+  código livre entre `BASE`, `BASE_2` … `BASE_50` (de qualquer status), ou
+  409 `codigo_indisponivel`; gravação e auditoria.
+- Código: ASCII em maiúsculas, sem acento, `_` no lugar de espaço e símbolo,
+  até 32; nome sem 2 caracteres úteis usa `DEP`, `CAR`, `UNI` ou `CC`.
+- Dois nomes diferentes que geram o mesmo código ao mesmo tempo: a
+  unicidade do banco recusa o segundo e a transação inteira roda de novo
+  (até 5 vezes), já vendo o código ocupado.
+- O 409 com código usa `ConflitoDeReferenciaException`, montado campo a
+  campo pelo filtro de exceções. A referência devolvida é sempre da empresa
+  da sessão.
+- Auditoria: as ações de criação de sempre (`organizacao_*_criad*`), só com
+  ids. Nome, código gerado e termo não vão para log, auditoria nem mensagem
+  de erro.
+
+### 12.2 Interface
+
+- `SeletorDeReferencia` ganhou `criacao` (só o RH a recebe) e `aviso`. Com
+  `criacao`, um termo válido sem nome idêntico entre os resultados oferece
+  "Criar «termo»" como última opção, também no vazio; o anúncio da contagem
+  diz que a opção está no fim da lista. A oferta só vale para o termo que os
+  resultados respondem.
+- `ModalCriacaoInline`: confirmação com o `Modal` do Evolli, título com o
+  tipo, o nome exato e "O código é gerado automaticamente", sem prévia do
+  código. "Criar e escolher" envia uma vez (trava síncrona); durante o envio
+  o diálogo não fecha. Cancelar, Escape e Fechar não criam nada e devolvem o
+  foco ao campo, com o termo.
+- Sucesso: a referência fica escolhida pelo mesmo caminho da escolha manual
+  (no Departamento, limpa e relê as Áreas), a busca do seletor é relida, o
+  foco volta ao campo e a região de status anuncia "Criado e escolhido:
+  CÓDIGO — Nome." uma vez. Nada da admissão se perde.
+- Recusas no diálogo: `nome_em_uso` oferece "Escolher CÓDIGO — Nome";
+  `nome_inativo`, `codigo_indisponivel`, 400, 403 e 404 explicam e não
+  oferecem nova tentativa; 401, sessão expirada e CSRF desatualizado dizem
+  que nada foi criado e permitem confirmar de novo; rede e 5xx não afirmam
+  criação, releem a busca e permitem confirmar de novo (um nome já gravado
+  volta como `nome_em_uso`).
+- A confirmação aberta é edição pendente e o envio, salvamento (T189); a
+  troca de empresa remonta a página e descarta respostas atrasadas.
+- O "+" da T180 segue para Departamento, Cargo e Unidade; Centro de custo
+  ganhou só a criação inline. O DP não recebe a oferta.
+
+### 12.3 Limites conhecidos
+
+- Nome repetido é regra da aplicação no caminho automático; os caminhos com
+  código manual continuam aceitando nomes repetidos.
+- Nomes que só diferem por acento são diferentes (mesma regra da T196).
+- O código gerado é imutável (R1).

@@ -2712,23 +2712,24 @@ carregado.
 
 **Fora de escopo:** criação inline, Área, Equipe, o teto de 100 fora da admissão, schema, migration, RBAC, seed, Docker, dependências, promoção e merge.
 
-## Criação inline de referências na Nova admissão — T197 (preparação de decisão)
+## Criação inline de referências na Nova admissão — T197 (em implementação)
 
-| Tarefa | Estado            | Resultado principal                                                                                                                  |
-| ------ | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| T197   | **Em preparação** | Dossiê de decisão da criação inline de Departamento, Cargo, Unidade e Centro de custo a partir da busca da etapa 2 da Nova admissão. |
+| Tarefa | Estado               | Resultado principal                                                                                             |
+| ------ | -------------------- | --------------------------------------------------------------------------------------------------------------- |
+| T197   | **Em implementação** | Criação inline de Departamento, Cargo, Unidade e Centro de custo a partir da busca da etapa 2 da Nova admissão. |
 
-**Escopo da T197:** só preparação de decisão — o
-[dossiê](../docs/decisions/t197-dossie-criacao-inline-referencias.md) levanta
-o cadastro atual (T180) e os contratos de criação, e propõe o contrato do
-código automático no servidor, a confirmação curta, a escolha automática da
-referência criada, o tratamento de cada recusa, acessibilidade e testes. O RH
-cria só na empresa ativa; o DP só pesquisa e escolhe. Nada de produto nesta
-tarefa.
+**Escopo da T197:** a preparação de decisão veio primeiro (o
+[dossiê](../docs/decisions/t197-dossie-criacao-inline-referencias.md)); depois,
+a implementação aprovada: `POST` das quatro referências sem `codigo`, com o
+código gerado no servidor, nome repetido recusado e pedidos iguais
+serializados; e "Criar «termo»" no seletor da etapa 2, só para o RH, com
+confirmação curta e a referência criada já escolhida. O DP só pesquisa e
+escolhe. Sem schema, migration, RBAC, seed ou dependência.
 
-**Decisões pendentes:** D10 a D16 (seção 11 do dossiê).
+**Decisões aprovadas (2026-10-29):** D10 a D16 (seção 11 do dossiê); entrega
+e limites na seção 12.
 
-**Fora de escopo:** implementação de produto, Área, Equipe, importação, admissão digital, documentos, upload, R2, schema, migration, RBAC, seed, Docker, dependências, banco, push, PR, promoção e merge.
+**Fora de escopo:** Área, Equipe, importação, admissão digital, documentos, upload, R2, schema, migration, RBAC, seed, Docker, dependências, promoção e merge.
 
 ## Próxima ação autorizável
 

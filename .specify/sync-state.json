@@ -12,14 +12,14 @@
   },
   "nextTask": {
     "id": "T197",
-    "status": "criacao_inline_referencias_em_preparacao",
-    "reason": "T196 integrada em main pela PR #189 (squash 513f39fd43dd0df1848d8a36041e3b8a530b5c16), com a CI de push 3/3 verde (run 40920945239). A T197 e so preparacao de decisao da criacao inline de Departamento, Cargo, Unidade e Centro de custo a partir da busca da etapa 2 da Nova admissao (docs/decisions/t197-dossie-criacao-inline-referencias.md): RH cria so na empresa ativa, referencia criada fica escolhida, codigo gerado no servidor a partir do nome (maiusculas ASCII, sufixos previsiveis em colisao), confirmacao curta antes de criar; DP so pesquisa e escolhe. Pendentes: D10 a D16 do dossie. Sem produto, API, schema, migration, RBAC, seed, Docker, dependencia, banco, push ou PR."
+    "status": "criacao_inline_referencias_em_implementacao",
+    "reason": "T196 integrada em main pela PR #189 (squash 513f39fd43dd0df1848d8a36041e3b8a530b5c16), com a CI de push 3/3 verde (run 40920945239). A T197 implementa a criacao inline aprovada (D10 a D16, docs/decisions/t197-dossie-criacao-inline-referencias.md, secao 12): POST de Departamento, Cargo, Unidade e Centro de custo sem codigo, com o codigo gerado no servidor a partir do nome (ASCII em maiusculas, prefixo do tipo para nome curto, sufixos _2 a _50), nome repetido recusado (nome_em_uso com a existente, nome_inativo sem reativar) e trava por empresa, tipo e nome normalizado; e Criar no seletor da etapa 2 da Nova admissao, so para o RH, com confirmacao curta e a referencia criada ja escolhida. O + da T180 fica; Centro de custo sem +. Sem schema, migration, RBAC, seed ou dependencia."
   },
   "openDeliveries": [
     {
       "id": "T197",
       "pullRequest": null,
-      "status": "criacao_inline_referencias_em_preparacao"
+      "status": "criacao_inline_referencias_em_implementacao"
     }
   ],
   "requiredArtifacts": [

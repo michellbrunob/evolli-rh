@@ -2892,8 +2892,9 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
     - **Fora de escopo:** criação inline, Área, Equipe, o teto de 100 fora da admissão,
       schema, migration, RBAC, seed, Docker, dependências, promoção e merge.
 
-94. **T197 - Criação inline de referências na Nova admissão (preparação de decisão)**
-    - **Estado:** **em preparação**. Branch `codex/t197-criacao-inline-referencias`, a partir do
+94. **T197 - Criação inline de referências na Nova admissão**
+    - **Estado:** **em implementação** (a preparação de decisão veio antes, nos commits
+      `f1485b8` e `a0adaa5`). Branch `codex/t197-criacao-inline-referencias`, a partir do
       squash `513f39fd43dd0df1848d8a36041e3b8a530b5c16` (T196 integrada, PR #189).
     - **Objetivo:** preparar a decisão da criação inline de Departamento, Cargo, Unidade e
       Centro de custo a partir da busca da etapa 2 da Nova admissão, no
@@ -2901,10 +2902,15 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       empresa ativa, a referência criada fica escolhida, o código é gerado no servidor a partir
       do nome (maiúsculas ASCII, sufixos previsíveis em colisão) e uma confirmação curta vem
       antes de criar. O DP só pesquisa e escolhe; as demais permissões não mudam.
-    - **Decisões pendentes:** as da seção 11 do dossiê (D10 a D16).
-    - **Fora de escopo:** implementação de produto, Área, Equipe, importação, admissão digital,
-      documentos, upload, R2, schema, migration, RBAC, seed, Docker, dependências, banco, push,
-      PR, promoção e merge.
+    - **Decisões aprovadas (2026-10-29):** D10 a D16 da seção 11 do dossiê — `codigo`
+      opcional no `POST` atual; código ASCII em maiúsculas, prefixo `DEP`/`CAR`/`UNI`/`CC` para
+      nome curto, sufixos `_2` a `_50`; nome repetido recusado (`nome_em_uso` com a existente,
+      `nome_inativo` sem reativar) sob trava por empresa, tipo e nome normalizado; "Criar" no fim
+      da lista e no vazio, só para o RH; confirmação curta no `Modal`, sem prévia do código; o
+      "+" da T180 fica (Centro de custo sem "+"); nome aparado, espaços reduzidos, sem controle.
+    - **Entrega:** seção 12 do [dossiê](../docs/decisions/t197-dossie-criacao-inline-referencias.md).
+    - **Fora de escopo:** Área, Equipe, importação, admissão digital, documentos, upload, R2,
+      schema, migration, RBAC, seed, Docker, dependências, promoção e merge.
 
 ## Regra obrigatória para as próximas tarefas
 
