@@ -235,15 +235,24 @@ async function admitirPelaPagina({ semContatos = false } = {}) {
   fireEvent.change(screen.getByLabelText(/Data de admissão/), {
     target: { value: "2026-10-20" },
   });
-  fireEvent.change(screen.getByLabelText(/^Departamento/), {
-    target: { value: departamento.id },
-  });
-  fireEvent.change(screen.getByLabelText(/^Cargo/), {
-    target: { value: cargo.id },
-  });
-  fireEvent.change(screen.getByLabelText(/^Unidade/), {
-    target: { value: unidade.id },
-  });
+  // T196 — as referências são escolhidas pela busca no servidor: seta para
+  // baixo abre a lista e a opção é clicada.
+  for (const [rotulo, referencia] of [
+    [/^Departamento/, departamento],
+    [/^Cargo/, cargo],
+    [/^Unidade/, unidade],
+  ] as const) {
+    const campo = screen.getByLabelText(rotulo);
+    fireEvent.keyDown(campo, { key: "ArrowDown" });
+    fireEvent.click(
+      await within(
+        document.getElementById(campo.getAttribute("aria-controls")!)!,
+      ).findByRole("option", {
+        name: new RegExp(`^${referencia.codigo} — `),
+        hidden: true,
+      }),
+    );
+  }
   // T195 — quatro etapas: "Continuar" até a revisão. Nela, "Confirmar
   // admissão" só valida e abre a confirmação (T179); quem grava é
   // "Confirmar cadastro".

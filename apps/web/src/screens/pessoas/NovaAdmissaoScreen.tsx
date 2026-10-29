@@ -122,11 +122,8 @@ import {
 } from "../../api/colaboradoresClient";
 import {
   type AreaApi,
-  type CentroCustoApi,
-  type DepartamentoApi,
   type EmpresaApi,
   type EquipeApi,
-  type UnidadeOrganizacionalApi,
   listarAreas,
   listarCentrosCusto,
   listarDepartamentos,
@@ -134,7 +131,7 @@ import {
   listarEquipes,
   listarUnidades,
 } from "../../api/organizacaoClient";
-import { type CargoApi, listarCargos } from "../../api/cargoClient";
+import { listarCargos } from "../../api/cargoClient";
 import {
   type TabelaHorarioApi,
   listarTabelasHorario,
@@ -182,6 +179,12 @@ import {
   type TipoReferenciaRapida,
 } from "./ModalReferenciaRapida";
 import { listaComE, useCepAssistido } from "./cepAssistido";
+import {
+  type ListarReferencias,
+  type ReferenciaEscolhida,
+  SeletorDeReferencia,
+  TAMANHO_DA_PAGINA_DE_REFERENCIAS,
+} from "./SeletorDeReferencia";
 import "./NovaAdmissaoScreen.css";
 import { useEdicaoEmAndamento } from "../../app/edicoesPendentes";
 
@@ -245,24 +248,6 @@ function comReferenciaNova<T extends Referencia>(
   return posicao === -1
     ? [...sem, nova]
     : [...sem.slice(0, posicao), nova, ...sem.slice(posicao)];
-}
-
-/**
- * T180 (revisão) — a lista recarregada substitui a atual, mas nunca tira dela
- * a referência ESCOLHIDA: seletor, confirmação e envio falam sempre da mesma.
- * Se ela não veio na recarga (inativada nesse meio-tempo, por exemplo), quem
- * decide é o servidor, ao gravar a admissão.
- */
-function mantendoEscolhida<T extends Referencia>(
-  recarregada: T[],
-  atual: readonly T[],
-  idEscolhido: string,
-): T[] {
-  if (!idEscolhido || recarregada.some((r) => r.id === idEscolhido)) {
-    return recarregada;
-  }
-  const escolhida = atual.find((r) => r.id === idEscolhido);
-  return escolhida ? comReferenciaNova(recarregada, escolhida) : recarregada;
 }
 
 /** T180 — nome acessível do "+" de cada seletor. */
@@ -704,11 +689,18 @@ function mensagemSemReferencias(
 
 interface Opcoes {
   empresas: EmpresaApi[];
-  departamentos: DepartamentoApi[];
-  unidades: UnidadeOrganizacionalApi[];
+  /**
+   * T196 — Departamento, Cargo, Unidade e Centro de custo são escolhidos pela
+   * busca no servidor (`SeletorDeReferencia`), não por lista carregada. Estas
+   * quatro listas guardam só as referências CONHECIDAS pela página — as
+   * escolhidas e as criadas pelo "+" (T180) —, que nomeiam a escolha na
+   * revisão, na confirmação e na tela de sucesso.
+   */
+  departamentos: Referencia[];
+  unidades: Referencia[];
   equipes: EquipeApi[];
-  cargos: CargoApi[];
-  centrosCusto: CentroCustoApi[];
+  cargos: Referencia[];
+  centrosCusto: Referencia[];
   /** T183 — só as jornadas ATIVAS, e só para o RH. */
   jornadas: TabelaHorarioApi[];
 }
@@ -853,30 +845,32 @@ export function NovaAdmissaoScreen({
   /** T180 — gatilho de uma vez só: devolver o foco ao seletor da referência. */
   const focarSeletorRef = useRef<TipoReferenciaRapida | null>(null);
   /**
-   * T180 (revisão) — versão da lista de cada referência do cadastro rápido. A
-   * criação e cada recarga a avançam, e a resposta de uma recarga só vale se
-   * ainda for a mais recente. Sem isso, uma recarga lenta, lida ANTES de uma
-   * criação, chegava depois dela e tirava a referência nova do seletor: a
-   * confirmação dizia "Não informado" enquanto a admissão enviava o id.
+   * T180 (revisão) — versão da leitura de cada referência do cadastro rápido.
+   * A criação e cada recarga a avançam, e a resposta de uma recarga só vale se
+   * ainda for a mais recente.
    */
   const versaoDaListaRef = useRef<Record<TipoReferenciaRapida, number>>({
     departamento: 0,
     cargo: 0,
     unidade: 0,
   });
-  /** T180 (revisão) — as referências escolhidas agora, lidas pela recarga. */
-  const escolhidasRef = useRef<Record<TipoReferenciaRapida, string>>({
-    departamento: "",
-    cargo: "",
-    unidade: "",
+  /**
+   * T196 — a busca de cada seletor relida depois de um cadastro rápido com
+   * falha de rede (o servidor pode ter gravado): o seletor descarta o que
+   * mostrava e consulta de novo na próxima abertura.
+   */
+  const [versaoDaBusca, setVersaoDaBusca] = useState<
+    Record<TipoReferenciaRapida, number>
+  >({ departamento: 0, cargo: 0, unidade: 0 });
+  /**
+   * T179/T196 — a empresa tem Departamento e Cargo ativos? Sem um deles a
+   * admissão não pode seguir (aviso de referências). Sabido por uma consulta
+   * de um item só (`total`), não pela lista inteira.
+   */
+  const [existemAtivos, setExistemAtivos] = useState({
+    departamento: true,
+    cargo: true,
   });
-  useEffect(() => {
-    escolhidasRef.current = {
-      departamento: campos.departamentoId,
-      cargo: campos.cargoId,
-      unidade: campos.unidadeId,
-    };
-  }, [campos.departamentoId, campos.cargoId, campos.unidadeId]);
 
   const empresa = opcoes.empresas.length === 1 ? opcoes.empresas[0] : undefined;
 
@@ -918,26 +912,25 @@ export function NovaAdmissaoScreen({
     let vigente = true;
     void (async () => {
       try {
-        const [empresas, departamentos, unidades, equipes, cargos, centros] =
-          await Promise.all([
-            listarEmpresasMulti(),
-            listarDepartamentos({ status: "ativo", tamanhoPagina: 100 }),
-            listarUnidades({ status: "ativo", tamanhoPagina: 100 }),
-            listarEquipes({ status: "ativo", tamanhoPagina: 100 }),
-            listarCargos({ status: "ativo", tamanhoPagina: 100 }),
-            listarCentrosCusto({ status: "ativo", tamanhoPagina: 100 }),
-          ]);
+        // T196 — Departamento e Cargo: só se EXISTE algum ativo (um item);
+        // a escolha é pela busca. Unidade e Centro de custo nem são lidos
+        // aqui. A Equipe segue como lista.
+        const [empresas, departamentos, equipes, cargos] = await Promise.all([
+          listarEmpresasMulti(),
+          listarDepartamentos({ status: "ativo", tamanhoPagina: 1 }),
+          listarEquipes({ status: "ativo", tamanhoPagina: 100 }),
+          listarCargos({ status: "ativo", tamanhoPagina: 1 }),
+        ]);
         if (!vigente) return;
         setOpcoes((prev) => ({
-          // T183 — as jornadas chegam por conta própria (ver abaixo).
-          jornadas: prev.jornadas,
+          ...prev,
           empresas: empresas.itens,
-          departamentos: soAtivos(departamentos.itens),
-          unidades: soAtivos(unidades.itens),
           equipes: soAtivos(equipes.itens),
-          cargos: soAtivos(cargos.itens),
-          centrosCusto: soAtivos(centros.itens),
         }));
+        setExistemAtivos({
+          departamento: departamentos.total > 0,
+          cargo: cargos.total > 0,
+        });
         if (empresas.itens.length !== 1) {
           setErros({ geral: MENSAGEM_EMPRESA_INDEFINIDA });
         }
@@ -996,8 +989,8 @@ export function NovaAdmissaoScreen({
     carregandoOpcoes || !empresa
       ? []
       : [
-          ...(opcoes.departamentos.length === 0 ? ["Departamento"] : []),
-          ...(opcoes.cargos.length === 0 ? ["Cargo"] : []),
+          ...(existemAtivos.departamento ? [] : ["Departamento"]),
+          ...(existemAtivos.cargo ? [] : ["Cargo"]),
         ];
 
   const alterado =
@@ -1124,6 +1117,7 @@ export function NovaAdmissaoScreen({
           ...prev,
           departamentos: comReferenciaNova(prev.departamentos, criada),
         }));
+        setExistemAtivos((prev) => ({ ...prev, departamento: true }));
         void selecionarDepartamento(criada.id);
         break;
       case "cargo":
@@ -1131,6 +1125,7 @@ export function NovaAdmissaoScreen({
           ...prev,
           cargos: comReferenciaNova(prev.cargos, criada),
         }));
+        setExistemAtivos((prev) => ({ ...prev, cargo: true }));
         atualizar("cargoId", criada.id, "cargo", "lotacao");
         break;
       case "unidade":
@@ -1146,63 +1141,34 @@ export function NovaAdmissaoScreen({
   }
 
   /**
-   * Rede ou 5xx no cadastro rápido: o servidor pode ter gravado. A lista
-   * daquela referência é lida de novo, como no carregamento inicial.
-   * Responde se a lista foi de fato atualizada: `false` quando a leitura
-   * falhou (a lista atual fica) ou quando a resposta chegou obsoleta, depois
-   * de uma criação ou de outra recarga (é descartada). A referência
-   * escolhida nunca sai do seletor (`mantendoEscolhida`).
+   * Rede ou 5xx no cadastro rápido: o servidor pode ter gravado. T196 — a
+   * busca daquela referência é descartada e relida na próxima abertura do
+   * seletor; aqui, uma leitura de um item confere se o servidor responde (e,
+   * para Departamento e Cargo, se já existe algum ativo). Responde se a lista
+   * foi de fato atualizada: `false` quando a leitura falhou ou chegou
+   * obsoleta, depois de uma criação ou de outra recarga. A escolha atual
+   * nunca muda aqui.
    */
   async function recarregarReferencia(
     tipo: TipoReferenciaRapida,
   ): Promise<boolean> {
     const versao = ++versaoDaListaRef.current[tipo];
     const vigente = () => versao === versaoDaListaRef.current[tipo];
-    const filtro = { status: "ativo", tamanhoPagina: 100 };
+    const filtro = { status: "ativo", tamanhoPagina: 1 };
     try {
-      switch (tipo) {
-        case "departamento": {
-          const itens = soAtivos((await listarDepartamentos(filtro)).itens);
-          if (!vigente()) return false;
-          setOpcoes((prev) => ({
-            ...prev,
-            departamentos: mantendoEscolhida(
-              itens,
-              prev.departamentos,
-              escolhidasRef.current.departamento,
-            ),
-          }));
-          return true;
-        }
-        case "cargo": {
-          const itens = soAtivos((await listarCargos(filtro)).itens);
-          if (!vigente()) return false;
-          setOpcoes((prev) => ({
-            ...prev,
-            cargos: mantendoEscolhida(
-              itens,
-              prev.cargos,
-              escolhidasRef.current.cargo,
-            ),
-          }));
-          return true;
-        }
-        case "unidade": {
-          const itens = soAtivos((await listarUnidades(filtro)).itens);
-          if (!vigente()) return false;
-          setOpcoes((prev) => ({
-            ...prev,
-            unidades: mantendoEscolhida(
-              itens,
-              prev.unidades,
-              escolhidasRef.current.unidade,
-            ),
-          }));
-          return true;
-        }
+      const { total } = await {
+        departamento: listarDepartamentos,
+        cargo: listarCargos,
+        unidade: listarUnidades,
+      }[tipo](filtro);
+      if (!vigente()) return false;
+      if (tipo === "departamento" || tipo === "cargo") {
+        setExistemAtivos((prev) => ({ ...prev, [tipo]: total > 0 }));
       }
+      setVersaoDaBusca((prev) => ({ ...prev, [tipo]: prev[tipo] + 1 }));
+      return true;
     } catch {
-      // A lista atual fica; o modal diz que ela não pôde ser atualizada.
+      // A busca atual fica; o modal diz que ela não pôde ser atualizada.
       return false;
     }
   }
@@ -1253,16 +1219,14 @@ export function NovaAdmissaoScreen({
       novos.dataAdmissao = "Informe a data de admissão.";
     }
     if (!campos.departamentoId) {
-      novos.departamento =
-        opcoes.departamentos.length > 0
-          ? "Selecione o departamento."
-          : "Não há departamento ativo nesta empresa.";
+      novos.departamento = existemAtivos.departamento
+        ? "Selecione o departamento."
+        : "Não há departamento ativo nesta empresa.";
     }
     if (!campos.cargoId) {
-      novos.cargo =
-        opcoes.cargos.length > 0
-          ? "Selecione o cargo."
-          : "Não há cargo ativo nesta empresa.";
+      novos.cargo = existemAtivos.cargo
+        ? "Selecione o cargo."
+        : "Não há cargo ativo nesta empresa.";
     }
     Object.assign(
       novos,
@@ -1484,6 +1448,55 @@ export function NovaAdmissaoScreen({
     requestAnimationFrame(() =>
       document.getElementById(ID_DO_CAMPO.nome)?.focus(),
     );
+  }
+
+  /**
+   * T196 — a consulta de cada seletor pesquisável: só ativos, 20 por página,
+   * busca por código ou nome no servidor. A empresa é a da sessão.
+   */
+  function consultaDe(
+    listar: (q: {
+      status: string;
+      tamanhoPagina: number;
+      pagina: number;
+      busca?: string;
+    }) => Promise<{
+      itens: readonly Referencia[];
+      total: number;
+      pagina: number;
+      tamanhoPagina: number;
+    }>,
+  ): ListarReferencias {
+    return async ({ busca, pagina }) => {
+      const r = await listar({
+        status: "ativo",
+        tamanhoPagina: TAMANHO_DA_PAGINA_DE_REFERENCIAS,
+        pagina,
+        ...(busca ? { busca } : {}),
+      });
+      return {
+        ...r,
+        itens: r.itens.map(({ id, codigo, nome }) => ({ id, codigo, nome })),
+      };
+    };
+  }
+
+  /** T196 — a escolha guardada entre as referências conhecidas da página. */
+  function conhecer(
+    chave: "departamentos" | "cargos" | "unidades" | "centrosCusto",
+    referencia: ReferenciaEscolhida,
+  ) {
+    setOpcoes((prev) => ({
+      ...prev,
+      [chave]: comReferenciaNova(prev[chave], referencia),
+    }));
+  }
+
+  function referenciaPorId(
+    lista: readonly Referencia[],
+    id: string,
+  ): ReferenciaEscolhida | null {
+    return id ? (lista.find((r) => r.id === id) ?? null) : null;
   }
 
   /** Referência escolhida, pelo id, para o resumo da confirmação. */
@@ -2112,37 +2125,68 @@ export function NovaAdmissaoScreen({
               demais opcionais na segunda, com a Área logo abaixo do
               Departamento que a filtra. */}
               <div className="nova-admissao__linha nova-admissao__linha--3">
-                {seletorDeLotacao({
-                  campo: "departamento",
-                  rotulo: "Departamento",
-                  obrigatorio: true,
-                  valor: campos.departamentoId,
-                  lista: opcoes.departamentos,
-                  aoMudar: (id) => void selecionarDepartamento(id),
-                  vazio: "Nenhum departamento ativo",
-                  acao: botaoNovaReferencia("departamento"),
-                })}
-                {seletorDeLotacao({
-                  campo: "cargo",
-                  rotulo: "Cargo",
-                  obrigatorio: true,
-                  valor: campos.cargoId,
-                  lista: opcoes.cargos,
-                  aoMudar: (id) => atualizar("cargoId", id, "cargo", "lotacao"),
-                  vazio: "Nenhum cargo ativo",
-                  acao: botaoNovaReferencia("cargo"),
-                })}
-                {seletorDeLotacao({
-                  campo: "unidade",
-                  rotulo: "Unidade",
-                  obrigatorio: false,
-                  valor: campos.unidadeId,
-                  lista: opcoes.unidades,
-                  aoMudar: (id) =>
-                    atualizar("unidadeId", id, "unidade", "lotacao"),
-                  vazio: "Nenhuma unidade ativa",
-                  acao: botaoNovaReferencia("unidade"),
-                })}
+                {/* T196 — Departamento, Cargo, Unidade e Centro de custo
+                    são escolhidos pela busca no servidor, de 20 em 20. */}
+                <SeletorDeReferencia
+                  id={ID_DO_CAMPO.departamento}
+                  rotulo="Departamento"
+                  rotuloVisivel="Departamento"
+                  plural="departamentos"
+                  nenhum="Nenhum"
+                  ativo="ativo"
+                  obrigatorio
+                  {...(erros.departamento ? { erro: erros.departamento } : {})}
+                  escolhida={referenciaPorId(
+                    opcoes.departamentos,
+                    campos.departamentoId,
+                  )}
+                  onEscolher={(r) => {
+                    if (r) conhecer("departamentos", r);
+                    void selecionarDepartamento(r?.id ?? "");
+                  }}
+                  listar={consultaDe(listarDepartamentos)}
+                  desabilitado={carregandoOpcoes}
+                  versao={versaoDaBusca.departamento}
+                  acao={botaoNovaReferencia("departamento")}
+                />
+                <SeletorDeReferencia
+                  id={ID_DO_CAMPO.cargo}
+                  rotulo="Cargo"
+                  rotuloVisivel="Cargo"
+                  plural="cargos"
+                  nenhum="Nenhum"
+                  ativo="ativo"
+                  obrigatorio
+                  {...(erros.cargo ? { erro: erros.cargo } : {})}
+                  escolhida={referenciaPorId(opcoes.cargos, campos.cargoId)}
+                  onEscolher={(r) => {
+                    if (r) conhecer("cargos", r);
+                    atualizar("cargoId", r?.id ?? "", "cargo", "lotacao");
+                  }}
+                  listar={consultaDe(listarCargos)}
+                  desabilitado={carregandoOpcoes}
+                  versao={versaoDaBusca.cargo}
+                  acao={botaoNovaReferencia("cargo")}
+                />
+                <SeletorDeReferencia
+                  id={ID_DO_CAMPO.unidade}
+                  rotulo="Unidade"
+                  rotuloVisivel={rotuloOpcional("Unidade")}
+                  plural="unidades"
+                  nenhum="Nenhuma"
+                  ativo="ativa"
+                  obrigatorio={false}
+                  {...(erros.unidade ? { erro: erros.unidade } : {})}
+                  escolhida={referenciaPorId(opcoes.unidades, campos.unidadeId)}
+                  onEscolher={(r) => {
+                    if (r) conhecer("unidades", r);
+                    atualizar("unidadeId", r?.id ?? "", "unidade", "lotacao");
+                  }}
+                  listar={consultaDe(listarUnidades)}
+                  desabilitado={carregandoOpcoes}
+                  versao={versaoDaBusca.unidade}
+                  acao={botaoNovaReferencia("unidade")}
+                />
               </div>
               <div className="nova-admissao__linha nova-admissao__linha--3">
                 {seletorDeLotacao({
@@ -2171,16 +2215,31 @@ export function NovaAdmissaoScreen({
                     atualizar("equipeId", id, "equipe", "lotacao"),
                   vazio: "Nenhuma equipe ativa",
                 })}
-                {seletorDeLotacao({
-                  campo: "centroCusto",
-                  rotulo: "Centro de custo",
-                  obrigatorio: false,
-                  valor: campos.centroCustoId,
-                  lista: opcoes.centrosCusto,
-                  aoMudar: (id) =>
-                    atualizar("centroCustoId", id, "centroCusto", "lotacao"),
-                  vazio: "Nenhum centro de custo ativo",
-                })}
+                <SeletorDeReferencia
+                  id={ID_DO_CAMPO.centroCusto}
+                  rotulo="Centro de custo"
+                  rotuloVisivel={rotuloOpcional("Centro de custo")}
+                  plural="centros de custo"
+                  nenhum="Nenhum"
+                  ativo="ativo"
+                  obrigatorio={false}
+                  {...(erros.centroCusto ? { erro: erros.centroCusto } : {})}
+                  escolhida={referenciaPorId(
+                    opcoes.centrosCusto,
+                    campos.centroCustoId,
+                  )}
+                  onEscolher={(r) => {
+                    if (r) conhecer("centrosCusto", r);
+                    atualizar(
+                      "centroCustoId",
+                      r?.id ?? "",
+                      "centroCusto",
+                      "lotacao",
+                    );
+                  }}
+                  listar={consultaDe(listarCentrosCusto)}
+                  desabilitado={carregandoOpcoes}
+                />
               </div>
               {erros.lotacao ? (
                 <p

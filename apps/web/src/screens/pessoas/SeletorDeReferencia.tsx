@@ -1,0 +1,487 @@
+/**
+ * T196 — seletor pesquisável de uma referência da lotação (Departamento,
+ * Cargo, Unidade ou Centro de custo) na Nova admissão.
+ *
+ * ## Por que existe
+ *
+ * O `<select>` anterior carregava uma única página de até 100 itens ativos:
+ * numa empresa com mais do que isso, o que ficava além não podia ser escolhido.
+ * Aqui a busca é feita NO SERVIDOR (`busca`, por código ou nome, antes da
+ * paginação), de 20 em 20, com "Mostrar mais".
+ *
+ * ## Comportamento
+ *
+ * - É um combobox com lista (ARIA 1.2): o campo é só a BUSCA; a escolha atual
+ *   aparece sempre logo abaixo ("Escolha atual: CÓDIGO — Nome"), mesmo quando
+ *   não está na página exibida, e é lida junto do campo (`aria-describedby`).
+ * - A lista só abre por ação explícita: digitar, clicar no campo, seta para
+ *   baixo ou o botão "Mostrar opções". Foco vindo de Tab ou de um erro não a
+ *   abre.
+ * - Teclado: setas percorrem as opções, Enter escolhe, Escape fecha sem mexer
+ *   na escolha, Tab sai. Com a lista fechada, Enter segue o formulário (T195:
+ *   avança a etapa).
+ * - Só a resposta mais recente vale: busca nova, página nova ou o componente
+ *   desmontado (troca de empresa remonta a tela, T189) descartam as antigas.
+ * - Vazio, carregando e falha têm texto próprio; a falha oferece "Tentar de
+ *   novo" e não toca na escolha. Contagens e escolhas são anunciadas UMA vez,
+ *   numa região de status sempre montada.
+ * - Busca sem remoção de acentos (regra desta entrega).
+ */
+import {
+  type KeyboardEvent,
+  type ReactNode,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from "react";
+import { FormField } from "../../components";
+import type { ResultadoPaginado } from "../../api/organizacaoClient";
+import "./SeletorDeReferencia.css";
+
+/** Referência como aparece na lista e na escolha atual. */
+export interface ReferenciaEscolhida {
+  readonly id: string;
+  readonly codigo: string;
+  readonly nome: string;
+}
+
+/** `CÓDIGO — Nome`: nomes repetidos são permitidos, o código distingue. */
+export function rotuloDaReferenciaEscolhida(r: ReferenciaEscolhida): string {
+  return `${r.codigo} — ${r.nome}`;
+}
+
+/** T196 — decisão aprovada: páginas de 20. */
+export const TAMANHO_DA_PAGINA_DE_REFERENCIAS = 20;
+
+/** Espera curta entre a digitação e a consulta. */
+const ESPERA_DA_DIGITACAO_MS = 300;
+
+export type ListarReferencias = (consulta: {
+  readonly busca?: string;
+  readonly pagina: number;
+}) => Promise<ResultadoPaginado<ReferenciaEscolhida>>;
+
+export interface SeletorDeReferenciaProps {
+  /** `id` do campo de busca — o alvo do foco quando há erro (T179/T195). */
+  readonly id: string;
+  /** Nome do campo, também usado nos textos ("Departamento"). */
+  readonly rotulo: string;
+  /** Rótulo visível; os opcionais trazem "(opcional)". */
+  readonly rotuloVisivel: string;
+  /** Nome no plural e em minúsculas, para os textos ("departamentos"). */
+  readonly plural: string;
+  /** "Nenhum" ou "Nenhuma", no gênero do campo. */
+  readonly nenhum: "Nenhum" | "Nenhuma";
+  /** "ativo" ou "ativa", no gênero do campo. */
+  readonly ativo: "ativo" | "ativa";
+  readonly obrigatorio: boolean;
+  readonly ajuda?: string;
+  readonly erro?: string;
+  readonly escolhida: ReferenciaEscolhida | null;
+  readonly onEscolher: (referencia: ReferenciaEscolhida | null) => void;
+  /** A consulta ao servidor (só ativos da empresa da sessão). */
+  readonly listar: ListarReferencias;
+  readonly desabilitado?: boolean;
+  /**
+   * Muda quando a lista precisa ser relida (T180: depois de um cadastro
+   * rápido): os resultados guardados deixam de valer.
+   */
+  readonly versao?: number;
+  /** T180 — o "+" do cadastro rápido, ao lado do campo. */
+  readonly acao?: ReactNode;
+}
+
+type Estado =
+  | { tipo: "fechado" }
+  | { tipo: "carregando" }
+  | {
+      tipo: "pronto";
+      itens: readonly ReferenciaEscolhida[];
+      total: number;
+      pagina: number;
+      carregandoMais: boolean;
+      falhaAoCarregarMais: boolean;
+    }
+  | { tipo: "falha" };
+
+export function SeletorDeReferencia({
+  id,
+  rotulo,
+  rotuloVisivel,
+  plural,
+  nenhum,
+  ativo,
+  obrigatorio,
+  ajuda,
+  erro,
+  escolhida,
+  onEscolher,
+  listar,
+  desabilitado = false,
+  versao = 0,
+  acao,
+}: SeletorDeReferenciaProps) {
+  const base = useId();
+  const idLista = `${base}-lista`;
+  const idEscolha = `${id}-escolha`;
+  const idDaOpcao = (indice: number) => `${base}-opcao-${indice}`;
+
+  const [termo, setTermo] = useState("");
+  const [estado, setEstado] = useState<Estado>({ tipo: "fechado" });
+  const [ativa, setAtiva] = useState(-1);
+  /** Anúncio único (contagem, escolha); limpo antes de cada novo. */
+  const [anuncio, setAnuncio] = useState("");
+
+  /** Só a resposta do pedido mais recente vale. */
+  const pedidoRef = useRef(0);
+  const esperaRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const campoRef = useRef<HTMLInputElement | null>(null);
+  const raizRef = useRef<HTMLDivElement | null>(null);
+  const mostrarMaisRef = useRef<HTMLButtonElement | null>(null);
+  /** Foco a devolver ao campo depois de "Mostrar mais" sem mais páginas. */
+  const focarCampoRef = useRef(false);
+
+  const aberto = estado.tipo !== "fechado";
+  /** O estado deste render, lido pelas respostas que chegam depois. */
+  const estadoRef = useRef(estado);
+  estadoRef.current = estado;
+
+  // Desmontado (troca de empresa, saída da página): nenhuma resposta vale.
+  useEffect(
+    () => () => {
+      pedidoRef.current += 1;
+      if (esperaRef.current) clearTimeout(esperaRef.current);
+    },
+    [],
+  );
+
+  // T180 — lista relida no servidor: o que estava na tela não vale mais.
+  useEffect(() => {
+    if (versao === 0) return;
+    pedidoRef.current += 1;
+    setEstado({ tipo: "fechado" });
+    setAtiva(-1);
+  }, [versao]);
+
+  useEffect(() => {
+    if (!focarCampoRef.current) return;
+    focarCampoRef.current = false;
+    campoRef.current?.focus();
+  });
+
+  function anunciar(texto: string) {
+    setAnuncio(texto);
+  }
+
+  function textoDaContagem(exibidos: number, total: number): string {
+    if (total === 0) return `${nenhum} ${rotulo.toLowerCase()} encontrado.`;
+    return total === 1
+      ? "1 resultado."
+      : `${total} resultados; ${exibidos} exibidos.`;
+  }
+
+  async function consultar(busca: string, pagina: number) {
+    const pedido = ++pedidoRef.current;
+    if (pagina === 1) {
+      setEstado({ tipo: "carregando" });
+      setAtiva(-1);
+    } else {
+      setEstado((atual) =>
+        atual.tipo === "pronto"
+          ? { ...atual, carregandoMais: true, falhaAoCarregarMais: false }
+          : atual,
+      );
+    }
+    try {
+      const resposta = await listar({
+        ...(busca ? { busca } : {}),
+        pagina,
+      });
+      if (pedido !== pedidoRef.current) return;
+      const atual = estadoRef.current;
+      const anteriores =
+        pagina > 1 && atual.tipo === "pronto" ? atual.itens : [];
+      const itens = [...anteriores, ...resposta.itens];
+      // "Mostrar mais" some quando acabam as páginas: o foco volta ao campo.
+      if (pagina > 1 && itens.length >= resposta.total) {
+        focarCampoRef.current = true;
+      }
+      setEstado({
+        tipo: "pronto",
+        itens,
+        total: resposta.total,
+        pagina,
+        carregandoMais: false,
+        falhaAoCarregarMais: false,
+      });
+      anunciar(textoDaContagem(itens.length, resposta.total));
+    } catch {
+      if (pedido !== pedidoRef.current) return;
+      if (pagina > 1) {
+        setEstado((atual) =>
+          atual.tipo === "pronto"
+            ? { ...atual, carregandoMais: false, falhaAoCarregarMais: true }
+            : atual,
+        );
+      } else {
+        setEstado({ tipo: "falha" });
+      }
+    }
+  }
+
+  function abrir(busca = termo) {
+    if (desabilitado) return;
+    if (esperaRef.current) clearTimeout(esperaRef.current);
+    void consultar(busca.trim(), 1);
+  }
+
+  function fechar() {
+    if (esperaRef.current) clearTimeout(esperaRef.current);
+    pedidoRef.current += 1;
+    setEstado({ tipo: "fechado" });
+    setAtiva(-1);
+    setTermo("");
+  }
+
+  function aoDigitar(valor: string) {
+    setTermo(valor);
+    if (esperaRef.current) clearTimeout(esperaRef.current);
+    esperaRef.current = setTimeout(
+      () => void consultar(valor.trim(), 1),
+      ESPERA_DA_DIGITACAO_MS,
+    );
+    if (!aberto) setEstado({ tipo: "carregando" });
+  }
+
+  function escolher(referencia: ReferenciaEscolhida | null) {
+    onEscolher(referencia);
+    fechar();
+    anunciar(
+      referencia
+        ? `${rotulo} escolhido: ${rotuloDaReferenciaEscolhida(referencia)}.`
+        : `${rotulo}: escolha removida.`,
+    );
+    campoRef.current?.focus();
+  }
+
+  const itens = estado.tipo === "pronto" ? estado.itens : [];
+
+  function aoTeclar(evento: KeyboardEvent<HTMLInputElement>) {
+    switch (evento.key) {
+      case "ArrowDown":
+        evento.preventDefault();
+        if (!aberto) {
+          abrir();
+          return;
+        }
+        if (itens.length > 0)
+          setAtiva((a) => Math.min(a + 1, itens.length - 1));
+        return;
+      case "ArrowUp":
+        if (!aberto) return;
+        evento.preventDefault();
+        if (itens.length > 0) setAtiva((a) => Math.max(a - 1, 0));
+        return;
+      case "Enter":
+        // Lista aberta: Enter é da lista, nunca envia o formulário.
+        if (!aberto) return;
+        evento.preventDefault();
+        if (ativa >= 0 && itens[ativa]) escolher(itens[ativa]!);
+        return;
+      case "Escape":
+        if (!aberto) return;
+        evento.preventDefault();
+        evento.stopPropagation();
+        fechar();
+        return;
+      default:
+        return;
+    }
+  }
+
+  return (
+    <div
+      className="seletor-referencia"
+      ref={raizRef}
+      onBlur={(evento) => {
+        const destino = evento.relatedTarget as Node | null;
+        if (aberto && (!destino || !raizRef.current?.contains(destino))) {
+          fechar();
+        }
+      }}
+    >
+      <FormField
+        id={id}
+        label={rotuloVisivel}
+        required={obrigatorio}
+        {...(ajuda ? { help: ajuda } : {})}
+        {...(erro ? { error: erro } : {})}
+      >
+        {(control) => (
+          <div className="seletor-referencia__linha">
+            <input
+              {...control}
+              ref={campoRef}
+              type="text"
+              role="combobox"
+              autoComplete="off"
+              placeholder="Buscar por código ou nome"
+              aria-autocomplete="list"
+              aria-expanded={aberto}
+              aria-controls={idLista}
+              aria-describedby={[control["aria-describedby"], idEscolha]
+                .filter(Boolean)
+                .join(" ")}
+              {...(aberto && ativa >= 0 && itens[ativa]
+                ? { "aria-activedescendant": idDaOpcao(ativa) }
+                : {})}
+              value={termo}
+              disabled={desabilitado}
+              onChange={(e) => aoDigitar(e.target.value)}
+              onClick={() => {
+                if (!aberto) abrir();
+              }}
+              onKeyDown={aoTeclar}
+            />
+            <button
+              type="button"
+              className="seletor-referencia__botao"
+              aria-label={`Mostrar opções de ${rotulo}`}
+              aria-controls={idLista}
+              aria-expanded={aberto}
+              disabled={desabilitado}
+              onClick={() => {
+                if (aberto) {
+                  fechar();
+                } else {
+                  abrir();
+                }
+                campoRef.current?.focus();
+              }}
+            >
+              <span aria-hidden="true">▾</span>
+            </button>
+            {acao}
+          </div>
+        )}
+      </FormField>
+
+      <p id={idEscolha} className="seletor-referencia__escolha">
+        {escolhida ? (
+          <>
+            Escolha atual:{" "}
+            <strong>{rotuloDaReferenciaEscolhida(escolhida)}</strong>
+          </>
+        ) : (
+          "Nenhuma escolha."
+        )}
+      </p>
+      {escolhida && !obrigatorio ? (
+        <button
+          type="button"
+          className="seletor-referencia__limpar"
+          aria-label={`Limpar ${rotulo}`}
+          disabled={desabilitado}
+          onClick={() => escolher(null)}
+        >
+          Limpar escolha
+        </button>
+      ) : null}
+
+      {/* Região de status sempre montada: anuncia contagens e escolhas uma
+          vez, sem mover o foco. */}
+      <p className="seletor-referencia__so-leitor" role="status">
+        {anuncio}
+      </p>
+
+      <div className="seletor-referencia__painel" hidden={!aberto}>
+        <ul
+          id={idLista}
+          role="listbox"
+          aria-label={`Resultados de ${rotulo}`}
+          className="seletor-referencia__lista"
+        >
+          {itens.map((item, indice) => {
+            const marcada = escolhida?.id === item.id;
+            return (
+              <li
+                key={item.id}
+                id={idDaOpcao(indice)}
+                role="option"
+                aria-selected={marcada}
+                className={[
+                  "seletor-referencia__opcao",
+                  indice === ativa ? "seletor-referencia__opcao--ativa" : "",
+                  marcada ? "seletor-referencia__opcao--marcada" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+                // O campo mantém o foco: o clique não o tira dele.
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => escolher(item)}
+              >
+                <span>{rotuloDaReferenciaEscolhida(item)}</span>
+                {marcada ? (
+                  <span className="seletor-referencia__marca">
+                    {" "}
+                    (escolha atual)
+                  </span>
+                ) : null}
+              </li>
+            );
+          })}
+        </ul>
+        {estado.tipo === "carregando" ? (
+          <p className="seletor-referencia__texto">Buscando {plural}…</p>
+        ) : null}
+        {estado.tipo === "pronto" && estado.total === 0 ? (
+          <p className="seletor-referencia__texto">
+            {termo.trim()
+              ? `${nenhum} ${rotulo.toLowerCase()} ${ativo} encontrado para a busca.`
+              : `${nenhum} ${rotulo.toLowerCase()} ${ativo} nesta empresa.`}
+          </p>
+        ) : null}
+        {estado.tipo === "falha" ? (
+          <div className="seletor-referencia__falha" role="alert">
+            <p className="seletor-referencia__texto">
+              Não foi possível carregar {plural}. A escolha atual foi mantida.
+            </p>
+            <button
+              type="button"
+              className="seletor-referencia__acao"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                abrir();
+                campoRef.current?.focus();
+              }}
+            >
+              Tentar de novo
+            </button>
+          </div>
+        ) : null}
+        {estado.tipo === "pronto" && estado.falhaAoCarregarMais ? (
+          <p className="seletor-referencia__texto" role="alert">
+            Não foi possível carregar mais {plural}. Tente de novo.
+          </p>
+        ) : null}
+        {estado.tipo === "pronto" && estado.itens.length < estado.total ? (
+          <button
+            type="button"
+            ref={mostrarMaisRef}
+            className="seletor-referencia__acao"
+            aria-busy={estado.carregandoMais}
+            onClick={() => {
+              if (estado.carregandoMais) return;
+              void consultar(termo.trim(), estado.pagina + 1);
+            }}
+          >
+            {estado.carregandoMais
+              ? `Carregando mais ${plural}…`
+              : "Mostrar mais"}
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+}

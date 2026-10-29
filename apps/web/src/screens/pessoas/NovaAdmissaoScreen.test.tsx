@@ -229,6 +229,30 @@ const unidadeSel = () => screen.getByLabelText(/^Unidade/);
 const areaSel = () => screen.getByLabelText(/^Área/);
 const equipeSel = () => screen.getByLabelText(/^Equipe/);
 const centroSel = () => screen.getByLabelText(/^Centro de custo/);
+
+/** T196 — a linha "Escolha atual" de um seletor pesquisável. */
+const escolhaDe = (campo: HTMLElement) =>
+  document.getElementById(`${campo.id}-escolha`)!;
+
+/** T196 — a lista de resultados de um seletor pesquisável. */
+const listaDe = (campo: HTMLElement) =>
+  document.getElementById(campo.getAttribute("aria-controls")!)!;
+
+/**
+ * T196 — escolhe uma referência no seletor pesquisável, como quem usa o
+ * teclado: seta para baixo abre a lista (consulta ao servidor) e a opção é
+ * clicada.
+ */
+async function escolher(campo: HTMLElement, referencia: { codigo: string }) {
+  fireEvent.keyDown(campo, { key: "ArrowDown" });
+  fireEvent.click(
+    await within(listaDe(campo)).findByRole("option", {
+      name: new RegExp(`^${referencia.codigo} — `),
+      // Como os demais preenchimentos, vale também com a etapa 2 oculta.
+      hidden: true,
+    }),
+  );
+}
 /** T195 — o título da etapa na tela ("Etapa N de 4: …"). */
 const tituloDaEtapa = () =>
   screen.getByRole("heading", { level: 2, name: /^Etapa \d de 4/ });
@@ -304,20 +328,20 @@ function preencherContatos() {
 }
 
 /** T179 — Departamento, Cargo e Unidade: obrigatórios, um seletor cada. */
-function preencherLotacao() {
-  fireEvent.change(departamentoSel(), { target: { value: departamento.id } });
-  fireEvent.change(cargoSel(), { target: { value: cargo.id } });
-  fireEvent.change(unidadeSel(), { target: { value: unidade.id } });
+async function preencherLotacao() {
+  await escolher(departamentoSel(), departamento);
+  await escolher(cargoSel(), cargo);
+  await escolher(unidadeSel(), unidade);
 }
 
-function preencherValido() {
+async function preencherValido() {
   preencherContatos();
   fireEvent.change(nome(), { target: { value: "  Pessoa Sintética Nova " } });
   fireEvent.change(dataNascimento(), { target: { value: "1990-05-20" } });
   fireEvent.change(matricula(), { target: { value: "mat-0900" } });
   fireEvent.change(tipo(), { target: { value: "clt" } });
   fireEvent.change(data(), { target: { value: "2026-11-03" } });
-  preencherLotacao();
+  await preencherLotacao();
 }
 
 /**
@@ -338,8 +362,8 @@ function abrirLotacao() {
 }
 
 /** T195 — leva à etapa 3 (Endereço), com os obrigatórios preenchidos. */
-function abrirEndereco() {
-  preencherValido();
+async function abrirEndereco() {
+  await preencherValido();
   irAteEtapa("Endereço");
 }
 
@@ -621,7 +645,7 @@ describe("Nova admissão — página própria", () => {
   it("data de nascimento é obrigatória: sem ela, nada é enviado", async () => {
     montar();
     await aguardarEmpresa();
-    preencherValido();
+    await preencherValido();
     fireEvent.change(dataNascimento(), { target: { value: "" } });
     fireEvent.click(salvar());
     await waitFor(() => expect(dataNascimento()).toHaveFocus());
@@ -652,10 +676,10 @@ describe("Nova admissão — página própria", () => {
     fireEvent.click(salvar());
     // T179 — e, por fim, os dois seletores obrigatórios da lotação.
     await waitFor(() => expect(departamentoSel()).toHaveFocus());
-    fireEvent.change(departamentoSel(), { target: { value: departamento.id } });
+    await escolher(departamentoSel(), departamento);
     fireEvent.click(salvar());
     await waitFor(() => expect(cargoSel()).toHaveFocus());
-    fireEvent.change(cargoSel(), { target: { value: cargo.id } });
+    await escolher(cargoSel(), cargo);
     fireEvent.click(salvar());
     // Sem Unidade, o formulário está completo: abre a confirmação.
     await screen.findByRole("dialog", {
@@ -754,7 +778,7 @@ describe("Nova admissão — página própria", () => {
       ),
     ).toBeInTheDocument();
 
-    preencherValido();
+    await preencherValido();
     await salvarEConfirmar();
     await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
     const dto = vi.mocked(admitirColaborador).mock.calls[0]![0];
@@ -795,7 +819,7 @@ describe("Nova admissão — página própria", () => {
     async (rotulo, valor, mensagem) => {
       montar();
       await aguardarEmpresa();
-      preencherValido();
+      await preencherValido();
       const campo = screen.getByLabelText(rotulo);
       fireEvent.change(campo, { target: { value: valor } });
       fireEvent.click(salvar());
@@ -809,7 +833,7 @@ describe("Nova admissão — página própria", () => {
   it("com outro país, o CEP é texto livre e segue a forma de antes", async () => {
     montar();
     await aguardarEmpresa();
-    preencherValido();
+    await preencherValido();
     fireEvent.change(pais(), { target: { value: "Portugal" } });
     const cep = screen.getByLabelText(/^CEP/);
     fireEvent.change(cep, { target: { value: "30140/071" } });
@@ -838,7 +862,7 @@ describe("Nova admissão — página própria", () => {
   it("envia exatamente o contrato: empresa da sessão, matrícula normalizada, Departamento, Cargo e Unidade, e a chave do envio", async () => {
     montar();
     await aguardarEmpresa();
-    preencherValido();
+    await preencherValido();
     await salvarEConfirmar();
     await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
     expect(admitirColaborador).toHaveBeenCalledWith(
@@ -891,8 +915,8 @@ describe("Nova admissão — página própria", () => {
     fireEvent.change(dataNascimento(), { target: { value: "1991-02-03" } });
     fireEvent.change(tipo(), { target: { value: "estagio" } });
     fireEvent.change(data(), { target: { value: "2026-11-04" } });
-    fireEvent.change(departamentoSel(), { target: { value: departamento.id } });
-    fireEvent.change(cargoSel(), { target: { value: cargo.id } });
+    await escolher(departamentoSel(), departamento);
+    await escolher(cargoSel(), cargo);
     await salvarEConfirmar();
     await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
     const [dto, opcoes] = vi.mocked(admitirColaborador).mock.calls[0]!;
@@ -946,7 +970,7 @@ describe("Nova admissão — página própria", () => {
   it("T179 — um contato só: o bloco leva só ele", async () => {
     montar();
     await aguardarEmpresa();
-    preencherValido();
+    await preencherValido();
     fireEvent.change(emailPessoal(), { target: { value: "" } });
     fireEvent.change(telefone(), { target: { value: "" } });
     await salvarEConfirmar();
@@ -964,7 +988,7 @@ describe("Nova admissão — página própria", () => {
   ])("T179 — sexo %s (%s) vai como código no corpo", async (codigo, rotulo) => {
     montar();
     await aguardarEmpresa();
-    preencherValido();
+    await preencherValido();
     const sexo = screen.getByLabelText("Sexo (opcional)");
     fireEvent.change(sexo, { target: { value: codigo } });
     expect(sexo).toHaveDisplayValue(rotulo);
@@ -978,7 +1002,7 @@ describe("Nova admissão — página própria", () => {
   it("T179 — sexo sem seleção vai null, e voltar a 'Selecione…' desfaz a escolha", async () => {
     montar();
     await aguardarEmpresa();
-    preencherValido();
+    await preencherValido();
     const sexo = screen.getByLabelText("Sexo (opcional)");
     fireEvent.change(sexo, { target: { value: "masculino" } });
     fireEvent.change(sexo, { target: { value: "" } });
@@ -1001,7 +1025,7 @@ describe("Nova admissão — página própria", () => {
   it("envia os dados pessoais e o endereço normalizados, vazio como null", async () => {
     montar();
     await aguardarEmpresa();
-    preencherValido();
+    await preencherValido();
     fireEvent.change(screen.getByLabelText(/Data de nascimento/), {
       target: { value: "1990-05-20" },
     });
@@ -1059,7 +1083,7 @@ describe("Nova admissão — página própria", () => {
     await aguardarEmpresa();
     // Sem departamento, a área não tem o que listar.
     expect(areaSel()).toBeDisabled();
-    preencherValido();
+    await preencherValido();
     abrirLotacao();
     await screen.findByRole("option", {
       name: "ARE1 — Área Sintética (teste)",
@@ -1107,12 +1131,12 @@ describe("Nova admissão — página própria", () => {
     montar();
     await aguardarEmpresa();
     abrirLotacao();
-    fireEvent.change(departamentoSel(), { target: { value: departamento.id } });
+    await escolher(departamentoSel(), departamento);
     await screen.findByRole("option", { name: /ARE1/ });
     fireEvent.change(areaSel(), {
       target: { value: "66666666-6666-6666-6666-666666666666" },
     });
-    fireEvent.change(departamentoSel(), { target: { value: outro.id } });
+    await escolher(departamentoSel(), outro);
     expect(areaSel()).toHaveValue("");
   });
 
@@ -1139,7 +1163,7 @@ describe("Nova admissão — página própria", () => {
     );
     montar();
     await aguardarEmpresa();
-    preencherValido();
+    await preencherValido();
     abrirLotacao();
     expect(
       within(equipeSel()).getByRole("option", {
@@ -1149,9 +1173,7 @@ describe("Nova admissão — página própria", () => {
     fireEvent.change(equipeSel(), {
       target: { value: "99999999-9999-4999-8999-999999999999" },
     });
-    fireEvent.change(centroSel(), {
-      target: { value: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" },
-    });
+    await escolher(centroSel(), { codigo: "CC1" });
     await salvarEConfirmar();
     await waitFor(() =>
       expect(admitirColaborador).toHaveBeenCalledWith(
@@ -1177,10 +1199,24 @@ describe("Nova admissão — página própria", () => {
     montar();
     await aguardarEmpresa();
     abrirLotacao();
-    const opcoes = within(cargoSel())
-      .getAllByRole("option")
-      .map((o) => o.textContent);
-    expect(opcoes).toEqual(["Selecione…", "CAR1 — Cargo Sintético (teste)"]);
+    // T196 — a busca pede só ativos ao servidor, 20 por página.
+    fireEvent.keyDown(cargoSel(), { key: "ArrowDown" });
+    await within(listaDe(cargoSel())).findByRole("option", {
+      name: /^CAR1 — /,
+    });
+    expect(listarCargos).toHaveBeenLastCalledWith({
+      status: "ativo",
+      tamanhoPagina: 20,
+      pagina: 1,
+    });
+    expect(
+      within(listaDe(cargoSel()))
+        .getAllByRole("option")
+        .map((o) => o.textContent),
+    ).toEqual([
+      "CAR1 — Cargo Sintético (teste)",
+      "CARX — Cargo Sintético (teste)",
+    ]);
   });
 });
 
@@ -1191,7 +1227,7 @@ describe("T179 — confirmação antes de gravar", () => {
   it("só 'Salvar' não envia: abre a confirmação com o título e as duas ações", async () => {
     montar();
     await aguardarEmpresa();
-    preencherValido();
+    await preencherValido();
     fireEvent.click(salvar());
     const dialogo = await screen.findByRole("dialog", {
       name: "Confirmar cadastro de colaborador?",
@@ -1209,7 +1245,7 @@ describe("T179 — confirmação antes de gravar", () => {
   it("o resumo traz empresa, nome, matrícula, vínculo, data e lotação — nunca contatos, endereço ou nascimento", async () => {
     montar();
     await aguardarEmpresa();
-    abrirEndereco();
+    await abrirEndereco();
     fireEvent.change(screen.getByLabelText(/^CEP/), {
       target: { value: "30140071" },
     });
@@ -1259,9 +1295,11 @@ describe("T179 — confirmação antes de gravar", () => {
   it("T179 — sem matrícula e sem unidade, o resumo diz 'Não informada'", async () => {
     montar();
     await aguardarEmpresa();
-    preencherValido();
+    await preencherValido();
     fireEvent.change(matricula(), { target: { value: "" } });
-    fireEvent.change(unidadeSel(), { target: { value: "" } });
+    abrirLotacao();
+    fireEvent.click(screen.getByRole("button", { name: "Limpar Unidade" }));
+    expect(escolhaDe(unidadeSel())).toHaveTextContent("Nenhuma escolha.");
     fireEvent.click(salvar());
     const dialogo = await screen.findByRole("dialog", {
       name: "Confirmar cadastro de colaborador?",
@@ -1287,7 +1325,7 @@ describe("T179 — confirmação antes de gravar", () => {
     });
     montar();
     await aguardarEmpresa();
-    abrirEndereco();
+    await abrirEndereco();
     fireEvent.change(screen.getByLabelText(/^CEP/), {
       target: { value: "30140071" },
     });
@@ -1310,9 +1348,15 @@ describe("T179 — confirmação antes de gravar", () => {
     expect(admitirColaborador).not.toHaveBeenCalled();
     expect(nome()).toHaveValue("  Pessoa Sintética Nova ");
     expect(matricula()).toHaveValue("MAT-0900");
-    expect(departamentoSel()).toHaveValue(departamento.id);
-    expect(cargoSel()).toHaveValue(cargo.id);
-    expect(unidadeSel()).toHaveValue(unidade.id);
+    expect(escolhaDe(departamentoSel())).toHaveTextContent(
+      `${departamento.codigo} — ${departamento.nome}`,
+    );
+    expect(escolhaDe(cargoSel())).toHaveTextContent(
+      `${cargo.codigo} — ${cargo.nome}`,
+    );
+    expect(escolhaDe(unidadeSel())).toHaveTextContent(
+      `${unidade.codigo} — ${unidade.nome}`,
+    );
     expect(celular()).toHaveValue("(31) 99999-0000");
     expect(screen.getByLabelText(/^CEP/)).toHaveValue("30140-071");
     expect(
@@ -1323,7 +1367,7 @@ describe("T179 — confirmação antes de gravar", () => {
   it("Escape faz o mesmo que 'Voltar e revisar'", async () => {
     montar();
     await aguardarEmpresa();
-    preencherValido();
+    await preencherValido();
     fireEvent.click(salvar());
     await screen.findByRole("dialog", {
       name: "Confirmar cadastro de colaborador?",
@@ -1344,7 +1388,7 @@ describe("T179 — confirmação antes de gravar", () => {
     );
     montar();
     await aguardarEmpresa();
-    preencherValido();
+    await preencherValido();
     fireEvent.click(salvar());
     await screen.findByRole("dialog", {
       name: "Confirmar cadastro de colaborador?",
@@ -1376,7 +1420,7 @@ describe("T179 — confirmação antes de gravar", () => {
     try {
       montar();
       await aguardarEmpresa();
-      preencherValido();
+      await preencherValido();
       await salvarEConfirmar();
       await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
       expect(chaveDaChamada(0)).toBe("12345678-1234-4234-8234-123456789abc");
@@ -1394,7 +1438,7 @@ describe("Nova admissão — recusa do servidor preserva os dados", () => {
     );
     montar();
     await aguardarEmpresa();
-    preencherValido();
+    await preencherValido();
     await salvarEConfirmar();
     await waitFor(() => expect(matricula()).toHaveFocus());
     expect(dialogoConfirmacao()).toBeNull();
@@ -1406,9 +1450,15 @@ describe("Nova admissão — recusa do servidor preserva os dados", () => {
     expect(matricula()).toHaveValue("MAT-0900");
     expect(tipo()).toHaveValue("clt");
     expect(data()).toHaveValue("2026-11-03");
-    expect(departamentoSel()).toHaveValue(departamento.id);
-    expect(cargoSel()).toHaveValue(cargo.id);
-    expect(unidadeSel()).toHaveValue(unidade.id);
+    expect(escolhaDe(departamentoSel())).toHaveTextContent(
+      `${departamento.codigo} — ${departamento.nome}`,
+    );
+    expect(escolhaDe(cargoSel())).toHaveTextContent(
+      `${cargo.codigo} — ${cargo.nome}`,
+    );
+    expect(escolhaDe(unidadeSel())).toHaveTextContent(
+      `${unidade.codigo} — ${unidade.nome}`,
+    );
     // `type="email"` apara as pontas no próprio campo; o resto fica como digitado.
     expect(emailPessoal()).toHaveValue("Pessoa.Nova@Exemplo.TEST");
     expect(celular()).toHaveValue("(31) 99999-0000");
@@ -1432,7 +1482,7 @@ describe("Nova admissão — recusa do servidor preserva os dados", () => {
     );
     montar();
     await aguardarEmpresa();
-    preencherValido();
+    await preencherValido();
     await salvarEConfirmar();
     await waitFor(() => expect(emailPessoal()).toHaveFocus());
     expect(emailPessoal()).toHaveAccessibleDescription(
@@ -1453,7 +1503,7 @@ describe("Nova admissão — recusa do servidor preserva os dados", () => {
     );
     montar();
     await aguardarEmpresa();
-    preencherValido();
+    await preencherValido();
     await salvarEConfirmar();
     // O e-mail vem antes da matrícula na tela.
     await waitFor(() => expect(emailPessoal()).toHaveFocus());
@@ -1481,7 +1531,7 @@ describe("Nova admissão — recusa do servidor preserva os dados", () => {
     vi.mocked(admitirColaborador).mockRejectedValue(recusa(409));
     montar();
     await aguardarEmpresa();
-    preencherValido();
+    await preencherValido();
     await salvarEConfirmar();
     const alerta = await screen.findByText(/conflita com um registro/);
     await waitFor(() => expect(alerta).toHaveFocus());
@@ -1492,14 +1542,16 @@ describe("Nova admissão — recusa do servidor preserva os dados", () => {
     vi.mocked(admitirColaborador).mockRejectedValue(recusa(422));
     montar();
     await aguardarEmpresa();
-    preencherValido();
+    await preencherValido();
     await salvarEConfirmar();
     const aviso = await screen.findByText(/A lotação escolhida não foi aceita/);
     await waitFor(() => expect(aviso).toHaveFocus());
     expect(
       screen.getByRole("group", { name: "Revise 1 campo antes de confirmar" }),
     ).toHaveTextContent("Lotação inicial");
-    expect(departamentoSel()).toHaveValue(departamento.id);
+    expect(escolhaDe(departamentoSel())).toHaveTextContent(
+      `${departamento.codigo} — ${departamento.nome}`,
+    );
   });
 
   it("422 idempotência divergente: explica que o envio já foi registrado com outros dados", async () => {
@@ -1508,7 +1560,7 @@ describe("Nova admissão — recusa do servidor preserva os dados", () => {
     );
     montar();
     await aguardarEmpresa();
-    preencherValido();
+    await preencherValido();
     await salvarEConfirmar();
     const alerta = await screen.findByText(
       /Este envio já foi registrado antes, com outros dados/,
@@ -1525,7 +1577,7 @@ describe("Nova admissão — recusa do servidor preserva os dados", () => {
     );
     montar();
     await aguardarEmpresa();
-    preencherValido();
+    await preencherValido();
     await salvarEConfirmar();
     await screen.findByText(/Este envio já foi registrado antes/);
     const chaveRecusada = chaveDaChamada(0);
@@ -1543,7 +1595,7 @@ describe("Nova admissão — recusa do servidor preserva os dados", () => {
       screen.queryByRole("button", { name: "Recomeçar a admissão" }),
     ).toBeNull();
     // O próximo envio é OUTRO: chave nova.
-    preencherValido();
+    await preencherValido();
     await salvarEConfirmar();
     await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(2));
     expect(chaveDaChamada(1)).toMatch(/^[0-9a-f-]{36}$/);
@@ -1554,7 +1606,7 @@ describe("Nova admissão — recusa do servidor preserva os dados", () => {
     vi.mocked(admitirColaborador).mockRejectedValue(recusa(500));
     montar();
     await aguardarEmpresa();
-    preencherValido();
+    await preencherValido();
     await salvarEConfirmar();
     // T179 (revisão final) — 5xx é envio incerto: reconfirmar, não recomeçar.
     await screen.findByText(/Não foi possível confirmar se o cadastro/);
@@ -1581,13 +1633,15 @@ describe("Nova admissão — recusa do servidor preserva os dados", () => {
       vi.mocked(admitirColaborador).mockRejectedValue(recusa(status));
       montar();
       await aguardarEmpresa();
-      preencherValido();
+      await preencherValido();
       await salvarEConfirmar();
       const alerta = await screen.findByText(texto);
       await waitFor(() => expect(alerta).toHaveFocus());
       expect(dialogoConfirmacao()).toBeNull();
       expect(matricula()).toHaveValue("MAT-0900");
-      expect(unidadeSel()).toHaveValue(unidade.id);
+      expect(escolhaDe(unidadeSel())).toHaveTextContent(
+        `${unidade.codigo} — ${unidade.nome}`,
+      );
     },
   );
 
@@ -1597,7 +1651,7 @@ describe("Nova admissão — recusa do servidor preserva os dados", () => {
       .mockResolvedValueOnce(resposta);
     montar();
     await aguardarEmpresa();
-    preencherValido();
+    await preencherValido();
     await salvarEConfirmar();
     const alerta = await screen.findByText(
       "Não foi possível confirmar se o cadastro foi gravado. Antes de tentar de novo, confira em Colaboradores; se ele não estiver lá, confirme de novo: o mesmo envio não cria um segundo cadastro.",
@@ -1621,7 +1675,7 @@ describe("Nova admissão — recusa do servidor preserva os dados", () => {
       .mockResolvedValueOnce(resposta);
     montar();
     await aguardarEmpresa();
-    preencherValido();
+    await preencherValido();
     await salvarEConfirmar();
     await waitFor(() => expect(matricula()).toHaveFocus());
     fireEvent.change(matricula(), { target: { value: "MAT-0901" } });
@@ -1634,13 +1688,13 @@ describe("Nova admissão — recusa do servidor preserva os dados", () => {
   it("recomeçar a página gera uma chave NOVA para a próxima admissão", async () => {
     montar();
     await aguardarEmpresa();
-    preencherValido();
+    await preencherValido();
     await salvarEConfirmar();
     await screen.findByText("Admissão registrada");
     fireEvent.click(
       screen.getByRole("button", { name: "Registrar outra admissão" }),
     );
-    preencherValido();
+    await preencherValido();
     await salvarEConfirmar();
     await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(2));
     expect(chaveDaChamada(1)).toEqual(expect.any(String));
@@ -1657,7 +1711,7 @@ describe("Nova admissão — empresa indefinida não envia", () => {
       expect(
         await screen.findByText(/Não foi possível confirmar a empresa ativa/),
       ).toBeInTheDocument();
-      preencherValido();
+      await preencherValido();
       fireEvent.click(salvar());
       expect(dialogoConfirmacao()).toBeNull();
       expect(admitirColaborador).not.toHaveBeenCalled();
@@ -1691,9 +1745,11 @@ describe("T179 — empresa sem Departamento ou Cargo ativos", () => {
     preencherContatos();
     fireEvent.change(nome(), { target: { value: "Pessoa Sintética" } });
     abrirLotacao();
+    fireEvent.keyDown(cargoSel(), { key: "ArrowDown" });
     expect(
-      within(cargoSel()).getByRole("option", { name: "Nenhum cargo ativo" }),
+      await screen.findByText("Nenhum cargo ativo nesta empresa."),
     ).toBeInTheDocument();
+    fireEvent.keyDown(cargoSel(), { key: "Escape" });
     // T195 — o aviso fica no bloco da empresa, visível em toda etapa, e
     // impede sair da etapa da lotação.
     fireEvent.click(salvar());
@@ -1748,18 +1804,18 @@ describe("T179 — empresa sem Departamento ou Cargo ativos", () => {
     await aguardarEmpresa();
     expect(screen.queryByText(/ainda não tem cadastro ativo de/)).toBeNull();
     abrirLotacao();
+    fireEvent.keyDown(unidadeSel(), { key: "ArrowDown" });
     expect(
-      within(unidadeSel()).getByRole("option", {
-        name: "Nenhuma unidade ativa",
-      }),
+      await screen.findByText("Nenhuma unidade ativa nesta empresa."),
     ).toBeInTheDocument();
+    fireEvent.keyDown(unidadeSel(), { key: "Escape" });
     preencherContatos();
     fireEvent.change(nome(), { target: { value: "Pessoa Sintética" } });
     fireEvent.change(dataNascimento(), { target: { value: "1990-05-20" } });
     fireEvent.change(tipo(), { target: { value: "clt" } });
     fireEvent.change(data(), { target: { value: "2026-11-03" } });
-    fireEvent.change(departamentoSel(), { target: { value: departamento.id } });
-    fireEvent.change(cargoSel(), { target: { value: cargo.id } });
+    await escolher(departamentoSel(), departamento);
+    await escolher(cargoSel(), cargo);
     await salvarEConfirmar();
     await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
     expect(
@@ -1788,7 +1844,7 @@ describe("T179 — máscaras na Nova admissão", () => {
   it("T179 (B1): +55 digitado tecla a tecla, com DDD comum e com DDD iniciado por 9, chega certo ao servidor", async () => {
     montar();
     await aguardarEmpresa();
-    preencherValido();
+    await preencherValido();
     const teclar = (campo: HTMLElement, texto: string) => {
       fireEvent.change(campo, { target: { value: "" } });
       for (const tecla of texto) {
@@ -1810,7 +1866,7 @@ describe("T179 — máscaras na Nova admissão", () => {
   it("T179 (B2): +55 digitado e o resto colado, e DDD 55 completo com dígitos a mais, chegam certos ao servidor", async () => {
     montar();
     await aguardarEmpresa();
-    preencherValido();
+    await preencherValido();
     const teclar = (campo: HTMLElement, texto: string) => {
       for (const tecla of texto) {
         const atual = (campo as HTMLInputElement).value;
@@ -1883,7 +1939,7 @@ describe("Nova admissão — cancelar", () => {
   it("escolher só uma referência da lotação já conta como alteração", async () => {
     const { onSair } = montar();
     await aguardarEmpresa();
-    fireEvent.change(cargoSel(), { target: { value: cargo.id } });
+    await escolher(cargoSel(), cargo);
     fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
     expect(
       screen.getByRole("dialog", { name: "Descartar esta admissão?" }),
@@ -1929,7 +1985,7 @@ describe("Nova admissão — cancelar", () => {
     );
     montar();
     await aguardarEmpresa();
-    preencherValido();
+    await preencherValido();
     await salvarEConfirmar();
     await waitFor(() => expect(matricula()).toHaveFocus());
     fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
@@ -1953,7 +2009,7 @@ describe("Nova admissão — sucesso", () => {
   async function admitirComSucesso() {
     const handlers = montar();
     await aguardarEmpresa();
-    preencherValido();
+    await preencherValido();
     await salvarEConfirmar();
     await screen.findByText("Admissão registrada");
     return handlers;
@@ -2086,7 +2142,7 @@ describe("Nova admissão — sucesso", () => {
     expect(matricula()).toHaveValue("");
     expect(emailPessoal()).toHaveValue("");
     expect(celular()).toHaveValue("");
-    expect(departamentoSel()).toHaveValue("");
+    expect(escolhaDe(departamentoSel())).toHaveTextContent("Nenhuma escolha.");
     expect(pais()).toHaveValue("Brasil");
   });
 });
@@ -2182,7 +2238,7 @@ describe("T178 — CEP: quando consulta", () => {
   it("'Buscar CEP' consulta com os 8 dígitos; o campo fica na máscara 00000-000", async () => {
     montar();
     await aguardarEmpresa();
-    abrirEndereco();
+    await abrirEndereco();
     digitarCep(" 30.140-071 ");
     // T179 — a máscara limpa pontos e espaços já na digitação.
     expect(campoCep()).toHaveValue("30140-071");
@@ -2196,7 +2252,7 @@ describe("T178 — CEP: quando consulta", () => {
   it("digitar não consulta; sair do campo com CEP completo consulta UMA vez", async () => {
     montar();
     await aguardarEmpresa();
-    abrirEndereco();
+    await abrirEndereco();
     digitarCep("3014");
     digitarCep("30140-071");
     expect(consultarCep).not.toHaveBeenCalled();
@@ -2214,7 +2270,7 @@ describe("T178 — CEP: quando consulta", () => {
   it("sair do campo com CEP incompleto não consulta nem acusa erro", async () => {
     montar();
     await aguardarEmpresa();
-    abrirEndereco();
+    await abrirEndereco();
     digitarCep("30140-07");
     fireEvent.blur(campoCep());
     expect(consultarCep).not.toHaveBeenCalled();
@@ -2224,7 +2280,7 @@ describe("T178 — CEP: quando consulta", () => {
   it("'Buscar CEP' com CEP incompleto: mensagem no campo, sem consultar", async () => {
     montar();
     await aguardarEmpresa();
-    abrirEndereco();
+    await abrirEndereco();
     digitarCep("3014");
     fireEvent.click(botaoBuscarCep()!);
     await waitFor(() =>
@@ -2238,7 +2294,7 @@ describe("T178 — CEP: quando consulta", () => {
   it("com outro país não há botão e nada é consultado", async () => {
     montar();
     await aguardarEmpresa();
-    abrirEndereco();
+    await abrirEndereco();
     fireEvent.change(pais(), { target: { value: "Portugal" } });
     expect(botaoBuscarCep()).toBeNull();
     expect(statusCep()).toBeNull();
@@ -2250,7 +2306,7 @@ describe("T178 — CEP: quando consulta", () => {
   it("'Brasil' é reconhecido sem diferenciar caixa, acento e espaços", async () => {
     montar();
     await aguardarEmpresa();
-    abrirEndereco();
+    await abrirEndereco();
     fireEvent.change(pais(), { target: { value: "  BRASÍL " } });
     expect(botaoBuscarCep()).not.toBeNull();
     digitarCep("30140071");
@@ -2268,7 +2324,7 @@ describe("T178 — CEP: quando consulta", () => {
     );
     montar();
     await aguardarEmpresa();
-    abrirEndereco();
+    await abrirEndereco();
     digitarCep("30140071");
     fireEvent.click(botaoBuscarCep()!);
     const botao = await screen.findByRole("button", { name: "Buscando CEP…" });
@@ -2294,7 +2350,7 @@ describe("T178 — CEP: quando consulta", () => {
     );
     montar();
     await aguardarEmpresa();
-    abrirEndereco();
+    await abrirEndereco();
     digitarCep("30140071");
     fireEvent.click(botaoBuscarCep()!);
     await screen.findByRole("button", { name: "Buscando CEP…" });
@@ -2317,7 +2373,7 @@ describe("T178 — CEP: o que faz com a resposta", () => {
   it("preenche os vazios (estado pela sigla) e nunca toca número nem complemento", async () => {
     montar();
     await aguardarEmpresa();
-    abrirEndereco();
+    await abrirEndereco();
     fireEvent.change(numero(), { target: { value: "100" } });
     fireEvent.change(complemento(), { target: { value: "Sala 2" } });
     digitarCep("30140-071");
@@ -2341,7 +2397,7 @@ describe("T178 — CEP: o que faz com a resposta", () => {
     vi.mocked(consultarCep).mockResolvedValue({ ...RESPOSTA_CEP, uf: null });
     montar();
     await aguardarEmpresa();
-    abrirEndereco();
+    await abrirEndereco();
     digitarCep("30140071");
     fireEvent.click(botaoBuscarCep()!);
     await waitFor(() => expect(estado()).toHaveValue("Minas Gerais"));
@@ -2350,7 +2406,7 @@ describe("T178 — CEP: o que faz com a resposta", () => {
   it("campo já digitado é mantido, com aviso; 'Usar endereço do CEP' substitui", async () => {
     montar();
     await aguardarEmpresa();
-    abrirEndereco();
+    await abrirEndereco();
     fireEvent.change(logradouro(), { target: { value: "Rua Já Digitada" } });
     // Igual ao sugerido, a menos de caixa: não conta como conflito.
     fireEvent.change(bairro(), { target: { value: "bairro sintético" } });
@@ -2380,13 +2436,13 @@ describe("T178 — CEP: o que faz com a resposta", () => {
   it("os campos seguem editáveis e a admissão leva o valor editado", async () => {
     montar();
     await aguardarEmpresa();
-    abrirEndereco();
+    await abrirEndereco();
     digitarCep("30140-071");
     fireEvent.click(botaoBuscarCep()!);
     await waitFor(() => expect(logradouro()).toHaveValue("Avenida Sintética"));
 
     fireEvent.change(logradouro(), { target: { value: "Avenida Editada" } });
-    preencherValido();
+    await preencherValido();
     await salvarEConfirmar();
 
     await waitFor(() => expect(admitirColaborador).toHaveBeenCalled());
@@ -2426,7 +2482,7 @@ describe("T178 — CEP: o que faz com a resposta", () => {
       vi.mocked(consultarCep).mockRejectedValue(recusaCep(status));
       montar();
       await aguardarEmpresa();
-      abrirEndereco();
+      await abrirEndereco();
       digitarCep("30140071");
       fireEvent.click(botaoBuscarCep()!);
       await waitFor(() => expect(statusCep()).toHaveTextContent(mensagem));
@@ -2434,7 +2490,7 @@ describe("T178 — CEP: o que faz com a resposta", () => {
       expect(campoCep()).not.toHaveAttribute("aria-invalid");
       fireEvent.change(cidade(), { target: { value: "Cidade Manual" } });
 
-      preencherValido();
+      await preencherValido();
       await salvarEConfirmar();
       await waitFor(() => expect(admitirColaborador).toHaveBeenCalled());
       const dto = vi.mocked(admitirColaborador).mock.calls.at(-1)![0];
@@ -2474,7 +2530,7 @@ describe("T179 (revisão final) — descarte depois de envio incerto", () => {
     );
     const { onSair } = montar();
     await aguardarEmpresa();
-    preencherValido();
+    await preencherValido();
     await salvarEConfirmar();
     await screen.findByText(/Não foi possível confirmar se o cadastro/);
     fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
@@ -2493,7 +2549,7 @@ describe("T179 (revisão final) — descarte depois de envio incerto", () => {
     );
     montar();
     await aguardarEmpresa();
-    preencherValido();
+    await preencherValido();
     await salvarEConfirmar();
     await screen.findByText(/Este envio já foi registrado antes/);
     fireEvent.click(
@@ -2512,7 +2568,7 @@ describe("T179 (revisão final) — descarte depois de envio incerto", () => {
       );
     montar();
     await aguardarEmpresa();
-    preencherValido();
+    await preencherValido();
     await salvarEConfirmar();
     await screen.findByText(/Não foi possível confirmar se o cadastro/);
     await salvarEConfirmar();
@@ -2529,7 +2585,7 @@ describe("T179 (revisão final) — descarte depois de envio incerto", () => {
       vi.mocked(admitirColaborador).mockRejectedValueOnce(recusa(status));
       montar();
       await aguardarEmpresa();
-      preencherValido();
+      await preencherValido();
       await salvarEConfirmar();
       const alerta = await screen.findByText(
         "Não foi possível confirmar se o cadastro foi gravado. Antes de tentar de novo, confira em Colaboradores; se ele não estiver lá, confirme de novo: o mesmo envio não cria um segundo cadastro.",
@@ -2539,7 +2595,9 @@ describe("T179 (revisão final) — descarte depois de envio incerto", () => {
       // O formulário fica como estava, pronto para reconfirmar.
       expect(nome()).not.toHaveValue("");
       expect(matricula()).toHaveValue("MAT-0900");
-      expect(unidadeSel()).toHaveValue(unidade.id);
+      expect(escolhaDe(unidadeSel())).toHaveTextContent(
+        `${unidade.codigo} — ${unidade.nome}`,
+      );
       fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
       const dialogo = dialogoDescarte();
       expect(dialogo).toHaveAccessibleDescription(DESCARTE_INCERTO);
@@ -2555,7 +2613,7 @@ describe("T179 (revisão final) — descarte depois de envio incerto", () => {
         .mockResolvedValueOnce(resposta);
       montar();
       await aguardarEmpresa();
-      preencherValido();
+      await preencherValido();
       await salvarEConfirmar();
       await screen.findByText(/Não foi possível confirmar se o cadastro/);
       await salvarEConfirmar();
@@ -2570,7 +2628,7 @@ describe("T179 (revisão final) — descarte depois de envio incerto", () => {
     );
     montar();
     await aguardarEmpresa();
-    preencherValido();
+    await preencherValido();
     await salvarEConfirmar();
     await screen.findByText(/Este envio já foi registrado antes/);
     fireEvent.click(
@@ -2598,7 +2656,7 @@ describe("T179 (revisão final) — CEP e telefone sem excedente na página", ()
   it("'0131' + colar '04567-000': recusado com aviso, e o ViaCEP não é consultado", async () => {
     montar();
     await aguardarEmpresa();
-    abrirEndereco();
+    await abrirEndereco();
     digitarCep("0131");
     colarNoCep(4, "04567-000");
     expect(campoCep()).toHaveValue("0131");
@@ -2639,7 +2697,7 @@ describe("T179 (revisão final) — CEP e telefone sem excedente na página", ()
   it("telefone de DDD 55 completo com dígitos soltos de uma vez: recusado e chega intacto ao servidor", async () => {
     montar();
     await aguardarEmpresa();
-    preencherValido();
+    await preencherValido();
     fireEvent.change(telefone(), { target: { value: "(55) 99999-8888" } });
     fireEvent.change(telefone(), { target: { value: "(55) 99999-888877" } });
     expect(telefone()).toHaveValue("(55) 99999-8888");
@@ -2655,7 +2713,7 @@ describe("T179 (revisão final) — CEP e telefone sem excedente na página", ()
   it("T179 (revisão final): telefone com ramal ou rótulo é recusado com aviso de formato, e o servidor recebe só os números certos", async () => {
     montar();
     await aguardarEmpresa();
-    preencherValido();
+    await preencherValido();
     expect(celular()).toHaveValue("(31) 99999-0000");
     fireEvent.change(telefone(), { target: { value: "" } });
     fireEvent.paste(telefone(), {
@@ -2682,7 +2740,7 @@ describe("T179 (revisão final) — CEP e telefone sem excedente na página", ()
     );
     montar();
     await aguardarEmpresa();
-    preencherValido();
+    await preencherValido();
     await salvarEConfirmar();
     await screen.findByText(/Este envio já foi registrado antes/);
     // Telefone vazio + colagem recusada: o valor segue vazio, com aviso.
@@ -2710,7 +2768,7 @@ describe("T179 (revisão final) — matrícula", () => {
   ])("matrícula %s fica fora do corpo da admissão", async (_, valor) => {
     montar();
     await aguardarEmpresa();
-    preencherValido();
+    await preencherValido();
     fireEvent.change(matricula(), { target: { value: valor } });
     await salvarEConfirmar();
     await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
@@ -2748,7 +2806,9 @@ describe("T179 (revisão final) — sessão expirada separada de envio incerto",
     expect(dialogoConfirmacao()).toBeNull();
     expect(nome()).toHaveValue("  Pessoa Sintética Nova ");
     expect(matricula()).toHaveValue("MAT-0900");
-    expect(unidadeSel()).toHaveValue(unidade.id);
+    expect(escolhaDe(unidadeSel())).toHaveTextContent(
+      `${unidade.codigo} — ${unidade.nome}`,
+    );
     expect(celular()).toHaveValue("(31) 99999-0000");
   }
 
@@ -2770,7 +2830,7 @@ describe("T179 (revisão final) — sessão expirada separada de envio incerto",
       vi.mocked(admitirColaborador).mockRejectedValueOnce(erro());
       montar();
       await aguardarEmpresa();
-      preencherValido();
+      await preencherValido();
       await salvarEConfirmar();
       const alerta = await screen.findByText(MENSAGEM_SESSAO_EXPIRADA);
       await waitFor(() => expect(alerta).toHaveFocus());
@@ -2793,7 +2853,7 @@ describe("T179 (revisão final) — sessão expirada separada de envio incerto",
       .mockResolvedValueOnce(resposta);
     montar();
     await aguardarEmpresa();
-    preencherValido();
+    await preencherValido();
     await salvarEConfirmar();
     const alerta = await screen.findByText(MENSAGEM_PAGINA_DESATUALIZADA);
     await waitFor(() => expect(alerta).toHaveFocus());
@@ -2817,7 +2877,7 @@ describe("T179 (revisão final) — sessão expirada separada de envio incerto",
     vi.mocked(admitirColaborador).mockRejectedValueOnce(recusa(403));
     montar();
     await aguardarEmpresa();
-    preencherValido();
+    await preencherValido();
     await salvarEConfirmar();
     const alerta = await screen.findByText(MENSAGEM_PERMISSAO);
     await waitFor(() => expect(alerta).toHaveFocus());
@@ -2832,7 +2892,7 @@ describe("T179 (revisão final) — sessão expirada separada de envio incerto",
     );
     montar();
     await aguardarEmpresa();
-    preencherValido();
+    await preencherValido();
     await salvarEConfirmar();
     const alerta = await screen.findByText(MENSAGEM_FALHA_AO_PREPARAR);
     await waitFor(() => expect(alerta).toHaveFocus());
@@ -2852,7 +2912,7 @@ describe("T179 (revisão final) — sessão expirada separada de envio incerto",
       vi.mocked(admitirColaborador).mockRejectedValueOnce(erro());
       montar();
       await aguardarEmpresa();
-      preencherValido();
+      await preencherValido();
       await salvarEConfirmar();
       const alerta = await screen.findByText(MENSAGEM_INCERTO);
       await waitFor(() => expect(alerta).toHaveFocus());
@@ -2907,7 +2967,7 @@ describe("T179 (revisão final) — sessão expirada separada de envio incerto",
         .mockResolvedValueOnce(resposta);
       montar();
       await aguardarEmpresa();
-      preencherValido();
+      await preencherValido();
       await salvarEConfirmar();
       await screen.findByText(MENSAGEM_INCERTO);
       await salvarEConfirmar();
@@ -3256,7 +3316,7 @@ describe("T180 — cadastro rápido de referências na Nova admissão", () => {
     async ({ rotulo, criar, nova, seletor, chave }) => {
       montar("rh");
       await aguardarEmpresa();
-      preencherValido();
+      await preencherValido();
       await cadastrarPeloMais(rotulo, nova.codigo.toLowerCase(), nova.nome);
       await waitFor(() => expect(dialogoReferencia()).toBeNull());
       expect(criar).toHaveBeenCalledWith({
@@ -3264,13 +3324,10 @@ describe("T180 — cadastro rápido de referências na Nova admissão", () => {
         nome: nova.nome,
         empresaId: empresa.id,
       });
-      // A nova opção está no seletor, escolhida, e o foco voltou a ele.
-      expect(seletor()).toHaveValue(nova.id);
-      expect(
-        within(seletor()).getByRole("option", {
-          name: `${nova.codigo} — ${nova.nome}`,
-        }),
-      ).toBeInTheDocument();
+      // A nova referência fica escolhida, e o foco voltou ao campo.
+      expect(escolhaDe(seletor())).toHaveTextContent(
+        `${nova.codigo} — ${nova.nome}`,
+      );
       expect(seletor()).toHaveFocus();
       // O resto da admissão continua como estava.
       expect(nome()).toHaveValue("  Pessoa Sintética Nova ");
@@ -3288,7 +3345,7 @@ describe("T180 — cadastro rápido de referências na Nova admissão", () => {
   it("o departamento criado passa pelo caminho da troca: limpa a Área e recarrega as áreas dele", async () => {
     montar("rh");
     await aguardarEmpresa();
-    fireEvent.change(departamentoSel(), { target: { value: departamento.id } });
+    await escolher(departamentoSel(), departamento);
     await waitFor(() =>
       expect(listarAreas).toHaveBeenCalledWith(
         expect.objectContaining({ departamentoId: departamento.id }),
@@ -3307,7 +3364,7 @@ describe("T180 — cadastro rápido de referências na Nova admissão", () => {
     expect(areaSel()).toHaveValue("");
   });
 
-  it("a nova opção entra na ordem por código", async () => {
+  it("T196 — a referência criada fica escolhida mesmo que a busca do servidor ainda não a traga", async () => {
     vi.mocked(listarCargos).mockResolvedValue(
       paginado([
         { ...cargo, id: "c-a", codigo: "AAA", nome: "Primeiro" },
@@ -3322,15 +3379,16 @@ describe("T180 — cadastro rápido de referências na Nova admissão", () => {
       cargoNovo.nome,
     );
     await waitFor(() => expect(dialogoReferencia()).toBeNull());
-    const rotulos = within(cargoSel())
-      .getAllByRole("option")
-      .map((o) => o.textContent);
-    expect(rotulos).toEqual([
-      "Selecione…",
-      "AAA — Primeiro",
+    fireEvent.keyDown(cargoSel(), { key: "ArrowDown" });
+    await within(listaDe(cargoSel())).findByRole("option", { name: /^AAA/ });
+    expect(
+      within(listaDe(cargoSel()))
+        .getAllByRole("option")
+        .map((o) => o.textContent),
+    ).toEqual(["AAA — Primeiro", "ZZZ — Último"]);
+    expect(escolhaDe(cargoSel())).toHaveTextContent(
       "CAR_RAPIDO — Cargo Rápido (teste)",
-      "ZZZ — Último",
-    ]);
+    );
   });
 
   it("código inválido: nenhuma chamada e o erro no campo do modal", async () => {
@@ -3369,7 +3427,7 @@ describe("T180 — cadastro rápido de referências na Nova admissão", () => {
     );
     expect(codigoDoModal).toHaveFocus();
     expect(dialogoReferencia()).toBeInTheDocument();
-    expect(departamentoSel()).toHaveValue("");
+    expect(escolhaDe(departamentoSel())).toHaveTextContent("Nenhuma escolha.");
     admissaoPreservada();
   });
 
@@ -3415,7 +3473,8 @@ describe("T180 — cadastro rápido de referências na Nova admissão", () => {
         mensagem,
       );
       expect(dialogoReferencia()).toBeInTheDocument();
-      expect(listarUnidades).toHaveBeenCalledTimes(1);
+      // Recusa clara: nada é relido.
+      expect(listarUnidades).not.toHaveBeenCalled();
       admissaoPreservada();
     },
   );
@@ -3437,23 +3496,25 @@ describe("T180 — cadastro rápido de referências na Nova admissão", () => {
         "Não foi possível confirmar se o cadastro foi feito. A lista foi atualizada: confira se a referência já aparece antes de tentar de novo.",
       ),
     );
+    // T196 — uma leitura de um item confere o servidor; a busca do seletor é
+    // descartada e relida na próxima abertura.
     await waitFor(() => expect(listarCargos).toHaveBeenCalledTimes(2));
     expect(listarCargos).toHaveBeenLastCalledWith({
       status: "ativo",
-      tamanhoPagina: 100,
+      tamanhoPagina: 1,
     });
     expect(listarDepartamentos).toHaveBeenCalledTimes(1);
-    expect(listarUnidades).toHaveBeenCalledTimes(1);
+    expect(listarUnidades).not.toHaveBeenCalled();
     expect(dialogoReferencia()).toBeInTheDocument();
-    await waitFor(() =>
-      expect(
-        within(cargoSel()).getByRole("option", {
-          name: `${cargoNovo.codigo} — ${cargoNovo.nome}`,
-        }),
-      ).toBeInTheDocument(),
-    );
+    fireEvent.click(within(dialogo).getByRole("button", { name: "Cancelar" }));
+    fireEvent.keyDown(cargoSel(), { key: "ArrowDown" });
+    expect(
+      await within(listaDe(cargoSel())).findByRole("option", {
+        name: `${cargoNovo.codigo} — ${cargoNovo.nome}`,
+      }),
+    ).toBeInTheDocument();
     // Nada foi escolhido por conta própria.
-    expect(cargoSel()).toHaveValue("");
+    expect(escolhaDe(cargoSel())).toHaveTextContent("Nenhuma escolha.");
   });
 
   it("rede e recarga falha: diz que a lista não pôde ser atualizada, e a lista e a admissão ficam", async () => {
@@ -3477,11 +3538,18 @@ describe("T180 — cadastro rápido de referências na Nova admissão", () => {
     );
     expect(listarCargos).toHaveBeenCalledTimes(2);
     expect(dialogoReferencia()).toBeInTheDocument();
+    fireEvent.click(within(dialogo).getByRole("button", { name: "Cancelar" }));
+    // T196 — a busca também falha: estado claro, escolha e admissão mantidas.
+    fireEvent.keyDown(cargoSel(), { key: "ArrowDown" });
     expect(
-      within(cargoSel())
-        .getAllByRole("option")
-        .map((o) => o.textContent),
-    ).toEqual(["Selecione…", "CAR1 — Cargo Sintético (teste)"]);
+      await screen.findByText(
+        "Não foi possível carregar cargos. A escolha atual foi mantida.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Tentar de novo" }),
+    ).toBeInTheDocument();
+    expect(escolhaDe(cargoSel())).toHaveTextContent("Nenhuma escolha.");
     admissaoPreservada();
   });
 
@@ -3540,7 +3608,7 @@ describe("T180 — cadastro rápido de referências na Nova admissão", () => {
         .mockResolvedValueOnce(nova as CargoApi);
       montar("rh");
       await aguardarEmpresa();
-      preencherValido();
+      await preencherValido();
       // A recarga do envio incerto fica pendente, lida ANTES da criação.
       let liberarRecarga: () => void = () => undefined;
       const obsoleto = {
@@ -3563,21 +3631,16 @@ describe("T180 — cadastro rápido de referências na Nova admissão", () => {
         within(dialogo).getByRole("button", { name: "Cadastrar" }),
       );
       await waitFor(() => expect(dialogoReferencia()).toBeNull());
-      expect(seletor()).toHaveValue(nova.id);
+      expect(escolhaDe(seletor())).toHaveTextContent(
+        `${nova.codigo} — ${nova.nome}`,
+      );
 
-      // Só agora chega a recarga antiga.
+      // Só agora chega a recarga antiga: não muda a escolha.
       await act(async () => liberarRecarga());
 
-      expect(seletor()).toHaveValue(nova.id);
-      expect(
-        within(seletor())
-          .getAllByRole("option")
-          .map((o) => o.textContent),
-      ).toEqual([
-        "Selecione…",
-        `${existente.codigo} — ${existente.nome}`,
+      expect(escolhaDe(seletor())).toHaveTextContent(
         `${nova.codigo} — ${nova.nome}`,
-      ]);
+      );
 
       fireEvent.click(salvar());
       const confirmacao = await screen.findByRole("dialog", {
@@ -3616,10 +3679,12 @@ describe("T180 — cadastro rápido de referências na Nova admissão", () => {
         .mockRejectedValueOnce(new TypeError("Failed to fetch"));
       montar("rh");
       await aguardarEmpresa();
-      preencherValido();
+      await preencherValido();
       await cadastrarPeloMais(rotulo, nova.codigo, nova.nome);
       await waitFor(() => expect(dialogoReferencia()).toBeNull());
-      expect(seletor()).toHaveValue(nova.id);
+      expect(escolhaDe(seletor())).toHaveTextContent(
+        `${nova.codigo} — ${nova.nome}`,
+      );
 
       vi.mocked(listar as typeof listarCargos).mockResolvedValueOnce(
         paginado([existente]) as never,
@@ -3638,12 +3703,9 @@ describe("T180 — cadastro rápido de referências na Nova admissão", () => {
         within(dialogo).getByRole("button", { name: "Cancelar" }),
       );
 
-      expect(seletor()).toHaveValue(nova.id);
-      expect(
-        within(seletor()).getByRole("option", {
-          name: `${nova.codigo} — ${nova.nome}`,
-        }),
-      ).toBeInTheDocument();
+      expect(escolhaDe(seletor())).toHaveTextContent(
+        `${nova.codigo} — ${nova.nome}`,
+      );
       fireEvent.click(salvar());
       const confirmacao = await screen.findByRole("dialog", {
         name: "Confirmar cadastro de colaborador?",
@@ -3763,7 +3825,7 @@ describe("Nova admissão — jornada de trabalho opcional (T183)", () => {
     comJornada();
     montar("rh");
     await aguardarEmpresa();
-    preencherValido();
+    await preencherValido();
     await salvarEConfirmar();
     await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
     expect(vi.mocked(admitirColaborador).mock.calls[0]![0]).not.toHaveProperty(
@@ -3775,7 +3837,7 @@ describe("Nova admissão — jornada de trabalho opcional (T183)", () => {
     comJornada();
     montar("rh");
     await aguardarEmpresa();
-    preencherValido();
+    await preencherValido();
     abrirLotacao();
     const seletor = await screen.findByRole("combobox", {
       name: /Jornada de trabalho/,
@@ -3809,7 +3871,7 @@ describe("Nova admissão — jornada de trabalho opcional (T183)", () => {
     );
     montar("rh");
     await aguardarEmpresa();
-    preencherValido();
+    await preencherValido();
     abrirLotacao();
     const seletor = await screen.findByRole("combobox", {
       name: /Jornada de trabalho/,
@@ -3849,8 +3911,8 @@ const botaoVoltar = () => screen.getByRole("button", { name: "Voltar" });
 const botaoContinuar = () => screen.getByRole("button", { name: "Continuar" });
 
 /** As etapas 1 e 2 válidas e a 3 vazia: chega à revisão. */
-function ateARevisao() {
-  preencherValido();
+async function ateARevisao() {
+  await preencherValido();
   irAteEtapa("Revisão e conclusão");
 }
 
@@ -3878,7 +3940,7 @@ describe("T195 — quatro etapas: indicador e progresso", () => {
   it("avançar leva a 50%, 75% e 100%, com o foco no título de cada etapa", async () => {
     montar();
     await aguardarEmpresa();
-    preencherValido();
+    await preencherValido();
     for (const [titulo, pct] of [
       ["Etapa 2 de 4: Dados profissionais e lotação", "50"],
       ["Etapa 3 de 4: Endereço", "75"],
@@ -3945,7 +4007,7 @@ describe("T195 — quatro etapas: voltar, revisitar e não saltar", () => {
   it("Voltar não valida, preserva tudo e leva o foco ao título da etapa anterior", async () => {
     montar();
     await aguardarEmpresa();
-    preencherValido();
+    await preencherValido();
     fireEvent.change(screen.getByLabelText(/^Saudação/), {
       target: { value: "Sra." },
     });
@@ -3965,7 +4027,9 @@ describe("T195 — quatro etapas: voltar, revisitar e não saltar", () => {
     expect(screen.getByLabelText(/^Saudação/)).toHaveValue("Sra.");
     expect(celular()).toHaveValue("(31) 99999-0000");
     expect(matricula()).toHaveValue("MAT-0900");
-    expect(departamentoSel()).toHaveValue(departamento.id);
+    expect(escolhaDe(departamentoSel())).toHaveTextContent(
+      `${departamento.codigo} — ${departamento.nome}`,
+    );
     expect(logradouro()).toHaveValue("Rua Sintética");
     expect(admitirColaborador).not.toHaveBeenCalled();
   });
@@ -3973,7 +4037,7 @@ describe("T195 — quatro etapas: voltar, revisitar e não saltar", () => {
   it("as etapas alcançadas são botões do indicador; voltar por ele preserva os dados", async () => {
     montar();
     await aguardarEmpresa();
-    ateARevisao();
+    await ateARevisao();
     fireEvent.click(
       within(indicador()).getByRole("button", {
         name: "Etapa 1: Dados básicos, concluída",
@@ -3995,7 +4059,7 @@ describe("T195 — quatro etapas: voltar, revisitar e não saltar", () => {
   it("ir adiante pelo indicador para na etapa com erro, com o foco no campo", async () => {
     montar();
     await aguardarEmpresa();
-    ateARevisao();
+    await ateARevisao();
     fireEvent.click(
       within(indicador()).getByRole("button", {
         name: "Etapa 2: Dados profissionais e lotação, concluída",
@@ -4034,7 +4098,7 @@ describe("T195 — revisão e conclusão", () => {
   it("mostra o que foi digitado, sem opcional em branco, com Editar por bloco", async () => {
     montar();
     await aguardarEmpresa();
-    preencherValido();
+    await preencherValido();
     irAteEtapa("Endereço");
     fireEvent.change(cidade(), { target: { value: "Cidade Sintética" } });
     irAteEtapa("Revisão e conclusão");
@@ -4083,7 +4147,7 @@ describe("T195 — revisão e conclusão", () => {
   it("documentos: aviso acessível de entrega própria, sem campo de arquivo nem envio", async () => {
     montar();
     await aguardarEmpresa();
-    ateARevisao();
+    await ateARevisao();
     const documentos = screen
       .getByRole("heading", { level: 3, name: "Documentos" })
       .closest("section")!;
@@ -4098,7 +4162,7 @@ describe("T195 — revisão e conclusão", () => {
   it("Confirmar admissão abre a mesma confirmação e envia uma vez, com a chave", async () => {
     montar();
     await aguardarEmpresa();
-    ateARevisao();
+    await ateARevisao();
     fireEvent.click(screen.getByRole("button", { name: "Confirmar admissão" }));
     const dialogo = await screen.findByRole("dialog", {
       name: "Confirmar cadastro de colaborador?",
@@ -4123,7 +4187,7 @@ describe("T195 — revisão e conclusão", () => {
     );
     montar();
     await aguardarEmpresa();
-    preencherValido();
+    await preencherValido();
     await salvarEConfirmar();
     // O primeiro da tela é o e-mail, na etapa 1.
     await waitFor(() => expect(emailPessoal()).toHaveFocus());
@@ -4145,7 +4209,7 @@ describe("T195 — revisão e conclusão", () => {
     vi.mocked(admitirColaborador).mockRejectedValueOnce(new TypeError("rede"));
     montar();
     await aguardarEmpresa();
-    preencherValido();
+    await preencherValido();
     await salvarEConfirmar();
     const alerta = await screen.findByText(
       /Não foi possível confirmar se o cadastro foi gravado/,
@@ -4160,7 +4224,7 @@ describe("T195 — revisão e conclusão", () => {
   it("DP: sem jornada na etapa 2 nem na revisão", async () => {
     montar("dp");
     await aguardarEmpresa();
-    ateARevisao();
+    await ateARevisao();
     expect(
       screen
         .getByRole("heading", {
@@ -4179,7 +4243,7 @@ describe("T195 — cancelar e recomeçar", () => {
   it("Cancelar numa etapa adiante pede o descarte; continuar mantém a etapa e os dados", async () => {
     const { onSair } = montar();
     await aguardarEmpresa();
-    preencherValido();
+    await preencherValido();
     irAteEtapa("Endereço");
     fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
     const dialogo = await screen.findByRole("dialog", {
@@ -4196,7 +4260,7 @@ describe("T195 — cancelar e recomeçar", () => {
   it("registrar outra admissão volta à etapa 1, com 25% e nada alcançado", async () => {
     montar();
     await aguardarEmpresa();
-    preencherValido();
+    await preencherValido();
     await salvarEConfirmar();
     fireEvent.click(
       await screen.findByRole("button", { name: "Registrar outra admissão" }),
@@ -4229,7 +4293,7 @@ describe("T195 (revisão final) — duplo clique não salta a revisão", () => {
   it("duplo clique em Continuar na etapa 3: para na revisão, e a confirmação só abre num clique novo", async () => {
     montar();
     await aguardarEmpresa();
-    preencherValido();
+    await preencherValido();
     irAteEtapa("Endereço");
     const botao = botaoContinuar();
     // O navegador conta os cliques: 1 e depois 2, no mesmo lugar.
@@ -4251,7 +4315,7 @@ describe("T195 (revisão final) — duplo clique não salta a revisão", () => {
   it("duplo e triplo clique em Continuar avançam uma etapa só, sem perder nada", async () => {
     montar();
     await aguardarEmpresa();
-    preencherValido();
+    await preencherValido();
     fireEvent.click(botaoContinuar(), { detail: 1 });
     fireEvent.click(botaoContinuar(), { detail: 2 });
     expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais e lotação$/);
@@ -4260,13 +4324,15 @@ describe("T195 (revisão final) — duplo clique não salta a revisão", () => {
     fireEvent.click(botaoContinuar(), { detail: 3 });
     expect(tituloDaEtapa()).toHaveTextContent(/Endereço$/);
     expect(nome()).toHaveValue("  Pessoa Sintética Nova ");
-    expect(departamentoSel()).toHaveValue(departamento.id);
+    expect(escolhaDe(departamentoSel())).toHaveTextContent(
+      `${departamento.codigo} — ${departamento.nome}`,
+    );
   });
 
   it("teclado e Enter num campo seguem normais (sem contagem de cliques)", async () => {
     montar();
     await aguardarEmpresa();
-    preencherValido();
+    await preencherValido();
     // Enter num campo de texto: envio implícito do navegador.
     fireEvent.submit(nome().closest("form")!);
     expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais e lotação$/);
@@ -4294,22 +4360,133 @@ describe("T195 (revisão final) — depois de um seletor, avança-se por Tab e E
     abrirLotacao();
     fireEvent.change(tipo(), { target: { value: "clt" } });
     fireEvent.change(data(), { target: { value: "2026-11-03" } });
-    preencherLotacao();
-    // O seletor fica com o Enter: nada de envio a partir dele.
-    fireEvent.keyDown(centroSel(), { key: "Enter" });
+    await preencherLotacao();
+    // O seletor nativo (Equipe) fica com o Enter: nada de envio a partir dele.
+    fireEvent.keyDown(equipeSel(), { key: "Enter" });
     expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais e lotação$/);
-    // O último seletor da etapa e, logo depois, as ações — nesta ordem.
+    // T196 — o último campo da etapa (Centro de custo, pesquisável), o botão
+    // de opções dele e, logo depois, as ações — nesta ordem.
     const ordem = tabulaveis();
     const depois = ordem.slice(ordem.indexOf(centroSel()) + 1);
-    expect(depois.map((e) => e.textContent)).toEqual([
+    expect(
+      depois.map((e) => e.getAttribute("aria-label") ?? e.textContent),
+    ).toEqual([
+      "Mostrar opções de Centro de custo",
       "Cancelar",
       "Voltar",
       "Continuar",
     ]);
-    const continuar = depois[2]!;
+    const continuar = depois[3]!;
     expect(continuar).toHaveAttribute("type", "submit");
     continuar.focus();
     fireEvent.click(continuar, { detail: 0 });
     expect(tituloDaEtapa()).toHaveTextContent(/Endereço$/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T196 — Departamento, Cargo, Unidade e Centro de custo pela busca no servidor.
+// ---------------------------------------------------------------------------
+describe("T196 — busca nas referências da etapa 2", () => {
+  it("a carga inicial não lê as listas: só confere se existe Departamento e Cargo ativos", async () => {
+    montar();
+    await aguardarEmpresa();
+    expect(listarDepartamentos).toHaveBeenCalledWith({
+      status: "ativo",
+      tamanhoPagina: 1,
+    });
+    expect(listarCargos).toHaveBeenCalledWith({
+      status: "ativo",
+      tamanhoPagina: 1,
+    });
+    expect(listarUnidades).not.toHaveBeenCalled();
+    expect(listarCentrosCusto).not.toHaveBeenCalled();
+  });
+
+  it("RH digita, o servidor busca ativos de 20 em 20 com o termo, e a admissão envia o escolhido", async () => {
+    montar("rh");
+    await aguardarEmpresa();
+    await preencherValido();
+    abrirLotacao();
+    fireEvent.change(departamentoSel(), { target: { value: " dep1 " } });
+    await waitFor(() =>
+      expect(listarDepartamentos).toHaveBeenLastCalledWith({
+        status: "ativo",
+        tamanhoPagina: 20,
+        pagina: 1,
+        busca: "dep1",
+      }),
+    );
+    fireEvent.click(
+      await within(listaDe(departamentoSel())).findByRole("option", {
+        name: /^DEP1 — /,
+      }),
+    );
+    expect(escolhaDe(departamentoSel())).toHaveTextContent(
+      `${departamento.codigo} — ${departamento.nome}`,
+    );
+    await salvarEConfirmar();
+    await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(admitirColaborador).mock.calls[0]![0]).toMatchObject({
+      departamentoId: departamento.id,
+      cargoId: cargo.id,
+      unidadeOrganizacionalId: unidade.id,
+    });
+  });
+
+  it("DP pesquisa e escolhe as quatro referências, sem o '+' de cadastro", async () => {
+    vi.mocked(listarCentrosCusto).mockResolvedValue(
+      paginado([
+        {
+          id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          codigo: "CC1",
+          nome: "Centro Sintético (teste)",
+          status: "ativo",
+        } as never,
+      ]),
+    );
+    montar("dp");
+    await aguardarEmpresa();
+    abrirLotacao();
+    expect(screen.queryByRole("button", { name: /^Cadastrar nov/ })).toBeNull();
+    await escolher(departamentoSel(), departamento);
+    await escolher(cargoSel(), cargo);
+    await escolher(unidadeSel(), unidade);
+    await escolher(centroSel(), { codigo: "CC1" });
+    expect(escolhaDe(centroSel())).toHaveTextContent(
+      "CC1 — Centro Sintético (teste)",
+    );
+  });
+
+  it("o servidor segue soberano: referência escolhida pela busca e recusada na gravação aponta a lotação", async () => {
+    vi.mocked(admitirColaborador).mockRejectedValue(recusa(422));
+    montar();
+    await aguardarEmpresa();
+    await preencherValido();
+    await salvarEConfirmar();
+    const aviso = await screen.findByText(/A lotação escolhida não foi aceita/);
+    await waitFor(() => expect(aviso).toHaveFocus());
+    expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais e lotação$/);
+    // A escolha não some: a pessoa decide trocar.
+    expect(escolhaDe(cargoSel())).toHaveTextContent(
+      `${cargo.codigo} — ${cargo.nome}`,
+    );
+  });
+
+  it("obrigatórios seguem obrigatórios: sem Departamento, o erro fica no campo de busca, com o foco nele", async () => {
+    montar();
+    await aguardarEmpresa();
+    abrirLotacao();
+    fireEvent.change(tipo(), { target: { value: "clt" } });
+    fireEvent.change(data(), { target: { value: "2026-11-03" } });
+    await escolher(cargoSel(), cargo);
+    fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
+    await waitFor(() => expect(departamentoSel()).toHaveFocus());
+    expect(departamentoSel()).toHaveAttribute("aria-invalid", "true");
+    expect(departamentoSel()).toHaveAccessibleDescription(
+      /Selecione o departamento\./,
+    );
+    // Abrir só por foco, não: a lista segue fechada.
+    expect(departamentoSel()).toHaveAttribute("aria-expanded", "false");
   });
 });
