@@ -23,6 +23,7 @@ import { NOVA_ADMISSAO_TITULO_ID } from "../screens/pessoas";
 import {
   type AdmissaoRegistradaApi,
   admitirColaborador,
+  buscarColaborador,
   listarColaboradores,
   listarVinculosDoColaborador,
 } from "../api/colaboradoresClient";
@@ -154,6 +155,14 @@ beforeEach(() => {
     contadores: { ativos: 0, inativos: 0 },
   });
   vi.mocked(listarVinculosDoColaborador).mockResolvedValue([]);
+  // T198 — a ficha (página própria) lê o colaborador pelo id.
+  vi.mocked(buscarColaborador).mockResolvedValue({
+    id: resposta.id,
+    nome: resposta.nome,
+    situacao: resposta.situacao,
+    criadoEm: resposta.criadoEm,
+    atualizadoEm: resposta.atualizadoEm,
+  });
   vi.mocked(admitirColaborador).mockResolvedValue(resposta);
   vi.mocked(listarEmpresasMulti).mockResolvedValue(paginado([empresa]));
   vi.mocked(listarDepartamentos).mockResolvedValue(paginado([departamento]));
@@ -173,6 +182,14 @@ beforeEach(() => {
 });
 
 const ROTA_COLABORADORES = "#/pessoas/colaboradores";
+
+/** T198 — a ficha é página própria: espera a navegação interna dela. */
+async function esperarFicha(): Promise<HTMLElement> {
+  await screen.findByRole("tablist", { name: /^Seções da ficha de / });
+  const ficha = document.querySelector<HTMLElement>(".ficha-colaborador");
+  if (!ficha) throw new Error("A ficha não está aberta.");
+  return ficha;
+}
 
 /** T178 — a barra não tem mais item próprio de Nova admissão. */
 function itemNovaAdmissaoNaBarra() {
@@ -794,7 +811,7 @@ describe("T176/T178 — da página à listagem e à ficha do admitido", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("'Abrir ficha' leva a Colaboradores com a ficha do admitido aberta", async () => {
+  it("'Abrir ficha' leva à ficha do admitido, na rota dela", async () => {
     render(<App papelDoAtor="rh" />);
     await abrirNovaAdmissaoPelaListagem();
     await admitirPelaPagina();
@@ -803,13 +820,16 @@ describe("T176/T178 — da página à listagem e à ficha do admitido", () => {
         name: "Abrir ficha de Pessoa Sintética Fluxo",
       }),
     );
-    const ficha = await screen.findByRole("dialog", {
-      name: "Pessoa Sintética Fluxo",
-    });
+    const ficha = await esperarFicha();
     expect(
-      screen.getByRole("heading", { level: 1, name: "Colaboradores" }),
+      within(ficha).getByRole("heading", {
+        level: 1,
+        name: "Pessoa Sintética Fluxo",
+      }),
     ).toBeInTheDocument();
-    expect(window.location.hash).toBe(ROTA_COLABORADORES);
+    expect(window.location.hash).toBe(
+      `${ROTA_COLABORADORES}/${resposta.id}/dados`,
+    );
     expect(listarVinculosDoColaborador).toHaveBeenCalledWith(resposta.id);
     expect(within(ficha).getByLabelText("Nome")).toHaveValue(
       "Pessoa Sintética Fluxo",
@@ -823,7 +843,7 @@ describe("T176/T178 — da página à listagem e à ficha do admitido", () => {
     fireEvent.click(
       screen.getByRole("button", { name: "Revisar contatos na ficha" }),
     );
-    await screen.findByRole("dialog", { name: "Pessoa Sintética Fluxo" });
+    await esperarFicha();
     await waitFor(() =>
       expect(screen.getByLabelText(/E-mail pessoal/)).toHaveFocus(),
     );
@@ -857,9 +877,7 @@ describe("T176/T178 — da página à listagem e à ficha do admitido", () => {
         name: "Abrir ficha de Pessoa Sintética Fluxo",
       }),
     );
-    const ficha = await screen.findByRole("dialog", {
-      name: "Pessoa Sintética Fluxo",
-    });
+    const ficha = await esperarFicha();
     const contatos = await within(ficha).findByRole("region", {
       name: "Contatos",
     });
@@ -882,16 +900,18 @@ describe("T176/T178 — da página à listagem e à ficha do admitido", () => {
         name: "Abrir ficha de Pessoa Sintética Fluxo",
       }),
     );
-    const ficha = await screen.findByRole("dialog", {
-      name: "Pessoa Sintética Fluxo",
-    });
-    fireEvent.click(within(ficha).getByRole("button", { name: /Fechar/ }));
+    const ficha = await esperarFicha();
+    fireEvent.click(
+      within(ficha).getByRole("button", { name: "Colaboradores" }),
+    );
+    await screen.findByRole("heading", { level: 1, name: "Colaboradores" });
+    expect(window.location.hash).toBe(ROTA_COLABORADORES);
     fireEvent.click(
       screen.getByRole("button", { name: /^Estrutura organizacional/ }),
     );
     fireEvent.click(itemColaboradoresNaBarra());
     await screen.findByRole("heading", { level: 1, name: "Colaboradores" });
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(document.querySelector(".ficha-colaborador")).toBeNull();
   });
 });
 

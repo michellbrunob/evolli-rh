@@ -153,6 +153,12 @@ export async function listarCargos(
   return jsonOrThrow(res);
 }
 
+/** T198 — um cargo pelo id (`GET /cargos/:id`), para a ficha do colaborador. */
+export async function buscarCargo(id: string): Promise<CargoApi> {
+  const res = await apiFetch(`/cargos/${encodeURIComponent(id)}`);
+  return jsonOrThrow(res);
+}
+
 export async function criarCargo(dto: CriarCargoDto): Promise<CargoApi> {
   const token = await getCsrf();
   const res = await apiFetch("/cargos", {

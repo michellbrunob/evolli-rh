@@ -8,7 +8,11 @@ import {
 } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { useState } from "react";
 import { ColaboradoresScreen } from "./ColaboradoresScreen";
+import { PessoasScreen } from "./PessoasScreen";
+import { FichaColaboradorScreen } from "./FichaColaboradorScreen";
+import type { RotaDaFicha } from "../../app/rotasDoShell";
 import { diaDeHoje, proximoDiaCivil } from "./jornadaColaborador";
 import { listarVinculosHorario } from "../../api/vinculoHorarioClient";
 import { listarTabelasHorario } from "../../api/horariosClient";
@@ -48,8 +52,11 @@ import {
   type AlocacaoOrganizacionalApi,
 } from "../../api/vinculoContratualClient";
 import { AVISO_DE_RECUSA } from "../../format/mascaras";
-import { listarDepartamentos } from "../../api/organizacaoClient";
-import { listarCargos } from "../../api/cargoClient";
+import {
+  buscarDepartamento,
+  listarDepartamentos,
+} from "../../api/organizacaoClient";
+import { buscarCargo, listarCargos } from "../../api/cargoClient";
 import {
   ProvedorDeEdicoes,
   RegistroDeEdicoes,
@@ -179,6 +186,23 @@ beforeEach(() => {
   // T187 — por padrão, vínculo sem movimentação e sem lotação vigente.
   vi.mocked(buscarLinhaDoTempo).mockResolvedValue([]);
   vi.mocked(listarAlocacoesVinculo).mockResolvedValue([]);
+  // T198 — a ficha resolve cargo e departamento da alocação vigente por id.
+  vi.mocked(buscarCargo).mockImplementation(
+    async (id) =>
+      ({
+        ...LOTACAO_ATIVA.cargo,
+        id,
+        status: "ativo",
+      }) as Awaited<ReturnType<typeof buscarCargo>>,
+  );
+  vi.mocked(buscarDepartamento).mockImplementation(
+    async (id) =>
+      ({
+        ...LOTACAO_ATIVA.departamento,
+        id,
+        status: "ativo",
+      }) as Awaited<ReturnType<typeof buscarDepartamento>>,
+  );
   vi.mocked(listarVinculosHorario).mockResolvedValue({
     itens: [],
     pagina: 1,
@@ -194,7 +218,15 @@ beforeEach(() => {
   vi.mocked(listarColaboradores).mockResolvedValue(
     paginado([colaborador1, colaborador2]),
   );
-  vi.mocked(buscarColaborador).mockResolvedValue(colaborador1);
+  // T198 — a ficha lê o colaborador pelo id: por padrão, o da lista que o
+  // teste montou; fora dela, 404 (fora da empresa ativa).
+  vi.mocked(buscarColaborador).mockImplementation(async (id) => {
+    const listar = vi.mocked(listarColaboradores).getMockImplementation();
+    const pagina = listar ? await listar({}) : null;
+    const achado = pagina?.itens.find((c) => c.id === id);
+    if (achado) return achado;
+    throw Object.assign(new Error("Recurso não encontrado."), { status: 404 });
+  });
   vi.mocked(listarVinculosDoColaborador).mockResolvedValue([vinculo1]);
   vi.mocked(retificarColaborador).mockResolvedValue(colaborador1);
   // T190 — por padrão, catálogos vazios: os filtros ficam só com "Todos".
@@ -262,9 +294,64 @@ function semContatos(colaboradorId: string): ContatosDoColaboradorApi {
   };
 }
 
+/**
+ * T198 — a ficha deixou de ser modal: é página própria, aberta pela rota. O
+ * shell guarda a rota; aqui, um estado local faz esse papel, e o contêiner de
+ * Pessoas monta a listagem e a ficha exatamente como no produto.
+ */
+function ComFicha({
+  podeEditarFicha = false,
+  podeOperarJornada = false,
+  empresaAtiva = null,
+  onNovaAdmissao,
+}: {
+  podeEditarFicha?: boolean;
+  podeOperarJornada?: boolean;
+  empresaAtiva?: { nome: string; codigo: string } | null;
+  onNovaAdmissao?: () => void;
+}) {
+  const [ficha, setFicha] = useState<RotaDaFicha | null>(null);
+  return (
+    <PessoasScreen
+      empresaAtiva={empresaAtiva}
+      ficha={ficha}
+      onAbrirFicha={(colaboradorId) =>
+        setFicha({ colaboradorId, aba: "dados" })
+      }
+      onTrocarAbaDaFicha={(aba) =>
+        setFicha((atual) => (atual ? { ...atual, aba } : atual))
+      }
+      onFecharFicha={() => setFicha(null)}
+      podeEditarFicha={podeEditarFicha}
+      podeOperarJornada={podeOperarJornada}
+      {...(onNovaAdmissao ? { onNovaAdmissao } : {})}
+    />
+  );
+}
+
+/** T198 — a ficha aberta (a página, não mais um diálogo). */
+function fichaAberta(): HTMLElement {
+  const ficha = document.querySelector<HTMLElement>(".ficha-colaborador");
+  if (!ficha) throw new Error("A ficha não está aberta.");
+  return ficha;
+}
+
+/** T198 — espera a ficha carregar (a navegação interna só aparece então). */
+async function esperarFicha(): Promise<HTMLElement> {
+  await screen.findByRole("tablist", { name: /^Seções da ficha de / });
+  return fichaAberta();
+}
+
+/** T198 — volta da ficha à listagem pela trilha. */
+function voltarDaFicha() {
+  fireEvent.click(
+    within(fichaAberta()).getByRole("button", { name: "Colaboradores" }),
+  );
+}
+
 describe("ColaboradoresScreen (T111 — funcional)", () => {
   it("tem um único h1 e exibe o aviso RH e DP", async () => {
-    render(<ColaboradoresScreen />);
+    render(<ComFicha />);
 
     expect(
       screen.getAllByRole("heading", { level: 1, name: "Colaboradores" }),
@@ -275,7 +362,7 @@ describe("ColaboradoresScreen (T111 — funcional)", () => {
   });
 
   it("lista colaboradores reais retornados pela API", async () => {
-    render(<ColaboradoresScreen />);
+    render(<ComFicha />);
 
     const tabela = await screen.findByRole("table", {
       name: "Colaboradores desta empresa",
@@ -295,7 +382,7 @@ describe("ColaboradoresScreen (T111 — funcional)", () => {
       }) as ReturnType<typeof listarColaboradores>,
     );
 
-    render(<ColaboradoresScreen />);
+    render(<ComFicha />);
 
     expect(screen.getByText("Carregando colaboradores…")).toBeInTheDocument();
 
@@ -306,7 +393,7 @@ describe("ColaboradoresScreen (T111 — funcional)", () => {
   it("mostra erro de carregamento e permite tentar novamente", async () => {
     vi.mocked(listarColaboradores).mockRejectedValueOnce(new Error("falha"));
 
-    render(<ColaboradoresScreen />);
+    render(<ComFicha />);
 
     await screen.findByRole("heading", {
       name: "Não foi possível carregar os colaboradores",
@@ -320,7 +407,7 @@ describe("ColaboradoresScreen (T111 — funcional)", () => {
   it("mostra EmptyState quando não há colaboradores", async () => {
     vi.mocked(listarColaboradores).mockResolvedValue(paginado([]));
 
-    render(<ColaboradoresScreen />);
+    render(<ComFicha />);
 
     expect(
       await screen.findByRole("heading", {
@@ -330,7 +417,7 @@ describe("ColaboradoresScreen (T111 — funcional)", () => {
   });
 
   it("filtra por situação, enviando o parâmetro correto à API", async () => {
-    render(<ColaboradoresScreen />);
+    render(<ComFicha />);
     await screen.findByRole("table", { name: "Colaboradores desta empresa" });
 
     filtrarSituacao("Ativos");
@@ -347,7 +434,7 @@ describe("ColaboradoresScreen (T111 — funcional)", () => {
   });
 
   it("filtra por situação do vínculo, enviando o parâmetro correto à API", async () => {
-    render(<ColaboradoresScreen />);
+    render(<ComFicha />);
     await screen.findByRole("table", { name: "Colaboradores desta empresa" });
 
     fireEvent.change(screen.getByLabelText("Situação do vínculo"), {
@@ -363,91 +450,71 @@ describe("ColaboradoresScreen (T111 — funcional)", () => {
     );
   });
 
-  it("abre o detalhe de um colaborador e carrega seus vínculos", async () => {
-    render(<ColaboradoresScreen />);
+  // ---- T198 — a ficha é página própria (D17, D22): abrir pela linha, voltar
+  // pela trilha, e a mesma proteção de antes para o que não foi salvo.
+  async function abrirDetalheDeAna() {
+    render(<ComFicha podeEditarFicha />);
     await screen.findByRole("table", { name: "Colaboradores desta empresa" });
-
     const linha = screen.getByText("Ana Colaboradora (teste)").closest("tr")!;
-    fireEvent.click(within(linha).getByRole("button", { name: /Abrir ficha/ }));
+    const abrir = within(linha).getByRole("button", { name: /Abrir ficha/ });
+    abrir.focus();
+    fireEvent.click(abrir);
+    await esperarFicha();
+    return abrir;
+  }
+
+  it("abre a ficha pela linha: vínculo principal, admissão e nenhum dia em ISO", async () => {
+    await abrirDetalheDeAna();
 
     expect(listarVinculosDoColaborador).toHaveBeenCalledWith(colaborador1.id);
-
-    const tabelaVinculos = await screen.findByRole("table", {
-      name: `Vínculos — ${colaborador1.nome}`,
-    });
-    const dentro = within(tabelaVinculos);
-    expect(dentro.getByText("MAT-0001")).toBeInTheDocument();
-    expect(dentro.getByText("CLT")).toBeInTheDocument();
-    // Admissão e desligamento são os únicos dias exibidos nesta tela, e vivem
-    // aqui no detalhe — por isso a guarda da T154 é chamada com a lista E o
-    // detalhe na tela, e não só com a listagem.
-    expect(dentro.getByText("10/01/2025")).toBeInTheDocument();
-
-    // Guarda da T154: varre o texto visível INTEIRO — cabeçalho, filtros,
-    // tabela da lista e painel de detalhe entram junto. O `value` de campo de
-    // formulário fica fora do alcance por ser atributo, e não texto: ali o ISO
-    // é contrato com o `<input type="date">`, não apresentação.
-    expectSemIsoVisivel(document.body);
+    const ficha = fichaAberta();
+    expect(
+      within(ficha).getByRole("heading", { level: 1, name: colaborador1.nome }),
+    ).toBeInTheDocument();
+    expect(ficha).toHaveTextContent("CLT · MAT-0001");
+    expect(ficha).toHaveTextContent("10/01/2025");
+    // A listagem fica por baixo, escondida: fora da árvore acessível.
+    expect(
+      screen.queryByRole("table", { name: "Colaboradores desta empresa" }),
+    ).toBeNull();
+    expectSemIsoVisivel(ficha);
   });
 
-  it("não expõe campos para alterar matrícula, tipo ou data de admissão no detalhe", async () => {
-    render(<ColaboradoresScreen />);
-    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+  it("não expõe campos para alterar matrícula, tipo ou data de admissão na ficha", async () => {
+    await abrirDetalheDeAna();
 
-    const linha = screen.getByText("Ana Colaboradora (teste)").closest("tr")!;
-    fireEvent.click(within(linha).getByRole("button", { name: /Abrir ficha/ }));
-
-    await screen.findByRole("table", {
-      name: `Vínculos — ${colaborador1.nome}`,
-    });
-
-    expect(screen.queryByLabelText("Matrícula")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Tipo de vínculo")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Data de admissão")).not.toBeInTheDocument();
-    expect(screen.getByLabelText("Nome")).toBeInTheDocument();
+    const ficha = within(fichaAberta());
+    expect(ficha.queryByLabelText("Matrícula")).not.toBeInTheDocument();
+    expect(ficha.queryByLabelText("Tipo de vínculo")).not.toBeInTheDocument();
+    expect(ficha.queryByLabelText("Data de admissão")).not.toBeInTheDocument();
+    expect(ficha.getByLabelText("Nome")).toBeInTheDocument();
   });
 
-  it("mostra erro ao carregar vínculos, com opção de tentar novamente", async () => {
+  it("falha ao ler a ficha: aviso e 'Tentar de novo', que relê", async () => {
     vi.mocked(listarVinculosDoColaborador).mockRejectedValueOnce(
       new Error("falha"),
     );
-
-    render(<ColaboradoresScreen />);
+    render(<ComFicha />);
     await screen.findByRole("table", { name: "Colaboradores desta empresa" });
-
     const linha = screen.getByText("Ana Colaboradora (teste)").closest("tr")!;
     fireEvent.click(within(linha).getByRole("button", { name: /Abrir ficha/ }));
 
     expect(
-      await screen.findByText(
-        "Não foi possível carregar os vínculos deste colaborador.",
-      ),
+      await screen.findByText("Não foi possível carregar a ficha."),
     ).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
-
-    await screen.findByRole("table", {
-      name: `Vínculos — ${colaborador1.nome}`,
-    });
+    fireEvent.click(screen.getByRole("button", { name: "Tentar de novo" }));
+    await esperarFicha();
   });
 
-  it("edita o nome do colaborador com sucesso e atualiza a listagem", async () => {
+  it("edita o nome na ficha; de volta, a listagem relê o servidor", async () => {
     const atualizado: ColaboradorApi = {
       ...colaborador1,
       nome: "Ana Renomeada (teste)",
     };
     vi.mocked(retificarColaborador).mockResolvedValueOnce(atualizado);
+    await abrirDetalheDeAna();
 
-    render(<ColaboradoresScreen />);
-    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
-
-    const linha = screen.getByText("Ana Colaboradora (teste)").closest("tr")!;
-    fireEvent.click(within(linha).getByRole("button", { name: /Abrir ficha/ }));
-    await screen.findByRole("table", {
-      name: `Vínculos — ${colaborador1.nome}`,
-    });
-
-    fireEvent.change(screen.getByLabelText("Nome"), {
+    fireEvent.change(within(fichaAberta()).getByLabelText("Nome"), {
       target: { value: "Ana Renomeada (teste)" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Salvar nome" }));
@@ -458,28 +525,38 @@ describe("ColaboradoresScreen (T111 — funcional)", () => {
       }),
     );
     expect(
-      await screen.findByRole("heading", { name: "Ana Renomeada (teste)" }),
+      await screen.findByRole("heading", {
+        level: 1,
+        name: "Ana Renomeada (teste)",
+      }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", { name: "Colaboradores desta empresa" }),
-    ).toHaveTextContent("Ana Renomeada (teste)");
+
+    // O servidor já devolve o nome novo; voltar relê a página da listagem.
+    vi.mocked(listarColaboradores).mockResolvedValue(
+      paginado([
+        { ...colaborador1, nome: "Ana Renomeada (teste)" },
+        colaborador2,
+      ]),
+    );
+    const leiturasAntes = vi.mocked(listarColaboradores).mock.calls.length;
+    voltarDaFicha();
+    await waitFor(() =>
+      expect(
+        screen.getByRole("table", { name: "Colaboradores desta empresa" }),
+      ).toHaveTextContent("Ana Renomeada (teste)"),
+    );
+    expect(vi.mocked(listarColaboradores).mock.calls.length).toBe(
+      leiturasAntes + 1,
+    );
   });
 
   it("mostra erro ao falhar a alteração de nome", async () => {
     vi.mocked(retificarColaborador).mockRejectedValueOnce(
       new Error("Não foi possível salvar."),
     );
+    await abrirDetalheDeAna();
 
-    render(<ColaboradoresScreen />);
-    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
-
-    const linha = screen.getByText("Ana Colaboradora (teste)").closest("tr")!;
-    fireEvent.click(within(linha).getByRole("button", { name: /Abrir ficha/ }));
-    await screen.findByRole("table", {
-      name: `Vínculos — ${colaborador1.nome}`,
-    });
-
-    fireEvent.change(screen.getByLabelText("Nome"), {
+    fireEvent.change(within(fichaAberta()).getByLabelText("Nome"), {
       target: { value: "Outro Nome (teste)" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Salvar nome" }));
@@ -489,118 +566,84 @@ describe("ColaboradoresScreen (T111 — funcional)", () => {
     ).toBeInTheDocument();
   });
 
-  it("fecha o painel de detalhe", async () => {
-    render(<ColaboradoresScreen />);
-    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+  it("voltar pela trilha mostra a listagem e devolve o foco ao 'Abrir ficha'", async () => {
+    const abrir = await abrirDetalheDeAna();
 
-    const linha = screen.getByText("Ana Colaboradora (teste)").closest("tr")!;
-    fireEvent.click(within(linha).getByRole("button", { name: /Abrir ficha/ }));
-    await screen.findByRole("table", {
-      name: `Vínculos — ${colaborador1.nome}`,
-    });
+    voltarDaFicha();
 
-    fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
-
+    expect(document.querySelector(".ficha-colaborador")).toBeNull();
     expect(
-      screen.queryByRole("table", { name: `Vínculos — ${colaborador1.nome}` }),
-    ).not.toBeInTheDocument();
+      screen.getByRole("table", { name: "Colaboradores desta empresa" }),
+    ).toBeInTheDocument();
+    await waitFor(() => expect(document.activeElement).toBe(abrir));
   });
 
-  // ---- T144 (R1): o detalhe edita o nome, logo também tem o que perder.
-  // Fechar com alteração pendente precisa perguntar antes de descartar.
-  async function abrirDetalheDeAna() {
-    render(<ColaboradoresScreen />);
-    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
-    const linha = screen.getByText("Ana Colaboradora (teste)").closest("tr")!;
-    fireEvent.click(within(linha).getByRole("button", { name: /Abrir ficha/ }));
-    await screen.findByRole("table", {
-      name: `Vínculos — ${colaborador1.nome}`,
-    });
-  }
-
-  it("sem alterar o nome, o detalhe fecha direto — nada a confirmar", async () => {
+  it("sem alterar o nome, voltar não pergunta nada", async () => {
     await abrirDetalheDeAna();
 
-    fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
+    voltarDaFicha();
 
     expect(screen.queryByText(/alterações não salvas/i)).toBeNull();
-    expect(
-      screen.queryByRole("table", { name: `Vínculos — ${colaborador1.nome}` }),
-    ).not.toBeInTheDocument();
+    expect(document.querySelector(".ficha-colaborador")).toBeNull();
   });
 
-  it("com o nome alterado, fechar pelo botão pede confirmação em vez de descartar", async () => {
+  it("com o nome alterado, voltar pede confirmação em vez de descartar", async () => {
     // Mocks não são limpos entre testes neste arquivo: contagem por delta.
     const antes = vi.mocked(retificarColaborador).mock.calls.length;
     await abrirDetalheDeAna();
 
-    fireEvent.change(screen.getByLabelText("Nome"), {
+    fireEvent.change(within(fichaAberta()).getByLabelText("Nome"), {
       target: { value: "Ana Corrigida (teste)" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
+    voltarDaFicha();
 
     expect(screen.getByText(/alterações não salvas/i)).toBeInTheDocument();
-    // Não fechou: o detalhe continua aberto.
-    expect(
-      screen.getByRole("table", { name: `Vínculos — ${colaborador1.nome}` }),
-    ).toBeInTheDocument();
+    // Não saiu: a ficha continua aberta.
+    expect(fichaAberta()).toBeInTheDocument();
     expect(vi.mocked(retificarColaborador).mock.calls.length).toBe(antes);
   });
 
-  it("com o nome alterado, Escape também pede confirmação", async () => {
+  it("Escape na página não sai da ficha: ela não é mais uma janela", async () => {
     await abrirDetalheDeAna();
 
-    fireEvent.change(screen.getByLabelText("Nome"), {
-      target: { value: "Ana Corrigida (teste)" },
-    });
     fireEvent.keyDown(document, { key: "Escape" });
 
-    expect(screen.getByText(/alterações não salvas/i)).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", { name: `Vínculos — ${colaborador1.nome}` }),
-    ).toBeInTheDocument();
+    expect(fichaAberta()).toBeInTheDocument();
   });
 
-  it("'Continuar editando' preserva o que foi digitado e devolve o foco ao campo", async () => {
+  it("'Continuar editando' preserva o que foi digitado e devolve o foco a quem pediu para sair", async () => {
     await abrirDetalheDeAna();
 
-    const campo = screen.getByLabelText("Nome");
+    const campo = within(fichaAberta()).getByLabelText("Nome");
     fireEvent.change(campo, { target: { value: "Ana Corrigida (teste)" } });
-    campo.focus();
-    fireEvent.keyDown(document, { key: "Escape" });
+    const trilha = within(fichaAberta()).getByRole("button", {
+      name: "Colaboradores",
+    });
+    trilha.focus();
+    fireEvent.click(trilha);
     expect(screen.getByText(/alterações não salvas/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Continuar editando" }));
 
     expect(screen.queryByText(/alterações não salvas/i)).toBeNull();
-    // O valor digitado continua lá, e o foco volta para onde se estava editando.
-    expect(screen.getByLabelText("Nome")).toHaveValue("Ana Corrigida (teste)");
-    await waitFor(() =>
-      expect(document.activeElement).toBe(screen.getByLabelText("Nome")),
+    expect(within(fichaAberta()).getByLabelText("Nome")).toHaveValue(
+      "Ana Corrigida (teste)",
     );
-    expect(
-      screen.getByRole("table", { name: `Vínculos — ${colaborador1.nome}` }),
-    ).toBeInTheDocument();
+    await waitFor(() => expect(document.activeElement).toBe(trilha));
   });
 
-  it("'Descartar alterações' fecha o detalhe sem gravar", async () => {
+  it("'Sair sem salvar' volta à listagem sem gravar", async () => {
     const antes = vi.mocked(retificarColaborador).mock.calls.length;
     await abrirDetalheDeAna();
 
-    fireEvent.change(screen.getByLabelText("Nome"), {
+    fireEvent.change(within(fichaAberta()).getByLabelText("Nome"), {
       target: { value: "Ana Corrigida (teste)" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
-    fireEvent.click(
-      screen.getByRole("button", { name: "Descartar alterações" }),
-    );
+    voltarDaFicha();
+    fireEvent.click(screen.getByRole("button", { name: "Sair sem salvar" }));
 
     await waitFor(() =>
-      expect(
-        screen.queryByRole("table", {
-          name: `Vínculos — ${colaborador1.nome}`,
-        }),
-      ).not.toBeInTheDocument(),
+      expect(document.querySelector(".ficha-colaborador")).toBeNull(),
     );
     expect(vi.mocked(retificarColaborador).mock.calls.length).toBe(antes);
     // A lista preserva o nome original: nada foi gravado.
@@ -609,7 +652,7 @@ describe("ColaboradoresScreen (T111 — funcional)", () => {
     ).toHaveTextContent("Ana Colaboradora (teste)");
   });
 
-  it("durante a retificação, nenhuma forma de fechamento funciona", async () => {
+  it("durante a retificação, voltar não faz nada", async () => {
     const pendente: { current: ((v: ColaboradorApi) => void) | null } = {
       current: null,
     };
@@ -621,7 +664,7 @@ describe("ColaboradoresScreen (T111 — funcional)", () => {
     );
     await abrirDetalheDeAna();
 
-    fireEvent.change(screen.getByLabelText("Nome"), {
+    fireEvent.change(within(fichaAberta()).getByLabelText("Nome"), {
       target: { value: "Ana Corrigida (teste)" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Salvar nome" }));
@@ -629,13 +672,9 @@ describe("ColaboradoresScreen (T111 — funcional)", () => {
       expect(screen.getByRole("button", { name: "Salvando…" })).toBeDisabled(),
     );
 
-    // Escape não fecha e não abre a confirmação; o botão Fechar fica inerte.
-    fireEvent.keyDown(document, { key: "Escape" });
+    voltarDaFicha();
     expect(screen.queryByText(/alterações não salvas/i)).toBeNull();
-    expect(screen.getByRole("button", { name: "Fechar" })).toBeDisabled();
-    expect(
-      screen.getByRole("table", { name: `Vínculos — ${colaborador1.nome}` }),
-    ).toBeInTheDocument();
+    expect(fichaAberta()).toBeInTheDocument();
 
     pendente.current?.({ ...colaborador1, nome: "Ana Corrigida (teste)" });
     await waitFor(() =>
@@ -653,35 +692,36 @@ describe("ColaboradoresScreen (T111 — funcional)", () => {
     vi.mocked(retificarColaborador).mockResolvedValueOnce(atualizado);
     await abrirDetalheDeAna();
 
-    fireEvent.change(screen.getByLabelText("Nome"), {
+    fireEvent.change(within(fichaAberta()).getByLabelText("Nome"), {
       target: { value: "Ana Corrigida (teste)" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Salvar nome" }));
-    await screen.findByRole("heading", { name: "Ana Corrigida (teste)" });
+    await screen.findByRole("heading", {
+      level: 1,
+      name: "Ana Corrigida (teste)",
+    });
 
-    // Salvo: o botão volta a ficar inerte e fechar não pergunta mais nada.
+    // Salvo: o botão volta a ficar inerte e voltar não pergunta mais nada.
     expect(screen.getByRole("button", { name: "Salvar nome" })).toBeDisabled();
-    fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
+    voltarDaFicha();
     expect(screen.queryByText(/alterações não salvas/i)).toBeNull();
-    expect(
-      screen.queryByRole("table", { name: `Vínculos — ${colaborador1.nome}` }),
-    ).not.toBeInTheDocument();
+    expect(document.querySelector(".ficha-colaborador")).toBeNull();
   });
 
   it("só espaços em volta do nome não contam como alteração", async () => {
     await abrirDetalheDeAna();
 
-    fireEvent.change(screen.getByLabelText("Nome"), {
+    fireEvent.change(within(fichaAberta()).getByLabelText("Nome"), {
       target: { value: `  ${colaborador1.nome}  ` },
     });
 
     expect(screen.getByRole("button", { name: "Salvar nome" })).toBeDisabled();
-    fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
+    voltarDaFicha();
     expect(screen.queryByText(/alterações não salvas/i)).toBeNull();
   });
 
   it("não contém CPF, senha, sessão ou outro dado sensível na tela", async () => {
-    render(<ColaboradoresScreen />);
+    render(<ComFicha />);
     await screen.findByRole("table", { name: "Colaboradores desta empresa" });
 
     const texto = document.body.innerHTML.toLowerCase();
@@ -696,28 +736,21 @@ describe("ColaboradoresScreen (T111 — funcional)", () => {
     }
   });
 
-  it("o detalhe recebe o foco e fecha com Escape, devolvendo o foco", async () => {
-    render(<ColaboradoresScreen />);
-    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+  it("a ficha leva o foco ao título (h1); voltar o devolve ao 'Abrir ficha'", async () => {
+    const abrir = await abrirDetalheDeAna();
 
-    const linha = screen.getByText("Ana Colaboradora (teste)").closest("tr")!;
-    const verDetalhes = within(linha).getByRole("button", {
-      name: /Abrir ficha/,
-    });
-    fireEvent.click(verDetalhes);
-
-    const titulo = await screen.findByRole("heading", {
+    const titulo = screen.getByRole("heading", {
       name: colaborador1.nome,
-      level: 2,
+      level: 1,
     });
     await waitFor(() => expect(document.activeElement).toBe(titulo));
 
-    fireEvent.keyDown(document, { key: "Escape" });
-    await waitFor(() => expect(document.activeElement).toBe(verDetalhes));
+    voltarDaFicha();
+    await waitFor(() => expect(document.activeElement).toBe(abrir));
   });
 
   it("o título da página não é repetido pela seção da lista", async () => {
-    render(<ColaboradoresScreen />);
+    render(<ComFicha />);
     await screen.findByRole("table", { name: "Colaboradores desta empresa" });
 
     const titulos = screen
@@ -853,7 +886,7 @@ describe("ColaboradoresScreen (T147 — homologação da admissão)", () => {
       // 3ª: filtro "Inativo" — resolve antes da anterior.
       .mockResolvedValueOnce(paginado([colaborador2]));
 
-    render(<ColaboradoresScreen />);
+    render(<ComFicha />);
     await screen.findByRole("table", { name: "Colaboradores desta empresa" });
 
     filtrarSituacao("Ativos");
@@ -898,7 +931,7 @@ describe("ColaboradoresScreen (T147 — homologação da admissão)", () => {
           : Promise.resolve([vinculoDeBruno]),
     );
 
-    render(<ColaboradoresScreen />);
+    render(<ComFicha />);
     await screen.findByRole("table", { name: "Colaboradores desta empresa" });
 
     const linhaAna = screen
@@ -907,8 +940,8 @@ describe("ColaboradoresScreen (T147 — homologação da admissão)", () => {
     fireEvent.click(
       within(linhaAna).getByRole("button", { name: /Abrir ficha/ }),
     );
-    // Fecha o detalhe de Ana com a requisição dela ainda em voo.
-    fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
+    // T198 — volta da ficha de Ana com a requisição dela ainda em voo.
+    voltarDaFicha();
 
     const linhaBruno = screen
       .getByText("Bruno Colaborador (teste)")
@@ -917,19 +950,16 @@ describe("ColaboradoresScreen (T147 — homologação da admissão)", () => {
       within(linhaBruno).getByRole("button", { name: /Abrir ficha/ }),
     );
 
-    const tabela = await screen.findByRole("table", {
-      name: `Vínculos — ${colaborador2.nome}`,
-    });
-    expect(within(tabela).getByText("MAT-0002")).toBeInTheDocument();
+    await screen.findByRole("heading", { level: 1, name: colaborador2.nome });
+    expect(fichaAberta()).toHaveTextContent("MAT-0002");
 
-    // A resposta atrasada de Ana chega AGORA, com o detalhe de Bruno aberto.
-    deAna.resolver([vinculo1]);
+    // A resposta atrasada de Ana chega AGORA, com a ficha de Bruno aberta.
+    await act(async () => deAna.resolver([vinculo1]));
 
-    await waitFor(() =>
-      expect(within(tabela).getByText("MAT-0002")).toBeInTheDocument(),
-    );
-    // A matrícula de Ana não pode ter entrado na ficha de Bruno.
-    expect(within(tabela).queryByText("MAT-0001")).toBeNull();
+    expect(fichaAberta()).toHaveTextContent("MAT-0002");
+    // Nada de Ana pode ter entrado na ficha de Bruno.
+    expect(fichaAberta()).not.toHaveTextContent("MAT-0001");
+    expect(fichaAberta()).not.toHaveTextContent(colaborador1.nome);
   });
 
   /**
@@ -943,16 +973,14 @@ describe("ColaboradoresScreen (T147 — homologação da admissão)", () => {
     const patch = adiado<ColaboradorApi>();
     vi.mocked(retificarColaborador).mockImplementation(() => patch.promessa);
 
-    render(<ColaboradoresScreen />);
+    render(<ComFicha podeEditarFicha />);
     await screen.findByRole("table", { name: "Colaboradores desta empresa" });
 
     const linha = screen.getByText("Ana Colaboradora (teste)").closest("tr")!;
     fireEvent.click(within(linha).getByRole("button", { name: /Abrir ficha/ }));
-    await screen.findByRole("table", {
-      name: `Vínculos — ${colaborador1.nome}`,
-    });
+    await esperarFicha();
 
-    fireEvent.change(screen.getByLabelText("Nome"), {
+    fireEvent.change(within(fichaAberta()).getByLabelText("Nome"), {
       target: { value: "Ana Corrigida (teste)" },
     });
 
@@ -995,15 +1023,14 @@ describe("ColaboradoresScreen (T147 — homologação da admissão)", () => {
       { ...vinculo1, dataAdmissao: "2026-01-05T00:00:00.000Z" },
     ]);
 
-    render(<ColaboradoresScreen />);
+    render(<ComFicha />);
     await screen.findByRole("table", { name: "Colaboradores desta empresa" });
 
     const linha = screen.getByText("Ana Colaboradora (teste)").closest("tr")!;
     fireEvent.click(within(linha).getByRole("button", { name: /Abrir ficha/ }));
 
-    const tabela = await screen.findByRole("table", {
-      name: `Vínculos — ${colaborador1.nome}`,
-    });
+    // T198 — a admissão do vínculo principal está no cabeçalho da ficha.
+    const tabela = await esperarFicha();
     expect(within(tabela).getByText("05/01/2026")).toBeInTheDocument();
     expect(within(tabela).queryByText("2026-01-05")).toBeNull();
     expect(within(tabela).queryByText("2026-01-05T00:00:00.000Z")).toBeNull();
@@ -1531,7 +1558,7 @@ describe("ColaboradoresScreen (T169 — contatos do colaborador)", () => {
   }
 
   async function abrirDetalheDeAna() {
-    render(<ColaboradoresScreen podeEditarFicha />);
+    render(<ComFicha podeEditarFicha />);
     await screen.findByRole("table", { name: "Colaboradores desta empresa" });
     const linha = screen.getByText("Ana Colaboradora (teste)").closest("tr")!;
     fireEvent.click(within(linha).getByRole("button", { name: /Abrir ficha/ }));
@@ -1544,7 +1571,7 @@ describe("ColaboradoresScreen (T169 — contatos do colaborador)", () => {
 
   it("a lista não pede contatos: só o detalhe, pela rota própria e sem empresa", async () => {
     const antes = vi.mocked(consultarContatosDoColaborador).mock.calls.length;
-    render(<ColaboradoresScreen podeEditarFicha />);
+    render(<ComFicha podeEditarFicha />);
     await screen.findByRole("table", { name: "Colaboradores desta empresa" });
     expect(vi.mocked(consultarContatosDoColaborador).mock.calls.length).toBe(
       antes,
@@ -1846,8 +1873,8 @@ describe("ColaboradoresScreen (T169 — contatos do colaborador)", () => {
     expect(celular()).toHaveValue("(11) 98765-0001");
     expect(telefone()).toHaveValue("(11) 3333-0001");
 
-    // Salvo: fechar não pede confirmação.
-    fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
+    // Salvo: voltar não pede confirmação.
+    voltarDaFicha();
     expect(screen.queryByText(/alterações não salvas/i)).toBeNull();
   });
 
@@ -2060,7 +2087,7 @@ describe("ColaboradoresScreen (T169 — contatos do colaborador)", () => {
     expect(telefone()).toHaveValue("(11) 3333-0001");
   });
 
-  it("contato editado e não salvo: fechar pede confirmação; descartar fecha sem gravar", async () => {
+  it("contato editado e não salvo: voltar pede confirmação; sair sem salvar não grava", async () => {
     const antes = vi.mocked(registrarContatosDoColaborador).mock.calls.length;
     vi.mocked(consultarContatosDoColaborador).mockResolvedValueOnce(registrado);
     await abrirDetalheDeAna();
@@ -2069,16 +2096,14 @@ describe("ColaboradoresScreen (T169 — contatos do colaborador)", () => {
     );
 
     fireEvent.change(telefone(), { target: { value: "1133330002" } });
-    fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
+    voltarDaFicha();
 
     expect(screen.getByText(/alterações não salvas/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Continuar editando" }));
     expect(telefone()).toHaveValue("(11) 3333-0002");
 
-    fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
-    fireEvent.click(
-      screen.getByRole("button", { name: "Descartar alterações" }),
-    );
+    voltarDaFicha();
+    fireEvent.click(screen.getByRole("button", { name: "Sair sem salvar" }));
     await waitFor(() =>
       expect(screen.queryByRole("region", { name: "Contatos" })).toBeNull(),
     );
@@ -2087,7 +2112,7 @@ describe("ColaboradoresScreen (T169 — contatos do colaborador)", () => {
     );
   });
 
-  it("durante a gravação, a janela não fecha", async () => {
+  it("durante a gravação, voltar não sai da ficha", async () => {
     let concluir: (v: ContatosRegistradosApi) => void = () => {};
     vi.mocked(registrarContatosDoColaborador).mockImplementationOnce(
       () =>
@@ -2103,13 +2128,10 @@ describe("ColaboradoresScreen (T169 — contatos do colaborador)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Salvar contatos" }));
 
     await within(secao).findByRole("button", { name: "Salvando…" });
-    // A janela fica TRAVADA, não apenas pedindo confirmação: "Fechar" está
-    // desabilitado e clicar nele não abre o diálogo de descarte nem fecha.
-    // (Sem a trava, o mesmo clique abriria a confirmação — há edição não
-    // salva —, e o teste falharia aqui.)
-    const fechar = screen.getByRole("button", { name: "Fechar" });
-    expect(fechar).toBeDisabled();
-    fireEvent.click(fechar);
+    // A ficha fica TRAVADA, não apenas pedindo confirmação: voltar não abre
+    // a confirmação nem sai. (Sem a trava, o mesmo clique abriria a
+    // confirmação — há edição não salva —, e o teste falharia aqui.)
+    voltarDaFicha();
     expect(screen.queryByRole("alertdialog")).toBeNull();
     expect(screen.queryByText(/alterações não salvas/i)).toBeNull();
     expect(
@@ -2272,8 +2294,12 @@ describe("ColaboradoresScreen (T169 — contatos do colaborador)", () => {
 
   it("T179 — 'Revisar contatos na ficha': o foco cai no e-mail, e o estado vem na descrição dele", async () => {
     render(
-      <ColaboradoresScreen
-        aberturaInicial={{ colaborador: colaborador1, foco: "contatos" }}
+      <FichaColaboradorScreen
+        colaboradorId={colaborador1.id}
+        aba="dados"
+        onTrocarAba={vi.fn()}
+        onVoltar={vi.fn()}
+        focarContatos
         podeEditarFicha
       />,
     );
@@ -2663,7 +2689,7 @@ describe("T178 — colunas e vínculo principal", () => {
     vi.mocked(listarVinculosDoColaborador).mockResolvedValue([
       { ...vinculo1, matricula: null },
     ]);
-    render(<ColaboradoresScreen />);
+    render(<ComFicha />);
     const tabela = await screen.findByRole("table", {
       name: "Colaboradores desta empresa",
     });
@@ -2674,11 +2700,9 @@ describe("T178 — colunas e vínculo principal", () => {
     expect(tabela).not.toHaveTextContent("null");
 
     fireEvent.click(within(ana).getByRole("button", { name: /Abrir ficha/ }));
-    const vinculos = await screen.findByRole("table", {
-      name: `Vínculos — ${colaborador1.nome}`,
-    });
-    expect(within(vinculos).getByText("Sem matrícula")).toBeInTheDocument();
-    expect(vinculos).not.toHaveTextContent("null");
+    const ficha = await esperarFicha();
+    expect(ficha).toHaveTextContent("Sem matrícula");
+    expect(ficha).not.toHaveTextContent("null");
   });
 
   it("cada linha mostra nome, matrícula, situação e admissão do vínculo principal", async () => {
@@ -3362,7 +3386,7 @@ describe("T178 — contadores do escopo, do servidor", () => {
 describe("T178 — 'Nova admissão' e a ficha a partir da linha", () => {
   it("'Adicionar colaborador' (T194) é a ação principal, ao lado da busca", async () => {
     const onNovaAdmissao = vi.fn();
-    render(<ColaboradoresScreen onNovaAdmissao={onNovaAdmissao} />);
+    render(<ComFicha onNovaAdmissao={onNovaAdmissao} />);
     await screen.findByRole("table", { name: "Colaboradores desta empresa" });
 
     const botao = screen.getByRole("button", { name: "Adicionar colaborador" });
@@ -3378,7 +3402,9 @@ describe("T178 — 'Nova admissão' e a ficha a partir da linha", () => {
   });
 
   it("'Abrir ficha' abre a ficha do colaborador da linha", async () => {
-    render(<ColaboradoresScreen />);
+    // Bruno não tem vínculo na empresa ativa.
+    vi.mocked(listarVinculosDoColaborador).mockResolvedValueOnce([]);
+    render(<ComFicha />);
     await screen.findByRole("table", { name: "Colaboradores desta empresa" });
 
     fireEvent.click(
@@ -3387,15 +3413,18 @@ describe("T178 — 'Nova admissão' e a ficha a partir da linha", () => {
       }),
     );
 
-    const ficha = await screen.findByRole("dialog", {
-      name: colaborador2.nome,
-    });
+    const ficha = await esperarFicha();
+    expect(
+      within(ficha).getByRole("heading", { level: 1, name: colaborador2.nome }),
+    ).toBeInTheDocument();
     expect(listarVinculosDoColaborador).toHaveBeenLastCalledWith(
       colaborador2.id,
     );
-    expect(within(ficha).getByLabelText("Nome")).toHaveValue(colaborador2.nome);
-    // A situação da ficha é a da linha (na empresa ativa).
-    expect(within(ficha).getByText("Inativo")).toBeInTheDocument();
+    // A situação da ficha é a da empresa ativa, não a global.
+    expect(
+      within(ficha).getByText("Inativo nesta empresa"),
+    ).toBeInTheDocument();
+    expect(ficha).toHaveTextContent("Sem vínculo nesta empresa");
   });
 
   it("retificar o nome troca só o nome: a situação na empresa e a matrícula ficam", async () => {
@@ -3415,6 +3444,17 @@ describe("T178 — 'Nova admissão' e a ficha a partir da linha", () => {
       ],
     );
     vi.mocked(listarColaboradores).mockResolvedValue(paginado([elisa]));
+    vi.mocked(listarVinculosDoColaborador).mockResolvedValueOnce([
+      {
+        ...vinculo1,
+        id: "v-9",
+        colaboradorId: elisa.id,
+        matricula: "MAT-0009",
+        situacao: "encerrado",
+        dataAdmissao: "2024-05-02",
+        dataDesligamento: "2025-06-30",
+      },
+    ]);
     // O PATCH devolve a situação GLOBAL — aqui "ativo", por outra empresa.
     vi.mocked(retificarColaborador).mockResolvedValueOnce({
       id: elisa.id,
@@ -3424,22 +3464,33 @@ describe("T178 — 'Nova admissão' e a ficha a partir da linha", () => {
       atualizadoEm: "2026-10-20T12:00:00.000Z",
     });
 
-    render(<ColaboradoresScreen />);
+    render(<ComFicha podeEditarFicha />);
     await screen.findByRole("table", { name: "Colaboradores desta empresa" });
     fireEvent.click(
       screen.getByRole("button", {
         name: "Abrir ficha de Elisa Antes (teste)",
       }),
     );
-    const ficha = await screen.findByRole("dialog", {
-      name: "Elisa Antes (teste)",
-    });
+    const ficha = await esperarFicha();
     fireEvent.change(within(ficha).getByLabelText("Nome"), {
       target: { value: "Elisa Depois (teste)" },
     });
     fireEvent.click(within(ficha).getByRole("button", { name: "Salvar nome" }));
 
-    await screen.findByRole("heading", { name: "Elisa Depois (teste)" });
+    await screen.findByRole("heading", {
+      level: 1,
+      name: "Elisa Depois (teste)",
+    });
+    // A ficha aberta segue com a situação desta empresa.
+    expect(
+      within(fichaAberta()).getByText("Inativo nesta empresa"),
+    ).toBeInTheDocument();
+
+    vi.mocked(listarColaboradores).mockResolvedValue(
+      paginado([{ ...elisa, nome: "Elisa Depois (teste)" }]),
+    );
+    voltarDaFicha();
+    await screen.findByText("Elisa Depois (teste)");
     const linha = within(
       screen.getByRole("table", { name: "Colaboradores desta empresa" }),
     )
@@ -3448,19 +3499,15 @@ describe("T178 — 'Nova admissão' e a ficha a partir da linha", () => {
     const celulas = within(linha).getAllByRole("cell");
     expect(celulas[1]).toHaveTextContent("MAT-0009");
     expect(celulas[5]).toHaveTextContent("Inativo");
-    // A ficha aberta também segue com a situação da linha.
-    expect(
-      within(screen.getByRole("dialog")).getByText("Inativo"),
-    ).toBeInTheDocument();
   });
 
   it("cada montagem relê o servidor: nada de lista guardada entre montagens", async () => {
     const antes = vi.mocked(listarColaboradores).mock.calls.length;
-    const { unmount } = render(<ColaboradoresScreen />);
+    const { unmount } = render(<ComFicha />);
     await screen.findByRole("table", { name: "Colaboradores desta empresa" });
     unmount();
 
-    render(<ColaboradoresScreen />);
+    render(<ComFicha />);
     await screen.findByRole("table", { name: "Colaboradores desta empresa" });
     expect(vi.mocked(listarColaboradores).mock.calls.length - antes).toBe(2);
   });
@@ -3474,23 +3521,27 @@ describe("T178 — 'Nova admissão' e a ficha a partir da linha", () => {
 // ---------------------------------------------------------------------------
 describe("T181 — ficha: dados pessoais e endereço editáveis no detalhe", () => {
   async function abrirFicha(props: { podeEditarFicha?: boolean } = {}) {
-    render(<ColaboradoresScreen podeEditarFicha {...props} />);
+    render(<ComFicha podeEditarFicha {...props} />);
     await screen.findByRole("table", { name: "Colaboradores desta empresa" });
     const linha = screen.getByText("Ana Colaboradora (teste)").closest("tr")!;
     fireEvent.click(within(linha).getByRole("button", { name: /Abrir ficha/ }));
     return screen.findByRole("region", { name: "Endereço" });
   }
 
-  it("o aviso do detalhe diz o que pode ser corrigido", async () => {
+  it("a aba de dados reúne nome, dados pessoais, endereço e contatos", async () => {
     await abrirFicha();
+    const ficha = within(fichaAberta());
+    expect(ficha.getByLabelText("Nome")).toBeInTheDocument();
     expect(
-      screen.getByText(
-        /O nome, os dados pessoais, o endereço e os contatos podem ser\s+corrigidos abaixo\./,
-      ),
+      ficha.getByRole("button", { name: "Editar dados pessoais" }),
     ).toBeInTheDocument();
+    expect(
+      ficha.getByRole("button", { name: "Editar endereço" }),
+    ).toBeInTheDocument();
+    expect(ficha.getByRole("region", { name: "Contatos" })).toBeInTheDocument();
   });
 
-  it("endereço em edição com alteração: fechar pede confirmação, e descartar não grava", async () => {
+  it("endereço em edição com alteração: voltar pede confirmação, e sair sem salvar não grava", async () => {
     const endereco = await abrirFicha();
     fireEvent.click(
       within(endereco).getByRole("button", { name: "Editar endereço" }),
@@ -3498,24 +3549,23 @@ describe("T181 — ficha: dados pessoais e endereço editáveis no detalhe", () 
     fireEvent.change(screen.getByLabelText(/^Número/), {
       target: { value: "999" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
+    voltarDaFicha();
     expect(screen.getByText(/alterações não salvas/i)).toBeInTheDocument();
-    fireEvent.click(
-      screen.getByRole("button", { name: "Descartar alterações" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Sair sem salvar" }));
     expect(registrarDadosPessoaisDoColaborador).not.toHaveBeenCalled();
   });
 
-  it("dados pessoais só abertos, sem alteração: fecha direto", async () => {
+  it("dados pessoais só abertos, sem alteração: voltar sai direto", async () => {
     await abrirFicha();
     fireEvent.click(
       screen.getByRole("button", { name: "Editar dados pessoais" }),
     );
-    fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
+    voltarDaFicha();
     expect(screen.queryByText(/alterações não salvas/i)).toBeNull();
+    expect(document.querySelector(".ficha-colaborador")).toBeNull();
   });
 
-  it("durante a gravação de um bloco, o detalhe não fecha", async () => {
+  it("durante a gravação de um bloco, voltar não sai da ficha", async () => {
     vi.mocked(registrarDadosPessoaisDoColaborador).mockReturnValueOnce(
       new Promise(() => undefined),
     );
@@ -3529,9 +3579,10 @@ describe("T181 — ficha: dados pessoais e endereço editáveis no detalhe", () 
     fireEvent.click(
       screen.getByRole("button", { name: "Salvar dados pessoais" }),
     );
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Fechar" })).toBeDisabled(),
-    );
+    await screen.findByRole("button", { name: "Salvando…" });
+    voltarDaFicha();
+    expect(screen.queryByText(/alterações não salvas/i)).toBeNull();
+    expect(fichaAberta()).toBeInTheDocument();
   });
 
   it("quem edita a ficha (RH ou DP) tem 'Buscar CEP' na edição do endereço", async () => {
@@ -3858,14 +3909,17 @@ describe("T187 — Vida funcional na ficha", () => {
     });
     const linha = within(tabela).getByText(colaborador1.nome).closest("tr")!;
     fireEvent.click(within(linha).getByRole("button", { name: /Abrir ficha/ }));
-    const ficha = await screen.findByRole("dialog");
-    return within(ficha).findByRole("region", { name: "Vida funcional" });
+    await esperarFicha();
+    fireEvent.click(screen.getByRole("tab", { name: "Vida funcional" }));
+    return within(fichaAberta()).findByRole("region", {
+      name: "Vida funcional",
+    });
   }
 
   it("mostra a vida funcional do vínculo principal, com a lotação da linha", async () => {
     vi.mocked(listarAlocacoesVinculo).mockResolvedValue([ALOCACAO_ABERTA]);
     vi.mocked(buscarLinhaDoTempo).mockResolvedValue([ADMISSAO_EFETIVADA]);
-    render(<ColaboradoresScreen />);
+    render(<ComFicha />);
     const secao = await abrirFichaDaAna();
 
     await within(secao).findByRole("table", {
@@ -3891,7 +3945,7 @@ describe("T187 — Vida funcional na ficha", () => {
       previstoNovo,
       vinculo1,
     ]);
-    render(<ColaboradoresScreen />);
+    render(<ComFicha />);
     const secao = await abrirFichaDaAna();
     await within(secao).findByText(
       "Nenhuma movimentação registrada para este vínculo.",
@@ -3902,7 +3956,7 @@ describe("T187 — Vida funcional na ficha", () => {
   });
 
   it("estados vazios: sem movimentação e sem lotação vigente", async () => {
-    render(<ColaboradoresScreen />);
+    render(<ComFicha />);
     const secao = await abrirFichaDaAna();
     expect(
       await within(secao).findByText(
@@ -3912,38 +3966,50 @@ describe("T187 — Vida funcional na ficha", () => {
     expect(secao).toHaveTextContent(/Sem lotação vigente/);
   });
 
-  it("o atalho leva o colaborador e o vínculo da ficha", async () => {
-    const onAbrirHistoricoFuncional = vi.fn();
-    render(
-      <ColaboradoresScreen
-        onAbrirHistoricoFuncional={onAbrirHistoricoFuncional}
-      />,
-    );
+  it("o atalho sai da ficha para o Histórico funcional, com o colaborador e o vínculo", async () => {
+    render(<ComFicha />);
     const secao = await abrirFichaDaAna();
     fireEvent.click(
       within(secao).getByRole("button", {
         name: "Abrir no Histórico funcional",
       }),
     );
-    expect(onAbrirHistoricoFuncional).toHaveBeenCalledWith({
-      colaboradorId: colaborador1.id,
-      vinculoId: vinculo1.id,
-    });
+    await waitFor(() =>
+      expect(document.querySelector(".ficha-colaborador")).toBeNull(),
+    );
+    expect(
+      screen.getByRole("tab", { name: "Histórico funcional", selected: true }),
+    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(buscarLinhaDoTempo).toHaveBeenLastCalledWith(vinculo1.id),
+    );
   });
 
   it("com o nome alterado e não salvo, o atalho espera", async () => {
     const onAbrirHistoricoFuncional = vi.fn();
-    render(
-      <ColaboradoresScreen
-        onAbrirHistoricoFuncional={onAbrirHistoricoFuncional}
-        podeEditarFicha
-      />,
-    );
-    const secao = await abrirFichaDaAna();
-    fireEvent.change(
-      within(screen.getByRole("dialog")).getByLabelText("Nome"),
-      { target: { value: "Outro nome (teste)" } },
-    );
+    // A aba é do shell; aqui, um estado local faz esse papel.
+    function FichaDaAna() {
+      const [aba, setAba] = useState<RotaDaFicha["aba"]>("dados");
+      return (
+        <FichaColaboradorScreen
+          colaboradorId={colaborador1.id}
+          aba={aba}
+          onTrocarAba={setAba}
+          onVoltar={vi.fn()}
+          onAbrirHistoricoFuncional={onAbrirHistoricoFuncional}
+          podeEditarFicha
+        />
+      );
+    }
+    render(<FichaDaAna />);
+    await esperarFicha();
+    fireEvent.change(within(fichaAberta()).getByLabelText("Nome"), {
+      target: { value: "Outro nome (teste)" },
+    });
+    fireEvent.click(screen.getByRole("tab", { name: "Vida funcional" }));
+    const secao = await within(fichaAberta()).findByRole("region", {
+      name: "Vida funcional",
+    });
     const atalho = within(secao).getByRole("button", {
       name: "Abrir no Histórico funcional",
     });
@@ -3954,13 +4020,7 @@ describe("T187 — Vida funcional na ficha", () => {
 
   it("só leitura mesmo para quem edita a ficha: nenhum botão de operar movimentação", async () => {
     vi.mocked(buscarLinhaDoTempo).mockResolvedValue([ADMISSAO_EFETIVADA]);
-    render(
-      <ColaboradoresScreen
-        podeEditarFicha
-        podeOperarJornada
-        onAbrirHistoricoFuncional={() => {}}
-      />,
-    );
+    render(<ComFicha podeEditarFicha podeOperarJornada />);
     const secao = await abrirFichaDaAna();
     await within(secao).findByRole("table", {
       name: `Linha do tempo — ${colaborador1.nome}`,
@@ -3976,7 +4036,7 @@ describe("T187 — Vida funcional na ficha", () => {
     vi.mocked(buscarLinhaDoTempo).mockRejectedValue(
       Object.assign(new Error("recusado"), { status: 403 }),
     );
-    render(<ColaboradoresScreen onAbrirHistoricoFuncional={() => {}} />);
+    render(<ComFicha />);
     const secao = await abrirFichaDaAna();
     expect(
       await within(secao).findByText(
@@ -3989,9 +4049,7 @@ describe("T187 — Vida funcional na ficha", () => {
 
   it("troca de empresa: a ficha remontada lê só o vínculo da empresa nova", async () => {
     const { unmount } = render(
-      <ColaboradoresScreen
-        empresaAtiva={{ nome: "Empresa Teste A", codigo: "TA" }}
-      />,
+      <ComFicha empresaAtiva={{ nome: "Empresa Teste A", codigo: "TA" }} />,
     );
     await abrirFichaDaAna();
     await waitFor(() =>
@@ -4028,18 +4086,17 @@ describe("T187 — Vida funcional na ficha", () => {
     vi.mocked(listarAlocacoesVinculo).mockClear();
 
     render(
-      <ColaboradoresScreen
-        empresaAtiva={{ nome: "Empresa Teste B", codigo: "TB" }}
-      />,
+      <ComFicha empresaAtiva={{ nome: "Empresa Teste B", codigo: "TB" }} />,
     );
     const secao = await abrirFichaDaAna();
     await within(secao).findByText(
       "Nenhuma movimentação registrada para este vínculo.",
     );
     expect(vi.mocked(buscarLinhaDoTempo).mock.calls).toEqual([[vinculoB.id]]);
-    expect(vi.mocked(listarAlocacoesVinculo).mock.calls).toEqual([
-      [vinculoB.id],
-    ]);
+    // O cabeçalho (lotação vigente) e a seção leem as alocações: só do B.
+    const alocacoesLidas = vi.mocked(listarAlocacoesVinculo).mock.calls;
+    expect(alocacoesLidas.length).toBeGreaterThan(0);
+    expect(alocacoesLidas.every(([id]) => id === vinculoB.id)).toBe(true);
     expect(secao).toHaveTextContent("Vínculo principal: MAT-B-0001");
     expect(secao).not.toHaveTextContent("MAT-0001");
   });
@@ -4104,7 +4161,7 @@ describe("T187 — contrato de CSS da Vida funcional (375 px)", () => {
         atualizadoEm: "2025-01-10T12:00:00.000Z",
       },
     ]);
-    render(<ColaboradoresScreen />);
+    render(<ComFicha />);
     const tabela = await screen.findByRole("table", {
       name: "Colaboradores desta empresa",
     });
@@ -4113,6 +4170,8 @@ describe("T187 — contrato de CSS da Vida funcional (375 px)", () => {
         within(tabela).getByText(colaborador1.nome).closest("tr")!,
       ).getByRole("button", { name: /Abrir ficha/ }),
     );
+    await esperarFicha();
+    fireEvent.click(screen.getByRole("tab", { name: "Vida funcional" }));
     const linhaDoTempo = await screen.findByRole("table", {
       name: `Linha do tempo — ${colaborador1.nome}`,
     });

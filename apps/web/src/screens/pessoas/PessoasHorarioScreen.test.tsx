@@ -2025,3 +2025,34 @@ describe("T193 — recuperação, anúncios e formulário no Horário de trabalh
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// T198 — o Horário de trabalho segue como visão da empresa (D24): o nome do
+// colaborador na linha abre a ficha dele.
+// ---------------------------------------------------------------------------
+describe("T198 — Horário de trabalho e a ficha do colaborador", () => {
+  it("o nome na linha é um botão que abre a ficha daquele colaborador", async () => {
+    const onAbrirFicha = vi.fn();
+    render(<PessoasHorarioScreen podeOperar onAbrirFicha={onAbrirFicha} />);
+    const tabela = await screen.findByRole("table", {
+      name: "Colaboradores com tabela de horário vinculada",
+    });
+    fireEvent.click(
+      within(tabela).getByRole("button", {
+        name: `Abrir ficha de ${colaborador1.nome}`,
+      }),
+    );
+    expect(onAbrirFicha).toHaveBeenCalledWith(colaborador1.id);
+  });
+
+  it("sem quem abra a ficha, o nome segue como texto", async () => {
+    render(<PessoasHorarioScreen podeOperar />);
+    const tabela = await screen.findByRole("table", {
+      name: "Colaboradores com tabela de horário vinculada",
+    });
+    expect(
+      within(tabela).queryByRole("button", { name: /^Abrir ficha de/ }),
+    ).toBeNull();
+    expect(within(tabela).getByText(colaborador1.nome)).toBeInTheDocument();
+  });
+});

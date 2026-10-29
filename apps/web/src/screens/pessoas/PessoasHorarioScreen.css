@@ -205,3 +205,23 @@
 #pessoas-horario-formulario-sem-opcoes:focus {
   outline-offset: 2px;
 }
+
+/* T198 — o nome do colaborador abre a ficha dele: link no texto, alvo de
+   44 px, sublinhado (não só cor). */
+.pessoas-horario-screen__ficha {
+  min-height: var(--touch-target);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-action);
+  font: inherit;
+  text-align: left;
+  text-decoration: underline;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.pessoas-horario-screen__ficha:focus-visible {
+  outline: var(--focus-width) solid var(--color-action);
+  outline-offset: var(--focus-offset);
+}

@@ -49,3 +49,16 @@
 .pessoas-screen__panel {
   min-width: 0;
 }
+
+/* T198 — abas e conteúdo de Pessoas, escondidos (e preservados) enquanto a
+   ficha do colaborador está aberta. */
+.pessoas-screen__conteudo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  min-width: 0;
+}
+
+.pessoas-screen__conteudo[hidden] {
+  display: none;
+}

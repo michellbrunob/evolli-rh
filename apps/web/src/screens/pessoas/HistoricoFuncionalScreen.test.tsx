@@ -1359,3 +1359,35 @@ describe("T188 (O3) — resposta atrasada de vínculos é descartada", () => {
     expect(botaoRegistrar()).toBeDisabled();
   });
 });
+
+// ---------------------------------------------------------------------------
+// T198 — o Histórico funcional segue como visão da empresa (D24), com atalho
+// para a ficha do colaborador escolhido.
+// ---------------------------------------------------------------------------
+describe("T198 — Histórico funcional e a ficha do colaborador", () => {
+  it("sem colaborador escolhido não há atalho; escolhido, leva o id dele", async () => {
+    const onAbrirFicha = vi.fn();
+    render(<HistoricoFuncionalScreen onAbrirFicha={onAbrirFicha} />);
+    await screen.findByRole("table", { name: "Movimentações funcionais" });
+    expect(
+      screen.queryByRole("button", { name: /^Abrir ficha de/ }),
+    ).toBeNull();
+
+    await selecionarColaborador(colaborador1.id);
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: `Abrir ficha de ${colaborador1.nome}`,
+      }),
+    );
+    expect(onAbrirFicha).toHaveBeenCalledWith(colaborador1.id);
+  });
+
+  it("sem quem abra a ficha, nenhum atalho aparece", async () => {
+    render(<HistoricoFuncionalScreen />);
+    await screen.findByRole("table", { name: "Movimentações funcionais" });
+    await selecionarColaborador(colaborador1.id);
+    expect(
+      screen.queryByRole("button", { name: /^Abrir ficha de/ }),
+    ).toBeNull();
+  });
+});

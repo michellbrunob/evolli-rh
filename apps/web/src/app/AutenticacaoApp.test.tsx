@@ -1059,6 +1059,33 @@ describe("T163/T189 — contexto empresarial ativo", () => {
     );
   });
 
+  it("T198 — ficha aberta pela rota: a troca volta à listagem da empresa nova, sem a ficha anterior", async () => {
+    trocarParaBetaNoServidor();
+    const rotaDaFicha =
+      "#/pessoas/colaboradores/11111111-1111-4111-8111-111111111111/contratuais";
+    window.history.replaceState(null, "", rotaDaFicha);
+    vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
+    render(<AutenticacaoApp />);
+    await waitFor(() =>
+      expect(document.querySelector(".ficha-colaborador")).not.toBeNull(),
+    );
+    expect(window.location.hash).toBe(rotaDaFicha);
+
+    await trocarPeloMenuPara("Empresa Beta");
+
+    await waitFor(() =>
+      expect(seletorDoMenu()).toHaveTextContent("Empresa Beta"),
+    );
+    await waitFor(() =>
+      expect(window.location.hash).toBe("#/pessoas/colaboradores"),
+    );
+    // A ficha da empresa anterior não é reaberta na empresa nova.
+    expect(document.querySelector(".ficha-colaborador")).toBeNull();
+    await waitFor(() =>
+      expect(document.activeElement?.id).toBe("colaboradores-titulo"),
+    );
+  });
+
   it("edição pendente: cancelar a confirmação mantém a empresa e o que foi digitado", async () => {
     trocarParaBetaNoServidor();
     const nome = await abrirNovaAdmissaoPorRota();
