@@ -2823,8 +2823,13 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       como `[T194 dev]`, não a `main`.
 
 92. **T195 - Cadastro individual em quatro etapas**
-    - **Estado:** **em implementação**. Branch `codex/t195-admissao-quatro-etapas`, a partir do
+    - **Estado:** **integrada** em `main` pela PR #188, squash
+      `e473d47642cde02ed22fec3970fcfe293b9202cb`, com a CI de push 3/3 verde (run 40859789278);
+      branch preservada. Implementada na branch `codex/t195-admissao-quatro-etapas`, a partir do
       squash `dd79f4c4703f797498fcc72fc41f436e3eb44928` (T194 integrada, PR #187).
+    - **Observação de relatório:** a integração funcional da T195 está concluída; a única
+      pendência administrativa era a sua convergência no Spec Kit, resolvida no primeiro commit
+      da T196.
     - **Origem:** fatia 2 do [dossiê](../docs/decisions/t194-dossie-entrada-de-colaboradores.md) da entrada de colaboradores.
     - **Decisões aprovadas (2026-10-28):** A Etapa 4 terá revisão final e um bloco explicando que documentos serão liberados em entrega própria; nenhum upload nesta entrega. Área, Equipe e Centro de custo seguem na
       lotação como hoje (opcionais, Área dependente do Departamento, sem criação inline).
@@ -2855,6 +2860,20 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
     - **Fora de escopo:** documentos e Cloudflare R2, importação, admissão digital, criação inline, busca de referências, criação ou retirada de Área, Aprendiz, salário, escala, gestor direto, conselho profissional, dependentes e pensão; promoção e merge.
     - **Prévia:** `http://127.0.0.1:5173` passa a mostrar a branch da T195 ao vivo, identificada
       como `[T195 dev]`, não a `main`.
+
+93. **T196 - Busca nas referências organizacionais (preparação de decisão)**
+    - **Estado:** **em preparação**. Branch `codex/t196-busca-referencias`, a partir do squash
+      `e473d47642cde02ed22fec3970fcfe293b9202cb` (T195 integrada, PR #188).
+    - **Diretriz (proprietária, 2026-10-29):** uma funcionalidade completa por entrega, com as correções pequenas e acionáveis resolvidas antes de Ready for review (regras 7 e 8).
+    - **Objetivo:** preparar a decisão da busca pesquisável em Departamento, Cargo, Unidade e
+      Centro de custo na etapa 2 da Nova admissão, no [dossiê](../docs/decisions/t196-dossie-busca-referencias.md): contratos e
+      paginação atuais, permissões e isolamento, arquitetura da busca no servidor, interface
+      acessível, testes, riscos e a proposta da entrega seguinte de criação inline.
+    - **Decisões pendentes:** D8 — busca aditiva no servidor para as quatro referências; D9 —
+      formato do código automático por empresa na criação inline pelo RH, e confirmação antes
+      de criar ou criação imediata; Centro de custo — se já tem todos os contratos para entrar
+      nesta etapa.
+    - **Fora de escopo:** implementação de produto, mudança de API, schema, migration, RBAC, seed, Docker, dependências ou banco, criação inline, push, PR, promoção e merge.
 
 ## Regra obrigatória para as próximas tarefas
 

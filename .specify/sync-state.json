@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "constitutionVersion": "1.4.0",
-  "lastConvergedAt": "2026-10-28",
-  "lastIntegratedTask": 194,
-  "lastRecordedTask": 195,
+  "lastConvergedAt": "2026-10-29",
+  "lastIntegratedTask": 195,
+  "lastRecordedTask": 196,
   "platformDecision": {
     "adr": "docs/adr/0014-evolli-plataforma-base-e-encerramento-do-frappe.md",
     "decidedAt": "2026-10-01",
@@ -11,15 +11,15 @@
     "frappe": "encerrado_como_candidato_referencia_apenas"
   },
   "nextTask": {
-    "id": "T195",
-    "status": "admissao_quatro_etapas_em_implementacao",
-    "reason": "T194 integrada em main pela PR #187 (squash dd79f4c4703f797498fcc72fc41f436e3eb44928), com a CI de push 3/3 verde (run 40746014658); seguem abertas as observacoes da revisao final e as decisoes pendentes do dossie. A T195 implementa a fatia 2 do dossie (docs/decisions/t194-dossie-entrada-de-colaboradores.md): a Nova admissao vira um fluxo guiado em quatro etapas (dados basicos, dados profissionais e lotacao, endereco, revisao e conclusao), com os campos, regras e contratos ja aprovados. Decisao aprovada: a etapa 4 tem revisao final e um bloco explicando que documentos serao liberados em entrega propria; nenhum upload. Area, Equipe e Centro de custo seguem na lotacao como hoje. Sem API, schema, migration, RBAC, auditoria, seed, Docker ou dependencia. Fora de escopo: documentos e R2, importacao, admissao digital, criacao inline, busca de referencias, Aprendiz, salario, escala, gestor direto, conselho profissional, dependentes, pensao, promocao e merge."
+    "id": "T196",
+    "status": "busca_referencias_em_preparacao",
+    "reason": "T195 integrada em main pela PR #188 (squash e473d47642cde02ed22fec3970fcfe293b9202cb), com a CI de push 3/3 verde (run 40859789278). A T196 e so preparacao de decisao da busca pesquisavel em Departamento, Cargo, Unidade e Centro de custo na etapa 2 da Nova admissao (docs/decisions/t196-dossie-busca-referencias.md). Diretriz: uma funcionalidade completa por entrega, com correcoes pequenas acionaveis resolvidas antes de Ready for review. Pendentes: D8 (busca aditiva no servidor), D9 (codigo automatico e confirmacao na criacao inline) e Centro de custo. Sem produto, API, schema, migration, RBAC, seed, Docker, dependencia, banco, push ou PR."
   },
   "openDeliveries": [
     {
-      "id": "T195",
+      "id": "T196",
       "pullRequest": null,
-      "status": "admissao_quatro_etapas_em_implementacao"
+      "status": "busca_referencias_em_preparacao"
     }
   ],
   "requiredArtifacts": [

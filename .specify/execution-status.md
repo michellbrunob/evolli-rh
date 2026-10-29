@@ -2640,11 +2640,18 @@ no dossiê.
 
 **Fora de escopo:** fluxo de cadastro em quatro etapas; documentos e Cloudflare R2; importação CSV/XLSX; admissão digital; Área; busca de referências; criação inline; Aprendiz; promoção e merge.
 
-## Cadastro individual em quatro etapas — T195 (em implementação)
+## Cadastro individual em quatro etapas — T195 (integrada)
 
-| Tarefa | Estado               | Resultado principal                                                                                                            |
-| ------ | -------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| T195   | **Em implementação** | Nova admissão como fluxo guiado em quatro etapas: dados básicos, dados profissionais e lotação, endereço, revisão e conclusão. |
+| Tarefa | Estado                                    | Resultado principal                                                                                                            |
+| ------ | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| T195   | **Integrada** (PR #188, squash `e473d47`) | Nova admissão como fluxo guiado em quatro etapas: dados básicos, dados profissionais e lotação, endereço, revisão e conclusão. |
+
+**Observação de relatório:** a integração funcional da T195 está concluída
+(CI de push 3/3 verde, run 40859789278); a única pendência administrativa era
+a sua convergência no Spec Kit, resolvida no primeiro commit da T196. As
+correções acionáveis da revisão (N1, N3 e A1) foram feitas dentro da
+entrega; N2 e N4 ficaram como decisão e limitação justificadas no dossiê
+(seção 16.4).
 
 **Escopo da T195:** a página de Nova admissão vira um fluxo guiado em quatro
 etapas (fatia 2 do [dossiê](../docs/decisions/t194-dossie-entrada-de-colaboradores.md)), com os campos, regras e contratos já
@@ -2669,6 +2676,27 @@ nem persistência nova: recarregar começa do zero, na etapa 1, como antes.
 (E2E de navegador) têm decisão e motivo registrados na seção 16.4 do dossiê.
 
 **Fora de escopo:** documentos e Cloudflare R2, importação, admissão digital, criação inline, busca de referências, criação ou retirada de Área, Aprendiz, salário, escala, gestor direto, conselho profissional, dependentes e pensão; promoção e merge.
+
+## Busca nas referências organizacionais — T196 (preparação de decisão)
+
+| Tarefa | Estado            | Resultado principal                                                                                                   |
+| ------ | ----------------- | --------------------------------------------------------------------------------------------------------------------- |
+| T196   | **Em preparação** | Dossiê de decisão da busca pesquisável em Departamento, Cargo, Unidade e Centro de custo na etapa 2 da Nova admissão. |
+
+**Escopo da T196:** só preparação de decisão — o [dossiê](../docs/decisions/t196-dossie-busca-referencias.md)
+levanta contratos, paginação, permissões, isolamento e o uso na etapa 2, e
+propõe a arquitetura da busca no servidor, a interface acessível dos
+seletores, testes, riscos e a entrega seguinte de criação inline. Nada de
+produto nesta tarefa.
+
+**Diretriz (proprietária, 2026-10-29):** uma funcionalidade completa por entrega, com as correções pequenas e acionáveis resolvidas antes de Ready for review (regras 7 e 8).
+
+**Decisões pendentes:** D8 (busca aditiva no servidor para as quatro
+referências); D9 (formato do código automático por empresa na criação
+inline; confirmação antes de criar ou criação imediata); e se Centro de custo
+já tem todos os contratos para entrar nesta etapa.
+
+**Fora de escopo:** implementação de produto, mudança de API, schema, migration, RBAC, seed, Docker, dependências ou banco, criação inline, push, PR, promoção e merge.
 
 ## Próxima ação autorizável
 
