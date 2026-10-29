@@ -23,7 +23,7 @@ import { UnidadeOrganizacionalService } from "./unidade-organizacional.service";
 import {
   AtualizarNoOrganizacionalDto,
   CriarUnidadeOrganizacionalDto,
-  ListarPorEmpresaQueryDto,
+  ListarReferenciasQueryDto,
 } from "../dto/organizacao.dto";
 
 /** Sem rota `DELETE` (spec R6). Ver `EmpresaController` para o padrão. */
@@ -38,7 +38,7 @@ export class UnidadeOrganizacionalController {
   @RequirePermission("unidade_organizacional", "read")
   @ApiOperation({ summary: "Lista unidades organizacionais do escopo do ator" })
   async listar(
-    @Query() query: ListarPorEmpresaQueryDto,
+    @Query() query: ListarReferenciasQueryDto,
     @CurrentUser() actor: AccessUser,
     @Req() req: Request,
   ) {

@@ -23,7 +23,7 @@ import { CentroCustoService } from "./centro-custo.service";
 import {
   AtualizarNoOrganizacionalDto,
   CriarCentroCustoDto,
-  ListarPorEmpresaQueryDto,
+  ListarReferenciasQueryDto,
 } from "../dto/organizacao.dto";
 
 /** Sem rota `DELETE` (spec R6). Ver `EmpresaController` para o padrão. */
@@ -38,7 +38,7 @@ export class CentroCustoController {
   @RequirePermission("centro_custo", "read")
   @ApiOperation({ summary: "Lista centros de custo do escopo do ator" })
   async listar(
-    @Query() query: ListarPorEmpresaQueryDto,
+    @Query() query: ListarReferenciasQueryDto,
     @CurrentUser() actor: AccessUser,
     @Req() req: Request,
   ) {

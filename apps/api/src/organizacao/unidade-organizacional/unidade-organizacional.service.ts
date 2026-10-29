@@ -30,8 +30,9 @@ import {
 import {
   AtualizarNoOrganizacionalDto,
   CriarUnidadeOrganizacionalDto,
-  ListarPorEmpresaQueryDto,
+  ListarReferenciasQueryDto,
 } from "../dto/organizacao.dto";
+import { filtroDeBuscaPorCodigoOuNome } from "../busca-referencias.util";
 
 /** UnidadeOrganizacional — estabelecimento/filial/local de uma empresa (§3.2). */
 @Injectable()
@@ -93,7 +94,7 @@ export class UnidadeOrganizacionalService {
   }
 
   async listar(
-    query: ListarPorEmpresaQueryDto,
+    query: ListarReferenciasQueryDto,
     ctx: OrganizacaoAuditContext,
   ): Promise<ResultadoPaginado<UnidadeOrganizacional>> {
     const escopo = resolverEscopo(ctx.actor);
@@ -113,6 +114,8 @@ export class UnidadeOrganizacionalService {
     const where: Prisma.UnidadeOrganizacionalWhereInput = {
       ...filtro,
       ...(query.status ? { status: query.status } : {}),
+      // T196 — busca por código ou nome, antes da paginação.
+      ...filtroDeBuscaPorCodigoOuNome(query.busca),
     };
 
     const [itens, total] = await Promise.all([
