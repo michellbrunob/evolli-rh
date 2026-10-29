@@ -343,7 +343,13 @@ documentada para a entrega seguinte, sem produto agora.
   busca caber ao lado dos botões de 44 px.
 - Defesa do cliente mantida (`soAtivos`, a mesma de antes da T196): a
   consulta pede só ativos ao servidor e, se ele devolver uma referência
-  inativa, ela não vira opção (e sai do total da página).
+  inativa, ela não vira opção.
+- A paginação segue só o servidor: há próxima página enquanto
+  `pagina × tamanhoPagina < total`, com o total e a página que ele devolve.
+  A defesa do cliente não mexe nesse total; ela só filtra opções. A contagem
+  exibida desconta os descartados de todas as páginas já carregadas. Assim,
+  uma página esvaziada pela defesa não trava nem repete "Mostrar mais", e o
+  botão some na última página real do servidor.
 - A carga inicial não lê mais as quatro listas (o teto de 100): só confere,
   com um item, se a empresa tem Departamento e Cargo ativos (o aviso de
   referências da T179). O "+" do RH (T180) continua para Departamento, Cargo

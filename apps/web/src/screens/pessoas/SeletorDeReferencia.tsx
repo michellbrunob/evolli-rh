@@ -57,10 +57,20 @@ export const TAMANHO_DA_PAGINA_DE_REFERENCIAS = 20;
 /** Espera curta entre a digitação e a consulta. */
 const ESPERA_DA_DIGITACAO_MS = 300;
 
+/**
+ * Uma página da consulta. `total`, `pagina` e `tamanhoPagina` são os do
+ * servidor e só eles decidem se há próxima página. `descartados` conta o que a
+ * defesa do cliente tirou desta página (referência inativa devolvida
+ * indevidamente) e só ajusta a contagem exibida.
+ */
+export interface PaginaDeReferencias extends ResultadoPaginado<ReferenciaEscolhida> {
+  readonly descartados?: number;
+}
+
 export type ListarReferencias = (consulta: {
   readonly busca?: string;
   readonly pagina: number;
-}) => Promise<ResultadoPaginado<ReferenciaEscolhida>>;
+}) => Promise<PaginaDeReferencias>;
 
 export interface SeletorDeReferenciaProps {
   /** `id` do campo de busca — o alvo do foco quando há erro (T179/T195). */
@@ -98,12 +108,32 @@ type Estado =
   | {
       tipo: "pronto";
       itens: readonly ReferenciaEscolhida[];
-      total: number;
+      /** Do servidor: com `pagina` e `tamanhoPagina`, decide a próxima página. */
+      totalDoServidor: number;
       pagina: number;
+      tamanhoPagina: number;
+      /** Tirados pela defesa do cliente em todas as páginas já carregadas. */
+      descartados: number;
       carregandoMais: boolean;
       falhaAoCarregarMais: boolean;
     }
   | { tipo: "falha" };
+
+type Pronto = Extract<Estado, { tipo: "pronto" }>;
+
+/**
+ * Há próxima página no servidor. Decide pela página pedida e pelo total do
+ * servidor, nunca pela quantidade exibida: uma página que a defesa do cliente
+ * esvaziou não trava nem repete a paginação.
+ */
+function haMaisPaginas(e: Pronto): boolean {
+  return e.tamanhoPagina > 0 && e.pagina * e.tamanhoPagina < e.totalDoServidor;
+}
+
+/** Contagem exibida: o total do servidor menos o que já foi descartado. */
+function totalExibido(e: Pronto): number {
+  return Math.max(e.itens.length, e.totalDoServidor - e.descartados);
+}
 
 export function SeletorDeReferencia({
   id,
@@ -176,9 +206,10 @@ export function SeletorDeReferencia({
 
   function textoDaContagem(exibidos: number, total: number): string {
     if (total === 0) return `${nenhum} ${rotulo.toLowerCase()} encontrado.`;
-    return total === 1
-      ? "1 resultado."
-      : `${total} resultados; ${exibidos} exibidos.`;
+    if (total === 1 && exibidos === 1) return "1 resultado.";
+    return `${total} ${total === 1 ? "resultado" : "resultados"}; ${exibidos} ${
+      exibidos === 1 ? "exibido" : "exibidos"
+    }.`;
   }
 
   async function consultar(busca: string, pagina: number) {
@@ -200,22 +231,23 @@ export function SeletorDeReferencia({
       });
       if (pedido !== pedidoRef.current) return;
       const atual = estadoRef.current;
-      const anteriores =
-        pagina > 1 && atual.tipo === "pronto" ? atual.itens : [];
-      const itens = [...anteriores, ...resposta.itens];
-      // "Mostrar mais" some quando acabam as páginas: o foco volta ao campo.
-      if (pagina > 1 && itens.length >= resposta.total) {
-        focarCampoRef.current = true;
-      }
-      setEstado({
+      const anterior = pagina > 1 && atual.tipo === "pronto" ? atual : null;
+      const proximo: Pronto = {
         tipo: "pronto",
-        itens,
-        total: resposta.total,
+        itens: [...(anterior?.itens ?? []), ...resposta.itens],
+        totalDoServidor: resposta.total,
         pagina,
+        tamanhoPagina: resposta.tamanhoPagina,
+        descartados: (anterior?.descartados ?? 0) + (resposta.descartados ?? 0),
         carregandoMais: false,
         falhaAoCarregarMais: false,
-      });
-      anunciar(textoDaContagem(itens.length, resposta.total));
+      };
+      // "Mostrar mais" some quando acabam as páginas: o foco volta ao campo.
+      if (pagina > 1 && !haMaisPaginas(proximo)) {
+        focarCampoRef.current = true;
+      }
+      setEstado(proximo);
+      anunciar(textoDaContagem(proximo.itens.length, totalExibido(proximo)));
     } catch {
       if (pedido !== pedidoRef.current) return;
       if (pagina > 1) {
@@ -435,7 +467,9 @@ export function SeletorDeReferencia({
         {estado.tipo === "carregando" ? (
           <p className="seletor-referencia__texto">Buscando {plural}…</p>
         ) : null}
-        {estado.tipo === "pronto" && estado.total === 0 ? (
+        {estado.tipo === "pronto" &&
+        totalExibido(estado) === 0 &&
+        !haMaisPaginas(estado) ? (
           <p className="seletor-referencia__texto">
             {termo.trim()
               ? `${nenhum} ${rotulo.toLowerCase()} ${ativo} encontrado para a busca.`
@@ -465,7 +499,7 @@ export function SeletorDeReferencia({
             Não foi possível carregar mais {plural}. Tente de novo.
           </p>
         ) : null}
-        {estado.tipo === "pronto" && estado.itens.length < estado.total ? (
+        {estado.tipo === "pronto" && haMaisPaginas(estado) ? (
           <button
             type="button"
             ref={mostrarMaisRef}

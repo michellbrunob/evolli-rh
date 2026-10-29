@@ -1221,7 +1221,7 @@ describe("Nova admissão — página própria", () => {
 
   // T196 — a defesa vale para as quatro referências da busca: a consulta
   // comum pede só ativos ao servidor e ainda descarta inativo devolvido
-  // indevidamente, descontando-o do total.
+  // indevidamente, descontando-o da contagem exibida.
   it.each([
     {
       rotulo: "Departamento",
@@ -1284,6 +1284,122 @@ describe("Nova admissão — página própria", () => {
           .closest(".seletor-referencia")!
           .querySelector('[role="status"]'),
       ).toHaveTextContent("1 resultado.");
+    },
+  );
+
+  // T196 — a paginação segue o total e a página do servidor; a defesa do
+  // cliente só tira opções e desconta, da contagem exibida, os descartados de
+  // todas as páginas carregadas. Servidor dublê de 20 em 20.
+  const cargoAtivo = (n: number) => ({
+    ...cargo,
+    id: `cargo-${n}`,
+    codigo: `CA${String(n).padStart(2, "0")}`,
+    nome: `Cargo ${n} (teste)`,
+  });
+  const cargoInativo = (n: number) => ({
+    ...cargo,
+    id: `inativo-${n}`,
+    codigo: `IN${String(n).padStart(2, "0")}`,
+    nome: `Inativo ${n} (teste)`,
+    status: "inativo",
+  });
+  const faixa = <T,>(de: number, ate: number, f: (n: number) => T) =>
+    Array.from({ length: ate - de + 1 }, (_, k) => f(de + k));
+
+  it.each([
+    {
+      caso: "um inativo na primeira página",
+      lista: [cargoInativo(1), ...faixa(1, 40, cargoAtivo)],
+      contagens: [
+        "40 resultados; 19 exibidos.",
+        "40 resultados; 39 exibidos.",
+        "40 resultados; 40 exibidos.",
+      ],
+    },
+    {
+      caso: "um inativo numa página intermediária",
+      lista: [
+        ...faixa(1, 20, cargoAtivo),
+        cargoInativo(1),
+        ...faixa(21, 40, cargoAtivo),
+      ],
+      contagens: [
+        "41 resultados; 20 exibidos.",
+        "40 resultados; 39 exibidos.",
+        "40 resultados; 40 exibidos.",
+      ],
+    },
+    {
+      caso: "uma página inteira de inativos seguida de ativos",
+      lista: [...faixa(1, 20, cargoInativo), ...faixa(1, 5, cargoAtivo)],
+      contagens: ["5 resultados; 0 exibidos.", "5 resultados; 5 exibidos."],
+    },
+    {
+      caso: "sem inativos",
+      lista: faixa(1, 45, cargoAtivo),
+      contagens: [
+        "45 resultados; 20 exibidos.",
+        "45 resultados; 40 exibidos.",
+        "45 resultados; 45 exibidos.",
+      ],
+    },
+  ])(
+    "paginação com $caso: carrega até a última página do servidor e termina",
+    async ({ lista, contagens }) => {
+      vi.mocked(listarCargos).mockImplementation(async (q = {}) => {
+        const pagina = q.pagina ?? 1;
+        const tamanho = q.tamanhoPagina ?? 20;
+        return {
+          itens: lista.slice((pagina - 1) * tamanho, pagina * tamanho),
+          total: lista.length,
+          pagina,
+          tamanhoPagina: tamanho,
+        };
+      });
+      montar();
+      await aguardarEmpresa();
+      abrirLotacao();
+      const raiz = cargoSel().closest(".seletor-referencia") as HTMLElement;
+      const status = () => raiz.querySelector('[role="status"]');
+      const buscas = () =>
+        vi
+          .mocked(listarCargos)
+          .mock.calls.filter(([q]) => q?.tamanhoPagina === 20);
+      const ativosDaLista = lista
+        .filter((c) => c.status === "ativo")
+        .map((c) => `${c.codigo} — ${c.nome}`);
+
+      fireEvent.keyDown(cargoSel(), { key: "ArrowDown" });
+      await waitFor(() => expect(status()).toHaveTextContent(contagens[0]!));
+      for (let pagina = 2; pagina <= contagens.length; pagina += 1) {
+        const mais = within(raiz).getByRole("button", { name: "Mostrar mais" });
+        mais.focus();
+        fireEvent.click(mais);
+        await waitFor(() =>
+          expect(status()).toHaveTextContent(contagens[pagina - 1]!),
+        );
+      }
+
+      // Todas as páginas do servidor foram pedidas, cada uma uma vez, só ativos.
+      expect(buscas().map(([q]) => q)).toEqual(
+        contagens.map((_, k) => ({
+          status: "ativo",
+          tamanhoPagina: 20,
+          pagina: k + 1,
+        })),
+      );
+      // Só ativos viraram opção, e todos eles.
+      expect(
+        within(listaDe(cargoSel()))
+          .queryAllByRole("option")
+          .map((o) => o.textContent),
+      ).toEqual(ativosDaLista);
+      // Fim real: o botão some, nada mais é pedido e o foco volta ao campo.
+      expect(
+        within(raiz).queryByRole("button", { name: /Mostrar mais|Carregando/ }),
+      ).toBeNull();
+      await waitFor(() => expect(cargoSel()).toHaveFocus());
+      expect(buscas()).toHaveLength(contagens.length);
     },
   );
 });
