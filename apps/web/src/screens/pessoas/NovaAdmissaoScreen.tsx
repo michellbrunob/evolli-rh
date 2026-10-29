@@ -339,8 +339,8 @@ const CAMPOS_DA_ETAPA: readonly (readonly CampoErro[])[] = [
     "dataAdmissao",
     "departamento",
     "cargo",
-    "unidade",
     "area",
+    "unidade",
     "equipe",
     "centroCusto",
     "lotacao",
@@ -2120,13 +2120,13 @@ export function NovaAdmissaoScreen({
               >
                 Lotação inicial
               </h3>
-              {/* T179 — um seletor por referência: Departamento e Cargo
-              (obrigatórios) e a Unidade (opcional) na primeira linha; os
-              demais opcionais na segunda, com a Área logo abaixo do
-              Departamento que a filtra. */}
-              <div className="nova-admissao__linha nova-admissao__linha--3">
-                {/* T196 — Departamento, Cargo, Unidade e Centro de custo
-                    são escolhidos pela busca no servidor, de 20 em 20. */}
+              {/* T179 — um seletor por referência. T196 — Departamento,
+                  Cargo, Unidade e Centro de custo são escolhidos pela busca
+                  no servidor, de 20 em 20; em duas colunas, para o campo de
+                  busca caber ao lado dos botões de 44 px. Departamento e
+                  Cargo (obrigatórios) primeiro; a Área logo abaixo do
+                  Departamento que a filtra; os demais opcionais depois. */}
+              <div className="nova-admissao__linha nova-admissao__linha--2">
                 <SeletorDeReferencia
                   id={ID_DO_CAMPO.departamento}
                   rotulo="Departamento"
@@ -2168,6 +2168,24 @@ export function NovaAdmissaoScreen({
                   versao={versaoDaBusca.cargo}
                   acao={botaoNovaReferencia("cargo")}
                 />
+              </div>
+              <div className="nova-admissao__linha nova-admissao__linha--2">
+                {seletorDeLotacao({
+                  campo: "area",
+                  rotulo: "Área",
+                  obrigatorio: false,
+                  valor: campos.areaId,
+                  lista: areas,
+                  aoMudar: (id) => atualizar("areaId", id, "area", "lotacao"),
+                  ajuda:
+                    "Escolha antes o departamento: a lista mostra só as áreas dele.",
+                  vazio: campos.departamentoId
+                    ? carregandoAreas
+                      ? "Carregando áreas…"
+                      : "Nenhuma área ativa neste departamento"
+                    : "Escolha antes o departamento",
+                  desabilitado: !campos.departamentoId || carregandoAreas,
+                })}
                 <SeletorDeReferencia
                   id={ID_DO_CAMPO.unidade}
                   rotulo="Unidade"
@@ -2188,23 +2206,7 @@ export function NovaAdmissaoScreen({
                   acao={botaoNovaReferencia("unidade")}
                 />
               </div>
-              <div className="nova-admissao__linha nova-admissao__linha--3">
-                {seletorDeLotacao({
-                  campo: "area",
-                  rotulo: "Área",
-                  obrigatorio: false,
-                  valor: campos.areaId,
-                  lista: areas,
-                  aoMudar: (id) => atualizar("areaId", id, "area", "lotacao"),
-                  ajuda:
-                    "Escolha antes o departamento: a lista mostra só as áreas dele.",
-                  vazio: campos.departamentoId
-                    ? carregandoAreas
-                      ? "Carregando áreas…"
-                      : "Nenhuma área ativa neste departamento"
-                    : "Escolha antes o departamento",
-                  desabilitado: !campos.departamentoId || carregandoAreas,
-                })}
+              <div className="nova-admissao__linha nova-admissao__linha--2">
                 {seletorDeLotacao({
                   campo: "equipe",
                   rotulo: "Equipe",

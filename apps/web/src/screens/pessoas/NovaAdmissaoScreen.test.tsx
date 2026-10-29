@@ -733,11 +733,13 @@ describe("Nova admissão — página própria", () => {
     expect(linhasDo("Vínculo")).toEqual([
       ["Matrícula", "Tipo de vínculo", "Data de admissão"],
     ]);
-    // T179 — os três obrigatórios na primeira linha; os opcionais na
-    // segunda, com a Área logo abaixo do Departamento que a filtra.
+    // T196 — duas colunas, para o campo de busca caber ao lado dos botões:
+    // os obrigatórios primeiro, a Área logo abaixo do Departamento que a
+    // filtra, os demais opcionais depois.
     expect(linhasDo("Lotação inicial")).toEqual([
-      ["Departamento", "Cargo", "Unidade"],
-      ["Área", "Equipe", "Centro de custo"],
+      ["Departamento", "Cargo"],
+      ["Área", "Unidade"],
+      ["Equipe", "Centro de custo"],
     ]);
 
     // Classes de coluna: 2, 3 e a linha larga/estreita do logradouro.
@@ -754,7 +756,7 @@ describe("Nova admissão — página própria", () => {
       screen.getByLabelText(/^Matrícula/).closest(".nova-admissao__linha"),
     ).toHaveClass("nova-admissao__linha--3");
     expect(departamentoSel().closest(".nova-admissao__linha")).toHaveClass(
-      "nova-admissao__linha--3",
+      "nova-admissao__linha--2",
     );
   });
 
