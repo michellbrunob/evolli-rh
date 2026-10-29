@@ -1427,6 +1427,24 @@ describe("T189 (B1/N1) — referência rápida pendente e conferência antes de 
   const aviso = () =>
     screen.findByRole("alertdialog", { name: "A empresa ativa mudou" });
 
+  /**
+   * T195 — a etapa ATIVA da Nova admissão: os quatro painéis ficam sempre
+   * montados, e só o da etapa atual está sem `hidden`. Confere que exatamente
+   * a Etapa 2 é a visível — nenhuma outra ao mesmo tempo — e que o indicador
+   * das etapas a marca como atual (`aria-current="step"`).
+   */
+  function esperarEtapa2Ativa() {
+    const visiveis = [
+      ...document.querySelectorAll<HTMLElement>("section.nova-admissao__etapa"),
+    ]
+      .filter((painel) => !painel.hasAttribute("hidden"))
+      .map((painel) => painel.querySelector("h2")?.textContent);
+    expect(visiveis).toEqual(["Etapa 2 de 4: Dados profissionais e lotação"]);
+    expect(
+      document.querySelector('.nova-admissao__etapas [aria-current="step"]'),
+    ).toHaveTextContent("Etapa 2: Dados profissionais e lotação, etapa atual");
+  }
+
   it("B1: código digitado + troca em outra aba → aviso; voltar preserva empresa, modal e código", async () => {
     vi.mocked(trocarEmpresaDoContexto).mockResolvedValue(EMPRESA_ALFA);
     await abrirReferenciaRapida();
@@ -1458,13 +1476,7 @@ describe("T189 (B1/N1) — referência rápida pendente e conferência antes de 
     expect(
       (screen.getByLabelText(/Nome completo/) as HTMLInputElement).value,
     ).toBe("Pessoa Sintetica Referencia");
-    expect(
-      screen.getByRole("heading", {
-        level: 2,
-        name: /Dados profissionais e lotação$/,
-        hidden: true,
-      }),
-    ).toBeInTheDocument();
+    esperarEtapa2Ativa();
   });
 
   it("B1: nome digitado → descarte só depois de “continuar”, no contexto atual", async () => {
@@ -1532,6 +1544,7 @@ describe("T189 (B1/N1) — referência rápida pendente e conferência antes de 
       (screen.getByLabelText(/Nome completo/) as HTMLInputElement).value,
     ).toBe("Pessoa Sintetica Referencia");
     expect(seletorDoMenu()).toHaveTextContent("Empresa Alfa");
+    esperarEtapa2Ativa();
   });
 
   it("N1: duas trocas seguidas em outra aba — “continuar” relê e aplica a mais recente", async () => {
