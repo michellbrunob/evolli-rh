@@ -178,10 +178,15 @@ import {
   type ReferenciaCriada,
   type TipoReferenciaRapida,
 } from "./ModalReferenciaRapida";
+import {
+  ModalCriacaoInline,
+  type TipoReferenciaInline,
+} from "./ModalCriacaoInline";
 import { listaComE, useCepAssistido } from "./cepAssistido";
 import {
   type ListarReferencias,
   type ReferenciaEscolhida,
+  rotuloDaReferenciaEscolhida,
   SeletorDeReferencia,
   TAMANHO_DA_PAGINA_DE_REFERENCIAS,
 } from "./SeletorDeReferencia";
@@ -860,8 +865,19 @@ export function NovaAdmissaoScreen({
    * mostrava e consulta de novo na próxima abertura.
    */
   const [versaoDaBusca, setVersaoDaBusca] = useState<
-    Record<TipoReferenciaRapida, number>
-  >({ departamento: 0, cargo: 0, unidade: 0 });
+    Record<TipoReferenciaInline, number>
+  >({ departamento: 0, cargo: 0, unidade: 0, centroCusto: 0 });
+  /** T197 — a criação inline pedida num seletor; `null` sem confirmação. */
+  const [criacaoInline, setCriacaoInline] = useState<{
+    tipo: TipoReferenciaInline;
+    nome: string;
+  } | null>(null);
+  /** T197 — gatilho de uma vez só: devolver o foco ao seletor da criação. */
+  const focarSeletorDaCriacaoRef = useRef<TipoReferenciaInline | null>(null);
+  /** T197 — anúncio da referência criada (ou escolhida), por seletor. */
+  const [avisoDaCriacao, setAvisoDaCriacao] = useState<
+    Partial<Record<TipoReferenciaInline, { id: number; texto: string }>>
+  >({});
   /**
    * T179/T196 — a empresa tem Departamento e Cargo ativos? Sem um deles a
    * admissão não pode seguir (aviso de referências). Sabido por uma consulta
@@ -978,6 +994,15 @@ export function NovaAdmissaoScreen({
     focarSeletorRef.current = null;
     document.getElementById(ID_DO_CAMPO[campo])?.focus();
   }, [referenciaEmCadastro]);
+
+  // T197 — ao fechar a confirmação da criação inline por qualquer caminho, o
+  // foco volta ao campo de busca do seletor (depois da limpeza do `Modal`).
+  useEffect(() => {
+    if (criacaoInline || !focarSeletorDaCriacaoRef.current) return;
+    const campo = focarSeletorDaCriacaoRef.current;
+    focarSeletorDaCriacaoRef.current = null;
+    document.getElementById(ID_DO_CAMPO[campo])?.focus();
+  }, [criacaoInline]);
 
   /**
    * T179 — o que falta para admitir nesta empresa: Departamento e Cargo são
@@ -1192,6 +1217,76 @@ export function NovaAdmissaoScreen({
         <span aria-hidden="true">+</span>
       </Button>
     );
+  }
+
+  // ---- T197 — criação inline a partir da busca ----------------------------
+
+  /**
+   * "Criar «termo»" no seletor: só para o RH, com a empresa resolvida, fora do
+   * carregamento e do envio da admissão. O DP nunca recebe a oferta.
+   */
+  function criacaoDe(
+    tipo: TipoReferenciaInline,
+  ): { onCriar: (nome: string) => void } | undefined {
+    if (papelDoAtor !== "rh" || !empresa || carregandoOpcoes || salvando) {
+      return undefined;
+    }
+    return { onCriar: (nome) => setCriacaoInline({ tipo, nome }) };
+  }
+
+  /** Fecha a confirmação sem tocar na admissão; o foco volta ao seletor. */
+  function fecharCriacaoInline() {
+    focarSeletorDaCriacaoRef.current = criacaoInline?.tipo ?? null;
+    setCriacaoInline(null);
+  }
+
+  /**
+   * A referência criada (ou a já existente, escolhida no lugar) fica escolhida
+   * pelo MESMO caminho da escolha manual — no Departamento, o que limpa e relê
+   * as Áreas. A busca daquele seletor é relida, o anúncio sai uma vez e o foco
+   * volta ao campo. Nada da admissão é perdido.
+   */
+  function escolherDaCriacao(
+    tipo: TipoReferenciaInline,
+    referencia: ReferenciaEscolhida,
+    criada: boolean,
+  ) {
+    const r = {
+      id: referencia.id,
+      codigo: referencia.codigo,
+      nome: referencia.nome,
+    };
+    switch (tipo) {
+      case "departamento":
+        conhecer("departamentos", r);
+        setExistemAtivos((prev) => ({ ...prev, departamento: true }));
+        void selecionarDepartamento(r.id);
+        break;
+      case "cargo":
+        conhecer("cargos", r);
+        setExistemAtivos((prev) => ({ ...prev, cargo: true }));
+        atualizar("cargoId", r.id, "cargo", "lotacao");
+        break;
+      case "unidade":
+        conhecer("unidades", r);
+        atualizar("unidadeId", r.id, "unidade", "lotacao");
+        break;
+      case "centroCusto":
+        conhecer("centrosCusto", r);
+        atualizar("centroCustoId", r.id, "centroCusto", "lotacao");
+        break;
+    }
+    if (tipo !== "centroCusto") versaoDaListaRef.current[tipo] += 1;
+    setVersaoDaBusca((prev) => ({ ...prev, [tipo]: prev[tipo] + 1 }));
+    setAvisoDaCriacao((prev) => ({
+      ...prev,
+      [tipo]: {
+        id: (prev[tipo]?.id ?? 0) + 1,
+        texto: `${criada ? "Criado e escolhido" : "Escolhido"}: ${rotuloDaReferenciaEscolhida(r)}.`,
+      },
+    }));
+    focarSeletorDaCriacaoRef.current = tipo;
+    setCriacaoInline(null);
   }
 
   function validar(): Erros {
@@ -2154,6 +2249,8 @@ export function NovaAdmissaoScreen({
                   desabilitado={carregandoOpcoes}
                   versao={versaoDaBusca.departamento}
                   acao={botaoNovaReferencia("departamento")}
+                  criacao={criacaoDe("departamento")}
+                  aviso={avisoDaCriacao.departamento}
                 />
                 <SeletorDeReferencia
                   id={ID_DO_CAMPO.cargo}
@@ -2173,6 +2270,8 @@ export function NovaAdmissaoScreen({
                   desabilitado={carregandoOpcoes}
                   versao={versaoDaBusca.cargo}
                   acao={botaoNovaReferencia("cargo")}
+                  criacao={criacaoDe("cargo")}
+                  aviso={avisoDaCriacao.cargo}
                 />
               </div>
               <div className="nova-admissao__linha nova-admissao__linha--2">
@@ -2210,6 +2309,8 @@ export function NovaAdmissaoScreen({
                   desabilitado={carregandoOpcoes}
                   versao={versaoDaBusca.unidade}
                   acao={botaoNovaReferencia("unidade")}
+                  criacao={criacaoDe("unidade")}
+                  aviso={avisoDaCriacao.unidade}
                 />
               </div>
               <div className="nova-admissao__linha nova-admissao__linha--2">
@@ -2247,6 +2348,9 @@ export function NovaAdmissaoScreen({
                   }}
                   listar={consultaDe(listarCentrosCusto)}
                   desabilitado={carregandoOpcoes}
+                  versao={versaoDaBusca.centroCusto}
+                  criacao={criacaoDe("centroCusto")}
+                  aviso={avisoDaCriacao.centroCusto}
                 />
               </div>
               {erros.lotacao ? (
@@ -2644,6 +2748,22 @@ export function NovaAdmissaoScreen({
           onFechar={fecharCadastroRapido}
           onCriada={referenciaCriada}
           onRecarregar={recarregarReferencia}
+        />
+      ) : null}
+
+      {/* T197 — confirmação curta da criação inline, pedida no seletor. */}
+      {empresa ? (
+        <ModalCriacaoInline
+          pedido={criacaoInline}
+          empresaId={empresa.id}
+          onFechar={fecharCriacaoInline}
+          onCriada={(tipo, criada) => escolherDaCriacao(tipo, criada, true)}
+          onEscolherExistente={(tipo, existente) =>
+            escolherDaCriacao(tipo, existente, false)
+          }
+          onIncerto={(tipo) =>
+            setVersaoDaBusca((prev) => ({ ...prev, [tipo]: prev[tipo] + 1 }))
+          }
         />
       ) : null}
 
