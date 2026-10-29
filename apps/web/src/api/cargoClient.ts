@@ -35,6 +35,8 @@ export interface ListarCargosQuery {
   pagina?: number;
   tamanhoPagina?: number;
   status?: string;
+  /** T196 — busca por código ou nome, no servidor, antes da paginação. */
+  busca?: string;
 }
 
 export interface CriarCargoDto {
@@ -118,6 +120,7 @@ export async function listarCargos(
   if (query.tamanhoPagina !== undefined)
     params.set("tamanhoPagina", String(query.tamanhoPagina));
   if (query.status) params.set("status", query.status);
+  if (query.busca) params.set("busca", query.busca);
   const qs = params.toString();
   const res = await apiFetch(`/cargos${qs ? `?${qs}` : ""}`);
   return jsonOrThrow(res);

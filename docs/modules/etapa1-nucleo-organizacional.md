@@ -721,6 +721,14 @@ criado nesta fase. Rotas em português, conforme nomenclatura aprovada
 ### Regras de contrato
 
 - **Nenhuma rota `DELETE`** em entidade organizacional (R6).
+- **T196 — busca nas referências da lotação.** `GET` de `/departamentos`,
+  `/cargos`, `/unidades-organizacionais` e `/centros-de-custo` aceita
+  `busca` opcional: parte do código **ou** do nome, sem diferenciar
+  maiúsculas e sem remover acentos, aplicada antes da paginação (o `total`
+  conta só o que casa). Escopo, situação, ordenação por código, RBAC e
+  auditoria não mudam, e o termo não vai para log, auditoria nem mensagem
+  de erro. É a única exceção à listagem sem texto livre; Empresa, Área e
+  Equipe seguem sem busca.
 - **Escopo nunca vem do cliente** — a empresa acessível é sempre derivada
   da sessão autenticada e do escopo autorizado do ator. Aceitá-la do
   corpo/query seria vetor direto de acesso fora de escopo.

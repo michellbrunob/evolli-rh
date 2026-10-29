@@ -1367,4 +1367,264 @@ describe("Núcleo Organizacional Interno (e2e)", () => {
       expect(JSON.stringify(resposta.body)).not.toMatch(/prisma|sql|select/i);
     });
   });
+  // -------------------------------------------------------------------------
+  // T196 — busca por código ou nome nas referências da lotação (Departamento,
+  // Cargo, Unidade e Centro de custo). Empresa própria, com MAIS de 100
+  // referências ativas em cada rota, para provar que a busca alcança o que a
+  // página máxima (100) não alcança; termos e valores sintéticos.
+  // -------------------------------------------------------------------------
+  describe("T196 — busca nas referências da lotação", () => {
+    const REFERENCIAS = [
+      {
+        rota: "/v1/departamentos",
+        modelo: "departamento",
+        recurso: "departamento",
+      },
+      { rota: "/v1/cargos", modelo: "cargo", recurso: "cargo" },
+      {
+        rota: "/v1/unidades-organizacionais",
+        modelo: "unidadeOrganizacional",
+        recurso: "unidade_organizacional",
+      },
+      {
+        rota: "/v1/centros-de-custo",
+        modelo: "centroCusto",
+        recurso: "centro_custo",
+      },
+    ] as const;
+    /** Nome do 115º item, fora do alcance da página máxima. */
+    const NOME_PROFUNDO = "Alvo Profundo Sintetico";
+    const TOTAL_ATIVOS = 120;
+
+    let empresaC: string;
+    let rhC: Credencial;
+    let dpC: Credencial;
+    let financeiroC: Credencial;
+
+    const codigo = (i: number) => `R${String(i).padStart(3, "0")}`;
+
+    type Modelo = (typeof REFERENCIAS)[number]["modelo"];
+    async function semear(prisma: PrismaClient, modelo: Modelo) {
+      const delegado = prisma[modelo] as unknown as {
+        createMany: (args: { data: object[] }) => Promise<unknown>;
+      };
+      await delegado.createMany({
+        data: [
+          ...Array.from({ length: TOTAL_ATIVOS }, (_, k) => ({
+            empresaId: empresaC,
+            codigo: codigo(k + 1),
+            nome:
+              k + 1 === 115 ? NOME_PROFUNDO : `Referencia sintetica ${k + 1}`,
+          })),
+          {
+            empresaId: empresaC,
+            codigo: "INATIVA_ALVO",
+            nome: "Alvo Profundo Inativo",
+            status: "inativo",
+          },
+          // A outra empresa tem uma referência com o MESMO nome.
+          { empresaId: empresaB, codigo: "B_ALVO", nome: NOME_PROFUNDO },
+        ],
+      });
+    }
+
+    async function listar(
+      rota: string,
+      cred: Credencial,
+      query: Record<string, string | number>,
+    ) {
+      const qs = new URLSearchParams(
+        Object.entries(query).map(([k, v]): [string, string] => [k, String(v)]),
+      ).toString();
+      return (await get(`${rota}?${qs}`, cred).expect(200)).body as {
+        itens: {
+          codigo: string;
+          nome: string;
+          empresaId: string;
+          status: string;
+        }[];
+        total: number;
+        pagina: number;
+        tamanhoPagina: number;
+      };
+    }
+
+    beforeAll(async () => {
+      empresaC = (
+        await post("/v1/empresas", master)
+          .send({ codigo: "T196C", nome: "Empresa Busca" })
+          .expect(201)
+      ).body.id as string;
+      rhC = await criarUsuario("rh.c@example.test", "rh", empresaC);
+      dpC = await criarUsuario("dp.c@example.test", "dp", empresaC);
+      financeiroC = await criarUsuario(
+        "fin.c@example.test",
+        "financeiro",
+        empresaC,
+      );
+      const prisma = new PrismaClient({ datasources: { db: { url: appUrl } } });
+      try {
+        for (const { modelo } of REFERENCIAS) await semear(prisma, modelo);
+      } finally {
+        await prisma.$disconnect();
+      }
+    });
+
+    describe.each(REFERENCIAS)("$rota", ({ rota }) => {
+      it("a página máxima (100) não alcança o 115º; a busca pelo nome, sem diferenciar maiúsculas, o encontra", async () => {
+        const pagina = await listar(rota, rhC, {
+          status: "ativo",
+          tamanhoPagina: 100,
+        });
+        expect(pagina.total).toBe(TOTAL_ATIVOS);
+        expect(pagina.itens).toHaveLength(100);
+        expect(pagina.itens.map((i) => i.codigo)).not.toContain(codigo(115));
+
+        const achado = await listar(rota, rhC, {
+          status: "ativo",
+          busca: "alvo PROFUNDO",
+        });
+        expect(achado.total).toBe(1);
+        expect(achado.itens.map((i) => [i.codigo, i.empresaId])).toEqual([
+          [codigo(115), empresaC],
+        ]);
+      });
+
+      it("busca por parte do código, sem diferenciar maiúsculas, na ordem do código", async () => {
+        const r = await listar(rota, rhC, { busca: "r11", tamanhoPagina: 20 });
+        expect(r.total).toBe(10);
+        expect(r.itens.map((i) => i.codigo)).toEqual(
+          Array.from({ length: 10 }, (_, k) => codigo(110 + k)),
+        );
+      });
+
+      it("a busca vem antes da paginação: total filtrado e páginas de 20", async () => {
+        const p1 = await listar(rota, rhC, {
+          status: "ativo",
+          busca: "referencia sintetica",
+          tamanhoPagina: 20,
+        });
+        const p2 = await listar(rota, rhC, {
+          status: "ativo",
+          busca: "referencia sintetica",
+          tamanhoPagina: 20,
+          pagina: 2,
+        });
+        expect(p1.total).toBe(TOTAL_ATIVOS - 1);
+        expect(p2.total).toBe(TOTAL_ATIVOS - 1);
+        expect(p1.itens.map((i) => i.codigo)).toEqual(
+          Array.from({ length: 20 }, (_, k) => codigo(k + 1)),
+        );
+        expect(p2.itens.map((i) => i.codigo)).toEqual(
+          Array.from({ length: 20 }, (_, k) => codigo(k + 21)),
+        );
+      });
+
+      it("situação segue valendo: inativa só aparece sem o filtro de ativos", async () => {
+        expect(
+          (await listar(rota, rhC, { status: "ativo", busca: "alvo profundo" }))
+            .total,
+        ).toBe(1);
+        const todos = await listar(rota, rhC, { busca: "alvo profundo" });
+        expect(todos.itens.map((i) => i.codigo).sort()).toEqual(
+          ["INATIVA_ALVO", codigo(115)].sort(),
+        );
+      });
+
+      it("termo vazio ou só de espaços é o mesmo que nenhum; curingas não ampliam", async () => {
+        const sem = await listar(rota, rhC, {});
+        expect((await listar(rota, rhC, { busca: "" })).total).toBe(sem.total);
+        expect((await listar(rota, rhC, { busca: "   " })).total).toBe(
+          sem.total,
+        );
+        expect((await listar(rota, rhC, { busca: "%" })).total).toBe(0);
+        // "_" vale literalmente: só o código que TEM sublinhado, não todos.
+        const sublinhado = await listar(rota, rhC, { busca: "_" });
+        expect(sublinhado.itens.map((i) => i.codigo)).toEqual(["INATIVA_ALVO"]);
+      });
+
+      it("isolamento: cada empresa só encontra a própria referência, mesmo com o mesmo nome", async () => {
+        const b = await listar(rota, rhB, { busca: "alvo profundo" });
+        expect(b.itens.map((i) => [i.codigo, i.empresaId])).toEqual([
+          ["B_ALVO", empresaB],
+        ]);
+        const c = await listar(rota, rhC, { busca: "b_alvo" });
+        expect(c.total).toBe(0);
+        // Pedir a outra empresa pelo filtro: página vazia, nunca a dela.
+        const outra = await listar(rota, rhC, {
+          empresaId: empresaB,
+          busca: "alvo profundo",
+        });
+        expect(outra).toMatchObject({ itens: [], total: 0 });
+      });
+
+      it("termo longo demais ou com caractere de controle: 400, sem repetir o termo", async () => {
+        const longo = `${"x".repeat(150)}TERMO-RECUSADO`;
+        const r1 = await get(`${rota}?busca=${longo}`, rhC).expect(400);
+        expect(JSON.stringify(r1.body)).not.toContain("TERMO-RECUSADO");
+        const r2 = await get(
+          `${rota}?busca=${encodeURIComponent("ab\u0007CONTROLE")}`,
+          rhC,
+        ).expect(400);
+        expect(JSON.stringify(r2.body)).not.toContain("CONTROLE");
+      });
+
+      it("DP lê e busca na própria empresa; colaborador é negado", async () => {
+        const r = await listar(rota, dpC, {
+          busca: "alvo profundo",
+          status: "ativo",
+        });
+        expect(r.itens.map((i) => i.codigo)).toEqual([codigo(115)]);
+        await get(`${rota}?busca=alvo`, colaboradorA).expect(403);
+      });
+    });
+
+    it("financeiro busca só em Centro de custo; as outras três seguem negadas", async () => {
+      const r = await listar("/v1/centros-de-custo", financeiroC, {
+        busca: "alvo profundo",
+        status: "ativo",
+      });
+      expect(r.itens.map((i) => i.codigo)).toEqual([codigo(115)]);
+      for (const rota of [
+        "/v1/departamentos",
+        "/v1/cargos",
+        "/v1/unidades-organizacionais",
+      ]) {
+        await get(`${rota}?busca=alvo`, financeiroC).expect(403);
+      }
+    });
+
+    it("master global: encontra nas duas empresas, a consulta é auditada como sempre e o termo não vai para a trilha", async () => {
+      const termo = "alvo profundo sintetico";
+      const prisma = new PrismaClient({ datasources: { db: { url: appUrl } } });
+      try {
+        const antes = new Date();
+        for (const { rota, recurso } of REFERENCIAS) {
+          const r = await listar(rota, master, {
+            busca: termo,
+            status: "ativo",
+          });
+          expect(r.itens.map((i) => i.empresaId).sort()).toEqual(
+            [empresaB, empresaC].sort(),
+          );
+          const eventos = await prisma.auditEvent.findMany({
+            where: {
+              action: "organizacao_estrutura_consultada",
+              resource: recurso,
+              createdAt: { gte: antes },
+            },
+          });
+          expect(eventos.length).toBeGreaterThanOrEqual(1);
+        }
+        const trilha = await prisma.auditEvent.findMany({
+          where: { createdAt: { gte: antes } },
+        });
+        expect(JSON.stringify(trilha).toLowerCase()).not.toContain(
+          "alvo profundo",
+        );
+      } finally {
+        await prisma.$disconnect();
+      }
+    });
+  });
 });

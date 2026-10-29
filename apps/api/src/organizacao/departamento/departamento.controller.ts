@@ -23,7 +23,7 @@ import { DepartamentoService } from "./departamento.service";
 import {
   AtualizarNoOrganizacionalDto,
   CriarDepartamentoDto,
-  ListarPorEmpresaQueryDto,
+  ListarReferenciasQueryDto,
 } from "../dto/organizacao.dto";
 
 /** Sem rota `DELETE` (spec R6). Ver `EmpresaController` para o padrão. */
@@ -38,7 +38,7 @@ export class DepartamentoController {
   @RequirePermission("departamento", "read")
   @ApiOperation({ summary: "Lista departamentos do escopo do ator" })
   async listar(
-    @Query() query: ListarPorEmpresaQueryDto,
+    @Query() query: ListarReferenciasQueryDto,
     @CurrentUser() actor: AccessUser,
     @Req() req: Request,
   ) {

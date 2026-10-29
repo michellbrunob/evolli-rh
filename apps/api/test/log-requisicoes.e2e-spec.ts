@@ -446,6 +446,38 @@ describe("Log geral de requisições sem valores (T178, e2e)", () => {
     });
   });
 
+  describe("T196 — busca nas referências da lotação", () => {
+    it("Departamento, Cargo, Unidade e Centro de custo: encontrados pela busca, e o termo fica fora do log", async () => {
+      const empresaId = (await get("/v1/empresas", rh).expect(200)).body
+        .itens[0].id as string;
+      for (const [rota, codigo] of [
+        ["/v1/departamentos", "LOGBUSCA_DEP"],
+        ["/v1/cargos", "LOGBUSCA_CAR"],
+        ["/v1/unidades-organizacionais", "LOGBUSCA_UNI"],
+        ["/v1/centros-de-custo", "LOGBUSCA_CC"],
+      ] as const) {
+        await post(rota, rh)
+          .send({ empresaId, codigo, nome: "Referencia Rastreavel Log" })
+          .expect(201);
+        const r = await get(
+          `${rota}?busca=${encodeURIComponent("rastreavel log")}&status=ativo`,
+          rh,
+        ).expect(200);
+        expect(r.body.itens.map((i: { codigo: string }) => i.codigo)).toEqual([
+          codigo,
+        ]);
+        expect(conclusao(r.headers[REQUEST_ID_HEADER] as string)).toMatchObject(
+          {
+            req: { method: "GET" },
+            res: { statusCode: 200 },
+            rota,
+          },
+        );
+      }
+      ausenteDoLog("rastreavel log", "rastreavel+log", "busca=");
+    });
+  });
+
   it("caminho inexistente: só o padrão genérico do Nest, e nada do caminho pedido", async () => {
     const r = await get(
       "/v1/caminho-inexistente/87654321?busca=Valor%20Secreto",

@@ -26,8 +26,9 @@ import {
 import {
   AtualizarNoOrganizacionalDto,
   CriarCentroCustoDto,
-  ListarPorEmpresaQueryDto,
+  ListarReferenciasQueryDto,
 } from "../dto/organizacao.dto";
+import { filtroDeBuscaPorCodigoOuNome } from "../busca-referencias.util";
 
 /**
  * CentroCusto — cadastrado **por empresa**, sem associação a unidade,
@@ -88,7 +89,7 @@ export class CentroCustoService {
   }
 
   async listar(
-    query: ListarPorEmpresaQueryDto,
+    query: ListarReferenciasQueryDto,
     ctx: OrganizacaoAuditContext,
   ): Promise<ResultadoPaginado<CentroCusto>> {
     const escopo = resolverEscopo(ctx.actor);
@@ -106,6 +107,8 @@ export class CentroCustoService {
     const where: Prisma.CentroCustoWhereInput = {
       ...filtro,
       ...(query.status ? { status: query.status } : {}),
+      // T196 — busca por código ou nome, antes da paginação.
+      ...filtroDeBuscaPorCodigoOuNome(query.busca),
     };
 
     const [itens, total] = await Promise.all([

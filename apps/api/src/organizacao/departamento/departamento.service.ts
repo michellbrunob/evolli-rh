@@ -26,8 +26,9 @@ import {
 import {
   AtualizarNoOrganizacionalDto,
   CriarDepartamentoDto,
-  ListarPorEmpresaQueryDto,
+  ListarReferenciasQueryDto,
 } from "../dto/organizacao.dto";
+import { filtroDeBuscaPorCodigoOuNome } from "../busca-referencias.util";
 
 /**
  * Departamento — nível organizacional principal, pertencente à **empresa** e
@@ -89,7 +90,7 @@ export class DepartamentoService {
   }
 
   async listar(
-    query: ListarPorEmpresaQueryDto,
+    query: ListarReferenciasQueryDto,
     ctx: OrganizacaoAuditContext,
   ): Promise<ResultadoPaginado<Departamento>> {
     const escopo = resolverEscopo(ctx.actor);
@@ -107,6 +108,8 @@ export class DepartamentoService {
     const where: Prisma.DepartamentoWhereInput = {
       ...filtro,
       ...(query.status ? { status: query.status } : {}),
+      // T196 — busca por código ou nome, antes da paginação.
+      ...filtroDeBuscaPorCodigoOuNome(query.busca),
     };
 
     const [itens, total] = await Promise.all([

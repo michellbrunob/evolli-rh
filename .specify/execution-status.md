@@ -2640,11 +2640,18 @@ no dossiê.
 
 **Fora de escopo:** fluxo de cadastro em quatro etapas; documentos e Cloudflare R2; importação CSV/XLSX; admissão digital; Área; busca de referências; criação inline; Aprendiz; promoção e merge.
 
-## Cadastro individual em quatro etapas — T195 (em implementação)
+## Cadastro individual em quatro etapas — T195 (integrada)
 
-| Tarefa | Estado               | Resultado principal                                                                                                            |
-| ------ | -------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| T195   | **Em implementação** | Nova admissão como fluxo guiado em quatro etapas: dados básicos, dados profissionais e lotação, endereço, revisão e conclusão. |
+| Tarefa | Estado                                    | Resultado principal                                                                                                            |
+| ------ | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| T195   | **Integrada** (PR #188, squash `e473d47`) | Nova admissão como fluxo guiado em quatro etapas: dados básicos, dados profissionais e lotação, endereço, revisão e conclusão. |
+
+**Observação de relatório:** a integração funcional da T195 está concluída
+(CI de push 3/3 verde, run 40859789278); a única pendência administrativa era
+a sua convergência no Spec Kit, resolvida no primeiro commit da T196. As
+correções acionáveis da revisão (N1, N3 e A1) foram feitas dentro da
+entrega; N2 e N4 ficaram como decisão e limitação justificadas no dossiê
+(seção 16.4).
 
 **Escopo da T195:** a página de Nova admissão vira um fluxo guiado em quatro
 etapas (fatia 2 do [dossiê](../docs/decisions/t194-dossie-entrada-de-colaboradores.md)), com os campos, regras e contratos já
@@ -2669,6 +2676,29 @@ nem persistência nova: recarregar começa do zero, na etapa 1, como antes.
 (E2E de navegador) têm decisão e motivo registrados na seção 16.4 do dossiê.
 
 **Fora de escopo:** documentos e Cloudflare R2, importação, admissão digital, criação inline, busca de referências, criação ou retirada de Área, Aprendiz, salário, escala, gestor direto, conselho profissional, dependentes e pensão; promoção e merge.
+
+## Busca nas referências organizacionais — T196 (em implementação)
+
+| Tarefa | Estado               | Resultado principal                                                                                                      |
+| ------ | -------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| T196   | **Em implementação** | Busca no servidor e seletor pesquisável para Departamento, Cargo, Unidade e Centro de custo na etapa 2 da Nova admissão. |
+
+**Escopo da T196:** a preparação de decisão veio primeiro (o
+[dossiê](../docs/decisions/t196-dossie-busca-referencias.md)); depois, a
+implementação aprovada: `busca` opcional por código ou nome nas rotas de
+Departamento, Cargo, Unidade e Centro de custo, antes da paginação, e o
+seletor pesquisável acessível na etapa 2 da Nova admissão. Sem schema,
+migration, índice, extensão de banco, RBAC, seed ou dependência.
+
+**Diretriz (proprietária, 2026-10-29):** uma funcionalidade completa por entrega, com as correções pequenas e acionáveis resolvidas antes de Ready for review (regras 7 e 8).
+
+**Decisões aprovadas (2026-10-29):** D8 — busca aditiva no servidor, por
+código ou nome, sem diferenciar maiúsculas, antes da paginação, de 20 em 20;
+Centro de custo entra na busca. Regra desta entrega: busca **sem remoção de
+acentos**. Criação inline, código automático e confirmação curta (D9) ficam
+para a fatia seguinte. Entrega e limites na seção 11 do dossiê.
+
+**Fora de escopo:** criação inline, Área, Equipe, o teto de 100 fora da admissão, schema, migration, RBAC, seed, Docker, dependências, promoção e merge.
 
 ## Próxima ação autorizável
 

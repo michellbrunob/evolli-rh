@@ -1,4 +1,4 @@
-import { Type } from "class-transformer";
+import { Transform, Type } from "class-transformer";
 import {
   IsIn,
   IsInt,
@@ -17,6 +17,7 @@ import {
   TAMANHO_PAGINA_MAXIMO,
   TAMANHO_PAGINA_PADRAO,
 } from "../organizacao.types";
+import { LIMITE_BUSCA, normalizarBusca } from "../../pessoas/dto/pessoas.dto";
 
 /**
  * Código estável e imutável de um nó organizacional (spec R1). Restrito a
@@ -97,8 +98,9 @@ export class CriarCentroCustoDto extends CodigoNomeDto {
 }
 
 /**
- * Filtros de listagem. Apenas o necessário e autorizado (spec §10): sem texto
- * livre, sem ordenação vinda do cliente. A ordenação é fixa por `codigo` no
+ * Filtros de listagem. Apenas o necessário e autorizado (spec §10): sem
+ * ordenação vinda do cliente e, fora das referências da lotação (T196,
+ * `ListarReferenciasQueryDto`), sem texto livre. A ordenação é fixa por `codigo` no
  * service, e o escopo de empresa é sempre interseccionado com o da sessão —
  * `empresaId` aqui é filtro, nunca concessão de escopo.
  */
@@ -125,6 +127,23 @@ export class ListarPorEmpresaQueryDto extends ListarNosOrganizacionaisQueryDto {
   @IsOptional()
   @IsUUID()
   empresaId?: string;
+}
+
+/**
+ * T196 — listagem das referências usadas na lotação (Departamento, Cargo,
+ * Unidade e Centro de custo), com busca opcional por **código ou nome**. Mesma
+ * normalização da T178/T182: aparada, espaços colapsados, vazia vale como
+ * ausente; até 160 caracteres e sem caractere de controle. A mensagem de erro
+ * de validação diz só a regra, nunca o termo.
+ */
+export class ListarReferenciasQueryDto extends ListarPorEmpresaQueryDto {
+  @Transform(({ value }) => normalizarBusca(value))
+  @IsOptional()
+  @IsString()
+  @MaxLength(LIMITE_BUSCA)
+  // eslint-disable-next-line no-control-regex
+  @Matches(/^[^\u0000-\u001F\u007F]*$/)
+  busca?: string;
 }
 
 export class ListarAreasQueryDto extends ListarNosOrganizacionaisQueryDto {

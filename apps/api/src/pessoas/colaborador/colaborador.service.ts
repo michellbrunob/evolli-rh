@@ -62,6 +62,7 @@ import {
   camposPreenchidos,
   contatosInformados,
 } from "../contatos/contato-colaborador.service";
+import { escaparCuringas } from "../../common/busca.util";
 
 /**
  * Resposta da admissão (T167).
@@ -212,13 +213,10 @@ export interface ListagemColaboradores extends ResultadoPaginado<ColaboradorList
   contadores: ContadoresColaboradores;
 }
 
-/**
- * O `contains` do Prisma vira `LIKE '%termo%'` sem escapar os curingas: uma
- * busca por "%" ou "_" casaria com todo mundo. Escapados, valem literalmente.
- */
-export function escaparCuringas(termo: string): string {
-  return termo.replace(/[\\%_]/g, (c) => `\\${c}`);
-}
+// T196 — o escape dos curingas passou ao utilitário comum (`common/busca.util`),
+// usado também pelas referências organizacionais; reexportado aqui para quem
+// já importava daqui.
+export { escaparCuringas };
 
 const ORDEM_SITUACAO_VINCULO: Record<SituacaoVinculo, number> = {
   ativo: 0,

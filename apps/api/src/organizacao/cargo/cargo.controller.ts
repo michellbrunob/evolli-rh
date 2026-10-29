@@ -23,7 +23,7 @@ import { CargoService } from "./cargo.service";
 import {
   AtualizarNoOrganizacionalDto,
   CriarCargoDto,
-  ListarPorEmpresaQueryDto,
+  ListarReferenciasQueryDto,
 } from "../dto/organizacao.dto";
 
 /** Sem rota `DELETE` (spec R6). Ver `EmpresaController` para o padrão. */
@@ -38,7 +38,7 @@ export class CargoController {
   @RequirePermission("cargo", "read")
   @ApiOperation({ summary: "Lista cargos do escopo do ator" })
   async listar(
-    @Query() query: ListarPorEmpresaQueryDto,
+    @Query() query: ListarReferenciasQueryDto,
     @CurrentUser() actor: AccessUser,
     @Req() req: Request,
   ) {

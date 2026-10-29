@@ -26,8 +26,9 @@ import {
 import {
   AtualizarNoOrganizacionalDto,
   CriarCargoDto,
-  ListarPorEmpresaQueryDto,
+  ListarReferenciasQueryDto,
 } from "../dto/organizacao.dto";
+import { filtroDeBuscaPorCodigoOuNome } from "../busca-referencias.util";
 
 /**
  * Cargo — catálogo **por empresa** (Baseline V1, item 5). O mesmo `codigo`
@@ -87,7 +88,7 @@ export class CargoService {
   }
 
   async listar(
-    query: ListarPorEmpresaQueryDto,
+    query: ListarReferenciasQueryDto,
     ctx: OrganizacaoAuditContext,
   ): Promise<ResultadoPaginado<Cargo>> {
     const escopo = resolverEscopo(ctx.actor);
@@ -105,6 +106,8 @@ export class CargoService {
     const where: Prisma.CargoWhereInput = {
       ...filtro,
       ...(query.status ? { status: query.status } : {}),
+      // T196 — busca por código ou nome, antes da paginação.
+      ...filtroDeBuscaPorCodigoOuNome(query.busca),
     };
 
     const [itens, total] = await Promise.all([
