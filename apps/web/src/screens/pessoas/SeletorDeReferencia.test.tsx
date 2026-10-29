@@ -107,7 +107,7 @@ describe("T196 — SeletorDeReferencia: abrir e ler", () => {
     expect(listar).toHaveBeenCalledWith({ pagina: 1 });
     expect(campo()).toHaveAttribute("aria-expanded", "true");
     expect(opcoes()[0]).toBe("R001 — Referencia 001");
-    expect(status()).toHaveTextContent("45 resultados; 20 exibidos.");
+    expect(status().textContent).toBe("45 resultados; 20 exibidos.");
   });
 
   it("o botão 'Mostrar opções' também abre, e o foco fica no campo", async () => {
@@ -130,10 +130,11 @@ describe("T196 — SeletorDeReferencia: abrir e ler", () => {
     fireEvent.click(mais);
     await waitFor(() => expect(opcoes()).toHaveLength(40));
     expect(listar).toHaveBeenLastCalledWith({ pagina: 2 });
-    expect(status()).toHaveTextContent("45 resultados; 40 exibidos.");
+    expect(status().textContent).toBe("45 resultados; 40 exibidos.");
     expect(screen.getByRole("button", { name: "Mostrar mais" })).toHaveFocus();
     fireEvent.click(screen.getByRole("button", { name: "Mostrar mais" }));
     await waitFor(() => expect(opcoes()).toHaveLength(45));
+    expect(status().textContent).toBe("45 resultados; 45 exibidos.");
     expect(screen.queryByRole("button", { name: "Mostrar mais" })).toBeNull();
     await waitFor(() => expect(campo()).toHaveFocus());
   });

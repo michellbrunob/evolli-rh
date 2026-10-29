@@ -1424,6 +1424,17 @@ describe("Nova admissão — página própria", () => {
   // T196 — o servidor informa um total maior do que tem: a página que ele
   // devolve vazia encerra (as opções já carregadas ficam), sem pedir as
   // páginas que o total sugeria.
+  // T196 — o servidor informa um total maior e a última página vem
+  // incompleta (não vazia): a paginação termina pela conta normal e a
+  // contagem final é o que foi carregado, não o total informado.
+  it("paginação: ao terminar, a contagem é o que foi carregado, mesmo com total informado maior", async () => {
+    await paginarAteOFim({
+      lista: faixa(1, 25, cargoAtivo),
+      total: 30,
+      contagens: ["30 resultados; 20 exibidos.", "25 resultados; 25 exibidos."],
+    });
+  });
+
   it("paginação: página vazia do servidor encerra, mesmo com total informado maior", async () => {
     await paginarAteOFim({
       lista: faixa(1, 25, cargoAtivo),

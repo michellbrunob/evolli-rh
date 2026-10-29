@@ -141,11 +141,13 @@ function haMaisPaginas(e: Pronto): boolean {
 }
 
 /**
- * Contagem exibida: o total do servidor menos o que já foi descartado. Com
- * o servidor esgotado, é exatamente o que foi carregado.
+ * Contagem exibida. Enquanto há páginas a carregar: o total do servidor menos
+ * o que já foi descartado. Encerrada a paginação (última página pelo total ou
+ * página vazia): exatamente as opções carregadas, mesmo que o total informado
+ * fosse maior. Não entra na decisão de próxima página.
  */
 function totalExibido(e: Pronto): number {
-  if (e.esgotado) return e.itens.length;
+  if (!haMaisPaginas(e)) return e.itens.length;
   return Math.max(e.itens.length, e.totalDoServidor - e.descartados);
 }
 
