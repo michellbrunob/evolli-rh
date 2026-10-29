@@ -241,6 +241,8 @@ export function ModalCriacaoInline({
    * diálogo continuar montado (troca de empresa remonta a página, T189).
    */
   const pedidoRef = useRef(0);
+  /** A mensagem da recusa: alvo do foco quando a ação principal some. */
+  const mensagemRef = useRef<HTMLParagraphElement | null>(null);
 
   // O diálogo aberto é edição pendente (a troca de empresa avisa antes); o
   // envio em andamento, salvamento.
@@ -261,6 +263,16 @@ export function ModalCriacaoInline({
     },
     [],
   );
+
+  // Recusa definitiva (sem nova tentativa nem referência para escolher): a
+  // ação principal, que tinha o foco, sai da tela. O foco vai à mensagem,
+  // DEPOIS de o DOM refletir a recusa, para não cair fora do diálogo; é o
+  // foco que a lê, uma vez (por isso ela não é `alert` nesse caso).
+  useEffect(() => {
+    if (recusa && !recusa.podeRepetir && !recusa.existente) {
+      mensagemRef.current?.focus();
+    }
+  }, [recusa]);
 
   function fechar() {
     if (enviandoRef.current) return;
@@ -294,6 +306,8 @@ export function ModalCriacaoInline({
   const tipo = pedido ? TIPOS[pedido.tipo] : null;
   const existente = recusa?.existente;
   const mostrarCriar = !recusa || recusa.podeRepetir;
+  /** Recusa que tira a ação principal: a mensagem recebe o foco. */
+  const definitiva = recusa !== null && !recusa.podeRepetir && !existente;
 
   return (
     <Modal
@@ -316,8 +330,11 @@ export function ModalCriacaoInline({
           >
             Cancelar
           </Button>
+          {/* A mesma `key` nas duas: no `nome_em_uso`, o botão em foco vira
+              "Escolher …" sem sair da tela, e o foco fica nele. */}
           {existente && pedido ? (
             <Button
+              key="acao-principal"
               type="button"
               variant="primary"
               onClick={() => onEscolherExistente(pedido.tipo, existente)}
@@ -328,6 +345,7 @@ export function ModalCriacaoInline({
             // `aria-disabled`, e não `disabled`: o botão em foco não perde o
             // foco durante o envio; a trava é `enviandoRef`.
             <Button
+              key="acao-principal"
               type="button"
               variant="primary"
               aria-disabled={enviando}
@@ -345,7 +363,13 @@ export function ModalCriacaoInline({
         </p>
       ) : null}
       {recusa ? (
-        <p className="nova-admissao__erro-geral" role="alert">
+        <p
+          ref={mensagemRef}
+          className="nova-admissao__erro-geral"
+          // Com a ação principal ainda na tela, o foco fica nela e a recusa é
+          // anunciada pelo `alert`; na definitiva, quem a lê é o foco.
+          {...(definitiva ? { tabIndex: -1 } : { role: "alert" })}
+        >
           {recusa.mensagem}
           {existente ? (
             <>

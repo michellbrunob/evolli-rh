@@ -390,6 +390,10 @@ tipo **e nome normalizado** (seção 12).
   409 `codigo_indisponivel`; gravação e auditoria.
 - Código: ASCII em maiúsculas, sem acento, `_` no lugar de espaço e símbolo,
   até 32; nome sem 2 caracteres úteis usa `DEP`, `CAR`, `UNI` ou `CC`.
+- Testes unitários isolam a trava: ela é pedida antes de tudo, com a mesma
+  chave para variações equivalentes do nome e chaves distintas por empresa,
+  tipo e nome, e sem ela o caminho automático não segue. O E2E concorrente
+  prova o resultado final (um registro).
 - Dois nomes diferentes que geram o mesmo código ao mesmo tempo: a
   unicidade do banco recusa o segundo e a transação inteira roda de novo
   (até 5 vezes), já vendo o código ocupado.
@@ -422,6 +426,11 @@ tipo **e nome normalizado** (seção 12).
   que nada foi criado e permitem confirmar de novo; rede e 5xx não afirmam
   criação, releem a busca e permitem confirmar de novo (um nome já gravado
   volta como `nome_em_uso`).
+- Foco nas recusas: quando a recusa tira a ação principal (`nome_inativo`,
+  `codigo_indisponivel`, 400, 403, 404), o foco vai à mensagem, dentro do
+  diálogo (focável por script), e é o foco que a lê, uma vez; nas demais, a
+  ação continua na tela e com o foco ("Escolher …" no `nome_em_uso`, "Criar e
+  escolher" nas que permitem repetir) e a recusa é anunciada como alerta.
 - A confirmação aberta é edição pendente e o envio, salvamento (T189); a
   troca de empresa remonta a página e descarta respostas atrasadas.
 - O "+" da T180 segue para Departamento, Cargo e Unidade; Centro de custo

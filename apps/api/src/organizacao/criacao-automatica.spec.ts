@@ -89,6 +89,8 @@ function cenario({
   mesmoNome = [] as Gravada[],
   codigosUsados = [] as string[],
   falhasDeUnicidade = 0,
+  tipo = "cargo",
+  empresaId = EMPRESA,
 } = {}) {
   const tx = { $executeRaw: jest.fn().mockResolvedValue(1) };
   const prisma = {
@@ -115,9 +117,9 @@ function cenario({
   const executar = (nome: string) =>
     criarComCodigoAutomatico<Gravada>({
       prisma: prisma as unknown as PrismaService,
-      tipo: "cargo",
+      tipo,
       prefixo: "CAR",
-      empresaId: EMPRESA,
+      empresaId,
       nome,
       porNome,
       codigosUsados: usados,
@@ -230,6 +232,64 @@ describe("T197 — criarComCodigoAutomatico", () => {
     );
     await expect(c.executar("   ")).rejects.toBeInstanceOf(BadRequestException);
     expect(c.prisma.$transaction).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * T197 (revisão) — a trava consultiva por si só. O E2E concorrente prova o
+ * resultado final (um registro), mas ali a unicidade do código também
+ * convergiria; aqui se prova que a TRAVA é pedida, antes de tudo, com a chave
+ * certa, e que sem ela o caminho automático não segue.
+ */
+describe("T197 — trava consultiva do caminho automático", () => {
+  /** A chave passada à trava (o valor do template de `$executeRaw`). */
+  const chaveDa = (c: ReturnType<typeof cenario>) =>
+    c.tx.$executeRaw.mock.calls[0]?.[1] as string | undefined;
+
+  it("é pedida uma vez, antes da procura do nome, da escolha do código e da gravação", async () => {
+    const c = cenario();
+    await c.executar("Analista Fiscal");
+    expect(c.tx.$executeRaw).toHaveBeenCalledTimes(1);
+    const [sql] = c.tx.$executeRaw.mock.calls[0]!;
+    expect((sql as readonly string[]).join("?")).toContain(
+      "pg_advisory_xact_lock",
+    );
+    const ordemDaTrava = c.tx.$executeRaw.mock.invocationCallOrder[0]!;
+    expect(ordemDaTrava).toBeLessThan(c.porNome.mock.invocationCallOrder[0]!);
+    expect(ordemDaTrava).toBeLessThan(c.usados.mock.invocationCallOrder[0]!);
+    expect(ordemDaTrava).toBeLessThan(c.criar.mock.invocationCallOrder[0]!);
+  });
+
+  it("variações equivalentes do nome (maiúsculas e espaços) usam a mesma chave", async () => {
+    const a = cenario();
+    const b = cenario();
+    await a.executar("  Analista   Fiscal ");
+    await b.executar("ANALISTA fiscal");
+    expect(chaveDa(a)).toBeDefined();
+    expect(chaveDa(a)).toBe(chaveDa(b));
+  });
+
+  it("empresa, tipo ou nome diferentes não compartilham a chave", async () => {
+    const base = cenario();
+    const outraEmpresa = cenario({ empresaId: "empresa-b" });
+    const outroTipo = cenario({ tipo: "departamento" });
+    const outroNome = cenario();
+    await base.executar("Analista Fiscal");
+    await outraEmpresa.executar("Analista Fiscal");
+    await outroTipo.executar("Analista Fiscal");
+    await outroNome.executar("Analista Fiscal Senior");
+    const chaves = [base, outraEmpresa, outroTipo, outroNome].map(chaveDa);
+    expect(new Set(chaves).size).toBe(4);
+  });
+
+  it("é obrigatória: se a trava falhar, nada é procurado, escolhido nem gravado", async () => {
+    const c = cenario();
+    c.tx.$executeRaw.mockRejectedValueOnce(new Error("trava indisponivel"));
+    await expect(c.executar("Analista Fiscal")).rejects.toThrow();
+    expect(c.porNome).not.toHaveBeenCalled();
+    expect(c.usados).not.toHaveBeenCalled();
+    expect(c.criar).not.toHaveBeenCalled();
+    expect(c.auditar).not.toHaveBeenCalled();
   });
 });
 

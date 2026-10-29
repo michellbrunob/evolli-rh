@@ -5002,12 +5002,14 @@ describe("T197 — criação inline de referências na Nova admissão", () => {
     fireEvent.click(opcaoCriar(cargoSel())!);
     return screen.findByRole("dialog", { name: "Criar cargo" });
   }
-  const confirmar = (dialogo: HTMLElement) =>
-    fireEvent.click(
-      within(dialogo).getByRole("button", {
-        name: /^Criar e escolher|^Criando/,
-      }),
-    );
+  /** Ativa "Criar e escolher" como no navegador: o botão recebe o foco. */
+  const confirmar = (dialogo: HTMLElement) => {
+    const botao = within(dialogo).getByRole("button", {
+      name: /^Criar e escolher|^Criando/,
+    });
+    botao.focus();
+    fireEvent.click(botao);
+  };
 
   it("nome já em uso (ativo): oferece escolher a existente, sem criar outra", async () => {
     vi.mocked(criarCargo).mockRejectedValue(
@@ -5029,11 +5031,12 @@ describe("T197 — criação inline de referências na Nova admissão", () => {
     expect(
       within(dialogo).queryByRole("button", { name: "Criar e escolher" }),
     ).toBeNull();
-    fireEvent.click(
-      within(dialogo).getByRole("button", {
-        name: "Escolher CAR_EXISTENTE — Nova Referência Sintética",
-      }),
-    );
+    // A ação em foco virou "Escolher …" sem sair da tela: o foco fica nela.
+    const escolher = within(dialogo).getByRole("button", {
+      name: "Escolher CAR_EXISTENTE — Nova Referência Sintética",
+    });
+    expect(escolher).toHaveFocus();
+    fireEvent.click(escolher);
     await waitFor(() => expect(dialogoCriacao()).toBeNull());
     expect(escolhaDe(cargoSel())).toHaveTextContent(
       "Escolha atual: CAR_EXISTENTE — Nova Referência Sintética",
@@ -5076,12 +5079,20 @@ describe("T197 — criação inline de referências na Nova admissão", () => {
       vi.mocked(criarCargo).mockRejectedValue(erro);
       const dialogo = await abrirConfirmacaoDeCargo();
       confirmar(dialogo);
-      expect(await within(dialogo).findByRole("alert")).toHaveTextContent(
-        mensagem,
+      // A ação principal, que tinha o foco, sai; o foco vai à mensagem, dentro
+      // do diálogo, e não ao corpo da página.
+      await waitFor(() =>
+        expect(document.activeElement).toHaveTextContent(mensagem),
       );
+      const foco = document.activeElement as HTMLElement;
+      expect(dialogo).toContainElement(foco);
+      expect(foco.tagName).toBe("P");
+      expect(foco).toHaveAttribute("tabindex", "-1");
       expect(
         within(dialogo).queryByRole("button", { name: "Criar e escolher" }),
       ).toBeNull();
+      // Lida uma vez, pelo foco: sem `alert` repetindo a mesma mensagem.
+      expect(within(dialogo).queryByRole("alert")).toBeNull();
       expect(escolhaDe(cargoSel())).toHaveTextContent("Nenhuma escolha.");
     },
   );
@@ -5100,9 +5111,11 @@ describe("T197 — criação inline de referências na Nova admissão", () => {
       name: "Criar centro de custo",
     });
     confirmar(dialogo);
-    const alerta = await within(dialogo).findByRole("alert");
-    expect(alerta).toHaveTextContent("Use outro nome.");
-    expect(alerta).not.toHaveTextContent("+");
+    await waitFor(() =>
+      expect(document.activeElement).toHaveTextContent("Use outro nome."),
+    );
+    expect(dialogo).toContainElement(document.activeElement as HTMLElement);
+    expect(document.activeElement).not.toHaveTextContent("+");
   });
 
   it.each([
@@ -5131,6 +5144,10 @@ describe("T197 — criação inline de referências na Nova admissão", () => {
       expect(await within(dialogo).findByRole("alert")).toHaveTextContent(
         mensagem,
       );
+      // Pode repetir: o foco continua na ação de confirmar.
+      expect(
+        within(dialogo).getByRole("button", { name: "Criar e escolher" }),
+      ).toHaveFocus();
       expect(escolhaDe(cargoSel())).toHaveTextContent("Nenhuma escolha.");
       confirmar(dialogo);
       await waitFor(() => expect(dialogoCriacao()).toBeNull());
@@ -5165,6 +5182,9 @@ describe("T197 — criação inline de referências na Nova admissão", () => {
         "Não foi possível confirmar se o cargo foi criado.",
       );
       expect(alerta).not.toHaveTextContent(/criado e escolhido/i);
+      expect(
+        within(dialogo).getByRole("button", { name: "Criar e escolher" }),
+      ).toHaveFocus();
       expect(escolhaDe(cargoSel())).toHaveTextContent("Nenhuma escolha.");
       confirmar(dialogo);
       fireEvent.click(
