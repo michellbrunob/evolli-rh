@@ -34,7 +34,13 @@ Recomendação (sujeita a **D8**):
 3. **Entrega seguinte:** criação inline pelo RH ("Criar «termo»"), que
    depende de **D9** (código automático e confirmação) — só proposta aqui.
 
-## 2. Estado atual (levantamento no código)
+## 2. Antes da T196 (levantamento no código)
+
+Esta seção registra o código **antes** da T196, como base da decisão. O que
+mudou está na seção 11: na etapa 2 da Nova admissão, Departamento, Cargo,
+Unidade e Centro de custo **não usam mais a carga fixa de 100 itens** — são
+buscados no servidor, de 20 em 20. A carga até 100 continua em Área e
+Equipe e nas telas fora da Nova admissão.
 
 ### 2.1 Contratos de listagem
 
@@ -107,7 +113,7 @@ Recomendação (sujeita a **D8**):
   `apps/api/src/pessoas/validacao-pessoas.util.ts:118`) e responde 422 se não
   for. A busca não muda essa autoridade.
 
-### 2.6 Como a etapa 2 carrega e valida hoje
+### 2.6 Como a etapa 2 carregava e validava antes da T196
 
 - `NovaAdmissaoScreen.tsx:922-948`: um `Promise.all` lê empresas,
   Departamentos, Unidades, Equipes, Cargos e Centros de custo **ativos**, cada
@@ -123,8 +129,8 @@ Recomendação (sujeita a **D8**):
   rápido por decisão da T180.
 - O mesmo teto de 100 aparece fora da admissão: `ColaboradoresScreen.tsx:526-527`
   (filtros da T190), `DadosContratuaisScreen.tsx:183-188` e
-  `HistoricoFuncionalScreen.tsx:307-312`. **Fora do escopo desta preparação**;
-  a busca no servidor, se aprovada, serve depois a essas telas.
+  `HistoricoFuncionalScreen.tsx:307-312`. Fora do escopo da T196: essas telas
+  continuam com o teto de 100.
 
 ### 2.7 Compatibilidade
 
@@ -335,6 +341,9 @@ documentada para a entrega seguinte, sem produto agora.
 - A lotação passou a duas colunas — Departamento e Cargo; Área (logo abaixo
   do Departamento) e Unidade; Equipe e Centro de custo — para o campo de
   busca caber ao lado dos botões de 44 px.
+- Defesa do cliente mantida (`soAtivos`, a mesma de antes da T196): a
+  consulta pede só ativos ao servidor e, se ele devolver uma referência
+  inativa, ela não vira opção (e sai do total da página).
 - A carga inicial não lê mais as quatro listas (o teto de 100): só confere,
   com um item, se a empresa tem Departamento e Cargo ativos (o aviso de
   referências da T179). O "+" do RH (T180) continua para Departamento, Cargo
