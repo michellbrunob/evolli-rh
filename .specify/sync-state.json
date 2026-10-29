@@ -12,14 +12,14 @@
   },
   "nextTask": {
     "id": "T198",
-    "status": "ficha_unificada_colaborador_em_preparacao",
-    "reason": "T197 integrada em main pela PR #190 (squash 0ca4df56bd3f15eae9a47dc4de689a0a44ecbcd7), com a CI de push 3/3 verde (run 40945643467). A T198 e so preparacao de decisao da primeira fatia da ficha unificada do Colaborador (docs/decisions/t198-dossie-ficha-unificada-colaborador.md): inventario da ficha atual, listagem, Dados contratuais, Vida funcional, Horario e jornadas; contratos e permissoes existentes; matriz por perfil; estados; acessibilidade; primeira fatia recomendada e roadmap das abas futuras. Pendentes: D17 a D24 do dossie. Sem produto, API, schema, migration, permissoes, banco, Docker, seed, dependencia, UI, push ou PR."
+    "status": "ficha_unificada_colaborador_em_implementacao",
+    "reason": "T197 integrada em main pela PR #190 (squash 0ca4df56bd3f15eae9a47dc4de689a0a44ecbcd7), com a CI de push 3/3 verde (run 40945643467). A T198 implementa a ficha unificada do Colaborador aprovada (D17 a D24, docs/decisions/t198-dossie-ficha-unificada-colaborador.md, secao 13): pagina propria com rota #/pessoas/colaboradores/:id/:aba no lugar do modal; cabecalho com situacao nesta empresa, vinculo principal, cargo e departamento da lotacao vigente por id, admissao e jornada vigente; quatro abas funcionais (Dados do colaborador, Vida funcional, Dados contratuais, Jornada de trabalho); master_tecnico so leitura; Dados contratuais, Historico funcional e Horario como visoes da empresa com atalho para a ficha. Sem API nova, schema, migration, RBAC, seed ou dependencia."
   },
   "openDeliveries": [
     {
       "id": "T198",
       "pullRequest": null,
-      "status": "ficha_unificada_colaborador_em_preparacao"
+      "status": "ficha_unificada_colaborador_em_implementacao"
     }
   ],
   "requiredArtifacts": [

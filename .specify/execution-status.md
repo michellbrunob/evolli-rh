@@ -2741,23 +2741,27 @@ imutável (R1).
 
 **Fora de escopo:** Área, Equipe, importação, admissão digital, documentos, upload, R2, schema, migration, RBAC, seed, Docker, dependências, promoção e merge.
 
-## Ficha unificada do Colaborador — T198 (preparação de decisão)
+## Ficha unificada do Colaborador — T198 (em implementação)
 
-| Tarefa | Estado            | Resultado principal                                                                                         |
-| ------ | ----------------- | ----------------------------------------------------------------------------------------------------------- |
-| T198   | **Em preparação** | Dossiê de decisão da primeira fatia da ficha unificada do Colaborador como ponto central do módulo Pessoas. |
+| Tarefa | Estado               | Resultado principal                                                                                      |
+| ------ | -------------------- | -------------------------------------------------------------------------------------------------------- |
+| T198   | **Em implementação** | Ficha unificada do Colaborador em página própria, com rota por colaborador e por aba, no lugar do modal. |
 
-**Escopo da T198:** só preparação de decisão — o
-[dossiê](../docs/decisions/t198-dossie-ficha-unificada-colaborador.md) levanta
-a ficha atual e as telas vizinhas, os contratos e permissões existentes, a
-matriz por perfil e os estados, e propõe a primeira fatia (cabeçalho, vínculo
-principal, resumo seguro, navegação interna, Dados do colaborador, Vida
-funcional, Dados contratuais e Jornada) e o roadmap das abas futuras. Nada de
-produto nesta tarefa.
+**Escopo da T198:** a preparação de decisão veio primeiro (o
+[dossiê](../docs/decisions/t198-dossie-ficha-unificada-colaborador.md)); depois,
+a implementação aprovada: rota `#/pessoas/colaboradores/:id/:aba`, cabeçalho
+consolidado (situação nesta empresa, vínculo principal, cargo e departamento
+da lotação vigente, admissão e jornada vigente) e quatro abas funcionais (Dados
+do colaborador, Vida funcional, Dados contratuais e Jornada de trabalho),
+compostas pelos contratos existentes. RH e DP mantêm as capacidades de antes;
+`master_tecnico` só lê. Dados contratuais, Histórico funcional e Horário seguem
+como visões da empresa, com atalho para a ficha. Sem API nova, schema,
+migration, RBAC, seed ou dependência.
 
-**Decisões pendentes:** D17 a D24 (seção 12 do dossiê).
+**Decisões aprovadas (2026-10-29):** D17 a D24 (seção 12 do dossiê); entrega
+e limites na seção 13.
 
-**Fora de escopo:** implementação de produto, API, schema, migration, permissões, banco, Docker, seed, dependências, UI, push, PR, promoção e merge.
+**Fora de escopo:** foto, portal, salários, férias e ausências, benefícios, documentos, upload, R2, pesquisas, comentários, exportação, API nova, schema, migration, RBAC, seed, Docker, dependências, promoção e merge.
 
 ## Próxima ação autorizável
 

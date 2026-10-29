@@ -2921,18 +2921,26 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
     - **Fora de escopo:** Área, Equipe, importação, admissão digital, documentos, upload, R2,
       schema, migration, RBAC, seed, Docker, dependências, promoção e merge.
 
-95. **T198 - Ficha unificada do Colaborador (preparação de decisão)**
-    - **Estado:** **em preparação**. Branch `codex/t198-ficha-unificada-colaborador`, a partir
-      do squash `0ca4df56bd3f15eae9a47dc4de689a0a44ecbcd7` (T197 integrada, PR #190).
+95. **T198 - Ficha unificada do Colaborador**
+    - **Estado:** **em implementação** (a preparação de decisão veio antes, nos commits
+      `cb9aa6f` e `fe3ba70`). Branch `codex/t198-ficha-unificada-colaborador`, a partir do
+      squash `0ca4df56bd3f15eae9a47dc4de689a0a44ecbcd7` (T197 integrada, PR #190).
     - **Objetivo:** definir a primeira fatia viável e segura da ficha unificada do
       Colaborador como ponto central de consulta e operação de Pessoas, no
       [dossiê](../docs/decisions/t198-dossie-ficha-unificada-colaborador.md): inventário do que
       já existe (ficha, listagem, Dados contratuais, Vida funcional, Horário, jornadas, rotas e
       permissões), contratos disponíveis, matriz por perfil, estados, acessibilidade, primeira
       fatia recomendada e roadmap das abas futuras com critérios de entrada.
-    - **Decisões pendentes:** as da seção 12 do dossiê (D17 a D24).
-    - **Fora de escopo:** implementação de produto, API, schema, migration, permissões, banco,
-      Docker, seed, dependências, UI, push, PR, promoção e merge.
+    - **Decisões aprovadas (2026-10-29):** D17 a D24 da seção 12 do dossiê — página própria
+      com rota por colaborador e por aba; admissão e jornada vigente no resumo, sem "tempo de
+      empresa"; contatos só na aba de dados; cargo e departamento pela alocação vigente e
+      detalhe por id, sem API nova; nada do roadmap na tela; o modal substituído;
+      `master_tecnico` só leitura; Dados contratuais, Histórico funcional e Horário mantidos
+      como visões da empresa, com atalho para a ficha.
+    - **Entrega:** seção 13 do [dossiê](../docs/decisions/t198-dossie-ficha-unificada-colaborador.md).
+    - **Fora de escopo:** API nova, schema, migration, RBAC, auditoria, seed, Docker,
+      dependências, foto, portal, salários, férias e ausências, benefícios, documentos, upload,
+      R2, pesquisas, comentários, exportação, promoção e merge.
 
 ## Regra obrigatória para as próximas tarefas
 

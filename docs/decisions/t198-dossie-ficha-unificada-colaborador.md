@@ -1,7 +1,8 @@
 # T198 — Dossiê: ficha unificada do Colaborador
 
-**Situação:** preparação de decisão. Nenhum produto, API, schema, migration,
-permissão, banco, Docker, seed, dependência ou interface muda nesta tarefa.
+**Situação:** decisões D17 a D24 aprovadas em 2026-10-29 (seção 12) e
+primeira fatia implementada (seção 13). Nenhuma API, schema, migration,
+permissão, banco, Docker, seed ou dependência mudou.
 **Escopo:** a ficha do Colaborador no módulo Pessoas, como ponto central de
 consulta e operação do que já tem dados e regras aprovadas.
 **Diretriz:** uma funcionalidade completa por entrega, com as correções
@@ -22,7 +23,7 @@ só abre a partir da listagem. Dados contratuais, Histórico funcional e Horári
 de trabalho vivem como abas separadas do contêiner Pessoas, cada uma com o seu
 próprio seletor de colaborador.
 
-Recomendação (sujeita às decisões da seção 12):
+Recomendação (aprovada; decisões na seção 12, entrega na seção 13):
 
 1. A ficha vira **página própria**, com rota por colaborador, aberta pela
    listagem no lugar do modal.
@@ -304,7 +305,14 @@ Cada uma entra como entrega própria, depois da decisão, nunca como aba vazia.
 | **B** | Página própria com rota por colaborador e por aba, substituindo o modal; sem API nova (recomendada) | Endereço estável, voltar e recarregar funcionam | Exige o primeiro segmento variável na tabela de rotas |
 | C     | B mais um endpoint de resumo agregado (cabeçalho em uma requisição)                                 | Menos requisições no cabeçalho                  | Mudança de API; entrega maior                         |
 
-## 12. Decisões pendentes
+## 12. Decisões (aprovadas em 2026-10-29)
+
+Todas aprovadas como recomendado abaixo: página própria com rota por
+colaborador e por aba, admissão e jornada vigente no resumo sem "tempo de
+empresa", contatos só na aba de dados, cargo e departamento pela alocação
+vigente e detalhe por id, nada do roadmap na tela, o modal substituído,
+`master_tecnico` só leitura e as três visões da empresa mantidas com atalho
+para a ficha.
 
 1. **D17 — Forma da ficha:** página própria com rota (recomendado) ou modal
    ampliado.
@@ -326,3 +334,79 @@ Cada uma entra como entrega própria, depois da decisão, nunca como aba vazia.
    funcional, Horário): continuam como visões da empresa, com atalho para a
    ficha (recomendado), ou deixam de existir quando a ficha cobrir o mesmo
    conteúdo.
+
+## 13. Entrega (implementada em 2026-10-29)
+
+### 13.1 Rotas e shell
+
+- Rota `#/pessoas/colaboradores/:id/:aba`, com as abas `dados`,
+  `vida-funcional`, `contratuais` e `jornada` (`fichaDaRota` e `rotaDaFicha`
+  em `apps/web/src/app/rotasDoShell.ts`). Sem aba, vale `dados` e a URL é
+  corrigida no lugar. Id fora do formato UUID, aba desconhecida ou segmento a
+  mais não são rota: nenhuma requisição é feita por eles.
+- A ficha pertence ao destino `pessoas`: a mesma capacidade de Colaboradores
+  (`rh`, `dp`, `master_tecnico`) decide a entrada pela URL, o "voltar" e o
+  "avançar". Quem não abre Colaboradores (gestor, colaborador, financeiro,
+  auditor, DPO) não monta a ficha, e a rota recusada não fica na URL.
+- Abrir pela linha da listagem empilha a rota da ficha; trocar de aba
+  empilha a rota da aba; a rota digitada ou recarregada abre direto, sem
+  entrada nova no histórico e sem montar a listagem por baixo.
+- Troca de empresa com a ficha aberta: o shell é recriado na listagem de
+  Colaboradores da empresa nova, com o foco no título — a ficha da empresa
+  anterior não é reaberta. Colaborador de outra empresa pela URL: "não
+  encontrado" (o 404 do servidor), sem nome nem dado.
+
+### 13.2 Página da ficha
+
+- `FichaColaboradorScreen` substitui o modal da listagem (D22); a trilha
+  volta a Colaboradores, e o foco volta a quem abriu a ficha (ou à aba ativa
+  de Pessoas, quando a ficha veio pela URL).
+- Cabeçalho: nome (h1, com foco ao abrir), situação **nesta empresa** (ativo
+  se houver vínculo ativo nela, nunca a situação global), cargo e
+  departamento da lotação vigente, vínculo principal (tipo, matrícula e
+  situação, pela mesma regra da listagem), admissão, desligamento quando
+  encerrado e jornada vigente. Lotação e jornada só para vínculo principal
+  ativo; previsto, encerrado ou sem vínculo dizem "Sem lotação vigente" e
+  "Sem jornada vigente" sem consultar. Referência inativa leva "(inativo)";
+  jornada inativa, a marca "Jornada inativa".
+- Composição (D20): `GET /colaboradores/:id` e `/:id/vinculos`; a alocação
+  aberta de `GET /vinculos/:id/alocacoes`; `GET /cargos/:id` e
+  `GET /departamentos/:id` pelos ids dela; `GET /horarios/vinculos` do
+  colaborador para a jornada. Falha de lotação ou de jornada fica no próprio
+  item, com "Tentar de novo".
+- Quatro abas funcionais (D21), com `tablist`, `tabpanel`, setas, Home e End
+  movendo o foco e a ativação pelo clique ou Enter: Dados do colaborador
+  (nome, dados pessoais, endereço e contatos), Vida funcional (linha do tempo
+  do vínculo principal, atalho para o Histórico funcional e os outros
+  vínculos), Dados contratuais (a tela da empresa fixada no colaborador, sem
+  seletor) e Jornada de trabalho. Abas visitadas ficam montadas e escondidas:
+  trocar de aba não perde o que foi digitado.
+- Edição (D23): as mesmas regras de antes — nome, dados pessoais, endereço e
+  contatos para RH e DP; jornada só para o RH; `master_tecnico` só lê. Edição
+  pendente pede confirmação ao voltar; durante a gravação, voltar não sai; a
+  troca de empresa avisa como antes (T189).
+- Respostas atrasadas: a página é remontada por colaborador e descarta
+  qualquer resposta de uma montagem anterior — de outro colaborador ou de
+  outra empresa.
+- Em 375 px, cabeçalho, resumo e painéis encolhem com a tela; as abas rolam
+  na própria faixa e as tabelas, no próprio quadro. Nenhuma rolagem
+  horizontal da página.
+
+### 13.3 Visões da empresa (D24)
+
+- Dados contratuais e Histórico funcional ganham "Abrir ficha de …" depois de
+  escolhido o colaborador; no Horário de trabalho, o nome na linha abre a
+  ficha. As três continuam como visões da empresa inteira.
+
+### 13.4 Limites conhecidos
+
+- O cabeçalho faz algumas leituras pequenas por colaborador (colaborador,
+  vínculos, alocações, cargo, departamento, jornada); um resumo agregado
+  seria a opção C, não aprovada.
+- A jornada do cabeçalho lê até 100 vigências do colaborador, como a seção
+  de jornada já fazia.
+- As demais abas de Pessoas seguem sem URL própria (limitação anterior,
+  registrada em `rotasDoShell.ts`).
+- Foto, portal, salários, férias e ausências, benefícios, documentos,
+  pesquisas, comentários e exportação seguem no roadmap da seção 10, sem
+  nada na tela.
