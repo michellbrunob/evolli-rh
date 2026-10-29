@@ -68,7 +68,7 @@ Recomendação (sujeita a **D8**):
   `UnidadeOrganizacional`, `CentroCusto`): `empresaId`, `codigo`, `nome`,
   `status` (`StatusOrganizacional`, padrão `ativo`), datas.
 - **Unicidade:** `@@unique([empresaId, codigo])` nas quatro. O nome **não** é
-  único (dois "Operações" na mesma empresa são permitidos — o código
+  único (dois nomes iguais na mesma empresa são permitidos — o código
   distingue; por isso o rótulo é `CÓDIGO — Nome`).
 - **Código:** `^[A-Z0-9_]{2,32}$`, imutável depois de criado; nome de 1 a 160.
 - **Índices:** `@@index([empresaId, status])`. Não há índice de texto.
@@ -234,7 +234,8 @@ revalidada na admissão (422 se inativa ou de outra empresa).
   índice `[empresaId, status]` reduz ao conjunto da empresa). Adequado para
   milhares de itens por empresa; para volumes maiores, `pg_trgm` com índice
   GIN exigiria extensão e migration — decisão própria, fora desta proposta.
-- **Acentos:** sem `unaccent`, "operacoes" não encontra "Operações".
+- **Acentos:** sem `unaccent`, um termo digitado sem acento não encontra
+  um nome acentuado.
   Aceitar na primeira entrega (os códigos não têm acento) ou decidir
   normalização depois.
 - **`count` a cada busca:** dobra a consulta; aceitável no mesmo volume.
@@ -302,8 +303,8 @@ documentada para a entrega seguinte, sem produto agora.
 - `busca` opcional nas quatro rotas, num DTO próprio
   (`ListarReferenciasQueryDto`); Empresa, Área e Equipe seguem sem busca.
 - O termo casa com parte do **código ou do nome**, sem diferenciar
-  maiúsculas. **Regra desta entrega: sem remoção de acentos** — "operacoes"
-  não encontra "Operações".
+  maiúsculas. **Regra desta entrega: sem remoção de acentos** — um termo
+  digitado sem acento não encontra um nome acentuado.
 - Entra no `where` com escopo e situação, antes de `skip`/`take`; o `total`
   conta só o que casa. Termo vazio ou ausente: a listagem de sempre.
 - Validação igual à da T178/T182: aparada, espaços colapsados, até 160
