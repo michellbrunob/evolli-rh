@@ -1461,7 +1461,7 @@ export function NovaAdmissaoScreen({
       pagina: number;
       busca?: string;
     }) => Promise<{
-      itens: readonly Referencia[];
+      itens: readonly (Referencia & { status: string })[];
       total: number;
       pagina: number;
       tamanhoPagina: number;
@@ -1474,9 +1474,14 @@ export function NovaAdmissaoScreen({
         pagina,
         ...(busca ? { busca } : {}),
       });
+      // Defesa do cliente (a mesma `soAtivos` de antes da T196): referência
+      // inativa devolvida indevidamente nunca vira opção, e o total desconta
+      // o que foi retirado desta página.
+      const ativos = soAtivos(r.itens);
       return {
         ...r,
-        itens: r.itens.map(({ id, codigo, nome }) => ({ id, codigo, nome })),
+        total: Math.max(0, r.total - (r.itens.length - ativos.length)),
+        itens: ativos.map(({ id, codigo, nome }) => ({ id, codigo, nome })),
       };
     };
   }

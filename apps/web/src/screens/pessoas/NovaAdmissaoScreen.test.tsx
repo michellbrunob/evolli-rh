@@ -1211,15 +1211,81 @@ describe("Nova admissão — página própria", () => {
       tamanhoPagina: 20,
       pagina: 1,
     });
+    // Defesa do cliente: o inativo devolvido indevidamente não vira opção.
     expect(
       within(listaDe(cargoSel()))
         .getAllByRole("option")
         .map((o) => o.textContent),
-    ).toEqual([
-      "CAR1 — Cargo Sintético (teste)",
-      "CARX — Cargo Sintético (teste)",
-    ]);
+    ).toEqual(["CAR1 — Cargo Sintético (teste)"]);
   });
+
+  // T196 — a defesa vale para as quatro referências da busca: a consulta
+  // comum pede só ativos ao servidor e ainda descarta inativo devolvido
+  // indevidamente, descontando-o do total.
+  it.each([
+    {
+      rotulo: "Departamento",
+      campo: () => departamentoSel(),
+      listar: listarDepartamentos,
+      ativo: departamento,
+    },
+    {
+      rotulo: "Cargo",
+      campo: () => cargoSel(),
+      listar: listarCargos,
+      ativo: cargo,
+    },
+    {
+      rotulo: "Unidade",
+      campo: () => unidadeSel(),
+      listar: listarUnidades,
+      ativo: unidade,
+    },
+    {
+      rotulo: "Centro de custo",
+      campo: () => centroSel(),
+      listar: listarCentrosCusto,
+      ativo: {
+        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        codigo: "CC1",
+        nome: "Centro Sintético (teste)",
+        status: "ativo",
+      },
+    },
+  ] as const)(
+    "$rotulo: só ativos viram opção, mesmo se o servidor devolver um inativo",
+    async ({ campo, listar, ativo }) => {
+      vi.mocked(listar as typeof listarCargos).mockResolvedValue(
+        paginado([
+          ativo,
+          { ...ativo, id: "inativo-1", codigo: "INATIVA", status: "inativo" },
+        ]) as never,
+      );
+      montar();
+      await aguardarEmpresa();
+      abrirLotacao();
+      fireEvent.keyDown(campo(), { key: "ArrowDown" });
+      await within(listaDe(campo())).findByRole("option", {
+        name: new RegExp(`^${ativo.codigo} — `),
+      });
+      expect(listar).toHaveBeenLastCalledWith({
+        status: "ativo",
+        tamanhoPagina: 20,
+        pagina: 1,
+      });
+      expect(
+        within(listaDe(campo()))
+          .getAllByRole("option")
+          .map((o) => o.textContent),
+      ).toEqual([`${ativo.codigo} — ${ativo.nome}`]);
+      // O total anunciado desconta o inativo retirado.
+      expect(
+        campo()
+          .closest(".seletor-referencia")!
+          .querySelector('[role="status"]'),
+      ).toHaveTextContent("1 resultado.");
+    },
+  );
 });
 
 // ---------------------------------------------------------------------------
