@@ -2861,19 +2861,26 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
     - **Prévia:** `http://127.0.0.1:5173` passa a mostrar a branch da T195 ao vivo, identificada
       como `[T195 dev]`, não a `main`.
 
-93. **T196 - Busca nas referências organizacionais (preparação de decisão)**
-    - **Estado:** **em preparação**. Branch `codex/t196-busca-referencias`, a partir do squash
+93. **T196 - Busca nas referências organizacionais**
+    - **Estado:** **em implementação** (a preparação de decisão veio antes, nos commits
+      `4985760` e `9bd56be`). Branch `codex/t196-busca-referencias`, a partir do squash
       `e473d47642cde02ed22fec3970fcfe293b9202cb` (T195 integrada, PR #188).
     - **Diretriz (proprietária, 2026-10-29):** uma funcionalidade completa por entrega, com as correções pequenas e acionáveis resolvidas antes de Ready for review (regras 7 e 8).
     - **Objetivo:** preparar a decisão da busca pesquisável em Departamento, Cargo, Unidade e
       Centro de custo na etapa 2 da Nova admissão, no [dossiê](../docs/decisions/t196-dossie-busca-referencias.md): contratos e
       paginação atuais, permissões e isolamento, arquitetura da busca no servidor, interface
       acessível, testes, riscos e a proposta da entrega seguinte de criação inline.
-    - **Decisões pendentes:** D8 — busca aditiva no servidor para as quatro referências; D9 —
-      formato do código automático por empresa na criação inline pelo RH, e confirmação antes
-      de criar ou criação imediata; Centro de custo — se já tem todos os contratos para entrar
-      nesta etapa.
-    - **Fora de escopo:** implementação de produto, mudança de API, schema, migration, RBAC, seed, Docker, dependências ou banco, criação inline, push, PR, promoção e merge.
+    - **Decisões aprovadas (2026-10-29):** D8 — busca aditiva no servidor para Departamento,
+      Cargo, Unidade e Centro de custo, por código ou nome, sem diferenciar maiúsculas, antes da
+      paginação, de 20 em 20 com "Mostrar mais"; Centro de custo entra na busca. **Regra desta
+      entrega: busca sem remoção de acentos.**
+    - **Entrega:** `busca` opcional nas quatro rotas (sem schema, migration, índice ou
+      dependência; termo fora de log e auditoria) e o seletor pesquisável acessível na etapa 2
+      da Nova admissão; detalhes e limites na seção 11 do [dossiê](../docs/decisions/t196-dossie-busca-referencias.md).
+    - **Próxima fatia (documentada, sem produto):** criação inline, código automático por
+      empresa e confirmação curta antes de criar (D9).
+    - **Fora de escopo:** criação inline, Área, Equipe, o teto de 100 fora da admissão,
+      schema, migration, RBAC, seed, Docker, dependências, promoção e merge.
 
 ## Regra obrigatória para as próximas tarefas
 

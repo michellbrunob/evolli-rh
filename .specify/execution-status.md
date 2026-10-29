@@ -2677,26 +2677,28 @@ nem persistência nova: recarregar começa do zero, na etapa 1, como antes.
 
 **Fora de escopo:** documentos e Cloudflare R2, importação, admissão digital, criação inline, busca de referências, criação ou retirada de Área, Aprendiz, salário, escala, gestor direto, conselho profissional, dependentes e pensão; promoção e merge.
 
-## Busca nas referências organizacionais — T196 (preparação de decisão)
+## Busca nas referências organizacionais — T196 (em implementação)
 
-| Tarefa | Estado            | Resultado principal                                                                                                   |
-| ------ | ----------------- | --------------------------------------------------------------------------------------------------------------------- |
-| T196   | **Em preparação** | Dossiê de decisão da busca pesquisável em Departamento, Cargo, Unidade e Centro de custo na etapa 2 da Nova admissão. |
+| Tarefa | Estado               | Resultado principal                                                                                                      |
+| ------ | -------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| T196   | **Em implementação** | Busca no servidor e seletor pesquisável para Departamento, Cargo, Unidade e Centro de custo na etapa 2 da Nova admissão. |
 
-**Escopo da T196:** só preparação de decisão — o [dossiê](../docs/decisions/t196-dossie-busca-referencias.md)
-levanta contratos, paginação, permissões, isolamento e o uso na etapa 2, e
-propõe a arquitetura da busca no servidor, a interface acessível dos
-seletores, testes, riscos e a entrega seguinte de criação inline. Nada de
-produto nesta tarefa.
+**Escopo da T196:** a preparação de decisão veio primeiro (o
+[dossiê](../docs/decisions/t196-dossie-busca-referencias.md)); depois, a
+implementação aprovada: `busca` opcional por código ou nome nas rotas de
+Departamento, Cargo, Unidade e Centro de custo, antes da paginação, e o
+seletor pesquisável acessível na etapa 2 da Nova admissão. Sem schema,
+migration, índice, extensão de banco, RBAC, seed ou dependência.
 
 **Diretriz (proprietária, 2026-10-29):** uma funcionalidade completa por entrega, com as correções pequenas e acionáveis resolvidas antes de Ready for review (regras 7 e 8).
 
-**Decisões pendentes:** D8 (busca aditiva no servidor para as quatro
-referências); D9 (formato do código automático por empresa na criação
-inline; confirmação antes de criar ou criação imediata); e se Centro de custo
-já tem todos os contratos para entrar nesta etapa.
+**Decisões aprovadas (2026-10-29):** D8 — busca aditiva no servidor, por
+código ou nome, sem diferenciar maiúsculas, antes da paginação, de 20 em 20;
+Centro de custo entra na busca. Regra desta entrega: busca **sem remoção de
+acentos**. Criação inline, código automático e confirmação curta (D9) ficam
+para a fatia seguinte. Entrega e limites na seção 11 do dossiê.
 
-**Fora de escopo:** implementação de produto, mudança de API, schema, migration, RBAC, seed, Docker, dependências ou banco, criação inline, push, PR, promoção e merge.
+**Fora de escopo:** criação inline, Área, Equipe, o teto de 100 fora da admissão, schema, migration, RBAC, seed, Docker, dependências, promoção e merge.
 
 ## Próxima ação autorizável
 

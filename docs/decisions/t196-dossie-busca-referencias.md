@@ -1,7 +1,8 @@
 # T196 — Dossiê: busca pesquisável nas referências organizacionais da Nova admissão
 
-**Situação:** preparação de decisão (2026-10-29). Nenhum produto, contrato,
-schema, migration, RBAC, seed ou dado foi alterado nesta tarefa.
+**Situação:** implementada (2026-10-29), depois da preparação de decisão;
+a entrega está na seção 11. Sem schema, migration, índice, extensão de
+banco, RBAC, seed ou dependência.
 **Escopo:** os quatro seletores de referência da **etapa 2** da Nova admissão
 (T195): **Departamento**, **Cargo**, **Unidade** e **Centro de custo**.
 **Diretriz:** uma funcionalidade completa por entrega, com as correções
@@ -285,3 +286,72 @@ revalidada na admissão (422 se inativa ou de outra empresa).
 Implementação de produto; mudança de API, schema, migration, índice, RBAC,
 seed, Docker, dependências ou banco; criação inline; Área e Equipe; o teto
 de 100 nas outras telas; push, PR, promoção e merge.
+
+## 11. Entrega (implementada em 2026-10-29)
+
+**Decisões aprovadas pela proprietária:** D8 aprovada — busca aditiva no
+servidor para Departamento, Cargo, Unidade e Centro de custo, por código ou
+nome, sem diferenciar maiúsculas, antes da paginação; resultados de 20 em 20
+com "Mostrar mais"; `CÓDIGO — Nome` visível. **D-CC:** Centro de custo entra
+na busca (ele já é campo da etapa 2 da Nova admissão). Criação inline fica
+fora; Área continua fora. D9 (código automático e confirmação curta) segue
+documentada para a entrega seguinte, sem produto agora.
+
+### 11.1 API
+
+- `busca` opcional nas quatro rotas, num DTO próprio
+  (`ListarReferenciasQueryDto`); Empresa, Área e Equipe seguem sem busca.
+- O termo casa com parte do **código ou do nome**, sem diferenciar
+  maiúsculas. **Regra desta entrega: sem remoção de acentos** — "operacoes"
+  não encontra "Operações".
+- Entra no `where` com escopo e situação, antes de `skip`/`take`; o `total`
+  conta só o que casa. Termo vazio ou ausente: a listagem de sempre.
+- Validação igual à da T178/T182: aparada, espaços colapsados, até 160
+  caracteres, sem caractere de controle, só texto; o erro diz a regra, nunca
+  o termo. Curingas (`%`, `_`) valem literalmente.
+- Escopo por empresa, RBAC, ordenação por código e auditoria inalterados; o
+  termo não vai para log (o log de requisições já não leva URL nem query,
+  T178), auditoria nem evento. `escaparCuringas` passou a um utilitário comum.
+
+### 11.2 Interface
+
+- Os quatro campos viraram o componente `SeletorDeReferencia` (combobox com
+  lista): o campo é a busca; a escolha atual aparece sempre logo abaixo
+  ("Escolha atual: CÓDIGO — Nome"), mesmo fora da página exibida.
+- Abre só por ação explícita (digitar, clicar, seta para baixo, "Mostrar
+  opções"); foco vindo de Tab ou de erro não abre. Setas percorrem, Enter
+  escolhe, Escape fecha sem mexer na escolha. Com a lista **fechada**, Enter
+  segue o formulário (como nos demais campos de texto, T195). O Enter que
+  fica com o próprio seletor (decisão N2 da T195) vale para os seletores
+  nativos que restaram (Área, Equipe, jornada).
+- Vazio, carregando e falha com "Tentar de novo"; contagem e escolha
+  anunciadas uma vez numa região de status; a opção escolhida é marcada por
+  texto ("escolha atual"), não só por cor.
+- Resposta atrasada, página anterior e componente desmontado (a troca de
+  empresa remonta a tela, T189) são descartados.
+- Opcionais (Unidade e Centro de custo) têm "Limpar escolha"; obrigatórios
+  (Departamento e Cargo) não.
+- A lotação passou a duas colunas — Departamento e Cargo; Área (logo abaixo
+  do Departamento) e Unidade; Equipe e Centro de custo — para o campo de
+  busca caber ao lado dos botões de 44 px.
+- A carga inicial não lê mais as quatro listas (o teto de 100): só confere,
+  com um item, se a empresa tem Departamento e Cargo ativos (o aviso de
+  referências da T179). O "+" do RH (T180) continua para Departamento, Cargo
+  e Unidade; depois de uma falha de rede nele, a busca daquela referência é
+  relida.
+- Validação por etapa, confirmação, idempotência, ViaCEP e etapas sem
+  mudança; o servidor continua revalidando cada referência (ativa e da
+  empresa da sessão) na gravação.
+
+### 11.3 Limites conhecidos
+
+- Sem remoção de acentos; sem índice de texto (`ILIKE` por empresa).
+- O teto de 100 segue em Área e Equipe (listas) e fora da admissão
+  (filtros de Colaboradores, Dados contratuais e Histórico funcional).
+- O termo digitado é descartado ao fechar a lista (Escape, escolha ou saída
+  do campo); a escolha nunca.
+
+### 11.4 Próxima fatia (não implementada)
+
+Criação inline ("Criar «termo»" para o RH), código automático por empresa e
+confirmação curta antes de criar (D9) pertencem à entrega seguinte.

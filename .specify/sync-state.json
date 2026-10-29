@@ -12,14 +12,14 @@
   },
   "nextTask": {
     "id": "T196",
-    "status": "busca_referencias_em_preparacao",
-    "reason": "T195 integrada em main pela PR #188 (squash e473d47642cde02ed22fec3970fcfe293b9202cb), com a CI de push 3/3 verde (run 40859789278). A T196 e so preparacao de decisao da busca pesquisavel em Departamento, Cargo, Unidade e Centro de custo na etapa 2 da Nova admissao (docs/decisions/t196-dossie-busca-referencias.md). Diretriz: uma funcionalidade completa por entrega, com correcoes pequenas acionaveis resolvidas antes de Ready for review. Pendentes: D8 (busca aditiva no servidor), D9 (codigo automatico e confirmacao na criacao inline) e Centro de custo. Sem produto, API, schema, migration, RBAC, seed, Docker, dependencia, banco, push ou PR."
+    "status": "busca_referencias_em_implementacao",
+    "reason": "T195 integrada em main pela PR #188 (squash e473d47642cde02ed22fec3970fcfe293b9202cb), com a CI de push 3/3 verde (run 40859789278). A T196 implementa a busca aprovada (D8): busca opcional por codigo ou nome, sem diferenciar maiusculas e sem remover acentos, antes da paginacao, nas rotas de Departamento, Cargo, Unidade e Centro de custo, e o seletor pesquisavel acessivel na etapa 2 da Nova admissao (docs/decisions/t196-dossie-busca-referencias.md, secao 11). Sem schema, migration, indice, RBAC, seed ou dependencia. Criacao inline, codigo automatico e confirmacao curta (D9) ficam para a fatia seguinte. Diretriz: uma funcionalidade completa por entrega, com correcoes pequenas acionaveis resolvidas antes de Ready for review."
   },
   "openDeliveries": [
     {
       "id": "T196",
       "pullRequest": null,
-      "status": "busca_referencias_em_preparacao"
+      "status": "busca_referencias_em_implementacao"
     }
   ],
   "requiredArtifacts": [
