@@ -407,6 +407,12 @@ para a ficha.
   de jornada já fazia.
 - As demais abas de Pessoas seguem sem URL própria (limitação anterior,
   registrada em `rotasDoShell.ts`).
+- Edição pendente: a trilha da ficha pede confirmação, e a troca de empresa
+  avisa (T189); a barra lateral, o "voltar" do navegador e recarregar a
+  página não pedem. O modal antigo bloqueava a barra por ser modal; como
+  página, a ficha fica como a Nova admissão já estava. Uma guarda de
+  navegação do shell, para todas as páginas, é arquitetura própria e precisa
+  de decisão.
 - Foto, portal, salários, férias e ausências, benefícios, documentos,
   pesquisas, comentários e exportação seguem no roadmap da seção 10, sem
   nada na tela.
