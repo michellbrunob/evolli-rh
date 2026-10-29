@@ -14,6 +14,7 @@
 
 .ficha-colaborador__cabecalho {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-md);
   padding: var(--space-lg);
   border: 1px solid var(--hairline);
@@ -24,6 +25,7 @@
 
 .ficha-colaborador__identidade {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-xs);
   min-width: 0;
 }
@@ -62,6 +64,7 @@
 
 .ficha-colaborador__item {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-xxs);
   min-width: 0;
 }
@@ -118,6 +121,8 @@
 
 .ficha-colaborador__painel {
   display: grid;
+  /* Coluna única que encolhe: o conteúdo largo rola no próprio quadro. */
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-lg);
   min-width: 0;
 }
@@ -141,12 +146,19 @@
 
 .ficha-colaborador__aviso {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-sm);
   justify-items: start;
 }
 
+/* Mesmo tamanho dos títulos das seções vizinhas (h2 da Vida funcional). */
 .ficha-colaborador__subtitulo {
   margin: 0 0 var(--space-sm);
+  font-size: var(--text-lead);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  font-weight: var(--weight-strong);
+  color: var(--color-ink);
 }
 
 /* Tabela larga rola dentro do próprio quadro, nunca a página. */

@@ -852,6 +852,20 @@ describe("T198 — contrato de CSS (375 px, sem rolagem da página)", () => {
     );
   });
 
+  it("os grids de coluna única encolhem: nunca a coluna implícita 'auto'", () => {
+    for (const seletor of [
+      ".ficha-colaborador__cabecalho",
+      ".ficha-colaborador__identidade",
+      ".ficha-colaborador__item",
+      ".ficha-colaborador__painel",
+      ".ficha-colaborador__aviso",
+    ]) {
+      expect(corpo(seletor)).toMatch(
+        /grid-template-columns:\s*minmax\(\s*0\s*,\s*1fr\s*\)\s*;/,
+      );
+    }
+  });
+
   it("o resumo nunca exige mais que a largura disponível", () => {
     expect(corpo(".ficha-colaborador__resumo")).toMatch(
       /minmax\(\s*min\(\s*12rem\s*,\s*100%\s*\)\s*,\s*1fr\s*\)/,
@@ -878,4 +892,32 @@ describe("T198 — contrato de CSS (375 px, sem rolagem da página)", () => {
     expect(css).not.toMatch(/#[0-9a-f]{3,8}\b/i);
     expect(css).not.toMatch(/\brgba?\(/i);
   });
+});
+
+describe("T198 — títulos para quem navega por eles", () => {
+  it.each([
+    ["dados", "Dados do colaborador"],
+    ["vida-funcional", "Vida funcional"],
+    ["contratuais", "Dados contratuais"],
+    ["jornada", "Jornada de trabalho"],
+  ] as const)(
+    "aba %s: um único h2 com o nome da aba, abaixo do h1 da ficha",
+    async (aba, rotulo) => {
+      render(<Ficha abaInicial={aba} />);
+      await esperarFicha();
+      const painel = screen.getByRole("tabpanel", { name: rotulo });
+      await waitFor(() =>
+        expect(
+          within(painel).getAllByRole("heading", { level: 2, name: rotulo }),
+        ).toHaveLength(1),
+      );
+      // Nenhum título repete o nome da aba em outro nível.
+      expect(
+        within(painel)
+          .queryAllByRole("heading", { name: rotulo })
+          .filter((h) => h.tagName !== "H2"),
+      ).toHaveLength(0);
+      expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    },
+  );
 });

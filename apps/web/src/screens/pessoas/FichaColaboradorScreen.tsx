@@ -554,6 +554,8 @@ export function FichaColaboradorScreen({
 
   function lotacaoNoCabecalho() {
     if (!principal) return "Sem vínculo nesta empresa";
+    // Previsto ou encerrado: não há lotação vigente, nem o que esperar.
+    if (!principalAtivo) return "Sem lotação vigente";
     if (lotacao.tipo === "carregando") return "Carregando lotação…";
     if (lotacao.tipo === "erro") {
       return (
@@ -726,7 +728,14 @@ export function FichaColaboradorScreen({
             hidden={a !== aba}
             className="ficha-colaborador__painel"
           >
-            <h2 className="ficha-colaborador__so-leitor">{ROTULO_DA_ABA[a]}</h2>
+            {/* Vida funcional e Jornada já abrem com o próprio título (h2);
+                as outras abas reúnem várias seções, e o h2 as agrupa para
+                quem navega por títulos. */}
+            {a === "dados" || a === "contratuais" ? (
+              <h2 className="ficha-colaborador__so-leitor">
+                {ROTULO_DA_ABA[a]}
+              </h2>
+            ) : null}
             {a === "dados" ? (
               <>
                 {podeEditarFicha ? (
@@ -788,9 +797,9 @@ export function FichaColaboradorScreen({
                 />
                 {outrosVinculos.length > 0 ? (
                   <section className="ficha-colaborador__vinculos">
-                    <h3 className="ficha-colaborador__subtitulo">
+                    <h2 className="ficha-colaborador__subtitulo">
                       Outros vínculos nesta empresa
-                    </h3>
+                    </h2>
                     <div className="ficha-colaborador__quadro">
                       <DataTable
                         caption={`Outros vínculos — ${nome}`}

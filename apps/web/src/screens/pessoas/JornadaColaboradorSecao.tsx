@@ -422,13 +422,13 @@ export function JornadaColaboradorSecao({
       className="colaboradores-screen__jornada"
       aria-labelledby={ID_TITULO}
     >
-      <h3
+      <h2
         id={ID_TITULO}
         className="colaboradores-screen__section-title"
         tabIndex={-1}
       >
         Jornada de trabalho
-      </h3>
+      </h2>
 
       {status === "carregando" ? (
         <p className="colaboradores-screen__carregando" role="status">

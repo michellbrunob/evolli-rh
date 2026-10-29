@@ -518,7 +518,7 @@ export function DadosContratuaisScreen({
           id="dados-contratuais-colaborador-titulo"
           className="dados-contratuais-screen__section-title"
         >
-          {embutida ? "Vínculo" : "Colaborador e vínculo"}
+          {embutida ? "Vínculos nesta empresa" : "Colaborador e vínculo"}
         </TituloSecao>
 
         <div className="dados-contratuais-screen__selecao">
