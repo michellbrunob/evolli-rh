@@ -10,6 +10,9 @@ import { Request, Response } from "express";
 import { descreverErroDeBanco } from "../diagnostico-banco";
 import {
   CamposRecusadosException,
+  type CodigoDeConflitoDeReferencia,
+  ConflitoDeReferenciaException,
+  type ReferenciaExistente,
   CodigoDeRecusa,
   ConflitoDeCamposException,
   ErroDeCampo,
@@ -25,7 +28,9 @@ interface ErrorBody {
   /** T179 — campos recusados e o motivo, sem o valor (`DP-ADM-15`). */
   erros?: readonly ErroDeCampo[];
   /** T179 — código estável de recusa de negócio sem campo próprio. */
-  codigo?: CodigoDeRecusa;
+  codigo?: CodigoDeRecusa | CodigoDeConflitoDeReferencia;
+  /** T197 — a referência ativa da empresa que já tem o nome (`nome_em_uso`). */
+  referencia?: ReferenciaExistente;
 }
 
 const DEFAULT_CLIENT_MESSAGE = "Não foi possível processar a requisição.";
@@ -105,6 +110,22 @@ export class AllExceptionsFilter implements ExceptionFilter {
       ...(exception instanceof RecusaDeNegocioException ||
       exception instanceof RecusaCsrfException
         ? { codigo: exception.codigo }
+        : {}),
+      // T197 — código do conflito e, no `nome_em_uso`, só id, código e nome
+      // da referência da própria empresa, montados campo a campo.
+      ...(exception instanceof ConflitoDeReferenciaException
+        ? {
+            codigo: exception.codigo,
+            ...(exception.referencia
+              ? {
+                  referencia: {
+                    id: exception.referencia.id,
+                    codigo: exception.referencia.codigo,
+                    nome: exception.referencia.nome,
+                  },
+                }
+              : {}),
+          }
         : {}),
     };
 

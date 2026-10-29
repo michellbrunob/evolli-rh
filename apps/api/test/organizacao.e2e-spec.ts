@@ -1627,4 +1627,302 @@ describe("Núcleo Organizacional Interno (e2e)", () => {
       }
     });
   });
+
+  // -------------------------------------------------------------------------
+  // T197 — criação inline (sem código) das referências da lotação: o servidor
+  // gera o código, recusa nome repetido na empresa e serializa pedidos iguais.
+  // Empresa própria; nomes e códigos sintéticos.
+  // -------------------------------------------------------------------------
+  describe("T197 — criação com código gerado no servidor", () => {
+    const TIPOS = [
+      {
+        rota: "/v1/departamentos",
+        modelo: "departamento",
+        acao: "organizacao_departamento_criado",
+        prefixo: "DEP",
+      },
+      {
+        rota: "/v1/cargos",
+        modelo: "cargo",
+        acao: "organizacao_cargo_criado",
+        prefixo: "CAR",
+      },
+      {
+        rota: "/v1/unidades-organizacionais",
+        modelo: "unidadeOrganizacional",
+        acao: "organizacao_unidade_organizacional_criada",
+        prefixo: "UNI",
+      },
+      {
+        rota: "/v1/centros-de-custo",
+        modelo: "centroCusto",
+        acao: "organizacao_centro_custo_criado",
+        prefixo: "CC",
+      },
+    ] as const;
+    type Modelo = (typeof TIPOS)[number]["modelo"];
+
+    let empresaD: string;
+    let rhD: Credencial;
+    let dpD: Credencial;
+    let financeiroD: Credencial;
+    let prisma: PrismaClient;
+
+    interface Delegado {
+      count: (args: { where: object }) => Promise<number>;
+      findMany: (args: {
+        where: object;
+      }) => Promise<
+        { id: string; codigo: string; nome: string; status: string }[]
+      >;
+      createMany: (args: { data: object[] }) => Promise<unknown>;
+    }
+    const delegado = (modelo: Modelo) => prisma[modelo] as unknown as Delegado;
+    const contarNome = (modelo: Modelo, empresaId: string, nome: string) =>
+      delegado(modelo).count({ where: { empresaId, nome } });
+
+    beforeAll(async () => {
+      empresaD = (
+        await post("/v1/empresas", master)
+          .send({ codigo: "T197D", nome: "Empresa Criacao Inline" })
+          .expect(201)
+      ).body.id as string;
+      rhD = await criarUsuario("rh.d@example.test", "rh", empresaD);
+      dpD = await criarUsuario("dp.d@example.test", "dp", empresaD);
+      financeiroD = await criarUsuario(
+        "fin.d@example.test",
+        "financeiro",
+        empresaD,
+      );
+      prisma = new PrismaClient({ datasources: { db: { url: appUrl } } });
+    });
+
+    afterAll(async () => {
+      await prisma.$disconnect();
+    });
+
+    describe.each(TIPOS)("$rota", ({ rota, modelo, acao, prefixo }) => {
+      it("RH cria sem código: nome normalizado, código ASCII em maiúsculas, auditoria só com ids", async () => {
+        const antes = new Date();
+        const r = await post(rota, rhD)
+          .send({ empresaId: empresaD, nome: "  Ação   Fiscal Sintética " })
+          .expect(201);
+        expect(r.body).toMatchObject({
+          empresaId: empresaD,
+          nome: "Ação Fiscal Sintética",
+          codigo: "ACAO_FISCAL_SINTETICA",
+          status: "ativo",
+        });
+        const eventos = await prisma.auditEvent.findMany({
+          where: { resourceId: r.body.id as string },
+        });
+        expect(eventos).toHaveLength(1);
+        expect(eventos[0]).toMatchObject({
+          action: acao,
+          companyId: empresaD,
+          result: "success",
+        });
+        const trilha = JSON.stringify(
+          await prisma.auditEvent.findMany({
+            where: { createdAt: { gte: antes } },
+          }),
+        ).toLowerCase();
+        expect(trilha).not.toContain("fiscal sint");
+        expect(trilha).not.toContain("acao_fiscal");
+      });
+
+      it("mesmo nome (maiúsculas e espaços diferentes): 409 nome_em_uso com a existente, sem criar", async () => {
+        const r = await post(rota, rhD)
+          .send({ empresaId: empresaD, nome: "AÇÃO fiscal   sintética" })
+          .expect(409);
+        expect(r.body).toMatchObject({
+          codigo: "nome_em_uso",
+          referencia: {
+            codigo: "ACAO_FISCAL_SINTETICA",
+            nome: "Ação Fiscal Sintética",
+          },
+        });
+        expect(Object.keys(r.body.referencia as object).sort()).toEqual([
+          "codigo",
+          "id",
+          "nome",
+        ]);
+        expect(
+          await contarNome(modelo, empresaD, "Ação Fiscal Sintética"),
+        ).toBe(1);
+      });
+
+      it("nome diferente com o mesmo código-base: sufixo _2", async () => {
+        const r = await post(rota, rhD)
+          .send({ empresaId: empresaD, nome: "Acao Fiscal Sintetica" })
+          .expect(201);
+        expect(r.body.codigo).toBe("ACAO_FISCAL_SINTETICA_2");
+      });
+
+      it("nome só com símbolos: prefixo do tipo, e depois _2", async () => {
+        const a = await post(rota, rhD)
+          .send({ empresaId: empresaD, nome: "!!!" })
+          .expect(201);
+        const b = await post(rota, rhD)
+          .send({ empresaId: empresaD, nome: "???" })
+          .expect(201);
+        expect([a.body.codigo, b.body.codigo]).toEqual([
+          prefixo,
+          `${prefixo}_2`,
+        ]);
+      });
+
+      it("só existe inativa com o nome: 409 nome_inativo, sem reativar nem criar", async () => {
+        await delegado(modelo).createMany({
+          data: [
+            {
+              empresaId: empresaD,
+              codigo: "INATIVA_T197",
+              nome: "Inativa Sintetica",
+              status: "inativo",
+            },
+          ],
+        });
+        const r = await post(rota, rhD)
+          .send({ empresaId: empresaD, nome: "inativa sintetica" })
+          .expect(409);
+        expect(r.body).toMatchObject({ codigo: "nome_inativo" });
+        expect(r.body).not.toHaveProperty("referencia");
+        const todas = await delegado(modelo).findMany({
+          where: { empresaId: empresaD, codigo: "INATIVA_T197" },
+        });
+        expect(todas.map((t) => t.status)).toEqual(["inativo"]);
+        expect(
+          await delegado(modelo).count({
+            where: {
+              empresaId: empresaD,
+              nome: { equals: "inativa sintetica", mode: "insensitive" },
+            },
+          }),
+        ).toBe(1);
+      });
+
+      it("os 50 códigos possíveis ocupados: 409 codigo_indisponivel, sem criar", async () => {
+        await delegado(modelo).createMany({
+          data: Array.from({ length: 50 }, (_, k) => ({
+            empresaId: empresaD,
+            codigo: k === 0 ? "LOTADO" : `LOTADO_${k + 1}`,
+            nome: `Ocupante ${k + 1}`,
+          })),
+        });
+        const r = await post(rota, rhD)
+          .send({ empresaId: empresaD, nome: "Lotado" })
+          .expect(409);
+        expect(r.body).toMatchObject({ codigo: "codigo_indisponivel" });
+        expect(await contarNome(modelo, empresaD, "Lotado")).toBe(0);
+      });
+
+      it("dois pedidos simultâneos com o mesmo nome: um registro só", async () => {
+        const respostas = await Promise.all(
+          [0, 1].map(() =>
+            post(rota, rhD).send({
+              empresaId: empresaD,
+              nome: "Concorrente Sintetico",
+            }),
+          ),
+        );
+        expect(respostas.map((r) => r.status).sort()).toEqual([201, 409]);
+        const recusa = respostas.find((r) => r.status === 409)!;
+        const criada = respostas.find((r) => r.status === 201)!;
+        expect(recusa.body).toMatchObject({
+          codigo: "nome_em_uso",
+          referencia: { id: criada.body.id },
+        });
+        expect(
+          await contarNome(modelo, empresaD, "Concorrente Sintetico"),
+        ).toBe(1);
+      });
+
+      it("nomes diferentes que geram o mesmo código, ao mesmo tempo: dois registros com códigos distintos", async () => {
+        const respostas = await Promise.all(
+          ["Paralelo Único", "Paralelo Unico"].map((nome) =>
+            post(rota, rhD).send({ empresaId: empresaD, nome }),
+          ),
+        );
+        expect(respostas.map((r) => r.status)).toEqual([201, 201]);
+        expect(respostas.map((r) => r.body.codigo).sort()).toEqual([
+          "PARALELO_UNICO",
+          "PARALELO_UNICO_2",
+        ]);
+      });
+
+      it("nome só de outra empresa não conta, e a outra empresa nunca aparece", async () => {
+        await post(rota, rhB)
+          .send({ empresaId: empresaB, codigo: "SO_B_T197", nome: "Somente B" })
+          .expect(201);
+        const r = await post(rota, rhD)
+          .send({ empresaId: empresaD, nome: "Somente B" })
+          .expect(201);
+        expect(r.body.empresaId).toBe(empresaD);
+        const fora = await post(rota, rhD)
+          .send({ empresaId: empresaB, nome: "Tentativa Fora" })
+          .expect(404);
+        expect(JSON.stringify(fora.body)).not.toContain("Somente B");
+        expect(await contarNome(modelo, empresaB, "Tentativa Fora")).toBe(0);
+      });
+
+      it("DP, financeiro e colaborador: recusados, sem gravar", async () => {
+        await post(rota, dpD)
+          .send({ empresaId: empresaD, nome: "Escrita Negada" })
+          .expect(403);
+        await post(rota, financeiroD)
+          .send({ empresaId: empresaD, nome: "Escrita Negada" })
+          .expect(403);
+        await post(rota, colaboradorA)
+          .send({ empresaId: empresaA, nome: "Escrita Negada" })
+          .expect(403);
+        expect(await contarNome(modelo, empresaD, "Escrita Negada")).toBe(0);
+        expect(await contarNome(modelo, empresaA, "Escrita Negada")).toBe(0);
+      });
+
+      it("sem sessão: 401; sem token CSRF: 403 csrf_invalido; nada gravado", async () => {
+        await agent()
+          .post(rota)
+          .send({ empresaId: empresaD, nome: "Sem Sessao" })
+          .expect(401);
+        const r = await agent()
+          .post(rota)
+          .set("Cookie", rhD.cookie)
+          .send({ empresaId: empresaD, nome: "Sem Sessao" })
+          .expect(403);
+        expect(r.body).toMatchObject({ codigo: "csrf_invalido" });
+        expect(await contarNome(modelo, empresaD, "Sem Sessao")).toBe(0);
+      });
+
+      it("nome vazio, só espaços ou com caractere de controle: 400, sem repetir o nome", async () => {
+        for (const nome of ["", "   ", "Nome\u0007CONTROLE"]) {
+          const r = await post(rota, rhD)
+            .send({ empresaId: empresaD, nome })
+            .expect(400);
+          expect(JSON.stringify(r.body)).not.toContain("CONTROLE");
+        }
+        await post(rota, rhD)
+          .send({ empresaId: empresaD, nome: "Nome", codigo: "" })
+          .expect(400);
+      });
+
+      it("caminho manual (com código) segue igual: aceita nome repetido e recusa código em uso", async () => {
+        const r = await post(rota, rhD)
+          .send({
+            empresaId: empresaD,
+            codigo: "MANUAL_T197",
+            nome: "Ação Fiscal Sintética",
+          })
+          .expect(201);
+        expect(r.body).toMatchObject({
+          codigo: "MANUAL_T197",
+          nome: "Ação Fiscal Sintética",
+        });
+        const repetido = await post(rota, rhD)
+          .send({ empresaId: empresaD, codigo: "MANUAL_T197", nome: "Outro" })
+          .expect(409);
+        expect(repetido.body).not.toHaveProperty("codigo");
+      });
+    });
+  });
 });
