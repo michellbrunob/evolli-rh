@@ -2712,11 +2712,17 @@ carregado.
 
 **Fora de escopo:** criação inline, Área, Equipe, o teto de 100 fora da admissão, schema, migration, RBAC, seed, Docker, dependências, promoção e merge.
 
-## Criação inline de referências na Nova admissão — T197 (em implementação)
+## Criação inline de referências na Nova admissão — T197 (integrada)
 
-| Tarefa | Estado               | Resultado principal                                                                                             |
-| ------ | -------------------- | --------------------------------------------------------------------------------------------------------------- |
-| T197   | **Em implementação** | Criação inline de Departamento, Cargo, Unidade e Centro de custo a partir da busca da etapa 2 da Nova admissão. |
+| Tarefa | Estado                                    | Resultado principal                                                                                             |
+| ------ | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| T197   | **Integrada** (PR #190, squash `0ca4df5`) | Criação inline de Departamento, Cargo, Unidade e Centro de custo a partir da busca da etapa 2 da Nova admissão. |
+
+**Observação de relatório:** a integração funcional da T197 está concluída
+(CI de push 3/3 verde, run 40945643467); a única pendência administrativa era
+a sua convergência no Spec Kit, resolvida no primeiro commit da T198. As
+correções das revisões (foco dentro do diálogo nas recusas definitivas e a
+prova isolada da trava consultiva) foram feitas dentro da entrega.
 
 **Escopo da T197:** a preparação de decisão veio primeiro (o
 [dossiê](../docs/decisions/t197-dossie-criacao-inline-referencias.md)); depois,
@@ -2729,7 +2735,29 @@ escolhe. Sem schema, migration, RBAC, seed ou dependência.
 **Decisões aprovadas (2026-10-29):** D10 a D16 (seção 11 do dossiê); entrega
 e limites na seção 12.
 
+**Limites que continuam:** nome repetido é regra da aplicação só no caminho
+automático; nomes que diferem só por acento são diferentes; o código gerado é
+imutável (R1).
+
 **Fora de escopo:** Área, Equipe, importação, admissão digital, documentos, upload, R2, schema, migration, RBAC, seed, Docker, dependências, promoção e merge.
+
+## Ficha unificada do Colaborador — T198 (preparação de decisão)
+
+| Tarefa | Estado            | Resultado principal                                                                                         |
+| ------ | ----------------- | ----------------------------------------------------------------------------------------------------------- |
+| T198   | **Em preparação** | Dossiê de decisão da primeira fatia da ficha unificada do Colaborador como ponto central do módulo Pessoas. |
+
+**Escopo da T198:** só preparação de decisão — o
+[dossiê](../docs/decisions/t198-dossie-ficha-unificada-colaborador.md) levanta
+a ficha atual e as telas vizinhas, os contratos e permissões existentes, a
+matriz por perfil e os estados, e propõe a primeira fatia (cabeçalho, vínculo
+principal, resumo seguro, navegação interna, Dados do colaborador, Vida
+funcional, Dados contratuais e Jornada) e o roadmap das abas futuras. Nada de
+produto nesta tarefa.
+
+**Decisões pendentes:** D17 a D24 (seção 12 do dossiê).
+
+**Fora de escopo:** implementação de produto, API, schema, migration, permissões, banco, Docker, seed, dependências, UI, push, PR, promoção e merge.
 
 ## Próxima ação autorizável
 
