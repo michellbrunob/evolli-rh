@@ -1278,12 +1278,14 @@ describe("Nova admissão — página própria", () => {
           .getAllByRole("option")
           .map((o) => o.textContent),
       ).toEqual([`${ativo.codigo} — ${ativo.nome}`]);
-      // O total anunciado desconta o inativo retirado.
-      expect(
-        campo()
-          .closest(".seletor-referencia")!
-          .querySelector('[role="status"]'),
-      ).toHaveTextContent("1 resultado.");
+      // O total anunciado desconta o inativo retirado (texto exato).
+      await waitFor(() =>
+        expect(
+          campo()
+            .closest(".seletor-referencia")!
+            .querySelector('[role="status"]')?.textContent,
+        ).toBe("1 resultado."),
+      );
     },
   );
 
@@ -1305,6 +1307,75 @@ describe("Nova admissão — página própria", () => {
   });
   const faixa = <T,>(de: number, ate: number, f: (n: number) => T) =>
     Array.from({ length: ate - de + 1 }, (_, k) => f(de + k));
+
+  /**
+   * Abre o Cargo e clica "Mostrar mais" até o fim. `contagens` é o anúncio
+   * EXATO de cada página (comparação por igualdade: um trecho não basta) e
+   * diz quantas páginas devem ser pedidas. `total` é o total que o servidor
+   * informa (padrão: o tamanho real da lista).
+   */
+  async function paginarAteOFim({
+    lista,
+    contagens,
+    total = lista.length,
+  }: {
+    lista: readonly ReturnType<typeof cargoAtivo>[];
+    contagens: readonly string[];
+    total?: number;
+  }) {
+    vi.mocked(listarCargos).mockImplementation(async (q = {}) => {
+      const pagina = q.pagina ?? 1;
+      const tamanho = q.tamanhoPagina ?? 20;
+      return {
+        itens: lista.slice((pagina - 1) * tamanho, pagina * tamanho),
+        total,
+        pagina,
+        tamanhoPagina: tamanho,
+      };
+    });
+    montar();
+    await aguardarEmpresa();
+    abrirLotacao();
+    const raiz = cargoSel().closest(".seletor-referencia") as HTMLElement;
+    const status = () => raiz.querySelector('[role="status"]')?.textContent;
+    const buscas = () =>
+      vi
+        .mocked(listarCargos)
+        .mock.calls.filter(([q]) => q?.tamanhoPagina === 20);
+    const ativosDaLista = lista
+      .filter((c) => c.status === "ativo")
+      .map((c) => `${c.codigo} — ${c.nome}`);
+
+    fireEvent.keyDown(cargoSel(), { key: "ArrowDown" });
+    await waitFor(() => expect(status()).toBe(contagens[0]));
+    for (let pagina = 2; pagina <= contagens.length; pagina += 1) {
+      const mais = within(raiz).getByRole("button", { name: "Mostrar mais" });
+      mais.focus();
+      fireEvent.click(mais);
+      await waitFor(() => expect(status()).toBe(contagens[pagina - 1]));
+    }
+
+    // Todas as páginas do servidor foram pedidas, cada uma uma vez, só ativos.
+    expect(buscas().map(([q]) => q)).toEqual(
+      contagens.map((_, k) => ({
+        status: "ativo",
+        tamanhoPagina: 20,
+        pagina: k + 1,
+      })),
+    );
+    // Só ativos viraram opção, e todos eles.
+    expect(
+      within(listaDe(cargoSel()))
+        .queryAllByRole("option")
+        .map((o) => o.textContent),
+    ).toEqual(ativosDaLista);
+    // Fim: o botão some, nada mais é pedido e o foco volta ao campo.
+    expect(
+      within(raiz).queryByRole("button", { name: /Mostrar mais|Carregando/ }),
+    ).toBeNull();
+    await waitFor(() => expect(cargoSel()).toHaveFocus());
+    expect(buscas()).toHaveLength(contagens.length);
+  }
 
   it.each([
     {
@@ -1330,6 +1401,8 @@ describe("Nova admissão — página própria", () => {
       ],
     },
     {
+      // A página filtrada a zero opções pela defesa NÃO encerra: a seguinte,
+      // com os ativos, ainda é pedida.
       caso: "uma página inteira de inativos seguida de ativos",
       lista: [...faixa(1, 20, cargoInativo), ...faixa(1, 5, cargoAtivo)],
       contagens: ["5 resultados; 0 exibidos.", "5 resultados; 5 exibidos."],
@@ -1345,63 +1418,23 @@ describe("Nova admissão — página própria", () => {
     },
   ])(
     "paginação com $caso: carrega até a última página do servidor e termina",
-    async ({ lista, contagens }) => {
-      vi.mocked(listarCargos).mockImplementation(async (q = {}) => {
-        const pagina = q.pagina ?? 1;
-        const tamanho = q.tamanhoPagina ?? 20;
-        return {
-          itens: lista.slice((pagina - 1) * tamanho, pagina * tamanho),
-          total: lista.length,
-          pagina,
-          tamanhoPagina: tamanho,
-        };
-      });
-      montar();
-      await aguardarEmpresa();
-      abrirLotacao();
-      const raiz = cargoSel().closest(".seletor-referencia") as HTMLElement;
-      const status = () => raiz.querySelector('[role="status"]');
-      const buscas = () =>
-        vi
-          .mocked(listarCargos)
-          .mock.calls.filter(([q]) => q?.tamanhoPagina === 20);
-      const ativosDaLista = lista
-        .filter((c) => c.status === "ativo")
-        .map((c) => `${c.codigo} — ${c.nome}`);
-
-      fireEvent.keyDown(cargoSel(), { key: "ArrowDown" });
-      await waitFor(() => expect(status()).toHaveTextContent(contagens[0]!));
-      for (let pagina = 2; pagina <= contagens.length; pagina += 1) {
-        const mais = within(raiz).getByRole("button", { name: "Mostrar mais" });
-        mais.focus();
-        fireEvent.click(mais);
-        await waitFor(() =>
-          expect(status()).toHaveTextContent(contagens[pagina - 1]!),
-        );
-      }
-
-      // Todas as páginas do servidor foram pedidas, cada uma uma vez, só ativos.
-      expect(buscas().map(([q]) => q)).toEqual(
-        contagens.map((_, k) => ({
-          status: "ativo",
-          tamanhoPagina: 20,
-          pagina: k + 1,
-        })),
-      );
-      // Só ativos viraram opção, e todos eles.
-      expect(
-        within(listaDe(cargoSel()))
-          .queryAllByRole("option")
-          .map((o) => o.textContent),
-      ).toEqual(ativosDaLista);
-      // Fim real: o botão some, nada mais é pedido e o foco volta ao campo.
-      expect(
-        within(raiz).queryByRole("button", { name: /Mostrar mais|Carregando/ }),
-      ).toBeNull();
-      await waitFor(() => expect(cargoSel()).toHaveFocus());
-      expect(buscas()).toHaveLength(contagens.length);
-    },
+    paginarAteOFim,
   );
+
+  // T196 — o servidor informa um total maior do que tem: a página que ele
+  // devolve vazia encerra (as opções já carregadas ficam), sem pedir as
+  // páginas que o total sugeria.
+  it("paginação: página vazia do servidor encerra, mesmo com total informado maior", async () => {
+    await paginarAteOFim({
+      lista: faixa(1, 25, cargoAtivo),
+      total: 100,
+      contagens: [
+        "100 resultados; 20 exibidos.",
+        "100 resultados; 25 exibidos.",
+        "25 resultados; 25 exibidos.",
+      ],
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------

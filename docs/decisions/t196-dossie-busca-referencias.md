@@ -349,7 +349,10 @@ documentada para a entrega seguinte, sem produto agora.
   A defesa do cliente não mexe nesse total; ela só filtra opções. A contagem
   exibida desconta os descartados de todas as páginas já carregadas. Assim,
   uma página esvaziada pela defesa não trava nem repete "Mostrar mais", e o
-  botão some na última página real do servidor.
+  botão some na última página real do servidor. Uma página que o servidor
+  devolve vazia (nenhum item, nem descartado) também encerra, mesmo se o
+  total informado for maior; as opções já carregadas e a escolha ficam, e a
+  contagem passa a ser o que foi carregado.
 - A carga inicial não lê mais as quatro listas (o teto de 100): só confere,
   com um item, se a empresa tem Departamento e Cargo ativos (o aviso de
   referências da T179). O "+" do RH (T180) continua para Departamento, Cargo

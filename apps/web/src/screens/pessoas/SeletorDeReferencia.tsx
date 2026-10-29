@@ -114,6 +114,11 @@ type Estado =
       tamanhoPagina: number;
       /** Tirados pela defesa do cliente em todas as páginas já carregadas. */
       descartados: number;
+      /**
+       * O servidor devolveu uma página vazia (nenhum item, nem descartado):
+       * não há mais nada, seja qual for o total informado.
+       */
+      esgotado: boolean;
       carregandoMais: boolean;
       falhaAoCarregarMais: boolean;
     }
@@ -124,14 +129,23 @@ type Pronto = Extract<Estado, { tipo: "pronto" }>;
 /**
  * Há próxima página no servidor. Decide pela página pedida e pelo total do
  * servidor, nunca pela quantidade exibida: uma página que a defesa do cliente
- * esvaziou não trava nem repete a paginação.
+ * esvaziou não trava nem repete a paginação. Uma página que o servidor
+ * devolveu vazia encerra, mesmo com um total informado maior.
  */
 function haMaisPaginas(e: Pronto): boolean {
-  return e.tamanhoPagina > 0 && e.pagina * e.tamanhoPagina < e.totalDoServidor;
+  return (
+    !e.esgotado &&
+    e.tamanhoPagina > 0 &&
+    e.pagina * e.tamanhoPagina < e.totalDoServidor
+  );
 }
 
-/** Contagem exibida: o total do servidor menos o que já foi descartado. */
+/**
+ * Contagem exibida: o total do servidor menos o que já foi descartado. Com
+ * o servidor esgotado, é exatamente o que foi carregado.
+ */
 function totalExibido(e: Pronto): number {
+  if (e.esgotado) return e.itens.length;
   return Math.max(e.itens.length, e.totalDoServidor - e.descartados);
 }
 
@@ -239,6 +253,7 @@ export function SeletorDeReferencia({
         pagina,
         tamanhoPagina: resposta.tamanhoPagina,
         descartados: (anterior?.descartados ?? 0) + (resposta.descartados ?? 0),
+        esgotado: resposta.itens.length + (resposta.descartados ?? 0) === 0,
         carregandoMais: false,
         falhaAoCarregarMais: false,
       };
