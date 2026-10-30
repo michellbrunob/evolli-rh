@@ -226,8 +226,9 @@ requisição.
 - **375 px:**
   - o cabeçalho empilha;
   - a faixa de indicadores vira lista;
-  - as abas rolam na horizontal dentro da própria faixa, sem rolagem da
-    página;
+  - até 40rem (inclusive 375 px), as quatro abas formam uma grade de duas
+    colunas, sem rolagem horizontal; em telas maiores, a faixa de abas pode
+    rolar dentro do próprio painel;
   - controles de 44 px.
 - Edição pendente em qualquer bloco conta para a troca de empresa (T189) e
   para sair pela trilha da ficha. Os demais caminhos de saída não pedem
@@ -391,9 +392,10 @@ para a ficha.
 - Respostas atrasadas: a página é remontada por colaborador e descarta
   qualquer resposta de uma montagem anterior — de outro colaborador ou de
   outra empresa.
-- Em 375 px, cabeçalho, resumo e painéis encolhem com a tela; as abas rolam
-  na própria faixa e as tabelas, no próprio quadro. Nenhuma rolagem
-  horizontal da página.
+- Em 375 px, cabeçalho, resumo e painéis encolhem com a tela; até 40rem as
+  quatro abas formam uma grade de duas colunas, sem rolagem horizontal (em
+  telas maiores, a faixa de abas pode rolar dentro do próprio painel), e as
+  tabelas rolam no próprio quadro. Nenhuma rolagem horizontal da página.
 
 ### 13.3 Visões da empresa (D24)
 
