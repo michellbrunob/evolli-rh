@@ -2969,6 +2969,18 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       URL, nunca o texto da busca; aba "Em admissão" para vínculos previstos; "Jornada de
       trabalho" só como acesso à visão existente; "no seu escopo" para o `master_tecnico` sem
       empresa ativa.
+    - **Decisões aprovadas (2026-10-30), seção 3 do dossiê:** N-1 grupos exclusivos com
+      precedência ativo > previsto > encerrado; N-2 distribuição por tipo conta colaboradores,
+      pelo vínculo principal ativo; N-3 as abas substituem Todos/Ativos/Inativos e o select
+      "Situação do vínculo" na tela (a API mantém os parâmetros antigos); N-4 Jornada é aba
+      funcional com a mesma visão e as mesmas permissões; N-5 o tipo vale para o vínculo que
+      define o grupo ou a aba; N-6 a aba inicial é Ativos.
+    - **Entrega (seção 12 do dossiê):** `GET /v1/colaboradores` ganha `grupo` e `tipoVinculo`
+      (400 fora do enum), `tipo` por vínculo e os contadores `emAdmissao`, `desligados`,
+      `total` e `ativosPorTipo`, do escopo inteiro; dashboard com indicadores, distribuição
+      com legenda em texto, cinco abas com teclado, tabela sem CPF, salário ou contatos,
+      filtros por busca, Departamento, Cargo (só em Ativos e Todos) e Tipo, e o estado na URL
+      sem a busca. Sem schema, migration, seed, RBAC, Docker ou dependência.
     - **Fora de escopo:** guarda global de navegação do shell, "Referência técnica" em Dados
       contratuais, exportação, ausências, férias, escala, organograma, CPF, salário, contatos
       na visão coletiva, documentos, R2, foto, portal, benefícios, pesquisas, comentários,

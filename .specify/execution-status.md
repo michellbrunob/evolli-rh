@@ -2794,7 +2794,17 @@ aba, página e ids de filtros na URL, sem o texto da busca. Extensão mínima da
 listagem para tipo de vínculo e grupos; sem schema, migration, RBAC novo, seed
 ou dependência.
 
-**Decisões aprovadas (2026-10-30):** D-1 a D-6 (seção 2 do dossiê).
+**Decisões aprovadas (2026-10-30):** D-1 a D-6 (seção 2 do dossiê) e N-1 a
+N-6 (seção 3): grupos exclusivos ativo > previsto > encerrado; distribuição
+por colaborador, pelo vínculo principal ativo; abas no lugar dos seletores de
+situação (a API mantém os parâmetros antigos); Jornada como aba com a mesma
+visão e permissões; tipo aplicado ao vínculo do grupo; aba inicial Ativos.
+
+**Entrega:** contrato final e notas de implementação na seção 12 do dossiê —
+`grupo` e `tipoVinculo` (400 fora do enum), `tipo` por vínculo, contadores
+`emAdmissao`, `desligados`, `total` e `ativosPorTipo`; Departamento e Cargo só
+em Ativos e Todos; ids da URL conferidos nos catálogos antes da consulta, com
+correção no lugar.
 
 **Fora de escopo:** guarda global de navegação do shell, "Referência técnica", exportação, ausências, férias, escala, organograma, CPF, salário, contatos na visão coletiva, documentos, R2, foto, portal, benefícios, pesquisas, comentários, schema, migration, RBAC novo, seed, Docker, dependências, promoção e merge.
 

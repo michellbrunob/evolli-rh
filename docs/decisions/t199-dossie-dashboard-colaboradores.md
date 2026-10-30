@@ -1,7 +1,8 @@
 # T199 — Dossiê: Dashboard de Colaboradores
 
-**Situação:** decisões D-1 a D-6 aprovadas em 2026-10-30 (seção 2); contrato e
-telas propostos (seções 5 a 8); decisões novas pendentes (seção 3).
+**Situação:** decisões D-1 a D-6 e N-1 a N-6 aprovadas em 2026-10-30 (seções
+2 e 3); contrato e telas implementados (seções 5 a 8); a entrega, com as
+notas de implementação, na seção 12.
 **Base:** `main` no squash `cfcd901` (T198 integrada, PR #191): a ficha
 unificada em página própria (`#/pessoas/colaboradores/:id/:aba`).
 **Escopo:** a porta principal de Gestão de Pessoas › Colaboradores vira um
@@ -48,42 +49,43 @@ qualquer artefato versionado.
 6. **D-6 — Escopo global:** para o `master_tecnico` sem empresa ativa, os
    rótulos dizem "no seu escopo", nunca "nesta empresa".
 
-## 3. Decisões novas (pendentes, com recomendação)
+## 3. Decisões novas (aprovadas em 2026-10-30, como recomendadas)
 
-Pontos que as D-1 a D-6 não cobrem e que mudam o resultado.
+Pontos que as D-1 a D-6 não cobrem e que mudam o resultado. As seis foram
+aprovadas na forma recomendada abaixo.
 
 1. **N-1 — Grupos exclusivos e precedência.** Um colaborador com vínculo
    previsto e outro encerrado (readmissão em andamento) cairia, pela letra
    das D-1 e D-4, em "Desligados" e em "Em admissão" ao mesmo tempo.
-   **Recomendado:** grupos exclusivos, com precedência ativo > previsto >
+   **Aprovado:** grupos exclusivos, com precedência ativo > previsto >
    encerrado — Ativos (tem vínculo ativo), Em admissão (sem ativo, com
    previsto), Desligados (sem ativo nem previsto, com encerrado). Assim
    Ativos + Em admissão + Desligados = Total no escopo, sempre.
 2. **N-2 — Unidade da distribuição por tipo.** Contar **colaboradores
    ativos** pelo tipo do vínculo principal ativo (soma = Ativos), ou contar
    **vínculos ativos** por tipo (soma pode passar de Ativos quando alguém tem
-   dois vínculos ativos). **Recomendado:** colaboradores, pelo vínculo
+   dois vínculos ativos). **Aprovado:** colaboradores, pelo vínculo
    principal (mesma regra da listagem e da ficha).
 3. **N-3 — Abas versus filtros de situação atuais.** As abas Ativos, Em
    admissão, Desligados e Todos fazem o papel dos seletores
    Todos/Ativos/Inativos e do select "Situação do vínculo"; manter os dois
    produziria combinações contraditórias (aba Ativos + "encerrado").
-   **Recomendado:** as abas substituem os seletores e o select; ficam busca,
+   **Aprovado:** as abas substituem os seletores e o select; ficam busca,
    Departamento, Cargo e o novo Tipo de vínculo. O contrato antigo
    (`situacao`, `situacaoVinculo`) continua aceito pela API.
 4. **N-4 — Forma da aba "Jornada de trabalho".** O contêiner Pessoas já tem a
    aba "Horário de trabalho" com essa visão. Opções: (a) a aba do dashboard
    mostra o mesmo componente da visão existente, sem lógica nova; (b) um
    atalho fora das abas que leva a Pessoas › Horário de trabalho.
-   **Recomendado:** (a), com o mesmo componente e as mesmas permissões
+   **Aprovado:** (a), com o mesmo componente e as mesmas permissões
    (operação só do RH); o rótulo do contêiner ("Horário de trabalho") fica
    como está nesta entrega.
 5. **N-5 — Filtro de tipo combinado com a aba.** "Ativos + PJ" pode
    significar "tem vínculo ativo do tipo PJ" ou "está ativo e tem algum
-   vínculo PJ". **Recomendado:** o mesmo vínculo — o tipo se aplica ao
+   vínculo PJ". **Aprovado:** o mesmo vínculo — o tipo se aplica ao
    vínculo que define o grupo (ativo em Ativos, previsto em Em admissão,
    encerrado em Desligados; qualquer um em Todos).
-6. **N-6 — Aba inicial.** Hoje a listagem abre em "Todos". **Recomendado:**
+6. **N-6 — Aba inicial.** Hoje a listagem abre em "Todos". **Aprovado:**
    abrir em Ativos (a visão operacional do dia a dia); "Todos" continua a um
    clique e endereçável pela URL.
 
@@ -104,7 +106,7 @@ mesmos números com qualquer filtro, como os contadores da T186:
 Nada de ausentes do dia, tempo de casa, salário, CPF, contatos, férias ou
 escala: não há fonte real para nenhum deles.
 
-## 5. Contrato proposto (extensão mínima de `GET /v1/colaboradores`)
+## 5. Contrato (extensão mínima de `GET /v1/colaboradores`)
 
 Sem endpoint novo, sem schema, migration, RBAC novo, seed ou dependência.
 
@@ -212,3 +214,54 @@ Docker, dependências, promoção e merge.
 - **Dado pessoal na URL:** a busca fica fora por regra e por teste.
 - **Duas portas para a mesma visão de jornada** (N-4): o rótulo precisa
   deixar claro que é a mesma visão.
+
+## 12. Entrega
+
+**Contrato final de `GET /v1/colaboradores`** (sem endpoint novo):
+
+- Query nova, opcional: `grupo` (`ativos` | `em_admissao` | `desligados`) e
+  `tipoVinculo` (enum do vínculo). Valor fora do enum responde **400**, sem
+  consulta. Os dois entram no `where` antes da paginação; `situacao`,
+  `situacaoVinculo`, `busca`, `departamentoId` e `cargoId` seguem como antes
+  e se combinam com eles.
+- Grupos (N-1): Ativos = algum vínculo ativo no escopo; Em admissão = nenhum
+  ativo e algum previsto; Desligados = nenhum ativo nem previsto e algum
+  encerrado. O tipo (N-5) vale para o vínculo que define o grupo; sem grupo,
+  para qualquer vínculo do escopo.
+- Projeção: cada vínculo ganha `tipo`.
+- `contadores`: `ativos`, `inativos` (mantidos), `emAdmissao`, `desligados`,
+  `total` e `ativosPorTipo` (os cinco tipos, zeros incluídos), sempre do
+  escopo inteiro, sem busca, filtros nem grupo.
+
+**Notas de implementação:**
+
+- **N-2 só pesa no escopo global.** O banco já impede dois vínculos ativos do
+  mesmo colaborador na mesma empresa (`vinculo_funcional_ativo_unico`), então,
+  para RH e DP, "o vínculo principal ativo" é o único ativo. A regra do
+  principal (admissão mais recente, depois a matrícula) decide só para o
+  `master_tecnico` sem empresa ativa, com ativos em empresas diferentes; o
+  teste unitário cobre esse caso, e o E2E cobre o caso por empresa.
+- **Lotação só em Ativos e Todos.** A lotação vigente só existe em vínculo
+  ativo (T184, T190): Departamento e Cargo nunca casariam em Em admissão nem
+  em Desligados, então lá os dois filtros não aparecem e os ids saem do
+  estado e da URL. O Tipo de vínculo vale em todas as abas da tabela.
+- **Ids de filtro conferidos antes da consulta.** Um id de Departamento ou
+  Cargo vindo da URL só vira consulta depois de conferido nos catálogos da
+  empresa ativa (só ativos). Enquanto eles carregam, a tabela espera; se o id
+  não está lá (outra empresa, inativo), cai no padrão e a URL é corrigida
+  **no lugar** (`replaceState`), para o "voltar" não cair de novo no
+  endereço inválido. Se os catálogos falham, o servidor decide — o escopo
+  dele nunca devolve outra empresa.
+- **URL.** `#/pessoas/colaboradores?aba=…&pagina=…&departamento=…&cargo=…&tipo=…`
+  só com o que difere do padrão (Ativos, página 1, sem filtros), em ordem
+  fixa. Trocar aba, página ou filtro empilha uma entrada; corrigir valor
+  inválido não. A aba Jornada não leva página, lotação nem tipo. Sair pela
+  barra lateral e voltar abre o estado inicial; a troca de empresa também.
+- **Aba Jornada de trabalho (N-4).** É a visão de Pessoas › Horário de
+  trabalho, embutida (título em `h2`), com as mesmas permissões: só o RH
+  opera. Os indicadores continuam acima dela, por uma leitura mínima dos
+  contadores quando ela é a primeira aba aberta.
+- **Tela.** Os seletores Todos/Ativos/Inativos, o select "Situação do
+  vínculo" e o aviso "Ainda indisponível" saíram (N-3); a frase do cabeçalho
+  descreve o que a tela faz. O nome acessível de cada aba traz o total
+  ("Ativos, 12"); o número visível é decorativo para leitor de tela.
