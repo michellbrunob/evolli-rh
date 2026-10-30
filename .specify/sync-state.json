@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "constitutionVersion": "1.4.0",
-  "lastConvergedAt": "2026-10-29",
-  "lastIntegratedTask": 197,
-  "lastRecordedTask": 198,
+  "lastConvergedAt": "2026-10-30",
+  "lastIntegratedTask": 198,
+  "lastRecordedTask": 199,
   "platformDecision": {
     "adr": "docs/adr/0014-evolli-plataforma-base-e-encerramento-do-frappe.md",
     "decidedAt": "2026-10-01",
@@ -11,15 +11,15 @@
     "frappe": "encerrado_como_candidato_referencia_apenas"
   },
   "nextTask": {
-    "id": "T198",
-    "status": "ficha_unificada_colaborador_em_implementacao",
-    "reason": "T197 integrada em main pela PR #190 (squash 0ca4df56bd3f15eae9a47dc4de689a0a44ecbcd7), com a CI de push 3/3 verde (run 40945643467). A T198 implementa a ficha unificada do Colaborador aprovada (D17 a D24, docs/decisions/t198-dossie-ficha-unificada-colaborador.md, secao 13): pagina propria com rota #/pessoas/colaboradores/:id/:aba no lugar do modal; cabecalho com situacao nesta empresa, vinculo principal, cargo e departamento da lotacao vigente por id, admissao e jornada vigente; quatro abas funcionais (Dados do colaborador, Vida funcional, Dados contratuais, Jornada de trabalho); master_tecnico so leitura; Dados contratuais, Historico funcional e Horario como visoes da empresa com atalho para a ficha. Sem API nova, schema, migration, RBAC, seed ou dependencia."
+    "id": "T199",
+    "status": "dashboard_colaboradores_em_implementacao",
+    "reason": "T198 integrada em main pela PR #191 (squash cfcd901f7f1e3e6684c3e5a818994e96570d367f), com a CI de push 3/3 verde (run 41114960659). A T199 transforma a listagem de Colaboradores num dashboard (docs/decisions/t199-dossie-dashboard-colaboradores.md): indicadores reais calculados no servidor (ativos, em admissao, desligados, total no escopo e ativos por tipo de vinculo); abas Ativos, Em admissao, Desligados, Todos e Jornada de trabalho; tabela com abertura da ficha da T198; aba, pagina e ids de filtros na URL, sem o texto da busca. Decisoes D-1 a D-6 aprovadas. Extensao minima da listagem; sem schema, migration, RBAC novo, seed ou dependencia."
   },
   "openDeliveries": [
     {
-      "id": "T198",
+      "id": "T199",
       "pullRequest": null,
-      "status": "ficha_unificada_colaborador_em_implementacao"
+      "status": "dashboard_colaboradores_em_implementacao"
     }
   ],
   "requiredArtifacts": [
