@@ -385,8 +385,9 @@ para a ficha.
   trocar de aba não perde o que foi digitado.
 - Edição (D23): as mesmas regras de antes — nome, dados pessoais, endereço e
   contatos para RH e DP; jornada só para o RH; `master_tecnico` só lê. Edição
-  pendente pede confirmação ao voltar; durante a gravação, voltar não sai; a
-  troca de empresa avisa como antes (T189).
+  pendente pede confirmação ao sair pela trilha da ficha; durante a gravação,
+  a trilha da ficha não sai; a troca de empresa avisa como antes (T189). Os
+  demais caminhos de saída ainda não pedem confirmação (seção 13.4).
 - Respostas atrasadas: a página é remontada por colaborador e descarta
   qualquer resposta de uma montagem anterior — de outro colaborador ou de
   outra empresa.
