@@ -67,6 +67,7 @@ import {
   type AlvoHistoricoFuncional,
   VidaFuncionalColaboradorSecao,
 } from "./VidaFuncionalColaboradorSecao";
+import { type IconeFichaId, IconeFicha } from "./IconeFicha";
 import { jornadaDeHoje, rotuloDaJornada } from "./jornadaColaborador";
 import { vinculoPrincipal } from "./vinculoPrincipal";
 import "./FichaColaboradorScreen.css";
@@ -81,6 +82,29 @@ export const ROTULO_DA_ABA: Readonly<Record<AbaDaFicha, string>> = {
   contratuais: "Dados contratuais",
   jornada: "Jornada de trabalho",
 };
+
+/** Ícone de cada aba (desenho próprio, ao lado do rótulo). */
+const ICONE_DA_ABA: Readonly<Record<AbaDaFicha, IconeFichaId>> = {
+  dados: "dados",
+  "vida-funcional": "vida-funcional",
+  contratuais: "contratuais",
+  jornada: "jornada",
+};
+
+/**
+ * Iniciais do avatar neutro: primeira letra do primeiro e do último nome.
+ * Sem foto e sem upload — só o nome que a ficha já exibe.
+ */
+export function iniciaisDe(nome: string): string {
+  const partes = nome
+    .split(/\s+/)
+    .map((p) => p.replace(/[^\p{L}]/gu, ""))
+    .filter((p) => p.length > 0);
+  if (partes.length === 0) return "";
+  const primeira = partes[0]!.charAt(0);
+  const ultima = partes.length > 1 ? partes[partes.length - 1]!.charAt(0) : "";
+  return `${primeira}${ultima}`.toLocaleUpperCase("pt-BR");
+}
 
 const ROTULO_TIPO_VINCULO: Record<TipoVinculo, string> = {
   clt: "CLT",
@@ -212,7 +236,7 @@ export function FichaColaboradorScreen({
   const idDoPainel = (a: AbaDaFicha) => `${prefixo}-painel-${a}`;
   const tituloRef = useRef<HTMLHeadingElement | null>(null);
   /** Destinos do foco quando uma nova leitura do resumo dá certo. */
-  const lotacaoRef = useRef<HTMLParagraphElement | null>(null);
+  const lotacaoRef = useRef<HTMLDivElement | null>(null);
   const jornadaRef = useRef<HTMLDivElement | null>(null);
   /** Para onde levar o foco depois do próximo desenho (nova leitura bem-sucedida). */
   const focoPendenteRef = useRef<"titulo" | "lotacao" | "jornada" | null>(null);
@@ -729,107 +753,164 @@ export function FichaColaboradorScreen({
         }
       : null;
 
+  // Cargo e departamento vigentes, em linguagem de perfil ("quem é, onde
+  // está"); o detalhe com código fica no cartão da faixa de resumo.
+  const papelNaEstrutura =
+    lotacao.tipo === "dados"
+      ? [lotacao.cargo?.nome, lotacao.departamento?.nome]
+          .filter((v): v is string => Boolean(v))
+          .join(" · ")
+      : "";
+
   return (
     <div className="ficha-colaborador">
       <TrilhaNavegacao itens={trilha} />
 
-      <header className="ficha-colaborador__cabecalho">
-        <div className="ficha-colaborador__identidade">
-          <h1
-            id={FICHA_COLABORADOR_TITULO_ID}
-            ref={tituloRef}
-            tabIndex={-1}
-            className="ficha-colaborador__titulo"
-          >
-            {nome}
-          </h1>
-          <p className="ficha-colaborador__selos">
-            <StatusBadge variant={ativoNaEmpresa ? "success" : "neutral"}>
-              {ativoNaEmpresa ? "Ativo" : "Inativo"} nesta empresa
-            </StatusBadge>
-          </p>
-          <p
-            ref={lotacaoRef}
-            tabIndex={-1}
-            className="ficha-colaborador__lotacao"
-          >
-            {lotacaoNoCabecalho()}
-          </p>
-        </div>
-
-        <dl className="ficha-colaborador__resumo">
-          <div className="ficha-colaborador__item">
-            <dt>Vínculo principal</dt>
-            <dd>
-              {principal ? (
-                <>
-                  {ROTULO_TIPO_VINCULO[principal.tipo] ?? principal.tipo} ·{" "}
-                  {exibirMatricula(principal.matricula)} ·{" "}
+      <div className="ficha-colaborador__perfil">
+        <header className="ficha-colaborador__cabecalho">
+          {/* Faixa institucional: só decoração, sem conteúdo. */}
+          <div className="ficha-colaborador__faixa" aria-hidden="true" />
+          <div className="ficha-colaborador__topo">
+            {/* Avatar neutro por iniciais: o nome já está no h1 ao lado. */}
+            <span className="ficha-colaborador__avatar" aria-hidden="true">
+              {iniciaisDe(nome)}
+            </span>
+            <div className="ficha-colaborador__identidade">
+              <h1
+                id={FICHA_COLABORADOR_TITULO_ID}
+                ref={tituloRef}
+                tabIndex={-1}
+                className="ficha-colaborador__titulo"
+              >
+                {nome}
+              </h1>
+              <p className="ficha-colaborador__selos">
+                <StatusBadge variant={ativoNaEmpresa ? "success" : "neutral"}>
+                  {ativoNaEmpresa ? "Ativo" : "Inativo"} nesta empresa
+                </StatusBadge>
+                {principal ? (
                   <StatusBadge
                     variant={VARIANTE_SITUACAO_VINCULO[principal.situacao]}
                   >
+                    {ROTULO_TIPO_VINCULO[principal.tipo] ?? principal.tipo}
+                    {" · "}
                     {ROTULO_SITUACAO_VINCULO[principal.situacao]}
                   </StatusBadge>
-                </>
-              ) : (
-                "Sem vínculo nesta empresa"
-              )}
-            </dd>
-          </div>
-          <div className="ficha-colaborador__item">
-            <dt>Admissão</dt>
-            <dd>
-              {principal ? formatarDiaCivil(principal.dataAdmissao) : "—"}
-            </dd>
-          </div>
-          {principal?.situacao === "encerrado" ? (
-            <div className="ficha-colaborador__item">
-              <dt>Desligamento</dt>
-              <dd>{formatarDiaCivil(principal.dataDesligamento)}</dd>
+                ) : null}
+              </p>
+              {papelNaEstrutura ? (
+                <p className="ficha-colaborador__papel">{papelNaEstrutura}</p>
+              ) : null}
             </div>
-          ) : null}
-          <div
-            ref={jornadaRef}
-            tabIndex={-1}
-            className="ficha-colaborador__item"
-          >
-            <dt>Jornada vigente</dt>
-            <dd>{jornadaNoCabecalho()}</dd>
+            <div className="ficha-colaborador__acoes">
+              <Button variant="secondary" onClick={pedirVoltar}>
+                Voltar para {rotuloColaboradores}
+              </Button>
+            </div>
           </div>
-        </dl>
-      </header>
 
-      <div
-        role="tablist"
-        aria-label={`Seções da ficha de ${nome}`}
-        className="ficha-colaborador__abas"
-      >
-        {ABAS_DA_FICHA.map((a) => {
-          const selecionada = a === aba;
-          return (
-            <button
-              key={a}
-              type="button"
-              role="tab"
-              id={idDaAba(a)}
-              data-aba={a}
-              aria-selected={selecionada}
-              aria-controls={idDoPainel(a)}
-              tabIndex={selecionada ? 0 : -1}
-              className={
-                selecionada
-                  ? "ficha-colaborador__aba ficha-colaborador__aba--ativa"
-                  : "ficha-colaborador__aba"
-              }
-              onClick={() => {
-                if (!selecionada) onTrocarAba(a);
-              }}
-              onKeyDown={aoTeclarNaAba}
+          {/* Faixa de resumo: só dados reais; nada calculado no navegador
+              (D19) e nenhum contato. */}
+          <dl className="ficha-colaborador__resumo">
+            <div className="ficha-colaborador__item">
+              <dt>
+                <IconeFicha nome="calendario" />
+                Admissão
+              </dt>
+              <dd>
+                {principal
+                  ? formatarDiaCivil(principal.dataAdmissao)
+                  : "Sem admissão nesta empresa"}
+              </dd>
+            </div>
+            {principal?.situacao === "encerrado" ? (
+              <div className="ficha-colaborador__item">
+                <dt>
+                  <IconeFicha nome="calendario" />
+                  Desligamento
+                </dt>
+                <dd>{formatarDiaCivil(principal.dataDesligamento)}</dd>
+              </div>
+            ) : null}
+            <div
+              ref={lotacaoRef}
+              tabIndex={-1}
+              className="ficha-colaborador__item ficha-colaborador__lotacao"
             >
-              {ROTULO_DA_ABA[a]}
-            </button>
-          );
-        })}
+              <dt>
+                <IconeFicha nome="estrutura" />
+                Cargo e departamento
+              </dt>
+              <dd>{lotacaoNoCabecalho()}</dd>
+            </div>
+            <div
+              ref={jornadaRef}
+              tabIndex={-1}
+              className="ficha-colaborador__item"
+            >
+              <dt>
+                <IconeFicha nome="jornada" />
+                Jornada vigente
+              </dt>
+              <dd>{jornadaNoCabecalho()}</dd>
+            </div>
+            <div className="ficha-colaborador__item">
+              <dt>
+                <IconeFicha nome="cracha" />
+                Vínculo principal
+              </dt>
+              <dd>
+                {principal ? (
+                  <>
+                    {ROTULO_TIPO_VINCULO[principal.tipo] ?? principal.tipo} ·{" "}
+                    {exibirMatricula(principal.matricula)} ·{" "}
+                    <StatusBadge
+                      variant={VARIANTE_SITUACAO_VINCULO[principal.situacao]}
+                    >
+                      {ROTULO_SITUACAO_VINCULO[principal.situacao]}
+                    </StatusBadge>
+                  </>
+                ) : (
+                  "Sem vínculo nesta empresa"
+                )}
+              </dd>
+            </div>
+          </dl>
+        </header>
+
+        <div
+          role="tablist"
+          aria-label={`Seções da ficha de ${nome}`}
+          className="ficha-colaborador__abas"
+        >
+          {ABAS_DA_FICHA.map((a) => {
+            const selecionada = a === aba;
+            return (
+              <button
+                key={a}
+                type="button"
+                role="tab"
+                id={idDaAba(a)}
+                data-aba={a}
+                aria-selected={selecionada}
+                aria-controls={idDoPainel(a)}
+                tabIndex={selecionada ? 0 : -1}
+                className={
+                  selecionada
+                    ? "ficha-colaborador__aba ficha-colaborador__aba--ativa"
+                    : "ficha-colaborador__aba"
+                }
+                onClick={() => {
+                  if (!selecionada) onTrocarAba(a);
+                }}
+                onKeyDown={aoTeclarNaAba}
+              >
+                <IconeFicha nome={ICONE_DA_ABA[a]} />
+                {ROTULO_DA_ABA[a]}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {ABAS_DA_FICHA.map((a) =>
@@ -853,34 +934,48 @@ export function FichaColaboradorScreen({
             {a === "dados" ? (
               <>
                 {podeEditarFicha ? (
-                  <div className="ficha-colaborador__nome">
-                    <FormField
-                      id={`${prefixo}-nome`}
-                      label="Nome"
-                      {...(erroNome ? { error: erroNome } : {})}
+                  <section
+                    className="ficha-colaborador__cartao"
+                    aria-labelledby={`${prefixo}-identificacao`}
+                  >
+                    <h3
+                      id={`${prefixo}-identificacao`}
+                      className="ficha-colaborador__cartao-titulo"
                     >
-                      {(control) => (
-                        <input
-                          type="text"
-                          maxLength={160}
-                          value={nomeEdicao}
-                          onChange={(e) => {
-                            setNomeEdicao(e.target.value);
-                            setErroNome(null);
-                          }}
-                          {...control}
-                        />
-                      )}
-                    </FormField>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={() => void salvarNome()}
-                      disabled={salvandoNome || !nomeAlterado}
-                    >
-                      {salvandoNome ? "Salvando…" : "Salvar nome"}
-                    </Button>
-                  </div>
+                      Identificação
+                    </h3>
+                    <p className="ficha-colaborador__cartao-contexto">
+                      O nome aparece em todas as telas do Evolli.
+                    </p>
+                    <div className="ficha-colaborador__nome">
+                      <FormField
+                        id={`${prefixo}-nome`}
+                        label="Nome"
+                        {...(erroNome ? { error: erroNome } : {})}
+                      >
+                        {(control) => (
+                          <input
+                            type="text"
+                            maxLength={160}
+                            value={nomeEdicao}
+                            onChange={(e) => {
+                              setNomeEdicao(e.target.value);
+                              setErroNome(null);
+                            }}
+                            {...control}
+                          />
+                        )}
+                      </FormField>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={() => void salvarNome()}
+                        disabled={salvandoNome || !nomeAlterado}
+                      >
+                        {salvandoNome ? "Salvando…" : "Salvar nome"}
+                      </Button>
+                    </div>
+                  </section>
                 ) : null}
                 <DadosPessoaisColaboradorSecao
                   colaboradorId={colaboradorId}

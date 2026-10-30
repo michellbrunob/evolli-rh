@@ -446,3 +446,33 @@ para a ficha.
   fora do alerta.
 - **Edição pendente documentada com exatidão** (13.4): o que pede
   confirmação, o que ainda descarta sem pedir, e o gate para produção.
+
+### 13.6 Refinamento visual: painel de perfil
+
+A ficha passa a se apresentar como painel de perfil do colaborador, com a
+identidade do Evolli (tokens de cor, superfície, raio e espaçamento; ícones
+desenhados no próprio projeto, no padrão de `IconeModulo`). Nada de
+contrato, regra, rota ou permissão mudou.
+
+- **Cabeçalho de perfil:** faixa institucional discreta (só decoração);
+  avatar neutro com as iniciais do nome, sem foto nem upload; nome (h1);
+  selos de situação nesta empresa e de tipo e situação do vínculo principal;
+  cargo e departamento vigentes em linguagem de perfil; e "Voltar para
+  Colaboradores", a única ação do cabeçalho, com a mesma proteção de edição
+  pendente da trilha.
+- **Faixa de resumo:** cartões compactos com admissão, desligamento (quando
+  encerrado), cargo e departamento (com código), jornada vigente e vínculo
+  principal (tipo, matrícula e situação). Ausência de dado é dita em texto
+  ("Sem admissão nesta empresa", "Sem lotação vigente", "Sem jornada
+  vigente"), nunca com identificador. Sem tempo de empresa e sem contatos
+  (D19).
+- **Abas:** as mesmas quatro, no pé do painel, com ícone decorativo e a aba
+  ativa marcada por peso, barra e cor do ícone; teclado, rota, recarga e
+  histórico como antes. No celular, viram uma grade de duas colunas, sem
+  rolagem lateral.
+- **Conteúdo em cartões:** as seções reaproveitadas ganham a moldura de
+  cartão da ficha; a edição do nome fica num cartão "Identificação", com
+  contexto, só para quem edita.
+- **Ajuste encontrado na validação:** na aba Dados contratuais (e na tela da
+  empresa), o selo de situação do vínculo esticava na largura do cartão;
+  agora ocupa só o próprio texto.

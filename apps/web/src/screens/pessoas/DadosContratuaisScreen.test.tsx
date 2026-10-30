@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import {
   fireEvent,
   render,
@@ -706,5 +707,17 @@ describe("T198 — Dados contratuais e a ficha do colaborador", () => {
     expect(
       screen.queryByRole("button", { name: /^Abrir ficha de/ }),
     ).toBeNull();
+  });
+});
+
+describe("T198 — contrato de CSS do detalhe do vínculo", () => {
+  it("o selo de situação ocupa só o próprio texto, não a largura do cartão", () => {
+    const css = readFileSync(
+      "src/screens/pessoas/DadosContratuaisScreen.css",
+      "utf8",
+    );
+    expect(css).toMatch(
+      /\.dados-contratuais-screen__detalhe\s*>\s*\.evolli-badge\s*\{[^}]*align-self:\s*flex-start;/,
+    );
   });
 });

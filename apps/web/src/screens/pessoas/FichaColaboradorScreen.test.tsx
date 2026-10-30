@@ -39,7 +39,7 @@ import { consultarDadosPessoaisDoColaborador } from "../../api/dadosPessoaisClie
 import { buscarLinhaDoTempo } from "../../api/movimentacaoClient";
 import type { AbaDaFicha } from "../../app/rotasDoShell";
 import { expectSemIsoVisivel } from "../../test/semIsoVisivel";
-import { FichaColaboradorScreen } from "./FichaColaboradorScreen";
+import { FichaColaboradorScreen, iniciaisDe } from "./FichaColaboradorScreen";
 
 /**
  * T198 — a ficha unificada do colaborador, em página própria. O que se prova
@@ -393,7 +393,7 @@ describe("T198 — cabeçalho da ficha", () => {
     expect(resumo("Vínculo principal")).toHaveTextContent(
       "Sem vínculo nesta empresa",
     );
-    expect(resumo("Admissão")).toHaveTextContent("—");
+    expect(resumo("Admissão")).toHaveTextContent("Sem admissão nesta empresa");
     expect(resumo("Jornada vigente")).toHaveTextContent("Sem jornada vigente");
     expect(
       within(cabecalho()).getByText("Inativo nesta empresa"),
@@ -1245,5 +1245,230 @@ describe("T198 — foco e anúncio nas novas leituras", () => {
       expect(alertas).toHaveLength(1);
       expect(alertas[0]).not.toBe(primeiro);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Refinamento visual — a ficha como painel de perfil: cabeçalho com faixa,
+// avatar por iniciais, selos, papel na estrutura e retorno à listagem; faixa
+// de resumo em cartões; abas com ícone próprio. Só dados reais e só ações que
+// existem.
+// ---------------------------------------------------------------------------
+describe("T198 — painel de perfil", () => {
+  function perfil(): HTMLElement {
+    const el = document.querySelector<HTMLElement>(
+      ".ficha-colaborador__perfil",
+    );
+    if (!el) throw new Error("Sem painel de perfil.");
+    return el;
+  }
+
+  it("iniciais do avatar: primeira letra do primeiro e do último nome", () => {
+    expect(iniciaisDe("Ana Sintética (teste)")).toBe("AT");
+    expect(iniciaisDe("  bruno   sintético ")).toBe("BS");
+    expect(iniciaisDe("Única")).toBe("Ú");
+    expect(iniciaisDe("   ")).toBe("");
+  });
+
+  it("cabeçalho: faixa e avatar decorativos, nome, selos e papel na estrutura", async () => {
+    render(<Ficha />);
+    await esperarFicha();
+    const faixa = perfil().querySelector(".ficha-colaborador__faixa");
+    expect(faixa).toHaveAttribute("aria-hidden", "true");
+    expect(faixa).toBeEmptyDOMElement();
+    const avatar = perfil().querySelector(".ficha-colaborador__avatar");
+    expect(avatar).toHaveAttribute("aria-hidden", "true");
+    expect(avatar).toHaveTextContent(/^AT$/);
+    // Sem foto: nenhum <img> no painel.
+    expect(perfil().querySelector("img")).toBeNull();
+
+    const selos = perfil().querySelector(".ficha-colaborador__selos")!;
+    expect(selos).toHaveTextContent("Ativo nesta empresa");
+    expect(selos).toHaveTextContent("CLT · Ativo");
+    await waitFor(() =>
+      expect(
+        perfil().querySelector(".ficha-colaborador__papel"),
+      ).toHaveTextContent("Analista (teste) · Administrativo (teste)"),
+    );
+  });
+
+  it("sem lotação vigente, o papel na estrutura não aparece (nada inventado)", async () => {
+    vi.mocked(listarAlocacoesVinculo).mockResolvedValue([]);
+    render(<Ficha />);
+    await esperarFicha();
+    await waitFor(() =>
+      expect(cabecalho()).toHaveTextContent("Sem lotação vigente"),
+    );
+    expect(perfil().querySelector(".ficha-colaborador__papel")).toBeNull();
+  });
+
+  it("faixa de resumo: admissão, cargo e departamento, jornada e vínculo, nessa ordem, com ícone decorativo", async () => {
+    render(<Ficha />);
+    await esperarFicha();
+    const rotulos = [
+      ...cabecalho().querySelectorAll(".ficha-colaborador__resumo dt"),
+    ].map((dt) => dt.textContent);
+    expect(rotulos).toEqual([
+      "Admissão",
+      "Cargo e departamento",
+      "Jornada vigente",
+      "Vínculo principal",
+    ]);
+    for (const icone of cabecalho().querySelectorAll(
+      ".ficha-colaborador__resumo svg",
+    )) {
+      expect(icone).toHaveAttribute("aria-hidden", "true");
+      expect(icone).toHaveAttribute("focusable", "false");
+    }
+    // Nada de tempo de empresa nem de contato na faixa (D19).
+    expect(cabecalho()).not.toHaveTextContent(/tempo de (casa|empresa)/i);
+    expect(cabecalho()).not.toHaveTextContent(/e-mail|celular|telefone/i);
+  });
+
+  it("encerrado: o desligamento entra como cartão depois da admissão", async () => {
+    vi.mocked(listarVinculosDoColaborador).mockResolvedValue([
+      vinculo({ situacao: "encerrado", dataDesligamento: "2026-06-30" }),
+    ]);
+    render(<Ficha />);
+    await esperarFicha();
+    const rotulos = [
+      ...cabecalho().querySelectorAll(".ficha-colaborador__resumo dt"),
+    ].map((dt) => dt.textContent);
+    expect(rotulos.slice(0, 2)).toEqual(["Admissão", "Desligamento"]);
+    expect(
+      perfil().querySelector(".ficha-colaborador__selos"),
+    ).toHaveTextContent("CLT · Encerrado");
+  });
+
+  it("'Voltar para Colaboradores' no cabeçalho volta à listagem e respeita a edição pendente", async () => {
+    const onVoltar = vi.fn();
+    render(<Ficha podeEditarFicha onVoltar={onVoltar} />);
+    await esperarFicha();
+    const voltar = within(cabecalho()).getByRole("button", {
+      name: "Voltar para Colaboradores",
+    });
+    fireEvent.click(voltar);
+    expect(onVoltar).toHaveBeenCalledTimes(1);
+
+    fireEvent.change(screen.getByLabelText("Nome"), {
+      target: { value: "Outra (teste)" },
+    });
+    fireEvent.click(voltar);
+    expect(
+      screen.getByRole("dialog", { name: "Sair da ficha sem salvar?" }),
+    ).toBeInTheDocument();
+    expect(onVoltar).toHaveBeenCalledTimes(1);
+  });
+
+  it("o cabeçalho só tem a ação que existe: nada de editar, exportar, convidar ou menu", async () => {
+    render(<Ficha podeEditarFicha podeOperarJornada />);
+    await esperarFicha();
+    await waitFor(() =>
+      expect(cabecalho()).toHaveTextContent("JOR44 — Comercial (teste)"),
+    );
+    expect(
+      within(cabecalho())
+        .getAllByRole("button")
+        .map((b) => b.textContent),
+    ).toEqual(["Voltar para Colaboradores"]);
+  });
+
+  it("abas com ícone decorativo: o nome acessível é só o rótulo; nenhuma aba indisponível", async () => {
+    render(<Ficha />);
+    await esperarFicha();
+    const abas = within(screen.getByRole("tablist")).getAllByRole("tab");
+    expect(abas).toHaveLength(4);
+    for (const aba of abas) {
+      const icone = aba.querySelector("svg");
+      expect(icone).toHaveAttribute("aria-hidden", "true");
+    }
+    expect(abas.map((a) => a.textContent)).toEqual([
+      "Dados do colaborador",
+      "Vida funcional",
+      "Dados contratuais",
+      "Jornada de trabalho",
+    ]);
+    expect(
+      screen.queryByRole("tab", {
+        name: /sal[aá]rio|f[eé]rias|benef[ií]cio|documento|pesquisa|coment[aá]rio|portal/i,
+      }),
+    ).toBeNull();
+    // As abas ficam no mesmo painel do cabeçalho.
+    expect(perfil()).toContainElement(screen.getByRole("tablist"));
+  });
+
+  it("a edição do nome fica num cartão com título e contexto (só para quem edita)", async () => {
+    const { unmount } = render(<Ficha podeEditarFicha />);
+    await esperarFicha();
+    const cartao = screen.getByRole("region", { name: "Identificação" });
+    expect(within(cartao).getByLabelText("Nome")).toBeInTheDocument();
+    expect(cartao).toHaveTextContent(
+      "O nome aparece em todas as telas do Evolli.",
+    );
+    unmount();
+
+    render(<Ficha />);
+    await esperarFicha();
+    expect(screen.queryByRole("region", { name: "Identificação" })).toBeNull();
+  });
+});
+
+describe("T198 — contrato de CSS do painel de perfil (375 px, tokens)", () => {
+  const css = readFileSync(
+    "src/screens/pessoas/FichaColaboradorScreen.css",
+    "utf8",
+  );
+  const corpo = (seletor: string) => {
+    const escapado = seletor.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const m = new RegExp(
+      String.raw`(?:^|\})\s*${escapado}\s*\{([^}]*)\}`,
+      "m",
+    ).exec(css);
+    return m ? (m[1] ?? "") : null;
+  };
+  /** O bloco do `@media (max-width: 40rem)` que contém o seletor. */
+  const noCelular = (seletor: string) => {
+    const blocos = css.split("@media (max-width: 40rem)").slice(1);
+    const escapado = seletor.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    for (const bloco of blocos) {
+      const m = new RegExp(String.raw`${escapado}\s*\{([^}]*)\}`).exec(bloco);
+      if (m) return m[1] ?? "";
+    }
+    return null;
+  };
+
+  it("o painel recorta a faixa e encolhe com a tela", () => {
+    expect(corpo(".ficha-colaborador__perfil")).toMatch(/overflow:\s*hidden;/);
+    expect(corpo(".ficha-colaborador__perfil")).toMatch(/min-width:\s*0;/);
+    expect(corpo(".ficha-colaborador__topo")).toMatch(/flex-wrap:\s*wrap;/);
+  });
+
+  it("faixa e avatar só com tokens do Evolli", () => {
+    expect(corpo(".ficha-colaborador__faixa")).toMatch(/var\(--color-action\)/);
+    expect(corpo(".ficha-colaborador__avatar")).toMatch(
+      /border-radius:\s*var\(--radius-pill\);/,
+    );
+    expect(css).not.toMatch(/#[0-9a-f]{3,8}\b/i);
+    expect(css).not.toMatch(/\brgba?\(|\bhsla?\(/i);
+    expect(css).not.toMatch(/url\(/i);
+  });
+
+  it("no celular, as quatro abas viram grade de duas colunas, sem rolagem lateral", () => {
+    const abas = noCelular(".ficha-colaborador__abas");
+    expect(abas).toMatch(/display:\s*grid;/);
+    expect(abas).toMatch(
+      /grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/,
+    );
+    expect(abas).toMatch(/overflow-x:\s*visible;/);
+    expect(noCelular(".ficha-colaborador__aba")).toMatch(
+      /white-space:\s*normal;/,
+    );
+  });
+
+  it("cartões da faixa e do conteúdo encolhem abaixo do conteúdo", () => {
+    expect(corpo(".ficha-colaborador__item")).toMatch(/min-width:\s*0;/);
+    expect(corpo(".ficha-colaborador__cartao")).toMatch(
+      /grid-template-columns:\s*minmax\(0,\s*1fr\);/,
+    );
   });
 });

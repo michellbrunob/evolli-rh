@@ -80,6 +80,12 @@
   gap: var(--space-md);
 }
 
+/* T198 — o selo de situação ocupa só o próprio texto, não a largura do
+   cartão (o item flex esticava por padrão). */
+.dados-contratuais-screen__detalhe > .evolli-badge {
+  align-self: flex-start;
+}
+
 .dados-contratuais-screen__lista {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
