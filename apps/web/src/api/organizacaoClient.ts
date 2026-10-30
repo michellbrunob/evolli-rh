@@ -187,6 +187,15 @@ export async function listarDepartamentos(
   return jsonOrThrow(res);
 }
 
+/**
+ * T198 — um departamento pelo id (`GET /departamentos/:id`), para a ficha do
+ * colaborador: o nome sai do detalhe, sem o teto de 100 dos catálogos.
+ */
+export async function buscarDepartamento(id: string): Promise<DepartamentoApi> {
+  const res = await apiFetch(`/departamentos/${encodeURIComponent(id)}`);
+  return jsonOrThrow(res);
+}
+
 export async function criarDepartamento(
   dto: CriarDepartamentoDto,
 ): Promise<DepartamentoApi> {

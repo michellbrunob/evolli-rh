@@ -2712,11 +2712,17 @@ carregado.
 
 **Fora de escopo:** criação inline, Área, Equipe, o teto de 100 fora da admissão, schema, migration, RBAC, seed, Docker, dependências, promoção e merge.
 
-## Criação inline de referências na Nova admissão — T197 (em implementação)
+## Criação inline de referências na Nova admissão — T197 (integrada)
 
-| Tarefa | Estado               | Resultado principal                                                                                             |
-| ------ | -------------------- | --------------------------------------------------------------------------------------------------------------- |
-| T197   | **Em implementação** | Criação inline de Departamento, Cargo, Unidade e Centro de custo a partir da busca da etapa 2 da Nova admissão. |
+| Tarefa | Estado                                    | Resultado principal                                                                                             |
+| ------ | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| T197   | **Integrada** (PR #190, squash `0ca4df5`) | Criação inline de Departamento, Cargo, Unidade e Centro de custo a partir da busca da etapa 2 da Nova admissão. |
+
+**Observação de relatório:** a integração funcional da T197 está concluída
+(CI de push 3/3 verde, run 40945643467); a única pendência administrativa era
+a sua convergência no Spec Kit, resolvida no primeiro commit da T198. As
+correções das revisões (foco dentro do diálogo nas recusas definitivas e a
+prova isolada da trava consultiva) foram feitas dentro da entrega.
 
 **Escopo da T197:** a preparação de decisão veio primeiro (o
 [dossiê](../docs/decisions/t197-dossie-criacao-inline-referencias.md)); depois,
@@ -2729,7 +2735,40 @@ escolhe. Sem schema, migration, RBAC, seed ou dependência.
 **Decisões aprovadas (2026-10-29):** D10 a D16 (seção 11 do dossiê); entrega
 e limites na seção 12.
 
+**Limites que continuam:** nome repetido é regra da aplicação só no caminho
+automático; nomes que diferem só por acento são diferentes; o código gerado é
+imutável (R1).
+
 **Fora de escopo:** Área, Equipe, importação, admissão digital, documentos, upload, R2, schema, migration, RBAC, seed, Docker, dependências, promoção e merge.
+
+## Ficha unificada do Colaborador — T198 (em implementação)
+
+| Tarefa | Estado               | Resultado principal                                                                                      |
+| ------ | -------------------- | -------------------------------------------------------------------------------------------------------- |
+| T198   | **Em implementação** | Ficha unificada do Colaborador em página própria, com rota por colaborador e por aba, no lugar do modal. |
+
+**Escopo da T198:** a preparação de decisão veio primeiro (o
+[dossiê](../docs/decisions/t198-dossie-ficha-unificada-colaborador.md)); depois,
+a implementação aprovada: rota `#/pessoas/colaboradores/:id/:aba`, cabeçalho
+consolidado (situação nesta empresa, vínculo principal, cargo e departamento
+da lotação vigente, admissão e jornada vigente) e quatro abas funcionais (Dados
+do colaborador, Vida funcional, Dados contratuais e Jornada de trabalho),
+compostas pelos contratos existentes. RH e DP mantêm as capacidades de antes;
+`master_tecnico` só lê. Dados contratuais, Histórico funcional e Horário seguem
+como visões da empresa, com atalho para a ficha. Sem API nova, schema,
+migration, RBAC, seed ou dependência.
+
+**Decisões aprovadas (2026-10-29):** D17 a D24 (seção 12 do dossiê); entrega
+e limites na seção 13.
+
+**Gate para produção do módulo Pessoas:** edição não salva ainda pode ser
+descartada sem confirmação pela barra lateral (inclusive o item
+Colaboradores), Hub, Sair, voltar e avançar do navegador e recarregar; só a
+trilha da ficha e a troca de empresa pedem confirmação. Fechar isso exige uma
+guarda de navegação reutilizável no shell inteiro, decisão e arquitetura
+próprias (seção 13.4 do dossiê).
+
+**Fora de escopo:** foto, portal, salários, férias e ausências, benefícios, documentos, upload, R2, pesquisas, comentários, exportação, API nova, schema, migration, RBAC, seed, Docker, dependências, promoção e merge.
 
 ## Próxima ação autorizável
 

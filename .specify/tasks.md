@@ -2893,9 +2893,15 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       schema, migration, RBAC, seed, Docker, dependências, promoção e merge.
 
 94. **T197 - Criação inline de referências na Nova admissão**
-    - **Estado:** **em implementação** (a preparação de decisão veio antes, nos commits
-      `f1485b8` e `a0adaa5`). Branch `codex/t197-criacao-inline-referencias`, a partir do
-      squash `513f39fd43dd0df1848d8a36041e3b8a530b5c16` (T196 integrada, PR #189).
+    - **Estado:** **integrada** em `main` pela PR #190, squash
+      `0ca4df56bd3f15eae9a47dc4de689a0a44ecbcd7`, com a CI de push 3/3 verde (run 40945643467);
+      branch preservada. Implementada na branch `codex/t197-criacao-inline-referencias`, a
+      partir do squash `513f39fd43dd0df1848d8a36041e3b8a530b5c16` (T196 integrada, PR #189); a
+      preparação de decisão veio antes, nos commits `f1485b8` e `a0adaa5`.
+    - **Observação de relatório:** a integração funcional da T197 está concluída; a única
+      pendência administrativa era a sua convergência no Spec Kit, resolvida no primeiro commit
+      da T198. As correções das revisões (foco dentro do diálogo nas recusas definitivas e a
+      prova isolada da trava consultiva) foram feitas dentro da entrega.
     - **Objetivo:** preparar a decisão da criação inline de Departamento, Cargo, Unidade e
       Centro de custo a partir da busca da etapa 2 da Nova admissão, no
       [dossiê](../docs/decisions/t197-dossie-criacao-inline-referencias.md): o RH cria só na
@@ -2909,8 +2915,37 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       da lista e no vazio, só para o RH; confirmação curta no `Modal`, sem prévia do código; o
       "+" da T180 fica (Centro de custo sem "+"); nome aparado, espaços reduzidos, sem controle.
     - **Entrega:** seção 12 do [dossiê](../docs/decisions/t197-dossie-criacao-inline-referencias.md).
+    - **Limites que continuam:** nome repetido é regra da aplicação só no caminho automático
+      (o manual, com código, segue aceitando nomes repetidos); nomes que diferem só por acento
+      são diferentes; o código gerado é imutável (R1).
     - **Fora de escopo:** Área, Equipe, importação, admissão digital, documentos, upload, R2,
       schema, migration, RBAC, seed, Docker, dependências, promoção e merge.
+
+95. **T198 - Ficha unificada do Colaborador**
+    - **Estado:** **em implementação** (a preparação de decisão veio antes, nos commits
+      `cb9aa6f` e `fe3ba70`). Branch `codex/t198-ficha-unificada-colaborador`, a partir do
+      squash `0ca4df56bd3f15eae9a47dc4de689a0a44ecbcd7` (T197 integrada, PR #190).
+    - **Objetivo:** definir a primeira fatia viável e segura da ficha unificada do
+      Colaborador como ponto central de consulta e operação de Pessoas, no
+      [dossiê](../docs/decisions/t198-dossie-ficha-unificada-colaborador.md): inventário do que
+      já existe (ficha, listagem, Dados contratuais, Vida funcional, Horário, jornadas, rotas e
+      permissões), contratos disponíveis, matriz por perfil, estados, acessibilidade, primeira
+      fatia recomendada e roadmap das abas futuras com critérios de entrada.
+    - **Decisões aprovadas (2026-10-29):** D17 a D24 da seção 12 do dossiê — página própria
+      com rota por colaborador e por aba; admissão e jornada vigente no resumo, sem "tempo de
+      empresa"; contatos só na aba de dados; cargo e departamento pela alocação vigente e
+      detalhe por id, sem API nova; nada do roadmap na tela; o modal substituído;
+      `master_tecnico` só leitura; Dados contratuais, Histórico funcional e Horário mantidos
+      como visões da empresa, com atalho para a ficha.
+    - **Entrega:** seção 13 do [dossiê](../docs/decisions/t198-dossie-ficha-unificada-colaborador.md).
+    - **Gate para produção do módulo Pessoas:** a confirmação de edição pendente cobre só a
+      trilha da ficha e a troca de empresa; barra lateral (inclusive o item Colaboradores), Hub,
+      Sair, voltar e avançar do navegador e recarregar ainda descartam sem pedir. Exige uma
+      guarda de navegação reutilizável no shell inteiro — decisão e arquitetura próprias, fora
+      desta tarefa (seção 13.4 do dossiê).
+    - **Fora de escopo:** API nova, schema, migration, RBAC, auditoria, seed, Docker,
+      dependências, foto, portal, salários, férias e ausências, benefícios, documentos, upload,
+      R2, pesquisas, comentários, exportação, promoção e merge.
 
 ## Regra obrigatória para as próximas tarefas
 

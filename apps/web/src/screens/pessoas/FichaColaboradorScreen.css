@@ -1,0 +1,419 @@
+/**
+ * T198 — ficha unificada do colaborador como painel de perfil. Só tokens de
+ * `tokens.css` (cor de ação, superfícies, linhas, raios e espaços do Evolli);
+ * nenhuma cor literal. Nada força largura: em 375 px o cabeçalho empilha, a
+ * faixa de resumo vira cartões em coluna, as abas viram grade de duas colunas
+ * e as tabelas rolam dentro do próprio quadro — nunca a página.
+ */
+
+.ficha-colaborador {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  min-width: 0;
+}
+
+/* ---- Painel de perfil: cabeçalho, resumo e abas num só cartão ----------- */
+
+.ficha-colaborador__perfil {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+  background: var(--surface-canvas);
+  overflow: hidden;
+}
+
+.ficha-colaborador__cabecalho {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+}
+
+/* Faixa institucional discreta: a cor de ação do Evolli, bem diluída. */
+.ficha-colaborador__faixa {
+  height: 4.5rem;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--color-action) 14%, var(--surface-canvas)),
+    color-mix(in srgb, var(--color-action) 5%, var(--surface-pearl))
+  );
+  border-bottom: 1px solid var(--divider-soft);
+}
+
+.ficha-colaborador__topo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-md) var(--space-lg);
+  padding: 0 var(--space-lg) var(--space-lg);
+  min-width: 0;
+}
+
+/* Avatar neutro por iniciais, sobreposto à faixa. */
+.ficha-colaborador__avatar {
+  flex: 0 0 auto;
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 5rem;
+  height: 5rem;
+  margin-top: -2.5rem;
+  border: 4px solid var(--surface-canvas);
+  border-radius: var(--radius-pill);
+  background: var(--status-info-surface);
+  color: var(--color-action);
+  font-size: var(--text-title);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-tight);
+  line-height: 1;
+}
+
+/* Estados sem dados (carregando, erro, não encontrado): avatar só com o
+   desenho de pessoa, em tom neutro. */
+.ficha-colaborador__avatar--neutro {
+  background: var(--surface-neutral);
+  color: var(--color-ink-muted);
+}
+
+.ficha-colaborador__avatar--neutro .ficha-colaborador__icone {
+  width: 2rem;
+  height: 2rem;
+}
+
+.ficha-colaborador__identidade {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-xs);
+  flex: 1 1 18rem;
+  min-width: 0;
+  padding-top: var(--space-md);
+}
+
+.ficha-colaborador__titulo {
+  margin: 0;
+  font-size: var(--text-title);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  overflow-wrap: anywhere;
+}
+
+.ficha-colaborador__titulo:focus-visible {
+  outline: var(--focus-width) solid var(--color-action);
+  outline-offset: var(--focus-offset);
+}
+
+.ficha-colaborador__selos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+.ficha-colaborador__selos,
+.ficha-colaborador__papel,
+.ficha-colaborador__texto {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.ficha-colaborador__papel {
+  color: var(--color-ink-muted);
+}
+
+.ficha-colaborador__acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin-left: auto;
+}
+
+/* ---- Faixa de resumo: cartões compactos, responsivos ---------------------- */
+
+.ficha-colaborador__resumo {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(12rem, 100%), 1fr));
+  gap: var(--space-sm);
+  margin: 0;
+  padding: var(--space-md) var(--space-lg);
+  border-top: 1px solid var(--divider-soft);
+  background: var(--surface-pearl);
+  min-width: 0;
+}
+
+.ficha-colaborador__item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: var(--space-xxs);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--divider-soft);
+  border-radius: var(--radius-md);
+  background: var(--surface-canvas);
+  min-width: 0;
+}
+
+.ficha-colaborador__item dt {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+}
+
+.ficha-colaborador__item dt .ficha-colaborador__icone {
+  flex: 0 0 auto;
+  width: 1rem;
+  height: 1rem;
+  color: var(--color-action);
+}
+
+.ficha-colaborador__item dd {
+  margin: 0;
+  font-weight: var(--weight-strong);
+  overflow-wrap: anywhere;
+}
+
+/* No cartão de lotação, cargo e departamento em linhas próprias; o separador
+   (aria-hidden) só faz sentido em linha corrida. */
+.ficha-colaborador__lotacao dd > span:not(.ficha-colaborador__falha) {
+  display: block;
+}
+
+.ficha-colaborador__lotacao dd > span[aria-hidden="true"] {
+  display: none;
+}
+
+/* ---- Abas: integradas ao pé do painel ------------------------------------ */
+
+.ficha-colaborador__abas {
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  gap: var(--space-xs);
+  padding: 0 var(--space-md);
+  border-top: 1px solid var(--hairline);
+  min-width: 0;
+}
+
+.ficha-colaborador__aba {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-height: var(--touch-target);
+  padding: var(--space-sm) var(--space-md);
+  border: none;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  color: var(--color-ink-muted);
+  font: inherit;
+  font-weight: var(--weight-regular);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.ficha-colaborador__aba .ficha-colaborador__icone {
+  flex: 0 0 auto;
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+.ficha-colaborador__aba:hover {
+  color: var(--color-ink);
+  background: var(--surface-pearl);
+}
+
+.ficha-colaborador__aba:focus-visible {
+  outline: var(--focus-width) solid var(--color-action);
+  outline-offset: calc(-1 * var(--focus-width));
+}
+
+/* Aba ativa: nunca só cor — `aria-selected`, peso e barra inferior sólida. */
+.ficha-colaborador__aba--ativa {
+  border-bottom-color: var(--color-action);
+  color: var(--color-ink);
+  font-weight: var(--weight-strong);
+}
+
+.ficha-colaborador__aba--ativa .ficha-colaborador__icone {
+  color: var(--color-action);
+}
+
+/* Celular: as quatro abas cabem em duas colunas, sem rolagem lateral. */
+@media (max-width: 40rem) {
+  .ficha-colaborador__abas {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0;
+    padding: 0;
+    overflow-x: visible;
+  }
+
+  .ficha-colaborador__aba {
+    justify-content: flex-start;
+    white-space: normal;
+    text-align: left;
+    border-top: 1px solid var(--divider-soft);
+  }
+
+  .ficha-colaborador__aba:nth-child(odd) {
+    border-right: 1px solid var(--divider-soft);
+  }
+
+  .ficha-colaborador__aba--ativa {
+    background: var(--status-info-surface);
+  }
+
+  .ficha-colaborador__topo {
+    padding: 0 var(--space-md) var(--space-md);
+  }
+
+  .ficha-colaborador__resumo {
+    padding: var(--space-md);
+  }
+
+  .ficha-colaborador__acoes {
+    margin-left: 0;
+  }
+}
+
+/* ---- Conteúdo das abas: cartões ------------------------------------------ */
+
+.ficha-colaborador__painel {
+  display: grid;
+  /* Coluna única que encolhe: o conteúdo largo rola no próprio quadro. */
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-lg);
+  min-width: 0;
+}
+
+.ficha-colaborador__painel[hidden] {
+  display: none;
+}
+
+/* As seções reaproveitadas (dados pessoais, endereço, contatos, vida
+   funcional, jornada, Dados contratuais) ganham a moldura de cartão da
+   ficha — a regra e o conteúdo delas não mudam. */
+.ficha-colaborador__cartao,
+.ficha-colaborador__painel > .colaboradores-screen__dados-pessoais,
+.ficha-colaborador__painel > .colaboradores-screen__contatos,
+.ficha-colaborador__painel > .colaboradores-screen__vida-funcional,
+.ficha-colaborador__painel > .colaboradores-screen__jornada,
+.ficha-colaborador__painel > .ficha-colaborador__vinculos,
+.ficha-colaborador__painel .dados-contratuais-screen__secao {
+  margin: 0;
+  padding: var(--space-lg);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+  background: var(--surface-canvas);
+  min-width: 0;
+}
+
+.ficha-colaborador__cartao {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-sm);
+}
+
+.ficha-colaborador__cartao-titulo {
+  margin: 0;
+  font-size: var(--text-lead);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  font-weight: var(--weight-strong);
+  color: var(--color-ink);
+}
+
+.ficha-colaborador__cartao-contexto {
+  margin: 0;
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+}
+
+.ficha-colaborador__nome {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+
+.ficha-colaborador__nome > :first-child {
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+
+@media (max-width: 40rem) {
+  .ficha-colaborador__cartao,
+  .ficha-colaborador__painel > .colaboradores-screen__dados-pessoais,
+  .ficha-colaborador__painel > .colaboradores-screen__contatos,
+  .ficha-colaborador__painel > .colaboradores-screen__vida-funcional,
+  .ficha-colaborador__painel > .colaboradores-screen__jornada,
+  .ficha-colaborador__painel > .ficha-colaborador__vinculos,
+  .ficha-colaborador__painel .dados-contratuais-screen__secao {
+    padding: var(--space-md);
+  }
+}
+
+.ficha-colaborador__aviso {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-sm);
+  justify-items: start;
+}
+
+/* Mesmo tamanho dos títulos das seções vizinhas (h2 da Vida funcional). */
+.ficha-colaborador__subtitulo {
+  margin: 0 0 var(--space-sm);
+  font-size: var(--text-lead);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  font-weight: var(--weight-strong);
+  color: var(--color-ink);
+}
+
+/* Tabela larga rola dentro do próprio quadro, nunca a página. */
+.ficha-colaborador__quadro {
+  overflow-x: auto;
+  min-width: 0;
+}
+
+.ficha-colaborador__so-leitor {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Nova leitura: o aviso e o botão ficam no lugar; o botão, indisponível por
+   `aria-disabled` (continua focável), parece o desabilitado nativo. */
+.ficha-colaborador__falha {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs) var(--space-sm);
+  font-weight: var(--weight-regular);
+}
+
+.ficha-colaborador .evolli-button[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: progress;
+}
+
+.ficha-colaborador .evolli-button--secondary[aria-disabled="true"]:hover {
+  background: var(--surface-canvas);
+}
+
+/* Destinos do foco depois de uma nova leitura bem-sucedida. */
+.ficha-colaborador__lotacao:focus-visible,
+.ficha-colaborador__item:focus-visible {
+  outline: var(--focus-width) solid var(--color-action);
+  outline-offset: var(--focus-offset);
+}

@@ -225,10 +225,16 @@ export interface HistoricoFuncionalScreenProps {
     readonly colaboradorId: string;
     readonly vinculoId: string;
   } | null;
+  /**
+   * T198 — atalho para a ficha unificada do colaborador escolhido (D24): esta
+   * continua sendo a visão da empresa inteira, e a ficha, a do colaborador.
+   */
+  readonly onAbrirFicha?: (colaboradorId: string) => void;
 }
 
 export function HistoricoFuncionalScreen({
   selecaoInicial = null,
+  onAbrirFicha,
 }: HistoricoFuncionalScreenProps = {}) {
   const [statusCarregamento, setStatusCarregamento] = useState<
     "carregando" | "erro" | "dados"
@@ -1070,6 +1076,14 @@ export function HistoricoFuncionalScreen({
                   onSelecionar={(c) => void selecionarColaborador(c)}
                   rotuloLimpar="Ver todos os colaboradores"
                 />
+                {onAbrirFicha && colaboradorEscolhido ? (
+                  <Button
+                    variant="secondary"
+                    onClick={() => onAbrirFicha(colaboradorEscolhido.id)}
+                  >
+                    Abrir ficha de {colaboradorEscolhido.nome}
+                  </Button>
+                ) : null}
               </div>
 
               <FormField

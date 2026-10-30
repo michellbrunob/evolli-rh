@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import {
   fireEvent,
   render,
@@ -660,5 +661,63 @@ describe("T188 — Dados contratuais sem o teto de 100", () => {
     for (const acao of [/Salvar/, /Editar/, /Registrar/, /Efetivar/]) {
       expect(screen.queryByRole("button", { name: acao })).toBeNull();
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T198 — a visão da empresa continua aqui (D24), com atalho coerente para a
+// ficha do colaborador escolhido; embutida na ficha, sem seletor nem atalho.
+// ---------------------------------------------------------------------------
+describe("T198 — Dados contratuais e a ficha do colaborador", () => {
+  it("visão da empresa: escolhido o colaborador, 'Abrir ficha de …' leva o id dele", async () => {
+    configurarPadrao({
+      colaboradores: [COLAB_1, COLAB_2],
+      vinculos: [vinculo()],
+    });
+    const onAbrirFicha = vi.fn();
+    render(<DadosContratuaisScreen onAbrirFicha={onAbrirFicha} />);
+    expect(
+      screen.queryByRole("button", { name: /^Abrir ficha de/ }),
+    ).toBeNull();
+
+    await escolherColaborador(COLAB_1.nome);
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: `Abrir ficha de ${COLAB_1.nome}`,
+      }),
+    );
+    expect(onAbrirFicha).toHaveBeenCalledWith(COLAB_1.id);
+  });
+
+  it("embutida na ficha: sem h1, sem seletor e sem atalho para a própria ficha", async () => {
+    configurarPadrao({ colaboradores: [COLAB_1], vinculos: [vinculo()] });
+    render(
+      <DadosContratuaisScreen
+        colaborador={{ id: COLAB_1.id, nome: COLAB_1.nome }}
+        onAbrirFicha={vi.fn()}
+      />,
+    );
+    expect(
+      await screen.findByRole("heading", { name: "Vínculo — M-001" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
+    expect(
+      screen.queryByLabelText("Colaborador (buscar por nome ou matrícula)"),
+    ).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: /^Abrir ficha de/ }),
+    ).toBeNull();
+  });
+});
+
+describe("T198 — contrato de CSS do detalhe do vínculo", () => {
+  it("o selo de situação ocupa só o próprio texto, não a largura do cartão", () => {
+    const css = readFileSync(
+      "src/screens/pessoas/DadosContratuaisScreen.css",
+      "utf8",
+    );
+    expect(css).toMatch(
+      /\.dados-contratuais-screen__detalhe\s*>\s*\.evolli-badge\s*\{[^}]*align-self:\s*flex-start;/,
+    );
   });
 });

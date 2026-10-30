@@ -15,10 +15,15 @@
  * duas, ir da listagem à admissão empilha um endereço, e voltar, cancelar ou
  * concluir devolve à listagem pelo endereço dela.
  *
- * **Limitação conhecida:** a rota abre a área de Pessoas na aba
- * Colaboradores. As demais abas internas de `PessoasScreen` (horário,
- * histórico funcional, dados contratuais...) continuam sendo estado local,
- * sem URL — recarregar numa delas volta à aba Colaboradores.
+ * T198 — a ficha do colaborador é página própria, com endereço por
+ * colaborador e por aba (`#/pessoas/colaboradores/:id/:aba`, ver
+ * `fichaDaRota`). Ela pertence ao destino `pessoas`: a mesma capacidade de
+ * Colaboradores, e a troca de empresa a reduz à listagem.
+ *
+ * **Limitação conhecida:** as demais abas internas de `PessoasScreen`
+ * (horário, histórico funcional, dados contratuais da empresa...) continuam
+ * sendo estado local, sem URL — recarregar numa delas volta à aba
+ * Colaboradores.
  *
  * A rota usa o fragmento (`#/...`), e não o caminho, de propósito: o fragmento
  * nunca chega ao servidor, então nenhum servidor estático precisa aprender a
@@ -49,8 +54,54 @@ export function rotaDoDestino(destinoId: string): string | null {
   return ROTA_POR_DESTINO[destinoId] ?? null;
 }
 
-/** O destino que o fragmento pede, ou `null` se ele não é rota conhecida. */
+/**
+ * T198 — as abas da ficha do colaborador, cada uma com endereço próprio (D18).
+ * A ordem é a da navegação interna da ficha.
+ */
+export const ABAS_DA_FICHA = [
+  "dados",
+  "vida-funcional",
+  "contratuais",
+  "jornada",
+] as const;
+export type AbaDaFicha = (typeof ABAS_DA_FICHA)[number];
+
+/** T198 — a ficha pedida pela URL: o colaborador e a aba. */
+export interface RotaDaFicha {
+  readonly colaboradorId: string;
+  readonly aba: AbaDaFicha;
+}
+
+/**
+ * T198 — a ficha é a primeira rota com parâmetro: `#/pessoas/colaboradores/`,
+ * o id do colaborador (UUID, conferido antes de qualquer requisição) e, se
+ * houver, a aba. Sem aba, vale "dados". Id ou aba fora do formato: não é rota.
+ */
+const PREFIXO_DA_FICHA = "#/pessoas/colaboradores/";
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function fichaDaRota(fragmento: string): RotaDaFicha | null {
+  if (!fragmento.startsWith(PREFIXO_DA_FICHA)) return null;
+  const partes = fragmento.slice(PREFIXO_DA_FICHA.length).split("/");
+  if (partes.length > 2) return null;
+  const [colaboradorId = "", aba = "dados"] = partes;
+  if (!UUID.test(colaboradorId)) return null;
+  if (!(ABAS_DA_FICHA as readonly string[]).includes(aba)) return null;
+  return { colaboradorId, aba: aba as AbaDaFicha };
+}
+
+/** T198 — o endereço da ficha, sempre com a aba explícita. */
+export function rotaDaFicha(ficha: RotaDaFicha): string {
+  return `${PREFIXO_DA_FICHA}${ficha.colaboradorId}/${ficha.aba}`;
+}
+
+/**
+ * O destino que o fragmento pede, ou `null` se ele não é rota conhecida.
+ * T198 — a ficha pertence ao destino `pessoas` (o mesmo contêiner, a mesma
+ * capacidade por papel): quem abre Colaboradores abre a ficha.
+ */
 export function destinoDaRota(fragmento: string): string | null {
+  if (fichaDaRota(fragmento) !== null) return "pessoas";
   const entrada = Object.entries(ROTA_POR_DESTINO).find(
     ([, rota]) => rota === fragmento,
   );

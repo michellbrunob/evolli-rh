@@ -210,9 +210,9 @@ export function VidaFuncionalColaboradorSecao({
       className="colaboradores-screen__vida-funcional"
       aria-labelledby={tituloId}
     >
-      <h3 id={tituloId} className="colaboradores-screen__section-title">
+      <h2 id={tituloId} className="colaboradores-screen__section-title">
         Vida funcional
-      </h3>
+      </h2>
       <p className="colaboradores-screen__vida-funcional-nota">
         Somente leitura. Registrar, efetivar, cancelar e retificar movimentações
         é feito no Histórico funcional.
@@ -274,9 +274,9 @@ export function VidaFuncionalColaboradorSecao({
             </p>
           ) : (
             <>
-              <h4 className="colaboradores-screen__vida-funcional-subtitulo">
+              <h3 className="colaboradores-screen__vida-funcional-subtitulo">
                 Lotação vigente
-              </h4>
+              </h3>
               {estado.alocacaoVigente ? (
                 <dl className="colaboradores-screen__vida-funcional-lotacao">
                   <div>
@@ -308,9 +308,9 @@ export function VidaFuncionalColaboradorSecao({
                 </p>
               )}
 
-              <h4 className="colaboradores-screen__vida-funcional-subtitulo">
+              <h3 className="colaboradores-screen__vida-funcional-subtitulo">
                 Linha do tempo
-              </h4>
+              </h3>
               {estado.linhaDoTempo.length === 0 ? (
                 <p>Nenhuma movimentação registrada para este vínculo.</p>
               ) : (

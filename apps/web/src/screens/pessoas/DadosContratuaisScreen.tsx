@@ -67,6 +67,7 @@ import {
   SeletorColaboradorPaginado,
   type ColaboradorEscolhido,
 } from "./SeletorColaboradorPaginado";
+import { vinculoPrincipal } from "./vinculoPrincipal";
 import "./DadosContratuaisScreen.css";
 
 export const DADOS_CONTRATUAIS_TITULO_ID = "dados-contratuais-titulo";
@@ -123,10 +124,31 @@ const VARIANTE_STATUS_MOV: Record<StatusMovimentacao, StatusVariant> = {
 // propósito: ele escondia qual das duas semânticas estava em jogo em cada
 // célula, que é exatamente a distinção que esta tela precisa deixar visível.
 
-export function DadosContratuaisScreen() {
+export interface DadosContratuaisScreenProps {
+  /**
+   * T198 — fixa a tela num colaborador: é a aba "Dados contratuais" da ficha.
+   * Sem o seletor e sem título de página (a ficha já tem o dela), com os
+   * títulos das seções um nível abaixo; com vários vínculos, começa no
+   * vínculo principal, o mesmo do cabeçalho da ficha. Sem esta prop, é a
+   * visão da empresa inteira de sempre (D24).
+   */
+  readonly colaborador?: ColaboradorEscolhido | null;
+  /**
+   * T198 — atalho para a ficha unificada do colaborador escolhido (D24): esta
+   * continua sendo a visão da empresa inteira, e a ficha, a do colaborador.
+   */
+  readonly onAbrirFicha?: (colaboradorId: string) => void;
+}
+
+export function DadosContratuaisScreen({
+  colaborador = null,
+  onAbrirFicha,
+}: DadosContratuaisScreenProps = {}) {
+  const embutida = colaborador !== null;
+  const TituloSecao = embutida ? "h3" : "h2";
   // T188 — escolhido pela busca paginada no servidor, sem o teto de 100.
   const [colaboradorEscolhido, setColaboradorEscolhido] =
-    useState<ColaboradorEscolhido | null>(null);
+    useState<ColaboradorEscolhido | null>(colaborador);
   const colaboradorId = colaboradorEscolhido?.id ?? "";
 
   const [vinculos, setVinculos] = useState<VinculoApi[]>([]);
@@ -154,6 +176,7 @@ export function DadosContratuaisScreen() {
   // invalidando qualquer resposta anterior — inclusive uma segunda tentativa
   // para o MESMO id, que compete com a original.
   const seqVinculos = useRef(0);
+  const embutidaRef = useRef(embutida);
   const seqAlocacoes = useRef(0);
   const seqHorarios = useRef(0);
   const seqLinhaTempo = useRef(0);
@@ -223,7 +246,14 @@ export function DadosContratuaisScreen() {
       if (seq !== seqVinculos.current) return; // resposta superada: descarta
       setVinculos(lista);
       // Zero bloqueia; uma resolve automaticamente; múltiplas exigem escolha.
-      setVinculoId(lista.length === 1 ? lista[0]!.id : "");
+      // T198 — na ficha, começa no vínculo principal (o do cabeçalho).
+      setVinculoId(
+        lista.length === 1
+          ? lista[0]!.id
+          : embutidaRef.current
+            ? (vinculoPrincipal(lista)?.id ?? "")
+            : "",
+      );
       setStatusVinculos("pronto");
     } catch {
       if (seq !== seqVinculos.current) return;
@@ -452,12 +482,14 @@ export function DadosContratuaisScreen() {
 
   return (
     <div className="dados-contratuais-screen">
-      <PageHeader
-        headingLevel={1}
-        titleId={DADOS_CONTRATUAIS_TITULO_ID}
-        title="Dados contratuais"
-        description="Consulta somente leitura do vínculo: matrícula, tipo, situação, admissão/desligamento, cargo e lotação vigentes, horário e a linha do tempo de movimentações. Alterações contratuais ocorrem por movimentação (aba Histórico funcional)."
-      />
+      {embutida ? null : (
+        <PageHeader
+          headingLevel={1}
+          titleId={DADOS_CONTRATUAIS_TITULO_ID}
+          title="Dados contratuais"
+          description="Consulta somente leitura do vínculo: matrícula, tipo, situação, admissão/desligamento, cargo e lotação vigentes, horário e a linha do tempo de movimentações. Alterações contratuais ocorrem por movimentação (aba Histórico funcional)."
+        />
+      )}
 
       <Surface
         as="section"
@@ -482,24 +514,34 @@ export function DadosContratuaisScreen() {
         aria-labelledby="dados-contratuais-colaborador-titulo"
         className="dados-contratuais-screen__secao"
       >
-        <h2
+        <TituloSecao
           id="dados-contratuais-colaborador-titulo"
           className="dados-contratuais-screen__section-title"
         >
-          Colaborador e vínculo
-        </h2>
+          {embutida ? "Vínculos nesta empresa" : "Colaborador e vínculo"}
+        </TituloSecao>
 
         <div className="dados-contratuais-screen__selecao">
           {/* T188 — qualquer colaborador da empresa ativa, por busca
               paginada no servidor; sem o teto de 100. Com um só no escopo,
               ele é escolhido sozinho, como antes. */}
-          <SeletorColaboradorPaginado
-            id="dados-contratuais-colaborador"
-            rotulo="Colaborador (buscar por nome ou matrícula)"
-            selecionado={colaboradorEscolhido}
-            onSelecionar={selecionarColaborador}
-            autoSelecionarUnico
-          />
+          {embutida ? null : (
+            <SeletorColaboradorPaginado
+              id="dados-contratuais-colaborador"
+              rotulo="Colaborador (buscar por nome ou matrícula)"
+              selecionado={colaboradorEscolhido}
+              onSelecionar={selecionarColaborador}
+              autoSelecionarUnico
+            />
+          )}
+          {!embutida && onAbrirFicha && colaboradorEscolhido ? (
+            <Button
+              variant="secondary"
+              onClick={() => onAbrirFicha(colaboradorEscolhido.id)}
+            >
+              Abrir ficha de {colaboradorEscolhido.nome}
+            </Button>
+          ) : null}
 
           {colaboradorId ? (
             statusVinculos === "carregando" ? (
@@ -559,12 +601,12 @@ export function DadosContratuaisScreen() {
             >
               {ROTULO_SITUACAO_VINCULO[vinculoSelecionado.situacao]}
             </StatusBadge>
-            <h2
+            <TituloSecao
               id="dados-contratuais-detalhe-titulo"
               className="dados-contratuais-screen__section-title"
             >
               Vínculo — {exibirMatricula(vinculoSelecionado.matricula)}
-            </h2>
+            </TituloSecao>
             <dl className="dados-contratuais-screen__lista">
               <div>
                 <dt>Matrícula</dt>
@@ -635,12 +677,12 @@ export function DadosContratuaisScreen() {
             aria-labelledby="dados-contratuais-alocacoes-titulo"
             className="dados-contratuais-screen__secao"
           >
-            <h2
+            <TituloSecao
               id="dados-contratuais-alocacoes-titulo"
               className="dados-contratuais-screen__section-title"
             >
               Cargo e lotação (vigências)
-            </h2>
+            </TituloSecao>
             {statusAlocacoes === "carregando" ? (
               <p role="status">Carregando alocações…</p>
             ) : statusAlocacoes === "erro" ? (
@@ -675,12 +717,12 @@ export function DadosContratuaisScreen() {
             aria-labelledby="dados-contratuais-horario-titulo"
             className="dados-contratuais-screen__secao"
           >
-            <h2
+            <TituloSecao
               id="dados-contratuais-horario-titulo"
               className="dados-contratuais-screen__section-title"
             >
               Horário (vigências)
-            </h2>
+            </TituloSecao>
             {statusHorarios === "carregando" ? (
               <p role="status">Carregando horários…</p>
             ) : statusHorarios === "erro" ? (
@@ -715,12 +757,12 @@ export function DadosContratuaisScreen() {
             aria-labelledby="dados-contratuais-linha-titulo"
             className="dados-contratuais-screen__secao"
           >
-            <h2
+            <TituloSecao
               id="dados-contratuais-linha-titulo"
               className="dados-contratuais-screen__section-title"
             >
               Linha do tempo de movimentações
-            </h2>
+            </TituloSecao>
             <p className="dados-contratuais-screen__nota">
               Exibição somente leitura. Para registrar, cancelar, efetivar ou
               retificar uma movimentação, use a aba{" "}

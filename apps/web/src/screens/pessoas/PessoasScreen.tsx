@@ -28,6 +28,11 @@ import {
   tituloDoGrupoDe,
 } from "../../app/mapaNavegacao";
 import { TrilhaNavegacao } from "../../components";
+import type { AbaDaFicha, RotaDaFicha } from "../../app/rotasDoShell";
+import {
+  FICHA_COLABORADOR_TITULO_ID,
+  FichaColaboradorScreen,
+} from "./FichaColaboradorScreen";
 import {
   AFASTAMENTOS_TITULO_ID,
   AfastamentosScreen,
@@ -168,9 +173,20 @@ export interface PessoasScreenProps {
    * `<main>` (`aria-labelledby`) mesmo quando a aba muda sem trocar de
    * destino. Não é navegação real — só sincroniza o rótulo de acessibilidade. */
   onTituloIdChange?: (tituloId: string) => void;
-  /** T176 — repassados à aba Colaboradores (ver `ColaboradoresScreenProps`). */
-  aberturaInicial?: ColaboradoresScreenProps["aberturaInicial"];
-  onAberturaAtendida?: () => void;
+  /**
+   * T198 — a ficha pedida pela rota (`#/pessoas/colaboradores/:id/:aba`).
+   * Com ela, este contêiner mostra a ficha unificada no lugar das abas, e a
+   * listagem fica montada por baixo, escondida, com busca, filtros e página.
+   */
+  ficha?: RotaDaFicha | null;
+  /** T198 — "Abrir ficha": o shell troca a rota. */
+  onAbrirFicha?: (colaboradorId: string) => void;
+  /** T198 — outra aba da ficha: o shell troca a rota. */
+  onTrocarAbaDaFicha?: (aba: AbaDaFicha) => void;
+  /** T198 — volta da ficha à listagem: o shell troca a rota. */
+  onFecharFicha?: () => void;
+  /** T176 — "Completar contatos" da Nova admissão: foco nos contatos. */
+  focarContatosNaFicha?: boolean;
   /** T177 — leva "Novo colaborador" à página de Nova admissão. */
   onNovaAdmissao?: ColaboradoresScreenProps["onNovaAdmissao"];
   /** T181 — repassado à aba Colaboradores (ver `ColaboradoresScreenProps`). */
@@ -187,8 +203,11 @@ export function PessoasScreen({
   onTituloIdChange,
   modo = "funcional",
   empresaAtiva = null,
-  aberturaInicial = null,
-  onAberturaAtendida,
+  ficha = null,
+  onAbrirFicha,
+  onTrocarAbaDaFicha,
+  onFecharFicha,
+  focarContatosNaFicha = false,
   onNovaAdmissao,
   podeEditarFicha = false,
   podeOperarJornada = false,
@@ -225,9 +244,67 @@ export function PessoasScreen({
 
   const definicaoAtiva = abas.find((aba) => aba.id === abaAtiva) ?? abas[0]!;
 
+  // ---- T198 — a ficha unificada --------------------------------------------
+  const fichaAberta = modo === "funcional" && ficha !== null;
+  /**
+   * A listagem só monta quando é vista pela primeira vez: a ficha aberta por
+   * endereço direto não lê a lista por baixo. Depois, fica montada.
+   */
+  const [listagemMontada, setListagemMontada] = useState(!fichaAberta);
+  /** Releitura da listagem ao voltar da ficha (ver `atualizacao`). */
+  const [atualizacaoDaListagem, setAtualizacaoDaListagem] = useState(0);
+  /** Quem abriu a ficha: recebe o foco de volta ao fechar. */
+  const gatilhoDaFichaRef = useRef<HTMLElement | null>(null);
+  /** O atalho para o Histórico funcional já leva o foco à aba dele. */
+  const pularRestauroRef = useRef(false);
+  const fichaAnteriorRef = useRef(fichaAberta);
+
   useEffect(() => {
-    onTituloIdChange?.(definicaoAtiva.tituloId);
-  }, [definicaoAtiva.tituloId, onTituloIdChange]);
+    const vinhaDaFicha = fichaAnteriorRef.current;
+    fichaAnteriorRef.current = fichaAberta;
+    if (fichaAberta || !vinhaDaFicha) return;
+    // A listagem que ficou por baixo relê a página atual; a que nunca foi
+    // vista monta agora e lê sozinha.
+    if (listagemMontada) setAtualizacaoDaListagem((n) => n + 1);
+    setListagemMontada(true);
+    const gatilho = gatilhoDaFichaRef.current;
+    gatilhoDaFichaRef.current = null;
+    if (pularRestauroRef.current) {
+      pularRestauroRef.current = false;
+      return;
+    }
+    if (gatilho && document.contains(gatilho)) {
+      gatilho.focus();
+    } else {
+      document.getElementById(`pessoas-tab-${abaAtiva}`)?.focus();
+    }
+    // Só a transição ficha → listagem importa aqui.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fichaAberta]);
+
+  function abrirFicha(colaboradorId: string) {
+    gatilhoDaFichaRef.current =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    onAbrirFicha?.(colaboradorId);
+  }
+
+  /** T187 — o atalho da Vida funcional, agora a partir da ficha. */
+  function abrirHistoricoDaFicha(alvo: {
+    colaboradorId: string;
+    vinculoId: string;
+  }) {
+    pularRestauroRef.current = true;
+    abrirHistoricoFuncional(alvo);
+    onFecharFicha?.();
+  }
+
+  useEffect(() => {
+    onTituloIdChange?.(
+      fichaAberta ? FICHA_COLABORADOR_TITULO_ID : definicaoAtiva.tituloId,
+    );
+  }, [fichaAberta, definicaoAtiva.tituloId, onTituloIdChange]);
 
   /**
    * T178 — voltar a Colaboradores pela trilha. O botão acionado vira texto (a
@@ -263,72 +340,94 @@ export function PessoasScreen({
 
   return (
     <div className="pessoas-screen">
-      {trilha ? <TrilhaNavegacao itens={trilha} /> : null}
-      <div
-        role="tablist"
-        aria-label="Seções de Pessoas"
-        className="pessoas-screen__tabs"
-      >
-        {abas.map((aba) => {
-          const selecionada = aba.id === abaAtiva;
-          return (
-            <button
-              key={aba.id}
-              type="button"
-              role="tab"
-              id={`pessoas-tab-${aba.id}`}
-              aria-selected={selecionada}
-              aria-controls={`pessoas-panel-${aba.id}`}
-              className={
-                selecionada
-                  ? "pessoas-screen__tab pessoas-screen__tab--ativa"
-                  : "pessoas-screen__tab"
-              }
-              onClick={() => {
-                setSelecaoHistorico(null);
-                setAbaAtiva(aba.id);
-              }}
-            >
-              {aba.rotulo}
-            </button>
-          );
-        })}
-      </div>
+      {fichaAberta && ficha ? (
+        <FichaColaboradorScreen
+          key={ficha.colaboradorId}
+          colaboradorId={ficha.colaboradorId}
+          aba={ficha.aba}
+          onTrocarAba={(aba) => onTrocarAbaDaFicha?.(aba)}
+          onVoltar={() => onFecharFicha?.()}
+          podeEditarFicha={podeEditarFicha}
+          podeOperarJornada={podeOperarJornada}
+          onAbrirHistoricoFuncional={abrirHistoricoDaFicha}
+          focarContatos={focarContatosNaFicha}
+        />
+      ) : null}
+      {listagemMontada || !fichaAberta ? (
+        <div className="pessoas-screen__conteudo" hidden={fichaAberta}>
+          {trilha ? <TrilhaNavegacao itens={trilha} /> : null}
+          <div
+            role="tablist"
+            aria-label="Seções de Pessoas"
+            className="pessoas-screen__tabs"
+          >
+            {abas.map((aba) => {
+              const selecionada = aba.id === abaAtiva;
+              return (
+                <button
+                  key={aba.id}
+                  type="button"
+                  role="tab"
+                  id={`pessoas-tab-${aba.id}`}
+                  aria-selected={selecionada}
+                  aria-controls={`pessoas-panel-${aba.id}`}
+                  className={
+                    selecionada
+                      ? "pessoas-screen__tab pessoas-screen__tab--ativa"
+                      : "pessoas-screen__tab"
+                  }
+                  onClick={() => {
+                    setSelecaoHistorico(null);
+                    setAbaAtiva(aba.id);
+                  }}
+                >
+                  {aba.rotulo}
+                </button>
+              );
+            })}
+          </div>
 
-      <div
-        role="tabpanel"
-        id={`pessoas-panel-${definicaoAtiva.id}`}
-        aria-labelledby={`pessoas-tab-${definicaoAtiva.id}`}
-        className="pessoas-screen__panel"
-      >
-        {abaAtiva === "colaboradores" ? (
-          <ColaboradoresScreen
-            empresaAtiva={empresaAtiva}
-            aberturaInicial={aberturaInicial}
-            {...(onAberturaAtendida ? { onAberturaAtendida } : {})}
-            {...(onNovaAdmissao ? { onNovaAdmissao } : {})}
-            podeEditarFicha={podeEditarFicha}
-            podeOperarJornada={podeOperarJornada}
-            onAbrirHistoricoFuncional={abrirHistoricoFuncional}
-          />
-        ) : abaAtiva === "horario" ? (
-          <PessoasHorarioScreen podeOperar={podeOperarJornada} />
-        ) : abaAtiva === "historico_funcional" ? (
-          <HistoricoFuncionalScreen selecaoInicial={selecaoHistorico} />
-        ) : abaAtiva === "dados_contratuais" ? (
-          <DadosContratuaisScreen />
-        ) : abaAtiva === "documentos" ? (
-          <PessoasDocumentosScreen />
-        ) : abaAtiva === "solicitacoes" ? (
-          <SolicitacoesScreen />
-        ) : abaAtiva === "beneficios" ? (
-          <BeneficiosScreen />
-        ) : abaAtiva === "dependentes" ? (
-          <DependentesScreen />
-        ) : (
-          <AfastamentosScreen />
-        )}
-      </div>
+          <div
+            role="tabpanel"
+            id={`pessoas-panel-${definicaoAtiva.id}`}
+            aria-labelledby={`pessoas-tab-${definicaoAtiva.id}`}
+            className="pessoas-screen__panel"
+          >
+            {abaAtiva === "colaboradores" ? (
+              <ColaboradoresScreen
+                empresaAtiva={empresaAtiva}
+                {...(onNovaAdmissao ? { onNovaAdmissao } : {})}
+                {...(onAbrirFicha ? { onAbrirFicha: abrirFicha } : {})}
+                atualizacao={atualizacaoDaListagem}
+              />
+            ) : abaAtiva === "horario" ? (
+              <PessoasHorarioScreen
+                podeOperar={podeOperarJornada}
+                {...(onAbrirFicha ? { onAbrirFicha: abrirFicha } : {})}
+              />
+            ) : abaAtiva === "historico_funcional" ? (
+              <HistoricoFuncionalScreen
+                selecaoInicial={selecaoHistorico}
+                {...(onAbrirFicha ? { onAbrirFicha: abrirFicha } : {})}
+              />
+            ) : abaAtiva === "dados_contratuais" ? (
+              <DadosContratuaisScreen
+                {...(onAbrirFicha ? { onAbrirFicha: abrirFicha } : {})}
+              />
+            ) : abaAtiva === "documentos" ? (
+              <PessoasDocumentosScreen />
+            ) : abaAtiva === "solicitacoes" ? (
+              <SolicitacoesScreen />
+            ) : abaAtiva === "beneficios" ? (
+              <BeneficiosScreen />
+            ) : abaAtiva === "dependentes" ? (
+              <DependentesScreen />
+            ) : (
+              <AfastamentosScreen />
+            )}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

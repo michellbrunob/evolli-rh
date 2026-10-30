@@ -110,10 +110,26 @@ import {
   podeOperarJornadas,
 } from "./mapaNavegacao";
 import {
+  type AbaDaFicha,
+  type RotaDaFicha,
   destinoDaRota,
   ehFragmentoDeRota,
+  fichaDaRota,
+  rotaDaFicha,
   rotaDoDestino,
 } from "./rotasDoShell";
+
+/**
+ * T198 — a rota do que está na tela: a da ficha, quando ela está aberta em
+ * Colaboradores; senão, a do destino (ou nenhuma).
+ */
+function rotaDoExibido(
+  destinoId: string,
+  ficha: RotaDaFicha | null,
+): string | null {
+  if (destinoId === "pessoas" && ficha !== null) return rotaDaFicha(ficha);
+  return rotaDoDestino(destinoId);
+}
 
 /** `titleId` do `h1` de cada destino, para `aria-labelledby` do `<main>`.
  * "cadastros", "pessoas", "ponto", "documentos", "portal-colaborador" e
@@ -250,9 +266,7 @@ function conteudoDoDestino(
   empresaAtiva: { readonly nome: string; readonly codigo: string } | null,
   // T176 — também no fim, pelo mesmo motivo.
   admissao: {
-    readonly abertura: AberturaDoAdmitido | null;
     readonly onAbrirAdmitido: (abertura: AberturaDoAdmitido) => void;
-    readonly onAberturaAtendida: () => void;
     /** T177 — o papel abre a página de Nova admissão (ver `resolverEntrada`). */
     readonly podeAdmitir: boolean;
     /**
@@ -260,6 +274,14 @@ function conteudoDoDestino(
      * referências que faltam (RH) ou a quem pedir (DP). Não concede nada.
      */
     readonly papelDoAtor: string | null;
+  },
+  // T198 — a ficha unificada do colaborador, aberta pela rota.
+  fichaDoColaborador: {
+    readonly ficha: RotaDaFicha | null;
+    readonly focarContatos: boolean;
+    readonly onAbrir: (colaboradorId: string) => void;
+    readonly onTrocarAba: (aba: AbaDaFicha) => void;
+    readonly onFechar: () => void;
   },
 ) {
   if (destinoId === "inicio") {
@@ -295,8 +317,11 @@ function conteudoDoDestino(
       <PessoasScreen
         onTituloIdChange={onPessoasTituloIdChange}
         empresaAtiva={empresaAtiva}
-        aberturaInicial={admissao.abertura}
-        onAberturaAtendida={admissao.onAberturaAtendida}
+        ficha={fichaDoColaborador.ficha}
+        focarContatosNaFicha={fichaDoColaborador.focarContatos}
+        onAbrirFicha={fichaDoColaborador.onAbrir}
+        onTrocarAbaDaFicha={fichaDoColaborador.onTrocarAba}
+        onFecharFicha={fichaDoColaborador.onFechar}
         {...(admissao.podeAdmitir
           ? { onNovaAdmissao: () => onNavegar("nova-admissao") }
           : {})}
@@ -543,18 +568,31 @@ export function App({
   // só quando o papel PODE abri-la — a mesma validação de capacidade de
   // qualquer pedido. Rota que o papel não abre é ignorada, e vale a escolha do
   // Hub, como se a URL não tivesse rota.
-  const [destinoAtivoId, setDestinoAtivoId] = useState(() => {
+  // T198 — a mesma leitura decide o destino e, se for a ficha, qual ficha.
+  const [entradaDaUrl] = useState(() => {
     const pedidoDaRota = destinoDaRota(window.location.hash);
     if (
       pedidoDaRota !== null &&
       resolverEntrada(pedidoDaRota, papelDoAtor) === pedidoDaRota
     ) {
-      return pedidoDaRota;
+      return {
+        destino: pedidoDaRota,
+        ficha: fichaDaRota(window.location.hash),
+      };
     }
-    return resolverEntrada(destinoInicial, papelDoAtor);
+    return {
+      destino: resolverEntrada(destinoInicial, papelDoAtor),
+      ficha: null,
+    };
   });
-  const [aberturaDoAdmitido, setAberturaDoAdmitido] =
-    useState<AberturaDoAdmitido | null>(null);
+  const [destinoAtivoId, setDestinoAtivoId] = useState(entradaDaUrl.destino);
+  /**
+   * T198 — a ficha do colaborador aberta em Colaboradores (D17, D18): o
+   * colaborador e a aba, sempre os da URL. `null` é a listagem.
+   */
+  const [ficha, setFicha] = useState<RotaDaFicha | null>(entradaDaUrl.ficha);
+  /** T176 — "Completar contatos": a ficha abre com o foco nos contatos. */
+  const [focarContatosNaFicha, setFocarContatosNaFicha] = useState(false);
   /**
    * Para onde a URL SEM rota devolve (o "voltar" até ela): o último destino
    * sem rota exibido ou, antes de haver um, o destino inicial do papel — que,
@@ -562,7 +600,7 @@ export function App({
    * a dela, no lugar (ver `aoMudarUrl`).
    */
   const destinoSemRotaRef = useRef(
-    rotaDoDestino(destinoAtivoId) === null
+    rotaDoExibido(destinoAtivoId, ficha) === null
       ? destinoAtivoId
       : destinoInicialPara(papelDoAtor),
   );
@@ -623,15 +661,31 @@ export function App({
   // Navegar fecha a gaveta — no desktop isto não tem efeito, porque ela já
   // está fechada. Vale para a barra e para os atalhos da Visão geral.
   const irPara = useCallback((destinoId: string) => {
+    // T198 — navegar pela barra sai da ficha: Colaboradores abre na listagem.
+    setFicha(null);
+    setFocarContatosNaFicha(false);
     setDestinoAtivoId(destinoId);
     setGavetaAberta(false);
   }, []);
 
+  // T176/T198 — "Abrir ficha" e "Completar contatos" da Nova admissão abrem a
+  // ficha do admitido, na aba de dados.
   const abrirAdmitido = useCallback((abertura: AberturaDoAdmitido) => {
-    setAberturaDoAdmitido(abertura);
+    setFicha({ colaboradorId: abertura.colaborador.id, aba: "dados" });
+    setFocarContatosNaFicha(abertura.foco === "contatos");
     setDestinoAtivoId("pessoas");
   }, []);
-  const aberturaAtendida = useCallback(() => setAberturaDoAdmitido(null), []);
+  const abrirFicha = useCallback((colaboradorId: string) => {
+    setFocarContatosNaFicha(false);
+    setFicha({ colaboradorId, aba: "dados" });
+  }, []);
+  const trocarAbaDaFicha = useCallback((aba: AbaDaFicha) => {
+    setFicha((atual) => (atual ? { ...atual, aba } : atual));
+  }, []);
+  const fecharFicha = useCallback(() => {
+    setFocarContatosNaFicha(false);
+    setFicha(null);
+  }, []);
   // T177 — "Nova admissão" (T178; era "Novo colaborador"), na listagem, leva
   // à página de Nova admissão e só aparece para
   // quem pode abri-la: a mesma validação de capacidade da entrada e da rota.
@@ -666,7 +720,7 @@ export function App({
   // outra (Nova admissão → Colaboradores): é o ramo de baixo, com `pushState`
   // — o "voltar" retorna à página de onde se saiu.
   useEffect(() => {
-    const rota = rotaDoDestino(destinoAtivoId);
+    const rota = rotaDoExibido(destinoAtivoId, ficha);
     const atual = window.location.hash;
     const vinhaDeRota = rotaExibidaRef.current !== null;
     const primeiraExibicao = primeiraExibicaoRef.current;
@@ -690,7 +744,7 @@ export function App({
         window.history.pushState(null, "", rota);
       }
     }
-  }, [destinoAtivoId]);
+  }, [destinoAtivoId, ficha]);
 
   // T189 — quem monta o shell sabe sempre o destino exibido: é para ele que
   // uma troca de empresa devolve. Ref, para não refazer o efeito a cada
@@ -730,7 +784,15 @@ export function App({
       // quem mudou a URL foi o navegador, e empilhar aqui criaria um histórico
       // que a pessoa não percorreu. T178: vale também para o "voltar" até a
       // URL sem rota quando o destino dela tem rota (`pessoas`).
-      const rotaExibida = rotaDoDestino(exibido);
+      // T198 — em Colaboradores, a URL diz se é a listagem ou qual ficha (e
+      // em qual aba); fora dele, não há ficha.
+      const fichaExibida =
+        exibido === "pessoas" && pedido === "pessoas"
+          ? fichaDaRota(fragmento)
+          : null;
+      setFicha(fichaExibida);
+      if (fichaExibida === null) setFocarContatosNaFicha(false);
+      const rotaExibida = rotaDoExibido(exibido, fichaExibida);
       if (rotaExibida !== null) {
         if (fragmento !== rotaExibida) {
           window.history.replaceState(null, "", rotaExibida);
@@ -1060,11 +1122,16 @@ export function App({
             () => onSessaoAtualEncerrada?.(),
             empresaAtiva,
             {
-              abertura: aberturaDoAdmitido,
               onAbrirAdmitido: abrirAdmitido,
-              onAberturaAtendida: aberturaAtendida,
               podeAdmitir,
               papelDoAtor,
+            },
+            {
+              ficha,
+              focarContatos: focarContatosNaFicha,
+              onAbrir: abrirFicha,
+              onTrocarAba: trocarAbaDaFicha,
+              onFechar: fecharFicha,
             },
           )}
         </main>

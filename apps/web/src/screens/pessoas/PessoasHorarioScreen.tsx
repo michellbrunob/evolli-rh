@@ -130,10 +130,16 @@ export interface PessoasHorarioScreenProps {
    * Só orienta a tela: quem recusa é o servidor.
    */
   readonly podeOperar?: boolean;
+  /**
+   * T198 — atalho para a ficha unificada do colaborador escolhido (D24): esta
+   * continua sendo a visão da empresa inteira, e a ficha, a do colaborador.
+   */
+  readonly onAbrirFicha?: (colaboradorId: string) => void;
 }
 
 export function PessoasHorarioScreen({
   podeOperar = false,
+  onAbrirFicha,
 }: PessoasHorarioScreenProps = {}) {
   const [statusCarregamento, setStatusCarregamento] = useState<
     "carregando" | "erro" | "dados"
@@ -710,7 +716,20 @@ export function PessoasHorarioScreen({
     {
       key: "colaborador",
       header: "Colaborador",
-      cell: (v) => nomeColaborador(v),
+      cell: (v) => {
+        const colaborador = v.colaborador;
+        if (!onAbrirFicha || !colaborador) return nomeColaborador(v);
+        return (
+          <button
+            type="button"
+            className="pessoas-horario-screen__ficha"
+            aria-label={`Abrir ficha de ${colaborador.nome}`}
+            onClick={() => onAbrirFicha(colaborador.id)}
+          >
+            {colaborador.nome}
+          </button>
+        );
+      },
     },
     {
       key: "tabela",

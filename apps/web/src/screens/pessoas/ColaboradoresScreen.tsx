@@ -5,7 +5,6 @@ import {
   DataTable,
   EmptyState,
   FormField,
-  Modal,
   PageHeader,
   StatusBadge,
   Surface,
@@ -13,18 +12,12 @@ import {
 import type { DataTableColumn, StatusVariant } from "../../components";
 import {
   BUSCA_COLABORADORES_MAXIMO,
-  type ColaboradorApi,
   type ColaboradorListadoApi,
   type ContadoresColaboradoresApi,
   type ListarColaboradoresQuery,
-  type RetificarColaboradorDto,
-  type TipoVinculo,
   type LotacaoListadaApi,
-  type VinculoApi,
   type VinculoListadoApi,
   listarColaboradores,
-  listarVinculosDoColaborador,
-  retificarColaborador,
 } from "../../api/colaboradoresClient";
 import {
   type DepartamentoApi,
@@ -33,19 +26,11 @@ import {
 import { type CargoApi, listarCargos } from "../../api/cargoClient";
 import { formatarDiaCivil } from "../../format/data";
 import { exibirMatricula } from "../../format/matricula";
-import { ContatosColaboradorSecao } from "./ContatosColaboradorSecao";
-import { JornadaColaboradorSecao } from "./JornadaColaboradorSecao";
-import {
-  VidaFuncionalColaboradorSecao,
-  type AlvoHistoricoFuncional,
-} from "./VidaFuncionalColaboradorSecao";
-import { vinculoPrincipal } from "./vinculoPrincipal";
 import {
   diaDeHoje,
   rotuloDaJornada,
   situacaoDaVigencia,
 } from "./jornadaColaborador";
-import { DadosPessoaisColaboradorSecao } from "./DadosPessoaisColaboradorSecao";
 import {
   IconeAdicionarPessoa,
   PainelAdicionarColaborador,
@@ -105,48 +90,10 @@ const OPCOES_SITUACAO: readonly {
   { valor: "inativo", rotulo: "Inativos", total: (c) => c.inativos },
 ];
 
-const ROTULO_TIPO_VINCULO: Record<TipoVinculo, string> = {
-  clt: "CLT",
-  estagio: "Estágio",
-  pj: "PJ",
-  temporario: "Temporário",
-  outro_controlado: "Outro controlado",
-};
-
 const VARIANTE_SITUACAO_COLABORADOR: Record<string, StatusVariant> = {
   ativo: "success",
   inativo: "neutral",
 };
-
-const VARIANTE_SITUACAO_VINCULO: Record<string, StatusVariant> = {
-  previsto: "info",
-  ativo: "success",
-  encerrado: "neutral",
-};
-
-const ROTULO_SITUACAO_VINCULO: Record<string, string> = {
-  previsto: "Previsto",
-  ativo: "Ativo",
-  encerrado: "Encerrado",
-};
-
-interface DetalheState {
-  colaborador: ColaboradorApi;
-  /**
-   * T187 — a lotação que a linha da listagem já trazia (T184), com o vínculo
-   * a que se refere. Dá nome a departamento e cargo na "Vida funcional" sem
-   * ler catálogo; `null` quando a ficha não veio de uma linha.
-   */
-  lotacaoDaLinha: {
-    vinculoId: string;
-    lotacao: LotacaoListadaApi | null;
-  } | null;
-  statusVinculos: "carregando" | "erro" | "dados";
-  vinculos: VinculoApi[];
-  nomeEdicao: string;
-  salvandoNome: boolean;
-  erroNome: string | null;
-}
 
 /**
  * Quantas linhas por página.
@@ -212,22 +159,16 @@ export interface ColaboradoresScreenProps {
   } | null;
   readonly onTituloIdChange?: (tituloId: string) => void;
   /**
-   * T176 — colaborador a abrir assim que a tela montar: é o destino das ações
-   * "Abrir ficha" e "Completar contatos" da página de Nova admissão. Vem da
-   * RESPOSTA da admissão, não de nova busca. `foco: "contatos"` leva o foco ao
-   * primeiro campo de contatos quando eles carregam.
+   * T198 — "Abrir ficha" leva à ficha unificada, em página própria (D17,
+   * D22): quem decide o endereço é o shell. Sem esta prop, a ação não aparece.
    */
-  readonly aberturaInicial?: {
-    readonly colaborador: ColaboradorApi;
-    readonly foco: "ficha" | "contatos";
-  } | null;
-  /** Avisa que `aberturaInicial` foi atendida, para o shell não repeti-la. */
-  readonly onAberturaAtendida?: () => void;
+  readonly onAbrirFicha?: (colaboradorId: string) => void;
   /**
-   * T187 — atalho da "Vida funcional": abre o Histórico funcional já no
-   * colaborador e no vínculo da ficha. Quem decide a aba é o contêiner.
+   * T198 — muda quando a pessoa volta da ficha: a listagem (que ficou montada,
+   * com busca, filtros e página) relê a página atual, para mostrar o que a
+   * ficha pode ter alterado (nome, jornada).
    */
-  readonly onAbrirHistoricoFuncional?: (alvo: AlvoHistoricoFuncional) => void;
+  readonly atualizacao?: number;
   /**
    * T177 — a admissão acontece só na página de Nova admissão. O modal
    * transitório da T176 foi aposentado porque não coletava os campos que a
@@ -239,19 +180,6 @@ export interface ColaboradoresScreenProps {
    * esta prop. Sem ela, nem botão nem painel existem.
    */
   readonly onNovaAdmissao?: () => void;
-  /**
-   * T181 — o perfil edita, na ficha, dados pessoais, endereço e contatos: só
-   * RH e DP (`PAPEIS_EDICAO_FICHA`). Sem isso, os blocos ficam só em leitura,
-   * sem Preencher, Editar, Salvar nem Cancelar. Os mesmos papéis consultam o
-   * CEP. Só orienta a tela: quem recusa é o servidor.
-   */
-  readonly podeEditarFicha?: boolean;
-  /**
-   * T183 — o perfil atribui, troca e encerra a jornada do colaborador na
-   * ficha: só o RH (`PAPEIS_OPERACAO_JORNADAS`). Sem isso, a seção "Jornada
-   * de trabalho" é só consulta. Só orienta a tela: quem recusa é o servidor.
-   */
-  readonly podeOperarJornada?: boolean;
 }
 
 /**
@@ -317,12 +245,9 @@ function celulaDaJornada(
 
 export function ColaboradoresScreen({
   empresaAtiva = null,
-  aberturaInicial = null,
-  onAberturaAtendida,
   onNovaAdmissao,
-  podeEditarFicha = false,
-  podeOperarJornada = false,
-  onAbrirHistoricoFuncional,
+  onAbrirFicha,
+  atualizacao = 0,
 }: ColaboradoresScreenProps = {}) {
   const [statusCarregamento, setStatusCarregamento] = useState<
     "carregando" | "erro" | "dados"
@@ -394,27 +319,11 @@ export function ColaboradoresScreen({
    */
   const [tamanhoPaginaEfetivo, setTamanhoPaginaEfetivo] =
     useState(TAMANHO_PAGINA);
-  const [detalhe, setDetalhe] = useState<DetalheState | null>(null);
   /**
    * T194 — painel "Adicionar colaborador". Só estado local: abrir e fechar não
    * mexem em busca, filtros, página nem empresa, e não relêem nada.
    */
   const [painelAdicionarAberto, setPainelAdicionarAberto] = useState(false);
-  // T169 — a seção de contatos do detalhe edita por conta própria e avisa
-  // aqui quando há edição não salva e quando está gravando, para que o
-  // `Modal` peça confirmação de descarte e não feche no meio da gravação.
-  const [contatosAlterados, setContatosAlterados] = useState(false);
-  const [salvandoContatos, setSalvandoContatos] = useState(false);
-  // T181 — idem para os dados pessoais e o endereço, agora editáveis.
-  const [dadosPessoaisAlterados, setDadosPessoaisAlterados] = useState(false);
-  const [salvandoDadosPessoais, setSalvandoDadosPessoais] = useState(false);
-  // T183 — idem para a jornada de trabalho (atribuir, trocar e encerrar).
-  const [jornadaAlterada, setJornadaAlterada] = useState(false);
-  const [salvandoJornada, setSalvandoJornada] = useState(false);
-  // T176 — "Completar contatos" vindo da página de Nova admissão.
-  const [focarContatos, setFocarContatos] = useState(false);
-  /** Salvamento do nome em curso — trava síncrona, ver `handleSalvarNome`. */
-  const salvandoNomeRef = useRef(false);
   /**
    * Sequência do pedido de lista em voo.
    *
@@ -425,19 +334,16 @@ export function ColaboradoresScreen({
    */
   const pedidoListaRef = useRef(0);
 
-  // T144 (R1) — o detalhe também edita, e portanto também tem o que perder: o
-  // nome. Um só derivado governa a confirmação de descarte do `Modal` e o
-  // botão de salvar; se divergissem, a janela fecharia calada com o botão
-  // ainda habilitado. Compara o valor normalizado com o nome já carregado, e
-  // por isso volta sozinho a `false` depois de salvar, quando o nome gravado
-  // passa a ser o nome em edição.
-  const detalheNomeAlterado =
-    detalhe !== null && detalhe.nomeEdicao.trim() !== detalhe.colaborador.nome;
-
   const carregarDados = useCallback(
-    async (consulta: ConsultaColaboradores, paginaPedida: number) => {
+    async (
+      consulta: ConsultaColaboradores,
+      paginaPedida: number,
+      // T198 — a releitura na volta da ficha não troca a tabela pelo aviso de
+      // carregamento: as linhas (e o botão que recebe o foco) continuam lá.
+      silenciosa = false,
+    ) => {
       const pedido = ++pedidoListaRef.current;
-      setStatusCarregamento("carregando");
+      if (!silenciosa) setStatusCarregamento("carregando");
       try {
         // A empresa nunca entra na query: é a da sessão, resolvida no servidor.
         const query: ListarColaboradoresQuery = {
@@ -515,6 +421,17 @@ export function ColaboradoresScreen({
     filtroCargoId,
     carregarDados,
   ]);
+
+  // T198 — volta da ficha: relê a página atual, com a mesma consulta. A
+  // primeira montagem já leu pelo efeito acima.
+  const consultaRef = useRef(consulta);
+  consultaRef.current = consulta;
+  const paginaRef = useRef(pagina);
+  paginaRef.current = pagina;
+  useEffect(() => {
+    if (atualizacao === 0) return;
+    void carregarDados(consultaRef.current, paginaRef.current, true);
+  }, [atualizacao, carregarDados]);
 
   // T190 — catálogos dos filtros de lotação: uma leitura por montagem (e a
   // cada "Tentar novamente"), só ativos. A troca de empresa recria a tela e
@@ -666,138 +583,6 @@ export function ColaboradoresScreen({
     };
   }
 
-  // T176 — atende a abertura pedida pela página de Nova admissão, uma vez.
-  const aberturaAtendidaRef = useRef(false);
-  useEffect(() => {
-    if (!aberturaInicial || aberturaAtendidaRef.current) return;
-    aberturaAtendidaRef.current = true;
-    abrirDetalhe(aberturaInicial.colaborador);
-    setFocarContatos(aberturaInicial.foco === "contatos");
-    onAberturaAtendida?.();
-    // `abrirDetalhe` é recriada a cada desenho; a abertura vale só na montagem.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [aberturaInicial, onAberturaAtendida]);
-
-  function abrirDetalhe(colaborador: ColaboradorApi) {
-    // T187 — aberta de uma linha da listagem, a ficha herda a lotação do
-    // vínculo principal daquela linha; vinda da Nova admissão, não há.
-    const principalDaLinha =
-      "vinculos" in colaborador
-        ? (colaborador as ColaboradorListadoApi).vinculos[0]
-        : undefined;
-    setDetalhe({
-      colaborador,
-      lotacaoDaLinha: principalDaLinha
-        ? {
-            vinculoId: principalDaLinha.id,
-            lotacao: principalDaLinha.lotacaoVigente,
-          }
-        : null,
-      statusVinculos: "carregando",
-      vinculos: [],
-      nomeEdicao: colaborador.nome,
-      salvandoNome: false,
-      erroNome: null,
-    });
-    void carregarVinculos(colaborador.id);
-  }
-
-  async function carregarVinculos(colaboradorId: string) {
-    setDetalhe((prev) =>
-      prev ? { ...prev, statusVinculos: "carregando" } : prev,
-    );
-    try {
-      const vinculos = await listarVinculosDoColaborador(colaboradorId);
-      // Só escreve se o detalhe aberto ainda for o MESMO colaborador. Sem esta
-      // conferência, fechar o detalhe de A e abrir o de B fazia a resposta
-      // atrasada de A gravar os vínculos de A no painel de B — dado de uma
-      // pessoa aparecendo na ficha de outra.
-      setDetalhe((prev) =>
-        prev && prev.colaborador.id === colaboradorId
-          ? { ...prev, vinculos, statusVinculos: "dados" }
-          : prev,
-      );
-    } catch {
-      setDetalhe((prev) =>
-        prev && prev.colaborador.id === colaboradorId
-          ? { ...prev, statusVinculos: "erro" }
-          : prev,
-      );
-    }
-  }
-
-  function fecharDetalhe() {
-    setDetalhe(null);
-    setFocarContatos(false);
-  }
-
-  async function handleSalvarNome() {
-    if (!detalhe) return;
-    // Trava síncrona contra envio duplicado: `disabled` depende de um
-    // `setState`, que só chega no próximo render, e cliques no mesmo quadro
-    // escapam dele.
-    if (salvandoNomeRef.current) return;
-    const nome = detalhe.nomeEdicao.trim();
-    if (!nome) {
-      setDetalhe((prev) =>
-        prev ? { ...prev, erroNome: "Nome é obrigatório." } : prev,
-      );
-      return;
-    }
-    if (nome.length > 160) {
-      setDetalhe((prev) =>
-        prev
-          ? { ...prev, erroNome: "Nome deve ter no máximo 160 caracteres." }
-          : prev,
-      );
-      return;
-    }
-
-    salvandoNomeRef.current = true;
-    setDetalhe((prev) =>
-      prev ? { ...prev, salvandoNome: true, erroNome: null } : prev,
-    );
-    try {
-      const dto: RetificarColaboradorDto = { nome };
-      const atualizado = await retificarColaborador(
-        detalhe.colaborador.id,
-        dto,
-      );
-      // T178 — só o NOME vem da resposta. O `PATCH` devolve a situação
-      // GLOBAL do colaborador, e a linha (e a ficha aberta a partir dela)
-      // mostra a situação NA EMPRESA ATIVA: copiar o objeto inteiro trocaria
-      // "Inativo nesta empresa" por "Ativo" só porque o nome foi corrigido — e
-      // apagaria os vínculos que a listagem projetou.
-      setDetalhe((prev) =>
-        prev
-          ? {
-              ...prev,
-              colaborador: { ...prev.colaborador, nome: atualizado.nome },
-              nomeEdicao: atualizado.nome,
-              salvandoNome: false,
-            }
-          : prev,
-      );
-      setColaboradores((prev) =>
-        prev.map((c) =>
-          c.id === atualizado.id ? { ...c, nome: atualizado.nome } : c,
-        ),
-      );
-    } catch (err: unknown) {
-      const mensagem =
-        err instanceof Error
-          ? err.message
-          : "Não foi possível salvar o nome. Tente novamente.";
-      setDetalhe((prev) =>
-        prev ? { ...prev, salvandoNome: false, erroNome: mensagem } : prev,
-      );
-    } finally {
-      // Libera só depois que a tentativa termina — sucesso ou falha —, para
-      // que corrigir e reenviar continue possível.
-      salvandoNomeRef.current = false;
-    }
-  }
-
   /**
    * T178 — colunas da porta principal.
    *
@@ -895,52 +680,13 @@ export function ColaboradoresScreen({
           variant="secondary"
           onClick={(evento) => {
             evento.currentTarget.focus();
-            abrirDetalhe(c);
+            onAbrirFicha?.(c.id);
           }}
-          aria-haspopup="dialog"
-          aria-expanded={detalhe?.colaborador.id === c.id}
         >
           Abrir ficha
           <span className="sr-only"> de {c.nome}</span>
         </Button>
       ),
-    },
-  ];
-
-  const colunasVinculos: DataTableColumn<VinculoApi>[] = [
-    {
-      key: "matricula",
-      header: "Matrícula",
-      cell: (v) => exibirMatricula(v.matricula),
-    },
-    {
-      key: "tipo",
-      header: "Tipo",
-      cell: (v) => ROTULO_TIPO_VINCULO[v.tipo] ?? v.tipo,
-    },
-    {
-      key: "situacao",
-      header: "Situação",
-      cell: (v) => (
-        <StatusBadge
-          variant={VARIANTE_SITUACAO_VINCULO[v.situacao] ?? "neutral"}
-        >
-          {ROTULO_SITUACAO_VINCULO[v.situacao] ?? v.situacao}
-        </StatusBadge>
-      ),
-    },
-    {
-      // Dias civis (`@db.Date`): o Prisma os entrega como datetime ISO, e
-      // `formatarDiaCivil` lê os componentes direto da string — `Date` não
-      // entra no caminho, logo o dia exibido nunca recua a oeste de Greenwich.
-      key: "admissao",
-      header: "Admissão",
-      cell: (v) => formatarDiaCivil(v.dataAdmissao),
-    },
-    {
-      key: "desligamento",
-      header: "Desligamento",
-      cell: (v) => formatarDiaCivil(v.dataDesligamento),
     },
   ];
 
@@ -1451,168 +1197,6 @@ export function ColaboradoresScreen({
           ) : null}
         </section>
       )}
-
-      <Modal
-        aberto={detalhe !== null}
-        titulo={detalhe?.colaborador.nome ?? ""}
-        onFechar={fecharDetalhe}
-        bloqueado={
-          (detalhe?.salvandoNome ?? false) ||
-          salvandoContatos ||
-          salvandoDadosPessoais ||
-          salvandoJornada
-        }
-        alterado={
-          detalheNomeAlterado ||
-          contatosAlterados ||
-          dadosPessoaisAlterados ||
-          jornadaAlterada
-        }
-        largura="media"
-      >
-        {detalhe ? (
-          <>
-            <p>
-              <StatusBadge
-                variant={
-                  VARIANTE_SITUACAO_COLABORADOR[detalhe.colaborador.situacao] ??
-                  "neutral"
-                }
-              >
-                {detalhe.colaborador.situacao === "ativo" ? "Ativo" : "Inativo"}
-              </StatusBadge>
-            </p>
-            <p className="colaboradores-screen__aviso-texto">
-              Matrícula, tipo de vínculo e data de admissão são imutáveis nesta
-              tela. O nome, os dados pessoais, o endereço e os contatos podem
-              ser corrigidos abaixo.
-            </p>
-
-            <div className="colaboradores-screen__edicao-nome">
-              <FormField
-                id="colaboradores-detalhe-nome"
-                label="Nome"
-                {...(detalhe.erroNome ? { error: detalhe.erroNome } : {})}
-              >
-                {(control) => (
-                  <input
-                    type="text"
-                    maxLength={160}
-                    value={detalhe.nomeEdicao}
-                    onChange={(e) =>
-                      setDetalhe((prev) =>
-                        prev
-                          ? {
-                              ...prev,
-                              nomeEdicao: e.target.value,
-                              erroNome: null,
-                            }
-                          : prev,
-                      )
-                    }
-                    {...control}
-                  />
-                )}
-              </FormField>
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => void handleSalvarNome()}
-                disabled={detalhe.salvandoNome || !detalheNomeAlterado}
-              >
-                {detalhe.salvandoNome ? "Salvando…" : "Salvar nome"}
-              </Button>
-            </div>
-
-            {/* T177 — Módulo 1: dados pessoais e endereço. T181 — editáveis,
-                cada bloco com Salvar e Cancelar. */}
-            <DadosPessoaisColaboradorSecao
-              key={`dados-${detalhe.colaborador.id}`}
-              colaboradorId={detalhe.colaborador.id}
-              podeEditar={podeEditarFicha}
-              onAlteradoChange={setDadosPessoaisAlterados}
-              onSalvandoChange={setSalvandoDadosPessoais}
-            />
-
-            <ContatosColaboradorSecao
-              key={detalhe.colaborador.id}
-              colaboradorId={detalhe.colaborador.id}
-              onAlteradoChange={setContatosAlterados}
-              onSalvandoChange={setSalvandoContatos}
-              focarAoCarregar={focarContatos}
-              podeEditar={podeEditarFicha}
-            />
-
-            {/* T183 — a jornada atual e o histórico de vigências; o RH
-                atribui, troca e encerra. */}
-            <JornadaColaboradorSecao
-              key={`jornada-${detalhe.colaborador.id}`}
-              colaboradorId={detalhe.colaborador.id}
-              podeOperar={podeOperarJornada}
-              onAlteradoChange={setJornadaAlterada}
-              onSalvandoChange={setSalvandoJornada}
-            />
-
-            {/* T187 — vida funcional do vínculo principal, só leitura. Espera
-                os vínculos: é deles que sai o principal, pela mesma ordem da
-                listagem. */}
-            {detalhe.statusVinculos === "dados" ? (
-              <VidaFuncionalColaboradorSecao
-                key={`vida-${detalhe.colaborador.id}-${
-                  vinculoPrincipal(detalhe.vinculos)?.id ?? "sem-vinculo"
-                }`}
-                colaboradorId={detalhe.colaborador.id}
-                nomeColaborador={detalhe.colaborador.nome}
-                vinculo={vinculoPrincipal(detalhe.vinculos)}
-                lotacaoDaLinha={detalhe.lotacaoDaLinha}
-                {...(onAbrirHistoricoFuncional
-                  ? { onAbrirHistorico: onAbrirHistoricoFuncional }
-                  : {})}
-                atalhoBloqueado={
-                  detalheNomeAlterado ||
-                  contatosAlterados ||
-                  dadosPessoaisAlterados ||
-                  jornadaAlterada ||
-                  detalhe.salvandoNome ||
-                  salvandoContatos ||
-                  salvandoDadosPessoais ||
-                  salvandoJornada
-                }
-              />
-            ) : null}
-
-            <div className="colaboradores-screen__vinculos">
-              <h3 className="colaboradores-screen__section-title">Vínculos</h3>
-              {detalhe.statusVinculos === "carregando" ? (
-                <p className="colaboradores-screen__carregando" role="status">
-                  Carregando vínculos…
-                </p>
-              ) : detalhe.statusVinculos === "erro" ? (
-                <p className="colaboradores-screen__form-erro" role="alert">
-                  Não foi possível carregar os vínculos deste colaborador.{" "}
-                  <Button
-                    variant="secondary"
-                    onClick={() =>
-                      void carregarVinculos(detalhe.colaborador.id)
-                    }
-                  >
-                    Tentar novamente
-                  </Button>
-                </p>
-              ) : detalhe.vinculos.length === 0 ? (
-                <p>Nenhum vínculo encontrado.</p>
-              ) : (
-                <DataTable
-                  caption={`Vínculos — ${detalhe.colaborador.nome}`}
-                  columns={colunasVinculos}
-                  rows={detalhe.vinculos}
-                  rowKey={(v) => v.id}
-                />
-              )}
-            </div>
-          </>
-        ) : null}
-      </Modal>
 
       {/* T194 — painel "Adicionar colaborador": só para quem pode admitir (a
           mesma prop que mostra o botão). "Cadastro individual" fecha o painel
