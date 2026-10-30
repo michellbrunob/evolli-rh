@@ -921,3 +921,329 @@ describe("T198 — títulos para quem navega por eles", () => {
     },
   );
 });
+
+// ---------------------------------------------------------------------------
+// Pós-revisão (C1) — a jornada do cabeçalho é só da empresa do vínculo
+// principal. O `master_tecnico` sem empresa ativa lê vínculos e horários de
+// todas as empresas: sem o filtro, a jornada de uma empresa aparecia ao lado
+// do vínculo, da lotação e da situação de outra.
+// ---------------------------------------------------------------------------
+describe("T198 — jornada do cabeçalho na empresa do vínculo principal", () => {
+  const EMPRESA_B = "55555555-5555-4555-8555-555555555555";
+  /** Vínculo principal ativo na empresa A; o da empresa B, encerrado. */
+  const vinculosEmDuasEmpresas = () => [
+    vinculo(),
+    vinculo({
+      id: "66666666-6666-4666-8666-666666666666",
+      empresaId: EMPRESA_B,
+      matricula: "MAT-B-0001",
+      situacao: "encerrado",
+      dataAdmissao: "2020-01-02",
+      dataDesligamento: "2024-12-31",
+    }),
+  ];
+  const jornadaDaEmpresaB = () =>
+    jornada({
+      id: "h-b",
+      empresaId: EMPRESA_B,
+      tabelaHorarioId: "t-b",
+      tabela: {
+        id: "t-b",
+        codigo: "JORB",
+        nome: "Outra empresa (teste)",
+        ativo: true,
+      },
+    });
+
+  it("leitura global com só a jornada da outra empresa: 'Sem jornada vigente'", async () => {
+    vi.mocked(listarVinculosDoColaborador).mockResolvedValue(
+      vinculosEmDuasEmpresas(),
+    );
+    vi.mocked(listarVinculosHorario).mockResolvedValue(
+      paginado([jornadaDaEmpresaB()]),
+    );
+    render(<Ficha />);
+    await esperarFicha();
+    expect(resumo("Vínculo principal")).toHaveTextContent("MAT-0001");
+    await waitFor(() => expect(listarVinculosHorario).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(resumo("Jornada vigente")).toHaveTextContent(
+        "Sem jornada vigente",
+      ),
+    );
+    expect(cabecalho()).not.toHaveTextContent("Outra empresa (teste)");
+    expect(cabecalho()).not.toHaveTextContent("JORB");
+  });
+
+  it("com as duas jornadas vigentes, mostra a da empresa do vínculo principal", async () => {
+    vi.mocked(listarVinculosDoColaborador).mockResolvedValue(
+      vinculosEmDuasEmpresas(),
+    );
+    // A da outra empresa vem primeiro: a regra antiga a escolheria.
+    vi.mocked(listarVinculosHorario).mockResolvedValue(
+      paginado([jornadaDaEmpresaB(), jornada()]),
+    );
+    render(<Ficha />);
+    await esperarFicha();
+    await waitFor(() =>
+      expect(resumo("Jornada vigente")).toHaveTextContent(
+        "JOR44 — Comercial (teste)",
+      ),
+    );
+    expect(cabecalho()).not.toHaveTextContent("Outra empresa (teste)");
+    // Lotação e situação continuam as da empresa A.
+    await waitFor(() =>
+      expect(cabecalho()).toHaveTextContent("Cargo: ANL — Analista (teste)"),
+    );
+    expect(
+      within(cabecalho()).getByText("Ativo nesta empresa"),
+    ).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Pós-revisão (C2) — nova leitura sem perder o foco. O botão "Tentar de novo"
+// fica no lugar, com `aria-disabled`, até a resposta; sucesso leva o foco ao
+// título (ficha) ou ao item recuperado (lotação, jornada); nova falha mantém o
+// foco no botão. Cada falha é anunciada uma vez, por um alerta novo.
+// ---------------------------------------------------------------------------
+describe("T198 — foco e anúncio nas novas leituras", () => {
+  function adiado<T>() {
+    let resolver!: (v: T) => void;
+    let rejeitar!: (e: unknown) => void;
+    const promessa = new Promise<T>((res, rej) => {
+      resolver = res;
+      rejeitar = rej;
+    });
+    return { promessa, resolver, rejeitar };
+  }
+
+  /** Clica como a pessoa clica: o botão recebe o foco antes do clique. */
+  function clicarComFoco(botao: HTMLElement) {
+    botao.focus();
+    fireEvent.click(botao);
+  }
+
+  /** O botão "Tentar de novo" do mesmo bloco do alerta. */
+  function botaoDoAlerta(alerta: HTMLElement): HTMLButtonElement {
+    const botao = alerta.parentElement?.querySelector("button");
+    if (!botao) throw new Error("Sem botão ao lado do alerta.");
+    return botao;
+  }
+
+  describe("ficha", () => {
+    it("durante a nova leitura o botão fica, focado e indisponível; o sucesso leva o foco ao h1", async () => {
+      vi.mocked(buscarColaborador).mockRejectedValueOnce(new Error("falha"));
+      render(<Ficha />);
+      const alerta = await screen.findByRole("alert");
+      expect(alerta).toHaveTextContent("Não foi possível carregar a ficha.");
+      const botao = screen.getByRole("button", { name: "Tentar de novo" });
+
+      const leitura = adiado<ColaboradorApi>();
+      vi.mocked(buscarColaborador).mockImplementationOnce(
+        () => leitura.promessa,
+      );
+      clicarComFoco(botao);
+
+      expect(document.activeElement).toBe(botao);
+      expect(botao).toHaveAttribute("aria-disabled", "true");
+      expect(botao).not.toBeDisabled();
+      // Indisponível: um segundo clique não dispara outra leitura.
+      const chamadas = vi.mocked(buscarColaborador).mock.calls.length;
+      fireEvent.click(botao);
+      expect(vi.mocked(buscarColaborador).mock.calls.length).toBe(chamadas);
+
+      await act(async () => {
+        leitura.resolver(ana);
+      });
+      const titulo = await screen.findByRole("heading", {
+        level: 1,
+        name: ana.nome,
+      });
+      await waitFor(() => expect(titulo).toHaveFocus());
+    });
+
+    it("nova falha: o foco segue no botão e a falha é anunciada uma vez", async () => {
+      vi.mocked(buscarColaborador).mockRejectedValueOnce(new Error("falha"));
+      render(<Ficha />);
+      const primeiro = await screen.findByRole("alert");
+      const botao = screen.getByRole("button", { name: "Tentar de novo" });
+
+      const leitura = adiado<ColaboradorApi>();
+      vi.mocked(buscarColaborador).mockImplementationOnce(
+        () => leitura.promessa,
+      );
+      clicarComFoco(botao);
+      await act(async () => {
+        leitura.rejeitar(new Error("falha de novo"));
+      });
+
+      await waitFor(() =>
+        expect(botao).toHaveAttribute("aria-disabled", "false"),
+      );
+      expect(document.activeElement).toBe(botao);
+      const alertas = screen.getAllByRole("alert");
+      expect(alertas).toHaveLength(1);
+      // Alerta NOVO (outro nó): o leitor de tela anuncia a nova falha.
+      expect(alertas[0]).not.toBe(primeiro);
+      expect(alertas[0]).toHaveTextContent(
+        "Não foi possível carregar a ficha.",
+      );
+    });
+
+    it("nova leitura que vira 'não encontrado' leva o foco ao h1 dele", async () => {
+      vi.mocked(buscarColaborador).mockRejectedValueOnce(new Error("falha"));
+      render(<Ficha />);
+      await screen.findByRole("alert");
+      vi.mocked(buscarColaborador).mockRejectedValueOnce(
+        Object.assign(new Error("Recurso não encontrado."), { status: 404 }),
+      );
+      clicarComFoco(screen.getByRole("button", { name: "Tentar de novo" }));
+      const titulo = await screen.findByRole("heading", {
+        level: 1,
+        name: "Colaborador não encontrado",
+      });
+      await waitFor(() => expect(titulo).toHaveFocus());
+    });
+  });
+
+  describe("lotação e jornada do cabeçalho", () => {
+    it("falhas de lotação e de jornada são anunciadas, cada uma uma vez", async () => {
+      vi.mocked(listarAlocacoesVinculo).mockRejectedValueOnce(
+        new Error("falha"),
+      );
+      vi.mocked(listarVinculosHorario).mockRejectedValueOnce(
+        new Error("falha"),
+      );
+      render(<Ficha />);
+      await esperarFicha();
+      await waitFor(() =>
+        expect(within(cabecalho()).getAllByRole("alert")).toHaveLength(2),
+      );
+      const textos = within(cabecalho())
+        .getAllByRole("alert")
+        .map((a) => a.textContent);
+      expect(textos).toEqual([
+        "Não foi possível carregar a lotação.",
+        "Não foi possível carregar a jornada.",
+      ]);
+      // O botão fica fora do alerta: o nome dele não entra no anúncio.
+      for (const botao of within(cabecalho()).getAllByRole("button", {
+        name: "Tentar de novo",
+      })) {
+        expect(botao.closest("[role=alert]")).toBeNull();
+      }
+    });
+
+    it("lotação: botão estável e focado na nova leitura; sucesso leva o foco à lotação", async () => {
+      vi.mocked(listarAlocacoesVinculo).mockRejectedValueOnce(
+        new Error("falha"),
+      );
+      render(<Ficha />);
+      await esperarFicha();
+      const botao = botaoDoAlerta(
+        await within(cabecalho()).findByRole("alert"),
+      );
+
+      const leitura = adiado<AlocacaoOrganizacionalApi[]>();
+      vi.mocked(listarAlocacoesVinculo).mockImplementationOnce(
+        () => leitura.promessa,
+      );
+      clicarComFoco(botao);
+      expect(document.activeElement).toBe(botao);
+      expect(botao).toHaveAttribute("aria-disabled", "true");
+
+      await act(async () => {
+        leitura.resolver([alocacao()]);
+      });
+      await waitFor(() =>
+        expect(document.activeElement).toHaveClass(
+          "ficha-colaborador__lotacao",
+        ),
+      );
+      expect(document.activeElement).toHaveTextContent(
+        "Cargo: ANL — Analista (teste)",
+      );
+    });
+
+    it("lotação: nova falha mantém o foco no botão, com um alerta novo", async () => {
+      vi.mocked(listarAlocacoesVinculo).mockRejectedValueOnce(
+        new Error("falha"),
+      );
+      render(<Ficha />);
+      await esperarFicha();
+      const primeiro = await within(cabecalho()).findByRole("alert");
+      const botao = botaoDoAlerta(primeiro);
+
+      const leitura = adiado<AlocacaoOrganizacionalApi[]>();
+      vi.mocked(listarAlocacoesVinculo).mockImplementationOnce(
+        () => leitura.promessa,
+      );
+      clicarComFoco(botao);
+      await act(async () => {
+        leitura.rejeitar(new Error("falha de novo"));
+      });
+      await waitFor(() =>
+        expect(botao).toHaveAttribute("aria-disabled", "false"),
+      );
+      expect(document.activeElement).toBe(botao);
+      const alertas = within(cabecalho()).getAllByRole("alert");
+      expect(alertas).toHaveLength(1);
+      expect(alertas[0]).not.toBe(primeiro);
+    });
+
+    it("jornada: botão estável e focado na nova leitura; sucesso leva o foco ao item 'Jornada vigente'", async () => {
+      vi.mocked(listarVinculosHorario).mockRejectedValueOnce(
+        new Error("falha"),
+      );
+      render(<Ficha />);
+      await esperarFicha();
+      const botao = botaoDoAlerta(
+        await within(cabecalho()).findByRole("alert"),
+      );
+
+      const leitura = adiado<ReturnType<typeof paginado<VinculoHorarioApi>>>();
+      vi.mocked(listarVinculosHorario).mockImplementationOnce(
+        () => leitura.promessa,
+      );
+      clicarComFoco(botao);
+      expect(document.activeElement).toBe(botao);
+      expect(botao).toHaveAttribute("aria-disabled", "true");
+
+      await act(async () => {
+        leitura.resolver(paginado([jornada()]));
+      });
+      await waitFor(() =>
+        expect(document.activeElement).toHaveTextContent(
+          /^Jornada vigente\s*JOR44 — Comercial \(teste\)$/,
+        ),
+      );
+    });
+
+    it("jornada: nova falha mantém o foco no botão, com um alerta novo", async () => {
+      vi.mocked(listarVinculosHorario).mockRejectedValueOnce(
+        new Error("falha"),
+      );
+      render(<Ficha />);
+      await esperarFicha();
+      const primeiro = await within(cabecalho()).findByRole("alert");
+      const botao = botaoDoAlerta(primeiro);
+
+      const leitura = adiado<ReturnType<typeof paginado<VinculoHorarioApi>>>();
+      vi.mocked(listarVinculosHorario).mockImplementationOnce(
+        () => leitura.promessa,
+      );
+      clicarComFoco(botao);
+      await act(async () => {
+        leitura.rejeitar(new Error("falha de novo"));
+      });
+      await waitFor(() =>
+        expect(botao).toHaveAttribute("aria-disabled", "false"),
+      );
+      expect(document.activeElement).toBe(botao);
+      const alertas = within(cabecalho()).getAllByRole("alert");
+      expect(alertas).toHaveLength(1);
+      expect(alertas[0]).not.toBe(primeiro);
+    });
+  });
+});

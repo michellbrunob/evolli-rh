@@ -124,10 +124,36 @@ interface ReferenciaDaFicha {
   readonly ativa: boolean;
 }
 
+/**
+ * Falha com nova tentativa. Durante a nova leitura (`relendo`), o aviso e o
+ * botão ficam no lugar — o botão, focado, com `aria-disabled` —, em vez de
+ * darem lugar a "Carregando…" e levarem o foco junto. `falhas` conta as
+ * falhas: cada uma monta um alerta novo, anunciado uma vez.
+ */
+interface FalhaComNovaTentativa {
+  readonly tipo: "erro";
+  readonly relendo: boolean;
+  readonly falhas: number;
+}
+
+/** A próxima falha, contada a partir do estado anterior. */
+function proximaFalha(anterior: {
+  readonly tipo: string;
+}): FalhaComNovaTentativa {
+  const falhas =
+    anterior.tipo === "erro" ? (anterior as FalhaComNovaTentativa).falhas : 0;
+  return { tipo: "erro", relendo: false, falhas: falhas + 1 };
+}
+
+/** Marca a falha atual como em nova leitura (o resto do estado fica). */
+function emNovaLeitura<T extends { readonly tipo: string }>(anterior: T): T {
+  return anterior.tipo === "erro" ? { ...anterior, relendo: true } : anterior;
+}
+
 type EstadoDoColaborador =
   | { readonly tipo: "carregando" }
   | { readonly tipo: "nao-encontrado" }
-  | { readonly tipo: "erro" }
+  | FalhaComNovaTentativa
   | {
       readonly tipo: "dados";
       readonly colaborador: ColaboradorApi;
@@ -137,7 +163,7 @@ type EstadoDoColaborador =
 type EstadoDaLotacao =
   | { readonly tipo: "carregando" }
   | { readonly tipo: "sem-lotacao" }
-  | { readonly tipo: "erro" }
+  | FalhaComNovaTentativa
   | {
       readonly tipo: "dados";
       readonly vinculoId: string;
@@ -147,7 +173,7 @@ type EstadoDaLotacao =
 
 type EstadoDaJornada =
   | { readonly tipo: "carregando" }
-  | { readonly tipo: "erro" }
+  | FalhaComNovaTentativa
   | { readonly tipo: "dados"; readonly vigente: VinculoHorarioApi | null };
 
 export interface FichaColaboradorScreenProps {
@@ -185,6 +211,11 @@ export function FichaColaboradorScreen({
   const idDaAba = (a: AbaDaFicha) => `${prefixo}-aba-${a}`;
   const idDoPainel = (a: AbaDaFicha) => `${prefixo}-painel-${a}`;
   const tituloRef = useRef<HTMLHeadingElement | null>(null);
+  /** Destinos do foco quando uma nova leitura do resumo dá certo. */
+  const lotacaoRef = useRef<HTMLParagraphElement | null>(null);
+  const jornadaRef = useRef<HTMLDivElement | null>(null);
+  /** Para onde levar o foco depois do próximo desenho (nova leitura bem-sucedida). */
+  const focoPendenteRef = useRef<"titulo" | "lotacao" | "jornada" | null>(null);
 
   const [estado, setEstado] = useState<EstadoDoColaborador>({
     tipo: "carregando",
@@ -247,21 +278,33 @@ export function FichaColaboradorScreen({
     };
   }, []);
 
-  const carregarColaborador = useCallback(async () => {
-    setEstado({ tipo: "carregando" });
-    try {
-      const [dados, lista] = await Promise.all([
-        buscarColaborador(colaboradorId),
-        listarVinculosDoColaborador(colaboradorId),
-      ]);
-      if (!vivaRef.current) return;
-      setEstado({ tipo: "dados", colaborador: dados, vinculos: lista });
-      setNomeEdicao(dados.nome);
-    } catch (erro) {
-      if (!vivaRef.current) return;
-      setEstado({ tipo: semAcesso(erro) ? "nao-encontrado" : "erro" });
-    }
-  }, [colaboradorId]);
+  const carregarColaborador = useCallback(
+    async (novaLeitura = false) => {
+      if (novaLeitura) setEstado(emNovaLeitura);
+      else setEstado({ tipo: "carregando" });
+      try {
+        const [dados, lista] = await Promise.all([
+          buscarColaborador(colaboradorId),
+          listarVinculosDoColaborador(colaboradorId),
+        ]);
+        if (!vivaRef.current) return;
+        if (novaLeitura) focoPendenteRef.current = "titulo";
+        setEstado({ tipo: "dados", colaborador: dados, vinculos: lista });
+        setNomeEdicao(dados.nome);
+      } catch (erro) {
+        if (!vivaRef.current) return;
+        if (semAcesso(erro)) {
+          // O aviso some: o foco vai ao título "não encontrado".
+          if (novaLeitura) focoPendenteRef.current = "titulo";
+          setEstado({ tipo: "nao-encontrado" });
+        } else {
+          // Nova falha: o botão segue no lugar e com o foco.
+          setEstado(proximaFalha);
+        }
+      }
+    },
+    [colaboradorId],
+  );
 
   useEffect(() => {
     void carregarColaborador();
@@ -270,43 +313,55 @@ export function FichaColaboradorScreen({
   // ---- Lotação vigente do vínculo principal (só ativo) --------------------
   const principalId = principal?.id ?? null;
   const principalAtivo = principal?.situacao === "ativo";
-  const carregarLotacao = useCallback(async (vinculoId: string) => {
-    setLotacao({ tipo: "carregando" });
-    try {
-      const alocacoes = await listarAlocacoesVinculo(vinculoId);
-      const vigente = alocacoes.find((a) => a.vigenteAte === null) ?? null;
-      if (!vigente) {
-        if (vivaRef.current) setLotacao({ tipo: "sem-lotacao" });
-        return;
+  const carregarLotacao = useCallback(
+    async (vinculoId: string, novaLeitura = false) => {
+      if (novaLeitura) setLotacao(emNovaLeitura);
+      else setLotacao({ tipo: "carregando" });
+      try {
+        const alocacoes = await listarAlocacoesVinculo(vinculoId);
+        const vigente = alocacoes.find((a) => a.vigenteAte === null) ?? null;
+        if (!vigente) {
+          if (!vivaRef.current) return;
+          if (novaLeitura) focoPendenteRef.current = "lotacao";
+          setLotacao({ tipo: "sem-lotacao" });
+          return;
+        }
+        const [cargo, departamento] = await Promise.all([
+          vigente.cargoId ? buscarCargo(vigente.cargoId) : null,
+          vigente.departamentoId
+            ? buscarDepartamento(vigente.departamentoId)
+            : null,
+        ]);
+        if (!vivaRef.current) return;
+        const referencia = (
+          r: {
+            id: string;
+            codigo: string;
+            nome: string;
+            status: string;
+          } | null,
+        ): ReferenciaDaFicha | null =>
+          r
+            ? {
+                id: r.id,
+                codigo: r.codigo,
+                nome: r.nome,
+                ativa: r.status === "ativo",
+              }
+            : null;
+        if (novaLeitura) focoPendenteRef.current = "lotacao";
+        setLotacao({
+          tipo: "dados",
+          vinculoId,
+          cargo: referencia(cargo),
+          departamento: referencia(departamento),
+        });
+      } catch {
+        if (vivaRef.current) setLotacao(proximaFalha);
       }
-      const [cargo, departamento] = await Promise.all([
-        vigente.cargoId ? buscarCargo(vigente.cargoId) : null,
-        vigente.departamentoId
-          ? buscarDepartamento(vigente.departamentoId)
-          : null,
-      ]);
-      if (!vivaRef.current) return;
-      const referencia = (
-        r: { id: string; codigo: string; nome: string; status: string } | null,
-      ): ReferenciaDaFicha | null =>
-        r
-          ? {
-              id: r.id,
-              codigo: r.codigo,
-              nome: r.nome,
-              ativa: r.status === "ativo",
-            }
-          : null;
-      setLotacao({
-        tipo: "dados",
-        vinculoId,
-        cargo: referencia(cargo),
-        departamento: referencia(departamento),
-      });
-    } catch {
-      if (vivaRef.current) setLotacao({ tipo: "erro" });
-    }
-  }, []);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (estado.tipo !== "dados") return;
@@ -318,22 +373,32 @@ export function FichaColaboradorScreen({
   }, [estado.tipo, principalId, principalAtivo, carregarLotacao]);
 
   // ---- Jornada vigente (só com vínculo ativo) -----------------------------
-  const carregarJornada = useCallback(async () => {
-    setJornada({ tipo: "carregando" });
-    try {
-      const resposta = await listarVinculosHorario({
-        colaboradorId,
-        tamanhoPagina: 100,
-      });
-      if (!vivaRef.current) return;
-      setJornada({
-        tipo: "dados",
-        vigente: jornadaDeHoje(resposta.itens, hoje),
-      });
-    } catch {
-      if (vivaRef.current) setJornada({ tipo: "erro" });
-    }
-  }, [colaboradorId, hoje]);
+  // Só a jornada da EMPRESA do vínculo principal. Quem lê sem empresa ativa
+  // (o `master_tecnico` global) recebe os vínculos de horário de todas as
+  // empresas do colaborador; sem este filtro, a jornada de uma empresa
+  // apareceria ao lado do vínculo, da lotação e da situação de outra.
+  const principalEmpresaId = principal?.empresaId ?? null;
+  const carregarJornada = useCallback(
+    async (novaLeitura = false) => {
+      if (novaLeitura) setJornada(emNovaLeitura);
+      else setJornada({ tipo: "carregando" });
+      try {
+        const resposta = await listarVinculosHorario({
+          colaboradorId,
+          tamanhoPagina: 100,
+        });
+        if (!vivaRef.current) return;
+        const daEmpresa = resposta.itens.filter(
+          (v) => v.empresaId === principalEmpresaId,
+        );
+        if (novaLeitura) focoPendenteRef.current = "jornada";
+        setJornada({ tipo: "dados", vigente: jornadaDeHoje(daEmpresa, hoje) });
+      } catch {
+        if (vivaRef.current) setJornada(proximaFalha);
+      }
+    },
+    [colaboradorId, hoje, principalEmpresaId],
+  );
 
   useEffect(() => {
     if (estado.tipo !== "dados") return;
@@ -357,6 +422,22 @@ export function FichaColaboradorScreen({
     if (focarContatos && estado.tipo === "dados") return;
     tituloRef.current?.focus();
   }, [estado.tipo, focarContatos]);
+
+  // Nova leitura bem-sucedida: o nó que tinha o foco (o botão) saiu; o foco
+  // vai ao que foi recuperado — o título da ficha, a lotação ou a jornada.
+  useEffect(() => {
+    const destino = focoPendenteRef.current;
+    if (destino === null) return;
+    const alvo =
+      destino === "titulo"
+        ? tituloRef.current
+        : destino === "lotacao"
+          ? lotacaoRef.current
+          : jornadaRef.current;
+    if (!alvo) return;
+    focoPendenteRef.current = null;
+    alvo.focus();
+  });
 
   useEffect(() => {
     setAbasVisitadas((atual) =>
@@ -484,13 +565,21 @@ export function FichaColaboradorScreen({
             </Button>
           </div>
         ) : (
-          <div className="ficha-colaborador__aviso" role="alert">
-            <p className="ficha-colaborador__texto">
+          <div className="ficha-colaborador__aviso">
+            {/* Um alerta novo por falha (a `key`): anunciado uma vez. */}
+            <p
+              key={estado.falhas}
+              role="alert"
+              className="ficha-colaborador__texto"
+            >
               Não foi possível carregar a ficha.
             </p>
             <Button
               variant="secondary"
-              onClick={() => void carregarColaborador()}
+              aria-disabled={estado.relendo}
+              onClick={() => {
+                if (!estado.relendo) void carregarColaborador(true);
+              }}
             >
               Tentar de novo
             </Button>
@@ -558,16 +647,22 @@ export function FichaColaboradorScreen({
     if (!principalAtivo) return "Sem lotação vigente";
     if (lotacao.tipo === "carregando") return "Carregando lotação…";
     if (lotacao.tipo === "erro") {
+      const relendo = lotacao.relendo;
       return (
-        <>
-          Não foi possível carregar a lotação.{" "}
+        <span className="ficha-colaborador__falha">
+          <span key={lotacao.falhas} role="alert">
+            Não foi possível carregar a lotação.
+          </span>{" "}
           <Button
             variant="secondary"
-            onClick={() => void carregarLotacao(principal.id)}
+            aria-disabled={relendo}
+            onClick={() => {
+              if (!relendo) void carregarLotacao(principal.id, true);
+            }}
           >
             Tentar de novo
           </Button>
-        </>
+        </span>
       );
     }
     if (lotacao.tipo === "sem-lotacao") return "Sem lotação vigente";
@@ -589,13 +684,22 @@ export function FichaColaboradorScreen({
     if (!principal || !principalAtivo) return "Sem jornada vigente";
     if (jornada.tipo === "carregando") return "Carregando jornada…";
     if (jornada.tipo === "erro") {
+      const relendo = jornada.relendo;
       return (
-        <>
-          Não foi possível carregar a jornada.{" "}
-          <Button variant="secondary" onClick={() => void carregarJornada()}>
+        <span className="ficha-colaborador__falha">
+          <span key={jornada.falhas} role="alert">
+            Não foi possível carregar a jornada.
+          </span>{" "}
+          <Button
+            variant="secondary"
+            aria-disabled={relendo}
+            onClick={() => {
+              if (!relendo) void carregarJornada(true);
+            }}
+          >
             Tentar de novo
           </Button>
-        </>
+        </span>
       );
     }
     if (!jornada.vigente) return "Sem jornada vigente";
@@ -644,7 +748,13 @@ export function FichaColaboradorScreen({
               {ativoNaEmpresa ? "Ativo" : "Inativo"} nesta empresa
             </StatusBadge>
           </p>
-          <p className="ficha-colaborador__lotacao">{lotacaoNoCabecalho()}</p>
+          <p
+            ref={lotacaoRef}
+            tabIndex={-1}
+            className="ficha-colaborador__lotacao"
+          >
+            {lotacaoNoCabecalho()}
+          </p>
         </div>
 
         <dl className="ficha-colaborador__resumo">
@@ -678,7 +788,11 @@ export function FichaColaboradorScreen({
               <dd>{formatarDiaCivil(principal.dataDesligamento)}</dd>
             </div>
           ) : null}
-          <div className="ficha-colaborador__item">
+          <div
+            ref={jornadaRef}
+            tabIndex={-1}
+            className="ficha-colaborador__item"
+          >
             <dt>Jornada vigente</dt>
             <dd>{jornadaNoCabecalho()}</dd>
           </div>

@@ -407,6 +407,45 @@ describe("T198 — quem abre a ficha (mesma capacidade de Colaboradores)", () =>
     }
   });
 
+  it("pós-revisão (C1): rh e dp seguem vendo a jornada vigente da própria empresa no cabeçalho", async () => {
+    // Escopados, rh e dp só recebem vínculos de horário da empresa ativa — a
+    // mesma do vínculo principal: o filtro por empresa não muda nada para eles.
+    vi.mocked(listarVinculosHorario).mockResolvedValue(
+      paginado([
+        {
+          id: "h-1",
+          colaboradorId: ana.id,
+          empresaId: EMPRESA,
+          tabelaHorarioId: "t-1",
+          tabela: {
+            id: "t-1",
+            codigo: "JOR44",
+            nome: "Comercial (teste)",
+            ativo: true,
+          },
+          colaborador: { id: ana.id, nome: ana.nome },
+          vigenciaInicio: "2025-01-10",
+          vigenciaFim: null,
+          criadoPorUserId: "u-1",
+          criadoEm: "2025-01-10T12:00:00.000Z",
+          atualizadoEm: "2025-01-10T12:00:00.000Z",
+        },
+      ]),
+    );
+    for (const papel of ["rh", "dp"] as const) {
+      window.history.replaceState(null, "", `/${rotaDe(ana)}`);
+      const { unmount } = render(<App papelDoAtor={papel} />);
+      await esperarFicha(ana.nome);
+      const cabecalho = document.querySelector<HTMLElement>(
+        ".ficha-colaborador__cabecalho",
+      )!;
+      await waitFor(() =>
+        expect(cabecalho).toHaveTextContent("JOR44 — Comercial (teste)"),
+      );
+      unmount();
+    }
+  });
+
   it.each(["gestor", "colaborador", "financeiro", "auditor", "dpo"] as const)(
     "%s com a URL da ficha não a monta, e nada é lido",
     async (papel) => {

@@ -229,8 +229,9 @@ requisição.
   - as abas rolam na horizontal dentro da própria faixa, sem rolagem da
     página;
   - controles de 44 px.
-- Edição pendente em qualquer bloco conta para a troca de empresa e para
-  sair da página (T189).
+- Edição pendente em qualquer bloco conta para a troca de empresa (T189) e
+  para sair pela trilha da ficha. Os demais caminhos de saída não pedem
+  confirmação (ver 13.4).
 
 ## 9. Riscos e testes necessários
 
@@ -372,8 +373,9 @@ para a ficha.
 - Composição (D20): `GET /colaboradores/:id` e `/:id/vinculos`; a alocação
   aberta de `GET /vinculos/:id/alocacoes`; `GET /cargos/:id` e
   `GET /departamentos/:id` pelos ids dela; `GET /horarios/vinculos` do
-  colaborador para a jornada. Falha de lotação ou de jornada fica no próprio
-  item, com "Tentar de novo".
+  colaborador para a jornada, só os da empresa do vínculo principal (quem
+  lê sem empresa ativa recebe os de todas as empresas). Falha de lotação ou
+  de jornada fica no próprio item, com "Tentar de novo".
 - Quatro abas funcionais (D21), com `tablist`, `tabpanel`, setas, Home e End
   movendo o foco e a ativação pelo clique ou Enter: Dados do colaborador
   (nome, dados pessoais, endereço e contatos), Vida funcional (linha do tempo
@@ -407,12 +409,39 @@ para a ficha.
   de jornada já fazia.
 - As demais abas de Pessoas seguem sem URL própria (limitação anterior,
   registrada em `rotasDoShell.ts`).
-- Edição pendente: a trilha da ficha pede confirmação, e a troca de empresa
-  avisa (T189); a barra lateral, o "voltar" do navegador e recarregar a
-  página não pedem. O modal antigo bloqueava a barra por ser modal; como
-  página, a ficha fica como a Nova admissão já estava. Uma guarda de
-  navegação do shell, para todas as páginas, é arquitetura própria e precisa
-  de decisão.
+- **Edição pendente — gate para produção do módulo Pessoas.** A
+  confirmação existe só em dois caminhos: a trilha da ficha ("Sair da ficha
+  sem salvar?") e a troca de empresa (T189). Os demais ainda podem descartar,
+  sem confirmação, uma edição não salva:
+  - a barra lateral, inclusive o próprio item Colaboradores;
+  - os botões Hub e Sair do cabeçalho;
+  - voltar e avançar do navegador;
+  - recarregar a página.
+
+  O modal antigo bloqueava a barra lateral, o Hub e o Sair por ser modal; o
+  voltar, o avançar e o recarregar já não pediam confirmação antes, e a Nova
+  admissão tem a mesma exposição. Fechar isso exige uma guarda de navegação
+  reutilizável no shell inteiro (barra, cabeçalho, histórico do navegador e
+  saída da página), que é decisão e arquitetura próprias: não entra nesta
+  tarefa, e o módulo Pessoas não vai para produção sem ela.
+
 - Foto, portal, salários, férias e ausências, benefícios, documentos,
   pesquisas, comentários e exportação seguem no roadmap da seção 10, sem
   nada na tela.
+
+### 13.5 Correções da revisão final
+
+- **Jornada do cabeçalho por empresa:** a jornada vigente é escolhida só
+  entre os vínculos de horário da empresa do vínculo principal. Antes, na
+  leitura sem empresa ativa (`master_tecnico` global), a jornada de uma
+  empresa podia aparecer ao lado do vínculo, da lotação e da situação de
+  outra. Para RH e DP, que já recebiam só a empresa ativa, nada muda.
+- **Nova leitura sem perder o foco:** em "Tentar de novo" (ficha, lotação e
+  jornada), o aviso e o botão ficam no lugar durante a nova leitura; o botão
+  segue focado, com `aria-disabled`, e ignora cliques repetidos. Se der
+  certo, o foco vai ao título da ficha (ou ao "não encontrado"), à lotação ou
+  ao item "Jornada vigente"; se falhar de novo, fica no botão. Cada falha
+  monta um alerta novo (`role="alert"`), anunciado uma vez; o botão fica
+  fora do alerta.
+- **Edição pendente documentada com exatidão** (13.4): o que pede
+  confirmação, o que ainda descarta sem pedir, e o gate para produção.

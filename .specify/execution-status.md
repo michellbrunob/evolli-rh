@@ -2761,6 +2761,13 @@ migration, RBAC, seed ou dependência.
 **Decisões aprovadas (2026-10-29):** D17 a D24 (seção 12 do dossiê); entrega
 e limites na seção 13.
 
+**Gate para produção do módulo Pessoas:** edição não salva ainda pode ser
+descartada sem confirmação pela barra lateral (inclusive o item
+Colaboradores), Hub, Sair, voltar e avançar do navegador e recarregar; só a
+trilha da ficha e a troca de empresa pedem confirmação. Fechar isso exige uma
+guarda de navegação reutilizável no shell inteiro, decisão e arquitetura
+próprias (seção 13.4 do dossiê).
+
 **Fora de escopo:** foto, portal, salários, férias e ausências, benefícios, documentos, upload, R2, pesquisas, comentários, exportação, API nova, schema, migration, RBAC, seed, Docker, dependências, promoção e merge.
 
 ## Próxima ação autorizável

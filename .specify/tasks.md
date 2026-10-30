@@ -2938,6 +2938,11 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       `master_tecnico` só leitura; Dados contratuais, Histórico funcional e Horário mantidos
       como visões da empresa, com atalho para a ficha.
     - **Entrega:** seção 13 do [dossiê](../docs/decisions/t198-dossie-ficha-unificada-colaborador.md).
+    - **Gate para produção do módulo Pessoas:** a confirmação de edição pendente cobre só a
+      trilha da ficha e a troca de empresa; barra lateral (inclusive o item Colaboradores), Hub,
+      Sair, voltar e avançar do navegador e recarregar ainda descartam sem pedir. Exige uma
+      guarda de navegação reutilizável no shell inteiro — decisão e arquitetura próprias, fora
+      desta tarefa (seção 13.4 do dossiê).
     - **Fora de escopo:** API nova, schema, migration, RBAC, auditoria, seed, Docker,
       dependências, foto, portal, salários, férias e ausências, benefícios, documentos, upload,
       R2, pesquisas, comentários, exportação, promoção e merge.
