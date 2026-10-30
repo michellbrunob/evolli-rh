@@ -619,7 +619,20 @@ function servidorComCentoECinquenta() {
       pagina,
       tamanhoPagina: tamanho,
       total: filtrada.length,
-      contadores: { ativos: filtrada.length, inativos: 0 },
+      contadores: {
+        ativos: filtrada.length,
+        inativos: 0,
+        emAdmissao: 0,
+        desligados: 0,
+        total: filtrada.length,
+        ativosPorTipo: {
+          clt: filtrada.length,
+          estagio: 0,
+          pj: 0,
+          temporario: 0,
+          outro_controlado: 0,
+        },
+      },
     };
   }) as never);
 }

@@ -37,4 +37,11 @@ describe("EmptyState (UI-F02)", () => {
     render(<EmptyState title="Sem itens" headingLevel={3} />);
     expect(screen.getByRole("heading", { level: 3 })).toBeInTheDocument();
   });
+
+  it("aceita nível 4, para telas embutidas abaixo de um h3", () => {
+    render(<EmptyState title="Sem itens" headingLevel={4} />);
+    expect(
+      screen.getByRole("heading", { level: 4, name: "Sem itens" }),
+    ).toBeInTheDocument();
+  });
 });

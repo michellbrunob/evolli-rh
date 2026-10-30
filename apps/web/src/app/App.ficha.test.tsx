@@ -82,6 +82,7 @@ const ana: ColaboradorListadoApi = {
       id: "33333333-3333-4333-8333-333333333333",
       empresaId: EMPRESA,
       matricula: "MAT-0001",
+      tipo: "clt" as const,
       situacao: "ativo",
       dataAdmissao: "2025-01-10T00:00:00.000Z",
       dataDesligamento: null,
@@ -128,7 +129,20 @@ beforeEach(() => {
   window.history.replaceState(null, "", "/");
   vi.mocked(listarColaboradores).mockResolvedValue({
     ...paginado([ana, bruno]),
-    contadores: { ativos: 2, inativos: 0 },
+    contadores: {
+      ativos: 2,
+      inativos: 0,
+      emAdmissao: 0,
+      desligados: 0,
+      total: 2,
+      ativosPorTipo: {
+        clt: 2,
+        estagio: 0,
+        pj: 0,
+        temporario: 0,
+        outro_controlado: 0,
+      },
+    },
   });
   vi.mocked(buscarColaborador).mockImplementation(async (id) => {
     const achado = [ana, bruno].find((c) => c.id === id);
@@ -248,7 +262,7 @@ describe("T198 — abrir, trocar de aba, voltar (App)", () => {
   it("abre pela linha: rota da ficha empilhada; as abas mudam a URL; a trilha volta à listagem", async () => {
     render(<App papelDoAtor="rh" />);
     const tabela = await screen.findByRole("table", {
-      name: "Colaboradores desta empresa",
+      name: /^Colaboradores — /,
     });
     const entradas = window.history.length;
     fireEvent.click(
@@ -273,7 +287,7 @@ describe("T198 — abrir, trocar de aba, voltar (App)", () => {
         document.querySelector<HTMLElement>(".ficha-colaborador")!,
       ).getByRole("button", { name: "Colaboradores" }),
     );
-    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+    await screen.findByRole("table", { name: /^Colaboradores — / });
     expect(window.location.hash).toBe(LISTAGEM);
   });
 
@@ -332,7 +346,7 @@ describe("T198 — abrir, trocar de aba, voltar (App)", () => {
     ).toBeNull();
 
     navegadorVaiPara(LISTAGEM);
-    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+    await screen.findByRole("table", { name: /^Colaboradores — / });
     expect(document.querySelector(".ficha-colaborador")).toBeNull();
 
     navegadorVaiPara(rotaDe(ana, "vida-funcional"));
@@ -356,14 +370,14 @@ describe("T198 — abrir, trocar de aba, voltar (App)", () => {
     fireEvent.click(
       screen.getByRole("button", { name: "Voltar para Colaboradores" }),
     );
-    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+    await screen.findByRole("table", { name: /^Colaboradores — / });
     expect(window.location.hash).toBe(LISTAGEM);
   });
 
   it("id fora do formato não vira requisição: a URL não é rota", async () => {
     window.history.replaceState(null, "", `/${LISTAGEM}/nao-e-uuid/dados`);
     render(<App papelDoAtor="rh" />);
-    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+    await screen.findByRole("table", { name: /^Colaboradores — / });
     expect(buscarColaborador).not.toHaveBeenCalled();
     expect(document.querySelector(".ficha-colaborador")).toBeNull();
   });
@@ -381,7 +395,7 @@ describe("T198 — abrir, trocar de aba, voltar (App)", () => {
     fireEvent.click(
       within(barra).getByRole("button", { name: /^Colaboradores/ }),
     );
-    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+    await screen.findByRole("table", { name: /^Colaboradores — / });
     expect(document.querySelector(".ficha-colaborador")).toBeNull();
     expect(window.location.hash).toBe(LISTAGEM);
   });
@@ -498,7 +512,7 @@ describe("T198 — atalhos das visões da empresa para a ficha (D24)", () => {
       ]),
     );
     render(<App papelDoAtor="rh" />);
-    await screen.findByRole("table", { name: "Colaboradores desta empresa" });
+    await screen.findByRole("table", { name: /^Colaboradores — / });
     fireEvent.click(screen.getByRole("tab", { name: "Horário de trabalho" }));
     const tabela = await screen.findByRole("table", {
       name: "Colaboradores com tabela de horário vinculada",
@@ -523,5 +537,205 @@ describe("T198 — atalhos das visões da empresa para a ficha (D24)", () => {
         selected: true,
       }),
     ).toBeInTheDocument();
+  });
+});
+
+/**
+ * T199 — o estado do dashboard de Colaboradores na URL (D-3): aba, página e
+ * ids de filtros. Recarregar, voltar e avançar o restauram; a busca nunca vai
+ * para a URL; valor inválido cai no padrão e a URL é corrigida no lugar.
+ */
+describe("T199 — o estado do dashboard na URL (App)", () => {
+  const ultimaConsulta = () =>
+    vi.mocked(listarColaboradores).mock.lastCall?.[0] ?? {};
+  const abaDoDashboard = (nome: RegExp) =>
+    within(
+      screen.getByRole("tablist", { name: "Grupos de colaboradores" }),
+    ).getByRole("tab", { name: nome });
+
+  it("trocar de aba empilha a URL com a aba; a consulta pede o grupo", async () => {
+    render(<App papelDoAtor="rh" />);
+    await screen.findByRole("table", { name: /^Colaboradores — Ativos/ });
+    expect(window.location.hash).toBe(LISTAGEM);
+    const entradas = window.history.length;
+
+    fireEvent.click(abaDoDashboard(/^Desligados/));
+    await waitFor(() =>
+      expect(window.location.hash).toBe(`${LISTAGEM}?aba=desligados`),
+    );
+    expect(window.history.length).toBe(entradas + 1);
+    await waitFor(() => expect(ultimaConsulta().grupo).toBe("desligados"));
+  });
+
+  it("a busca nunca vai para a URL", async () => {
+    render(<App papelDoAtor="rh" />);
+    await screen.findByRole("table", { name: /^Colaboradores — / });
+    fireEvent.change(screen.getByLabelText("Tipo de vínculo"), {
+      target: { value: "pj" },
+    });
+    await waitFor(() =>
+      expect(window.location.hash).toBe(`${LISTAGEM}?tipo=pj`),
+    );
+    fireEvent.change(screen.getByLabelText("Buscar por nome ou matrícula"), {
+      target: { value: "Ana MAT-0001" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Buscar" }));
+    await waitFor(() => expect(ultimaConsulta().busca).toBe("Ana MAT-0001"));
+    expect(window.location.hash).toBe(`${LISTAGEM}?tipo=pj`);
+    expect(window.location.href).not.toMatch(/Ana|MAT-0001|busca/);
+  });
+
+  it("rota direta abre na aba e no filtro pedidos, sem entrada nova no histórico", async () => {
+    const rota = `${LISTAGEM}?aba=em-admissao&tipo=estagio`;
+    window.history.replaceState(null, "", `/${rota}`);
+    const entradas = window.history.length;
+    render(<App papelDoAtor="dp" />);
+    await screen.findByRole("table", { name: /^Colaboradores — Em admissão/ });
+    expect(abaDoDashboard(/^Em admissão/)).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(ultimaConsulta()).toMatchObject({
+      grupo: "em_admissao",
+      tipoVinculo: "estagio",
+      pagina: 1,
+    });
+    expect(window.location.hash).toBe(rota);
+    expect(window.history.length).toBe(entradas);
+  });
+
+  it("URL inválida: cai em Ativos sem filtros e é corrigida no lugar; nada inválido vira consulta", async () => {
+    window.history.replaceState(
+      null,
+      "",
+      `/${LISTAGEM}?aba=inativos&pagina=0&tipo=autonomo&departamento=1&busca=Ana`,
+    );
+    const entradas = window.history.length;
+    render(<App papelDoAtor="rh" />);
+    await screen.findByRole("table", { name: /^Colaboradores — Ativos/ });
+    await waitFor(() => expect(window.location.hash).toBe(LISTAGEM));
+    expect(window.history.length).toBe(entradas);
+    for (const [consulta] of vi.mocked(listarColaboradores).mock.calls) {
+      expect(consulta).not.toHaveProperty("busca");
+      expect(consulta).not.toHaveProperty("tipoVinculo");
+      expect(consulta).not.toHaveProperty("departamentoId");
+      expect(consulta?.pagina).toBe(1);
+    }
+  });
+
+  it("id de lotação desconhecido na URL: nunca vira consulta; a URL é corrigida no lugar, sem entrada no histórico", async () => {
+    const OUTRO = "99999999-9999-4999-8999-999999999999";
+    render(<App papelDoAtor="rh" />);
+    await screen.findByRole("table", { name: /^Colaboradores — Ativos/ });
+    fireEvent.click(abaDoDashboard(/^Todos/));
+    await waitFor(() =>
+      expect(window.location.hash).toBe(`${LISTAGEM}?aba=todos`),
+    );
+
+    // "voltar"/"avançar" não mudam o tamanho do histórico; só a correção
+    // poderia (e não deve).
+    const entradas = window.history.length;
+    navegadorVaiPara(`${LISTAGEM}?aba=todos&departamento=${OUTRO}`);
+    await waitFor(() =>
+      expect(window.location.hash).toBe(`${LISTAGEM}?aba=todos`),
+    );
+    expect(window.history.length).toBe(entradas);
+    for (const [consulta] of vi.mocked(listarColaboradores).mock.calls) {
+      expect(consulta?.departamentoId).toBeUndefined();
+    }
+  });
+
+  it("recarregar (nova montagem) mantém aba e filtro", async () => {
+    const { unmount } = render(<App papelDoAtor="rh" />);
+    await screen.findByRole("table", { name: /^Colaboradores — / });
+    fireEvent.click(abaDoDashboard(/^Todos/));
+    fireEvent.change(screen.getByLabelText("Tipo de vínculo"), {
+      target: { value: "temporario" },
+    });
+    await waitFor(() =>
+      expect(window.location.hash).toBe(
+        `${LISTAGEM}?aba=todos&tipo=temporario`,
+      ),
+    );
+    const url = window.location.hash;
+    unmount();
+
+    vi.mocked(listarColaboradores).mockClear();
+    window.history.replaceState(null, "", `/${url}`);
+    render(<App papelDoAtor="rh" />);
+    await screen.findByRole("table", { name: /^Colaboradores — Todos/ });
+    expect(
+      (screen.getByLabelText("Tipo de vínculo") as HTMLSelectElement).value,
+    ).toBe("temporario");
+    expect(ultimaConsulta()).toMatchObject({ tipoVinculo: "temporario" });
+    expect(ultimaConsulta()).not.toHaveProperty("grupo");
+  });
+
+  it("'voltar' e 'avançar' do navegador percorrem as abas", async () => {
+    render(<App papelDoAtor="rh" />);
+    await screen.findByRole("table", { name: /^Colaboradores — Ativos/ });
+
+    navegadorVaiPara(`${LISTAGEM}?aba=desligados`);
+    await screen.findByRole("table", { name: /^Colaboradores — Desligados/ });
+    await waitFor(() => expect(ultimaConsulta().grupo).toBe("desligados"));
+
+    navegadorVaiPara(`${LISTAGEM}?aba=todos&pagina=2`);
+    await screen.findByRole("table", { name: /^Colaboradores — Todos/ });
+    await waitFor(() => expect(ultimaConsulta().pagina).toBe(2));
+
+    navegadorVaiPara(LISTAGEM);
+    await screen.findByRole("table", { name: /^Colaboradores — Ativos/ });
+    await waitFor(() => expect(ultimaConsulta()).toMatchObject({ pagina: 1 }));
+    expect(ultimaConsulta().grupo).toBe("ativos");
+  });
+
+  it("abrir a ficha a partir de uma aba e voltar: a URL e a aba voltam, o foco volta ao nome", async () => {
+    window.history.replaceState(null, "", `/${LISTAGEM}?aba=todos&tipo=clt`);
+    render(<App papelDoAtor="rh" />);
+    const tabela = await screen.findByRole("table", {
+      name: /^Colaboradores — Todos/,
+    });
+    const nome = within(tabela).getByRole("button", {
+      name: `Abrir ficha de ${ana.nome}`,
+    });
+    nome.focus();
+    fireEvent.click(nome);
+    await esperarFicha(ana.nome);
+    expect(window.location.hash).toBe(rotaDe(ana));
+
+    fireEvent.click(
+      within(
+        document.querySelector<HTMLElement>(".ficha-colaborador")!,
+      ).getByRole("button", { name: "Colaboradores" }),
+    );
+    await waitFor(() =>
+      expect(window.location.hash).toBe(`${LISTAGEM}?aba=todos&tipo=clt`),
+    );
+    expect(abaDoDashboard(/^Todos/)).toHaveAttribute("aria-selected", "true");
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: `Abrir ficha de ${ana.nome}` }),
+      ).toHaveFocus(),
+    );
+  });
+
+  it("sair pela barra e voltar a Colaboradores abre o dashboard no estado inicial", async () => {
+    window.history.replaceState(
+      null,
+      "",
+      `/${LISTAGEM}?aba=desligados&tipo=pj`,
+    );
+    render(<App papelDoAtor="rh" />);
+    await screen.findByRole("table", { name: /^Colaboradores — Desligados/ });
+    fireEvent.click(
+      screen.getByRole("button", { name: /^Estrutura organizacional/ }),
+    );
+    fireEvent.click(
+      within(
+        screen.getByRole("navigation", { name: "Navegação do painel" }),
+      ).getByRole("button", { name: /^Colaboradores/ }),
+    );
+    await screen.findByRole("table", { name: /^Colaboradores — Ativos/ });
+    expect(window.location.hash).toBe(LISTAGEM);
   });
 });

@@ -28,7 +28,12 @@ import {
   tituloDoGrupoDe,
 } from "../../app/mapaNavegacao";
 import { TrilhaNavegacao } from "../../components";
-import type { AbaDaFicha, RotaDaFicha } from "../../app/rotasDoShell";
+import type {
+  AbaDaFicha,
+  EstadoDaListagem,
+  OpcoesDaMudancaDaListagem,
+  RotaDaFicha,
+} from "../../app/rotasDoShell";
 import {
   FICHA_COLABORADOR_TITULO_ID,
   FichaColaboradorScreen,
@@ -197,6 +202,16 @@ export interface PessoasScreenProps {
    * consulta.
    */
   podeOperarJornada?: boolean;
+  /**
+   * T199 — o estado do dashboard de Colaboradores (aba, página e ids de
+   * filtros), guardado pelo shell na URL. Sem ele, o dashboard guarda o
+   * próprio estado (telas montadas sozinhas, como nos testes).
+   */
+  listagem?: EstadoDaListagem;
+  onListagemChange?: (
+    listagem: EstadoDaListagem,
+    opcoes?: OpcoesDaMudancaDaListagem,
+  ) => void;
 }
 
 export function PessoasScreen({
@@ -211,6 +226,8 @@ export function PessoasScreen({
   onNovaAdmissao,
   podeEditarFicha = false,
   podeOperarJornada = false,
+  listagem,
+  onListagemChange,
 }: PessoasScreenProps) {
   // Só as abas do modo. `ABAS` continua sendo a fonte única; o filtro é
   // de apresentação, e a primeira aba do conjunto vira o padrão — assim
@@ -399,6 +416,10 @@ export function PessoasScreen({
                 {...(onNovaAdmissao ? { onNovaAdmissao } : {})}
                 {...(onAbrirFicha ? { onAbrirFicha: abrirFicha } : {})}
                 atualizacao={atualizacaoDaListagem}
+                {...(listagem && onListagemChange
+                  ? { estado: listagem, onEstadoChange: onListagemChange }
+                  : {})}
+                podeOperarJornada={podeOperarJornada}
               />
             ) : abaAtiva === "horario" ? (
               <PessoasHorarioScreen

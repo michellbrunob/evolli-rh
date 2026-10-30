@@ -1086,6 +1086,44 @@ describe("T163/T189 — contexto empresarial ativo", () => {
     );
   });
 
+  it("T199 — dashboard com aba, página e filtros na URL: a troca limpa tudo e volta a Ativos", async () => {
+    trocarParaBetaNoServidor();
+    window.history.replaceState(
+      null,
+      "",
+      "#/pessoas/colaboradores?aba=desligados&pagina=2&tipo=pj",
+    );
+    vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
+    render(<AutenticacaoApp />);
+    await waitFor(() =>
+      expect(
+        screen.getByRole("tab", { name: /^Desligados/, selected: true }),
+      ).toBeInTheDocument(),
+    );
+    expect(window.location.hash).toBe(
+      "#/pessoas/colaboradores?aba=desligados&pagina=2&tipo=pj",
+    );
+
+    await trocarPeloMenuPara("Empresa Beta");
+
+    await waitFor(() =>
+      expect(seletorDoMenu()).toHaveTextContent("Empresa Beta"),
+    );
+    await waitFor(() =>
+      expect(window.location.hash).toBe("#/pessoas/colaboradores"),
+    );
+    // Recriado no estado inicial: Ativos, sem tipo, página 1.
+    expect(
+      await screen.findByRole("tab", { name: /^Ativos/, selected: true }),
+    ).toBeInTheDocument();
+    expect(
+      (screen.getByLabelText("Tipo de vínculo") as HTMLSelectElement).value,
+    ).toBe("");
+    await waitFor(() =>
+      expect(document.activeElement?.id).toBe("colaboradores-titulo"),
+    );
+  });
+
   it("edição pendente: cancelar a confirmação mantém a empresa e o que foi digitado", async () => {
     trocarParaBetaNoServidor();
     const nome = await abrirNovaAdmissaoPorRota();

@@ -111,23 +111,32 @@ import {
 } from "./mapaNavegacao";
 import {
   type AbaDaFicha,
+  type EstadoDaListagem,
+  type OpcoesDaMudancaDaListagem,
   type RotaDaFicha,
+  ESTADO_INICIAL_DA_LISTAGEM,
   destinoDaRota,
   ehFragmentoDeRota,
   fichaDaRota,
+  listagemDaRota,
   rotaDaFicha,
+  rotaDaListagem,
   rotaDoDestino,
 } from "./rotasDoShell";
 
 /**
  * T198 — a rota do que está na tela: a da ficha, quando ela está aberta em
  * Colaboradores; senão, a do destino (ou nenhuma).
+ * T199 — a listagem de Colaboradores leva na rota o estado do dashboard (aba,
+ * página e ids de filtros; nunca a busca).
  */
 function rotaDoExibido(
   destinoId: string,
   ficha: RotaDaFicha | null,
+  listagem: EstadoDaListagem = ESTADO_INICIAL_DA_LISTAGEM,
 ): string | null {
   if (destinoId === "pessoas" && ficha !== null) return rotaDaFicha(ficha);
+  if (destinoId === "pessoas") return rotaDaListagem(listagem);
   return rotaDoDestino(destinoId);
 }
 
@@ -282,6 +291,12 @@ function conteudoDoDestino(
     readonly onAbrir: (colaboradorId: string) => void;
     readonly onTrocarAba: (aba: AbaDaFicha) => void;
     readonly onFechar: () => void;
+    /** T199 — o estado do dashboard de Colaboradores, guardado na URL. */
+    readonly listagem: EstadoDaListagem;
+    readonly onListagemChange: (
+      listagem: EstadoDaListagem,
+      opcoes?: OpcoesDaMudancaDaListagem,
+    ) => void;
   },
 ) {
   if (destinoId === "inicio") {
@@ -322,6 +337,8 @@ function conteudoDoDestino(
         onAbrirFicha={fichaDoColaborador.onAbrir}
         onTrocarAbaDaFicha={fichaDoColaborador.onTrocarAba}
         onFecharFicha={fichaDoColaborador.onFechar}
+        listagem={fichaDoColaborador.listagem}
+        onListagemChange={fichaDoColaborador.onListagemChange}
         {...(admissao.podeAdmitir
           ? { onNovaAdmissao: () => onNavegar("nova-admissao") }
           : {})}
@@ -578,11 +595,15 @@ export function App({
       return {
         destino: pedidoDaRota,
         ficha: fichaDaRota(window.location.hash),
+        // T199 — inválido cai no padrão; a URL é corrigida no lugar.
+        listagem:
+          listagemDaRota(window.location.hash) ?? ESTADO_INICIAL_DA_LISTAGEM,
       };
     }
     return {
       destino: resolverEntrada(destinoInicial, papelDoAtor),
       ficha: null,
+      listagem: ESTADO_INICIAL_DA_LISTAGEM,
     };
   });
   const [destinoAtivoId, setDestinoAtivoId] = useState(entradaDaUrl.destino);
@@ -591,6 +612,29 @@ export function App({
    * colaborador e a aba, sempre os da URL. `null` é a listagem.
    */
   const [ficha, setFicha] = useState<RotaDaFicha | null>(entradaDaUrl.ficha);
+  /**
+   * T199 — o estado do dashboard de Colaboradores (aba, página e ids de
+   * filtros), sempre o da URL: recarregar, voltar e avançar o restauram.
+   */
+  const [listagem, setListagem] = useState<EstadoDaListagem>(
+    entradaDaUrl.listagem,
+  );
+  const listagemAtualRef = useRef(listagem);
+  listagemAtualRef.current = listagem;
+  /**
+   * T199 — o estado que, quando exibido, corrige a URL no lugar
+   * (`replaceState`). Preso ao próprio estado, não à próxima escrita: o
+   * efeito da URL roda depois dos efeitos dos filhos, ainda com o estado
+   * anterior, e não pode gastar a correção numa rodada que nada escreve.
+   */
+  const correcaoDaListagemRef = useRef<EstadoDaListagem | null>(null);
+  const mudarListagem = useCallback(
+    (nova: EstadoDaListagem, opcoes?: OpcoesDaMudancaDaListagem) => {
+      correcaoDaListagemRef.current = opcoes?.substituir ? nova : null;
+      setListagem(nova);
+    },
+    [],
+  );
   /** T176 — "Completar contatos": a ficha abre com o foco nos contatos. */
   const [focarContatosNaFicha, setFocarContatosNaFicha] = useState(false);
   /**
@@ -600,7 +644,7 @@ export function App({
    * a dela, no lugar (ver `aoMudarUrl`).
    */
   const destinoSemRotaRef = useRef(
-    rotaDoExibido(destinoAtivoId, ficha) === null
+    rotaDoExibido(destinoAtivoId, ficha, listagem) === null
       ? destinoAtivoId
       : destinoInicialPara(papelDoAtor),
   );
@@ -662,7 +706,9 @@ export function App({
   // está fechada. Vale para a barra e para os atalhos da Visão geral.
   const irPara = useCallback((destinoId: string) => {
     // T198 — navegar pela barra sai da ficha: Colaboradores abre na listagem.
+    // T199 — e a listagem abre no estado inicial (Ativos, sem filtros).
     setFicha(null);
+    setListagem(ESTADO_INICIAL_DA_LISTAGEM);
     setFocarContatosNaFicha(false);
     setDestinoAtivoId(destinoId);
     setGavetaAberta(false);
@@ -720,11 +766,15 @@ export function App({
   // outra (Nova admissão → Colaboradores): é o ramo de baixo, com `pushState`
   // — o "voltar" retorna à página de onde se saiu.
   useEffect(() => {
-    const rota = rotaDoExibido(destinoAtivoId, ficha);
+    const rota = rotaDoExibido(destinoAtivoId, ficha, listagem);
     const atual = window.location.hash;
     const vinhaDeRota = rotaExibidaRef.current !== null;
     const primeiraExibicao = primeiraExibicaoRef.current;
     primeiraExibicaoRef.current = false;
+    const substituir =
+      correcaoDaListagemRef.current !== null &&
+      correcaoDaListagemRef.current === listagem;
+    if (substituir) correcaoDaListagemRef.current = null;
     destinoAtivoRef.current = destinoAtivoId;
     rotaExibidaRef.current = rota;
     if (rota === null) {
@@ -738,13 +788,13 @@ export function App({
         }
       }
     } else if (atual !== rota) {
-      if (primeiraExibicao) {
+      if (primeiraExibicao || substituir) {
         window.history.replaceState(null, "", rota);
       } else {
         window.history.pushState(null, "", rota);
       }
     }
-  }, [destinoAtivoId, ficha]);
+  }, [destinoAtivoId, ficha, listagem]);
 
   // T189 — quem monta o shell sabe sempre o destino exibido: é para ele que
   // uma troca de empresa devolve. Ref, para não refazer o efeito a cada
@@ -792,7 +842,14 @@ export function App({
           : null;
       setFicha(fichaExibida);
       if (fichaExibida === null) setFocarContatosNaFicha(false);
-      const rotaExibida = rotaDoExibido(exibido, fichaExibida);
+      // T199 — na listagem, a URL diz a aba, a página e os filtros; valor
+      // inválido cai no padrão e a URL é corrigida no lugar, logo abaixo.
+      const listagemExibida =
+        exibido === "pessoas" && pedido === "pessoas"
+          ? (listagemDaRota(fragmento) ?? listagemAtualRef.current)
+          : ESTADO_INICIAL_DA_LISTAGEM;
+      setListagem(listagemExibida);
+      const rotaExibida = rotaDoExibido(exibido, fichaExibida, listagemExibida);
       if (rotaExibida !== null) {
         if (fragmento !== rotaExibida) {
           window.history.replaceState(null, "", rotaExibida);
@@ -1132,6 +1189,8 @@ export function App({
               onAbrir: abrirFicha,
               onTrocarAba: trocarAbaDaFicha,
               onFechar: fecharFicha,
+              listagem,
+              onListagemChange: mudarListagem,
             },
           )}
         </main>

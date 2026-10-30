@@ -18,7 +18,7 @@ export interface EmptyStateProps {
   /** Símbolo/ícone decorativo opcional (não anunciado por leitores de tela). */
   icon?: ReactNode;
   /** Nível do título para preservar a hierarquia de cabeçalhos. Padrão: 2. */
-  headingLevel?: 2 | 3;
+  headingLevel?: 2 | 3 | 4;
   /** `id` do título, quando for necessário referenciá-lo. */
   titleId?: string;
 }
@@ -31,7 +31,7 @@ export function EmptyState({
   headingLevel = 2,
   titleId,
 }: EmptyStateProps) {
-  const Heading = `h${headingLevel}` as "h2" | "h3";
+  const Heading = `h${headingLevel}` as "h2" | "h3" | "h4";
 
   return (
     <div className="evolli-empty-state">

@@ -56,7 +56,20 @@ function paginado<T>(itens: T[]): Paginado<T> {
 function listagem(itens: ColaboradorApi[]): ListagemColaboradoresApi {
   return {
     ...paginado(itens.map((c) => ({ ...c, vinculos: [] }))),
-    contadores: { ativos: 0, inativos: 0 },
+    contadores: {
+      ativos: 0,
+      inativos: 0,
+      emAdmissao: 0,
+      desligados: 0,
+      total: 0,
+      ativosPorTipo: {
+        clt: 0,
+        estagio: 0,
+        pj: 0,
+        temporario: 0,
+        outro_controlado: 0,
+      },
+    },
   };
 }
 

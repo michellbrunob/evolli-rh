@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { PessoasScreen } from "./PessoasScreen";
 
@@ -37,7 +37,8 @@ describe("PessoasScreen — modo funcional (T072/T088/T089/T090/T091)", () => {
       "Documentos",
       "Solicitações",
     ];
-    const abas = screen.getAllByRole("tab");
+    // T199 — o dashboard de Colaboradores tem abas próprias; aqui só as de Pessoas.
+    const abas = within(tablist).getAllByRole("tab");
     expect(abas.map((a) => a.textContent)).toEqual(esperadas);
 
     for (const aba of abas) {

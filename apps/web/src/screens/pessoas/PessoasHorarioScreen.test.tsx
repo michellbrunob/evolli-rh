@@ -48,7 +48,20 @@ function paginado<T>(itens: T[]): ResultadoPaginadoTeste<T> {
 function listagem(itens: ColaboradorApi[]): ListagemColaboradoresApi {
   return {
     ...paginado(itens.map((c) => ({ ...c, vinculos: [] }))),
-    contadores: { ativos: 0, inativos: 0 },
+    contadores: {
+      ativos: 0,
+      inativos: 0,
+      emAdmissao: 0,
+      desligados: 0,
+      total: 0,
+      ativosPorTipo: {
+        clt: 0,
+        estagio: 0,
+        pj: 0,
+        temporario: 0,
+        outro_controlado: 0,
+      },
+    },
   };
 }
 
@@ -177,6 +190,32 @@ beforeEach(() => {
 });
 
 describe("PessoasHorarioScreen (T112 — funcional)", () => {
+  it("T199 — embutida no dashboard: título h2 e as seções um nível abaixo (h3)", async () => {
+    render(<PessoasHorarioScreen podeOperar embutida />);
+    expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
+    expect(
+      screen.getByRole("heading", { level: 2, name: "Jornada de trabalho" }),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", {
+        level: 3,
+        name: "Colaboradores com tabela de horário vinculada",
+      }),
+    ).toBeInTheDocument();
+    // Nenhum outro h2 disputa o título da aba.
+    expect(screen.getAllByRole("heading", { level: 2 })).toHaveLength(1);
+  });
+
+  it("T199 — sozinha (Pessoas › Horário de trabalho): h1 e seções em h2, como antes", async () => {
+    render(<PessoasHorarioScreen podeOperar />);
+    expect(
+      await screen.findByRole("heading", {
+        level: 2,
+        name: "Colaboradores com tabela de horário vinculada",
+      }),
+    ).toBeInTheDocument();
+  });
+
   it("tem um único h1 e exibe o aviso Somente RH", async () => {
     render(<PessoasHorarioScreen podeOperar />);
 
@@ -700,7 +739,20 @@ function servidorComCentoECinquenta() {
       pagina,
       tamanhoPagina: tamanho,
       total: filtrada.length,
-      contadores: { ativos: filtrada.length, inativos: 0 },
+      contadores: {
+        ativos: filtrada.length,
+        inativos: 0,
+        emAdmissao: 0,
+        desligados: 0,
+        total: filtrada.length,
+        ativosPorTipo: {
+          clt: filtrada.length,
+          estagio: 0,
+          pj: 0,
+          temporario: 0,
+          outro_controlado: 0,
+        },
+      },
     };
   }) as never);
 }

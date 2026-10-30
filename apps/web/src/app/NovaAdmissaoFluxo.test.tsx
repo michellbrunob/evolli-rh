@@ -152,7 +152,20 @@ beforeEach(() => {
   window.history.replaceState(null, "", "/");
   vi.mocked(listarColaboradores).mockResolvedValue({
     ...paginado([]),
-    contadores: { ativos: 0, inativos: 0 },
+    contadores: {
+      ativos: 0,
+      inativos: 0,
+      emAdmissao: 0,
+      desligados: 0,
+      total: 0,
+      ativosPorTipo: {
+        clt: 0,
+        estagio: 0,
+        pj: 0,
+        temporario: 0,
+        outro_controlado: 0,
+      },
+    },
   });
   vi.mocked(listarVinculosDoColaborador).mockResolvedValue([]);
   // T198 — a ficha (página própria) lê o colaborador pelo id.
@@ -333,7 +346,8 @@ describe("T178 — Gestão de Pessoas › Colaboradores na barra lateral", () =>
     render(<App papelDoAtor="master_tecnico" />);
     await screen.findByRole("heading", { level: 1, name: "Colaboradores" });
     await screen.findByRole("heading", {
-      name: "Nenhum colaborador cadastrado nesta empresa",
+      // T199 (D-6) — master_tecnico sem empresa ativa: escopo global.
+      name: "Nenhum colaborador ativo no seu escopo",
     });
     expect(
       screen.queryByRole("button", { name: "Nova admissão" }),
@@ -766,6 +780,7 @@ describe("T176/T178 — da página à listagem e à ficha do admitido", () => {
               id: resposta.vinculo.id,
               empresaId: empresa.id,
               matricula: "MAT-FLX1",
+              tipo: "clt" as const,
               situacao: "previsto" as const,
               dataAdmissao: "2026-10-20T00:00:00.000Z",
               dataDesligamento: null,
@@ -776,7 +791,20 @@ describe("T176/T178 — da página à listagem e à ficha do admitido", () => {
           ],
         },
       ]),
-      contadores: { ativos: 0, inativos: 1 },
+      contadores: {
+        ativos: 0,
+        inativos: 1,
+        emAdmissao: 0,
+        desligados: 1,
+        total: 1,
+        ativosPorTipo: {
+          clt: 0,
+          estagio: 0,
+          pj: 0,
+          temporario: 0,
+          outro_controlado: 0,
+        },
+      },
     });
 
     fireEvent.click(
@@ -784,7 +812,7 @@ describe("T176/T178 — da página à listagem e à ficha do admitido", () => {
     );
 
     const tabela = await screen.findByRole("table", {
-      name: "Colaboradores desta empresa",
+      name: /^Colaboradores — /,
     });
     expect(
       within(tabela).getByText("Pessoa Sintética Fluxo"),
