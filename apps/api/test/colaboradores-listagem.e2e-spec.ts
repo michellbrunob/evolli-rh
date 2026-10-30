@@ -126,6 +126,8 @@ interface ItemListado {
     matricula: string;
     situacao: string;
     dataAdmissao: string;
+    /** T199 — tipo do vínculo. */
+    tipo?: string;
   }[];
 }
 
@@ -240,7 +242,13 @@ describe("Colaboradores — listagem da porta principal (T178, e2e)", () => {
   ): Promise<{
     itens: ItemListado[];
     total: number;
-    contadores: { ativos: number; inativos: number };
+    contadores: {
+      ativos: number;
+      inativos: number;
+      emAdmissao: number;
+      desligados: number;
+      total: number;
+    };
   }> {
     const qs = new URLSearchParams(query).toString();
     const r = await get(`/v1/colaboradores${qs ? `?${qs}` : ""}`, cred).expect(
@@ -418,7 +426,7 @@ describe("Colaboradores — listagem da porta principal (T178, e2e)", () => {
         "Carla Sintetica Multi",
       ]);
       expect(r.total).toBe(3);
-      expect(r.contadores).toEqual({ ativos: 2, inativos: 1 });
+      expect(r.contadores).toMatchObject({ ativos: 2, inativos: 1 });
       for (const item of r.itens) {
         for (const v of item.vinculos) {
           expect(v.empresaId).toBe(empresaA);
@@ -450,7 +458,7 @@ describe("Colaboradores — listagem da porta principal (T178, e2e)", () => {
         "Carla Sintetica Multi",
         "Diego Sintetico Beta",
       ]);
-      expect(r.contadores).toEqual({ ativos: 0, inativos: 2 });
+      expect(r.contadores).toMatchObject({ ativos: 0, inativos: 2 });
       const carlaNaBeta = r.itens.find((i) => i.id === carla)!;
       expect(carlaNaBeta.situacao).toBe("inativo");
       expect(carlaNaBeta.vinculos.map((v) => v.matricula)).toEqual([
@@ -474,7 +482,7 @@ describe("Colaboradores — listagem da porta principal (T178, e2e)", () => {
       expect(r).toMatchObject({
         itens: [],
         total: 0,
-        contadores: { ativos: 0, inativos: 0 },
+        contadores: expect.objectContaining({ ativos: 0, inativos: 0 }),
       });
     });
 
@@ -483,7 +491,7 @@ describe("Colaboradores — listagem da porta principal (T178, e2e)", () => {
       expect(r).toMatchObject({
         itens: [],
         total: 0,
-        contadores: { ativos: 0, inativos: 0 },
+        contadores: expect.objectContaining({ ativos: 0, inativos: 0 }),
       });
       const propria = await listar(rhA, { empresaId: empresaA });
       expect(propria.total).toBe(3);
@@ -492,7 +500,7 @@ describe("Colaboradores — listagem da porta principal (T178, e2e)", () => {
     it("dp lê a mesma listagem da própria empresa", async () => {
       const r = await listar(dpA);
       expect(r.total).toBe(3);
-      expect(r.contadores).toEqual({ ativos: 2, inativos: 1 });
+      expect(r.contadores).toMatchObject({ ativos: 2, inativos: 1 });
     });
 
     it("projeção fechada: só os campos aprovados no item e no vínculo", async () => {
@@ -518,6 +526,8 @@ describe("Colaboradores — listagem da porta principal (T178, e2e)", () => {
           "lotacaoVigente",
           "matricula",
           "situacao",
+          // T199 — o tipo do vínculo (dado aprovado), para o dashboard.
+          "tipo",
           // T185 — vigências de jornada perto de hoje; vazias aqui: o Bruno
           // só tem vínculo previsto.
           "vigenciasDeJornada",
@@ -563,7 +573,7 @@ describe("Colaboradores — listagem da porta principal (T178, e2e)", () => {
       const r = await listar(rhA, { busca: "Sintetic", situacao: "inativo" });
       expect(nomes(r.itens)).toEqual(["Bruno Sintetico Alfa"]);
       expect(r.total).toBe(1);
-      expect(r.contadores).toEqual({ ativos: 2, inativos: 1 });
+      expect(r.contadores).toMatchObject({ ativos: 2, inativos: 1 });
     });
 
     it("busca só de espaços vale como ausente; curingas não ampliam o resultado", async () => {
@@ -590,7 +600,7 @@ describe("Colaboradores — listagem da porta principal (T178, e2e)", () => {
         "Carla Sintetica Multi",
         "Diego Sintetico Beta",
       ]);
-      expect(r.contadores).toEqual({ ativos: 2, inativos: 2 });
+      expect(r.contadores).toMatchObject({ ativos: 2, inativos: 2 });
       const carlaGlobal = r.itens.find((i) => i.id === carla)!;
       expect(carlaGlobal.situacao).toBe("ativo");
       expect(carlaGlobal.vinculos.map((v) => v.matricula).sort()).toEqual([
@@ -605,7 +615,7 @@ describe("Colaboradores — listagem da porta principal (T178, e2e)", () => {
         "Carla Sintetica Multi",
         "Diego Sintetico Beta",
       ]);
-      expect(r.contadores).toEqual({ ativos: 0, inativos: 2 });
+      expect(r.contadores).toMatchObject({ ativos: 0, inativos: 2 });
       expect(r.itens.find((i) => i.id === carla)!.situacao).toBe("inativo");
       expect(JSON.stringify(r)).not.toContain("MAT-L-CAR");
     });
@@ -643,7 +653,7 @@ describe("Colaboradores — listagem da porta principal (T178, e2e)", () => {
         matricula: "MAT-L-ELI",
         situacao: "previsto",
       });
-      expect(depois.contadores).toEqual({
+      expect(depois.contadores).toMatchObject({
         ativos: antes.contadores.ativos,
         inativos: antes.contadores.inativos + 1,
       });
@@ -851,9 +861,14 @@ describe("Colaboradores — listagem da porta principal (T178, e2e)", () => {
       expect(r.body.itens.map((i: { nome: string }) => i.nome)).toEqual([
         "Eva Sintetica Lotacao",
       ]);
+      // T199 — os contadores do dashboard, ao lado dos de sempre.
       expect(Object.keys(r.body.contadores).sort()).toEqual([
         "ativos",
+        "ativosPorTipo",
+        "desligados",
+        "emAdmissao",
         "inativos",
+        "total",
       ]);
       for (const cred of [gestorA, colaboradorA]) {
         const negada = await get("/v1/colaboradores", cred);
@@ -1321,6 +1336,423 @@ describe("Colaboradores — listagem da porta principal (T178, e2e)", () => {
     it("situação fora do contrato é recusada, nunca ignorada", async () => {
       await get("/v1/colaboradores?situacao=previsto", rhA).expect(400);
       await get("/v1/colaboradores?situacao=todos", rhA).expect(400);
+    });
+  });
+
+  // T199 — dashboard de Colaboradores: grupos exclusivos (N-1, ativo >
+  // previsto > encerrado; D-1, D-4), tipo de vínculo no mesmo vínculo do
+  // grupo (N-5) e ativos por tipo pelo vínculo principal (N-2). Empresa
+  // PRÓPRIA, para que os números sejam exatos e não mexam nos de cima. Fica no
+  // fim de propósito.
+  describe("T199 — grupos, tipo de vínculo e contadores do dashboard", () => {
+    let empresaD: string;
+    let departamentoD: string;
+    let rhD: Credencial;
+    let dpD: Credencial;
+    let masterD: Credencial;
+    const negados: [string, Credencial][] = [];
+
+    type Grupo = "ativos" | "em_admissao" | "desligados";
+    interface Contadores {
+      ativos: number;
+      inativos: number;
+      emAdmissao: number;
+      desligados: number;
+      total: number;
+      ativosPorTipo: Record<string, number>;
+    }
+
+    async function listarD(
+      cred: Credencial,
+      query: Record<string, string> = {},
+    ): Promise<{
+      itens: ItemListado[];
+      total: number;
+      contadores: Contadores;
+    }> {
+      const qs = new URLSearchParams(query).toString();
+      return (
+        await get(`/v1/colaboradores${qs ? `?${qs}` : ""}`, cred).expect(200)
+      ).body;
+    }
+
+    /** Admite na empresa D com o tipo pedido; com `efetivar`, fica ativo. */
+    async function admitirD(
+      nome: string,
+      matricula: string,
+      tipo: string,
+      efetivar: boolean,
+    ): Promise<{ colaboradorId: string; vinculoId: string }> {
+      const r = await post("/v1/colaboradores", rhD)
+        .send({
+          ...camposObrigatoriosAdmissao(),
+          ...(await lotacaoMinima(appUrl, empresaD)),
+          nome,
+          empresaId: empresaD,
+          matricula,
+          tipo,
+          dataAdmissao: ADMISSAO,
+          motivoCodigo: "admissao_inicial",
+          departamentoId: departamentoD,
+        })
+        .expect(201);
+      if (efetivar) {
+        await post(`/v1/movimentacoes/${r.body.movimentacao.id}/efetivar`, rhD)
+          .send()
+          .expect(201);
+      }
+      return { colaboradorId: r.body.id, vinculoId: r.body.vinculo.id };
+    }
+
+    /** Desliga pela API: o vínculo ativo vira encerrado, com a data. */
+    async function desligar(vinculoId: string) {
+      const m = await post("/v1/movimentacoes", rhD)
+        .send({
+          vinculoId,
+          tipo: "desligamento",
+          motivoCodigo: "encerramento_de_vinculo",
+          vigenciaInicio: DESLIGAMENTO,
+        })
+        .expect(201);
+      await post(`/v1/movimentacoes/${m.body.id}/efetivar`, rhD)
+        .send()
+        .expect(201);
+    }
+
+    /**
+     * Vínculo extra direto no banco (a API não cria um segundo vínculo para
+     * quem já existe), como nos blocos de cima.
+     */
+    const vinculoExtra = (
+      colaboradorId: string,
+      empresaId: string,
+      matricula: string,
+      tipo: string,
+      situacao: "ativo" | "previsto" | "encerrado",
+      dataAdmissao: string,
+      dataDesligamento: string | null,
+    ) =>
+      prisma.$executeRawUnsafe(
+        `INSERT INTO app.vinculo_funcional
+           (id, colaborador_id, empresa_id, matricula, tipo, situacao,
+            data_admissao, data_desligamento, criado_em, atualizado_em)
+         VALUES (gen_random_uuid()::text, $1, $2, $3, $4::app."TipoVinculo",
+                 $5::app."SituacaoVinculo", $6::date, $7::date, now(), now())`,
+        colaboradorId,
+        empresaId,
+        matricula,
+        tipo,
+        situacao,
+        dataAdmissao,
+        dataDesligamento,
+      );
+
+    beforeAll(async () => {
+      empresaD = (
+        await post("/v1/empresas", master)
+          .send({ codigo: "LISTD", nome: "Empresa Listagem Dashboard" })
+          .expect(201)
+      ).body.id;
+      departamentoD = (
+        await post("/v1/departamentos", master)
+          .send({ empresaId: empresaD, codigo: "DEPLD", nome: "Depto DEPLD" })
+          .expect(201)
+      ).body.id;
+      rhD = await criarUsuario("rh.ld@example.test", "rh", empresaD);
+      dpD = await criarUsuario("dp.ld@example.test", "dp", empresaD);
+      for (const papel of ["gestor", "colaborador", "financeiro"]) {
+        negados.push([
+          papel,
+          await criarUsuario(`${papel}.ld@example.test`, papel, empresaD),
+        ]);
+      }
+      // `auditor` e `dpo` não são criáveis pela API (regra do RBAC de
+      // usuários): entram direto no banco, como o `master_tecnico` acima.
+      const { PasswordHashService } =
+        await import("../src/auth/password/password-hash.service");
+      const passwordHash = await new PasswordHashService().hash(SENHA_PADRAO);
+      for (const papel of ["auditor", "dpo"] as const) {
+        const email = `${papel}.ld@example.test`;
+        await prisma.accessUser.create({
+          data: {
+            email,
+            passwordHash,
+            role: papel,
+            status: "active",
+            companyId: empresaD,
+          },
+        });
+        negados.push([papel, await login(email, SENHA_PADRAO)]);
+      }
+      masterD = await seedMaster("master.ld@example.test");
+      await post("/v1/auth/contexto/empresa", masterD)
+        .send({ empresaId: empresaD })
+        .expect(200);
+
+      // Ativos: Gabi (CLT), Hugo (PJ), Iara readmitida (encerrado antigo +
+      // estágio ativo) e Nina (temporário). O banco aceita um só vínculo ativo
+      // por colaborador e empresa (`vinculo_funcional_ativo_unico`) e exige
+      // alocação vigente em todo ativo; a regra do principal (N-2), que só
+      // pesa no escopo global, fica provada no teste unitário.
+      await admitirD("Gabi Dashboard Ativa", "MAT-D-GAB", "clt", true);
+      await admitirD("Hugo Dashboard Ativo", "MAT-D-HUG", "pj", true);
+      const iara = await admitirD(
+        "Iara Dashboard Readmitida",
+        "MAT-D-IAR",
+        "estagio",
+        true,
+      );
+      await vinculoExtra(
+        iara.colaboradorId,
+        empresaD,
+        "MAT-D-IAR0",
+        "clt",
+        "encerrado",
+        "2023-02-01",
+        "2024-12-31",
+      );
+      await admitirD(
+        "Nina Dashboard Temporaria",
+        "MAT-D-NIN",
+        "temporario",
+        true,
+      );
+      // Em admissão: João só previsto (estágio) e Lia previsto + encerrado
+      // (readmissão em andamento: Em admissão, nunca Desligados).
+      await admitirD("Joao Dashboard Previsto", "MAT-D-JOA", "estagio", false);
+      const lia = await admitirD(
+        "Lia Dashboard Retorno",
+        "MAT-D-LIA",
+        "clt",
+        false,
+      );
+      await vinculoExtra(
+        lia.colaboradorId,
+        empresaD,
+        "MAT-D-LIA0",
+        "pj",
+        "encerrado",
+        "2022-05-02",
+        "2023-06-30",
+      );
+      // Desligados: Marcos, desligado pela API; e Carla, ATIVA na Alfa, com
+      // um vínculo só encerrado aqui — desligada NESTA empresa.
+      const marcos = await admitirD(
+        "Marcos Dashboard Desligado",
+        "MAT-D-MAR",
+        "clt",
+        true,
+      );
+      await desligar(marcos.vinculoId);
+      await vinculoExtra(
+        carla,
+        empresaD,
+        "MAT-D-CAR",
+        "temporario",
+        "encerrado",
+        "2021-01-04",
+        "2022-01-31",
+      );
+    });
+
+    const nomesD = (r: { itens: ItemListado[] }) => r.itens.map((i) => i.nome);
+
+    it("contadores do escopo: grupos exclusivos que somam o total, e ativos por tipo pelo principal", async () => {
+      const r = await listarD(rhD);
+      expect(r.contadores).toEqual({
+        ativos: 4,
+        inativos: 4,
+        emAdmissao: 2,
+        desligados: 2,
+        total: 8,
+        ativosPorTipo: {
+          clt: 1,
+          estagio: 1,
+          pj: 1,
+          temporario: 1,
+          outro_controlado: 0,
+        },
+      });
+    });
+
+    it("cada grupo traz exatamente os seus: readmitida em Ativos, previsto + encerrado em Em admissão", async () => {
+      const grupos: Record<Grupo, string[]> = {
+        ativos: [
+          "Gabi Dashboard Ativa",
+          "Hugo Dashboard Ativo",
+          "Iara Dashboard Readmitida",
+          "Nina Dashboard Temporaria",
+        ],
+        em_admissao: ["Joao Dashboard Previsto", "Lia Dashboard Retorno"],
+        desligados: ["Carla Sintetica Multi", "Marcos Dashboard Desligado"],
+      };
+      for (const [grupo, esperado] of Object.entries(grupos)) {
+        const r = await listarD(rhD, { grupo });
+        expect(nomesD(r)).toEqual(esperado);
+        expect(r.total).toBe(esperado.length);
+      }
+      // Ninguém em dois grupos.
+      const todos = Object.values(grupos).flat();
+      expect(new Set(todos).size).toBe(todos.length);
+    });
+
+    it("isolamento: ativa em outra empresa não sai de Desligados aqui; e não aparece como ativa na Alfa por causa daqui", async () => {
+      const desligadosD = await listarD(rhD, { grupo: "desligados" });
+      const carlaD = desligadosD.itens.find((i) => i.id === carla)!;
+      // Só os vínculos desta empresa, e nenhum ativo.
+      expect(carlaD.vinculos.map((v) => [v.empresaId, v.situacao])).toEqual([
+        [empresaD, "encerrado"],
+      ]);
+      const ativosA = await listar(rhA, { grupo: "ativos" });
+      expect(ativosA.itens.map((i) => i.id)).toContain(carla);
+      expect(JSON.stringify(ativosA)).not.toContain("MAT-D-");
+      expect(JSON.stringify(await listarD(rhD))).not.toContain("MAT-L-");
+    });
+
+    it("tipo de vínculo vale para o vínculo que define o grupo", async () => {
+      // Ativos + CLT: só a Gabi (o CLT da Iara é o ENCERRADO).
+      expect(
+        nomesD(await listarD(rhD, { grupo: "ativos", tipoVinculo: "clt" })),
+      ).toEqual(["Gabi Dashboard Ativa"]);
+      // Iara: o CLT dela é ENCERRADO — fora de Ativos + CLT; dentro de
+      // Ativos + estágio.
+      expect(
+        nomesD(await listarD(rhD, { grupo: "ativos", tipoVinculo: "estagio" })),
+      ).toEqual(["Iara Dashboard Readmitida"]);
+      // Lia: o PJ dela é o encerrado, não o previsto.
+      expect(
+        nomesD(await listarD(rhD, { grupo: "em_admissao", tipoVinculo: "pj" })),
+      ).toEqual([]);
+      expect(
+        nomesD(
+          await listarD(rhD, { grupo: "em_admissao", tipoVinculo: "estagio" }),
+        ),
+      ).toEqual(["Joao Dashboard Previsto"]);
+      expect(
+        nomesD(
+          await listarD(rhD, {
+            grupo: "desligados",
+            tipoVinculo: "temporario",
+          }),
+        ),
+      ).toEqual(["Carla Sintetica Multi"]);
+      // Sem grupo: qualquer vínculo do escopo com o tipo.
+      expect(nomesD(await listarD(rhD, { tipoVinculo: "pj" }))).toEqual([
+        "Hugo Dashboard Ativo",
+        "Lia Dashboard Retorno",
+      ]);
+    });
+
+    it("cada vínculo da linha traz o tipo, e nada além do aprovado", async () => {
+      const r = await listarD(rhD, { busca: "Nina" });
+      expect(
+        r.itens[0]!.vinculos.map((v) => [v.matricula, v.situacao, v.tipo]),
+      ).toEqual([["MAT-D-NIN", "ativo", "temporario"]]);
+      const texto = JSON.stringify(r);
+      for (const proibido of [
+        "cpf",
+        "salario",
+        "email",
+        "celular",
+        "telefone",
+      ]) {
+        expect(texto.toLowerCase()).not.toContain(proibido);
+      }
+    });
+
+    it("paginação, busca e filtros combinados: filtro antes da página; contadores fixos", async () => {
+      const todos = await listarD(rhD);
+      const p1 = await listarD(rhD, {
+        grupo: "ativos",
+        pagina: "1",
+        tamanhoPagina: "3",
+      });
+      const p2 = await listarD(rhD, {
+        grupo: "ativos",
+        pagina: "2",
+        tamanhoPagina: "3",
+      });
+      expect(p1.total).toBe(4);
+      expect(p2.total).toBe(4);
+      expect([...nomesD(p1), ...nomesD(p2)]).toEqual([
+        "Gabi Dashboard Ativa",
+        "Hugo Dashboard Ativo",
+        "Iara Dashboard Readmitida",
+        "Nina Dashboard Temporaria",
+      ]);
+      const combinado = await listarD(rhD, {
+        grupo: "ativos",
+        tipoVinculo: "temporario",
+        busca: "Nina",
+        departamentoId: departamentoD,
+      });
+      expect(nomesD(combinado)).toEqual(["Nina Dashboard Temporaria"]);
+      for (const r of [p1, p2, combinado]) {
+        expect(r.contadores).toEqual(todos.contadores);
+      }
+    });
+
+    it("dp e master com a empresa D ativa leem o mesmo que o rh", async () => {
+      const doRh = await listarD(rhD, { grupo: "em_admissao" });
+      for (const cred of [dpD, masterD]) {
+        const r = await listarD(cred, { grupo: "em_admissao" });
+        expect(nomesD(r)).toEqual(nomesD(doRh));
+        expect(r.contadores).toEqual(doRh.contadores);
+      }
+    });
+
+    it("master global: grupos e contadores do escopo inteiro, coerentes com o total", async () => {
+      const r = await listarD(master);
+      const c = r.contadores;
+      expect(c.ativos + c.emAdmissao + c.desligados).toBe(c.total);
+      expect(Object.values(c.ativosPorTipo).reduce((s, n) => s + n, 0)).toBe(
+        c.ativos,
+      );
+      // Carla: ATIVA no escopo global (ativa na Alfa) — fora de Desligados.
+      const desligados = await listarD(master, {
+        grupo: "desligados",
+        tamanhoPagina: "100",
+      });
+      expect(desligados.itens.map((i) => i.id)).not.toContain(carla);
+      const ativos = await listarD(master, {
+        grupo: "ativos",
+        tamanhoPagina: "100",
+      });
+      expect(ativos.itens.map((i) => i.id)).toContain(carla);
+    });
+
+    it("rh e dp de qualquer empresa: grupos somam o total também na Alfa e na Beta", async () => {
+      for (const cred of [rhA, rhB, dpA]) {
+        const c = (await listarD(cred)).contadores;
+        expect(c.ativos + c.emAdmissao + c.desligados).toBe(c.total);
+        expect(c.inativos).toBe(c.total - c.ativos);
+      }
+    });
+
+    it("perfis negados não leem, nem com grupo ou tipo", async () => {
+      for (const [, cred] of negados) {
+        const r = await get(
+          "/v1/colaboradores?grupo=ativos&tipoVinculo=clt",
+          cred,
+        );
+        expect([403, 404]).toContain(r.status);
+        expect(JSON.stringify(r.body)).not.toContain("Dashboard");
+      }
+    });
+
+    it("grupo ou tipo fora do controlado: 400, sem consulta", async () => {
+      await get("/v1/colaboradores?grupo=inativos", rhD).expect(400);
+      await get("/v1/colaboradores?grupo=ATIVOS", rhD).expect(400);
+      await get("/v1/colaboradores?tipoVinculo=aprendiz", rhD).expect(400);
+      await get("/v1/colaboradores?tipoVinculo=CLT", rhD).expect(400);
+    });
+
+    it("parâmetros antigos seguem aceitos, ao lado dos novos", async () => {
+      const r = await listarD(rhD, { situacao: "inativo" });
+      expect(r.total).toBe(4);
+      const v = await listarD(rhD, { situacaoVinculo: "encerrado" });
+      // Quem tem algum vínculo encerrado: Iara, Lia, Marcos e Carla.
+      expect(v.total).toBe(4);
     });
   });
 });
