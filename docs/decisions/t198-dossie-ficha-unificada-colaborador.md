@@ -476,3 +476,8 @@ contrato, regra, rota ou permissão mudou.
 - **Ajuste encontrado na validação:** na aba Dados contratuais (e na tela da
   empresa), o selo de situação do vínculo esticava na largura do cartão;
   agora ocupa só o próprio texto.
+- **Estados sem dados no painel:** carregando, erro e não encontrado usam o
+  mesmo painel de perfil (faixa e avatar neutro, só com o desenho de pessoa),
+  com o título na mesma posição de nós do estado com dados. Assim o foco vai
+  ao título já no carregamento — antes ficava em "Abrir ficha", escondido com
+  a listagem — e o mesmo nó o mantém quando os dados chegam.

@@ -71,6 +71,18 @@
   line-height: 1;
 }
 
+/* Estados sem dados (carregando, erro, não encontrado): avatar só com o
+   desenho de pessoa, em tom neutro. */
+.ficha-colaborador__avatar--neutro {
+  background: var(--surface-neutral);
+  color: var(--color-ink-muted);
+}
+
+.ficha-colaborador__avatar--neutro .ficha-colaborador__icone {
+  width: 2rem;
+  height: 2rem;
+}
+
 .ficha-colaborador__identidade {
   display: grid;
   grid-template-columns: minmax(0, 1fr);

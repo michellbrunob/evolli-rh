@@ -437,10 +437,17 @@ export function FichaColaboradorScreen({
   // Ao abrir (ou ao trocar de colaborador, que remonta a página), o foco vai
   // ao título quando ele chega: quem usa teclado ou leitor de tela sabe onde
   // está. Na troca de aba, o foco fica na própria aba (ver `aoTeclarNaAba`).
+  // O título fica na MESMA posição em todos os estados (ver o painel dos
+  // estados sem dados): já no carregamento ele recebe o foco — quem abriu a
+  // ficha está escondido com a listagem —, e o mesmo nó o mantém quando os
+  // dados chegam.
   const focouTituloRef = useRef(false);
   useEffect(() => {
     if (focouTituloRef.current) return;
-    if (estado.tipo === "carregando") return;
+    if (estado.tipo === "carregando") {
+      tituloRef.current?.focus();
+      return;
+    }
     focouTituloRef.current = true;
     // "Completar contatos": o foco é da seção de contatos, não do título.
     if (focarContatos && estado.tipo === "dados") return;
@@ -562,53 +569,71 @@ export function FichaColaboradorScreen({
   ];
 
   if (estado.tipo !== "dados") {
+    // Mesmo painel de perfil do estado com dados, na mesma ordem de nós: o
+    // h1 é reaproveitado quando os dados chegam, e o foco fica nele.
     return (
       <div className="ficha-colaborador">
         <TrilhaNavegacao itens={trilha} />
-        <h1
-          id={FICHA_COLABORADOR_TITULO_ID}
-          ref={tituloRef}
-          tabIndex={-1}
-          className="ficha-colaborador__titulo"
-        >
-          {estado.tipo === "nao-encontrado"
-            ? "Colaborador não encontrado"
-            : "Ficha do colaborador"}
-        </h1>
-        {estado.tipo === "carregando" ? (
-          <p role="status" className="ficha-colaborador__texto">
-            Carregando a ficha…
-          </p>
-        ) : estado.tipo === "nao-encontrado" ? (
-          <div className="ficha-colaborador__aviso">
-            <p className="ficha-colaborador__texto">
-              Este colaborador não foi encontrado na empresa ativa.
-            </p>
-            <Button variant="secondary" onClick={onVoltar}>
-              Voltar para {rotuloColaboradores}
-            </Button>
-          </div>
-        ) : (
-          <div className="ficha-colaborador__aviso">
-            {/* Um alerta novo por falha (a `key`): anunciado uma vez. */}
-            <p
-              key={estado.falhas}
-              role="alert"
-              className="ficha-colaborador__texto"
-            >
-              Não foi possível carregar a ficha.
-            </p>
-            <Button
-              variant="secondary"
-              aria-disabled={estado.relendo}
-              onClick={() => {
-                if (!estado.relendo) void carregarColaborador(true);
-              }}
-            >
-              Tentar de novo
-            </Button>
-          </div>
-        )}
+        <div className="ficha-colaborador__perfil">
+          <header className="ficha-colaborador__cabecalho">
+            <div className="ficha-colaborador__faixa" aria-hidden="true" />
+            <div className="ficha-colaborador__topo">
+              {/* Sem nome ainda: avatar neutro, só com o desenho de pessoa. */}
+              <span
+                className="ficha-colaborador__avatar ficha-colaborador__avatar--neutro"
+                aria-hidden="true"
+              >
+                <IconeFicha nome="dados" />
+              </span>
+              <div className="ficha-colaborador__identidade">
+                <h1
+                  id={FICHA_COLABORADOR_TITULO_ID}
+                  ref={tituloRef}
+                  tabIndex={-1}
+                  className="ficha-colaborador__titulo"
+                >
+                  {estado.tipo === "nao-encontrado"
+                    ? "Colaborador não encontrado"
+                    : "Ficha do colaborador"}
+                </h1>
+                {estado.tipo === "carregando" ? (
+                  <p role="status" className="ficha-colaborador__texto">
+                    Carregando a ficha…
+                  </p>
+                ) : estado.tipo === "nao-encontrado" ? (
+                  <div className="ficha-colaborador__aviso">
+                    <p className="ficha-colaborador__texto">
+                      Este colaborador não foi encontrado na empresa ativa.
+                    </p>
+                    <Button variant="secondary" onClick={onVoltar}>
+                      Voltar para {rotuloColaboradores}
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="ficha-colaborador__aviso">
+                    {/* Um alerta novo por falha (a `key`): anunciado uma vez. */}
+                    <p
+                      key={estado.falhas}
+                      role="alert"
+                      className="ficha-colaborador__texto"
+                    >
+                      Não foi possível carregar a ficha.
+                    </p>
+                    <Button
+                      variant="secondary"
+                      aria-disabled={estado.relendo}
+                      onClick={() => {
+                        if (!estado.relendo) void carregarColaborador(true);
+                      }}
+                    >
+                      Tentar de novo
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </header>
+        </div>
       </div>
     );
   }

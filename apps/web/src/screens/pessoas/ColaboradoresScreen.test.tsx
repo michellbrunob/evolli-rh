@@ -4638,3 +4638,32 @@ describe("T194 — painel 'Adicionar colaborador' na listagem", () => {
     expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Validação local — abrir a ficha pela linha: enquanto ela carrega, o foco
+// não fica no "Abrir ficha" (já escondido com a listagem), e sim no título.
+// ---------------------------------------------------------------------------
+describe("T198 — foco ao abrir a ficha pela linha", () => {
+  it("durante o carregamento, o foco vai ao título, nunca a um botão escondido", async () => {
+    vi.mocked(buscarColaborador).mockImplementation(
+      () => new Promise(() => {}),
+    );
+    render(<ComFicha />);
+    const tabela = await screen.findByRole("table", {
+      name: "Colaboradores desta empresa",
+    });
+    const abrir = within(
+      within(tabela).getByText(colaborador1.nome).closest("tr")!,
+    ).getByRole("button", { name: /Abrir ficha/ });
+    abrir.focus();
+    fireEvent.click(abrir);
+
+    const titulo = await screen.findByRole("heading", {
+      level: 1,
+      name: "Ficha do colaborador",
+    });
+    await waitFor(() => expect(titulo).toHaveFocus());
+    expect(document.activeElement).not.toBe(abrir);
+    expect(document.activeElement?.closest("[hidden]")).toBeNull();
+  });
+});

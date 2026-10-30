@@ -1472,3 +1472,78 @@ describe("T198 — contrato de CSS do painel de perfil (375 px, tokens)", () => 
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// Validação local — os estados sem dados (carregando, erro, não encontrado)
+// usam o mesmo painel de perfil, e o título é o MESMO nó em todos eles: o
+// foco vai ao título já no carregamento e continua nele quando os dados
+// chegam (antes, o foco ficava em quem abriu a ficha, já escondido).
+// ---------------------------------------------------------------------------
+describe("T198 — estados sem dados no painel de perfil", () => {
+  function painelDoTitulo(titulo: HTMLElement) {
+    const painel = titulo.closest(".ficha-colaborador__perfil");
+    if (!painel) throw new Error("Título fora do painel de perfil.");
+    return painel as HTMLElement;
+  }
+
+  it("carregando: título no painel, com faixa e avatar neutro, e já com o foco", async () => {
+    vi.mocked(buscarColaborador).mockImplementation(
+      () => new Promise(() => {}),
+    );
+    render(<Ficha />);
+    const titulo = screen.getByRole("heading", {
+      level: 1,
+      name: "Ficha do colaborador",
+    });
+    const painel = painelDoTitulo(titulo);
+    expect(painel.querySelector(".ficha-colaborador__faixa")).not.toBeNull();
+    const avatar = painel.querySelector(".ficha-colaborador__avatar");
+    expect(avatar).toHaveAttribute("aria-hidden", "true");
+    expect(avatar).toHaveTextContent("");
+    expect(within(painel).getByRole("status")).toHaveTextContent(
+      "Carregando a ficha…",
+    );
+    await waitFor(() => expect(titulo).toHaveFocus());
+  });
+
+  it("quando os dados chegam, o título é o mesmo nó e mantém o foco", async () => {
+    let soltar: ((c: ColaboradorApi) => void) | null = null;
+    vi.mocked(buscarColaborador).mockImplementation(
+      () =>
+        new Promise<ColaboradorApi>((res) => {
+          soltar = res;
+        }),
+    );
+    render(<Ficha />);
+    const titulo = screen.getByRole("heading", { level: 1 });
+    await waitFor(() => expect(titulo).toHaveFocus());
+
+    await act(async () => {
+      soltar?.(ana);
+    });
+    await esperarFicha();
+    expect(screen.getByRole("heading", { level: 1 })).toBe(titulo);
+    expect(titulo).toHaveTextContent(ana.nome);
+    expect(titulo).toHaveFocus();
+  });
+
+  it("não encontrado e erro também ficam no painel de perfil", async () => {
+    const { unmount } = render(
+      <Ficha colaboradorId="99999999-9999-4999-8999-999999999999" />,
+    );
+    const naoEncontrado = await screen.findByRole("heading", {
+      level: 1,
+      name: "Colaborador não encontrado",
+    });
+    expect(
+      painelDoTitulo(naoEncontrado).querySelector(".ficha-colaborador__faixa"),
+    ).not.toBeNull();
+    unmount();
+
+    vi.mocked(buscarColaborador).mockRejectedValueOnce(new Error("falha"));
+    render(<Ficha />);
+    const alerta = await screen.findByRole("alert");
+    const titulo = screen.getByRole("heading", { level: 1 });
+    expect(painelDoTitulo(titulo)).toContainElement(alerta);
+  });
+});
