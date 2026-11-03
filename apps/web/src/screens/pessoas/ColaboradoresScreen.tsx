@@ -49,6 +49,8 @@ import {
 } from "./PainelAdicionarColaborador";
 import { iniciaisDe } from "./FichaColaboradorScreen";
 import { PessoasHorarioScreen } from "./PessoasHorarioScreen";
+import { AREAS_DE_EDICAO, AreaDeEdicao } from "../../app/edicoesPendentes";
+import { useGuardaDeSaida } from "../../app/guardaDeSaida";
 import "./ColaboradoresScreen.css";
 
 export const COLABORADORES_TITULO_ID = "colaboradores-titulo";
@@ -401,6 +403,7 @@ export function ColaboradoresScreen({
 
   // T199 — controlado pelo shell (URL) ou, montado sozinho, pelo próprio
   // componente. Sempre normalizado: lotação só onde ela existe.
+  const guarda = useGuardaDeSaida();
   const [estadoInterno, setEstadoInterno] = useState(
     ESTADO_INICIAL_DA_LISTAGEM,
   );
@@ -837,7 +840,17 @@ export function ColaboradoresScreen({
     if (nova === aba) return;
     // A aba nova começa na primeira página; tipo e lotação seguem quando
     // fazem sentido nela (a normalização tira o que não faz).
-    mudarEstado({ ...estado, aba: nova, pagina: 1 });
+    const trocar = () => mudarEstado({ ...estado, aba: nova, pagina: 1 });
+    // T200 — sair da aba Jornada desmonta a visão de jornadas embutida: com
+    // edição pendente nela, a guarda do shell pergunta antes.
+    if (aba === "jornada") {
+      guarda.solicitarSaida({
+        area: AREAS_DE_EDICAO.jornadaDoDashboard,
+        executar: trocar,
+      });
+      return;
+    }
+    trocar();
   }
 
   function aoTeclarNaAba(evento: KeyboardEvent<HTMLButtonElement>) {
@@ -1282,11 +1295,13 @@ export function ColaboradoresScreen({
           {aba === "jornada" ? (
             /* D-5, N-4 — a mesma visão de jornadas da empresa, com as mesmas
                permissões: só o RH opera. */
-            <PessoasHorarioScreen
-              embutida
-              podeOperar={podeOperarJornada}
-              {...(onAbrirFicha ? { onAbrirFicha } : {})}
-            />
+            <AreaDeEdicao id={AREAS_DE_EDICAO.jornadaDoDashboard}>
+              <PessoasHorarioScreen
+                embutida
+                podeOperar={podeOperarJornada}
+                {...(onAbrirFicha ? { onAbrirFicha } : {})}
+              />
+            </AreaDeEdicao>
           ) : (
             <>
               {/* T199 — o título da seção da aba: os estados vazios (h3)

@@ -1725,3 +1725,151 @@ describe("T189 (B1/N1) — referência rápida pendente e conferência antes de 
     ).not.toHaveAttribute("inert");
   });
 });
+
+// ---------------------------------------------------------------------------
+// T200 — a guarda de saída no shell autenticado: Hub, Sair, sessão encerrada
+// por fora, o aviso nativo do navegador e a troca de empresa, que continua com
+// o diálogo próprio da T189.
+// ---------------------------------------------------------------------------
+describe("T200 — guarda de saída no shell autenticado", () => {
+  beforeEach(() => {
+    CanalFalso.abertos.clear();
+    vi.stubGlobal("BroadcastChannel", CanalFalso);
+    window.history.replaceState(null, "", window.location.pathname);
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    window.history.replaceState(null, "", window.location.pathname);
+  });
+
+  const perguntaDeSaida = () =>
+    screen.getByRole("alertdialog", { name: "Sair sem salvar?" });
+
+  async function novaAdmissaoComNome() {
+    const nome = await abrirNovaAdmissaoPorRota();
+    fireEvent.change(nome, { target: { value: "Pessoa Sintetica Rascunho" } });
+    return nome as HTMLInputElement;
+  }
+
+  it("Hub: pergunta, lista a tela e a frase da T179; continuar mantém tudo; sair sem salvar vai ao Hub", async () => {
+    const nome = await novaAdmissaoComNome();
+    const hub = screen.getByRole("button", { name: "Hub" });
+    hub.focus();
+    fireEvent.click(hub);
+    const pergunta = perguntaDeSaida();
+    expect(pergunta).toHaveAccessibleDescription(
+      "Há alterações não salvas em: Nova admissão Saindo agora, elas serão descartadas. Nada da Nova admissão foi salvo.",
+    );
+    expect(
+      within(pergunta).getByRole("button", { name: "Continuar editando" }),
+    ).toHaveFocus();
+    fireEvent.click(
+      within(pergunta).getByRole("button", { name: "Continuar editando" }),
+    );
+    expect(nome.value).toBe("Pessoa Sintetica Rascunho");
+    expect(hub).toHaveFocus();
+    expect(
+      screen.queryByRole("heading", { level: 1, name: TITULO_DO_HUB }),
+    ).toBeNull();
+
+    fireEvent.click(hub);
+    fireEvent.click(
+      within(perguntaDeSaida()).getByRole("button", {
+        name: "Sair sem salvar",
+      }),
+    );
+    expect(
+      await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB }),
+    ).toBeInTheDocument();
+  });
+
+  it("Sair: continuar não encerra a sessão; sair sem salvar encerra, sem o aviso de perda (foi escolha)", async () => {
+    await novaAdmissaoComNome();
+    fireEvent.click(screen.getByRole("button", { name: "Sair" }));
+    fireEvent.click(
+      within(perguntaDeSaida()).getByRole("button", {
+        name: "Continuar editando",
+      }),
+    );
+    expect(logout).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Sair" }));
+    fireEvent.click(
+      within(perguntaDeSaida()).getByRole("button", {
+        name: "Sair sem salvar",
+      }),
+    );
+    await screen.findByLabelText(/^E-mail\b/i);
+    expect(logout).toHaveBeenCalledTimes(1);
+    expect(
+      screen.queryByText(/alterações que não tinham sido salvas/),
+    ).toBeNull();
+  });
+
+  it("sessão encerrada por fora com edição pendente: sai, nada é gravado, e o login avisa que se perdeu", async () => {
+    await novaAdmissaoComNome();
+    vi.mocked(obterUsuarioAtual).mockRejectedValue(
+      new ApiErrorDeUsuarios(401, "Não autenticado."),
+    );
+    const outraAba = new CanalFalso(NOME_DO_CANAL);
+    act(() => outraAba.postMessage({ tipo: "contexto-empresarial-alterado" }));
+
+    const aviso = await screen.findByText(
+      "Sua sessão foi encerrada. As alterações que não tinham sido salvas foram perdidas.",
+    );
+    expect(aviso).toHaveAttribute("role", "alert");
+    expect(screen.getByLabelText(/^E-mail\b/i)).toBeInTheDocument();
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+  });
+
+  it("sessão encerrada por fora sem nada pendente: volta ao login sem o aviso de perda", async () => {
+    vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
+    render(<AutenticacaoApp />);
+    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
+    await abrirProduto(/^Colaboradores/);
+    vi.mocked(obterUsuarioAtual).mockRejectedValue(
+      new ApiErrorDeUsuarios(401, "Não autenticado."),
+    );
+    act(() =>
+      new CanalFalso(NOME_DO_CANAL).postMessage({
+        tipo: "contexto-empresarial-alterado",
+      }),
+    );
+    await screen.findByLabelText(/^E-mail\b/i);
+    expect(
+      screen.queryByText(/alterações que não tinham sido salvas/),
+    ).toBeNull();
+  });
+
+  it("troca de empresa continua no diálogo próprio da T189, não no da guarda", async () => {
+    trocarParaBetaNoServidor();
+    await novaAdmissaoComNome();
+    await trocarPeloMenuPara("Empresa Beta");
+    expect(
+      await screen.findByText(/Há edição em andamento em: Nova admissão\./),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("alertdialog", { name: "Sair sem salvar?" }),
+    ).toBeNull();
+  });
+
+  it("recarregar ou fechar a aba: o aviso nativo só enquanto houver o que perder", async () => {
+    const disparar = () => {
+      const evento = new Event("beforeunload", { cancelable: true });
+      window.dispatchEvent(evento);
+      return evento.defaultPrevented;
+    };
+    const nome = await abrirNovaAdmissaoPorRota();
+    expect(disparar()).toBe(false);
+    fireEvent.change(nome, { target: { value: "Pessoa Sintetica Rascunho" } });
+    expect(disparar()).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Hub" }));
+    fireEvent.click(
+      within(perguntaDeSaida()).getByRole("button", {
+        name: "Sair sem salvar",
+      }),
+    );
+    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
+    expect(disparar()).toBe(false);
+  });
+});

@@ -28,6 +28,8 @@ import {
   tituloDoGrupoDe,
 } from "../../app/mapaNavegacao";
 import { TrilhaNavegacao } from "../../components";
+import { AREAS_DE_EDICAO, AreaDeEdicao } from "../../app/edicoesPendentes";
+import { useGuardaDeSaida } from "../../app/guardaDeSaida";
 import type {
   AbaDaFicha,
   EstadoDaListagem,
@@ -234,6 +236,7 @@ export function PessoasScreen({
   // o contêiner nunca abre numa aba que ele mesmo não lista.
   const abas = ABAS.filter((aba) => aba.estado === modo);
   const [abaAtiva, setAbaAtiva] = useState<AbaPessoas>(abas[0]!.id);
+  const guarda = useGuardaDeSaida();
   /**
    * T187 — o atalho da "Vida funcional" da ficha: abre o Histórico funcional
    * já no colaborador e no vínculo. Vale só para essa abertura; trocar de aba
@@ -312,9 +315,35 @@ export function PessoasScreen({
     colaboradorId: string;
     vinculoId: string;
   }) {
-    pularRestauroRef.current = true;
-    abrirHistoricoFuncional(alvo);
-    onFecharFicha?.();
+    // T200 — trocar de aba desmonta o painel de Pessoas que ficou por baixo.
+    guarda.solicitarSaida({
+      area: AREAS_DE_EDICAO.painelPessoas,
+      executar: () => {
+        pularRestauroRef.current = true;
+        abrirHistoricoFuncional(alvo);
+        onFecharFicha?.();
+      },
+    });
+  }
+
+  /**
+   * T200 — trocar a aba de Pessoas desmonta o painel atual: com edição
+   * pendente nele, a guarda do shell pergunta antes. A mesma aba não
+   * desmonta nada.
+   */
+  function trocarAbaDePessoas(id: AbaPessoas, depois?: () => void) {
+    if (id === abaAtiva) {
+      depois?.();
+      setAbaAtiva(id);
+      return;
+    }
+    guarda.solicitarSaida({
+      area: AREAS_DE_EDICAO.painelPessoas,
+      executar: () => {
+        depois?.();
+        setAbaAtiva(id);
+      },
+    });
   }
 
   useEffect(() => {
@@ -344,10 +373,10 @@ export function PessoasScreen({
           { rotulo: tituloDoGrupoDe("pessoas") ?? "Gestão de Pessoas" },
           {
             rotulo: destinoPorId("pessoas")?.label ?? "Colaboradores",
-            onSelecionar: () => {
-              focarAbaColaboradoresRef.current = true;
-              setAbaAtiva("colaboradores");
-            },
+            onSelecionar: () =>
+              trocarAbaDePessoas("colaboradores", () => {
+                focarAbaColaboradoresRef.current = true;
+              }),
           },
           ...(definicaoAtiva.id === "colaboradores"
             ? []
@@ -358,6 +387,7 @@ export function PessoasScreen({
   return (
     <div className="pessoas-screen">
       {fichaAberta && ficha ? (
+        // T200 — a ficha declara a própria área de edição (ver o componente).
         <FichaColaboradorScreen
           key={ficha.colaboradorId}
           colaboradorId={ficha.colaboradorId}
@@ -393,10 +423,9 @@ export function PessoasScreen({
                       ? "pessoas-screen__tab pessoas-screen__tab--ativa"
                       : "pessoas-screen__tab"
                   }
-                  onClick={() => {
-                    setSelecaoHistorico(null);
-                    setAbaAtiva(aba.id);
-                  }}
+                  onClick={() =>
+                    trocarAbaDePessoas(aba.id, () => setSelecaoHistorico(null))
+                  }
                 >
                   {aba.rotulo}
                 </button>
@@ -410,42 +439,44 @@ export function PessoasScreen({
             aria-labelledby={`pessoas-tab-${definicaoAtiva.id}`}
             className="pessoas-screen__panel"
           >
-            {abaAtiva === "colaboradores" ? (
-              <ColaboradoresScreen
-                empresaAtiva={empresaAtiva}
-                {...(onNovaAdmissao ? { onNovaAdmissao } : {})}
-                {...(onAbrirFicha ? { onAbrirFicha: abrirFicha } : {})}
-                atualizacao={atualizacaoDaListagem}
-                {...(listagem && onListagemChange
-                  ? { estado: listagem, onEstadoChange: onListagemChange }
-                  : {})}
-                podeOperarJornada={podeOperarJornada}
-              />
-            ) : abaAtiva === "horario" ? (
-              <PessoasHorarioScreen
-                podeOperar={podeOperarJornada}
-                {...(onAbrirFicha ? { onAbrirFicha: abrirFicha } : {})}
-              />
-            ) : abaAtiva === "historico_funcional" ? (
-              <HistoricoFuncionalScreen
-                selecaoInicial={selecaoHistorico}
-                {...(onAbrirFicha ? { onAbrirFicha: abrirFicha } : {})}
-              />
-            ) : abaAtiva === "dados_contratuais" ? (
-              <DadosContratuaisScreen
-                {...(onAbrirFicha ? { onAbrirFicha: abrirFicha } : {})}
-              />
-            ) : abaAtiva === "documentos" ? (
-              <PessoasDocumentosScreen />
-            ) : abaAtiva === "solicitacoes" ? (
-              <SolicitacoesScreen />
-            ) : abaAtiva === "beneficios" ? (
-              <BeneficiosScreen />
-            ) : abaAtiva === "dependentes" ? (
-              <DependentesScreen />
-            ) : (
-              <AfastamentosScreen />
-            )}
+            <AreaDeEdicao id={AREAS_DE_EDICAO.painelPessoas}>
+              {abaAtiva === "colaboradores" ? (
+                <ColaboradoresScreen
+                  empresaAtiva={empresaAtiva}
+                  {...(onNovaAdmissao ? { onNovaAdmissao } : {})}
+                  {...(onAbrirFicha ? { onAbrirFicha: abrirFicha } : {})}
+                  atualizacao={atualizacaoDaListagem}
+                  {...(listagem && onListagemChange
+                    ? { estado: listagem, onEstadoChange: onListagemChange }
+                    : {})}
+                  podeOperarJornada={podeOperarJornada}
+                />
+              ) : abaAtiva === "horario" ? (
+                <PessoasHorarioScreen
+                  podeOperar={podeOperarJornada}
+                  {...(onAbrirFicha ? { onAbrirFicha: abrirFicha } : {})}
+                />
+              ) : abaAtiva === "historico_funcional" ? (
+                <HistoricoFuncionalScreen
+                  selecaoInicial={selecaoHistorico}
+                  {...(onAbrirFicha ? { onAbrirFicha: abrirFicha } : {})}
+                />
+              ) : abaAtiva === "dados_contratuais" ? (
+                <DadosContratuaisScreen
+                  {...(onAbrirFicha ? { onAbrirFicha: abrirFicha } : {})}
+                />
+              ) : abaAtiva === "documentos" ? (
+                <PessoasDocumentosScreen />
+              ) : abaAtiva === "solicitacoes" ? (
+                <SolicitacoesScreen />
+              ) : abaAtiva === "beneficios" ? (
+                <BeneficiosScreen />
+              ) : abaAtiva === "dependentes" ? (
+                <DependentesScreen />
+              ) : (
+                <AfastamentosScreen />
+              )}
+            </AreaDeEdicao>
           </div>
         </div>
       ) : null}

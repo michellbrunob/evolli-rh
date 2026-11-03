@@ -163,3 +163,16 @@
     width: 100%;
   }
 }
+
+/* T200 — a sessão terminou por fora com alteração não salva: o login diz o
+   que se perdeu, uma vez (role="alert"). */
+.autenticacao-app__edicoes-perdidas {
+  max-width: 34rem;
+  margin: var(--space-lg) auto 0;
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  background: var(--surface-canvas);
+  color: var(--status-danger-ink);
+  overflow-wrap: anywhere;
+}

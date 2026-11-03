@@ -2,11 +2,13 @@ import { readFileSync } from "node:fs";
 import {
   act,
   fireEvent,
-  render,
+  render as renderSemGuarda,
   screen,
   waitFor,
   within,
+  type RenderOptions,
 } from "@testing-library/react";
+import { ComGuardaDeSaida } from "../../test/ComGuardaDeSaida";
 import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -823,7 +825,7 @@ describe("T198 — voltar", () => {
       within(trilha).getByRole("button", { name: "Colaboradores" }),
     );
     expect(
-      screen.getByRole("dialog", { name: "Sair da ficha sem salvar?" }),
+      screen.getByRole("alertdialog", { name: "Sair sem salvar?" }),
     ).toBeInTheDocument();
     expect(onVoltar).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole("button", { name: "Sair sem salvar" }));
@@ -1355,7 +1357,7 @@ describe("T198 — painel de perfil", () => {
     });
     fireEvent.click(voltar);
     expect(
-      screen.getByRole("dialog", { name: "Sair da ficha sem salvar?" }),
+      screen.getByRole("alertdialog", { name: "Sair sem salvar?" }),
     ).toBeInTheDocument();
     expect(onVoltar).toHaveBeenCalledTimes(1);
   });
@@ -1547,3 +1549,14 @@ describe("T198 — estados sem dados no painel de perfil", () => {
     expect(painelDoTitulo(titulo)).toContainElement(alerta);
   });
 });
+
+/**
+ * T200 — as telas montadas como no shell: com o registro de edições e a
+ * guarda de saída (sem ela, a saída não pergunta).
+ */
+function render(
+  ui: Parameters<typeof renderSemGuarda>[0],
+  opcoes?: Omit<RenderOptions, "wrapper">,
+) {
+  return renderSemGuarda(ui, { wrapper: ComGuardaDeSaida, ...opcoes });
+}

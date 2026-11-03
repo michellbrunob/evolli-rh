@@ -25,12 +25,21 @@
  * vira no-op e o resumo é vazio. O comportamento delas não muda.
  *
  * Nada é guardado fora da memória: sem `localStorage`, sem `sessionStorage`.
+ *
+ * ## Áreas (T200)
+ *
+ * Nem toda saída descarta a tela inteira: fechar a ficha deixa a listagem
+ * montada; trocar a aba de Pessoas desmonta só o painel. Quem desmonta uma
+ * parte envolve essa parte em `AreaDeEdicao`, e a guarda de navegação
+ * pergunta só pelas edições daquela área (`resumir(area)`). Sem área, vale o
+ * registro inteiro.
  */
 import {
   createContext,
   useContext,
   useEffect,
   useId,
+  useMemo,
   useState,
   useSyncExternalStore,
 } from "react";
@@ -47,6 +56,13 @@ interface EstadoDaEdicao {
   readonly rotulo: string;
   readonly pendente: boolean;
   readonly salvando: boolean;
+  /** T200 — as áreas que envolvem quem declarou, da mais externa à interna. */
+  readonly areas?: readonly string[];
+  /**
+   * T200 — frase a mais que a guarda de saída mostra enquanto esta edição
+   * está pendente (ex.: um envio anterior com resultado incerto).
+   */
+  readonly aviso?: string;
 }
 
 const RESUMO_VAZIO: ResumoDasEdicoes = { pendentes: [], salvando: [] };
@@ -54,6 +70,33 @@ const RESUMO_VAZIO: ResumoDasEdicoes = { pendentes: [], salvando: [] };
 function unicos(rotulos: string[]): string[] {
   return [...new Set(rotulos)];
 }
+
+function resumoDe(valores: readonly EstadoDaEdicao[]): ResumoDasEdicoes {
+  if (valores.length === 0) return RESUMO_VAZIO;
+  return {
+    pendentes: unicos(valores.filter((v) => v.pendente).map((v) => v.rotulo)),
+    salvando: unicos(valores.filter((v) => v.salvando).map((v) => v.rotulo)),
+  };
+}
+
+/**
+ * T200 — as partes da tela que uma saída pode desmontar sozinha. Uma saída
+ * que desmonta só uma delas pergunta só pelo que está dentro dela.
+ */
+export const AREAS_DE_EDICAO = {
+  /** A ficha do colaborador (fechar a ficha deixa a listagem montada). */
+  ficha: "ficha",
+  /** O painel da aba ativa de Pessoas. */
+  painelPessoas: "painel-pessoas",
+  /** A aba Jornada de trabalho do dashboard de Colaboradores. */
+  jornadaDoDashboard: "jornada-dashboard",
+  /** O painel da aba ativa de Cadastros. */
+  painelCadastros: "painel-cadastros",
+  /** O painel da aba ativa do Ponto. */
+  painelPonto: "painel-ponto",
+} as const;
+export type AreaDeEdicaoId =
+  (typeof AREAS_DE_EDICAO)[keyof typeof AREAS_DE_EDICAO];
 
 /**
  * O registro. Uma instância por sessão de interface — criada pelo
@@ -71,23 +114,36 @@ export class RegistroDeEdicoes {
     } else {
       this.entradas.set(id, estado);
     }
-    const valores = [...this.entradas.values()];
-    this.resumo =
-      valores.length === 0
-        ? RESUMO_VAZIO
-        : {
-            pendentes: unicos(
-              valores.filter((v) => v.pendente).map((v) => v.rotulo),
-            ),
-            salvando: unicos(
-              valores.filter((v) => v.salvando).map((v) => v.rotulo),
-            ),
-          };
+    this.resumo = resumoDe([...this.entradas.values()]);
     for (const ouvinte of this.ouvintes) ouvinte();
   }
 
   /** Estado atual. Mesma referência enquanto nada muda. */
   obter = (): ResumoDasEdicoes => this.resumo;
+
+  /**
+   * T200 — o resumo só das edições dentro de `area` (sem área: o registro
+   * inteiro). É o que uma saída que desmonta só essa parte descartaria.
+   */
+  resumir = (area?: string): ResumoDasEdicoes => {
+    if (area === undefined) return this.resumo;
+    return resumoDe(this.daArea(area));
+  };
+
+  /** T200 — os avisos das edições pendentes (na área, se dada), sem repetição. */
+  avisos = (area?: string): readonly string[] =>
+    unicos(
+      this.daArea(area)
+        .filter((v) => v.pendente && v.aviso)
+        .map((v) => v.aviso as string),
+    );
+
+  private daArea(area?: string): EstadoDaEdicao[] {
+    const valores = [...this.entradas.values()];
+    return area === undefined
+      ? valores
+      : valores.filter((v) => v.areas?.includes(area));
+  }
 
   assinar = (ouvinte: () => void): (() => void) => {
     this.ouvintes.add(ouvinte);
@@ -98,6 +154,25 @@ export class RegistroDeEdicoes {
 }
 
 const RegistroContext = createContext<RegistroDeEdicoes | null>(null);
+
+/** T200 — o caminho de áreas de quem está dentro; vazio fora de todas. */
+const AreaContext = createContext<readonly string[]>([]);
+
+/**
+ * T200 — marca uma parte da tela que uma saída pode desmontar sozinha. As
+ * edições declaradas dentro dela levam a área (e as de fora, não).
+ */
+export function AreaDeEdicao({
+  id,
+  children,
+}: {
+  readonly id: AreaDeEdicaoId;
+  readonly children: ReactNode;
+}) {
+  const pai = useContext(AreaContext);
+  const areas = useMemo(() => [...pai, id], [pai, id]);
+  return <AreaContext.Provider value={areas}>{children}</AreaContext.Provider>;
+}
 
 export function ProvedorDeEdicoes({
   registro,
@@ -120,15 +195,27 @@ export function ProvedorDeEdicoes({
  */
 export function useEdicaoEmAndamento(
   rotulo: string,
-  estado: { readonly pendente: boolean; readonly salvando: boolean },
+  estado: {
+    readonly pendente: boolean;
+    readonly salvando: boolean;
+    /** T200 — frase a mais na guarda de saída enquanto houver pendência. */
+    readonly aviso?: string;
+  },
 ): void {
   const registro = useContext(RegistroContext);
+  const areas = useContext(AreaContext);
   const id = useId();
-  const { pendente, salvando } = estado;
+  const { pendente, salvando, aviso } = estado;
 
   useEffect(() => {
-    registro?.definir(id, { rotulo, pendente, salvando });
-  }, [registro, id, rotulo, pendente, salvando]);
+    registro?.definir(id, {
+      rotulo,
+      pendente,
+      salvando,
+      areas,
+      ...(aviso ? { aviso } : {}),
+    });
+  }, [registro, id, rotulo, pendente, salvando, areas, aviso]);
 
   useEffect(() => () => registro?.definir(id, null), [registro, id]);
 }
@@ -143,6 +230,11 @@ export function useResumoDasEdicoes(): ResumoDasEdicoes {
     registro?.assinar ?? assinarNada,
     registro?.obter ?? obterVazio,
   );
+}
+
+/** T200 — o registro do provedor mais próximo (`null` fora de um). */
+export function useRegistroDoContexto(): RegistroDeEdicoes | null {
+  return useContext(RegistroContext);
 }
 
 /** Cria o registro uma vez por montagem de quem o possui. */

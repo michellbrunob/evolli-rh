@@ -18,6 +18,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
+import { ComGuardaDeSaida } from "../test/ComGuardaDeSaida";
 import {
   ABAS_DA_FICHA,
   destinoDaRota,
@@ -783,6 +784,410 @@ describe("T199 — o estado do dashboard na URL (App)", () => {
       ).getByRole("button", { name: /^Colaboradores/ }),
     );
     await screen.findByRole("table", { name: /^Colaboradores — Ativos/ });
+    expect(window.location.hash).toBe(LISTAGEM);
+  });
+});
+
+/**
+ * T200 — a guarda de saída no App, com o histórico de verdade do navegador:
+ * menu, trilha da ficha, abas internas, rota digitada, voltar e avançar.
+ * Montado como no shell (`ComGuardaDeSaida`).
+ */
+describe("T200 — guarda de saída no App", () => {
+  function montarComGuarda(papel = "rh") {
+    return render(
+      <ComGuardaDeSaida>
+        <App papelDoAtor={papel} />
+      </ComGuardaDeSaida>,
+    );
+  }
+  const pergunta = () =>
+    screen.getByRole("alertdialog", { name: "Sair sem salvar?" });
+  const telasDaPergunta = () =>
+    within(pergunta())
+      .getAllByRole("listitem")
+      .map((li) => li.textContent);
+  const fichaNaTela = () =>
+    document.querySelector<HTMLElement>(".ficha-colaborador");
+  function editarNome(valor = "Ana Editada (teste)") {
+    const campo = within(fichaNaTela()!).getByLabelText(
+      "Nome",
+    ) as HTMLInputElement;
+    fireEvent.change(campo, { target: { value: valor } });
+    return campo;
+  }
+  const barra = () =>
+    screen.getByRole("navigation", { name: "Navegação do painel" });
+  /** A pergunta aparece depois que o navegador anda (assíncrono). */
+  const esperarPergunta = () =>
+    screen.findByRole("alertdialog", { name: "Sair sem salvar?" });
+  /** O navegador anda no histórico de forma assíncrona. */
+  async function navegador(acao: () => void) {
+    await act(async () => {
+      acao();
+      await new Promise((resolver) => setTimeout(resolver, 20));
+    });
+  }
+
+  it("menu lateral: pergunta; continuar mantém a ficha e devolve o foco ao item; sair sem salvar navega", async () => {
+    window.history.replaceState(null, "", `/${rotaDe(ana)}`);
+    montarComGuarda();
+    await esperarFicha(ana.nome);
+    const campo = editarNome();
+    const item = within(barra()).getByRole("button", {
+      name: /^Colaboradores/,
+    });
+    item.focus();
+    fireEvent.click(item);
+    expect(telasDaPergunta()).toEqual(["Ficha do colaborador"]);
+    fireEvent.click(
+      within(pergunta()).getByRole("button", { name: "Continuar editando" }),
+    );
+    expect(fichaNaTela()).not.toBeNull();
+    expect(campo.value).toBe("Ana Editada (teste)");
+    expect(item).toHaveFocus();
+
+    fireEvent.click(item);
+    fireEvent.click(
+      within(pergunta()).getByRole("button", { name: "Sair sem salvar" }),
+    );
+    await screen.findByRole("table", { name: /^Colaboradores — / });
+    expect(fichaNaTela()).toBeNull();
+    expect(window.location.hash).toBe(LISTAGEM);
+  });
+
+  it("trilha da ficha: o diálogo único (não mais o da ficha); sair sem salvar volta à listagem", async () => {
+    window.history.replaceState(null, "", `/${rotaDe(ana)}`);
+    montarComGuarda();
+    await esperarFicha(ana.nome);
+    editarNome();
+    const trilha = within(fichaNaTela()!).getByRole("button", {
+      name: "Colaboradores",
+    });
+    fireEvent.click(trilha);
+    expect(telasDaPergunta()).toEqual(["Ficha do colaborador"]);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    fireEvent.click(
+      within(pergunta()).getByRole("button", { name: "Sair sem salvar" }),
+    );
+    await screen.findByRole("table", { name: /^Colaboradores — / });
+    expect(window.location.hash).toBe(LISTAGEM);
+  });
+
+  it("voltar do navegador: desfaz e pergunta; continuar fica na ficha; sair sem salvar volta — sem entradas a mais", async () => {
+    window.history.replaceState(null, "", `/${LISTAGEM}`);
+    montarComGuarda();
+    const tabela = await screen.findByRole("table", {
+      name: /^Colaboradores — /,
+    });
+    fireEvent.click(
+      within(tabela).getByRole("button", {
+        name: `Abrir ficha de ${ana.nome}`,
+      }),
+    );
+    await esperarFicha(ana.nome);
+    const entradas = window.history.length;
+    const campo = editarNome();
+
+    await navegador(() => window.history.back());
+    await esperarPergunta();
+    expect(telasDaPergunta()).toEqual(["Ficha do colaborador"]);
+    await waitFor(() => expect(window.location.hash).toBe(rotaDe(ana)));
+    fireEvent.click(
+      within(pergunta()).getByRole("button", { name: "Continuar editando" }),
+    );
+    expect(fichaNaTela()).not.toBeNull();
+    expect(campo.value).toBe("Ana Editada (teste)");
+    expect(window.location.hash).toBe(rotaDe(ana));
+
+    await navegador(() => window.history.back());
+    await esperarPergunta();
+    fireEvent.click(
+      within(pergunta()).getByRole("button", { name: "Sair sem salvar" }),
+    );
+    await navegador(() => undefined);
+    await screen.findByRole("table", { name: /^Colaboradores — / });
+    expect(window.location.hash).toBe(LISTAGEM);
+    expect(fichaNaTela()).toBeNull();
+    expect(window.history.length).toBe(entradas);
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+
+    // A entrada da ficha continua lá: avançar a reabre, sem nada a perguntar.
+    await navegador(() => window.history.forward());
+    await esperarFicha(ana.nome);
+    expect(window.location.hash).toBe(rotaDe(ana));
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+  });
+
+  it("'Sair sem salvar' antes de o navegador terminar de desfazer: o passo aceito espera e não se perde", async () => {
+    window.history.replaceState(null, "", `/${LISTAGEM}`);
+    montarComGuarda();
+    const tabela = await screen.findByRole("table", {
+      name: /^Colaboradores — /,
+    });
+    fireEvent.click(
+      within(tabela).getByRole("button", {
+        name: `Abrir ficha de ${ana.nome}`,
+      }),
+    );
+    await esperarFicha(ana.nome);
+    editarNome();
+    // Os `go` do shell ficam retidos: a reversão ainda não chegou.
+    const ir = window.history.go.bind(window.history);
+    const retidos: number[] = [];
+    const espiao = vi
+      .spyOn(window.history, "go")
+      .mockImplementation((passo?: number) => {
+        retidos.push(passo ?? 0);
+      });
+    await navegador(() => window.history.back());
+    await esperarPergunta();
+    expect(retidos).toEqual([1]);
+    fireEvent.click(
+      within(pergunta()).getByRole("button", { name: "Sair sem salvar" }),
+    );
+    // Nenhum passo novo antes de a reversão chegar.
+    expect(retidos).toEqual([1]);
+    espiao.mockRestore();
+    await navegador(() => ir(retidos[0]!));
+    await navegador(() => undefined);
+    await screen.findByRole("table", { name: /^Colaboradores — / });
+    expect(window.location.hash).toBe(LISTAGEM);
+    expect(fichaNaTela()).toBeNull();
+  });
+
+  it("avançar do navegador: desfaz e pergunta; sair sem salvar aplica o mesmo passo", async () => {
+    window.history.replaceState(null, "", `/${LISTAGEM}`);
+    montarComGuarda();
+    const tabela = await screen.findByRole("table", {
+      name: /^Colaboradores — /,
+    });
+    fireEvent.click(
+      within(tabela).getByRole("button", {
+        name: `Abrir ficha de ${ana.nome}`,
+      }),
+    );
+    await esperarFicha(ana.nome);
+    // Sem edição: a trilha sai direto (entrada nova da listagem).
+    fireEvent.click(
+      within(fichaNaTela()!).getByRole("button", { name: "Colaboradores" }),
+    );
+    await screen.findByRole("table", { name: /^Colaboradores — / });
+    const entradas = window.history.length;
+    await navegador(() => window.history.back());
+    await esperarFicha(ana.nome);
+    editarNome();
+
+    await navegador(() => window.history.forward());
+    await esperarPergunta();
+    expect(telasDaPergunta()).toEqual(["Ficha do colaborador"]);
+    await waitFor(() => expect(window.location.hash).toBe(rotaDe(ana)));
+    fireEvent.click(
+      within(pergunta()).getByRole("button", { name: "Continuar editando" }),
+    );
+    expect(fichaNaTela()).not.toBeNull();
+
+    await navegador(() => window.history.forward());
+    await esperarPergunta();
+    fireEvent.click(
+      within(pergunta()).getByRole("button", { name: "Sair sem salvar" }),
+    );
+    await navegador(() => undefined);
+    await screen.findByRole("table", { name: /^Colaboradores — / });
+    expect(window.location.hash).toBe(LISTAGEM);
+    expect(window.history.length).toBe(entradas);
+  });
+
+  it("rota digitada: desfaz e pergunta; continuar fica; sair sem salvar vai à rota digitada, com os parâmetros", async () => {
+    window.history.replaceState(null, "", `/${rotaDe(ana)}`);
+    montarComGuarda();
+    await esperarFicha(ana.nome);
+    const campo = editarNome();
+    const digitada = `${LISTAGEM}?aba=desligados&tipo=pj`;
+
+    await navegador(() => {
+      window.location.hash = digitada;
+    });
+    await esperarPergunta();
+    expect(telasDaPergunta()).toEqual(["Ficha do colaborador"]);
+    await waitFor(() => expect(window.location.hash).toBe(rotaDe(ana)));
+    fireEvent.click(
+      within(pergunta()).getByRole("button", { name: "Continuar editando" }),
+    );
+    expect(campo.value).toBe("Ana Editada (teste)");
+
+    await navegador(() => {
+      window.location.hash = digitada;
+    });
+    await esperarPergunta();
+    fireEvent.click(
+      within(pergunta()).getByRole("button", { name: "Sair sem salvar" }),
+    );
+    await navegador(() => undefined);
+    await screen.findByRole("table", { name: "Colaboradores — Desligados" });
+    expect(window.location.hash).toBe(digitada);
+    expect(fichaNaTela()).toBeNull();
+  });
+
+  it("aba interna de Pessoas: trocar de aba com o formulário aberto pergunta; continuar fica na aba", async () => {
+    vi.mocked(listarTabelasHorario).mockResolvedValue(
+      paginado([
+        {
+          id: "tabela-1",
+          codigo: "ADM",
+          nome: "Administrativo (teste)",
+          ativo: true,
+        },
+      ]) as never,
+    );
+    window.history.replaceState(null, "", `/${LISTAGEM}`);
+    montarComGuarda();
+    await screen.findByRole("table", { name: /^Colaboradores — / });
+    const abas = screen.getByRole("tablist", { name: "Seções de Pessoas" });
+    fireEvent.click(
+      within(abas).getByRole("tab", { name: "Horário de trabalho" }),
+    );
+    const novo = await screen.findByRole("button", { name: "Novo vínculo" });
+    await waitFor(() => expect(novo).toBeEnabled());
+    fireEvent.click(novo);
+
+    fireEvent.click(
+      within(abas).getByRole("tab", { name: "Histórico funcional" }),
+    );
+    expect(telasDaPergunta()).toEqual(["Horário de trabalho"]);
+    fireEvent.click(
+      within(pergunta()).getByRole("button", { name: "Continuar editando" }),
+    );
+    expect(
+      within(abas).getByRole("tab", { name: "Horário de trabalho" }),
+    ).toHaveAttribute("aria-selected", "true");
+
+    fireEvent.click(
+      within(abas).getByRole("tab", { name: "Histórico funcional" }),
+    );
+    fireEvent.click(
+      within(pergunta()).getByRole("button", { name: "Sair sem salvar" }),
+    );
+    expect(
+      within(abas).getByRole("tab", { name: "Histórico funcional" }),
+    ).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("aba Jornada do dashboard: sair dela com o formulário aberto pergunta; sem formulário, troca direto", async () => {
+    vi.mocked(listarTabelasHorario).mockResolvedValue(
+      paginado([
+        {
+          id: "tabela-1",
+          codigo: "ADM",
+          nome: "Administrativo (teste)",
+          ativo: true,
+        },
+      ]) as never,
+    );
+    window.history.replaceState(null, "", `/${LISTAGEM}?aba=jornada`);
+    montarComGuarda();
+    const novo = await screen.findByRole("button", { name: "Novo vínculo" });
+    await waitFor(() => expect(novo).toBeEnabled());
+    const grupos = screen.getByRole("tablist", {
+      name: "Grupos de colaboradores",
+    });
+    // Sem formulário aberto, a troca de aba não pergunta.
+    fireEvent.click(within(grupos).getByRole("tab", { name: /^Todos/ }));
+    await screen.findByRole("table", { name: "Colaboradores — Todos" });
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+
+    fireEvent.click(
+      within(grupos).getByRole("tab", { name: /^Jornada de trabalho/ }),
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Novo vínculo" }),
+    );
+    fireEvent.click(within(grupos).getByRole("tab", { name: /^Ativos/ }));
+    expect(telasDaPergunta()).toEqual(["Horário de trabalho"]);
+    fireEvent.click(
+      within(pergunta()).getByRole("button", { name: "Sair sem salvar" }),
+    );
+    await screen.findByRole("table", { name: "Colaboradores — Ativos" });
+  });
+
+  it("por papel: RH e DP editam e a guarda pergunta; master_tecnico só lê e sai direto", async () => {
+    for (const papel of ["rh", "dp"] as const) {
+      window.history.replaceState(null, "", `/${rotaDe(ana)}`);
+      const { unmount } = montarComGuarda(papel);
+      await esperarFicha(ana.nome);
+      editarNome();
+      fireEvent.click(
+        within(barra()).getByRole("button", { name: /^Colaboradores/ }),
+      );
+      expect(telasDaPergunta()).toEqual(["Ficha do colaborador"]);
+      unmount();
+    }
+    window.history.replaceState(null, "", `/${rotaDe(ana)}`);
+    montarComGuarda("master_tecnico");
+    await esperarFicha(ana.nome);
+    expect(within(fichaNaTela()!).queryByLabelText("Nome")).toBeNull();
+    fireEvent.click(
+      within(barra()).getByRole("button", { name: /^Colaboradores/ }),
+    );
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    await screen.findByRole("table", { name: /^Colaboradores — / });
+  });
+
+  it("perfil sem acesso a Colaboradores: a rota é recusada e nada pergunta", async () => {
+    window.history.replaceState(null, "", "/");
+    montarComGuarda("gestor");
+    await navegador(() => {
+      window.location.hash = rotaDe(ana);
+    });
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(fichaNaTela()).toBeNull();
+  });
+
+  it("resposta atrasada da listagem depois de sair sem salvar não reabre a ficha nem a pergunta", async () => {
+    window.history.replaceState(null, "", `/${LISTAGEM}`);
+    montarComGuarda();
+    const tabela = await screen.findByRole("table", {
+      name: /^Colaboradores — /,
+    });
+    fireEvent.click(
+      within(tabela).getByRole("button", {
+        name: `Abrir ficha de ${ana.nome}`,
+      }),
+    );
+    await esperarFicha(ana.nome);
+    editarNome();
+    let responder: (v: never) => void = () => undefined;
+    vi.mocked(listarColaboradores).mockImplementationOnce(
+      () => new Promise((r) => (responder = r as never)),
+    );
+    fireEvent.click(
+      within(fichaNaTela()!).getByRole("button", { name: "Colaboradores" }),
+    );
+    fireEvent.click(
+      within(pergunta()).getByRole("button", { name: "Sair sem salvar" }),
+    );
+    expect(fichaNaTela()).toBeNull();
+    await act(async () => {
+      responder({
+        ...paginado([ana, bruno]),
+        contadores: {
+          ativos: 2,
+          inativos: 0,
+          emAdmissao: 0,
+          desligados: 0,
+          total: 2,
+          ativosPorTipo: {
+            clt: 2,
+            estagio: 0,
+            pj: 0,
+            temporario: 0,
+            outro_controlado: 0,
+          },
+        },
+      } as never);
+    });
+    expect(fichaNaTela()).toBeNull();
+    expect(screen.queryByRole("alertdialog")).toBeNull();
     expect(window.location.hash).toBe(LISTAGEM);
   });
 });

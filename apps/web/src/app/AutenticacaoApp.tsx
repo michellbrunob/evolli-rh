@@ -91,6 +91,7 @@ import {
 import { HubPosLogin } from "./HubPosLogin";
 import { LoginScreen } from "./LoginScreen";
 import { ProvedorDeEdicoes, useRegistroDeEdicoes } from "./edicoesPendentes";
+import { ProvedorDeGuarda } from "./guardaDeSaida";
 import { ProvedorDeEmpresasDoContexto } from "./SeletorEmpresaAtiva";
 import {
   abrirCanalDeContexto,
@@ -177,6 +178,12 @@ export function AutenticacaoApp() {
    */
   const [contextoAlterado, setContextoAlterado] =
     useState<SafeAccessUserApi | null>(null);
+  /**
+   * T200 — a sessão terminou por fora (revogada, expirada, logout em outra
+   * aba) com alteração não salva ou salvamento em andamento. Sem sessão nada
+   * pode ser gravado: a tela sai, e o login diz o que se perdeu.
+   */
+  const [edicoesPerdidas, setEdicoesPerdidas] = useState(false);
 
   // Leituras fora do desenho (ouvintes de foco e do canal) precisam do valor
   // atual, não do capturado quando o ouvinte foi criado.
@@ -282,6 +289,19 @@ export function AutenticacaoApp() {
     setEstado("login");
   }, []);
 
+  /**
+   * T200 — a sessão terminou por fora desta aba (o servidor respondeu 401).
+   * Nada é salvo nem tentado: sai como no logout e, se havia algo não salvo,
+   * o login avisa que foi perdido.
+   */
+  const encerrarSessaoPorFora = useCallback(() => {
+    const resumo = registro.obter();
+    setEdicoesPerdidas(
+      resumo.pendentes.length > 0 || resumo.salvando.length > 0,
+    );
+    encerrarSessaoLocalmente();
+  }, [registro, encerrarSessaoLocalmente]);
+
   /** O módulo em que a pessoa está, ou `null` no Hub. */
   const destinoAtual = useCallback((): string | null => {
     const aberto = destinoAbertoRef.current;
@@ -324,8 +344,9 @@ export function AutenticacaoApp() {
       // admissão, por exemplo). A rota sai aqui; o shell novo escreve a do
       // destino reduzido.
       if (destinoDaRota(window.location.hash) !== null) {
+        // T200 — o estado (com o índice do histórico) fica; só a rota sai.
         window.history.replaceState(
-          null,
+          window.history.state,
           "",
           window.location.pathname + window.location.search,
         );
@@ -379,12 +400,12 @@ export function AutenticacaoApp() {
       // saída de `SessoesAtivasPanel`. Outras falhas não mudam nada — a
       // próxima reconferência tenta de novo.
       if (erro instanceof ApiError && erro.status === 401) {
-        encerrarSessaoLocalmente();
+        encerrarSessaoPorFora();
       }
     } finally {
       reconferindoRef.current = false;
     }
-  }, [registro, aplicarContextoAlterado, encerrarSessaoLocalmente]);
+  }, [registro, aplicarContextoAlterado, encerrarSessaoPorFora]);
 
   // T189 — quando reconferir: aviso de outra aba, aba visível de novo, janela
   // com foco de novo. Só com o ator conhecido.
@@ -511,7 +532,20 @@ export function AutenticacaoApp() {
 
   if (estado === "login") {
     return comContexto(
-      <LoginScreen onLoginSuccess={() => setEstado("resolvendo-ator")} />,
+      <>
+        {edicoesPerdidas ? (
+          <p className="autenticacao-app__edicoes-perdidas" role="alert">
+            Sua sessão foi encerrada. As alterações que não tinham sido salvas
+            foram perdidas.
+          </p>
+        ) : null}
+        <LoginScreen
+          onLoginSuccess={() => {
+            setEdicoesPerdidas(false);
+            setEstado("resolvendo-ator");
+          }}
+        />
+      </>,
     );
   }
 
@@ -571,7 +605,7 @@ export function AutenticacaoApp() {
         // pelo login. Desde a T163 ela inclui também a empresa ativa.
         key={chaveDaArvore}
         onLogout={() => void handleLogout()}
-        onSessaoAtualEncerrada={encerrarSessaoLocalmente}
+        onSessaoAtualEncerrada={encerrarSessaoPorFora}
         mfaDisponivel={ator.mfaAvailable === true}
         papelDoAtor={ator.role}
         // T164 — a empresa ATIVA desce para as telas que precisam dizer em
@@ -601,7 +635,12 @@ export function AutenticacaoApp() {
         className="autenticacao-app__arvore"
         {...(contextoAlterado ? FUNDO_INERTE : {})}
       >
-        {arvore}
+        {/* T200 — a guarda de saída do shell: menu, Hub, Sair, abas, rotas,
+            voltar/avançar e o aviso nativo do navegador. Fica suspensa
+            enquanto o aviso de empresa trocada (T189) está na tela. */}
+        <ProvedorDeGuarda suspensa={contextoAlterado !== null}>
+          {arvore}
+        </ProvedorDeGuarda>
       </div>
       {contextoAlterado ? (
         <AvisoContextoAlterado
