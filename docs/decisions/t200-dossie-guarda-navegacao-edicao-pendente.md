@@ -1,7 +1,7 @@
 # T200 — Dossiê: guarda de navegação com edição pendente
 
-**Situação:** preparação de decisão. Nenhuma linha de produto muda nesta
-entrega; as decisões da seção 11 vêm antes de qualquer implementação.
+**Situação:** decisões G-1 a G-8 aprovadas em 2026-11-03 (seção 11) e
+implementadas na mesma branch; a entrega está descrita na seção 14.
 **Base:** `main` no squash `6b3d24d` (T199 integrada, PR #192).
 **Por que agora:** a guarda global de navegação é o gate de produção do módulo
 Pessoas registrado desde a T198 e mantido fora do escopo da T199.
@@ -266,7 +266,14 @@ B + todas as telas passam a declarar pendência só quando algo foi alterado
 **Recomendação:** **Opção B**, em uma entrega, mantendo a granularidade atual
 (seguro por excesso) e registrando C como próxima evolução.
 
-## 11. Decisões pendentes
+## 11. Decisões (aprovadas em 2026-11-03)
+
+As oito decisões foram aprovadas como recomendadas: opção B; aviso nativo só
+com pendência ou salvamento; ficha e Nova admissão no diálogo da guarda, troca
+de empresa no diálogo da T189; granularidade atual; salvamento em andamento
+bloqueia com aviso, sem descarte e sem seguir sozinho; Segurança e portal
+demonstrativo fora; sessão encerrada por fora sai e avisa a perda; o diálogo
+lista os rótulos das telas.
 
 | Id  | Pergunta                                                                                                             | Recomendação                                                                                    |
 | --- | -------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
@@ -307,7 +314,7 @@ registro da T189:
 | 11  | título da referência rápida               | `pessoas/ModalReferenciaRapida.tsx`          | as do shell (dentro da Nova admissão)                                        |
 | 12  | "Nova admissão"                           | `pessoas/NovaAdmissaoScreen.tsx`             | as do shell e as saídas próprias da página (trilha, Cancelar, Conferir)      |
 | 13  | "Documentos"                              | `pessoas/PessoasDocumentosScreen.tsx`        | as do shell e a troca de aba de Pessoas                                      |
-| 14  | "Registro de ponto"                       | `ponto/VisaoPeriodoScreen.tsx`               | as do shell e a troca de aba do Ponto                                        |
+| 14  | "Registro de ponto"                       | `ponto/VisaoPeriodoScreen.tsx`               | as do shell (a troca de aba do Ponto é guardada, mas hoje só há uma aba)     |
 | 15  | "Horário de trabalho"                     | `pessoas/PessoasHorarioScreen.tsx`           | as do shell, a troca de aba de Pessoas e a saída da aba Jornada do dashboard |
 | 16  | "Solicitações"                            | `pessoas/SolicitacoesScreen.tsx`             | as do shell e a troca de aba de Pessoas                                      |
 
@@ -319,3 +326,72 @@ empresa continua com o diálogo próprio da T189 (G-3).
 o portal demonstrativo "Minhas solicitações" (não grava nada) e as buscas e
 filtros das listagens (não são edição). A granularidade fina ("só pergunta
 depois de alterar") fica fora (G-4, opção C).
+
+## 14. Entrega
+
+**Um ponto no shell.** `app/guardaDeSaida.tsx` expõe `useGuardaDeSaida()` com
+`solicitarSaida({ executar, area? })`: sem pendência, `executar` roda na hora;
+com pendência, abre o diálogo e só a escolha explícita "Sair sem salvar" roda
+`executar`. Quem chama não sabe de diálogo nem de registro. O provedor envolve
+o shell autenticado em `AutenticacaoApp` e lê o mesmo registro de edições da
+T189 (`edicoesPendentes.tsx`), que não muda de forma: só ganha **áreas**.
+
+**Áreas.** Uma saída que desmonta só parte da tela pergunta só pelas edições
+dessa parte. `AreaDeEdicao` marca a subárvore e `useEdicaoEmAndamento`
+registra o caminho de áreas; `resumir(area)` filtra. As áreas desta entrega
+são: ficha, painel de Pessoas (abas internas), aba Jornada do dashboard,
+painel de Cadastros (abas internas) e painel do Ponto. Uma saída sem área
+(outro destino, Hub, Sair) pergunta por tudo.
+
+**Quem chama a guarda.** Menu lateral e atalhos do shell (`irPara`), Hub, Sair,
+a trilha e o "voltar" da ficha, as abas internas de Pessoas, Cadastros e Ponto,
+a saída da aba Jornada do dashboard, a trilha e o Cancelar da Nova admissão,
+voltar/avançar e a rota digitada. As confirmações locais da ficha e da Nova
+admissão saíram: as duas usam o diálogo único. A frase da T179 ("Nada da Nova
+admissão foi salvo." ou o aviso do envio incerto) passou a ser um `aviso` da
+declaração da tela, que o diálogo exibe abaixo da lista.
+
+**Diálogo.** `role="alertdialog"`, modal, com título e descrição ligados por
+`aria-labelledby`/`aria-describedby`. A descrição lista os rótulos das telas
+(nunca o conteúdo digitado). "Continuar editando" é o padrão: recebe o foco
+inicial e responde ao Escape. O foco fica preso no diálogo e o resto da árvore
+fica `inert`. Ao fechar, o foco volta à origem; se a origem saiu da tela, vai
+ao conteúdo principal. A 375 px os botões ocupam a largura e não há rolagem
+horizontal.
+
+**Salvamento em andamento.** O diálogo explica que há um salvamento em curso,
+oferece só "Entendi" e não navega sozinho quando ele termina (G-5).
+
+**Voltar/avançar e rota digitada.** Cada entrada do histórico escrita pelo
+shell leva o próprio índice em `history.state` (`evolliIndice`), e as
+correções no lugar o preservam. Ao chegar uma navegação do navegador que
+desmontaria algo pendente, o shell volta o navegador para a entrada que a tela
+descreve (`history.go(-passo)`, ou `replaceState` para a rota digitada), sem
+criar entrada, e pergunta. "Sair sem salvar" refaz o mesmo passo, marcado como
+aceito. O `popstate` e o `hashchange` do mesmo passo são deduplicados (sem
+desfazer dois passos), e uma escolha feita antes de o navegador terminar de
+desfazer espera a reversão chegar. Parâmetros e fragmento da URL são
+preservados. Abrir a ficha a partir da listagem não pergunta (a listagem fica
+montada); trocar de ficha ou sair dela pergunta pela área da ficha.
+
+**Recarregar e fechar a aba.** `beforeunload` só fica registrado enquanto há
+pendência ou salvamento; o texto é o do navegador. A navegação do navegador
+para outro documento (por exemplo, voltar além da primeira entrada do shell)
+também só conta com esse aviso.
+
+**Duas abas.** As edições ficam na aba: nada delas vai ao `BroadcastChannel`.
+O canal da T189 (contexto empresarial) segue igual, e a troca de empresa
+continua com o diálogo próprio da T189.
+
+**Sessão encerrada por fora.** Quando a reconferência recebe 401 (ou a sessão
+atual é revogada em Sessões ativas), o shell sai sem tentar salvar. Se havia
+pendência ou salvamento, o login mostra "Sua sessão foi encerrada. As
+alterações que não tinham sido salvas foram perdidas." (`role="alert"`), que
+some no próximo login. Sair por escolha não mostra esse aviso.
+
+**Ponto.** A troca de aba do Ponto está guardada, mas no modo funcional só
+existe a aba "Visão do período"; a guarda dessa troca fica dormente até haver
+uma segunda aba funcional.
+
+**Sem mudança em:** API, schema, migration, RBAC, auditoria, Docker, seed,
+dependências, lockfile e workflows.

@@ -2818,24 +2818,34 @@ correção no lugar.
 
 **Fora de escopo:** guarda global de navegação do shell, "Referência técnica", exportação, ausências, férias, escala, organograma, CPF, salário, contatos na visão coletiva, documentos, R2, foto, portal, benefícios, pesquisas, comentários, schema, migration, RBAC novo, seed, Docker, dependências, promoção e merge.
 
-## Guarda de navegação com edição pendente — T200 (em preparação)
+## Guarda global de edição pendente — T200 (em implementação)
 
-| Tarefa | Estado            | Resultado principal                                                                                       |
-| ------ | ----------------- | --------------------------------------------------------------------------------------------------------- |
-| T200   | **Em preparação** | Preparação de decisão da guarda de navegação do shell para edição pendente (gate de produção de Pessoas). |
+| Tarefa | Estado               | Resultado principal                                                                                                  |
+| ------ | -------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| T200   | **Em implementação** | Guarda de saída única no shell para edição pendente: menu, Hub, Sair, abas internas, voltar/avançar, rota e recarga. |
 
-**Escopo da T200:** só preparação de decisão, no
+**Escopo da T200:** a guarda global de navegação do shell, gate de produção do
+módulo Pessoas registrado desde a T198, conforme o
 [dossiê](../docs/decisions/t200-dossie-guarda-navegacao-edicao-pendente.md):
-levantamento das telas com edição pendente e de cada saída (rota interna, menu,
-Hub, Sair, voltar/avançar, recarregar/fechar aba, troca de empresa e rota
-direta), arquitetura reutilizável no shell, limites do aviso nativo do
-navegador, acessibilidade, segurança, duas abas, matriz de permissões e testes,
-e até três opções de escopo com recomendação. A guarda é o gate de produção do
-módulo Pessoas registrado desde a T198.
+um ponto único (`solicitarSaida`) chamado pelo menu lateral, Hub, Sair, abas
+internas que desmontam, voltar/avançar, rota digitada e, pelo aviso nativo,
+recarregar e fechar a aba; um diálogo único da Evolli, para o qual migram as
+confirmações da ficha e da Nova admissão. As 16 telas que declaram edição
+ficam cobertas (seção 13).
 
-**Decisões pendentes:** seção 11 do dossiê.
+**Decisões aprovadas (2026-11-03):** G-1 a G-8 (seção 11 do dossiê): opção B;
+aviso nativo só com pendência ou salvamento; troca de empresa segue no diálogo
+da T189; granularidade atual; salvamento em andamento bloqueia sem descarte e
+sem seguir sozinho; Segurança e portal demonstrativo fora; sessão encerrada por
+fora sai e avisa a perda; o diálogo lista os rótulos das telas.
 
-**Fora de escopo:** implementação de produto, API, schema, migration, RBAC, auditoria, Docker, seed, dependências, workflow, push, PR, promoção e merge.
+**Entrega:** seção 14 do dossiê — áreas de edição no registro da T189, índice
+próprio em `history.state` para desfazer e refazer a navegação do navegador
+sem entrada extra, edições locais à aba (nada no `BroadcastChannel`) e aviso de
+perda no login. A troca de aba do Ponto fica guardada, mas dormente: no modo
+funcional só há uma aba.
+
+**Fora de escopo:** painel de Segurança, portal demonstrativo "Minhas solicitações", granularidade fina, rascunho automático, edições entre abas, API, schema, migration, RBAC, auditoria, Docker, seed, dependências, lockfile, workflows, promoção e merge.
 
 ## Próxima ação autorizável
 

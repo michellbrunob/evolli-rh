@@ -12,14 +12,14 @@
   },
   "nextTask": {
     "id": "T200",
-    "status": "guarda_navegacao_edicao_pendente_em_preparacao",
-    "reason": "T199 integrada em main pela PR #192 (squash 6b3d24d72e080cbf9cce59f6246715b2bfb84b5e), com a CI de push 3/3 verde (run 41646155827). A T200 prepara a decisao da guarda de navegacao do shell para edicao pendente (docs/decisions/t200-dossie-guarda-navegacao-edicao-pendente.md): hoje so a trilha da ficha e a troca de empresa confirmam o descarte; menu lateral, Hub, Sair, voltar/avancar e recarregar podem perder alteracoes. Levantamento das telas e das saidas, arquitetura reutilizavel no shell, limites do aviso nativo do navegador, acessibilidade, seguranca, duas abas, matriz de permissoes e testes, e ate tres opcoes de escopo. So preparacao: sem produto, API, schema, migration, RBAC, auditoria, seed ou dependencia."
+    "status": "guarda_navegacao_edicao_pendente_em_implementacao",
+    "reason": "T199 integrada em main pela PR #192 (squash 6b3d24d72e080cbf9cce59f6246715b2bfb84b5e), com a CI de push 3/3 verde (run 41646155827). A T200 implementa a guarda global de edicao pendente aprovada em G-1 a G-8 (docs/decisions/t200-dossie-guarda-navegacao-edicao-pendente.md): ponto unico de saida no shell, dialogo unico da Evolli para menu lateral, Hub, Sair, abas internas, voltar/avancar e rota digitada, aviso nativo so com pendencia, indice proprio em history.state, aviso de perda apos sessao encerrada por fora e a troca de empresa mantida na T189. Sem API, schema, migration, RBAC, auditoria, seed ou dependencia."
   },
   "openDeliveries": [
     {
       "id": "T200",
       "pullRequest": null,
-      "status": "guarda_navegacao_edicao_pendente_em_preparacao"
+      "status": "guarda_navegacao_edicao_pendente_em_implementacao"
     }
   ],
   "requiredArtifacts": [

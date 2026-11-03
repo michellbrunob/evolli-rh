@@ -3001,19 +3001,32 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       na visão coletiva, documentos, R2, foto, portal, benefícios, pesquisas, comentários,
       schema, migration, RBAC novo, seed, Docker, dependências, promoção e merge.
 
-97. **T200 - Guarda de navegação com edição pendente (preparação de decisão)**
-    - **Estado:** **em preparação**. Branch `codex/t200-guarda-navegacao-edicao-pendente`, a
-      partir do squash `6b3d24d72e080cbf9cce59f6246715b2bfb84b5e` (T199 integrada, PR #192).
-    - **Objetivo:** decidir a guarda de navegação do shell para edição pendente — hoje só a
-      trilha da ficha e a troca de empresa confirmam o descarte; menu lateral, Hub, Sair,
-      voltar/avançar e recarregar podem perder alterações — no
-      [dossiê](../docs/decisions/t200-dossie-guarda-navegacao-edicao-pendente.md): levantamento
-      das telas com edição pendente e de cada saída, arquitetura reutilizável no shell, limites
-      do aviso nativo do navegador, acessibilidade, segurança, respostas pendentes, duas abas,
-      matriz de permissões e testes, e até três opções de escopo com recomendação.
-    - **Decisões pendentes:** as da seção 11 do dossiê.
-    - **Fora de escopo:** implementação de produto, API, schema, migration, RBAC, auditoria,
-      Docker, seed, dependências, workflow, push, PR, promoção e merge.
+97. **T200 - Guarda global de edição pendente**
+    - **Estado:** **em implementação** (entrega em PR Draft). Branch
+      `codex/t200-guarda-navegacao-edicao-pendente`, a partir do squash
+      `6b3d24d72e080cbf9cce59f6246715b2bfb84b5e` (T199 integrada, PR #192).
+    - **Objetivo:** guarda de navegação do shell para edição pendente — antes só a trilha da
+      ficha, a Nova admissão e a troca de empresa confirmavam o descarte; menu lateral, Hub,
+      Sair, abas internas, voltar/avançar, rota digitada e recarregar podiam perder alterações
+      — conforme o [dossiê](../docs/decisions/t200-dossie-guarda-navegacao-edicao-pendente.md).
+    - **Decisões aprovadas (2026-11-03):** G-1 a G-8 da seção 11 do dossiê — opção B (guarda
+      completa no shell); aviso nativo só com pendência ou salvamento; ficha e Nova admissão no
+      diálogo único, troca de empresa no diálogo da T189; granularidade atual; salvamento em
+      andamento bloqueia com aviso, sem descarte e sem seguir sozinho; Segurança e portal
+      demonstrativo fora; sessão encerrada por fora sai e avisa a perda; o diálogo lista os
+      rótulos das telas.
+    - **Entrega (seção 14 do dossiê):** `useGuardaDeSaida().solicitarSaida` como ponto único
+      no shell; áreas de edição no registro da T189 para saídas parciais (ficha, abas de
+      Pessoas, aba Jornada do dashboard, abas de Cadastros e do Ponto); diálogo
+      `alertdialog` com "Continuar editando" como padrão e Escape, foco preso e devolvido;
+      índice próprio em `history.state` para desfazer e refazer voltar/avançar e a rota
+      digitada sem entrada extra; `beforeunload` só com pendência ou salvamento; aviso de
+      perda no login após sessão encerrada por fora; as 16 telas que declaram edição cobertas
+      (seção 13). Sem API, schema, migration, RBAC, auditoria, Docker, seed, dependência ou
+      workflow.
+    - **Fora de escopo:** painel de Segurança, portal demonstrativo "Minhas solicitações",
+      granularidade fina (opção C), rascunho salvo automaticamente, transmissão de edições
+      entre abas, migração do diálogo da troca de empresa, promoção e merge.
 
 ## Regra obrigatória para as próximas tarefas
 
