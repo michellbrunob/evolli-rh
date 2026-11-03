@@ -107,6 +107,27 @@
   color: var(--color-ink);
 }
 
+/* Foco por programa (volta dos totais depois de uma falha); o anel vem de
+   `:focus-visible`. */
+.colaboradores-screen__indicadores-titulo:focus {
+  outline-offset: 2px;
+}
+
+/* Totais que não carregaram: aviso e nova tentativa, no lugar dos cartões. */
+.colaboradores-screen__totais-falha {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm) var(--space-md);
+  min-width: 0;
+}
+
+.colaboradores-screen__totais-falha-texto {
+  margin: 0;
+  color: var(--color-ink);
+  overflow-wrap: anywhere;
+}
+
 /* Distribuição dos ativos por tipo: barra decorativa + legenda em texto. */
 .colaboradores-screen__distribuicao {
   display: grid;

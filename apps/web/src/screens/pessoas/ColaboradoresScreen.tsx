@@ -379,6 +379,19 @@ export function ColaboradoresScreen({
    */
   const [contadores, setContadores] =
     useState<ContadoresColaboradoresApi | null>(null);
+  /**
+   * T199 — a leitura mínima dos contadores (aba Jornada) falhou: em vez de
+   * "…" para sempre, um aviso e "Tentar novamente", que relê SÓ os
+   * contadores — a visão de jornadas ao lado continua montada.
+   */
+  const [falhaContadores, setFalhaContadores] = useState(false);
+  const [repetindoContadores, setRepetindoContadores] = useState(false);
+  const [tentativaContadores, setTentativaContadores] = useState(0);
+  /** Anúncio único da falha e da volta dos totais (região sempre montada). */
+  const [anuncioTotais, setAnuncioTotais] = useState("");
+  /** Na volta depois de uma falha, o botão some: o foco vai ao título. */
+  const focarTotaisRef = useRef(false);
+  const tituloTotaisRef = useRef<HTMLHeadingElement | null>(null);
   // T164 — página e total da RESPOSTA: o servidor é quem sabe o conjunto.
   const [paginaRespondida, setPaginaRespondida] = useState(estado.pagina);
   const [total, setTotal] = useState(0);
@@ -422,6 +435,7 @@ export function ColaboradoresScreen({
         setTotal(resp.total);
         setTamanhoPaginaEfetivo(tamanhoDePaginaValido(resp.tamanhoPagina));
         setContadores(resp.contadores);
+        setFalhaContadores(false);
         setStatusCarregamento("dados");
       } catch {
         if (pedido !== pedidoListaRef.current) return;
@@ -493,21 +507,50 @@ export function ColaboradoresScreen({
   ]);
 
   // Os indicadores aparecem também na aba de jornada: uma leitura mínima só
-  // dos contadores, sem grupo nem filtros.
+  // dos contadores, sem grupo nem filtros. Falhou: aviso e nova tentativa.
+  const falhaContadoresRef = useRef(falhaContadores);
+  falhaContadoresRef.current = falhaContadores;
   useEffect(() => {
     if (temTabela || contadores !== null) return;
     let vigente = true;
     listarColaboradores({ pagina: 1, tamanhoPagina: 1 })
       .then((resp) => {
-        if (vigente) setContadores(resp.contadores);
+        if (!vigente) return;
+        setContadores(resp.contadores);
+        if (falhaContadoresRef.current) {
+          focarTotaisRef.current = true;
+          setAnuncioTotais("Totais de colaboradores carregados.");
+        }
+        setFalhaContadores(false);
       })
       .catch(() => {
-        // Os cartões seguem com "…"; a aba de jornada tem o próprio aviso.
+        if (!vigente) return;
+        setFalhaContadores(true);
+        setAnuncioTotais(
+          "Não foi possível carregar os totais de colaboradores.",
+        );
+      })
+      .finally(() => {
+        if (vigente) setRepetindoContadores(false);
       });
     return () => {
       vigente = false;
     };
-  }, [temTabela, contadores]);
+  }, [temTabela, contadores, tentativaContadores]);
+
+  useEffect(() => {
+    if (contadores === null || !focarTotaisRef.current) return;
+    focarTotaisRef.current = false;
+    tituloTotaisRef.current?.focus();
+  }, [contadores]);
+
+  function repetirContadores() {
+    if (repetindoContadores) return;
+    // Limpa o anúncio antes: a mesma falha, de novo, é anunciada de novo.
+    setAnuncioTotais("");
+    setRepetindoContadores(true);
+    setTentativaContadores((n) => n + 1);
+  }
 
   // T198 — volta da ficha: relê a página atual, com a mesma consulta.
   const estadoRef = useRef(estado);
@@ -626,9 +669,22 @@ export function ColaboradoresScreen({
     });
   }
 
+  /**
+   * T199 — busca, lotação e tipo saem numa ÚNICA mudança de estado: duas
+   * (filtros, depois página) partiriam do mesmo estado antigo, e a segunda
+   * devolveria os filtros que a primeira tirou.
+   */
   function limparBuscaEFiltros() {
-    limparFiltros();
-    limparBusca();
+    mudarEstado({
+      ...estado,
+      pagina: 1,
+      departamentoId: null,
+      cargoId: null,
+      tipo: null,
+    });
+    setBuscaDigitada("");
+    setBuscaAplicada("");
+    campoBuscaRef.current?.focus();
   }
 
   /** O vazio de uma consulta filtrada: diz o que não foi achado e como desfazer. */
@@ -847,69 +903,96 @@ export function ColaboradoresScreen({
         <h2
           id="colaboradores-indicadores-titulo"
           className="colaboradores-screen__indicadores-titulo"
+          ref={tituloTotaisRef}
+          tabIndex={-1}
         >
           {empresaAtiva
             ? `Totais de ${empresaAtiva.nome}, sem filtros`
             : "Totais no seu escopo, sem filtros"}
         </h2>
-        <dl className="colaboradores-screen__cartoes">
-          {(
-            [
-              ["Ativos", contadores?.ativos],
-              ["Em admissão", contadores?.emAdmissao],
-              ["Desligados", contadores?.desligados],
-              [
-                empresaAtiva ? "Total nesta empresa" : "Total no seu escopo",
-                contadores?.total,
-              ],
-            ] as const
-          ).map(([rotulo, numero]) => (
-            <div key={rotulo} className="colaboradores-screen__cartao">
-              <dt>{rotulo}</dt>
-              <dd>{valor(numero)}</dd>
-            </div>
-          ))}
-        </dl>
-        <div className="colaboradores-screen__distribuicao">
-          <h3 className="colaboradores-screen__distribuicao-titulo">
-            Ativos por tipo de vínculo
-          </h3>
-          {contadores === null ? (
-            <p className="colaboradores-screen__distribuicao-vazio">…</p>
-          ) : distribuicao.length === 0 ? (
-            <p className="colaboradores-screen__distribuicao-vazio">
-              Nenhum colaborador ativo {onde}.
+        <p
+          className="colaboradores-screen__anuncio-totais colaboradores-screen__so-leitor"
+          role="status"
+        >
+          {anuncioTotais}
+        </p>
+        {!temTabela && contadores === null && falhaContadores ? (
+          <div className="colaboradores-screen__totais-falha">
+            <p className="colaboradores-screen__totais-falha-texto">
+              Não foi possível carregar os totais de colaboradores.
             </p>
-          ) : (
-            <>
-              {/* Barra só visual; a legenda em texto diz os mesmos números. */}
-              <div
-                className="colaboradores-screen__barra-tipos"
-                aria-hidden="true"
-              >
-                {distribuicao.map((d) => (
-                  <span
-                    key={d.tipo}
-                    className={`colaboradores-screen__barra-tipo colaboradores-screen__barra-tipo--${d.tipo}`}
-                    style={{ flexGrow: d.quantidade }}
-                  />
-                ))}
-              </div>
-              <ul className="colaboradores-screen__legenda-tipos">
-                {distribuicao.map((d) => (
-                  <li key={d.tipo}>
-                    <span
-                      className={`colaboradores-screen__marcador colaboradores-screen__barra-tipo--${d.tipo}`}
-                      aria-hidden="true"
-                    />
-                    {ROTULO_TIPO_DE_VINCULO[d.tipo]}:{" "}
-                    <strong>{d.quantidade}</strong>
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-        </div>
+            <Button
+              variant="secondary"
+              onClick={repetirContadores}
+              aria-disabled={repetindoContadores}
+            >
+              Tentar novamente
+            </Button>
+          </div>
+        ) : (
+          <>
+            <dl className="colaboradores-screen__cartoes">
+              {(
+                [
+                  ["Ativos", contadores?.ativos],
+                  ["Em admissão", contadores?.emAdmissao],
+                  ["Desligados", contadores?.desligados],
+                  [
+                    empresaAtiva
+                      ? "Total nesta empresa"
+                      : "Total no seu escopo",
+                    contadores?.total,
+                  ],
+                ] as const
+              ).map(([rotulo, numero]) => (
+                <div key={rotulo} className="colaboradores-screen__cartao">
+                  <dt>{rotulo}</dt>
+                  <dd>{valor(numero)}</dd>
+                </div>
+              ))}
+            </dl>
+            <div className="colaboradores-screen__distribuicao">
+              <h3 className="colaboradores-screen__distribuicao-titulo">
+                Ativos por tipo de vínculo
+              </h3>
+              {contadores === null ? (
+                <p className="colaboradores-screen__distribuicao-vazio">…</p>
+              ) : distribuicao.length === 0 ? (
+                <p className="colaboradores-screen__distribuicao-vazio">
+                  Nenhum colaborador ativo {onde}.
+                </p>
+              ) : (
+                <>
+                  {/* Barra só visual; a legenda em texto diz os mesmos números. */}
+                  <div
+                    className="colaboradores-screen__barra-tipos"
+                    aria-hidden="true"
+                  >
+                    {distribuicao.map((d) => (
+                      <span
+                        key={d.tipo}
+                        className={`colaboradores-screen__barra-tipo colaboradores-screen__barra-tipo--${d.tipo}`}
+                        style={{ flexGrow: d.quantidade }}
+                      />
+                    ))}
+                  </div>
+                  <ul className="colaboradores-screen__legenda-tipos">
+                    {distribuicao.map((d) => (
+                      <li key={d.tipo}>
+                        <span
+                          className={`colaboradores-screen__marcador colaboradores-screen__barra-tipo--${d.tipo}`}
+                          aria-hidden="true"
+                        />
+                        {ROTULO_TIPO_DE_VINCULO[d.tipo]}:{" "}
+                        <strong>{d.quantidade}</strong>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </div>
+          </>
+        )}
       </section>
 
       <div className="colaboradores-screen__painel">
@@ -974,6 +1057,12 @@ export function ColaboradoresScreen({
             />
           ) : (
             <>
+              {/* T199 — o título da seção da aba: os estados vazios (h3)
+                  e o erro ficam abaixo dele, e não de "Totais…". Só para
+                  leitor de tela; a aba selecionada já o mostra. */}
+              <h2 className="colaboradores-screen__so-leitor">
+                {`Colaboradores — ${ROTULO_DA_ABA[aba]}`}
+              </h2>
               <div className="colaboradores-screen__filtros">
                 <form
                   role="search"
@@ -1201,12 +1290,12 @@ export function ColaboradoresScreen({
                   aria-labelledby="colaboradores-erro-titulo"
                 >
                   <StatusBadge variant="danger">Erro</StatusBadge>
-                  <h2
+                  <h3
                     id="colaboradores-erro-titulo"
                     className="colaboradores-screen__section-title"
                   >
                     Não foi possível carregar os colaboradores
-                  </h2>
+                  </h3>
                   <p>
                     Verifique sua conexão e tente novamente. Se o problema
                     persistir, contate o suporte.
@@ -1239,6 +1328,28 @@ export function ColaboradoresScreen({
                     >
                       Carregando colaboradores…
                     </p>
+                  ) : colaboradores.length === 0 && total > 0 ? (
+                    /* T199 — vazia, mas a consulta tem gente (o servidor
+                       diz): página além do fim (URL, voltar, conjunto que
+                       encolheu). Com ou sem busca e filtros, que ficam. */
+                    <EmptyState
+                      headingLevel={3}
+                      icon="—"
+                      title="Nenhum colaborador nesta página"
+                      description="Esta página voltou vazia, embora a consulta tenha colaboradores: o conjunto pode ter mudado desde a última leitura."
+                      action={
+                        <Button
+                          variant="secondary"
+                          onClick={() =>
+                            estado.pagina === 1
+                              ? void carregarDados(estado, buscaAplicada)
+                              : mudarEstado({ ...estado, pagina: 1 })
+                          }
+                        >
+                          Ir para a primeira página
+                        </Button>
+                      }
+                    />
                   ) : colaboradores.length === 0 ? (
                     filtrando ? (
                       (() => {
@@ -1260,26 +1371,6 @@ export function ColaboradoresScreen({
                           />
                         );
                       })()
-                    ) : contadores !== null &&
-                      (totalDaAba(aba, contadores) ?? 0) > 0 ? (
-                      <EmptyState
-                        headingLevel={3}
-                        icon="—"
-                        title="Nenhum colaborador nesta página"
-                        description="Esta página voltou vazia, embora o grupo tenha colaboradores: o conjunto pode ter mudado desde a última leitura."
-                        action={
-                          <Button
-                            variant="secondary"
-                            onClick={() =>
-                              estado.pagina === 1
-                                ? void carregarDados(estado, buscaAplicada)
-                                : mudarEstado({ ...estado, pagina: 1 })
-                            }
-                          >
-                            Ir para a primeira página
-                          </Button>
-                        }
-                      />
                     ) : (
                       (() => {
                         const vazio = vazioDaAba();

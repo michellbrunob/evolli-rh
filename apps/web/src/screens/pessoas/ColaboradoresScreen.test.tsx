@@ -12,7 +12,11 @@ import { useState } from "react";
 import { ColaboradoresScreen } from "./ColaboradoresScreen";
 import { PessoasScreen } from "./PessoasScreen";
 import { FichaColaboradorScreen } from "./FichaColaboradorScreen";
-import type { RotaDaFicha } from "../../app/rotasDoShell";
+import type {
+  EstadoDaListagem,
+  OpcoesDaMudancaDaListagem,
+  RotaDaFicha,
+} from "../../app/rotasDoShell";
 import { diaDeHoje, proximoDiaCivil } from "./jornadaColaborador";
 import { listarVinculosHorario } from "../../api/vinculoHorarioClient";
 import { listarTabelasHorario } from "../../api/horariosClient";
@@ -5026,5 +5030,488 @@ describe("T199 — ids de lotação da URL conferidos nos catálogos", () => {
         expect.objectContaining({ pagina: 3, tipoVinculo: "clt" }),
       ),
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T199 (revisão final da PR) — B1: página fora do intervalo, com ou sem
+// filtros e busca; B2: "Limpar busca e filtros" numa única mudança; cartões
+// que se recuperam de falha na aba Jornada; título da seção da tabela.
+// ---------------------------------------------------------------------------
+
+/** O dashboard com o estado guardado por fora, como o shell faz com a URL. */
+function DashboardComEstado({
+  inicial,
+  onMudanca,
+  atualizacao = 0,
+}: {
+  readonly inicial: EstadoDaListagem;
+  readonly onMudanca: (
+    estado: EstadoDaListagem,
+    opcoes?: OpcoesDaMudancaDaListagem,
+  ) => void;
+  readonly atualizacao?: number;
+}) {
+  const [estado, setEstado] = useState(inicial);
+  return (
+    <ColaboradoresScreen
+      estado={estado}
+      atualizacao={atualizacao}
+      onEstadoChange={(novo, opcoes) => {
+        if (opcoes) onMudanca(novo, opcoes);
+        else onMudanca(novo);
+        setEstado(novo);
+      }}
+    />
+  );
+}
+
+const ESTADO_PADRAO: EstadoDaListagem = {
+  aba: "ativos",
+  pagina: 1,
+  departamentoId: null,
+  cargoId: null,
+  tipo: null,
+};
+
+const CONTADORES_CHEIOS: ContadoresColaboradoresApi = {
+  ...contados([]),
+  ativos: 30,
+  inativos: 3,
+  desligados: 3,
+  total: 33,
+};
+
+describe("T199 (revisão) — B1: página fora do intervalo", () => {
+  it("com aba Todos, tipo PJ e página 4 (servidor: vazia, total 3): 'nesta página', e a primeira página mantém o PJ", async () => {
+    vi.mocked(listarColaboradores).mockImplementation(async (consulta) =>
+      consulta?.pagina === 4
+        ? {
+            itens: [],
+            pagina: 4,
+            tamanhoPagina: 20,
+            total: 3,
+            contadores: CONTADORES_CHEIOS,
+          }
+        : { ...paginado([colaborador1]), contadores: CONTADORES_CHEIOS },
+    );
+    const onMudanca = vi.fn();
+    render(
+      <DashboardComEstado
+        inicial={{ ...ESTADO_PADRAO, aba: "todos", tipo: "pj", pagina: 4 }}
+        onMudanca={onMudanca}
+      />,
+    );
+    expect(
+      await screen.findByRole("heading", {
+        name: "Nenhum colaborador nesta página",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", {
+        name: "Nenhum colaborador com estes filtros",
+      }),
+    ).toBeNull();
+    expect(screen.queryByRole("button", { name: "Limpar filtros" })).toBeNull();
+    // O filtro continua à vista e removível.
+    expect(
+      screen.getByRole("button", {
+        name: "Remover filtro de tipo de vínculo: PJ",
+      }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Ir para a primeira página" }),
+    );
+    expect(onMudanca).toHaveBeenLastCalledWith({
+      ...ESTADO_PADRAO,
+      aba: "todos",
+      tipo: "pj",
+      pagina: 1,
+    });
+    await waitFor(() =>
+      expect(listarColaboradores).toHaveBeenLastCalledWith({
+        pagina: 1,
+        tamanhoPagina: 20,
+        tipoVinculo: "pj",
+      }),
+    );
+    await screen.findByRole("table", { name: "Colaboradores — Todos" });
+  });
+
+  it("com busca: 'nesta página', e a primeira página mantém a busca", async () => {
+    vi.mocked(listarColaboradores).mockImplementation(async (consulta) => ({
+      itens: [colaborador1],
+      pagina: consulta?.pagina ?? 1,
+      tamanhoPagina: 20,
+      total: 45,
+      contadores: CONTADORES_CHEIOS,
+    }));
+    render(<DashboardComEstado inicial={ESTADO_PADRAO} onMudanca={vi.fn()} />);
+    await screen.findByRole("table", { name: /^Colaboradores — Ativos/ });
+    buscar("Ana");
+    await waitFor(() =>
+      expect(listarColaboradores).toHaveBeenLastCalledWith(
+        expect.objectContaining({ busca: "Ana", pagina: 1 }),
+      ),
+    );
+    await screen.findByText("Página 1 de 3");
+    // O conjunto encolheu entre uma página e outra.
+    vi.mocked(listarColaboradores).mockImplementation(async (consulta) => ({
+      itens: [],
+      pagina: consulta?.pagina ?? 1,
+      tamanhoPagina: 20,
+      total: 3,
+      contadores: CONTADORES_CHEIOS,
+    }));
+    fireEvent.click(screen.getByRole("button", { name: "Próxima página" }));
+    const titulo = await screen.findByRole("heading", {
+      name: "Nenhum colaborador nesta página",
+    });
+    expect(
+      screen.queryByRole("heading", { name: "Nenhum colaborador encontrado" }),
+    ).toBeNull();
+    // O estado vazio oferece a primeira página, não "Limpar busca".
+    const vazio = titulo.closest(".evolli-empty-state") as HTMLElement;
+    expect(
+      within(vazio)
+        .getAllByRole("button")
+        .map((b) => b.textContent),
+    ).toEqual(["Ir para a primeira página"]);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Ir para a primeira página" }),
+    );
+    await waitFor(() =>
+      expect(listarColaboradores).toHaveBeenLastCalledWith({
+        pagina: 1,
+        tamanhoPagina: 20,
+        grupo: "ativos",
+        busca: "Ana",
+      }),
+    );
+  });
+
+  it("sem busca nem filtros: o mesmo estado, pelo total da consulta", async () => {
+    vi.mocked(listarColaboradores).mockImplementation(async (consulta) =>
+      consulta?.pagina === 4
+        ? {
+            itens: [],
+            pagina: 4,
+            tamanhoPagina: 20,
+            total: 3,
+            contadores: CONTADORES_CHEIOS,
+          }
+        : { ...paginado([colaborador1]), contadores: CONTADORES_CHEIOS },
+    );
+    const onMudanca = vi.fn();
+    render(
+      <DashboardComEstado
+        inicial={{ ...ESTADO_PADRAO, aba: "desligados", pagina: 4 }}
+        onMudanca={onMudanca}
+      />,
+    );
+    await screen.findByRole("heading", {
+      name: "Nenhum colaborador nesta página",
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Ir para a primeira página" }),
+    );
+    expect(onMudanca).toHaveBeenLastCalledWith({
+      ...ESTADO_PADRAO,
+      aba: "desligados",
+    });
+  });
+});
+
+describe("T199 (revisão) — B2: 'Limpar busca e filtros' numa única mudança", () => {
+  const DEP = {
+    id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+    codigo: "ADM",
+    nome: "Administrativo (teste)",
+    empresaId: "44444444-4444-4444-4444-444444444444",
+    status: "ativo",
+    criadoEm: "2025-01-01T12:00:00.000Z",
+    atualizadoEm: "2025-01-01T12:00:00.000Z",
+  };
+  const CAR = { ...DEP, id: "ffffffff-ffff-4fff-8fff-ffffffffffff" };
+  const pagina1 = <T,>(itens: T[]) => ({
+    itens,
+    pagina: 1,
+    tamanhoPagina: 100,
+    total: itens.length,
+  });
+
+  it("na página 2, com busca, departamento, cargo e tipo: volta à página 1 sem nenhum deles, e nada os restaura", async () => {
+    vi.mocked(listarDepartamentos).mockResolvedValue(pagina1([DEP]) as never);
+    vi.mocked(listarCargos).mockResolvedValue(pagina1([CAR]) as never);
+    vi.mocked(listarColaboradores).mockImplementation(async (consulta) => ({
+      itens: [colaborador1],
+      pagina: consulta?.pagina ?? 1,
+      tamanhoPagina: 20,
+      total: 45,
+      contadores: CONTADORES_CHEIOS,
+    }));
+    const onMudanca = vi.fn();
+    const inicial: EstadoDaListagem = {
+      ...ESTADO_PADRAO,
+      departamentoId: DEP.id,
+      cargoId: CAR.id,
+      tipo: "pj",
+    };
+    const { rerender } = render(
+      <DashboardComEstado inicial={inicial} onMudanca={onMudanca} />,
+    );
+    await screen.findByRole("table", { name: /^Colaboradores — Ativos/ });
+    buscar("Ana");
+    await screen.findByText("Página 1 de 3");
+    fireEvent.click(screen.getByRole("button", { name: "Próxima página" }));
+    await waitFor(() =>
+      expect(listarColaboradores).toHaveBeenLastCalledWith({
+        pagina: 2,
+        tamanhoPagina: 20,
+        grupo: "ativos",
+        tipoVinculo: "pj",
+        busca: "Ana",
+        departamentoId: DEP.id,
+        cargoId: CAR.id,
+      }),
+    );
+    await screen.findByText("Página 2 de 3");
+
+    // Volta da ficha: a página 2 relida chega vazia, sem ninguém.
+    vi.mocked(listarColaboradores).mockImplementation(async (consulta) => ({
+      itens: [],
+      pagina: consulta?.pagina ?? 1,
+      tamanhoPagina: 20,
+      total: 0,
+      contadores: CONTADORES_CHEIOS,
+    }));
+    rerender(
+      <DashboardComEstado
+        inicial={inicial}
+        onMudanca={onMudanca}
+        atualizacao={1}
+      />,
+    );
+    const limpar = await screen.findByRole("button", {
+      name: "Limpar busca e filtros",
+    });
+
+    vi.mocked(listarColaboradores).mockImplementation(async (consulta) => ({
+      itens: [colaborador1],
+      pagina: consulta?.pagina ?? 1,
+      tamanhoPagina: 20,
+      total: 1,
+      contadores: CONTADORES_CHEIOS,
+    }));
+    const antes = onMudanca.mock.calls.length;
+    const consultasAntes = vi.mocked(listarColaboradores).mock.calls.length;
+    fireEvent.click(limpar);
+
+    // Uma única mudança, já completa.
+    expect(onMudanca.mock.calls.slice(antes)).toEqual([[ESTADO_PADRAO]]);
+    await waitFor(() =>
+      expect(listarColaboradores).toHaveBeenLastCalledWith({
+        pagina: 1,
+        tamanhoPagina: 20,
+        grupo: "ativos",
+      }),
+    );
+    await screen.findByRole("table", { name: /^Colaboradores — Ativos/ });
+    expect(campoBusca()).toHaveValue("");
+    expect(campoBusca()).toHaveFocus();
+    expect(screen.getByLabelText("Departamento")).toHaveValue("");
+    expect(screen.getByLabelText("Cargo")).toHaveValue("");
+    expect(screen.getByLabelText("Tipo de vínculo")).toHaveValue("");
+    expect(screen.queryByRole("group", { name: "Filtros ativos" })).toBeNull();
+    // Nenhuma atualização seguinte devolveu os filtros.
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(onMudanca.mock.calls.length).toBe(antes + 1);
+    const depois = vi
+      .mocked(listarColaboradores)
+      .mock.calls.slice(consultasAntes);
+    expect(depois).toHaveLength(1);
+    for (const [consulta] of depois) {
+      expect(consulta).not.toHaveProperty("tipoVinculo");
+      expect(consulta).not.toHaveProperty("departamentoId");
+      expect(consulta).not.toHaveProperty("busca");
+    }
+  });
+});
+
+describe("T199 (revisão) — cartões que se recuperam de falha na aba Jornada", () => {
+  const JORNADA: EstadoDaListagem = { ...ESTADO_PADRAO, aba: "jornada" };
+  const anuncio = () =>
+    document.querySelector(".colaboradores-screen__anuncio-totais");
+
+  function dublê(falhar: { valor: boolean }) {
+    vi.mocked(listarColaboradores).mockImplementation(async (consulta) => {
+      // Só a leitura mínima dos contadores (sem situação) falha; a da visão
+      // de jornadas (situação "ativo") segue normal.
+      if (consulta?.tamanhoPagina === 1 && !consulta.situacao) {
+        if (falhar.valor) throw new Error("falha");
+        return { ...paginado([]), contadores: CONTADORES_CHEIOS };
+      }
+      return paginado([colaborador1]);
+    });
+  }
+
+  it("falha: aviso e 'Tentar novamente' no lugar dos '…'; a repetição relê só os contadores, sem remontar a Jornada", async () => {
+    const falhar = { valor: true };
+    dublê(falhar);
+    render(<DashboardComEstado inicial={JORNADA} onMudanca={vi.fn()} />);
+    const regiao = screen.getByRole("region", {
+      name: "Totais no seu escopo, sem filtros",
+    });
+    expect(
+      await within(regiao).findByText(
+        "Não foi possível carregar os totais de colaboradores.",
+        { selector: ".colaboradores-screen__totais-falha-texto" },
+      ),
+    ).toBeVisible();
+    expect(within(regiao).queryByText("…")).toBeNull();
+    expect(anuncio()).toHaveTextContent(
+      "Não foi possível carregar os totais de colaboradores.",
+    );
+    const tituloDaJornada = screen.getByRole("heading", {
+      level: 2,
+      name: "Jornada de trabalho",
+    });
+    const leiturasDaJornada = vi.mocked(listarVinculosHorario).mock.calls
+      .length;
+    const leiturasAntes = vi.mocked(listarColaboradores).mock.calls.length;
+
+    falhar.valor = false;
+    const repetir = within(regiao).getByRole("button", {
+      name: "Tentar novamente",
+    });
+    repetir.focus();
+    fireEvent.click(repetir);
+
+    await waitFor(() => expect(cartaoDe(regiao, "Ativos")).toBe("30"));
+    expect(cartaoDe(regiao, "Total no seu escopo")).toBe("33");
+    // Só os contadores foram relidos; a Jornada é o mesmo nó, sem releitura.
+    expect(
+      vi
+        .mocked(listarColaboradores)
+        .mock.calls.slice(leiturasAntes)
+        .map(([c]) => c),
+    ).toEqual([{ pagina: 1, tamanhoPagina: 1 }]);
+    expect(vi.mocked(listarVinculosHorario).mock.calls.length).toBe(
+      leiturasDaJornada,
+    );
+    expect(
+      screen.getByRole("heading", { level: 2, name: "Jornada de trabalho" }),
+    ).toBe(tituloDaJornada);
+    // O botão sumiu: o foco vai ao título dos totais, e a volta é anunciada.
+    expect(
+      screen.getByRole("heading", {
+        level: 2,
+        name: "Totais no seu escopo, sem filtros",
+      }),
+    ).toHaveFocus();
+    expect(anuncio()).toHaveTextContent("Totais de colaboradores carregados.");
+  });
+
+  it("nova falha: o botão fica com o foco e a falha é anunciada de novo", async () => {
+    dublê({ valor: true });
+    render(<DashboardComEstado inicial={JORNADA} onMudanca={vi.fn()} />);
+    const repetir = await screen.findByRole("button", {
+      name: "Tentar novamente",
+    });
+    repetir.focus();
+    fireEvent.click(repetir);
+    // Durante a nova leitura, o botão continua focado e indisponível.
+    expect(repetir).toHaveAttribute("aria-disabled", "true");
+    expect(anuncio()?.textContent).toBe("");
+    await waitFor(() =>
+      expect(anuncio()).toHaveTextContent(
+        "Não foi possível carregar os totais de colaboradores.",
+      ),
+    );
+    expect(repetir).toHaveFocus();
+    expect(repetir).not.toHaveAttribute("aria-disabled", "true");
+  });
+
+  /** O número de um cartão: o `dd` que segue o `dt` do rótulo. */
+  function cartaoDe(regiao: HTMLElement, rotulo: string): string | null {
+    const termo = within(regiao)
+      .queryAllByText(rotulo)
+      .find((n) => n.tagName === "DT");
+    return termo?.nextElementSibling?.textContent ?? null;
+  }
+});
+
+describe("T199 (revisão) — título da seção da tabela", () => {
+  /** Os títulos em ordem de documento: [nível, texto]. */
+  function titulos(): [number, string][] {
+    return [...document.querySelectorAll("h1, h2, h3, h4, h5, h6")].map((h) => [
+      Number(h.tagName.slice(1)),
+      h.textContent ?? "",
+    ]);
+  }
+  /** O h2 de que um título depende, na estrutura da página. */
+  function h2Acima(texto: string): string | undefined {
+    const lista = titulos();
+    const i = lista.findIndex(([, t]) => t === texto);
+    return lista
+      .slice(0, i)
+      .reverse()
+      .find(([nivel]) => nivel === 2)?.[1];
+  }
+
+  it("estado vazio em h3 sob o h2 da aba, não sob 'Totais…'; o h2 é só para leitor de tela", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue(paginado([]));
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("heading", {
+      level: 3,
+      name: "Nenhum colaborador ativo no seu escopo",
+    });
+    const painel = screen.getByRole("tabpanel");
+    const titulo = within(painel).getByRole("heading", {
+      level: 2,
+      name: "Colaboradores — Ativos",
+    });
+    expect(titulo).toHaveClass("colaboradores-screen__so-leitor");
+    expect(h2Acima("Nenhum colaborador ativo no seu escopo")).toBe(
+      "Colaboradores — Ativos",
+    );
+  });
+
+  it("o título acompanha a aba, e o erro da tabela também fica abaixo dele (h3)", async () => {
+    vi.mocked(listarColaboradores).mockRejectedValue(new Error("falha"));
+    render(
+      <DashboardComEstado
+        inicial={{ ...ESTADO_PADRAO, aba: "desligados" }}
+        onMudanca={vi.fn()}
+      />,
+    );
+    expect(
+      await screen.findByRole("heading", {
+        level: 3,
+        name: "Não foi possível carregar os colaboradores",
+      }),
+    ).toBeInTheDocument();
+    expect(h2Acima("Não foi possível carregar os colaboradores")).toBe(
+      "Colaboradores — Desligados",
+    );
+  });
+
+  it("na aba Jornada, o h2 é o da própria visão: nenhum título de tabela a mais", async () => {
+    render(
+      <DashboardComEstado
+        inicial={{ ...ESTADO_PADRAO, aba: "jornada" }}
+        onMudanca={vi.fn()}
+      />,
+    );
+    const painel = screen.getByRole("tabpanel");
+    expect(
+      within(painel)
+        .getAllByRole("heading", { level: 2 })
+        .map((h) => h.textContent),
+    ).toEqual(["Jornada de trabalho"]);
   });
 });

@@ -265,3 +265,10 @@ Docker, dependências, promoção e merge.
   vínculo" e o aviso "Ainda indisponível" saíram (N-3); a frase do cabeçalho
   descreve o que a tela faz. O nome acessível de cada aba traz o total
   ("Ativos, 12"); o número visível é decorativo para leitor de tela.
+- **Estados de exceção.** Lista vazia com total maior que zero (página além
+  do fim, vinda da URL, do "voltar" ou de um conjunto que encolheu) mostra
+  sempre "Nenhum colaborador nesta página" e "Ir para a primeira página",
+  mantendo busca e filtros. "Limpar busca e filtros" é uma única mudança de
+  estado. Se os totais não carregam na aba Jornada, um aviso com "Tentar
+  novamente" relê só os contadores. Cada aba de tabela tem um título de
+  seção (`h2`, só para leitor de tela) acima dos estados vazios e do erro.

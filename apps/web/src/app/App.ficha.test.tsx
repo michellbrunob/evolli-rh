@@ -645,6 +645,53 @@ describe("T199 — o estado do dashboard na URL (App)", () => {
     }
   });
 
+  it("B1 — URL com Todos, PJ e página 4 além do fim: 'nesta página'; a primeira página mantém o PJ na URL", async () => {
+    vi.mocked(listarColaboradores).mockImplementation(async (consulta) => ({
+      itens: consulta?.pagina === 4 ? [] : [ana],
+      pagina: consulta?.pagina ?? 1,
+      tamanhoPagina: 20,
+      total: 3,
+      contadores: {
+        ativos: 2,
+        inativos: 1,
+        emAdmissao: 0,
+        desligados: 1,
+        total: 3,
+        ativosPorTipo: {
+          clt: 1,
+          estagio: 0,
+          pj: 1,
+          temporario: 0,
+          outro_controlado: 0,
+        },
+      },
+    }));
+    window.history.replaceState(
+      null,
+      "",
+      `/${LISTAGEM}?aba=todos&pagina=4&tipo=pj`,
+    );
+    render(<App papelDoAtor="rh" />);
+    await screen.findByRole("heading", {
+      name: "Nenhum colaborador nesta página",
+    });
+    expect(screen.queryByRole("button", { name: "Limpar filtros" })).toBeNull();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Ir para a primeira página" }),
+    );
+    await waitFor(() =>
+      expect(window.location.hash).toBe(`${LISTAGEM}?aba=todos&tipo=pj`),
+    );
+    await waitFor(() =>
+      expect(ultimaConsulta()).toEqual({
+        pagina: 1,
+        tamanhoPagina: 20,
+        tipoVinculo: "pj",
+      }),
+    );
+    await screen.findByRole("table", { name: "Colaboradores — Todos" });
+  });
+
   it("recarregar (nova montagem) mantém aba e filtro", async () => {
     const { unmount } = render(<App papelDoAtor="rh" />);
     await screen.findByRole("table", { name: /^Colaboradores — / });
