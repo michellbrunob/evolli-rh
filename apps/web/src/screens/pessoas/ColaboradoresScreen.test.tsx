@@ -5951,3 +5951,258 @@ describe("T199 (revisão B4/B5) — falha sem 'Contando…' e repetição do err
     await waitFor(() => expect(campoBusca()).toHaveFocus());
   });
 });
+
+// ---------------------------------------------------------------------------
+// T199 (revisão B6/B7) — filtros que não perdem o foco: as selects não ficam
+// `disabled` durante a releitura da tabela (só Departamento e Cargo, quando o
+// catálogo não está disponível); remover um chip leva o foco ao próximo chip
+// ou ao campo de busca; "Recarregar departamentos e cargos" no padrão seguro.
+// ---------------------------------------------------------------------------
+describe("T199 (revisão B6/B7) — foco nos filtros, nos chips e na recarga dos catálogos", () => {
+  type Resposta = Awaited<ReturnType<typeof listarColaboradores>>;
+  type Catalogo = Awaited<ReturnType<typeof listarDepartamentos>>;
+  const anuncioDaLista = () =>
+    document.querySelector(".colaboradores-screen__anuncio-lista");
+  const DEP = {
+    id: "abababab-abab-4bab-8bab-abababababab",
+    codigo: "ADM",
+    nome: "Administrativo (teste)",
+    empresaId: "44444444-4444-4444-4444-444444444444",
+    status: "ativo",
+    criadoEm: "2025-01-01T12:00:00.000Z",
+    atualizadoEm: "2025-01-01T12:00:00.000Z",
+  };
+  const CAR = { ...DEP, id: "cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd" };
+  const catalogo = <T,>(itens: T[]) =>
+    ({ itens, pagina: 1, tamanhoPagina: 100, total: itens.length }) as never;
+  const seletor = (rotulo: string) =>
+    screen.getByLabelText(rotulo) as HTMLSelectElement;
+  const comAna = (nome = colaborador1.nome): Resposta => ({
+    itens: [{ ...colaborador1, nome }],
+    pagina: 1,
+    tamanhoPagina: 20,
+    total: 1,
+    contadores: CONTADORES_CHEIOS,
+  });
+
+  /** A primeira leitura responde; as seguintes ficam pendentes, uma a uma. */
+  function listagem() {
+    const pendentes: ((r: Resposta) => void)[] = [];
+    let lidas = 0;
+    vi.mocked(listarColaboradores).mockImplementation(() => {
+      lidas += 1;
+      if (lidas === 1) return Promise.resolve(comAna());
+      return new Promise<Resposta>((resolver) => pendentes.push(resolver));
+    });
+    return {
+      leituras: () => lidas,
+      async responder(indice: number, r: Resposta) {
+        await act(async () => {
+          pendentes[indice]!(r);
+        });
+      },
+    };
+  }
+
+  beforeEach(() => {
+    vi.mocked(listarDepartamentos).mockResolvedValue(catalogo([DEP]));
+    vi.mocked(listarCargos).mockResolvedValue(catalogo([CAR]));
+  });
+
+  it.each([
+    ["Tipo de vínculo", "pj"],
+    ["Departamento", DEP.id],
+    ["Cargo", CAR.id],
+  ])(
+    "B6 — trocar %s com a resposta pendente: a select segue habilitada e com o foco",
+    async (rotulo, valor) => {
+      const srv = listagem();
+      render(
+        <DashboardComEstado inicial={ESTADO_PADRAO} onMudanca={vi.fn()} />,
+      );
+      await screen.findByRole("table", { name: /^Colaboradores — Ativos/ });
+      await waitFor(() => expect(seletor("Departamento")).toBeEnabled());
+      const select = seletor(rotulo);
+      select.focus();
+      fireEvent.change(select, { target: { value: valor } });
+      await waitFor(() => expect(srv.leituras()).toBe(2));
+      expect(select).not.toBeDisabled();
+      expect(select).toHaveFocus();
+      expect(select).toHaveValue(valor);
+    },
+  );
+
+  it("B6 — duas trocas seguidas: a resposta antiga, que chega depois, não muda o resultado", async () => {
+    const srv = listagem();
+    render(<DashboardComEstado inicial={ESTADO_PADRAO} onMudanca={vi.fn()} />);
+    await screen.findByRole("table", { name: /^Colaboradores — Ativos/ });
+    const tipo = seletor("Tipo de vínculo");
+    tipo.focus();
+    fireEvent.change(tipo, { target: { value: "pj" } });
+    await waitFor(() => expect(srv.leituras()).toBe(2));
+    // A segunda escolha é possível durante a leitura da primeira.
+    fireEvent.change(tipo, { target: { value: "clt" } });
+    await waitFor(() => expect(srv.leituras()).toBe(3));
+    expect(vi.mocked(listarColaboradores).mock.lastCall?.[0]).toMatchObject({
+      tipoVinculo: "clt",
+    });
+
+    await srv.responder(1, comAna("Pessoa da escolha nova (teste)"));
+    await srv.responder(0, comAna("Pessoa da escolha antiga (teste)"));
+    expect(
+      await screen.findByText("Pessoa da escolha nova (teste)"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Pessoa da escolha antiga (teste)")).toBeNull();
+    expect(tipo).toHaveValue("clt");
+  });
+
+  it("B6 — catálogo em erro bloqueia só Departamento e Cargo; Tipo segue livre", async () => {
+    vi.mocked(listarDepartamentos).mockRejectedValue(new Error("rede"));
+    render(<ColaboradoresScreen />);
+    await screen.findByText(
+      "Não foi possível carregar departamentos e cargos.",
+    );
+    expect(seletor("Departamento")).toBeDisabled();
+    expect(seletor("Cargo")).toBeDisabled();
+    expect(seletor("Tipo de vínculo")).toBeEnabled();
+  });
+
+  it("B7 — remover chips: o foco vai ao próximo chip; sem nenhum, ao campo de busca; uma mudança por remoção", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue(paginado([colaborador1]));
+    const onMudanca = vi.fn();
+    render(
+      <DashboardComEstado
+        inicial={{
+          ...ESTADO_PADRAO,
+          departamentoId: DEP.id,
+          cargoId: CAR.id,
+          tipo: "pj",
+        }}
+        onMudanca={onMudanca}
+      />,
+    );
+    const chipDep = await screen.findByRole("button", {
+      name: /^Remover filtro de departamento:/,
+    });
+    chipDep.focus();
+    fireEvent.click(chipDep);
+    const chipCargo = screen.getByRole("button", {
+      name: /^Remover filtro de cargo:/,
+    });
+    await waitFor(() => expect(chipCargo).toHaveFocus());
+
+    fireEvent.click(chipCargo);
+    const chipTipo = screen.getByRole("button", {
+      name: "Remover filtro de tipo de vínculo: PJ",
+    });
+    await waitFor(() => expect(chipTipo).toHaveFocus());
+
+    fireEvent.click(chipTipo);
+    await waitFor(() => expect(campoBusca()).toHaveFocus());
+    expect(document.activeElement).not.toBe(document.body);
+    expect(onMudanca.mock.calls.map(([e]) => e)).toEqual([
+      { ...ESTADO_PADRAO, cargoId: CAR.id, tipo: "pj" },
+      { ...ESTADO_PADRAO, tipo: "pj" },
+      ESTADO_PADRAO,
+    ]);
+  });
+
+  it("B7 — remover o último chip da fila com outro antes dele: o foco vai ao anterior", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue(paginado([colaborador1]));
+    render(
+      <DashboardComEstado
+        inicial={{ ...ESTADO_PADRAO, departamentoId: DEP.id, tipo: "pj" }}
+        onMudanca={vi.fn()}
+      />,
+    );
+    const chipTipo = await screen.findByRole("button", {
+      name: "Remover filtro de tipo de vínculo: PJ",
+    });
+    chipTipo.focus();
+    fireEvent.click(chipTipo);
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", {
+          name: /^Remover filtro de departamento:/,
+        }),
+      ).toHaveFocus(),
+    );
+  });
+
+  /** Departamentos: a primeira leitura falha; as seguintes ficam pendentes. */
+  function catalogoDeDepartamentos() {
+    const pendentes: {
+      resolver: (c: Catalogo) => void;
+      rejeitar: (e: unknown) => void;
+    }[] = [];
+    let lidas = 0;
+    vi.mocked(listarDepartamentos).mockImplementation(() => {
+      lidas += 1;
+      if (lidas === 1) return Promise.reject(new Error("rede"));
+      return new Promise<Catalogo>((resolver, rejeitar) =>
+        pendentes.push({ resolver, rejeitar }),
+      );
+    });
+    return {
+      leituras: () => lidas,
+      async responder() {
+        await act(async () => {
+          pendentes.shift()!.resolver(catalogo([DEP]));
+        });
+      },
+      async falhar() {
+        await act(async () => {
+          pendentes.shift()!.rejeitar(new Error("rede"));
+        });
+      },
+    };
+  }
+
+  it("B7 — 'Recarregar departamentos e cargos': botão montado, focado e indisponível; clique repetido ignorado; no sucesso, foco em Departamento; a listagem não é relida", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue(paginado([colaborador1]));
+    const deps = catalogoDeDepartamentos();
+    render(<ColaboradoresScreen />);
+    const recarregar = await screen.findByRole("button", {
+      name: "Recarregar departamentos e cargos",
+    });
+    const leiturasDaLista = vi.mocked(listarColaboradores).mock.calls.length;
+    recarregar.focus();
+    fireEvent.click(recarregar);
+    await waitFor(() => expect(deps.leituras()).toBe(2));
+    expect(recarregar).toBeInTheDocument();
+    expect(recarregar).toHaveAttribute("aria-disabled", "true");
+    expect(recarregar).not.toBeDisabled();
+    expect(recarregar).toHaveFocus();
+    fireEvent.click(recarregar);
+    fireEvent.click(recarregar);
+    expect(deps.leituras()).toBe(2);
+
+    await deps.responder();
+    await waitFor(() => expect(seletor("Departamento")).toHaveFocus());
+    expect(seletor("Departamento")).toBeEnabled();
+    expect(vi.mocked(listarColaboradores).mock.calls.length).toBe(
+      leiturasDaLista,
+    );
+  });
+
+  it("B7 — recarga com nova falha: foco no botão e falha anunciada uma vez", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue(paginado([colaborador1]));
+    const deps = catalogoDeDepartamentos();
+    render(<ColaboradoresScreen />);
+    const recarregar = await screen.findByRole("button", {
+      name: "Recarregar departamentos e cargos",
+    });
+    recarregar.focus();
+    fireEvent.click(recarregar);
+    await waitFor(() => expect(deps.leituras()).toBe(2));
+    await deps.falhar();
+    expect(recarregar).toBeInTheDocument();
+    expect(recarregar).toHaveFocus();
+    expect(recarregar).not.toHaveAttribute("aria-disabled", "true");
+    expect(anuncioDaLista()?.textContent).toBe(
+      "Não foi possível carregar departamentos e cargos.",
+    );
+    fireEvent.click(recarregar);
+    expect(anuncioDaLista()?.textContent).toBe("");
+  });
+});

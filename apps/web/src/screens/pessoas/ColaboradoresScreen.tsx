@@ -238,6 +238,15 @@ const ID_CAMPO_BUSCA = "colaboradores-busca";
 
 const FALHA_DA_LISTA = "Não foi possível carregar os colaboradores.";
 
+const FALHA_DOS_CATALOGOS = "Não foi possível carregar departamentos e cargos.";
+
+/** A select de Departamento: destino do foco quando os catálogos voltam. */
+const ID_FILTRO_DEPARTAMENTO = "colaboradores-filtro-departamento";
+
+/** Os chips de filtro, na ordem em que aparecem. */
+const FILTROS_REMOVIVEIS = ["departamento", "cargo", "tipo"] as const;
+type FiltroRemovivel = (typeof FILTROS_REMOVIVEIS)[number];
+
 const DESCRICAO_PAGINA_VAZIA =
   "Esta página voltou vazia, embora a consulta tenha colaboradores: o conjunto pode ter mudado desde a última leitura.";
 
@@ -427,6 +436,15 @@ export function ColaboradoresScreen({
     status: "carregando",
   });
   const [tentativaCatalogos, setTentativaCatalogos] = useState(0);
+  /**
+   * T199 — "Recarregar departamentos e cargos" no padrão seguro: o botão fica
+   * montado (indisponível, com o foco) durante a nova leitura; no sucesso, o
+   * foco vai à select de Departamento; numa nova falha, fica no botão e a
+   * falha é anunciada uma vez. A listagem não é relida por isso.
+   */
+  const [repetindoCatalogos, setRepetindoCatalogos] = useState(false);
+  const repetindoCatalogosRef = useRef(repetindoCatalogos);
+  repetindoCatalogosRef.current = repetindoCatalogos;
   const campoBuscaRef = useRef<HTMLInputElement | null>(null);
   /**
    * T178/T199 — contagens do escopo inteiro, vindas do servidor, SEM busca,
@@ -567,7 +585,10 @@ export function ColaboradoresScreen({
    * servidor decide (o escopo dele nunca devolve outra empresa).
    */
   const comLotacaoNaAba = abaTemLotacao(aba);
+  // Só a primeira leitura dos catálogos segura a tabela: uma recarga depois
+  // de falha não relê a listagem (o servidor já decidiu sem os catálogos).
   const aguardandoCatalogos =
+    tentativaCatalogos === 0 &&
     comLotacaoNaAba &&
     (departamentoId !== null || cargoId !== null) &&
     catalogos.status === "carregando";
@@ -698,9 +719,18 @@ export function ColaboradoresScreen({
           ),
           cargos: cargos.itens.filter((c) => c.status === "ativo"),
         });
+        if (repetindoCatalogosRef.current) {
+          setRepetindoCatalogos(false);
+          setFocoPendente(ID_FILTRO_DEPARTAMENTO);
+        }
       })
       .catch(() => {
-        if (vigente) setCatalogos({ status: "erro" });
+        if (!vigente) return;
+        setCatalogos({ status: "erro" });
+        if (repetindoCatalogosRef.current) {
+          setRepetindoCatalogos(false);
+          setAnuncioDaLista(FALHA_DOS_CATALOGOS);
+        }
       });
     return () => {
       vigente = false;
@@ -744,6 +774,41 @@ export function ColaboradoresScreen({
       cargaDaAcaoRef.current = true;
       mudarEstado(normalizado);
     }
+  }
+
+  function recarregarCatalogos() {
+    if (repetindoCatalogos) return;
+    // Limpa o anúncio antes: a mesma falha, de novo, é anunciada de novo.
+    setAnuncioDaLista("");
+    setRepetindoCatalogos(true);
+    setTentativaCatalogos((n) => n + 1);
+  }
+
+  const idDoChip = (filtro: FiltroRemovivel) => `${prefixo}-chip-${filtro}`;
+
+  /**
+   * T199 — remove um filtro pelo chip (uma única mudança de estado). O chip
+   * some: o foco vai ao chip seguinte, ou ao anterior, ou ao campo de busca.
+   */
+  function removerFiltro(filtro: FiltroRemovivel) {
+    const presentes = FILTROS_REMOVIVEIS.filter((f) =>
+      f === "tipo"
+        ? tipo !== null
+        : temFiltroDeLotacao &&
+          (f === "departamento" ? departamentoId : cargoId) !== null,
+    );
+    const i = presentes.indexOf(filtro);
+    const destino = presentes[i + 1] ?? presentes[i - 1];
+    mudarEstado({
+      ...estado,
+      pagina: 1,
+      ...(filtro === "departamento"
+        ? { departamentoId: null }
+        : filtro === "cargo"
+          ? { cargoId: null }
+          : { tipo: null }),
+    });
+    setFocoPendente(destino ? idDoChip(destino) : ID_CAMPO_BUSCA);
   }
 
   /** "Tentar novamente" do erro da tabela: relê a mesma consulta. */
@@ -1284,7 +1349,7 @@ export function ColaboradoresScreen({
                       label="Departamento"
                       {...(catalogos.status === "erro"
                         ? {
-                            help: "Não foi possível carregar departamentos e cargos.",
+                            help: FALHA_DOS_CATALOGOS,
                           }
                         : {})}
                     >
@@ -1298,7 +1363,7 @@ export function ColaboradoresScreen({
                               departamentoId: e.target.value || null,
                             })
                           }
-                          disabled={carregando || catalogos.status !== "dados"}
+                          disabled={catalogos.status !== "dados"}
                           {...control}
                         >
                           <option value="">
@@ -1328,7 +1393,7 @@ export function ColaboradoresScreen({
                               cargoId: e.target.value || null,
                             })
                           }
-                          disabled={carregando || catalogos.status !== "dados"}
+                          disabled={catalogos.status !== "dados"}
                           {...control}
                         >
                           <option value="">
@@ -1364,7 +1429,6 @@ export function ColaboradoresScreen({
                             null) as TipoDeVinculo | null,
                         })
                       }
-                      disabled={carregando}
                       {...control}
                     >
                       <option value="">Todos os tipos</option>
@@ -1377,11 +1441,13 @@ export function ColaboradoresScreen({
                   )}
                 </FormField>
 
-                {comLotacao && catalogos.status === "erro" ? (
+                {comLotacao &&
+                (catalogos.status === "erro" || repetindoCatalogos) ? (
                   <Button
                     variant="subtle"
                     className="colaboradores-screen__filtros-retry"
-                    onClick={() => setTentativaCatalogos((n) => n + 1)}
+                    aria-disabled={repetindoCatalogos}
+                    onClick={recarregarCatalogos}
                   >
                     Recarregar departamentos e cargos
                   </Button>
@@ -1397,6 +1463,7 @@ export function ColaboradoresScreen({
                 >
                   {temFiltroDeLotacao && departamentoId ? (
                     <Button
+                      id={idDoChip("departamento")}
                       variant="secondary"
                       className="colaboradores-screen__filtro-ativo"
                       aria-label={`Remover filtro de departamento: ${
@@ -1404,13 +1471,7 @@ export function ColaboradoresScreen({
                           ? rotuloDaReferencia(departamentoFiltrado)
                           : "selecionado"
                       }`}
-                      onClick={() =>
-                        mudarEstado({
-                          ...estado,
-                          pagina: 1,
-                          departamentoId: null,
-                        })
-                      }
+                      onClick={() => removerFiltro("departamento")}
                     >
                       Departamento:{" "}
                       {departamentoFiltrado
@@ -1421,6 +1482,7 @@ export function ColaboradoresScreen({
                   ) : null}
                   {temFiltroDeLotacao && cargoId ? (
                     <Button
+                      id={idDoChip("cargo")}
                       variant="secondary"
                       className="colaboradores-screen__filtro-ativo"
                       aria-label={`Remover filtro de cargo: ${
@@ -1428,9 +1490,7 @@ export function ColaboradoresScreen({
                           ? rotuloDaReferencia(cargoFiltrado)
                           : "selecionado"
                       }`}
-                      onClick={() =>
-                        mudarEstado({ ...estado, pagina: 1, cargoId: null })
-                      }
+                      onClick={() => removerFiltro("cargo")}
                     >
                       Cargo:{" "}
                       {cargoFiltrado
@@ -1441,12 +1501,11 @@ export function ColaboradoresScreen({
                   ) : null}
                   {tipo ? (
                     <Button
+                      id={idDoChip("tipo")}
                       variant="secondary"
                       className="colaboradores-screen__filtro-ativo"
                       aria-label={`Remover filtro de tipo de vínculo: ${ROTULO_TIPO_DE_VINCULO[tipo]}`}
-                      onClick={() =>
-                        mudarEstado({ ...estado, pagina: 1, tipo: null })
-                      }
+                      onClick={() => removerFiltro("tipo")}
                     >
                       Tipo: {ROTULO_TIPO_DE_VINCULO[tipo]}{" "}
                       <span aria-hidden="true">×</span>
