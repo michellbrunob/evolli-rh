@@ -5798,3 +5798,156 @@ describe("T199 (revisão B3) — ações do estado vazio e paginação fora do i
     ).toBeInTheDocument();
   });
 });
+
+// ---------------------------------------------------------------------------
+// T199 (revisão B4/B5) — nada de "Contando…" depois de uma falha; e o
+// "Tentar novamente" do erro da tabela no mesmo padrão seguro das ações do
+// estado vazio: bloco de erro montado, mesmo botão focado e indisponível,
+// cliques repetidos ignorados, foco no campo de busca no sucesso, anúncio
+// único numa nova falha.
+// ---------------------------------------------------------------------------
+describe("T199 (revisão B4/B5) — falha sem 'Contando…' e repetição do erro da tabela", () => {
+  type Resposta = Awaited<ReturnType<typeof listarColaboradores>>;
+  const anuncioDaLista = () =>
+    document.querySelector(".colaboradores-screen__anuncio-lista");
+  const respostaComAna = (): Resposta => ({
+    itens: [colaborador1],
+    pagina: 1,
+    tamanhoPagina: 20,
+    total: 1,
+    contadores: CONTADORES_CHEIOS,
+  });
+
+  /**
+   * Primeira leitura: a dada (ou uma falha); as seguintes, uma a uma,
+   * controladas pelo teste.
+   */
+  function servidor(primeira: Resposta | "falha") {
+    const pendentes: {
+      resolver: (r: Resposta) => void;
+      rejeitar: (e: unknown) => void;
+    }[] = [];
+    let lidas = 0;
+    vi.mocked(listarColaboradores).mockImplementation(() => {
+      lidas += 1;
+      if (lidas === 1) {
+        return primeira === "falha"
+          ? Promise.reject(new Error("falha"))
+          : Promise.resolve(primeira);
+      }
+      return new Promise<Resposta>((resolver, rejeitar) => {
+        pendentes.push({ resolver, rejeitar });
+      });
+    });
+    return {
+      leituras: () => lidas,
+      async responder(r: Resposta) {
+        await act(async () => {
+          pendentes.shift()!.resolver(r);
+        });
+      },
+      async falhar() {
+        await act(async () => {
+          pendentes.shift()!.rejeitar(new Error("falha"));
+        });
+      },
+    };
+  }
+
+  it.each([
+    [
+      "Ir para a primeira página",
+      {
+        ...ESTADO_PADRAO,
+        aba: "todos" as const,
+        tipo: "pj" as const,
+        pagina: 4,
+      },
+      { itens: [], pagina: 4, tamanhoPagina: 20, total: 3 },
+    ],
+    [
+      "Limpar filtros",
+      { ...ESTADO_PADRAO, tipo: "pj" as const },
+      { itens: [], pagina: 1, tamanhoPagina: 20, total: 0 },
+    ],
+  ])(
+    "B4 — '%s' que falha: aviso e botão à vista, sem 'Contando…' nem total",
+    async (rotulo, inicial, vazia) => {
+      const srv = servidor({ ...vazia, contadores: CONTADORES_CHEIOS });
+      render(<DashboardComEstado inicial={inicial} onMudanca={vi.fn()} />);
+      const botao = await screen.findByRole("button", { name: rotulo });
+      botao.focus();
+      fireEvent.click(botao);
+      await waitFor(() => expect(srv.leituras()).toBe(2));
+      await srv.falhar();
+
+      expect(
+        screen.getByText(
+          "Não foi possível carregar os colaboradores. Verifique sua conexão e tente novamente.",
+        ),
+      ).toBeInTheDocument();
+      expect(botao).toBeInTheDocument();
+      expect(botao).toHaveFocus();
+      expect(screen.queryByText("Contando…")).toBeNull();
+      expect(screen.queryByText(/nesta consulta$/)).toBeNull();
+    },
+  );
+
+  it("B5 — 'Tentar novamente': bloco de erro montado, mesmo botão focado e indisponível, cliques repetidos ignorados; no sucesso, foco no campo de busca", async () => {
+    const srv = servidor("falha");
+    render(<ColaboradoresScreen />);
+    const tentar = await screen.findByRole("button", {
+      name: "Tentar novamente",
+    });
+    const tituloDoErro = screen.getByRole("heading", {
+      name: "Não foi possível carregar os colaboradores",
+    });
+    tentar.focus();
+    fireEvent.click(tentar);
+    await waitFor(() => expect(srv.leituras()).toBe(2));
+
+    // Durante a leitura: o mesmo bloco, o mesmo botão, focado.
+    expect(tentar).toBeInTheDocument();
+    expect(tentar).toHaveAttribute("aria-disabled", "true");
+    expect(tentar).toHaveFocus();
+    expect(tituloDoErro).toBeInTheDocument();
+    expect(screen.queryByText("Carregando colaboradores…")).toBeNull();
+    expect(
+      screen.queryByRole("table", { name: /^Colaboradores — / }),
+    ).toBeNull();
+    fireEvent.click(tentar);
+    fireEvent.click(tentar);
+    expect(srv.leituras()).toBe(2);
+
+    await srv.responder(respostaComAna());
+    await screen.findByRole("table", { name: /^Colaboradores — / });
+    await waitFor(() => expect(campoBusca()).toHaveFocus());
+    expect(document.activeElement).not.toBe(document.body);
+  });
+
+  it("B5 — nova falha: foco segue no botão e a falha é anunciada uma vez; a próxima tentativa limpa o anúncio", async () => {
+    const srv = servidor("falha");
+    render(<ColaboradoresScreen />);
+    const tentar = await screen.findByRole("button", {
+      name: "Tentar novamente",
+    });
+    tentar.focus();
+    fireEvent.click(tentar);
+    await waitFor(() => expect(srv.leituras()).toBe(2));
+    await srv.falhar();
+
+    expect(tentar).toBeInTheDocument();
+    expect(tentar).toHaveFocus();
+    expect(tentar).not.toHaveAttribute("aria-disabled", "true");
+    expect(anuncioDaLista()?.textContent).toBe(
+      "Não foi possível carregar os colaboradores.",
+    );
+    expect(screen.queryByText("Contando…")).toBeNull();
+
+    fireEvent.click(tentar);
+    expect(anuncioDaLista()?.textContent).toBe("");
+    await waitFor(() => expect(srv.leituras()).toBe(3));
+    await srv.responder(respostaComAna());
+    await waitFor(() => expect(campoBusca()).toHaveFocus());
+  });
+});

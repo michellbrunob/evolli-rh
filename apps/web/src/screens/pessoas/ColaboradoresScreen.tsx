@@ -468,6 +468,13 @@ export function ColaboradoresScreen({
   /** Anúncio único da falha de uma ação do vazio (região sempre montada). */
   const [anuncioDaLista, setAnuncioDaLista] = useState("");
   const [focoPendente, setFocoPendente] = useState<string | null>(null);
+  /**
+   * T199 — "Tentar novamente" do erro da tabela, no mesmo padrão seguro: o
+   * bloco de erro fica montado durante a nova leitura, com o mesmo botão
+   * focado e indisponível; no sucesso, o foco vai ao campo de busca; numa
+   * nova falha, fica no botão e a falha é anunciada uma vez.
+   */
+  const [repetindoErro, setRepetindoErro] = useState(false);
 
   const carregarDados = useCallback(
     async (
@@ -478,10 +485,13 @@ export function ColaboradoresScreen({
       silenciosa = false,
       // T199 — pedida por uma ação do estado vazio (ver `AcaoDoVazio`).
       daAcaoDoVazio = false,
+      // T199 — pedida pelo "Tentar novamente" do erro da tabela.
+      daRepeticaoDoErro = false,
     ) => {
       const pedido = ++pedidoListaRef.current;
       // Qualquer outra carga (aba, filtro, página, busca) encerra a ação.
       if (!daAcaoDoVazio) setAcaoDoVazio(null);
+      if (!daRepeticaoDoErro) setRepetindoErro(false);
       if (!silenciosa) setStatusCarregamento("carregando");
       try {
         // A empresa nunca entra na query: é a da sessão.
@@ -521,12 +531,20 @@ export function ColaboradoresScreen({
           }
           setAcaoDoVazio(null);
         }
+        if (daRepeticaoDoErro) {
+          setRepetindoErro(false);
+          setFocoPendente(ID_CAMPO_BUSCA);
+        }
       } catch {
         if (pedido !== pedidoListaRef.current) return;
         setStatusCarregamento("erro");
         const acao = acaoDoVazioRef.current;
         if (daAcaoDoVazio && acao) {
           setAcaoDoVazio({ ...acao, fase: "falha" });
+          setAnuncioDaLista(FALHA_DA_LISTA);
+        }
+        if (daRepeticaoDoErro) {
+          setRepetindoErro(false);
           setAnuncioDaLista(FALHA_DA_LISTA);
         }
       }
@@ -726,6 +744,15 @@ export function ColaboradoresScreen({
       cargaDaAcaoRef.current = true;
       mudarEstado(normalizado);
     }
+  }
+
+  /** "Tentar novamente" do erro da tabela: relê a mesma consulta. */
+  function repetirLeitura() {
+    if (repetindoErro) return;
+    // Limpa o anúncio antes: a mesma falha, de novo, é anunciada de novo.
+    setAnuncioDaLista("");
+    setRepetindoErro(true);
+    void carregarDados(estado, buscaAplicada, false, false, true);
   }
 
   /** Depois de uma falha: o estado já é o alvo; relê, no mesmo botão. */
@@ -1428,7 +1455,8 @@ export function ColaboradoresScreen({
                 </div>
               ) : null}
 
-              {statusCarregamento === "erro" && acaoDoVazio === null ? (
+              {(statusCarregamento === "erro" || repetindoErro) &&
+              acaoDoVazio === null ? (
                 <Surface
                   as="section"
                   padding="lg"
@@ -1448,7 +1476,8 @@ export function ColaboradoresScreen({
                   </p>
                   <Button
                     variant="secondary"
-                    onClick={() => void carregarDados(estado, buscaAplicada)}
+                    aria-disabled={repetindoErro}
+                    onClick={repetirLeitura}
                   >
                     Tentar novamente
                   </Button>
@@ -1456,16 +1485,20 @@ export function ColaboradoresScreen({
               ) : (
                 <>
                   {/* O total da consulta vem do SERVIDOR; sem região viva —
-                      a paginação já anuncia a posição. */}
-                  <p className="colaboradores-screen__contexto">
-                    <span className="colaboradores-screen__total">
-                      {statusCarregamento === "dados"
-                        ? total === 1
-                          ? "1 colaborador nesta consulta"
-                          : `${total} colaboradores nesta consulta`
-                        : "Contando…"}
-                    </span>
-                  </p>
+                      a paginação já anuncia a posição. Depois de uma falha
+                      (o estado vazio da ação segue à vista), nenhum total:
+                      nem "Contando…", nem o número de antes. */}
+                  {statusCarregamento !== "erro" ? (
+                    <p className="colaboradores-screen__contexto">
+                      <span className="colaboradores-screen__total">
+                        {statusCarregamento === "dados"
+                          ? total === 1
+                            ? "1 colaborador nesta consulta"
+                            : `${total} colaboradores nesta consulta`
+                          : "Contando…"}
+                      </span>
+                    </p>
+                  ) : null}
 
                   {acaoDoVazio ? (
                     /* T199 — o estado vazio que pediu a ação, no MESMO lugar
