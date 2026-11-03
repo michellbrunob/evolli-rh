@@ -695,11 +695,7 @@ export function App({
    * meio-tempo espera ele terminar: refeita antes, partiria da entrada errada.
    */
   const desfazendoRef = useRef<{ indiceDesfeito: number | null } | null>(null);
-  const refazerDepoisRef = useRef<{
-    passo: number;
-    indice: number;
-    url: string;
-  } | null>(null);
+  const refazerDepoisRef = useRef<{ indice: number; url: string } | null>(null);
   /**
    * T200 — saídas adiadas (voltar, avançar, rota digitada) aceitas e já
    * aplicadas: o efeito de foco abaixo roda depois que a tela nova montou.
@@ -982,10 +978,22 @@ export function App({
       window.history.go(-passo);
     }
 
-    /** Refaz a navegação aceita: o mesmo passo, agora sem perguntar. */
-    function refazer(passo: number, indice: number, url: string) {
+    /**
+     * Refaz a navegação aceita, agora sem perguntar, até a entrada de índice
+     * `indice`. O salto é contado na hora, a partir de onde o navegador está:
+     * com o diálogo aberto, uma âncora digitada muda essa posição, e o passo
+     * do pedido original levaria a outra entrada.
+     */
+    function refazer(indice: number, url: string) {
       if (desfazendoRef.current !== null) {
-        refazerDepoisRef.current = { passo, indice, url };
+        refazerDepoisRef.current = { indice, url };
+        return;
+      }
+      const passo = indice - indiceRef.current;
+      // O navegador já estaria na entrada de destino — o que, com os índices
+      // em ordem, não acontece. `go(0)` recarregaria a página: nada a refazer.
+      if (passo === 0) {
+        focarRegiaoPrincipal();
         return;
       }
       aceitaRef.current = { indice, url };
@@ -1005,7 +1013,7 @@ export function App({
           desfazendoRef.current = null;
           const depois = refazerDepoisRef.current;
           refazerDepoisRef.current = null;
-          if (depois) refazer(depois.passo, depois.indice, depois.url);
+          if (depois) refazer(depois.indice, depois.url);
           return;
         }
         if (indiceLido === desfazendo.indiceDesfeito) return;
@@ -1100,7 +1108,7 @@ export function App({
             guardaAtual.solicitarSaida({
               ...(area ? { area } : {}),
               adiada: true,
-              executar: () => refazer(passo, indiceNovo, urlPedida),
+              executar: () => refazer(indiceNovo, urlPedida),
             });
           }
           return;

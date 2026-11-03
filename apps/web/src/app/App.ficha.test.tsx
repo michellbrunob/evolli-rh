@@ -1623,5 +1623,40 @@ describe("T200 — guarda de saída no App", () => {
         redefinirLarguraDaJanela();
       }
     });
+
+    it("B10 — âncora digitada com o diálogo aberto: 'Sair sem salvar' chega exatamente ao destino do voltar, sem segunda pergunta e sem foco no body", async () => {
+      window.history.replaceState(null, "", `/${LISTAGEM}`);
+      montarComGuarda();
+      const tabela = await screen.findByRole("table", {
+        name: /^Colaboradores — /,
+      });
+      fireEvent.click(
+        within(tabela).getByRole("button", {
+          name: `Abrir ficha de ${ana.nome}`,
+        }),
+      );
+      await esperarFicha(ana.nome);
+      editarNome();
+
+      await navegador(() => window.history.back());
+      await esperarPergunta();
+      await waitFor(() => expect(window.location.hash).toBe(rotaDe(ana)));
+      // Com o diálogo ainda aberto, uma âncora digitada na barra: entrada
+      // nova, sem rota, que muda o índice em que o navegador está.
+      await navegador(() => {
+        window.location.hash = "#conteudo-principal";
+      });
+      expect(pergunta()).toBeInTheDocument();
+      expect(fichaNaTela()).not.toBeNull();
+
+      sairSemSalvar();
+      await navegador(() => undefined);
+      await navegador(() => undefined);
+      await screen.findByRole("table", { name: /^Colaboradores — / });
+      expect(window.location.hash).toBe(LISTAGEM);
+      expect(fichaNaTela()).toBeNull();
+      expect(screen.queryByRole("alertdialog")).toBeNull();
+      expect(document.activeElement).not.toBe(document.body);
+    });
   });
 });
