@@ -2778,11 +2778,21 @@ próprias (seção 13.4 do dossiê).
 
 **Fora de escopo:** foto, portal, salários, férias e ausências, benefícios, documentos, upload, R2, pesquisas, comentários, exportação, API nova, schema, migration, RBAC, seed, Docker, dependências, promoção e merge.
 
-## Dashboard de Colaboradores — T199 (em implementação)
+## Dashboard de Colaboradores — T199 (integrada)
 
-| Tarefa | Estado               | Resultado principal                                                                                           |
-| ------ | -------------------- | ------------------------------------------------------------------------------------------------------------- |
-| T199   | **Em implementação** | Dashboard de Colaboradores: indicadores reais, abas funcionais, tabela com abertura da ficha e estado na URL. |
+| Tarefa | Estado                                    | Resultado principal                                                                                           |
+| ------ | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| T199   | **Integrada** (PR #192, squash `6b3d24d`) | Dashboard de Colaboradores: indicadores reais, abas funcionais, tabela com abertura da ficha e estado na URL. |
+
+**Observação de relatório:** a integração funcional da T199 está concluída
+(CI de push 3/3 verde, run 41646155827); a única pendência administrativa era
+a sua convergência no Spec Kit, resolvida no primeiro commit da T200. As
+correções das revisões (estados de exceção, foco e anúncios nas ações de
+recuperação, filtros e chips que não perdem o foco) foram feitas dentro da
+entrega. Continuam como observações, sem decisão de mudança: custo da
+distribuição por tipo, total teórico do escopo global, limite de 100 itens nos
+catálogos, abas em largura média e a conferência de um id novo na URL durante
+uma recarga de catálogo.
 
 **Escopo da T199:** a listagem de Colaboradores vira dashboard (o
 [dossiê](../docs/decisions/t199-dossie-dashboard-colaboradores.md)):
@@ -2807,6 +2817,25 @@ em Ativos e Todos; ids da URL conferidos nos catálogos antes da consulta, com
 correção no lugar.
 
 **Fora de escopo:** guarda global de navegação do shell, "Referência técnica", exportação, ausências, férias, escala, organograma, CPF, salário, contatos na visão coletiva, documentos, R2, foto, portal, benefícios, pesquisas, comentários, schema, migration, RBAC novo, seed, Docker, dependências, promoção e merge.
+
+## Guarda de navegação com edição pendente — T200 (em preparação)
+
+| Tarefa | Estado            | Resultado principal                                                                                       |
+| ------ | ----------------- | --------------------------------------------------------------------------------------------------------- |
+| T200   | **Em preparação** | Preparação de decisão da guarda de navegação do shell para edição pendente (gate de produção de Pessoas). |
+
+**Escopo da T200:** só preparação de decisão, no
+[dossiê](../docs/decisions/t200-dossie-guarda-navegacao-edicao-pendente.md):
+levantamento das telas com edição pendente e de cada saída (rota interna, menu,
+Hub, Sair, voltar/avançar, recarregar/fechar aba, troca de empresa e rota
+direta), arquitetura reutilizável no shell, limites do aviso nativo do
+navegador, acessibilidade, segurança, duas abas, matriz de permissões e testes,
+e até três opções de escopo com recomendação. A guarda é o gate de produção do
+módulo Pessoas registrado desde a T198.
+
+**Decisões pendentes:** seção 11 do dossiê.
+
+**Fora de escopo:** implementação de produto, API, schema, migration, RBAC, auditoria, Docker, seed, dependências, workflow, push, PR, promoção e merge.
 
 ## Próxima ação autorizável
 

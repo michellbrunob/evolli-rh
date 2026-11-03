@@ -2955,8 +2955,23 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       R2, pesquisas, comentários, exportação, promoção e merge.
 
 96. **T199 - Dashboard de Colaboradores**
-    - **Estado:** **em implementação**. Branch `codex/t199-dashboard-colaboradores`, a partir
+    - **Estado:** **integrada** em `main` pela PR #192, squash
+      `6b3d24d72e080cbf9cce59f6246715b2bfb84b5e`, com a CI de push 3/3 verde (run 41646155827);
+      branch preservada. Implementada na branch `codex/t199-dashboard-colaboradores`, a partir
       do squash `cfcd901f7f1e3e6684c3e5a818994e96570d367f` (T198 integrada, PR #191).
+    - **Observação de relatório:** a integração funcional da T199 está concluída; a única
+      pendência administrativa era a sua convergência no Spec Kit, resolvida no primeiro commit
+      da T200. As correções das revisões (página fora do intervalo, limpeza de busca e filtros
+      numa única mudança, recuperação dos totais na aba Jornada, título da seção da tabela,
+      foco e paginação nas ações do estado vazio, total ausente depois de falha, repetição
+      segura do erro da tabela, selects de filtro sem `disabled` durante a releitura, foco nos
+      chips e na recarga dos catálogos) foram feitas dentro da entrega.
+    - **Observações que continuam (sem decisão de mudança):** custo da distribuição por tipo
+      (todos os vínculos ativos do escopo lidos a cada pedido); total teórico do escopo global
+      contando colaborador sem vínculo; limite de 100 itens nos catálogos de Departamento e
+      Cargo; faixa de abas que rola dentro do quadro em largura média; um id de lotação novo na
+      URL durante uma recarga de catálogo vai ao servidor antes de ser conferido (o escopo do
+      servidor nunca devolve outra empresa).
     - **Objetivo:** transformar a listagem de Colaboradores num dashboard com indicadores
       reais calculados no servidor (ativos, em admissão, desligados, total no escopo e
       distribuição dos ativos por tipo de vínculo), abas funcionais (Ativos, Em admissão,
@@ -2985,6 +3000,20 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       contratuais, exportação, ausências, férias, escala, organograma, CPF, salário, contatos
       na visão coletiva, documentos, R2, foto, portal, benefícios, pesquisas, comentários,
       schema, migration, RBAC novo, seed, Docker, dependências, promoção e merge.
+
+97. **T200 - Guarda de navegação com edição pendente (preparação de decisão)**
+    - **Estado:** **em preparação**. Branch `codex/t200-guarda-navegacao-edicao-pendente`, a
+      partir do squash `6b3d24d72e080cbf9cce59f6246715b2bfb84b5e` (T199 integrada, PR #192).
+    - **Objetivo:** decidir a guarda de navegação do shell para edição pendente — hoje só a
+      trilha da ficha e a troca de empresa confirmam o descarte; menu lateral, Hub, Sair,
+      voltar/avançar e recarregar podem perder alterações — no
+      [dossiê](../docs/decisions/t200-dossie-guarda-navegacao-edicao-pendente.md): levantamento
+      das telas com edição pendente e de cada saída, arquitetura reutilizável no shell, limites
+      do aviso nativo do navegador, acessibilidade, segurança, respostas pendentes, duas abas,
+      matriz de permissões e testes, e até três opções de escopo com recomendação.
+    - **Decisões pendentes:** as da seção 11 do dossiê.
+    - **Fora de escopo:** implementação de produto, API, schema, migration, RBAC, auditoria,
+      Docker, seed, dependências, workflow, push, PR, promoção e merge.
 
 ## Regra obrigatória para as próximas tarefas
 
