@@ -1783,6 +1783,23 @@ describe("T200 — guarda de saída no shell autenticado", () => {
     ).toBeInTheDocument();
   });
 
+  it("Hub: depois de 'Sair sem salvar', o foco vai à área do Hub — nunca ao body", async () => {
+    await novaAdmissaoComNome();
+    const hub = screen.getByRole("button", { name: "Hub" });
+    hub.focus();
+    fireEvent.click(hub);
+    fireEvent.click(
+      within(perguntaDeSaida()).getByRole("button", {
+        name: "Sair sem salvar",
+      }),
+    );
+    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
+    expect(document.activeElement).not.toBe(document.body);
+    expect(
+      document.getElementById("hub-conteudo")!.contains(document.activeElement),
+    ).toBe(true);
+  });
+
   it("Sair: continuar não encerra a sessão; sair sem salvar encerra, sem o aviso de perda (foi escolha)", async () => {
     await novaAdmissaoComNome();
     fireEvent.click(screen.getByRole("button", { name: "Sair" }));

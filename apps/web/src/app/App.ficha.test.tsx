@@ -1190,4 +1190,343 @@ describe("T200 — guarda de saída no App", () => {
     expect(screen.queryByRole("alertdialog")).toBeNull();
     expect(window.location.hash).toBe(LISTAGEM);
   });
+
+  describe("revisão adversarial", () => {
+    const jornadaAtiva = {
+      id: "tabela-1",
+      codigo: "ADM",
+      nome: "Administrativo (teste)",
+      ativo: true,
+    };
+    /** A Jornada com uma jornada ativa e um vínculo de Ana (link da ficha). */
+    function comJornadaAtiva() {
+      vi.mocked(listarTabelasHorario).mockResolvedValue(
+        paginado([jornadaAtiva]) as never,
+      );
+      vi.mocked(listarVinculosHorario).mockResolvedValue(
+        paginado([
+          {
+            id: "66666666-6666-4666-8666-666666666666",
+            colaboradorId: ana.id,
+            empresaId: EMPRESA,
+            tabelaHorarioId: jornadaAtiva.id,
+            tabela: jornadaAtiva,
+            colaborador: { id: ana.id, nome: ana.nome },
+            vigenciaInicio: "2025-01-10",
+            vigenciaFim: null,
+            criadoPorUserId: "77777777-7777-4777-8777-777777777777",
+            criadoEm: "2025-01-10T12:00:00.000Z",
+            atualizadoEm: "2025-01-10T12:00:00.000Z",
+          },
+        ]) as never,
+      );
+    }
+    const formularioDeVinculo = () =>
+      screen.queryByRole("form", {
+        name: "Formulário de novo vínculo de horário",
+      });
+    async function abrirNovoVinculo() {
+      const novo = await screen.findByRole("button", { name: "Novo vínculo" });
+      await waitFor(() => expect(novo).toBeEnabled());
+      fireEvent.click(novo);
+      await waitFor(() => expect(formularioDeVinculo()).not.toBeNull());
+    }
+    /** O foco num controle do formulário, como quem está digitando nele. */
+    function focarNoFormulario() {
+      const controle = formularioDeVinculo()!.querySelector<HTMLElement>(
+        "input, select, button",
+      )!;
+      controle.focus();
+      expect(controle).toHaveFocus();
+    }
+    const grupos = () =>
+      screen.getByRole("tablist", { name: "Grupos de colaboradores" });
+    async function irParaJornada() {
+      fireEvent.click(
+        within(grupos()).getByRole("tab", { name: /^Jornada de trabalho/ }),
+      );
+      await screen.findByRole("button", { name: "Novo vínculo" });
+    }
+    const principal = () => document.getElementById("conteudo-principal");
+    const sairSemSalvar = () =>
+      fireEvent.click(
+        within(pergunta()).getByRole("button", { name: "Sair sem salvar" }),
+      );
+    const continuarEditando = () =>
+      fireEvent.click(
+        within(pergunta()).getByRole("button", { name: "Continuar editando" }),
+      );
+
+    it("B1 — 'Pular para o conteúdo' foca o conteúdo sem mudar a URL nem criar entrada no histórico", async () => {
+      window.history.replaceState(null, "", `/${LISTAGEM}`);
+      montarComGuarda();
+      await screen.findByRole("table", { name: /^Colaboradores — / });
+      const entradas = window.history.length;
+      const estado: unknown = window.history.state;
+      const link = screen.getByRole("link", { name: "Pular para o conteúdo" });
+      // `false`: o padrão do link (navegar até a âncora) foi impedido.
+      expect(fireEvent.click(link)).toBe(false);
+      await navegador(() => undefined);
+      expect(window.history.length).toBe(entradas);
+      expect(window.history.state).toEqual(estado);
+      expect(window.location.hash).toBe(LISTAGEM);
+      expect(principal()).toHaveFocus();
+    });
+
+    it("B1 — âncora sem índice no meio do histórico: voltar continua perguntando, 'Sair sem salvar' executa e nada fica preso", async () => {
+      window.history.replaceState(null, "", `/${LISTAGEM}`);
+      montarComGuarda();
+      const tabela = await screen.findByRole("table", {
+        name: /^Colaboradores — /,
+      });
+      // Uma âncora da própria página aberta pelo navegador (digitada, ou um
+      // link antigo): entrada nova, sem o índice do shell.
+      await navegador(() => {
+        window.location.hash = "#conteudo-principal";
+      });
+      fireEvent.click(
+        within(tabela).getByRole("button", {
+          name: `Abrir ficha de ${ana.nome}`,
+        }),
+      );
+      await esperarFicha(ana.nome);
+      const campo = editarNome();
+
+      // Voltar até a âncora: não é rota, a ficha fica e nada pergunta.
+      await navegador(() => window.history.back());
+      expect(fichaNaTela()).not.toBeNull();
+      expect(screen.queryByRole("alertdialog")).toBeNull();
+      // Voltar até a listagem: pergunta; continuar fica na ficha.
+      await navegador(() => window.history.back());
+      await esperarPergunta();
+      await navegador(() => undefined);
+      continuarEditando();
+      expect(fichaNaTela()).not.toBeNull();
+      expect(campo.value).toBe("Ana Editada (teste)");
+
+      // De novo: pergunta outra vez, e "Sair sem salvar" vai à listagem.
+      await navegador(() => window.history.back());
+      await esperarPergunta();
+      await navegador(() => undefined);
+      sairSemSalvar();
+      await navegador(() => undefined);
+      await screen.findByRole("table", { name: /^Colaboradores — / });
+      expect(fichaNaTela()).toBeNull();
+      expect(window.location.hash).toBe(LISTAGEM);
+      expect(screen.queryByRole("alertdialog")).toBeNull();
+
+      // Nada ficou preso: avançar reabre a ficha (passando pela âncora), e
+      // com nova edição o voltar pergunta de novo.
+      await navegador(() => window.history.forward());
+      await navegador(() => window.history.forward());
+      await esperarFicha(ana.nome);
+      expect(screen.queryByRole("alertdialog")).toBeNull();
+      editarNome("Ana Outra Edição (teste)");
+      await navegador(() => window.history.go(-2));
+      await esperarPergunta();
+      expect(telasDaPergunta()).toEqual(["Ficha do colaborador"]);
+    });
+
+    it("B2 — ficha aberta pela Jornada: rota digitada que sai da Jornada pergunta pelo formulário; continuar o preserva; sair sem salvar descarta", async () => {
+      comJornadaAtiva();
+      window.history.replaceState(null, "", `/${LISTAGEM}?aba=jornada`);
+      montarComGuarda();
+      await abrirNovoVinculo();
+      fireEvent.click(
+        await screen.findByRole("button", {
+          name: `Abrir ficha de ${ana.nome}`,
+        }),
+      );
+      await esperarFicha(ana.nome);
+      const digitada = `${LISTAGEM}?aba=ativos`;
+
+      await navegador(() => {
+        window.location.hash = digitada;
+      });
+      await esperarPergunta();
+      expect(telasDaPergunta()).toEqual(["Horário de trabalho"]);
+      await navegador(() => undefined);
+      continuarEditando();
+      expect(fichaNaTela()).not.toBeNull();
+      // De volta à Jornada pela trilha (só a ficha sai, e ela está limpa):
+      // o formulário continua aberto.
+      fireEvent.click(
+        within(fichaNaTela()!).getByRole("button", { name: "Colaboradores" }),
+      );
+      await waitFor(() => expect(formularioDeVinculo()).not.toBeNull());
+      expect(screen.queryByRole("alertdialog")).toBeNull();
+
+      fireEvent.click(
+        await screen.findByRole("button", {
+          name: `Abrir ficha de ${ana.nome}`,
+        }),
+      );
+      await esperarFicha(ana.nome);
+      await navegador(() => {
+        window.location.hash = digitada;
+      });
+      await esperarPergunta();
+      await navegador(() => undefined);
+      sairSemSalvar();
+      await navegador(() => undefined);
+      await screen.findByRole("table", { name: "Colaboradores — Ativos" });
+      expect(fichaNaTela()).toBeNull();
+      expect(formularioDeVinculo()).toBeNull();
+    });
+
+    it("B2 — ficha aberta pela Jornada: dois passos de histórico até fora da Jornada perguntam; trocar a aba da ficha não", async () => {
+      comJornadaAtiva();
+      window.history.replaceState(null, "", `/${LISTAGEM}`);
+      montarComGuarda();
+      await screen.findByRole("table", { name: "Colaboradores — Ativos" });
+      await irParaJornada();
+      await abrirNovoVinculo();
+      fireEvent.click(
+        await screen.findByRole("button", {
+          name: `Abrir ficha de ${ana.nome}`,
+        }),
+      );
+      await esperarFicha(ana.nome);
+      // Saída isenta: trocar a aba da ficha não desmonta nada.
+      fireEvent.click(
+        within(fichaNaTela()!).getByRole("tab", { name: /^Jornada/ }),
+      );
+      expect(screen.queryByRole("alertdialog")).toBeNull();
+
+      await navegador(() => window.history.go(-3));
+      await esperarPergunta();
+      expect(telasDaPergunta()).toEqual(["Horário de trabalho"]);
+      await navegador(() => undefined);
+      continuarEditando();
+      expect(fichaNaTela()).not.toBeNull();
+
+      await navegador(() => window.history.go(-3));
+      await esperarPergunta();
+      await navegador(() => undefined);
+      sairSemSalvar();
+      await navegador(() => undefined);
+      await screen.findByRole("table", { name: "Colaboradores — Ativos" });
+      expect(formularioDeVinculo()).toBeNull();
+    });
+
+    it("B3 — voltar aceito: o foco vai ao conteúdo principal depois da navegação, nunca ao body", async () => {
+      comJornadaAtiva();
+      window.history.replaceState(null, "", `/${LISTAGEM}`);
+      montarComGuarda();
+      await screen.findByRole("table", { name: "Colaboradores — Ativos" });
+      await irParaJornada();
+      await abrirNovoVinculo();
+      focarNoFormulario();
+
+      await navegador(() => window.history.back());
+      await esperarPergunta();
+      await navegador(() => undefined);
+      sairSemSalvar();
+      await navegador(() => undefined);
+      await screen.findByRole("table", { name: "Colaboradores — Ativos" });
+      expect(formularioDeVinculo()).toBeNull();
+      expect(document.activeElement).not.toBe(document.body);
+      expect(principal()).toHaveFocus();
+    });
+
+    it("B3 — avançar aceito: o foco vai ao conteúdo principal depois da navegação, nunca ao body", async () => {
+      comJornadaAtiva();
+      window.history.replaceState(null, "", `/${LISTAGEM}`);
+      montarComGuarda();
+      await screen.findByRole("table", { name: "Colaboradores — Ativos" });
+      await irParaJornada();
+      fireEvent.click(within(grupos()).getByRole("tab", { name: /^Ativos/ }));
+      await screen.findByRole("table", { name: "Colaboradores — Ativos" });
+      await navegador(() => window.history.back());
+      await abrirNovoVinculo();
+      focarNoFormulario();
+
+      await navegador(() => window.history.forward());
+      await esperarPergunta();
+      await navegador(() => undefined);
+      sairSemSalvar();
+      await navegador(() => undefined);
+      await screen.findByRole("table", { name: "Colaboradores — Ativos" });
+      expect(document.activeElement).not.toBe(document.body);
+      expect(principal()).toHaveFocus();
+    });
+
+    it("B3 — rota digitada aceita: o foco vai ao conteúdo principal depois da navegação, nunca ao body", async () => {
+      comJornadaAtiva();
+      window.history.replaceState(null, "", `/${LISTAGEM}?aba=jornada`);
+      montarComGuarda();
+      await abrirNovoVinculo();
+      focarNoFormulario();
+
+      await navegador(() => {
+        window.location.hash = `${LISTAGEM}?aba=ativos`;
+      });
+      await esperarPergunta();
+      await navegador(() => undefined);
+      sairSemSalvar();
+      await navegador(() => undefined);
+      await screen.findByRole("table", { name: "Colaboradores — Ativos" });
+      expect(document.activeElement).not.toBe(document.body);
+      expect(principal()).toHaveFocus();
+    });
+
+    it("B5 — Jornadas de trabalho: o item do menu já ativo não pergunta; outro destino pergunta", async () => {
+      window.history.replaceState(null, "", `/${LISTAGEM}`);
+      montarComGuarda();
+      await screen.findByRole("table", { name: "Colaboradores — Ativos" });
+
+      // Jornadas de trabalho com o formulário aberto.
+      const jornadas = () =>
+        within(barra()).getByRole("button", { name: /^Jornadas de trabalho/ });
+      fireEvent.click(jornadas());
+      const nova = await screen.findAllByRole("button", {
+        name: "Nova jornada",
+      });
+      fireEvent.click(nova[0]!);
+      fireEvent.click(jornadas());
+      expect(screen.queryByRole("alertdialog")).toBeNull();
+      // Outro destino desmonta: pergunta.
+      fireEvent.click(
+        within(barra()).getByRole("button", { name: /^Colaboradores/ }),
+      );
+      expect(telasDaPergunta()).toEqual(["Jornadas de trabalho"]);
+      sairSemSalvar();
+      await screen.findByRole("table", { name: "Colaboradores — Ativos" });
+    });
+
+    it("B5 — Pessoas › Horário de trabalho: o item já ativo não troca a aba, então não pergunta", async () => {
+      comJornadaAtiva();
+      window.history.replaceState(null, "", `/${LISTAGEM}`);
+      montarComGuarda();
+      await screen.findByRole("table", { name: "Colaboradores — Ativos" });
+      const abas = screen.getByRole("tablist", { name: "Seções de Pessoas" });
+      fireEvent.click(
+        within(abas).getByRole("tab", { name: "Horário de trabalho" }),
+      );
+      await abrirNovoVinculo();
+      fireEvent.click(
+        within(barra()).getByRole("button", { name: /^Colaboradores/ }),
+      );
+      expect(screen.queryByRole("alertdialog")).toBeNull();
+      expect(formularioDeVinculo()).not.toBeNull();
+    });
+
+    it("B5 — Pessoas com a Jornada aberta: o item já ativo volta a listagem ao início, então pergunta", async () => {
+      comJornadaAtiva();
+      window.history.replaceState(null, "", `/${LISTAGEM}?aba=jornada`);
+      montarComGuarda();
+      await abrirNovoVinculo();
+      fireEvent.click(
+        within(barra()).getByRole("button", { name: /^Colaboradores/ }),
+      );
+      expect(telasDaPergunta()).toEqual(["Horário de trabalho"]);
+      continuarEditando();
+      expect(formularioDeVinculo()).not.toBeNull();
+      fireEvent.click(
+        within(barra()).getByRole("button", { name: /^Colaboradores/ }),
+      );
+      sairSemSalvar();
+      await screen.findByRole("table", { name: "Colaboradores — Ativos" });
+    });
+  });
 });

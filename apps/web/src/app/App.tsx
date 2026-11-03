@@ -124,7 +124,7 @@ import {
   rotaDoDestino,
 } from "./rotasDoShell";
 import { AREAS_DE_EDICAO, type AreaDeEdicaoId } from "./edicoesPendentes";
-import { useGuardaDeSaida } from "./guardaDeSaida";
+import { focarRegiaoPrincipal, useGuardaDeSaida } from "./guardaDeSaida";
 
 /**
  * T200 — índice próprio de cada entrada do histórico criada pelo shell, em
@@ -162,6 +162,32 @@ function rotaDoExibido(
   if (destinoId === "pessoas" && ficha !== null) return rotaDaFicha(ficha);
   if (destinoId === "pessoas") return rotaDaListagem(listagem);
   return rotaDoDestino(destinoId);
+}
+
+/**
+ * T200 — dentro de Colaboradores, o que sai da tela quando a ficha e a
+ * listagem exibidas mudam: a ficha (fechada, ou trocada por outro
+ * colaborador) e a aba Jornada do dashboard (a listagem sai dela, mesmo com a
+ * ficha aberta por cima). Abrir a ficha e trocar a aba dela não desmontam
+ * nada: a listagem fica montada, escondida.
+ */
+function areasDescartadasEmPessoas(
+  fichaAntes: RotaDaFicha | null,
+  listagemAntes: EstadoDaListagem,
+  fichaDepois: RotaDaFicha | null,
+  listagemDepois: EstadoDaListagem,
+): AreaDeEdicaoId[] {
+  const areas: AreaDeEdicaoId[] = [];
+  if (
+    fichaAntes !== null &&
+    fichaDepois?.colaboradorId !== fichaAntes.colaboradorId
+  ) {
+    areas.push(AREAS_DE_EDICAO.ficha);
+  }
+  if (listagemAntes.aba === "jornada" && listagemDepois.aba !== "jornada") {
+    areas.push(AREAS_DE_EDICAO.jornadaDoDashboard);
+  }
+  return areas;
 }
 
 /** `titleId` do `h1` de cada destino, para `aria-labelledby` do `<main>`.
@@ -652,24 +678,33 @@ export function App({
   const guarda = useGuardaDeSaida();
   const guardaRef = useRef(guarda);
   guardaRef.current = guarda;
-  /** T200 — o índice da entrada do histórico que a tela descreve agora. */
+  /**
+   * T200 — o índice da entrada do histórico em que o navegador está (a
+   * posição dela). Toda entrada percorrida ganha um, inclusive a de uma
+   * âncora da própria página: voltar e avançar contam passos certos.
+   */
   const indiceRef = useRef(indiceDoEstado(window.history.state) ?? 0);
-  /** T200 — a URL que a tela descreve agora (ver `aoMudarUrl`). */
-  const urlAplicadaRef = useRef(window.location.href);
-  /** T200 — a URL de uma navegação já aceita na guarda (não pergunta de novo). */
-  const urlAceitaRef = useRef<string | null>(null);
+  /** T200 — a navegação já aceita na guarda: refeita, não pergunta de novo. */
+  const aceitaRef = useRef<{ indice: number; url: string } | null>(null);
   /**
-   * T200 — o navegador ainda está desfazendo um passo (o `go` é assíncrono).
-   * Uma navegação aceita nesse meio-tempo espera ele terminar: refeita antes,
-   * partiria da entrada errada e se perderia.
+   * T200 — o passo que o navegador está desfazendo (o `go` é assíncrono), com
+   * o índice lido na entrada desfeita (`null`: ela não tinha). Só a chegada
+   * de volta à entrada de `indiceRef` o encerra — pelo índice, nunca pela
+   * URL; o outro evento do mesmo passo (`popstate` e `hashchange`) é
+   * ignorado, para não desfazer duas vezes. Uma navegação aceita nesse
+   * meio-tempo espera ele terminar: refeita antes, partiria da entrada errada.
    */
-  const desfazendoRef = useRef(false);
+  const desfazendoRef = useRef<{ indiceDesfeito: number | null } | null>(null);
+  const refazerDepoisRef = useRef<{
+    passo: number;
+    indice: number;
+    url: string;
+  } | null>(null);
   /**
-   * T200 — a URL que está sendo desfeita: o `hashchange` que chega junto do
-   * `popstate` do mesmo passo não desfaz de novo (andaria dois passos).
+   * T200 — saídas adiadas (voltar, avançar, rota digitada) aceitas e já
+   * aplicadas: o efeito de foco abaixo roda depois que a tela nova montou.
    */
-  const urlDesfeitaRef = useRef<string | null>(null);
-  const refazerDepoisRef = useRef<{ passo: number; url: string } | null>(null);
+  const [saidasConcluidas, setSaidasConcluidas] = useState(0);
   /** T200 — escreve no histórico levando o índice (`push` avança um). */
   const escreverNoHistorico = useCallback(
     (modo: "push" | "replace", url: string) => {
@@ -681,7 +716,6 @@ export function App({
         window.history.replaceState(estadoComIndice(indice), "", url);
       }
       indiceRef.current = indice;
-      urlAplicadaRef.current = window.location.href;
     },
     [],
   );
@@ -779,11 +813,30 @@ export function App({
   }, []);
   // T200 — menu, atalhos e as navegações das telas passam pela guarda: com
   // edição pendente, a troca de destino pergunta antes de descartar.
+  // O mesmo destino não desmonta a tela: só conta o que a volta da ficha e da
+  // listagem ao início descarta (em Colaboradores); nada, nos outros.
   const irPara = useCallback(
-    (destinoId: string) =>
-      guardaRef.current.solicitarSaida({
-        executar: () => irParaDireto(destinoId),
-      }),
+    (destinoId: string) => {
+      const executar = () => irParaDireto(destinoId);
+      if (destinoId !== destinoAtivoRef.current) {
+        guardaRef.current.solicitarSaida({ executar });
+        return;
+      }
+      const area =
+        destinoId === "pessoas"
+          ? areasDescartadasEmPessoas(
+              fichaAtualRef.current,
+              listagemAtualRef.current,
+              null,
+              ESTADO_INICIAL_DA_LISTAGEM,
+            )
+          : [];
+      if (area.length === 0) {
+        executar();
+        return;
+      }
+      guardaRef.current.solicitarSaida({ area, executar });
+    },
     [irParaDireto],
   );
 
@@ -877,8 +930,16 @@ export function App({
         escreverNoHistorico("push", rota);
       }
     }
-    urlAplicadaRef.current = window.location.href;
   }, [destinoAtivoId, ficha, listagem, escreverNoHistorico]);
+
+  // T200 — uma saída adiada (voltar, avançar, rota digitada) foi aceita e a
+  // tela nova já montou: o foco, que estava no diálogo, vai à região
+  // principal — a menos que a tela nova já o tenha posto em algum lugar.
+  useEffect(() => {
+    if (saidasConcluidas === 0) return;
+    const ativo = document.activeElement;
+    if (ativo === null || ativo === document.body) focarRegiaoPrincipal();
+  }, [saidasConcluidas]);
 
   // T189 — quem monta o shell sabe sempre o destino exibido: é para ele que
   // uma troca de empresa devolve. Ref, para não refazer o efeito a cada
@@ -894,89 +955,91 @@ export function App({
   useEffect(() => {
     /**
      * T200 — o que a navegação pedida desmontaria: `undefined` é a tela
-     * inteira (outro destino); uma área, só ela; `null`, nada.
+     * inteira (outro destino); uma lista de áreas, só elas; `null`, nada.
      */
     function areaDoDescarte(
       exibido: string,
       fichaExibida: RotaDaFicha | null,
       listagemExibida: EstadoDaListagem,
-    ): AreaDeEdicaoId | undefined | null {
+    ): AreaDeEdicaoId[] | undefined | null {
       if (exibido !== destinoAtivoRef.current) return undefined;
       if (exibido !== "pessoas") return null;
-      const fichaAntes = fichaAtualRef.current;
-      if (fichaAntes !== null) {
-        return fichaExibida?.colaboradorId === fichaAntes.colaboradorId
-          ? null
-          : AREAS_DE_EDICAO.ficha;
-      }
-      // Abrir a ficha não desmonta a listagem (ela fica, escondida).
-      if (fichaExibida !== null) return null;
-      return listagemAtualRef.current.aba === "jornada" &&
-        listagemExibida.aba !== "jornada"
-        ? AREAS_DE_EDICAO.jornadaDoDashboard
-        : null;
+      const areas = areasDescartadasEmPessoas(
+        fichaAtualRef.current,
+        listagemAtualRef.current,
+        fichaExibida,
+        listagemExibida,
+      );
+      return areas.length > 0 ? areas : null;
     }
 
-    /** Volta a URL para a que a tela descreve, sem trocar de tela. */
-    function desfazer(passo: number) {
-      if (passo !== 0) {
-        desfazendoRef.current = true;
-        urlDesfeitaRef.current = window.location.href;
-        window.history.go(-passo);
-        return;
-      }
-      window.history.replaceState(
-        estadoComIndice(indiceRef.current),
-        "",
-        urlAplicadaRef.current,
-      );
+    /**
+     * Volta o navegador à entrada que a tela descreve, sem trocar de tela.
+     * `indiceDesfeito`: o índice lido na entrada que está sendo desfeita.
+     */
+    function desfazer(passo: number, indiceDesfeito: number | null) {
+      desfazendoRef.current = { indiceDesfeito };
+      window.history.go(-passo);
     }
 
     /** Refaz a navegação aceita: o mesmo passo, agora sem perguntar. */
-    function refazer(passo: number, url: string) {
-      if (desfazendoRef.current) {
-        refazerDepoisRef.current = { passo, url };
+    function refazer(passo: number, indice: number, url: string) {
+      if (desfazendoRef.current !== null) {
+        refazerDepoisRef.current = { passo, indice, url };
         return;
       }
-      urlAceitaRef.current = url;
-      if (passo !== 0) {
-        window.history.go(passo);
-        return;
-      }
-      window.history.replaceState(window.history.state, "", url);
-      aoMudarUrl();
+      aceitaRef.current = { indice, url };
+      window.history.go(passo);
     }
 
     function aoMudarUrl() {
       const fragmento = window.location.hash;
-      // T178 — âncora da própria página (o link "Pular para o conteúdo" põe
-      // `#conteudo-principal` na URL e dispara `hashchange`): ninguém pediu
-      // outro destino, e a tela fica onde está.
-      if (!ehFragmentoDeRota(fragmento)) return;
-      // T200 — `popstate` e `hashchange` do mesmo passo, e a URL que a guarda
-      // acabou de desfazer: a tela já descreve esta URL.
       const urlPedida = window.location.href;
-      if (urlPedida === urlAplicadaRef.current) {
-        // O passo desfeito chegou: se a saída já foi aceita, refaz agora.
-        if (desfazendoRef.current) {
-          desfazendoRef.current = false;
-          urlDesfeitaRef.current = null;
+      const indiceLido = indiceDoEstado(window.history.state);
+      // T200 — o navegador desfazendo um passo da guarda: só a chegada de
+      // volta à entrada de `indiceRef` o encerra (e refaz a saída, se ela já
+      // foi aceita); o outro evento do passo desfeito é ignorado.
+      const desfazendo = desfazendoRef.current;
+      if (desfazendo !== null) {
+        if (indiceLido === indiceRef.current) {
+          desfazendoRef.current = null;
           const depois = refazerDepoisRef.current;
           refazerDepoisRef.current = null;
-          if (depois) refazer(depois.passo, depois.url);
+          if (depois) refazer(depois.passo, depois.indice, depois.url);
+          return;
         }
-        return;
+        if (indiceLido === desfazendo.indiceDesfeito) return;
+        // Outra entrada: a pessoa andou de novo no meio da reversão. Ela não
+        // chega mais; segue como navegação nova, sem refazer nada.
+        desfazendoRef.current = null;
+        refazerDepoisRef.current = null;
       }
-      // O outro evento do mesmo passo que já está sendo desfeito.
-      if (desfazendoRef.current && urlPedida === urlDesfeitaRef.current) {
-        return;
-      }
-      const indiceLido = indiceDoEstado(window.history.state);
+      // T200 — o outro evento (`popstate` e `hashchange`) de um passo já
+      // aplicado: a tela já descreve esta entrada.
+      if (indiceLido !== null && indiceLido === indiceRef.current) return;
       // Sem índice, é uma entrada que o navegador criou agora (rota digitada
       // ou link): fica logo depois da atual.
       const indiceNovo = indiceLido ?? indiceRef.current + 1;
-      const aceita = urlAceitaRef.current === urlPedida;
-      urlAceitaRef.current = null;
+      // T178 — âncora da própria página (digitada, ou de um link): ninguém
+      // pediu outro destino, e a tela fica onde está. T200 — a entrada ganha o
+      // índice da posição dela: sem ele, voltar e avançar contariam errado.
+      if (!ehFragmentoDeRota(fragmento)) {
+        if (indiceLido === null) {
+          window.history.replaceState(
+            estadoComIndice(indiceNovo),
+            "",
+            urlPedida,
+          );
+        }
+        indiceRef.current = indiceNovo;
+        return;
+      }
+      const aceitaAntes = aceitaRef.current;
+      aceitaRef.current = null;
+      const aceita =
+        aceitaAntes !== null &&
+        aceitaAntes.indice === indiceNovo &&
+        aceitaAntes.url === urlPedida;
       const pedido = destinoDaRota(fragmento);
       let exibido: string;
       if (pedido === null) {
@@ -1021,11 +1084,12 @@ export function App({
           (area !== null && guardaAtual.exigeConfirmacao(area ?? undefined))
         ) {
           const passo = indiceNovo - indiceRef.current;
-          desfazer(passo);
+          desfazer(passo, indiceLido);
           if (!ocupada) {
             guardaAtual.solicitarSaida({
               ...(area ? { area } : {}),
-              executar: () => refazer(passo, urlPedida),
+              adiada: true,
+              executar: () => refazer(passo, indiceNovo, urlPedida),
             });
           }
           return;
@@ -1049,8 +1113,8 @@ export function App({
           window.location.pathname + window.location.search,
         );
       }
-      urlAplicadaRef.current = window.location.href;
       setDestinoAtivoId(exibido);
+      if (aceita) setSaidasConcluidas((n) => n + 1);
     }
     window.addEventListener("popstate", aoMudarUrl);
     window.addEventListener("hashchange", aoMudarUrl);
@@ -1182,7 +1246,16 @@ export function App({
         gavetaModal ? "app-shell app-shell--gaveta-aberta" : "app-shell"
       }
     >
-      <a className="app-shell__skip-link" href="#conteudo-principal">
+      {/* T200 — o salto só move o foco: seguir a âncora criaria uma entrada
+          no histórico (e tiraria a rota da URL). */}
+      <a
+        className="app-shell__skip-link"
+        href="#conteudo-principal"
+        onClick={(evento) => {
+          evento.preventDefault();
+          mainRef.current?.focus();
+        }}
+      >
         Pular para o conteúdo
       </a>
 

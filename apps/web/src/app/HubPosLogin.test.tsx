@@ -216,6 +216,18 @@ describe("T162 — o Hub oferece só o que o servidor autoriza", () => {
     expect(abrir).toHaveBeenCalledWith("equipe");
   });
 
+  it("T200 — 'Pular para o conteúdo' foca a área do Hub sem mudar a URL nem criar entrada no histórico", () => {
+    montar({ papel: "rh" });
+    const entradas = window.history.length;
+    const url = window.location.href;
+    const link = screen.getByRole("link", { name: "Pular para o conteúdo" });
+    // `false`: o padrão do link (navegar até a âncora) foi impedido.
+    expect(fireEvent.click(link)).toBe(false);
+    expect(window.history.length).toBe(entradas);
+    expect(window.location.href).toBe(url);
+    expect(document.getElementById("hub-conteudo")).toHaveFocus();
+  });
+
   it("o bloco de Demonstração é nomeado como tal e não promete produto", async () => {
     montar({ papel: "rh" });
     expect(

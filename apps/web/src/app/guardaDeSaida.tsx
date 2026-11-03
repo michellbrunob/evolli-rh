@@ -56,17 +56,23 @@ export interface PedidoDeSaida {
   /** A saída em si: só roda sem pendência, ou depois de "Sair sem salvar". */
   readonly executar: () => void;
   /**
-   * Só as edições desta área contam (a saída desmonta só ela). Sem área,
-   * contam todas.
+   * Só as edições desta área contam (a saída desmonta só ela); numa lista,
+   * as de todas elas. Sem área, contam todas.
    */
-  readonly area?: AreaDeEdicaoId;
+  readonly area?: AreaDeEdicaoId | readonly AreaDeEdicaoId[];
+  /**
+   * A saída só começa em `executar` e termina depois (voltar/avançar do
+   * navegador, que é assíncrono). Depois de "Sair sem salvar", o foco não
+   * volta a quem pediu: quem conclui a saída cuida dele.
+   */
+  readonly adiada?: boolean;
 }
 
 export interface GuardaDeSaida {
   /** Pede a saída: executa já, ou depois da escolha explícita. */
   solicitarSaida(pedido: PedidoDeSaida): void;
   /** Há o que perguntar (edição pendente ou salvamento) nesta área? */
-  exigeConfirmacao(area?: AreaDeEdicaoId): boolean;
+  exigeConfirmacao(area?: AreaDeEdicaoId | readonly AreaDeEdicaoId[]): boolean;
   /** O diálogo da guarda está na tela. */
   ocupada(): boolean;
 }
@@ -82,6 +88,22 @@ const GuardaContext = createContext<GuardaDeSaida>(GUARDA_LIVRE);
 /** A guarda do shell (fora dele, uma que deixa sair sempre). */
 export function useGuardaDeSaida(): GuardaDeSaida {
   return useContext(GuardaContext);
+}
+
+/**
+ * Onde o foco descansa quando quem o tinha saiu da tela: a região principal
+ * do shell, a área do Hub ou, sem nenhuma delas, o `<main>`. Nunca o `body`.
+ */
+const REGIOES_PRINCIPAIS = ["#conteudo-principal", "#hub-conteudo", "main"];
+
+/** Foca a região principal que estiver na tela. `true` se conseguiu. */
+export function focarRegiaoPrincipal(): boolean {
+  for (const seletor of REGIOES_PRINCIPAIS) {
+    const regiao = document.querySelector<HTMLElement>(seletor);
+    regiao?.focus();
+    if (regiao && document.activeElement === regiao) return true;
+  }
+  return false;
 }
 
 interface PerguntaAberta {
@@ -178,7 +200,9 @@ export function ProvedorDeGuarda({
   const sairSemSalvar = useCallback(() => {
     const atual = perguntaRef.current;
     if (atual === null || atual.modo !== "confirmar") return;
-    focoDepoisRef.current = { alvo: atual.origem, saiu: true };
+    focoDepoisRef.current = atual.pedido.adiada
+      ? null
+      : { alvo: atual.origem, saiu: true };
     perguntaRef.current = null;
     setPergunta(null);
     executandoRef.current = true;
@@ -196,7 +220,8 @@ export function ProvedorDeGuarda({
 
   // O foco depois do diálogo: de volta a quem pediu, se ele ainda está na
   // tela; senão, depois de sair, à região principal — nunca o `body`. Roda
-  // depois dos efeitos da tela nova, que podem ter decidido o foco antes.
+  // depois dos efeitos da tela nova, que podem ter decidido o foco antes. A
+  // saída adiada não passa por aqui: quem a conclui cuida do foco.
   useEffect(() => {
     if (pergunta !== null) return;
     const depois = focoDepoisRef.current;
@@ -209,7 +234,7 @@ export function ProvedorDeGuarda({
     }
     const ativo = document.activeElement;
     if (saiu && ativo !== null && ativo !== document.body) return;
-    document.getElementById("conteudo-principal")?.focus();
+    focarRegiaoPrincipal();
   }, [pergunta]);
 
   // Recarregar e fechar a aba: só o aviso nativo, e só com o que perder.
@@ -296,7 +321,14 @@ function DialogoDeSaida({
 
   return (
     <div className="guarda-saida" role="presentation">
-      <div className="guarda-saida__fundo" aria-hidden="true" />
+      {/* O fundo não é focável: sem impedir o mousedown, o clique nele
+          levaria o foco ao `body`, fora do diálogo. Ele também não fecha
+          nem sai — só os botões decidem. */}
+      <div
+        className="guarda-saida__fundo"
+        aria-hidden="true"
+        onMouseDown={(evento) => evento.preventDefault()}
+      />
       <div
         className="guarda-saida__caixa"
         role="alertdialog"

@@ -123,26 +123,27 @@ export class RegistroDeEdicoes {
 
   /**
    * T200 — o resumo só das edições dentro de `area` (sem área: o registro
-   * inteiro). É o que uma saída que desmonta só essa parte descartaria.
+   * inteiro). É o que uma saída que desmonta só essa parte descartaria. Uma
+   * lista de áreas vale por todas elas juntas.
    */
-  resumir = (area?: string): ResumoDasEdicoes => {
+  resumir = (area?: string | readonly string[]): ResumoDasEdicoes => {
     if (area === undefined) return this.resumo;
     return resumoDe(this.daArea(area));
   };
 
   /** T200 — os avisos das edições pendentes (na área, se dada), sem repetição. */
-  avisos = (area?: string): readonly string[] =>
+  avisos = (area?: string | readonly string[]): readonly string[] =>
     unicos(
       this.daArea(area)
         .filter((v) => v.pendente && v.aviso)
         .map((v) => v.aviso as string),
     );
 
-  private daArea(area?: string): EstadoDaEdicao[] {
+  private daArea(area?: string | readonly string[]): EstadoDaEdicao[] {
     const valores = [...this.entradas.values()];
-    return area === undefined
-      ? valores
-      : valores.filter((v) => v.areas?.includes(area));
+    if (area === undefined) return valores;
+    const pedidas: readonly string[] = typeof area === "string" ? [area] : area;
+    return valores.filter((v) => v.areas?.some((a) => pedidas.includes(a)));
   }
 
   assinar = (ouvinte: () => void): (() => void) => {

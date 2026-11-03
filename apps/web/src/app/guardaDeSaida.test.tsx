@@ -214,6 +214,104 @@ describe("T200 — guarda de saída: o diálogo único", () => {
     expect(document.getElementById("conteudo-principal")).toHaveFocus();
   });
 
+  it("sem a região principal do shell (no Hub), o foco vai à área do Hub; sem ela, ao <main>", () => {
+    function Shell({ destino }: { destino: "hub" | "main" }) {
+      const [saiu, setSaiu] = useState(false);
+      if (saiu) {
+        return destino === "hub" ? (
+          <main id="hub-conteudo" tabIndex={-1}>
+            Seu acesso
+          </main>
+        ) : (
+          <main tabIndex={-1}>Outra página</main>
+        );
+      }
+      return (
+        <>
+          <Edicao rotulo="Nova admissão" />
+          <Saida rotulo="Hub" pedido={{ executar: () => setSaiu(true) }} />
+        </>
+      );
+    }
+    for (const destino of ["hub", "main"] as const) {
+      const registro = new RegistroDeEdicoes();
+      const { unmount } = render(
+        <ProvedorDeEdicoes registro={registro}>
+          <ProvedorDeGuarda>
+            <Shell destino={destino} />
+          </ProvedorDeGuarda>
+        </ProvedorDeEdicoes>,
+      );
+      const hub = screen.getByRole("button", { name: "Hub" });
+      hub.focus();
+      fireEvent.click(hub);
+      fireEvent.click(
+        within(dialogo()).getByRole("button", { name: "Sair sem salvar" }),
+      );
+      expect(document.activeElement).not.toBe(document.body);
+      expect(screen.getByRole("main")).toHaveFocus();
+      unmount();
+    }
+  });
+
+  it("saída adiada (o navegador a conclui depois): o foco não volta a quem pediu — quem conclui decide", () => {
+    const executar = vi.fn();
+    montar(
+      <>
+        <Edicao rotulo="Ficha do colaborador" />
+        <Saida rotulo="Voltar" pedido={{ executar, adiada: true }} />
+      </>,
+    );
+    const botao = screen.getByRole("button", { name: "Voltar" });
+    botao.focus();
+    fireEvent.click(botao);
+    fireEvent.click(
+      within(dialogo()).getByRole("button", { name: "Sair sem salvar" }),
+    );
+    expect(executar).toHaveBeenCalledTimes(1);
+    expect(botao).not.toHaveFocus();
+
+    // "Continuar editando" numa saída adiada devolve o foco normalmente.
+    botao.focus();
+    fireEvent.click(botao);
+    fireEvent.click(
+      within(dialogo()).getByRole("button", { name: "Continuar editando" }),
+    );
+    expect(botao).toHaveFocus();
+  });
+
+  it("clique no fundo: o foco fica no diálogo, que continua aberto, e nada sai", () => {
+    const executar = vi.fn();
+    montar(
+      <>
+        <Edicao rotulo="Solicitações" />
+        <Saida pedido={{ executar }} />
+      </>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Ir para Ponto" }));
+    const continuar = within(dialogo()).getByRole("button", {
+      name: "Continuar editando",
+    });
+    expect(continuar).toHaveFocus();
+    const fundo = document.querySelector<HTMLElement>(".guarda-saida__fundo")!;
+    // `false`: o padrão do mousedown foi impedido — o navegador não leva o
+    // foco para fora do diálogo (no navegador real, iria ao body).
+    expect(fireEvent.mouseDown(fundo)).toBe(false);
+    fireEvent.mouseUp(fundo);
+    fireEvent.click(fundo);
+    expect(continuar).toHaveFocus();
+    expect(dialogo()).toBeInTheDocument();
+    expect(executar).not.toHaveBeenCalled();
+    // Tab e Escape continuam valendo.
+    fireEvent.keyDown(continuar, { key: "Tab" });
+    expect(
+      within(dialogo()).getByRole("button", { name: "Sair sem salvar" }),
+    ).toHaveFocus();
+    fireEvent.keyDown(document.activeElement!, { key: "Escape" });
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(executar).not.toHaveBeenCalled();
+  });
+
   it("um pedido aninhado durante a saída aceita passa direto (uma pergunta só por saída)", () => {
     const final = vi.fn();
     function Dupla() {
@@ -349,6 +447,50 @@ describe("T200 — guarda de saída: áreas", () => {
     fireEvent.click(screen.getByRole("button", { name: "Aba Desligados" }));
     expect(executar).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole("alertdialog")).toBeNull();
+  });
+
+  it("uma saída que desmonta duas áreas pergunta pelas duas — e só por elas", () => {
+    const executar = vi.fn();
+    montar(
+      <>
+        <AreaDeEdicao id={AREAS_DE_EDICAO.painelPessoas}>
+          <Edicao rotulo="Documentos" />
+          <AreaDeEdicao id={AREAS_DE_EDICAO.jornadaDoDashboard}>
+            <Edicao rotulo="Horário de trabalho" />
+          </AreaDeEdicao>
+        </AreaDeEdicao>
+        <AreaDeEdicao id={AREAS_DE_EDICAO.ficha}>
+          <Edicao rotulo="Ficha do colaborador" pendente={false} />
+        </AreaDeEdicao>
+        <Saida
+          rotulo="Ativos"
+          pedido={{
+            area: [AREAS_DE_EDICAO.ficha, AREAS_DE_EDICAO.jornadaDoDashboard],
+            executar,
+          }}
+        />
+        <Saida
+          rotulo="Outra ficha"
+          pedido={{
+            area: [AREAS_DE_EDICAO.ficha, AREAS_DE_EDICAO.painelCadastros],
+            executar,
+          }}
+        />
+      </>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Ativos" }));
+    expect(
+      within(dialogo())
+        .getAllByRole("listitem")
+        .map((li) => li.textContent),
+    ).toEqual(["Horário de trabalho"]);
+    fireEvent.click(
+      within(dialogo()).getByRole("button", { name: "Continuar editando" }),
+    );
+    // Nada pendente nas áreas pedidas: sai direto.
+    fireEvent.click(screen.getByRole("button", { name: "Outra ficha" }));
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(executar).toHaveBeenCalledTimes(1);
   });
 
   it("áreas aninhadas: a edição de dentro conta para a de fora", () => {

@@ -179,6 +179,7 @@ export function HubPosLogin({
   const produtos = capacidadeFuncionalDe(papelDoAtor);
 
   const tituloRef = useRef<HTMLHeadingElement | null>(null);
+  const areaRef = useRef<HTMLElement | null>(null);
   const focarTituloRef = useRef(focarTituloAoAbrir);
   useEffect(() => {
     if (!focarTituloRef.current) return;
@@ -190,7 +191,16 @@ export function HubPosLogin({
 
   return (
     <div className="hub">
-      <a className="hub__skip-link" href="#hub-conteudo">
+      {/* T200 — o salto só move o foco: seguir a âncora criaria uma entrada
+          no histórico. */}
+      <a
+        className="hub__skip-link"
+        href="#hub-conteudo"
+        onClick={(evento) => {
+          evento.preventDefault();
+          areaRef.current?.focus();
+        }}
+      >
         Pular para o conteúdo
       </a>
 
@@ -209,7 +219,9 @@ export function HubPosLogin({
         </div>
       </header>
 
-      <main className="hub__area" id="hub-conteudo">
+      {/* T200 — focável por script: destino do salto e da guarda de saída
+          quando quem tinha o foco saiu da tela. */}
+      <main className="hub__area" id="hub-conteudo" tabIndex={-1} ref={areaRef}>
         <div className="hub__area-inner">
           <h1 className="hub__titulo" ref={tituloRef} tabIndex={-1}>
             Seu acesso
