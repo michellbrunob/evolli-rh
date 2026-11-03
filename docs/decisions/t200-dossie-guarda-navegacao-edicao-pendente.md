@@ -341,7 +341,14 @@ dessa parte. `AreaDeEdicao` marca a subárvore e `useEdicaoEmAndamento`
 registra o caminho de áreas; `resumir(area)` filtra. As áreas desta entrega
 são: ficha, painel de Pessoas (abas internas), aba Jornada do dashboard,
 painel de Cadastros (abas internas) e painel do Ponto. Uma saída sem área
-(outro destino, Hub, Sair) pergunta por tudo.
+(outro destino, Hub, Sair) pergunta por tudo. Uma saída que desmonta mais de
+uma área pergunta por todas elas: com a ficha aberta por cima da aba Jornada,
+sair para outra aba da listagem conta a ficha e a Jornada.
+
+**Menu no destino já ativo.** O item do destino que já está na tela não
+desmonta nada e sai direto, sem perguntar. A exceção é Colaboradores: o item
+fecha a ficha e volta a listagem ao início, então pergunta pela ficha e pela
+aba Jornada, se elas forem descartadas.
 
 **Quem chama a guarda.** Menu lateral e atalhos do shell (`irPara`), Hub, Sair,
 a trilha e o "voltar" da ficha, as abas internas de Pessoas, Cadastros e Ponto,
@@ -355,24 +362,43 @@ declaração da tela, que o diálogo exibe abaixo da lista.
 `aria-labelledby`/`aria-describedby`. A descrição lista os rótulos das telas
 (nunca o conteúdo digitado). "Continuar editando" é o padrão: recebe o foco
 inicial e responde ao Escape. O foco fica preso no diálogo e o resto da árvore
-fica `inert`. Ao fechar, o foco volta à origem; se a origem saiu da tela, vai
-ao conteúdo principal. A 375 px os botões ocupam a largura e não há rolagem
-horizontal.
+fica `inert`; o clique no fundo não tira o foco do diálogo, não fecha e não
+sai. Ao fechar, o foco volta à origem; se a origem saiu da tela, vai à região
+principal: o conteúdo do shell, ou a área do Hub depois de "Sair sem salvar"
+para o Hub. Nas saídas do navegador (voltar, avançar, rota digitada), o foco
+é decidido só depois que a navegação aceita termina. A 375 px os botões
+ocupam a largura e não há rolagem horizontal.
 
 **Salvamento em andamento.** O diálogo explica que há um salvamento em curso,
 oferece só "Entendi" e não navega sozinho quando ele termina (G-5).
 
-**Voltar/avançar e rota digitada.** Cada entrada do histórico escrita pelo
-shell leva o próprio índice em `history.state` (`evolliIndice`), e as
-correções no lugar o preservam. Ao chegar uma navegação do navegador que
+**Voltar/avançar e rota digitada.** Cada entrada do histórico leva o próprio
+índice em `history.state` (`evolliIndice`): as que o shell escreve, as que o
+navegador cria (rota digitada, âncora da página) assim que são percorridas, e
+as correções no lugar o preservam. Ao chegar uma navegação do navegador que
 desmontaria algo pendente, o shell volta o navegador para a entrada que a tela
-descreve (`history.go(-passo)`, ou `replaceState` para a rota digitada), sem
-criar entrada, e pergunta. "Sair sem salvar" refaz o mesmo passo, marcado como
-aceito. O `popstate` e o `hashchange` do mesmo passo são deduplicados (sem
-desfazer dois passos), e uma escolha feita antes de o navegador terminar de
-desfazer espera a reversão chegar. Parâmetros e fragmento da URL são
-preservados. Abrir a ficha a partir da listagem não pergunta (a listagem fica
-montada); trocar de ficha ou sair dela pergunta pela área da ficha.
+descreve com `history.go(-passo)` e pergunta. A reversão termina quando o
+navegador chega de volta à entrada com o índice da tela; a chegada é
+reconhecida pelo índice, nunca pela URL. "Sair sem salvar" refaz o mesmo
+passo, marcado como aceito. O `popstate` e o `hashchange` do mesmo passo são
+deduplicados (sem desfazer dois passos), e uma escolha feita antes de o
+navegador terminar de desfazer espera a reversão chegar. Parâmetros e
+fragmento da URL são preservados. Abrir a ficha a partir da listagem não
+pergunta (a listagem fica montada); trocar de ficha ou sair dela pergunta pela
+área da ficha.
+
+A rota digitada é uma entrada nova que o navegador cria. Com pendência, o
+shell a desfaz com `history.go(-1)`: a URL volta à da tela, e a entrada
+digitada fica no histórico como entrada de avançar (como em qualquer
+navegação, ela toma o lugar das entradas que estavam à frente). O histórico
+não volta, portanto, ao tamanho de antes. Avançar até ela é uma navegação como
+outra qualquer e pergunta de novo. "Sair sem salvar" vai até ela.
+
+**Pular para o conteúdo.** Os links de salto do shell e do Hub só movem o foco
+para a região principal: não seguem a âncora, não mudam a URL e não criam
+entrada no histórico. Uma âncora da página aberta de outro jeito (digitada)
+não troca a tela; a entrada dela ganha índice, para que voltar e avançar
+continuem contando passos certos.
 
 **Recarregar e fechar a aba.** `beforeunload` só fica registrado enquanto há
 pendência ou salvamento; o texto é o do navegador. A navegação do navegador
