@@ -216,6 +216,39 @@ function normalizarBusca(termo: string): string {
   return termo.trim().slice(0, BUSCA_COLABORADORES_MAXIMO).trim();
 }
 
+/**
+ * T199 — uma ação disparada de um estado vazio ("Ir para a primeira página",
+ * "Limpar filtros"). O estado vazio que a pediu fica montado, como estava,
+ * até a resposta: o botão conserva o foco, indisponível. No sucesso, o foco
+ * vai ao destino; numa falha, fica no botão e a falha é anunciada uma vez.
+ */
+interface AcaoDoVazio {
+  readonly titulo: string;
+  readonly descricao: string;
+  readonly rotulo: string;
+  /** `id` de quem recebe o foco quando a leitura dá certo. */
+  readonly destinoDoFoco: string;
+  readonly fase: "carregando" | "falha";
+}
+
+/** O campo de busca: destino do foco depois de limpar filtros ou busca. */
+const ID_CAMPO_BUSCA = "colaboradores-busca";
+
+const FALHA_DA_LISTA = "Não foi possível carregar os colaboradores.";
+
+const DESCRICAO_PAGINA_VAZIA =
+  "Esta página voltou vazia, embora a consulta tenha colaboradores: o conjunto pode ter mudado desde a última leitura.";
+
+function mesmoEstado(a: EstadoDaListagem, b: EstadoDaListagem): boolean {
+  return (
+    a.aba === b.aba &&
+    a.pagina === b.pagina &&
+    a.departamentoId === b.departamentoId &&
+    a.cargoId === b.cargoId &&
+    a.tipo === b.tipo
+  );
+}
+
 /** Concordância de "N vínculo(s)", para o texto lido por leitor de tela. */
 function vinculosAMais(quantidade: number): string {
   return quantidade === 1 ? "1 vínculo" : `${quantidade} vínculos`;
@@ -333,6 +366,7 @@ export function ColaboradoresScreen({
   const prefixo = useId();
   const idDaAba = (aba: AbaDaListagem) => `${prefixo}-aba-${aba}`;
   const idDoPainel = `${prefixo}-painel`;
+  const idDoTituloDaSecao = `${prefixo}-secao-titulo`;
 
   // T199 — controlado pelo shell (URL) ou, montado sozinho, pelo próprio
   // componente. Sempre normalizado: lotação só onde ela existe.
@@ -404,6 +438,14 @@ export function ColaboradoresScreen({
    * recente — um filtro trocado depressa nunca é sobrescrito pelo anterior.
    */
   const pedidoListaRef = useRef(0);
+  const [acaoDoVazio, setAcaoDoVazio] = useState<AcaoDoVazio | null>(null);
+  const acaoDoVazioRef = useRef(acaoDoVazio);
+  acaoDoVazioRef.current = acaoDoVazio;
+  /** A próxima carga do efeito foi pedida pela ação do estado vazio. */
+  const cargaDaAcaoRef = useRef(false);
+  /** Anúncio único da falha de uma ação do vazio (região sempre montada). */
+  const [anuncioDaLista, setAnuncioDaLista] = useState("");
+  const [focoPendente, setFocoPendente] = useState<string | null>(null);
 
   const carregarDados = useCallback(
     async (
@@ -412,8 +454,12 @@ export function ColaboradoresScreen({
       // T198 — a releitura na volta da ficha não troca a tabela pelo aviso
       // de carregamento: as linhas (e o botão que recebe o foco) continuam.
       silenciosa = false,
+      // T199 — pedida por uma ação do estado vazio (ver `AcaoDoVazio`).
+      daAcaoDoVazio = false,
     ) => {
       const pedido = ++pedidoListaRef.current;
+      // Qualquer outra carga (aba, filtro, página, busca) encerra a ação.
+      if (!daAcaoDoVazio) setAcaoDoVazio(null);
       if (!silenciosa) setStatusCarregamento("carregando");
       try {
         // A empresa nunca entra na query: é a da sessão.
@@ -437,13 +483,29 @@ export function ColaboradoresScreen({
         setContadores(resp.contadores);
         setFalhaContadores(false);
         setStatusCarregamento("dados");
+        if (daAcaoDoVazio) {
+          setFocoPendente(acaoDoVazioRef.current?.destinoDoFoco ?? null);
+          setAcaoDoVazio(null);
+        }
       } catch {
         if (pedido !== pedidoListaRef.current) return;
         setStatusCarregamento("erro");
+        const acao = acaoDoVazioRef.current;
+        if (daAcaoDoVazio && acao) {
+          setAcaoDoVazio({ ...acao, fase: "falha" });
+          setAnuncioDaLista(FALHA_DA_LISTA);
+        }
       }
     },
     [],
   );
+
+  // O destino do foco depois de uma ação, quando ele já está na tela.
+  useEffect(() => {
+    if (!focoPendente) return;
+    document.getElementById(focoPendente)?.focus();
+    setFocoPendente(null);
+  }, [focoPendente]);
 
   /**
    * T199 — um id de lotação vindo da URL só vira consulta depois de
@@ -489,9 +551,13 @@ export function ColaboradoresScreen({
   // jornada é outra visão: o dashboard não consulta a listagem por ela.
   useEffect(() => {
     if (!temTabela || aguardandoCatalogos || lotacaoDesconhecida) return;
+    const daAcaoDoVazio = cargaDaAcaoRef.current;
+    cargaDaAcaoRef.current = false;
     void carregarDados(
       { aba, pagina: estado.pagina, departamentoId, cargoId, tipo },
       buscaAplicada,
+      false,
+      daAcaoDoVazio,
     );
   }, [
     temTabela,
@@ -607,6 +673,35 @@ export function ColaboradoresScreen({
       ? catalogos.cargos.find((c) => c.id === cargoId)
       : undefined;
 
+  /**
+   * T199 — dispara a ação de um estado vazio: congela o estado vazio como
+   * está e leva ao estado `alvo` (uma única mudança); se o estado já é o
+   * alvo, relê direto. Cliques durante a leitura são ignorados.
+   */
+  function iniciarAcaoDoVazio(
+    acao: Omit<AcaoDoVazio, "fase">,
+    alvo: EstadoDaListagem,
+  ) {
+    if (acaoDoVazio?.fase === "carregando") return;
+    setAnuncioDaLista("");
+    setAcaoDoVazio({ ...acao, fase: "carregando" });
+    const normalizado = normalizarEstadoDaListagem(alvo);
+    if (mesmoEstado(normalizado, estado)) {
+      void carregarDados(normalizado, buscaAplicada, false, true);
+    } else {
+      cargaDaAcaoRef.current = true;
+      mudarEstado(normalizado);
+    }
+  }
+
+  /** Depois de uma falha: o estado já é o alvo; relê, no mesmo botão. */
+  function repetirAcaoDoVazio() {
+    if (!acaoDoVazio || acaoDoVazio.fase === "carregando") return;
+    setAnuncioDaLista("");
+    setAcaoDoVazio({ ...acaoDoVazio, fase: "carregando" });
+    void carregarDados(estado, buscaAplicada, false, true);
+  }
+
   function irParaPagina(destino: number) {
     if (destino < 1 || destino > totalPaginas || carregando) return;
     mudarEstado({ ...estado, pagina: destino });
@@ -658,17 +753,6 @@ export function ColaboradoresScreen({
     campoBuscaRef.current?.focus();
   }
 
-  /** T190/T199 — lotação e tipo saem; aba e busca ficam. */
-  function limparFiltros() {
-    mudarEstado({
-      ...estado,
-      pagina: 1,
-      departamentoId: null,
-      cargoId: null,
-      tipo: null,
-    });
-  }
-
   /**
    * T199 — busca, lotação e tipo saem numa ÚNICA mudança de estado: duas
    * (filtros, depois página) partiriam do mesmo estado antigo, e a segunda
@@ -701,10 +785,32 @@ export function ColaboradoresScreen({
       };
     }
     if (!buscaAplicada) {
+      const titulo = "Nenhum colaborador com estes filtros";
+      const descricao = `Nenhum colaborador em “${ROTULO_DA_ABA[aba]}” corresponde aos filtros selecionados.`;
       return {
-        titulo: "Nenhum colaborador com estes filtros",
-        descricao: `Nenhum colaborador em “${ROTULO_DA_ABA[aba]}” corresponde aos filtros selecionados.`,
-        acao: { rotulo: "Limpar filtros", executar: limparFiltros },
+        titulo,
+        descricao,
+        acao: {
+          rotulo: "Limpar filtros",
+          // T199 — do estado vazio: ele segue montado durante a leitura e,
+          // no fim, o foco vai ao campo de busca.
+          executar: () =>
+            iniciarAcaoDoVazio(
+              {
+                titulo,
+                descricao,
+                rotulo: "Limpar filtros",
+                destinoDoFoco: ID_CAMPO_BUSCA,
+              },
+              {
+                ...estado,
+                pagina: 1,
+                departamentoId: null,
+                cargoId: null,
+                tipo: null,
+              },
+            ),
+        },
       };
     }
     return {
@@ -1060,9 +1166,19 @@ export function ColaboradoresScreen({
               {/* T199 — o título da seção da aba: os estados vazios (h3)
                   e o erro ficam abaixo dele, e não de "Totais…". Só para
                   leitor de tela; a aba selecionada já o mostra. */}
-              <h2 className="colaboradores-screen__so-leitor">
+              <h2
+                id={idDoTituloDaSecao}
+                className="colaboradores-screen__so-leitor"
+                tabIndex={-1}
+              >
                 {`Colaboradores — ${ROTULO_DA_ABA[aba]}`}
               </h2>
+              <p
+                className="colaboradores-screen__anuncio-lista colaboradores-screen__so-leitor"
+                role="status"
+              >
+                {anuncioDaLista}
+              </p>
               <div className="colaboradores-screen__filtros">
                 <form
                   role="search"
@@ -1282,7 +1398,7 @@ export function ColaboradoresScreen({
                 </div>
               ) : null}
 
-              {statusCarregamento === "erro" ? (
+              {statusCarregamento === "erro" && acaoDoVazio === null ? (
                 <Surface
                   as="section"
                   padding="lg"
@@ -1321,7 +1437,29 @@ export function ColaboradoresScreen({
                     </span>
                   </p>
 
-                  {statusCarregamento === "carregando" ? (
+                  {acaoDoVazio ? (
+                    /* T199 — o estado vazio que pediu a ação, no MESMO lugar
+                       e com o mesmo botão (o foco fica nele). */
+                    <EmptyState
+                      headingLevel={3}
+                      icon="—"
+                      title={acaoDoVazio.titulo}
+                      description={
+                        acaoDoVazio.fase === "falha"
+                          ? `${FALHA_DA_LISTA} Verifique sua conexão e tente novamente.`
+                          : acaoDoVazio.descricao
+                      }
+                      action={
+                        <Button
+                          variant="secondary"
+                          aria-disabled={acaoDoVazio.fase === "carregando"}
+                          onClick={repetirAcaoDoVazio}
+                        >
+                          {acaoDoVazio.rotulo}
+                        </Button>
+                      }
+                    />
+                  ) : statusCarregamento === "carregando" ? (
                     <p
                       className="colaboradores-screen__carregando"
                       role="status"
@@ -1336,14 +1474,20 @@ export function ColaboradoresScreen({
                       headingLevel={3}
                       icon="—"
                       title="Nenhum colaborador nesta página"
-                      description="Esta página voltou vazia, embora a consulta tenha colaboradores: o conjunto pode ter mudado desde a última leitura."
+                      description={DESCRICAO_PAGINA_VAZIA}
                       action={
                         <Button
                           variant="secondary"
                           onClick={() =>
-                            estado.pagina === 1
-                              ? void carregarDados(estado, buscaAplicada)
-                              : mudarEstado({ ...estado, pagina: 1 })
+                            iniciarAcaoDoVazio(
+                              {
+                                titulo: "Nenhum colaborador nesta página",
+                                descricao: DESCRICAO_PAGINA_VAZIA,
+                                rotulo: "Ir para a primeira página",
+                                destinoDoFoco: idDoTituloDaSecao,
+                              },
+                              { ...estado, pagina: 1 },
+                            )
                           }
                         >
                           Ir para a primeira página
@@ -1415,7 +1559,9 @@ export function ColaboradoresScreen({
                   {/* T164/R-2 — a navegação fica fora do ramo que troca na
                       carga e usa `aria-disabled`: o botão focado continua
                       focado enquanto a página nova chega. */}
-                  {totalPaginas > 1 ? (
+                  {/* Página além do fim: o estado vazio já oferece a
+                      primeira; nada de "Página 4 de 2". */}
+                  {totalPaginas > 1 && paginaRespondida <= totalPaginas ? (
                     <nav
                       className="colaboradores-screen__paginacao"
                       aria-label="Paginação de colaboradores"

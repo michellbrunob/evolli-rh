@@ -5515,3 +5515,238 @@ describe("T199 (revisão) — título da seção da tabela", () => {
     ).toEqual(["Jornada de trabalho"]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// T199 (revisão B3) — ações do estado vazio: o estado vazio fica montado
+// durante a nova leitura, o botão conserva o foco (indisponível), cliques
+// repetidos são ignorados; no sucesso o foco vai a um destino estável; numa
+// nova falha fica no botão e a falha é anunciada uma vez. E nenhuma
+// paginação "Página X de Y" com X > Y.
+// ---------------------------------------------------------------------------
+describe("T199 (revisão B3) — ações do estado vazio e paginação fora do intervalo", () => {
+  type Resposta = Awaited<ReturnType<typeof listarColaboradores>>;
+  const anuncioDaLista = () =>
+    document.querySelector(".colaboradores-screen__anuncio-lista");
+  const tituloDaSecao = (rotulo: string) =>
+    screen.getByRole("heading", {
+      level: 2,
+      name: `Colaboradores — ${rotulo}`,
+    });
+
+  function vazia(pagina: number, total: number): Resposta {
+    return {
+      itens: [],
+      pagina,
+      tamanhoPagina: 20,
+      total,
+      contadores: CONTADORES_CHEIOS,
+    };
+  }
+  function comAna(): Resposta {
+    return {
+      itens: [colaborador1],
+      pagina: 1,
+      tamanhoPagina: 20,
+      total: 1,
+      contadores: CONTADORES_CHEIOS,
+    };
+  }
+
+  /** Primeira leitura: a dada; as seguintes, uma a uma, controladas. */
+  function servidor(primeira: Resposta) {
+    const pendentes: {
+      resolver: (r: Resposta) => void;
+      rejeitar: (e: unknown) => void;
+    }[] = [];
+    let lidas = 0;
+    vi.mocked(listarColaboradores).mockImplementation(() => {
+      lidas += 1;
+      if (lidas === 1) return Promise.resolve(primeira);
+      return new Promise<Resposta>((resolver, rejeitar) => {
+        pendentes.push({ resolver, rejeitar });
+      });
+    });
+    return {
+      leituras: () => lidas,
+      async responder(r: Resposta) {
+        await act(async () => {
+          pendentes.shift()!.resolver(r);
+        });
+      },
+      async falhar() {
+        await act(async () => {
+          pendentes.shift()!.rejeitar(new Error("falha"));
+        });
+      },
+    };
+  }
+
+  it("'Ir para a primeira página': vazio montado, foco no botão indisponível, clique repetido ignorado; no sucesso, foco no h2 da seção", async () => {
+    const srv = servidor(vazia(4, 3));
+    render(
+      <DashboardComEstado
+        inicial={{ ...ESTADO_PADRAO, aba: "todos", tipo: "pj", pagina: 4 }}
+        onMudanca={vi.fn()}
+      />,
+    );
+    const ir = await screen.findByRole("button", {
+      name: "Ir para a primeira página",
+    });
+    ir.focus();
+    fireEvent.click(ir);
+    await waitFor(() => expect(srv.leituras()).toBe(2));
+    // Durante a leitura: o mesmo botão, indisponível e com o foco.
+    expect(ir).toBeInTheDocument();
+    expect(ir).toHaveAttribute("aria-disabled", "true");
+    expect(ir).toHaveFocus();
+    expect(
+      screen.getByRole("heading", { name: "Nenhum colaborador nesta página" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Carregando colaboradores…")).toBeNull();
+    fireEvent.click(ir);
+    fireEvent.click(ir);
+    expect(srv.leituras()).toBe(2);
+
+    await srv.responder(comAna());
+    await screen.findByRole("table", { name: "Colaboradores — Todos" });
+    await waitFor(() => expect(tituloDaSecao("Todos")).toHaveFocus());
+    expect(tituloDaSecao("Todos")).toHaveAttribute("tabindex", "-1");
+  });
+
+  it("'Ir para a primeira página' com nova falha: foco segue no botão, falha anunciada uma vez; repetir e conseguir leva ao h2", async () => {
+    const srv = servidor(vazia(4, 3));
+    render(
+      <DashboardComEstado
+        inicial={{ ...ESTADO_PADRAO, aba: "todos", tipo: "pj", pagina: 4 }}
+        onMudanca={vi.fn()}
+      />,
+    );
+    const ir = await screen.findByRole("button", {
+      name: "Ir para a primeira página",
+    });
+    ir.focus();
+    fireEvent.click(ir);
+    await waitFor(() => expect(srv.leituras()).toBe(2));
+    await srv.falhar();
+
+    expect(ir).toBeInTheDocument();
+    expect(ir).toHaveFocus();
+    expect(ir).not.toHaveAttribute("aria-disabled", "true");
+    expect(anuncioDaLista()?.textContent).toBe(
+      "Não foi possível carregar os colaboradores.",
+    );
+    // O estado vazio segue montado e diz o que houve; nenhum aviso a mais.
+    expect(
+      screen.getByRole("heading", { name: "Nenhum colaborador nesta página" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).toBeNull();
+
+    fireEvent.click(ir);
+    // A nova tentativa limpa o anúncio, para a próxima falha ser lida de novo.
+    expect(anuncioDaLista()?.textContent).toBe("");
+    await waitFor(() => expect(srv.leituras()).toBe(3));
+    await srv.responder(comAna());
+    await waitFor(() => expect(tituloDaSecao("Todos")).toHaveFocus());
+  });
+
+  it("'Limpar filtros' a partir do vazio: o foco não cai no body; no sucesso vai ao campo de busca; uma única mudança de estado", async () => {
+    const srv = servidor(vazia(1, 0));
+    const onMudanca = vi.fn();
+    render(
+      <DashboardComEstado
+        inicial={{ ...ESTADO_PADRAO, tipo: "pj" }}
+        onMudanca={onMudanca}
+      />,
+    );
+    const limpar = await screen.findByRole("button", {
+      name: "Limpar filtros",
+    });
+    limpar.focus();
+    fireEvent.click(limpar);
+    await waitFor(() => expect(srv.leituras()).toBe(2));
+    expect(limpar).toBeInTheDocument();
+    expect(limpar).toHaveAttribute("aria-disabled", "true");
+    expect(limpar).toHaveFocus();
+    expect(document.activeElement).not.toBe(document.body);
+    fireEvent.click(limpar);
+    expect(srv.leituras()).toBe(2);
+    expect(onMudanca.mock.calls).toEqual([[ESTADO_PADRAO]]);
+
+    await srv.responder(comAna());
+    await screen.findByRole("table", { name: "Colaboradores — Ativos" });
+    await waitFor(() => expect(campoBusca()).toHaveFocus());
+    expect(screen.getByLabelText("Tipo de vínculo")).toHaveValue("");
+  });
+
+  it("'Limpar filtros' com nova falha: foco no botão e falha anunciada uma vez; repetir relê sem mudar o estado de novo", async () => {
+    const srv = servidor(vazia(1, 0));
+    const onMudanca = vi.fn();
+    render(
+      <DashboardComEstado
+        inicial={{ ...ESTADO_PADRAO, tipo: "pj" }}
+        onMudanca={onMudanca}
+      />,
+    );
+    const limpar = await screen.findByRole("button", {
+      name: "Limpar filtros",
+    });
+    limpar.focus();
+    fireEvent.click(limpar);
+    await waitFor(() => expect(srv.leituras()).toBe(2));
+    await srv.falhar();
+    expect(limpar).toHaveFocus();
+    expect(limpar).not.toHaveAttribute("aria-disabled", "true");
+    expect(anuncioDaLista()?.textContent).toBe(
+      "Não foi possível carregar os colaboradores.",
+    );
+
+    // O estado já está sem filtros: repetir relê direto.
+    fireEvent.click(limpar);
+    await waitFor(() => expect(srv.leituras()).toBe(3));
+    expect(onMudanca).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(listarColaboradores).mock.lastCall?.[0]).toEqual({
+      pagina: 1,
+      tamanhoPagina: 20,
+      grupo: "ativos",
+    });
+    await srv.responder(comAna());
+    await waitFor(() => expect(campoBusca()).toHaveFocus());
+  });
+
+  it("página 4 quando só há 2 páginas: 'nesta página', sem paginação 'Página 4 de 2'", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue(vazia(4, 24));
+    render(
+      <DashboardComEstado
+        inicial={{ ...ESTADO_PADRAO, aba: "todos", tipo: "pj", pagina: 4 }}
+        onMudanca={vi.fn()}
+      />,
+    );
+    await screen.findByRole("heading", {
+      name: "Nenhum colaborador nesta página",
+    });
+    expect(screen.queryByText(/Página 4 de/)).toBeNull();
+    expect(
+      screen.queryByRole("navigation", { name: "Paginação de colaboradores" }),
+    ).toBeNull();
+  });
+
+  it("página dentro do intervalo: a paginação normal continua", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue({
+      itens: [colaborador1],
+      pagina: 2,
+      tamanhoPagina: 20,
+      total: 45,
+      contadores: CONTADORES_CHEIOS,
+    });
+    render(
+      <DashboardComEstado
+        inicial={{ ...ESTADO_PADRAO, pagina: 2 }}
+        onMudanca={vi.fn()}
+      />,
+    );
+    expect(await screen.findByText("Página 2 de 3")).toBeInTheDocument();
+    expect(
+      screen.getByRole("navigation", { name: "Paginação de colaboradores" }),
+    ).toBeInTheDocument();
+  });
+});
