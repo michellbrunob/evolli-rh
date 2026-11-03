@@ -20,6 +20,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import { ComGuardaDeSaida } from "../test/ComGuardaDeSaida";
 import {
+  definirLarguraDaJanela,
+  redefinirLarguraDaJanela,
+} from "../test/viewport";
+import {
   ABAS_DA_FICHA,
   destinoDaRota,
   fichaDaRota,
@@ -1325,6 +1329,11 @@ describe("T200 — guarda de saída no App", () => {
       await navegador(() => window.history.go(-2));
       await esperarPergunta();
       expect(telasDaPergunta()).toEqual(["Ficha do colaborador"]);
+      // A reversão chega de volta à ficha (o navegador termina de andar
+      // antes de o teste acabar, sem vazar para o próximo).
+      await waitFor(() => expect(window.location.hash).toBe(rotaDe(ana)));
+      continuarEditando();
+      expect(fichaNaTela()).not.toBeNull();
     });
 
     it("B2 — ficha aberta pela Jornada: rota digitada que sai da Jornada pergunta pelo formulário; continuar o preserva; sair sem salvar descarta", async () => {
@@ -1527,6 +1536,92 @@ describe("T200 — guarda de saída no App", () => {
       );
       sairSemSalvar();
       await screen.findByRole("table", { name: "Colaboradores — Ativos" });
+    });
+
+    it("B7 — rota digitada desfeita ganha índice: o salto de dois passos até ela pergunta e 'Sair sem salvar' chega exatamente a ela", async () => {
+      window.history.replaceState(null, "", `/${LISTAGEM}`);
+      montarComGuarda();
+      const tabela = await screen.findByRole("table", {
+        name: /^Colaboradores — /,
+      });
+      fireEvent.click(
+        within(tabela).getByRole("button", {
+          name: `Abrir ficha de ${ana.nome}`,
+        }),
+      );
+      await esperarFicha(ana.nome);
+      const campo = editarNome();
+      // Trocar a aba da ficha é uma entrada nova, sem nada a perguntar.
+      fireEvent.click(
+        within(fichaNaTela()!).getByRole("tab", { name: /^Jornada/ }),
+      );
+      await waitFor(() =>
+        expect(window.location.hash).toBe(rotaDe(ana, "jornada")),
+      );
+      const digitada = `${LISTAGEM}?aba=desligados`;
+
+      await navegador(() => {
+        window.location.hash = digitada;
+      });
+      await esperarPergunta();
+      await navegador(() => undefined);
+      continuarEditando();
+      expect(window.location.hash).toBe(rotaDe(ana, "jornada"));
+      // A entrada digitada ficou à frente, já com o índice dela.
+      await navegador(() => window.history.back());
+      expect(window.location.hash).toBe(rotaDe(ana));
+      expect(screen.queryByRole("alertdialog")).toBeNull();
+
+      // Salto de dois passos até a rota digitada: pergunta.
+      await navegador(() => window.history.go(2));
+      await esperarPergunta();
+      expect(telasDaPergunta()).toEqual(["Ficha do colaborador"]);
+      await navegador(() => undefined);
+      expect(window.location.hash).toBe(rotaDe(ana));
+      expect(campo.value).toBe("Ana Editada (teste)");
+
+      sairSemSalvar();
+      await navegador(() => undefined);
+      await navegador(() => undefined);
+      await screen.findByRole("table", { name: "Colaboradores — Desligados" });
+      expect(window.location.hash).toBe(digitada);
+      expect(fichaNaTela()).toBeNull();
+      expect(screen.queryByRole("alertdialog")).toBeNull();
+    });
+
+    it("B8 — gaveta aberta e voltar aceito: a gaveta fecha e o foco chega a um destino fora de [inert], nunca ao body", async () => {
+      definirLarguraDaJanela(375);
+      try {
+        window.history.replaceState(null, "", `/${LISTAGEM}`);
+        montarComGuarda();
+        const tabela = await screen.findByRole("table", {
+          name: /^Colaboradores — /,
+        });
+        fireEvent.click(
+          within(tabela).getByRole("button", {
+            name: `Abrir ficha de ${ana.nome}`,
+          }),
+        );
+        await esperarFicha(ana.nome);
+        editarNome();
+        const menu = screen.getByRole("button", { name: "Menu" });
+        fireEvent.click(menu);
+        expect(menu).toHaveAttribute("aria-expanded", "true");
+
+        await navegador(() => window.history.back());
+        await esperarPergunta();
+        await navegador(() => undefined);
+        sairSemSalvar();
+        await navegador(() => undefined);
+        await waitFor(() => expect(fichaNaTela()).toBeNull());
+        expect(menu).toHaveAttribute("aria-expanded", "false");
+        await screen.findByRole("table", { name: /^Colaboradores — / });
+        const ativo = document.activeElement;
+        expect(ativo).not.toBe(document.body);
+        expect(ativo?.closest("[inert]")).toBeNull();
+      } finally {
+        redefinirLarguraDaJanela();
+      }
     });
   });
 });

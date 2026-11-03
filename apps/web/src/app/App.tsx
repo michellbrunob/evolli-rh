@@ -1084,7 +1084,18 @@ export function App({
           (area !== null && guardaAtual.exigeConfirmacao(area ?? undefined))
         ) {
           const passo = indiceNovo - indiceRef.current;
-          desfazer(passo, indiceLido);
+          // A entrada sem índice (rota digitada, criada agora logo depois da
+          // atual) ganha o dela antes de ser desfeita: fica à frente como
+          // entrada de avançar, e um salto de vários passos até ela precisa
+          // saber onde ela está.
+          if (indiceLido === null) {
+            window.history.replaceState(
+              estadoComIndice(indiceNovo),
+              "",
+              urlPedida,
+            );
+          }
+          desfazer(passo, indiceNovo);
           if (!ocupada) {
             guardaAtual.solicitarSaida({
               ...(area ? { area } : {}),
@@ -1099,6 +1110,9 @@ export function App({
       if (indiceLido === null) {
         window.history.replaceState(estadoComIndice(indiceNovo), "", urlPedida);
       }
+      // T200 — como em `irParaDireto`: navegar fecha a gaveta. Aberta, ela
+      // deixaria o conteúdo principal inerte, sem como receber o foco.
+      setGavetaAberta(false);
       setFicha(fichaExibida);
       if (fichaExibida === null) setFocarContatosNaFicha(false);
       setListagem(listagemExibida);

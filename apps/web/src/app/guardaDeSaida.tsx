@@ -96,12 +96,18 @@ export function useGuardaDeSaida(): GuardaDeSaida {
  */
 const REGIOES_PRINCIPAIS = ["#conteudo-principal", "#hub-conteudo", "main"];
 
-/** Foca a região principal que estiver na tela. `true` se conseguiu. */
+/**
+ * Foca a região principal que estiver disponível. Uma região dentro de
+ * `[inert]` (atrás da gaveta aberta, por exemplo) não conta. `true` se
+ * conseguiu.
+ */
 export function focarRegiaoPrincipal(): boolean {
   for (const seletor of REGIOES_PRINCIPAIS) {
-    const regiao = document.querySelector<HTMLElement>(seletor);
-    regiao?.focus();
-    if (regiao && document.activeElement === regiao) return true;
+    for (const regiao of document.querySelectorAll<HTMLElement>(seletor)) {
+      if (regiao.closest("[inert]") !== null) continue;
+      regiao.focus();
+      if (document.activeElement === regiao) return true;
+    }
   }
   return false;
 }

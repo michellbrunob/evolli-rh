@@ -17,6 +17,7 @@ import {
 import {
   type PedidoDeSaida,
   ProvedorDeGuarda,
+  focarRegiaoPrincipal,
   useGuardaDeSaida,
 } from "./guardaDeSaida";
 
@@ -79,6 +80,9 @@ function montar(
 
 const dialogo = () =>
   screen.getByRole("alertdialog", { name: "Sair sem salvar?" });
+
+/** `inert` como o shell o aplica (o React 18 não tipa o atributo). */
+const INERTE_NO_TESTE = { inert: "" } as Record<string, string>;
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -252,6 +256,34 @@ describe("T200 — guarda de saída: o diálogo único", () => {
       expect(screen.getByRole("main")).toHaveFocus();
       unmount();
     }
+  });
+
+  it("a região principal dentro de [inert] (gaveta aberta) não serve: vale a próxima disponível; sem nenhuma, nada é focado", () => {
+    const { unmount } = render(
+      <>
+        <div {...INERTE_NO_TESTE}>
+          <main id="conteudo-principal" tabIndex={-1}>
+            Conteúdo atrás da gaveta
+          </main>
+        </div>
+        <main id="hub-conteudo" tabIndex={-1}>
+          Área disponível
+        </main>
+      </>,
+    );
+    expect(focarRegiaoPrincipal()).toBe(true);
+    expect(document.getElementById("hub-conteudo")).toHaveFocus();
+    unmount();
+
+    render(
+      <div {...INERTE_NO_TESTE}>
+        <main id="conteudo-principal" tabIndex={-1}>
+          Conteúdo atrás da gaveta
+        </main>
+      </div>,
+    );
+    expect(focarRegiaoPrincipal()).toBe(false);
+    expect(document.getElementById("conteudo-principal")).not.toHaveFocus();
   });
 
   it("saída adiada (o navegador a conclui depois): o foco não volta a quem pediu — quem conclui decide", () => {
