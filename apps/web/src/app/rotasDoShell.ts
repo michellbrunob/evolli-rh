@@ -96,12 +96,147 @@ export function rotaDaFicha(ficha: RotaDaFicha): string {
 }
 
 /**
+ * T199 — as abas do dashboard de Colaboradores. Ativos é a inicial (N-6);
+ * "jornada" mostra a visão de jornadas que já existia (N-4).
+ */
+export const ABAS_DA_LISTAGEM = [
+  "ativos",
+  "em-admissao",
+  "desligados",
+  "todos",
+  "jornada",
+] as const;
+export type AbaDaListagem = (typeof ABAS_DA_LISTAGEM)[number];
+
+/**
+ * T199 — os tipos de vínculo controlados. Aqui, e não importados do cliente da
+ * API, porque os testes automockam aquele módulo (e listas viram vazias).
+ */
+export const TIPOS_DE_VINCULO = [
+  "clt",
+  "estagio",
+  "pj",
+  "temporario",
+  "outro_controlado",
+] as const;
+export type TipoDeVinculo = (typeof TIPOS_DE_VINCULO)[number];
+
+/**
+ * T199 — o que o dashboard guarda na URL (D-3): aba, página e os ids dos
+ * filtros. **Nunca o texto da busca**, que pode ser nome ou matrícula — dado
+ * pessoal não vai para a URL, o histórico ou o servidor de log.
+ */
+export interface EstadoDaListagem {
+  readonly aba: AbaDaListagem;
+  readonly pagina: number;
+  readonly departamentoId: string | null;
+  readonly cargoId: string | null;
+  readonly tipo: TipoDeVinculo | null;
+}
+
+/**
+ * T199 — como o dashboard pede uma mudança de estado ao shell. `substituir`:
+ * é uma CORREÇÃO (um id da URL que não existe nos catálogos da empresa), não
+ * uma navegação — a URL é corrigida no lugar, sem entrada no histórico, para
+ * o "voltar" não cair de novo no endereço inválido.
+ */
+export interface OpcoesDaMudancaDaListagem {
+  readonly substituir?: boolean;
+}
+
+export const ESTADO_INICIAL_DA_LISTAGEM: EstadoDaListagem = {
+  aba: "ativos",
+  pagina: 1,
+  departamentoId: null,
+  cargoId: null,
+  tipo: null,
+};
+
+const ROTA_DA_LISTAGEM = "#/pessoas/colaboradores";
+const PAGINA_MAXIMA = 100_000;
+
+/**
+ * T199 — abas com filtro de lotação: a lotação vigente só existe em vínculo
+ * ATIVO (T184, T190), então Departamento e Cargo nunca casariam em "Em
+ * admissão" nem em "Desligados".
+ */
+export function abaTemLotacao(aba: AbaDaListagem): boolean {
+  return aba === "ativos" || aba === "todos";
+}
+
+/**
+ * T199 — o estado coerente com a aba: lotação só onde ela existe; a aba de
+ * jornada (outra visão, com paginação e filtros próprios) não leva página,
+ * lotação nem tipo.
+ */
+export function normalizarEstadoDaListagem(
+  estado: EstadoDaListagem,
+): EstadoDaListagem {
+  if (estado.aba === "jornada") {
+    return { ...ESTADO_INICIAL_DA_LISTAGEM, aba: "jornada" };
+  }
+  return abaTemLotacao(estado.aba)
+    ? estado
+    : { ...estado, departamentoId: null, cargoId: null };
+}
+
+/**
+ * T199 — o estado do dashboard pedido pelo fragmento, ou `null` se ele não é a
+ * rota da listagem. Valor inválido (aba desconhecida, página que não é inteiro
+ * positivo, id que não é UUID, tipo fora dos controlados) cai no padrão seguro
+ * — nunca vira consulta. Qualquer outro parâmetro é ignorado, inclusive uma
+ * busca colada na URL.
+ */
+export function listagemDaRota(fragmento: string): EstadoDaListagem | null {
+  if (fragmento === ROTA_DA_LISTAGEM) return ESTADO_INICIAL_DA_LISTAGEM;
+  if (!fragmento.startsWith(`${ROTA_DA_LISTAGEM}?`)) return null;
+  const params = new URLSearchParams(
+    fragmento.slice(ROTA_DA_LISTAGEM.length + 1),
+  );
+  const aba = params.get("aba") ?? "";
+  const pagina = params.get("pagina") ?? "";
+  const numero = /^[1-9][0-9]{0,5}$/.test(pagina) ? Number(pagina) : 1;
+  const uuid = (valor: string | null) =>
+    valor !== null && UUID.test(valor) ? valor.toLowerCase() : null;
+  const tipo = params.get("tipo") ?? "";
+  return normalizarEstadoDaListagem({
+    aba: (ABAS_DA_LISTAGEM as readonly string[]).includes(aba)
+      ? (aba as AbaDaListagem)
+      : ESTADO_INICIAL_DA_LISTAGEM.aba,
+    pagina: numero <= PAGINA_MAXIMA ? numero : 1,
+    departamentoId: uuid(params.get("departamento")),
+    cargoId: uuid(params.get("cargo")),
+    tipo: (TIPOS_DE_VINCULO as readonly string[]).includes(tipo)
+      ? (tipo as TipoDeVinculo)
+      : null,
+  });
+}
+
+/**
+ * T199 — o endereço do dashboard: só o que difere do padrão, sempre na mesma
+ * ordem (o mesmo estado dá sempre a mesma URL).
+ */
+export function rotaDaListagem(estado: EstadoDaListagem): string {
+  const e = normalizarEstadoDaListagem(estado);
+  const params = new URLSearchParams();
+  if (e.aba !== ESTADO_INICIAL_DA_LISTAGEM.aba) params.set("aba", e.aba);
+  if (e.pagina > 1) params.set("pagina", String(e.pagina));
+  if (e.departamentoId) params.set("departamento", e.departamentoId);
+  if (e.cargoId) params.set("cargo", e.cargoId);
+  if (e.tipo) params.set("tipo", e.tipo);
+  const qs = params.toString();
+  return qs ? `${ROTA_DA_LISTAGEM}?${qs}` : ROTA_DA_LISTAGEM;
+}
+
+/**
  * O destino que o fragmento pede, ou `null` se ele não é rota conhecida.
  * T198 — a ficha pertence ao destino `pessoas` (o mesmo contêiner, a mesma
  * capacidade por papel): quem abre Colaboradores abre a ficha.
+ * T199 — o dashboard com estado na URL também.
  */
 export function destinoDaRota(fragmento: string): string | null {
   if (fichaDaRota(fragmento) !== null) return "pessoas";
+  if (listagemDaRota(fragmento) !== null) return "pessoas";
   const entrada = Object.entries(ROTA_POR_DESTINO).find(
     ([, rota]) => rota === fragmento,
   );

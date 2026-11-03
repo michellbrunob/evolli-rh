@@ -72,6 +72,8 @@ export interface VinculoListadoApi {
   empresaId: string;
   /** T179 — `null` quando a admissão não informou matrícula. */
   matricula: string | null;
+  /** T199 — tipo do vínculo (CLT, estágio, PJ…). */
+  tipo: TipoVinculo;
   situacao: SituacaoVinculo;
   /** Dia civil (`@db.Date`); exibir só com `formatarDiaCivil`. */
   dataAdmissao: string;
@@ -117,7 +119,20 @@ export interface ColaboradorListadoApi extends ColaboradorApi {
 export interface ContadoresColaboradoresApi {
   ativos: number;
   inativos: number;
+  /**
+   * T199 — grupos exclusivos, com prioridade ativo > previsto > encerrado:
+   * `ativos + emAdmissao + desligados = total`. Contados no servidor, sem
+   * busca nem filtros.
+   */
+  emAdmissao: number;
+  desligados: number;
+  total: number;
+  /** T199 — ativos pelo tipo do vínculo principal ativo; a soma é `ativos`. */
+  ativosPorTipo: Record<TipoVinculo, number>;
 }
+
+/** T199 — grupo da aba do dashboard (ausente: todos). */
+export type GrupoColaboradores = "ativos" | "em_admissao" | "desligados";
 
 export interface ListagemColaboradoresApi extends ResultadoPaginado<ColaboradorListadoApi> {
   contadores: ContadoresColaboradoresApi;
@@ -147,6 +162,10 @@ export interface ListarColaboradoresQuery {
    */
   departamentoId?: string;
   cargoId?: string;
+  /** T199 — grupo da aba, aplicado no servidor antes da paginação. */
+  grupo?: GrupoColaboradores;
+  /** T199 — tipo do vínculo que define o grupo (sem grupo: qualquer um). */
+  tipoVinculo?: TipoVinculo;
   pagina?: number;
   tamanhoPagina?: number;
 }
@@ -393,6 +412,8 @@ export async function listarColaboradores(
   if (busca) params.set("busca", busca);
   if (query.departamentoId) params.set("departamentoId", query.departamentoId);
   if (query.cargoId) params.set("cargoId", query.cargoId);
+  if (query.grupo) params.set("grupo", query.grupo);
+  if (query.tipoVinculo) params.set("tipoVinculo", query.tipoVinculo);
   if (query.pagina !== undefined) params.set("pagina", String(query.pagina));
   if (query.tamanhoPagina !== undefined)
     params.set("tamanhoPagina", String(query.tamanhoPagina));

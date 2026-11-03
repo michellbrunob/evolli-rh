@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import type { FormEvent } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
+import type { FormEvent, KeyboardEvent, ReactNode } from "react";
 import {
   Button,
   DataTable,
@@ -14,6 +14,7 @@ import {
   BUSCA_COLABORADORES_MAXIMO,
   type ColaboradorListadoApi,
   type ContadoresColaboradoresApi,
+  type GrupoColaboradores,
   type ListarColaboradoresQuery,
   type LotacaoListadaApi,
   type VinculoListadoApi,
@@ -24,6 +25,17 @@ import {
   listarDepartamentos,
 } from "../../api/organizacaoClient";
 import { type CargoApi, listarCargos } from "../../api/cargoClient";
+import {
+  type AbaDaListagem,
+  type EstadoDaListagem,
+  type OpcoesDaMudancaDaListagem,
+  type TipoDeVinculo,
+  ABAS_DA_LISTAGEM,
+  ESTADO_INICIAL_DA_LISTAGEM,
+  TIPOS_DE_VINCULO,
+  abaTemLotacao,
+  normalizarEstadoDaListagem,
+} from "../../app/rotasDoShell";
 import { formatarDiaCivil } from "../../format/data";
 import { exibirMatricula } from "../../format/matricula";
 import {
@@ -35,26 +47,31 @@ import {
   IconeAdicionarPessoa,
   PainelAdicionarColaborador,
 } from "./PainelAdicionarColaborador";
+import { iniciaisDe } from "./FichaColaboradorScreen";
+import { PessoasHorarioScreen } from "./PessoasHorarioScreen";
 import "./ColaboradoresScreen.css";
 
 export const COLABORADORES_TITULO_ID = "colaboradores-titulo";
 
-type FiltroSituacao = "todos" | "ativo" | "inativo";
-type FiltroSituacaoVinculo = "todos" | "previsto" | "ativo" | "encerrado";
-
 /**
- * T190 — a consulta da listagem inteira: situação, situação do vínculo,
- * busca e, desde a T190, departamento e cargo da lotação vigente. Um objeto
- * só, para que nenhum caminho (efeito, página, busca, tentar de novo) esqueça
- * um dos filtros. Vazio (`""`) é "todos".
+ * T199 — dashboard de Colaboradores. A antiga listagem (T178 a T190) ganhou
+ * indicadores calculados no servidor, abas por grupo e o estado na URL:
+ *
+ * - **Grupos exclusivos** (N-1, ativo > previsto > encerrado): Ativos, Em
+ *   admissão (D-4), Desligados (D-1) e Todos — cada um consultado e paginado
+ *   no servidor (`grupo`). As abas substituem os antigos seletores
+ *   Todos/Ativos/Inativos e o select "Situação do vínculo" (N-3).
+ * - **Jornada de trabalho** (D-5, N-4): a mesma visão da empresa que já
+ *   existia, com as mesmas permissões (só o RH opera).
+ * - **Tipo de vínculo** (D-2, N-5): filtro aplicado ao vínculo que define a
+ *   aba; distribuição dos ativos pelo vínculo principal (N-2).
+ * - **URL** (D-3): aba, página e ids dos filtros, guardados pelo shell. A
+ *   busca nunca vai para a URL.
+ * - **Escopo** (D-6): sem empresa ativa (`master_tecnico` global), os textos
+ *   dizem "no seu escopo", nunca "nesta empresa".
+ *
+ * Nada de CPF, salário ou contatos na visão coletiva.
  */
-interface ConsultaColaboradores {
-  readonly situacao: FiltroSituacao;
-  readonly situacaoVinculo: FiltroSituacaoVinculo;
-  readonly busca: string;
-  readonly departamentoId: string;
-  readonly cargoId: string;
-}
 
 /**
  * T190 — catálogos dos filtros de lotação: só departamentos e cargos ATIVOS
@@ -74,26 +91,97 @@ function rotuloDaReferencia(ref: { nome: string; codigo: string }): string {
   return `${ref.nome} (${ref.codigo})`;
 }
 
-/**
- * T186 — os contadores viram os filtros de situação: cada opção mostra o
- * total do escopo (sem filtro nem busca) e, acionada, filtra a lista no
- * servidor. "Todos" soma os dois totais do servidor — o escopo é a soma de
- * ativos e inativos.
- */
-const OPCOES_SITUACAO: readonly {
-  valor: FiltroSituacao;
-  rotulo: string;
-  total: (c: ContadoresColaboradoresApi) => number;
-}[] = [
-  { valor: "todos", rotulo: "Todos", total: (c) => c.ativos + c.inativos },
-  { valor: "ativo", rotulo: "Ativos", total: (c) => c.ativos },
-  { valor: "inativo", rotulo: "Inativos", total: (c) => c.inativos },
-];
-
-const VARIANTE_SITUACAO_COLABORADOR: Record<string, StatusVariant> = {
-  ativo: "success",
-  inativo: "neutral",
+const ROTULO_DA_ABA: Readonly<Record<AbaDaListagem, string>> = {
+  ativos: "Ativos",
+  "em-admissao": "Em admissão",
+  desligados: "Desligados",
+  todos: "Todos",
+  jornada: "Jornada de trabalho",
 };
+
+/** O grupo que cada aba pede ao servidor ("Todos": sem grupo). */
+const GRUPO_DA_ABA: Readonly<
+  Partial<Record<AbaDaListagem, GrupoColaboradores>>
+> = {
+  ativos: "ativos",
+  "em-admissao": "em_admissao",
+  desligados: "desligados",
+};
+
+/** O total de cada aba, dos contadores do servidor (sem filtros). */
+function totalDaAba(
+  aba: AbaDaListagem,
+  c: ContadoresColaboradoresApi,
+): number | null {
+  switch (aba) {
+    case "ativos":
+      return c.ativos;
+    case "em-admissao":
+      return c.emAdmissao;
+    case "desligados":
+      return c.desligados;
+    case "todos":
+      return c.total;
+    default:
+      return null;
+  }
+}
+
+export const ROTULO_TIPO_DE_VINCULO: Readonly<Record<TipoDeVinculo, string>> = {
+  clt: "CLT",
+  estagio: "Estágio",
+  pj: "PJ",
+  temporario: "Temporário",
+  outro_controlado: "Outro controlado",
+};
+
+/** A situação da pessoa no escopo, pela mesma regra dos grupos (N-1). */
+type SituacaoNoEscopo = "ativo" | "em_admissao" | "desligado";
+
+function situacaoNoEscopo(c: ColaboradorListadoApi): SituacaoNoEscopo | null {
+  if (c.vinculos.some((v) => v.situacao === "ativo")) return "ativo";
+  if (c.vinculos.some((v) => v.situacao === "previsto")) return "em_admissao";
+  if (c.vinculos.some((v) => v.situacao === "encerrado")) return "desligado";
+  return null;
+}
+
+const SITUACAO_NO_ESCOPO: Readonly<
+  Record<SituacaoNoEscopo, { rotulo: string; variante: StatusVariant }>
+> = {
+  ativo: { rotulo: "Ativo", variante: "success" },
+  em_admissao: { rotulo: "Em admissão", variante: "info" },
+  desligado: { rotulo: "Desligado", variante: "neutral" },
+};
+
+/** A situação de vínculo que define cada aba (N-5). */
+const SITUACAO_DA_ABA: Readonly<
+  Partial<Record<AbaDaListagem, VinculoListadoApi["situacao"]>>
+> = {
+  ativos: "ativo",
+  "em-admissao": "previsto",
+  desligados: "encerrado",
+};
+
+/**
+ * T199 — o vínculo que a linha mostra: o que define a aba (ativo em Ativos,
+ * previsto em Em admissão, encerrado em Desligados), do tipo filtrado quando
+ * há filtro (N-5). Em Todos, o principal (o servidor já ordena: ativo,
+ * previsto, encerrado; admissão mais recente primeiro).
+ */
+function vinculoDaLinha(
+  c: ColaboradorListadoApi,
+  aba: AbaDaListagem,
+  tipo: TipoDeVinculo | null,
+): VinculoListadoApi | undefined {
+  const situacao = SITUACAO_DA_ABA[aba];
+  return (
+    c.vinculos.find(
+      (v) =>
+        (situacao === undefined || v.situacao === situacao) &&
+        (tipo === null || v.tipo === tipo),
+    ) ?? c.vinculos[0]
+  );
+}
 
 /**
  * Quantas linhas por página.
@@ -106,16 +194,9 @@ const VARIANTE_SITUACAO_COLABORADOR: Record<string, StatusVariant> = {
 const TAMANHO_PAGINA = 20;
 
 /**
- * R-1 — o tamanho de página da resposta, quando ele é utilizável.
- *
- * Recusa o que não serve para dividir: ausente, não numérico, zero, negativo,
- * fracionário ou não finito. Qualquer um deles produziria uma contagem de
- * páginas sem sentido — `Infinity`, `NaN` ou uma divisão por zero —, e uma
- * paginação inventada é pior que nenhuma.
- *
- * A recusa **volta ao tamanho pedido**, que é o que a tela de fato usou na
- * requisição. Não há degradação para "sem paginação": o comportamento fica
- * exatamente o de antes desta correção.
+ * R-1 — o tamanho de página da resposta, quando ele é utilizável. Ausente,
+ * não numérico, zero, negativo, fracionário ou não finito volta ao tamanho
+ * pedido: uma paginação inventada é pior que nenhuma.
  */
 function tamanhoDePaginaValido(valor: unknown): number {
   return typeof valor === "number" &&
@@ -128,14 +209,76 @@ function tamanhoDePaginaValido(valor: unknown): number {
 
 /**
  * T178 — o termo como o servidor o aceita: aparado e no teto de 160; `""` é
- * "sem busca". É também o termo exibido no estado vazio ("Nenhum colaborador
- * encontrado para …"), para que a tela mostre exatamente o que pediu.
- *
- * Mora aqui, e não no cliente, porque os testes automockam o cliente inteiro:
- * uma função de lá viraria `vi.fn` e a normalização sumiria justo neles.
+ * "sem busca". Mora aqui, e não no cliente, porque os testes automockam o
+ * cliente inteiro: uma função de lá viraria `vi.fn`.
  */
 function normalizarBusca(termo: string): string {
   return termo.trim().slice(0, BUSCA_COLABORADORES_MAXIMO).trim();
+}
+
+/**
+ * T199 — uma ação disparada de um estado vazio ("Ir para a primeira página",
+ * "Limpar filtros"). O estado vazio que a pediu fica montado, como estava,
+ * até a resposta: o botão conserva o foco, indisponível. No sucesso, o foco
+ * vai ao destino; numa falha, fica no botão e a falha é anunciada uma vez.
+ */
+interface AcaoDoVazio {
+  readonly titulo: string;
+  readonly descricao: string;
+  readonly rotulo: string;
+  /** `id` de quem recebe o foco quando a leitura dá certo (sempre visível). */
+  readonly destinoDoFoco: string;
+  /** "Ir para a primeira página": anuncia a página carregada no sucesso. */
+  readonly anunciarPrimeiraPagina?: boolean;
+  readonly fase: "carregando" | "falha";
+}
+
+/** O campo de busca: destino do foco depois de limpar filtros ou busca. */
+const ID_CAMPO_BUSCA = "colaboradores-busca";
+
+const FALHA_DA_LISTA = "Não foi possível carregar os colaboradores.";
+
+const FALHA_DOS_CATALOGOS = "Não foi possível carregar departamentos e cargos.";
+
+/** A select de Departamento: destino do foco quando os catálogos voltam. */
+const ID_FILTRO_DEPARTAMENTO = "colaboradores-filtro-departamento";
+
+/** Os chips de filtro, na ordem em que aparecem. */
+const FILTROS_REMOVIVEIS = ["departamento", "cargo", "tipo"] as const;
+type FiltroRemovivel = (typeof FILTROS_REMOVIVEIS)[number];
+
+const DESCRICAO_PAGINA_VAZIA =
+  "Esta página voltou vazia, embora a consulta tenha colaboradores: o conjunto pode ter mudado desde a última leitura.";
+
+/**
+ * O anúncio de "Ir para a primeira página" que deu certo: a página, quantos
+ * há na consulta e o que ficou (busca e filtros não mudam com a página).
+ */
+function anuncioDaPrimeiraPagina(
+  total: number,
+  comBusca: boolean,
+  comFiltros: boolean,
+): string {
+  const quantos = total === 1 ? "1 colaborador" : `${total} colaboradores`;
+  const mantidos =
+    comBusca && comFiltros
+      ? ", com a busca e os filtros mantidos"
+      : comBusca
+        ? ", com a busca mantida"
+        : comFiltros
+          ? ", com os filtros mantidos"
+          : "";
+  return `Página 1 carregada: ${quantos} nesta consulta${mantidos}.`;
+}
+
+function mesmoEstado(a: EstadoDaListagem, b: EstadoDaListagem): boolean {
+  return (
+    a.aba === b.aba &&
+    a.pagina === b.pagina &&
+    a.departamentoId === b.departamentoId &&
+    a.cargoId === b.cargoId &&
+    a.tipo === b.tipo
+  );
 }
 
 /** Concordância de "N vínculo(s)", para o texto lido por leitor de tela. */
@@ -146,12 +289,7 @@ function vinculosAMais(quantidade: number): string {
 export interface ColaboradoresScreenProps {
   /**
    * T164 — a empresa de trabalho ATIVA, resolvida pelo servidor e repassada
-   * pelo shell. É contexto, não controle: quem troca de empresa é o Hub, e só
-   * para os papéis que o servidor autoriza.
-   *
-   * Vem por prop em vez de uma leitura própria porque o `AutenticacaoApp` já
-   * tem o ator — pedir `/v1/users/me` de novo aqui seria uma requisição a mais
-   * para um dado que já está em memória.
+   * pelo shell. `null`: `master_tecnico` sem empresa ativa (escopo global).
    */
   readonly empresaAtiva?: {
     readonly nome: string;
@@ -159,40 +297,45 @@ export interface ColaboradoresScreenProps {
   } | null;
   readonly onTituloIdChange?: (tituloId: string) => void;
   /**
-   * T198 — "Abrir ficha" leva à ficha unificada, em página própria (D17,
-   * D22): quem decide o endereço é o shell. Sem esta prop, a ação não aparece.
+   * T198 — o nome na linha leva à ficha unificada, em página própria: quem
+   * decide o endereço é o shell. Sem esta prop, o nome é só texto.
    */
   readonly onAbrirFicha?: (colaboradorId: string) => void;
   /**
-   * T198 — muda quando a pessoa volta da ficha: a listagem (que ficou montada,
-   * com busca, filtros e página) relê a página atual, para mostrar o que a
-   * ficha pode ter alterado (nome, jornada).
+   * T198 — muda quando a pessoa volta da ficha: o dashboard (que ficou
+   * montado, com busca, filtros e página) relê a página atual.
    */
   readonly atualizacao?: number;
   /**
-   * T177 — a admissão acontece só na página de Nova admissão. O modal
-   * transitório da T176 foi aposentado porque não coletava os campos que a
-   * admissão passou a exigir (data de nascimento e os três contatos).
-   * "Nova admissão" (T178; era "Novo colaborador") leva até a página; sem esta
-   * prop — perfil que não pode admitir —, o botão não aparece.
-   * T194 — o botão passou a ser "Adicionar colaborador" e abre um painel
-   * lateral com as formas de entrada; o "Cadastro individual" dele é que chama
-   * esta prop. Sem ela, nem botão nem painel existem.
+   * T194 — "Adicionar colaborador" abre o painel das formas de entrada; o
+   * "Cadastro individual" dele chama esta prop. Sem ela (perfil que não
+   * admite), nem botão nem painel existem.
    */
   readonly onNovaAdmissao?: () => void;
+  /**
+   * T199 — o estado do dashboard (aba, página e ids de filtros), guardado
+   * pelo shell na URL. Sem ele, o dashboard guarda o próprio estado.
+   */
+  readonly estado?: EstadoDaListagem;
+  readonly onEstadoChange?: (
+    estado: EstadoDaListagem,
+    opcoes?: OpcoesDaMudancaDaListagem,
+  ) => void;
+  /** T183/T199 — a aba de jornada opera só para o RH. */
+  readonly podeOperarJornada?: boolean;
 }
 
 /**
- * T184 — cargo ou departamento da lotação vigente do vínculo principal. Sem
- * lotação vigente, o texto neutro diz isso; lotação vigente sem a referência
- * diz "Não informado". Sem vínculo, o mesmo "—" das outras colunas.
+ * T184 — cargo ou departamento da lotação vigente do vínculo da linha. Sem
+ * lotação vigente, o texto neutro diz isso; sem a referência, "Não
+ * informado". Sem vínculo, "—".
  */
 function celulaDaLotacao(
-  principal: VinculoListadoApi | undefined,
+  vinculo: VinculoListadoApi | undefined,
   campo: keyof LotacaoListadaApi,
-): React.ReactNode {
-  if (!principal) return "—";
-  const lotacao = principal.lotacaoVigente;
+): ReactNode {
+  if (!vinculo) return "—";
+  const lotacao = vinculo.lotacaoVigente;
   if (!lotacao) {
     return (
       <span className="colaboradores-screen__sem-lotacao">
@@ -209,17 +352,17 @@ function celulaDaLotacao(
 }
 
 /**
- * T185 — jornada vigente HOJE (dia civil do navegador) do vínculo principal
- * ativo. Sem vínculo, o mesmo "—" das outras colunas.
+ * T185 — jornada vigente HOJE (dia civil do navegador) do vínculo ativo da
+ * linha. Sem vínculo, "—".
  */
 function celulaDaJornada(
-  principal: VinculoListadoApi | undefined,
+  vinculo: VinculoListadoApi | undefined,
   hoje: string,
-): React.ReactNode {
-  if (!principal) return "—";
+): ReactNode {
+  if (!vinculo) return "—";
   const vigente =
-    principal.situacao === "ativo"
-      ? principal.vigenciasDeJornada.find(
+    vinculo.situacao === "ativo"
+      ? vinculo.vigenciasDeJornada.find(
           (v) => situacaoDaVigencia(v, hoje) === "vigente",
         )
       : undefined;
@@ -248,194 +391,318 @@ export function ColaboradoresScreen({
   onNovaAdmissao,
   onAbrirFicha,
   atualizacao = 0,
+  estado: estadoControlado,
+  onEstadoChange,
+  podeOperarJornada = false,
 }: ColaboradoresScreenProps = {}) {
+  const prefixo = useId();
+  const idDaAba = (aba: AbaDaListagem) => `${prefixo}-aba-${aba}`;
+  const idDoPainel = `${prefixo}-painel`;
+
+  // T199 — controlado pelo shell (URL) ou, montado sozinho, pelo próprio
+  // componente. Sempre normalizado: lotação só onde ela existe.
+  const [estadoInterno, setEstadoInterno] = useState(
+    ESTADO_INICIAL_DA_LISTAGEM,
+  );
+  const estado = normalizarEstadoDaListagem(estadoControlado ?? estadoInterno);
+  const mudarEstado = useCallback(
+    (novo: EstadoDaListagem, opcoes?: OpcoesDaMudancaDaListagem) => {
+      const normalizado = normalizarEstadoDaListagem(novo);
+      if (onEstadoChange) {
+        if (opcoes) onEstadoChange(normalizado, opcoes);
+        else onEstadoChange(normalizado);
+      } else setEstadoInterno(normalizado);
+    },
+    [onEstadoChange],
+  );
+  const { aba, tipo, departamentoId, cargoId } = estado;
+  const temTabela = aba !== "jornada";
+
   const [statusCarregamento, setStatusCarregamento] = useState<
     "carregando" | "erro" | "dados"
   >("carregando");
-  // T178 — a lista vive só nesta montagem, de propósito: sem cache entre
-  // montagens, voltar da Nova admissão relê o servidor e o admitido aparece.
+  // T178 — a lista vive só nesta montagem: voltar da Nova admissão relê.
   const [colaboradores, setColaboradores] = useState<ColaboradorListadoApi[]>(
     [],
   );
-  const [filtroSituacao, setFiltroSituacao] = useState<FiltroSituacao>("todos");
-  const [filtroSituacaoVinculo, setFiltroSituacaoVinculo] =
-    useState<FiltroSituacaoVinculo>("todos");
   /**
-   * T178 — busca por nome ou matrícula, em dois tempos: o que está no campo
-   * (`buscaDigitada`) e o que foi PEDIDO ao servidor (`buscaAplicada`, já
-   * normalizada). Separados porque a busca vai ao servidor só quando a pessoa
-   * envia — consultar a cada tecla dispararia uma requisição por caractere e
-   * deixaria a lista mudando por baixo de quem ainda digita.
-   *
-   * Nunca se filtra no cliente: a página tem 20 linhas de um conjunto maior, e
-   * filtrar só o que chegou esconderia quem está nas outras páginas.
+   * T178 — busca em dois tempos: o que está no campo e o que foi PEDIDO ao
+   * servidor (já normalizado). Vai ao servidor só quando a pessoa envia.
+   * T199 — nunca vai para a URL (D-3).
    */
   const [buscaDigitada, setBuscaDigitada] = useState("");
   const [buscaAplicada, setBuscaAplicada] = useState("");
-  /**
-   * T190 — filtros pela lotação vigente. Vazio é "todos". Vão ao servidor,
-   * antes da paginação; os contadores não dependem deles. Não ficam na URL e
-   * somem na troca de empresa, que recria a tela (T189), como a busca.
-   */
-  const [filtroDepartamentoId, setFiltroDepartamentoId] = useState("");
-  const [filtroCargoId, setFiltroCargoId] = useState("");
   const [catalogos, setCatalogos] = useState<CatalogosDeLotacao>({
     status: "carregando",
   });
   const [tentativaCatalogos, setTentativaCatalogos] = useState(0);
+  /**
+   * T199 — "Recarregar departamentos e cargos" no padrão seguro: o botão fica
+   * montado (indisponível, com o foco) durante a nova leitura; no sucesso, o
+   * foco vai à select de Departamento; numa nova falha, fica no botão e a
+   * falha é anunciada uma vez. A listagem não é relida por isso.
+   */
+  const [repetindoCatalogos, setRepetindoCatalogos] = useState(false);
+  const repetindoCatalogosRef = useRef(repetindoCatalogos);
+  repetindoCatalogosRef.current = repetindoCatalogos;
   const campoBuscaRef = useRef<HTMLInputElement | null>(null);
   /**
-   * T178 — contagem do escopo inteiro, vinda do servidor (`contadores`), SEM
-   * filtros nem busca. `null` até a primeira resposta. Não é somada no
-   * cliente: a página só tem parte do conjunto, e a soma dela mentiria.
+   * T178/T199 — contagens do escopo inteiro, vindas do servidor, SEM busca,
+   * filtros nem aba. `null` até a primeira resposta. Nunca somadas no
+   * cliente: a página só tem parte do conjunto.
    */
   const [contadores, setContadores] =
     useState<ContadoresColaboradoresApi | null>(null);
   /**
-   * T164 — paginação real.
-   *
-   * Antes desta tarefa a tela pedia a lista **sem** `pagina`, recebia a
-   * primeira página do servidor e descartava o `total`. O efeito era silencioso
-   * e grave: a partir do vigésimo primeiro colaborador, as pessoas seguintes
-   * simplesmente não existiam na interface, sem nada na tela sugerindo que
-   * houvesse mais. Uma lista que esconde registros é pior que uma lista vazia,
-   * porque parece completa.
-   *
-   * `pagina` e `total` vêm da RESPOSTA, não do que a tela pediu: o servidor é
-   * quem sabe quantos registros o escopo ativo tem.
+   * T199 — a leitura mínima dos contadores (aba Jornada) falhou: em vez de
+   * "…" para sempre, um aviso e "Tentar novamente", que relê SÓ os
+   * contadores — a visão de jornadas ao lado continua montada.
    */
-  const [pagina, setPagina] = useState(1);
+  const [falhaContadores, setFalhaContadores] = useState(false);
+  const [repetindoContadores, setRepetindoContadores] = useState(false);
+  const [tentativaContadores, setTentativaContadores] = useState(0);
+  /** Anúncio único da falha e da volta dos totais (região sempre montada). */
+  const [anuncioTotais, setAnuncioTotais] = useState("");
+  /** Na volta depois de uma falha, o botão some: o foco vai ao título. */
+  const focarTotaisRef = useRef(false);
+  const tituloTotaisRef = useRef<HTMLHeadingElement | null>(null);
+  // T164 — página e total da RESPOSTA: o servidor é quem sabe o conjunto.
+  const [paginaRespondida, setPaginaRespondida] = useState(estado.pagina);
   const [total, setTotal] = useState(0);
-  /**
-   * R-1 — o tamanho de página que o SERVIDOR aplicou.
-   *
-   * Contar as páginas com a constante local assumia que o servidor sempre
-   * honra o tamanho pedido. Ele honra hoje, mas a resposta carrega o valor
-   * efetivo justamente para que o cliente não precise supor: no dia em que a
-   * rota limitar a página, contar com 20 um conjunto servido de 10 em 10
-   * ofereceria metade das páginas — e cada uma delas voltaria vazia.
-   *
-   * Começa na constante porque é o que foi pedido na primeira carga.
-   */
   const [tamanhoPaginaEfetivo, setTamanhoPaginaEfetivo] =
     useState(TAMANHO_PAGINA);
-  /**
-   * T194 — painel "Adicionar colaborador". Só estado local: abrir e fechar não
-   * mexem em busca, filtros, página nem empresa, e não relêem nada.
-   */
+  /** T194 — painel "Adicionar colaborador": só estado local. */
   const [painelAdicionarAberto, setPainelAdicionarAberto] = useState(false);
   /**
-   * Sequência do pedido de lista em voo.
-   *
-   * Trocar um filtro dispara `carregarDados` sem cancelar o anterior. Se a
-   * primeira resposta chegar DEPOIS da segunda, ela sobrescreve a lista com
-   * dados que não correspondem ao filtro na tela. O contador resolve sem
-   * `AbortController`: a resposta só é aplicada se ainda for a mais recente.
+   * Sequência do pedido em voo: a resposta só é aplicada se ainda for a mais
+   * recente — um filtro trocado depressa nunca é sobrescrito pelo anterior.
    */
   const pedidoListaRef = useRef(0);
+  const [acaoDoVazio, setAcaoDoVazio] = useState<AcaoDoVazio | null>(null);
+  const acaoDoVazioRef = useRef(acaoDoVazio);
+  acaoDoVazioRef.current = acaoDoVazio;
+  /** A próxima carga do efeito foi pedida pela ação do estado vazio. */
+  const cargaDaAcaoRef = useRef(false);
+  /** Anúncio único da falha de uma ação do vazio (região sempre montada). */
+  const [anuncioDaLista, setAnuncioDaLista] = useState("");
+  const [focoPendente, setFocoPendente] = useState<string | null>(null);
+  /**
+   * T199 — "Tentar novamente" do erro da tabela, no mesmo padrão seguro: o
+   * bloco de erro fica montado durante a nova leitura, com o mesmo botão
+   * focado e indisponível; no sucesso, o foco vai ao campo de busca; numa
+   * nova falha, fica no botão e a falha é anunciada uma vez.
+   */
+  const [repetindoErro, setRepetindoErro] = useState(false);
 
   const carregarDados = useCallback(
     async (
-      consulta: ConsultaColaboradores,
-      paginaPedida: number,
-      // T198 — a releitura na volta da ficha não troca a tabela pelo aviso de
-      // carregamento: as linhas (e o botão que recebe o foco) continuam lá.
+      consulta: EstadoDaListagem,
+      busca: string,
+      // T198 — a releitura na volta da ficha não troca a tabela pelo aviso
+      // de carregamento: as linhas (e o botão que recebe o foco) continuam.
       silenciosa = false,
+      // T199 — pedida por uma ação do estado vazio (ver `AcaoDoVazio`).
+      daAcaoDoVazio = false,
+      // T199 — pedida pelo "Tentar novamente" do erro da tabela.
+      daRepeticaoDoErro = false,
     ) => {
       const pedido = ++pedidoListaRef.current;
+      // Qualquer outra carga (aba, filtro, página, busca) encerra a ação.
+      if (!daAcaoDoVazio) setAcaoDoVazio(null);
+      if (!daRepeticaoDoErro) setRepetindoErro(false);
       if (!silenciosa) setStatusCarregamento("carregando");
       try {
-        // A empresa nunca entra na query: é a da sessão, resolvida no servidor.
+        // A empresa nunca entra na query: é a da sessão.
         const query: ListarColaboradoresQuery = {
-          pagina: paginaPedida,
+          pagina: consulta.pagina,
           tamanhoPagina: TAMANHO_PAGINA,
         };
-        if (consulta.situacao !== "todos") query.situacao = consulta.situacao;
-        if (consulta.situacaoVinculo !== "todos")
-          query.situacaoVinculo = consulta.situacaoVinculo;
-        // T178 — vazio é "sem busca": a chave nem vai.
-        if (consulta.busca) query.busca = consulta.busca;
-        // T190 — idem para departamento e cargo.
+        const grupo = GRUPO_DA_ABA[consulta.aba];
+        if (grupo) query.grupo = grupo;
+        if (consulta.tipo) query.tipoVinculo = consulta.tipo;
+        if (busca) query.busca = busca;
         if (consulta.departamentoId)
           query.departamentoId = consulta.departamentoId;
         if (consulta.cargoId) query.cargoId = consulta.cargoId;
         const resp = await listarColaboradores(query);
-        // Resposta obsoleta: outro filtro (ou outra busca) já pediu a lista
-        // depois desta. Aplicá-la mostraria dados que não correspondem ao que
-        // está na tela — inclusive os contadores, que vêm na mesma resposta.
-        if (pedido !== pedidoListaRef.current) return null;
+        if (pedido !== pedidoListaRef.current) return;
         setColaboradores(resp.itens);
-        // Página e total saem da RESPOSTA. Se a tela guardasse o que pediu, um
-        // servidor que ajustasse a página (ou um filtro que encolhesse o
-        // conjunto) deixaria o rodapé mentindo sobre onde a pessoa está.
-        setPagina(resp.pagina);
+        setPaginaRespondida(resp.pagina);
         setTotal(resp.total);
         setTamanhoPaginaEfetivo(tamanhoDePaginaValido(resp.tamanhoPagina));
         setContadores(resp.contadores);
+        setFalhaContadores(false);
         setStatusCarregamento("dados");
-        return resp.itens;
+        if (daAcaoDoVazio) {
+          const acao = acaoDoVazioRef.current;
+          setFocoPendente(acao?.destinoDoFoco ?? null);
+          if (acao?.anunciarPrimeiraPagina) {
+            setAnuncioDaLista(
+              anuncioDaPrimeiraPagina(
+                resp.total,
+                busca !== "",
+                consulta.tipo !== null ||
+                  consulta.departamentoId !== null ||
+                  consulta.cargoId !== null,
+              ),
+            );
+          }
+          setAcaoDoVazio(null);
+        }
+        if (daRepeticaoDoErro) {
+          setRepetindoErro(false);
+          setFocoPendente(ID_CAMPO_BUSCA);
+        }
       } catch {
-        if (pedido !== pedidoListaRef.current) return null;
+        if (pedido !== pedidoListaRef.current) return;
         setStatusCarregamento("erro");
-        return null;
+        const acao = acaoDoVazioRef.current;
+        if (daAcaoDoVazio && acao) {
+          setAcaoDoVazio({ ...acao, fase: "falha" });
+          setAnuncioDaLista(FALHA_DA_LISTA);
+        }
+        if (daRepeticaoDoErro) {
+          setRepetindoErro(false);
+          setAnuncioDaLista(FALHA_DA_LISTA);
+        }
       }
     },
     [],
   );
 
-  /**
-   * Trocar de filtro volta para a PRIMEIRA página.
-   *
-   * Sem isto, quem estivesse na página 3 e filtrasse por "Ativo" pediria a
-   * página 3 de um conjunto que talvez tenha uma só — e receberia uma lista
-   * vazia que parece "nenhum colaborador ativo", quando na verdade há vários
-   * na página 1. O filtro muda o conjunto; a posição dentro dele não
-   * sobrevive à mudança.
-   */
-  //
-  // T178 — a busca entra na mesma regra: um termo novo é um conjunto novo.
-  // T190 — departamento e cargo também.
-  const consulta: ConsultaColaboradores = {
-    situacao: filtroSituacao,
-    situacaoVinculo: filtroSituacaoVinculo,
-    busca: buscaAplicada,
-    departamentoId: filtroDepartamentoId,
-    cargoId: filtroCargoId,
-  };
+  // O destino do foco depois de uma ação, quando ele já está na tela.
   useEffect(() => {
-    void carregarDados(
+    if (!focoPendente) return;
+    document.getElementById(focoPendente)?.focus();
+    setFocoPendente(null);
+  }, [focoPendente]);
+
+  /**
+   * T199 — um id de lotação vindo da URL só vira consulta depois de
+   * conferido nos catálogos da empresa ativa (só ativos): enquanto eles
+   * carregam, espera; se o id não está lá (outra empresa, inativo, apagado),
+   * cai no padrão, com a URL corrigida no lugar. Se os catálogos falham, o
+   * servidor decide (o escopo dele nunca devolve outra empresa).
+   */
+  const comLotacaoNaAba = abaTemLotacao(aba);
+  // Só a primeira leitura dos catálogos segura a tabela: uma recarga depois
+  // de falha não relê a listagem (o servidor já decidiu sem os catálogos).
+  const aguardandoCatalogos =
+    tentativaCatalogos === 0 &&
+    comLotacaoNaAba &&
+    (departamentoId !== null || cargoId !== null) &&
+    catalogos.status === "carregando";
+  const departamentoDesconhecido =
+    comLotacaoNaAba &&
+    departamentoId !== null &&
+    catalogos.status === "dados" &&
+    !catalogos.departamentos.some((d) => d.id === departamentoId);
+  const cargoDesconhecido =
+    comLotacaoNaAba &&
+    cargoId !== null &&
+    catalogos.status === "dados" &&
+    !catalogos.cargos.some((c) => c.id === cargoId);
+  const lotacaoDesconhecida = departamentoDesconhecido || cargoDesconhecido;
+  useEffect(() => {
+    if (!lotacaoDesconhecida) return;
+    mudarEstado(
       {
-        situacao: filtroSituacao,
-        situacaoVinculo: filtroSituacaoVinculo,
-        busca: buscaAplicada,
-        departamentoId: filtroDepartamentoId,
-        cargoId: filtroCargoId,
+        ...estado,
+        pagina: 1,
+        departamentoId: departamentoDesconhecido ? null : departamentoId,
+        cargoId: cargoDesconhecido ? null : cargoId,
       },
-      1,
+      { substituir: true },
+    );
+    // A cada estado novo vindo do shell, não só na primeira descoberta: se a
+    // URL inválida é reaplicada (voltar, `popstate` e `hashchange` do mesmo
+    // passo), a correção é pedida de novo, em vez de ficar presa.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lotacaoDesconhecida, estadoControlado]);
+
+  // Relê a cada mudança de aba, página, filtro ou busca enviada. A aba de
+  // jornada é outra visão: o dashboard não consulta a listagem por ela.
+  useEffect(() => {
+    if (!temTabela || aguardandoCatalogos || lotacaoDesconhecida) return;
+    const daAcaoDoVazio = cargaDaAcaoRef.current;
+    cargaDaAcaoRef.current = false;
+    void carregarDados(
+      { aba, pagina: estado.pagina, departamentoId, cargoId, tipo },
+      buscaAplicada,
+      false,
+      daAcaoDoVazio,
     );
   }, [
-    filtroSituacao,
-    filtroSituacaoVinculo,
+    temTabela,
+    aguardandoCatalogos,
+    lotacaoDesconhecida,
+    aba,
+    estado.pagina,
+    departamentoId,
+    cargoId,
+    tipo,
     buscaAplicada,
-    filtroDepartamentoId,
-    filtroCargoId,
     carregarDados,
   ]);
 
-  // T198 — volta da ficha: relê a página atual, com a mesma consulta. A
-  // primeira montagem já leu pelo efeito acima.
-  const consultaRef = useRef(consulta);
-  consultaRef.current = consulta;
-  const paginaRef = useRef(pagina);
-  paginaRef.current = pagina;
+  // Os indicadores aparecem também na aba de jornada: uma leitura mínima só
+  // dos contadores, sem grupo nem filtros. Falhou: aviso e nova tentativa.
+  const falhaContadoresRef = useRef(falhaContadores);
+  falhaContadoresRef.current = falhaContadores;
   useEffect(() => {
-    if (atualizacao === 0) return;
-    void carregarDados(consultaRef.current, paginaRef.current, true);
+    if (temTabela || contadores !== null) return;
+    let vigente = true;
+    listarColaboradores({ pagina: 1, tamanhoPagina: 1 })
+      .then((resp) => {
+        if (!vigente) return;
+        setContadores(resp.contadores);
+        if (falhaContadoresRef.current) {
+          focarTotaisRef.current = true;
+          setAnuncioTotais("Totais de colaboradores carregados.");
+        }
+        setFalhaContadores(false);
+      })
+      .catch(() => {
+        if (!vigente) return;
+        setFalhaContadores(true);
+        setAnuncioTotais(
+          "Não foi possível carregar os totais de colaboradores.",
+        );
+      })
+      .finally(() => {
+        if (vigente) setRepetindoContadores(false);
+      });
+    return () => {
+      vigente = false;
+    };
+  }, [temTabela, contadores, tentativaContadores]);
+
+  useEffect(() => {
+    if (contadores === null || !focarTotaisRef.current) return;
+    focarTotaisRef.current = false;
+    tituloTotaisRef.current?.focus();
+  }, [contadores]);
+
+  function repetirContadores() {
+    if (repetindoContadores) return;
+    // Limpa o anúncio antes: a mesma falha, de novo, é anunciada de novo.
+    setAnuncioTotais("");
+    setRepetindoContadores(true);
+    setTentativaContadores((n) => n + 1);
+  }
+
+  // T198 — volta da ficha: relê a página atual, com a mesma consulta.
+  const estadoRef = useRef(estado);
+  estadoRef.current = estado;
+  const buscaRef = useRef(buscaAplicada);
+  buscaRef.current = buscaAplicada;
+  useEffect(() => {
+    if (atualizacao === 0 || estadoRef.current.aba === "jornada") return;
+    void carregarDados(estadoRef.current, buscaRef.current, true);
   }, [atualizacao, carregarDados]);
 
   // T190 — catálogos dos filtros de lotação: uma leitura por montagem (e a
-  // cada "Tentar novamente"), só ativos. A troca de empresa recria a tela e
-  // relê os da empresa nova.
+  // cada "Recarregar"), só ativos.
   useEffect(() => {
     let vigente = true;
     setCatalogos({ status: "carregando" });
@@ -445,8 +712,6 @@ export function ColaboradoresScreen({
     ])
       .then(([departamentos, cargos]) => {
         if (!vigente) return;
-        // Só ativos, mesmo que o servidor devolva outro status: o filtro
-        // oferece o que a lotação vigente pode ter.
         setCatalogos({
           status: "dados",
           departamentos: departamentos.itens.filter(
@@ -454,9 +719,18 @@ export function ColaboradoresScreen({
           ),
           cargos: cargos.itens.filter((c) => c.status === "ativo"),
         });
+        if (repetindoCatalogosRef.current) {
+          setRepetindoCatalogos(false);
+          setFocoPendente(ID_FILTRO_DEPARTAMENTO);
+        }
       })
       .catch(() => {
-        if (vigente) setCatalogos({ status: "erro" });
+        if (!vigente) return;
+        setCatalogos({ status: "erro" });
+        if (repetindoCatalogosRef.current) {
+          setRepetindoCatalogos(false);
+          setAnuncioDaLista(FALHA_DOS_CATALOGOS);
+        }
       });
     return () => {
       vigente = false;
@@ -465,164 +739,284 @@ export function ColaboradoresScreen({
 
   const totalPaginas = Math.max(1, Math.ceil(total / tamanhoPaginaEfetivo));
   const carregando = statusCarregamento === "carregando";
+  const comLotacao = abaTemLotacao(aba);
   const temFiltroDeLotacao =
-    filtroDepartamentoId !== "" || filtroCargoId !== "";
-  const temFiltro =
-    filtroSituacao !== "todos" ||
-    filtroSituacaoVinculo !== "todos" ||
-    temFiltroDeLotacao;
+    comLotacao && (departamentoId !== null || cargoId !== null);
+  const temFiltro = temFiltroDeLotacao || tipo !== null;
   const filtrando = temFiltro || buscaAplicada !== "";
+  const onde = empresaAtiva ? "nesta empresa" : "no seu escopo";
 
   const departamentoFiltrado =
     catalogos.status === "dados"
-      ? catalogos.departamentos.find((d) => d.id === filtroDepartamentoId)
+      ? catalogos.departamentos.find((d) => d.id === departamentoId)
       : undefined;
   const cargoFiltrado =
     catalogos.status === "dados"
-      ? catalogos.cargos.find((c) => c.id === filtroCargoId)
+      ? catalogos.cargos.find((c) => c.id === cargoId)
       : undefined;
+
+  /**
+   * T199 — dispara a ação de um estado vazio: congela o estado vazio como
+   * está e leva ao estado `alvo` (uma única mudança); se o estado já é o
+   * alvo, relê direto. Cliques durante a leitura são ignorados.
+   */
+  function iniciarAcaoDoVazio(
+    acao: Omit<AcaoDoVazio, "fase">,
+    alvo: EstadoDaListagem,
+  ) {
+    if (acaoDoVazio?.fase === "carregando") return;
+    setAnuncioDaLista("");
+    setAcaoDoVazio({ ...acao, fase: "carregando" });
+    const normalizado = normalizarEstadoDaListagem(alvo);
+    if (mesmoEstado(normalizado, estado)) {
+      void carregarDados(normalizado, buscaAplicada, false, true);
+    } else {
+      cargaDaAcaoRef.current = true;
+      mudarEstado(normalizado);
+    }
+  }
+
+  function recarregarCatalogos() {
+    if (repetindoCatalogos) return;
+    // Limpa o anúncio antes: a mesma falha, de novo, é anunciada de novo.
+    setAnuncioDaLista("");
+    setRepetindoCatalogos(true);
+    setTentativaCatalogos((n) => n + 1);
+  }
+
+  const idDoChip = (filtro: FiltroRemovivel) => `${prefixo}-chip-${filtro}`;
+
+  /**
+   * T199 — remove um filtro pelo chip (uma única mudança de estado). O chip
+   * some: o foco vai ao chip seguinte, ou ao anterior, ou ao campo de busca.
+   */
+  function removerFiltro(filtro: FiltroRemovivel) {
+    const presentes = FILTROS_REMOVIVEIS.filter((f) =>
+      f === "tipo"
+        ? tipo !== null
+        : temFiltroDeLotacao &&
+          (f === "departamento" ? departamentoId : cargoId) !== null,
+    );
+    const i = presentes.indexOf(filtro);
+    const destino = presentes[i + 1] ?? presentes[i - 1];
+    mudarEstado({
+      ...estado,
+      pagina: 1,
+      ...(filtro === "departamento"
+        ? { departamentoId: null }
+        : filtro === "cargo"
+          ? { cargoId: null }
+          : { tipo: null }),
+    });
+    setFocoPendente(destino ? idDoChip(destino) : ID_CAMPO_BUSCA);
+  }
+
+  /** "Tentar novamente" do erro da tabela: relê a mesma consulta. */
+  function repetirLeitura() {
+    if (repetindoErro) return;
+    // Limpa o anúncio antes: a mesma falha, de novo, é anunciada de novo.
+    setAnuncioDaLista("");
+    setRepetindoErro(true);
+    void carregarDados(estado, buscaAplicada, false, false, true);
+  }
+
+  /** Depois de uma falha: o estado já é o alvo; relê, no mesmo botão. */
+  function repetirAcaoDoVazio() {
+    if (!acaoDoVazio || acaoDoVazio.fase === "carregando") return;
+    setAnuncioDaLista("");
+    setAcaoDoVazio({ ...acaoDoVazio, fase: "carregando" });
+    void carregarDados(estado, buscaAplicada, false, true);
+  }
 
   function irParaPagina(destino: number) {
     if (destino < 1 || destino > totalPaginas || carregando) return;
-    void carregarDados(consulta, destino);
+    mudarEstado({ ...estado, pagina: destino });
+  }
+
+  function trocarAba(nova: AbaDaListagem) {
+    if (nova === aba) return;
+    // A aba nova começa na primeira página; tipo e lotação seguem quando
+    // fazem sentido nela (a normalização tira o que não faz).
+    mudarEstado({ ...estado, aba: nova, pagina: 1 });
+  }
+
+  function aoTeclarNaAba(evento: KeyboardEvent<HTMLButtonElement>) {
+    const atual = ABAS_DA_LISTAGEM.indexOf(
+      (evento.currentTarget.dataset.aba ?? aba) as AbaDaListagem,
+    );
+    const n = ABAS_DA_LISTAGEM.length;
+    let alvo: number | null = null;
+    if (evento.key === "ArrowRight") alvo = (atual + 1) % n;
+    if (evento.key === "ArrowLeft") alvo = (atual - 1 + n) % n;
+    if (evento.key === "Home") alvo = 0;
+    if (evento.key === "End") alvo = n - 1;
+    if (alvo === null) return;
+    evento.preventDefault();
+    document.getElementById(idDaAba(ABAS_DA_LISTAGEM[alvo]!))?.focus();
   }
 
   /**
-   * T178 — enviar a busca. Um termo novo dispara a releitura pelo efeito; o
-   * MESMO termo reenviado também relê (página 1), porque reenviar é pedir de
-   * novo — e o efeito não rodaria, já que o estado não mudou.
+   * T178 — enviar a busca. Um termo novo relê pelo efeito (na página 1); o
+   * MESMO termo reenviado também relê, porque reenviar é pedir de novo.
    */
   function handleBuscar(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
     const termo = normalizarBusca(buscaDigitada);
     setBuscaDigitada(termo);
-    if (termo === buscaAplicada) {
-      void carregarDados({ ...consulta, busca: termo }, 1);
+    if (estado.pagina !== 1) mudarEstado({ ...estado, pagina: 1 });
+    if (termo === buscaAplicada && estado.pagina === 1) {
+      void carregarDados(estado, termo);
       return;
     }
     setBuscaAplicada(termo);
   }
 
-  /**
-   * T178 — "Limpar busca": volta ao conjunto sem termo. O foco vai ao campo,
-   * porque o botão acionado some junto com o termo — sem isto o foco cairia
-   * no `<body>`.
-   */
+  /** T178 — "Limpar busca": o foco vai ao campo (o botão some com o termo). */
   function limparBusca() {
+    setBuscaDigitada("");
+    setBuscaAplicada("");
+    if (estado.pagina !== 1) mudarEstado({ ...estado, pagina: 1 });
+    campoBuscaRef.current?.focus();
+  }
+
+  /**
+   * T199 — busca, lotação e tipo saem numa ÚNICA mudança de estado: duas
+   * (filtros, depois página) partiriam do mesmo estado antigo, e a segunda
+   * devolveria os filtros que a primeira tirou.
+   */
+  function limparBuscaEFiltros() {
+    mudarEstado({
+      ...estado,
+      pagina: 1,
+      departamentoId: null,
+      cargoId: null,
+      tipo: null,
+    });
     setBuscaDigitada("");
     setBuscaAplicada("");
     campoBuscaRef.current?.focus();
   }
 
-  /**
-   * T186 — do estado vazio por filtro: volta a "Todos", busca intacta.
-   * T190 — departamento e cargo também saem.
-   */
-  function limparFiltros() {
-    setFiltroSituacao("todos");
-    setFiltroSituacaoVinculo("todos");
-    setFiltroDepartamentoId("");
-    setFiltroCargoId("");
-  }
-
-  /** T178 — do estado vazio por busca/filtro: tudo volta ao conjunto inteiro. */
-  function limparBuscaEFiltros() {
-    limparFiltros();
-    limparBusca();
-  }
-
-  /**
-   * T186 — o estado vazio de uma consulta filtrada, distinto para busca,
-   * filtro e os dois juntos: cada um diz o que não foi achado e oferece
-   * desfazer exatamente o que o produziu. "Ativo" e "inativo" seguem a regra
-   * da T178 (na empresa ativa; sem empresa, no escopo do master).
-   */
+  /** O vazio de uma consulta filtrada: diz o que não foi achado e como desfazer. */
   function vazioDaConsulta(): {
     titulo: string;
     descricao: string;
     acao: { rotulo: string; executar: () => void };
   } {
-    const onde = empresaAtiva ? "nesta empresa" : "no seu escopo";
-    const situacao =
-      filtroSituacao === "todos"
-        ? null
-        : filtroSituacao === "ativo"
-          ? "ativo"
-          : "inativo";
-    const soSituacao =
-      situacao !== null &&
-      filtroSituacaoVinculo === "todos" &&
-      !temFiltroDeLotacao;
     if (buscaAplicada && !temFiltro) {
       return {
         titulo: "Nenhum colaborador encontrado",
-        descricao: `Nenhum colaborador corresponde a “${buscaAplicada}” por nome ou matrícula.`,
+        descricao: `Nenhum colaborador em “${ROTULO_DA_ABA[aba]}” corresponde a “${buscaAplicada}” por nome ou matrícula.`,
         acao: { rotulo: "Limpar busca", executar: limparBusca },
       };
     }
     if (!buscaAplicada) {
-      return soSituacao
-        ? {
-            titulo: `Nenhum colaborador ${situacao} ${onde}`,
-            descricao: `Não há colaborador ${situacao} ${onde}. Os totais acima não dependem do filtro.`,
-            acao: { rotulo: "Ver todos", executar: limparFiltros },
-          }
-        : {
-            titulo: "Nenhum colaborador com estes filtros",
-            descricao:
-              "Nenhum colaborador corresponde aos filtros selecionados.",
-            acao: { rotulo: "Limpar filtros", executar: limparFiltros },
-          };
+      const titulo = "Nenhum colaborador com estes filtros";
+      const descricao = `Nenhum colaborador em “${ROTULO_DA_ABA[aba]}” corresponde aos filtros selecionados.`;
+      return {
+        titulo,
+        descricao,
+        acao: {
+          rotulo: "Limpar filtros",
+          // T199 — do estado vazio: ele segue montado durante a leitura e,
+          // no fim, o foco vai ao campo de busca.
+          executar: () =>
+            iniciarAcaoDoVazio(
+              {
+                titulo,
+                descricao,
+                rotulo: "Limpar filtros",
+                destinoDoFoco: ID_CAMPO_BUSCA,
+              },
+              {
+                ...estado,
+                pagina: 1,
+                departamentoId: null,
+                cargoId: null,
+                tipo: null,
+              },
+            ),
+        },
+      };
     }
     return {
       titulo: "Nenhum colaborador encontrado com estes filtros",
-      descricao: soSituacao
-        ? `Nenhum colaborador ${situacao} corresponde a “${buscaAplicada}” por nome ou matrícula.`
-        : `Nenhum colaborador corresponde a “${buscaAplicada}” com os filtros selecionados.`,
+      descricao: `Nenhum colaborador corresponde a “${buscaAplicada}” com os filtros selecionados.`,
       acao: { rotulo: "Limpar busca e filtros", executar: limparBuscaEFiltros },
     };
   }
 
-  /**
-   * T178 — colunas da porta principal.
-   *
-   * Matrícula e admissão saem do VÍNCULO PRINCIPAL: o primeiro de `vinculos`,
-   * que o servidor já ordena (ativo, previsto, encerrado; admissão mais
-   * recente primeiro). Vêm na mesma resposta da lista — nenhuma leitura por
-   * pessoa. A coluna "Cadastrado em" (T164) saiu: ela existia porque a
-   * admissão não vinha na listagem, e `criadoEm` não é admissão.
-   *
-   * T184 — Cargo e Departamento são os da LOTAÇÃO VIGENTE do vínculo
-   * principal (a alocação organizacional aberta), que o servidor já devolve
-   * na mesma resposta. Vínculo previsto (admissão não efetivada) ou encerrado
-   * não tem lotação vigente e mostra "Sem lotação vigente" — nunca o destino
-   * planejado nem a última lotação (decisão da proprietária de 2026-10-26).
-   * O Banco de Horas segue fora: não tem operação.
-   *
-   * T185 — Jornada de trabalho: a vigência (T183) que contém o dia civil do
-   * navegador — a mesma regra da ficha —, do colaborador na empresa do
-   * vínculo principal ATIVO. Previsto, encerrado, sem jornada ou com
-   * vigência futura: "Sem jornada vigente". Jornada inativada aparece com a
-   * indicação (decisões da proprietária de 2026-10-26).
-   */
+  /** O vazio de uma aba sem ninguém (sem busca nem filtros). */
+  function vazioDaAba(): { titulo: string; descricao: string } {
+    switch (aba) {
+      case "ativos":
+        return {
+          titulo: `Nenhum colaborador ativo ${onde}`,
+          descricao: "Quem tem vínculo ativo aparece aqui.",
+        };
+      case "em-admissao":
+        return {
+          titulo: `Nenhuma admissão em andamento ${onde}`,
+          descricao:
+            "Quem tem vínculo previsto, ainda sem vínculo ativo, aparece aqui.",
+        };
+      case "desligados":
+        return {
+          titulo: `Nenhum colaborador desligado ${onde}`,
+          descricao:
+            "Quem não tem vínculo ativo nem previsto, e tem vínculo encerrado, aparece aqui.",
+        };
+      default:
+        return {
+          titulo: `Nenhum colaborador cadastrado ${onde}`,
+          descricao: onNovaAdmissao
+            ? "Registre a admissão do primeiro colaborador."
+            : "Ainda não há colaboradores admitidos.",
+        };
+    }
+  }
+
   const hoje = diaDeHoje();
   const colunasColaboradores: DataTableColumn<ColaboradorListadoApi>[] = [
-    { key: "nome", header: "Nome", cell: (c) => c.nome },
+    {
+      key: "colaborador",
+      header: "Colaborador",
+      cell: (c) => (
+        <span className="colaboradores-screen__pessoa">
+          {/* Avatar neutro por iniciais: o nome está ao lado. */}
+          <span className="colaboradores-screen__avatar" aria-hidden="true">
+            {iniciaisDe(c.nome)}
+          </span>
+          {onAbrirFicha ? (
+            <button
+              type="button"
+              className="colaboradores-screen__nome"
+              aria-label={`Abrir ficha de ${c.nome}`}
+              onClick={(evento) => {
+                evento.currentTarget.focus();
+                onAbrirFicha(c.id);
+              }}
+            >
+              {c.nome}
+            </button>
+          ) : (
+            <span className="colaboradores-screen__nome-texto">{c.nome}</span>
+          )}
+        </span>
+      ),
+    },
     {
       key: "matricula",
       header: "Matrícula",
       cell: (c) => {
-        const principal = c.vinculos[0];
-        if (!principal) return "—";
+        const vinculo = vinculoDaLinha(c, aba, tipo);
+        if (!vinculo) return "—";
         const aMais = c.vinculos.length - 1;
         return (
           <>
-            {/* T179 — matrícula opcional: sem ela, "Sem matrícula". */}
-            {exibirMatricula(principal.matricula)}
+            {exibirMatricula(vinculo.matricula)}
             {aMais > 0 ? (
               <>
-                {/* "+N" é o atalho visual; quem usa leitor de tela ouve a
-                    frase inteira, em vez de "mais um" solto. */}
                 <span
                   className="colaboradores-screen__vinculos-a-mais"
                   aria-hidden="true"
@@ -630,7 +1024,10 @@ export function ColaboradoresScreen({
                   {" "}
                   +{aMais}
                 </span>
-                <span className="sr-only"> e mais {vinculosAMais(aMais)}</span>
+                <span className="colaboradores-screen__so-leitor">
+                  {" "}
+                  e mais {vinculosAMais(aMais)}
+                </span>
               </>
             ) : null}
           </>
@@ -640,55 +1037,71 @@ export function ColaboradoresScreen({
     {
       key: "cargo",
       header: "Cargo",
-      cell: (c) => celulaDaLotacao(c.vinculos[0], "cargo"),
+      cell: (c) => celulaDaLotacao(vinculoDaLinha(c, aba, tipo), "cargo"),
     },
     {
       key: "departamento",
       header: "Departamento",
-      cell: (c) => celulaDaLotacao(c.vinculos[0], "departamento"),
+      cell: (c) =>
+        celulaDaLotacao(vinculoDaLinha(c, aba, tipo), "departamento"),
     },
     {
       key: "jornada",
       header: "Jornada de trabalho",
-      cell: (c) => celulaDaJornada(c.vinculos[0], hoje),
+      cell: (c) => celulaDaJornada(vinculoDaLinha(c, aba, tipo), hoje),
     },
     {
-      // Situação do ITEM: para `rh`/`dp`, na empresa ativa (tem vínculo ativo
-      // nela) — decidida pelo servidor, não derivada dos vínculos aqui.
+      key: "tipo",
+      header: "Tipo",
+      cell: (c) => {
+        const vinculo = vinculoDaLinha(c, aba, tipo);
+        return vinculo ? ROTULO_TIPO_DE_VINCULO[vinculo.tipo] : "—";
+      },
+    },
+    {
       key: "situacao",
       header: "Situação",
-      cell: (c) => (
-        <StatusBadge
-          variant={VARIANTE_SITUACAO_COLABORADOR[c.situacao] ?? "neutral"}
-        >
-          {c.situacao === "ativo" ? "Ativo" : "Inativo"}
-        </StatusBadge>
-      ),
+      cell: (c) => {
+        const situacao = situacaoNoEscopo(c);
+        // Sem vínculo na resposta: a situação do próprio item.
+        if (!situacao) {
+          return (
+            <StatusBadge
+              variant={c.situacao === "ativo" ? "success" : "neutral"}
+            >
+              {c.situacao === "ativo" ? "Ativo" : "Inativo"}
+            </StatusBadge>
+          );
+        }
+        const { rotulo, variante } = SITUACAO_NO_ESCOPO[situacao];
+        return <StatusBadge variant={variante}>{rotulo}</StatusBadge>;
+      },
     },
     {
-      // Dia civil (`@db.Date`): `formatarDiaCivil` corta a string, sem `Date`,
-      // e devolve "—" quando não há vínculo — nunca uma data inventada.
       key: "admissao",
       header: "Admissão",
-      cell: (c) => formatarDiaCivil(c.vinculos[0]?.dataAdmissao),
+      cell: (c) => formatarDiaCivil(vinculoDaLinha(c, aba, tipo)?.dataAdmissao),
     },
-    {
-      key: "acoes",
-      header: "Ações",
-      cell: (c) => (
-        <Button
-          variant="secondary"
-          onClick={(evento) => {
-            evento.currentTarget.focus();
-            onAbrirFicha?.(c.id);
-          }}
-        >
-          Abrir ficha
-          <span className="sr-only"> de {c.nome}</span>
-        </Button>
-      ),
-    },
+    ...(aba === "desligados"
+      ? [
+          {
+            key: "desligamento",
+            header: "Desligamento",
+            cell: (c: ColaboradorListadoApi) =>
+              formatarDiaCivil(vinculoDaLinha(c, aba, tipo)?.dataDesligamento),
+          },
+        ]
+      : []),
   ];
+
+  const valor = (n: number | undefined) =>
+    contadores && n !== undefined ? String(n) : "…";
+  const distribuicao = contadores
+    ? TIPOS_DE_VINCULO.map((t) => ({
+        tipo: t,
+        quantidade: contadores.ativosPorTipo?.[t] ?? 0,
+      })).filter((d) => d.quantidade > 0)
+    : [];
 
   return (
     <div className="colaboradores-screen">
@@ -696,112 +1109,620 @@ export function ColaboradoresScreen({
         headingLevel={1}
         titleId={COLABORADORES_TITULO_ID}
         title="Colaboradores"
-        description="Consulte os colaboradores da empresa ativa, abra a ficha de cada um e inicie uma nova admissão. Situação e vínculo seguem sempre a fonte de verdade do backend."
+        description="Acompanhe quem está ativo, em admissão ou desligado, filtre pela lotação e pelo tipo de vínculo e abra a ficha de cada pessoa."
         actions={
-          /* T178 — contadores do escopo inteiro, como o servidor os contou,
-             no cabeçalho: são o tamanho da área, não um detalhe da lista.
-
-             Rotulados "sem filtros" porque NÃO acompanham a busca nem os
-             filtros: dizem quantos ativos e inativos há, enquanto o total da
-             lista diz quantos a consulta atual achou. Sem o rótulo, "Ativos
-             40" ao lado de uma busca com três resultados pareceria erro.
-
-             Antes da primeira resposta, reticências; depois, o último valor
-             do servidor fica à vista durante as releituras — ele não depende
-             do filtro, e trocá-lo por reticências a cada consulta só
-             piscaria. Sem `role="status"`, pelo mesmo motivo do total da
-             lista: regiões vivas a mais atropelam as que já existem.
-
-             T186 — os contadores SÃO o filtro de situação (o select
-             "Situação" saiu, por decisão da proprietária de 2026-10-26).
-             Botões com `aria-pressed`, como os demais seletores do produto:
-             o número segue sendo o total sem filtros, e o botão pressionado
-             diz qual recorte a lista mostra. O filtro vai ao servidor, antes
-             da paginação; nada é escondido no navegador. Não fica na URL:
-             recarregar volta a "Todos". */
-          <div
-            className="colaboradores-screen__contadores"
-            role="group"
-            aria-labelledby="colaboradores-contadores-rotulo"
-          >
-            <p
-              id="colaboradores-contadores-rotulo"
-              className="colaboradores-screen__contadores-rotulo"
+          /* T194 — "Adicionar colaborador" abre o painel das formas de
+             entrada. Só o que existe: nada de exportar. */
+          onNovaAdmissao ? (
+            <Button
+              aria-haspopup="dialog"
+              onClick={() => setPainelAdicionarAberto(true)}
             >
-              Situação {empresaAtiva ? "na empresa ativa" : "no seu escopo"},
-              totais sem filtros
-            </p>
-            <div className="colaboradores-screen__contadores-lista">
-              {OPCOES_SITUACAO.map((opcao) => (
-                <Button
-                  key={opcao.valor}
-                  variant={
-                    filtroSituacao === opcao.valor ? "primary" : "secondary"
-                  }
-                  aria-pressed={filtroSituacao === opcao.valor}
-                  className="colaboradores-screen__contador"
-                  onClick={() => setFiltroSituacao(opcao.valor)}
-                >
-                  <span className="colaboradores-screen__contador-rotulo">
-                    {opcao.rotulo}
-                  </span>{" "}
-                  <span className="colaboradores-screen__contador-valor">
-                    {contadores ? opcao.total(contadores) : "…"}
-                  </span>
-                </Button>
-              ))}
-            </div>
-          </div>
+              <IconeAdicionarPessoa />
+              Adicionar colaborador
+            </Button>
+          ) : null
         }
       />
 
-      {/* T178 — barra de ações: a entrada de colaboradores é a ação principal
-          da área e a busca fica ao lado. Só o que existe: nada de exportar.
-          T194 — "Adicionar colaborador" abre o painel das formas de entrada;
-          as que ainda não existem aparecem lá como indisponíveis, sem ação. */}
-      <div className="colaboradores-screen__barra-acoes">
-        {onNovaAdmissao ? (
-          <Button
-            aria-haspopup="dialog"
-            onClick={() => setPainelAdicionarAberto(true)}
-          >
-            <IconeAdicionarPessoa />
-            Adicionar colaborador
-          </Button>
-        ) : null}
-        <form
-          role="search"
-          aria-label="Buscar colaboradores"
-          className="colaboradores-screen__busca"
-          onSubmit={handleBuscar}
+      {/* T199 — indicadores do escopo inteiro, como o servidor os contou:
+          não acompanham aba, busca nem filtros (o rótulo diz isso). Sem
+          região viva: o número não é anunciado a cada filtro. */}
+      <section
+        className="colaboradores-screen__indicadores"
+        aria-labelledby="colaboradores-indicadores-titulo"
+      >
+        <h2
+          id="colaboradores-indicadores-titulo"
+          className="colaboradores-screen__indicadores-titulo"
+          ref={tituloTotaisRef}
+          tabIndex={-1}
         >
-          <FormField
-            id="colaboradores-busca"
-            label="Buscar por nome ou matrícula"
-          >
-            {(control) => (
-              <input
-                ref={campoBuscaRef}
-                type="search"
-                maxLength={BUSCA_COLABORADORES_MAXIMO}
-                autoComplete="off"
-                value={buscaDigitada}
-                onChange={(e) => setBuscaDigitada(e.target.value)}
-                {...control}
-              />
-            )}
-          </FormField>
-          <div className="colaboradores-screen__busca-acoes">
-            <Button type="submit" variant="secondary">
-              Buscar
+          {empresaAtiva
+            ? `Totais de ${empresaAtiva.nome}, sem filtros`
+            : "Totais no seu escopo, sem filtros"}
+        </h2>
+        <p
+          className="colaboradores-screen__anuncio-totais colaboradores-screen__so-leitor"
+          role="status"
+        >
+          {anuncioTotais}
+        </p>
+        {!temTabela && contadores === null && falhaContadores ? (
+          <div className="colaboradores-screen__totais-falha">
+            <p className="colaboradores-screen__totais-falha-texto">
+              Não foi possível carregar os totais de colaboradores.
+            </p>
+            <Button
+              variant="secondary"
+              onClick={repetirContadores}
+              aria-disabled={repetindoContadores}
+            >
+              Tentar novamente
             </Button>
-            {buscaDigitada !== "" || buscaAplicada !== "" ? (
-              <Button type="button" variant="subtle" onClick={limparBusca}>
-                Limpar busca
-              </Button>
-            ) : null}
           </div>
-        </form>
+        ) : (
+          <>
+            <dl className="colaboradores-screen__cartoes">
+              {(
+                [
+                  ["Ativos", contadores?.ativos],
+                  ["Em admissão", contadores?.emAdmissao],
+                  ["Desligados", contadores?.desligados],
+                  [
+                    empresaAtiva
+                      ? "Total nesta empresa"
+                      : "Total no seu escopo",
+                    contadores?.total,
+                  ],
+                ] as const
+              ).map(([rotulo, numero]) => (
+                <div key={rotulo} className="colaboradores-screen__cartao">
+                  <dt>{rotulo}</dt>
+                  <dd>{valor(numero)}</dd>
+                </div>
+              ))}
+            </dl>
+            <div className="colaboradores-screen__distribuicao">
+              <h3 className="colaboradores-screen__distribuicao-titulo">
+                Ativos por tipo de vínculo
+              </h3>
+              {contadores === null ? (
+                <p className="colaboradores-screen__distribuicao-vazio">…</p>
+              ) : distribuicao.length === 0 ? (
+                <p className="colaboradores-screen__distribuicao-vazio">
+                  Nenhum colaborador ativo {onde}.
+                </p>
+              ) : (
+                <>
+                  {/* Barra só visual; a legenda em texto diz os mesmos números. */}
+                  <div
+                    className="colaboradores-screen__barra-tipos"
+                    aria-hidden="true"
+                  >
+                    {distribuicao.map((d) => (
+                      <span
+                        key={d.tipo}
+                        className={`colaboradores-screen__barra-tipo colaboradores-screen__barra-tipo--${d.tipo}`}
+                        style={{ flexGrow: d.quantidade }}
+                      />
+                    ))}
+                  </div>
+                  <ul className="colaboradores-screen__legenda-tipos">
+                    {distribuicao.map((d) => (
+                      <li key={d.tipo}>
+                        <span
+                          className={`colaboradores-screen__marcador colaboradores-screen__barra-tipo--${d.tipo}`}
+                          aria-hidden="true"
+                        />
+                        {ROTULO_TIPO_DE_VINCULO[d.tipo]}:{" "}
+                        <strong>{d.quantidade}</strong>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </div>
+          </>
+        )}
+      </section>
+
+      <div className="colaboradores-screen__painel">
+        <div
+          role="tablist"
+          aria-label="Grupos de colaboradores"
+          className="colaboradores-screen__abas"
+        >
+          {ABAS_DA_LISTAGEM.map((a) => {
+            const selecionada = a === aba;
+            const numero = contadores ? totalDaAba(a, contadores) : null;
+            return (
+              <button
+                key={a}
+                type="button"
+                role="tab"
+                id={idDaAba(a)}
+                data-aba={a}
+                aria-selected={selecionada}
+                aria-controls={idDoPainel}
+                tabIndex={selecionada ? 0 : -1}
+                className={
+                  selecionada
+                    ? "colaboradores-screen__aba colaboradores-screen__aba--ativa"
+                    : "colaboradores-screen__aba"
+                }
+                // Nome acessível "Ativos, 12": a pausa que o número
+                // colado ao rótulo não dá.
+                {...(numero !== null
+                  ? { "aria-label": `${ROTULO_DA_ABA[a]}, ${numero}` }
+                  : {})}
+                onClick={() => trocarAba(a)}
+                onKeyDown={aoTeclarNaAba}
+              >
+                {ROTULO_DA_ABA[a]}
+                {numero !== null ? (
+                  <span
+                    className="colaboradores-screen__aba-total"
+                    aria-hidden="true"
+                  >
+                    {numero}
+                  </span>
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
+
+        <section
+          role="tabpanel"
+          id={idDoPainel}
+          aria-labelledby={idDaAba(aba)}
+          className="colaboradores-screen__painel-conteudo"
+        >
+          {aba === "jornada" ? (
+            /* D-5, N-4 — a mesma visão de jornadas da empresa, com as mesmas
+               permissões: só o RH opera. */
+            <PessoasHorarioScreen
+              embutida
+              podeOperar={podeOperarJornada}
+              {...(onAbrirFicha ? { onAbrirFicha } : {})}
+            />
+          ) : (
+            <>
+              {/* T199 — o título da seção da aba: os estados vazios (h3)
+                  e o erro ficam abaixo dele, e não de "Totais…". Só para
+                  leitor de tela; a aba selecionada já o mostra. */}
+              <h2 className="colaboradores-screen__so-leitor">
+                {`Colaboradores — ${ROTULO_DA_ABA[aba]}`}
+              </h2>
+              <p
+                className="colaboradores-screen__anuncio-lista colaboradores-screen__so-leitor"
+                role="status"
+              >
+                {anuncioDaLista}
+              </p>
+              <div className="colaboradores-screen__filtros">
+                <form
+                  role="search"
+                  aria-label="Buscar colaboradores"
+                  className="colaboradores-screen__busca"
+                  onSubmit={handleBuscar}
+                >
+                  <FormField
+                    id="colaboradores-busca"
+                    label="Buscar por nome ou matrícula"
+                  >
+                    {(control) => (
+                      <input
+                        ref={campoBuscaRef}
+                        type="search"
+                        maxLength={BUSCA_COLABORADORES_MAXIMO}
+                        autoComplete="off"
+                        value={buscaDigitada}
+                        onChange={(e) => setBuscaDigitada(e.target.value)}
+                        {...control}
+                      />
+                    )}
+                  </FormField>
+                  <div className="colaboradores-screen__busca-acoes">
+                    <Button type="submit" variant="secondary">
+                      Buscar
+                    </Button>
+                    {buscaDigitada !== "" || buscaAplicada !== "" ? (
+                      <Button
+                        type="button"
+                        variant="subtle"
+                        onClick={limparBusca}
+                      >
+                        Limpar busca
+                      </Button>
+                    ) : null}
+                  </div>
+                </form>
+
+                {/* T190 — lotação vigente: só existe em vínculo ativo, então
+                    só em Ativos e Todos. */}
+                {comLotacao ? (
+                  <>
+                    <FormField
+                      id="colaboradores-filtro-departamento"
+                      label="Departamento"
+                      {...(catalogos.status === "erro"
+                        ? {
+                            help: FALHA_DOS_CATALOGOS,
+                          }
+                        : {})}
+                    >
+                      {(control) => (
+                        <select
+                          value={departamentoId ?? ""}
+                          onChange={(e) =>
+                            mudarEstado({
+                              ...estado,
+                              pagina: 1,
+                              departamentoId: e.target.value || null,
+                            })
+                          }
+                          disabled={catalogos.status !== "dados"}
+                          {...control}
+                        >
+                          <option value="">
+                            {catalogos.status === "carregando"
+                              ? "Carregando…"
+                              : "Todos os departamentos"}
+                          </option>
+                          {catalogos.status === "dados"
+                            ? catalogos.departamentos.map((d) => (
+                                <option key={d.id} value={d.id}>
+                                  {rotuloDaReferencia(d)}
+                                </option>
+                              ))
+                            : null}
+                        </select>
+                      )}
+                    </FormField>
+
+                    <FormField id="colaboradores-filtro-cargo" label="Cargo">
+                      {(control) => (
+                        <select
+                          value={cargoId ?? ""}
+                          onChange={(e) =>
+                            mudarEstado({
+                              ...estado,
+                              pagina: 1,
+                              cargoId: e.target.value || null,
+                            })
+                          }
+                          disabled={catalogos.status !== "dados"}
+                          {...control}
+                        >
+                          <option value="">
+                            {catalogos.status === "carregando"
+                              ? "Carregando…"
+                              : "Todos os cargos"}
+                          </option>
+                          {catalogos.status === "dados"
+                            ? catalogos.cargos.map((c) => (
+                                <option key={c.id} value={c.id}>
+                                  {rotuloDaReferencia(c)}
+                                </option>
+                              ))
+                            : null}
+                        </select>
+                      )}
+                    </FormField>
+                  </>
+                ) : null}
+
+                <FormField
+                  id="colaboradores-filtro-tipo"
+                  label="Tipo de vínculo"
+                >
+                  {(control) => (
+                    <select
+                      value={tipo ?? ""}
+                      onChange={(e) =>
+                        mudarEstado({
+                          ...estado,
+                          pagina: 1,
+                          tipo: (e.target.value ||
+                            null) as TipoDeVinculo | null,
+                        })
+                      }
+                      {...control}
+                    >
+                      <option value="">Todos os tipos</option>
+                      {TIPOS_DE_VINCULO.map((t) => (
+                        <option key={t} value={t}>
+                          {ROTULO_TIPO_DE_VINCULO[t]}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </FormField>
+
+                {comLotacao &&
+                (catalogos.status === "erro" || repetindoCatalogos) ? (
+                  <Button
+                    variant="subtle"
+                    className="colaboradores-screen__filtros-retry"
+                    aria-disabled={repetindoCatalogos}
+                    onClick={recarregarCatalogos}
+                  >
+                    Recarregar departamentos e cargos
+                  </Button>
+                ) : null}
+              </div>
+
+              {/* O que está filtrando, à vista, e como desfazer cada um. */}
+              {temFiltro ? (
+                <div
+                  className="colaboradores-screen__filtros-ativos"
+                  role="group"
+                  aria-label="Filtros ativos"
+                >
+                  {temFiltroDeLotacao && departamentoId ? (
+                    <Button
+                      id={idDoChip("departamento")}
+                      variant="secondary"
+                      className="colaboradores-screen__filtro-ativo"
+                      aria-label={`Remover filtro de departamento: ${
+                        departamentoFiltrado
+                          ? rotuloDaReferencia(departamentoFiltrado)
+                          : "selecionado"
+                      }`}
+                      onClick={() => removerFiltro("departamento")}
+                    >
+                      Departamento:{" "}
+                      {departamentoFiltrado
+                        ? rotuloDaReferencia(departamentoFiltrado)
+                        : "selecionado"}{" "}
+                      <span aria-hidden="true">×</span>
+                    </Button>
+                  ) : null}
+                  {temFiltroDeLotacao && cargoId ? (
+                    <Button
+                      id={idDoChip("cargo")}
+                      variant="secondary"
+                      className="colaboradores-screen__filtro-ativo"
+                      aria-label={`Remover filtro de cargo: ${
+                        cargoFiltrado
+                          ? rotuloDaReferencia(cargoFiltrado)
+                          : "selecionado"
+                      }`}
+                      onClick={() => removerFiltro("cargo")}
+                    >
+                      Cargo:{" "}
+                      {cargoFiltrado
+                        ? rotuloDaReferencia(cargoFiltrado)
+                        : "selecionado"}{" "}
+                      <span aria-hidden="true">×</span>
+                    </Button>
+                  ) : null}
+                  {tipo ? (
+                    <Button
+                      id={idDoChip("tipo")}
+                      variant="secondary"
+                      className="colaboradores-screen__filtro-ativo"
+                      aria-label={`Remover filtro de tipo de vínculo: ${ROTULO_TIPO_DE_VINCULO[tipo]}`}
+                      onClick={() => removerFiltro("tipo")}
+                    >
+                      Tipo: {ROTULO_TIPO_DE_VINCULO[tipo]}{" "}
+                      <span aria-hidden="true">×</span>
+                    </Button>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {(statusCarregamento === "erro" || repetindoErro) &&
+              acaoDoVazio === null ? (
+                <Surface
+                  as="section"
+                  padding="lg"
+                  className="colaboradores-screen__erro"
+                  aria-labelledby="colaboradores-erro-titulo"
+                >
+                  <StatusBadge variant="danger">Erro</StatusBadge>
+                  <h3
+                    id="colaboradores-erro-titulo"
+                    className="colaboradores-screen__section-title"
+                  >
+                    Não foi possível carregar os colaboradores
+                  </h3>
+                  <p>
+                    Verifique sua conexão e tente novamente. Se o problema
+                    persistir, contate o suporte.
+                  </p>
+                  <Button
+                    variant="secondary"
+                    aria-disabled={repetindoErro}
+                    onClick={repetirLeitura}
+                  >
+                    Tentar novamente
+                  </Button>
+                </Surface>
+              ) : (
+                <>
+                  {/* O total da consulta vem do SERVIDOR; sem região viva —
+                      a paginação já anuncia a posição. Depois de uma falha
+                      (o estado vazio da ação segue à vista), nenhum total:
+                      nem "Contando…", nem o número de antes. */}
+                  {statusCarregamento !== "erro" ? (
+                    <p className="colaboradores-screen__contexto">
+                      <span className="colaboradores-screen__total">
+                        {statusCarregamento === "dados"
+                          ? total === 1
+                            ? "1 colaborador nesta consulta"
+                            : `${total} colaboradores nesta consulta`
+                          : "Contando…"}
+                      </span>
+                    </p>
+                  ) : null}
+
+                  {acaoDoVazio ? (
+                    /* T199 — o estado vazio que pediu a ação, no MESMO lugar
+                       e com o mesmo botão (o foco fica nele). */
+                    <EmptyState
+                      headingLevel={3}
+                      icon="—"
+                      title={acaoDoVazio.titulo}
+                      description={
+                        acaoDoVazio.fase === "falha"
+                          ? `${FALHA_DA_LISTA} Verifique sua conexão e tente novamente.`
+                          : acaoDoVazio.descricao
+                      }
+                      action={
+                        <Button
+                          variant="secondary"
+                          aria-disabled={acaoDoVazio.fase === "carregando"}
+                          onClick={repetirAcaoDoVazio}
+                        >
+                          {acaoDoVazio.rotulo}
+                        </Button>
+                      }
+                    />
+                  ) : statusCarregamento === "carregando" ? (
+                    <p
+                      className="colaboradores-screen__carregando"
+                      role="status"
+                    >
+                      Carregando colaboradores…
+                    </p>
+                  ) : colaboradores.length === 0 && total > 0 ? (
+                    /* T199 — vazia, mas a consulta tem gente (o servidor
+                       diz): página além do fim (URL, voltar, conjunto que
+                       encolheu). Com ou sem busca e filtros, que ficam. */
+                    <EmptyState
+                      headingLevel={3}
+                      icon="—"
+                      title="Nenhum colaborador nesta página"
+                      description={DESCRICAO_PAGINA_VAZIA}
+                      action={
+                        <Button
+                          variant="secondary"
+                          onClick={() =>
+                            iniciarAcaoDoVazio(
+                              {
+                                titulo: "Nenhum colaborador nesta página",
+                                descricao: DESCRICAO_PAGINA_VAZIA,
+                                rotulo: "Ir para a primeira página",
+                                // O campo de busca: visível para quem usa
+                                // teclado; o anúncio dá o contexto.
+                                destinoDoFoco: ID_CAMPO_BUSCA,
+                                anunciarPrimeiraPagina: true,
+                              },
+                              { ...estado, pagina: 1 },
+                            )
+                          }
+                        >
+                          Ir para a primeira página
+                        </Button>
+                      }
+                    />
+                  ) : colaboradores.length === 0 ? (
+                    filtrando ? (
+                      (() => {
+                        const vazio = vazioDaConsulta();
+                        return (
+                          <EmptyState
+                            headingLevel={3}
+                            icon="—"
+                            title={vazio.titulo}
+                            description={vazio.descricao}
+                            action={
+                              <Button
+                                variant="secondary"
+                                onClick={vazio.acao.executar}
+                              >
+                                {vazio.acao.rotulo}
+                              </Button>
+                            }
+                          />
+                        );
+                      })()
+                    ) : (
+                      (() => {
+                        const vazio = vazioDaAba();
+                        const admitir =
+                          onNovaAdmissao &&
+                          (aba === "ativos" || aba === "todos");
+                        return (
+                          <EmptyState
+                            headingLevel={3}
+                            icon="—"
+                            title={vazio.titulo}
+                            description={vazio.descricao}
+                            {...(admitir
+                              ? {
+                                  action: (
+                                    <Button
+                                      aria-haspopup="dialog"
+                                      onClick={() =>
+                                        setPainelAdicionarAberto(true)
+                                      }
+                                    >
+                                      <IconeAdicionarPessoa />
+                                      Adicionar colaborador
+                                    </Button>
+                                  ),
+                                }
+                              : {})}
+                          />
+                        );
+                      })()
+                    )
+                  ) : (
+                    <DataTable
+                      caption={`Colaboradores — ${ROTULO_DA_ABA[aba]}`}
+                      captionVisible={false}
+                      columns={colunasColaboradores}
+                      rows={colaboradores}
+                      rowKey={(c) => c.id}
+                    />
+                  )}
+
+                  {/* T164/R-2 — a navegação fica fora do ramo que troca na
+                      carga e usa `aria-disabled`: o botão focado continua
+                      focado enquanto a página nova chega. */}
+                  {/* Página além do fim: o estado vazio já oferece a
+                      primeira; nada de "Página 4 de 2". */}
+                  {totalPaginas > 1 && paginaRespondida <= totalPaginas ? (
+                    <nav
+                      className="colaboradores-screen__paginacao"
+                      aria-label="Paginação de colaboradores"
+                      aria-busy={carregando}
+                    >
+                      <Button
+                        variant="secondary"
+                        onClick={() => irParaPagina(paginaRespondida - 1)}
+                        aria-disabled={paginaRespondida <= 1 || carregando}
+                      >
+                        Página anterior
+                      </Button>
+                      <span
+                        role="status"
+                        className="colaboradores-screen__paginacao-posicao"
+                      >
+                        {carregando
+                          ? "Carregando página…"
+                          : `Página ${paginaRespondida} de ${totalPaginas}`}
+                      </span>
+                      <Button
+                        variant="secondary"
+                        onClick={() => irParaPagina(paginaRespondida + 1)}
+                        aria-disabled={
+                          paginaRespondida >= totalPaginas || carregando
+                        }
+                      >
+                        Próxima página
+                      </Button>
+                    </nav>
+                  ) : null}
+                </>
+              )}
+            </>
+          )}
+        </section>
       </div>
 
       <Surface
@@ -811,9 +1732,6 @@ export function ColaboradoresScreen({
         aria-labelledby="colaboradores-aviso-rh-titulo"
       >
         <StatusBadge variant="info">RH e DP</StatusBadge>
-        {/* T178 — o texto antigo dizia "operado exclusivamente pelo RH e DP",
-            e o suporte técnico (`master_tecnico`) também abre esta tela, só
-            para consultar. Operar continua sendo do RH e do DP; ler, não. */}
         <p
           id="colaboradores-aviso-rh-titulo"
           className="colaboradores-screen__aviso-texto"
@@ -825,382 +1743,7 @@ export function ColaboradoresScreen({
         </p>
       </Surface>
 
-      <Surface
-        as="section"
-        padding="md"
-        className="colaboradores-screen__aviso"
-        aria-labelledby="colaboradores-aviso-indisponivel-titulo"
-      >
-        <StatusBadge variant="warning">Ainda indisponível</StatusBadge>
-        <p
-          id="colaboradores-aviso-indisponivel-titulo"
-          className="colaboradores-screen__aviso-texto"
-        >
-          Transferência, mudança de cargo, desligamento, reclassificação de
-          vínculo, Folha, documentos, benefícios, dependentes, afastamentos e
-          Banco de Horas ainda não têm operação nesta tela.
-        </p>
-      </Surface>
-
-      {statusCarregamento === "erro" ? (
-        <Surface
-          as="section"
-          padding="lg"
-          className="colaboradores-screen__erro"
-          aria-labelledby="colaboradores-erro-titulo"
-        >
-          <StatusBadge variant="danger">Erro</StatusBadge>
-          <h2
-            id="colaboradores-erro-titulo"
-            className="colaboradores-screen__section-title"
-          >
-            Não foi possível carregar os colaboradores
-          </h2>
-          <p>
-            Verifique sua conexão e tente novamente. Se o problema persistir,
-            contate o suporte.
-          </p>
-          <Button
-            variant="secondary"
-            onClick={() => void carregarDados(consulta, pagina)}
-          >
-            Tentar novamente
-          </Button>
-        </Surface>
-      ) : (
-        <section
-          className="colaboradores-screen__lista"
-          aria-labelledby="colaboradores-lista-titulo"
-        >
-          {/* O H1 da página já diz "Colaboradores"; repetir aqui só somava
-              ruído. A seção passa a nomear o que a lista realmente é. */}
-          <h2
-            id="colaboradores-lista-titulo"
-            className="colaboradores-screen__section-title"
-          >
-            {empresaAtiva
-              ? `Colaboradores de ${empresaAtiva.nome}`
-              : "Colaboradores desta empresa"}
-          </h2>
-
-          {/* T164 — contexto e tamanho do conjunto, lado a lado.
-
-              O total vem do SERVIDOR, do mesmo `total` que paginou a consulta.
-              Não é `colaboradores.length`: esse número seria o da página, e
-              exibi-lo como total faria "20" significar "vinte pessoas" numa
-              empresa com duzentas.
-
-              T178 — a contagem por situação passou a existir NO SERVIDOR
-              (`contadores`) e fica no cabeçalho da página. */}
-          <p className="colaboradores-screen__contexto">
-            {empresaAtiva ? (
-              <span className="colaboradores-screen__empresa">
-                {empresaAtiva.nome}{" "}
-                <span className="colaboradores-screen__empresa-codigo">
-                  ({empresaAtiva.codigo})
-                </span>
-              </span>
-            ) : null}
-            {/* Sem `role="status"`: a tela ja tem duas regioes vivas - a
-                mensagem de carregamento e a posicao da paginacao. Uma terceira
-                faria o leitor de tela anunciar o total a cada filtro, por cima
-                das outras duas, e tres avisos simultaneos nao informam: atropelam. */}
-            <span className="colaboradores-screen__total">
-              {statusCarregamento === "dados"
-                ? total === 1
-                  ? "1 colaborador no filtro atual"
-                  : `${total} colaboradores no filtro atual`
-                : "Contando…"}
-            </span>
-          </p>
-
-          <div className="colaboradores-screen__filtros">
-            <FormField
-              id="colaboradores-filtro-situacao-vinculo"
-              label="Situação do vínculo"
-            >
-              {(control) => (
-                <select
-                  value={filtroSituacaoVinculo}
-                  onChange={(e) =>
-                    setFiltroSituacaoVinculo(
-                      e.target.value as FiltroSituacaoVinculo,
-                    )
-                  }
-                  disabled={statusCarregamento === "carregando"}
-                  {...control}
-                >
-                  <option value="todos">Todas</option>
-                  <option value="previsto">Previsto</option>
-                  <option value="ativo">Ativo</option>
-                  <option value="encerrado">Encerrado</option>
-                </select>
-              )}
-            </FormField>
-
-            {/* T190 — lotação vigente. Seletor simples, só com referências
-                ATIVAS da empresa ativa; "Todos" desfaz só este filtro. */}
-            <FormField
-              id="colaboradores-filtro-departamento"
-              label="Departamento"
-              {...(catalogos.status === "erro"
-                ? {
-                    help: "Não foi possível carregar departamentos e cargos.",
-                  }
-                : {})}
-            >
-              {(control) => (
-                <select
-                  value={filtroDepartamentoId}
-                  onChange={(e) => setFiltroDepartamentoId(e.target.value)}
-                  disabled={
-                    statusCarregamento === "carregando" ||
-                    catalogos.status !== "dados"
-                  }
-                  {...control}
-                >
-                  <option value="">
-                    {catalogos.status === "carregando"
-                      ? "Carregando…"
-                      : "Todos os departamentos"}
-                  </option>
-                  {catalogos.status === "dados"
-                    ? catalogos.departamentos.map((d) => (
-                        <option key={d.id} value={d.id}>
-                          {rotuloDaReferencia(d)}
-                        </option>
-                      ))
-                    : null}
-                </select>
-              )}
-            </FormField>
-
-            <FormField id="colaboradores-filtro-cargo" label="Cargo">
-              {(control) => (
-                <select
-                  value={filtroCargoId}
-                  onChange={(e) => setFiltroCargoId(e.target.value)}
-                  disabled={
-                    statusCarregamento === "carregando" ||
-                    catalogos.status !== "dados"
-                  }
-                  {...control}
-                >
-                  <option value="">
-                    {catalogos.status === "carregando"
-                      ? "Carregando…"
-                      : "Todos os cargos"}
-                  </option>
-                  {catalogos.status === "dados"
-                    ? catalogos.cargos.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {rotuloDaReferencia(c)}
-                        </option>
-                      ))
-                    : null}
-                </select>
-              )}
-            </FormField>
-
-            {catalogos.status === "erro" ? (
-              <Button
-                variant="subtle"
-                className="colaboradores-screen__filtros-retry"
-                onClick={() => setTentativaCatalogos((n) => n + 1)}
-              >
-                Recarregar departamentos e cargos
-              </Button>
-            ) : null}
-          </div>
-
-          {/* T190 — o que a lotação está filtrando, à vista, e como desfazer
-              cada um sem perder os demais (busca, situação e o outro). */}
-          {temFiltroDeLotacao ? (
-            <div
-              className="colaboradores-screen__filtros-ativos"
-              role="group"
-              aria-label="Filtros de lotação ativos"
-            >
-              <span className="colaboradores-screen__filtros-ativos-rotulo">
-                Lotação vigente:
-              </span>
-              {filtroDepartamentoId ? (
-                <Button
-                  variant="secondary"
-                  className="colaboradores-screen__filtro-ativo"
-                  aria-label={`Remover filtro de departamento: ${
-                    departamentoFiltrado
-                      ? rotuloDaReferencia(departamentoFiltrado)
-                      : "selecionado"
-                  }`}
-                  onClick={() => setFiltroDepartamentoId("")}
-                >
-                  Departamento:{" "}
-                  {departamentoFiltrado
-                    ? rotuloDaReferencia(departamentoFiltrado)
-                    : "selecionado"}{" "}
-                  <span aria-hidden="true">×</span>
-                </Button>
-              ) : null}
-              {filtroCargoId ? (
-                <Button
-                  variant="secondary"
-                  className="colaboradores-screen__filtro-ativo"
-                  aria-label={`Remover filtro de cargo: ${
-                    cargoFiltrado
-                      ? rotuloDaReferencia(cargoFiltrado)
-                      : "selecionado"
-                  }`}
-                  onClick={() => setFiltroCargoId("")}
-                >
-                  Cargo:{" "}
-                  {cargoFiltrado
-                    ? rotuloDaReferencia(cargoFiltrado)
-                    : "selecionado"}{" "}
-                  <span aria-hidden="true">×</span>
-                </Button>
-              ) : null}
-            </div>
-          ) : null}
-
-          {statusCarregamento === "carregando" ? (
-            <p className="colaboradores-screen__carregando" role="status">
-              Carregando colaboradores…
-            </p>
-          ) : colaboradores.length === 0 ? (
-            /* T178 — três vazios diferentes, porque pedem ações diferentes.
-
-               (b) Busca ou filtro sem resultado: o conjunto existe, a consulta
-               é que não achou — oferecer "Nova admissão" aqui sugeriria
-               cadastrar de novo quem talvez só tenha sido digitado errado.
-               (a) Sem busca nem filtro e o servidor contando zero: a empresa
-               ainda não tem colaborador, e a ação é admitir.
-               Fora dos dois — sem filtro, contadores acima de zero e página
-               vazia —, o conjunto provavelmente mudou entre uma leitura e
-               outra; a saída é voltar à primeira página, não admitir. */
-            filtrando ? (
-              (() => {
-                // T186 — busca, filtro e os dois juntos: vazios distintos.
-                const vazio = vazioDaConsulta();
-                return (
-                  <EmptyState
-                    headingLevel={3}
-                    icon="—"
-                    title={vazio.titulo}
-                    description={vazio.descricao}
-                    action={
-                      <Button variant="secondary" onClick={vazio.acao.executar}>
-                        {vazio.acao.rotulo}
-                      </Button>
-                    }
-                  />
-                );
-              })()
-            ) : contadores !== null &&
-              contadores.ativos + contadores.inativos > 0 ? (
-              <EmptyState
-                headingLevel={3}
-                icon="—"
-                title="Nenhum colaborador nesta página"
-                description="Esta página voltou vazia, embora a empresa tenha colaboradores: o conjunto pode ter mudado desde a última leitura."
-                action={
-                  <Button
-                    variant="secondary"
-                    onClick={() => void carregarDados(consulta, 1)}
-                  >
-                    Ir para a primeira página
-                  </Button>
-                }
-              />
-            ) : (
-              <EmptyState
-                headingLevel={3}
-                icon="—"
-                title="Nenhum colaborador cadastrado nesta empresa"
-                description={
-                  onNovaAdmissao
-                    ? "Registre a admissão do primeiro colaborador desta empresa."
-                    : "Ainda não há colaboradores admitidos nesta empresa."
-                }
-                {...(onNovaAdmissao
-                  ? {
-                      action: (
-                        <Button
-                          aria-haspopup="dialog"
-                          onClick={() => setPainelAdicionarAberto(true)}
-                        >
-                          <IconeAdicionarPessoa />
-                          Adicionar colaborador
-                        </Button>
-                      ),
-                    }
-                  : {})}
-              />
-            )
-          ) : (
-            <DataTable
-              caption="Colaboradores desta empresa"
-              captionVisible={false}
-              columns={colunasColaboradores}
-              rows={colaboradores}
-              rowKey={(c) => c.id}
-            />
-          )}
-
-          {/* T164, com a correção R-2 da revisão adversarial.
-
-              A navegação fica FORA do ramo que troca durante o carregamento.
-              Antes ela vivia junto da tabela, dentro do `else`: acionar
-              "Próxima página" desmontava o botão que tinha o foco, e o foco
-              caía no `<body>` — quem navega por teclado perdia a posição a
-              cada troca de página e tinha de tabular de volta.
-
-              Os controles ficam inertes por `aria-disabled`, e não por
-              `disabled`. A diferença é exatamente o ponto: um botão
-              `disabled` que tem o foco também o perde, porque deixa de ser
-              focalizável. Com `aria-disabled` ele permanece no foco e na
-              ordem de tabulação, anuncia o estado ao leitor de tela, e quem
-              recusa a ação é `irParaPagina` — que já retorna cedo quando a
-              página é inválida ou há carga em voo.
-
-              `aria-busy` no `<nav>` informa o carregamento sem depender de o
-              texto mudar. */}
-          {totalPaginas > 1 ? (
-            <nav
-              className="colaboradores-screen__paginacao"
-              aria-label="Paginação de colaboradores"
-              aria-busy={carregando}
-            >
-              <Button
-                variant="secondary"
-                onClick={() => irParaPagina(pagina - 1)}
-                aria-disabled={pagina <= 1 || carregando}
-              >
-                Página anterior
-              </Button>
-              <span
-                role="status"
-                className="colaboradores-screen__paginacao-posicao"
-              >
-                {carregando
-                  ? "Carregando página…"
-                  : `Página ${pagina} de ${totalPaginas}`}
-              </span>
-              <Button
-                variant="secondary"
-                onClick={() => irParaPagina(pagina + 1)}
-                aria-disabled={pagina >= totalPaginas || carregando}
-              >
-                Próxima página
-              </Button>
-            </nav>
-          ) : null}
-        </section>
-      )}
-
-      {/* T194 — painel "Adicionar colaborador": só para quem pode admitir (a
-          mesma prop que mostra o botão). "Cadastro individual" fecha o painel
-          e segue para a Nova admissão de sempre. */}
+      {/* T194 — painel "Adicionar colaborador": só para quem pode admitir. */}
       {onNovaAdmissao ? (
         <PainelAdicionarColaborador
           aberto={painelAdicionarAberto}

@@ -2922,9 +2922,16 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       schema, migration, RBAC, seed, Docker, dependências, promoção e merge.
 
 95. **T198 - Ficha unificada do Colaborador**
-    - **Estado:** **em implementação** (a preparação de decisão veio antes, nos commits
-      `cb9aa6f` e `fe3ba70`). Branch `codex/t198-ficha-unificada-colaborador`, a partir do
-      squash `0ca4df56bd3f15eae9a47dc4de689a0a44ecbcd7` (T197 integrada, PR #190).
+    - **Estado:** **integrada** em `main` pela PR #191, squash
+      `cfcd901f7f1e3e6684c3e5a818994e96570d367f`, com a CI de push 3/3 verde (run 41114960659);
+      branch preservada. Implementada na branch `codex/t198-ficha-unificada-colaborador`, a
+      partir do squash `0ca4df56bd3f15eae9a47dc4de689a0a44ecbcd7` (T197 integrada, PR #190); a
+      preparação de decisão veio antes, nos commits `cb9aa6f` e `fe3ba70`.
+    - **Observação de relatório:** a integração funcional da T198 está concluída; a única
+      pendência administrativa era a sua convergência no Spec Kit, resolvida no primeiro commit
+      da T199. As correções das revisões (jornada do cabeçalho pela empresa do vínculo
+      principal, foco e anúncio nas novas leituras, documentação exata da edição pendente,
+      painel de perfil e estados sem dados no painel) foram feitas dentro da entrega.
     - **Objetivo:** definir a primeira fatia viável e segura da ficha unificada do
       Colaborador como ponto central de consulta e operação de Pessoas, no
       [dossiê](../docs/decisions/t198-dossie-ficha-unificada-colaborador.md): inventário do que
@@ -2946,6 +2953,38 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
     - **Fora de escopo:** API nova, schema, migration, RBAC, auditoria, seed, Docker,
       dependências, foto, portal, salários, férias e ausências, benefícios, documentos, upload,
       R2, pesquisas, comentários, exportação, promoção e merge.
+
+96. **T199 - Dashboard de Colaboradores**
+    - **Estado:** **em implementação**. Branch `codex/t199-dashboard-colaboradores`, a partir
+      do squash `cfcd901f7f1e3e6684c3e5a818994e96570d367f` (T198 integrada, PR #191).
+    - **Objetivo:** transformar a listagem de Colaboradores num dashboard com indicadores
+      reais calculados no servidor (ativos, em admissão, desligados, total no escopo e
+      distribuição dos ativos por tipo de vínculo), abas funcionais (Ativos, Em admissão,
+      Desligados, Todos e Jornada de trabalho), tabela com abertura da ficha da T198 e estado
+      de aba, página e filtros na URL, no
+      [dossiê](../docs/decisions/t199-dossie-dashboard-colaboradores.md).
+    - **Decisões aprovadas (2026-10-30):** D-1 a D-6 da seção 2 do dossiê — "Desligados" sem
+      vínculo ativo e com vínculo encerrado na empresa ativa (readmitido fica em Ativos); tipo
+      de vínculo na projeção, no filtro e na contagem da API; aba, página e ids de filtros na
+      URL, nunca o texto da busca; aba "Em admissão" para vínculos previstos; "Jornada de
+      trabalho" só como acesso à visão existente; "no seu escopo" para o `master_tecnico` sem
+      empresa ativa.
+    - **Decisões aprovadas (2026-10-30), seção 3 do dossiê:** N-1 grupos exclusivos com
+      precedência ativo > previsto > encerrado; N-2 distribuição por tipo conta colaboradores,
+      pelo vínculo principal ativo; N-3 as abas substituem Todos/Ativos/Inativos e o select
+      "Situação do vínculo" na tela (a API mantém os parâmetros antigos); N-4 Jornada é aba
+      funcional com a mesma visão e as mesmas permissões; N-5 o tipo vale para o vínculo que
+      define o grupo ou a aba; N-6 a aba inicial é Ativos.
+    - **Entrega (seção 12 do dossiê):** `GET /v1/colaboradores` ganha `grupo` e `tipoVinculo`
+      (400 fora do enum), `tipo` por vínculo e os contadores `emAdmissao`, `desligados`,
+      `total` e `ativosPorTipo`, do escopo inteiro; dashboard com indicadores, distribuição
+      com legenda em texto, cinco abas com teclado, tabela sem CPF, salário ou contatos,
+      filtros por busca, Departamento, Cargo (só em Ativos e Todos) e Tipo, e o estado na URL
+      sem a busca. Sem schema, migration, seed, RBAC, Docker ou dependência.
+    - **Fora de escopo:** guarda global de navegação do shell, "Referência técnica" em Dados
+      contratuais, exportação, ausências, férias, escala, organograma, CPF, salário, contatos
+      na visão coletiva, documentos, R2, foto, portal, benefícios, pesquisas, comentários,
+      schema, migration, RBAC novo, seed, Docker, dependências, promoção e merge.
 
 ## Regra obrigatória para as próximas tarefas
 

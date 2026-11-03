@@ -18,7 +18,20 @@ const VAZIA = {
   pagina: 1,
   tamanhoPagina: 20,
   total: 0,
-  contadores: { ativos: 0, inativos: 0 },
+  contadores: {
+    ativos: 0,
+    inativos: 0,
+    emAdmissao: 0,
+    desligados: 0,
+    total: 0,
+    ativosPorTipo: {
+      clt: 0,
+      estagio: 0,
+      pj: 0,
+      temporario: 0,
+      outro_controlado: 0,
+    },
+  },
 };
 
 const fetchMock = vi.fn();
@@ -78,6 +91,22 @@ describe("T178 — listarColaboradores", () => {
       "b".repeat(BUSCA_COLABORADORES_MAXIMO),
     );
     expect(BUSCA_COLABORADORES_MAXIMO).toBe(160);
+  });
+
+  it("T199 — grupo e tipo de vínculo vão na query; ausentes, não vão", async () => {
+    await listarColaboradores({
+      grupo: "em_admissao",
+      tipoVinculo: "estagio",
+      pagina: 1,
+    });
+    let q = queryEnviada();
+    expect(q.get("grupo")).toBe("em_admissao");
+    expect(q.get("tipoVinculo")).toBe("estagio");
+
+    await listarColaboradores({ pagina: 1 });
+    q = queryEnviada();
+    expect(q.has("grupo")).toBe(false);
+    expect(q.has("tipoVinculo")).toBe(false);
   });
 
   it("devolve o envelope com `contadores` como veio do servidor", async () => {

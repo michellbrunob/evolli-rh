@@ -46,6 +46,7 @@ import {
 import { extrairDestino, traduzirErroPessoas } from "../pessoas-comum.util";
 import {
   AdmitirColaboradorDto,
+  type GrupoColaborador,
   ListarColaboradoresQueryDto,
   RetificarColaboradorDto,
 } from "../dto/pessoas.dto";
@@ -159,6 +160,8 @@ export interface VinculoListado {
   empresaId: string;
   /** T179 — opcional na Nova admissão: pode vir `null`. */
   matricula: string | null;
+  /** T199 — tipo do vínculo (dado aprovado: "tipo/situação do vínculo"). */
+  tipo: TipoVinculo;
   situacao: SituacaoVinculo;
   dataAdmissao: Date;
   dataDesligamento: Date | null;
@@ -262,6 +265,86 @@ export function filtroDeLotacaoVigente(
         },
       },
     },
+  };
+}
+
+/**
+ * T199 — o grupo da aba (N-1, exclusivo: ativo > previsto > encerrado) e o
+ * tipo de vínculo (N-5, no MESMO vínculo que define o grupo), no `where` —
+ * antes da paginação. `null` quando nenhum dos dois foi pedido.
+ */
+export function filtroDeGrupo(
+  noEscopo: Prisma.VinculoFuncionalWhereInput,
+  grupo: GrupoColaborador | undefined,
+  tipo?: TipoVinculo,
+): Prisma.ColaboradorWhereInput | null {
+  const doTipo = tipo ? { tipo } : {};
+  const com = (situacao: SituacaoVinculo): Prisma.ColaboradorWhereInput => ({
+    vinculos: { some: { ...noEscopo, situacao, ...doTipo } },
+  });
+  const sem = (situacao: SituacaoVinculo): Prisma.ColaboradorWhereInput => ({
+    vinculos: { none: { ...noEscopo, situacao } },
+  });
+  switch (grupo) {
+    case "ativos":
+      return com("ativo");
+    case "em_admissao":
+      return { AND: [sem("ativo"), com("previsto")] };
+    case "desligados":
+      return { AND: [sem("ativo"), sem("previsto"), com("encerrado")] };
+    default:
+      return tipo ? { vinculos: { some: { ...noEscopo, tipo } } } : null;
+  }
+}
+
+/** Um vínculo ativo, só com o que decide o principal e o tipo. */
+export interface VinculoAtivoResumido {
+  colaboradorId: string;
+  tipo: TipoVinculo;
+  dataAdmissao: Date;
+  matricula: string | null;
+}
+
+/**
+ * T199 — ativos por tipo (N-2): cada colaborador conta UMA vez, pelo tipo do
+ * vínculo principal ativo — a mesma ordem da listagem e da ficha (admissão
+ * mais recente, depois a matrícula). A soma é o número de ativos.
+ */
+export function distribuirAtivosPorTipo(
+  vinculosAtivos: readonly VinculoAtivoResumido[],
+): Record<TipoVinculo, number> {
+  const principal = new Map<string, VinculoAtivoResumido>();
+  for (const v of vinculosAtivos) {
+    const atual = principal.get(v.colaboradorId);
+    if (
+      !atual ||
+      v.dataAdmissao.getTime() > atual.dataAdmissao.getTime() ||
+      (v.dataAdmissao.getTime() === atual.dataAdmissao.getTime() &&
+        compararMatriculas(v.matricula, atual.matricula) < 0)
+    ) {
+      principal.set(v.colaboradorId, v);
+    }
+  }
+  const contagem: Record<TipoVinculo, number> = {
+    clt: 0,
+    estagio: 0,
+    pj: 0,
+    temporario: 0,
+    outro_controlado: 0,
+  };
+  for (const v of principal.values()) contagem[v.tipo] += 1;
+  return contagem;
+}
+
+/** T199 — contadores de um escopo vazio (filtro de empresa sem interseção). */
+export function contadoresVazios(): ContadoresColaboradores {
+  return {
+    ativos: 0,
+    inativos: 0,
+    emAdmissao: 0,
+    desligados: 0,
+    total: 0,
+    ativosPorTipo: distribuirAtivosPorTipo([]),
   };
 }
 
@@ -1098,7 +1181,7 @@ export class ColaboradorService {
         pagina: query.pagina,
         tamanhoPagina: query.tamanhoPagina,
         total: 0,
-        contadores: { ativos: 0, inativos: 0 },
+        contadores: contadoresVazios(),
       };
     }
 
@@ -1153,9 +1236,27 @@ export class ColaboradorService {
       query.cargoId,
     );
     if (porLotacao) filtros.push(porLotacao);
+    // T199 — grupo da aba e tipo de vínculo, no banco e antes da paginação.
+    const porGrupo = filtroDeGrupo(noEscopo, query.grupo, query.tipoVinculo);
+    if (porGrupo) filtros.push(porGrupo);
     const where: Prisma.ColaboradorWhereInput = { AND: filtros };
 
-    const [linhas, total, ativos, totalNoEscopo] = await Promise.all([
+    // T199 — contadores do escopo inteiro, sem busca, filtros nem aba; os
+    // três grupos pela MESMA regra do filtro, para que somem o total.
+    const contarGrupo = (grupo: GrupoColaborador) =>
+      this.prisma.colaborador.count({
+        where: { AND: [base, filtroDeGrupo(noEscopo, grupo)!] },
+      });
+
+    const [
+      linhas,
+      total,
+      ativos,
+      totalNoEscopo,
+      emAdmissao,
+      desligados,
+      vinculosAtivos,
+    ] = await Promise.all([
       this.prisma.colaborador.findMany({
         where,
         // Ordenação fixa no servidor — nunca vinda do cliente.
@@ -1174,6 +1275,7 @@ export class ColaboradorService {
               id: true,
               empresaId: true,
               matricula: true,
+              tipo: true,
               situacao: true,
               dataAdmissao: true,
               dataDesligamento: true,
@@ -1196,8 +1298,19 @@ export class ColaboradorService {
         },
       }),
       this.prisma.colaborador.count({ where }),
-      this.prisma.colaborador.count({ where: { AND: [base, ativoNoEscopo] } }),
+      contarGrupo("ativos"),
       this.prisma.colaborador.count({ where: base }),
+      contarGrupo("em_admissao"),
+      contarGrupo("desligados"),
+      this.prisma.vinculoFuncional.findMany({
+        where: { ...noEscopo, situacao: "ativo" },
+        select: {
+          colaboradorId: true,
+          tipo: true,
+          dataAdmissao: true,
+          matricula: true,
+        },
+      }),
     ]);
 
     if (escopo.global) {
@@ -1249,7 +1362,14 @@ export class ColaboradorService {
       pagina: query.pagina,
       tamanhoPagina: query.tamanhoPagina,
       total,
-      contadores: { ativos, inativos: totalNoEscopo - ativos },
+      contadores: {
+        ativos,
+        inativos: totalNoEscopo - ativos,
+        emAdmissao,
+        desligados,
+        total: totalNoEscopo,
+        ativosPorTipo: distribuirAtivosPorTipo(vinculosAtivos),
+      },
     };
   }
 

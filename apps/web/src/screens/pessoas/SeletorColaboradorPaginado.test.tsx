@@ -37,6 +37,7 @@ function sintetico(n: number, situacao: "ativo" | "inativo" = "ativo") {
         id: `v-${numero}`,
         empresaId: "e-1",
         matricula: `MAT-${numero}`,
+        tipo: "clt" as const,
         situacao: "ativo",
         dataAdmissao: "2025-01-01",
         dataDesligamento: null,
@@ -70,7 +71,20 @@ function servidor(lista: readonly ColaboradorListadoApi[]) {
         pagina,
         tamanhoPagina: tamanho,
         total: filtrada.length,
-        contadores: { ativos: 0, inativos: 0 },
+        contadores: {
+          ativos: 0,
+          inativos: 0,
+          emAdmissao: 0,
+          desligados: 0,
+          total: 0,
+          ativosPorTipo: {
+            clt: 0,
+            estagio: 0,
+            pj: 0,
+            temporario: 0,
+            outro_controlado: 0,
+          },
+        },
       } as ListagemColaboradoresApi;
     },
   );
@@ -298,7 +312,20 @@ describe("T188 — seletor: estados", () => {
         pagina: 1,
         tamanhoPagina: 10,
         total: 1,
-        contadores: { ativos: 0, inativos: 0 },
+        contadores: {
+          ativos: 0,
+          inativos: 0,
+          emAdmissao: 0,
+          desligados: 0,
+          total: 0,
+          ativosPorTipo: {
+            clt: 0,
+            estagio: 0,
+            pj: 0,
+            temporario: 0,
+            outro_controlado: 0,
+          },
+        },
       });
     });
     expect(screen.queryByText(/Pessoa Teste 077/)).toBeNull();

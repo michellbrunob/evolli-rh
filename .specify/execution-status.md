@@ -2741,11 +2741,19 @@ imutável (R1).
 
 **Fora de escopo:** Área, Equipe, importação, admissão digital, documentos, upload, R2, schema, migration, RBAC, seed, Docker, dependências, promoção e merge.
 
-## Ficha unificada do Colaborador — T198 (em implementação)
+## Ficha unificada do Colaborador — T198 (integrada)
 
-| Tarefa | Estado               | Resultado principal                                                                                      |
-| ------ | -------------------- | -------------------------------------------------------------------------------------------------------- |
-| T198   | **Em implementação** | Ficha unificada do Colaborador em página própria, com rota por colaborador e por aba, no lugar do modal. |
+| Tarefa | Estado                                    | Resultado principal                                                                                      |
+| ------ | ----------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| T198   | **Integrada** (PR #191, squash `cfcd901`) | Ficha unificada do Colaborador em página própria, com rota por colaborador e por aba, no lugar do modal. |
+
+**Observação de relatório:** a integração funcional da T198 está concluída
+(CI de push 3/3 verde, run 41114960659); a única pendência administrativa era
+a sua convergência no Spec Kit, resolvida no primeiro commit da T199. As
+correções das revisões (jornada do cabeçalho pela empresa do vínculo
+principal, foco e anúncio nas novas leituras, documentação exata da edição
+pendente, painel de perfil e estados sem dados no painel) foram feitas dentro
+da entrega.
 
 **Escopo da T198:** a preparação de decisão veio primeiro (o
 [dossiê](../docs/decisions/t198-dossie-ficha-unificada-colaborador.md)); depois,
@@ -2769,6 +2777,36 @@ guarda de navegação reutilizável no shell inteiro, decisão e arquitetura
 próprias (seção 13.4 do dossiê).
 
 **Fora de escopo:** foto, portal, salários, férias e ausências, benefícios, documentos, upload, R2, pesquisas, comentários, exportação, API nova, schema, migration, RBAC, seed, Docker, dependências, promoção e merge.
+
+## Dashboard de Colaboradores — T199 (em implementação)
+
+| Tarefa | Estado               | Resultado principal                                                                                           |
+| ------ | -------------------- | ------------------------------------------------------------------------------------------------------------- |
+| T199   | **Em implementação** | Dashboard de Colaboradores: indicadores reais, abas funcionais, tabela com abertura da ficha e estado na URL. |
+
+**Escopo da T199:** a listagem de Colaboradores vira dashboard (o
+[dossiê](../docs/decisions/t199-dossie-dashboard-colaboradores.md)):
+indicadores calculados no servidor (ativos, em admissão, desligados, total no
+escopo e ativos por tipo de vínculo); abas Ativos, Em admissão, Desligados,
+Todos e Jornada de trabalho; tabela com avatar por iniciais, nome que abre a
+ficha da T198, matrícula, cargo, departamento, jornada, situação e datas;
+aba, página e ids de filtros na URL, sem o texto da busca. Extensão mínima da
+listagem para tipo de vínculo e grupos; sem schema, migration, RBAC novo, seed
+ou dependência.
+
+**Decisões aprovadas (2026-10-30):** D-1 a D-6 (seção 2 do dossiê) e N-1 a
+N-6 (seção 3): grupos exclusivos ativo > previsto > encerrado; distribuição
+por colaborador, pelo vínculo principal ativo; abas no lugar dos seletores de
+situação (a API mantém os parâmetros antigos); Jornada como aba com a mesma
+visão e permissões; tipo aplicado ao vínculo do grupo; aba inicial Ativos.
+
+**Entrega:** contrato final e notas de implementação na seção 12 do dossiê —
+`grupo` e `tipoVinculo` (400 fora do enum), `tipo` por vínculo, contadores
+`emAdmissao`, `desligados`, `total` e `ativosPorTipo`; Departamento e Cargo só
+em Ativos e Todos; ids da URL conferidos nos catálogos antes da consulta, com
+correção no lugar.
+
+**Fora de escopo:** guarda global de navegação do shell, "Referência técnica", exportação, ausências, férias, escala, organograma, CPF, salário, contatos na visão coletiva, documentos, R2, foto, portal, benefícios, pesquisas, comentários, schema, migration, RBAC novo, seed, Docker, dependências, promoção e merge.
 
 ## Próxima ação autorizável
 

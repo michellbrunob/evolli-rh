@@ -39,7 +39,7 @@ import { TAMANHO_PAGINA_MAXIMO, TAMANHO_PAGINA_PADRAO } from "../pessoas.types";
  */
 const MATRICULA_PATTERN = /^[A-Z0-9_-]{2,32}$/;
 
-const TIPOS_VINCULO = [
+export const TIPOS_VINCULO = [
   "clt",
   "estagio",
   "pj",
@@ -99,6 +99,14 @@ const SITUACOES_COLABORADOR = [
   "ativo",
   "inativo",
 ] as const satisfies readonly SituacaoColaborador[];
+
+/** T199 — grupos das abas do dashboard de Colaboradores. */
+export const GRUPOS_COLABORADOR = [
+  "ativos",
+  "em_admissao",
+  "desligados",
+] as const;
+export type GrupoColaborador = (typeof GRUPOS_COLABORADOR)[number];
 
 const STATUS_MOVIMENTACAO = [
   "solicitada",
@@ -390,6 +398,24 @@ export class ListarColaboradoresQueryDto extends ListarPaginadoQueryDto {
   @IsOptional()
   @IsUUID()
   cargoId?: string;
+
+  /**
+   * T199 — grupo da aba do dashboard, EXCLUSIVO, com prioridade ativo >
+   * previsto > encerrado (N-1): `ativos` (tem vínculo ativo no escopo),
+   * `em_admissao` (sem ativo, com previsto) e `desligados` (sem ativo nem
+   * previsto, com encerrado — D-1). Ausente: todos.
+   */
+  @IsOptional()
+  @IsIn(GRUPOS_COLABORADOR)
+  grupo?: GrupoColaborador;
+
+  /**
+   * T199 — tipo do vínculo, só os tipos controlados. Vale para o MESMO
+   * vínculo que define o grupo (N-5); sem grupo, qualquer vínculo do escopo.
+   */
+  @IsOptional()
+  @IsIn(TIPOS_VINCULO)
+  tipoVinculo?: TipoVinculo;
 }
 
 export class ListarMovimentacoesQueryDto extends ListarPaginadoQueryDto {

@@ -415,7 +415,21 @@ describe("Log geral de requisições sem valores (T178, e2e)", () => {
         rh,
       ).expect(200);
       expect(r.body.itens.map((c: { nome: string }) => c.nome)).toEqual([NOME]);
-      expect(r.body.contadores).toEqual({ ativos: 0, inativos: 1 });
+      expect(r.body.contadores).toEqual({
+        ativos: 0,
+        inativos: 1,
+        // T199 — o admitido ainda está previsto: Em admissão.
+        emAdmissao: 1,
+        desligados: 0,
+        total: 1,
+        ativosPorTipo: {
+          clt: 0,
+          estagio: 0,
+          pj: 0,
+          temporario: 0,
+          outro_controlado: 0,
+        },
+      });
 
       const fim = conclusao(r.headers[REQUEST_ID_HEADER] as string);
       expect(fim).toMatchObject({

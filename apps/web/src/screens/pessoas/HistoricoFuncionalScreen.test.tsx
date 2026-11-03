@@ -64,7 +64,20 @@ function paginado<T>(itens: T[]): ResultadoPaginadoTeste<T> {
 function listagem(itens: ColaboradorApi[]): ListagemColaboradoresApi {
   return {
     ...paginado(itens.map((c) => ({ ...c, vinculos: [] }))),
-    contadores: { ativos: 0, inativos: 0 },
+    contadores: {
+      ativos: 0,
+      inativos: 0,
+      emAdmissao: 0,
+      desligados: 0,
+      total: 0,
+      ativosPorTipo: {
+        clt: 0,
+        estagio: 0,
+        pj: 0,
+        temporario: 0,
+        outro_controlado: 0,
+      },
+    },
   };
 }
 
@@ -1042,7 +1055,20 @@ function servidorComCentoECinquenta() {
       pagina,
       tamanhoPagina: tamanho,
       total: filtrada.length,
-      contadores: { ativos: filtrada.length, inativos: 0 },
+      contadores: {
+        ativos: filtrada.length,
+        inativos: 0,
+        emAdmissao: 0,
+        desligados: 0,
+        total: filtrada.length,
+        ativosPorTipo: {
+          clt: filtrada.length,
+          estagio: 0,
+          pj: 0,
+          temporario: 0,
+          outro_controlado: 0,
+        },
+      },
     };
   }) as never);
 }

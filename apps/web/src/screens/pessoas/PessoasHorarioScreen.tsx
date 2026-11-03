@@ -135,12 +135,24 @@ export interface PessoasHorarioScreenProps {
    * continua sendo a visão da empresa inteira, e a ficha, a do colaborador.
    */
   readonly onAbrirFicha?: (colaboradorId: string) => void;
+  /**
+   * T199 — dentro da aba "Jornada de trabalho" do dashboard de Colaboradores
+   * (D-5, N-4): a mesma visão e as mesmas permissões, sob o `h1` da página —
+   * o título vira `h2` e acompanha o nome da aba.
+   */
+  readonly embutida?: boolean;
 }
 
 export function PessoasHorarioScreen({
   podeOperar = false,
   onAbrirFicha,
+  embutida = false,
 }: PessoasHorarioScreenProps = {}) {
+  // T199 — embutida na aba do dashboard, o título dela é h2: as seções
+  // descem um nível, para a hierarquia de títulos não pular nem repetir.
+  const TituloDeSecao = embutida ? "h3" : "h2";
+  const TituloInterno = embutida ? "h4" : "h3";
+  const nivelInterno = embutida ? 4 : 3;
   const [statusCarregamento, setStatusCarregamento] = useState<
     "carregando" | "erro" | "dados"
   >("carregando");
@@ -770,9 +782,9 @@ export function PessoasHorarioScreen({
   return (
     <div className="pessoas-horario-screen">
       <PageHeader
-        headingLevel={1}
+        headingLevel={embutida ? 2 : 1}
         titleId={PESSOAS_HORARIO_TITULO_ID}
-        title="Horário de trabalho"
+        title={embutida ? "Jornada de trabalho" : "Horário de trabalho"}
         description="O RH vincula uma tabela de horário ao colaborador, com vigência — a mesma tabela pode ser reaproveitada por vários colaboradores, e uma nova vigência substitui a anterior somente dali em diante."
         actions={
           podeOperar ? (
@@ -820,13 +832,13 @@ export function PessoasHorarioScreen({
       </p>
 
       <section aria-labelledby={ID_TITULO_LISTA}>
-        <h2
+        <TituloDeSecao
           id={ID_TITULO_LISTA}
           className="pessoas-horario-screen__section-title"
           tabIndex={-1}
         >
           Colaboradores com tabela de horário vinculada
-        </h2>
+        </TituloDeSecao>
 
         {/* T191 — filtros combináveis, no servidor e antes da paginação:
             o colaborador por busca (o mesmo seletor da T188) e a jornada.
@@ -918,9 +930,9 @@ export function PessoasHorarioScreen({
             role="alert"
           >
             <StatusBadge variant="danger">Erro</StatusBadge>
-            <h3 className="pessoas-horario-screen__section-title">
+            <TituloInterno className="pessoas-horario-screen__section-title">
               Não foi possível carregar os vínculos de horário
-            </h3>
+            </TituloInterno>
             <p>
               {paginaPedida > 1
                 ? `A página ${paginaPedida} não carregou. `
@@ -943,7 +955,7 @@ export function PessoasHorarioScreen({
             total > 0 &&
             !filtrando) ? (
           <EmptyState
-            headingLevel={3}
+            headingLevel={nivelInterno}
             icon="—"
             title="Nenhum vínculo nesta página"
             description="Esta página voltou vazia: o conjunto pode ter mudado desde a última leitura."
@@ -965,7 +977,7 @@ export function PessoasHorarioScreen({
           </p>
         ) : vinculos.length === 0 && filtrando ? (
           <EmptyState
-            headingLevel={3}
+            headingLevel={nivelInterno}
             icon="—"
             title="Nenhum vínculo com estes filtros"
             description="Nenhum vínculo de horário corresponde ao colaborador ou à jornada escolhidos."
@@ -977,7 +989,7 @@ export function PessoasHorarioScreen({
           />
         ) : vinculos.length === 0 ? (
           <EmptyState
-            headingLevel={3}
+            headingLevel={nivelInterno}
             icon="—"
             title="Nenhum vínculo de horário cadastrado"
             description="Vincule uma tabela de horário a um colaborador desta empresa para que ela apareça aqui."
@@ -1055,12 +1067,12 @@ export function PessoasHorarioScreen({
           className="pessoas-horario-screen__formulario"
           aria-labelledby={detalheTituloId}
         >
-          <h2
+          <TituloDeSecao
             id={detalheTituloId}
             className="pessoas-horario-screen__section-title"
           >
             {nomeColaborador(detalhe.vinculo)}
-          </h2>
+          </TituloDeSecao>
           <p>
             <StatusBadge
               variant={
@@ -1146,12 +1158,12 @@ export function PessoasHorarioScreen({
           className="pessoas-horario-screen__formulario"
           aria-labelledby={formTituloId}
         >
-          <h2
+          <TituloDeSecao
             id={formTituloId}
             className="pessoas-horario-screen__section-title"
           >
             Novo vínculo de horário
-          </h2>
+          </TituloDeSecao>
           <p className="pessoas-horario-screen__aviso-texto">
             Colaborador, tabela de horário e início da vigência não poderão ser
             alterados depois de criados. Para corrigir, encerre a vigência e

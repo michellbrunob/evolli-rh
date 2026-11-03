@@ -53,32 +53,321 @@
   border-color: var(--status-danger-border);
 }
 
-/* T178 — contadores do escopo (sem filtros), na área de ações do cabeçalho.
-   Rótulo pequeno em cima; cada contador é "termo + número" numa linha. */
-.colaboradores-screen__contadores {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xs);
+/* ---- T199 — dashboard de Colaboradores ---------------------------------- */
+
+/* Indicadores do escopo: cartões compactos que quebram linha; no celular,
+   dois por linha. Só tokens; nenhuma cor literal. */
+.colaboradores-screen__indicadores {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-md);
+  padding: var(--space-lg);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+  background: var(--surface-canvas);
+  min-width: 0;
 }
 
-.colaboradores-screen__contadores-rotulo {
+.colaboradores-screen__indicadores-titulo {
   margin: 0;
   font-size: var(--text-caption);
-  color: var(--color-ink-subtle);
+  font-weight: var(--weight-regular);
+  color: var(--color-ink-muted);
 }
 
-/* T186 — os contadores são botões de filtro: quebram linha no celular em
-   vez de empurrar a página para o lado. */
-.colaboradores-screen__contadores-lista {
+.colaboradores-screen__cartoes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(10rem, 100%), 1fr));
+  gap: var(--space-sm);
+  margin: 0;
+  min-width: 0;
+}
+
+.colaboradores-screen__cartao {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-xxs);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--divider-soft);
+  border-radius: var(--radius-md);
+  background: var(--surface-pearl);
+  min-width: 0;
+}
+
+.colaboradores-screen__cartao dt {
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+}
+
+.colaboradores-screen__cartao dd {
+  margin: 0;
+  font-size: var(--text-title);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-tight);
+  color: var(--color-ink);
+}
+
+/* Foco por programa (volta dos totais depois de uma falha); o anel vem de
+   `:focus-visible`. */
+.colaboradores-screen__indicadores-titulo:focus {
+  outline-offset: 2px;
+}
+
+/* Totais que não carregaram: aviso e nova tentativa, no lugar dos cartões. */
+.colaboradores-screen__totais-falha {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-xs);
-  margin: 0;
-  max-width: 100%;
+  align-items: center;
+  gap: var(--space-sm) var(--space-md);
+  min-width: 0;
 }
 
-.colaboradores-screen__contador-valor {
+.colaboradores-screen__totais-falha-texto {
+  margin: 0;
+  color: var(--color-ink);
+  overflow-wrap: anywhere;
+}
+
+/* Distribuição dos ativos por tipo: barra decorativa + legenda em texto. */
+.colaboradores-screen__distribuicao {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+.colaboradores-screen__distribuicao-titulo {
+  margin: 0;
+  font-size: var(--text-ui);
   font-weight: var(--weight-strong);
+}
+
+.colaboradores-screen__distribuicao-vazio {
+  margin: 0;
+  color: var(--color-ink-muted);
+}
+
+.colaboradores-screen__barra-tipos {
+  display: flex;
+  gap: 2px;
+  height: 0.5rem;
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  background: var(--surface-neutral);
+}
+
+.colaboradores-screen__barra-tipo {
+  flex-basis: 0;
+  min-width: 0.25rem;
+}
+
+.colaboradores-screen__barra-tipo--clt {
+  background: var(--color-action);
+}
+
+.colaboradores-screen__barra-tipo--estagio {
+  background: var(--status-success-ink);
+}
+
+.colaboradores-screen__barra-tipo--pj {
+  background: var(--status-warning-ink);
+}
+
+.colaboradores-screen__barra-tipo--temporario {
+  background: color-mix(
+    in srgb,
+    var(--color-action) 45%,
+    var(--surface-canvas)
+  );
+}
+
+.colaboradores-screen__barra-tipo--outro_controlado {
+  background: var(--color-ink-subtle);
+}
+
+.colaboradores-screen__legenda-tipos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs) var(--space-md);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.colaboradores-screen__legenda-tipos li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.colaboradores-screen__marcador {
+  display: inline-block;
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: var(--radius-pill);
+}
+
+/* Painel das abas: a faixa de abas em cima, o conteúdo da aba embaixo. */
+.colaboradores-screen__painel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+  background: var(--surface-canvas);
+  min-width: 0;
+  overflow: hidden;
+}
+
+.colaboradores-screen__abas {
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  gap: var(--space-xs);
+  padding: 0 var(--space-md);
+  border-bottom: 1px solid var(--hairline);
+  min-width: 0;
+}
+
+.colaboradores-screen__aba {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-height: var(--touch-target);
+  padding: var(--space-sm) var(--space-md);
+  border: none;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  color: var(--color-ink-muted);
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.colaboradores-screen__aba:hover {
+  color: var(--color-ink);
+  background: var(--surface-pearl);
+}
+
+.colaboradores-screen__aba:focus-visible {
+  outline: var(--focus-width) solid var(--color-action);
+  outline-offset: calc(-1 * var(--focus-width));
+}
+
+/* Aba ativa: nunca só cor — `aria-selected`, peso e barra inferior sólida. */
+.colaboradores-screen__aba--ativa {
+  border-bottom-color: var(--color-action);
+  color: var(--color-ink);
+  font-weight: var(--weight-strong);
+}
+
+.colaboradores-screen__aba-total {
+  min-width: 1.5rem;
+  padding: 0 var(--space-xs);
+  border-radius: var(--radius-pill);
+  background: var(--surface-neutral);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  text-align: center;
+}
+
+.colaboradores-screen__painel-conteudo {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-md);
+  padding: var(--space-lg);
+  min-width: 0;
+}
+
+/* Linha da tabela: avatar neutro por iniciais e o nome, que abre a ficha. */
+.colaboradores-screen__pessoa {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+
+.colaboradores-screen__avatar {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: var(--radius-pill);
+  background: var(--status-info-surface);
+  color: var(--color-action);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-bold);
+}
+
+.colaboradores-screen__nome {
+  min-height: var(--touch-target);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-action);
+  font: inherit;
+  font-weight: var(--weight-strong);
+  text-align: left;
+  text-decoration: underline;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.colaboradores-screen__nome:focus-visible {
+  outline: var(--focus-width) solid var(--color-action);
+  outline-offset: var(--focus-offset);
+}
+
+.colaboradores-screen__nome-texto {
+  font-weight: var(--weight-strong);
+  overflow-wrap: anywhere;
+}
+
+/* Texto só para leitor de tela, próprio da tela (a `.sr-only` global não é
+   garantida em todas as composições). */
+.colaboradores-screen__so-leitor {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Celular: abas em grade (sem rolagem lateral), cartões dois a dois. */
+@media (max-width: 40rem) {
+  .colaboradores-screen__abas {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0;
+    padding: 0;
+    overflow-x: visible;
+  }
+
+  .colaboradores-screen__aba {
+    justify-content: space-between;
+    white-space: normal;
+    text-align: left;
+    border-top: 1px solid var(--divider-soft);
+  }
+
+  .colaboradores-screen__aba--ativa {
+    background: var(--status-info-surface);
+  }
+
+  .colaboradores-screen__cartoes {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .colaboradores-screen__indicadores,
+  .colaboradores-screen__painel-conteudo {
+    padding: var(--space-md);
+  }
 }
 
 /* T178 — barra de ações: "Nova admissão" e a busca ao lado, alinhadas à base
