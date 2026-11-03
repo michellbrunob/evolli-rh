@@ -383,8 +383,10 @@ chegar uma navegação do navegador que
 desmontaria algo pendente, o shell volta o navegador para a entrada que a tela
 descreve com `history.go(-passo)` e pergunta. A reversão termina quando o
 navegador chega de volta à entrada com o índice da tela; a chegada é
-reconhecida pelo índice, nunca pela URL. "Sair sem salvar" refaz o mesmo
-passo, marcado como aceito. O `popstate` e o `hashchange` do mesmo passo são
+reconhecida pelo índice, nunca pela URL. "Sair sem salvar" refaz a navegação
+até a mesma entrada de destino, marcada como aceita: o salto é contado na
+hora, do índice em que o navegador está até o índice do destino (com o
+diálogo aberto, uma âncora digitada muda essa posição). O `popstate` e o `hashchange` do mesmo passo são
 deduplicados (sem desfazer dois passos), e uma escolha feita antes de o
 navegador terminar de desfazer espera a reversão chegar. Parâmetros e
 fragmento da URL são preservados. Abrir a ficha a partir da listagem não
