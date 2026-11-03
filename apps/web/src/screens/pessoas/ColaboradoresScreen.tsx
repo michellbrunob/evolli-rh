@@ -226,8 +226,10 @@ interface AcaoDoVazio {
   readonly titulo: string;
   readonly descricao: string;
   readonly rotulo: string;
-  /** `id` de quem recebe o foco quando a leitura dá certo. */
+  /** `id` de quem recebe o foco quando a leitura dá certo (sempre visível). */
   readonly destinoDoFoco: string;
+  /** "Ir para a primeira página": anuncia a página carregada no sucesso. */
+  readonly anunciarPrimeiraPagina?: boolean;
   readonly fase: "carregando" | "falha";
 }
 
@@ -238,6 +240,27 @@ const FALHA_DA_LISTA = "Não foi possível carregar os colaboradores.";
 
 const DESCRICAO_PAGINA_VAZIA =
   "Esta página voltou vazia, embora a consulta tenha colaboradores: o conjunto pode ter mudado desde a última leitura.";
+
+/**
+ * O anúncio de "Ir para a primeira página" que deu certo: a página, quantos
+ * há na consulta e o que ficou (busca e filtros não mudam com a página).
+ */
+function anuncioDaPrimeiraPagina(
+  total: number,
+  comBusca: boolean,
+  comFiltros: boolean,
+): string {
+  const quantos = total === 1 ? "1 colaborador" : `${total} colaboradores`;
+  const mantidos =
+    comBusca && comFiltros
+      ? ", com a busca e os filtros mantidos"
+      : comBusca
+        ? ", com a busca mantida"
+        : comFiltros
+          ? ", com os filtros mantidos"
+          : "";
+  return `Página 1 carregada: ${quantos} nesta consulta${mantidos}.`;
+}
 
 function mesmoEstado(a: EstadoDaListagem, b: EstadoDaListagem): boolean {
   return (
@@ -366,7 +389,6 @@ export function ColaboradoresScreen({
   const prefixo = useId();
   const idDaAba = (aba: AbaDaListagem) => `${prefixo}-aba-${aba}`;
   const idDoPainel = `${prefixo}-painel`;
-  const idDoTituloDaSecao = `${prefixo}-secao-titulo`;
 
   // T199 — controlado pelo shell (URL) ou, montado sozinho, pelo próprio
   // componente. Sempre normalizado: lotação só onde ela existe.
@@ -484,7 +506,19 @@ export function ColaboradoresScreen({
         setFalhaContadores(false);
         setStatusCarregamento("dados");
         if (daAcaoDoVazio) {
-          setFocoPendente(acaoDoVazioRef.current?.destinoDoFoco ?? null);
+          const acao = acaoDoVazioRef.current;
+          setFocoPendente(acao?.destinoDoFoco ?? null);
+          if (acao?.anunciarPrimeiraPagina) {
+            setAnuncioDaLista(
+              anuncioDaPrimeiraPagina(
+                resp.total,
+                busca !== "",
+                consulta.tipo !== null ||
+                  consulta.departamentoId !== null ||
+                  consulta.cargoId !== null,
+              ),
+            );
+          }
           setAcaoDoVazio(null);
         }
       } catch {
@@ -1166,11 +1200,7 @@ export function ColaboradoresScreen({
               {/* T199 — o título da seção da aba: os estados vazios (h3)
                   e o erro ficam abaixo dele, e não de "Totais…". Só para
                   leitor de tela; a aba selecionada já o mostra. */}
-              <h2
-                id={idDoTituloDaSecao}
-                className="colaboradores-screen__so-leitor"
-                tabIndex={-1}
-              >
+              <h2 className="colaboradores-screen__so-leitor">
                 {`Colaboradores — ${ROTULO_DA_ABA[aba]}`}
               </h2>
               <p
@@ -1484,7 +1514,10 @@ export function ColaboradoresScreen({
                                 titulo: "Nenhum colaborador nesta página",
                                 descricao: DESCRICAO_PAGINA_VAZIA,
                                 rotulo: "Ir para a primeira página",
-                                destinoDoFoco: idDoTituloDaSecao,
+                                // O campo de busca: visível para quem usa
+                                // teclado; o anúncio dá o contexto.
+                                destinoDoFoco: ID_CAMPO_BUSCA,
+                                anunciarPrimeiraPagina: true,
                               },
                               { ...estado, pagina: 1 },
                             )

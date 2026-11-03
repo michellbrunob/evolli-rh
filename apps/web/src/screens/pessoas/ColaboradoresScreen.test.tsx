@@ -5581,7 +5581,7 @@ describe("T199 (revisão B3) — ações do estado vazio e paginação fora do i
     };
   }
 
-  it("'Ir para a primeira página': vazio montado, foco no botão indisponível, clique repetido ignorado; no sucesso, foco no h2 da seção", async () => {
+  it("'Ir para a primeira página': vazio montado, foco no botão indisponível, clique repetido ignorado; no sucesso, foco no campo de busca visível e página 1 anunciada", async () => {
     const srv = servidor(vazia(4, 3));
     render(
       <DashboardComEstado
@@ -5609,11 +5609,59 @@ describe("T199 (revisão B3) — ações do estado vazio e paginação fora do i
 
     await srv.responder(comAna());
     await screen.findByRole("table", { name: "Colaboradores — Todos" });
-    await waitFor(() => expect(tituloDaSecao("Todos")).toHaveFocus());
-    expect(tituloDaSecao("Todos")).toHaveAttribute("tabindex", "-1");
+    // O foco vai a um controle VISÍVEL: nunca a um título só para leitor.
+    await waitFor(() => expect(campoBusca()).toHaveFocus());
+    expect(campoBusca().closest(".colaboradores-screen__so-leitor")).toBeNull();
+    expect(document.activeElement).not.toBe(tituloDaSecao("Todos"));
+    expect(anuncioDaLista()?.textContent).toBe(
+      "Página 1 carregada: 1 colaborador nesta consulta, com os filtros mantidos.",
+    );
+    expect(screen.getByLabelText("Tipo de vínculo")).toHaveValue("pj");
+    // O h2 da seção continua, só para leitor de tela, acima dos h3.
+    expect(tituloDaSecao("Todos")).toHaveClass(
+      "colaboradores-screen__so-leitor",
+    );
   });
 
-  it("'Ir para a primeira página' com nova falha: foco segue no botão, falha anunciada uma vez; repetir e conseguir leva ao h2", async () => {
+  it("'Ir para a primeira página' com busca e filtro: o anúncio diz que os dois ficaram, e o foco vai ao campo com a busca", async () => {
+    const srv = servidor({
+      ...comAna(),
+      total: 45,
+    });
+    render(
+      <DashboardComEstado
+        inicial={{ ...ESTADO_PADRAO, aba: "todos", tipo: "pj" }}
+        onMudanca={vi.fn()}
+      />,
+    );
+    await screen.findByRole("table", { name: "Colaboradores — Todos" });
+    buscar("Ana");
+    await waitFor(() => expect(srv.leituras()).toBe(2));
+    await srv.responder({ ...comAna(), total: 45 });
+    fireEvent.click(screen.getByRole("button", { name: "Próxima página" }));
+    await waitFor(() => expect(srv.leituras()).toBe(3));
+    await srv.responder(vazia(2, 3));
+    const ir = await screen.findByRole("button", {
+      name: "Ir para a primeira página",
+    });
+    ir.focus();
+    fireEvent.click(ir);
+    await waitFor(() => expect(srv.leituras()).toBe(4));
+    expect(vi.mocked(listarColaboradores).mock.lastCall?.[0]).toEqual({
+      pagina: 1,
+      tamanhoPagina: 20,
+      tipoVinculo: "pj",
+      busca: "Ana",
+    });
+    await srv.responder(comAna());
+    await waitFor(() => expect(campoBusca()).toHaveFocus());
+    expect(campoBusca()).toHaveValue("Ana");
+    expect(anuncioDaLista()?.textContent).toBe(
+      "Página 1 carregada: 1 colaborador nesta consulta, com a busca e os filtros mantidos.",
+    );
+  });
+
+  it("'Ir para a primeira página' com nova falha: foco segue no botão, falha anunciada uma vez; repetir e conseguir leva ao campo de busca", async () => {
     const srv = servidor(vazia(4, 3));
     render(
       <DashboardComEstado
@@ -5646,7 +5694,7 @@ describe("T199 (revisão B3) — ações do estado vazio e paginação fora do i
     expect(anuncioDaLista()?.textContent).toBe("");
     await waitFor(() => expect(srv.leituras()).toBe(3));
     await srv.responder(comAna());
-    await waitFor(() => expect(tituloDaSecao("Todos")).toHaveFocus());
+    await waitFor(() => expect(campoBusca()).toHaveFocus());
   });
 
   it("'Limpar filtros' a partir do vazio: o foco não cai no body; no sucesso vai ao campo de busca; uma única mudança de estado", async () => {
