@@ -285,3 +285,37 @@ Implementação de produto, API, schema, migration, RBAC, auditoria, Docker,
 seed, dependências, workflow, rascunho salvo automaticamente, transmissão de
 edições entre abas, mudança de granularidade das telas (Opção C), push, PR,
 promoção e merge.
+
+## 13. Telas cobertas na implementação (levantamento de 2026-11-03)
+
+As 16 declarações de `useEdicaoEmAndamento` existentes na base passam a ser
+cobertas pela guarda do shell, sem lógica nova nas telas — a guarda lê o mesmo
+registro da T189:
+
+| #   | Declaração (rótulo)                       | Arquivo                                      | Saídas que a guardam                                                         |
+| --- | ----------------------------------------- | -------------------------------------------- | ---------------------------------------------------------------------------- |
+| 1   | título de qualquer `Modal` com `alterado` | `components/Modal.tsx`                       | todas as do shell (o `Modal` cobre a tela; voltar/avançar e recarregar)      |
+| 2   | "Contas de acesso"                        | `administracao/ContasAcessoScreen.tsx`       | menu, Hub, Sair, voltar/avançar, rota digitada, recarregar                   |
+| 3   | "Centros de custo"                        | `horarios/CentrosCustoScreen.tsx`            | as do shell e a troca de aba de Cadastros                                    |
+| 4   | "Estrutura organizacional"                | `horarios/EstruturaOrganizacionalScreen.tsx` | as do shell e a troca de aba de Cadastros                                    |
+| 5   | "Ficha do colaborador"                    | `pessoas/FichaColaboradorScreen.tsx`         | as do shell, a trilha da ficha e voltar/avançar para fora da ficha           |
+| 6   | "Registrar movimentação"                  | `pessoas/HistoricoFuncionalScreen.tsx`       | as do shell e a troca de aba de Pessoas                                      |
+| 7   | "Retificar movimentação"                  | `pessoas/HistoricoFuncionalScreen.tsx`       | as do shell e a troca de aba de Pessoas                                      |
+| 8   | "Cargos"                                  | `horarios/FuncoesCargosScreen.tsx`           | as do shell e a troca de aba de Cadastros                                    |
+| 9   | "Jornadas de trabalho"                    | `horarios/JornadasTrabalhoScreen.tsx`        | as do shell                                                                  |
+| 10  | título da criação inline                  | `pessoas/ModalCriacaoInline.tsx`             | as do shell (dentro da Nova admissão)                                        |
+| 11  | título da referência rápida               | `pessoas/ModalReferenciaRapida.tsx`          | as do shell (dentro da Nova admissão)                                        |
+| 12  | "Nova admissão"                           | `pessoas/NovaAdmissaoScreen.tsx`             | as do shell e as saídas próprias da página (trilha, Cancelar, Conferir)      |
+| 13  | "Documentos"                              | `pessoas/PessoasDocumentosScreen.tsx`        | as do shell e a troca de aba de Pessoas                                      |
+| 14  | "Registro de ponto"                       | `ponto/VisaoPeriodoScreen.tsx`               | as do shell e a troca de aba do Ponto                                        |
+| 15  | "Horário de trabalho"                     | `pessoas/PessoasHorarioScreen.tsx`           | as do shell, a troca de aba de Pessoas e a saída da aba Jornada do dashboard |
+| 16  | "Solicitações"                            | `pessoas/SolicitacoesScreen.tsx`             | as do shell e a troca de aba de Pessoas                                      |
+
+"As do shell" são: menu lateral e atalhos, Hub, Sair, rota digitada,
+voltar/avançar e, pelo aviso nativo, recarregar e fechar a aba. A troca de
+empresa continua com o diálogo próprio da T189 (G-3).
+
+**Excluídas (G-6):** o painel de Segurança (código do segundo fator, efêmero),
+o portal demonstrativo "Minhas solicitações" (não grava nada) e as buscas e
+filtros das listagens (não são edição). A granularidade fina ("só pergunta
+depois de alterar") fica fora (G-4, opção C).
