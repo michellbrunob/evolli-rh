@@ -366,16 +366,20 @@ fica `inert`; o clique no fundo não tira o foco do diálogo, não fecha e não
 sai. Ao fechar, o foco volta à origem; se a origem saiu da tela, vai à região
 principal: o conteúdo do shell, ou a área do Hub depois de "Sair sem salvar"
 para o Hub. Nas saídas do navegador (voltar, avançar, rota digitada), o foco
-é decidido só depois que a navegação aceita termina. A 375 px os botões
-ocupam a largura e não há rolagem horizontal.
+é decidido só depois que a navegação aceita termina; como o menu, essas
+navegações fecham a gaveta do celular. Uma região que esteja dentro de
+`[inert]` nunca recebe esse foco. A 375 px os botões ocupam a largura e não
+há rolagem horizontal.
 
 **Salvamento em andamento.** O diálogo explica que há um salvamento em curso,
 oferece só "Entendi" e não navega sozinho quando ele termina (G-5).
 
 **Voltar/avançar e rota digitada.** Cada entrada do histórico leva o próprio
-índice em `history.state` (`evolliIndice`): as que o shell escreve, as que o
-navegador cria (rota digitada, âncora da página) assim que são percorridas, e
-as correções no lugar o preservam. Ao chegar uma navegação do navegador que
+índice em `history.state` (`evolliIndice`). As que o shell escreve já nascem
+com ele, e as correções no lugar o preservam. As que o navegador cria (rota
+digitada, âncora da página) o recebem quando chegam ao shell: a aplicada, ao
+ser aplicada; a rota digitada que a guarda desfaz, antes de ser desfeita. Ao
+chegar uma navegação do navegador que
 desmontaria algo pendente, o shell volta o navegador para a entrada que a tela
 descreve com `history.go(-passo)` e pergunta. A reversão termina quando o
 navegador chega de volta à entrada com o índice da tela; a chegada é
@@ -387,12 +391,15 @@ fragmento da URL são preservados. Abrir a ficha a partir da listagem não
 pergunta (a listagem fica montada); trocar de ficha ou sair dela pergunta pela
 área da ficha.
 
-A rota digitada é uma entrada nova que o navegador cria. Com pendência, o
-shell a desfaz com `history.go(-1)`: a URL volta à da tela, e a entrada
-digitada fica no histórico como entrada de avançar (como em qualquer
-navegação, ela toma o lugar das entradas que estavam à frente). O histórico
-não volta, portanto, ao tamanho de antes. Avançar até ela é uma navegação como
-outra qualquer e pergunta de novo. "Sair sem salvar" vai até ela.
+A rota digitada é uma entrada nova que o navegador cria logo depois da atual.
+Com pendência, o shell grava nela o índice dessa posição e a desfaz com
+`history.go(-1)`: a URL volta à da tela, e a entrada digitada fica no
+histórico como entrada de avançar. Como em qualquer navegação, ela ocupa a
+posição das entradas que antes estavam à frente. Por isso o histórico não é
+restaurado como era — embora o tamanho possa coincidir com o de antes, quando
+havia exatamente uma entrada à frente. Avançar até ela, num passo ou num salto
+de vários, é uma navegação como outra qualquer e pergunta de novo; "Sair sem
+salvar" chega exatamente a ela.
 
 **Pular para o conteúdo.** Os links de salto do shell e do Hub só movem o foco
 para a região principal: não seguem a âncora, não mudam a URL e não criam
