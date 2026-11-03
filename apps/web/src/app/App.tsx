@@ -149,6 +149,23 @@ function estadoComIndice(indice: number): Record<string, unknown> {
 }
 
 /**
+ * T200 — anota a URL da entrada de índice `indice` no mapa das entradas que
+ * ainda existem. Uma entrada nova (criada logo depois da atual) apaga as que
+ * estavam à frente — o navegador as descarta —, e elas saem do mapa.
+ */
+function anotarEntrada(
+  entradas: Map<number, string>,
+  indice: number,
+  url: string,
+  nova = false,
+): void {
+  if (nova) {
+    for (const i of [...entradas.keys()]) if (i > indice) entradas.delete(i);
+  }
+  entradas.set(indice, url);
+}
+
+/**
  * T198 — a rota do que está na tela: a da ficha, quando ela está aberta em
  * Colaboradores; senão, a do destino (ou nenhuma).
  * T199 — a listagem de Colaboradores leva na rota o estado do dashboard (aba,
@@ -684,6 +701,15 @@ export function App({
    * âncora da própria página: voltar e avançar contam passos certos.
    */
   const indiceRef = useRef(indiceDoEstado(window.history.state) ?? 0);
+  /**
+   * T200 — as entradas que o shell sabe que ainda existem: índice → URL. Uma
+   * âncora ou rota digitada cria entrada nova e apaga as que estavam à
+   * frente; uma saída aceita só é refeita pelo histórico quando o destino
+   * continua lá (ver `refazer`).
+   */
+  const [entradas] = useState(
+    () => new Map<number, string>([[indiceRef.current, window.location.href]]),
+  );
   /** T200 — a navegação já aceita na guarda: refeita, não pergunta de novo. */
   const aceitaRef = useRef<{ indice: number; url: string } | null>(null);
   /**
@@ -712,8 +738,9 @@ export function App({
         window.history.replaceState(estadoComIndice(indice), "", url);
       }
       indiceRef.current = indice;
+      anotarEntrada(entradas, indice, window.location.href, modo === "push");
     },
-    [],
+    [entradas],
   );
   /**
    * T199 — o estado que, quando exibido, corrige a URL no lugar
@@ -980,9 +1007,9 @@ export function App({
 
     /**
      * Refaz a navegação aceita, agora sem perguntar, até a entrada de índice
-     * `indice`. O salto é contado na hora, a partir de onde o navegador está:
-     * com o diálogo aberto, uma âncora digitada muda essa posição, e o passo
-     * do pedido original levaria a outra entrada.
+     * `indice` e URL `url`. O salto é contado na hora, a partir de onde o
+     * navegador está: com o diálogo aberto, uma âncora digitada muda essa
+     * posição, e o passo do pedido original levaria a outra entrada.
      */
     function refazer(indice: number, url: string) {
       if (desfazendoRef.current !== null) {
@@ -990,20 +1017,35 @@ export function App({
         return;
       }
       const passo = indice - indiceRef.current;
-      // O navegador já estaria na entrada de destino — o que, com os índices
-      // em ordem, não acontece. `go(0)` recarregaria a página: nada a refazer.
-      if (passo === 0) {
-        focarRegiaoPrincipal();
+      if (passo !== 0 && entradas.get(indice) === url) {
+        aceitaRef.current = { indice, url };
+        window.history.go(passo);
         return;
       }
-      aceitaRef.current = { indice, url };
-      window.history.go(passo);
+      // O destino aceito já não está no histórico: uma âncora ou rota
+      // digitada com o diálogo aberto o apagou (ou ocupou o lugar dele). A
+      // URL aceita vira uma entrada nova, logo depois da atual, já aceita —
+      // nunca `go(0)`, que recarregaria a página. O foco segue o caminho
+      // normal da saída concluída.
+      aceitaRef.current = { indice: indiceRef.current + 1, url };
+      window.location.assign(url);
+    }
+
+    /** Uma entrada que o navegador acabou de criar, logo depois da atual. */
+    function anotarEntradaNova(indice: number, url: string) {
+      anotarEntrada(entradas, indice, url, true);
+      // Uma saída aceita para uma entrada que acabou de sumir não vale mais.
+      if (aceitaRef.current !== null && aceitaRef.current.indice >= indice) {
+        aceitaRef.current = null;
+      }
     }
 
     function aoMudarUrl() {
       const fragmento = window.location.hash;
       const urlPedida = window.location.href;
       const indiceLido = indiceDoEstado(window.history.state);
+      // T200 — a entrada em que o navegador está existe, com esta URL.
+      if (indiceLido !== null) anotarEntrada(entradas, indiceLido, urlPedida);
       // T200 — o navegador desfazendo um passo da guarda: só a chegada de
       // volta à entrada de `indiceRef` o encerra (e refaz a saída, se ela já
       // foi aceita); o outro evento do passo desfeito é ignorado.
@@ -1038,6 +1080,7 @@ export function App({
             "",
             urlPedida,
           );
+          anotarEntradaNova(indiceNovo, urlPedida);
         }
         indiceRef.current = indiceNovo;
         return;
@@ -1102,6 +1145,7 @@ export function App({
               "",
               urlPedida,
             );
+            anotarEntradaNova(indiceNovo, urlPedida);
           }
           desfazer(passo, indiceNovo);
           if (!ocupada) {
@@ -1117,6 +1161,7 @@ export function App({
       indiceRef.current = indiceNovo;
       if (indiceLido === null) {
         window.history.replaceState(estadoComIndice(indiceNovo), "", urlPedida);
+        anotarEntradaNova(indiceNovo, urlPedida);
       }
       // T200 — como em `irParaDireto`: navegar fecha a gaveta. Aberta, ela
       // deixaria o conteúdo principal inerte, sem como receber o foco.
@@ -1144,7 +1189,7 @@ export function App({
       window.removeEventListener("popstate", aoMudarUrl);
       window.removeEventListener("hashchange", aoMudarUrl);
     };
-  }, [papelDoAtor, escreverNoHistorico]);
+  }, [papelDoAtor, escreverNoHistorico, entradas]);
 
   // Sair do shell (Hub, logout) não deixa a rota pendurada na URL: a próxima
   // entrada pelo Hub não deve ser sequestrada por ela. T178: efeito próprio,

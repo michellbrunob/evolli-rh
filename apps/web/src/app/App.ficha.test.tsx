@@ -1658,5 +1658,107 @@ describe("T200 — guarda de saída no App", () => {
       expect(screen.queryByRole("alertdialog")).toBeNull();
       expect(document.activeElement).not.toBe(document.body);
     });
+
+    const indiceAtual = () =>
+      (window.history.state as Record<string, unknown> | null)?.[
+        "evolliIndice"
+      ];
+
+    it("B11 — avançar um passo, âncora digitada com o diálogo aberto (o destino à frente some): 'Sair sem salvar' chega ao destino aceito, numa entrada nova", async () => {
+      window.history.replaceState(null, "", `/${LISTAGEM}`);
+      montarComGuarda();
+      const tabela = await screen.findByRole("table", {
+        name: /^Colaboradores — /,
+      });
+      fireEvent.click(
+        within(tabela).getByRole("button", {
+          name: `Abrir ficha de ${ana.nome}`,
+        }),
+      );
+      await esperarFicha(ana.nome);
+      // A listagem à frente da ficha (índices 0 → 1 → 2), e de volta à ficha.
+      fireEvent.click(
+        within(fichaNaTela()!).getByRole("button", { name: "Colaboradores" }),
+      );
+      await screen.findByRole("table", { name: /^Colaboradores — / });
+      await navegador(() => window.history.back());
+      await esperarFicha(ana.nome);
+      expect(indiceAtual()).toBe(1);
+      editarNome();
+
+      await navegador(() => window.history.forward());
+      await esperarPergunta();
+      await waitFor(() => expect(window.location.hash).toBe(rotaDe(ana)));
+      // A âncora digitada toma o lugar da listagem que estava à frente.
+      await navegador(() => {
+        window.location.hash = "#conteudo-principal";
+      });
+      expect(pergunta()).toBeInTheDocument();
+
+      sairSemSalvar();
+      await navegador(() => undefined);
+      await navegador(() => undefined);
+      await screen.findByRole("table", { name: /^Colaboradores — / });
+      expect(window.location.hash).toBe(LISTAGEM);
+      expect(indiceAtual()).toBe(3);
+      expect(fichaNaTela()).toBeNull();
+      expect(screen.queryByRole("alertdialog")).toBeNull();
+      expect(document.activeElement).not.toBe(document.body);
+      // Nenhuma pergunta nem navegação a mais depois.
+      await navegador(() => undefined);
+      expect(window.location.hash).toBe(LISTAGEM);
+      expect(screen.queryByRole("alertdialog")).toBeNull();
+    });
+
+    it("B11 — salto de dois passos para frente, âncora digitada com o diálogo aberto: o destino aceito, já apagado, é aplicado numa entrada nova", async () => {
+      window.history.replaceState(null, "", `/${LISTAGEM}`);
+      montarComGuarda();
+      const tabela = await screen.findByRole("table", {
+        name: /^Colaboradores — /,
+      });
+      fireEvent.click(
+        within(tabela).getByRole("button", {
+          name: `Abrir ficha de ${ana.nome}`,
+        }),
+      );
+      await esperarFicha(ana.nome);
+      fireEvent.click(
+        within(fichaNaTela()!).getByRole("button", { name: "Colaboradores" }),
+      );
+      const listagem = await screen.findByRole("table", {
+        name: /^Colaboradores — /,
+      });
+      fireEvent.click(
+        within(listagem).getByRole("button", {
+          name: `Abrir ficha de ${bruno.nome}`,
+        }),
+      );
+      await esperarFicha(bruno.nome);
+      // Ficha de Ana (1), listagem (2), ficha de Bruno (3): de volta à de Ana.
+      await navegador(() => window.history.go(-2));
+      await esperarFicha(ana.nome);
+      expect(indiceAtual()).toBe(1);
+      editarNome();
+
+      await navegador(() => window.history.go(2));
+      await esperarPergunta();
+      await waitFor(() => expect(window.location.hash).toBe(rotaDe(ana)));
+      await navegador(() => {
+        window.location.hash = "#conteudo-principal";
+      });
+      expect(pergunta()).toBeInTheDocument();
+
+      sairSemSalvar();
+      await navegador(() => undefined);
+      await navegador(() => undefined);
+      await esperarFicha(bruno.nome);
+      expect(window.location.hash).toBe(rotaDe(bruno));
+      expect(indiceAtual()).toBe(3);
+      expect(screen.queryByRole("alertdialog")).toBeNull();
+      expect(document.activeElement).not.toBe(document.body);
+      await navegador(() => undefined);
+      expect(window.location.hash).toBe(rotaDe(bruno));
+      expect(screen.queryByRole("alertdialog")).toBeNull();
+    });
   });
 });
