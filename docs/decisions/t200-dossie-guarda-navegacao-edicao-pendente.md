@@ -384,11 +384,9 @@ desmontaria algo pendente, o shell volta o navegador para a entrada que a tela
 descreve com `history.go(-passo)` e pergunta. A reversão termina quando o
 navegador chega de volta à entrada com o índice da tela; a chegada é
 reconhecida pelo índice, nunca pela URL. "Sair sem salvar" leva ao destino
-escolhido, marcado como aceito, por um de dois caminhos. A exceção registrada:
-se a pessoa navegar de novo enquanto a reversão ainda não chegou, a saída
-pendente é descartada. O shell anota as entradas que sabe que ainda existem
-(índice e URL); uma entrada nova criada pelo navegador apaga as que estavam à
-frente dela.
+escolhido, marcado como aceito, por um de dois caminhos. O shell anota as
+entradas que sabe que ainda existem (índice e URL); uma entrada nova criada
+pelo navegador apaga as que estavam à frente dela.
 
 - **Destino ainda no histórico:** o shell anda até a mesma entrada. O salto é
   contado na hora, do índice em que o navegador está até o índice do destino
@@ -447,3 +445,28 @@ uma segunda aba funcional.
 
 **Sem mudança em:** API, schema, migration, RBAC, auditoria, Docker, seed,
 dependências, lockfile e workflows.
+
+### Observações e limites conhecidos
+
+Não são funcionalidades desta entrega: são os casos que ela não cobre ou que
+não foram verificados, registrados nas revisões da PR.
+
+- **Nova navegação no meio da reversão:** se a pessoa anda no histórico de
+  novo antes de a reversão chegar, a intenção de saída pendente é descartada.
+  Nada é descartado sem pergunta; a saída simplesmente não acontece.
+- **Navegação até a URL atual:** pela especificação do HTML, ela substitui a
+  entrada atual, sem índice, e o shell a conta como entrada nova, o que pode
+  desalinhar os índices. A conclusão vem da leitura do código e da
+  especificação; o caso não foi reproduzido em navegador.
+- **Hash digitado no Hub:** o Hub não acompanha a URL. Uma entrada sem índice
+  criada ali pode desalinhar os índices quando o shell é aberto. Também não
+  foi reproduzido em navegador.
+- **Correção de URL no meio da reversão:** uma correção da URL no lugar
+  (`replaceState`) entre a chegada ao destino e a volta da reversão poderia
+  deixar duas entradas com o mesmo índice. Não verificada: a janela de tempo
+  é mínima e o caso não foi reproduzido.
+- **Voltar a partir da primeira tela aberta pelo Hub:** sai do documento e
+  depende somente do aviso nativo do navegador (`beforeunload`).
+- **Salvamento em andamento:** coberto por teste automatizado (bloqueio com
+  "Entendi", sem descarte e sem navegação automática), sem validação visual ao
+  vivo.
