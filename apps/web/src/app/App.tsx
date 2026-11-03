@@ -1024,11 +1024,16 @@ export function App({
       }
       // O destino aceito já não está no histórico: uma âncora ou rota
       // digitada com o diálogo aberto o apagou (ou ocupou o lugar dele). A
-      // URL aceita vira uma entrada nova, logo depois da atual, já aceita —
-      // nunca `go(0)`, que recarregaria a página. O foco segue o caminho
+      // URL aceita vira uma entrada nova da própria aplicação, logo depois da
+      // atual, já aceita, e é aplicada aqui mesmo: `pushState` não dispara
+      // evento. Nunca `go(0)` nem o `location` — sem hash, ele navegaria o
+      // documento (recarga, com o aviso nativo). O foco segue o caminho
       // normal da saída concluída.
-      aceitaRef.current = { indice: indiceRef.current + 1, url };
-      window.location.assign(url);
+      const novo = indiceRef.current + 1;
+      window.history.pushState({ [CHAVE_DO_INDICE]: novo }, "", url);
+      anotarEntradaNova(novo, window.location.href);
+      aceitaRef.current = { indice: novo, url: window.location.href };
+      aoMudarUrl();
     }
 
     /** Uma entrada que o navegador acabou de criar, logo depois da atual. */

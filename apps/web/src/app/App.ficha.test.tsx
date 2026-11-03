@@ -1760,5 +1760,147 @@ describe("T200 — guarda de saída no App", () => {
       expect(window.location.hash).toBe(rotaDe(bruno));
       expect(screen.queryByRole("alertdialog")).toBeNull();
     });
+
+    it("B12 — destino à frente SEM hash, apagado por âncora digitada: 'Sair sem salvar' chega a ele sem recarregar o documento nem armar o aviso nativo", async () => {
+      // No navegador, ir de `/#x` para uma URL sem hash pelo `location` é
+      // navegação de documento (recarga, com o aviso nativo). O jsdom a
+      // trata como navegação de fragmento — e dispara `popstate` e
+      // `hashchange`. A entrada recriada pelo shell vem de `pushState`, que
+      // não dispara evento nenhum: é isso que o teste exige.
+      const eventosDoNavegador: string[] = [];
+      const contar = (evento: Event) => eventosDoNavegador.push(evento.type);
+      try {
+        window.history.replaceState(null, "", "/#/pessoas/nova-admissao");
+        montarComGuarda();
+        await screen.findByLabelText(/^Nome completo/);
+        // Um destino do shell sem rota: a URL fica sem hash (índice 1).
+        fireEvent.click(
+          within(barra()).getByRole("button", {
+            name: /^Estrutura organizacional/,
+          }),
+        );
+        await screen.findByRole("heading", {
+          level: 1,
+          name: "Estrutura organizacional",
+        });
+        expect(window.location.hash).toBe("");
+        expect(indiceAtual()).toBe(1);
+        const destino = window.location.pathname + window.location.search;
+
+        // De volta à Nova admissão, com edição pendente.
+        await navegador(() => window.history.back());
+        const nome = await screen.findByLabelText(/^Nome completo/);
+        fireEvent.change(nome, {
+          target: { value: "Pessoa Sintetica Rascunho" },
+        });
+
+        await navegador(() => window.history.forward());
+        await esperarPergunta();
+        expect(telasDaPergunta()).toEqual(["Nova admissão"]);
+        await waitFor(() =>
+          expect(window.location.hash).toBe("#/pessoas/nova-admissao"),
+        );
+        // A âncora digitada toma o lugar do destino sem hash.
+        await navegador(() => {
+          window.location.hash = "#conteudo-principal";
+        });
+        expect(pergunta()).toBeInTheDocument();
+
+        const empilhar = vi.spyOn(window.history, "pushState");
+        window.addEventListener("popstate", contar);
+        window.addEventListener("hashchange", contar);
+        sairSemSalvar();
+        await navegador(() => undefined);
+        await navegador(() => undefined);
+        expect(
+          await screen.findByRole("heading", {
+            level: 1,
+            name: "Estrutura organizacional",
+          }),
+        ).toBeInTheDocument();
+        // Uma entrada da própria aplicação, com o índice novo; nenhuma
+        // navegação de documento (nem evento do navegador).
+        expect(empilhar).toHaveBeenCalledWith(
+          expect.objectContaining({ evolliIndice: 2 }),
+          "",
+          expect.stringMatching(/\/$/),
+        );
+        expect(eventosDoNavegador).toEqual([]);
+        empilhar.mockRestore();
+        expect(window.location.pathname + window.location.search).toBe(destino);
+        expect(window.location.hash).toBe("");
+        expect(indiceAtual()).toBe(2);
+        expect(screen.queryByRole("alertdialog")).toBeNull();
+        const ativo = document.activeElement;
+        expect(ativo).not.toBe(document.body);
+        expect(ativo?.closest("[inert]")).toBeNull();
+        // A edição foi descartada: o aviso nativo não está mais armado.
+        const aviso = new Event("beforeunload", { cancelable: true });
+        window.dispatchEvent(aviso);
+        expect(aviso.defaultPrevented).toBe(false);
+        // Nada mais pergunta nem anda depois.
+        await navegador(() => undefined);
+        expect(screen.queryByRole("alertdialog")).toBeNull();
+        expect(indiceAtual()).toBe(2);
+      } finally {
+        window.removeEventListener("popstate", contar);
+        window.removeEventListener("hashchange", contar);
+      }
+    });
+
+    it("B12 — destino à frente COM hash, apagado por âncora digitada: o mesmo caminho, por pushState, sem navegação do documento", async () => {
+      const eventosDoNavegador: string[] = [];
+      const contar = (evento: Event) => eventosDoNavegador.push(evento.type);
+      try {
+        window.history.replaceState(null, "", `/${LISTAGEM}`);
+        montarComGuarda();
+        const tabela = await screen.findByRole("table", {
+          name: /^Colaboradores — /,
+        });
+        fireEvent.click(
+          within(tabela).getByRole("button", {
+            name: `Abrir ficha de ${ana.nome}`,
+          }),
+        );
+        await esperarFicha(ana.nome);
+        fireEvent.click(
+          within(fichaNaTela()!).getByRole("button", {
+            name: "Colaboradores",
+          }),
+        );
+        await screen.findByRole("table", { name: /^Colaboradores — / });
+        await navegador(() => window.history.back());
+        await esperarFicha(ana.nome);
+        editarNome();
+        await navegador(() => window.history.forward());
+        await esperarPergunta();
+        await waitFor(() => expect(window.location.hash).toBe(rotaDe(ana)));
+        await navegador(() => {
+          window.location.hash = "#conteudo-principal";
+        });
+
+        const empilhar = vi.spyOn(window.history, "pushState");
+        window.addEventListener("popstate", contar);
+        window.addEventListener("hashchange", contar);
+        sairSemSalvar();
+        await navegador(() => undefined);
+        await navegador(() => undefined);
+        await screen.findByRole("table", { name: /^Colaboradores — / });
+        expect(window.location.hash).toBe(LISTAGEM);
+        expect(indiceAtual()).toBe(3);
+        expect(empilhar).toHaveBeenCalledWith(
+          expect.objectContaining({ evolliIndice: 3 }),
+          "",
+          expect.stringContaining(LISTAGEM),
+        );
+        expect(eventosDoNavegador).toEqual([]);
+        empilhar.mockRestore();
+        expect(screen.queryByRole("alertdialog")).toBeNull();
+        expect(document.activeElement).not.toBe(document.body);
+      } finally {
+        window.removeEventListener("popstate", contar);
+        window.removeEventListener("hashchange", contar);
+      }
+    });
   });
 });
