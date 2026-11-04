@@ -51,6 +51,21 @@ import { formatarInstante } from "../../format/data";
 import { exibirMatricula } from "../../format/matricula";
 import "./RegistrosPontoColaboradorSecao.css";
 
+/**
+ * Anos aceitos no CAMPO de mês (só o controle interativo; a rota segue a
+ * regra do servidor). Enquanto a pessoa digita o ano, o navegador emite
+ * valores intermediários ("0002-10", "0020-10", "0202-10"): fora desta faixa,
+ * eles não viram navegação, leitura nem anúncio.
+ */
+export const MES_MINIMO_DO_CAMPO = "1900-01";
+export const MES_MAXIMO_DO_CAMPO = "2100-12";
+
+function mesPlausivelNoCampo(valor: string): boolean {
+  if (!competenciaValida(valor)) return false;
+  const ano = Number(valor.slice(0, 4));
+  return ano >= 1900 && ano <= 2100;
+}
+
 /** Itens por página pedidos ao servidor: o máximo que ele aceita. */
 export const TAMANHO_PAGINA_PONTO = 100;
 
@@ -360,8 +375,9 @@ export function RegistrosPontoColaboradorSecao({
   function aoDigitarMes(evento: ChangeEvent<HTMLInputElement>) {
     const valor = evento.target.value;
     setMesDigitado(valor);
-    // Só um mês válido vira rota; vazio ou incompleto fica no campo.
-    if (competenciaValida(valor)) irPara(valor);
+    // Só um mês completo e plausível vira rota; vazio, incompleto ou um ano
+    // ainda sendo digitado fica no campo.
+    if (mesPlausivelNoCampo(valor)) irPara(valor);
   }
 
   const rotuloDoMes = rotuloDaCompetencia(competencia);
@@ -452,6 +468,8 @@ export function RegistrosPontoColaboradorSecao({
               <input
                 id={ids.mes}
                 type="month"
+                min={MES_MINIMO_DO_CAMPO}
+                max={MES_MAXIMO_DO_CAMPO}
                 value={mesDigitado}
                 onChange={aoDigitarMes}
                 onBlur={() => setMesDigitado(competencia)}

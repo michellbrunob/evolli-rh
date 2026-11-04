@@ -561,6 +561,43 @@ describe("T202 — troca de mês", () => {
     expect(campo).toHaveValue(NOV);
   });
 
+  it("B1: anos parciais enquanto se digita o ano não navegam, nem leem, nem anunciam; o mês completo navega uma vez", async () => {
+    const trocar = vi.fn();
+    render(<Secao onTrocarCompetencia={trocar} />);
+    await bloco(/MAT-0001/);
+    const campo = screen.getByLabelText("Mês");
+    const status = screen.getByRole("status");
+    const textoAntes = status.textContent;
+    const leiturasAntes = vi.mocked(listarPontosDoVinculo).mock.calls.length;
+    // O que o navegador emite ao digitar "2026" no ano de um mês.
+    for (const parcial of ["0002-10", "0020-10", "0202-10"]) {
+      fireEvent.change(campo, { target: { value: parcial } });
+    }
+    expect(trocar).not.toHaveBeenCalled();
+    expect(vi.mocked(listarPontosDoVinculo).mock.calls.length).toBe(
+      leiturasAntes,
+    );
+    expect(status.textContent).toBe(textoAntes);
+    fireEvent.change(campo, { target: { value: "2026-10" } });
+    expect(trocar).toHaveBeenCalledTimes(1);
+    expect(trocar).toHaveBeenCalledWith("2026-10");
+  });
+
+  it("B1: o campo aceita só anos de 1900 a 2100 (limites inclusive) e expõe min e max", async () => {
+    const trocar = vi.fn();
+    render(<Secao onTrocarCompetencia={trocar} />);
+    await bloco(/MAT-0001/);
+    const campo = screen.getByLabelText("Mês");
+    expect(campo).toHaveAttribute("min", "1900-01");
+    expect(campo).toHaveAttribute("max", "2100-12");
+    fireEvent.change(campo, { target: { value: "1899-12" } });
+    fireEvent.change(campo, { target: { value: "2101-01" } });
+    expect(trocar).not.toHaveBeenCalled();
+    fireEvent.change(campo, { target: { value: "1900-01" } });
+    fireEvent.change(campo, { target: { value: "2100-12" } });
+    expect(trocar.mock.calls).toEqual([["1900-01"], ["2100-12"]]);
+  });
+
   it("resposta atrasada do mês anterior não substitui o mês atual", async () => {
     const novembro = adiada<Pagina>();
     vi.mocked(listarPontosDoVinculo).mockImplementation(async (id, q) => {

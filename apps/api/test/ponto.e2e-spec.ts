@@ -1692,12 +1692,31 @@ describe("Jornada e Ponto Rastreavel (e2e)", () => {
     });
 
     it("master_tecnico sem empresa ativa lê por vínculo em qualquer empresa (global, auditado)", async () => {
-      const resposta = await get(
-        `/v1/vinculos/${vinculoB}/pontos?competencia=${COMPETENCIA_T202}`,
-        master,
-      ).expect(200);
-      const ids = (resposta.body.itens as { id: string }[]).map((e) => e.id);
-      expect(ids).toContain(marcacaoB);
+      const prisma = new PrismaClient({ datasources: { db: { url: appUrl } } });
+      const auditoriaDoMaster = {
+        action: "ponto_consultado",
+        actorRole: "master_tecnico",
+        resourceId: vinculoB,
+      } as const;
+      try {
+        const antes = await prisma.auditEvent.count({
+          where: auditoriaDoMaster,
+        });
+        const resposta = await get(
+          `/v1/vinculos/${vinculoB}/pontos?competencia=${COMPETENCIA_T202}`,
+          master,
+        ).expect(200);
+        const ids = (resposta.body.itens as { id: string }[]).map((e) => e.id);
+        expect(ids).toContain(marcacaoB);
+        // A leitura global por vínculo gravou exatamente um evento de
+        // consulta de ponto do master, com o vínculo consultado.
+        const depois = await prisma.auditEvent.count({
+          where: auditoriaDoMaster,
+        });
+        expect(depois).toBe(antes + 1);
+      } finally {
+        await prisma.$disconnect();
+      }
     });
 
     it("master_tecnico COM empresa ativa lê só a empresa escolhida; a outra é 404", async () => {

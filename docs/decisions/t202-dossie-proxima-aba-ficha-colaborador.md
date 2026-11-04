@@ -276,7 +276,11 @@ Todas aprovadas como recomendado.
     efetivo; "Ajustada" (com o registro original quando mudou) e "Anulada"
     (marcada, nunca some — P-5); quem registrou não aparece;
   - controle de mês com "Mês anterior", campo de mês e "Próximo mês"; só um
-    mês válido vira rota;
+    mês válido vira rota; o campo (`min="1900-01"`, `max="2100-12"`) só aceita
+    anos de 1900 a 2100, para que os valores intermediários que o navegador
+    emite enquanto se digita o ano ("0002-10", "0020-10", "0202-10") não virem
+    navegação, leitura nem anúncio (achado da revisão; a regra da rota não
+    muda);
   - um só nó de status do começo ao fim (sessão e marcações), falha com alerta
     e "Tentar de novo" que fica focado com `aria-disabled` durante a nova
     leitura; sucesso leva o foco ao título da aba;
@@ -302,12 +306,13 @@ Todas aprovadas como recomendado.
 ### 10.3 Testes e validação
 
 - **Web:**
-  - `RegistrosPontoColaboradorSecao.test.tsx` (25 casos): vínculos, pessoa,
+  - `RegistrosPontoColaboradorSecao.test.tsx` (27 casos): vínculos, pessoa,
     empresa e competência; master sem e com empresa; perfis sem escrita; dia
     em São Paulo e ordem efetiva; ajustada e anulada; nenhum cálculo; mês com
     130 marcações em duas páginas; repetição entre páginas; falha numa página
     seguinte; um só nó de status; vazio; falha e nova tentativa; troca de mês,
-    virada de ano, campo de mês, resposta atrasada e desmontagem; 375 px;
+    virada de ano, campo de mês (inclusive anos parciais e os limites de 1900
+    e 2100), resposta atrasada e desmontagem; 375 px;
   - `App.ficha.test.tsx`: rota com competência (válida, sem mês, inválida),
     competência vizinha, rota direta, recarga, URL sem mês corrigida no lugar,
     mês inválido, troca de mês com voltar e avançar, troca de aba com o último
@@ -320,9 +325,9 @@ Todas aprovadas como recomendado.
 - **API (só testes, `ponto.e2e-spec.ts`):** leitura por vínculo para RH e DP,
   paginação pelo total, recusas 400, isolamento 404 nos dois sentidos, perfis
   negados, master global, master com empresa ativa (só a empresa; a outra é
-  404; continua sem escrita) e auditoria `ponto.consultado` por leitura.
-- **Prova de falha:** onze mutações do código, cada uma derrubando ao menos um
-  teste:
+  404; continua sem escrita) e auditoria `ponto.consultado` por leitura,
+  inclusive a do master global (papel e vínculo consultado).
+- **Prova de falha:** cada mutação abaixo derruba ao menos um teste:
   - filtro defensivo de item;
   - master sem empresa consultando;
   - só a primeira página;
@@ -333,7 +338,11 @@ Todas aprovadas como recomendado.
   - vínculo de outra empresa;
   - anulada sem marca;
   - rota aceitando mês inválido;
-  - troca de aba sem guardar o último mês.
+  - troca de aba sem guardar o último mês;
+  - campo de mês aceitando ano parcial (os testes novos falham no código
+    anterior);
+  - auditoria da consulta do master sem o vínculo (mutação temporária do
+    serviço, desfeita; só o teste do master global falha).
 - **Localhost** (banco isolado, dados sintéticos; pessoas pela API de
   Pessoas e marcações, ajuste e anulação pela tela Jornada › Visão do
   período):
