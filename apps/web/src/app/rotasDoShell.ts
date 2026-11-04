@@ -57,12 +57,16 @@ export function rotaDoDestino(destinoId: string): string | null {
 /**
  * T198 — as abas da ficha do colaborador, cada uma com endereço próprio (D18).
  * A ordem é a da navegação interna da ficha.
+ *
+ * T201 — "documentos": registros e solicitações de documento da pessoa, só
+ * metadados (ADR 0011).
  */
 export const ABAS_DA_FICHA = [
   "dados",
   "vida-funcional",
   "contratuais",
   "jornada",
+  "documentos",
 ] as const;
 export type AbaDaFicha = (typeof ABAS_DA_FICHA)[number];
 

@@ -24,6 +24,10 @@
  * colaborador. Edição: as mesmas regras de antes — dados e contatos para RH e
  * DP, jornada só para o RH, `master_tecnico` só lê (D23). Quem recusa é o
  * servidor.
+ *
+ * T201 — aba Documentos: registros e solicitações de documento só desta
+ * pessoa, com os contratos da visão coletiva (ver
+ * `DocumentosColaboradorSecao`). Só metadados; sem empresa ativa, nada é lido.
  */
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
@@ -65,6 +69,7 @@ import { exibirMatricula } from "../../format/matricula";
 import { ContatosColaboradorSecao } from "./ContatosColaboradorSecao";
 import { DadosContratuaisScreen } from "./DadosContratuaisScreen";
 import { DadosPessoaisColaboradorSecao } from "./DadosPessoaisColaboradorSecao";
+import { DocumentosColaboradorSecao } from "./DocumentosColaboradorSecao";
 import { JornadaColaboradorSecao } from "./JornadaColaboradorSecao";
 import {
   type AlvoHistoricoFuncional,
@@ -84,6 +89,7 @@ export const ROTULO_DA_ABA: Readonly<Record<AbaDaFicha, string>> = {
   "vida-funcional": "Vida funcional",
   contratuais: "Dados contratuais",
   jornada: "Jornada de trabalho",
+  documentos: "Documentos",
 };
 
 /** Ícone de cada aba (desenho próprio, ao lado do rótulo). */
@@ -92,6 +98,7 @@ const ICONE_DA_ABA: Readonly<Record<AbaDaFicha, IconeFichaId>> = {
   "vida-funcional": "vida-funcional",
   contratuais: "contratuais",
   jornada: "jornada",
+  documentos: "documentos",
 };
 
 /**
@@ -281,6 +288,8 @@ function FichaColaboradorConteudo({
   const [salvandoDadosPessoais, setSalvandoDadosPessoais] = useState(false);
   const [jornadaAlterada, setJornadaAlterada] = useState(false);
   const [salvandoJornada, setSalvandoJornada] = useState(false);
+  const [documentosAlterados, setDocumentosAlterados] = useState(false);
+  const [salvandoDocumentos, setSalvandoDocumentos] = useState(false);
 
   const colaborador = estado.tipo === "dados" ? estado.colaborador : null;
   const vinculos = estado.tipo === "dados" ? estado.vinculos : [];
@@ -291,12 +300,14 @@ function FichaColaboradorConteudo({
     nomeAlterado ||
     contatosAlterados ||
     dadosPessoaisAlterados ||
-    jornadaAlterada;
+    jornadaAlterada ||
+    documentosAlterados;
   const salvando =
     salvandoNome ||
     salvandoContatos ||
     salvandoDadosPessoais ||
-    salvandoJornada;
+    salvandoJornada ||
+    salvandoDocumentos;
 
   // T189 — edição não salva ou gravação em curso: a troca de empresa avisa
   // antes de descartar, como fazia o modal.
@@ -964,7 +975,7 @@ function FichaColaboradorConteudo({
             hidden={a !== aba}
             className="ficha-colaborador__painel"
           >
-            {/* Vida funcional e Jornada já abrem com o próprio título (h2);
+            {/* Vida funcional, Jornada e Documentos já abrem com o próprio título (h2);
                 as outras abas reúnem várias seções, e o h2 as agrupa para
                 quem navega por títulos. */}
             {a === "dados" || a === "contratuais" ? (
@@ -1064,6 +1075,13 @@ function FichaColaboradorConteudo({
             ) : a === "contratuais" ? (
               <DadosContratuaisScreen
                 colaborador={{ id: colaboradorId, nome }}
+              />
+            ) : a === "documentos" ? (
+              <DocumentosColaboradorSecao
+                colaboradorId={colaboradorId}
+                nomeColaborador={nome}
+                onAlteradoChange={setDocumentosAlterados}
+                onSalvandoChange={setSalvandoDocumentos}
               />
             ) : (
               <JornadaColaboradorSecao

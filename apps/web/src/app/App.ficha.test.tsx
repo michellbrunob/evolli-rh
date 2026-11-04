@@ -55,6 +55,13 @@ import {
   buscarLinhaDoTempo,
   listarMovimentacoes,
 } from "../api/movimentacaoClient";
+import { obterUsuarioAtual } from "../api/usersClient";
+import {
+  criarDocumento,
+  listarDocumentos,
+  listarSolicitacoesDocumento,
+  listarTiposDocumento,
+} from "../api/documentosClient";
 
 vi.mock("../api/colaboradoresClient");
 vi.mock("../api/cargoClient");
@@ -65,6 +72,28 @@ vi.mock("../api/horariosClient");
 vi.mock("../api/contatosColaboradorClient");
 vi.mock("../api/dadosPessoaisClient");
 vi.mock("../api/movimentacaoClient");
+// T201 — a aba Documentos lê o ator da sessão e os documentos da pessoa.
+vi.mock("../api/usersClient", async () => {
+  const actual =
+    await vi.importActual<typeof import("../api/usersClient")>(
+      "../api/usersClient",
+    );
+  return { ...actual, obterUsuarioAtual: vi.fn() };
+});
+vi.mock("../api/documentosClient", async () => {
+  const actual = await vi.importActual<
+    typeof import("../api/documentosClient")
+  >("../api/documentosClient");
+  return {
+    ...actual,
+    listarTiposDocumento: vi.fn(),
+    listarDocumentos: vi.fn(),
+    listarSolicitacoesDocumento: vi.fn(),
+    criarDocumento: vi.fn(),
+    substituirDocumento: vi.fn(),
+    criarSolicitacaoDocumento: vi.fn(),
+  };
+});
 
 // Fluxo com o App inteiro: o limite maior vale só para este arquivo.
 vi.setConfig({ testTimeout: 20_000 });
@@ -193,6 +222,44 @@ beforeEach(() => {
       contatos: null,
     }),
   );
+  vi.mocked(obterUsuarioAtual).mockResolvedValue({
+    id: "ator-sintetico",
+    email: "pessoa.teste@example.test",
+    role: "rh",
+    companyId: EMPRESA,
+    unitId: null,
+    teamId: null,
+    status: "active",
+    createdAt: "2026-01-01T00:00:00.000Z",
+  });
+  vi.mocked(listarTiposDocumento).mockResolvedValue(
+    paginado([
+      {
+        id: "t-rg",
+        empresaId: EMPRESA,
+        codigo: "RG",
+        nome: "Identidade (teste)",
+        classificacao: "restrito",
+        criadoEm: "2026-01-01T00:00:00.000Z",
+        atualizadoEm: "2026-01-01T00:00:00.000Z",
+      },
+    ]),
+  );
+  vi.mocked(listarDocumentos).mockImplementation(async (consulta) =>
+    paginado([
+      {
+        id: "d-1",
+        empresaId: EMPRESA,
+        colaboradorId: consulta?.colaboradorId ?? ana.id,
+        tipoDocumentoId: "t-rg",
+        estado: "upload_desabilitado" as const,
+        substituiDocumentoId: null,
+        criadoEm: "2026-03-10T12:00:00.000Z",
+        atualizadoEm: "2026-03-10T12:00:00.000Z",
+      },
+    ]),
+  );
+  vi.mocked(listarSolicitacoesDocumento).mockResolvedValue(paginado([]));
   vi.mocked(consultarDadosPessoaisDoColaborador).mockImplementation(
     async (colaboradorId) => ({
       colaboradorId,
@@ -1902,5 +1969,169 @@ describe("T200 — guarda de saída no App", () => {
         window.removeEventListener("hashchange", contar);
       }
     });
+  });
+});
+
+describe("T201 — aba Documentos da ficha no shell", () => {
+  const painelDocumentos = (nome = ana.nome) =>
+    screen.findByRole("table", { name: `Documentos registrados — ${nome}` });
+  const voltarPelaTrilha = () =>
+    fireEvent.click(
+      within(
+        document.querySelector<HTMLElement>(".ficha-colaborador")!,
+      ).getByRole("button", { name: "Colaboradores" }),
+    );
+
+  it("rota direta abre a aba Documentos; recarregar a mantém", async () => {
+    window.history.replaceState(null, "", `/${rotaDe(ana, "documentos")}`);
+    const entradas = window.history.length;
+    const { unmount } = render(<App papelDoAtor="dp" />);
+    await esperarFicha(ana.nome);
+    expect(abaSelecionada()).toHaveTextContent("Documentos");
+    await painelDocumentos();
+    expect(window.location.hash).toBe(rotaDe(ana, "documentos"));
+    expect(window.history.length).toBe(entradas);
+    expect(listarDocumentos).toHaveBeenCalledWith(
+      expect.objectContaining({ colaboradorId: ana.id }),
+    );
+    const url = window.location.hash;
+    unmount();
+
+    window.history.replaceState(null, "", `/${url}`);
+    render(<App papelDoAtor="dp" />);
+    await esperarFicha(ana.nome);
+    expect(abaSelecionada()).toHaveTextContent("Documentos");
+    await painelDocumentos();
+  });
+
+  it("a aba muda a URL; 'voltar' e 'avançar' alternam entre ela e a anterior", async () => {
+    window.history.replaceState(null, "", `/${rotaDe(ana, "jornada")}`);
+    render(<App papelDoAtor="rh" />);
+    await esperarFicha(ana.nome);
+    // Só ao abrir a aba os documentos são lidos.
+    expect(listarDocumentos).not.toHaveBeenCalled();
+    const aba = screen.getByRole("tab", { name: "Documentos" });
+    aba.focus();
+    fireEvent.click(aba);
+    await waitFor(() =>
+      expect(window.location.hash).toBe(rotaDe(ana, "documentos")),
+    );
+    await painelDocumentos();
+    // O foco fica na aba (padrão de abas): a carga não o tira dela.
+    expect(screen.getByRole("tab", { name: "Documentos" })).toHaveFocus();
+
+    navegadorVaiPara(rotaDe(ana, "jornada"));
+    await waitFor(() =>
+      expect(abaSelecionada()).toHaveTextContent("Jornada de trabalho"),
+    );
+    navegadorVaiPara(rotaDe(ana, "documentos"));
+    await waitFor(() =>
+      expect(abaSelecionada()).toHaveTextContent("Documentos"),
+    );
+    // A aba já visitada fica montada: nada é relido por voltar a ela.
+    expect(listarDocumentos).toHaveBeenCalledTimes(1);
+  });
+
+  it("outra pessoa pela URL: a aba lê e mostra só os documentos dela", async () => {
+    window.history.replaceState(null, "", `/${rotaDe(ana, "documentos")}`);
+    render(<App papelDoAtor="rh" />);
+    await painelDocumentos();
+    navegadorVaiPara(rotaDe(bruno, "documentos"));
+    await painelDocumentos(bruno.nome);
+    expect(
+      vi.mocked(listarDocumentos).mock.calls.map((c) => c[0]?.colaboradorId),
+    ).toEqual([ana.id, bruno.id]);
+    expect(
+      screen.queryByRole("table", {
+        name: `Documentos registrados — ${ana.nome}`,
+      }),
+    ).toBeNull();
+  });
+
+  it("colaborador fora da empresa da sessão: 'não encontrado', e nenhum documento é lido", async () => {
+    window.history.replaceState(
+      null,
+      "",
+      `/${LISTAGEM}/99999999-9999-4999-8999-999999999999/documentos`,
+    );
+    render(<App papelDoAtor="rh" />);
+    await screen.findByRole("heading", {
+      level: 1,
+      name: "Colaborador não encontrado",
+    });
+    expect(screen.queryByRole("tab", { name: "Documentos" })).toBeNull();
+    expect(obterUsuarioAtual).not.toHaveBeenCalled();
+    expect(listarDocumentos).not.toHaveBeenCalled();
+    expect(listarSolicitacoesDocumento).not.toHaveBeenCalled();
+  });
+
+  it.each(["gestor", "colaborador", "financeiro", "auditor", "dpo"] as const)(
+    "%s com a URL da aba Documentos não monta a ficha, e nenhum documento é lido",
+    async (papel) => {
+      window.history.replaceState(null, "", `/${rotaDe(ana, "documentos")}`);
+      render(<App papelDoAtor={papel} />);
+      await screen.findByRole("navigation", { name: "Navegação do painel" });
+      await waitFor(() => expect(window.location.hash).not.toContain(ana.id));
+      expect(document.querySelector(".ficha-colaborador")).toBeNull();
+      expect(listarDocumentos).not.toHaveBeenCalled();
+      expect(listarSolicitacoesDocumento).not.toHaveBeenCalled();
+      expect(listarTiposDocumento).not.toHaveBeenCalled();
+    },
+  );
+
+  it("guarda de saída (T200): tipo escolhido e não salvo pergunta antes de sair da ficha", async () => {
+    window.history.replaceState(null, "", `/${rotaDe(ana, "documentos")}`);
+    render(
+      <ComGuardaDeSaida>
+        <App papelDoAtor="rh" />
+      </ComGuardaDeSaida>,
+    );
+    await painelDocumentos();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Registrar documento" }),
+    );
+    fireEvent.change(screen.getByLabelText(/^Tipo do documento/), {
+      target: { value: "t-rg" },
+    });
+    voltarPelaTrilha();
+    const pergunta = screen.getByRole("alertdialog", {
+      name: "Sair sem salvar?",
+    });
+    expect(
+      within(pergunta)
+        .getAllByRole("listitem")
+        .map((li) => li.textContent),
+    ).toEqual(["Ficha do colaborador"]);
+    fireEvent.click(
+      within(pergunta).getByRole("button", { name: "Continuar editando" }),
+    );
+    expect(screen.getByLabelText(/^Tipo do documento/)).toHaveValue("t-rg");
+    expect(criarDocumento).not.toHaveBeenCalled();
+
+    // Outra aba da ficha não é saída: o formulário fica, escondido.
+    fireEvent.click(screen.getByRole("tab", { name: "Dados do colaborador" }));
+    await waitFor(() => expect(window.location.hash).toBe(rotaDe(ana)));
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    fireEvent.click(screen.getByRole("tab", { name: "Documentos" }));
+    await waitFor(() =>
+      expect(window.location.hash).toBe(rotaDe(ana, "documentos")),
+    );
+    expect(screen.getByLabelText(/^Tipo do documento/)).toHaveValue("t-rg");
+  });
+
+  it("formulário aberto e vazio não pergunta nada ao sair", async () => {
+    window.history.replaceState(null, "", `/${rotaDe(ana, "documentos")}`);
+    render(
+      <ComGuardaDeSaida>
+        <App papelDoAtor="dp" />
+      </ComGuardaDeSaida>,
+    );
+    await painelDocumentos();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Solicitar documento" }),
+    );
+    voltarPelaTrilha();
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    await screen.findByRole("table", { name: /^Colaboradores — / });
   });
 });

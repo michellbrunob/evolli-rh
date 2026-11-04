@@ -3002,9 +3002,21 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       schema, migration, RBAC novo, seed, Docker, dependências, promoção e merge.
 
 97. **T200 - Guarda global de edição pendente**
-    - **Estado:** **em implementação** (entrega em PR Draft). Branch
-      `codex/t200-guarda-navegacao-edicao-pendente`, a partir do squash
-      `6b3d24d72e080cbf9cce59f6246715b2bfb84b5e` (T199 integrada, PR #192).
+    - **Estado:** **integrada** em `main` pela PR #193, squash
+      `9fd3427daa40067f6de6af4c35843f4e38e85ad2`, com a CI de push 3/3 verde (run 41817085354);
+      branch preservada. Implementada na branch `codex/t200-guarda-navegacao-edicao-pendente`,
+      a partir do squash `6b3d24d72e080cbf9cce59f6246715b2bfb84b5e` (T199 integrada, PR #192).
+    - **Observação de relatório:** a integração funcional da T200 está concluída; a única
+      pendência administrativa era a sua convergência no Spec Kit, resolvida no primeiro commit
+      da T201. As correções das revisões adversariais (B1 a B14: links de salto, rota digitada
+      com índice, ficha sobre a Jornada, foco depois da saída, fundo do diálogo, menu já ativo,
+      gaveta móvel, destino refeito pelo índice e destino apagado recriado por `pushState`, e
+      os textos do dossiê e do Spec Kit) foram feitas dentro da entrega.
+    - **Observações que continuam (sem decisão de mudança):** as da seção 14 do dossiê — nova
+      navegação no meio da reversão descarta a saída pendente; navegação até a URL atual; hash
+      digitado no Hub; correção de URL no meio da reversão (não verificada); voltar a partir da
+      primeira tela aberta pelo Hub só com o aviso nativo; salvamento em andamento só com prova
+      automatizada.
     - **Objetivo:** guarda de navegação do shell para edição pendente — antes só a trilha da
       ficha, a Nova admissão e a troca de empresa confirmavam o descarte; menu lateral, Hub,
       Sair, abas internas, voltar/avançar, rota digitada e recarregar podiam perder alterações
@@ -3030,6 +3042,43 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
     - **Fora de escopo:** painel de Segurança, portal demonstrativo "Minhas solicitações",
       granularidade fina (opção C), rascunho salvo automaticamente, transmissão de edições
       entre abas, migração do diálogo da troca de empresa, promoção e merge.
+
+98. **T201 - Ficha do colaborador funcional: aba Documentos**
+    - **Estado:** **em implementação** (entrega em PR Draft). Branch
+      `codex/t201-ficha-colaborador-funcional`, a partir do squash
+      `9fd3427daa40067f6de6af4c35843f4e38e85ad2` (T200 integrada, PR #193). A preparação
+      (dossiê e decisões) foi feita antes, sem código de produto, sem push e sem PR; isso
+      valeu só para aquela fase.
+    - **Objetivo:** a ficha individual concentra o que é de uma pessoa, e a listagem de
+      Colaboradores continua coletiva e enxuta. A primeira fatia é a aba Documentos, conforme o
+      [dossiê](../docs/decisions/t201-dossie-ficha-colaborador-funcional.md).
+    - **Decisões aprovadas (2026-11-04):** F-1 a F-8 da seção 9 do dossiê:
+      - primeira fatia Documentos;
+      - RH e DP registram, corrigem o tipo e solicitam, e o `master_tecnico` só lê;
+      - as visões da empresa em Pessoas ficam como estão;
+      - sem empresa ativa, a aba pede a empresa e não lê;
+      - cabeçalho sem tempo de casa ou carga horária;
+      - Solicitações, quando entrar, some para o DP;
+      - Ponto, quando entrar, só consulta, com a competência na rota;
+      - Vida funcional sem operações.
+    - **Entrega (seção 11 do dossiê):**
+      - aba `documentos` com URL própria;
+      - seção `DocumentosColaboradorSecao`, só com os contratos existentes de documentos e
+        solicitações de documento, filtrados pela pessoa e pela empresa da sessão;
+      - aviso de que só o registro é guardado, sem arquivo, envio, download ou visualização;
+      - estados de carga, vazio, falha e nova tentativa, com foco e anúncios;
+      - respostas atrasadas descartadas;
+      - edição pendente na guarda da área `ficha`;
+      - 375 px sem rolagem horizontal; o quadro de tabela da ficha passou a ser posicionado
+        (defeito achado na validação);
+      - um só nó de status durante a carga, da sessão ao conteúdo (achado da revisão).
+      - Sem API, schema, migration, RBAC, auditoria, Docker, seed, dependência ou workflow.
+    - **Fora de escopo:**
+      - abas Solicitações e Ponto, e operações na Vida funcional;
+      - arquivo, upload, download, visualização e foto;
+      - salário, benefícios, férias, ausências, pesquisas, comentários, portal e convite;
+      - mudança nas visões da empresa em Pessoas;
+      - promoção e merge.
 
 ## Regra obrigatória para as próximas tarefas
 

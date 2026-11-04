@@ -28,6 +28,15 @@ import {
 } from "../api/organizacaoClient";
 import { listarCargos } from "../api/cargoClient";
 import {
+  buscarColaborador,
+  listarVinculosDoColaborador,
+} from "../api/colaboradoresClient";
+import {
+  listarDocumentos,
+  listarSolicitacoesDocumento,
+  listarTiposDocumento,
+} from "../api/documentosClient";
+import {
   listarEmpresasDoContexto,
   trocarEmpresaDoContexto,
 } from "../api/contextoEmpresarialClient";
@@ -158,6 +167,32 @@ vi.mock("../api/cargoClient", async () => {
   return { ...actual, listarCargos: vi.fn() };
 });
 
+// T201 — a ficha aberta na aba Documentos: a pessoa, os vínculos e os
+// documentos. Por padrão estas leituras FALHAM, como falhavam antes (fetch
+// sem servidor); os testes da T201 as resolvem.
+vi.mock("../api/colaboradoresClient", async () => {
+  const actual = await vi.importActual<
+    typeof import("../api/colaboradoresClient")
+  >("../api/colaboradoresClient");
+  return {
+    ...actual,
+    buscarColaborador: vi.fn(),
+    listarVinculosDoColaborador: vi.fn(),
+  };
+});
+
+vi.mock("../api/documentosClient", async () => {
+  const actual = await vi.importActual<
+    typeof import("../api/documentosClient")
+  >("../api/documentosClient");
+  return {
+    ...actual,
+    listarTiposDocumento: vi.fn(),
+    listarDocumentos: vi.fn(),
+    listarSolicitacoesDocumento: vi.fn(),
+  };
+});
+
 vi.mock("../api/horariosClient", async () => {
   const actual = await vi.importActual<typeof import("../api/horariosClient")>(
     "../api/horariosClient",
@@ -201,6 +236,11 @@ beforeEach(() => {
     listarCentrosCusto,
     listarAreas,
     listarCargos,
+    buscarColaborador,
+    listarVinculosDoColaborador,
+    listarTiposDocumento,
+    listarDocumentos,
+    listarSolicitacoesDocumento,
   ]) {
     vi.mocked(leitura).mockRejectedValue(new Error("rede") as never);
   }
@@ -1084,6 +1124,123 @@ describe("T163/T189 — contexto empresarial ativo", () => {
     await waitFor(() =>
       expect(document.activeElement?.id).toBe("colaboradores-titulo"),
     );
+  });
+
+  describe("T201 — ficha na aba Documentos", () => {
+    const ANA_ID = "11111111-1111-4111-8111-111111111111";
+    const ROTA = `#/pessoas/colaboradores/${ANA_ID}/documentos`;
+    const TIPO = {
+      id: "t-rg",
+      empresaId: EMPRESA_ALFA.id,
+      codigo: "RG",
+      nome: "Identidade (teste)",
+      classificacao: "restrito",
+      criadoEm: "2026-01-01T00:00:00.000Z",
+      atualizadoEm: "2026-01-01T00:00:00.000Z",
+    };
+    const DOC = {
+      id: "d-1",
+      empresaId: EMPRESA_ALFA.id,
+      colaboradorId: ANA_ID,
+      tipoDocumentoId: TIPO.id,
+      estado: "upload_desabilitado" as const,
+      substituiDocumentoId: null,
+      criadoEm: "2026-03-10T12:00:00.000Z",
+      atualizadoEm: "2026-03-10T12:00:00.000Z",
+    };
+    const paginado = <T,>(itens: T[]) => ({
+      itens,
+      pagina: 1,
+      tamanhoPagina: 20,
+      total: itens.length,
+    });
+
+    function anaNaEmpresaAlfa() {
+      vi.mocked(buscarColaborador).mockResolvedValue({
+        id: ANA_ID,
+        nome: "Ana Sintética (teste)",
+        situacao: "ativo",
+        criadoEm: "2025-01-10T12:00:00.000Z",
+        atualizadoEm: "2025-01-10T12:00:00.000Z",
+      });
+      vi.mocked(listarVinculosDoColaborador).mockResolvedValue([
+        {
+          id: "33333333-3333-4333-8333-333333333333",
+          colaboradorId: ANA_ID,
+          empresaId: EMPRESA_ALFA.id,
+          matricula: "MAT-0001",
+          tipo: "clt",
+          situacao: "previsto",
+          dataAdmissao: "2025-01-10",
+          dataDesligamento: null,
+          criadoEm: "2025-01-10T12:00:00.000Z",
+          atualizadoEm: "2025-01-10T12:00:00.000Z",
+        },
+      ]);
+      vi.mocked(listarTiposDocumento).mockResolvedValue(paginado([TIPO]));
+      vi.mocked(listarSolicitacoesDocumento).mockResolvedValue(paginado([]));
+    }
+
+    it("troca de empresa com a leitura em curso: volta à listagem da empresa nova, e a resposta atrasada não aparece", async () => {
+      trocarParaBetaNoServidor();
+      anaNaEmpresaAlfa();
+      let entregar!: (v: ReturnType<typeof paginado<typeof DOC>>) => void;
+      vi.mocked(listarDocumentos).mockReturnValue(
+        new Promise((ok) => {
+          entregar = ok;
+        }),
+      );
+      window.history.replaceState(null, "", ROTA);
+      vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
+      render(<AutenticacaoApp />);
+      await screen.findByRole("tab", { name: "Documentos", selected: true });
+      await waitFor(() => expect(listarDocumentos).toHaveBeenCalledTimes(1));
+
+      await trocarPeloMenuPara("Empresa Beta");
+      await waitFor(() =>
+        expect(seletorDoMenu()).toHaveTextContent("Empresa Beta"),
+      );
+      await waitFor(() =>
+        expect(window.location.hash).toBe("#/pessoas/colaboradores"),
+      );
+      expect(document.querySelector(".ficha-colaborador")).toBeNull();
+
+      await act(async () => {
+        entregar(paginado([DOC]));
+      });
+      const main = document.getElementById("conteudo-principal")!;
+      expect(main.textContent).not.toMatch(
+        /Identidade \(teste\)|Documentos registrados/,
+      );
+      expect(listarDocumentos).toHaveBeenCalledTimes(1);
+    });
+
+    it("tipo escolhido e não salvo: a troca de empresa pergunta antes, e continuar mantém a escolha", async () => {
+      trocarParaBetaNoServidor();
+      anaNaEmpresaAlfa();
+      vi.mocked(listarDocumentos).mockResolvedValue(paginado([DOC]));
+      window.history.replaceState(null, "", ROTA);
+      vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
+      render(<AutenticacaoApp />);
+      fireEvent.click(
+        await screen.findByRole("button", { name: "Registrar documento" }),
+      );
+      fireEvent.change(screen.getByLabelText(/^Tipo do documento/), {
+        target: { value: TIPO.id },
+      });
+
+      await trocarPeloMenuPara("Empresa Beta");
+      expect(
+        await screen.findByText(
+          /Há edição em andamento em: Ficha do colaborador\./,
+        ),
+      ).toBeInTheDocument();
+      fireEvent.click(
+        screen.getByRole("button", { name: "Continuar editando" }),
+      );
+      expect(trocarEmpresaDoContexto).not.toHaveBeenCalled();
+      expect(screen.getByLabelText(/^Tipo do documento/)).toHaveValue(TIPO.id);
+    });
   });
 
   it("T199 — dashboard com aba, página e filtros na URL: a troca limpa tudo e volta a Ativos", async () => {

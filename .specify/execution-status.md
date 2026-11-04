@@ -2818,11 +2818,20 @@ correção no lugar.
 
 **Fora de escopo:** guarda global de navegação do shell, "Referência técnica", exportação, ausências, férias, escala, organograma, CPF, salário, contatos na visão coletiva, documentos, R2, foto, portal, benefícios, pesquisas, comentários, schema, migration, RBAC novo, seed, Docker, dependências, promoção e merge.
 
-## Guarda global de edição pendente — T200 (em implementação)
+## Guarda global de edição pendente — T200 (integrada)
 
-| Tarefa | Estado               | Resultado principal                                                                                                  |
-| ------ | -------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| T200   | **Em implementação** | Guarda de saída única no shell para edição pendente: menu, Hub, Sair, abas internas, voltar/avançar, rota e recarga. |
+| Tarefa | Estado                                    | Resultado principal                                                                                                  |
+| ------ | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| T200   | **Integrada** (PR #193, squash `9fd3427`) | Guarda de saída única no shell para edição pendente: menu, Hub, Sair, abas internas, voltar/avançar, rota e recarga. |
+
+**Observação de relatório:** a integração funcional da T200 está concluída
+(CI de push 3/3 verde, run 41817085354); a única pendência administrativa era
+a sua convergência no Spec Kit, resolvida no primeiro commit da T201. As
+correções das revisões adversariais (B1 a B14) foram feitas dentro da entrega.
+Continuam como observações, sem decisão de mudança, as da seção 14 do dossiê:
+nova navegação no meio da reversão, URL atual, hash digitado no Hub, correção
+de URL no meio da reversão, voltar a partir da primeira tela aberta pelo Hub e
+salvamento em andamento só com prova automatizada.
 
 **Escopo da T200:** a guarda global de navegação do shell, gate de produção do
 módulo Pessoas registrado desde a T198, conforme o
@@ -2849,6 +2858,36 @@ aplicação com `pushState`, sem recarga. Observações e limites constam na se�
 funcional só há uma aba.
 
 **Fora de escopo:** painel de Segurança, portal demonstrativo "Minhas solicitações", granularidade fina, rascunho automático, edições entre abas, API, schema, migration, RBAC, auditoria, Docker, seed, dependências, lockfile, workflows, promoção e merge.
+
+## Ficha do colaborador funcional — T201 (em implementação)
+
+| Tarefa | Estado                                     | Resultado principal                                                                                                 |
+| ------ | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| T201   | **Em implementação** (entrega em PR Draft) | Aba Documentos na ficha individual: registros e solicitações de documento só da pessoa, na empresa ativa da sessão. |
+
+**Escopo da T201:** as decisões F-1 a F-8 do
+[dossiê](../docs/decisions/t201-dossie-ficha-colaborador-funcional.md), aprovadas
+em 2026-11-04, e a entrega da seção 11:
+
+- aba `documentos` com URL própria, recarga, voltar e avançar;
+- RH e DP registram, corrigem o tipo e solicitam, pelos contratos que já existiam;
+- o `master_tecnico` só lê, e sem empresa ativa a aba não lê nada;
+- só o registro, sem arquivo;
+- foco, anúncios, estados de falha com nova tentativa e respostas atrasadas;
+- guarda de saída da área `ficha`;
+- 375 px.
+
+**Fora de escopo:**
+
+- abas Solicitações e Ponto, e operações na Vida funcional;
+- arquivo, upload, download, visualização e foto;
+- salário, benefícios, férias, ausências, pesquisas, comentários, portal e convite;
+- mudança nas visões da empresa em Pessoas;
+- API, schema, migration, RBAC, auditoria, Docker, seed, dependências, lockfile e workflows;
+- promoção e merge.
+
+**Histórico da preparação:** o dossiê e as decisões foram preparados sem código de
+produto, sem push e sem PR; isso valeu só para aquela fase.
 
 ## Próxima ação autorizável
 
