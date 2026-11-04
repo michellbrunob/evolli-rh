@@ -567,14 +567,22 @@ export function DocumentosColaboradorSecao({
     </p>
   ) : null;
 
-  if (sessao.tipo !== "pronta") {
+  // Enquanto não há listas (sessão ou conteúdo carregando, sem empresa, ou
+  // falha), um ramo só, com a mesma estrutura: o status "Carregando…" é o
+  // MESMO nó da sessão ao conteúdo — desmontá-lo e montá-lo de novo
+  // anunciaria a mesma carga duas vezes.
+  if (sessao.tipo !== "pronta" || conteudo.tipo !== "dados") {
+    const carregando =
+      sessao.tipo === "carregando" ||
+      (sessao.tipo === "pronta" && conteudo.tipo === "carregando");
     return (
       <section
         className="ficha-colaborador__cartao documentos-colaborador"
         aria-labelledby={ids.titulo}
       >
         {cabecalho}
-        {sessao.tipo === "carregando" ? (
+        {avisoDeGravacao}
+        {carregando ? (
           <p role="status">Carregando documentos…</p>
         ) : sessao.tipo === "sem-empresa" ? (
           <div className="documentos-colaborador__orientacao">
@@ -587,36 +595,21 @@ export function DocumentosColaboradorSecao({
               misturados. Use o seletor de empresa do menu.
             </p>
           </div>
-        ) : (
+        ) : sessao.tipo === "erro" ? (
           <FalhaComNovaTentativa
             id={ids.novaTentativa}
             falha={sessao}
             texto="Não foi possível conferir o seu acesso aos documentos."
             onTentar={() => void carregarSessao(true)}
           />
-        )}
-      </section>
-    );
-  }
-
-  if (conteudo.tipo !== "dados") {
-    return (
-      <section
-        className="ficha-colaborador__cartao documentos-colaborador"
-        aria-labelledby={ids.titulo}
-      >
-        {cabecalho}
-        {avisoDeGravacao}
-        {conteudo.tipo === "carregando" ? (
-          <p role="status">Carregando documentos…</p>
-        ) : (
+        ) : conteudo.tipo === "erro" ? (
           <FalhaComNovaTentativa
             id={ids.novaTentativa}
             falha={conteudo}
             texto="Não foi possível carregar os documentos."
             onTentar={() => void carregarConteudo(true)}
           />
-        )}
+        ) : null}
       </section>
     );
   }

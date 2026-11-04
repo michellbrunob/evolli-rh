@@ -1,9 +1,9 @@
 # T201 — Dossiê: ficha do colaborador funcional
 
 **Situação:** decisões F-1 a F-8 aprovadas pela proprietária em 2026-11-04;
-primeira fatia (aba Documentos) implementada e validada localmente — ver a
-seção 11. Sem API, schema, migration, RBAC, auditoria, seed ou dependência
-nova.
+primeira fatia (aba Documentos) em implementação, com a entrega em PR Draft —
+ver a seção 11. Sem API, schema, migration, RBAC, auditoria, seed ou
+dependência nova.
 
 **Base:** `main` em `9fd3427` (T200 integrada, PR #193). A ficha individual
 nasceu na T198 ([dossiê](t198-dossie-ficha-unificada-colaborador.md)) e recebeu
@@ -171,10 +171,11 @@ Nenhuma capacidade bloqueada aparece na tela, nem como aba vazia (D21).
 - **Reaproveitamento:** a tela de Documentos de Pessoas fixada no colaborador,
   como já foi feito com Dados contratuais na T198. O seletor de colaborador
   some e o colaborador vem da rota.
-- **Guarda de saída:** o formulário declara "Documentos" no registro de
-  edições (já é uma das 16 declarações da T200). Dentro da ficha, a aba fica na
-  área `ficha`: sair da ficha com o formulário aberto pergunta; trocar de aba
-  não desmonta e não pergunta.
+- **Guarda de saída:** a edição da aba conta como edição da área `ficha`
+  ("Ficha do colaborador"). Há edição pendente só quando um tipo está
+  escolhido e não foi salvo (ou há gravação em curso): aí sair da ficha ou
+  trocar de empresa pergunta. Formulário aberto e vazio não pergunta. Trocar
+  de aba não desmonta e não pergunta.
 
 ### 5.2 O que não entra
 
@@ -191,20 +192,22 @@ Documentos de Pessoas.
 
 ## 6. Riscos
 
-| Risco                        | Cuidado na implementação                                                                                                                                                                                                                                                                  |
-| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Isolamento entre empresas    | O colaborador vem só da rota e todo pedido leva `colaboradorId`; o servidor filtra pela empresa da sessão e responde 404 fora do escopo. A troca de empresa remonta a árvore (T163) e a guarda da T189 continua valendo. Nenhum dado de outra empresa pode ficar em cache entre montagens |
-| `master_tecnico` sem empresa | A leitura global de documentos não filtra por empresa. Na ficha, isso misturaria documentos de empresas diferentes da mesma pessoa. Decidir em F-4 (recomendado: pedir empresa ativa para a aba)                                                                                          |
-| Foco                         | Abrir a aba pela URL foca o painel, como as demais. Fechar um formulário devolve o foco a quem o abriu. Nunca foco no `body` nem em `[inert]` (regras da T200)                                                                                                                            |
-| URL por aba                  | `documentos` entra em `ABAS_DA_FICHA`, e a rota antiga continua válida. Uma aba desconhecida não é rota (cai na correção no lugar). Voltar e avançar entre abas seguem a T200                                                                                                             |
-| Acessibilidade               | A aba nova entra no `tablist` com setas, Home e End. Tabelas com legenda, estados vazios que explicam e oferecem a próxima ação só a quem pode agir, e mensagens de erro anunciadas                                                                                                       |
-| 375 px                       | Com cinco abas a faixa precisa rolar dentro do quadro, sem rolagem horizontal da página. As tabelas usam o padrão responsivo de `DataTable`                                                                                                                                               |
-| Expectativa de arquivo       | O nome "Documentos" sugere arquivo. O estado `upload_desabilitado` precisa ser dito em linguagem simples, sem parecer erro                                                                                                                                                                |
+| Risco                        | Cuidado na implementação                                                                                                                                                                                                                                                                                  |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Isolamento entre empresas    | O colaborador vem só da rota e todo pedido leva `colaboradorId`; o servidor filtra pela empresa da sessão e responde 404 fora do escopo. A troca de empresa remonta a árvore (T163) e a guarda da T189 continua valendo. Nenhum dado de outra empresa pode ficar em cache entre montagens                 |
+| `master_tecnico` sem empresa | A leitura global de documentos não filtra por empresa. Na ficha, isso misturaria documentos de empresas diferentes da mesma pessoa. Decidido em F-4: sem empresa ativa, a aba aparece com orientação para escolher a empresa, sem consulta e sem dados; com empresa ativa, lê só o escopo daquela empresa |
+| Foco                         | Abrir a ficha pela URL da aba leva o foco ao título principal da ficha (h1), como nas demais abas; trocar de aba mantém o foco na aba ativada. Fechar um formulário devolve o foco a quem o abriu. Nunca foco no `body` nem em `[inert]` (regras da T200)                                                 |
+| URL por aba                  | `documentos` entra em `ABAS_DA_FICHA`, e a rota antiga continua válida. Uma aba desconhecida não é rota (cai na correção no lugar). Voltar e avançar entre abas seguem a T200                                                                                                                             |
+| Acessibilidade               | A aba nova entra no `tablist` com setas, Home e End. Tabelas com legenda, estados vazios que explicam e oferecem a próxima ação só a quem pode agir, e mensagens de erro anunciadas                                                                                                                       |
+| 375 px                       | Até 40rem (375 px), as cinco abas ficam em grade de duas colunas, e a quinta ocupa a linha inteira, sem rolagem horizontal da página. As tabelas rolam no próprio quadro                                                                                                                                  |
+| Expectativa de arquivo       | O nome "Documentos" sugere arquivo. O estado `upload_desabilitado` precisa ser dito em linguagem simples, sem parecer erro                                                                                                                                                                                |
 
 ## 7. Critérios de aceite
 
-1. A aba Documentos aparece na ficha para RH, DP e `master_tecnico` (com
-   empresa ativa). O gestor e os demais perfis continuam sem ficha.
+1. A aba Documentos aparece na ficha para RH, DP e `master_tecnico`. Sem
+   empresa ativa, o `master_tecnico` vê a aba com a orientação para escolher a
+   empresa, sem consulta nem dados; com empresa ativa, lê só o escopo daquela
+   empresa. O gestor e os demais perfis continuam sem ficha.
 2. A URL `…/:colaboradorId/documentos` abre a ficha nessa aba; recarregar,
    voltar e avançar funcionam como nas outras abas.
 3. A lista mostra só documentos e solicitações deste colaborador, na empresa
@@ -212,8 +215,12 @@ Documentos de Pessoas.
 4. RH e DP registram, corrigem o tipo e solicitam; o `master_tecnico` não vê
    ação de escrita; recusa do servidor vira mensagem, sem dado.
 5. Nenhum controle de arquivo (envio, download, visualização) existe na aba.
-6. Formulário aberto e saída da ficha pedem confirmação; troca de aba não pede.
-7. A 375 px não há rolagem horizontal da página; foco e anúncios corretos.
+6. Com um tipo escolhido e não salvo, sair da ficha ou trocar de empresa pede
+   confirmação; formulário aberto e vazio não pede; troca de aba não pede.
+7. Até 40rem (375 px), as abas ficam em grade de duas colunas, com a quinta na
+   linha inteira, sem rolagem horizontal da página. Na rota direta, o foco vai
+   ao título da ficha; na troca de aba, fica na aba; cada evento é anunciado
+   uma vez.
 8. As visões da empresa em Pessoas continuam iguais.
 
 ## 8. Plano de testes
@@ -260,8 +267,13 @@ Ponto entrarem; F-5 e F-8 mantêm o que já existia.
 
 ## 10. Limites e fora de escopo
 
-- **Nesta etapa:** nenhum código de produto, API, schema, migration, RBAC,
-  auditoria, Docker, seed, dependências, lockfile ou workflow; sem push e sem PR.
+- **Na etapa de preparação (histórico):** nenhum código de produto, API,
+  schema, migration, RBAC, auditoria, Docker, seed, dependências, lockfile ou
+  workflow; sem push e sem PR. Isso valeu só para a preparação: a primeira
+  fatia foi implementada depois da aprovação de F-1 a F-8 e está em entrega por
+  PR Draft (seção 11).
+- **Na entrega da primeira fatia:** sem API, schema, migration, RBAC,
+  auditoria, Docker, seed, dependências, lockfile ou workflow.
 - **Na primeira fatia:** só a aba Documentos (seção 5). Ficam de fora:
   - as candidatas Solicitações, Ponto e Vida funcional operável;
   - tudo o que está bloqueado na seção 4.3;
@@ -343,12 +355,22 @@ Ponto entrarem; F-5 e F-8 mantêm o que já existia.
   coletiva: dentro da ficha, a edição pendente é da ficha, como as das demais
   abas.
 
+Foco na rota direta, grade de abas a 375 px, guarda só com tipo escolhido e a
+aba do `master_tecnico` sem empresa ativa não são desvios: são o comportamento
+descrito nas seções 5.1, 6 e 7 e coberto por testes.
+
 ### 11.3 Defeito encontrado na validação e corrigido
 
 No navegador, a 1024 px, a aba criava rolagem horizontal da página: o texto
 só para leitor do "Corrigir tipo" (posição absoluta) escapava do quadro
 rolável da tabela. O quadro da ficha (`.ficha-colaborador__quadro`) passou a
 ser posicionado. O teste que confere a regra falha sem a correção.
+
+Na revisão da PR, o aviso "Carregando documentos…" (`role="status"`) era
+desmontado e montado de novo na passagem de "sessão carregando" para
+"conteúdo carregando", o que anunciaria a mesma carga duas vezes. Os estados
+sem listas passaram a um ramo só, com o mesmo nó de status do começo ao fim
+da carga. O teste que confere o mesmo nó falha com a estrutura anterior.
 
 ### 11.4 Observação (fora do escopo)
 
@@ -357,12 +379,13 @@ A trilha da ficha ("Colaboradores") tem alvo de toque menor que 44 px a
 
 ### 11.5 Testes e validação
 
-- **Web:** `DocumentosColaboradorSecao.test.tsx` (29 casos), cobrindo:
+- **Web:** `DocumentosColaboradorSecao.test.tsx` (30 casos), cobrindo:
   - leitura e isolamento;
   - papéis, com e sem empresa ativa;
   - registrar, corrigir e solicitar;
   - recusas 403, 404, 409 e 422 e falha de rede;
-  - carga, falha e nova tentativa;
+  - carga (um só nó de status da sessão ao conteúdo), falha e nova
+    tentativa;
   - resposta atrasada e desmontagem;
   - paginação;
   - guarda;
@@ -384,7 +407,8 @@ A trilha da ficha ("Colaboradores") tem alvo de toque menor que 44 px a
   - `master_tecnico` operando;
   - sem foco após releitura falha;
   - sem a edição da aba na guarda;
-  - sem o quadro posicionado.
+  - sem o quadro posicionado;
+  - status de carga desmontado e montado de novo (estrutura anterior).
 - **Localhost** (banco isolado, dados sintéticos):
   - RH: registrar, corrigir e solicitar;
   - DP: solicitar;

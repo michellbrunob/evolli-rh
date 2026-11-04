@@ -2859,11 +2859,11 @@ funcional só há uma aba.
 
 **Fora de escopo:** painel de Segurança, portal demonstrativo "Minhas solicitações", granularidade fina, rascunho automático, edições entre abas, API, schema, migration, RBAC, auditoria, Docker, seed, dependências, lockfile, workflows, promoção e merge.
 
-## Ficha do colaborador funcional — T201 (implementada, local)
+## Ficha do colaborador funcional — T201 (em implementação)
 
-| Tarefa | Estado                                 | Resultado principal                                                                                                 |
-| ------ | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| T201   | **Implementada e validada localmente** | Aba Documentos na ficha individual: registros e solicitações de documento só da pessoa, na empresa ativa da sessão. |
+| Tarefa | Estado                                     | Resultado principal                                                                                                 |
+| ------ | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| T201   | **Em implementação** (entrega em PR Draft) | Aba Documentos na ficha individual: registros e solicitações de documento só da pessoa, na empresa ativa da sessão. |
 
 **Escopo da T201:** as decisões F-1 a F-8 do
 [dossiê](../docs/decisions/t201-dossie-ficha-colaborador-funcional.md), aprovadas
@@ -2884,7 +2884,10 @@ em 2026-11-04, e a entrega da seção 11:
 - salário, benefícios, férias, ausências, pesquisas, comentários, portal e convite;
 - mudança nas visões da empresa em Pessoas;
 - API, schema, migration, RBAC, auditoria, Docker, seed, dependências, lockfile e workflows;
-- push, PR, promoção e merge.
+- promoção e merge.
+
+**Histórico da preparação:** o dossiê e as decisões foram preparados sem código de
+produto, sem push e sem PR; isso valeu só para aquela fase.
 
 ## Próxima ação autorizável
 

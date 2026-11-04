@@ -3044,9 +3044,11 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       entre abas, migração do diálogo da troca de empresa, promoção e merge.
 
 98. **T201 - Ficha do colaborador funcional: aba Documentos**
-    - **Estado:** **implementada e validada localmente**, sem push e sem PR. Branch
+    - **Estado:** **em implementação** (entrega em PR Draft). Branch
       `codex/t201-ficha-colaborador-funcional`, a partir do squash
-      `9fd3427daa40067f6de6af4c35843f4e38e85ad2` (T200 integrada, PR #193).
+      `9fd3427daa40067f6de6af4c35843f4e38e85ad2` (T200 integrada, PR #193). A preparação
+      (dossiê e decisões) foi feita antes, sem código de produto, sem push e sem PR; isso
+      valeu só para aquela fase.
     - **Objetivo:** a ficha individual concentra o que é de uma pessoa, e a listagem de
       Colaboradores continua coletiva e enxuta. A primeira fatia é a aba Documentos, conforme o
       [dossiê](../docs/decisions/t201-dossie-ficha-colaborador-funcional.md).
@@ -3068,7 +3070,8 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       - respostas atrasadas descartadas;
       - edição pendente na guarda da área `ficha`;
       - 375 px sem rolagem horizontal; o quadro de tabela da ficha passou a ser posicionado
-        (defeito achado na validação).
+        (defeito achado na validação);
+      - um só nó de status durante a carga, da sessão ao conteúdo (achado da revisão).
       - Sem API, schema, migration, RBAC, auditoria, Docker, seed, dependência ou workflow.
     - **Fora de escopo:**
       - abas Solicitações e Ponto, e operações na Vida funcional;

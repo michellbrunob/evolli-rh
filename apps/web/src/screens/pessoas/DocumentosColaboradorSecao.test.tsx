@@ -599,6 +599,38 @@ describe("T201 — ações de RH e DP (contratos existentes)", () => {
 });
 
 describe("T201 — carga, falha, nova tentativa e atraso", () => {
+  it("B3: de 'sessão carregando' a 'conteúdo carregando', o mesmo nó de status fica montado (um anúncio só)", async () => {
+    const sessao = adiada<SafeAccessUserApi>();
+    vi.mocked(obterUsuarioAtual).mockReturnValue(sessao.promessa);
+    const documentos =
+      adiada<ReturnType<typeof paginado<DocumentoMetadadoApi>>>();
+    vi.mocked(listarDocumentos).mockReturnValue(documentos.promessa);
+    render(<Secao />);
+
+    // Sessão carregando: um único status.
+    const statusDaSessao = screen.getByRole("status");
+    expect(statusDaSessao).toHaveTextContent("Carregando documentos…");
+    expect(listarDocumentos).not.toHaveBeenCalled();
+
+    // A sessão chega: a seção passa a ler o conteúdo, ainda carregando.
+    await act(async () => {
+      sessao.resolver(ator());
+    });
+    await waitFor(() => expect(listarDocumentos).toHaveBeenCalledTimes(1));
+    const statusDoConteudo = screen.getAllByRole("status");
+    expect(statusDoConteudo).toHaveLength(1);
+    // O mesmo nó: não foi desmontado e montado de novo (anúncio repetido).
+    expect(statusDoConteudo[0]).toBe(statusDaSessao);
+    expect(statusDaSessao).toBeInTheDocument();
+    expect(statusDaSessao).toHaveTextContent("Carregando documentos…");
+
+    await act(async () => {
+      documentos.resolver(paginado([documento()]));
+    });
+    expect(await tabelaDocumentos()).toBeInTheDocument();
+    expect(screen.queryByText("Carregando documentos…")).toBeNull();
+  });
+
   it("carga anunciada; falha com alerta e nova tentativa que mantém o foco no botão; sucesso foca o título", async () => {
     const primeira =
       adiada<ReturnType<typeof paginado<DocumentoMetadadoApi>>>();
