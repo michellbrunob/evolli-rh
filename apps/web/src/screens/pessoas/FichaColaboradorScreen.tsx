@@ -30,9 +30,7 @@ import type { KeyboardEvent } from "react";
 import {
   Button,
   DataTable,
-  FormActions,
   FormField,
-  Modal,
   StatusBadge,
   TrilhaNavegacao,
 } from "../../components";
@@ -56,7 +54,12 @@ import {
 } from "../../api/vinculoHorarioClient";
 import { destinoPorId, tituloDoGrupoDe } from "../../app/mapaNavegacao";
 import { type AbaDaFicha, ABAS_DA_FICHA } from "../../app/rotasDoShell";
-import { useEdicaoEmAndamento } from "../../app/edicoesPendentes";
+import {
+  AREAS_DE_EDICAO,
+  AreaDeEdicao,
+  useEdicaoEmAndamento,
+} from "../../app/edicoesPendentes";
+import { useGuardaDeSaida } from "../../app/guardaDeSaida";
 import { formatarDiaCivil } from "../../format/data";
 import { exibirMatricula } from "../../format/matricula";
 import { ContatosColaboradorSecao } from "./ContatosColaboradorSecao";
@@ -220,7 +223,19 @@ export interface FichaColaboradorScreenProps {
   readonly hoje?: string;
 }
 
-export function FichaColaboradorScreen({
+/**
+ * T200 — a ficha é uma área de edição própria: fechá-la (trilha, voltar do
+ * navegador) desmonta só ela, e a guarda pergunta só pelo que está aqui.
+ */
+export function FichaColaboradorScreen(props: FichaColaboradorScreenProps) {
+  return (
+    <AreaDeEdicao id={AREAS_DE_EDICAO.ficha}>
+      <FichaColaboradorConteudo {...props} />
+    </AreaDeEdicao>
+  );
+}
+
+function FichaColaboradorConteudo({
   colaboradorId,
   aba,
   onTrocarAba,
@@ -266,7 +281,6 @@ export function FichaColaboradorScreen({
   const [salvandoDadosPessoais, setSalvandoDadosPessoais] = useState(false);
   const [jornadaAlterada, setJornadaAlterada] = useState(false);
   const [salvandoJornada, setSalvandoJornada] = useState(false);
-  const [confirmandoSaida, setConfirmandoSaida] = useState(false);
 
   const colaborador = estado.tipo === "dados" ? estado.colaborador : null;
   const vinculos = estado.tipo === "dados" ? estado.vinculos : [];
@@ -545,13 +559,15 @@ export function FichaColaboradorScreen({
   }
 
   // ---- Voltar ---------------------------------------------------------------
+  // T200 — a confirmação de saída é a do shell (diálogo único): com edição
+  // pendente na ficha, ele pergunta; com salvamento, bloqueia e diz por quê.
+  // Só as edições da ficha contam: a listagem fica montada por baixo.
+  const guarda = useGuardaDeSaida();
   function pedirVoltar() {
-    if (salvando) return;
-    if (alterada) {
-      setConfirmandoSaida(true);
-      return;
-    }
-    onVoltar();
+    guarda.solicitarSaida({
+      area: AREAS_DE_EDICAO.ficha,
+      executar: onVoltar,
+    });
   }
 
   // ---- Trilha ---------------------------------------------------------------
@@ -1060,33 +1076,6 @@ export function FichaColaboradorScreen({
           </section>
         ) : null,
       )}
-
-      <Modal
-        aberto={confirmandoSaida}
-        titulo="Sair da ficha sem salvar?"
-        descricao="Há alterações não salvas nesta ficha. Saindo agora, elas serão descartadas."
-        onFechar={() => setConfirmandoSaida(false)}
-      >
-        <FormActions>
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={() => setConfirmandoSaida(false)}
-          >
-            Continuar editando
-          </Button>
-          <Button
-            type="button"
-            variant="primary"
-            onClick={() => {
-              setConfirmandoSaida(false);
-              onVoltar();
-            }}
-          >
-            Sair sem salvar
-          </Button>
-        </FormActions>
-      </Modal>
     </div>
   );
 }

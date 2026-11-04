@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "constitutionVersion": "1.4.0",
-  "lastConvergedAt": "2026-10-30",
-  "lastIntegratedTask": 198,
-  "lastRecordedTask": 199,
+  "lastConvergedAt": "2026-11-03",
+  "lastIntegratedTask": 199,
+  "lastRecordedTask": 200,
   "platformDecision": {
     "adr": "docs/adr/0014-evolli-plataforma-base-e-encerramento-do-frappe.md",
     "decidedAt": "2026-10-01",
@@ -11,15 +11,15 @@
     "frappe": "encerrado_como_candidato_referencia_apenas"
   },
   "nextTask": {
-    "id": "T199",
-    "status": "dashboard_colaboradores_em_implementacao",
-    "reason": "T198 integrada em main pela PR #191 (squash cfcd901f7f1e3e6684c3e5a818994e96570d367f), com a CI de push 3/3 verde (run 41114960659). A T199 transforma a listagem de Colaboradores num dashboard (docs/decisions/t199-dossie-dashboard-colaboradores.md): indicadores reais calculados no servidor (ativos, em admissao, desligados, total no escopo e ativos por tipo de vinculo); abas Ativos, Em admissao, Desligados, Todos e Jornada de trabalho; tabela com abertura da ficha da T198; aba, pagina e ids de filtros na URL, sem o texto da busca. Decisoes D-1 a D-6 aprovadas. Extensao minima da listagem; sem schema, migration, RBAC novo, seed ou dependencia."
+    "id": "T200",
+    "status": "guarda_navegacao_edicao_pendente_em_implementacao",
+    "reason": "T199 integrada em main pela PR #192 (squash 6b3d24d72e080cbf9cce59f6246715b2bfb84b5e), com a CI de push 3/3 verde (run 41646155827). A T200 implementa a guarda global de edicao pendente aprovada em G-1 a G-8 (docs/decisions/t200-dossie-guarda-navegacao-edicao-pendente.md): ponto unico de saida no shell, dialogo unico da Evolli para menu lateral, Hub, Sair, abas internas, voltar/avancar e rota digitada, aviso nativo so com pendencia, indice proprio em history.state, aviso de perda apos sessao encerrada por fora e a troca de empresa mantida na T189. Sem API, schema, migration, RBAC, auditoria, seed ou dependencia."
   },
   "openDeliveries": [
     {
-      "id": "T199",
+      "id": "T200",
       "pullRequest": null,
-      "status": "dashboard_colaboradores_em_implementacao"
+      "status": "guarda_navegacao_edicao_pendente_em_implementacao"
     }
   ],
   "requiredArtifacts": [

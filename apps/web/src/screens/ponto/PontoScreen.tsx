@@ -21,6 +21,8 @@
  */
 import { useEffect, useState } from "react";
 import type { EstadoDestino } from "../../app/mapaNavegacao";
+import { AREAS_DE_EDICAO, AreaDeEdicao } from "../../app/edicoesPendentes";
+import { useGuardaDeSaida } from "../../app/guardaDeSaida";
 import {
   VISAO_PERIODO_TITULO_ID,
   VisaoPeriodoScreen,
@@ -148,6 +150,7 @@ export function PontoScreen({
   // o contêiner nunca abre numa aba que ele mesmo não lista.
   const abas = ABAS.filter((aba) => aba.estado === modo);
   const [abaAtiva, setAbaAtiva] = useState<AbaPonto>(abas[0]!.id);
+  const guarda = useGuardaDeSaida();
 
   const definicaoAtiva = abas.find((aba) => aba.id === abaAtiva) ?? abas[0]!;
 
@@ -177,7 +180,16 @@ export function PontoScreen({
                   ? "ponto-screen__tab ponto-screen__tab--ativa"
                   : "ponto-screen__tab"
               }
-              onClick={() => setAbaAtiva(aba.id)}
+              onClick={() =>
+                // T200 — a aba anterior desmonta: com edição pendente nela,
+                // a guarda do shell pergunta antes.
+                aba.id === abaAtiva
+                  ? undefined
+                  : guarda.solicitarSaida({
+                      area: AREAS_DE_EDICAO.painelPonto,
+                      executar: () => setAbaAtiva(aba.id),
+                    })
+              }
             >
               {aba.rotulo}
             </button>
@@ -191,23 +203,25 @@ export function PontoScreen({
         aria-labelledby={`ponto-tab-${definicaoAtiva.id}`}
         className="ponto-screen__panel"
       >
-        {abaAtiva === "periodo" ? (
-          <VisaoPeriodoScreen />
-        ) : abaAtiva === "verificar_folhas" ? (
-          <VerificarFolhasScreen />
-        ) : abaAtiva === "banco_horas" ? (
-          <BancoHorasScreen />
-        ) : abaAtiva === "ajustes_manuais" ? (
-          <AjustesManuaisScreen />
-        ) : abaAtiva === "fechamento_espelho" ? (
-          <FechamentoEspelhoScreen />
-        ) : abaAtiva === "escalas_jornadas" ? (
-          <EscalasJornadasScreen />
-        ) : abaAtiva === "inconsistencias" ? (
-          <InconsistenciasScreen />
-        ) : (
-          <JustificativasScreen />
-        )}
+        <AreaDeEdicao id={AREAS_DE_EDICAO.painelPonto}>
+          {abaAtiva === "periodo" ? (
+            <VisaoPeriodoScreen />
+          ) : abaAtiva === "verificar_folhas" ? (
+            <VerificarFolhasScreen />
+          ) : abaAtiva === "banco_horas" ? (
+            <BancoHorasScreen />
+          ) : abaAtiva === "ajustes_manuais" ? (
+            <AjustesManuaisScreen />
+          ) : abaAtiva === "fechamento_espelho" ? (
+            <FechamentoEspelhoScreen />
+          ) : abaAtiva === "escalas_jornadas" ? (
+            <EscalasJornadasScreen />
+          ) : abaAtiva === "inconsistencias" ? (
+            <InconsistenciasScreen />
+          ) : (
+            <JustificativasScreen />
+          )}
+        </AreaDeEdicao>
       </div>
     </div>
   );

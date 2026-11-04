@@ -1,11 +1,13 @@
 import {
   act,
   fireEvent,
-  render,
+  render as renderSemGuarda,
   screen,
   waitFor,
   within,
+  type RenderOptions,
 } from "@testing-library/react";
+import { ComGuardaDeSaida } from "../../test/ComGuardaDeSaida";
 import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useState } from "react";
@@ -2223,12 +2225,19 @@ describe("ColaboradoresScreen (T169 — contatos do colaborador)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Salvar contatos" }));
 
     await within(secao).findByRole("button", { name: "Salvando…" });
-    // A ficha fica TRAVADA, não apenas pedindo confirmação: voltar não abre
-    // a confirmação nem sai. (Sem a trava, o mesmo clique abriria a
-    // confirmação — há edição não salva —, e o teste falharia aqui.)
+    // T200 — com o salvamento em andamento, a saída fica BLOQUEADA: a guarda
+    // do shell diz por quê e não oferece descarte (sem a trava, o mesmo
+    // clique perguntaria "Sair sem salvar?" — há edição não salva).
     voltarDaFicha();
-    expect(screen.queryByRole("alertdialog")).toBeNull();
+    const aguarde = screen.getByRole("alertdialog", {
+      name: "Aguarde o salvamento terminar",
+    });
+    expect(
+      within(aguarde).queryByRole("button", { name: "Sair sem salvar" }),
+    ).toBeNull();
     expect(screen.queryByText(/alterações não salvas/i)).toBeNull();
+    fireEvent.click(within(aguarde).getByRole("button", { name: "Entendi" }));
+    expect(screen.queryByRole("alertdialog")).toBeNull();
     expect(
       screen.getByRole("region", { name: "Contatos" }),
     ).toBeInTheDocument();
@@ -6206,3 +6215,14 @@ describe("T199 (revisão B6/B7) — foco nos filtros, nos chips e na recarga dos
     expect(anuncioDaLista()?.textContent).toBe("");
   });
 });
+
+/**
+ * T200 — as telas montadas como no shell: com o registro de edições e a
+ * guarda de saída (sem ela, a saída não pergunta).
+ */
+function render(
+  ui: Parameters<typeof renderSemGuarda>[0],
+  opcoes?: Omit<RenderOptions, "wrapper">,
+) {
+  return renderSemGuarda(ui, { wrapper: ComGuardaDeSaida, ...opcoes });
+}

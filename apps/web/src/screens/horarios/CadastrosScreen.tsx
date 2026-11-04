@@ -30,6 +30,8 @@
  */
 import { useEffect, useState } from "react";
 import type { EstadoDestino } from "../../app/mapaNavegacao";
+import { AREAS_DE_EDICAO, AreaDeEdicao } from "../../app/edicoesPendentes";
+import { useGuardaDeSaida } from "../../app/guardaDeSaida";
 import {
   CALENDARIO_FERIADOS_TITULO_ID,
   CalendarioFeriadosScreen,
@@ -190,6 +192,7 @@ export function CadastrosScreen({
   // o contêiner nunca abre numa aba que ele mesmo não lista.
   const abas = ABAS.filter((aba) => aba.estado === modo);
   const [abaAtiva, setAbaAtiva] = useState<AbaCadastros>(abas[0]!.id);
+  const guarda = useGuardaDeSaida();
 
   const definicaoAtiva = abas.find((aba) => aba.id === abaAtiva) ?? abas[0]!;
 
@@ -219,7 +222,16 @@ export function CadastrosScreen({
                   ? "cadastros-screen__tab cadastros-screen__tab--ativa"
                   : "cadastros-screen__tab"
               }
-              onClick={() => setAbaAtiva(aba.id)}
+              onClick={() =>
+                // T200 — a aba anterior desmonta: com edição pendente nela,
+                // a guarda do shell pergunta antes.
+                aba.id === abaAtiva
+                  ? undefined
+                  : guarda.solicitarSaida({
+                      area: AREAS_DE_EDICAO.painelCadastros,
+                      executar: () => setAbaAtiva(aba.id),
+                    })
+              }
             >
               {aba.rotulo}
             </button>
@@ -233,27 +245,29 @@ export function CadastrosScreen({
         aria-labelledby={`cadastros-tab-${definicaoAtiva.id}`}
         className="cadastros-screen__panel"
       >
-        {abaAtiva === "estrutura" ? (
-          <EstruturaOrganizacionalScreen podeOperar={podeOperar} />
-        ) : abaAtiva === "feriados" ? (
-          <CalendarioFeriadosScreen />
-        ) : abaAtiva === "politicas_bh" ? (
-          <PoliticasBancoHorasScreen />
-        ) : abaAtiva === "funcoes_cargos" ? (
-          <FuncoesCargosScreen podeOperar={podeOperar} />
-        ) : abaAtiva === "motivos_ausencia_justificativas" ? (
-          <MotivosAusenciaJustificativasScreen />
-        ) : abaAtiva === "centros_custo" ? (
-          <CentrosCustoScreen podeOperar={podeOperar} />
-        ) : abaAtiva === "tipos_documento" ? (
-          <TiposDocumentoScreen />
-        ) : abaAtiva === "motivos_desligamento" ? (
-          <MotivosDesligamentoScreen />
-        ) : abaAtiva === "escolaridade" ? (
-          <EscolaridadeScreen />
-        ) : (
-          <CidadesLocalidadesScreen />
-        )}
+        <AreaDeEdicao id={AREAS_DE_EDICAO.painelCadastros}>
+          {abaAtiva === "estrutura" ? (
+            <EstruturaOrganizacionalScreen podeOperar={podeOperar} />
+          ) : abaAtiva === "feriados" ? (
+            <CalendarioFeriadosScreen />
+          ) : abaAtiva === "politicas_bh" ? (
+            <PoliticasBancoHorasScreen />
+          ) : abaAtiva === "funcoes_cargos" ? (
+            <FuncoesCargosScreen podeOperar={podeOperar} />
+          ) : abaAtiva === "motivos_ausencia_justificativas" ? (
+            <MotivosAusenciaJustificativasScreen />
+          ) : abaAtiva === "centros_custo" ? (
+            <CentrosCustoScreen podeOperar={podeOperar} />
+          ) : abaAtiva === "tipos_documento" ? (
+            <TiposDocumentoScreen />
+          ) : abaAtiva === "motivos_desligamento" ? (
+            <MotivosDesligamentoScreen />
+          ) : abaAtiva === "escolaridade" ? (
+            <EscolaridadeScreen />
+          ) : (
+            <CidadesLocalidadesScreen />
+          )}
+        </AreaDeEdicao>
       </div>
     </div>
   );

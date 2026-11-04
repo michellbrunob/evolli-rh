@@ -192,6 +192,7 @@ import {
 } from "./SeletorDeReferencia";
 import "./NovaAdmissaoScreen.css";
 import { useEdicaoEmAndamento } from "../../app/edicoesPendentes";
+import { useGuardaDeSaida } from "../../app/guardaDeSaida";
 
 export const NOVA_ADMISSAO_TITULO_ID = "nova-admissao-titulo";
 
@@ -471,10 +472,14 @@ const MENSAGEM_FALHA_AO_PREPARAR_APOS_INCERTO =
  * final) ou de 422 `idempotencia_conteudo_divergente`, um envio anterior pode
  * ter sido registrado, e o texto não afirma nem nega gravação.
  */
-const DESCARTE_SEM_ENVIO_INCERTO =
-  "Os dados digitados nesta página serão perdidos. Nada foi salvo.";
-const DESCARTE_COM_ENVIO_INCERTO =
-  "Os dados digitados nesta página serão descartados. Um envio anterior pode ter sido registrado: confira em Colaboradores.";
+/**
+ * T179/T200 — a frase a mais que a Nova admissão declara para o diálogo único
+ * da guarda, em qualquer saída: sem envio incerto, é certo que nada foi
+ * salvo; com ele, descartar a página não desfaz o que pode ter sido gravado.
+ */
+const AVISO_NADA_SALVO = "Nada da Nova admissão foi salvo.";
+const AVISO_ENVIO_INCERTO =
+  "Um envio anterior da Nova admissão pode ter sido registrado: confira em Colaboradores.";
 
 /** Limpa o erro do campo em correção e preserva os demais, inclusive `geral`. */
 function semErroDe(erros: Erros, ...campos: CampoErro[]): Erros {
@@ -800,7 +805,6 @@ export function NovaAdmissaoScreen({
   const [confirmando, setConfirmando] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [admissao, setAdmissao] = useState<AdmissaoRegistradaApi | null>(null);
-  const [confirmandoDescarte, setConfirmandoDescarte] = useState(false);
   /**
    * T179 — o servidor disse que a chave deste envio já registrou uma admissão
    * com OUTRO conteúdo (422 `idempotencia_conteudo_divergente`). Toda nova
@@ -1033,9 +1037,12 @@ export function NovaAdmissaoScreen({
   // T189 — o cadastro com dados digitados e ainda não registrado é edição
   // pendente; o envio, salvamento em andamento. A troca de empresa pergunta
   // antes de descartar, e espera o envio terminar.
+  // T200 — e toda saída do shell, pelo diálogo único, com a frase da T179
+  // sobre o que pode (ou não) ter sido gravado.
   useEdicaoEmAndamento("Nova admissão", {
     pendente: alterado && admissao === null,
     salvando,
+    aviso: envioIncerto ? AVISO_ENVIO_INCERTO : AVISO_NADA_SALVO,
   });
 
   function atualizarPerfil(campo: ChavePerfil, valor: string) {
@@ -1506,13 +1513,12 @@ export function NovaAdmissaoScreen({
     }
   }
 
+  // T200 — a confirmação de descarte é a do shell (diálogo único): com
+  // edição pendente, ele pergunta; com envio em andamento, bloqueia e diz
+  // por quê. Sem nada digitado, sai direto.
+  const guarda = useGuardaDeSaida();
   function pedirCancelamento() {
-    if (salvando) return;
-    if (alterado) {
-      setConfirmandoDescarte(true);
-      return;
-    }
-    onSair();
+    guarda.solicitarSaida({ executar: onSair });
   }
 
   function recomecar() {
@@ -2766,37 +2772,6 @@ export function NovaAdmissaoScreen({
           }
         />
       ) : null}
-
-      {/* Confirmação de descarte: é confirmação curta, o uso de modal que a
-          decisão do `DP-FLX-21` mantém. O cadastro em si nunca abre em modal. */}
-      <Modal
-        aberto={confirmandoDescarte}
-        titulo="Descartar esta admissão?"
-        descricao={
-          envioIncerto ? DESCARTE_COM_ENVIO_INCERTO : DESCARTE_SEM_ENVIO_INCERTO
-        }
-        onFechar={() => setConfirmandoDescarte(false)}
-      >
-        <FormActions>
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={() => setConfirmandoDescarte(false)}
-          >
-            Continuar preenchendo
-          </Button>
-          <Button
-            type="button"
-            variant="primary"
-            onClick={() => {
-              setConfirmandoDescarte(false);
-              onSair();
-            }}
-          >
-            Descartar e sair
-          </Button>
-        </FormActions>
-      </Modal>
     </div>
   );
 }

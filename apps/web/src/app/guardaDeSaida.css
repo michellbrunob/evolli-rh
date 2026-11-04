@@ -1,0 +1,74 @@
+/**
+ * T200 — diálogo da guarda de saída. Mesma família visual do aviso de
+ * empresa alterada (T189): camada fixa sobre a página, caixa central e ações
+ * que quebram linha no celular. Só tokens.
+ */
+.guarda-saida {
+  position: fixed;
+  inset: 0;
+  z-index: 110;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-lg);
+}
+
+.guarda-saida__fundo {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--color-ink) 45%, transparent);
+}
+
+.guarda-saida__caixa {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  width: 100%;
+  max-width: 34rem;
+  max-height: calc(100dvh - 2 * var(--space-lg));
+  overflow-y: auto;
+  padding: var(--space-lg);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+  background: var(--surface-canvas);
+  min-width: 0;
+}
+
+.guarda-saida__titulo {
+  margin: 0;
+  font-size: var(--text-lead);
+  font-weight: var(--weight-bold);
+}
+
+.guarda-saida__texto p {
+  margin: 0 0 var(--space-xs);
+  overflow-wrap: anywhere;
+}
+
+.guarda-saida__telas {
+  margin: 0 0 var(--space-xs);
+  padding-left: var(--space-lg);
+  overflow-wrap: anywhere;
+}
+
+.guarda-saida__acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+.guarda-saida__acoes .evolli-button {
+  max-width: 100%;
+  white-space: normal;
+}
+
+@media (max-width: 640px) {
+  .guarda-saida {
+    padding: var(--space-sm);
+  }
+
+  .guarda-saida__acoes .evolli-button {
+    width: 100%;
+  }
+}

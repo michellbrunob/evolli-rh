@@ -2778,11 +2778,21 @@ próprias (seção 13.4 do dossiê).
 
 **Fora de escopo:** foto, portal, salários, férias e ausências, benefícios, documentos, upload, R2, pesquisas, comentários, exportação, API nova, schema, migration, RBAC, seed, Docker, dependências, promoção e merge.
 
-## Dashboard de Colaboradores — T199 (em implementação)
+## Dashboard de Colaboradores — T199 (integrada)
 
-| Tarefa | Estado               | Resultado principal                                                                                           |
-| ------ | -------------------- | ------------------------------------------------------------------------------------------------------------- |
-| T199   | **Em implementação** | Dashboard de Colaboradores: indicadores reais, abas funcionais, tabela com abertura da ficha e estado na URL. |
+| Tarefa | Estado                                    | Resultado principal                                                                                           |
+| ------ | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| T199   | **Integrada** (PR #192, squash `6b3d24d`) | Dashboard de Colaboradores: indicadores reais, abas funcionais, tabela com abertura da ficha e estado na URL. |
+
+**Observação de relatório:** a integração funcional da T199 está concluída
+(CI de push 3/3 verde, run 41646155827); a única pendência administrativa era
+a sua convergência no Spec Kit, resolvida no primeiro commit da T200. As
+correções das revisões (estados de exceção, foco e anúncios nas ações de
+recuperação, filtros e chips que não perdem o foco) foram feitas dentro da
+entrega. Continuam como observações, sem decisão de mudança: custo da
+distribuição por tipo, total teórico do escopo global, limite de 100 itens nos
+catálogos, abas em largura média e a conferência de um id novo na URL durante
+uma recarga de catálogo.
 
 **Escopo da T199:** a listagem de Colaboradores vira dashboard (o
 [dossiê](../docs/decisions/t199-dossie-dashboard-colaboradores.md)):
@@ -2807,6 +2817,38 @@ em Ativos e Todos; ids da URL conferidos nos catálogos antes da consulta, com
 correção no lugar.
 
 **Fora de escopo:** guarda global de navegação do shell, "Referência técnica", exportação, ausências, férias, escala, organograma, CPF, salário, contatos na visão coletiva, documentos, R2, foto, portal, benefícios, pesquisas, comentários, schema, migration, RBAC novo, seed, Docker, dependências, promoção e merge.
+
+## Guarda global de edição pendente — T200 (em implementação)
+
+| Tarefa | Estado               | Resultado principal                                                                                                  |
+| ------ | -------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| T200   | **Em implementação** | Guarda de saída única no shell para edição pendente: menu, Hub, Sair, abas internas, voltar/avançar, rota e recarga. |
+
+**Escopo da T200:** a guarda global de navegação do shell, gate de produção do
+módulo Pessoas registrado desde a T198, conforme o
+[dossiê](../docs/decisions/t200-dossie-guarda-navegacao-edicao-pendente.md):
+um ponto único (`solicitarSaida`) chamado pelo menu lateral, Hub, Sair, abas
+internas que desmontam, voltar/avançar, rota digitada e, pelo aviso nativo,
+recarregar e fechar a aba; um diálogo único da Evolli, para o qual migram as
+confirmações da ficha e da Nova admissão. As 16 telas que declaram edição
+ficam cobertas (seção 13).
+
+**Decisões aprovadas (2026-11-03):** G-1 a G-8 (seção 11 do dossiê): opção B;
+aviso nativo só com pendência ou salvamento; troca de empresa segue no diálogo
+da T189; granularidade atual; salvamento em andamento bloqueia sem descarte e
+sem seguir sozinho; Segurança e portal demonstrativo fora; sessão encerrada por
+fora sai e avisa a perda; o diálogo lista os rótulos das telas.
+
+**Entrega:** seção 14 do dossiê — áreas de edição no registro da T189, índice
+próprio em `history.state` para desfazer e refazer a navegação do navegador
+sem entrada duplicada, edições locais à aba (nada no `BroadcastChannel`) e aviso
+de perda no login. Quando uma âncora ou rota digitada com o diálogo aberto
+tiver apagado o destino aceito, a URL é recriada como entrada da própria
+aplicação com `pushState`, sem recarga. Observações e limites constam na seção
+14 do dossiê. A troca de aba do Ponto fica guardada, mas dormente: no modo
+funcional só há uma aba.
+
+**Fora de escopo:** painel de Segurança, portal demonstrativo "Minhas solicitações", granularidade fina, rascunho automático, edições entre abas, API, schema, migration, RBAC, auditoria, Docker, seed, dependências, lockfile, workflows, promoção e merge.
 
 ## Próxima ação autorizável
 

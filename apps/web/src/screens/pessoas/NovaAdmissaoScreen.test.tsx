@@ -17,11 +17,13 @@
 import {
   act,
   fireEvent,
-  render,
+  render as renderSemGuarda,
   screen,
   waitFor,
   within,
+  type RenderOptions,
 } from "@testing-library/react";
+import { ComGuardaDeSaida } from "../../test/ComGuardaDeSaida";
 import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NovaAdmissaoScreen } from "./NovaAdmissaoScreen";
@@ -383,7 +385,7 @@ describe("Nova admissão — página própria", () => {
       name: "Formulário de nova admissão",
     });
     expect(form.closest("[role='dialog']")).toBeNull();
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
   });
 
   it("mostra a empresa ativa só para leitura, sem controle para trocá-la", async () => {
@@ -2164,7 +2166,7 @@ describe("Nova admissão — cancelar", () => {
     fireEvent.change(pais(), { target: { value: "Argentina" } });
     fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
     expect(
-      screen.getByRole("dialog", { name: "Descartar esta admissão?" }),
+      screen.getByRole("alertdialog", { name: "Sair sem salvar?" }),
     ).toBeInTheDocument();
     expect(onSair).not.toHaveBeenCalled();
   });
@@ -2175,7 +2177,7 @@ describe("Nova admissão — cancelar", () => {
     await escolher(cargoSel(), cargo);
     fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
     expect(
-      screen.getByRole("dialog", { name: "Descartar esta admissão?" }),
+      screen.getByRole("alertdialog", { name: "Sair sem salvar?" }),
     ).toBeInTheDocument();
     expect(onSair).not.toHaveBeenCalled();
   });
@@ -2185,7 +2187,7 @@ describe("Nova admissão — cancelar", () => {
     await aguardarEmpresa();
     fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
     expect(onSair).toHaveBeenCalledTimes(1);
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
   });
 
   it("com dados, pede confirmação; continuar mantém tudo", async () => {
@@ -2193,22 +2195,20 @@ describe("Nova admissão — cancelar", () => {
     await aguardarEmpresa();
     fireEvent.change(nome(), { target: { value: "Pessoa Sintética" } });
     fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
-    const confirmacao = screen.getByRole("dialog", {
-      name: "Descartar esta admissão?",
+    const confirmacao = screen.getByRole("alertdialog", {
+      name: "Sair sem salvar?",
     });
     // T176 — "Nada foi salvo", e não "Nada foi enviado": depois de uma
     // tentativa recusada, algo FOI enviado; o que não houve foi gravação.
-    expect(confirmacao).toHaveAccessibleDescription(
-      "Os dados digitados nesta página serão perdidos. Nada foi salvo.",
-    );
+    expect(confirmacao).toHaveAccessibleDescription(DESCARTE_COMUM);
     expect(confirmacao).not.toHaveTextContent(/Nada foi enviado/);
     fireEvent.click(
       within(confirmacao).getByRole("button", {
-        name: "Continuar preenchendo",
+        name: "Continuar editando",
       }),
     );
     expect(onSair).not.toHaveBeenCalled();
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
     expect(nome()).toHaveValue("Pessoa Sintética");
   });
 
@@ -2223,8 +2223,8 @@ describe("Nova admissão — cancelar", () => {
     await waitFor(() => expect(matricula()).toHaveFocus());
     fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
     expect(
-      screen.getByRole("dialog", { name: "Descartar esta admissão?" }),
-    ).toHaveAccessibleDescription(/Nada foi salvo\.$/);
+      screen.getByRole("alertdialog", { name: "Sair sem salvar?" }),
+    ).toHaveAccessibleDescription(DESCARTE_COMUM);
   });
 
   it("com dados, descartar sai sem enviar nada", async () => {
@@ -2232,7 +2232,7 @@ describe("Nova admissão — cancelar", () => {
     await aguardarEmpresa();
     fireEvent.change(matricula(), { target: { value: "MAT-1" } });
     fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
-    fireEvent.click(screen.getByRole("button", { name: "Descartar e sair" }));
+    fireEvent.click(screen.getByRole("button", { name: "Sair sem salvar" }));
     expect(onSair).toHaveBeenCalledTimes(1);
     expect(admitirColaborador).not.toHaveBeenCalled();
   });
@@ -2740,14 +2740,16 @@ describe("T178 — CEP: o que faz com a resposta", () => {
 // telefone sem excedente, matrícula só de espaços fora do corpo.
 // ---------------------------------------------------------------------------
 
+// T200 — o diálogo único da guarda: a lista das telas, o descarte e a frase
+// que a Nova admissão declara (T179: certo que nada foi salvo, ou incerto).
 const DESCARTE_COMUM =
-  "Os dados digitados nesta página serão perdidos. Nada foi salvo.";
+  /^Há alterações não salvas em: Nova admissão Saindo agora, elas serão descartadas\. Nada da Nova admissão foi salvo\.$/;
 const DESCARTE_INCERTO =
-  "Os dados digitados nesta página serão descartados. Um envio anterior pode ter sido registrado: confira em Colaboradores.";
+  /^Há alterações não salvas em: Nova admissão Saindo agora, elas serão descartadas\. Um envio anterior da Nova admissão pode ter sido registrado: confira em Colaboradores\.$/;
 
 describe("T179 (revisão final) — descarte depois de envio incerto", () => {
   const dialogoDescarte = () =>
-    screen.getByRole("dialog", { name: "Descartar esta admissão?" });
+    screen.getByRole("alertdialog", { name: "Sair sem salvar?" });
 
   it("cancelamento comum: 'Nada foi salvo.'", async () => {
     montar();
@@ -2769,9 +2771,9 @@ describe("T179 (revisão final) — descarte depois de envio incerto", () => {
     fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
     const dialogo = dialogoDescarte();
     expect(dialogo).toHaveAccessibleDescription(DESCARTE_INCERTO);
-    expect(dialogo).not.toHaveTextContent(/Nada foi salvo/);
+    expect(dialogo).not.toHaveTextContent(/Nada da Nova admissão foi salvo/);
     fireEvent.click(
-      within(dialogo).getByRole("button", { name: "Descartar e sair" }),
+      within(dialogo).getByRole("button", { name: "Sair sem salvar" }),
     );
     expect(onSair).toHaveBeenCalledTimes(1);
   });
@@ -2790,7 +2792,7 @@ describe("T179 (revisão final) — descarte depois de envio incerto", () => {
     );
     const dialogo = dialogoDescarte();
     expect(dialogo).toHaveAccessibleDescription(DESCARTE_INCERTO);
-    expect(dialogo).not.toHaveTextContent(/Nada foi salvo/);
+    expect(dialogo).not.toHaveTextContent(/Nada da Nova admissão foi salvo/);
   });
 
   it("a dúvida fica mesmo se a tentativa seguinte for recusada por 409", async () => {
@@ -2834,7 +2836,7 @@ describe("T179 (revisão final) — descarte depois de envio incerto", () => {
       fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
       const dialogo = dialogoDescarte();
       expect(dialogo).toHaveAccessibleDescription(DESCARTE_INCERTO);
-      expect(dialogo).not.toHaveTextContent(/Nada foi salvo/);
+      expect(dialogo).not.toHaveTextContent(/Nada da Nova admissão foi salvo/);
     },
   );
 
@@ -3032,7 +3034,7 @@ const MENSAGEM_PREPARO_APOS_INCERTO =
 
 describe("T179 (revisão final) — sessão expirada separada de envio incerto", () => {
   const dialogoDescarte = () =>
-    screen.getByRole("dialog", { name: "Descartar esta admissão?" });
+    screen.getByRole("alertdialog", { name: "Sair sem salvar?" });
 
   /** O formulário segue como foi preenchido por `preencherValido`. */
   function esperarFormularioPreservado() {
@@ -3097,7 +3099,7 @@ describe("T179 (revisão final) — sessão expirada separada de envio incerto",
     expect(descricaoDoDescarte()).toHaveAccessibleDescription(DESCARTE_COMUM);
     fireEvent.click(
       within(dialogoDescarte()).getByRole("button", {
-        name: "Continuar preenchendo",
+        name: "Continuar editando",
       }),
     );
     await salvarEConfirmar();
@@ -3207,13 +3209,13 @@ describe("T179 (revisão final) — sessão expirada separada de envio incerto",
       const alerta = await screen.findByText(texto);
       await waitFor(() => expect(alerta).toHaveFocus());
       expect(document.body).not.toHaveTextContent(
-        /não foi gravado|não foi enviado|Nada foi salvo/,
+        /não foi gravado|não foi enviado|Nada foi salvo|Nada da Nova admissão foi salvo/,
       );
       esperarFormularioPreservado();
       const dialogo = descricaoDoDescarte();
       expect(dialogo).toHaveAccessibleDescription(DESCARTE_INCERTO);
       fireEvent.click(
-        within(dialogo).getByRole("button", { name: "Continuar preenchendo" }),
+        within(dialogo).getByRole("button", { name: "Continuar editando" }),
       );
       // A chave é a mesma em todas as tentativas: reconfirmar não duplica.
       await salvarEConfirmar();
@@ -4479,11 +4481,11 @@ describe("T195 — cancelar e recomeçar", () => {
     await preencherValido();
     irAteEtapa("Endereço");
     fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
-    const dialogo = await screen.findByRole("dialog", {
-      name: "Descartar esta admissão?",
+    const dialogo = await screen.findByRole("alertdialog", {
+      name: "Sair sem salvar?",
     });
     fireEvent.click(
-      within(dialogo).getByRole("button", { name: "Continuar preenchendo" }),
+      within(dialogo).getByRole("button", { name: "Continuar editando" }),
     );
     expect(tituloDaEtapa()).toHaveTextContent(/Endereço$/);
     expect(nome()).toHaveValue("  Pessoa Sintética Nova ");
@@ -5274,3 +5276,14 @@ describe("T197 — criação inline de referências na Nova admissão", () => {
     );
   });
 });
+
+/**
+ * T200 — as telas montadas como no shell: com o registro de edições e a
+ * guarda de saída (sem ela, a saída não pergunta).
+ */
+function render(
+  ui: Parameters<typeof renderSemGuarda>[0],
+  opcoes?: Omit<RenderOptions, "wrapper">,
+) {
+  return renderSemGuarda(ui, { wrapper: ComGuardaDeSaida, ...opcoes });
+}

@@ -12,11 +12,13 @@
 import {
   act,
   fireEvent,
-  render,
+  render as renderSemGuarda,
   screen,
   waitFor,
   within,
+  type RenderOptions,
 } from "@testing-library/react";
+import { ComGuardaDeSaida } from "../test/ComGuardaDeSaida";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import { NOVA_ADMISSAO_TITULO_ID } from "../screens/pessoas";
@@ -449,18 +451,18 @@ describe("T178 — trilha de navegação", () => {
     fireEvent.click(
       within(trilha()).getByRole("button", { name: "Colaboradores" }),
     );
-    const confirmacao = await screen.findByRole("dialog", {
-      name: "Descartar esta admissão?",
+    const confirmacao = await screen.findByRole("alertdialog", {
+      name: "Sair sem salvar?",
     });
-    // "Continuar preenchendo" fica na página, com o que foi digitado.
+    // "Continuar editando" fica na página, com o que foi digitado.
     fireEvent.click(
       within(confirmacao).getByRole("button", {
-        name: "Continuar preenchendo",
+        name: "Continuar editando",
       }),
     );
     await waitFor(() =>
       expect(
-        screen.queryByRole("dialog", { name: "Descartar esta admissão?" }),
+        screen.queryByRole("alertdialog", { name: "Sair sem salvar?" }),
       ).not.toBeInTheDocument(),
     );
     expect(screen.getByLabelText(/Nome completo/)).toHaveValue(
@@ -474,8 +476,8 @@ describe("T178 — trilha de navegação", () => {
     );
     fireEvent.click(
       within(
-        await screen.findByRole("dialog", { name: "Descartar esta admissão?" }),
-      ).getByRole("button", { name: "Descartar e sair" }),
+        await screen.findByRole("alertdialog", { name: "Sair sem salvar?" }),
+      ).getByRole("button", { name: "Sair sem salvar" }),
     );
     expect(
       await screen.findByRole("heading", { level: 1, name: "Colaboradores" }),
@@ -835,7 +837,7 @@ describe("T176/T178 — da página à listagem e à ficha do admitido", () => {
       await screen.findByRole("heading", { level: 1, name: "Colaboradores" }),
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole("dialog", { name: "Descartar esta admissão?" }),
+      screen.queryByRole("alertdialog", { name: "Sair sem salvar?" }),
     ).not.toBeInTheDocument();
   });
 
@@ -980,3 +982,14 @@ describe("T179 — empresa sem referências, pelo papel que o shell conhece", ()
     },
   );
 });
+
+/**
+ * T200 — as telas montadas como no shell: com o registro de edições e a
+ * guarda de saída (sem ela, a saída não pergunta).
+ */
+function render(
+  ui: Parameters<typeof renderSemGuarda>[0],
+  opcoes?: Omit<RenderOptions, "wrapper">,
+) {
+  return renderSemGuarda(ui, { wrapper: ComGuardaDeSaida, ...opcoes });
+}
