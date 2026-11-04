@@ -3020,7 +3020,10 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       Pessoas, aba Jornada do dashboard, abas de Cadastros e do Ponto); diálogo
       `alertdialog` com "Continuar editando" como padrão e Escape, foco preso e devolvido;
       índice próprio em `history.state` para desfazer e refazer voltar/avançar e a rota
-      digitada sem entrada extra; `beforeunload` só com pendência ou salvamento; aviso de
+      digitada sem entrada duplicada (quando uma âncora ou rota digitada com o diálogo
+      aberto tiver apagado o destino aceito, a URL é recriada como entrada da própria
+      aplicação com `pushState`, sem recarga; observações e limites constam na seção 14
+      do dossiê); `beforeunload` só com pendência ou salvamento; aviso de
       perda no login após sessão encerrada por fora; as 16 telas que declaram edição cobertas
       (seção 13). Sem API, schema, migration, RBAC, auditoria, Docker, seed, dependência ou
       workflow.

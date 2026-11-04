@@ -2841,8 +2841,11 @@ fora sai e avisa a perda; o diálogo lista os rótulos das telas.
 
 **Entrega:** seção 14 do dossiê — áreas de edição no registro da T189, índice
 próprio em `history.state` para desfazer e refazer a navegação do navegador
-sem entrada extra, edições locais à aba (nada no `BroadcastChannel`) e aviso de
-perda no login. A troca de aba do Ponto fica guardada, mas dormente: no modo
+sem entrada duplicada, edições locais à aba (nada no `BroadcastChannel`) e aviso
+de perda no login. Quando uma âncora ou rota digitada com o diálogo aberto
+tiver apagado o destino aceito, a URL é recriada como entrada da própria
+aplicação com `pushState`, sem recarga. Observações e limites constam na seção
+14 do dossiê. A troca de aba do Ponto fica guardada, mas dormente: no modo
 funcional só há uma aba.
 
 **Fora de escopo:** painel de Segurança, portal demonstrativo "Minhas solicitações", granularidade fina, rascunho automático, edições entre abas, API, schema, migration, RBAC, auditoria, Docker, seed, dependências, lockfile, workflows, promoção e merge.
