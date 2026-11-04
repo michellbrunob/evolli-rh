@@ -36,6 +36,7 @@ import {
   listarSolicitacoesDocumento,
   listarTiposDocumento,
 } from "../api/documentosClient";
+import { listarPontosDoVinculo } from "../api/pontoClient";
 import {
   listarEmpresasDoContexto,
   trocarEmpresaDoContexto,
@@ -181,6 +182,16 @@ vi.mock("../api/colaboradoresClient", async () => {
   };
 });
 
+// T202 — a ficha aberta na aba Registros de ponto. Por padrão a leitura FALHA,
+// como falhava antes (fetch sem servidor); os testes da T202 a resolvem.
+vi.mock("../api/pontoClient", async () => {
+  const actual =
+    await vi.importActual<typeof import("../api/pontoClient")>(
+      "../api/pontoClient",
+    );
+  return { ...actual, listarPontosDoVinculo: vi.fn() };
+});
+
 vi.mock("../api/documentosClient", async () => {
   const actual = await vi.importActual<
     typeof import("../api/documentosClient")
@@ -241,6 +252,7 @@ beforeEach(() => {
     listarTiposDocumento,
     listarDocumentos,
     listarSolicitacoesDocumento,
+    listarPontosDoVinculo,
   ]) {
     vi.mocked(leitura).mockRejectedValue(new Error("rede") as never);
   }
@@ -1240,6 +1252,69 @@ describe("T163/T189 — contexto empresarial ativo", () => {
       );
       expect(trocarEmpresaDoContexto).not.toHaveBeenCalled();
       expect(screen.getByLabelText(/^Tipo do documento/)).toHaveValue(TIPO.id);
+    });
+
+    it("T202 — aba Registros de ponto com a leitura em curso: a troca volta à listagem da empresa nova e a resposta atrasada não aparece", async () => {
+      trocarParaBetaNoServidor();
+      anaNaEmpresaAlfa();
+      const momento = "2026-10-05T11:00:00.000Z";
+      let entregar!: (v: unknown) => void;
+      vi.mocked(listarPontosDoVinculo).mockReturnValue(
+        new Promise((ok) => {
+          entregar = ok;
+        }) as never,
+      );
+      const rotaPonto = `#/pessoas/colaboradores/${ANA_ID}/ponto/2026-10`;
+      window.history.replaceState(null, "", rotaPonto);
+      vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
+      render(<AutenticacaoApp />);
+      await screen.findByRole("tab", {
+        name: "Registros de ponto",
+        selected: true,
+      });
+      await waitFor(() =>
+        expect(listarPontosDoVinculo).toHaveBeenCalledTimes(1),
+      );
+
+      await trocarPeloMenuPara("Empresa Beta");
+      await waitFor(() =>
+        expect(seletorDoMenu()).toHaveTextContent("Empresa Beta"),
+      );
+      await waitFor(() =>
+        expect(window.location.hash).toBe("#/pessoas/colaboradores"),
+      );
+      expect(document.querySelector(".ficha-colaborador")).toBeNull();
+      // Sem edição pendente: a aba de ponto só lê, a troca não pergunta.
+      expect(screen.queryByText(/Há edição em andamento/)).toBeNull();
+
+      await act(async () => {
+        entregar({
+          itens: [
+            {
+              id: "e-1",
+              vinculoId: "33333333-3333-4333-8333-333333333333",
+              empresaId: EMPRESA_ALFA.id,
+              tipo: "entrada",
+              momento,
+              competencia: "2026-10",
+              registradoPorUserId: "u-1",
+              registradoEm: momento,
+              efetivo: {
+                tipo: "entrada",
+                momento,
+                anulado: false,
+                totalAjustes: 0,
+              },
+            },
+          ],
+          pagina: 1,
+          tamanhoPagina: 100,
+          total: 1,
+        });
+      });
+      const main = document.getElementById("conteudo-principal")!;
+      expect(main.textContent).not.toMatch(/05\/10\/2026|Registros de ponto/);
+      expect(listarPontosDoVinculo).toHaveBeenCalledTimes(1);
     });
   });
 

@@ -28,6 +28,10 @@
  * T201 — aba Documentos: registros e solicitações de documento só desta
  * pessoa, com os contratos da visão coletiva (ver
  * `DocumentosColaboradorSecao`). Só metadados; sem empresa ativa, nada é lido.
+ *
+ * T202 — aba Registros de ponto: só consulta, com a competência na rota (ver
+ * `RegistrosPontoColaboradorSecao`). Sem escrita, sem cálculo e sem edição
+ * pendente; sem empresa ativa, nada é lido.
  */
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
@@ -57,7 +61,11 @@ import {
   listarVinculosHorario,
 } from "../../api/vinculoHorarioClient";
 import { destinoPorId, tituloDoGrupoDe } from "../../app/mapaNavegacao";
-import { type AbaDaFicha, ABAS_DA_FICHA } from "../../app/rotasDoShell";
+import {
+  type AbaDaFicha,
+  ABAS_DA_FICHA,
+  competenciaDoMesAtual,
+} from "../../app/rotasDoShell";
 import {
   AREAS_DE_EDICAO,
   AreaDeEdicao,
@@ -70,6 +78,7 @@ import { ContatosColaboradorSecao } from "./ContatosColaboradorSecao";
 import { DadosContratuaisScreen } from "./DadosContratuaisScreen";
 import { DadosPessoaisColaboradorSecao } from "./DadosPessoaisColaboradorSecao";
 import { DocumentosColaboradorSecao } from "./DocumentosColaboradorSecao";
+import { RegistrosPontoColaboradorSecao } from "./RegistrosPontoColaboradorSecao";
 import { JornadaColaboradorSecao } from "./JornadaColaboradorSecao";
 import {
   type AlvoHistoricoFuncional,
@@ -90,6 +99,7 @@ export const ROTULO_DA_ABA: Readonly<Record<AbaDaFicha, string>> = {
   contratuais: "Dados contratuais",
   jornada: "Jornada de trabalho",
   documentos: "Documentos",
+  ponto: "Registros de ponto",
 };
 
 /** Ícone de cada aba (desenho próprio, ao lado do rótulo). */
@@ -99,6 +109,7 @@ const ICONE_DA_ABA: Readonly<Record<AbaDaFicha, IconeFichaId>> = {
   contratuais: "contratuais",
   jornada: "jornada",
   documentos: "documentos",
+  ponto: "ponto",
 };
 
 /**
@@ -216,6 +227,10 @@ export interface FichaColaboradorScreenProps {
   readonly aba: AbaDaFicha;
   /** Pede outra aba: o shell troca a rota, e a nova aba volta por `aba`. */
   readonly onTrocarAba: (aba: AbaDaFicha) => void;
+  /** T202 — a competência da aba de ponto (`AAAA-MM`), vinda da rota. */
+  readonly competencia?: string;
+  /** T202 — pede outra competência: o shell troca a rota. */
+  readonly onTrocarCompetencia?: (competencia: string) => void;
   /** Volta à listagem de Colaboradores. */
   readonly onVoltar: () => void;
   /** T181 — dados pessoais, endereço e contatos editáveis (RH e DP). */
@@ -246,6 +261,8 @@ function FichaColaboradorConteudo({
   colaboradorId,
   aba,
   onTrocarAba,
+  competencia,
+  onTrocarCompetencia,
   onVoltar,
   podeEditarFicha = false,
   podeOperarJornada = false,
@@ -975,7 +992,7 @@ function FichaColaboradorConteudo({
             hidden={a !== aba}
             className="ficha-colaborador__painel"
           >
-            {/* Vida funcional, Jornada e Documentos já abrem com o próprio título (h2);
+            {/* Vida funcional, Jornada, Documentos e Registros de ponto já abrem com o próprio título (h2);
                 as outras abas reúnem várias seções, e o h2 as agrupa para
                 quem navega por títulos. */}
             {a === "dados" || a === "contratuais" ? (
@@ -1075,6 +1092,15 @@ function FichaColaboradorConteudo({
             ) : a === "contratuais" ? (
               <DadosContratuaisScreen
                 colaborador={{ id: colaboradorId, nome }}
+              />
+            ) : a === "ponto" ? (
+              <RegistrosPontoColaboradorSecao
+                colaboradorId={colaboradorId}
+                nomeColaborador={nome}
+                vinculos={vinculos}
+                vinculoPrincipalId={principal?.id ?? null}
+                competencia={competencia ?? competenciaDoMesAtual()}
+                onTrocarCompetencia={(c) => onTrocarCompetencia?.(c)}
               />
             ) : a === "documentos" ? (
               <DocumentosColaboradorSecao

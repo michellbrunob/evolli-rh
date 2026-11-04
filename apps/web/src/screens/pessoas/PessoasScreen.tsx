@@ -190,6 +190,8 @@ export interface PessoasScreenProps {
   onAbrirFicha?: (colaboradorId: string) => void;
   /** T198 — outra aba da ficha: o shell troca a rota. */
   onTrocarAbaDaFicha?: (aba: AbaDaFicha) => void;
+  /** T202 — outra competência da aba de ponto: o shell troca a rota. */
+  onTrocarCompetenciaDaFicha?: (competencia: string) => void;
   /** T198 — volta da ficha à listagem: o shell troca a rota. */
   onFecharFicha?: () => void;
   /** T176 — "Completar contatos" da Nova admissão: foco nos contatos. */
@@ -223,6 +225,7 @@ export function PessoasScreen({
   ficha = null,
   onAbrirFicha,
   onTrocarAbaDaFicha,
+  onTrocarCompetenciaDaFicha,
   onFecharFicha,
   focarContatosNaFicha = false,
   onNovaAdmissao,
@@ -393,6 +396,12 @@ export function PessoasScreen({
           colaboradorId={ficha.colaboradorId}
           aba={ficha.aba}
           onTrocarAba={(aba) => onTrocarAbaDaFicha?.(aba)}
+          {...(ficha.competencia !== undefined
+            ? { competencia: ficha.competencia }
+            : {})}
+          onTrocarCompetencia={(competencia) =>
+            onTrocarCompetenciaDaFicha?.(competencia)
+          }
           onVoltar={() => onFecharFicha?.()}
           podeEditarFicha={podeEditarFicha}
           podeOperarJornada={podeOperarJornada}

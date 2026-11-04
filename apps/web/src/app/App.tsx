@@ -117,6 +117,8 @@ import {
   ESTADO_INICIAL_DA_LISTAGEM,
   destinoDaRota,
   ehFragmentoDeRota,
+  competenciaDoMesAtual,
+  competenciaValida,
   fichaDaRota,
   listagemDaRota,
   rotaDaFicha,
@@ -357,6 +359,8 @@ function conteudoDoDestino(
     readonly focarContatos: boolean;
     readonly onAbrir: (colaboradorId: string) => void;
     readonly onTrocarAba: (aba: AbaDaFicha) => void;
+    /** T202 — outra competência da aba de ponto: o shell troca a rota. */
+    readonly onTrocarCompetencia: (competencia: string) => void;
     readonly onFechar: () => void;
     /** T199 — o estado do dashboard de Colaboradores, guardado na URL. */
     readonly listagem: EstadoDaListagem;
@@ -403,6 +407,7 @@ function conteudoDoDestino(
         focarContatosNaFicha={fichaDoColaborador.focarContatos}
         onAbrirFicha={fichaDoColaborador.onAbrir}
         onTrocarAbaDaFicha={fichaDoColaborador.onTrocarAba}
+        onTrocarCompetenciaDaFicha={fichaDoColaborador.onTrocarCompetencia}
         onFecharFicha={fichaDoColaborador.onFechar}
         listagem={fichaDoColaborador.listagem}
         onListagemChange={fichaDoColaborador.onListagemChange}
@@ -875,7 +880,27 @@ export function App({
     setFicha({ colaboradorId, aba: "dados" });
   }, []);
   const trocarAbaDaFicha = useCallback((aba: AbaDaFicha) => {
-    setFicha((atual) => (atual ? { ...atual, aba } : atual));
+    // T202 — a aba de ponto abre na última competência vista nesta ficha ou,
+    // na primeira vez, no mês corrente (P-4).
+    setFicha((atual) =>
+      atual
+        ? {
+            ...atual,
+            aba,
+            ...(aba === "ponto"
+              ? { competencia: atual.competencia ?? competenciaDoMesAtual() }
+              : {}),
+          }
+        : atual,
+    );
+  }, []);
+  // T202 — trocar de mês é navegação: empilha uma entrada (voltar e avançar
+  // percorrem os meses). Competência fora do formato não vira rota.
+  const trocarCompetenciaDaFicha = useCallback((competencia: string) => {
+    if (!competenciaValida(competencia)) return;
+    setFicha((atual) =>
+      atual && atual.aba === "ponto" ? { ...atual, competencia } : atual,
+    );
   }, []);
   const fecharFicha = useCallback(() => {
     setFocarContatosNaFicha(false);
@@ -1527,6 +1552,7 @@ export function App({
               focarContatos: focarContatosNaFicha,
               onAbrir: abrirFicha,
               onTrocarAba: trocarAbaDaFicha,
+              onTrocarCompetencia: trocarCompetenciaDaFicha,
               onFechar: fecharFicha,
               listagem,
               onListagemChange: mudarListagem,
