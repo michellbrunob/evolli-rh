@@ -16,6 +16,7 @@ export type IconeFichaId =
   | "contratuais"
   | "jornada"
   | "documentos"
+  | "ponto"
   | "calendario"
   | "estrutura"
   | "cracha";
@@ -56,6 +57,14 @@ const TRACOS: Readonly<Record<IconeFichaId, ReactNode>> = {
     <>
       <path d="M2.75 5.25a1.5 1.5 0 0 1 1.5-1.5h3.5l1.75 2h6.25a1.5 1.5 0 0 1 1.5 1.5v7.5a1.5 1.5 0 0 1-1.5 1.5H4.25a1.5 1.5 0 0 1-1.5-1.5z" />
       <path d="M2.75 8.75h14.5" />
+    </>
+  ),
+  // T202 — registro de ponto: um cartão com marcas de horário.
+  ponto: (
+    <>
+      <rect x="3.25" y="3.25" width="13.5" height="13.5" rx="1.5" />
+      <path d="M6.5 7h7M6.5 10h7M6.5 13h4" />
+      <circle cx="14" cy="13" r="0.75" />
     </>
   ),
   // Calendário: uma data.

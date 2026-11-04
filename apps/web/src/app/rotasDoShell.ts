@@ -60,6 +60,9 @@ export function rotaDoDestino(destinoId: string): string | null {
  *
  * T201 — "documentos": registros e solicitações de documento da pessoa, só
  * metadados (ADR 0011).
+ *
+ * T202 — "ponto": registros de ponto da pessoa, só consulta, com a
+ * competência (mês) na rota (`…/ponto/AAAA-MM`).
  */
 export const ABAS_DA_FICHA = [
   "dados",
@@ -67,13 +70,50 @@ export const ABAS_DA_FICHA = [
   "contratuais",
   "jornada",
   "documentos",
+  "ponto",
 ] as const;
 export type AbaDaFicha = (typeof ABAS_DA_FICHA)[number];
 
-/** T198 — a ficha pedida pela URL: o colaborador e a aba. */
+/**
+ * T198 — a ficha pedida pela URL: o colaborador e a aba.
+ *
+ * T202 — `competencia` (`AAAA-MM`) vale só para a aba "ponto"; nas outras,
+ * não vai à URL.
+ */
 export interface RotaDaFicha {
   readonly colaboradorId: string;
   readonly aba: AbaDaFicha;
+  readonly competencia?: string;
+}
+
+/**
+ * T202 — competência no formato do servidor (`COMPETENCIA_PATTERN` da API):
+ * quatro dígitos de ano e mês de 01 a 12.
+ */
+const COMPETENCIA = /^[0-9]{4}-(0[1-9]|1[0-2])$/;
+
+/** T202 — `AAAA-MM` válido (o mesmo formato que o servidor aceita). */
+export function competenciaValida(valor: string): boolean {
+  return COMPETENCIA.test(valor) && Number(valor.slice(0, 4)) >= 1;
+}
+
+/**
+ * T202 — a competência do dia civil do navegador (P-4): a mesma regra de
+ * "hoje" da listagem (T185).
+ */
+export function competenciaDoMesAtual(agora: Date = new Date()): string {
+  const mes = String(agora.getMonth() + 1).padStart(2, "0");
+  return `${String(agora.getFullYear()).padStart(4, "0")}-${mes}`;
+}
+
+/** T202 — a competência `delta` meses antes (negativo) ou depois. */
+export function competenciaVizinha(competencia: string, delta: number): string {
+  const ano = Number(competencia.slice(0, 4));
+  const mes = Number(competencia.slice(5, 7));
+  const indice = ano * 12 + (mes - 1) + delta;
+  const novoAno = Math.floor(indice / 12);
+  const novoMes = (indice % 12) + 1;
+  return `${String(novoAno).padStart(4, "0")}-${String(novoMes).padStart(2, "0")}`;
 }
 
 /**
@@ -87,16 +127,35 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export function fichaDaRota(fragmento: string): RotaDaFicha | null {
   if (!fragmento.startsWith(PREFIXO_DA_FICHA)) return null;
   const partes = fragmento.slice(PREFIXO_DA_FICHA.length).split("/");
-  if (partes.length > 2) return null;
-  const [colaboradorId = "", aba = "dados"] = partes;
+  if (partes.length > 3) return null;
+  const [colaboradorId = "", aba = "dados", competencia] = partes;
   if (!UUID.test(colaboradorId)) return null;
   if (!(ABAS_DA_FICHA as readonly string[]).includes(aba)) return null;
-  return { colaboradorId, aba: aba as AbaDaFicha };
+  // T202 — o terceiro segmento é só da aba "ponto", e só no formato do
+  // servidor. Sem ele, vale o mês corrente (P-4): a URL é corrigida no lugar.
+  if (aba !== "ponto") {
+    return competencia === undefined
+      ? { colaboradorId, aba: aba as AbaDaFicha }
+      : null;
+  }
+  if (competencia !== undefined && !competenciaValida(competencia)) {
+    return null;
+  }
+  return {
+    colaboradorId,
+    aba: "ponto",
+    competencia: competencia ?? competenciaDoMesAtual(),
+  };
 }
 
-/** T198 — o endereço da ficha, sempre com a aba explícita. */
+/**
+ * T198 — o endereço da ficha, sempre com a aba explícita. T202 — na aba
+ * "ponto", sempre com a competência (a do mês corrente, se não houver).
+ */
 export function rotaDaFicha(ficha: RotaDaFicha): string {
-  return `${PREFIXO_DA_FICHA}${ficha.colaboradorId}/${ficha.aba}`;
+  const base = `${PREFIXO_DA_FICHA}${ficha.colaboradorId}/${ficha.aba}`;
+  if (ficha.aba !== "ponto") return base;
+  return `${base}/${ficha.competencia ?? competenciaDoMesAtual()}`;
 }
 
 /**

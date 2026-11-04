@@ -2859,11 +2859,11 @@ funcional só há uma aba.
 
 **Fora de escopo:** painel de Segurança, portal demonstrativo "Minhas solicitações", granularidade fina, rascunho automático, edições entre abas, API, schema, migration, RBAC, auditoria, Docker, seed, dependências, lockfile, workflows, promoção e merge.
 
-## Ficha do colaborador funcional — T201 (em implementação)
+## Ficha do colaborador funcional — T201 (integrada)
 
-| Tarefa | Estado                                     | Resultado principal                                                                                                 |
-| ------ | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
-| T201   | **Em implementação** (entrega em PR Draft) | Aba Documentos na ficha individual: registros e solicitações de documento só da pessoa, na empresa ativa da sessão. |
+| Tarefa | Estado                                    | Resultado principal                                                                                                 |
+| ------ | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| T201   | **Integrada** (PR #194, squash `8e1c7e9`) | Aba Documentos na ficha individual: registros e solicitações de documento só da pessoa, na empresa ativa da sessão. |
 
 **Escopo da T201:** as decisões F-1 a F-8 do
 [dossiê](../docs/decisions/t201-dossie-ficha-colaborador-funcional.md), aprovadas
@@ -2883,6 +2883,42 @@ em 2026-11-04, e a entrega da seção 11:
 - arquivo, upload, download, visualização e foto;
 - salário, benefícios, férias, ausências, pesquisas, comentários, portal e convite;
 - mudança nas visões da empresa em Pessoas;
+- API, schema, migration, RBAC, auditoria, Docker, seed, dependências, lockfile e workflows;
+- promoção e merge.
+
+**Histórico da preparação:** o dossiê e as decisões foram preparados sem código de
+produto, sem push e sem PR; isso valeu só para aquela fase.
+
+**Observação de relatório:** a integração funcional da T201 está concluída (PR #194,
+squash `8e1c7e96a3f6b8994518a8499b76041c12a4179e`, CI de push 3/3 verde, run
+41837091002); a única pendência administrativa era a sua convergência no Spec Kit,
+resolvida no primeiro commit da T202.
+
+## Próxima aba funcional da ficha — T202 (em implementação)
+
+| Tarefa | Estado                                     | Resultado principal                                                                                                      |
+| ------ | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| T202   | **Em implementação** (entrega em PR Draft) | Aba Registros de ponto na ficha individual: só consulta, com o mês na URL, todos os vínculos da pessoa na empresa ativa. |
+
+**Escopo da T202:** as decisões P-1 a P-5 do
+[dossiê](../docs/decisions/t202-dossie-proxima-aba-ficha-colaborador.md), aprovadas
+em 2026-11-04, e a entrega da seção 10:
+
+- aba `ponto` com a rota `…/ponto/AAAA-MM`, recarga, voltar e avançar e correção da URL
+  sem mês;
+- só `GET /v1/vinculos/:vinculoId/pontos`, todas as páginas, filtrado pela pessoa, pela
+  empresa e pelo mês;
+- dia civil de São Paulo, ordem efetiva, ajustada e anulada;
+- o `master_tecnico` sem empresa ativa não consulta;
+- sem escrita, sem cálculo e sem edição pendente;
+- foco, anúncios, falha com nova tentativa, respostas atrasadas e 375 px;
+- testes de API do contrato existente, sem mudar código da API.
+
+**Fora de escopo:**
+
+- registro, ajuste ou anulação de ponto pela ficha;
+- total, saldo, horas trabalhadas, banco de horas ou comparação com a jornada;
+- Solicitações de Pessoas e operações de Vida funcional;
 - API, schema, migration, RBAC, auditoria, Docker, seed, dependências, lockfile e workflows;
 - promoção e merge.
 

@@ -542,8 +542,8 @@ describe("T198 — estados da página", () => {
   });
 });
 
-describe("T198 — as abas (cinco desde a T201)", () => {
-  it("cinco abas, só as que funcionam, na ordem; a ativa é a da rota", async () => {
+describe("T198 — as abas (seis desde a T202)", () => {
+  it("seis abas, só as que funcionam, na ordem; a ativa é a da rota", async () => {
     render(<Ficha abaInicial="contratuais" />);
     await esperarFicha();
     const abas = within(screen.getByRole("tablist")).getAllByRole("tab");
@@ -553,12 +553,13 @@ describe("T198 — as abas (cinco desde a T201)", () => {
       "Dados contratuais",
       "Jornada de trabalho",
       "Documentos",
+      "Registros de ponto",
     ]);
     expect(
       screen.getByRole("tab", { name: "Dados contratuais", selected: true }),
     ).toBeInTheDocument();
     // Só a aba ativa entra na sequência do Tab.
-    expect(abas.map((a) => a.tabIndex)).toEqual([-1, -1, 0, -1, -1]);
+    expect(abas.map((a) => a.tabIndex)).toEqual([-1, -1, 0, -1, -1, -1]);
     const painel = screen.getByRole("tabpanel", { name: "Dados contratuais" });
     expect(painel).toHaveAttribute(
       "aria-labelledby",
@@ -639,10 +640,12 @@ describe("T198 — as abas (cinco desde a T201)", () => {
     fireEvent.keyDown(aba("Dados do colaborador"), { key: "ArrowRight" });
     expect(aba("Vida funcional")).toHaveFocus();
     fireEvent.keyDown(aba("Vida funcional"), { key: "End" });
-    expect(aba("Documentos")).toHaveFocus();
-    fireEvent.keyDown(aba("Documentos"), { key: "ArrowRight" });
+    expect(aba("Registros de ponto")).toHaveFocus();
+    fireEvent.keyDown(aba("Registros de ponto"), { key: "ArrowRight" });
     expect(aba("Dados do colaborador")).toHaveFocus();
     fireEvent.keyDown(aba("Dados do colaborador"), { key: "ArrowLeft" });
+    expect(aba("Registros de ponto")).toHaveFocus();
+    fireEvent.keyDown(aba("Registros de ponto"), { key: "ArrowLeft" });
     expect(aba("Documentos")).toHaveFocus();
     fireEvent.keyDown(aba("Documentos"), { key: "ArrowLeft" });
     expect(aba("Jornada de trabalho")).toHaveFocus();
@@ -1382,7 +1385,7 @@ describe("T198 — painel de perfil", () => {
     render(<Ficha />);
     await esperarFicha();
     const abas = within(screen.getByRole("tablist")).getAllByRole("tab");
-    expect(abas).toHaveLength(5);
+    expect(abas).toHaveLength(6);
     for (const aba of abas) {
       const icone = aba.querySelector("svg");
       expect(icone).toHaveAttribute("aria-hidden", "true");
@@ -1393,11 +1396,13 @@ describe("T198 — painel de perfil", () => {
       "Dados contratuais",
       "Jornada de trabalho",
       "Documentos",
+      "Registros de ponto",
     ]);
-    // T201 — "Documentos" é a única aba nova; as bloqueadas seguem fora.
+    // T201/T202 — "Documentos" e "Registros de ponto" são as abas novas; as
+    // bloqueadas seguem fora.
     expect(
       screen.queryByRole("tab", {
-        name: /sal[aá]rio|f[eé]rias|benef[ií]cio|pesquisa|coment[aá]rio|portal|ponto|solicita|foto|aus[eê]ncia/i,
+        name: /sal[aá]rio|f[eé]rias|benef[ií]cio|pesquisa|coment[aá]rio|portal|solicita|foto|aus[eê]ncia|banco de horas|espelho/i,
       }),
     ).toBeNull();
     // As abas ficam no mesmo painel do cabeçalho.

@@ -140,6 +140,36 @@ export async function listarPontos(
   return jsonOrThrow(res);
 }
 
+/** T202 — filtros de `GET /v1/vinculos/:vinculoId/pontos` (sem `vinculoId`). */
+export interface ListarPontosDoVinculoQuery {
+  competencia?: string;
+  tipo?: TipoEventoPonto;
+  pagina?: number;
+  tamanhoPagina?: number;
+}
+
+/**
+ * T202 — `GET /v1/vinculos/:vinculoId/pontos`: as marcações de UM vínculo,
+ * só leitura, no escopo da sessão (fora dele: 404). A mesma forma de item e
+ * de página de `listarPontos`.
+ */
+export async function listarPontosDoVinculo(
+  vinculoId: string,
+  query: ListarPontosDoVinculoQuery = {},
+): Promise<ResultadoPaginado<EventoPontoApi>> {
+  const params = new URLSearchParams();
+  if (query.competencia) params.set("competencia", query.competencia);
+  if (query.tipo) params.set("tipo", query.tipo);
+  if (query.pagina !== undefined) params.set("pagina", String(query.pagina));
+  if (query.tamanhoPagina !== undefined)
+    params.set("tamanhoPagina", String(query.tamanhoPagina));
+  const qs = params.toString();
+  const res = await apiFetch(
+    `/vinculos/${encodeURIComponent(vinculoId)}/pontos${qs ? `?${qs}` : ""}`,
+  );
+  return jsonOrThrow(res);
+}
+
 export async function buscarPonto(
   id: string,
 ): Promise<EventoPontoDetalhadoApi> {

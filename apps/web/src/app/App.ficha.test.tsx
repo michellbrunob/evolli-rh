@@ -25,6 +25,9 @@ import {
 } from "../test/viewport";
 import {
   ABAS_DA_FICHA,
+  competenciaDoMesAtual,
+  competenciaValida,
+  competenciaVizinha,
   destinoDaRota,
   fichaDaRota,
   rotaDaFicha,
@@ -57,6 +60,11 @@ import {
 } from "../api/movimentacaoClient";
 import { obterUsuarioAtual } from "../api/usersClient";
 import {
+  listarPontosDoVinculo,
+  registrarAjustePonto,
+  registrarPonto,
+} from "../api/pontoClient";
+import {
   criarDocumento,
   listarDocumentos,
   listarSolicitacoesDocumento,
@@ -79,6 +87,19 @@ vi.mock("../api/usersClient", async () => {
       "../api/usersClient",
     );
   return { ...actual, obterUsuarioAtual: vi.fn() };
+});
+// T202 — a aba Registros de ponto lê as marcações por vínculo.
+vi.mock("../api/pontoClient", async () => {
+  const actual =
+    await vi.importActual<typeof import("../api/pontoClient")>(
+      "../api/pontoClient",
+    );
+  return {
+    ...actual,
+    listarPontosDoVinculo: vi.fn(),
+    registrarPonto: vi.fn(),
+    registrarAjustePonto: vi.fn(),
+  };
 });
 vi.mock("../api/documentosClient", async () => {
   const actual = await vi.importActual<
@@ -260,6 +281,7 @@ beforeEach(() => {
     ]),
   );
   vi.mocked(listarSolicitacoesDocumento).mockResolvedValue(paginado([]));
+  vi.mocked(listarPontosDoVinculo).mockResolvedValue(paginado([]));
   vi.mocked(consultarDadosPessoaisDoColaborador).mockImplementation(
     async (colaboradorId) => ({
       colaboradorId,
@@ -307,6 +329,9 @@ describe("T198 — rota da ficha (rotasDoShell)", () => {
       expect(fichaDaRota(rotaDaFicha({ colaboradorId: ana.id, aba }))).toEqual({
         colaboradorId: ana.id,
         aba,
+        // T202 — a aba de ponto sempre leva a competência (a do mês corrente,
+        // se não houver).
+        ...(aba === "ponto" ? { competencia: competenciaDoMesAtual() } : {}),
       });
     }
   });
@@ -2133,5 +2158,252 @@ describe("T201 — aba Documentos da ficha no shell", () => {
     voltarPelaTrilha();
     expect(screen.queryByRole("alertdialog")).toBeNull();
     await screen.findByRole("table", { name: /^Colaboradores — / });
+  });
+});
+
+describe("T202 — rota da aba de ponto (rotasDoShell)", () => {
+  it("competência na rota; sem ela, o mês corrente", () => {
+    expect(fichaDaRota(`${LISTAGEM}/${ana.id}/ponto/2026-10`)).toEqual({
+      colaboradorId: ana.id,
+      aba: "ponto",
+      competencia: "2026-10",
+    });
+    expect(fichaDaRota(`${LISTAGEM}/${ana.id}/ponto`)).toEqual({
+      colaboradorId: ana.id,
+      aba: "ponto",
+      competencia: competenciaDoMesAtual(),
+    });
+    expect(
+      rotaDaFicha({
+        colaboradorId: ana.id,
+        aba: "ponto",
+        competencia: "2026-10",
+      }),
+    ).toBe(`${LISTAGEM}/${ana.id}/ponto/2026-10`);
+    // Nas outras abas a competência não vai à URL.
+    expect(
+      rotaDaFicha({
+        colaboradorId: ana.id,
+        aba: "dados",
+        competencia: "2026-10",
+      }),
+    ).toBe(`${LISTAGEM}/${ana.id}/dados`);
+  });
+
+  it("mês inválido, mês em outra aba ou segmento a mais: não é rota", () => {
+    for (const fragmento of [
+      `${LISTAGEM}/${ana.id}/ponto/2026-13`,
+      `${LISTAGEM}/${ana.id}/ponto/2026-00`,
+      `${LISTAGEM}/${ana.id}/ponto/2026-1`,
+      `${LISTAGEM}/${ana.id}/ponto/26-11`,
+      `${LISTAGEM}/${ana.id}/ponto/abc`,
+      `${LISTAGEM}/${ana.id}/ponto/`,
+      `${LISTAGEM}/${ana.id}/ponto/2026-11/extra`,
+      `${LISTAGEM}/${ana.id}/dados/2026-11`,
+      `${LISTAGEM}/${ana.id}/documentos/2026-11`,
+    ]) {
+      expect(fichaDaRota(fragmento)).toBeNull();
+      expect(destinoDaRota(fragmento)).toBeNull();
+    }
+  });
+
+  it("competência vizinha e validação", () => {
+    expect(competenciaVizinha("2026-01", -1)).toBe("2025-12");
+    expect(competenciaVizinha("2026-12", 1)).toBe("2027-01");
+    expect(competenciaVizinha("2026-11", -1)).toBe("2026-10");
+    expect(competenciaValida("2026-11")).toBe(true);
+    expect(competenciaValida("2026-13")).toBe(false);
+    expect(competenciaValida("0000-05")).toBe(false);
+    expect(competenciaDoMesAtual(new Date(2026, 0, 31))).toBe("2026-01");
+  });
+});
+
+describe("T202 — aba Registros de ponto no shell", () => {
+  const blocoPrincipal = () =>
+    screen.findByRole("region", { name: /MAT-0001 · vínculo principal/ });
+  const rotaPonto = (c: ColaboradorListadoApi, competencia: string) =>
+    `${LISTAGEM}/${c.id}/ponto/${competencia}`;
+  const entradaDe = (competencia: string, momento: string) => ({
+    id: `e-${competencia}`,
+    vinculoId: ana.vinculos[0]!.id,
+    empresaId: EMPRESA,
+    tipo: "entrada" as const,
+    momento,
+    competencia,
+    registradoPorUserId: "u-1",
+    registradoEm: momento,
+    efetivo: {
+      tipo: "entrada" as const,
+      momento,
+      anulado: false,
+      totalAjustes: 0,
+    },
+  });
+
+  beforeEach(() => {
+    vi.mocked(listarPontosDoVinculo).mockImplementation(async (_id, q) =>
+      q?.competencia === "2026-10"
+        ? paginado([entradaDe("2026-10", "2026-10-05T11:00:00.000Z")])
+        : paginado([]),
+    );
+  });
+
+  it("rota direta abre a aba no mês da URL, sem entrada nova; recarregar mantém", async () => {
+    window.history.replaceState(null, "", `/${rotaPonto(ana, "2026-10")}`);
+    const entradas = window.history.length;
+    const { unmount } = render(<App papelDoAtor="dp" />);
+    await esperarFicha(ana.nome);
+    expect(abaSelecionada()).toHaveTextContent("Registros de ponto");
+    const bloco = await blocoPrincipal();
+    expect(bloco).toHaveTextContent("05/10/2026");
+    expect(screen.getByText("outubro de 2026")).toBeInTheDocument();
+    expect(window.location.hash).toBe(rotaPonto(ana, "2026-10"));
+    expect(window.history.length).toBe(entradas);
+    expect(listarPontosDoVinculo).toHaveBeenCalledWith(ana.vinculos[0]!.id, {
+      competencia: "2026-10",
+      pagina: 1,
+      tamanhoPagina: 100,
+    });
+    const url = window.location.hash;
+    unmount();
+
+    window.history.replaceState(null, "", `/${url}`);
+    render(<App papelDoAtor="dp" />);
+    await esperarFicha(ana.nome);
+    expect(abaSelecionada()).toHaveTextContent("Registros de ponto");
+    expect(await blocoPrincipal()).toHaveTextContent("05/10/2026");
+  });
+
+  it("URL sem mês: abre no mês corrente e corrige a URL no lugar", async () => {
+    window.history.replaceState(null, "", `/${LISTAGEM}/${ana.id}/ponto`);
+    const entradas = window.history.length;
+    render(<App papelDoAtor="rh" />);
+    await esperarFicha(ana.nome);
+    await blocoPrincipal();
+    await waitFor(() =>
+      expect(window.location.hash).toBe(
+        rotaPonto(ana, competenciaDoMesAtual()),
+      ),
+    );
+    expect(window.history.length).toBe(entradas);
+  });
+
+  it("mês inválido na URL não abre a ficha nem consulta ponto", async () => {
+    window.history.replaceState(null, "", `/${rotaPonto(ana, "2026-13")}`);
+    render(<App papelDoAtor="rh" />);
+    await screen.findByRole("navigation", { name: "Navegação do painel" });
+    await waitFor(() => expect(window.location.hash).not.toContain("2026-13"));
+    expect(document.querySelector(".ficha-colaborador")).toBeNull();
+    expect(listarPontosDoVinculo).not.toHaveBeenCalled();
+  });
+
+  it("trocar de mês empilha entrada; voltar e avançar percorrem os meses", async () => {
+    window.history.replaceState(null, "", `/${rotaPonto(ana, "2026-10")}`);
+    render(<App papelDoAtor="rh" />);
+    await blocoPrincipal();
+    const entradas = window.history.length;
+    const anterior = screen.getByRole("button", { name: "Mês anterior" });
+    anterior.focus();
+    fireEvent.click(anterior);
+    await waitFor(() =>
+      expect(window.location.hash).toBe(rotaPonto(ana, "2026-09")),
+    );
+    expect(window.history.length).toBe(entradas + 1);
+    expect(await screen.findByText("setembro de 2026")).toBeInTheDocument();
+    expect(anterior).toHaveFocus();
+
+    navegadorVaiPara(rotaPonto(ana, "2026-10"));
+    expect(await screen.findByText("outubro de 2026")).toBeInTheDocument();
+    expect(await blocoPrincipal()).toHaveTextContent("05/10/2026");
+    navegadorVaiPara(rotaPonto(ana, "2026-09"));
+    expect(await screen.findByText("setembro de 2026")).toBeInTheDocument();
+  });
+
+  it("trocar de aba: a de ponto abre no mês corrente e, ao voltar a ela, no último mês visto", async () => {
+    window.history.replaceState(null, "", `/${rotaDe(ana, "dados")}`);
+    render(<App papelDoAtor="rh" />);
+    await esperarFicha(ana.nome);
+    expect(listarPontosDoVinculo).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("tab", { name: "Registros de ponto" }));
+    await waitFor(() =>
+      expect(window.location.hash).toBe(
+        rotaPonto(ana, competenciaDoMesAtual()),
+      ),
+    );
+    await blocoPrincipal();
+    fireEvent.click(screen.getByRole("button", { name: "Mês anterior" }));
+    const mesAnterior = competenciaVizinha(competenciaDoMesAtual(), -1);
+    await waitFor(() =>
+      expect(window.location.hash).toBe(rotaPonto(ana, mesAnterior)),
+    );
+    fireEvent.click(screen.getByRole("tab", { name: "Documentos" }));
+    await waitFor(() =>
+      expect(window.location.hash).toBe(rotaDe(ana, "documentos")),
+    );
+    fireEvent.click(screen.getByRole("tab", { name: "Registros de ponto" }));
+    await waitFor(() =>
+      expect(window.location.hash).toBe(rotaPonto(ana, mesAnterior)),
+    );
+  });
+
+  it("outra pessoa pela URL: lê só os vínculos dela", async () => {
+    window.history.replaceState(null, "", `/${rotaPonto(ana, "2026-10")}`);
+    render(<App papelDoAtor="rh" />);
+    await blocoPrincipal();
+    navegadorVaiPara(rotaPonto(bruno, "2026-10"));
+    await screen.findByRole("region", { name: /MAT-0002 · vínculo principal/ });
+    expect(
+      vi.mocked(listarPontosDoVinculo).mock.calls.map(([id]) => id),
+    ).toEqual([ana.vinculos[0]!.id, bruno.vinculos[0]!.id]);
+    expect(screen.queryByRole("region", { name: /MAT-0001/ })).toBeNull();
+  });
+
+  it("colaborador fora da empresa da sessão: 'não encontrado', sem consulta de ponto", async () => {
+    window.history.replaceState(
+      null,
+      "",
+      `/${LISTAGEM}/99999999-9999-4999-8999-999999999999/ponto/2026-10`,
+    );
+    render(<App papelDoAtor="rh" />);
+    await screen.findByRole("heading", {
+      level: 1,
+      name: "Colaborador não encontrado",
+    });
+    expect(listarPontosDoVinculo).not.toHaveBeenCalled();
+  });
+
+  it.each(["gestor", "colaborador", "financeiro", "auditor", "dpo"] as const)(
+    "%s com a URL da aba de ponto não monta a ficha, e nada de ponto é lido",
+    async (papel) => {
+      window.history.replaceState(null, "", `/${rotaPonto(ana, "2026-10")}`);
+      render(<App papelDoAtor={papel} />);
+      await screen.findByRole("navigation", { name: "Navegação do painel" });
+      await waitFor(() => expect(window.location.hash).not.toContain(ana.id));
+      expect(document.querySelector(".ficha-colaborador")).toBeNull();
+      expect(listarPontosDoVinculo).not.toHaveBeenCalled();
+    },
+  );
+
+  it("só leitura: sair da ficha pela aba de ponto não pergunta nada (sem edição pendente)", async () => {
+    window.history.replaceState(null, "", `/${rotaPonto(ana, "2026-10")}`);
+    render(
+      <ComGuardaDeSaida>
+        <App papelDoAtor="rh" />
+      </ComGuardaDeSaida>,
+    );
+    await blocoPrincipal();
+    fireEvent.click(screen.getByRole("button", { name: "Mês anterior" }));
+    await waitFor(() =>
+      expect(window.location.hash).toBe(rotaPonto(ana, "2026-09")),
+    );
+    fireEvent.click(
+      within(
+        document.querySelector<HTMLElement>(".ficha-colaborador")!,
+      ).getByRole("button", { name: "Colaboradores" }),
+    );
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    await screen.findByRole("table", { name: /^Colaboradores — / });
+    expect(registrarPonto).not.toHaveBeenCalled();
+    expect(registrarAjustePonto).not.toHaveBeenCalled();
   });
 });

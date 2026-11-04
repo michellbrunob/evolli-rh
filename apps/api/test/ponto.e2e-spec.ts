@@ -1562,4 +1562,213 @@ describe("Jornada e Ponto Rastreavel (e2e)", () => {
       }
     });
   });
+
+  // -------------------------------------------------------------------------
+  // T202 — leitura por vínculo, o contrato que a aba "Registros de ponto" da
+  // ficha usa. Só testes: nenhum código da API muda. Até aqui a rota só era
+  // exercitada como negação.
+  // -------------------------------------------------------------------------
+
+  describe("T202 — GET /v1/vinculos/:vinculoId/pontos (leitura por vínculo)", () => {
+    const COMPETENCIA_T202 = "2026-08";
+    let marcacoesA: string[] = [];
+    let marcacaoOutroMes: string;
+    let marcacaoB: string;
+
+    beforeAll(async () => {
+      marcacoesA = [
+        (
+          await registrarPonto(
+            rhA,
+            vinculoA,
+            "entrada",
+            "2026-08-03T08:00:00-03:00",
+          )
+        ).id,
+        (
+          await registrarPonto(
+            dpA,
+            vinculoA,
+            "saida",
+            "2026-08-03T17:00:00-03:00",
+          )
+        ).id,
+      ];
+      marcacaoOutroMes = (
+        await registrarPonto(
+          rhA,
+          vinculoA,
+          "entrada",
+          "2026-09-01T08:00:00-03:00",
+        )
+      ).id;
+      marcacaoB = (
+        await registrarPonto(
+          rhB,
+          vinculoB,
+          "entrada",
+          "2026-08-03T08:00:00-03:00",
+        )
+      ).id;
+    });
+
+    it("RH e DP leem as marcações do vínculo na competência, só dele e só da empresa", async () => {
+      for (const cred of [rhA, dpA]) {
+        const resposta = await get(
+          `/v1/vinculos/${vinculoA}/pontos?competencia=${COMPETENCIA_T202}&tamanhoPagina=100`,
+          cred,
+        ).expect(200);
+        const ids = (resposta.body.itens as { id: string }[]).map((e) => e.id);
+        expect(ids).toEqual(expect.arrayContaining(marcacoesA));
+        expect(ids).not.toContain(marcacaoOutroMes);
+        expect(ids).not.toContain(marcacaoB);
+        for (const item of resposta.body.itens as {
+          vinculoId: string;
+          empresaId: string;
+          competencia: string;
+          efetivo: { anulado: boolean; totalAjustes: number };
+        }[]) {
+          expect(item.vinculoId).toBe(vinculoA);
+          expect(item.empresaId).toBe(empresaA);
+          expect(item.competencia).toBe(COMPETENCIA_T202);
+          expect(item.efetivo).toEqual(
+            expect.objectContaining({ anulado: false, totalAjustes: 0 }),
+          );
+        }
+        expect(resposta.body.total).toBe(resposta.body.itens.length);
+        // Sem cálculo e sem pessoa na resposta (ADR 0008 §7).
+        const texto = JSON.stringify(resposta.body);
+        expect(texto).not.toMatch(
+          /saldo|horaExtra|jornadaEsperada|colaboradorId/,
+        );
+      }
+    });
+
+    it("pagina pelo total: duas páginas de 1 trazem as duas marcações, sem repetir", async () => {
+      const p1 = await get(
+        `/v1/vinculos/${vinculoA}/pontos?competencia=${COMPETENCIA_T202}&pagina=1&tamanhoPagina=1`,
+        rhA,
+      ).expect(200);
+      const p2 = await get(
+        `/v1/vinculos/${vinculoA}/pontos?competencia=${COMPETENCIA_T202}&pagina=2&tamanhoPagina=1`,
+        rhA,
+      ).expect(200);
+      expect(p1.body.total).toBe(2);
+      expect(p1.body.itens).toHaveLength(1);
+      expect(p2.body.itens).toHaveLength(1);
+      expect([p1.body.itens[0].id, p2.body.itens[0].id].sort()).toEqual(
+        [...marcacoesA].sort(),
+      );
+    });
+
+    it("tamanho de página acima de 100 e competência fora do formato são recusados", async () => {
+      await get(
+        `/v1/vinculos/${vinculoA}/pontos?tamanhoPagina=101`,
+        rhA,
+      ).expect(400);
+      await get(
+        `/v1/vinculos/${vinculoA}/pontos?competencia=2026-13`,
+        rhA,
+      ).expect(400);
+      // `colaboradorId` não é filtro deste contrato.
+      await get(
+        `/v1/vinculos/${vinculoA}/pontos?colaboradorId=${vinculoA}`,
+        rhA,
+      ).expect(400);
+    });
+
+    it("isolamento: vínculo de outra empresa é 404 nos dois sentidos", async () => {
+      await get(`/v1/vinculos/${vinculoB}/pontos`, rhA).expect(404);
+      await get(`/v1/vinculos/${vinculoA}/pontos`, rhB).expect(404);
+      await get(`/v1/vinculos/${vinculoA}/pontos`, dpA).expect(200);
+    });
+
+    it("perfis sem leitura de ponto: negados", async () => {
+      for (const cred of [gestorA, colaboradorA, financeiroA, auditorA, dpoA]) {
+        const status = (await get(`/v1/vinculos/${vinculoA}/pontos`, cred))
+          .status;
+        expect([403, 404]).toContain(status);
+      }
+    });
+
+    it("master_tecnico sem empresa ativa lê por vínculo em qualquer empresa (global, auditado)", async () => {
+      const prisma = new PrismaClient({ datasources: { db: { url: appUrl } } });
+      const auditoriaDoMaster = {
+        action: "ponto_consultado",
+        actorRole: "master_tecnico",
+        resourceId: vinculoB,
+      } as const;
+      try {
+        const antes = await prisma.auditEvent.count({
+          where: auditoriaDoMaster,
+        });
+        const resposta = await get(
+          `/v1/vinculos/${vinculoB}/pontos?competencia=${COMPETENCIA_T202}`,
+          master,
+        ).expect(200);
+        const ids = (resposta.body.itens as { id: string }[]).map((e) => e.id);
+        expect(ids).toContain(marcacaoB);
+        // A leitura global por vínculo gravou exatamente um evento de
+        // consulta de ponto do master, com o vínculo consultado.
+        const depois = await prisma.auditEvent.count({
+          where: auditoriaDoMaster,
+        });
+        expect(depois).toBe(antes + 1);
+      } finally {
+        await prisma.$disconnect();
+      }
+    });
+
+    it("master_tecnico COM empresa ativa lê só a empresa escolhida; a outra é 404", async () => {
+      const masterA = await seedMaster("master.ponto.t202@example.test");
+      await post("/v1/auth/contexto/empresa", masterA)
+        .send({ empresaId: empresaA })
+        .expect(200);
+
+      const daEmpresa = await get(
+        `/v1/vinculos/${vinculoA}/pontos?competencia=${COMPETENCIA_T202}`,
+        masterA,
+      ).expect(200);
+      const ids = (daEmpresa.body.itens as { id: string }[]).map((e) => e.id);
+      expect(ids).toEqual(expect.arrayContaining(marcacoesA));
+      for (const item of daEmpresa.body.itens as { empresaId: string }[]) {
+        expect(item.empresaId).toBe(empresaA);
+      }
+
+      await get(`/v1/vinculos/${vinculoB}/pontos`, masterA).expect(404);
+      const lista = await get(
+        `/v1/pontos?vinculoId=${vinculoB}`,
+        masterA,
+      ).expect(200);
+      expect(lista.body.itens).toHaveLength(0);
+
+      // Continua só leitura.
+      await post("/v1/pontos", masterA)
+        .send({
+          vinculoId: vinculoA,
+          tipo: "entrada",
+          momento: "2026-08-04T08:00:00-03:00",
+        })
+        .expect(403);
+    });
+
+    it("cada leitura por vínculo grava ponto.consultado com o id do vínculo", async () => {
+      const prisma = new PrismaClient({ datasources: { db: { url: appUrl } } });
+      try {
+        const antes = await prisma.auditEvent.count({
+          where: { action: "ponto_consultado", resourceId: vinculoA },
+        });
+        await get(
+          `/v1/vinculos/${vinculoA}/pontos?competencia=${COMPETENCIA_T202}`,
+          rhA,
+        ).expect(200);
+        const depois = await prisma.auditEvent.count({
+          where: { action: "ponto_consultado", resourceId: vinculoA },
+        });
+        expect(depois).toBe(antes + 1);
+      } finally {
+        await prisma.$disconnect();
+      }
+    });
+  });
 });
