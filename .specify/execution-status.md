@@ -2818,11 +2818,20 @@ correção no lugar.
 
 **Fora de escopo:** guarda global de navegação do shell, "Referência técnica", exportação, ausências, férias, escala, organograma, CPF, salário, contatos na visão coletiva, documentos, R2, foto, portal, benefícios, pesquisas, comentários, schema, migration, RBAC novo, seed, Docker, dependências, promoção e merge.
 
-## Guarda global de edição pendente — T200 (em implementação)
+## Guarda global de edição pendente — T200 (integrada)
 
-| Tarefa | Estado               | Resultado principal                                                                                                  |
-| ------ | -------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| T200   | **Em implementação** | Guarda de saída única no shell para edição pendente: menu, Hub, Sair, abas internas, voltar/avançar, rota e recarga. |
+| Tarefa | Estado                                    | Resultado principal                                                                                                  |
+| ------ | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| T200   | **Integrada** (PR #193, squash `9fd3427`) | Guarda de saída única no shell para edição pendente: menu, Hub, Sair, abas internas, voltar/avançar, rota e recarga. |
+
+**Observação de relatório:** a integração funcional da T200 está concluída
+(CI de push 3/3 verde, run 41817085354); a única pendência administrativa era
+a sua convergência no Spec Kit, resolvida no primeiro commit da T201. As
+correções das revisões adversariais (B1 a B14) foram feitas dentro da entrega.
+Continuam como observações, sem decisão de mudança, as da seção 14 do dossiê:
+nova navegação no meio da reversão, URL atual, hash digitado no Hub, correção
+de URL no meio da reversão, voltar a partir da primeira tela aberta pelo Hub e
+salvamento em andamento só com prova automatizada.
 
 **Escopo da T200:** a guarda global de navegação do shell, gate de produção do
 módulo Pessoas registrado desde a T198, conforme o
@@ -2849,6 +2858,24 @@ aplicação com `pushState`, sem recarga. Observações e limites constam na se�
 funcional só há uma aba.
 
 **Fora de escopo:** painel de Segurança, portal demonstrativo "Minhas solicitações", granularidade fina, rascunho automático, edições entre abas, API, schema, migration, RBAC, auditoria, Docker, seed, dependências, lockfile, workflows, promoção e merge.
+
+## Ficha do colaborador funcional — T201 (em preparação)
+
+| Tarefa | Estado            | Resultado principal                                                                                  |
+| ------ | ----------------- | ---------------------------------------------------------------------------------------------------- |
+| T201   | **Em preparação** | Preparação de decisão da próxima fatia da ficha individual do colaborador (listagem segue coletiva). |
+
+**Escopo da T201:** só preparação de decisão, no
+[dossiê](../docs/decisions/t201-dossie-ficha-colaborador-funcional.md): estado
+atual da ficha e das rotas, matriz de dados e permissões por perfil, inventário
+de abas reais, candidatas e bloqueadas, contratos envolvidos, riscos de
+isolamento entre empresas, foco, URL por aba, acessibilidade e 375 px,
+critérios de aceite, plano de testes e proposta de uma primeira fatia pequena,
+completa e sem abas decorativas.
+
+**Decisões pendentes:** as do dossiê.
+
+**Fora de escopo:** implementação de produto, API, schema, migration, RBAC, auditoria, Docker, seed, dependências, lockfile, workflow, push, PR, promoção e merge.
 
 ## Próxima ação autorizável
 
