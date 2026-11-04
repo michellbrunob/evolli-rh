@@ -3043,18 +3043,39 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       granularidade fina (opção C), rascunho salvo automaticamente, transmissão de edições
       entre abas, migração do diálogo da troca de empresa, promoção e merge.
 
-98. **T201 - Ficha do colaborador funcional (preparação de decisão)**
-    - **Estado:** **em preparação**. Branch `codex/t201-ficha-colaborador-funcional`, a partir
-      do squash `9fd3427daa40067f6de6af4c35843f4e38e85ad2` (T200 integrada, PR #193).
-    - **Objetivo:** decidir a próxima fatia do módulo Pessoas — a ficha individual concentra o
-      que é de uma pessoa, e a listagem de Colaboradores continua coletiva e enxuta — no
-      [dossiê](../docs/decisions/t201-dossie-ficha-colaborador-funcional.md): estado atual da
-      ficha e das rotas, matriz de dados e permissões por perfil, inventário de abas reais,
-      candidatas e bloqueadas, contratos envolvidos, riscos, critérios de aceite, plano de
-      testes e proposta de uma primeira fatia pequena e completa, sem abas decorativas.
-    - **Decisões pendentes:** as do dossiê.
-    - **Fora de escopo:** implementação de produto, API, schema, migration, RBAC, auditoria,
-      Docker, seed, dependências, lockfile, workflow, push, PR, promoção e merge.
+98. **T201 - Ficha do colaborador funcional: aba Documentos**
+    - **Estado:** **implementada e validada localmente**, sem push e sem PR. Branch
+      `codex/t201-ficha-colaborador-funcional`, a partir do squash
+      `9fd3427daa40067f6de6af4c35843f4e38e85ad2` (T200 integrada, PR #193).
+    - **Objetivo:** a ficha individual concentra o que é de uma pessoa, e a listagem de
+      Colaboradores continua coletiva e enxuta. A primeira fatia é a aba Documentos, conforme o
+      [dossiê](../docs/decisions/t201-dossie-ficha-colaborador-funcional.md).
+    - **Decisões aprovadas (2026-11-04):** F-1 a F-8 da seção 9 do dossiê:
+      - primeira fatia Documentos;
+      - RH e DP registram, corrigem o tipo e solicitam, e o `master_tecnico` só lê;
+      - as visões da empresa em Pessoas ficam como estão;
+      - sem empresa ativa, a aba pede a empresa e não lê;
+      - cabeçalho sem tempo de casa ou carga horária;
+      - Solicitações, quando entrar, some para o DP;
+      - Ponto, quando entrar, só consulta, com a competência na rota;
+      - Vida funcional sem operações.
+    - **Entrega (seção 11 do dossiê):**
+      - aba `documentos` com URL própria;
+      - seção `DocumentosColaboradorSecao`, só com os contratos existentes de documentos e
+        solicitações de documento, filtrados pela pessoa e pela empresa da sessão;
+      - aviso de que só o registro é guardado, sem arquivo, envio, download ou visualização;
+      - estados de carga, vazio, falha e nova tentativa, com foco e anúncios;
+      - respostas atrasadas descartadas;
+      - edição pendente na guarda da área `ficha`;
+      - 375 px sem rolagem horizontal; o quadro de tabela da ficha passou a ser posicionado
+        (defeito achado na validação).
+      - Sem API, schema, migration, RBAC, auditoria, Docker, seed, dependência ou workflow.
+    - **Fora de escopo:**
+      - abas Solicitações e Ponto, e operações na Vida funcional;
+      - arquivo, upload, download, visualização e foto;
+      - salário, benefícios, férias, ausências, pesquisas, comentários, portal e convite;
+      - mudança nas visões da empresa em Pessoas;
+      - promoção e merge.
 
 ## Regra obrigatória para as próximas tarefas
 

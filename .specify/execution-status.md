@@ -2859,23 +2859,32 @@ funcional só há uma aba.
 
 **Fora de escopo:** painel de Segurança, portal demonstrativo "Minhas solicitações", granularidade fina, rascunho automático, edições entre abas, API, schema, migration, RBAC, auditoria, Docker, seed, dependências, lockfile, workflows, promoção e merge.
 
-## Ficha do colaborador funcional — T201 (em preparação)
+## Ficha do colaborador funcional — T201 (implementada, local)
 
-| Tarefa | Estado            | Resultado principal                                                                                  |
-| ------ | ----------------- | ---------------------------------------------------------------------------------------------------- |
-| T201   | **Em preparação** | Preparação de decisão da próxima fatia da ficha individual do colaborador (listagem segue coletiva). |
+| Tarefa | Estado                                 | Resultado principal                                                                                                 |
+| ------ | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| T201   | **Implementada e validada localmente** | Aba Documentos na ficha individual: registros e solicitações de documento só da pessoa, na empresa ativa da sessão. |
 
-**Escopo da T201:** só preparação de decisão, no
-[dossiê](../docs/decisions/t201-dossie-ficha-colaborador-funcional.md): estado
-atual da ficha e das rotas, matriz de dados e permissões por perfil, inventário
-de abas reais, candidatas e bloqueadas, contratos envolvidos, riscos de
-isolamento entre empresas, foco, URL por aba, acessibilidade e 375 px,
-critérios de aceite, plano de testes e proposta de uma primeira fatia pequena,
-completa e sem abas decorativas.
+**Escopo da T201:** as decisões F-1 a F-8 do
+[dossiê](../docs/decisions/t201-dossie-ficha-colaborador-funcional.md), aprovadas
+em 2026-11-04, e a entrega da seção 11:
 
-**Decisões pendentes:** as do dossiê.
+- aba `documentos` com URL própria, recarga, voltar e avançar;
+- RH e DP registram, corrigem o tipo e solicitam, pelos contratos que já existiam;
+- o `master_tecnico` só lê, e sem empresa ativa a aba não lê nada;
+- só o registro, sem arquivo;
+- foco, anúncios, estados de falha com nova tentativa e respostas atrasadas;
+- guarda de saída da área `ficha`;
+- 375 px.
 
-**Fora de escopo:** implementação de produto, API, schema, migration, RBAC, auditoria, Docker, seed, dependências, lockfile, workflow, push, PR, promoção e merge.
+**Fora de escopo:**
+
+- abas Solicitações e Ponto, e operações na Vida funcional;
+- arquivo, upload, download, visualização e foto;
+- salário, benefícios, férias, ausências, pesquisas, comentários, portal e convite;
+- mudança nas visões da empresa em Pessoas;
+- API, schema, migration, RBAC, auditoria, Docker, seed, dependências, lockfile e workflows;
+- push, PR, promoção e merge.
 
 ## Próxima ação autorizável
 

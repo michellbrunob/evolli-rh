@@ -1,7 +1,9 @@
 # T201 — Dossiê: ficha do colaborador funcional
 
-**Situação:** preparação de decisão (2026-11-04). Nenhum código de produto,
-API, schema, migration, RBAC, auditoria, seed ou dependência muda nesta etapa.
+**Situação:** decisões F-1 a F-8 aprovadas pela proprietária em 2026-11-04;
+primeira fatia (aba Documentos) implementada e validada localmente — ver a
+seção 11. Sem API, schema, migration, RBAC, auditoria, seed ou dependência
+nova.
 
 **Base:** `main` em `9fd3427` (T200 integrada, PR #193). A ficha individual
 nasceu na T198 ([dossiê](t198-dossie-ficha-unificada-colaborador.md)) e recebeu
@@ -240,7 +242,10 @@ Documentos de Pessoas.
   (`--runInBand`), scripts, lint, typecheck, build, Prettier, `spec:check`,
   prévia do squash e `git diff --check`.
 
-## 9. Decisões pendentes
+## 9. Decisões (aprovadas em 2026-11-04)
+
+Todas aprovadas como recomendado. F-6 e F-7 valem para quando Solicitações e
+Ponto entrarem; F-5 e F-8 mantêm o que já existia.
 
 | Id  | Pergunta                                                                                          | Recomendação                                                                                                                                           |
 | --- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -263,3 +268,131 @@ Documentos de Pessoas.
   - mudança no cabeçalho e nas visões da empresa.
 - **Sempre:** nada do que está bloqueado aparece na tela, nem como aba vazia ou
   aviso de "em breve".
+
+## 11. Entrega da primeira fatia
+
+### 11.1 O que foi feito
+
+- **Aba `documentos`** em `ABAS_DA_FICHA` (`rotasDoShell.ts`), depois de
+  `jornada`, com rótulo "Documentos" e ícone próprio (pasta). A rota
+  `#/pessoas/colaboradores/:colaboradorId/documentos` abre, recarrega, volta e
+  avança como as outras abas; a aba só é montada (e só lê) quando visitada.
+- **Seção nova `DocumentosColaboradorSecao`**, em vez de fixar a tela coletiva
+  no colaborador (desvio da seção 5.1, ver 11.2). Ela usa só os contratos da
+  seção 5.3, pelo mesmo `documentosClient` da visão coletiva:
+  - `GET /v1/users/me` — papel e empresa ativa da sessão;
+  - `GET /v1/tipos-documento`, `GET /v1/documentos?colaboradorId=` e
+    `GET /v1/solicitacoes-documento?colaboradorId=` — 20 por página, pelo
+    servidor;
+  - `POST /v1/documentos`, `POST /v1/documentos/:id/substituicoes` e
+    `POST /v1/solicitacoes-documento` — registrar, corrigir o tipo e
+    solicitar.
+- **Empresa só da sessão.** A empresa enviada nas gravações é a de
+  `/users/me` (o servidor reconfere). Sem empresa ativa (o `master_tecnico`
+  global), a aba orienta a escolher a empresa e **não faz nenhuma leitura de
+  documento** (F-4). Com empresa, a aba ainda descarta o que não for desta
+  pessoa nesta empresa, além do filtro do servidor.
+- **Papéis (F-2).** RH e DP veem "Registrar documento", "Corrigir tipo" (por
+  linha, com nome acessível que diz qual registro) e "Solicitar documento". O
+  `master_tecnico` lê, com o aviso "Somente consulta", sem botão, formulário
+  ou chamada de escrita. Quem não abre a ficha (gestor, colaborador,
+  financeiro, auditor, DPO) continua sem a ficha e sem a aba.
+- **Sem arquivo.** Aviso fixo: o Evolli guarda só o registro (tipo, situação
+  e datas); arquivo, envio, download e visualização não estão disponíveis.
+  Nenhum campo de arquivo, link ou botão de baixar ou visualizar.
+- **Estados.** Carga anunciada; vazio que diz que ainda não há documentos ou
+  solicitações para a pessoa; falha com alerta e "Tentar de novo" que fica
+  no lugar, focado e com `aria-disabled`, durante a nova leitura (cada falha
+  anuncia uma vez). Falha ao conferir o acesso também tem nova tentativa, e
+  nenhum documento é lido antes.
+- **Foco e anúncios.**
+  - Rota direta: o foco vai ao título da ficha, como nas outras abas.
+  - Troca de aba: o foco fica na aba.
+  - Abrir um formulário leva o foco ao campo do tipo.
+  - Erro de campo: foco no campo, com a mensagem ligada a ele.
+  - Recusa do servidor: foco na mensagem (lida pelo foco, sem região viva
+    extra).
+  - Sucesso: um aviso `status` por gravação, com o foco no título do bloco
+    alterado.
+  - Cancelar devolve o foco a quem abriu o formulário, ou ao título do bloco
+    se o registro de origem foi substituído.
+  - Releitura que falha depois de uma gravação: o aviso de sucesso fica, e o
+    foco vai ao "Tentar de novo".
+- **Respostas atrasadas.** Cada leitura tem geração própria: resposta de outra
+  pessoa, de outra página ou de uma montagem anterior não substitui o que está
+  na tela. A troca de empresa remonta a árvore (T163) e devolve à listagem da
+  empresa nova (T198).
+- **Guarda de saída (T200).** Tipo escolhido e não salvo, ou gravação em
+  curso, entram na edição da área `ficha` ("Ficha do colaborador"): sair da
+  ficha ou trocar de empresa pergunta; trocar de aba não pergunta, e o
+  formulário fica montado. Formulário aberto e vazio não pergunta.
+- **375 px.** As cinco abas ficam em grade de duas colunas, e a quinta ocupa
+  a linha inteira; tabelas rolam no próprio quadro; controles da aba com pelo
+  menos 44 px.
+
+### 11.2 Desvios do proposto
+
+- **Componente próprio em vez da tela coletiva fixada.** A tela coletiva não
+  tem o foco, os anúncios, a releitura sem perder o foco, a regra de empresa
+  ativa nem a integração com a guarda que a ficha exige, e a ordem desta
+  entrega era não alterá-la. A seção nova repete só o que é de apresentação
+  (rótulos de tipo e situação); os contratos e o cliente são os mesmos.
+- **Sem o "detalhe só leitura" por item.** A linha já mostra tipo, situação e
+  data; a referência técnica segue no detalhe da visão coletiva.
+- **Guarda pela área `ficha`**, e não pela declaração "Documentos" da visão
+  coletiva: dentro da ficha, a edição pendente é da ficha, como as das demais
+  abas.
+
+### 11.3 Defeito encontrado na validação e corrigido
+
+No navegador, a 1024 px, a aba criava rolagem horizontal da página: o texto
+só para leitor do "Corrigir tipo" (posição absoluta) escapava do quadro
+rolável da tabela. O quadro da ficha (`.ficha-colaborador__quadro`) passou a
+ser posicionado. O teste que confere a regra falha sem a correção.
+
+### 11.4 Observação (fora do escopo)
+
+A trilha da ficha ("Colaboradores") tem alvo de toque menor que 44 px a
+375 px. É da T198 e não muda nesta entrega.
+
+### 11.5 Testes e validação
+
+- **Web:** `DocumentosColaboradorSecao.test.tsx` (29 casos), cobrindo:
+  - leitura e isolamento;
+  - papéis, com e sem empresa ativa;
+  - registrar, corrigir e solicitar;
+  - recusas 403, 404, 409 e 422 e falha de rede;
+  - carga, falha e nova tentativa;
+  - resposta atrasada e desmontagem;
+  - paginação;
+  - guarda;
+  - largura.
+
+  Também cobrem a aba:
+  - `App.ficha.test.tsx`: rota direta, recarga, voltar e avançar, outra
+    pessoa pela URL, fora da empresa, perfis negados, guarda e formulário
+    vazio;
+  - `AutenticacaoApp.test.tsx`: troca de empresa com leitura em curso, e com
+    tipo escolhido;
+  - `FichaColaboradorScreen.test.tsx`: cinco abas e teclado.
+
+- **Prova de falha (mutações):** cada um destes defeitos faz pelo menos um
+  teste falhar:
+  - sem o filtro por pessoa e empresa;
+  - `master_tecnico` sem empresa consultando;
+  - sem a geração das leituras;
+  - `master_tecnico` operando;
+  - sem foco após releitura falha;
+  - sem a edição da aba na guarda;
+  - sem o quadro posicionado.
+- **Localhost** (banco isolado, dados sintéticos):
+  - RH: registrar, corrigir e solicitar;
+  - DP: solicitar;
+  - `master_tecnico`: sem empresa, nenhuma leitura de documento; com a Alfa,
+    só leitura; com a Beta, a pessoa da Alfa dá "não encontrado" e só
+    aparece o documento da Beta;
+  - gestor: sem ficha e sem requisição;
+  - RH multiempresa: teclado (End e Enter), troca de empresa com formulário
+    preenchido (pergunta; descartar volta à listagem da Beta sem dado da
+    Alfa);
+  - 375 px sem rolagem horizontal.

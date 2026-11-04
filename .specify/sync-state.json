@@ -12,14 +12,14 @@
   },
   "nextTask": {
     "id": "T201",
-    "status": "ficha_colaborador_funcional_em_preparacao",
-    "reason": "T200 integrada em main pela PR #193 (squash 9fd3427daa40067f6de6af4c35843f4e38e85ad2), com a CI de push 3/3 verde (run 41817085354). A T201 prepara a decisao da proxima fatia do modulo Pessoas (docs/decisions/t201-dossie-ficha-colaborador-funcional.md): a ficha individual concentra o que e de uma pessoa e a listagem de Colaboradores continua coletiva. Estado atual da ficha e das rotas, matriz de dados e permissoes, inventario de abas reais, candidatas e bloqueadas, contratos, riscos, criterios de aceite, plano de testes e proposta de primeira fatia. So preparacao: sem produto, API, schema, migration, RBAC, auditoria, seed ou dependencia."
+    "status": "ficha_colaborador_documentos_implementada_local",
+    "reason": "T200 integrada em main pela PR #193 (squash 9fd3427daa40067f6de6af4c35843f4e38e85ad2), com a CI de push 3/3 verde (run 41817085354). A T201 implementa a primeira fatia da ficha individual do colaborador aprovada em 2026-11-04 (decisoes F-1 a F-8 de docs/decisions/t201-dossie-ficha-colaborador-funcional.md): aba Documentos com registros e solicitacoes de documento so da pessoa, na empresa ativa da sessao, pelos contratos que ja existiam; RH e DP registram, corrigem o tipo e solicitam; master_tecnico so le e, sem empresa ativa, nada e lido; so metadados, sem arquivo. Sem API, schema, migration, RBAC, auditoria, seed ou dependencia. Validada localmente; sem push e sem PR."
   },
   "openDeliveries": [
     {
       "id": "T201",
       "pullRequest": null,
-      "status": "ficha_colaborador_funcional_em_preparacao"
+      "status": "ficha_colaborador_documentos_implementada_local"
     }
   ],
   "requiredArtifacts": [
