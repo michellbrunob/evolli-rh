@@ -241,7 +241,7 @@
   color: var(--color-action);
 }
 
-/* Celular: as quatro abas cabem em duas colunas, sem rolagem lateral. */
+/* Celular: as abas cabem em duas colunas, sem rolagem lateral. */
 @media (max-width: 40rem) {
   .ficha-colaborador__abas {
     display: grid;
@@ -260,6 +260,12 @@
 
   .ficha-colaborador__aba:nth-child(odd) {
     border-right: 1px solid var(--divider-soft);
+  }
+
+  /* T201 — número ímpar de abas: a última ocupa a linha inteira. */
+  .ficha-colaborador__aba:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+    border-right: none;
   }
 
   .ficha-colaborador__aba--ativa {
@@ -302,6 +308,7 @@
 .ficha-colaborador__painel > .colaboradores-screen__vida-funcional,
 .ficha-colaborador__painel > .colaboradores-screen__jornada,
 .ficha-colaborador__painel > .ficha-colaborador__vinculos,
+.ficha-colaborador__painel > .documentos-colaborador,
 .ficha-colaborador__painel .dados-contratuais-screen__secao {
   margin: 0;
   padding: var(--space-lg);
@@ -374,8 +381,11 @@
   color: var(--color-ink);
 }
 
-/* Tabela larga rola dentro do próprio quadro, nunca a página. */
+/* Tabela larga rola dentro do próprio quadro, nunca a página. T201 — o
+   quadro é posicionado: o texto só para leitor (absoluto) dentro de uma
+   célula fica contido nele, em vez de escapar e alargar a página. */
 .ficha-colaborador__quadro {
+  position: relative;
   overflow-x: auto;
   min-width: 0;
 }

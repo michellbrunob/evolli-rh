@@ -1,0 +1,75 @@
+/* T201 — aba Documentos da ficha do colaborador. A moldura de cartão, os
+   títulos e o quadro de tabela são os da ficha (`FichaColaboradorScreen.css`);
+   aqui só o que é próprio da aba. */
+
+.documentos-colaborador {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-md);
+}
+
+.documentos-colaborador__aviso {
+  margin: 0;
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+  overflow-wrap: anywhere;
+}
+
+.documentos-colaborador__orientacao {
+  display: grid;
+  gap: var(--space-xs);
+}
+
+.documentos-colaborador__bloco {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-sm);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--hairline);
+  min-width: 0;
+}
+
+.documentos-colaborador__bloco-topo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+
+.documentos-colaborador__form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  background: var(--surface-pearl);
+  min-width: 0;
+}
+
+.documentos-colaborador__acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.documentos-colaborador__erro {
+  margin: 0;
+  color: var(--status-danger-ink, var(--color-ink));
+  font-weight: var(--weight-strong);
+  overflow-wrap: anywhere;
+}
+
+.documentos-colaborador__sucesso {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.documentos-colaborador__erro:focus-visible,
+.documentos-colaborador h2:focus-visible,
+.documentos-colaborador h3:focus-visible {
+  outline: var(--focus-width) solid var(--color-action);
+  outline-offset: var(--focus-offset);
+}

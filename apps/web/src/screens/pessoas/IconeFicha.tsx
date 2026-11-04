@@ -15,6 +15,7 @@ export type IconeFichaId =
   | "vida-funcional"
   | "contratuais"
   | "jornada"
+  | "documentos"
   | "calendario"
   | "estrutura"
   | "cracha";
@@ -48,6 +49,13 @@ const TRACOS: Readonly<Record<IconeFichaId, ReactNode>> = {
     <>
       <circle cx="10" cy="10" r="7.25" />
       <path d="M10 5.75V10l3 2" />
+    </>
+  ),
+  // T201 — pasta: o registro do documento (sem arquivo dentro).
+  documentos: (
+    <>
+      <path d="M2.75 5.25a1.5 1.5 0 0 1 1.5-1.5h3.5l1.75 2h6.25a1.5 1.5 0 0 1 1.5 1.5v7.5a1.5 1.5 0 0 1-1.5 1.5H4.25a1.5 1.5 0 0 1-1.5-1.5z" />
+      <path d="M2.75 8.75h14.5" />
     </>
   ),
   // Calendário: uma data.
