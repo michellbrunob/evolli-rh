@@ -3090,10 +3090,11 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       - promoção e merge.
 
 99. **T202 - Próxima aba funcional da ficha do colaborador: Registros de ponto**
-    - **Estado:** **implementada e validada localmente**, sem push e sem PR. Branch
+    - **Estado:** **em implementação** (entrega em PR Draft). Branch
       `codex/t202-proxima-aba-ficha-colaborador`, a partir do squash
       `8e1c7e96a3f6b8994518a8499b76041c12a4179e` (T201 integrada, PR #194). A preparação
-      (dossiê e decisões) veio antes, sem código de produto.
+      (dossiê e decisões) foi feita antes, sem código de produto, sem push e sem PR; isso
+      valeu só para aquela fase.
     - **Objetivo:** decidir, com evidência no código e nos contratos existentes, a próxima aba
       funcional da ficha individual depois de Documentos — Solicitações ou Ponto (só leitura,
       com o mês na URL) — no
@@ -3124,7 +3125,7 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       - total, saldo, horas trabalhadas, banco de horas ou comparação com a jornada;
       - Solicitações de Pessoas e operações de Vida funcional;
       - arquivos, foto e dado pessoal novo;
-      - push, PR, promoção e merge.
+      - promoção e merge.
 
 ## Regra obrigatória para as próximas tarefas
 

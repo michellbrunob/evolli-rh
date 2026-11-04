@@ -1,7 +1,7 @@
 # T202 — Dossiê: próxima aba funcional da ficha do colaborador
 
 **Situação:** decisões P-1 a P-5 aprovadas pela proprietária em 2026-11-04;
-a aba Registros de ponto foi implementada e validada localmente — ver a seção 10. Sem API, schema, migration, RBAC, auditoria, seed ou dependência nova.
+a aba Registros de ponto está em implementação, com a entrega em PR Draft — ver a seção 10. Sem API, schema, migration, RBAC, auditoria, seed ou dependência nova.
 
 **Base:** `main` em `8e1c7e9` (T201 integrada, PR #194). A ficha individual
 tem cinco abas reais: Dados do colaborador, Vida funcional, Dados contratuais,
