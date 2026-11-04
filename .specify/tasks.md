@@ -3044,11 +3044,20 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       entre abas, migração do diálogo da troca de empresa, promoção e merge.
 
 98. **T201 - Ficha do colaborador funcional: aba Documentos**
-    - **Estado:** **em implementação** (entrega em PR Draft). Branch
-      `codex/t201-ficha-colaborador-funcional`, a partir do squash
-      `9fd3427daa40067f6de6af4c35843f4e38e85ad2` (T200 integrada, PR #193). A preparação
-      (dossiê e decisões) foi feita antes, sem código de produto, sem push e sem PR; isso
-      valeu só para aquela fase.
+    - **Estado:** **integrada** em `main` pela PR #194, squash
+      `8e1c7e96a3f6b8994518a8499b76041c12a4179e`, com a CI de push 3/3 verde (run 41837091002);
+      branch preservada. Implementada na branch `codex/t201-ficha-colaborador-funcional`, a
+      partir do squash `9fd3427daa40067f6de6af4c35843f4e38e85ad2` (T200 integrada, PR #193).
+      A preparação (dossiê e decisões) foi feita antes, sem código de produto, sem push e sem
+      PR; isso valeu só para aquela fase.
+    - **Observação de relatório:** a integração funcional da T201 está concluída; a única
+      pendência administrativa era a sua convergência no Spec Kit, resolvida no primeiro commit
+      da T202. Os achados das revisões (texto só para leitor que alargava a página, documentação
+      do estado da PR, dossiê alinhado ao entregue e status de carga único) foram corrigidos
+      dentro da entrega.
+    - **Observações que continuam (sem decisão de mudança):** as da seção 11 do dossiê — o
+      "detalhe só leitura" por item segue só na visão coletiva; a trilha da ficha (T198) tem
+      alvo de toque menor que 44 px a 375 px.
     - **Objetivo:** a ficha individual concentra o que é de uma pessoa, e a listagem de
       Colaboradores continua coletiva e enxuta. A primeira fatia é a aba Documentos, conforme o
       [dossiê](../docs/decisions/t201-dossie-ficha-colaborador-funcional.md).
@@ -3079,6 +3088,21 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       - salário, benefícios, férias, ausências, pesquisas, comentários, portal e convite;
       - mudança nas visões da empresa em Pessoas;
       - promoção e merge.
+
+99. **T202 - Próxima aba funcional da ficha do colaborador (preparação de decisão)**
+    - **Estado:** **em preparação**. Branch `codex/t202-proxima-aba-ficha-colaborador`, a
+      partir do squash `8e1c7e96a3f6b8994518a8499b76041c12a4179e` (T201 integrada, PR #194).
+    - **Objetivo:** decidir, com evidência no código e nos contratos existentes, a próxima aba
+      funcional da ficha individual depois de Documentos — Solicitações ou Ponto (só leitura,
+      com o mês na URL) — no
+      [dossiê](../docs/decisions/t202-dossie-proxima-aba-ficha-colaborador.md): dados e ações
+      existentes, filtros por pessoa, empresa e período, permissões por perfil,
+      `master_tecnico` com e sem empresa ativa, isolamento, URL, foco, estados, 375 px, guarda
+      de saída, lacunas, recomendação de uma única primeira fatia, critérios de aceite e plano
+      de testes.
+    - **Decisões pendentes:** as do dossiê.
+    - **Fora de escopo:** implementação de produto, API, schema, migration, RBAC, auditoria,
+      Docker, seed, dependências, lockfile, workflow, push, PR, promoção e merge.
 
 ## Regra obrigatória para as próximas tarefas
 

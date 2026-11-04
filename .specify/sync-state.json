@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "constitutionVersion": "1.4.0",
   "lastConvergedAt": "2026-11-04",
-  "lastIntegratedTask": 200,
-  "lastRecordedTask": 201,
+  "lastIntegratedTask": 201,
+  "lastRecordedTask": 202,
   "platformDecision": {
     "adr": "docs/adr/0014-evolli-plataforma-base-e-encerramento-do-frappe.md",
     "decidedAt": "2026-10-01",
@@ -11,15 +11,15 @@
     "frappe": "encerrado_como_candidato_referencia_apenas"
   },
   "nextTask": {
-    "id": "T201",
-    "status": "ficha_colaborador_documentos_em_implementacao",
-    "reason": "T200 integrada em main pela PR #193 (squash 9fd3427daa40067f6de6af4c35843f4e38e85ad2), com a CI de push 3/3 verde (run 41817085354). A T201 implementa a primeira fatia da ficha individual do colaborador aprovada em 2026-11-04 (decisoes F-1 a F-8 de docs/decisions/t201-dossie-ficha-colaborador-funcional.md): aba Documentos com registros e solicitacoes de documento so da pessoa, na empresa ativa da sessao, pelos contratos que ja existiam; RH e DP registram, corrigem o tipo e solicitam; master_tecnico so le e, sem empresa ativa, nada e lido; so metadados, sem arquivo. Sem API, schema, migration, RBAC, auditoria, seed ou dependencia. Em implementacao, com a entrega em PR Draft. A preparacao (dossie e decisoes) foi feita sem codigo de produto, sem push e sem PR; isso valeu so para aquela fase."
+    "id": "T202",
+    "status": "proxima_aba_ficha_colaborador_em_preparacao",
+    "reason": "T201 integrada em main pela PR #194 (squash 8e1c7e96a3f6b8994518a8499b76041c12a4179e), com a CI de push 3/3 verde (run 41837091002). A T202 prepara a decisao da proxima aba funcional da ficha individual do colaborador depois de Documentos (docs/decisions/t202-dossie-proxima-aba-ficha-colaborador.md): Solicitacoes ou Ponto (so leitura, com o mes na URL), com evidencia nos contratos, RBAC, telas, rotas e testes existentes; comparacao, recomendacao de uma unica primeira fatia, criterios de aceite, plano de testes, riscos e limites. So preparacao: sem produto, API, schema, migration, RBAC, auditoria, seed ou dependencia."
   },
   "openDeliveries": [
     {
-      "id": "T201",
+      "id": "T202",
       "pullRequest": null,
-      "status": "ficha_colaborador_documentos_em_implementacao"
+      "status": "proxima_aba_ficha_colaborador_em_preparacao"
     }
   ],
   "requiredArtifacts": [
