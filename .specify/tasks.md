@@ -3089,9 +3089,11 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       - mudança nas visões da empresa em Pessoas;
       - promoção e merge.
 
-99. **T202 - Próxima aba funcional da ficha do colaborador (preparação de decisão)**
-    - **Estado:** **em preparação**. Branch `codex/t202-proxima-aba-ficha-colaborador`, a
-      partir do squash `8e1c7e96a3f6b8994518a8499b76041c12a4179e` (T201 integrada, PR #194).
+99. **T202 - Próxima aba funcional da ficha do colaborador: Registros de ponto**
+    - **Estado:** **implementada e validada localmente**, sem push e sem PR. Branch
+      `codex/t202-proxima-aba-ficha-colaborador`, a partir do squash
+      `8e1c7e96a3f6b8994518a8499b76041c12a4179e` (T201 integrada, PR #194). A preparação
+      (dossiê e decisões) veio antes, sem código de produto.
     - **Objetivo:** decidir, com evidência no código e nos contratos existentes, a próxima aba
       funcional da ficha individual depois de Documentos — Solicitações ou Ponto (só leitura,
       com o mês na URL) — no
@@ -3100,9 +3102,29 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       `master_tecnico` com e sem empresa ativa, isolamento, URL, foco, estados, 375 px, guarda
       de saída, lacunas, recomendação de uma única primeira fatia, critérios de aceite e plano
       de testes.
-    - **Decisões pendentes:** as do dossiê.
-    - **Fora de escopo:** implementação de produto, API, schema, migration, RBAC, auditoria,
-      Docker, seed, dependências, lockfile, workflow, push, PR, promoção e merge.
+    - **Decisões aprovadas (2026-11-04):** P-1 a P-5 da seção 8 do dossiê:
+      - próxima aba: Ponto, só consulta;
+      - `master_tecnico` sem empresa ativa: orientação, sem consulta;
+      - todos os vínculos da pessoa na empresa ativa, o principal primeiro, inclusive
+        encerrados;
+      - sem mês na URL, o mês corrente, corrigido no lugar;
+      - anuladas aparecem marcadas.
+    - **Entrega (seção 10 do dossiê):**
+      - aba `ponto` com a rota `…/ponto/AAAA-MM`, recarga, voltar e avançar;
+      - seção `RegistrosPontoColaboradorSecao`, só com `GET /v1/vinculos/:vinculoId/pontos`
+        (todas as páginas), filtrada pela pessoa, pela empresa e pelo mês;
+      - dia civil de São Paulo, ordem efetiva, ajustada e anulada;
+      - sem escrita, sem cálculo e sem edição pendente;
+      - foco, um só nó de status, falha com nova tentativa, respostas atrasadas e 375 px;
+      - testes de API do contrato existente (leitura positiva, `master_tecnico` com empresa
+        ativa, isolamento), sem mudar código da API.
+      - Sem API, schema, migration, RBAC, auditoria, Docker, seed, dependência ou workflow.
+    - **Fora de escopo:**
+      - registro, ajuste ou anulação de ponto pela ficha;
+      - total, saldo, horas trabalhadas, banco de horas ou comparação com a jornada;
+      - Solicitações de Pessoas e operações de Vida funcional;
+      - arquivos, foto e dado pessoal novo;
+      - push, PR, promoção e merge.
 
 ## Regra obrigatória para as próximas tarefas
 

@@ -1,7 +1,7 @@
 # T202 — Dossiê: próxima aba funcional da ficha do colaborador
 
-**Situação:** preparação de decisão (2026-11-04). Nenhum código de produto,
-API, schema, migration, RBAC, auditoria, seed ou dependência muda nesta etapa.
+**Situação:** decisões P-1 a P-5 aprovadas pela proprietária em 2026-11-04;
+a aba Registros de ponto foi implementada e validada localmente — ver a seção 10. Sem API, schema, migration, RBAC, auditoria, seed ou dependência nova.
 
 **Base:** `main` em `8e1c7e9` (T201 integrada, PR #194). A ficha individual
 tem cinco abas reais: Dados do colaborador, Vida funcional, Dados contratuais,
@@ -122,8 +122,9 @@ como a próxima candidata, sem número reservado.
   empresa ativa (P-3), um bloco por vínculo, o principal primeiro:
   - agrupadas por dia civil no fuso de São Paulo (o mesmo do servidor), em
     ordem do momento **efetivo**;
-  - colunas: dia, horário efetivo, tipo efetivo e situação ("Ajustada" com a
-    contagem, "Anulada", ou original);
+  - cada marcação: horário efetivo, tipo efetivo e situação ("Ajustada",
+    com o registro original quando o ajuste mudou horário ou tipo, ou
+    "Anulada"); nenhuma contagem;
   - anuladas aparecem marcadas, nunca somem (P-5);
   - quem registrou não aparece (o contrato traz só o id da conta).
 - **Aviso fixo:** a aba mostra as marcações registradas, sem total, saldo,
@@ -133,8 +134,8 @@ como a próxima candidata, sem número reservado.
   empresa e não lê nada (P-2, mesmo padrão de F-4).
 - **Paginação:** a aba lê todas as páginas da competência de cada vínculo
   (100 por página, guiada por `total`) antes de mostrar o bloco, para nunca
-  exibir um mês truncado; a falha em qualquer página vira falha do bloco, com
-  nova tentativa.
+  exibir um mês truncado; a falha em qualquer página de qualquer vínculo
+  vira falha do mês, com nova tentativa que relê tudo.
 
 ### 4.2 Contratos
 
@@ -170,18 +171,18 @@ Exigiria, antes de implementar:
 
 ## 5. Riscos
 
-| Risco                     | Cuidado na implementação                                                                                                                                                                                            |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Isolamento entre empresas | Vínculos e marcações vêm só do escopo da sessão; a aba descarta item cujo `vinculoId` ou `empresaId` não seja do bloco. URL de outra pessoa dá "não encontrado". A troca de empresa remonta a árvore (T163)         |
-| Respostas atrasadas       | Geração por leitura (pessoa, competência, vínculo): resposta de outro mês ou de outra pessoa nunca substitui a tela                                                                                                 |
-| Mês truncado              | Ler todas as páginas pelo `total`; nunca mostrar só as 100 primeiras                                                                                                                                                |
-| Regra de negócio nova     | Nenhum cálculo: agrupar por dia e ordenar é apresentação; somar ou parear entrada e saída é proibido pela ADR 0008 §7                                                                                               |
-| Fuso                      | Agrupar pelo dia civil de São Paulo, como o servidor; nunca pelo fuso do navegador                                                                                                                                  |
-| Auditoria                 | Cada abertura grava uma linha por vínculo e página; ler só a aba visitada e não reler ao voltar a ela                                                                                                               |
-| Foco e anúncios           | Rota direta: foco no título da ficha. Troca de aba: foco na aba. Troca de mês: foco no controle usado, um anúncio de carga e um de resultado ("N marcações em novembro de 2026"). Falha com nova tentativa no lugar |
-| 375 px                    | Seis abas na grade de duas colunas (três linhas, sem aba sozinha). Seletor de mês empilhado; tabelas rolam no próprio quadro posicionado (T201); controles com 44 px                                                |
-| Prévia vazia              | O seed não cria marcação: registrar marcações sintéticas pela Visão do período antes da validação                                                                                                                   |
-| Nome                      | "Registros de ponto", e não "Jornada" nem "Ponto" sozinho, para não confundir com "Jornada de trabalho"                                                                                                             |
+| Risco                     | Cuidado na implementação                                                                                                                                                                                                                                                                                 |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Isolamento entre empresas | Vínculos e marcações vêm só do escopo da sessão; a aba descarta item cujo `vinculoId` ou `empresaId` não seja do bloco. URL de outra pessoa dá "não encontrado". A troca de empresa remonta a árvore (T163)                                                                                              |
+| Respostas atrasadas       | Geração por leitura (pessoa, competência, vínculo): resposta de outro mês ou de outra pessoa nunca substitui a tela                                                                                                                                                                                      |
+| Mês truncado              | Ler todas as páginas pelo `total`; nunca mostrar só as 100 primeiras                                                                                                                                                                                                                                     |
+| Regra de negócio nova     | Nenhum cálculo: agrupar por dia e ordenar é apresentação; somar ou parear entrada e saída é proibido pela ADR 0008 §7                                                                                                                                                                                    |
+| Fuso                      | Agrupar pelo dia civil de São Paulo, como o servidor; nunca pelo fuso do navegador                                                                                                                                                                                                                       |
+| Auditoria                 | Cada abertura grava uma linha por vínculo e página; ler só a aba visitada e não reler ao voltar a ela                                                                                                                                                                                                    |
+| Foco e anúncios           | Rota direta: foco no título da ficha. Troca de aba: foco na aba. Troca de mês: foco no controle usado; um só nó de status anuncia a carga e o resultado ("Registros de ponto de novembro de 2026 carregados" ou "Nenhuma marcação em novembro de 2026"), sem contagem. Falha com nova tentativa no lugar |
+| 375 px                    | Seis abas na grade de duas colunas (três linhas, sem aba sozinha). Seletor de mês empilhado; tabelas rolam no próprio quadro posicionado (T201); controles com 44 px                                                                                                                                     |
+| Prévia vazia              | O seed não cria marcação: registrar marcações sintéticas pela Visão do período antes da validação                                                                                                                                                                                                        |
+| Nome                      | "Registros de ponto", e não "Jornada" nem "Ponto" sozinho, para não confundir com "Jornada de trabalho"                                                                                                                                                                                                  |
 
 ## 6. Critérios de aceite
 
@@ -223,7 +224,9 @@ Exigiria, antes de implementar:
   (`--runInBand`), scripts, lint, typecheck, build, Prettier, `spec:check`,
   prévia do squash e `git diff --check`.
 
-## 8. Decisões pendentes
+## 8. Decisões (aprovadas em 2026-11-04)
+
+Todas aprovadas como recomendado.
 
 | Id  | Pergunta                                                              | Recomendação                                                                                                                      |
 | --- | --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
@@ -235,11 +238,114 @@ Exigiria, antes de implementar:
 
 ## 9. Limites e fora de escopo
 
-- **Nesta etapa:** nenhum código de produto, API, schema, migration, RBAC,
-  auditoria, Docker, seed, dependências, lockfile ou workflow; sem push e sem
-  PR.
+- **Na etapa de preparação (histórico):** nenhum código de produto, API,
+  schema, migration, RBAC, auditoria, Docker, seed, dependências, lockfile ou
+  workflow; sem push e sem PR. Isso valeu só para a preparação.
+- **Na entrega:** sem API, schema, migration, RBAC, auditoria, Docker, seed,
+  dependências, lockfile ou workflow; os testes de API novos só exercitam o
+  contrato existente.
 - **Na primeira fatia:** só a aba de ponto (seção 4). Ficam de fora registro e
   ajuste na ficha, totais e saldo, espelho e fechamento, comparação com a
   jornada, dados reais ou integração de relógio, acesso do gestor e do
   colaborador, e Solicitações de Pessoas.
 - **Sempre:** nada de aba decorativa nem aviso de "em breve".
+
+## 10. Entrega da primeira fatia
+
+### 10.1 O que foi feito
+
+- **Aba `ponto`** em `ABAS_DA_FICHA`, depois de `documentos`, rótulo
+  "Registros de ponto" e ícone próprio. Rota
+  `#/pessoas/colaboradores/:colaboradorId/ponto/AAAA-MM`:
+  - `fichaDaRota` aceita o terceiro segmento só na aba de ponto e só no
+    formato do servidor; mês inválido, mês em outra aba ou segmento a mais não
+    é rota;
+  - `…/ponto` sem mês abre o mês corrente do navegador, e a URL é corrigida no
+    lugar (sem entrada nova);
+  - trocar de mês empilha uma entrada; voltar e avançar percorrem os meses;
+  - trocar de aba e voltar à de ponto reabre o último mês visto nesta ficha.
+- **Seção nova `RegistrosPontoColaboradorSecao`**:
+  - empresa ativa da sessão por `GET /v1/users/me`; sem ela, orientação e
+    nenhuma consulta (P-2);
+  - os vínculos vêm da ficha, filtrados pela pessoa e pela empresa da sessão,
+    o principal primeiro, encerrados incluídos (P-3);
+  - `GET /v1/vinculos/:vinculoId/pontos?competencia=` por vínculo, todas as
+    páginas de 100 pelo `total`, sem repetir marcação entre páginas e
+    descartando o que não for do vínculo, da empresa ou do mês;
+  - marcações agrupadas pelo dia civil de São Paulo e ordenadas pelo horário
+    efetivo; "Ajustada" (com o registro original quando mudou) e "Anulada"
+    (marcada, nunca some — P-5); quem registrou não aparece;
+  - controle de mês com "Mês anterior", campo de mês e "Próximo mês"; só um
+    mês válido vira rota;
+  - um só nó de status do começo ao fim (sessão e marcações), falha com alerta
+    e "Tentar de novo" que fica focado com `aria-disabled` durante a nova
+    leitura; sucesso leva o foco ao título da aba;
+  - resposta atrasada de outro mês, de outra pessoa ou de uma montagem
+    anterior não substitui a tela;
+  - sem formulário: nenhuma edição pendente, a guarda da T200 não pergunta
+    ao sair nem na troca de empresa.
+- **Cliente web:** `listarPontosDoVinculo` em `pontoClient.ts`, para a rota que
+  já existia.
+- **Sem escrita e sem cálculo:** nenhum botão além do controle de mês; nada de
+  total, saldo, horas trabalhadas ou contagem.
+- **375 px:** seis abas em três linhas de duas; controle de mês que quebra
+  linha; listas por dia em vez de tabela; campo de mês com 44 px.
+
+### 10.2 Diferenças em relação à proposta
+
+- A falha é do mês inteiro (todos os vínculos), e não de um bloco: uma
+  nova tentativa relê tudo, e a tela nunca mostra parte de um mês.
+- O anúncio de resultado não traz número de marcações, e a situação
+  "Ajustada" não traz a contagem de ajustes: a ficha não exibe nenhuma métrica
+  derivada. Quando o ajuste mudou horário ou tipo, aparece o registro original.
+
+### 10.3 Testes e validação
+
+- **Web:**
+  - `RegistrosPontoColaboradorSecao.test.tsx` (25 casos): vínculos, pessoa,
+    empresa e competência; master sem e com empresa; perfis sem escrita; dia
+    em São Paulo e ordem efetiva; ajustada e anulada; nenhum cálculo; mês com
+    130 marcações em duas páginas; repetição entre páginas; falha numa página
+    seguinte; um só nó de status; vazio; falha e nova tentativa; troca de mês,
+    virada de ano, campo de mês, resposta atrasada e desmontagem; 375 px;
+  - `App.ficha.test.tsx`: rota com competência (válida, sem mês, inválida),
+    competência vizinha, rota direta, recarga, URL sem mês corrigida no lugar,
+    mês inválido, troca de mês com voltar e avançar, troca de aba com o último
+    mês, outra pessoa pela URL, fora da empresa, perfis negados e saída sem
+    pergunta;
+  - `AutenticacaoApp.test.tsx`: troca de empresa com a leitura de ponto em
+    curso;
+  - `pontoClient.test.ts`: rota, query, sem CSRF, 404;
+  - `FichaColaboradorScreen.test.tsx`: seis abas e teclado.
+- **API (só testes, `ponto.e2e-spec.ts`):** leitura por vínculo para RH e DP,
+  paginação pelo total, recusas 400, isolamento 404 nos dois sentidos, perfis
+  negados, master global, master com empresa ativa (só a empresa; a outra é
+  404; continua sem escrita) e auditoria `ponto.consultado` por leitura.
+- **Prova de falha:** onze mutações do código, cada uma derrubando ao menos um
+  teste:
+  - filtro defensivo de item;
+  - master sem empresa consultando;
+  - só a primeira página;
+  - sem deduplicar;
+  - sem geração de leitura;
+  - ordem pelo momento original;
+  - principal fora do primeiro lugar;
+  - vínculo de outra empresa;
+  - anulada sem marca;
+  - rota aceitando mês inválido;
+  - troca de aba sem guardar o último mês.
+- **Localhost** (banco isolado, dados sintéticos; pessoas pela API de
+  Pessoas e marcações, ajuste e anulação pela tela Jornada › Visão do
+  período):
+  - uma pessoa com vínculo de estágio encerrado (7 marcações em junho, uma
+    ajustada e uma anulada) e vínculo CLT ativo (112 marcações em outubro e 2
+    em novembro);
+  - RH: rota direta, 112 marcações em duas páginas, junho com ajustada e
+    anulada e o 23:30 no dia certo, voltar e avançar, URL sem mês corrigida,
+    "Mês anterior" pelo teclado com o foco no botão;
+  - DP: só leitura;
+  - `master_tecnico`: sem empresa, orientação e nenhuma consulta de ponto;
+    com a Alfa, só leitura; trocando para a Beta, volta à listagem e a pessoa
+    da Alfa dá "não encontrado";
+  - gestor: sem ficha e sem requisição;
+  - 375 px sem rolagem horizontal.
