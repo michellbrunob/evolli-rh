@@ -2894,11 +2894,11 @@ squash `8e1c7e96a3f6b8994518a8499b76041c12a4179e`, CI de push 3/3 verde, run
 41837091002); a única pendência administrativa era a sua convergência no Spec Kit,
 resolvida no primeiro commit da T202.
 
-## Próxima aba funcional da ficha — T202 (em implementação)
+## Próxima aba funcional da ficha — T202 (integrada)
 
-| Tarefa | Estado                                     | Resultado principal                                                                                                      |
-| ------ | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
-| T202   | **Em implementação** (entrega em PR Draft) | Aba Registros de ponto na ficha individual: só consulta, com o mês na URL, todos os vínculos da pessoa na empresa ativa. |
+| Tarefa | Estado                                    | Resultado principal                                                                                                      |
+| ------ | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| T202   | **Integrada** (PR #195, squash `adc1123`) | Aba Registros de ponto na ficha individual: só consulta, com o mês na URL, todos os vínculos da pessoa na empresa ativa. |
 
 **Escopo da T202:** as decisões P-1 a P-5 do
 [dossiê](../docs/decisions/t202-dossie-proxima-aba-ficha-colaborador.md), aprovadas
@@ -2924,6 +2924,27 @@ em 2026-11-04, e a entrega da seção 10:
 
 **Histórico da preparação:** o dossiê e as decisões foram preparados sem código de
 produto, sem push e sem PR; isso valeu só para aquela fase.
+
+**Observação de relatório:** a integração funcional da T202 está concluída (PR #195,
+squash `adc1123e1e3cf6f73fde85de7919fcd765ae50e2`, CI de push 3/3 verde, run
+41910744912); a única pendência administrativa era a sua convergência no Spec Kit,
+resolvida no primeiro commit da T203.
+
+## Solicitações de Pessoas na ficha — T203 (em preparação)
+
+| Tarefa | Estado            | Resultado principal                                                                                                      |
+| ------ | ----------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| T203   | **Em preparação** | Preparação de decisão das Solicitações de Pessoas na ficha individual: só leitura, uma ação inicial ou o fluxo completo. |
+
+**Escopo da T203:** só preparação de decisão, no
+[dossiê](../docs/decisions/t203-dossie-solicitacoes-pessoas-ficha.md): estado do domínio,
+matriz de tipos, dados, ações e permissões, comparação entre três alternativas, recomendação
+de uma primeira fatia, contratos, riscos de isolamento, auditoria, guarda de saída, URL,
+ações irreversíveis e 375 px, critérios de aceite, plano de testes e decisões pendentes.
+
+**Decisões pendentes:** as do dossiê.
+
+**Fora de escopo:** implementação de produto, API, schema, migration, RBAC, auditoria, Docker, seed, dependências, lockfile, workflow, push, PR, promoção e merge.
 
 ## Próxima ação autorizável
 
