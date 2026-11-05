@@ -17,6 +17,7 @@ export type IconeFichaId =
   | "jornada"
   | "documentos"
   | "ponto"
+  | "solicitacoes"
   | "calendario"
   | "estrutura"
   | "cracha";
@@ -65,6 +66,13 @@ const TRACOS: Readonly<Record<IconeFichaId, ReactNode>> = {
       <rect x="3.25" y="3.25" width="13.5" height="13.5" rx="1.5" />
       <path d="M6.5 7h7M6.5 10h7M6.5 13h4" />
       <circle cx="14" cy="13" r="0.75" />
+    </>
+  ),
+  // T203 — solicitação: um balão de pedido com linhas.
+  solicitacoes: (
+    <>
+      <path d="M3.25 4.75a1.5 1.5 0 0 1 1.5-1.5h10.5a1.5 1.5 0 0 1 1.5 1.5v7.5a1.5 1.5 0 0 1-1.5 1.5H8.5l-3.5 3v-3h-.25a1.5 1.5 0 0 1-1.5-1.5z" />
+      <path d="M6.5 7.25h7M6.5 10h4.5" />
     </>
   ),
   // Calendário: uma data.

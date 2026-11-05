@@ -60,6 +60,13 @@ import {
 } from "../api/movimentacaoClient";
 import { obterUsuarioAtual } from "../api/usersClient";
 import {
+  detalharSolicitacaoPessoa,
+  historicoSolicitacaoPessoa,
+  listarSolicitacoesPessoas,
+  registrarSolicitacaoPessoa,
+  transicionarSolicitacaoPessoa,
+} from "../api/solicitacoesPessoasClient";
+import {
   listarPontosDoVinculo,
   registrarAjustePonto,
   registrarPonto,
@@ -87,6 +94,20 @@ vi.mock("../api/usersClient", async () => {
       "../api/usersClient",
     );
   return { ...actual, obterUsuarioAtual: vi.fn() };
+});
+// T203 — a aba Solicitações lê as solicitações por vínculo.
+vi.mock("../api/solicitacoesPessoasClient", async () => {
+  const actual = await vi.importActual<
+    typeof import("../api/solicitacoesPessoasClient")
+  >("../api/solicitacoesPessoasClient");
+  return {
+    ...actual,
+    listarSolicitacoesPessoas: vi.fn(),
+    detalharSolicitacaoPessoa: vi.fn(),
+    historicoSolicitacaoPessoa: vi.fn(),
+    registrarSolicitacaoPessoa: vi.fn(),
+    transicionarSolicitacaoPessoa: vi.fn(),
+  };
 });
 // T202 — a aba Registros de ponto lê as marcações por vínculo.
 vi.mock("../api/pontoClient", async () => {
@@ -282,6 +303,8 @@ beforeEach(() => {
   );
   vi.mocked(listarSolicitacoesDocumento).mockResolvedValue(paginado([]));
   vi.mocked(listarPontosDoVinculo).mockResolvedValue(paginado([]));
+  vi.mocked(listarSolicitacoesPessoas).mockResolvedValue(paginado([]));
+  vi.mocked(historicoSolicitacaoPessoa).mockResolvedValue([]);
   vi.mocked(consultarDadosPessoaisDoColaborador).mockImplementation(
     async (colaboradorId) => ({
       colaboradorId,
@@ -2405,5 +2428,214 @@ describe("T202 — aba Registros de ponto no shell", () => {
     await screen.findByRole("table", { name: /^Colaboradores — / });
     expect(registrarPonto).not.toHaveBeenCalled();
     expect(registrarAjustePonto).not.toHaveBeenCalled();
+  });
+});
+
+describe("T203 — aba Solicitações no shell", () => {
+  const blocoPrincipal = (c: ColaboradorListadoApi = ana) =>
+    screen.findByRole("region", {
+      name: new RegExp(
+        `^CLT · ${c.vinculos[0]!.matricula} · vínculo principal`,
+      ),
+    });
+  const solicitacaoDe = (c: ColaboradorListadoApi) => ({
+    id: `s-de-${c.id}`,
+    empresaId: EMPRESA,
+    vinculoId: c.vinculos[0]!.id,
+    tipo: "atestado" as const,
+    motivo: "atestado_apresentado" as const,
+    situacao: "enviada" as const,
+    periodoReferencia: "2026-10-05",
+    registradoPorUserId: "u-1",
+    enviadaEm: "2026-10-05T12:30:00.000Z",
+    primeiraRevisaoEm: null,
+    criadoEm: "2026-10-05T12:00:00.000Z",
+    atualizadoEm: "2026-10-05T12:30:00.000Z",
+  });
+
+  beforeEach(() => {
+    vi.mocked(listarSolicitacoesPessoas).mockImplementation(async (q) => {
+      const dono = [ana, bruno].find((c) => c.vinculos[0]!.id === q?.vinculoId);
+      return paginado(dono ? [solicitacaoDe(dono)] : []);
+    });
+  });
+
+  function comoMaster(companyId: string | null) {
+    vi.mocked(obterUsuarioAtual).mockResolvedValue({
+      id: "ator-sintetico",
+      email: "pessoa.teste@example.test",
+      role: "master_tecnico",
+      companyId,
+      unitId: null,
+      teamId: null,
+      status: "active",
+      createdAt: "2026-01-01T00:00:00.000Z",
+    });
+  }
+
+  it("rota direta (RH) abre a aba, sem entrada nova; recarregar mantém; só leitura", async () => {
+    window.history.replaceState(null, "", `/${rotaDe(ana, "solicitacoes")}`);
+    const entradas = window.history.length;
+    const { unmount } = render(<App papelDoAtor="rh" />);
+    await esperarFicha(ana.nome);
+    expect(abaSelecionada()).toHaveTextContent("Solicitações");
+    const bloco = await blocoPrincipal();
+    expect(bloco).toHaveTextContent("Atestado");
+    expect(window.location.hash).toBe(rotaDe(ana, "solicitacoes"));
+    expect(window.history.length).toBe(entradas);
+    expect(listarSolicitacoesPessoas).toHaveBeenCalledWith({
+      vinculoId: ana.vinculos[0]!.id,
+      pagina: 1,
+      tamanhoPagina: 100,
+    });
+    const url = window.location.hash;
+    unmount();
+
+    window.history.replaceState(null, "", `/${url}`);
+    render(<App papelDoAtor="rh" />);
+    await esperarFicha(ana.nome);
+    expect(abaSelecionada()).toHaveTextContent("Solicitações");
+    await blocoPrincipal();
+    expect(registrarSolicitacaoPessoa).not.toHaveBeenCalled();
+    expect(transicionarSolicitacaoPessoa).not.toHaveBeenCalled();
+  });
+
+  it("DP com a URL da aba: abre Dados do colaborador, corrige a URL no lugar e não consulta solicitações", async () => {
+    window.history.replaceState(null, "", `/${rotaDe(ana, "solicitacoes")}`);
+    const entradas = window.history.length;
+    render(<App papelDoAtor="dp" />);
+    await esperarFicha(ana.nome);
+    expect(abaSelecionada()).toHaveTextContent("Dados do colaborador");
+    await waitFor(() => expect(window.location.hash).toBe(rotaDe(ana)));
+    expect(window.history.length).toBe(entradas);
+    expect(screen.queryByRole("tab", { name: "Solicitações" })).toBeNull();
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 20));
+    });
+    expect(listarSolicitacoesPessoas).not.toHaveBeenCalled();
+    expect(detalharSolicitacaoPessoa).not.toHaveBeenCalled();
+    expect(historicoSolicitacaoPessoa).not.toHaveBeenCalled();
+  });
+
+  it("DP indo à URL da aba por voltar/avançar: fica em Dados, URL corrigida, sem consulta", async () => {
+    window.history.replaceState(null, "", `/${rotaDe(ana, "jornada")}`);
+    render(<App papelDoAtor="dp" />);
+    await esperarFicha(ana.nome);
+    navegadorVaiPara(rotaDe(ana, "solicitacoes"));
+    await waitFor(() => expect(window.location.hash).toBe(rotaDe(ana)));
+    expect(abaSelecionada()).toHaveTextContent("Dados do colaborador");
+    expect(listarSolicitacoesPessoas).not.toHaveBeenCalled();
+  });
+
+  it("master_tecnico com empresa ativa lê; sem empresa, orientação e nenhuma consulta", async () => {
+    comoMaster(EMPRESA);
+    window.history.replaceState(null, "", `/${rotaDe(ana, "solicitacoes")}`);
+    const { unmount } = render(<App papelDoAtor="master_tecnico" />);
+    await blocoPrincipal();
+    expect(listarSolicitacoesPessoas).toHaveBeenCalledTimes(1);
+    unmount();
+
+    vi.mocked(listarSolicitacoesPessoas).mockClear();
+    comoMaster(null);
+    window.history.replaceState(null, "", `/${rotaDe(ana, "solicitacoes")}`);
+    render(<App papelDoAtor="master_tecnico" />);
+    expect(
+      await screen.findByText(
+        `Escolha uma empresa ativa para consultar as solicitações de ${ana.nome}.`,
+      ),
+    ).toBeInTheDocument();
+    expect(listarSolicitacoesPessoas).not.toHaveBeenCalled();
+  });
+
+  it("trocar de aba empilha a URL; voltar e avançar alternam entre ela e a anterior", async () => {
+    window.history.replaceState(null, "", `/${rotaDe(ana, "dados")}`);
+    render(<App papelDoAtor="rh" />);
+    await esperarFicha(ana.nome);
+    expect(listarSolicitacoesPessoas).not.toHaveBeenCalled();
+    const entradas = window.history.length;
+    const aba = screen.getByRole("tab", { name: "Solicitações" });
+    aba.focus();
+    fireEvent.click(aba);
+    await waitFor(() =>
+      expect(window.location.hash).toBe(rotaDe(ana, "solicitacoes")),
+    );
+    expect(window.history.length).toBe(entradas + 1);
+    await blocoPrincipal();
+    expect(screen.getByRole("tab", { name: "Solicitações" })).toHaveFocus();
+
+    navegadorVaiPara(rotaDe(ana, "dados"));
+    await waitFor(() =>
+      expect(abaSelecionada()).toHaveTextContent("Dados do colaborador"),
+    );
+    navegadorVaiPara(rotaDe(ana, "solicitacoes"));
+    await waitFor(() =>
+      expect(abaSelecionada()).toHaveTextContent("Solicitações"),
+    );
+    // A aba já visitada fica montada: nada é relido por voltar a ela.
+    expect(listarSolicitacoesPessoas).toHaveBeenCalledTimes(1);
+  });
+
+  it("outra pessoa pela URL: lê só os vínculos dela", async () => {
+    window.history.replaceState(null, "", `/${rotaDe(ana, "solicitacoes")}`);
+    render(<App papelDoAtor="rh" />);
+    await blocoPrincipal();
+    navegadorVaiPara(rotaDe(bruno, "solicitacoes"));
+    await blocoPrincipal(bruno);
+    expect(
+      vi
+        .mocked(listarSolicitacoesPessoas)
+        .mock.calls.map(([q]) => q?.vinculoId),
+    ).toEqual([ana.vinculos[0]!.id, bruno.vinculos[0]!.id]);
+  });
+
+  it("colaborador fora da empresa da sessão: 'não encontrado', sem consulta", async () => {
+    window.history.replaceState(
+      null,
+      "",
+      `/${LISTAGEM}/99999999-9999-4999-8999-999999999999/solicitacoes`,
+    );
+    render(<App papelDoAtor="rh" />);
+    await screen.findByRole("heading", {
+      level: 1,
+      name: "Colaborador não encontrado",
+    });
+    expect(listarSolicitacoesPessoas).not.toHaveBeenCalled();
+  });
+
+  it.each(["gestor", "colaborador", "financeiro", "auditor", "dpo"] as const)(
+    "%s com a URL da aba Solicitações não monta a ficha, e nada é lido",
+    async (papel) => {
+      window.history.replaceState(null, "", `/${rotaDe(ana, "solicitacoes")}`);
+      render(<App papelDoAtor={papel} />);
+      await screen.findByRole("navigation", { name: "Navegação do painel" });
+      await waitFor(() => expect(window.location.hash).not.toContain(ana.id));
+      expect(document.querySelector(".ficha-colaborador")).toBeNull();
+      expect(listarSolicitacoesPessoas).not.toHaveBeenCalled();
+    },
+  );
+
+  it("só leitura: com o detalhe aberto, sair da ficha não pergunta nada (sem edição pendente)", async () => {
+    vi.mocked(detalharSolicitacaoPessoa).mockResolvedValue(solicitacaoDe(ana));
+    window.history.replaceState(null, "", `/${rotaDe(ana, "solicitacoes")}`);
+    render(
+      <ComGuardaDeSaida>
+        <App papelDoAtor="rh" />
+      </ComGuardaDeSaida>,
+    );
+    const bloco = await blocoPrincipal();
+    fireEvent.click(
+      within(bloco).getByRole("button", { name: /^Ver detalhe/ }),
+    );
+    await screen.findByRole("heading", {
+      level: 4,
+      name: "Detalhe da solicitação de Atestado",
+    });
+    fireEvent.click(
+      within(
+        document.querySelector<HTMLElement>(".ficha-colaborador")!,
+      ).getByRole("button", { name: "Colaboradores" }),
+    );
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    await screen.findByRole("table", { name: /^Colaboradores — / });
   });
 });

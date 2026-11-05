@@ -3090,11 +3090,20 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       - promoção e merge.
 
 99. **T202 - Próxima aba funcional da ficha do colaborador: Registros de ponto**
-    - **Estado:** **em implementação** (entrega em PR Draft). Branch
-      `codex/t202-proxima-aba-ficha-colaborador`, a partir do squash
-      `8e1c7e96a3f6b8994518a8499b76041c12a4179e` (T201 integrada, PR #194). A preparação
-      (dossiê e decisões) foi feita antes, sem código de produto, sem push e sem PR; isso
-      valeu só para aquela fase.
+    - **Estado:** **integrada** em `main` pela PR #195, squash
+      `adc1123e1e3cf6f73fde85de7919fcd765ae50e2`, com a CI de push 3/3 verde (run 41910744912);
+      branch preservada. Implementada na branch `codex/t202-proxima-aba-ficha-colaborador`, a
+      partir do squash `8e1c7e96a3f6b8994518a8499b76041c12a4179e` (T201 integrada, PR #194).
+      A preparação (dossiê e decisões) foi feita antes, sem código de produto, sem push e sem
+      PR; isso valeu só para aquela fase.
+    - **Observação de relatório:** a integração funcional da T202 está concluída; a única
+      pendência administrativa era a sua convergência no Spec Kit, resolvida no primeiro commit
+      da T203. Os achados das revisões (estado da entrega em PR Draft, campo de mês aceitando
+      anos parciais e auditoria do master global provada em teste) foram corrigidos dentro da
+      entrega.
+    - **Observações que continuam (sem decisão de mudança):** a trilha da ficha (T198) tem alvo
+      de toque menor que 44 px a 375 px; testes de histórico da T200 (B7 e B8) podem oscilar
+      sob carga concorrente, e passam isolados.
     - **Objetivo:** decidir, com evidência no código e nos contratos existentes, a próxima aba
       funcional da ficha individual depois de Documentos — Solicitações ou Ponto (só leitura,
       com o mês na URL) — no
@@ -3126,6 +3135,41 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       - Solicitações de Pessoas e operações de Vida funcional;
       - arquivos, foto e dado pessoal novo;
       - promoção e merge.
+
+100.  **T203 - Solicitações de Pessoas na ficha do colaborador: aba só leitura**
+      - **Estado:** **em implementação** (entrega em PR Draft). Branch
+        `codex/t203-solicitacoes-pessoas-ficha`, a partir do squash
+        `adc1123e1e3cf6f73fde85de7919fcd765ae50e2` (T202 integrada, PR #195). A preparação
+        (dossiê e decisões) foi feita antes, sem código de produto, sem push e sem PR; isso
+        valeu só para aquela fase.
+      - **Objetivo:** levar as Solicitações de Pessoas (ajuste de ponto, ausência, férias,
+        atualização cadastral, atestado e benefícios) à ficha individual, conforme o
+        [dossiê](../docs/decisions/t203-dossie-solicitacoes-pessoas-ficha.md). Solicitações de
+        documento seguem na aba Documentos.
+      - **Decisões aprovadas (2026-11-05):** S-1 a S-5 da seção 9 do dossiê:
+        - opção 1, só leitura;
+        - `master_tecnico` sem empresa ativa: orientação, sem consulta;
+        - DP com a URL da aba: "Dados do colaborador", URL corrigida, sem consulta;
+        - todos os vínculos da pessoa na empresa ativa, o principal primeiro, inclusive
+          encerrados;
+        - Atestado como os demais tipos (tipo, motivo e datas).
+      - **Entrega (seção 11 do dossiê):**
+        - aba `solicitacoes` com URL própria, só para quem lê (RH e `master_tecnico`);
+        - correção da rota para o DP na entrada e no voltar/avançar, sem consulta;
+        - seção `SolicitacoesColaboradorSecao`, só com as três leituras existentes, por
+          vínculo e com todas as páginas, filtrada pela pessoa e pela empresa da sessão;
+        - detalhe e linha do tempo com defesa de escopo;
+        - sem escrita e sem edição pendente; foco, anúncios, falhas, respostas atrasadas e
+          375 px;
+        - testes de API do contrato existente (`master_tecnico` com empresa ativa, leitura
+          por vínculo, isolamento e auditoria), sem mudar código da API.
+        - Sem API, schema, migration, RBAC, auditoria, Docker, seed, dependência ou workflow.
+      - **Fora de escopo:**
+        - registro, transições e qualquer escrita de solicitação pela ficha;
+        - anexo, CID, arquivo, foto, upload, download e visualização;
+        - solicitações de documento (aba Documentos);
+        - mudança na Central de Pessoas › Solicitações;
+        - promoção e merge.
 
 ## Regra obrigatória para as próximas tarefas
 
