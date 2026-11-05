@@ -1,8 +1,8 @@
 # T203 — Dossiê: Solicitações de Pessoas na ficha do colaborador
 
 **Situação:** decisões S-1 a S-5 aprovadas pela proprietária em 2026-11-05;
-a aba Solicitações (só leitura) foi implementada e validada localmente — ver a
-seção 11. Sem API, schema, migration, RBAC, auditoria, seed ou dependência
+a aba Solicitações (só leitura) está em implementação, com a entrega em PR
+Draft — ver a seção 11. Sem API, schema, migration, RBAC, auditoria, seed ou dependência
 nova.
 
 **Base:** `main` em `adc1123` (T202 integrada, PR #195). A ficha individual tem

@@ -2930,11 +2930,11 @@ squash `adc1123e1e3cf6f73fde85de7919fcd765ae50e2`, CI de push 3/3 verde, run
 41910744912); a única pendência administrativa era a sua convergência no Spec Kit,
 resolvida no primeiro commit da T203.
 
-## Solicitações de Pessoas na ficha — T203 (implementada, local)
+## Solicitações de Pessoas na ficha — T203 (em implementação)
 
-| Tarefa | Estado                                 | Resultado principal                                                                                                |
-| ------ | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| T203   | **Implementada e validada localmente** | Aba Solicitações na ficha individual: só leitura, por vínculo, com detalhe e linha do tempo; não existe para o DP. |
+| Tarefa | Estado                                     | Resultado principal                                                                                                |
+| ------ | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| T203   | **Em implementação** (entrega em PR Draft) | Aba Solicitações na ficha individual: só leitura, por vínculo, com detalhe e linha do tempo; não existe para o DP. |
 
 **Escopo da T203:** as decisões S-1 a S-5 do
 [dossiê](../docs/decisions/t203-dossie-solicitacoes-pessoas-ficha.md), aprovadas
@@ -2956,10 +2956,10 @@ em 2026-11-05, e a entrega da seção 11:
 - anexo, CID, arquivo, foto, upload, download e visualização;
 - solicitações de documento e mudança na Central de Pessoas › Solicitações;
 - API, schema, migration, RBAC, auditoria, Docker, seed, dependências, lockfile e workflows;
-- push, PR, promoção e merge.
+- promoção e merge.
 
 **Histórico da preparação:** o dossiê e as decisões foram preparados sem código de
-produto, sem push e sem PR.
+produto, sem push e sem PR; isso valeu só para aquela fase.
 
 ## Próxima ação autorizável
 

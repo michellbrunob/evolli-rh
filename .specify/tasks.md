@@ -3137,10 +3137,11 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       - promoção e merge.
 
 100.  **T203 - Solicitações de Pessoas na ficha do colaborador: aba só leitura**
-      - **Estado:** **implementada e validada localmente**, sem push e sem PR. Branch
+      - **Estado:** **em implementação** (entrega em PR Draft). Branch
         `codex/t203-solicitacoes-pessoas-ficha`, a partir do squash
         `adc1123e1e3cf6f73fde85de7919fcd765ae50e2` (T202 integrada, PR #195). A preparação
-        (dossiê e decisões) veio antes, sem código de produto.
+        (dossiê e decisões) foi feita antes, sem código de produto, sem push e sem PR; isso
+        valeu só para aquela fase.
       - **Objetivo:** levar as Solicitações de Pessoas (ajuste de ponto, ausência, férias,
         atualização cadastral, atestado e benefícios) à ficha individual, conforme o
         [dossiê](../docs/decisions/t203-dossie-solicitacoes-pessoas-ficha.md). Solicitações de
@@ -3168,7 +3169,7 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         - anexo, CID, arquivo, foto, upload, download e visualização;
         - solicitações de documento (aba Documentos);
         - mudança na Central de Pessoas › Solicitações;
-        - push, PR, promoção e merge.
+        - promoção e merge.
 
 ## Regra obrigatória para as próximas tarefas
 
