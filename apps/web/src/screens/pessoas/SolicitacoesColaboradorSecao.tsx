@@ -162,6 +162,12 @@ export function SolicitacoesColaboradorSecao({
   const [sessao, setSessao] = useState<EstadoDaSessao>({ tipo: "carregando" });
   const [lista, setLista] = useState<EstadoDaLista>({ tipo: "carregando" });
   const [detalhe, setDetalhe] = useState<Detalhe | null>(null);
+  /**
+   * O resultado da lista já foi anunciado e o detalhe passou a falar: abrir,
+   * concluir, falhar ou fechar o detalhe não repete o anúncio da lista. Só uma
+   * nova leitura da lista volta a anunciar.
+   */
+  const [detalheDesdeALista, setDetalheDesdeALista] = useState(false);
 
   /** `id` do elemento que recebe o foco depois do próximo desenho. */
   const focoRef = useRef<string | null>(null);
@@ -227,6 +233,7 @@ export function SolicitacoesColaboradorSecao({
     async (novaLeitura = false) => {
       if (empresaId === null) return;
       const geracao = ++geracaoRef.current.lista;
+      setDetalheDesdeALista(false);
       if (novaLeitura) setLista(emNovaLeitura);
       else setLista({ tipo: "carregando" });
       try {
@@ -287,6 +294,7 @@ export function SolicitacoesColaboradorSecao({
     async (linha: SolicitacaoPessoaApi, novaLeitura = false) => {
       if (empresaId === null) return;
       const geracao = ++geracaoRef.current.detalhe;
+      setDetalheDesdeALista(true);
       setDetalhe((atual) =>
         novaLeitura && atual && atual.linha.id === linha.id
           ? { linha, conteudo: emNovaLeitura(atual.conteudo) }
@@ -380,7 +388,8 @@ export function SolicitacoesColaboradorSecao({
   );
 
   // Um só nó de status do começo ao fim (lição do B3 da T201): sessão e lista
-  // carregando dizem o MESMO texto; o detalhe anuncia só a própria carga.
+  // carregando dizem o MESMO texto; o detalhe anuncia só a própria carga, e o
+  // resultado da lista é anunciado uma vez por leitura (B1).
   const carregandoLista =
     sessao.tipo === "carregando" ||
     (sessao.tipo === "pronta" &&
@@ -398,7 +407,8 @@ export function SolicitacoesColaboradorSecao({
     ? "Carregando solicitações…"
     : carregandoDetalhe
       ? "Carregando o detalhe da solicitação…"
-      : sessao.tipo === "pronta" &&
+      : !detalheDesdeALista &&
+          sessao.tipo === "pronta" &&
           lista.tipo === "dados" &&
           vinculosDaEmpresa.length > 0
         ? totalDeItens === 0

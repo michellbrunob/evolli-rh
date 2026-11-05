@@ -566,6 +566,130 @@ describe("T203 — estados, foco e anúncios", () => {
     expect(screen.getByRole("status")).toBe(status);
   });
 
+  /** Os textos que o nó de status assume a partir de agora. */
+  function textosDoStatus(status: HTMLElement) {
+    const textos: string[] = [];
+    const observador = new MutationObserver(() => {
+      textos.push(status.textContent ?? "");
+    });
+    observador.observe(status, {
+      childList: true,
+      characterData: true,
+      subtree: true,
+    });
+    return { textos, parar: () => observador.disconnect() };
+  }
+
+  it("B1: abrir e concluir o detalhe não repete o anúncio da lista", async () => {
+    const s = solicitacao();
+    comDetalheDe(s);
+    vi.mocked(listarSolicitacoesPessoas).mockImplementation(async (q) =>
+      q?.vinculoId === PRINCIPAL.id ? pagina([s]) : pagina([]),
+    );
+    render(<Secao />);
+    const principal = await bloco(/^CLT · MAT-0001/);
+    const status = screen.getByRole("status");
+    const anuncioDaLista = `Solicitações de ${NOME} carregadas.`;
+    expect(status).toHaveTextContent(anuncioDaLista);
+    const visto = textosDoStatus(status);
+    fireEvent.click(
+      within(principal).getByRole("button", { name: /^Ver detalhe/ }),
+    );
+    const titulo = await screen.findByRole("heading", {
+      level: 4,
+      name: /Detalhe da solicitação/,
+    });
+    await waitFor(() => expect(status).not.toHaveTextContent(/Carregando/));
+    await waitFor(() => expect(titulo).toHaveFocus());
+    visto.parar();
+    expect(visto.textos).toContain("Carregando o detalhe da solicitação…");
+    expect(visto.textos).not.toContain(anuncioDaLista);
+    expect(status.textContent).not.toBe(anuncioDaLista);
+  });
+
+  it("B1: fechar o detalhe não restaura o anúncio da lista; o nó de status é o mesmo", async () => {
+    const s = solicitacao();
+    comDetalheDe(s);
+    vi.mocked(listarSolicitacoesPessoas).mockImplementation(async (q) =>
+      q?.vinculoId === PRINCIPAL.id ? pagina([s]) : pagina([]),
+    );
+    render(<Secao />);
+    const principal = await bloco(/^CLT · MAT-0001/);
+    const status = screen.getByRole("status");
+    const anuncioDaLista = `Solicitações de ${NOME} carregadas.`;
+    const ver = within(principal).getByRole("button", { name: /^Ver detalhe/ });
+    fireEvent.click(ver);
+    await screen.findByRole("heading", {
+      level: 4,
+      name: /Detalhe da solicitação/,
+    });
+    await waitFor(() => expect(status).not.toHaveTextContent(/Carregando/));
+    const visto = textosDoStatus(status);
+    fireEvent.click(screen.getByRole("button", { name: "Fechar detalhe" }));
+    await waitFor(() => expect(ver).toHaveFocus());
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 10));
+    });
+    visto.parar();
+    expect(visto.textos).not.toContain(anuncioDaLista);
+    expect(status.textContent).not.toBe(anuncioDaLista);
+    expect(screen.getAllByRole("status")).toHaveLength(1);
+    expect(screen.getByRole("status")).toBe(status);
+  });
+
+  it("B1: falha do detalhe só anuncia a falha (um alerta), sem o anúncio da lista", async () => {
+    const s = solicitacao();
+    vi.mocked(listarSolicitacoesPessoas).mockImplementation(async (q) =>
+      q?.vinculoId === PRINCIPAL.id ? pagina([s]) : pagina([]),
+    );
+    vi.mocked(detalharSolicitacaoPessoa).mockRejectedValueOnce(
+      new ApiError(500, "x"),
+    );
+    render(<Secao />);
+    const principal = await bloco(/^CLT · MAT-0001/);
+    const status = screen.getByRole("status");
+    const anuncioDaLista = `Solicitações de ${NOME} carregadas.`;
+    const visto = textosDoStatus(status);
+    fireEvent.click(
+      within(principal).getByRole("button", { name: /^Ver detalhe/ }),
+    );
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Não foi possível carregar o detalhe da solicitação.",
+    );
+    visto.parar();
+    expect(screen.getAllByRole("alert")).toHaveLength(1);
+    expect(status.textContent).not.toBe(anuncioDaLista);
+    expect(visto.textos).not.toContain(anuncioDaLista);
+  });
+
+  it("B1: uma releitura verdadeira da lista volta a anunciar, uma vez", async () => {
+    const s = solicitacao();
+    comDetalheDe(s);
+    vi.mocked(listarSolicitacoesPessoas).mockImplementation(async (q) =>
+      q?.vinculoId === PRINCIPAL.id ? pagina([s]) : pagina([]),
+    );
+    const vinculos = [ENCERRADO, PRINCIPAL];
+    const { rerender } = render(<Secao vinculos={vinculos} />);
+    const principal = await bloco(/^CLT · MAT-0001/);
+    const status = screen.getByRole("status");
+    const anuncioDaLista = `Solicitações de ${NOME} carregadas.`;
+    fireEvent.click(
+      within(principal).getByRole("button", { name: /^Ver detalhe/ }),
+    );
+    await screen.findByRole("heading", {
+      level: 4,
+      name: /Detalhe da solicitação/,
+    });
+    await waitFor(() => expect(status).not.toHaveTextContent(/Carregando/));
+    const visto = textosDoStatus(status);
+    // A ficha releu os vínculos (lista nova): a seção relê as solicitações.
+    rerender(<Secao vinculos={[...vinculos]} />);
+    await waitFor(() => expect(status).toHaveTextContent(anuncioDaLista));
+    visto.parar();
+    expect(visto.textos.filter((t) => t === anuncioDaLista)).toHaveLength(1);
+    expect(screen.getByRole("status")).toBe(status);
+  });
+
   it("vazio: anuncia e mostra 'nenhuma solicitação' por vínculo", async () => {
     render(<Secao />);
     const principal = await bloco(/^CLT · MAT-0001/);

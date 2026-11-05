@@ -328,8 +328,10 @@ S-1 a S-5 aprovadas como recomendado.
     "Fechar detalhe".
 - **Foco e anúncios:** rota direta com o foco no título da ficha; "Ver
   detalhe" leva o foco ao título do painel e "Fechar detalhe" o devolve ao
-  botão de origem; um só nó de status (sessão, lista e carga do detalhe);
-  falhas com alerta e "Tentar de novo" no lugar.
+  botão de origem; um só nó de status (sessão, lista e carga do detalhe),
+  sem temporizador; o resultado da lista é anunciado uma vez por leitura
+  real da lista, e abrir, concluir, falhar ou fechar o detalhe não o repete
+  (correção B1 da revisão); falhas com alerta e "Tentar de novo" no lugar.
 - **Respostas atrasadas e desmontagem:** geração própria para a lista e para
   o detalhe; troca de empresa remonta a árvore.
 - **Sem edição pendente:** sem formulário, a guarda da T200 não pergunta ao
@@ -341,12 +343,13 @@ S-1 a S-5 aprovadas como recomendado.
 ### 11.2 Testes e validação
 
 - **Web:**
-  - `SolicitacoesColaboradorSecao.test.tsx` (20 casos): vínculos, pessoa e
+  - `SolicitacoesColaboradorSecao.test.tsx` (24 casos): vínculos, pessoa e
     empresa; os seis tipos com Atestado; master sem e com empresa; RH sem
     escrita; todas as páginas e deduplicação; falha numa página seguinte;
     detalhe e linha do tempo com defesa de escopo; detalhe indisponível;
     falha e nova tentativa do detalhe; detalhe atrasado; um só nó de status;
-    vazio; falha da lista; falha ao conferir o acesso; lista atrasada de
+    anúncio da lista sem repetição ao abrir, concluir, fechar ou falhar o
+    detalhe, e de novo uma vez numa releitura real da lista; vazio; falha da lista; falha ao conferir o acesso; lista atrasada de
     outra pessoa; desmontagem; 375 px;
   - `App.ficha.test.tsx` (13 casos T203): rota direta e recarga; DP com a
     URL da aba na entrada e no voltar/avançar (Dados, URL corrigida, zero
@@ -374,6 +377,9 @@ S-1 a S-5 aprovadas como recomendado.
   - linha do tempo sem filtro;
   - sem geração do detalhe;
   - fechar sem devolver o foco;
+  - status do detalhe voltando ao anúncio da lista (estado anterior à
+    correção B1);
+  - releitura da lista sem voltar a anunciar;
   - DP sem correção na entrada;
   - DP sem correção no voltar/avançar;
   - auditoria do master sem a empresa (mutação temporária do serviço,
