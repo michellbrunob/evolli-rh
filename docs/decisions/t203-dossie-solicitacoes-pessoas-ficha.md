@@ -1,7 +1,9 @@
 # T203 — Dossiê: Solicitações de Pessoas na ficha do colaborador
 
-**Situação:** preparação de decisão (2026-11-05). Nenhum código de produto,
-API, schema, migration, RBAC, auditoria, seed ou dependência muda nesta etapa.
+**Situação:** decisões S-1 a S-5 aprovadas pela proprietária em 2026-11-05;
+a aba Solicitações (só leitura) foi implementada e validada localmente — ver a
+seção 11. Sem API, schema, migration, RBAC, auditoria, seed ou dependência
+nova.
 
 **Base:** `main` em `adc1123` (T202 integrada, PR #195). A ficha individual tem
 seis abas reais: Dados do colaborador, Vida funcional, Dados contratuais,
@@ -259,7 +261,9 @@ estados é a mesma.
   lint, typecheck, build, Prettier, `spec:check`, prévia do squash e
   `git diff --check`).
 
-## 9. Decisões pendentes
+## 9. Decisões (aprovadas em 2026-11-05)
+
+S-1 a S-5 aprovadas como recomendado.
 
 | Id  | Pergunta                            | Recomendação                                                                                                |
 | --- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------- |
@@ -278,10 +282,119 @@ estados é a mesma.
 
 ## 10. Limites e fora de escopo
 
-- **Nesta etapa:** nenhum código de produto, API, schema, migration, RBAC,
-  auditoria, Docker, seed, dependências, lockfile ou workflow; sem push e sem
-  PR.
+- **Na etapa de preparação (histórico):** nenhum código de produto, API,
+  schema, migration, RBAC, auditoria, Docker, seed, dependências, lockfile ou
+  workflow; sem push e sem PR. Isso valeu só para a preparação.
+- **Na entrega:** sem API, schema, migration, RBAC, auditoria, Docker, seed,
+  dependências, lockfile ou workflow; os testes de API novos só exercitam o
+  contrato existente.
 - **Na primeira fatia:** só leitura. Ficam de fora registro e transições na
   ficha, filtros, detalhe na URL, nome de quem registrou e mudança na Central.
 - **Sempre:** solicitações de documento seguem na aba Documentos; nada de aba
   decorativa; nenhum anexo, texto livre, CID ou dado clínico.
+
+## 11. Entrega da primeira fatia
+
+### 11.1 O que foi feito
+
+- **Aba `solicitacoes`** em `ABAS_DA_FICHA`, depois de `ponto`, com o rótulo
+  "Solicitações", ícone próprio e a rota
+  `#/pessoas/colaboradores/:colaboradorId/solicitacoes` (recarga, voltar e
+  avançar como as demais abas).
+- **Papel (S-3):**
+  - `podeLerSolicitacoesPessoas` (`mapaNavegacao.ts`) espelha
+    `evaluateSolicitacoesPessoas`: `rh` e `master_tecnico` leem; `dp` e os
+    demais, não;
+  - a ficha só lista a aba para quem lê (`podeVerSolicitacoes`), e o teclado
+    percorre só as abas visíveis;
+  - `fichaParaOPapel` troca a aba pedida por "dados" para o DP, na entrada e
+    no voltar/avançar; o shell corrige a URL no lugar, sem entrada nova e sem
+    nenhuma consulta de solicitações.
+- **Seção nova `SolicitacoesColaboradorSecao`**, só com contratos existentes:
+  - empresa ativa por `GET /v1/users/me`; sem ela, orientação e nenhuma
+    leitura (S-2);
+  - vínculos da ficha filtrados pela pessoa e pela empresa da sessão, o
+    principal primeiro, encerrados incluídos (S-4);
+  - `GET /v1/solicitacoes-pessoas?vinculoId=` por vínculo, todas as páginas
+    de 100 pelo `total`, sem repetir e descartando o que não for do vínculo
+    ou da empresa;
+  - tabela por vínculo com tipo, situação, motivo, dia de referência e
+    "registrada em"; "Atestado" como os demais (S-5);
+  - "Ver detalhe" lê `/:id` e `/:id/historico`; o detalhe só vale se for o
+    pedido, da empresa da sessão e de um vínculo da pessoa; a linha do tempo
+    só com eventos dele, em ordem de ocorrência; 404 ou fora do escopo
+    mostram "não está disponível na empresa ativa";
+  - só leitura: o único controle por linha é "Ver detalhe", e no painel só
+    "Fechar detalhe".
+- **Foco e anúncios:** rota direta com o foco no título da ficha; "Ver
+  detalhe" leva o foco ao título do painel e "Fechar detalhe" o devolve ao
+  botão de origem; um só nó de status (sessão, lista e carga do detalhe);
+  falhas com alerta e "Tentar de novo" no lugar.
+- **Respostas atrasadas e desmontagem:** geração própria para a lista e para
+  o detalhe; troca de empresa remonta a árvore.
+- **Sem edição pendente:** sem formulário, a guarda da T200 não pergunta ao
+  sair nem na troca de empresa.
+- **375 px:** sete abas na grade de duas colunas (a sétima na linha inteira);
+  tabelas no quadro posicionado; painel de detalhe empilhado.
+- **Pessoas › Solicitações** (a Central) não mudou.
+
+### 11.2 Testes e validação
+
+- **Web:**
+  - `SolicitacoesColaboradorSecao.test.tsx` (20 casos): vínculos, pessoa e
+    empresa; os seis tipos com Atestado; master sem e com empresa; RH sem
+    escrita; todas as páginas e deduplicação; falha numa página seguinte;
+    detalhe e linha do tempo com defesa de escopo; detalhe indisponível;
+    falha e nova tentativa do detalhe; detalhe atrasado; um só nó de status;
+    vazio; falha da lista; falha ao conferir o acesso; lista atrasada de
+    outra pessoa; desmontagem; 375 px;
+  - `App.ficha.test.tsx` (13 casos T203): rota direta e recarga; DP com a
+    URL da aba na entrada e no voltar/avançar (Dados, URL corrigida, zero
+    consulta); master com e sem empresa; troca de aba com voltar e avançar;
+    outra pessoa pela URL; fora da empresa; perfis negados; saída sem
+    pergunta com o detalhe aberto;
+  - `AutenticacaoApp.test.tsx`: troca de empresa com a leitura em curso;
+  - `FichaColaboradorScreen.test.tsx`: sete abas com permissão, seis sem, e
+    o teclado;
+  - `mapaNavegacao.solicitacoes.test.ts`: papéis e correção da rota.
+- **API (só testes, `solicitacoes-pessoas.e2e-spec.ts`, 4 casos):** leitura
+  por vínculo paginada e isolada; Atestado sem campo a mais; `master_tecnico`
+  com empresa ativa (lista, detalhe e histórico só da empresa; a outra vazia
+  ou 404; sem escrita); auditoria `pessoas_solicitacao_consultada` de cada
+  leitura do master com o papel e a empresa.
+- **Prova de falha:** cada mutação abaixo derruba ao menos um teste:
+  - filtro defensivo da lista;
+  - master sem empresa consultando;
+  - só a primeira página;
+  - sem deduplicar;
+  - sem geração da lista;
+  - principal fora do primeiro lugar;
+  - vínculo de outra empresa;
+  - detalhe sem defesa de escopo;
+  - linha do tempo sem filtro;
+  - sem geração do detalhe;
+  - fechar sem devolver o foco;
+  - DP sem correção na entrada;
+  - DP sem correção no voltar/avançar;
+  - auditoria do master sem a empresa (mutação temporária do serviço,
+    desfeita).
+- **Achados na própria entrega e corrigidos:**
+  - o teste de paginação da API dependia de registros de outros blocos;
+    passou a registrar as suas próprias solicitações;
+  - o teste de arquitetura de formatação (T154) tomou um auxiliar de teste
+    por formatador de data local; o auxiliar deixou de recortar texto.
+- **Localhost** (banco isolado, dados sintéticos; pessoa e vínculos pela API
+  de Pessoas; solicitações e transições pela Central):
+  - uma pessoa com vínculo CLT ativo (contestação de ajuste de ponto,
+    férias encaminhada, atestado recusado e benefícios) e vínculo de estágio
+    encerrado (ausência e atualização cadastral);
+  - RH: rota direta, seis tipos nos dois blocos, detalhe e linha do tempo do
+    atestado pelo teclado (foco no título do painel e de volta ao botão),
+    sem anexo nem CID;
+  - DP: URL da aba corrigida para "dados", seis abas, zero requisições de
+    solicitações;
+  - `master_tecnico`: sem empresa, orientação e nenhuma consulta; com a
+    Alfa, só leitura; trocando para a Beta, volta à listagem e a pessoa da
+    Alfa dá "não encontrado";
+  - gestor: sem ficha e sem requisição;
+  - 375 px sem rolagem horizontal, com o painel de detalhe aberto.

@@ -3136,20 +3136,39 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       - arquivos, foto e dado pessoal novo;
       - promoção e merge.
 
-100.  **T203 - Solicitações de Pessoas na ficha do colaborador (preparação de decisão)**
-      - **Estado:** **em preparação**. Branch `codex/t203-solicitacoes-pessoas-ficha`, a partir
-        do squash `adc1123e1e3cf6f73fde85de7919fcd765ae50e2` (T202 integrada, PR #195).
-      - **Objetivo:** decidir, com evidência no código e nos contratos existentes, como as
-        Solicitações de Pessoas (ajuste de ponto, ausência, férias, atualização cadastral,
-        atestado e benefícios) entram na ficha individual, no
-        [dossiê](../docs/decisions/t203-dossie-solicitacoes-pessoas-ficha.md): estado do domínio,
-        matriz de tipos, dados, ações e permissões, comparação entre aba só leitura, leitura com
-        uma ação inicial e fluxo completo, recomendação de uma primeira fatia, contratos, riscos,
-        critérios de aceite, plano de testes e decisões pendentes. Solicitações de documento
-        seguem na aba Documentos; a aba some para o DP (F-6 da T201).
-      - **Decisões pendentes:** as do dossiê.
-      - **Fora de escopo:** implementação de produto, API, schema, migration, RBAC, auditoria,
-        Docker, seed, dependências, lockfile, workflow, push, PR, promoção e merge.
+100.  **T203 - Solicitações de Pessoas na ficha do colaborador: aba só leitura**
+      - **Estado:** **implementada e validada localmente**, sem push e sem PR. Branch
+        `codex/t203-solicitacoes-pessoas-ficha`, a partir do squash
+        `adc1123e1e3cf6f73fde85de7919fcd765ae50e2` (T202 integrada, PR #195). A preparação
+        (dossiê e decisões) veio antes, sem código de produto.
+      - **Objetivo:** levar as Solicitações de Pessoas (ajuste de ponto, ausência, férias,
+        atualização cadastral, atestado e benefícios) à ficha individual, conforme o
+        [dossiê](../docs/decisions/t203-dossie-solicitacoes-pessoas-ficha.md). Solicitações de
+        documento seguem na aba Documentos.
+      - **Decisões aprovadas (2026-11-05):** S-1 a S-5 da seção 9 do dossiê:
+        - opção 1, só leitura;
+        - `master_tecnico` sem empresa ativa: orientação, sem consulta;
+        - DP com a URL da aba: "Dados do colaborador", URL corrigida, sem consulta;
+        - todos os vínculos da pessoa na empresa ativa, o principal primeiro, inclusive
+          encerrados;
+        - Atestado como os demais tipos (tipo, motivo e datas).
+      - **Entrega (seção 11 do dossiê):**
+        - aba `solicitacoes` com URL própria, só para quem lê (RH e `master_tecnico`);
+        - correção da rota para o DP na entrada e no voltar/avançar, sem consulta;
+        - seção `SolicitacoesColaboradorSecao`, só com as três leituras existentes, por
+          vínculo e com todas as páginas, filtrada pela pessoa e pela empresa da sessão;
+        - detalhe e linha do tempo com defesa de escopo;
+        - sem escrita e sem edição pendente; foco, anúncios, falhas, respostas atrasadas e
+          375 px;
+        - testes de API do contrato existente (`master_tecnico` com empresa ativa, leitura
+          por vínculo, isolamento e auditoria), sem mudar código da API.
+        - Sem API, schema, migration, RBAC, auditoria, Docker, seed, dependência ou workflow.
+      - **Fora de escopo:**
+        - registro, transições e qualquer escrita de solicitação pela ficha;
+        - anexo, CID, arquivo, foto, upload, download e visualização;
+        - solicitações de documento (aba Documentos);
+        - mudança na Central de Pessoas › Solicitações;
+        - push, PR, promoção e merge.
 
 ## Regra obrigatória para as próximas tarefas
 
