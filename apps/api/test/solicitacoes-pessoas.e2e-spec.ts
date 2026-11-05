@@ -1332,4 +1332,177 @@ describe("Central de Solicitações de Pessoas — fundação backend (e2e)", ()
       }
     });
   });
+
+  // -------------------------------------------------------------------------
+  // T203 — leituras que a aba "Solicitações" da ficha usa: lista por vínculo
+  // (todas as páginas pelo total), detalhe e histórico, inclusive para o
+  // `master_tecnico` com empresa ativa (lacuna do domínio). Só testes:
+  // nenhum código da API muda.
+  // -------------------------------------------------------------------------
+
+  describe("T203 — leitura por vínculo e master_tecnico com empresa ativa", () => {
+    let atestadoA: string;
+    let feriasA: string;
+    let solicitacaoB: string;
+
+    // Autossuficiente: duas solicitações próprias no vínculo A, para a
+    // paginação não depender de registros feitos por outros blocos.
+    beforeAll(async () => {
+      atestadoA = await registrar(rhA, empresaA, vinculoA1, {
+        tipo: "atestado",
+        motivo: "atestado_apresentado",
+      });
+      feriasA = await registrar(rhA, empresaA, vinculoA1);
+      solicitacaoB = await registrar(rhB, empresaB, vinculoB1);
+    });
+
+    it("RH lê por vínculo: só do vínculo e da empresa, paginado pelo total sem repetir", async () => {
+      const tudo = await get(
+        `/v1/solicitacoes-pessoas?vinculoId=${vinculoA1}&tamanhoPagina=100`,
+        rhA,
+      ).expect(200);
+      const ids = (tudo.body.itens as { id: string }[]).map((s) => s.id);
+      expect(ids).toEqual(expect.arrayContaining([atestadoA, feriasA]));
+      expect(ids).not.toContain(solicitacaoB);
+      for (const item of tudo.body.itens as {
+        vinculoId: string;
+        empresaId: string;
+      }[]) {
+        expect(item.vinculoId).toBe(vinculoA1);
+        expect(item.empresaId).toBe(empresaA);
+      }
+      expect(tudo.body.total).toBeGreaterThanOrEqual(2);
+
+      const p1 = await get(
+        `/v1/solicitacoes-pessoas?vinculoId=${vinculoA1}&pagina=1&tamanhoPagina=1`,
+        rhA,
+      ).expect(200);
+      const p2 = await get(
+        `/v1/solicitacoes-pessoas?vinculoId=${vinculoA1}&pagina=2&tamanhoPagina=1`,
+        rhA,
+      ).expect(200);
+      expect(p1.body.total).toBe(tudo.body.total);
+      expect(p1.body.itens).toHaveLength(1);
+      expect(p2.body.itens).toHaveLength(1);
+      expect(p1.body.itens[0].id).not.toBe(p2.body.itens[0].id);
+
+      // `colaboradorId` não é filtro deste contrato.
+      await get(
+        `/v1/solicitacoes-pessoas?colaboradorId=${vinculoA1}`,
+        rhA,
+      ).expect(400);
+    });
+
+    it("Atestado tem a mesma estrutura dos demais: sem anexo, CID ou texto livre", async () => {
+      const detalhe = await get(
+        `/v1/solicitacoes-pessoas/${atestadoA}`,
+        rhA,
+      ).expect(200);
+      expect(Object.keys(detalhe.body).sort()).toEqual(
+        [
+          "atualizadoEm",
+          "criadoEm",
+          "empresaId",
+          "enviadaEm",
+          "id",
+          "motivo",
+          "periodoReferencia",
+          "primeiraRevisaoEm",
+          "registradoPorUserId",
+          "situacao",
+          "tipo",
+          "vinculoId",
+        ].sort(),
+      );
+      expect(detalhe.body.tipo).toBe("atestado");
+    });
+
+    it("master_tecnico COM empresa ativa lê só a empresa escolhida (lista, detalhe e histórico); a outra é vazia ou 404; continua sem escrita", async () => {
+      const masterA = await seedMaster("master.sol.t203@example.test");
+      await post("/v1/auth/contexto/empresa", masterA)
+        .send({ empresaId: empresaA })
+        .expect(200);
+
+      const daEmpresa = await get(
+        `/v1/solicitacoes-pessoas?vinculoId=${vinculoA1}&tamanhoPagina=100`,
+        masterA,
+      ).expect(200);
+      expect(
+        (daEmpresa.body.itens as { id: string }[]).map((s) => s.id),
+      ).toContain(atestadoA);
+      for (const item of daEmpresa.body.itens as { empresaId: string }[]) {
+        expect(item.empresaId).toBe(empresaA);
+      }
+
+      const detalhe = await get(
+        `/v1/solicitacoes-pessoas/${atestadoA}`,
+        masterA,
+      ).expect(200);
+      expect(detalhe.body.empresaId).toBe(empresaA);
+      const historico = await get(
+        `/v1/solicitacoes-pessoas/${atestadoA}/historico`,
+        masterA,
+      ).expect(200);
+      expect(historico.body.length).toBeGreaterThan(0);
+      for (const e of historico.body as {
+        solicitacaoId: string;
+        empresaId: string;
+      }[]) {
+        expect(e.solicitacaoId).toBe(atestadoA);
+        expect(e.empresaId).toBe(empresaA);
+      }
+
+      // A outra empresa: lista vazia, detalhe e histórico 404.
+      const outra = await get(
+        `/v1/solicitacoes-pessoas?vinculoId=${vinculoB1}`,
+        masterA,
+      ).expect(200);
+      expect(outra.body.itens).toHaveLength(0);
+      expect(outra.body.total).toBe(0);
+      await get(`/v1/solicitacoes-pessoas/${solicitacaoB}`, masterA).expect(
+        404,
+      );
+      await get(
+        `/v1/solicitacoes-pessoas/${solicitacaoB}/historico`,
+        masterA,
+      ).expect(404);
+
+      // Continua só leitura.
+      await post("/v1/solicitacoes-pessoas", masterA)
+        .send({
+          empresaId: empresaA,
+          vinculoId: vinculoA1,
+          tipo: "ferias",
+          motivo: "periodo_ferias",
+        })
+        .expect(403);
+      await transicionar(masterA, atestadoA, "enviar").expect(403);
+    });
+
+    it("cada leitura do master com empresa ativa grava pessoas_solicitacao_consultada com o papel e a empresa", async () => {
+      const masterA = await seedMaster("master.sol.t203.aud@example.test");
+      await post("/v1/auth/contexto/empresa", masterA)
+        .send({ empresaId: empresaA })
+        .expect(200);
+      const filtro = {
+        action: "pessoas_solicitacao_consultada",
+        actorRole: "master_tecnico",
+        companyId: empresaA,
+      } as const;
+      await comApp(async (p) => {
+        const antes = await p.auditEvent.count({ where: filtro });
+        await get(
+          `/v1/solicitacoes-pessoas?vinculoId=${vinculoA1}`,
+          masterA,
+        ).expect(200);
+        await get(`/v1/solicitacoes-pessoas/${atestadoA}`, masterA).expect(200);
+        await get(
+          `/v1/solicitacoes-pessoas/${atestadoA}/historico`,
+          masterA,
+        ).expect(200);
+        const depois = await p.auditEvent.count({ where: filtro });
+        expect(depois).toBe(antes + 3);
+      });
+    });
+  });
 });

@@ -32,6 +32,10 @@
  * T202 — aba Registros de ponto: só consulta, com a competência na rota (ver
  * `RegistrosPontoColaboradorSecao`). Sem escrita, sem cálculo e sem edição
  * pendente; sem empresa ativa, nada é lido.
+ *
+ * T203 — aba Solicitações: Solicitações de Pessoas só consulta (ver
+ * `SolicitacoesColaboradorSecao`). Só existe para quem as lê (não o DP):
+ * `podeVerSolicitacoes`. Sem escrita e sem edição pendente.
  */
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
@@ -79,6 +83,7 @@ import { DadosContratuaisScreen } from "./DadosContratuaisScreen";
 import { DadosPessoaisColaboradorSecao } from "./DadosPessoaisColaboradorSecao";
 import { DocumentosColaboradorSecao } from "./DocumentosColaboradorSecao";
 import { RegistrosPontoColaboradorSecao } from "./RegistrosPontoColaboradorSecao";
+import { SolicitacoesColaboradorSecao } from "./SolicitacoesColaboradorSecao";
 import { JornadaColaboradorSecao } from "./JornadaColaboradorSecao";
 import {
   type AlvoHistoricoFuncional,
@@ -100,6 +105,7 @@ export const ROTULO_DA_ABA: Readonly<Record<AbaDaFicha, string>> = {
   jornada: "Jornada de trabalho",
   documentos: "Documentos",
   ponto: "Registros de ponto",
+  solicitacoes: "Solicitações",
 };
 
 /** Ícone de cada aba (desenho próprio, ao lado do rótulo). */
@@ -110,6 +116,7 @@ const ICONE_DA_ABA: Readonly<Record<AbaDaFicha, IconeFichaId>> = {
   jornada: "jornada",
   documentos: "documentos",
   ponto: "ponto",
+  solicitacoes: "solicitacoes",
 };
 
 /**
@@ -237,6 +244,11 @@ export interface FichaColaboradorScreenProps {
   readonly podeEditarFicha?: boolean;
   /** T183 — atribuir, trocar e encerrar jornada (só o RH). */
   readonly podeOperarJornada?: boolean;
+  /**
+   * T203 — a aba Solicitações existe para este papel (RH e `master_tecnico`;
+   * o DP é negado no servidor). Sem isso, ela não aparece nem no teclado.
+   */
+  readonly podeVerSolicitacoes?: boolean;
   /** T187 — atalho da Vida funcional para o Histórico funcional. */
   readonly onAbrirHistoricoFuncional?: (alvo: AlvoHistoricoFuncional) => void;
   /** T176 — "Completar contatos" da Nova admissão: foco nos contatos. */
@@ -266,12 +278,17 @@ function FichaColaboradorConteudo({
   onVoltar,
   podeEditarFicha = false,
   podeOperarJornada = false,
+  podeVerSolicitacoes = false,
   onAbrirHistoricoFuncional,
   focarContatos = false,
   hoje = diaDeHoje(),
 }: FichaColaboradorScreenProps) {
   const prefixo = useId();
   const idDaAba = (a: AbaDaFicha) => `${prefixo}-aba-${a}`;
+  // T203 — as abas que este papel vê: Solicitações só para quem as lê.
+  const abasVisiveis = ABAS_DA_FICHA.filter(
+    (a) => a !== "solicitacoes" || podeVerSolicitacoes,
+  );
   const idDoPainel = (a: AbaDaFicha) => `${prefixo}-painel-${a}`;
   const tituloRef = useRef<HTMLHeadingElement | null>(null);
   /** Destinos do foco quando uma nova leitura do resumo dá certo. */
@@ -530,18 +547,18 @@ function FichaColaboradorConteudo({
 
   // ---- Abas: setas, Home e End movem o foco; Enter e Espaço ativam ---------
   function aoTeclarNaAba(evento: KeyboardEvent<HTMLButtonElement>) {
-    const atual = ABAS_DA_FICHA.indexOf(
+    const atual = abasVisiveis.indexOf(
       (evento.currentTarget.dataset.aba ?? aba) as AbaDaFicha,
     );
     let alvo: number | null = null;
-    if (evento.key === "ArrowRight") alvo = (atual + 1) % ABAS_DA_FICHA.length;
+    if (evento.key === "ArrowRight") alvo = (atual + 1) % abasVisiveis.length;
     if (evento.key === "ArrowLeft")
-      alvo = (atual - 1 + ABAS_DA_FICHA.length) % ABAS_DA_FICHA.length;
+      alvo = (atual - 1 + abasVisiveis.length) % abasVisiveis.length;
     if (evento.key === "Home") alvo = 0;
-    if (evento.key === "End") alvo = ABAS_DA_FICHA.length - 1;
+    if (evento.key === "End") alvo = abasVisiveis.length - 1;
     if (alvo === null) return;
     evento.preventDefault();
-    document.getElementById(idDaAba(ABAS_DA_FICHA[alvo]!))?.focus();
+    document.getElementById(idDaAba(abasVisiveis[alvo]!))?.focus();
   }
 
   // ---- Nome -----------------------------------------------------------------
@@ -952,7 +969,7 @@ function FichaColaboradorConteudo({
           aria-label={`Seções da ficha de ${nome}`}
           className="ficha-colaborador__abas"
         >
-          {ABAS_DA_FICHA.map((a) => {
+          {abasVisiveis.map((a) => {
             const selecionada = a === aba;
             return (
               <button
@@ -982,7 +999,7 @@ function FichaColaboradorConteudo({
         </div>
       </div>
 
-      {ABAS_DA_FICHA.map((a) =>
+      {abasVisiveis.map((a) =>
         abasVisitadas.has(a) || a === aba ? (
           <section
             key={a}
@@ -992,7 +1009,7 @@ function FichaColaboradorConteudo({
             hidden={a !== aba}
             className="ficha-colaborador__painel"
           >
-            {/* Vida funcional, Jornada, Documentos e Registros de ponto já abrem com o próprio título (h2);
+            {/* Vida funcional, Jornada, Documentos, Registros de ponto e Solicitações já abrem com o próprio título (h2);
                 as outras abas reúnem várias seções, e o h2 as agrupa para
                 quem navega por títulos. */}
             {a === "dados" || a === "contratuais" ? (
@@ -1092,6 +1109,13 @@ function FichaColaboradorConteudo({
             ) : a === "contratuais" ? (
               <DadosContratuaisScreen
                 colaborador={{ id: colaboradorId, nome }}
+              />
+            ) : a === "solicitacoes" ? (
+              <SolicitacoesColaboradorSecao
+                colaboradorId={colaboradorId}
+                nomeColaborador={nome}
+                vinculos={vinculos}
+                vinculoPrincipalId={principal?.id ?? null}
               />
             ) : a === "ponto" ? (
               <RegistrosPontoColaboradorSecao

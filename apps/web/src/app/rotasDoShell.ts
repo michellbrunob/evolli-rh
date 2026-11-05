@@ -63,6 +63,10 @@ export function rotaDoDestino(destinoId: string): string | null {
  *
  * T202 — "ponto": registros de ponto da pessoa, só consulta, com a
  * competência (mês) na rota (`…/ponto/AAAA-MM`).
+ *
+ * T203 — "solicitacoes": Solicitações de Pessoas da pessoa, só consulta. Não
+ * existe para o DP (negado no servidor): o shell corrige a rota para "dados"
+ * (ver `fichaParaOPapel`).
  */
 export const ABAS_DA_FICHA = [
   "dados",
@@ -71,6 +75,7 @@ export const ABAS_DA_FICHA = [
   "jornada",
   "documentos",
   "ponto",
+  "solicitacoes",
 ] as const;
 export type AbaDaFicha = (typeof ABAS_DA_FICHA)[number];
 

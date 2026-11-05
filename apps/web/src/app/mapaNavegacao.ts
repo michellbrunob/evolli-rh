@@ -124,6 +124,38 @@ export function podeEditarFicha(papel: string | null): boolean {
 }
 
 /**
+ * T203 — papéis que LEEM as Solicitações de Pessoas (`solicitacao_pessoa`/
+ * `read`): `rh` na própria empresa e `master_tecnico`. O `dp` é negado
+ * (`PD-SOL-01`). Espelha `evaluateSolicitacoesPessoas` em
+ * `rbac.evaluator.ts`. Decide se a aba "Solicitações" da ficha existe; quem
+ * recusa cada requisição é o servidor.
+ */
+export const PAPEIS_LEITURA_SOLICITACOES_PESSOAS: readonly string[] = [
+  "rh",
+  "master_tecnico",
+];
+
+export function podeLerSolicitacoesPessoas(papel: string | null): boolean {
+  return papel !== null && PAPEIS_LEITURA_SOLICITACOES_PESSOAS.includes(papel);
+}
+
+/**
+ * T203 — a ficha pedida, ajustada ao que o papel pode ver: a aba
+ * "Solicitações" pedida por quem não a lê (o DP) vira "Dados do colaborador".
+ * O shell escreve a URL corrigida no lugar, sem consulta nenhuma.
+ */
+export function fichaParaOPapel<T extends { readonly aba: string } | null>(
+  ficha: T,
+  papel: string | null,
+): T {
+  if (ficha === null) return ficha;
+  if (ficha.aba === "solicitacoes" && !podeLerSolicitacoesPessoas(papel)) {
+    return { ...ficha, aba: "dados" };
+  }
+  return ficha;
+}
+
+/**
  * T182 — papéis que CONSULTAM o catálogo de Jornadas de trabalho
  * (`tabela_horario`/`read`): `rh` e `dp` na própria empresa (o DP por decisão
  * da proprietária de 2026-10-23) e `master_tecnico`, que já lia. Espelha
