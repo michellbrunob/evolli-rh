@@ -3178,9 +3178,12 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         - mudança na Central de Pessoas › Solicitações;
         - promoção e merge.
 
-101.  **T204 - Primeira ação operacional em Solicitações na ficha (preparação de decisão)**
-      - **Estado:** **em preparação**. Branch `codex/t204-acao-solicitacoes-ficha`, a partir do
-        squash `e086d1ca79d978a51373f1b3afafbfba3cdd069f` (T203 integrada, PR #196).
+101.  **T204 - Primeira ação operacional em Solicitações na ficha: registrar e enviar**
+      - **Estado:** **em implementação** (commits locais, sem push). Branch
+        `codex/t204-acao-solicitacoes-ficha`, a partir do squash
+        `e086d1ca79d978a51373f1b3afafbfba3cdd069f` (T203 integrada, PR #196). A preparação
+        (dossiê e decisões) foi feita antes, sem código de produto, sem push e sem PR; isso
+        valeu só para aquela fase.
       - **Objetivo:** decidir, com evidência no código, nos contratos, no RBAC, na auditoria e
         na tela coletiva, se e como a aba Solicitações da ficha ganha a primeira ação
         operacional, sem duplicar o fluxo completo de Pessoas › Solicitações e sem criar
@@ -3190,9 +3193,28 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         ação, registrar e voltar à tela coletiva, registrar e enviar pela ficha, fluxo completo
         só estimado), recomendação, contratos, critérios de aceite, testes, riscos e decisões
         pendentes.
-      - **Decisões pendentes:** as do dossiê.
-      - **Fora de escopo:** implementação de produto, API, schema, migration, RBAC, auditoria,
-        Docker, seed, dependências, lockfile, workflow, push, PR, promoção e merge.
+      - **Decisões aprovadas (2026-11-09):** A-1 a A-6 da seção 9 do dossiê:
+        - opção 3: o RH registra e envia pela ficha;
+        - uma só ação "Confirmar e enviar", sem "salvar rascunho";
+        - todos os vínculos da pessoa na empresa ativa, principal pré-selecionado, situação no
+          rótulo;
+        - motivo natural do tipo, com "Outro (controlado)" como única alternativa;
+        - sem cancelar pela ficha;
+        - dia de referência opcional para todos os tipos.
+      - **Entrega (seção 12 do dossiê):**
+        - "Nova solicitação" só para `rh` com empresa ativa, numa janela do Evolli;
+        - registrar e depois enviar pelos contratos existentes, sem repetição automática;
+          registro recusado ou incerto não envia; envio falho deixa "Enviar" só no rascunho
+          criado pela ficha;
+        - guarda T200, foco, anúncio único e 375 px;
+        - testes de API do contrato existente, sem mudar código da API.
+        - Sem API, schema, migration, RBAC, auditoria, Docker, seed, dependência ou workflow.
+      - **Fora de escopo:**
+        - cancelar e as seis transições de análise pela ficha;
+        - registro por `master_tecnico` ou DP; solicitações de documento;
+        - anexo, CID, texto livre, arquivo, foto, upload, download e visualização;
+        - mudança na tela coletiva Pessoas › Solicitações;
+        - push, PR, promoção e merge.
 
 ## Regra obrigatória para as próximas tarefas
 

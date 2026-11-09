@@ -2966,22 +2966,36 @@ squash `e086d1ca79d978a51373f1b3afafbfba3cdd069f`, CI de push 3/3 verde, run
 42608918002); a única pendência administrativa era a sua convergência no Spec Kit,
 resolvida no primeiro commit da T204.
 
-## Primeira ação operacional em Solicitações na ficha — T204 (em preparação)
+## Primeira ação operacional em Solicitações na ficha — T204 (em implementação)
 
-| Tarefa | Estado            | Resultado principal                                                                                                     |
-| ------ | ----------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| T204   | **Em preparação** | Preparação de decisão da primeira ação operacional na aba Solicitações da ficha, sem duplicar o fluxo da tela coletiva. |
+| Tarefa | Estado                                          | Resultado principal                                                                                             |
+| ------ | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| T204   | **Em implementação** (commits locais, sem push) | RH registra e envia uma solicitação pela aba Solicitações da ficha; o resto do fluxo continua na tela coletiva. |
 
-**Escopo da T204:** só preparação de decisão, no
-[dossiê](../docs/decisions/t204-dossie-acao-solicitacoes-ficha.md): estado atual e limitações
-da aba, matriz de ações e transições, comparação entre quatro opções (sem ação, registrar e
-voltar à tela coletiva, registrar e enviar pela ficha, fluxo completo só estimado),
-recomendação de uma primeira fatia segura e completa, contratos reaproveitados, critérios de
-aceite, testes, riscos, fora de escopo e decisões pendentes.
+**Escopo da T204:** as decisões A-1 a A-6 do
+[dossiê](../docs/decisions/t204-dossie-acao-solicitacoes-ficha.md), aprovadas em
+2026-11-09, e a entrega da seção 12:
 
-**Decisões pendentes:** as do dossiê.
+- "Nova solicitação" só para `rh` com empresa ativa, numa janela do Evolli (formulário e
+  revisão, uma só ação "Confirmar e enviar");
+- todos os vínculos da pessoa na empresa ativa, o principal pré-selecionado, situação no
+  rótulo; motivo natural do tipo ou "Outro (controlado)"; dia opcional;
+- registrar e depois enviar pelos contratos existentes, sem repetição automática; registro
+  recusado ou incerto não envia; envio falho deixa "Enviar" só no rascunho criado;
+- guarda T200, foco, anúncio único e 375 px;
+- testes de API do contrato existente, sem mudar código da API.
 
-**Fora de escopo:** implementação de produto, API, schema, migration, RBAC, auditoria, Docker, seed, dependências, lockfile, workflow, push, PR, promoção e merge.
+**Fora de escopo:**
+
+- cancelar e as seis transições de análise pela ficha;
+- registro por `master_tecnico` ou DP; solicitações de documento;
+- anexo, CID, texto livre, arquivo, foto, upload, download e visualização;
+- mudança na tela coletiva Pessoas › Solicitações;
+- API, schema, migration, RBAC, auditoria, Docker, seed, dependências, lockfile e workflows;
+- push, PR, promoção e merge.
+
+**Histórico da preparação:** o dossiê e as decisões foram preparados sem código de
+produto, sem push e sem PR; isso valeu só para aquela fase.
 
 ## Próxima ação autorizável
 

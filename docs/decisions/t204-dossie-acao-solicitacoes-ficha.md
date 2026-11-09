@@ -1,8 +1,10 @@
 # T204 — Dossiê: primeira ação operacional em Solicitações na ficha
 
-**Situação:** preparação de decisão. Nenhum código de produto, API, schema,
-migration, RBAC, auditoria, Docker, seed, dependência, lockfile ou workflow;
-sem push e sem PR. As decisões A-1 a A-6 (seção 9) aguardam a proprietária.
+**Situação:** decisões A-1 a A-6 aprovadas pela proprietária em
+2026-11-09; a "Nova solicitação" (registrar e enviar pela ficha) está em
+implementação, em commits locais, sem push e sem PR — ver a seção 12. Sem API,
+schema, migration, RBAC, auditoria, Docker, seed, dependência, lockfile ou
+workflow novos.
 
 **Base:** `main` em `e086d1c` (T203 integrada, PR #196). A ficha individual
 tem sete abas reais; a aba Solicitações é só leitura
@@ -412,7 +414,9 @@ nada gravado.
 | Auditoria de leitura em volume        | Releitura só depois de gravar; não reler ao abrir ou fechar o formulário                                                                |
 | Divergência com a tela coletiva       | Mesmos contratos, rótulos e mensagens do cliente; o servidor é a autoridade                                                             |
 
-## 9. Decisões pendentes
+## 9. Decisões (aprovadas em 2026-11-09)
+
+A-1 a A-6 aprovadas como recomendado.
 
 | Id  | Pergunta                                          | Recomendação                                                                                                                                           |
 | --- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -441,3 +445,105 @@ nada gravado.
   contrato existente; sem mudança na tela coletiva.
 - **Sempre:** solicitações de documento na aba Documentos; sem anexo, CID,
   texto livre ou dado clínico; nenhuma ação além de registrar e enviar.
+
+## 12. Entrega da primeira fatia
+
+### 12.1 O que foi feito
+
+- **"Nova solicitação"** na aba Solicitações, só para `rh` com empresa ativa
+  (o papel e a empresa vêm de `GET /v1/users/me`, como na tela coletiva). Não
+  aparece para `master_tecnico`, com a lista em falha nem sem vínculo na
+  empresa; o DP continua sem a aba.
+- **Janela do Evolli** (`NovaSolicitacaoModal`, sobre o `Modal`): foco no
+  título ao abrir, foco preso, Escape e "Cancelar" pelo mesmo caminho, e
+  confirmação de descarte quando há alteração.
+  - **Formulário:** tipo (os seis), vínculo (todos os da pessoa na empresa
+    ativa, o principal pré-selecionado, situação no rótulo), motivo (o natural
+    do tipo, com "Outro (controlado)" como única alternativa —
+    `MOTIVO_NATURAL_POR_TIPO`) e dia de referência opcional, validado (ano de
+    1900 a 2100 e dia existente).
+  - **Revisão:** "Confira antes de enviar", com tipo, vínculo, motivo e o dia
+    quando preenchido; "Voltar" mantém os valores; uma só ação, "Confirmar e
+    enviar".
+- **Gravação:** `POST /v1/solicitacoes-pessoas` e, em seguida,
+  `POST /:id/transicoes` com `enviar`, uma vez cada, com trava síncrona contra
+  clique repetido e sem repetição automática.
+  - **Registro recusado** (400, 403, 404, 409, 422, sessão expirada): aviso de
+    que nada foi registrado; o formulário volta com os valores; nada é
+    enviado.
+  - **Registro incerto** (rede ou 5xx): aviso de que não foi possível
+    confirmar; nada é enviado nem repetido; ao fechar a janela, a lista é
+    relida para conferir.
+  - **Envio falhando depois do registro:** a janela fecha, a lista é relida e
+    o detalhe daquele rascunho abre com o aviso e **"Enviar" — só para ele**
+    (o rascunho que esta ficha registrou e não enviou; por instrução da
+    implementação, nenhum outro rascunho ganha ação na ficha).
+  - **"Enviar" repetido ou concorrente:** a resposta do servidor (422 ou 404)
+    vira aviso no detalhe, e a situação é relida — sem efeito duplo.
+  - **Desmontagem entre o registro e o envio:** o envio do registro
+    recém-criado acontece mesmo assim (a pessoa confirmou), sem atualizar a
+    tela.
+- **Sucesso:** a janela fecha, a lista é relida sem "Carregando…" (no lugar)
+  e mostra a solicitação "Enviada"; o foco vai ao título do bloco do vínculo;
+  o nó de status anuncia "Solicitação de {tipo} registrada e enviada." uma
+  vez (um `span` novo no mesmo nó), sem repetir o anúncio da lista (B1 da
+  T203).
+- **Guarda T200 e troca de empresa:** a janela se declara "Nova solicitação"
+  enquanto houver alteração (pendente) ou gravação (salvando); o envio pelo
+  detalhe se declara "Envio da solicitação" (salvando).
+- **Aviso fixo** para o RH: "Registro e envio" — analisar, encaminhar,
+  recusar, reabrir e cancelar continuam em Pessoas › Solicitações. O
+  `master_tecnico` continua com "Somente consulta".
+- **375 px:** formulário e revisão empilhados numa coluna que encolhe; campos
+  e botões com o alvo de toque do Evolli.
+- **Sem mudança** na API, na tela coletiva e nas demais abas. Cancelar e as
+  seis transições de análise não aparecem na ficha.
+
+### 12.2 Testes e validação
+
+- **Web:**
+  - `SolicitacoesColaboradorSecao.registro.test.tsx` (28 casos): quem vê;
+    vínculos e rótulos; tipos e motivos; validação; revisão e "Voltar";
+    Escape e descarte; sucesso (corpo exato, ordem, lista, foco, um anúncio,
+    mesmo nó de status); dia vazio e vínculo previsto; clique repetido e
+    Escape durante o envio; registro recusado (5 status) e incerto (rede e
+    5xx); envio falhando depois do registro e "Enviar"; "Enviar" concorrente;
+    rascunho que a ficha não criou; nenhuma transição fora de escopo;
+    desmontagem; registro de edições (pendente e salvando); 375 px;
+  - `SolicitacoesColaboradorSecao.test.tsx` (24 casos): o caso "só leitura"
+    agora cobre `master_tecnico` e um papel sem escrita;
+  - `App.ficha.test.tsx` (4 casos T204): guarda ao sair da ficha com a janela
+    alterada, com o registro em curso e sem alteração; `master_tecnico` sem
+    o botão;
+  - `AutenticacaoApp.test.tsx`: troca de empresa com a janela alterada.
+- **API (só testes, `solicitacoes-pessoas.e2e-spec.ts`, 9 casos):** registrar
+  e depois enviar em vínculo ativo, previsto e encerrado (criados pelos
+  fluxos reais de admissão e desligamento), com os eventos e as auditorias;
+  escopo entre empresas; `master_tecnico` com empresa e DP negados; envio
+  repetido e simultâneo (um 201 e um 422, um evento, uma auditoria); envio
+  depois de cancelada; registro não idempotente.
+- **Prova de falha:** cada mutação abaixo derruba ao menos um teste:
+  - qualquer papel com empresa registra;
+  - sem trava contra clique repetido (confirmação);
+  - registro recusado ainda envia;
+  - registro incerto repetido automaticamente;
+  - envio falho sem "Enviar" no rascunho;
+  - "Enviar" para qualquer rascunho;
+  - motivo natural trocado;
+  - vínculo pré-selecionado diferente do principal;
+  - janela que não se declara alterada (guarda e descarte);
+  - releitura silenciosa apagando o aviso de sucesso;
+  - sucesso sem foco no bloco do vínculo;
+  - desmontagem abandonando o rascunho;
+  - dia fora do calendário aceito;
+  - envio falho sem abrir o detalhe;
+  - "Enviar" do detalhe sem trava contra clique repetido.
+- **Achados na própria entrega e corrigidos:** o foco depois de um erro de
+  registro caía no título do passo que saía (ids de título distintos por
+  passo); duas chamadas redundantes ao sinal do anúncio da lista (mutação
+  equivalente) foram removidas; a fixture de vínculo ativo por SQL foi
+  trocada pelos fluxos reais de admissão e desligamento.
+- **Resultados:** web 3309 testes; API unitária 1472; E2E com PostgreSQL real
+  1013 testes (20 suítes); scripts 182; lint, typecheck, build, Prettier, `spec:check`,
+  prévia do squash e `git diff --check`: verdes.
+- **Localhost:** pendente — a prévia está no ar (web 5173 e API 3204 da T204, no banco sintético isolado da T203), mas a entrada com a conta sintética de RH precisa ser feita pela proprietária no navegador; o fluxo ainda não foi exercitado no localhost.
