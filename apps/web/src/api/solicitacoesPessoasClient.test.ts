@@ -18,11 +18,15 @@ import {
 import { clearCsrfToken, getCsrfToken, setCsrfToken } from "./csrfClient";
 
 function resposta(status: number, body: unknown): Response {
-  return {
+  // `clone` como o `Response` real: o transporte lê uma cópia do corpo num
+  // 403 para decidir se descarta o token CSRF (T204).
+  const r = {
     ok: status >= 200 && status < 300,
     status,
     json: async () => body,
-  } as unknown as Response;
+    clone: () => r,
+  };
+  return r as unknown as Response;
 }
 
 const SOLICITACAO = {
@@ -307,3 +311,63 @@ describe("solicitacoesPessoasClient — catálogos e rótulos", () => {
 
 // A formatação de datas saiu deste cliente na T154 (era erro de camada) e mora
 // em `src/format/data.ts`; a cobertura equivalente está em `format/data.test.ts`.
+
+// T204 — achado na validação local: com duas abas na mesma sessão, a outra
+// aba renova o token CSRF e o desta fica desatualizado. Como os demais
+// clientes de gravação (T179), um 403 `csrf_invalido` guarda o `codigo` e
+// descarta o token, para a próxima gravação pedir um novo.
+describe("solicitacoesPessoasClient — token CSRF desatualizado (T204)", () => {
+  function respostaErro(status: number, corpo: unknown = {}): Response {
+    const r = {
+      ok: false,
+      status,
+      json: async () => corpo,
+      clone: () => r,
+    };
+    return r as unknown as Response;
+  }
+
+  it.each([
+    [
+      "registrar",
+      () =>
+        registrarSolicitacaoPessoa({
+          empresaId: SOLICITACAO.empresaId,
+          vinculoId: SOLICITACAO.vinculoId,
+          tipo: "ferias",
+          motivo: "periodo_ferias",
+        }),
+    ],
+    [
+      "transicionar",
+      () => transicionarSolicitacaoPessoa(SOLICITACAO.id, { acao: "enviar" }),
+    ],
+  ])(
+    "%s: 403 csrf_invalido guarda o codigo e descarta o token",
+    async (_nome, gravar) => {
+      fetchMock.mockResolvedValueOnce(
+        respostaErro(403, {
+          message: "Acesso negado.",
+          codigo: "csrf_invalido",
+        }),
+      );
+      const erro = (await gravar().catch((e: unknown) => e)) as ApiError;
+      expect(erro).toBeInstanceOf(ApiError);
+      expect(erro.status).toBe(403);
+      expect(erro.codigo).toBe("csrf_invalido");
+      // Só o código estável; a mensagem do servidor não é repassada.
+      expect(erro.message).not.toContain("Acesso negado");
+      expect(getCsrfToken()).toBeNull();
+    },
+  );
+
+  it("403 de permissão, sem codigo: mantém o token", async () => {
+    fetchMock.mockResolvedValueOnce(respostaErro(403));
+    const erro = (await transicionarSolicitacaoPessoa(SOLICITACAO.id, {
+      acao: "enviar",
+    }).catch((e: unknown) => e)) as ApiError;
+    expect(erro.status).toBe(403);
+    expect(erro.codigo).toBeUndefined();
+    expect(getCsrfToken()).toBe("csrf-em-memoria");
+  });
+});

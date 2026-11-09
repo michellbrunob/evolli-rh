@@ -1,4 +1,9 @@
-import { clearCsrfToken, getCsrfToken, refreshCsrfToken } from "./csrfClient";
+import {
+  clearCsrfToken,
+  descartarTokenSeDesatualizado,
+  getCsrfToken,
+  refreshCsrfToken,
+} from "./csrfClient";
 
 /**
  * Cliente da Central de Solicitações de Pessoas (T140) — consome EXCLUSIVAMENTE
@@ -194,12 +199,23 @@ export interface ResultadoPaginado<T> {
 }
 
 export class ApiError extends Error {
+  /**
+   * T204 — código estável da recusa, quando o servidor o informa (ex.:
+   * `csrf_invalido`). Só o código: a mensagem do servidor nunca é repassada.
+   */
+  readonly codigo?: string;
+
   constructor(
     readonly status: number,
     message: string,
+    corpo?: unknown,
   ) {
     super(message);
     this.name = "ApiError";
+    if (typeof corpo === "object" && corpo !== null) {
+      const { codigo } = corpo as { codigo?: unknown };
+      if (typeof codigo === "string") this.codigo = codigo;
+    }
   }
 }
 
@@ -226,17 +242,22 @@ async function apiFetch(
   if (res.status === 401) {
     clearCsrfToken();
   }
+  // T204 (como os demais clientes de gravação, T179) — 403 `csrf_invalido`:
+  // o token desta aba ficou desatualizado (outra aba o renovou); descartado,
+  // a próxima gravação pede um novo.
+  await descartarTokenSeDesatualizado(res);
   return res;
 }
 
 /**
- * Nunca repassa o corpo de erro do servidor — só o status. A tela decide a
- * mensagem pública; 404 (anti-enumeração) e 422 (transição recusada) são
- * traduzidos por quem chama.
+ * Nunca repassa a mensagem de erro do servidor — só o status e, quando houver,
+ * o código estável (T204). A tela decide a mensagem pública; 404
+ * (anti-enumeração) e 422 (transição recusada) são traduzidos por quem chama.
  */
 async function jsonOrThrow<T>(res: Response, fallback: string): Promise<T> {
   if (!res.ok) {
-    throw new ApiError(res.status, fallback);
+    const corpo: unknown = await res.json().catch(() => null);
+    throw new ApiError(res.status, fallback, corpo);
   }
   return res.json() as Promise<T>;
 }

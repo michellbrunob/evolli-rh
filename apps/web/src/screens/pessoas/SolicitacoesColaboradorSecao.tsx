@@ -46,7 +46,10 @@ import {
 import { Button, DataTable, StatusBadge } from "../../components";
 import type { DataTableColumn, StatusVariant } from "../../components";
 import { obterUsuarioAtual } from "../../api/usersClient";
-import { falhaPorSessaoExpirada } from "../../api/csrfClient";
+import {
+  falhaPorSessaoExpirada,
+  falhaPorTokenDesatualizado,
+} from "../../api/csrfClient";
 import { useEdicaoEmAndamento } from "../../app/edicoesPendentes";
 import type {
   SituacaoVinculo,
@@ -177,6 +180,15 @@ function falhaDoRegistro(erro: unknown): {
       incerto: false,
     };
   }
+  // Outra aba renovou o token CSRF: o servidor recusou, o token já foi
+  // descartado e confirmar de novo pede um novo.
+  if (falhaPorTokenDesatualizado(erro)) {
+    return {
+      texto:
+        "Esta página ficou desatualizada e nada foi registrado. Confirme de novo.",
+      incerto: false,
+    };
+  }
   if (erro instanceof ApiError && erro.status < 500) {
     switch (erro.status) {
       case 403:
@@ -210,6 +222,9 @@ function falhaDoRegistro(erro: unknown): {
 function falhaDoEnvio(erro: unknown): string {
   if (falhaPorSessaoExpirada(erro)) {
     return "Sua sessão expirou e nada foi enviado. Entre de novo para continuar.";
+  }
+  if (falhaPorTokenDesatualizado(erro)) {
+    return "Esta página ficou desatualizada e nada foi enviado. A solicitação foi atualizada: se ainda estiver em rascunho, use “Enviar” de novo.";
   }
   if (erro instanceof ApiError && erro.status < 500) {
     switch (erro.status) {

@@ -2682,6 +2682,10 @@ describe("T204 — Nova solicitação na ficha, no shell", () => {
 
     await navegador(() => window.history.go(-2));
     const dialogo = await pergunta();
+    // A guarda desfaz o passo do navegador antes de perguntar.
+    await waitFor(() =>
+      expect(window.location.hash).toBe(rotaDe(ana, "solicitacoes")),
+    );
     expect(
       within(dialogo)
         .getAllByRole("listitem")
@@ -2695,7 +2699,9 @@ describe("T204 — Nova solicitação na ficha, no shell", () => {
         screen.getByRole("dialog", { name: "Nova solicitação" }),
       ).getByLabelText(/^Tipo/),
     ).toHaveValue("ferias");
-    expect(window.location.hash).toBe(rotaDe(ana, "solicitacoes"));
+    await waitFor(() =>
+      expect(window.location.hash).toBe(rotaDe(ana, "solicitacoes")),
+    );
 
     await navegador(() => window.history.go(-2));
     fireEvent.click(

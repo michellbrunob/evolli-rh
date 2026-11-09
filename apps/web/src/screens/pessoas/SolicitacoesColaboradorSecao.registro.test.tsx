@@ -737,6 +737,69 @@ describe("T204 — registrar e enviar", () => {
     expect(registrarSolicitacaoPessoa).toHaveBeenCalledTimes(1);
   });
 
+  // T204 — achado na validação local: outra aba renovou o token CSRF.
+  it("registro com a página desatualizada (403 csrf_invalido): diz isso, nada registrado, e confirmar de novo funciona", async () => {
+    vi.mocked(registrarSolicitacaoPessoa).mockRejectedValueOnce(
+      new ApiError(403, "x", { codigo: "csrf_invalido" }),
+    );
+    await abrirNova();
+    preencher("ferias");
+    revisar();
+    confirmar();
+    const alerta = await within(janela()).findByRole("alert");
+    expect(alerta).toHaveTextContent(
+      "Esta página ficou desatualizada e nada foi registrado. Confirme de novo.",
+    );
+    expect(alerta.textContent).not.toMatch(/permissão/);
+    expect(transicionarSolicitacaoPessoa).not.toHaveBeenCalled();
+
+    revisar();
+    confirmar();
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(registrarSolicitacaoPessoa).toHaveBeenCalledTimes(2);
+    expect(transicionarSolicitacaoPessoa).toHaveBeenCalledTimes(1);
+  });
+
+  it("'Enviar' com a página desatualizada (403 csrf_invalido): diz isso, o rascunho continua com 'Enviar', e a nova tentativa envia", async () => {
+    servidor();
+    vi.mocked(transicionarSolicitacaoPessoa)
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+      .mockRejectedValueOnce(
+        new ApiError(403, "x", { codigo: "csrf_invalido" }),
+      );
+    await abrirNova();
+    preencher("ferias");
+    revisar();
+    confirmar();
+    const titulo = await screen.findByRole("heading", {
+      level: 4,
+      name: "Detalhe da solicitação de Férias",
+    });
+    const painel = titulo.closest("section")!;
+    fireEvent.click(
+      await within(painel).findByRole("button", { name: "Enviar" }),
+    );
+    await waitFor(() =>
+      expect(within(painel).getByRole("alert")).toHaveTextContent(
+        "Esta página ficou desatualizada e nada foi enviado. A solicitação foi atualizada: se ainda estiver em rascunho, use “Enviar” de novo.",
+      ),
+    );
+    expect(within(painel).getByRole("alert").textContent).not.toMatch(
+      /permissão/,
+    );
+    const enviar = await within(painel).findByRole("button", {
+      name: "Enviar",
+    });
+    fireEvent.click(enviar);
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent(
+        "Solicitação de Férias enviada.",
+      ),
+    );
+    expect(transicionarSolicitacaoPessoa).toHaveBeenCalledTimes(3);
+    expect(registrarSolicitacaoPessoa).toHaveBeenCalledTimes(1);
+  });
+
   it("rascunho que a ficha não criou (veio da tela coletiva): o detalhe não oferece 'Enviar' nem outra transição", async () => {
     servidor([solicitacao({ situacao: "rascunho", enviadaEm: null })]);
     render(<Secao />);
