@@ -492,3 +492,17 @@ e com alvos de 44 px.
 Os da seção 8 continuam fora: nada de turnover, ativos históricos,
 departamento ou cargo, pendências, ponto, custo, absenteísmo, painel do
 gestor, abas, exportação ou endpoint novo.
+
+### 15.7 Comportamentos aprovados (2026-11-09)
+
+A proprietária aprovou, como entregues:
+
+1. **Troca de empresa:** o Dashboard reabre no ano corrente da empresa nova
+   (estado inicial seguro, como nas demais telas desde a T189).
+2. **"Hoje":** o ano e o dia vêm do relógio do navegador, não de UTC.
+3. **Menor ano consultável:** 2000.
+4. **Gestor:** aterrissa direto em Minha equipe depois do login, sem passar
+   pelo Hub.
+5. **Foco no Hub:** quem aterrissa no Hub depois do login (papéis sem
+   Dashboard nem Minha equipe) continua com o foco no `body`, como antes
+   desta tarefa; fica como observação fora do escopo da T205.

@@ -3250,6 +3250,7 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         atrasada e interrupção da paginação obsoleta, troca de empresa e 375 px. Testes web,
         E2E do contrato existente e mutações detectadas; validação local com dados
         sintéticos (seção 15 do dossiê).
+      - **Comportamentos aprovados (2026-11-09):** os cinco da seção 15.7 do dossiê.
       - **Fora de escopo:** API nova, banco, schema, migration, RBAC, auditoria, Docker,
         seed, dependências, lockfile, workflow, push, PR, promoção e merge; e os itens da
         seção 8 do dossiê.

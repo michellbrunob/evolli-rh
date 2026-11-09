@@ -3039,6 +3039,10 @@ do dossiê:
   falha e nova tentativa por bloco; resposta atrasada descartada e paginação obsoleta
   interrompida; troca de empresa reabre no ano corrente da empresa nova.
 
+**Comportamentos aprovados (2026-11-09):** os cinco da seção 15.7 do dossiê (troca de
+empresa reabre no ano corrente; "hoje" pelo relógio do navegador; menor ano 2000; gestor
+direto em Minha equipe; foco no Hub sem mudança, como observação fora do escopo).
+
 **Contratos reutilizados:** `GET /v1/colaboradores` (contadores) e `GET /v1/movimentacoes`
 (`tipo` + `status=efetivada`); nenhum endpoint, permissão ou dependência nova.
 
