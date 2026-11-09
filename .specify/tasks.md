@@ -3179,7 +3179,8 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         - promoção e merge.
 
 101.  **T204 - Primeira ação operacional em Solicitações na ficha: registrar e enviar**
-      - **Estado:** **em implementação** (commits locais, sem push). Branch
+      - **Estado:** **em implementação** (commits locais, validada no localhost, sem
+        push). Branch
         `codex/t204-acao-solicitacoes-ficha`, a partir do squash
         `e086d1ca79d978a51373f1b3afafbfba3cdd069f` (T203 integrada, PR #196). A preparação
         (dossiê e decisões) foi feita antes, sem código de produto, sem push e sem PR; isso
@@ -3201,12 +3202,17 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         - motivo natural do tipo, com "Outro (controlado)" como única alternativa;
         - sem cancelar pela ficha;
         - dia de referência opcional para todos os tipos.
+      - **Decisões da implementação (2026-11-09):** A-7 — o envio continua se a aba for
+        desmontada entre registrar e enviar; A-8 — depois de recarregar, o rascunho não
+        enviado fica só na tela coletiva (retomada na ficha fora desta fatia).
       - **Entrega (seção 12 do dossiê):**
         - "Nova solicitação" só para `rh` com empresa ativa, numa janela do Evolli;
         - registrar e depois enviar pelos contratos existentes, sem repetição automática;
           registro recusado ou incerto não envia; envio falho deixa "Enviar" só no rascunho
           criado pela ficha;
         - guarda T200, foco, anúncio único e 375 px;
+        - página desatualizada (`403 csrf_invalido`): o cliente descarta o token e a ficha
+          orienta confirmar de novo (achado da validação local);
         - testes de API do contrato existente, sem mudar código da API.
         - Sem API, schema, migration, RBAC, auditoria, Docker, seed, dependência ou workflow.
       - **Fora de escopo:**

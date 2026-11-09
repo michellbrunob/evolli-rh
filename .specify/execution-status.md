@@ -2968,9 +2968,9 @@ resolvida no primeiro commit da T204.
 
 ## Primeira ação operacional em Solicitações na ficha — T204 (em implementação)
 
-| Tarefa | Estado                                          | Resultado principal                                                                                             |
-| ------ | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| T204   | **Em implementação** (commits locais, sem push) | RH registra e envia uma solicitação pela aba Solicitações da ficha; o resto do fluxo continua na tela coletiva. |
+| Tarefa | Estado                                                                 | Resultado principal                                                                                             |
+| ------ | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| T204   | **Em implementação** (commits locais, validada no localhost, sem push) | RH registra e envia uma solicitação pela aba Solicitações da ficha; o resto do fluxo continua na tela coletiva. |
 
 **Escopo da T204:** as decisões A-1 a A-6 do
 [dossiê](../docs/decisions/t204-dossie-acao-solicitacoes-ficha.md), aprovadas em
@@ -2983,11 +2983,16 @@ resolvida no primeiro commit da T204.
 - registrar e depois enviar pelos contratos existentes, sem repetição automática; registro
   recusado ou incerto não envia; envio falho deixa "Enviar" só no rascunho criado;
 - guarda T200, foco, anúncio único e 375 px;
+- A-7: o envio continua se a aba for desmontada entre registrar e enviar; A-8: depois de
+  recarregar, o rascunho não enviado fica só na tela coletiva;
+- página desatualizada (`403 csrf_invalido`): o cliente descarta o token, como os demais
+  clientes de gravação, e a ficha orienta confirmar de novo (achado da validação local);
 - testes de API do contrato existente, sem mudar código da API.
 
 **Fora de escopo:**
 
 - cancelar e as seis transições de análise pela ficha;
+- retomar pela ficha o envio de um rascunho depois de recarregar;
 - registro por `master_tecnico` ou DP; solicitações de documento;
 - anexo, CID, texto livre, arquivo, foto, upload, download e visualização;
 - mudança na tela coletiva Pessoas › Solicitações;

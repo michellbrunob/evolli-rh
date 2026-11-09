@@ -1,8 +1,9 @@
 # T204 — Dossiê: primeira ação operacional em Solicitações na ficha
 
-**Situação:** decisões A-1 a A-6 aprovadas pela proprietária em
-2026-11-09; a "Nova solicitação" (registrar e enviar pela ficha) está em
-implementação, em commits locais, sem push e sem PR — ver a seção 12. Sem API,
+**Situação:** decisões A-1 a A-8 aprovadas pela proprietária em
+2026-11-09; a "Nova solicitação" (registrar e enviar pela ficha) está
+implementada e validada no localhost, em commits locais, sem push e sem PR —
+ver a seção 12. Sem API,
 schema, migration, RBAC, auditoria, Docker, seed, dependência, lockfile ou
 workflow novos.
 
@@ -427,6 +428,24 @@ A-1 a A-6 aprovadas como recomendado.
 | A-5 | Cancelar rascunho ou enviada na ficha?            | **Não nesta fatia**: cancelar é terminal e continua na tela coletiva; o rascunho tem saída pelo "Enviar"                                               |
 | A-6 | Dia de referência                                 | **Opcional para todos os tipos**, como no servidor; nenhuma regra por tipo inventada                                                                   |
 
+**Decisões da implementação (aprovadas em 2026-11-09):**
+
+- **A-7 — desmontagem entre registrar e enviar:** depois de "Confirmar e
+  enviar", se a aba for desmontada entre o registro e o envio, o envio do
+  registro recém-criado continua.
+  - **Motivo:** a pessoa já confirmou; interromper deixaria um rascunho órfão.
+  - **Limites:** vale só para o registro daquela confirmação; nada é exibido
+    nem atualizado na tela desmontada; nenhuma repetição automática. Na
+    interface, a guarda de saída (T200) já impede sair durante a gravação,
+    então este é um caminho de defesa.
+- **A-8 — recarga com rascunho não enviado:** se a página for recarregada
+  antes de o rascunho ser enviado, a ficha não oferece retomada de "Enviar";
+  o rascunho fica disponível somente na tela coletiva Pessoas › Solicitações.
+  - **Motivo:** "Enviar" vale só para o rascunho que a ficha registrou e não
+    enviou na mesma sessão; nada é guardado no navegador nem no servidor
+    para lembrar isso.
+  - **Limites:** persistir a retomada na ficha fica fora desta fatia.
+
 ## 10. Observações fora desta tarefa
 
 - **O-1 — seletor da tela coletiva limitado a 100 colaboradores**
@@ -480,9 +499,18 @@ A-1 a A-6 aprovadas como recomendado.
     implementação, nenhum outro rascunho ganha ação na ficha).
   - **"Enviar" repetido ou concorrente:** a resposta do servidor (422 ou 404)
     vira aviso no detalhe, e a situação é relida — sem efeito duplo.
-  - **Desmontagem entre o registro e o envio:** o envio do registro
+  - **Desmontagem entre o registro e o envio (A-7):** o envio do registro
     recém-criado acontece mesmo assim (a pessoa confirmou), sem atualizar a
     tela.
+  - **Recarga com rascunho não enviado (A-8):** a ficha mostra o rascunho sem
+    "Enviar"; ele segue na tela coletiva.
+  - **Página desatualizada** (`403 csrf_invalido`, quando outra aba da mesma
+    sessão renova o token CSRF): o cliente de Solicitações de Pessoas guarda o
+    `codigo` e descarta o token, como os demais clientes de gravação (T179);
+    a ficha avisa que nada foi registrado (ou enviado) e que basta confirmar
+    (ou "Enviar") de novo. Corrigido durante a validação local; a tela
+    coletiva não muda de tela, só passa a pedir um token novo na próxima
+    gravação.
 - **Sucesso:** a janela fecha, a lista é relida sem "Carregando…" (no lugar)
   e mostra a solicitação "Enviada"; o foco vai ao título do bloco do vínculo;
   o nó de status anuncia "Solicitação de {tipo} registrada e enviada." uma
@@ -502,14 +530,18 @@ A-1 a A-6 aprovadas como recomendado.
 ### 12.2 Testes e validação
 
 - **Web:**
-  - `SolicitacoesColaboradorSecao.registro.test.tsx` (28 casos): quem vê;
+  - `SolicitacoesColaboradorSecao.registro.test.tsx` (30 casos): quem vê;
     vínculos e rótulos; tipos e motivos; validação; revisão e "Voltar";
     Escape e descarte; sucesso (corpo exato, ordem, lista, foco, um anúncio,
     mesmo nó de status); dia vazio e vínculo previsto; clique repetido e
     Escape durante o envio; registro recusado (5 status) e incerto (rede e
     5xx); envio falhando depois do registro e "Enviar"; "Enviar" concorrente;
     rascunho que a ficha não criou; nenhuma transição fora de escopo;
-    desmontagem; registro de edições (pendente e salvando); 375 px;
+    desmontagem; página desatualizada no registro e no "Enviar"; registro
+    de edições (pendente e salvando); 375 px;
+  - `solicitacoesPessoasClient.test.ts` (3 casos novos): `403 csrf_invalido`
+    guarda o `codigo` e descarta o token no registro e na transição; 403 de
+    permissão mantém o token;
   - `SolicitacoesColaboradorSecao.test.tsx` (24 casos): o caso "só leitura"
     agora cobre `master_tecnico` e um papel sem escrita;
   - `App.ficha.test.tsx` (4 casos T204): guarda ao sair da ficha com a janela
@@ -537,13 +569,57 @@ A-1 a A-6 aprovadas como recomendado.
   - desmontagem abandonando o rascunho;
   - dia fora do calendário aceito;
   - envio falho sem abrir o detalhe;
-  - "Enviar" do detalhe sem trava contra clique repetido.
+  - "Enviar" do detalhe sem trava contra clique repetido;
+  - código anterior à correção do token desatualizado (4 testes falham: 2 do
+    cliente e 2 da ficha).
 - **Achados na própria entrega e corrigidos:** o foco depois de um erro de
   registro caía no título do passo que saía (ids de título distintos por
   passo); duas chamadas redundantes ao sinal do anúncio da lista (mutação
   equivalente) foram removidas; a fixture de vínculo ativo por SQL foi
-  trocada pelos fluxos reais de admissão e desligamento.
-- **Resultados:** web 3309 testes; API unitária 1472; E2E com PostgreSQL real
-  1013 testes (20 suítes); scripts 182; lint, typecheck, build, Prettier, `spec:check`,
-  prévia do squash e `git diff --check`: verdes.
-- **Localhost:** pendente — a prévia está no ar (web 5173 e API 3204 da T204, no banco sintético isolado da T203), mas a entrada com a conta sintética de RH precisa ser feita pela proprietária no navegador; o fluxo ainda não foi exercitado no localhost.
+  trocada pelos fluxos reais de admissão e desligamento; **na validação
+  local**, o `403 csrf_invalido` com duas abas aparecia como "sem permissão"
+  e prendia toda nova tentativa (corrigido, ver 12.1); a frase do envio
+  recusado por página desatualizada passou a valer também quando a releitura
+  mostra a solicitação já enviada.
+- **Resultados:** web 3314 testes; API unitária 1472; E2E com PostgreSQL real
+  1013 testes (20 suítes); scripts 182; lint, typecheck, build, Prettier, `spec:check`, prévia
+  do squash e `git diff --check`: verdes.
+- **Localhost** (web 5173 e API 3204 da T204, sobre o banco sintético
+  isolado da T203; contas sintéticas do seed de demonstração; solicitações
+  criadas só pela ficha e enviadas pela ficha ou pela tela coletiva):
+  - **RH, pelo teclado:** janela com foco no título e foco preso; "Revisar"
+    sem tipo leva o foco ao campo com o aviso; motivo natural e "Outro
+    (controlado)"; revisão com e sem dia; "Voltar" mantém os valores;
+    "Confirmar e enviar" faz `POST` de registro e depois a transição; a
+    lista é relida no lugar, o foco vai ao bloco do vínculo e o nó de status
+    (o mesmo) anuncia uma vez;
+  - **vínculos ativo, previsto e encerrado** enviados (duas pessoas
+    sintéticas);
+  - **falhas simuladas no navegador:** registro recusado (422) e incerto
+    (rede) sem envio e com um só `POST`; no incerto, a lista relida ao
+    fechar; envio falhando depois do registro com o detalhe do rascunho e
+    "Enviar" (clique duplo, um só `POST`);
+  - **concorrência:** rascunho enviado pela tela coletiva em outra aba e, em
+    outro caso, a mesma transição disparada duas vezes ao mesmo tempo
+    (servidor: 201 e 422; um só evento "Enviar"); a ficha mostra a recusa e
+    a situação relida;
+  - **recarga com rascunho (A-8):** a ficha mostra o rascunho sem "Enviar";
+    a tela coletiva o encontra pela pessoa e pelo vínculo;
+  - **saída durante a gravação:** "voltar" do navegador com o registro em
+    curso mostra "Aguarde o salvamento terminar"; registro e envio concluem
+    e a pessoa continua na ficha. A desmontagem em si (A-7) não é alcançável
+    pela interface por causa dessa guarda; a continuação do envio está
+    provada no teste de unidade;
+  - **guarda e troca de empresa:** janela alterada — "Sair sem salvar?" e o
+    aviso da troca de empresa listam "Nova solicitação", e continuar mantém o
+    tipo; Escape sem alteração fecha e devolve o foco a "Nova solicitação";
+    com alteração, pede para descartar; trocar de fato leva à listagem da
+    empresa nova;
+  - **`master_tecnico`:** sem empresa, orientação e nenhum botão; com a Alfa,
+    "Somente consulta", só "Ver detalhe" e "Fechar detalhe";
+  - **DP:** URL da aba corrigida para "Dados", seis abas, zero consultas de
+    solicitações;
+  - **gestor:** sem ficha e sem consulta;
+  - **375 px:** sem rolagem horizontal; todos os controles com 44 px;
+  - **console:** só os erros provocados (401, 403, 422) e dois 500 do proxy
+    do Vite antes de a API subir.
