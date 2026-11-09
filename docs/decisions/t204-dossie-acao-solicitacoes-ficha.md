@@ -2,8 +2,8 @@
 
 **Situação:** decisões A-1 a A-8 aprovadas pela proprietária em
 2026-11-09; a "Nova solicitação" (registrar e enviar pela ficha) está
-implementada e validada no localhost, em commits locais, sem push e sem PR —
-ver a seção 12. Sem API,
+implementada e validada no localhost, com a entrega em PR Draft — ver a
+seção 12. Sem API,
 schema, migration, RBAC, auditoria, Docker, seed, dependência, lockfile ou
 workflow novos.
 
@@ -457,9 +457,9 @@ A-1 a A-6 aprovadas como recomendado.
 
 ## 11. Limites e fora de escopo
 
-- **Nesta preparação:** nenhum código de produto, API, schema, migration,
-  RBAC, auditoria, Docker, seed, dependências, lockfile ou workflow; sem push
-  e sem PR.
+- **Na preparação (histórico):** nenhum código de produto, API, schema,
+  migration, RBAC, auditoria, Docker, seed, dependências, lockfile ou
+  workflow; sem push e sem PR. Isso valeu só para aquela fase.
 - **Na fatia recomendada:** só web na aba Solicitações, mais testes de API do
   contrato existente; sem mudança na tela coletiva.
 - **Sempre:** solicitações de documento na aba Documentos; sem anexo, CID,

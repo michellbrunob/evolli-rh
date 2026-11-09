@@ -2968,9 +2968,9 @@ resolvida no primeiro commit da T204.
 
 ## Primeira ação operacional em Solicitações na ficha — T204 (em implementação)
 
-| Tarefa | Estado                                                                 | Resultado principal                                                                                             |
-| ------ | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| T204   | **Em implementação** (commits locais, validada no localhost, sem push) | RH registra e envia uma solicitação pela aba Solicitações da ficha; o resto do fluxo continua na tela coletiva. |
+| Tarefa | Estado                                                            | Resultado principal                                                                                             |
+| ------ | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| T204   | **Em implementação** (entrega em PR Draft, validada no localhost) | RH registra e envia uma solicitação pela aba Solicitações da ficha; o resto do fluxo continua na tela coletiva. |
 
 **Escopo da T204:** as decisões A-1 a A-6 do
 [dossiê](../docs/decisions/t204-dossie-acao-solicitacoes-ficha.md), aprovadas em
@@ -2997,7 +2997,7 @@ resolvida no primeiro commit da T204.
 - anexo, CID, texto livre, arquivo, foto, upload, download e visualização;
 - mudança na tela coletiva Pessoas › Solicitações;
 - API, schema, migration, RBAC, auditoria, Docker, seed, dependências, lockfile e workflows;
-- push, PR, promoção e merge.
+- promoção e merge.
 
 **Histórico da preparação:** o dossiê e as decisões foram preparados sem código de
 produto, sem push e sem PR; isso valeu só para aquela fase.

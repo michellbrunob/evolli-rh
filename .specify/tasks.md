@@ -3179,8 +3179,8 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         - promoção e merge.
 
 101.  **T204 - Primeira ação operacional em Solicitações na ficha: registrar e enviar**
-      - **Estado:** **em implementação** (commits locais, validada no localhost, sem
-        push). Branch
+      - **Estado:** **em implementação** (entrega em PR Draft, validada no localhost).
+        Branch
         `codex/t204-acao-solicitacoes-ficha`, a partir do squash
         `e086d1ca79d978a51373f1b3afafbfba3cdd069f` (T203 integrada, PR #196). A preparação
         (dossiê e decisões) foi feita antes, sem código de produto, sem push e sem PR; isso
@@ -3220,7 +3220,7 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         - registro por `master_tecnico` ou DP; solicitações de documento;
         - anexo, CID, texto livre, arquivo, foto, upload, download e visualização;
         - mudança na tela coletiva Pessoas › Solicitações;
-        - push, PR, promoção e merge.
+        - promoção e merge.
 
 ## Regra obrigatória para as próximas tarefas
 
