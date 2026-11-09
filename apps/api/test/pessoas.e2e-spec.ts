@@ -4538,6 +4538,8 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
         "/v1/movimentacoes?tipo=admissao&status=efetivada",
         rhB,
       );
+      // Sem movimentação da Beta, o laço abaixo não provaria nada.
+      expect(daBeta.length).toBeGreaterThan(0);
       for (const m of daBeta) {
         expect(daAlfa.has(m.id)).toBe(false);
         expect(m.empresaId).toBe(empresaB);
