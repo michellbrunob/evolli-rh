@@ -2639,3 +2639,152 @@ describe("T203 — aba Solicitações no shell", () => {
     await screen.findByRole("table", { name: /^Colaboradores — / });
   });
 });
+
+describe("T204 — Nova solicitação na ficha, no shell", () => {
+  const pergunta = () =>
+    screen.findByRole("alertdialog", { name: "Sair sem salvar?" });
+  async function navegador(acao: () => void) {
+    await act(async () => {
+      acao();
+      await new Promise((resolver) => setTimeout(resolver, 20));
+    });
+  }
+  /** Listagem → ficha (Dados) → aba Solicitações: três entradas. */
+  async function abrirAbaSolicitacoes() {
+    window.history.replaceState(null, "", `/${LISTAGEM}`);
+    render(
+      <ComGuardaDeSaida>
+        <App papelDoAtor="rh" />
+      </ComGuardaDeSaida>,
+    );
+    const tabela = await screen.findByRole("table", {
+      name: /^Colaboradores — /,
+    });
+    fireEvent.click(
+      within(tabela).getByRole("button", {
+        name: `Abrir ficha de ${ana.nome}`,
+      }),
+    );
+    await esperarFicha(ana.nome);
+    fireEvent.click(screen.getByRole("tab", { name: "Solicitações" }));
+    return screen.findByRole("button", { name: "Nova solicitação" });
+  }
+  function escolherTipo(valor: string) {
+    const janela = screen.getByRole("dialog", { name: "Nova solicitação" });
+    fireEvent.change(within(janela).getByLabelText(/^Tipo/), {
+      target: { value: valor },
+    });
+  }
+
+  it("janela alterada: sair da ficha pelo navegador pergunta ('Nova solicitação'); continuar mantém o tipo; sair sem salvar sai sem gravar", async () => {
+    fireEvent.click(await abrirAbaSolicitacoes());
+    escolherTipo("ferias");
+
+    await navegador(() => window.history.go(-2));
+    const dialogo = await pergunta();
+    expect(
+      within(dialogo)
+        .getAllByRole("listitem")
+        .map((li) => li.textContent),
+    ).toEqual(["Nova solicitação"]);
+    fireEvent.click(
+      within(dialogo).getByRole("button", { name: "Continuar editando" }),
+    );
+    expect(
+      within(
+        screen.getByRole("dialog", { name: "Nova solicitação" }),
+      ).getByLabelText(/^Tipo/),
+    ).toHaveValue("ferias");
+    expect(window.location.hash).toBe(rotaDe(ana, "solicitacoes"));
+
+    await navegador(() => window.history.go(-2));
+    fireEvent.click(
+      within(await pergunta()).getByRole("button", { name: "Sair sem salvar" }),
+    );
+    await navegador(() => undefined);
+    await screen.findByRole("table", { name: /^Colaboradores — / });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(registrarSolicitacaoPessoa).not.toHaveBeenCalled();
+  });
+
+  it("registro em curso: sair espera o salvamento (nada é descartado nem repetido)", async () => {
+    let entregar!: (v: unknown) => void;
+    vi.mocked(registrarSolicitacaoPessoa).mockReturnValueOnce(
+      new Promise((ok) => {
+        entregar = ok;
+      }) as never,
+    );
+    vi.mocked(transicionarSolicitacaoPessoa).mockResolvedValueOnce({} as never);
+    fireEvent.click(await abrirAbaSolicitacoes());
+    escolherTipo("ausencia");
+    const janela = screen.getByRole("dialog", { name: "Nova solicitação" });
+    fireEvent.click(within(janela).getByRole("button", { name: "Revisar" }));
+    fireEvent.click(
+      await within(janela).findByRole("button", { name: "Confirmar e enviar" }),
+    );
+
+    await navegador(() => window.history.go(-2));
+    expect(
+      await screen.findByRole("alertdialog", {
+        name: "Aguarde o salvamento terminar",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Sair sem salvar" })).toBe(
+      null,
+    );
+    await act(async () => {
+      entregar({
+        id: "nova-shell",
+        empresaId: EMPRESA,
+        vinculoId: ana.vinculos[0]!.id,
+        tipo: "ausencia",
+        motivo: "ausencia_programada",
+        situacao: "rascunho",
+        periodoReferencia: null,
+        registradoPorUserId: "u-1",
+        enviadaEm: null,
+        primeiraRevisaoEm: null,
+        criadoEm: "2026-11-09T12:00:00.000Z",
+        atualizadoEm: "2026-11-09T12:00:00.000Z",
+      });
+    });
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Nova solicitação" })).toBe(
+        null,
+      ),
+    );
+    expect(registrarSolicitacaoPessoa).toHaveBeenCalledTimes(1);
+    expect(transicionarSolicitacaoPessoa).toHaveBeenCalledWith("nova-shell", {
+      acao: "enviar",
+    });
+    // Nada navega sozinho: continua na ficha.
+    expect(document.querySelector(".ficha-colaborador")).not.toBeNull();
+  });
+
+  it("janela aberta sem alteração: sair não pergunta", async () => {
+    fireEvent.click(await abrirAbaSolicitacoes());
+    await navegador(() => window.history.go(-2));
+    await screen.findByRole("table", { name: /^Colaboradores — / });
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+  });
+
+  it("master_tecnico com empresa: a aba lê, sem 'Nova solicitação'", async () => {
+    vi.mocked(obterUsuarioAtual).mockResolvedValue({
+      id: "ator-sintetico",
+      email: "pessoa.teste@example.test",
+      role: "master_tecnico",
+      companyId: EMPRESA,
+      unitId: null,
+      teamId: null,
+      status: "active",
+      createdAt: "2026-01-01T00:00:00.000Z",
+    });
+    window.history.replaceState(null, "", `/${rotaDe(ana, "solicitacoes")}`);
+    render(<App papelDoAtor="master_tecnico" />);
+    await screen.findByText("Somente consulta");
+    await waitFor(() => expect(listarSolicitacoesPessoas).toHaveBeenCalled());
+    expect(screen.queryByRole("button", { name: "Nova solicitação" })).toBe(
+      null,
+    );
+  });
+});

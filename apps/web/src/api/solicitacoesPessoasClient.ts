@@ -78,6 +78,28 @@ export const MOTIVOS_SOLICITACAO_PESSOA = [
 export type MotivoSolicitacaoPessoa =
   (typeof MOTIVOS_SOLICITACAO_PESSOA)[number];
 
+/**
+ * T204 (decisão A-4, 2026-11-09) — no registro pela FICHA do colaborador, o
+ * motivo começa no motivo natural do tipo, e "Outro (controlado)" é a única
+ * alternativa. É regra de apresentação daquela tela: o servidor continua
+ * aceitando qualquer motivo do catálogo, e a tela coletiva continua com a
+ * lista inteira (o comentário acima vale para ela).
+ */
+export const MOTIVO_NATURAL_POR_TIPO: Readonly<
+  Record<TipoSolicitacaoPessoa, MotivoSolicitacaoPessoa>
+> = {
+  contestacao_ajuste_ponto: "divergencia_marcacao",
+  ausencia: "ausencia_programada",
+  ferias: "periodo_ferias",
+  atualizacao_cadastral: "dado_cadastral_desatualizado",
+  atestado: "atestado_apresentado",
+  beneficios: "beneficio_solicitado",
+};
+
+/** T204 (A-4) — a única alternativa ao motivo natural, na ficha. */
+export const MOTIVO_ALTERNATIVO_NA_FICHA: MotivoSolicitacaoPessoa =
+  "outro_controlado";
+
 /** `criar` só aparece no histórico: não é transição, é o nascimento do registro. */
 export type AcaoSolicitacaoPessoa =
   | "criar"

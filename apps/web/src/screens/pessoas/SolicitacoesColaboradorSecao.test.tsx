@@ -312,7 +312,10 @@ describe("T203 — vínculos, pessoa e empresa", () => {
     expect(within(container).queryAllByRole("button")).toHaveLength(0);
   });
 
-  it.each(["rh", "master_tecnico"])(
+  // T204: o RH com empresa ganhou "Nova solicitação" (ver
+  // `SolicitacoesColaboradorSecao.registro.test.tsx`); o master continua só
+  // leitura, e o "outro" papel abaixo prova o fail-closed.
+  it.each(["master_tecnico", "dp"])(
     "%s com empresa ativa lê, e o único controle é 'Ver detalhe'; nenhuma escrita",
     async (papel) => {
       vi.mocked(obterUsuarioAtual).mockResolvedValue(ator({ role: papel }));

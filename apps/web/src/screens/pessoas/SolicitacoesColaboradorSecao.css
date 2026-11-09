@@ -1,4 +1,4 @@
-/* T203 — aba Solicitações da ficha do colaborador. A moldura de cartão, os
+/* T203/T204 — aba Solicitações da ficha do colaborador. A moldura de cartão, os
    títulos e o quadro de tabela (posicionado, T201) são os da ficha
    (`FichaColaboradorScreen.css`); aqui só o que é próprio da aba. */
 
@@ -88,7 +88,36 @@
   gap: var(--space-sm);
 }
 
+/* T204 — "Nova solicitação": formulário e revisão empilhados (cabem em
+   375 px); campos e botões com o alvo de toque do Evolli (FormField/Button). */
+.solicitacoes-colaborador__formulario {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-md);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.solicitacoes-colaborador__passo {
+  margin: 0;
+  font-size: var(--text-body);
+  font-weight: var(--weight-strong);
+  color: var(--color-ink);
+}
+
+.solicitacoes-colaborador__erro {
+  margin: 0;
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--status-danger-border);
+  border-radius: var(--radius-md);
+  background: var(--status-danger-surface);
+  color: var(--status-danger-ink);
+  overflow-wrap: anywhere;
+}
+
 .solicitacoes-colaborador h2:focus-visible,
+.solicitacoes-colaborador__vinculo-titulo:focus-visible,
+.solicitacoes-colaborador__passo:focus-visible,
 .solicitacoes-colaborador__detalhe-titulo:focus-visible {
   outline: var(--focus-width) solid var(--color-action);
   outline-offset: var(--focus-offset);
