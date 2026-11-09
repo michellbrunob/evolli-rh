@@ -27,7 +27,7 @@ de vínculo, dentro da listagem de Pessoas.
 
 **Recomendação para a primeira fatia: "Visão geral do ano", só com dados que
 o Evolli já tem e contratos que já existem**, para RH, DP e `master_tecnico`
-com empresa ativa:
+com empresa ativa, em cinco elementos (E-1 a E-5, seção 6.2):
 
 - **período:** um ano civil, o corrente por padrão, até hoje, na URL;
 - **resumo:** ativos hoje, em admissão hoje, admissões e desligamentos
@@ -345,20 +345,20 @@ variação de conteúdo por papel nesta fatia.
 
 ## 12. Decisões pendentes
 
-| Id   | Pergunta                           | Recomendação                                                                                                                                     |
-| ---- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| D-1  | Escopo da 1ª fatia                 | **E-1 a E-5** (período, resumo, ativos por tipo, admissões e desligamentos por mês, momento da leitura), só com contratos existentes             |
-| D-2  | Página inicial depois do login     | **Dashboard para RH, DP e `master_tecnico`**; gestor em Minha equipe; demais no Hub; Hub acessível pelo topo                                     |
-| D-3  | Período e URL                      | **Ano civil** em `#/dashboard?ano=AAAA`, o corrente por padrão e "até hoje"; meses dentro do ano; ano inválido ou futuro corrigido no lugar      |
-| D-4  | Unidade das contagens              | **Ativos e em admissão em pessoas** (contadores); **admissões e desligamentos em vínculos** (movimentações efetivadas), com rótulos explícitos   |
-| D-5  | Navegação a partir dos indicadores | **Ativos, em admissão e cada tipo** abrem a listagem filtrada; admissões e desligamentos sem clique nesta fatia                                  |
-| D-6  | `master_tecnico` sem empresa       | **Orientação para escolher a empresa, sem consulta**                                                                                             |
-| D-7  | Limite de consulta                 | **20 páginas por série** (2.000 movimentações no período); acima disso, aviso sem números parciais                                               |
-| D-8  | Dados insuficientes                | **Zero real mostra 0**; série vazia com frase própria; indicador sem fonte não aparece                                                           |
-| D-9  | Nome e posição                     | **"Dashboard"**, primeiro item do menu                                                                                                           |
-| D-10 | Gráficos                           | **Barras em CSS + tabela acessível**, sem biblioteca nova                                                                                        |
-| D-11 | Telas existentes                   | **Hub mantido** (papéis sem Dashboard e botão do topo); **"Visão geral" demonstrativa intacta** na Demonstração; painel de Colaboradores intacto |
-| D-12 | Atualização                        | **Leitura ao entrar e botão "Atualizar"** com o horário da leitura; sem atualização automática                                                   |
+| Id   | Pergunta                           | Recomendação                                                                                                                                                                                                                    |
+| ---- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D-1  | Escopo da 1ª fatia                 | **Cinco elementos, E-1 a E-5** (período, resumo, ativos por tipo, admissões e desligamentos por mês, momento da leitura), só com contratos existentes; os cliques (D-5) são comportamento de E-2 e E-3, não um elemento à parte |
+| D-2  | Página inicial depois do login     | **Dashboard para RH, DP e `master_tecnico`**; gestor em Minha equipe; demais no Hub; Hub acessível pelo topo                                                                                                                    |
+| D-3  | Período e URL                      | **Ano civil** em `#/dashboard?ano=AAAA`, o corrente por padrão e "até hoje"; meses dentro do ano; ano inválido ou futuro corrigido no lugar                                                                                     |
+| D-4  | Unidade das contagens              | **Ativos e em admissão em pessoas** (contadores); **admissões e desligamentos em vínculos** (movimentações efetivadas), com rótulos explícitos                                                                                  |
+| D-5  | Navegação a partir dos indicadores | **Ativos, em admissão e cada tipo** abrem a listagem filtrada; admissões e desligamentos sem clique nesta fatia                                                                                                                 |
+| D-6  | `master_tecnico` sem empresa       | **Orientação para escolher a empresa, sem consulta**                                                                                                                                                                            |
+| D-7  | Limite de consulta                 | **20 páginas por série** (2.000 movimentações no período); acima disso, aviso sem números parciais                                                                                                                              |
+| D-8  | Dados insuficientes                | **Zero real mostra 0**; série vazia com frase própria; indicador sem fonte não aparece                                                                                                                                          |
+| D-9  | Nome e posição                     | **"Dashboard"**, primeiro item do menu                                                                                                                                                                                          |
+| D-10 | Gráficos                           | **Barras em CSS + tabela acessível**, sem biblioteca nova                                                                                                                                                                       |
+| D-11 | Telas existentes                   | **Hub mantido** (papéis sem Dashboard e botão do topo); **"Visão geral" demonstrativa intacta** na Demonstração; painel de Colaboradores intacto                                                                                |
+| D-12 | Atualização                        | **Leitura ao entrar e botão "Atualizar"** com o horário da leitura; sem atualização automática                                                                                                                                  |
 
 ## 13. Observações fora desta tarefa
 
