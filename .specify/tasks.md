@@ -3137,11 +3137,18 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       - promoção e merge.
 
 100.  **T203 - Solicitações de Pessoas na ficha do colaborador: aba só leitura**
-      - **Estado:** **em implementação** (entrega em PR Draft). Branch
+      - **Estado:** **integrada** em `main` pela PR #196, squash
+        `e086d1ca79d978a51373f1b3afafbfba3cdd069f`, com a CI de push 3/3 verde (run
+        42608918002); branch preservada. Implementada na branch
         `codex/t203-solicitacoes-pessoas-ficha`, a partir do squash
         `adc1123e1e3cf6f73fde85de7919fcd765ae50e2` (T202 integrada, PR #195). A preparação
         (dossiê e decisões) foi feita antes, sem código de produto, sem push e sem PR; isso
         valeu só para aquela fase.
+      - **Observação de relatório:** a integração funcional da T203 está concluída; a única
+        pendência administrativa era a sua convergência no Spec Kit, resolvida no primeiro
+        commit da T204. Os achados das revisões (estado da entrega em PR Draft e o anúncio da
+        lista repetido ao abrir, concluir, falhar ou fechar o detalhe) foram corrigidos dentro
+        da entrega.
       - **Objetivo:** levar as Solicitações de Pessoas (ajuste de ponto, ausência, férias,
         atualização cadastral, atestado e benefícios) à ficha individual, conforme o
         [dossiê](../docs/decisions/t203-dossie-solicitacoes-pessoas-ficha.md). Solicitações de
@@ -3170,6 +3177,22 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         - solicitações de documento (aba Documentos);
         - mudança na Central de Pessoas › Solicitações;
         - promoção e merge.
+
+101.  **T204 - Primeira ação operacional em Solicitações na ficha (preparação de decisão)**
+      - **Estado:** **em preparação**. Branch `codex/t204-acao-solicitacoes-ficha`, a partir do
+        squash `e086d1ca79d978a51373f1b3afafbfba3cdd069f` (T203 integrada, PR #196).
+      - **Objetivo:** decidir, com evidência no código, nos contratos, no RBAC, na auditoria e
+        na tela coletiva, se e como a aba Solicitações da ficha ganha a primeira ação
+        operacional, sem duplicar o fluxo completo de Pessoas › Solicitações e sem criar
+        rascunhos sem saída, no
+        [dossiê](../docs/decisions/t204-dossie-acao-solicitacoes-ficha.md): estado atual e
+        limitações da aba, matriz de ações e transições, comparação entre quatro opções (sem
+        ação, registrar e voltar à tela coletiva, registrar e enviar pela ficha, fluxo completo
+        só estimado), recomendação, contratos, critérios de aceite, testes, riscos e decisões
+        pendentes.
+      - **Decisões pendentes:** as do dossiê.
+      - **Fora de escopo:** implementação de produto, API, schema, migration, RBAC, auditoria,
+        Docker, seed, dependências, lockfile, workflow, push, PR, promoção e merge.
 
 ## Regra obrigatória para as próximas tarefas
 

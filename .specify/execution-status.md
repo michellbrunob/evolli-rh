@@ -2930,11 +2930,11 @@ squash `adc1123e1e3cf6f73fde85de7919fcd765ae50e2`, CI de push 3/3 verde, run
 41910744912); a única pendência administrativa era a sua convergência no Spec Kit,
 resolvida no primeiro commit da T203.
 
-## Solicitações de Pessoas na ficha — T203 (em implementação)
+## Solicitações de Pessoas na ficha — T203 (integrada)
 
-| Tarefa | Estado                                     | Resultado principal                                                                                                |
-| ------ | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
-| T203   | **Em implementação** (entrega em PR Draft) | Aba Solicitações na ficha individual: só leitura, por vínculo, com detalhe e linha do tempo; não existe para o DP. |
+| Tarefa | Estado                                    | Resultado principal                                                                                                |
+| ------ | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| T203   | **Integrada** (PR #196, squash `e086d1c`) | Aba Solicitações na ficha individual: só leitura, por vínculo, com detalhe e linha do tempo; não existe para o DP. |
 
 **Escopo da T203:** as decisões S-1 a S-5 do
 [dossiê](../docs/decisions/t203-dossie-solicitacoes-pessoas-ficha.md), aprovadas
@@ -2960,6 +2960,28 @@ em 2026-11-05, e a entrega da seção 11:
 
 **Histórico da preparação:** o dossiê e as decisões foram preparados sem código de
 produto, sem push e sem PR; isso valeu só para aquela fase.
+
+**Observação de relatório:** a integração funcional da T203 está concluída (PR #196,
+squash `e086d1ca79d978a51373f1b3afafbfba3cdd069f`, CI de push 3/3 verde, run
+42608918002); a única pendência administrativa era a sua convergência no Spec Kit,
+resolvida no primeiro commit da T204.
+
+## Primeira ação operacional em Solicitações na ficha — T204 (em preparação)
+
+| Tarefa | Estado            | Resultado principal                                                                                                     |
+| ------ | ----------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| T204   | **Em preparação** | Preparação de decisão da primeira ação operacional na aba Solicitações da ficha, sem duplicar o fluxo da tela coletiva. |
+
+**Escopo da T204:** só preparação de decisão, no
+[dossiê](../docs/decisions/t204-dossie-acao-solicitacoes-ficha.md): estado atual e limitações
+da aba, matriz de ações e transições, comparação entre quatro opções (sem ação, registrar e
+voltar à tela coletiva, registrar e enviar pela ficha, fluxo completo só estimado),
+recomendação de uma primeira fatia segura e completa, contratos reaproveitados, critérios de
+aceite, testes, riscos, fora de escopo e decisões pendentes.
+
+**Decisões pendentes:** as do dossiê.
+
+**Fora de escopo:** implementação de produto, API, schema, migration, RBAC, auditoria, Docker, seed, dependências, lockfile, workflow, push, PR, promoção e merge.
 
 ## Próxima ação autorizável
 
