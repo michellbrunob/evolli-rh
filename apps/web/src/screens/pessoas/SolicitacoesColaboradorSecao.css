@@ -1,0 +1,95 @@
+/* T203 — aba Solicitações da ficha do colaborador. A moldura de cartão, os
+   títulos e o quadro de tabela (posicionado, T201) são os da ficha
+   (`FichaColaboradorScreen.css`); aqui só o que é próprio da aba. */
+
+.solicitacoes-colaborador {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-md);
+}
+
+.solicitacoes-colaborador__aviso {
+  margin: 0;
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+  overflow-wrap: anywhere;
+}
+
+.solicitacoes-colaborador__orientacao {
+  display: grid;
+  gap: var(--space-xs);
+}
+
+.solicitacoes-colaborador__vinculo {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-sm);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--hairline);
+  min-width: 0;
+}
+
+.solicitacoes-colaborador__situacao {
+  margin: 0;
+}
+
+/* Detalhe: empilhado, sem tabela, cabe em 375 px. */
+.solicitacoes-colaborador__detalhe {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  background: var(--surface-pearl);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.solicitacoes-colaborador__detalhe-titulo,
+.solicitacoes-colaborador__linha-titulo {
+  margin: 0;
+  font-size: var(--text-body);
+  font-weight: var(--weight-strong);
+  color: var(--color-ink);
+}
+
+.solicitacoes-colaborador__campos {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: var(--space-sm) var(--space-md);
+}
+
+.solicitacoes-colaborador__campos dt {
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+}
+
+.solicitacoes-colaborador__campos dd {
+  margin: 0;
+}
+
+.solicitacoes-colaborador__linha {
+  margin: 0;
+  padding-left: var(--space-lg);
+  display: grid;
+  gap: var(--space-xs);
+}
+
+.solicitacoes-colaborador__quando {
+  font-variant-numeric: tabular-nums;
+  color: var(--color-ink-muted);
+}
+
+.solicitacoes-colaborador__acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.solicitacoes-colaborador h2:focus-visible,
+.solicitacoes-colaborador__detalhe-titulo:focus-visible {
+  outline: var(--focus-width) solid var(--color-action);
+  outline-offset: var(--focus-offset);
+}

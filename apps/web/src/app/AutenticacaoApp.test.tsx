@@ -37,6 +37,7 @@ import {
   listarTiposDocumento,
 } from "../api/documentosClient";
 import { listarPontosDoVinculo } from "../api/pontoClient";
+import { listarSolicitacoesPessoas } from "../api/solicitacoesPessoasClient";
 import {
   listarEmpresasDoContexto,
   trocarEmpresaDoContexto,
@@ -182,6 +183,15 @@ vi.mock("../api/colaboradoresClient", async () => {
   };
 });
 
+// T203 — a ficha aberta na aba Solicitações. Por padrão a leitura FALHA,
+// como falhava antes (fetch sem servidor); os testes da T203 a resolvem.
+vi.mock("../api/solicitacoesPessoasClient", async () => {
+  const actual = await vi.importActual<
+    typeof import("../api/solicitacoesPessoasClient")
+  >("../api/solicitacoesPessoasClient");
+  return { ...actual, listarSolicitacoesPessoas: vi.fn() };
+});
+
 // T202 — a ficha aberta na aba Registros de ponto. Por padrão a leitura FALHA,
 // como falhava antes (fetch sem servidor); os testes da T202 a resolvem.
 vi.mock("../api/pontoClient", async () => {
@@ -253,6 +263,7 @@ beforeEach(() => {
     listarDocumentos,
     listarSolicitacoesDocumento,
     listarPontosDoVinculo,
+    listarSolicitacoesPessoas,
   ]) {
     vi.mocked(leitura).mockRejectedValue(new Error("rede") as never);
   }
@@ -1252,6 +1263,63 @@ describe("T163/T189 — contexto empresarial ativo", () => {
       );
       expect(trocarEmpresaDoContexto).not.toHaveBeenCalled();
       expect(screen.getByLabelText(/^Tipo do documento/)).toHaveValue(TIPO.id);
+    });
+
+    it("T203 — aba Solicitações com a leitura em curso: a troca volta à listagem da empresa nova e a resposta atrasada não aparece", async () => {
+      trocarParaBetaNoServidor();
+      anaNaEmpresaAlfa();
+      let entregar!: (v: unknown) => void;
+      vi.mocked(listarSolicitacoesPessoas).mockReturnValue(
+        new Promise((ok) => {
+          entregar = ok;
+        }) as never,
+      );
+      const rotaSolicitacoes = `#/pessoas/colaboradores/${ANA_ID}/solicitacoes`;
+      window.history.replaceState(null, "", rotaSolicitacoes);
+      vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
+      render(<AutenticacaoApp />);
+      await screen.findByRole("tab", { name: "Solicitações", selected: true });
+      await waitFor(() =>
+        expect(listarSolicitacoesPessoas).toHaveBeenCalledTimes(1),
+      );
+
+      await trocarPeloMenuPara("Empresa Beta");
+      await waitFor(() =>
+        expect(seletorDoMenu()).toHaveTextContent("Empresa Beta"),
+      );
+      await waitFor(() =>
+        expect(window.location.hash).toBe("#/pessoas/colaboradores"),
+      );
+      expect(document.querySelector(".ficha-colaborador")).toBeNull();
+      // Só leitura: a troca não pergunta nada.
+      expect(screen.queryByText(/Há edição em andamento/)).toBeNull();
+
+      await act(async () => {
+        entregar({
+          itens: [
+            {
+              id: "s-1",
+              empresaId: EMPRESA_ALFA.id,
+              vinculoId: "33333333-3333-4333-8333-333333333333",
+              tipo: "atestado",
+              motivo: "atestado_apresentado",
+              situacao: "enviada",
+              periodoReferencia: "2026-10-05",
+              registradoPorUserId: "u-1",
+              enviadaEm: null,
+              primeiraRevisaoEm: null,
+              criadoEm: "2026-10-05T12:00:00.000Z",
+              atualizadoEm: "2026-10-05T12:00:00.000Z",
+            },
+          ],
+          pagina: 1,
+          tamanhoPagina: 100,
+          total: 1,
+        });
+      });
+      const main = document.getElementById("conteudo-principal")!;
+      expect(main.textContent).not.toMatch(/Atestado|Solicitações de /);
+      expect(listarSolicitacoesPessoas).toHaveBeenCalledTimes(1);
     });
 
     it("T202 — aba Registros de ponto com a leitura em curso: a troca volta à listagem da empresa nova e a resposta atrasada não aparece", async () => {

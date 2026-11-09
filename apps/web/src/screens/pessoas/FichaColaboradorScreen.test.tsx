@@ -215,6 +215,7 @@ function Ficha({
   onVoltar?: () => void;
   podeEditarFicha?: boolean;
   podeOperarJornada?: boolean;
+  podeVerSolicitacoes?: boolean;
 }) {
   const [aba, setAba] = useState<AbaDaFicha>(abaInicial);
   return (
@@ -539,6 +540,43 @@ describe("T198 — estados da página", () => {
     expect(document.title).toBe(`${ana.nome} — Colaboradores`);
     unmount();
     expect(document.title).toBe("Evolli RH");
+  });
+});
+
+describe("T203 — aba Solicitações por papel", () => {
+  it("com permissão (RH, master): sete abas, Solicitações por último, alcançável pelo teclado", async () => {
+    render(<Ficha podeVerSolicitacoes />);
+    await esperarFicha();
+    const abas = within(screen.getByRole("tablist")).getAllByRole("tab");
+    expect(abas.map((a) => a.textContent)).toEqual([
+      "Dados do colaborador",
+      "Vida funcional",
+      "Dados contratuais",
+      "Jornada de trabalho",
+      "Documentos",
+      "Registros de ponto",
+      "Solicitações",
+    ]);
+    const dados = screen.getByRole("tab", { name: "Dados do colaborador" });
+    dados.focus();
+    fireEvent.keyDown(dados, { key: "End" });
+    expect(screen.getByRole("tab", { name: "Solicitações" })).toHaveFocus();
+    fireEvent.keyDown(screen.getByRole("tab", { name: "Solicitações" }), {
+      key: "ArrowRight",
+    });
+    expect(dados).toHaveFocus();
+  });
+
+  it("sem permissão (DP): a aba não existe nem no teclado", async () => {
+    render(<Ficha podeVerSolicitacoes={false} />);
+    await esperarFicha();
+    expect(screen.queryByRole("tab", { name: "Solicitações" })).toBeNull();
+    const dados = screen.getByRole("tab", { name: "Dados do colaborador" });
+    dados.focus();
+    fireEvent.keyDown(dados, { key: "End" });
+    expect(
+      screen.getByRole("tab", { name: "Registros de ponto" }),
+    ).toHaveFocus();
   });
 });
 

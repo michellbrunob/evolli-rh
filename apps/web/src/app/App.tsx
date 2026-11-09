@@ -105,7 +105,9 @@ import {
   destinoInicialPara,
   destinoPorId,
   capacidadeFuncionalDe,
+  fichaParaOPapel,
   podeEditarFicha,
+  podeLerSolicitacoesPessoas,
   podeOperarEstrutura,
   podeOperarJornadas,
 } from "./mapaNavegacao";
@@ -418,6 +420,8 @@ function conteudoDoDestino(
         podeEditarFicha={podeEditarFicha(admissao.papelDoAtor)}
         // T183 — atribuir, trocar e encerrar jornada é só do RH.
         podeOperarJornada={podeOperarJornadas(admissao.papelDoAtor)}
+        // T203 — a aba Solicitações só existe para quem a lê (não o DP).
+        podeVerSolicitacoes={podeLerSolicitacoesPessoas(admissao.papelDoAtor)}
       />
     );
   }
@@ -666,7 +670,9 @@ export function App({
     ) {
       return {
         destino: pedidoDaRota,
-        ficha: fichaDaRota(window.location.hash),
+        // T203 — a aba que o papel não lê (Solicitações, para o DP) vira
+        // "dados"; a primeira exibição corrige a URL no lugar.
+        ficha: fichaParaOPapel(fichaDaRota(window.location.hash), papelDoAtor),
         // T199 — inválido cai no padrão; a URL é corrigida no lugar.
         listagem:
           listagemDaRota(window.location.hash) ?? ESTADO_INICIAL_DA_LISTAGEM,
@@ -879,21 +885,28 @@ export function App({
     setFocarContatosNaFicha(false);
     setFicha({ colaboradorId, aba: "dados" });
   }, []);
-  const trocarAbaDaFicha = useCallback((aba: AbaDaFicha) => {
-    // T202 — a aba de ponto abre na última competência vista nesta ficha ou,
-    // na primeira vez, no mês corrente (P-4).
-    setFicha((atual) =>
-      atual
-        ? {
-            ...atual,
-            aba,
-            ...(aba === "ponto"
-              ? { competencia: atual.competencia ?? competenciaDoMesAtual() }
-              : {}),
-          }
-        : atual,
-    );
-  }, []);
+  const trocarAbaDaFicha = useCallback(
+    (aba: AbaDaFicha) => {
+      // T203 — aba que o papel não lê não é oferecida; se pedida, é ignorada.
+      if (aba === "solicitacoes" && !podeLerSolicitacoesPessoas(papelDoAtor)) {
+        return;
+      }
+      // T202 — a aba de ponto abre na última competência vista nesta ficha ou,
+      // na primeira vez, no mês corrente (P-4).
+      setFicha((atual) =>
+        atual
+          ? {
+              ...atual,
+              aba,
+              ...(aba === "ponto"
+                ? { competencia: atual.competencia ?? competenciaDoMesAtual() }
+                : {}),
+            }
+          : atual,
+      );
+    },
+    [papelDoAtor],
+  );
   // T202 — trocar de mês é navegação: empilha uma entrada (voltar e avançar
   // percorrem os meses). Competência fora do formato não vira rota.
   const trocarCompetenciaDaFicha = useCallback((competencia: string) => {
@@ -1145,7 +1158,7 @@ export function App({
       // em qual aba); fora dele, não há ficha.
       const fichaExibida =
         exibido === "pessoas" && pedido === "pessoas"
-          ? fichaDaRota(fragmento)
+          ? fichaParaOPapel(fichaDaRota(fragmento), papelDoAtor)
           : null;
       // T199 — na listagem, a URL diz a aba, a página e os filtros; valor
       // inválido cai no padrão e a URL é corrigida no lugar, logo abaixo.

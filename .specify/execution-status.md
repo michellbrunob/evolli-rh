@@ -2894,11 +2894,11 @@ squash `8e1c7e96a3f6b8994518a8499b76041c12a4179e`, CI de push 3/3 verde, run
 41837091002); a única pendência administrativa era a sua convergência no Spec Kit,
 resolvida no primeiro commit da T202.
 
-## Próxima aba funcional da ficha — T202 (em implementação)
+## Próxima aba funcional da ficha — T202 (integrada)
 
-| Tarefa | Estado                                     | Resultado principal                                                                                                      |
-| ------ | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
-| T202   | **Em implementação** (entrega em PR Draft) | Aba Registros de ponto na ficha individual: só consulta, com o mês na URL, todos os vínculos da pessoa na empresa ativa. |
+| Tarefa | Estado                                    | Resultado principal                                                                                                      |
+| ------ | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| T202   | **Integrada** (PR #195, squash `adc1123`) | Aba Registros de ponto na ficha individual: só consulta, com o mês na URL, todos os vínculos da pessoa na empresa ativa. |
 
 **Escopo da T202:** as decisões P-1 a P-5 do
 [dossiê](../docs/decisions/t202-dossie-proxima-aba-ficha-colaborador.md), aprovadas
@@ -2919,6 +2919,42 @@ em 2026-11-04, e a entrega da seção 10:
 - registro, ajuste ou anulação de ponto pela ficha;
 - total, saldo, horas trabalhadas, banco de horas ou comparação com a jornada;
 - Solicitações de Pessoas e operações de Vida funcional;
+- API, schema, migration, RBAC, auditoria, Docker, seed, dependências, lockfile e workflows;
+- promoção e merge.
+
+**Histórico da preparação:** o dossiê e as decisões foram preparados sem código de
+produto, sem push e sem PR; isso valeu só para aquela fase.
+
+**Observação de relatório:** a integração funcional da T202 está concluída (PR #195,
+squash `adc1123e1e3cf6f73fde85de7919fcd765ae50e2`, CI de push 3/3 verde, run
+41910744912); a única pendência administrativa era a sua convergência no Spec Kit,
+resolvida no primeiro commit da T203.
+
+## Solicitações de Pessoas na ficha — T203 (em implementação)
+
+| Tarefa | Estado                                     | Resultado principal                                                                                                |
+| ------ | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| T203   | **Em implementação** (entrega em PR Draft) | Aba Solicitações na ficha individual: só leitura, por vínculo, com detalhe e linha do tempo; não existe para o DP. |
+
+**Escopo da T203:** as decisões S-1 a S-5 do
+[dossiê](../docs/decisions/t203-dossie-solicitacoes-pessoas-ficha.md), aprovadas
+em 2026-11-05, e a entrega da seção 11:
+
+- aba `solicitacoes` com URL própria, só para RH e `master_tecnico`;
+- o DP com a URL da aba vai a "Dados do colaborador", URL corrigida, sem consulta;
+- só as três leituras existentes, por vínculo e com todas as páginas, filtradas pela pessoa
+  e pela empresa da sessão;
+- detalhe e linha do tempo com defesa de escopo;
+- o `master_tecnico` sem empresa ativa não consulta;
+- sem escrita e sem edição pendente;
+- foco, anúncios, falhas, respostas atrasadas e 375 px;
+- testes de API do contrato existente, sem mudar código da API.
+
+**Fora de escopo:**
+
+- registro, transições e qualquer escrita de solicitação pela ficha;
+- anexo, CID, arquivo, foto, upload, download e visualização;
+- solicitações de documento e mudança na Central de Pessoas › Solicitações;
 - API, schema, migration, RBAC, auditoria, Docker, seed, dependências, lockfile e workflows;
 - promoção e merge.
 

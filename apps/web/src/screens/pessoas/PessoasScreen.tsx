@@ -206,6 +206,8 @@ export interface PessoasScreenProps {
    * consulta.
    */
   podeOperarJornada?: boolean;
+  /** T203 — a aba Solicitações da ficha existe para este papel (não o DP). */
+  podeVerSolicitacoes?: boolean;
   /**
    * T199 — o estado do dashboard de Colaboradores (aba, página e ids de
    * filtros), guardado pelo shell na URL. Sem ele, o dashboard guarda o
@@ -231,6 +233,7 @@ export function PessoasScreen({
   onNovaAdmissao,
   podeEditarFicha = false,
   podeOperarJornada = false,
+  podeVerSolicitacoes = false,
   listagem,
   onListagemChange,
 }: PessoasScreenProps) {
@@ -405,6 +408,7 @@ export function PessoasScreen({
           onVoltar={() => onFecharFicha?.()}
           podeEditarFicha={podeEditarFicha}
           podeOperarJornada={podeOperarJornada}
+          podeVerSolicitacoes={podeVerSolicitacoes}
           onAbrirHistoricoFuncional={abrirHistoricoDaFicha}
           focarContatos={focarContatosNaFicha}
         />

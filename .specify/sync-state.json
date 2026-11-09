@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "constitutionVersion": "1.4.0",
-  "lastConvergedAt": "2026-11-04",
-  "lastIntegratedTask": 201,
-  "lastRecordedTask": 202,
+  "lastConvergedAt": "2026-11-05",
+  "lastIntegratedTask": 202,
+  "lastRecordedTask": 203,
   "platformDecision": {
     "adr": "docs/adr/0014-evolli-plataforma-base-e-encerramento-do-frappe.md",
     "decidedAt": "2026-10-01",
@@ -11,15 +11,15 @@
     "frappe": "encerrado_como_candidato_referencia_apenas"
   },
   "nextTask": {
-    "id": "T202",
-    "status": "ficha_colaborador_registros_ponto_em_implementacao",
-    "reason": "T201 integrada em main pela PR #194 (squash 8e1c7e96a3f6b8994518a8499b76041c12a4179e), com a CI de push 3/3 verde (run 41837091002). A T202 implementa a aba Registros de ponto da ficha individual do colaborador aprovada em 2026-11-04 (decisoes P-1 a P-5 de docs/decisions/t202-dossie-proxima-aba-ficha-colaborador.md): so consulta, com o mes na URL; todos os vinculos da pessoa na empresa ativa, principal primeiro, inclusive encerrados; GET /v1/vinculos/:vinculoId/pontos com todas as paginas; dia civil de Sao Paulo, ordem efetiva, ajustada e anulada; master_tecnico sem empresa ativa nao consulta; sem escrita, sem calculo e sem edicao pendente. Testes de API do contrato existente. Sem API, schema, migration, RBAC, auditoria, seed ou dependencia. Em implementacao, com a entrega em PR Draft. A preparacao (dossie e decisoes) foi feita sem codigo de produto, sem push e sem PR; isso valeu so para aquela fase."
+    "id": "T203",
+    "status": "solicitacoes_pessoas_ficha_em_implementacao",
+    "reason": "T202 integrada em main pela PR #195 (squash adc1123e1e3cf6f73fde85de7919fcd765ae50e2), com a CI de push 3/3 verde (run 41910744912). A T203 implementa a aba Solicitacoes da ficha individual do colaborador aprovada em 2026-11-05 (decisoes S-1 a S-5 de docs/decisions/t203-dossie-solicitacoes-pessoas-ficha.md): so leitura; so para RH e master_tecnico (o DP com a URL da aba vai a Dados, URL corrigida, sem consulta); todos os vinculos da pessoa na empresa ativa, principal primeiro, inclusive encerrados; GET /v1/solicitacoes-pessoas por vinculo com todas as paginas, detalhe e historico com defesa de escopo; master_tecnico sem empresa ativa nao consulta; sem escrita e sem edicao pendente. Testes de API do contrato existente. Sem API, schema, migration, RBAC, auditoria, seed ou dependencia. Em implementacao, com a entrega em PR Draft. A preparacao (dossie e decisoes) foi feita sem codigo de produto, sem push e sem PR; isso valeu so para aquela fase."
   },
   "openDeliveries": [
     {
-      "id": "T202",
+      "id": "T203",
       "pullRequest": null,
-      "status": "ficha_colaborador_registros_ponto_em_implementacao"
+      "status": "solicitacoes_pessoas_ficha_em_implementacao"
     }
   ],
   "requiredArtifacts": [
