@@ -78,6 +78,10 @@ import {
 } from "../screens/horarios";
 import { InicioVisaoGeralScreen } from "../screens/inicio";
 import {
+  DASHBOARD_TITULO_ID,
+  DashboardScreen,
+} from "../screens/dashboard/DashboardScreen";
+import {
   COLABORADORES_TITULO_ID,
   type FocoDoAdmitido,
   NOVA_ADMISSAO_TITULO_ID,
@@ -126,6 +130,10 @@ import {
   rotaDaFicha,
   rotaDaListagem,
   rotaDoDestino,
+  anoCorrente,
+  anoDoDashboardValido,
+  dashboardDaRota,
+  rotaDoDashboard,
 } from "./rotasDoShell";
 import { AREAS_DE_EDICAO, type AreaDeEdicaoId } from "./edicoesPendentes";
 import { focarRegiaoPrincipal, useGuardaDeSaida } from "./guardaDeSaida";
@@ -179,7 +187,10 @@ function rotaDoExibido(
   destinoId: string,
   ficha: RotaDaFicha | null,
   listagem: EstadoDaListagem = ESTADO_INICIAL_DA_LISTAGEM,
+  ano: number = anoCorrente(),
 ): string | null {
+  // T205 — o Dashboard leva sempre o ano consultado (forma canônica).
+  if (destinoId === "dashboard") return rotaDoDashboard(ano);
   if (destinoId === "pessoas" && ficha !== null) return rotaDaFicha(ficha);
   if (destinoId === "pessoas") return rotaDaListagem(listagem);
   return rotaDoDestino(destinoId);
@@ -218,6 +229,7 @@ function areasDescartadasEmPessoas(
  * "solicitacoes-rh" tem tela única, sem aba local, então usa o mapa estático
  * normalmente. */
 const TITULO_ID_POR_DESTINO: Record<string, string> = {
+  dashboard: DASHBOARD_TITULO_ID,
   inicio: "inicio-visao-geral-titulo",
   "solicitacoes-rh": "central-solicitacoes-rh-titulo",
   "contas-acesso": CONTAS_ACESSO_TITULO_ID,
@@ -371,7 +383,23 @@ function conteudoDoDestino(
       opcoes?: OpcoesDaMudancaDaListagem,
     ) => void;
   },
+  // T205 — o Dashboard inicial: o ano da URL e as navegações que ele pede.
+  dashboard: {
+    readonly ano: number;
+    readonly onTrocarAno: (ano: number) => void;
+    readonly onAbrirListagem: (estado: EstadoDaListagem) => void;
+  },
 ) {
+  if (destinoId === "dashboard") {
+    return (
+      <DashboardScreen
+        ano={dashboard.ano}
+        empresaAtiva={empresaAtiva}
+        onTrocarAno={dashboard.onTrocarAno}
+        onAbrirListagem={dashboard.onAbrirListagem}
+      />
+    );
+  }
   if (destinoId === "inicio") {
     return <InicioVisaoGeralScreen onNavegar={onNavegar} />;
   }
@@ -676,12 +704,16 @@ export function App({
         // T199 — inválido cai no padrão; a URL é corrigida no lugar.
         listagem:
           listagemDaRota(window.location.hash) ?? ESTADO_INICIAL_DA_LISTAGEM,
+        // T205 — ano ausente, inválido ou futuro vira o corrente; a primeira
+        // exibição corrige a URL no lugar.
+        ano: dashboardDaRota(window.location.hash)?.ano ?? anoCorrente(),
       };
     }
     return {
       destino: resolverEntrada(destinoInicial, papelDoAtor),
       ficha: null,
       listagem: ESTADO_INICIAL_DA_LISTAGEM,
+      ano: anoCorrente(),
     };
   });
   const [destinoAtivoId, setDestinoAtivoId] = useState(entradaDaUrl.destino);
@@ -699,6 +731,8 @@ export function App({
   );
   const listagemAtualRef = useRef(listagem);
   listagemAtualRef.current = listagem;
+  /** T205 — o ano consultado no Dashboard, sempre o da URL. */
+  const [anoDoDashboard, setAnoDoDashboard] = useState(entradaDaUrl.ano);
   /** T200 — a ficha exibida agora, lida pelo manipulador de URL. */
   const fichaAtualRef = useRef(ficha);
   fichaAtualRef.current = ficha;
@@ -776,7 +810,7 @@ export function App({
    * a dela, no lugar (ver `aoMudarUrl`).
    */
   const destinoSemRotaRef = useRef(
-    rotaDoExibido(destinoAtivoId, ficha, listagem) === null
+    rotaDoExibido(destinoAtivoId, ficha, listagem, anoDoDashboard) === null
       ? destinoAtivoId
       : destinoInicialPara(papelDoAtor),
   );
@@ -841,6 +875,8 @@ export function App({
     // T199 — e a listagem abre no estado inicial (Ativos, sem filtros).
     setFicha(null);
     setListagem(ESTADO_INICIAL_DA_LISTAGEM);
+    // T205 — o Dashboard abre pelo menu no ano corrente.
+    setAnoDoDashboard(anoCorrente());
     setFocarContatosNaFicha(false);
     setDestinoAtivoId(destinoId);
     setGavetaAberta(false);
@@ -880,6 +916,27 @@ export function App({
     setFicha({ colaboradorId: abertura.colaborador.id, aba: "dados" });
     setFocarContatosNaFicha(abertura.foco === "contatos");
     setDestinoAtivoId("pessoas");
+  }, []);
+  // T205 — trocar de ano no Dashboard é navegação: empilha uma entrada
+  // (voltar e avançar percorrem os anos). Ano fora do intervalo não vira rota.
+  const trocarAnoDoDashboard = useCallback((ano: number) => {
+    if (!anoDoDashboardValido(ano)) return;
+    setAnoDoDashboard(ano);
+  }, []);
+  // T205 — um indicador do Dashboard abre a listagem de Colaboradores já
+  // filtrada (D-5). Passa pela guarda, como qualquer troca de destino; o
+  // foco, que estava no indicador, vai à região principal da tela nova.
+  const abrirListagemDoDashboard = useCallback((estado: EstadoDaListagem) => {
+    guardaRef.current.solicitarSaida({
+      executar: () => {
+        setFicha(null);
+        setFocarContatosNaFicha(false);
+        setListagem(estado);
+        setDestinoAtivoId("pessoas");
+        setGavetaAberta(false);
+        setSaidasConcluidas((n) => n + 1);
+      },
+    });
   }, []);
   const abrirFicha = useCallback((colaboradorId: string) => {
     setFocarContatosNaFicha(false);
@@ -963,7 +1020,7 @@ export function App({
   // outra (Nova admissão → Colaboradores): é o ramo de baixo, com `pushState`
   // — o "voltar" retorna à página de onde se saiu.
   useEffect(() => {
-    const rota = rotaDoExibido(destinoAtivoId, ficha, listagem);
+    const rota = rotaDoExibido(destinoAtivoId, ficha, listagem, anoDoDashboard);
     const atual = window.location.hash;
     const vinhaDeRota = rotaExibidaRef.current !== null;
     const primeiraExibicao = primeiraExibicaoRef.current;
@@ -991,7 +1048,7 @@ export function App({
         escreverNoHistorico("push", rota);
       }
     }
-  }, [destinoAtivoId, ficha, listagem, escreverNoHistorico]);
+  }, [destinoAtivoId, ficha, listagem, anoDoDashboard, escreverNoHistorico]);
 
   // T200 — uma saída adiada (voltar, avançar, rota digitada) foi aceita e a
   // tela nova já montou: o foco, que estava no diálogo, vai à região
@@ -1166,6 +1223,12 @@ export function App({
         exibido === "pessoas" && pedido === "pessoas"
           ? (listagemDaRota(fragmento) ?? listagemAtualRef.current)
           : ESTADO_INICIAL_DA_LISTAGEM;
+      // T205 — no Dashboard, a URL diz o ano; inválido ou futuro vira o
+      // corrente e a URL é corrigida no lugar, logo abaixo.
+      const anoExibido =
+        exibido === "dashboard" && pedido === "dashboard"
+          ? (dashboardDaRota(fragmento)?.ano ?? anoCorrente())
+          : anoCorrente();
       // T200 — com edição pendente no que esta navegação desmontaria (ou com
       // a guarda já perguntando), a URL volta ao que a tela descreve e a
       // guarda pergunta; só a escolha explícita refaz o mesmo passo.
@@ -1212,7 +1275,13 @@ export function App({
       setFicha(fichaExibida);
       if (fichaExibida === null) setFocarContatosNaFicha(false);
       setListagem(listagemExibida);
-      const rotaExibida = rotaDoExibido(exibido, fichaExibida, listagemExibida);
+      setAnoDoDashboard(anoExibido);
+      const rotaExibida = rotaDoExibido(
+        exibido,
+        fichaExibida,
+        listagemExibida,
+        anoExibido,
+      );
       if (rotaExibida !== null) {
         if (fragmento !== rotaExibida) {
           escreverNoHistorico("replace", rotaExibida);
@@ -1569,6 +1638,11 @@ export function App({
               onFechar: fecharFicha,
               listagem,
               onListagemChange: mudarListagem,
+            },
+            {
+              ano: anoDoDashboard,
+              onTrocarAno: trocarAnoDoDashboard,
+              onAbrirListagem: abrirListagemDoDashboard,
             },
           )}
         </main>

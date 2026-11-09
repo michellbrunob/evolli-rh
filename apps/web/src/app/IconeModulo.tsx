@@ -24,6 +24,7 @@ import type { ReactNode } from "react";
 
 /** Identificadores aceitos — um por módulo da navegação. */
 export type IconeModuloId =
+  | "painel"
   | "pessoas"
   | "estrutura"
   | "jornada"
@@ -40,6 +41,13 @@ export interface IconeModuloProps {
  * moldura: mesmo `viewBox`, mesma espessura, mesmo alinhamento óptico.
  */
 const TRACOS: Readonly<Record<IconeModuloId, ReactNode>> = {
+  // T205 — moldura com três barras de alturas diferentes: a visão do ano.
+  painel: (
+    <>
+      <rect x="2.75" y="2.75" width="14.5" height="14.5" rx="2" />
+      <path d="M6.5 14v-3M10 14V7.5M13.5 14v-5" />
+    </>
+  ),
   // Uma pessoa: cabeça e ombros.
   pessoas: (
     <>

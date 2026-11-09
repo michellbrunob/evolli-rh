@@ -290,10 +290,36 @@ function preencherEEntrar() {
   fireEvent.click(screen.getByRole("button", { name: "Entrar" }));
 }
 
-/** Do login até o Hub — a primeira tela depois de o ator ser resolvido. */
+/**
+ * T205 — depois do login (ou da sessão restaurada), RH, DP e
+ * `master_tecnico` aterrissam no Dashboard (D-2); o Hub fica a um clique,
+ * pelo topo. Os testes que exercitam o Hub chegam a ele por aqui: aceitam o
+ * Hub já na tela ou saem do Dashboard pelo botão "Hub".
+ */
+const TITULO_DO_DASHBOARD = "Dashboard";
+
+function hubNaTela() {
+  return screen.queryByRole("heading", { level: 1, name: TITULO_DO_HUB });
+}
+
+function dashboardNaTela() {
+  return screen.queryByRole("heading", {
+    level: 1,
+    name: TITULO_DO_DASHBOARD,
+  });
+}
+
+async function chegarAoHub() {
+  await waitFor(() => expect(hubNaTela() ?? dashboardNaTela()).not.toBeNull());
+  if (hubNaTela()) return;
+  fireEvent.click(screen.getByRole("button", { name: "Hub" }));
+  await chegarAoHub();
+}
+
+/** Do login até o Hub (passando pela aterrissagem no Dashboard). */
 async function entrarNoHub() {
   preencherEEntrar();
-  await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
+  await chegarAoHub();
 }
 
 /** Abre um produto do Hub e espera o shell montar. */
@@ -329,7 +355,7 @@ describe("AutenticacaoApp (T116) — portão de sessão", () => {
 
     resolver!();
     // Sessão válida leva ao Hub (T162), e nunca ao login.
-    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
+    await chegarAoHub();
     expect(
       screen.queryByRole("navigation", { name: "Navegação do painel" }),
     ).not.toBeInTheDocument();
@@ -349,22 +375,25 @@ describe("AutenticacaoApp (T116) — portão de sessão", () => {
     expect(screen.queryByRole("banner")).not.toBeInTheDocument();
   });
 
-  it("sessão válida ao recarregar: o Hub aparece direto, nunca mostra login (T162)", async () => {
+  it("sessão válida ao recarregar: abre a aterrissagem do papel (o Dashboard, T205), nunca o login", async () => {
     vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token-restaurado");
 
     render(<AutenticacaoApp />);
 
     expect(
-      await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB }),
+      await screen.findByRole("heading", {
+        level: 1,
+        name: TITULO_DO_DASHBOARD,
+      }),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole("heading", { level: 1, name: "Entrar" }),
     ).not.toBeInTheDocument();
-    // E dali o shell continua a um clique de distância.
-    await abrirProduto(/^Colaboradores/);
     expect(
       screen.getByRole("navigation", { name: "Navegação do painel" }),
     ).toBeInTheDocument();
+    // O Hub continua a um clique, pelo topo.
+    await chegarAoHub();
   });
 
   it("T178: recarregar numa rota do shell abre direto nela, sem passar pelo Hub", async () => {
@@ -384,13 +413,18 @@ describe("AutenticacaoApp (T116) — portão de sessão", () => {
     }
   });
 
-  it("T178: sem rota na URL, recarregar continua abrindo o Hub", async () => {
+  it("T178/T205: sem rota na URL, recarregar abre a aterrissagem do papel, com a rota dela", async () => {
     window.history.replaceState(null, "", window.location.pathname);
     vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token-restaurado");
     render(<AutenticacaoApp />);
     expect(
-      await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB }),
+      await screen.findByRole("heading", {
+        level: 1,
+        name: TITULO_DO_DASHBOARD,
+      }),
     ).toBeInTheDocument();
+    expect(window.location.hash).toMatch(/^#\/dashboard\?ano=\d{4}$/);
+    expect(hubNaTela()).toBeNull();
   });
 
   it("login bem-sucedido libera o shell (navegação e telas internas aparecem só depois)", async () => {
@@ -433,7 +467,7 @@ describe("AutenticacaoApp (T116) — portão de sessão", () => {
     vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token-restaurado");
 
     render(<AutenticacaoApp />);
-    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
+    await chegarAoHub();
     await abrirProduto(/^Colaboradores/);
 
     fireEvent.click(screen.getByRole("button", { name: "Hub" }));
@@ -451,7 +485,7 @@ describe("AutenticacaoApp (T116) — portão de sessão", () => {
     vi.mocked(logout).mockResolvedValueOnce(undefined);
 
     render(<AutenticacaoApp />);
-    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
+    await chegarAoHub();
     await abrirProduto(/^Colaboradores/);
 
     fireEvent.click(screen.getByRole("button", { name: "Sair" }));
@@ -470,7 +504,7 @@ describe("AutenticacaoApp (T116) — portão de sessão", () => {
     vi.mocked(logout).mockRejectedValueOnce(new Error("401"));
 
     render(<AutenticacaoApp />);
-    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
+    await chegarAoHub();
     await abrirProduto(/^Colaboradores/);
 
     fireEvent.click(screen.getByRole("button", { name: "Sair" }));
@@ -513,7 +547,7 @@ describe("AutenticacaoApp (T116) — portão de sessão", () => {
     );
 
     render(<AutenticacaoApp />);
-    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
+    await chegarAoHub();
     await abrirProduto(/^Colaboradores/);
 
     fireEvent.click(screen.getByRole("button", { name: "Sessões ativas" }));
@@ -598,15 +632,17 @@ describe("T153 — aterrissagem segura por papel", () => {
     expect(screen.queryByRole("button", { name: "Sair" })).toBeNull();
 
     await commitar(() => d.resolve(ator("rh")));
-    // Ator conhecido: o Hub monta. O shell ainda não — e isso é o ponto.
+    // T205 — ator conhecido: só agora o shell monta, já no Dashboard (D-2).
     expect(
-      await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB }),
+      await screen.findByRole("heading", {
+        level: 1,
+        name: TITULO_DO_DASHBOARD,
+      }),
     ).toBeInTheDocument();
-    expect(screen.queryByRole("navigation")).toBeNull();
-    await abrirProduto(/^Colaboradores/);
     expect(
       screen.getByRole("navigation", { name: "Navegação do painel" }),
     ).toBeInTheDocument();
+    expect(hubNaTela()).toBeNull();
   });
 
   it("B1.2 nenhum cliente funcional é chamado antes de o ator ser conhecido", async () => {
@@ -623,29 +659,31 @@ describe("T153 — aterrissagem segura por papel", () => {
     expect(vi.mocked(listarEquipe)).not.toHaveBeenCalled();
 
     await commitar(() => d.resolve(ator("gestor")));
-    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
-    // T162 — no Hub ainda não saiu NENHUMA chamada funcional, nem a permitida.
-    expect(vi.mocked(listarTabelasHorario)).not.toHaveBeenCalled();
-    expect(vi.mocked(listarEquipe)).not.toHaveBeenCalled();
-
-    await abrirProduto(/Minha equipe/);
-    // Agora sim: a primeira (e única) chamada funcional é a permitida.
+    // T205 — o gestor aterrissa direto na consulta da equipe (D-2): a
+    // primeira (e única) chamada funcional é a permitida.
+    await screen.findByRole("heading", { level: 1, name: "Minha equipe" });
     expect(vi.mocked(listarTabelasHorario)).not.toHaveBeenCalled();
     expect(vi.mocked(listarEquipe)).toHaveBeenCalled();
   });
 
-  it("B1.3 gestor entra DIRETO na consulta da equipe — o único produto que o Hub lhe oferece", async () => {
+  it("B1.3 gestor entra DIRETO na consulta da equipe, sem passar pelo Hub (T205)", async () => {
     vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
     vi.mocked(obterUsuarioAtual).mockResolvedValueOnce(ator("gestor"));
 
     render(<AutenticacaoApp />);
-    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
-    await abrirProduto(/Minha equipe/);
 
     expect(
       await screen.findByRole("heading", { level: 1, name: "Minha equipe" }),
     ).toBeInTheDocument();
     expect(destinosAtivos()).toEqual(["Minha equipe Consulta do gestor"]);
+    expect(hubNaTela()).toBeNull();
+    // Sem Dashboard para o gestor (ADR 0015): nem tela, nem item no menu.
+    expect(dashboardNaTela()).toBeNull();
+    expect(
+      within(
+        screen.getByRole("navigation", { name: "Navegação do painel" }),
+      ).queryByRole("button", { name: /^Dashboard/ }),
+    ).toBeNull();
   });
 
   it("B1.4 gestor NÃO chama /v1/horarios no login", async () => {
@@ -655,13 +693,8 @@ describe("T153 — aterrissagem segura por papel", () => {
 
     render(<AutenticacaoApp />);
     await screen.findByRole("button", { name: "Entrar" });
-    await entrarNoHub();
-    // Nem no Hub...
-    expect(vi.mocked(listarTabelasHorario)).not.toHaveBeenCalled();
-
-    await abrirProduto(/Minha equipe/);
+    preencherEEntrar();
     await screen.findByRole("heading", { level: 1, name: "Minha equipe" });
-    // ...nem depois de abrir o produto.
     expect(vi.mocked(listarTabelasHorario)).not.toHaveBeenCalled();
   });
 
@@ -671,10 +704,6 @@ describe("T153 — aterrissagem segura por papel", () => {
     vi.mocked(obterUsuarioAtual).mockResolvedValueOnce(ator("gestor"));
 
     render(<AutenticacaoApp />);
-    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
-    expect(vi.mocked(listarTabelasHorario)).not.toHaveBeenCalled();
-
-    await abrirProduto(/Minha equipe/);
     await screen.findByRole("heading", { level: 1, name: "Minha equipe" });
 
     expect(vi.mocked(listarTabelasHorario)).not.toHaveBeenCalled();
@@ -691,14 +720,10 @@ describe("T153 — aterrissagem segura por papel", () => {
     expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
 
     await commitar(() => d.resolve(ator("gestor")));
-    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
-    // O Hub tampouco oferece horários ao gestor — a capacidade não existe.
-    expect(screen.getByRole("main").textContent).not.toContain("Horários");
-
-    await abrirProduto(/Minha equipe/);
     await screen.findByRole("heading", { level: 1, name: "Minha equipe" });
 
     const main = screen.getByRole("main");
+    expect(main.textContent).not.toContain("Horários");
     expect(main.textContent).not.toContain("Somente RH");
     expect(main.textContent).not.toContain("tabelas de horário");
   });
@@ -708,30 +733,29 @@ describe("T153 — aterrissagem segura por papel", () => {
     vi.mocked(obterUsuarioAtual).mockResolvedValueOnce(ator("gestor"));
 
     render(<AutenticacaoApp />);
-    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
-    await abrirProduto(/Minha equipe/);
     await screen.findByRole("heading", { level: 1, name: "Minha equipe" });
 
     expect(vi.mocked(listarEquipe)).toHaveBeenCalled();
     expect(vi.mocked(listarTabelasHorario)).not.toHaveBeenCalled();
   });
 
-  it("B1.8 rh aterrissa em 'Pessoas Colaboradores' (T159)", async () => {
+  it("B1.8 rh aterrissa no Dashboard (T205), que é o primeiro item do menu", async () => {
     vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
     vi.mocked(obterUsuarioAtual).mockResolvedValueOnce(ator("rh"));
 
     render(<AutenticacaoApp />);
-    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
-    // O Hub já oferece "Minha equipe" ao rh, porque o contrato lhe concede.
-    expect(
-      screen.getByRole("button", { name: /Minha equipe/ }),
-    ).toBeInTheDocument();
+    await screen.findByRole("heading", {
+      level: 1,
+      name: TITULO_DO_DASHBOARD,
+    });
 
-    await abrirProduto(/^Colaboradores/);
-
-    expect(destinosAtivos()).toEqual([
-      "Colaboradores Consulta, ficha e vida funcional",
-    ]);
+    expect(destinosAtivos()).toEqual(["Dashboard Visão geral do ano"]);
+    const nav = screen.getByRole("navigation", {
+      name: "Navegação do painel",
+    });
+    expect(within(nav).getAllByRole("button")[0]).toHaveTextContent(
+      /^Dashboard/,
+    );
     // E continua vendo "Minha equipe", porque o contrato lhe concede.
     expect(
       screen.getByRole("button", { name: /Minha equipe/ }),
@@ -739,37 +763,58 @@ describe("T153 — aterrissagem segura por papel", () => {
   });
 
   /**
-   * T159 — a aterrissagem deixou de ser "Cadastros para todos".
-   *
-   * `dp` e `master_tecnico` leem colaborador e vão para Pessoas. `colaborador`
-   * e `financeiro` não têm destino funcional algum: vão para a Visão geral,
-   * que é demonstrativa e **não faz requisição** — antes caíam em Cadastros e
-   * tomavam 403 na primeira chamada, que era a primeira impressão do produto.
+   * T159 — a aterrissagem deixou de ser "Cadastros para todos". T205 — `dp`
+   * e `master_tecnico` (com ou sem empresa) aterrissam no Dashboard;
+   * `colaborador` e `financeiro` não têm destino funcional algum: ficam no
+   * Hub e, de lá, só a Visão geral demonstrativa, que **não faz requisição**.
    */
   it.each([
-    ["dp", "Colaboradores Consulta, ficha e vida funcional", /^Colaboradores/],
+    ["dp", {}],
+    ["master_tecnico", {}],
     [
       "master_tecnico",
-      "Colaboradores Consulta, ficha e vida funcional",
-      /^Colaboradores/,
+      { companyId: null, empresaAtiva: null, podeTrocarEmpresa: true },
     ],
+  ])(
+    "B1.9 papel %s aterrissa no Dashboard e não ganha a capacidade de liderança",
+    async (papel, extra) => {
+      vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
+      vi.mocked(obterUsuarioAtual).mockResolvedValueOnce(ator(papel, extra));
+
+      render(<AutenticacaoApp />);
+      await screen.findByRole("heading", {
+        level: 1,
+        name: TITULO_DO_DASHBOARD,
+      });
+
+      expect(destinosAtivos()).toEqual(["Dashboard Visão geral do ano"]);
+      expect(screen.queryByRole("button", { name: /Minha equipe/ })).toBeNull();
+    },
+  );
+
+  it.each([
     ["colaborador", "Visão geral", /Visão geral/],
     ["financeiro", "Visão geral", /Visão geral/],
   ])(
-    "B1.9 papel %s aterrissa em %s e não ganha a capacidade",
+    "B1.9 papel %s fica no Hub (sem Dashboard) e abre só %s",
     async (papel, destino, abrir) => {
       vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
       vi.mocked(obterUsuarioAtual).mockResolvedValueOnce(ator(papel));
 
       render(<AutenticacaoApp />);
       await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
-      // Nem no Hub o destino de liderança é oferecido a estes papéis.
+      expect(dashboardNaTela()).toBeNull();
       expect(screen.queryByRole("button", { name: /Minha equipe/ })).toBeNull();
 
       await abrirProduto(abrir);
 
       expect(destinosAtivos()).toEqual([destino]);
       expect(screen.queryByRole("button", { name: /Minha equipe/ })).toBeNull();
+      expect(
+        within(
+          screen.getByRole("navigation", { name: "Navegação do painel" }),
+        ).queryByRole("button", { name: /^Dashboard/ }),
+      ).toBeNull();
     },
   );
 
@@ -799,8 +844,7 @@ describe("T153 — aterrissagem segura por papel", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
 
-    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
-    await abrirProduto(/Minha equipe/);
+    // T205 — a aterrissagem vale também depois da nova tentativa.
     await screen.findByRole("heading", { level: 1, name: "Minha equipe" });
     expect(screen.queryByRole("alert")).toBeNull();
     // Uma aplicação, não duas: um <main>, uma navegação.
@@ -815,8 +859,6 @@ describe("T153 — aterrissagem segura por papel", () => {
     vi.mocked(login).mockResolvedValueOnce({ mfaRequerido: false });
 
     render(<AutenticacaoApp />);
-    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
-    await abrirProduto(/Minha equipe/);
     await screen.findByRole("heading", { level: 1, name: "Minha equipe" });
 
     fireEvent.click(screen.getByRole("button", { name: "Sair" }));
@@ -831,15 +873,13 @@ describe("T153 — aterrissagem segura por papel", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Entrar" }));
 
-    // T162 — a sessão nova começa no Hub, nunca dentro do produto em que a
-    // anterior estava. Era "Minha equipe", e o gestor saiu.
-    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
-    await abrirProduto(/^Colaboradores/);
-
-    // Recalculado para o ator NOVO, não herdado do gestor anterior.
-    expect(destinosAtivos()).toEqual([
-      "Colaboradores Consulta, ficha e vida funcional",
-    ]);
+    // T205 — a sessão nova aterrissa de novo, pelo papel NOVO (o rh vai ao
+    // Dashboard), e não herda o produto em que a anterior estava.
+    await screen.findByRole("heading", {
+      level: 1,
+      name: TITULO_DO_DASHBOARD,
+    });
+    expect(destinosAtivos()).toEqual(["Dashboard Visão geral do ano"]);
   });
 
   it("B1.13 quem já navegou não é redirecionado de novo", async () => {
@@ -847,8 +887,6 @@ describe("T153 — aterrissagem segura por papel", () => {
     vi.mocked(obterUsuarioAtual).mockResolvedValue(ator("gestor"));
 
     render(<AutenticacaoApp />);
-    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
-    await abrirProduto(/Minha equipe/);
     await screen.findByRole("heading", { level: 1, name: "Minha equipe" });
 
     fireEvent.click(screen.getByRole("button", { name: /^Relatórios/ }));
@@ -864,6 +902,27 @@ describe("T153 — aterrissagem segura por papel", () => {
     ).toBeNull();
   });
 
+  it("B1.13b voltar ao Hub pelo topo não reaterrissa (T205)", async () => {
+    vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
+    vi.mocked(obterUsuarioAtual).mockResolvedValue(ator("rh"));
+
+    render(<AutenticacaoApp />);
+    await screen.findByRole("heading", {
+      level: 1,
+      name: TITULO_DO_DASHBOARD,
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Hub" }));
+    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50));
+    });
+    expect(hubNaTela()).not.toBeNull();
+    expect(dashboardNaTela()).toBeNull();
+    // E o Dashboard fica a um clique, como cartão do Hub.
+    await abrirProduto(/^Dashboard/);
+    expect(dashboardNaTela()).not.toBeNull();
+  });
+
   it("B1.14 montagem dupla (StrictMode) não produz chamada proibida", async () => {
     vi.mocked(refreshCsrfToken).mockResolvedValue("token");
     vi.mocked(obterUsuarioAtual).mockResolvedValue(ator("gestor"));
@@ -873,8 +932,6 @@ describe("T153 — aterrissagem segura por papel", () => {
         <AutenticacaoApp />
       </StrictMode>,
     );
-    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
-    await abrirProduto(/Minha equipe/);
     await screen.findByRole("heading", { level: 1, name: "Minha equipe" });
 
     expect(vi.mocked(listarTabelasHorario)).not.toHaveBeenCalled();
@@ -1018,7 +1075,7 @@ describe("T163/T189 — contexto empresarial ativo", () => {
   it("o Hub mostra a empresa ATIVA que o servidor resolveu, no seletor", async () => {
     vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
     render(<AutenticacaoApp />);
-    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
+    await chegarAoHub();
     const botao = await screen.findByRole("button", { name: /Empresa ativa/ });
     expect(botao).toHaveTextContent("Empresa Alfa");
     expect(botao).toHaveTextContent("Código ALFA");
@@ -1032,7 +1089,7 @@ describe("T163/T189 — contexto empresarial ativo", () => {
     outraAba.addEventListener("message", avisoNaOutraAba);
 
     render(<AutenticacaoApp />);
-    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
+    await chegarAoHub();
     fireEvent.click(
       await screen.findByRole("button", { name: /Empresa ativa/ }),
     );
@@ -1067,7 +1124,7 @@ describe("T163/T189 — contexto empresarial ativo", () => {
     vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
     trocarParaBetaNoServidor();
     render(<AutenticacaoApp />);
-    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
+    await chegarAoHub();
     await abrirProduto(/^Colaboradores/);
     expect(window.location.hash).toBe("#/pessoas/colaboradores");
 
@@ -1146,6 +1203,63 @@ describe("T163/T189 — contexto empresarial ativo", () => {
     expect(document.querySelector(".ficha-colaborador")).toBeNull();
     await waitFor(() =>
       expect(document.activeElement?.id).toBe("colaboradores-titulo"),
+    );
+  });
+
+  it("T205 — Dashboard aberto: a troca mantém o Dashboard, reabre no ano corrente (estado inicial seguro, como a T189), relê tudo na empresa nova e põe o foco no título", async () => {
+    trocarParaBetaNoServidor();
+    const respostas: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        respostas.push(String(url));
+        const corpo = String(url).includes("/v1/colaboradores")
+          ? {
+              itens: [],
+              pagina: 1,
+              tamanhoPagina: 1,
+              total: 0,
+              contadores: {
+                ativos: 0,
+                inativos: 0,
+                emAdmissao: 0,
+                desligados: 0,
+                total: 0,
+                ativosPorTipo: {},
+              },
+            }
+          : { itens: [], pagina: 1, tamanhoPagina: 100, total: 0 };
+        return new Response(JSON.stringify(corpo), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }),
+    );
+    window.history.replaceState(null, "", "#/dashboard?ano=2025");
+    vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
+    render(<AutenticacaoApp />);
+    const status = () =>
+      document.querySelector<HTMLElement>(".dashboard [role=status]");
+    await waitFor(() =>
+      expect(status()).toHaveTextContent("Dashboard de 2025 lido em"),
+    );
+    const leiturasAntes = respostas.length;
+    expect(leiturasAntes).toBeGreaterThanOrEqual(3);
+
+    await trocarPeloMenuPara("Empresa Beta");
+
+    await waitFor(() =>
+      expect(seletorDoMenu()).toHaveTextContent("Empresa Beta"),
+    );
+    const corrente = new Date().getFullYear();
+    await waitFor(() =>
+      expect(status()).toHaveTextContent(`Dashboard de ${corrente} lido em`),
+    );
+    expect(window.location.hash).toBe(`#/dashboard?ano=${corrente}`);
+    // Contadores e as duas séries, de novo, na empresa nova.
+    expect(respostas.length).toBeGreaterThanOrEqual(leiturasAntes + 3);
+    await waitFor(() =>
+      expect(document.activeElement?.id).toBe("dashboard-titulo"),
     );
   });
 
@@ -1534,7 +1648,7 @@ describe("T163/T189 — contexto empresarial ativo", () => {
     } as never);
 
     render(<AutenticacaoApp />);
-    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
+    await chegarAoHub();
     expect(screen.queryByRole("button", { name: /Empresa ativa/ })).toBeNull();
     await abrirProduto(/^Colaboradores/);
     expect(
@@ -1558,7 +1672,7 @@ describe("T163/T189 — contexto empresarial ativo", () => {
   it("aviso de outra aba: reconfere o servidor e recria no mesmo módulo", async () => {
     vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
     render(<AutenticacaoApp />);
-    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
+    await chegarAoHub();
     await abrirProduto(/^Colaboradores/);
     const leiturasAntes = vi.mocked(obterUsuarioAtual).mock.calls.length;
 
@@ -1581,7 +1695,7 @@ describe("T163/T189 — contexto empresarial ativo", () => {
   it("mensagem estranha no canal é ignorada (não reconfere)", async () => {
     vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
     render(<AutenticacaoApp />);
-    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
+    await chegarAoHub();
     const leituras = vi.mocked(obterUsuarioAtual).mock.calls.length;
     act(() =>
       new CanalFalso(NOME_DO_CANAL).postMessage({ tipo: "outra-coisa" }),
@@ -1609,7 +1723,7 @@ describe("T163/T189 — contexto empresarial ativo", () => {
   it("ao recuperar o foco com a empresa trocada por fora (sem edição), recria no contexto novo", async () => {
     vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
     render(<AutenticacaoApp />);
-    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
+    await chegarAoHub();
     await abrirProduto(/^Colaboradores/);
 
     servidorPassaParaBeta();
@@ -1692,7 +1806,7 @@ describe("T163/T189 — contexto empresarial ativo", () => {
   it("reconferência que encontra a sessão encerrada (401) volta ao login", async () => {
     vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
     render(<AutenticacaoApp />);
-    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
+    await chegarAoHub();
     vi.mocked(obterUsuarioAtual).mockRejectedValue(
       new ApiErrorDeUsuarios(401, "sessão expirada"),
     );
@@ -1707,7 +1821,7 @@ describe("T163/T189 — contexto empresarial ativo", () => {
     vi.mocked(logout).mockResolvedValueOnce(undefined);
 
     render(<AutenticacaoApp />);
-    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
+    await chegarAoHub();
     fireEvent.click(screen.getByRole("button", { name: "Sair" }));
 
     await screen.findByRole("heading", { level: 1, name: "Entrar" });
@@ -1722,7 +1836,7 @@ describe("T163/T189 — contexto empresarial ativo", () => {
     trocarParaBetaNoServidor();
 
     render(<AutenticacaoApp />);
-    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
+    await chegarAoHub();
     await abrirProduto(/^Colaboradores/);
     await trocarPeloMenuPara("Empresa Beta");
     await waitFor(() =>
@@ -2131,7 +2245,7 @@ describe("T200 — guarda de saída no shell autenticado", () => {
         name: "Sair sem salvar",
       }),
     );
-    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
+    await chegarAoHub();
     expect(document.activeElement).not.toBe(document.body);
     expect(
       document.getElementById("hub-conteudo")!.contains(document.activeElement),
@@ -2180,7 +2294,7 @@ describe("T200 — guarda de saída no shell autenticado", () => {
   it("sessão encerrada por fora sem nada pendente: volta ao login sem o aviso de perda", async () => {
     vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
     render(<AutenticacaoApp />);
-    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
+    await chegarAoHub();
     await abrirProduto(/^Colaboradores/);
     vi.mocked(obterUsuarioAtual).mockRejectedValue(
       new ApiErrorDeUsuarios(401, "Não autenticado."),
@@ -2224,7 +2338,7 @@ describe("T200 — guarda de saída no shell autenticado", () => {
         name: "Sair sem salvar",
       }),
     );
-    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
+    await chegarAoHub();
     expect(disparar()).toBe(false);
   });
 });

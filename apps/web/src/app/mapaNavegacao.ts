@@ -196,12 +196,41 @@ export function podeOperarEstrutura(papel: string | null): boolean {
 }
 
 /**
+ * T205 — papéis que abrem o Dashboard inicial (D-2): os que leem
+ * `colaborador` e `movimentacao_funcional` — `rh` e `dp` na própria empresa e
+ * `master_tecnico` (com empresa ativa; sem ela, a tela só orienta, sem
+ * consultar). Espelha `evaluatePessoas` em `rbac.evaluator.ts`. O `gestor`
+ * não lê a empresa inteira (ADR 0015).
+ */
+export const PAPEIS_DASHBOARD: readonly string[] = [
+  "rh",
+  "dp",
+  "master_tecnico",
+];
+
+/**
  * Os cinco módulos da navegação primária, mais Demonstração.
+ *
+ * T205 — o Dashboard vem antes de todos, para quem o abre: é a página
+ * inicial depois do login (D-2, D-9).
  *
  * A ordem é de uso: quem se opera no dia a dia vem antes do que se administra,
  * e o que é maquete vem por último, separado e nomeado.
  */
 export const GRUPOS: readonly GrupoNavegacao[] = [
+  {
+    titulo: "Dashboard",
+    icone: "painel",
+    destinos: [
+      {
+        id: "dashboard",
+        label: "Dashboard",
+        subRotulo: "Visão geral do ano",
+        estado: "funcional",
+        papeis: PAPEIS_DASHBOARD,
+      },
+    ],
+  },
   {
     // T178 — "Gestão de Pessoas", com "Colaboradores" como porta principal:
     // é dali que se consulta quem já está na empresa e se inicia uma admissão.
@@ -443,6 +472,24 @@ export function destinoInicialPara(papel: string | null): string {
 }
 
 /**
+ * T205 — onde a sessão abre depois do login (D-2), quando a URL não traz uma
+ * rota do shell: o Dashboard para quem o lê; Minha equipe para o `gestor`;
+ * `null` (o Hub) para os demais. Não é autorização: o `App` ainda passa o
+ * destino por `resolverEntrada`.
+ */
+const DESTINO_POS_LOGIN_POR_PAPEL: Readonly<Record<string, string>> = {
+  rh: "dashboard",
+  dp: "dashboard",
+  master_tecnico: "dashboard",
+  gestor: "equipe",
+};
+
+export function destinoPosLoginPara(papel: string | null): string | null {
+  if (papel === null) return null;
+  return DESTINO_POS_LOGIN_POR_PAPEL[papel] ?? null;
+}
+
+/**
  * Destinos **funcionais que o papel de fato consegue abrir** — a lista que o
  * Hub pós-login (T162) oferece.
  *
@@ -471,6 +518,7 @@ export function destinoInicialPara(papel: string | null): string {
  *
  * | Destino                   | Recurso da aba padrão   | Papéis concedidos                |
  * | ------------------------- | ----------------------- | -------------------------------- |
+ * | `dashboard` (T205)        | `colaborador` read      | `rh`, `dp`, `master_tecnico`     |
  * | `pessoas`                 | `colaborador` read      | `rh`, `dp`, `master_tecnico`     |
  * | `nova-admissao`           | `colaborador` create    | `rh`, `dp`                       |
  * | `cadastros`               | `unidade_organizacional`| `rh`, `dp`, `master_tecnico`     |
@@ -508,6 +556,7 @@ const CAPACIDADE_FUNCIONAL_POR_PAPEL: Readonly<
   Record<string, readonly string[]>
 > = {
   rh: [
+    "dashboard",
     "pessoas",
     "nova-admissao",
     "cadastros",
@@ -518,6 +567,7 @@ const CAPACIDADE_FUNCIONAL_POR_PAPEL: Readonly<
     "contas-acesso",
   ],
   dp: [
+    "dashboard",
     "pessoas",
     "nova-admissao",
     "cadastros",
@@ -526,6 +576,7 @@ const CAPACIDADE_FUNCIONAL_POR_PAPEL: Readonly<
     "contas-acesso",
   ],
   master_tecnico: [
+    "dashboard",
     "pessoas",
     "cadastros",
     "jornadas-trabalho",
