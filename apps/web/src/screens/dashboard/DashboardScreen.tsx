@@ -125,6 +125,12 @@ export function DashboardScreen({
     Parte<ContadoresColaboradoresApi>
   >({ tipo: "carregando" });
   const [series, setSeries] = useState<Parte<Series>>({ tipo: "carregando" });
+  /**
+   * O ano a que a última série lida (ou a última falha) se refere. Ao trocar
+   * de ano, o que estava na tela é de outro ano e não pode ser desenhado com
+   * o rótulo do ano novo, nem por um único desenho.
+   */
+  const [anoDaSerie, setAnoDaSerie] = useState<number | null>(null);
   const [lendo, setLendo] = useState(temEmpresa);
   /** O anúncio da última leitura concluída (um `span` novo por leitura). */
   const [aviso, setAviso] = useState<{
@@ -182,12 +188,14 @@ export function DashboardScreen({
         }
         const dados = { periodo, admissoes, desligamentos };
         setSeries({ tipo: "dados", dados });
+        setAnoDaSerie(anoLido);
         return dados;
       } catch {
         if (!vivaRef.current || geracao !== geracaoRef.current.series) {
           return null;
         }
         setSeries(proximaFalha);
+        setAnoDaSerie(anoLido);
         return null;
       }
     },
@@ -329,11 +337,17 @@ export function DashboardScreen({
 
   const anos: number[] = [];
   for (let a = corrente; a >= ANO_MINIMO_DO_DASHBOARD; a -= 1) anos.push(a);
-  const periodo = periodoDoAno(ano);
-  const quando = periodo.ateHoje ? `em ${ano}, até hoje` : `em ${ano}`;
-
   const dadosContadores = contadores.tipo === "dados" ? contadores.dados : null;
-  const dadosSeries = series.tipo === "dados" ? series.dados : null;
+  // Só a série (ou a falha) do ano exibido conta; a de outro ano é tratada
+  // como "carregando" até a leitura deste ano terminar.
+  const dadosSeries =
+    series.tipo === "dados" && series.dados.periodo.ano === ano
+      ? series.dados
+      : null;
+  const falhaDaSerie =
+    series.tipo === "erro" && anoDaSerie === ano ? series : null;
+  const periodo = dadosSeries?.periodo ?? periodoDoAno(ano);
+  const quando = periodo.ateHoje ? `em ${ano}, até hoje` : `em ${ano}`;
   const admissoes =
     dadosSeries?.admissoes.tipo === "completa" ? dadosSeries.admissoes : null;
   const desligamentos =
@@ -604,16 +618,16 @@ export function DashboardScreen({
         <h2 id={ids.serie} tabIndex={-1} className="dashboard__subtitulo">
           Admissões e desligamentos efetivados por mês
         </h2>
-        {series.tipo === "erro" ? (
+        {falhaDaSerie ? (
           <div className="dashboard__falha">
-            <p key={series.falhas} role="alert">
+            <p key={falhaDaSerie.falhas} role="alert">
               Não foi possível carregar as admissões e os desligamentos de {ano}
               .
             </p>
             <Button
               type="button"
               variant="secondary"
-              aria-disabled={series.relendo}
+              aria-disabled={falhaDaSerie.relendo}
               onClick={() => void novaTentativaDaSerie()}
             >
               Tentar de novo
@@ -623,7 +637,7 @@ export function DashboardScreen({
               </span>
             </Button>
           </div>
-        ) : series.tipo === "carregando" ? (
+        ) : dadosSeries === null ? (
           <p className="dashboard__nota" aria-hidden="true">
             Carregando…
           </p>

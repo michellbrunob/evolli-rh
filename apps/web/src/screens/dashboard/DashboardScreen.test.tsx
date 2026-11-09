@@ -629,6 +629,67 @@ describe("T205 — período, atualização, atrasos (E-1, E-5)", () => {
     expect(screen.getByRole("status")).toHaveTextContent(/2025/);
   });
 
+  it("B3 — ao trocar de ano, nenhum desenho mostra os números do ano anterior com o rótulo do ano novo", async () => {
+    const { rerender } = render(<Tela ano={2026} />);
+    await lido();
+    // A leitura de 2025 fica pendente: só o que a tela desenha ao receber
+    // o ano novo importa.
+    vi.mocked(listarMovimentacoes).mockReturnValue(new Promise(() => {}));
+    const tela = document.querySelector<HTMLElement>(".dashboard")!;
+    const observador = new MutationObserver(() => {});
+    observador.observe(tela, {
+      characterData: true,
+      characterDataOldValue: true,
+      childList: true,
+      subtree: true,
+    });
+    rerender(<Tela ano={2025} />);
+    const registros = observador.takeRecords();
+    observador.disconnect();
+    // Texto existente reescrito para 2025 (legenda, frase, notas dos
+    // cartões) = os dados de 2026 com o rótulo de 2025.
+    const reescritos = registros
+      .filter((r) => r.type === "characterData")
+      .map((r) => (r.target as Text).data)
+      .filter((texto) => /2025/.test(texto));
+    expect(reescritos).toEqual([]);
+    // E, enquanto 2025 não chega, nada de vínculos na tela.
+    expect(screen.queryByRole("table")).toBeNull();
+    expect(screen.queryByText(/houve/)).toBeNull();
+    expect(screen.queryByText("Admissões efetivadas")).toBeNull();
+    expect(
+      bloco(/^Admissões e desligamentos efetivados por mês/),
+    ).toHaveTextContent("Carregando…");
+  });
+
+  it("B3 — falha de um ano não aparece rotulada com outro ano", async () => {
+    vi.mocked(listarMovimentacoes).mockRejectedValue(new Error("rede"));
+    const { rerender } = render(<Tela ano={2026} />);
+    await screen.findByText(
+      "Não foi possível carregar as admissões e os desligamentos de 2026.",
+    );
+    vi.mocked(listarMovimentacoes).mockReturnValue(new Promise(() => {}));
+    const tela = document.querySelector<HTMLElement>(".dashboard")!;
+    const observador = new MutationObserver(() => {});
+    observador.observe(tela, {
+      characterData: true,
+      childList: true,
+      subtree: true,
+    });
+    rerender(<Tela ano={2025} />);
+    const registros = observador.takeRecords();
+    observador.disconnect();
+    // A falha de 2026 não é redesenhada como "… de 2025" em momento algum.
+    const reescritos = registros
+      .filter((r) => r.type === "characterData")
+      .map((r) => (r.target as Text).data)
+      .filter((texto) => /2025/.test(texto));
+    expect(reescritos).toEqual([]);
+    expect(
+      screen.queryByText(/Não foi possível carregar as admissões/),
+    ).toBeNull();
+  });
+
   it("leitura antiga que termina antes da nova não encerra o 'Atualizando…' da nova", async () => {
     const antiga = adiada<ListagemColaboradoresApi>();
     const nova = adiada<ListagemColaboradoresApi>();
