@@ -35,6 +35,7 @@ import {
   transicionarSolicitacaoPessoa,
 } from "../../api/solicitacoesPessoasClient";
 import type { VinculoApi } from "../../api/colaboradoresClient";
+import { CsrfRequestError } from "../../api/csrfClient";
 import {
   ProvedorDeEdicoes,
   RegistroDeEdicoes,
@@ -797,6 +798,101 @@ describe("T204 — registrar e enviar", () => {
       ),
     );
     expect(transicionarSolicitacaoPessoa).toHaveBeenCalledTimes(3);
+    expect(registrarSolicitacaoPessoa).toHaveBeenCalledTimes(1);
+  });
+
+  // T204 (B2) — o token CSRF não pôde ser obtido: o pedido nem saiu.
+  it("registro com falha ao preparar o envio: 'nada foi registrado', não é incerto e fechar não relê a lista", async () => {
+    vi.mocked(registrarSolicitacaoPessoa).mockRejectedValueOnce(
+      new CsrfRequestError("Não foi possível obter o token CSRF."),
+    );
+    await abrirNova();
+    preencher("ferias");
+    revisar();
+    confirmar();
+    const alerta = await within(janela()).findByRole("alert");
+    expect(alerta).toHaveTextContent(
+      "Não foi possível preparar o envio e nada foi registrado. Confira a conexão e tente de novo.",
+    );
+    expect(alerta.textContent).not.toMatch(/confirmar se/);
+    expect(transicionarSolicitacaoPessoa).not.toHaveBeenCalled();
+    const leituras = vi.mocked(listarSolicitacoesPessoas).mock.calls.length;
+
+    fireEvent.click(within(janela()).getByRole("button", { name: "Cancelar" }));
+    fireEvent.click(await screen.findByRole("button", { name: /^Descartar/ }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 20));
+    });
+    expect(vi.mocked(listarSolicitacoesPessoas).mock.calls.length).toBe(
+      leituras,
+    );
+  });
+
+  it("'Enviar' com falha ao preparar o envio: 'nada foi enviado', sem reler lista nem detalhe, e 'Enviar' continua", async () => {
+    vi.mocked(transicionarSolicitacaoPessoa)
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+      .mockRejectedValueOnce(
+        new CsrfRequestError("Não foi possível obter o token CSRF."),
+      );
+    await abrirNova();
+    preencher("ferias");
+    revisar();
+    confirmar();
+    const titulo = await screen.findByRole("heading", {
+      level: 4,
+      name: "Detalhe da solicitação de Férias",
+    });
+    const painel = titulo.closest("section")!;
+    const enviar = await within(painel).findByRole("button", {
+      name: "Enviar",
+    });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 20));
+    });
+    const leituras = vi.mocked(listarSolicitacoesPessoas).mock.calls.length;
+    const detalhes = vi.mocked(detalharSolicitacaoPessoa).mock.calls.length;
+
+    fireEvent.click(enviar);
+    await waitFor(() =>
+      expect(within(painel).getByRole("alert")).toHaveTextContent(
+        "Não foi possível preparar o envio e nada foi enviado. Confira a conexão e tente de novo.",
+      ),
+    );
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 20));
+    });
+    expect(vi.mocked(listarSolicitacoesPessoas).mock.calls.length).toBe(
+      leituras,
+    );
+    expect(vi.mocked(detalharSolicitacaoPessoa).mock.calls.length).toBe(
+      detalhes,
+    );
+    expect(
+      within(painel).getByRole("button", { name: "Enviar" }),
+    ).toBeInTheDocument();
+    expect(registrarSolicitacaoPessoa).toHaveBeenCalledTimes(1);
+  });
+
+  it("registro concluído e envio sem conseguir preparar o token: o rascunho abre com o aviso certo e 'Enviar'", async () => {
+    vi.mocked(transicionarSolicitacaoPessoa).mockRejectedValueOnce(
+      new CsrfRequestError("Não foi possível obter o token CSRF."),
+    );
+    await abrirNova();
+    preencher("ferias");
+    revisar();
+    confirmar();
+    const titulo = await screen.findByRole("heading", {
+      level: 4,
+      name: "Detalhe da solicitação de Férias",
+    });
+    const painel = titulo.closest("section")!;
+    expect(within(painel).getByRole("alert")).toHaveTextContent(
+      "A solicitação foi registrada, mas não foi enviada: não foi possível preparar o envio. Confira a conexão e use “Enviar” para concluir.",
+    );
+    expect(
+      await within(painel).findByRole("button", { name: "Enviar" }),
+    ).toBeInTheDocument();
     expect(registrarSolicitacaoPessoa).toHaveBeenCalledTimes(1);
   });
 

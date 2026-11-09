@@ -24,8 +24,9 @@ tem sete abas reais; a aba Solicitações é só leitura
 
 **Recomendação: opção 3, restrita à entrada do pedido.** O RH registra e
 envia uma solicitação da pessoa na própria ficha ("Nova solicitação" →
-confirmar → `rascunho` → `enviada`). Uma solicitação que ficar em `rascunho`
-mostra "Enviar" no detalhe. As outras seis ações (revisar, aguardar
+confirmar → `rascunho` → `enviada`). Se o envio falhar depois do registro,
+o detalhe daquele rascunho mostra "Enviar" — só para o rascunho que a própria
+ficha registrou e não enviou, e só na mesma sessão (A-8). As outras seis ações (revisar, aguardar
 informação, retomar, encaminhar, recusar e reabrir) e o cancelamento continuam
 só na tela coletiva.
 
@@ -230,8 +231,10 @@ registra solicitação de documento na ficha:
 - **Rascunho:** só existe se o envio falhar depois do registro. Nesse caso:
   - a ficha relê a lista, avisa "Solicitação registrada, mas não enviada" e o
     detalhe da linha mostra "Enviar";
-  - qualquer rascunho que a ficha mostra (inclusive os criados na tela
-    coletiva) tem "Enviar" no detalhe — nenhum fica sem saída na ficha.
+  - "Enviar" aparece só para esse rascunho, enquanto a ficha estiver na mesma
+    sessão. Depois de recarregar, e para rascunhos criados fora desse fluxo
+    (inclusive na tela coletiva), a ficha não oferece "Enviar": a ação
+    continua na tela coletiva (A-8).
 - **Permissões:** só `rh` com empresa vê "Nova solicitação" e "Enviar"
   (mesma regra de `podeMutar`); `master_tecnico` continua só leitura, sem
   nenhum controle; DP sem aba; o servidor decide cada requisição.
@@ -298,16 +301,16 @@ registra solicitação de documento na ficha:
 
 ### 4.5 Quadro-resumo
 
-| Critério                | 1. Sem ação | 2. Registrar e voltar               | 3. Registrar e enviar       | 4. Fluxo completo       |
-| ----------------------- | ----------- | ----------------------------------- | --------------------------- | ----------------------- |
-| Contratos novos         | nenhum      | nenhum na API; muda a tela coletiva | nenhum                      | nenhum                  |
-| Cria rascunho           | não         | sempre                              | só se o envio falhar        | sim                     |
-| Rascunho tem saída?     | —           | só na tela coletiva (com limites)   | sim, "Enviar" na ficha      | sim                     |
-| Ações irreversíveis     | nenhuma     | nenhuma na ficha                    | nenhuma                     | cancelar, recusar       |
-| Guarda T200             | não         | sim                                 | sim                         | sim, vários formulários |
-| Duplica a tela coletiva | não         | parcialmente (entrada)              | não (2 de 9 ações, entrada) | sim                     |
-| Completa sozinha        | sim         | não                                 | sim                         | sim                     |
-| Tamanho                 | zero        | médio + tela coletiva               | médio                       | grande                  |
+| Critério                | 1. Sem ação | 2. Registrar e voltar               | 3. Registrar e enviar         | 4. Fluxo completo       |
+| ----------------------- | ----------- | ----------------------------------- | ----------------------------- | ----------------------- |
+| Contratos novos         | nenhum      | nenhum na API; muda a tela coletiva | nenhum                        | nenhum                  |
+| Cria rascunho           | não         | sempre                              | só se o envio falhar          | sim                     |
+| Rascunho tem saída?     | —           | só na tela coletiva (com limites)   | sim, "Enviar" na mesma sessão | sim                     |
+| Ações irreversíveis     | nenhuma     | nenhuma na ficha                    | nenhuma                       | cancelar, recusar       |
+| Guarda T200             | não         | sim                                 | sim                           | sim, vários formulários |
+| Duplica a tela coletiva | não         | parcialmente (entrada)              | não (2 de 9 ações, entrada)   | sim                     |
+| Completa sozinha        | sim         | não                                 | sim                           | sim                     |
+| Tamanho                 | zero        | médio + tela coletiva               | médio                         | grande                  |
 
 ## 5. Proposta da primeira fatia (opção 3)
 
@@ -319,7 +322,10 @@ registra solicitação de documento na ficha:
     referência opcional;
   - passo de confirmação com o resumo e "Confirmar e enviar";
   - gravação: registro e envio em sequência, sem repetição automática;
-  - no detalhe de uma solicitação em `rascunho`: "Enviar", com confirmação.
+  - no detalhe do rascunho que a própria ficha registrou e não conseguiu
+    enviar, na mesma sessão: "Enviar" (sem nova confirmação; A-8 — depois de
+    recarregar, ou para rascunhos de fora desse fluxo, a ação fica na tela
+    coletiva).
 - **Aviso fixo atualizado:** "Registrar e enviar pedidos da pessoa pode ser
   feito aqui. Analisar, encaminhar, recusar, reabrir e cancelar continuam em
   Pessoas › Solicitações."
@@ -405,7 +411,7 @@ nada gravado.
 | Risco                                 | Cuidado                                                                                                                                 |
 | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
 | Registro duplicado                    | Sem repetição automática; botão desabilitado durante a gravação; registro sem resposta orienta conferir a lista antes de tentar de novo |
-| Rascunho órfão                        | Envio em seguida ao registro; falha do envio deixa "Enviar" no detalhe; todo rascunho visível na ficha tem "Enviar"                     |
+| Rascunho órfão                        | Envio em seguida ao registro; falha do envio deixa "Enviar" no detalhe daquele rascunho, na mesma sessão; depois, a tela coletiva (A-8) |
 | Envio concorrente com a tela coletiva | 422 do servidor, mensagem e releitura; nada projetado localmente                                                                        |
 | Isolamento                            | Vínculo só de `vinculosDaEmpresa`; `empresaId` da sessão; servidor confere (404); troca de empresa remonta depois da guarda             |
 | `master_tecnico` agindo               | Nenhum controle; o servidor nega com 403 e auditoria                                                                                    |
@@ -490,13 +496,20 @@ A-1 a A-6 aprovadas como recomendado.
   - **Registro recusado** (400, 403, 404, 409, 422, sessão expirada): aviso de
     que nada foi registrado; o formulário volta com os valores; nada é
     enviado.
-  - **Registro incerto** (rede ou 5xx): aviso de que não foi possível
-    confirmar; nada é enviado nem repetido; ao fechar a janela, a lista é
-    relida para conferir.
+  - **Registro incerto** (rede ou 5xx depois de o pedido sair): aviso de que
+    não foi possível confirmar; nada é enviado nem repetido; ao fechar a
+    janela, a lista é relida para conferir.
+  - **Falha ao preparar o envio** (o token CSRF não pôde ser obtido, por rede
+    ou 5xx; o pedido nem sai): o cliente usa o caminho padrão de token para
+    gravação (`tokenCsrfParaGravacao`, como Contatos e Jornada), e a ficha
+    reconhece `falhaAoPrepararEnvio`: "Não foi possível preparar o envio e
+    nada foi registrado" (ou "enviado"), "Confira a conexão e tente de
+    novo"; não é tratada como incerta e não dispara releitura. Corrigido na
+    revisão adversarial (B2).
   - **Envio falhando depois do registro:** a janela fecha, a lista é relida e
     o detalhe daquele rascunho abre com o aviso e **"Enviar" — só para ele**
-    (o rascunho que esta ficha registrou e não enviou; por instrução da
-    implementação, nenhum outro rascunho ganha ação na ficha).
+    (o rascunho que esta ficha registrou e não enviou, na mesma sessão;
+    nenhum outro rascunho ganha ação na ficha — A-8).
   - **"Enviar" repetido ou concorrente:** a resposta do servidor (422 ou 404)
     vira aviso no detalhe, e a situação é relida — sem efeito duplo.
   - **Desmontagem entre o registro e o envio (A-7):** o envio do registro
@@ -530,18 +543,20 @@ A-1 a A-6 aprovadas como recomendado.
 ### 12.2 Testes e validação
 
 - **Web:**
-  - `SolicitacoesColaboradorSecao.registro.test.tsx` (30 casos): quem vê;
+  - `SolicitacoesColaboradorSecao.registro.test.tsx` (33 casos): quem vê;
     vínculos e rótulos; tipos e motivos; validação; revisão e "Voltar";
     Escape e descarte; sucesso (corpo exato, ordem, lista, foco, um anúncio,
     mesmo nó de status); dia vazio e vínculo previsto; clique repetido e
     Escape durante o envio; registro recusado (5 status) e incerto (rede e
     5xx); envio falhando depois do registro e "Enviar"; "Enviar" concorrente;
     rascunho que a ficha não criou; nenhuma transição fora de escopo;
-    desmontagem; página desatualizada no registro e no "Enviar"; registro
-    de edições (pendente e salvando); 375 px;
-  - `solicitacoesPessoasClient.test.ts` (3 casos novos): `403 csrf_invalido`
+    desmontagem; página desatualizada no registro e no "Enviar"; falha ao
+    preparar o envio no registro, no envio logo após o registro e no
+    "Enviar"; registro de edições (pendente e salvando); 375 px;
+  - `solicitacoesPessoasClient.test.ts` (7 casos novos): `403 csrf_invalido`
     guarda o `codigo` e descarta o token no registro e na transição; 403 de
-    permissão mantém o token;
+    permissão mantém o token; falha ao obter o token (rede ou 5xx) vira falha
+    de preparação, sem nenhum POST, no registro e na transição;
   - `SolicitacoesColaboradorSecao.test.tsx` (24 casos): o caso "só leitura"
     agora cobre `master_tecnico` e um papel sem escrita;
   - `App.ficha.test.tsx` (4 casos T204): guarda ao sair da ficha com a janela
@@ -560,7 +575,8 @@ A-1 a A-6 aprovadas como recomendado.
   - registro recusado ainda envia;
   - registro incerto repetido automaticamente;
   - envio falho sem "Enviar" no rascunho;
-  - "Enviar" para qualquer rascunho;
+  - "Enviar" para qualquer rascunho (e não só para o que a ficha registrou
+    na mesma sessão — A-8);
   - motivo natural trocado;
   - vínculo pré-selecionado diferente do principal;
   - janela que não se declara alterada (guarda e descarte);
@@ -571,7 +587,9 @@ A-1 a A-6 aprovadas como recomendado.
   - envio falho sem abrir o detalhe;
   - "Enviar" do detalhe sem trava contra clique repetido;
   - código anterior à correção do token desatualizado (4 testes falham: 2 do
-    cliente e 2 da ficha).
+    cliente e 2 da ficha);
+  - código anterior à correção da falha de preparação (B2: 5 testes falham —
+    2 do cliente e 3 da ficha).
 - **Achados na própria entrega e corrigidos:** o foco depois de um erro de
   registro caía no título do passo que saía (ids de título distintos por
   passo); duas chamadas redundantes ao sinal do anúncio da lista (mutação
@@ -580,12 +598,16 @@ A-1 a A-6 aprovadas como recomendado.
   local**, o `403 csrf_invalido` com duas abas aparecia como "sem permissão"
   e prendia toda nova tentativa (corrigido, ver 12.1); a frase do envio
   recusado por página desatualizada passou a valer também quando a releitura
-  mostra a solicitação já enviada.
-- **Resultados:** web 3314 testes; API unitária 1472; E2E com PostgreSQL real
+  mostra a solicitação já enviada; **na revisão adversarial**, a falha ao
+  obter o token CSRF (pedido que nem saiu) aparecia como envio incerto (B2,
+  corrigido), havia porta local na evidência de localhost (B1, removida) e o
+  texto da proposta dizia que todo rascunho teria "Enviar" (B3, alinhado à
+  A-8).
+- **Resultados:** web 3321 testes; API unitária 1472; E2E com PostgreSQL real
   1013 testes (20 suítes); scripts 182; lint, typecheck, build, Prettier, `spec:check`, prévia
   do squash e `git diff --check`: verdes.
-- **Localhost** (web 5173 e API 3204 da T204, sobre o banco sintético
-  isolado da T203; contas sintéticas do seed de demonstração; solicitações
+- **Localhost** (prévia local da T204, sobre banco sintético isolado; contas
+  sintéticas do seed de demonstração; solicitações
   criadas só pela ficha e enviadas pela ficha ou pela tela coletiva):
   - **RH, pelo teclado:** janela com foco no título e foco preso; "Revisar"
     sem tipo leva o foco ao campo com o aviso; motivo natural e "Outro

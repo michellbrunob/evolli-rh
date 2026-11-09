@@ -1,8 +1,7 @@
 import {
   clearCsrfToken,
   descartarTokenSeDesatualizado,
-  getCsrfToken,
-  refreshCsrfToken,
+  tokenCsrfParaGravacao,
 } from "./csrfClient";
 
 /**
@@ -223,8 +222,14 @@ export class ApiError extends Error {
 // Transporte
 // ---------------------------------------------------------------------------
 
+/**
+ * T204 (B2) — o token para uma gravação pelo caminho padrão (T179): se ele
+ * precisa ser obtido e isso falha (rede ou 5xx), o erro é
+ * `CsrfRequestError` — o pedido de gravação nem saiu, e quem chama não o
+ * confunde com envio incerto (`falhaAoPrepararEnvio`).
+ */
 async function getCsrf(): Promise<string> {
-  return getCsrfToken() ?? refreshCsrfToken();
+  return tokenCsrfParaGravacao();
 }
 
 async function apiFetch(

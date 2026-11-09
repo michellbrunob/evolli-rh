@@ -47,6 +47,7 @@ import { Button, DataTable, StatusBadge } from "../../components";
 import type { DataTableColumn, StatusVariant } from "../../components";
 import { obterUsuarioAtual } from "../../api/usersClient";
 import {
+  falhaAoPrepararEnvio,
   falhaPorSessaoExpirada,
   falhaPorTokenDesatualizado,
 } from "../../api/csrfClient";
@@ -189,6 +190,14 @@ function falhaDoRegistro(erro: unknown): {
       incerto: false,
     };
   }
+  // B2 — o token não pôde ser obtido: o pedido nem saiu. Não é incerto.
+  if (falhaAoPrepararEnvio(erro)) {
+    return {
+      texto:
+        "Não foi possível preparar o envio e nada foi registrado. Confira a conexão e tente de novo.",
+      incerto: false,
+    };
+  }
   if (erro instanceof ApiError && erro.status < 500) {
     switch (erro.status) {
       case 403:
@@ -225,6 +234,9 @@ function falhaDoEnvio(erro: unknown): string {
   }
   if (falhaPorTokenDesatualizado(erro)) {
     return "Esta página ficou desatualizada e nada foi enviado. A solicitação foi atualizada: se ainda estiver em rascunho, use “Enviar” de novo.";
+  }
+  if (falhaAoPrepararEnvio(erro)) {
+    return "Não foi possível preparar o envio e nada foi enviado. Confira a conexão e tente de novo.";
   }
   if (erro instanceof ApiError && erro.status < 500) {
     switch (erro.status) {
@@ -599,7 +611,9 @@ export function SolicitacoesColaboradorSecao({
       setAvisoDoDetalhe({
         texto: falhaPorSessaoExpirada(erro)
           ? "A solicitação foi registrada, mas não foi enviada: sua sessão expirou. Entre de novo e use “Enviar” para concluir."
-          : "A solicitação foi registrada, mas o envio não foi confirmado. Se ela estiver em rascunho, use “Enviar” para concluir.",
+          : falhaAoPrepararEnvio(erro)
+            ? "A solicitação foi registrada, mas não foi enviada: não foi possível preparar o envio. Confira a conexão e use “Enviar” para concluir."
+            : "A solicitação foi registrada, mas o envio não foi confirmado. Se ela estiver em rascunho, use “Enviar” para concluir.",
         n: proximoN(),
       });
       void carregarLista("silenciosa");
@@ -643,11 +657,18 @@ export function SolicitacoesColaboradorSecao({
       });
     } catch (erro: unknown) {
       if (!vivaRef.current) return;
+      setAvisoDoDetalhe({ texto: falhaDoEnvio(erro), n: proximoN() });
+      // B2 — o pedido nem saiu: nada mudou no servidor, então nada é relido
+      // e "Enviar" continua ali para a nova tentativa.
+      if (falhaAoPrepararEnvio(erro)) {
+        enviandoRef.current = false;
+        setEnviandoRascunho(false);
+        return;
+      }
       // A situação é relida do servidor: nada é projetado localmente.
       void carregarDetalhe(linha, true);
-      setAvisoDoDetalhe({ texto: falhaDoEnvio(erro), n: proximoN() });
     } finally {
-      if (vivaRef.current) {
+      if (vivaRef.current && enviandoRef.current) {
         enviandoRef.current = false;
         setEnviandoRascunho(false);
         focoRef.current = ids.tituloDetalhe;

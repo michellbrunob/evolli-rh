@@ -15,7 +15,12 @@ import {
   registrarSolicitacaoPessoa,
   transicionarSolicitacaoPessoa,
 } from "./solicitacoesPessoasClient";
-import { clearCsrfToken, getCsrfToken, setCsrfToken } from "./csrfClient";
+import {
+  clearCsrfToken,
+  falhaAoPrepararEnvio,
+  getCsrfToken,
+  setCsrfToken,
+} from "./csrfClient";
 
 function resposta(status: number, body: unknown): Response {
   // `clone` como o `Response` real: o transporte lê uma cópia do corpo num
@@ -370,4 +375,52 @@ describe("solicitacoesPessoasClient — token CSRF desatualizado (T204)", () => 
     expect(erro.codigo).toBeUndefined();
     expect(getCsrfToken()).toBe("csrf-em-memoria");
   });
+});
+
+// T204 (B2) — sem token em memória, a gravação primeiro obtém um token CSRF.
+// Se isso falha (rede ou 5xx), o pedido de gravação nem sai: é falha de
+// preparação (`falhaAoPrepararEnvio`), não envio incerto.
+describe("solicitacoesPessoasClient — falha ao preparar o envio (T204)", () => {
+  const gravacoes: [string, () => Promise<unknown>][] = [
+    [
+      "registrar",
+      () =>
+        registrarSolicitacaoPessoa({
+          empresaId: SOLICITACAO.empresaId,
+          vinculoId: SOLICITACAO.vinculoId,
+          tipo: "ferias",
+          motivo: "periodo_ferias",
+        }),
+    ],
+    [
+      "transicionar",
+      () => transicionarSolicitacaoPessoa(SOLICITACAO.id, { acao: "enviar" }),
+    ],
+  ];
+
+  it.each(gravacoes)(
+    "%s: a obtenção do token cai por rede — falha de preparação e nenhum POST",
+    async (_nome, gravar) => {
+      clearCsrfToken();
+      fetchMock.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+      const erro = await gravar().catch((e: unknown) => e);
+      expect(falhaAoPrepararEnvio(erro)).toBe(true);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const [url, init] = fetchMock.mock.calls[0]!;
+      expect(String(url)).toContain("/v1/auth/csrf");
+      expect((init as RequestInit | undefined)?.method ?? "GET").toBe("GET");
+    },
+  );
+
+  it.each(gravacoes)(
+    "%s: a obtenção do token responde 5xx — falha de preparação e nenhum POST",
+    async (_nome, gravar) => {
+      clearCsrfToken();
+      fetchMock.mockResolvedValueOnce(resposta(503, {}));
+      const erro = await gravar().catch((e: unknown) => e);
+      expect(falhaAoPrepararEnvio(erro)).toBe(true);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(String(fetchMock.mock.calls[0]![0])).toContain("/v1/auth/csrf");
+    },
+  );
 });
