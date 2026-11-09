@@ -16,13 +16,24 @@
  *   linha do tempo, ao abrir uma solicitação.
  * Os vínculos já vêm da ficha (`GET /v1/colaboradores/:id/vinculos`).
  *
- * Nada é escrito: registrar e dar andamento continuam na Central (Pessoas ›
- * Solicitações). Sem formulário, a aba não cria edição pendente. "Atestado" é
- * um tipo como os outros (S-5): tipo, motivo e datas, sem anexo nem CID.
+ * T204 — a primeira ação: o RH (só `rh` com empresa ativa) registra e envia
+ * uma solicitação da pessoa pela "Nova solicitação" (decisões A-1 a A-6):
+ * - `POST /v1/solicitacoes-pessoas` e, em seguida,
+ *   `POST /v1/solicitacoes-pessoas/:id/transicoes` com `acao: "enviar"` — os
+ *   mesmos contratos da Central, nesta ordem, sem repetição automática;
+ * - se o registro falhar ou ficar incerto, nada é enviado e a pessoa confere a
+ *   lista; se o envio falhar depois do registro, o detalhe daquele rascunho
+ *   abre com "Enviar" (só para ele);
+ * - analisar, encaminhar, recusar, reabrir e cancelar continuam na Central
+ *   (Pessoas › Solicitações). "Atestado" é um tipo como os outros (S-5):
+ *   tipo, motivo e datas, sem anexo nem CID.
+ * O formulário vive numa janela do Evolli (`NovaSolicitacaoModal`), que se
+ * declara na guarda de saída (T200) enquanto houver alteração ou envio.
  *
  * Empresa ativa (S-2): sem ela — o `master_tecnico` global —, a leitura do
  * servidor é de todas as empresas; a aba não consulta nada e orienta a
  * escolher a empresa. O DP nem chega aqui: o shell não oferece a aba (S-3).
+ * O `master_tecnico` com empresa só lê: nenhum controle de escrita.
  */
 import {
   useCallback,
@@ -35,6 +46,12 @@ import {
 import { Button, DataTable, StatusBadge } from "../../components";
 import type { DataTableColumn, StatusVariant } from "../../components";
 import { obterUsuarioAtual } from "../../api/usersClient";
+import {
+  falhaAoPrepararEnvio,
+  falhaPorSessaoExpirada,
+  falhaPorTokenDesatualizado,
+} from "../../api/csrfClient";
+import { useEdicaoEmAndamento } from "../../app/edicoesPendentes";
 import type {
   SituacaoVinculo,
   TipoVinculo,
@@ -52,9 +69,15 @@ import {
   detalharSolicitacaoPessoa,
   historicoSolicitacaoPessoa,
   listarSolicitacoesPessoas,
+  registrarSolicitacaoPessoa,
+  transicionarSolicitacaoPessoa,
 } from "../../api/solicitacoesPessoasClient";
 import { formatarDiaCivil, formatarInstante } from "../../format/data";
 import { exibirMatricula } from "../../format/matricula";
+import {
+  NovaSolicitacaoModal,
+  type DadosDaNovaSolicitacao,
+} from "./NovaSolicitacaoModal";
 import "./SolicitacoesColaboradorSecao.css";
 
 /** Itens por página pedidos ao servidor: o máximo que ele aceita. */
@@ -100,7 +123,12 @@ type EstadoDaSessao =
   | { readonly tipo: "carregando" }
   | Falha
   | { readonly tipo: "sem-empresa" }
-  | { readonly tipo: "pronta"; readonly empresaId: string };
+  | {
+      readonly tipo: "pronta";
+      readonly empresaId: string;
+      /** T204 — só `rh` com empresa registra e envia (espelha a Central). */
+      readonly podeRegistrar: boolean;
+    };
 
 type EstadoDaLista =
   | { readonly tipo: "carregando" }
@@ -131,6 +159,98 @@ function descricaoDaLinha(s: SolicitacaoPessoaApi): string {
   return `${ROTULO_TIPO[s.tipo] ?? s.tipo}, registrada em ${formatarInstante(s.criadoEm)}`;
 }
 
+/** Um texto anunciado uma vez (a `n` muda a cada evento). */
+interface Aviso {
+  readonly texto: string;
+  readonly n: number;
+}
+
+/**
+ * T204 — falha do REGISTRO. Recusa do servidor (ou pedido que nem saiu) diz
+ * que nada foi registrado; sem resposta (rede) ou 5xx é incerto: o registro
+ * pode ter sido gravado, então nada é repetido e a pessoa confere a lista.
+ */
+function falhaDoRegistro(erro: unknown): {
+  readonly texto: string;
+  readonly incerto: boolean;
+} {
+  if (falhaPorSessaoExpirada(erro)) {
+    return {
+      texto:
+        "Sua sessão expirou e nada foi registrado. Entre de novo para continuar.",
+      incerto: false,
+    };
+  }
+  // Outra aba renovou o token CSRF: o servidor recusou, o token já foi
+  // descartado e confirmar de novo pede um novo.
+  if (falhaPorTokenDesatualizado(erro)) {
+    return {
+      texto:
+        "Esta página ficou desatualizada e nada foi registrado. Confirme de novo.",
+      incerto: false,
+    };
+  }
+  // B2 — o token não pôde ser obtido: o pedido nem saiu. Não é incerto.
+  if (falhaAoPrepararEnvio(erro)) {
+    return {
+      texto:
+        "Não foi possível preparar o envio e nada foi registrado. Confira a conexão e tente de novo.",
+      incerto: false,
+    };
+  }
+  if (erro instanceof ApiError && erro.status < 500) {
+    switch (erro.status) {
+      case 403:
+        return {
+          texto:
+            "Seu perfil não tem permissão para registrar solicitações nesta empresa. Nada foi registrado.",
+          incerto: false,
+        };
+      case 404:
+        return {
+          texto:
+            "O vínculo escolhido não está disponível na empresa ativa. Nada foi registrado.",
+          incerto: false,
+        };
+      default:
+        return {
+          texto:
+            "Os dados foram recusados e nada foi registrado. Confira o tipo, o vínculo, o motivo e o dia.",
+          incerto: false,
+        };
+    }
+  }
+  return {
+    texto:
+      "Não foi possível confirmar se a solicitação foi registrada. Feche esta janela e confira a lista antes de tentar de novo; nada é repetido automaticamente.",
+    incerto: true,
+  };
+}
+
+/** T204 — falha do ENVIO de um rascunho; a situação é relida em seguida. */
+function falhaDoEnvio(erro: unknown): string {
+  if (falhaPorSessaoExpirada(erro)) {
+    return "Sua sessão expirou e nada foi enviado. Entre de novo para continuar.";
+  }
+  if (falhaPorTokenDesatualizado(erro)) {
+    return "Esta página ficou desatualizada e nada foi enviado. A solicitação foi atualizada: se ainda estiver em rascunho, use “Enviar” de novo.";
+  }
+  if (falhaAoPrepararEnvio(erro)) {
+    return "Não foi possível preparar o envio e nada foi enviado. Confira a conexão e tente de novo.";
+  }
+  if (erro instanceof ApiError && erro.status < 500) {
+    switch (erro.status) {
+      case 403:
+        return "Seu perfil não tem permissão para enviar esta solicitação. Nada foi alterado.";
+      case 404:
+        return "Esta solicitação não está mais disponível na empresa ativa.";
+      default:
+        return "O envio não é mais possível na situação atual. A solicitação foi atualizada.";
+    }
+  }
+  return "Não foi possível confirmar o envio. A solicitação foi atualizada: se ainda estiver em rascunho, use “Enviar” de novo.";
+}
+
 export interface SolicitacoesColaboradorSecaoProps {
   readonly colaboradorId: string;
   readonly nomeColaborador: string;
@@ -151,6 +271,7 @@ export function SolicitacoesColaboradorSecao({
     () => ({
       titulo: `${prefixo}-titulo`,
       novaTentativa: `${prefixo}-nova-tentativa`,
+      novaSolicitacao: `${prefixo}-nova-solicitacao`,
       tituloDetalhe: `${prefixo}-detalhe`,
       tentarDetalhe: `${prefixo}-tentar-detalhe`,
       vinculo: (vinculoId: string) => `${prefixo}-vinculo-${vinculoId}`,
@@ -163,11 +284,39 @@ export function SolicitacoesColaboradorSecao({
   const [lista, setLista] = useState<EstadoDaLista>({ tipo: "carregando" });
   const [detalhe, setDetalhe] = useState<Detalhe | null>(null);
   /**
-   * O resultado da lista já foi anunciado e o detalhe passou a falar: abrir,
-   * concluir, falhar ou fechar o detalhe não repete o anúncio da lista. Só uma
-   * nova leitura da lista volta a anunciar.
+   * O resultado da lista já foi anunciado e outra fala tomou o lugar (o
+   * detalhe ou um aviso de envio): abrir, concluir, falhar ou fechar o
+   * detalhe não repete o anúncio da lista. Só uma nova leitura da lista volta
+   * a anunciar.
    */
   const [detalheDesdeALista, setDetalheDesdeALista] = useState(false);
+
+  // ---- T204: Nova solicitação ------------------------------------------------
+  const [novaAberta, setNovaAberta] = useState(false);
+  const [enviandoNova, setEnviandoNova] = useState(false);
+  const [erroNova, setErroNova] = useState<Aviso | null>(null);
+  /** Registro incerto: ao fechar a janela, a lista é relida para conferir. */
+  const conferirAoFecharRef = useRef(false);
+  /** Trava contra clique repetido, síncrona (o estado só vale no desenho). */
+  const enviandoRef = useRef(false);
+  /** Aviso de sucesso no nó de status (um por evento). */
+  const [aviso, setAviso] = useState<Aviso | null>(null);
+  /** Rascunhos que ESTA ficha registrou e não conseguiu enviar. */
+  const [rascunhosDaFicha, setRascunhosDaFicha] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  const [enviandoRascunho, setEnviandoRascunho] = useState(false);
+  /** Aviso do painel de detalhe (envio não confirmado ou recusado). */
+  const [avisoDoDetalhe, setAvisoDoDetalhe] = useState<Aviso | null>(null);
+  const contadorRef = useRef(0);
+  const proximoN = () => ++contadorRef.current;
+
+  // O envio de um rascunho em curso é salvamento: a guarda de saída espera.
+  // (A janela "Nova solicitação" se declara sozinha, pelo `Modal`.)
+  useEdicaoEmAndamento("Envio da solicitação", {
+    pendente: false,
+    salvando: enviandoRascunho,
+  });
 
   /** `id` do elemento que recebe o foco depois do próximo desenho. */
   const focoRef = useRef<string | null>(null);
@@ -197,7 +346,11 @@ export function SolicitacoesColaboradorSecao({
         setSessao(
           empresaId === null
             ? { tipo: "sem-empresa" }
-            : { tipo: "pronta", empresaId },
+            : {
+                tipo: "pronta",
+                empresaId,
+                podeRegistrar: ator.role === "rh",
+              },
         );
       } catch {
         if (vivaRef.current) setSessao(proximaFalha);
@@ -211,6 +364,7 @@ export function SolicitacoesColaboradorSecao({
   }, [carregarSessao]);
 
   const empresaId = sessao.tipo === "pronta" ? sessao.empresaId : null;
+  const podeRegistrar = sessao.tipo === "pronta" && sessao.podeRegistrar;
 
   /** Os vínculos desta pessoa NESTA empresa, o principal primeiro (S-4). */
   const vinculosDaEmpresa = useMemo(() => {
@@ -229,13 +383,21 @@ export function SolicitacoesColaboradorSecao({
   );
 
   // ---- Lista: todas as páginas de cada vínculo --------------------------------
+  /**
+   * `inicial` e `novaTentativa` anunciam a carga e o resultado. `silenciosa`
+   * (T204, depois de gravar) troca a lista no lugar, sem "Carregando…" e sem
+   * anúncio: quem fala é o aviso da gravação.
+   */
   const carregarLista = useCallback(
-    async (novaLeitura = false) => {
+    async (modo: "inicial" | "novaTentativa" | "silenciosa" = "inicial") => {
       if (empresaId === null) return;
       const geracao = ++geracaoRef.current.lista;
-      setDetalheDesdeALista(false);
-      if (novaLeitura) setLista(emNovaLeitura);
-      else setLista({ tipo: "carregando" });
+      if (modo !== "silenciosa") {
+        setDetalheDesdeALista(false);
+        setAviso(null);
+      }
+      if (modo === "novaTentativa") setLista(emNovaLeitura);
+      else if (modo === "inicial") setLista({ tipo: "carregando" });
       try {
         const lidas = await Promise.all(
           vinculosDaEmpresa.map(async (vinculo) => {
@@ -274,10 +436,13 @@ export function SolicitacoesColaboradorSecao({
           }),
         );
         if (!vivaRef.current || geracao !== geracaoRef.current.lista) return;
-        if (novaLeitura) focoRef.current = ids.titulo;
+        if (modo === "novaTentativa") focoRef.current = ids.titulo;
         setLista({ tipo: "dados", porVinculo: new Map(lidas) });
       } catch {
         if (!vivaRef.current || geracao !== geracaoRef.current.lista) return;
+        // Na releitura silenciosa, os blocos (e o foco neles) somem: o foco
+        // vai à nova tentativa, nunca ao `body`.
+        if (modo === "silenciosa") focoRef.current = ids.novaTentativa;
         setLista(proximaFalha);
       }
     },
@@ -295,6 +460,10 @@ export function SolicitacoesColaboradorSecao({
       if (empresaId === null) return;
       const geracao = ++geracaoRef.current.detalhe;
       setDetalheDesdeALista(true);
+      if (!novaLeitura) {
+        setAviso(null);
+        setAvisoDoDetalhe(null);
+      }
       setDetalhe((atual) =>
         novaLeitura && atual && atual.linha.id === linha.id
           ? { linha, conteudo: emNovaLeitura(atual.conteudo) }
@@ -351,11 +520,169 @@ export function SolicitacoesColaboradorSecao({
   );
 
   function fecharDetalhe() {
-    if (detalhe === null) return;
+    if (detalhe === null || enviandoRascunho) return;
     // Fechar descarta qualquer leitura em curso do detalhe.
     geracaoRef.current.detalhe++;
     focoRef.current = ids.verDetalhe(detalhe.linha.id);
+    setAvisoDoDetalhe(null);
     setDetalhe(null);
+  }
+
+  // ---- T204: registrar e enviar ------------------------------------------------
+  function abrirNova() {
+    if (!podeRegistrar || enviandoRef.current) return;
+    setErroNova(null);
+    conferirAoFecharRef.current = false;
+    setNovaAberta(true);
+  }
+
+  function fecharNova() {
+    if (enviandoRef.current) return;
+    setNovaAberta(false);
+    setErroNova(null);
+    // A janela devolve o foco a "Nova solicitação"; se o botão sumiu, o
+    // título da aba o recebe.
+    if (!document.getElementById(ids.novaSolicitacao)) {
+      focoRef.current = ids.titulo;
+    }
+    if (conferirAoFecharRef.current) {
+      conferirAoFecharRef.current = false;
+      void carregarLista("silenciosa");
+    }
+  }
+
+  async function confirmarNova(dados: DadosDaNovaSolicitacao) {
+    if (enviandoRef.current || empresaId === null || !podeRegistrar) return;
+    // Defesa: só um vínculo desta pessoa nesta empresa.
+    if (!idsDosVinculos.has(dados.vinculoId)) return;
+    enviandoRef.current = true;
+    setEnviandoNova(true);
+    setErroNova(null);
+
+    // 1. Registrar. Sem repetição automática: o contrato não é idempotente.
+    let registrada: SolicitacaoPessoaApi;
+    try {
+      registrada = await registrarSolicitacaoPessoa({
+        empresaId,
+        vinculoId: dados.vinculoId,
+        tipo: dados.tipo,
+        motivo: dados.motivo,
+        ...(dados.periodoReferencia
+          ? { periodoReferencia: dados.periodoReferencia }
+          : {}),
+      });
+    } catch (erro: unknown) {
+      if (!vivaRef.current) return;
+      enviandoRef.current = false;
+      setEnviandoNova(false);
+      const { texto, incerto } = falhaDoRegistro(erro);
+      if (incerto) conferirAoFecharRef.current = true;
+      setErroNova({ texto, n: proximoN() });
+      return;
+    }
+    // Defesa: a resposta tem de ser do vínculo e da empresa pedidos. Se não
+    // for, nada é enviado e a pessoa confere a lista.
+    if (
+      registrada.empresaId !== empresaId ||
+      registrada.vinculoId !== dados.vinculoId
+    ) {
+      enviandoRef.current = false;
+      if (!vivaRef.current) return;
+      setEnviandoNova(false);
+      conferirAoFecharRef.current = true;
+      setErroNova({ texto: falhaDoRegistro(null).texto, n: proximoN() });
+      return;
+    }
+
+    // 2. Enviar o registro recém-criado — e só ele. Mesmo que a aba tenha
+    // sido desmontada no meio (a guarda impede, mas não custa): a pessoa
+    // confirmou o envio, e parar aqui deixaria um rascunho sem saída.
+    try {
+      await transicionarSolicitacaoPessoa(registrada.id, { acao: "enviar" });
+    } catch (erro: unknown) {
+      if (!vivaRef.current) return;
+      enviandoRef.current = false;
+      setEnviandoNova(false);
+      setNovaAberta(false);
+      setRascunhosDaFicha((atual) => new Set(atual).add(registrada.id));
+      // O detalhe daquele registro abre com "Enviar"; nada é registrado de
+      // novo. A situação real vem do servidor.
+      void carregarDetalhe(registrada);
+      setAvisoDoDetalhe({
+        texto: falhaPorSessaoExpirada(erro)
+          ? "A solicitação foi registrada, mas não foi enviada: sua sessão expirou. Entre de novo e use “Enviar” para concluir."
+          : falhaAoPrepararEnvio(erro)
+            ? "A solicitação foi registrada, mas não foi enviada: não foi possível preparar o envio. Confira a conexão e use “Enviar” para concluir."
+            : "A solicitação foi registrada, mas o envio não foi confirmado. Se ela estiver em rascunho, use “Enviar” para concluir.",
+        n: proximoN(),
+      });
+      void carregarLista("silenciosa");
+      return;
+    }
+    if (!vivaRef.current) return;
+    enviandoRef.current = false;
+    setEnviandoNova(false);
+    setNovaAberta(false);
+    setAviso({
+      texto: `Solicitação de ${ROTULO_TIPO[dados.tipo]} registrada e enviada.`,
+      n: proximoN(),
+    });
+    focoRef.current = ids.vinculo(dados.vinculoId);
+    void carregarLista("silenciosa");
+  }
+
+  async function enviarRascunho(linha: SolicitacaoPessoaApi) {
+    if (
+      enviandoRef.current ||
+      !podeRegistrar ||
+      !rascunhosDaFicha.has(linha.id)
+    ) {
+      return;
+    }
+    enviandoRef.current = true;
+    setEnviandoRascunho(true);
+    setAvisoDoDetalhe(null);
+    try {
+      await transicionarSolicitacaoPessoa(linha.id, { acao: "enviar" });
+      if (!vivaRef.current) return;
+      setRascunhosDaFicha((atual) => {
+        const proximo = new Set(atual);
+        proximo.delete(linha.id);
+        return proximo;
+      });
+      void carregarDetalhe(linha, true);
+      setAviso({
+        texto: `Solicitação de ${ROTULO_TIPO[linha.tipo] ?? linha.tipo} enviada.`,
+        n: proximoN(),
+      });
+    } catch (erro: unknown) {
+      if (!vivaRef.current) return;
+      setAvisoDoDetalhe({ texto: falhaDoEnvio(erro), n: proximoN() });
+      // B2 — o pedido nem saiu: nada mudou no servidor, então nada é relido
+      // e "Enviar" continua ali para a nova tentativa.
+      if (falhaAoPrepararEnvio(erro)) {
+        enviandoRef.current = false;
+        setEnviandoRascunho(false);
+        return;
+      }
+      // A situação é relida do servidor: nada é projetado localmente.
+      void carregarDetalhe(linha, true);
+    } finally {
+      if (vivaRef.current && enviandoRef.current) {
+        enviandoRef.current = false;
+        setEnviandoRascunho(false);
+        focoRef.current = ids.tituloDetalhe;
+        void carregarLista("silenciosa");
+      }
+    }
+  }
+
+  function rotuloDoVinculo(v: VinculoApi): string {
+    return `${ROTULO_TIPO_VINCULO[v.tipo] ?? v.tipo} · ${exibirMatricula(
+      v.matricula,
+    )} · ${ROTULO_SITUACAO_VINCULO[v.situacao] ?? v.situacao}${
+      v.id === vinculoPrincipalId ? " · vínculo principal" : ""
+    }`;
   }
 
   // ---- Foco depois do desenho -----------------------------------------------
@@ -378,12 +705,22 @@ export function SolicitacoesColaboradorSecao({
       >
         Solicitações
       </h2>
-      <p className="solicitacoes-colaborador__aviso">
-        <StatusBadge variant="info">Somente consulta</StatusBadge> Pedidos de
-        Pessoas desta pessoa, com detalhe e linha do tempo. Registrar e dar
-        andamento às solicitações continua em Pessoas › Solicitações.
-        Solicitações de documento ficam na aba Documentos.
-      </p>
+      {podeRegistrar ? (
+        <p className="solicitacoes-colaborador__aviso">
+          <StatusBadge variant="info">Registro e envio</StatusBadge> Pedidos de
+          Pessoas desta pessoa, com detalhe e linha do tempo. Aqui o RH registra
+          e envia novos pedidos; analisar, encaminhar, recusar, reabrir e
+          cancelar continuam em Pessoas › Solicitações. Solicitações de
+          documento ficam na aba Documentos.
+        </p>
+      ) : (
+        <p className="solicitacoes-colaborador__aviso">
+          <StatusBadge variant="info">Somente consulta</StatusBadge> Pedidos de
+          Pessoas desta pessoa, com detalhe e linha do tempo. Registrar e dar
+          andamento às solicitações continua em Pessoas › Solicitações.
+          Solicitações de documento ficam na aba Documentos.
+        </p>
+      )}
     </>
   );
 
@@ -403,18 +740,22 @@ export function SolicitacoesColaboradorSecao({
     lista.tipo === "dados"
       ? [...lista.porVinculo.values()].reduce((n, l) => n + l.length, 0)
       : 0;
+  // T204 — o aviso de gravação vale como fala própria (um `span` novo por
+  // evento, no MESMO nó de status), sem repetir o anúncio da lista.
   const textoDoStatus = carregandoLista
     ? "Carregando solicitações…"
     : carregandoDetalhe
       ? "Carregando o detalhe da solicitação…"
-      : !detalheDesdeALista &&
-          sessao.tipo === "pronta" &&
-          lista.tipo === "dados" &&
-          vinculosDaEmpresa.length > 0
-        ? totalDeItens === 0
-          ? `Nenhuma solicitação registrada para ${nomeColaborador}.`
-          : `Solicitações de ${nomeColaborador} carregadas.`
-        : "";
+      : aviso
+        ? null
+        : !detalheDesdeALista &&
+            sessao.tipo === "pronta" &&
+            lista.tipo === "dados" &&
+            vinculosDaEmpresa.length > 0
+          ? totalDeItens === 0
+            ? `Nenhuma solicitação registrada para ${nomeColaborador}.`
+            : `Solicitações de ${nomeColaborador} carregadas.`
+          : "";
 
   const colunas: DataTableColumn<SolicitacaoPessoaApi>[] = [
     {
@@ -480,6 +821,15 @@ export function SolicitacoesColaboradorSecao({
         >
           {`Detalhe da solicitação de ${ROTULO_TIPO[linha.tipo] ?? linha.tipo}`}
         </h4>
+        {avisoDoDetalhe ? (
+          <p
+            key={avisoDoDetalhe.n}
+            role="alert"
+            className="solicitacoes-colaborador__erro"
+          >
+            {avisoDoDetalhe.texto}
+          </p>
+        ) : null}
         {conteudo.tipo === "carregando" ? (
           <p className="ficha-colaborador__texto" aria-hidden="true">
             Carregando…
@@ -577,7 +927,24 @@ export function SolicitacoesColaboradorSecao({
           </>
         )}
         <div className="solicitacoes-colaborador__acoes">
-          <Button variant="secondary" onClick={fecharDetalhe}>
+          {podeRegistrar &&
+          conteudo.tipo === "dados" &&
+          conteudo.solicitacao.situacao === "rascunho" &&
+          rascunhosDaFicha.has(linha.id) ? (
+            // T204 — só o rascunho que esta ficha registrou e não enviou.
+            <Button
+              variant="primary"
+              aria-disabled={enviandoRascunho}
+              onClick={() => void enviarRascunho(linha)}
+            >
+              {enviandoRascunho ? "Enviando…" : "Enviar"}
+            </Button>
+          ) : null}
+          <Button
+            variant="secondary"
+            aria-disabled={enviandoRascunho}
+            onClick={fecharDetalhe}
+          >
             Fechar detalhe
           </Button>
         </div>
@@ -592,8 +959,37 @@ export function SolicitacoesColaboradorSecao({
     >
       {cabecalho}
       <p role="status" className="ficha-colaborador__so-leitor">
-        {textoDoStatus}
+        {textoDoStatus === null && aviso ? (
+          <span key={aviso.n}>{aviso.texto}</span>
+        ) : (
+          textoDoStatus
+        )}
       </p>
+      {podeRegistrar &&
+      lista.tipo === "dados" &&
+      vinculosDaEmpresa.length > 0 ? (
+        <div className="solicitacoes-colaborador__acoes">
+          <Button
+            id={ids.novaSolicitacao}
+            variant="primary"
+            onClick={abrirNova}
+          >
+            Nova solicitação
+          </Button>
+        </div>
+      ) : null}
+      {podeRegistrar ? (
+        <NovaSolicitacaoModal
+          aberto={novaAberta}
+          vinculos={vinculosDaEmpresa}
+          vinculoPrincipalId={vinculoPrincipalId}
+          rotuloDoVinculo={rotuloDoVinculo}
+          enviando={enviandoNova}
+          erro={erroNova}
+          onConfirmar={(dados) => void confirmarNova(dados)}
+          onFechar={fecharNova}
+        />
+      ) : null}
       {sessao.tipo === "carregando" ? (
         <p className="ficha-colaborador__texto" aria-hidden="true">
           Carregando…
@@ -625,7 +1021,7 @@ export function SolicitacoesColaboradorSecao({
           id={ids.novaTentativa}
           falha={lista}
           texto="Não foi possível carregar as solicitações."
-          onTentar={() => void carregarLista(true)}
+          onTentar={() => void carregarLista("novaTentativa")}
         />
       ) : lista.tipo === "carregando" ? (
         <p className="ficha-colaborador__texto" aria-hidden="true">
@@ -642,7 +1038,8 @@ export function SolicitacoesColaboradorSecao({
             >
               <h3
                 id={ids.vinculo(vinculo.id)}
-                className="ficha-colaborador__cartao-titulo"
+                tabIndex={-1}
+                className="ficha-colaborador__cartao-titulo solicitacoes-colaborador__vinculo-titulo"
               >
                 {ROTULO_TIPO_VINCULO[vinculo.tipo] ?? vinculo.tipo} ·{" "}
                 {exibirMatricula(vinculo.matricula)}

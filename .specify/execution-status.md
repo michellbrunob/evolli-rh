@@ -2930,11 +2930,11 @@ squash `adc1123e1e3cf6f73fde85de7919fcd765ae50e2`, CI de push 3/3 verde, run
 41910744912); a única pendência administrativa era a sua convergência no Spec Kit,
 resolvida no primeiro commit da T203.
 
-## Solicitações de Pessoas na ficha — T203 (em implementação)
+## Solicitações de Pessoas na ficha — T203 (integrada)
 
-| Tarefa | Estado                                     | Resultado principal                                                                                                |
-| ------ | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
-| T203   | **Em implementação** (entrega em PR Draft) | Aba Solicitações na ficha individual: só leitura, por vínculo, com detalhe e linha do tempo; não existe para o DP. |
+| Tarefa | Estado                                    | Resultado principal                                                                                                |
+| ------ | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| T203   | **Integrada** (PR #196, squash `e086d1c`) | Aba Solicitações na ficha individual: só leitura, por vínculo, com detalhe e linha do tempo; não existe para o DP. |
 
 **Escopo da T203:** as decisões S-1 a S-5 do
 [dossiê](../docs/decisions/t203-dossie-solicitacoes-pessoas-ficha.md), aprovadas
@@ -2955,6 +2955,47 @@ em 2026-11-05, e a entrega da seção 11:
 - registro, transições e qualquer escrita de solicitação pela ficha;
 - anexo, CID, arquivo, foto, upload, download e visualização;
 - solicitações de documento e mudança na Central de Pessoas › Solicitações;
+- API, schema, migration, RBAC, auditoria, Docker, seed, dependências, lockfile e workflows;
+- promoção e merge.
+
+**Histórico da preparação:** o dossiê e as decisões foram preparados sem código de
+produto, sem push e sem PR; isso valeu só para aquela fase.
+
+**Observação de relatório:** a integração funcional da T203 está concluída (PR #196,
+squash `e086d1ca79d978a51373f1b3afafbfba3cdd069f`, CI de push 3/3 verde, run
+42608918002); a única pendência administrativa era a sua convergência no Spec Kit,
+resolvida no primeiro commit da T204.
+
+## Primeira ação operacional em Solicitações na ficha — T204 (em implementação)
+
+| Tarefa | Estado                                                            | Resultado principal                                                                                             |
+| ------ | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| T204   | **Em implementação** (entrega em PR Draft, validada no localhost) | RH registra e envia uma solicitação pela aba Solicitações da ficha; o resto do fluxo continua na tela coletiva. |
+
+**Escopo da T204:** as decisões A-1 a A-6 do
+[dossiê](../docs/decisions/t204-dossie-acao-solicitacoes-ficha.md), aprovadas em
+2026-11-09, e a entrega da seção 12:
+
+- "Nova solicitação" só para `rh` com empresa ativa, numa janela do Evolli (formulário e
+  revisão, uma só ação "Confirmar e enviar");
+- todos os vínculos da pessoa na empresa ativa, o principal pré-selecionado, situação no
+  rótulo; motivo natural do tipo ou "Outro (controlado)"; dia opcional;
+- registrar e depois enviar pelos contratos existentes, sem repetição automática; registro
+  recusado ou incerto não envia; envio falho deixa "Enviar" só no rascunho criado;
+- guarda T200, foco, anúncio único e 375 px;
+- A-7: o envio continua se a aba for desmontada entre registrar e enviar; A-8: depois de
+  recarregar, o rascunho não enviado fica só na tela coletiva;
+- página desatualizada (`403 csrf_invalido`): o cliente descarta o token, como os demais
+  clientes de gravação, e a ficha orienta confirmar de novo (achado da validação local);
+- testes de API do contrato existente, sem mudar código da API.
+
+**Fora de escopo:**
+
+- cancelar e as seis transições de análise pela ficha;
+- retomar pela ficha o envio de um rascunho depois de recarregar;
+- registro por `master_tecnico` ou DP; solicitações de documento;
+- anexo, CID, texto livre, arquivo, foto, upload, download e visualização;
+- mudança na tela coletiva Pessoas › Solicitações;
 - API, schema, migration, RBAC, auditoria, Docker, seed, dependências, lockfile e workflows;
 - promoção e merge.
 

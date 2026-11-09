@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "constitutionVersion": "1.4.0",
-  "lastConvergedAt": "2026-11-05",
-  "lastIntegratedTask": 202,
-  "lastRecordedTask": 203,
+  "lastConvergedAt": "2026-11-09",
+  "lastIntegratedTask": 203,
+  "lastRecordedTask": 204,
   "platformDecision": {
     "adr": "docs/adr/0014-evolli-plataforma-base-e-encerramento-do-frappe.md",
     "decidedAt": "2026-10-01",
@@ -11,15 +11,15 @@
     "frappe": "encerrado_como_candidato_referencia_apenas"
   },
   "nextTask": {
-    "id": "T203",
-    "status": "solicitacoes_pessoas_ficha_em_implementacao",
-    "reason": "T202 integrada em main pela PR #195 (squash adc1123e1e3cf6f73fde85de7919fcd765ae50e2), com a CI de push 3/3 verde (run 41910744912). A T203 implementa a aba Solicitacoes da ficha individual do colaborador aprovada em 2026-11-05 (decisoes S-1 a S-5 de docs/decisions/t203-dossie-solicitacoes-pessoas-ficha.md): so leitura; so para RH e master_tecnico (o DP com a URL da aba vai a Dados, URL corrigida, sem consulta); todos os vinculos da pessoa na empresa ativa, principal primeiro, inclusive encerrados; GET /v1/solicitacoes-pessoas por vinculo com todas as paginas, detalhe e historico com defesa de escopo; master_tecnico sem empresa ativa nao consulta; sem escrita e sem edicao pendente. Testes de API do contrato existente. Sem API, schema, migration, RBAC, auditoria, seed ou dependencia. Em implementacao, com a entrega em PR Draft. A preparacao (dossie e decisoes) foi feita sem codigo de produto, sem push e sem PR; isso valeu so para aquela fase."
+    "id": "T204",
+    "status": "acao_solicitacoes_ficha_em_implementacao",
+    "reason": "T203 integrada em main pela PR #196 (squash e086d1ca79d978a51373f1b3afafbfba3cdd069f), com a CI de push 3/3 verde (run 42608918002). A T204 implementa a primeira acao operacional na aba Solicitacoes da ficha individual do colaborador aprovada em 2026-11-09 (decisoes A-1 a A-6 de docs/decisions/t204-dossie-acao-solicitacoes-ficha.md): o RH (so rh com empresa ativa) registra e envia uma solicitacao numa janela do Evolli, com todos os vinculos da pessoa na empresa ativa (principal pre-selecionado), motivo natural do tipo ou Outro (controlado) e dia opcional; POST /v1/solicitacoes-pessoas e depois a transicao enviar, sem repeticao automatica; registro recusado ou incerto nao envia; envio falho deixa Enviar so no rascunho criado pela ficha; guarda T200. Cancelar e as seis transicoes de analise continuam na tela coletiva. Decisoes A-7 (o envio continua se a aba for desmontada entre registrar e enviar) e A-8 (depois de recarregar, o rascunho nao enviado fica so na tela coletiva). Pagina desatualizada (403 csrf_invalido): o cliente descarta o token e a ficha orienta confirmar de novo. Testes de API do contrato existente. Sem API, schema, migration, RBAC, auditoria, seed ou dependencia. Em implementacao, validada no localhost, com a entrega em PR Draft. A preparacao (dossie e decisoes) foi feita sem codigo de produto, sem push e sem PR; isso valeu so para aquela fase."
   },
   "openDeliveries": [
     {
-      "id": "T203",
+      "id": "T204",
       "pullRequest": null,
-      "status": "solicitacoes_pessoas_ficha_em_implementacao"
+      "status": "acao_solicitacoes_ficha_em_implementacao"
     }
   ],
   "requiredArtifacts": [

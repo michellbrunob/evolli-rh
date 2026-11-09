@@ -1505,4 +1505,287 @@ describe("Central de Solicitações de Pessoas — fundação backend (e2e)", ()
       });
     });
   });
+
+  // -------------------------------------------------------------------------
+  // T204 — o que a "Nova solicitação" da ficha usa: registrar e, em seguida,
+  // enviar, pelos contratos que já existem. Só testes: nenhum código da API
+  // muda. Prova a sequência em vínculo ativo, previsto e encerrado, o escopo,
+  // o envio repetido e simultâneo (resposta do servidor, sem efeito duplo), a
+  // auditoria existente e que o registro NÃO é idempotente (por isso a ficha
+  // nunca o repete sozinha).
+  // -------------------------------------------------------------------------
+
+  describe("T204 — registrar e enviar (contrato existente)", () => {
+    let vinculoAtivo: string;
+    let vinculoPrevisto: string;
+    let vinculoEncerrado: string;
+
+    /** Eventos de auditoria de uma solicitação, na ordem de gravação. */
+    async function auditoriaDe(id: string): Promise<AuditAction[]> {
+      return comApp(async (p) =>
+        (
+          await p.auditEvent.findMany({
+            where: {
+              resource: "solicitacao_pessoa",
+              resourceId: id,
+              action: {
+                in: [
+                  "pessoas_solicitacao_criada",
+                  "pessoas_solicitacao_enviada",
+                ],
+              },
+            },
+            orderBy: { occurredAt: "asc" },
+          })
+        ).map((e) => e.action),
+      );
+    }
+
+    async function quantasNoVinculo(vinculoId: string): Promise<number> {
+      return comApp((p) => p.solicitacaoPessoa.count({ where: { vinculoId } }));
+    }
+
+    beforeAll(async () => {
+      const departamento = (
+        await post("/v1/departamentos", master)
+          .send({ empresaId: empresaA, codigo: "ST204", nome: "Dep Sol T204" })
+          .expect(201)
+      ).body.id as string;
+      // Pelos fluxos reais da API: a admissão nasce `previsto`; efetivada,
+      // fica `ativo`; com o desligamento efetivado, `encerrado`.
+      async function admitir(matricula: string) {
+        const r = await post("/v1/colaboradores", rhA)
+          .send({
+            ...camposObrigatoriosAdmissao(),
+            ...(await lotacaoMinima(appUrl, empresaA)),
+            nome: "Pessoa Sintetica Solicitacoes T204",
+            empresaId: empresaA,
+            matricula,
+            tipo: "clt",
+            dataAdmissao: ADMISSAO,
+            motivoCodigo: "admissao_inicial",
+            departamentoId: departamento,
+          })
+          .expect(201);
+        return {
+          vinculoId: r.body.vinculo.id as string,
+          admissaoId: r.body.movimentacao.id as string,
+        };
+      }
+      const efetivar = (movimentacaoId: string) =>
+        post(`/v1/movimentacoes/${movimentacaoId}/efetivar`, rhA)
+          .send()
+          .expect(201);
+
+      vinculoPrevisto = (await admitir("SOL-T204-P")).vinculoId;
+
+      const ativo = await admitir("SOL-T204-A");
+      await efetivar(ativo.admissaoId);
+      vinculoAtivo = ativo.vinculoId;
+
+      const encerrado = await admitir("SOL-T204-E");
+      await efetivar(encerrado.admissaoId);
+      const desligamento = await post("/v1/movimentacoes", rhA)
+        .send({
+          vinculoId: encerrado.vinculoId,
+          tipo: "desligamento",
+          motivoCodigo: "encerramento_de_vinculo",
+          vigenciaInicio: "2026-02-02",
+        })
+        .expect(201);
+      await efetivar(desligamento.body.id);
+      vinculoEncerrado = encerrado.vinculoId;
+
+      // Conferência: as três situações são as que o teste diz.
+      const situacoes = await comApp((p) =>
+        p.vinculoFuncional.findMany({
+          where: {
+            id: { in: [vinculoPrevisto, vinculoAtivo, vinculoEncerrado] },
+          },
+          select: { id: true, situacao: true },
+        }),
+      );
+      expect(
+        Object.fromEntries(situacoes.map((v) => [v.id, v.situacao])),
+      ).toEqual({
+        [vinculoPrevisto]: "previsto",
+        [vinculoAtivo]: "ativo",
+        [vinculoEncerrado]: "encerrado",
+      });
+    });
+
+    it.each([
+      ["ativo", () => vinculoAtivo],
+      ["previsto", () => vinculoPrevisto],
+      ["encerrado", () => vinculoEncerrado],
+    ])(
+      "vínculo %s: registrar (rascunho) e depois enviar (enviada), com os dois eventos e as duas auditorias",
+      async (_situacao, vinculo) => {
+        const vinculoId = vinculo();
+        const registro = await post("/v1/solicitacoes-pessoas", rhA)
+          .send({
+            empresaId: empresaA,
+            vinculoId,
+            tipo: "contestacao_ajuste_ponto",
+            motivo: "divergencia_marcacao",
+            periodoReferencia: "2026-11-03",
+          })
+          .expect(201);
+        expect(registro.body.situacao).toBe("rascunho");
+        expect(registro.body.enviadaEm).toBeNull();
+        expect(registro.body.vinculoId).toBe(vinculoId);
+        expect(registro.body.empresaId).toBe(empresaA);
+
+        const envio = await transicionar(
+          rhA,
+          registro.body.id,
+          "enviar",
+        ).expect(201);
+        expect(envio.body.situacao).toBe("enviada");
+        expect(envio.body.enviadaEm).not.toBeNull();
+
+        const historico = await get(
+          `/v1/solicitacoes-pessoas/${registro.body.id}/historico`,
+          rhA,
+        ).expect(200);
+        expect(
+          (historico.body as Array<Record<string, string | null>>).map((e) => [
+            e.acao,
+            e.situacaoDe,
+            e.situacaoPara,
+          ]),
+        ).toEqual([
+          ["criar", null, "rascunho"],
+          ["enviar", "rascunho", "enviada"],
+        ]);
+        expect(await auditoriaDe(registro.body.id)).toEqual([
+          "pessoas_solicitacao_criada",
+          "pessoas_solicitacao_enviada",
+        ]);
+      },
+    );
+
+    it("escopo: vínculo de outra empresa no registro e envio por RH de outra empresa respondem 404, sem gravar nada", async () => {
+      const antesB = await quantasNoVinculo(vinculoB1);
+      await post("/v1/solicitacoes-pessoas", rhA)
+        .send({
+          empresaId: empresaA,
+          vinculoId: vinculoB1,
+          tipo: "ferias",
+          motivo: "periodo_ferias",
+        })
+        .expect(404);
+      expect(await quantasNoVinculo(vinculoB1)).toBe(antesB);
+
+      const rascunho = await registrar(rhA, empresaA, vinculoAtivo);
+      await transicionar(rhB, rascunho, "enviar").expect(404);
+      const detalhe = await get(
+        `/v1/solicitacoes-pessoas/${rascunho}`,
+        rhA,
+      ).expect(200);
+      expect(detalhe.body.situacao).toBe("rascunho");
+      expect(await auditoriaDe(rascunho)).toEqual([
+        "pessoas_solicitacao_criada",
+      ]);
+    });
+
+    it("master_tecnico com empresa ativa e DP: registrar e enviar negados, nada gravado", async () => {
+      const masterA = await seedMaster("master.sol.t204@example.test");
+      await post("/v1/auth/contexto/empresa", masterA)
+        .send({ empresaId: empresaA })
+        .expect(200);
+      const rascunho = await registrar(rhA, empresaA, vinculoPrevisto);
+      const antes = await quantasNoVinculo(vinculoPrevisto);
+
+      for (const cred of [masterA, dpA]) {
+        await post("/v1/solicitacoes-pessoas", cred)
+          .send({
+            empresaId: empresaA,
+            vinculoId: vinculoPrevisto,
+            tipo: "ferias",
+            motivo: "periodo_ferias",
+          })
+          .expect(403);
+        await transicionar(cred, rascunho, "enviar").expect(403);
+      }
+      expect(await quantasNoVinculo(vinculoPrevisto)).toBe(antes);
+      const detalhe = await get(
+        `/v1/solicitacoes-pessoas/${rascunho}`,
+        rhA,
+      ).expect(200);
+      expect(detalhe.body.situacao).toBe("rascunho");
+    });
+
+    it("envio repetido: o segundo 'enviar' recebe 422, sem segundo evento nem segunda auditoria", async () => {
+      const id = await registrar(rhA, empresaA, vinculoAtivo);
+      await transicionar(rhA, id, "enviar").expect(201);
+      await transicionar(rhA, id, "enviar").expect(422);
+      const historico = await get(
+        `/v1/solicitacoes-pessoas/${id}/historico`,
+        rhA,
+      ).expect(200);
+      expect(
+        (historico.body as Array<{ acao: string }>).filter(
+          (e) => e.acao === "enviar",
+        ),
+      ).toHaveLength(1);
+      expect(await auditoriaDe(id)).toEqual([
+        "pessoas_solicitacao_criada",
+        "pessoas_solicitacao_enviada",
+      ]);
+    });
+
+    it("envios simultâneos do mesmo rascunho: exatamente um 201 e um 422; um evento e uma auditoria de envio", async () => {
+      for (let i = 0; i < 5; i += 1) {
+        const id = await registrar(rhA, empresaA, vinculoAtivo);
+        const respostas = await Promise.all([
+          transicionar(rhA, id, "enviar").ok(() => true),
+          transicionar(rhA, id, "enviar").ok(() => true),
+        ]);
+        expect(respostas.map((r) => r.status).sort()).toEqual([201, 422]);
+        const historico = await get(
+          `/v1/solicitacoes-pessoas/${id}/historico`,
+          rhA,
+        ).expect(200);
+        expect(
+          (historico.body as Array<{ acao: string }>).filter(
+            (e) => e.acao === "enviar",
+          ),
+        ).toHaveLength(1);
+        expect(await auditoriaDe(id)).toEqual([
+          "pessoas_solicitacao_criada",
+          "pessoas_solicitacao_enviada",
+        ]);
+      }
+    });
+
+    it("cancelada na tela coletiva antes do envio: 'enviar' recebe 422 e a situação não muda", async () => {
+      const id = await registrar(rhA, empresaA, vinculoAtivo);
+      await transicionar(rhA, id, "cancelar").expect(201);
+      await transicionar(rhA, id, "enviar").expect(422);
+      const detalhe = await get(`/v1/solicitacoes-pessoas/${id}`, rhA).expect(
+        200,
+      );
+      expect(detalhe.body.situacao).toBe("cancelada");
+      expect(detalhe.body.enviadaEm).toBeNull();
+    });
+
+    it("o registro NÃO é idempotente: dois POST iguais criam dois registros (por isso a ficha nunca repete sozinha)", async () => {
+      const antes = await quantasNoVinculo(vinculoEncerrado);
+      const corpo = {
+        empresaId: empresaA,
+        vinculoId: vinculoEncerrado,
+        tipo: "beneficios",
+        motivo: "outro_controlado",
+      };
+      const a = await post("/v1/solicitacoes-pessoas", rhA)
+        .send(corpo)
+        .expect(201);
+      const b = await post("/v1/solicitacoes-pessoas", rhA)
+        .send(corpo)
+        .expect(201);
+      expect(a.body.id).not.toBe(b.body.id);
+      expect(await quantasNoVinculo(vinculoEncerrado)).toBe(antes + 2);
+    });
+  });
 });

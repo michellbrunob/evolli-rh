@@ -1,4 +1,8 @@
-import { clearCsrfToken, getCsrfToken, refreshCsrfToken } from "./csrfClient";
+import {
+  clearCsrfToken,
+  descartarTokenSeDesatualizado,
+  tokenCsrfParaGravacao,
+} from "./csrfClient";
 
 /**
  * Cliente da Central de Solicitações de Pessoas (T140) — consome EXCLUSIVAMENTE
@@ -77,6 +81,28 @@ export const MOTIVOS_SOLICITACAO_PESSOA = [
 ] as const;
 export type MotivoSolicitacaoPessoa =
   (typeof MOTIVOS_SOLICITACAO_PESSOA)[number];
+
+/**
+ * T204 (decisão A-4, 2026-11-09) — no registro pela FICHA do colaborador, o
+ * motivo começa no motivo natural do tipo, e "Outro (controlado)" é a única
+ * alternativa. É regra de apresentação daquela tela: o servidor continua
+ * aceitando qualquer motivo do catálogo, e a tela coletiva continua com a
+ * lista inteira (o comentário acima vale para ela).
+ */
+export const MOTIVO_NATURAL_POR_TIPO: Readonly<
+  Record<TipoSolicitacaoPessoa, MotivoSolicitacaoPessoa>
+> = {
+  contestacao_ajuste_ponto: "divergencia_marcacao",
+  ausencia: "ausencia_programada",
+  ferias: "periodo_ferias",
+  atualizacao_cadastral: "dado_cadastral_desatualizado",
+  atestado: "atestado_apresentado",
+  beneficios: "beneficio_solicitado",
+};
+
+/** T204 (A-4) — a única alternativa ao motivo natural, na ficha. */
+export const MOTIVO_ALTERNATIVO_NA_FICHA: MotivoSolicitacaoPessoa =
+  "outro_controlado";
 
 /** `criar` só aparece no histórico: não é transição, é o nascimento do registro. */
 export type AcaoSolicitacaoPessoa =
@@ -172,12 +198,23 @@ export interface ResultadoPaginado<T> {
 }
 
 export class ApiError extends Error {
+  /**
+   * T204 — código estável da recusa, quando o servidor o informa (ex.:
+   * `csrf_invalido`). Só o código: a mensagem do servidor nunca é repassada.
+   */
+  readonly codigo?: string;
+
   constructor(
     readonly status: number,
     message: string,
+    corpo?: unknown,
   ) {
     super(message);
     this.name = "ApiError";
+    if (typeof corpo === "object" && corpo !== null) {
+      const { codigo } = corpo as { codigo?: unknown };
+      if (typeof codigo === "string") this.codigo = codigo;
+    }
   }
 }
 
@@ -185,8 +222,14 @@ export class ApiError extends Error {
 // Transporte
 // ---------------------------------------------------------------------------
 
+/**
+ * T204 (B2) — o token para uma gravação pelo caminho padrão (T179): se ele
+ * precisa ser obtido e isso falha (rede ou 5xx), o erro é
+ * `CsrfRequestError` — o pedido de gravação nem saiu, e quem chama não o
+ * confunde com envio incerto (`falhaAoPrepararEnvio`).
+ */
 async function getCsrf(): Promise<string> {
-  return getCsrfToken() ?? refreshCsrfToken();
+  return tokenCsrfParaGravacao();
 }
 
 async function apiFetch(
@@ -204,17 +247,22 @@ async function apiFetch(
   if (res.status === 401) {
     clearCsrfToken();
   }
+  // T204 (como os demais clientes de gravação, T179) — 403 `csrf_invalido`:
+  // o token desta aba ficou desatualizado (outra aba o renovou); descartado,
+  // a próxima gravação pede um novo.
+  await descartarTokenSeDesatualizado(res);
   return res;
 }
 
 /**
- * Nunca repassa o corpo de erro do servidor — só o status. A tela decide a
- * mensagem pública; 404 (anti-enumeração) e 422 (transição recusada) são
- * traduzidos por quem chama.
+ * Nunca repassa a mensagem de erro do servidor — só o status e, quando houver,
+ * o código estável (T204). A tela decide a mensagem pública; 404
+ * (anti-enumeração) e 422 (transição recusada) são traduzidos por quem chama.
  */
 async function jsonOrThrow<T>(res: Response, fallback: string): Promise<T> {
   if (!res.ok) {
-    throw new ApiError(res.status, fallback);
+    const corpo: unknown = await res.json().catch(() => null);
+    throw new ApiError(res.status, fallback, corpo);
   }
   return res.json() as Promise<T>;
 }

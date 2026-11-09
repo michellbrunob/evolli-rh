@@ -3137,11 +3137,18 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       - promoção e merge.
 
 100.  **T203 - Solicitações de Pessoas na ficha do colaborador: aba só leitura**
-      - **Estado:** **em implementação** (entrega em PR Draft). Branch
+      - **Estado:** **integrada** em `main` pela PR #196, squash
+        `e086d1ca79d978a51373f1b3afafbfba3cdd069f`, com a CI de push 3/3 verde (run
+        42608918002); branch preservada. Implementada na branch
         `codex/t203-solicitacoes-pessoas-ficha`, a partir do squash
         `adc1123e1e3cf6f73fde85de7919fcd765ae50e2` (T202 integrada, PR #195). A preparação
         (dossiê e decisões) foi feita antes, sem código de produto, sem push e sem PR; isso
         valeu só para aquela fase.
+      - **Observação de relatório:** a integração funcional da T203 está concluída; a única
+        pendência administrativa era a sua convergência no Spec Kit, resolvida no primeiro
+        commit da T204. Os achados das revisões (estado da entrega em PR Draft e o anúncio da
+        lista repetido ao abrir, concluir, falhar ou fechar o detalhe) foram corrigidos dentro
+        da entrega.
       - **Objetivo:** levar as Solicitações de Pessoas (ajuste de ponto, ausência, férias,
         atualização cadastral, atestado e benefícios) à ficha individual, conforme o
         [dossiê](../docs/decisions/t203-dossie-solicitacoes-pessoas-ficha.md). Solicitações de
@@ -3169,6 +3176,50 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         - anexo, CID, arquivo, foto, upload, download e visualização;
         - solicitações de documento (aba Documentos);
         - mudança na Central de Pessoas › Solicitações;
+        - promoção e merge.
+
+101.  **T204 - Primeira ação operacional em Solicitações na ficha: registrar e enviar**
+      - **Estado:** **em implementação** (entrega em PR Draft, validada no localhost).
+        Branch
+        `codex/t204-acao-solicitacoes-ficha`, a partir do squash
+        `e086d1ca79d978a51373f1b3afafbfba3cdd069f` (T203 integrada, PR #196). A preparação
+        (dossiê e decisões) foi feita antes, sem código de produto, sem push e sem PR; isso
+        valeu só para aquela fase.
+      - **Objetivo:** decidir, com evidência no código, nos contratos, no RBAC, na auditoria e
+        na tela coletiva, se e como a aba Solicitações da ficha ganha a primeira ação
+        operacional, sem duplicar o fluxo completo de Pessoas › Solicitações e sem criar
+        rascunhos sem saída, no
+        [dossiê](../docs/decisions/t204-dossie-acao-solicitacoes-ficha.md): estado atual e
+        limitações da aba, matriz de ações e transições, comparação entre quatro opções (sem
+        ação, registrar e voltar à tela coletiva, registrar e enviar pela ficha, fluxo completo
+        só estimado), recomendação, contratos, critérios de aceite, testes, riscos e decisões
+        pendentes.
+      - **Decisões aprovadas (2026-11-09):** A-1 a A-6 da seção 9 do dossiê:
+        - opção 3: o RH registra e envia pela ficha;
+        - uma só ação "Confirmar e enviar", sem "salvar rascunho";
+        - todos os vínculos da pessoa na empresa ativa, principal pré-selecionado, situação no
+          rótulo;
+        - motivo natural do tipo, com "Outro (controlado)" como única alternativa;
+        - sem cancelar pela ficha;
+        - dia de referência opcional para todos os tipos.
+      - **Decisões da implementação (2026-11-09):** A-7 — o envio continua se a aba for
+        desmontada entre registrar e enviar; A-8 — depois de recarregar, o rascunho não
+        enviado fica só na tela coletiva (retomada na ficha fora desta fatia).
+      - **Entrega (seção 12 do dossiê):**
+        - "Nova solicitação" só para `rh` com empresa ativa, numa janela do Evolli;
+        - registrar e depois enviar pelos contratos existentes, sem repetição automática;
+          registro recusado ou incerto não envia; envio falho deixa "Enviar" só no rascunho
+          criado pela ficha;
+        - guarda T200, foco, anúncio único e 375 px;
+        - página desatualizada (`403 csrf_invalido`): o cliente descarta o token e a ficha
+          orienta confirmar de novo (achado da validação local);
+        - testes de API do contrato existente, sem mudar código da API.
+        - Sem API, schema, migration, RBAC, auditoria, Docker, seed, dependência ou workflow.
+      - **Fora de escopo:**
+        - cancelar e as seis transições de análise pela ficha;
+        - registro por `master_tecnico` ou DP; solicitações de documento;
+        - anexo, CID, texto livre, arquivo, foto, upload, download e visualização;
+        - mudança na tela coletiva Pessoas › Solicitações;
         - promoção e merge.
 
 ## Regra obrigatória para as próximas tarefas

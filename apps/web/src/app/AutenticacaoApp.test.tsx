@@ -1322,6 +1322,44 @@ describe("T163/T189 — contexto empresarial ativo", () => {
       expect(listarSolicitacoesPessoas).toHaveBeenCalledTimes(1);
     });
 
+    it("T204 — 'Nova solicitação' com o tipo escolhido: a troca de empresa pergunta antes, e continuar mantém a escolha", async () => {
+      trocarParaBetaNoServidor();
+      anaNaEmpresaAlfa();
+      vi.mocked(listarSolicitacoesPessoas).mockResolvedValue({
+        itens: [],
+        pagina: 1,
+        tamanhoPagina: 100,
+        total: 0,
+      });
+      const rotaSolicitacoes = `#/pessoas/colaboradores/${ANA_ID}/solicitacoes`;
+      window.history.replaceState(null, "", rotaSolicitacoes);
+      vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
+      render(<AutenticacaoApp />);
+      fireEvent.click(
+        await screen.findByRole("button", { name: "Nova solicitação" }),
+      );
+      const janela = screen.getByRole("dialog", { name: "Nova solicitação" });
+      fireEvent.change(within(janela).getByLabelText(/^Tipo/), {
+        target: { value: "ferias" },
+      });
+
+      await trocarPeloMenuPara("Empresa Beta");
+      expect(
+        await screen.findByText(
+          /Há edição em andamento em: Nova solicitação\./,
+        ),
+      ).toBeInTheDocument();
+      fireEvent.click(
+        screen.getByRole("button", { name: "Continuar editando" }),
+      );
+      expect(trocarEmpresaDoContexto).not.toHaveBeenCalled();
+      expect(
+        within(
+          screen.getByRole("dialog", { name: "Nova solicitação" }),
+        ).getByLabelText(/^Tipo/),
+      ).toHaveValue("ferias");
+    });
+
     it("T202 — aba Registros de ponto com a leitura em curso: a troca volta à listagem da empresa nova e a resposta atrasada não aparece", async () => {
       trocarParaBetaNoServidor();
       anaNaEmpresaAlfa();
