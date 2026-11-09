@@ -262,7 +262,11 @@ export function AutenticacaoApp() {
         if (aterrissagemPendenteRef.current) {
           aterrissagemPendenteRef.current = false;
           if (destinoAbertoRef.current === null) {
-            setDestinoAberto(destinoPosLoginPara(eu.role));
+            const destino = destinoPosLoginPara(eu.role);
+            setDestinoAberto(destino);
+            // A tela de aterrissagem nasce com o foco no título, como
+            // depois de uma troca de empresa: nunca no body.
+            if (destino !== null) setFocarTitulo(true);
           }
         }
         setAtor(eu);

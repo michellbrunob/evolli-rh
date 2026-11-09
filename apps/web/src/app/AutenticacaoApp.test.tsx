@@ -677,6 +677,10 @@ describe("T153 — aterrissagem segura por papel", () => {
     ).toBeInTheDocument();
     expect(destinosAtivos()).toEqual(["Minha equipe Consulta do gestor"]);
     expect(hubNaTela()).toBeNull();
+    // Aterrissar numa tela não deixa o foco no body: ele vai ao título.
+    await waitFor(() =>
+      expect(document.activeElement?.id).toBe("equipe-titulo"),
+    );
     // Sem Dashboard para o gestor (ADR 0015): nem tela, nem item no menu.
     expect(dashboardNaTela()).toBeNull();
     expect(
