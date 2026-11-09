@@ -1,9 +1,10 @@
 # T205 — Dossiê: Dashboard inicial pós-login
 
-**Situação:** preparação de decisão. Nenhum código de produto, API, banco,
-schema, migration, RBAC, auditoria, Docker, seed, dependência, lockfile ou
-workflow; sem push e sem PR. As decisões D-1 a D-12 (seção 12) aguardam a
-proprietária.
+**Situação:** preparação de decisão. Decisões D-1 a D-12 (seção 12)
+aprovadas pela proprietária em 2026-11-09, como recomendado; a implementação
+ainda não começou. Nenhum código de produto, API, banco, schema, migration,
+RBAC, auditoria, Docker, seed, dependência, lockfile ou workflow; sem push e
+sem PR.
 
 **Base:** `main` em `f51c21d` (T204 integrada, PR #197).
 
@@ -343,7 +344,9 @@ variação de conteúdo por papel nesta fatia.
   teclado e 375 px.
 - **Bateria completa** como nas tarefas anteriores.
 
-## 12. Decisões pendentes
+## 12. Decisões (aprovadas em 2026-11-09)
+
+D-1 a D-12 aprovadas como recomendado.
 
 | Id   | Pergunta                           | Recomendação                                                                                                                                                                                                                    |
 | ---- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

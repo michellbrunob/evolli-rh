@@ -3229,7 +3229,8 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         dentro da entrega.
 
 102.  **T205 - Dashboard inicial pós-login (preparação de decisão)**
-      - **Estado:** **em preparação**. Branch `codex/t205-dashboard-inicial`, a partir do squash
+      - **Estado:** **em preparação** (decisões aprovadas; implementação não iniciada). Branch
+        `codex/t205-dashboard-inicial`, a partir do squash
         `f51c21d0d0451079e1e93c8a25e8b48ccbd07bff` (T204 integrada, PR #197).
       - **Objetivo:** decidir, com evidência no código, nos contratos, no RBAC e nas ADRs, como
         a página inicial depois do login vira uma visão executiva operacional de RH, só com
@@ -3237,7 +3238,11 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         [dossiê](../docs/decisions/t205-dossie-dashboard-inicial.md): estado atual pós-login por
         papel, dados reais e limites, papéis e isolamento, primeira fatia recomendada, o que
         fica fora e por quê, riscos, critérios de aceite, plano de testes e decisões pendentes.
-      - **Decisões pendentes:** as do dossiê.
+      - **Decisões aprovadas (2026-11-09):** D-1 a D-12 da seção 12 do dossiê, como
+        recomendado: cinco elementos (período anual na URL, resumo, ativos por tipo de
+        vínculo, admissões e desligamentos por mês, momento da leitura) só com contratos
+        existentes; página inicial de RH, DP e `master_tecnico`; `master_tecnico` sem empresa
+        só com orientação; teto de 20 páginas por série; barras em CSS e tabela acessível.
       - **Fora de escopo:** implementação de produto, API, banco, schema, migration, RBAC,
         auditoria, Docker, seed, dependências, lockfile, workflow, push, PR, promoção e merge.
 

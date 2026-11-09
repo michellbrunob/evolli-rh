@@ -3011,9 +3011,9 @@ resolvida no primeiro commit da T205.
 
 ## Dashboard inicial pós-login — T205 (em preparação)
 
-| Tarefa | Estado            | Resultado principal                                                                                                   |
-| ------ | ----------------- | --------------------------------------------------------------------------------------------------------------------- |
-| T205   | **Em preparação** | Preparação de decisão do Dashboard inicial pós-login: visão executiva operacional de RH só com dados reais do Evolli. |
+| Tarefa | Estado                                 | Resultado principal                                                                                                   |
+| ------ | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| T205   | **Em preparação** (decisões aprovadas) | Preparação de decisão do Dashboard inicial pós-login: visão executiva operacional de RH só com dados reais do Evolli. |
 
 **Escopo da T205:** só levantamento e preparação de decisão, no
 [dossiê](../docs/decisions/t205-dossie-dashboard-inicial.md): estado atual pós-login por papel,
@@ -3021,7 +3021,8 @@ dados reais disponíveis e seus limites, papéis e isolamento por empresa, propo
 primeira fatia completa só com dados reais, o que fica fora dela e por quê, riscos, critérios
 de aceite, plano de testes e decisões pendentes.
 
-**Decisões pendentes:** as do dossiê.
+**Decisões aprovadas (2026-11-09):** D-1 a D-12 do dossiê, como recomendado; a
+implementação ainda não começou.
 
 **Fora de escopo:** implementação de produto, API, banco, schema, migration, RBAC, auditoria, Docker, seed, dependências, lockfile, workflow, push, PR, promoção e merge.
 
