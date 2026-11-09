@@ -1,10 +1,10 @@
 # T205 — Dossiê: Dashboard inicial pós-login
 
-**Situação:** preparação de decisão. Decisões D-1 a D-12 (seção 12)
-aprovadas pela proprietária em 2026-11-09, como recomendado; a implementação
-ainda não começou. Nenhum código de produto, API, banco, schema, migration,
-RBAC, auditoria, Docker, seed, dependência, lockfile ou workflow; sem push e
-sem PR.
+**Situação:** em implementação, validada localmente. Decisões D-1 a D-12
+(seção 12) aprovadas pela proprietária em 2026-11-09, como recomendado, e
+implementadas sem ampliar o escopo (seção 15). Só web e testes; nenhuma API
+nova, banco, schema, migration, RBAC, auditoria, Docker, seed, dependência,
+lockfile ou workflow; sem push e sem PR.
 
 **Base:** `main` em `f51c21d` (T204 integrada, PR #197).
 
@@ -382,3 +382,113 @@ D-1 a D-12 aprovadas como recomendado.
   workflow; sem push e sem PR.
 - **Na fatia recomendada:** só web (rota, tela, cálculo das séries e testes)
   mais testes de API do contrato existente; sem endpoint novo.
+
+## 15. Entrega
+
+### 15.1 Comportamento entregue
+
+- **Entrada (D-2, D-9):** depois do login, RH, DP e `master_tecnico` abrem o
+  Dashboard; o gestor abre Minha equipe direto; os demais papéis ficam no Hub.
+  A tela de aterrissagem recebe o foco no título. O Dashboard é o primeiro
+  item do menu para quem o abre, e o Hub ganhou o cartão "Dashboard" para os
+  mesmos papéis. Voltar ao Hub pelo topo não aterrissa de novo. A rota do
+  Dashboard aberta por quem não tem o destino é corrigida para o destino do
+  papel, sem leitura.
+- **Rota e período (D-3, E-1):** `#/dashboard?ano=AAAA`. Sem ano, ou com ano
+  inválido, futuro ou anterior a 2000, vale o ano corrente e a URL é
+  corrigida no lugar, sem entrada nova. Trocar de ano ("Ano anterior",
+  seletor "Ano", "Próximo ano") empilha uma entrada; voltar e avançar
+  percorrem os anos; recarregar mantém o ano. No limite, o botão fica
+  indisponível sem perder o foco. Ano corrente vai de 1º de janeiro até hoje;
+  anos anteriores, o ano inteiro.
+- **Resumo (D-4, E-2):** pessoas ativas hoje e pessoas em admissão hoje (com
+  atalho para a listagem), admissões e desligamentos efetivados no ano (com a
+  nota "Vínculos") e a diferença, mais uma frase com exatamente os mesmos
+  números e as duas unidades distintas.
+- **Ativos por tipo (E-3):** só os tipos com alguém, com número e percentual
+  em texto e barra em CSS oculta ao leitor; cada tipo abre a listagem de
+  Colaboradores na aba Ativos com o filtro do tipo.
+- **Série mensal (D-10, E-4):** barras em CSS ocultas ao leitor e tabela
+  equivalente (mês, admissões, desligamentos, diferença e total), com rolagem
+  dentro do próprio quadro. Série vazia tem frase própria; zero aparece como 0.
+- **Leitura (D-12, E-5):** momento da leitura e "Atualizar", sem atualização
+  automática; clique repetido durante a leitura é ignorado; um único nó de
+  status anuncia o carregamento e o resultado de cada leitura.
+- **Falhas:** contadores e série falham separadamente, cada um com alerta e
+  "Tentar de novo"; o sucesso leva o foco ao título do bloco. Sem a série, o
+  resumo não mostra admissões, desligamentos, diferença nem a frase.
+- **Teto (D-7):** acima de 20 páginas (2.000 movimentações) numa série, aviso
+  claro e nenhum número de admissões ou desligamentos, nem parcial.
+- **Sem empresa (D-6):** `master_tecnico` sem empresa ativa vê só a
+  orientação para escolher a empresa, sem controles e sem nenhuma consulta.
+- **Troca de empresa:** a tela é recriada no estado inicial seguro, como nas
+  demais telas desde a T189: o Dashboard reabre no ano corrente da empresa
+  nova, relê tudo e põe o foco no título.
+- **Atrasos e desmontagem:** cada leitura tem geração própria; resposta de
+  ano ou leitura anterior é descartada, e a paginação da série obsoleta (ou
+  de tela desmontada) para sem pedir as páginas seguintes.
+- **Telas preservadas (D-11):** Hub, "Visão geral" demonstrativa e painel de
+  Colaboradores sem mudança além da rota, do menu, do cartão no Hub e da
+  aterrissagem.
+
+### 15.2 Contratos reutilizados
+
+- `GET /v1/colaboradores?tamanhoPagina=1`, só pelos `contadores` (ativos, em
+  admissão e ativos por tipo, do escopo inteiro da empresa).
+- `GET /v1/movimentacoes?tipo=…&status=efetivada&pagina=…&tamanhoPagina=100`,
+  uma série por tipo, de trás para frente pela ordem decrescente de vigência,
+  parando ao passar do início do ano, em página incompleta ou ao atingir o
+  total. Registro repetido entre páginas conta uma vez; outro tipo ou status
+  é descartado também no cliente.
+- Listagem de Colaboradores (T199) como destino dos atalhos, no formato de
+  URL que ela já aceita.
+- Nenhum endpoint, campo, permissão ou dependência nova.
+
+### 15.3 Notas de implementação
+
+- O ano e o dia de "hoje" vêm do relógio do navegador (hora local), não de
+  UTC; num navegador fora do fuso de São Paulo, "hoje" segue esse fuso. Não
+  há utilitário compartilhado de "hoje em São Paulo" na web (O-3).
+- O menor ano consultável é 2000.
+- Ativos abre a listagem na aba padrão (Ativos), cuja URL canônica não leva
+  `aba`.
+
+### 15.4 Testes e provas de falha
+
+- **Web:** dados (período, série, paginação, teto, deduplicação,
+  abandono da paginação, frase); rota (ano padrão, inválido, futuro,
+  mínimo); tela (sem empresa, resumo, unidades, tipos e atalhos, série, ano
+  passado, teto, falhas e nova tentativa, troca de ano, "Atualizar",
+  respostas atrasadas, desmontagem, foco, anúncios, CSS a 375 px); shell
+  (rota, correção no lugar, recarga, histórico, papéis, menu, atalhos com
+  volta e foco); autenticação (aterrissagem por papel e foco, volta ao Hub,
+  troca de empresa com o Dashboard aberto).
+- **API (contrato existente):** filtro `tipo` + `status=efetivada` igual ao
+  recorte da lista inteira, em vigência decrescente, só da empresa do ator;
+  DP lê o mesmo; isolamento entre empresas; página acima de 100 recusada.
+- **Mutações (todas detectadas):** gestor com o Dashboard; gestor
+  aterrissando no Dashboard; leitura sem empresa ativa; teto de 21 páginas;
+  teto devolvendo número parcial; frase sem "vínculos"; contagem de não
+  efetivadas; fim do período sempre em 31/12; ano futuro aceito; série,
+  leitura e desmontagem sem geração; paginação ignorando a validade. A falta
+  do foco na aterrissagem do gestor foi achada na validação local e tem teste
+  que falha sem a correção.
+
+### 15.5 Validação local
+
+Dados sintéticos, navegador real, desktop e 375 px: RH e DP aterrissam no
+Dashboard com o foco no título, e os números conferem com a API;
+`master_tecnico` sem empresa vê a orientação sem nenhuma consulta e, ao
+escolher a empresa, lê os números dela; troca de empresa isola os números e
+reabre no ano corrente; gestor aterrissa em Minha equipe com o foco no título
+e a rota do Dashboard é corrigida; troca de ano empilha e voltar retorna;
+série vazia com frase própria; "Atualizar" anuncia carregamento e leitura;
+atalho para Colaboradores e volta; falha simulada da série com alerta, sem
+números, e recuperação com o foco no bloco; a 375 px, sem rolagem horizontal
+e com alvos de 44 px.
+
+### 15.6 Limites
+
+Os da seção 8 continuam fora: nada de turnover, ativos históricos,
+departamento ou cargo, pendências, ponto, custo, absenteísmo, painel do
+gestor, abas, exportação ou endpoint novo.

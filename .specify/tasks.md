@@ -3228,8 +3228,8 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         token CSRF tratada como incerta e texto da proposta contrário à A-8) foram corrigidos
         dentro da entrega.
 
-102.  **T205 - Dashboard inicial pós-login (preparação de decisão)**
-      - **Estado:** **em preparação** (decisões aprovadas; implementação não iniciada). Branch
+102.  **T205 - Dashboard inicial pós-login**
+      - **Estado:** **em implementação** (validada localmente; sem push e sem PR). Branch
         `codex/t205-dashboard-inicial`, a partir do squash
         `f51c21d0d0451079e1e93c8a25e8b48ccbd07bff` (T204 integrada, PR #197).
       - **Objetivo:** decidir, com evidência no código, nos contratos, no RBAC e nas ADRs, como
@@ -3243,8 +3243,16 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         vínculo, admissões e desligamentos por mês, momento da leitura) só com contratos
         existentes; página inicial de RH, DP e `master_tecnico`; `master_tecnico` sem empresa
         só com orientação; teto de 20 páginas por série; barras em CSS e tabela acessível.
-      - **Fora de escopo:** implementação de produto, API, banco, schema, migration, RBAC,
-        auditoria, Docker, seed, dependências, lockfile, workflow, push, PR, promoção e merge.
+      - **Entregue:** as D-1 a D-12 na web, só com `GET /v1/colaboradores` (contadores) e
+        `GET /v1/movimentacoes` (`tipo` + `status=efetivada`): rota anual com correção no
+        lugar e histórico, aterrissagem por papel com foco no título, os cinco elementos,
+        teto sem número parcial, estados de falha e nova tentativa, descarte de resposta
+        atrasada e interrupção da paginação obsoleta, troca de empresa e 375 px. Testes web,
+        E2E do contrato existente e mutações detectadas; validação local com dados
+        sintéticos (seção 15 do dossiê).
+      - **Fora de escopo:** API nova, banco, schema, migration, RBAC, auditoria, Docker,
+        seed, dependências, lockfile, workflow, push, PR, promoção e merge; e os itens da
+        seção 8 do dossiê.
 
 ## Regra obrigatória para as próximas tarefas
 

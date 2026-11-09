@@ -12,14 +12,14 @@
   },
   "nextTask": {
     "id": "T205",
-    "status": "dashboard_inicial_em_preparacao",
-    "reason": "T204 integrada em main pela PR #197 (squash f51c21d0d0451079e1e93c8a25e8b48ccbd07bff), com a CI de push 3/3 verde (run 42663261934). A T205 prepara a decisao do Dashboard inicial pos-login (docs/decisions/t205-dossie-dashboard-inicial.md): visao executiva operacional de RH so com dados reais do Evolli; estado atual pos-login por papel, dados reais e limites, papeis e isolamento por empresa, primeira fatia recomendada, o que fica fora e por que, riscos, criterios de aceite, plano de testes e decisoes pendentes. Sem controles, metricas, graficos ou abas decorativos. Decisoes D-1 a D-12 aprovadas em 2026-11-09, como recomendado; implementacao ainda nao iniciada. So preparacao: sem produto, API, banco, schema, migration, RBAC, auditoria, seed ou dependencia."
+    "status": "dashboard_inicial_em_implementacao",
+    "reason": "T204 integrada em main pela PR #197 (squash f51c21d0d0451079e1e93c8a25e8b48ccbd07bff), com a CI de push 3/3 verde (run 42663261934). A T205 implementa o Dashboard inicial pos-login conforme as decisoes D-1 a D-12 aprovadas em 2026-11-09 (docs/decisions/t205-dossie-dashboard-inicial.md, secao 15): rota #/dashboard?ano=AAAA, aterrissagem de RH, DP e master_tecnico, gestor em Minha equipe, master_tecnico sem empresa sem consulta, resumo, ativos por tipo, serie mensal com tabela acessivel, momento da leitura e Atualizar, teto de 20 paginas por serie sem numero parcial. So web e testes, com os contratos existentes de colaboradores e movimentacoes; validada localmente; sem push e sem PR."
   },
   "openDeliveries": [
     {
       "id": "T205",
       "pullRequest": null,
-      "status": "dashboard_inicial_em_preparacao"
+      "status": "dashboard_inicial_em_implementacao"
     }
   ],
   "requiredArtifacts": [
