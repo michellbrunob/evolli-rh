@@ -3229,7 +3229,7 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         dentro da entrega.
 
 102.  **T205 - Dashboard inicial pós-login**
-      - **Estado:** **em implementação** (validada localmente; sem push e sem PR). Branch
+      - **Estado:** **em implementação** — entrega em PR Draft #198, validada localmente. Branch
         `codex/t205-dashboard-inicial`, a partir do squash
         `f51c21d0d0451079e1e93c8a25e8b48ccbd07bff` (T204 integrada, PR #197).
       - **Objetivo:** decidir, com evidência no código, nos contratos, no RBAC e nas ADRs, como
@@ -3252,7 +3252,7 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         sintéticos (seção 15 do dossiê).
       - **Comportamentos aprovados (2026-11-09):** os cinco da seção 15.7 do dossiê.
       - **Fora de escopo:** API nova, banco, schema, migration, RBAC, auditoria, Docker,
-        seed, dependências, lockfile, workflow, push, PR, promoção e merge; e os itens da
+        seed, dependências, lockfile, workflow, Ready for review e merge; e os itens da
         seção 8 do dossiê.
 
 ## Regra obrigatória para as próximas tarefas

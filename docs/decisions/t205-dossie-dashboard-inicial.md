@@ -1,10 +1,10 @@
 # T205 — Dossiê: Dashboard inicial pós-login
 
-**Situação:** em implementação, validada localmente. Decisões D-1 a D-12
-(seção 12) aprovadas pela proprietária em 2026-11-09, como recomendado, e
-implementadas sem ampliar o escopo (seção 15). Só web e testes; nenhuma API
-nova, banco, schema, migration, RBAC, auditoria, Docker, seed, dependência,
-lockfile ou workflow; sem push e sem PR.
+**Situação:** em implementação — entrega em PR Draft #198, validada
+localmente. Decisões D-1 a D-12 (seção 12) aprovadas pela proprietária em
+2026-11-09, como recomendado, e implementadas sem ampliar o escopo (seção 15).
+Só web e testes; nenhuma API nova, banco, schema, migration, RBAC, auditoria,
+Docker, seed, dependência, lockfile ou workflow.
 
 **Base:** `main` em `f51c21d` (T204 integrada, PR #197).
 
@@ -426,7 +426,10 @@ D-1 a D-12 aprovadas como recomendado.
   nova, relê tudo e põe o foco no título.
 - **Atrasos e desmontagem:** cada leitura tem geração própria; resposta de
   ano ou leitura anterior é descartada, e a paginação da série obsoleta (ou
-  de tela desmontada) para sem pedir as páginas seguintes.
+  de tela desmontada) para sem pedir as páginas seguintes. Ao trocar de ano,
+  a série e a falha do ano anterior não são desenhadas com o rótulo do ano
+  novo, nem por um desenho: o bloco fica em "Carregando…" até a leitura do
+  ano exibido terminar.
 - **Telas preservadas (D-11):** Hub, "Visão geral" demonstrativa e painel de
   Colaboradores sem mudança além da rota, do menu, do cartão no Hub e da
   aterrissagem.
@@ -470,9 +473,10 @@ D-1 a D-12 aprovadas como recomendado.
   aterrissando no Dashboard; leitura sem empresa ativa; teto de 21 páginas;
   teto devolvendo número parcial; frase sem "vínculos"; contagem de não
   efetivadas; fim do período sempre em 31/12; ano futuro aceito; série,
-  leitura e desmontagem sem geração; paginação ignorando a validade. A falta
-  do foco na aterrissagem do gestor foi achada na validação local e tem teste
-  que falha sem a correção.
+  leitura e desmontagem sem geração; paginação ignorando a validade; série
+  e falha de outro ano aceitas na troca de ano. A falta do foco na
+  aterrissagem do gestor foi achada na validação local e tem teste que falha
+  sem a correção.
 
 ### 15.5 Validação local
 

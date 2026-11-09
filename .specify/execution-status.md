@@ -3011,11 +3011,11 @@ resolvida no primeiro commit da T205.
 
 ## Dashboard inicial pós-login — T205 (em implementação)
 
-| Tarefa | Estado                                     | Resultado principal                                                                          |
-| ------ | ------------------------------------------ | -------------------------------------------------------------------------------------------- |
-| T205   | **Em implementação** (validada localmente) | Dashboard inicial pós-login: visão executiva operacional de RH só com dados reais do Evolli. |
+| Tarefa | Estado                                                               | Resultado principal                                                                          |
+| ------ | -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| T205   | **Em implementação** (entrega em PR Draft #198, validada localmente) | Dashboard inicial pós-login: visão executiva operacional de RH só com dados reais do Evolli. |
 
-**Escopo da T205:** só levantamento e preparação de decisão, no
+**Escopo da preparação (concluída):** levantamento e preparação de decisão, no
 [dossiê](../docs/decisions/t205-dossie-dashboard-inicial.md): estado atual pós-login por papel,
 dados reais disponíveis e seus limites, papéis e isolamento por empresa, proposta de uma
 primeira fatia completa só com dados reais, o que fica fora dela e por quê, riscos, critérios
@@ -3023,7 +3023,7 @@ de aceite, plano de testes e decisões pendentes.
 
 **Decisões aprovadas (2026-11-09):** D-1 a D-12 do dossiê, como recomendado.
 
-**Entregue (local, sem push nem PR):** a implementação das D-1 a D-12, descrita na seção 15
+**Entregue (PR Draft #198, validada localmente):** a implementação das D-1 a D-12, descrita na seção 15
 do dossiê:
 
 - rota `#/dashboard?ano=AAAA` (ano civil, até hoje no corrente; ano ausente, inválido,
@@ -3051,7 +3051,7 @@ movimentações e mutações de permissão, empresa, teto, unidade, limite do an
 detectadas. Validação local com dados sintéticos para RH, DP, `master_tecnico` com e sem
 empresa e gestor, em desktop e 375 px.
 
-**Fora de escopo:** API nova, banco, schema, migration, RBAC, auditoria, Docker, seed, dependências, lockfile, workflow, push, PR, promoção e merge; e os itens da seção 8 do dossiê.
+**Fora de escopo:** API nova, banco, schema, migration, RBAC, auditoria, Docker, seed, dependências, lockfile, workflow, Ready for review e merge; e os itens da seção 8 do dossiê.
 
 ## Próxima ação autorizável
 

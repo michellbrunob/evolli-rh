@@ -13,7 +13,7 @@
   "nextTask": {
     "id": "T205",
     "status": "dashboard_inicial_em_implementacao",
-    "reason": "T204 integrada em main pela PR #197 (squash f51c21d0d0451079e1e93c8a25e8b48ccbd07bff), com a CI de push 3/3 verde (run 42663261934). A T205 implementa o Dashboard inicial pos-login conforme as decisoes D-1 a D-12 aprovadas em 2026-11-09 (docs/decisions/t205-dossie-dashboard-inicial.md, secao 15): rota #/dashboard?ano=AAAA, aterrissagem de RH, DP e master_tecnico, gestor em Minha equipe, master_tecnico sem empresa sem consulta, resumo, ativos por tipo, serie mensal com tabela acessivel, momento da leitura e Atualizar, teto de 20 paginas por serie sem numero parcial. So web e testes, com os contratos existentes de colaboradores e movimentacoes; validada localmente; sem push e sem PR."
+    "reason": "T204 integrada em main pela PR #197 (squash f51c21d0d0451079e1e93c8a25e8b48ccbd07bff), com a CI de push 3/3 verde (run 42663261934). A T205 implementa o Dashboard inicial pos-login conforme as decisoes D-1 a D-12 aprovadas em 2026-11-09 (docs/decisions/t205-dossie-dashboard-inicial.md, secao 15): rota #/dashboard?ano=AAAA, aterrissagem de RH, DP e master_tecnico, gestor em Minha equipe, master_tecnico sem empresa sem consulta, resumo, ativos por tipo, serie mensal com tabela acessivel, momento da leitura e Atualizar, teto de 20 paginas por serie sem numero parcial. So web e testes, com os contratos existentes de colaboradores e movimentacoes; em implementacao, entrega em PR Draft #198, validada localmente."
   },
   "openDeliveries": [
     {
