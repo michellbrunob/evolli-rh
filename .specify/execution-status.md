@@ -2966,11 +2966,11 @@ squash `e086d1ca79d978a51373f1b3afafbfba3cdd069f`, CI de push 3/3 verde, run
 42608918002); a única pendência administrativa era a sua convergência no Spec Kit,
 resolvida no primeiro commit da T204.
 
-## Primeira ação operacional em Solicitações na ficha — T204 (em implementação)
+## Primeira ação operacional em Solicitações na ficha — T204 (integrada)
 
-| Tarefa | Estado                                                            | Resultado principal                                                                                             |
-| ------ | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| T204   | **Em implementação** (entrega em PR Draft, validada no localhost) | RH registra e envia uma solicitação pela aba Solicitações da ficha; o resto do fluxo continua na tela coletiva. |
+| Tarefa | Estado                                    | Resultado principal                                                                                             |
+| ------ | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| T204   | **Integrada** (PR #197, squash `f51c21d`) | RH registra e envia uma solicitação pela aba Solicitações da ficha; o resto do fluxo continua na tela coletiva. |
 
 **Escopo da T204:** as decisões A-1 a A-6 do
 [dossiê](../docs/decisions/t204-dossie-acao-solicitacoes-ficha.md), aprovadas em
@@ -2987,6 +2987,8 @@ resolvida no primeiro commit da T204.
   recarregar, o rascunho não enviado fica só na tela coletiva;
 - página desatualizada (`403 csrf_invalido`): o cliente descarta o token, como os demais
   clientes de gravação, e a ficha orienta confirmar de novo (achado da validação local);
+- falha ao preparar o envio (token CSRF não obtido): nada é registrado nem enviado, sem
+  tratar como incerto (achado da revisão);
 - testes de API do contrato existente, sem mudar código da API.
 
 **Fora de escopo:**
@@ -3001,6 +3003,27 @@ resolvida no primeiro commit da T204.
 
 **Histórico da preparação:** o dossiê e as decisões foram preparados sem código de
 produto, sem push e sem PR; isso valeu só para aquela fase.
+
+**Observação de relatório:** a integração funcional da T204 está concluída (PR #197,
+squash `f51c21d0d0451079e1e93c8a25e8b48ccbd07bff`, CI de push 3/3 verde, run
+42663261934); a única pendência administrativa era a sua convergência no Spec Kit,
+resolvida no primeiro commit da T205.
+
+## Dashboard inicial pós-login — T205 (em preparação)
+
+| Tarefa | Estado            | Resultado principal                                                                                                   |
+| ------ | ----------------- | --------------------------------------------------------------------------------------------------------------------- |
+| T205   | **Em preparação** | Preparação de decisão do Dashboard inicial pós-login: visão executiva operacional de RH só com dados reais do Evolli. |
+
+**Escopo da T205:** só levantamento e preparação de decisão, no
+[dossiê](../docs/decisions/t205-dossie-dashboard-inicial.md): estado atual pós-login por papel,
+dados reais disponíveis e seus limites, papéis e isolamento por empresa, proposta de uma
+primeira fatia completa só com dados reais, o que fica fora dela e por quê, riscos, critérios
+de aceite, plano de testes e decisões pendentes.
+
+**Decisões pendentes:** as do dossiê.
+
+**Fora de escopo:** implementação de produto, API, banco, schema, migration, RBAC, auditoria, Docker, seed, dependências, lockfile, workflow, push, PR, promoção e merge.
 
 ## Próxima ação autorizável
 

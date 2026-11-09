@@ -3179,8 +3179,9 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         - promoção e merge.
 
 101.  **T204 - Primeira ação operacional em Solicitações na ficha: registrar e enviar**
-      - **Estado:** **em implementação** (entrega em PR Draft, validada no localhost).
-        Branch
+      - **Estado:** **integrada** em `main` pela PR #197, squash
+        `f51c21d0d0451079e1e93c8a25e8b48ccbd07bff`, com a CI de push 3/3 verde (run
+        42663261934); branch preservada. Implementada na branch
         `codex/t204-acao-solicitacoes-ficha`, a partir do squash
         `e086d1ca79d978a51373f1b3afafbfba3cdd069f` (T203 integrada, PR #196). A preparação
         (dossiê e decisões) foi feita antes, sem código de produto, sem push e sem PR; isso
@@ -3221,6 +3222,24 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         - anexo, CID, texto livre, arquivo, foto, upload, download e visualização;
         - mudança na tela coletiva Pessoas › Solicitações;
         - promoção e merge.
+      - **Observação de relatório:** a integração funcional da T204 está concluída; a única
+        pendência administrativa era a sua convergência no Spec Kit, resolvida no primeiro
+        commit da T205. Os achados das revisões (portas locais no dossiê, falha ao preparar o
+        token CSRF tratada como incerta e texto da proposta contrário à A-8) foram corrigidos
+        dentro da entrega.
+
+102.  **T205 - Dashboard inicial pós-login (preparação de decisão)**
+      - **Estado:** **em preparação**. Branch `codex/t205-dashboard-inicial`, a partir do squash
+        `f51c21d0d0451079e1e93c8a25e8b48ccbd07bff` (T204 integrada, PR #197).
+      - **Objetivo:** decidir, com evidência no código, nos contratos, no RBAC e nas ADRs, como
+        a página inicial depois do login vira uma visão executiva operacional de RH, só com
+        dados reais do Evolli e sem controle, métrica, gráfico ou aba decorativos, no
+        [dossiê](../docs/decisions/t205-dossie-dashboard-inicial.md): estado atual pós-login por
+        papel, dados reais e limites, papéis e isolamento, primeira fatia recomendada, o que
+        fica fora e por quê, riscos, critérios de aceite, plano de testes e decisões pendentes.
+      - **Decisões pendentes:** as do dossiê.
+      - **Fora de escopo:** implementação de produto, API, banco, schema, migration, RBAC,
+        auditoria, Docker, seed, dependências, lockfile, workflow, push, PR, promoção e merge.
 
 ## Regra obrigatória para as próximas tarefas
 
