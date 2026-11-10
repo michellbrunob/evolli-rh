@@ -2,7 +2,112 @@
  * T207 — peças comuns do Dashboard: "Como calculamos" (V-5), o card de
  * indicador sem dado (V-2) e o estado de bloco ou aba sem dado no Evolli.
  */
-import { useId, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+
+/** T207 — como um bloco com dado real é visto: gráfico ou tabela. */
+export type VistaDoBloco = "grafico" | "tabela";
+/** T207 — os blocos que têm as duas vistas. */
+export type BlocoComVista = "quadro" | "distribuicao" | "tempo-de-casa";
+
+/**
+ * T207 — "Como calculamos" junto do título: um botão de informação que
+ * mostra um painel ao passar o ponteiro, ao receber foco ou ao ser clicado
+ * (o clique o deixa aberto). Escape, clique fora e foco fora fecham. Nenhuma
+ * região viva: o botão diz se está aberto (`aria-expanded`) e o painel vem
+ * logo depois dele na leitura — nada é anunciado sozinho.
+ *
+ * O painel se posiciona pelo topo do bloco (o elemento posicionado mais
+ * próximo), à esquerda e com largura limitada: nunca passa da borda.
+ */
+export function InfoComoCalculamos({
+  assunto,
+  children,
+}: {
+  readonly assunto: string;
+  readonly children: ReactNode;
+}) {
+  const id = useId();
+  const raizRef = useRef<HTMLDivElement | null>(null);
+  const pressionadoRef = useRef(false);
+  const [porPonteiro, setPorPonteiro] = useState(false);
+  const [porFoco, setPorFoco] = useState(false);
+  const [fixo, setFixo] = useState(false);
+  const aberto = porPonteiro || porFoco || fixo;
+
+  function fechar() {
+    setPorPonteiro(false);
+    setPorFoco(false);
+    setFixo(false);
+  }
+
+  useEffect(() => {
+    if (!aberto) return undefined;
+    function aoPressionarFora(evento: Event) {
+      const alvo = evento.target;
+      if (alvo instanceof Node && raizRef.current?.contains(alvo)) return;
+      fechar();
+    }
+    document.addEventListener("pointerdown", aoPressionarFora);
+    document.addEventListener("mousedown", aoPressionarFora);
+    return () => {
+      document.removeEventListener("pointerdown", aoPressionarFora);
+      document.removeEventListener("mousedown", aoPressionarFora);
+    };
+  }, [aberto]);
+
+  return (
+    <div
+      ref={raizRef}
+      className="dashboard__info dashboard__sem-impressao"
+      onMouseEnter={() => setPorPonteiro(true)}
+      onMouseLeave={() => setPorPonteiro(false)}
+      onKeyDown={(evento) => {
+        if (evento.key === "Escape" && aberto) {
+          evento.preventDefault();
+          evento.stopPropagation();
+          fechar();
+        }
+      }}
+      onBlur={(evento) => {
+        const destino = evento.relatedTarget;
+        if (destino instanceof Node && raizRef.current?.contains(destino)) {
+          return;
+        }
+        setPorFoco(false);
+        setFixo(false);
+      }}
+    >
+      <button
+        type="button"
+        className="dashboard__info-botao"
+        aria-expanded={aberto}
+        aria-controls={id}
+        onPointerDown={() => {
+          pressionadoRef.current = true;
+        }}
+        onMouseDown={() => {
+          pressionadoRef.current = true;
+        }}
+        onFocus={() => {
+          // Foco vindo de um clique: quem decide é o clique.
+          if (!pressionadoRef.current) setPorFoco(true);
+        }}
+        onClick={() => {
+          pressionadoRef.current = false;
+          if (fixo) fechar();
+          else setFixo(true);
+        }}
+      >
+        <span aria-hidden="true">i</span>
+        <span className="dashboard__so-leitor">Como calculamos: {assunto}</span>
+      </button>
+      <div id={id} className="dashboard__info-painel" hidden={!aberto}>
+        <p className="dashboard__info-titulo">Como calculamos</p>
+        {children}
+      </div>
+    </div>
+  );
+}
 
 /**
  * "Como calculamos": um botão que abre e fecha a explicação, no fluxo da

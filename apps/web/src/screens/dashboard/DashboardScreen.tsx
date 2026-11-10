@@ -73,7 +73,10 @@ import {
   CartaoSemDado,
   ComoCalculamos,
   EstadoIndisponivel,
+  type BlocoComVista,
+  type VistaDoBloco,
 } from "./componentesDoDashboard";
+import { QuadroDeColaboradores } from "./QuadroDeColaboradores";
 import { DistribuicaoDoTimeBloco, TempoDeCasaBloco } from "./BlocosDoTime";
 import { GraficoMensal } from "./GraficoMensal";
 import "./DashboardScreen.css";
@@ -159,6 +162,16 @@ export interface DashboardScreenProps {
   readonly onTrocarAba?: (aba: AbaDoDashboard) => void;
   /** Um indicador clicado: a listagem de Colaboradores com este estado. */
   readonly onAbrirListagem: (estado: EstadoDaListagem) => void;
+  /**
+   * T207 — gráfico ou tabela em cada bloco que tem as duas vistas. Guardado
+   * por quem monta o shell, em memória e por conta (ver `AutenticacaoApp`):
+   * vale só nesta aba do navegador e não passa para outra conta. Ausente, a
+   * tela guarda sozinha, enquanto estiver montada.
+   */
+  readonly vistas?:
+    Readonly<Partial<Record<BlocoComVista, VistaDoBloco>>> | undefined;
+  readonly onTrocarVista?:
+    ((bloco: BlocoComVista, vista: VistaDoBloco) => void) | undefined;
 }
 
 export function DashboardScreen({
@@ -168,6 +181,8 @@ export function DashboardScreen({
   onTrocarAno,
   onTrocarAba,
   onAbrirListagem,
+  vistas,
+  onTrocarVista,
 }: DashboardScreenProps) {
   const prefixo = useId();
   const ids = {
@@ -204,6 +219,15 @@ export function DashboardScreen({
     readonly n: number;
   } | null>(null);
   const [lidoEm, setLidoEm] = useState<string | null>(null);
+  const [vistasLocais, setVistasLocais] = useState<
+    Partial<Record<BlocoComVista, VistaDoBloco>>
+  >({});
+  const vistaDe = (bloco: BlocoComVista): VistaDoBloco =>
+    (vistas ?? vistasLocais)[bloco] ?? "grafico";
+  const trocarVista = (bloco: BlocoComVista) => (vista: VistaDoBloco) => {
+    if (onTrocarVista) onTrocarVista(bloco, vista);
+    else setVistasLocais((atuais) => ({ ...atuais, [bloco]: vista }));
+  };
 
   const vivaRef = useRef(true);
   useEffect(() => {
@@ -303,6 +327,12 @@ export function DashboardScreen({
       texto: texto.replace("{instante}", instante),
       n: contadorDeAvisosRef.current,
     });
+  }, []);
+
+  /** Um anúncio no status, sem mexer na hora da leitura (exportações). */
+  const anunciar = useCallback((texto: string) => {
+    contadorDeAvisosRef.current += 1;
+    setAviso({ texto, n: contadorDeAvisosRef.current });
   }, []);
 
   /** Leitura completa: na entrada, ao trocar de ano e em "Atualizar". */
@@ -584,9 +614,7 @@ export function DashboardScreen({
           <h2 id={ids.pessoas} tabIndex={-1} className="dashboard__subtitulo">
             Resumo
           </h2>
-          <span className="dashboard__selo dashboard__selo--leitura">
-            {lidoEm ? `Dados lidos em ${lidoEm}` : "Ainda não lido"}
-          </span>
+          {/* A hora da leitura fica uma vez só, junto de "Atualizar". */}
         </div>
         {dadosContadores && admissoes && desligamentos ? (
           <p className="dashboard__frase">
@@ -708,92 +736,36 @@ export function DashboardScreen({
         </ul>
       </section>
 
-      <section
-        className="dashboard__bloco dashboard__bloco--quadro"
-        aria-labelledby={ids.serie}
-      >
-        <div className="dashboard__bloco-topo">
-          <h2 id={ids.serie} tabIndex={-1} className="dashboard__subtitulo">
-            Movimentação mensal
-          </h2>
-          <p className="dashboard__explicacao">
-            Admissões e desligamentos efetivados em cada mês do ano escolhido.
-            São eventos do período, contados em vínculos — não o número de
-            pessoas ativas em cada mês.
-          </p>
-        </div>
-        {estadoDaSerie(["admissao", "desligamento"], (porTipo) => {
-          const totalA = porTipo.admissao.reduce((x, y) => x + y, 0);
-          const totalD = porTipo.desligamento.reduce((x, y) => x + y, 0);
-          return (
-            <>
-              <div className="dashboard__quadro-topo">
-                <p className="dashboard__destaque">
-                  {dadosContadores ? (
-                    <>
-                      <span className="dashboard__destaque-valor">
-                        {String(dadosContadores.ativos)}
-                      </span>{" "}
-                      {dadosContadores.ativos === 1
-                        ? "pessoa ativa hoje"
-                        : "pessoas ativas hoje"}
-                    </>
-                  ) : null}
-                </p>
-                <ul className="dashboard__totais">
-                  <li className="dashboard__total">
-                    <span
-                      className="dashboard__marca dashboard__marca--admissao"
-                      aria-hidden="true"
-                    />
-                    <span className="dashboard__total-rotulo">
-                      Admissões efetivadas
-                    </span>
-                    <span className="dashboard__total-valor">
-                      {String(totalA)}
-                    </span>
-                  </li>
-                  <li className="dashboard__total">
-                    <span
-                      className="dashboard__marca dashboard__marca--desligamento"
-                      aria-hidden="true"
-                    />
-                    <span className="dashboard__total-rotulo">
-                      Desligamentos efetivados
-                    </span>
-                    <span className="dashboard__total-valor">
-                      {String(totalD)}
-                    </span>
-                  </li>
-                  <li className="dashboard__total">
-                    <span className="dashboard__total-rotulo">Diferença</span>
-                    <span className="dashboard__total-valor">
-                      {sinal(totalA - totalD)}
-                    </span>
-                  </li>
-                </ul>
-              </div>
-              <SerieMensalVisual
-                periodo={periodo}
-                tipos={["admissao", "desligamento"]}
-                porTipo={porTipo}
-                quando={quando}
-              />
-            </>
-          );
-        })}
-        <p className="dashboard__nota dashboard__nota--discreta">
-          Pessoas ativas no fim de cada mês ainda não são calculadas no Evolli;
-          o gráfico mostra os eventos efetivados em cada mês.
-        </p>
-        {dadosSeries ? <ComoCalculamosMovimentacao /> : null}
-      </section>
+      <QuadroDeColaboradores
+        idTitulo={ids.serie}
+        empresa={empresaAtiva.nome}
+        periodo={periodo}
+        quando={quando}
+        ativosHoje={dadosContadores ? dadosContadores.ativos : null}
+        dados={
+          admissoes && desligamentos
+            ? { entradas: admissoes.porMes, saidas: desligamentos.porMes }
+            : null
+        }
+        semDados={
+          admissoes && desligamentos
+            ? null
+            : estadoDaSerie(["admissao", "desligamento"], () => null)
+        }
+        vista={vistaDe("quadro")}
+        onTrocarVista={trocarVista("quadro")}
+        onAnunciar={anunciar}
+      />
 
       <div className="dashboard__grade">
         <DistribuicaoDoTimeBloco
           idTitulo={ids.distribuicao}
           time={dadosDoTime}
           falha={falhaDoTime}
+          empresa={empresaAtiva.nome}
+          vista={vistaDe("distribuicao")}
+          onTrocarVista={trocarVista("distribuicao")}
+          onAnunciar={anunciar}
         />
         <BlocoSemDado
           titulo="eNPS"
@@ -815,6 +787,10 @@ export function DashboardScreen({
         <TempoDeCasaBloco
           idTitulo={ids.tempoDeCasa}
           time={dadosDoTime}
+          empresa={empresaAtiva.nome}
+          vista={vistaDe("tempo-de-casa")}
+          onTrocarVista={trocarVista("tempo-de-casa")}
+          onAnunciar={anunciar}
           falha={
             falhaDoTime ? (
               <p className="dashboard__nota">

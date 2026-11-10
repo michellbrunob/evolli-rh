@@ -105,6 +105,10 @@ import {
   type EmpresaDoContextoApi,
 } from "../api/contextoEmpresarialClient";
 import { clearCsrfToken, refreshCsrfToken } from "../api/csrfClient";
+import type {
+  BlocoComVista,
+  VistaDoBloco,
+} from "../screens/dashboard/componentesDoDashboard";
 import {
   ApiError,
   obterUsuarioAtual,
@@ -202,6 +206,15 @@ export function AutenticacaoApp() {
    * de um contexto para outro. Nunca há `localStorage`, `sessionStorage`,
    * cookie ou URL.
    */
+  /**
+   * T207 — gráfico ou tabela em cada bloco do Dashboard: a mesma regra do
+   * menu recolhido (só nesta aba, só em memória, uma conta numa empresa;
+   * outra conta, outra empresa ou o logout apagam).
+   */
+  const [vistasDoDashboard, setVistasDoDashboard] = useState<{
+    readonly chave: string;
+    readonly vistas: Readonly<Partial<Record<BlocoComVista, VistaDoBloco>>>;
+  } | null>(null);
   const [preferenciaDoMenu, setPreferenciaDoMenu] = useState<{
     readonly chave: string;
     readonly recolhido: boolean;
@@ -322,6 +335,7 @@ export function AutenticacaoApp() {
     setAnuncio("");
     // T206 — a preferência do menu sai junto com a sessão.
     setPreferenciaDoMenu(null);
+    setVistasDoDashboard(null);
     setEstado("login");
   }, []);
 
@@ -627,6 +641,11 @@ export function AutenticacaoApp() {
   }
   const menuRecolhido =
     preferenciaDoMenu?.chave === chaveDaArvore && preferenciaDoMenu.recolhido;
+  if (vistasDoDashboard !== null && vistasDoDashboard.chave !== chaveDaArvore) {
+    setVistasDoDashboard(null);
+  }
+  const vistasDaConta =
+    vistasDoDashboard?.chave === chaveDaArvore ? vistasDoDashboard.vistas : {};
 
   const arvore =
     destinoAberto === null ? (
@@ -677,6 +696,16 @@ export function AutenticacaoApp() {
         menuRecolhido={menuRecolhido}
         onMenuRecolhidoChange={(recolhido) =>
           setPreferenciaDoMenu({ chave: chaveDaArvore, recolhido })
+        }
+        vistasDoDashboard={vistasDaConta}
+        onVistaDoDashboardChange={(bloco, vista) =>
+          setVistasDoDashboard((atual) => ({
+            chave: chaveDaArvore,
+            vistas: {
+              ...(atual?.chave === chaveDaArvore ? atual.vistas : {}),
+              [bloco]: vista,
+            },
+          }))
         }
       />
     );

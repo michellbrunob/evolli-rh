@@ -29,6 +29,15 @@ export interface GraficoMensalProps {
   readonly porTipo: Readonly<Record<TipoMovimentacao, readonly number[]>>;
   /** Nome do grupo de meses para o leitor de tela. */
   readonly rotulo: string;
+  /** Rótulo de cada tipo (padrão: o da movimentação). */
+  readonly rotulos?: Partial<Readonly<Record<TipoMovimentacao, string>>>;
+  /**
+   * Métricas do mês que ainda não têm fonte: aparecem no painel como
+   * "indisponível" — nunca como zero.
+   */
+  readonly indisponiveis?: readonly string[];
+  /** Rótulo da diferença entre admissões e desligamentos. */
+  readonly rotuloDoSaldo?: string;
 }
 
 function sinal(n: number): string {
@@ -43,7 +52,12 @@ export function GraficoMensal({
   tipos,
   porTipo,
   rotulo,
+  rotulos = {},
+  indisponiveis = [],
+  rotuloDoSaldo = "Diferença",
 }: GraficoMensalProps) {
+  const nomeDoTipo = (t: TipoMovimentacao) =>
+    rotulos[t] ?? ROTULO_DA_MOVIMENTACAO[t];
   const prefixo = useId();
   const idPainel = `${prefixo}-painel`;
   const botoesRef = useRef<(HTMLButtonElement | null)[]>([]);
@@ -97,7 +111,7 @@ export function GraficoMensal({
         {tipos.map((t) => (
           <span key={t}>
             <span className={`dashboard__marca dashboard__marca--${t}`} />
-            {ROTULO_DA_MOVIMENTACAO[t]}
+            {nomeDoTipo(t)}
           </span>
         ))}
       </div>
@@ -131,6 +145,12 @@ export function GraficoMensal({
                 }
               }}
               onMouseEnter={() => setAberto(i)}
+              onClick={() => {
+                // Ativar (clique ou toque) também abre o mês, mesmo onde o
+                // clique não leva o foco ao botão.
+                setDaVez(i);
+                setAberto(i);
+              }}
               onKeyDown={(evento) => aoTeclar(evento, i)}
             >
               <span className="dashboard__barras" aria-hidden="true">
@@ -172,14 +192,14 @@ export function GraficoMensal({
                       className={`dashboard__marca dashboard__marca--${t}`}
                       aria-hidden="true"
                     />
-                    {ROTULO_DA_MOVIMENTACAO[t]}
+                    {nomeDoTipo(t)}
                   </dt>
                   <dd>{valor(t, aberto)}</dd>
                 </div>
               ))}
               {comSaldo ? (
                 <div>
-                  <dt>Diferença</dt>
+                  <dt>{rotuloDoSaldo}</dt>
                   <dd>
                     {sinal(
                       valor("admissao", aberto) - valor("desligamento", aberto),
@@ -187,6 +207,12 @@ export function GraficoMensal({
                   </dd>
                 </div>
               ) : null}
+              {indisponiveis.map((nome) => (
+                <div key={nome} className="dashboard__dica-mes-indisponivel">
+                  <dt>{nome}</dt>
+                  <dd>indisponível</dd>
+                </div>
+              ))}
             </dl>
           </div>
         ) : null}

@@ -29,8 +29,10 @@ import {
 import { listarCargos } from "../api/cargoClient";
 import {
   buscarColaborador,
+  listarColaboradores,
   listarVinculosDoColaborador,
 } from "../api/colaboradoresClient";
+import { listarMovimentacoes } from "../api/movimentacaoClient";
 import {
   listarDocumentos,
   listarSolicitacoesDocumento,
@@ -180,6 +182,20 @@ vi.mock("../api/colaboradoresClient", async () => {
     ...actual,
     buscarColaborador: vi.fn(),
     listarVinculosDoColaborador: vi.fn(),
+    // T207 — as leituras do Dashboard passam pela implementação real (como
+    // antes: fetch sem servidor, ou o fetch falso do teste); os testes da
+    // vista do quadro as resolvem e devolvem depois.
+    listarColaboradores: vi.fn(actual.listarColaboradores),
+  };
+});
+
+vi.mock("../api/movimentacaoClient", async () => {
+  const actual = await vi.importActual<
+    typeof import("../api/movimentacaoClient")
+  >("../api/movimentacaoClient");
+  return {
+    ...actual,
+    listarMovimentacoes: vi.fn(actual.listarMovimentacoes),
   };
 });
 
@@ -2538,5 +2554,123 @@ describe("T206 — foco ao abrir um produto pelo Hub", () => {
     expect(document.body.textContent).not.toContain(
       "Pessoa Sintetica Rascunho",
     );
+  });
+});
+
+describe("T207 — vista do Quadro de colaboradores: só nesta aba, por conta e empresa", () => {
+  const CONTADORES_VAZIOS = {
+    ativos: 0,
+    inativos: 0,
+    emAdmissao: 0,
+    desligados: 0,
+    total: 0,
+    ativosPorTipo: {
+      clt: 0,
+      estagio: 0,
+      pj: 0,
+      temporario: 0,
+      outro_controlado: 0,
+    },
+  };
+  const emTabela = () =>
+    document.querySelector(".dashboard__bloco--quadro table") !== null;
+  const acoesDoQuadro = () =>
+    screen.findByRole("button", { name: "Ações: Quadro de colaboradores" });
+
+  beforeEach(() => {
+    CanalFalso.abertos.clear();
+    vi.stubGlobal("BroadcastChannel", CanalFalso);
+    window.history.replaceState(null, "", window.location.pathname);
+    vi.mocked(listarColaboradores).mockResolvedValue({
+      itens: [],
+      pagina: 1,
+      tamanhoPagina: 1,
+      total: 0,
+      contadores: CONTADORES_VAZIOS,
+    } as never);
+    vi.mocked(listarMovimentacoes).mockResolvedValue({
+      itens: [],
+      pagina: 1,
+      tamanhoPagina: 100,
+      total: 0,
+    } as never);
+  });
+  afterEach(async () => {
+    vi.unstubAllGlobals();
+    window.history.replaceState(null, "", window.location.pathname);
+    const reais = {
+      ...(await vi.importActual<typeof import("../api/colaboradoresClient")>(
+        "../api/colaboradoresClient",
+      )),
+      ...(await vi.importActual<typeof import("../api/movimentacaoClient")>(
+        "../api/movimentacaoClient",
+      )),
+    };
+    vi.mocked(listarColaboradores).mockImplementation(
+      reais.listarColaboradores,
+    );
+    vi.mocked(listarMovimentacoes).mockImplementation(
+      reais.listarMovimentacoes,
+    );
+  });
+
+  async function verComoTabela() {
+    fireEvent.click(await acoesDoQuadro());
+    fireEvent.click(screen.getByRole("menuitem", { name: "Ver como tabela" }));
+    expect(emTabela()).toBe(true);
+  }
+
+  it("sobrevive à volta pelo Hub; outra conta, depois do logout, começa no gráfico", async () => {
+    vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
+    vi.mocked(logout).mockResolvedValueOnce(undefined);
+    vi.mocked(login).mockResolvedValueOnce({ mfaRequerido: false });
+    render(<AutenticacaoApp />);
+    await screen.findByRole("heading", { level: 1, name: "Dashboard" });
+    await verComoTabela();
+
+    fireEvent.click(screen.getByRole("button", { name: "Hub" }));
+    await chegarAoHub();
+    await abrirProduto(/^Dashboard/);
+    await acoesDoQuadro();
+    expect(emTabela()).toBe(true);
+
+    fireEvent.click(screen.getByRole("button", { name: "Sair" }));
+    await screen.findByLabelText(/^E-mail\b/i);
+    vi.mocked(obterUsuarioAtual).mockResolvedValue(ator("dp"));
+    preencherEEntrar();
+    await screen.findByRole("heading", { level: 1, name: "Dashboard" });
+    await acoesDoQuadro();
+    expect(emTabela()).toBe(false);
+  });
+
+  it("outra empresa abre no gráfico — e a vista antiga não volta com a empresa antiga", async () => {
+    vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
+    render(<AutenticacaoApp />);
+    await screen.findByRole("heading", { level: 1, name: "Dashboard" });
+    await verComoTabela();
+
+    servidorPassaParaBeta();
+    act(() =>
+      new CanalFalso(NOME_DO_CANAL).postMessage({
+        tipo: "contexto-empresarial-alterado",
+      }),
+    );
+    await waitFor(() =>
+      expect(seletorDoMenu()).toHaveTextContent("Empresa Beta"),
+    );
+    await acoesDoQuadro();
+    expect(emTabela()).toBe(false);
+
+    vi.mocked(obterUsuarioAtual).mockResolvedValue(ATOR_PADRAO as never);
+    act(() =>
+      new CanalFalso(NOME_DO_CANAL).postMessage({
+        tipo: "contexto-empresarial-alterado",
+      }),
+    );
+    await waitFor(() =>
+      expect(seletorDoMenu()).toHaveTextContent("Empresa Alfa"),
+    );
+    await acoesDoQuadro();
+    expect(emTabela()).toBe(false);
   });
 });

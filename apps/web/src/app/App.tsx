@@ -93,6 +93,10 @@ import {
   DASHBOARD_TITULO_ID,
   DashboardScreen,
 } from "../screens/dashboard/DashboardScreen";
+import type {
+  BlocoComVista,
+  VistaDoBloco,
+} from "../screens/dashboard/componentesDoDashboard";
 import {
   COLABORADORES_TITULO_ID,
   type FocoDoAdmitido,
@@ -434,6 +438,10 @@ function conteudoDoDestino(
     readonly onTrocarAno: (ano: number) => void;
     readonly onTrocarAba: (aba: AbaDoDashboard) => void;
     readonly onAbrirListagem: (estado: EstadoDaListagem) => void;
+    readonly vistas?:
+      Readonly<Partial<Record<BlocoComVista, VistaDoBloco>>> | undefined;
+    readonly onTrocarVista?:
+      ((bloco: BlocoComVista, vista: VistaDoBloco) => void) | undefined;
   },
 ) {
   if (destinoId === "dashboard") {
@@ -445,6 +453,8 @@ function conteudoDoDestino(
         onTrocarAno={dashboard.onTrocarAno}
         onTrocarAba={dashboard.onTrocarAba}
         onAbrirListagem={dashboard.onAbrirListagem}
+        vistas={dashboard.vistas}
+        onTrocarVista={dashboard.onTrocarVista}
       />
     );
   }
@@ -716,6 +726,15 @@ export interface AppProps {
    */
   menuRecolhido?: boolean;
   onMenuRecolhidoChange?: (recolhido: boolean) => void;
+  /**
+   * T207 — gráfico ou tabela nos blocos do Dashboard, guardado por quem monta
+   * o shell (mesma regra do menu recolhido). Ausente, a tela guarda sozinha.
+   */
+  vistasDoDashboard?: Readonly<Partial<Record<BlocoComVista, VistaDoBloco>>>;
+  onVistaDoDashboardChange?: (
+    bloco: BlocoComVista,
+    vista: VistaDoBloco,
+  ) => void;
 }
 
 export function App({
@@ -732,6 +751,8 @@ export function App({
   onVoltarAoHub,
   menuRecolhido,
   onMenuRecolhidoChange,
+  vistasDoDashboard,
+  onVistaDoDashboardChange,
 }: AppProps = {}) {
   // Inicialização SÍNCRONA com o papel já resolvido. O `AutenticacaoApp` só
   // monta este componente depois de `GET /v1/users/me` concluir com sucesso,
@@ -1716,6 +1737,15 @@ export function App({
                 <span className="app-shell__marca-nome">Evolli RH</span>
               </span>
 
+              {/* T207 — o nome da tela atual na barra, junto da área
+                  principal. É só visual: o título da tela (o `h1` que recebe
+                  o foco) continua único para o leitor de tela. */}
+              {destinoAtivoId === "dashboard" ? (
+                <p className="app-shell__tela-atual" aria-hidden="true">
+                  Dashboard
+                </p>
+              ) : null}
+
               <div className="app-shell__acoes">
                 {/* Contexto do ator: o papel que o SERVIDOR informou. Nada de
                     menu de conta, foto nem nome inventado — só o que existe. */}
@@ -1842,6 +1872,8 @@ export function App({
                 onTrocarAno: trocarAnoDoDashboard,
                 onTrocarAba: trocarAbaDoDashboard,
                 onAbrirListagem: abrirListagemDoDashboard,
+                vistas: vistasDoDashboard,
+                onTrocarVista: onVistaDoDashboardChange,
               },
             )}
           </main>

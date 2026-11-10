@@ -115,6 +115,20 @@
   color: var(--color-ink);
 }
 
+/* T207 — nome da tela atual, junto da área principal. Só visual (o título
+   da tela continua sendo o h1 dela); some onde a barra não tem espaço. Nas
+   cores neutras do cabeçalho (a paleta Evolli fica no menu e no Dashboard). */
+.app-shell__tela-atual {
+  margin: 0;
+  min-width: 0;
+  color: var(--color-ink);
+  font-size: var(--text-ui);
+  font-weight: var(--weight-strong);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* Grupo de ações reais, encostado na borda oposta. */
 .app-shell__acoes {
   display: flex;
@@ -470,6 +484,11 @@
 @media (max-width: 640px) {
   .app-shell__footer-inner {
     flex-direction: column;
+  }
+
+  /* T207 — sem espaço para o nome da tela; o título dela segue logo abaixo. */
+  .app-shell__tela-atual {
+    display: none;
   }
 
   /* Em telas muito estreitas as ações quebram em duas linhas em vez de

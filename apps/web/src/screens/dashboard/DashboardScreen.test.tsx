@@ -275,7 +275,11 @@ async function lido() {
 const bloco = (nome: RegExp | string) =>
   screen.getByRole("region", { name: nome });
 const indicador = (nome: string) => screen.getByRole("article", { name: nome });
-const SERIE = "Movimentação mensal";
+const SERIE = "Quadro de colaboradores";
+/** T207 — o quadro na vista de tabela (gráfico é a vista padrão). */
+const EM_TABELA = { quadro: "tabela" } as const;
+/** "—" à vista e "indisponível" ao leitor: o texto da célula sem fonte. */
+const SEM_FONTE = "—indisponível";
 
 function textosDoStatus(status: HTMLElement) {
   const textos: string[] = [];
@@ -362,9 +366,9 @@ describe("T205 — leitura e resumo (E-2)", () => {
       bloco(SERIE).querySelector<HTMLElement>(".dashboard__totais")!;
     const total = (rotulo: string) =>
       within(totais).getByText(rotulo).closest("li") as HTMLElement;
-    expect(total("Admissões efetivadas")).toHaveTextContent("4");
-    expect(total("Desligamentos efetivados")).toHaveTextContent("1");
-    expect(total("Diferença")).toHaveTextContent("+3");
+    expect(total("Entradas")).toHaveTextContent("4");
+    expect(total("Saídas")).toHaveTextContent("1");
+    expect(total("Saldo")).toHaveTextContent("+3");
     expect(
       within(bloco("Resumo")).getByText(
         "Hoje há 12 pessoas ativas e 2 pessoas em admissão. Em 2026, até hoje, houve 4 admissões e 1 desligamento de vínculos efetivados.",
@@ -400,12 +404,12 @@ describe("T205 — leitura e resumo (E-2)", () => {
     const serie = bloco(SERIE);
     expect(
       within(serie.querySelector<HTMLElement>(".dashboard__totais")!)
-        .getByText("Diferença")
+        .getByText("Saldo")
         .closest("li"),
     ).toHaveTextContent("0");
     expect(
       within(serie).getByText(
-        "Nenhuma admissão ou desligamento efetivado em 2026, até hoje.",
+        "Nenhuma entrada ou saída efetivada em 2026, até hoje.",
       ),
     ).toBeVisible();
     expect(within(serie).queryByRole("table")).toBeNull();
@@ -482,21 +486,22 @@ describe("T205 — atalhos (D-5)", () => {
 });
 
 describe("T205 — série mensal (E-4)", () => {
-  it("tabela equivalente às barras: meses do ano até o atual, diferença e total; barras ocultas ao leitor", async () => {
-    render(<Tela />);
+  it("tabela: meses do ano até o atual, entradas, saídas e total; ativos no fim e turnover sem fonte", async () => {
+    render(<Tela vistas={EM_TABELA} />);
     await lido();
     const serie = bloco(SERIE);
     const tabela = within(serie).getByRole("table", {
-      name: "Admissões e desligamentos de vínculos efetivados por mês, em 2026, até hoje",
+      name: "Quadro de colaboradores por mês, em 2026, até hoje",
     });
     const linhas = within(tabela)
       .getAllByRole("row")
       .map((r) => [...r.querySelectorAll("th, td")].map((c) => c.textContent));
     expect(linhas[0]).toEqual([
       "Mês",
-      "Admissões",
-      "Desligamentos",
-      "Diferença",
+      "Ativos no fim",
+      "Entradas",
+      "Saídas",
+      "Turnover",
     ]);
     // Janeiro a novembro (até hoje), mais o total.
     expect(linhas.slice(1, -1).map((l) => l[0])).toEqual([
@@ -512,16 +517,26 @@ describe("T205 — série mensal (E-4)", () => {
       "Outubro",
       "Novembro",
     ]);
-    expect(linhas[1]).toEqual(["Janeiro", "2", "0", "+2"]);
-    expect(linhas[3]).toEqual(["Março", "1", "1", "0"]);
-    expect(linhas[11]).toEqual(["Novembro", "1", "0", "+1"]);
-    expect(linhas.at(-1)).toEqual(["Total", "4", "1", "+3"]);
-    // T207 — um botão por mês (até hoje); as barras seguem decorativas.
+    expect(linhas[1]).toEqual(["Janeiro", SEM_FONTE, "2", "0", SEM_FONTE]);
+    expect(linhas[3]).toEqual(["Março", SEM_FONTE, "1", "1", SEM_FONTE]);
+    expect(linhas[11]).toEqual(["Novembro", SEM_FONTE, "1", "0", SEM_FONTE]);
+    expect(linhas.at(-1)).toEqual(["Total", SEM_FONTE, "4", "1", SEM_FONTE]);
+    // Sem fonte nunca vira zero nem porcentagem.
+    expect(tabela.textContent).not.toMatch(/%/);
+    // Na vista de tabela, nenhum gráfico.
+    expect(within(serie).queryByRole("group", { name: /por mês/ })).toBeNull();
+  });
+
+  it("gráfico: um botão por mês até hoje; barras ocultas ao leitor; nenhuma tabela", async () => {
+    render(<Tela />);
+    await lido();
+    const serie = bloco(SERIE);
     const meses = within(serie).getByRole("group", { name: /por mês/ });
     expect(within(meses).getAllByRole("button")).toHaveLength(11);
     for (const barras of serie.querySelectorAll(".dashboard__barras")) {
       expect(barras).toHaveAttribute("aria-hidden", "true");
     }
+    expect(within(serie).queryByRole("table")).toBeNull();
   });
 
   it("ano passado: os doze meses, sem 'até hoje'", async () => {
@@ -529,10 +544,10 @@ describe("T205 — série mensal (E-4)", () => {
       mov("admissao", "2025-12-31"),
       mov("desligamento", "2025-02-01"),
     ]);
-    render(<Tela ano={2025} />);
+    render(<Tela ano={2025} vistas={EM_TABELA} />);
     await lido();
     const tabela = screen.getByRole("table", {
-      name: "Admissões e desligamentos de vínculos efetivados por mês, em 2025",
+      name: "Quadro de colaboradores por mês, em 2025",
     });
     expect(within(tabela).getAllByRole("row")).toHaveLength(1 + 12 + 1);
     expect(indicador("Colaboradores ativos")).toHaveTextContent(
@@ -557,8 +572,9 @@ describe("T205 — série mensal (E-4)", () => {
     );
     expect(within(bloco("Resumo")).queryByText(/^Hoje há/)).toBeNull();
     const serie = bloco(SERIE);
-    expect(within(serie).queryByText("Admissões efetivadas")).toBeNull();
-    expect(within(serie).queryByText("Diferença")).toBeNull();
+    expect(serie.querySelector(".dashboard__totais")).toBeNull();
+    // Sem números, sem menu de ações (nada a trocar nem a exportar).
+    expect(within(serie).queryByRole("button", { name: /^Ações/ })).toBeNull();
     expect(serie).toHaveTextContent(
       "Admissões e desligamentos: mais de 2.000 vínculos efetivados em 2026, até hoje, o limite desta visão. Os números não são exibidos para não mostrar um total incompleto.",
     );
@@ -585,9 +601,7 @@ describe("T205 — falhas e nova tentativa", () => {
       within(bloco("Pessoas ativas por tipo de vínculo")).queryByRole("link"),
     ).toBeNull();
     expect(within(bloco("Pessoas hoje")).queryByRole("link")).toBeNull();
-    expect(
-      within(bloco(SERIE)).getByText("Admissões efetivadas"),
-    ).toBeVisible();
+    expect(bloco(SERIE).querySelector(".dashboard__totais")).toBeVisible();
 
     fireEvent.click(
       screen.getByRole("button", {
@@ -614,7 +628,7 @@ describe("T205 — falhas e nova tentativa", () => {
       "Não foi possível carregar as movimentações de 2026.",
     );
     expect(within(bloco("Resumo")).queryByText(/^Hoje há/)).toBeNull();
-    expect(within(bloco(SERIE)).queryByText("Admissões efetivadas")).toBeNull();
+    expect(bloco(SERIE).querySelector(".dashboard__totais")).toBeNull();
     servidorDeMovimentacoes(MOVIMENTACOES_PADRAO());
     fireEvent.click(
       screen.getByRole("button", {
@@ -626,7 +640,9 @@ describe("T205 — falhas e nova tentativa", () => {
         screen.getByRole("heading", { level: 2, name: SERIE }),
       ).toHaveFocus(),
     );
-    expect(screen.getByRole("table")).toBeVisible();
+    expect(
+      within(bloco(SERIE)).getByRole("group", { name: /por mês/ }),
+    ).toBeVisible();
   });
 
   it("as três leituras falham: três alertas, nenhum número, nada anunciado como lido", async () => {
@@ -688,7 +704,9 @@ describe("T205 — período, atualização, atrasos (E-1, E-5)", () => {
     expect(servidorDosContadores).toHaveBeenCalledTimes(2);
     expect(servidorDosAtivos).toHaveBeenCalledTimes(2);
     // A série do mesmo ano fica na tela durante a releitura.
-    expect(screen.getByRole("table")).toBeVisible();
+    expect(
+      within(bloco(SERIE)).getByRole("group", { name: /por mês/ }),
+    ).toBeVisible();
     await act(async () => {
       leitura.resolver(listagem(contadores({ ativos: 13 })));
     });
@@ -705,8 +723,8 @@ describe("T205 — período, atualização, atrasos (E-1, E-5)", () => {
   it("outro ano com a leitura anterior pendente: a resposta atrasada é descartada", async () => {
     const atrasada = adiada<ResultadoPaginado<MovimentacaoApi>>();
     vi.mocked(listarMovimentacoes).mockReturnValueOnce(atrasada.promessa);
-    const { rerender } = render(<Tela ano={2026} />);
-    rerender(<Tela ano={2025} />);
+    const { rerender } = render(<Tela ano={2026} vistas={EM_TABELA} />);
+    rerender(<Tela ano={2025} vistas={EM_TABELA} />);
     await waitFor(() =>
       expect(screen.getByRole("status")).toHaveTextContent(
         /Dashboard de 2025 lido em/,
@@ -726,7 +744,7 @@ describe("T205 — período, atualização, atrasos (E-1, E-5)", () => {
     const corpo = within(tabela).getAllByRole("rowgroup")[1]!;
     expect(within(corpo).getAllByRole("row")).toHaveLength(12);
     expect(within(tabela).getAllByRole("row").at(-1)).toHaveTextContent(
-      "Total10+1",
+      `Total${SEM_FONTE}10${SEM_FONTE}`,
     );
     expect(screen.getByRole("status")).toHaveTextContent(/2025/);
   });
@@ -758,7 +776,7 @@ describe("T205 — período, atualização, atrasos (E-1, E-5)", () => {
     // E, enquanto 2025 não chega, nada de vínculos na tela.
     expect(screen.queryByRole("table")).toBeNull();
     expect(screen.queryByText(/houve/)).toBeNull();
-    expect(screen.queryByText("Admissões efetivadas")).toBeNull();
+    expect(bloco(SERIE).querySelector(".dashboard__totais")).toBeNull();
     expect(bloco(SERIE)).toHaveTextContent("Carregando…");
   });
 
@@ -1053,18 +1071,19 @@ describe("T207 — Visão Geral: cards honestos (V-2) e Como calculamos (V-5)", 
       .map((b) => b.textContent);
     expect(nomes).toEqual([
       "Como calculamos: colaboradores ativos",
-      "Como calculamos: movimentação mensal",
+      // T207 — no quadro, o botão de informação ao lado do título.
+      "iComo calculamos: quadro de colaboradores",
       "Como calculamos: distribuição do time",
       "Como calculamos: tempo de casa",
       "Como calculamos: pessoas hoje",
     ]);
   });
 
-  it("o quadro mensal diz que são eventos do período, não pessoas ativas por mês", async () => {
+  it("o quadro diz que ativos no fim e turnover não têm fonte, e que entradas e saídas são movimentações", async () => {
     render(<Tela />);
     await lido();
     expect(bloco(SERIE)).toHaveTextContent(
-      "São eventos do período, contados em vínculos — não o número de pessoas ativas em cada mês.",
+      "Ativos no fim e turnover ainda não têm fonte no Evolli e aparecem como “—”. Entradas e saídas são movimentações efetivadas, contadas em vínculos.",
     );
   });
 });
@@ -1236,12 +1255,9 @@ describe("T207 — Visão Geral ampliada: ordem e quadro mensal", () => {
     expect(serie.querySelector(".dashboard__destaque")).toHaveTextContent(
       "12 pessoas ativas hoje",
     );
-    expect(serie).toHaveTextContent(
-      "Pessoas ativas no fim de cada mês ainda não são calculadas no Evolli; o gráfico mostra os eventos efetivados em cada mês.",
-    );
-    expect(
-      within(serie).queryByRole("columnheader", { name: /ativ/i }),
-    ).toBeNull();
+    expect(serie).toHaveTextContent("ainda não têm fonte no Evolli");
+    // Nenhum número de ativos por mês, em nenhuma vista.
+    expect(serie.textContent).not.toMatch(/ativos no fim\s*\d/i);
   });
 
   it("uma pessoa ativa: singular no destaque", async () => {
@@ -1259,7 +1275,7 @@ describe("T207 — Visão Geral ampliada: ordem e quadro mensal", () => {
 describe("T207 — gráfico mensal interativo", () => {
   const grupoDosMeses = () =>
     within(bloco(SERIE)).getByRole("group", {
-      name: "Admissões e desligamentos por mês — use as setas para percorrer os meses",
+      name: "Entradas e saídas por mês — use as setas para percorrer os meses",
     });
   const mes = (nome: string) =>
     within(grupoDosMeses()).getByRole("button", { name: nome });
@@ -1283,11 +1299,11 @@ describe("T207 — gráfico mensal interativo", () => {
     act(() => janeiro.focus());
     const painel = dica()!;
     expect(painel).toHaveTextContent(
-      "Janeiro de 2026Admissões2Desligamentos0Diferença+2",
+      "Janeiro de 2026Entradas2Saídas0Saldo+2Ativos no fimindisponívelTurnoverindisponível",
     );
     expect(janeiro).toHaveAttribute("aria-describedby", painel.id);
     expect(janeiro).toHaveAccessibleDescription(
-      /Janeiro de 2026.*Admissões.*2.*Desligamentos.*0.*Diferença.*\+2/,
+      /Janeiro de 2026.*Entradas.*2.*Saídas.*0.*Saldo.*\+2.*Ativos no fim.*indisponível.*Turnover.*indisponível/,
     );
     // Primeira metade do ano: o painel fica à direita da coluna.
     expect(painel).toHaveClass("dashboard__dica-mes--depois");
@@ -1315,7 +1331,7 @@ describe("T207 — gráfico mensal interativo", () => {
     fireEvent.keyDown(fevereiro, { key: "End" });
     const novembro = mes("Novembro de 2026");
     expect(novembro).toHaveFocus();
-    expect(dica()).toHaveTextContent("Novembro de 2026Admissões1");
+    expect(dica()).toHaveTextContent("Novembro de 2026Entradas1");
     // Segunda metade: à esquerda da coluna, dentro do quadro.
     expect(dica()).toHaveClass("dashboard__dica-mes--antes");
     fireEvent.keyDown(novembro, { key: "ArrowRight" });
@@ -1666,5 +1682,813 @@ describe("T207 — Visão Geral em 375 px (CSS)", () => {
     expect(regra(".dashboard__grupo-nome")).toMatch(
       /overflow-wrap:\s*anywhere/,
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T207 — refino: título e informação do quadro, menu de ações, vistas,
+// CSV e PDF reais, e os mesmos números em todas as formas.
+// ---------------------------------------------------------------------------
+
+const GRUPO_NEUTRO_DO_TESTE =
+  "Grupos com menos de 3 pessoas ou sem departamento";
+
+const acoesDo = (nome: string) =>
+  screen.getByRole("button", { name: `Ações: ${nome}` });
+
+function escolher(nomeDoBloco: string, acao: string) {
+  fireEvent.click(acoesDo(nomeDoBloco));
+  fireEvent.click(screen.getByRole("menuitem", { name: acao }));
+}
+
+/** Captura o arquivo baixado: conteúdo (com o BOM), nome e tipo. */
+async function capturarDownload(acao: () => void) {
+  const original = {
+    criar: URL.createObjectURL,
+    revogar: URL.revokeObjectURL,
+  };
+  const blobs: Blob[] = [];
+  URL.createObjectURL = vi.fn((b: Blob) => {
+    blobs.push(b);
+    return "blob:sintetico";
+  }) as typeof URL.createObjectURL;
+  URL.revokeObjectURL = vi.fn();
+  const nomes: string[] = [];
+  const clique = vi
+    .spyOn(HTMLAnchorElement.prototype, "click")
+    .mockImplementation(function (this: HTMLAnchorElement) {
+      nomes.push(this.download);
+    });
+  try {
+    acao();
+  } finally {
+    clique.mockRestore();
+  }
+  const blob = blobs[0]!;
+  const bytes = await new Promise<ArrayBuffer>((ok) => {
+    const leitor = new FileReader();
+    leitor.onload = () => ok(leitor.result as ArrayBuffer);
+    leitor.readAsArrayBuffer(blob);
+  });
+  URL.createObjectURL = original.criar;
+  URL.revokeObjectURL = original.revogar;
+  return {
+    texto: new TextDecoder("utf-8", { ignoreBOM: true }).decode(bytes),
+    nome: nomes[0],
+    tipo: blob.type,
+    downloads: nomes.length,
+  };
+}
+
+const linhasDoCsv = (texto: string) =>
+  texto
+    .replace(/^\uFEFF/, "")
+    .split("\r\n")
+    .filter((l) => l.length > 0)
+    .map((l) => l.split(";"));
+
+describe("T207 — Quadro de colaboradores: título, subtítulo e informação", () => {
+  const info = () =>
+    screen.getByRole("button", {
+      name: "Como calculamos: quadro de colaboradores",
+    });
+  const painelDaInfo = () =>
+    document.getElementById(info().getAttribute("aria-controls")!)!;
+
+  it("título e subtítulo do quadro; informação fechada, ligada ao painel", async () => {
+    render(<Tela />);
+    await lido();
+    const quadro = bloco(SERIE);
+    expect(
+      within(quadro).getByRole("heading", { level: 2, name: SERIE }),
+    ).toBeVisible();
+    expect(quadro).toHaveTextContent(
+      "Pessoas ativas no fim de cada mês e quem entrou e saiu",
+    );
+    expect(info()).toHaveAttribute("aria-expanded", "false");
+    expect(painelDaInfo()).not.toBeVisible();
+  });
+
+  it("foco abre, Escape fecha e o foco fica no botão; foco fora fecha", async () => {
+    render(<Tela />);
+    await lido();
+    act(() => info().focus());
+    expect(info()).toHaveAttribute("aria-expanded", "true");
+    expect(painelDaInfo()).toBeVisible();
+    fireEvent.keyDown(info(), { key: "Escape" });
+    expect(info()).toHaveAttribute("aria-expanded", "false");
+    expect(painelDaInfo()).not.toBeVisible();
+    expect(info()).toHaveFocus();
+
+    act(() => {
+      info().blur();
+      info().focus();
+    });
+    expect(painelDaInfo()).toBeVisible();
+    act(() =>
+      screen.getByRole("heading", { level: 2, name: "Resumo" }).focus(),
+    );
+    expect(painelDaInfo()).not.toBeVisible();
+  });
+
+  it("ponteiro: passar abre e sair fecha; clique fixa; clique de novo ou clique fora fecham", async () => {
+    render(<Tela />);
+    await lido();
+    const raiz = info().parentElement!;
+    fireEvent.mouseEnter(raiz);
+    expect(painelDaInfo()).toBeVisible();
+    fireEvent.mouseLeave(raiz);
+    expect(painelDaInfo()).not.toBeVisible();
+
+    fireEvent.mouseEnter(raiz);
+    fireEvent.mouseDown(info());
+    fireEvent.click(info());
+    fireEvent.mouseLeave(raiz);
+    expect(painelDaInfo()).toBeVisible();
+    fireEvent.click(info());
+    expect(painelDaInfo()).not.toBeVisible();
+
+    fireEvent.mouseDown(info());
+    fireEvent.click(info());
+    expect(painelDaInfo()).toBeVisible();
+    fireEvent.mouseDown(document.body);
+    expect(painelDaInfo()).not.toBeVisible();
+  });
+
+  it("o painel explica só o que existe: entradas e saídas reais; ativos no fim e turnover aguardam fonte — sem região viva nem anúncio", async () => {
+    render(<Tela />);
+    await lido();
+    const status = screen.getByRole("status");
+    const antes = status.textContent;
+    act(() => info().focus());
+    const painel = painelDaInfo();
+    expect(painel).toHaveTextContent("Como calculamos");
+    expect(painel).toHaveTextContent(
+      "Entradas: admissões efetivadas com vigência no mês",
+    );
+    expect(painel).toHaveTextContent("Saídas: desligamentos efetivados");
+    expect(painel).toHaveTextContent(
+      "Ativos no fim e turnover aguardam fonte e definição",
+    );
+    expect(painel).toHaveTextContent("nunca como zero");
+    expect(painel.textContent).not.toMatch(/%|÷|média de ativos/);
+    expect(painel).not.toHaveAttribute("aria-live");
+    expect(painel.closest("[aria-live]")).toBeNull();
+    expect(painel).not.toHaveAttribute("role");
+    expect(status.textContent).toBe(antes);
+  });
+});
+
+describe("T207 — menu de ações do quadro", () => {
+  it("botão de menu com nome e estado; abrir leva o foco à primeira ação, com descrição", async () => {
+    render(<Tela />);
+    await lido();
+    const botao = acoesDo(SERIE);
+    expect(botao).toHaveAttribute("aria-haspopup", "menu");
+    expect(botao).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(botao);
+    expect(botao).toHaveAttribute("aria-expanded", "true");
+    const menu = screen.getByRole("menu", { name: `Ações: ${SERIE}` });
+    const itens = within(menu).getAllByRole("menuitem");
+    expect(
+      itens.map(
+        (i) =>
+          document.getElementById(i.getAttribute("aria-labelledby")!)!
+            .textContent,
+      ),
+    ).toEqual(["Ver como tabela", "Baixar CSV", "Exportar PDF"]);
+    expect(itens[0]).toHaveFocus();
+    expect(itens[2]).toHaveAccessibleDescription(
+      "Abre a impressão do navegador; no destino, escolha Salvar como PDF",
+    );
+    expect(itens.every((i) => i.tabIndex === -1)).toBe(true);
+  });
+
+  it("setas (com volta), Home e End; Escape fecha e devolve o foco ao botão", async () => {
+    render(<Tela />);
+    await lido();
+    fireEvent.click(acoesDo(SERIE));
+    const [tabela, csv, pdf] = screen.getAllByRole("menuitem");
+    fireEvent.keyDown(tabela!, { key: "ArrowDown" });
+    expect(csv).toHaveFocus();
+    fireEvent.keyDown(csv!, { key: "End" });
+    expect(pdf).toHaveFocus();
+    fireEvent.keyDown(pdf!, { key: "ArrowDown" });
+    expect(tabela).toHaveFocus();
+    fireEvent.keyDown(tabela!, { key: "ArrowUp" });
+    expect(pdf).toHaveFocus();
+    fireEvent.keyDown(pdf!, { key: "Home" });
+    expect(tabela).toHaveFocus();
+    fireEvent.keyDown(tabela!, { key: "Escape" });
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(acoesDo(SERIE)).toHaveFocus();
+    expect(acoesDo(SERIE)).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("seta para baixo no botão abre na primeira ação; seta para cima, na última", async () => {
+    render(<Tela />);
+    await lido();
+    fireEvent.keyDown(acoesDo(SERIE), { key: "ArrowUp" });
+    expect(
+      screen.getByRole("menuitem", { name: "Exportar PDF" }),
+    ).toHaveFocus();
+    fireEvent.keyDown(screen.getByRole("menuitem", { name: "Exportar PDF" }), {
+      key: "Escape",
+    });
+    fireEvent.keyDown(acoesDo(SERIE), { key: "ArrowDown" });
+    expect(
+      screen.getByRole("menuitem", { name: "Ver como tabela" }),
+    ).toHaveFocus();
+  });
+
+  it("clique fora, Tab e foco fora fecham o menu", async () => {
+    render(<Tela />);
+    await lido();
+    fireEvent.click(acoesDo(SERIE));
+    fireEvent.mouseDown(document.body);
+    expect(screen.queryByRole("menu")).toBeNull();
+
+    fireEvent.click(acoesDo(SERIE));
+    fireEvent.keyDown(screen.getAllByRole("menuitem")[0]!, { key: "Tab" });
+    expect(screen.queryByRole("menu")).toBeNull();
+
+    fireEvent.click(acoesDo(SERIE));
+    act(() =>
+      screen.getByRole("heading", { level: 2, name: "Resumo" }).focus(),
+    );
+    expect(screen.queryByRole("menu")).toBeNull();
+  });
+
+  it("ao abrir, o menu nunca fica atrás do cabeçalho fixo, mesmo quando ele é mais alto que o normal (barra quebrada no celular)", async () => {
+    const cabecalho = document.createElement("header");
+    cabecalho.className = "app-shell__topbar";
+    document.body.prepend(cabecalho);
+    const retangulo = (topo: number, base: number) =>
+      ({
+        top: topo,
+        bottom: base,
+        left: 0,
+        right: 0,
+        width: 0,
+        height: base - topo,
+        x: 0,
+        y: topo,
+        toJSON: () => ({}),
+      }) as DOMRect;
+    const medir = vi
+      .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+      .mockImplementation(function (this: HTMLElement) {
+        if (this === cabecalho) return retangulo(0, 180);
+        if (this.getAttribute("role") === "menu") return retangulo(128, 330);
+        if (this.classList.contains("dashboard__botao-acoes")) {
+          return retangulo(100, 144);
+        }
+        return retangulo(0, 0);
+      });
+    const rolar = vi.spyOn(window, "scrollBy").mockImplementation(() => {});
+    try {
+      render(<Tela />);
+      await lido();
+      fireEvent.click(acoesDo(SERIE));
+      // O botão (100) e o menu ficam abaixo de 180 + 8: a página sobe 88.
+      expect(rolar).toHaveBeenCalledWith({ top: -88 });
+    } finally {
+      medir.mockRestore();
+      rolar.mockRestore();
+      cabecalho.remove();
+    }
+  });
+
+  it("menu já visível abaixo do cabeçalho: a página não rola", async () => {
+    const rolar = vi.spyOn(window, "scrollBy").mockImplementation(() => {});
+    const medir = vi
+      .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+      .mockImplementation(
+        () =>
+          ({
+            top: 300,
+            bottom: 450,
+            left: 0,
+            right: 0,
+            width: 0,
+            height: 150,
+            x: 0,
+            y: 300,
+            toJSON: () => ({}),
+          }) as DOMRect,
+      );
+    try {
+      render(<Tela />);
+      await lido();
+      fireEvent.click(acoesDo(SERIE));
+      expect(rolar).not.toHaveBeenCalled();
+    } finally {
+      medir.mockRestore();
+      rolar.mockRestore();
+    }
+  });
+
+  it("clicar no botão com o menu aberto fecha o menu", async () => {
+    render(<Tela />);
+    await lido();
+    fireEvent.click(acoesDo(SERIE));
+    fireEvent.click(acoesDo(SERIE));
+    expect(screen.queryByRole("menu")).toBeNull();
+  });
+
+  it("Ver como tabela e Ver como gráfico: mesma ação, rótulo pela vista; foco volta ao botão; anúncio curto", async () => {
+    render(<Tela />);
+    await lido();
+    escolher(SERIE, "Ver como tabela");
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(acoesDo(SERIE)).toHaveFocus();
+    expect(within(bloco(SERIE)).getByRole("table")).toBeVisible();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Quadro de colaboradores em tabela.",
+    );
+    fireEvent.click(acoesDo(SERIE));
+    expect(
+      screen.getByRole("menuitem", { name: "Ver como gráfico" }),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole("menuitem", { name: "Ver como tabela" }),
+    ).toBeNull();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Ver como gráfico" }));
+    expect(within(bloco(SERIE)).queryByRole("table")).toBeNull();
+    expect(
+      within(bloco(SERIE)).getByRole("group", { name: /por mês/ }),
+    ).toBeVisible();
+  });
+
+  it("vista controlada por quem monta: avisa a troca e mostra o que recebe", async () => {
+    const onTrocarVista = vi.fn();
+    const { rerender } = render(
+      <Tela onTrocarVista={onTrocarVista} vistas={{}} />,
+    );
+    await lido();
+    escolher(SERIE, "Ver como tabela");
+    expect(onTrocarVista).toHaveBeenCalledWith("quadro", "tabela");
+    // Quem monta ainda não trocou: continua gráfico.
+    expect(within(bloco(SERIE)).queryByRole("table")).toBeNull();
+    rerender(<Tela onTrocarVista={onTrocarVista} vistas={EM_TABELA} />);
+    expect(within(bloco(SERIE)).getByRole("table")).toBeVisible();
+  });
+
+  it("a vista escolhida segue ao trocar de ano (a leitura nova é desenhada nela)", async () => {
+    const { rerender } = render(<Tela ano={2026} />);
+    await lido();
+    escolher(SERIE, "Ver como tabela");
+    rerender(<Tela ano={2025} />);
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent(
+        /Dashboard de 2025 lido em/,
+      ),
+    );
+    expect(
+      screen.getByRole("table", {
+        name: "Quadro de colaboradores por mês, em 2025",
+      }),
+    ).toBeVisible();
+  });
+
+  it("só blocos com dado real têm menu: quadro, distribuição e tempo de casa — nunca cards nem blocos indisponíveis", async () => {
+    render(<Tela />);
+    await lido();
+    expect(
+      screen
+        .getAllByRole("button", { name: /^Ações: / })
+        .map((b) => b.textContent),
+    ).toEqual([
+      "Ações: Quadro de colaboradores",
+      "Ações: Distribuição do time",
+      "Ações: Tempo de casa",
+    ]);
+    for (const nome of ["eNPS", "Quem é o time"]) {
+      expect(within(bloco(nome)).queryByRole("button")).toBeNull();
+    }
+    expect(
+      within(bloco("Indicadores")).queryByRole("button", { name: /^Ações/ }),
+    ).toBeNull();
+  });
+
+  it("carregando ou com falha: sem menu no quadro", async () => {
+    vi.mocked(listarMovimentacoes).mockReturnValue(new Promise(() => {}));
+    const { unmount } = render(<Tela />);
+    expect(
+      within(bloco(SERIE)).queryByRole("button", { name: /^Ações/ }),
+    ).toBeNull();
+    unmount();
+    vi.mocked(listarMovimentacoes).mockRejectedValue(new Error("rede"));
+    render(<Tela />);
+    await waitFor(() =>
+      expect(
+        within(bloco(SERIE)).getByText(
+          "Não foi possível carregar as movimentações de 2026.",
+        ),
+      ).toBeVisible(),
+    );
+    expect(
+      within(bloco(SERIE)).queryByRole("button", { name: /^Ações/ }),
+    ).toBeNull();
+  });
+});
+
+describe("T207 — os mesmos números no gráfico, no painel, na tabela e no CSV", () => {
+  it("cada mês: painel do gráfico = linha da tabela = linha do CSV; nenhuma linha a mais", async () => {
+    render(<Tela />);
+    await lido();
+    // Gráfico: o painel de cada mês.
+    const doGrafico: string[][] = [];
+    const grupo = within(bloco(SERIE)).getByRole("group", { name: /por mês/ });
+    for (const botao of within(grupo).getAllByRole("button")) {
+      act(() => botao.focus());
+      const dl = screen.getByRole("tooltip").querySelector("dl")!;
+      const valor = (rotulo: string) =>
+        [...dl.querySelectorAll("div")]
+          .find((d) => d.querySelector("dt")?.textContent === rotulo)!
+          .querySelector("dd")!.textContent!;
+      doGrafico.push([
+        valor("Ativos no fim"),
+        valor("Entradas"),
+        valor("Saídas"),
+        valor("Turnover"),
+      ]);
+    }
+    act(() => (document.activeElement as HTMLElement).blur());
+
+    // Tabela.
+    escolher(SERIE, "Ver como tabela");
+    const corpo = within(within(bloco(SERIE)).getByRole("table")).getAllByRole(
+      "rowgroup",
+    )[1]!;
+    const daTabela = within(corpo)
+      .getAllByRole("row")
+      .map((r) => [...r.querySelectorAll("td")].map((c) => c.textContent!));
+
+    // CSV.
+    const { texto } = await capturarDownload(() =>
+      escolher(SERIE, "Baixar CSV"),
+    );
+    const doCsv = linhasDoCsv(texto).slice(1);
+
+    expect(doGrafico).toHaveLength(11);
+    expect(daTabela).toHaveLength(11);
+    expect(doCsv).toHaveLength(11);
+    const comoNumero = (v: string) => (/indispon|—/.test(v) ? "sem fonte" : v);
+    for (let i = 0; i < 11; i += 1) {
+      const g = doGrafico[i]!.map(comoNumero);
+      expect(daTabela[i]!.map(comoNumero)).toEqual(g);
+      expect(doCsv[i]!.slice(1).map(comoNumero)).toEqual(g);
+    }
+    // Os números reais da série: janeiro 2/0, março 1/1, novembro 1/0.
+    expect(doGrafico[0]).toEqual(["indisponível", "2", "0", "indisponível"]);
+    expect(doGrafico[2]!.slice(1, 3)).toEqual(["1", "1"]);
+    expect(doGrafico[10]!.slice(1, 3)).toEqual(["1", "0"]);
+  });
+});
+
+describe("T207 — CSV real do quadro", () => {
+  it("arquivo com BOM, ponto e vírgula, cabeçalho claro, um mês por linha até hoje, empresa e ano no nome", async () => {
+    render(<Tela />);
+    await lido();
+    const { texto, nome, tipo, downloads } = await capturarDownload(() =>
+      escolher(SERIE, "Baixar CSV"),
+    );
+    expect(downloads).toBe(1);
+    expect(nome).toBe(
+      "quadro-de-colaboradores-empresa-sintetica-alfa-2026.csv",
+    );
+    expect(tipo).toBe("text/csv;charset=utf-8");
+    expect(texto.startsWith("\uFEFF")).toBe(true);
+    expect(texto.endsWith("\r\n")).toBe(true);
+    const linhas = linhasDoCsv(texto);
+    expect(linhas[0]).toEqual([
+      "Mês",
+      "Ativos no fim",
+      "Entradas",
+      "Saídas",
+      "Turnover",
+    ]);
+    expect(linhas.slice(1).map((l) => l[0])).toEqual([
+      "Janeiro de 2026",
+      "Fevereiro de 2026",
+      "Março de 2026",
+      "Abril de 2026",
+      "Maio de 2026",
+      "Junho de 2026",
+      "Julho de 2026",
+      "Agosto de 2026",
+      "Setembro de 2026",
+      "Outubro de 2026",
+      "Novembro de 2026",
+    ]);
+    expect(linhas[1]).toEqual(["Janeiro de 2026", "—", "2", "0", "—"]);
+    // Nada inventado: sem total, sem dezembro (ainda não chegou), sem 0% como
+    // ausência de dado e sem dado pessoal.
+    expect(linhas).toHaveLength(12);
+    expect(texto).not.toMatch(/Total|Dezembro|%/);
+    expect(texto).not.toMatch(/Pessoa sintética/);
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Arquivo quadro-de-colaboradores-empresa-sintetica-alfa-2026.csv baixado.",
+    );
+  });
+
+  it("ano passado: os doze meses do ano e o ano no nome; na vista de tabela, o mesmo CSV", async () => {
+    servidorDeMovimentacoes([
+      mov("admissao", "2025-12-31"),
+      mov("desligamento", "2025-02-01"),
+    ]);
+    render(<Tela ano={2025} vistas={EM_TABELA} />);
+    await lido();
+    const { texto, nome } = await capturarDownload(() =>
+      escolher(SERIE, "Baixar CSV"),
+    );
+    expect(nome).toBe(
+      "quadro-de-colaboradores-empresa-sintetica-alfa-2025.csv",
+    );
+    const linhas = linhasDoCsv(texto);
+    expect(linhas).toHaveLength(13);
+    expect(linhas[2]).toEqual(["Fevereiro de 2025", "—", "0", "1", "—"]);
+    expect(linhas[12]).toEqual(["Dezembro de 2025", "—", "1", "0", "—"]);
+  });
+
+  it("outra empresa: o nome dela no arquivo", async () => {
+    render(<Tela empresaAtiva={{ nome: "Empresa Sintética Beta" }} />);
+    await lido();
+    const { nome } = await capturarDownload(() =>
+      escolher(SERIE, "Baixar CSV"),
+    );
+    expect(nome).toBe(
+      "quadro-de-colaboradores-empresa-sintetica-beta-2026.csv",
+    );
+  });
+});
+
+describe("T207 — Exportar PDF (impressão do navegador)", () => {
+  it("imprime só o quadro, na vista escolhida, e desfaz tudo depois da impressão", async () => {
+    render(<Tela vistas={EM_TABELA} />);
+    await lido();
+    const quadro = bloco(SERIE);
+    let naHora: {
+      classe: boolean;
+      bloco: boolean;
+      foraResumo: boolean;
+      foraDistribuicao: boolean;
+      tabela: boolean;
+      cabecalho: string | null;
+    } | null = null;
+    const imprimir = vi.spyOn(window, "print").mockImplementation(() => {
+      naHora = {
+        classe: document.documentElement.classList.contains(
+          "evolli-imprimindo-bloco",
+        ),
+        bloco: quadro.hasAttribute("data-bloco-impresso"),
+        foraResumo: bloco("Resumo").hasAttribute("data-fora-da-impressao"),
+        foraDistribuicao: bloco("Distribuição do time")
+          .closest(".dashboard__grade")!
+          .hasAttribute("data-fora-da-impressao"),
+        tabela: within(quadro).queryByRole("table") !== null,
+        cabecalho:
+          quadro.querySelector(".dashboard__so-impressao")?.textContent ?? null,
+      };
+    });
+    escolher(SERIE, "Exportar PDF");
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Impressão aberta só com o Quadro de colaboradores. No destino, escolha Salvar como PDF.",
+    );
+    await waitFor(() => expect(imprimir).toHaveBeenCalledTimes(1));
+    expect(naHora).toEqual({
+      classe: true,
+      bloco: true,
+      foraResumo: true,
+      foraDistribuicao: true,
+      tabela: true,
+      cabecalho:
+        "Empresa Sintética Alfa · Quadro de colaboradores · Janeiro a Novembro de 2026",
+    });
+    // O próprio quadro e o caminho até ele ficam na impressão.
+    let no: HTMLElement | null = quadro;
+    while (no) {
+      expect(no).not.toHaveAttribute("data-fora-da-impressao");
+      no = no.parentElement;
+    }
+
+    act(() => {
+      window.dispatchEvent(new Event("afterprint"));
+    });
+    expect(document.querySelector("[data-fora-da-impressao]")).toBeNull();
+    expect(document.querySelector("[data-bloco-impresso]")).toBeNull();
+    expect(
+      document.documentElement.classList.contains("evolli-imprimindo-bloco"),
+    ).toBe(false);
+    imprimir.mockRestore();
+  });
+
+  it("tela desmontada antes de a impressão abrir: nada é impresso nem marcado", async () => {
+    const imprimir = vi.spyOn(window, "print").mockImplementation(() => {});
+    const { unmount } = render(<Tela />);
+    await lido();
+    escolher(SERIE, "Exportar PDF");
+    unmount();
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 20));
+    });
+    expect(imprimir).not.toHaveBeenCalled();
+    expect(document.querySelector("[data-fora-da-impressao]")).toBeNull();
+    imprimir.mockRestore();
+  });
+});
+
+describe("T207 — Distribuição e Tempo de casa: gráfico, tabela e exportações", () => {
+  it("distribuição em tabela: os mesmos grupos do gráfico, com o grupo neutro e sem nome de grupo pequeno", async () => {
+    render(<Tela />);
+    await lido();
+    const doGrafico = within(bloco("Distribuição do time"))
+      .getAllByRole("listitem")
+      .map((li) => li.textContent);
+    escolher("Distribuição do time", "Ver como tabela");
+    const tabela = within(bloco("Distribuição do time")).getByRole("table", {
+      name: "Pessoas ativas hoje por departamento",
+    });
+    const linhas = within(tabela)
+      .getAllByRole("row")
+      .map((r) => [...r.querySelectorAll("th, td")].map((c) => c.textContent));
+    expect(linhas).toEqual([
+      ["Grupo", "Pessoas", "Percentual"],
+      ["Operações", "5", "50%"],
+      ["Vendas", "3", "30%"],
+      [GRUPO_NEUTRO_DO_TESTE, "2", "20%"],
+      ["Total", "10", "100%"],
+    ]);
+    expect(doGrafico).toEqual([
+      "Operações5 pessoas · 50%",
+      "Vendas3 pessoas · 30%",
+      `${GRUPO_NEUTRO_DO_TESTE}2 pessoas · 20%`,
+    ]);
+    expect(
+      within(bloco("Distribuição do time")).queryByRole("list"),
+    ).toBeNull();
+    expect(screen.queryByText(/Jurídico/)).toBeNull();
+  });
+
+  it("distribuição em CSV: os mesmos grupos, sem nome de pessoa nem de grupo pequeno", async () => {
+    render(<Tela />);
+    await lido();
+    const { texto, nome } = await capturarDownload(() =>
+      escolher("Distribuição do time", "Baixar CSV"),
+    );
+    expect(nome).toBe("distribuicao-do-time-empresa-sintetica-alfa-hoje.csv");
+    expect(linhasDoCsv(texto)).toEqual([
+      ["Grupo", "Pessoas", "Percentual"],
+      ["Operações", "5", "50%"],
+      ["Vendas", "3", "30%"],
+      [GRUPO_NEUTRO_DO_TESTE, "2", "20%"],
+    ]);
+    expect(texto).not.toMatch(/Jurídico|Pessoa sintética/);
+  });
+
+  it("tempo de casa em tabela e em CSV: as mesmas faixas agrupadas do gráfico", async () => {
+    render(<Tela />);
+    await lido();
+    escolher("Tempo de casa", "Ver como tabela");
+    const tabela = within(bloco("Tempo de casa")).getByRole("table", {
+      name: "Pessoas ativas hoje por tempo de casa",
+    });
+    expect(
+      within(tabela)
+        .getAllByRole("row")
+        .map((r) =>
+          [...r.querySelectorAll("th, td")].map((c) => c.textContent),
+        ),
+    ).toEqual([
+      ["Faixa de tempo de casa", "Pessoas", "Percentual"],
+      ["Menos de 1 ano", "4", "40%"],
+      ["1 ano ou mais", "6", "60%"],
+      ["Total", "10", "100%"],
+    ]);
+    expect(bloco("Tempo de casa")).toHaveTextContent(
+      "1 ano e 6 meses na mediana",
+    );
+    const { texto } = await capturarDownload(() =>
+      escolher("Tempo de casa", "Baixar CSV"),
+    );
+    expect(linhasDoCsv(texto)).toEqual([
+      ["Faixa de tempo de casa", "Pessoas", "Percentual"],
+      ["Menos de 1 ano", "4", "40%"],
+      ["1 ano ou mais", "6", "60%"],
+    ]);
+  });
+
+  it("imprimir a distribuição: só ela vai para a impressão", async () => {
+    render(<Tela />);
+    await lido();
+    const alvo = bloco("Distribuição do time");
+    let soEla = false;
+    const imprimir = vi.spyOn(window, "print").mockImplementation(() => {
+      soEla =
+        alvo.hasAttribute("data-bloco-impresso") &&
+        bloco("eNPS").hasAttribute("data-fora-da-impressao") &&
+        bloco(SERIE).hasAttribute("data-fora-da-impressao");
+    });
+    escolher("Distribuição do time", "Exportar PDF");
+    await waitFor(() => expect(imprimir).toHaveBeenCalledTimes(1));
+    expect(soEla).toBe(true);
+    act(() => {
+      window.dispatchEvent(new Event("afterprint"));
+    });
+    expect(document.querySelector("[data-fora-da-impressao]")).toBeNull();
+    imprimir.mockRestore();
+  });
+
+  it("menos de 3 pessoas, teto ou falha: sem menu nos blocos do time", async () => {
+    servidorDeAtivos(TIME_PADRAO().slice(0, 2));
+    render(<Tela />);
+    await lido();
+    for (const nome of ["Distribuição do time", "Tempo de casa"]) {
+      expect(
+        within(bloco(nome)).queryByRole("button", { name: /^Ações/ }),
+      ).toBeNull();
+    }
+  });
+});
+
+describe("T207 — refino em 375 px (CSS)", () => {
+  const css = () =>
+    readFileSync("src/screens/dashboard/DashboardScreen.css", "utf8");
+  const regra = (seletor: string) => {
+    const escapado = seletor.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return [
+      ...css().matchAll(new RegExp(`(^|\\n)${escapado}\\s*\\{([^}]*)\\}`, "g")),
+    ]
+      .map((m) => m[2])
+      .join("\n");
+  };
+
+  it("menu: dentro do bloco, abaixo do cabeçalho fixo (camada baixa), largura limitada à tela, alvos de 44 px", () => {
+    const menu = regra(".dashboard__menu");
+    expect(menu).toMatch(/position:\s*absolute/);
+    expect(menu).toMatch(/right:\s*0/);
+    expect(menu).toMatch(/z-index:\s*5;/);
+    expect(menu).toMatch(/max-width:\s*min\(20rem,\s*calc\(100vw/);
+    expect(menu).toMatch(/scroll-margin-top:\s*calc\(var\(--topbar-altura/);
+    expect(regra(".dashboard__menu-item")).toMatch(
+      /min-height:\s*var\(--touch-target\)/,
+    );
+    expect(regra(".dashboard__botao-acoes")).toMatch(
+      /min-width:\s*var\(--touch-target\)/,
+    );
+  });
+
+  it("painel de informação: preso ao cabeçalho do bloco, à esquerda, nunca mais largo que o bloco", () => {
+    expect(regra(".dashboard__bloco-cabeca")).toMatch(/position:\s*relative/);
+    const painel = regra(".dashboard__info-painel");
+    expect(painel).toMatch(/position:\s*absolute/);
+    expect(painel).toMatch(/left:\s*0/);
+    expect(painel).toMatch(/max-width:\s*min\(28rem,\s*100%\)/);
+    expect(painel).toMatch(/z-index:\s*4;/);
+  });
+
+  it("título da tela fora da vista onde a barra do shell mostra o nome (acima de 640 px); visível abaixo", () => {
+    const bloco = css().match(
+      /@media \(min-width: 641px\) \{\s*\.dashboard__titulo \{([^}]*)\}/,
+    );
+    expect(bloco).not.toBeNull();
+    expect(bloco![1]).toMatch(/position:\s*absolute/);
+    expect(bloco![1]).toMatch(/clip:\s*rect\(0 0 0 0\)/);
+    expect(bloco![1]).not.toMatch(/display:\s*none|visibility:\s*hidden/);
+    // O mesmo corte do shell: a barra esconde o nome em até 640 px.
+    expect(readFileSync("src/app/app-shell.css", "utf8")).toMatch(
+      /@media \(max-width: 640px\) \{[^@]*\.app-shell__tela-atual \{\s*display: none;/,
+    );
+  });
+
+  it("tabela do quadro rola no próprio quadro; impressão esconde menu e informação", () => {
+    expect(regra(".dashboard__quadro")).toMatch(/overflow-x:\s*auto/);
+    expect(css()).toMatch(
+      /\[data-bloco-impresso\] \.dashboard__sem-impressao,[\s\S]*display:\s*none !important/,
+    );
+    expect(css()).toMatch(
+      /\.evolli-imprimindo-bloco \[data-fora-da-impressao\]\s*\{\s*display:\s*none !important;/,
+    );
+  });
+});
+
+describe("T207 — hora da leitura sem repetição", () => {
+  it("a hora da leitura aparece uma vez só, junto de Atualizar — não também no Resumo", async () => {
+    render(<Tela />);
+    await lido();
+    const visiveis = [...document.querySelectorAll<HTMLElement>(".dashboard *")]
+      .filter((no) => !no.closest(".dashboard__so-leitor"))
+      .filter((no) =>
+        [...no.childNodes].some(
+          (filho) =>
+            filho.nodeType === Node.TEXT_NODE &&
+            /lidos? em/i.test(filho.textContent ?? ""),
+        ),
+      );
+    expect(visiveis.map((no) => no.textContent)).toEqual([
+      expect.stringMatching(/^Lido em \d{2}\/\d{2}\/\d{4} às \d{2}:\d{2}$/),
+    ]);
+    expect(within(bloco("Resumo")).queryByText(/lido/i)).toBeNull();
   });
 });
