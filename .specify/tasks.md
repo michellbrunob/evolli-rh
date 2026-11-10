@@ -3299,9 +3299,10 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         pelo Hub e dica do botão de recolher atrás do cabeçalho) foram corrigidos dentro da
         entrega.
 
-104.  **T207 - Dashboard funcional e seletor de empresas (preparação)**
-      - **Estado:** **em preparação**. Branch `codex/t207-dashboard-seletor-empresas`, a partir
-        do squash `512d24914519fed335a900b18cab690832e8f121` (T206 integrada, PR #199).
+104.  **T207 - Dashboard funcional e seletor de empresas**
+      - **Estado:** **em implementação local**. Branch `codex/t207-dashboard-seletor-empresas`,
+        a partir do squash `512d24914519fed335a900b18cab690832e8f121` (T206 integrada, PR #199).
+        A preparação (dossiê e decisões) foi feita antes, sem código de produto.
       - **Objetivo:** levantar, com evidência no código, nos contratos, no RBAC e nas decisões,
         como completar o Dashboard como produto funcional (Visão Geral e as abas Pessoas,
         Movimentação, Remuneração e Clima e saúde, sem aba decorativa nem métrica sem dado
@@ -3309,8 +3310,17 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         [dossiê](../docs/decisions/t207-dossie-dashboard-seletor-empresas.md): inventário de
         dados reais, lacunas, riscos, escopo, fora de escopo e decisões V-1 a V-6 e E-1 a E-4
         para aprovação antes da implementação.
-      - **Fora de escopo:** código de produto, API, schema, migration, RBAC, auditoria, seed,
-        Docker, dependências, lockfile, workflow, push, PR, promoção e merge.
+      - **Decisões aprovadas (2026-11-10):** V-1 a V-6, E-1 a E-4 e P-1, conforme a
+        recomendação (seção 13 do dossiê): cinco abas com rota (`#/dashboard?ano=AAAA` e
+        `#/dashboard/<aba>?ano=AAAA`); Visão Geral, Pessoas e Movimentação com dados reais;
+        turnover, absenteísmo e custo por pessoa como cards honestos, sem número; Remuneração e
+        Clima e saúde com estado de indisponibilidade; "Como calculamos" só nos indicadores
+        reais; seletor com iniciais, nome e código, lista "Empresas da conta" e busca acima de
+        8 empresas, sem documento fiscal nem ações de adicionar e gerenciar; paleta Evolli no
+        menu lateral, no Dashboard e no seletor.
+      - **Fora de escopo:** API, schema, migration, RBAC, auditoria, seed, Docker,
+        dependências, lockfile, workflow; turnover, absenteísmo, custo, salário, clima e ativos
+        históricos calculados; tela de empresas; mudança global de cor; promoção e merge.
 
 ## Regra obrigatória para as próximas tarefas
 

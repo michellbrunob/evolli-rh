@@ -12,14 +12,14 @@
   },
   "nextTask": {
     "id": "T207",
-    "status": "dashboard_seletor_empresas_em_preparacao",
-    "reason": "T206 integrada em main pela PR #199 (squash 512d24914519fed335a900b18cab690832e8f121), com a CI de push 3/3 verde (run 42823908545). A T207 prepara a decisao de completar o Dashboard como produto funcional (Visao Geral e as abas Pessoas, Movimentacao, Remuneracao e Clima e saude, sem aba decorativa nem metrica sem dado real) e de evoluir o seletor de empresa ativa (docs/decisions/t207-dossie-dashboard-seletor-empresas.md): inventario de dados reais, lacunas, riscos, escopo e decisoes V-1 a V-6 e E-1 a E-4. So preparacao: sem codigo de produto, API, banco, schema, migration, RBAC, auditoria, seed ou dependencia."
+    "status": "dashboard_seletor_empresas_em_implementacao",
+    "reason": "T206 integrada em main pela PR #199 (squash 512d24914519fed335a900b18cab690832e8f121), com a CI de push 3/3 verde (run 42823908545). A T207 implementa o Dashboard funcional e a evolucao do seletor de empresa ativa conforme as decisoes V-1 a V-6, E-1 a E-4 e P-1 aprovadas em 2026-11-10 (docs/decisions/t207-dossie-dashboard-seletor-empresas.md, secao 13): cinco abas com rota e ano compartilhado; Visao Geral, Pessoas e Movimentacao so com dados reais; turnover, absenteismo e custo por pessoa como cards honestos, sem numero; Remuneracao e Clima e saude com estado de indisponibilidade; seletor com lista Empresas da conta e busca acima de 8 empresas; paleta Evolli no menu lateral, no Dashboard e no seletor. So web e testes: sem API, banco, schema, migration, RBAC, auditoria, seed ou dependencia. Em implementacao local."
   },
   "openDeliveries": [
     {
       "id": "T207",
       "pullRequest": null,
-      "status": "dashboard_seletor_empresas_em_preparacao"
+      "status": "dashboard_seletor_empresas_em_implementacao"
     }
   ],
   "requiredArtifacts": [

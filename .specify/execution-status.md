@@ -3106,13 +3106,13 @@ squash `512d24914519fed335a900b18cab690832e8f121`, CI de push 3/3 verde, run
 42823908545); a única pendência administrativa era a sua convergência no Spec Kit,
 resolvida no primeiro commit da T207.
 
-## Dashboard funcional e seletor de empresas — T207 (em preparação)
+## Dashboard funcional e seletor de empresas — T207 (em implementação)
 
-| Tarefa | Estado            | Resultado principal                                                                                             |
-| ------ | ----------------- | --------------------------------------------------------------------------------------------------------------- |
-| T207   | **Em preparação** | Levantamento e decisões para completar o Dashboard como produto funcional e evoluir o seletor de empresa ativa. |
+| Tarefa | Estado                       | Resultado principal                                                                    |
+| ------ | ---------------------------- | -------------------------------------------------------------------------------------- |
+| T207   | **Em implementação** (local) | Dashboard funcional com cinco abas e dados reais, e seletor de empresa ativa evoluído. |
 
-**Escopo da preparação:** levantamento e preparação de decisão, no
+**Escopo da preparação (concluída):** levantamento e preparação de decisão, no
 [dossiê](../docs/decisions/t207-dossie-dashboard-seletor-empresas.md):
 
 - Dashboard: rota, permissões, empresa ativa, URL, troca de empresa, foco, teclado,
@@ -3124,8 +3124,18 @@ resolvida no primeiro commit da T207.
   tela; ações de adicionar e gerenciar empresas só com rota, permissão e produto reais;
 - decisões V-1 a V-6 (Dashboard) e E-1 a E-4 (seletor) para aprovação.
 
-**Fora de escopo:** código de produto, API, schema, migration, RBAC, auditoria, seed,
-Docker, dependências, lockfile, workflow, push, PR, promoção e merge.
+**Decisões aprovadas (2026-11-10):** V-1 a V-6, E-1 a E-4 e P-1, conforme a recomendação do
+dossiê (seção 13).
+
+**Escopo da implementação:** cinco abas com rota e ano compartilhado; Visão Geral, Pessoas e
+Movimentação só com dados reais; cards honestos para turnover, absenteísmo e custo por pessoa;
+Remuneração e Clima e saúde com estado de indisponibilidade; seletor de empresa com lista
+"Empresas da conta" e busca acima de 8 empresas; paleta Evolli no menu lateral, no Dashboard e no
+seletor.
+
+**Fora de escopo:** API, schema, migration, RBAC, auditoria, seed, Docker, dependências,
+lockfile, workflow; turnover, absenteísmo, custo, salário, clima e ativos históricos calculados;
+tela de empresas; mudança global de cor; promoção e merge.
 
 ## Próxima ação autorizável
 

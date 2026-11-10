@@ -2,7 +2,9 @@
 
 ## 1. Situação
 
-- **Estado:** em preparação. Só levantamento e decisões; nenhuma linha de código de produto.
+- **Estado:** em implementação local. As decisões V-1 a V-6, E-1 a E-4 e P-1 foram aprovadas
+  em 2026-11-10, conforme a recomendação (seção 13.1). A preparação (levantamento e decisões) foi
+  feita antes, sem código de produto; isso valeu só para aquela fase.
 - **Branch:** `codex/t207-dashboard-seletor-empresas`, a partir do squash
   `512d24914519fed335a900b18cab690832e8f121` (T206 integrada, PR #199).
 - **Fora desta preparação:** código de produto, API, schema, migration, RBAC, auditoria, seed,
@@ -210,6 +212,16 @@ exportação e IA.
 ## 13. Decisões para aprovação
 
 Cada decisão traz a recomendação primeiro.
+
+### 13.1 Aprovação (2026-11-10)
+
+A proprietária aprovou V-1 a V-6, E-1 a E-4 e P-1 **conforme a recomendação** abaixo. Na
+implementação: Pessoas mostra só a distribuição por tipo de vínculo; Movimentação mostra as
+quatro movimentações mensais efetivadas; o quadro mensal deixa claro que representa eventos do
+período, não pessoas ativas; a paleta Evolli vale só para o menu lateral, o Dashboard e o seletor;
+o seletor não mostra documento fiscal nem as ações de adicionar e gerenciar empresas.
+
+### 13.2 Decisões
 
 - **V-1 — recorte da primeira Visão Geral.**
   - **Recomendado (A):** cards de ativos (real), turnover, absenteísmo e custo (estados próprios),
