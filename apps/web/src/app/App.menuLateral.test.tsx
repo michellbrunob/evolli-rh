@@ -559,6 +559,44 @@ describe("T206 — celular: a gaveta continua a mesma", () => {
     expect(document.activeElement).toBe(recolherBotao);
   });
 
+  it("o navegador já tirou o foco no redimensionamento (CSS da gaveta): ainda assim vai ao equivalente", () => {
+    // No Chrome, a faixa some pelo CSS no próprio redimensionamento e o foco
+    // cai no body ANTES de o React saber do breakpoint.
+    render(<App papelDoAtor="rh" />);
+    const recolherBotao = botaoRecolher();
+    recolherBotao.focus();
+    act(() => {
+      recolherBotao.blur();
+      definirLarguraDaJanela(375);
+    });
+    const menu = screen.getByRole("button", { name: "Menu" });
+    expect(document.activeElement).toBe(menu);
+    act(() => {
+      menu.blur();
+      definirLarguraDaJanela(1280);
+    });
+    expect(document.activeElement).toBe(recolherBotao);
+  });
+
+  it("foco perdido em qualquer item da faixa vai ao Menu; fora da faixa, nada é movido", () => {
+    render(<App papelDoAtor="rh" />);
+    const jornada = screen.getByRole("button", { name: /^Jornada Visão/ });
+    jornada.focus();
+    act(() => {
+      jornada.blur();
+      definirLarguraDaJanela(375);
+    });
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "Menu" }),
+    );
+    act(() => definirLarguraDaJanela(1280));
+
+    const principal = screen.getByRole("main");
+    principal.focus();
+    act(() => definirLarguraDaJanela(375));
+    expect(document.activeElement).toBe(principal);
+  });
+
   it("desktop → celular → desktop: o trilho escolhido volta", () => {
     render(<App papelDoAtor="rh" />);
     recolher();
@@ -680,6 +718,16 @@ describe("T206 — contrato de CSS do shell", () => {
     expect(botao).toMatch(/height:\s*var\(--touch-target\)/);
     expect(regra(shellCss, ".dica-trilho")).toMatch(/position:\s*fixed/);
     expect(shellCss).not.toMatch(/translateX|translate3d/);
+  });
+
+  it("no celular todo item do menu tem alvo de 44px, inclusive os sub-itens", () => {
+    const celular = bloco(navCss, /@media\s*\(\s*max-width:\s*834px\s*\)\s*\{/);
+    expect(celular).toMatch(
+      /\.painel-nav__destino--sub\s*\{[^}]*min-height:\s*var\(--touch-target\)/,
+    );
+    expect(
+      regra(navCss, ".painel-nav__destino,\n.painel-nav__cabecalho"),
+    ).toMatch(/min-height:\s*var\(--touch-target\)/);
   });
 
   it("a transição de largura só existe sem redução de movimento", () => {

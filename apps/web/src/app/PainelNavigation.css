@@ -242,6 +242,14 @@
   color: var(--color-action);
 }
 
+/* No celular (gaveta), todo alvo tem 44px — inclusive os sub-itens, que no
+   desktop são mais baixos para caber a lista (T206). */
+@media (max-width: 834px) {
+  .painel-nav__destino--sub {
+    min-height: var(--touch-target);
+  }
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .painel-nav__seta {
     transition: transform 140ms ease;

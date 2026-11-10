@@ -914,20 +914,41 @@ export function App({
   const botaoMenuRef = useRef<HTMLButtonElement | null>(null);
   const botaoRecolherRef = useRef<HTMLButtonElement | null>(null);
 
-  // T206 — atravessar o breakpoint esconde um dos dois acionadores do menu:
-  // o "Recolher menu" sai no modo gaveta (`hidden`), o "Menu" sai no desktop
-  // (CSS). Se o foco estava no que sumiu, ele cairia no `body`; passa para o
-  // equivalente que acabou de aparecer. Efeito de layout: roda antes de o
-  // navegador desistir do elemento focado.
+  const sidebarRef = useRef<HTMLDivElement | null>(null);
+
+  // T206 — atravessar o breakpoint esconde parte do menu: no modo gaveta a
+  // faixa inteira some pelo CSS (e o "Recolher menu" ganha `hidden`); no
+  // desktop some o "Menu" (CSS). Se o foco estava no que sumiu, ele cairia no
+  // `body`; passa para a entrada equivalente que acabou de aparecer — o
+  // "Menu" para qualquer coisa da faixa, o "Recolher menu" para o "Menu".
+  //
+  // O navegador real tira o foco JÁ no redimensionamento, quando o CSS
+  // esconde o elemento — antes de o React saber do breakpoint. Por isso não
+  // basta perguntar quem está focado agora: guarda-se o último elemento que
+  // recebeu foco, e um foco perdido (no `body`) que estava num acionador
+  // conta como estando nele.
+  const ultimoFocadoRef = useRef<Element | null>(null);
+  useEffect(() => {
+    const registrar = (evento: FocusEvent) => {
+      ultimoFocadoRef.current = evento.target as Element | null;
+    };
+    document.addEventListener("focusin", registrar);
+    return () => document.removeEventListener("focusin", registrar);
+  }, []);
   useLayoutEffect(() => {
     const ativo = document.activeElement;
-    if (modoGaveta && ativo === botaoRecolherRef.current) {
+    const perdido = ativo === null || ativo === document.body;
+    const ultimo = ultimoFocadoRef.current;
+    const estavaEm = (regiao: HTMLElement | null) =>
+      regiao !== null &&
+      (regiao.contains(ativo) ||
+        (perdido && ultimo !== null && regiao.contains(ultimo)));
+    if (modoGaveta && estavaEm(sidebarRef.current)) {
       botaoMenuRef.current?.focus();
-    } else if (!modoGaveta && ativo === botaoMenuRef.current) {
+    } else if (!modoGaveta && estavaEm(botaoMenuRef.current)) {
       botaoRecolherRef.current?.focus();
     }
   }, [modoGaveta]);
-  const sidebarRef = useRef<HTMLDivElement | null>(null);
 
   // R1 — atravessar o breakpoint para o desktop desfaz o estado móvel por
   // completo: sem gaveta aberta, sem scrim, sem foco preso, sem semântica de
