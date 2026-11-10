@@ -479,3 +479,42 @@
     justify-content: flex-end;
   }
 }
+
+/* T207 — paleta Evolli na faixa lateral (P-1): estrutura em azul-marinho,
+   marca e textos claros. Escopado à faixa: o cabeçalho, o conteúdo e as
+   demais telas não mudam de cor. Contraste: branco e o texto suave sobre o
+   marinho passam de 4,5:1; o foco dentro da faixa é branco, porque o azul
+   de ação sobre o marinho fica abaixo de 3:1. */
+.app-shell__sidebar {
+  background: var(--evolli-marinho);
+  border-right-color: var(--evolli-marinho);
+  color: var(--evolli-sobre-marinho);
+  scrollbar-color: var(--evolli-marinho-divisa) var(--evolli-marinho);
+}
+
+.app-shell__sidebar .app-shell__marca {
+  color: var(--evolli-sobre-marinho);
+}
+
+.app-shell__sidebar .app-shell__marca-nome {
+  color: var(--evolli-sobre-marinho);
+}
+
+.app-shell__sidebar .app-shell__marca-tag {
+  color: var(--evolli-sobre-marinho-suave);
+}
+
+.app-shell__sidebar .app-shell__recolher {
+  color: var(--evolli-sobre-marinho-suave);
+}
+
+.app-shell__sidebar .app-shell__recolher:hover {
+  background: var(--evolli-marinho-realce);
+  color: var(--evolli-sobre-marinho);
+}
+
+.app-shell__sidebar .app-shell__recolher:focus-visible,
+.app-shell__sidebar .painel-nav :focus-visible,
+.app-shell__sidebar .seletor-empresa__botao:focus-visible {
+  outline-color: var(--evolli-sobre-marinho);
+}

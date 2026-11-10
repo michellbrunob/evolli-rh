@@ -59,6 +59,25 @@
   --status-info-surface: #e9f2fb;
   --status-info-border: #bcd8f2;
 
+  /* T207 — paleta Evolli (P-1). Aplicada só ao menu lateral, ao Dashboard e
+     ao seletor de empresa; as demais telas seguem com os tokens acima.
+     Contraste conferido por par (teste de contrato): texto branco sobre o
+     marinho e sobre o azul; o verde-água NUNCA é cor de texto sobre branco
+     (fica abaixo de 3:1) — só destaque, sempre acompanhado de texto. */
+  --evolli-marinho: #0b2d5b;
+  --evolli-marinho-realce: #16407a; /* hover sobre o marinho */
+  --evolli-marinho-divisa: #2a4f86; /* filetes sobre o marinho */
+  --evolli-azul: #0066ff;
+  --evolli-azul-escuro: #0052cc; /* hover do azul */
+  --evolli-azul-suave: #eaf1ff; /* superfície de destaque */
+  --evolli-verde-agua: #00d4a3;
+  --evolli-verde-agua-escuro: #00a07a; /* barra de gráfico (3:1 no branco) */
+  --evolli-verde-agua-suave: #e1f9f2;
+  --evolli-sobre-marinho: #ffffff;
+  --evolli-sobre-marinho-suave: #c9d6ea; /* texto secundário no marinho */
+  --evolli-ardosia: #6b7c99; /* apoio neutro de gráfico */
+  --evolli-fundo: #f4f7fb; /* fundo neutro do Dashboard */
+
   /* Raios (grade fechada: sm / md / lg / pill). */
   --radius-sm: 8px;
   --radius-md: 11px;

@@ -282,7 +282,9 @@ describe("T205 — atalhos para a listagem (D-5)", () => {
     montar("#/dashboard?ano=2025");
     await esperarLeitura(2025);
     const entradas = window.history.length;
-    const link = screen.getByRole("link", { name: /Pessoas ativas hoje/ });
+    const link = screen.getByRole("link", {
+      name: "Abrir na listagem de Colaboradores: pessoas ativas",
+    });
     link.focus();
     fireEvent.click(link);
     await screen.findByRole("heading", { level: 1, name: "Colaboradores" });
@@ -309,13 +311,116 @@ describe("T205 — atalhos para a listagem (D-5)", () => {
     );
     navegadorVaiPara("#/dashboard?ano=2026");
     await esperarLeitura(2026);
-    fireEvent.click(
-      screen.getByRole("link", { name: /Pessoas em admissão hoje/ }),
-    );
+    fireEvent.click(screen.getByRole("link", { name: /^Em admissão/ }));
     await waitFor(() =>
       expect(window.location.hash).toBe(
         "#/pessoas/colaboradores?aba=em-admissao",
       ),
     );
+  });
+});
+
+describe("T207 — abas do Dashboard no shell (V-3, V-4)", () => {
+  const aba = (nome: string) =>
+    within(
+      screen.getByRole("tablist", { name: "Seções do Dashboard" }),
+    ).getByRole("tab", { name: nome });
+
+  it.each([
+    ["#/dashboard/pessoas?ano=2024", "Pessoas"],
+    ["#/dashboard/movimentacao?ano=2024", "Movimentação"],
+    ["#/dashboard/remuneracao?ano=2024", "Remuneração"],
+    ["#/dashboard/clima-e-saude?ano=2024", "Clima e saúde"],
+  ])("recarga em %s abre a aba e o ano da URL", async (rota, nome) => {
+    const entradas = window.history.length;
+    montar(rota);
+    expect(await screen.findByRole("tab", { name: nome })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(window.location.hash).toBe(rota);
+    expect(window.history.length).toBe(entradas);
+    expect(screen.getByRole("combobox", { name: "Ano" })).toHaveValue("2024");
+  });
+
+  it.each([
+    ["#/dashboard/inexistente?ano=2024", "#/dashboard?ano=2024"],
+    ["#/dashboard/visao-geral?ano=2024", "#/dashboard?ano=2024"],
+    ["#/dashboard/pessoas?ano=2099", "#/dashboard/pessoas?ano=2026"],
+  ])(
+    "aba ou ano inválido (%s): corrigido no lugar, sem entrada nova",
+    async (rota, certa) => {
+      window.history.replaceState(null, "", `/${rota}`);
+      const entradas = window.history.length;
+      render(<App papelDoAtor="rh" empresaAtiva={EMPRESA} />);
+      await waitFor(() => expect(window.location.hash).toBe(certa));
+      expect(window.history.length).toBe(entradas);
+    },
+  );
+
+  it("trocar de aba empilha no mesmo ano; voltar e avançar percorrem as abas", async () => {
+    montar("#/dashboard?ano=2025");
+    await esperarLeitura(2025);
+    const entradas = window.history.length;
+    fireEvent.click(aba("Movimentação"));
+    await waitFor(() =>
+      expect(window.location.hash).toBe("#/dashboard/movimentacao?ano=2025"),
+    );
+    expect(window.history.length).toBe(entradas + 1);
+    expect(aba("Movimentação")).toHaveAttribute("aria-selected", "true");
+    // O ano é compartilhado: trocar de ano na aba mantém a aba.
+    fireEvent.click(screen.getByRole("button", { name: "Ano anterior" }));
+    await waitFor(() =>
+      expect(window.location.hash).toBe("#/dashboard/movimentacao?ano=2024"),
+    );
+
+    navegadorVaiPara("#/dashboard/movimentacao?ano=2025");
+    await waitFor(() =>
+      expect(screen.getByRole("combobox", { name: "Ano" })).toHaveValue("2025"),
+    );
+    expect(aba("Movimentação")).toHaveAttribute("aria-selected", "true");
+    navegadorVaiPara("#/dashboard?ano=2025");
+    await waitFor(() =>
+      expect(aba("Visão Geral")).toHaveAttribute("aria-selected", "true"),
+    );
+  });
+
+  it("pelo menu, o Dashboard volta à Visão Geral no ano corrente", async () => {
+    montar("#/dashboard/pessoas?ano=2024");
+    await screen.findByRole("tab", { name: "Pessoas" });
+    const nav = screen.getByRole("navigation", { name: "Navegação do painel" });
+    fireEvent.click(
+      within(nav).getByRole("button", { name: /^Jornada Visão/ }),
+    );
+    await screen.findByRole("heading", { level: 1, name: "Visão do período" });
+    fireEvent.click(within(nav).getByRole("button", { name: /^Dashboard/ }));
+    await waitFor(() =>
+      expect(window.location.hash).toBe("#/dashboard?ano=2026"),
+    );
+    expect(aba("Visão Geral")).toHaveAttribute("aria-selected", "true");
+  });
+
+  it.each(["gestor", "colaborador", "admin_tecnico"])(
+    "%s: a rota de uma aba do Dashboard não monta o Dashboard",
+    async (papel) => {
+      montar("#/dashboard/pessoas?ano=2026", papel);
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 20));
+      });
+      expect(
+        screen.queryByRole("tablist", { name: "Seções do Dashboard" }),
+      ).toBeNull();
+      expect(window.location.hash).not.toMatch(/^#\/dashboard/);
+    },
+  );
+
+  it("master_tecnico sem empresa ativa: orientação em qualquer aba, sem abas nem consulta", async () => {
+    montar("#/dashboard/movimentacao?ano=2026", "master_tecnico", null);
+    expect(
+      await screen.findByText(
+        "Escolha uma empresa ativa no menu para ver o Dashboard.",
+      ),
+    ).toBeVisible();
+    expect(screen.queryByRole("tablist")).toBeNull();
   });
 });

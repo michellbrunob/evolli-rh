@@ -252,7 +252,7 @@ const botaoDaEmpresa = () =>
 
 async function abrirListaDeEmpresas() {
   fireEvent.click(await botaoDaEmpresa());
-  await screen.findByRole("list", { name: "Empresas autorizadas" });
+  await screen.findByRole("list", { name: "Empresas da conta" });
 }
 
 describe("T163/T189 — quem troca de empresa, e quem não troca", () => {
@@ -262,7 +262,7 @@ describe("T163/T189 — quem troca de empresa, e quem não troca", () => {
     expect(botao).toHaveTextContent("Empresa B");
     expect(botao).toHaveTextContent("Código EMPB");
     await abrirListaDeEmpresas();
-    const lista = screen.getByRole("list", { name: "Empresas autorizadas" });
+    const lista = screen.getByRole("list", { name: "Empresas da conta" });
     expect(
       [...lista.querySelectorAll(".seletor-empresa__opcao-nome")].map(
         (n) => n.textContent,

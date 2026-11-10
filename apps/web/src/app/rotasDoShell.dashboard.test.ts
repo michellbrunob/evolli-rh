@@ -21,16 +21,20 @@ const AGORA = new Date(2026, 10, 9, 12, 0, 0);
 
 describe("T205 — rota do Dashboard", () => {
   it("sem ano: o ano corrente do navegador", () => {
-    expect(dashboardDaRota("#/dashboard", AGORA)).toEqual({ ano: 2026 });
+    expect(dashboardDaRota("#/dashboard", AGORA)).toEqual({
+      aba: "visao-geral",
+      ano: 2026,
+    });
   });
 
   it("com ano válido: o ano pedido", () => {
     expect(dashboardDaRota("#/dashboard?ano=2024", AGORA)).toEqual({
+      aba: "visao-geral",
       ano: 2024,
     });
     expect(
       dashboardDaRota(`#/dashboard?ano=${ANO_MINIMO_DO_DASHBOARD}`, AGORA),
-    ).toEqual({ ano: ANO_MINIMO_DO_DASHBOARD });
+    ).toEqual({ aba: "visao-geral", ano: ANO_MINIMO_DO_DASHBOARD });
   });
 
   it.each([
@@ -41,7 +45,10 @@ describe("T205 — rota do Dashboard", () => {
     "#/dashboard?ano=",
     "#/dashboard?outra=1",
   ])("ano ausente, inválido ou futuro (%s) vira o corrente", (rota) => {
-    expect(dashboardDaRota(rota, AGORA)).toEqual({ ano: 2026 });
+    expect(dashboardDaRota(rota, AGORA)).toEqual({
+      aba: "visao-geral",
+      ano: 2026,
+    });
   });
 
   it("outra rota não é do Dashboard", () => {
@@ -56,6 +63,50 @@ describe("T205 — rota do Dashboard", () => {
     expect(destinoDaRota("#/dashboard")).toBe("dashboard");
     // A troca de empresa devolve ao próprio Dashboard (remontado).
     expect(destinoAposTrocaDeEmpresa("dashboard")).toBe("dashboard");
+  });
+
+  it.each([
+    ["pessoas", "#/dashboard/pessoas?ano=2024"],
+    ["movimentacao", "#/dashboard/movimentacao?ano=2024"],
+    ["remuneracao", "#/dashboard/remuneracao?ano=2024"],
+    ["clima-e-saude", "#/dashboard/clima-e-saude?ano=2024"],
+  ] as const)("T207 — aba %s: caminho próprio e o mesmo ano", (aba, rota) => {
+    expect(dashboardDaRota(rota, AGORA)).toEqual({ aba, ano: 2024 });
+    expect(rotaDoDashboard(2024, aba)).toBe(rota);
+    expect(destinoDaRota(rota)).toBe("dashboard");
+  });
+
+  it.each([
+    "#/dashboard/inexistente?ano=2024",
+    "#/dashboard/visao-geral?ano=2024",
+    "#/dashboard/?ano=2024",
+    "#/dashboard/PESSOAS?ano=2024",
+  ])(
+    "T207 — aba desconhecida (%s) vira a Visão Geral, com o ano mantido",
+    (rota) => {
+      expect(dashboardDaRota(rota, AGORA)).toEqual({
+        aba: "visao-geral",
+        ano: 2024,
+      });
+    },
+  );
+
+  it("T207 — aba válida com ano inválido: a aba fica, o ano vira o corrente", () => {
+    expect(dashboardDaRota("#/dashboard/pessoas?ano=2099", AGORA)).toEqual({
+      aba: "pessoas",
+      ano: 2026,
+    });
+    expect(dashboardDaRota("#/dashboard/pessoas", AGORA)).toEqual({
+      aba: "pessoas",
+      ano: 2026,
+    });
+  });
+
+  it("T207 — a Visão Geral continua sem caminho (compatível com a T205)", () => {
+    expect(rotaDoDashboard(2025, "visao-geral")).toBe("#/dashboard?ano=2025");
+    expect(dashboardDaRota("#/dashboard/pessoasx?ano=2024", AGORA)?.aba).toBe(
+      "visao-geral",
+    );
   });
 
   it("intervalo consultável: do mínimo até o ano corrente", () => {

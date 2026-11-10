@@ -6,6 +6,7 @@ import { readFileSync } from "node:fs";
 import {
   act,
   fireEvent,
+  within,
   render,
   screen,
   waitFor,
@@ -114,7 +115,7 @@ const opcao = (nome: string) =>
 async function abrirLista() {
   const botao = await screen.findByRole("button", { name: /Empresa ativa/ });
   fireEvent.click(botao);
-  await screen.findByRole("list", { name: "Empresas autorizadas" });
+  await screen.findByRole("list", { name: "Empresas da conta" });
 }
 
 beforeEach(() => {
@@ -294,9 +295,9 @@ describe("T189 — aberto: lista, atual marcada, teclado", () => {
     const botao = await screen.findByRole("button", { name: /Empresa ativa/ });
     botao.focus();
     fireEvent.keyDown(botao, { key: "ArrowDown" });
-    await screen.findByRole("list", { name: "Empresas autorizadas" });
+    await screen.findByRole("list", { name: "Empresas da conta" });
     expect(document.activeElement).toBe(opcao("Empresa Alfa"));
-    const lista = screen.getByRole("list", { name: "Empresas autorizadas" });
+    const lista = screen.getByRole("list", { name: "Empresas da conta" });
     fireEvent.keyDown(lista, { key: "ArrowDown" });
     expect(document.activeElement).toBe(opcao("Empresa Beta"));
     fireEvent.keyDown(lista, { key: "End" });
@@ -511,6 +512,121 @@ describe("T189 — o navegador não é autoridade, e o visual é do Evolli", () 
     // O painel abre no fluxo (dentro da gaveta), nunca flutuando por cima.
     expect(bloco(".seletor-empresa__painel")).not.toMatch(
       /position: (absolute|fixed)/,
+    );
+  });
+});
+
+describe("T207 — lista Empresas da conta e busca (E-1, E-3)", () => {
+  /** `n` empresas sintéticas, com a ALFA (a ativa) entre elas. */
+  function empresas(n: number) {
+    return [
+      ALFA,
+      ...Array.from({ length: n - 1 }, (_, i) => ({
+        id: `empresa-sintetica-${i + 2}`,
+        codigo: `E${String(i + 2).padStart(2, "0")}`,
+        nome: `Empresa Sintetica ${String(i + 2).padStart(2, "0")}`,
+      })),
+    ];
+  }
+
+  it("cada empresa com iniciais (decorativas), nome e código; a atual marcada por texto e aria-current", async () => {
+    montar();
+    await abrirLista();
+    const lista = screen.getByRole("list", { name: "Empresas da conta" });
+    const itens = within(lista).getAllByRole("button");
+    expect(itens).toHaveLength(2);
+    const monograma = itens[0]!.querySelector(".seletor-empresa__monograma")!;
+    expect(monograma).toHaveAttribute("aria-hidden", "true");
+    expect(monograma).toHaveTextContent("EA");
+    expect(opcao("Empresa Alfa")).toHaveAttribute("aria-current", "true");
+    expect(opcao("Empresa Alfa")).toHaveTextContent("Atual");
+    expect(opcao("Empresa Beta")).not.toHaveAttribute("aria-current");
+  });
+
+  it("até 8 empresas: sem busca, e o foco vai à empresa atual", async () => {
+    vi.mocked(listarEmpresasDoContexto).mockResolvedValue(empresas(8));
+    montar();
+    await abrirLista();
+    expect(screen.queryByRole("searchbox")).toBeNull();
+    expect(opcao("Empresa Alfa")).toHaveFocus();
+  });
+
+  it("mais de 8: busca rotulada recebe o foco, filtra nome e código, anuncia a contagem", async () => {
+    vi.mocked(listarEmpresasDoContexto).mockResolvedValue(empresas(9));
+    montar();
+    await abrirLista();
+    const busca = screen.getByRole("searchbox", {
+      name: "Buscar empresa por nome ou código",
+    });
+    expect(busca).toHaveFocus();
+    const lista = screen.getByRole("list", { name: "Empresas da conta" });
+    expect(within(lista).getAllByRole("button")).toHaveLength(9);
+
+    fireEvent.change(busca, { target: { value: "sintetica 0" } });
+    expect(within(lista).getAllByRole("button")).toHaveLength(8);
+    expect(screen.getByText("8 empresas encontradas.")).toBeInTheDocument();
+
+    fireEvent.change(busca, { target: { value: "e05" } });
+    expect(
+      within(lista)
+        .getAllByRole("button")
+        .map((b) => b.textContent),
+    ).toEqual(["ESEmpresa Sintetica 05Código E05"]);
+    expect(screen.getByText("1 empresa encontrada.")).toBeInTheDocument();
+
+    fireEvent.change(busca, { target: { value: "nada disso" } });
+    expect(within(lista).queryAllByRole("button")).toHaveLength(0);
+    expect(screen.getByText("Nenhuma empresa encontrada.")).toBeInTheDocument();
+  });
+
+  it("da busca, seta para baixo vai à lista; Esc fecha, limpa a busca e devolve o foco ao botão", async () => {
+    vi.mocked(listarEmpresasDoContexto).mockResolvedValue(empresas(10));
+    montar();
+    await abrirLista();
+    const busca = screen.getByRole("searchbox");
+    fireEvent.change(busca, { target: { value: "sintetica" } });
+    fireEvent.keyDown(busca, { key: "ArrowDown" });
+    expect(opcao("Empresa Sintetica 02")).toHaveFocus();
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(botaoDaEmpresa()).toHaveFocus();
+    expect(botaoDaEmpresa()).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(botaoDaEmpresa());
+    expect(screen.getByRole("searchbox")).toHaveValue("");
+  });
+
+  it("nenhuma ação de adicionar ou gerenciar empresas existe (sem tela, rota nem permissão)", async () => {
+    vi.mocked(listarEmpresasDoContexto).mockResolvedValue(empresas(10));
+    montar({ papelDoAtor: "master_tecnico" });
+    await abrirLista();
+    expect(
+      screen.queryByRole("button", {
+        name: /adicionar|gerenciar|nova empresa/i,
+      }),
+    ).toBeNull();
+    expect(screen.queryByRole("link")).toBeNull();
+    expect(
+      screen.queryByText(/adicionar empresa|gerenciar empresas/i),
+    ).toBeNull();
+  });
+
+  it("CSS: busca e opções com alvo de 44 px, foco visível e a paleta Evolli no monograma", () => {
+    const css = readFileSync("src/app/SeletorEmpresaAtiva.css", "utf8");
+    const regra = (seletor: string) => {
+      const inicio = css.lastIndexOf(`\n${seletor} {`);
+      expect(inicio).toBeGreaterThanOrEqual(0);
+      return css.slice(inicio, css.indexOf("}", inicio));
+    };
+    expect(regra(".seletor-empresa__busca-campo")).toContain(
+      "min-height: var(--touch-target)",
+    );
+    expect(regra(".seletor-empresa__opcao")).toContain(
+      "min-height: var(--touch-target)",
+    );
+    expect(regra(".seletor-empresa__monograma")).toContain(
+      "background: var(--evolli-azul)",
+    );
+    expect(css).toMatch(
+      /\.seletor-empresa__opcao:focus-visible[\s\S]*?outline: var\(--focus-width\) solid var\(--evolli-azul\)/,
     );
   });
 });

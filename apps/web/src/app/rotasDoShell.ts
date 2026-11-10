@@ -324,29 +324,84 @@ export function anoDoDashboardValido(
 }
 
 /**
+ * T207 — as abas do Dashboard (V-3, V-4). A Visão Geral fica na rota da T205
+ * (`#/dashboard?ano=AAAA`); as demais levam o próprio caminho
+ * (`#/dashboard/<aba>?ano=AAAA`). O ano é um só para todas as abas.
+ */
+export const ABAS_DO_DASHBOARD = [
+  "visao-geral",
+  "pessoas",
+  "movimentacao",
+  "remuneracao",
+  "clima-e-saude",
+] as const;
+export type AbaDoDashboard = (typeof ABAS_DO_DASHBOARD)[number];
+export const ABA_INICIAL_DO_DASHBOARD: AbaDoDashboard = "visao-geral";
+
+/** Prefixos da rota do Dashboard: com consulta e com caminho de aba. */
+const PREFIXO_DA_CONSULTA = ROTA_DO_DASHBOARD + "?";
+const PREFIXO_DA_ABA = ROTA_DO_DASHBOARD + "/";
+
+export function abaDoDashboardValida(valor: string): valor is AbaDoDashboard {
+  return (ABAS_DO_DASHBOARD as readonly string[]).includes(valor);
+}
+
+/** T205/T207 — o que a rota do Dashboard pede: a aba e o ano. */
+export interface RotaDoDashboard {
+  readonly aba: AbaDoDashboard;
+  readonly ano: number;
+}
+
+/**
  * T205 — o ano que a rota do Dashboard pede, ou `null` se o fragmento não é
  * a rota do Dashboard. Ano ausente, malformado, anterior ao mínimo ou futuro
  * vira o ano corrente (a URL é corrigida no lugar por quem exibe).
+ * T207 — e a aba: caminho desconhecido vira a Visão Geral, também corrigido
+ * no lugar. `#/dashboardx` não é a rota do Dashboard.
  */
 export function dashboardDaRota(
   fragmento: string,
   agora: Date = new Date(),
-): { readonly ano: number } | null {
-  if (fragmento === ROTA_DO_DASHBOARD) return { ano: anoCorrente(agora) };
-  if (!fragmento.startsWith(`${ROTA_DO_DASHBOARD}?`)) return null;
-  const params = new URLSearchParams(
-    fragmento.slice(ROTA_DO_DASHBOARD.length + 1),
-  );
-  const texto = params.get("ano") ?? "";
+): RotaDoDashboard | null {
+  let resto: string;
+  if (fragmento === ROTA_DO_DASHBOARD) {
+    resto = "";
+  } else if (
+    fragmento.startsWith(PREFIXO_DA_CONSULTA) ||
+    fragmento.startsWith(PREFIXO_DA_ABA)
+  ) {
+    resto = fragmento.slice(ROTA_DO_DASHBOARD.length);
+  } else {
+    return null;
+  }
+  let segmento = "";
+  let consulta = "";
+  if (resto.startsWith("/")) {
+    const interrogacao = resto.indexOf("?");
+    segmento = interrogacao < 0 ? resto.slice(1) : resto.slice(1, interrogacao);
+    consulta = interrogacao < 0 ? "" : resto.slice(interrogacao + 1);
+  } else if (resto.startsWith("?")) {
+    consulta = resto.slice(1);
+  }
+  const texto = new URLSearchParams(consulta).get("ano") ?? "";
   const ano = /^[0-9]{4}$/.test(texto) ? Number(texto) : NaN;
   return {
+    aba: abaDoDashboardValida(segmento) ? segmento : ABA_INICIAL_DO_DASHBOARD,
     ano: anoDoDashboardValido(ano, agora) ? ano : anoCorrente(agora),
   };
 }
 
-/** T205 — o endereço do Dashboard: sempre com o ano, na forma canônica. */
-export function rotaDoDashboard(ano: number): string {
-  return `${ROTA_DO_DASHBOARD}?ano=${ano}`;
+/**
+ * T205 — o endereço do Dashboard: sempre com o ano, na forma canônica.
+ * T207 — a Visão Geral sem caminho; as demais abas com o próprio.
+ */
+export function rotaDoDashboard(
+  ano: number,
+  aba: AbaDoDashboard = ABA_INICIAL_DO_DASHBOARD,
+): string {
+  return aba === ABA_INICIAL_DO_DASHBOARD
+    ? `${ROTA_DO_DASHBOARD}?ano=${ano}`
+    : `${ROTA_DO_DASHBOARD}/${aba}?ano=${ano}`;
 }
 
 /**

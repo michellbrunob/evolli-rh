@@ -1612,7 +1612,7 @@ describe("T189 — empresa ativa no topo do menu lateral", () => {
     });
     fireEvent.click(botao);
     const lista = await within(gaveta).findByRole("list", {
-      name: "Empresas autorizadas",
+      name: "Empresas da conta",
     });
     expect(gaveta.contains(lista)).toBe(true);
     expect(gaveta.contains(document.activeElement)).toBe(true);

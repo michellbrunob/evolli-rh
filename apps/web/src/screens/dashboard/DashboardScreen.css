@@ -1,6 +1,11 @@
-/* T205 — Dashboard inicial. Tokens do Evolli; cabe em 375 px sem rolagem
-   horizontal da página: tudo em grade de coluna que encolhe, e a tabela rola
-   dentro do próprio quadro. */
+/* T205 — Dashboard inicial. T207 — cinco abas e a paleta Evolli (P-1).
+   Cabe em 375 px sem rolagem horizontal da página: tudo em grade de coluna
+   que encolhe; as abas e a tabela rolam dentro do próprio quadro.
+
+   Cor nunca é o único sinal: a aba ativa tem sublinhado e `aria-selected`,
+   cada estado de card tem um selo em texto, e as barras dos gráficos são
+   decorativas (a tabela equivalente é a leitura principal). O verde-água só
+   aparece como marca ao lado de texto, nunca como texto. */
 
 .dashboard {
   display: grid;
@@ -19,7 +24,7 @@
   margin: 0;
   font-size: var(--text-display, var(--text-title));
   font-weight: var(--weight-bold);
-  color: var(--color-ink);
+  color: var(--evolli-marinho);
 }
 
 .dashboard__contexto,
@@ -55,7 +60,53 @@
   margin: 0;
 }
 
-/* Ano consultado + momento da leitura. */
+/* ---- Abas + período ---------------------------------------------------- */
+.dashboard__navegacao {
+  display: grid;
+  gap: var(--space-md);
+  min-width: 0;
+}
+
+/* As abas rolam dentro da própria faixa no celular (sem rolar a página). */
+.dashboard__abas {
+  display: flex;
+  gap: var(--space-xs);
+  min-width: 0;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--hairline);
+  scrollbar-width: thin;
+}
+
+.dashboard__aba {
+  position: relative;
+  flex: none;
+  min-height: var(--touch-target);
+  padding: 0 var(--space-md);
+  border: none;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  color: var(--color-ink-muted);
+  font: inherit;
+  font-size: var(--text-ui);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.dashboard__aba:hover {
+  color: var(--evolli-marinho);
+}
+
+.dashboard__aba--ativa {
+  border-bottom-color: var(--evolli-azul);
+  color: var(--evolli-marinho);
+  font-weight: var(--weight-strong);
+}
+
+.dashboard__aba:focus-visible {
+  outline: var(--focus-width) solid var(--evolli-azul);
+  outline-offset: -3px;
+}
+
 .dashboard__barra {
   display: flex;
   flex-wrap: wrap;
@@ -84,10 +135,174 @@
   font: inherit;
 }
 
-/* Blocos. */
+.dashboard__painel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-lg);
+  min-width: 0;
+}
+
+.dashboard__painel[hidden] {
+  display: none;
+}
+
+/* ---- Resumo (faixa de destaque) --------------------------------------- */
+.dashboard__resumo {
+  display: grid;
+  gap: var(--space-sm);
+  padding: var(--space-lg);
+  border-radius: var(--radius-lg);
+  background: var(--evolli-azul-suave);
+  min-width: 0;
+}
+
+.dashboard__resumo-topo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-xs) var(--space-md);
+}
+
+.dashboard__frase {
+  margin: 0;
+  font-size: var(--text-lead, var(--text-body));
+  color: var(--evolli-marinho);
+  overflow-wrap: anywhere;
+}
+
+/* Selos: estado em TEXTO (nunca só cor). */
+.dashboard__selo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+  width: fit-content;
+  margin: 0;
+  padding: 2px var(--space-sm);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-strong);
+}
+
+.dashboard__selo--leitura {
+  background: var(--surface-canvas);
+  color: var(--color-ink-muted);
+}
+
+/* Marca verde-água ao lado do texto: destaque, não informação. */
+.dashboard__selo--leitura::before {
+  content: "";
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: var(--radius-pill);
+  background: var(--evolli-verde-agua);
+}
+
+.dashboard__selo--estado {
+  border: 1px solid var(--status-neutral-border);
+  background: var(--status-neutral-surface);
+  color: var(--status-neutral-ink);
+}
+
+/* ---- Indicadores ------------------------------------------------------- */
+.dashboard__indicadores {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(14rem, 100%), 1fr));
+  gap: var(--space-md);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  min-width: 0;
+}
+
+.dashboard__indicadores > li {
+  display: grid;
+  min-width: 0;
+}
+
+.dashboard__indicador {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: var(--space-xs);
+  padding: var(--space-md) var(--space-lg);
+  border: 1px solid var(--hairline);
+  border-top: 4px solid var(--evolli-azul);
+  border-radius: var(--radius-lg);
+  background: var(--surface-canvas);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.dashboard__indicador--sem-dado {
+  border-top-color: var(--status-neutral-border);
+}
+
+.dashboard__indicador-rotulo {
+  margin: 0;
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-strong);
+}
+
+.dashboard__indicador-valor {
+  margin: 0;
+  color: var(--evolli-marinho);
+  font-size: var(--text-title);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-tight);
+}
+
+.dashboard__indicador--sem-dado .dashboard__indicador-valor {
+  color: var(--color-ink-subtle);
+}
+
+.dashboard__indicador-unidade {
+  font-size: var(--text-body);
+  font-weight: var(--weight-regular);
+  color: var(--color-ink-muted);
+}
+
+.dashboard__indicador-nota {
+  margin: 0;
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+  line-height: var(--leading-body);
+}
+
+.dashboard__saldo {
+  font-weight: var(--weight-strong);
+  color: var(--evolli-marinho);
+}
+
+.dashboard__link {
+  color: var(--evolli-azul-escuro);
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: var(--touch-target);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-strong);
+}
+
+/* ---- Blocos ------------------------------------------------------------ */
+.dashboard__duas-colunas {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-lg);
+  min-width: 0;
+}
+
+@media (min-width: 64rem) {
+  .dashboard__duas-colunas {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 .dashboard__bloco {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
+  align-content: start;
   gap: var(--space-md);
   padding: var(--space-lg);
   border: 1px solid var(--hairline);
@@ -100,73 +315,69 @@
   margin: 0;
   font-size: var(--text-body);
   font-weight: var(--weight-strong, var(--weight-bold));
-  color: var(--color-ink);
+  color: var(--evolli-marinho);
 }
 
-.dashboard__frase {
+.dashboard__explicacao {
   margin: 0;
-  font-size: var(--text-body);
-  color: var(--color-ink);
-  overflow-wrap: anywhere;
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+  line-height: var(--leading-body);
 }
 
-.dashboard__cartoes {
+/* Pessoas hoje: quatro números, os três primeiros levam à listagem. */
+.dashboard__situacoes {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(11rem, 100%), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(9rem, 100%), 1fr));
   gap: var(--space-sm);
   margin: 0;
   padding: 0;
   list-style: none;
-  min-width: 0;
 }
 
-.dashboard__cartoes li {
+.dashboard__situacoes > li {
   display: grid;
   min-width: 0;
 }
 
-.dashboard__cartao {
+.dashboard__situacao {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-xxs);
+  min-height: var(--touch-target);
   padding: var(--space-sm) var(--space-md);
   border: 1px solid var(--divider-soft);
   border-radius: var(--radius-md);
-  background: var(--surface-pearl);
+  background: var(--evolli-fundo);
   color: var(--color-ink);
-  min-width: 0;
-  min-height: var(--touch-target);
+  text-decoration: none;
   overflow-wrap: anywhere;
 }
 
-.dashboard__cartao--link {
-  text-decoration: none;
-  border-color: var(--hairline);
+a.dashboard__situacao:hover {
+  border-color: var(--evolli-azul);
 }
 
-.dashboard__cartao--link:hover .dashboard__cartao-nota,
-.dashboard__cartao--link:focus-visible .dashboard__cartao-nota {
-  text-decoration: underline;
-}
-
-.dashboard__cartao-rotulo {
+.dashboard__situacao-rotulo {
+  display: grid;
   color: var(--color-ink-muted);
   font-size: var(--text-caption);
 }
 
-.dashboard__cartao-valor {
+.dashboard__situacao-detalhe {
+  font-size: var(--text-caption);
+  color: var(--color-ink-subtle);
+}
+
+.dashboard__situacao-valor {
+  color: var(--evolli-marinho);
   font-size: var(--text-title);
   font-weight: var(--weight-bold);
   line-height: var(--leading-tight);
 }
 
-.dashboard__cartao-nota {
-  color: var(--color-ink-muted);
-  font-size: var(--text-caption);
-}
-
-.dashboard__cartao--link .dashboard__cartao-nota {
-  color: var(--color-action);
+a.dashboard__situacao .dashboard__situacao-rotulo {
+  color: var(--evolli-azul-escuro);
+  text-decoration: underline;
 }
 
 .dashboard__falha {
@@ -196,14 +407,72 @@
   background: var(--status-warning-surface, var(--surface-pearl));
 }
 
-/* E-3 — barra proporcional (decorativa) + lista com os números. */
+/* ---- "Como calculamos" ------------------------------------------------- */
+.dashboard__como {
+  display: grid;
+  gap: var(--space-xs);
+}
+
+.dashboard__como-botao {
+  color: var(--evolli-azul-escuro);
+  justify-self: start;
+  min-height: var(--touch-target);
+  padding: 0;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: var(--text-caption);
+  font-weight: var(--weight-strong);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.dashboard__como-texto {
+  display: grid;
+  gap: var(--space-xs);
+  padding: var(--space-sm) var(--space-md);
+  border-left: 3px solid var(--evolli-verde-agua);
+  border-radius: var(--radius-sm);
+  background: var(--evolli-fundo);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--leading-body);
+}
+
+.dashboard__como-texto[hidden] {
+  display: none;
+}
+
+.dashboard__como-texto p {
+  margin: 0;
+}
+
+/* ---- Aba sem dado ------------------------------------------------------ */
+.dashboard__indisponivel {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-sm);
+  padding: var(--space-xl, var(--space-lg));
+  border: 1px dashed var(--status-neutral-border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-canvas);
+}
+
+.dashboard__indisponivel-texto {
+  margin: 0;
+  max-width: 40rem;
+  color: var(--color-ink-muted);
+  line-height: var(--leading-body);
+}
+
+/* ---- Tipo de vínculo: barra proporcional (decorativa) + lista --------- */
 .dashboard__barra-tipos {
   display: flex;
   gap: 2px;
-  height: 0.5rem;
+  height: 0.75rem;
   border-radius: var(--radius-pill);
   overflow: hidden;
-  background: var(--surface-neutral);
+  background: var(--evolli-fundo);
 }
 
 .dashboard__barra-tipo {
@@ -212,23 +481,19 @@
 }
 
 .dashboard__barra-tipo--clt {
-  background: var(--color-action);
+  background: var(--evolli-azul);
 }
 
 .dashboard__barra-tipo--estagio {
-  background: var(--status-success-ink);
+  background: var(--evolli-verde-agua-escuro);
 }
 
 .dashboard__barra-tipo--pj {
-  background: var(--status-warning-ink);
+  background: var(--evolli-marinho);
 }
 
 .dashboard__barra-tipo--temporario {
-  background: color-mix(
-    in srgb,
-    var(--color-action) 45%,
-    var(--surface-canvas)
-  );
+  background: var(--evolli-ardosia);
 }
 
 .dashboard__barra-tipo--outro_controlado {
@@ -246,11 +511,11 @@
 }
 
 .dashboard__tipo {
+  color: var(--evolli-azul-escuro);
   display: inline-flex;
   align-items: center;
   gap: var(--space-xs);
   min-height: var(--touch-target);
-  color: var(--color-action);
   overflow-wrap: anywhere;
 }
 
@@ -259,18 +524,64 @@
   flex: none;
   width: 0.75rem;
   height: 0.75rem;
-  border-radius: 2px;
+  border-radius: 3px;
 }
 
-.dashboard__marca--admissao {
-  background: var(--color-action);
+/* ---- Movimentação ------------------------------------------------------ */
+.dashboard__totais {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(10rem, 100%), 1fr));
+  gap: var(--space-sm);
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-.dashboard__marca--desligamento {
-  background: var(--status-warning-ink);
+.dashboard__total {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: var(--space-xs);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--divider-soft);
+  border-radius: var(--radius-md);
+  background: var(--evolli-fundo);
 }
 
-/* E-4 — colunas por mês (decorativas; a tabela é a leitura principal). */
+.dashboard__total-rotulo {
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+}
+
+.dashboard__total-valor {
+  grid-column: 2;
+  color: var(--evolli-marinho);
+  font-size: var(--text-title);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-tight);
+}
+
+.dashboard__marca--admissao,
+.dashboard__barra-mes--admissao {
+  background: var(--evolli-azul);
+}
+
+.dashboard__marca--desligamento,
+.dashboard__barra-mes--desligamento {
+  background: var(--evolli-marinho);
+}
+
+.dashboard__marca--transferencia_organizacional,
+.dashboard__barra-mes--transferencia_organizacional {
+  background: var(--evolli-verde-agua-escuro);
+}
+
+.dashboard__marca--mudanca_cargo,
+.dashboard__barra-mes--mudanca_cargo {
+  background: var(--evolli-ardosia);
+}
+
+/* Colunas por mês (decorativas; a tabela é a leitura principal). */
 .dashboard__grafico {
   display: grid;
   gap: var(--space-sm);
@@ -296,7 +607,7 @@
   grid-auto-flow: column;
   grid-auto-columns: minmax(0, 1fr);
   gap: 2px;
-  height: 8rem;
+  height: 9rem;
   min-width: 0;
 }
 
@@ -317,17 +628,9 @@
 }
 
 .dashboard__barra-mes {
-  width: 40%;
-  max-width: 0.75rem;
-  border-radius: 2px 2px 0 0;
-}
-
-.dashboard__barra-mes--admissao {
-  background: var(--color-action);
-}
-
-.dashboard__barra-mes--desligamento {
-  background: var(--status-warning-ink);
+  flex: 0 1 0.75rem;
+  min-width: 2px;
+  border-radius: 3px 3px 0 0;
 }
 
 .dashboard__mes {
@@ -363,6 +666,10 @@
   text-align: right;
 }
 
+.dashboard__tabela thead th {
+  color: var(--evolli-marinho);
+}
+
 .dashboard__tabela th[scope="row"],
 .dashboard__tabela thead th:first-child {
   text-align: left;
@@ -374,8 +681,12 @@
 }
 
 .dashboard h1:focus-visible,
-.dashboard h2:focus-visible {
-  outline: var(--focus-width) solid var(--color-action);
+.dashboard h2:focus-visible,
+.dashboard__link:focus-visible,
+.dashboard__tipo:focus-visible,
+.dashboard__situacao:focus-visible,
+.dashboard__como-botao:focus-visible {
+  outline: var(--focus-width) solid var(--evolli-azul);
   outline-offset: var(--focus-offset);
 }
 
@@ -386,7 +697,12 @@
     align-items: stretch;
   }
 
-  .dashboard__bloco {
+  .dashboard__bloco,
+  .dashboard__resumo {
+    padding: var(--space-md);
+  }
+
+  .dashboard__indicador {
     padding: var(--space-md);
   }
 

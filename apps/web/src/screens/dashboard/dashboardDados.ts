@@ -20,6 +20,7 @@ import type {
   ListarMovimentacoesQuery,
   MovimentacaoApi,
   ResultadoPaginado,
+  TipoMovimentacao,
 } from "../../api/movimentacaoClient";
 
 export const TAMANHO_PAGINA_MOVIMENTACOES = 100;
@@ -114,7 +115,7 @@ export class LeituraAbandonada extends Error {
  * leitura deixou de valer, a paginação para com `LeituraAbandonada`.
  */
 export async function lerSerieMensal(
-  tipo: "admissao" | "desligamento",
+  tipo: TipoMovimentacao,
   periodo: PeriodoDoDashboard,
   listar: ListarMovimentacoes,
   vale: () => boolean = () => true,
@@ -158,6 +159,27 @@ export async function lerSerieMensal(
   }
   return { tipo: "excedida" };
 }
+
+/**
+ * T207 — as quatro movimentações efetivadas que o contrato entrega (V-3), na
+ * ordem em que aparecem na aba Movimentação.
+ */
+export const TIPOS_DE_MOVIMENTACAO: readonly TipoMovimentacao[] = [
+  "admissao",
+  "desligamento",
+  "transferencia_organizacional",
+  "mudanca_cargo",
+];
+
+/** T207 — rótulo no plural, para cabeçalhos e legendas. */
+export const ROTULO_DA_MOVIMENTACAO: Readonly<
+  Record<TipoMovimentacao, string>
+> = {
+  admissao: "Admissões",
+  desligamento: "Desligamentos",
+  transferencia_organizacional: "Transferências",
+  mudanca_cargo: "Mudanças de cargo",
+};
 
 const NOMES_DOS_MESES = [
   "janeiro",

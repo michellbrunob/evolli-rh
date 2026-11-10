@@ -147,6 +147,8 @@ import {
   anoDoDashboardValido,
   dashboardDaRota,
   rotaDoDashboard,
+  ABA_INICIAL_DO_DASHBOARD,
+  type AbaDoDashboard,
 } from "./rotasDoShell";
 import { AREAS_DE_EDICAO, type AreaDeEdicaoId } from "./edicoesPendentes";
 import { focarRegiaoPrincipal, useGuardaDeSaida } from "./guardaDeSaida";
@@ -201,9 +203,11 @@ function rotaDoExibido(
   ficha: RotaDaFicha | null,
   listagem: EstadoDaListagem = ESTADO_INICIAL_DA_LISTAGEM,
   ano: number = anoCorrente(),
+  abaDoDashboard: AbaDoDashboard = ABA_INICIAL_DO_DASHBOARD,
 ): string | null {
   // T205 — o Dashboard leva sempre o ano consultado (forma canônica).
-  if (destinoId === "dashboard") return rotaDoDashboard(ano);
+  // T207 — e a aba (a Visão Geral, sem caminho).
+  if (destinoId === "dashboard") return rotaDoDashboard(ano, abaDoDashboard);
   if (destinoId === "pessoas" && ficha !== null) return rotaDaFicha(ficha);
   if (destinoId === "pessoas") return rotaDaListagem(listagem);
   return rotaDoDestino(destinoId);
@@ -423,9 +427,12 @@ function conteudoDoDestino(
     ) => void;
   },
   // T205 — o Dashboard inicial: o ano da URL e as navegações que ele pede.
+  // T207 — e a aba.
   dashboard: {
     readonly ano: number;
+    readonly aba: AbaDoDashboard;
     readonly onTrocarAno: (ano: number) => void;
+    readonly onTrocarAba: (aba: AbaDoDashboard) => void;
     readonly onAbrirListagem: (estado: EstadoDaListagem) => void;
   },
 ) {
@@ -433,8 +440,10 @@ function conteudoDoDestino(
     return (
       <DashboardScreen
         ano={dashboard.ano}
+        aba={dashboard.aba}
         empresaAtiva={empresaAtiva}
         onTrocarAno={dashboard.onTrocarAno}
+        onTrocarAba={dashboard.onTrocarAba}
         onAbrirListagem={dashboard.onAbrirListagem}
       />
     );
@@ -758,6 +767,10 @@ export function App({
         // T205 — ano ausente, inválido ou futuro vira o corrente; a primeira
         // exibição corrige a URL no lugar.
         ano: dashboardDaRota(window.location.hash)?.ano ?? anoCorrente(),
+        // T207 — aba desconhecida vira a Visão Geral; idem, corrigida no lugar.
+        abaDoDashboard:
+          dashboardDaRota(window.location.hash)?.aba ??
+          ABA_INICIAL_DO_DASHBOARD,
       };
     }
     return {
@@ -765,6 +778,7 @@ export function App({
       ficha: null,
       listagem: ESTADO_INICIAL_DA_LISTAGEM,
       ano: anoCorrente(),
+      abaDoDashboard: ABA_INICIAL_DO_DASHBOARD,
     };
   });
   const [destinoAtivoId, setDestinoAtivoId] = useState(entradaDaUrl.destino);
@@ -784,6 +798,10 @@ export function App({
   listagemAtualRef.current = listagem;
   /** T205 — o ano consultado no Dashboard, sempre o da URL. */
   const [anoDoDashboard, setAnoDoDashboard] = useState(entradaDaUrl.ano);
+  /** T207 — a aba do Dashboard, sempre a da URL. */
+  const [abaDoDashboard, setAbaDoDashboard] = useState<AbaDoDashboard>(
+    entradaDaUrl.abaDoDashboard,
+  );
   /** T200 — a ficha exibida agora, lida pelo manipulador de URL. */
   const fichaAtualRef = useRef(ficha);
   fichaAtualRef.current = ficha;
@@ -861,7 +879,13 @@ export function App({
    * a dela, no lugar (ver `aoMudarUrl`).
    */
   const destinoSemRotaRef = useRef(
-    rotaDoExibido(destinoAtivoId, ficha, listagem, anoDoDashboard) === null
+    rotaDoExibido(
+      destinoAtivoId,
+      ficha,
+      listagem,
+      anoDoDashboard,
+      abaDoDashboard,
+    ) === null
       ? destinoAtivoId
       : destinoInicialPara(papelDoAtor),
   );
@@ -981,7 +1005,9 @@ export function App({
     setFicha(null);
     setListagem(ESTADO_INICIAL_DA_LISTAGEM);
     // T205 — o Dashboard abre pelo menu no ano corrente.
+    // T207 — e na Visão Geral.
     setAnoDoDashboard(anoCorrente());
+    setAbaDoDashboard(ABA_INICIAL_DO_DASHBOARD);
     setFocarContatosNaFicha(false);
     setDestinoAtivoId(destinoId);
     setGavetaAberta(false);
@@ -1027,6 +1053,11 @@ export function App({
   const trocarAnoDoDashboard = useCallback((ano: number) => {
     if (!anoDoDashboardValido(ano)) return;
     setAnoDoDashboard(ano);
+  }, []);
+  // T207 — trocar de aba também é navegação: empilha uma entrada, no mesmo
+  // ano (o ano é compartilhado entre as abas).
+  const trocarAbaDoDashboard = useCallback((aba: AbaDoDashboard) => {
+    setAbaDoDashboard(aba);
   }, []);
   // T205 — um indicador do Dashboard abre a listagem de Colaboradores já
   // filtrada (D-5). Passa pela guarda, como qualquer troca de destino; o
@@ -1125,7 +1156,13 @@ export function App({
   // outra (Nova admissão → Colaboradores): é o ramo de baixo, com `pushState`
   // — o "voltar" retorna à página de onde se saiu.
   useEffect(() => {
-    const rota = rotaDoExibido(destinoAtivoId, ficha, listagem, anoDoDashboard);
+    const rota = rotaDoExibido(
+      destinoAtivoId,
+      ficha,
+      listagem,
+      anoDoDashboard,
+      abaDoDashboard,
+    );
     const atual = window.location.hash;
     const vinhaDeRota = rotaExibidaRef.current !== null;
     const primeiraExibicao = primeiraExibicaoRef.current;
@@ -1153,7 +1190,14 @@ export function App({
         escreverNoHistorico("push", rota);
       }
     }
-  }, [destinoAtivoId, ficha, listagem, anoDoDashboard, escreverNoHistorico]);
+  }, [
+    destinoAtivoId,
+    ficha,
+    listagem,
+    anoDoDashboard,
+    abaDoDashboard,
+    escreverNoHistorico,
+  ]);
 
   // T200 — uma saída adiada (voltar, avançar, rota digitada) foi aceita e a
   // tela nova já montou: o foco, que estava no diálogo, vai à região
@@ -1334,6 +1378,11 @@ export function App({
         exibido === "dashboard" && pedido === "dashboard"
           ? (dashboardDaRota(fragmento)?.ano ?? anoCorrente())
           : anoCorrente();
+      // T207 — e a aba; desconhecida vira a Visão Geral, corrigida no lugar.
+      const abaExibida =
+        exibido === "dashboard" && pedido === "dashboard"
+          ? (dashboardDaRota(fragmento)?.aba ?? ABA_INICIAL_DO_DASHBOARD)
+          : ABA_INICIAL_DO_DASHBOARD;
       // T200 — com edição pendente no que esta navegação desmontaria (ou com
       // a guarda já perguntando), a URL volta ao que a tela descreve e a
       // guarda pergunta; só a escolha explícita refaz o mesmo passo.
@@ -1381,11 +1430,13 @@ export function App({
       if (fichaExibida === null) setFocarContatosNaFicha(false);
       setListagem(listagemExibida);
       setAnoDoDashboard(anoExibido);
+      setAbaDoDashboard(abaExibida);
       const rotaExibida = rotaDoExibido(
         exibido,
         fichaExibida,
         listagemExibida,
         anoExibido,
+        abaExibida,
       );
       if (rotaExibida !== null) {
         if (fragmento !== rotaExibida) {
@@ -1787,7 +1838,9 @@ export function App({
               },
               {
                 ano: anoDoDashboard,
+                aba: abaDoDashboard,
                 onTrocarAno: trocarAnoDoDashboard,
+                onTrocarAba: trocarAbaDoDashboard,
                 onAbrirListagem: abrirListagemDoDashboard,
               },
             )}
