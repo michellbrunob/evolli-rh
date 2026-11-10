@@ -2346,3 +2346,89 @@ describe("T200 — guarda de saída no shell autenticado", () => {
     expect(disparar()).toBe(false);
   });
 });
+
+describe("T206 — preferência do menu lateral: só nesta aba, por conta e empresa", () => {
+  const emTrilho = () =>
+    document.querySelector(".app-shell--menu-recolhido") !== null;
+
+  beforeEach(() => {
+    CanalFalso.abertos.clear();
+    vi.stubGlobal("BroadcastChannel", CanalFalso);
+    window.history.replaceState(null, "", window.location.pathname);
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    window.history.replaceState(null, "", window.location.pathname);
+  });
+
+  it("sobrevive à volta pelo Hub (mesma conta, mesma empresa)", async () => {
+    vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
+    render(<AutenticacaoApp />);
+    await chegarAoHub();
+    await abrirProduto(/^Colaboradores/);
+    fireEvent.click(screen.getByRole("button", { name: "Recolher menu" }));
+    expect(emTrilho()).toBe(true);
+
+    fireEvent.click(screen.getByRole("button", { name: "Hub" }));
+    await chegarAoHub();
+    expect(emTrilho()).toBe(false); // o Hub não tem menu lateral
+    await abrirProduto(/^Colaboradores/);
+
+    expect(emTrilho()).toBe(true);
+    expect(
+      screen.getByRole("button", { name: "Expandir menu" }),
+    ).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("outra empresa abre expandida — e a preferência antiga não volta com a empresa antiga", async () => {
+    vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
+    render(<AutenticacaoApp />);
+    await chegarAoHub();
+    await abrirProduto(/^Colaboradores/);
+    fireEvent.click(screen.getByRole("button", { name: "Recolher menu" }));
+    expect(emTrilho()).toBe(true);
+
+    servidorPassaParaBeta();
+    act(() =>
+      new CanalFalso(NOME_DO_CANAL).postMessage({
+        tipo: "contexto-empresarial-alterado",
+      }),
+    );
+    await waitFor(() =>
+      expect(seletorDoMenu()).toHaveTextContent("Empresa Beta"),
+    );
+    expect(emTrilho()).toBe(false);
+
+    vi.mocked(obterUsuarioAtual).mockResolvedValue(ATOR_PADRAO as never);
+    act(() =>
+      new CanalFalso(NOME_DO_CANAL).postMessage({
+        tipo: "contexto-empresarial-alterado",
+      }),
+    );
+    await waitFor(() =>
+      expect(seletorDoMenu()).toHaveTextContent("Empresa Alfa"),
+    );
+    expect(emTrilho()).toBe(false);
+  });
+
+  it("logout apaga a preferência: o próximo login começa expandido", async () => {
+    vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
+    vi.mocked(logout).mockResolvedValueOnce(undefined);
+    vi.mocked(login).mockResolvedValueOnce({ mfaRequerido: false });
+    render(<AutenticacaoApp />);
+    await chegarAoHub();
+    await abrirProduto(/^Colaboradores/);
+    fireEvent.click(screen.getByRole("button", { name: "Recolher menu" }));
+    expect(emTrilho()).toBe(true);
+
+    fireEvent.click(screen.getByRole("button", { name: "Sair" }));
+    await screen.findByLabelText(/^E-mail\b/i);
+    preencherEEntrar();
+    await screen.findByRole("navigation", { name: "Navegação do painel" });
+
+    expect(emTrilho()).toBe(false);
+    expect(
+      screen.getByRole("button", { name: "Recolher menu" }),
+    ).toHaveAttribute("aria-expanded", "true");
+  });
+});

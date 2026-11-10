@@ -1505,7 +1505,10 @@ describe("T189 — empresa ativa no topo do menu lateral", () => {
     await screen.findByRole("button", { name: /Empresa ativa/ });
     const barra = document.getElementById("navegacao-lateral")!;
     const filhos = [...barra.children].map((f) => f.className);
-    const marca = filhos.findIndex((c) => c.includes("app-shell__marca"));
+    // T206 — a marca divide o topo da barra com o botão de recolher.
+    const marca = [...barra.children].findIndex(
+      (f) => f.querySelector(".app-shell__marca") !== null,
+    );
     const seletor = filhos.findIndex((c) => c.includes("seletor-empresa"));
     const navegacao = [...barra.children].findIndex(
       (f) => f.querySelector("nav") !== null || f.tagName === "NAV",

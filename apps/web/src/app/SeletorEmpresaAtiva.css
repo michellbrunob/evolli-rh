@@ -228,6 +228,30 @@
   border: 0;
 }
 
+/* Compacto (T206): no trilho do menu, só o monograma — ou o símbolo, sem
+   empresa. Os textos ficam visualmente ocultos e seguem no nome acessível;
+   o cartão é posicionado, então eles não escapam para alargar a página. */
+.seletor-empresa--compacto .seletor-empresa__cartao {
+  justify-content: center;
+  padding: var(--space-xxs);
+}
+
+.seletor-empresa--compacto .seletor-empresa__textos {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.seletor-empresa--compacto .seletor-empresa__seta {
+  display: none;
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .seletor-empresa__seta {
     transition: transform 120ms ease;
