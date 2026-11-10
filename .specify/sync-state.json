@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "constitutionVersion": "1.4.0",
-  "lastConvergedAt": "2026-11-09",
-  "lastIntegratedTask": 204,
-  "lastRecordedTask": 205,
+  "lastConvergedAt": "2026-11-10",
+  "lastIntegratedTask": 205,
+  "lastRecordedTask": 206,
   "platformDecision": {
     "adr": "docs/adr/0014-evolli-plataforma-base-e-encerramento-do-frappe.md",
     "decidedAt": "2026-10-01",
@@ -11,15 +11,15 @@
     "frappe": "encerrado_como_candidato_referencia_apenas"
   },
   "nextTask": {
-    "id": "T205",
-    "status": "dashboard_inicial_em_implementacao",
-    "reason": "T204 integrada em main pela PR #197 (squash f51c21d0d0451079e1e93c8a25e8b48ccbd07bff), com a CI de push 3/3 verde (run 42663261934). A T205 implementa o Dashboard inicial pos-login conforme as decisoes D-1 a D-12 aprovadas em 2026-11-09 (docs/decisions/t205-dossie-dashboard-inicial.md, secao 15): rota #/dashboard?ano=AAAA, aterrissagem de RH, DP e master_tecnico, gestor em Minha equipe, master_tecnico sem empresa sem consulta, resumo, ativos por tipo, serie mensal com tabela acessivel, momento da leitura e Atualizar, teto de 20 paginas por serie sem numero parcial. So web e testes, com os contratos existentes de colaboradores e movimentacoes; em implementacao, entrega em PR Draft #198, validada localmente."
+    "id": "T206",
+    "status": "shell_menu_lateral_em_implementacao",
+    "reason": "T205 integrada em main pela PR #198 (squash c2c83622fd84bba9af73da3af96a4d5cb255b6a3), com a CI de push 3/3 verde (run 42798080671). A T206 implementa o shell com menu lateral fixo e recolhivel (docs/decisions/t206-shell-menu-lateral.md): barra presa a esquerda sem vazio entre navegacao e conteudo; trilho compacto de icones quando recolhido, com nome acessivel, dica ao passar o mouse e ao focar e item ativo identificavel; conteudo ocupando a largura liberada; preferencia so em memoria da aba; gaveta do celular, guarda T200, troca de empresa T189 e permissoes por papel preservadas. So shell e navegacao na web: sem API, schema, migration, RBAC, auditoria, seed ou dependencia. Em implementacao."
   },
   "openDeliveries": [
     {
-      "id": "T205",
+      "id": "T206",
       "pullRequest": null,
-      "status": "dashboard_inicial_em_implementacao"
+      "status": "shell_menu_lateral_em_implementacao"
     }
   ],
   "requiredArtifacts": [
