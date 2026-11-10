@@ -1519,7 +1519,10 @@ export function App({
     tituloAoMontarRef.current = null;
     const titulo = document.getElementById(id);
     const alvo = titulo ?? mainRef.current;
-    if (!alvo) return;
+    // T206 — a tela pode já ter levado o foco ao próprio título ao montar (o
+    // Dashboard faz isso quando o foco está no `body`): um segundo `focus()`
+    // no mesmo elemento seria um foco programático duplicado.
+    if (!alvo || document.activeElement === alvo) return;
     if (!alvo.hasAttribute("tabindex")) alvo.setAttribute("tabindex", "-1");
     alvo.focus();
   }, []);

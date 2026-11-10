@@ -636,7 +636,14 @@ export function AutenticacaoApp() {
         empresaAtiva={ator.empresaAtiva ?? null}
         podeTrocarEmpresa={podeTrocarEmpresa}
         emailDoAtor={ator.email}
-        onAbrirDestino={setDestinoAberto}
+        onAbrirDestino={(destino) => {
+          // T206 — o cartão clicado some com o Hub; sem isto o foco ficaria
+          // no `body`. A tela que nasce leva o foco ao próprio título, pelo
+          // mesmo pedido de uma montagem só da aterrissagem e da troca de
+          // empresa (`focarTitulo`, consumido e desligado logo depois).
+          setFocarTitulo(true);
+          setDestinoAberto(destino);
+        }}
         onEmpresaTrocada={aoTrocarEmpresa}
         onLogout={() => void handleLogout()}
         focarTituloAoAbrir={focarTitulo}

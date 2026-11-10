@@ -3283,7 +3283,8 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         visualmente oculto; módulo com submenu e empresa compacta que expandem o menu no mesmo
         gesto, com o foco no próprio controle; item ativo herdado pelo cabeçalho do módulo
         oculto; dica `aria-hidden`; preferência em memória por conta e empresa; foco nunca no
-        `body` ao atravessar o breakpoint; alvos de 44 px na gaveta. Testes web, mutações
+        `body` ao atravessar o breakpoint; alvos de 44 px na gaveta; foco no título ao abrir um
+        produto pelo Hub, uma vez só. Testes web, mutações
         detectadas e validação local com dados sintéticos (seção 12 do dossiê).
       - **Fora de escopo:** API, schema, migration, RBAC, auditoria, seed, Docker,
         dependências, lockfile e workflows; regras do Dashboard, de Colaboradores e das fichas;
