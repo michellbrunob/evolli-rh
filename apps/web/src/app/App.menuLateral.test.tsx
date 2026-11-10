@@ -730,6 +730,52 @@ describe("T206 — contrato de CSS do shell", () => {
     ).toMatch(/min-height:\s*var\(--touch-target\)/);
   });
 
+  it("no desktop a faixa fica acima do cabeçalho (a dica do botão não é encoberta) e abaixo das camadas de sobreposição", () => {
+    const modalCss = readFileSync("src/components/Modal.css", "utf8");
+    const guardaCss = readFileSync("src/app/guardaDeSaida.css", "utf8");
+    const avisoCss = readFileSync("src/app/AutenticacaoApp.css", "utf8");
+    const camada = (corpo: string, origem: string): number => {
+      const achado = /z-index:\s*(\d+)/.exec(corpo);
+      if (!achado) throw new Error(`sem z-index em ${origem}`);
+      return Number(achado[1]);
+    };
+    const celular = bloco(
+      shellCss,
+      /@media\s*\(\s*max-width:\s*834px\s*\)\s*\{/,
+    );
+
+    // A dica mora dentro da faixa, que é `sticky` e por isso forma um
+    // contexto de empilhamento próprio: só a camada da FAIXA conta.
+    // A regra da própria faixa (não a do trilho, `--menu-recolhido ...`).
+    const faixa = camada(
+      bloco(desktop, /\n\s*\.app-shell__sidebar\s*\{/),
+      "faixa (desktop)",
+    );
+    const cabecalho = camada(
+      regra(shellCss, ".app-shell__topbar"),
+      "cabeçalho",
+    );
+    const pular = camada(
+      regra(shellCss, ".app-shell__skip-link"),
+      "link de pular",
+    );
+    const gaveta = camada(
+      bloco(celular, /\n\s*\.app-shell__sidebar\s*\{/),
+      "gaveta",
+    );
+    const modal = camada(regra(modalCss, ".evolli-modal"), "modal");
+    const guarda = camada(regra(guardaCss, ".guarda-saida"), "guarda");
+    const aviso = camada(
+      regra(avisoCss, ".aviso-contexto"),
+      "aviso de contexto",
+    );
+
+    expect(faixa).toBeGreaterThan(cabecalho);
+    for (const acima of [pular, gaveta, modal, guarda, aviso]) {
+      expect(faixa).toBeLessThan(acima);
+    }
+  });
+
   it("a transição de largura só existe sem redução de movimento", () => {
     expect(semMovimentoReduzido).toMatch(/\.app-shell__sidebar\s*\{[^}]*width/);
     const foraDela = shellCss.replace(semMovimentoReduzido, "");

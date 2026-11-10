@@ -127,6 +127,11 @@ O resultado era o vazio branco junto à navegação que esta tarefa remove.
   desenhado por dentro da própria dica.
 - Ela é remedida ao fim da transição de largura da faixa: um item focado enquanto a largura ainda
   anda seria medido na posição errada (achado da validação local, seção 13).
+- **Camada:** a dica mora dentro da faixa, que é `sticky` e forma um contexto de empilhamento
+  próprio. Por isso, no desktop, a faixa tem `z-index: 31`, acima do cabeçalho (30) e abaixo do link
+  de pular (60), da gaveta do celular (40), do modal (100) e da guarda e do aviso de contexto (110).
+  Sem isso, a dica do botão "Recolher menu", no menu expandido, ficava atrás do cabeçalho (achado da
+  revisão, seção 13).
 
 ## 9. Item ativo nos dois estados
 
@@ -169,12 +174,13 @@ O resultado era o vazio branco junto à navegação que esta tarefa remove.
 
 ### 12.1 Testes automatizados
 
-- `App.menuLateral.test.tsx` (novo, 45 testes): botão, nome, ARIA, foco e anúncio único; trilho com nome, dica
+- `App.menuLateral.test.tsx` (novo, 46 testes): botão, nome, ARIA, foco e anúncio único; trilho com nome, dica
   e destino de cada item; submenus, empresa e Demonstração no trilho; item ativo nos dois estados;
   dica (foco, ponteiro, 1.4.13, Escape, clique, transição, redimensionamento); guarda T200 a partir
   do trilho; gaveta, fundo inerte, foco e travessia do breakpoint; contrato de CSS (sem trava de
   largura, faixa da altura da janela, largura variável só no desktop, texto oculto por recorte,
-  alvos de 44 px, transição só sem redução de movimento, sem deslocamento horizontal).
+  alvos de 44 px, transição só sem redução de movimento, sem deslocamento horizontal, e a camada da
+  faixa acima do cabeçalho e abaixo do link de pular, da gaveta, do modal e da guarda).
 - `AutenticacaoApp.test.tsx` (9 testes novos): a preferência sobrevive à volta pelo Hub e é
   apagada na troca de empresa e no logout; ao abrir um produto pelo Hub (Dashboard, Colaboradores e,
   para o gestor, Minha equipe), o foco vai ao título — uma vez só, fora de região oculta ou inerte —,
@@ -182,13 +188,13 @@ O resultado era o vazio branco junto à navegação que esta tarefa remove.
   login também foca o título uma vez só.
 - `App.test.tsx`: um teste da ordem da faixa (T189) ajustado à marca dentro do cabeçalho da faixa.
   Nenhuma asserção foi removida.
-- Suíte web completa: 126 arquivos, 3448 testes. API unitária: 60 suítes, 1472 testes. Scripts: 182
+- Suíte web completa: 126 arquivos, 3449 testes. API unitária: 60 suítes, 1472 testes. Scripts: 182
   testes. Lint, typecheck e build verdes. A API não mudou;
   o E2E serial com PostgreSQL real (20 suítes, 1017 testes) passou como regressão.
 
 ### 12.2 Mutações
 
-29 mutações temporárias, todas detectadas:
+31 mutações temporárias, todas detectadas:
 
 - nome do botão, `aria-expanded` fixo, botão remontado ao alternar;
 - trilho sem trocar a largura, conteúdo com teto de largura, corpo centralizado;
@@ -200,30 +206,32 @@ O resultado era o vazio branco junto à navegação que esta tarefa remove.
 - sub-itens de 38 px no celular;
 - preferência que não sobrevive ao Hub, que sobrevive à troca de empresa ou ao logout, e gravação em
   `sessionStorage`;
-- Hub sem pedir foco ao abrir o produto, shell sem o foco de montagem, e foco duplicado permitido.
+- Hub sem pedir foco ao abrir o produto, shell sem o foco de montagem, e foco duplicado permitido;
+- faixa sem `z-index` no desktop e faixa acima do modal.
 
 ### 12.3 Validação local no navegador
 
 Prévia local da branch, com dados sintéticos.
 
-| Verificação                    | Resultado                                                                                                                                                                                                                                    |
-| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Faixa e conteúdo a 1366 px     | Faixa em x = 0, da altura da janela; nenhum vão entre faixa e conteúdo nem à direita. Conteúdo com 1079 px expandido e 1279 px recolhido.                                                                                                    |
-| Faixa e conteúdo a 1600 px     | Conteúdo de 1313 px para 1513 px ao recolher.                                                                                                                                                                                                |
-| Largura intermediária (900 px) | Conteúdo de 613 px para 813 px; sem rolagem horizontal.                                                                                                                                                                                      |
-| 375 px                         | Sem rolagem horizontal; gaveta modal, fundo inerte, foco no primeiro controle, Escape devolve ao "Menu"; todo alvo com 44 px.                                                                                                                |
-| RH                             | Aterrissa no Dashboard; trilho com Dashboard, Gestão de Pessoas, Estrutura, Jornada, Liderança, Contas de acesso e Demonstração, todos com nome e dica.                                                                                      |
-| DP                             | Dashboard; trilho sem Liderança, como o menu expandido.                                                                                                                                                                                      |
-| `master_tecnico`               | Dashboard; empresa compacta com o símbolo e o nome do acesso global.                                                                                                                                                                         |
-| Gestor                         | Minha equipe; Estrutura organizacional e Minha equipe como destinos diretos.                                                                                                                                                                 |
-| Perfis sem acesso ao shell     | Colaborador e administração técnica ficam no Hub, sem mudança. Pelo Hub o colaborador abre o shell de Demonstração, e o grupo herda `aria-current` no trilho.                                                                                |
-| Dashboard, Hub e Colaboradores | Dashboard nos dois estados; volta pelo Hub preserva o recolhido; Colaboradores aberto pelo submenu a partir do trilho.                                                                                                                       |
-| Submenu                        | Gestão de Pessoas, Estrutura e Demonstração no trilho expandem o menu e abrem o módulo, com o foco no cabeçalho.                                                                                                                             |
-| Troca de empresa               | Pelo trilho: o seletor compacto expande e abre a lista na empresa atual; a troca recria a tela expandida, anuncia e foca o título.                                                                                                           |
-| Edição pendente                | Com o menu recolhido e uma admissão em rascunho, o ícone do trilho abre "Sair sem salvar?". O trilho fica inerte e o foco vai a "Continuar editando"; continuar mantém o rascunho e devolve o foco ao ícone.                                 |
-| Teclado                        | Enter recolhe e mantém o foco no botão; Tab percorre empresa e ícones com a dica ao focar; Escape esconde a dica sem mover o foco.                                                                                                           |
-| Hub → produto                  | Em 1366 e 375 px: Hub → Dashboard e Hub → Colaboradores (RH) e Hub → Minha equipe (gestor) aplicam a rota e levam o foco ao título, fora de região oculta ou inerte, sem rolagem horizontal; com o menu recolhido, o recolhido é preservado. |
-| Travessia do breakpoint        | Com o foco no "Recolher menu", ir a 375 px leva o foco ao "Menu"; voltar ao desktop leva ao "Expandir menu", com o trilho de volta.                                                                                                          |
+| Verificação                    | Resultado                                                                                                                                                                                                                                                                                                               |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Faixa e conteúdo a 1366 px     | Faixa em x = 0, da altura da janela; nenhum vão entre faixa e conteúdo nem à direita. Conteúdo com 1079 px expandido e 1279 px recolhido.                                                                                                                                                                               |
+| Faixa e conteúdo a 1600 px     | Conteúdo de 1313 px para 1513 px ao recolher.                                                                                                                                                                                                                                                                           |
+| Largura intermediária (900 px) | Conteúdo de 613 px para 813 px; sem rolagem horizontal.                                                                                                                                                                                                                                                                 |
+| 375 px                         | Sem rolagem horizontal; gaveta modal, fundo inerte, foco no primeiro controle, Escape devolve ao "Menu"; todo alvo com 44 px.                                                                                                                                                                                           |
+| RH                             | Aterrissa no Dashboard; trilho com Dashboard, Gestão de Pessoas, Estrutura, Jornada, Liderança, Contas de acesso e Demonstração, todos com nome e dica.                                                                                                                                                                 |
+| DP                             | Dashboard; trilho sem Liderança, como o menu expandido.                                                                                                                                                                                                                                                                 |
+| `master_tecnico`               | Dashboard; empresa compacta com o símbolo e o nome do acesso global.                                                                                                                                                                                                                                                    |
+| Gestor                         | Minha equipe; Estrutura organizacional e Minha equipe como destinos diretos.                                                                                                                                                                                                                                            |
+| Perfis sem acesso ao shell     | Colaborador e administração técnica ficam no Hub, sem mudança. Pelo Hub o colaborador abre o shell de Demonstração, e o grupo herda `aria-current` no trilho.                                                                                                                                                           |
+| Dashboard, Hub e Colaboradores | Dashboard nos dois estados; volta pelo Hub preserva o recolhido; Colaboradores aberto pelo submenu a partir do trilho.                                                                                                                                                                                                  |
+| Submenu                        | Gestão de Pessoas, Estrutura e Demonstração no trilho expandem o menu e abrem o módulo, com o foco no cabeçalho.                                                                                                                                                                                                        |
+| Troca de empresa               | Pelo trilho: o seletor compacto expande e abre a lista na empresa atual; a troca recria a tela expandida, anuncia e foca o título.                                                                                                                                                                                      |
+| Edição pendente                | Com o menu recolhido e uma admissão em rascunho, o ícone do trilho abre "Sair sem salvar?". O trilho fica inerte e o foco vai a "Continuar editando"; continuar mantém o rascunho e devolve o foco ao ícone.                                                                                                            |
+| Teclado                        | Enter recolhe e mantém o foco no botão; Tab percorre empresa e ícones com a dica ao focar; Escape esconde a dica sem mover o foco.                                                                                                                                                                                      |
+| Hub → produto                  | Em 1366 e 375 px: Hub → Dashboard e Hub → Colaboradores (RH) e Hub → Minha equipe (gestor) aplicam a rota e levam o foco ao título, fora de região oculta ou inerte, sem rolagem horizontal; com o menu recolhido, o recolhido é preservado.                                                                            |
+| Camadas (1366 px)              | Menu expandido: a dica de "Recolher menu" aparece por cima do cabeçalho, pelo mouse e pelo teclado. No trilho, as dicas de Dashboard, Gestão de Pessoas, Estrutura, Jornada e "Expandir menu" ficam visíveis. Modal, guarda de saída e link de pular continuam acima da faixa; a gaveta do celular mantém a sua camada. |
+| Travessia do breakpoint        | Com o foco no "Recolher menu", ir a 375 px leva o foco ao "Menu"; voltar ao desktop leva ao "Expandir menu", com o trilho de volta.                                                                                                                                                                                     |
 
 ## 13. Achados da validação local, corrigidos dentro da entrega
 
@@ -241,6 +249,11 @@ Prévia local da branch, com dados sintéticos.
    novo um título que a própria tela já focou ao montar (o Dashboard faz isso), o que antes gerava
    um foco duplicado na aterrissagem. Os testes falhavam no head anterior (4 de 5) e as três
    mutações (sem o pedido no Hub, sem o foco de montagem, foco duplicado) foram detectadas.
+5. **Dica de "Recolher menu" atrás do cabeçalho** (achado da revisão): com o menu expandido, a dica
+   do botão ficava encoberta pelo cabeçalho, porque a faixa `sticky` forma um contexto de
+   empilhamento próprio e não tinha camada. A faixa ganhou `z-index: 31` no desktop (seção 8). O
+   teste de contrato de CSS falhava no head anterior, e as mutações (sem a camada; faixa acima do
+   modal) foram detectadas.
 
 ## 14. Limites e observações
 

@@ -358,6 +358,14 @@
 
 /* Trilho recolhido (T206) — só no desktop. */
 @media (min-width: 835px) {
+  /* A faixa é `sticky` e forma um contexto de empilhamento próprio: a dica
+     que mora nela só sobe acima do cabeçalho (30) se a FAIXA subir. Fica
+     abaixo do link de pular (60), da gaveta (40), do modal (100) e da
+     guarda e do aviso de contexto (110). */
+  .app-shell__sidebar {
+    z-index: 31;
+  }
+
   .app-shell--menu-recolhido {
     --largura-lateral: var(--largura-trilho);
   }

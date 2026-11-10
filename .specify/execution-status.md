@@ -3087,7 +3087,7 @@ os mesmos botões e o texto visualmente oculto; módulo com submenu e empresa co
 expandem o menu no mesmo gesto; item ativo herdado pelo cabeçalho do módulo oculto; dica
 `aria-hidden`; preferência em memória por conta e empresa; foco nunca no `body` ao atravessar
 o breakpoint; alvos de 44 px na gaveta; foco no título ao abrir um produto pelo Hub, uma vez só.
-Quatro achados corrigidos dentro da entrega (seção 13 do dossiê).
+Cinco achados corrigidos dentro da entrega (seção 13 do dossiê).
 
 **Testes:** web (shell, trilho, dica, gaveta, preferência e contrato de CSS) e mutações, todas
 detectadas. Validação local com dados sintéticos para RH, DP, `master_tecnico`, gestor e perfis
