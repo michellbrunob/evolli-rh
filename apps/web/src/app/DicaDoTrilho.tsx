@@ -19,7 +19,9 @@
  * - aparece ao passar o ponteiro e ao receber foco;
  * - some ao sair o ponteiro (exceto se ele passou para a própria dica, que
  *   pode ser percorrida — critério 1.4.13), ao perder o foco, com `Escape`,
- *   com clique e com rolagem.
+ *   com clique, com rolagem e com o redimensionamento da janela;
+ * - se reposiciona ao fim de uma transição da faixa: o item pode receber foco
+ *   enquanto a largura ainda anda, e a posição medida ali já não vale.
  *
  * O clique também a esconde porque ele pode trocar o próprio nome do item
  * (recolher vira expandir): uma dica com o nome antigo mentiria.
@@ -99,22 +101,29 @@ export function DicaDoTrilho({ raizRef, ativa }: DicaDoTrilhoProps) {
     const aoTeclar = (evento: KeyboardEvent) => {
       if (evento.key === "Escape") esconder();
     };
+    const aoTerminarTransicao = () => {
+      if (alvoAtual !== null) mostrar(alvoAtual);
+    };
 
     raiz.addEventListener("pointerover", aoApontar);
     raiz.addEventListener("pointerout", aoSairDoPonteiro);
     raiz.addEventListener("focusin", aoFocar);
     raiz.addEventListener("focusout", esconder);
     raiz.addEventListener("click", esconder);
+    raiz.addEventListener("transitionend", aoTerminarTransicao);
     document.addEventListener("keydown", aoTeclar);
     window.addEventListener("scroll", esconder, true);
+    window.addEventListener("resize", esconder);
     return () => {
       raiz.removeEventListener("pointerover", aoApontar);
       raiz.removeEventListener("pointerout", aoSairDoPonteiro);
       raiz.removeEventListener("focusin", aoFocar);
       raiz.removeEventListener("focusout", esconder);
       raiz.removeEventListener("click", esconder);
+      raiz.removeEventListener("transitionend", aoTerminarTransicao);
       document.removeEventListener("keydown", aoTeclar);
       window.removeEventListener("scroll", esconder, true);
+      window.removeEventListener("resize", esconder);
       setDica(null);
     };
   }, [ativa, raizRef]);

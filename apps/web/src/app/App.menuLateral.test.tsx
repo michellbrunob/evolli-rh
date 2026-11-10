@@ -361,6 +361,36 @@ describe("T206 — dica visual do trilho", () => {
     expect(dica()).toBeNull();
   });
 
+  it("reposiciona ao fim da transição da faixa (o foco pode chegar com a largura andando)", () => {
+    render(<App papelDoAtor="rh" />);
+    recolher();
+    const estrutura = itemDoTrilho("Estrutura");
+    const caixa = (direita: number, topo: number) =>
+      ({ top: topo, height: 40, right: direita }) as DOMRect;
+    // Durante a transição a faixa ainda é larga: a medida sai deslocada.
+    estrutura.getBoundingClientRect = () => caixa(272, 100);
+    act(() => estrutura.focus());
+    expect(dica()!.style.left).toBe("272px");
+    // Terminada a transição, o item está no trilho.
+    estrutura.getBoundingClientRect = () => caixa(64, 100);
+    act(() => {
+      barra().dispatchEvent(new Event("transitionend", { bubbles: true }));
+    });
+    expect(dica()!.style.left).toBe("64px");
+    expect(dica()!.style.top).toBe("120px");
+  });
+
+  it("some quando a janela é redimensionada", () => {
+    render(<App papelDoAtor="rh" />);
+    recolher();
+    act(() => itemDoTrilho("Estrutura").focus());
+    expect(dica()).not.toBeNull();
+    act(() => {
+      window.dispatchEvent(new Event("resize"));
+    });
+    expect(dica()).toBeNull();
+  });
+
   it("o botão de recolher também tem dica, com o nome atual", () => {
     render(<App papelDoAtor="rh" />);
     fireEvent.pointerOver(botaoRecolher());
