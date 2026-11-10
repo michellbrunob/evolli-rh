@@ -895,7 +895,7 @@ describe("T205 — foco, anúncio e 375 px", () => {
     expect(screen.getByRole("status")).toHaveTextContent(
       /^Dashboard de 2026 lido em \d{2}\/\d{2}\/\d{4} às \d{2}:\d{2}\.$/,
     );
-    expect(screen.getByText(/^Lido em /)).toBeVisible();
+    expect(screen.getByText(/^Dados lidos em /)).toBeVisible();
   });
 
   it("CSS: colunas que encolhem, tabela rolando no próprio quadro, alvos de 44 px", () => {
@@ -2473,22 +2473,74 @@ describe("T207 — refino em 375 px (CSS)", () => {
   });
 });
 
-describe("T207 — hora da leitura sem repetição", () => {
-  it("a hora da leitura aparece uma vez só, junto de Atualizar — não também no Resumo", async () => {
-    render(<Tela />);
-    await lido();
-    const visiveis = [...document.querySelectorAll<HTMLElement>(".dashboard *")]
+describe("T207 — hora da leitura: uma vez só em cada aba", () => {
+  /** Os nós visíveis cujo texto próprio fala da leitura. */
+  const horasVisiveis = () =>
+    [...document.querySelectorAll<HTMLElement>(".dashboard *")]
       .filter((no) => !no.closest(".dashboard__so-leitor"))
       .filter((no) =>
         [...no.childNodes].some(
           (filho) =>
             filho.nodeType === Node.TEXT_NODE &&
-            /lidos? em/i.test(filho.textContent ?? ""),
+            /lidos? em|ainda não lido/i.test(filho.textContent ?? ""),
         ),
       );
-    expect(visiveis.map((no) => no.textContent)).toEqual([
-      expect.stringMatching(/^Lido em \d{2}\/\d{2}\/\d{4} às \d{2}:\d{2}$/),
+
+  it("Visão Geral: no card do Resumo, com a marca verde-água; nada ao lado de Atualizar", async () => {
+    render(<Tela />);
+    await lido();
+    const horas = horasVisiveis();
+    expect(horas.map((no) => no.textContent)).toEqual([
+      expect.stringMatching(
+        /^Dados lidos em \d{2}\/\d{2}\/\d{4} às \d{2}:\d{2}$/,
+      ),
     ]);
-    expect(within(bloco("Resumo")).queryByText(/lido/i)).toBeNull();
+    expect(bloco("Resumo")).toContainElement(horas[0]!);
+    expect(horas[0]).toHaveClass("dashboard__selo--leitura");
+    const barra = document.querySelector<HTMLElement>(".dashboard__leitura")!;
+    expect(
+      within(barra).getByRole("button", { name: "Atualizar" }),
+    ).toBeVisible();
+    expect(barra.textContent).not.toMatch(/lido/i);
+  });
+
+  it("antes da primeira leitura, o card diz que ainda não leu", () => {
+    vi.mocked(listarMovimentacoes).mockReturnValue(new Promise(() => {}));
+    servidorDosContadores.mockReturnValue(new Promise(() => {}));
+    servidorDosAtivos.mockReturnValue(new Promise(() => {}));
+    render(<Tela />);
+    expect(horasVisiveis().map((no) => no.textContent)).toEqual([
+      "Ainda não lido",
+    ]);
+  });
+
+  it.each(["pessoas", "movimentacao"] as const)(
+    "%s (sem Resumo): a hora fica ao lado de Atualizar, uma vez só",
+    async (aba) => {
+      render(<Tela aba={aba} />);
+      await lido();
+      const horas = horasVisiveis();
+      expect(horas.map((no) => no.textContent)).toEqual([
+        expect.stringMatching(/^Lido em \d{2}\/\d{2}\/\d{4} às \d{2}:\d{2}$/),
+      ]);
+      expect(document.querySelector(".dashboard__leitura")!).toContainElement(
+        horas[0]!,
+      );
+    },
+  );
+
+  it("CSS: a marca verde-água é decorativa (antes do texto), e o texto não é verde-água", () => {
+    const css = readFileSync(
+      "src/screens/dashboard/DashboardScreen.css",
+      "utf8",
+    );
+    const antes = css.match(/\n\.dashboard__selo--leitura::before \{([^}]*)\}/);
+    expect(antes![1]).toMatch(/content:\s*""/);
+    expect(antes![1]).toMatch(/background:\s*var\(--evolli-verde-agua\)/);
+    const selo = css.match(/\n\.dashboard__selo--leitura \{([^}]*)\}/);
+    expect(selo![1]).not.toMatch(/color:\s*var\(--evolli-verde-agua/);
+    // Logo depois do título do card, à esquerda (não empurrado para a borda).
+    const topo = css.match(/\n\.dashboard__resumo-topo \{([^}]*)\}/);
+    expect(topo![1]).toMatch(/justify-content:\s*flex-start/);
   });
 });

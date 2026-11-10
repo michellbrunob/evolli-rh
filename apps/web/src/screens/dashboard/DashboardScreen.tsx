@@ -614,7 +614,11 @@ export function DashboardScreen({
           <h2 id={ids.pessoas} tabIndex={-1} className="dashboard__subtitulo">
             Resumo
           </h2>
-          {/* A hora da leitura fica uma vez só, junto de "Atualizar". */}
+          {/* A hora da leitura, uma vez só: na Visão Geral fica aqui, no
+              card do Resumo; nas outras abas, junto de "Atualizar". */}
+          <span className="dashboard__selo dashboard__selo--leitura">
+            {lidoEm ? `Dados lidos em ${lidoEm}` : "Ainda não lido"}
+          </span>
         </div>
         {dadosContadores && admissoes && desligamentos ? (
           <p className="dashboard__frase">
@@ -1093,9 +1097,11 @@ export function DashboardScreen({
           </div>
           {abaLeDados(aba) ? (
             <div className="dashboard__leitura">
-              <span className="dashboard__nota">
-                {lidoEm ? `Lido em ${lidoEm}` : "Ainda não lido"}
-              </span>
+              {aba !== "visao-geral" ? (
+                <span className="dashboard__nota">
+                  {lidoEm ? `Lido em ${lidoEm}` : "Ainda não lido"}
+                </span>
+              ) : null}
               <Button
                 type="button"
                 variant="secondary"

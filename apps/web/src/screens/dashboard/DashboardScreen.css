@@ -178,7 +178,7 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: var(--space-xs) var(--space-md);
 }
 
@@ -200,6 +200,22 @@
   border-radius: var(--radius-pill);
   font-size: var(--text-caption);
   font-weight: var(--weight-strong);
+}
+
+.dashboard__selo--leitura {
+  background: var(--surface-canvas);
+  color: var(--color-ink-muted);
+}
+
+/* Marca verde-água antes do texto: destaque, não informação (o texto segue
+   em tom neutro; verde-água nunca é texto pequeno sobre branco). */
+.dashboard__selo--leitura::before {
+  content: "";
+  flex: 0 0 auto;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: var(--radius-pill);
+  background: var(--evolli-verde-agua);
 }
 
 .dashboard__selo--estado {
