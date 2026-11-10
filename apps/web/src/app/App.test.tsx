@@ -788,12 +788,13 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
       name: "Navegação do painel",
     });
     const botoes = Array.from(nav.querySelectorAll("button"));
-    // Quinze destinos (`rh` enxerga o mapa inteiro; Nova admissão, T176,
+    // Dezesseis destinos (`rh` enxerga o mapa inteiro; Nova admissão, T176,
     // saiu da barra na T178 — é sub-página de Colaboradores; Jornadas de
-    // trabalho entrou na T182) mais os quatro cabeçalhos de módulo
-    // expansível: Gestão de Pessoas (`sempreComoModulo`), Estrutura (dois
-    // itens desde a T182), Liderança e Demonstração.
-    expect(botoes).toHaveLength(19);
+    // trabalho entrou na T182; o Dashboard, na T205) mais os quatro
+    // cabeçalhos de módulo expansível: Gestão de Pessoas
+    // (`sempreComoModulo`), Estrutura (dois itens desde a T182), Liderança e
+    // Demonstração. O Dashboard é item único: módulo e destino fundidos.
+    expect(botoes).toHaveLength(20);
     expect(
       botoes
         .filter((b) => b.hasAttribute("aria-expanded"))

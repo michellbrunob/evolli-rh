@@ -114,9 +114,12 @@ describe("T162 — o Hub oferece só o que o servidor autoriza", () => {
    * destino. Ver o bloco de `capacidadeFuncionalDe`.
    */
   const ESPERADO: ReadonlyArray<readonly [string, readonly string[]]> = [
+    // T205 — o Dashboard lê `colaborador` (e movimentações): rh, dp e
+    // master_tecnico.
     [
       "rh",
       [
+        "Dashboard",
         "Colaboradores",
         "Nova admissão",
         "Estrutura organizacional",
@@ -132,6 +135,7 @@ describe("T162 — o Hub oferece só o que o servidor autoriza", () => {
     [
       "dp",
       [
+        "Dashboard",
         "Colaboradores",
         "Nova admissão",
         "Estrutura organizacional",
@@ -143,6 +147,7 @@ describe("T162 — o Hub oferece só o que o servidor autoriza", () => {
     [
       "master_tecnico",
       [
+        "Dashboard",
         "Colaboradores",
         "Estrutura organizacional",
         "Jornadas de trabalho",
@@ -459,7 +464,7 @@ describe("T162 — acessibilidade e estrutura", () => {
 
   it("cada cartão tem nome acessível com o rótulo do produto", async () => {
     montar({ papel: "rh" });
-    await waitFor(() => expect(cartoesVisiveis().length).toBe(8));
+    await waitFor(() => expect(cartoesVisiveis().length).toBe(9));
     for (const destino of capacidadeFuncionalDe("rh")) {
       // T182 — "Jornada" também casa com "Jornadas de trabalho".
       expect(

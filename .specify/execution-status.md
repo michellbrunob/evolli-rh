@@ -2966,11 +2966,11 @@ squash `e086d1ca79d978a51373f1b3afafbfba3cdd069f`, CI de push 3/3 verde, run
 42608918002); a única pendência administrativa era a sua convergência no Spec Kit,
 resolvida no primeiro commit da T204.
 
-## Primeira ação operacional em Solicitações na ficha — T204 (em implementação)
+## Primeira ação operacional em Solicitações na ficha — T204 (integrada)
 
-| Tarefa | Estado                                                            | Resultado principal                                                                                             |
-| ------ | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| T204   | **Em implementação** (entrega em PR Draft, validada no localhost) | RH registra e envia uma solicitação pela aba Solicitações da ficha; o resto do fluxo continua na tela coletiva. |
+| Tarefa | Estado                                    | Resultado principal                                                                                             |
+| ------ | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| T204   | **Integrada** (PR #197, squash `f51c21d`) | RH registra e envia uma solicitação pela aba Solicitações da ficha; o resto do fluxo continua na tela coletiva. |
 
 **Escopo da T204:** as decisões A-1 a A-6 do
 [dossiê](../docs/decisions/t204-dossie-acao-solicitacoes-ficha.md), aprovadas em
@@ -2987,6 +2987,8 @@ resolvida no primeiro commit da T204.
   recarregar, o rascunho não enviado fica só na tela coletiva;
 - página desatualizada (`403 csrf_invalido`): o cliente descarta o token, como os demais
   clientes de gravação, e a ficha orienta confirmar de novo (achado da validação local);
+- falha ao preparar o envio (token CSRF não obtido): nada é registrado nem enviado, sem
+  tratar como incerto (achado da revisão);
 - testes de API do contrato existente, sem mudar código da API.
 
 **Fora de escopo:**
@@ -3001,6 +3003,55 @@ resolvida no primeiro commit da T204.
 
 **Histórico da preparação:** o dossiê e as decisões foram preparados sem código de
 produto, sem push e sem PR; isso valeu só para aquela fase.
+
+**Observação de relatório:** a integração funcional da T204 está concluída (PR #197,
+squash `f51c21d0d0451079e1e93c8a25e8b48ccbd07bff`, CI de push 3/3 verde, run
+42663261934); a única pendência administrativa era a sua convergência no Spec Kit,
+resolvida no primeiro commit da T205.
+
+## Dashboard inicial pós-login — T205 (em implementação)
+
+| Tarefa | Estado                                                               | Resultado principal                                                                          |
+| ------ | -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| T205   | **Em implementação** (entrega em PR Draft #198, validada localmente) | Dashboard inicial pós-login: visão executiva operacional de RH só com dados reais do Evolli. |
+
+**Escopo da preparação (concluída):** levantamento e preparação de decisão, no
+[dossiê](../docs/decisions/t205-dossie-dashboard-inicial.md): estado atual pós-login por papel,
+dados reais disponíveis e seus limites, papéis e isolamento por empresa, proposta de uma
+primeira fatia completa só com dados reais, o que fica fora dela e por quê, riscos, critérios
+de aceite, plano de testes e decisões pendentes.
+
+**Decisões aprovadas (2026-11-09):** D-1 a D-12 do dossiê, como recomendado.
+
+**Entregue (PR Draft #198, validada localmente):** a implementação das D-1 a D-12, descrita na seção 15
+do dossiê:
+
+- rota `#/dashboard?ano=AAAA` (ano civil, até hoje no corrente; ano ausente, inválido,
+  futuro ou anterior a 2000 corrigido no lugar; troca de ano empilha; voltar, avançar e
+  recarga funcionam);
+- aterrissagem: RH, DP e `master_tecnico` no Dashboard, gestor em Minha equipe, demais no
+  Hub, com o foco no título; Dashboard primeiro no menu e cartão no Hub para os mesmos papéis;
+- `master_tecnico` sem empresa: orientação e nenhuma consulta;
+- E-1 a E-5: período, resumo (pessoas hoje × vínculos no ano, diferença e frase com os mesmos
+  números), ativos por tipo com atalhos para a listagem, série mensal em barras CSS com
+  tabela equivalente, momento da leitura e "Atualizar";
+- série paginada de 100 em 100 com teto de 20 páginas e nenhum número parcial acima dele;
+  falha e nova tentativa por bloco; resposta atrasada descartada e paginação obsoleta
+  interrompida; troca de empresa reabre no ano corrente da empresa nova.
+
+**Comportamentos aprovados (2026-11-09):** os cinco da seção 15.7 do dossiê (troca de
+empresa reabre no ano corrente; "hoje" pelo relógio do navegador; menor ano 2000; gestor
+direto em Minha equipe; foco no Hub sem mudança, como observação fora do escopo).
+
+**Contratos reutilizados:** `GET /v1/colaboradores` (contadores) e `GET /v1/movimentacoes`
+(`tipo` + `status=efetivada`); nenhum endpoint, permissão ou dependência nova.
+
+**Testes:** web (dados, rota, tela, shell, autenticação), E2E do contrato existente de
+movimentações e mutações de permissão, empresa, teto, unidade, limite do ano e atraso, todas
+detectadas. Validação local com dados sintéticos para RH, DP, `master_tecnico` com e sem
+empresa e gestor, em desktop e 375 px.
+
+**Fora de escopo:** API nova, banco, schema, migration, RBAC, auditoria, Docker, seed, dependências, lockfile, workflow, Ready for review e merge; e os itens da seção 8 do dossiê.
 
 ## Próxima ação autorizável
 

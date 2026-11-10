@@ -98,6 +98,7 @@ import {
   type CanalDeContexto,
 } from "./sincronizacaoDeContexto";
 import { destinoAposTrocaDeEmpresa, destinoDaRota } from "./rotasDoShell";
+import { destinoPosLoginPara } from "./mapaNavegacao";
 import { logout } from "../api/authClient";
 import {
   trocarEmpresaDoContexto,
@@ -161,6 +162,14 @@ export function AutenticacaoApp() {
   const [destinoAberto, setDestinoAberto] = useState<string | null>(() =>
     destinoDaRota(window.location.hash),
   );
+  /**
+   * T205 — a primeira resolução do ator nesta sessão ainda não aconteceu. Nela,
+   * sem rota na URL, a sessão abre onde o papel trabalha (D-2): o Dashboard
+   * para RH, DP e `master_tecnico`; Minha equipe para o `gestor`; o Hub para
+   * os demais. Só uma vez: voltar ao Hub pelo topo, ou trocar de empresa
+   * estando nele, não redireciona. Volta a valer a cada novo login.
+   */
+  const aterrissagemPendenteRef = useRef(true);
 
   /** T189 — edições pendentes e salvamentos em andamento, da árvore toda. */
   const registro = useRegistroDeEdicoes();
@@ -250,6 +259,16 @@ export function AutenticacaoApp() {
           setEstado("falha-ator");
           return;
         }
+        if (aterrissagemPendenteRef.current) {
+          aterrissagemPendenteRef.current = false;
+          if (destinoAbertoRef.current === null) {
+            const destino = destinoPosLoginPara(eu.role);
+            setDestinoAberto(destino);
+            // A tela de aterrissagem nasce com o foco no título, como
+            // depois de uma troca de empresa: nunca no body.
+            if (destino !== null) setFocarTitulo(true);
+          }
+        }
         setAtor(eu);
         setEstado("pronto");
       } catch {
@@ -284,6 +303,8 @@ export function AutenticacaoApp() {
     // E o produto aberto sai junto com os dois: a sessão seguinte começa no
     // Hub, nunca dentro do módulo em que a anterior estava.
     setDestinoAberto(null);
+    // T205 — e o próximo login volta a aterrissar onde o papel trabalha.
+    aterrissagemPendenteRef.current = true;
     setContextoAlterado(null);
     setAnuncio("");
     setEstado("login");

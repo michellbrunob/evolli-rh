@@ -297,12 +297,67 @@ export function rotaDaListagem(estado: EstadoDaListagem): string {
 }
 
 /**
+ * T205 — o Dashboard inicial: a visão do ano, com o ano na URL
+ * (`#/dashboard?ano=AAAA`, decisão D-3). O ano vale de `ANO_MINIMO_DO_DASHBOARD`
+ * até o ano corrente do navegador; ausente, inválido ou futuro é corrigido no
+ * lugar para o ano corrente (sem entrada nova no histórico). Qualquer outro
+ * parâmetro é ignorado.
+ */
+const ROTA_DO_DASHBOARD = "#/dashboard";
+export const ANO_MINIMO_DO_DASHBOARD = 2000;
+
+/** T205 — o ano civil corrente, pelo relógio do navegador. */
+export function anoCorrente(agora: Date = new Date()): number {
+  return agora.getFullYear();
+}
+
+/** T205 — o ano está no intervalo consultável do Dashboard? */
+export function anoDoDashboardValido(
+  ano: number,
+  agora: Date = new Date(),
+): boolean {
+  return (
+    Number.isInteger(ano) &&
+    ano >= ANO_MINIMO_DO_DASHBOARD &&
+    ano <= anoCorrente(agora)
+  );
+}
+
+/**
+ * T205 — o ano que a rota do Dashboard pede, ou `null` se o fragmento não é
+ * a rota do Dashboard. Ano ausente, malformado, anterior ao mínimo ou futuro
+ * vira o ano corrente (a URL é corrigida no lugar por quem exibe).
+ */
+export function dashboardDaRota(
+  fragmento: string,
+  agora: Date = new Date(),
+): { readonly ano: number } | null {
+  if (fragmento === ROTA_DO_DASHBOARD) return { ano: anoCorrente(agora) };
+  if (!fragmento.startsWith(`${ROTA_DO_DASHBOARD}?`)) return null;
+  const params = new URLSearchParams(
+    fragmento.slice(ROTA_DO_DASHBOARD.length + 1),
+  );
+  const texto = params.get("ano") ?? "";
+  const ano = /^[0-9]{4}$/.test(texto) ? Number(texto) : NaN;
+  return {
+    ano: anoDoDashboardValido(ano, agora) ? ano : anoCorrente(agora),
+  };
+}
+
+/** T205 — o endereço do Dashboard: sempre com o ano, na forma canônica. */
+export function rotaDoDashboard(ano: number): string {
+  return `${ROTA_DO_DASHBOARD}?ano=${ano}`;
+}
+
+/**
  * O destino que o fragmento pede, ou `null` se ele não é rota conhecida.
  * T198 — a ficha pertence ao destino `pessoas` (o mesmo contêiner, a mesma
  * capacidade por papel): quem abre Colaboradores abre a ficha.
  * T199 — o dashboard com estado na URL também.
+ * T205 — o Dashboard inicial é o destino `dashboard`.
  */
 export function destinoDaRota(fragmento: string): string | null {
+  if (dashboardDaRota(fragmento) !== null) return "dashboard";
   if (fichaDaRota(fragmento) !== null) return "pessoas";
   if (listagemDaRota(fragmento) !== null) return "pessoas";
   const entrada = Object.entries(ROTA_POR_DESTINO).find(

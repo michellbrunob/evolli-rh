@@ -45,8 +45,10 @@ function botoesDeDestino(): HTMLElement[] {
 }
 
 describe("estrutura dos grupos", () => {
-  it("os cinco módulos operacionais vêm antes de Demonstração", () => {
+  // T205 — o Dashboard vem antes de todos (D-9).
+  it("o Dashboard e os cinco módulos operacionais vêm antes de Demonstração", () => {
     expect(GRUPOS.map((g) => g.titulo)).toEqual([
+      "Dashboard",
       "Gestão de Pessoas",
       "Estrutura",
       "Jornada",
@@ -96,6 +98,8 @@ describe("o estado declarado bate com o código", () => {
 
   /** Tela que cada destino abre por padrão. */
   const TELA_PADRAO: Readonly<Record<string, string>> = {
+    // T205 — o Dashboard lê colaboradores e movimentações: funcional.
+    dashboard: "src/screens/dashboard/DashboardScreen.tsx",
     pessoas: "src/screens/pessoas/ColaboradoresScreen.tsx",
     "nova-admissao": "src/screens/pessoas/NovaAdmissaoScreen.tsx",
     cadastros: "src/screens/horarios/EstruturaOrganizacionalScreen.tsx",

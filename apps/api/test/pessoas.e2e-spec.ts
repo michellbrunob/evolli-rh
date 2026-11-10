@@ -4458,4 +4458,99 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
       );
     });
   });
+
+  // T205 — o contrato que o Dashboard inicial lê, sem endpoint novo: a lista
+  // de movimentações filtrada por `tipo` + `status`, só da empresa do ator e
+  // na ordem decrescente de vigência que permite parar a paginação.
+  describe("T205 — movimentações efetivadas por tipo (contrato do Dashboard)", () => {
+    type Mov = {
+      id: string;
+      empresaId: string;
+      tipo: string;
+      status: string;
+      vigenciaInicio: string;
+      registradaEm: string;
+    };
+
+    async function todasDe(rota: string, cred: Credencial): Promise<Mov[]> {
+      const itens: Mov[] = [];
+      for (let pagina = 1; pagina <= 50; pagina++) {
+        const r = await get(
+          `${rota}${rota.includes("?") ? "&" : "?"}pagina=${pagina}&tamanhoPagina=100`,
+          cred,
+        ).expect(200);
+        itens.push(...(r.body.itens as Mov[]));
+        if ((r.body.itens as Mov[]).length < 100) return itens;
+      }
+      throw new Error("paginação sem fim");
+    }
+
+    const decrescente = (a: Mov, b: Mov) =>
+      b.vigenciaInicio.localeCompare(a.vigenciaInicio) ||
+      b.registradaEm.localeCompare(a.registradaEm) ||
+      b.id.localeCompare(a.id);
+
+    it.each(["admissao", "desligamento"])(
+      "tipo=%s&status=efetivada: exatamente as efetivadas desse tipo da empresa, em vigência decrescente",
+      async (tipo) => {
+        const tudo = await todasDe("/v1/movimentacoes", rhA);
+        const esperadas = tudo
+          .filter((m) => m.tipo === tipo && m.status === "efetivada")
+          .sort(decrescente);
+        // O filtro só prova algo se houver o que excluir e o que manter.
+        expect(esperadas.length).toBeGreaterThan(0);
+        expect(tudo.length).toBeGreaterThan(esperadas.length);
+
+        const filtradas = await todasDe(
+          `/v1/movimentacoes?tipo=${tipo}&status=efetivada`,
+          rhA,
+        );
+        expect(filtradas.map((m) => m.id)).toEqual(esperadas.map((m) => m.id));
+        for (const m of filtradas) {
+          expect(m).toMatchObject({
+            tipo,
+            status: "efetivada",
+            empresaId: empresaA,
+          });
+        }
+
+        // O DP lê o mesmo (é papel do Dashboard); o total da primeira página
+        // é o da série inteira.
+        const dp = await get(
+          `/v1/movimentacoes?tipo=${tipo}&status=efetivada&pagina=1&tamanhoPagina=100`,
+          dpA,
+        ).expect(200);
+        expect(dp.body.total).toBe(esperadas.length);
+        expect((dp.body.itens as Mov[]).map((m) => m.id)).toEqual(
+          esperadas.slice(0, 100).map((m) => m.id),
+        );
+      },
+    );
+
+    it("isolamento: o RH da outra empresa não recebe nenhuma movimentação da Alfa", async () => {
+      const daAlfa = new Set(
+        (
+          await todasDe("/v1/movimentacoes?tipo=admissao&status=efetivada", rhA)
+        ).map((m) => m.id),
+      );
+      expect(daAlfa.size).toBeGreaterThan(0);
+      const daBeta = await todasDe(
+        "/v1/movimentacoes?tipo=admissao&status=efetivada",
+        rhB,
+      );
+      // Sem movimentação da Beta, o laço abaixo não provaria nada.
+      expect(daBeta.length).toBeGreaterThan(0);
+      for (const m of daBeta) {
+        expect(daAlfa.has(m.id)).toBe(false);
+        expect(m.empresaId).toBe(empresaB);
+      }
+    });
+
+    it("tamanho de página acima de 100 é recusado (o Dashboard pede 100)", async () => {
+      await get(
+        "/v1/movimentacoes?tipo=admissao&status=efetivada&tamanhoPagina=101",
+        rhA,
+      ).expect(400);
+    });
+  });
 });
