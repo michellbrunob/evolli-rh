@@ -3061,11 +3061,11 @@ squash `c2c83622fd84bba9af73da3af96a4d5cb255b6a3`, CI de push 3/3 verde, run
 42798080671); a única pendência administrativa era a sua convergência no Spec Kit,
 resolvida no primeiro commit da T206.
 
-## Shell com menu lateral fixo e recolhível — T206 (em implementação)
+## Shell com menu lateral fixo e recolhível — T206 (em implementação, validada localmente)
 
-| Tarefa | Estado               | Resultado principal                                                                                        |
-| ------ | -------------------- | ---------------------------------------------------------------------------------------------------------- |
-| T206   | **Em implementação** | Menu lateral preso à esquerda, recolhível em trilho de ícones, com o conteúdo ocupando a largura liberada. |
+| Tarefa | Estado                                     | Resultado principal                                                                                        |
+| ------ | ------------------------------------------ | ---------------------------------------------------------------------------------------------------------- |
+| T206   | **Em implementação** (validada localmente) | Menu lateral preso à esquerda, recolhível em trilho de ícones, com o conteúdo ocupando a largura liberada. |
 
 **Escopo:** só shell e navegação na web, registrado no
 [dossiê](../docs/decisions/t206-shell-menu-lateral.md):
@@ -3080,6 +3080,18 @@ resolvida no primeiro commit da T206.
 - gaveta do celular, guarda de edição pendente (T200), troca de empresa (T189) e
   permissões por papel preservadas; sem rolagem horizontal em desktop, largura
   intermediária e 375 px.
+
+**Entregue (validada localmente):** a implementação descrita nas seções 4 a 11 do dossiê —
+faixa da altura da janela presa à esquerda, sem trava de largura no corpo; trilho de 72 px com
+os mesmos botões e o texto visualmente oculto; módulo com submenu e empresa compacta que
+expandem o menu no mesmo gesto; item ativo herdado pelo cabeçalho do módulo oculto; dica
+`aria-hidden`; preferência em memória por conta e empresa; foco nunca no `body` ao atravessar
+o breakpoint; alvos de 44 px na gaveta. Três achados da validação local corrigidos dentro da
+entrega (seção 13 do dossiê).
+
+**Testes:** web (shell, trilho, dica, gaveta, preferência e contrato de CSS) e mutações, todas
+detectadas. Validação local com dados sintéticos para RH, DP, `master_tecnico`, gestor e perfis
+sem acesso ao shell, em desktop, largura intermediária e 375 px.
 
 **Fora de escopo:**
 

@@ -3264,8 +3264,9 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         foram corrigidos dentro da entrega.
 
 103.  **T206 - Shell com menu lateral fixo e recolhível**
-      - **Estado:** **em implementação**. Branch `codex/t206-shell-menu-lateral`, a partir do
-        squash `c2c83622fd84bba9af73da3af96a4d5cb255b6a3` (T205 integrada, PR #198).
+      - **Estado:** **em implementação, validada localmente**. Branch
+        `codex/t206-shell-menu-lateral`, a partir do squash
+        `c2c83622fd84bba9af73da3af96a4d5cb255b6a3` (T205 integrada, PR #198).
       - **Objetivo:** o menu passa a ser uma faixa lateral real e estável, presa à esquerda da
         aplicação, sem espaço morto entre navegação e conteúdo. Recolhido, vira um trilho
         compacto de ícones funcionais, e o conteúdo principal ocupa a largura liberada. Registro
@@ -3277,6 +3278,13 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         preferência só em memória da aba; gaveta do celular, guarda de edição pendente (T200),
         troca de empresa (T189) e permissões por papel preservadas; sem rolagem horizontal em
         desktop, largura intermediária e 375 px.
+      - **Entregue (seções 4 a 11 do dossiê):** faixa da altura da janela presa à esquerda,
+        sem trava de largura no corpo; trilho de 72 px com os mesmos botões e o texto
+        visualmente oculto; módulo com submenu e empresa compacta que expandem o menu no mesmo
+        gesto, com o foco no próprio controle; item ativo herdado pelo cabeçalho do módulo
+        oculto; dica `aria-hidden`; preferência em memória por conta e empresa; foco nunca no
+        `body` ao atravessar o breakpoint; alvos de 44 px na gaveta. Testes web, mutações
+        detectadas e validação local com dados sintéticos (seção 12 do dossiê).
       - **Fora de escopo:** API, schema, migration, RBAC, auditoria, seed, Docker,
         dependências, lockfile e workflows; regras do Dashboard, de Colaboradores e das fichas;
         identidade visual, ativos de marca e logotipo; menu, seção, trilha de navegação,

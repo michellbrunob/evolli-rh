@@ -13,7 +13,7 @@
   "nextTask": {
     "id": "T206",
     "status": "shell_menu_lateral_em_implementacao",
-    "reason": "T205 integrada em main pela PR #198 (squash c2c83622fd84bba9af73da3af96a4d5cb255b6a3), com a CI de push 3/3 verde (run 42798080671). A T206 implementa o shell com menu lateral fixo e recolhivel (docs/decisions/t206-shell-menu-lateral.md): barra presa a esquerda sem vazio entre navegacao e conteudo; trilho compacto de icones quando recolhido, com nome acessivel, dica ao passar o mouse e ao focar e item ativo identificavel; conteudo ocupando a largura liberada; preferencia so em memoria da aba; gaveta do celular, guarda T200, troca de empresa T189 e permissoes por papel preservadas. So shell e navegacao na web: sem API, schema, migration, RBAC, auditoria, seed ou dependencia. Em implementacao."
+    "reason": "T205 integrada em main pela PR #198 (squash c2c83622fd84bba9af73da3af96a4d5cb255b6a3), com a CI de push 3/3 verde (run 42798080671). A T206 implementa o shell com menu lateral fixo e recolhivel (docs/decisions/t206-shell-menu-lateral.md): barra presa a esquerda sem vazio entre navegacao e conteudo; trilho compacto de icones quando recolhido, com nome acessivel, dica ao passar o mouse e ao focar e item ativo identificavel; conteudo ocupando a largura liberada; preferencia so em memoria da aba; gaveta do celular, guarda T200, troca de empresa T189 e permissoes por papel preservadas. So shell e navegacao na web: sem API, schema, migration, RBAC, auditoria, seed ou dependencia. Em implementacao, validada localmente."
   },
   "openDeliveries": [
     {
