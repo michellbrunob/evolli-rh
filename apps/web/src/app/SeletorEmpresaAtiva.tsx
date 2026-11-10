@@ -40,6 +40,14 @@
  *
  * Sem `localStorage`, `sessionStorage`, cookie escrito por script ou URL: a
  * empresa ativa é da sessão, no servidor.
+ *
+ * ## Compacto (T206)
+ *
+ * No trilho recolhido do menu, `compacto` mostra só o monograma — ou, sem
+ * empresa, um símbolo próprio —, com os textos visualmente ocultos e, por
+ * isso, ainda no nome acessível. Abrir a lista ali não cabe: o botão primeiro
+ * pede espaço ao shell (`onExpandirMenu`) e abre no mesmo gesto, com o foco
+ * seguindo para a empresa atual, como no menu expandido.
  */
 import {
   createContext,
@@ -168,6 +176,31 @@ export interface SeletorEmpresaAtivaProps {
   readonly papelDoAtor: string | null;
   /** Chamado depois de o SERVIDOR confirmar a troca. */
   readonly onEmpresaTrocada: (empresa: EmpresaDoContextoApi) => void;
+  /** T206 — trilho recolhido do menu: só o monograma à vista. */
+  readonly compacto?: boolean;
+  /** T206 — pedido ao shell para sair do trilho antes de abrir a lista. */
+  readonly onExpandirMenu?: () => void;
+}
+
+/** T206 — símbolo próprio da empresa no trilho, quando não há monograma. */
+function SimboloEmpresa() {
+  return (
+    <svg
+      className="seletor-empresa__simbolo"
+      viewBox="0 0 20 20"
+      width="20"
+      height="20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="M4 16.5V4.5h7v12M11 8.5h5v8M2.75 16.5h14.5M6.5 7.5h2M6.5 10.5h2M6.5 13.5h2M13.5 11.5v.01M13.5 14v.01" />
+    </svg>
+  );
 }
 
 const ROTULO_GLOBAL = "Acesso global — todas as empresas";
@@ -190,6 +223,8 @@ export function SeletorEmpresaAtiva({
   podeTrocarEmpresa,
   papelDoAtor,
   onEmpresaTrocada,
+  compacto = false,
+  onExpandirMenu,
 }: SeletorEmpresaAtivaProps) {
   const { estado: opcoes, recarregar } = useOpcoesDeEmpresa(podeTrocarEmpresa);
   const resumo = useResumoDasEdicoes();
@@ -303,6 +338,7 @@ export function SeletorEmpresaAtiva({
       fechar(false);
       return;
     }
+    if (compacto) onExpandirMenu?.();
     focarListaRef.current = true;
     setAberto(true);
   }
@@ -310,6 +346,7 @@ export function SeletorEmpresaAtiva({
   function aoTeclarNoBotao(evento: KeyboardEventReact<HTMLButtonElement>) {
     if (evento.key === "ArrowDown" && !aberto) {
       evento.preventDefault();
+      if (compacto) onExpandirMenu?.();
       focarListaRef.current = true;
       setAberto(true);
     }
@@ -386,6 +423,10 @@ export function SeletorEmpresaAtiva({
         <span className="seletor-empresa__monograma" aria-hidden="true">
           {iniciais(empresaAtiva.nome)}
         </span>
+      ) : compacto ? (
+        <span className="seletor-empresa__monograma" aria-hidden="true">
+          <SimboloEmpresa />
+        </span>
       ) : null}
       <span className="seletor-empresa__textos">
         <span className="seletor-empresa__rotulo">Empresa ativa</span>
@@ -408,9 +449,18 @@ export function SeletorEmpresaAtiva({
           ? `Aguarde: há um salvamento em andamento (${listaEmTexto(resumo.salvando)}). A troca de empresa fica disponível quando ele terminar.`
           : "";
 
+  // T206 — a dica visual do trilho repete o que o leitor de tela já ouve.
+  const dica = compacto ? { "data-dica": `Empresa ativa: ${nomeExibido}` } : {};
+
   return (
     <div
-      className={`seletor-empresa seletor-empresa--${variante}`}
+      className={[
+        "seletor-empresa",
+        `seletor-empresa--${variante}`,
+        compacto ? "seletor-empresa--compacto" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
       ref={raizRef}
       onBlur={(evento) => {
         // Foco que sai do componente fecha o painel (Tab para fora).
@@ -432,6 +482,7 @@ export function SeletorEmpresaAtiva({
           className="seletor-empresa__cartao seletor-empresa__botao"
           aria-expanded={aberto}
           aria-controls={idPainel}
+          {...dica}
           onClick={alternar}
           onKeyDown={aoTeclarNoBotao}
         >
@@ -456,7 +507,10 @@ export function SeletorEmpresaAtiva({
           </svg>
         </button>
       ) : (
-        <div className="seletor-empresa__cartao seletor-empresa__leitura">
+        <div
+          className="seletor-empresa__cartao seletor-empresa__leitura"
+          {...dica}
+        >
           {identidade}
         </div>
       )}

@@ -193,6 +193,19 @@ export function AutenticacaoApp() {
    * pode ser gravado: a tela sai, e o login diz o que se perdeu.
    */
   const [edicoesPerdidas, setEdicoesPerdidas] = useState(false);
+  /**
+   * T206 — menu lateral recolhido, lembrado só nesta aba e só em memória.
+   *
+   * Fica aqui, e não no shell, para sobreviver à volta pelo Hub (que desmonta
+   * o shell). Vale para UMA conta numa UMA empresa: `chave` é a mesma da
+   * árvore, e outra conta, outra empresa ou o logout a apagam — nada passa
+   * de um contexto para outro. Nunca há `localStorage`, `sessionStorage`,
+   * cookie ou URL.
+   */
+  const [preferenciaDoMenu, setPreferenciaDoMenu] = useState<{
+    readonly chave: string;
+    readonly recolhido: boolean;
+  } | null>(null);
 
   // Leituras fora do desenho (ouvintes de foco e do canal) precisam do valor
   // atual, não do capturado quando o ouvinte foi criado.
@@ -307,6 +320,8 @@ export function AutenticacaoApp() {
     aterrissagemPendenteRef.current = true;
     setContextoAlterado(null);
     setAnuncio("");
+    // T206 — a preferência do menu sai junto com a sessão.
+    setPreferenciaDoMenu(null);
     setEstado("login");
   }, []);
 
@@ -605,6 +620,14 @@ export function AutenticacaoApp() {
   const chaveDaArvore = `${ator.id}:${ator.companyId ?? "global"}`;
   const podeTrocarEmpresa = ator.podeTrocarEmpresa === true;
 
+  // T206 — outra conta ou outra empresa: a preferência anterior é apagada, não
+  // só ignorada, para não reaparecer se a sessão voltar ao contexto antigo.
+  if (preferenciaDoMenu !== null && preferenciaDoMenu.chave !== chaveDaArvore) {
+    setPreferenciaDoMenu(null);
+  }
+  const menuRecolhido =
+    preferenciaDoMenu?.chave === chaveDaArvore && preferenciaDoMenu.recolhido;
+
   const arvore =
     destinoAberto === null ? (
       <HubPosLogin
@@ -613,7 +636,14 @@ export function AutenticacaoApp() {
         empresaAtiva={ator.empresaAtiva ?? null}
         podeTrocarEmpresa={podeTrocarEmpresa}
         emailDoAtor={ator.email}
-        onAbrirDestino={setDestinoAberto}
+        onAbrirDestino={(destino) => {
+          // T206 — o cartão clicado some com o Hub; sem isto o foco ficaria
+          // no `body`. A tela que nasce leva o foco ao próprio título, pelo
+          // mesmo pedido de uma montagem só da aterrissagem e da troca de
+          // empresa (`focarTitulo`, consumido e desligado logo depois).
+          setFocarTitulo(true);
+          setDestinoAberto(destino);
+        }}
         onEmpresaTrocada={aoTrocarEmpresa}
         onLogout={() => void handleLogout()}
         focarTituloAoAbrir={focarTitulo}
@@ -644,6 +674,10 @@ export function AutenticacaoApp() {
           destinoExibidoRef.current = null;
           setDestinoAberto(null);
         }}
+        menuRecolhido={menuRecolhido}
+        onMenuRecolhidoChange={(recolhido) =>
+          setPreferenciaDoMenu({ chave: chaveDaArvore, recolhido })
+        }
       />
     );
 

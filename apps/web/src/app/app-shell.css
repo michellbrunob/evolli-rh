@@ -22,10 +22,22 @@
  * da tela com `transform`, justamente para não criar rolagem horizontal nem
  * deixar botões invisíveis na ordem de tabulação. O foco preso, o `Escape` e
  * a devolução de foco ficam no `App`, que é quem conhece o acionador.
+ *
+ * ## Faixa lateral e trilho (T206)
+ *
+ * No desktop a barra é uma faixa presa à borda esquerda, da altura da janela;
+ * cabeçalho, conteúdo e rodapé formam a coluna à direita dela. Não há mais
+ * trava de largura centralizando o corpo: era ela que deixava faixas vazias
+ * dos dois lados. A largura da faixa é uma variável só (`--largura-lateral`):
+ * recolhida, ela vira o trilho (`--largura-trilho`) e a coluna ocupa o resto.
+ * As regras do trilho moram num bloco `min-width: 835px` — segunda barreira,
+ * como o scrim do mobile: a gaveta nunca vira trilho.
  */
 
 .app-shell {
   --topbar-altura: 60px;
+  --largura-trilho: 72px;
+  --largura-lateral: var(--sidebar-width);
   min-height: 100vh;
   min-height: 100svh;
   display: flex;
@@ -66,8 +78,6 @@
 }
 
 .app-shell__topbar-inner {
-  max-width: var(--shell-max);
-  margin: 0 auto;
   min-height: var(--topbar-altura);
   display: flex;
   align-items: center;
@@ -165,7 +175,8 @@
   padding: var(--space-md) clamp(var(--space-md), 3vw, var(--space-lg)) 0;
 }
 
-/* Corpo: barra lateral + área principal. */
+/* Corpo: faixa lateral + coluna. Sem trava de largura nem centralização: a
+   faixa encosta na borda esquerda e a coluna vai até a direita (T206). */
 .app-shell__body {
   flex: 1 1 auto;
   display: flex;
@@ -173,15 +184,22 @@
   align-items: stretch;
   min-width: 0;
   width: 100%;
-  max-width: var(--shell-max);
-  margin: 0 auto;
 }
 
-/* Barra lateral branca, estável e espaçosa. Acompanha a rolagem e rola por
-   dentro quando a lista é mais alta que a janela. */
+/* Coluna à direita da faixa: cabeçalho, painéis, conteúdo e rodapé. */
+.app-shell__coluna {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* Faixa lateral branca e estável, da altura da janela, presa à esquerda.
+   Fica no lugar enquanto a página rola e rola por dentro quando a lista é
+   mais alta que a janela. */
 .app-shell__sidebar {
-  flex: 0 0 var(--sidebar-width);
-  width: var(--sidebar-width);
+  flex: 0 0 var(--largura-lateral);
+  width: var(--largura-lateral);
   display: flex;
   flex-direction: column;
   gap: var(--space-lg);
@@ -189,14 +207,69 @@
   background: var(--surface-canvas);
   border-right: 1px solid var(--divider-soft);
   position: sticky;
-  top: var(--topbar-altura);
+  top: 0;
   align-self: flex-start;
-  max-height: calc(100vh - var(--topbar-altura));
-  max-height: calc(100svh - var(--topbar-altura));
+  height: 100vh;
+  height: 100svh;
+  overflow-x: hidden;
   overflow-y: auto;
 }
 
+/* Topo da faixa: marca e o botão de recolher, lado a lado. */
+.app-shell__cabecalho-lateral {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-height: var(--touch-target);
+}
+
+/* Recolher/expandir (T206). Só ícone à vista; o nome é o texto oculto. */
+.app-shell__recolher {
+  position: relative;
+  flex: 0 0 auto;
+  display: inline-grid;
+  place-items: center;
+  width: var(--touch-target);
+  height: var(--touch-target);
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-ink-muted);
+  cursor: pointer;
+}
+
+.app-shell__recolher:hover {
+  background: var(--surface-neutral);
+  color: var(--color-ink);
+}
+
+.app-shell__recolher[hidden] {
+  display: none;
+}
+
+/* A seta do ícone aponta para onde o menu vai: recolhido, para a direita. */
+.app-shell--menu-recolhido .app-shell__recolher-icone {
+  transform: scaleX(-1);
+}
+
+/* Texto só para leitor de tela, contido no próprio botão (lição da T188). */
+.app-shell__oculto {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .app-shell__marca {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: var(--space-sm);
@@ -229,12 +302,12 @@
 }
 
 /* Área principal. `min-width: 0` impede que uma tabela larga com rolagem
-   própria vaze a rolagem para a página inteira. */
+   própria vaze a rolagem para a página inteira. Sem `max-width` (T206): o
+   conteúdo ocupa a largura da coluna, e a largura que o trilho libera. */
 .app-shell__main {
   flex: 1 1 auto;
   min-width: 0;
   width: 100%;
-  max-width: calc(var(--content-max) + 2 * var(--space-xl));
   padding: clamp(var(--space-lg), 4vw, var(--space-2xl))
     clamp(var(--space-md), 3vw, var(--space-xl));
   outline: none; /* alvo do skip-link; foco não desenha contorno na região */
@@ -247,8 +320,6 @@
 }
 
 .app-shell__footer-inner {
-  max-width: var(--shell-max);
-  margin: 0 auto;
   padding: var(--space-md) clamp(var(--space-md), 3vw, var(--space-lg));
   display: flex;
   flex-wrap: wrap;
@@ -263,9 +334,79 @@
   color: var(--color-ink-muted);
 }
 
+/* Dica visual do trilho (`DicaDoTrilho`). Fixa, para não ser cortada pela
+   faixa que rola por dentro; o afastamento é desenhado por dentro dela, para
+   que o ponteiro possa passar do item para a dica sem que ela suma. */
+.dica-trilho {
+  position: fixed;
+  z-index: 50;
+  transform: translateY(-50%);
+  padding-left: var(--space-xs);
+}
+
+.dica-trilho__texto {
+  display: block;
+  max-width: 16rem;
+  padding: var(--space-xxs) var(--space-sm);
+  border-radius: var(--radius-sm);
+  background: var(--color-ink);
+  color: var(--surface-canvas);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-strong);
+  line-height: var(--leading-tight);
+}
+
+/* Trilho recolhido (T206) — só no desktop. */
+@media (min-width: 835px) {
+  /* A faixa é `sticky` e forma um contexto de empilhamento próprio: a dica
+     que mora nela só sobe acima do cabeçalho (30) se a FAIXA subir. Fica
+     abaixo do link de pular (60), da gaveta (40), do modal (100) e da
+     guarda e do aviso de contexto (110). */
+  .app-shell__sidebar {
+    z-index: 31;
+  }
+
+  .app-shell--menu-recolhido {
+    --largura-lateral: var(--largura-trilho);
+  }
+
+  .app-shell--menu-recolhido .app-shell__sidebar {
+    gap: var(--space-md);
+    padding: var(--space-md) var(--space-xs);
+  }
+
+  .app-shell--menu-recolhido .app-shell__cabecalho-lateral {
+    flex-direction: column;
+  }
+
+  .app-shell--menu-recolhido .app-shell__marca {
+    flex: 0 0 auto;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .app-shell--menu-recolhido .app-shell__marca-texto {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .app-shell__skip-link {
     transition: transform 120ms ease;
+  }
+
+  .app-shell__sidebar {
+    transition:
+      width 160ms ease,
+      flex-basis 160ms ease;
   }
 }
 
@@ -296,6 +437,7 @@
     z-index: 40;
     width: min(300px, 86vw);
     flex-basis: auto;
+    height: auto;
     max-height: none;
     border-right: 1px solid var(--hairline);
   }

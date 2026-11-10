@@ -3009,11 +3009,11 @@ squash `f51c21d0d0451079e1e93c8a25e8b48ccbd07bff`, CI de push 3/3 verde, run
 42663261934); a única pendência administrativa era a sua convergência no Spec Kit,
 resolvida no primeiro commit da T205.
 
-## Dashboard inicial pós-login — T205 (em implementação)
+## Dashboard inicial pós-login — T205 (integrada)
 
-| Tarefa | Estado                                                               | Resultado principal                                                                          |
-| ------ | -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| T205   | **Em implementação** (entrega em PR Draft #198, validada localmente) | Dashboard inicial pós-login: visão executiva operacional de RH só com dados reais do Evolli. |
+| Tarefa | Estado                                    | Resultado principal                                                                          |
+| ------ | ----------------------------------------- | -------------------------------------------------------------------------------------------- |
+| T205   | **Integrada** (PR #198, squash `c2c8362`) | Dashboard inicial pós-login: visão executiva operacional de RH só com dados reais do Evolli. |
 
 **Escopo da preparação (concluída):** levantamento e preparação de decisão, no
 [dossiê](../docs/decisions/t205-dossie-dashboard-inicial.md): estado atual pós-login por papel,
@@ -3023,8 +3023,7 @@ de aceite, plano de testes e decisões pendentes.
 
 **Decisões aprovadas (2026-11-09):** D-1 a D-12 do dossiê, como recomendado.
 
-**Entregue (PR Draft #198, validada localmente):** a implementação das D-1 a D-12, descrita na seção 15
-do dossiê:
+**Entregue (PR #198):** a implementação das D-1 a D-12, descrita na seção 15 do dossiê:
 
 - rota `#/dashboard?ano=AAAA` (ano civil, até hoje no corrente; ano ausente, inválido,
   futuro ou anterior a 2000 corrigido no lugar; troca de ano empilha; voltar, avançar e
@@ -3051,7 +3050,56 @@ movimentações e mutações de permissão, empresa, teto, unidade, limite do an
 detectadas. Validação local com dados sintéticos para RH, DP, `master_tecnico` com e sem
 empresa e gestor, em desktop e 375 px.
 
-**Fora de escopo:** API nova, banco, schema, migration, RBAC, auditoria, Docker, seed, dependências, lockfile, workflow, Ready for review e merge; e os itens da seção 8 do dossiê.
+**Fora de escopo:** API nova, banco, schema, migration, RBAC, auditoria, Docker, seed,
+dependências, lockfile, workflow e promoção; e os itens da seção 8 do dossiê.
+
+**Histórico da preparação:** o dossiê e as decisões foram preparados sem código de
+produto, sem push e sem PR; isso valeu só para aquela fase.
+
+**Observação de relatório:** a integração funcional da T205 está concluída (PR #198,
+squash `c2c83622fd84bba9af73da3af96a4d5cb255b6a3`, CI de push 3/3 verde, run
+42798080671); a única pendência administrativa era a sua convergência no Spec Kit,
+resolvida no primeiro commit da T206.
+
+## Shell com menu lateral fixo e recolhível — T206 (em implementação, validada localmente)
+
+| Tarefa | Estado                                     | Resultado principal                                                                                        |
+| ------ | ------------------------------------------ | ---------------------------------------------------------------------------------------------------------- |
+| T206   | **Em implementação** (validada localmente) | Menu lateral preso à esquerda, recolhível em trilho de ícones, com o conteúdo ocupando a largura liberada. |
+
+**Escopo:** só shell e navegação na web, registrado no
+[dossiê](../docs/decisions/t206-shell-menu-lateral.md):
+
+- barra lateral fixa na borda esquerda, integrada ao shell inteiro, sem vazio entre a
+  navegação e o conteúdo;
+- controle "Recolher menu" / "Expandir menu", com estado exposto, teclado e foco preservado;
+- trilho compacto de ícones com nome acessível, dica visual ao passar o mouse e ao focar,
+  item ativo identificável sem depender de cor, e acesso ao seletor de empresa, aos grupos
+  com submenu e ao grupo Demonstração;
+- preferência só em memória da aba, limpa na troca de conta, de empresa e no logout;
+- gaveta do celular, guarda de edição pendente (T200), troca de empresa (T189) e
+  permissões por papel preservadas; sem rolagem horizontal em desktop, largura
+  intermediária e 375 px.
+
+**Entregue (validada localmente):** a implementação descrita nas seções 4 a 11 do dossiê —
+faixa da altura da janela presa à esquerda, sem trava de largura no corpo; trilho de 72 px com
+os mesmos botões e o texto visualmente oculto; módulo com submenu e empresa compacta que
+expandem o menu no mesmo gesto; item ativo herdado pelo cabeçalho do módulo oculto; dica
+`aria-hidden`; preferência em memória por conta e empresa; foco nunca no `body` ao atravessar
+o breakpoint; alvos de 44 px na gaveta; foco no título ao abrir um produto pelo Hub, uma vez só.
+Cinco achados corrigidos dentro da entrega (seção 13 do dossiê).
+
+**Testes:** web (shell, trilho, dica, gaveta, preferência e contrato de CSS) e mutações, todas
+detectadas. Validação local com dados sintéticos para RH, DP, `master_tecnico`, gestor e perfis
+sem acesso ao shell, em desktop, largura intermediária e 375 px.
+
+**Fora de escopo:**
+
+- API, schema, migration, RBAC, auditoria, seed, Docker, dependências, lockfile e workflows;
+- regras do Dashboard, de Colaboradores e das fichas;
+- identidade visual, ativos de marca e logotipo;
+- menu, seção, trilha de navegação, exportação ou IA sem contrato real;
+- promoção e merge.
 
 ## Próxima ação autorizável
 

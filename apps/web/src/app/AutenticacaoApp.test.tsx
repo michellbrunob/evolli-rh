@@ -2346,3 +2346,197 @@ describe("T200 — guarda de saída no shell autenticado", () => {
     expect(disparar()).toBe(false);
   });
 });
+
+describe("T206 — preferência do menu lateral: só nesta aba, por conta e empresa", () => {
+  const emTrilho = () =>
+    document.querySelector(".app-shell--menu-recolhido") !== null;
+
+  beforeEach(() => {
+    CanalFalso.abertos.clear();
+    vi.stubGlobal("BroadcastChannel", CanalFalso);
+    window.history.replaceState(null, "", window.location.pathname);
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    window.history.replaceState(null, "", window.location.pathname);
+  });
+
+  it("sobrevive à volta pelo Hub (mesma conta, mesma empresa)", async () => {
+    vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
+    render(<AutenticacaoApp />);
+    await chegarAoHub();
+    await abrirProduto(/^Colaboradores/);
+    fireEvent.click(screen.getByRole("button", { name: "Recolher menu" }));
+    expect(emTrilho()).toBe(true);
+
+    fireEvent.click(screen.getByRole("button", { name: "Hub" }));
+    await chegarAoHub();
+    expect(emTrilho()).toBe(false); // o Hub não tem menu lateral
+    await abrirProduto(/^Colaboradores/);
+
+    expect(emTrilho()).toBe(true);
+    expect(
+      screen.getByRole("button", { name: "Expandir menu" }),
+    ).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("outra empresa abre expandida — e a preferência antiga não volta com a empresa antiga", async () => {
+    vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
+    render(<AutenticacaoApp />);
+    await chegarAoHub();
+    await abrirProduto(/^Colaboradores/);
+    fireEvent.click(screen.getByRole("button", { name: "Recolher menu" }));
+    expect(emTrilho()).toBe(true);
+
+    servidorPassaParaBeta();
+    act(() =>
+      new CanalFalso(NOME_DO_CANAL).postMessage({
+        tipo: "contexto-empresarial-alterado",
+      }),
+    );
+    await waitFor(() =>
+      expect(seletorDoMenu()).toHaveTextContent("Empresa Beta"),
+    );
+    expect(emTrilho()).toBe(false);
+
+    vi.mocked(obterUsuarioAtual).mockResolvedValue(ATOR_PADRAO as never);
+    act(() =>
+      new CanalFalso(NOME_DO_CANAL).postMessage({
+        tipo: "contexto-empresarial-alterado",
+      }),
+    );
+    await waitFor(() =>
+      expect(seletorDoMenu()).toHaveTextContent("Empresa Alfa"),
+    );
+    expect(emTrilho()).toBe(false);
+  });
+
+  it("logout apaga a preferência: o próximo login começa expandido", async () => {
+    vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
+    vi.mocked(logout).mockResolvedValueOnce(undefined);
+    vi.mocked(login).mockResolvedValueOnce({ mfaRequerido: false });
+    render(<AutenticacaoApp />);
+    await chegarAoHub();
+    await abrirProduto(/^Colaboradores/);
+    fireEvent.click(screen.getByRole("button", { name: "Recolher menu" }));
+    expect(emTrilho()).toBe(true);
+
+    fireEvent.click(screen.getByRole("button", { name: "Sair" }));
+    await screen.findByLabelText(/^E-mail\b/i);
+    preencherEEntrar();
+    await screen.findByRole("navigation", { name: "Navegação do painel" });
+
+    expect(emTrilho()).toBe(false);
+    expect(
+      screen.getByRole("button", { name: "Recolher menu" }),
+    ).toHaveAttribute("aria-expanded", "true");
+  });
+});
+
+describe("T206 — foco ao abrir um produto pelo Hub", () => {
+  beforeEach(() => {
+    CanalFalso.abertos.clear();
+    vi.stubGlobal("BroadcastChannel", CanalFalso);
+    window.history.replaceState(null, "", window.location.pathname);
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    window.history.replaceState(null, "", window.location.pathname);
+  });
+
+  /** O foco está num elemento real, visível e alcançável — nunca no body. */
+  function esperarFocoValido(alvo: HTMLElement) {
+    expect(document.activeElement).not.toBe(document.body);
+    expect(document.activeElement).toBe(alvo);
+    expect(alvo.closest("[inert]")).toBeNull();
+    expect(alvo.closest("[hidden]")).toBeNull();
+    expect(alvo.closest('[aria-hidden="true"]')).toBeNull();
+  }
+
+  async function abrirPeloHub(rotulo: RegExp, titulo: string) {
+    fireEvent.click(screen.getByRole("button", { name: rotulo }));
+    return screen.findByRole("heading", { level: 1, name: titulo });
+  }
+
+  it("RH: Hub → Dashboard leva o foco ao título do Dashboard, uma vez só", async () => {
+    vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
+    render(<AutenticacaoApp />);
+    await chegarAoHub();
+    const focar = vi.spyOn(HTMLElement.prototype, "focus");
+    const titulo = await abrirPeloHub(/^Dashboard/, "Dashboard");
+    await waitFor(() => esperarFocoValido(titulo));
+    expect(window.location.hash).toMatch(/^#\/dashboard\?ano=\d{4}$/);
+    expect(focar.mock.contexts.filter((c) => c === titulo)).toHaveLength(1);
+    focar.mockRestore();
+  });
+
+  it("RH: Hub → Colaboradores leva o foco ao título de Colaboradores", async () => {
+    vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
+    render(<AutenticacaoApp />);
+    await chegarAoHub();
+    const focar = vi.spyOn(HTMLElement.prototype, "focus");
+    const titulo = await abrirPeloHub(/^Colaboradores/, "Colaboradores");
+    await waitFor(() => esperarFocoValido(titulo));
+    expect(window.location.hash).toBe("#/pessoas/colaboradores");
+    expect(focar.mock.contexts.filter((c) => c === titulo)).toHaveLength(1);
+    focar.mockRestore();
+  });
+
+  it("aterrissagem depois do login: o título do Dashboard recebe o foco uma vez só", async () => {
+    const focar = vi.spyOn(HTMLElement.prototype, "focus");
+    vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
+    render(<AutenticacaoApp />);
+    const titulo = await screen.findByRole("heading", {
+      level: 1,
+      name: "Dashboard",
+    });
+    await waitFor(() => esperarFocoValido(titulo));
+    expect(focar.mock.contexts.filter((c) => c === titulo)).toHaveLength(1);
+    focar.mockRestore();
+  });
+
+  it("gestor: Hub → Minha equipe leva o foco ao título de Minha equipe", async () => {
+    vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
+    vi.mocked(obterUsuarioAtual).mockResolvedValue(ator("gestor") as never);
+    render(<AutenticacaoApp />);
+    await screen.findByRole("heading", { level: 1, name: "Minha equipe" });
+    fireEvent.click(screen.getByRole("button", { name: "Hub" }));
+    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
+    const titulo = await abrirPeloHub(/^Minha equipe/, "Minha equipe");
+    await waitFor(() => esperarFocoValido(titulo));
+  });
+
+  it("abrir pelo Hub não muda a preferência do menu recolhido", async () => {
+    vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
+    render(<AutenticacaoApp />);
+    await chegarAoHub();
+    await abrirProduto(/^Colaboradores/);
+    fireEvent.click(screen.getByRole("button", { name: "Recolher menu" }));
+    fireEvent.click(screen.getByRole("button", { name: "Hub" }));
+    await chegarAoHub();
+    const titulo = await abrirPeloHub(/^Colaboradores/, "Colaboradores");
+    await waitFor(() => esperarFocoValido(titulo));
+    expect(document.querySelector(".app-shell--menu-recolhido")).not.toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Expandir menu" }),
+    ).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("a guarda de edição pendente continua valendo, e depois de sair o produto aberto pelo Hub recebe o foco", async () => {
+    const nome = await abrirNovaAdmissaoPorRota();
+    fireEvent.change(nome, { target: { value: "Pessoa Sintetica Rascunho" } });
+    fireEvent.click(screen.getByRole("button", { name: "Hub" }));
+    const pergunta = screen.getByRole("alertdialog", {
+      name: "Sair sem salvar?",
+    });
+    fireEvent.click(
+      within(pergunta).getByRole("button", { name: "Sair sem salvar" }),
+    );
+    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
+    const titulo = await abrirPeloHub(/^Colaboradores/, "Colaboradores");
+    await waitFor(() => esperarFocoValido(titulo));
+    expect(document.body.textContent).not.toContain(
+      "Pessoa Sintetica Rascunho",
+    );
+  });
+});

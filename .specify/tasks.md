@@ -3229,9 +3229,13 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         dentro da entrega.
 
 102.  **T205 - Dashboard inicial pós-login**
-      - **Estado:** **em implementação** — entrega em PR Draft #198, validada localmente. Branch
+      - **Estado:** **integrada** em `main` pela PR #198, squash
+        `c2c83622fd84bba9af73da3af96a4d5cb255b6a3`, com a CI de push 3/3 verde (run
+        42798080671); branch preservada. Implementada na branch
         `codex/t205-dashboard-inicial`, a partir do squash
-        `f51c21d0d0451079e1e93c8a25e8b48ccbd07bff` (T204 integrada, PR #197).
+        `f51c21d0d0451079e1e93c8a25e8b48ccbd07bff` (T204 integrada, PR #197). A preparação
+        (dossiê e decisões) foi feita antes, sem código de produto, sem push e sem PR; isso
+        valeu só para aquela fase.
       - **Objetivo:** decidir, com evidência no código, nos contratos, no RBAC e nas ADRs, como
         a página inicial depois do login vira uma visão executiva operacional de RH, só com
         dados reais do Evolli e sem controle, métrica, gráfico ou aba decorativos, no
@@ -3252,8 +3256,40 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         sintéticos (seção 15 do dossiê).
       - **Comportamentos aprovados (2026-11-09):** os cinco da seção 15.7 do dossiê.
       - **Fora de escopo:** API nova, banco, schema, migration, RBAC, auditoria, Docker,
-        seed, dependências, lockfile, workflow, Ready for review e merge; e os itens da
-        seção 8 do dossiê.
+        seed, dependências, lockfile, workflow e promoção; e os itens da seção 8 do dossiê.
+      - **Observação de relatório:** a integração funcional da T205 está concluída; a única
+        pendência administrativa era a sua convergência no Spec Kit, resolvida no primeiro
+        commit da T206. Os achados das revisões (estado da entrega nos documentos, isolamento
+        do E2E sem dados da segunda empresa e série de um ano exibida sob o rótulo de outro)
+        foram corrigidos dentro da entrega.
+
+103.  **T206 - Shell com menu lateral fixo e recolhível**
+      - **Estado:** **em implementação, validada localmente**. Branch
+        `codex/t206-shell-menu-lateral`, a partir do squash
+        `c2c83622fd84bba9af73da3af96a4d5cb255b6a3` (T205 integrada, PR #198).
+      - **Objetivo:** o menu passa a ser uma faixa lateral real e estável, presa à esquerda da
+        aplicação, sem espaço morto entre navegação e conteúdo. Recolhido, vira um trilho
+        compacto de ícones funcionais, e o conteúdo principal ocupa a largura liberada. Registro
+        no [dossiê](../docs/decisions/t206-shell-menu-lateral.md): arquitetura do shell,
+        comportamento expandido e recolhido, acessibilidade, mobile, limites e evidências.
+      - **Escopo:** só shell e navegação na web: barra fixa à esquerda com marca, controle de
+        recolher, seletor de empresa, itens, grupos e submenus atuais; trilho com nome
+        acessível, dica visual ao passar o mouse e ao focar e item ativo identificável;
+        preferência só em memória da aba; gaveta do celular, guarda de edição pendente (T200),
+        troca de empresa (T189) e permissões por papel preservadas; sem rolagem horizontal em
+        desktop, largura intermediária e 375 px.
+      - **Entregue (seções 4 a 11 do dossiê):** faixa da altura da janela presa à esquerda,
+        sem trava de largura no corpo; trilho de 72 px com os mesmos botões e o texto
+        visualmente oculto; módulo com submenu e empresa compacta que expandem o menu no mesmo
+        gesto, com o foco no próprio controle; item ativo herdado pelo cabeçalho do módulo
+        oculto; dica `aria-hidden`; preferência em memória por conta e empresa; foco nunca no
+        `body` ao atravessar o breakpoint; alvos de 44 px na gaveta; foco no título ao abrir um
+        produto pelo Hub, uma vez só. Testes web, mutações
+        detectadas e validação local com dados sintéticos (seção 12 do dossiê).
+      - **Fora de escopo:** API, schema, migration, RBAC, auditoria, seed, Docker,
+        dependências, lockfile e workflows; regras do Dashboard, de Colaboradores e das fichas;
+        identidade visual, ativos de marca e logotipo; menu, seção, trilha de navegação,
+        exportação ou IA sem contrato real; promoção e merge.
 
 ## Regra obrigatória para as próximas tarefas
 

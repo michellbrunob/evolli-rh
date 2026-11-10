@@ -27,6 +27,19 @@
  * selecionado, nunca por esta barra. E não é autorização: `papeis` evita
  * oferecer uma porta que o servidor recusaria (spec §3.6), mas quem decide é
  * o RBAC, a cada requisição.
+ *
+ * ## Trilho recolhido (T206)
+ *
+ * Com `recolhido`, os MESMOS botões viram um trilho de ícones: o texto de cada
+ * um continua no DOM, só visualmente oculto, e segue sendo o nome acessível —
+ * a dica visual (`data-dica`, lida por `DicaDoTrilho`) repete esse nome para
+ * quem enxerga, sem substituí-lo.
+ *
+ * Nenhum submenu é escondido de vez. Um módulo com submenu, no trilho, não
+ * abre um painel flutuante: o cabeçalho dele expande o menu e abre o módulo,
+ * e o foco fica no próprio cabeçalho — agora com o submenu à vista logo
+ * abaixo. Por isso `aria-expanded` continua verdadeiro: o botão anuncia
+ * "recolhido" e, ao ser acionado, revela exatamente a região que controla.
  */
 import { useState } from "react";
 import "./PainelNavigation.css";
@@ -64,7 +77,18 @@ export interface PainelNavigationProps {
    * oferecer um caminho que sempre responderia 403.
    */
   papel?: string | null;
+  /**
+   * T206 — trilho de ícones. Os submenus ficam fechados (fora da tabulação e
+   * da árvore de acessibilidade), e o cabeçalho de cada módulo passa a pedir
+   * espaço ao shell por `onExpandir` em vez de abrir no lugar.
+   */
+  recolhido?: boolean;
+  /** T206 — pedido ao shell para sair do trilho. */
+  onExpandir?: () => void;
 }
+
+/** Id da `<nav>`: alvo do `aria-controls` do botão de recolher do shell. */
+export const ID_NAVEGACAO_PAINEL = "navegacao-painel";
 
 /** Seta do disclosure. Desenho próprio, elementar; gira por CSS ao abrir. */
 function SetaExpansao() {
@@ -93,6 +117,8 @@ interface BotaoDestinoProps {
   readonly nivel: "modulo" | "sub";
   readonly icone?: GrupoNavegacao["icone"];
   readonly onSelecionar: (id: string) => void;
+  /** T206 — no trilho, o nome repetido na dica visual. */
+  readonly dica?: string;
 }
 
 function BotaoDestino({
@@ -101,6 +127,7 @@ function BotaoDestino({
   nivel,
   icone,
   onSelecionar,
+  dica,
 }: BotaoDestinoProps) {
   return (
     <button
@@ -113,6 +140,7 @@ function BotaoDestino({
         .filter(Boolean)
         .join(" ")}
       aria-current={ativo ? "page" : undefined}
+      {...(dica ? { "data-dica": dica } : {})}
       onClick={() => onSelecionar(destino.id)}
     >
       {icone ? <IconeModulo nome={icone} /> : null}
@@ -133,6 +161,9 @@ interface ModuloProps {
   readonly aberto: boolean;
   readonly onAlternar: () => void;
   readonly onSelecionar: (id: string) => void;
+  /** T206 — trilho: a região fica fechada e o cabeçalho pede espaço. */
+  readonly recolhido: boolean;
+  readonly onAbrirNoMenuExpandido: () => void;
 }
 
 function Modulo({
@@ -142,6 +173,8 @@ function Modulo({
   aberto,
   onAlternar,
   onSelecionar,
+  recolhido,
+  onAbrirNoMenuExpandido,
 }: ModuloProps) {
   // T178 — espaços viram hífen: "Gestão de Pessoas" foi o primeiro título com
   // espaço, e `aria-labelledby`/`aria-controls` leem espaço como SEPARADOR de
@@ -153,6 +186,11 @@ function Modulo({
   const regiaoId = `${tituloId}-conteudo`;
   const descricaoId = grupo.descricao ? `${tituloId}-descricao` : undefined;
   const contemAtivo = visiveis.some((d) => d.id === destinoAtivoId);
+  // T206 — no trilho nenhuma região fica à vista: o destino ativo, se está
+  // dentro dela, sobe para o cabeçalho — visualmente E na semântica, porque o
+  // botão marcado com `aria-current="page"` está oculto.
+  const regiaoVisivel = aberto && !recolhido;
+  const ativoNoCabecalho = contemAtivo && !regiaoVisivel;
 
   // Módulo de um destino só: o item É o destino. Um cabeçalho que expandisse
   // para revelar exatamente um filho seria um clique sem informação — e dois
@@ -169,6 +207,7 @@ function Modulo({
           nivel="modulo"
           icone={grupo.icone}
           onSelecionar={onSelecionar}
+          {...(recolhido ? { dica: unico.label } : {})}
         />
       </li>
     );
@@ -181,13 +220,15 @@ function Modulo({
         id={tituloId}
         className={[
           "painel-nav__cabecalho",
-          contemAtivo && !aberto ? "painel-nav__cabecalho--contem-ativo" : "",
+          ativoNoCabecalho ? "painel-nav__cabecalho--contem-ativo" : "",
         ]
           .filter(Boolean)
           .join(" ")}
-        aria-expanded={aberto}
+        aria-expanded={regiaoVisivel}
         aria-controls={regiaoId}
-        onClick={onAlternar}
+        aria-current={ativoNoCabecalho ? "true" : undefined}
+        {...(recolhido ? { "data-dica": grupo.titulo } : {})}
+        onClick={recolhido ? onAbrirNoMenuExpandido : onAlternar}
       >
         <IconeModulo nome={grupo.icone} />
         <span className="painel-nav__texto">
@@ -196,7 +237,7 @@ function Modulo({
         <SetaExpansao />
       </button>
 
-      <div className="painel-nav__regiao" id={regiaoId} hidden={!aberto}>
+      <div className="painel-nav__regiao" id={regiaoId} hidden={!regiaoVisivel}>
         {grupo.descricao ? (
           <p className="painel-nav__descricao" id={descricaoId}>
             {grupo.descricao}
@@ -228,6 +269,8 @@ export function PainelNavigation({
   destinoAtivoId,
   onSelecionar,
   papel = null,
+  recolhido = false,
+  onExpandir,
 }: PainelNavigationProps) {
   // Só o que a pessoa fechou à mão entra aqui. Tudo começa aberto, inclusive
   // Demonstração: escondê-la por padrão a tornaria difícil de alcançar, e o
@@ -270,6 +313,13 @@ export function PainelNavigation({
         }))
       }
       onSelecionar={onSelecionar}
+      recolhido={recolhido}
+      onAbrirNoMenuExpandido={() => {
+        // Abre o módulo E sai do trilho no mesmo desenho: o foco, que está
+        // no cabeçalho, termina sobre um submenu já visível.
+        setFechados((atual) => ({ ...atual, [grupo.titulo]: false }));
+        onExpandir?.();
+      }}
     />
   );
 
@@ -277,7 +327,11 @@ export function PainelNavigation({
   const secundarios = grupos.filter(({ grupo }) => grupo.secundario);
 
   return (
-    <nav className="painel-nav" aria-label="Navegação do painel">
+    <nav
+      id={ID_NAVEGACAO_PAINEL}
+      className={recolhido ? "painel-nav painel-nav--trilho" : "painel-nav"}
+      aria-label="Navegação do painel"
+    >
       <ul className="painel-nav__modulos">{principais.map(renderizar)}</ul>
 
       {secundarios.length > 0 ? (

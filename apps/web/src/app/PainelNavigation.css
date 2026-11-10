@@ -207,6 +207,49 @@
   color: var(--color-ink);
 }
 
+/* Trilho recolhido (T206): os mesmos botões, só com o ícone à vista. O
+   texto continua no DOM, visualmente oculto — é ele o nome acessível. O item
+   ativo mantém superfície, barra indicadora e `aria-current`; o cabeçalho de
+   um módulo que contém o ativo ganha a mesma superfície. */
+.painel-nav--trilho .painel-nav__destino,
+.painel-nav--trilho .painel-nav__cabecalho {
+  justify-content: center;
+  gap: 0;
+  padding: var(--space-xs);
+}
+
+.painel-nav--trilho .painel-nav__texto {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.painel-nav--trilho .painel-nav__seta {
+  display: none;
+}
+
+.painel-nav--trilho .painel-nav__cabecalho--contem-ativo {
+  background: var(--surface-neutral);
+}
+
+.painel-nav--trilho .painel-nav__cabecalho--contem-ativo .painel-nav__icone {
+  color: var(--color-action);
+}
+
+/* No celular (gaveta), todo alvo tem 44px — inclusive os sub-itens, que no
+   desktop são mais baixos para caber a lista (T206). */
+@media (max-width: 834px) {
+  .painel-nav__destino--sub {
+    min-height: var(--touch-target);
+  }
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .painel-nav__seta {
     transition: transform 140ms ease;
