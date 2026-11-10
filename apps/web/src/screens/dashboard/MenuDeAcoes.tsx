@@ -40,6 +40,8 @@ function mostrarAbaixoDoCabecalho(
   const limite =
     (cabecalho ? cabecalho.getBoundingClientRect().bottom : 0) + FOLGA;
   const caixa = menu.getBoundingClientRect();
+  // Sem caixa desenhada (sem layout), não há o que mostrar: nada rola.
+  if (caixa.height === 0) return;
   // O botão também fica à vista: é para ele que o foco volta.
   const topo = Math.min(
     caixa.top,

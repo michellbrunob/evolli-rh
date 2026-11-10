@@ -253,6 +253,16 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+/**
+ * Deixa terminar, dentro de `act`, as leituras que o teste não esperou (as
+ * que não ficaram pendentes de propósito) — nenhum desenho fora de `act`.
+ */
+async function assentar() {
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 0));
+  });
+}
+
 function Tela(props: Partial<Parameters<typeof DashboardScreen>[0]> = {}) {
   return (
     <DashboardScreen
@@ -687,6 +697,7 @@ describe("T205 — período, atualização, atrasos (E-1, E-5)", () => {
     expect(anterior).toHaveAttribute("aria-disabled", "true");
     fireEvent.click(anterior);
     expect(onTrocarAno).not.toHaveBeenCalled();
+    await assentar();
   });
 
   it("'Atualizar' relê tudo, ignora clique repetido durante a leitura e anuncia uma vez por leitura", async () => {
@@ -778,6 +789,7 @@ describe("T205 — período, atualização, atrasos (E-1, E-5)", () => {
     expect(screen.queryByText(/houve/)).toBeNull();
     expect(bloco(SERIE).querySelector(".dashboard__totais")).toBeNull();
     expect(bloco(SERIE)).toHaveTextContent("Carregando…");
+    await assentar();
   });
 
   it("B3 — falha de um ano não aparece rotulada com outro ano", async () => {
@@ -806,6 +818,7 @@ describe("T205 — período, atualização, atrasos (E-1, E-5)", () => {
     expect(
       screen.queryByText(/Não foi possível carregar as movimentações/),
     ).toBeNull();
+    await assentar();
   });
 
   it("leitura antiga que termina antes da nova não encerra o 'Atualizando…' da nova", async () => {
@@ -1494,13 +1507,21 @@ describe("T207 — Distribuição do time e Tempo de casa", () => {
     }
   });
 
-  it("enquanto lê: 'Carregando…' visível, escondido do leitor (o status anuncia)", () => {
+  it("enquanto lê: 'Carregando…' visível, escondido do leitor (o status anuncia)", async () => {
     servidorDosAtivos.mockReturnValue(new Promise(() => {}));
     render(<Tela />);
     const textos = within(bloco("Distribuição do time")).getByText(
       "Carregando…",
     );
     expect(textos).toHaveAttribute("aria-hidden", "true");
+    // As outras leituras chegam; a do time continua pendente e o bloco segue
+    // em "Carregando…".
+    await waitFor(() =>
+      expect(bloco(SERIE).querySelector(".dashboard__totais")).not.toBeNull(),
+    );
+    expect(
+      within(bloco("Distribuição do time")).getByText("Carregando…"),
+    ).toBeVisible();
   });
 
   it("leitura falha: um único alerta e uma única nova tentativa; sucesso leva o foco à Distribuição e anuncia", async () => {
@@ -1791,6 +1812,30 @@ describe("T207 — Quadro de colaboradores: título, subtítulo e informação",
     expect(painelDaInfo()).not.toBeVisible();
   });
 
+  it("pressionar o botão e soltar fora (sem clique) não impede o foco pelo teclado de abrir depois", async () => {
+    render(<Tela />);
+    await lido();
+    fireEvent.pointerDown(info());
+    fireEvent.mouseDown(info());
+    act(() =>
+      screen.getByRole("heading", { level: 2, name: "Resumo" }).focus(),
+    );
+    act(() => info().focus());
+    expect(info()).toHaveAttribute("aria-expanded", "true");
+    expect(painelDaInfo()).toBeVisible();
+  });
+
+  it("foco e clique pelo teclado: o primeiro Enter fixa, o segundo fecha", async () => {
+    render(<Tela />);
+    await lido();
+    act(() => info().focus());
+    fireEvent.click(info());
+    expect(painelDaInfo()).toBeVisible();
+    fireEvent.click(info());
+    expect(painelDaInfo()).not.toBeVisible();
+    expect(info()).toHaveFocus();
+  });
+
   it("ponteiro: passar abre e sair fecha; clique fixa; clique de novo ou clique fora fecham", async () => {
     render(<Tela />);
     await lido();
@@ -1956,6 +2001,19 @@ describe("T207 — menu de ações do quadro", () => {
       medir.mockRestore();
       rolar.mockRestore();
       cabecalho.remove();
+    }
+  });
+
+  it("menu sem caixa desenhada (sem layout): a página não rola", async () => {
+    const rolar = vi.spyOn(window, "scrollBy");
+    try {
+      render(<Tela />);
+      await lido();
+      fireEvent.click(acoesDo(SERIE));
+      expect(screen.getByRole("menu")).toBeVisible();
+      expect(rolar).not.toHaveBeenCalled();
+    } finally {
+      rolar.mockRestore();
     }
   });
 

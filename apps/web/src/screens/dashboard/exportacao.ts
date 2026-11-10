@@ -18,7 +18,8 @@ export const INDISPONIVEL_NO_CSV = "—";
 
 const SEPARADOR = ";";
 const FIM_DE_LINHA = "\r\n";
-const BOM = "﻿";
+/** Marca de ordem de bytes (U+FEFF): planilhas reconhecem o UTF-8. */
+const BOM = String.fromCharCode(0xfeff);
 
 function celula(valor: CelulaDoCsv): string {
   const texto = valor === null ? INDISPONIVEL_NO_CSV : String(valor);

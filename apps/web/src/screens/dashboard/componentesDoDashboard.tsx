@@ -28,7 +28,6 @@ export function InfoComoCalculamos({
 }) {
   const id = useId();
   const raizRef = useRef<HTMLDivElement | null>(null);
-  const pressionadoRef = useRef(false);
   const [porPonteiro, setPorPonteiro] = useState(false);
   const [porFoco, setPorFoco] = useState(false);
   const [fixo, setFixo] = useState(false);
@@ -82,18 +81,9 @@ export function InfoComoCalculamos({
         className="dashboard__info-botao"
         aria-expanded={aberto}
         aria-controls={id}
-        onPointerDown={() => {
-          pressionadoRef.current = true;
-        }}
-        onMouseDown={() => {
-          pressionadoRef.current = true;
-        }}
-        onFocus={() => {
-          // Foco vindo de um clique: quem decide é o clique.
-          if (!pressionadoRef.current) setPorFoco(true);
-        }}
+        onFocus={() => setPorFoco(true)}
         onClick={() => {
-          pressionadoRef.current = false;
+          // O primeiro clique (ou Enter) fixa o painel aberto; o segundo fecha.
           if (fixo) fechar();
           else setFixo(true);
         }}
