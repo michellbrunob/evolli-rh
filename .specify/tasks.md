@@ -3300,9 +3300,11 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         entrega.
 
 104.  **T207 - Dashboard funcional e seletor de empresas**
-      - **Estado:** **em implementação local**. Branch `codex/t207-dashboard-seletor-empresas`,
-        a partir do squash `512d24914519fed335a900b18cab690832e8f121` (T206 integrada, PR #199).
-        A preparação (dossiê e decisões) foi feita antes, sem código de produto.
+      - **Estado:** **implementada e validada localmente**, sem push, PR, promoção ou merge.
+        Branch `codex/t207-dashboard-seletor-empresas`, a partir do squash
+        `512d24914519fed335a900b18cab690832e8f121` (T206 integrada, PR #199). A preparação
+        (dossiê e decisões) foi feita antes, sem código de produto. Validação visual aprovada
+        pela proprietária em 2026-11-10.
       - **Objetivo:** levantar, com evidência no código, nos contratos, no RBAC e nas decisões,
         como completar o Dashboard como produto funcional (Visão Geral e as abas Pessoas,
         Movimentação, Remuneração e Clima e saúde, sem aba decorativa nem métrica sem dado
@@ -3321,6 +3323,16 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       - **Fora de escopo:** API, schema, migration, RBAC, auditoria, seed, Docker,
         dependências, lockfile, workflow; turnover, absenteísmo, custo, salário, clima e ativos
         históricos calculados; tela de empresas; mudança global de cor; promoção e merge.
+      - **Entrega (seções 16 a 19 do dossiê):** Visão Geral com "Dashboard" na barra superior,
+        momento da leitura uma vez por aba, Quadro de colaboradores (botão de informação,
+        gráfico e tabela com os mesmos números, painel por mês, menu de ações, CSV e impressão
+        para salvar em PDF), Distribuição do time e Tempo de casa com gráfico e tabela e
+        agrupamento mínimo de 3 pessoas; ativos no fim e turnover como "—" por falta de fonte e
+        regra aprovada, nunca zero; eNPS e Quem é o time indisponíveis. Achados da
+        implementação corrigidos com teste que falhava antes (seção 17 do dossiê).
+      - **Validação final local:** web 128 arquivos e 3598 testes; API unitária 60 suítes e
+        1472 testes; E2E serial com PostgreSQL real 20 suítes e 1017 testes; scripts 182 testes;
+        35 mutações, todas detectadas; lint, typecheck e build verdes.
 
 ## Regra obrigatória para as próximas tarefas
 

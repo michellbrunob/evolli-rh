@@ -3106,11 +3106,11 @@ squash `512d24914519fed335a900b18cab690832e8f121`, CI de push 3/3 verde, run
 42823908545); a única pendência administrativa era a sua convergência no Spec Kit,
 resolvida no primeiro commit da T207.
 
-## Dashboard funcional e seletor de empresas — T207 (em implementação)
+## Dashboard funcional e seletor de empresas — T207 (implementada e validada localmente)
 
-| Tarefa | Estado                       | Resultado principal                                                                    |
-| ------ | ---------------------------- | -------------------------------------------------------------------------------------- |
-| T207   | **Em implementação** (local) | Dashboard funcional com cinco abas e dados reais, e seletor de empresa ativa evoluído. |
+| Tarefa | Estado                                         | Resultado principal                                                                    |
+| ------ | ---------------------------------------------- | -------------------------------------------------------------------------------------- |
+| T207   | **Implementada** (validada localmente, sem PR) | Dashboard funcional com cinco abas e dados reais, e seletor de empresa ativa evoluído. |
 
 **Escopo da preparação (concluída):** levantamento e preparação de decisão, no
 [dossiê](../docs/decisions/t207-dossie-dashboard-seletor-empresas.md):
@@ -3136,6 +3136,16 @@ seletor.
 **Fora de escopo:** API, schema, migration, RBAC, auditoria, seed, Docker, dependências,
 lockfile, workflow; turnover, absenteísmo, custo, salário, clima e ativos históricos calculados;
 tela de empresas; mudança global de cor; promoção e merge.
+
+**Entrega validada localmente (seções 16 a 19 do dossiê):** Quadro de colaboradores com gráfico
+e tabela, painel por mês, informação "Como calculamos", menu de ações, CSV e impressão para salvar
+em PDF; Distribuição do time e Tempo de casa com agrupamento mínimo de 3 pessoas; ativos no fim e
+turnover como "—" por falta de fonte e regra aprovada; validação visual aprovada pela
+proprietária em 2026-11-10. Sem push, PR, promoção ou merge.
+
+**Validação final local:** web 128 arquivos e 3598 testes; API unitária 60 suítes e 1472
+testes; E2E serial com PostgreSQL real 20 suítes e 1017 testes; scripts 182 testes; 35 mutações,
+todas detectadas; lint, typecheck e build verdes.
 
 ## Próxima ação autorizável
 

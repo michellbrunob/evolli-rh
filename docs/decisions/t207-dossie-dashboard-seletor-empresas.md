@@ -1,10 +1,11 @@
-# T207 — Dashboard funcional e seletor de empresas (preparação)
+# T207 — Dashboard funcional e seletor de empresas
 
 ## 1. Situação
 
-- **Estado:** em implementação local. As decisões V-1 a V-6, E-1 a E-4 e P-1 foram aprovadas
-  em 2026-11-10, conforme a recomendação (seção 13.1). A preparação (levantamento e decisões) foi
-  feita antes, sem código de produto; isso valeu só para aquela fase.
+- **Estado:** implementada e validada localmente, sem push, PR, promoção ou merge (seções 16 a
+  19). As decisões V-1 a V-6, E-1 a E-4 e P-1 foram aprovadas em 2026-11-10, conforme a
+  recomendação (seção 13.1), e a validação visual foi aprovada pela proprietária no mesmo dia. A
+  preparação (levantamento e decisões, seções 2 a 15) foi feita antes, sem código de produto.
 - **Branch:** `codex/t207-dashboard-seletor-empresas`, a partir do squash
   `512d24914519fed335a900b18cab690832e8f121` (T206 integrada, PR #199).
 - **Fora desta preparação:** código de produto, API, schema, migration, RBAC, auditoria, seed,
@@ -314,3 +315,227 @@ o seletor não mostra documento fiscal nem as ações de adicionar e gerenciar e
   `apps/web/src/api/contextoEmpresarialClient.ts`; `apps/web/src/app/SeletorEmpresaAtiva.tsx`.
 - Decisões: T205 (seções 8, 12 e 15), T189, T163, T200, T206; ADRs 0006, 0007, 0008, 0010, 0012,
   0016 e 0017; pacotes de integração do ponto e de banco de horas.
+
+## 16. Entrega
+
+Implementada e validada localmente, com a validação visual aprovada pela proprietária em
+2026-11-10. Sem push, PR, promoção ou merge. Só web e testes.
+
+### 16.1 Decisões preservadas
+
+V-1 a V-6, E-1 a E-4 e P-1 valem como aprovadas (seção 13), com estes detalhes da entrega:
+
+- **V-1:** a Visão Geral tem Resumo, os quatro cards, o Quadro de colaboradores, Distribuição do
+  time, eNPS, Quem é o time, Tempo de casa, Pessoas hoje e Pessoas ativas por tipo de vínculo.
+  Ativos no fim de cada mês não são reconstruídos no navegador.
+- **V-2:** turnover, absenteísmo e custo por pessoa no molde do card real, com "—" escondido do
+  leitor, selo em texto e o que falta; sem número, porcentagem, tendência ou ação.
+- **V-3:** Visão Geral, Pessoas e Movimentação com dados reais; Remuneração e Clima e saúde com
+  rota e estado de indisponibilidade, sem consulta.
+- **V-4:** `#/dashboard?ano=AAAA` e `#/dashboard/<aba>?ano=AAAA`; aba ou ano inválidos corrigidos
+  no lugar; trocar aba ou ano cria uma entrada no histórico.
+- **V-5:** "Como calculamos" só em indicador real — disclosure nos cards e blocos, e botão de
+  informação junto do título no Quadro de colaboradores.
+- **V-6:** `rh`, `dp` e `master_tecnico` com empresa ativa; `master_tecnico` sem empresa vê a
+  orientação, sem consulta; `gestor` e os demais papéis vão ao destino do próprio papel.
+- **E-1 a E-4:** seletor com monograma, nome e código, lista "Empresas da conta" com a atual
+  marcada, busca acima de 8 empresas, sem documento fiscal e sem ações de adicionar ou gerenciar;
+  troca, confirmação com pendência e guarda global como na T189 e na T200.
+- **P-1:** tokens Evolli no menu lateral, no Dashboard e no seletor; o cabeçalho e as outras
+  telas seguem com as cores neutras.
+
+### 16.2 O que a Visão Geral mostra
+
+- **Barra superior:** o nome "Dashboard" junto da área principal, só visual. Acima de 640 px o
+  título da tela sai da vista (continua no documento como título e alvo do foco de entrada);
+  abaixo disso a barra não tem espaço para o nome e o título aparece.
+- **Momento da leitura:** uma vez só em cada aba — na Visão Geral, no card do Resumo, com a marca
+  verde-água (decorativa, o texto em tom neutro); em Pessoas e Movimentação, junto de
+  "Atualizar".
+- **Quadro de colaboradores:** título, subtítulo, botão de informação, pessoas ativas hoje e os
+  totais de entradas, saídas e saldo do ano. Duas vistas com os mesmos números:
+  - gráfico: um botão por mês (uma parada de Tab; setas, Home e End sem volta; Escape fecha o
+    painel e o foco fica no mês); o painel do mês fica ao lado da coluna, dentro do quadro, e é a
+    descrição do botão focado, sem região viva;
+  - tabela: Mês, Ativos no fim, Entradas, Saídas e Turnover, com total.
+- **Menu de ações (reticências):** só nos blocos com dado real (Quadro de colaboradores,
+  Distribuição do time e Tempo de casa). "Ver como tabela" ou "Ver como gráfico", "Baixar CSV" e
+  "Exportar PDF". Botão de menu com nome e estado; setas com volta, Home, End, Enter e Espaço;
+  Escape fecha e devolve o foco ao botão; Tab, clique ou foco fora fecham. O menu fica dentro do
+  bloco, abaixo da altura real do cabeçalho fixo.
+- **Vista escolhida:** em memória, como a preferência do menu recolhido da T206 — vale nesta aba
+  do navegador para a mesma conta na mesma empresa; outra conta, outra empresa ou o logout a
+  apagam. Nada em armazenamento do navegador.
+- **Distribuição do time e Tempo de casa:** gráfico e tabela, com os grupos e faixas já seguros
+  (seção 16.4).
+
+### 16.3 Dados reais e indisponíveis
+
+| Bloco ou coluna                    | Situação                                                          |
+| ---------------------------------- | ----------------------------------------------------------------- |
+| Colaboradores ativos, Pessoas hoje | Real: contadores da listagem de Colaboradores.                    |
+| Pessoas ativas por tipo de vínculo | Real: contadores por tipo.                                        |
+| Entradas, Saídas e Saldo (quadro)  | Real: admissões e desligamentos efetivados, por mês de vigência.  |
+| Movimentação (quatro tipos)        | Real: movimentações efetivadas, por mês de vigência.              |
+| Distribuição do time               | Real: departamento da lotação vigente das pessoas ativas.         |
+| Tempo de casa                      | Real: admissão do vínculo principal e o dia de hoje do navegador. |
+| Ativos no fim (quadro)             | Indisponível: "—", lido como "indisponível".                      |
+| Turnover (quadro e card)           | Indisponível: "—"; o card diz "Requer definição".                 |
+| Absenteísmo, Custo por pessoa      | Indisponível no Evolli.                                           |
+| eNPS, Quem é o time                | Indisponível, sem número, gráfico, tabela, exportação ou ação.    |
+| Remuneração, Clima e saúde         | Abas com estado de indisponibilidade, sem consulta.               |
+
+Nenhum dado ausente aparece como zero ou "0,0%" — nem no gráfico, nem no painel do mês, nem na
+tabela, nem no CSV.
+
+### 16.4 Limites de contrato e privacidade
+
+- **Ativos no fim de cada mês:** o vínculo guarda a situação de hoje, mas não quando passou de
+  previsto a ativo, e o contrato não define se a data de desligamento é o último dia trabalhado.
+  Sem uma regra aprovada (corte do desligamento, vínculos previstos, vínculos sem movimentação de
+  admissão, pessoa ou vínculo), o número seria inventado. Exige decisão e leitura própria no
+  servidor.
+- **Turnover:** sem fórmula aprovada e sem a série de ativos.
+- **Distribuição:** só departamento; centro de custo, área e unidade não fazem parte da
+  listagem.
+- **Quem é o time:** idade, gênero e escolaridade são dados pessoais restritos; exige regra de
+  privacidade aprovada.
+- **Teto de leitura:** as pessoas ativas de hoje são lidas de 100 em 100 até 2.000; acima disso os
+  dois blocos do time mostram só o aviso do limite. Cada tipo de movimentação também para em
+  2.000 no ano.
+- **Privacidade:** com menos de 3 pessoas ativas, Distribuição e Tempo de casa não são exibidos;
+  departamentos com menos de 3 pessoas e quem não tem departamento vigente formam um grupo neutro,
+  sem nome; faixa de tempo de casa com 1 ou 2 pessoas se junta à vizinha até ter 3, então todo
+  número exibido é exato e nada pode ser deduzido pela diferença para o total. Nenhum nome de
+  pessoa aparece no Dashboard nem nos arquivos.
+
+### 16.5 Exportação
+
+- **CSV:** gerado no navegador com os números que o bloco mostra; BOM UTF-8, ponto e vírgula,
+  cabeçalho legível, um mês (ou grupo, ou faixa) por linha, "—" no que não tem fonte, sem linha
+  de total, sem dado pessoal. O nome do arquivo leva o bloco, a empresa e o ano (ou "hoje").
+- **PDF:** a impressão do navegador, que oferece "Salvar como PDF". Antes de abrir, tudo o que não
+  é o bloco escolhido (menu lateral, cabeçalho, outros blocos) sai da impressão; a folha leva a
+  empresa, o bloco e o período; menu e informação não são impressos; ao fim da impressão a página
+  volta como estava. A ação diz, na descrição e no anúncio, que o destino "Salvar como PDF" está
+  na impressão. Nenhuma dependência nova e nenhum arquivo gerado fora do navegador.
+
+## 17. Achados corrigidos durante a implementação
+
+Cada um com teste que falhava antes da correção:
+
+1. **Faixa de tempo de casa deduzível:** "menos de 3" ao lado das outras faixas e do total
+   entregava a quantidade escondida. Agora a faixa se junta à vizinha; o teste percorre todas as
+   composições de 0 a 4 pessoas por faixa.
+2. **Alerta duplicado:** a falha da leitura das pessoas ativas gerava dois alertas e duas novas
+   tentativas. Agora há um só, na Distribuição; o Tempo de casa diz que depende da mesma leitura.
+3. **Painel do mês sobre a barra inspecionada:** passou para o lado da coluna, sem passar da
+   borda.
+4. **Nome da tela na barra com cor da paleta:** passou à cor neutra do cabeçalho (teste de paleta).
+5. **Segundo bloco de 640 px no CSS do shell:** a regra foi para o bloco existente (contrato
+   responsivo do shell).
+6. **Menu atrás do cabeçalho fixo a 375 px:** a barra quebra e fica mais alta que a nominal; o
+   menu passou a rolar pela altura real, mantendo botão e menu à vista.
+7. **Título repetido:** o título grande da tela repetia o nome da barra; saiu da vista acima de
+   640 px.
+8. **Momento da leitura repetido:** aparecia no Resumo e junto de "Atualizar"; agora uma vez por
+   aba.
+9. **Selo "Atual" no seletor:** quebrava palavras na faixa estreita; foi para baixo do nome.
+10. **Informação presa depois de soltar fora** (achado das mutações): pressionar o botão de
+    informação e soltar fora dele, sem clique, deixava uma marca de "veio do ponteiro" que impedia
+    o foco pelo teclado de abrir o painel depois. A marca foi removida; foco abre, o primeiro
+    clique ou Enter fixa e o segundo fecha.
+11. **Rolagem sem caixa desenhada** (achado da validação final): o menu tentava rolar a página
+    mesmo sem caixa (sem layout). Agora só rola quando há o que mostrar.
+
+## 18. Evidências da entrega
+
+### 18.1 Testes automatizados
+
+- `DashboardScreen.test.tsx` (105 testes): as garantias da T205 reescritas sobre a estrutura nova
+  (nenhuma removida); cinco abas, rota e foco; cards honestos; Quadro de colaboradores (título,
+  subtítulo, informação por ponteiro, foco, clique e Escape, sem região viva), gráfico com painel
+  por mês (teclado, ponteiro, Escape, `aria-describedby`, posição), tabela com "—" lido como
+  "indisponível", menu de ações (nome, estado, setas, Home, End, Escape, Tab, clique e foco fora,
+  rolagem abaixo do cabeçalho fixo), os mesmos números no gráfico, no painel, na tabela e no CSV,
+  CSV real (BOM, separador, cabeçalho, linhas, nome com empresa e ano), impressão só do bloco e
+  limpeza depois, Distribuição e Tempo de casa com gráfico, tabela, CSV e impressão, privacidade,
+  teto, falha com um único alerta, respostas atrasadas, desmontagem, hora da leitura uma vez por
+  aba e o contrato de CSS a 375 px.
+- `dashboardTime.test.ts` (18 testes, novo): leitura das pessoas ativas (páginas, teto, repetidos,
+  abandono), distribuição com grupo neutro, mediana e faixas, e a composição exaustiva de faixas
+  (0 a 4 pessoas em cada uma) sem nenhuma faixa entre 1 e 2.
+- `App.dashboard.test.tsx` (34 testes): rota, ano, histórico, papéis, abas no shell, "Dashboard"
+  na barra só visual e título único com o foco, vista vinda de quem monta o shell, contrato de
+  CSS do nome na barra.
+- `AutenticacaoApp.test.tsx` (89 testes, 2 novos): a vista sobrevive à volta pelo Hub, e outra
+  conta (depois do logout) ou outra empresa começam no gráfico.
+- `rotasDoShell.dashboard.test.ts` (24), `SeletorEmpresaAtiva.test.tsx` (42) e
+  `paletaEvolli.test.ts` (14): rota das abas, seletor e paleta, como na primeira implementação.
+- Suíte web completa: 128 arquivos, 3598 testes. Numa rodada anterior, um teste de Nova admissão (arquivo que a T207 não
+  altera) estourou o limite de 5 s sob carga; sozinho, o arquivo passou com 263 de 263, e a rodada
+  seguinte da suíte completa passou inteira. API unitária: 60 suítes, 1472 testes. E2E serial com
+  PostgreSQL real: 20 suítes, 1017 testes. Scripts: 182 testes. Lint, typecheck e build verdes. A
+  API não mudou; a API unitária e o E2E rodaram como regressão.
+
+### 18.2 Mutações
+
+35 mutações temporárias, todas detectadas:
+
+- privacidade: departamento de 2 pessoas exibido, distribuição com menos de 3 pessoas, faixa
+  pequena que não se junta;
+- leitura: sem deduplicação entre páginas, página seguinte pedida depois de abandonar, média no
+  lugar da mediana;
+- quadro: ativos no fim como zero, célula sem fonte sem texto para o leitor, painel do mês sem as
+  métricas indisponíveis;
+- CSV: sem BOM, vírgula no lugar do ponto e vírgula, indisponível como vazio, nome sem a empresa;
+- impressão: irmãos que não saem da impressão, marcação que não é desfeita, impressão com a tela
+  já desmontada;
+- menu: Escape sem devolver o foco, setas sem volta, clique fora sem fechar, menu atrás do
+  cabeçalho fixo, rolagem sem caixa desenhada, menu num bloco sem dados;
+- informação: Escape sem fechar, foco sem abrir;
+- gráfico: painel sobre a coluna inspecionada, Escape sem fechar o painel;
+- tela e shell: hora da leitura repetida ao lado de "Atualizar", vista sem repasse ao shell, vista
+  que sobrevive à troca de empresa, nome da barra anunciado ao leitor, cor da paleta no
+  cabeçalho, aba inválida aceita na rota;
+- seletor e paleta: busca já com 8 empresas, Escape sem fechar, faixa lateral sem o marinho.
+
+Na primeira rodada, duas sobreviveram e foram tratadas: uma era equivalente (a deduplicação usa um
+mapa por id, então tirar só o desvio não mudava a contagem) e foi trocada por uma que remove de
+fato a deduplicação; a outra revelou o achado 10 da seção 17.
+
+### 18.3 Validação local no navegador
+
+Prévia local da branch, com dados sintéticos (duas empresas, contas de cada papel). Downloads e
+impressão foram exercitados interceptando o arquivo e o diálogo na própria página, sem salvar
+arquivo nem abrir o diálogo nativo.
+
+| Verificação                  | Resultado                                                                                                                                                                              |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| RH                           | Aterrissa no Dashboard; foco no título uma vez; "Dashboard" na barra; nove blocos na ordem; três menus de ações; hora da leitura uma vez, no Resumo.                                   |
+| DP                           | Dashboard com os mesmos blocos e menus.                                                                                                                                                |
+| `master_tecnico` sem empresa | Orientação para escolher a empresa, sem consulta.                                                                                                                                      |
+| `master_tecnico` com empresa | Seletor abre na empresa atual; Escape fecha e devolve o foco; a escolha anuncia a troca, lê os dados e foca o título.                                                                  |
+| Gestor                       | Minha equipe; a rota do Dashboard não abre para o papel.                                                                                                                               |
+| Perfis sem shell             | Colaborador e administração técnica ficam no Hub.                                                                                                                                      |
+| Troca de empresa             | Conta com duas empresas: tabela escolhida sobrevive ao Hub e volta ao gráfico na outra empresa; totais da empresa nova; foco no título.                                                |
+| Privacidade                  | Empresa com uma pessoa ativa: Distribuição e Tempo de casa "Não exibido por privacidade", sem menu.                                                                                    |
+| Guarda de edição pendente    | Admissão em rascunho + troca pelo seletor: "Continuar editando" com o foco; rascunho e empresa preservados.                                                                            |
+| URL e histórico              | Ano anterior cria entrada; voltar e avançar percorrem os anos com releitura; aba Pessoas com rota própria; recarga mantém a rota.                                                      |
+| CSV                          | Quadro e Distribuição: BOM, ponto e vírgula, "—" no que não tem fonte, empresa e ano no nome, sem dado pessoal.                                                                        |
+| Impressão/PDF                | Só o quadro, na vista de tabela, com empresa e período no topo; menu lateral e cabeçalho fora; tudo desfeito depois da impressão.                                                      |
+| 375 px                       | Sem rolagem horizontal; painel de informação dentro da tela, Escape fecha; menu abaixo do cabeçalho; painel do mês dentro da tela, sem cobrir a coluna; tabela rola no próprio quadro. |
+
+### 18.4 Referências
+
+As referências visuais privadas usadas na conferência ficaram fora do repositório: nenhum nome,
+texto, imagem, cor, ícone, dado ou endereço delas entrou em código, teste, commit ou documento.
+
+## 19. Observações
+
+- **Leitor de tela:** os anúncios únicos e a ausência de região viva no gráfico, no painel de
+  informação e no menu são garantidos pela estrutura e pelos testes; não houve sessão com leitor
+  de tela real.
+- **Diálogo de impressão:** o conteúdo impresso é preparado e testado; a geração do PDF é do
+  navegador.
+- **Vista após recarregar:** volta ao gráfico (seção 16.2).
