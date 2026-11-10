@@ -711,6 +711,276 @@ a.dashboard__situacao .dashboard__situacao-rotulo {
   }
 }
 
+/* ---- T207 — Visão Geral ampliada ---------------------------------------- */
+
+/* Topo de cada bloco: título e subtítulo juntos. */
+.dashboard__bloco-topo {
+  display: grid;
+  gap: var(--space-xxs);
+  min-width: 0;
+}
+
+/* Número de destaque de um bloco (pessoas ativas, mediana). */
+.dashboard__destaque {
+  margin: 0;
+  color: var(--color-ink-muted);
+  overflow-wrap: anywhere;
+}
+
+.dashboard__destaque-valor {
+  color: var(--evolli-marinho);
+  font-size: var(--text-title);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-tight);
+}
+
+/* Quadro de movimentação: destaque à esquerda, totais à direita. */
+.dashboard__quadro-topo {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: end;
+  gap: var(--space-md);
+  min-width: 0;
+}
+
+@media (min-width: 56rem) {
+  .dashboard__quadro-topo {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  }
+}
+
+.dashboard__nota--discreta {
+  color: var(--color-ink-subtle);
+}
+
+/* Grade de blocos: duas colunas no desktop, uma no celular. */
+.dashboard__grade {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-lg);
+  min-width: 0;
+}
+
+@media (min-width: 64rem) {
+  .dashboard__grade {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Bloco sem dado: quadro neutro com o estado em texto. */
+.dashboard__vazio-quadro {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: var(--space-sm);
+  min-height: 9rem;
+  padding: var(--space-lg);
+  border-radius: var(--radius-md);
+  background: var(--evolli-fundo);
+  text-align: center;
+}
+
+.dashboard__vazio-texto {
+  margin: 0;
+  max-width: 32rem;
+  color: var(--color-ink-muted);
+  line-height: var(--leading-body);
+}
+
+/* Distribuição do time. */
+.dashboard__grupos {
+  display: grid;
+  gap: var(--space-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dashboard__grupo {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-xs) var(--space-sm);
+  padding-bottom: var(--space-xs);
+  border-bottom: 1px solid var(--divider-soft);
+}
+
+.dashboard__grupo-nome {
+  color: var(--color-ink);
+  overflow-wrap: anywhere;
+}
+
+.dashboard__grupo-valor {
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.dashboard__barra-grupo--0 {
+  background: var(--evolli-azul);
+}
+
+.dashboard__barra-grupo--1 {
+  background: var(--evolli-marinho);
+}
+
+.dashboard__barra-grupo--2 {
+  background: var(--evolli-verde-agua-escuro);
+}
+
+.dashboard__barra-grupo--3 {
+  background: var(--evolli-ardosia);
+}
+
+.dashboard__barra-grupo--neutro {
+  background: var(--status-neutral-border);
+}
+
+/* Tempo de casa: faixas com trilho (decorativo) e o número em texto. */
+.dashboard__faixas {
+  display: grid;
+  gap: var(--space-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dashboard__faixa {
+  display: grid;
+  grid-template-columns: minmax(6.5rem, 9rem) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.dashboard__faixa-rotulo {
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+}
+
+.dashboard__faixa-trilho {
+  height: 0.625rem;
+  border-radius: var(--radius-pill);
+  background: var(--evolli-fundo);
+  overflow: hidden;
+}
+
+.dashboard__faixa-barra {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--evolli-azul);
+}
+
+.dashboard__faixa-valor {
+  color: var(--evolli-marinho);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-strong);
+  white-space: nowrap;
+}
+
+@media (max-width: 40rem) {
+  .dashboard__faixa {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .dashboard__faixa-trilho {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
+
+/* ---- Gráfico mensal interativo ----------------------------------------- */
+.dashboard__area-grafico {
+  position: relative;
+  min-width: 0;
+}
+
+/* Cada mês é um botão: a coluna inteira é o alvo. */
+.dashboard__coluna {
+  margin: 0;
+  padding: 0 1px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.dashboard__coluna:hover,
+.dashboard__coluna--aberta {
+  background: var(--evolli-azul-suave);
+}
+
+.dashboard__coluna:focus-visible {
+  outline: var(--focus-width) solid var(--evolli-azul);
+  outline-offset: 1px;
+}
+
+/* Painel do mês: dentro do quadro (nunca por cima de modal, guarda ou
+   menu) e AO LADO da coluna inspecionada — à direita na primeira metade do
+   ano, à esquerda na segunda —, então nunca cobre a própria barra e nunca
+   passa da borda (no máximo metade da largura do gráfico). */
+.dashboard__dica-mes {
+  position: absolute;
+  top: 0;
+  z-index: 2;
+  display: grid;
+  gap: var(--space-xxs);
+  width: max-content;
+  max-width: min(16rem, 50%);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--hairline);
+  border-top: 3px solid var(--evolli-azul);
+  border-radius: var(--radius-md);
+  background: var(--surface-canvas);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  pointer-events: none;
+}
+
+.dashboard__dica-mes--depois {
+  left: calc((var(--coluna) + 1) / var(--colunas) * 100%);
+  margin-left: var(--space-xxs);
+}
+
+.dashboard__dica-mes--antes {
+  right: calc((var(--colunas) - var(--coluna)) / var(--colunas) * 100%);
+  margin-right: var(--space-xxs);
+}
+
+.dashboard__dica-mes-titulo {
+  margin: 0;
+  color: var(--evolli-marinho);
+  font-weight: var(--weight-strong);
+}
+
+.dashboard__dica-mes-lista {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+}
+
+.dashboard__dica-mes-lista > div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+
+.dashboard__dica-mes-lista dt {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+  color: var(--color-ink-muted);
+}
+
+.dashboard__dica-mes-lista dd {
+  margin: 0;
+  font-weight: var(--weight-strong);
+  font-variant-numeric: tabular-nums;
+}
+
 /* Controles que, agora, não fazem nada (ano no limite, leitura em curso):
    continuam focáveis (`aria-disabled`), com a aparência de desabilitados. */
 .dashboard .evolli-button[aria-disabled="true"] {

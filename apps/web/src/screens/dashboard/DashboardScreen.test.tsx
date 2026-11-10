@@ -20,8 +20,10 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   listarColaboradores,
+  type ColaboradorListadoApi,
   type ContadoresColaboradoresApi,
   type ListagemColaboradoresApi,
+  type ListarColaboradoresQuery,
 } from "../../api/colaboradoresClient";
 import {
   listarMovimentacoes,
@@ -86,6 +88,84 @@ function listagem(c: ContadoresColaboradoresApi): ListagemColaboradoresApi {
     total: c.total,
     contadores: c,
   };
+}
+
+/**
+ * T207 — o mesmo endpoint serve duas leituras: os contadores (uma página
+ * mínima) e as pessoas ativas de hoje (`grupo: "ativos"`, de 100 em 100).
+ * Cada uma tem o seu "servidor", para que as garantias da T205 sobre os
+ * contadores continuem medidas só nos contadores.
+ */
+const servidorDosContadores =
+  vi.fn<(q?: ListarColaboradoresQuery) => Promise<ListagemColaboradoresApi>>();
+const servidorDosAtivos =
+  vi.fn<(q?: ListarColaboradoresQuery) => Promise<ListagemColaboradoresApi>>();
+
+function ativo(
+  id: string,
+  dataAdmissao: string,
+  departamento: string | null,
+): ColaboradorListadoApi {
+  return {
+    id,
+    nome: `Pessoa sintética ${id}`,
+    situacao: "ativo",
+    criadoEm: "2026-01-01T00:00:00.000Z",
+    atualizadoEm: "2026-01-01T00:00:00.000Z",
+    vinculos: [
+      {
+        id: `v-${id}`,
+        empresaId: "empresa-sintetica",
+        matricula: null,
+        tipo: "clt",
+        situacao: "ativo",
+        dataAdmissao,
+        dataDesligamento: null,
+        lotacaoVigente: departamento
+          ? {
+              cargo: null,
+              departamento: {
+                id: `d-${departamento}`,
+                codigo: departamento.slice(0, 3).toUpperCase(),
+                nome: departamento,
+              },
+            }
+          : null,
+        vigenciasDeJornada: [],
+      },
+    ],
+  };
+}
+
+/**
+ * Time sintético de hoje (9/11/2026): 5 em Operações há 18 meses, 3 em
+ * Vendas há 6, 1 em Jurídico há 10 anos (departamento pequeno) e 1 sem
+ * lotação vigente há 1 mês.
+ */
+const TIME_PADRAO = () => [
+  ...Array.from({ length: 5 }, (_, i) =>
+    ativo(`op-${i}`, "2025-05-09", "Operações"),
+  ),
+  ...Array.from({ length: 3 }, (_, i) =>
+    ativo(`ve-${i}`, "2026-05-09", "Vendas"),
+  ),
+  ativo("ju-0", "2016-11-09", "Jurídico"),
+  ativo("sem-0", "2026-10-09", null),
+];
+
+/** Pessoas ativas do "servidor", de 100 em 100. */
+function servidorDeAtivos(todas: ColaboradorListadoApi[]) {
+  servidorDosAtivos.mockImplementation(async (q = {}) => {
+    const tamanho = q.tamanhoPagina ?? 20;
+    const pagina = q.pagina ?? 1;
+    return {
+      itens: todas.slice((pagina - 1) * tamanho, pagina * tamanho),
+      pagina,
+      tamanhoPagina: tamanho,
+      total: todas.length,
+      contadores: contadores(),
+    };
+  });
 }
 
 let n = 0;
@@ -159,7 +239,13 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(AGORA);
   n = 0;
-  vi.mocked(listarColaboradores).mockResolvedValue(listagem(contadores()));
+  servidorDosContadores.mockReset();
+  servidorDosAtivos.mockReset();
+  vi.mocked(listarColaboradores).mockImplementation((q = {}) =>
+    q.grupo === "ativos" ? servidorDosAtivos(q) : servidorDosContadores(q),
+  );
+  servidorDosContadores.mockResolvedValue(listagem(contadores()));
+  servidorDeAtivos(TIME_PADRAO());
   servidorDeMovimentacoes(MOVIMENTACOES_PADRAO());
 });
 
@@ -227,8 +313,15 @@ describe("T205 — leitura e resumo (E-2)", () => {
   it("lê os contadores (uma página mínima) e as movimentações efetivadas de cada tipo", async () => {
     render(<Tela />);
     await lido();
-    expect(listarColaboradores).toHaveBeenCalledTimes(1);
-    expect(listarColaboradores).toHaveBeenCalledWith({ tamanhoPagina: 1 });
+    expect(servidorDosContadores).toHaveBeenCalledTimes(1);
+    expect(servidorDosContadores).toHaveBeenCalledWith({ tamanhoPagina: 1 });
+    // T207 — e as pessoas ativas de hoje, uma página de 100 (são 10).
+    expect(servidorDosAtivos).toHaveBeenCalledTimes(1);
+    expect(servidorDosAtivos).toHaveBeenCalledWith({
+      grupo: "ativos",
+      pagina: 1,
+      tamanhoPagina: 100,
+    });
     const consultas = vi.mocked(listarMovimentacoes).mock.calls.map(([q]) => q);
     expect(consultas).toEqual(
       expect.arrayContaining([
@@ -280,7 +373,7 @@ describe("T205 — leitura e resumo (E-2)", () => {
   });
 
   it("zero é zero; sem pessoas nem movimentações, frases próprias e nada de gráfico", async () => {
-    vi.mocked(listarColaboradores).mockResolvedValue(
+    servidorDosContadores.mockResolvedValue(
       listagem(
         contadores({
           ativos: 0,
@@ -423,9 +516,12 @@ describe("T205 — série mensal (E-4)", () => {
     expect(linhas[3]).toEqual(["Março", "1", "1", "0"]);
     expect(linhas[11]).toEqual(["Novembro", "1", "0", "+1"]);
     expect(linhas.at(-1)).toEqual(["Total", "4", "1", "+3"]);
-    const grafico = serie.querySelector(".dashboard__grafico")!;
-    expect(grafico).toHaveAttribute("aria-hidden", "true");
-    expect(grafico.querySelectorAll(".dashboard__coluna")).toHaveLength(11);
+    // T207 — um botão por mês (até hoje); as barras seguem decorativas.
+    const meses = within(serie).getByRole("group", { name: /por mês/ });
+    expect(within(meses).getAllByRole("button")).toHaveLength(11);
+    for (const barras of serie.querySelectorAll(".dashboard__barras")) {
+      expect(barras).toHaveAttribute("aria-hidden", "true");
+    }
   });
 
   it("ano passado: os doze meses, sem 'até hoje'", async () => {
@@ -477,7 +573,7 @@ describe("T205 — série mensal (E-4)", () => {
 
 describe("T205 — falhas e nova tentativa", () => {
   it("totais de pessoas falham: alerta e nova tentativa no lugar; a série continua; sucesso leva o foco ao Resumo", async () => {
-    vi.mocked(listarColaboradores).mockRejectedValueOnce(new Error("rede"));
+    servidorDosContadores.mockRejectedValueOnce(new Error("rede"));
     render(<Tela />);
     await lido();
     expect(screen.getAllByRole("alert")).toHaveLength(1);
@@ -533,11 +629,12 @@ describe("T205 — falhas e nova tentativa", () => {
     expect(screen.getByRole("table")).toBeVisible();
   });
 
-  it("as duas leituras falham: dois alertas, nenhum número, nada anunciado como lido", async () => {
-    vi.mocked(listarColaboradores).mockRejectedValueOnce(new Error("rede"));
+  it("as três leituras falham: três alertas, nenhum número, nada anunciado como lido", async () => {
+    servidorDosContadores.mockRejectedValueOnce(new Error("rede"));
+    servidorDosAtivos.mockRejectedValueOnce(new Error("rede"));
     vi.mocked(listarMovimentacoes).mockRejectedValue(new Error("rede"));
     render(<Tela />);
-    await waitFor(() => expect(screen.getAllByRole("alert")).toHaveLength(2));
+    await waitFor(() => expect(screen.getAllByRole("alert")).toHaveLength(3));
     expect(screen.getByRole("status")).toHaveTextContent("");
     expect(screen.queryByText(/^Hoje há/)).toBeNull();
   });
@@ -582,13 +679,14 @@ describe("T205 — período, atualização, atrasos (E-1, E-5)", () => {
     const status = screen.getByRole("status");
     const visto = textosDoStatus(status);
     const leitura = adiada<ListagemColaboradoresApi>();
-    vi.mocked(listarColaboradores).mockReturnValueOnce(leitura.promessa);
+    servidorDosContadores.mockReturnValueOnce(leitura.promessa);
     const atualizar = screen.getByRole("button", { name: "Atualizar" });
     fireEvent.click(atualizar);
     const emCurso = screen.getByRole("button", { name: "Atualizando…" });
     expect(emCurso).toHaveAttribute("aria-disabled", "true");
     fireEvent.click(emCurso);
-    expect(listarColaboradores).toHaveBeenCalledTimes(2);
+    expect(servidorDosContadores).toHaveBeenCalledTimes(2);
+    expect(servidorDosAtivos).toHaveBeenCalledTimes(2);
     // A série do mesmo ano fica na tela durante a releitura.
     expect(screen.getByRole("table")).toBeVisible();
     await act(async () => {
@@ -695,7 +793,7 @@ describe("T205 — período, atualização, atrasos (E-1, E-5)", () => {
   it("leitura antiga que termina antes da nova não encerra o 'Atualizando…' da nova", async () => {
     const antiga = adiada<ListagemColaboradoresApi>();
     const nova = adiada<ListagemColaboradoresApi>();
-    vi.mocked(listarColaboradores)
+    servidorDosContadores
       .mockReturnValueOnce(antiga.promessa)
       .mockReturnValueOnce(nova.promessa);
     const { rerender } = render(<Tela ano={2026} />);
@@ -754,7 +852,7 @@ describe("T205 — período, atualização, atrasos (E-1, E-5)", () => {
 
   it("desmontagem com a leitura pendente: nada é atualizado depois", async () => {
     const leitura = adiada<ListagemColaboradoresApi>();
-    vi.mocked(listarColaboradores).mockReturnValueOnce(leitura.promessa);
+    servidorDosContadores.mockReturnValueOnce(leitura.promessa);
     const erros = vi.spyOn(console, "error").mockImplementation(() => {});
     const { unmount } = render(<Tela />);
     unmount();
@@ -894,7 +992,7 @@ describe("T207 — abas do Dashboard (V-3)", () => {
 
 describe("T207 — Visão Geral: cards honestos (V-2) e Como calculamos (V-5)", () => {
   it.each([
-    ["Turnover", "Requer definição"],
+    ["Turnover no ano", "Requer definição"],
     ["Absenteísmo", "Indisponível no Evolli"],
     ["Custo por pessoa", "Indisponível no Evolli"],
   ])(
@@ -926,7 +1024,7 @@ describe("T207 — Visão Geral: cards honestos (V-2) e Como calculamos (V-5)", 
         .map((a) => a.querySelector("h3")?.textContent),
     ).toEqual([
       "Colaboradores ativos",
-      "Turnover",
+      "Turnover no ano",
       "Absenteísmo",
       "Custo por pessoa",
     ]);
@@ -955,8 +1053,10 @@ describe("T207 — Visão Geral: cards honestos (V-2) e Como calculamos (V-5)", 
       .map((b) => b.textContent);
     expect(nomes).toEqual([
       "Como calculamos: colaboradores ativos",
-      "Como calculamos: pessoas hoje",
       "Como calculamos: movimentação mensal",
+      "Como calculamos: distribuição do time",
+      "Como calculamos: tempo de casa",
+      "Como calculamos: pessoas hoje",
     ]);
   });
 
@@ -1092,17 +1192,479 @@ describe("T207 — Remuneração e Clima e saúde: sem dado no Evolli", () => {
     expect(listarColaboradores).not.toHaveBeenCalled();
     rerender(<Tela aba="pessoas" />);
     await lido();
-    expect(listarColaboradores).toHaveBeenCalledTimes(1);
+    expect(servidorDosContadores).toHaveBeenCalledTimes(1);
   });
 
   it("sair para uma aba sem dado no meio da leitura: a resposta atrasada não anuncia nada", async () => {
     const leitura = adiada<ListagemColaboradoresApi>();
-    vi.mocked(listarColaboradores).mockReturnValueOnce(leitura.promessa);
+    servidorDosContadores.mockReturnValueOnce(leitura.promessa);
     const { rerender } = render(<Tela aba="visao-geral" />);
     rerender(<Tela aba="clima-e-saude" />);
     await act(async () => {
       leitura.resolver(listagem(contadores()));
     });
     expect(screen.getByRole("status")).toHaveTextContent("");
+  });
+});
+
+describe("T207 — Visão Geral ampliada: ordem e quadro mensal", () => {
+  it("blocos na ordem: resumo, indicadores, movimentação, time, eNPS, quem é o time, tempo de casa, pessoas", async () => {
+    render(<Tela />);
+    await lido();
+    const painel = screen.getByRole("tabpanel");
+    expect(
+      within(painel)
+        .getAllByRole("heading", { level: 2 })
+        .map((h) => h.textContent),
+    ).toEqual([
+      "Resumo",
+      "Indicadores",
+      SERIE,
+      "Distribuição do time",
+      "eNPS",
+      "Quem é o time",
+      "Tempo de casa",
+      "Pessoas hoje",
+      "Pessoas ativas por tipo de vínculo",
+    ]);
+  });
+
+  it("quadro mensal: pessoas ativas hoje, totais do ano e nota discreta — sem série de ativos por mês", async () => {
+    render(<Tela />);
+    await lido();
+    const serie = bloco(SERIE);
+    expect(serie.querySelector(".dashboard__destaque")).toHaveTextContent(
+      "12 pessoas ativas hoje",
+    );
+    expect(serie).toHaveTextContent(
+      "Pessoas ativas no fim de cada mês ainda não são calculadas no Evolli; o gráfico mostra os eventos efetivados em cada mês.",
+    );
+    expect(
+      within(serie).queryByRole("columnheader", { name: /ativ/i }),
+    ).toBeNull();
+  });
+
+  it("uma pessoa ativa: singular no destaque", async () => {
+    servidorDosContadores.mockResolvedValue(
+      listagem(contadores({ ativos: 1 })),
+    );
+    render(<Tela />);
+    await lido();
+    expect(
+      bloco(SERIE).querySelector(".dashboard__destaque"),
+    ).toHaveTextContent("1 pessoa ativa hoje");
+  });
+});
+
+describe("T207 — gráfico mensal interativo", () => {
+  const grupoDosMeses = () =>
+    within(bloco(SERIE)).getByRole("group", {
+      name: "Admissões e desligamentos por mês — use as setas para percorrer os meses",
+    });
+  const mes = (nome: string) =>
+    within(grupoDosMeses()).getByRole("button", { name: nome });
+  const dica = () => screen.queryByRole("tooltip");
+
+  it("um botão por mês com nome e ano; uma parada de Tab só (o mês mais recente)", async () => {
+    render(<Tela />);
+    await lido();
+    const botoes = within(grupoDosMeses()).getAllByRole("button");
+    expect(botoes.map((b) => b.textContent)).toContain("JanJaneiro de 2026");
+    expect(botoes.filter((b) => b.tabIndex === 0)).toEqual([
+      mes("Novembro de 2026"),
+    ]);
+    expect(dica()).toBeNull();
+  });
+
+  it("foco abre o painel do mês com os números reais, ligado por aria-describedby", async () => {
+    render(<Tela />);
+    await lido();
+    const janeiro = mes("Janeiro de 2026");
+    act(() => janeiro.focus());
+    const painel = dica()!;
+    expect(painel).toHaveTextContent(
+      "Janeiro de 2026Admissões2Desligamentos0Diferença+2",
+    );
+    expect(janeiro).toHaveAttribute("aria-describedby", painel.id);
+    expect(janeiro).toHaveAccessibleDescription(
+      /Janeiro de 2026.*Admissões.*2.*Desligamentos.*0.*Diferença.*\+2/,
+    );
+    // Primeira metade do ano: o painel fica à direita da coluna.
+    expect(painel).toHaveClass("dashboard__dica-mes--depois");
+    // Nenhuma região viva: só o mês focado é descrito.
+    expect(painel).not.toHaveAttribute("aria-live");
+    expect(painel.closest("[aria-live]")).toBeNull();
+  });
+
+  it("setas, Home e End percorrem os meses sem dar a volta; o painel acompanha; a parada de Tab vai junto", async () => {
+    render(<Tela />);
+    await lido();
+    const status = screen.getByRole("status");
+    const anunciado = status.textContent;
+    const janeiro = mes("Janeiro de 2026");
+    act(() => janeiro.focus());
+    fireEvent.keyDown(janeiro, { key: "ArrowLeft" });
+    expect(janeiro).toHaveFocus();
+    fireEvent.keyDown(janeiro, { key: "ArrowRight" });
+    const fevereiro = mes("Fevereiro de 2026");
+    expect(fevereiro).toHaveFocus();
+    expect(dica()).toHaveTextContent("Fevereiro de 2026");
+    expect(janeiro).not.toHaveAttribute("aria-describedby");
+    expect(fevereiro.tabIndex).toBe(0);
+    expect(janeiro.tabIndex).toBe(-1);
+    fireEvent.keyDown(fevereiro, { key: "End" });
+    const novembro = mes("Novembro de 2026");
+    expect(novembro).toHaveFocus();
+    expect(dica()).toHaveTextContent("Novembro de 2026Admissões1");
+    // Segunda metade: à esquerda da coluna, dentro do quadro.
+    expect(dica()).toHaveClass("dashboard__dica-mes--antes");
+    fireEvent.keyDown(novembro, { key: "ArrowRight" });
+    expect(novembro).toHaveFocus();
+    fireEvent.keyDown(novembro, { key: "Home" });
+    expect(janeiro).toHaveFocus();
+    // Percorrer meses não mexe no anúncio da página.
+    expect(status.textContent).toBe(anunciado);
+  });
+
+  it("Escape fecha o painel e o foco fica no mês; Escape de novo não faz nada", async () => {
+    render(<Tela />);
+    await lido();
+    const marco = mes("Março de 2026");
+    act(() => marco.focus());
+    expect(dica()).not.toBeNull();
+    fireEvent.keyDown(marco, { key: "Escape" });
+    expect(dica()).toBeNull();
+    expect(marco).toHaveFocus();
+    expect(marco).not.toHaveAttribute("aria-describedby");
+    fireEvent.keyDown(marco, { key: "Escape" });
+    expect(dica()).toBeNull();
+    expect(marco).toHaveFocus();
+  });
+
+  it("ponteiro: entrar abre o mês; sair do gráfico fecha — ou volta ao mês focado", async () => {
+    render(<Tela />);
+    await lido();
+    const grafico = bloco(SERIE).querySelector<HTMLElement>(
+      ".dashboard__grafico",
+    )!;
+    fireEvent.mouseEnter(mes("Abril de 2026"));
+    expect(dica()).toHaveTextContent("Abril de 2026");
+    fireEvent.mouseLeave(grafico);
+    expect(dica()).toBeNull();
+
+    act(() => mes("Março de 2026").focus());
+    fireEvent.mouseEnter(mes("Junho de 2026"));
+    expect(dica()).toHaveTextContent("Junho de 2026");
+    fireEvent.mouseLeave(grafico);
+    expect(dica()).toHaveTextContent("Março de 2026");
+  });
+
+  it("foco sai do gráfico: o painel fecha", async () => {
+    render(<Tela />);
+    await lido();
+    act(() => mes("Março de 2026").focus());
+    expect(dica()).not.toBeNull();
+    act(() =>
+      screen.getByRole("heading", { level: 2, name: "Resumo" }).focus(),
+    );
+    expect(dica()).toBeNull();
+  });
+
+  it("na aba Movimentação, os quatro tipos no painel e a diferença, como na tabela", async () => {
+    render(<Tela aba="movimentacao" />);
+    await lido();
+    const painel = screen.getByRole("tabpanel");
+    const botao = within(painel).getByRole("button", {
+      name: "Janeiro de 2026",
+    });
+    act(() => botao.focus());
+    const d = dica()!;
+    expect(d).toHaveTextContent("Admissões2");
+    expect(d).toHaveTextContent("Mudanças de cargo0");
+    expect(d).toHaveTextContent("Diferença+2");
+  });
+});
+
+describe("T207 — Distribuição do time e Tempo de casa", () => {
+  it("distribuição: só departamento, maior grupo primeiro, pequenos e sem departamento juntos e sem nome", async () => {
+    render(<Tela />);
+    await lido();
+    const b = bloco("Distribuição do time");
+    expect(b.querySelector(".dashboard__destaque")).toHaveTextContent(
+      "10 pessoas em 3 departamentos",
+    );
+    expect(
+      within(b)
+        .getAllByRole("listitem")
+        .map((li) => li.textContent),
+    ).toEqual([
+      "Operações5 pessoas · 50%",
+      "Vendas3 pessoas · 30%",
+      "Grupos com menos de 3 pessoas ou sem departamento2 pessoas · 20%",
+    ]);
+    expect(screen.queryByText(/Jurídico/)).toBeNull();
+    expect(b).toHaveTextContent(
+      "Departamentos com menos de 3 pessoas, e quem não tem departamento vigente, ficam juntos",
+    );
+    // Nenhum nome de pessoa aparece no Dashboard.
+    expect(screen.queryByText(/Pessoa sintética/)).toBeNull();
+  });
+
+  it("tempo de casa: mediana e faixas; faixa pequena junta à vizinha (nada deduzível pela diferença)", async () => {
+    render(<Tela />);
+    await lido();
+    const b = bloco("Tempo de casa");
+    expect(b.querySelector(".dashboard__destaque")).toHaveTextContent(
+      "1 ano e 6 meses na mediana",
+    );
+    // Sem junção haveria "10 anos ou mais: 1" — a pessoa mais antiga.
+    expect(
+      within(b)
+        .getAllByRole("listitem")
+        .map((li) => li.textContent),
+    ).toEqual(["Menos de 1 ano4 pessoas", "1 ano ou mais6 pessoas"]);
+    expect(b).not.toHaveTextContent(/menos de 3$/);
+    expect(b).toHaveTextContent(
+      "Faixa com menos de 3 pessoas se junta à faixa vizinha",
+    );
+  });
+
+  it("tempo de casa usa o dia de hoje do navegador", async () => {
+    vi.setSystemTime(new Date(2027, 4, 9, 12));
+    render(<Tela ano={2027} />);
+    await lido();
+    expect(
+      bloco("Tempo de casa").querySelector(".dashboard__destaque"),
+    ).toHaveTextContent("2 anos na mediana");
+  });
+
+  it("menos de 3 pessoas ativas: os dois blocos não exibem nada, por privacidade", async () => {
+    servidorDeAtivos(TIME_PADRAO().slice(0, 2));
+    render(<Tela />);
+    await lido();
+    for (const nome of ["Distribuição do time", "Tempo de casa"]) {
+      const b = bloco(nome);
+      expect(within(b).getByText("Não exibido por privacidade")).toBeVisible();
+      expect(within(b).queryByRole("list")).toBeNull();
+      expect(within(b).queryByRole("button")).toBeNull();
+      expect(b).not.toHaveTextContent("Operações");
+    }
+  });
+
+  it("mais de 2.000 pessoas ativas: aviso do limite, nenhum número parcial", async () => {
+    let pedido = 0;
+    servidorDosAtivos.mockImplementation(async () => {
+      pedido += 1;
+      return {
+        itens: Array.from({ length: 100 }, (_, i) =>
+          ativo(`x-${pedido}-${i}`, "2025-01-01", "Operações"),
+        ),
+        pagina: pedido,
+        tamanhoPagina: 100,
+        total: 5000,
+        contadores: contadores(),
+      };
+    });
+    render(<Tela />);
+    await lido();
+    expect(servidorDosAtivos).toHaveBeenCalledTimes(20);
+    for (const nome of ["Distribuição do time", "Tempo de casa"]) {
+      const b = bloco(nome);
+      expect(b).toHaveTextContent(
+        "Mais de 2.000 pessoas ativas: o limite desta visão.",
+      );
+      expect(within(b).queryByRole("list")).toBeNull();
+      expect(b.querySelector(".dashboard__destaque")).toBeNull();
+    }
+  });
+
+  it("enquanto lê: 'Carregando…' visível, escondido do leitor (o status anuncia)", () => {
+    servidorDosAtivos.mockReturnValue(new Promise(() => {}));
+    render(<Tela />);
+    const textos = within(bloco("Distribuição do time")).getByText(
+      "Carregando…",
+    );
+    expect(textos).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("leitura falha: um único alerta e uma única nova tentativa; sucesso leva o foco à Distribuição e anuncia", async () => {
+    servidorDosAtivos.mockRejectedValueOnce(new Error("rede"));
+    render(<Tela />);
+    await lido();
+    expect(screen.getAllByRole("alert")).toHaveLength(1);
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Não foi possível carregar as pessoas ativas de hoje.",
+    );
+    expect(
+      screen.getAllByRole("button", { name: /Tentar de novo/ }),
+    ).toHaveLength(1);
+    expect(
+      within(bloco("Distribuição do time")).getByRole("alert"),
+    ).toBeVisible();
+    // Tempo de casa diz que depende da mesma leitura, sem repetir o alerta.
+    expect(bloco("Tempo de casa")).toHaveTextContent(
+      "Depende da leitura das pessoas ativas de hoje",
+    );
+    expect(
+      bloco("Tempo de casa").querySelector(".dashboard__faixas"),
+    ).toBeNull();
+    // O resto do Dashboard segue com os seus números.
+    expect(indicador("Colaboradores ativos")).toHaveTextContent("12 pessoas");
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Tentar de novo as pessoas ativas de hoje",
+      }),
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByRole("heading", { level: 2, name: "Distribuição do time" }),
+      ).toHaveFocus(),
+    );
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      /Distribuição e tempo de casa lidos em/,
+    );
+    expect(bloco("Tempo de casa")).toHaveTextContent("na mediana");
+  });
+
+  it("clique repetido na nova tentativa durante a leitura não pede de novo", async () => {
+    servidorDosAtivos.mockRejectedValueOnce(new Error("rede"));
+    render(<Tela />);
+    await lido();
+    const pendente = adiada<ListagemColaboradoresApi>();
+    servidorDosAtivos.mockReturnValueOnce(pendente.promessa);
+    const tentar = screen.getByRole("button", {
+      name: "Tentar de novo as pessoas ativas de hoje",
+    });
+    fireEvent.click(tentar);
+    fireEvent.click(tentar);
+    expect(servidorDosAtivos).toHaveBeenCalledTimes(2);
+    expect(tentar).toHaveAttribute("aria-disabled", "true");
+    await act(async () => {
+      pendente.resolver({
+        itens: TIME_PADRAO(),
+        pagina: 1,
+        tamanhoPagina: 100,
+        total: 10,
+        contadores: contadores(),
+      });
+    });
+    expect(bloco("Distribuição do time")).toHaveTextContent("10 pessoas");
+  });
+
+  it("resposta atrasada de uma leitura anterior do time é descartada", async () => {
+    const antiga = adiada<ListagemColaboradoresApi>();
+    servidorDosAtivos.mockReturnValueOnce(antiga.promessa);
+    const { rerender } = render(<Tela ano={2026} />);
+    rerender(<Tela ano={2025} />);
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent(
+        /Dashboard de 2025 lido em/,
+      ),
+    );
+    expect(bloco("Distribuição do time")).toHaveTextContent(
+      "10 pessoas em 3 departamentos",
+    );
+    await act(async () => {
+      antiga.resolver({
+        itens: Array.from({ length: 4 }, (_, i) =>
+          ativo(`velho-${i}`, "2020-01-01", "Antigo"),
+        ),
+        pagina: 1,
+        tamanhoPagina: 100,
+        total: 4,
+        contadores: contadores(),
+      });
+    });
+    expect(bloco("Distribuição do time")).toHaveTextContent(
+      "10 pessoas em 3 departamentos",
+    );
+    expect(screen.queryByText("Antigo")).toBeNull();
+  });
+
+  it("desmontagem no meio da leitura do time: nenhuma página a mais, nada atualizado", async () => {
+    const primeira = adiada<ListagemColaboradoresApi>();
+    servidorDosAtivos.mockReturnValueOnce(primeira.promessa);
+    const erros = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { unmount } = render(<Tela />);
+    await waitFor(() => expect(servidorDosAtivos).toHaveBeenCalledTimes(1));
+    unmount();
+    await act(async () => {
+      primeira.resolver({
+        itens: Array.from({ length: 100 }, (_, i) =>
+          ativo(`p-${i}`, "2025-01-01", "Operações"),
+        ),
+        pagina: 1,
+        tamanhoPagina: 100,
+        total: 300,
+        contadores: contadores(),
+      });
+    });
+    expect(servidorDosAtivos).toHaveBeenCalledTimes(1);
+    expect(erros).not.toHaveBeenCalled();
+    erros.mockRestore();
+  });
+});
+
+describe("T207 — eNPS e Quem é o time: indisponíveis", () => {
+  it.each([
+    ["eNPS", /não tem pesquisas internas/],
+    ["Quem é o time", /dados pessoais restritos/],
+  ])(
+    "%s: selo em texto, explicação, nenhum número, gráfico ou ação",
+    async (titulo, texto) => {
+      render(<Tela />);
+      await lido();
+      const b = bloco(titulo);
+      expect(within(b).getByText("Indisponível no Evolli")).toBeVisible();
+      expect(b).toHaveTextContent(texto);
+      expect(b.textContent).not.toMatch(/\d/);
+      expect(b.textContent).not.toMatch(/%/);
+      expect(within(b).queryByRole("button")).toBeNull();
+      expect(within(b).queryByRole("link")).toBeNull();
+      expect(b.querySelector("svg, canvas, img, ul, table")).toBeNull();
+    },
+  );
+});
+
+describe("T207 — Visão Geral em 375 px (CSS)", () => {
+  const css = () =>
+    readFileSync("src/screens/dashboard/DashboardScreen.css", "utf8");
+  /** Todas as declarações de um seletor exato, somadas. */
+  const regra = (seletor: string) => {
+    const escapado = seletor.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return [
+      ...css().matchAll(new RegExp(`(^|\\n)${escapado}\\s*\\{([^}]*)\\}`, "g")),
+    ]
+      .map((m) => m[2])
+      .join("\n");
+  };
+
+  it("painel do mês: dentro do quadro (absoluto, não fixo), camada baixa, no máximo metade da largura", () => {
+    const dica = regra(".dashboard__dica-mes");
+    expect(dica).toMatch(/position:\s*absolute/);
+    expect(dica).not.toMatch(/position:\s*fixed/);
+    expect(dica).toMatch(/z-index:\s*2;/);
+    expect(dica).toMatch(/max-width:\s*min\(16rem,\s*50%\)/);
+    expect(dica).toMatch(/pointer-events:\s*none/);
+    expect(regra(".dashboard__area-grafico")).toMatch(/position:\s*relative/);
+    expect(regra(".dashboard__dica-mes--depois")).toMatch(/left:/);
+    expect(regra(".dashboard__dica-mes--antes")).toMatch(/right:/);
+  });
+
+  it("grade e quadro em uma coluna que encolhe; faixas quebram em duas linhas no celular", () => {
+    expect(regra(".dashboard__grade")).toMatch(
+      /grid-template-columns:\s*minmax\(0,\s*1fr\)/,
+    );
+    expect(regra(".dashboard__quadro-topo")).toMatch(
+      /grid-template-columns:\s*minmax\(0,\s*1fr\)/,
+    );
+    expect(css()).toMatch(
+      /@media \(max-width: 40rem\)\s*\{\s*\.dashboard__faixa\s*\{\s*grid-template-columns:\s*minmax\(0,\s*1fr\)\s*auto;/,
+    );
+    expect(regra(".dashboard__grupo-nome")).toMatch(
+      /overflow-wrap:\s*anywhere/,
+    );
   });
 });

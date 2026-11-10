@@ -60,13 +60,22 @@ import {
   TIPOS_DE_MOVIMENTACAO,
   fraseResumo,
   lerSerieMensal,
-  mesAbreviado,
   nomeDoMes,
   periodoDoAno,
   plural,
   type PeriodoDoDashboard,
   type SerieMensal,
+  lerTimeDeHoje,
+  type TimeDeHoje,
 } from "./dashboardDados";
+import {
+  BlocoSemDado,
+  CartaoSemDado,
+  ComoCalculamos,
+  EstadoIndisponivel,
+} from "./componentesDoDashboard";
+import { DistribuicaoDoTimeBloco, TempoDeCasaBloco } from "./BlocosDoTime";
+import { GraficoMensal } from "./GraficoMensal";
 import "./DashboardScreen.css";
 
 export const DASHBOARD_TITULO_ID = "dashboard-titulo";
@@ -168,6 +177,8 @@ export function DashboardScreen({
     seletorAno: `${prefixo}-ano`,
     hoje: `${prefixo}-hoje`,
     indicadores: `${prefixo}-indicadores`,
+    distribuicao: `${prefixo}-distribuicao`,
+    tempoDeCasa: `${prefixo}-tempo-de-casa`,
   };
   const idDaAba = (a: AbaDoDashboard) => `${prefixo}-aba-${a}`;
   const idDoPainel = (a: AbaDoDashboard) => `${prefixo}-painel-${a}`;
@@ -178,6 +189,8 @@ export function DashboardScreen({
     Parte<ContadoresColaboradoresApi>
   >({ tipo: "carregando" });
   const [series, setSeries] = useState<Parte<Series>>({ tipo: "carregando" });
+  /** T207 — as pessoas ativas de hoje (distribuição e tempo de casa). */
+  const [time, setTime] = useState<Parte<TimeDeHoje>>({ tipo: "carregando" });
   /**
    * O ano a que a última série lida (ou a última falha) se refere. Ao trocar
    * de ano, o que estava na tela é de outro ano e não pode ser desenhado com
@@ -200,7 +213,7 @@ export function DashboardScreen({
     };
   }, []);
   /** Só a leitura mais recente de cada parte vale. */
-  const geracaoRef = useRef({ leitura: 0, contadores: 0, series: 0 });
+  const geracaoRef = useRef({ leitura: 0, contadores: 0, series: 0, time: 0 });
   const contadorDeAvisosRef = useRef(0);
   /** `id` do elemento que recebe o foco depois do próximo desenho. */
   const focoRef = useRef<string | null>(null);
@@ -259,6 +272,28 @@ export function DashboardScreen({
     [],
   );
 
+  /**
+   * T207 — as pessoas ativas de hoje, de 100 em 100, com o teto da T205.
+   * Outra leitura ou a tela desmontada: as páginas restantes não são pedidas.
+   */
+  const lerTime = useCallback(async (): Promise<boolean> => {
+    const geracao = ++geracaoRef.current.time;
+    const vale = () => vivaRef.current && geracao === geracaoRef.current.time;
+    try {
+      const lido = await lerTimeDeHoje(
+        (query) => listarColaboradores(query),
+        vale,
+      );
+      if (!vale()) return false;
+      setTime({ tipo: "dados", dados: lido });
+      return true;
+    } catch {
+      if (!vale()) return false;
+      setTime(proximaFalha);
+      return false;
+    }
+  }, []);
+
   /** Conclui uma leitura: hora da leitura e um anúncio. */
   const concluir = useCallback((texto: string) => {
     const instante = formatarInstante(new Date().toISOString());
@@ -284,13 +319,15 @@ export function DashboardScreen({
           ? s
           : { tipo: "carregando" },
       );
-      const [okContadores, dadosSeries] = await Promise.all([
+      setTime((p) => (p.tipo === "dados" ? p : { tipo: "carregando" }));
+      const [okContadores, dadosSeries, okTime] = await Promise.all([
         lerContadores(),
         lerSeries(anoLido),
+        lerTime(),
       ]);
       if (!vivaRef.current || geracao !== geracaoRef.current.leitura) return;
       setLendo(false);
-      if (okContadores || dadosSeries) {
+      if (okContadores || dadosSeries || okTime) {
         concluir(
           `Dashboard de ${anoLido} lido em {instante}.${
             dadosSeries && excedeu(dadosSeries)
@@ -300,7 +337,7 @@ export function DashboardScreen({
         );
       }
     },
-    [lerContadores, lerSeries, concluir],
+    [lerContadores, lerSeries, lerTime, concluir],
   );
 
   // Leitura na entrada, a cada ano e ao chegar numa aba que lê dados; sem
@@ -311,6 +348,7 @@ export function DashboardScreen({
       geracaoRef.current.leitura += 1;
       geracaoRef.current.series += 1;
       geracaoRef.current.contadores += 1;
+      geracaoRef.current.time += 1;
       setLendo(false);
       return;
     }
@@ -332,6 +370,15 @@ export function DashboardScreen({
     if ((await lerSeries(ano)) !== null) {
       focoRef.current = ids.serie;
       concluir(`Movimentações de ${ano} lidas em {instante}.`);
+    }
+  }
+
+  async function novaTentativaDoTime() {
+    if (time.tipo !== "erro" || time.relendo) return;
+    setTime(emNovaLeitura);
+    if (await lerTime()) {
+      focoRef.current = ids.distribuicao;
+      concluir(`Distribuição e tempo de casa lidos em {instante}.`);
     }
   }
 
@@ -437,6 +484,27 @@ export function DashboardScreen({
   const desligamentos = completa("desligamento");
 
   const textoDoStatus = lendo ? `Carregando o Dashboard de ${ano}…` : null;
+  const dadosDoTime = time.tipo === "dados" ? time.dados : null;
+  const falhaDoTime =
+    time.tipo === "erro" ? (
+      <div className="dashboard__falha">
+        <p key={time.falhas} role="alert">
+          Não foi possível carregar as pessoas ativas de hoje.
+        </p>
+        <Button
+          type="button"
+          variant="secondary"
+          aria-disabled={time.relendo}
+          onClick={() => void novaTentativaDoTime()}
+        >
+          Tentar de novo
+          <span className="dashboard__so-leitor">
+            {" "}
+            as pessoas ativas de hoje
+          </span>
+        </Button>
+      </div>
+    ) : null;
 
   const falhaDosContadores =
     contadores.tipo === "erro" ? (
@@ -609,7 +677,7 @@ export function DashboardScreen({
           <li>
             <CartaoSemDado
               id={`${prefixo}-ind-turnover`}
-              rotulo="Turnover"
+              rotulo="Turnover no ano"
               selo="Requer definição"
             >
               Para calcular a rotatividade, o Evolli precisa de uma regra
@@ -639,6 +707,124 @@ export function DashboardScreen({
           </li>
         </ul>
       </section>
+
+      <section
+        className="dashboard__bloco dashboard__bloco--quadro"
+        aria-labelledby={ids.serie}
+      >
+        <div className="dashboard__bloco-topo">
+          <h2 id={ids.serie} tabIndex={-1} className="dashboard__subtitulo">
+            Movimentação mensal
+          </h2>
+          <p className="dashboard__explicacao">
+            Admissões e desligamentos efetivados em cada mês do ano escolhido.
+            São eventos do período, contados em vínculos — não o número de
+            pessoas ativas em cada mês.
+          </p>
+        </div>
+        {estadoDaSerie(["admissao", "desligamento"], (porTipo) => {
+          const totalA = porTipo.admissao.reduce((x, y) => x + y, 0);
+          const totalD = porTipo.desligamento.reduce((x, y) => x + y, 0);
+          return (
+            <>
+              <div className="dashboard__quadro-topo">
+                <p className="dashboard__destaque">
+                  {dadosContadores ? (
+                    <>
+                      <span className="dashboard__destaque-valor">
+                        {String(dadosContadores.ativos)}
+                      </span>{" "}
+                      {dadosContadores.ativos === 1
+                        ? "pessoa ativa hoje"
+                        : "pessoas ativas hoje"}
+                    </>
+                  ) : null}
+                </p>
+                <ul className="dashboard__totais">
+                  <li className="dashboard__total">
+                    <span
+                      className="dashboard__marca dashboard__marca--admissao"
+                      aria-hidden="true"
+                    />
+                    <span className="dashboard__total-rotulo">
+                      Admissões efetivadas
+                    </span>
+                    <span className="dashboard__total-valor">
+                      {String(totalA)}
+                    </span>
+                  </li>
+                  <li className="dashboard__total">
+                    <span
+                      className="dashboard__marca dashboard__marca--desligamento"
+                      aria-hidden="true"
+                    />
+                    <span className="dashboard__total-rotulo">
+                      Desligamentos efetivados
+                    </span>
+                    <span className="dashboard__total-valor">
+                      {String(totalD)}
+                    </span>
+                  </li>
+                  <li className="dashboard__total">
+                    <span className="dashboard__total-rotulo">Diferença</span>
+                    <span className="dashboard__total-valor">
+                      {sinal(totalA - totalD)}
+                    </span>
+                  </li>
+                </ul>
+              </div>
+              <SerieMensalVisual
+                periodo={periodo}
+                tipos={["admissao", "desligamento"]}
+                porTipo={porTipo}
+                quando={quando}
+              />
+            </>
+          );
+        })}
+        <p className="dashboard__nota dashboard__nota--discreta">
+          Pessoas ativas no fim de cada mês ainda não são calculadas no Evolli;
+          o gráfico mostra os eventos efetivados em cada mês.
+        </p>
+        {dadosSeries ? <ComoCalculamosMovimentacao /> : null}
+      </section>
+
+      <div className="dashboard__grade">
+        <DistribuicaoDoTimeBloco
+          idTitulo={ids.distribuicao}
+          time={dadosDoTime}
+          falha={falhaDoTime}
+        />
+        <BlocoSemDado
+          titulo="eNPS"
+          subtitulo="Quanto o time recomendaria a empresa como lugar para trabalhar."
+          selo="Indisponível no Evolli"
+        >
+          O Evolli ainda não tem pesquisas internas. Sem uma pesquisa respondida
+          pelo time, não há nota a mostrar.
+        </BlocoSemDado>
+        <BlocoSemDado
+          titulo="Quem é o time"
+          subtitulo="Retrato agregado de quem está ativo hoje."
+          selo="Indisponível no Evolli"
+        >
+          Idade, gênero e escolaridade são dados pessoais restritos e não fazem
+          parte da leitura do Dashboard. Um retrato agregado do time depende de
+          uma regra de privacidade aprovada.
+        </BlocoSemDado>
+        <TempoDeCasaBloco
+          idTitulo={ids.tempoDeCasa}
+          time={dadosDoTime}
+          falha={
+            falhaDoTime ? (
+              <p className="dashboard__nota">
+                Depende da leitura das pessoas ativas de hoje, que não foi
+                carregada. A nova tentativa fica em Distribuição do time.
+              </p>
+            ) : null
+          }
+        />
+      </div>
 
       <div className="dashboard__duas-colunas">
         <section className="dashboard__bloco" aria-labelledby={ids.hoje}>
@@ -744,64 +930,6 @@ export function DashboardScreen({
           )}
         </section>
       </div>
-
-      <section className="dashboard__bloco" aria-labelledby={ids.serie}>
-        <h2 id={ids.serie} tabIndex={-1} className="dashboard__subtitulo">
-          Movimentação mensal
-        </h2>
-        <p className="dashboard__explicacao">
-          Admissões e desligamentos efetivados em cada mês do ano escolhido. São
-          eventos do período, contados em vínculos — não o número de pessoas
-          ativas em cada mês.
-        </p>
-        {estadoDaSerie(["admissao", "desligamento"], (porTipo) => {
-          const totalA = porTipo.admissao.reduce((x, y) => x + y, 0);
-          const totalD = porTipo.desligamento.reduce((x, y) => x + y, 0);
-          return (
-            <>
-              <ul className="dashboard__totais">
-                <li className="dashboard__total">
-                  <span
-                    className="dashboard__marca dashboard__marca--admissao"
-                    aria-hidden="true"
-                  />
-                  <span className="dashboard__total-rotulo">
-                    Admissões efetivadas
-                  </span>
-                  <span className="dashboard__total-valor">
-                    {String(totalA)}
-                  </span>
-                </li>
-                <li className="dashboard__total">
-                  <span
-                    className="dashboard__marca dashboard__marca--desligamento"
-                    aria-hidden="true"
-                  />
-                  <span className="dashboard__total-rotulo">
-                    Desligamentos efetivados
-                  </span>
-                  <span className="dashboard__total-valor">
-                    {String(totalD)}
-                  </span>
-                </li>
-                <li className="dashboard__total">
-                  <span className="dashboard__total-rotulo">Diferença</span>
-                  <span className="dashboard__total-valor">
-                    {sinal(totalA - totalD)}
-                  </span>
-                </li>
-              </ul>
-              <SerieMensalVisual
-                periodo={periodo}
-                tipos={["admissao", "desligamento"]}
-                porTipo={porTipo}
-                quando={quando}
-              />
-            </>
-          );
-        })}
-        {dadosSeries ? <ComoCalculamosMovimentacao /> : null}
-      </section>
     </>
   );
 
@@ -1044,38 +1172,6 @@ function sinal(n: number): string {
   return "0";
 }
 
-/**
- * T207 — "Como calculamos" (V-5): um botão que abre e fecha a explicação, no
- * fluxo da página. Só em indicador com cálculo real.
- */
-function ComoCalculamos({
-  assunto,
-  children,
-}: {
-  readonly assunto: string;
-  readonly children: ReactNode;
-}) {
-  const id = useId();
-  const [aberto, setAberto] = useState(false);
-  return (
-    <div className="dashboard__como">
-      <button
-        type="button"
-        className="dashboard__como-botao"
-        aria-expanded={aberto}
-        aria-controls={id}
-        onClick={() => setAberto((a) => !a)}
-      >
-        Como calculamos
-        <span className="dashboard__so-leitor">: {assunto}</span>
-      </button>
-      <div id={id} className="dashboard__como-texto" hidden={!aberto}>
-        {children}
-      </div>
-    </div>
-  );
-}
-
 function ComoCalculamosMovimentacao() {
   return (
     <ComoCalculamos assunto="movimentação mensal">
@@ -1090,62 +1186,6 @@ function ComoCalculamosMovimentacao() {
         movimentações no ano; acima disso, o total não é exibido.
       </p>
     </ComoCalculamos>
-  );
-}
-
-/**
- * T207 — card de indicador sem dado (V-2): o mesmo molde do card real, com
- * "—" no lugar do número, o estado em texto e o que falta. Sem porcentagem,
- * tendência, comparação nem ação. O "—" é escondido do leitor de tela, que
- * ouve o nome, o estado e a explicação.
- */
-function CartaoSemDado({
-  id,
-  rotulo,
-  selo,
-  children,
-}: {
-  readonly id: string;
-  readonly rotulo: string;
-  readonly selo: string;
-  readonly children: ReactNode;
-}) {
-  return (
-    <article
-      className="dashboard__indicador dashboard__indicador--sem-dado"
-      aria-labelledby={id}
-    >
-      <h3 id={id} className="dashboard__indicador-rotulo">
-        {rotulo}
-      </h3>
-      <p className="dashboard__indicador-valor" aria-hidden="true">
-        —
-      </p>
-      <p className="dashboard__selo dashboard__selo--estado">{selo}</p>
-      <p className="dashboard__indicador-nota">{children}</p>
-    </article>
-  );
-}
-
-/** T207 — aba sem dado no Evolli: rota real, nenhum número, o porquê. */
-function EstadoIndisponivel({
-  titulo,
-  texto,
-}: {
-  readonly titulo: string;
-  readonly texto: string;
-}) {
-  const id = useId();
-  return (
-    <section className="dashboard__indisponivel" aria-labelledby={id}>
-      <h2 id={id} className="dashboard__subtitulo">
-        {titulo}
-      </h2>
-      <p className="dashboard__selo dashboard__selo--estado">
-        Indisponível no Evolli
-      </p>
-      <p className="dashboard__indisponivel-texto">{texto}</p>
-    </section>
   );
 }
 
@@ -1259,37 +1299,17 @@ function SerieMensalVisual({
       </p>
     );
   }
-  const maximo = Math.max(1, ...tipos.flatMap((t) => porTipo[t] ?? []));
   const meses = Array.from({ length: periodo.meses }, (_, i) => i);
   const comSaldo = tipos.includes("admissao") && tipos.includes("desligamento");
   return (
     <>
-      <div className="dashboard__grafico" aria-hidden="true">
-        <div className="dashboard__legenda">
-          {tipos.map((t) => (
-            <span key={t}>
-              <span className={`dashboard__marca dashboard__marca--${t}`} />
-              {ROTULO_DA_MOVIMENTACAO[t]}
-            </span>
-          ))}
-        </div>
-        <div className="dashboard__colunas">
-          {meses.map((i) => (
-            <div key={i} className="dashboard__coluna">
-              <div className="dashboard__barras">
-                {tipos.map((t) => (
-                  <span
-                    key={t}
-                    className={`dashboard__barra-mes dashboard__barra-mes--${t}`}
-                    style={{ height: `${(valor(t, i) / maximo) * 100}%` }}
-                  />
-                ))}
-              </div>
-              <span className="dashboard__mes">{mesAbreviado(i)}</span>
-            </div>
-          ))}
-        </div>
-      </div>
+      <GraficoMensal
+        ano={periodo.ano}
+        meses={periodo.meses}
+        tipos={tipos}
+        porTipo={porTipo}
+        rotulo={`${juntarRotulos(tipos)} por mês — use as setas para percorrer os meses`}
+      />
       <div className="dashboard__quadro">
         <table className="dashboard__tabela">
           <caption>
