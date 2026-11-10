@@ -3061,11 +3061,11 @@ squash `c2c83622fd84bba9af73da3af96a4d5cb255b6a3`, CI de push 3/3 verde, run
 42798080671); a única pendência administrativa era a sua convergência no Spec Kit,
 resolvida no primeiro commit da T206.
 
-## Shell com menu lateral fixo e recolhível — T206 (em implementação, validada localmente)
+## Shell com menu lateral fixo e recolhível — T206 (integrada)
 
-| Tarefa | Estado                                     | Resultado principal                                                                                        |
-| ------ | ------------------------------------------ | ---------------------------------------------------------------------------------------------------------- |
-| T206   | **Em implementação** (validada localmente) | Menu lateral preso à esquerda, recolhível em trilho de ícones, com o conteúdo ocupando a largura liberada. |
+| Tarefa | Estado                                    | Resultado principal                                                                                        |
+| ------ | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| T206   | **Integrada** (PR #199, squash `512d249`) | Menu lateral preso à esquerda, recolhível em trilho de ícones, com o conteúdo ocupando a largura liberada. |
 
 **Escopo:** só shell e navegação na web, registrado no
 [dossiê](../docs/decisions/t206-shell-menu-lateral.md):
@@ -3081,7 +3081,7 @@ resolvida no primeiro commit da T206.
   permissões por papel preservadas; sem rolagem horizontal em desktop, largura
   intermediária e 375 px.
 
-**Entregue (validada localmente):** a implementação descrita nas seções 4 a 11 do dossiê —
+**Entregue (PR #199):** a implementação descrita nas seções 4 a 11 do dossiê —
 faixa da altura da janela presa à esquerda, sem trava de largura no corpo; trilho de 72 px com
 os mesmos botões e o texto visualmente oculto; módulo com submenu e empresa compacta que
 expandem o menu no mesmo gesto; item ativo herdado pelo cabeçalho do módulo oculto; dica
@@ -3099,7 +3099,33 @@ sem acesso ao shell, em desktop, largura intermediária e 375 px.
 - regras do Dashboard, de Colaboradores e das fichas;
 - identidade visual, ativos de marca e logotipo;
 - menu, seção, trilha de navegação, exportação ou IA sem contrato real;
-- promoção e merge.
+- promoção.
+
+**Observação de relatório:** a integração funcional da T206 está concluída (PR #199,
+squash `512d24914519fed335a900b18cab690832e8f121`, CI de push 3/3 verde, run
+42823908545); a única pendência administrativa era a sua convergência no Spec Kit,
+resolvida no primeiro commit da T207.
+
+## Dashboard funcional e seletor de empresas — T207 (em preparação)
+
+| Tarefa | Estado            | Resultado principal                                                                                             |
+| ------ | ----------------- | --------------------------------------------------------------------------------------------------------------- |
+| T207   | **Em preparação** | Levantamento e decisões para completar o Dashboard como produto funcional e evoluir o seletor de empresa ativa. |
+
+**Escopo da preparação:** levantamento e preparação de decisão, no
+[dossiê](../docs/decisions/t207-dossie-dashboard-seletor-empresas.md):
+
+- Dashboard: rota, permissões, empresa ativa, URL, troca de empresa, foco, teclado,
+  anúncios, carregamento, erro, respostas atrasadas e 375 px; abas Visão Geral, Pessoas,
+  Movimentação, Remuneração e Clima e saúde, cada uma com rota e estado funcional;
+  inventário do que existe com dado real e do que exige contrato novo;
+- seletor de empresa ativa: controle compacto, lista das empresas da conta, empresa
+  atual, troca da T189, faixa expandida, trilho e celular, teclado, foco e leitores de
+  tela; ações de adicionar e gerenciar empresas só com rota, permissão e produto reais;
+- decisões V-1 a V-6 (Dashboard) e E-1 a E-4 (seletor) para aprovação.
+
+**Fora de escopo:** código de produto, API, schema, migration, RBAC, auditoria, seed,
+Docker, dependências, lockfile, workflow, push, PR, promoção e merge.
 
 ## Próxima ação autorizável
 

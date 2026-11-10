@@ -3264,7 +3264,9 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         foram corrigidos dentro da entrega.
 
 103.  **T206 - Shell com menu lateral fixo e recolhível**
-      - **Estado:** **em implementação, validada localmente**. Branch
+      - **Estado:** **integrada** em `main` pela PR #199, squash
+        `512d24914519fed335a900b18cab690832e8f121`, com a CI de push 3/3 verde (run
+        42823908545); branch preservada. Implementada na branch
         `codex/t206-shell-menu-lateral`, a partir do squash
         `c2c83622fd84bba9af73da3af96a4d5cb255b6a3` (T205 integrada, PR #198).
       - **Objetivo:** o menu passa a ser uma faixa lateral real e estável, presa à esquerda da
@@ -3289,7 +3291,26 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       - **Fora de escopo:** API, schema, migration, RBAC, auditoria, seed, Docker,
         dependências, lockfile e workflows; regras do Dashboard, de Colaboradores e das fichas;
         identidade visual, ativos de marca e logotipo; menu, seção, trilha de navegação,
-        exportação ou IA sem contrato real; promoção e merge.
+        exportação ou IA sem contrato real; promoção.
+      - **Observação de relatório:** a integração funcional da T206 está concluída; a única
+        pendência administrativa era a sua convergência no Spec Kit, resolvida no primeiro
+        commit da T207. Os achados da validação local e da revisão (dica fora do lugar, foco no
+        `body` ao atravessar o breakpoint, alvos de 38 px na gaveta, foco ao abrir um produto
+        pelo Hub e dica do botão de recolher atrás do cabeçalho) foram corrigidos dentro da
+        entrega.
+
+104.  **T207 - Dashboard funcional e seletor de empresas (preparação)**
+      - **Estado:** **em preparação**. Branch `codex/t207-dashboard-seletor-empresas`, a partir
+        do squash `512d24914519fed335a900b18cab690832e8f121` (T206 integrada, PR #199).
+      - **Objetivo:** levantar, com evidência no código, nos contratos, no RBAC e nas decisões,
+        como completar o Dashboard como produto funcional (Visão Geral e as abas Pessoas,
+        Movimentação, Remuneração e Clima e saúde, sem aba decorativa nem métrica sem dado
+        real) e como evoluir o seletor de empresa ativa, no
+        [dossiê](../docs/decisions/t207-dossie-dashboard-seletor-empresas.md): inventário de
+        dados reais, lacunas, riscos, escopo, fora de escopo e decisões V-1 a V-6 e E-1 a E-4
+        para aprovação antes da implementação.
+      - **Fora de escopo:** código de produto, API, schema, migration, RBAC, auditoria, seed,
+        Docker, dependências, lockfile, workflow, push, PR, promoção e merge.
 
 ## Regra obrigatória para as próximas tarefas
 
