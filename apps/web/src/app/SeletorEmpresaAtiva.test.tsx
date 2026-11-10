@@ -611,10 +611,16 @@ describe("T207 — lista Empresas da conta e busca (E-1, E-3)", () => {
 
   it("CSS: busca e opções com alvo de 44 px, foco visível e a paleta Evolli no monograma", () => {
     const css = readFileSync("src/app/SeletorEmpresaAtiva.css", "utf8");
+    /** Todas as regras com exatamente este seletor, juntas. */
     const regra = (seletor: string) => {
-      const inicio = css.lastIndexOf(`\n${seletor} {`);
-      expect(inicio).toBeGreaterThanOrEqual(0);
-      return css.slice(inicio, css.indexOf("}", inicio));
+      const blocos: string[] = [];
+      let inicio = css.indexOf(`\n${seletor} {`);
+      while (inicio >= 0) {
+        blocos.push(css.slice(inicio, css.indexOf("}", inicio)));
+        inicio = css.indexOf(`\n${seletor} {`, inicio + 1);
+      }
+      expect(blocos.length).toBeGreaterThan(0);
+      return blocos.join("\n");
     };
     expect(regra(".seletor-empresa__busca-campo")).toContain(
       "min-height: var(--touch-target)",

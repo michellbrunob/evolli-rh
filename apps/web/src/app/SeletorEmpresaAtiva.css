@@ -346,3 +346,24 @@
 .seletor-empresa--hub .seletor-empresa__cartao {
   border-color: var(--hairline);
 }
+
+/* Na faixa estreita, o selo "Atual" ao lado do nome espremia o texto até
+   quebrar no meio das palavras: o selo desce para baixo do nome, na coluna
+   do texto, e o nome só quebra entre palavras (ou numa palavra que não cabe
+   sozinha). */
+.seletor-empresa__opcao {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: var(--space-sm);
+  row-gap: var(--space-xxs);
+  align-items: center;
+}
+
+.seletor-empresa__atual {
+  grid-column: 2;
+  justify-self: start;
+}
+
+.seletor-empresa__opcao-nome {
+  overflow-wrap: break-word;
+}
