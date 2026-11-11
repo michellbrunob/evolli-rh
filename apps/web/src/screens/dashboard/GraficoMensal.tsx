@@ -56,8 +56,13 @@ export interface PosicaoDoPainel {
   readonly espaco: number;
 }
 
-/** Largura útil mínima ao lado da coluna (px); com menos, abre abaixo. */
-export const LARGURA_UTIL_MINIMA_DO_PAINEL = 160;
+/**
+ * Largura útil mínima ao lado da coluna (px); com menos, abre na largura
+ * total. 210 px: a largura natural do painel (cerca de 195 a 204 px, com os
+ * rótulos mais longos) mais a folga — ao lado, o texto não quebra e a vaga
+ * fica na altura reservada; no celular, os meses do meio usam a largura total.
+ */
+export const LARGURA_UTIL_MINIMA_DO_PAINEL = 210;
 
 /**
  * Abaixo das colunas, a partir do mês e para o lado com mais colunas livres,

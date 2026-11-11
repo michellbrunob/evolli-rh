@@ -1458,6 +1458,121 @@ describe("T207 — posição do painel do mês (nunca sobre um mês, nunca além
     }
   });
 
+  it("M1 — 375 px (gráfico com 305 px): ao lado só com pelo menos 210 px livres; senão, largura total — o texto do painel não quebra e a vaga fica na altura-base", () => {
+    // 210 px: a largura natural do painel (cerca de 195 a 204 px) mais a folga.
+    for (let i = 0; i < 11; i += 1) {
+      const p = posicaoDoPainel(i, 11, 305);
+      if (p.lado !== "abaixo") {
+        expect(
+          (p.espaco / 11) * 305,
+          `mês ${String(i)}`,
+        ).toBeGreaterThanOrEqual(210);
+      }
+    }
+    // Abril a agosto: largura total; janeiro a março e setembro a novembro: ao lado.
+    expect(
+      Array.from({ length: 11 }, (_, i) => posicaoDoPainel(i, 11, 305).lado),
+    ).toEqual([
+      "depois",
+      "depois",
+      "depois",
+      "abaixo",
+      "abaixo",
+      "abaixo",
+      "abaixo",
+      "abaixo",
+      "antes",
+      "antes",
+      "antes",
+    ]);
+    // A 1024 px (gráfico com ~625 px), todos os meses continuam ao lado.
+    for (let i = 0; i < 11; i += 1) {
+      expect(posicaoDoPainel(i, 11, 625).lado).not.toBe("abaixo");
+    }
+  });
+
+  async function comGraficoDe305px(acao: () => Promise<void>) {
+    const original = HTMLElement.prototype.getBoundingClientRect;
+    const medir = vi
+      .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+      .mockImplementation(function (this: HTMLElement) {
+        if (this.classList.contains("dashboard__area-grafico")) {
+          return {
+            width: 305,
+            height: 144,
+            top: 0,
+            left: 0,
+            right: 305,
+            bottom: 144,
+            x: 0,
+            y: 0,
+            toJSON: () => ({}),
+          } as DOMRect;
+        }
+        return original.call(this);
+      });
+    try {
+      await acao();
+    } finally {
+      medir.mockRestore();
+    }
+  }
+
+  it("M1 — Movimentação a 375 px: maio e julho abrem na largura total; março e setembro continuam ao lado", async () => {
+    await comGraficoDe305px(async () => {
+      render(<Tela aba="movimentacao" />);
+      await lido();
+      const grafico = document.querySelector<HTMLElement>(
+        ".dashboard__grafico",
+      )!;
+      const mes = (nome: string) =>
+        within(grafico).getByRole("button", { name: `${nome} de 2026` });
+      for (const nome of ["Maio", "Julho"]) {
+        fireEvent.mouseEnter(mes(nome));
+        expect(screen.getByRole("tooltip")).toHaveTextContent(
+          `${nome} de 2026`,
+        );
+        expect(screen.getByRole("tooltip")).toHaveClass(
+          "dashboard__dica-mes--abaixo",
+        );
+      }
+      fireEvent.mouseEnter(mes("Março"));
+      expect(screen.getByRole("tooltip")).toHaveClass(
+        "dashboard__dica-mes--depois",
+      );
+      fireEvent.mouseEnter(mes("Setembro"));
+      expect(screen.getByRole("tooltip")).toHaveClass(
+        "dashboard__dica-mes--antes",
+      );
+    });
+  });
+
+  it("M1 — Visão Geral a 375 px: abril, maio, julho e agosto abrem na largura total; março e setembro continuam ao lado", async () => {
+    await comGraficoDe305px(async () => {
+      render(<Tela />);
+      await lido();
+      const mes = (nome: string) =>
+        within(bloco(SERIE)).getByRole("button", { name: `${nome} de 2026` });
+      for (const nome of ["Abril", "Maio", "Julho", "Agosto"]) {
+        fireEvent.mouseEnter(mes(nome));
+        expect(screen.getByRole("tooltip")).toHaveTextContent(
+          `${nome} de 2026`,
+        );
+        expect(screen.getByRole("tooltip")).toHaveClass(
+          "dashboard__dica-mes--abaixo",
+        );
+      }
+      fireEvent.mouseEnter(mes("Março"));
+      expect(screen.getByRole("tooltip")).toHaveClass(
+        "dashboard__dica-mes--depois",
+      );
+      fireEvent.mouseEnter(mes("Setembro"));
+      expect(screen.getByRole("tooltip")).toHaveClass(
+        "dashboard__dica-mes--antes",
+      );
+    });
+  });
+
   it("CSS: o painel recebe o ponteiro (WCAG 1.4.13) e fica rente ao mês, sem margem que abra caminho por outro mês", () => {
     const css = readFileSync(
       "src/screens/dashboard/DashboardScreen.css",
