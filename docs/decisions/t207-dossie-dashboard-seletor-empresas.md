@@ -360,8 +360,10 @@ V-1 a V-6, E-1 a E-4 e P-1 valem como aprovadas (seção 13), com estes detalhes
   totais de entradas, saídas e saldo do ano. Duas vistas com os mesmos números:
   - gráfico: um botão por mês (uma parada de Tab; setas, Home e End sem volta; Escape fecha o
     painel e o foco fica no mês); o painel do mês fica ao lado da coluna, no lado com mais colunas
-    livres e com a largura limitada a elas — nunca sobre a coluna, nunca além da borda; com um mês
-    só (janeiro do ano corrente), abre abaixo das barras; é a descrição do botão focado, sem
+    livres e com a largura limitada a elas — nunca sobre a coluna, nunca além da borda; sem
+    largura útil ao lado (um mês só, ano curto ou gráfico estreito, pela largura medida do
+    gráfico), abre abaixo das barras; o texto de cada linha encolhe e quebra, nunca passa da
+    caixa; é a descrição do botão focado, sem
     região viva; aberto pelo ponteiro, Escape fecha de qualquer lugar sem mover o foco;
   - tabela: Mês, Ativos no fim, Entradas, Saídas e Turnover, com total.
 - **Menu de ações (reticências):** só nos blocos com dado real (Quadro de colaboradores,
@@ -416,8 +418,10 @@ tabela, nem no CSV.
   um grupo neutro, sem nome ("Outros (agrupados por privacidade)"); se esse grupo ficaria com 1 ou
   2 pessoas, o menor departamento exibido entra nele, até ter ao menos 3; e a quantidade de
   departamentos não é exibida. No Tempo de casa, faixa com 1 ou 2 pessoas se junta à vizinha até
-  ter 3. Assim todo número exibido é exato, é 0 ou pelo menos 3, e nenhum grupo pequeno pode ser
-  deduzido pelos outros números do bloco. Nenhum nome de pessoa aparece no Dashboard nem nos
+  ter 3. Pessoas sem data de admissão legível ficam fora do cálculo; com 1 ou 2 delas, o aviso
+  não diz quantas ("Há pessoas sem data de admissão legível…"), e com 3 ou mais diz o número.
+  Assim toda contagem de pessoas exibida nos dois blocos é exata e é 0 ou pelo menos 3, e nenhum
+  grupo pequeno pode ser deduzido pelos outros números do bloco. Nenhum nome de pessoa aparece no Dashboard nem nos
   arquivos.
 - **Dados lidos:** a listagem de pessoas ativas devolve o cadastro listado de cada uma (inclusive o
   nome); a tela usa só o id, a data de admissão e o departamento do vínculo principal, e descarta o
@@ -473,7 +477,7 @@ Cada um com teste que falhava antes da correção:
 
 ### 18.1 Testes automatizados
 
-- `DashboardScreen.test.tsx` (121 testes): as garantias da T205 reescritas sobre a estrutura nova
+- `DashboardScreen.test.tsx` (128 testes): as garantias da T205 reescritas sobre a estrutura nova
   (nenhuma removida); cinco abas, rota e foco; cards honestos; Quadro de colaboradores (título,
   subtítulo, informação por ponteiro, foco, clique e Escape, sem região viva), gráfico com painel
   por mês (teclado, ponteiro, Escape, `aria-describedby`, posição), tabela com "—" lido como
@@ -483,20 +487,20 @@ Cada um com teste que falhava antes da correção:
   limpeza depois, Distribuição e Tempo de casa com gráfico, tabela, CSV e impressão, privacidade,
   teto, falha com um único alerta, respostas atrasadas, desmontagem, hora da leitura uma vez por
   aba e o contrato de CSS a 375 px.
-- `dashboardTime.test.ts` (22 testes, novo): leitura das pessoas ativas (páginas, teto, repetidos,
+- `dashboardTime.test.ts` (23 testes, novo): leitura das pessoas ativas (páginas, teto, repetidos,
   abandono), distribuição com grupo neutro, mediana e faixas, e a composição exaustiva de faixas
   (0 a 4 pessoas em cada uma) sem nenhuma faixa entre 1 e 2.
 - `App.dashboard.test.tsx` (34 testes): rota, ano, histórico, papéis, abas no shell, "Dashboard"
   na barra só visual e título único com o foco, vista vinda de quem monta o shell, contrato de
   CSS do nome na barra.
-- `AutenticacaoApp.test.tsx` (89 testes, 2 novos): a vista sobrevive à volta pelo Hub, e outra
-  conta (depois do logout) ou outra empresa começam no gráfico.
+- `AutenticacaoApp.test.tsx` (90 testes, 3 novos): a vista sobrevive à volta pelo Hub; outra
+  conta (depois do logout), a mesma conta depois do logout e outra empresa começam no gráfico.
 - `exportacao.test.ts` (10 testes, novo): CSV com BOM, separador, "—", texto que começaria uma
   fórmula guardado como texto, escape de aspas e quebras, e o nome do arquivo.
 - `rotasDoShell.dashboard.test.ts` (24), `SeletorEmpresaAtiva.test.tsx` (44, com o selo "Atual"
   abaixo do nome) e `paletaEvolli.test.ts` (15, com as regras do menu fora do Hub): rota das abas,
   seletor e paleta.
-- Suíte web completa: 129 arquivos, 3631 testes. API unitária: 60 suítes, 1472 testes. E2E
+- Suíte web completa: 129 arquivos, 3640 testes. API unitária: 60 suítes, 1472 testes. E2E
   serial com PostgreSQL real: 20 suítes, 1017 testes. Scripts: 182 testes. Lint, typecheck e
   build verdes. A API não mudou; a API unitária e o E2E rodaram como regressão. (Numa rodada da
   validação anterior, um teste de Nova admissão — arquivo que a T207 não altera — estourou o
@@ -505,7 +509,8 @@ Cada um com teste que falhava antes da correção:
 
 ### 18.2 Mutações
 
-49 mutações temporárias, todas detectadas.
+56 mutações temporárias, todas detectadas (33 da primeira bateria, 16 da revisão da seção 20 e
+7 da revisão final da seção 21).
 
 Da primeira bateria, 33 que continuam válidas:
 
@@ -617,3 +622,32 @@ correção (que falhava sem ela) e mutação detectada:
    de impressão em janeiro deixou de dizer "Janeiro a Janeiro"; a lista de departamentos usa o id
    como chave (dois departamentos com o mesmo nome); o estado da entrega passou a dizer "PR #200
    em Draft"; o limite do subtítulo do quadro foi registrado (seção 16.4).
+
+## 21. Revisão adversarial final da PR #200
+
+Achados corrigidos na própria entrega, cada um com prova de falha (teste que falhava sem a
+correção, ou mutação detectada quando a proteção já existia):
+
+1. **"Tentar de novo" travado (R1, regressão da leitura só na Visão Geral):** uma nova tentativa
+   das pessoas ativas em curso, abandonada pela troca de aba, deixava o botão desabilitado até
+   "Atualizar". Agora a invalidação desfaz o estado de releitura e o botão volta a funcionar ao
+   retornar à Visão Geral. O teste falhava sem a correção.
+2. **Texto do painel do mês além da caixa (R2):** em gráfico estreito ou ano curto, a caixa
+   respeitava a borda, mas o texto não encolhia. Agora o painel mede a largura real do gráfico e,
+   sem largura útil ao lado (mínimo de 160 px), abre abaixo das barras; e as linhas encolhem e
+   quebram. Os testes da largura medida e das regras de quebra falhavam sem a correção; ao vivo, a
+   375 px, os 11 meses ficaram com a caixa no quadro, o texto na caixa, nenhuma coluna coberta e
+   sem rolagem lateral (junho abre abaixo).
+3. **Contagem de 1 ou 2 no Tempo de casa (R3):** "1 pessoa sem data de admissão legível…" expunha
+   uma contagem individual (e com concordância errada). Agora, com 1 ou 2, o aviso não tem número;
+   com 3 ou mais, o número aparece com concordância. Os testes falhavam sem a correção; a frase
+   sobre as contagens foi corrigida aqui e na PR (seção 16.4).
+4. **Comentários desatualizados (R4):** o do CSS do painel do mês e o do cabeçalho do gráfico, sem
+   mudança funcional.
+5. **Provas que faltavam (R5):** a mesma conta que sai e entra começa no gráfico (o logout apaga a
+   vista); a leitura das pessoas ativas guarda só id, data de admissão e departamento (o nome é
+   descartado). As duas proteções já existiam: as provas de falha são as mutações que tiram a
+   limpeza do logout e que guardam o nome, ambas detectadas.
+
+**Ícone do Hub:** azul `#0066cc`, da regra própria do Hub (`.hub__cartao-icone`); a correção da
+seção 20 (item 3) só impede que a cor do menu lateral alcance o ícone.

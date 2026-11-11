@@ -3337,8 +3337,12 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         em todo mês, paleta do menu fora do Hub, CSV sem fórmula, foco pendurado entre abas,
         limpeza da impressão, Escape global nos painéis, pessoas ativas lidas só na Visão Geral e
         ajustes de texto e documentação.
-      - **Validação local:** web 129 arquivos, 3631 testes; API unitária 60 suítes, 1472 testes; E2E serial com PostgreSQL real
-        20 suítes, 1017 testes; scripts 182 testes; 49 mutações, todas detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia
+      - **Revisão final da PR #200 (seção 21 do dossiê):** R1 a R5 corrigidos — "Tentar de
+        novo" que travava ao trocar de aba, texto do painel do mês dentro da caixa (abaixo das
+        barras sem largura útil), nenhuma contagem de 1 ou 2 no Tempo de casa, comentários e
+        provas do logout e do descarte do nome.
+      - **Validação local:** web 129 arquivos, 3640 testes; API unitária 60 suítes, 1472 testes; E2E serial com PostgreSQL real
+        20 suítes, 1017 testes; scripts 182 testes; 56 mutações, todas detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia
         do squash e `git diff --check` verdes.
 
 ## Regra obrigatória para as próximas tarefas

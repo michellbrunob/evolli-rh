@@ -3148,8 +3148,10 @@ cada um com teste que falhava antes (privacidade da Distribuição, painel do m�
 Hub, CSV sem fórmula, foco entre abas, limpeza da impressão, Escape global, leitura só na Visão
 Geral, textos e documentação).
 
-**Validação local:** web 129 arquivos, 3631 testes; API unitária 60 suítes, 1472 testes; E2E serial com PostgreSQL real 20 suítes, 1017 testes; scripts
-182 testes; 49 mutações, todas detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia do squash e
+**Revisão final da PR #200 (seção 21 do dossiê):** R1 a R5 corrigidos, com prova de falha.
+
+**Validação local:** web 129 arquivos, 3640 testes; API unitária 60 suítes, 1472 testes; E2E serial com PostgreSQL real 20 suítes, 1017 testes; scripts
+182 testes; 56 mutações, todas detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia do squash e
 `git diff --check` verdes.
 
 ## Próxima ação autorizável
