@@ -1481,7 +1481,7 @@ describe("T207 — posição do painel do mês (nunca sobre um mês, nunca além
     }
   });
 
-  it("CSS (G1): o painel lateral abre abaixo da faixa das colunas, alinhado ao mês aberto — não cobre nenhum outro mês", () => {
+  it("CSS (G1/H1): o painel fica numa vaga reservada logo abaixo das colunas, dentro do gráfico, alinhado ao mês — sem sobrepor nada fora do bloco", () => {
     const css = readFileSync(
       "src/screens/dashboard/DashboardScreen.css",
       "utf8",
@@ -1495,42 +1495,65 @@ describe("T207 — posição do painel do mês (nunca sobre um mês, nunca além
       }
       return blocos.join("\n");
     };
-    // A área do gráfico é a referência do painel; abaixo dela, nada de mês.
-    expect(regra(".dashboard__area-grafico")).toMatch(/position:\s*relative/);
+    // A vaga: no fluxo, com a altura do painel reservada (linhas de texto,
+    // intervalos, preenchimento e bordas) — o bloco cresce, nada transborda.
+    const vaga = regra(".dashboard__vaga-do-painel");
+    expect(vaga).toMatch(/display:\s*grid;/);
+    expect(vaga).not.toMatch(/position:\s*(absolute|fixed)/);
+    expect(vaga).toMatch(
+      /min-height:\s*calc\(\s*var\(--linhas-do-painel\) \* 1lh \+\s*\(var\(--linhas-do-painel\) - 2\) \* 2px \+\s*var\(--space-xxs\) \+\s*2 \* var\(--space-sm\) \+\s*4px\s*\);/,
+    );
+    // O painel: item da vaga, no fluxo — sem posição absoluta e sem camada.
     const painel = regra(".dashboard__dica-mes");
-    expect(painel).toMatch(/position:\s*absolute/);
-    expect(painel).toMatch(/\btop:\s*100%;/);
-    expect(painel).not.toMatch(/\btop:\s*0;/);
+    expect(painel).not.toMatch(/position:\s*(absolute|fixed)/);
+    expect(painel).not.toMatch(/z-index/);
+    expect(painel).not.toMatch(/\n\s+top:/);
     // "depois": começa na borda esquerda do mês aberto.
     expect(regra(".dashboard__dica-mes--depois")).toMatch(
       /left:\s*calc\(var\(--coluna\) \/ var\(--colunas\) \* 100%\);/,
     );
-    // "antes": termina na borda direita do mês aberto.
-    expect(regra(".dashboard__dica-mes--antes")).toMatch(
+    // "antes": encostado à direita da vaga e recuado até a borda direita do mês.
+    const antes = regra(".dashboard__dica-mes--antes");
+    expect(antes).toMatch(/justify-self:\s*end;/);
+    expect(antes).toMatch(
       /right:\s*calc\(\s*\(var\(--colunas\) - var\(--coluna\) - 1\) \/ var\(--colunas\) \* 100%\s*\);/,
+    );
+    // Na impressão, a vaga vazia não ocupa espaço.
+    const impressao = css.slice(css.indexOf("@media print"));
+    expect(impressao).toMatch(
+      /\[data-bloco-impresso\] \.dashboard__vaga-do-painel[\s,{]/,
     );
   });
 
-  it("G1: o painel lateral fica na área do gráfico, logo depois da faixa das colunas, e os nomes dos meses ficam dentro das colunas", async () => {
+  it("G1/H1: a vaga do painel existe mesmo fechado, logo depois das colunas, com as linhas do painel; aberto, o painel fica nela e segue o ponteiro", async () => {
     render(<Tela />);
     await lido();
     const area = bloco(SERIE).querySelector<HTMLElement>(
       ".dashboard__area-grafico",
     )!;
+    const vaga = area.querySelector<HTMLElement>(".dashboard__vaga-do-painel");
+    // Fechado: a vaga já reserva o espaço (título + Entradas, Saídas, Saldo,
+    // Ativos no fim e Turnover = 6 linhas).
+    expect(vaga).not.toBeNull();
+    expect([...area.children]).toEqual([
+      area.querySelector(".dashboard__colunas"),
+      vaga,
+    ]);
+    expect(vaga!.style.getPropertyValue("--linhas-do-painel")).toBe("6");
+    expect(screen.queryByRole("tooltip")).toBeNull();
+    for (const coluna of area.querySelectorAll(".dashboard__coluna")) {
+      expect(coluna.querySelector(".dashboard__mes")).not.toBeNull();
+    }
     const marco = within(bloco(SERIE)).getByRole("button", {
       name: "Março de 2026",
     });
     fireEvent.mouseEnter(marco);
     const painel = screen.getByRole("tooltip");
     expect(painel).toHaveClass("dashboard__dica-mes--depois");
-    // Só a faixa das colunas e o painel: `top: 100%` é o fim da faixa.
-    expect([...area.children]).toEqual([
-      area.querySelector(".dashboard__colunas"),
-      painel,
-    ]);
-    for (const coluna of area.querySelectorAll(".dashboard__coluna")) {
-      expect(coluna.querySelector(".dashboard__mes")).not.toBeNull();
-    }
+    expect(painel.parentElement).toBe(vaga);
+    expect(
+      painel.querySelectorAll(".dashboard__dica-mes-lista > div"),
+    ).toHaveLength(5);
     // O painel recebe o ponteiro: entrar nele mantém o mês.
     fireEvent.mouseEnter(painel);
     expect(screen.getByRole("tooltip")).toHaveTextContent("Março de 2026");
@@ -1541,6 +1564,10 @@ describe("T207 — posição do painel do mês (nunca sobre um mês, nunca além
       );
       expect(screen.getByRole("tooltip")).toHaveTextContent(`${nome} de 2026`);
     }
+    // Saindo do gráfico, o painel fecha e a vaga continua lá.
+    fireEvent.mouseLeave(bloco(SERIE).querySelector(".dashboard__grafico")!);
+    expect(screen.queryByRole("tooltip")).toBeNull();
+    expect(area.querySelector(".dashboard__vaga-do-painel")).toBe(vaga);
   });
 
   it("ponteiro: do mês para o painel, o painel continua no mesmo mês; sair do gráfico fecha", async () => {
@@ -2247,23 +2274,20 @@ describe("T207 — Visão Geral em 375 px (CSS)", () => {
       .join("\n");
   };
 
-  it("painel do mês: dentro do quadro (absoluto, não fixo), camada baixa, largura limitada ao espaço do lado escolhido", () => {
+  it("painel do mês: na vaga do gráfico, no fluxo (sem posição absoluta nem camada), largura limitada ao espaço do lado escolhido", () => {
     const dica = regra(".dashboard__dica-mes");
-    expect(dica).toMatch(/position:\s*absolute/);
-    expect(dica).not.toMatch(/position:\s*fixed/);
-    expect(dica).toMatch(/z-index:\s*2;/);
+    expect(dica).not.toMatch(/position:\s*(absolute|fixed)/);
+    expect(dica).not.toMatch(/z-index/);
     expect(dica).toMatch(
       /max-width:\s*min\(\s*16rem,\s*calc\(var\(--espaco\) \/ var\(--colunas\) \* 100% - var\(--space-xxs\)\)\s*\)/,
     );
-    // Um mês só: no fluxo, abaixo das colunas (sem cobrir a coluna).
+    // Um mês só ou sem largura útil: a largura da vaga, abaixo das colunas.
     const abaixo = regra(".dashboard__dica-mes--abaixo");
-    expect(abaixo).toMatch(/position:\s*static/);
     expect(abaixo).toMatch(/max-width:\s*100%/);
     // O painel recebe o ponteiro (WCAG 1.4.13): sem `pointer-events: none`.
     expect(dica).not.toMatch(/pointer-events:\s*none/);
-    expect(regra(".dashboard__area-grafico")).toMatch(/position:\s*relative/);
-    // G1 — abaixo da faixa das colunas, sem cobrir mês nenhum.
-    expect(dica).toMatch(/\btop:\s*100%;/);
+    // G1/H1 — na vaga abaixo da faixa das colunas, sem cobrir mês nem bloco.
+    expect(regra(".dashboard__vaga-do-painel")).toMatch(/min-height:\s*calc\(/);
     // "depois": começa na borda esquerda do próprio mês.
     expect(regra(".dashboard__dica-mes--depois")).toMatch(
       /left:\s*calc\(var\(--coluna\) \/ var\(--colunas\) \* 100%\)/,

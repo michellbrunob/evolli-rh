@@ -938,15 +938,30 @@ a.dashboard__situacao .dashboard__situacao-rotulo {
   outline-offset: 1px;
 }
 
-/* Painel do mês: dentro do quadro (nunca por cima de modal, guarda ou
-   menu). Abre logo abaixo da faixa das colunas (barras e nomes dos meses),
-   alinhado ao mês aberto e estendido para o lado com mais colunas livres,
-   com a largura limitada a elas (ver `posicaoDoPainel`): não cobre nenhum
-   mês, e nunca passa da borda. Sem largura útil, entra no fluxo (`--abaixo`). */
+/* Vaga do painel do mês: logo abaixo da faixa das colunas (barras e nomes dos
+   meses), dentro do próprio gráfico e no fluxo do bloco. Reserva a altura do
+   painel — linhas de texto (`--linhas-do-painel`, 1lh cada), 2px entre as
+   linhas da lista, o intervalo do título, o preenchimento e as bordas —, então
+   abrir o painel não empurra nada e ele nunca cobre outro bloco. Se o texto
+   quebrar numa caixa estreita, a vaga cresce com o painel, também no fluxo. */
+.dashboard__vaga-do-painel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  margin-top: var(--space-xs);
+  min-height: calc(
+    var(--linhas-do-painel) * 1lh + (var(--linhas-do-painel) - 2) * 2px +
+      var(--space-xxs) + 2 * var(--space-sm) + 4px
+  );
+  font-size: var(--text-caption);
+}
+
+/* Painel do mês: item da vaga (nunca por cima de modal, guarda, menu ou outro
+   bloco), alinhado ao mês aberto e estendido para o lado com mais colunas
+   livres, com a largura limitada a elas (ver `posicaoDoPainel`): não cobre
+   nenhum mês e nunca passa da borda. */
 .dashboard__dica-mes {
-  position: absolute;
-  top: 100%;
-  z-index: 2;
+  position: relative;
   display: grid;
   gap: var(--space-xxs);
   width: max-content;
@@ -966,23 +981,23 @@ a.dashboard__situacao .dashboard__situacao-rotulo {
 }
 
 /* Sem largura útil ao lado — um mês só, ano curto ou gráfico estreito (pela
-   largura medida em `posicaoDoPainel`) —: o painel entra no fluxo, abaixo das
-   barras e dentro do quadro. */
+   largura medida em `posicaoDoPainel`) —: o painel ocupa a largura da vaga,
+   a partir da borda esquerda. */
 .dashboard__dica-mes--abaixo {
-  position: static;
   max-width: 100%;
-  margin-top: var(--space-xs);
 }
 
 /* Debaixo do próprio mês, sem margem: o ponteiro desce da coluna ao painel
    sem cruzar outro mês, e o painel recebe o ponteiro (WCAG 1.4.13) sem
    encobrir coluna nenhuma — a varredura pelos meses continua livre.
-   "depois": começa na borda esquerda do mês; "antes": termina na direita. */
+   "depois": começa na borda esquerda do mês; "antes": encostado à direita
+   da vaga e recuado até a borda direita do mês. */
 .dashboard__dica-mes--depois {
   left: calc(var(--coluna) / var(--colunas) * 100%);
 }
 
 .dashboard__dica-mes--antes {
+  justify-self: end;
   right: calc((var(--colunas) - var(--coluna) - 1) / var(--colunas) * 100%);
 }
 
@@ -1260,6 +1275,7 @@ a.dashboard__situacao .dashboard__situacao-rotulo {
 
   .evolli-imprimindo-bloco [data-bloco-impresso] .dashboard__sem-impressao,
   .evolli-imprimindo-bloco [data-bloco-impresso] .dashboard__como,
+  .evolli-imprimindo-bloco [data-bloco-impresso] .dashboard__vaga-do-painel,
   .evolli-imprimindo-bloco [data-bloco-impresso] .dashboard__dica-mes {
     display: none !important;
   }

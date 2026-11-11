@@ -9,8 +9,9 @@
  *
  * Teclado: setas, Home e End percorrem os meses; Escape fecha o painel e o
  * foco fica no mês. O painel fica dentro do quadro (sem posição fixa), então
- * não passa por cima de modal, guarda ou menu, e abre logo abaixo da faixa
- * das colunas, alinhado ao mês (nunca sobre um mês, nunca além da borda).
+ * não passa por cima de modal, guarda ou menu. Ele abre numa vaga reservada
+ * logo abaixo da faixa das colunas, dentro do próprio gráfico, alinhado ao
+ * mês: nunca sobre um mês, nunca além da borda, nunca sobre outro bloco.
  *
  * As barras continuam decorativas. Os mesmos números ficam em tabela: na
  * aba Movimentação, logo abaixo do gráfico; no Quadro de colaboradores, na
@@ -140,6 +141,9 @@ export function GraficoMensal({
   const valor = (t: TipoMovimentacao, i: number) => porTipo[t]?.[i] ?? 0;
   const maximo = Math.max(1, ...tipos.flatMap((t) => [...(porTipo[t] ?? [])]));
   const comSaldo = tipos.includes("admissao") && tipos.includes("desligamento");
+  /** Linhas de texto do painel: título, tipos, saldo e indisponíveis. */
+  const linhasDoPainel =
+    1 + tipos.length + (comSaldo ? 1 : 0) + indisponiveis.length;
   const indices = Array.from({ length: meses }, (_, i) => i);
   const daVezValido = Math.min(Math.max(daVez, 0), meses - 1);
 
@@ -234,52 +238,61 @@ export function GraficoMensal({
             </button>
           ))}
         </div>
-        {aberto !== null ? (
-          <div
-            id={idPainel}
-            role="tooltip"
-            className={`dashboard__dica-mes dashboard__dica-mes--${posicao?.lado ?? "depois"}`}
-            style={{
-              ["--coluna" as string]: String(aberto),
-              ["--colunas" as string]: String(meses),
-              ["--espaco" as string]: String(posicao?.espaco ?? 1),
-            }}
-          >
-            <p className="dashboard__dica-mes-titulo">
-              {nomeDoMes(aberto)} de {ano}
-            </p>
-            <dl className="dashboard__dica-mes-lista">
-              {tipos.map((t) => (
-                <div key={t}>
-                  <dt>
-                    <span
-                      className={`dashboard__marca dashboard__marca--${t}`}
-                      aria-hidden="true"
-                    />
-                    {nomeDoTipo(t)}
-                  </dt>
-                  <dd>{valor(t, aberto)}</dd>
-                </div>
-              ))}
-              {comSaldo ? (
-                <div>
-                  <dt>{rotuloDoSaldo}</dt>
-                  <dd>
-                    {sinal(
-                      valor("admissao", aberto) - valor("desligamento", aberto),
-                    )}
-                  </dd>
-                </div>
-              ) : null}
-              {indisponiveis.map((nome) => (
-                <div key={nome} className="dashboard__dica-mes-indisponivel">
-                  <dt>{nome}</dt>
-                  <dd>indisponível</dd>
-                </div>
-              ))}
-            </dl>
-          </div>
-        ) : null}
+        {/* A vaga do painel: espaço reservado aqui, dentro do gráfico, com a
+            altura das linhas do painel — aberto, ele nunca sai do bloco nem
+            cobre o que vem depois. */}
+        <div
+          className="dashboard__vaga-do-painel"
+          style={{ ["--linhas-do-painel" as string]: String(linhasDoPainel) }}
+        >
+          {aberto !== null ? (
+            <div
+              id={idPainel}
+              role="tooltip"
+              className={`dashboard__dica-mes dashboard__dica-mes--${posicao?.lado ?? "depois"}`}
+              style={{
+                ["--coluna" as string]: String(aberto),
+                ["--colunas" as string]: String(meses),
+                ["--espaco" as string]: String(posicao?.espaco ?? 1),
+              }}
+            >
+              <p className="dashboard__dica-mes-titulo">
+                {nomeDoMes(aberto)} de {ano}
+              </p>
+              <dl className="dashboard__dica-mes-lista">
+                {tipos.map((t) => (
+                  <div key={t}>
+                    <dt>
+                      <span
+                        className={`dashboard__marca dashboard__marca--${t}`}
+                        aria-hidden="true"
+                      />
+                      {nomeDoTipo(t)}
+                    </dt>
+                    <dd>{valor(t, aberto)}</dd>
+                  </div>
+                ))}
+                {comSaldo ? (
+                  <div>
+                    <dt>{rotuloDoSaldo}</dt>
+                    <dd>
+                      {sinal(
+                        valor("admissao", aberto) -
+                          valor("desligamento", aberto),
+                      )}
+                    </dd>
+                  </div>
+                ) : null}
+                {indisponiveis.map((nome) => (
+                  <div key={nome} className="dashboard__dica-mes-indisponivel">
+                    <dt>{nome}</dt>
+                    <dd>indisponível</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          ) : null}
+        </div>
       </div>
     </div>
   );
