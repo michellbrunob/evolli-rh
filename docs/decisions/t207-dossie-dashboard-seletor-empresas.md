@@ -3,10 +3,10 @@
 ## 1. Situação
 
 - **Estado:** implementada e validada localmente, em revisão na PR #200 (Draft), sem Ready e sem
-  merge (seções 16 a 22). As decisões V-1 a V-6, E-1 a E-4 e P-1 foram aprovadas em 2026-11-10,
+  merge (seções 16 a 23). As decisões V-1 a V-6, E-1 a E-4 e P-1 foram aprovadas em 2026-11-10,
   conforme a recomendação (seção 13.1), e a validação visual foi aprovada pela proprietária no
   mesmo dia. Os achados das revisões adversariais da PR foram corrigidos na própria entrega
-  (seções 20, 21 e 22). A preparação (levantamento e decisões, seções 2 a 15) foi feita antes, sem código de
+  (seções 20 a 23). A preparação (levantamento e decisões, seções 2 a 15) foi feita antes, sem código de
   produto.
 - **Branch:** `codex/t207-dashboard-seletor-empresas`, a partir do squash
   `512d24914519fed335a900b18cab690832e8f121` (T206 integrada, PR #199).
@@ -359,12 +359,16 @@ V-1 a V-6, E-1 a E-4 e P-1 valem como aprovadas (seção 13), com estes detalhes
 - **Quadro de colaboradores:** título, subtítulo, botão de informação, pessoas ativas hoje e os
   totais de entradas, saídas e saldo do ano. Duas vistas com os mesmos números:
   - gráfico: um botão por mês (uma parada de Tab; setas, Home e End sem volta; Escape fecha o
-    painel e o foco fica no mês); o painel do mês fica ao lado da coluna, no lado com mais colunas
-    livres e com a largura limitada a elas — nunca sobre a coluna, nunca além da borda; sem
-    largura útil ao lado (um mês só, ano curto ou gráfico estreito, pela largura medida do
-    gráfico), abre abaixo das barras; o texto de cada linha encolhe e quebra, nunca passa da
-    caixa; o painel recebe o ponteiro (WCAG 1.4.13): encosta na coluna vizinha, sem fresta de outra
-    coluna, e o ponteiro vai da coluna ao painel sem trocar de mês; é a descrição do botão focado, sem
+    painel e o foco fica no mês); o painel do mês abre logo abaixo da faixa das colunas (abaixo
+    das barras e dos nomes dos meses), alinhado ao mês aberto: pela borda esquerda do mês quando se
+    estende para o lado depois, pela borda direita quando se estende para o lado antes — o lado com
+    mais colunas livres, com a largura limitada a elas; não cobre nenhum mês e nunca passa da
+    borda; sem largura útil (um mês só, ano curto ou gráfico estreito, pela largura medida do
+    gráfico), entra no fluxo abaixo das barras, na largura do gráfico; o texto de cada linha
+    encolhe e quebra, nunca passa da caixa; o painel recebe o ponteiro (WCAG 1.4.13): o ponteiro
+    desce da coluna ao painel sem cruzar outro mês, e a varredura de Janeiro a Novembro alcança
+    todos os meses sem sair do gráfico; aberto, o painel pode ficar por cima do conteúdo logo
+    abaixo do gráfico (texto do bloco e o topo do bloco seguinte), até fechar; é a descrição do botão focado, sem
     região viva; aberto pelo ponteiro, Escape fecha de qualquer lugar sem mover o foco;
   - tabela: Mês, Ativos no fim, Entradas, Saídas e Turnover, com total.
 - **Menu de ações (reticências):** só nos blocos com dado real (Quadro de colaboradores,
@@ -485,7 +489,7 @@ Cada um com teste que falhava antes da correção:
 
 ### 18.1 Testes automatizados
 
-- `DashboardScreen.test.tsx` (135 testes): as garantias da T205 reescritas sobre a estrutura nova
+- `DashboardScreen.test.tsx` (137 testes): as garantias da T205 reescritas sobre a estrutura nova
   (nenhuma removida); cinco abas, rota e foco; cards honestos; Quadro de colaboradores (título,
   subtítulo, informação por ponteiro, foco, clique e Escape, sem região viva), gráfico com painel
   por mês (teclado, ponteiro, Escape, `aria-describedby`, posição), tabela com "—" lido como
@@ -508,7 +512,7 @@ Cada um com teste que falhava antes da correção:
 - `rotasDoShell.dashboard.test.ts` (24), `SeletorEmpresaAtiva.test.tsx` (44, com o selo "Atual"
   abaixo do nome) e `paletaEvolli.test.ts` (15, com as regras do menu fora do Hub): rota das abas,
   seletor e paleta.
-- Suíte web completa: 129 arquivos, 3648 testes. API unitária: 60 suítes, 1472 testes. E2E
+- Suíte web completa: 129 arquivos, 3650 testes. API unitária: 60 suítes, 1472 testes. E2E
   serial com PostgreSQL real: 20 suítes, 1017 testes. Scripts: 182 testes. Lint, typecheck e
   build verdes. A API não mudou; a API unitária e o E2E rodaram como regressão. (Numa rodada da
   validação anterior, um teste de Nova admissão — arquivo que a T207 não altera — estourou o
@@ -517,8 +521,8 @@ Cada um com teste que falhava antes da correção:
 
 ### 18.2 Mutações
 
-62 mutações temporárias, todas detectadas (33 da primeira bateria, 16 da revisão da seção 20,
-7 da revisão da seção 21 e 6 da seção 22).
+64 mutações temporárias, todas detectadas (33 da primeira bateria, 16 da revisão da seção 20,
+7 da revisão da seção 21, 6 da seção 22 e 2 da seção 23).
 
 Da primeira bateria, 33 que continuam válidas:
 
@@ -533,7 +537,7 @@ Da primeira bateria, 33 que continuam válidas:
   já desmontada;
 - menu: Escape sem devolver o foco, setas sem volta, clique fora sem fechar, menu atrás do
   cabeçalho fixo, rolagem sem caixa desenhada, menu num bloco sem dados;
-- informação: foco sem abrir; gráfico: painel começando sobre a coluna inspecionada;
+- informação: foco sem abrir; gráfico: painel desalinhado do mês aberto;
 - tela e shell: hora da leitura repetida ao lado de "Atualizar", vista sem repasse ao shell, vista
   que sobrevive à troca de empresa, nome da barra anunciado ao leitor, cor da paleta no
   cabeçalho, aba inválida aceita na rota;
@@ -561,21 +565,21 @@ Prévia local da branch, com dados sintéticos (duas empresas, contas de cada pa
 impressão foram exercitados interceptando o arquivo e o diálogo na própria página, sem salvar
 arquivo nem abrir o diálogo nativo.
 
-| Verificação                  | Resultado                                                                                                                                                                              |
-| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| RH                           | Aterrissa no Dashboard; foco no título uma vez; "Dashboard" na barra; nove blocos na ordem; três menus de ações; hora da leitura uma vez, no Resumo.                                   |
-| DP                           | Dashboard com os mesmos blocos e menus.                                                                                                                                                |
-| `master_tecnico` sem empresa | Orientação para escolher a empresa, sem consulta.                                                                                                                                      |
-| `master_tecnico` com empresa | Seletor abre na empresa atual; Escape fecha e devolve o foco; a escolha anuncia a troca, lê os dados e foca o título.                                                                  |
-| Gestor                       | Minha equipe; a rota do Dashboard não abre para o papel.                                                                                                                               |
-| Perfis sem shell             | Colaborador e administração técnica ficam no Hub.                                                                                                                                      |
-| Troca de empresa             | Conta com duas empresas: tabela escolhida sobrevive ao Hub e volta ao gráfico na outra empresa; totais da empresa nova; foco no título.                                                |
-| Privacidade                  | Empresa com uma pessoa ativa: Distribuição e Tempo de casa "Não exibido por privacidade", sem menu.                                                                                    |
-| Guarda de edição pendente    | Admissão em rascunho + troca pelo seletor: "Continuar editando" com o foco; rascunho e empresa preservados.                                                                            |
-| URL e histórico              | Ano anterior cria entrada; voltar e avançar percorrem os anos com releitura; aba Pessoas com rota própria; recarga mantém a rota.                                                      |
-| CSV                          | Quadro e Distribuição: BOM, ponto e vírgula, "—" no que não tem fonte, empresa e ano no nome, sem dado pessoal.                                                                        |
-| Impressão/PDF                | Só o quadro, na vista de tabela, com empresa e período no topo; menu lateral e cabeçalho fora; tudo desfeito depois da impressão.                                                      |
-| 375 px                       | Sem rolagem horizontal; painel de informação dentro da tela, Escape fecha; menu abaixo do cabeçalho; painel do mês dentro da tela, sem cobrir a coluna; tabela rola no próprio quadro. |
+| Verificação                  | Resultado                                                                                                                                                                                             |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| RH                           | Aterrissa no Dashboard; foco no título uma vez; "Dashboard" na barra; nove blocos na ordem; três menus de ações; hora da leitura uma vez, no Resumo.                                                  |
+| DP                           | Dashboard com os mesmos blocos e menus.                                                                                                                                                               |
+| `master_tecnico` sem empresa | Orientação para escolher a empresa, sem consulta.                                                                                                                                                     |
+| `master_tecnico` com empresa | Seletor abre na empresa atual; Escape fecha e devolve o foco; a escolha anuncia a troca, lê os dados e foca o título.                                                                                 |
+| Gestor                       | Minha equipe; a rota do Dashboard não abre para o papel.                                                                                                                                              |
+| Perfis sem shell             | Colaborador e administração técnica ficam no Hub.                                                                                                                                                     |
+| Troca de empresa             | Conta com duas empresas: tabela escolhida sobrevive ao Hub e volta ao gráfico na outra empresa; totais da empresa nova; foco no título.                                                               |
+| Privacidade                  | Empresa com uma pessoa ativa: Distribuição e Tempo de casa "Não exibido por privacidade", sem menu.                                                                                                   |
+| Guarda de edição pendente    | Admissão em rascunho + troca pelo seletor: "Continuar editando" com o foco; rascunho e empresa preservados.                                                                                           |
+| URL e histórico              | Ano anterior cria entrada; voltar e avançar percorrem os anos com releitura; aba Pessoas com rota própria; recarga mantém a rota.                                                                     |
+| CSV                          | Quadro e Distribuição: BOM, ponto e vírgula, "—" no que não tem fonte, empresa e ano no nome, sem dado pessoal.                                                                                       |
+| Impressão/PDF                | Só o quadro, na vista de tabela, com empresa e período no topo; menu lateral e cabeçalho fora; tudo desfeito depois da impressão.                                                                     |
+| 375 px                       | Sem rolagem horizontal; painel de informação dentro da tela, Escape fecha; menu abaixo do cabeçalho; painel do mês dentro da tela, abaixo das colunas, sem cobrir mês; tabela rola no próprio quadro. |
 
 ### 18.4 Referências
 
@@ -691,3 +695,28 @@ anterior) e mutação detectada:
    pinta o texto de branco, e o símbolo da marca, que usa essa cor no fundo, virava um quadrado
    branco com as barras brancas. A faixa passou a usar a variante clara do símbolo (quadrado claro,
    barras em azul), a mesma da tela de entrada. O teste falhava no head anterior.
+
+## 23. Revisão adversarial final da PR #200 (G1)
+
+**Painel do mês cobria os meses vizinhos (G1):** com o painel recebendo o ponteiro (seção 22, item
+6), ele abria ao lado da coluna, por cima dos meses vizinhos (no desktop, dois a três meses; a
+375 px, até sete). Enquanto ficava aberto, esses meses não recebiam o ponteiro nem o toque, e a
+varredura pelos meses pulava colunas.
+
+Correção: o painel abre logo abaixo da faixa das colunas (barras e nomes dos meses), alinhado ao
+mês aberto — pela borda esquerda quando se estende para depois, pela direita quando se estende
+para antes —, com a mesma largura máxima e a mesma regra para gráfico estreito (seção 16.2).
+
+- Prova de falha: o teste do CSS (painel lateral abaixo da faixa e alinhado ao mês) falhava no
+  head anterior.
+- Mutações detectadas: o painel de volta ao topo da faixa das colunas; o lado "antes" com o
+  alinhamento antigo. A mutação da primeira bateria sobre a posição do lado "depois" passou a ser
+  o desalinhamento do mês aberto.
+- Ao vivo, no desktop e a 375 px: varredura de Janeiro a Novembro com o ponteiro, sem sair do
+  gráfico — os 11 meses abertos em sequência, nenhuma coluna coberta, o painel começando onde
+  termina a faixa das colunas; o ponteiro desce da coluna ao painel e o mês continua o mesmo;
+  clique ou toque num mês com outro painel aberto abre o mês tocado; Escape fecha e o foco fica
+  no mês; sem rolagem horizontal a 375 px.
+- Limite observado: aberto, o painel pode ficar por cima do conteúdo logo abaixo do gráfico. No
+  desktop medido, em alguns meses, ele cobre o botão de ações do bloco seguinte até fechar
+  (ponteiro fora do gráfico, Escape ou foco fora do mês).
